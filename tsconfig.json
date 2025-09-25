@@ -5,6 +5,9 @@
   "references": [
     {
       "path": "./apps/bublys-os"
+    },
+    {
+      "path": "./bublys-libs/state-management"
     }
   ]
 }

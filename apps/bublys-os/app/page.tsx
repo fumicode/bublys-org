@@ -1,5 +1,6 @@
 'use client';
 import styled from 'styled-components';
+import { stateManagement } from '@bublys-org/state-management';
 
 const StyledPage = styled.div`
   .page {
@@ -14,6 +15,7 @@ export default function Index() {
    */
   return (
     <StyledPage>
+      {stateManagement()}
       <div className="wrapper">
         <div className="container">
           <div id="welcome">
