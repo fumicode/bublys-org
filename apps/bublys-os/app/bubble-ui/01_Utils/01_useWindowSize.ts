@@ -1,4 +1,4 @@
-import { Size2 } from "../BubblesUI/domain/Bubbles.domain";
+import { Size2 } from "@bublys-org/bubbles-ui";
 import { useLayoutEffect, useState } from "react";
 
 export const useWindowSize = (): Size2 => {

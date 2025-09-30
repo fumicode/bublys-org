@@ -1,11 +1,11 @@
 import { FC, useContext } from "react";
-import { Bubble } from "../domain/Bubbles.domain";
-import { Point2 } from "../../01_Utils/00_Point";
+import { Bubble } from "@bublys-org/bubbles-ui";
+import { Point2 } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 import { Button } from "@mui/material";
-import { useAppDispatch } from "@ep2as-apps/redux-store";
+import { useAppDispatch } from "@bublys-org/state-management"
 
-import { moveTo as moveToAction } from "@ep2as-apps/redux-store";
+import { moveTo as moveToAction } from "@bublys-org/state-management"
 import { useMyRect } from "../../01_Utils/01_useMyRect";
 
 export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {

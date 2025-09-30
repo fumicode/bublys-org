@@ -1,7 +1,7 @@
 import { FC, Fragment } from "react";
 import styled from "styled-components";
-import { Bubble, BubblesProcess } from "../domain/Bubbles.domain";
-import { Point2, Vec2 } from "../../01_Utils/00_Point";
+import { Bubble, BubblesProcess } from "@bublys-org/bubbles-ui"
+import { Point2, Vec2 } from "@bublys-org/bubbles-ui"
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 

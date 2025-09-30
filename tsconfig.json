@@ -8,6 +8,9 @@
     },
     {
       "path": "./bublys-libs/state-management"
+    },
+    {
+      "path": "./bublys-libs/bubbles-ui"
     }
   ]
 }

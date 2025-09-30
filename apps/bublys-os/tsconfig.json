@@ -31,7 +31,8 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "../../bublys-libs/bubbles-ui/src/lib/Bubbles.domain.ts"
   ],
   "exclude": [
     "out-tsc",
@@ -48,6 +49,9 @@
     "eslint.config.mjs"
   ],
   "references": [
+    {
+      "path": "../../bublys-libs/bubbles-ui"
+    },
     {
       "path": "../../bublys-libs/state-management"
     }
