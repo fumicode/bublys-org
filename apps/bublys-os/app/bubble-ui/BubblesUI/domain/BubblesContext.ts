@@ -1,6 +1,6 @@
 import { createContext } from "react";
-import { Size2 } from "../../01_Utils/00_Point";
-import { BubblesProcess } from "./Bubbles.domain"
+import { Size2 } from "@bublys-org/bubbles-ui";
+import { BubblesProcess } from "@bublys-org/bubbles-ui";
 import SmartRect from "./01_SmartRect";
 
 type BubblesContextType = {

@@ -1,5 +1,5 @@
 {
-  "name": "@bublys-org/state-management",
+  "name": "@bublys-org/bubbles-ui",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -20,9 +20,6 @@
     }
   },
   "dependencies": {
-    "@reduxjs/toolkit": "^2.9.0",
-    "react-redux": "^9.2.0",
-    "@bublys-org/bubbles-ui": "*"
   },
   "nx": {
     "targets": {

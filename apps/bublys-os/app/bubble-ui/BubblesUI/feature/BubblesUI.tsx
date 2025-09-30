@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from "react";
-import { useAppSelector, useAppDispatch } from "@ep2as-apps/redux-store";
+import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
 import {
   selectBubbles,
   deleteBubble as deleteBubbleAction,
@@ -9,12 +9,12 @@ import {
   popChild as popChildAction,
   joinSibling as joinSiblingAction,
   renameBubble as renameBubbleAction,
-} from "@ep2as-apps/redux-store";
-import { Bubble, BubblesProcess } from "@ep2as-apps/vue-domain";
+} from "@bublys-org/state-management"
+import { Bubble, BubblesProcess } from "@bublys-org/bubbles-ui";
+import { Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import { Point2 } from "../../01_Utils/00_Point";
 import SmartRect from "../domain/01_SmartRect";
 import { Box, Button, Slider, Typography } from "@mui/material";
 
@@ -142,7 +142,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         </Button>
         {additionalButton}
       </Box>
-      <PositionDebuggerProvider isShown={true}>
+      <PositionDebuggerProvider isShown={false}>
         <BubblesContext.Provider
           value={{
             pageSize,

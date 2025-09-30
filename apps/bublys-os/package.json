@@ -3,8 +3,30 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
     "next": "~15.2.4",
     "react": "19.0.0",
     "react-dom": "19.0.0"
+  },
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": [
+          {
+            "projects": [
+              "@bublys-org/state-management",
+              "@bublys-org/bubbles-ui"
+            ],
+            "target": "dev"
+          }
+        ],
+        "continuous": true
+      }
+    }
   }
 }

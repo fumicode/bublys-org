@@ -1,7 +1,7 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { Bubble } from "../domain/Bubbles.domain";
-import { Point2, Vec2 } from "../../01_Utils/00_Point";
+import { Bubble } from "@bublys-org/bubbles-ui"
+import { Point2, Vec2 } from "@bublys-org/bubbles-ui"
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
