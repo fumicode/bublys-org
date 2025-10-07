@@ -201,6 +201,7 @@ export const BubbleView: FC<BubbleProps> = ({
         Type: {bubble.type}
         <br /> */}
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
+        [{bubble.size?.width}x{bubble.size?.height}]
       </main>
     </StyledBubble>
   );

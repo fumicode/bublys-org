@@ -1,5 +1,6 @@
 import { FC, useEffect, useState } from "react";
 import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
+
 import {
   selectBubbles,
   deleteBubble as deleteBubbleAction,
@@ -9,7 +10,8 @@ import {
   popChild as popChildAction,
   joinSibling as joinSiblingAction,
   renameBubble as renameBubbleAction,
-} from "@bublys-org/state-management"
+} from "@bublys-org/bubbles-ui-state"
+
 import { Bubble, BubblesProcess } from "@bublys-org/bubbles-ui";
 import { Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
@@ -99,6 +101,29 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <>
+      <PositionDebuggerProvider isShown={true}>
+        <BubblesContext.Provider
+          value={{
+            pageSize,
+            bubbles,
+            openBubble: popChildOrJoinSibling,
+            renameBubble: (id: string, newName: string) => {
+              dispatch(renameBubbleAction({ id, newName }));
+              return id;
+            },
+          }}
+        >
+          <BubblesLayeredView
+            bubbles={bubbles}
+            vanishingPoint={vanishingPoint}
+            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+            onBubbleClose={deleteBubble}
+            onBubbleMove={onMove}
+            onBubbleLayerDown={layerDown}
+            onBubbleLayerUp={layerUp}
+          />
+        </BubblesContext.Provider>
+      </PositionDebuggerProvider>
       <Box
         sx={{
           position: "fixed",
@@ -142,29 +167,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         </Button>
         {additionalButton}
       </Box>
-      <PositionDebuggerProvider isShown={false}>
-        <BubblesContext.Provider
-          value={{
-            pageSize,
-            bubbles,
-            openBubble: popChildOrJoinSibling,
-            renameBubble: (id: string, newName: string) => {
-              dispatch(renameBubbleAction({ id, newName }));
-              return id;
-            },
-          }}
-        >
-          <BubblesLayeredView
-            bubbles={bubbles}
-            vanishingPoint={vanishingPoint}
-            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-            onBubbleClose={deleteBubble}
-            onBubbleMove={onMove}
-            onBubbleLayerDown={layerDown}
-            onBubbleLayerUp={layerUp}
-          />
-        </BubblesContext.Provider>
-      </PositionDebuggerProvider>
+
     </>
   );
 };

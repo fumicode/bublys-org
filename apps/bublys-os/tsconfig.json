@@ -50,10 +50,10 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/bubbles-ui"
+      "path": "../../bublys-libs/bubbles-ui-state"
     },
     {
-      "path": "../../bublys-libs/state-management"
+      "path": "../../bublys-libs/bubbles-ui"
     }
   ]
 }

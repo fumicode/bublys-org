@@ -1,6 +1,6 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { counterSlice } from "./slices/counter-slice.js";
-import { bubblesSlice } from "./slices/bubbles-slice.js";
+import { bubblesSlice } from "@bublys-org/bubbles-ui-state";
 
 const reducers = combineReducers({
   [counterSlice.reducerPath]: counterSlice.reducer,

@@ -1,5 +1,4 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import type { RootState } from "../store.js";
 import { Bubble, BubblesProcess, BubbleState } from "@bublys-org/bubbles-ui"
 
 // Redux ストアに保持する型（純粋なプレーンオブジェクトの二次元配列）
@@ -155,7 +154,7 @@ export const {
 } = bubblesSlice.actions;
 
 // 外部向けセレクター：保存されたプレーンオブジェクトをクラスインスタンスに変換して返す
-export const selectBubbles = (state: RootState): BubblesProcess => {
+export const selectBubbles = (state: { bubbleState: { bubblesProcess: BubblesProcessState } } ): BubblesProcess => {
   const ret = state.bubbleState.bubblesProcess.map((layer) =>
     layer.map((bubbleState) => Bubble.fromJSON(bubbleState))
   );

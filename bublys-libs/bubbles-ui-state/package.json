@@ -1,15 +1,17 @@
 {
-  "name": "@bublys-org/state-management",
+  "name": "@bublys-org/bubbles-ui-state",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+
   "scripts": {
     "build": "tsc -p tsconfig.lib.json",
     "dev": "tsc -p tsconfig.lib.json --watch"
   },
+
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -19,18 +21,17 @@
       "default": "./dist/index.js"
     }
   },
+
   "dependencies": {
     "@reduxjs/toolkit": "^2.9.0",
-    "react-redux": "^9.2.0",
-    "@bublys-org/bubbles-ui-state": "*"
+    "@bublys-org/bubbles-ui": "*"
   },
   "nx": {
     "targets": {
       "dev": {
         "dependsOn": [
-          
           {"projects": [
-            "@bublys-org/bubbles-ui-state"
+            "@bublys-org/bubbles-ui"
           ],
           "target": "dev"}
         ],
