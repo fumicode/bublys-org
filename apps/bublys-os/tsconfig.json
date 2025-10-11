@@ -54,6 +54,9 @@
     },
     {
       "path": "../../bublys-libs/bubbles-ui"
+    },
+    {
+      "path": "../../bublys-libs/state-management"
     }
   ]
 }
