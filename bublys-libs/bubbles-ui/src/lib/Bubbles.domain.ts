@@ -1,7 +1,5 @@
 import { Point2, Size2 } from "./00_Point.js";
 
-export type BubblesProcess = Bubble[][];
-
 export type BubbleProps = {
   id?: string;
   name: string;

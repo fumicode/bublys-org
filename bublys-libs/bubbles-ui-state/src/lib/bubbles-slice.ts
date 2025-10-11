@@ -1,8 +1,10 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { Bubble, BubblesProcess, BubbleState } from "@bublys-org/bubbles-ui"
-
-// Redux ストアに保持する型（純粋なプレーンオブジェクトの二次元配列）
-export type BubblesProcessState = BubbleState[][];
+import {
+  Bubble,
+  BubbleState,
+  BubblesProcess,
+  BubblesProcessState,
+} from "@bublys-org/bubbles-ui";
 
 const bubblesProcess = [
   [
@@ -41,83 +43,43 @@ export const bubblesSlice = createSlice({
   initialState: bubbleState,
   reducers: {
     deleteBubble: (state, action: PayloadAction<string>) => {
-      //state は writable な状態なので、直接変更して良い
-      const id = action.payload;
-
-      state.bubblesProcess = state.bubblesProcess
-        .map((layer) => layer.filter((bubble) => bubble.id !== id))
-        .filter((layer) => layer.length > 0);
+      const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+      const next = proc.deleteBubble(action.payload);
+      state.bubblesProcess = next.toJSON();
     },
     layerDown: (state, action: PayloadAction<string>) => {
-      //state は writable な状態なので、直接変更して良い
-
-      const id = action.payload;
-      const layerIdx = state.bubblesProcess.findIndex((layer) =>
-        layer.some((bubble) => bubble.id === id)
-      );
-      if (layerIdx < 0 || layerIdx >= state.bubblesProcess.length - 1) return;
-      const bubbleIdx = state.bubblesProcess[layerIdx].findIndex(
-        (bubble) => bubble.id === id
-      );
-      if (bubbleIdx < 0) return;
-
-      const [bubble] = state.bubblesProcess[layerIdx].splice(bubbleIdx, 1);
-      state.bubblesProcess[layerIdx + 1].push(bubble);
+      const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+      const next = proc.layerDown(action.payload);
+      state.bubblesProcess = next.toJSON();
     },
     layerUp: (state, action: PayloadAction<string>) => {
-      //state は writable な状態なので、直接変更して良い
-      const id = action.payload;
-      const layerIdx = state.bubblesProcess.findIndex((layer) =>
-        layer.some((bubble) => bubble.id === id)
-      );
-      if (layerIdx <= 0) return;
-      const bubbleIdx = state.bubblesProcess[layerIdx].findIndex(
-        (bubble) => bubble.id === id
-      );
-      if (bubbleIdx < 0) return;
-
-      const [bubble] = state.bubblesProcess[layerIdx].splice(bubbleIdx, 1);
-      if (state.bubblesProcess[layerIdx].length === 0) {
-        state.bubblesProcess.splice(layerIdx, 1);
-      }
-      state.bubblesProcess[layerIdx - 1].push(bubble);
+      const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+      const next = proc.layerUp(action.payload);
+      state.bubblesProcess = next.toJSON();
     },
     moveTo: (
       state,
       action: PayloadAction<{ id: string; position: { x: number; y: number } }>
     ) => {
-      //state は writable な状態なので、直接変更して良い
-
-      const id = action.payload.id;
-      const bubble = findBubbleFromRepo(state.bubblesProcess, id);
-      if (!bubble) return;
-
-      const movedBubble = bubble.moveTo(action.payload.position);
-
-      state.bubblesProcess = state.bubblesProcess.map((layer) =>
-        layer.map((bubble) =>
-          bubble.id === id ? movedBubble.toJSON() : bubble
-        )
-      );
+      const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+      const next = proc.moveTo(action.payload.id, action.payload.position);
+      state.bubblesProcess = next.toJSON();
     },
     popChild: {
       reducer: (state, action: PayloadAction<BubbleState>) => {
-        //state は writable な状態なので、直接変更して良い
-        state.bubblesProcess.unshift([action.payload]);
+        const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+        const bubble = Bubble.fromJSON(action.payload);
+        const next = proc.popChild(bubble);
+        state.bubblesProcess = next.toJSON();
       },
       prepare: (bubble: Bubble) => ({ payload: bubble.toJSON() }),
     },
     joinSibling: {
       reducer: (state, action: PayloadAction<BubbleState>) => {
-        //state は writable な状態なので、直接変更して良い
-
-        const bubbleState = action.payload;
-
-        if (state.bubblesProcess.length === 0) {
-          state.bubblesProcess.push([bubbleState]);
-        } else {
-          state.bubblesProcess[0].push(bubbleState);
-        }
+        const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+        const bubble = Bubble.fromJSON(action.payload);
+        const next = proc.joinSibling(bubble);
+        state.bubblesProcess = next.toJSON();
       },
       prepare: (bubble: Bubble) => ({ payload: bubble.toJSON() }),
     },
@@ -125,20 +87,9 @@ export const bubblesSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; newName: string }>
     ) => {
-      const bubble = findBubbleFromRepo(
-        state.bubblesProcess,
-        action.payload.id
-      );
-      if (!bubble) return;
-
-      const id = action.payload.id;
-      const renamedBubble = bubble.rename(action.payload.newName);
-
-      state.bubblesProcess = state.bubblesProcess.map((layer) =>
-        layer.map((bubble) =>
-          bubble.id === id ? renamedBubble.toJSON() : bubble
-        )
-      );
+      const proc = BubblesProcess.fromJSON(state.bubblesProcess);
+      const next = proc.renameBubble(action.payload.id, action.payload.newName);
+      state.bubblesProcess = next.toJSON();
     },
   },
 });
@@ -153,25 +104,9 @@ export const {
   renameBubble,
 } = bubblesSlice.actions;
 
-// 外部向けセレクター：保存されたプレーンオブジェクトをクラスインスタンスに変換して返す
-export const selectBubbles = (state: { bubbleState: { bubblesProcess: BubblesProcessState } } ): BubblesProcess => {
-  const ret = state.bubbleState.bubblesProcess.map((layer) =>
-    layer.map((bubbleState) => Bubble.fromJSON(bubbleState))
-  );
-  return ret;
-};
-
-export const findBubbleFromRepo = (
-  state: BubblesProcessState,
-  id: string
-): Bubble | undefined => {
-  const bubblesState = state;
-  for (const layer of bubblesState) {
-    for (const bubbleState of layer) {
-      if (bubbleState.id === id) {
-        return Bubble.fromJSON(bubbleState);
-      }
-    }
-  }
-  return undefined;
+// 外部向けセレクター：BubblesProcess クラスを返す
+export const selectBubbles = (
+  state: { bubbleState: { bubblesProcess: BubblesProcessState } }
+): BubblesProcess => {
+  return BubblesProcess.fromJSON(state.bubbleState.bubblesProcess);
 };
