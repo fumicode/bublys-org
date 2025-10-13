@@ -2,7 +2,6 @@ import { World } from './World';
 
 /**
  * WorldLineGit クラス
- * gitリポジトリのような構造で世界線を管理
  */
 export class WorldLineGit {
   public readonly worlds: Map<string, World>;

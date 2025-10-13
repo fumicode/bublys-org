@@ -60,14 +60,6 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     }
   }, []);
 
-  // 指定された世界から新しいブランチを作成
-  const createBranch = useCallback((fromWorldId: string) => {
-    try {
-      setWorldLineGit(prev => prev.createBranch(fromWorldId));
-    } catch (error) {
-      console.error('Create branch failed:', error);
-    }
-  }, []);
 
   // 現在の世界線で子要素に移動（Ctrl+Shift+Z）
   const undo = useCallback(() => {
@@ -114,21 +106,12 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     setIsModalOpen(false);
   }, []);
 
-  // ルート世界にリセット
-  const resetToRoot = useCallback(() => {
-    if (!worldLineGit.rootWorldId) return;
-    
-    setWorldLineGit(prev => prev.checkout(prev.rootWorldId!));
-  }, [worldLineGit.rootWorldId]);
 
   // ヘルパー関数
   const getAllWorlds = useCallback(() => {
     return worldLineGit.getAllWorlds();
   }, [worldLineGit]);
 
-  const getWorldHistory = useCallback((worldId: string) => {
-    return worldLineGit.getWorldHistory(worldId);
-  }, [worldLineGit]);
 
   const getWorldTree = useCallback(() => {
     return worldLineGit.getWorldTree();
@@ -154,17 +137,13 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
   }, [undo, showAllWorldLines]);
 
   const contextValue: WorldLineGitContextType = {
-    worldLineGit,
     currentWorld,
     currentWorldId,
     updateCounter,
     checkout,
-    createBranch,
     undo,
     showAllWorldLines,
-    resetToRoot,
     getAllWorlds,
-    getWorldHistory,
     getWorldTree,
     isModalOpen,
     closeModal,
