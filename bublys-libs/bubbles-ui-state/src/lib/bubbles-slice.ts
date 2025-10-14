@@ -4,6 +4,7 @@ import {
   BubbleState,
   BubblesProcess,
   BubblesProcessState,
+  BubblesProcessDPO,
 } from "@bublys-org/bubbles-ui";
 
 /**
@@ -138,15 +139,15 @@ export const selectProcess = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.process;
 
 /**
- * Returns nested arrays of BubbleState, resolving IDs via entities map.
+ * Returns a BubblesProcessDPO instance for the given state.
  */
-export const selectBubbles = (
+export const selectBubblesProcessDPO = (
   state: { bubbleState: BubbleStateSlice }
-): Bubble[][] => {
+): BubblesProcessDPO => {
   const { entities, process } = state.bubbleState;
-  return process.layers.map((layer) =>
-    layer.map((id) => Bubble.fromJSON(entities[id]))
-  );
+  const bubbles = Object.values(entities).map((s) => Bubble.fromJSON(s));
+  const processInstance = BubblesProcess.fromJSON(process);
+  return new BubblesProcessDPO(processInstance, bubbles);
 };
 
 export default bubblesSlice.reducer;

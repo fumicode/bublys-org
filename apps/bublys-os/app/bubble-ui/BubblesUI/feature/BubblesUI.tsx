@@ -2,7 +2,7 @@ import { FC, useEffect, useState } from "react";
 import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
 
 import {
-  selectBubbles,
+  selectBubblesProcessDPO,
   addBubble,
   deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
@@ -47,7 +47,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
-  const bubblesProcess = useAppSelector(selectBubbles);
+  const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
 
   // ページサイズ管理
   const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
@@ -86,7 +86,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openerRect?: SmartRect
   ): string => {
     const newBubble = createBubble(name);
-    const surface = bubblesProcess[0];
+    const surface = bubblesDPO.surface;
     if (surface?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble);
     } else {
@@ -106,7 +106,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         <BubblesContext.Provider
           value={{
             pageSize,
-            bubbles: bubblesProcess,
+            bubbles: bubblesDPO.layers,
             openBubble: popChildOrJoinSibling,
             renameBubble: (id: string, newName: string) => {
               dispatch(renameBubbleAction({ id, newName }));
@@ -114,15 +114,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             },
           }}
         >
-          <BubblesLayeredView
-            bubbles={bubblesProcess}
-            vanishingPoint={vanishingPoint}
-            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-            onBubbleClose={deleteBubble}
-            onBubbleMove={onMove}
-            onBubbleLayerDown={layerDown}
-            onBubbleLayerUp={layerUp}
-          />
+      <BubblesLayeredView
+        bubbles={bubblesDPO.layers}
+        vanishingPoint={vanishingPoint}
+        onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+        onBubbleClose={deleteBubble}
+        onBubbleMove={onMove}
+        onBubbleLayerDown={layerDown}
+        onBubbleLayerUp={layerUp}
+      />
         </BubblesContext.Provider>
       </PositionDebuggerProvider>
       <Box
