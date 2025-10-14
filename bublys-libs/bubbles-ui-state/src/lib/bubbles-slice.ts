@@ -13,7 +13,7 @@ import {
  * - process: BubblesProcessState holding layers of Bubble IDs
  */
 export interface BubbleStateSlice {
-  entities: Record<string, BubbleState>;
+  bubbles: Record<string, BubbleState>;
   process: BubblesProcessState;
 }
 
@@ -49,7 +49,7 @@ const initialProcess: BubblesProcessState = {
 
 // Combined initial state
 const initialState: BubbleStateSlice = {
-  entities: initialEntities,
+  bubbles: initialEntities,
   process: initialProcess,
 };
 
@@ -83,37 +83,36 @@ export const bubblesSlice = createSlice({
         .joinSibling(action.payload)
         .toJSON();
     },
-
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleState>) => {
-      state.entities[action.payload.id] = action.payload;
+      state.bubbles[action.payload.id] = action.payload;
     },
     moveBubble: (
       state,
       action: PayloadAction<{ id: string; position: { x: number; y: number } }>
     ) => {
       const { id, position } = action.payload;
-      const updated = Bubble.fromJSON(state.entities[id]).moveTo(position);
-      state.entities[id] = updated.toJSON();
+      const updated = Bubble.fromJSON(state.bubbles[id]).moveTo(position);
+      state.bubbles[id] = updated.toJSON();
     },
     renameBubble: (
       state,
       action: PayloadAction<{ id: string; newName: string }>
     ) => {
       const { id, newName } = action.payload;
-      const updated = Bubble.fromJSON(state.entities[id]).rename(newName);
-      state.entities[id] = updated.toJSON();
+      const updated = Bubble.fromJSON(state.bubbles[id]).rename(newName);
+      state.bubbles[id] = updated.toJSON();
     },
     resizeBubble: (
       state,
       action: PayloadAction<{ id: string; size: { width: number; height: number } }>
     ) => {
       const { id, size } = action.payload;
-      const updated = Bubble.fromJSON(state.entities[id]).resizeTo(size);
-      state.entities[id] = updated.toJSON();
+      const updated = Bubble.fromJSON(state.bubbles[id]).resizeTo(size);
+      state.bubbles[id] = updated.toJSON();
     },
     removeBubble: (state, action: PayloadAction<string>) => {
-      delete state.entities[action.payload];
+      delete state.bubbles[action.payload];
     },
   },
 });
@@ -131,22 +130,20 @@ export const {
   removeBubble,
 } = bubblesSlice.actions;
 
-// Selectors
-export const selectEntities = (state: { bubbleState: BubbleStateSlice }) =>
-  state.bubbleState.entities;
 
-export const selectProcess = (state: { bubbleState: BubbleStateSlice }) =>
-  state.bubbleState.process;
+// Selectors
+export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
+  new Bubble(state.bubbleState.bubbles[id]);
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.
  */
 export const selectBubblesProcessDPO = (
-  state: { bubbleState: BubbleStateSlice }
+  state: { bubbleState: BubbleStateSlice } //bubbleStateという名前は、bubblesSliceのnameと一致させる
 ): BubblesProcessDPO => {
-  const { entities, process } = state.bubbleState;
-  const bubbles = Object.values(entities).map((s) => Bubble.fromJSON(s));
-  const processInstance = BubblesProcess.fromJSON(process);
+  const { bubbles: bubblesJson, process: processJson } = state.bubbleState;
+  const bubbles = Object.values(bubblesJson).map((s) => Bubble.fromJSON(s));
+  const processInstance = BubblesProcess.fromJSON(processJson);
   return new BubblesProcessDPO(processInstance, bubbles);
 };
 

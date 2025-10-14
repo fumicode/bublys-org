@@ -18,7 +18,7 @@ describe("selectBubblesProcessDPO", () => {
     const processState = { layers: [[bubble1.id], [bubble2.id]] };
 
     const state: { bubbleState: BubbleStateSlice } = {
-      bubbleState: { entities, process: processState },
+      bubbleState: { bubbles: entities, process: processState },
     };
 
     // Act: get DPO

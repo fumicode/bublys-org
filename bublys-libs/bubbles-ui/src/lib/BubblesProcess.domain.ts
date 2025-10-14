@@ -3,15 +3,19 @@ import { produce } from "immer";
 // Redux store representation: process holds only Bubble IDs
 export interface BubblesProcessState {
   layers: string[][];
+  // e.g.
+  // [["A"], ["B", "C"], ["D"]]
 }
 
-// Internal state: same shape, IDs only
-interface BubblesProcessInternalState {
-  layers: string[][];
-}
 
 export class BubblesProcess {
-  private constructor(private state: BubblesProcessInternalState) {}
+  private state: BubblesProcessState
+
+  constructor(props: BubblesProcessState) {
+    const layers = props.layers;
+    //空のレイヤーがあったら削除する
+    this.state = { layers: layers.filter(layer => layer.length > 0) };
+  }
 
   /** Create from JSON with ID layers */
   static fromJSON(state: BubblesProcessState): BubblesProcess {
@@ -37,7 +41,7 @@ export class BubblesProcess {
 
   /** Immer producer helper */
   private apply(
-    producer: (draft: BubblesProcessInternalState) => void
+    producer: (draft: BubblesProcessState) => void
   ): BubblesProcess {
     const nextState = produce(this.state, producer);
     return new BubblesProcess(nextState);
