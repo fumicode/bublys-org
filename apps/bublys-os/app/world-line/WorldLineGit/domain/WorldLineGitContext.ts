@@ -14,6 +14,7 @@ export type WorldLineGitContextType = {
   checkout: (worldId: string) => void;
   undo: () => void; // Ctrl+Shift+Z: 現在の世界線で子要素に移動
   showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示
+  initialize: () => void; // 初期化
   
   // ヘルパー関数
   getAllWorlds: () => World[];
@@ -22,6 +23,10 @@ export type WorldLineGitContextType = {
   // モーダル関連
   isModalOpen: boolean;
   closeModal: () => void;
+  
+  // 初期化状態
+  isInitializing: boolean;
+  isInitialized: boolean;
 };
 
 /**
@@ -43,6 +48,9 @@ export const WorldLineGitContext = createContext<WorldLineGitContextType>({
   showAllWorldLines: () => {
     console.warn("showAllWorldLines not implemented");
   },
+  initialize: () => {
+    console.warn("initialize not implemented");
+  },
   getAllWorlds: () => {
     console.warn("getAllWorlds not implemented");
     return [];
@@ -55,4 +63,6 @@ export const WorldLineGitContext = createContext<WorldLineGitContextType>({
   closeModal: () => {
     console.warn("closeModal not implemented");
   },
+  isInitializing: false,
+  isInitialized: false,
 });
