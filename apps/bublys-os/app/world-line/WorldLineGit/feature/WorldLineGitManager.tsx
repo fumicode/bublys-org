@@ -1,105 +1,141 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { WorldLineGitContext, WorldLineGitContextType } from '../domain/WorldLineGitContext';
-import { WorldLineGit } from '../domain/WorldLineGit';
-import { World } from '../domain/World';
+import {
+  initialize,
+  updateState,
+  selectWorldLineGit,
+  selectHeadWorld,
+  useAppDispatch,
+  useAppSelector,
+  type WorldLineGitState,
+} from '@bublys-org/state-management';
 import { Counter } from '../domain/Counter';
+import { World } from '../domain/World';
+import { WorldLineGit } from '../domain/WorldLineGit';
 
 interface WorldLineGitManagerProps {
   children: React.ReactNode;
 }
 
 export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
-  const [worldLineGit, setWorldLineGit] = useState<WorldLineGit>(() => {
-    // 初期状態でルート世界を作成
-    const rootWorld = new World(crypto.randomUUID(), null, new Counter());
-    return new WorldLineGit(new Map([[rootWorld.worldId, rootWorld]]), rootWorld.worldId, rootWorld.worldId);
-  });
+  const dispatch = useAppDispatch();
+  
+  // Reduxから状態を取得
+  const worldLineGitState = useAppSelector(selectWorldLineGit);
+  const currentWorldState = useAppSelector(selectHeadWorld);
+  
+  // ドメインオブジェクトに変換
+  const worldLineGit = worldLineGitState ? WorldLineGit.fromJson(worldLineGitState) : null;
+  const currentWorld = currentWorldState ? World.fromJson(currentWorldState) : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  const currentWorld = worldLineGit.getHeadWorld();
-  const currentWorldId = worldLineGit.headWorldId;
+  // 初期化ハンドラー
+  const initializeHandler = useCallback(async () => {
+    if (isInitializing) return;
+    
+    setIsInitializing(true);
+    
+    try {
+      // 初期状態でルート世界を作成
+      const rootWorld = new World(
+        crypto.randomUUID(),
+        null,
+        new Counter(100),
+        crypto.randomUUID()
+      );
+      const initialWorldLineGit = new WorldLineGit(
+        new Map([[rootWorld.worldId, rootWorld]]),
+        rootWorld.worldId,
+        rootWorld.worldId
+      );
+      
+      // シリアライズ可能な形式に変換してReduxに送信
+      const serializedState = initialWorldLineGit.toJson() as WorldLineGitState;
+      dispatch(initialize(serializedState));
+    } catch (error) {
+      console.error('Initialization failed:', error);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [isInitializing, dispatch]);
+
+  const currentWorldId = worldLineGit?.headWorldId || null;
+
+  // 汎用的な状態更新ヘルパー
+  const updateWorldLineGit = useCallback((newWorldLineGit: WorldLineGit, operation: string) => {
+    const serializedState = newWorldLineGit.toJson() as WorldLineGitState;
+    dispatch(updateState({ newWorldLineGit: serializedState, operation }));
+  }, [dispatch]);
 
   // カウンターを更新して新しい世界を作成
-  const updateCounter = useCallback((newCounter: Counter) => {
-    if (!currentWorld) return;
-    
-    // 現在の世界に子要素があるかチェック
+  const updateCounterHandler = useCallback((newCounter: Counter) => {
+    if (!currentWorld || !worldLineGit) return;
+    // 現在の世界に子要素が存在するかチェック
     const worldTree = worldLineGit.getWorldTree();
-    const hasChildren = worldTree[currentWorld.worldId] && worldTree[currentWorld.worldId].length > 0;
+    const hasChildren = worldTree[currentWorld.worldId]?.length > 0;
+    
+    let newWorld: World;
     
     if (hasChildren) {
-      // 子要素がある場合：新しい世界線IDを生成して新しい世界を作成
+      // 子要素が存在する場合：新しい世界線IDを生成してカウンターを更新
       const newWorldLineId = crypto.randomUUID();
-      const newWorld = new World(
-        crypto.randomUUID(),
-        currentWorld.worldId,
-        newCounter,
-        newWorldLineId
-      );
-      setWorldLineGit(prev => prev.addWorld(newWorld));
+      newWorld = currentWorld
+        .updateCurrentWorldLineId(newWorldLineId)
+        .updateCounter(newCounter);
     } else {
-      // 子要素がない場合：同じ世界線IDを維持して新しい世界を作成
-      const newWorld = new World(
-        crypto.randomUUID(),
-        currentWorld.worldId,
-        newCounter,
-        currentWorld.currentWorldLineId // 同じ世界線IDを維持
-      );
-      setWorldLineGit(prev => prev.addWorld(newWorld));
+      // 子要素が存在しない場合：現在の世界線でカウンターを更新
+      newWorld = currentWorld.updateCounter(newCounter);
     }
-  }, [currentWorld, worldLineGit]);
+    
+    // 新しい世界を追加してWorldLineGitを更新
+    const newWorldLineGit = worldLineGit.addWorld(newWorld);
+    updateWorldLineGit(newWorldLineGit, 'updateCounter');
+  }, [currentWorld, worldLineGit, updateWorldLineGit]);
 
-  // 指定された世界にチェックアウト（単純に移動するだけ）
-  const checkout = useCallback((worldId: string) => {
+  // 指定された世界にチェックアウト
+  const checkoutHandler = useCallback((worldId: string) => {
+    if (!worldLineGit) return;
+    
     try {
-      setWorldLineGit(prev => prev.checkout(worldId));
+      const newWorldLineGit = worldLineGit.checkout(worldId);
+      updateWorldLineGit(newWorldLineGit, 'checkout');
     } catch (error) {
       console.error('Checkout failed:', error);
     }
-  }, []);
+  }, [worldLineGit, updateWorldLineGit]);
 
 
   // 現在の世界線で子要素に移動（Ctrl+Shift+Z）
-  const undo = useCallback(() => {
-    if (!currentWorld) return;
+  const undoHandler = useCallback(() => {
+    if (!currentWorld || !worldLineGit) return;
     
-    // 現在の世界の子世界を探す
     const worldTree = worldLineGit.getWorldTree();
     const children = worldTree[currentWorld.worldId];
     
-    if (!children || children.length === 0) {
-      return;
-    }
+    if (!children || children.length === 0) return;
     
-    // 目的の世界IDを示す
-    let targetChildId: string;
-    
-    // 複数の子要素がある場合、現在の世界線IDと同じcurrentWorldLineIdを持つ子要素を探す
     const currentWorldLineId = currentWorld.currentWorldLineId;
-    
-    // 同じ世界線IDを持つ子要素を探す
-    let sameWorldLineChild = children.find(childId => {
+    const sameWorldLineChild = children.find((childId: string) => {
       const childWorld = worldLineGit.getWorld(childId);
       return childWorld?.currentWorldLineId === currentWorldLineId;
     });
     
     if (sameWorldLineChild) {
-      targetChildId = sameWorldLineChild;
-    } else {
-      // 同じ世界線IDの子要素が見つからない場合は、undoを使えない
-      return;
+      const newWorldLineGit = worldLineGit.checkoutForUndo(sameWorldLineChild);
+      updateWorldLineGit(newWorldLineGit, 'undo');
     }
-    
-    // undoの場合は同じ世界線IDを維持してチェックアウト
-    setWorldLineGit(prev => prev.checkoutForUndo(targetChildId));
-  }, [currentWorld, worldLineGit]);
+  }, [currentWorld, worldLineGit, updateWorldLineGit]);
 
   // 全ての世界線を表示（Ctrl+Z）
-  const showAllWorldLines = useCallback(() => {
+  const showAllWorldLinesHandler = useCallback(() => {
+    if (!worldLineGit) return;
+    
+    updateWorldLineGit(worldLineGit, 'showAllWorldLines');
     setIsModalOpen(true);
-  }, []);
+  }, [worldLineGit, updateWorldLineGit]);
 
   // モーダルを閉じる
   const closeModal = useCallback(() => {
@@ -109,12 +145,11 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
 
   // ヘルパー関数
   const getAllWorlds = useCallback(() => {
-    return worldLineGit.getAllWorlds();
+    return worldLineGit?.getAllWorlds() || [];
   }, [worldLineGit]);
 
-
   const getWorldTree = useCallback(() => {
-    return worldLineGit.getWorldTree();
+    return worldLineGit?.getWorldTree() || {};
   }, [worldLineGit]);
 
   // キーボードショートカットの処理
@@ -124,29 +159,32 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
       // Shiftの影響で大文字のZが検出される
       if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
         event.preventDefault();
-        undo();
+        undoHandler();
       } 
       // Ctrl+Z の検出（zは小文字）
       else if (event.ctrlKey && !event.shiftKey && event.key === 'z') {
         event.preventDefault();
-        showAllWorldLines();
+        showAllWorldLinesHandler();
       }
     };
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [undo, showAllWorldLines]);
+  }, [undoHandler, showAllWorldLinesHandler]);
 
   const contextValue: WorldLineGitContextType = {
     currentWorld,
     currentWorldId,
-    updateCounter,
-    checkout,
-    undo,
-    showAllWorldLines,
+    updateCounter: updateCounterHandler,
+    checkout: checkoutHandler,
+    undo: undoHandler,
+    showAllWorldLines: showAllWorldLinesHandler,
     getAllWorlds,
     getWorldTree,
     isModalOpen,
     closeModal,
+    initialize: initializeHandler,
+    isInitializing,
+    isInitialized: !!worldLineGitState,
   };
 
   return (
