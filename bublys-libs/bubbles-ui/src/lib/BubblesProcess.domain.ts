@@ -1,8 +1,10 @@
 import { produce } from "immer";
 import { Bubble, BubbleState } from "./Bubbles.domain.js";
 
-// Redux ストアに保持する型（純粋なプレーンオブジェクトの二次元配列）
-export type BubblesProcessState = BubbleState[][];
+// Redux ストアに保持する型（純粋なプレーンオブジェクト）
+export interface BubblesProcessState {
+  layers: BubbleState[][];
+}
 
 // 内部で保持する state オブジェクトの型
 interface BubblesProcessInternalState {
@@ -14,7 +16,7 @@ export class BubblesProcess {
 
   /** JSON からインスタンス作成 */
   static fromJSON(state: BubblesProcessState): BubblesProcess {
-    const layers = state.map(layer =>
+    const layers = state.layers.map(layer =>
       layer.map(bState => Bubble.fromJSON(bState))
     );
     return new BubblesProcess({ layers });
@@ -29,15 +31,21 @@ export class BubblesProcess {
 
   /** プレーンオブジェクトへシリアライズ (外部用) */
   toJSON(): BubblesProcessState {
-    return this.state.layers.map(layer =>
-      layer.map(bubble => bubble.toJSON())
-    );
+    return {
+      layers: this.state.layers.map(layer =>
+        layer.map(bubble => bubble.toJSON())
+      )
+    };
   }
+
   /** Immer で draft 操作し、新インスタンス返却 */
-  private apply(producer: (draft: BubblesProcessInternalState) => void): BubblesProcess {
+  private apply(
+    producer: (draft: BubblesProcessInternalState) => void
+  ): BubblesProcess {
     const nextState = produce(this.state, producer);
     return new BubblesProcess(nextState);
   }
+
   deleteBubble(id: string): BubblesProcess {
     return this.apply(draft => {
       for (let i = draft.layers.length - 1; i >= 0; --i) {
@@ -86,18 +94,14 @@ export class BubblesProcess {
 
   popChild(bubble: Bubble | BubbleState): BubblesProcess {
     return this.apply(draft => {
-      const inst = bubble instanceof Bubble
-        ? bubble
-        : Bubble.fromJSON(bubble);
+      const inst = bubble instanceof Bubble ? bubble : Bubble.fromJSON(bubble);
       draft.layers.unshift([inst]);
     });
   }
 
   joinSibling(bubble: Bubble | BubbleState): BubblesProcess {
     return this.apply(draft => {
-      const inst = bubble instanceof Bubble
-        ? bubble
-        : Bubble.fromJSON(bubble);
+      const inst = bubble instanceof Bubble ? bubble : Bubble.fromJSON(bubble);
       if (draft.layers.length === 0) {
         draft.layers.push([inst]);
       } else {

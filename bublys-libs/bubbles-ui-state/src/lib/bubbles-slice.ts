@@ -31,12 +31,15 @@ const bubblesProcess = [
 ];
 
 
-const bubblesProcessState: BubblesProcessState = bubblesProcess.map((layer) =>
-  layer.map((bubble) => bubble.toJSON())
-);
+const bubblesProcessState: BubblesProcessState = {
+  layers: bubblesProcess.map((layer) =>
+    layer.map((bubble) => bubble.toJSON())
+  )
+};
 
 const bubbleState = {
   bubblesProcess: bubblesProcessState,
+  //bubbleの実体は別で管理すべきなのでは？
 };
 
 export const bubblesSlice = createSlice({
