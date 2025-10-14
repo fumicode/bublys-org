@@ -1,44 +1,41 @@
 import { produce } from "immer";
-import { Bubble, BubbleState } from "./Bubbles.domain.js";
 
-// Redux ストアに保持する型（純粋なプレーンオブジェクト）
+// Redux store representation: process holds only Bubble IDs
 export interface BubblesProcessState {
-  layers: BubbleState[][];
+  layers: string[][];
 }
 
-// 内部で保持する state オブジェクトの型
+// Internal state: same shape, IDs only
 interface BubblesProcessInternalState {
-  layers: Bubble[][];
+  layers: string[][];
 }
 
 export class BubblesProcess {
   private constructor(private state: BubblesProcessInternalState) {}
 
-  /** JSON からインスタンス作成 */
+  /** Create from JSON with ID layers */
   static fromJSON(state: BubblesProcessState): BubblesProcess {
-    const layers = state.layers.map(layer =>
-      layer.map(bState => Bubble.fromJSON(bState))
-    );
-    return new BubblesProcess({ layers });
+    // layers is string[][]
+    return new BubblesProcess({ layers: state.layers.map(layer => [...layer]) });
   }
 
-  get layers(): Bubble[][] {
-    return this.state.layers;
-  }
-  get surface(): Bubble[] | undefined {
-    return this.state.layers[0];
+  /** Expose layers of IDs */
+  get layers(): string[][] {
+    // return deep copy to preserve immutability
+    return this.state.layers.map(layer => [...layer]);
   }
 
-  /** プレーンオブジェクトへシリアライズ (外部用) */
+  /** Convenience: first layer of IDs */
+  get surface(): string[] | undefined {
+    return this.layers[0];
+  }
+
+  /** Serialize to JSON */
   toJSON(): BubblesProcessState {
-    return {
-      layers: this.state.layers.map(layer =>
-        layer.map(bubble => bubble.toJSON())
-      )
-    };
+    return { layers: this.layers.map(layer => [...layer]) };
   }
 
-  /** Immer で draft 操作し、新インスタンス返却 */
+  /** Immer producer helper */
   private apply(
     producer: (draft: BubblesProcessInternalState) => void
   ): BubblesProcess {
@@ -49,7 +46,7 @@ export class BubblesProcess {
   deleteBubble(id: string): BubblesProcess {
     return this.apply(draft => {
       for (let i = draft.layers.length - 1; i >= 0; --i) {
-        draft.layers[i] = draft.layers[i].filter(b => b.id !== id);
+        draft.layers[i] = draft.layers[i].filter(bId => bId !== id);
         if (draft.layers[i].length === 0) draft.layers.splice(i, 1);
       }
     });
@@ -58,66 +55,40 @@ export class BubblesProcess {
   layerDown(id: string): BubblesProcess {
     return this.apply(draft => {
       const layerIdx = draft.layers.findIndex(layer =>
-        layer.some(b => b.id === id)
+        layer.includes(id)
       );
       if (layerIdx < 0 || layerIdx >= draft.layers.length - 1) return;
-      const idx = draft.layers[layerIdx].findIndex(b => b.id === id);
-      const [bubble] = draft.layers[layerIdx].splice(idx, 1);
-      draft.layers[layerIdx + 1].push(bubble);
+      const idx = draft.layers[layerIdx].indexOf(id);
+      const [bId] = draft.layers[layerIdx].splice(idx, 1);
+      draft.layers[layerIdx + 1].push(bId);
     });
   }
 
   layerUp(id: string): BubblesProcess {
     return this.apply(draft => {
       const layerIdx = draft.layers.findIndex(layer =>
-        layer.some(b => b.id === id)
+        layer.includes(id)
       );
       if (layerIdx <= 0) return;
-      const idx = draft.layers[layerIdx].findIndex(b => b.id === id);
-      const [bubble] = draft.layers[layerIdx].splice(idx, 1);
+      const idx = draft.layers[layerIdx].indexOf(id);
+      const [bId] = draft.layers[layerIdx].splice(idx, 1);
       if (draft.layers[layerIdx].length === 0) draft.layers.splice(layerIdx, 1);
-      draft.layers[layerIdx - 1].push(bubble);
+      draft.layers[layerIdx - 1].push(bId);
     });
   }
 
-  moveTo(id: string, position: { x: number; y: number }): BubblesProcess {
+  popChild(id: string): BubblesProcess {
     return this.apply(draft => {
-      for (const layer of draft.layers) {
-        const idx = layer.findIndex(b => b.id === id);
-        if (idx >= 0) {
-          layer[idx] = layer[idx].moveTo(position);
-          return;
-        }
-      }
+      draft.layers.unshift([id]);
     });
   }
 
-  popChild(bubble: Bubble | BubbleState): BubblesProcess {
+  joinSibling(id: string): BubblesProcess {
     return this.apply(draft => {
-      const inst = bubble instanceof Bubble ? bubble : Bubble.fromJSON(bubble);
-      draft.layers.unshift([inst]);
-    });
-  }
-
-  joinSibling(bubble: Bubble | BubbleState): BubblesProcess {
-    return this.apply(draft => {
-      const inst = bubble instanceof Bubble ? bubble : Bubble.fromJSON(bubble);
       if (draft.layers.length === 0) {
-        draft.layers.push([inst]);
+        draft.layers.push([id]);
       } else {
-        draft.layers[0].push(inst);
-      }
-    });
-  }
-
-  renameBubble(id: string, newName: string): BubblesProcess {
-    return this.apply(draft => {
-      for (const layer of draft.layers) {
-        const idx = layer.findIndex(b => b.id === id);
-        if (idx >= 0) {
-          layer[idx] = layer[idx].rename(newName);
-          return;
-        }
+        draft.layers[0].push(id);
       }
     });
   }

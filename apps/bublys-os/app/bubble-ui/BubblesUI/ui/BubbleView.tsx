@@ -1,7 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { Bubble } from "@bublys-org/bubbles-ui"
-import { Point2, Vec2 } from "@bublys-org/bubbles-ui"
+import { BubbleState, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
@@ -11,7 +10,7 @@ import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRect } from "../../01_Utils/01_useMyRect";
 
 type BubbleProps = {
-  bubble: Bubble;
+  bubble: BubbleState;
 
   position?: Point2; // 位置を指定するためのオプション rectのほうが優先される
   vanishingPoint?: Point2; // バニシングポイントを指定するためのオプション
@@ -21,11 +20,11 @@ type BubbleProps = {
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
-  onCloseClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onMoveClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onLayerDownClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onLayerUpClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onRendered?: (bubble: Bubble) => void; // バブルがレンダリングされたときに呼び出されるコールバック
+  onCloseClick?: (bubble: BubbleState) => void;
+  onMoveClick?: (bubble: BubbleState) => void;
+  onLayerDownClick?: (bubble: BubbleState) => void;
+  onLayerUpClick?: (bubble: BubbleState) => void;
+  onRendered?: (bubble: BubbleState) => void;
 };
 
 export const BubbleView: FC<BubbleProps> = ({

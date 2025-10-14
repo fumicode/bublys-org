@@ -3,17 +3,17 @@ import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
 
 import {
   selectBubbles,
-  deleteBubble as deleteBubbleAction,
+  addBubble,
+  deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
   layerUp as layerUpAction,
-  moveTo,
-  popChild as popChildAction,
-  joinSibling as joinSiblingAction,
+  moveBubble as moveTo,
+  popChildInProcess as popChildAction,
+  joinSiblingInProcess as joinSiblingAction,
   renameBubble as renameBubbleAction,
-} from "@bublys-org/bubbles-ui-state"
+} from "@bublys-org/bubbles-ui-state";
 
-import { Bubble, BubblesProcess } from "@bublys-org/bubbles-ui";
-import { Point2 } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
@@ -30,7 +30,6 @@ function getColorHueFromString(name: string): number {
   return Math.abs(hash % 360);
 }
 
-// ドメイン Bubble インスタンスを生成
 const createBubble = (name: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(name);
   const type =
@@ -48,7 +47,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
-  const bubblesProcess: BubblesProcess = useAppSelector(selectBubbles);
+  const bubblesProcess = useAppSelector(selectBubbles);
 
   // ページサイズ管理
   const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
@@ -71,11 +70,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(moveTo({ id: b.id, position: { x: 300, y: 300 } }));
   };
   const popChild = (b: Bubble): string => {
-    dispatch(popChildAction(b));
+    dispatch(addBubble(b.toJSON()));
+    dispatch(popChildAction(b.id));
     return b.id;
   };
   const joinSibling = (b: Bubble): string => {
-    dispatch(joinSiblingAction(b));
+    dispatch(addBubble(b.toJSON()));
+    dispatch(joinSiblingAction(b.id));
     return b.id;
   };
 
@@ -85,7 +86,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openerRect?: SmartRect
   ): string => {
     const newBubble = createBubble(name);
-    const surface = bubblesProcess.surface;
+    const surface = bubblesProcess[0];
     if (surface?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble);
     } else {
