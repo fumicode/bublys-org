@@ -30,12 +30,13 @@ const bubblesProcess = [
   ],
 ];
 
-const initialState: BubblesProcessState = bubblesProcess.map((layer) =>
+
+const bubblesProcessState: BubblesProcessState = bubblesProcess.map((layer) =>
   layer.map((bubble) => bubble.toJSON())
 );
 
 const bubbleState = {
-  bubblesProcess: initialState,
+  bubblesProcess: bubblesProcessState,
 };
 
 export const bubblesSlice = createSlice({

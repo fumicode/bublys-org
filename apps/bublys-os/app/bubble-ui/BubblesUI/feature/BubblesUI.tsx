@@ -48,7 +48,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
-  const bubbles: BubblesProcess = useAppSelector(selectBubbles);
+  const bubblesProcess: BubblesProcess = useAppSelector(selectBubbles);
 
   // ページサイズ管理
   const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
@@ -85,7 +85,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openerRect?: SmartRect
   ): string => {
     const newBubble = createBubble(name);
-    const surface = bubbles[0];
+    const surface = bubblesProcess.surface;
     if (surface?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble);
     } else {
@@ -101,11 +101,11 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <>
-      <PositionDebuggerProvider isShown={true}>
+      <PositionDebuggerProvider isShown={false}>
         <BubblesContext.Provider
           value={{
             pageSize,
-            bubbles,
+            bubbles: bubblesProcess,
             openBubble: popChildOrJoinSibling,
             renameBubble: (id: string, newName: string) => {
               dispatch(renameBubbleAction({ id, newName }));
@@ -114,7 +114,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           }}
         >
           <BubblesLayeredView
-            bubbles={bubbles}
+            bubbles={bubblesProcess}
             vanishingPoint={vanishingPoint}
             onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
             onBubbleClose={deleteBubble}

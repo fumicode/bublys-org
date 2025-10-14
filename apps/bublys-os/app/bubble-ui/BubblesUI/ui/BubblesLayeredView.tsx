@@ -25,6 +25,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = (props) => {
   };
 
   const zIndex = 100 - 1; // z-indexの基準値
+  
 
   return (
     <StyledBubblesLayeredView
@@ -37,10 +38,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = (props) => {
       surfaceZIndex={zIndex - 2}
     >
       {/* 5つまで表示 */}
-      {bubblesProcess.map((layer, layerIndex) => {
+      {bubblesProcess.layers.map((layer, layerIndex) => {
         return (
-          <Fragment key={`layer-${layer[0]?.id}`}>
-            {layer.map((bubble, xIndex) => {
+            layer.map((bubble, xIndex) => {
               //同じレイヤーでは横に400ずつずらして並べている
               //const pos = new Vec2(surfaceLeftTop).add({ x: xIndex * 400, y: 0 });
               const bubbleXSizes = layer.map(
@@ -78,10 +78,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = (props) => {
                   <BubbleContent bubble={bubble} />
                 </BubbleView>
               );
-            })}
-          </Fragment>
+            })
         );
-      })}
+      }).flat()}
       <div className="e-underground-curtain">curtain</div>
 
       <div className="e-debug-visualizations">

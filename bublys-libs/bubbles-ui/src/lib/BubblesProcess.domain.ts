@@ -20,19 +20,24 @@ export class BubblesProcess {
     return new BubblesProcess({ layers });
   }
 
+  get layers(): Bubble[][] {
+    return this.state.layers;
+  }
+  get surface(): Bubble[] | undefined {
+    return this.state.layers[0];
+  }
+
   /** プレーンオブジェクトへシリアライズ (外部用) */
   toJSON(): BubblesProcessState {
     return this.state.layers.map(layer =>
       layer.map(bubble => bubble.toJSON())
     );
   }
-
   /** Immer で draft 操作し、新インスタンス返却 */
   private apply(producer: (draft: BubblesProcessInternalState) => void): BubblesProcess {
     const nextState = produce(this.state, producer);
     return new BubblesProcess(nextState);
   }
-
   deleteBubble(id: string): BubblesProcess {
     return this.apply(draft => {
       for (let i = draft.layers.length - 1; i >= 0; --i) {
