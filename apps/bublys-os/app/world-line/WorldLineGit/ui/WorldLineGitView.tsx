@@ -4,6 +4,70 @@ import { WorldLineGitContext } from '../domain/WorldLineGitContext';
 import { CounterView } from './CounterView';
 import { CreateTreeView } from './CreateTreeView';
 
+// InitializeButtonコンポーネントを直接定義
+function InitializeButton({ onInitialize, disabled = false }: { onInitialize: () => void; disabled?: boolean }) {
+  return (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      padding: '2rem',
+      backgroundColor: '#f8f9fa',
+      borderRadius: '12px',
+      marginBottom: '2rem',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <h3 style={{ 
+          margin: '0 0 1rem 0', 
+          color: '#333',
+          fontSize: '1.2rem'
+        }}>
+          🌍 WorldLineGit を初期化
+        </h3>
+        <p style={{ 
+          margin: '0 0 1.5rem 0', 
+          color: '#666',
+          fontSize: '0.9rem'
+        }}>
+          新しい世界線を開始するには、初期化ボタンをクリックしてください
+        </p>
+        <button
+          onClick={onInitialize}
+          disabled={disabled}
+          style={{
+            padding: '0.75rem 2rem',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            backgroundColor: disabled ? '#ccc' : '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            boxShadow: disabled ? 'none' : '0 2px 4px rgba(0,123,255,0.3)',
+            transition: 'all 0.2s ease',
+            minWidth: '120px'
+          }}
+          onMouseEnter={(e) => {
+            if (!disabled) {
+              e.currentTarget.style.backgroundColor = '#0056b3';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!disabled) {
+              e.currentTarget.style.backgroundColor = '#007bff';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }
+          }}
+        >
+          {disabled ? '初期化中...' : '🚀 初期化'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function WorldLineGitView() {
   const {
     currentWorld,
@@ -13,7 +77,10 @@ export function WorldLineGitView() {
     getAllWorlds,
     getWorldTree,
     isModalOpen,
-    closeModal
+    closeModal,
+    initialize,
+    isInitializing,
+    isInitialized,
   } = useContext(WorldLineGitContext);
 
   const handleWorldSelect = (worldId: string) => {
@@ -22,8 +89,16 @@ export function WorldLineGitView() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      {/* 現在の世界のカウンター */}
-      {currentWorld && (
+      {/* 初期化ボタン（未初期化時のみ表示） */}
+      {!isInitialized && (
+        <InitializeButton 
+          onInitialize={initialize}
+          disabled={isInitializing}
+        />
+      )}
+
+      {/* 現在の世界のカウンター（初期化済み時のみ表示） */}
+      {isInitialized && currentWorld && (
         <div style={{
           backgroundColor: 'white',
           padding: '2rem',
@@ -52,7 +127,7 @@ export function WorldLineGitView() {
       )}
 
       {/* 世界ツリー（Ctrl+Zで表示） */}
-      {isModalOpen && (
+      {isInitialized && isModalOpen && (
         <div style={{
           backgroundColor: 'white',
           padding: '2rem',
