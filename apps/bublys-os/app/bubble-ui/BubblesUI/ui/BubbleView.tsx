@@ -1,6 +1,6 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { FC, use, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { BubbleState, Point2, Vec2 } from "@bublys-org/bubbles-ui";
+import { Bubble,  Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
@@ -8,9 +8,11 @@ import MoveDownIcon from "@mui/icons-material/MoveDown";
 import MoveUpIcon from "@mui/icons-material/MoveUp";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRect } from "../../01_Utils/01_useMyRect";
+import { useAppDispatch } from "@bublys-org/state-management";
+import { renderBubble } from "@bublys-org/bubbles-ui-state";
 
 type BubbleProps = {
-  bubble: BubbleState;
+  bubble: Bubble;
 
   position?: Point2; // 位置を指定するためのオプション rectのほうが優先される
   vanishingPoint?: Point2; // バニシングポイントを指定するためのオプション
@@ -20,11 +22,10 @@ type BubbleProps = {
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
-  onCloseClick?: (bubble: BubbleState) => void;
-  onMoveClick?: (bubble: BubbleState) => void;
-  onLayerDownClick?: (bubble: BubbleState) => void;
-  onLayerUpClick?: (bubble: BubbleState) => void;
-  onRendered?: (bubble: BubbleState) => void;
+  onCloseClick?: (bubble: Bubble) => void;
+  onMoveClick?: (bubble: Bubble) => void;
+  onLayerDownClick?: (bubble: Bubble) => void;
+  onLayerUpClick?: (bubble: Bubble) => void;
 };
 
 export const BubbleView: FC<BubbleProps> = ({
@@ -39,7 +40,6 @@ export const BubbleView: FC<BubbleProps> = ({
   onLayerDownClick,
   onLayerUpClick,
   onMoveClick,
-  onRendered,
 }) => {
   position = position || { x: 0, y: 0 };
   vanishingPoint = vanishingPoint || new Vec2({ x: 0, y: 0 });
@@ -49,24 +49,26 @@ export const BubbleView: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-  const { addPoints } = usePositionDebugger();
+  const { addPoints, addRects } = usePositionDebugger();
 
   const { ref, myRect } = useMyRect();
 
   console.log("BubbleView: myRect", myRect);
 
-  // バブルの位置とバニシングポイントをPositionDebuggerに登録
-  useEffect(() => {
-    // 初期化時にポイントと矩形を追加
-    addPoints([position, vanishingPoint]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
-    // バブルがレンダリングされたときに呼び出される
-    onRendered?.(bubble);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (myRect) {
+      const renderedBubble = bubble.rendered(myRect); // Bubbleにレンダリング結果を保存しておく
+
+      dispatch(renderBubble({ id: bubble.id, rect: { x: myRect.x, y: myRect.y, width: myRect.width, height: myRect.height } })); // Reduxにも保存しておく
+
+
+      
+    }
+  }, [myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
+
+
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -201,7 +203,14 @@ export const BubbleView: FC<BubbleProps> = ({
         <br /> */}
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
         [{bubble.size?.width}x{bubble.size?.height}]
+
       </main>
+
+      {bubble.renderedRect && (
+        <div className="e-debug-rect"
+          style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>
+        </div>
+      )}
     </StyledBubble>
   );
 };
@@ -249,7 +258,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   border-radius: 3em;
 
-  .e-bubble-header {
+  >.e-bubble-header {
     .e-bubble-name {
       background: hsla(0, 0%, 100%, 0.5);
       padding: 0.5em;
@@ -262,12 +271,31 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     }
   }
 
-  .e-bubble-content {
+  >.e-bubble-content {
     padding: 1em;
     font-size: 1em;
     background: white;
 
     border-radius: 0.5em;
     margin: 0.5em;
+  }
+
+  >.e-debug-rect {
+    //下中央
+    display: flex;
+    justify-content: center;
+    align-items: end;
+
+    border-radius: 30px;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border: 1px solid blue;
+    pointer-events: none;
+    box-sizing: border-box;
+    
   }
 `;

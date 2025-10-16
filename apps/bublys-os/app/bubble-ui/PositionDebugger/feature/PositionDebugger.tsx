@@ -1,7 +1,8 @@
 "use client";
 
 import { FC, useState } from "react";
-import { Point2 } from "../../01_Utils/00_Point";
+import { Point2 } from "@bublys-org/bubbles-ui"
+
 import SmartRect from "../../BubblesUI/domain/01_SmartRect";
 import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";

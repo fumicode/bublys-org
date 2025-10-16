@@ -1,5 +1,12 @@
 import { Point2, Size2 } from "./00_Point.js";
 
+type Rect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export type BubbleProps = {
   id?: string;
   name: string;
@@ -7,6 +14,9 @@ export type BubbleProps = {
   type: string;
   position?: Point2;
   size?: Size2;
+
+  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+
 };
 
 export type BubbleState = {
@@ -16,6 +26,9 @@ export type BubbleState = {
   type: string;
   position?: Point2;
   size?: Size2;
+
+  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+
 };
 
 
@@ -53,6 +66,9 @@ export class Bubble {
     return this.state.position || { x: 0, y: 0 };
   }
 
+
+
+
   moveTo(pos: Point2): Bubble {
     return new Bubble({ ...this.state, position: pos });
   }
@@ -65,15 +81,28 @@ export class Bubble {
     return new Bubble({ ...this.state, name: newName });
   }
 
+
+  get renderedRect(): Rect | undefined {
+    return this.state.renderedRect;
+  }
+
+  rendered(rect: Rect): this {
+    return new Bubble({ ...this.state , renderedRect: rect }) as this;
+  }
+
   resizeTo(size: Size2): Bubble {
     return new Bubble({ ...this.state, size });
   }
 
   toJSON(): BubbleState {
-    return { ...this.state };
+    return { ...this.state,
+      renderedRect: Object.assign({}, this.state.renderedRect)
+    };
   }
 
   static fromJSON(s: BubbleState): Bubble {
     return new Bubble(s);
   }
 }
+
+

@@ -111,8 +111,23 @@ export const bubblesSlice = createSlice({
       const updated = Bubble.fromJSON(state.bubbles[id]).resizeTo(size);
       state.bubbles[id] = updated.toJSON();
     },
+    renderBubble: (
+      state,
+      action: PayloadAction<{ id: string; rect: { x: number; y: number; width: number; height: number } }>
+    ) => {
+      const { id, rect } = action.payload;
+      const updated = Bubble.fromJSON(state.bubbles[id]).rendered(rect);
+      state.bubbles[id] = updated.toJSON();
+    },
+    // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
-      delete state.bubbles[action.payload];
+      const id = action.payload;
+
+      delete state.bubbles[id];
+      //TODO: Also remove from process
+      // state.process = BubblesProcess.fromJSON(state.process)
+      //   .removeBubble(id)
+      //   .toJSON();
     },
   },
 });
@@ -127,6 +142,7 @@ export const {
   moveBubble,
   renameBubble,
   resizeBubble,
+  renderBubble,
   removeBubble,
 } = bubblesSlice.actions;
 
