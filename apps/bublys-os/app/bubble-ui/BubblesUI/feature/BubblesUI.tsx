@@ -7,10 +7,9 @@ import {
   deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
   layerUp as layerUpAction,
-  moveBubble as moveTo,
+  updateBubble,
   popChildInProcess as popChildAction,
   joinSiblingInProcess as joinSiblingAction,
-  renameBubble as renameBubbleAction,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
@@ -67,7 +66,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(layerUpAction(b.id));
   };
   const onMove = (b: Bubble) => {
-    dispatch(moveTo({ id: b.id, position: { x: 300, y: 300 } }));
+    const updated = b.moveTo({ x: 300, y: 300 });
+    dispatch(updateBubble(updated));
   };
   const popChild = (b: Bubble): string => {
     dispatch(addBubble(b.toJSON()));
@@ -108,10 +108,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             pageSize,
             bubbles: bubblesDPO.layers,
             openBubble: popChildOrJoinSibling,
-            renameBubble: (id: string, newName: string) => {
-              dispatch(renameBubbleAction({ id, newName }));
-              return id;
-            },
+          renameBubble: (id: string, newName: string) => {
+            const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
+            const updated = existing.rename(newName);
+            dispatch(updateBubble(updated));
+            return id;
+          },
           }}
         >
       <BubblesLayeredView

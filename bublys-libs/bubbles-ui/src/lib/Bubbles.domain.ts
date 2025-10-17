@@ -19,6 +19,18 @@ export type BubbleProps = {
 
 };
 
+export type BubbleJson= {
+  id: string;
+  name: string;
+  colorHue: number;
+  type: string;
+  position?: Point2;
+  size?: Size2;
+
+  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+
+};
+
 export type BubbleState = {
   id: string;
   name: string;

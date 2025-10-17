@@ -83,41 +83,18 @@ export const bubblesSlice = createSlice({
         .joinSibling(action.payload)
         .toJSON();
     },
+
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleState>) => {
       state.bubbles[action.payload.id] = action.payload;
     },
-    moveBubble: (
-      state,
-      action: PayloadAction<{ id: string; position: { x: number; y: number } }>
-    ) => {
-      const { id, position } = action.payload;
-      const updated = Bubble.fromJSON(state.bubbles[id]).moveTo(position);
-      state.bubbles[id] = updated.toJSON();
-    },
-    renameBubble: (
-      state,
-      action: PayloadAction<{ id: string; newName: string }>
-    ) => {
-      const { id, newName } = action.payload;
-      const updated = Bubble.fromJSON(state.bubbles[id]).rename(newName);
-      state.bubbles[id] = updated.toJSON();
-    },
-    resizeBubble: (
-      state,
-      action: PayloadAction<{ id: string; size: { width: number; height: number } }>
-    ) => {
-      const { id, size } = action.payload;
-      const updated = Bubble.fromJSON(state.bubbles[id]).resizeTo(size);
-      state.bubbles[id] = updated.toJSON();
-    },
-    renderBubble: (
-      state,
-      action: PayloadAction<{ id: string; rect: { x: number; y: number; width: number; height: number } }>
-    ) => {
-      const { id, rect } = action.payload;
-      const updated = Bubble.fromJSON(state.bubbles[id]).rendered(rect);
-      state.bubbles[id] = updated.toJSON();
+    updateBubble: {
+      prepare: (bubble: Bubble) => ({
+        payload: bubble.toJSON(),
+      }),
+      reducer: (state, action: PayloadAction<BubbleState>) => {
+        state.bubbles[action.payload.id] = action.payload;
+      },
     },
     // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
@@ -139,10 +116,7 @@ export const {
   popChildInProcess,
   joinSiblingInProcess,
   addBubble,
-  moveBubble,
-  renameBubble,
-  resizeBubble,
-  renderBubble,
+  updateBubble,
   removeBubble,
 } = bubblesSlice.actions;
 

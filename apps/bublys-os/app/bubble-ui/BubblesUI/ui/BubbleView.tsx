@@ -9,7 +9,7 @@ import MoveUpIcon from "@mui/icons-material/MoveUp";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRect } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble } from "@bublys-org/bubbles-ui-state";
+import { updateBubble } from "@bublys-org/bubbles-ui-state";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -59,12 +59,8 @@ export const BubbleView: FC<BubbleProps> = ({
 
   useEffect(() => {
     if (myRect) {
-      const renderedBubble = bubble.rendered(myRect); // Bubbleにレンダリング結果を保存しておく
-
-      dispatch(renderBubble({ id: bubble.id, rect: { x: myRect.x, y: myRect.y, width: myRect.width, height: myRect.height } })); // Reduxにも保存しておく
-
-
-      
+      const updated = bubble.rendered(myRect);
+      dispatch(updateBubble(updated));
     }
   }, [myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
 
