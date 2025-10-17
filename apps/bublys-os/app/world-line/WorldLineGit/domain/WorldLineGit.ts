@@ -33,35 +33,10 @@ export class WorldLineGit {
   }
 
   /**
-   * 現在のAPEX世界を取得
-   */
-  public getApexWorld(): World | null {
-    if (!this.apexWorldId) return null;
-    return this.worlds.get(this.apexWorldId) || null;
-  }
-
-  /**
    * 指定された世界IDの世界を取得
    */
   public getWorld(worldId: string): World | null {
     return this.worlds.get(worldId) || null;
-  }
-
-  /**
-   * 世界の親子関係を辿って履歴を取得
-   */
-  public getWorldHistory(worldId: string): World[] {
-    const history: World[] = [];
-    let currentWorld = this.getWorld(worldId);
-    
-    while (currentWorld) {
-      history.push(currentWorld);
-      currentWorld = currentWorld.parentWorldId 
-        ? this.getWorld(currentWorld.parentWorldId)
-        : null;
-    }
-    
-    return history;
   }
 
   /**
@@ -95,21 +70,6 @@ export class WorldLineGit {
   }
 
   /**
-   * 新しいブランチを作成（sprout: createBranch相当）
-   */
-  public sprout(fromWorldId: string): WorldLineGit {
-    if (!this.worlds.has(fromWorldId)) {
-      throw new Error(`World ${fromWorldId} not found`);
-    }
-    
-    return new WorldLineGit(
-      this.worlds,
-      fromWorldId,
-      this.rootWorldId
-    );
-  }
-
-  /**
    * 全ての世界を取得
    */
   public getAllWorlds(): World[] {
@@ -132,15 +92,6 @@ export class WorldLineGit {
     }
     
     return tree;
-  }
-
-  /**
-   * 指定された世界線IDを持つ世界を取得
-   */
-  public getWorldsByWorldLineId(worldLineId: string): World[] {
-    return Array.from(this.worlds.values()).filter(world => 
-      world.apexWorldLineId === worldLineId
-    );
   }
 
   /**
