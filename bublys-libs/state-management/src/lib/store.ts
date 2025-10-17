@@ -1,10 +1,12 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { counterSlice } from "./slices/counter-slice.js";
 import { bubblesSlice } from "./slices/bubbles-slice.js";
+import { worldSlice } from "./slices/world-slice.js";
 
 const reducers = combineReducers({
-  [counterSlice.reducerPath]: counterSlice.reducer,
-  [bubblesSlice.reducerPath]: bubblesSlice.reducer,
+  counter: counterSlice.reducer,
+  bubbleState: bubblesSlice.reducer,
+  worldLine: worldSlice.reducer,
 });
 
 export const makeStore = () => {
