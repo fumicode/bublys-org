@@ -1,23 +1,23 @@
 import { createContext } from "react";
 import { World } from "./World";
-import { Counter } from "./Counter";
 
 /**
- * WorldLineGitContext の型定義
+ * WorldLineGitContext の型定義（ジェネリック版）
+ * 任意のWorldStateを管理可能
  */
-export type WorldLineGitContextType = {
-  currentWorld: World | null;
+export type WorldLineGitContextType<TWorldState = any> = {
+  currentWorld: World<TWorldState> | null;
   currentWorldId: string | null;
 
   // アクション
-  updateCounter: (counterId: string, newCounter: Counter) => void;
+  updateWorldState: (newWorldState: TWorldState) => void;
   checkout: (worldId: string) => void;
   undo: () => void; // Ctrl+Shift+Z: 現在の世界線で子要素に移動
   showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示
   initialize: () => void; // 初期化
   
   // ヘルパー関数
-  getAllWorlds: () => World[];
+  getAllWorlds: () => World<TWorldState>[];
   getWorldTree: () => { [worldId: string]: string[] };
   
   // モーダル関連
@@ -32,12 +32,12 @@ export type WorldLineGitContextType = {
 /**
  * WorldLineGitContext のデフォルト値
  */
-export const WorldLineGitContext = createContext<WorldLineGitContextType>({
+export const WorldLineGitContext = createContext<WorldLineGitContextType<any>>({
   currentWorld: null,
   currentWorldId: null,
 
-  updateCounter: () => {
-    console.warn("updateCounter not implemented");
+  updateWorldState: () => {
+    console.warn("updateWorldState not implemented");
   },
   checkout: () => {
     console.warn("checkout not implemented");

@@ -10,15 +10,27 @@ import {
   useAppSelector,
   type WorldLineGitState,
 } from '@bublys-org/state-management';
-import { Counter } from '../domain/Counter';
 import { World } from '../domain/World';
 import { WorldLineGit } from '../domain/WorldLineGit';
 
-interface WorldLineGitManagerProps {
+/**
+ * WorldLineGitManagerのプロパティ（ジェネリック版）
+ */
+interface WorldLineGitManagerProps<TWorldState> {
   children: React.ReactNode;
+  // シリアライズ/デシリアライズ関数
+  serialize: (state: TWorldState) => any;
+  deserialize: (data: any) => TWorldState;
+  // 初期WorldStateを作成する関数
+  createInitialWorldState: () => TWorldState;
 }
 
-export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
+export function WorldLineGitManager<TWorldState>({ 
+  children, 
+  serialize, 
+  deserialize, 
+  createInitialWorldState 
+}: WorldLineGitManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
   
   // Reduxから状態を取得
@@ -26,8 +38,12 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
   const currentWorldState = useAppSelector(selectHeadWorld);
   
   // ドメインオブジェクトに変換
-  const worldLineGit = worldLineGitState ? WorldLineGit.fromJson(worldLineGitState) : null;
-  const currentWorld = currentWorldState ? World.fromJson(currentWorldState) : null;
+  const worldLineGit = worldLineGitState 
+    ? WorldLineGit.fromJson<TWorldState>(worldLineGitState, deserialize) 
+    : null;
+  const currentWorld = currentWorldState 
+    ? World.fromJson<TWorldState>(currentWorldState, deserialize) 
+    : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -39,65 +55,62 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     setIsInitializing(true);
     
     try {
-      // 初期状態でルート世界を作成（2つのCounterを含む）
-      const initialCounters = new Map<string, Counter>([
-        ['counter-1', new Counter(100)],
-        ['counter-2', new Counter(200)]
-      ]);
+      // 初期WorldStateを作成
+      const initialWorldState = createInitialWorldState();
       
-      const rootWorld = new World(
+      const rootWorld = new World<TWorldState>(
         crypto.randomUUID(),
         null,
-        { counters: initialCounters },
+        initialWorldState,
         crypto.randomUUID()
       );
-      const initialWorldLineGit = new WorldLineGit(
+      const initialWorldLineGit = new WorldLineGit<TWorldState>(
         new Map([[rootWorld.worldId, rootWorld]]),
         rootWorld.worldId,
         rootWorld.worldId
       );
       
       // シリアライズ可能な形式に変換してReduxに送信
-      const serializedState = initialWorldLineGit.toJson() as WorldLineGitState;
+      const serializedState = initialWorldLineGit.toJson(serialize) as WorldLineGitState;
       dispatch(initialize(serializedState));
     } catch (error) {
       console.error('Initialization failed:', error);
     } finally {
       setIsInitializing(false);
     }
-  }, [isInitializing, dispatch]);
+  }, [isInitializing, dispatch, createInitialWorldState, serialize]);
 
   const currentWorldId = worldLineGit?.headWorldId || null;
 
   // 汎用的な状態更新ヘルパー
-  const updateWorldLineGit = useCallback((newWorldLineGit: WorldLineGit, operation: string) => {
-    const serializedState = newWorldLineGit.toJson() as WorldLineGitState;
+  const updateWorldLineGit = useCallback((newWorldLineGit: WorldLineGit<TWorldState>, operation: string) => {
+    const serializedState = newWorldLineGit.toJson(serialize) as WorldLineGitState;
     dispatch(updateState({ newWorldLineGit: serializedState, operation }));
-  }, [dispatch]);
+  }, [dispatch, serialize]);
 
-  // カウンターを更新して新しい世界を作成
-  const updateCounterHandler = useCallback((counterId: string, newCounter: Counter) => {
+  // WorldStateを更新して新しい世界を作成
+  const updateWorldStateHandler = useCallback((newWorldState: TWorldState) => {
     if (!currentWorld || !worldLineGit) return;
     // 現在の世界に子要素が存在するかチェック
     const worldTree = worldLineGit.getWorldTree();
     const hasChildren = worldTree[currentWorld.worldId]?.length > 0;
     
-    let newWorld: World;
+    let newWorld: World<TWorldState>;
     
     if (hasChildren) {
-      // 子要素が存在する場合：新しい世界線IDを生成してカウンターを更新
+      // 子要素が存在する場合：新しい世界線IDを生成してWorldStateを更新
       const newWorldLineId = crypto.randomUUID();
       newWorld = currentWorld
         .updateCurrentWorldLineId(newWorldLineId)
-        .updateCounter(counterId, newCounter);
+        .updateWorldState(newWorldState);
     } else {
-      // 子要素が存在しない場合：現在の世界線でカウンターを更新
-      newWorld = currentWorld.updateCounter(counterId, newCounter);
+      // 子要素が存在しない場合：現在の世界線でWorldStateを更新
+      newWorld = currentWorld.updateWorldState(newWorldState);
     }
     
     // 新しい世界を追加してWorldLineGitを更新
     const newWorldLineGit = worldLineGit.addWorld(newWorld);
-    updateWorldLineGit(newWorldLineGit, 'updateCounter');
+    updateWorldLineGit(newWorldLineGit, 'updateWorldState');
   }, [currentWorld, worldLineGit, updateWorldLineGit]);
 
   // 指定された世界にチェックアウト
@@ -176,10 +189,10 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [undoHandler, showAllWorldLinesHandler]);
 
-  const contextValue: WorldLineGitContextType = {
+  const contextValue: WorldLineGitContextType<TWorldState> = {
     currentWorld,
     currentWorldId,
-    updateCounter: updateCounterHandler,
+    updateWorldState: updateWorldStateHandler,
     checkout: checkoutHandler,
     undo: undoHandler,
     showAllWorldLines: showAllWorldLinesHandler,

@@ -68,3 +68,4 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
     </div>
   );
 }
+

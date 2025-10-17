@@ -2,9 +2,15 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 
-// シリアライズ可能な状態の型定義
+/**
+ * WorldLineGitState - シリアライズ可能な状態の型定義
+ * ジェネリックな設計により、任意のWorldState型を管理可能
+ * 
+ * world: any は WorldLineGit<TWorldState>.toJson() の結果を格納
+ * 実際の型はアプリケーション層で定義される（例：CounterWorldState）
+ */
 export interface WorldLineGitState {
-  worlds: Array<{ id: string; world: any }>; // WorldLineGit.fromJson()が期待する形式
+  worlds: Array<{ id: string; world: any }>; // world.worldState に任意の型が含まれる
   headWorldId: string | null;
   rootWorldId: string | null;
 }

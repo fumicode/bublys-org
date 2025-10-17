@@ -2,7 +2,7 @@ import React from 'react';
 import { World } from '../domain/World';
 
 interface CreateTreeViewProps {
-  creates: World[];
+  creates: World<any>[];
   currentCreateId: string | null;
   onCreateSelect: (createId: string) => void;
   createTree: { [createId: string]: string[] };
@@ -14,9 +14,18 @@ export function CreateTreeView({
   onCreateSelect, 
   createTree 
 }: CreateTreeViewProps) {
-  const renderCreateNode = (create: World, level: number = 0) => {
+  const renderCreateNode = (create: World<any>, level: number = 0) => {
     const isCurrent = create.worldId === currentCreateId;
     const children = createTree[create.worldId] || [];
+    
+    // WorldStateの表示（CounterWorldStateの場合）
+    let stateDisplay = 'State: -';
+    if (create.worldState?.counters) {
+      const countersArray = Array.from(create.worldState.counters.entries()) as [string, any][];
+      stateDisplay = `Counters: ${countersArray
+        .map(([id, counter]) => `${id}: ${counter.value}`)
+        .join(', ')}`;
+    }
     
     return (
       <div key={create.worldId} style={{ marginLeft: `${level * 20}px` }}>
@@ -36,9 +45,7 @@ export function CreateTreeView({
             {create.worldId.substring(0, 8)}...
           </div>
           <div style={{ color: '#666', fontSize: '0.8rem' }}>
-            Counters: {Array.from(create.worldObject.counters.entries())
-              .map(([id, counter]) => `${id}: ${counter.value}`)
-              .join(', ')}
+            {stateDisplay}
           </div>
           <div style={{ color: '#999', fontSize: '0.7rem' }}>
             WorldLine: {create.currentWorldLineId.substring(0, 8)}...

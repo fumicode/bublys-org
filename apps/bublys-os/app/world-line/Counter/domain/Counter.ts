@@ -39,3 +39,4 @@ export class Counter {
     return new Counter(json.value || 0);
   }
 }
+
