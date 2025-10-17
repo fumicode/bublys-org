@@ -1,7 +1,7 @@
 import React from 'react';
 import { useContext } from 'react';
 import { WorldLineGitContext } from '../domain/WorldLineGitContext';
-import { CounterView } from './CounterView';
+import { CounterView } from '../../Counter/ui/CounterView';
 import { CreateTreeView } from './CreateTreeView';
 
 // InitializeButtonコンポーネントを直接定義
@@ -72,7 +72,7 @@ export function WorldLineGitView() {
   const {
     currentWorld,
     currentWorldId,
-    updateCounter,
+    updateWorldState,
     checkout,
     getAllWorlds,
     getWorldTree,
@@ -119,10 +119,34 @@ export function WorldLineGitView() {
             </div>
           </div>
           
-          <CounterView
-            counter={currentWorld.counter}
-            onCounterChange={updateCounter}
-          />
+          {/* 複数のカウンターを表示 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {(Array.from(currentWorld.worldState.counters.entries()) as [string, any][]).map(([counterId, counter]) => (
+              <div key={counterId} style={{
+                backgroundColor: '#f8f9fa',
+                padding: '1rem',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ 
+                  fontSize: '0.9rem', 
+                  fontWeight: 'bold', 
+                  color: '#495057',
+                  marginBottom: '0.5rem'
+                }}>
+                  {counterId}
+                </div>
+                <CounterView
+                  counter={counter}
+                  onCounterChange={(newCounter) => {
+                    const newCounters = new Map(currentWorld.worldState.counters);
+                    newCounters.set(counterId, newCounter);
+                    updateWorldState({ counters: newCounters });
+                  }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
