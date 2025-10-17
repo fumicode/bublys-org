@@ -2,53 +2,96 @@ import { World } from './World';
 
 /**
  * WorldLine クラス
- * 世界線を管理し、親子関係を表現する
  */
 export class WorldLine {
-  public readonly parentWorldId: string;
-  public readonly worldLineId: string;
-  public readonly worlds: World[];
+  public readonly worlds: Map<string, World>;
+  public readonly apexWorldId: string | null;
+  public readonly rootWorldId: string | null;
 
   constructor(
-    parentWorldId: string,
-    worldLineId: string,
-    worlds: World[] = []
+    worlds: Map<string, World> = new Map(),
+    apexWorldId: string | null = null,
+    rootWorldId: string | null = null
   ) {
-    this.parentWorldId = parentWorldId;
-    this.worldLineId = worldLineId;
     this.worlds = worlds;
+    this.apexWorldId = apexWorldId;
+    this.rootWorldId = rootWorldId;
   }
 
   /**
-   * 新しいWorldを追加したWorldLineを作成
+   * 新しい世界を追加（grow: commit相当）
    */
-  public addWorld(world: World): WorldLine {
+  public grow(world: World): WorldLine {
+    const newWorlds = new Map(this.worlds);
+    newWorlds.set(world.worldId, world);
+    
     return new WorldLine(
-      this.parentWorldId,
-      this.worldLineId,
-      [...this.worlds, world]
+      newWorlds,
+      world.worldId,
+      this.rootWorldId || world.worldId
     );
   }
 
   /**
-   * 指定されたWorldを更新したWorldLineを作成
+   * 指定された世界IDの世界を取得
    */
-  public updateWorld(worldId: string, updatedWorld: World): WorldLine {
-    const updatedWorlds = this.worlds.map(world =>
-      world.worldId === worldId ? updatedWorld : world
-    );
+  public getWorld(worldId: string): World | null {
+    return this.worlds.get(worldId) || null;
+  }
+
+  /**
+   * 指定された世界にAPEXを移動（regrow用 - 世界線IDを変更しない）
+   */
+  public setApexForRegrow(worldId: string): WorldLine {
+    if (!this.worlds.has(worldId)) {
+      throw new Error(`World ${worldId} not found`);
+    }
+    
     return new WorldLine(
-      this.parentWorldId,
-      this.worldLineId,
-      updatedWorlds
+      this.worlds,
+      worldId,
+      this.rootWorldId
     );
   }
 
   /**
-   * 指定されたIDのWorldを取得
+   * 指定された世界にAPEXを移動（setApex: checkout相当）
    */
-  public getWorld(worldId: string): World | undefined {
-    return this.worlds.find(world => world.worldId === worldId);
+  public setApex(worldId: string): WorldLine {
+    if (!this.worlds.has(worldId)) {
+      throw new Error(`World ${worldId} not found`);
+    }
+    
+    return new WorldLine(
+      this.worlds,
+      worldId,
+      this.rootWorldId
+    );
+  }
+
+  /**
+   * 全ての世界を取得
+   */
+  public getAllWorlds(): World[] {
+    return Array.from(this.worlds.values());
+  }
+
+  /**
+   * 世界ツリーの構造を取得（親子関係）
+   */
+  public getWorldTree(): { [worldId: string]: string[] } {
+    const tree: { [worldId: string]: string[] } = {};
+    
+    for (const world of this.worlds.values()) {
+      if (world.parentWorldId) {
+        if (!tree[world.parentWorldId]) {
+          tree[world.parentWorldId] = [];
+        }
+        tree[world.parentWorldId].push(world.worldId);
+      }
+    }
+    
+    return tree;
   }
 
   /**
@@ -56,9 +99,12 @@ export class WorldLine {
    */
   public toJson(): object {
     return {
-      parentWorldId: this.parentWorldId,
-      worldLineId: this.worldLineId,
-      worlds: this.worlds.map(world => world.toJson()),
+      worlds: Array.from(this.worlds.entries()).map(([id, world]) => ({
+        id,
+        world: world.toJson()
+      })),
+      apexWorldId: this.apexWorldId,
+      rootWorldId: this.rootWorldId,
     };
   }
 
@@ -66,10 +112,23 @@ export class WorldLine {
    * JSONからWorldLineインスタンスを作成
    */
   public static fromJson(json: any): WorldLine {
+    const worlds = new Map<string, World>();
+    
+    if (json.worlds) {
+      for (const { id, world } of json.worlds) {
+        worlds.set(id, World.fromJson(world));
+      }
+    } else if (json.commits) {
+      // 後方互換性のためcommitsもサポート
+      for (const { id, commit } of json.commits) {
+        worlds.set(id, World.fromJson(commit));
+      }
+    }
+    
     return new WorldLine(
-      json.parentWorldId || '',
-      json.worldLineId || '',
-      (json.worlds || []).map((worldJson: any) => World.fromJson(worldJson))
+      worlds,
+      json.apexWorldId || json.apexWorldLineId || null,
+      json.rootWorldId || json.rootWorldLineId || null
     );
   }
 }

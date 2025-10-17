@@ -1,160 +1,195 @@
-"use client";
+'use client';
+import React, { useState, useCallback, useEffect } from 'react';
+import { WorldLineContext, WorldLineContextType } from '../domain/WorldLineContext';
+import {
+  initialize,
+  updateState,
+  selectWorldLine,
+  useAppDispatch,
+  useAppSelector,
+  type WorldLineState,
+  selectApexWorld,
+} from '@bublys-org/state-management';
+import { Counter } from '../domain/Counter';
+import { World } from '../domain/World';
+import { WorldLine } from '../domain/WorldLine';
 
-import { FC, useState, useMemo } from "react";
-import { WorldLineContext } from "../domain/WorldLineContext";
-import { AkashicRecord } from "../domain/AkashicRecord";
-import { WorldLine } from "../domain/WorldLine";
-import { World } from "../domain/World";
-import { Counter } from "../domain/Counter";
-
-type WorldLineManagerProps = {
+interface WorldLineManagerProps {
   children: React.ReactNode;
-};
+}
 
-/**
- * WorldLineManager
- * WorldLine機能全体を管理するProviderコンポーネント
- */
-export const WorldLineManager: FC<WorldLineManagerProps> = ({ children }) => {
-  // 状態管理
-  const [akashicRecord, setAkashicRecord] = useState<AkashicRecord>(
-    new AkashicRecord()
-  );
-  const [currentWorldId, setCurrentWorldId] = useState<string>('');
+export function WorldLineManager({ children }: WorldLineManagerProps) {
+  const dispatch = useAppDispatch();
+  
+  // Reduxから状態を取得
+  const worldLineState = useAppSelector(selectWorldLine);
+  const apexWorldState = useAppSelector(selectApexWorld);
+  
+  // ドメインオブジェクトに変換
+  const worldLine = worldLineState ? WorldLine.fromJson(worldLineState) : null;
+  const apexWorld = apexWorldState ? World.fromJson(apexWorldState) : null;
 
-  // 現在の世界を取得
-  const currentWorld = useMemo(() => {
-    if (!currentWorldId) return null;
-    const result = akashicRecord.findWorldByWorldId(currentWorldId);
-    return result?.world || null;
-  }, [akashicRecord, currentWorldId]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
-  // アクション関数
-  const addWorldLine = (worldLine: WorldLine) => {
-    setAkashicRecord(prev => prev.addWorldLine(worldLine));
-  };
-
-  const updateWorldLine = (worldLineId: string, worldLine: WorldLine) => {
-    setAkashicRecord(prev => prev.updateWorldLine(worldLineId, worldLine));
-  };
-
-  const setCurrentWorld = (worldId: string) => {
-    setCurrentWorldId(worldId);
-  };
-
-  const getNextWorldChoices = (worldId: string) => {
-    return akashicRecord.getNextWorldChoices(worldId);
-  };
-
-  // 現在の世界が属する世界線を取得
-  const getCurrentWorldLine = () => {
-    if (!currentWorldId) return null;
+  // 初期化ハンドラー
+  const initializeHandler = useCallback(async () => {
+    if (isInitializing) return;
     
-    // 現在の世界が属する世界線を検索
-    for (const worldLine of akashicRecord.worldLines) {
-      const world = worldLine.getWorld(currentWorldId);
-      if (world) {
-        return worldLine;
+    setIsInitializing(true);
+    
+    try {
+      // 初期状態でルート世界を作成
+      const rootWorld = new World(
+        crypto.randomUUID(),
+        null,
+        new Counter(100),
+        crypto.randomUUID()
+      );
+      const initialWorldLine = new WorldLine(
+        new Map([[rootWorld.worldId, rootWorld]]),
+        rootWorld.worldId,
+        rootWorld.worldId
+      );
+      
+      // シリアライズ可能な形式に変換してReduxに送信
+      const serializedState = initialWorldLine.toJson() as WorldLineState;
+      dispatch(initialize(serializedState));
+    } catch (error) {
+      console.error('Initialization failed:', error);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [isInitializing, dispatch]);
+
+  const apexWorldId = worldLine?.apexWorldId || null;
+
+  // 汎用的な状態更新ヘルパー
+  const updateWorldLine = useCallback((newWorldLine: WorldLine, operation: string) => {
+    const serializedState = newWorldLine.toJson() as WorldLineState;
+    dispatch(updateState({ newWorldLine: serializedState, operation }));
+  }, [dispatch]);
+
+  // カウンターを更新して新しい世界を作成（grow: commit相当）
+  const growHandler = useCallback((newCounter: Counter) => {
+    if (!apexWorld || !worldLine) return;
+    // 現在の世界に子要素が存在するかチェック
+    const worldTree = worldLine.getWorldTree();
+    const hasChildren = worldTree[apexWorld.worldId]?.length > 0;
+    
+    let newWorld: World;
+    
+    if (hasChildren) {
+      // 子要素が存在する場合：新しい世界線IDを生成してカウンターを更新
+      const newWorldLineId = crypto.randomUUID();
+      newWorld = apexWorld
+        .updateCurrentWorldLineId(newWorldLineId)
+        .updateCounter(newCounter);
+    } else {
+      // 子要素が存在しない場合：現在の世界線でカウンターを更新
+      newWorld = apexWorld.updateCounter(newCounter);
+    }
+    
+    // 新しい世界を追加してWorldLineを更新
+    const newWorldLine = worldLine.grow(newWorld);
+    updateWorldLine(newWorldLine, 'grow');
+  }, [apexWorld, worldLine, updateWorldLine]);
+
+  // 指定された世界にAPEXを移動（setApex: checkout相当）
+  const setApexHandler = useCallback((worldId: string) => {
+    if (!worldLine) return;
+    
+    try {
+      const newWorldLine = worldLine.setApex(worldId);
+      updateWorldLine(newWorldLine, 'setApex');
+    } catch (error) {
+      console.error('SetApex failed:', error);
+    }
+  }, [worldLine, updateWorldLine]);
+
+
+  // 現在の世界線で子要素に移動（regrow: redo相当 - Ctrl+Shift+Z）
+  const regrowHandler = useCallback(() => {
+    if (!apexWorld || !worldLine) return;
+    
+    const worldTree = worldLine.getWorldTree();
+    const children = worldTree[apexWorld.worldId];
+    
+    if (!children || children.length === 0) return;
+    
+    const apexWorldLineId = apexWorld.apexWorldLineId;
+    const sameWorldLineChild = children.find((childId: string) => {
+      const childWorld = worldLine.getWorld(childId);
+      return childWorld?.apexWorldLineId === apexWorldLineId;
+    });
+    
+    if (sameWorldLineChild) {
+      const newWorldLine = worldLine.setApexForRegrow(sameWorldLineChild);
+      updateWorldLine(newWorldLine, 'regrow');
+    }
+  }, [apexWorld, worldLine, updateWorldLine]);
+
+  // 全ての世界線を表示（Ctrl+Z）
+  const showAllWorldLinesHandler = useCallback(() => {
+      if (!worldLine) return;
+    
+    updateWorldLine(worldLine, 'showAllWorldLines');
+    setIsModalOpen(true);
+  }, [worldLine, updateWorldLine]);
+
+  // モーダルを閉じる
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+  }, []);
+
+
+  // ヘルパー関数
+  const getAllWorlds = useCallback(() => {
+    return worldLine?.getAllWorlds() || [];
+  }, [worldLine]);
+
+  const getWorldTree = useCallback(() => {
+    return worldLine?.getWorldTree() || {};
+  }, [worldLine]);
+
+  // キーボードショートカットの処理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+Shift+Z の検出（Zは大文字）
+      // Shiftの影響で大文字のZが検出される
+      if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
+        event.preventDefault();
+        regrowHandler();
+      } 
+      // Ctrl+Z の検出（zは小文字）
+      else if (event.ctrlKey && !event.shiftKey && event.key === 'z') {
+        event.preventDefault();
+        showAllWorldLinesHandler();
       }
-    }
-    return null;
-  };
+    };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [regrowHandler, showAllWorldLinesHandler]);
 
-  // カウンター更新時に新しい世界を作成
-  const updateCounterAndCreateWorld = (worldId: string, newCounter: Counter) => {
-    // 現在の世界が属する世界線を取得
-    const currentWorldLine = getCurrentWorldLine();
-    if (!currentWorldLine) return;
-
-    // 現在の世界線に新しい世界を追加
-    const newWorldId = `${worldId}-${Date.now()}`;
-    const newWorld = new World(newWorldId, newCounter);
-    const updatedWorldLine = currentWorldLine.addWorld(newWorld);
-    
-    // アカシックレコードを更新
-    setAkashicRecord(prev => 
-      prev.updateWorldLine(currentWorldLine.worldLineId, updatedWorldLine)
-    );
-    
-    // 新しい世界に移動
-    setCurrentWorldId(newWorldId);
-  };
-
-  // 世界の切り替え時に新しい世界線を作成
-  const switchToWorldAndCreateBranch = (targetWorldId: string) => {
-    const result = akashicRecord.findWorldByWorldId(targetWorldId);
-    if (!result) return;
-
-    const { world } = result;
-    
-    // 分岐した世界線が既に存在するかチェック
-    const existingBranch = akashicRecord.worldLines.find(wl => 
-      wl.parentWorldId === currentWorldId && 
-      wl.worlds.some(w => w.worldId === targetWorldId)
-    );
-    
-    if (existingBranch) {
-      // 既存の分岐世界線に移動
-      setCurrentWorldId(targetWorldId);
-      return;
-    }
-    
-    // 新しい世界線を作成（独立した新しい世界を作成）
-    const newWorldLineId = `branch-${Date.now()}`;
-    const newWorldId = `${targetWorldId}-branch-${Date.now()}`;
-    
-    // 独立した新しい世界を作成（前の世界線のカウンター値を参照しない）
-    const newWorld = new World(newWorldId, new Counter(world.counter.value));
-    const newWorldLine = new WorldLine(currentWorldId, newWorldLineId, [newWorld]);
-    
-    // アカシックレコードに新しい世界線を追加
-    setAkashicRecord(prev => prev.addWorldLine(newWorldLine));
-    
-    // 新しい世界に移動
-    setCurrentWorldId(newWorldId);
-  };
-
-  // 全ての世界を削除してルート世界を作成
-  const resetToRootWorld = () => {
-    // ルート世界を作成
-    const rootWorld = new World('root-world', new Counter(0));
-    
-    // ルート世界線を作成
-    const rootWorldLine = new WorldLine('', 'root-worldline', [rootWorld]);
-    
-    // アカシックレコードをリセット
-    const newAkashicRecord = new AkashicRecord([rootWorldLine]);
-    
-    setAkashicRecord(newAkashicRecord);
-    setCurrentWorldId('root-world');
+  const contextValue: WorldLineContextType = {
+    apexWorld,
+    apexWorldId,
+    grow: growHandler,
+    setApex: setApexHandler,
+    regrow: regrowHandler,
+    showAllWorldLines: showAllWorldLinesHandler,
+    getAllWorlds,
+    getWorldTree,
+    isModalOpen,
+    closeModal,
+    initialize: initializeHandler,
+    isInitializing,
+    isInitialized: !!worldLineState,
   };
 
   return (
-    <WorldLineContext.Provider
-      value={{
-        akashicRecord,
-        currentWorldId,
-        currentWorld,
-        addWorldLine,
-        updateWorldLine,
-        setCurrentWorld,
-        getNextWorldChoices,
-        updateCounterAndCreateWorld,
-        switchToWorldAndCreateBranch,
-        resetToRootWorld,
-      }}
-    >
-      <div>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-          <button 
-            onClick={resetToRootWorld}
-            style={{ backgroundColor: '#f44336', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
-          >
-            🔄 世界リセット
-          </button>
-        </div>
-        {children}
-      </div>
+    <WorldLineContext.Provider value={contextValue}>
+      {children}
     </WorldLineContext.Provider>
   );
-};
+}

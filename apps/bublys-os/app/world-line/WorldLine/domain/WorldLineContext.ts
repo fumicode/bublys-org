@@ -1,5 +1,4 @@
 import { createContext } from "react";
-import { AkashicRecord } from "./AkashicRecord";
 import { World } from "./World";
 import { Counter } from "./Counter";
 
@@ -7,48 +6,63 @@ import { Counter } from "./Counter";
  * WorldLineContext の型定義
  */
 export type WorldLineContextType = {
-  akashicRecord: AkashicRecord;
-  currentWorldId: string;
-  currentWorld: World | null;
+  apexWorld: World | null;
+  apexWorldId: string | null;
 
   // アクション
-  addWorldLine: (worldLine: any) => void;
-  updateWorldLine: (worldLineId: string, worldLine: any) => void;
-  setCurrentWorld: (worldId: string) => void;
-  getNextWorldChoices: (worldId: string) => any[];
-  updateCounterAndCreateWorld: (worldId: string, newCounter: Counter) => void;
-  switchToWorldAndCreateBranch: (targetWorldId: string) => void;
-  resetToRootWorld: () => void;
+  grow: (newCounter: Counter) => void; // grow: commit相当 - カウンターを更新して新しい世界を作成
+  setApex: (worldId: string) => void; // setApex: checkout相当
+  regrow: () => void; // regrow: redo相当 (Ctrl+Shift+Z) - 現在の世界線で子要素に移動
+  showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示
+  initialize: () => void; // 初期化
+  
+  // ヘルパー関数
+  getAllWorlds: () => World[];
+  getWorldTree: () => { [worldId: string]: string[] };
+  
+  // モーダル関連
+  isModalOpen: boolean;
+  closeModal: () => void;
+  
+  // 初期化状態
+  isInitializing: boolean;
+  isInitialized: boolean;
 };
 
 /**
  * WorldLineContext のデフォルト値
  */
 export const WorldLineContext = createContext<WorldLineContextType>({
-  akashicRecord: new AkashicRecord(),
-  currentWorldId: '',
-  currentWorld: null,
+  apexWorld: null,
+  apexWorldId: null,
 
-  addWorldLine: () => {
-    console.warn("addWorldLine not implemented");
+  grow: () => {
+    console.warn("grow not implemented");
   },
-  updateWorldLine: () => {
-    console.warn("updateWorldLine not implemented");
+  setApex: () => {
+    console.warn("setApex not implemented");
   },
-  setCurrentWorld: () => {
-    console.warn("setCurrentWorld not implemented");
+  regrow: () => {
+    console.warn("regrow not implemented");
   },
-  getNextWorldChoices: () => {
-    console.warn("getNextWorldChoices not implemented");
+  showAllWorldLines: () => {
+    console.warn("showAllWorldLines not implemented");
+  },
+  initialize: () => {
+    console.warn("initialize not implemented");
+  },
+  getAllWorlds: () => {
+    console.warn("getAllWorlds not implemented");
     return [];
   },
-  updateCounterAndCreateWorld: () => {
-    console.warn("updateCounterAndCreateWorld not implemented");
+  getWorldTree: () => {
+    console.warn("getWorldTree not implemented");
+    return {};
   },
-  switchToWorldAndCreateBranch: () => {
-    console.warn("switchToWorldAndCreateBranch not implemented");
+  isModalOpen: false,
+  closeModal: () => {
+    console.warn("closeModal not implemented");
   },
-  resetToRootWorld: () => {
-    console.warn("resetToRootWorld not implemented");
-  },
+  isInitializing: false,
+  isInitialized: false,
 });

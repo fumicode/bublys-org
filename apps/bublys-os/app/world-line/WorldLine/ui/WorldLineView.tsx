@@ -1,6 +1,6 @@
 import React from 'react';
 import { useContext } from 'react';
-import { WorldLineGitContext } from '../domain/WorldLineGitContext';
+import { WorldLineContext } from '../domain/WorldLineContext';
 import { CounterView } from './CounterView';
 import { CreateTreeView } from './CreateTreeView';
 
@@ -23,7 +23,7 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
           color: '#333',
           fontSize: '1.2rem'
         }}>
-          🌍 WorldLineGit を初期化
+          🌍 WorldLine を初期化
         </h3>
         <p style={{ 
           margin: '0 0 1.5rem 0', 
@@ -68,7 +68,7 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
   );
 }
 
-export function WorldLineGitView() {
+export function WorldLineView() {
   const {
     apexWorld,
     apexWorldId,
@@ -81,7 +81,7 @@ export function WorldLineGitView() {
     initialize,
     isInitializing,
     isInitialized,
-  } = useContext(WorldLineGitContext);
+  } = useContext(WorldLineContext);
 
   const handleWorldSelect = (worldId: string) => {
     setApex(worldId);

@@ -1,11 +1,11 @@
 'use client';
-import { WorldLineGitManager } from './WorldLineGit/feature/WorldLineGitManager';
-import { WorldLineGitView } from './WorldLineGit/ui/WorldLineGitView';
+import { WorldLineManager } from './WorldLine/feature/WorldLineManager';
+import { WorldLineView } from './WorldLine/ui/WorldLineView';
 
 export default function Index() {
   return (
-    <WorldLineGitManager>
-      <WorldLineGitView />
-    </WorldLineGitManager>
+    <WorldLineManager>
+      <WorldLineView />
+    </WorldLineManager>
   );
 }
