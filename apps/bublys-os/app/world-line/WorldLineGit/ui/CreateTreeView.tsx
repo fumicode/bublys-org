@@ -36,7 +36,9 @@ export function CreateTreeView({
             {create.worldId.substring(0, 8)}...
           </div>
           <div style={{ color: '#666', fontSize: '0.8rem' }}>
-            Counter: {create.counter.value}
+            Counters: {Array.from(create.worldObject.counters.entries())
+              .map(([id, counter]) => `${id}: ${counter.value}`)
+              .join(', ')}
           </div>
           <div style={{ color: '#999', fontSize: '0.7rem' }}>
             WorldLine: {create.currentWorldLineId.substring(0, 8)}...

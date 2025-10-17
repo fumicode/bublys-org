@@ -119,10 +119,30 @@ export function WorldLineGitView() {
             </div>
           </div>
           
-          <CounterView
-            counter={currentWorld.counter}
-            onCounterChange={updateCounter}
-          />
+          {/* 複数のカウンターを表示 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {Array.from(currentWorld.worldObject.counters.entries()).map(([counterId, counter]) => (
+              <div key={counterId} style={{
+                backgroundColor: '#f8f9fa',
+                padding: '1rem',
+                borderRadius: '8px',
+                border: '2px solid #e9ecef'
+              }}>
+                <div style={{ 
+                  fontSize: '0.9rem', 
+                  fontWeight: 'bold', 
+                  color: '#495057',
+                  marginBottom: '0.5rem'
+                }}>
+                  {counterId}
+                </div>
+                <CounterView
+                  counter={counter}
+                  onCounterChange={(newCounter) => updateCounter(counterId, newCounter)}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -10,7 +10,7 @@ export type WorldLineGitContextType = {
   currentWorldId: string | null;
 
   // アクション
-  updateCounter: (newCounter: Counter) => void;
+  updateCounter: (counterId: string, newCounter: Counter) => void;
   checkout: (worldId: string) => void;
   undo: () => void; // Ctrl+Shift+Z: 現在の世界線で子要素に移動
   showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示

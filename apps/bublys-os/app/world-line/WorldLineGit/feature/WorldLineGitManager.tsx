@@ -39,11 +39,16 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     setIsInitializing(true);
     
     try {
-      // 初期状態でルート世界を作成
+      // 初期状態でルート世界を作成（2つのCounterを含む）
+      const initialCounters = new Map<string, Counter>([
+        ['counter-1', new Counter(100)],
+        ['counter-2', new Counter(200)]
+      ]);
+      
       const rootWorld = new World(
         crypto.randomUUID(),
         null,
-        new Counter(100),
+        { counters: initialCounters },
         crypto.randomUUID()
       );
       const initialWorldLineGit = new WorldLineGit(
@@ -71,7 +76,7 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
   }, [dispatch]);
 
   // カウンターを更新して新しい世界を作成
-  const updateCounterHandler = useCallback((newCounter: Counter) => {
+  const updateCounterHandler = useCallback((counterId: string, newCounter: Counter) => {
     if (!currentWorld || !worldLineGit) return;
     // 現在の世界に子要素が存在するかチェック
     const worldTree = worldLineGit.getWorldTree();
@@ -84,10 +89,10 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
       const newWorldLineId = crypto.randomUUID();
       newWorld = currentWorld
         .updateCurrentWorldLineId(newWorldLineId)
-        .updateCounter(newCounter);
+        .updateCounter(counterId, newCounter);
     } else {
       // 子要素が存在しない場合：現在の世界線でカウンターを更新
-      newWorld = currentWorld.updateCounter(newCounter);
+      newWorld = currentWorld.updateCounter(counterId, newCounter);
     }
     
     // 新しい世界を追加してWorldLineGitを更新
