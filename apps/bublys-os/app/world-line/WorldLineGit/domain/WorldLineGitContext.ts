@@ -6,13 +6,13 @@ import { Counter } from "./Counter";
  * WorldLineGitContext の型定義
  */
 export type WorldLineGitContextType = {
-  currentWorld: World | null;
-  currentWorldId: string | null;
+  apexWorld: World | null;
+  apexWorldId: string | null;
 
   // アクション
-  updateCounter: (newCounter: Counter) => void;
-  checkout: (worldId: string) => void;
-  undo: () => void; // Ctrl+Shift+Z: 現在の世界線で子要素に移動
+  grow: (newCounter: Counter) => void; // grow: commit相当 - カウンターを更新して新しい世界を作成
+  setApex: (worldId: string) => void; // setApex: checkout相当
+  regrow: () => void; // regrow: redo相当 (Ctrl+Shift+Z) - 現在の世界線で子要素に移動
   showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示
   initialize: () => void; // 初期化
   
@@ -33,17 +33,17 @@ export type WorldLineGitContextType = {
  * WorldLineGitContext のデフォルト値
  */
 export const WorldLineGitContext = createContext<WorldLineGitContextType>({
-  currentWorld: null,
-  currentWorldId: null,
+  apexWorld: null,
+  apexWorldId: null,
 
-  updateCounter: () => {
-    console.warn("updateCounter not implemented");
+  grow: () => {
+    console.warn("grow not implemented");
   },
-  checkout: () => {
-    console.warn("checkout not implemented");
+  setApex: () => {
+    console.warn("setApex not implemented");
   },
-  undo: () => {
-    console.warn("undo not implemented");
+  regrow: () => {
+    console.warn("regrow not implemented");
   },
   showAllWorldLines: () => {
     console.warn("showAllWorldLines not implemented");

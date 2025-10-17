@@ -39,7 +39,7 @@ export function CreateTreeView({
             Counter: {create.counter.value}
           </div>
           <div style={{ color: '#999', fontSize: '0.7rem' }}>
-            WorldLine: {create.currentWorldLineId.substring(0, 8)}...
+            WorldLine: {create.apexWorldLineId.substring(0, 8)}...
           </div>
         </div>
         

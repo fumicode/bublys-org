@@ -5,23 +5,23 @@ import { World } from './World';
  */
 export class WorldLineGit {
   public readonly worlds: Map<string, World>;
-  public readonly headWorldId: string | null;
+  public readonly apexWorldId: string | null;
   public readonly rootWorldId: string | null;
 
   constructor(
     worlds: Map<string, World> = new Map(),
-    headWorldId: string | null = null,
+    apexWorldId: string | null = null,
     rootWorldId: string | null = null
   ) {
     this.worlds = worlds;
-    this.headWorldId = headWorldId;
+    this.apexWorldId = apexWorldId;
     this.rootWorldId = rootWorldId;
   }
 
   /**
-   * 新しい世界を追加
+   * 新しい世界を追加（grow: commit相当）
    */
-  public addWorld(world: World): WorldLineGit {
+  public grow(world: World): WorldLineGit {
     const newWorlds = new Map(this.worlds);
     newWorlds.set(world.worldId, world);
     
@@ -33,11 +33,11 @@ export class WorldLineGit {
   }
 
   /**
-   * 現在のHEAD世界を取得
+   * 現在のAPEX世界を取得
    */
-  public getHeadWorld(): World | null {
-    if (!this.headWorldId) return null;
-    return this.worlds.get(this.headWorldId) || null;
+  public getApexWorld(): World | null {
+    if (!this.apexWorldId) return null;
+    return this.worlds.get(this.apexWorldId) || null;
   }
 
   /**
@@ -65,9 +65,9 @@ export class WorldLineGit {
   }
 
   /**
-   * 指定された世界にHEADを移動（undo用 - 世界線IDを変更しない）
+   * 指定された世界にAPEXを移動（regrow用 - 世界線IDを変更しない）
    */
-  public checkoutForUndo(worldId: string): WorldLineGit {
+  public setApexForRegrow(worldId: string): WorldLineGit {
     if (!this.worlds.has(worldId)) {
       throw new Error(`World ${worldId} not found`);
     }
@@ -80,9 +80,9 @@ export class WorldLineGit {
   }
 
   /**
-   * 指定された世界にHEADを移動（新しい世界線IDを生成）
+   * 指定された世界にAPEXを移動（setApex: checkout相当）
    */
-  public checkout(worldId: string): WorldLineGit {
+  public setApex(worldId: string): WorldLineGit {
     if (!this.worlds.has(worldId)) {
       throw new Error(`World ${worldId} not found`);
     }
@@ -95,9 +95,9 @@ export class WorldLineGit {
   }
 
   /**
-   * 新しいブランチを作成（指定された世界から）
+   * 新しいブランチを作成（sprout: createBranch相当）
    */
-  public createBranch(fromWorldId: string): WorldLineGit {
+  public sprout(fromWorldId: string): WorldLineGit {
     if (!this.worlds.has(fromWorldId)) {
       throw new Error(`World ${fromWorldId} not found`);
     }
@@ -139,7 +139,7 @@ export class WorldLineGit {
    */
   public getWorldsByWorldLineId(worldLineId: string): World[] {
     return Array.from(this.worlds.values()).filter(world => 
-      world.currentWorldLineId === worldLineId
+      world.apexWorldLineId === worldLineId
     );
   }
 
@@ -152,7 +152,7 @@ export class WorldLineGit {
         id,
         world: world.toJson()
       })),
-      headWorldId: this.headWorldId,
+      apexWorldId: this.apexWorldId,
       rootWorldId: this.rootWorldId,
     };
   }
@@ -176,8 +176,8 @@ export class WorldLineGit {
     
     return new WorldLineGit(
       worlds,
-      json.headWorldId || json.headCommitId || null,
-      json.rootWorldId || json.rootCommitId || null
+      json.apexWorldId || json.apexWorldLineId || null,
+      json.rootWorldId || json.rootWorldLineId || null
     );
   }
 }

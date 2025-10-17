@@ -5,7 +5,7 @@ import type { RootState } from "../store.js";
 // シリアライズ可能な状態の型定義
 export interface WorldLineGitState {
   worlds: Array<{ id: string; world: any }>; // WorldLineGit.fromJson()が期待する形式
-  headWorldId: string | null;
+  apexWorldId: string | null;
   rootWorldId: string | null;
 }
 
@@ -48,10 +48,10 @@ export const {
 
 // セレクター関数
 export const selectWorldLineGit = (state: RootState) => state.worldLine.worldLineGit;
-export const selectHeadWorld = (state: RootState) => {
+export const selectApexWorld = (state: RootState) => {
   const worldLineGit = state.worldLine.worldLineGit;
-  if (!worldLineGit || !worldLineGit.headWorldId) return null;
-  const worldEntry = worldLineGit.worlds.find(w => w.id === worldLineGit.headWorldId);
+  if (!worldLineGit || !worldLineGit.apexWorldId) return null;
+  const worldEntry = worldLineGit.worlds.find(w => w.id === worldLineGit.apexWorldId);
   return worldEntry ? worldEntry.world : null;
 };
 export const selectOperationHistory = (state: RootState) => state.worldLine.operationHistory;

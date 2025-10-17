@@ -8,18 +8,18 @@ export class World {
   public readonly worldId: string;
   public readonly parentWorldId: string | null;
   public readonly counter: Counter;
-  public readonly currentWorldLineId: string;
+  public readonly apexWorldLineId: string;
 
   constructor(
     worldId: string,
     parentWorldId: string | null = null,
     counter: Counter = new Counter(),
-    currentWorldLineId: string = ''
+    apexWorldLineId: string = ''
   ) {
     this.worldId = worldId;
     this.parentWorldId = parentWorldId;
     this.counter = counter;
-    this.currentWorldLineId = currentWorldLineId || worldId; // デフォルトは自身のID
+    this.apexWorldLineId = apexWorldLineId || worldId; // デフォルトは自身のID
   }
 
   /**
@@ -30,7 +30,7 @@ export class World {
       crypto.randomUUID(),
       this.worldId,
       newCounter,
-      this.currentWorldLineId
+      this.apexWorldLineId
     );
   }
 
@@ -54,7 +54,7 @@ export class World {
       worldId: this.worldId,
       parentWorldId: this.parentWorldId,
       counter: this.counter.toJson(),
-      currentWorldLineId: this.currentWorldLineId,
+      apexWorldLineId: this.apexWorldLineId,
     };
   }
 
@@ -66,7 +66,7 @@ export class World {
       json.worldId || json.commitId || '', // 後方互換性のためcommitIdもサポート
       json.parentWorldId || json.parentCommitId || null,
       Counter.fromJson(json.counter || {}),
-      json.currentWorldLineId || json.worldId || json.commitId || ''
+      json.apexWorldLineId || json.worldId || json.commitId || ''
     );
   }
 }

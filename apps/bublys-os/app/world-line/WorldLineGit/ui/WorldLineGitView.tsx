@@ -70,10 +70,10 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
 
 export function WorldLineGitView() {
   const {
-    currentWorld,
-    currentWorldId,
-    updateCounter,
-    checkout,
+    apexWorld,
+    apexWorldId,
+    grow,
+    setApex,
     getAllWorlds,
     getWorldTree,
     isModalOpen,
@@ -84,7 +84,7 @@ export function WorldLineGitView() {
   } = useContext(WorldLineGitContext);
 
   const handleWorldSelect = (worldId: string) => {
-    checkout(worldId);
+    setApex(worldId);
   };
 
   return (
@@ -98,7 +98,7 @@ export function WorldLineGitView() {
       )}
 
       {/* 現在の世界のカウンター（初期化済み時のみ表示） */}
-      {isInitialized && currentWorld && (
+      {isInitialized && apexWorld && (
         <div style={{
           backgroundColor: 'white',
           padding: '2rem',
@@ -112,16 +112,16 @@ export function WorldLineGitView() {
               現在の世界
             </h3>
             <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              ID: {currentWorldId?.substring(0, 12)}...
+              ID: {apexWorldId?.substring(0, 12)}...
             </div>
             <div style={{ color: '#666', fontSize: '0.8rem' }}>
-              世界線ID: {currentWorld.currentWorldLineId.substring(0, 12)}...
+              世界線ID: {apexWorld.apexWorldLineId.substring(0, 12)}...
             </div>
           </div>
           
           <CounterView
-            counter={currentWorld.counter}
-            onCounterChange={updateCounter}
+            counter={apexWorld.counter}
+            onCounterChange={grow}
           />
         </div>
       )}
@@ -162,17 +162,17 @@ export function WorldLineGitView() {
           
           <CreateTreeView
             creates={getAllWorlds()}
-            currentCreateId={currentWorldId}
+            currentCreateId={apexWorldId}
             onCreateSelect={handleWorldSelect}
             createTree={getWorldTree()}
           />
         </div>
       )}
 
-      {/* 世界ツリー（デバッグ用）
+      {/* /* 世界ツリー（デバッグ用）
       <CreateTreeView
         creates={getAllWorlds()}
-        currentCreateId={currentWorldId}
+        currentCreateId={apexWorldId}
         onCreateSelect={handleWorldSelect}
         createTree={getWorldTree()}
       /> */}

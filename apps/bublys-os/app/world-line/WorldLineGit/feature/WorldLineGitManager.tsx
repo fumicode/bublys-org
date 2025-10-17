@@ -5,10 +5,10 @@ import {
   initialize,
   updateState,
   selectWorldLineGit,
-  selectHeadWorld,
   useAppDispatch,
   useAppSelector,
   type WorldLineGitState,
+  selectApexWorld,
 } from '@bublys-org/state-management';
 import { Counter } from '../domain/Counter';
 import { World } from '../domain/World';
@@ -23,11 +23,11 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
   
   // Reduxから状態を取得
   const worldLineGitState = useAppSelector(selectWorldLineGit);
-  const currentWorldState = useAppSelector(selectHeadWorld);
+  const apexWorldState = useAppSelector(selectApexWorld);
   
   // ドメインオブジェクトに変換
   const worldLineGit = worldLineGitState ? WorldLineGit.fromJson(worldLineGitState) : null;
-  const currentWorld = currentWorldState ? World.fromJson(currentWorldState) : null;
+  const apexWorld = apexWorldState ? World.fromJson(apexWorldState) : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -62,7 +62,7 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     }
   }, [isInitializing, dispatch]);
 
-  const currentWorldId = worldLineGit?.headWorldId || null;
+  const apexWorldId = worldLineGit?.apexWorldId || null;
 
   // 汎用的な状態更新ヘルパー
   const updateWorldLineGit = useCallback((newWorldLineGit: WorldLineGit, operation: string) => {
@@ -70,64 +70,64 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     dispatch(updateState({ newWorldLineGit: serializedState, operation }));
   }, [dispatch]);
 
-  // カウンターを更新して新しい世界を作成
-  const updateCounterHandler = useCallback((newCounter: Counter) => {
-    if (!currentWorld || !worldLineGit) return;
+  // カウンターを更新して新しい世界を作成（grow: commit相当）
+  const growHandler = useCallback((newCounter: Counter) => {
+    if (!apexWorld || !worldLineGit) return;
     // 現在の世界に子要素が存在するかチェック
     const worldTree = worldLineGit.getWorldTree();
-    const hasChildren = worldTree[currentWorld.worldId]?.length > 0;
+    const hasChildren = worldTree[apexWorld.worldId]?.length > 0;
     
     let newWorld: World;
     
     if (hasChildren) {
       // 子要素が存在する場合：新しい世界線IDを生成してカウンターを更新
       const newWorldLineId = crypto.randomUUID();
-      newWorld = currentWorld
+      newWorld = apexWorld
         .updateCurrentWorldLineId(newWorldLineId)
         .updateCounter(newCounter);
     } else {
       // 子要素が存在しない場合：現在の世界線でカウンターを更新
-      newWorld = currentWorld.updateCounter(newCounter);
+      newWorld = apexWorld.updateCounter(newCounter);
     }
     
     // 新しい世界を追加してWorldLineGitを更新
-    const newWorldLineGit = worldLineGit.addWorld(newWorld);
-    updateWorldLineGit(newWorldLineGit, 'updateCounter');
-  }, [currentWorld, worldLineGit, updateWorldLineGit]);
+    const newWorldLineGit = worldLineGit.grow(newWorld);
+    updateWorldLineGit(newWorldLineGit, 'grow');
+  }, [apexWorld, worldLineGit, updateWorldLineGit]);
 
-  // 指定された世界にチェックアウト
-  const checkoutHandler = useCallback((worldId: string) => {
+  // 指定された世界にAPEXを移動（setApex: checkout相当）
+  const setApexHandler = useCallback((worldId: string) => {
     if (!worldLineGit) return;
     
     try {
-      const newWorldLineGit = worldLineGit.checkout(worldId);
-      updateWorldLineGit(newWorldLineGit, 'checkout');
+      const newWorldLineGit = worldLineGit.setApex(worldId);
+      updateWorldLineGit(newWorldLineGit, 'setApex');
     } catch (error) {
-      console.error('Checkout failed:', error);
+      console.error('SetApex failed:', error);
     }
   }, [worldLineGit, updateWorldLineGit]);
 
 
-  // 現在の世界線で子要素に移動（Ctrl+Shift+Z）
-  const undoHandler = useCallback(() => {
-    if (!currentWorld || !worldLineGit) return;
+  // 現在の世界線で子要素に移動（regrow: redo相当 - Ctrl+Shift+Z）
+  const regrowHandler = useCallback(() => {
+    if (!apexWorld || !worldLineGit) return;
     
     const worldTree = worldLineGit.getWorldTree();
-    const children = worldTree[currentWorld.worldId];
+    const children = worldTree[apexWorld.worldId];
     
     if (!children || children.length === 0) return;
     
-    const currentWorldLineId = currentWorld.currentWorldLineId;
+    const apexWorldLineId = apexWorld.apexWorldLineId;
     const sameWorldLineChild = children.find((childId: string) => {
       const childWorld = worldLineGit.getWorld(childId);
-      return childWorld?.currentWorldLineId === currentWorldLineId;
+      return childWorld?.apexWorldLineId === apexWorldLineId;
     });
     
     if (sameWorldLineChild) {
-      const newWorldLineGit = worldLineGit.checkoutForUndo(sameWorldLineChild);
-      updateWorldLineGit(newWorldLineGit, 'undo');
+      const newWorldLineGit = worldLineGit.setApexForRegrow(sameWorldLineChild);
+      updateWorldLineGit(newWorldLineGit, 'regrow');
     }
-  }, [currentWorld, worldLineGit, updateWorldLineGit]);
+  }, [apexWorld, worldLineGit, updateWorldLineGit]);
 
   // 全ての世界線を表示（Ctrl+Z）
   const showAllWorldLinesHandler = useCallback(() => {
@@ -159,7 +159,7 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
       // Shiftの影響で大文字のZが検出される
       if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
         event.preventDefault();
-        undoHandler();
+        regrowHandler();
       } 
       // Ctrl+Z の検出（zは小文字）
       else if (event.ctrlKey && !event.shiftKey && event.key === 'z') {
@@ -169,14 +169,14 @@ export function WorldLineGitManager({ children }: WorldLineGitManagerProps) {
     };
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [undoHandler, showAllWorldLinesHandler]);
+  }, [regrowHandler, showAllWorldLinesHandler]);
 
   const contextValue: WorldLineGitContextType = {
-    currentWorld,
-    currentWorldId,
-    updateCounter: updateCounterHandler,
-    checkout: checkoutHandler,
-    undo: undoHandler,
+    apexWorld,
+    apexWorldId,
+    grow: growHandler,
+    setApex: setApexHandler,
+    regrow: regrowHandler,
     showAllWorldLines: showAllWorldLinesHandler,
     getAllWorlds,
     getWorldTree,
