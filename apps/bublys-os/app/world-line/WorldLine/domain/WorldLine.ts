@@ -3,13 +3,13 @@ import { World } from './World';
 /**
  * WorldLine クラス
  */
-export class WorldLine {
-  public readonly worlds: Map<string, World>;
+export class WorldLine<TWorldState> {
+  public readonly worlds: Map<string, World<TWorldState>>;
   public readonly apexWorldId: string | null;
   public readonly rootWorldId: string | null;
 
   constructor(
-    worlds: Map<string, World> = new Map(),
+    worlds: Map<string, World<TWorldState>> = new Map(),
     apexWorldId: string | null = null,
     rootWorldId: string | null = null
   ) {
@@ -21,11 +21,11 @@ export class WorldLine {
   /**
    * 新しい世界を追加（grow: commit相当）
    */
-  public grow(world: World): WorldLine {
+  public grow(world: World<TWorldState>): WorldLine<TWorldState> {
     const newWorlds = new Map(this.worlds);
     newWorlds.set(world.worldId, world);
     
-    return new WorldLine(
+    return new WorldLine<TWorldState>(
       newWorlds,
       world.worldId,
       this.rootWorldId || world.worldId
@@ -35,19 +35,19 @@ export class WorldLine {
   /**
    * 指定された世界IDの世界を取得
    */
-  public getWorld(worldId: string): World | null {
+  public getWorld(worldId: string): World<TWorldState> | null {
     return this.worlds.get(worldId) || null;
   }
 
   /**
    * 指定された世界にAPEXを移動（regrow用 - 世界線IDを変更しない）
    */
-  public setApexForRegrow(worldId: string): WorldLine {
+  public setApexForRegrow(worldId: string): WorldLine<TWorldState> {
     if (!this.worlds.has(worldId)) {
       throw new Error(`World ${worldId} not found`);
     }
     
-    return new WorldLine(
+    return new WorldLine<TWorldState>(
       this.worlds,
       worldId,
       this.rootWorldId
@@ -57,12 +57,12 @@ export class WorldLine {
   /**
    * 指定された世界にAPEXを移動（setApex: checkout相当）
    */
-  public setApex(worldId: string): WorldLine {
+  public setApex(worldId: string): WorldLine<TWorldState> {
     if (!this.worlds.has(worldId)) {
       throw new Error(`World ${worldId} not found`);
     }
     
-    return new WorldLine(
+    return new WorldLine<TWorldState>(
       this.worlds,
       worldId,
       this.rootWorldId
@@ -72,7 +72,7 @@ export class WorldLine {
   /**
    * 全ての世界を取得
    */
-  public getAllWorlds(): World[] {
+  public getAllWorlds(): World<TWorldState>[] {
     return Array.from(this.worlds.values());
   }
 
@@ -97,11 +97,11 @@ export class WorldLine {
   /**
    * JSON形式に変換
    */
-  public toJson(): object {
+  public toJson(worldStateSerializer: (state: TWorldState) => any): object {
     return {
       worlds: Array.from(this.worlds.entries()).map(([id, world]) => ({
         id,
-        world: world.toJson()
+        world: world.toJson(worldStateSerializer)
       })),
       apexWorldId: this.apexWorldId,
       rootWorldId: this.rootWorldId,
@@ -111,21 +111,24 @@ export class WorldLine {
   /**
    * JSONからWorldLineインスタンスを作成
    */
-  public static fromJson(json: any): WorldLine {
-    const worlds = new Map<string, World>();
+  public static fromJson<TWorldState>(
+    json: any,
+    worldStateDeserializer: (data: any) => TWorldState = (data: any) => data as TWorldState
+  ): WorldLine<TWorldState> {
+    const worlds = new Map<string, World<TWorldState>>();
     
     if (json.worlds) {
       for (const { id, world } of json.worlds) {
-        worlds.set(id, World.fromJson(world));
+        worlds.set(id, World.fromJson<TWorldState>(world, worldStateDeserializer));
       }
     } else if (json.commits) {
       // 後方互換性のためcommitsもサポート
       for (const { id, commit } of json.commits) {
-        worlds.set(id, World.fromJson(commit));
+        worlds.set(id, World.fromJson<TWorldState>(commit, worldStateDeserializer));
       }
     }
     
-    return new WorldLine(
+    return new WorldLine<TWorldState>(
       worlds,
       json.apexWorldId || json.apexWorldLineId || null,
       json.rootWorldId || json.rootWorldLineId || null

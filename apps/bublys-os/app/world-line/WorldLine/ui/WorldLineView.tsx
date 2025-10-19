@@ -1,7 +1,5 @@
-import React from 'react';
 import { useContext } from 'react';
 import { WorldLineContext } from '../domain/WorldLineContext';
-import { CounterView } from './CounterView';
 import { CreateTreeView } from './CreateTreeView';
 
 // InitializeButtonコンポーネントを直接定義
@@ -68,7 +66,19 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
   );
 }
 
-export function WorldLineView() {
+/**
+ * WorldLineViewのプロップス
+ * TWorldState: 管理する状態の型（ジェネリック）
+ */
+interface WorldLineViewProps<TWorldState> {
+  /** 世界の状態を表示するレンダー関数 */
+  renderWorldState: (
+    worldState: TWorldState,
+    onWorldStateChange: (newWorldState: TWorldState) => void
+  ) => React.ReactNode;
+}
+
+export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewProps<TWorldState>) {
   const {
     apexWorld,
     apexWorldId,
@@ -97,7 +107,7 @@ export function WorldLineView() {
         />
       )}
 
-      {/* 現在の世界のカウンター（初期化済み時のみ表示） */}
+      {/* 現在の世界の状態（初期化済み時のみ表示） */}
       {isInitialized && apexWorld && (
         <div style={{
           backgroundColor: 'white',
@@ -117,12 +127,12 @@ export function WorldLineView() {
             <div style={{ color: '#666', fontSize: '0.8rem' }}>
               世界線ID: {apexWorld.apexWorldLineId.substring(0, 12)}...
             </div>
+            
+            {/* 状態を表示（カスタマイズ可能） */}
+            <div style={{ marginTop: '1rem' }}>
+              {renderWorldState(apexWorld.worldState as TWorldState, grow)}
+            </div>
           </div>
-          
-          <CounterView
-            counter={apexWorld.counter}
-            onCounterChange={grow}
-          />
         </div>
       )}
 
@@ -168,14 +178,6 @@ export function WorldLineView() {
           />
         </div>
       )}
-
-      {/* /* 世界ツリー（デバッグ用）
-      <CreateTreeView
-        creates={getAllWorlds()}
-        currentCreateId={apexWorldId}
-        onCreateSelect={handleWorldSelect}
-        createTree={getWorldTree()}
-      /> */}
     </div>
   );
 }

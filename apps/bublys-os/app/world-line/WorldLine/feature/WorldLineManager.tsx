@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { WorldLineContext, WorldLineContextType } from '../domain/WorldLineContext';
 import {
   initialize,
@@ -10,24 +10,33 @@ import {
   type WorldLineState,
   selectApexWorld,
 } from '@bublys-org/state-management';
-import { Counter } from '../domain/Counter';
 import { World } from '../domain/World';
 import { WorldLine } from '../domain/WorldLine';
 
-interface WorldLineManagerProps {
+interface WorldLineManagerProps<TWorldState> {
   children: React.ReactNode;
+  objectId: string;  // Counter1, Counter2, Timer1などを識別
+  serialize: (state: TWorldState) => any;
+  deserialize: (data: any) => TWorldState;
+  createInitialWorldState: () => TWorldState;
 }
 
-export function WorldLineManager({ children }: WorldLineManagerProps) {
+export function WorldLineManager<TWorldState>({ 
+  children,
+  objectId,
+  serialize,
+  deserialize,
+  createInitialWorldState 
+}: WorldLineManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
   
-  // Reduxから状態を取得
-  const worldLineState = useAppSelector(selectWorldLine);
-  const apexWorldState = useAppSelector(selectApexWorld);
+  // Reduxから状態を取得（objectIdを指定）
+  const worldLineState = useAppSelector(selectWorldLine(objectId));
+  const apexWorldState = useAppSelector(selectApexWorld(objectId));
   
   // ドメインオブジェクトに変換
-  const worldLine = worldLineState ? WorldLine.fromJson(worldLineState) : null;
-  const apexWorld = apexWorldState ? World.fromJson(apexWorldState) : null;
+  const worldLine = worldLineState ? WorldLine.fromJson<TWorldState>(worldLineState, deserialize) : null;
+  const apexWorld = apexWorldState ? World.fromJson<TWorldState>(apexWorldState, deserialize) : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -40,54 +49,53 @@ export function WorldLineManager({ children }: WorldLineManagerProps) {
     
     try {
       // 初期状態でルート世界を作成
-      const rootWorld = new World(
+      const initialWorldState = createInitialWorldState();
+      const rootWorld = new World<TWorldState>(
         crypto.randomUUID(),
         null,
-        new Counter(100),
+        initialWorldState,
         crypto.randomUUID()
       );
-      const initialWorldLine = new WorldLine(
+      const initialWorldLine = new WorldLine<TWorldState>(
         new Map([[rootWorld.worldId, rootWorld]]),
         rootWorld.worldId,
         rootWorld.worldId
       );
       
       // シリアライズ可能な形式に変換してReduxに送信
-      const serializedState = initialWorldLine.toJson() as WorldLineState;
-      dispatch(initialize(serializedState));
+      const serializedState = initialWorldLine.toJson(serialize) as WorldLineState;
+      dispatch(initialize({ objectId, worldLine: serializedState }));
     } catch (error) {
       console.error('Initialization failed:', error);
     } finally {
       setIsInitializing(false);
     }
-  }, [isInitializing, dispatch]);
+  }, [isInitializing, dispatch, serialize, createInitialWorldState, objectId]);
 
   const apexWorldId = worldLine?.apexWorldId || null;
 
   // 汎用的な状態更新ヘルパー
-  const updateWorldLine = useCallback((newWorldLine: WorldLine, operation: string) => {
-    const serializedState = newWorldLine.toJson() as WorldLineState;
-    dispatch(updateState({ newWorldLine: serializedState, operation }));
-  }, [dispatch]);
+  const updateWorldLine = useCallback((newWorldLine: WorldLine<TWorldState>, operation: string) => {
+    const serializedState = newWorldLine.toJson(serialize) as WorldLineState;
+    dispatch(updateState({ objectId, newWorldLine: serializedState, operation }));
+  }, [dispatch, serialize, objectId]);
 
-  // カウンターを更新して新しい世界を作成（grow: commit相当）
-  const growHandler = useCallback((newCounter: Counter) => {
+  // WorldStateを更新して新しい世界を作成（grow: commit相当）
+  const growHandler = useCallback((newWorldState: TWorldState) => {
     if (!apexWorld || !worldLine) return;
     // 現在の世界に子要素が存在するかチェック
     const worldTree = worldLine.getWorldTree();
     const hasChildren = worldTree[apexWorld.worldId]?.length > 0;
     
-    let newWorld: World;
+    let newWorld: World<TWorldState>;
     
     if (hasChildren) {
-      // 子要素が存在する場合：新しい世界線IDを生成してカウンターを更新
       const newWorldLineId = crypto.randomUUID();
       newWorld = apexWorld
         .updateCurrentWorldLineId(newWorldLineId)
-        .updateCounter(newCounter);
+        .updateWorldState(newWorldState);
     } else {
-      // 子要素が存在しない場合：現在の世界線でカウンターを更新
-      newWorld = apexWorld.updateCounter(newCounter);
+      newWorld = apexWorld.updateWorldState(newWorldState);
     }
     
     // 新しい世界を追加してWorldLineを更新
@@ -142,7 +150,6 @@ export function WorldLineManager({ children }: WorldLineManagerProps) {
     setIsModalOpen(false);
   }, []);
 
-
   // ヘルパー関数
   const getAllWorlds = useCallback(() => {
     return worldLine?.getAllWorlds() || [];
@@ -171,7 +178,7 @@ export function WorldLineManager({ children }: WorldLineManagerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [regrowHandler, showAllWorldLinesHandler]);
 
-  const contextValue: WorldLineContextType = {
+  const contextValue: WorldLineContextType<TWorldState> = {
     apexWorld,
     apexWorldId,
     grow: growHandler,

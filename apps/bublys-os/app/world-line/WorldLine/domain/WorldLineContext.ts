@@ -1,38 +1,37 @@
 import { createContext } from "react";
 import { World } from "./World";
-import { Counter } from "./Counter";
 
 /**
- * WorldLineContext の型定義
+ * WorldLineContext の型定義(ジェネリック版)
  */
-export type WorldLineContextType = {
-  apexWorld: World | null;
+export type WorldLineContextType<TWorldState> = {
+  apexWorld: World<TWorldState> | null;
   apexWorldId: string | null;
-
-  // アクション
-  grow: (newCounter: Counter) => void; // grow: commit相当 - カウンターを更新して新しい世界を作成
-  setApex: (worldId: string) => void; // setApex: checkout相当
-  regrow: () => void; // regrow: redo相当 (Ctrl+Shift+Z) - 現在の世界線で子要素に移動
-  showAllWorldLines: () => void; // Ctrl+z: 全ての世界線を表示
-  initialize: () => void; // 初期化
   
   // ヘルパー関数
-  getAllWorlds: () => World[];
+  getAllWorlds: () => World<TWorldState>[];
   getWorldTree: () => { [worldId: string]: string[] };
   
-  // モーダル関連
-  isModalOpen: boolean;
-  closeModal: () => void;
+  // アクション
+  grow: (newWorldState: TWorldState) => void;
+  setApex: (worldId: string) => void;
+  regrow: () => void; 
+  showAllWorldLines: () => void;
+  initialize: () => void;
   
   // 初期化状態
   isInitializing: boolean;
   isInitialized: boolean;
+
+  // モーダル関連
+  isModalOpen: boolean;
+  closeModal: () => void;
 };
 
 /**
  * WorldLineContext のデフォルト値
  */
-export const WorldLineContext = createContext<WorldLineContextType>({
+export const WorldLineContext = createContext<WorldLineContextType<any>>({
   apexWorld: null,
   apexWorldId: null,
 
