@@ -27,7 +27,7 @@ export type BubbleJson= {
   position?: Point2;
   size?: Size2;
 
-  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+  renderedRect?: Rect; 
 
 };
 
@@ -107,8 +107,15 @@ export class Bubble {
   }
 
   toJSON(): BubbleState {
-    return { ...this.state,
-      renderedRect: Object.assign({}, this.state.renderedRect)
+    const rect = this.state.renderedRect;
+    return {
+      ...this.state,
+      renderedRect: {
+        x: rect?.x || 0,
+        y: rect?.y || 0,
+        width: rect?.width || 0,
+        height: rect?.height || 0,
+      }
     };
   }
 
@@ -116,5 +123,3 @@ export class Bubble {
     return new Bubble(s);
   }
 }
-
-

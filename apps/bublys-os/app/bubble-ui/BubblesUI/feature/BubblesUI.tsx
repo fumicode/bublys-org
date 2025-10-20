@@ -65,10 +65,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const layerUp = (b: Bubble) => {
     dispatch(layerUpAction(b.id));
   };
-  const onMove = (b: Bubble) => {
-    const updated = b.moveTo({ x: 300, y: 300 });
-    dispatch(updateBubble(updated));
-  };
+    const onMove = (b: Bubble) => {
+      const updated = b.moveTo({ x: 300, y: 300 });
+      dispatch(updateBubble(updated.toJSON()));
+    };
   const popChild = (b: Bubble): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(popChildAction(b.id));
@@ -108,12 +108,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             pageSize,
             bubbles: bubblesDPO.layers,
             openBubble: popChildOrJoinSibling,
-          renameBubble: (id: string, newName: string) => {
-            const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
-            const updated = existing.rename(newName);
-            dispatch(updateBubble(updated));
-            return id;
-          },
+      renameBubble: (id: string, newName: string) => {
+        const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
+        const updated = existing.rename(newName);
+        dispatch(updateBubble(updated.toJSON()));
+        return id;
+      },
           }}
         >
       <BubblesLayeredView

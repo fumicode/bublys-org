@@ -60,7 +60,7 @@ export const BubbleView: FC<BubbleProps> = ({
   useEffect(() => {
     if (myRect) {
       const updated = bubble.rendered(myRect);
-      dispatch(updateBubble(updated));
+      dispatch(updateBubble(updated.toJSON()));
     }
   }, [myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
 

@@ -83,24 +83,18 @@ export const bubblesSlice = createSlice({
         .joinSibling(action.payload)
         .toJSON();
     },
-
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleState>) => {
       state.bubbles[action.payload.id] = action.payload;
     },
-    updateBubble: {
-      prepare: (bubble: Bubble) => ({
-        payload: bubble.toJSON(),
-      }),
-      reducer: (state, action: PayloadAction<BubbleState>) => {
-        state.bubbles[action.payload.id] = action.payload;
-      },
+    updateBubble: (state, action: PayloadAction<BubbleState>) => {
+      state.bubbles[action.payload.id] = action.payload;
     },
     // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
       const id = action.payload;
-
       delete state.bubbles[id];
+
       //TODO: Also remove from process
       // state.process = BubblesProcess.fromJSON(state.process)
       //   .removeBubble(id)
