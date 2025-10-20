@@ -13,14 +13,16 @@ export default function EmbeddedPage() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       console.log('Message received in calculator:', event.data);
-      
-      try {
-        const message = event.data as ReceivedMessage;
-        console.log('Parsed message:', message);
-        
-        setReceivedMessages(prev => [...prev, message]);
-      } catch (error) {
-        console.error('Error processing message:', error);
+
+      if (event.data.type === 'POST') {
+        try {
+          const message = event.data as ReceivedMessage;
+          console.log('Parsed message:', message);
+          
+          setReceivedMessages(prev => [...prev, message]);
+        } catch (error) {
+          console.error('Error processing message:', error);
+        }
       }
     };
 

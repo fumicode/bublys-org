@@ -8,7 +8,7 @@ export interface AppData {
 
 export interface AppState {
   apps: AppData[];
-  activeAppId: string | null;
+  activeAppIds: string[];
 }
 
 // ローカルストレージから状態を読み込む
@@ -16,12 +16,12 @@ const loadState = (): AppState => {
   try {
     const serializedState = localStorage.getItem('iframeViewerState');
     if (serializedState === null) {
-      return { apps: [], activeAppId: null };
+      return { apps: [], activeAppIds: [] };
     }
     return JSON.parse(serializedState);
   } catch (err) {
     console.warn('ローカルストレージからの読み込みに失敗しました', err);
-    return { apps: [], activeAppId: null };
+    return { apps: [], activeAppIds: [] };
   }
 };
 
@@ -39,31 +39,34 @@ const appSlice = createSlice({
       state.apps.push(newApp);
     },
     removeApp: (state, action: PayloadAction<string>) => {
-      state.apps = state.apps.filter(app => app.id !== action.payload);
-      if (state.activeAppId === action.payload) {
-        state.activeAppId = null;
+      state.apps = state.apps.filter((app) => app.id !== action.payload);
+      if (state.activeAppIds.includes(action.payload)) {
+        state.activeAppIds = state.activeAppIds.filter(
+          (id) => id !== action.payload
+        );
       }
     },
-    setActiveApp: (state, action: PayloadAction<string | null>) => {
-      state.activeAppId = action.payload;
+    setActiveApp: (state, action: PayloadAction<string[] | null>) => {
+      state.activeAppIds = action.payload ? action.payload : [];
     },
   },
 });
 
 // 状態が変更されるたびにローカルストレージに保存するミドルウェア
-export const localStorageMiddleware = (store: any) => (next: any) => (action: any) => {
-  const result = next(action);
-  if (action.type.startsWith('app/')) {
-    const state = store.getState().app;
-    try {
-      const serializedState = JSON.stringify(state);
-      localStorage.setItem('iframeViewerState', serializedState);
-    } catch (e) {
-      console.warn('ローカルストレージへの保存に失敗しました', e);
+export const localStorageMiddleware =
+  (store: any) => (next: any) => (action: any) => {
+    const result = next(action);
+    if (action.type.startsWith('app/')) {
+      const state = store.getState().app;
+      try {
+        const serializedState = JSON.stringify(state);
+        localStorage.setItem('iframeViewerState', serializedState);
+      } catch (e) {
+        console.warn('ローカルストレージへの保存に失敗しました', e);
+      }
     }
-  }
-  return result;
-};
+    return result;
+  };
 
 export const { addApp, removeApp, setActiveApp } = appSlice.actions;
 export default appSlice.reducer;
