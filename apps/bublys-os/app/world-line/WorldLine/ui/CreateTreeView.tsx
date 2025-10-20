@@ -61,10 +61,6 @@ export function CreateTreeView<TWorldState>({
       margin: '1rem 0',
       border: '1px solid #ddd'
     }}>
-      <h3 style={{ margin: '0 0 1rem 0', color: '#333' }}>
-        🌳 世界ツリー
-      </h3>
-      
       {rootCreates.length === 0 ? (
         <div style={{ color: '#666', fontStyle: 'italic' }}>
           世界がありません
