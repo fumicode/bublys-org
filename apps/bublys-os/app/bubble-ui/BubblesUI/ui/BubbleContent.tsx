@@ -36,7 +36,12 @@ const UserGroupDetail: FC<{ userGroupId: number }> = ({ userGroupId }) => {
 const UserGroupList: FC = () => {
   const { openBubble } = useContext(BubblesContext);
 
-  const { ref, myRect } = useMyRect();
+  const { ref, myRect } = useMyRect({bubble: new Bubble({
+    name: "dummy",
+    colorHue: 0,
+    type: "normal",
+
+  })}); // Dummy bubble for rect calculation
 
   return (
     <div ref={ref}>

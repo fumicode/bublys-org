@@ -53,23 +53,14 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const { addPoints, addRects } = usePositionDebugger();
 
-  const { ref, myRect } = useMyRect();
 
-  const renderCount = useAppSelector(selectRenderCount);
-  const dispatch = useAppDispatch();
+  const { ref, handleTransitionEnd } = useMyRect({ bubble });
 
-  useEffect(() => {
-    if (myRect) {
-      console.log("BubbleView: myRect changed",renderCount, myRect);
-      const updated = bubble.rendered(myRect);
-      dispatch(renderBubble(updated.toJSON()));
-    }
 
-  }, [renderCount, myRect, myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
+
 
 
   
-  const pageSize = useWindowSize();
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,18 +98,7 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onTransitionEnd={() => {
-        if(!ref.current)
-          return;
-
-
-        const myRect = new SmartRect(ref.current.getBoundingClientRect(), pageSize);
-        const updated = bubble.rendered(myRect);
-        dispatch(renderBubble(updated.toJSON()));
-
-        addRects([ref.current.getBoundingClientRect()]);
-
-      }}>
+      onTransitionEnd={handleTransitionEnd}>
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.name}</h1>
@@ -213,7 +193,6 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
-        {renderCount}<br/>
         [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
         [{bubble.size?.width}x{bubble.size?.height}]
