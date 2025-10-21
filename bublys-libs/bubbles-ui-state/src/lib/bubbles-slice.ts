@@ -80,14 +80,14 @@ export const bubblesSlice = createSlice({
 
       state.renderCount += 1;
     },
-    popChildInProcess: (state, action: PayloadAction<string>) => {
+    popChild: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .popChild(action.payload)
         .toJSON();
 
       state.renderCount += 1;
     },
-    joinSiblingInProcess: (state, action: PayloadAction<string>) => {
+    joinSibling: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .joinSibling(action.payload)
         .toJSON();
@@ -128,8 +128,8 @@ export const {
   deleteProcessBubble,
   layerDown,
   layerUp,
-  popChildInProcess,
-  joinSiblingInProcess,
+  popChild: popChildInProcess,
+  joinSibling: joinSiblingInProcess,
   addBubble,
   updateBubble,
   renderBubble,

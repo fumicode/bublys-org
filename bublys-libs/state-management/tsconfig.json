@@ -4,6 +4,9 @@
   "include": [],
   "references": [
     {
+      "path": "../bubbles-ui"
+    },
+    {
       "path": "../bubbles-ui-state"
     },
     {

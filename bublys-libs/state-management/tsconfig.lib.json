@@ -11,10 +11,11 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
+    {
+      "path": "../bubbles-ui/tsconfig.lib.json"
+    },
     {
       "path": "../bubbles-ui-state/tsconfig.lib.json"
     }
