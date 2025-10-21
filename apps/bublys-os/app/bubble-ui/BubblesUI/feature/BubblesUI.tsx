@@ -102,7 +102,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <>
-      <PositionDebuggerProvider isShown={false}>
+      <PositionDebuggerProvider isShown={true}>
         <BubblesContext.Provider
           value={{
             pageSize,
@@ -127,6 +127,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       />
         </BubblesContext.Provider>
       </PositionDebuggerProvider>
+
       <Box
         sx={{
           position: "fixed",

@@ -15,6 +15,7 @@ import {
 export interface BubbleStateSlice {
   bubbles: Record<string, BubbleState>;
   process: BubblesProcessState;
+  renderCount: number;
 }
 
 // --- Initial data setup ---
@@ -51,6 +52,7 @@ const initialProcess: BubblesProcessState = {
 const initialState: BubbleStateSlice = {
   bubbles: initialEntities,
   process: initialProcess,
+  renderCount: 0,
 };
 
 export const bubblesSlice = createSlice({
@@ -62,38 +64,57 @@ export const bubblesSlice = createSlice({
       state.process = BubblesProcess.fromJSON(state.process)
         .deleteBubble(action.payload)
         .toJSON();
+      state.renderCount += 1;
     },
     layerDown: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .layerDown(action.payload)
         .toJSON();
+
+      state.renderCount += 1;
     },
     layerUp: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .layerUp(action.payload)
         .toJSON();
+
+      state.renderCount += 1;
     },
     popChildInProcess: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .popChild(action.payload)
         .toJSON();
+
+      state.renderCount += 1;
     },
     joinSiblingInProcess: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .joinSibling(action.payload)
         .toJSON();
+
+      state.renderCount += 1;
     },
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleState>) => {
       state.bubbles[action.payload.id] = action.payload;
+
+      state.renderCount += 1;
     },
     updateBubble: (state, action: PayloadAction<BubbleState>) => {
       state.bubbles[action.payload.id] = action.payload;
+      state.renderCount += 1;
     },
+
+    renderBubble: (state, action: PayloadAction<BubbleState>) => {
+      console.log("render bubble", action.payload);
+      state.bubbles[action.payload.id] = action.payload;
+    },
+
     // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
       const id = action.payload;
       delete state.bubbles[id];
+      state.renderCount += 1;
 
       //TODO: Also remove from process
       // state.process = BubblesProcess.fromJSON(state.process)
@@ -111,6 +132,7 @@ export const {
   joinSiblingInProcess,
   addBubble,
   updateBubble,
+  renderBubble,
   removeBubble,
 } = bubblesSlice.actions;
 
@@ -118,6 +140,10 @@ export const {
 // Selectors
 export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
   new Bubble(state.bubbleState.bubbles[id]);
+
+// Selectors
+export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
+  state.bubbleState.renderCount;
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.

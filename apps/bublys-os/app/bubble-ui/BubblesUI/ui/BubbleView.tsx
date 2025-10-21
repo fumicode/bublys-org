@@ -1,6 +1,6 @@
-import { FC, use, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { Bubble,  Point2, Vec2 } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
@@ -8,8 +8,10 @@ import MoveDownIcon from "@mui/icons-material/MoveDown";
 import MoveUpIcon from "@mui/icons-material/MoveUp";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRect } from "../../01_Utils/01_useMyRect";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { updateBubble } from "@bublys-org/bubbles-ui-state";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { renderBubble, selectRenderCount } from "@bublys-org/bubbles-ui-state";
+import SmartRect from "../domain/01_SmartRect";
+import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -53,18 +55,21 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const { ref, myRect } = useMyRect();
 
-  console.log("BubbleView: myRect", myRect);
-
+  const renderCount = useAppSelector(selectRenderCount);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
     if (myRect) {
+      console.log("BubbleView: myRect changed",renderCount, myRect);
       const updated = bubble.rendered(myRect);
-      dispatch(updateBubble(updated.toJSON()));
+      dispatch(renderBubble(updated.toJSON()));
     }
-  }, [myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
+
+  }, [renderCount, myRect, myRect?.x, myRect?.y, myRect?.width, myRect?.height]);
 
 
+  
+  const pageSize = useWindowSize();
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -102,7 +107,18 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-    >
+      onTransitionEnd={() => {
+        if(!ref.current)
+          return;
+
+
+        const myRect = new SmartRect(ref.current.getBoundingClientRect(), pageSize);
+        const updated = bubble.rendered(myRect);
+        dispatch(renderBubble(updated.toJSON()));
+
+        addRects([ref.current.getBoundingClientRect()]);
+
+      }}>
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.name}</h1>
@@ -197,9 +213,10 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
+        {renderCount}<br/>
+        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
         [{bubble.size?.width}x{bubble.size?.height}]
-
       </main>
 
       {bubble.renderedRect && (
@@ -295,3 +312,4 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     
   }
 `;
+
