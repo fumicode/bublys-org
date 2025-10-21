@@ -7,11 +7,10 @@ import HighLightOffIcon from "@mui/icons-material/HighLightOff";
 import MoveDownIcon from "@mui/icons-material/MoveDown";
 import MoveUpIcon from "@mui/icons-material/MoveUp";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
-import { useMyRect } from "../../01_Utils/01_useMyRect";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { renderBubble, selectRenderCount } from "@bublys-org/bubbles-ui-state";
+import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
+import { useAppDispatch } from "@bublys-org/state-management";
+import { renderBubble } from "@bublys-org/bubbles-ui-state";
 import SmartRect from "../domain/01_SmartRect";
-import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -51,10 +50,18 @@ export const BubbleView: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-  const { addPoints, addRects } = usePositionDebugger();
 
+  const { addRects } = usePositionDebugger();
+  const dispatch = useAppDispatch();
 
-  const { ref, handleTransitionEnd } = useMyRect({ bubble });
+  const { ref, onRenderChange: handleTransitionEnd } = useMyRectObserver({ 
+    onRectChanged: (rect: SmartRect) => {
+      const updated = bubble.rendered(rect);
+      dispatch(renderBubble(updated.toJSON()));
+
+      addRects([rect])
+    }
+  });
 
 
 

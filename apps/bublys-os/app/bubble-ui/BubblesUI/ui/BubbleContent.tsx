@@ -1,9 +1,11 @@
-import { FC, useContext } from "react";
+import { FC, useContext, useState } from "react";
 import { Bubble } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 import { Button } from "@mui/material";
 
-import { useMyRect } from "../../01_Utils/01_useMyRect";
+import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
+import SmartRect from "../domain/01_SmartRect";
+import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 
 export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {
   if (bubble.type === "user-groups") {
@@ -36,15 +38,25 @@ const UserGroupDetail: FC<{ userGroupId: number }> = ({ userGroupId }) => {
 const UserGroupList: FC = () => {
   const { openBubble } = useContext(BubblesContext);
 
-  const { ref, myRect } = useMyRect({bubble: new Bubble({
-    name: "dummy",
-    colorHue: 0,
-    type: "normal",
+  const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
 
-  })}); // Dummy bubble for rect calculation
+
+  const { addRects } = usePositionDebugger();
+
+  const { ref, onRenderChange} = useMyRectObserver({ 
+    onRectChanged: (rect: SmartRect) => {
+      //TODO: render直後しか呼ばれない問題あり。移動してたりすると追従できない
+
+      setMyRect (rect);
+
+      addRects([rect]);
+    }
+  });
+
+
 
   return (
-    <div ref={ref}>
+    <div ref={ref} onTransitionEnd={onRenderChange}>
       <Button variant="contained" onClick={() => openBubble("huga", myRect)}>
         normal
       </Button>
