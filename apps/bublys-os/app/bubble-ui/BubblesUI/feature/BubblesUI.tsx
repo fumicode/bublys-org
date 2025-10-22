@@ -16,7 +16,7 @@ import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import SmartRect from "../domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 import { Box, Button, Slider, Typography } from "@mui/material";
 
 // 文字列から1対1の一意な色を生成。

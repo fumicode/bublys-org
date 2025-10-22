@@ -1,6 +1,6 @@
 import { createContext } from "react";
 import { Size2, Bubble } from "@bublys-org/bubbles-ui";
-import SmartRect from "./01_SmartRect";
+import {SmartRect} from "@bublys-org/bubbles-ui";
 
 type BubblesContextType = {
   pageSize?: Size2;

@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   Bubble,
-  BubbleState,
+  BubbleJson,
   BubblesProcess,
   BubblesProcessState,
   BubblesProcessDPO,
@@ -13,7 +13,7 @@ import {
  * - process: BubblesProcessState holding layers of Bubble IDs
  */
 export interface BubbleStateSlice {
-  bubbles: Record<string, BubbleState>;
+  bubbles: Record<string, BubbleJson>;
   process: BubblesProcessState;
   renderCount: number;
 }
@@ -38,7 +38,7 @@ const initialBubbleInstances: Bubble[] = [
 ];
 
 // Build entities map
-const initialEntities: Record<string, BubbleState> = {};
+const initialEntities: Record<string, BubbleJson> = {};
 initialBubbleInstances.forEach((b) => {
   initialEntities[b.id] = b.toJSON();
 });
@@ -95,17 +95,17 @@ export const bubblesSlice = createSlice({
       state.renderCount += 1;
     },
     // Entity-only actions
-    addBubble: (state, action: PayloadAction<BubbleState>) => {
+    addBubble: (state, action: PayloadAction<BubbleJson>) => {
       state.bubbles[action.payload.id] = action.payload;
 
       state.renderCount += 1;
     },
-    updateBubble: (state, action: PayloadAction<BubbleState>) => {
+    updateBubble: (state, action: PayloadAction<BubbleJson>) => {
       state.bubbles[action.payload.id] = action.payload;
       state.renderCount += 1;
     },
 
-    renderBubble: (state, action: PayloadAction<BubbleState>) => {
+    renderBubble: (state, action: PayloadAction<BubbleJson>) => {
       console.log("render bubble", action.payload);
       state.bubbles[action.payload.id] = action.payload;
     },
@@ -139,7 +139,7 @@ export const {
 
 // Selectors
 export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
-  new Bubble(state.bubbleState.bubbles[id]);
+  Bubble.fromJSON(state.bubbleState.bubbles[id]);
 
 // Selectors
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>

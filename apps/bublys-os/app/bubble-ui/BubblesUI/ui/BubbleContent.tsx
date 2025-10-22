@@ -1,10 +1,9 @@
 import { FC, useContext, useState } from "react";
-import { Bubble } from "@bublys-org/bubbles-ui";
+import { Bubble,SmartRect } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 import { Button } from "@mui/material";
 
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
-import SmartRect from "../domain/01_SmartRect";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 
 export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {
