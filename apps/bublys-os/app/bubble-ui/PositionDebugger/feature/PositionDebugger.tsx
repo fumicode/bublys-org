@@ -3,7 +3,7 @@
 import { FC, useState } from "react";
 import { Point2 } from "@bublys-org/bubbles-ui"
 
-import SmartRect from "../../BubblesUI/domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";
 import { PagePointViewer } from "../ui/PagePointViewer";

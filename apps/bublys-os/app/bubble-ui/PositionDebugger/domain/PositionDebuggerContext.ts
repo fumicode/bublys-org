@@ -1,8 +1,7 @@
 //pointsとrectsを保存するコンテキスト
 
 import { createContext, useContext } from "react";
-import { Point2 } from "../../01_Utils/00_Point";
-import SmartRect from "../../BubblesUI/domain/01_SmartRect";
+import { Point2, SmartRect } from "@bublys-org/bubbles-ui"
 
 export type PositionDebuggerState = {
   points: Point2[];

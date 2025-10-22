@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useWindowSize } from "./01_useWindowSize";
-import SmartRect from "../BubblesUI/domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount } from "@bublys-org/bubbles-ui-state";
 

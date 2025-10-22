@@ -10,7 +10,8 @@ import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble } from "@bublys-org/bubbles-ui-state";
-import SmartRect from "../domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
+import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -105,7 +106,10 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onTransitionEnd={handleTransitionEnd}>
+      onTransitionEnd={handleTransitionEnd}
+      
+
+      >
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.name}</h1>
@@ -200,6 +204,8 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
+
+        {bubble.renderedRect && ( <SmartRectView rect={bubble.renderedRect} />)}
         [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
         [{bubble.size?.width}x{bubble.size?.height}]
@@ -299,4 +305,3 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     
   }
 `;
-
