@@ -20,7 +20,8 @@
           {
             "projects": [
               "@bublys-org/state-management",
-              "@bublys-org/bubbles-ui"
+              "@bublys-org/bubbles-ui",
+              "@bublys-org/bubbles-ui-state"
             ],
             "target": "dev"
           }

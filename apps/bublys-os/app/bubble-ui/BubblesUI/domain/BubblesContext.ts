@@ -1,11 +1,10 @@
 import { createContext } from "react";
-import { Size2 } from "@bublys-org/bubbles-ui";
-import { BubblesProcess } from "@bublys-org/bubbles-ui";
+import { Size2, Bubble } from "@bublys-org/bubbles-ui";
 import SmartRect from "./01_SmartRect";
 
 type BubblesContextType = {
   pageSize?: Size2;
-  bubbles: BubblesProcess;
+  bubbles: Bubble[][];
 
   openBubble: (name: string, parentRect?: SmartRect) => string;
   renameBubble: (id: string, newName: string) => string;

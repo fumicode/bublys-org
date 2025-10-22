@@ -1,14 +1,16 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { Bubble } from "@bublys-org/bubbles-ui"
-import { Point2, Vec2 } from "@bublys-org/bubbles-ui"
+import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
 import MoveDownIcon from "@mui/icons-material/MoveDown";
 import MoveUpIcon from "@mui/icons-material/MoveUp";
 import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
-import { useMyRect } from "../../01_Utils/01_useMyRect";
+import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
+import { useAppDispatch } from "@bublys-org/state-management";
+import { renderBubble } from "@bublys-org/bubbles-ui-state";
+import SmartRect from "../domain/01_SmartRect";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -21,11 +23,10 @@ type BubbleProps = {
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
-  onCloseClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onMoveClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onLayerDownClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onLayerUpClick?: (bubble: Bubble) => void; // クリックイベントハンドラ
-  onRendered?: (bubble: Bubble) => void; // バブルがレンダリングされたときに呼び出されるコールバック
+  onCloseClick?: (bubble: Bubble) => void;
+  onMoveClick?: (bubble: Bubble) => void;
+  onLayerDownClick?: (bubble: Bubble) => void;
+  onLayerUpClick?: (bubble: Bubble) => void;
 };
 
 export const BubbleView: FC<BubbleProps> = ({
@@ -40,7 +41,6 @@ export const BubbleView: FC<BubbleProps> = ({
   onLayerDownClick,
   onLayerUpClick,
   onMoveClick,
-  onRendered,
 }) => {
   position = position || { x: 0, y: 0 };
   vanishingPoint = vanishingPoint || new Vec2({ x: 0, y: 0 });
@@ -50,24 +50,24 @@ export const BubbleView: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-  const { addPoints } = usePositionDebugger();
 
-  const { ref, myRect } = useMyRect();
+  const { addRects } = usePositionDebugger();
+  const dispatch = useAppDispatch();
 
-  console.log("BubbleView: myRect", myRect);
+  const { ref, onRenderChange: handleTransitionEnd } = useMyRectObserver({ 
+    onRectChanged: (rect: SmartRect) => {
+      const updated = bubble.rendered(rect);
+      dispatch(renderBubble(updated.toJSON()));
 
-  // バブルの位置とバニシングポイントをPositionDebuggerに登録
-  useEffect(() => {
-    // 初期化時にポイントと矩形を追加
-    addPoints([position, vanishingPoint]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      addRects([rect])
+    }
+  });
 
-  useEffect(() => {
-    // バブルがレンダリングされたときに呼び出される
-    onRendered?.(bubble);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+
+
+
+  
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -105,7 +105,7 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-    >
+      onTransitionEnd={handleTransitionEnd}>
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.name}</h1>
@@ -200,8 +200,17 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
+        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
         {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
+        [{bubble.size?.width}x{bubble.size?.height}]
       </main>
+
+      {/* {bubble.renderedRect && ( // デバッグ用矩形
+        <div className="e-debug-rect"
+          style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>
+        </div>
+      )} */}
+
     </StyledBubble>
   );
 };
@@ -249,7 +258,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   border-radius: 3em;
 
-  .e-bubble-header {
+  >.e-bubble-header {
     .e-bubble-name {
       background: hsla(0, 0%, 100%, 0.5);
       padding: 0.5em;
@@ -262,7 +271,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     }
   }
 
-  .e-bubble-content {
+  >.e-bubble-content {
     padding: 1em;
     font-size: 1em;
     background: white;
@@ -270,4 +279,24 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     border-radius: 0.5em;
     margin: 0.5em;
   }
+
+  >.e-debug-rect {
+    //下中央
+    display: flex;
+    justify-content: center;
+    align-items: end;
+
+    border-radius: 30px;
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    border: 1px solid blue;
+    pointer-events: none;
+    box-sizing: border-box;
+    
+  }
 `;
+
