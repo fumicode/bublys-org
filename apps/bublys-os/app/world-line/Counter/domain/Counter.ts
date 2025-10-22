@@ -4,25 +4,24 @@
  */
 export class Counter {
     public readonly value: number;
-  
     constructor(value: number = 0) {
       this.value = value;
     }
-  
+
     /**
      * カウンターを増加させる（新しいインスタンスを返す）
      */
     public countUp(): Counter {
       return new Counter(this.value + 1);
     }
-  
+
     /**
      * カウンターを減少させる（新しいインスタンスを返す）
      */
     public countDown(): Counter {
       return new Counter(this.value - 1);
     }
-  
+
     /**
      * JSON形式に変換
      */
@@ -31,7 +30,7 @@ export class Counter {
         value: this.value,
       };
     }
-  
+    
     /**
      * JSONからCounterインスタンスを作成
      */

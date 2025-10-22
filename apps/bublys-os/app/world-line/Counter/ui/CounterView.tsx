@@ -1,21 +1,16 @@
 'use client';
-import React from 'react';
 import { Counter } from '../domain/Counter';
-
 interface CounterViewProps {
   counter: Counter;
   onCounterChange: (newCounter: Counter) => void;
 }
-
 export function CounterView({ counter, onCounterChange }: CounterViewProps) {
   const handleCountUp = () => {
     onCounterChange(counter.countUp());
   };
-
   const handleCountDown = () => {
     onCounterChange(counter.countDown());
   };
-
   return (
     <div style={{ 
       display: 'flex', 

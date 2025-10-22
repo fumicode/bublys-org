@@ -1,7 +1,5 @@
-import React from 'react';
 import { useContext } from 'react';
-import { WorldLineGitContext } from '../domain/WorldLineGitContext';
-import { CounterView } from './CounterView';
+import { WorldLineContext } from '../domain/WorldLineContext';
 import { CreateTreeView } from './CreateTreeView';
 
 // InitializeButtonコンポーネントを直接定義
@@ -23,7 +21,7 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
           color: '#333',
           fontSize: '1.2rem'
         }}>
-          🌍 WorldLineGit を初期化
+          🌍 WorldLine を初期化
         </h3>
         <p style={{ 
           margin: '0 0 1.5rem 0', 
@@ -68,12 +66,24 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
   );
 }
 
-export function WorldLineGitView() {
+/**
+ * WorldLineViewのプロップス
+ * TWorldState: 管理する状態の型（ジェネリック）
+ */
+interface WorldLineViewProps<TWorldState> {
+  /** 世界の状態を表示するレンダー関数 */
+  renderWorldState: (
+    worldState: TWorldState,
+    onWorldStateChange: (newWorldState: TWorldState) => void
+  ) => React.ReactNode;
+}
+
+export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewProps<TWorldState>) {
   const {
-    currentWorld,
-    currentWorldId,
-    updateCounter,
-    checkout,
+    apexWorld,
+    apexWorldId,
+    grow,
+    setApex,
     getAllWorlds,
     getWorldTree,
     isModalOpen,
@@ -81,10 +91,10 @@ export function WorldLineGitView() {
     initialize,
     isInitializing,
     isInitialized,
-  } = useContext(WorldLineGitContext);
+  } = useContext(WorldLineContext);
 
   const handleWorldSelect = (worldId: string) => {
-    checkout(worldId);
+    setApex(worldId);
   };
 
   return (
@@ -97,8 +107,8 @@ export function WorldLineGitView() {
         />
       )}
 
-      {/* 現在の世界のカウンター（初期化済み時のみ表示） */}
-      {isInitialized && currentWorld && (
+      {/* 現在の世界の状態（初期化済み時のみ表示） */}
+      {isInitialized && apexWorld && (
         <div style={{
           backgroundColor: 'white',
           padding: '2rem',
@@ -112,17 +122,17 @@ export function WorldLineGitView() {
               現在の世界
             </h3>
             <div style={{ color: '#666', fontSize: '0.9rem' }}>
-              ID: {currentWorldId?.substring(0, 12)}...
+              ID: {apexWorldId?.substring(0, 12)}...
             </div>
             <div style={{ color: '#666', fontSize: '0.8rem' }}>
-              世界線ID: {currentWorld.currentWorldLineId.substring(0, 12)}...
+              世界線ID: {apexWorld.apexWorldLineId.substring(0, 12)}...
+            </div>
+            
+            {/* 状態を表示（カスタマイズ可能） */}
+            <div style={{ marginTop: '1rem' }}>
+              {renderWorldState(apexWorld.worldState as TWorldState, grow)}
             </div>
           </div>
-          
-          <CounterView
-            counter={currentWorld.counter}
-            onCounterChange={updateCounter}
-          />
         </div>
       )}
 
@@ -162,20 +172,12 @@ export function WorldLineGitView() {
           
           <CreateTreeView
             creates={getAllWorlds()}
-            currentCreateId={currentWorldId}
+            currentCreateId={apexWorldId}
             onCreateSelect={handleWorldSelect}
             createTree={getWorldTree()}
           />
         </div>
       )}
-
-      {/* 世界ツリー（デバッグ用）
-      <CreateTreeView
-        creates={getAllWorlds()}
-        currentCreateId={currentWorldId}
-        onCreateSelect={handleWorldSelect}
-        createTree={getWorldTree()}
-      /> */}
     </div>
   );
 }
