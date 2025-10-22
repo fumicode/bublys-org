@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+"use client";
+import { useLayoutEffect, useRef } from "react";
 import { useWindowSize } from "./01_useWindowSize";
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { useAppSelector } from "@bublys-org/state-management";
@@ -36,14 +37,14 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
 
     saveRect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderCount]);
+  }, [renderCount, pageSize]);
 
 
 
-  const onRenderChange = () => {
+  const notifyRendered = () => {
     saveRect();
   }
 
 
-  return { ref, onRenderChange: onRenderChange  };
+  return { ref, notifyRendered };
 };

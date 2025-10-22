@@ -55,7 +55,7 @@ export const BubbleView: FC<BubbleProps> = ({
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
 
-  const { ref, onRenderChange: handleTransitionEnd } = useMyRectObserver({ 
+  const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
       dispatch(renderBubble(updated.toJSON()));
@@ -106,7 +106,7 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onTransitionEnd={handleTransitionEnd}
+      onTransitionEnd={notifyRendered}
       
 
       >
