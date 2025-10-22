@@ -205,11 +205,12 @@ export const BubbleView: FC<BubbleProps> = ({
         [{bubble.size?.width}x{bubble.size?.height}]
       </main>
 
-      {bubble.renderedRect && (
+      {/* {bubble.renderedRect && ( // デバッグ用矩形
         <div className="e-debug-rect"
           style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>
         </div>
-      )}
+      )} */}
+
     </StyledBubble>
   );
 };

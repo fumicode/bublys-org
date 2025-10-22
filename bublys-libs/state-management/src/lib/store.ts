@@ -5,12 +5,8 @@ import {
 import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
-  joinSiblingInProcess,
-  renderBubble,
-  updateBubble,
 } from "@bublys-org/bubbles-ui-state";
 import { bubblesListener } from "@bublys-org/bubbles-ui-state";
-import { Bubble } from "@bublys-org/bubbles-ui";
 
 // Reducers 定義
 const reducers = combineReducers({

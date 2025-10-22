@@ -145,6 +145,13 @@ export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: {
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
+export const selectSurfaceBubbles = (state: { bubbleState: BubbleStateSlice }) => {
+  const process = BubblesProcess.fromJSON(state.bubbleState.process);
+  const bubbles = state.bubbleState.bubbles;
+  const surfaceIds = process.surface || [];
+  return surfaceIds.map(id => Bubble.fromJSON(bubbles[id]));
+}
+
 /**
  * Returns a BubblesProcessDPO instance for the given state.
  */

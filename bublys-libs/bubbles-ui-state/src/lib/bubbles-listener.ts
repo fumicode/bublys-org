@@ -2,9 +2,10 @@ import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   joinSiblingInProcess,
   renderBubble,
+  selectBubble,
+  selectSurfaceBubbles,
   updateBubble,
 } from './bubbles-slice.js';
-import { Bubble } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -25,11 +26,19 @@ bubblesListener.startListening({
 
     // 現在の state から対象バブルを取得
     const state = listenerApi.getState() as any;
-    const bubbleJson = state.bubbleState.bubbles[id];
-    const bubble = Bubble.fromJSON(bubbleJson);
+    const surfaceBubbles = selectSurfaceBubbles(state);
+    const otherSiblingBubbles = surfaceBubbles.filter(b => b.id !== id);
 
-    // TODO: 目標座標を指定してください
-    const moved = bubble.moveTo({ x: 0, y: 0 });
+    if (!otherSiblingBubbles.length) {
+      return;
+    }
+    //全ての幅を足す
+    const totalWidth = otherSiblingBubbles.reduce((sum, b) => sum + (b.renderedRect?.width || 0), 0);
+
+
+
+    const bubble = selectBubble(state, { id });
+    const moved = bubble.moveTo({ x: totalWidth, y: 0 });
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));

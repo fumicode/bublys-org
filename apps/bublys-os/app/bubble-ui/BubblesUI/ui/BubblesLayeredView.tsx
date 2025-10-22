@@ -37,8 +37,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         const bubbleWidths = layer.map((b) => b.size?.width || 400);
         const offsetX = bubbleWidths.slice(0, xIndex).reduce((sum, w) => sum + w, 0);
         const pos = new Vec2(bubble.position || { x: 0, y: 0 })
-          .add(surfaceLeftTop)
-          .add({ x: offsetX, y: 0 });
+          .add(surfaceLeftTop);
         return (
           <BubbleView
             bubble={bubble}
