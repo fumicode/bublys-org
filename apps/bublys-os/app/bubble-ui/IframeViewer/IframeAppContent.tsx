@@ -13,7 +13,7 @@ export const IframeAppContent = ({
   sendMessageToIframe,
 }: IframeAppContentProps) => {
   const [inputURLText, setInputURLText] = useState('');
-  const [DisplayedApp, setActiveApp] = useState<AppData | null>(application);
+  const [displayedApp, setActiveApp] = useState<AppData | null>(application);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [inputMethodText, setInputMethodText] = useState('');
   const [inputParamsText, setInputParamsText] = useState('');
@@ -28,7 +28,7 @@ export const IframeAppContent = ({
         sx={{ mb: 2 }}
       />
 
-      {DisplayedApp && (
+      {displayedApp && (
         <Box
           sx={{
             display: 'flex',
@@ -48,14 +48,14 @@ export const IframeAppContent = ({
           >
             <iframe
               ref={iframeRef}
-              src={DisplayedApp.url}
+              src={displayedApp.url}
               style={{
                 width: '100%',
                 height: '100%',
                 border: 'none',
                 display: 'block',
               }}
-              title={DisplayedApp.name}
+              title={displayedApp.name}
             />
           </Box>
 
