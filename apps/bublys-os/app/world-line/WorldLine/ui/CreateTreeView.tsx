@@ -1,20 +1,19 @@
-import React from 'react';
 import { World } from '../domain/World';
 
-interface CreateTreeViewProps {
-  creates: World[];
+interface CreateTreeViewProps<TWorldState> {
+  creates: World<TWorldState>[];
   currentCreateId: string | null;
   onCreateSelect: (createId: string) => void;
   createTree: { [createId: string]: string[] };
 }
 
-export function CreateTreeView({ 
+export function CreateTreeView<TWorldState>({ 
   creates, 
   currentCreateId, 
   onCreateSelect, 
   createTree 
-}: CreateTreeViewProps) {
-  const renderCreateNode = (create: World, level: number = 0) => {
+}: CreateTreeViewProps<TWorldState>) {
+  const renderCreateNode = (create: World<TWorldState>, level: number = 0) => {
     const isCurrent = create.worldId === currentCreateId;
     const children = createTree[create.worldId] || [];
     
@@ -36,14 +35,14 @@ export function CreateTreeView({
             {create.worldId.substring(0, 8)}...
           </div>
           <div style={{ color: '#666', fontSize: '0.8rem' }}>
-            Counter: {create.counter.value}
+            WorldState: {JSON.stringify(create.worldState)}
           </div>
           <div style={{ color: '#999', fontSize: '0.7rem' }}>
-            WorldLine: {create.currentWorldLineId.substring(0, 8)}...
+            WorldLine: {create.apexWorldLineId.substring(0, 8)}...
           </div>
         </div>
         
-        {children.map(childId => {
+        {children.map((childId: string) => {
           const childCreate = creates.find(c => c.worldId === childId);
           return childCreate ? renderCreateNode(childCreate, level + 1) : null;
         })}
@@ -62,10 +61,6 @@ export function CreateTreeView({
       margin: '1rem 0',
       border: '1px solid #ddd'
     }}>
-      <h3 style={{ margin: '0 0 1rem 0', color: '#333' }}>
-        🌳 世界ツリー
-      </h3>
-      
       {rootCreates.length === 0 ? (
         <div style={{ color: '#666', fontStyle: 'italic' }}>
           世界がありません
