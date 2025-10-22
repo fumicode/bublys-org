@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from "react";
-import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize } from "@bublys-org/state-management";
 
 import {
   selectBubblesProcessDPO,
@@ -48,12 +48,17 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
   const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
 
-  // ページサイズ管理
-  const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
+   // ページサイズ管理
+  const pageSize = useAppSelector(selectWindowSize);
   useEffect(() => {
-    const rect = document.body.getBoundingClientRect();
-    setPageSize({ width: rect.width, height: rect.height });
-  }, []);
+    const update = () =>
+      dispatch(
+        setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+      );
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [dispatch]);
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {

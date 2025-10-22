@@ -75,6 +75,7 @@ const StyledSmartRectView = styled.div`
 
   td {
     &.m-widest {
+      color: red;
       font-weight: bold;
     }
   }

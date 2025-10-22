@@ -42,7 +42,7 @@ const UserGroupList: FC = () => {
 
   const { addRects } = usePositionDebugger();
 
-  const { ref, onRenderChange} = useMyRectObserver({ 
+  const { ref, notifyRendered: onRenderChange} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
       //TODO: render直後しか呼ばれない問題あり。移動してたりすると追従できない
 
