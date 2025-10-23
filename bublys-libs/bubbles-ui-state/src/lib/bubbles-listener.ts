@@ -6,6 +6,7 @@ import {
   selectSurfaceBubbles,
   updateBubble,
 } from './bubbles-slice.js';
+import { SmartRect } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -33,12 +34,26 @@ bubblesListener.startListening({
       return;
     }
     //全ての幅を足す
-    const totalWidth = otherSiblingBubbles.reduce((sum, b) => sum + (b.renderedRect?.width || 0), 0);
+    // const totalWidth = otherSiblingBubbles.reduce((sum, b) => sum + (b.renderedRect?.width || 0), 0);
+    // const thisBubble = selectBubble(state, { id });
+    // const moved = thisBubble.moveTo({ x: totalWidth, y: 0 });
 
 
 
-    const bubble = selectBubble(state, { id });
-    const moved = bubble.moveTo({ x: totalWidth, y: 0 });
+    const thisBubble = selectBubble(state, { id });
+
+    //他のバブルの領域を合体mergeする
+    const merged = otherSiblingBubbles.map(b => b.renderedRect).filter((b): b is SmartRect=> !!b).reduce((acc, b) => acc.merge(b));
+
+    const point = merged.calcPositionToOpen(thisBubble.renderedRect?.size || { width: 0, height: 0 });
+
+    //listenerApi.dispatch(addPoint(point));
+
+    if(!point) {
+      return;
+    }
+
+    const moved = thisBubble.moveTo(point);
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));
