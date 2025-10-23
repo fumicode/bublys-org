@@ -28,16 +28,16 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     x: 20,
     y: 10,
   };
+
   const baseZIndex = 100;
 
   const renderedBubbles = bubbles
     .map((layer, layerIndex) =>
       layer.map((bubble, xIndex) => {
         // calculate position based on existing bubble properties
-        const bubbleWidths = layer.map((b) => b.size?.width || 400);
-        const offsetX = bubbleWidths.slice(0, xIndex).reduce((sum, w) => sum + w, 0);
         const pos = new Vec2(bubble.position || { x: 0, y: 0 })
           .add(surfaceLeftTop);
+
         return (
           <BubbleView
             bubble={bubble}

@@ -51,7 +51,6 @@ export const BubbleView: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
 
@@ -63,12 +62,6 @@ export const BubbleView: FC<BubbleProps> = ({
       addRects([rect])
     }
   });
-
-
-
-
-
-  
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
