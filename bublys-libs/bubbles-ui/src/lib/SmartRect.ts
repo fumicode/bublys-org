@@ -100,18 +100,21 @@ export class SmartRect implements DOMRectReadOnly {
     if (direction === "top") {
       ret = {
         x: this.left,
-        y: this.top - openingSize.height ,
+        y: this.top - openingSize.height,
       };
+
     } else if (direction === "right") {
       ret ={
-        x: this.right + this.width,
+        x: this.right,
         y: this.top,
       };
+
     } else if (direction === "bottom") {
       ret ={
         x: this.left,
-        y: this.bottom + openingSize.height,
+        y: this.bottom,
       };
+
     } else if (direction === "left") {
       ret ={
         x: this.left - openingSize.width ,

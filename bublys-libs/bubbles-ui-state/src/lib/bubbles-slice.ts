@@ -106,7 +106,6 @@ export const bubblesSlice = createSlice({
     },
 
     renderBubble: (state, action: PayloadAction<BubbleJson>) => {
-      console.log("render bubble", action.payload);
       state.bubbles[action.payload.id] = action.payload;
     },
 
