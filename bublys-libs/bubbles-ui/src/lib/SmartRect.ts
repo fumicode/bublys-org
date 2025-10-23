@@ -32,6 +32,9 @@ export class SmartRect implements DOMRectReadOnly {
   get height() {
     return this.domRect.height;
   }
+  get size() : Size2 {
+    return { width: this.width, height: this.height };
+  }
   get top() {
     return this.domRect.top;
   }
@@ -69,6 +72,8 @@ export class SmartRect implements DOMRectReadOnly {
     return [this.topSpace, this.rightSpace, this.bottomSpace, this.leftSpace];
   }
 
+  
+
   calcSpaceWideDirection(
     openingSize: Size2 = { width: 0, height: 0 }
   ): Direction {
@@ -88,31 +93,50 @@ export class SmartRect implements DOMRectReadOnly {
   }
 
   calcPositionToOpen(openingSize: Size2): Point2 {
-    const direction: Direction = this.calcSpaceWideDirection(openingSize);
+    const direction: Direction = this.calcSpaceWideDirection({width:0, height:0});
+
+    let ret: Point2;
 
     if (direction === "top") {
-      return {
+      ret = {
         x: this.left,
-        y: this.top - openingSize.height * 1.2,
+        y: this.top - openingSize.height ,
       };
     } else if (direction === "right") {
-      return {
-        x: this.right + openingSize.width * 0.2,
+      ret ={
+        x: this.right + this.width,
         y: this.top,
       };
     } else if (direction === "bottom") {
-      return {
+      ret ={
         x: this.left,
-        y: this.bottom + openingSize.height * 0.2,
+        y: this.bottom + openingSize.height,
       };
     } else if (direction === "left") {
-      return {
-        x: this.left - openingSize.width * 1.2,
+      ret ={
+        x: this.left - openingSize.width ,
         y: this.top,
       };
     }
+    else {
+      throw new Error("Unexpected direction");
+    }
 
-    throw new Error("Unexpected direction");
+    return ret;
+  }
+
+  /**
+   * Merge this SmartRect with another, returning the minimal bounding SmartRect.
+   */
+  merge(other: SmartRect): SmartRect {
+    const x = Math.min(this.x, other.x);
+    const y = Math.min(this.y, other.y);
+    const right = Math.max(this.right, other.right);
+    const bottom = Math.max(this.bottom, other.bottom);
+    const width = right - x;
+    const height = bottom - y;
+    const domRect = new DOMRect(x, y, width, height);
+    return new SmartRect(domRect, this.parentSize);
   }
 
   toJSON(): SmartRectJson {
