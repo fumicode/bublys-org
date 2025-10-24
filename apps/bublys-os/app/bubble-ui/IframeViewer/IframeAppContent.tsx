@@ -1,23 +1,24 @@
 import { Box, Button, TextField, Typography } from '@mui/material';
 import { useState, useRef } from 'react';
 import type { AppData } from './store/appSlice';
-import type { Message } from './sendMessage.domain';
+import type { Message } from './Message.domain';
 
 interface IframeAppContentProps {
   application: AppData | null;
+  iframeRef: (element: HTMLIFrameElement | null) => void;
   sendMessageToIframe: (message: Message) => void;
+  receivedMessages: Message[];
 }
 
 export const IframeAppContent = ({
   application,
+  iframeRef,
   sendMessageToIframe,
+  receivedMessages,
 }: IframeAppContentProps) => {
   const [inputURLText, setInputURLText] = useState('');
-  const [displayedApp, setActiveApp] = useState<AppData | null>(application);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [inputMethodText, setInputMethodText] = useState('');
-  const [inputParamsText, setInputParamsText] = useState('');
-
+  // const [inputMethodText, setInputMethodText] = useState('');
+  // const [inputParamsText, setInputParamsText] = useState('');
   return (
     <Box sx={{ flex: 1, p: 2, minHeight: 0 }}>
       <TextField
@@ -28,7 +29,7 @@ export const IframeAppContent = ({
         sx={{ mb: 2 }}
       />
 
-      {displayedApp && (
+      {application && (
         <Box
           sx={{
             display: 'flex',
@@ -47,15 +48,16 @@ export const IframeAppContent = ({
             }}
           >
             <iframe
+              key={application?.id}
               ref={iframeRef}
-              src={displayedApp.url}
+              src={application?.url}
               style={{
                 width: '100%',
                 height: '100%',
                 border: 'none',
                 display: 'block',
               }}
-              title={displayedApp.name}
+              title={application?.name}
             />
           </Box>
 
@@ -75,6 +77,65 @@ export const IframeAppContent = ({
 
             {/* PAYLOAD */}
             <Box sx={{ mb: 2 }}>
+              <div>
+                <h3>受信したメッセージ履歴</h3>
+                {receivedMessages.length > 0 ? (
+                  <div
+                    style={{
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      margin: '10px 0',
+                      padding: '12px',
+                      backgroundColor: '#f9f9f9',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        paddingBottom: '4px',
+                        borderBottom: '1px solid #eee',
+                      }}
+                    >
+                      <span>
+                        <strong>method:</strong>{' '}
+                        {receivedMessages[receivedMessages.length - 1].method}
+                      </span>
+                      <span
+                        style={{
+                          color: '#555',
+                          fontSize: '0.9em',
+                        }}
+                      >
+                        {new Date().toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: 'monospace',
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {JSON.stringify(
+                        receivedMessages[receivedMessages.length - 1],
+                        null,
+                        2
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p>メッセージ履歴がありません</p>
+                )}
+              </div>
+              <Box
+                sx={{ pl: 2, borderLeft: 2, borderColor: 'primary.main' }}
+              ></Box>
+            </Box>
+
+            {/* PAYLOAD */}
+            {/* <Box sx={{ mb: 2 }}>
               <Typography
                 variant="subtitle2"
                 sx={{ mb: 1, fontWeight: 'medium' }}
@@ -126,7 +187,7 @@ export const IframeAppContent = ({
                   />
                 </Box>
               </Box>
-            </Box>
+            </Box> */}
 
             {/* Send Button */}
             <Button
@@ -136,10 +197,10 @@ export const IframeAppContent = ({
                 sendMessageToIframe({
                   protocol: 'MCP',
                   version: '1.0',
-                  method: inputMethodText,
+                  method: 'PushNumber',
                   params: {
-                    sender: 'bublysOS',
-                    data: inputParamsText,
+                    slotURL: 'calculator/slot1', //inputParamsText,
+                    value: 4, //inputParamsText,
                   },
                   id: '1',
                   timestamp: Date.now(),

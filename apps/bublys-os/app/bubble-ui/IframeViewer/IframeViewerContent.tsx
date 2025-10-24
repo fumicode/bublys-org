@@ -12,13 +12,47 @@ import {
   IconButton,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { addApp, setActiveApp, removeApp } from './store/appSlice';
 import type { AppData } from './store/appSlice';
-import { Message } from './sendMessage.domain';
+import { Message } from './Message.domain';
 import IframeAppContent from './IframeAppContent';
+import { v4 as uuidv4 } from 'uuid';
+
+interface ExportDataDTO {
+  containerURL: string;
+  value: number;
+}
+
+interface OnChangeValueDTO {
+  containerURL: string;
+  value: number;
+}
+
+//自分のメソッドを相手に渡す
+const handShakeMessage = () => {
+  return {
+    protocol: 'http://localhost:3000',
+    version: '0.0.1',
+    method: 'handShake',
+    params: {
+      methods: [
+        {
+          key: 'exportData',
+          value: { containerURL: 'string', value: 'number' },
+        },
+        {
+          key: 'onChangeValue',
+          value: { containerURL: 'string', value: 'number' },
+        },
+      ],
+    },
+    id: uuidv4(),
+    timestamp: Date.now(),
+  };
+};
 
 const IframeViewerContent = () => {
   const dispatch = useDispatch();
@@ -27,7 +61,51 @@ const IframeViewerContent = () => {
   const [inputURLText, setInputURLText] = useState('');
   const [isModalOpen, setModalOpen] = useState(false);
   const [appName, setAppName] = useState('');
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const activeApps = apps.filter((app) => activeAppIds.includes(app.id));
+  const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
+
+  const [holdData, setHoldData] = useState<Message[]>([]);
+  const checkAndSetHoldData = (message: Message) => {
+    //同じようなデータがすでに存在する場合は置き換える
+    setHoldData((prev) =>
+      prev.map((e) =>
+        e.protocol === message.protocol &&
+        e.version === message.version &&
+        e.method === message.method &&
+        e.params.containerURL === message.params.containerURL
+          ? message
+          : e
+      )
+    );
+    //同じようなデータが存在しない場合は追加する
+    setHoldData((prev) => [...prev, message]);
+  };
+
+  const onChangeHoldData = (message: Message) => {
+    setHoldData((prev) =>
+      prev.map((e) =>
+        e.protocol === message.protocol &&
+        e.params.containerURL === message.params.containerURL
+          ? message
+          : e
+      )
+    );
+  };
+
+  // activeAppsごとに個別のiframe refをMapで管理
+  const iframeRefsMap = useRef(new Map<string, HTMLIFrameElement | null>());
+
+  const setIframeRef = useCallback((appId: string) => {
+    return (element: HTMLIFrameElement | null) => {
+      if (element) {
+        iframeRefsMap.current.set(appId, element);
+        console.log('✅ Iframe ref set for app:', appId);
+      } else {
+        iframeRefsMap.current.delete(appId);
+        console.log('❌ Iframe ref removed for app:', appId);
+      }
+    };
+  }, []);
 
   const handleAppClick = (app: AppData) => {
     if (activeAppIds.includes(app.id)) {
@@ -55,42 +133,64 @@ const IframeViewerContent = () => {
     }
   };
 
-  const activeApps = apps.filter((app) => activeAppIds.includes(app.id));
-
-  // 親ウィンドウからのメッセージを受信
+  // 子ウィンドウからのメッセージを受信
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log('Message received in parent:', event.data);
+      // React DevToolsを除外
+      if (
+        event.data?.source?.includes('react-devtools') ||
+        event.data?.source?.includes('devtools')
+      ) {
+        return;
+      }
 
-      // メッセージの処理
-      const message = event.data;
-      if (message && typeof message === 'object' && message.type) {
-        console.log('Received message from iframe:', message);
-
-        if (message.type === 'INIT_RESPONSE') {
-          console.log('Iframe is ready:', message.data);
+      // 自分からのメッセージを除外
+      if (event.source === window) {
+        return;
+      }
+      try {
+        const message = event.data as Message;
+        setReceivedMessages((prev) => [...prev, message]);
+        if (message.method === 'exportData') {
+          checkAndSetHoldData(message);
+        } else if (message.method === 'onChangeValue') {
+          onChangeHoldData(message);
+        } else if (message.method === 'handShake') {
+          console.log(apps.find((app) => app.url === message.protocol)?.url);
+          sendMessageToIframe(
+            apps.find((app) => app.url === message.protocol)?.id || '',
+            handShakeMessage()
+          );
         }
+      } catch (error) {
+        console.error('Error :サポートされていない形式です', error);
+        return;
       }
     };
-
     window.addEventListener('message', handleMessage);
+
     return () => {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
 
-  const sendMessageToIframe = useCallback((message: Message) => {
-    if (iframeRef.current?.contentWindow) {
-      console.log('Sending message to iframe:', message);
-      try {
-        iframeRef.current.contentWindow.postMessage(message, '*');
-      } catch (error) {
-        console.error('Error sending message to iframe:', error);
+  const sendMessageToIframe = useCallback(
+    (appId: string, message: Message) => {
+      const iframe = iframeRefsMap.current.get(appId);
+      if (iframe?.contentWindow) {
+        console.log('📤 Sending message to iframe:', message);
+        try {
+          iframe.contentWindow.postMessage(message, '*');
+        } catch (error) {
+          console.error('Error sending message to iframe:', error);
+        }
+      } else {
+        console.error('❌ Iframe contentWindow is not available for app:', appId);
+        console.log('Available iframes:', Array.from(iframeRefsMap.current.keys()));
       }
-    } else {
-      console.error('Iframe contentWindow is not available');
-    }
-  }, []);
+    },
+    []
+  );
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -149,8 +249,14 @@ const IframeViewerContent = () => {
       {activeApps.map((app) => (
         <IframeAppContent
           key={app.id}
+          receivedMessages={receivedMessages.filter(
+            (msg) => msg.protocol === app.url
+          )}
           application={app}
-          sendMessageToIframe={sendMessageToIframe}
+          iframeRef={setIframeRef(app.id)}
+          sendMessageToIframe={(message) =>
+            sendMessageToIframe(app.id, message)
+          }
         />
       ))}
 

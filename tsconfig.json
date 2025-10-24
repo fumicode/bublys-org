@@ -16,7 +16,7 @@
       "path": "./apps/calculator"
     },
     {
-      "path": "./memo"
+      "path": "./apps/memo"
     }
   ]
 }
