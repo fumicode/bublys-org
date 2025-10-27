@@ -11,21 +11,8 @@ export interface AppState {
   activeAppIds: string[];
 }
 
-// ローカルストレージから状態を読み込む
-const loadState = (): AppState => {
-  try {
-    const serializedState = localStorage.getItem('iframeViewerState');
-    if (serializedState === null) {
-      return { apps: [], activeAppIds: [] };
-    }
-    return JSON.parse(serializedState);
-  } catch (err) {
-    console.warn('ローカルストレージからの読み込みに失敗しました', err);
-    return { apps: [], activeAppIds: [] };
-  }
-};
-
-const initialState: AppState = loadState();
+// 初期状態は常に空（サーバーとクライアントで一致させる）
+const initialState: AppState = { apps: [], activeAppIds: [] };
 
 const appSlice = createSlice({
   name: 'app',
@@ -49,6 +36,9 @@ const appSlice = createSlice({
     setActiveApp: (state, action: PayloadAction<string[] | null>) => {
       state.activeAppIds = action.payload ? action.payload : [];
     },
+    hydrate: (_state, action: PayloadAction<AppState>) => {
+      return action.payload;
+    },
   },
 });
 
@@ -68,5 +58,5 @@ export const localStorageMiddleware =
     return result;
   };
 
-export const { addApp, removeApp, setActiveApp } = appSlice.actions;
+export const { addApp, removeApp, setActiveApp, hydrate } = appSlice.actions;
 export default appSlice.reducer;

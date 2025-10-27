@@ -15,20 +15,24 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store/store';
-import { addApp, setActiveApp, removeApp } from './store/appSlice';
+import { addApp, setActiveApp, removeApp, hydrate } from './store/appSlice';
 import type { AppData } from './store/appSlice';
 import { Message } from './Message.domain';
 import IframeAppContent from './IframeAppContent';
 import { v4 as uuidv4 } from 'uuid';
 
-interface ExportDataDTO {
+export interface ExportDataDTO {
   containerURL: string;
   value: number;
 }
 
-interface OnChangeValueDTO {
+export interface OnChangeValueDTO {
   containerURL: string;
   value: number;
+}
+export interface HandShakeDTO {
+  key: string;
+  value: { URL: string; value: string };
 }
 
 //自分のメソッドを相手に渡す
@@ -63,26 +67,46 @@ const IframeViewerContent = () => {
   const [appName, setAppName] = useState('');
   const activeApps = apps.filter((app) => activeAppIds.includes(app.id));
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
+  const [handShakeData, setHandShakeData] = useState<Message[]>([]);
+  const [exportData, setExportData] = useState<Message[]>([]);
 
-  const [holdData, setHoldData] = useState<Message[]>([]);
-  const checkAndSetHoldData = (message: Message) => {
-    //同じようなデータがすでに存在する場合は置き換える
-    setHoldData((prev) =>
-      prev.map((e) =>
-        e.protocol === message.protocol &&
-        e.version === message.version &&
-        e.method === message.method &&
-        e.params.containerURL === message.params.containerURL
-          ? message
-          : e
-      )
-    );
-    //同じようなデータが存在しない場合は追加する
-    setHoldData((prev) => [...prev, message]);
+  // クライアント側でマウント時にlocalStorageから状態を復元
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const serializedState = localStorage.getItem('iframeViewerState');
+        if (serializedState) {
+          const savedState = JSON.parse(serializedState);
+          dispatch(hydrate(savedState));
+        }
+      } catch (err) {
+        console.warn('ローカルストレージからの復元に失敗しました', err);
+      }
+    }
+  }, [dispatch]);
+  const checkAndSetExportData = (message: Message) => {
+    setExportData((prev) => {
+      // 同じようなデータが存在するかチェック
+      const existingIndex = prev.findIndex(
+        (e) =>
+          e.protocol === message.protocol &&
+          e.version === message.version &&
+          e.method === message.method &&
+          e.params.containerURL === message.params.containerURL
+      );
+
+      // 存在する場合は置き換え
+      if (existingIndex !== -1) {
+        return prev.map((e, i) => (i === existingIndex ? message : e));
+      }
+
+      // 存在しない場合は追加
+      return [...prev, message];
+    });
   };
 
-  const onChangeHoldData = (message: Message) => {
-    setHoldData((prev) =>
+  const onChangeExportData = (message: Message) => {
+    setExportData((prev) =>
       prev.map((e) =>
         e.protocol === message.protocol &&
         e.params.containerURL === message.params.containerURL
@@ -90,22 +114,78 @@ const IframeViewerContent = () => {
           : e
       )
     );
+  };
+
+  const checkAndSetHandShakeData = (message: Message) => {
+    setHandShakeData((prev) => {
+      // 同じようなデータが存在するかチェック
+      const existingIndex = prev.findIndex(
+        (e) =>
+          e.protocol === message.protocol &&
+          e.version === message.version &&
+          e.method === message.method &&
+          e.params.methods === message.params.methods
+      );
+
+      // 存在する場合は置き換え
+      if (existingIndex !== -1) {
+        return prev.map((e, i) => (i === existingIndex ? message : e));
+      }
+
+      // 存在しない場合は追加
+      return [...prev, message];
+    });
   };
 
   // activeAppsごとに個別のiframe refをMapで管理
   const iframeRefsMap = useRef(new Map<string, HTMLIFrameElement | null>());
+
+  const sendMessageToIframe = useCallback((appId: string, message: Message) => {
+    const iframe = iframeRefsMap.current.get(appId);
+    if (iframe?.contentWindow) {
+      console.log('📤 Sending message to iframe:', message);
+      try {
+        iframe.contentWindow.postMessage(message, '*');
+      } catch (error) {
+        console.error('Error sending message to iframe:', error);
+      }
+    } else {
+      console.error('❌ Iframe contentWindow is not available for app:', appId);
+      console.log(
+        'Available iframes:',
+        Array.from(iframeRefsMap.current.keys())
+      );
+    }
+  }, []);
 
   const setIframeRef = useCallback((appId: string) => {
     return (element: HTMLIFrameElement | null) => {
       if (element) {
         iframeRefsMap.current.set(appId, element);
         console.log('✅ Iframe ref set for app:', appId);
+
+        // refが設定されたら、iframeのロードを待ってhandshakeを送信
+        const sendHandshakeWhenReady = () => {
+          if (element.contentWindow) {
+            console.log('📤 Sending initial handShake to app:', appId);
+            sendMessageToIframe(appId, handShakeMessage());
+          } else {
+            // contentWindowがまだ準備できていない場合は少し待つ
+            setTimeout(sendHandshakeWhenReady, 100);
+          }
+        };
+
+        // iframeのロードイベントを待つ
+        element.addEventListener('load', () => {
+          console.log('🎯 Iframe loaded for app:', appId);
+          setTimeout(() => sendHandshakeWhenReady(), 100);
+        });
       } else {
         iframeRefsMap.current.delete(appId);
         console.log('❌ Iframe ref removed for app:', appId);
       }
     };
-  }, []);
+  }, [sendMessageToIframe]);
 
   const handleAppClick = (app: AppData) => {
     if (activeAppIds.includes(app.id)) {
@@ -152,15 +232,18 @@ const IframeViewerContent = () => {
         const message = event.data as Message;
         setReceivedMessages((prev) => [...prev, message]);
         if (message.method === 'exportData') {
-          checkAndSetHoldData(message);
+          checkAndSetExportData(message);
         } else if (message.method === 'onChangeValue') {
-          onChangeHoldData(message);
+          onChangeExportData(message);
         } else if (message.method === 'handShake') {
-          console.log(apps.find((app) => app.url === message.protocol)?.url);
-          sendMessageToIframe(
-            apps.find((app) => app.url === message.protocol)?.id || '',
-            handShakeMessage()
-          );
+          const targetApp = apps.find((app) => app.url === message.protocol);
+          console.log('📨 Received handShake from:', message.protocol, 'targetApp:', targetApp);
+          if (targetApp) {
+            sendMessageToIframe(targetApp.id, handShakeMessage());
+          } else {
+            console.warn('⚠️ App not found for protocol:', message.protocol);
+          }
+          checkAndSetHandShakeData(message);
         }
       } catch (error) {
         console.error('Error :サポートされていない形式です', error);
@@ -172,25 +255,7 @@ const IframeViewerContent = () => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, []);
-
-  const sendMessageToIframe = useCallback(
-    (appId: string, message: Message) => {
-      const iframe = iframeRefsMap.current.get(appId);
-      if (iframe?.contentWindow) {
-        console.log('📤 Sending message to iframe:', message);
-        try {
-          iframe.contentWindow.postMessage(message, '*');
-        } catch (error) {
-          console.error('Error sending message to iframe:', error);
-        }
-      } else {
-        console.error('❌ Iframe contentWindow is not available for app:', appId);
-        console.log('Available iframes:', Array.from(iframeRefsMap.current.keys()));
-      }
-    },
-    []
-  );
+  }, [apps, sendMessageToIframe]);
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -246,19 +311,27 @@ const IframeViewerContent = () => {
 
       {/* メインコンテンツ */}
 
-      {activeApps.map((app) => (
-        <IframeAppContent
-          key={app.id}
-          receivedMessages={receivedMessages.filter(
-            (msg) => msg.protocol === app.url
-          )}
-          application={app}
-          iframeRef={setIframeRef(app.id)}
-          sendMessageToIframe={(message) =>
-            sendMessageToIframe(app.id, message)
-          }
-        />
-      ))}
+      {activeApps.map((app) => {
+        const childHandShakeData = handShakeData?.find(
+          (e) => e.protocol === app.url
+        );
+
+        return (
+          <IframeAppContent
+            key={app.id}
+            receivedMessages={receivedMessages.filter(
+              (msg) => msg.protocol === app.url
+            )}
+            application={app}
+            exportData={exportData}
+            childHandShakeMessage={childHandShakeData || null}
+            iframeRef={setIframeRef(app.id)}
+            sendMessageToIframe={(message) =>
+              sendMessageToIframe(app.id, message)
+            }
+          />
+        );
+      })}
 
       {/* アプリ追加モーダル */}
       <Dialog open={isModalOpen} onClose={() => setModalOpen(false)}>

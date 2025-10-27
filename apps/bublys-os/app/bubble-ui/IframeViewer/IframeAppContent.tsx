@@ -1,13 +1,25 @@
-import { Box, Button, TextField, Typography } from '@mui/material';
-import { useState, useRef } from 'react';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  Stack,
+  Select,
+  MenuItem,
+} from '@mui/material';
+import { useState, useEffect } from 'react';
 import type { AppData } from './store/appSlice';
 import type { Message } from './Message.domain';
+import type { HandShakeDTO } from './IframeViewerContent';
+import { v4 as uuidv4 } from 'uuid';
 
 interface IframeAppContentProps {
   application: AppData | null;
   iframeRef: (element: HTMLIFrameElement | null) => void;
   sendMessageToIframe: (message: Message) => void;
   receivedMessages: Message[];
+  exportData: Message[];
+  childHandShakeMessage: Message | null;
 }
 
 export const IframeAppContent = ({
@@ -15,10 +27,36 @@ export const IframeAppContent = ({
   iframeRef,
   sendMessageToIframe,
   receivedMessages,
+  exportData,
+  childHandShakeMessage,
 }: IframeAppContentProps) => {
   const [inputURLText, setInputURLText] = useState('');
-  // const [inputMethodText, setInputMethodText] = useState('');
-  // const [inputParamsText, setInputParamsText] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
+    null
+  );
+  const [selectedExportData, setSelectedExportData] = useState<Message | null>(
+    null
+  );
+  const childMethods = childHandShakeMessage?.params
+    .methods as unknown as HandShakeDTO[];
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const createMessage = (method: string, params: any) => {
+    return {
+      protocol: 'http://localhost:3000',
+      version: '0.0.1',
+      method: method,
+      params: params,
+      id: uuidv4(),
+      timestamp: Date.now(),
+    };
+  };
+
   return (
     <Box sx={{ flex: 1, p: 2, minHeight: 0 }}>
       <TextField
@@ -103,14 +141,20 @@ export const IframeAppContent = ({
                         <strong>method:</strong>{' '}
                         {receivedMessages[receivedMessages.length - 1].method}
                       </span>
-                      <span
-                        style={{
-                          color: '#555',
-                          fontSize: '0.9em',
-                        }}
-                      >
-                        {new Date().toLocaleTimeString()}
-                      </span>
+                      {isClient && (
+                        <span
+                          style={{
+                            color: '#555',
+                            fontSize: '0.9em',
+                          }}
+                        >
+                          {new Date(
+                            receivedMessages[
+                              receivedMessages.length - 1
+                            ].timestamp
+                          ).toLocaleTimeString()}
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{
@@ -189,26 +233,51 @@ export const IframeAppContent = ({
               </Box>
             </Box> */}
 
-            {/* Send Button */}
-            <Button
-              fullWidth
-              variant="contained"
-              onClick={() => {
-                sendMessageToIframe({
-                  protocol: 'MCP',
-                  version: '1.0',
-                  method: 'PushNumber',
-                  params: {
-                    slotURL: 'calculator/slot1', //inputParamsText,
-                    value: 4, //inputParamsText,
-                  },
-                  id: '1',
-                  timestamp: Date.now(),
-                });
-              }}
-            >
-              Send Message
-            </Button>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Select
+                onChange={(e) =>
+                  setSelectedMethod(e.target.value as unknown as HandShakeDTO)
+                }
+              >
+                <MenuItem value={''}>Unselected</MenuItem>
+                {childMethods?.map((e, index) => (
+                  <MenuItem key={index} value={e.key}>
+                    {e.key}
+                  </MenuItem>
+                ))}
+              </Select>
+              <Select
+                onChange={(event) =>
+                  setSelectedExportData(
+                    exportData.find(
+                      (e) => e.params.containerURL === event.target.value
+                    ) as unknown as Message
+                  )
+                }
+              >
+                <MenuItem value={''}>Unselected</MenuItem>
+                {exportData.map((e, index) => (
+                  <MenuItem key={index} value={e.params.containerURL}>
+                    {e.params.containerURL}: {JSON.stringify(e.params.value)}
+                  </MenuItem>
+                ))}
+              </Select>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (selectedMethod && selectedExportData) {
+                    sendMessageToIframe(
+                      createMessage(
+                        selectedMethod.key,
+                        selectedExportData.params
+                      )
+                    );
+                  }
+                }}
+              >
+                送信
+              </Button>
+            </Stack>
           </Box>
         </Box>
       )}

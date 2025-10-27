@@ -37,7 +37,7 @@ const handShakeMessage = () => {
     version: '0.0.1',
     method: 'handShake',
     params: {
-      method: [
+      methods: [
         {
           key: 'startReferBlock',
           value: { blockURL: 'string', displayText: 'string' },
@@ -54,14 +54,9 @@ const handShakeMessage = () => {
   };
 };
 
-export interface SimpleMemoDTO {
-  UUID: string;
-  text: string;
-}
-
 interface BlockData {
-  blockURL: string;
-  displayText: string;
+  URL: string;
+  value: string;
 }
 
 export const MemoBody = () => {
@@ -78,8 +73,8 @@ export const MemoBody = () => {
 
   useEffect(() => {
     setSelectedBlock({
-      blockURL: selectedBlock?.blockURL || '',
-      displayText: textareaValue,
+      URL: selectedBlock?.URL || '',
+      value: textareaValue,
     });
   }, [textareaValue]);
 
@@ -291,7 +286,7 @@ export const MemoBody = () => {
           onChange={(e) =>
             setSelectedBlock(
               e.target.value === 'memo/text/line1'
-                ? { blockURL: 'memo/text/line1', displayText: textareaValue }
+                ? { URL: 'memo/text/line1', value: textareaValue }
                 : null
             )
           }
@@ -304,8 +299,8 @@ export const MemoBody = () => {
           onClick={() => {
             if (selectedMethod && selectedBlock) {
               setSelectedBlock({
-                blockURL: selectedBlock?.blockURL || '',
-                displayText: textareaValue,
+                URL: selectedBlock?.URL || '',
+                value: textareaValue,
               });
               sendMessageToIframeParent(
                 createMessage(selectedMethod.key, selectedBlock)
