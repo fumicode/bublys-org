@@ -45,21 +45,14 @@ bubblesListener.startListening({
     //const merged = otherSiblingBubbles.map(b => b.renderedRect).filter((b): b is SmartRect=> !!b).reduce((acc, b) => acc.merge(b));
 
     const brotherBubble = otherSiblingBubbles[otherSiblingBubbles.length -1];
-    console.log("bubblesListener: ", { brotherBubble });
-    
 
     const brotherRect = brotherBubble.renderedRect;
-
-    console.log("bubblesListener: ", { brotherRect });
 
     if(!brotherRect) {
       return;
     }
 
-
     const point = brotherRect.calcPositionToOpen(thisBubble.renderedRect?.size || { width: 0, height: 0 });
-
-    console.log("bubblesListener: ", { point });
 
     //listenerApi.dispatch(addPoint(point));
 
