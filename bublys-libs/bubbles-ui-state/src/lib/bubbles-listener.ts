@@ -1,6 +1,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   joinSiblingInProcess,
+  popChildInProcess,
   renderBubble,
   selectBubble,
   selectSurfaceBubbles,
@@ -64,5 +65,33 @@ bubblesListener.startListening({
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));
+  },
+});
+
+
+// joinSiblingInProcess 発火後、renderBubble の完了を待ち moveTo → updateBubble を順次実行
+bubblesListener.startListening({
+  type: popChildInProcess.type,
+  effect: async (popChildAction, listenerApi) => {
+    const poppingBubbleId = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
+
+    // renderBubble が dispatch され、かつ payload.id が id と一致するのを待つ
+    await listenerApi.take(
+      (otherAction): otherAction is ReturnType<typeof renderBubble> => {
+        const oa = otherAction as ReturnType<typeof renderBubble>;
+        return oa.type === renderBubble.type && oa.payload.id === poppingBubbleId;
+      }
+    );
+
+    //どこに描画されたかsmartRectを表示
+
+    
+    const state = listenerApi.getState() as any;
+    const poppingBubble = selectBubble(state, { id: poppingBubbleId });
+
+    console.log(`Popped bubble ${poppingBubble.id} renderedRect: ${JSON.stringify(poppingBubble.renderedRect)}`);
+
+    
+
   },
 });

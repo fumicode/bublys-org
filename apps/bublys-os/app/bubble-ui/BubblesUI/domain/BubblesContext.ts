@@ -6,14 +6,14 @@ type BubblesContextType = {
   pageSize?: Size2;
   bubbles: Bubble[][];
 
-  openBubble: (name: string, parentRect?: SmartRect) => string;
+  openBubble: (name: string, openerBubbleId: string) => string;
   renameBubble: (id: string, newName: string) => string;
 };
 
 export const BubblesContext = createContext<BubblesContextType>({
   pageSize: { width: 1000, height: 1000 },
   bubbles: [],
-  openBubble(name, parentRect) {
+  openBubble(name, openerBubbleId) {
     console.warn("addBubble not implemented");
     return "void_id";
   },

@@ -21,22 +21,7 @@ export const IframeBubble: FC = () => {
 
   return (
     <div ref={ref} onTransitionEnd={onRenderChange}>
-      <Button variant="contained" onClick={() => openBubble("huga", myRect)}>
-        normal
-      </Button>
-      <Button
-        variant="contained"
-        onClick={() => openBubble("user-groups", myRect)}
-      >
-        other User Groups
-      </Button>
-      <ul>
-        {["Admins", "Editors", "Guests"].map((group) => (
-          <li key={group}>
-            {group}
-          </li>
-        ))}
-      </ul>
+      iframe here
     </div>
   );
 };

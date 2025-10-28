@@ -15,7 +15,6 @@ export function registerBubbleRenderers(typeName: string, renderer: (bubble: Bub
 
 
 export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {
-
   const BubbleRenderer = typeToBubbleRenderer[bubble.type];
   if (BubbleRenderer) {
     return BubbleRenderer(bubble);
@@ -28,7 +27,7 @@ export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {
 
 
 registerBubbleRenderers("mob", (bubble: Bubble) => <MobBubble bubble={bubble} />);
-registerBubbleRenderers("user-groups", (bubble: Bubble) => <UserGroupList />);
+registerBubbleRenderers("user-groups", (bubble: Bubble) => <UserGroupList containedBubble={bubble} />);
 registerBubbleRenderers("user-group", (bubble: Bubble) => {
   const groupId = bubble.name.replace("user-groups/", "");
   return <UserGroupDetail userGroupId={Number(groupId)} />;

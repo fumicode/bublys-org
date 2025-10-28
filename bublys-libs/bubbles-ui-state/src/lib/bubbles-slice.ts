@@ -7,6 +7,12 @@ import {
   BubblesProcessDPO,
 } from "@bublys-org/bubbles-ui";
 
+
+type BubblesRelation = {
+  openerId: string;
+  openeeId: string;
+}
+
 /**
  * Normalized slice state:
  * - entities: map of BubbleState by ID
@@ -15,6 +21,9 @@ import {
 export interface BubbleStateSlice {
   bubbles: Record<string, BubbleJson>;
   process: BubblesProcessState;
+
+  bubbleRelations:  BubblesRelation[];
+
   renderCount: number;
 }
 
@@ -52,6 +61,7 @@ const initialProcess: BubblesProcessState = {
 const initialState: BubbleStateSlice = {
   bubbles: initialEntities,
   process: initialProcess,
+  bubbleRelations: [],
   renderCount: 0,
 };
 
@@ -94,6 +104,7 @@ export const bubblesSlice = createSlice({
 
       state.renderCount += 1;
     },
+
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleJson>) => {
       state.bubbles[action.payload.id] = action.payload;
@@ -104,7 +115,6 @@ export const bubblesSlice = createSlice({
       state.bubbles[action.payload.id] = action.payload;
       state.renderCount += 1;
     },
-
     renderBubble: (state, action: PayloadAction<BubbleJson>) => {
       state.bubbles[action.payload.id] = action.payload;
     },
@@ -120,6 +130,10 @@ export const bubblesSlice = createSlice({
       //   .removeBubble(id)
       //   .toJSON();
     },
+    relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
+      //重複がないようにチェックが必要そう
+      state.bubbleRelations.push(action.payload);
+    }
   },
 });
 
@@ -133,8 +147,8 @@ export const {
   updateBubble,
   renderBubble,
   removeBubble,
+  relateBubbles
 } = bubblesSlice.actions;
-
 
 // Selectors
 export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
@@ -150,6 +164,21 @@ export const selectSurfaceBubbles = (state: { bubbleState: BubbleStateSlice }) =
   const surfaceIds = process.surface || [];
   return surfaceIds.map(id => Bubble.fromJSON(bubbles[id]));
 }
+
+export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice }) => {
+  return state.bubbleState.bubbleRelations;
+}
+
+export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
+  const relations = state.bubbleState.bubbleRelations;
+  const bubbles = state.bubbleState.bubbles;
+  
+  return relations.map(relation => ({
+    opener: Bubble.fromJSON(bubbles[relation.openerId]),
+    openee: Bubble.fromJSON(bubbles[relation.openeeId]),
+  }));
+}
+
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.

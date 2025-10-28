@@ -10,6 +10,8 @@ import {
   updateBubble,
   popChildInProcess as popChildAction,
   joinSiblingInProcess as joinSiblingAction,
+  relateBubbles,
+  selectBubblesRelations,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
@@ -60,6 +62,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     return () => window.removeEventListener("resize", update);
   }, [dispatch]);
 
+
+  const relations = useAppSelector(selectBubblesRelations)
+
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
@@ -78,29 +83,33 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(updateBubble(updated.toJSON()));
   };
 
-  const popChild = (b: Bubble): string => {
+  const popChild = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(popChildAction(b.id));
+    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
     return b.id;
   };
 
-  const joinSibling = (b: Bubble): string => {
+  const joinSibling = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(joinSiblingAction(b.id));
+    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
     return b.id;
   };
 
   // openBubble 用ロジック
   const popChildOrJoinSibling = (
     name: string,
-    openerRect?: SmartRect
+    openerBubbleId: string
   ): string => {
     const newBubble = createBubble(name);
     const surface = bubblesDPO.surface;
     if (surface?.[0]?.type === newBubble.type) {
-      return joinSibling(newBubble);
+      return joinSibling(newBubble, openerBubbleId);
     } else {
-      return popChild(newBubble);
+      return popChild(newBubble, openerBubbleId);
     }
   };
 
@@ -126,15 +135,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             },
           }}
         >
-      <BubblesLayeredView
-        bubbles={bubblesDPO.layers}
-        vanishingPoint={vanishingPoint}
-        onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-        onBubbleClose={deleteBubble}
-        onBubbleMove={onMove}
-        onBubbleLayerDown={layerDown}
-        onBubbleLayerUp={layerUp}
-      />
+          <BubblesLayeredView
+            bubbles={bubblesDPO.layers}
+            vanishingPoint={vanishingPoint}
+            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+            onBubbleClose={deleteBubble}
+            onBubbleMove={onMove}
+            onBubbleLayerDown={layerDown}
+            onBubbleLayerUp={layerUp}
+          />
         </BubblesContext.Provider>
       </PositionDebuggerProvider>
 
@@ -150,6 +159,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           width: 300,
         }}
       >
+        <pre>{JSON.stringify(relations, null, 2)}</pre>
+
         <Typography gutterBottom>Vanishing Point X</Typography>
         <Slider
           value={vanishingPoint.x}
@@ -175,7 +186,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         {/* open user group bubble*/}
         <Button
           variant="outlined"
-          onClick={() => popChildOrJoinSibling("user-groups")}
+          onClick={() => popChildOrJoinSibling("user-groups", "root")}
         >
           Open User Groups Bubble
         </Button>

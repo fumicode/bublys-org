@@ -1,8 +1,11 @@
-import React, { FC } from "react";
+import React, { FC, use } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
+import { useAppSelector } from "@bublys-org/state-management";
+import { selectBubblesRelationsWithBubble } from "@bublys-org/bubbles-ui-state";
+
 
 type BubblesLayeredViewProps = {
   bubbles: Bubble[][];
@@ -23,6 +26,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerDown,
   onBubbleLayerUp,
 }) => {
+
+  const relations = useAppSelector(selectBubblesRelationsWithBubble);
+
+
   const surfaceLeftTop: Point2 = { x: 100, y: 100 };
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
@@ -72,6 +79,44 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         <div className="e-underground-border">underground</div>
         <div className="e-vanishing-point"></div>
       </div>
+
+      {
+        relations.map(({ opener, openee }) => (
+          <div key={opener.id + "_" + openee.id} style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}>
+            <svg width="100%" height="100%">
+              <defs>
+                <marker
+                  id="arrowhead"
+                  markerWidth="10"
+                  markerHeight="7"
+                  refX="0"
+                  refY="3.5"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 3.5, 0 7" fill="red" />
+                </marker>
+              </defs>
+              <line
+                x1={(opener.renderedRect?.x || 0) + (opener.position?.x || 0) + surfaceLeftTop.x}
+                y1={(opener.renderedRect?.y || 0) + (opener.position?.y || 0) + surfaceLeftTop.y}
+                x2={(openee.renderedRect?.x || 0) + (openee.position?.x || 0) + surfaceLeftTop.x}
+                y2={(openee.renderedRect?.y || 0) + (openee.position?.y || 0) + surfaceLeftTop.y}
+                stroke="red"
+                strokeWidth="2"
+                markerEnd="url(#arrowhead)"
+              />
+            </svg>
+          </div>
+        ))
+      } 
+
     </StyledBubblesLayeredView>
   );
 };

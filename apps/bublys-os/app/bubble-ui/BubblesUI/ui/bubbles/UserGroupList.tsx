@@ -1,11 +1,19 @@
 import { FC, useContext, useState } from "react";
 import { BubblesContext } from "../../domain/BubblesContext";
-import { SmartRect } from "@bublys-org/bubbles-ui";
+import { Bubble, SmartRect } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "@/app/bubble-ui/PositionDebugger/domain/PositionDebuggerContext";
 import { useMyRectObserver } from "@/app/bubble-ui/01_Utils/01_useMyRect";
 import { Button } from "@mui/material";
 
-export const UserGroupList: FC = () => {
+type UserGroupListProps = {
+  containedBubble: Bubble;
+
+}
+
+export const UserGroupList: FC<UserGroupListProps> = ({
+  containedBubble
+}) => {
+  
   const { openBubble } = useContext(BubblesContext);
 
   const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
@@ -21,12 +29,12 @@ export const UserGroupList: FC = () => {
 
   return (
     <div ref={ref} onTransitionEnd={onRenderChange}>
-      <Button variant="contained" onClick={() => openBubble("huga", myRect)}>
+      <Button variant="contained" onClick={() => openBubble("huga", containedBubble.id)}>
         normal
       </Button>
       <Button
         variant="contained"
-        onClick={() => openBubble("user-groups", myRect)}
+        onClick={() => openBubble("user-groups", containedBubble.id)}
       >
         other User Groups
       </Button>
