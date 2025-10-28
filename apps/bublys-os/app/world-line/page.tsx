@@ -13,11 +13,11 @@ export default function Index() {
       </div>
       
       {/* Counter2: 独立した世界線 */}
-      <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
+      {/* <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
         <CounterWorldLineManager counterId="counter-2" initialValue={200}>
           <CounterWorldLineIntegration />
         </CounterWorldLineManager>
-      </div>
+      </div> */}
     </div>
   );
 }

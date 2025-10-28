@@ -16,17 +16,18 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center', 
-      gap: '0.8rem',
+      gap: '1rem',
+      padding: '1rem',
     }}>
       <button 
         onClick={handleCountDown}
         style={{
-          padding: '0.4rem 0.8rem',
-          fontSize: '1.1rem',
+          padding: '0.5rem 1rem',
+          fontSize: '1.2rem',
           backgroundColor: '#ff5722',
           color: 'white',
           border: 'none',
-          borderRadius: '6px',
+          borderRadius: '8px',
           cursor: 'pointer',
           fontWeight: 'bold',
         }}
@@ -35,7 +36,7 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
       </button>
       
       <span style={{ 
-        fontSize: '2.5rem', 
+        fontSize: '2rem', 
         fontWeight: 'bold',
         minWidth: '3rem',
         textAlign: 'center',
@@ -47,12 +48,12 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
       <button 
         onClick={handleCountUp}
         style={{
-          padding: '0.4rem 0.8rem',
-          fontSize: '1.1rem',
+          padding: '0.5rem 1rem',
+          fontSize: '1.2rem',
           backgroundColor: '#4caf50',
           color: 'white',
           border: 'none',
-          borderRadius: '6px',
+          borderRadius: '8px',
           cursor: 'pointer',
           fontWeight: 'bold',
         }}
