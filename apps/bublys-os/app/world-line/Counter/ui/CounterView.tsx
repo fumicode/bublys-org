@@ -1,21 +1,16 @@
 'use client';
-import React from 'react';
 import { Counter } from '../domain/Counter';
-
 interface CounterViewProps {
   counter: Counter;
   onCounterChange: (newCounter: Counter) => void;
 }
-
 export function CounterView({ counter, onCounterChange }: CounterViewProps) {
   const handleCountUp = () => {
     onCounterChange(counter.countUp());
   };
-
   const handleCountDown = () => {
     onCounterChange(counter.countDown());
   };
-
   return (
     <div style={{ 
       display: 'flex', 
@@ -23,9 +18,6 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
       justifyContent: 'center', 
       gap: '1rem',
       padding: '1rem',
-      backgroundColor: '#f5f5f5',
-      borderRadius: '8px',
-      margin: '1rem 0'
     }}>
       <button 
         onClick={handleCountDown}
@@ -35,8 +27,9 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
           backgroundColor: '#ff5722',
           color: 'white',
           border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: 'bold',
         }}
       >
         -
@@ -46,7 +39,8 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
         fontSize: '2rem', 
         fontWeight: 'bold',
         minWidth: '3rem',
-        textAlign: 'center'
+        textAlign: 'center',
+        color: '#333',
       }}>
         {counter.value}
       </span>
@@ -59,8 +53,9 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
           backgroundColor: '#4caf50',
           color: 'white',
           border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontWeight: 'bold',
         }}
       >
         +

@@ -1,11 +1,23 @@
 'use client';
-import { WorldLineGitManager } from './WorldLineGit/feature/WorldLineGitManager';
-import { WorldLineGitView } from './WorldLineGit/ui/WorldLineGitView';
+import { CounterWorldLineIntegration } from './integrations/CounterWorldLineIntegration';
+import { CounterWorldLineManager } from './integrations/CounterWorldLineManager';
 
 export default function Index() {
   return (
-    <WorldLineGitManager>
-      <WorldLineGitView />
-    </WorldLineGitManager>
+    <div>
+      {/* Counter1: 独立した世界線 */}
+      <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
+        <CounterWorldLineManager counterId="counter-1" initialValue={100}>
+          <CounterWorldLineIntegration />
+        </CounterWorldLineManager>
+      </div>
+      
+      {/* Counter2: 独立した世界線 */}
+      {/* <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
+        <CounterWorldLineManager counterId="counter-2" initialValue={200}>
+          <CounterWorldLineIntegration />
+        </CounterWorldLineManager>
+      </div> */}
+    </div>
   );
 }
