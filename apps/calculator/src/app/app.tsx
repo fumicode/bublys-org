@@ -28,9 +28,16 @@ interface HandShakeDTO {
 }
 
 interface SlotData {
-  slotURL: string;
+  containerURL: string;
   value: string;
 }
+
+type slotRefState = 'None' | 'ReferTo' | 'ReferFrom';
+
+interface ReferSlotDTO {
+  containerURL: string;
+}
+
 //自分のメソッドを相手に渡す
 const handShakeMessage = () => {
   return {
@@ -41,6 +48,15 @@ const handShakeMessage = () => {
       methods: [
         { key: 'PushNumber', value: { slotURL: 'string', value: 'number' } },
         { key: 'UpdateNumber', value: { slotURL: 'string', value: 'number' } },
+        {
+          key: 'startRefer',
+          value: { containerURL: 'string' },
+        },
+        {
+          key: 'requestGetData',
+          value: { containerURL: 'string' },
+        },
+        { key: 'endRefer', value: { containerURL: 'string' } },
       ],
     },
     id: uuidv4(),
@@ -53,23 +69,69 @@ export default function EmbeddedPage() {
 
   const [slot1Value, setSlot1Value] = useState('');
   const [slot2Value, setSlot2Value] = useState('');
+
+  const handleSetSlot1Value = (value: string) => {
+    setSlot1Value(value);
+    if (isReferSlot1 === 'ReferFrom') {
+      sendMessageToIframeParent(
+        createMessage('exportData', {
+          containerURL: 'calculator/slot1',
+          value: value,
+        })
+      );
+    }
+  };
+
+  const handleSetSlot2Value = (value: string) => {
+    setSlot2Value(value);
+    if (isReferSlot2 === 'ReferFrom') {
+      sendMessageToIframeParent(
+        createMessage('exportData', {
+          containerURL: 'calculator/slot2',
+          value: value,
+        })
+      );
+    }
+  };
+
   useEffect(() => {
     const calcResult = Number(slot1Value) + Number(slot2Value);
     setCalcResultValue(calcResult.toString());
-    if (selectedSlot && selectedSlot.slotURL === 'calculator/result') {
+    if (selectedSlot && selectedSlot.containerURL === 'calculator/result') {
       setSelectedSlot({
-        slotURL: selectedSlot.slotURL,
+        containerURL: selectedSlot.containerURL,
         value: calcResult.toString(),
       });
     }
+    if (isReferResult === 'ReferFrom') {
+      sendMessageToIframeParent(
+        createMessage('exportData', {
+          containerURL: 'calculator/result',
+          value: calcResult.toString(),
+        })
+      );
+    }
   }, [slot1Value, slot2Value]);
   const [calcResultValue, setCalcResultValue] = useState('');
+
+  const [isReferSlot1, setIsReferSlot1] = useState<slotRefState>('None');
+  const [isReferSlot2, setIsReferSlot2] = useState<slotRefState>('None');
+  const [isReferResult, setIsReferResult] = useState<slotRefState>('None');
+
   const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
     null
   );
   const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
     null
   );
+  const selectMethod = (method: string) => {
+    const handShakeDTO = parentMethods?.find((e) => e.key === method);
+    if (!handShakeDTO) {
+      console.log('Method not found');
+      return;
+    }
+    setSelectedMethod(handShakeDTO);
+  };
   const [selectedSlot, setSelectedSlot] = useState<SlotData | null>(null);
 
   useEffect(() => {
@@ -121,6 +183,54 @@ export default function EmbeddedPage() {
           const handShakeDTO = message.params
             .methods as unknown as HandShakeDTO[];
           setParentMethods(handShakeDTO);
+        } else if (event.data.method === 'startRefer') {
+          const referSlotDTO = message.params as unknown as ReferSlotDTO;
+          if (referSlotDTO.containerURL === 'calculator/slot1') {
+            setIsReferSlot1('ReferFrom');
+          }
+          if (referSlotDTO.containerURL === 'calculator/slot2') {
+            setIsReferSlot2('ReferFrom');
+          }
+          if (referSlotDTO.containerURL === 'calculator/result') {
+            setIsReferResult('ReferFrom');
+          }
+        } else if (event.data.method === 'requestGetData') {
+          const referSlotDTO = message.params as unknown as ReferSlotDTO;
+          if (referSlotDTO.containerURL === 'calculator/slot1') {
+            sendMessageToIframeParent(
+              createMessage('exportData', {
+                containerURL: 'calculator/slot1',
+                value: slot1Value,
+              })
+            );
+          }
+          if (referSlotDTO.containerURL === 'calculator/slot2') {
+            sendMessageToIframeParent(
+              createMessage('exportData', {
+                containerURL: 'calculator/slot2',
+                value: slot2Value,
+              })
+            );
+          }
+          if (referSlotDTO.containerURL === 'calculator/result') {
+            sendMessageToIframeParent(
+              createMessage('exportData', {
+                containerURL: 'calculator/result',
+                value: calcResultValue,
+              })
+            );
+          }
+        } else if (event.data.method === 'endRefer') {
+          const referSlotDTO = message.params as unknown as ReferSlotDTO;
+          if (referSlotDTO.containerURL === 'calculator/slot1') {
+            setIsReferSlot1('None');
+          }
+          if (referSlotDTO.containerURL === 'calculator/slot2') {
+            setIsReferSlot2('None');
+          }
+          if (referSlotDTO.containerURL === 'calculator/result') {
+            setIsReferResult('None');
+          }
         }
       } catch (error) {
         console.error('Error :サポートされていない形式です', error);
@@ -168,19 +278,103 @@ export default function EmbeddedPage() {
       <Stack direction="row" spacing={1} alignItems="center">
         <TextField
           value={slot1Value}
-          onChange={(e) => setSlot1Value(e.target.value)}
-          sx={{ width: '5rem' }}
+          onChange={(e) => handleSetSlot1Value(e.target.value)}
+          sx={{
+            width: '5rem',
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                border:
+                  isReferSlot1 === 'ReferTo'
+                    ? '1px solid blue'
+                    : isReferSlot1 === 'ReferFrom'
+                    ? '1px solid red'
+                    : '1px solid black',
+              },
+              '&:hover fieldset': {
+                border:
+                  isReferSlot1 === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferSlot1 === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+              '&.Mui-focused fieldset': {
+                border:
+                  isReferSlot1 === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferSlot1 === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+            },
+          }}
         ></TextField>
         <span style={{ fontSize: '2rem' }}>+</span>
         <TextField
           value={slot2Value}
-          onChange={(e) => setSlot2Value(e.target.value)}
-          sx={{ width: '5rem' }}
+          onChange={(e) => handleSetSlot2Value(e.target.value)}
+          sx={{
+            width: '5rem',
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                border:
+                  isReferSlot2 === 'ReferTo'
+                    ? '1px solid blue'
+                    : isReferSlot2 === 'ReferFrom'
+                    ? '1px solid red'
+                    : '1px solid black',
+              },
+              '&:hover fieldset': {
+                border:
+                  isReferSlot2 === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferSlot2 === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+              '&.Mui-focused fieldset': {
+                border:
+                  isReferSlot2 === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferSlot2 === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+            },
+          }}
         ></TextField>
         <span style={{ fontSize: '2rem' }}>=</span>
         <TextField
           value={calcResultValue}
-          sx={{ width: '5rem' }}
+          sx={{
+            width: '5rem',
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                border:
+                  isReferResult === 'ReferTo'
+                    ? '1px solid blue'
+                    : isReferResult === 'ReferFrom'
+                    ? '1px solid red'
+                    : '1px solid black',
+              },
+              '&:hover fieldset': {
+                border:
+                  isReferResult === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferResult === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+              '&.Mui-focused fieldset': {
+                border:
+                  isReferResult === 'ReferTo'
+                    ? '2px solid blue'
+                    : isReferResult === 'ReferFrom'
+                    ? '2px solid red'
+                    : '2px solid black',
+              },
+            },
+          }}
           disabled
         ></TextField>
       </Stack>
@@ -252,7 +446,7 @@ export default function EmbeddedPage() {
                 </span>
               </div>
               <div style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(msg.params, null, 2)}
+                {JSON.stringify(msg, null, 2)}
               </div>
             </div>
           ))
@@ -261,9 +455,7 @@ export default function EmbeddedPage() {
         )}
       </div>
       <Stack direction="row" spacing={1} alignItems="center">
-        <Select
-          onChange={(e) => setSelectedMethod(e.target.value as HandShakeDTO)}
-        >
+        <Select onChange={(e) => selectMethod(e.target.value as string)}>
           <MenuItem value={''}>Unselected</MenuItem>
           {parentMethods?.map((e, index) => (
             <MenuItem key={index} value={e.key}>
@@ -275,11 +467,11 @@ export default function EmbeddedPage() {
           onChange={(e) =>
             setSelectedSlot(
               e.target.value === 'calculator/slot1'
-                ? { slotURL: 'calculator/slot1', value: slot1Value }
+                ? { containerURL: 'calculator/slot1', value: slot1Value }
                 : e.target.value === 'calculator/slot2'
-                ? { slotURL: 'calculator/slot2', value: slot2Value }
+                ? { containerURL: 'calculator/slot2', value: slot2Value }
                 : e.target.value === 'calculator/result'
-                ? { slotURL: 'calculator/result', value: calcResultValue }
+                ? { containerURL: 'calculator/result', value: calcResultValue }
                 : null
             )
           }
@@ -294,7 +486,7 @@ export default function EmbeddedPage() {
           onClick={() => {
             if (selectedMethod && selectedSlot) {
               setSelectedSlot({
-                slotURL: selectedSlot?.slotURL || '',
+                containerURL: selectedSlot?.containerURL || '',
                 value: selectedSlot.value,
               });
               sendMessageToIframeParent(

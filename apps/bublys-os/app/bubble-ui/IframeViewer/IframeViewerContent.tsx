@@ -30,9 +30,15 @@ export interface OnChangeValueDTO {
   containerURL: string;
   value: number;
 }
+
 export interface HandShakeDTO {
   key: string;
   value: { URL: string; value: string };
+}
+
+interface AssociateMessage {
+  fromMessage: Message;
+  toMessages: Message[];
 }
 
 //自分のメソッドを相手に渡す
@@ -69,6 +75,18 @@ const IframeViewerContent = () => {
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
   const [handShakeData, setHandShakeData] = useState<Message[]>([]);
   const [exportData, setExportData] = useState<Message[]>([]);
+  const [associateData, setAssociateData] = useState<AssociateMessage[]>([]);
+
+  const createMessage = (method: string, params: any) => {
+    return {
+      protocol: 'http://localhost:3000',
+      version: '0.0.1',
+      method: method,
+      params: params,
+      id: uuidv4(),
+      timestamp: Date.now(),
+    };
+  };
 
   // クライアント側でマウント時にlocalStorageから状態を復元
   useEffect(() => {
@@ -85,6 +103,7 @@ const IframeViewerContent = () => {
     }
   }, [dispatch]);
   const checkAndSetExportData = (message: Message) => {
+    console.log(JSON.stringify(message));
     setExportData((prev) => {
       // 同じようなデータが存在するかチェック
       const existingIndex = prev.findIndex(
@@ -100,9 +119,30 @@ const IframeViewerContent = () => {
         return prev.map((e, i) => (i === existingIndex ? message : e));
       }
 
-      // 存在しない場合は追加
+      // 存在しない場合は追加し、同時にstartReferBlockを送信
+      const app = activeApps?.find((app) => app.url === message.protocol);
+      const startReferMessage = createMessage('startRefer', {
+        containerURL: message.params.containerURL,
+      });
+      if (app) {
+        sendMessageToIframe(app.id, startReferMessage);
+      }
       return [...prev, message];
     });
+
+    // const getValueMessage: Message = {
+    //   protocol: message.protocol,
+    //   version: message.version,
+    //   method: 'getValue',
+    //   params: message.params,
+    //   id: message.id,
+    //   timestamp: message.timestamp,
+    // };
+    // const associateMessage: AssociateMessage = {
+    //   fromMessage: message,
+    //   toMessages: [getValueMessage],
+    // };
+    // setAssociateData((prev) => [...prev, associateMessage]);
   };
 
   const onChangeExportData = (message: Message) => {
@@ -158,34 +198,33 @@ const IframeViewerContent = () => {
     }
   }, []);
 
-  const setIframeRef = useCallback((appId: string) => {
-    return (element: HTMLIFrameElement | null) => {
-      if (element) {
-        iframeRefsMap.current.set(appId, element);
-        console.log('✅ Iframe ref set for app:', appId);
+  const setIframeRef = useCallback(
+    (appId: string) => {
+      return (element: HTMLIFrameElement | null) => {
+        if (element) {
+          iframeRefsMap.current.set(appId, element);
 
-        // refが設定されたら、iframeのロードを待ってhandshakeを送信
-        const sendHandshakeWhenReady = () => {
-          if (element.contentWindow) {
-            console.log('📤 Sending initial handShake to app:', appId);
-            sendMessageToIframe(appId, handShakeMessage());
-          } else {
-            // contentWindowがまだ準備できていない場合は少し待つ
-            setTimeout(sendHandshakeWhenReady, 100);
-          }
-        };
+          // refが設定されたら、iframeのロードを待ってhandshakeを送信
+          const sendHandshakeWhenReady = () => {
+            if (element.contentWindow) {
+              sendMessageToIframe(appId, handShakeMessage());
+            } else {
+              // contentWindowがまだ準備できていない場合は少し待つ
+              setTimeout(sendHandshakeWhenReady, 100);
+            }
+          };
 
-        // iframeのロードイベントを待つ
-        element.addEventListener('load', () => {
-          console.log('🎯 Iframe loaded for app:', appId);
-          setTimeout(() => sendHandshakeWhenReady(), 100);
-        });
-      } else {
-        iframeRefsMap.current.delete(appId);
-        console.log('❌ Iframe ref removed for app:', appId);
-      }
-    };
-  }, [sendMessageToIframe]);
+          // iframeのロードイベントを待つ
+          element.addEventListener('load', () => {
+            setTimeout(() => sendHandshakeWhenReady(), 100);
+          });
+        } else {
+          iframeRefsMap.current.delete(appId);
+        }
+      };
+    },
+    [sendMessageToIframe]
+  );
 
   const handleAppClick = (app: AppData) => {
     if (activeAppIds.includes(app.id)) {
@@ -228,6 +267,7 @@ const IframeViewerContent = () => {
       if (event.source === window) {
         return;
       }
+      console.log(JSON.stringify(event.data));
       try {
         const message = event.data as Message;
         setReceivedMessages((prev) => [...prev, message]);
@@ -237,7 +277,6 @@ const IframeViewerContent = () => {
           onChangeExportData(message);
         } else if (message.method === 'handShake') {
           const targetApp = apps.find((app) => app.url === message.protocol);
-          console.log('📨 Received handShake from:', message.protocol, 'targetApp:', targetApp);
           if (targetApp) {
             sendMessageToIframe(targetApp.id, handShakeMessage());
           } else {

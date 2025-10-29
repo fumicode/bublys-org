@@ -36,9 +36,17 @@ export const IframeAppContent = ({
   const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
     null
   );
-  const [selectedExportData, setSelectedExportData] = useState<Message | null>(
-    null
-  );
+
+  const selectMethod = (method: string) => {
+    const handShakeDTO = childMethods?.find((e) => e.key === method);
+    if (!handShakeDTO) {
+      console.log('Method not found');
+      return;
+    }
+    setSelectedMethod(handShakeDTO);
+  };
+
+  const [selectedContainerURL, setSelectedContainerURL] = useState<string>('');
   const childMethods = childHandShakeMessage?.params
     .methods as unknown as HandShakeDTO[];
 
@@ -114,7 +122,13 @@ export const IframeAppContent = ({
             </Typography>
 
             {/* PAYLOAD */}
-            <Box sx={{ mb: 2 }}>
+            <Box
+              sx={{
+                mb: 2,
+                maxHeight: '500px',
+                overflowY: 'scroll',
+              }}
+            >
               <div>
                 <h3>受信したメッセージ履歴</h3>
                 {receivedMessages.length > 0 ? (
@@ -234,11 +248,7 @@ export const IframeAppContent = ({
             </Box> */}
 
             <Stack direction="row" spacing={1} alignItems="center">
-              <Select
-                onChange={(e) =>
-                  setSelectedMethod(e.target.value as unknown as HandShakeDTO)
-                }
-              >
+              <Select onChange={(e) => selectMethod(e.target.value as string)}>
                 <MenuItem value={''}>Unselected</MenuItem>
                 {childMethods?.map((e, index) => (
                   <MenuItem key={index} value={e.key}>
@@ -248,11 +258,7 @@ export const IframeAppContent = ({
               </Select>
               <Select
                 onChange={(event) =>
-                  setSelectedExportData(
-                    exportData.find(
-                      (e) => e.params.containerURL === event.target.value
-                    ) as unknown as Message
-                  )
+                  setSelectedContainerURL(event.target.value as string)
                 }
               >
                 <MenuItem value={''}>Unselected</MenuItem>
@@ -265,13 +271,15 @@ export const IframeAppContent = ({
               <Button
                 variant="outlined"
                 onClick={() => {
-                  if (selectedMethod && selectedExportData) {
-                    sendMessageToIframe(
-                      createMessage(
-                        selectedMethod.key,
-                        selectedExportData.params
-                      )
+                  if (selectedMethod) {
+                    const current = exportData.find(
+                      (e) => e.params.containerURL === selectedContainerURL
                     );
+                    if (current) {
+                      sendMessageToIframe(
+                        createMessage(selectedMethod.key, current.params)
+                      );
+                    }
                   }
                 }}
               >

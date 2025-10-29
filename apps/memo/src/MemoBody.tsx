@@ -11,18 +11,8 @@ export interface Message {
   timestamp: number;
 }
 
-interface StartReferBlockDTO {
-  blockURL: string;
-  displayText: string;
-}
-
-interface RequestGetBlockDTO {
-  blockURL: string;
-  displayText: string;
-}
-
-interface EndReferBlockDTO {
-  blockURL: string;
+interface ReferBlockDTO {
+  containerURL: string;
 }
 
 interface HandShakeDTO {
@@ -39,14 +29,14 @@ const handShakeMessage = () => {
     params: {
       methods: [
         {
-          key: 'startReferBlock',
-          value: { blockURL: 'string', displayText: 'string' },
+          key: 'startRefer',
+          value: { containerURL: 'string', displayText: 'string' },
         },
         {
-          key: 'requestGetBlock',
-          value: { blockURL: 'string', displayText: 'string' },
+          key: 'requestGetData',
+          value: { containerURL: 'string', displayText: 'string' },
         },
-        { key: 'endReferBlock', value: { blockURL: 'string' } },
+        { key: 'endRefer', value: { containerURL: 'string' } },
       ],
     },
     id: uuidv4(),
@@ -55,13 +45,16 @@ const handShakeMessage = () => {
 };
 
 interface BlockData {
-  URL: string;
+  containerURL: string;
   value: string;
 }
+
+type slotRefState = 'None' | 'ReferTo' | 'ReferFrom';
 
 export const MemoBody = () => {
   //textareaに実際に表示されている文字
   const [textareaValue, setTextareaValue] = useState('');
+  const [isReferBlock, setIsReferBlock] = useState<slotRefState>('None');
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
   const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
     null
@@ -71,11 +64,28 @@ export const MemoBody = () => {
   );
   const [selectedBlock, setSelectedBlock] = useState<BlockData | null>(null);
 
+  const selectMethod = (method: string) => {
+    const handShakeDTO = parentMethods?.find((e) => e.key === method);
+    if (!handShakeDTO) {
+      console.log('Method not found');
+      return;
+    }
+    setSelectedMethod(handShakeDTO);
+  };
+
   useEffect(() => {
     setSelectedBlock({
-      URL: selectedBlock?.URL || '',
+      containerURL: selectedBlock?.containerURL || '',
       value: textareaValue,
     });
+    if (isReferBlock === 'ReferFrom') {
+      sendMessageToIframeParent(
+        createMessage('exportData', {
+          containerURL: 'memo/text/line1',
+          value: textareaValue,
+        })
+      );
+    }
   }, [textareaValue]);
 
   useEffect(() => {
@@ -93,36 +103,34 @@ export const MemoBody = () => {
         return;
       }
 
+      console.log(JSON.stringify(event.data));
       try {
         const message = event.data as Message;
-        console.log('Parsed message:', message);
         setReceivedMessages((prev) => [...prev, message]);
         if (event.data.method === 'handShake') {
-          console.log(message.params.methods);
           const handShakeDTO = message.params
             .methods as unknown as HandShakeDTO[];
           setParentMethods(handShakeDTO);
         }
-        if (event.data.method === 'startReferBlock') {
-          const startReferBlockDTO =
-            message.params as unknown as StartReferBlockDTO;
-          if (startReferBlockDTO.blockURL === 'memo/text/line1') {
-            // 関数形式で最新の値を取得
-            setTextareaValue(startReferBlockDTO.displayText);
+        if (event.data.method === 'startRefer') {
+          const referBlockDTO = message.params as unknown as ReferBlockDTO;
+          if (referBlockDTO.containerURL === 'memo/text/line1') {
+            setIsReferBlock('ReferFrom');
           }
-        } else if (event.data.method === 'requestGetBlock') {
-          const requestGetBlockDTO =
-            message.params as unknown as RequestGetBlockDTO;
-          if (requestGetBlockDTO.blockURL === 'memo/text/line1') {
-            // 関数形式で最新の値を取得
-            setTextareaValue(requestGetBlockDTO.displayText);
+        } else if (event.data.method === 'requestGetData') {
+          const referBlockDTO = message.params as unknown as ReferBlockDTO;
+          if (referBlockDTO.containerURL === 'memo/text/line1') {
+            sendMessageToIframeParent(
+              createMessage('exportData', {
+                containerURL: 'memo/text/line1',
+                value: textareaValue,
+              })
+            );
           }
-        } else if (event.data.method === 'endReferBlock') {
-          const endReferBlockDTO =
-            message.params as unknown as EndReferBlockDTO;
-          if (endReferBlockDTO.blockURL === 'memo/text/line1') {
-            // 関数形式で最新の値を取得
-            setTextareaValue('');
+        } else if (event.data.method === 'endRefer') {
+          const referBlockDTO = message.params as unknown as ReferBlockDTO;
+          if (referBlockDTO.containerURL === 'memo/text/line1') {
+            setIsReferBlock('None');
           }
         }
       } catch (error) {
@@ -194,7 +202,35 @@ export const MemoBody = () => {
         onChange={(e) => {
           saveMemoData(e.target.value);
         }}
-        sx={{ width: '100%' }}
+        sx={{
+          width: '100%',
+          '& .MuiOutlinedInput-root': {
+            '& fieldset': {
+              border:
+                isReferBlock === 'ReferTo'
+                  ? '1px solid blue'
+                  : isReferBlock === 'ReferFrom'
+                  ? '1px solid red'
+                  : '1px solid black',
+            },
+            '&:hover fieldset': {
+              border:
+                isReferBlock === 'ReferTo'
+                  ? '2px solid blue'
+                  : isReferBlock === 'ReferFrom'
+                  ? '2px solid red'
+                  : '2px solid black',
+            },
+            '&.Mui-focused fieldset': {
+              border:
+                isReferBlock === 'ReferTo'
+                  ? '2px solid blue'
+                  : isReferBlock === 'ReferFrom'
+                  ? '2px solid red'
+                  : '2px solid black',
+            },
+          },
+        }}
       ></TextField>
       {/* <textarea
         ref={(el) => {
@@ -260,7 +296,7 @@ export const MemoBody = () => {
                 </span>
               </div>
               <div style={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(msg.params, null, 2)}
+                {JSON.stringify(msg, null, 2)}
               </div>
             </div>
           ))
@@ -270,15 +306,11 @@ export const MemoBody = () => {
       </div>
 
       <Stack direction="row" spacing={1} alignItems="center">
-        <Select
-          onChange={(e) =>
-            setSelectedMethod(e.target.value as unknown as HandShakeDTO)
-          }
-        >
+        <Select onChange={(e) => selectMethod(e.target.value as string)}>
           <MenuItem value={''}>Unselected</MenuItem>
-          {parentMethods?.map((e, index) => (
-            <MenuItem key={index} value={e.key}>
-              {e.key}
+          {parentMethods?.map((pMethod, index) => (
+            <MenuItem key={index} value={pMethod.key}>
+              {pMethod.key}
             </MenuItem>
           ))}
         </Select>
@@ -286,7 +318,7 @@ export const MemoBody = () => {
           onChange={(e) =>
             setSelectedBlock(
               e.target.value === 'memo/text/line1'
-                ? { URL: 'memo/text/line1', value: textareaValue }
+                ? { containerURL: 'memo/text/line1', value: textareaValue }
                 : null
             )
           }
@@ -299,7 +331,7 @@ export const MemoBody = () => {
           onClick={() => {
             if (selectedMethod && selectedBlock) {
               setSelectedBlock({
-                URL: selectedBlock?.URL || '',
+                containerURL: selectedBlock.containerURL || '',
                 value: textareaValue,
               });
               sendMessageToIframeParent(
