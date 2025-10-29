@@ -197,11 +197,10 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
-
-        {bubble.renderedRect && ( <SmartRectView rect={bubble.renderedRect} />)}
+        <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
+        ({bubble?.position?.x},{bubble?.position?.y})<br />
         [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
-        {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
-        [{bubble.size?.width}x{bubble.size?.height}]
+        {children}<br />#{bubble.id}
       </main>
 
       {/* {bubble.renderedRect && ( // デバッグ用矩形

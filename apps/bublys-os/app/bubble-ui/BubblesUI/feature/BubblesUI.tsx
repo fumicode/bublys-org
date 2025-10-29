@@ -12,6 +12,7 @@ import {
   joinSiblingInProcess as joinSiblingAction,
   relateBubbles,
   selectBubblesRelations,
+  removeBubble,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
@@ -68,6 +69,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
+    dispatch(removeBubble(b.id));
   };
 
   const layerDown = (b: Bubble) => {
@@ -159,8 +161,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           width: 300,
         }}
       >
-        <pre>{JSON.stringify(relations, null, 2)}</pre>
-
         <Typography gutterBottom>Vanishing Point X</Typography>
         <Slider
           value={vanishingPoint.x}

@@ -121,9 +121,13 @@ export const bubblesSlice = createSlice({
 
     // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
-      const id = action.payload;
-      delete state.bubbles[id];
+      const removingId = action.payload;
+      delete state.bubbles[removingId];
       state.renderCount += 1;
+
+      state.bubbleRelations = state.bubbleRelations.filter(
+        relation => relation.openerId !== removingId && relation.openeeId !== removingId
+      );
 
       //TODO: Also remove from process
       // state.process = BubblesProcess.fromJSON(state.process)
@@ -172,13 +176,11 @@ export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice })
 export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
   const relations = state.bubbleState.bubbleRelations;
   const bubbles = state.bubbleState.bubbles;
-  
   return relations.map(relation => ({
     opener: Bubble.fromJSON(bubbles[relation.openerId]),
     openee: Bubble.fromJSON(bubbles[relation.openeeId]),
   }));
 }
-
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.

@@ -80,9 +80,6 @@ export class Bubble {
     return this.state.position || { x: 0, y: 0 };
   }
 
-
-
-
   moveTo(pos: Point2): Bubble {
     return new Bubble({ ...this.state, position: pos });
   }

@@ -26,6 +26,8 @@ export class SmartRect implements DOMRectReadOnly {
   get position(): Point2 {
     return { x: this.x, y: this.y };
   }
+
+
   get width() {
     return this.domRect.width;
   }
