@@ -2,6 +2,11 @@
   "name": "@bublys-org/source",
   "version": "0.0.0",
   "license": "MIT",
+  "engines": {
+    "node": "24.x",
+    "npm": "10.x"
+
+  },
   "scripts": {
     "dev": "nx dev bublys-os"
   },

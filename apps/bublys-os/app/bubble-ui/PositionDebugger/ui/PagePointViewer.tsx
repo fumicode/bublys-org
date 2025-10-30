@@ -5,7 +5,7 @@ import { FC, useContext, useState } from "react";
 import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";
 import { SmartRectView } from "./SmartRectView";
 import { Box, Stack } from "@mui/material";
-import { Point2 } from "@ep2as-apps/vue-domain";
+import { Point2 } from "@bublys-org/bubbles-ui";
 import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 
 //PositionDebuggerからpointsとrectsをもらって表示する
@@ -88,7 +88,7 @@ export const PagePointViewer: FC = () => {
             height: rect.height,
           }}
         >
-          <span className="e-rect">
+          <span className="e-inner-rect">
             <SmartRectView rect={rect} />
           </span>
         </div>
@@ -99,6 +99,7 @@ export const PagePointViewer: FC = () => {
 
 type StyledPointViewerProps = {
   blurred?: boolean;
+  children?: React.ReactNode;
 };
 const StyledPointViewer = styled.div<StyledPointViewerProps>`
   position: fixed;
@@ -112,7 +113,7 @@ const StyledPointViewer = styled.div<StyledPointViewerProps>`
 
   ${({ blurred }) => (blurred ? `backdrop-filter: blur(10px);` : "")}
 
-  .e-controls {
+  >.e-controls {
     position: absolute;
     top: 10px;
     right: 10px;
@@ -128,12 +129,12 @@ const StyledPointViewer = styled.div<StyledPointViewerProps>`
     }
   }
 
-  .e-point {
+  >.e-point {
     position: absolute;
     width: 100px;
     height: 20px;
 
-    .e-point-mark {
+    >.e-point-mark {
       position: absolute;
       top: 0px;
       left: 0px;
@@ -152,18 +153,19 @@ const StyledPointViewer = styled.div<StyledPointViewerProps>`
         background-color: hsla(0, 0%, 50%, 0.5);
       }
     }
-    .e-point-value {
+    >.e-point-value {
       font-size: 9px;
       opacity: 0.8;
     }
   }
 
-  .e-rect {
+  >.e-rect {
     position: absolute;
-    border: 1px solid red;
+    border: 1px dashed red;
 
-    .e-rect {
+    >.e-inner-rect {
       position: absolute;
+
       top: 0;
       left: 0;
       width: 100%;

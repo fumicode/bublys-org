@@ -1,7 +1,6 @@
 'use client'
 import { useRef } from 'react'
 import { Provider } from 'react-redux'
-import { stateManagement } from "@bublys-org/state-management";
 import { makeStore, AppStore } from "@bublys-org/state-management";
 
 export default function StoreProvider({
@@ -9,7 +8,6 @@ export default function StoreProvider({
 }: {
   children: React.ReactNode
 }) {
-  console.log(stateManagement());
   
   const storeRef = useRef<AppStore | null>(null)
   if (!storeRef.current) {

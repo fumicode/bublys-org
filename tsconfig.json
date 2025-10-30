@@ -13,6 +13,9 @@
       "path": "./bublys-libs/bubbles-ui"
     },
     {
+      "path": "./bublys-libs/bubbles-ui-state"
+    },
+    {
       "path": "./apps/calculator"
     },
     {

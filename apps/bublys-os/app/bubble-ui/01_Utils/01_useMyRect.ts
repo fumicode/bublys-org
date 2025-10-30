@@ -1,40 +1,49 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useWindowSize } from "./01_useWindowSize";
-import { usePositionDebugger } from "../PositionDebugger/domain/PositionDebuggerContext";
-
 import SmartRect from "../BubblesUI/domain/01_SmartRect";
+import { useAppSelector } from "@bublys-org/state-management";
+import { selectRenderCount } from "@bublys-org/bubbles-ui-state";
 
-export const useMyRect = () => {
+type useMyRectProps  = {
+  onRectChanged?: (rect: SmartRect) => void;
+}
+
+export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const ref = useRef<HTMLDivElement>(null);
 
-  const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
+
+  //うまく取れてない
   const pageSize = useWindowSize();
 
-  const { addRects } = usePositionDebugger();
+  const renderCount = useAppSelector(selectRenderCount);
+
+
+  const saveRect = () => {
+    if(!ref.current){
+      return;
+    }
+
+    const rect = new SmartRect(ref.current.getBoundingClientRect(), pageSize);
+    onRectChanged?.(rect);
+  };
+
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (!pageSize) return;
 
-    const setRect = () => {
-      const rect = el.getBoundingClientRect();
-      const newRect = new SmartRect(rect, pageSize);
-      setMyRect(newRect);
-      addRects([newRect]);
-    };
 
-    const ro = new ResizeObserver(setRect);
-
-    ro.observe(el);
-
-    setRect();
-
-    return () => {
-      ro.disconnect();
-    };
-
+    saveRect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [renderCount]);
 
-  return { ref, myRect };
+
+
+  const onRenderChange = () => {
+    saveRect();
+  }
+
+
+  return { ref, onRenderChange: onRenderChange  };
 };

@@ -1,17 +1,18 @@
 import { FC, useEffect, useState } from "react";
 import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
+
 import {
-  selectBubbles,
-  deleteBubble as deleteBubbleAction,
+  selectBubblesProcessDPO,
+  addBubble,
+  deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
   layerUp as layerUpAction,
-  moveTo,
-  popChild as popChildAction,
-  joinSibling as joinSiblingAction,
-  renameBubble as renameBubbleAction,
-} from "@bublys-org/state-management"
-import { Bubble, BubblesProcess } from "@bublys-org/bubbles-ui";
-import { Point2 } from "@bublys-org/bubbles-ui";
+  updateBubble,
+  popChildInProcess as popChildAction,
+  joinSiblingInProcess as joinSiblingAction,
+} from "@bublys-org/bubbles-ui-state";
+
+import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
@@ -28,7 +29,6 @@ function getColorHueFromString(name: string): number {
   return Math.abs(hash % 360);
 }
 
-// ドメイン Bubble インスタンスを生成
 const createBubble = (name: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(name);
   const type =
@@ -46,7 +46,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
-  const bubbles: BubblesProcess = useAppSelector(selectBubbles);
+  const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
 
   // ページサイズ管理
   const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
@@ -59,21 +59,29 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const deleteBubble = (b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
   };
+
   const layerDown = (b: Bubble) => {
     dispatch(layerDownAction(b.id));
   };
+
   const layerUp = (b: Bubble) => {
     dispatch(layerUpAction(b.id));
   };
+
   const onMove = (b: Bubble) => {
-    dispatch(moveTo({ id: b.id, position: { x: 300, y: 300 } }));
+    const updated = b.moveTo({ x: 300, y: 300 });
+    dispatch(updateBubble(updated.toJSON()));
   };
+
   const popChild = (b: Bubble): string => {
-    dispatch(popChildAction(b));
+    dispatch(addBubble(b.toJSON()));
+    dispatch(popChildAction(b.id));
     return b.id;
   };
+
   const joinSibling = (b: Bubble): string => {
-    dispatch(joinSiblingAction(b));
+    dispatch(addBubble(b.toJSON()));
+    dispatch(joinSiblingAction(b.id));
     return b.id;
   };
 
@@ -83,7 +91,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openerRect?: SmartRect
   ): string => {
     const newBubble = createBubble(name);
-    const surface = bubbles[0];
+    const surface = bubblesDPO.surface;
     if (surface?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble);
     } else {
@@ -99,6 +107,32 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <>
+      <PositionDebuggerProvider isShown={false}>
+        <BubblesContext.Provider
+          value={{
+            pageSize,
+            bubbles: bubblesDPO.layers,
+            openBubble: popChildOrJoinSibling,
+            renameBubble: (id: string, newName: string) => {
+              const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
+              const updated = existing.rename(newName);
+              dispatch(updateBubble(updated.toJSON()));
+              return id;
+            },
+          }}
+        >
+      <BubblesLayeredView
+        bubbles={bubblesDPO.layers}
+        vanishingPoint={vanishingPoint}
+        onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+        onBubbleClose={deleteBubble}
+        onBubbleMove={onMove}
+        onBubbleLayerDown={layerDown}
+        onBubbleLayerUp={layerUp}
+      />
+        </BubblesContext.Provider>
+      </PositionDebuggerProvider>
+
       <Box
         sx={{
           position: "fixed",
@@ -142,29 +176,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         </Button>
         {additionalButton}
       </Box>
-      <PositionDebuggerProvider isShown={false}>
-        <BubblesContext.Provider
-          value={{
-            pageSize,
-            bubbles,
-            openBubble: popChildOrJoinSibling,
-            renameBubble: (id: string, newName: string) => {
-              dispatch(renameBubbleAction({ id, newName }));
-              return id;
-            },
-          }}
-        >
-          <BubblesLayeredView
-            bubbles={bubbles}
-            vanishingPoint={vanishingPoint}
-            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-            onBubbleClose={deleteBubble}
-            onBubbleMove={onMove}
-            onBubbleLayerDown={layerDown}
-            onBubbleLayerUp={layerUp}
-          />
-        </BubblesContext.Provider>
-      </PositionDebuggerProvider>
+
     </>
   );
 };
