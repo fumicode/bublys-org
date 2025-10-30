@@ -39,14 +39,9 @@ export function WorldLineManager<TWorldState>({
   const apexWorld = apexWorldState ? World.fromJson<TWorldState>(apexWorldState, deserialize) : null;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
 
   // 初期化ハンドラー
-  const initializeHandler = useCallback(async () => {
-    if (isInitializing) return;
-    
-    setIsInitializing(true);
-    
+  useEffect(() => {
     try {
       // 初期状態でルート世界を作成
       const initialWorldState = createInitialWorldState();
@@ -68,9 +63,8 @@ export function WorldLineManager<TWorldState>({
     } catch (error) {
       console.error('Initialization failed:', error);
     } finally {
-      setIsInitializing(false);
     }
-  }, [isInitializing, dispatch, serialize, createInitialWorldState, objectId]);
+  }, [dispatch, serialize, createInitialWorldState, objectId]);
 
   const apexWorldId = worldLine?.apexWorldId || null;
 
@@ -189,9 +183,6 @@ export function WorldLineManager<TWorldState>({
     getWorldTree,
     isModalOpen,
     closeModal,
-    initialize: initializeHandler,
-    isInitializing,
-    isInitialized: !!worldLineState,
   };
 
   return (

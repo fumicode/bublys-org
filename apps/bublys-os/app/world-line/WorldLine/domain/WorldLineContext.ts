@@ -17,11 +17,6 @@ export type WorldLineContextType<TWorldState> = {
   setApex: (worldId: string) => void;
   regrow: () => void; 
   showAllWorldLines: () => void;
-  initialize: () => void;
-  
-  // 初期化状態
-  isInitializing: boolean;
-  isInitialized: boolean;
 
   // モーダル関連
   isModalOpen: boolean;
@@ -47,9 +42,6 @@ export const WorldLineContext = createContext<WorldLineContextType<any>>({
   showAllWorldLines: () => {
     console.warn("showAllWorldLines not implemented");
   },
-  initialize: () => {
-    console.warn("initialize not implemented");
-  },
   getAllWorlds: () => {
     console.warn("getAllWorlds not implemented");
     return [];
@@ -62,6 +54,4 @@ export const WorldLineContext = createContext<WorldLineContextType<any>>({
   closeModal: () => {
     console.warn("closeModal not implemented");
   },
-  isInitializing: false,
-  isInitialized: false,
 });

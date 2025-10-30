@@ -2,23 +2,6 @@ import { useContext, useMemo, useState } from 'react';
 import { WorldLineContext } from '../domain/WorldLineContext';
 import { World } from '../domain/World';
 
-// InitializeButtonコンポーネントを直接定義
-function InitializeButton({ onInitialize, disabled = false }: { onInitialize: () => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={onInitialize}
-      disabled={disabled}
-      style={{
-        cursor: 'pointer',
-        backgroundColor: 'transparent',
-        width: '100px',
-      }}
-    >
-      {disabled ? '初期化中...' : '🚀 初期化'}
-    </button>
-  );
-}
-
 // 3D WorldView コンポーネント
 interface WorldView3DProps<TWorldState> {
   worlds: World<TWorldState>[];
@@ -422,9 +405,6 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
     // getWorldTree,
     isModalOpen,
     closeModal,
-    initialize,
-    isInitializing,
-    isInitialized,
   } = useContext(WorldLineContext);
 
   const handleWorldSelect = (worldId: string) => {
@@ -434,16 +414,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* 初期化ボタン（未初期化時のみ表示） */}
-      {!isInitialized && (
-        <InitializeButton 
-          onInitialize={initialize}
-          disabled={isInitializing}
-        />
-      )}
-
-      {/* 通常表示: 現在の世界のみ */}
-      {isInitialized && apexWorld && !isModalOpen && (
+      {apexWorld && !isModalOpen && (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', width: '100%' }}>
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ marginTop: '1rem' }}>
@@ -454,7 +425,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
       )}
 
       {/* 3D世界線ビュー（Ctrl+Zで表示） */}
-      {isInitialized && isModalOpen && (
+      {isModalOpen && (
         <div style={{ 
           position: 'fixed',
           top: 0,
