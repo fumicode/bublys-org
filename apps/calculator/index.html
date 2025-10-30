@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Calculator</title>
+    <base href="/" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- TODO: 本番環境ではHTTPヘッダーでCSPを設定するように変更する -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="frame-src 'self' * data: blob: https:;"
+    />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
