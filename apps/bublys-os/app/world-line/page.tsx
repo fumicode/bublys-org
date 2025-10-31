@@ -1,11 +1,13 @@
 'use client';
 import { BublyWorldLineIntegration } from './integrations/BublyWorldLineIntegration';
 import { BublyWorldLineManager } from './integrations/BublyWorldLineManager';
+import { BublyAddButtons } from './integrations/BublyAddButtons';
 
 export default function Index() {
   return (
-    <div style={{ flex: '1', minWidth: '600px' }}>
+    <div>
       <BublyWorldLineManager worldId="bubly-world-1">
+        <BublyAddButtons />
         <BublyWorldLineIntegration />
       </BublyWorldLineManager>
     </div>
