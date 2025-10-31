@@ -9,8 +9,8 @@ import {
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import type { AppData } from './store/appSlice';
-import type { Message } from './Message.domain';
-import type { HandShakeDTO } from './IframeViewerContent';
+import type { Message } from './Messages.domain';
+import type { HandShakeDTO } from './IframeViewer';
 import { v4 as uuidv4 } from 'uuid';
 
 interface IframeAppContentProps {
@@ -52,6 +52,7 @@ export const IframeAppContent = ({
 
   useEffect(() => {
     setIsClient(true);
+    console.log(iframeRef?.current?.contentWindow.location);
   }, []);
 
   const createMessage = (method: string, params: any) => {
@@ -248,7 +249,10 @@ export const IframeAppContent = ({
             </Box> */}
 
             <Stack direction="row" spacing={1} alignItems="center">
-              <Select onChange={(e) => selectMethod(e.target.value as string)}>
+              <Select
+                value={selectedMethod?.key ?? ''}
+                onChange={(e) => selectMethod(e.target.value as string)}
+              >
                 <MenuItem value={''}>Unselected</MenuItem>
                 {childMethods?.map((e, index) => (
                   <MenuItem key={index} value={e.key}>
@@ -257,6 +261,7 @@ export const IframeAppContent = ({
                 ))}
               </Select>
               <Select
+                value={selectedContainerURL ?? ''}
                 onChange={(event) =>
                   setSelectedContainerURL(event.target.value as string)
                 }

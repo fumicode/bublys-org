@@ -58,5 +58,20 @@ export const localStorageMiddleware =
     return result;
   };
 
+export const handShakeMiddleware =
+  (store: any) => (next: any) => (action: any) => {
+    const result = next(action);
+    if (action.type.startsWith('app/setActiveApp')) {
+      const state = store.getState().app;
+      try {
+        const serializedState = JSON.stringify(state);
+        localStorage.setItem('iframeViewerState', serializedState);
+      } catch (e) {
+        console.warn('ローカルストレージへの保存に失敗しました', e);
+      }
+    }
+    return result;
+  };
+
 export const { addApp, removeApp, setActiveApp, hydrate } = appSlice.actions;
 export default appSlice.reducer;

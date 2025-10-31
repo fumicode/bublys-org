@@ -1,12 +1,12 @@
 'use client';
 
 import { IframeViewerProviders } from './providers';
-import IframeViewerContent from './IframeViewerContent';
+import IframeViewer from './IframeViewer';
 
 export default function IframeViewerPage() {
   return (
     <IframeViewerProviders>
-      <IframeViewerContent />
+      <IframeViewer />
     </IframeViewerProviders>
   );
 }

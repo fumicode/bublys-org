@@ -1,59 +1,54 @@
 import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { TextField, Stack, Select, MenuItem, Button } from '@mui/material';
-
-export interface Message {
-  protocol: string;
-  version: string;
-  method: string;
-  params: any;
-  id: string;
-  timestamp: number;
-}
+import {
+  Message,
+  DTOParams,
+  ExportDataMessage,
+  HandShakeMessage,
+  HandShakeDTO,
+} from './Messages.domain';
 
 interface ReferBlockDTO {
   containerURL: string;
 }
 
-interface HandShakeDTO {
-  key: string;
-  value: { blockURL: string; displayText: string };
-}
-
-//自分のメソッドを相手に渡す
+//自分の読めるメソッドを相手に渡す
 const handShakeMessage = () => {
+  return createMessage('handShake', {
+    methods: [
+      {
+        key: 'exportData',
+        value: { containerURL: 'string', value: 'string' },
+      },
+      {
+        key: 'startRefer',
+        value: { containerURL: 'string', displayText: 'string' },
+      },
+      { key: 'endRefer', value: { containerURL: 'string' } },
+    ],
+  });
+};
+
+const createMessage = (method: string, params: any) => {
   return {
     protocol: 'http://localhost:4201',
     version: '0.0.1',
-    method: 'handShake',
-    params: {
-      methods: [
-        {
-          key: 'startRefer',
-          value: { containerURL: 'string', displayText: 'string' },
-        },
-        {
-          key: 'requestGetData',
-          value: { containerURL: 'string', displayText: 'string' },
-        },
-        { key: 'endRefer', value: { containerURL: 'string' } },
-      ],
-    },
+    method: method,
+    params: params,
     id: uuidv4(),
     timestamp: Date.now(),
   };
 };
 
-interface BlockData {
-  containerURL: string;
-  value: string;
-}
-
 type slotRefState = 'None' | 'ReferTo' | 'ReferFrom';
 
-export const MemoBody = () => {
-  //textareaに実際に表示されている文字
-  const [textareaValue, setTextareaValue] = useState('');
+export const Memo = () => {
+  //export可能なデータ
+  const blockURLs = ['http://localhost:4201/memo/text/block1'];
+  const [exportableData, setExportableData] = useState<DTOParams[]>([
+    ...blockURLs.map((url) => ({ containerURL: url, value: '' })),
+  ]);
   const [isReferBlock, setIsReferBlock] = useState<slotRefState>('None');
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
   const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
@@ -62,7 +57,31 @@ export const MemoBody = () => {
   const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
     null
   );
-  const [selectedBlock, setSelectedBlock] = useState<BlockData | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<DTOParams | null>(null);
+
+  const checkAndSetHandShakeData = (message: HandShakeMessage) => {
+    setParentMethods((prev) => {
+      if (!prev) return null;
+      const index = prev.findIndex(
+        (e) => e.key === message.params.methods[0].key
+      );
+      if (index !== -1) {
+        const newData = [...prev];
+        newData[index] = {
+          ...newData[index],
+          value: message.params.methods[0].value,
+        };
+        return newData;
+      }
+      return [
+        ...prev,
+        {
+          key: message.params.methods[0].key,
+          value: message.params.methods[0].value,
+        },
+      ];
+    });
+  };
 
   const selectMethod = (method: string) => {
     const handShakeDTO = parentMethods?.find((e) => e.key === method);
@@ -73,21 +92,49 @@ export const MemoBody = () => {
     setSelectedMethod(handShakeDTO);
   };
 
+  const checkAndSetExportData = (message: Message) => {
+    setExportableData((prev) => {
+      const index = prev.findIndex(
+        (e) => e.containerURL === message.params.containerURL
+      );
+      if (index === -1) {
+        return prev;
+      }
+      const newData = [...prev];
+      newData[index] = {
+        ...newData[index],
+        value: message.params.value,
+      };
+      return newData;
+    });
+  };
+
   useEffect(() => {
     setSelectedBlock({
       containerURL: selectedBlock?.containerURL || '',
-      value: textareaValue,
+      value:
+        exportableData.find((e) => e.containerURL === blockURLs[0])?.value ||
+        '',
     });
     if (isReferBlock === 'ReferFrom') {
       sendMessageToIframeParent(
         createMessage('exportData', {
-          containerURL: 'memo/text/line1',
-          value: textareaValue,
+          containerURL: blockURLs[0],
+          value:
+            exportableData.find((e) => e.containerURL === blockURLs[0])
+              ?.value || '',
         })
       );
     }
-  }, [textareaValue]);
+  }, [exportableData]);
 
+  function isExportDataMessage(msg: Message): msg is ExportDataMessage {
+    return (msg as ExportDataMessage).params !== undefined; // 判定条件を適宜
+  }
+
+  function isHandShakeMessage(msg: Message): msg is HandShakeMessage {
+    return (msg as HandShakeMessage).params !== undefined;
+  }
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // React DevToolsを除外
@@ -107,29 +154,20 @@ export const MemoBody = () => {
       try {
         const message = event.data as Message;
         setReceivedMessages((prev) => [...prev, message]);
-        if (event.data.method === 'handShake') {
-          const handShakeDTO = message.params
-            .methods as unknown as HandShakeDTO[];
-          setParentMethods(handShakeDTO);
+        if (isExportDataMessage(message)) {
+          checkAndSetExportData(message);
+        }
+        if (isHandShakeMessage(message)) {
+          checkAndSetHandShakeData(message);
         }
         if (event.data.method === 'startRefer') {
           const referBlockDTO = message.params as unknown as ReferBlockDTO;
-          if (referBlockDTO.containerURL === 'memo/text/line1') {
+          if (blockURLs.includes(referBlockDTO.containerURL)) {
             setIsReferBlock('ReferFrom');
-          }
-        } else if (event.data.method === 'requestGetData') {
-          const referBlockDTO = message.params as unknown as ReferBlockDTO;
-          if (referBlockDTO.containerURL === 'memo/text/line1') {
-            sendMessageToIframeParent(
-              createMessage('exportData', {
-                containerURL: 'memo/text/line1',
-                value: textareaValue,
-              })
-            );
           }
         } else if (event.data.method === 'endRefer') {
           const referBlockDTO = message.params as unknown as ReferBlockDTO;
-          if (referBlockDTO.containerURL === 'memo/text/line1') {
+          if (blockURLs.includes(referBlockDTO.containerURL)) {
             setIsReferBlock('None');
           }
         }
@@ -144,17 +182,6 @@ export const MemoBody = () => {
     };
   }, []);
 
-  const createMessage = (method: string, params: any) => {
-    return {
-      protocol: 'http://localhost:4201',
-      version: '0.0.1',
-      method: method,
-      params: params,
-      id: uuidv4(),
-      timestamp: Date.now(),
-    };
-  };
-
   const sendMessageToIframeParent = (message: Message) => {
     if (window.parent === window) {
       console.log('Iframeの中に表示されていないため、メッセージを送信しません');
@@ -165,42 +192,23 @@ export const MemoBody = () => {
     console.log('Sending message to parent:', message);
   };
 
-  // const autoResizeTextarea = (element: HTMLTextAreaElement) => {
-  //   element.style.height = 'auto';
-  //   element.style.height = element.scrollHeight + 'px';
-  // };
-
-  //参照情報も含んだ各行のデータ
-  // const [memoData, setMemoData] = useState<MemoData[]>([]);
-  // console.log(memoData);
-  //参照情報だけのデータ
-  // const [refs, setRefs] = useState<InlineContent[]>([]);
-
-  //参照情報だけを抽出する
-  // const ExtractionRef = (memoData: MemoData[]) => {
-  //   const newRefsState: InlineContent[] = [];
-  //   memoData.forEach((memo) => {
-  //     memo.lineDatas.forEach((line) => {
-  //       line.contents.forEach((content) => {
-  //         if (content.type === 'ref') {
-  //           newRefsState.push(content);
-  //         }
-  //       });
-  //     });
-  //   });
-  //   setRefs(newRefsState);
-  // };
-
-  const saveMemoData = (input: string) => {
-    setTextareaValue(input);
-  };
-
   return (
     <div>
       <TextField
-        value={textareaValue}
+        value={
+          exportableData.find((e) => e.containerURL === blockURLs[0])?.value ||
+          ''
+        }
         onChange={(e) => {
-          saveMemoData(e.target.value);
+          setExportableData((prev) => {
+            const index = prev.findIndex(
+              (d) => d.containerURL === blockURLs[0]
+            );
+            if (index === -1) return prev;
+            const newData = [...prev];
+            newData[index] = { ...newData[index], value: e.target.value };
+            return newData;
+          });
         }}
         sx={{
           width: '100%',
@@ -232,33 +240,6 @@ export const MemoBody = () => {
           },
         }}
       ></TextField>
-      {/* <textarea
-        ref={(el) => {
-          if (el) {
-            autoResizeTextarea(el);
-          }
-        }}
-        value={textareaValue}
-        spellCheck={false}
-        onChange={(e) => {
-          saveMemoData(e.target.value);
-          autoResizeTextarea(e.target);
-        }}
-        rows={3}
-        placeholder="paramsを入力"
-        style={{
-          width: '100%',
-          fontFamily: 'inherit',
-          fontSize: '0.875rem',
-          padding: '8.5px 14px',
-          border: '1px solid rgba(0, 0, 0, 0.23)',
-          borderRadius: '4px',
-          resize: 'none',
-          minHeight: 'calc(3 * 1.5em + 17px)',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-        }}
-      /> */}
       <div>
         <h3>受信したメッセージ履歴</h3>
         {receivedMessages.length > 0 ? (
@@ -316,24 +297,26 @@ export const MemoBody = () => {
         </Select>
         <Select
           onChange={(e) =>
-            setSelectedBlock(
-              e.target.value === 'memo/text/line1'
-                ? { containerURL: 'memo/text/line1', value: textareaValue }
-                : null
-            )
+            setSelectedBlock({
+              containerURL: e.target.value as string,
+              value:
+                exportableData.find(
+                  (data) => data.containerURL === e.target.value
+                )?.value || '',
+            })
           }
         >
           <MenuItem value={''}>Unselected</MenuItem>
-          <MenuItem value={'memo/text/line1'}>memo/text/line1</MenuItem>
+          {exportableData?.map((data, index) => (
+            <MenuItem key={index} value={data.containerURL}>
+              {data.containerURL}
+            </MenuItem>
+          ))}
         </Select>
         <Button
           variant="outlined"
           onClick={() => {
             if (selectedMethod && selectedBlock) {
-              setSelectedBlock({
-                containerURL: selectedBlock.containerURL || '',
-                value: textareaValue,
-              });
               sendMessageToIframeParent(
                 createMessage(selectedMethod.key, selectedBlock)
               );
@@ -347,4 +330,4 @@ export const MemoBody = () => {
   );
 };
 
-export default MemoBody;
+export default Memo;
