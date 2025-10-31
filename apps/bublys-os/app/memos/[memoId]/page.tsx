@@ -12,7 +12,7 @@ export default function Index({ params }: { params: { memoId: string } }) {
       {memo.lines.map((lineId) => {
         const block = memo.blocks[lineId];
         if (block.type === "text") {
-          return <p key={block.id}>{block.content}</p>;
+          return <p key={block.id} contentEditable>{block.content}</p>;
         }
         return null;
       })}

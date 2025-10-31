@@ -3,6 +3,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
  
 export type Memo = {
+  id: string;
   blocks: {
     [key: string]: {
       id: string;
@@ -35,6 +36,7 @@ const initialState: MemoState = {
   memos: {
     //uuid
     [waMemo]: {
+      id: waMemo,
       blocks: {
         [ichi]: { id: ichi, type: "text", content: "これはメモ1の内容です。" },
         [ni]: { id: ni, type: "text", content: "さらに別の内容。" }
@@ -42,6 +44,7 @@ const initialState: MemoState = {
       lines: [ichi, ni]
     },
     [enMemo]: {
+      id: enMemo,
       blocks: {
         [one]: { id: one, type: "text", content: "これはメモ2の内容です。" },
         [two]: { id: two, type: "text", content: "メモ2の追加情報。" }
@@ -56,14 +59,14 @@ export const memoSlice = createSlice({
   name: "memo",
   initialState,
   reducers: {
-    addMemo: (state, action: PayloadAction<{ id: string; memo: Memo }>) => {
-      const { id, memo } = action.payload;
-      state.memos[id] = memo;
+    addMemo: (state, action: PayloadAction<{ memo: Memo }>) => {
+      const { memo } = action.payload;
+      state.memos[memo.id] = memo;
     },
-    updateMemo: (state, action: PayloadAction<{ id: string; memo: Memo }>) => {
-      const { id, memo } = action.payload;
-      if (state.memos[id]) {
-        state.memos[id] = memo;
+    updateMemo: (state, action: PayloadAction<{ memo: Memo }>) => {
+      const { memo } = action.payload;
+      if (state.memos[memo.id]) {
+        state.memos[memo.id] = memo;
       }
     },
     deleteMemo: (state, action: PayloadAction<string>) => {

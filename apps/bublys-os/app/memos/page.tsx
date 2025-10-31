@@ -1,6 +1,21 @@
 "use client";
 
-import { addMemo, Memo, selectMemos, useAppDispatch, useAppSelector } from '@bublys-org/state-management';
+import { addMemo, deleteMemo, Memo, selectMemos, useAppDispatch, useAppSelector } from '@bublys-org/state-management';
+
+const createMemo = ():Memo => {
+  const memoId = crypto.randomUUID();
+  const firstLineId = crypto.randomUUID();
+  return { 
+    id: memoId, 
+    blocks: {
+      [firstLineId]: { 
+        id: firstLineId,
+        type: "text", content: "新しいメモの内容です。" 
+      }
+    },
+    lines: [firstLineId]
+  };
+}
 
 
 export default function Index() {
@@ -14,8 +29,17 @@ export default function Index() {
       <ul>
         {Object.entries(memos).map(([id, memo]) => (
           <li key={id}>
-            <a href={`/memos/${id}`}>メモID: {id}</a>
-            {memo.blocks[memo.lines?.[0]]?.content}
+            <a href={`/memos/${id}`}>#{id}</a>
+            「{memo.blocks[memo.lines?.[0]]?.content}...」
+
+            <button onClick={(e)=> {
+              e.preventDefault();
+              navigator.clipboard.writeText(id);
+            }}>[IDをコピー]</button>
+            <button onClick={(e)=> {
+              e.preventDefault();
+              dispatch(deleteMemo(id));
+            }}>[削除]</button>
           </li>
         ))}
       </ul>
@@ -23,7 +47,7 @@ export default function Index() {
       <div>
         <button onClick={(e)=> {
           e.preventDefault();
-          dispatch(addMemo({ id: crypto.randomUUID(), memo: { blocks: {}, lines: [] } }));
+          dispatch(addMemo({memo:createMemo()} ));
 
         }}>メモを追加</button> 
       </div>
