@@ -81,22 +81,24 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   };
 
   const onMove = (b: Bubble) => {
-    const updated = b.moveTo({ x: 300, y: 300 });
+    const updated = b.moveTo({ x: 0, y: 0 });
     dispatch(updateBubble(updated.toJSON()));
   };
 
   const popChild = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
-    dispatch(popChildAction(b.id));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
+    dispatch(popChildAction(b.id));
 
     return b.id;
   };
 
   const joinSibling = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
-    dispatch(joinSiblingAction(b.id));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
+    dispatch(joinSiblingAction(b.id));
 
     return b.id;
   };
@@ -118,7 +120,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // 消失点
   const [vanishingPoint, setVanishingPoint] = useState<Point2>({
     x: -10,
-    y: 1000,
+    y: -10,
   });
 
   return (

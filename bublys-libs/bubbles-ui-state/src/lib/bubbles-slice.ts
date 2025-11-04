@@ -24,7 +24,7 @@ export interface BubbleStateSlice {
 
   bubbleRelations:  BubblesRelation[];
 
-  renderCount: number;
+  renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 }
 
 // --- Initial data setup ---
@@ -136,6 +136,11 @@ export const bubblesSlice = createSlice({
     },
     relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
       //重複がないようにチェックが必要そう
+
+      if(action.payload.openerId === "root") {
+        return ;
+      }
+
       state.bubbleRelations.push(action.payload);
     }
   },
@@ -173,13 +178,19 @@ export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice })
   return state.bubbleState.bubbleRelations;
 }
 
+export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStateSlice }, { openeeId }: { openeeId: string }) => {
+  return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
+}
+
 export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
   const relations = state.bubbleState.bubbleRelations;
   const bubbles = state.bubbleState.bubbles;
-  return relations.map(relation => ({
-    opener: Bubble.fromJSON(bubbles[relation.openerId]),
-    openee: Bubble.fromJSON(bubbles[relation.openeeId]),
-  }));
+  return relations.map(relation => {
+    return({
+      opener: Bubble.fromJSON(bubbles[relation.openerId]),
+      openee: Bubble.fromJSON(bubbles[relation.openeeId]),
+    }
+  )});
 }
 
 /**

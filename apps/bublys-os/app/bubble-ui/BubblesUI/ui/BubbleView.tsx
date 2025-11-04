@@ -203,6 +203,11 @@ export const BubbleView: FC<BubbleProps> = ({
         {children}<br />#{bubble.id}
       </main>
 
+      {
+        bubble.renderedRect && (
+          <SmartRectView rect={bubble.renderedRect} />
+        )
+      }
       {/* {bubble.renderedRect && ( // デバッグ用矩形
         <div className="e-debug-rect"
           style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>

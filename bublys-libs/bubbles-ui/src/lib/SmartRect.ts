@@ -102,7 +102,7 @@ export class SmartRect implements DOMRectReadOnly {
     if (direction === "top") {
       ret = {
         x: this.left,
-        y: this.top - openingSize.height,
+        y: this.top - openingSize.height * 1.2 ,
       };
 
     } else if (direction === "right") {
@@ -119,7 +119,7 @@ export class SmartRect implements DOMRectReadOnly {
 
     } else if (direction === "left") {
       ret ={
-        x: this.left - openingSize.width ,
+        x: this.left - openingSize.width * 1.2 ,
         y: this.top,
       };
     }
