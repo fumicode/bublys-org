@@ -1,10 +1,12 @@
 import { Point2, Size2 } from "./00_Point.js";
+import {SmartRect} from "./SmartRect.js";
 
-type Rect = {
+export type RectJson = {
   x: number;
   y: number;
   width: number;
   height: number;
+  parentSize: Size2;
 }
 
 export type BubbleProps = {
@@ -15,7 +17,7 @@ export type BubbleProps = {
   position?: Point2;
   size?: Size2;
 
-  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+  renderedRect?: SmartRect; //内部ではSmartRectを使う
 
 };
 
@@ -27,7 +29,7 @@ export type BubbleJson= {
   position?: Point2;
   size?: Size2;
 
-  renderedRect?: Rect; 
+  renderedRect?: RectJson; //これはシリアライズ可能な型に保つ
 
 };
 
@@ -39,7 +41,7 @@ export type BubbleState = {
   position?: Point2;
   size?: Size2;
 
-  renderedRect?: Rect; //簡易的な定義。そのうちにSmartRectにしたい
+  renderedRect?: SmartRect; //内部ではSmartRectを使う
 
 };
 
@@ -78,9 +80,6 @@ export class Bubble {
     return this.state.position || { x: 0, y: 0 };
   }
 
-
-
-
   moveTo(pos: Point2): Bubble {
     return new Bubble({ ...this.state, position: pos });
   }
@@ -94,11 +93,11 @@ export class Bubble {
   }
 
 
-  get renderedRect(): Rect | undefined {
+  get renderedRect(): SmartRect | undefined {
     return this.state.renderedRect;
   }
 
-  rendered(rect: Rect): this {
+  rendered(rect: SmartRect): this {
     return new Bubble({ ...this.state , renderedRect: rect }) as this;
   }
 
@@ -106,20 +105,18 @@ export class Bubble {
     return new Bubble({ ...this.state, size });
   }
 
-  toJSON(): BubbleState {
+  toJSON(): BubbleJson {
     const rect = this.state.renderedRect;
     return {
       ...this.state,
-      renderedRect: {
-        x: rect?.x || 0,
-        y: rect?.y || 0,
-        width: rect?.width || 0,
-        height: rect?.height || 0,
-      }
+      renderedRect: rect ? rect.toJSON() : undefined
     };
   }
 
-  static fromJSON(s: BubbleState): Bubble {
-    return new Bubble(s);
+  static fromJSON(s: BubbleJson): Bubble {
+    const renderedRect = s.renderedRect
+      ? SmartRect.fromJSON(s.renderedRect)
+      : undefined;
+    return new Bubble({ ...s, renderedRect });
   }
 }

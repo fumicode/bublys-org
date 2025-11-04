@@ -1,7 +1,5 @@
-import {
-  combineReducers,
-  configureStore,
-} from '@reduxjs/toolkit';
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import {environmentSlice} from "./slices/environment-slice.js";
 import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
@@ -11,9 +9,10 @@ import { worldSlice } from "./slices/world-slice.js";
 
 // Reducers 定義
 const reducers = combineReducers({
-  counter: counterSlice.reducer,
-  bubbleState: bubblesSlice.reducer,
-  worldLine: worldSlice.reducer,
+  [counterSlice.reducerPath]: counterSlice.reducer,
+  [bubblesSlice.reducerPath]: bubblesSlice.reducer,
+  [worldSlice.reducerPath]: worldSlice.reducer,
+  [environmentSlice.reducerPath]: environmentSlice.reducer
 });
 
 // RootState を reducers から推論

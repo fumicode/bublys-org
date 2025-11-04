@@ -10,7 +10,8 @@ import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble } from "@bublys-org/bubbles-ui-state";
-import SmartRect from "../domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
+import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -50,11 +51,10 @@ export const BubbleView: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
 
-  const { ref, onRenderChange: handleTransitionEnd } = useMyRectObserver({ 
+  const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
       dispatch(renderBubble(updated.toJSON()));
@@ -62,12 +62,6 @@ export const BubbleView: FC<BubbleProps> = ({
       addRects([rect])
     }
   });
-
-
-
-
-
-  
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -105,7 +99,10 @@ export const BubbleView: FC<BubbleProps> = ({
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onTransitionEnd={handleTransitionEnd}>
+      onTransitionEnd={notifyRendered}
+      
+
+      >
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.name}</h1>
@@ -200,11 +197,17 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
+        <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
+        ({bubble?.position?.x},{bubble?.position?.y})<br />
         [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
-        {children}#{bubble.id}({bubble?.position?.x},{bubble?.position?.y})
-        [{bubble.size?.width}x{bubble.size?.height}]
+        {children}<br />#{bubble.id}
       </main>
 
+      {
+        bubble.renderedRect && (
+          <SmartRectView rect={bubble.renderedRect} />
+        )
+      }
       {/* {bubble.renderedRect && ( // デバッグ用矩形
         <div className="e-debug-rect"
           style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>
@@ -299,4 +302,3 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     
   }
 `;
-
