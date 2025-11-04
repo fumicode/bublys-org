@@ -33,6 +33,46 @@ export default function Index({ params }: { params: { memoId: string } }) {
 
                   // Skip IME composition commit
                   if ((e.nativeEvent as any).isComposing) return;
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setTimeout(() => {
+                      const idx = memo.lines.findIndex(id => id === block.id);
+                      if (idx < memo.lines.length - 1) {
+                        const nextId = memo.lines[idx + 1];
+                        const node = contentRefs.current[nextId];
+                        if (node) {
+                          node.focus();
+                          const range = document.createRange();
+                          range.selectNodeContents(node);
+                          range.collapse(true);
+                          const sel2 = window.getSelection();
+                          sel2?.removeAllRanges();
+                          sel2?.addRange(range);
+                        }
+                      }
+                    }, 0);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setTimeout(() => {
+                      const idx = memo.lines.findIndex(id => id === block.id);
+                      if (idx > 0) {
+                        const prevId = memo.lines[idx - 1];
+                        const node = contentRefs.current[prevId];
+                        if (node) {
+                          node.focus();
+                          const range = document.createRange();
+                          range.selectNodeContents(node);
+                          range.collapse(false);
+                          const sel2 = window.getSelection();
+                          sel2?.removeAllRanges();
+                          sel2?.addRange(range);
+                        }
+                      }
+                    }, 0);
+                    return;
+                  }
                   // Merge on backspace at start of block
                   if (e.key === 'Backspace') {
 
@@ -102,6 +142,12 @@ const StyledMemoDiv = styled.div`
     padding: 8px;
     display: flex;
     flex-direction: row;
+
+    //outlineを削除
+    &:focus-within {
+      outline: none;
+    }
+    outline:none;
 
     > .e-block-id {
       font-size: 12px;
