@@ -36,10 +36,30 @@ const IframeViewer = () => {
   const [isModalOpen, setModalOpen] = useState(false);
   const [appName, setAppName] = useState('');
 
-  // activeAppsごとに個別のiframe refをMapで管理
-  const iframeRefsMap = useRef(new Map<string, HTMLIFrameElement | null>());
+  //各アプリのref
+  const [iframeRefsMap, setIframeRefsMap] = useState<
+    Map<string, HTMLIFrameElement | null>
+  >(new Map());
+
   // refが取得できるまで待機するアプリIDのセット。refが取得できたらactiveAppIdsに追加し削除
   const [pendingAppIds, setPendingAppIds] = useState<Set<string>>(new Set());
+
+  //各アプリのrefをセットする。この関数はIframeAppContentでrefの参照が取れた際に呼び出される。
+  const handleSetIframeRef = (appId: string, iframe: HTMLIFrameElement) => {
+    setIframeRefsMap((prev) => new Map(prev).set(appId, iframe));
+
+    if (pendingAppIds.has(appId)) {
+      if (!activeAppIds.includes(appId)) {
+        dispatch(setActiveApp(appId));
+      }
+      setPendingAppIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(appId);
+        return newSet;
+      });
+    }
+  };
+
   //アプリクリックの処理
   const handleAppClick = (app: AppData) => {
     if (activeAppIds.includes(app.uuid)) {
@@ -48,35 +68,6 @@ const IframeViewer = () => {
       setPendingAppIds((prev) => new Set(prev).add(app.uuid));
     }
   };
-  //iframe refをセットする
-  const setIframeRef = useCallback(
-    (appId: string) => {
-      return (element: HTMLIFrameElement | null) => {
-        if (element) {
-          iframeRefsMap.current.set(appId, element);
-          // refが設定されたら、待機中の場合はactiveAppIdsに追加
-          if (pendingAppIds.has(appId)) {
-            setPendingAppIds((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(appId);
-              return newSet;
-            });
-            // activeAppsに追加可能か確認（appDataが存在するか）
-            const appData = apps?.find((app) => app.uuid === appId);
-            if (!appData) {
-              return;
-            }
-            if (!activeAppIds.includes(appId)) {
-              dispatch(setActiveApp(appId));
-            }
-          }
-        } else {
-          iframeRefsMap.current.delete(appId);
-        }
-      };
-    },
-    [iframeRefsMap]
-  );
 
   //activeAppIdsに対応するappDataとiframeRefを組み合わせた配列
   const activeApps: AppDataAndRefs[] = useMemo(() => {
@@ -86,14 +77,14 @@ const IframeViewer = () => {
       if (!appData) {
         continue;
       }
-      const appRef = iframeRefsMap.current.get(appData.uuid);
+      const appRef = iframeRefsMap.get(appData.uuid);
       if (!appRef) {
         continue;
       }
       newActiveApps.push({ appData, ref: appRef });
     }
     return newActiveApps;
-  }, [activeAppIds, apps]);
+  }, [activeAppIds]);
 
   // クライアント側でマウント時にlocalStorageから状態を復元
   useEffect(() => {
@@ -111,7 +102,7 @@ const IframeViewer = () => {
   }, [dispatch]);
 
   const sendMessageToIframe = useCallback((appId: string, message: Message) => {
-    const iframe = iframeRefsMap.current.get(appId);
+    const iframe = iframeRefsMap.get(appId);
     if (iframe?.contentWindow) {
       console.log('📤 Sending message to iframe:', message);
       try {
@@ -121,10 +112,7 @@ const IframeViewer = () => {
       }
     } else {
       console.error('❌ Iframe contentWindow is not available for app:', appId);
-      console.log(
-        'Available iframes:',
-        Array.from(iframeRefsMap.current.keys())
-      );
+      console.log('Available iframes:', Array.from(iframeRefsMap.keys()));
     }
   }, []);
 
@@ -217,6 +205,8 @@ const IframeViewer = () => {
 
           return (
             <IframeAppContent
+              onIframeLoad={handleSetIframeRef}
+              appId={app.uuid}
               key={app.uuid}
               receivedMessages={receivedMessages.filter(
                 (msg) =>
@@ -226,7 +216,7 @@ const IframeViewer = () => {
               application={app}
               exportData={associateUpdateDataPairs.map((e) => e.fromDTO)}
               childHandShakeMessage={childHandShakeData || null}
-              iframeRef={setIframeRef(app.uuid)}
+              // iframeRef={setIframeRef(app.uuid)}
               sendMessageToIframe={(message) =>
                 sendMessageToIframe(app.uuid, message)
               }

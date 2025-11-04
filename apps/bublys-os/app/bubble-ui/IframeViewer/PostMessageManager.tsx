@@ -8,7 +8,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store/store';
-import { addHandShakeMessage } from './store/massageSlice';
+import { addHandShakeMessage, addMessage } from './store/massageSlice';
 import { addFromDTO, addToDTOs } from './store/exportData.Slice';
 import { AppData } from './store/appSlice';
 import getDomainWithProtocol from './GetDomainWithProtocol';
@@ -86,6 +86,7 @@ export const PostMessageManager = ({
     if (!appDiff) {
       return;
     }
+    console.log('appDiff', appDiff);
     const appRef = findAppRefByUuid(appDiff);
     if (!appRef) {
       console.log(
@@ -95,8 +96,10 @@ export const PostMessageManager = ({
       );
       return;
     }
-    appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
-  }, [appDiff, appRefs, findAppRefByUuid]);
+    setTimeout(() => {
+      appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
+    }, 1000);
+  }, [activeAppIds]);
 
   const sendMessageToIframeAutoFind = useCallback((message: Message) => {
     const url = getDomainWithProtocol(message.params.containerURL);
@@ -181,7 +184,7 @@ export const PostMessageManager = ({
       console.log(JSON.stringify(data));
 
       const message = data as Message;
-
+      dispatch(addMessage(message));
       if (isExportDataMessage(message)) {
         checkAndSetExportData(message);
         console.log('exportDataを受け取った');

@@ -19,6 +19,7 @@ const massageSlice = createSlice({
   reducers: {
     addMessage: (state, action: PayloadAction<Message>) => {
       state.receivedMessages.push(action.payload);
+      console.log(state.receivedMessages);
     },
     removeMessage: (state, action: PayloadAction<string>) => {
       state.receivedMessages = state.receivedMessages.filter(
@@ -29,7 +30,6 @@ const massageSlice = createSlice({
       return action.payload;
     },
     addHandShakeMessage: (state, action: PayloadAction<HandShakeMessage>) => {
-      state.receivedMessages.push(action.payload);
       const index = state.handShakeMessages.findIndex(
         (e) => e.protocol === action.payload.protocol
       );

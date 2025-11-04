@@ -43,6 +43,13 @@ const handShakeMessage = () => {
       },
       { key: 'endRefer', value: { containerURL: 'string' } },
     ],
+    resources: [
+      {
+        containerName: 'string',
+        containerURL: 'string',
+        storableTypes: ['string'],
+      },
+    ],
   });
 };
 
@@ -62,32 +69,43 @@ export default function EmbeddedPage() {
     'http://localhost:4201/calculator/slot2',
     'http://localhost:4201/calculator/result',
   ];
+
+  const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
+    null
+  );
+  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
+    null
+  );
+  const selectMethod = (method: string) => {
+    const handShakeDTO = parentMethods?.find((e) => e.key === method);
+    if (!handShakeDTO) {
+      console.log('Method not found');
+      return;
+    }
+    setSelectedMethod(handShakeDTO);
+  };
+  const [selectedSlot, setSelectedSlot] = useState<DTOParams | null>(null);
   const [exportableData, setExportableData] = useState<DTOParams[]>([
     ...slotURLs.map((url) => ({ containerURL: url, value: '' })),
   ]);
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
 
   const checkAndSetHandShakeData = (message: HandShakeMessage) => {
+    console.log('handShakeを受け取った', message);
     setParentMethods((prev) => {
-      if (!prev) return null;
-      const index = prev.findIndex(
-        (e) => e.key === message.params.methods[0].key
-      );
-      if (index !== -1) {
-        const newData = [...prev];
-        newData[index] = {
-          ...newData[index],
-          value: message.params.methods[0].value,
-        };
-        return newData;
-      }
-      return [
-        ...prev,
-        {
-          key: message.params.methods[0].key,
-          value: message.params.methods[0].value,
-        },
-      ];
+      const currentMethods = prev || [];
+      const newMethods = [...currentMethods];
+
+      //すでにkeyとvalueが登録されている場合は更新しない
+      message.params.methods.forEach((method) => {
+        if (!newMethods.find((e) => e.key === method.key)) {
+          newMethods.push({
+            key: method.key,
+            value: method.value,
+          });
+        }
+      });
+      return newMethods;
     });
   };
 
@@ -169,37 +187,20 @@ export default function EmbeddedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportableData, isReferResult]);
 
-  const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
-    null
-  );
-  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
-    null
-  );
-  const selectMethod = (method: string) => {
-    const handShakeDTO = parentMethods?.find((e) => e.key === method);
-    if (!handShakeDTO) {
-      console.log('Method not found');
-      return;
-    }
-    setSelectedMethod(handShakeDTO);
-  };
-  const [selectedSlot, setSelectedSlot] = useState<DTOParams | null>(null);
-
   function isExportDataMessage(msg: Message): msg is ExportDataMessage {
     return (
       (msg as ExportDataMessage).params.containerURL !== undefined &&
-      (msg as ExportDataMessage).params.value !== undefined
+      (msg as ExportDataMessage).method === 'exportData'
     );
   }
 
   function isHandShakeMessage(msg: Message): msg is HandShakeMessage {
     return (
       (msg as HandShakeMessage).params !== undefined &&
-      (msg as HandShakeMessage).params.methods !== undefined
+      (msg as HandShakeMessage).method === 'handShake'
     );
   }
   useEffect(() => {
-    console.log('🔥 Calculator useEffect called - Component mounted!');
     const handleMessage = (event: MessageEvent) => {
       // React DevToolsを除外
       if (

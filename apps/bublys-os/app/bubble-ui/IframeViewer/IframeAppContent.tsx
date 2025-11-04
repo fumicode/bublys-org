@@ -7,7 +7,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, RefObject } from 'react';
 import type { AppData } from './store/appSlice';
 import type { HandShakeDTO, Message } from './Messages.domain';
 import type { DTOParams } from './Messages.domain';
@@ -17,20 +17,24 @@ import { useSelector } from 'react-redux';
 
 interface IframeAppContentProps {
   application: AppData | null;
-  iframeRef: (element: HTMLIFrameElement | null) => void;
+  // iframeRef: (element: HTMLIFrameElement | null) => void;
   sendMessageToIframe: (message: Message) => void;
   receivedMessages: Message[];
   exportData: DTOParams[];
   childHandShakeMessage: Message | null;
+  onIframeLoad: (appId: string, ref: HTMLIFrameElement) => void;
+  appId: string;
 }
 
 export const IframeAppContent = ({
   application,
-  iframeRef,
+  // iframeRef,
   sendMessageToIframe,
   receivedMessages,
   exportData,
   childHandShakeMessage,
+  onIframeLoad,
+  appId,
 }: IframeAppContentProps) => {
   const [inputURLText, setInputURLText] = useState('');
   const [isClient, setIsClient] = useState(false);
@@ -72,7 +76,13 @@ export const IframeAppContent = ({
   };
 
   const myIframeRef = useRef<HTMLIFrameElement>(null);
-  console.log('myIframeRef.current', myIframeRef.current);
+
+  useEffect(() => {
+    if (myIframeRef.current) {
+      onIframeLoad(appId, myIframeRef.current);
+    }
+  }, [myIframeRef.current]);
+
   return (
     <Box sx={{ flex: 1, p: 2, minHeight: 0 }}>
       <TextField
@@ -200,61 +210,6 @@ export const IframeAppContent = ({
                 sx={{ pl: 2, borderLeft: 2, borderColor: 'primary.main' }}
               ></Box>
             </Box>
-
-            {/* PAYLOAD */}
-            {/* <Box sx={{ mb: 2 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 1, fontWeight: 'medium' }}
-              >
-                payload
-              </Typography>
-
-              <Box sx={{ pl: 2, borderLeft: 2, borderColor: 'primary.main' }}>
-                <Box sx={{ mb: 1.5 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 0.5 }}
-                  >
-                    method
-                  </Typography>
-                  <TextField
-                    value={inputMethodText}
-                    onChange={(e) => setInputMethodText(e.target.value)}
-                    fullWidth
-                    size="small"
-                    placeholder="methodを入力"
-                  />
-                </Box>
-
-                <Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 0.5 }}
-                  >
-                    params
-                  </Typography>
-
-                  <TextField
-                    fullWidth
-                    value={inputParamsText}
-                    onChange={(e) => setInputParamsText(e.target.value)}
-                    placeholder="paramsを入力"
-                    sx={{
-                      mb: 2,
-                      '& textarea': {
-                        whiteSpace: 'pre-wrap', // テキストの折り返しを有効にする
-                      },
-                    }}
-                    multiline
-                    minRows={1} // 最小行数
-                    maxRows={10} // 最大行数（スクロールが発生するまでの最大行数）
-                  />
-                </Box>
-              </Box>
-            </Box> */}
 
             <Stack direction="row" spacing={1} alignItems="center">
               <Select

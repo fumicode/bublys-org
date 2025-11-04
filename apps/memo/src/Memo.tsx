@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { TextField, Stack, Select, MenuItem, Button } from '@mui/material';
+import {
+  TextField,
+  Stack,
+  Select,
+  MenuItem,
+  Button,
+  Container,
+} from '@mui/material';
 import {
   Message,
   DTOParams,
@@ -26,6 +33,13 @@ const handShakeMessage = () => {
         value: { containerURL: 'string', displayText: 'string' },
       },
       { key: 'endRefer', value: { containerURL: 'string' } },
+    ],
+    resources: [
+      {
+        containerName: 'string',
+        containerURL: 'string',
+        storableTypes: ['string'],
+      },
     ],
   });
 };
@@ -60,26 +74,21 @@ export const Memo = () => {
   const [selectedBlock, setSelectedBlock] = useState<DTOParams | null>(null);
 
   const checkAndSetHandShakeData = (message: HandShakeMessage) => {
+    console.log('handShakeを受け取った', message);
     setParentMethods((prev) => {
-      if (!prev) return null;
-      const index = prev.findIndex(
-        (e) => e.key === message.params.methods[0].key
-      );
-      if (index !== -1) {
-        const newData = [...prev];
-        newData[index] = {
-          ...newData[index],
-          value: message.params.methods[0].value,
-        };
-        return newData;
-      }
-      return [
-        ...prev,
-        {
-          key: message.params.methods[0].key,
-          value: message.params.methods[0].value,
-        },
-      ];
+      const currentMethods = prev || [];
+      const newMethods = [...currentMethods];
+
+      //すでにkeyとvalueが登録されている場合は更新しない
+      message.params.methods.forEach((method) => {
+        if (!newMethods.find((e) => e.key === method.key)) {
+          newMethods.push({
+            key: method.key,
+            value: method.value,
+          });
+        }
+      });
+      return newMethods;
     });
   };
 
