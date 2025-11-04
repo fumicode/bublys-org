@@ -15,7 +15,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store/store';
-import { addApp, setActiveApp, removeApp, hydrate } from './store/appSlice';
+import {
+  addApp,
+  setActiveApp,
+  setInActiveApp,
+  removeApp,
+  hydrate,
+} from './store/appSlice';
 import type { AppData } from './store/appSlice';
 import { Message } from './Messages.domain';
 import IframeAppContent from './IframeAppContent';
@@ -26,41 +32,51 @@ import getDomainWithProtocol from './GetDomainWithProtocol';
 const IframeViewer = () => {
   const dispatch = useDispatch();
   const { apps, activeAppIds } = useSelector((state: RootState) => state.app);
-  const displayedAppLimit = 2;
   const [inputURLText, setInputURLText] = useState('');
   const [isModalOpen, setModalOpen] = useState(false);
   const [appName, setAppName] = useState('');
-  const receivedMessages = useSelector(
-    (state: RootState) => state.massage.receivedMessages
-  );
-  console.log(receivedMessages);
-  const handShakeData = useSelector(
-    (state: RootState) => state.massage.handShakeMessages
-  );
-  console.log(handShakeData);
-  const associateUpdateDataPairs = useSelector(
-    (state: RootState) => state.exportData.associateUpdateDataPairs
-  );
-  // refが取得できるまで待機するアプリIDのセット
-  const [pendingAppIds, setPendingAppIds] = useState<Set<string>>(new Set());
-
-  // クライアント側でマウント時にlocalStorageから状態を復元
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const serializedState = localStorage.getItem('iframeViewerState');
-        if (serializedState) {
-          const savedState = JSON.parse(serializedState);
-          dispatch(hydrate(savedState));
-        }
-      } catch (err) {
-        console.warn('ローカルストレージからの復元に失敗しました', err);
-      }
-    }
-  }, [dispatch]);
 
   // activeAppsごとに個別のiframe refをMapで管理
   const iframeRefsMap = useRef(new Map<string, HTMLIFrameElement | null>());
+  // refが取得できるまで待機するアプリIDのセット。refが取得できたらactiveAppIdsに追加し削除
+  const [pendingAppIds, setPendingAppIds] = useState<Set<string>>(new Set());
+  //アプリクリックの処理
+  const handleAppClick = (app: AppData) => {
+    if (activeAppIds.includes(app.uuid)) {
+      dispatch(setInActiveApp(app.uuid));
+    } else {
+      setPendingAppIds((prev) => new Set(prev).add(app.uuid));
+    }
+  };
+  //iframe refをセットする
+  const setIframeRef = useCallback(
+    (appId: string) => {
+      return (element: HTMLIFrameElement | null) => {
+        if (element) {
+          iframeRefsMap.current.set(appId, element);
+          // refが設定されたら、待機中の場合はactiveAppIdsに追加
+          if (pendingAppIds.has(appId)) {
+            setPendingAppIds((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(appId);
+              return newSet;
+            });
+            // activeAppsに追加可能か確認（appDataが存在するか）
+            const appData = apps?.find((app) => app.uuid === appId);
+            if (!appData) {
+              return;
+            }
+            if (!activeAppIds.includes(appId)) {
+              dispatch(setActiveApp(appId));
+            }
+          }
+        } else {
+          iframeRefsMap.current.delete(appId);
+        }
+      };
+    },
+    [iframeRefsMap]
+  );
 
   //activeAppIdsに対応するappDataとiframeRefを組み合わせた配列
   const activeApps: AppDataAndRefs[] = useMemo(() => {
@@ -78,6 +94,21 @@ const IframeViewer = () => {
     }
     return newActiveApps;
   }, [activeAppIds, apps]);
+
+  // クライアント側でマウント時にlocalStorageから状態を復元
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const serializedState = localStorage.getItem('iframeViewerState');
+        if (serializedState) {
+          const savedState = JSON.parse(serializedState);
+          dispatch(hydrate(savedState));
+        }
+      } catch (err) {
+        console.warn('ローカルストレージからの復元に失敗しました', err);
+      }
+    }
+  }, [dispatch]);
 
   const sendMessageToIframe = useCallback((appId: string, message: Message) => {
     const iframe = iframeRefsMap.current.get(appId);
@@ -97,55 +128,6 @@ const IframeViewer = () => {
     }
   }, []);
 
-  const setIframeRef = useCallback(
-    (appId: string) => {
-      return (element: HTMLIFrameElement | null) => {
-        if (element) {
-          console.log('✅ [setIframeRef] Ref set for:', appId);
-          iframeRefsMap.current.set(appId, element);
-
-          // refが設定されたら、待機中の場合はactiveAppIdsに追加
-          if (pendingAppIds.has(appId)) {
-            console.log('⏰ [setIframeRef] Pending app detected, adding to activeAppIds:', appId);
-            setPendingAppIds((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(appId);
-              return newSet;
-            });
-
-            if (activeAppIds.includes(appId)) {
-              // 既に含まれている場合はスキップ
-              console.log('⏭️ [setIframeRef] Already in activeAppIds:', appId);
-            } else if (activeAppIds.length >= displayedAppLimit) {
-              const newActiveAppIds = [
-                ...activeAppIds.slice(activeAppIds.length - displayedAppLimit + 1),
-                appId,
-              ];
-              console.log('📝 [setIframeRef] Dispatching setActiveApp (with limit):', newActiveAppIds);
-              dispatch(setActiveApp(newActiveAppIds));
-            } else {
-              console.log('📝 [setIframeRef] Dispatching setActiveApp:', [...activeAppIds, appId]);
-              dispatch(setActiveApp([...activeAppIds, appId]));
-            }
-          }
-        } else {
-          iframeRefsMap.current.delete(appId);
-        }
-      };
-    },
-    [activeAppIds, displayedAppLimit, pendingAppIds, dispatch]
-  );
-
-  const handleAppClick = (app: AppData) => {
-    if (activeAppIds.includes(app.uuid)) {
-      console.log('🔽 [handleAppClick] Removing from activeAppIds:', app.uuid);
-      dispatch(setActiveApp(activeAppIds.filter((id) => id !== app.uuid)));
-    } else {
-      console.log('⏳ [handleAppClick] Adding to pending:', app.uuid);
-      setPendingAppIds((prev) => new Set(prev).add(app.uuid));
-    }
-  };
-
   const handleInstall = () => {
     if (appName.trim() && inputURLText.trim()) {
       dispatch(addApp({ name: appName, url: inputURLText }));
@@ -155,6 +137,18 @@ const IframeViewer = () => {
     }
   };
 
+  //-----------uiに渡すためのメッセージ由来のデータ-------------
+  const receivedMessages = useSelector(
+    (state: RootState) => state.massage.receivedMessages
+  );
+  const handShakeData = useSelector(
+    (state: RootState) => state.massage.handShakeMessages
+  );
+  const associateUpdateDataPairs = useSelector(
+    (state: RootState) => state.exportData.associateUpdateDataPairs
+  );
+
+  //-----------ui本体-------------
   const child = (
     <Box sx={{ display: 'flex' }}>
       {/* サイドバー */}
@@ -211,7 +205,8 @@ const IframeViewer = () => {
 
       {apps
         .filter(
-          (app) => activeAppIds.includes(app.uuid) || pendingAppIds.has(app.uuid)
+          (app) =>
+            activeAppIds.includes(app.uuid) || pendingAppIds.has(app.uuid)
         )
         .map((app) => {
           const childHandShakeData = handShakeData?.find(

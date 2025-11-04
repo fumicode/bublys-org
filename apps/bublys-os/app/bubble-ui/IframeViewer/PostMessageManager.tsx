@@ -61,60 +61,42 @@ export const PostMessageManager = ({
   const associateUpdateDataPairs = useSelector(
     (state: RootState) => state.exportData.associateUpdateDataPairs
   );
-  const prevActiveAppIds = useRef<string[]>([]);
 
   //uuidでAppRefを探す。
-  const findAppRefByUuid = useCallback((uuid: string) => {
-    return appRefs.find((e) => e.appData.uuid === uuid);
-  }, [appRefs]);
+  const findAppRefByUuid = useCallback(
+    (uuid: string) => {
+      return appRefs.find((e) => e.appData.uuid === uuid);
+    },
+    [appRefs]
+  );
 
   //urlでAppRefを探す。
-  const findAppRefByUrl = useCallback((url: string) => {
-    return appRefs.filter((e) => e.appData.url === url);
-  }, [appRefs]);
+  const findAppRefByUrl = useCallback(
+    (url: string) => {
+      return appRefs.filter((e) => e.appData.url === url);
+    },
+    [appRefs]
+  );
+
+  const appDiff = useSelector((state: RootState) => state.app.appDiff);
 
   // activeAppIdsの変更を検知してhandShakeを送信
   // appRefsも依存配列に含めることで、refが利用可能になった時点で送信できる
   useEffect(() => {
-    const prev = prevActiveAppIds.current;
-    const current = activeAppIds;
-
-    // 前回のactiveAppIdsと現在のactiveAppIdsを比較して、追加されたappIdを検出する
-    const newlyActivatedAppUUID = current.find((id) => !prev.includes(id));
-    console.log('🔍 [activeAppIds or appRefs changed] newlyActivatedAppUUID:', newlyActivatedAppUUID);
-    console.log('🔍 Available appRefs:', appRefs.map(a => ({ uuid: a.appData.uuid, hasRef: !!a.ref })));
-
-    if (!newlyActivatedAppUUID) {
-      // 新しく追加されたappがない場合でも、appRefsの更新で送信可能になる場合がある
-      // activeAppIds全てに対してチェック
-      const needsHandShake = current.find((id) => {
-        const appRef = findAppRefByUuid(id);
-        return appRef && !prevActiveAppIds.current.includes(id);
-      });
-
-      if (needsHandShake) {
-        const appRef = findAppRefByUuid(needsHandShake);
-        if (appRef) {
-          console.log('✅ [Delayed] appRef found, sending handShake to:', needsHandShake);
-          appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
-          prevActiveAppIds.current = activeAppIds;
-        }
-      }
+    if (!appDiff) {
       return;
     }
-
-    const appRef = findAppRefByUuid(newlyActivatedAppUUID);
+    const appRef = findAppRefByUuid(appDiff);
     if (!appRef) {
-      console.log('❌ appRef not found for:', newlyActivatedAppUUID, '- waiting for appRefs update');
+      console.log(
+        '❌ appRef not found for:',
+        appDiff,
+        '- waiting for appRefs update'
+      );
       return;
     }
-
-    console.log('✅ appRef found, sending handShake to:', newlyActivatedAppUUID);
     appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
-
-    // 現在のactiveAppIdsを保存
-    prevActiveAppIds.current = activeAppIds;
-  }, [activeAppIds, appRefs, findAppRefByUuid]);
+  }, [appDiff, appRefs, findAppRefByUuid]);
 
   const sendMessageToIframeAutoFind = useCallback((message: Message) => {
     const url = getDomainWithProtocol(message.params.containerURL);

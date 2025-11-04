@@ -7,7 +7,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppData } from './store/appSlice';
 import type { HandShakeDTO, Message } from './Messages.domain';
 import type { DTOParams } from './Messages.domain';
@@ -71,6 +71,8 @@ export const IframeAppContent = ({
     };
   };
 
+  const myIframeRef = useRef<HTMLIFrameElement>(null);
+  console.log('myIframeRef.current', myIframeRef.current);
   return (
     <Box sx={{ flex: 1, p: 2, minHeight: 0 }}>
       <TextField
@@ -101,7 +103,8 @@ export const IframeAppContent = ({
           >
             <iframe
               key={application?.uuid}
-              ref={iframeRef}
+              // ref={iframeRef}
+              ref={myIframeRef}
               src={application?.url}
               style={{
                 width: '100%',

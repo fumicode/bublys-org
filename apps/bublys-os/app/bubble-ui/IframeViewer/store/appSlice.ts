@@ -9,10 +9,17 @@ export interface AppData {
 export interface AppState {
   apps: AppData[];
   activeAppIds: string[];
+  appDiff: string | undefined; //activeAppIdsの差分
+  displayedAppLimit: number;
 }
 
 // 初期状態は常に空（サーバーとクライアントで一致させる）
-const initialState: AppState = { apps: [], activeAppIds: [] };
+const initialState: AppState = {
+  apps: [],
+  activeAppIds: [],
+  appDiff: undefined,
+  displayedAppLimit: 2,
+};
 
 const appSlice = createSlice({
   name: 'app',
@@ -33,8 +40,20 @@ const appSlice = createSlice({
         );
       }
     },
-    setActiveApp: (state, action: PayloadAction<string[] | null>) => {
-      state.activeAppIds = action.payload ? action.payload : [];
+    setActiveApp: (state, action: PayloadAction<string>) => {
+      state.appDiff = action.payload;
+      state.activeAppIds = [...state.activeAppIds, action.payload];
+      if (state.activeAppIds.length >= state.displayedAppLimit) {
+        state.activeAppIds = state.activeAppIds.slice(
+          state.activeAppIds.length - state.displayedAppLimit + 1
+        );
+      }
+    },
+    setInActiveApp: (state, action: PayloadAction<string>) => {
+      state.appDiff = action.payload;
+      state.activeAppIds = state.activeAppIds.filter(
+        (id) => id !== action.payload
+      );
     },
     hydrate: (_state, action: PayloadAction<AppState>) => {
       return action.payload;
@@ -73,5 +92,6 @@ export const handShakeMiddleware =
     return result;
   };
 
-export const { addApp, removeApp, setActiveApp, hydrate } = appSlice.actions;
+export const { addApp, removeApp, setActiveApp, setInActiveApp, hydrate } =
+  appSlice.actions;
 export default appSlice.reducer;
