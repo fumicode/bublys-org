@@ -18,7 +18,6 @@ const createMemo = (): RawMemo => {
   };
 }
 
-
 export default function Index() {
   //メモの一覧を表示
   const memos = useAppSelector(selectMemos);

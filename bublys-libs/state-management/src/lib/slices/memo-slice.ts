@@ -12,7 +12,7 @@ export type RawMemo = {
     };
   };
   lines: string[];
-}
+};
 
 // Define a type for the slice state
 export interface MemoState {
@@ -31,7 +31,7 @@ export class Memo {
     const { id, blocks, lines } = this.state;
     const newBlocks = { ...blocks, [newBlock.id]: newBlock };
     const newLines = [...lines];
-    const idx = newLines.findIndex((id) => id === afterId);
+    const idx = newLines.findIndex((bid) => bid === afterId);
     newLines.splice(idx + 1, 0, newBlock.id);
     return new Memo({ id, blocks: newBlocks, lines: newLines });
   }
@@ -42,6 +42,18 @@ export class Memo {
       newBlocks[blockId] = { ...newBlocks[blockId], content };
     }
     return new Memo({ id, blocks: newBlocks, lines: [...lines] });
+  }
+  mergeBlock(blockId: string): Memo {
+    const { id, blocks, lines } = this.state;
+    const newBlocks = { ...blocks };
+    const newLines = [...lines];
+    const idx = newLines.findIndex((bid) => bid === blockId);
+    if (idx <= 0) return this;
+    const prevId = newLines[idx - 1];
+    newBlocks[prevId] = { ...newBlocks[prevId], content: newBlocks[prevId].content + newBlocks[blockId].content };
+    delete newBlocks[blockId];
+    newLines.splice(idx, 1);
+    return new Memo({ id, blocks: newBlocks, lines: newLines });
   }
   toPlain(): RawMemo {
     return { ...this.state };

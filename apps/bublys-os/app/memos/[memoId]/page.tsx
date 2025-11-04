@@ -30,8 +30,45 @@ export default function Index({ params }: { params: { memoId: string } }) {
                   dispatch(updateMemo({ memo: updated }));
                 }}
                 onKeyDown={e => {
-                  // Skip IME composition commit Enter
+
+                  // Skip IME composition commit
                   if ((e.nativeEvent as any).isComposing) return;
+                  // Merge on backspace at start of block
+                  if (e.key === 'Backspace') {
+
+
+                    const sel = window.getSelection();
+                    if (sel && sel.anchorOffset === 0 && sel.focusOffset === 0) {
+                      e.preventDefault();
+
+                      //はじめに、現在の行の内容を確定して保存する。
+                      const content = e.currentTarget.innerText;
+                      const updated = new Memo(memo).updateBlockContent(block.id, content);
+
+                      //そのうえで、前の行と結合する。
+                      const merged = updated.mergeBlock(block.id).toPlain();
+                      dispatch(updateMemo({ memo: merged }));
+
+                      setTimeout(() => {
+                        const idx = memo.lines.findIndex(id => id === block.id);
+                        if (idx > 0) {
+                          const prevId = memo.lines[idx - 1];
+                          const node = contentRefs.current[prevId];
+                          if (node) {
+                            node.focus();
+                            const range = document.createRange();
+                            range.selectNodeContents(node);
+                            range.collapse(false);
+                            const sel2 = window.getSelection();
+                            sel2?.removeAllRanges();
+                            sel2?.addRange(range);
+                          }
+                        }
+                      }, 0);
+                      return;
+                    }
+                  }
+                  // Insert new block on Enter
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     const newId = crypto.randomUUID();
