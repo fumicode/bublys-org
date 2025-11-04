@@ -61,6 +61,6 @@ export interface HandShakeMessage extends Message {
 }
 
 export interface HandShakeDTO {
-  key: string;
-  value: { URL: string; value: string };
+  key: string; //メソッド名
+  value: { containerURL: string; value: string }; //メソッドのパラメータ
 }

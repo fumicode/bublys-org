@@ -1,12 +1,17 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Message } from '../Messages.domain';
+import { HandShakeDTO, HandShakeMessage } from '../Messages.domain';
 
 export interface MessageState {
   receivedMessages: Message[];
+  handShakeMessages: HandShakeMessage[];
 }
 
 // 初期状態は常に空（サーバーとクライアントで一致させる）
-const initialState: MessageState = { receivedMessages: [] };
+const initialState: MessageState = {
+  receivedMessages: [],
+  handShakeMessages: [],
+};
 
 const massageSlice = createSlice({
   name: 'massage',
@@ -22,6 +27,20 @@ const massageSlice = createSlice({
     },
     hydrate: (_state, action: PayloadAction<MessageState>) => {
       return action.payload;
+    },
+    addHandShakeMessage: (state, action: PayloadAction<HandShakeMessage>) => {
+      state.receivedMessages.push(action.payload);
+      const index = state.handShakeMessages.findIndex(
+        (e) => e.protocol === action.payload.protocol
+      );
+      if (index !== -1) {
+        const newData = [...state.handShakeMessages];
+        newData[index] = action.payload;
+        state.handShakeMessages = newData;
+      } else {
+        state.handShakeMessages.push(action.payload);
+      }
+      console.log(state.handShakeMessages);
     },
   },
 });
@@ -44,5 +63,6 @@ export const localStorageMiddleware =
     return result;
   };
 
-export const { addMessage, removeMessage, hydrate } = massageSlice.actions;
+export const { addMessage, removeMessage, hydrate, addHandShakeMessage } =
+  massageSlice.actions;
 export default massageSlice.reducer;

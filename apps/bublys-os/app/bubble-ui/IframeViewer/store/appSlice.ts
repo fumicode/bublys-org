@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AppData {
-  id: string;
+  uuid: string;
   name: string;
   url: string;
 }
@@ -18,15 +18,15 @@ const appSlice = createSlice({
   name: 'app',
   initialState,
   reducers: {
-    addApp: (state, action: PayloadAction<Omit<AppData, 'id'>>) => {
+    addApp: (state, action: PayloadAction<Omit<AppData, 'uuid'>>) => {
       const newApp = {
         ...action.payload,
-        id: Date.now().toString(),
+        uuid: Date.now().toString(),
       };
       state.apps.push(newApp);
     },
     removeApp: (state, action: PayloadAction<string>) => {
-      state.apps = state.apps.filter((app) => app.id !== action.payload);
+      state.apps = state.apps.filter((app) => app.uuid !== action.payload);
       if (state.activeAppIds.includes(action.payload)) {
         state.activeAppIds = state.activeAppIds.filter(
           (id) => id !== action.payload

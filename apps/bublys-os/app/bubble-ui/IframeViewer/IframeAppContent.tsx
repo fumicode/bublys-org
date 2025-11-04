@@ -9,16 +9,18 @@ import {
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import type { AppData } from './store/appSlice';
-import type { Message } from './Messages.domain';
-import type { HandShakeDTO } from './IframeViewer';
+import type { HandShakeDTO, Message } from './Messages.domain';
+import type { DTOParams } from './Messages.domain';
 import { v4 as uuidv4 } from 'uuid';
+import { RootState } from './store/store';
+import { useSelector } from 'react-redux';
 
 interface IframeAppContentProps {
   application: AppData | null;
   iframeRef: (element: HTMLIFrameElement | null) => void;
   sendMessageToIframe: (message: Message) => void;
   receivedMessages: Message[];
-  exportData: Message[];
+  exportData: DTOParams[];
   childHandShakeMessage: Message | null;
 }
 
@@ -32,6 +34,10 @@ export const IframeAppContent = ({
 }: IframeAppContentProps) => {
   const [inputURLText, setInputURLText] = useState('');
   const [isClient, setIsClient] = useState(false);
+
+  // const handShakeMessages = useSelector(
+  //   (state: RootState) => state.massage.handShakeMessages
+  // );
 
   const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
     null
@@ -52,7 +58,6 @@ export const IframeAppContent = ({
 
   useEffect(() => {
     setIsClient(true);
-    console.log(iframeRef?.current?.contentWindow.location);
   }, []);
 
   const createMessage = (method: string, params: any) => {
@@ -95,7 +100,7 @@ export const IframeAppContent = ({
             }}
           >
             <iframe
-              key={application?.id}
+              key={application?.uuid}
               ref={iframeRef}
               src={application?.url}
               style={{
@@ -268,8 +273,8 @@ export const IframeAppContent = ({
               >
                 <MenuItem value={''}>Unselected</MenuItem>
                 {exportData.map((e, index) => (
-                  <MenuItem key={index} value={e.params.containerURL}>
-                    {e.params.containerURL}: {JSON.stringify(e.params.value)}
+                  <MenuItem key={index} value={e.containerURL}>
+                    {e.containerURL}: {JSON.stringify(e.value)}
                   </MenuItem>
                 ))}
               </Select>
@@ -278,11 +283,11 @@ export const IframeAppContent = ({
                 onClick={() => {
                   if (selectedMethod) {
                     const current = exportData.find(
-                      (e) => e.params.containerURL === selectedContainerURL
+                      (e) => e.containerURL === selectedContainerURL
                     );
                     if (current) {
                       sendMessageToIframe(
-                        createMessage(selectedMethod.key, current.params)
+                        createMessage(selectedMethod.key, current.value)
                       );
                     }
                   }

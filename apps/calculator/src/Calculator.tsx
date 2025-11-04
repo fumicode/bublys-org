@@ -32,8 +32,7 @@ const createMessage = (method: string, params: any) => {
 const handShakeMessage = () => {
   return createMessage('handShake', {
     methods: [
-      { key: 'PushNumber', value: { slotURL: 'string', value: 'number' } },
-      { key: 'UpdateNumber', value: { slotURL: 'string', value: 'number' } },
+      { key: 'exportData', value: { containerURL: 'string', value: 'string' } },
       {
         key: 'startRefer',
         value: { containerURL: 'string' },
@@ -127,38 +126,48 @@ export default function EmbeddedPage() {
     }
   };
 
-  useEffect(() => {
-    const calcResult =
-      Number(
-        exportableData.find((e) => e.containerURL === slotURLs[0])?.value
-      ) +
-      Number(exportableData.find((e) => e.containerURL === slotURLs[1])?.value);
-    setExportableData((prev) => {
-      const index = prev.findIndex((e) => e.containerURL === slotURLs[2]);
-      if (index === -1) return prev;
-      const newData = [...prev];
-      newData[index] = { ...newData[index], value: calcResult.toString() };
-      return newData;
-    });
-    if (selectedSlot && selectedSlot.containerURL === slotURLs[2]) {
-      setSelectedSlot({
-        containerURL: selectedSlot.containerURL,
-        value: calcResult.toString(),
-      });
-    }
-    if (isReferResult === 'ReferFrom') {
-      sendMessageToIframeParent(
-        createMessage('exportData', {
-          containerURL: slotURLs[2],
-          value: calcResult.toString(),
-        })
-      );
-    }
-  }, [exportableData]);
-
   const [isReferSlot1, setIsReferSlot1] = useState<slotRefState>('None');
   const [isReferSlot2, setIsReferSlot2] = useState<slotRefState>('None');
   const [isReferResult, setIsReferResult] = useState<slotRefState>('None');
+
+  useEffect(() => {
+    const slot1Value = exportableData.find(
+      (e) => e.containerURL === slotURLs[0]
+    )?.value;
+    const slot2Value = exportableData.find(
+      (e) => e.containerURL === slotURLs[1]
+    )?.value;
+    const calcResult = Number(slot1Value) + Number(slot2Value);
+    const currentResult = exportableData.find(
+      (e) => e.containerURL === slotURLs[2]
+    )?.value;
+
+    // 計算結果が変わった場合のみ更新
+    if (currentResult !== calcResult.toString()) {
+      setExportableData((prev) => {
+        const index = prev.findIndex((e) => e.containerURL === slotURLs[2]);
+        if (index === -1) return prev;
+        const newData = [...prev];
+        newData[index] = { ...newData[index], value: calcResult.toString() };
+        return newData;
+      });
+      if (selectedSlot && selectedSlot.containerURL === slotURLs[2]) {
+        setSelectedSlot({
+          containerURL: selectedSlot.containerURL,
+          value: calcResult.toString(),
+        });
+      }
+      if (isReferResult === 'ReferFrom') {
+        sendMessageToIframeParent(
+          createMessage('exportData', {
+            containerURL: slotURLs[2],
+            value: calcResult.toString(),
+          })
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportableData, isReferResult]);
 
   const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
     null
@@ -177,11 +186,17 @@ export default function EmbeddedPage() {
   const [selectedSlot, setSelectedSlot] = useState<DTOParams | null>(null);
 
   function isExportDataMessage(msg: Message): msg is ExportDataMessage {
-    return (msg as ExportDataMessage).params.containerURL !== undefined; // 判定条件を適宜
+    return (
+      (msg as ExportDataMessage).params.containerURL !== undefined &&
+      (msg as ExportDataMessage).params.value !== undefined
+    );
   }
 
   function isHandShakeMessage(msg: Message): msg is HandShakeMessage {
-    return (msg as HandShakeMessage).params !== undefined;
+    return (
+      (msg as HandShakeMessage).params !== undefined &&
+      (msg as HandShakeMessage).params.methods !== undefined
+    );
   }
   useEffect(() => {
     console.log('🔥 Calculator useEffect called - Component mounted!');
@@ -240,6 +255,7 @@ export default function EmbeddedPage() {
       console.log('🧹 Calculator useEffect cleanup - Component unmounting!');
       window.removeEventListener('message', handleMessage);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

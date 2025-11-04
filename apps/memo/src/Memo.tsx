@@ -110,30 +110,39 @@ export const Memo = () => {
   };
 
   useEffect(() => {
-    setSelectedBlock({
-      containerURL: selectedBlock?.containerURL || '',
-      value:
-        exportableData.find((e) => e.containerURL === blockURLs[0])?.value ||
-        '',
+    const blockValue =
+      exportableData.find((e) => e.containerURL === blockURLs[0])?.value || '';
+    setSelectedBlock((prev) => {
+      // 値が変わっていない場合は更新しない
+      if (prev?.value === blockValue) return prev;
+      return {
+        containerURL: prev?.containerURL || '',
+        value: blockValue,
+      };
     });
     if (isReferBlock === 'ReferFrom') {
       sendMessageToIframeParent(
         createMessage('exportData', {
           containerURL: blockURLs[0],
-          value:
-            exportableData.find((e) => e.containerURL === blockURLs[0])
-              ?.value || '',
+          value: blockValue,
         })
       );
     }
-  }, [exportableData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportableData, isReferBlock]);
 
   function isExportDataMessage(msg: Message): msg is ExportDataMessage {
-    return (msg as ExportDataMessage).params !== undefined; // 判定条件を適宜
+    return (
+      (msg as ExportDataMessage).params !== undefined &&
+      (msg as ExportDataMessage).method === 'exportData'
+    );
   }
 
   function isHandShakeMessage(msg: Message): msg is HandShakeMessage {
-    return (msg as HandShakeMessage).params !== undefined;
+    return (
+      (msg as HandShakeMessage).params !== undefined &&
+      (msg as HandShakeMessage).method === 'handShake'
+    );
   }
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

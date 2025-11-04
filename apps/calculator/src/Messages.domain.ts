@@ -62,5 +62,5 @@ export interface HandShakeMessage extends Message {
 
 export interface HandShakeDTO {
   key: string;
-  value: { URL: string; value: string };
+  value: { containerURL: string; value: string };
 }

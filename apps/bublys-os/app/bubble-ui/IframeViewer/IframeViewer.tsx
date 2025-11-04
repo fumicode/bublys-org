@@ -12,13 +12,16 @@ import {
   IconButton,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { addApp, setActiveApp, removeApp, hydrate } from './store/appSlice';
 import type { AppData } from './store/appSlice';
 import { Message } from './Messages.domain';
 import IframeAppContent from './IframeAppContent';
+import PostMessageManager from './PostMessageManager';
+import { AppDataAndRefs } from './PostMessageManager';
+import getDomainWithProtocol from './GetDomainWithProtocol';
 
 const IframeViewer = () => {
   const dispatch = useDispatch();
@@ -27,11 +30,19 @@ const IframeViewer = () => {
   const [inputURLText, setInputURLText] = useState('');
   const [isModalOpen, setModalOpen] = useState(false);
   const [appName, setAppName] = useState('');
-  const activeApps = apps.filter((app) => activeAppIds.includes(app.id));
-  const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
-  const [handShakeData, setHandShakeData] = useState<Message[]>([]);
-  const [exportData, setExportData] = useState<Message[]>([]);
-  const [pendingAppId, setPendingAppId] = useState<string | null>(null);
+  const receivedMessages = useSelector(
+    (state: RootState) => state.massage.receivedMessages
+  );
+  console.log(receivedMessages);
+  const handShakeData = useSelector(
+    (state: RootState) => state.massage.handShakeMessages
+  );
+  console.log(handShakeData);
+  const associateUpdateDataPairs = useSelector(
+    (state: RootState) => state.exportData.associateUpdateDataPairs
+  );
+  // refが取得できるまで待機するアプリIDのセット
+  const [pendingAppIds, setPendingAppIds] = useState<Set<string>>(new Set());
 
   // クライアント側でマウント時にlocalStorageから状態を復元
   useEffect(() => {
@@ -50,6 +61,23 @@ const IframeViewer = () => {
 
   // activeAppsごとに個別のiframe refをMapで管理
   const iframeRefsMap = useRef(new Map<string, HTMLIFrameElement | null>());
+
+  //activeAppIdsに対応するappDataとiframeRefを組み合わせた配列
+  const activeApps: AppDataAndRefs[] = useMemo(() => {
+    const newActiveApps: AppDataAndRefs[] = [];
+    for (let i = 0; i < activeAppIds.length; i++) {
+      const appData = apps?.find((app) => app.uuid === activeAppIds[i]);
+      if (!appData) {
+        continue;
+      }
+      const appRef = iframeRefsMap.current.get(appData.uuid);
+      if (!appRef) {
+        continue;
+      }
+      newActiveApps.push({ appData, ref: appRef });
+    }
+    return newActiveApps;
+  }, [activeAppIds, apps]);
 
   const sendMessageToIframe = useCallback((appId: string, message: Message) => {
     const iframe = iframeRefsMap.current.get(appId);
@@ -73,58 +101,48 @@ const IframeViewer = () => {
     (appId: string) => {
       return (element: HTMLIFrameElement | null) => {
         if (element) {
+          console.log('✅ [setIframeRef] Ref set for:', appId);
           iframeRefsMap.current.set(appId, element);
 
-          const sendHandshakeWhenReady = () => {
-            if (element.contentWindow) {
-              sendMessageToIframe(appId, handShakeMessage());
-            } else {
-              setTimeout(sendHandshakeWhenReady, 100);
-            }
-          };
+          // refが設定されたら、待機中の場合はactiveAppIdsに追加
+          if (pendingAppIds.has(appId)) {
+            console.log('⏰ [setIframeRef] Pending app detected, adding to activeAppIds:', appId);
+            setPendingAppIds((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(appId);
+              return newSet;
+            });
 
-          element.addEventListener('load', () => {
-            setTimeout(() => {
-              sendHandshakeWhenReady();
-              if (pendingAppId === appId) {
-                if (activeAppIds.includes(appId)) {
-                  // 既に含まれている場合はそのまま
-                  setPendingAppId(null);
-                } else if (activeAppIds.length >= displayedAppLimit) {
-                  const newActiveAppIds = [
-                    ...activeAppIds.slice(
-                      activeAppIds.length - displayedAppLimit
-                    ),
-                    appId,
-                  ];
-                  dispatch(setActiveApp(newActiveAppIds));
-                  setPendingAppId(null);
-                } else {
-                  dispatch(setActiveApp([...activeAppIds, appId]));
-                  setPendingAppId(null);
-                }
-              }
-            }, 100);
-          });
+            if (activeAppIds.includes(appId)) {
+              // 既に含まれている場合はスキップ
+              console.log('⏭️ [setIframeRef] Already in activeAppIds:', appId);
+            } else if (activeAppIds.length >= displayedAppLimit) {
+              const newActiveAppIds = [
+                ...activeAppIds.slice(activeAppIds.length - displayedAppLimit + 1),
+                appId,
+              ];
+              console.log('📝 [setIframeRef] Dispatching setActiveApp (with limit):', newActiveAppIds);
+              dispatch(setActiveApp(newActiveAppIds));
+            } else {
+              console.log('📝 [setIframeRef] Dispatching setActiveApp:', [...activeAppIds, appId]);
+              dispatch(setActiveApp([...activeAppIds, appId]));
+            }
+          }
         } else {
           iframeRefsMap.current.delete(appId);
         }
       };
     },
-    [
-      sendMessageToIframe,
-      activeAppIds,
-      displayedAppLimit,
-      pendingAppId,
-      dispatch,
-    ]
+    [activeAppIds, displayedAppLimit, pendingAppIds, dispatch]
   );
 
   const handleAppClick = (app: AppData) => {
-    if (activeAppIds.includes(app.id)) {
-      dispatch(setActiveApp(activeAppIds.filter((id) => id !== app.id)));
+    if (activeAppIds.includes(app.uuid)) {
+      console.log('🔽 [handleAppClick] Removing from activeAppIds:', app.uuid);
+      dispatch(setActiveApp(activeAppIds.filter((id) => id !== app.uuid)));
     } else {
-      setPendingAppId(app.id);
+      console.log('⏳ [handleAppClick] Adding to pending:', app.uuid);
+      setPendingAppIds((prev) => new Set(prev).add(app.uuid));
     }
   };
 
@@ -137,7 +155,7 @@ const IframeViewer = () => {
     }
   };
 
-  return (
+  const child = (
     <Box sx={{ display: 'flex' }}>
       {/* サイドバー */}
       <Box
@@ -161,12 +179,12 @@ const IframeViewer = () => {
         <Stack spacing={1}>
           {apps.map((app) => (
             <Box
-              key={app.id}
+              key={app.uuid}
               sx={{ display: 'flex', gap: 1, alignItems: 'center' }}
             >
               <Button
                 variant={
-                  activeAppIds.includes(app.id) ? 'contained' : 'outlined'
+                  activeAppIds.includes(app.uuid) ? 'contained' : 'outlined'
                 }
                 onClick={() => handleAppClick(app)}
                 fullWidth
@@ -177,7 +195,7 @@ const IframeViewer = () => {
               <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
-                  dispatch(removeApp(app.id));
+                  dispatch(removeApp(app.uuid));
                 }}
                 size="small"
                 color="error"
@@ -193,25 +211,29 @@ const IframeViewer = () => {
 
       {apps
         .filter(
-          (app) => activeAppIds.includes(app.id) || app.id === pendingAppId
+          (app) => activeAppIds.includes(app.uuid) || pendingAppIds.has(app.uuid)
         )
         .map((app) => {
           const childHandShakeData = handShakeData?.find(
-            (e) => e.protocol === app.url
+            (e) =>
+              getDomainWithProtocol(e.protocol) ===
+              getDomainWithProtocol(app.url)
           );
 
           return (
             <IframeAppContent
-              key={app.id}
+              key={app.uuid}
               receivedMessages={receivedMessages.filter(
-                (msg) => msg.protocol === app.url
+                (msg) =>
+                  getDomainWithProtocol(msg.protocol) ===
+                  getDomainWithProtocol(app.url)
               )}
               application={app}
-              exportData={exportData}
+              exportData={associateUpdateDataPairs.map((e) => e.fromDTO)}
               childHandShakeMessage={childHandShakeData || null}
-              iframeRef={setIframeRef(app.id)}
+              iframeRef={setIframeRef(app.uuid)}
               sendMessageToIframe={(message) =>
-                sendMessageToIframe(app.id, message)
+                sendMessageToIframe(app.uuid, message)
               }
             />
           );
@@ -252,6 +274,8 @@ const IframeViewer = () => {
       </Dialog>
     </Box>
   );
+
+  return <PostMessageManager appRefs={activeApps} child={child} />;
 };
 
 export default IframeViewer;
