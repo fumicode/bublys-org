@@ -1,8 +1,9 @@
 "use client";
 
-import { addMemo, deleteMemo, Memo, selectMemos, useAppDispatch, useAppSelector } from '@bublys-org/state-management';
+import { addMemo, deleteMemo, selectMemos, useAppDispatch, useAppSelector } from '@bublys-org/state-management';
+import type { RawMemo } from '@bublys-org/state-management';
 
-const createMemo = ():Memo => {
+const createMemo = (): RawMemo => {
   const memoId = crypto.randomUUID();
   const firstLineId = crypto.randomUUID();
   return { 
@@ -47,7 +48,7 @@ export default function Index() {
       <div>
         <button onClick={(e)=> {
           e.preventDefault();
-          dispatch(addMemo({memo:createMemo()} ));
+          dispatch(addMemo({ memo: createMemo() }));
 
         }}>メモを追加</button> 
       </div>

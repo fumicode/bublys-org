@@ -24,12 +24,12 @@ import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 
 // Reducers 定義
-const reducers = combineReducers({
-  counter: counterSlice.reducer,
-  bubbleState: bubblesSlice.reducer,
-  worldLine: worldSlice.reducer,
-  [memoSlice.reducerPath]: memoSlice.reducer,
-});
+  const reducers = combineReducers({
+    counter: counterSlice.reducer,
+    bubbleState: bubblesSlice.reducer,
+    worldLine: worldSlice.reducer,
+    memo: memoSlice.reducer,
+  });
 
 const persistConfig = {
   key: 'root',
