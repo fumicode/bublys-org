@@ -5,7 +5,6 @@ import { Button, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
-import { on } from 'events';
 
 const createMemo = (): RawMemo => {
   const memoId = crypto.randomUUID();
@@ -34,11 +33,11 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
   return (
     <div>
       <StyledMemoList>
-        {Object.entries(memos).map(([id, memo]) => (
-          <li key={id} className="e-item">
+        {memos.map((memo) => (
+          <li key={memo.id} className="e-item">
             {/* <a href={`/memos/${id}`}> */}
             <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
-              onSelectMemo?.(id);
+              onSelectMemo?.(memo.id);
             }}>
               <ArticleOutlinedIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
@@ -49,14 +48,14 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
               <IconButton
                 size="small"
                 onClick={() => {
-                  navigator.clipboard.writeText(id);
+                  navigator.clipboard.writeText(memo.id);
                 }}
               >
                 <LuClipboardCopy />
               </IconButton>
               <IconButton onClick={(e)=> {
                 e.preventDefault();
-                dispatch(deleteMemo(id));
+                dispatch(deleteMemo(memo.id));
               }}>
                 <DeleteIcon />
               </IconButton>

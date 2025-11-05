@@ -36,19 +36,24 @@ const createBubble = (name: string, pos?: Point2): Bubble => {
 
   let type = "normal";
 
+
   switch (true) {
     case name === "user-groups":
       type = "user-groups";
       break;
+
     case name.startsWith("user-groups/"):
       type = "user-group";
       break;
+
     case name === "memos":
       type = "memos";
       break;
+      
     case name.startsWith("memos/"):
       type = "memo";
       break;
+
     default:
       type = "normal";
   }

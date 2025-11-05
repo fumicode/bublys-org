@@ -17,7 +17,7 @@ export type RawMemo = {
 };
 
 // Define a type for the slice state
-export interface MemoState {
+export interface MemosState {
   memos: Record<string, RawMemo>;
 }
 
@@ -26,6 +26,34 @@ export class Memo {
   constructor(state: RawMemo) {
     this.state = { id: state.id, blocks: { ...state.blocks }, lines: [...state.lines] };
   }
+
+  get id(): string {
+    return this.state.id;
+  }
+  
+  get blocks(): Record<string, MemoBlock> {
+    return this.state.blocks;
+  }
+  get lines(): string[] {
+    return this.state.lines;
+  }
+
+  getNextBlockId(currentId: string): string | undefined {
+    const idx = this.state.lines.findIndex((id) => id === currentId);
+    return idx >= 0 && idx < this.state.lines.length - 1
+      ? this.state.lines[idx + 1]
+      : undefined;
+  }
+
+  getPrevBlockId(currentId: string): string | undefined {
+    const idx = this.state.lines.findIndex((id) => id === currentId);
+    return idx > 0 ? this.state.lines[idx - 1] : undefined;
+  }
+
+  mergeWithPrevious(blockId: string): Memo {
+    return this.mergeBlock(blockId);
+  }
+
   static from(state: RawMemo): Memo {
     return new Memo(state);
   }
@@ -63,7 +91,7 @@ export class Memo {
 }
 
 // Define the initial state using that type
-const initialState: MemoState = {
+const initialState: MemosState = {
   memos: {}
 };
 
@@ -80,6 +108,9 @@ export const memoSlice = createSlice({
       if (state.memos[memo.id]) {
         state.memos[memo.id] = memo;
       }
+      else{
+        console.warn(`Memo with id ${memo.id} not found for update.`);
+      }
     },
     deleteMemo: (state, action: PayloadAction<string>) => {
       const id = action.payload;
@@ -90,5 +121,13 @@ export const memoSlice = createSlice({
 
 export const { addMemo, updateMemo, deleteMemo } = memoSlice.actions;
 
-export const selectMemos = (state: RootState) => state.memo.memos;
-export const selectMemo = (id: string) => (state: RootState) => state.memo.memos[id];
+export const selectMemos = (state: RootState) => {
+  //raw memo を class Memo に変換して返す
+  //memosがRecord<string, RawMemo>なので、Object.valuesで配列に変換してからmapで変換
+
+  return (
+    Object.values(state.memo.memos).map((m) => Memo.from(m))
+  )
+};
+
+export const selectMemo = (id: string) => (state: RootState) => Memo.from(state.memo.memos[id]);
