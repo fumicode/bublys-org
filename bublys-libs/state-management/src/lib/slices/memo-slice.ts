@@ -57,13 +57,16 @@ export class Memo {
   static from(state: RawMemo): Memo {
     return new Memo(state);
   }
-  insertTextBlockAfter(afterId: string, newBlock: { id: string; type: string; content: string }): Memo {
+  insertTextBlockAfter(afterId: string, type: string, content: string = ""): { memo: Memo; newBlockId: string } {
+    const newBlockId = crypto.randomUUID();
+    const newBlock: MemoBlock = { id: newBlockId, type, content };
     const { id, blocks, lines } = this.state;
-    const newBlocks = { ...blocks, [newBlock.id]: newBlock };
+    const newBlocks = { ...blocks, [newBlockId]: newBlock };
     const newLines = [...lines];
     const idx = newLines.findIndex((bid) => bid === afterId);
-    newLines.splice(idx + 1, 0, newBlock.id);
-    return new Memo({ id, blocks: newBlocks, lines: newLines });
+    newLines.splice(idx + 1, 0, newBlockId);
+    const newMemo = new Memo({ id, blocks: newBlocks, lines: newLines });
+    return { memo: newMemo, newBlockId };
   }
   updateBlockContent(blockId: string, content: string): Memo {
     const { id, blocks, lines } = this.state;

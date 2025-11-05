@@ -37,14 +37,11 @@ export function MemoEditor({ memoId }: { memoId: string }) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       focusId = memo.getNextBlockId(block.id);
-
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       focusId = memo.getPrevBlockId(block.id);
-
     } else if (e.key === "Backspace") {
       const sel = window.getSelection();
-
       if (sel && sel.anchorOffset === 0 && sel.focusOffset === 0) {
         e.preventDefault();
         const content = e.currentTarget.innerText;
@@ -52,28 +49,24 @@ export function MemoEditor({ memoId }: { memoId: string }) {
           .updateBlockContent(block.id, content)
           .mergeWithPrevious(block.id);
         focusId = memo.getPrevBlockId(block.id);
-
       }
     } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const newId = crypto.randomUUID();
-      newMemo = memo.insertTextBlockAfter(block.id, {
-        id: newId,
-        type: "text",
-        content: "",
-      });
-      focusId = newId;
-
+      const { memo: updatedMemo, newBlockId } = memo.insertTextBlockAfter(
+        block.id,
+        "text",
+        ""
+      );
+      newMemo = updatedMemo;
+      focusId = newBlockId;
     }
 
     if (newMemo !== memo) {
       dispatch(updateMemo({ memo: newMemo.toPlain() }));
-
     }
     if (focusId) {
       const collapseToStart = e.key === "ArrowDown" || e.key === "Enter";
       focusBlock(focusId, collapseToStart);
-
     }
   };
 
