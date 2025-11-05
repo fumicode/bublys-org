@@ -5,6 +5,7 @@ import { Button, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
+import { on } from 'events';
 
 const createMemo = (): RawMemo => {
   const memoId = crypto.randomUUID();
@@ -21,7 +22,11 @@ const createMemo = (): RawMemo => {
   };
 }
 
-export function MemoList() {
+type MemoListProps = {
+  onSelectMemo: (memoId: string) => void;
+};
+
+export function MemoList({ onSelectMemo }: MemoListProps) {
   //メモの一覧を表示
   const memos = useAppSelector(selectMemos);
   const dispatch = useAppDispatch();
@@ -31,10 +36,14 @@ export function MemoList() {
       <StyledMemoList>
         {Object.entries(memos).map(([id, memo]) => (
           <li key={id} className="e-item">
-            <a href={`/memos/${id}`}>
+            {/* <a href={`/memos/${id}`}> */}
+            <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
+              onSelectMemo?.(id);
+            }}>
               <ArticleOutlinedIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
-            </a>
+            </button>
+            {/* </a> */}
 
             <span className='e-button-group'>
               <IconButton
@@ -59,7 +68,11 @@ export function MemoList() {
       <div>
         <Button variant="contained" onClick={(e)=> {
           e.preventDefault();
-          dispatch(addMemo({ memo: createMemo() }));
+          const memo = createMemo();
+          dispatch(addMemo({ memo }));
+
+          onSelectMemo(memo.id);
+
 
         }}>メモを追加</Button>
       </div>

@@ -25,12 +25,15 @@ const reducers = combineReducers({
   [counterSlice.reducerPath]: counterSlice.reducer,
   [bubblesSlice.reducerPath]: bubblesSlice.reducer,
   [worldSlice.reducerPath]: worldSlice.reducer,
-  [environmentSlice.reducerPath]: environmentSlice.reducer
+  [environmentSlice.reducerPath]: environmentSlice.reducer,
+  [memoSlice.reducerPath]: memoSlice.reducer
+
 });
 
 const persistConfig = {
   key: 'root',
   storage,
+  blacklist: [bubblesSlice.reducerPath, environmentSlice.reducerPath ],
 }
 
 const persistedReducer = persistReducer(persistConfig, reducers)

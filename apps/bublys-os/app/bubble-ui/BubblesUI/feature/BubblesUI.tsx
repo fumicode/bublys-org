@@ -19,7 +19,6 @@ import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import { SmartRect } from "@bublys-org/bubbles-ui";
 import { Box, Button, Slider, Typography } from "@mui/material";
 
 // 文字列から1対1の一意な色を生成。
@@ -34,12 +33,26 @@ function getColorHueFromString(name: string): number {
 
 const createBubble = (name: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(name);
-  const type =
-    name === "user-groups"
-      ? "user-groups"
-      : name.startsWith("user-groups/")
-      ? "user-group"
-      : "normal";
+
+  let type = "normal";
+
+  switch (true) {
+    case name === "user-groups":
+      type = "user-groups";
+      break;
+    case name.startsWith("user-groups/"):
+      type = "user-group";
+      break;
+    case name === "memos":
+      type = "memos";
+      break;
+    case name.startsWith("memos/"):
+      type = "memo";
+      break;
+    default:
+      type = "normal";
+  }
+
   return new Bubble({ name, colorHue, type, position: pos });
 };
 
@@ -191,6 +204,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           onClick={() => popChildOrJoinSibling("user-groups", "root")}
         >
           Open User Groups Bubble
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => popChildOrJoinSibling("memos", "root")}
+        >
+          Open Memos
         </Button>
         {additionalButton}
       </Box>

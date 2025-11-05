@@ -105,7 +105,7 @@ export const BubbleView: FC<BubbleProps> = ({
       >
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
-          <h1 className="e-bubble-name">{bubble.name}</h1>
+          <h1 className="e-bubble-name">{bubble.type}</h1>
           <Stack
             direction="row"
             spacing={0} // 間隔をさらに詰める（デフォルトは1）
@@ -135,6 +135,8 @@ export const BubbleView: FC<BubbleProps> = ({
                 <HighLightOffIcon />
               </IconButton>
             )}
+
+            {/* 
             {onMoveClick && (
               <IconButton
                 size="small"
@@ -187,7 +189,7 @@ export const BubbleView: FC<BubbleProps> = ({
               >
                 <MoveUpIcon />
               </IconButton>
-            )}
+            )} */}
           </Stack>
         </Box>
       </header>
@@ -197,16 +199,17 @@ export const BubbleView: FC<BubbleProps> = ({
         <br />
         Type: {bubble.type}
         <br /> */}
-        <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
+        {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
         ({bubble?.position?.x},{bubble?.position?.y})<br />
-        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
-        {children}<br />#{bubble.id}
+        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}] */}
+        {children}<br />
+        {/* #{bubble.id} */}
       </main>
 
       {
-        bubble.renderedRect && (
-          <SmartRectView rect={bubble.renderedRect} />
-        )
+        // bubble.renderedRect && (
+        //   <SmartRectView rect={bubble.renderedRect} />
+        // )
       }
       {/* {bubble.renderedRect && ( // デバッグ用矩形
         <div className="e-debug-rect"
