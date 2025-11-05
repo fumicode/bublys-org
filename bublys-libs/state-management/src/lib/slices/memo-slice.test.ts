@@ -15,7 +15,7 @@ describe('Memo.mergeBlock', () => {
   };
 
   it('merges block content into previous block and removes it', () => {
-    const merged = new Memo(initialMemo).mergeBlock(ni).toPlain();
+    const merged = new Memo(initialMemo).mergeBlock(ni).toJson();
     expect(merged.lines).toEqual([ichi]);
     expect(merged.blocks[ichi].content).toBe('Line ALine B');
     expect(merged.blocks[ni]).toBeUndefined();

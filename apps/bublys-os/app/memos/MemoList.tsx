@@ -1,25 +1,9 @@
-import { addMemo, deleteMemo, selectMemos, useAppDispatch, useAppSelector } from '@bublys-org/state-management';
-import type { RawMemo } from '@bublys-org/state-management';
+import { addMemo, deleteMemo, selectMemos, useAppDispatch, useAppSelector, Memo} from '@bublys-org/state-management';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import { Button, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
-
-const createMemo = (): RawMemo => {
-  const memoId = crypto.randomUUID();
-  const firstLineId = crypto.randomUUID();
-  return { 
-    id: memoId, 
-    blocks: {
-      [firstLineId]: { 
-        id: firstLineId,
-        type: "text", content: "新しいメモの内容です。" 
-      }
-    },
-    lines: [firstLineId]
-  };
-}
 
 type MemoListProps = {
   onSelectMemo: (memoId: string) => void;
@@ -67,10 +51,9 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
       <div>
         <Button variant="contained" onClick={(e)=> {
           e.preventDefault();
-          const memo = createMemo();
-          dispatch(addMemo({ memo }));
-
-          onSelectMemo(memo.id);
+          const newMemo = Memo.create();
+          dispatch(addMemo({ memo: newMemo.toJson() }));
+          onSelectMemo(newMemo.id);
 
 
         }}>メモを追加</Button>

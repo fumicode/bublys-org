@@ -62,7 +62,7 @@ export function MemoEditor({ memoId }: { memoId: string }) {
     }
 
     if (newMemo !== memo) {
-      dispatch(updateMemo({ memo: newMemo.toPlain() }));
+      dispatch(updateMemo({ memo: newMemo.toJson() }));
     }
     if (focusId) {
       const collapseToStart = e.key === "ArrowDown" || e.key === "Enter";
@@ -98,7 +98,7 @@ export function MemoEditor({ memoId }: { memoId: string }) {
                   const content = e.currentTarget.innerText;
                   const updated = memo
                     .updateBlockContent(block.id, content)
-                    .toPlain();
+                    .toJson();
                   dispatch(updateMemo({ memo: updated }));
                 }}
                 onKeyDown={(e) => handleKeyDown(e, block)}
