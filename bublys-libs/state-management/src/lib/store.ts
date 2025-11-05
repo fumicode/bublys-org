@@ -1,7 +1,5 @@
-import {
-  combineReducers,
-  configureStore,
-} from '@reduxjs/toolkit';
+import {environmentSlice} from "./slices/environment-slice.js";
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
 
 import { persistStore, persistReducer,
   FLUSH,
@@ -14,7 +12,6 @@ import { persistStore, persistReducer,
 
 import storage from "redux-persist/es/storage"; // defaults to localStorage for web
 
-
 import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
@@ -24,12 +21,12 @@ import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 
 // Reducers 定義
-  const reducers = combineReducers({
-    counter: counterSlice.reducer,
-    bubbleState: bubblesSlice.reducer,
-    worldLine: worldSlice.reducer,
-    memo: memoSlice.reducer,
-  });
+const reducers = combineReducers({
+  [counterSlice.reducerPath]: counterSlice.reducer,
+  [bubblesSlice.reducerPath]: bubblesSlice.reducer,
+  [worldSlice.reducerPath]: worldSlice.reducer,
+  [environmentSlice.reducerPath]: environmentSlice.reducer
+});
 
 const persistConfig = {
   key: 'root',

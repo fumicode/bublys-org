@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from "react";
-import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize } from "@bublys-org/state-management";
 
 import {
   selectBubblesProcessDPO,
@@ -10,13 +10,16 @@ import {
   updateBubble,
   popChildInProcess as popChildAction,
   joinSiblingInProcess as joinSiblingAction,
+  relateBubbles,
+  selectBubblesRelations,
+  removeBubble,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import SmartRect from "../domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 import { Box, Button, Slider, Typography } from "@mui/material";
 
 // 文字列から1対1の一意な色を生成。
@@ -48,16 +51,25 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
   const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
 
-  // ページサイズ管理
-  const [pageSize, setPageSize] = useState<{ width: number; height: number }>();
+   // ページサイズ管理
+  const pageSize = useAppSelector(selectWindowSize);
   useEffect(() => {
-    const rect = document.body.getBoundingClientRect();
-    setPageSize({ width: rect.width, height: rect.height });
-  }, []);
+    const update = () =>
+      dispatch(
+        setWindowSize({ width: window.innerWidth, height: window.innerHeight })
+      );
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [dispatch]);
+
+
+  const relations = useAppSelector(selectBubblesRelations)
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
+    dispatch(removeBubble(b.id));
   };
 
   const layerDown = (b: Bubble) => {
@@ -69,40 +81,46 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   };
 
   const onMove = (b: Bubble) => {
-    const updated = b.moveTo({ x: 300, y: 300 });
+    const updated = b.moveTo({ x: 0, y: 0 });
     dispatch(updateBubble(updated.toJSON()));
   };
 
-  const popChild = (b: Bubble): string => {
+  const popChild = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
+    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
     dispatch(popChildAction(b.id));
+
     return b.id;
   };
 
-  const joinSibling = (b: Bubble): string => {
+  const joinSibling = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
+    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
+
     dispatch(joinSiblingAction(b.id));
+
     return b.id;
   };
 
   // openBubble 用ロジック
   const popChildOrJoinSibling = (
     name: string,
-    openerRect?: SmartRect
+    openerBubbleId: string
   ): string => {
     const newBubble = createBubble(name);
     const surface = bubblesDPO.surface;
     if (surface?.[0]?.type === newBubble.type) {
-      return joinSibling(newBubble);
+      return joinSibling(newBubble, openerBubbleId);
     } else {
-      return popChild(newBubble);
+      return popChild(newBubble, openerBubbleId);
     }
   };
 
   // 消失点
   const [vanishingPoint, setVanishingPoint] = useState<Point2>({
     x: -10,
-    y: 1000,
+    y: -10,
   });
 
   return (
@@ -121,15 +139,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             },
           }}
         >
-      <BubblesLayeredView
-        bubbles={bubblesDPO.layers}
-        vanishingPoint={vanishingPoint}
-        onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-        onBubbleClose={deleteBubble}
-        onBubbleMove={onMove}
-        onBubbleLayerDown={layerDown}
-        onBubbleLayerUp={layerUp}
-      />
+          <BubblesLayeredView
+            bubbles={bubblesDPO.layers}
+            vanishingPoint={vanishingPoint}
+            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+            onBubbleClose={deleteBubble}
+            onBubbleMove={onMove}
+            onBubbleLayerDown={layerDown}
+            onBubbleLayerUp={layerUp}
+          />
         </BubblesContext.Provider>
       </PositionDebuggerProvider>
 
@@ -170,7 +188,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         {/* open user group bubble*/}
         <Button
           variant="outlined"
-          onClick={() => popChildOrJoinSibling("user-groups")}
+          onClick={() => popChildOrJoinSibling("user-groups", "root")}
         >
           Open User Groups Bubble
         </Button>
