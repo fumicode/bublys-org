@@ -1,16 +1,47 @@
 import styled from 'styled-components';
-import { MemoBody } from '../MemoBody';
-import MemoEditor from '../memoContentEditable';
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+  Link,
+  Navigate
+} from 'react-router-dom';
+import { MemoList } from '../components/MemoList';
+import { MemoTitle } from '../components/MemoTitle';
+import { MemoEditor } from '../components/MemoEditor';
 
 const StyledApp = styled.div`
+  padding: 16px;
   // Your style here
 `;
 
 export function App() {
+  const navigate = useNavigate();
   return (
     <StyledApp>
-      <MemoBody />
+      <Routes>
+        <Route
+          path="/memos"
+          element={<MemoList onSelectMemo={(id) => navigate(`/memos/${id}`)} />}
+        />
+        <Route path="/memos/:memoId" element={<MemoPage />} />
+        <Route path="*" element={<Navigate to="/memos" replace />} />
+      </Routes>
     </StyledApp>
+  );
+}
+
+function MemoPage() {
+  const { memoId } = useParams<{ memoId: string }>();
+  return (
+    <>
+      <div style={{ marginBottom: '16px' }}>
+        <Link to="/memos">← メモ一覧に戻る</Link>
+      </div>
+      <MemoTitle memoId={memoId!} />
+      <MemoEditor memoId={memoId!} />
+    </>
   );
 }
 
