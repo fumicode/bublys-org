@@ -16,10 +16,28 @@
     "react-router-dom": "^6.29.0",
     "redux": "^5.0.1",
     "redux-persist": "^6.0.0",
-    "styled-components": "^5.3.6"
+    "styled-components": "^5.3.6",
+
+    "@bublys-org/memo-model": "*"
   },
   "devDependencies": {
     "@types/react-router-dom": "^5.3.3",
     "@types/styled-components": "^5.1.26"
+  },
+  "nx": {
+    "targets": {
+
+      "dev": {
+        "dependsOn": [
+          {
+            "projects": [
+              "@bublys-org/memo-model"
+            ],
+            "target": "dev"
+          }
+        ],
+        "continuous": true
+      }
+    }
   }
 }

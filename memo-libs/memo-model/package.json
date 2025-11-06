@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "dev": "tsc -p tsconfig.lib.json --watch"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,5 +19,13 @@
       "default": "./dist/index.js"
     }
   },
-  "dependencies": {}
+  "dependencies": {},
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": [ ],
+        "continuous": true
+      }
+    }
+  }
 }

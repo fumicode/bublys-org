@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { selectMemo, updateMemo } from '../store/memoSlice';
-import { Memo, MemoBlock } from '../store/Memo';
+import { MemoBlock } from '@bublys-org/memo-model';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';

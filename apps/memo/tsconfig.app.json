@@ -29,5 +29,18 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+  "include": [
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+  ],
+  "references": [
+    {
+      "path": "../../memo-libs/memo-state/tsconfig.lib.json"
+    },
+    {
+      "path": "../../memo-libs/memo-model/tsconfig.lib.json"
+    }
+  ]
 }
