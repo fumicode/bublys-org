@@ -54,13 +54,35 @@ export interface HandShakeMessage extends Message {
   version: string;
   method: 'handShake';
   params: {
-    methods: HandShakeDTO[];
+    methods: BublyMethods[];
+    resources: ImportableContainer[];
   };
   id: string;
   timestamp: number;
 }
 
-export interface HandShakeDTO {
+export interface BublyMethods {
   key: string; //メソッド名
   value: { containerURL: string; value: string }; //メソッドのパラメータ
+}
+
+export enum StorableType {
+  TEXT = 'text',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  DATE = 'date',
+  TIME = 'time',
+}
+
+export interface ImportableContainer {
+  containerName: string;
+  containerUrl: string;
+  storableTypes: StorableType[];
+}
+
+//バブリ内で入力可能なコンテナーコンポーネントのURLとバブリのドメイン
+export interface BublyContainers {
+  isActive: boolean;
+  bublyUrl: string;
+  importableContainers: ImportableContainer[];
 }

@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AppData {
-  uuid: string;
+  id: string;
   name: string;
   url: string;
 }
@@ -25,15 +25,15 @@ const appSlice = createSlice({
   name: 'app',
   initialState,
   reducers: {
-    addApp: (state, action: PayloadAction<Omit<AppData, 'uuid'>>) => {
+    addApp: (state, action: PayloadAction<Omit<AppData, 'id'>>) => {
       const newApp = {
         ...action.payload,
-        uuid: Date.now().toString(),
+        id: Date.now().toString(),
       };
       state.apps.push(newApp);
     },
     removeApp: (state, action: PayloadAction<string>) => {
-      state.apps = state.apps.filter((app) => app.uuid !== action.payload);
+      state.apps = state.apps.filter((app) => app.id !== action.payload);
       if (state.activeAppIds.includes(action.payload)) {
         state.activeAppIds = state.activeAppIds.filter(
           (id) => id !== action.payload
@@ -41,11 +41,15 @@ const appSlice = createSlice({
       }
     },
     setActiveApp: (state, action: PayloadAction<string>) => {
+      // 既に含まれている場合は追加しない
+      if (state.activeAppIds.includes(action.payload)) {
+        return;
+      }
       state.appDiff = action.payload;
       state.activeAppIds = [...state.activeAppIds, action.payload];
-      if (state.activeAppIds.length >= state.displayedAppLimit) {
+      if (state.activeAppIds.length > state.displayedAppLimit) {
         state.activeAppIds = state.activeAppIds.slice(
-          state.activeAppIds.length - state.displayedAppLimit + 1
+          state.activeAppIds.length - state.displayedAppLimit
         );
       }
     },
@@ -94,4 +98,8 @@ export const handShakeMiddleware =
 
 export const { addApp, removeApp, setActiveApp, setInActiveApp, hydrate } =
   appSlice.actions;
+
+export const selectAppById = (state: AppState, id: string) =>
+  state.apps.find((app) => app.id === id);
+
 export default appSlice.reducer;

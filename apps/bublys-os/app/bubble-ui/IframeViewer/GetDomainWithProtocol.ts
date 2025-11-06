@@ -1,7 +1,7 @@
-function getDomainWithProtocol(url: string) {
+export function getDomainWithProtocol(url: string) {
   try {
     const u = new URL(url);
-    return `${u.protocol}//${u.hostname}`;
+    return `${u.protocol}//${u.host}`;
   } catch {
     return null;
   }

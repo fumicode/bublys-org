@@ -8,7 +8,7 @@ import {
   ExportDataMessage,
   OnChangeValueMessage,
   HandShakeMessage,
-  HandShakeDTO,
+  OSMethod,
 } from './Messages.domain';
 
 type slotRefState = 'None' | 'ReferTo' | 'ReferFrom';
@@ -19,7 +19,7 @@ interface ReferSlotDTO {
 
 const createMessage = (method: string, params: any) => {
   return {
-    protocol: 'http://localhost:4200',
+    protocol: 'http://localhost:4200/',
     version: '0.0.1',
     method: method,
     params: params,
@@ -27,6 +27,14 @@ const createMessage = (method: string, params: any) => {
     timestamp: Date.now(),
   };
 };
+
+export enum StorableType {
+  TEXT = 'text',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  DATE = 'date',
+  TIME = 'time',
+}
 
 //自分のメソッドを相手に渡す
 const handShakeMessage = () => {
@@ -45,9 +53,14 @@ const handShakeMessage = () => {
     ],
     resources: [
       {
-        containerName: 'string',
-        containerURL: 'string',
-        storableTypes: ['string'],
+        containerName: 'Slot1',
+        containerUrl: 'http://localhost:4200/calculator/slot1',
+        storableTypes: [StorableType.NUMBER],
+      },
+      {
+        containerName: 'Slot2',
+        containerUrl: 'http://localhost:4200/calculator/slot2',
+        storableTypes: [StorableType.NUMBER],
       },
     ],
   });
@@ -65,17 +78,13 @@ const sendMessageToIframeParent = (message: Message) => {
 
 export default function EmbeddedPage() {
   const slotURLs = [
-    'http://localhost:4201/calculator/slot1',
-    'http://localhost:4201/calculator/slot2',
-    'http://localhost:4201/calculator/result',
+    'http://localhost:4200/calculator/slot1',
+    'http://localhost:4200/calculator/slot2',
+    'http://localhost:4200/calculator/result',
   ];
 
-  const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
-    null
-  );
-  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
-    null
-  );
+  const [parentMethods, setParentMethods] = useState<OSMethod[] | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<OSMethod | null>(null);
   const selectMethod = (method: string) => {
     const handShakeDTO = parentMethods?.find((e) => e.key === method);
     if (!handShakeDTO) {
@@ -107,14 +116,24 @@ export default function EmbeddedPage() {
       });
       return newMethods;
     });
+
+    // OSからhandshakeを受け取ったら、自分のhandshakeを返す
+    sendMessageToIframeParent(handShakeMessage());
   };
 
   const checkAndSetExportData = (message: Message) => {
+    console.log('📥 checkAndSetExportData called', message);
+    console.log('Current slotURLs:', slotURLs);
+    console.log('Message containerURL:', message.params.containerURL);
+    console.log('Current exportableData:', exportableData);
+
     setExportableData((prev) => {
       const index = prev.findIndex(
         (e) => e.containerURL === message.params.containerURL
       );
+      console.log('Found index:', index);
       if (index === -1) {
+        console.log('❌ containerURL not found in exportableData');
         return prev;
       }
       const newData = [...prev];
@@ -122,6 +141,7 @@ export default function EmbeddedPage() {
         ...newData[index],
         value: message.params.value,
       };
+      console.log('✅ Updated exportableData:', newData);
       return newData;
     });
   };
@@ -251,7 +271,13 @@ export default function EmbeddedPage() {
       }
     };
     window.addEventListener('message', handleMessage);
-    sendMessageToIframeParent(handShakeMessage());
+
+    // アプリの準備が完了したことを通知（handshakeはOSからのhandshakeを受け取った後に送る）
+    console.log('📢 Calculator app is ready, sending ready message');
+    setTimeout(() => {
+      sendMessageToIframeParent(createMessage('ready', {}));
+    }, 100);
+
     return () => {
       console.log('🧹 Calculator useEffect cleanup - Component unmounting!');
       window.removeEventListener('message', handleMessage);
@@ -485,13 +511,14 @@ export default function EmbeddedPage() {
           variant="outlined"
           onClick={() => {
             if (selectedMethod && selectedSlot) {
-              setSelectedSlot({
-                containerURL: selectedSlot?.containerURL || '',
-                value: selectedSlot.value,
-              });
-              sendMessageToIframeParent(
-                createMessage(selectedMethod.key, selectedSlot)
+              const latestValue = exportableData.find(
+                (data) => data.containerURL === selectedSlot.containerURL
               );
+              if (latestValue) {
+                sendMessageToIframeParent(
+                  createMessage(selectedMethod.key, latestValue)
+                );
+              }
             }
           }}
         >

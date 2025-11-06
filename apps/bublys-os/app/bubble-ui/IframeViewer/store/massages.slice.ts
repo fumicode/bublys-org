@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Message } from '../Messages.domain';
-import { HandShakeDTO, HandShakeMessage } from '../Messages.domain';
+import { BublyMethods, HandShakeMessage } from '../Messages.domain';
+import { getDomainWithProtocol } from '../getDomainWithProtocol';
 
 export interface MessageState {
   receivedMessages: Message[];
@@ -65,4 +66,22 @@ export const localStorageMiddleware =
 
 export const { addMessage, removeMessage, hydrate, addHandShakeMessage } =
   massageSlice.actions;
+
+export const selectReceivedMessagesByAppUrl = (
+  state: MessageState,
+  appUrl: string
+) => {
+  return state.receivedMessages.filter(
+    (e) => getDomainWithProtocol(e.protocol) === getDomainWithProtocol(appUrl)
+  );
+};
+
+export const selectChildHandShakeMessage = (
+  state: MessageState,
+  appUrl: string
+) =>
+  state.handShakeMessages.find(
+    (e) => getDomainWithProtocol(e.protocol) === getDomainWithProtocol(appUrl)
+  );
+
 export default massageSlice.reducer;

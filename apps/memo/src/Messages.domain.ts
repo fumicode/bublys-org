@@ -54,13 +54,13 @@ export interface HandShakeMessage extends Message {
   version: string;
   method: 'handShake';
   params: {
-    methods: HandShakeDTO[];
+    methods: OSMethod[];
   };
   id: string;
   timestamp: number;
 }
 
-export interface HandShakeDTO {
+export interface OSMethod {
   key: string;
   value: { containerURL: string; value: string };
 }

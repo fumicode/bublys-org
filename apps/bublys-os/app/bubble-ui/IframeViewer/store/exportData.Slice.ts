@@ -36,22 +36,41 @@ const exportDataSlice = createSlice({
         });
       }
     },
-    //fromContainerURLに一致するfromDTOを検索して、そのtoDTOsのcontainerURLに一致しないtoDTOを追加する
+    //fromContainerURLに一致するfromDTOを検索して、そのtoDTOsのcontainerURLに一致しないtoDTOを追加または上書きする
     addToDTOs: (
       state,
       action: PayloadAction<{ toDTO: DTOParams; fromContainerURL: string }>
     ) => {
-      state.associateUpdateDataPairs
-        ?.find(
-          (e) => e.fromDTO.containerURL === action.payload.fromContainerURL
-        )
-        ?.toDTOs.filter(
-          (e) => e.containerURL !== action.payload.toDTO.containerURL
-        )
-        .push(action.payload.toDTO);
+      const associatePair = state.associateUpdateDataPairs.find(
+        (e) => e.fromDTO.containerURL === action.payload.fromContainerURL
+      );
+
+      if (!associatePair) {
+        console.warn('fromDTO not found for containerURL:', action.payload.fromContainerURL);
+        return;
+      }
+
+      // 既存のtoDTOを探す
+      const existingToDTOIndex = associatePair.toDTOs.findIndex(
+        (e) => e.containerURL === action.payload.toDTO.containerURL
+      );
+
+      if (existingToDTOIndex !== -1) {
+        // 既存のtoDTOを上書き
+        associatePair.toDTOs[existingToDTOIndex] = action.payload.toDTO;
+      } else {
+        // 新しいtoDTOを追加
+        associatePair.toDTOs.push(action.payload.toDTO);
+      }
     },
   },
 });
 
 export const { addFromDTO, addToDTOs } = exportDataSlice.actions;
+
+export const selectFromDTO = (state: AssociateUpdateDataPairsState) => {
+  const fromDTOs: DTOParams[] = [];
+  state.associateUpdateDataPairs.map((e) => fromDTOs.push(e.fromDTO));
+  return fromDTOs;
+};
 export default exportDataSlice.reducer;

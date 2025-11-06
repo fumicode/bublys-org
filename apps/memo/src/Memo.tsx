@@ -13,11 +13,19 @@ import {
   DTOParams,
   ExportDataMessage,
   HandShakeMessage,
-  HandShakeDTO,
+  OSMethod,
 } from './Messages.domain';
 
 interface ReferBlockDTO {
   containerURL: string;
+}
+
+export enum StorableType {
+  TEXT = 'text',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  DATE = 'date',
+  TIME = 'time',
 }
 
 //自分の読めるメソッドを相手に渡す
@@ -36,9 +44,9 @@ const handShakeMessage = () => {
     ],
     resources: [
       {
-        containerName: 'string',
-        containerURL: 'string',
-        storableTypes: ['string'],
+        containerName: 'MemoLine1',
+        containerUrl: 'http://localhost:4201/memo/text/block1',
+        storableTypes: [StorableType.TEXT],
       },
     ],
   });
@@ -46,7 +54,7 @@ const handShakeMessage = () => {
 
 const createMessage = (method: string, params: any) => {
   return {
-    protocol: 'http://localhost:4201',
+    protocol: 'http://localhost:4201/',
     version: '0.0.1',
     method: method,
     params: params,
@@ -63,14 +71,11 @@ export const Memo = () => {
   const [exportableData, setExportableData] = useState<DTOParams[]>([
     ...blockURLs.map((url) => ({ containerURL: url, value: '' })),
   ]);
+
   const [isReferBlock, setIsReferBlock] = useState<slotRefState>('None');
   const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
-  const [parentMethods, setParentMethods] = useState<HandShakeDTO[] | null>(
-    null
-  );
-  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
-    null
-  );
+  const [parentMethods, setParentMethods] = useState<OSMethod[] | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<OSMethod | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<DTOParams | null>(null);
 
   const checkAndSetHandShakeData = (message: HandShakeMessage) => {
@@ -90,6 +95,9 @@ export const Memo = () => {
       });
       return newMethods;
     });
+
+    // OSからhandshakeを受け取ったら、自分のhandshakeを返す
+    sendMessageToIframeParent(handShakeMessage());
   };
 
   const selectMethod = (method: string) => {
@@ -102,11 +110,18 @@ export const Memo = () => {
   };
 
   const checkAndSetExportData = (message: Message) => {
+    console.log('📥 checkAndSetExportData called', message);
+    console.log('Current blockURLs:', blockURLs);
+    console.log('Message containerURL:', message.params.containerURL);
+    console.log('Current exportableData:', exportableData);
+
     setExportableData((prev) => {
       const index = prev.findIndex(
         (e) => e.containerURL === message.params.containerURL
       );
+      console.log('Found index:', index);
       if (index === -1) {
+        console.log('❌ containerURL not found in exportableData');
         return prev;
       }
       const newData = [...prev];
@@ -114,6 +129,7 @@ export const Memo = () => {
         ...newData[index],
         value: message.params.value,
       };
+      console.log('✅ Updated exportableData:', newData);
       return newData;
     });
   };
@@ -194,7 +210,13 @@ export const Memo = () => {
       }
     };
     window.addEventListener('message', handleMessage);
-    sendMessageToIframeParent(handShakeMessage());
+
+    // アプリの準備が完了したことを通知（handshakeはOSからのhandshakeを受け取った後に送る）
+    console.log('📢 Memo app is ready, sending ready message');
+    setTimeout(() => {
+      sendMessageToIframeParent(createMessage('ready', {}));
+    }, 100);
+
     return () => {
       window.removeEventListener('message', handleMessage);
     };
@@ -335,9 +357,14 @@ export const Memo = () => {
           variant="outlined"
           onClick={() => {
             if (selectedMethod && selectedBlock) {
-              sendMessageToIframeParent(
-                createMessage(selectedMethod.key, selectedBlock)
+              const latestValue = exportableData.find(
+                (data) => data.containerURL === selectedBlock.containerURL
               );
+              if (latestValue) {
+                sendMessageToIframeParent(
+                  createMessage(selectedMethod.key, latestValue)
+                );
+              }
             }
           }}
         >
