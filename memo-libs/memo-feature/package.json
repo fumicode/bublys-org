@@ -13,5 +13,27 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "@bublys-org/memo-state": "*",
+    "@bublys-org/memo-model": "*"
+  },
+
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": [ 
+          {
+            "projects": [
+              "@bublys-org/memo-feature",
+              "@bublys-org/memo-model"
+            ],
+            "target": "dev"
+          }
+        ],
+        "continuous": true
+      }
+    }
   }
+
 }

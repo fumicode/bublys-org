@@ -7,9 +7,9 @@ import {
   Link,
   Navigate
 } from 'react-router-dom';
-import { MemoList } from '../components/MemoList';
-import { MemoTitle } from '../components/MemoTitle';
-import { MemoEditor } from '../components/MemoEditor';
+import { MemoList } from '@bublys-org/memo-feature'
+import { MemoTitle } from '@bublys-org/memo-feature';
+import { MemoEditor } from '@bublys-org/memo-feature';
 
 const StyledApp = styled.div`
   padding: 16px;

@@ -20,13 +20,23 @@
       "default": "./dist/index.js"
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.10.1",
+    "@bublys-org/memo-model": "0.0.1"
+  },
 
 
   "nx": {
     "targets": {
       "dev": {
-        "dependsOn": [ ],
+        "dependsOn": [ 
+          {
+            "projects": [
+              "@bublys-org/memo-model"
+            ],
+            "target": "dev"
+          }
+        ],
         "continuous": true
       }
     }

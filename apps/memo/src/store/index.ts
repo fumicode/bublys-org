@@ -1,7 +1,8 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import storage from 'redux-persist/es/storage';
 import { persistStore, persistReducer } from 'redux-persist';
-import memoReducer from './memoSlice';
+
+import { memoSlice } from "@bublys-org/memo-state";
 
 const rootPersistConfig = {
   key: 'root',
@@ -10,7 +11,7 @@ const rootPersistConfig = {
 };
 
 const rootReducer = combineReducers({
-  memo: memoReducer
+  [memoSlice.reducerPath]: memoSlice.reducer
 });
 
 const persistedReducer = persistReducer(rootPersistConfig, rootReducer);

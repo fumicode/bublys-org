@@ -1,8 +1,8 @@
-import React from 'react';
 import { useSelector } from 'react-redux';
-import { selectMemo } from '../store/memoSlice';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
+
+import { selectMemo } from '@bublys-org/memo-state';
 
 type MemoTitleProps = {
   memoId: string;

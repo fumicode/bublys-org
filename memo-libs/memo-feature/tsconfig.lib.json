@@ -10,7 +10,8 @@
     ],
     "rootDir": "src",
     "jsx": "react-jsx",
-    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
+    "lib": ["DOM"]
   },
   "exclude": [
     "out-tsc",
@@ -39,5 +40,13 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "../memo-model/tsconfig.lib.json"
+    },
+    {
+      "path": "../memo-state/tsconfig.lib.json"
+    }
+  ]
 }

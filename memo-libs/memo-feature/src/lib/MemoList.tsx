@@ -1,5 +1,5 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { selectMemos, addMemo, deleteMemo } from '../store/memoSlice';
+import { selectMemos, addMemo, deleteMemo } from '@bublys-org/memo-state'
 import { Memo } from '@bublys-org/memo-model';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import { Button, IconButton } from '@mui/material';

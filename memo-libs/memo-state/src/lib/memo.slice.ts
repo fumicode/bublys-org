@@ -1,5 +1,4 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { RootState } from './index';
 import { Memo, RawMemo } from '@bublys-org/memo-model'
 
 export interface MemosState {
@@ -10,7 +9,7 @@ const initialState: MemosState = {
   memos: {},
 };
 
-const memoSlice = createSlice({
+export const memoSlice = createSlice({
   name: 'memo',
   initialState,
   reducers: {
@@ -35,11 +34,8 @@ const memoSlice = createSlice({
 
 export const { addMemo, updateMemo, deleteMemo } = memoSlice.actions;
 
-export const selectMemos = (state: RootState): Memo[] =>
+export const selectMemos = (state: { memo: MemosState }): Memo[] =>
   Object.values(state.memo.memos).map((m) => Memo.fromJson(m));
 
-export const selectMemo = (memoId: string) => (state: RootState): Memo =>
+export const selectMemo = (memoId: string) => (state: { memo: MemosState }): Memo =>
   Memo.fromJson(state.memo.memos[memoId]);
-
-export default memoSlice.reducer;
-
