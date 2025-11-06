@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { MemoBody } from '../MemoBody';
+import { Memo } from '../Memo';
 import MemoEditor from '../memoContentEditable';
 
 const StyledApp = styled.div`
@@ -9,7 +9,7 @@ const StyledApp = styled.div`
 export function App() {
   return (
     <StyledApp>
-      <MemoBody />
+      <Memo />
     </StyledApp>
   );
 }

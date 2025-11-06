@@ -7,48 +7,93 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import { useState, useEffect } from 'react';
-import type { AppData } from './store/appSlice';
-import type { Message } from './Message.domain';
-import type { HandShakeDTO } from './IframeViewerContent';
+import { useState, useEffect, useRef } from 'react';
+import { selectAppById } from './store/apps.slice';
+import type {
+  BublyMethods,
+  Message,
+  ImportableContainer,
+} from './Messages.domain';
 import { v4 as uuidv4 } from 'uuid';
+import { RootState } from './store/store';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectBublysContainersByBublyUrl } from './store/bublysContainers.slice';
+import {
+  selectChildHandShakeMessage,
+  selectReceivedMessagesByAppUrl,
+} from './store/massages.slice';
+import { selectFromDTO } from './store/exportData.slice';
+import { usePostMessage } from './PostMessageManager';
 
 interface IframeAppContentProps {
-  application: AppData | null;
-  iframeRef: (element: HTMLIFrameElement | null) => void;
-  sendMessageToIframe: (message: Message) => void;
-  receivedMessages: Message[];
-  exportData: Message[];
-  childHandShakeMessage: Message | null;
+  appId: string;
 }
 
-export const IframeAppContent = ({
-  application,
-  iframeRef,
-  sendMessageToIframe,
-  receivedMessages,
-  exportData,
-  childHandShakeMessage,
-}: IframeAppContentProps) => {
+export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
+  const { sendMessageToIframeAutoFind, registerIframeRef } = usePostMessage();
+
+  const application = useSelector((state: RootState) =>
+    selectAppById(state.app, appId)
+  );
+
+  const receivedMessages = useSelector((state: RootState) =>
+    application
+      ? selectReceivedMessagesByAppUrl(state.massage, application.url)
+      : []
+  );
+
+  const exportData = useSelector((state: RootState) =>
+    application ? selectFromDTO(state.exportData) : []
+  );
+
+  const childHandShakeMessage = useSelector((state: RootState) =>
+    application
+      ? selectChildHandShakeMessage(state.massage, application.url)
+      : null
+  );
+
+  const bublyContainers = useSelector((state: RootState) =>
+    application
+      ? selectBublysContainersByBublyUrl(
+          state.bublysContainers,
+          application.url
+        )
+      : null
+  );
+
   const [inputURLText, setInputURLText] = useState('');
   const [isClient, setIsClient] = useState(false);
 
-  const [selectedMethod, setSelectedMethod] = useState<HandShakeDTO | null>(
+  const [selectedMethod, setSelectedMethod] = useState<BublyMethods | null>(
     null
   );
 
   const selectMethod = (method: string) => {
-    const handShakeDTO = childMethods?.find((e) => e.key === method);
-    if (!handShakeDTO) {
+    const childMethod = childMethods?.find((e) => e.key === method);
+    if (!childMethod) {
       console.log('Method not found');
       return;
     }
-    setSelectedMethod(handShakeDTO);
+    setSelectedMethod(childMethod);
   };
 
+  const [selectedImportableContainer, setSelectedImportableContainer] =
+    useState<ImportableContainer | null>(null);
+
+  const selectImportableContainer = (selectedContainerUrl: string) => {
+    const importableContainer = bublyContainers?.importableContainers?.find(
+      (e) => e.containerUrl === selectedContainerUrl
+    );
+    if (!importableContainer) {
+      console.log('Method not found');
+      setSelectedImportableContainer(null);
+      return;
+    }
+    setSelectedImportableContainer(importableContainer);
+  };
   const [selectedContainerURL, setSelectedContainerURL] = useState<string>('');
   const childMethods = childHandShakeMessage?.params
-    .methods as unknown as HandShakeDTO[];
+    .methods as unknown as BublyMethods[];
 
   useEffect(() => {
     setIsClient(true);
@@ -65,6 +110,16 @@ export const IframeAppContent = ({
     };
   };
 
+  const myIframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (myIframeRef.current) {
+      registerIframeRef(appId, myIframeRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appId]);
+
+  if (!application) return null;
   return (
     <Box sx={{ flex: 1, p: 2, minHeight: 0 }}>
       <TextField
@@ -95,7 +150,7 @@ export const IframeAppContent = ({
           >
             <iframe
               key={application?.id}
-              ref={iframeRef}
+              ref={myIframeRef}
               src={application?.url}
               style={{
                 width: '100%',
@@ -192,63 +247,11 @@ export const IframeAppContent = ({
               ></Box>
             </Box>
 
-            {/* PAYLOAD */}
-            {/* <Box sx={{ mb: 2 }}>
-              <Typography
-                variant="subtitle2"
-                sx={{ mb: 1, fontWeight: 'medium' }}
-              >
-                payload
-              </Typography>
-
-              <Box sx={{ pl: 2, borderLeft: 2, borderColor: 'primary.main' }}>
-                <Box sx={{ mb: 1.5 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 0.5 }}
-                  >
-                    method
-                  </Typography>
-                  <TextField
-                    value={inputMethodText}
-                    onChange={(e) => setInputMethodText(e.target.value)}
-                    fullWidth
-                    size="small"
-                    placeholder="methodを入力"
-                  />
-                </Box>
-
-                <Box>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mb: 0.5 }}
-                  >
-                    params
-                  </Typography>
-
-                  <TextField
-                    fullWidth
-                    value={inputParamsText}
-                    onChange={(e) => setInputParamsText(e.target.value)}
-                    placeholder="paramsを入力"
-                    sx={{
-                      mb: 2,
-                      '& textarea': {
-                        whiteSpace: 'pre-wrap', // テキストの折り返しを有効にする
-                      },
-                    }}
-                    multiline
-                    minRows={1} // 最小行数
-                    maxRows={10} // 最大行数（スクロールが発生するまでの最大行数）
-                  />
-                </Box>
-              </Box>
-            </Box> */}
-
             <Stack direction="row" spacing={1} alignItems="center">
-              <Select onChange={(e) => selectMethod(e.target.value as string)}>
+              <Select
+                value={selectedMethod?.key ?? ''}
+                onChange={(e) => selectMethod(e.target.value as string)}
+              >
                 <MenuItem value={''}>Unselected</MenuItem>
                 {childMethods?.map((e, index) => (
                   <MenuItem key={index} value={e.key}>
@@ -257,27 +260,55 @@ export const IframeAppContent = ({
                 ))}
               </Select>
               <Select
+                value={selectedImportableContainer?.containerUrl ?? ''}
+                onChange={(e) => selectImportableContainer(e.target.value)}
+              >
+                <MenuItem value={''}>Unselected</MenuItem>
+                {bublyContainers?.importableContainers?.map((e, index) => (
+                  <MenuItem key={index} value={e.containerUrl}>
+                    {e.containerName}
+                  </MenuItem>
+                ))}
+              </Select>
+              <Select
+                value={selectedContainerURL ?? ''}
                 onChange={(event) =>
                   setSelectedContainerURL(event.target.value as string)
                 }
               >
                 <MenuItem value={''}>Unselected</MenuItem>
                 {exportData.map((e, index) => (
-                  <MenuItem key={index} value={e.params.containerURL}>
-                    {e.params.containerURL}: {JSON.stringify(e.params.value)}
+                  <MenuItem key={index} value={e.containerURL}>
+                    {e.containerURL}: {JSON.stringify(e.value)}
                   </MenuItem>
                 ))}
               </Select>
               <Button
                 variant="outlined"
                 onClick={() => {
-                  if (selectedMethod) {
+                  if (selectedMethod && selectedImportableContainer) {
                     const current = exportData.find(
-                      (e) => e.params.containerURL === selectedContainerURL
+                      (e) => e.containerURL === selectedContainerURL
                     );
                     if (current) {
-                      sendMessageToIframe(
-                        createMessage(selectedMethod.key, current.params)
+                      sendMessageToIframeAutoFind(
+                        createMessage(selectedMethod.key, {
+                          containerURL:
+                            selectedImportableContainer.containerUrl,
+                          value: current.value,
+                        }),
+                        current.containerURL // fromContainerURL (valueの出どころ)
+                      );
+                    }
+                  } else if (selectedMethod) {
+                    const current = exportData.find(
+                      (e) => e.containerURL === selectedContainerURL
+                    );
+                    if (current) {
+                      sendMessageToIframeAutoFind(
+                        createMessage(selectedMethod.key, {
+                          containerURL: current.containerURL,
+                        })
                       );
                     }
                   }
