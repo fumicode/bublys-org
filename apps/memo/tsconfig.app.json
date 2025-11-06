@@ -36,6 +36,9 @@
     },
     {
       "path": "../../memo-libs/memo-model/tsconfig.lib.json"
+    },
+    {
+      "path": "../../memo-libs/memo-feature/tsconfig.lib.json"
     }
   ]
 }

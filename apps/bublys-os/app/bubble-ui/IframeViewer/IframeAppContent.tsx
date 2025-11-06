@@ -8,22 +8,24 @@ import {
   MenuItem,
 } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
-import { selectAppById } from './store/apps.slice';
+import { v4 as uuidv4 } from 'uuid';
+
+import { usePostMessage } from './PostMessageManager';
+
 import type {
   BublyMethods,
-  Message,
   ImportableContainer,
-} from './Messages.domain';
-import { v4 as uuidv4 } from 'uuid';
-import { RootState } from './store/store';
-import { useDispatch, useSelector } from 'react-redux';
-import { selectBublysContainersByBublyUrl } from './store/bublysContainers.slice';
-import {
+} from '@bublys-org/state-management';
+
+import { 
+  selectAppById, 
+  RootState ,
+  selectBublysContainersByBublyUrl ,
   selectChildHandShakeMessage,
   selectReceivedMessagesByAppUrl,
-} from './store/massages.slice';
-import { selectFromDTO } from './store/exportData.slice';
-import { usePostMessage } from './PostMessageManager';
+  selectFromDTO ,
+  useAppSelector
+ } from '@bublys-org/state-management';
 
 interface IframeAppContentProps {
   appId: string;
@@ -32,27 +34,25 @@ interface IframeAppContentProps {
 export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
   const { sendMessageToIframeAutoFind, registerIframeRef } = usePostMessage();
 
-  const application = useSelector((state: RootState) =>
-    selectAppById(state.app, appId)
-  );
+  const application = useAppSelector( selectAppById( appId));
 
-  const receivedMessages = useSelector((state: RootState) =>
+  const receivedMessages = useAppSelector((state: RootState) =>
     application
       ? selectReceivedMessagesByAppUrl(state.massage, application.url)
       : []
   );
 
-  const exportData = useSelector((state: RootState) =>
+  const exportData = useAppSelector((state: RootState) =>
     application ? selectFromDTO(state.exportData) : []
   );
 
-  const childHandShakeMessage = useSelector((state: RootState) =>
+  const childHandShakeMessage = useAppSelector((state: RootState) =>
     application
       ? selectChildHandShakeMessage(state.massage, application.url)
       : null
   );
 
-  const bublyContainers = useSelector((state: RootState) =>
+  const bublyContainers = useAppSelector((state: RootState) =>
     application
       ? selectBublysContainersByBublyUrl(
           state.bublysContainers,

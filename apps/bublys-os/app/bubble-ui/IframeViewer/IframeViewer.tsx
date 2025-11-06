@@ -13,23 +13,27 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from './store/store';
-import {
+
+import type { AppData } from "@bublys-org/state-management";
+
+import { 
+  RootState ,
   addApp,
   setActiveApp,
   setInActiveApp,
   removeApp,
   hydrate,
-} from './store/apps.slice';
-import type { AppData } from './store/apps.slice';
+  useAppDispatch, 
+  useAppSelector 
+} from "@bublys-org/state-management"
+
 import IframeAppContent from './IframeAppContent';
 import PostMessageManager from './PostMessageManager';
 import { AppDataAndRefs } from './PostMessageManager';
 
 const IframeViewer = () => {
-  const dispatch = useDispatch();
-  const { apps, activeAppIds } = useSelector((state: RootState) => state.app);
+  const dispatch = useAppDispatch();
+  const { apps, activeAppIds } = useAppSelector((state: RootState) => state.app);
   console.log(
     'apps',
     apps.map((e) => e.id)

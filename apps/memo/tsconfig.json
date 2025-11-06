@@ -9,6 +9,9 @@
       "path": "../../memo-libs/memo-model"
     },
     {
+      "path": "../../memo-libs/memo-feature"
+    },
+    {
       "path": "./tsconfig.app.json"
     },
     {

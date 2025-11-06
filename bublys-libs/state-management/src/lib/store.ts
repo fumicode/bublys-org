@@ -20,14 +20,25 @@ import { bubblesListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 
+//iframe-slices
+import appReducer from './iframe-slices/apps.slice.js';
+import exportDataReducer from './iframe-slices/exportData.slice.js';
+import massageReducer from './iframe-slices/massages.slice.js';
+import bublysContainersReducer from './iframe-slices/bublysContainers.slice.js';
+
 // Reducers 定義
 const reducers = combineReducers({
   [counterSlice.reducerPath]: counterSlice.reducer,
   [bubblesSlice.reducerPath]: bubblesSlice.reducer,
   [worldSlice.reducerPath]: worldSlice.reducer,
   [environmentSlice.reducerPath]: environmentSlice.reducer,
-  [memoSlice.reducerPath]: memoSlice.reducer
+  [memoSlice.reducerPath]: memoSlice.reducer,
 
+  //iframe-slices
+  app: appReducer,
+  exportData: exportDataReducer,
+  massage: massageReducer,
+  bublysContainers: bublysContainersReducer,
 });
 
 const persistConfig = {

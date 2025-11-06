@@ -11,6 +11,8 @@ import { MemoList } from '@bublys-org/memo-feature'
 import { MemoTitle } from '@bublys-org/memo-feature';
 import { MemoEditor } from '@bublys-org/memo-feature';
 
+import { Memo} from '../Memo';
+
 const StyledApp = styled.div`
   padding: 16px;
   // Your style here
@@ -21,6 +23,10 @@ export function App() {
   return (
     <StyledApp>
       <Routes>
+        <Route
+          path="/old-memo"
+          element={<Memo/>}
+        />
         <Route
           path="/memos"
           element={<MemoList onSelectMemo={(id) => navigate(`/memos/${id}`)} />}
