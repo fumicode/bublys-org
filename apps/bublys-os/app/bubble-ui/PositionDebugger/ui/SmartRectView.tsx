@@ -1,7 +1,7 @@
 import { FC } from "react";
 import clsx from "clsx";
 import styled from "styled-components";
-import SmartRect from "../../BubblesUI/domain/01_SmartRect";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 
 type SmartRectViewProps = {
   rect: SmartRect; // SmartRectのインスタンス
@@ -75,6 +75,7 @@ const StyledSmartRectView = styled.div`
 
   td {
     &.m-widest {
+      color: red;
       font-weight: bold;
     }
   }

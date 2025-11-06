@@ -1,9 +1,20 @@
-import { Point2, Size2 } from "../../01_Utils/00_Point";
+import { Point2, Size2 } from "./00_Point.js";
 
+export type SmartRectJson = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  parentSize: Size2;
+};
 type Direction = "top" | "right" | "bottom" | "left";
 const directions: Direction[] = ["top", "right", "bottom", "left"];
 
-export default class SmartRect implements DOMRectReadOnly {
+/**
+ * SmartRect wraps a DOMRectReadOnly and provides utility getters.
+ * Includes serialization support via toJSON() and static fromJSON().
+ */
+export class SmartRect implements DOMRectReadOnly {
   constructor(readonly domRect: DOMRectReadOnly, readonly parentSize: Size2) {}
 
   get x() {
@@ -15,11 +26,16 @@ export default class SmartRect implements DOMRectReadOnly {
   get position(): Point2 {
     return { x: this.x, y: this.y };
   }
+
+
   get width() {
     return this.domRect.width;
   }
   get height() {
     return this.domRect.height;
+  }
+  get size() : Size2 {
+    return { width: this.width, height: this.height };
   }
   get top() {
     return this.domRect.top;
@@ -39,11 +55,11 @@ export default class SmartRect implements DOMRectReadOnly {
   }
 
   get topSpace() {
-    return this.domRect.top - 0;
+    return this.domRect.top;
   }
 
   get leftSpace() {
-    return this.domRect.left - 0;
+    return this.domRect.left;
   }
 
   get rightSpace() {
@@ -58,14 +74,11 @@ export default class SmartRect implements DOMRectReadOnly {
     return [this.topSpace, this.rightSpace, this.bottomSpace, this.leftSpace];
   }
 
+  
+
   calcSpaceWideDirection(
     openingSize: Size2 = { width: 0, height: 0 }
   ): Direction {
-    if (!(this.spaces.length > 0)) {
-      throw new Error(
-        "まだ親要素のサイズが決まっていないので、spaceWideDirectionを計算できません。!!ありえない状況"
-      );
-    }
 
     const spaces = this.spaces.map((space, index) => ({
       original: space,
@@ -73,73 +86,76 @@ export default class SmartRect implements DOMRectReadOnly {
         space - (index % 2 === 0 ? openingSize.height : openingSize.width),
     }));
 
-    //TODO: 以下のコメントの内容を一行で書きたい。 reduceで書けるかも。
     const maxSpace = Math.max(...spaces.map((space) => space.subtractedSpace));
     const maxIndex = spaces.findIndex(
       (space) => space.subtractedSpace === maxSpace
     );
 
-    const direction = directions[maxIndex];
-
-    return direction;
+    return directions[maxIndex];
   }
 
   calcPositionToOpen(openingSize: Size2): Point2 {
-    //一番あいている方向に、相手の大きさを考慮して配置
-    const direction: Direction = this.calcSpaceWideDirection(openingSize);
-    if (!(this.spaces.length > 0)) {
-      throw new Error(
-        "まだ親要素のサイズが決まっていないので、spaceWideDirectionを計算できません。!!ありえない状況"
-      );
-    }
+    const direction: Direction = this.calcSpaceWideDirection({width:0, height:0});
+
+    let ret: Point2;
 
     if (direction === "top") {
-      return {
+      ret = {
         x: this.left,
-        y: this.top - openingSize.height * 1.2,
+        y: this.top - openingSize.height * 1.2 ,
       };
+
     } else if (direction === "right") {
-      return {
-        x: this.right + openingSize.width * 0.2,
+      ret ={
+        x: this.right,
         y: this.top,
       };
+
     } else if (direction === "bottom") {
-      return {
+      ret ={
         x: this.left,
-        y: this.bottom + openingSize.height * 0.2,
+        y: this.bottom,
       };
+
     } else if (direction === "left") {
-      return {
-        x: this.left - openingSize.width * 1.2, //ここは自分の幅は重要ではない。相手の幅。一旦便宜上自分の幅を使う。
+      ret ={
+        x: this.left - openingSize.width * 1.2 ,
         y: this.top,
       };
     }
+    else {
+      throw new Error("Unexpected direction");
+    }
 
-    throw new Error("ありえない状況");
+    return ret;
   }
 
-  toJSON() {
+  /**
+   * Merge this SmartRect with another, returning the minimal bounding SmartRect.
+   */
+  merge(other: SmartRect): SmartRect {
+    const x = Math.min(this.x, other.x);
+    const y = Math.min(this.y, other.y);
+    const right = Math.max(this.right, other.right);
+    const bottom = Math.max(this.bottom, other.bottom);
+    const width = right - x;
+    const height = bottom - y;
+    const domRect = new DOMRect(x, y, width, height);
+    return new SmartRect(domRect, this.parentSize);
+  }
+
+  toJSON(): SmartRectJson {
     return {
       x: this.x,
       y: this.y,
       width: this.width,
       height: this.height,
-
-      top: this.top,
-      right: this.right,
-      bottom: this.bottom,
-      left: this.left,
-
-      topSpace: this.topSpace,
-      rightSpace: this.rightSpace,
-      bottomSpace: this.bottomSpace,
-      leftSpace: this.leftSpace,
-      spaces: [
-        this.topSpace,
-        this.rightSpace,
-        this.bottomSpace,
-        this.leftSpace,
-      ],
+      parentSize: this.parentSize,
     };
+  }
+
+  static fromJSON(json: SmartRectJson): SmartRect {
+    const domRect = new DOMRect(json.x, json.y, json.width, json.height);
+    return new SmartRect(domRect, json.parentSize);
   }
 }
