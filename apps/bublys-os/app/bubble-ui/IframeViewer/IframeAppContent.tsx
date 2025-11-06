@@ -17,15 +17,15 @@ import type {
   ImportableContainer,
 } from '@bublys-org/state-management';
 
-import { 
-  selectAppById, 
-  RootState ,
-  selectBublysContainersByBublyUrl ,
+import {
+  selectAppById,
+  RootState,
+  selectBublysContainersByBublyUrl,
   selectChildHandShakeMessage,
   selectReceivedMessagesByAppUrl,
-  selectFromDTO ,
-  useAppSelector
- } from '@bublys-org/state-management';
+  selectFromDTO,
+  useAppSelector,
+} from '@bublys-org/state-management';
 
 interface IframeAppContentProps {
   appId: string;
@@ -34,7 +34,7 @@ interface IframeAppContentProps {
 export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
   const { sendMessageToIframeAutoFind, registerIframeRef } = usePostMessage();
 
-  const application = useAppSelector( selectAppById( appId));
+  const application = useAppSelector(selectAppById(appId));
 
   const receivedMessages = useAppSelector((state: RootState) =>
     application
@@ -71,7 +71,6 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
   const selectMethod = (method: string) => {
     const childMethod = childMethods?.find((e) => e.key === method);
     if (!childMethod) {
-      console.log('Method not found');
       return;
     }
     setSelectedMethod(childMethod);
@@ -85,7 +84,6 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
       (e) => e.containerUrl === selectedContainerUrl
     );
     if (!importableContainer) {
-      console.log('Method not found');
       setSelectedImportableContainer(null);
       return;
     }
@@ -114,8 +112,7 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
 
   useEffect(() => {
     if (myIframeRef.current) {
-      console.log("Iframe ref:", myIframeRef.current);
-      
+      console.log('Iframe ref:', myIframeRef.current);
       registerIframeRef(appId, myIframeRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,7 +152,7 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
               src={application?.url}
               style={{
                 width: '100%',
-                height: '100%',
+                height: '500px',
                 border: 'none',
                 display: 'block',
               }}
@@ -185,7 +182,7 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
                 overflowY: 'scroll',
               }}
             >
-              <div>
+              {/* <div>
                 <h3>受信したメッセージ履歴</h3>
                 {receivedMessages.length > 0 ? (
                   <div
@@ -242,7 +239,7 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
                 ) : (
                   <p>メッセージ履歴がありません</p>
                 )}
-              </div>
+              </div> */}
               <Box
                 sx={{ pl: 2, borderLeft: 2, borderColor: 'primary.main' }}
               ></Box>

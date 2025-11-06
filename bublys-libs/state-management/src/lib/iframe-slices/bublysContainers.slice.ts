@@ -28,7 +28,9 @@ const bublysContainersSlice = createSlice({
         action.payload.params.resources.forEach((item: ImportableContainer) => {
           const index = state.bublysContainers[
             existingIndex
-          ].importableContainers.findIndex((e) => e.containerUrl === item.containerUrl);
+          ].importableContainers.findIndex(
+            (e) => e.containerUrl === item.containerUrl
+          );
           if (index === -1) {
             state.bublysContainers[existingIndex].importableContainers.push(
               item
@@ -54,10 +56,6 @@ export const selectBublysContainersByBublyUrl = (
   state: BublysContainersState,
   bublyUrl: string
 ) => {
-  console.log(
-    getDomainWithProtocol(bublyUrl),
-    getDomainWithProtocol(state.bublysContainers[0]?.bublyUrl)
-  );
   return state.bublysContainers.find(
     (e) => getDomainWithProtocol(e.bublyUrl) === getDomainWithProtocol(bublyUrl)
   );

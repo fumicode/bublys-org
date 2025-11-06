@@ -14,35 +14,42 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 
-import type { AppData } from "@bublys-org/state-management";
+import type { AppData } from '@bublys-org/state-management';
 
-import { 
-  RootState ,
+import {
+  RootState,
   addApp,
   setActiveApp,
   setInActiveApp,
   removeApp,
   hydrate,
-  useAppDispatch, 
-  useAppSelector 
-} from "@bublys-org/state-management"
+  useAppDispatch,
+  useAppSelector,
+} from '@bublys-org/state-management';
 
-import {IframeAppContext} from './IframeAppContext';
+import { IframeAppContext } from './IframeAppContext';
 import PostMessageManager from './PostMessageManager';
 import { AppDataAndRef } from './PostMessageManager';
 import { Bubble } from '@bublys-org/bubbles-ui';
 import { BubblesContext } from '../BubblesUI/domain/BubblesContext';
+import {
+  removeBubbleByName,
+  deleteProcessBubbleByName,
+  selectBubbleByName,
+} from '@bublys-org/bubbles-ui-state';
 
 type IframeViewerProps = {
   children?: React.ReactNode;
-}
+};
 
 const IframeViewer = ({ children }: IframeViewerProps) => {
   const dispatch = useAppDispatch();
-  const { apps, activeAppIds } = useAppSelector((state: RootState) => state.app);
+  const { apps, activeAppIds } = useAppSelector(
+    (state: RootState) => state.app
+  );
   console.log(
     'active apps',
-    activeAppIds//.map((e) => e.id)
+    activeAppIds //.map((e) => e.id)
   );
   const [inputURLText, setInputURLText] = useState('');
   const [isModalOpen, setModalOpen] = useState(false);
@@ -82,15 +89,19 @@ const IframeViewer = ({ children }: IframeViewerProps) => {
     [activeAppIds, pendingAppIds, dispatch]
   );
 
-  const {openBubble} = useContext(BubblesContext);
+  const { openBubble } = useContext(BubblesContext);
 
   //アプリクリックの処理
   const handleAppClick = (app: AppData) => {
+    const bubbleName = 'iframes/' + app.id;
     if (activeAppIds.includes(app.id)) {
       dispatch(setInActiveApp(app.id));
+
+      dispatch(deleteProcessBubbleByName(bubbleName));
+      dispatch(removeBubbleByName(bubbleName));
     } else {
-      //setPendingAppIds((prev) => new Set(prev).add(app.id));
-      openBubble("iframes/" + app.id, "root");
+      setPendingAppIds((prev) => new Set(prev).add(app.id));
+      openBubble(bubbleName, 'root');
     }
   };
 

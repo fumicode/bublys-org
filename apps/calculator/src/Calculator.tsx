@@ -435,7 +435,7 @@ export default function EmbeddedPage() {
         )}
       </div> */}
 
-      <div>
+      {/* <div>
         <h3>受信したメッセージ履歴</h3>
         {receivedMessages.length > 0 ? (
           receivedMessages.map((msg, index) => (
@@ -479,7 +479,7 @@ export default function EmbeddedPage() {
         ) : (
           <p>メッセージ履歴がありません</p>
         )}
-      </div>
+      </div> */}
       <Stack direction="row" spacing={1} alignItems="center">
         <Select onChange={(e) => selectMethod(e.target.value as string)}>
           <MenuItem value={''}>Unselected</MenuItem>

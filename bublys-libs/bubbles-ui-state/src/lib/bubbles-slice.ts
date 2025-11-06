@@ -1,17 +1,16 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
   Bubble,
   BubbleJson,
   BubblesProcess,
   BubblesProcessState,
   BubblesProcessDPO,
-} from "@bublys-org/bubbles-ui";
-
+} from '@bublys-org/bubbles-ui';
 
 type BubblesRelation = {
   openerId: string;
   openeeId: string;
-}
+};
 
 /**
  * Normalized slice state:
@@ -22,7 +21,7 @@ export interface BubbleStateSlice {
   bubbles: Record<string, BubbleJson>;
   process: BubblesProcessState;
 
-  bubbleRelations:  BubblesRelation[];
+  bubbleRelations: BubblesRelation[];
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 }
@@ -30,19 +29,19 @@ export interface BubbleStateSlice {
 // --- Initial data setup ---
 const initialBubbleInstances: Bubble[] = [
   new Bubble({
-    name: "user-groups",
+    name: 'user-groups',
     colorHue: 200,
-    type: "user-groups",
+    type: 'user-groups',
   }),
   new Bubble({
-    name: "Element E",
+    name: 'Element E',
     colorHue: 100,
-    type: "normal",
+    type: 'normal',
   }),
   new Bubble({
-    name: "Element F",
+    name: 'Element F',
     colorHue: 300,
-    type: "normal",
+    type: 'normal',
   }),
 ];
 
@@ -66,7 +65,7 @@ const initialState: BubbleStateSlice = {
 };
 
 export const bubblesSlice = createSlice({
-  name: "bubbleState",
+  name: 'bubbleState',
   initialState,
   reducers: {
     // Process-only actions
@@ -76,6 +75,19 @@ export const bubblesSlice = createSlice({
         .toJSON();
       state.renderCount += 1;
     },
+    deleteProcessBubbleByName: (state, action: PayloadAction<string>) => {
+      const name = action.payload;
+      const bubble = selectBubbleByName({ bubbleState: state }, { name });
+      if (!bubble) {
+        return;
+      }
+      const removingId = bubble.id;
+      state.process = BubblesProcess.fromJSON(state.process)
+        .deleteBubble(removingId)
+        .toJSON();
+      state.renderCount += 1;
+    },
+
     layerDown: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .layerDown(action.payload)
@@ -126,7 +138,8 @@ export const bubblesSlice = createSlice({
       state.renderCount += 1;
 
       state.bubbleRelations = state.bubbleRelations.filter(
-        relation => relation.openerId !== removingId && relation.openeeId !== removingId
+        (relation) =>
+          relation.openerId !== removingId && relation.openeeId !== removingId
       );
 
       //TODO: Also remove from process
@@ -134,20 +147,38 @@ export const bubblesSlice = createSlice({
       //   .removeBubble(id)
       //   .toJSON();
     },
+    removeBubbleByName: (state, action: PayloadAction<string>) => {
+      const name = action.payload;
+      const bubble = selectBubbleByName({ bubbleState: state }, { name });
+      if (!bubble) {
+        return;
+      }
+      const removingId = bubble.id;
+
+      delete state.bubbles[removingId];
+      state.renderCount += 1;
+
+      state.bubbleRelations = state.bubbleRelations.filter(
+        (relation) =>
+          relation.openerId !== removingId && relation.openeeId !== removingId
+      );
+    },
+
     relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
       //重複がないようにチェックが必要そう
 
-      if(action.payload.openerId === "root") {
-        return ;
+      if (action.payload.openerId === 'root') {
+        return;
       }
 
       state.bubbleRelations.push(action.payload);
-    }
+    },
   },
 });
 
 export const {
   deleteProcessBubble,
+  deleteProcessBubbleByName,
   layerDown,
   layerUp,
   popChild: popChildInProcess,
@@ -156,42 +187,71 @@ export const {
   updateBubble,
   renderBubble,
   removeBubble,
-  relateBubbles
+  removeBubbleByName,
+  relateBubbles,
 } = bubblesSlice.actions;
 
 // Selectors
-export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
-  Bubble.fromJSON(state.bubbleState.bubbles[id]);
+export const selectBubble = (
+  state: { bubbleState: BubbleStateSlice },
+  { id }: { id: string }
+) => Bubble.fromJSON(state.bubbleState.bubbles[id]);
+
+export const selectBubbleByName = (
+  state: { bubbleState: BubbleStateSlice },
+  { name }: { name: string }
+): Bubble | undefined => {
+  const bubble = Object.values(state.bubbleState.bubbles).find(
+    (bubble) => bubble.name === name
+  );
+
+  if (!bubble) {
+    return undefined;
+  }
+
+  return Bubble.fromJSON(bubble);
+};
 
 // Selectors
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
-export const selectSurfaceBubbles = (state: { bubbleState: BubbleStateSlice }) => {
+export const selectSurfaceBubbles = (state: {
+  bubbleState: BubbleStateSlice;
+}) => {
   const process = BubblesProcess.fromJSON(state.bubbleState.process);
   const bubbles = state.bubbleState.bubbles;
   const surfaceIds = process.surface || [];
-  return surfaceIds.map(id => Bubble.fromJSON(bubbles[id]));
-}
+  return surfaceIds.map((id) => Bubble.fromJSON(bubbles[id]));
+};
 
-export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice }) => {
+export const selectBubblesRelations = (state: {
+  bubbleState: BubbleStateSlice;
+}) => {
   return state.bubbleState.bubbleRelations;
-}
+};
 
-export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStateSlice }, { openeeId }: { openeeId: string }) => {
-  return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
-}
+export const selectBubblesRelationByOpeneeId = (
+  state: { bubbleState: BubbleStateSlice },
+  { openeeId }: { openeeId: string }
+) => {
+  return state.bubbleState.bubbleRelations.find(
+    (relation) => relation.openeeId === openeeId
+  );
+};
 
-export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
+export const selectBubblesRelationsWithBubble = (state: {
+  bubbleState: BubbleStateSlice;
+}) => {
   const relations = state.bubbleState.bubbleRelations;
   const bubbles = state.bubbleState.bubbles;
-  return relations.map(relation => {
-    return({
+  return relations.map((relation) => {
+    return {
       opener: Bubble.fromJSON(bubbles[relation.openerId]),
       openee: Bubble.fromJSON(bubbles[relation.openeeId]),
-    }
-  )});
-}
+    };
+  });
+};
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.
