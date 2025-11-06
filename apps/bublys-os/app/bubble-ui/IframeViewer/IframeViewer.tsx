@@ -27,11 +27,15 @@ import {
   useAppSelector 
 } from "@bublys-org/state-management"
 
-import IframeAppContent from './IframeAppContent';
+import {IframeAppContext} from './IframeAppContext';
 import PostMessageManager from './PostMessageManager';
-import { AppDataAndRefs } from './PostMessageManager';
+import { AppDataAndRef } from './PostMessageManager';
 
-const IframeViewer = () => {
+type IframeViewerProps = {
+  children?: React.ReactNode;
+}
+
+const IframeViewer = ({ children }: IframeViewerProps) => {
   const dispatch = useAppDispatch();
   const { apps, activeAppIds } = useAppSelector((state: RootState) => state.app);
   console.log(
@@ -86,8 +90,8 @@ const IframeViewer = () => {
   };
 
   //activeAppIdsに対応するappDataとiframeRefを組み合わせた配列
-  const activeApps: AppDataAndRefs[] = useMemo(() => {
-    const newActiveApps: AppDataAndRefs[] = [];
+  const activeApps: AppDataAndRef[] = useMemo(() => {
+    const newActiveApps: AppDataAndRef[] = [];
     for (let i = 0; i < activeAppIds.length; i++) {
       const appData = apps?.find((app) => app.id === activeAppIds[i]);
       if (!appData) {
@@ -131,7 +135,7 @@ const IframeViewer = () => {
   };
 
   //-----------ui本体-------------
-  const children = (
+  const contents = (
     <Box sx={{ display: 'flex' }}>
       {/* サイドバー */}
       <Box
@@ -184,15 +188,15 @@ const IframeViewer = () => {
       </Box>
 
       {/* メインコンテンツ */}
-
-      {apps
+      {children}
+      {/* {apps
         .filter(
           (app) => activeAppIds.includes(app.id) || pendingAppIds.has(app.id)
         )
         .map((app) => {
           console.log('🖼️ Rendering IframeAppContent for:', app.id, app.name);
           return <IframeAppContent key={app.id} appId={app.id} />;
-        })}
+        })} */}
 
       {/* アプリ追加モーダル */}
       <Dialog open={isModalOpen} onClose={() => setModalOpen(false)}>
@@ -235,7 +239,7 @@ const IframeViewer = () => {
       appRefs={activeApps}
       registerIframeRef={handleSetIframeRef}
     >
-      {children}
+      {contents}
     </PostMessageManager>
   );
 };

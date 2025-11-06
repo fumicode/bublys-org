@@ -72,13 +72,13 @@ const handShakeMessage = () => {
   });
 };
 
-export interface AppDataAndRefs {
+export interface AppDataAndRef {
   appData: AppData;
   ref: HTMLIFrameElement; //メッセージを送るためにiframeを参照するために使う
 }
 
 interface PostMessageManagerProps {
-  appRefs: AppDataAndRefs[];
+  appRefs: AppDataAndRef[];
   children: React.ReactNode;
   registerIframeRef: (appId: string, iframe: HTMLIFrameElement) => void;
 }
@@ -134,7 +134,7 @@ export const PostMessageManager = ({
   );
 
   // アプリからのreadyメッセージを受け取った際にhandshakeを送信
-  const sendHandshakeToApp = useCallback((appRef: AppDataAndRefs) => {
+  const sendHandshakeToApp = useCallback((appRef: AppDataAndRef) => {
     console.log('✅ Sending handshake to app:', appRef.appData.id);
     appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
   }, []);

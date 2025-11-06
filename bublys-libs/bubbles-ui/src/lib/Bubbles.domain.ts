@@ -120,3 +120,44 @@ export class Bubble {
     return new Bubble({ ...s, renderedRect });
   }
 }
+
+export const createBubble = (name: string, pos?: Point2): Bubble => {
+  const colorHue = getColorHueFromString(name);
+
+  let type = "normal";
+
+
+  switch (true) {
+    case name === "user-groups":
+      type = "user-groups";
+      break;
+
+    case name.startsWith("user-groups/"):
+      type = "user-group";
+      break;
+
+    case name === "memos":
+      type = "memos";
+      break;
+      
+    case name.startsWith("memos/"):
+      type = "memo";
+      break;
+
+    default:
+      type = "normal";
+  }
+
+  return new Bubble({ name, colorHue, type, position: pos });
+};
+
+
+// 文字列から1対1の一意な色を生成。
+function getColorHueFromString(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash << 5) - hash + name.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash % 360);
+}
