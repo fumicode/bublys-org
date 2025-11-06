@@ -3,10 +3,15 @@ import { BubblesContext } from "../../domain/BubblesContext";
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "@/app/bubble-ui/PositionDebugger/domain/PositionDebuggerContext";
 import { useMyRectObserver } from "@/app/bubble-ui/01_Utils/01_useMyRect";
-import { Button } from "@mui/material";
+import IframeAppContent from "@/app/bubble-ui/IframeViewer/IframeAppContent";
 
-export const IframeBubble: FC = () => {
-  const { openBubble } = useContext(BubblesContext);
+
+type IframeBubbleProps = {
+  appId: string;
+};
+
+export const IframeBubble: FC<IframeBubbleProps> = ({appId}) => {
+  //const { openBubble } = useContext(BubblesContext);
 
   const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
 
@@ -21,7 +26,7 @@ export const IframeBubble: FC = () => {
 
   return (
     <div ref={ref} onTransitionEnd={onRenderChange}>
-      iframe here
+      <IframeAppContent key={appId} appId={appId} />
     </div>
   );
 };

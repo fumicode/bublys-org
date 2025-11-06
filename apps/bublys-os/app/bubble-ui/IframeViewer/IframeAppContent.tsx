@@ -7,7 +7,7 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { usePostMessage } from './PostMessageManager';
@@ -114,6 +114,8 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
 
   useEffect(() => {
     if (myIframeRef.current) {
+      console.log("Iframe ref:", myIframeRef.current);
+      
       registerIframeRef(appId, myIframeRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +137,6 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(100vh - 100px)',
             flex: 1,
             gap: 2,
           }}
@@ -324,4 +325,4 @@ export const IframeAppContent = ({ appId }: IframeAppContentProps) => {
   );
 };
 
-export default IframeAppContent;
+export default memo(IframeAppContent);

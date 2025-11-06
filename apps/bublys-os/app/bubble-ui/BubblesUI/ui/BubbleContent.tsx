@@ -7,6 +7,7 @@ import { UserGroupList } from "./bubbles/UserGroupList";
 import { MemoList } from "@/app/memos/MemoList";
 import { MemoEditor } from "@/app/memos/[memoId]/MemoEditor";
 import { BubblesContext } from "../domain/BubblesContext";
+import { IframeBubble } from "./bubbles/IframeBubble";
 
 const typeToBubbleRenderer: Record<string, (bubble: Bubble) => JSX.Element> = {
 };
@@ -52,3 +53,12 @@ registerBubbleRenderers("memo", (bubble: Bubble) => {
 });
 
 registerBubbleRenderers("normal", (bubble: Bubble) => <MobBubble bubble={bubble} />);
+
+registerBubbleRenderers("iframe", (bubble: Bubble) => {
+
+
+  const appId = bubble.name.replace("iframes/", "");
+  
+
+  return (<IframeBubble appId={appId} />)
+});

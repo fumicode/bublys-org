@@ -144,6 +144,11 @@ export const createBubble = (name: string, pos?: Point2): Bubble => {
       type = "memo";
       break;
 
+    case name.startsWith("iframes/"):
+      type = "iframe";
+      break;
+
+
     default:
       type = "normal";
   }

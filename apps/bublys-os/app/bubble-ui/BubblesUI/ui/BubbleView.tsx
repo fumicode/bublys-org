@@ -105,7 +105,7 @@ export const BubbleView: FC<BubbleProps> = ({
       >
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
-          <h1 className="e-bubble-name">{bubble.type}</h1>
+          <h1 className="e-bubble-name">{bubble.name}</h1>
           <Stack
             direction="row"
             spacing={0} // 間隔をさらに詰める（デフォルトは1）
@@ -136,7 +136,6 @@ export const BubbleView: FC<BubbleProps> = ({
               </IconButton>
             )}
 
-            {/* 
             {onMoveClick && (
               <IconButton
                 size="small"
@@ -189,15 +188,15 @@ export const BubbleView: FC<BubbleProps> = ({
               >
                 <MoveUpIcon />
               </IconButton>
-            )} */}
+            )} 
           </Stack>
         </Box>
       </header>
 
       <main className="e-bubble-content">
+        Type: {bubble.type}
         {/* #{bubble.id}
         <br />
-        Type: {bubble.type}
         <br /> */}
         {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
         ({bubble?.position?.x},{bubble?.position?.y})<br />
@@ -259,6 +258,8 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   transform: scale(
     ${({ layerIndex }) => (layerIndex !== undefined ? 1 - layerIndex * 0.1 : 1)}
   );
+
+  max-height: 90vh;//FIXME:突貫対応
 
   background-color: hsla(${({ colorHue: color }) => color}, 50%, 50%, 0.5);
 
