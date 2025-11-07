@@ -1,15 +1,21 @@
-import { RawMemo, selectMemo, useAppSelector } from "@bublys-org/state-management";
+import { Memo } from "@bublys-org/state-management";
 import { IconButton } from "@mui/material";
 import { LuClipboardCopy } from "react-icons/lu";
 
+interface MemoTitleProps {
+  memo: Memo;
+}
 
-export function MemoTitle({ memoId }: { memoId: string }) {
-  const memo = useAppSelector(selectMemo(memoId)) as RawMemo;
+export function MemoTitle({ memo }: MemoTitleProps) {
+  const firstBlockId = memo.lines[0];
+  const firstBlock = firstBlockId ? memo.blocks[firstBlockId] : null;
+  const content = firstBlock?.content || '';
+  
   return (
     <div>
       <h2>
-        「{memo.blocks[memo.lines?.[0]]?.content}」
-        <IconButton onClick={() => navigator.clipboard.writeText(memo.blocks[memo.lines?.[0]]?.content || '')}>
+        「{content}」
+        <IconButton onClick={() => navigator.clipboard.writeText(content)}>
           <LuClipboardCopy />
         </IconButton>
       </h2>

@@ -1,3 +1,4 @@
+'use client';
 import { FC, JSX, useContext, } from "react";
 import { Bubble,} from "@bublys-org/bubbles-ui";
 
@@ -6,6 +7,8 @@ import { UserGroupDetail } from "./bubbles/UserGroupDetail";
 import { UserGroupList } from "./bubbles/UserGroupList";
 import { MemoList } from "@/app/memos/MemoList";
 import { MemoEditor } from "@/app/memos/[memoId]/MemoEditor";
+import { MemoTitle } from "@/app/memos/[memoId]/MemoTitle";
+import { selectMemo, updateMemo, useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { BubblesContext } from "../domain/BubblesContext";
 
 const typeToBubbleRenderer: Record<string, (bubble: Bubble) => JSX.Element> = {
@@ -48,7 +51,30 @@ registerBubbleRenderers("memos", (bubble: Bubble) => {
 
 registerBubbleRenderers("memo", (bubble: Bubble) => {
   const memoId = bubble.name.replace("memos/", "");
-  return <MemoEditor memoId={memoId} />;
+  
+  // Reduxからmemoを取得して、MemoEditorとMemoTitleにpropsとして渡す
+  const MemoBubbleContent = () => {
+    const memo = useAppSelector(selectMemo(memoId));
+    const dispatch = useAppDispatch();
+
+    if (!memo) {
+      return null;
+    }
+
+    return (
+      <div>
+        <MemoTitle memo={memo} />
+        <MemoEditor 
+          memo={memo} 
+          onMemoChange={(newMemo) => {
+            dispatch(updateMemo({ memo: newMemo.toJson() }));
+          }}
+        />
+      </div>
+    );
+  };
+
+  return <MemoBubbleContent />;
 });
 
 registerBubbleRenderers("normal", (bubble: Bubble) => <MobBubble bubble={bubble} />);

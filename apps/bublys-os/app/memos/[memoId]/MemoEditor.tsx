@@ -1,12 +1,15 @@
-import { MemoBlock, selectMemo, updateMemo, useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { Memo, MemoBlock } from "@bublys-org/state-management";
 import { IconButton } from "@mui/material";
 import { useRef } from "react";
 import { LuClipboardCopy } from "react-icons/lu";
 import styled from "styled-components";
 
-export function MemoEditor({ memoId }: { memoId: string }) {
-  const memo = useAppSelector(selectMemo(memoId));
-  const dispatch = useAppDispatch();
+interface MemoEditorProps {
+  memo: Memo;
+  onMemoChange: (newMemo: Memo) => void;
+}
+
+export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
   const contentRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
   // ドメインオブジェクトのメソッド呼び出し後にフォーカスを移動する
@@ -62,7 +65,7 @@ export function MemoEditor({ memoId }: { memoId: string }) {
     }
 
     if (newMemo !== memo) {
-      dispatch(updateMemo({ memo: newMemo.toJson() }));
+      onMemoChange(newMemo);
     }
     if (focusId) {
       const collapseToStart = e.key === "ArrowDown" || e.key === "Enter";
@@ -96,10 +99,11 @@ export function MemoEditor({ memoId }: { memoId: string }) {
                 }}
                 onBlur={(e) => {
                   const content = e.currentTarget.innerText;
-                  const updated = memo
-                    .updateBlockContent(block.id, content)
-                    .toJson();
-                  dispatch(updateMemo({ memo: updated }));
+                  // 内容が実際に変更された場合のみonMemoChangeを呼ぶ
+                  if (block.content !== content) {
+                    const updated = memo.updateBlockContent(block.id, content);
+                    onMemoChange(updated);
+                  }
                 }}
                 onKeyDown={(e) => handleKeyDown(e, block)}
               >
