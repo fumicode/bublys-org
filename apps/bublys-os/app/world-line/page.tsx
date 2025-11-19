@@ -6,6 +6,7 @@ import { MemoWorldLineIntegration } from './integrations/MemoWorldLineIntegratio
 import { MemoWorldLineManager } from './integrations/MemoWorldLineManager';
 import { Memo } from './Memo/domain/Memo';
 import { MemoList } from './Memo/ui/MemoList';
+import { FocusedObjectProvider } from './WorldLine/domain/FocusedObjectContext';
 
 export default function Index() {
   const [counterId, setCounterId] = useState<string | null>(null);
@@ -31,7 +32,8 @@ export default function Index() {
   };
 
   return (
-    <div>
+    <FocusedObjectProvider>
+      <div>
       {/* 初期化ボタン（左上） */}
       <div style={{
         position: 'fixed',
@@ -111,7 +113,7 @@ export default function Index() {
       {counterId && (
         <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
           <CounterWorldLineManager counterId={counterId} initialValue={0}>
-            <CounterWorldLineIntegration />
+            <CounterWorldLineIntegration counterId={counterId} />
           </CounterWorldLineManager>
         </div>
       )}
@@ -124,6 +126,7 @@ export default function Index() {
           </MemoWorldLineManager>
         </div>
       )}
-    </div>
+      </div>
+    </FocusedObjectProvider>
   );
 }

@@ -3,14 +3,17 @@ import { IconButton } from '@mui/material';
 import { useRef } from 'react';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
+import { useFocusedObject } from '../../WorldLine/domain/FocusedObjectContext';
 
 interface MemoEditorProps {
   memo: Memo;
   onMemoChange: (newMemo: Memo) => void;
+  memoId: string;
 }
 
-export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
+export function MemoEditor({ memo, onMemoChange, memoId }: MemoEditorProps) {
   const contentRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
+  const { setFocusedObjectId } = useFocusedObject();
 
   // ドメインオブジェクトのメソッド呼び出し後にフォーカスを移動する
   const focusBlock = (id: string, collapseToStart: boolean) => {
@@ -97,6 +100,7 @@ export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
                 ref={(el) => {
                   contentRefs.current[block.id] = el;
                 }}
+                onFocus={() => setFocusedObjectId(memoId)}
                 onBlur={(e) => {
                   const content = e.currentTarget.innerText;
                   // 内容が実際に変更された場合のみonMemoChangeを呼ぶ

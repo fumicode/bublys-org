@@ -65,6 +65,7 @@ registerBubbleRenderers("memo", (bubble: Bubble) => {
       <div>
         <MemoTitle memo={memo} />
         <MemoEditor 
+          memoId={memoId}
           memo={memo} 
           onMemoChange={(newMemo) => {
             dispatch(updateMemo({ memo: newMemo.toJson() }));
