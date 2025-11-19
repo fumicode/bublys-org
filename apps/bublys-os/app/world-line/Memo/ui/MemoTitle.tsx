@@ -1,6 +1,6 @@
-import { Memo } from "@bublys-org/state-management";
-import { IconButton } from "@mui/material";
-import { LuClipboardCopy } from "react-icons/lu";
+import { Memo } from '../domain/Memo';
+import { IconButton } from '@mui/material';
+import { LuClipboardCopy } from 'react-icons/lu';
 
 interface MemoTitleProps {
   memo: Memo;
@@ -22,3 +22,4 @@ export function MemoTitle({ memo }: MemoTitleProps) {
     </div>
   );
 }
+

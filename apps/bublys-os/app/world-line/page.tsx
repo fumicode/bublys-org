@@ -4,12 +4,13 @@ import { CounterWorldLineIntegration } from './integrations/CounterWorldLineInte
 import { CounterWorldLineManager } from './integrations/CounterWorldLineManager';
 import { MemoWorldLineIntegration } from './integrations/MemoWorldLineIntegration';
 import { MemoWorldLineManager } from './integrations/MemoWorldLineManager';
-import { Memo, useAppDispatch, addMemo } from '@bublys-org/state-management';
+import { Memo } from './Memo/domain/Memo';
+import { MemoList } from './Memo/ui/MemoList';
 
 export default function Index() {
-  const dispatch = useAppDispatch();
   const [counterId, setCounterId] = useState<string | null>(null);
   const [memoId, setMemoId] = useState<string | null>(null);
+  const [showMemoList, setShowMemoList] = useState(false);
 
   const handleCreateCounter = () => {
     const newCounterId = `counter-${crypto.randomUUID()}`;
@@ -19,8 +20,14 @@ export default function Index() {
 
   const handleCreateMemo = () => {
     const newMemo = Memo.create();
-    dispatch(addMemo({ memo: newMemo.toJson() }));
+    // MemoはReduxに保存しない（世界線システムのみで管理）
     setMemoId(newMemo.id);
+    setShowMemoList(false);
+  };
+
+  const handleSelectMemo = (selectedMemoId: string) => {
+    setMemoId(selectedMemoId);
+    setShowMemoList(false);
   };
 
   return (
@@ -33,37 +40,71 @@ export default function Index() {
         zIndex: 1000,
         display: 'flex',
         gap: '8px',
+        flexDirection: 'column',
       }}>
-        <button
-          onClick={handleCreateCounter}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4caf50',
-            color: 'white',
-            border: 'none',
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleCreateCounter}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#4caf50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+          >
+            Counter作成
+          </button>
+          <button
+            onClick={handleCreateMemo}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#2196f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+          >
+            Memo作成
+          </button>
+          <button
+            onClick={() => setShowMemoList(!showMemoList)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: showMemoList ? '#ff9800' : '#ff9800',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+          >
+            {showMemoList ? 'メモ一覧を閉じる' : '既存メモを開く'}
+          </button>
+        </div>
+
+        {/* 既存メモ一覧 */}
+        {showMemoList && (
+          <div style={{
+            backgroundColor: 'white',
+            border: '1px solid #ddd',
             borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold',
-          }}
-        >
-          Counter作成
-        </button>
-        <button
-          onClick={handleCreateMemo}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#2196f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold',
-          }}
-        >
-          Memo作成
-        </button>
+            padding: '16px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+            minWidth: '300px',
+          }}>
+            <MemoList onSelectMemo={handleSelectMemo} />
+          </div>
+        )}
       </div>
 
       {/* Counter: 独立した世界線 */}

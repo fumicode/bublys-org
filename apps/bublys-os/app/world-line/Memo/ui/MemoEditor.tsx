@@ -1,8 +1,8 @@
-import { Memo, MemoBlock } from "@bublys-org/state-management";
-import { IconButton } from "@mui/material";
-import { useRef } from "react";
-import { LuClipboardCopy } from "react-icons/lu";
-import styled from "styled-components";
+import { Memo, MemoBlock } from '../domain/Memo';
+import { IconButton } from '@mui/material';
+import { useRef } from 'react';
+import { LuClipboardCopy } from 'react-icons/lu';
+import styled from 'styled-components';
 
 interface MemoEditorProps {
   memo: Memo;
@@ -32,18 +32,18 @@ export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
     e: React.KeyboardEvent<HTMLParagraphElement>,
     block: MemoBlock
   ) => {
-    if ("isComposing" in e.nativeEvent && e.nativeEvent.isComposing) return;
+    if ('isComposing' in e.nativeEvent && e.nativeEvent.isComposing) return;
 
     let newMemo = memo;
     let focusId: string | undefined;
 
-    if (e.key === "ArrowDown") {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       focusId = memo.getNextBlockId(block.id);
-    } else if (e.key === "ArrowUp") {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       focusId = memo.getPrevBlockId(block.id);
-    } else if (e.key === "Backspace") {
+    } else if (e.key === 'Backspace') {
       const sel = window.getSelection();
       if (sel && sel.anchorOffset === 0 && sel.focusOffset === 0) {
         e.preventDefault();
@@ -53,12 +53,12 @@ export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
           .mergeWithPrevious(block.id);
         focusId = memo.getPrevBlockId(block.id);
       }
-    } else if (e.key === "Enter" && !e.shiftKey) {
+    } else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const { memo: updatedMemo, newBlockId } = memo.insertTextBlockAfter(
         block.id,
-        "text",
-        ""
+        'text',
+        ''
       );
       newMemo = updatedMemo;
       focusId = newBlockId;
@@ -68,7 +68,7 @@ export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
       onMemoChange(newMemo);
     }
     if (focusId) {
-      const collapseToStart = e.key === "ArrowDown" || e.key === "Enter";
+      const collapseToStart = e.key === 'ArrowDown' || e.key === 'Enter';
       focusBlock(focusId, collapseToStart);
     }
   };
@@ -77,7 +77,7 @@ export function MemoEditor({ memo, onMemoChange }: MemoEditorProps) {
     <StyledMemoDiv>
       {memo.lines.map((lineId) => {
         const block = memo.blocks[lineId];
-        if (block.type === "text") {
+        if (block.type === 'text') {
           return (
             <div key={block.id} className="e-block">
               <div className="e-block-id">
@@ -151,3 +151,4 @@ const StyledMemoDiv = styled.div`
     }
   }
 `;
+

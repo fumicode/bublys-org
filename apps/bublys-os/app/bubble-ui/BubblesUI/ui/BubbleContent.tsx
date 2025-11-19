@@ -5,9 +5,9 @@ import { Bubble,} from "@bublys-org/bubbles-ui";
 import { MobBubble } from "./bubbles/MobBubble";
 import { UserGroupDetail } from "./bubbles/UserGroupDetail";
 import { UserGroupList } from "./bubbles/UserGroupList";
-import { MemoList } from "@/app/memos/MemoList";
-import { MemoEditor } from "@/app/memos/[memoId]/MemoEditor";
-import { MemoTitle } from "@/app/memos/[memoId]/MemoTitle";
+import { MemoList } from "@/app/world-line/Memo/ui/MemoList";
+import { MemoEditor } from "@/app/world-line/Memo/ui/MemoEditor";
+import { MemoTitle } from "@/app/world-line/Memo/ui/MemoTitle";
 import { selectMemo, updateMemo, useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { BubblesContext } from "../domain/BubblesContext";
 
