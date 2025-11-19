@@ -1,7 +1,8 @@
-import { addMemo, deleteMemo, selectMemos, useAppDispatch, useAppSelector, Memo} from '@bublys-org/state-management';
+import { useAppSelector, selectAllWorldLineObjectIds, selectApexWorld } from '@bublys-org/state-management';
+import { Memo } from '../domain/Memo';
+import { deserializeMemo } from '../feature/MemoManager';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
-import { Button, IconButton } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
 
@@ -9,24 +10,41 @@ type MemoListProps = {
   onSelectMemo: (memoId: string) => void;
 };
 
+// Memoかどうかを判定する関数
+function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; id: string } {
+  return worldState && 
+    typeof worldState === 'object' && 
+    'blocks' in worldState && 
+    'lines' in worldState && 
+    'id' in worldState;
+}
+
 export function MemoList({ onSelectMemo }: MemoListProps) {
-  //メモの一覧を表示
-  const memos = useAppSelector(selectMemos);
-  const dispatch = useAppDispatch();
+  // world-sliceからすべてのobjectIdを取得
+  const objectIds = useAppSelector(selectAllWorldLineObjectIds);
+  
+  // 各objectIdのapexWorldを取得し、Memoかどうかを判定
+  const memos = objectIds
+    .map(objectId => {
+      const apexWorld = useAppSelector(selectApexWorld(objectId));
+      if (apexWorld && isMemo(apexWorld.worldState)) {
+        return deserializeMemo(apexWorld.worldState);
+      }
+      return null;
+    })
+    .filter((memo): memo is Memo => memo !== null);
 
   return (
     <div>
       <StyledMemoList>
         {memos.map((memo) => (
           <li key={memo.id} className="e-item">
-            {/* <a href={`/memos/${id}`}> */}
             <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
               onSelectMemo?.(memo.id);
             }}>
               <ArticleOutlinedIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
             </button>
-            {/* </a> */}
 
             <span className='e-button-group'>
               <IconButton
@@ -37,27 +55,10 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
               >
                 <LuClipboardCopy />
               </IconButton>
-              <IconButton onClick={(e)=> {
-                e.preventDefault();
-                dispatch(deleteMemo(memo.id));
-              }}>
-                <DeleteIcon />
-              </IconButton>
             </span>
           </li>
         ))}
       </StyledMemoList>
-
-      <div>
-        <Button variant="contained" onClick={(e)=> {
-          e.preventDefault();
-          const newMemo = Memo.create();
-          dispatch(addMemo({ memo: newMemo.toJson() }));
-          onSelectMemo(newMemo.id);
-
-
-        }}>メモを追加</Button>
-      </div>
     </div>
   );
 }
@@ -94,3 +95,4 @@ const StyledMemoList = styled.ul`
     }
   }
 `
+

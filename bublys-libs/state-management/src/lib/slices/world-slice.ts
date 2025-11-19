@@ -67,3 +67,7 @@ export const selectApexWorld = (objectId: string) => (state: RootState) => {
 
 export const selectOperationHistory = (objectId: string) => (state: RootState) => 
   state.worldLine.operationHistory[objectId] || [];
+
+// すべてのworldLineのobjectIdを取得
+export const selectAllWorldLineObjectIds = (state: RootState) => 
+  Object.keys(state.worldLine.worldLines);
