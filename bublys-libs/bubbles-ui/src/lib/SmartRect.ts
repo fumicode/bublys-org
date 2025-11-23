@@ -12,10 +12,8 @@ export type Direction = "top" | "right" | "bottom" | "left";
 const directions: Direction[] = ["top", "right", "bottom", "left"];
 
 export type CornerPosition = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
-const cornerPositions: CornerPosition[] = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
 
 export type Side = "top" | "right" | "bottom" | "left";
-const sides: Side[] = ["top", "right", "bottom", "left"];
 
 /**
  * SmartRect wraps a DOMRectReadOnly and provides utility getters.
