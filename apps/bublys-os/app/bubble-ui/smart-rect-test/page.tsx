@@ -105,11 +105,6 @@ export default function SmartRectTestPage() {
     }
   }, [initialX, initialY, initialWidth, initialHeight, canvasSize]);
 
-  // ランダムな色を生成
-  const getRandomColor = () => {
-    const colors = ['#ff6b6b', '#4dabf7', '#51cf66', '#ffd43b', '#ff8787', '#94d82d', '#845ef7', '#ff6b9d'];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
 
   // 選択中の矩形を取得
   const getSelectedRect = () => {
@@ -183,39 +178,6 @@ export default function SmartRectTestPage() {
     }
   };
 
-  // 矩形を描画する関数
-  const drawRectItem = (
-    ctx: CanvasRenderingContext2D,
-    item: RectItem,
-    isSelected: boolean
-  ) => {
-    const { rect, color, label } = item;
-
-    // 塗りつぶし
-    ctx.fillStyle = color + '40'; // 半透明
-    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-
-    // 枠線（選択中は太く）
-    ctx.strokeStyle = color;
-    ctx.lineWidth = isSelected ? 4 : 2;
-    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-    // ラベル
-    ctx.fillStyle = color;
-    ctx.font = isSelected ? 'bold 14px monospace' : '14px monospace';
-    ctx.fillText(label, rect.x + 10, rect.y + 25);
-    ctx.font = '11px monospace';
-    ctx.fillText(
-      `(${Math.round(rect.x)}, ${Math.round(rect.y)})`,
-      rect.x + 10,
-      rect.y + 45
-    );
-    ctx.fillText(
-      `${Math.round(rect.width)}×${Math.round(rect.height)}`,
-      rect.x + 10,
-      rect.y + 60
-    );
-  };
 
   // 描画
   useEffect(() => {
