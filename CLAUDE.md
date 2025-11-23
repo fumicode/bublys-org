@@ -34,7 +34,7 @@ npx nx g @nx/react:lib <name>     # 新しいReactライブラリを生成
 
 ## アーキテクチャ概要
 
-このリポジトリは、独自の「世界線(world-line)」システムを特徴とするNxモノレポです。世界線システムは、アプリケーション状態のバージョン管理/タイムトラベル機構です。
+このリポジトリはNxモノレポで、React + Next.js + Redux Toolkitを使用したアプリケーションです。ドメイン駆動設計（DDD）の3層アーキテクチャを採用しています。
 
 ### モノレポ構造
 
@@ -68,94 +68,13 @@ Reduxストアは以下を統合しています:
 **リスナーミドルウェア:**
 `bublys-libs/bubbles-ui-state`に配置され、Redux Toolkitの`createListenerMiddleware`を使用して複雑なクロススライス副作用を実装しています。
 
-### 世界線システム（タイムトラベル状態管理）
+### 世界線システム（実験的機能）
 
-世界線システムは、アプリケーション状態のための洗練されたバージョン管理メカニズムで、各機能が独自の独立したタイムラインを維持でき、分岐とタイムトラベル機能を持ちます。
+世界線システムは、アプリケーション状態のタイムトラベル・バージョン管理を可能にする実験的な機能です。
 
 **配置場所:** `apps/bublys-os/app/world-line/`
 
-**コアコンセプト:**
-
-1. **World** (`WorldLine/domain/World.ts`):
-   - ある時点での状態の不変スナップショット
-   - 含まれるもの: `worldId`, `parentWorldId`, `worldState` (ジェネリック), `apexWorldLineId`
-   - 更新は`updateWorldState()`を通じて新しいインスタンスを作成
-
-2. **WorldLine** (`WorldLine/domain/WorldLine.ts`):
-   - ワールドのタイムラインを管理するジェネリッククラス`WorldLine<TWorldState>`
-   - 追跡するもの: すべてのワールド(Map)、`apexWorldId` (現在/HEAD)、`rootWorldId` (初期)
-   - 主要メソッド:
-     - `grow(worldState)`: タイムラインに新しいワールドを追加（git commitのような）
-     - `setApex(worldId)`: 特定のワールドへ移動（git checkoutのような）
-     - `setApexForRegrow(worldId)`: 前方へ移動（やり直し）
-     - `getWorldTree()`: 可視化のための親子関係を取得
-
-**3層アーキテクチャ:**
-
-1. **ドメイン層** (`WorldLine/domain/`):
-   - 純粋なTypeScriptドメインモデル（ReactもReduxも不要）
-   - `World.ts`, `WorldLine.ts`: コアの不変データ構造
-   - `WorldLineContext.ts`: React Contextの型定義
-   - `FocusedObjectContext.tsx`: キーボードショートカットに応答するオブジェクトを追跡
-
-2. **フィーチャー層** (`WorldLine/feature/`):
-   - `WorldLineManager.tsx`: ドメインとReduxの間の橋渡し
-     - propsとして`objectId`、`serialize`、`deserialize`関数を受け取る
-     - Reduxへ接続: `useAppSelector(selectWorldLine(objectId))`
-     - アクションをディスパッチ: `updateState()`, `createWorldLine()`, `navigateToWorld()`
-     - キーボードショートカットを処理:
-       - `Ctrl+Z`: 世界線の可視化を表示（フォーカスされたオブジェクトのみ）
-       - `Ctrl+Shift+Z`: やり直し
-     - 子コンポーネントにコンテキストを提供
-
-3. **UI層** (`WorldLine/ui/`):
-   - `WorldLineView.tsx`: WorldLineコンテキストを消費するジェネリックコンポーネント
-   - `WorldView3D.tsx`: 透視投影を使った3D可視化
-     - 各ブランチは固有の色を取得
-     - HEADからの距離が不透明度/サイズに影響
-     - クリックでナビゲート、ダブルクリックでチェックアウト
-     - リーフノードには完全なカード、中間ワールドにはドットを表示
-
-**統合パターン:**
-
-機能に世界線サポートを追加するには:
-
-```typescript
-// 1. 不変ドメインモデルを作成
-class MyFeature {
-  constructor(readonly data: string) {}
-  updateData(newData: string): MyFeature {
-    return new MyFeature(newData);
-  }
-}
-
-// 2. シリアライゼーションを提供
-const serialize = (feature: MyFeature) => ({ data: feature.data });
-const deserialize = (json: any) => new MyFeature(json.data);
-
-// 3. WorldLineManagerでラップ
-<WorldLineManager<MyFeature>
-  objectId="my-feature-1"
-  serialize={serialize}
-  deserialize={deserialize}
->
-  <MyFeatureComponent />
-</WorldLineManager>
-
-// 4. コンポーネント内でコンテキストを使用
-const { currentWorld, grow, setApex } = useContext(WorldLineContext);
-// 状態変更時: grow(newFeatureState)
-```
-
-**フォーカスシステム:**
-- フォーカスされたオブジェクトの世界線のみが`Ctrl+Z`ショートカットに応答
-- `FocusedObjectContext.Provider`を通じてフォーカスを設定
-- 複数の世界線オブジェクトが同時に存在する場合の競合を防止
-
-**Redux統合:**
-- Reduxスライス: `bublys-libs/state-management/src/lib/slices/world-slice.ts`
-- 正規化された状態: `worldLines: { [objectId]: WorldLineState }`
-- アクション: `createWorldLine`, `updateState`, `navigateToWorld`, `setApexForRegrow`
+**注意:** この機能は現在開発中であり、仕様が変更される可能性があります。詳細な実装パターンはコードを参照してください。
 
 ### コンポーネント構成（ドメイン駆動設計）
 
@@ -164,49 +83,54 @@ const { currentWorld, grow, setApex } = useContext(WorldLineContext);
 ```
 feature-name/
   ├─ domain/     # ドメインモデル、ビジネスロジック、型（React/Redux不要）
-  ├─ feature/    # オーケストレーション、状態コネクター、プロバイダー
-  └─ ui/         # 純粋なプレゼンテーショナルReactコンポーネント
+  ├─ ui/         # 純粋なプレゼンテーショナルReactコンポーネント
+  └─ feature/    # オーケストレーション、状態コネクター、プロバイダー
+```
+
+**依存関係の向き:**
+```
+domain (依存なし)
+  ↑
+  ui (domainに依存)
+  ↑
+feature (domain + ui + Reduxに依存)
 ```
 
 **例:**
-- `apps/bublys-os/app/world-line/Memo/` - 世界線統合付きメモ
-- `apps/bublys-os/app/world-line/Counter/` - 世界線統合付きカウンター
+- `apps/bublys-os/app/world-line/Counter/` - 3層DDD構造の実装例
 - `apps/bublys-os/app/bubble-ui/` - 複雑なバブルUIシステム
 
 **ガイドライン:**
-- ドメイン層: 純粋なTypeScript、不変データ構造
-- フィーチャー層: Redux統合、副作用、コンテキストプロバイダー
-- UI層: コンテキストを消費するReactコンポーネント、直接的なReduxアクセスなし
+- **ドメイン層**: 純粋なTypeScript、不変データ構造（他の層に依存しない）
+  - **重要**: ドメインオブジェクトの状態は`state`オブジェクトを介して管理する
+  - 例: `constructor(readonly state: { field1: string; field2: number })`
+  - ReactもReduxもインポートしない
+- **UI層**: プレゼンテーショナルReactコンポーネント（ドメイン層のみに依存）
+  - コンテキストを消費してドメインモデルを表示
+  - 直接的なReduxアクセスなし
+- **フィーチャー層**: オーケストレーション層（ドメイン層とUI層の両方に依存）
+  - Redux統合、副作用、コンテキストプロバイダー
+  - ドメインモデルとRedux状態を橋渡し
 
 ### 主要なアーキテクチャパターン
 
 1. **設計による不変性:**
    - ドメインクラスは更新時に新しいインスタンスを返す
-   - 安全なタイムトラベルと状態の分岐を可能にする
-   - 例: `World.updateWorldState()`, `Memo.updateTitle()`
+   - 状態は`state`オブジェクトを介して管理し、イミュータブルに扱う
+   - 例: `new MyFeature({ ...this.state, field: newValue })`
 
 2. **ジェネリック型パラメータ:**
-   - `WorldLine<TWorldState>`は任意の不変状態型で動作
+   - ドメインモデルはジェネリック型を活用して柔軟性を持たせる
    - serialize/deserialize関数がドメインモデルとRedux JSONを橋渡し
 
 3. **プロバイダーパターン:**
-   - WorldLineManagerがコンポーネントをラップし、コンテキストを提供
-   - コンポーネントはフックを使って`grow()`, `setApex()`などにアクセス
+   - フィーチャー層がコンポーネントをラップし、Contextを提供
+   - UIコンポーネントはフックを通じてドメインロジックにアクセス
    - Redux実装からコンポーネントを分離
 
-4. **選択的キーボードショートカット:**
-   - FocusedObjectContextが競合を防止
-   - フォーカスされたオブジェクトのみがグローバルショートカットに応答
-   - 同じ機能の複数インスタンスが存在する場合に必須
-
-5. **複雑な副作用のためのリスナーミドルウェア:**
+4. **リスナーミドルウェアによる副作用管理:**
    - `bubbles-ui-state`でクロススライスインタラクションに使用
    - 複数の状態スライスにまたがる非同期操作を処理
-
-6. **オブジェクトごとの状態分離:**
-   - 各機能インスタンスは一意の`objectId`を取得
-   - 複数のカウンター、メモなどに対して独立した世界線
-   - 同じ機能の複数の独立したインスタンスを可能にする
 
 ### 技術スタック
 
@@ -227,38 +151,28 @@ feature-name/
 - Vitest 3.0.0
 - @testing-library/react 16.1.0
 
-### データフロー例: メモの編集
+### 基本的なデータフロー
 
-1. ユーザーが`MemoEditor`コンポーネントで入力
-2. `MemoEditor`が`WorldLineContext`から`grow(newMemoState)`を呼び出す
-3. `WorldLineManager`がMemoドメインオブジェクトをJSONにシリアライズ
-4. Redux `world-slice`へ`updateState()`アクションをディスパッチ
-5. redux-persistを通じてlocalStorageに状態を永続化
-6. メモがフォーカスされている間にユーザーが`Ctrl+Z`を押す
-7. `WorldLineView3D`がすべてのメモワールドの3D可視化を表示
-8. ユーザーが3Dビューでワールドをダブルクリック
-9. `setApex()`がその履歴的なメモ状態を読み込む
-10. メモの`objectId`が`focusedObjectId`と一致する場合のみ動作
+1. ユーザーがUIコンポーネントで操作
+2. コンポーネントがドメインモデルの更新メソッドを呼び出す
+3. 新しいドメインインスタンスが作成される（不変性）
+4. フィーチャー層がReduxアクションをディスパッチ
+5. Redux storeが更新される
+6. redux-persistを通じてlocalStorageに状態を永続化
+7. コンポーネントが再レンダリングされる
 
 ### 重要な実装ファイル
 
 **Redux設定:**
 - `bublys-libs/state-management/src/lib/store.ts` - Reduxストアのセットアップ
-- `bublys-libs/state-management/src/lib/slices/world-slice.ts` - 世界線のRedux状態
-- `bublys-libs/state-management/src/lib/slices/memo-slice.ts` - メモのRedux状態
-
-**世界線システム:**
-- `apps/bublys-os/app/world-line/WorldLine/domain/` - コアドメインモデル
-- `apps/bublys-os/app/world-line/WorldLine/feature/WorldLineManager.tsx` - Redux統合
-- `apps/bublys-os/app/world-line/WorldLine/ui/WorldView3D.tsx` - 3D可視化
-
-**統合例:**
-- `apps/bublys-os/app/world-line/Memo/` - 世界線付きの完全なメモ実装
-- `apps/bublys-os/app/world-line/Counter/` - 世界線付きのシンプルなカウンター
+- `bublys-libs/state-management/src/lib/slices/` - 各機能のReduxスライス
 
 **アプリセットアップ:**
 - `apps/bublys-os/app/StoreProvider.tsx` - Redux Provider + PersistGate
-- `apps/bublys-os/app/world-line/page.tsx` - 世界線のルートページ
+
+**実装例:**
+- `apps/bublys-os/app/world-line/Counter/` - 3層DDD構造の実装例
+- `apps/bublys-os/app/bubble-ui/` - 複雑な機能の実装例
 
 ### 従うべき一般的なパターン
 
@@ -268,35 +182,16 @@ feature-name/
    const state = useAppSelector(selectSomething);  // useSelector()ではなく
    ```
 
-2. **ドメインモデルは不変である必要がある:**
+2. **ドメインモデルは不変である必要がある（stateオブジェクトを介して状態を管理）:**
    ```typescript
    class Counter {
-     constructor(readonly count: number) {}
+     constructor(readonly state: { count: number }) {}
      increment(): Counter {
-       return new Counter(this.count + 1);  // 新しいインスタンスを返す
+       return new Counter({ count: this.state.count + 1 });  // 新しいインスタンスを返す
      }
    }
    ```
 
-3. **世界線統合のためのserialize/deserialize:**
-   ```typescript
-   const serialize = (memo: Memo) => ({
-     id: memo.id,
-     title: memo.title,
-     content: memo.content
-   });
-   const deserialize = (json: any) => new Memo(json.id, json.title, json.content);
-   ```
-
-4. **世界線コンテキストでの状態更新にはgrow()を使用:**
-   ```typescript
-   const { currentWorld, grow } = useContext(WorldLineContext);
-   const handleUpdate = () => {
-     const newState = currentWorld.worldState.updateSomething();
-     grow(newState);  // タイムラインに新しいワールドを作成
-   };
-   ```
-
-5. **テストファイルはソースと同じ場所に配置:**
+3. **テストファイルはソースと同じ場所に配置:**
    - `*.test.ts`または`*.spec.ts`を実装ファイルの隣に配置
    - 例: `memo-slice.ts`の隣に`memo-slice.test.ts`
