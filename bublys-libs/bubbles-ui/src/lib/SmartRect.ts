@@ -7,12 +7,32 @@ export type SmartRectJson = {
   height: number;
   parentSize: Size2;
 };
-type Direction = "top" | "right" | "bottom" | "left";
+
+export type Direction = "top" | "right" | "bottom" | "left";
 const directions: Direction[] = ["top", "right", "bottom", "left"];
+
+export type CornerPosition = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
+const cornerPositions: CornerPosition[] = ["topLeft", "topRight", "bottomLeft", "bottomRight"];
+
+export type Side = "top" | "right" | "bottom" | "left";
+const sides: Side[] = ["top", "right", "bottom", "left"];
 
 /**
  * SmartRect wraps a DOMRectReadOnly and provides utility getters.
  * Includes serialization support via toJSON() and static fromJSON().
+ *
+ * 周囲の位置は以下のように番号付けされています:
+ * [1][2][3]
+ * [4]■[6]
+ * [7][8][9]
+ *
+ * - 角（corners）: [1][3][7][9] - 斜め4つの位置
+ * - 隣（neighbors）: [2][4][6][8] - 上下左右4つの位置
+ * - 側（sides）: 角と隣を含む領域
+ *   - 上側（top）: [1][2][3]
+ *   - 左側（left）: [1][4][7]
+ *   - 右側（right）: [3][6][9]
+ *   - 下側（bottom）: [7][8][9]
  */
 export class SmartRect implements DOMRectReadOnly {
   constructor(readonly domRect: DOMRectReadOnly, readonly parentSize: Size2) {}
@@ -142,6 +162,158 @@ export class SmartRect implements DOMRectReadOnly {
     const height = bottom - y;
     const domRect = new DOMRect(x, y, width, height);
     return new SmartRect(domRect, this.parentSize);
+  }
+
+  /**
+   * 隣接する位置（上下左右）のSmartRectを生成
+   * [2][4][6][8]の位置
+   * 画面の端まで広がる矩形を返す
+   */
+  getNeighbor(direction: Direction): SmartRect {
+    let x: number;
+    let y: number;
+    let width: number;
+    let height: number;
+
+    switch (direction) {
+      case "top":
+        x = this.x;
+        y = 0;
+        width = this.width;
+        height = this.y;
+        break;
+      case "right":
+        x = this.right;
+        y = this.y;
+        width = this.parentSize.width - this.right;
+        height = this.height;
+        break;
+      case "bottom":
+        x = this.x;
+        y = this.bottom;
+        width = this.width;
+        height = this.parentSize.height - this.bottom;
+        break;
+      case "left":
+        x = 0;
+        y = this.y;
+        width = this.x;
+        height = this.height;
+        break;
+    }
+
+    const domRect = new DOMRect(x, y, width, height);
+    return new SmartRect(domRect, this.parentSize);
+  }
+
+  /**
+   * 角の位置（斜め）のSmartRectを生成
+   * [1][3][7][9]の位置
+   * 画面の端まで広がる矩形を返す
+   */
+  getCorner(position: CornerPosition): SmartRect {
+    let x: number;
+    let y: number;
+    let width: number;
+    let height: number;
+
+    switch (position) {
+      case "topLeft":
+        x = 0;
+        y = 0;
+        width = this.x;
+        height = this.y;
+        break;
+      case "topRight":
+        x = this.right;
+        y = 0;
+        width = this.parentSize.width - this.right;
+        height = this.y;
+        break;
+      case "bottomLeft":
+        x = 0;
+        y = this.bottom;
+        width = this.x;
+        height = this.parentSize.height - this.bottom;
+        break;
+      case "bottomRight":
+        x = this.right;
+        y = this.bottom;
+        width = this.parentSize.width - this.right;
+        height = this.parentSize.height - this.bottom;
+        break;
+    }
+
+    const domRect = new DOMRect(x, y, width, height);
+    return new SmartRect(domRect, this.parentSize);
+  }
+
+  /**
+   * 側面（角+隣を合成した領域）のSmartRectを取得
+   * 例: getSide('top') => [1,2,3]を合成した1つのSmartRect
+   */
+  getSide(side: Side): SmartRect {
+    switch (side) {
+      case "top":
+        return this.getCorner("topLeft")
+          .merge(this.getNeighbor("top"))
+          .merge(this.getCorner("topRight"));
+      case "right":
+        return this.getCorner("topRight")
+          .merge(this.getNeighbor("right"))
+          .merge(this.getCorner("bottomRight"));
+      case "bottom":
+        return this.getCorner("bottomLeft")
+          .merge(this.getNeighbor("bottom"))
+          .merge(this.getCorner("bottomRight"));
+      case "left":
+        return this.getCorner("topLeft")
+          .merge(this.getNeighbor("left"))
+          .merge(this.getCorner("bottomLeft"));
+    }
+  }
+
+  /**
+   * 周囲8つのSmartRectを取得
+   * [1,2,3,4,6,7,8,9]の順番
+   */
+  getAllSurrounding(): SmartRect[] {
+    return [
+      this.getCorner("topLeft"),      // 1
+      this.getNeighbor("top"),         // 2
+      this.getCorner("topRight"),      // 3
+      this.getNeighbor("left"),        // 4
+      this.getNeighbor("right"),       // 6
+      this.getCorner("bottomLeft"),    // 7
+      this.getNeighbor("bottom"),      // 8
+      this.getCorner("bottomRight"),   // 9
+    ];
+  }
+
+  /**
+   * 角4つのSmartRectを取得
+   * [1,3,7,9]の順番
+   */
+  getAllCorners(): SmartRect[] {
+    return [
+      this.getCorner("topLeft"),       // 1
+      this.getCorner("topRight"),      // 3
+      this.getCorner("bottomLeft"),    // 7
+      this.getCorner("bottomRight"),   // 9
+    ];
+  }
+
+  /**
+   * 隣接4つのSmartRectを取得
+   * [2,4,6,8]の順番
+   */
+  getAllNeighbors(): SmartRect[] {
+    return [
+      this.getNeighbor("top"),         // 2
+      this.getNeighbor("left"),        // 4
+      this.getNeighbor("right"),       // 6
+      this.getNeighbor("bottom"),      // 8
+    ];
   }
 
   toJSON(): SmartRectJson {
