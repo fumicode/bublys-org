@@ -15,7 +15,7 @@ import {
   removeBubble,
 } from "@bublys-org/bubbles-ui-state";
 
-import { Bubble, createBubble, Point2 } from "@bublys-org/bubbles-ui";
+import { Bubble, createBubble, Point2, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
@@ -102,6 +102,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     y: -10,
   });
 
+  // CoordinateSystem
+  const [coordinateSystem, setCoordinateSystem] = useState<CoordinateSystem>(GLOBAL_COORDINATE_SYSTEM);
+
   return (
     <>
       <PositionDebuggerProvider isShown={false}>
@@ -109,6 +112,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           value={{
             pageSize,
             bubbles: bubblesDPO.layers,
+            coordinateSystem,
             openBubble: popChildOrJoinSibling,
             renameBubble: (id: string, newName: string) => {
               const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
@@ -127,6 +131,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               onBubbleMove={onMove}
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
+              onCoordinateSystemReady={setCoordinateSystem}
             />
           </IframeViewer>
         </BubblesContext.Provider>

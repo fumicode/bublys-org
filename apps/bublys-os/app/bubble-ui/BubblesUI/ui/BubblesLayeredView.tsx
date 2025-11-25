@@ -1,6 +1,6 @@
-import React, { FC, use } from "react";
+import React, { FC, use, useRef, useLayoutEffect, useState } from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
@@ -15,6 +15,7 @@ type BubblesLayeredViewProps = {
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
+  onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
 };
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
@@ -25,7 +26,70 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleMove,
   onBubbleLayerDown,
   onBubbleLayerUp,
+  onCoordinateSystemReady,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerCoordinateSystem, setContainerCoordinateSystem] = useState<CoordinateSystem>(GLOBAL_COORDINATE_SYSTEM);
+
+  // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
+  useLayoutEffect(() => {
+    let lastOffset = { x: 0, y: 0 };
+
+    const updateCoordinateSystem = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+
+        // 座標が変更された場合のみ更新（無限ループ防止）
+        if (rect.left === lastOffset.x && rect.top === lastOffset.y) {
+          return;
+        }
+
+        lastOffset = { x: rect.left, y: rect.top };
+
+        const coordinateSystem: CoordinateSystem = {
+          scale: 1.0,
+          offset: { x: rect.left, y: rect.top },
+          vanishingPoint: { x: 0, y: 0 },
+        };
+        setContainerCoordinateSystem(coordinateSystem);
+        onCoordinateSystemReady?.(coordinateSystem);
+        console.log('BubblesLayeredView CoordinateSystem updated:', coordinateSystem);
+      }
+    };
+
+    // 初期設定
+    updateCoordinateSystem();
+
+    // ResizeObserverでサイズ変更を監視
+    const resizeObserver = new ResizeObserver(() => {
+      updateCoordinateSystem();
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // windowのresizeイベントで位置変更も検出（サイドバー幅変更など）
+    // requestAnimationFrameでスロットリング
+    let rafId: number | null = null;
+    const handleResize = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        updateCoordinateSystem();
+        rafId = null;
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [onCoordinateSystemReady]);
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
 
@@ -73,74 +137,76 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     .flat();
 
   return (
-    <StyledBubblesLayeredView
-      surface={{ leftTop: surfaceLeftTop }}
-      underground={{ vanishingPoint: undergroundVanishingPoint }}
-      surfaceZIndex={baseZIndex - 2}
-    >
-      {renderedBubbles}
-      <div className="e-underground-curtain">curtain</div>
-      <div className="e-debug-visualizations">
-        <div className="e-surface-border">surface</div>
-        <div className="e-underground-border">underground</div>
-        <div className="e-vanishing-point"></div>
-      </div>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <StyledBubblesLayeredView
+        surface={{ leftTop: surfaceLeftTop }}
+        underground={{ vanishingPoint: undergroundVanishingPoint }}
+        surfaceZIndex={baseZIndex - 2}
+      >
+        {renderedBubbles}
+        <div className="e-underground-curtain">curtain</div>
+        <div className="e-debug-visualizations">
+          <div className="e-surface-border">surface</div>
+          <div className="e-underground-border">underground</div>
+          <div className="e-vanishing-point"></div>
+        </div>
 
-      {
-        relations.map(({ opener, openee }) => {
+        {
+          relations.map(({ opener, openee }) => {
 
-          const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
+            const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
 
-          console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
+            console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
 
-          if (!opener.renderedRect || !openee.renderedRect) return null;
+            if (!opener.renderedRect || !openee.renderedRect) return null;
 
-          // SmartRectをグローバル座標系に変換（既にビューポート座標のはずだが、念のため確認）
-          const openerRect = opener.renderedRect;
-          const openeeRect = openee.renderedRect;
+            // renderedRectはすでにローカル座標系（SVGはコンテナ内に配置されているため、そのまま使用）
+            const openerRect = opener.renderedRect;
+            const openeeRect = openee.renderedRect;
 
-          console.log('SVG座標:', {
-            opener: { x: openerRect.x, y: openerRect.y, left: openerRect.left, bottom: openerRect.bottom },
-            openee: { x: openeeRect.x, y: openeeRect.y, left: openeeRect.left, bottom: openeeRect.bottom }
-          });
+            console.log('SVG座標（local）:', {
+              opener: { x: openerRect.x, y: openerRect.y, left: openerRect.left, bottom: openerRect.bottom },
+              openee: { x: openeeRect.x, y: openeeRect.y, left: openeeRect.left, bottom: openeeRect.bottom }
+            });
 
-          return(
-            <div key={opener.id + "_" + openee.id} style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              zIndex: linkZIndex,
-              width: "100%",
-              height: "100%",
-              pointerEvents: "none",
-            }}>
-              <svg width="100%" height="100%">
-                <defs>
-                  <marker
-                    id="arrowhead"
-                    markerWidth="10"
-                    markerHeight="7"
-                    refX="0"
-                    refY="3.5"
-                    orient="auto"
-                  >
-                    <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-                  </marker>
-                </defs>
-                {/* バブル間の関係を示す領域 */}
-                <path
-                  d={`M ${openerRect.x} ${openerRect.y} L ${openeeRect.x} ${openeeRect.y} L ${openeeRect.left} ${openeeRect.bottom} L ${openerRect.left} ${openerRect.bottom} Z`}
-                  stroke="none"
-                  strokeWidth="2"
-                  fill={opener.colorHue === undefined ? "rgba(255,0,0,0.5)" : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`}
-                />
-              </svg>
-            </div>
-          )
-        })
-      }
+            return(
+              <div key={opener.id + "_" + openee.id} style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                zIndex: linkZIndex,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+              }}>
+                <svg width="100%" height="100%">
+                  <defs>
+                    <marker
+                      id="arrowhead"
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="0"
+                      refY="3.5"
+                      orient="auto"
+                    >
+                      <polygon points="0 0, 10 3.5, 0 7" fill="red" />
+                    </marker>
+                  </defs>
+                  {/* バブル間の関係を示す領域 */}
+                  <path
+                    d={`M ${openerRect.x} ${openerRect.y} L ${openeeRect.x} ${openeeRect.y} L ${openeeRect.left} ${openeeRect.bottom} L ${openerRect.left} ${openerRect.bottom} Z`}
+                    stroke="none"
+                    strokeWidth="2"
+                    fill={opener.colorHue === undefined ? "rgba(255,0,0,0.5)" : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`}
+                  />
+                </svg>
+              </div>
+            )
+          })
+        }
 
-    </StyledBubblesLayeredView>
+      </StyledBubblesLayeredView>
+    </div>
   );
 };
 
