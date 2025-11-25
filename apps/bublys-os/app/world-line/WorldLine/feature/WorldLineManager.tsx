@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import { WorldLineContext, WorldLineContextType } from '../domain/WorldLineContext';
+import { useFocusedObject } from '../domain/FocusedObjectContext';
 import {
   initialize,
   updateState,
@@ -29,6 +30,7 @@ export function WorldLineManager<TWorldState>({
   createInitialWorldState 
 }: WorldLineManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
+  const { focusedObjectId } = useFocusedObject();
   
   // Reduxから状態を取得（objectIdを指定）
   const worldLineState = useAppSelector(selectWorldLine(objectId));
@@ -159,9 +161,12 @@ export function WorldLineManager<TWorldState>({
     return worldLine?.getWorldTree() || {};
   }, [worldLine]);
 
-  // キーボードショートカットの処理
+  // キーボードショートカットの処理（フォーカスしているオブジェクトのみ反応）
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // このオブジェクトがフォーカスされていない場合は無視
+      if (focusedObjectId !== objectId) return;
+      
       // Ctrl+Shift+Z の検出（Zは大文字）
       // Shiftの影響で大文字のZが検出される
       if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
@@ -176,7 +181,7 @@ export function WorldLineManager<TWorldState>({
     };
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [regrowHandler, showAllWorldLinesHandler]);
+  }, [regrowHandler, showAllWorldLinesHandler, focusedObjectId, objectId]);
 
   const contextValue: WorldLineContextType<TWorldState> = {
     apexWorld,

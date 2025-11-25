@@ -1,10 +1,14 @@
 'use client';
 import { Counter } from '../domain/Counter';
+import { useFocusedObject } from '../../WorldLine/domain/FocusedObjectContext';
+
 interface CounterViewProps {
   counter: Counter;
   onCounterChange: (newCounter: Counter) => void;
+  counterId: string;
 }
-export function CounterView({ counter, onCounterChange }: CounterViewProps) {
+export function CounterView({ counter, onCounterChange, counterId }: CounterViewProps) {
+  const { setFocusedObjectId } = useFocusedObject();
   const handleCountUp = () => {
     onCounterChange(counter.countUp());
   };
@@ -21,6 +25,8 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
     }}>
       <button 
         onClick={handleCountDown}
+        onFocus={() => setFocusedObjectId(counterId)}
+        onMouseDown={() => setFocusedObjectId(counterId)}
         style={{
           padding: '0.5rem 1rem',
           fontSize: '1.2rem',
@@ -47,6 +53,8 @@ export function CounterView({ counter, onCounterChange }: CounterViewProps) {
       
       <button 
         onClick={handleCountUp}
+        onFocus={() => setFocusedObjectId(counterId)}
+        onMouseDown={() => setFocusedObjectId(counterId)}
         style={{
           padding: '0.5rem 1rem',
           fontSize: '1.2rem',

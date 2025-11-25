@@ -7,15 +7,13 @@ import { Button } from "@mui/material";
 
 type UserGroupListProps = {
   containedBubble: Bubble;
-
 }
 
 export const UserGroupList: FC<UserGroupListProps> = ({
   containedBubble
 }) => {
-  
-  const { openBubble } = useContext(BubblesContext);
 
+  const { openBubble } = useContext(BubblesContext);
   const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
 
   const { addRects } = usePositionDebugger();
@@ -38,7 +36,6 @@ export const UserGroupList: FC<UserGroupListProps> = ({
       >
         other User Groups
       </Button>
-
       <ul>
         {["Admins", "Editors", "Guests"].map((group) => (
           <li key={group}>

@@ -12,27 +12,37 @@ import {
   IconButton,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from './store/store';
-import {
+import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
+
+import type { AppData } from "@bublys-org/state-management";
+
+import { 
+  RootState ,
   addApp,
   setActiveApp,
   setInActiveApp,
   removeApp,
   hydrate,
-} from './store/apps.slice';
-import type { AppData } from './store/apps.slice';
-import IframeAppContent from './IframeAppContent';
-import PostMessageManager from './PostMessageManager';
-import { AppDataAndRefs } from './PostMessageManager';
+  useAppDispatch, 
+  useAppSelector 
+} from "@bublys-org/state-management"
 
-const IframeViewer = () => {
-  const dispatch = useDispatch();
-  const { apps, activeAppIds } = useSelector((state: RootState) => state.app);
+import {IframeAppContext} from './IframeAppContext';
+import PostMessageManager from './PostMessageManager';
+import { AppDataAndRef } from './PostMessageManager';
+import { Bubble } from '@bublys-org/bubbles-ui';
+import { BubblesContext } from '../BubblesUI/domain/BubblesContext';
+
+type IframeViewerProps = {
+  children?: React.ReactNode;
+}
+
+const IframeViewer = ({ children }: IframeViewerProps) => {
+  const dispatch = useAppDispatch();
+  const { apps, activeAppIds } = useAppSelector((state: RootState) => state.app);
   console.log(
-    'apps',
-    apps.map((e) => e.id)
+    'active apps',
+    activeAppIds//.map((e) => e.id)
   );
   const [inputURLText, setInputURLText] = useState('');
   const [isModalOpen, setModalOpen] = useState(false);
@@ -72,18 +82,21 @@ const IframeViewer = () => {
     [activeAppIds, pendingAppIds, dispatch]
   );
 
+  const {openBubble} = useContext(BubblesContext);
+
   //アプリクリックの処理
   const handleAppClick = (app: AppData) => {
     if (activeAppIds.includes(app.id)) {
       dispatch(setInActiveApp(app.id));
     } else {
-      setPendingAppIds((prev) => new Set(prev).add(app.id));
+      //setPendingAppIds((prev) => new Set(prev).add(app.id));
+      openBubble("iframes/" + app.id, "root");
     }
   };
 
   //activeAppIdsに対応するappDataとiframeRefを組み合わせた配列
-  const activeApps: AppDataAndRefs[] = useMemo(() => {
-    const newActiveApps: AppDataAndRefs[] = [];
+  const activeApps: AppDataAndRef[] = useMemo(() => {
+    const newActiveApps: AppDataAndRef[] = [];
     for (let i = 0; i < activeAppIds.length; i++) {
       const appData = apps?.find((app) => app.id === activeAppIds[i]);
       if (!appData) {
@@ -127,7 +140,7 @@ const IframeViewer = () => {
   };
 
   //-----------ui本体-------------
-  const children = (
+  const contents = (
     <Box sx={{ display: 'flex' }}>
       {/* サイドバー */}
       <Box
@@ -180,15 +193,15 @@ const IframeViewer = () => {
       </Box>
 
       {/* メインコンテンツ */}
-
-      {apps
+      {children}
+      {/* {apps
         .filter(
           (app) => activeAppIds.includes(app.id) || pendingAppIds.has(app.id)
         )
         .map((app) => {
           console.log('🖼️ Rendering IframeAppContent for:', app.id, app.name);
           return <IframeAppContent key={app.id} appId={app.id} />;
-        })}
+        })} */}
 
       {/* アプリ追加モーダル */}
       <Dialog open={isModalOpen} onClose={() => setModalOpen(false)}>
@@ -231,7 +244,7 @@ const IframeViewer = () => {
       appRefs={activeApps}
       registerIframeRef={handleSetIframeRef}
     >
-      {children}
+      {contents}
     </PostMessageManager>
   );
 };

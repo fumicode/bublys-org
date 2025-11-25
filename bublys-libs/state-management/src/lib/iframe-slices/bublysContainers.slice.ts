@@ -1,17 +1,17 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import getDomainWithProtocol from '../getDomainWithProtocol';
+import getDomainWithProtocol from '../messageDomain/getDomainWithProtocol.js';
 import {
   BublyContainers,
   ImportableContainer,
   HandShakeMessage,
-} from '../Messages.domain';
+} from '../messageDomain/Messages.domain.js';
 
 export interface BublysContainersState {
   bublysContainers: BublyContainers[];
 }
 
 //各バブリのimportableContainersを管理する
-export const initialState: BublysContainersState = {
+const initialState: BublysContainersState = {
   bublysContainers: [],
 };
 
