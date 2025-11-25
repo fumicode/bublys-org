@@ -315,3 +315,162 @@ describe("SmartRect.getAllNeighbors", () => {
     expect(neighbors[3].height).toBe(650);
   });
 });
+
+describe("SmartRect座標変換", () => {
+  const parentSize: Size2 = { width: 1000, height: 800 };
+
+  describe("toGlobal", () => {
+    it("グローバル座標系のSmartRectはそのまま返す", () => {
+      const globalRect = new SmartRect(new DOMRect(100, 100, 50, 50), parentSize);
+      const result = globalRect.toGlobal();
+
+      expect(result).toBe(globalRect); // 同じインスタンス
+      expect(result.x).toBe(100);
+      expect(result.y).toBe(100);
+      expect(result.width).toBe(50);
+      expect(result.height).toBe(50);
+    });
+
+    it("ローカル座標系からグローバル座標系に変換する", () => {
+      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+
+      // レイヤー0の座標系: scale=1.0, offset=(100, 100), vanishingPoint=(20, 10)
+      const layerCoordinateSystem = createLayerCoordinateSystem(
+        0,
+        { x: 100, y: 100 },
+        { x: 20, y: 10 }
+      );
+
+      // ローカル座標: (50, 60), サイズ: 40x30
+      const localRect = new SR(
+        new DOMRect(50, 60, 40, 30),
+        parentSize,
+        layerCoordinateSystem
+      );
+
+      const globalRect = localRect.toGlobal();
+
+      // 変換式: global = vanishingPoint + (local - vanishingPoint) * scale + offset
+      // globalX = 20 + (50 - 20) * 1.0 + 100 = 20 + 30 + 100 = 150
+      // globalY = 10 + (60 - 10) * 1.0 + 100 = 10 + 50 + 100 = 160
+      expect(globalRect.x).toBe(150);
+      expect(globalRect.y).toBe(160);
+      expect(globalRect.width).toBe(40);  // 40 * 1.0
+      expect(globalRect.height).toBe(30); // 30 * 1.0
+    });
+
+    it("scale=0.9のレイヤーから変換する", () => {
+      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+
+      // レイヤー1の座標系: scale=0.9, offset=(100, 100), vanishingPoint=(20, 10)
+      const layerCoordinateSystem = createLayerCoordinateSystem(
+        1,
+        { x: 100, y: 100 },
+        { x: 20, y: 10 }
+      );
+
+      // ローカル座標: (50, 60), サイズ: 40x30
+      const localRect = new SR(
+        new DOMRect(50, 60, 40, 30),
+        parentSize,
+        layerCoordinateSystem
+      );
+
+      const globalRect = localRect.toGlobal();
+
+      // globalX = 20 + (50 - 20) * 0.9 + 100 = 20 + 27 + 100 = 147
+      // globalY = 10 + (60 - 10) * 0.9 + 100 = 10 + 45 + 100 = 155
+      expect(globalRect.x).toBe(147);
+      expect(globalRect.y).toBe(155);
+      expect(globalRect.width).toBe(36);  // 40 * 0.9
+      expect(globalRect.height).toBe(27); // 30 * 0.9
+    });
+  });
+
+  describe("toLocal", () => {
+    it("グローバル座標系への変換（targetがGLOBAL_COORDINATE_SYSTEM）", () => {
+      const { SmartRect: SR, GLOBAL_COORDINATE_SYSTEM } = require("./SmartRect.js");
+
+      const globalRect = new SR(new DOMRect(100, 100, 50, 50), parentSize);
+      const result = globalRect.toLocal(GLOBAL_COORDINATE_SYSTEM);
+
+      expect(result).toBe(globalRect); // 同じインスタンス
+    });
+
+    it("グローバル座標系からローカル座標系に変換する", () => {
+      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+
+      // レイヤー0の座標系
+      const layerCoordinateSystem = createLayerCoordinateSystem(
+        0,
+        { x: 100, y: 100 },
+        { x: 20, y: 10 }
+      );
+
+      // グローバル座標: (150, 160), サイズ: 40x30
+      const globalRect = new SR(new DOMRect(150, 160, 40, 30), parentSize);
+
+      const localRect = globalRect.toLocal(layerCoordinateSystem);
+
+      // 変換式: local = vanishingPoint + (global - offset - vanishingPoint) / scale
+      // localX = 20 + (150 - 100 - 20) / 1.0 = 20 + 30 = 50
+      // localY = 10 + (160 - 100 - 10) / 1.0 = 10 + 50 = 60
+      expect(localRect.x).toBe(50);
+      expect(localRect.y).toBe(60);
+      expect(localRect.width).toBe(40);  // 40 / 1.0
+      expect(localRect.height).toBe(30); // 30 / 1.0
+    });
+
+    it("scale=0.9のレイヤーに変換する", () => {
+      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+
+      // レイヤー1の座標系: scale=0.9
+      const layerCoordinateSystem = createLayerCoordinateSystem(
+        1,
+        { x: 100, y: 100 },
+        { x: 20, y: 10 }
+      );
+
+      // グローバル座標: (147, 155), サイズ: 36x27
+      const globalRect = new SR(new DOMRect(147, 155, 36, 27), parentSize);
+
+      const localRect = globalRect.toLocal(layerCoordinateSystem);
+
+      // localX = 20 + (147 - 100 - 20) / 0.9 = 20 + 27 / 0.9 = 20 + 30 = 50
+      // localY = 10 + (155 - 100 - 10) / 0.9 = 10 + 45 / 0.9 = 10 + 50 = 60
+      expect(localRect.x).toBe(50);
+      expect(localRect.y).toBe(60);
+      expect(localRect.width).toBe(40);  // 36 / 0.9
+      expect(localRect.height).toBe(30); // 27 / 0.9
+    });
+  });
+
+  describe("往復変換", () => {
+    it("ローカル→グローバル→ローカルで元に戻る", () => {
+      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+
+      const layerCoordinateSystem = createLayerCoordinateSystem(
+        1,
+        { x: 100, y: 100 },
+        { x: 20, y: 10 }
+      );
+
+      // ローカル座標
+      const originalLocal = new SR(
+        new DOMRect(50, 60, 40, 30),
+        parentSize,
+        layerCoordinateSystem
+      );
+
+      // ローカル→グローバル→ローカル
+      const global = originalLocal.toGlobal();
+      const backToLocal = global.toLocal(layerCoordinateSystem);
+
+      // 元の座標に戻ることを確認（浮動小数点誤差を考慮）
+      expect(backToLocal.x).toBeCloseTo(50, 10);
+      expect(backToLocal.y).toBeCloseTo(60, 10);
+      expect(backToLocal.width).toBeCloseTo(40, 10);
+      expect(backToLocal.height).toBeCloseTo(30, 10);
+    });
+  });
+});
