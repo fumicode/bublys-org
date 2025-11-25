@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { DTOParams } from '../Messages.domain';
+import { DTOParams } from '../messageDomain/Messages.domain.js';
 
 // 初期状態は常に空（サーバーとクライアントで一致させる）
 //OSからバブリに送信するデータと、OSが参照しているデータを参照しているバブリのデータ

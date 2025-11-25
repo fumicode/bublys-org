@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { RootState } from '../store.js';
 
 export interface AppData {
   id: string;
@@ -65,41 +66,10 @@ const appSlice = createSlice({
   },
 });
 
-// 状態が変更されるたびにローカルストレージに保存するミドルウェア
-export const localStorageMiddleware =
-  (store: any) => (next: any) => (action: any) => {
-    const result = next(action);
-    if (action.type.startsWith('app/')) {
-      const state = store.getState().app;
-      try {
-        const serializedState = JSON.stringify(state);
-        localStorage.setItem('iframeViewerState', serializedState);
-      } catch (e) {
-        console.warn('ローカルストレージへの保存に失敗しました', e);
-      }
-    }
-    return result;
-  };
-
-export const handShakeMiddleware =
-  (store: any) => (next: any) => (action: any) => {
-    const result = next(action);
-    if (action.type.startsWith('app/setActiveApp')) {
-      const state = store.getState().app;
-      try {
-        const serializedState = JSON.stringify(state);
-        localStorage.setItem('iframeViewerState', serializedState);
-      } catch (e) {
-        console.warn('ローカルストレージへの保存に失敗しました', e);
-      }
-    }
-    return result;
-  };
-
 export const { addApp, removeApp, setActiveApp, setInActiveApp, hydrate } =
   appSlice.actions;
 
-export const selectAppById = (state: AppState, id: string) =>
-  state.apps.find((app) => app.id === id);
+export const selectAppById = (id: string) => (state: RootState) =>
+  state.app.apps.find((app) => app.id === id);
 
 export default appSlice.reducer;

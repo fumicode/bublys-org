@@ -20,6 +20,15 @@
     },
     {
       "path": "./apps/memo"
+    },
+    {
+      "path": "./memo-libs/memo-feature"
+    },
+    {
+      "path": "./memo-libs/memo-model"
+    },
+    {
+      "path": "./memo-libs/memo-state"
     }
   ]
 }

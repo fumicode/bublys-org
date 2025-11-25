@@ -135,6 +135,7 @@ export const BubbleView: FC<BubbleProps> = ({
                 <HighLightOffIcon />
               </IconButton>
             )}
+
             {onMoveClick && (
               <IconButton
                 size="small"
@@ -187,26 +188,27 @@ export const BubbleView: FC<BubbleProps> = ({
               >
                 <MoveUpIcon />
               </IconButton>
-            )}
+            )} 
           </Stack>
         </Box>
       </header>
 
       <main className="e-bubble-content">
+        Type: {bubble.type}
         {/* #{bubble.id}
         <br />
-        Type: {bubble.type}
         <br /> */}
-        <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
+        {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
         ({bubble?.position?.x},{bubble?.position?.y})<br />
-        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}]
-        {children}<br />#{bubble.id}
+        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}] */}
+        {children}<br />
+        {/* #{bubble.id} */}
       </main>
 
       {
-        bubble.renderedRect && (
-          <SmartRectView rect={bubble.renderedRect} />
-        )
+        // bubble.renderedRect && (
+        //   <SmartRectView rect={bubble.renderedRect} />
+        // )
       }
       {/* {bubble.renderedRect && ( // デバッグ用矩形
         <div className="e-debug-rect"
@@ -256,6 +258,8 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   transform: scale(
     ${({ layerIndex }) => (layerIndex !== undefined ? 1 - layerIndex * 0.1 : 1)}
   );
+
+  max-height: 90vh;//FIXME:突貫対応
 
   background-color: hsla(${({ colorHue: color }) => color}, 50%, 50%, 0.5);
 

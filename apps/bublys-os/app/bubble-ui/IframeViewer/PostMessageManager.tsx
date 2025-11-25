@@ -5,20 +5,28 @@ import {
   useContext,
   useState,
 } from 'react';
+
+import { v4 as uuidv4 } from 'uuid';
+
 import {
   Message,
   ExportDataMessage,
   OnChangeValueMessage,
   HandShakeMessage,
-} from './Messages.domain';
-import { v4 as uuidv4 } from 'uuid';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from './store/store';
-import { addHandShakeMessage, addMessage } from './store/massages.slice';
-import { addFromDTO, addToDTOs } from './store/exportData.slice';
-import { AppData } from './store/apps.slice';
-import getDomainWithProtocol from './getDomainWithProtocol';
-import { addBublyContainer } from './store/bublysContainers.slice';
+  AppData,
+  getDomainWithProtocol
+} from "@bublys-org/state-management";
+
+import { 
+  RootState ,
+  addHandShakeMessage, 
+  addMessage ,
+  addFromDTO, 
+  addToDTOs ,
+  addBublyContainer ,
+  useAppDispatch, 
+  useAppSelector 
+} from "@bublys-org/state-management";
 
 // PostMessageManager用のContext
 const PostMessageContext = createContext<{
@@ -64,13 +72,13 @@ const handShakeMessage = () => {
   });
 };
 
-export interface AppDataAndRefs {
+export interface AppDataAndRef {
   appData: AppData;
   ref: HTMLIFrameElement; //メッセージを送るためにiframeを参照するために使う
 }
 
 interface PostMessageManagerProps {
-  appRefs: AppDataAndRefs[];
+  appRefs: AppDataAndRef[];
   children: React.ReactNode;
   registerIframeRef: (appId: string, iframe: HTMLIFrameElement) => void;
 }
@@ -80,7 +88,7 @@ export const PostMessageManager = ({
   children,
   registerIframeRef,
 }: PostMessageManagerProps) => {
-  const associateUpdateDataPairs = useSelector(
+  const associateUpdateDataPairs = useAppSelector(
     (state: RootState) => state.exportData.associateUpdateDataPairs
   );
 
@@ -126,12 +134,12 @@ export const PostMessageManager = ({
   );
 
   // アプリからのreadyメッセージを受け取った際にhandshakeを送信
-  const sendHandshakeToApp = useCallback((appRef: AppDataAndRefs) => {
+  const sendHandshakeToApp = useCallback((appRef: AppDataAndRef) => {
     console.log('✅ Sending handshake to app:', appRef.appData.id);
     appRef.ref.contentWindow?.postMessage(handShakeMessage(), '*');
   }, []);
 
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
 
   const sendMessageToIframeAutoFind = useCallback(
     (message: Message, fromContainerURL?: string) => {

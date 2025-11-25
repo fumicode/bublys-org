@@ -15,33 +15,12 @@ import {
   removeBubble,
 } from "@bublys-org/bubbles-ui-state";
 
-import { Bubble, Point2 } from "@bublys-org/bubbles-ui";
+import { Bubble, createBubble, Point2 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import { SmartRect } from "@bublys-org/bubbles-ui";
 import { Box, Button, Slider, Typography } from "@mui/material";
-
-// 文字列から1対1の一意な色を生成。
-function getColorHueFromString(name: string): number {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash << 5) - hash + name.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash % 360);
-}
-
-const createBubble = (name: string, pos?: Point2): Bubble => {
-  const colorHue = getColorHueFromString(name);
-  const type =
-    name === "user-groups"
-      ? "user-groups"
-      : name.startsWith("user-groups/")
-      ? "user-group"
-      : "normal";
-  return new Bubble({ name, colorHue, type, position: pos });
-};
+import IframeViewer from "../../IframeViewer/IframeViewer";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -139,15 +118,17 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             },
           }}
         >
-          <BubblesLayeredView
-            bubbles={bubblesDPO.layers}
-            vanishingPoint={vanishingPoint}
-            onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-            onBubbleClose={deleteBubble}
-            onBubbleMove={onMove}
-            onBubbleLayerDown={layerDown}
-            onBubbleLayerUp={layerUp}
-          />
+          <IframeViewer>
+            <BubblesLayeredView
+              bubbles={bubblesDPO.layers}
+              vanishingPoint={vanishingPoint}
+              onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+              onBubbleClose={deleteBubble}
+              onBubbleMove={onMove}
+              onBubbleLayerDown={layerDown}
+              onBubbleLayerUp={layerUp}
+            />
+          </IframeViewer>
         </BubblesContext.Provider>
       </PositionDebuggerProvider>
 
@@ -191,6 +172,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           onClick={() => popChildOrJoinSibling("user-groups", "root")}
         >
           Open User Groups Bubble
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => popChildOrJoinSibling("memos", "root")}
+        >
+          Open Memos
         </Button>
         {additionalButton}
       </Box>

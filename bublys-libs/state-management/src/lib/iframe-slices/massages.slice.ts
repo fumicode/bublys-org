@@ -1,7 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Message } from '../Messages.domain';
-import { BublyMethods, HandShakeMessage } from '../Messages.domain';
-import { getDomainWithProtocol } from '../getDomainWithProtocol';
+import { Message,  HandShakeMessage } from '../messageDomain/Messages.domain.js';
+import { getDomainWithProtocol } from '../messageDomain/getDomainWithProtocol.js';
 
 export interface MessageState {
   receivedMessages: Message[];
@@ -27,9 +26,6 @@ const massageSlice = createSlice({
         (msg) => msg.id !== action.payload
       );
     },
-    hydrate: (_state, action: PayloadAction<MessageState>) => {
-      return action.payload;
-    },
     addHandShakeMessage: (state, action: PayloadAction<HandShakeMessage>) => {
       const index = state.handShakeMessages.findIndex(
         (e) => e.protocol === action.payload.protocol
@@ -46,28 +42,10 @@ const massageSlice = createSlice({
   },
 });
 
-// 状態が変更されるたびにローカルストレージに保存するミドルウェア
-export const localStorageMiddleware =
-  (store: { getState: () => { massage: MessageState } }) =>
-  (next: (action: { type: string }) => unknown) =>
-  (action: { type: string }) => {
-    const result = next(action);
-    if (action.type.startsWith('massage/')) {
-      const state = store.getState().massage;
-      try {
-        const serializedState = JSON.stringify(state);
-        localStorage.setItem('massageState', serializedState);
-      } catch (e) {
-        console.warn('ローカルストレージへの保存に失敗しました', e);
-      }
-    }
-    return result;
-  };
+export const { addMessage, removeMessage, addHandShakeMessage } = massageSlice.actions;
 
-export const { addMessage, removeMessage, hydrate, addHandShakeMessage } =
-  massageSlice.actions;
-
-export const selectReceivedMessagesByAppUrl = (
+export const selectReceivedMessagesByAppUrl = 
+(
   state: MessageState,
   appUrl: string
 ) => {
