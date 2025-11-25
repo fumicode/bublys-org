@@ -5,10 +5,12 @@ import { Bubble,} from "@bublys-org/bubbles-ui";
 import { MobBubble } from "./bubbles/MobBubble";
 import { UserGroupDetail } from "./bubbles/UserGroupDetail";
 import { UserGroupList } from "./bubbles/UserGroupList";
-import { MemoList } from "@/app/world-line/Memo/ui/MemoList";
+import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoEditor } from "@/app/world-line/Memo/ui/MemoEditor";
 import { MemoTitle } from "@/app/world-line/Memo/ui/MemoTitle";
-import { selectMemo, updateMemo, useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectApexWorld, updateState, useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { deserializeMemo, serializeMemo } from "@/app/world-line/Memo/feature/MemoManager";
+import { WorldLineState } from "@bublys-org/state-management";
 import { BubblesContext } from "../domain/BubblesContext";
 import { IframeBubble } from "./bubbles/IframeBubble";
 
@@ -43,7 +45,7 @@ registerBubbleRenderers("user-group", (bubble: Bubble) => {
 registerBubbleRenderers("memos", (bubble: Bubble) => {
   const { openBubble } = useContext(BubblesContext);
   return (
-    <MemoList onSelectMemo={(id) => {
+    <MemoCollection onSelectMemo={(id) => {
       const memoUrl = `memos/${id}`;
       openBubble(memoUrl, bubble.id);
     }} />
@@ -52,24 +54,50 @@ registerBubbleRenderers("memos", (bubble: Bubble) => {
 
 registerBubbleRenderers("memo", (bubble: Bubble) => {
   const memoId = bubble.name.replace("memos/", "");
-  
-  // Reduxからmemoを取得して、MemoEditorとMemoTitleにpropsとして渡す
+
+  // 世界線システムからmemoを取得して、MemoEditorとMemoTitleにpropsとして渡す
   const MemoBubbleContent = () => {
-    const memo = useAppSelector(selectMemo(memoId));
+    const apexWorld = useAppSelector(selectApexWorld(memoId));
+    const currentWorldLine = useAppSelector((state) => state.worldLine.worldLines[memoId]);
     const dispatch = useAppDispatch();
 
-    if (!memo) {
-      return null;
+    if (!apexWorld || !apexWorld.worldState) {
+      return <div>メモが見つかりません</div>;
     }
+
+    const memo = deserializeMemo(apexWorld.worldState);
 
     return (
       <div>
         <MemoTitle memo={memo} />
-        <MemoEditor 
+        <MemoEditor
           memoId={memoId}
-          memo={memo} 
+          memo={memo}
           onMemoChange={(newMemo) => {
-            dispatch(updateMemo({ memo: newMemo.toJson() }));
+            // 世界線システムの状態を更新
+            if (!currentWorldLine) return;
+
+            const newWorldId = crypto.randomUUID();
+            const newWorld = {
+              id: newWorldId,
+              world: {
+                worldId: newWorldId,
+                parentWorldId: currentWorldLine.apexWorldId,
+                worldState: serializeMemo(newMemo),
+              },
+            };
+
+            const newWorldLine: WorldLineState = {
+              worlds: [...currentWorldLine.worlds, newWorld],
+              apexWorldId: newWorldId,
+              rootWorldId: currentWorldLine.rootWorldId,
+            };
+
+            dispatch(updateState({
+              objectId: memoId,
+              newWorldLine,
+              operation: 'updateMemo'
+            }));
           }}
         />
       </div>

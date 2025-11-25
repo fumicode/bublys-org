@@ -22,11 +22,20 @@ function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; 
 export function MemoList({ onSelectMemo }: MemoListProps) {
   // world-sliceからすべてのobjectIdを取得
   const objectIds = useAppSelector(selectAllWorldLineObjectIds);
-  
+
+  // すべての世界線状態を取得
+  const worldLines = useAppSelector((state) => state.worldLine.worldLines);
+
   // 各objectIdのapexWorldを取得し、Memoかどうかを判定
   const memos = objectIds
     .map(objectId => {
-      const apexWorld = useAppSelector(selectApexWorld(objectId));
+      const worldLine = worldLines[objectId];
+      if (!worldLine || !worldLine.apexWorldId) return null;
+
+      const worldEntry = worldLine.worlds.find(w => w.id === worldLine.apexWorldId);
+      if (!worldEntry) return null;
+
+      const apexWorld = worldEntry.world;
       if (apexWorld && isMemo(apexWorld.worldState)) {
         return deserializeMemo(apexWorld.worldState);
       }

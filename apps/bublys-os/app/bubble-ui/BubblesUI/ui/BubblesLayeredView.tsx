@@ -92,8 +92,17 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
           const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
 
           console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
-          
+
           if (!opener.renderedRect || !openee.renderedRect) return null;
+
+          // SmartRectをグローバル座標系に変換（既にビューポート座標のはずだが、念のため確認）
+          const openerRect = opener.renderedRect;
+          const openeeRect = openee.renderedRect;
+
+          console.log('SVG座標:', {
+            opener: { x: openerRect.x, y: openerRect.y, left: openerRect.left, bottom: openerRect.bottom },
+            openee: { x: openeeRect.x, y: openeeRect.y, left: openeeRect.left, bottom: openeeRect.bottom }
+          });
 
           return(
             <div key={opener.id + "_" + openee.id} style={{
@@ -118,16 +127,14 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
                     <polygon points="0 0, 10 3.5, 0 7" fill="red" />
                   </marker>
                 </defs>
-                {/* 文字列表示 */}
-
+                {/* バブル間の関係を示す領域 */}
                 <path
-                  d={`M ${opener.renderedRect.x || 0} ${opener.renderedRect.y || 0} L ${openee.renderedRect.x || 0} ${openee.renderedRect.y || 0} L ${openee.renderedRect.left || 0} ${openee.renderedRect.bottom || 0} L ${opener.renderedRect.left || 0} ${opener.renderedRect.bottom || 0} Z`}
+                  d={`M ${openerRect.x} ${openerRect.y} L ${openeeRect.x} ${openeeRect.y} L ${openeeRect.left} ${openeeRect.bottom} L ${openerRect.left} ${openerRect.bottom} Z`}
                   stroke="none"
                   strokeWidth="2"
                   fill={opener.colorHue === undefined ? "rgba(255,0,0,0.5)" : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`}
                 />
               </svg>
-
             </div>
           )
         })
