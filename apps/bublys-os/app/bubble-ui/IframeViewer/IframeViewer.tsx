@@ -141,7 +141,7 @@ const IframeViewer = ({ children }: IframeViewerProps) => {
 
   //-----------ui本体-------------
   const contents = (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* サイドバー */}
       <Box
         sx={{
@@ -150,6 +150,7 @@ const IframeViewer = ({ children }: IframeViewerProps) => {
           borderRight: 1,
           borderColor: 'divider',
           p: 2,
+          overflowY: 'auto',
         }}
       >
         <Button
@@ -193,7 +194,9 @@ const IframeViewer = ({ children }: IframeViewerProps) => {
       </Box>
 
       {/* メインコンテンツ */}
-      {children}
+      <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {children}
+      </Box>
       {/* {apps
         .filter(
           (app) => activeAppIds.includes(app.id) || pendingAppIds.has(app.id)

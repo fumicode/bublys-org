@@ -218,8 +218,8 @@ type StyledBubblesLayeredViewProps = {
 };
 
 const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   position: relative;
   overflow: hidden;
   z-index: 0;
@@ -240,8 +240,8 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       position: absolute;
       top: ${({ surface }) => surface.leftTop.y}px;
       left: ${({ surface }) => surface.leftTop.x}px;
-      width: calc(100vw - ${({ surface }) => surface.leftTop.x}px);
-      height: calc(100vh - ${({ surface }) => surface.leftTop.y}px);
+      width: calc(100% - ${({ surface }) => surface.leftTop.x}px);
+      height: calc(100% - ${({ surface }) => surface.leftTop.y}px);
       border: 2px solid red;
       pointer-events: none;
     }
