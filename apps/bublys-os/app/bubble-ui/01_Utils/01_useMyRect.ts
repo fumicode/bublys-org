@@ -41,7 +41,7 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
 
     saveRect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderCount, pageSize]);
+  }, [renderCount, pageSize, coordinateSystem]);
 
 
 

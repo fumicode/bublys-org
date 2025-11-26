@@ -392,6 +392,27 @@ export class SmartRect implements DOMRectReadOnly {
   }
 
   /**
+   * 一個下のレイヤーの同じ位置・サイズのSmartRectを生成
+   * 現在のレイヤーインデックスから+1したレイヤーのSmartRectを返す
+   */
+  toLayerBelow(): SmartRect {
+    // 現在のscaleからlayerIndexを逆算
+    const currentLayerIndex = Math.round((1 - this.coordinateSystem.scale) / 0.1);
+    const belowLayerIndex = currentLayerIndex + 1;
+
+    // 新しい座標系を作成
+    const newCoordinateSystem = createLayerCoordinateSystem(
+      belowLayerIndex,
+      this.coordinateSystem.offset,
+      this.coordinateSystem.vanishingPoint
+    );
+
+    // 同じ位置・サイズで新しい座標系のSmartRectを返す
+    const domRect = new DOMRect(this.x, this.y, this.width, this.height);
+    return new SmartRect(domRect, this.parentSize, newCoordinateSystem);
+  }
+
+  /**
    * このSmartRectを指定されたローカル座標系に変換
    * 現在の座標系（通常はグローバル）から、指定されたローカル座標系に変換する
    *

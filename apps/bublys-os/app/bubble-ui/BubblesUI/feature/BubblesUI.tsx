@@ -107,21 +107,21 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <>
-      <PositionDebuggerProvider isShown={false}>
-        <BubblesContext.Provider
-          value={{
-            pageSize,
-            bubbles: bubblesDPO.layers,
-            coordinateSystem,
-            openBubble: popChildOrJoinSibling,
-            renameBubble: (id: string, newName: string) => {
-              const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
-              const updated = existing.rename(newName);
-              dispatch(updateBubble(updated.toJSON()));
-              return id;
-            },
-          }}
-        >
+      <BubblesContext.Provider
+        value={{
+          pageSize,
+          bubbles: bubblesDPO.layers,
+          coordinateSystem,
+          openBubble: popChildOrJoinSibling,
+          renameBubble: (id: string, newName: string) => {
+            const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
+            const updated = existing.rename(newName);
+            dispatch(updateBubble(updated.toJSON()));
+            return id;
+          },
+        }}
+      >
+        <PositionDebuggerProvider isShown={true}>
           <IframeViewer>
             <BubblesLayeredView
               bubbles={bubblesDPO.layers}
@@ -134,8 +134,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               onCoordinateSystemReady={setCoordinateSystem}
             />
           </IframeViewer>
-        </BubblesContext.Provider>
-      </PositionDebuggerProvider>
+        </PositionDebuggerProvider>
+      </BubblesContext.Provider>
 
       <Box
         sx={{
