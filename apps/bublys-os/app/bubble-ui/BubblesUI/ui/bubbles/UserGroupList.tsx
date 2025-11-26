@@ -1,4 +1,4 @@
-import { FC, useContext, useState } from "react";
+import { FC, useContext } from "react";
 import { BubblesContext } from "../../domain/BubblesContext";
 import { Bubble, SmartRect } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "@/app/bubble-ui/PositionDebugger/domain/PositionDebuggerContext";
@@ -14,13 +14,11 @@ export const UserGroupList: FC<UserGroupListProps> = ({
 }) => {
 
   const { openBubble } = useContext(BubblesContext);
-  const [myRect, setMyRect] = useState<SmartRect | undefined>(undefined);
 
   const { addRects } = usePositionDebugger();
 
   const { ref, notifyRendered: onRenderChange} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
-      setMyRect (rect);
       addRects([rect]);
     }
   });

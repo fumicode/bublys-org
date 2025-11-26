@@ -5,6 +5,8 @@ import {
   BubblesProcess,
   BubblesProcessState,
   BubblesProcessDPO,
+  CoordinateSystem,
+  GLOBAL_COORDINATE_SYSTEM,
 } from "@bublys-org/bubbles-ui";
 
 
@@ -23,6 +25,8 @@ export interface BubbleStateSlice {
   process: BubblesProcessState;
 
   bubbleRelations:  BubblesRelation[];
+
+  globalCoordinateSystem: CoordinateSystem;
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 }
@@ -62,6 +66,7 @@ const initialState: BubbleStateSlice = {
   bubbles: initialEntities,
   process: initialProcess,
   bubbleRelations: [],
+  globalCoordinateSystem: GLOBAL_COORDINATE_SYSTEM,
   renderCount: 0,
 };
 
@@ -142,6 +147,9 @@ export const bubblesSlice = createSlice({
       }
 
       state.bubbleRelations.push(action.payload);
+    },
+    setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystem>) => {
+      state.globalCoordinateSystem = action.payload;
     }
   },
 });
@@ -156,7 +164,8 @@ export const {
   updateBubble,
   renderBubble,
   removeBubble,
-  relateBubbles
+  relateBubbles,
+  setGlobalCoordinateSystem,
 } = bubblesSlice.actions;
 
 // Selectors
@@ -191,6 +200,10 @@ export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleSta
       openee: Bubble.fromJSON(bubbles[relation.openeeId]),
     }
   )});
+}
+
+export const selectCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
+  return state.bubbleState.globalCoordinateSystem;
 }
 
 /**

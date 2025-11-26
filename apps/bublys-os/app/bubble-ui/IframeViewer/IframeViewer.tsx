@@ -27,10 +27,8 @@ import {
   useAppSelector 
 } from "@bublys-org/state-management"
 
-import {IframeAppContext} from './IframeAppContext';
 import PostMessageManager from './PostMessageManager';
 import { AppDataAndRef } from './PostMessageManager';
-import { Bubble } from '@bublys-org/bubbles-ui';
 import { BubblesContext } from '../BubblesUI/domain/BubblesContext';
 
 type IframeViewerProps = {

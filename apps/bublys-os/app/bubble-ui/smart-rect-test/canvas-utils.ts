@@ -1,4 +1,4 @@
-import { SmartRect, GLOBAL_COORDINATE_SYSTEM, Point2, Size2 } from '@bublys-org/bubbles-ui';
+import { SmartRect, GLOBAL_COORDINATE_SYSTEM, Point2, Size2, getScale } from '@bublys-org/bubbles-ui';
 import { RectItem } from './types';
 
 /**
@@ -18,7 +18,8 @@ export const drawCoordinateSystemGrid = (
   color: string
 ) => {
   const coordinateSystem = rect.coordinateSystem;
-  const { scale, offset, vanishingPoint } = coordinateSystem;
+  const { offset, vanishingPoint } = coordinateSystem;
+  const scale = getScale(coordinateSystem);
   const gridSize = 100; // グリッドの間隔（ローカル座標系）
   const dotRadius = 2;
   const surroundingArea = 300; // 矩形の周辺300px

@@ -1,6 +1,6 @@
-import React, { FC, use, useRef, useLayoutEffect, useState } from "react";
+import React, { FC, useRef, useLayoutEffect} from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
@@ -29,29 +29,35 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onCoordinateSystemReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerCoordinateSystem, setContainerCoordinateSystem] = useState<CoordinateSystem>(GLOBAL_COORDINATE_SYSTEM);
 
   // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
   useLayoutEffect(() => {
     let lastOffset = { x: 0, y: 0 };
+    let lastVanishingPoint = { x: 0, y: 0 };
 
     const updateCoordinateSystem = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
+        const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
 
-        // 座標が変更された場合のみ更新（無限ループ防止）
-        if (rect.left === lastOffset.x && rect.top === lastOffset.y) {
+        // 座標またはvanishingPointが変更された場合のみ更新（無限ループ防止）
+        if (
+          rect.left === lastOffset.x &&
+          rect.top === lastOffset.y &&
+          currentVanishingPoint.x === lastVanishingPoint.x &&
+          currentVanishingPoint.y === lastVanishingPoint.y
+        ) {
           return;
         }
 
         lastOffset = { x: rect.left, y: rect.top };
+        lastVanishingPoint = currentVanishingPoint;
 
         const coordinateSystem: CoordinateSystem = {
           layerIndex: 0,
           offset: { x: rect.left, y: rect.top },
-          vanishingPoint: { x: 0, y: 0 },
+          vanishingPoint: currentVanishingPoint,
         };
-        setContainerCoordinateSystem(coordinateSystem);
         onCoordinateSystemReady?.(coordinateSystem);
         console.log('BubblesLayeredView CoordinateSystem updated:', coordinateSystem);
       }
@@ -89,7 +95,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         cancelAnimationFrame(rafId);
       }
     };
-  }, [onCoordinateSystemReady]);
+  }, [onCoordinateSystemReady, vanishingPoint]);
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
 
@@ -105,7 +111,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const renderedBubbles = bubbles
     .map((layer, layerIndex) =>
-      layer.map((bubble, xIndex) => {
+      layer.map((bubble, _siblingIndex) => {
         const zIndex = baseZIndex - layerIndex;
 
         // bubbleIdのレイヤー番号を記録

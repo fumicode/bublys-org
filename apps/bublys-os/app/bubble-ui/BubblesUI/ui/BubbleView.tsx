@@ -11,7 +11,7 @@ import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble } from "@bublys-org/bubbles-ui-state";
 import { SmartRect } from "@bublys-org/bubbles-ui";
-import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
+//import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
   bubble: Bubble;

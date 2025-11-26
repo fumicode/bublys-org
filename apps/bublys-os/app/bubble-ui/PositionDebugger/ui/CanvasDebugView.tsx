@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useEffect, useRef } from "react";
-import { SmartRect, Point2, Size2, GLOBAL_COORDINATE_SYSTEM, getScale, CoordinateSystem } from "@bublys-org/bubbles-ui";
+import { SmartRect, Size2, GLOBAL_COORDINATE_SYSTEM, getScale, CoordinateSystem } from "@bublys-org/bubbles-ui";
 
 export type RectItem = {
   rect: SmartRect;
@@ -158,7 +158,8 @@ const drawRectItem = (
   }
 };
 
-const getColorForIndex = (index: number): string => {
+// @ts-expect-error - 将来の実装のため保持
+const _getColorForIndex = (index: number): string => {
   const colors = ['#ff6b6b', '#4dabf7', '#51cf66', '#ffd43b', '#ff8787', '#94d82d', '#845ef7', '#ff6b9d'];
   return colors[index % colors.length];
 };
@@ -212,9 +213,11 @@ export const CanvasDebugView: FC<CanvasDebugViewProps> = ({
 
     // 選択されたrectを最後に描画するために並び替え
     const sortedItems = [...canvasRectItems];
-    if (selectedRectIndex !== null && selectedRectIndex < sortedItems.length) {
+    if (selectedRectIndex !== null && selectedRectIndex !== undefined && selectedRectIndex < sortedItems.length) {
       const selectedItem = sortedItems.splice(selectedRectIndex, 1)[0];
-      sortedItems.push(selectedItem);
+      if (selectedItem) {
+        sortedItems.push(selectedItem);
+      }
     }
 
     // グリッドを描画

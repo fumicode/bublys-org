@@ -3,7 +3,6 @@ import {
   useEffect,
   createContext,
   useContext,
-  useState,
 } from 'react';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -93,7 +92,9 @@ export const PostMessageManager = ({
   );
 
   //uuidでAppRefを探す。
-  const findAppRefByUuid = useCallback(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - 将来の実装のため保持
+  const _findAppRefByUuid = useCallback(
     (uuid: string) => {
       return appRefs.find((e) => e.appData.id === uuid);
     },

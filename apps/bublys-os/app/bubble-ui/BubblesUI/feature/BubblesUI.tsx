@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useCallback } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize } from "@bublys-org/state-management";
 
 import {
@@ -11,11 +11,12 @@ import {
   popChildInProcess as popChildAction,
   joinSiblingInProcess as joinSiblingAction,
   relateBubbles,
-  selectBubblesRelations,
   removeBubble,
+  selectCoordinateSystem,
+  setGlobalCoordinateSystem,
 } from "@bublys-org/bubbles-ui-state";
 
-import { Bubble, createBubble, Point2, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
@@ -41,9 +42,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, [dispatch]);
-
-
-  const relations = useAppSelector(selectBubblesRelations)
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
@@ -96,14 +94,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     }
   };
 
-  // 消失点
-  const [vanishingPoint, setVanishingPoint] = useState<Point2>({
-    x: -10,
-    y: -10,
-  });
+  // CoordinateSystem (Reduxから取得)
+  const coordinateSystem = useAppSelector(selectCoordinateSystem);
 
-  // CoordinateSystem
-  const [coordinateSystem, setCoordinateSystem] = useState<CoordinateSystem>(GLOBAL_COORDINATE_SYSTEM);
+  // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
+  const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
+    dispatch(setGlobalCoordinateSystem(cs));
+  }, [dispatch]);
 
   return (
     <>
@@ -114,7 +111,11 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           coordinateSystem,
           openBubble: popChildOrJoinSibling,
           renameBubble: (id: string, newName: string) => {
-            const existing = bubblesDPO.layers.flat().find((b) => b.id === id)!;
+            const existing = bubblesDPO.layers.flat().find((b) => b.id === id);
+            if (!existing) {
+              console.error(`Bubble with id ${id} not found`);
+              return id;
+            }
             const updated = existing.rename(newName);
             dispatch(updateBubble(updated.toJSON()));
             return id;
@@ -125,13 +126,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           <IframeViewer>
             <BubblesLayeredView
               bubbles={bubblesDPO.layers}
-              vanishingPoint={vanishingPoint}
+              vanishingPoint={coordinateSystem.vanishingPoint}
               onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
               onBubbleClose={deleteBubble}
               onBubbleMove={onMove}
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
-              onCoordinateSystemReady={setCoordinateSystem}
+              onCoordinateSystemReady={handleCoordinateSystemReady}
             />
           </IframeViewer>
         </PositionDebuggerProvider>
@@ -151,24 +152,30 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       >
         <Typography gutterBottom>Vanishing Point X</Typography>
         <Slider
-          value={vanishingPoint.x}
+          value={coordinateSystem.vanishingPoint.x}
           min={-1000}
           max={2000}
           step={20}
-          onChange={(_, v) =>
-            setVanishingPoint((prev) => ({ ...prev, x: v as number }))
-          }
+          onChange={(_, v) => {
+            dispatch(setGlobalCoordinateSystem({
+              ...coordinateSystem,
+              vanishingPoint: { ...coordinateSystem.vanishingPoint, x: v as number }
+            }));
+          }}
           valueLabelDisplay="auto"
         />
         <Typography gutterBottom>Vanishing Point Y</Typography>
         <Slider
-          value={vanishingPoint.y}
+          value={coordinateSystem.vanishingPoint.y}
           min={-1500}
           max={1500}
           step={20}
-          onChange={(_, v) =>
-            setVanishingPoint((prev) => ({ ...prev, y: v as number }))
-          }
+          onChange={(_, v) => {
+            dispatch(setGlobalCoordinateSystem({
+              ...coordinateSystem,
+              vanishingPoint: { ...coordinateSystem.vanishingPoint, y: v as number }
+            }));
+          }}
           valueLabelDisplay="auto"
         />
         {/* open user group bubble*/}

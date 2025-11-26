@@ -1,4 +1,4 @@
-import { useAppSelector, selectAllWorldLineObjectIds, selectApexWorld } from '@bublys-org/state-management';
+import { useAppSelector, selectAllWorldLineObjectIds } from '@bublys-org/state-management';
 import { Memo } from '../domain/Memo';
 import { deserializeMemo } from '../feature/MemoManager';
 import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
