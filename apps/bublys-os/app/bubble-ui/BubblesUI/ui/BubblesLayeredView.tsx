@@ -47,7 +47,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         lastOffset = { x: rect.left, y: rect.top };
 
         const coordinateSystem: CoordinateSystem = {
-          scale: 1.0,
+          layerIndex: 0,
           offset: { x: rect.left, y: rect.top },
           vanishingPoint: { x: 0, y: 0 },
         };

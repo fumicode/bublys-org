@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useEffect, useRef } from "react";
-import { SmartRect, Point2, Size2, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { SmartRect, Point2, Size2, GLOBAL_COORDINATE_SYSTEM, getScale, CoordinateSystem } from "@bublys-org/bubbles-ui";
 
 export type RectItem = {
   rect: SmartRect;
@@ -27,7 +27,8 @@ const drawCoordinateSystemGrid = (
   color: string
 ) => {
   const coordinateSystem = rect.coordinateSystem;
-  const { scale, offset, vanishingPoint } = coordinateSystem;
+  const { offset, vanishingPoint } = coordinateSystem;
+  const scale = getScale(coordinateSystem);
   const gridSize = 100; // グリッドの間隔（ローカル座標系）
   const dotRadius = 2;
   const surroundingArea = 300; // 矩形の周辺300px
@@ -187,19 +188,20 @@ export const CanvasDebugView: FC<CanvasDebugViewProps> = ({
     ctx.fillStyle = 'transparent';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // rectItemsはすでにローカル座標なので、そのまま使用
-    // （useMyRectObserverでtoLocal()して保存されている）
+    // rectItemsのlayerIndexを保持しつつ、offsetを0にリセット（canvas座標系用）
     const canvasRectItems = rectItems.map((item) => {
-      // ローカル座標をそのままcanvas座標として使用
+      // layerIndexは保持、offsetは(0,0)にリセット
+      const rectWithZeroOffset = item.rect.withCoordinateSystem({ offset: { x: 0, y: 0 } });
+
       const canvasRect = new SmartRect(
         new DOMRect(
-          item.rect.x,
-          item.rect.y,
-          item.rect.width,
-          item.rect.height
+          rectWithZeroOffset.x,
+          rectWithZeroOffset.y,
+          rectWithZeroOffset.width,
+          rectWithZeroOffset.height
         ),
         { width: canvasWidth, height: canvasHeight },
-        GLOBAL_COORDINATE_SYSTEM
+        rectWithZeroOffset.coordinateSystem
       );
 
       return {

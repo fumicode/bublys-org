@@ -1,14 +1,24 @@
 import { Point2, Size2 } from "./00_Point.js";
 
 /**
- * 座標系情報
+ * 座標系情報（2D一次変換）
  * SmartRectがどの座標系で表現されているかを示す
- * - scale: 拡大縮小率（1.0がデフォルト、レイヤーでは 1 - layerIndex * 0.1）
- * - offset: オフセット（topLeftに相当）
- * - vanishingPoint: 変換の基準点（CSS transform-originに相当）
+ *
+ * 数学的には以下の一次変換を表現：
+ * global = vanishingPoint + (local - vanishingPoint) * scale + offset
+ *
+ * プロパティ:
+ * - layerIndex: レイヤーのインデックス（0が最前面、数字が大きいほど奥）
+ *   - scaleはlayerIndexから計算される: scale = 1 - layerIndex * 0.1
+ * - offset: 平行移動（translation）
+ * - vanishingPoint: スケール変換の基準点（transform-origin）
+ *
+ * 座標系の合成:
+ * - withCoordinateSystem(): 部分的なオーバーライド
+ * - TODO: 数学的な合成（行列的な合成）を実装する場合はcomposeWith()を追加
  */
 export type CoordinateSystem = {
-  scale: number;
+  layerIndex: number;
   offset: Point2;
   vanishingPoint: Point2;
 };
@@ -22,6 +32,14 @@ export function calculateLayerScale(layerIndex: number): number {
 }
 
 /**
+ * CoordinateSystemからscaleを取得
+ * layerIndexから計算される
+ */
+export function getScale(coordinateSystem: CoordinateSystem): number {
+  return calculateLayerScale(coordinateSystem.layerIndex);
+}
+
+/**
  * レイヤーの座標系を作成
  */
 export function createLayerCoordinateSystem(
@@ -30,7 +48,7 @@ export function createLayerCoordinateSystem(
   vanishingPoint: Point2
 ): CoordinateSystem {
   return {
-    scale: calculateLayerScale(layerIndex),
+    layerIndex,
     offset,
     vanishingPoint,
   };
@@ -38,10 +56,10 @@ export function createLayerCoordinateSystem(
 
 /**
  * グローバル座標系（デフォルト）
- * scale=1.0, offset=(0,0), vanishingPoint=(0,0)
+ * layerIndex=0 (scale=1.0), offset=(0,0), vanishingPoint=(0,0)
  */
 export const GLOBAL_COORDINATE_SYSTEM: CoordinateSystem = {
-  scale: 1.0,
+  layerIndex: 0,
   offset: { x: 0, y: 0 },
   vanishingPoint: { x: 0, y: 0 },
 };
@@ -377,7 +395,8 @@ export class SmartRect implements DOMRectReadOnly {
       return this; // すでにグローバル座標系
     }
 
-    const { scale, offset, vanishingPoint } = this.coordinateSystem;
+    const { offset, vanishingPoint } = this.coordinateSystem;
+    const scale = getScale(this.coordinateSystem);
 
     // 位置を変換
     const globalX = vanishingPoint.x + (this.x - vanishingPoint.x) * scale + offset.x;
@@ -396,9 +415,7 @@ export class SmartRect implements DOMRectReadOnly {
    * 現在のレイヤーインデックスから+1したレイヤーのSmartRectを返す
    */
   toLayerBelow(): SmartRect {
-    // 現在のscaleからlayerIndexを逆算
-    const currentLayerIndex = Math.round((1 - this.coordinateSystem.scale) / 0.1);
-    const belowLayerIndex = currentLayerIndex + 1;
+    const belowLayerIndex = this.coordinateSystem.layerIndex + 1;
 
     // 新しい座標系を作成
     const newCoordinateSystem = createLayerCoordinateSystem(
@@ -408,6 +425,31 @@ export class SmartRect implements DOMRectReadOnly {
     );
 
     // 同じ位置・サイズで新しい座標系のSmartRectを返す
+    const domRect = new DOMRect(this.x, this.y, this.width, this.height);
+    return new SmartRect(domRect, this.parentSize, newCoordinateSystem);
+  }
+
+  /**
+   * CoordinateSystemの一部または全部をオーバーライドした新しいSmartRectを返す
+   * 指定されなかったプロパティは現在のcoordinateSystemから継承される
+   *
+   * @example
+   * // offsetだけをリセット（canvas座標系用）
+   * rect.withCoordinateSystem({ offset: { x: 0, y: 0 } })
+   *
+   * // layerIndexを変更
+   * rect.withCoordinateSystem({ layerIndex: 2 })
+   *
+   * // 複数のプロパティを変更
+   * rect.withCoordinateSystem({ layerIndex: 1, offset: { x: 100, y: 0 } })
+   */
+  withCoordinateSystem(override: Partial<CoordinateSystem>): SmartRect {
+    const newCoordinateSystem: CoordinateSystem = {
+      layerIndex: override.layerIndex ?? this.coordinateSystem.layerIndex,
+      offset: override.offset ?? this.coordinateSystem.offset,
+      vanishingPoint: override.vanishingPoint ?? this.coordinateSystem.vanishingPoint,
+    };
+
     const domRect = new DOMRect(this.x, this.y, this.width, this.height);
     return new SmartRect(domRect, this.parentSize, newCoordinateSystem);
   }
@@ -429,7 +471,8 @@ export class SmartRect implements DOMRectReadOnly {
       return globalRect; // グローバル座標系への変換
     }
 
-    const { scale, offset, vanishingPoint } = targetCoordinateSystem;
+    const { offset, vanishingPoint } = targetCoordinateSystem;
+    const scale = getScale(targetCoordinateSystem);
 
     // 位置を変換
     const localX = vanishingPoint.x + (globalRect.x - offset.x - vanishingPoint.x) / scale;

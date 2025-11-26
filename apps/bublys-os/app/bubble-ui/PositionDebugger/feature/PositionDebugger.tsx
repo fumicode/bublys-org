@@ -59,7 +59,7 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
               prevRect.y === newRect.y &&
               prevRect.width === newRect.width &&
               prevRect.height === newRect.height &&
-              prevRect.coordinateSystem.scale === newRect.coordinateSystem.scale &&
+              prevRect.coordinateSystem.layerIndex === newRect.coordinateSystem.layerIndex &&
               prevRect.coordinateSystem.offset.x === newRect.coordinateSystem.offset.x &&
               prevRect.coordinateSystem.offset.y === newRect.coordinateSystem.offset.y
           )
