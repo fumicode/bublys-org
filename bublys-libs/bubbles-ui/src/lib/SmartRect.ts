@@ -189,10 +189,7 @@ export class SmartRect implements DOMRectReadOnly {
     const rightSide = recededRect.getNeighbor('right');
 
     // 右側領域の左端（引っ込んだrectの右端）にopenee bubbleを配置
-    const ret: Point2 = {
-      x: rightSide.left,
-      y: recededRect.top,
-    };
+    const ret: Point2 = rightSide.position;
 
     return ret;
   }
