@@ -182,37 +182,17 @@ export class SmartRect implements DOMRectReadOnly {
   }
 
   calcPositionToOpen(openingSize: Size2): Point2 {
-    const direction: Direction = this.calcSpaceWideDirection({width:0, height:0});
+    // opener bubbleが一個奥のレイヤーに引っ込んだ後のrectを事前に計算
+    const recededRect = this.toLayerBelow().toGlobal();
 
-    let ret: Point2;
+    // 引っ込んだrectの右側領域を取得
+    const rightSide = recededRect.getNeighbor('right');
 
-    if (direction === "top") {
-      ret = {
-        x: this.left,
-        y: this.top - openingSize.height * 1.2 ,
-      };
-
-    } else if (direction === "right") {
-      ret ={
-        x: this.right,
-        y: this.top,
-      };
-
-    } else if (direction === "bottom") {
-      ret ={
-        x: this.left,
-        y: this.bottom,
-      };
-
-    } else if (direction === "left") {
-      ret ={
-        x: this.left - openingSize.width * 1.2 ,
-        y: this.top,
-      };
-    }
-    else {
-      throw new Error("Unexpected direction");
-    }
+    // 右側領域の左端（引っ込んだrectの右端）にopenee bubbleを配置
+    const ret: Point2 = {
+      x: rightSide.left,
+      y: recededRect.top,
+    };
 
     return ret;
   }

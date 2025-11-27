@@ -207,6 +207,23 @@ export const selectCoordinateSystem = (state: { bubbleState: BubbleStateSlice })
 }
 
 /**
+ * Returns the layerIndex of a bubble by its ID.
+ * Returns -1 if the bubble is not found in any layer.
+ */
+export const selectBubbleLayerIndex = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }): number => {
+  const process = BubblesProcess.fromJSON(state.bubbleState.process);
+  const layers = process.layers;
+
+  for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+    if (layers[layerIndex].includes(id)) {
+      return layerIndex;
+    }
+  }
+
+  return -1; // not found
+}
+
+/**
  * Returns a BubblesProcessDPO instance for the given state.
  */
 export const selectBubblesProcessDPO = (

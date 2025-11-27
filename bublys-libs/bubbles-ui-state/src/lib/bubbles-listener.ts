@@ -139,14 +139,28 @@ bubblesListener.startListening({
     }
 
     const point = openerBubble.renderedRect.calcPositionToOpen(poppingBubble.renderedRect.size);
-    console.log("Pop: Calculated point to open at", point);
-    
+    console.log("Pop: Calculated point to open at (global)", point);
+
 
     if(!point) {
       return;
     }
 
-    const moved = poppingBubble.moveTo(point);
+    // poppingBubbleのcoordinateSystemを取得
+    const poppingBubbleCoordinateSystem = poppingBubble.renderedRect.coordinateSystem;
+    console.log("Pop: poppingBubble coordinateSystem", poppingBubbleCoordinateSystem);
+
+    // calcPositionToOpenはglobal座標を返す
+    // moveTo()はsurfaceLeftTop + coordinateSystem.offsetからの相対座標を期待する
+    const surfaceLeftTop = { x: 100, y: 100 };
+    const relativePoint = {
+      x: point.x - surfaceLeftTop.x - poppingBubbleCoordinateSystem.offset.x,
+      y: point.y - surfaceLeftTop.y - poppingBubbleCoordinateSystem.offset.y,
+    };
+
+    console.log("Pop: Calculated point (relative to surfaceLeftTop + offset)", relativePoint);
+
+    const moved = poppingBubble.moveTo(relativePoint);
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));

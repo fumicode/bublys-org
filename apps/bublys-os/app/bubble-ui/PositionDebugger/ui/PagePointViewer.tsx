@@ -15,7 +15,7 @@ const getColorForIndex = (index: number): string => {
 //PositionDebuggerからpointsとrectsをもらって表示する
 export const PagePointViewer: FC = () => {
   const { points, rects, coordinateSystem, removeRect, addRects } = useContext(PositionDebuggerContext);
-  const [showCanvas, setShowCanvas] = useState(true);
+  const [showCanvas, setShowCanvas] = useState(false);
   const [canvasOpacity, setCanvasOpacity] = useState(0.7);
   const [selectedRectIndex, setSelectedRectIndex] = useState<number | null>(null);
   const [gridSettings, setGridSettings] = useState<boolean[]>([]);
