@@ -7,6 +7,7 @@ import {
   BubblesProcessDPO,
   CoordinateSystem,
   GLOBAL_COORDINATE_SYSTEM,
+  Point2,
 } from "@bublys-org/bubbles-ui";
 
 
@@ -27,6 +28,7 @@ export interface BubbleStateSlice {
   bubbleRelations:  BubblesRelation[];
 
   globalCoordinateSystem: CoordinateSystem;
+  surfaceLeftTop: Point2; // レンダリング時に追加されるオフセット
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 }
@@ -67,6 +69,7 @@ const initialState: BubbleStateSlice = {
   process: initialProcess,
   bubbleRelations: [],
   globalCoordinateSystem: GLOBAL_COORDINATE_SYSTEM,
+  surfaceLeftTop: { x: 100, y: 100 }, // デフォルト値
   renderCount: 0,
 };
 
@@ -150,6 +153,9 @@ export const bubblesSlice = createSlice({
     },
     setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystem>) => {
       state.globalCoordinateSystem = action.payload;
+    },
+    setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
+      state.surfaceLeftTop = action.payload;
     }
   },
 });
@@ -166,6 +172,7 @@ export const {
   removeBubble,
   relateBubbles,
   setGlobalCoordinateSystem,
+  setSurfaceLeftTop,
 } = bubblesSlice.actions;
 
 // Selectors
@@ -204,6 +211,10 @@ export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleSta
 
 export const selectCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
   return state.bubbleState.globalCoordinateSystem;
+}
+
+export const selectSurfaceLeftTop = (state: { bubbleState: BubbleStateSlice }): Point2 => {
+  return state.bubbleState.surfaceLeftTop;
 }
 
 /**

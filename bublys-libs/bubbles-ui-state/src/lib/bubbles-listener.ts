@@ -7,7 +7,10 @@ import {
   selectBubblesRelationByOpeneeId,
   selectSurfaceBubbles,
   updateBubble,
+  selectCoordinateSystem,
+  selectSurfaceLeftTop,
 } from './bubbles-slice.js';
+import { convertGlobalPointToLayerLocal } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -146,19 +149,22 @@ bubblesListener.startListening({
       return;
     }
 
-    // poppingBubbleのcoordinateSystemを取得
-    const poppingBubbleCoordinateSystem = poppingBubble.renderedRect.coordinateSystem;
-    console.log("Pop: poppingBubble coordinateSystem", poppingBubbleCoordinateSystem);
+    // グローバル座標系の設定を取得
+    const coordinateConfig = selectCoordinateSystem(newState);
+    const surfaceLeftTop = selectSurfaceLeftTop(newState);
+    console.log("Pop: Global coordinate config", coordinateConfig);
+    console.log("Pop: Surface left top", surfaceLeftTop);
 
     // calcPositionToOpenはglobal座標を返す
-    // moveTo()はsurfaceLeftTop + coordinateSystem.offsetからの相対座標を期待する
-    const surfaceLeftTop = { x: 100, y: 100 };
-    const relativePoint = {
-      x: point.x - surfaceLeftTop.x - poppingBubbleCoordinateSystem.offset.x,
-      y: point.y - surfaceLeftTop.y - poppingBubbleCoordinateSystem.offset.y,
-    };
+    // これをトップレイヤー（layerIndex=0）のローカル座標に変換
+    const relativePoint = convertGlobalPointToLayerLocal(
+      point,
+      0, // poppingBubbleはトップレイヤー（surface）に配置される
+      coordinateConfig,
+      surfaceLeftTop
+    );
 
-    console.log("Pop: Calculated point (relative to surfaceLeftTop + offset)", relativePoint);
+    console.log("Pop: Converted to layer-local point", relativePoint);
 
     const moved = poppingBubble.moveTo(relativePoint);
 

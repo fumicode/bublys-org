@@ -4,7 +4,7 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
 
 
 type BubblesLayeredViewProps = {
@@ -98,8 +98,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   }, [onCoordinateSystemReady, vanishingPoint]);
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
+  const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
-  const surfaceLeftTop: Point2 = { x: 100, y: 100 };
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
     y: 10,

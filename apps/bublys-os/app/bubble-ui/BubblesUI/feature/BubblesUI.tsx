@@ -14,6 +14,8 @@ import {
   removeBubble,
   selectCoordinateSystem,
   setGlobalCoordinateSystem,
+  selectSurfaceLeftTop,
+  setSurfaceLeftTop,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
@@ -96,6 +98,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   // CoordinateSystem (Reduxから取得)
   const coordinateSystem = useAppSelector(selectCoordinateSystem);
+  const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
@@ -174,6 +177,34 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             dispatch(setGlobalCoordinateSystem({
               ...coordinateSystem,
               vanishingPoint: { ...coordinateSystem.vanishingPoint, y: v as number }
+            }));
+          }}
+          valueLabelDisplay="auto"
+        />
+        <Typography gutterBottom>Surface Left Top X</Typography>
+        <Slider
+          value={surfaceLeftTop.x}
+          min={0}
+          max={500}
+          step={10}
+          onChange={(_, v) => {
+            dispatch(setSurfaceLeftTop({
+              ...surfaceLeftTop,
+              x: v as number
+            }));
+          }}
+          valueLabelDisplay="auto"
+        />
+        <Typography gutterBottom>Surface Left Top Y</Typography>
+        <Slider
+          value={surfaceLeftTop.y}
+          min={0}
+          max={500}
+          step={10}
+          onChange={(_, v) => {
+            dispatch(setSurfaceLeftTop({
+              ...surfaceLeftTop,
+              y: v as number
             }));
           }}
           valueLabelDisplay="auto"
