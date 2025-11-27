@@ -247,6 +247,57 @@ export class SmartRect implements DOMRectReadOnly {
   }
 
   /**
+   * 兄弟要素を配置する位置を計算（同じレイヤー）
+   * 優先順位: 右隣 → 下 → 左 → 上
+   *
+   * @param openingSize 配置する要素のサイズ
+   * @returns 配置すべきグローバル座標
+   */
+  calcPositionForSibling(openingSize: Size2): Point2 {
+    // 現在のrectをグローバル座標に変換
+    const globalRect = this.toGlobal();
+
+    // 各方向の利用可能なスペースとその方向の隣接領域を取得
+    const directions: Array<{ direction: Direction; neighbor: SmartRect; space: number }> = [
+      {
+        direction: 'right',
+        neighbor: globalRect.getNeighbor('right'),
+        space: globalRect.rightSpace - openingSize.width,
+      },
+      {
+        direction: 'bottom',
+        neighbor: globalRect.getNeighbor('bottom'),
+        space: globalRect.bottomSpace - openingSize.height,
+      },
+      {
+        direction: 'left',
+        neighbor: globalRect.getNeighbor('left'),
+        space: globalRect.leftSpace - openingSize.width,
+      },
+      {
+        direction: 'top',
+        neighbor: globalRect.getNeighbor('top'),
+        space: globalRect.topSpace - openingSize.height,
+      },
+    ];
+
+    // スペースが十分にある方向を優先順位順に探す
+    for (const { neighbor, space } of directions) {
+      if (space >= 0) {
+        // 十分なスペースがあるので、その方向の隣接領域の左上に配置
+        return neighbor.position;
+      }
+    }
+
+    // どの方向にも十分なスペースがない場合は、最もスペースが広い方向を選択
+    const bestDirection = directions.reduce((best, current) =>
+      current.space > best.space ? current : best
+    );
+
+    return bestDirection.neighbor.position;
+  }
+
+  /**
    * Merge this SmartRect with another, returning the minimal bounding SmartRect.
    */
   merge(other: SmartRect): SmartRect {
