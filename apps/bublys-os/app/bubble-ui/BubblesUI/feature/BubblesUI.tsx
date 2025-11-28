@@ -24,6 +24,7 @@ import { BubblesContext } from "../domain/BubblesContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Button, Slider, Typography } from "@mui/material";
 import IframeViewer from "../../IframeViewer/IframeViewer";
+import "../domain/bubbleRoutes";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;

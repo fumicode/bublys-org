@@ -119,55 +119,20 @@ export class Bubble {
       : undefined;
     return new Bubble({ ...s, renderedRect });
   }
+
 }
+
+type BubbleTypeResolver = (name: string) => string | undefined;
+let customBubbleTypeResolver: BubbleTypeResolver | undefined;
+
+export const registerBubbleTypeResolver = (resolver: BubbleTypeResolver) => {
+  customBubbleTypeResolver = resolver;
+};
 
 export const createBubble = (name: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(name);
-
-  let type = "normal";
-
-
-  switch (true) {
-    case name === "user-groups":
-      type = "user-groups";
-      break;
-
-    case name.startsWith("user-groups/"):
-      type = "user-group";
-      break;
-
-    case name.startsWith("users/") && name.endsWith("/delete-confirm"):
-      type = "user-delete-confirm";
-      break;
-
-    case name === "users/create":
-      type = "user-create";
-      break;
-
-    case name === "users":
-      type = "users";
-      break;
-
-    case name.startsWith("users/"):
-      type = "user";
-      break;
-
-    case name === "memos":
-      type = "memos";
-      break;
-      
-    case name.startsWith("memos/"):
-      type = "memo";
-      break;
-
-    case name.startsWith("iframes/"):
-      type = "iframe";
-      break;
-
-
-    default:
-      type = "normal";
-  }
+  const resolvedType = customBubbleTypeResolver?.(name);
+  const type = resolvedType ?? "normal";
 
   return new Bubble({ name, colorHue, type, position: pos });
 };
