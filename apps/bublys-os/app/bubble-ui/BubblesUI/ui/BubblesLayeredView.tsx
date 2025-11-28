@@ -1,10 +1,10 @@
 import React, { FC, useRef, useLayoutEffect} from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2, CoordinateSystem, SmartRect, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
 
 
 type BubblesLayeredViewProps = {
@@ -99,6 +99,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
+  const coordinateSystem = useAppSelector(selectCoordinateSystem);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
@@ -164,11 +165,19 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
             console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
 
-            if (!opener.renderedRect || !openee.renderedRect) return null;
+            const domOpenerRect = getOpenerRectForRelation(openee.name);
+            const baseOpenerRect = domOpenerRect || opener.renderedRect;
+            const openerRect = baseOpenerRect
+              ? baseOpenerRect.toLocal(coordinateSystem)
+              : undefined;
+
+            const openeeRect = openee.renderedRect
+              ? openee.renderedRect.toLocal(coordinateSystem)
+              : undefined;
+
+            if (!openerRect || !openeeRect) return null;
 
             // renderedRectはすでにローカル座標系（SVGはコンテナ内に配置されているため、そのまま使用）
-            const openerRect = opener.renderedRect;
-            const openeeRect = openee.renderedRect;
 
             console.log('SVG座標（local）:', {
               opener: { x: openerRect.x, y: openerRect.y, left: openerRect.left, bottom: openerRect.bottom },
@@ -263,3 +272,15 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     }
   }
 `;
+  const getOpenerRectForRelation = (detailName: string): SmartRect | undefined => {
+    if (typeof document === "undefined") return undefined;
+
+    const selector = `[data-link-href="${CSS?.escape ? CSS.escape(detailName) : detailName}"]`;
+    const openerEl = document.querySelector(selector) as HTMLElement | null;
+    if (!openerEl) return undefined;
+
+    const rect = openerEl.getBoundingClientRect();
+    const parentSize = { width: window.innerWidth, height: window.innerHeight };
+
+    return new SmartRect(rect, parentSize, GLOBAL_COORDINATE_SYSTEM);
+  };

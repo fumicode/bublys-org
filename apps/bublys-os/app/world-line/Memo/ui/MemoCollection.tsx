@@ -6,10 +6,11 @@ import { useAppDispatch, initialize } from '@bublys-org/state-management';
 import { WorldLineState } from '@bublys-org/state-management';
 
 type MemoCollectionProps = {
-  onSelectMemo: (memoId: string) => void;
+  buildDetailUrl: (memoId: string) => string;
+  onMemoClick?: (memoId: string, detailUrl: string) => void;
 };
 
-export function MemoCollection({ onSelectMemo }: MemoCollectionProps) {
+export function MemoCollection({ buildDetailUrl, onMemoClick }: MemoCollectionProps) {
   const dispatch = useAppDispatch();
 
   const handleAddMemo = () => {
@@ -38,12 +39,13 @@ export function MemoCollection({ onSelectMemo }: MemoCollectionProps) {
     dispatch(initialize({ objectId: memoId, worldLine: worldLineState }));
 
     // 新しいメモのバブルを開く
-    onSelectMemo(memoId);
+    const detailUrl = buildDetailUrl(memoId);
+    onMemoClick?.(memoId, detailUrl);
   };
 
   return (
     <div>
-      <MemoList onSelectMemo={onSelectMemo} />
+      <MemoList buildDetailUrl={buildDetailUrl} onMemoClick={onMemoClick} />
       <div style={{ marginTop: '16px' }}>
         <Button variant="contained" onClick={handleAddMemo}>
           メモを追加

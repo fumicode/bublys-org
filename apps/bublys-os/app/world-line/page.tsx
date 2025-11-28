@@ -30,6 +30,7 @@ export default function Index() {
     setMemoId(selectedMemoId);
     setShowMemoList(false);
   };
+  const buildMemoUrl = (memoId: string) => `memos/${memoId}`;
 
   return (
     <FocusedObjectProvider>
@@ -104,7 +105,7 @@ export default function Index() {
             boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
             minWidth: '300px',
           }}>
-            <MemoList onSelectMemo={handleSelectMemo} />
+            <MemoList buildDetailUrl={buildMemoUrl} onMemoClick={(id) => handleSelectMemo(id)} />
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client';
-import { FC, JSX, useContext, } from "react";
-import { Bubble,} from "@bublys-org/bubbles-ui";
+import { FC, JSX, useContext } from "react";
+import { Bubble } from "@bublys-org/bubbles-ui";
 
 import { MobBubble } from "./bubbles/MobBubble";
 import { UserGroupDetail } from "./bubbles/UserGroupDetail";
@@ -44,11 +44,12 @@ registerBubbleRenderers("user-group", (bubble: Bubble) => {
 
 registerBubbleRenderers("memos", (bubble: Bubble) => {
   const { openBubble } = useContext(BubblesContext);
+  const buildMemoUrl = (id: string) => `memos/${id}`;
+  const handleMemoClick = (_id: string, detailUrl: string) => {
+    openBubble(detailUrl, bubble.id);
+  };
   return (
-    <MemoCollection onSelectMemo={(id) => {
-      const memoUrl = `memos/${id}`;
-      openBubble(memoUrl, bubble.id);
-    }} />
+    <MemoCollection buildDetailUrl={buildMemoUrl} onMemoClick={handleMemoClick} />
   );
 });
 

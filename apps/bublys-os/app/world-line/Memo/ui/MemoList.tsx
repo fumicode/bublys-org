@@ -7,7 +7,8 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
 
 type MemoListProps = {
-  onSelectMemo: (memoId: string) => void;
+  buildDetailUrl: (memoId: string) => string;
+  onMemoClick?: (memoId: string, detailUrl: string) => void;
 };
 
 // Memoかどうかを判定する関数
@@ -19,7 +20,7 @@ function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; 
     'id' in worldState;
 }
 
-export function MemoList({ onSelectMemo }: MemoListProps) {
+export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
   // world-sliceからすべてのobjectIdを取得
   const objectIds = useAppSelector(selectAllWorldLineObjectIds);
 
@@ -49,8 +50,9 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
         {memos.map((memo) => (
           <li key={memo.id} className="e-item">
             <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
-              onSelectMemo?.(memo.id);
-            }}>
+              const detailUrl = buildDetailUrl(memo.id);
+              onMemoClick?.(memo.id, detailUrl);
+            }} data-link-href={buildDetailUrl(memo.id)}>
               <ArticleOutlinedIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
             </button>
@@ -104,4 +106,3 @@ const StyledMemoList = styled.ul`
     }
   }
 `
-
