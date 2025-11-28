@@ -17,8 +17,13 @@ export const UserDetail: FC<UserDetailProps> = ({ userId }) => {
     return <div>ユーザーが見つかりません</div>;
   }
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData("text/user-id", user.id);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
   return (
-    <div>
+    <div draggable onDragStart={handleDragStart}>
       <h3>{user.name}</h3>
       <div>生年月日: {user.birthday}</div>
       <div>年齢: {user.getAge()}歳</div>

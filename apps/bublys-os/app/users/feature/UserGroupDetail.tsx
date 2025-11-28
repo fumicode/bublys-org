@@ -14,9 +14,10 @@ import { UserListView } from "../ui/UserListView";
 type UserGroupDetailProps = {
   groupId: string;
   onDeleted?: () => void;
+  onOpenUser?: (userId: string, detailUrl: string) => void;
 };
 
-export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted }) => {
+export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, onOpenUser }) => {
   const dispatch = useAppDispatch();
   const groupEntity = useAppSelector(selectUserGroupById(groupId));
   const users = useAppSelector(selectUsers);
@@ -54,8 +55,16 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted }
     setSelectedUserId("");
   };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const droppedUserId = e.dataTransfer.getData("text/user-id");
+    if (!droppedUserId) return;
+    const updated = group.addUser(droppedUserId);
+    dispatch(updateUserGroup(updated.toJSON()));
+  };
+
   return (
-    <div>
+    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
       <h3>{group.name}</h3>
       <label>
         グループ名
@@ -69,6 +78,7 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted }
         users={memberUsers}
         buildDetailUrl={(id) => `users/${id}`}
         buildDeleteUrl={(id) => `users/${id}/delete-confirm`}
+        onUserClick={(userId, url) => onOpenUser?.(userId, url)}
       />
 
       <div>

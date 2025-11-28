@@ -180,7 +180,11 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
   const groupId = bubble.name.replace("user-groups/", "");
-  return <UserGroupDetail groupId={groupId} />;
+  const { openBubble } = useContext(BubblesContext);
+  const handleOpenUser = (_userId: string, url: string) => {
+    openBubble(url, bubble.id);
+  };
+  return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
 };
 
 const routes: BubbleRoute[] = [
