@@ -136,6 +136,22 @@ export const createBubble = (name: string, pos?: Point2): Bubble => {
       type = "user-group";
       break;
 
+    case name.startsWith("users/") && name.endsWith("/delete-confirm"):
+      type = "user-delete-confirm";
+      break;
+
+    case name === "users/create":
+      type = "user-create";
+      break;
+
+    case name === "users":
+      type = "users";
+      break;
+
+    case name.startsWith("users/"):
+      type = "user";
+      break;
+
     case name === "memos":
       type = "memos";
       break;

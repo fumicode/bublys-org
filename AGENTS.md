@@ -19,6 +19,7 @@
 - TypeScript 基準、2 スペースインデント、Prettier 既定。プッシュ前に lint を実行。
 - UI は styled-components を軸に、`bublys-os` では Emotion/MUI も併用。関数コンポーネント + hooks を優先し、`"use client"` は最小限。
 - Redux は型付きフック必須（`useAppDispatch`/`useAppSelector`/`useAppStore`）。直接の `useDispatch`/`useSelector` は避ける。
+- ドメインクラスのプロパティは `state` オブジェクトを介して保持し、直接メンバー変数をばらまかない。
 - コンポーネントは PascalCase、ユーティリティは camelCase、テストは `*.spec.ts[x]`。公開 API は各パッケージの index からエクスポート。
 - `@nx/enforce-module-boundaries` を守り、深いパス参照ではなく公開エクスポート経由で依存する。
 

@@ -222,6 +222,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         >
           Open Memos
         </Button>
+        <Button
+          variant="outlined"
+          onClick={() => popChildOrJoinSibling("users", "root")}
+        >
+          Open Users
+        </Button>
         {additionalButton}
       </Box>
 

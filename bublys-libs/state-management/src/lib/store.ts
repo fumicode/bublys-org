@@ -19,6 +19,7 @@ import {
 import { bubblesListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
+import { userSlice } from "./slices/user-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -33,6 +34,7 @@ const reducers = combineReducers({
   [worldSlice.reducerPath]: worldSlice.reducer,
   [environmentSlice.reducerPath]: environmentSlice.reducer,
   [memoSlice.reducerPath]: memoSlice.reducer,
+  [userSlice.name]: userSlice.reducer,
 
   //iframe-slices
   app: appReducer,
