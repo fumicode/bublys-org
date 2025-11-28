@@ -14,8 +14,8 @@ export const matchBubbleRoute = (name: string): BubbleRoute | undefined =>
 
 // ルーティング定義
 import { MobBubble } from "../ui/bubbles/MobBubble";
-import { UserGroupDetail } from "../ui/bubbles/UserGroupDetail";
-import { UserGroupList } from "../ui/bubbles/UserGroupList";
+import { UserGroupList } from "@/app/users/feature/UserGroupList";
+import { UserGroupDetail } from "@/app/users/feature/UserGroupDetail";
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoEditor } from "@/app/world-line/Memo/ui/MemoEditor";
 import { MemoTitle } from "@/app/world-line/Memo/ui/MemoTitle";
@@ -180,12 +180,25 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
   const groupId = bubble.name.replace("user-groups/", "");
-  return <UserGroupDetail userGroupId={Number(groupId)} />;
+  return <UserGroupDetail groupId={groupId} />;
 };
 
 const routes: BubbleRoute[] = [
   { pattern: /^mob$/, type: "mob", Component: ({ bubble }) => <MobBubble bubble={bubble} /> },
-  { pattern: /^user-groups$/, type: "user-groups", Component: ({ bubble }) => <UserGroupList containedBubble={bubble} /> },
+  {
+    pattern: /^user-groups$/,
+    type: "user-groups",
+    Component: ({ bubble }) => {
+      const { openBubble } = useContext(BubblesContext);
+      const buildGroupUrl = (id: string) => `user-groups/${id}`;
+      const handleSelect = (_id: string, url: string) => {
+        openBubble(url, bubble.id);
+      };
+      return (
+        <UserGroupList buildDetailUrl={buildGroupUrl} onSelect={handleSelect} />
+      );
+    },
+  },
   { pattern: /^user-groups\/.+$/, type: "user-group", Component: UserGroupBubble },
   { pattern: /^users$/, type: "users", Component: UsersBubble },
   { pattern: /^users\/create$/, type: "user-create", Component: UserCreateBubble },
