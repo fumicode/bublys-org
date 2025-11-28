@@ -14,7 +14,7 @@ const getColorForIndex = (index: number): string => {
 
 //PositionDebuggerからpointsとrectsをもらって表示する
 export const PagePointViewer: FC = () => {
-  const { points, rects, coordinateSystem, removeRect, addRects } = useContext(PositionDebuggerContext);
+  const { points, rects, coordinateSystem, removeRect, addRects, removeAllRects } = useContext(PositionDebuggerContext);
   const [showCanvas, setShowCanvas] = useState(false);
   const [canvasOpacity, setCanvasOpacity] = useState(0.7);
   const [selectedRectIndex, setSelectedRectIndex] = useState<number | null>(null);
@@ -198,6 +198,27 @@ export const PagePointViewer: FC = () => {
           <div>Points: {points.length}</div>
           <div>Rects: {rects.length}</div>
         </div>
+
+        {/* 全削除ボタン */}
+        {rects.length > 0 && (
+          <div style={{ marginBottom: '15px' }}>
+            <button
+              onClick={removeAllRects}
+              style={{
+                padding: '8px 12px',
+                background: '#ff6b6b',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                width: '100%',
+              }}
+            >
+              すべてのRectを削除
+            </button>
+          </div>
+        )}
 
         {/* 矩形リスト */}
         <RectList

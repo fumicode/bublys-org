@@ -73,6 +73,10 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
     setRects((prevRects) => prevRects.filter((_, i) => i !== index));
   };
 
+  const removeAllRects = () => {
+    setRects([]);
+  };
+
   return (
     //子コンポーネントにvalueを配布。ここではchildrenとPagePointViewerに配布
     <PositionDebuggerContext.Provider
@@ -83,6 +87,7 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
         addPoints,
         addRects,
         removeRect,
+        removeAllRects,
       }}
     >
       {children}

@@ -11,6 +11,7 @@ export type PositionDebuggerState = {
   addPoints: (points: Point2[]) => void;
   addRects: (rects: DOMRectReadOnly[]) => void; //外からもらうときは、一般的なDOMRectを使う
   removeRect: (index: number) => void;
+  removeAllRects: () => void;
 };
 
 export const PositionDebuggerContext = createContext<PositionDebuggerState>({
@@ -26,6 +27,9 @@ export const PositionDebuggerContext = createContext<PositionDebuggerState>({
   },
   removeRect: (index) => {
     console.warn("removeRect not implemented");
+  },
+  removeAllRects: () => {
+    console.warn("removeAllRects not implemented");
   },
 });
 

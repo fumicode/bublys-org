@@ -90,6 +90,25 @@ const drawRectItem = (
   ctx.lineWidth = 2;
   ctx.strokeRect(displayRect.x, displayRect.y, displayRect.width, displayRect.height);
 
+  // 対角線を描画
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]); // 破線スタイル
+
+  // 左上から右下への対角線
+  ctx.beginPath();
+  ctx.moveTo(displayRect.x, displayRect.y);
+  ctx.lineTo(displayRect.right, displayRect.bottom);
+  ctx.stroke();
+
+  // 右上から左下への対角線
+  ctx.beginPath();
+  ctx.moveTo(displayRect.right, displayRect.y);
+  ctx.lineTo(displayRect.x, displayRect.bottom);
+  ctx.stroke();
+
+  ctx.setLineDash([]); // 破線スタイルをリセット
+
   // ラベル
   if (label) {
     // テキスト情報の背景
