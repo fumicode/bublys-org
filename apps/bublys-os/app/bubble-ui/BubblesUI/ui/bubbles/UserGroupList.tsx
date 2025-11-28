@@ -25,11 +25,16 @@ export const UserGroupList: FC<UserGroupListProps> = ({
 
   return (
     <div ref={ref} onTransitionEnd={onRenderChange}>
-      <Button variant="contained" onClick={() => openBubble("huga", containedBubble.id)}>
+      <Button
+        variant="contained"
+        data-link-target="huga"
+        onClick={() => openBubble("huga", containedBubble.id)}
+      >
         normal
       </Button>
       <Button
         variant="contained"
+        data-link-target="user-groups"
         onClick={() => openBubble("user-groups", containedBubble.id)}
       >
         other User Groups

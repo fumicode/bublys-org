@@ -165,7 +165,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
             console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
 
-            const domOpenerRect = getOpenerRectForRelation(openee.name);
+            const domOpenerRect = getOpenerRectForRelation(opener, openee.name);
             const baseOpenerRect = domOpenerRect || opener.renderedRect;
             const openerRect = baseOpenerRect
               ? baseOpenerRect.toLocal(coordinateSystem)
@@ -272,11 +272,23 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     }
   }
 `;
-  const getOpenerRectForRelation = (detailName: string): SmartRect | undefined => {
+  const getOpenerRectForRelation = (
+    openerBubble: Bubble,
+    detailName: string
+  ): SmartRect | undefined => {
     if (typeof document === "undefined") return undefined;
 
-    const selector = `[data-link-href="${CSS?.escape ? CSS.escape(detailName) : detailName}"]`;
-    const openerEl = document.querySelector(selector) as HTMLElement | null;
+    const escapedName = CSS?.escape ? CSS.escape(detailName) : detailName;
+    const selector = `[data-link-target="${escapedName}"]`;
+
+    const openerContainer = document.querySelector(
+      `[data-bubble-id="${openerBubble.id}"]`
+    ) as HTMLElement | null;
+
+    const openerEl = openerContainer
+      ? (openerContainer.querySelector(selector) as HTMLElement | null)
+      : (document.querySelector(selector) as HTMLElement | null);
+
     if (!openerEl) return undefined;
 
     const rect = openerEl.getBoundingClientRect();

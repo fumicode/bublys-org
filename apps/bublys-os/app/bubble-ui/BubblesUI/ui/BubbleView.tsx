@@ -91,6 +91,7 @@ export const BubbleView: FC<BubbleProps> = ({
   return (
     <StyledBubble
       ref={ref}
+      data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
       zIndex={isHovered ? 100 : zIndex} // ホバー時に最前面に
       layerIndex={layerIndex}

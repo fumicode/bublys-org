@@ -52,7 +52,7 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
             <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
               const detailUrl = buildDetailUrl(memo.id);
               onMemoClick?.(memo.id, detailUrl);
-            }} data-link-href={buildDetailUrl(memo.id)}>
+            }} data-link-target={buildDetailUrl(memo.id)}>
               <ArticleOutlinedIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
             </button>
