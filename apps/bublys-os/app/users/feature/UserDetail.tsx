@@ -1,7 +1,7 @@
 import { FC } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectUserById } from "@bublys-org/state-management";
-import { User } from "../domain/User";
+import { User } from "../domain/User.domain";
 
 type UserDetailProps = {
   userId: string;

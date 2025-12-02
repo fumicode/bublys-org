@@ -1,6 +1,6 @@
 import { FC } from "react";
 import styled from "styled-components";
-import { User } from "../domain/User";
+import { User } from "../domain/User.domain";
 import { IconButton } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";

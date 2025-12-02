@@ -1,7 +1,7 @@
 import { FC, useEffect } from "react";
 import { useAppDispatch, useAppSelector ,  selectUsers, setUsers, deleteUser } from "@bublys-org/state-management";
 import { UserListView } from "../ui/UserListView";
-import { User } from "../domain/User";
+import { User } from "../domain/User.domain";
 
 const defaultUsers = [
   new User("2a5d5e9e-5d2b-4e9c-97e0-1d4f7f0db743", "Alice Johnson", "1990-04-12"),

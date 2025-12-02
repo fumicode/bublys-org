@@ -23,7 +23,7 @@ export class UserGroup {
     return this.state.userIds;
   }
 
-  addUser(userId: string): UserGroup {
+  joinMember(userId: string): UserGroup {
     if (this.state.userIds.includes(userId)) {
       return this;
     }

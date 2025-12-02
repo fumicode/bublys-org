@@ -7,8 +7,8 @@ import {
   updateUserGroup,
   deleteUserGroup,
 } from "@bublys-org/state-management";
-import { UserGroup } from "../domain/UserGroup";
-import { User } from "../domain/User";
+import { UserGroup } from "../domain/UserGroup.domain";
+import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
 
 type UserGroupDetailProps = {
@@ -60,7 +60,7 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
     e.preventDefault();
     const droppedUserId = e.dataTransfer.getData("text/user-id");
     if (!droppedUserId) return;
-    const updated = group.addUser(droppedUserId);
+    const updated = group.joinMember(droppedUserId);
     dispatch(updateUserGroup(updated.toJSON()));
   };
 

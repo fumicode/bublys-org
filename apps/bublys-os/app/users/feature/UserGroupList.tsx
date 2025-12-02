@@ -1,6 +1,6 @@
 import { FC, useEffect } from "react";
 import { useAppDispatch, useAppSelector, selectUserGroups, setUserGroups, addUserGroup } from "@bublys-org/state-management";
-import { UserGroup } from "../domain/UserGroup";
+import { UserGroup } from "../domain/UserGroup.domain";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;

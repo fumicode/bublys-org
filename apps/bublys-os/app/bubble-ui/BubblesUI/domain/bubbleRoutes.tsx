@@ -29,7 +29,7 @@ import { useAppDispatch, useAppSelector, selectApexWorld, updateState } from "@b
 import { deserializeMemo, serializeMemo } from "@/app/world-line/Memo/feature/MemoManager";
 import { WorldLineState } from "@bublys-org/state-management";
 import { addUser } from "@bublys-org/state-management";
-import { User } from "@/app/users/domain/User";
+import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 
 // 各バブルのコンポーネント
