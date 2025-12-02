@@ -5,6 +5,8 @@ import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
+import { UserBadge } from '@/app/users/ui/UserBadge';
+import { selectUsers } from '@bublys-org/state-management';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -13,7 +15,7 @@ type MemoListProps = {
 
 // Memoかどうかを判定する関数
 function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; id: string } {
-  return worldState && 
+  return worldState &&
     typeof worldState === 'object' && 
     'blocks' in worldState && 
     'lines' in worldState && 
@@ -23,6 +25,7 @@ function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; 
 export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
   // world-sliceからすべてのobjectIdを取得
   const objectIds = useAppSelector(selectAllWorldLineObjectIds);
+  const users = useAppSelector(selectUsers);
 
   // すべての世界線状態を取得
   const worldLines = useAppSelector((state) => state.worldLine.worldLines);
@@ -56,6 +59,16 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
               <MemoIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
             </button>
+
+            {memo.authorId && (
+              <span style={{ marginLeft: 8 }}>
+                <UserBadge
+                  label={users.find((u) => u.id === memo.authorId)?.name ?? "作者"}
+                  linkTarget={`users/${memo.authorId}`}
+                  onClick={() => onMemoClick?.(memo.authorId, `users/${memo.authorId}`)}
+                />
+              </span>
+            )}
 
             <span className='e-button-group'>
               <IconButton

@@ -14,13 +14,14 @@ export type RawMemo = {
     [key: string]: MemoBlock;
   };
   lines: string[];
+  authorId?: string | null;
 };
 
 export class Memo {
   readonly state: RawMemo;
   
   constructor(state: RawMemo) {
-    this.state = { id: state.id, blocks: { ...state.blocks }, lines: [...state.lines] };
+    this.state = { id: state.id, blocks: { ...state.blocks }, lines: [...state.lines], authorId: state.authorId ?? null };
   }
 
   get id(): string {
@@ -33,6 +34,10 @@ export class Memo {
   
   get lines(): string[] {
     return this.state.lines;
+  }
+
+  get authorId(): string | null | undefined {
+    return this.state.authorId;
   }
 
   getNextBlockId(currentId: string): string | undefined {
@@ -69,7 +74,7 @@ export class Memo {
     if (newBlocks[blockId]) {
       newBlocks[blockId] = { ...newBlocks[blockId], content };
     }
-    return new Memo({ id, blocks: newBlocks, lines: [...lines] });
+    return new Memo({ id, blocks: newBlocks, lines: [...lines], authorId: this.state.authorId });
   }
 
   mergeBlock(blockId: string): Memo {
@@ -82,7 +87,11 @@ export class Memo {
     newBlocks[prevId] = { ...newBlocks[prevId], content: newBlocks[prevId].content + newBlocks[blockId].content };
     delete newBlocks[blockId];
     newLines.splice(idx, 1);
-    return new Memo({ id, blocks: newBlocks, lines: newLines });
+    return new Memo({ id, blocks: newBlocks, lines: newLines, authorId: this.state.authorId });
+  }
+
+  setAuthor(userId: string | null): Memo {
+    return new Memo({ ...this.state, authorId: userId });
   }
 
   /**
@@ -115,8 +124,8 @@ export class Memo {
         },
       },
       lines: [firstLineId],
+      authorId: null,
     };
     return Memo.fromJson(raw);
   }
 }
-
