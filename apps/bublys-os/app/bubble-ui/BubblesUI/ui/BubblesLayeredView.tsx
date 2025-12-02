@@ -246,7 +246,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
     width: 100%;
     height: 100%;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(1px);
     pointer-events: none;
   }
 

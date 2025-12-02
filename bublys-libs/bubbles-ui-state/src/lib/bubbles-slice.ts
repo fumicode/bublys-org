@@ -95,7 +95,6 @@ export const bubblesSlice = createSlice({
       state.process = BubblesProcess.fromJSON(state.process)
         .layerUp(action.payload)
         .toJSON();
-
       state.renderCount += 1;
     },
     popChild: (state, action: PayloadAction<string>) => {

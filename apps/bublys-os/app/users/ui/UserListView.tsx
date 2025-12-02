@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { User } from "../domain/User";
 import { IconButton } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 
 type UserListViewProps = {
   users: User[];
@@ -10,6 +11,8 @@ type UserListViewProps = {
   buildDeleteUrl: (userId: string) => string;
   onUserClick?: (userId: string, detailUrl: string) => void;
   onUserDelete?: (userId: string) => void;
+  showReorder?: boolean;
+  onReorder?: (sourceUserId: string, targetUserId: string) => void;
 };
 
 export const UserListView: FC<UserListViewProps> = ({
@@ -18,15 +21,50 @@ export const UserListView: FC<UserListViewProps> = ({
   buildDeleteUrl,
   onUserClick,
   onUserDelete,
+  showReorder = false,
+  onReorder,
 }) => {
   return (
     <StyledUserList>
-      {users.map((user) => {
+      {users.map((user, index) => {
         const detailUrl = buildDetailUrl(user.id);
         const deleteUrl = buildDeleteUrl(user.id);
         return (
-          <li key={user.id} className="e-item">
+          <li
+            key={user.id}
+            className="e-item"
+            draggable={showReorder}
+            onDragStart={(e) => {
+              if (!showReorder) return;
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/user-id", user.id);
+            }}
+            onDragOver={(e) => {
+              if (!showReorder) return;
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              if (!showReorder) return;
+
+              const sourceId = e.dataTransfer.getData("text/user-id");
+              if (!sourceId || sourceId === user.id) return;
+              const existsInList = users.some((u) => u.id === sourceId);
+              if (!existsInList) {
+                // Allow bubbling so the parent container can handle adding external users.
+                e.preventDefault();
+                return;
+              }
+              e.preventDefault();
+              e.stopPropagation();
+              onReorder?.(sourceId, user.id);
+            }}
+          >
             <div className="e-content">
+              {showReorder && (
+                <span className="e-drag-handle" aria-label="drag user">
+                  <DragIndicatorIcon fontSize="small" />
+                </span>
+              )}
               <button
                 style={{ all: "unset", cursor: "pointer" }}
                 data-link-target={detailUrl}
@@ -92,6 +130,13 @@ const StyledUserList = styled.ul`
 
     .e-button-group {
       flex-shrink: 0;
+    }
+
+    .e-drag-handle {
+      cursor: grab;
+      display: inline-flex;
+      align-items: center;
+      color: #777;
     }
   }
 `;

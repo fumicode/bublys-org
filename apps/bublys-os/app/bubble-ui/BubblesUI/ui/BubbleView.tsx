@@ -106,7 +106,7 @@ export const BubbleView: FC<BubbleProps> = ({
       >
       <header className="e-bubble-header">
         <Box sx={{ position: "relative", textAlign: "center" }}>
-          <h1 className="e-bubble-name">{bubble.name}</h1>
+          <h1 className="e-bubble-name">{bubble.type}</h1>
           <Stack
             direction="row"
             spacing={0} // 間隔をさらに詰める（デフォルトは1）
@@ -137,7 +137,8 @@ export const BubbleView: FC<BubbleProps> = ({
               </IconButton>
             )}
 
-            {onMoveClick && (
+
+            {/* {onMoveClick && (
               <IconButton
                 size="small"
                 sx={{
@@ -189,14 +190,15 @@ export const BubbleView: FC<BubbleProps> = ({
               >
                 <MoveUpIcon />
               </IconButton>
-            )} 
+            )}  */}
           </Stack>
         </Box>
       </header>
 
       <main className="e-bubble-content">
+        {/* 
         Type: {bubble.type}
-        {/* #{bubble.id}
+        #{bubble.id}
         <br />
         <br /> */}
         {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>

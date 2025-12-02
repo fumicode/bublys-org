@@ -30,6 +30,25 @@ export class UserGroup {
     return new UserGroup(this.state.id, this.state.name, [...this.state.userIds, userId]);
   }
 
+  removeMember(userId: string): UserGroup {
+    if (!this.state.userIds.includes(userId)) {
+      return this;
+    }
+    return new UserGroup(
+      this.state.id,
+      this.state.name,
+      this.state.userIds.filter((id) => id !== userId)
+    );
+  }
+
+  reorderMembers(orderedUserIds: string[]): UserGroup {
+    const uniqueOrder = orderedUserIds.filter(
+      (id, idx, arr) => this.state.userIds.includes(id) && arr.indexOf(id) === idx
+    );
+    const remaining = this.state.userIds.filter((id) => !uniqueOrder.includes(id));
+    return new UserGroup(this.state.id, this.state.name, [...uniqueOrder, ...remaining]);
+  }
+
   rename(newName: string): UserGroup {
     return new UserGroup(this.state.id, newName, [...this.state.userIds]);
   }
