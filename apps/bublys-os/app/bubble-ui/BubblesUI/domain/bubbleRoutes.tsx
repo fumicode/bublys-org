@@ -31,6 +31,7 @@ import { WorldLineState } from "@bublys-org/state-management";
 import { addUser } from "@bublys-org/state-management";
 import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
+import { Memo } from "@/app/world-line/Memo/domain/Memo";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -61,7 +62,11 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const UserBubble: BubbleContentRenderer = ({ bubble }) => {
   const userId = bubble.name.replace("users/", "");
-  return <UserDetail userId={userId} />;
+  const { openBubble } = useContext(BubblesContext);
+  const handleOpenGroup = (groupId: string, url: string) => {
+    openBubble(url, bubble.id);
+  };
+  return <UserDetail userId={userId} onOpenGroup={handleOpenGroup} />;
 };
 
 const UserCreateBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -116,11 +121,38 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "");
+  const { openBubble } = useContext(BubblesContext);
 
   const MemoBubbleContent = () => {
     const apexWorld = useAppSelector(selectApexWorld(memoId));
     const currentWorldLine = useAppSelector((state) => state.worldLine.worldLines[memoId]);
     const dispatch = useAppDispatch();
+
+    const handleMemoChange = (newMemo: Memo) => {
+      if (!currentWorldLine) return;
+
+      const newWorldId = crypto.randomUUID();
+      const newWorld = {
+        id: newWorldId,
+        world: {
+          worldId: newWorldId,
+          parentWorldId: currentWorldLine.apexWorldId,
+          worldState: serializeMemo(newMemo),
+        },
+      };
+
+      const newWorldLine: WorldLineState = {
+        worlds: [...currentWorldLine.worlds, newWorld],
+        apexWorldId: newWorldId,
+        rootWorldId: currentWorldLine.rootWorldId,
+      };
+
+      dispatch(updateState({
+        objectId: memoId,
+        newWorldLine,
+        operation: 'updateMemo'
+      }));
+    };
 
     if (!apexWorld || !apexWorld.worldState) {
       return <div>メモが見つかりません</div>;
@@ -130,35 +162,15 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
 
     return (
       <div>
-        <MemoTitle memo={memo} />
+        <MemoTitle
+          memo={memo}
+          onSetAuthor={(userId) => handleMemoChange(memo.setAuthor(userId))}
+          onOpenAuthor={(userId, url) => openBubble(url, bubble.id)}
+        />
         <MemoEditor
           memoId={memoId}
           memo={memo}
-          onMemoChange={(newMemo) => {
-            if (!currentWorldLine) return;
-
-            const newWorldId = crypto.randomUUID();
-            const newWorld = {
-              id: newWorldId,
-              world: {
-                worldId: newWorldId,
-                parentWorldId: currentWorldLine.apexWorldId,
-                worldState: serializeMemo(newMemo),
-              },
-            };
-
-            const newWorldLine: WorldLineState = {
-              worlds: [...currentWorldLine.worlds, newWorld],
-              apexWorldId: newWorldId,
-              rootWorldId: currentWorldLine.rootWorldId,
-            };
-
-            dispatch(updateState({
-              objectId: memoId,
-              newWorldLine,
-              operation: 'updateMemo'
-            }));
-          }}
+          onMemoChange={handleMemoChange}
         />
       </div>
     );
