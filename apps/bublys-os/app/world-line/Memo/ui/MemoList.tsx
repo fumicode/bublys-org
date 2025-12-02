@@ -1,10 +1,10 @@
 import { useAppSelector, selectAllWorldLineObjectIds } from '@bublys-org/state-management';
 import { Memo } from '../domain/Memo';
 import { deserializeMemo } from '../feature/MemoManager';
-import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
+import { MemoIcon } from './MemoIcon';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -53,7 +53,7 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
               const detailUrl = buildDetailUrl(memo.id);
               onMemoClick?.(memo.id, detailUrl);
             }} data-link-target={buildDetailUrl(memo.id)}>
-              <ArticleOutlinedIcon/>
+              <MemoIcon/>
               <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
             </button>
 

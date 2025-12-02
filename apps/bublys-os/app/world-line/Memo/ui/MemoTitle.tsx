@@ -1,6 +1,7 @@
 import { Memo } from '../domain/Memo';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
+import { MemoIcon } from './MemoIcon';
 
 interface MemoTitleProps {
   memo: Memo;
@@ -13,8 +14,9 @@ export function MemoTitle({ memo }: MemoTitleProps) {
   
   return (
     <div>
-      <h2>
-        「{content}」
+      <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <MemoIcon fontSize="medium" />
+        <span>「{content}」</span>
         <IconButton onClick={() => navigator.clipboard.writeText(content)}>
           <LuClipboardCopy />
         </IconButton>
@@ -22,4 +24,3 @@ export function MemoTitle({ memo }: MemoTitleProps) {
     </div>
   );
 }
-

@@ -10,6 +10,7 @@ import {
 import { UserGroup } from "../domain/UserGroup.domain";
 import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
+import { UserGroupIcon } from "../ui/UserIcon";
 
 type UserGroupDetailProps = {
   groupId: string;
@@ -87,7 +88,9 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
 
   return (
     <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
-      <h3>{group.name}</h3>
+      <h3 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <UserGroupIcon fontSize="small" /> {group.name}
+      </h3>
 
       <div style={{ marginBottom: "8px" }}>
         <label>

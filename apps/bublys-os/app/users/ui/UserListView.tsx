@@ -2,8 +2,9 @@ import { FC } from "react";
 import styled from "styled-components";
 import { User } from "../domain/User.domain";
 import { IconButton } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import { UserIcon } from "./UserIcon";
 
 type UserListViewProps = {
   users: User[];
@@ -69,22 +70,27 @@ export const UserListView: FC<UserListViewProps> = ({
                 data-link-target={detailUrl}
                 onClick={() => onUserClick?.(user.id, detailUrl)}
               >
-                <div className="e-name">{user.name}</div>
-                <div className="e-meta">
-                  {user.birthday} / {user.getAge()}歳
+                <div className="e-main">
+                  <UserIcon fontSize="small" className="e-avatar" />
+                  <div className="e-text">
+                    <div className="e-name">{user.name}</div>
+                    <div className="e-meta">
+                      {user.birthday} / {user.getAge()}歳
+                    </div>
+                  </div>
                 </div>
               </button>
               <span className="e-button-group">
                 <IconButton
                   size="small"
-                  aria-label="delete user"
+                  aria-label="remove user"
                   data-link-target={deleteUrl}
                   onClick={(e) => {
                     e.stopPropagation();
                     onUserDelete?.(user.id);
                   }}
                 >
-                  <DeleteIcon fontSize="small" />
+                  <CloseIcon fontSize="small" />
                 </IconButton>
               </span>
             </div>
@@ -116,6 +122,22 @@ const StyledUserList = styled.ul`
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+    }
+
+    .e-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .e-avatar {
+      color: #444;
+    }
+
+    .e-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
     }
 
     .e-name {

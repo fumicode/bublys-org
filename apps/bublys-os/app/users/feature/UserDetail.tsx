@@ -2,6 +2,7 @@ import { FC } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectUserById } from "@bublys-org/state-management";
 import { User } from "../domain/User.domain";
+import { UserIcon } from "../ui/UserIcon";
 
 type UserDetailProps = {
   userId: string;
@@ -24,7 +25,9 @@ export const UserDetail: FC<UserDetailProps> = ({ userId }) => {
 
   return (
     <div draggable onDragStart={handleDragStart}>
-      <h3>{user.name}</h3>
+      <h3 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <UserIcon fontSize="small" /> {user.name}
+      </h3>
       <div>生年月日: {user.birthday}</div>
       <div>年齢: {user.getAge()}歳</div>
     </div>

@@ -1,6 +1,7 @@
 import { FC, useEffect } from "react";
 import { useAppDispatch, useAppSelector, selectUserGroups, setUserGroups, addUserGroup } from "@bublys-org/state-management";
 import { UserGroup } from "../domain/UserGroup.domain";
+import { UserGroupIcon } from "../ui/UserIcon";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;
@@ -40,6 +41,7 @@ export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect
                 data-link-target={url}
                 onClick={() => onSelect?.(group.id, url)}
               >
+                <UserGroupIcon fontSize="small" style={{ marginRight: 6, verticalAlign: "middle" }} />
                 {group.name}
               </button>
             </li>

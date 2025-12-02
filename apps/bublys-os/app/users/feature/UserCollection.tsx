@@ -49,7 +49,7 @@ export const UserCollection: FC<UserCollectionProps> = ({
 
   return (
     <div>
-      <h3>Users</h3>
+      <h3>ユーザー 一覧</h3>
       <UserListView
         users={users}
         buildDetailUrl={buildDetailUrl}
