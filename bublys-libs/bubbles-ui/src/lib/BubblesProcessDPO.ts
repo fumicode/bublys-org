@@ -1,5 +1,5 @@
 import { BubblesProcess } from "./BubblesProcess.domain.js";
-import { Bubble } from "./Bubbles.domain.js";
+import { Bubble } from "./Bubble.domain.js";
 
 export class BubblesProcessDPO {
   private process: BubblesProcess;

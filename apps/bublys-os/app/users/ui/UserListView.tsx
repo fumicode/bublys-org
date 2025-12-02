@@ -33,10 +33,9 @@ export const UserListView: FC<UserListViewProps> = ({
           <li
             key={user.id}
             className="e-item"
-            draggable={showReorder}
+            draggable={true}
             onDragStart={(e) => {
-              if (!showReorder) return;
-              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.effectAllowed = "linkMove";
               e.dataTransfer.setData("text/user-id", user.id);
             }}
             onDragOver={(e) => {

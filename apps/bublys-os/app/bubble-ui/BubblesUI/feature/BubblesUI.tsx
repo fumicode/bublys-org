@@ -60,10 +60,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(layerUpAction(b.id));
   };
 
-  const onMove = (b: Bubble) => {
-    const updated = b.moveTo({ x: 0, y: 0 });
-    dispatch(updateBubble(updated.toJSON()));
-  };
 
   const popChild = (b: Bubble, openerBubbleId:string): string => {
     dispatch(addBubble(b.toJSON()));
@@ -133,7 +129,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               vanishingPoint={coordinateSystem.vanishingPoint}
               onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
               onBubbleClose={deleteBubble}
-              onBubbleMove={onMove}
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
               onCoordinateSystemReady={handleCoordinateSystemReady}

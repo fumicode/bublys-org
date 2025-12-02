@@ -3,4 +3,4 @@ export * from './lib/00_Point.js';
 export * from './lib/BubblesProcessDPO.js';
 export * from './lib/SmartRect.js';
 export * from './lib/CoordinateSystemHelper.js';
-export * from './lib/Bubbles.domain.js';
+export * from './lib/Bubble.domain.js';

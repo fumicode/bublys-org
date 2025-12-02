@@ -132,7 +132,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             vanishingPoint={undergroundVanishingPoint}
             onClick={() => onBubbleClick?.(bubble.name)}
             onCloseClick={() => onBubbleClose?.(bubble)}
-            onMoveClick={() => onBubbleMove?.(bubble)}
+            onMove={(updated) => onBubbleMove?.(updated)}
             onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
             onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
           >

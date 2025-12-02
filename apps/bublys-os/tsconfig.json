@@ -32,7 +32,6 @@
     "app/**/*.tsx",
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    "../../bublys-libs/bubbles-ui/src/lib/Bubbles.domain.ts"
   ],
   "exclude": [
     "out-tsc",
