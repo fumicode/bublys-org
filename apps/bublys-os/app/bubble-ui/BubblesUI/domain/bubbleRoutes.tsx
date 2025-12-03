@@ -32,6 +32,8 @@ import { addUser } from "@bublys-org/state-management";
 import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { Memo } from "@/app/world-line/Memo/domain/Memo";
+import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
+import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -123,61 +125,73 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
 
-  const MemoBubbleContent = () => {
-    const apexWorld = useAppSelector(selectApexWorld(memoId));
-    const currentWorldLine = useAppSelector((state) => state.worldLine.worldLines[memoId]);
-    const dispatch = useAppDispatch();
-
-    const handleMemoChange = (newMemo: Memo) => {
-      if (!currentWorldLine) return;
-
-      const newWorldId = crypto.randomUUID();
-      const newWorld = {
-        id: newWorldId,
-        world: {
-          worldId: newWorldId,
-          parentWorldId: currentWorldLine.apexWorldId,
-          worldState: serializeMemo(newMemo),
-        },
-      };
-
-      const newWorldLine: WorldLineState = {
-        worlds: [...currentWorldLine.worlds, newWorld],
-        apexWorldId: newWorldId,
-        rootWorldId: currentWorldLine.rootWorldId,
-      };
-
-      dispatch(updateState({
-        objectId: memoId,
-        newWorldLine,
-        operation: 'updateMemo'
-      }));
-    };
-
-    if (!apexWorld || !apexWorld.worldState) {
-      return <div>メモが見つかりません</div>;
-    }
-
-    const memo = deserializeMemo(apexWorld.worldState);
 
     return (
-      <div>
-        <MemoTitle
-          memo={memo}
-          onSetAuthor={(userId) => handleMemoChange(memo.setAuthor(userId))}
-          onOpenAuthor={(userId, url) => openBubble(url, bubble.id)}
-        />
-        <MemoEditor
-          memoId={memoId}
-          memo={memo}
-          onMemoChange={handleMemoChange}
-        />
-      </div>
+      <MemoWorldLineManager memoId={memoId}>
+        <MemoWorldLineIntegration memoId={memoId} />
+      </MemoWorldLineManager>
     );
-  };
-
-  return <MemoBubbleContent />;
 };
+
+// const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
+//   const memoId = bubble.name.replace("memos/", "");
+//   const { openBubble } = useContext(BubblesContext);
+
+//   const MemoBubbleContent = () => {
+//     const apexWorld = useAppSelector(selectApexWorld(memoId));
+//     const currentWorldLine = useAppSelector((state) => state.worldLine.worldLines[memoId]);
+//     const dispatch = useAppDispatch();
+
+//     const handleMemoChange = (newMemo: Memo) => {
+//       if (!currentWorldLine) return;
+
+//       const newWorldId = crypto.randomUUID();
+//       const newWorld = {
+//         id: newWorldId,
+//         world: {
+//           worldId: newWorldId,
+//           parentWorldId: currentWorldLine.apexWorldId,
+//           worldState: serializeMemo(newMemo),
+//         },
+//       };
+
+//       const newWorldLine: WorldLineState = {
+//         worlds: [...currentWorldLine.worlds, newWorld],
+//         apexWorldId: newWorldId,
+//         rootWorldId: currentWorldLine.rootWorldId,
+//       };
+
+//       dispatch(updateState({
+//         objectId: memoId,
+//         newWorldLine,
+//         operation: 'updateMemo'
+//       }));
+//     };
+
+//     if (!apexWorld || !apexWorld.worldState) {
+//       return <div>メモが見つかりません</div>;
+//     }
+
+//     const memo = deserializeMemo(apexWorld.worldState);
+
+//     return (
+//       <div>
+//         <MemoTitle
+//           memo={memo}
+//           onSetAuthor={(userId) => handleMemoChange(memo.setAuthor(userId))}
+//           onOpenAuthor={(userId, url) => openBubble(url, bubble.id)}
+//         />
+//         <MemoEditor
+//           memoId={memoId}
+//           memo={memo}
+//           onMemoChange={handleMemoChange}
+//         />
+//       </div>
+//     );
+//   };
+
+//   return <MemoBubbleContent />;
+// };
 
 const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
