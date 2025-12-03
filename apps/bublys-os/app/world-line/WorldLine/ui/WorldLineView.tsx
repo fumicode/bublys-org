@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useMemo, useState, useEffect } from 'react';
 import { WorldLineContext } from '../domain/WorldLineContext';
 import { World } from '../domain/World';
 
@@ -23,7 +23,10 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
 interface WorldView3DProps<TWorldState> {
   worlds: World<TWorldState>[];
   apexWorldId: string | null;
+  apexWorld: World<TWorldState> | null;
   onWorldSelect: (worldId: string) => void;
+  onSetApex: (worldId: string) => void;
+  onRegrow: () => void;
   renderWorldState: (
     worldState: TWorldState,
     onWorldStateChange: (newWorldState: TWorldState) => void
@@ -33,13 +36,42 @@ interface WorldView3DProps<TWorldState> {
 function WorldView3D<TWorldState>({
   worlds,
   apexWorldId,
+  apexWorld,
   onWorldSelect,
+  onSetApex,
+  onRegrow,
   renderWorldState,
 }: WorldView3DProps<TWorldState>) {
   // クリックされた世界を一番手前に表示するためのstate（初期値はapexWorld）
   const [focusedWorldId, setFocusedWorldId] = useState<string | null>(apexWorldId);
   // ホバーされている世界のID
   const [hoveredWorldId, setHoveredWorldId] = useState<string | null>(null);
+  
+  // apexWorldIdが変更されたらfocusedWorldIdも更新
+  useEffect(() => {
+    setFocusedWorldId(apexWorldId);
+  }, [apexWorldId]);
+  
+  // キーボードイベント処理（世界線ビューが開いている時のみ）
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+Z または Command+Z（Mac）で親世界に移動
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'z') {
+        event.preventDefault();
+        if (apexWorld?.parentWorldId) {
+          onSetApex(apexWorld.parentWorldId);
+        }
+      }
+      // Ctrl+Shift+Z または Command+Shift+Z（Mac）で子世界に移動
+      else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Z') {
+        event.preventDefault();
+        onRegrow();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [apexWorld, onSetApex, onRegrow]);
   
   // 消失点（バニシングポイント）- 画面中央上部に配置
   const vanishingPoint = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.2 };
@@ -275,6 +307,8 @@ function WorldView3D<TWorldState>({
           const worldLineColor = worldLineHeadId ? worldLineColors.get(worldLineHeadId) : null;
 
           // HEADはフルカード表示、それ以外はドット表示
+          const isHovered = hoveredWorldId === world.worldId;
+          
           if (isHead) {
             return (
               <div
@@ -310,7 +344,7 @@ function WorldView3D<TWorldState>({
                   boxShadow: isFocused
                     ? '0 10px 40px rgba(0, 123, 255, 0.3)'
                     : '0 8px 24px rgba(0, 0, 0, 0.15)',
-                  zIndex: isFocused ? 1000 : baseZIndex + 50,
+                  zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex + 50),
                 }}
               >
                 {renderWorldState(world.worldState as TWorldState, () => {})}
@@ -319,7 +353,6 @@ function WorldView3D<TWorldState>({
           } else {
             // ドット表示（ホバー時にカード表示）
             const dotColor = worldLineColor?.border || 'rgba(150, 150, 200, 0.7)';
-            const isHovered = hoveredWorldId === world.worldId;
             
             return (
               <div
@@ -332,10 +365,10 @@ function WorldView3D<TWorldState>({
                   transformOrigin: 'center center',
                   transformStyle: 'preserve-3d',
                   pointerEvents: 'auto',
-                  zIndex: isHovered ? 2000 : (isFocused ? 1000 : baseZIndex),
+                  zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex),
                 }}
               >
-                {/* ドット */}
+                {/* ドット - ホバー領域を32px × 32pxに拡張 */}
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -348,24 +381,35 @@ function WorldView3D<TWorldState>({
                   onMouseEnter={() => setHoveredWorldId(world.worldId)}
                   onMouseLeave={() => setHoveredWorldId(null)}
                   style={{
-                    width: '16px',
-                    height: '16px',
-                    backgroundColor: isFocused
-                      ? 'rgba(0, 123, 255, 0.9)'
-                      : dotColor,
-                    border: isFocused
-                      ? '2px solid rgba(0, 123, 255, 1)'
-                      : `2px solid ${dotColor}`,
-                    borderRadius: '50%',
+                    width: '120px',
+                    height: '120px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
-                    opacity,
-                    boxShadow: isFocused
-                      ? '0 0 10px rgba(0, 123, 255, 0.5)'
-                      : 'none',
                     position: 'relative',
                     zIndex: 1,
                   }}
-                />
+                >
+                  {/* 実際のドット（16px × 16px） */}
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      backgroundColor: isFocused
+                        ? 'rgba(0, 123, 255, 0.9)'
+                        : dotColor,
+                      border: isFocused
+                        ? '2px solid rgba(0, 123, 255, 1)'
+                        : `2px solid ${dotColor}`,
+                      borderRadius: '50%',
+                      opacity,
+                      boxShadow: isFocused
+                        ? '0 0 10px rgba(0, 123, 255, 0.5)'
+                        : 'none',
+                    }}
+                  />
+                </div>
                 
                 {/* ホバー時のカード表示 */}
                 {isHovered && (
@@ -418,6 +462,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
     apexWorldId,
     grow,
     setApex,
+    regrow,
     getAllWorlds,
     // getWorldTree,
     isModalOpen,
@@ -470,7 +515,10 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
             <WorldView3D
               worlds={getAllWorlds()}
               apexWorldId={apexWorldId}
+              apexWorld={apexWorld}
               onWorldSelect={handleWorldSelect}
+              onSetApex={setApex}
+              onRegrow={regrow}
               renderWorldState={renderWorldState}
             />
           </div>
