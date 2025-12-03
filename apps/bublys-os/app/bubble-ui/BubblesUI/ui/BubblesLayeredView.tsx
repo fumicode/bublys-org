@@ -1,10 +1,11 @@
-import React, { FC, use } from "react";
+import React, { FC, useRef, useLayoutEffect } from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
+import { LinkBubbleView } from "./LinkBubbleView";
 
 
 type BubblesLayeredViewProps = {
@@ -15,6 +16,7 @@ type BubblesLayeredViewProps = {
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
+  onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
 };
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
@@ -25,11 +27,81 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleMove,
   onBubbleLayerDown,
   onBubbleLayerUp,
+  onCoordinateSystemReady,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
+  useLayoutEffect(() => {
+    let lastOffset = { x: 0, y: 0 };
+    let lastVanishingPoint = { x: 0, y: 0 };
+
+    const updateCoordinateSystem = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
+
+        // 座標またはvanishingPointが変更された場合のみ更新（無限ループ防止）
+        if (
+          rect.left === lastOffset.x &&
+          rect.top === lastOffset.y &&
+          currentVanishingPoint.x === lastVanishingPoint.x &&
+          currentVanishingPoint.y === lastVanishingPoint.y
+        ) {
+          return;
+        }
+
+        lastOffset = { x: rect.left, y: rect.top };
+        lastVanishingPoint = currentVanishingPoint;
+
+        const coordinateSystem: CoordinateSystem = {
+          layerIndex: 0,
+          offset: { x: rect.left, y: rect.top },
+          vanishingPoint: currentVanishingPoint,
+        };
+        onCoordinateSystemReady?.(coordinateSystem);
+        console.log('BubblesLayeredView CoordinateSystem updated:', coordinateSystem);
+      }
+    };
+
+    // 初期設定
+    updateCoordinateSystem();
+
+    // ResizeObserverでサイズ変更を監視
+    const resizeObserver = new ResizeObserver(() => {
+      updateCoordinateSystem();
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    // windowのresizeイベントで位置変更も検出（サイドバー幅変更など）
+    // requestAnimationFrameでスロットリング
+    let rafId: number | null = null;
+    const handleResize = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        updateCoordinateSystem();
+        rafId = null;
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [onCoordinateSystemReady, vanishingPoint]);
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
+  const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
+  const coordinateSystem = useAppSelector(selectCoordinateSystem);
 
-  const surfaceLeftTop: Point2 = { x: 100, y: 100 };
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
     y: 10,
@@ -41,7 +113,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const renderedBubbles = bubbles
     .map((layer, layerIndex) =>
-      layer.map((bubble, xIndex) => {
+      layer.map((bubble, _siblingIndex) => {
         const zIndex = baseZIndex - layerIndex;
 
         // bubbleIdのレイヤー番号を記録
@@ -61,7 +133,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             vanishingPoint={undergroundVanishingPoint}
             onClick={() => onBubbleClick?.(bubble.name)}
             onCloseClick={() => onBubbleClose?.(bubble)}
-            onMoveClick={() => onBubbleMove?.(bubble)}
+            onMove={(updated) => onBubbleMove?.(updated)}
             onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
             onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
           >
@@ -73,67 +145,39 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     .flat();
 
   return (
-    <StyledBubblesLayeredView
-      surface={{ leftTop: surfaceLeftTop }}
-      underground={{ vanishingPoint: undergroundVanishingPoint }}
-      surfaceZIndex={baseZIndex - 2}
-    >
-      {renderedBubbles}
-      <div className="e-underground-curtain">curtain</div>
-      <div className="e-debug-visualizations">
-        <div className="e-surface-border">surface</div>
-        <div className="e-underground-border">underground</div>
-        <div className="e-vanishing-point"></div>
-      </div>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <StyledBubblesLayeredView
+        surface={{ leftTop: surfaceLeftTop }}
+        underground={{ vanishingPoint: undergroundVanishingPoint }}
+        surfaceZIndex={baseZIndex - 2}
+      >
+        {renderedBubbles}
+        <div className="e-underground-curtain">curtain</div>
+        <div className="e-debug-visualizations">
+          <div className="e-surface-border">surface</div>
+          <div className="e-underground-border">underground</div>
+          <div className="e-vanishing-point"></div>
+        </div>
 
-      {
-        relations.map(({ opener, openee }) => {
+        {
+          relations.map(({ opener, openee }) => {
 
-          const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
+            const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
 
-          console.log({linkZIndex, openerZ: bubbleIdToZIndex[opener.id], openeeZ: bubbleIdToZIndex[openee.id]});
-          
-          if (!opener.renderedRect || !openee.renderedRect) return null;
+            return(
+              <LinkBubbleView
+                key={`${opener.id}_${openee.id}`}
+                opener={opener}
+                openee={openee}
+                coordinateSystem={coordinateSystem}
+                linkZIndex={linkZIndex}
+              />
+            );
+          })
+        }
 
-          return(
-            <div key={opener.id + "_" + openee.id} style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              zIndex: linkZIndex,
-              width: "100%",
-              height: "100%",
-              pointerEvents: "none",
-            }}>
-              <svg width="100%" height="100%">
-                <defs>
-                  <marker
-                    id="arrowhead"
-                    markerWidth="10"
-                    markerHeight="7"
-                    refX="0"
-                    refY="3.5"
-                    orient="auto"
-                  >
-                    <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-                  </marker>
-                </defs>
-                {/* 文字列表示 */}
-
-                <path
-                  d={`M ${opener.renderedRect.x || 0} ${opener.renderedRect.y || 0} L ${openee.renderedRect.x || 0} ${openee.renderedRect.y || 0} L ${openee.renderedRect.left || 0} ${openee.renderedRect.bottom || 0} L ${opener.renderedRect.left || 0} ${opener.renderedRect.bottom || 0} Z`}
-                  stroke="none"
-                  strokeWidth="2"
-                  fill={opener.colorHue === undefined ? "rgba(255,0,0,0.5)" : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`}
-                />
-              </svg>
-
-            </div>
-          )
-        })
-      }
-
-    </StyledBubblesLayeredView>
+      </StyledBubblesLayeredView>
+    </div>
   );
 };
 
@@ -145,8 +189,8 @@ type StyledBubblesLayeredViewProps = {
 };
 
 const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   position: relative;
   overflow: hidden;
   z-index: 0;
@@ -158,7 +202,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
     width: 100%;
     height: 100%;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(1px);
     pointer-events: none;
   }
 
@@ -167,8 +211,8 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       position: absolute;
       top: ${({ surface }) => surface.leftTop.y}px;
       left: ${({ surface }) => surface.leftTop.x}px;
-      width: calc(100vw - ${({ surface }) => surface.leftTop.x}px);
-      height: calc(100vh - ${({ surface }) => surface.leftTop.y}px);
+      width: calc(100% - ${({ surface }) => surface.leftTop.x}px);
+      height: calc(100% - ${({ surface }) => surface.leftTop.y}px);
       border: 2px solid red;
       pointer-events: none;
     }

@@ -4,14 +4,11 @@ import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
-import MoveDownIcon from "@mui/icons-material/MoveDown";
-import MoveUpIcon from "@mui/icons-material/MoveUp";
-import VerticalAlignTopIcon from "@mui/icons-material/VerticalAlignTop";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble } from "@bublys-org/bubbles-ui-state";
+import { renderBubble, updateBubble } from "@bublys-org/bubbles-ui-state";
 import { SmartRect } from "@bublys-org/bubbles-ui";
-import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
+//import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
   bubble: Bubble;
@@ -25,7 +22,7 @@ type BubbleProps = {
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
   onCloseClick?: (bubble: Bubble) => void;
-  onMoveClick?: (bubble: Bubble) => void;
+  onMove?: (bubble: Bubble) => void;
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
 };
@@ -41,7 +38,7 @@ export const BubbleView: FC<BubbleProps> = ({
   onCloseClick,
   onLayerDownClick,
   onLayerUpClick,
-  onMoveClick,
+  onMove,
 }) => {
   position = position || { x: 0, y: 0 };
   vanishingPoint = vanishingPoint || new Vec2({ x: 0, y: 0 });
@@ -88,9 +85,48 @@ export const BubbleView: FC<BubbleProps> = ({
     };
   }, []);
 
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
+
+  const endDrag = () => {
+    dragStartPosRef.current = null;
+    dragStartMouseRef.current = null;
+    document.removeEventListener("mousemove", handleDragging);
+    document.removeEventListener("mouseup", endDrag);
+  };
+
+  const handleDragging = (e: MouseEvent) => {
+    if (!dragStartPosRef.current || !dragStartMouseRef.current) return;
+    const deltaX = e.clientX - dragStartMouseRef.current.x;
+    const deltaY = e.clientY - dragStartMouseRef.current.y;
+    const newPos = {
+      x: dragStartPosRef.current.x + deltaX,
+      y: dragStartPosRef.current.y + deltaY,
+    };
+
+    dispatch(updateBubble(bubble.moveTo(newPos).toJSON()));
+  };
+
+  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
+    if (!onMove) return;
+    e.stopPropagation();
+    dragStartPosRef.current = { ...bubble.position };
+    dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
+    document.addEventListener("mousemove", handleDragging);
+    document.addEventListener("mouseup", endDrag);
+  };
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener("mousemove", handleDragging);
+      document.removeEventListener("mouseup", endDrag);
+    };
+  }, []);
+
   return (
     <StyledBubble
       ref={ref}
+      data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
       zIndex={isHovered ? 100 : zIndex} // ホバー時に最前面に
       layerIndex={layerIndex}
@@ -103,9 +139,9 @@ export const BubbleView: FC<BubbleProps> = ({
       
 
       >
-      <header className="e-bubble-header">
+      <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <Box sx={{ position: "relative", textAlign: "center" }}>
-          <h1 className="e-bubble-name">{bubble.name}</h1>
+          <h1 className="e-bubble-name">{bubble.type}</h1>
           <Stack
             direction="row"
             spacing={0} // 間隔をさらに詰める（デフォルトは1）
@@ -136,7 +172,8 @@ export const BubbleView: FC<BubbleProps> = ({
               </IconButton>
             )}
 
-            {onMoveClick && (
+
+            {/* {onMoveClick && (
               <IconButton
                 size="small"
                 sx={{
@@ -188,14 +225,15 @@ export const BubbleView: FC<BubbleProps> = ({
               >
                 <MoveUpIcon />
               </IconButton>
-            )} 
+            )}  */}
           </Stack>
         </Box>
       </header>
 
       <main className="e-bubble-content">
+        {/* 
         Type: {bubble.type}
-        {/* #{bubble.id}
+        #{bubble.id}
         <br />
         <br /> */}
         {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
@@ -266,6 +304,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   border-radius: 3em;
 
   >.e-bubble-header {
+    cursor: move;
+    user-select: none;
+
     .e-bubble-name {
       background: hsla(0, 0%, 100%, 0.5);
       padding: 0.5em;

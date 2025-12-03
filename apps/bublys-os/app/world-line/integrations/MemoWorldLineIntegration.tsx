@@ -19,11 +19,13 @@ export function MemoWorldLineIntegration({ memoId }: { memoId: string }) {
           onMouseDown={() => setFocusedObjectId(memoId)}
           tabIndex={-1}
         >
-          <MemoTitle memo={memo} />
+          <MemoTitle
+            memo={memo}
+            onSetAuthor={(userId) => onMemoChange(memo.setAuthor(userId))}
+          />
           <MemoEditor memo={memo} onMemoChange={onMemoChange} memoId={memoId} />
         </div>
       )}
     />
   );
 }
-

@@ -7,7 +7,10 @@ import {
   selectBubblesRelationByOpeneeId,
   selectSurfaceBubbles,
   updateBubble,
+  selectCoordinateSystem,
+  selectSurfaceLeftTop,
 } from './bubbles-slice.js';
+import { convertGlobalPointToLayerLocal } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -32,37 +35,48 @@ bubblesListener.startListening({
     const otherSiblingBubbles = surfaceBubbles.filter(b => b.id !== id);
 
     if (!otherSiblingBubbles.length) {
+      console.log("JoinSibling: No other siblings, skipping positioning");
       return;
     }
-    //全ての幅を足す
-    // const totalWidth = otherSiblingBubbles.reduce((sum, b) => sum + (b.renderedRect?.width || 0), 0);
-    // const thisBubble = selectBubble(state, { id });
-    // const moved = thisBubble.moveTo({ x: totalWidth, y: 0 });
-
-
 
     const thisBubble = selectBubble(state, { id });
 
-    //他のバブルの領域を合体mergeする
-    //const merged = otherSiblingBubbles.map(b => b.renderedRect).filter((b): b is SmartRect=> !!b).reduce((acc, b) => acc.merge(b));
-
-    const brotherBubble = otherSiblingBubbles[otherSiblingBubbles.length -1];
-
+    // 最後の兄弟バブル（最も右にあると想定）を基準にする
+    const brotherBubble = otherSiblingBubbles[otherSiblingBubbles.length - 1];
     const brotherRect = brotherBubble.renderedRect;
 
-    if(!brotherRect) {
+    if (!brotherRect) {
+      console.log("JoinSibling: Brother bubble has no renderedRect");
       return;
     }
 
-    const point = brotherRect.calcPositionToOpen(thisBubble.renderedRect?.size || { width: 0, height: 0 });
+    // 兄弟の隣に配置すべき位置を計算（グローバル座標）
+    const globalPoint = brotherRect.calcPositionForSibling(
+      thisBubble.renderedRect?.size || { width: 0, height: 0 }
+    );
+    console.log("JoinSibling: Calculated position (global)", globalPoint);
 
-    //listenerApi.dispatch(addPoint(point));
-
-    if(!point) {
+    if (!globalPoint) {
       return;
     }
 
-    const moved = thisBubble.moveTo(point);
+    // グローバル座標系の設定を取得
+    const coordinateConfig = selectCoordinateSystem(state);
+    const surfaceLeftTop = selectSurfaceLeftTop(state);
+    console.log("JoinSibling: Coordinate config", coordinateConfig);
+    console.log("JoinSibling: Surface left top", surfaceLeftTop);
+
+    // グローバル座標をトップレイヤーのローカル座標に変換
+    const relativePoint = convertGlobalPointToLayerLocal(
+      globalPoint,
+      0, // joinSiblingはトップレイヤー（surface）に配置される
+      coordinateConfig,
+      surfaceLeftTop
+    );
+
+    console.log("JoinSibling: Converted to layer-local point", relativePoint);
+
+    const moved = thisBubble.moveTo(relativePoint);
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));
@@ -139,14 +153,31 @@ bubblesListener.startListening({
     }
 
     const point = openerBubble.renderedRect.calcPositionToOpen(poppingBubble.renderedRect.size);
-    console.log("Pop: Calculated point to open at", point);
-    
+    console.log("Pop: Calculated point to open at (global)", point);
+
 
     if(!point) {
       return;
     }
 
-    const moved = poppingBubble.moveTo(point);
+    // グローバル座標系の設定を取得
+    const coordinateConfig = selectCoordinateSystem(newState);
+    const surfaceLeftTop = selectSurfaceLeftTop(newState);
+    console.log("Pop: Global coordinate config", coordinateConfig);
+    console.log("Pop: Surface left top", surfaceLeftTop);
+
+    // calcPositionToOpenはglobal座標を返す
+    // これをトップレイヤー（layerIndex=0）のローカル座標に変換
+    const relativePoint = convertGlobalPointToLayerLocal(
+      point,
+      0, // poppingBubbleはトップレイヤー（surface）に配置される
+      coordinateConfig,
+      surfaceLeftTop
+    );
+
+    console.log("Pop: Converted to layer-local point", relativePoint);
+
+    const moved = poppingBubble.moveTo(relativePoint);
 
     // バブルを更新
     listenerApi.dispatch(updateBubble(moved.toJSON()));

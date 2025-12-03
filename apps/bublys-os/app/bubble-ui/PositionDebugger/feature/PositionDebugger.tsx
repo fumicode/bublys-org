@@ -1,11 +1,12 @@
 "use client";
 
-import { FC, useState } from "react";
-import { Point2 } from "@bublys-org/bubbles-ui"
+import { FC, useState, useContext } from "react";
+import { Point2, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui"
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";
 import { PagePointViewer } from "../ui/PagePointViewer";
+import { BubblesContext } from "../../BubblesUI/domain/BubblesContext";
 
 type PositionDebuggerProviderProps = {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
   const [points, setPoints] = useState<Point2[]>([]);
   const [rects, setRects] = useState<SmartRect[]>([]);
   const pageSize = useWindowSize();
+  const { coordinateSystem } = useContext(BubblesContext);
   //------------------- hooks above --------------------
 
   if (isShown === false) {
@@ -40,7 +42,14 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
     });
   };
   const addRects = (newRects: DOMRectReadOnly[]) => {
-    const smartRects = newRects.map((rect) => new SmartRect(rect, pageSize));
+    const smartRects = newRects.map((rect) => {
+      // すでにSmartRectの場合はそのまま使用（coordinateSystemを保持）
+      if (rect instanceof SmartRect) {
+        return rect;
+      }
+      // DOMRectReadOnlyの場合は新しいSmartRectを作成
+      return new SmartRect(rect, pageSize);
+    });
     setRects((prevRects) => {
       const uniqueRects = smartRects.filter(
         (newRect) =>
@@ -49,21 +58,36 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
               prevRect.x === newRect.x &&
               prevRect.y === newRect.y &&
               prevRect.width === newRect.width &&
-              prevRect.height === newRect.height
+              prevRect.height === newRect.height &&
+              prevRect.coordinateSystem.layerIndex === newRect.coordinateSystem.layerIndex &&
+              prevRect.coordinateSystem.offset.x === newRect.coordinateSystem.offset.x &&
+              prevRect.coordinateSystem.offset.y === newRect.coordinateSystem.offset.y
           )
       );
 
       return [...prevRects, ...uniqueRects];
     });
   };
+
+  const removeRect = (index: number) => {
+    setRects((prevRects) => prevRects.filter((_, i) => i !== index));
+  };
+
+  const removeAllRects = () => {
+    setRects([]);
+  };
+
   return (
     //子コンポーネントにvalueを配布。ここではchildrenとPagePointViewerに配布
     <PositionDebuggerContext.Provider
       value={{
         points,
         rects,
+        coordinateSystem: coordinateSystem || GLOBAL_COORDINATE_SYSTEM,
         addPoints,
         addRects,
+        removeRect,
+        removeAllRects,
       }}
     >
       {children}

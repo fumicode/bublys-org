@@ -1,9 +1,10 @@
 "use client";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useContext } from "react";
 import { useWindowSize } from "./01_useWindowSize";
-import { SmartRect } from "@bublys-org/bubbles-ui";
+import { SmartRect, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount } from "@bublys-org/bubbles-ui-state";
+import { BubblesContext } from "../BubblesUI/domain/BubblesContext";
 
 type useMyRectProps  = {
   onRectChanged?: (rect: SmartRect) => void;
@@ -11,7 +12,7 @@ type useMyRectProps  = {
 
 export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const ref = useRef<HTMLDivElement>(null);
-
+  const { coordinateSystem } = useContext(BubblesContext);
 
   //うまく取れてない
   const pageSize = useWindowSize();
@@ -24,8 +25,11 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
       return;
     }
 
-    const rect = new SmartRect(ref.current.getBoundingClientRect(), pageSize);
-    onRectChanged?.(rect);
+    // getBoundingClientRect()はグローバル座標を返すので、まずGLOBAL_COORDINATE_SYSTEMでSmartRectを作成
+    const globalRect = new SmartRect(ref.current.getBoundingClientRect(), pageSize, GLOBAL_COORDINATE_SYSTEM);
+    // その後、ローカル座標系に変換
+    const localRect = globalRect.toLocal(coordinateSystem);
+    onRectChanged?.(localRect);
   };
 
 
@@ -37,7 +41,7 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
 
     saveRect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderCount, pageSize]);
+  }, [renderCount, pageSize, coordinateSystem]);
 
 
 
