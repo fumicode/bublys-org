@@ -6,6 +6,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon";
 import { UrledPlace } from "../../bubble-ui/components";
+import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
 
 type UserListViewProps = {
   users: User[];
@@ -37,22 +38,36 @@ export const UserListView: FC<UserListViewProps> = ({
             className="e-item"
             draggable={true}
             onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "linkMove";
-              e.dataTransfer.setData("text/user-id", user.id);
+              console.log('[UserListView] onDragStart', { userId: user.id, userName: user.name, showReorder, detailUrl });
+
+              // シンプルに3つのデータだけ
+              e.dataTransfer.setData("user", detailUrl);    // bubble type
+              e.dataTransfer.setData("label", user.name);   // 表示名
+
+              e.dataTransfer.effectAllowed = "copy";
             }}
             onDragOver={(e) => {
-              if (!showReorder) return;
+              if (!showReorder) {
+                // リオーダーモードでない場合は、preventDefault()しない（ポケットへのドロップを許可）
+                return;
+              }
               e.preventDefault();
             }}
             onDrop={(e) => {
-              if (!showReorder) return;
+              if (!showReorder) {
+                // リオーダーモードでない場合は、イベントをバブリングさせる（ポケットへのドロップを許可）
+                // preventDefault()もstopPropagation()も呼ばない
+                return;
+              }
 
-              const sourceId = e.dataTransfer.getData("text/user-id");
+              // URLからユーザーIDを抽出
+              const sourceUrl = e.dataTransfer.getData("user");
+              if (!sourceUrl) return;
+              const sourceId = extractIdFromUrl(sourceUrl);
               if (!sourceId || sourceId === user.id) return;
               const existsInList = users.some((u) => u.id === sourceId);
               if (!existsInList) {
-                // Allow bubbling so the parent container can handle adding external users.
-                e.preventDefault();
+                // リスト外のユーザーの場合もバブリングさせる
                 return;
               }
               e.preventDefault();
@@ -69,6 +84,7 @@ export const UserListView: FC<UserListViewProps> = ({
               <UrledPlace url={detailUrl}>
                 <button
                   style={{ all: "unset", cursor: "pointer" }}
+                  draggable={false}
                   onClick={() => onUserClick?.(user.id, detailUrl)}
                 >
                   <div className="e-main">
@@ -87,6 +103,7 @@ export const UserListView: FC<UserListViewProps> = ({
                   <IconButton
                     size="small"
                     aria-label="remove user"
+                    draggable={false}
                     onClick={(e) => {
                       e.stopPropagation();
                       onUserDelete?.(user.id);

@@ -7,9 +7,24 @@ type IconBadgeProps = {
   label: string;
   onClick?: () => void;
   dataUrl?: string;
+  draggable?: boolean;
+  dragType?: 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic';
 };
 
-export const IconBadge = ({ icon, label, onClick, dataUrl}: IconBadgeProps) => {
+export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType}: IconBadgeProps) => {
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!dataUrl) return;
+
+    e.dataTransfer.effectAllowed = 'copy';
+
+    // シンプルに bubble type と 2つのデータだけ
+    if (dragType) {
+      e.dataTransfer.setData(dragType, dataUrl);  // 例: "user" -> "users/123"
+    }
+    e.dataTransfer.setData('url', dataUrl);       // URL
+    e.dataTransfer.setData('label', label);        // ラベル（表示名）
+  };
+
   const badge = (
     <StyledBadge
       role={onClick ? "button" : undefined}
@@ -23,6 +38,8 @@ export const IconBadge = ({ icon, label, onClick, dataUrl}: IconBadgeProps) => {
         }
       }}
       $clickable={!!onClick}
+      draggable={draggable && !!dataUrl}
+      onDragStart={handleDragStart}
     >
       <span className="e-icon">{icon}</span>
       <span className="e-label">{label}</span>

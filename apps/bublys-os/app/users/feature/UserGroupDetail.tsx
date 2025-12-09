@@ -11,6 +11,7 @@ import { UserGroup } from "../domain/UserGroup.domain";
 import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
 import { UserGroupIcon } from "../ui/UserIcon";
+import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
 
 type UserGroupDetailProps = {
   groupId: string;
@@ -57,9 +58,12 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     console.log("onDrop UserGroupDetail start");
-    
+
     e.preventDefault();
-    const droppedUserId = e.dataTransfer.getData("text/user-id");
+    // URLからユーザーIDを抽出
+    const droppedUserUrl = e.dataTransfer.getData("user");
+    if (!droppedUserUrl) return;
+    const droppedUserId = extractIdFromUrl(droppedUserUrl);
     if (!droppedUserId) return;
     const updated = group.joinMember(droppedUserId);
     dispatch(updateUserGroup(updated.toJSON()));

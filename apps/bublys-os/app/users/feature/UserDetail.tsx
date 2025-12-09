@@ -21,13 +21,17 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData("text/user-id", user.id);
+    const userUrl = `users/${user.id}`;
+    // シンプルに3つのデータだけ
+    e.dataTransfer.setData("user", userUrl);      // bubble type
+    e.dataTransfer.setData("url", userUrl);       // URL
+    e.dataTransfer.setData("label", user.name);   // 表示名
     e.dataTransfer.effectAllowed = "copy";
   };
 
   return (
     <div >
-      <h3 draggable onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <h3 draggable={true} onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <UserIcon fontSize="small" /> {user.name}
       </h3>
       <div>生年月日: {user.birthday}</div>

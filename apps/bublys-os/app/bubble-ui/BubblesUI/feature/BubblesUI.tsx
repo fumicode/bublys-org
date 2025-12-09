@@ -1,5 +1,5 @@
 import { FC, useEffect, useCallback } from "react";
-import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
 
 import {
   selectBubblesProcessDPO,
@@ -25,6 +25,7 @@ import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Button, Slider, Typography } from "@mui/material";
 import IframeViewer from "../../IframeViewer/IframeViewer";
 import "../domain/bubbleRoutes";
+import { PocketView } from "../../Pocket/ui/PocketView";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -102,6 +103,22 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(setGlobalCoordinateSystem(cs));
   }, [dispatch]);
 
+  // Pocketのドロップハンドラー
+  const handlePocketDrop = (url: string, type: string, label?: string) => {
+    dispatch(addPocketItem({
+      id: crypto.randomUUID(),
+      url,
+      type: type as 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic',
+      label,
+      addedAt: Date.now(),
+    }));
+  };
+
+  // Pocketアイテムのクリックハンドラー
+  const handlePocketItemClick = (url: string) => {
+    popChildOrJoinSibling(url, "root");
+  };
+
   return (
     <>
       <BubblesContext.Provider
@@ -136,6 +153,21 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           </IframeViewer>
         </PositionDebuggerProvider>
       </BubblesContext.Provider>
+
+      {/* Pocket */}
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 20,
+          right: 340,
+          zIndex: 1000,
+        }}
+      >
+        <PocketView
+          onDrop={handlePocketDrop}
+          onItemClick={handlePocketItemClick}
+        />
+      </Box>
 
       <Box
         sx={{

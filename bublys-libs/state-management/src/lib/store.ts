@@ -21,6 +21,7 @@ import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { userSlice } from "./slices/user-slice.js";
 import { userGroupSlice } from "./slices/user-group-slice.js";
+import { pocketSlice } from "./slices/pocket-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -37,6 +38,7 @@ const reducers = combineReducers({
   [memoSlice.reducerPath]: memoSlice.reducer,
   [userSlice.name]: userSlice.reducer,
   [userGroupSlice.name]: userGroupSlice.reducer,
+  [pocketSlice.name]: pocketSlice.reducer,
 
   //iframe-slices
   app: appReducer,

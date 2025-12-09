@@ -14,6 +14,7 @@ export const UserBadge = ({ label, onClick, linkTarget }: UserBadgeProps) => {
       label={label}
       onClick={onClick}
       dataUrl={linkTarget}
+      dragType="user"
     />
   );
 };
