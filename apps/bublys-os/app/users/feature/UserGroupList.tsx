@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector, selectUserGroups, setUserGroups, addUse
 import { UserGroup } from "../domain/UserGroup.domain";
 import { UserGroupIcon } from "../ui/UserIcon";
 import { UrledPlace } from "../../bubble-ui/components";
+import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;
@@ -41,6 +42,13 @@ export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect
                 <button
                   style={{ all: "unset", cursor: "pointer" }}
                   onClick={() => onSelect?.(group.id, url)}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(DRAG_DATA_TYPES.userGroup, url);
+                    e.dataTransfer.setData("url", url);
+                    e.dataTransfer.setData("label", group.name);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
                 >
                   <UserGroupIcon fontSize="small" style={{ marginRight: 6, verticalAlign: "middle" }} />
                   {group.name}

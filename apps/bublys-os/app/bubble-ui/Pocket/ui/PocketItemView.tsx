@@ -16,14 +16,14 @@ type PocketItemViewProps = {
 export const PocketItemView: FC<PocketItemViewProps> = ({ item, onRemove, onClick }) => {
   const getIcon = () => {
     switch (item.type) {
-      case 'user':
-      case 'users':
+      case 'type/user':
+      case 'type/users':
         return <UserIcon fontSize="small" />;
-      case 'user-group':
-      case 'user-groups':
+      case 'type/user-group':
+      case 'type/user-groups':
         return <UserGroupIcon fontSize="small" />;
-      case 'memo':
-      case 'memos':
+      case 'type/memo':
+      case 'type/memos':
         return <MemoIcon />;
       default:
         return <InsertDriveFileIcon fontSize="small" />;

@@ -5,7 +5,14 @@ import type { RootState } from "../store.js";
 export type PocketItemState = {
   id: string;
   url: string;
-  type: 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic';
+  type:
+    | 'type/user'
+    | 'type/users'
+    | 'type/user-group'
+    | 'type/user-groups'
+    | 'type/memo'
+    | 'type/memos'
+    | 'type/generic';
   label?: string;
   icon?: string;
   addedAt: number;

@@ -3,6 +3,7 @@ import { useAppSelector, selectUserById, selectUserGroups } from "@bublys-org/st
 import { User } from "../domain/User.domain";
 import { UserIcon } from "../ui/UserIcon";
 import { UserGroupBadgeView } from "../ui/UserGroupBadgeView";
+import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
 
 type UserDetailProps = {
   userId: string;
@@ -23,9 +24,9 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     const userUrl = `users/${user.id}`;
     // シンプルに3つのデータだけ
-    e.dataTransfer.setData("user", userUrl);      // bubble type
-    e.dataTransfer.setData("url", userUrl);       // URL
-    e.dataTransfer.setData("label", user.name);   // 表示名
+    e.dataTransfer.setData(DRAG_DATA_TYPES.user, userUrl);      // bubble type
+    e.dataTransfer.setData("url", userUrl);                     // URL
+    e.dataTransfer.setData("label", user.name);                 // 表示名
     e.dataTransfer.effectAllowed = "copy";
   };
 

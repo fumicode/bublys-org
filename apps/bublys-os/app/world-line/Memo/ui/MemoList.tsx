@@ -8,6 +8,7 @@ import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
 import { selectUsers } from '@bublys-org/state-management';
 import { UrledPlace } from '../../../bubble-ui/components';
+import { DRAG_DATA_TYPES } from '../../../bubble-ui/utils/drag-types';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -52,7 +53,19 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
     <div>
       <StyledMemoList>
         {memos.map((memo) => (
-          <li key={memo.id} className="e-item">
+          <li
+            key={memo.id}
+            className="e-item"
+            draggable={true}
+            onDragStart={(e) => {
+              const detailUrl = buildDetailUrl(memo.id);
+              const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
+              e.dataTransfer.setData(DRAG_DATA_TYPES.memo, detailUrl);
+              e.dataTransfer.setData("url", detailUrl);
+              e.dataTransfer.setData("label", label);
+              e.dataTransfer.effectAllowed = "copy";
+            }}
+          >
             <UrledPlace url={buildDetailUrl(memo.id)}>
               <button
                 style={{ all: "unset", cursor: "pointer" }}

@@ -2,7 +2,14 @@
  * ポケットに保存されるアイテム
  * bubble typeと同じ形式を使用
  */
-export type PocketItemType = 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic';
+export type PocketItemType =
+  | 'type/user'
+  | 'type/users'
+  | 'type/user-group'
+  | 'type/user-groups'
+  | 'type/memo'
+  | 'type/memos'
+  | 'type/generic';
 
 export type PocketItemState = {
   id: string;
@@ -13,10 +20,12 @@ export type PocketItemState = {
   addedAt: number;
 };
 
+import { DRAG_DATA_TYPES } from '../../utils/drag-types';
+
 export class PocketItem {
   constructor(readonly state: PocketItemState) {}
 
-  static create(url: string, type: PocketItemType = 'generic', label?: string): PocketItem {
+  static create(url: string, type: PocketItemType = DRAG_DATA_TYPES.generic, label?: string): PocketItem {
     return new PocketItem({
       id: crypto.randomUUID(),
       url,

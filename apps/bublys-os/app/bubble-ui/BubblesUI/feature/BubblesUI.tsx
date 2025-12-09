@@ -26,6 +26,7 @@ import { Box, Button, Slider, Typography } from "@mui/material";
 import IframeViewer from "../../IframeViewer/IframeViewer";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+import { DragDataType } from "../../utils/drag-types";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -104,11 +105,11 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   // Pocketのドロップハンドラー
-  const handlePocketDrop = (url: string, type: string, label?: string) => {
+  const handlePocketDrop = (url: string, type: DragDataType, label?: string) => {
     dispatch(addPocketItem({
       id: crypto.randomUUID(),
       url,
-      type: type as 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic',
+      type,
       label,
       addedAt: Date.now(),
     }));

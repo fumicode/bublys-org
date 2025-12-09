@@ -4,10 +4,11 @@ import { useAppDispatch, useAppSelector, selectPocketItems, removePocketItem } f
 import { PocketItemView } from './PocketItemView';
 import { Box, Typography } from '@mui/material';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
+import { DRAG_DATA_TYPE_LIST, DRAG_DATA_TYPES, DragDataType } from '../../utils/drag-types';
 
 type PocketViewProps = {
   onItemClick?: (url: string) => void;
-  onDrop?: (url: string, type: string, label?: string) => void;
+  onDrop?: (url: string, type: DragDataType, label?: string) => void;
 };
 
 export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
@@ -41,10 +42,9 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
     const label = e.dataTransfer.getData('label');
 
     // bubble typeを検出
-    const bubbleTypes = ['user', 'users', 'user-group', 'user-groups', 'memo', 'memos'] as const;
-    let type: 'user' | 'users' | 'user-group' | 'user-groups' | 'memo' | 'memos' | 'generic' = 'generic';
+    let type: DragDataType = DRAG_DATA_TYPES.generic;
 
-    for (const t of bubbleTypes) {
+    for (const t of DRAG_DATA_TYPE_LIST) {
       if (e.dataTransfer.types.includes(t)) {
         type = t;
         break;

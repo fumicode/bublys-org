@@ -12,6 +12,7 @@ import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
 import { UserGroupIcon } from "../ui/UserIcon";
 import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
+import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
 
 type UserGroupDetailProps = {
   groupId: string;
@@ -61,7 +62,7 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
 
     e.preventDefault();
     // URLからユーザーIDを抽出
-    const droppedUserUrl = e.dataTransfer.getData("user");
+    const droppedUserUrl = e.dataTransfer.getData(DRAG_DATA_TYPES.user);
     if (!droppedUserUrl) return;
     const droppedUserId = extractIdFromUrl(droppedUserUrl);
     if (!droppedUserId) return;
@@ -92,7 +93,17 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
 
   return (
     <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
-      <h3 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <h3
+        style={{ display: "flex", alignItems: "center", gap: 6 }}
+        draggable={true}
+        onDragStart={(e) => {
+          const url = `user-groups/${group.id}`;
+          e.dataTransfer.setData(DRAG_DATA_TYPES.userGroup, url);
+          e.dataTransfer.setData("url", url);
+          e.dataTransfer.setData("label", group.name);
+          e.dataTransfer.effectAllowed = "copy";
+        }}
+      >
         <UserGroupIcon fontSize="small" /> {group.name}
       </h3>
 

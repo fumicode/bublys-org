@@ -1,5 +1,6 @@
 import { UserIcon } from "./UserIcon";
 import { IconBadge } from "./IconBadge";
+import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
 
 type UserBadgeProps = {
   label: string;
@@ -14,7 +15,7 @@ export const UserBadge = ({ label, onClick, linkTarget }: UserBadgeProps) => {
       label={label}
       onClick={onClick}
       dataUrl={linkTarget}
-      dragType="user"
+      dragType={DRAG_DATA_TYPES.user}
     />
   );
 };
