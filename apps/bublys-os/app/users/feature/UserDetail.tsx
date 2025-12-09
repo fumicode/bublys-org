@@ -26,7 +26,7 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
   };
 
   return (
-    <div>
+    <div >
       <h3 draggable onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <UserIcon fontSize="small" /> {user.name}
       </h3>

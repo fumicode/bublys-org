@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
 import { selectUsers } from '@bublys-org/state-management';
+import { UrledPlace } from '../../../bubble-ui/components';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -52,13 +53,18 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
       <StyledMemoList>
         {memos.map((memo) => (
           <li key={memo.id} className="e-item">
-            <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
-              const detailUrl = buildDetailUrl(memo.id);
-              onMemoClick?.(memo.id, detailUrl);
-            }} data-link-target={buildDetailUrl(memo.id)}>
-              <MemoIcon/>
-              <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
-            </button>
+            <UrledPlace url={buildDetailUrl(memo.id)}>
+              <button
+                style={{ all: "unset", cursor: "pointer" }}
+                onClick={() => {
+                  const detailUrl = buildDetailUrl(memo.id);
+                  onMemoClick?.(memo.id, detailUrl);
+                }}
+              >
+                <MemoIcon/>
+                <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
+              </button>
+            </UrledPlace>
 
             {memo.authorId && (
               <span style={{ marginLeft: 8 }}>

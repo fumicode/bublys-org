@@ -13,7 +13,7 @@ export const UserGroupBadge = ({ label, onClick, linkTarget }: UserGroupBadgePro
       icon={<UserGroupIcon fontSize="small" />}
       label={label}
       onClick={onClick}
-      dataLinkTarget={linkTarget}
+      dataUrl={linkTarget}
     />
   );
 };

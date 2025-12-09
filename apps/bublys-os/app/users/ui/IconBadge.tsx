@@ -1,15 +1,16 @@
 import React from "react";
 import styled from "styled-components";
+import { UrledPlace } from "../../bubble-ui/components";
 
 type IconBadgeProps = {
   icon: React.ReactNode;
   label: string;
   onClick?: () => void;
-  dataLinkTarget?: string;
+  dataUrl?: string;
 };
 
-export const IconBadge = ({ icon, label, onClick, dataLinkTarget }: IconBadgeProps) => {
-  return (
+export const IconBadge = ({ icon, label, onClick, dataUrl}: IconBadgeProps) => {
+  const badge = (
     <StyledBadge
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : -1}
@@ -22,12 +23,17 @@ export const IconBadge = ({ icon, label, onClick, dataLinkTarget }: IconBadgePro
         }
       }}
       $clickable={!!onClick}
-      data-link-target={dataLinkTarget}
     >
       <span className="e-icon">{icon}</span>
       <span className="e-label">{label}</span>
     </StyledBadge>
   );
+
+  if (dataUrl) {
+    return <UrledPlace url={dataUrl}>{badge}</UrledPlace>;
+  }
+
+  return badge;
 };
 
 const StyledBadge = styled.span<{ $clickable: boolean }>`

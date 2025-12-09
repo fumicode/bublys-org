@@ -13,7 +13,7 @@ export const UserBadge = ({ label, onClick, linkTarget }: UserBadgeProps) => {
       icon={<UserIcon fontSize="small" />}
       label={label}
       onClick={onClick}
-      dataLinkTarget={linkTarget}
+      dataUrl={linkTarget}
     />
   );
 };

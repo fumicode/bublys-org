@@ -5,6 +5,7 @@ import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon";
+import { UrledPlace } from "../../bubble-ui/components";
 
 type UserListViewProps = {
   users: User[];
@@ -58,40 +59,42 @@ export const UserListView: FC<UserListViewProps> = ({
               e.stopPropagation();
               onReorder?.(sourceId, user.id);
             }}
-          >
+          > 
             <div className="e-content">
               {showReorder && (
                 <span className="e-drag-handle" aria-label="drag user">
                   <DragIndicatorIcon fontSize="small" />
                 </span>
               )}
-              <button
-                style={{ all: "unset", cursor: "pointer" }}
-                data-link-target={detailUrl}
-                onClick={() => onUserClick?.(user.id, detailUrl)}
-              >
-                <div className="e-main">
-                  <UserIcon fontSize="small" className="e-avatar" />
-                  <div className="e-text">
-                    <div className="e-name">{user.name}</div>
-                    <div className="e-meta">
-                      {user.birthday} / {user.getAge()}歳
+              <UrledPlace url={detailUrl}>
+                <button
+                  style={{ all: "unset", cursor: "pointer" }}
+                  onClick={() => onUserClick?.(user.id, detailUrl)}
+                >
+                  <div className="e-main">
+                    <UserIcon fontSize="small" className="e-avatar" />
+                    <div className="e-text">
+                      <div className="e-name">{user.name}</div>
+                      <div className="e-meta">
+                        {user.birthday} / {user.getAge()}歳
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </UrledPlace>
               <span className="e-button-group">
-                <IconButton
-                  size="small"
-                  aria-label="remove user"
-                  data-link-target={deleteUrl}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUserDelete?.(user.id);
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
+                <UrledPlace url={deleteUrl}>
+                  <IconButton
+                    size="small"
+                    aria-label="remove user"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUserDelete?.(user.id);
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </UrledPlace>
               </span>
             </div>
           </li>
@@ -100,6 +103,10 @@ export const UserListView: FC<UserListViewProps> = ({
     </StyledUserList>
   );
 };
+
+
+
+
 
 const StyledUserList = styled.ul`
   list-style: none;

@@ -17,21 +17,16 @@ import { MobBubble } from "../ui/bubbles/MobBubble";
 import { UserGroupList } from "@/app/users/feature/UserGroupList";
 import { UserGroupDetail } from "@/app/users/feature/UserGroupDetail";
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
-import { MemoEditor } from "@/app/world-line/Memo/ui/MemoEditor";
-import { MemoTitle } from "@/app/world-line/Memo/ui/MemoTitle";
 import { UserCollection } from "@/app/users/feature/UserCollection";
 import { UserDetail } from "@/app/users/feature/UserDetail";
 import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
 import { IframeBubble } from "../ui/bubbles/IframeBubble";
 import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
 import { BubblesContext } from "./BubblesContext";
-import { useAppDispatch, useAppSelector, selectApexWorld, updateState } from "@bublys-org/state-management";
-import { deserializeMemo, serializeMemo } from "@/app/world-line/Memo/feature/MemoManager";
-import { WorldLineState } from "@bublys-org/state-management";
+import { useAppDispatch, useAppSelector, } from "@bublys-org/state-management";
 import { addUser } from "@bublys-org/state-management";
 import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
-import { Memo } from "@/app/world-line/Memo/domain/Memo";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 
@@ -123,14 +118,12 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "");
-  const { openBubble } = useContext(BubblesContext);
 
-
-    return (
-      <MemoWorldLineManager memoId={memoId}>
-        <MemoWorldLineIntegration memoId={memoId} />
-      </MemoWorldLineManager>
-    );
+  return (
+    <MemoWorldLineManager memoId={memoId}>
+      <MemoWorldLineIntegration memoId={memoId} />
+    </MemoWorldLineManager>
+  );
 };
 
 // const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -214,7 +207,11 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 const routes: BubbleRoute[] = [
-  { pattern: /^mob$/, type: "mob", Component: ({ bubble }) => <MobBubble bubble={bubble} /> },
+  { 
+    pattern: /^mob$/, 
+    type: "mob", 
+    Component: ({ bubble }) => <MobBubble bubble={bubble} /> 
+  },
   {
     pattern: /^user-groups$/,
     type: "user-groups",
@@ -229,17 +226,49 @@ const routes: BubbleRoute[] = [
       );
     },
   },
-  { pattern: /^user-groups\/.+$/, type: "user-group", Component: UserGroupBubble },
-  { pattern: /^users$/, type: "users", Component: UsersBubble },
-  { pattern: /^users\/create$/, type: "user-create", Component: UserCreateBubble },
-  { pattern: /^users\/[^/]+\/delete-confirm$/, type: "user-delete-confirm", Component: UserDeleteConfirmBubble },
-  { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
-  { pattern: /^memos$/, type: "memos", Component: MemosBubble },
-  { pattern: /^memos\/.+$/, type: "memo", Component: MemoBubble },
-  { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
-    const appId = bubble.name.replace("iframes/", "");
-    return (<IframeBubble appId={appId} />);
-  } },
+  { 
+    pattern: /^user-groups\/.+$/, 
+    type: "user-group", 
+    Component: UserGroupBubble 
+  },
+  { 
+    pattern: /^users$/, 
+    type: "users", 
+    Component: UsersBubble 
+  },
+  { 
+    pattern: /^users\/create$/, 
+    type: "user-create", 
+    Component: UserCreateBubble 
+  },
+  { 
+    pattern: /^users\/[^/]+\/delete-confirm$/, 
+    type: "user-delete-confirm", 
+    Component: UserDeleteConfirmBubble 
+  },
+  { 
+    pattern: /^users\/[^/]+$/, 
+    type: "user", 
+    Component: UserBubble 
+  },
+  { 
+    pattern: /^memos$/, 
+    type: "memos", 
+    Component: MemosBubble 
+  },
+  { 
+    pattern: /^memos\/.+$/, 
+    type: "memo", 
+    Component: MemoBubble 
+  },
+  { 
+    pattern: /^iframes\/.+$/, 
+    type: "iframe", 
+    Component: ({ bubble }) => {
+      const appId = bubble.name.replace("iframes/", "");
+      return (<IframeBubble appId={appId} />);
+    } 
+  },
 ];
 
 export const bubbleRoutes = routes;
