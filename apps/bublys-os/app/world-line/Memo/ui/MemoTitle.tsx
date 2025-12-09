@@ -4,7 +4,7 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import { MemoIcon } from './MemoIcon';
 import { useAppSelector, selectUsers } from '@bublys-org/state-management';
 import { UserBadge } from '@/app/users/ui/UserBadge';
-import { DRAG_DATA_TYPES } from '../../../bubble-ui/utils/drag-types';
+import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from '../../../bubble-ui/utils/drag-types';
 import { extractIdFromUrl } from '../../../bubble-ui/utils/url-parser';
 
 interface MemoTitleProps {
@@ -21,11 +21,9 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
   const authorName = memo.authorId ? users.find((u) => u.id === memo.authorId)?.name : undefined;
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    // 優先してtype/userのURLからIDを抽出、なければ旧形式のtext/user-idを使用
-    const userUrl = e.dataTransfer.getData(DRAG_DATA_TYPES.user);
-    const userIdFromUrl = userUrl ? extractIdFromUrl(userUrl) : "";
-    const fallbackUserId = e.dataTransfer.getData("text/user-id");
-    const userId = userIdFromUrl || fallbackUserId;
+    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+    const url = payload?.url || e.dataTransfer.getData(DRAG_DATA_TYPES.user);
+    const userId = url ? extractIdFromUrl(url) : "";
     if (!userId) return;
     e.preventDefault();
     onSetAuthor?.(userId);
@@ -38,10 +36,11 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
         draggable={true}
         onDragStart={(e) => {
           const url = `memos/${memo.id}`;
-          e.dataTransfer.setData(DRAG_DATA_TYPES.memo, url);
-          e.dataTransfer.setData("url", url);
-          e.dataTransfer.setData("label", content || "メモ");
-          e.dataTransfer.effectAllowed = "copy";
+          setDragPayload(e, {
+            type: DRAG_DATA_TYPES.memo,
+            url,
+            label: content || "メモ",
+          });
         }}
       >
         <MemoIcon fontSize="medium" />
@@ -53,7 +52,8 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
       <div
         style={{ display: "flex", alignItems: "center", gap: 6, color: "#555" }}
         onDragOver={(e) => {
-          if (onSetAuthor) e.preventDefault();
+          if (!onSetAuthor) return;
+          e.preventDefault();
         }}
         onDrop={handleDrop}
       >

@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "styled-components";
 import { UrledPlace } from "../../bubble-ui/components";
-import { DragDataType } from "../../bubble-ui/utils/drag-types";
+import { DragDataType, useDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type IconBadgeProps = {
   icon: React.ReactNode;
@@ -13,18 +13,8 @@ type IconBadgeProps = {
 };
 
 export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType}: IconBadgeProps) => {
-  const handleDragStart = (e: React.DragEvent) => {
-    if (!dataUrl) return;
-
-    e.dataTransfer.effectAllowed = 'copy';
-
-    // シンプルに bubble type と 2つのデータだけ
-    if (dragType) {
-      e.dataTransfer.setData(dragType, dataUrl);  // 例: "type/user" -> "users/123"
-    }
-    e.dataTransfer.setData('url', dataUrl);       // URL
-    e.dataTransfer.setData('label', label);        // ラベル（表示名）
-  };
+  const dragPayload = dragType && dataUrl ? { type: dragType, url: dataUrl, label } : null;
+  const { draggable: canDrag, onDragStart } = useDragPayload(dragPayload);
 
   const badge = (
     <StyledBadge
@@ -39,8 +29,8 @@ export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dra
         }
       }}
       $clickable={!!onClick}
-      draggable={draggable && !!dataUrl}
-      onDragStart={handleDragStart}
+      draggable={draggable && !!dataUrl && canDrag}
+      onDragStart={onDragStart}
     >
       <span className="e-icon">{icon}</span>
       <span className="e-label">{label}</span>

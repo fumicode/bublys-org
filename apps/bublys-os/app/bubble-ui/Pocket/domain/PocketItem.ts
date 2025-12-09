@@ -1,15 +1,11 @@
+import { DRAG_DATA_TYPES } from '../../utils/drag-types';
+import type { DragDataType } from '../../utils/drag-types';
+
 /**
  * ポケットに保存されるアイテム
  * bubble typeと同じ形式を使用
  */
-export type PocketItemType =
-  | 'type/user'
-  | 'type/users'
-  | 'type/user-group'
-  | 'type/user-groups'
-  | 'type/memo'
-  | 'type/memos'
-  | 'type/generic';
+export type PocketItemType = DragDataType;
 
 export type PocketItemState = {
   id: string;
@@ -19,8 +15,6 @@ export type PocketItemState = {
   icon?: string;
   addedAt: number;
 };
-
-import { DRAG_DATA_TYPES } from '../../utils/drag-types';
 
 export class PocketItem {
   constructor(readonly state: PocketItemState) {}

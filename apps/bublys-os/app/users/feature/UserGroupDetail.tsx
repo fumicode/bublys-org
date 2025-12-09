@@ -12,7 +12,7 @@ import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
 import { UserGroupIcon } from "../ui/UserIcon";
 import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
-import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
+import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserGroupDetailProps = {
   groupId: string;
@@ -60,11 +60,10 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     console.log("onDrop UserGroupDetail start");
 
+    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+    if (!payload) return;
     e.preventDefault();
-    // URLからユーザーIDを抽出
-    const droppedUserUrl = e.dataTransfer.getData(DRAG_DATA_TYPES.user);
-    if (!droppedUserUrl) return;
-    const droppedUserId = extractIdFromUrl(droppedUserUrl);
+    const droppedUserId = extractIdFromUrl(payload.url);
     if (!droppedUserId) return;
     const updated = group.joinMember(droppedUserId);
     dispatch(updateUserGroup(updated.toJSON()));
@@ -98,10 +97,11 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
         draggable={true}
         onDragStart={(e) => {
           const url = `user-groups/${group.id}`;
-          e.dataTransfer.setData(DRAG_DATA_TYPES.userGroup, url);
-          e.dataTransfer.setData("url", url);
-          e.dataTransfer.setData("label", group.name);
-          e.dataTransfer.effectAllowed = "copy";
+          setDragPayload(e, {
+            type: DRAG_DATA_TYPES.userGroup,
+            url,
+            label: group.name,
+          });
         }}
       >
         <UserGroupIcon fontSize="small" /> {group.name}

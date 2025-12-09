@@ -8,7 +8,7 @@ import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
 import { selectUsers } from '@bublys-org/state-management';
 import { UrledPlace } from '../../../bubble-ui/components';
-import { DRAG_DATA_TYPES } from '../../../bubble-ui/utils/drag-types';
+import { DRAG_DATA_TYPES, setDragPayload } from '../../../bubble-ui/utils/drag-types';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -60,10 +60,11 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
             onDragStart={(e) => {
               const detailUrl = buildDetailUrl(memo.id);
               const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
-              e.dataTransfer.setData(DRAG_DATA_TYPES.memo, detailUrl);
-              e.dataTransfer.setData("url", detailUrl);
-              e.dataTransfer.setData("label", label);
-              e.dataTransfer.effectAllowed = "copy";
+              setDragPayload(e, {
+                type: DRAG_DATA_TYPES.memo,
+                url: detailUrl,
+                label,
+              });
             }}
           >
             <UrledPlace url={buildDetailUrl(memo.id)}>

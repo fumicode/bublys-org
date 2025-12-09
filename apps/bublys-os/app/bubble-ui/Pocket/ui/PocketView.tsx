@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector, selectPocketItems, removePocketItem } f
 import { PocketItemView } from './PocketItemView';
 import { Box, Typography } from '@mui/material';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
-import { DRAG_DATA_TYPE_LIST, DRAG_DATA_TYPES, DragDataType } from '../../utils/drag-types';
+import { DRAG_DATA_TYPES, DragDataType, parseDragPayload } from '../../utils/drag-types';
 
 type PocketViewProps = {
   onItemClick?: (url: string) => void;
@@ -21,10 +21,11 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    console.log('[PocketView] handleDragOver called');
+    const payload = parseDragPayload(e);
+    // ドロップを許可するため常に preventDefault する（ハイライトは対応タイプのみ）
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    setIsDragOver(true);
+    setIsDragOver(!!payload);
   };
 
   const handleDragLeave = () => {
@@ -34,31 +35,19 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
 
   const handleDrop = (e: React.DragEvent) => {
     console.log('[PocketView] handleDrop called', { types: Array.from(e.dataTransfer.types) });
+    const payload = parseDragPayload(e);
+    if (!payload) {
+      setIsDragOver(false);
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
 
-    // シンプルに3つのデータを取得
-    const label = e.dataTransfer.getData('label');
+    console.log('[PocketView] Parsed data', payload);
 
-    // bubble typeを検出
-    let type: DragDataType = DRAG_DATA_TYPES.generic;
-
-    for (const t of DRAG_DATA_TYPE_LIST) {
-      if (e.dataTransfer.types.includes(t)) {
-        type = t;
-        break;
-      }
-    }
-
-
-    
-    const url = e.dataTransfer.getData(type);
-
-    console.log('[PocketView] Parsed data', { url, label, type });
-
-    if (url) {
-      onDrop?.(url, type, label || undefined);
+    if (payload.url) {
+      onDrop?.(payload.url, payload.type, payload.label);
     } else {
       console.warn('[PocketView] No URL found, cannot add to pocket');
     }

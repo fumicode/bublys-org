@@ -7,7 +7,7 @@ import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon";
 import { UrledPlace } from "../../bubble-ui/components";
 import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
-import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
+import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserListViewProps = {
   users: User[];
@@ -41,11 +41,11 @@ export const UserListView: FC<UserListViewProps> = ({
             onDragStart={(e) => {
               console.log('[UserListView] onDragStart', { userId: user.id, userName: user.name, showReorder, detailUrl });
 
-              // シンプルに3つのデータだけ
-              e.dataTransfer.setData(DRAG_DATA_TYPES.user, detailUrl);    // bubble type
-              e.dataTransfer.setData("label", user.name);   // 表示名
-
-              e.dataTransfer.effectAllowed = "copy";
+              setDragPayload(e, {
+                type: DRAG_DATA_TYPES.user,
+                url: detailUrl,
+                label: user.name,
+              });
             }}
             onDragOver={(e) => {
               if (!showReorder) {
@@ -62,9 +62,9 @@ export const UserListView: FC<UserListViewProps> = ({
               }
 
               // URLからユーザーIDを抽出
-              const sourceUrl = e.dataTransfer.getData(DRAG_DATA_TYPES.user);
-              if (!sourceUrl) return;
-              const sourceId = extractIdFromUrl(sourceUrl);
+              const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+              if (!payload) return;
+              const sourceId = extractIdFromUrl(payload.url);
               if (!sourceId || sourceId === user.id) return;
               const existsInList = users.some((u) => u.id === sourceId);
               if (!existsInList) {
