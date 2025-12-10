@@ -20,7 +20,9 @@ interface WorldLineManagerProps<TWorldState> {
   serialize: (state: TWorldState) => any;
   deserialize: (data: any) => TWorldState;
   createInitialWorldState: () => TWorldState;
-  isBubbleMode?: boolean;  // bubbleモードの場合、初期状態で3Dビューを表示
+  onOpenWorldLineView?: () => void;
+  onCloseWorldLineView?: () => void;
+  isBubbleMode: boolean;
 }
 
 export function WorldLineManager<TWorldState>({ 
@@ -29,7 +31,9 @@ export function WorldLineManager<TWorldState>({
   serialize,
   deserialize,
   createInitialWorldState,
-  isBubbleMode = false
+  onOpenWorldLineView,
+  onCloseWorldLineView,
+  isBubbleMode,
 }: WorldLineManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
   const { focusedObjectId } = useFocusedObject();
@@ -144,15 +148,17 @@ export function WorldLineManager<TWorldState>({
 
   // 全ての世界線を表示（Ctrl+Z）
   const showAllWorldLinesHandler = useCallback(() => {
-      if (!worldLine) return;
+    if (!worldLine) return;
     
     updateWorldLine(worldLine, 'showAllWorldLines');
-    setIsModalOpen(true);
-  }, [worldLine, updateWorldLine]);
+
+    onOpenWorldLineView?.();
+  }, [worldLine, updateWorldLine, onOpenWorldLineView]);
 
   // モーダルを閉じる
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
+    onCloseWorldLineView?.();
   }, []);
 
   // ヘルパー関数

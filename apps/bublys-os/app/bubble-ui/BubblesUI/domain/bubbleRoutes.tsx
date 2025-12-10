@@ -122,9 +122,18 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "");
+  const { openBubble } = useContext(BubblesContext);
+  const handleOpenWorldLineView = () => {
+    openBubble(`memos/${memoId}/history`, bubble.id);
+  };
 
   return (
-    <MemoWorldLineManager memoId={memoId}>
+    <MemoWorldLineManager 
+      memoId={memoId} 
+      isBubbleMode={false} 
+      onOpenWorldLineView={handleOpenWorldLineView} 
+      onCloseWorldLineView={() => {}}
+    >
       <MemoWorldLineIntegration memoId={memoId} />
     </MemoWorldLineManager>
   );
@@ -210,10 +219,24 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
   return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
 };
 
-const WorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
-  return <WorldLineView<Bubble>
-    renderWorldState={(_worldState: Bubble, _onWorldStateChange: (worldState: Bubble) => void) => <div>World Line</div>}
-  />
+const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
+  const memoId = bubble.name.replace("memos/", "").replace("/history", "");
+  const dispatch = useAppDispatch();
+  const handleCloseWorldLineView = () => {
+    dispatch(deleteProcessBubble(bubble.id));
+    dispatch(removeBubble(bubble.id));
+  };
+  
+  return (
+    <MemoWorldLineManager 
+      memoId={memoId} 
+      isBubbleMode={true} 
+      onOpenWorldLineView={() => {}} 
+      onCloseWorldLineView={handleCloseWorldLineView}
+    >
+      <MemoWorldLineIntegration memoId={memoId} />
+    </MemoWorldLineManager>
+  );
 };
 
 const routes: BubbleRoute[] = [
@@ -238,8 +261,8 @@ const routes: BubbleRoute[] = [
   { pattern: /^users\/[^/]+\/delete-confirm$/, type: "user-delete-confirm", Component: UserDeleteConfirmBubble },
   { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
-  { pattern: /^memos\/.+$/, type: "memo", Component: MemoBubble },
-  { pattern: /^world-lines\/.+$/, type: "world-lines", Component: WorldLinesBubble },
+  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
     const appId = bubble.name.replace("iframes/", "");
     return (<IframeBubble appId={appId} />);
