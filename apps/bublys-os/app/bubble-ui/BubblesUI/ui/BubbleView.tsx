@@ -1,13 +1,15 @@
-import { FC, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useContext } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
-import { Box, IconButton, Stack } from "@mui/material";
+import { Box, IconButton, Stack, Menu, MenuItem } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
+import AspectRatioIcon from "@mui/icons-material/AspectRatio";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble } from "@bublys-org/bubbles-ui-state";
-import { SmartRect } from "@bublys-org/bubbles-ui";
+import { SmartRect, createLayerCoordinateSystem, getScale } from "@bublys-org/bubbles-ui";
+import { BubblesContext } from "../domain/BubblesContext";
 //import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
@@ -25,6 +27,7 @@ type BubbleProps = {
   onMove?: (bubble: Bubble) => void;
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
+  onResize?: (bubble: Bubble) => void;
 };
 
 export const BubbleView: FC<BubbleProps> = ({
@@ -39,6 +42,7 @@ export const BubbleView: FC<BubbleProps> = ({
   onLayerDownClick,
   onLayerUpClick,
   onMove,
+  onResize,
 }) => {
   position = position || { x: 0, y: 0 };
   vanishingPoint = vanishingPoint || new Vec2({ x: 0, y: 0 });
@@ -50,6 +54,7 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
+  const { coordinateSystem, pageSize } = useContext(BubblesContext);
 
   const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
@@ -62,6 +67,7 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [sizeMenuAnchor, setSizeMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleMouseEnter = () => {
     hoverTimeoutRef.current = setTimeout(() => {
@@ -107,6 +113,30 @@ export const BubbleView: FC<BubbleProps> = ({
     dispatch(updateBubble(bubble.moveTo(newPos).toJSON()));
   };
 
+  const handleSizeMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setSizeMenuAnchor(e.currentTarget);
+  };
+
+  const handleSizeMenuClose = () => {
+    setSizeMenuAnchor(null);
+  };
+
+  const handleResizeClick = (width: number | null, height: number | null, newPosition?: Point2) => {
+    let resizedBubble = width && height
+      ? bubble.resizeTo({ width, height })
+      : Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
+
+    // 位置も変更する場合
+    if (newPosition) {
+      resizedBubble = resizedBubble.moveTo(newPosition);
+    }
+
+    dispatch(updateBubble(resizedBubble.toJSON()));
+    onResize?.(resizedBubble);
+    handleSizeMenuClose();
+  };
+
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
     if (!onMove) return;
     e.stopPropagation();
@@ -136,7 +166,8 @@ export const BubbleView: FC<BubbleProps> = ({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={notifyRendered}
-      
+      width={bubble.size ? `${bubble.size.width}px` : undefined}
+      height={bubble.size ? `${bubble.size.height}px` : undefined}
 
       >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
@@ -171,6 +202,20 @@ export const BubbleView: FC<BubbleProps> = ({
                 <HighLightOffIcon />
               </IconButton>
             )}
+
+            <IconButton
+              size="small"
+              sx={{
+                backgroundColor: "white",
+                padding: 0.5,
+                "& .MuiSvgIcon-root": {
+                  fontSize: "1.2rem",
+                },
+              }}
+              onClick={handleSizeMenuOpen}
+            >
+              <AspectRatioIcon />
+            </IconButton>
 
 
             {/* {onMoveClick && (
@@ -227,6 +272,47 @@ export const BubbleView: FC<BubbleProps> = ({
               </IconButton>
             )}  */}
           </Stack>
+
+          <Menu
+            anchorEl={sizeMenuAnchor}
+            open={Boolean(sizeMenuAnchor)}
+            onClose={handleSizeMenuClose}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MenuItem onClick={() => handleResizeClick(300, 200)}>小 (300x200)</MenuItem>
+            <MenuItem onClick={() => handleResizeClick(500, 350)}>中 (500x350)</MenuItem>
+            <MenuItem onClick={() => handleResizeClick(700, 500)}>大 (700x500)</MenuItem>
+            <MenuItem onClick={() => {
+              if (!pageSize) return;
+
+              // 最前面のレイヤー（layerIndex=0）のcoordinateSystemを作成
+              const surfaceCoordinateSystem = createLayerCoordinateSystem(
+                0, // 最前面のレイヤー
+                coordinateSystem.offset,
+                coordinateSystem.vanishingPoint
+              );
+
+              // 最前面のレイヤーのスケールを取得
+              const scale = getScale(surfaceCoordinateSystem);
+
+              // 利用可能なスペース（グローバル座標系）
+              const availableWidth = pageSize.width - surfaceCoordinateSystem.offset.x;
+              const availableHeight = pageSize.height - surfaceCoordinateSystem.offset.y;
+
+              // ローカル座標系でのサイズに変換（スケールで割る）
+              const localMaxWidth = availableWidth / scale;
+              const localMaxHeight = availableHeight / scale;
+
+              // 位置をoffset分だけマイナス方向に
+              const position = {
+                x: -surfaceCoordinateSystem.offset.x,
+                y: -surfaceCoordinateSystem.offset.y
+              };
+
+              handleResizeClick(localMaxWidth, localMaxHeight, position);
+            }}>最大化</MenuItem>
+            <MenuItem onClick={() => handleResizeClick(null, null)}>フィット (自動)</MenuItem>
+          </Menu>
         </Box>
       </header>
 

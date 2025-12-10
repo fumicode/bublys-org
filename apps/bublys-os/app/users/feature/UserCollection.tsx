@@ -1,5 +1,5 @@
 import { FC, useEffect } from "react";
-import { useAppDispatch, useAppSelector ,  selectUsers, setUsers, deleteUser } from "@bublys-org/state-management";
+import { useAppDispatch, useAppSelector ,  selectUsers, setUsers } from "@bublys-org/state-management";
 import { UserListView } from "../ui/UserListView";
 import { User } from "../domain/User.domain";
 import { UrledPlace } from "../../bubble-ui/components";

@@ -5,7 +5,6 @@ import {
   selectUserGroupById,
   selectUsers,
   updateUserGroup,
-  deleteUserGroup,
 } from "@bublys-org/state-management";
 import { UserGroup } from "../domain/UserGroup.domain";
 import { User } from "../domain/User.domain";
@@ -26,8 +25,8 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
   const users = useAppSelector(selectUsers);
 
   const group = groupEntity ? new UserGroup(groupEntity.id, groupEntity.name, groupEntity.userIds) : undefined;
-  const [name, setName] = useState(group?.name ?? "");
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [_name, _setName] = useState(group?.name ?? "");
+  const [_selectedUserId, _setSelectedUserId] = useState("");
   const [sortKey, setSortKey] = useState<"custom" | "age-desc" | "age-asc" | "name-asc" | "name-desc">("custom");
 
   const memberUsers = useMemo(

@@ -14,6 +14,7 @@ type BubblesLayeredViewProps = {
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
+  onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
@@ -25,6 +26,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
+  onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
   onCoordinateSystemReady,
@@ -134,6 +136,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             onClick={() => onBubbleClick?.(bubble.name)}
             onCloseClick={() => onBubbleClose?.(bubble)}
             onMove={(updated) => onBubbleMove?.(updated)}
+            onResize={(updated) => onBubbleResize?.(updated)}
             onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
             onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
           >

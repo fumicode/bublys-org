@@ -44,6 +44,7 @@ const initialBubbleInstances: Bubble[] = [
     name: "Element E",
     colorHue: 100,
     type: "normal",
+    size: { width: 300, height: 200 }, // サイズ指定のテスト
   }),
   new Bubble({
     name: "Element F",

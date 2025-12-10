@@ -21,7 +21,7 @@ export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dra
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : -1}
       onClick={onClick}
-      onKeyDown={(e) => {
+      onKeyDown={(e: React.KeyboardEvent) => {
         if (!onClick) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -44,7 +44,7 @@ export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dra
   return badge;
 };
 
-const StyledBadge = styled.span<{ $clickable: boolean }>`
+const StyledBadge = styled.span<{ $clickable: boolean } & React.HTMLAttributes<HTMLSpanElement>>`
   display: inline-flex;
   align-items: center;
   gap: 6px;

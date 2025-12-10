@@ -85,7 +85,7 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
                 <UserBadge
                   label={users.find((u) => u.id === memo.authorId)?.name ?? "作者"}
                   linkTarget={`users/${memo.authorId}`}
-                  onClick={() => onMemoClick?.(memo.authorId, `users/${memo.authorId}`)}
+                  onClick={() => onMemoClick?.(memo.authorId!, `users/${memo.authorId}`)}
                 />
               </span>
             )}

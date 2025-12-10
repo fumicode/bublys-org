@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector, selectPocketItems, removePocketItem } f
 import { PocketItemView } from './PocketItemView';
 import { Box, Typography } from '@mui/material';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
-import { DRAG_DATA_TYPES, DragDataType, parseDragPayload } from '../../utils/drag-types';
+import { DragDataType, parseDragPayload } from '../../utils/drag-types';
 
 type PocketViewProps = {
   onItemClick?: (url: string) => void;
@@ -84,7 +84,7 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
   );
 };
 
-const StyledPocketView = styled.div<{ $isDragOver: boolean }>`
+const StyledPocketView = styled.div<{ $isDragOver: boolean } & React.HTMLAttributes<HTMLDivElement>>`
   background: ${props => props.$isDragOver ? 'rgba(200, 230, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)'};
   border-radius: 8px;
   padding: 12px;
