@@ -1,6 +1,6 @@
 "use client";
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
-import { registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
+import { Bubble, registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
 import { useContext } from "react";
 
 export type BubbleRoute = {
@@ -25,15 +25,14 @@ import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
 import { IframeBubble } from "../ui/bubbles/IframeBubble";
 import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
 import { BubblesContext } from "./BubblesContext";
-import { useAppDispatch, useAppSelector, selectApexWorld, updateState } from "@bublys-org/state-management";
-import { deserializeMemo, serializeMemo } from "@/app/world-line/Memo/feature/MemoManager";
-import { WorldLineState } from "@bublys-org/state-management";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { addUser } from "@bublys-org/state-management";
 import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { Memo } from "@/app/world-line/Memo/domain/Memo";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { WorldLineView } from "@/app/world-line/WorldLine/ui/WorldLineView";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -123,14 +122,12 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "");
-  const { openBubble } = useContext(BubblesContext);
 
-
-    return (
-      <MemoWorldLineManager memoId={memoId}>
-        <MemoWorldLineIntegration memoId={memoId} />
-      </MemoWorldLineManager>
-    );
+  return (
+    <MemoWorldLineManager memoId={memoId}>
+      <MemoWorldLineIntegration memoId={memoId} />
+    </MemoWorldLineManager>
+  );
 };
 
 // const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -213,6 +210,12 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
   return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
 };
 
+const WorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
+  return <WorldLineView<Bubble>
+    renderWorldState={(_worldState: Bubble, _onWorldStateChange: (worldState: Bubble) => void) => <div>World Line</div>}
+  />
+};
+
 const routes: BubbleRoute[] = [
   { pattern: /^mob$/, type: "mob", Component: ({ bubble }) => <MobBubble bubble={bubble} /> },
   {
@@ -236,6 +239,7 @@ const routes: BubbleRoute[] = [
   { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
   { pattern: /^memos\/.+$/, type: "memo", Component: MemoBubble },
+  { pattern: /^world-lines\/.+$/, type: "world-lines", Component: WorldLinesBubble },
   { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
     const appId = bubble.name.replace("iframes/", "");
     return (<IframeBubble appId={appId} />);

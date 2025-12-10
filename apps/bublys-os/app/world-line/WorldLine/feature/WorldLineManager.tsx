@@ -20,6 +20,7 @@ interface WorldLineManagerProps<TWorldState> {
   serialize: (state: TWorldState) => any;
   deserialize: (data: any) => TWorldState;
   createInitialWorldState: () => TWorldState;
+  isBubbleMode?: boolean;  // bubbleモードの場合、初期状態で3Dビューを表示
 }
 
 export function WorldLineManager<TWorldState>({ 
@@ -27,7 +28,8 @@ export function WorldLineManager<TWorldState>({
   objectId,
   serialize,
   deserialize,
-  createInitialWorldState 
+  createInitialWorldState,
+  isBubbleMode = false
 }: WorldLineManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
   const { focusedObjectId } = useFocusedObject();
@@ -40,7 +42,8 @@ export function WorldLineManager<TWorldState>({
   const worldLine = worldLineState ? WorldLine.fromJson<TWorldState>(worldLineState, deserialize) : null;
   const apexWorld = apexWorldState ? World.fromJson<TWorldState>(apexWorldState, deserialize) : null;
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // bubbleモードの場合、初期状態で3Dビューを表示
+  const [isModalOpen, setIsModalOpen] = useState(isBubbleMode);
   const [isInitializing, setIsInitializing] = useState(false);
 
   // 初期化ハンドラー
