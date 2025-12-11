@@ -22,6 +22,7 @@ import { UserDetail } from "@/app/users/feature/UserDetail";
 import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
 import { IframeBubble } from "../ui/bubbles/IframeBubble";
 import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
+import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
 import { BubblesContext } from "./BubblesContext";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { addUser } from "@bublys-org/state-management";
@@ -189,11 +190,20 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
 const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const buildMemoUrl = (id: string) => `memos/${id}`;
+  const buildMemoDeleteUrl = (id: string) => `memos/${id}/delete-confirm`;
   const handleMemoClick = (_id: string, detailUrl: string) => {
     openBubble(detailUrl, bubble.id);
   };
+  const handleMemoDelete = (memoId: string) => {
+    openBubble(buildMemoDeleteUrl(memoId), bubble.id);
+  };
   return (
-    <MemoCollection buildDetailUrl={buildMemoUrl} onMemoClick={handleMemoClick} />
+    <MemoCollection
+      buildDetailUrl={buildMemoUrl}
+      buildDeleteUrl={buildMemoDeleteUrl}
+      onMemoClick={handleMemoClick}
+      onMemoDelete={handleMemoDelete}
+    />
   );
 };
 
@@ -217,6 +227,32 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 
+const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
+  const dispatch = useAppDispatch();
+  const memoId = bubble.name.replace("memos/", "").replace("/delete-confirm", "");
+
+  const closeSelf = () => {
+    dispatch(deleteProcessBubble(bubble.id));
+    dispatch(removeBubble(bubble.id));
+  };
+
+  const handleDeleted = () => {
+    closeSelf();
+  };
+
+  const handleCancel = () => {
+    closeSelf();
+  };
+
+  return (
+    <MemoDeleteConfirm
+      memoId={memoId}
+      onDeleted={handleDeleted}
+      onCancel={handleCancel}
+    />
+  );
+};
+
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "").replace("/history", "");
   const dispatch = useAppDispatch();
@@ -224,12 +260,12 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
     dispatch(deleteProcessBubble(bubble.id));
     dispatch(removeBubble(bubble.id));
   };
-  
+
   return (
-    <MemoWorldLineManager 
-      memoId={memoId} 
-      isBubbleMode={true} 
-      onOpenWorldLineView={() => {}} 
+    <MemoWorldLineManager
+      memoId={memoId}
+      isBubbleMode={true}
+      onOpenWorldLineView={() => {}}
       onCloseWorldLineView={handleCloseWorldLineView}
     >
       <MemoWorldLineIntegration memoId={memoId} />
@@ -265,8 +301,9 @@ const routes: BubbleRoute[] = [
   { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
 
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
-  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+  { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
+  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
   { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
     const appId = bubble.name.replace("iframes/", "");

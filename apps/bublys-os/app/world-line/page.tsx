@@ -31,6 +31,12 @@ export default function Index() {
     setShowMemoList(false);
   };
   const buildMemoUrl = (memoId: string) => `memos/${memoId}`;
+  const buildMemoDeleteUrl = (memoId: string) => `memos/${memoId}/delete-confirm`;
+
+  const handleMemoDelete = (_memoId: string) => {
+    // このページでは削除確認バブルは開かない（別のUIで削除処理を実装する場合はここに記述）
+    console.log('Delete memo:', _memoId);
+  };
 
   return (
     <FocusedObjectProvider>
@@ -105,7 +111,12 @@ export default function Index() {
             boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
             minWidth: '300px',
           }}>
-            <MemoList buildDetailUrl={buildMemoUrl} onMemoClick={(id) => handleSelectMemo(id)} />
+            <MemoList
+              buildDetailUrl={buildMemoUrl}
+              buildDeleteUrl={buildMemoDeleteUrl}
+              onMemoClick={(id) => handleSelectMemo(id)}
+              onMemoDelete={handleMemoDelete}
+            />
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ import { Memo } from '../domain/Memo';
 import { deserializeMemo } from '../feature/MemoManager';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
+import CloseIcon from '@mui/icons-material/Close';
 import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
@@ -12,7 +13,9 @@ import { DRAG_DATA_TYPES, setDragPayload } from '../../../bubble-ui/utils/drag-t
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
+  buildDeleteUrl: (memoId: string) => string;
   onMemoClick?: (memoId: string, detailUrl: string) => void;
+  onMemoDelete?: (memoId: string) => void;
 };
 
 // Memoかどうかを判定する関数
@@ -24,7 +27,7 @@ function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; 
     'id' in worldState;
 }
 
-export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
+export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoListProps) {
   // world-sliceからすべてのobjectIdを取得
   const objectIds = useAppSelector(selectAllWorldLineObjectIds);
   const users = useAppSelector(selectUsers);
@@ -99,6 +102,17 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
               >
                 <LuClipboardCopy />
               </IconButton>
+              <UrledPlace url={buildDeleteUrl(memo.id)}>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMemoDelete?.(memo.id);
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </UrledPlace>
             </span>
           </li>
         ))}

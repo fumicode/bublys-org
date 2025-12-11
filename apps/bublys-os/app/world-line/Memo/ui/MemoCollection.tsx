@@ -7,10 +7,12 @@ import { WorldLineState } from '@bublys-org/state-management';
 
 type MemoCollectionProps = {
   buildDetailUrl: (memoId: string) => string;
+  buildDeleteUrl: (memoId: string) => string;
   onMemoClick?: (memoId: string, detailUrl: string) => void;
+  onMemoDelete?: (memoId: string) => void;
 };
 
-export function MemoCollection({ buildDetailUrl, onMemoClick }: MemoCollectionProps) {
+export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoCollectionProps) {
   const dispatch = useAppDispatch();
 
   const handleAddMemo = () => {
@@ -43,9 +45,18 @@ export function MemoCollection({ buildDetailUrl, onMemoClick }: MemoCollectionPr
     onMemoClick?.(memoId, detailUrl);
   };
 
+  const handleDelete = (memoId: string) => {
+    onMemoDelete?.(memoId);
+  };
+
   return (
     <div>
-      <MemoList buildDetailUrl={buildDetailUrl} onMemoClick={onMemoClick} />
+      <MemoList
+        buildDetailUrl={buildDetailUrl}
+        buildDeleteUrl={buildDeleteUrl}
+        onMemoClick={onMemoClick}
+        onMemoDelete={handleDelete}
+      />
       <div style={{ marginTop: '16px' }}>
         <Button variant="contained" onClick={handleAddMemo}>
           メモを追加
