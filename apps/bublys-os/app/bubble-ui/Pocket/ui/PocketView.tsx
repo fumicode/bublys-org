@@ -2,16 +2,18 @@ import React, { FC } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector, selectPocketItems, removePocketItem } from '@bublys-org/state-management';
 import { PocketItemView } from './PocketItemView';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
+import CloseIcon from '@mui/icons-material/Close';
 import { DragDataType, parseDragPayload } from '../../utils/drag-types';
 
 type PocketViewProps = {
   onItemClick?: (url: string) => void;
   onDrop?: (url: string, type: DragDataType, label?: string) => void;
+  onClose?: () => void;
 };
 
-export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
+export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop, onClose }) => {
   const dispatch = useAppDispatch();
   const items = useAppSelector(selectPocketItems);
   const [isDragOver, setIsDragOver] = React.useState(false);
@@ -63,6 +65,19 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop }) => {
       <Box className="e-header">
         <WorkspacesIcon fontSize="small" />
         <Typography variant="subtitle2">ポケット</Typography>
+        {onClose && (
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{
+              marginLeft: 'auto',
+              padding: '2px',
+              pointerEvents: 'auto',
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        )}
       </Box>
       <Box className="e-items">
         {items.length === 0 ? (

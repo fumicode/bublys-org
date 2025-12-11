@@ -122,7 +122,12 @@ export default function Index() {
       {/* Memo: 独立した世界線 */}
       {memoId && (
         <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
-          <MemoWorldLineManager memoId={memoId}>
+          <MemoWorldLineManager
+            memoId={memoId}
+            isBubbleMode={false}
+            onOpenWorldLineView={() => {}}
+            onCloseWorldLineView={() => {}}
+          >
             <MemoWorldLineIntegration memoId={memoId} />
           </MemoWorldLineManager>
         </div>

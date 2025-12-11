@@ -7,7 +7,7 @@ import {
   selectBubblesRelationByOpeneeId,
   selectSurfaceBubbles,
   updateBubble,
-  selectCoordinateSystem,
+  selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
 } from './bubbles-slice.js';
 import { convertGlobalPointToLayerLocal } from '@bublys-org/bubbles-ui';
@@ -61,7 +61,7 @@ bubblesListener.startListening({
     }
 
     // グローバル座標系の設定を取得
-    const coordinateConfig = selectCoordinateSystem(state);
+    const coordinateConfig = selectGlobalCoordinateSystem(state);
     const surfaceLeftTop = selectSurfaceLeftTop(state);
     console.log("JoinSibling: Coordinate config", coordinateConfig);
     console.log("JoinSibling: Surface left top", surfaceLeftTop);
@@ -96,12 +96,8 @@ bubblesListener.startListening({
     const relation = selectBubblesRelationByOpeneeId(state, { openeeId: poppingBubbleId });
     if(!relation) {
       console.log("Pop: No relation found");
-      
       return;
     }
-
-
-
 
     const results = await Promise.all([
       listenerApi.take(
@@ -116,7 +112,6 @@ bubblesListener.startListening({
           if(condition) {
             console.log("Pop: Opener bubble render detected", oa.payload.id);
             console.log("Pop: Opener bubble render detected", oa.payload.renderedRect?.x, oa.payload.renderedRect?.y);
-
           }
 
           return condition;
@@ -161,7 +156,7 @@ bubblesListener.startListening({
     }
 
     // グローバル座標系の設定を取得
-    const coordinateConfig = selectCoordinateSystem(newState);
+    const coordinateConfig = selectGlobalCoordinateSystem(newState);
     const surfaceLeftTop = selectSurfaceLeftTop(newState);
     console.log("Pop: Global coordinate config", coordinateConfig);
     console.log("Pop: Surface left top", surfaceLeftTop);

@@ -8,7 +8,7 @@ import AspectRatioIcon from "@mui/icons-material/AspectRatio";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble } from "@bublys-org/bubbles-ui-state";
-import { SmartRect, createLayerCoordinateSystem, getScale } from "@bublys-org/bubbles-ui";
+import { SmartRect } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 //import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
@@ -54,7 +54,7 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
-  const { coordinateSystem, pageSize } = useContext(BubblesContext);
+  const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
 
   const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
@@ -168,8 +168,7 @@ export const BubbleView: FC<BubbleProps> = ({
       onTransitionEnd={notifyRendered}
       width={bubble.size ? `${bubble.size.width}px` : undefined}
       height={bubble.size ? `${bubble.size.height}px` : undefined}
-
-      >
+    >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.type}</h1>
@@ -285,31 +284,18 @@ export const BubbleView: FC<BubbleProps> = ({
             <MenuItem onClick={() => {
               if (!pageSize) return;
 
-              // 最前面のレイヤー（layerIndex=0）のcoordinateSystemを作成
-              const surfaceCoordinateSystem = createLayerCoordinateSystem(
-                0, // 最前面のレイヤー
-                coordinateSystem.offset,
-                coordinateSystem.vanishingPoint
-              );
-
-              // 最前面のレイヤーのスケールを取得
-              const scale = getScale(surfaceCoordinateSystem);
-
+              const globalCoordinateSystem = coordinateSystem;
               // 利用可能なスペース（グローバル座標系）
-              const availableWidth = pageSize.width - surfaceCoordinateSystem.offset.x;
-              const availableHeight = pageSize.height - surfaceCoordinateSystem.offset.y;
-
-              // ローカル座標系でのサイズに変換（スケールで割る）
-              const localMaxWidth = availableWidth / scale;
-              const localMaxHeight = availableHeight / scale;
+              const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
+              const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
 
               // 位置をoffset分だけマイナス方向に
               const position = {
-                x: -surfaceCoordinateSystem.offset.x,
-                y: -surfaceCoordinateSystem.offset.y
+                x: 0,
+                y: 0
               };
 
-              handleResizeClick(localMaxWidth, localMaxHeight, position);
+              handleResizeClick(availableWidth, availableHeight, position);
             }}>最大化</MenuItem>
             <MenuItem onClick={() => handleResizeClick(null, null)}>フィット (自動)</MenuItem>
           </Menu>
@@ -389,6 +375,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   border-radius: 3em;
 
+  display: flex;
+  flex-direction: column;
+
   >.e-bubble-header {
     cursor: move;
     user-select: none;
@@ -406,12 +395,14 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   }
 
   >.e-bubble-content {
+    flex: 1 0 auto;
     padding: 1em;
     font-size: 1em;
     background: white;
 
     border-radius: 0.5em;
     margin: 0.5em;
+
   }
 
   >.e-debug-rect {

@@ -253,7 +253,7 @@ function WorldView3D<TWorldState>({
       <div
         style={{
           width: '100%',
-          height: '100vh',
+          height: '100%',
           perspective: '1500px',
           perspectiveOrigin: '50% 20%',
           overflow: 'hidden',
@@ -475,7 +475,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
   } = useContext(WorldLineContext);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 500, height: 400 });
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
     const updateSize = () => {
@@ -498,7 +498,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', height: "100%", flexDirection: 'column' }}>
       {/* 初期化ボタン（未初期化時のみ表示） */}
       {!isInitialized && (
         <InitializeButton 
@@ -523,15 +523,14 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
         <div 
           ref={containerRef}
           style={{ 
-            width: `${containerSize.width}px`,
-            height: `${containerSize.height}px`,
+            width: `100%`,
+            height: `100%`,
             backgroundColor: 'rgba(0, 0, 0, 0.05)',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',
           }}
         >
-          <div style={{ flex: 1, overflow: 'hidden' }}>
             <WorldView3D
               containerSize={containerSize}
               worlds={getAllWorlds()}
@@ -542,7 +541,6 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
               onRegrow={regrow}
               renderWorldState={renderWorldState}
             />
-          </div>
         </div>
       )}
 

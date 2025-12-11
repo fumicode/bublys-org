@@ -1,6 +1,6 @@
 "use client";
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
-import { Bubble, registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
+import { registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
 import { useContext } from "react";
 
 export type BubbleRoute = {
@@ -29,7 +29,6 @@ import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
-import { WorldLineView } from "@/app/world-line/WorldLine/ui/WorldLineView";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -117,23 +116,14 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
-  const memoId = bubble.name.replace("memos/", "");
-  const { openBubble } = useContext(BubblesContext);
-  const handleOpenWorldLineView = () => {
-    openBubble(`memos/${memoId}/history`, bubble.id);
-  };
 
-  return (
-    <MemoWorldLineManager 
-      memoId={memoId} 
-      isBubbleMode={false} 
-      onOpenWorldLineView={handleOpenWorldLineView} 
-      onCloseWorldLineView={() => {}}
-    >
-      <MemoWorldLineIntegration memoId={memoId} />
-    </MemoWorldLineManager>
-  );
+const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
+  const groupId = bubble.name.replace("user-groups/", "");
+  const { openBubble } = useContext(BubblesContext);
+  const handleOpenUser = (_userId: string, url: string) => {
+    openBubble(url, bubble.id);
+  };
+  return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
 };
 
 // const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -207,14 +197,25 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
-  const groupId = bubble.name.replace("user-groups/", "");
+const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
+  const memoId = bubble.name.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
-  const handleOpenUser = (_userId: string, url: string) => {
-    openBubble(url, bubble.id);
+  const handleOpenWorldLineView = () => {
+    openBubble(`memos/${memoId}/history`, bubble.id);
   };
-  return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
+
+  return (
+    <MemoWorldLineManager 
+      memoId={memoId} 
+      isBubbleMode={false} 
+      onOpenWorldLineView={handleOpenWorldLineView} 
+      onCloseWorldLineView={() => {}}
+    >
+      <MemoWorldLineIntegration memoId={memoId} />
+    </MemoWorldLineManager>
+  );
 };
+
 
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.name.replace("memos/", "").replace("/history", "");

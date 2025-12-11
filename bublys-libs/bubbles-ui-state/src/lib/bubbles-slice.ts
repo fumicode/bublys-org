@@ -98,13 +98,24 @@ export const bubblesSlice = createSlice({
         .toJSON();
       state.renderCount += 1;
     },
-    popChild: (state, action: PayloadAction<string>) => {
-      state.process = BubblesProcess.fromJSON(state.process)
-        .popChild(action.payload)
-        .toJSON();
 
+    popChild: (state, action: PayloadAction<string>) => {
+      const process =   BubblesProcess.fromJSON(state.process);
+      const poppedProcess = process.popChild(action.payload);
+      state.process = poppedProcess.toJSON();
       state.renderCount += 1;
     },
+
+    popChildMax: (state, action: PayloadAction<string>) => {
+
+      const process = BubblesProcess.fromJSON(state.process);
+      const poppedProcess = process.popChild(action.payload);
+
+      state.process = poppedProcess.toJSON();
+      state.renderCount += 1;
+    },
+
+
     joinSibling: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
         .joinSibling(action.payload)
@@ -165,6 +176,7 @@ export const {
   layerDown,
   layerUp,
   popChild: popChildInProcess,
+  popChildMax: popChildMaxInProcess,
   joinSibling: joinSiblingInProcess,
   addBubble,
   updateBubble,
@@ -209,7 +221,7 @@ export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleSta
   )});
 }
 
-export const selectCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
+export const selectGlobalCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
   return state.bubbleState.globalCoordinateSystem;
 }
 

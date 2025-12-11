@@ -4,9 +4,8 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble, selectCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectGlobalCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
 import { LinkBubbleView } from "./LinkBubbleView";
-
 
 type BubblesLayeredViewProps = {
   bubbles: Bubble[][];
@@ -62,7 +61,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
           vanishingPoint: currentVanishingPoint,
         };
         onCoordinateSystemReady?.(coordinateSystem);
-        console.log('BubblesLayeredView CoordinateSystem updated:', coordinateSystem);
       }
     };
 
@@ -102,7 +100,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-  const coordinateSystem = useAppSelector(selectCoordinateSystem);
+  const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
