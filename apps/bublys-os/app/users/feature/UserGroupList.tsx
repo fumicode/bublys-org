@@ -2,6 +2,8 @@ import { FC, useEffect } from "react";
 import { useAppDispatch, useAppSelector, selectUserGroups, setUserGroups, addUserGroup } from "@bublys-org/state-management";
 import { UserGroup } from "../domain/UserGroup.domain";
 import { UserGroupIcon } from "../ui/UserIcon";
+import { UrledPlace } from "../../bubble-ui/components";
+import { DRAG_DATA_TYPES, setDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;
@@ -36,14 +38,23 @@ export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect
           const url = buildDetailUrl(group.id);
           return (
             <li key={group.id} style={{ marginBottom: 8 }}>
-              <button
-                style={{ all: "unset", cursor: "pointer" }}
-                data-link-target={url}
-                onClick={() => onSelect?.(group.id, url)}
-              >
-                <UserGroupIcon fontSize="small" style={{ marginRight: 6, verticalAlign: "middle" }} />
-                {group.name}
-              </button>
+              <UrledPlace url={url}>
+                <button
+                  style={{ all: "unset", cursor: "pointer" }}
+                  onClick={() => onSelect?.(group.id, url)}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    setDragPayload(e, {
+                      type: DRAG_DATA_TYPES.userGroup,
+                      url,
+                      label: group.name,
+                    });
+                  }}
+                >
+                  <UserGroupIcon fontSize="small" style={{ marginRight: 6, verticalAlign: "middle" }} />
+                  {group.name}
+                </button>
+              </UrledPlace>
             </li>
           );
         })}

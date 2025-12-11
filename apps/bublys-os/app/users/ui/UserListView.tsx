@@ -5,6 +5,9 @@ import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon";
+import { UrledPlace } from "../../bubble-ui/components";
+import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
+import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserListViewProps = {
   users: User[];
@@ -36,62 +39,80 @@ export const UserListView: FC<UserListViewProps> = ({
             className="e-item"
             draggable={true}
             onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "linkMove";
-              e.dataTransfer.setData("text/user-id", user.id);
+              console.log('[UserListView] onDragStart', { userId: user.id, userName: user.name, showReorder, detailUrl });
+
+              setDragPayload(e, {
+                type: DRAG_DATA_TYPES.user,
+                url: detailUrl,
+                label: user.name,
+              });
             }}
             onDragOver={(e) => {
-              if (!showReorder) return;
+              if (!showReorder) {
+                // リオーダーモードでない場合は、preventDefault()しない（ポケットへのドロップを許可）
+                return;
+              }
               e.preventDefault();
             }}
             onDrop={(e) => {
-              if (!showReorder) return;
+              if (!showReorder) {
+                // リオーダーモードでない場合は、イベントをバブリングさせる（ポケットへのドロップを許可）
+                // preventDefault()もstopPropagation()も呼ばない
+                return;
+              }
 
-              const sourceId = e.dataTransfer.getData("text/user-id");
+              // URLからユーザーIDを抽出
+              const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+              if (!payload) return;
+              const sourceId = extractIdFromUrl(payload.url);
               if (!sourceId || sourceId === user.id) return;
               const existsInList = users.some((u) => u.id === sourceId);
               if (!existsInList) {
-                // Allow bubbling so the parent container can handle adding external users.
-                e.preventDefault();
+                // リスト外のユーザーの場合もバブリングさせる
                 return;
               }
               e.preventDefault();
               e.stopPropagation();
               onReorder?.(sourceId, user.id);
             }}
-          >
+          > 
             <div className="e-content">
               {showReorder && (
                 <span className="e-drag-handle" aria-label="drag user">
                   <DragIndicatorIcon fontSize="small" />
                 </span>
               )}
-              <button
-                style={{ all: "unset", cursor: "pointer" }}
-                data-link-target={detailUrl}
-                onClick={() => onUserClick?.(user.id, detailUrl)}
-              >
-                <div className="e-main">
-                  <UserIcon fontSize="small" className="e-avatar" />
-                  <div className="e-text">
-                    <div className="e-name">{user.name}</div>
-                    <div className="e-meta">
-                      {user.birthday} / {user.getAge()}歳
+              <UrledPlace url={detailUrl}>
+                <button
+                  style={{ all: "unset", cursor: "pointer" }}
+                  draggable={false}
+                  onClick={() => onUserClick?.(user.id, detailUrl)}
+                >
+                  <div className="e-main">
+                    <UserIcon fontSize="small" className="e-avatar" />
+                    <div className="e-text">
+                      <div className="e-name">{user.name}</div>
+                      <div className="e-meta">
+                        {user.birthday} / {user.getAge()}歳
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </UrledPlace>
               <span className="e-button-group">
-                <IconButton
-                  size="small"
-                  aria-label="remove user"
-                  data-link-target={deleteUrl}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUserDelete?.(user.id);
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
+                <UrledPlace url={deleteUrl}>
+                  <IconButton
+                    size="small"
+                    aria-label="remove user"
+                    draggable={false}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUserDelete?.(user.id);
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </UrledPlace>
               </span>
             </div>
           </li>
@@ -100,6 +121,10 @@ export const UserListView: FC<UserListViewProps> = ({
     </StyledUserList>
   );
 };
+
+
+
+
 
 const StyledUserList = styled.ul`
   list-style: none;

@@ -1,5 +1,6 @@
 import { UserGroupIcon } from "./UserIcon";
 import { IconBadge } from "./IconBadge";
+import { DRAG_DATA_TYPES } from "../../bubble-ui/utils/drag-types";
 
 type UserGroupBadgeProps = {
   label: string;
@@ -13,7 +14,8 @@ export const UserGroupBadge = ({ label, onClick, linkTarget }: UserGroupBadgePro
       icon={<UserGroupIcon fontSize="small" />}
       label={label}
       onClick={onClick}
-      dataLinkTarget={linkTarget}
+      dataUrl={linkTarget}
+      dragType={DRAG_DATA_TYPES.userGroup}
     />
   );
 };

@@ -14,11 +14,17 @@ import { Memo } from '../Memo/domain/Memo';
 interface MemoWorldLineManagerProps {
   children: React.ReactNode;
   memoId: string;
+  isBubbleMode: boolean;
+  onOpenWorldLineView: () => void;
+  onCloseWorldLineView: () => void;
 }
 
 export function MemoWorldLineManager({ 
   children, 
-  memoId
+  memoId,
+  isBubbleMode = false,
+  onOpenWorldLineView,
+  onCloseWorldLineView
 }: MemoWorldLineManagerProps) {
   return (
     <WorldLineManager<Memo>
@@ -26,6 +32,9 @@ export function MemoWorldLineManager({
       serialize={serializeMemo}
       deserialize={deserializeMemo}
       createInitialWorldState={() => createInitialMemo()}
+      onOpenWorldLineView={onOpenWorldLineView}
+      onCloseWorldLineView={onCloseWorldLineView}
+      isBubbleMode={isBubbleMode}
     >
       {children}
     </WorldLineManager>

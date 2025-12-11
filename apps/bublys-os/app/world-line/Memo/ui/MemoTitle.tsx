@@ -4,6 +4,8 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import { MemoIcon } from './MemoIcon';
 import { useAppSelector, selectUsers } from '@bublys-org/state-management';
 import { UserBadge } from '@/app/users/ui/UserBadge';
+import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from '../../../bubble-ui/utils/drag-types';
+import { extractIdFromUrl } from '../../../bubble-ui/utils/url-parser';
 
 interface MemoTitleProps {
   memo: Memo;
@@ -19,7 +21,9 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
   const authorName = memo.authorId ? users.find((u) => u.id === memo.authorId)?.name : undefined;
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    const userId = e.dataTransfer.getData("text/user-id");
+    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+    const url = payload?.url || e.dataTransfer.getData(DRAG_DATA_TYPES.user);
+    const userId = url ? extractIdFromUrl(url) : "";
     if (!userId) return;
     e.preventDefault();
     onSetAuthor?.(userId);
@@ -27,7 +31,18 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
 
   return (
     <div>
-      <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <h2
+        style={{ display: "flex", alignItems: "center", gap: 8 }}
+        draggable={true}
+        onDragStart={(e) => {
+          const url = `memos/${memo.id}`;
+          setDragPayload(e, {
+            type: DRAG_DATA_TYPES.memo,
+            url,
+            label: content || "メモ",
+          });
+        }}
+      >
         <MemoIcon fontSize="medium" />
         <span>「{content}」</span>
         <IconButton onClick={() => navigator.clipboard.writeText(content)}>
@@ -37,7 +52,8 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
       <div
         style={{ display: "flex", alignItems: "center", gap: 6, color: "#555" }}
         onDragOver={(e) => {
-          if (onSetAuthor) e.preventDefault();
+          if (!onSetAuthor) return;
+          e.preventDefault();
         }}
         onDrop={handleDrop}
       >

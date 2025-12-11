@@ -45,6 +45,13 @@ export const worldSlice = createSlice({
       }
       state.operationHistory[objectId].push(operation);
     },
+
+    // 削除アクション
+    deleteWorldLine: (state, action: PayloadAction<string>) => {
+      const objectId = action.payload;
+      delete state.worldLines[objectId];
+      delete state.operationHistory[objectId];
+    },
   },
 });
 
@@ -52,6 +59,7 @@ export const worldSlice = createSlice({
 export const {
   initialize,
   updateState,
+  deleteWorldLine,
 } = worldSlice.actions;
 
 // セレクター関数（オブジェクトIDを指定）

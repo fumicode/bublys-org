@@ -4,9 +4,8 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble, selectCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectGlobalCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
 import { LinkBubbleView } from "./LinkBubbleView";
-
 
 type BubblesLayeredViewProps = {
   bubbles: Bubble[][];
@@ -14,6 +13,7 @@ type BubblesLayeredViewProps = {
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
+  onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
@@ -25,6 +25,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
+  onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
   onCoordinateSystemReady,
@@ -60,7 +61,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
           vanishingPoint: currentVanishingPoint,
         };
         onCoordinateSystemReady?.(coordinateSystem);
-        console.log('BubblesLayeredView CoordinateSystem updated:', coordinateSystem);
       }
     };
 
@@ -100,7 +100,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-  const coordinateSystem = useAppSelector(selectCoordinateSystem);
+  const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
@@ -134,6 +134,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             onClick={() => onBubbleClick?.(bubble.name)}
             onCloseClick={() => onBubbleClose?.(bubble)}
             onMove={(updated) => onBubbleMove?.(updated)}
+            onResize={(updated) => onBubbleResize?.(updated)}
             onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
             onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
           >

@@ -1,20 +1,27 @@
 import React from "react";
 import styled from "styled-components";
+import { UrledPlace } from "../../bubble-ui/components";
+import { DragDataType, useDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type IconBadgeProps = {
   icon: React.ReactNode;
   label: string;
   onClick?: () => void;
-  dataLinkTarget?: string;
+  dataUrl?: string;
+  draggable?: boolean;
+  dragType?: DragDataType;
 };
 
-export const IconBadge = ({ icon, label, onClick, dataLinkTarget }: IconBadgeProps) => {
-  return (
+export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType}: IconBadgeProps) => {
+  const dragPayload = dragType && dataUrl ? { type: dragType, url: dataUrl, label } : null;
+  const { draggable: canDrag, onDragStart } = useDragPayload(dragPayload);
+
+  const badge = (
     <StyledBadge
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : -1}
       onClick={onClick}
-      onKeyDown={(e) => {
+      onKeyDown={(e: React.KeyboardEvent) => {
         if (!onClick) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -22,15 +29,22 @@ export const IconBadge = ({ icon, label, onClick, dataLinkTarget }: IconBadgePro
         }
       }}
       $clickable={!!onClick}
-      data-link-target={dataLinkTarget}
+      draggable={draggable && !!dataUrl && canDrag}
+      onDragStart={onDragStart}
     >
       <span className="e-icon">{icon}</span>
       <span className="e-label">{label}</span>
     </StyledBadge>
   );
+
+  if (dataUrl) {
+    return <UrledPlace url={dataUrl}>{badge}</UrledPlace>;
+  }
+
+  return badge;
 };
 
-const StyledBadge = styled.span<{ $clickable: boolean }>`
+const StyledBadge = styled.span<{ $clickable: boolean } & React.HTMLAttributes<HTMLSpanElement>>`
   display: inline-flex;
   align-items: center;
   gap: 6px;

@@ -3,6 +3,7 @@ import { Size2, Bubble, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bubl
 
 type BubblesContextType = {
   pageSize?: Size2;
+  surfaceLeftTop: { x: number, y: number }, 
   bubbles: Bubble[][];
   coordinateSystem: CoordinateSystem;
 
@@ -12,6 +13,7 @@ type BubblesContextType = {
 
 export const BubblesContext = createContext<BubblesContextType>({
   pageSize: { width: 1000, height: 1000 },
+  surfaceLeftTop: { x: 0, y: 0 }, 
   bubbles: [],
   coordinateSystem: GLOBAL_COORDINATE_SYSTEM,
   openBubble(name, openerBubbleId) {

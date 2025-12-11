@@ -3,6 +3,7 @@ import { useAppSelector, selectUserById, selectUserGroups } from "@bublys-org/st
 import { User } from "../domain/User.domain";
 import { UserIcon } from "../ui/UserIcon";
 import { UserGroupBadgeView } from "../ui/UserGroupBadgeView";
+import { DRAG_DATA_TYPES, setDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserDetailProps = {
   userId: string;
@@ -21,13 +22,13 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    e.dataTransfer.setData("text/user-id", user.id);
-    e.dataTransfer.effectAllowed = "copy";
+    const userUrl = `users/${user.id}`;
+    setDragPayload(e, { type: DRAG_DATA_TYPES.user, url: userUrl, label: user.name });
   };
 
   return (
-    <div>
-      <h3 draggable onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div >
+      <h3 draggable={true} onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <UserIcon fontSize="small" /> {user.name}
       </h3>
       <div>生年月日: {user.birthday}</div>

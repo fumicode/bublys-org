@@ -15,12 +15,18 @@ interface CounterWorldLineManagerProps {
   children: React.ReactNode;
   initialValue?: number;
   counterId: string;
+  isBubbleMode?: boolean;
+  onOpenWorldLineView?: () => void;
+  onCloseWorldLineView?: () => void;
 }
 
-export function CounterWorldLineManager({ 
-  children, 
+export function CounterWorldLineManager({
+  children,
   initialValue,
-  counterId
+  counterId,
+  isBubbleMode = false,
+  onOpenWorldLineView,
+  onCloseWorldLineView
 }: CounterWorldLineManagerProps) {
   return (
     <WorldLineManager<Counter>
@@ -28,6 +34,9 @@ export function CounterWorldLineManager({
       serialize={serializeCounter}
       deserialize={deserializeCounter}
       createInitialWorldState={() => createInitialCounter(initialValue)}
+      isBubbleMode={isBubbleMode}
+      onOpenWorldLineView={onOpenWorldLineView}
+      onCloseWorldLineView={onCloseWorldLineView}
     >
       {children}
     </WorldLineManager>

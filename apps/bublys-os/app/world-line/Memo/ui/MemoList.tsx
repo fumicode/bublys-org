@@ -3,14 +3,19 @@ import { Memo } from '../domain/Memo';
 import { deserializeMemo } from '../feature/MemoManager';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
+import CloseIcon from '@mui/icons-material/Close';
 import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
 import { selectUsers } from '@bublys-org/state-management';
+import { UrledPlace } from '../../../bubble-ui/components';
+import { DRAG_DATA_TYPES, setDragPayload } from '../../../bubble-ui/utils/drag-types';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
+  buildDeleteUrl: (memoId: string) => string;
   onMemoClick?: (memoId: string, detailUrl: string) => void;
+  onMemoDelete?: (memoId: string) => void;
 };
 
 // Memoかどうかを判定する関数
@@ -22,7 +27,7 @@ function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; 
     'id' in worldState;
 }
 
-export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
+export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoListProps) {
   // world-sliceからすべてのobjectIdを取得
   const objectIds = useAppSelector(selectAllWorldLineObjectIds);
   const users = useAppSelector(selectUsers);
@@ -51,21 +56,39 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
     <div>
       <StyledMemoList>
         {memos.map((memo) => (
-          <li key={memo.id} className="e-item">
-            <button style={{ all: "unset", cursor: "pointer" }} onClick={() => {
+          <li
+            key={memo.id}
+            className="e-item"
+            draggable={true}
+            onDragStart={(e) => {
               const detailUrl = buildDetailUrl(memo.id);
-              onMemoClick?.(memo.id, detailUrl);
-            }} data-link-target={buildDetailUrl(memo.id)}>
-              <MemoIcon/>
-              <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
-            </button>
+              const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
+              setDragPayload(e, {
+                type: DRAG_DATA_TYPES.memo,
+                url: detailUrl,
+                label,
+              });
+            }}
+          >
+            <UrledPlace url={buildDetailUrl(memo.id)}>
+              <button
+                style={{ all: "unset", cursor: "pointer" }}
+                onClick={() => {
+                  const detailUrl = buildDetailUrl(memo.id);
+                  onMemoClick?.(memo.id, detailUrl);
+                }}
+              >
+                <MemoIcon/>
+                <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
+              </button>
+            </UrledPlace>
 
             {memo.authorId && (
               <span style={{ marginLeft: 8 }}>
                 <UserBadge
                   label={users.find((u) => u.id === memo.authorId)?.name ?? "作者"}
                   linkTarget={`users/${memo.authorId}`}
-                  onClick={() => onMemoClick?.(memo.authorId, `users/${memo.authorId}`)}
+                  onClick={() => onMemoClick?.(memo.authorId!, `users/${memo.authorId}`)}
                 />
               </span>
             )}
@@ -79,6 +102,17 @@ export function MemoList({ buildDetailUrl, onMemoClick }: MemoListProps) {
               >
                 <LuClipboardCopy />
               </IconButton>
+              <UrledPlace url={buildDeleteUrl(memo.id)}>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMemoDelete?.(memo.id);
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </UrledPlace>
             </span>
           </li>
         ))}

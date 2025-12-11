@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState, useEffect } from 'react';
+import { useContext, useMemo, useState, useRef, useEffect } from 'react';
 import { WorldLineContext } from '../domain/WorldLineContext';
 import { World } from '../domain/World';
 
@@ -21,6 +21,7 @@ function InitializeButton({ onInitialize, disabled = false }: { onInitialize: ()
 
 // 3D WorldView コンポーネント
 interface WorldView3DProps<TWorldState> {
+  containerSize: { width: number; height: number };
   worlds: World<TWorldState>[];
   apexWorldId: string | null;
   apexWorld: World<TWorldState> | null;
@@ -34,6 +35,7 @@ interface WorldView3DProps<TWorldState> {
 }
 
 function WorldView3D<TWorldState>({
+  containerSize,
   worlds,
   apexWorldId,
   apexWorld,
@@ -74,11 +76,11 @@ function WorldView3D<TWorldState>({
   }, [apexWorld, onSetApex, onRegrow]);
   
   // 消失点（バニシングポイント）- 画面中央上部に配置
-  const vanishingPoint = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.2 };
+  const vanishingPoint = { x: containerSize.width * 0.5, y: containerSize.height * 0.2 };
   // 現在の世界の位置（画面中央やや下）
   const apexPosition = { 
-    x: window.innerWidth * 0.5, 
-    y: window.innerHeight * 0.7 
+    x: containerSize.width * 0.5, 
+    y: containerSize.height * 0.7 
   };
   
   // 各世界線のHEAD（子を持たない世界）を特定
@@ -168,7 +170,7 @@ function WorldView3D<TWorldState>({
         
         // 各世界線を横に広げる（中央を基準に均等配置）
         if (headPos && headPos.total > 1) {
-          const spreadWidth = Math.min(window.innerWidth * 0.6, 800);
+          const spreadWidth = Math.min(containerSize.width * 0.4, containerSize.width);
           const offset = ((headPos.index - (headPos.total - 1) / 2) / headPos.total) * spreadWidth * ratio;
           x += offset;
         }
@@ -251,7 +253,7 @@ function WorldView3D<TWorldState>({
       <div
         style={{
           width: '100%',
-          height: '100vh',
+          height: '100%',
           perspective: '1500px',
           perspectiveOrigin: '50% 20%',
           overflow: 'hidden',
@@ -328,7 +330,7 @@ function WorldView3D<TWorldState>({
                   transform: `translate(-50%, -50%) translateZ(${adjustedZ}px) scale(${scale}) rotateX(20deg)`,
                   transformOrigin: 'center center',
                   transformStyle: 'preserve-3d',
-                  width: '380px',
+                  width: `${containerSize.width * 0.4}px`,
                   minHeight: '120px',
                   padding: '1.5rem',
                   backgroundColor: isFocused
@@ -419,7 +421,7 @@ function WorldView3D<TWorldState>({
                       left: '50%',
                       top: '50%',
                       transform: `translate(-50%, -50%) rotateX(20deg)`,
-                      width: '380px',
+                      width: `${containerSize.width * 0.4}px`,
                       minHeight: '120px',
                       padding: '1.5rem',
                       backgroundColor: worldLineColor?.bg || 'rgba(255, 255, 255, 0.98)',
@@ -472,13 +474,31 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
     isInitialized,
   } = useContext(WorldLineContext);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [isModalOpen]);
+
   const handleWorldSelect = (worldId: string) => {
     setApex(worldId);
     closeModal();
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', height: "100%", flexDirection: 'column' }}>
       {/* 初期化ボタン（未初期化時のみ表示） */}
       {!isInitialized && (
         <InitializeButton 
@@ -492,7 +512,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', width: '100%' }}>
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ marginTop: '1rem' }}>
-              {renderWorldState(apexWorld.worldState as TWorldState, grow)}
+              {renderWorldState(apexWorld.worldState, grow)}
             </div>
           </div>
         </div>
@@ -500,19 +520,19 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
 
       {/* 3D世界線ビュー（Ctrl+Zで表示） */}
       {isInitialized && isModalOpen && (
-        <div style={{ 
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.05)',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div 
+          ref={containerRef}
+          style={{ 
+            width: `100%`,
+            height: `100%`,
+            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
             <WorldView3D
+              containerSize={containerSize}
               worlds={getAllWorlds()}
               apexWorldId={apexWorldId}
               apexWorld={apexWorld}
@@ -521,7 +541,6 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
               onRegrow={regrow}
               renderWorldState={renderWorldState}
             />
-          </div>
         </div>
       )}
 
