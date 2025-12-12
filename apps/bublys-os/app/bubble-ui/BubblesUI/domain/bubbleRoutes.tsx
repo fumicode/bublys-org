@@ -29,7 +29,8 @@ import { addUser } from "@bublys-org/state-management";
 import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
-import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { MemoWorldLineEditor } from "@/app/world-line/integrations/MemoWorldLineEditor";
+import { MemoWorldLine3DView } from "@/app/world-line/integrations/MemoWorldLine3DView";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -216,12 +217,9 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
 
   return (
     <MemoWorldLineManager 
-      memoId={memoId} 
-      isBubbleMode={false} 
-      onOpenWorldLineView={handleOpenWorldLineView} 
-      onCloseWorldLineView={() => {}}
+      memoId={memoId}
     >
-      <MemoWorldLineIntegration memoId={memoId} />
+      <MemoWorldLineEditor memoId={memoId} onOpenWorldLineView={handleOpenWorldLineView} />
     </MemoWorldLineManager>
   );
 };
@@ -264,11 +262,8 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   return (
     <MemoWorldLineManager
       memoId={memoId}
-      isBubbleMode={true}
-      onOpenWorldLineView={() => {}}
-      onCloseWorldLineView={handleCloseWorldLineView}
     >
-      <MemoWorldLineIntegration memoId={memoId} />
+      <MemoWorldLine3DView memoId={memoId} onCloseWorldLineView={handleCloseWorldLineView} />
     </MemoWorldLineManager>
   );
 };
