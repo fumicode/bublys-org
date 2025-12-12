@@ -20,9 +20,6 @@ interface WorldLineManagerProps<TWorldState> {
   serialize: (state: TWorldState) => any;
   deserialize: (data: any) => TWorldState;
   createInitialWorldState: () => TWorldState;
-  onOpenWorldLineView?: () => void;
-  onCloseWorldLineView?: () => void;
-  isBubbleMode: boolean;
 }
 
 export function WorldLineManager<TWorldState>({ 
@@ -31,9 +28,6 @@ export function WorldLineManager<TWorldState>({
   serialize,
   deserialize,
   createInitialWorldState,
-  onOpenWorldLineView,
-  onCloseWorldLineView,
-  isBubbleMode,
 }: WorldLineManagerProps<TWorldState>) {
   const dispatch = useAppDispatch();
   const { focusedObjectId } = useFocusedObject();
@@ -46,9 +40,8 @@ export function WorldLineManager<TWorldState>({
   const worldLine = worldLineState ? WorldLine.fromJson<TWorldState>(worldLineState, deserialize) : null;
   const apexWorld = apexWorldState ? World.fromJson<TWorldState>(apexWorldState, deserialize) : null;
 
-  // bubbleモードの場合、初期状態で3Dビューを表示
-  const [isModalOpen, setIsModalOpen] = useState(isBubbleMode);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isShowing3DView, setIsShowing3DView] = useState(false);
 
   // 初期化ハンドラー
   const initializeHandler = useCallback(async () => {
@@ -149,16 +142,12 @@ export function WorldLineManager<TWorldState>({
   // 全ての世界線を表示（Ctrl+Z）
   const showAllWorldLinesHandler = useCallback(() => {
     if (!worldLine) return;
-    
-    updateWorldLine(worldLine, 'showAllWorldLines');
+    setIsShowing3DView(true);
+  }, [worldLine, isShowing3DView]);
 
-    onOpenWorldLineView?.();
-  }, [worldLine, updateWorldLine, onOpenWorldLineView]);
-
-  // モーダルを閉じる
+  // 3Dビューを閉じる
   const closeModal = useCallback(() => {
-    setIsModalOpen(false);
-    onCloseWorldLineView?.();
+    setIsShowing3DView(false);
   }, []);
 
   // ヘルパー関数
@@ -201,11 +190,11 @@ export function WorldLineManager<TWorldState>({
     showAllWorldLines: showAllWorldLinesHandler,
     getAllWorlds,
     getWorldTree,
-    isModalOpen,
     closeModal,
     initialize: initializeHandler,
     isInitializing,
     isInitialized: !!worldLineState,
+    isShowing3DView,
   };
 
   return (

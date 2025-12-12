@@ -1,514 +1,75 @@
-import { useContext, useMemo, useState, useRef, useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { WorldLineContext } from '../domain/WorldLineContext';
-import { World } from '../domain/World';
+import { WorldInitializeButton } from './WorldInitialize';
+import { WorldLine3DView } from './WorldLine3DView';
 
-// InitializeButtonコンポーネントを直接定義
-function InitializeButton({ onInitialize, disabled = false }: { onInitialize: () => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={onInitialize}
-      disabled={disabled}
-      style={{
-        cursor: 'pointer',
-        backgroundColor: 'transparent',
-        width: '100px',
-      }}
-    >
-      {disabled ? '初期化中...' : '🚀 初期化'}
-    </button>
-  );
-}
-
-// 3D WorldView コンポーネント
-interface WorldView3DProps<TWorldState> {
-  containerSize: { width: number; height: number };
-  worlds: World<TWorldState>[];
-  apexWorldId: string | null;
-  apexWorld: World<TWorldState> | null;
-  onWorldSelect: (worldId: string) => void;
-  onSetApex: (worldId: string) => void;
-  onRegrow: () => void;
+// 以降は通常表示用の WorldLineView
+export interface WorldLineViewProps<TWorldState> {
   renderWorldState: (
     worldState: TWorldState,
     onWorldStateChange: (newWorldState: TWorldState) => void
   ) => React.ReactNode;
+  onOpenWorldLineView?: () => void; // 外部から3Dビューを開く場合（例：bubble-uiで新しいバブルを開く）
 }
 
-function WorldView3D<TWorldState>({
-  containerSize,
-  worlds,
-  apexWorldId,
-  apexWorld,
-  onWorldSelect,
-  onSetApex,
-  onRegrow,
+export function WorldLineView<TWorldState>({
   renderWorldState,
-}: WorldView3DProps<TWorldState>) {
-  // クリックされた世界を一番手前に表示するためのstate（初期値はapexWorld）
-  const [focusedWorldId, setFocusedWorldId] = useState<string | null>(apexWorldId);
-  // ホバーされている世界のID
-  const [hoveredWorldId, setHoveredWorldId] = useState<string | null>(null);
-  
-  // apexWorldIdが変更されたらfocusedWorldIdも更新
-  useEffect(() => {
-    setFocusedWorldId(apexWorldId);
-  }, [apexWorldId]);
-  
-  // キーボードイベント処理（世界線ビューが開いている時のみ）
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+Z または Command+Z（Mac）で親世界に移動
-      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key === 'z') {
-        event.preventDefault();
-        if (apexWorld?.parentWorldId) {
-          onSetApex(apexWorld.parentWorldId);
-        }
-      }
-      // Ctrl+Shift+Z または Command+Shift+Z（Mac）で子世界に移動
-      else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'Z') {
-        event.preventDefault();
-        onRegrow();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [apexWorld, onSetApex, onRegrow]);
-  
-  // 消失点（バニシングポイント）- 画面中央上部に配置
-  const vanishingPoint = { x: containerSize.width * 0.5, y: containerSize.height * 0.2 };
-  // 現在の世界の位置（画面中央やや下）
-  const apexPosition = { 
-    x: containerSize.width * 0.5, 
-    y: containerSize.height * 0.7 
-  };
-  
-  // 各世界線のHEAD（子を持たない世界）を特定
-  const worldLineHeads = useMemo(() => {
-    const worldsWithChildren = new Set(worlds.filter(w => w.parentWorldId).map(w => w.parentWorldId));
-    
-    // 子を持たない世界 = 各世界線のHEAD
-    const heads = worlds.filter(w => !worldsWithChildren.has(w.worldId));
-    return new Set(heads.map(h => h.worldId));
-  }, [worlds]);
-
-  // 各世界線に色を割り当て
-  const worldLineColors = useMemo(() => {
-    const colors = [
-      { bg: 'rgba(200, 255, 200, 0.92)', border: 'rgba(100, 200, 100, 0.8)' }, // 緑
-      { bg: 'rgba(255, 200, 230, 0.92)', border: 'rgba(255, 100, 180, 0.8)' }, // ピンク
-      { bg: 'rgba(255, 255, 200, 0.92)', border: 'rgba(200, 200, 100, 0.8)' }, // 黄色
-      { bg: 'rgba(200, 230, 255, 0.92)', border: 'rgba(100, 180, 255, 0.8)' }, // 青
-      { bg: 'rgba(255, 220, 200, 0.92)', border: 'rgba(255, 150, 100, 0.8)' }, // オレンジ
-      { bg: 'rgba(230, 200, 255, 0.92)', border: 'rgba(180, 100, 255, 0.8)' }, // 紫
-    ];
-    
-    const colorMap = new Map<string, { bg: string; border: string }>();
-    const headsList = Array.from(worldLineHeads);
-    headsList.forEach((headId, index) => {
-      colorMap.set(headId, colors[index % colors.length]);
-    });
-    
-    return colorMap;
-  }, [worldLineHeads]);
-  
-  // 各世界の3D位置を計算
-  const worldsWithPosition = useMemo(() => {
-    if (!apexWorldId || worlds.length === 0) return [];
-
-    // 世界間の親子関係からグラフを構築
-    const worldMap = new Map(worlds.map((w) => [w.worldId, w]));
-    
-    // 各世界線のHEADから遡って距離を計算
-    const distances = new Map<string, number>();
-    const worldLineMap = new Map<string, string>(); // worldId -> worldLineId (HEAD)
-    
-    // 各HEADから親方向へ遡る
-    for (const headId of worldLineHeads) {
-      const queue: { id: string; distance: number }[] = [{ id: headId, distance: 0 }];
-      
-      while (queue.length > 0) {
-        const { id, distance } = queue.shift()!;
-        
-        // この世界線での距離を記録（より短い距離で上書きしない）
-        if (!distances.has(id) || distances.get(id)! > distance) {
-          distances.set(id, distance);
-          worldLineMap.set(id, headId);
-        }
-        
-        const world = worldMap.get(id);
-        if (!world) continue;
-        
-        // 親方向へ探索（過去の世界）
-        if (world.parentWorldId && (!distances.has(world.parentWorldId) || distances.get(world.parentWorldId)! > distance + 1)) {
-          queue.push({ id: world.parentWorldId, distance: distance + 1 });
-        }
-      }
-    }
-    
-    // 各世界線のHEADの数を数えて、横方向の配置を計算
-    const headsList = Array.from(worldLineHeads);
-    const headPositions = new Map<string, { index: number; total: number }>();
-    headsList.forEach((headId, index) => {
-      headPositions.set(headId, { index, total: headsList.length });
-    });
-
-    // 各世界の位置を計算（消失点に向かって配置）
-    return worlds
-      .map((world) => {
-        const distance = distances.get(world.worldId) ?? 999;
-        const worldLineHeadId = worldLineMap.get(world.worldId);
-        const headPos = worldLineHeadId ? headPositions.get(worldLineHeadId) : null;
-        
-        // 距離に応じて消失点との間の位置を計算
-        // distance=0(HEAD): apexPosition
-        // distance=∞: vanishingPoint
-        const ratio = distance === 0 ? 1 : 1 / (distance + 1);
-        
-        let x = vanishingPoint.x + (apexPosition.x - vanishingPoint.x) * ratio;
-        const y = vanishingPoint.y + (apexPosition.y - vanishingPoint.y) * ratio;
-        
-        // 各世界線を横に広げる（中央を基準に均等配置）
-        if (headPos && headPos.total > 1) {
-          const spreadWidth = Math.min(containerSize.width * 0.4, containerSize.width);
-          const offset = ((headPos.index - (headPos.total - 1) / 2) / headPos.total) * spreadWidth * ratio;
-          x += offset;
-        }
-        
-        // Z軸: 距離による奥行き（数値が大きいほど手前）
-        const z = distance * -120;
-        
-        // 基本のzIndex（距離が近いほど手前）
-        const baseZIndex = 100 - distance;
-        
-        return {
-          world,
-          distance,
-          x,
-          y,
-          z,
-          baseZIndex,
-          worldLineHeadId,
-          isHead: worldLineHeads.has(world.worldId),
-        };
-      });
-  }, [worlds, apexWorldId, worldLineHeads]);
-
-  // 世界間の接続線を計算
-  const connections = useMemo(() => {
-    const lines: Array<{
-      from: { x: number; y: number; z: number };
-      to: { x: number; y: number; z: number };
-      color: string;
-    }> = [];
-    
-    const posMap = new Map(worldsWithPosition.map(w => [w.world.worldId, { x: w.x, y: w.y, z: w.z, worldLineHeadId: w.worldLineHeadId }]));
-    
-    for (const { world, worldLineHeadId } of worldsWithPosition) {
-      if (world.parentWorldId) {
-        const childPos = posMap.get(world.worldId);
-        const parentPos = posMap.get(world.parentWorldId);
-        
-        if (childPos && parentPos) {
-          // 世界線の色を使用
-          const worldLineColor = worldLineHeadId ? worldLineColors.get(worldLineHeadId) : null;
-          const lineColor = worldLineColor?.border || 'rgba(150, 150, 200, 0.4)';
-          
-          lines.push({
-            from: parentPos,
-            to: childPos,
-            color: lineColor.replace(/[\d.]+\)$/, '0.5)'), // 透明度を調整
-          });
-        }
-      }
-    }
-    
-    return lines;
-  }, [worldsWithPosition, worldLineColors]);
-
-  const handleWorldClick = (worldId: string) => {
-    setFocusedWorldId(worldId);
-  };
-
-  const handleWorldDoubleClick = (worldId: string) => {
-    onWorldSelect(worldId);
-  };
-
-  return (
-    <>
-      {/* ホバーカードのフェードインアニメーション用スタイル */}
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translate(-50%, -50%) rotateX(20deg) scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, -50%) rotateX(20deg) scale(1);
-          }
-        }
-      `}</style>
-      
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          perspective: '1500px',
-          perspectiveOrigin: '50% 20%',
-          overflow: 'hidden',
-          position: 'relative',
-          backgroundColor: 'rgba(240, 245, 250, 0.3)',
-        }}
-      >
-        <div
-          style={{
-            transformStyle: 'preserve-3d',
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-          }}
-        >
-        {/* 接続線を描画 */}
-        <svg
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 1,
-          }}
-        >
-          {connections.map((conn, index) => (
-            <line
-              key={index}
-              x1={conn.from.x}
-              y1={conn.from.y}
-              x2={conn.to.x}
-              y2={conn.to.y}
-              stroke={conn.color}
-              strokeWidth="2"
-              strokeDasharray="4 4"
-            />
-          ))}
-        </svg>
-
-        {/* 世界を描画 */}
-        {worldsWithPosition.map(({ world, distance, x, y, z, baseZIndex, isHead, worldLineHeadId }) => {
-          const isFocused = world.worldId === focusedWorldId;
-          const opacity = Math.max(0.3, 1 - distance * 0.15);
-          const scale = Math.max(0.3, 1 - distance * 0.15);
-          
-          // focusedな世界はわずかに手前に
-          const adjustedZ = isFocused ? z + 50 : z;
-
-          // 世界線の色を取得
-          const worldLineColor = worldLineHeadId ? worldLineColors.get(worldLineHeadId) : null;
-
-          // HEADはフルカード表示、それ以外はドット表示
-          const isHovered = hoveredWorldId === world.worldId;
-          
-          if (isHead) {
-            return (
-              <div
-                key={world.worldId}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleWorldClick(world.worldId);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  handleWorldDoubleClick(world.worldId);
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${x}px`,
-                  top: `${y}px`,
-                  transform: `translate(-50%, -50%) translateZ(${adjustedZ}px) scale(${scale}) rotateX(20deg)`,
-                  transformOrigin: 'center center',
-                  transformStyle: 'preserve-3d',
-                  width: `${containerSize.width * 0.4}px`,
-                  minHeight: '120px',
-                  padding: '1.5rem',
-                  backgroundColor: isFocused
-                    ? 'rgba(255, 255, 255, 0.98)'
-                    : (worldLineColor?.bg || 'rgba(255, 255, 255, 0.92)'),
-                  border: isFocused
-                    ? '3px solid rgba(0, 123, 255, 0.8)'
-                    : `3px solid ${worldLineColor?.border || 'rgba(150, 150, 200, 0.6)'}`,
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  opacity,
-                  pointerEvents: 'auto',
-                  boxShadow: isFocused
-                    ? '0 10px 40px rgba(0, 123, 255, 0.3)'
-                    : '0 8px 24px rgba(0, 0, 0, 0.15)',
-                  zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex + 50),
-                }}
-              >
-                {renderWorldState(world.worldState as TWorldState, () => {})}
-              </div>
-            );
-          } else {
-            // ドット表示（ホバー時にカード表示）
-            const dotColor = worldLineColor?.border || 'rgba(150, 150, 200, 0.7)';
-            
-            return (
-              <div
-                key={world.worldId}
-                style={{
-                  position: 'absolute',
-                  left: `${x}px`,
-                  top: `${y}px`,
-                  transform: `translate(-50%, -50%) translateZ(${adjustedZ}px)`,
-                  transformOrigin: 'center center',
-                  transformStyle: 'preserve-3d',
-                  pointerEvents: 'auto',
-                  zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex),
-                }}
-              >
-                {/* ドット - ホバー領域を32px × 32pxに拡張 */}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleWorldClick(world.worldId);
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    handleWorldDoubleClick(world.worldId);
-                  }}
-                  onMouseEnter={() => setHoveredWorldId(world.worldId)}
-                  onMouseLeave={() => setHoveredWorldId(null)}
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    zIndex: 1,
-                  }}
-                >
-                  {/* 実際のドット（16px × 16px） */}
-                  <div
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      backgroundColor: isFocused
-                        ? 'rgba(0, 123, 255, 0.9)'
-                        : dotColor,
-                      border: isFocused
-                        ? '2px solid rgba(0, 123, 255, 1)'
-                        : `2px solid ${dotColor}`,
-                      borderRadius: '50%',
-                      opacity,
-                      boxShadow: isFocused
-                        ? '0 0 10px rgba(0, 123, 255, 0.5)'
-                        : 'none',
-                    }}
-                  />
-                </div>
-                
-                {/* ホバー時のカード表示 */}
-                {isHovered && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '50%',
-                      transform: `translate(-50%, -50%) rotateX(20deg)`,
-                      width: `${containerSize.width * 0.4}px`,
-                      minHeight: '120px',
-                      padding: '1.5rem',
-                      backgroundColor: worldLineColor?.bg || 'rgba(255, 255, 255, 0.98)',
-                      border: `3px solid ${worldLineColor?.border || 'rgba(150, 150, 200, 0.6)'}`,
-                      borderRadius: '16px',
-                      boxShadow: '0 12px 48px rgba(0, 0, 0, 0.25)',
-                      pointerEvents: 'none',
-                      zIndex: 2,
-                      animation: 'fadeIn 0.2s ease-out',
-                    }}
-                  >
-                    {renderWorldState(world.worldState as TWorldState, () => {})}
-                  </div>
-                )}
-              </div>
-            );
-          }
-        })}
-        </div>
-      </div>
-    </>
-  );
-}
-
-/**
- * WorldLineViewのプロップス
- * TWorldState: 管理する状態の型（ジェネリック）
- */
-interface WorldLineViewProps<TWorldState> {
-  /** 世界の状態を表示するレンダー関数 */
-  renderWorldState: (
-    worldState: TWorldState,
-    onWorldStateChange: (newWorldState: TWorldState) => void
-  ) => React.ReactNode;
-}
-
-export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewProps<TWorldState>) {
+  onOpenWorldLineView,
+}: WorldLineViewProps<TWorldState>) {
   const {
     apexWorld,
-    apexWorldId,
     grow,
-    setApex,
-    regrow,
-    getAllWorlds,
-    // getWorldTree,
-    isModalOpen,
-    closeModal,
     initialize,
     isInitializing,
     isInitialized,
+    isShowing3DView,
+    closeModal,
+    showAllWorldLines,
   } = useContext(WorldLineContext);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
-
+  
+  // Ctrl+Zで3Dビューを開くハンドラ
   useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
+    // 3Dビューが表示されている場合は、このハンドラを無効化
+    if (isShowing3DView) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.shiftKey && event.key === 'z') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (onOpenWorldLineView) {
+          onOpenWorldLineView();
+        } else if (isInitialized && showAllWorldLines) {
+          showAllWorldLines();
+        } else {
+        }
       }
     };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [onOpenWorldLineView, isInitialized, showAllWorldLines, isShowing3DView]);
 
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, [isModalOpen]);
-
-  const handleWorldSelect = (worldId: string) => {
-    setApex(worldId);
-    closeModal();
-  };
+  // 3Dビューを表示している場合は3Dビューを表示
+  if (isShowing3DView) {
+    return (
+      <WorldLine3DView<TWorldState>
+        renderWorldState={renderWorldState}
+        onCloseWorldLineView={closeModal}
+      />
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', height: "100%", flexDirection: 'column' }}>
-      {/* 初期化ボタン（未初期化時のみ表示） */}
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '200px' }}>
       {!isInitialized && (
-        <InitializeButton 
-          onInitialize={initialize}
-          disabled={isInitializing}
-        />
+        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <WorldInitializeButton 
+            onInitialize={initialize}
+            disabled={isInitializing}
+          />
+        </div>
       )}
 
-      {/* 通常表示: 現在の世界のみ */}
-      {isInitialized && apexWorld && !isModalOpen && (
+      {isInitialized && apexWorld && (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem', width: '100%' }}>
           <div style={{ marginBottom: '1rem' }}>
             <div style={{ marginTop: '1rem' }}>
@@ -517,51 +78,6 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
           </div>
         </div>
       )}
-
-      {/* 3D世界線ビュー（Ctrl+Zで表示） */}
-      {isInitialized && isModalOpen && (
-        <div 
-          ref={containerRef}
-          style={{ 
-            width: `100%`,
-            height: `100%`,
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-            <WorldView3D
-              containerSize={containerSize}
-              worlds={getAllWorlds()}
-              apexWorldId={apexWorldId}
-              apexWorld={apexWorld}
-              onWorldSelect={handleWorldSelect}
-              onSetApex={setApex}
-              onRegrow={regrow}
-              renderWorldState={renderWorldState}
-            />
-        </div>
-      )}
-
-      {/* デバッグ用: ツリー表示（コメントアウト） */}
-      {/* {isInitialized && isModalOpen && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '12px',
-          marginBottom: '2rem',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-          border: '2px solid #007bff'
-        }}>
-          <CreateTreeView
-            creates={getAllWorlds()}
-            currentCreateId={apexWorldId}
-            onCreateSelect={handleWorldSelect}
-            createTree={getWorldTree()}
-          />
-        </div>
-      )} */}
     </div>
   );
 }

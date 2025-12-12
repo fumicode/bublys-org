@@ -23,8 +23,9 @@ export type WorldLineContextType<TWorldState> = {
   isInitializing: boolean;
   isInitialized: boolean;
 
-  // モーダル関連
-  isModalOpen: boolean;
+  // 3Dビュー表示状態
+  isShowing3DView: boolean;
+
   closeModal: () => void;
 };
 
@@ -58,10 +59,10 @@ export const WorldLineContext = createContext<WorldLineContextType<any>>({
     console.warn("getWorldTree not implemented");
     return {};
   },
-  isModalOpen: false,
   closeModal: () => {
     console.warn("closeModal not implemented");
   },
   isInitializing: false,
   isInitialized: false,
+  isShowing3DView: false,
 });
