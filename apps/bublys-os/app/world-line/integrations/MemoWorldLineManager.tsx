@@ -1,5 +1,5 @@
 'use client';
-import { WorldLineManager } from '../WorldLine/feature/WorldLineManager';
+import { createWorldLineManager } from '../WorldLine/feature/createWorldLineManager';
 import { 
   serializeMemo, 
   deserializeMemo,
@@ -14,30 +14,22 @@ import { Memo } from '../Memo/domain/Memo';
 interface MemoWorldLineManagerProps {
   children: React.ReactNode;
   memoId: string;
-  isBubbleMode: boolean;
-  onOpenWorldLineView: () => void;
-  onCloseWorldLineView: () => void;
 }
+
+const MemoWorldLineManagerBase = createWorldLineManager<Memo>({
+  serialize: serializeMemo,
+  deserialize: deserializeMemo,
+  createInitialWorldState: () => createInitialMemo(),
+});
 
 export function MemoWorldLineManager({ 
   children, 
-  memoId,
-  isBubbleMode = false,
-  onOpenWorldLineView,
-  onCloseWorldLineView
+  memoId
 }: MemoWorldLineManagerProps) {
   return (
-    <WorldLineManager<Memo>
-      objectId={memoId}
-      serialize={serializeMemo}
-      deserialize={deserializeMemo}
-      createInitialWorldState={() => createInitialMemo()}
-      onOpenWorldLineView={onOpenWorldLineView}
-      onCloseWorldLineView={onCloseWorldLineView}
-      isBubbleMode={isBubbleMode}
-    >
+    <MemoWorldLineManagerBase objectId={memoId}>
       {children}
-    </WorldLineManager>
+    </MemoWorldLineManagerBase>
   );
 }
 

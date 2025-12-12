@@ -1,38 +1,31 @@
 'use client';
-import { WorldLineView } from '../WorldLine/ui/WorldLineView';
+import { WorldLine3DView } from '../WorldLine/ui/WorldLine3DView';
 import { MemoEditor } from '../Memo/ui/MemoEditor';
-import { MemoTitle } from '../Memo/ui/MemoTitle';
 import { Memo } from '../Memo/domain/Memo';
 import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 
 /**
- * MemoとWorldLineの統合層
+ * Memoの3Dビュー専用コンポーネント
  */
-export function MemoWorldLineIntegration({
-  memoId,
-  onOpenWorldLineView,
-}: {
-  memoId: string;
-  onOpenWorldLineView?: () => void; // bubble-uiで新しいバブルを開く場合に使用
-}) {
+export function MemoWorldLine3DView({ memoId, onCloseWorldLineView }: { memoId: string; onCloseWorldLineView: () => void }) {
   const { setFocusedObjectId } = useFocusedObject();
-  
+
+  const handleCloseWorldLineView = () => {
+    onCloseWorldLineView();
+  };
+
   return (
-    <WorldLineView<Memo>
+    <WorldLine3DView<Memo>
       renderWorldState={(memo: Memo, onMemoChange) => (
         <div
           onFocus={() => setFocusedObjectId(memoId)}
           onMouseDown={() => setFocusedObjectId(memoId)}
           tabIndex={-1}
         >
-          <MemoTitle
-            memo={memo}
-            onSetAuthor={(userId) => onMemoChange(memo.setAuthor(userId))}
-          />
           <MemoEditor memo={memo} onMemoChange={onMemoChange} memoId={memoId} />
         </div>
       )}
-      onOpenWorldLineView={onOpenWorldLineView}
+      onCloseWorldLineView={handleCloseWorldLineView}
     />
   );
 }

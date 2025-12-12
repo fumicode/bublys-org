@@ -7,7 +7,13 @@ import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 /**
  * CounterとWorldLineの統合層
  */
-export function CounterWorldLineIntegration({ counterId }: { counterId: string }) {
+export function CounterWorldLineIntegration({
+  counterId,
+  onOpenWorldLineView,
+}: {
+  counterId: string;
+  onOpenWorldLineView?: () => void;
+}) {
   const { setFocusedObjectId } = useFocusedObject();
   
   return (
@@ -25,6 +31,7 @@ export function CounterWorldLineIntegration({ counterId }: { counterId: string }
           />
         </div>
       )}
+      onOpenWorldLineView={onOpenWorldLineView}
     />
   );
 }

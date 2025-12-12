@@ -1,5 +1,5 @@
 'use client';
-import { WorldLineManager } from '../WorldLine/feature/WorldLineManager';
+import { createWorldLineManager } from '../WorldLine/feature/createWorldLineManager';
 import { 
   serializeCounter, 
   deserializeCounter,
@@ -15,31 +15,27 @@ interface CounterWorldLineManagerProps {
   children: React.ReactNode;
   initialValue?: number;
   counterId: string;
-  isBubbleMode?: boolean;
-  onOpenWorldLineView?: () => void;
-  onCloseWorldLineView?: () => void;
 }
+
+const CounterWorldLineManagerBase = createWorldLineManager<Counter>({
+  serialize: serializeCounter,
+  deserialize: deserializeCounter,
+  createInitialWorldState: () => createInitialCounter(),
+});
 
 export function CounterWorldLineManager({
   children,
   initialValue,
-  counterId,
-  isBubbleMode = false,
-  onOpenWorldLineView,
-  onCloseWorldLineView
+  counterId
 }: CounterWorldLineManagerProps) {
   return (
-    <WorldLineManager<Counter>
+    <CounterWorldLineManagerBase
       objectId={counterId}
-      serialize={serializeCounter}
-      deserialize={deserializeCounter}
+      // 初期値だけ個別に渡す
       createInitialWorldState={() => createInitialCounter(initialValue)}
-      isBubbleMode={isBubbleMode}
-      onOpenWorldLineView={onOpenWorldLineView}
-      onCloseWorldLineView={onCloseWorldLineView}
     >
       {children}
-    </WorldLineManager>
+    </CounterWorldLineManagerBase>
   );
 }
 

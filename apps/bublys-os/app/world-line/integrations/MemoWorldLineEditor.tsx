@@ -6,15 +6,9 @@ import { Memo } from '../Memo/domain/Memo';
 import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 
 /**
- * MemoとWorldLineの統合層
+ * Memoの通常表示用コンポーネント
  */
-export function MemoWorldLineIntegration({
-  memoId,
-  onOpenWorldLineView,
-}: {
-  memoId: string;
-  onOpenWorldLineView?: () => void; // bubble-uiで新しいバブルを開く場合に使用
-}) {
+export function MemoWorldLineEditor({ memoId, onOpenWorldLineView }: { memoId: string; onOpenWorldLineView?: () => void }) {
   const { setFocusedObjectId } = useFocusedObject();
   
   return (
