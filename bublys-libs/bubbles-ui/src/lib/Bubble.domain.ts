@@ -11,7 +11,7 @@ export type RectJson = {
 
 export type BubbleProps = {
   id?: string;
-  name: string;
+  url: string;
   colorHue: number;
   type: string;
   position?: Point2;
@@ -23,7 +23,7 @@ export type BubbleProps = {
 
 export type BubbleJson= {
   id: string;
-  name: string;
+  url: string;
   colorHue: number;
   type: string;
   position?: Point2;
@@ -35,7 +35,7 @@ export type BubbleJson= {
 
 export type BubbleState = {
   id: string;
-  name: string;
+  url: string;
   colorHue: number;
   type: string;
   position?: Point2;
@@ -60,12 +60,12 @@ export class Bubble {
     return this.state.id;
   }
 
-  get name(): string {
-    return this.state.name;
+  get url(): string {
+    return this.state.url;
   }
 
-  updateName(name: string): Bubble {
-    return new Bubble({ ...this.state, name });
+  updateUrl(url: string): Bubble {
+    return new Bubble({ ...this.state, url });
   }
 
   get colorHue(): number {
@@ -88,8 +88,9 @@ export class Bubble {
     return this.state.size;
   }
 
-  rename(newName: string): Bubble {
-    return new Bubble({ ...this.state, name: newName });
+  // 後方互換性のため rename を残す
+  rename(newUrl: string): Bubble {
+    return new Bubble({ ...this.state, url: newUrl });
   }
 
 
@@ -122,27 +123,27 @@ export class Bubble {
 
 }
 
-type BubbleTypeResolver = (name: string) => string | undefined;
+type BubbleTypeResolver = (url: string) => string | undefined;
 let customBubbleTypeResolver: BubbleTypeResolver | undefined;
 
 export const registerBubbleTypeResolver = (resolver: BubbleTypeResolver) => {
   customBubbleTypeResolver = resolver;
 };
 
-export const createBubble = (name: string, pos?: Point2): Bubble => {
-  const colorHue = getColorHueFromString(name);
-  const resolvedType = customBubbleTypeResolver?.(name);
+export const createBubble = (url: string, pos?: Point2): Bubble => {
+  const colorHue = getColorHueFromString(url);
+  const resolvedType = customBubbleTypeResolver?.(url);
   const type = resolvedType ?? "normal";
 
-  return new Bubble({ name, colorHue, type, position: pos });
+  return new Bubble({ url, colorHue, type, position: pos });
 };
 
 
 // 文字列から1対1の一意な色を生成。
-function getColorHueFromString(name: string): number {
+function getColorHueFromString(url: string): number {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash << 5) - hash + name.charCodeAt(i);
+  for (let i = 0; i < url.length; i++) {
+    hash = (hash << 5) - hash + url.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash % 360);

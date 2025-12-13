@@ -36,18 +36,18 @@ export interface BubbleStateSlice {
 // --- Initial data setup ---
 const initialBubbleInstances: Bubble[] = [
   new Bubble({
-    name: "user-groups",
+    url: "user-groups",
     colorHue: 200,
     type: "user-groups",
   }),
   new Bubble({
-    name: "Element E",
+    url: "Element E",
     colorHue: 100,
     type: "normal",
     size: { width: 300, height: 200 }, // サイズ指定のテスト
   }),
   new Bubble({
-    name: "Element F",
+    url: "Element F",
     colorHue: 300,
     type: "normal",
   }),
