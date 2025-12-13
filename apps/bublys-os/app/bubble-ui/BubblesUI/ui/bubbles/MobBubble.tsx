@@ -6,7 +6,7 @@ export const MobBubble: FC<{ bubble: Bubble }> = ({ bubble }) => {
   return (
     <div>
       <p>こちらがbubbleの中身です。</p>
-      <p>name: {bubble.name}</p>
+      <p>url: {bubble.url}</p>
     </div>
   );
 };

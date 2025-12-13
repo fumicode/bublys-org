@@ -4,7 +4,7 @@ import { Bubble } from "@bublys-org/bubbles-ui";
 import { matchBubbleRoute } from "../domain/bubbleRoutes";
 
 export const BubbleContent: FC<{ bubble: Bubble }> = ({ bubble }) => {
-  const route = matchBubbleRoute(bubble.name);
+  const route = matchBubbleRoute(bubble.url);
   const Renderer = route?.Component;
 
   if (Renderer) {

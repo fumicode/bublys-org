@@ -14,7 +14,7 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   coordinateSystem,
   linkZIndex,
 }) => {
-  const domOpenerRect = getOpenerRectForRelation(opener, openee.name);
+  const domOpenerRect = getOpenerRectForRelation(opener, openee.url);
   const baseOpenerRect = domOpenerRect || opener.renderedRect;
   const openerRect = baseOpenerRect
     ? baseOpenerRect.toLocal(coordinateSystem)

@@ -185,7 +185,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               vanishingPoint={globalCoordinateSystem.vanishingPoint}
               onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
               onBubbleClose={deleteBubble}
-              onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.name, bubble.size)}
+              onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
               onCoordinateSystemReady={handleCoordinateSystemReady}
