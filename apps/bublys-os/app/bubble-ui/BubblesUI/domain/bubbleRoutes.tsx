@@ -273,11 +273,13 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
+import { ShellBubble } from '../ui/bubbles/ShellBubble';
+
 const routes: BubbleRoute[] = [
-  { 
-    pattern: /^mob$/, 
-    type: "mob", 
-    Component: ({ bubble }) => <MobBubble bubble={bubble} /> 
+  {
+    pattern: /^mob$/,
+    type: "mob",
+    Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
   {
     pattern: /^user-groups$/,
@@ -304,6 +306,13 @@ const routes: BubbleRoute[] = [
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+
+  // ObjectShell統合ルート
+  {
+    pattern: /^object-shells\/[^/]+\/[^/]+$/,
+    type: "object-shell",
+    Component: ShellBubble
+  },
 
   { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
     const appId = bubble.url.replace("iframes/", "");

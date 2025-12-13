@@ -16,7 +16,7 @@ import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
 } from "@bublys-org/bubbles-ui-state";
-import { bubblesListener } from "@bublys-org/bubbles-ui-state";
+import { bubblesListener, shellBubbleListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { userSlice } from "./slices/user-slice.js";
@@ -67,7 +67,9 @@ export const makeStore = () => {
         serializableCheck: {
           ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
         },
-    }).prepend(bubblesListener.middleware),
+    })
+      .prepend(bubblesListener.middleware)
+      .prepend(shellBubbleListener.middleware),
   });
   console.log("Store created:", store);
   

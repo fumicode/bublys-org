@@ -7,6 +7,7 @@
 
 import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect } from 'react';
 import { ObjectShell, fromJson } from '../domain';
+import { useAppDispatch } from '@bublys-org/state-management';
 
 // ============================================
 // State
@@ -14,10 +15,19 @@ import { ObjectShell, fromJson } from '../domain';
 
 interface ShellManagerState {
   shells: Map<string, ObjectShell<any>>;
+  // 新規追加: Bubble統合用
+  shellTypes: Map<string, string>;  // shellId → typeName
+  pendingBubbleCreations: Array<{
+    shellId: string;
+    shellType: string;
+    openerBubbleId: string;
+  }>;
 }
 
 const initialState: ShellManagerState = {
   shells: new Map(),
+  shellTypes: new Map(),
+  pendingBubbleCreations: [],
 };
 
 // ============================================
@@ -28,7 +38,19 @@ type ShellManagerAction =
   | { type: 'SET_SHELL'; payload: { id: string; shell: ObjectShell<any> } }
   | { type: 'REMOVE_SHELL'; payload: { id: string } }
   | { type: 'LOAD_SHELLS'; payload: { shells: Map<string, ObjectShell<any>> } }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  // 新規: Bubble統合用
+  | {
+      type: 'SET_SHELL_WITH_BUBBLE';
+      payload: {
+        id: string;
+        shell: ObjectShell<any>;
+        shellType: string;
+        createBubble: boolean;
+        openerBubbleId: string;
+      }
+    }
+  | { type: 'MARK_BUBBLE_CREATED'; payload: { shellId: string } };
 
 // ============================================
 // Reducer
@@ -42,21 +64,63 @@ function shellManagerReducer(
     case 'SET_SHELL': {
       const newShells = new Map(state.shells);
       newShells.set(action.payload.id, action.payload.shell);
-      return { shells: newShells };
+      return {
+        ...state,
+        shells: newShells,
+      };
     }
 
     case 'REMOVE_SHELL': {
       const newShells = new Map(state.shells);
+      const newTypes = new Map(state.shellTypes);
       newShells.delete(action.payload.id);
-      return { shells: newShells };
+      newTypes.delete(action.payload.id);
+      return {
+        ...state,
+        shells: newShells,
+        shellTypes: newTypes,
+      };
     }
 
     case 'LOAD_SHELLS': {
-      return { shells: new Map(action.payload.shells) };
+      return {
+        ...state,
+        shells: new Map(action.payload.shells),
+      };
     }
 
     case 'CLEAR_ALL': {
-      return { shells: new Map() };
+      return {
+        shells: new Map(),
+        shellTypes: new Map(),
+        pendingBubbleCreations: [],
+      };
+    }
+
+    case 'SET_SHELL_WITH_BUBBLE': {
+      const { id, shell, shellType, createBubble, openerBubbleId } = action.payload;
+      const newShells = new Map(state.shells);
+      const newTypes = new Map(state.shellTypes);
+      newShells.set(id, shell);
+      newTypes.set(id, shellType);
+
+      return {
+        ...state,
+        shells: newShells,
+        shellTypes: newTypes,
+        pendingBubbleCreations: createBubble
+          ? [...state.pendingBubbleCreations, { shellId: id, shellType, openerBubbleId }]
+          : state.pendingBubbleCreations,
+      };
+    }
+
+    case 'MARK_BUBBLE_CREATED': {
+      return {
+        ...state,
+        pendingBubbleCreations: state.pendingBubbleCreations.filter(
+          p => p.shellId !== action.payload.shellId
+        ),
+      };
     }
 
     default:
@@ -85,6 +149,19 @@ interface ShellManagerContextType {
   // 永続化
   saveToStorage: () => void;
   loadFromStorage: () => void;
+
+  // 新規: Bubble統合用
+  setShellWithBubble: <T>(
+    id: string,
+    shell: ObjectShell<T>,
+    options: {
+      shellType: string;
+      createBubble?: boolean;    // デフォルト true
+      openerBubbleId?: string;   // デフォルト 'root'
+    }
+  ) => void;
+  getShellByBubbleUrl: (url: string) => ObjectShell<any> | undefined;
+  getShellType: (shellId: string) => string | undefined;
 }
 
 const ShellManagerContext = createContext<ShellManagerContextType | null>(null);
@@ -95,10 +172,33 @@ const ShellManagerContext = createContext<ShellManagerContextType | null>(null);
 
 export function ShellManagerProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(shellManagerReducer, initialState);
+  const reduxDispatch = useAppDispatch();  // Redux dispatch for Bubble creation
 
   // Actions
   const setShell = useCallback(<T,>(id: string, shell: ObjectShell<T>) => {
     dispatch({ type: 'SET_SHELL', payload: { id, shell } });
+  }, []);
+
+  // 新規: Bubble統合用
+  const setShellWithBubble = useCallback(<T,>(
+    id: string,
+    shell: ObjectShell<T>,
+    options: {
+      shellType: string;
+      createBubble?: boolean;
+      openerBubbleId?: string;
+    }
+  ) => {
+    dispatch({
+      type: 'SET_SHELL_WITH_BUBBLE',
+      payload: {
+        id,
+        shell,
+        shellType: options.shellType,
+        createBubble: options.createBubble ?? true,
+        openerBubbleId: options.openerBubbleId ?? 'root',
+      },
+    });
   }, []);
 
   const removeShell = useCallback((id: string) => {
@@ -127,6 +227,19 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
     },
     [state.shells]
   );
+
+  // 新規: Bubble統合用クエリ
+  const getShellByBubbleUrl = useCallback((url: string) => {
+    // URL: object-shells/counter/shell-counter-001
+    const match = url.match(/^object-shells\/[^/]+\/(.+)$/);
+    if (!match) return undefined;
+    const shellId = match[1];
+    return state.shells.get(shellId);
+  }, [state.shells]);
+
+  const getShellType = useCallback((shellId: string) => {
+    return state.shellTypes.get(shellId);
+  }, [state.shellTypes]);
 
   // 永続化
   const saveToStorage = useCallback(() => {
@@ -204,6 +317,26 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', handler);
   }, [saveToStorage]);
 
+  // Bubble自動作成（pendingBubbleCreationsを監視）
+  useEffect(() => {
+    state.pendingBubbleCreations.forEach((pending) => {
+      const { shellId, shellType, openerBubbleId } = pending;
+      const url = `object-shells/${shellType}/${shellId}`;
+
+      // Redux にBubble作成リクエストをディスパッチ
+      reduxDispatch({
+        type: 'bubbles/requestBubbleCreation',
+        payload: { url, openerBubbleId },
+      });
+
+      // 作成済みフラグを立てる
+      dispatch({
+        type: 'MARK_BUBBLE_CREATED',
+        payload: { shellId }
+      });
+    });
+  }, [state.pendingBubbleCreations, reduxDispatch]);
+
   return (
     <ShellManagerContext.Provider
       value={{
@@ -216,6 +349,9 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
         hasShell,
         saveToStorage,
         loadFromStorage,
+        setShellWithBubble,
+        getShellByBubbleUrl,
+        getShellType,
       }}
     >
       {children}
