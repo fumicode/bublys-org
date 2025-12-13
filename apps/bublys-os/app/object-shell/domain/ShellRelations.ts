@@ -10,11 +10,10 @@ export interface RelationReference {
 }
 
 /**
- * ShellRelations
- * オブジェクト間の関連を管理
- * ID参照のみを保持し、DDDの集約制約を守る
+ * ShellRelationsState
+ * 関連の状態を表すインターフェース
  */
-export interface ShellRelations {
+export interface ShellRelationsState {
   // 他オブジェクトへのID参照
   references: RelationReference[];
 
@@ -24,142 +23,137 @@ export interface ShellRelations {
 }
 
 /**
- * デフォルトのShellRelationsを作成
+ * ShellRelations
+ * オブジェクト間の関連を管理するクラス
+ * ID参照のみを保持し、DDDの集約制約を守る
  */
-export function createDefaultRelations(): ShellRelations {
-  return {
-    references: [],
-    referencedBy: [],
-  };
-}
+export class ShellRelations {
+  constructor(private readonly state: ShellRelationsState) {}
 
-/**
- * 参照を追加
- */
-export function addReference(
-  relations: ShellRelations,
-  reference: RelationReference
-): ShellRelations {
-  // 重複チェック（同じtargetIdとrelationTypeの組み合わせ）
-  const exists = relations.references.some(
-    r => r.targetId === reference.targetId && r.relationType === reference.relationType
-  );
-
-  if (exists) {
-    return relations;
+  // Getters for accessing state properties
+  get references(): RelationReference[] {
+    return this.state.references;
   }
 
-  return {
-    ...relations,
-    references: [...relations.references, reference],
-  };
-}
-
-/**
- * 参照を削除
- */
-export function removeReference(
-  relations: ShellRelations,
-  targetId: string,
-  relationType?: string
-): ShellRelations {
-  return {
-    ...relations,
-    references: relations.references.filter(r => {
-      if (relationType) {
-        return !(r.targetId === targetId && r.relationType === relationType);
-      }
-      return r.targetId !== targetId;
-    }),
-  };
-}
-
-/**
- * 特定のタイプの参照を取得
- */
-export function getReferencesByType(
-  relations: ShellRelations,
-  relationType: string
-): RelationReference[] {
-  return relations.references.filter(r => r.relationType === relationType);
-}
-
-/**
- * 特定のオブジェクトへの参照を取得
- */
-export function getReferencesToObject(
-  relations: ShellRelations,
-  targetId: string
-): RelationReference[] {
-  return relations.references.filter(r => r.targetId === targetId);
-}
-
-/**
- * 逆参照を追加（referencedByリストに追加）
- */
-export function addReferencedBy(
-  relations: ShellRelations,
-  objectId: string
-): ShellRelations {
-  if (relations.referencedBy.includes(objectId)) {
-    return relations;
+  get referencedBy(): string[] {
+    return this.state.referencedBy;
   }
 
-  return {
-    ...relations,
-    referencedBy: [...relations.referencedBy, objectId],
-  };
-}
+  /**
+   * デフォルトのShellRelationsを作成
+   */
+  static create(): ShellRelations {
+    return new ShellRelations({
+      references: [],
+      referencedBy: [],
+    });
+  }
 
-/**
- * 逆参照を削除
- */
-export function removeReferencedBy(
-  relations: ShellRelations,
-  objectId: string
-): ShellRelations {
-  return {
-    ...relations,
-    referencedBy: relations.referencedBy.filter(id => id !== objectId),
-  };
-}
-
-/**
- * 関連が存在するか確認
- */
-export function hasRelation(
-  relations: ShellRelations,
-  targetId: string,
-  relationType?: string
-): boolean {
-  if (relationType) {
-    return relations.references.some(
-      r => r.targetId === targetId && r.relationType === relationType
+  /**
+   * 参照を追加
+   */
+  addReference(reference: RelationReference): ShellRelations {
+    // 重複チェック（同じtargetIdとrelationTypeの組み合わせ）
+    const exists = this.state.references.some(
+      r => r.targetId === reference.targetId && r.relationType === reference.relationType
     );
+
+    if (exists) {
+      return this;
+    }
+
+    return new ShellRelations({
+      ...this.state,
+      references: [...this.state.references, reference],
+    });
   }
-  return relations.references.some(r => r.targetId === targetId);
-}
 
-/**
- * すべての関連先IDを取得（重複除去）
- */
-export function getAllRelatedIds(relations: ShellRelations): string[] {
-  return Array.from(new Set(relations.references.map(r => r.targetId)));
-}
+  /**
+   * 参照を削除
+   */
+  removeReference(targetId: string, relationType?: string): ShellRelations {
+    return new ShellRelations({
+      ...this.state,
+      references: this.state.references.filter(r => {
+        if (relationType) {
+          return !(r.targetId === targetId && r.relationType === relationType);
+        }
+        return r.targetId !== targetId;
+      }),
+    });
+  }
 
-/**
- * JSON形式に変換
- */
-export function serializeRelations(relations: ShellRelations): object {
-  return { ...relations };
-}
+  /**
+   * 特定のタイプの参照を取得
+   */
+  getReferencesByType(relationType: string): RelationReference[] {
+    return this.state.references.filter(r => r.relationType === relationType);
+  }
 
-/**
- * JSONからRelationsを復元
- */
-export function deserializeRelations(json: any): ShellRelations {
-  return {
-    references: json.references || [],
-    referencedBy: json.referencedBy || [],
-  };
+  /**
+   * 特定のオブジェクトへの参照を取得
+   */
+  getReferencesToObject(targetId: string): RelationReference[] {
+    return this.state.references.filter(r => r.targetId === targetId);
+  }
+
+  /**
+   * 逆参照を追加（referencedByリストに追加）
+   */
+  addReferencedBy(objectId: string): ShellRelations {
+    if (this.state.referencedBy.includes(objectId)) {
+      return this;
+    }
+
+    return new ShellRelations({
+      ...this.state,
+      referencedBy: [...this.state.referencedBy, objectId],
+    });
+  }
+
+  /**
+   * 逆参照を削除
+   */
+  removeReferencedBy(objectId: string): ShellRelations {
+    return new ShellRelations({
+      ...this.state,
+      referencedBy: this.state.referencedBy.filter(id => id !== objectId),
+    });
+  }
+
+  /**
+   * 関連が存在するか確認
+   */
+  hasRelation(targetId: string, relationType?: string): boolean {
+    if (relationType) {
+      return this.state.references.some(
+        r => r.targetId === targetId && r.relationType === relationType
+      );
+    }
+    return this.state.references.some(r => r.targetId === targetId);
+  }
+
+  /**
+   * すべての関連先IDを取得（重複除去）
+   */
+  getAllRelatedIds(): string[] {
+    return Array.from(new Set(this.state.references.map(r => r.targetId)));
+  }
+
+  /**
+   * JSON形式に変換
+   */
+  toJSON(): ShellRelationsState {
+    return { ...this.state };
+  }
+
+  /**
+   * JSONからRelationsを復元
+   */
+  static fromJSON(json: any): ShellRelations {
+    return new ShellRelations({
+      references: json.references || [],
+      referencedBy: json.referencedBy || [],
+    });
+  }
 }

@@ -8,10 +8,8 @@
 import { Counter } from '../../world-line/Counter/domain/Counter';
 import {
   wrap,
-  ObjectShellBase,
+  fromJson,
   createObjectShell,
-  addReference,
-  addViewReference,
 } from '../domain';
 
 /**
@@ -26,7 +24,7 @@ export function basicShellExample() {
 
   console.log('Initial Counter Shell:', {
     id: counterShell.id,
-    value: counterShell.domainObject.value,
+    value: counterShell.value,
     owner: counterShell.metadata.permissions.owner,
     historyLength: counterShell.history ? 1 : 0,
   });
@@ -41,31 +39,19 @@ export function updateDomainObjectExample() {
   const counterShell = basicShellExample();
 
   // カウントアップ操作
-  const newCounter = counterShell.domainObject.countUp();
-  const updatedShell = counterShell.updateDomainObject(
-    newCounter,
-    'countUp',
-    'user-001',
-    'カウンターを1増やしました'
-  );
+  const updatedShell = counterShell.countUp();
 
   console.log('After countUp:', {
-    oldValue: counterShell.domainObject.value,
-    newValue: updatedShell.domainObject.value,
+    oldValue: counterShell.value,
+    newValue: updatedShell.value,
     historyLength: updatedShell.history.length,
   });
 
   // さらにカウントアップ
-  const newCounter2 = updatedShell.domainObject.countUp();
-  const updatedShell2 = updatedShell.updateDomainObject(
-    newCounter2,
-    'countUp',
-    'user-001',
-    'さらにカウンターを1増やしました'
-  );
+  const updatedShell2 = updatedShell.countUp();
 
   console.log('After second countUp:', {
-    value: updatedShell2.domainObject.value,
+    value: updatedShell2.value,
     historyLength: updatedShell2.history.length,
   });
 
@@ -102,7 +88,7 @@ export function viewReferenceExample() {
   const counterShell = basicShellExample();
 
   // Viewへの関連を追加
-  const metadata1 = addViewReference(counterShell.metadata, {
+  const metadata1 = counterShell.metadata.addViewReference({
     viewId: 'bubble-001',
     viewType: 'bubble',
     position: { x: 100, y: 200, z: 0 },
@@ -113,7 +99,7 @@ export function viewReferenceExample() {
   });
 
   // 別のViewへの関連を追加
-  const metadata2 = addViewReference(shellWithView1.metadata, {
+  const metadata2 = shellWithView1.metadata.addViewReference({
     viewId: 'modal-001',
     viewType: 'modal',
   });
@@ -142,7 +128,7 @@ export function relationsExample() {
   const counterShell2 = wrap('counter-002', new Counter(10), 'user-001');
 
   // counter-001からcounter-002への参照を追加
-  const relations1 = addReference(counterShell1.relations, {
+  const relations1 = counterShell1.relations.addReference({
     targetId: 'counter-002',
     relationType: 'dependency',
     metadata: {
@@ -178,16 +164,15 @@ export function serializationExample() {
   console.log('Serialized Counter Shell:', JSON.stringify(json, null, 2));
 
   // JSONから復元
-  const restoredShellBase = ObjectShellBase.fromJson<Counter>(
+  const restoredShell = fromJson<Counter>(
     json,
     (data: any) => Counter.fromJson(data),
     (data: any) => Counter.fromJson(data)
   );
-  const restoredShell = createObjectShell(restoredShellBase);
 
   console.log('Restored Counter Shell:', {
     id: restoredShell.id,
-    value: restoredShell.domainObject.value,
+    value: restoredShell.value,
     historyLength: restoredShell.history.length,
   });
 
@@ -213,7 +198,7 @@ export function actionExample() {
 
   for (let i = 0; i < 3; i++) {
     // カウントアップ（5ずつ）
-    const newCounter = new Counter(counterShell.domainObject.value + 5);
+    const newCounter = new Counter(counterShell.value + 5);
     const newShellBase = counterShell.updateDomainObjectWithAction(
       newCounter,
       incrementAction
@@ -230,7 +215,7 @@ export function actionExample() {
     console.log(`      meta:`, node.action.meta);
   });
 
-  console.log('\n最終値:', counterShell.domainObject.value);
+  console.log('\n最終値:', counterShell.value);
 
   return counterShell;
 }
@@ -246,7 +231,7 @@ export function comprehensiveExample() {
   let counterShell = wrap('counter-comprehensive', counter, 'user-001');
 
   // 2. View関連を追加
-  const metadata = addViewReference(counterShell.metadata, {
+  const metadata = counterShell.metadata.addViewReference({
     viewId: 'main-bubble',
     viewType: 'bubble',
     position: { x: 50, y: 50, z: 0 },
@@ -255,13 +240,7 @@ export function comprehensiveExample() {
 
   // 3. カウンター操作を繰り返す
   for (let i = 0; i < 5; i++) {
-    const newCounter = counterShell.domainObject.countUp();
-    counterShell = createObjectShell(counterShell.updateDomainObject(
-      newCounter,
-      'countUp',
-      'user-001',
-      `カウント ${i + 1}回目`
-    ));
+    counterShell = counterShell.countUp();
   }
 
   // 4. 履歴を確認
@@ -274,7 +253,7 @@ export function comprehensiveExample() {
   // 5. 最終状態
   console.log('\n最終状態:', {
     id: counterShell.id,
-    value: counterShell.domainObject.value,
+    value: counterShell.value,
     views: counterShell.metadata.views.length,
     historyLength: history.length,
     owner: counterShell.metadata.permissions.owner,
@@ -286,15 +265,14 @@ export function comprehensiveExample() {
     (c: Counter) => c.toJson()
   );
 
-  const restoredBase = ObjectShellBase.fromJson<Counter>(
+  const restored = fromJson<Counter>(
     json,
     (data) => Counter.fromJson(data),
     (data) => Counter.fromJson(data)
   );
-  const restored = createObjectShell(restoredBase);
 
   console.log('\n復元後の検証:', {
-    isEqual: restored.domainObject.value === counterShell.domainObject.value,
+    isEqual: restored.value === counterShell.value,
     historyPreserved: restored.history.length === history.length,
   });
 

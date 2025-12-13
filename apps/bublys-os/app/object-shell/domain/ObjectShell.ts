@@ -1,31 +1,14 @@
-import type { ShellMetadata } from './ShellMetadata';
-import type { ShellRelations } from './ShellRelations';
-import type { ShellHistoryNode } from './ShellHistory';
-import {
-  createDefaultMetadata,
-  updateMetadata,
-  serializeMetadata,
-  deserializeMetadata,
-} from './ShellMetadata';
-import {
-  createDefaultRelations,
-  serializeRelations,
-  deserializeRelations,
-} from './ShellRelations';
-import {
-  createHistoryNode,
-  createHistoryNodeSimple,
-  serializeHistory,
-  deserializeHistory,
-  getHistoryAsArray,
-  type ShellAction,
-} from './ShellHistory';
+import { ShellMetadata, type ShellMetadataState } from './ShellMetadata';
+import { ShellRelations } from './ShellRelations';
+import { ShellHistory, type ShellHistoryNode, type ShellAction } from './ShellHistory';
 
 /**
  * ObjectShellState<T>
  * ObjectShellの内部状態を表す型
  */
 export interface ObjectShellState<T> {
+  id: string;                               // シェルの一意識別子
+  domainObject: T;                          // 包まれたドメインオブジェクト
   metadata: ShellMetadata;
   historyHead: ShellHistoryNode<T> | null;  // 履歴チェーンの先頭
   relations: ShellRelations;
@@ -44,17 +27,20 @@ export interface ObjectShellState<T> {
  * - ID参照による関連管理
  */
 export class ObjectShellBase<T> {
-  constructor(
-    readonly id: string,              // シェルの一意識別子
-    readonly domainObject: T,         // 包まれたドメインオブジェクト
-    readonly state: ObjectShellState<T>  // シェルの状態
-  ) {}
+  constructor(readonly state: ObjectShellState<T>) {}
+
+  /**
+   * シェルIDを取得
+   */
+  get id(): string {
+    return this.state.id;
+  }
 
   /**
    * 履歴を配列として取得（新しい順）
    */
   get history(): ShellHistoryNode<T>[] {
-    return getHistoryAsArray(this.state.historyHead);
+    return ShellHistory.getAsArray(this.state.historyHead);
   }
 
   /**
@@ -79,15 +65,13 @@ export class ObjectShellBase<T> {
     domainObject: T,
     ownerId: string
   ): ObjectShellBase<T> {
-    return new ObjectShellBase<T>(
+    return new ObjectShellBase<T>({
       id,
       domainObject,
-      {
-        metadata: createDefaultMetadata(ownerId),
-        historyHead: null,  // 初期状態は履歴なし
-        relations: createDefaultRelations(),
-      }
-    );
+      metadata: ShellMetadata.create(ownerId),
+      historyHead: null,  // 初期状態は履歴なし
+      relations: ShellRelations.create(),
+    });
   }
 
   /**
@@ -100,24 +84,22 @@ export class ObjectShellBase<T> {
     saveSnapshot: boolean = false
   ): ObjectShellBase<T> {
     // 履歴ノードを作成
-    const newHistoryHead = createHistoryNode<T>(
+    const newHistoryHead = ShellHistory.createNode<T>(
       this.state.historyHead,
       action,
-      saveSnapshot ? this.domainObject : undefined
+      saveSnapshot ? this.state.domainObject : undefined
     );
 
     // メタデータのupdatedAtを更新
-    const newMetadata = updateMetadata(this.state.metadata, {});
+    const newMetadata = this.state.metadata.update({});
 
-    return new ObjectShellBase<T>(
-      this.id,
-      newDomainObject,
-      {
-        metadata: newMetadata,
-        historyHead: newHistoryHead,
-        relations: this.state.relations,
-      }
-    );
+    return new ObjectShellBase<T>({
+      id: this.id,
+      domainObject: newDomainObject,
+      metadata: newMetadata,
+      historyHead: newHistoryHead,
+      relations: this.state.relations,
+    });
   }
 
   /**
@@ -133,70 +115,94 @@ export class ObjectShellBase<T> {
     saveSnapshot: boolean = false
   ): ObjectShellBase<T> {
     // 履歴ノードを作成
-    const newHistoryHead = createHistoryNodeSimple<T>(
+    const newHistoryHead = ShellHistory.createNodeSimple<T>(
       this.state.historyHead,
       actionType,
       payload,
       userId,
       description,
-      saveSnapshot ? this.domainObject : undefined
+      saveSnapshot ? this.state.domainObject : undefined
     );
 
     // メタデータのupdatedAtを更新
-    const newMetadata = updateMetadata(this.state.metadata, {});
+    const newMetadata = this.state.metadata.update({});
 
-    return new ObjectShellBase<T>(
-      this.id,
-      newDomainObject,
-      {
-        metadata: newMetadata,
-        historyHead: newHistoryHead,
-        relations: this.state.relations,
-      }
-    );
+    return new ObjectShellBase<T>({
+      id: this.id,
+      domainObject: newDomainObject,
+      metadata: newMetadata,
+      historyHead: newHistoryHead,
+      relations: this.state.relations,
+    });
   }
 
   /**
    * メタデータを更新
    */
-  updateMetadata(updates: Partial<ShellMetadata>): ObjectShellBase<T> {
-    return new ObjectShellBase<T>(
-      this.id,
-      this.domainObject,
-      {
-        ...this.state,
-        metadata: updateMetadata(this.state.metadata, updates),
-      }
-    );
+  updateMetadata(updates: Partial<ShellMetadataState>): ObjectShellBase<T> {
+    return new ObjectShellBase<T>({
+      ...this.state,
+      metadata: this.state.metadata.update(updates),
+    });
   }
 
   /**
    * 関連を更新
    */
   updateRelations(newRelations: ShellRelations): ObjectShellBase<T> {
-    return new ObjectShellBase<T>(
-      this.id,
-      this.domainObject,
-      {
-        metadata: updateMetadata(this.state.metadata, {}),  // updatedAtを更新
-        historyHead: this.state.historyHead,
-        relations: newRelations,
-      }
-    );
+    return new ObjectShellBase<T>({
+      id: this.id,
+      domainObject: this.state.domainObject,
+      metadata: this.state.metadata.update({}),  // updatedAtを更新
+      historyHead: this.state.historyHead,
+      relations: newRelations,
+    });
   }
 
   /**
    * 履歴を更新（通常は使用しない、主にデシリアライズ時用）
    */
   updateHistory(newHistoryHead: ShellHistoryNode<T> | null): ObjectShellBase<T> {
-    return new ObjectShellBase<T>(
-      this.id,
-      this.domainObject,
-      {
-        ...this.state,
-        historyHead: newHistoryHead,
-      }
-    );
+    return new ObjectShellBase<T>({
+      ...this.state,
+      historyHead: newHistoryHead,
+    });
+  }
+
+  /**
+   * View参照を追加（ヘルパーメソッド）
+   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
+   */
+  addViewReference(viewRef: import('./ShellMetadata').ViewReference): this {
+    const newMetadata = this.state.metadata.addViewReference(viewRef);
+    return this.updateMetadata({ views: newMetadata.views }) as this;
+  }
+
+  /**
+   * View参照を削除（ヘルパーメソッド）
+   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
+   */
+  removeViewReference(viewId: string): this {
+    const newMetadata = this.state.metadata.removeViewReference(viewId);
+    return this.updateMetadata({ views: newMetadata.views }) as this;
+  }
+
+  /**
+   * 関連を追加（ヘルパーメソッド）
+   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
+   */
+  addRelation(reference: import('./ShellRelations').RelationReference): this {
+    const newRelations = this.state.relations.addReference(reference);
+    return this.updateRelations(newRelations) as this;
+  }
+
+  /**
+   * 関連を削除（ヘルパーメソッド）
+   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
+   */
+  removeRelation(targetId: string, relationType?: string): this {
+    const newRelations = this.state.relations.removeReference(targetId, relationType);
+    return this.updateRelations(newRelations) as this;
   }
 
   /**
@@ -208,10 +214,10 @@ export class ObjectShellBase<T> {
   ): object {
     return {
       id: this.id,
-      domainObject: domainObjectSerializer(this.domainObject),
-      metadata: serializeMetadata(this.state.metadata),
-      history: serializeHistory(this.state.historyHead, snapshotSerializer),
-      relations: serializeRelations(this.state.relations),
+      domainObject: domainObjectSerializer(this.state.domainObject),
+      metadata: this.state.metadata.toJSON(),
+      history: ShellHistory.toJSON(this.state.historyHead, snapshotSerializer),
+      relations: this.state.relations.toJSON(),
     };
   }
 
@@ -223,15 +229,13 @@ export class ObjectShellBase<T> {
     domainObjectDeserializer: (data: any) => T,
     snapshotDeserializer?: (data: any) => T
   ): ObjectShellBase<T> {
-    return new ObjectShellBase<T>(
-      json.id,
-      domainObjectDeserializer(json.domainObject),
-      {
-        metadata: deserializeMetadata(json.metadata),
-        historyHead: deserializeHistory(json.history, snapshotDeserializer),
-        relations: deserializeRelations(json.relations),
-      }
-    );
+    return new ObjectShellBase<T>({
+      id: json.id,
+      domainObject: domainObjectDeserializer(json.domainObject),
+      metadata: ShellMetadata.fromJSON(json.metadata),
+      historyHead: ShellHistory.fromJSON(json.history, snapshotDeserializer),
+      relations: ShellRelations.fromJSON(json.relations),
+    });
   }
 }
 
@@ -244,7 +248,7 @@ export type Shelled<T> = ObjectShellBase<T>;
  * ユーティリティ関数：ドメインオブジェクトを取得
  */
 export function unwrap<T>(shell: ObjectShellBase<T>): T {
-  return shell.domainObject;
+  return shell.state.domainObject;
 }
 
 /**

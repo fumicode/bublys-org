@@ -24,139 +24,160 @@ export interface PermissionSet {
 }
 
 /**
- * ShellMetadata
- * オブジェクトシェルのメタデータ
- * 横断的関心事（View関連付け、権限、タグなど）を管理
+ * ShellMetadataState
+ * メタデータの状態を表すインターフェース
  */
-export interface ShellMetadata {
-  // View関連付け
+export interface ShellMetadataState {
   views: ViewReference[];          // このオブジェクトを表示しているView一覧
-
-  // 権限
   permissions: PermissionSet;      // アクセス制御情報
-
-  // タグとアノテーション
   tags?: string[];                 // タグやラベル
   annotations?: Record<string, any>;  // 任意のアノテーション
-
-  // 作成・更新情報
   createdAt: number;               // 作成時刻（Unix timestamp）
   updatedAt: number;               // 最終更新時刻（Unix timestamp）
   createdBy?: string;              // 作成者ID
 }
 
 /**
- * ShellMetadata のデフォルト値を作成
+ * ShellMetadata
+ * オブジェクトシェルのメタデータを管理するクラス
+ * 横断的関心事（View関連付け、権限、タグなど）を不変的に管理
  */
-export function createDefaultMetadata(ownerId: string): ShellMetadata {
-  const now = Date.now();
-  return {
-    views: [],
-    permissions: {
-      owner: ownerId,
-      readers: [],
-      writers: [],
-      isPublic: false,
-    },
-    tags: [],
-    annotations: {},
-    createdAt: now,
-    updatedAt: now,
-    createdBy: ownerId,
-  };
-}
+export class ShellMetadata {
+  constructor(private readonly state: ShellMetadataState) {}
 
-/**
- * Metadata を更新（不変更新）
- */
-export function updateMetadata(
-  metadata: ShellMetadata,
-  updates: Partial<ShellMetadata>
-): ShellMetadata {
-  return {
-    ...metadata,
-    ...updates,
-    updatedAt: Date.now(),
-  };
-}
-
-/**
- * View参照を追加
- */
-export function addViewReference(
-  metadata: ShellMetadata,
-  viewRef: ViewReference
-): ShellMetadata {
-  // 重複チェック
-  const exists = metadata.views.some(v => v.viewId === viewRef.viewId);
-  if (exists) {
-    return metadata;
+  // Getters for accessing state properties
+  get views(): ViewReference[] {
+    return this.state.views;
   }
 
-  return {
-    ...metadata,
-    views: [...metadata.views, viewRef],
-    updatedAt: Date.now(),
-  };
-}
+  get permissions(): PermissionSet {
+    return this.state.permissions;
+  }
 
-/**
- * View参照を削除
- */
-export function removeViewReference(
-  metadata: ShellMetadata,
-  viewId: string
-): ShellMetadata {
-  return {
-    ...metadata,
-    views: metadata.views.filter(v => v.viewId !== viewId),
-    updatedAt: Date.now(),
-  };
-}
+  get tags(): string[] | undefined {
+    return this.state.tags;
+  }
 
-/**
- * 権限確認：読み取り権限があるか
- */
-export function canRead(metadata: ShellMetadata, userId: string): boolean {
-  if (metadata.permissions.isPublic) return true;
-  if (metadata.permissions.owner === userId) return true;
-  if (metadata.permissions.readers.includes(userId)) return true;
-  if (metadata.permissions.writers.includes(userId)) return true;
-  return false;
-}
+  get annotations(): Record<string, any> | undefined {
+    return this.state.annotations;
+  }
 
-/**
- * 権限確認：書き込み権限があるか
- */
-export function canWrite(metadata: ShellMetadata, userId: string): boolean {
-  if (metadata.permissions.owner === userId) return true;
-  if (metadata.permissions.writers.includes(userId)) return true;
-  return false;
-}
+  get createdAt(): number {
+    return this.state.createdAt;
+  }
 
-/**
- * JSON形式に変換
- */
-export function serializeMetadata(metadata: ShellMetadata): object {
-  return { ...metadata };
-}
+  get updatedAt(): number {
+    return this.state.updatedAt;
+  }
 
-/**
- * JSONからMetadataを復元
- */
-export function deserializeMetadata(json: any): ShellMetadata {
-  return {
-    views: json.views || [],
-    permissions: json.permissions || {
-      owner: '',
-      readers: [],
-      writers: [],
-      isPublic: false,
-    },
-    tags: json.tags || [],
-    annotations: json.annotations || {},
-    createdAt: json.createdAt || Date.now(),
-    updatedAt: json.updatedAt || Date.now(),
-    createdBy: json.createdBy,
-  };
+  get createdBy(): string | undefined {
+    return this.state.createdBy;
+  }
+
+  /**
+   * デフォルトのメタデータを作成
+   */
+  static create(ownerId: string): ShellMetadata {
+    const now = Date.now();
+    return new ShellMetadata({
+      views: [],
+      permissions: {
+        owner: ownerId,
+        readers: [],
+        writers: [],
+        isPublic: false,
+      },
+      tags: [],
+      annotations: {},
+      createdAt: now,
+      updatedAt: now,
+      createdBy: ownerId,
+    });
+  }
+
+  /**
+   * メタデータを更新（不変更新）
+   */
+  update(updates: Partial<ShellMetadataState>): ShellMetadata {
+    return new ShellMetadata({
+      ...this.state,
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  }
+
+  /**
+   * View参照を追加
+   */
+  addViewReference(viewRef: ViewReference): ShellMetadata {
+    // 重複チェック
+    const exists = this.state.views.some(v => v.viewId === viewRef.viewId);
+    if (exists) {
+      return this;
+    }
+
+    return new ShellMetadata({
+      ...this.state,
+      views: [...this.state.views, viewRef],
+      updatedAt: Date.now(),
+    });
+  }
+
+  /**
+   * View参照を削除
+   */
+  removeViewReference(viewId: string): ShellMetadata {
+    return new ShellMetadata({
+      ...this.state,
+      views: this.state.views.filter(v => v.viewId !== viewId),
+      updatedAt: Date.now(),
+    });
+  }
+
+  /**
+   * 権限確認：読み取り権限があるか
+   */
+  canRead(userId: string): boolean {
+    if (this.state.permissions.isPublic) return true;
+    if (this.state.permissions.owner === userId) return true;
+    if (this.state.permissions.readers.includes(userId)) return true;
+    if (this.state.permissions.writers.includes(userId)) return true;
+    return false;
+  }
+
+  /**
+   * 権限確認：書き込み権限があるか
+   */
+  canWrite(userId: string): boolean {
+    if (this.state.permissions.owner === userId) return true;
+    if (this.state.permissions.writers.includes(userId)) return true;
+    return false;
+  }
+
+  /**
+   * JSON形式に変換
+   */
+  toJSON(): ShellMetadataState {
+    return { ...this.state };
+  }
+
+  /**
+   * JSONからMetadataを復元
+   */
+  static fromJSON(json: any): ShellMetadata {
+    return new ShellMetadata({
+      views: json.views || [],
+      permissions: json.permissions || {
+        owner: '',
+        readers: [],
+        writers: [],
+        isPublic: false,
+      },
+      tags: json.tags || [],
+      annotations: json.annotations || {},
+      createdAt: json.createdAt || Date.now(),
+      updatedAt: json.updatedAt || Date.now(),
+      createdBy: json.createdBy,
+    });
+  }
 }

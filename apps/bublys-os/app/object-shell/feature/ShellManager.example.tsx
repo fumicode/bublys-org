@@ -55,7 +55,7 @@ export function CounterWithShell({ shellId }: { shellId: string }) {
 
   return (
     <div>
-      <h2>Counter: {shell.domainObject.value}</h2>
+      <h2>Counter: {shell.value}</h2>
       <button onClick={handleIncrement}>+</button>
       <button onClick={handleDecrement}>-</button>
     </div>

@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect } from 'react';
-import { ObjectShell, ObjectShellBase, createObjectShell } from '../domain';
+import { ObjectShell, fromJson } from '../domain';
 
 // ============================================
 // State
@@ -141,7 +141,7 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
 
         return {
           id,
-          type: shell.domainObject.constructor.name, // 型情報を保存
+          type: shell.state.domainObject.constructor.name, // 型情報を保存
           data: shell.toJson(domainSerializer, domainSerializer),
         };
       });
@@ -173,14 +173,12 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
           return obj;
         };
 
-        const shellBase = ObjectShellBase.fromJson(
+        // fromJson は自動的にProxyでラップされたシェルを返す
+        const shell = fromJson(
           data,
           domainDeserializer,
           domainDeserializer
         );
-
-        // Proxyでラップして返す
-        const shell = createObjectShell(shellBase);
 
         newShells.set(id, shell);
       });

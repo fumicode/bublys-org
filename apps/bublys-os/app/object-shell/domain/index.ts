@@ -5,20 +5,22 @@
  * すべてのコア型定義と関数をまとめて提供
  */
 
-import { wrapBase } from './ObjectShell';
+import { ObjectShellBase, wrapBase } from './ObjectShell';
 import { createObjectShell, type ObjectShell } from './ShellProxy';
 
-// ObjectShell（Proxy版） - 推奨
+// ObjectShell（Proxy版） - 推奨API
 export { type ObjectShell, createObjectShell } from './ShellProxy';
 
-// ObjectShellBase（内部実装） - 通常は使用しない
+// 内部実装の型のみエクスポート（ObjectShellBase自体はエクスポートしない）
+export type { ObjectShellState, Shelled } from './ObjectShell';
+
+// Serializable インターフェース
 export {
-  ObjectShellBase,
-  type ObjectShellState,
-  type Shelled,
-  unwrap,
-  wrapBase,
-} from './ObjectShell';
+  type Serializable,
+  type SerializableConstructor,
+  isSerializable,
+  hasFromJSON,
+} from './Serializable';
 
 /**
  * ドメインオブジェクトをObjectShellでラップ（Proxy版）
@@ -37,53 +39,46 @@ export function wrap<T>(
   return createObjectShell(base);
 }
 
+/**
+ * JSONからObjectShellを復元
+ *
+ * @param json - シリアライズされたJSON
+ * @param domainObjectDeserializer - ドメインオブジェクトのデシリアライザー
+ * @param snapshotDeserializer - スナップショットのデシリアライザー（省略可能）
+ * @returns Proxyでラップされたシェル
+ */
+export function fromJson<T>(
+  json: any,
+  domainObjectDeserializer: (data: any) => T,
+  snapshotDeserializer?: (data: any) => T
+): ObjectShell<T> {
+  const base = ObjectShellBase.fromJson(
+    json,
+    domainObjectDeserializer,
+    snapshotDeserializer
+  );
+  return createObjectShell(base);
+}
+
 // ShellMetadata
 export {
+  ShellMetadata,
   type ViewReference,
   type PermissionSet,
-  type ShellMetadata,
-  createDefaultMetadata,
-  updateMetadata,
-  addViewReference,
-  removeViewReference,
-  canRead,
-  canWrite,
-  serializeMetadata,
-  deserializeMetadata,
+  type ShellMetadataState,
 } from './ShellMetadata';
 
 // ShellRelations
 export {
+  ShellRelations,
   type RelationReference,
-  type ShellRelations,
-  createDefaultRelations,
-  addReference,
-  removeReference,
-  getReferencesByType,
-  getReferencesToObject,
-  addReferencedBy,
-  removeReferencedBy,
-  hasRelation,
-  getAllRelatedIds,
-  serializeRelations,
-  deserializeRelations,
+  type ShellRelationsState,
 } from './ShellRelations';
 
 // ShellHistory
 export {
+  ShellHistory,
   type ShellAction,
   type ShellHistoryNode,
   type SerializedHistory,
-  createHistoryNode,
-  createHistoryNodeSimple,
-  getHistoryLength,
-  getHistoryAsArray,
-  findHistoryByActionType,
-  findHistoryByOperation,
-  getHistorySince,
-  getNthPreviousNode,
-  compressHistory,
-  truncateHistory,
-  serializeHistory,
-  deserializeHistory,
 } from './ShellHistory';

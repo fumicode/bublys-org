@@ -43,16 +43,25 @@ export function createObjectShell<T>(
       if (prop in target) {
         const value = Reflect.get(target, prop, receiver);
 
-        // メソッドの場合はbindして返す
+        // メソッドの場合はラップする
         if (typeof value === 'function') {
-          return value.bind(target);
+          return (...args: any[]) => {
+            const result = value.apply(target, args);
+
+            // 結果がObjectShellBaseなら自動でProxyラップ
+            if (result instanceof ObjectShellBase) {
+              return createObjectShell(result, userId);
+            }
+
+            return result;
+          };
         }
 
         return value;
       }
 
       // domainObjectのプロパティ/メソッドにフォールバック
-      const domainObject = target.domainObject as any;
+      const domainObject = target.state.domainObject as any;
 
       if (!(prop in domainObject)) {
         return undefined;
@@ -67,7 +76,7 @@ export function createObjectShell<T>(
           const result = domainValue.apply(domainObject, args);
 
           // 結果が新しいドメインオブジェクトなら自動でShellを更新
-          if (isNewDomainObject(target.domainObject, result)) {
+          if (isNewDomainObject(target.state.domainObject, result)) {
             const actionType = String(prop);
             const newShell = target.updateDomainObject(
               result,
