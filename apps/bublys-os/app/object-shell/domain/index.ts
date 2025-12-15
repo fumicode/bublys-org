@@ -23,6 +23,7 @@ export {
   type SerializableConstructor,
   isSerializable,
   hasFromJSON,
+  serializeDomainObject,
 } from './Serializable';
 
 /**

@@ -24,6 +24,7 @@ import { useHashWorldLine } from './HashWorldLineManager';
 import { useShellManager } from '../../object-shell/feature/ShellManager';
 import { computeObjectHash } from '../domain/hashUtils';
 import { shellEventEmitter } from '../../object-shell/domain/ShellEventEmitter';
+import { serializeDomainObject } from '../../object-shell/domain/Serializable';
 import type { DomainEntity } from '../../object-shell/domain/ObjectShell';
 import type { ObjectShell } from '../../object-shell/domain/ShellProxy';
 
@@ -40,7 +41,7 @@ interface ShellBridgeContextValue {
   ) => Promise<void>;
 
   /** 世界線から Shell の状態を復元 */
-  restoreShellFromWorldLine: <T extends DomainEntity>(
+  restoreShellFromWorldLine: (
     shellType: string,
     shellId: string
   ) => Promise<unknown | undefined>;
@@ -95,9 +96,7 @@ export function HashWorldLineShellBridgeProvider({
       }
 
       const domainObject = shell.dangerouslyGetDomainObject();
-      const stateData = 'toJson' in domainObject && typeof (domainObject as any).toJson === 'function'
-        ? (domainObject as any).toJson()
-        : domainObject;
+      const stateData = serializeDomainObject(domainObject);
 
       // 前回と同じハッシュならスキップ
       const newHash = await computeObjectHash(stateData);
@@ -125,10 +124,7 @@ export function HashWorldLineShellBridgeProvider({
    * 世界線から Shell の状態を復元
    */
   const restoreShellFromWorldLine = useCallback(
-    async <T extends DomainEntity>(
-      shellType: string,
-      shellId: string
-    ): Promise<unknown | undefined> => {
+    async (shellType: string, shellId: string): Promise<unknown | undefined> => {
       return await hashWorldLine.getObjectState(shellType, shellId);
     },
     [hashWorldLine]
@@ -204,11 +200,7 @@ export function HashWorldLineShellBridgeProvider({
       }
 
       // ドメインオブジェクトをシリアライズ
-      const domainObject = event.domainObject;
-      const stateData = domainObject && typeof domainObject === 'object' &&
-        'toJson' in domainObject && typeof (domainObject as any).toJson === 'function'
-        ? (domainObject as any).toJson()
-        : domainObject;
+      const stateData = serializeDomainObject(event.domainObject);
 
       // 前回と同じハッシュならスキップ（重複防止）
       const newHash = await computeObjectHash(stateData);
