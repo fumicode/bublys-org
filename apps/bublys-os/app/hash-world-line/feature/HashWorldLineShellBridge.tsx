@@ -23,6 +23,7 @@ import React, {
 import { useHashWorldLine } from './HashWorldLineManager';
 import { useShellManager } from '../../object-shell/feature/ShellManager';
 import { computeObjectHash } from '../domain/hashUtils';
+import { shellEventEmitter } from '../../object-shell/domain/ShellEventEmitter';
 import type { DomainEntity } from '../../object-shell/domain/ObjectShell';
 import type { ObjectShell } from '../../object-shell/domain/ShellProxy';
 
@@ -185,6 +186,52 @@ export function HashWorldLineShellBridgeProvider({
 
     return () => clearInterval(intervalId);
   }, [autoSyncInterval, runAutoSync]);
+
+  /**
+   * ShellEventEmitter を購読して自動同期（イベント駆動）
+   */
+  useEffect(() => {
+    const unsubscribe = shellEventEmitter.subscribe(async (event) => {
+      // 登録されたShellのみ同期
+      const shellType = registeredShellsRef.current.get(event.shellId);
+      if (!shellType) {
+        return;
+      }
+
+      if (!hashWorldLine.activeWorldLine) {
+        console.warn('[ShellBridge] No active world line, skipping sync');
+        return;
+      }
+
+      // ドメインオブジェクトをシリアライズ
+      const domainObject = event.domainObject;
+      const stateData = domainObject && typeof domainObject === 'object' &&
+        'toJson' in domainObject && typeof (domainObject as any).toJson === 'function'
+        ? (domainObject as any).toJson()
+        : domainObject;
+
+      // 前回と同じハッシュならスキップ（重複防止）
+      const newHash = await computeObjectHash(stateData);
+      const prevHash = previousHashesRef.current.get(event.shellId);
+      if (newHash === prevHash) {
+        return;
+      }
+
+      // 世界線に状態を保存
+      await hashWorldLine.updateObjectState(
+        shellType,
+        event.shellId,
+        stateData,
+        event.userId,
+        event.description
+      );
+
+      // ハッシュを更新
+      previousHashesRef.current.set(event.shellId, newHash);
+    });
+
+    return () => unsubscribe();
+  }, [hashWorldLine]);
 
   const value: ShellBridgeContextValue = {
     syncShellToWorldLine,

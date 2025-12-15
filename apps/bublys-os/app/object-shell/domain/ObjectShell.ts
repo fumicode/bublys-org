@@ -1,5 +1,6 @@
 import { ShellMetadata, type ShellMetadataState } from './ShellMetadata';
 import { ShellHistory, type ShellHistoryNode, type ShellAction } from './ShellHistory';
+import { shellEventEmitter } from './ShellEventEmitter';
 
 /**
  * DomainEntity
@@ -147,6 +148,16 @@ export class ObjectShellBase<T extends DomainEntity> {
       metadata: newMetadata,
       historyHead: newHistoryHead,
     };
+
+    // イベントを発火（外部リスナーに通知）
+    shellEventEmitter.emit({
+      shellId: this.id,
+      actionType,
+      domainObject: newDomainObject,
+      userId: userId || 'system',
+      description: description || `${actionType}を実行`,
+      timestamp: Date.now(),
+    });
   }
 
   /**

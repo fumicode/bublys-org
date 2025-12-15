@@ -83,3 +83,10 @@ export {
   type ShellHistoryNode,
   type SerializedHistory,
 } from './ShellHistory';
+
+// ShellEventEmitter
+export {
+  shellEventEmitter,
+  type ShellChangedEvent,
+  type ShellChangeHandler,
+} from './ShellEventEmitter';

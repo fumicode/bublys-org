@@ -1,30 +1,33 @@
 /**
  * CounterShellRenderer
  * Counter型のObjectShellをBubble内で表示するレンダラー
+ *
+ * 注: 世界線への同期はShellEventEmitter経由で自動的に行われます。
+ * このレンダラーは単にドメインメソッドを呼び出すだけです。
  */
 
 import { FC } from 'react';
 import { Counter } from '../../world-line/Counter/domain/Counter';
 import { ObjectShell } from '../domain';
 import { useShellManager } from '../feature/ShellManager';
-import { useHashWorldLineShellBridge } from '../../hash-world-line';
+import { useShellWorldLineSync } from '../../hash-world-line/feature/HashWorldLineShellBridge';
 
 export const CounterShellRenderer: FC<{ shell: ObjectShell<Counter> }> = ({ shell }) => {
   const { setShell } = useShellManager();
-  const { syncShellToWorldLine } = useHashWorldLineShellBridge();
+
+  // Shellを自動同期対象として登録（イベント駆動で同期される）
+  useShellWorldLineSync(shell.id, 'counter');
 
   const handleIncrement = () => {
+    // ShellProxy経由でcountUp()を呼ぶとイベントが自動発火される
     const newShell = shell.countUp();
+    // React再レンダリングのためにsetShell()を呼ぶ（同じProxyだが状態は更新されている）
     setShell(shell.id, newShell);
-    // 世界線に同期
-    syncShellToWorldLine(newShell, 'counter', `Counter incremented to ${newShell.value}`);
   };
 
   const handleDecrement = () => {
     const newShell = shell.countDown();
     setShell(shell.id, newShell);
-    // 世界線に同期
-    syncShellToWorldLine(newShell, 'counter', `Counter decremented to ${newShell.value}`);
   };
 
   return (
