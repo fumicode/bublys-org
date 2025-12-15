@@ -61,7 +61,7 @@ export function createObjectShell<T extends DomainEntity>(
       }
 
       // domainObjectのプロパティ/メソッドにフォールバック
-      const domainObject = target.state.domainObject as any;
+      const domainObject = target.dangerouslyGetDomainObject() as any;
 
       if (!(prop in domainObject)) {
         return undefined;
@@ -75,10 +75,10 @@ export function createObjectShell<T extends DomainEntity>(
           // ドメインメソッドを実行
           const result = domainValue.apply(domainObject, args);
 
-          // 結果が新しいドメインオブジェクトなら自動でShellを更新
-          if (isNewDomainObject(target.state.domainObject, result)) {
+          // 結果が新しいドメインオブジェクトなら自動でShellを更新（in-place）
+          if (isNewDomainObject(target.dangerouslyGetDomainObject(), result)) {
             const actionType = String(prop);
-            const newShell = target.updateDomainObject(
+            target.updateDomainObject(
               result,
               actionType,
               { args },
@@ -86,8 +86,8 @@ export function createObjectShell<T extends DomainEntity>(
               `${actionType}を実行`
             );
 
-            // 新しいShellもProxyでラップして返す
-            return createObjectShell(newShell, userId);
+            // 同じProxyを返す（in-place更新なので新しいインスタンスは作らない）
+            return receiver;
           }
 
           // プリミティブや他の値はそのまま返す

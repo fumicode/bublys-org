@@ -83,7 +83,7 @@ export abstract class BaseShell<T extends DomainEntity> extends ObjectShellBase<
     domainSerializer: (obj: T) => DomainJson,
     historySerializer: (obj: T) => HistoryJson
   ): {
-    domainData: ReturnType<typeof this.toJson>;
+    domainData: object;
     relationIds: Record<string, string[]>;
   } {
     return {

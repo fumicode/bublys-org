@@ -245,17 +245,24 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
   const saveToStorage = useCallback(() => {
     try {
       const serialized = Array.from(state.shells.entries()).map(([id, shell]) => {
+        const shellType = state.shellTypes.get(id) || 'unknown';
+
         // ドメインオブジェクトのシリアライザを動的に選択
-        // 実際の実装では、型情報からシリアライザを決定
         const domainSerializer = (obj: any) => {
           if (obj.toJson) return obj.toJson();
           return obj;
         };
 
+        // BaseShell の場合は関連IDも含めて保存
+        const shellData = 'toJsonWithRelations' in shell
+          ? (shell as any).toJsonWithRelations(domainSerializer, domainSerializer)
+          : { domainData: shell.toJson(domainSerializer, domainSerializer), relationIds: {} };
+
         return {
           id,
-          type: shell.state.domainObject.constructor.name, // 型情報を保存
-          data: shell.toJson(domainSerializer, domainSerializer),
+          shellType,
+          domainData: shellData.domainData,
+          relationIds: shellData.relationIds,
         };
       });
 
@@ -264,7 +271,7 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to save shells:', error);
     }
-  }, [state.shells]);
+  }, [state.shells, state.shellTypes]);
 
   const loadFromStorage = useCallback(() => {
     try {
@@ -276,28 +283,54 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
 
       const serialized = JSON.parse(stored);
       const newShells = new Map<string, ObjectShell<any>>();
+      const newShellTypes = new Map<string, string>();
+      const relationData: Array<{ shell: any; relationIds: Record<string, string[]> }> = [];
 
-      serialized.forEach(({ id, type, data }: any) => {
+      // パス1: すべてのShellを作成（関連なし）
+      serialized.forEach(({ id, shellType, domainData, relationIds }: any) => {
         // 型情報からデシリアライザを選択
-        // 実際の実装では、typeからデシリアライザを決定
         const domainDeserializer = (obj: any) => {
           // ここで型に応じたデシリアライザを選択
-          // 例：type === 'Counter' なら Counter.fromJson
+          // 例：shellType === 'counter' なら Counter.fromJson
+          if (obj.toJson) return obj;
           return obj;
         };
 
         // fromJson は自動的にProxyでラップされたシェルを返す
         const shell = fromJson(
-          data,
+          domainData,
           domainDeserializer,
           domainDeserializer
         );
 
         newShells.set(id, shell);
+        newShellTypes.set(id, shellType);
+
+        // 関連情報があれば記録
+        if (relationIds && Object.keys(relationIds).length > 0) {
+          relationData.push({ shell, relationIds });
+        }
       });
 
-      dispatch({ type: 'LOAD_SHELLS', payload: { shells: newShells } });
-      console.log(`📂 Loaded ${newShells.size} shells from storage`);
+      // パス2: 関連を復元（BaseShellの場合のみ）
+      relationData.forEach(({ shell, relationIds }) => {
+        if ('restoreRelations' in shell && typeof shell.restoreRelations === 'function') {
+          shell.restoreRelations(newShells, relationIds);
+        }
+      });
+
+      dispatch({
+        type: 'LOAD_SHELLS',
+        payload: { shells: newShells }
+      });
+
+      // shellTypes も復元
+      state.shellTypes.clear();
+      newShellTypes.forEach((type, id) => {
+        state.shellTypes.set(id, type);
+      });
+
+      console.log(`📂 Loaded ${newShells.size} shells from storage (${relationData.length} with relations)`);
     } catch (error) {
       console.error('Failed to load shells:', error);
     }

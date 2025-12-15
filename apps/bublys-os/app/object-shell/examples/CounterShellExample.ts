@@ -9,7 +9,6 @@ import { Counter } from '../../world-line/Counter/domain/Counter';
 import {
   wrap,
   fromJson,
-  createObjectShell,
 } from '../domain';
 
 /**
@@ -87,41 +86,37 @@ export function historyExample() {
 export function viewReferenceExample() {
   const counterShell = basicShellExample();
 
-  // Viewへの関連を追加
-  const metadata1 = counterShell.metadata.addViewReference({
+  // Viewへの関連を追加（in-place更新）
+  counterShell.addViewReference({
     viewId: 'bubble-001',
     viewType: 'bubble',
     position: { x: 100, y: 200, z: 0 },
   });
 
-  const shellWithView1 = counterShell.updateMetadata({
-    views: metadata1.views,
-  });
-
   // 別のViewへの関連を追加
-  const metadata2 = shellWithView1.metadata.addViewReference({
+  counterShell.addViewReference({
     viewId: 'modal-001',
     viewType: 'modal',
   });
 
-  const shellWithView2 = shellWithView1.updateMetadata({
-    views: metadata2.views,
-  });
-
   console.log('View関連付け:', {
-    viewCount: shellWithView2.metadata.views.length,
-    views: shellWithView2.metadata.views.map(v => ({
+    viewCount: counterShell.metadata.views.length,
+    views: counterShell.metadata.views.map(v => ({
       id: v.viewId,
       type: v.viewType,
     })),
   });
 
-  return shellWithView2;
+  return counterShell;
 }
 
 /**
  * 例5: オブジェクト間の関連（ID参照）
+ *
+ * 注意: この例は現在コメントアウトされています。
+ * 関連管理は BaseShell サブクラスで実装されます（Step 3で実装予定）。
  */
+/*
 export function relationsExample() {
   // 2つのカウンターシェルを作成
   const counterShell1 = wrap(new Counter('counter-001', 0), 'user-001');
@@ -148,6 +143,7 @@ export function relationsExample() {
 
   return { counterShell1: shellWithRelation, counterShell2 };
 }
+*/
 
 /**
  * 例6: シリアライゼーション
@@ -197,13 +193,12 @@ export function actionExample() {
   };
 
   for (let i = 0; i < 3; i++) {
-    // カウントアップ（5ずつ）
+    // カウントアップ（5ずつ）- in-place更新
     const newCounter = new Counter(counterShell.id, counterShell.value + 5);
-    const newShellBase = counterShell.updateDomainObjectWithAction(
+    counterShell.updateDomainObjectWithAction(
       newCounter,
       incrementAction
     );
-    counterShell = createObjectShell(newShellBase);
   }
 
   // 履歴を確認
@@ -230,17 +225,16 @@ export function comprehensiveExample() {
   const counter = new Counter('counter-comprehensive', 0);
   let counterShell = wrap(counter, 'user-001');
 
-  // 2. View関連を追加
-  const metadata = counterShell.metadata.addViewReference({
+  // 2. View関連を追加（in-place更新）
+  counterShell.addViewReference({
     viewId: 'main-bubble',
     viewType: 'bubble',
     position: { x: 50, y: 50, z: 0 },
   });
-  counterShell = createObjectShell(counterShell.updateMetadata({ views: metadata.views }));
 
-  // 3. カウンター操作を繰り返す
+  // 3. カウンター操作を繰り返す（in-place更新）
   for (let i = 0; i < 5; i++) {
-    counterShell = counterShell.countUp();
+    counterShell.countUp();
   }
 
   // 4. 履歴を確認
@@ -295,8 +289,8 @@ export function runAllExamples() {
   console.log('\n4. View関連付け');
   viewReferenceExample();
 
-  console.log('\n5. オブジェクト間の関連');
-  relationsExample();
+  // console.log('\n5. オブジェクト間の関連');
+  // relationsExample(); // Step 3で実装予定
 
   console.log('\n6. シリアライゼーション');
   serializationExample();

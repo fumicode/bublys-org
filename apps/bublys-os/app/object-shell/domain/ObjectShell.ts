@@ -1,5 +1,4 @@
 import { ShellMetadata, type ShellMetadataState } from './ShellMetadata';
-import { ShellRelations } from './ShellRelations';
 import { ShellHistory, type ShellHistoryNode, type ShellAction } from './ShellHistory';
 
 /**
@@ -31,30 +30,49 @@ export interface ObjectShellState<T extends DomainEntity> {
  * - 履歴管理（線形リスト）
  * - メタデータ管理（View関連、権限など）
  *
- * 注意：関連管理はBaseShellサブクラスで行います。
+ * 注意：
+ * - 関連管理はBaseShellサブクラスで行います
+ * - Shell自体は可変です（ドメインオブジェクトと履歴は不変）
+ * - React再レンダリングはShellManager側で制御します
  */
 export class ObjectShellBase<T extends DomainEntity> {
-  constructor(readonly state: ObjectShellState<T>) {}
+  private _internalState: ObjectShellState<T>;
+
+  constructor(initialState: ObjectShellState<T>) {
+    this._internalState = initialState;
+  }
 
   /**
    * シェルIDを取得（ドメインオブジェクトのIDと同じ）
    */
   get id(): string {
-    return this.state.domainObject.id;
+    return this._internalState.domainObject.id;
+  }
+
+  /**
+   * ドメインオブジェクトを取得
+   *
+   * ⚠️ 警告: このメソッドは慎重に使用してください
+   * - ドメインオブジェクトを直接操作しないでください（不変性が壊れます）
+   * - 読み取り専用の用途（シリアライズ、デバッグなど）に限定してください
+   * - 通常はShellのメソッドやProxyを通じて操作してください
+   */
+  dangerouslyGetDomainObject(): T {
+    return this._internalState.domainObject;
   }
 
   /**
    * 履歴を配列として取得（新しい順）
    */
   get history(): ShellHistoryNode<T>[] {
-    return ShellHistory.getAsArray(this.state.historyHead);
+    return ShellHistory.getAsArray(this._internalState.historyHead);
   }
 
   /**
    * メタデータを取得
    */
   get metadata(): ShellMetadata {
-    return this.state.metadata;
+    return this._internalState.metadata;
   }
 
   /**
@@ -68,39 +86,38 @@ export class ObjectShellBase<T extends DomainEntity> {
       domainObject,
       metadata: ShellMetadata.create(ownerId),
       historyHead: null,  // 初期状態は履歴なし
-      relations: ShellRelations.create(),
     });
   }
 
   /**
-   * ドメインオブジェクトを更新（新しいシェルを返す）
+   * ドメインオブジェクトを更新（in-place）
    * actionオブジェクトを指定する版
    */
   updateDomainObjectWithAction(
     newDomainObject: T,
     action: ShellAction,
-    saveSnapshot: boolean = false
-  ): ObjectShellBase<T> {
+    saveSnapshot = false
+  ): void {
     // 履歴ノードを作成
     const newHistoryHead = ShellHistory.createNode<T>(
-      this.state.historyHead,
+      this._internalState.historyHead,
       action,
-      saveSnapshot ? this.state.domainObject : undefined
+      saveSnapshot ? this._internalState.domainObject : undefined
     );
 
     // メタデータのupdatedAtを更新
-    const newMetadata = this.state.metadata.update({});
+    const newMetadata = this._internalState.metadata.update({});
 
-    return new ObjectShellBase<T>({
+    // in-place更新
+    this._internalState = {
       domainObject: newDomainObject,
       metadata: newMetadata,
       historyHead: newHistoryHead,
-      relations: this.state.relations,
-    });
+    };
   }
 
   /**
-   * ドメインオブジェクトを更新（新しいシェルを返す）
+   * ドメインオブジェクトを更新（in-place）
    * 簡易版：actionTypeとpayloadを指定
    */
   updateDomainObject(
@@ -109,59 +126,47 @@ export class ObjectShellBase<T extends DomainEntity> {
     payload?: any,
     userId?: string,
     description?: string,
-    saveSnapshot: boolean = false
-  ): ObjectShellBase<T> {
+    saveSnapshot = false
+  ): void {
     // 履歴ノードを作成
     const newHistoryHead = ShellHistory.createNodeSimple<T>(
-      this.state.historyHead,
+      this._internalState.historyHead,
       actionType,
       payload,
       userId,
       description,
-      saveSnapshot ? this.state.domainObject : undefined
+      saveSnapshot ? this._internalState.domainObject : undefined
     );
 
     // メタデータのupdatedAtを更新
-    const newMetadata = this.state.metadata.update({});
+    const newMetadata = this._internalState.metadata.update({});
 
-    return new ObjectShellBase<T>({
+    // in-place更新
+    this._internalState = {
       domainObject: newDomainObject,
       metadata: newMetadata,
       historyHead: newHistoryHead,
-      relations: this.state.relations,
-    });
+    };
   }
 
   /**
-   * メタデータを更新
+   * メタデータを更新（in-place）
    */
-  updateMetadata(updates: Partial<ShellMetadataState>): ObjectShellBase<T> {
-    return new ObjectShellBase<T>({
-      ...this.state,
-      metadata: this.state.metadata.update(updates),
-    });
-  }
-
-  /**
-   * 関連を更新
-   */
-  updateRelations(newRelations: ShellRelations): ObjectShellBase<T> {
-    return new ObjectShellBase<T>({
-      domainObject: this.state.domainObject,
-      metadata: this.state.metadata.update({}),  // updatedAtを更新
-      historyHead: this.state.historyHead,
-      relations: newRelations,
-    });
+  updateMetadata(updates: Partial<ShellMetadataState>): void {
+    this._internalState = {
+      ...this._internalState,
+      metadata: this._internalState.metadata.update(updates),
+    };
   }
 
   /**
    * 履歴を更新（通常は使用しない、主にデシリアライズ時用）
    */
-  updateHistory(newHistoryHead: ShellHistoryNode<T> | null): ObjectShellBase<T> {
-    return new ObjectShellBase<T>({
-      ...this.state,
+  updateHistory(newHistoryHead: ShellHistoryNode<T> | null): void {
+    this._internalState = {
+      ...this._internalState,
       historyHead: newHistoryHead,
-    });
+    };
   }
 
   /**
@@ -169,8 +174,9 @@ export class ObjectShellBase<T extends DomainEntity> {
    * 注: Proxyでラップされている場合、ObjectShell<T>を返します
    */
   addViewReference(viewRef: import('./ShellMetadata').ViewReference): this {
-    const newMetadata = this.state.metadata.addViewReference(viewRef);
-    return this.updateMetadata({ views: newMetadata.views }) as this;
+    const newMetadata = this._internalState.metadata.addViewReference(viewRef);
+    this.updateMetadata({ views: newMetadata.views });
+    return this;
   }
 
   /**
@@ -178,26 +184,9 @@ export class ObjectShellBase<T extends DomainEntity> {
    * 注: Proxyでラップされている場合、ObjectShell<T>を返します
    */
   removeViewReference(viewId: string): this {
-    const newMetadata = this.state.metadata.removeViewReference(viewId);
-    return this.updateMetadata({ views: newMetadata.views }) as this;
-  }
-
-  /**
-   * 関連を追加（ヘルパーメソッド）
-   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
-   */
-  addRelation(reference: import('./ShellRelations').RelationReference): this {
-    const newRelations = this.state.relations.addReference(reference);
-    return this.updateRelations(newRelations) as this;
-  }
-
-  /**
-   * 関連を削除（ヘルパーメソッド）
-   * 注: Proxyでラップされている場合、ObjectShell<T>を返します
-   */
-  removeRelation(targetId: string, relationType?: string): this {
-    const newRelations = this.state.relations.removeReference(targetId, relationType);
-    return this.updateRelations(newRelations) as this;
+    const newMetadata = this._internalState.metadata.removeViewReference(viewId);
+    this.updateMetadata({ views: newMetadata.views });
+    return this;
   }
 
   /**
@@ -209,10 +198,9 @@ export class ObjectShellBase<T extends DomainEntity> {
   ): object {
     return {
       id: this.id,
-      domainObject: domainObjectSerializer(this.state.domainObject),
-      metadata: this.state.metadata.toJSON(),
-      history: ShellHistory.toJSON(this.state.historyHead, snapshotSerializer),
-      relations: this.state.relations.toJSON(),
+      domainObject: domainObjectSerializer(this._internalState.domainObject),
+      metadata: this._internalState.metadata.toJSON(),
+      history: ShellHistory.toJSON(this._internalState.historyHead, snapshotSerializer),
     };
   }
 
@@ -228,7 +216,6 @@ export class ObjectShellBase<T extends DomainEntity> {
       domainObject: domainObjectDeserializer(json.domainObject),
       metadata: ShellMetadata.fromJSON(json.metadata),
       historyHead: ShellHistory.fromJSON(json.history, snapshotDeserializer),
-      relations: ShellRelations.fromJSON(json.relations),
     });
   }
 }
@@ -240,9 +227,12 @@ export type Shelled<T extends DomainEntity> = ObjectShellBase<T>;
 
 /**
  * ユーティリティ関数：ドメインオブジェクトを取得
+ *
+ * ⚠️ 警告: このメソッドは慎重に使用してください
+ * 通常はShellのメソッドやProxyを通じて操作してください
  */
 export function unwrap<T extends DomainEntity>(shell: ObjectShellBase<T>): T {
-  return shell.state.domainObject;
+  return shell.dangerouslyGetDomainObject();
 }
 
 /**

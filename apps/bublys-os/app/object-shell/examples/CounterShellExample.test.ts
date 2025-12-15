@@ -125,47 +125,15 @@ describe('CounterShellExample', () => {
       expect(counterShell.metadata.views.length).toBe(1);
     });
 
-    it('addRelationで関連を追加できる', () => {
-      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
-
-      const updatedShell = counterShell.addRelation({
-        targetId: 'counter-002',
-        relationType: 'dependency',
-      });
-
-      expect(updatedShell.relations.references.length).toBe(1);
-      expect(updatedShell.relations.references[0].targetId).toBe('counter-002');
-      expect(updatedShell.relations.references[0].relationType).toBe('dependency');
-
-      // 元のシェルは変更されていない
-      expect(counterShell.relations.references.length).toBe(0);
-    });
-
-    it('removeRelationで関連を削除できる', () => {
-      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
-
-      counterShell = counterShell.addRelation({
-        targetId: 'counter-002',
-        relationType: 'dependency',
-      });
-
-      const updatedShell = counterShell.removeRelation('counter-002');
-
-      expect(updatedShell.relations.references.length).toBe(0);
-      expect(counterShell.relations.references.length).toBe(1);
-    });
-
     it('ヘルパーメソッドはメソッドチェーンが可能', () => {
       const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       const updatedShell = counterShell
         .addViewReference({ viewId: 'view-001', viewType: 'demo' })
-        .addRelation({ targetId: 'counter-002', relationType: 'dependency' })
         .countUp();
 
       expect(updatedShell.value).toBe(1);
       expect(updatedShell.metadata.views.length).toBe(1);
-      expect(updatedShell.relations.references.length).toBe(1);
     });
   });
 });
