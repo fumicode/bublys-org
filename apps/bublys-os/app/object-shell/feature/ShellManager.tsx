@@ -6,7 +6,7 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect } from 'react';
-import { ObjectShell, fromJson } from '../domain';
+import { ObjectShell, fromJson, type DomainEntity } from '../domain';
 import { useAppDispatch } from '@bublys-org/state-management';
 
 // ============================================
@@ -137,12 +137,12 @@ interface ShellManagerContextType {
   shells: Map<string, ObjectShell<any>>;
 
   // アクション
-  setShell: <T>(id: string, shell: ObjectShell<T>) => void;
+  setShell: <T extends DomainEntity>(id: string, shell: ObjectShell<T>) => void;
   removeShell: (id: string) => void;
   clearAll: () => void;
 
   // クエリ
-  getShell: <T>(id: string) => ObjectShell<T> | undefined;
+  getShell: <T extends DomainEntity>(id: string) => ObjectShell<T> | undefined;
   getAllShellIds: () => string[];
   hasShell: (id: string) => boolean;
 
@@ -151,7 +151,7 @@ interface ShellManagerContextType {
   loadFromStorage: () => void;
 
   // 新規: Bubble統合用
-  setShellWithBubble: <T>(
+  setShellWithBubble: <T extends DomainEntity>(
     id: string,
     shell: ObjectShell<T>,
     options: {
@@ -175,12 +175,12 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
   const reduxDispatch = useAppDispatch();  // Redux dispatch for Bubble creation
 
   // Actions
-  const setShell = useCallback(<T,>(id: string, shell: ObjectShell<T>) => {
+  const setShell = useCallback(<T extends DomainEntity>(id: string, shell: ObjectShell<T>) => {
     dispatch({ type: 'SET_SHELL', payload: { id, shell } });
   }, []);
 
   // 新規: Bubble統合用
-  const setShellWithBubble = useCallback(<T,>(
+  const setShellWithBubble = useCallback(<T extends DomainEntity>(
     id: string,
     shell: ObjectShell<T>,
     options: {
@@ -211,7 +211,7 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
 
   // Queries
   const getShell = useCallback(
-    <T,>(id: string): ObjectShell<T> | undefined => {
+    <T extends DomainEntity>(id: string): ObjectShell<T> | undefined => {
       return state.shells.get(id) as ObjectShell<T> | undefined;
     },
     [state.shells]
@@ -374,7 +374,7 @@ export function useShellManager() {
 /**
  * 特定のシェルを取得するフック
  */
-export function useShell<T>(shellId: string | undefined): ObjectShell<T> | undefined {
+export function useShell<T extends DomainEntity>(shellId: string | undefined): ObjectShell<T> | undefined {
   const { getShell } = useShellManager();
   return shellId ? getShell<T>(shellId) : undefined;
 }
@@ -382,7 +382,7 @@ export function useShell<T>(shellId: string | undefined): ObjectShell<T> | undef
 /**
  * シェルを更新するフック（便利関数）
  */
-export function useShellUpdater<T>(shellId: string | undefined) {
+export function useShellUpdater<T extends DomainEntity>(shellId: string | undefined) {
   const { getShell, setShell } = useShellManager();
 
   return useCallback(

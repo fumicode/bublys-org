@@ -4,9 +4,9 @@
  */
 
 import { FC } from 'react';
-import { ObjectShell } from '../domain';
+import { ObjectShell, type DomainEntity } from '../domain';
 
-export interface ShellTypeConfig<T> {
+export interface ShellTypeConfig<T extends DomainEntity> {
   typeName: string;
   serializer: (obj: T) => any;
   deserializer: (data: any) => T;
@@ -16,7 +16,7 @@ export interface ShellTypeConfig<T> {
 class ShellTypeRegistry {
   private types = new Map<string, ShellTypeConfig<any>>();
 
-  register<T>(config: ShellTypeConfig<T>) {
+  register<T extends DomainEntity>(config: ShellTypeConfig<T>) {
     this.types.set(config.typeName, config);
   }
 
@@ -32,7 +32,7 @@ class ShellTypeRegistry {
     return config.Renderer;
   }
 
-  serialize<T>(typeName: string, obj: T): any {
+  serialize<T extends DomainEntity>(typeName: string, obj: T): any {
     const config = this.get(typeName);
     if (!config) {
       throw new Error(`Unknown shell type: ${typeName}`);
@@ -40,7 +40,7 @@ class ShellTypeRegistry {
     return config.serializer(obj);
   }
 
-  deserialize<T>(typeName: string, data: any): T {
+  deserialize<T extends DomainEntity>(typeName: string, data: any): T {
     const config = this.get(typeName);
     if (!config) {
       throw new Error(`Unknown shell type: ${typeName}`);

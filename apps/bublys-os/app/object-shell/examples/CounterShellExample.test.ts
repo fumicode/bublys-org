@@ -8,8 +8,8 @@ import { fromJson, wrap } from '../domain';
 describe('CounterShellExample', () => {
   describe('basicShellExample', () => {
     it('Counterをシェルでラップできる', () => {
-      const counter = new Counter(0);
-      const counterShell = wrap('counter-001', counter, 'user-001');
+      const counter = new Counter('counter-001', 0);
+      const counterShell = wrap(counter, 'user-001');
 
       expect(counterShell.id).toBe('counter-001');
       expect(counterShell.value).toBe(0);
@@ -20,7 +20,7 @@ describe('CounterShellExample', () => {
 
   describe('updateDomainObjectExample', () => {
     it('ドメインオブジェクトを更新すると履歴が記録される', () => {
-      const counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       const updatedShell = counterShell.countUp();
 
@@ -33,7 +33,7 @@ describe('CounterShellExample', () => {
     });
 
     it('複数回の更新で履歴が蓄積される', () => {
-      let counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       for (let i = 0; i < 5; i++) {
         counterShell = counterShell.countUp();
@@ -46,7 +46,7 @@ describe('CounterShellExample', () => {
 
   describe('serializationExample', () => {
     it('シリアライズと復元が正しく動作する', () => {
-      let counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       // 複数回の操作
       for (let i = 0; i < 3; i++) {
@@ -77,7 +77,7 @@ describe('CounterShellExample', () => {
 
   describe('immutability', () => {
     it('元のシェルは更新されない（不変性）', () => {
-      const originalShell = wrap('counter-001', new Counter(0), 'user-001');
+      const originalShell = wrap(new Counter('counter-001', 0), 'user-001');
       const originalValue = originalShell.value;
 
       const updatedShell = originalShell.countUp();
@@ -94,7 +94,7 @@ describe('CounterShellExample', () => {
 
   describe('helperMethods', () => {
     it('addViewReferenceでView参照を追加できる', () => {
-      const counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       const updatedShell = counterShell.addViewReference({
         viewId: 'view-001',
@@ -112,7 +112,7 @@ describe('CounterShellExample', () => {
     });
 
     it('removeViewReferenceでView参照を削除できる', () => {
-      let counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       counterShell = counterShell.addViewReference({
         viewId: 'view-001',
@@ -126,7 +126,7 @@ describe('CounterShellExample', () => {
     });
 
     it('addRelationで関連を追加できる', () => {
-      const counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       const updatedShell = counterShell.addRelation({
         targetId: 'counter-002',
@@ -142,7 +142,7 @@ describe('CounterShellExample', () => {
     });
 
     it('removeRelationで関連を削除できる', () => {
-      let counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       counterShell = counterShell.addRelation({
         targetId: 'counter-002',
@@ -156,7 +156,7 @@ describe('CounterShellExample', () => {
     });
 
     it('ヘルパーメソッドはメソッドチェーンが可能', () => {
-      const counterShell = wrap('counter-001', new Counter(0), 'user-001');
+      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
       const updatedShell = counterShell
         .addViewReference({ viewId: 'view-001', viewType: 'demo' })

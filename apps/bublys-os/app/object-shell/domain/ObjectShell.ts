@@ -3,15 +3,21 @@ import { ShellRelations } from './ShellRelations';
 import { ShellHistory, type ShellHistoryNode, type ShellAction } from './ShellHistory';
 
 /**
+ * DomainEntity
+ * ObjectShellで包むドメインオブジェクトは必ずidを持つ
+ */
+export interface DomainEntity {
+  readonly id: string;
+}
+
+/**
  * ObjectShellState<T>
  * ObjectShellの内部状態を表す型
  */
-export interface ObjectShellState<T> {
-  id: string;                               // シェルの一意識別子
+export interface ObjectShellState<T extends DomainEntity> {
   domainObject: T;                          // 包まれたドメインオブジェクト
   metadata: ShellMetadata;
   historyHead: ShellHistoryNode<T> | null;  // 履歴チェーンの先頭
-  relations: ShellRelations;
 }
 
 /**
@@ -24,16 +30,17 @@ export interface ObjectShellState<T> {
  * DDDの原則を守りつつ、以下の機能を提供：
  * - 履歴管理（線形リスト）
  * - メタデータ管理（View関連、権限など）
- * - ID参照による関連管理
+ *
+ * 注意：関連管理はBaseShellサブクラスで行います。
  */
-export class ObjectShellBase<T> {
+export class ObjectShellBase<T extends DomainEntity> {
   constructor(readonly state: ObjectShellState<T>) {}
 
   /**
-   * シェルIDを取得
+   * シェルIDを取得（ドメインオブジェクトのIDと同じ）
    */
   get id(): string {
-    return this.state.id;
+    return this.state.domainObject.id;
   }
 
   /**
@@ -51,22 +58,13 @@ export class ObjectShellBase<T> {
   }
 
   /**
-   * 関連を取得
-   */
-  get relations(): ShellRelations {
-    return this.state.relations;
-  }
-
-  /**
    * 新しいObjectShellBaseを作成（ファクトリーメソッド）
    */
-  static create<T>(
-    id: string,
+  static create<T extends DomainEntity>(
     domainObject: T,
     ownerId: string
   ): ObjectShellBase<T> {
     return new ObjectShellBase<T>({
-      id,
       domainObject,
       metadata: ShellMetadata.create(ownerId),
       historyHead: null,  // 初期状態は履歴なし
@@ -94,7 +92,6 @@ export class ObjectShellBase<T> {
     const newMetadata = this.state.metadata.update({});
 
     return new ObjectShellBase<T>({
-      id: this.id,
       domainObject: newDomainObject,
       metadata: newMetadata,
       historyHead: newHistoryHead,
@@ -128,7 +125,6 @@ export class ObjectShellBase<T> {
     const newMetadata = this.state.metadata.update({});
 
     return new ObjectShellBase<T>({
-      id: this.id,
       domainObject: newDomainObject,
       metadata: newMetadata,
       historyHead: newHistoryHead,
@@ -151,7 +147,6 @@ export class ObjectShellBase<T> {
    */
   updateRelations(newRelations: ShellRelations): ObjectShellBase<T> {
     return new ObjectShellBase<T>({
-      id: this.id,
       domainObject: this.state.domainObject,
       metadata: this.state.metadata.update({}),  // updatedAtを更新
       historyHead: this.state.historyHead,
@@ -224,13 +219,12 @@ export class ObjectShellBase<T> {
   /**
    * JSONからObjectShellBaseインスタンスを作成
    */
-  static fromJson<T>(
+  static fromJson<T extends DomainEntity>(
     json: any,
     domainObjectDeserializer: (data: any) => T,
     snapshotDeserializer?: (data: any) => T
   ): ObjectShellBase<T> {
     return new ObjectShellBase<T>({
-      id: json.id,
       domainObject: domainObjectDeserializer(json.domainObject),
       metadata: ShellMetadata.fromJSON(json.metadata),
       historyHead: ShellHistory.fromJSON(json.history, snapshotDeserializer),
@@ -242,12 +236,12 @@ export class ObjectShellBase<T> {
 /**
  * ユーティリティ型：Shellでラップされたオブジェクト
  */
-export type Shelled<T> = ObjectShellBase<T>;
+export type Shelled<T extends DomainEntity> = ObjectShellBase<T>;
 
 /**
  * ユーティリティ関数：ドメインオブジェクトを取得
  */
-export function unwrap<T>(shell: ObjectShellBase<T>): T {
+export function unwrap<T extends DomainEntity>(shell: ObjectShellBase<T>): T {
   return shell.state.domainObject;
 }
 
@@ -257,10 +251,9 @@ export function unwrap<T>(shell: ObjectShellBase<T>): T {
  * 注意：通常はwrap()から返されたObjectShell<T>を使用してください。
  * この関数は内部実装やテスト用です。
  */
-export function wrapBase<T>(
-  id: string,
+export function wrapBase<T extends DomainEntity>(
   domainObject: T,
   ownerId: string
 ): ObjectShellBase<T> {
-  return ObjectShellBase.create(id, domainObject, ownerId);
+  return ObjectShellBase.create(domainObject, ownerId);
 }

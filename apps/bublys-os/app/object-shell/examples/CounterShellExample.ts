@@ -17,10 +17,10 @@ import {
  */
 export function basicShellExample() {
   // Counterドメインオブジェクトを作成
-  const counter = new Counter(0);
+  const counter = new Counter('counter-001', 0);
 
   // オブジェクトシェルでラップ
-  const counterShell = wrap('counter-001', counter, 'user-001');
+  const counterShell = wrap(counter, 'user-001');
 
   console.log('Initial Counter Shell:', {
     id: counterShell.id,
@@ -124,8 +124,8 @@ export function viewReferenceExample() {
  */
 export function relationsExample() {
   // 2つのカウンターシェルを作成
-  const counterShell1 = wrap('counter-001', new Counter(0), 'user-001');
-  const counterShell2 = wrap('counter-002', new Counter(10), 'user-001');
+  const counterShell1 = wrap(new Counter('counter-001', 0), 'user-001');
+  const counterShell2 = wrap(new Counter('counter-002', 10), 'user-001');
 
   // counter-001からcounter-002への参照を追加
   const relations1 = counterShell1.relations.addReference({
@@ -183,8 +183,8 @@ export function serializationExample() {
  * 例7: Reduxライクなアクションの使用
  */
 export function actionExample() {
-  const counter = new Counter(0);
-  let counterShell = wrap('counter-action', counter, 'user-001');
+  const counter = new Counter('counter-action', 0);
+  let counterShell = wrap(counter, 'user-001');
 
   // アクションオブジェクトを使った更新
   const incrementAction = {
@@ -198,7 +198,7 @@ export function actionExample() {
 
   for (let i = 0; i < 3; i++) {
     // カウントアップ（5ずつ）
-    const newCounter = new Counter(counterShell.value + 5);
+    const newCounter = new Counter(counterShell.id, counterShell.value + 5);
     const newShellBase = counterShell.updateDomainObjectWithAction(
       newCounter,
       incrementAction
@@ -227,8 +227,8 @@ export function comprehensiveExample() {
   console.log('\n=== 包括的な例 ===\n');
 
   // 1. Counterを作成しシェルでラップ
-  const counter = new Counter(0);
-  let counterShell = wrap('counter-comprehensive', counter, 'user-001');
+  const counter = new Counter('counter-comprehensive', 0);
+  let counterShell = wrap(counter, 'user-001');
 
   // 2. View関連を追加
   const metadata = counterShell.metadata.addViewReference({

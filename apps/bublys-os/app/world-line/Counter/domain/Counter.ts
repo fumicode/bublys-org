@@ -1,12 +1,16 @@
 import { Serializable } from '../../../object-shell/domain/Serializable';
+import { DomainEntity } from '../../../object-shell/domain/ObjectShell';
 
 /**
  * Counter クラス
  * カウンターの値を管理し、不変性を保つ
  */
-export class Counter implements Serializable<{ value: number }> {
+export class Counter implements Serializable<{ id: string; value: number }>, DomainEntity {
+    public readonly id: string;
     public readonly value: number;
-    constructor(value: number = 0) {
+
+    constructor(id: string, value: number = 0) {
+      this.id = id;
       this.value = value;
     }
 
@@ -14,21 +18,22 @@ export class Counter implements Serializable<{ value: number }> {
      * カウンターを増加させる（新しいインスタンスを返す）
      */
     public countUp(): Counter {
-      return new Counter(this.value + 1);
+      return new Counter(this.id, this.value + 1);
     }
 
     /**
      * カウンターを減少させる（新しいインスタンスを返す）
      */
     public countDown(): Counter {
-      return new Counter(this.value - 1);
+      return new Counter(this.id, this.value - 1);
     }
 
     /**
      * JSON形式に変換
      */
-    public toJSON(): { value: number } {
+    public toJSON(): { id: string; value: number } {
       return {
+        id: this.id,
         value: this.value,
       };
     }
@@ -37,15 +42,15 @@ export class Counter implements Serializable<{ value: number }> {
      * 後方互換性のため
      * @deprecated toJSON()を使用してください
      */
-    public toJson(): { value: number } {
+    public toJson(): { id: string; value: number } {
       return this.toJSON();
     }
 
     /**
      * JSONからCounterインスタンスを作成
      */
-    public static fromJSON(json: { value: number }): Counter {
-      return new Counter(json.value || 0);
+    public static fromJSON(json: { id: string; value: number }): Counter {
+      return new Counter(json.id || 'counter-unknown', json.value || 0);
     }
 
     /**

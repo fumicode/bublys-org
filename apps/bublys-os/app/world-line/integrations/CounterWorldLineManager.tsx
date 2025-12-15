@@ -33,7 +33,7 @@ export function CounterWorldLineManager({
       objectId={counterId}
       serialize={serializeCounter}
       deserialize={deserializeCounter}
-      createInitialWorldState={() => createInitialCounter(initialValue)}
+      createInitialWorldState={() => createInitialCounter(counterId, initialValue)}
       isBubbleMode={isBubbleMode}
       onOpenWorldLineView={onOpenWorldLineView}
       onCloseWorldLineView={onCloseWorldLineView}

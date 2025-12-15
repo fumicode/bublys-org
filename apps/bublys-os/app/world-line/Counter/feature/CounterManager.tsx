@@ -17,6 +17,6 @@ export function deserializeCounter(data: any): Counter {
 /**
  * Counterの初期状態を作成
  */
-export function createInitialCounter(initialValue: number = 0): Counter {
-  return new Counter(initialValue);
+export function createInitialCounter(id: string, initialValue: number = 0): Counter {
+  return new Counter(id, initialValue);
 }

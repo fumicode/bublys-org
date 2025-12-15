@@ -13,9 +13,9 @@ function ObjectShellDemoContent() {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleCreateShellWithBubble = () => {
-    const counter = new Counter(0);
+    const counterId = `shell-counter-${Date.now()}`;
+    const counter = new Counter(counterId, 0);
     const shell = wrap(
-      `shell-counter-${Date.now()}`,
       counter,
       'demo-user'
     );
@@ -29,9 +29,9 @@ function ObjectShellDemoContent() {
   };
 
   const handleCreateShellOnly = () => {
-    const counter = new Counter(0);
+    const counterId = `shell-counter-${Date.now()}`;
+    const counter = new Counter(counterId, 0);
     const shell = wrap(
-      `shell-counter-${Date.now()}`,
       counter,
       'demo-user'
     );

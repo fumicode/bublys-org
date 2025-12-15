@@ -15,10 +15,11 @@ export function BasicExample() {
 
   const handleCreateCounter = () => {
     // 1. ドメインオブジェクトを作成
-    const counter = new Counter(0);
+    const counterId = 'counter-' + Date.now();
+    const counter = new Counter(counterId, 0);
 
     // 2. シェルでラップ
-    const shell = wrap('counter-' + Date.now(), counter, 'user-001');
+    const shell = wrap(counter, 'user-001');
 
     // 3. メモリに保存
     setShell(shell.id, shell);

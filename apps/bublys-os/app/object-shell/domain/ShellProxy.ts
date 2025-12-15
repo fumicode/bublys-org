@@ -7,7 +7,7 @@
  * ObjectShell<T> はこのProxyでラップされた型です。
  */
 
-import { ObjectShellBase } from './ObjectShell';
+import { ObjectShellBase, DomainEntity } from './ObjectShell';
 
 /**
  * ObjectShell<T>
@@ -18,7 +18,7 @@ import { ObjectShellBase } from './ObjectShell';
  *
  * 内部的には ObjectShellBase<T> を Proxy でラップしています。
  */
-export type ObjectShell<T> = ObjectShellBase<T> & {
+export type ObjectShell<T extends DomainEntity> = ObjectShellBase<T> & {
   [K in keyof T]: T[K] extends (...args: infer Args) => infer R
     ? R extends T
       ? (...args: Args) => ObjectShell<T>  // ドメインオブジェクトを返すメソッド → Shellを返す
@@ -33,7 +33,7 @@ export type ObjectShell<T> = ObjectShellBase<T> & {
  * @param userId - デフォルトのユーザーID（省略可能）
  * @returns ドメインオブジェクトのメソッドを持つように見えるShell
  */
-export function createObjectShell<T>(
+export function createObjectShell<T extends DomainEntity>(
   shell: ObjectShellBase<T>,
   userId?: string
 ): ObjectShell<T> {
