@@ -7,6 +7,7 @@ import { ShellManagerProvider, useShellManager } from '../object-shell/feature/S
 import { FocusedObjectProvider } from '../world-line/WorldLine/domain/FocusedObjectContext';
 import { registerShellTypes } from '../object-shell/setup/registerShellTypes';
 import { BubblesUI } from '../bubble-ui/BubblesUI/feature/BubblesUI';
+import { ShellListPanel } from '../object-shell/ui/ShellListPanel';
 import {
   HashWorldLineProvider,
   useHashWorldLine,
@@ -62,6 +63,7 @@ const BRANCH_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#
 function ObjectShellDemoContent() {
   const { setShellWithBubble, shells } = useShellManager();
   const [isOpen, setIsOpen] = useState(false);
+  const [showShellList, setShowShellList] = useState(false);
   const {
     state: worldLineState,
     activeWorldLine,
@@ -98,21 +100,9 @@ function ObjectShellDemoContent() {
     }
   }, [setShellWithBubble, activeWorldLine, syncShellToWorldLine]);
 
-  const handleCreateShellOnly = useCallback(() => {
-    const counterId = `shell-counter-${Date.now()}`;
-    const counter = new Counter(counterId, 0);
-    const shell = wrap(counter, 'demo-user');
-
-    setShellWithBubble(shell.id, shell, {
-      shellType: 'counter',
-      createBubble: false,
-    });
-
-    // 世界線に同期
-    if (activeWorldLine) {
-      syncShellToWorldLine(shell, 'counter', 'Counter created (no bubble)');
-    }
-  }, [setShellWithBubble, activeWorldLine, syncShellToWorldLine]);
+  const handleToggleShellList = useCallback(() => {
+    setShowShellList((prev) => !prev);
+  }, []);
 
   if (!isOpen) {
     return (
@@ -169,24 +159,36 @@ function ObjectShellDemoContent() {
           Bubble
         </button>
         <button
-          onClick={handleCreateShellOnly}
+          onClick={handleToggleShellList}
           style={{
             padding: '8px 12px',
             fontSize: '14px',
             cursor: 'pointer',
-            backgroundColor: '#2196F3',
+            backgroundColor: showShellList ? '#1565c0' : '#2196F3',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
           }}
         >
-          Shell
+          Shell一覧 {showShellList ? '▼' : '▶'}
         </button>
       </div>
 
-      <div style={{ fontSize: '12px', color: '#666' }}>
+      <div style={{ fontSize: '12px', color: '#666', marginBottom: showShellList ? '12px' : 0 }}>
         Shells: {shells.size}個 | 履歴: {activeWorldLine?.getHistory().length ?? 0}件
       </div>
+
+      {/* Shell一覧パネル */}
+      {showShellList && (
+        <div style={{
+          borderTop: '1px solid #eee',
+          marginTop: '8px',
+          maxHeight: '400px',
+          overflowY: 'auto',
+        }}>
+          <ShellListPanel />
+        </div>
+      )}
     </div>
   );
 }
