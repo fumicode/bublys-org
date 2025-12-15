@@ -237,17 +237,20 @@ function DemoContent() {
     const targetNode = activeWorldLine.getHistoryNode(worldStateHash);
     if (!targetNode) return;
 
-    // 巻き戻し前に履歴情報を保持（rewind後にactiveWorldLineは古くなるため）
+    // DAG構造: 親をたどって経路上のノードを収集（古い順）
     const history = activeWorldLine.getHistory();
-    const targetIndex = history.findIndex(
-      (node) => node.worldStateHash === worldStateHash
-    );
+    const pathNodes: typeof history = [];
+    let currentHash: string | undefined = worldStateHash;
+    while (currentHash) {
+      const node = history.find((n) => n.worldStateHash === currentHash);
+      if (!node) break;
+      pathNodes.unshift(node); // 先頭に追加（古い順にする）
+      currentHash = node.parentWorldStateHash;
+    }
 
-    // 巻き戻し先時点での各オブジェクトの最新スナップショットを収集
-    // （同じオブジェクトが複数回更新されている場合、巻き戻し先時点での状態を取得）
+    // 経路上のノードの変更を順に適用して、各オブジェクトの最新スナップショットを収集
     const latestSnapshots = new Map<string, { type: string; id: string; stateHash: string }>();
-    for (let i = 0; i <= targetIndex; i++) {
-      const node = history[i];
+    for (const node of pathNodes) {
       for (const changed of node.changedObjects) {
         // 後のノードで上書きされる可能性があるので、常に最新を保持
         latestSnapshots.set(`${changed.type}:${changed.id}`, {
