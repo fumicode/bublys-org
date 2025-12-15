@@ -19,7 +19,6 @@ import {
   HashWorldLineShellBridgeProvider,
   useHashWorldLineShellBridge,
   loadState,
-  createStateSnapshot,
 } from '../hash-world-line';
 import type { ObjectShell } from '../object-shell/domain/ShellProxy';
 
@@ -233,51 +232,22 @@ function DemoContent() {
   const handleMoveTo = useCallback(async (worldStateHash: string) => {
     if (!activeWorldLine) return;
 
-    // 巻き戻し先の履歴ノードを取得
-    const targetNode = activeWorldLine.getHistoryNode(worldStateHash);
-    if (!targetNode) return;
-
-    // DAG構造: 親をたどって経路上のノードを収集（古い順）
-    const history = activeWorldLine.getHistory();
-    const pathNodes: typeof history = [];
-    let currentHash: string | undefined = worldStateHash;
-    while (currentHash) {
-      const node = history.find((n) => n.worldStateHash === currentHash);
-      if (!node) break;
-      pathNodes.unshift(node); // 先頭に追加（古い順にする）
-      currentHash = node.parentWorldStateHash;
-    }
-
-    // 経路上のノードの変更を順に適用して、各オブジェクトの最新スナップショットを収集
-    const latestSnapshots = new Map<string, { type: string; id: string; stateHash: string }>();
-    for (const node of pathNodes) {
-      for (const changed of node.changedObjects) {
-        // 後のノードで上書きされる可能性があるので、常に最新を保持
-        latestSnapshots.set(`${changed.type}:${changed.id}`, {
-          type: changed.type,
-          id: changed.id,
-          stateHash: changed.stateHash,
-        });
-      }
-    }
+    // 移動先時点での各オブジェクトのスナップショットを取得
+    const snapshots = activeWorldLine.getSnapshotsAt(worldStateHash);
 
     // 世界線の参照位置を移動
     await rewindWorldLine(worldStateHash);
 
-    // 収集したスナップショットを使ってIndexedDBから直接状態を取得し、Shellを復元
-    for (const { type, id, stateHash } of latestSnapshots.values()) {
-      if (type === 'counter') {
-        // スナップショットを作成してIndexedDBから直接取得
-        const snapshot = createStateSnapshot(type, id, stateHash);
+    // スナップショットを使ってIndexedDBから状態を取得し、Shellを復元
+    for (const snapshot of snapshots.values()) {
+      if (snapshot.type === 'counter') {
         const stateData = await loadState<{ id: string; value: number }>(snapshot);
         if (stateData) {
-          // Counter を復元
           const counter = Counter.fromJSON(stateData);
-          const existingShell = shells.get(id);
+          const existingShell = shells.get(snapshot.id);
           if (existingShell) {
-            // 既存のShellを更新
             const newShell = wrap(counter, 'demo-user');
-            setShell(id, newShell);
+            setShell(snapshot.id, newShell);
           }
         }
       }

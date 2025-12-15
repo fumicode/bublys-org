@@ -275,6 +275,46 @@ export class HashWorldLine {
   }
 
   /**
+   * 特定の状態までのDAG経路上にあるノードを取得（古い順）
+   * @param worldStateHash 目標の状態ハッシュ
+   * @returns 経路上のノード配列（ルートから目標まで）
+   */
+  getPathTo(worldStateHash: string): WorldHistoryNode[] {
+    const pathNodes: WorldHistoryNode[] = [];
+    let currentHash: string | undefined = worldStateHash;
+
+    while (currentHash) {
+      const node = this.state.history.find((n) => n.worldStateHash === currentHash);
+      if (!node) break;
+      pathNodes.unshift(node); // 先頭に追加（古い順にする）
+      currentHash = node.parentWorldStateHash;
+    }
+
+    return pathNodes;
+  }
+
+  /**
+   * 特定の状態時点での各オブジェクトの最新スナップショットを取得
+   * DAG経路をたどり、各オブジェクトの最終状態を収集する
+   * @param worldStateHash 目標の状態ハッシュ
+   * @returns オブジェクトキー（type:id）からスナップショットへのMap
+   */
+  getSnapshotsAt(worldStateHash: string): Map<string, StateSnapshot> {
+    const pathNodes = this.getPathTo(worldStateHash);
+    const snapshots = new Map<string, StateSnapshot>();
+
+    for (const node of pathNodes) {
+      for (const changed of node.changedObjects) {
+        // 後のノードで上書きされる可能性があるので、常に最新を保持
+        const key = `${changed.type}:${changed.id}`;
+        snapshots.set(key, changed);
+      }
+    }
+
+    return snapshots;
+  }
+
+  /**
    * 名前を変更
    */
   rename(newName: string): HashWorldLine {
