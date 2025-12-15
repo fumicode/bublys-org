@@ -83,7 +83,8 @@ export function createObjectShell<T extends DomainEntity>(
               actionType,
               { args },
               userId || 'system',
-              `${actionType}を実行`
+              `${actionType}を実行`,
+              true  // saveSnapshot = true（履歴に前の状態を保存）
             );
 
             // 同じProxyを返す（in-place更新なので新しいインスタンスは作らない）

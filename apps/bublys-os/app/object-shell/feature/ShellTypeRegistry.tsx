@@ -5,9 +5,23 @@
 
 import { FC } from 'react';
 import { ObjectShell, type DomainEntity } from '../domain';
+import { BaseShell } from '../domain/BaseShell';
+
+/**
+ * Shell クラスのコンストラクタ型
+ * static fromJson メソッドを持つクラスを表す
+ */
+export interface ShellConstructor<T extends DomainEntity> {
+  fromJson(
+    json: any,
+    domainObjectDeserializer: (data: any) => any,
+    snapshotDeserializer?: (data: any) => any
+  ): BaseShell<T>;
+}
 
 export interface ShellTypeConfig<T extends DomainEntity> {
   typeName: string;
+  ShellClass: ShellConstructor<T>;  // Shell クラスのコンストラクタ
   serializer: (obj: T) => any;
   deserializer: (data: any) => T;
   Renderer: FC<{ shell: ObjectShell<T> }>;

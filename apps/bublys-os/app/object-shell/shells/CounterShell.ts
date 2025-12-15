@@ -8,6 +8,7 @@
 
 import { BaseShell } from '../domain/BaseShell';
 import { Counter } from '../../world-line/Counter/domain/Counter';
+import { ObjectShellBase, DomainEntity } from '../domain/ObjectShell';
 
 /**
  * Counter専用Shell
@@ -41,5 +42,27 @@ export class CounterShell extends BaseShell<Counter> {
     _relationIds: Record<string, string[]>
   ): void {
     // 関連なし - 何もしない
+  }
+
+  /**
+   * JSONからCounterShellを作成（デシリアライズ）
+   */
+  static override fromJson<T extends DomainEntity>(
+    json: any,
+    domainObjectDeserializer: (data: any) => T,
+    snapshotDeserializer?: (data: any) => T
+  ): BaseShell<T> {
+    // ObjectShellBase.fromJson を呼び出して基底データを復元
+    const baseShell = ObjectShellBase.fromJson(
+      json,
+      domainObjectDeserializer,
+      snapshotDeserializer
+    );
+
+    // CounterShell インスタンスを作成（BaseShell のコンストラクタは ObjectShellBase を継承）
+    const counterShell = Object.create(CounterShell.prototype);
+    Object.assign(counterShell, baseShell);
+
+    return counterShell as BaseShell<T>;
   }
 }

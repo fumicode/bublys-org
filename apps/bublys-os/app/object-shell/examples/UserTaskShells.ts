@@ -10,7 +10,7 @@
  */
 
 import { BaseShell } from '../domain/BaseShell';
-import { DomainEntity } from '../domain/ObjectShell';
+import { DomainEntity, ObjectShellBase } from '../domain/ObjectShell';
 
 // ============================================
 // ドメインオブジェクト（例示用）
@@ -180,6 +180,32 @@ export class UserShell extends BaseShell<User> {
       }
     }
   }
+
+  /**
+   * JSONからUserShellを作成（デシリアライズ）
+   */
+  static override fromJson<T extends DomainEntity>(
+    json: any,
+    domainObjectDeserializer: (data: any) => T,
+    snapshotDeserializer?: (data: any) => T
+  ): BaseShell<T> {
+    // ObjectShellBase.fromJson を呼び出して基底データを復元
+    const baseShell = ObjectShellBase.fromJson(
+      json,
+      domainObjectDeserializer,
+      snapshotDeserializer
+    );
+
+    // UserShell インスタンスを作成
+    const userShell = Object.create(UserShell.prototype);
+    Object.assign(userShell, baseShell);
+
+    // 関連の初期化（空配列）
+    userShell.ownedTasks = [];
+    userShell.friends = [];
+
+    return userShell as BaseShell<T>;
+  }
 }
 
 /**
@@ -242,5 +268,31 @@ export class TaskShell extends BaseShell<Task> {
     if (index >= 0) {
       this.assignees.splice(index, 1);
     }
+  }
+
+  /**
+   * JSONからTaskShellを作成（デシリアライズ）
+   */
+  static override fromJson<T extends DomainEntity>(
+    json: any,
+    domainObjectDeserializer: (data: any) => T,
+    snapshotDeserializer?: (data: any) => T
+  ): BaseShell<T> {
+    // ObjectShellBase.fromJson を呼び出して基底データを復元
+    const baseShell = ObjectShellBase.fromJson(
+      json,
+      domainObjectDeserializer,
+      snapshotDeserializer
+    );
+
+    // TaskShell インスタンスを作成
+    const taskShell = Object.create(TaskShell.prototype);
+    Object.assign(taskShell, baseShell);
+
+    // 関連の初期化
+    taskShell.owner = undefined;
+    taskShell.assignees = [];
+
+    return taskShell as BaseShell<T>;
   }
 }

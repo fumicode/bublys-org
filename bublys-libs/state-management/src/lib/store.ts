@@ -16,7 +16,7 @@ import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
 } from "@bublys-org/bubbles-ui-state";
-import { bubblesListener, shellBubbleListener } from "@bublys-org/bubbles-ui-state";
+import { bubblesListener, shellBubbleListener, shellDeletionListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { userSlice } from "./slices/user-slice.js";
@@ -69,7 +69,8 @@ export const makeStore = () => {
         },
     })
       .prepend(bubblesListener.middleware)
-      .prepend(shellBubbleListener.middleware),
+      .prepend(shellBubbleListener.middleware)
+      .prepend(shellDeletionListener.middleware),
   });
   console.log("Store created:", store);
   

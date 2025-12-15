@@ -6,8 +6,9 @@
  */
 
 import { createContext, useContext, useReducer, useCallback, ReactNode, useEffect } from 'react';
-import { ObjectShell, fromJson, type DomainEntity } from '../domain';
+import { ObjectShell, type DomainEntity, createObjectShell } from '../domain';
 import { useAppDispatch } from '@bublys-org/state-management';
+import { shellTypeRegistry } from './ShellTypeRegistry';
 
 // ============================================
 // State
@@ -202,8 +203,14 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeShell = useCallback((id: string) => {
+    const shellType = state.shellTypes.get(id);
     dispatch({ type: 'REMOVE_SHELL', payload: { id } });
-  }, []);
+
+    // Bubble削除イベントをディスパッチ
+    if (shellType) {
+      reduxDispatch({ type: 'shells/deleted', payload: { shellId: id, shellType } });
+    }
+  }, [state.shellTypes, reduxDispatch]);
 
   const clearAll = useCallback(() => {
     dispatch({ type: 'CLEAR_ALL' });
@@ -284,38 +291,42 @@ export function ShellManagerProvider({ children }: { children: ReactNode }) {
       const serialized = JSON.parse(stored);
       const newShells = new Map<string, ObjectShell<any>>();
       const newShellTypes = new Map<string, string>();
+      const baseShells = new Map<string, any>();  // BaseShell のマップ（関連復元用）
       const relationData: Array<{ shell: any; relationIds: Record<string, string[]> }> = [];
 
       // パス1: すべてのShellを作成（関連なし）
       serialized.forEach(({ id, shellType, domainData, relationIds }: any) => {
-        // 型情報からデシリアライザを選択
-        const domainDeserializer = (obj: any) => {
-          // ここで型に応じたデシリアライザを選択
-          // 例：shellType === 'counter' なら Counter.fromJson
-          if (obj.toJson) return obj;
-          return obj;
-        };
+        // ShellTypeRegistry から設定を取得
+        const config = shellTypeRegistry.get(shellType);
+        if (!config) {
+          console.warn(`Unknown shell type: ${shellType}, skipping shell ${id}`);
+          return;
+        }
 
-        // fromJson は自動的にProxyでラップされたシェルを返す
-        const shell = fromJson(
+        // ShellClass.fromJson を使って型特化 Shell を作成（BaseShell を返す）
+        const baseShell = config.ShellClass.fromJson(
           domainData,
-          domainDeserializer,
-          domainDeserializer
+          config.deserializer,
+          config.deserializer
         );
 
+        // Proxy でラップして ObjectShell にする
+        const shell = createObjectShell(baseShell);
+
         newShells.set(id, shell);
+        baseShells.set(id, baseShell);  // BaseShell も保存
         newShellTypes.set(id, shellType);
 
-        // 関連情報があれば記録
+        // 関連情報があれば記録（BaseShell を渡す）
         if (relationIds && Object.keys(relationIds).length > 0) {
-          relationData.push({ shell, relationIds });
+          relationData.push({ shell: baseShell, relationIds });
         }
       });
 
       // パス2: 関連を復元（BaseShellの場合のみ）
       relationData.forEach(({ shell, relationIds }) => {
         if ('restoreRelations' in shell && typeof shell.restoreRelations === 'function') {
-          shell.restoreRelations(newShells, relationIds);
+          shell.restoreRelations(baseShells, relationIds);
         }
       });
 
