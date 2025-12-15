@@ -7,18 +7,24 @@ import { FC } from 'react';
 import { Counter } from '../../world-line/Counter/domain/Counter';
 import { ObjectShell } from '../domain';
 import { useShellManager } from '../feature/ShellManager';
+import { useHashWorldLineShellBridge } from '../../hash-world-line';
 
 export const CounterShellRenderer: FC<{ shell: ObjectShell<Counter> }> = ({ shell }) => {
   const { setShell } = useShellManager();
+  const { syncShellToWorldLine } = useHashWorldLineShellBridge();
 
   const handleIncrement = () => {
     const newShell = shell.countUp();
     setShell(shell.id, newShell);
+    // 世界線に同期
+    syncShellToWorldLine(newShell, 'counter', `Counter incremented to ${newShell.value}`);
   };
 
   const handleDecrement = () => {
     const newShell = shell.countDown();
     setShell(shell.id, newShell);
+    // 世界線に同期
+    syncShellToWorldLine(newShell, 'counter', `Counter decremented to ${newShell.value}`);
   };
 
   return (
