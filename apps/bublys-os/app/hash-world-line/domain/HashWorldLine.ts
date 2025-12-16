@@ -1,5 +1,5 @@
 /**
- * HashWorldLine
+ * WorldLine
  * 世界線ドメインモデル
  *
  * 複数オブジェクトの状態履歴を DAG（有向非巡回グラフ）として管理する。
@@ -7,21 +7,29 @@
  */
 import { StateSnapshot } from './StateSnapshot';
 import { WorldState, WorldStateJson } from './WorldState';
-import { normalizeJson, computeHash } from './hashUtils';
+
+/**
+ * 一意なノードIDを生成
+ */
+function generateNodeId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${timestamp}-${random}`;
+}
 
 /**
  * WorldHistoryNode
  * 世界線の履歴ノード（DAG構造）
  */
 export interface WorldHistoryNode {
-  /** タイムスタンプ（ミリ秒） */
+  /** ノードの一意識別子 */
+  id: string;
+  /** タイムスタンプ（ミリ秒）- 記録用 */
   timestamp: number;
-  /** この時点での世界全体の状態ハッシュ */
-  worldStateHash: string;
   /** この時点で変更されたオブジェクト */
   changedObjects: StateSnapshot[];
-  /** 親ノード（DAG）のハッシュ。最初のノードは undefined */
-  parentWorldStateHash?: string;
+  /** 親ノード（DAG）のID。最初のノードは undefined */
+  parentId?: string;
   /** 変更を行ったユーザー */
   userId?: string;
   /** 変更の説明 */
@@ -43,8 +51,8 @@ export interface HistoryDAGNode {
   isOnCurrentPath: boolean;
   /** 現在位置かどうか */
   isCurrent: boolean;
-  /** 子ノード */
-  children: WorldHistoryNode[];
+  /** 子ノードのID */
+  childIds: string[];
 }
 
 /**
@@ -134,20 +142,19 @@ export class HashWorldLine {
    * オブジェクトの状態を更新
    * 現在参照位置から新しい履歴を追加する
    */
-  async updateObjectState(
+  updateObjectState(
     snapshot: StateSnapshot,
     userId?: string,
     description?: string
-  ): Promise<HashWorldLine> {
+  ): HashWorldLine {
     const newCurrentState = this.state.currentState.setSnapshot(snapshot);
-    const worldStateHash = await computeWorldStateHash(newCurrentState);
 
     const currentNode = this.getCurrentHistoryNode();
     const newHistoryNode: WorldHistoryNode = {
+      id: generateNodeId(),
       timestamp: Date.now(),
-      worldStateHash,
       changedObjects: [snapshot],
-      parentWorldStateHash: currentNode?.worldStateHash,
+      parentId: currentNode?.id,
       userId,
       description,
     };
@@ -167,20 +174,19 @@ export class HashWorldLine {
    * 複数オブジェクトの状態を一度に更新
    * 現在参照位置から新しい履歴を追加する
    */
-  async updateObjectStates(
+  updateObjectStates(
     snapshots: StateSnapshot[],
     userId?: string,
     description?: string
-  ): Promise<HashWorldLine> {
+  ): HashWorldLine {
     const newCurrentState = this.state.currentState.setSnapshots(snapshots);
-    const worldStateHash = await computeWorldStateHash(newCurrentState);
 
     const currentNode = this.getCurrentHistoryNode();
     const newHistoryNode: WorldHistoryNode = {
+      id: generateNodeId(),
       timestamp: Date.now(),
-      worldStateHash,
       changedObjects: snapshots,
-      parentWorldStateHash: currentNode?.worldStateHash,
+      parentId: currentNode?.id,
       userId,
       description,
     };
@@ -201,21 +207,21 @@ export class HashWorldLine {
    * 履歴は削除せず、currentHistoryIndex を変更するだけ
    * DAG構造を考慮し、親をたどって状態を再構築する
    */
-  moveTo(worldStateHash: string): HashWorldLine | undefined {
+  moveTo(nodeId: string): HashWorldLine | undefined {
     const targetIndex = this.state.history.findIndex(
-      (node) => node.worldStateHash === worldStateHash
+      (node) => node.id === nodeId
     );
     if (targetIndex === -1) return undefined;
 
     // DAG構造: 親をたどって経路上のノードを収集
     const pathNodes: WorldHistoryNode[] = [];
-    let currentHash: string | undefined = worldStateHash;
+    let currentId: string | undefined = nodeId;
 
-    while (currentHash) {
-      const node = this.state.history.find((n) => n.worldStateHash === currentHash);
+    while (currentId !== undefined) {
+      const node = this.state.history.find((n) => n.id === currentId);
       if (!node) break;
       pathNodes.unshift(node); // 先頭に追加（古い順にする）
-      currentHash = node.parentWorldStateHash;
+      currentId = node.parentId;
     }
 
     // 経路上のノードの変更を順に適用してcurrentStateを再構築
@@ -237,7 +243,7 @@ export class HashWorldLine {
   moveBack(): HashWorldLine | undefined {
     if (this.state.currentHistoryIndex <= 0) return undefined;
     const targetNode = this.state.history[this.state.currentHistoryIndex - 1];
-    return this.moveTo(targetNode.worldStateHash);
+    return this.moveTo(targetNode.id);
   }
 
   /**
@@ -246,7 +252,7 @@ export class HashWorldLine {
   moveForward(): HashWorldLine | undefined {
     if (this.state.currentHistoryIndex >= this.state.history.length - 1) return undefined;
     const targetNode = this.state.history[this.state.currentHistoryIndex + 1];
-    return this.moveTo(targetNode.worldStateHash);
+    return this.moveTo(targetNode.id);
   }
 
   /**
@@ -255,39 +261,39 @@ export class HashWorldLine {
   moveToLatest(): HashWorldLine | undefined {
     if (this.state.history.length === 0) return undefined;
     const latestNode = this.state.history[this.state.history.length - 1];
-    return this.moveTo(latestNode.worldStateHash);
+    return this.moveTo(latestNode.id);
   }
 
   /**
    * @deprecated Use moveTo instead. rewindTo will be removed in future versions.
    */
-  rewindTo(worldStateHash: string): HashWorldLine | undefined {
-    return this.moveTo(worldStateHash);
+  rewindTo(nodeId: string): HashWorldLine | undefined {
+    return this.moveTo(nodeId);
   }
 
   /**
    * 特定の履歴ノードを取得
    */
-  getHistoryNode(worldStateHash: string): WorldHistoryNode | undefined {
+  getHistoryNode(nodeId: string): WorldHistoryNode | undefined {
     return this.state.history.find(
-      (node) => node.worldStateHash === worldStateHash
+      (node) => node.id === nodeId
     );
   }
 
   /**
    * 特定の状態までのDAG経路上にあるノードを取得（古い順）
-   * @param worldStateHash 目標の状態ハッシュ
+   * @param nodeId 目標のノードID
    * @returns 経路上のノード配列（ルートから目標まで）
    */
-  getPathTo(worldStateHash: string): WorldHistoryNode[] {
+  getPathTo(nodeId: string): WorldHistoryNode[] {
     const pathNodes: WorldHistoryNode[] = [];
-    let currentHash: string | undefined = worldStateHash;
+    let currentId: string | undefined = nodeId;
 
-    while (currentHash) {
-      const node = this.state.history.find((n) => n.worldStateHash === currentHash);
+    while (currentId !== undefined) {
+      const node = this.state.history.find((n) => n.id === currentId);
       if (!node) break;
       pathNodes.unshift(node); // 先頭に追加（古い順にする）
-      currentHash = node.parentWorldStateHash;
+      currentId = node.parentId;
     }
 
     return pathNodes;
@@ -296,11 +302,11 @@ export class HashWorldLine {
   /**
    * 特定の状態時点での各オブジェクトの最新スナップショットを取得
    * DAG経路をたどり、各オブジェクトの最終状態を収集する
-   * @param worldStateHash 目標の状態ハッシュ
+   * @param nodeId 目標のノードID
    * @returns オブジェクトキー（type:id）からスナップショットへのMap
    */
-  getSnapshotsAt(worldStateHash: string): Map<string, StateSnapshot> {
-    const pathNodes = this.getPathTo(worldStateHash);
+  getSnapshotsAt(nodeId: string): Map<string, StateSnapshot> {
+    const pathNodes = this.getPathTo(nodeId);
     const snapshots = new Map<string, StateSnapshot>();
 
     for (const node of pathNodes) {
@@ -327,9 +333,9 @@ export class HashWorldLine {
   /**
    * 特定のノードの子ノードを取得
    */
-  getChildNodes(worldStateHash: string): WorldHistoryNode[] {
+  getChildNodes(nodeId: string): WorldHistoryNode[] {
     return this.state.history.filter(
-      (node) => node.parentWorldStateHash === worldStateHash
+      (node) => node.parentId === nodeId
     );
   }
 
@@ -337,22 +343,22 @@ export class HashWorldLine {
    * ルートノード（親がないノード）を取得
    */
   getRootNodes(): WorldHistoryNode[] {
-    return this.state.history.filter((node) => !node.parentWorldStateHash);
+    return this.state.history.filter((node) => node.parentId === undefined);
   }
 
   /**
-   * 現在位置からルートまでの経路上にあるノードのハッシュセットを取得
+   * 現在位置からルートまでの経路上にあるノードのIDセットを取得
    */
   getCurrentPath(): Set<string> {
     const path = new Set<string>();
     const currentNode = this.getCurrentHistoryNode();
     if (!currentNode) return path;
 
-    let hash: string | undefined = currentNode.worldStateHash;
-    while (hash) {
-      path.add(hash);
-      const node = this.getHistoryNode(hash);
-      hash = node?.parentWorldStateHash;
+    let nodeId: string | undefined = currentNode.id;
+    while (nodeId !== undefined) {
+      path.add(nodeId);
+      const node = this.getHistoryNode(nodeId);
+      nodeId = node?.parentId;
     }
     return path;
   }
@@ -369,23 +375,23 @@ export class HashWorldLine {
     const branchMap = new Map<string, number>(); // 分岐番号
 
     // ルートから深さ優先で探索
-    const calculateDepth = (hash: string, depth: number, branch: number) => {
-      if (depthMap.has(hash)) return;
-      depthMap.set(hash, depth);
-      branchMap.set(hash, branch);
+    const calculateDepth = (nodeId: string, depth: number, branch: number) => {
+      if (depthMap.has(nodeId)) return;
+      depthMap.set(nodeId, depth);
+      branchMap.set(nodeId, branch);
 
-      const children = this.getChildNodes(hash);
+      const children = this.getChildNodes(nodeId);
       children.forEach((child, index) => {
         // 最初の子は同じ分岐、2番目以降は新しい分岐
         const childBranch = index === 0 ? branch : Math.max(...branchMap.values()) + 1;
-        calculateDepth(child.worldStateHash, depth + 1, childBranch);
+        calculateDepth(child.id, depth + 1, childBranch);
       });
     };
 
     // ルートノードから開始
     const roots = this.getRootNodes();
     roots.forEach((root, index) => {
-      calculateDepth(root.worldStateHash, 0, index);
+      calculateDepth(root.id, 0, index);
     });
 
     // 現在の経路を取得
@@ -395,11 +401,11 @@ export class HashWorldLine {
     // DAGノードを構築
     return this.state.history.map((node) => ({
       node,
-      depth: depthMap.get(node.worldStateHash) ?? 0,
-      branch: branchMap.get(node.worldStateHash) ?? 0,
-      isOnCurrentPath: currentPath.has(node.worldStateHash),
-      isCurrent: node.worldStateHash === currentNode?.worldStateHash,
-      children: this.getChildNodes(node.worldStateHash),
+      depth: depthMap.get(node.id) ?? 0,
+      branch: branchMap.get(node.id) ?? 0,
+      isOnCurrentPath: currentPath.has(node.id),
+      isCurrent: node.id === currentNode?.id,
+      childIds: this.getChildNodes(node.id).map(c => c.id),
     }));
   }
 
@@ -443,21 +449,4 @@ export interface HashWorldLineJson {
   currentState: WorldStateJson;
   history: WorldHistoryNode[];
   currentHistoryIndex?: number;
-}
-
-/**
- * 世界全体の状態のハッシュを計算
- */
-export async function computeWorldStateHash(
-  worldState: WorldState
-): Promise<string> {
-  const snapshots = worldState.getAllSnapshots();
-  // スナップショットをキーでソートして正規化
-  const sorted = [...snapshots].sort((a, b) => {
-    const keyA = `${a.type}:${a.id}`;
-    const keyB = `${b.type}:${b.id}`;
-    return keyA.localeCompare(keyB);
-  });
-  const normalized = normalizeJson(sorted);
-  return await computeHash(normalized);
 }

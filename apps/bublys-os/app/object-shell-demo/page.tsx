@@ -202,11 +202,11 @@ function HistoryPanel() {
   const { shells, setShell, setShellWithBubble, removeShell } = useShellManager();
   const [, forceUpdate] = useState(0);
 
-  const handleMoveTo = useCallback(async (worldStateHash: string) => {
+  const handleMoveTo = useCallback(async (targetNodeId: string) => {
     if (!activeWorldLine) return;
 
-    const snapshots = activeWorldLine.getSnapshotsAt(worldStateHash);
-    await rewindWorldLine(worldStateHash);
+    const snapshots = activeWorldLine.getSnapshotsAt(targetNodeId);
+    await rewindWorldLine(targetNodeId);
 
     // 移動先の状態に存在するShell IDのセット
     const targetShellIds = new Set<string>();
@@ -260,7 +260,13 @@ function HistoryPanel() {
     });
   };
 
-  const formatHash = (hash: string) => hash.substring(0, 7);
+  const formatTimestampShort = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
 
   if (!activeWorldLine) {
     return (
@@ -292,13 +298,13 @@ function HistoryPanel() {
           {sortedDagNodes.map((dagNode) => {
             const { node, branch, isOnCurrentPath, isCurrent } = dagNode;
             const branchColor = BRANCH_COLORS[branch % BRANCH_COLORS.length];
-            const parentNode = dagNodes.find(d => d.node.worldStateHash === node.parentWorldStateHash);
+            const parentNode = dagNodes.find(d => d.node.id === node.parentId);
             const parentBranch = parentNode?.branch ?? branch;
             const isBranchPoint = parentNode && parentBranch !== branch;
 
             return (
               <div
-                key={node.worldStateHash}
+                key={node.id}
                 style={{
                   display: 'flex',
                   alignItems: 'stretch',
@@ -316,7 +322,7 @@ function HistoryPanel() {
                 >
                   {Array.from({ length: branchCount }).map((_, b) => {
                     const shouldDrawLine = sortedDagNodes.some((d, di) => {
-                      const currentIndex = sortedDagNodes.findIndex(n => n.node.worldStateHash === node.worldStateHash);
+                      const currentIndex = sortedDagNodes.findIndex(n => n.node.timestamp === node.timestamp);
                       return di > currentIndex && d.branch === b;
                     });
                     if (!shouldDrawLine && b !== branch) return null;
@@ -378,7 +384,7 @@ function HistoryPanel() {
                     cursor: isCurrent ? 'default' : 'pointer',
                     marginBottom: '2px',
                   }}
-                  onClick={() => !isCurrent && handleMoveTo(node.worldStateHash)}
+                  onClick={() => !isCurrent && handleMoveTo(node.id)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                     <span
@@ -391,7 +397,7 @@ function HistoryPanel() {
                         borderRadius: '2px',
                       }}
                     >
-                      {formatHash(node.worldStateHash)}
+                      {formatTimestampShort(node.timestamp)}
                     </span>
                     {isCurrent && (
                       <span

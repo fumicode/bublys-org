@@ -210,9 +210,9 @@ export function HashWorldLineViewer() {
   );
 
   const handleRewind = useCallback(
-    async (worldStateHash: string) => {
+    async (targetNodeId: string) => {
       if (confirm('この状態に巻き戻しますか？')) {
-        await rewindWorldLine(worldStateHash);
+        await rewindWorldLine(targetNodeId);
       }
     },
     [rewindWorldLine]
@@ -228,8 +228,12 @@ export function HashWorldLineViewer() {
     });
   };
 
-  const formatHash = (hash: string) => {
-    return hash.substring(0, 8) + '...';
+  const formatTimestampShort = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   };
 
   if (state.isLoading) {
@@ -329,12 +333,12 @@ export function HashWorldLineViewer() {
                 const isLatest = index === 0;
                 return (
                   <HistoryNodeView
-                    key={node.worldStateHash}
+                    key={node.id}
                     node={node}
                     isCurrent={isLatest}
                     onRewind={handleRewind}
                     formatTimestamp={formatTimestamp}
-                    formatHash={formatHash}
+                    formatTimestampShort={formatTimestampShort}
                   />
                 );
               })
@@ -360,9 +364,9 @@ export function HashWorldLineViewer() {
 interface HistoryNodeViewProps {
   node: WorldHistoryNode;
   isCurrent: boolean;
-  onRewind: (hash: string) => void;
+  onRewind: (nodeId: string) => void;
   formatTimestamp: (ts: number) => string;
-  formatHash: (hash: string) => string;
+  formatTimestampShort: (ts: number) => string;
 }
 
 function HistoryNodeView({
@@ -370,7 +374,7 @@ function HistoryNodeView({
   isCurrent,
   onRewind,
   formatTimestamp,
-  formatHash,
+  formatTimestampShort,
 }: HistoryNodeViewProps) {
   return (
     <div
@@ -384,7 +388,7 @@ function HistoryNodeView({
         {isCurrent && ' (現在)'}
       </div>
       <div style={styles.historyHash}>
-        hash: {formatHash(node.worldStateHash)}
+        ID: {node.id}
       </div>
       <div style={styles.historyChanges}>
         変更: {node.changedObjects.map((o) => `${o.type}:${o.id}`).join(', ')}
@@ -396,7 +400,7 @@ function HistoryNodeView({
         <div style={styles.historyActions}>
           <button
             style={styles.smallButton}
-            onClick={() => onRewind(node.worldStateHash)}
+            onClick={() => onRewind(node.id)}
           >
             この状態に戻す
           </button>

@@ -2,7 +2,7 @@
  * WorldState
  * 世界の現在の状態（各オブジェクトのポインタ集合）
  *
- * 各オブジェクト（type:id）に対して、現在どのバージョン（stateHash）を
+ * 各オブジェクト（type:id）に対して、現在どのバージョン（timestamp）を
  * 指しているかを保持する。
  */
 import {
@@ -97,7 +97,7 @@ export class WorldState {
     const snapshots = new Map<string, StateSnapshot>();
     if (json.snapshots) {
       for (const [key, value] of json.snapshots) {
-        snapshots.set(key, createStateSnapshot(value.type, value.id, value.stateHash));
+        snapshots.set(key, createStateSnapshot(value.type, value.id, value.timestamp));
       }
     }
     return new WorldState({ snapshots });

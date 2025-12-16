@@ -17,12 +17,10 @@ import React, {
   useContext,
   useEffect,
   useCallback,
-  useRef,
   ReactNode,
 } from 'react';
 import { useHashWorldLine } from './HashWorldLineManager';
 import { useShellManager } from '../../object-shell/feature/ShellManager';
-import { computeObjectHash } from '../domain/hashUtils';
 import { shellEventEmitter } from '../../object-shell/domain/ShellEventEmitter';
 import { serializeDomainObject } from '../../object-shell/domain/Serializable';
 import type { DomainEntity } from '../../object-shell/domain/ObjectShell';
@@ -76,10 +74,7 @@ export function HashWorldLineShellBridgeProvider({
   const shellManager = useShellManager();
 
   // 自動同期対象の Shell（shellId → shellType）
-  const registeredShellsRef = useRef<Map<string, string>>(new Map());
-
-  // 前回のハッシュ値を記録（変更検出用）
-  const previousHashesRef = useRef<Map<string, string>>(new Map());
+  const registeredShellsRef = React.useRef<Map<string, string>>(new Map());
 
   /**
    * Shell の状態を世界線に同期
@@ -98,13 +93,6 @@ export function HashWorldLineShellBridgeProvider({
       const domainObject = shell.dangerouslyGetDomainObject();
       const stateData = serializeDomainObject(domainObject);
 
-      // 前回と同じハッシュならスキップ
-      const newHash = await computeObjectHash(stateData);
-      const prevHash = previousHashesRef.current.get(shell.id);
-      if (newHash === prevHash) {
-        return;
-      }
-
       // 世界線に状態を保存
       await hashWorldLine.updateObjectState(
         shellType,
@@ -113,9 +101,6 @@ export function HashWorldLineShellBridgeProvider({
         'system',
         description || `${shellType}:${shell.id} updated`
       );
-
-      // ハッシュを更新
-      previousHashesRef.current.set(shell.id, newHash);
     },
     [hashWorldLine]
   );
@@ -145,7 +130,6 @@ export function HashWorldLineShellBridgeProvider({
    */
   const unregisterFromAutoSync = useCallback((shellId: string) => {
     registeredShellsRef.current.delete(shellId);
-    previousHashesRef.current.delete(shellId);
   }, []);
 
   /**
@@ -202,13 +186,6 @@ export function HashWorldLineShellBridgeProvider({
       // ドメインオブジェクトをシリアライズ
       const stateData = serializeDomainObject(event.domainObject);
 
-      // 前回と同じハッシュならスキップ（重複防止）
-      const newHash = await computeObjectHash(stateData);
-      const prevHash = previousHashesRef.current.get(event.shellId);
-      if (newHash === prevHash) {
-        return;
-      }
-
       // 世界線に状態を保存
       await hashWorldLine.updateObjectState(
         shellType,
@@ -217,9 +194,6 @@ export function HashWorldLineShellBridgeProvider({
         event.userId,
         event.description
       );
-
-      // ハッシュを更新
-      previousHashesRef.current.set(event.shellId, newHash);
     });
 
     return () => unsubscribe();

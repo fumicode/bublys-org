@@ -75,20 +75,17 @@ describe('CounterShellExample', () => {
     });
   });
 
-  describe('immutability', () => {
-    it('元のシェルは更新されない（不変性）', () => {
-      const originalShell = wrap(new Counter('counter-001', 0), 'user-001');
-      const originalValue = originalShell.value;
+  describe('mutability', () => {
+    it('シェルはin-place更新される（可変）', () => {
+      const shell = wrap(new Counter('counter-001', 0), 'user-001');
 
-      const updatedShell = originalShell.countUp();
+      const returnedShell = shell.countUp();
 
-      // 元のシェルは変更されていない
-      expect(originalShell.value).toBe(originalValue);
-      expect(originalShell.history.length).toBe(0);
-
-      // 新しいシェルは更新されている
-      expect(updatedShell.value).toBe(originalValue + 1);
-      expect(updatedShell.history.length).toBe(1);
+      // 同じインスタンスが返される
+      expect(returnedShell).toBe(shell);
+      // シェルが更新されている
+      expect(shell.value).toBe(1);
+      expect(shell.history.length).toBe(1);
     });
   });
 
@@ -96,44 +93,42 @@ describe('CounterShellExample', () => {
     it('addViewReferenceでView参照を追加できる', () => {
       const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
-      const updatedShell = counterShell.addViewReference({
+      counterShell.addViewReference({
         viewId: 'view-001',
         viewType: 'demo',
         position: { x: 10, y: 20, z: 0 },
       });
 
-      expect(updatedShell.metadata.views.length).toBe(1);
-      expect(updatedShell.metadata.views[0].viewId).toBe('view-001');
-      expect(updatedShell.metadata.views[0].viewType).toBe('demo');
-      expect(updatedShell.metadata.views[0].position).toEqual({ x: 10, y: 20, z: 0 });
-
-      // 元のシェルは変更されていない
-      expect(counterShell.metadata.views.length).toBe(0);
+      expect(counterShell.metadata.views.length).toBe(1);
+      expect(counterShell.metadata.views[0].viewId).toBe('view-001');
+      expect(counterShell.metadata.views[0].viewType).toBe('demo');
+      expect(counterShell.metadata.views[0].position).toEqual({ x: 10, y: 20, z: 0 });
     });
 
     it('removeViewReferenceでView参照を削除できる', () => {
-      let counterShell = wrap(new Counter('counter-001', 0), 'user-001');
+      const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
-      counterShell = counterShell.addViewReference({
+      counterShell.addViewReference({
         viewId: 'view-001',
         viewType: 'demo',
       });
 
-      const updatedShell = counterShell.removeViewReference('view-001');
-
-      expect(updatedShell.metadata.views.length).toBe(0);
       expect(counterShell.metadata.views.length).toBe(1);
+
+      counterShell.removeViewReference('view-001');
+
+      expect(counterShell.metadata.views.length).toBe(0);
     });
 
     it('ヘルパーメソッドはメソッドチェーンが可能', () => {
       const counterShell = wrap(new Counter('counter-001', 0), 'user-001');
 
-      const updatedShell = counterShell
+      counterShell
         .addViewReference({ viewId: 'view-001', viewType: 'demo' })
         .countUp();
 
-      expect(updatedShell.value).toBe(1);
-      expect(updatedShell.metadata.views.length).toBe(1);
+      expect(counterShell.value).toBe(1);
+      expect(counterShell.metadata.views.length).toBe(1);
     });
   });
 });

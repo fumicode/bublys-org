@@ -19,7 +19,6 @@ import React, {
 } from 'react';
 import { HashWorldLine } from '../domain/HashWorldLine';
 import { createStateSnapshot } from '../domain/StateSnapshot';
-import { computeObjectHash } from '../domain/hashUtils';
 import {
   saveWorldLine,
   loadWorldLine,
@@ -142,8 +141,8 @@ interface HashWorldLineContextValue {
     type: string,
     id: string
   ) => Promise<T | undefined>;
-  /** 世界線を巻き戻す */
-  rewindWorldLine: (worldStateHash: string) => Promise<void>;
+  /** 世界線を特定のノードに移動 */
+  rewindWorldLine: (targetNodeId: string) => Promise<void>;
   /** 世界線の名前を変更 */
   renameWorldLine: (id: string, newName: string) => Promise<void>;
   /** 世界線一覧を再読み込み */
@@ -260,17 +259,17 @@ export function HashWorldLineProvider({
         throw new Error('Active world line not found');
       }
 
-      // ハッシュを計算
-      const stateHash = await computeObjectHash(stateData);
+      // タイムスタンプを生成
+      const timestamp = Date.now();
 
       // スナップショットを作成
-      const snapshot = createStateSnapshot(type, id, stateHash);
+      const snapshot = createStateSnapshot(type, id, timestamp);
 
       // 状態を IndexedDB に保存
       await saveState(snapshot, stateData);
 
-      // 世界線を更新
-      const updatedWorldLine = await worldLine.updateObjectState(
+      // 世界線を更新（同期処理に変更）
+      const updatedWorldLine = worldLine.updateObjectState(
         snapshot,
         userId,
         description
@@ -310,9 +309,9 @@ export function HashWorldLineProvider({
     [state.activeWorldLineId, state.worldLines]
   );
 
-  // 世界線を巻き戻す
+  // 世界線を特定のノードに移動
   const rewindWorldLine = useCallback(
-    async (worldStateHash: string) => {
+    async (targetNodeId: string) => {
       if (!state.activeWorldLineId) {
         throw new Error('No active world line');
       }
@@ -322,9 +321,9 @@ export function HashWorldLineProvider({
         throw new Error('Active world line not found');
       }
 
-      const rewound = worldLine.rewindTo(worldStateHash);
+      const rewound = worldLine.rewindTo(targetNodeId);
       if (!rewound) {
-        throw new Error('World state hash not found in history');
+        throw new Error('World history node not found');
       }
 
       // 世界線を IndexedDB に保存

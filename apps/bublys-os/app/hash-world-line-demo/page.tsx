@@ -229,14 +229,14 @@ function DemoContent() {
   }, [activeWorldLine, syncShellToWorldLine]);
 
   // 世界線の参照位置を移動してShellを復元
-  const handleMoveTo = useCallback(async (worldStateHash: string) => {
+  const handleMoveTo = useCallback(async (targetNodeId: string) => {
     if (!activeWorldLine) return;
 
     // 移動先時点での各オブジェクトのスナップショットを取得
-    const snapshots = activeWorldLine.getSnapshotsAt(worldStateHash);
+    const snapshots = activeWorldLine.getSnapshotsAt(targetNodeId);
 
     // 世界線の参照位置を移動
-    await rewindWorldLine(worldStateHash);
+    await rewindWorldLine(targetNodeId);
 
     // スナップショットを使ってIndexedDBから状態を取得し、Shellを復元
     for (const snapshot of snapshots.values()) {
@@ -342,7 +342,7 @@ const BRANCH_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#
 
 interface HistoryPanelProps {
   activeWorldLine: ReturnType<typeof useHashWorldLine>['activeWorldLine'];
-  onMoveTo: (worldStateHash: string) => void;
+  onMoveTo: (targetNodeId: string) => void;
 }
 
 function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
@@ -356,8 +356,12 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
     });
   };
 
-  const formatHash = (hash: string) => {
-    return hash.substring(0, 7);
+  const formatTimestampShort = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   };
 
   if (!activeWorldLine) {
@@ -396,7 +400,7 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
             const branchColor = BRANCH_COLORS[branch % BRANCH_COLORS.length];
 
             // このノードの親がどのブランチにいるか
-            const parentNode = dagNodes.find(d => d.node.worldStateHash === node.parentWorldStateHash);
+            const parentNode = dagNodes.find(d => d.node.id === node.parentId);
             const parentBranch = parentNode?.branch ?? branch;
 
             // 分岐点かどうか（親と異なるブランチ）
@@ -404,7 +408,7 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
 
             return (
               <div
-                key={node.worldStateHash}
+                key={node.id}
                 style={{
                   display: 'flex',
                   alignItems: 'stretch',
@@ -493,7 +497,7 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
                     cursor: isCurrent ? 'default' : 'pointer',
                     marginBottom: '2px',
                   }}
-                  onClick={() => !isCurrent && onMoveTo(node.worldStateHash)}
+                  onClick={() => !isCurrent && onMoveTo(node.id)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span
@@ -506,7 +510,7 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
                         borderRadius: '2px',
                       }}
                     >
-                      {formatHash(node.worldStateHash)}
+                      {formatTimestampShort(node.timestamp)}
                     </span>
                     {isCurrent && (
                       <span
