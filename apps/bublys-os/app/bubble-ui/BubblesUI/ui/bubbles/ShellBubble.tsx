@@ -5,8 +5,7 @@
 
 import { useState } from 'react';
 import { BubbleContentRenderer } from '../BubbleContentRenderer';
-import { useShell, useShellManager } from '@/app/object-shell/feature/ShellManager';
-import { shellTypeRegistry } from '@/app/object-shell/feature/ShellTypeRegistry';
+import { useShell, useShellManager, shellTypeRegistry } from '@bublys-org/object-shell';
 
 export const ShellBubble: BubbleContentRenderer = ({ bubble }) => {
   const [showHistory, setShowHistory] = useState(false);

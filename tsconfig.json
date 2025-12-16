@@ -29,6 +29,15 @@
     },
     {
       "path": "./memo-libs/memo-state"
+    },
+    {
+      "path": "./bublys-libs/akashic-record"
+    },
+    {
+      "path": "./bublys-libs/hash-world-line"
+    },
+    {
+      "path": "./bublys-libs/object-shell"
     }
   ]
 }

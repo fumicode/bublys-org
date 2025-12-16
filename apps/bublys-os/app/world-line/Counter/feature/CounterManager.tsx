@@ -1,4 +1,4 @@
-import { Counter } from '../domain/Counter';
+import { Counter } from '../../../counter/Counter';
 
 /**
  * Counterのシリアライズ

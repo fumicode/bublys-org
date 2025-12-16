@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { FocusedObjectProvider } from "../world-line/WorldLine/domain/FocusedObjectContext";
 import { BubblesUI } from "./BubblesUI/feature/BubblesUI";
-import { ShellManagerProvider } from "../object-shell/feature/ShellManager";
-import { registerShellTypes } from "../object-shell/setup/registerShellTypes";
+import { ShellManagerProvider } from "@bublys-org/object-shell";
+import { registerShellTypes } from "../counter/registerShellTypes";
 
 export default function Index() {
   // 型レジストリの初期化

@@ -1,6 +1,6 @@
 import { FC, useEffect, useCallback, useState } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
-import { useShellManager } from "../../../object-shell/feature/ShellManager";
+import { useShellManager } from "@bublys-org/object-shell";
 
 import {
   selectBubblesProcessDPO,

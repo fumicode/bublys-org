@@ -1,18 +1,21 @@
 'use client';
 
 import { useEffect, useState, useCallback, CSSProperties } from 'react';
-import { Counter } from '../world-line/Counter/domain/Counter';
-import { wrap } from '../object-shell/domain';
-import { ShellManagerProvider, useShellManager } from '../object-shell/feature/ShellManager';
+import { Counter } from '../counter/Counter';
+import {
+  wrap,
+  ShellManagerProvider,
+  useShellManager,
+  ShellListPanel,
+} from '@bublys-org/object-shell';
 import { FocusedObjectProvider } from '../world-line/WorldLine/domain/FocusedObjectContext';
-import { registerShellTypes } from '../object-shell/setup/registerShellTypes';
+import { registerShellTypes } from '../counter/registerShellTypes';
 import { BubblesUI } from '../bubble-ui/BubblesUI/feature/BubblesUI';
-import { ShellListPanel } from '../object-shell/ui/ShellListPanel';
 import {
   AkashicRecordProvider,
   useAkashicRecord,
   loadState,
-} from '../akashic-record';
+} from '@bublys-org/akashic-record';
 
 // モジュール読み込み時に型を登録（ShellManagerProvider初期化前に必要）
 registerShellTypes();

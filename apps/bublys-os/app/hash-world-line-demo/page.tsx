@@ -9,17 +9,20 @@
  * - 履歴の確認と巻き戻し
  */
 import { useEffect, useCallback, CSSProperties, useState } from 'react';
-import { Counter } from '../world-line/Counter/domain/Counter';
-import { wrap } from '../object-shell/domain';
-import { ShellManagerProvider, useShellManager } from '../object-shell/feature/ShellManager';
-import { registerShellTypes } from '../object-shell/setup/registerShellTypes';
+import { Counter } from '../counter/Counter';
+import {
+  wrap,
+  type ObjectShell,
+  ShellManagerProvider,
+  useShellManager,
+} from '@bublys-org/object-shell';
+import { registerShellTypes } from '../counter/registerShellTypes';
 import {
   AkashicRecordProvider,
   useAkashicRecord,
   loadState,
-} from '../akashic-record';
-import type { ObjectShell } from '../object-shell/domain/ShellProxy';
-import type { HashWorldLine } from '../hash-world-line/domain/HashWorldLine';
+} from '@bublys-org/akashic-record';
+import type { HashWorldLine } from '@bublys-org/hash-world-line';
 
 // ============================================================================
 // Styles
