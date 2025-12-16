@@ -5,7 +5,7 @@
 
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { createBubble } from '@bublys-org/bubbles-ui';
-import { addBubble, relateBubbles, popChildInProcess } from './bubbles-slice.js';
+import { addBubble, relateBubbles, joinSiblingInProcess } from './bubbles-slice.js';
 
 export const shellBubbleListener = createListenerMiddleware();
 
@@ -33,8 +33,8 @@ shellBubbleListener.startListening({
       openeeId: newBubble.id
     }));
 
-    // プロセス層に追加（新しいレイヤーとして）
-    listenerApi.dispatch(popChildInProcess(newBubble.id));
+    // プロセス層に追加（横並びとして）
+    listenerApi.dispatch(joinSiblingInProcess(newBubble.id));
 
     console.log('[ShellBubble Listener] Bubble created:', newBubble.id);
   }
