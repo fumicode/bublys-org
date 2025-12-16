@@ -9,12 +9,10 @@ import { registerShellTypes } from '../object-shell/setup/registerShellTypes';
 import { BubblesUI } from '../bubble-ui/BubblesUI/feature/BubblesUI';
 import { ShellListPanel } from '../object-shell/ui/ShellListPanel';
 import {
-  HashWorldLineProvider,
-  useHashWorldLine,
-  HashWorldLineShellBridgeProvider,
-  useHashWorldLineShellBridge,
+  AkashicRecordProvider,
+  useAkashicRecord,
   loadState,
-} from '../hash-world-line';
+} from '../akashic-record';
 
 // モジュール読み込み時に型を登録（ShellManagerProvider初期化前に必要）
 registerShellTypes();
@@ -61,29 +59,94 @@ const BRANCH_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#
 // ============================================================================
 
 function ObjectShellDemoContent() {
-  const { setShellWithBubble, shells } = useShellManager();
+  const { setShellWithBubble, shells, removeShell } = useShellManager();
   const [isOpen, setIsOpen] = useState(false);
   const [showShellList, setShowShellList] = useState(false);
   const {
-    state: worldLineState,
     activeWorldLine,
+    worldLineList,
+    isInitialized,
     createWorldLine,
     setActiveWorldLine,
-  } = useHashWorldLine();
-  const { syncShellToWorldLine } = useHashWorldLineShellBridge();
+    registerShell,
+    record,
+  } = useAkashicRecord();
 
-  // 世界線が無ければ作成
+  // 世界線が無ければ作成、あれば選択して状態を復元
   useEffect(() => {
-    if (!worldLineState.isLoading && worldLineState.worldLineList.length === 0) {
-      createWorldLine('shell-demo-world-line', 'Shell Demo 世界線').then((wl) => {
-        setActiveWorldLine(wl.state.id);
-      });
-    } else if (!worldLineState.isLoading && !worldLineState.activeWorldLineId && worldLineState.worldLineList.length > 0) {
-      setActiveWorldLine(worldLineState.worldLineList[0].id);
-    }
-  }, [worldLineState.isLoading, worldLineState.worldLineList, worldLineState.activeWorldLineId, createWorldLine, setActiveWorldLine]);
+    if (!isInitialized) return;
 
-  const handleCreateShellWithBubble = useCallback(() => {
+    const initWorldLine = async () => {
+      if (worldLineList.length === 0) {
+        // 世界線がない場合は新規作成
+        const wl = await createWorldLine('shell-demo-world-line', 'Shell Demo 世界線');
+        await setActiveWorldLine(wl.state.id);
+      } else if (!activeWorldLine) {
+        // 世界線があるがアクティブでない場合は最初の世界線を選択
+        await setActiveWorldLine(worldLineList[0].id);
+      }
+    };
+
+    initWorldLine();
+  }, [isInitialized, worldLineList, activeWorldLine, createWorldLine, setActiveWorldLine]);
+
+  // 世界線がアクティブになったらShellを復元（初回のみ）
+  const [hasRestoredForWorldLine, setHasRestoredForWorldLine] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeWorldLine) return;
+    // 同じ世界線で既に復元済みならスキップ
+    if (hasRestoredForWorldLine === activeWorldLine.state.id) return;
+
+    const restoreShells = async () => {
+      const currentNode = activeWorldLine.getCurrentHistoryNode();
+      if (!currentNode) return;
+
+      const snapshots = activeWorldLine.getSnapshotsAt(currentNode.id);
+
+      // 復元対象のShell IDを収集
+      const targetShellIds = new Set<string>();
+      for (const snapshot of snapshots.values()) {
+        if (snapshot.type === 'counter') {
+          targetShellIds.add(snapshot.id);
+        }
+      }
+
+      // 現在のShellで、WorldLineに存在しないものを削除
+      for (const [shellId] of shells) {
+        if (shellId.startsWith('shell-counter-') && !targetShellIds.has(shellId)) {
+          removeShell(shellId);
+        }
+      }
+
+      // WorldLineの状態からShellを復元（常にBubbleも作成）
+      for (const snapshot of snapshots.values()) {
+        if (snapshot.type === 'counter') {
+          const stateData = await loadState<{ id: string; value: number }>(snapshot);
+          if (stateData) {
+            const counter = Counter.fromJSON(stateData);
+            // 既存Shellがあっても削除して新規作成（Bubbleとの整合性を保つため）
+            if (shells.has(snapshot.id)) {
+              removeShell(snapshot.id);
+            }
+            const newShell = wrap(counter, 'demo-user');
+            setShellWithBubble(snapshot.id, newShell, {
+              shellType: 'counter',
+              createBubble: true,
+              openerBubbleId: 'root',
+            });
+            registerShell(snapshot.id, 'counter');
+          }
+        }
+      }
+
+      setHasRestoredForWorldLine(activeWorldLine.state.id);
+    };
+
+    restoreShells();
+  }, [activeWorldLine?.state.id, hasRestoredForWorldLine]);
+
+  const handleCreateShellWithBubble = useCallback(async () => {
     const counterId = `shell-counter-${Date.now()}`;
     const counter = new Counter(counterId, 0);
     const shell = wrap(counter, 'demo-user');
@@ -94,11 +157,12 @@ function ObjectShellDemoContent() {
       openerBubbleId: 'root',
     });
 
-    // 世界線に同期
-    if (activeWorldLine) {
-      syncShellToWorldLine(shell, 'counter', 'Counter created');
-    }
-  }, [setShellWithBubble, activeWorldLine, syncShellToWorldLine]);
+    // 自動同期対象に登録
+    registerShell(shell.id, 'counter');
+
+    // 初期状態を記録
+    await record(shell, 'counter', 'Counter created');
+  }, [setShellWithBubble, registerShell, record]);
 
   const handleToggleShellList = useCallback(() => {
     setShowShellList((prev) => !prev);
@@ -198,15 +262,16 @@ function ObjectShellDemoContent() {
 // ============================================================================
 
 function HistoryPanel() {
-  const { activeWorldLine, rewindWorldLine } = useHashWorldLine();
+  const { activeWorldLine, moveTo } = useAkashicRecord();
   const { shells, setShell, setShellWithBubble, removeShell } = useShellManager();
+  const { registerShell } = useAkashicRecord();
   const [, forceUpdate] = useState(0);
 
   const handleMoveTo = useCallback(async (targetNodeId: string) => {
     if (!activeWorldLine) return;
 
     const snapshots = activeWorldLine.getSnapshotsAt(targetNodeId);
-    await rewindWorldLine(targetNodeId);
+    await moveTo(targetNodeId);
 
     // 移動先の状態に存在するShell IDのセット
     const targetShellIds = new Set<string>();
@@ -231,7 +296,7 @@ function HistoryPanel() {
           const counter = Counter.fromJSON(stateData);
           const existingShell = shells.get(snapshot.id);
           if (existingShell) {
-            // 既存のShellを更新
+            // 既存のShellを更新（Bubbleは既に存在）
             const newShell = wrap(counter, 'demo-user');
             setShell(snapshot.id, newShell);
           } else {
@@ -242,13 +307,14 @@ function HistoryPanel() {
               createBubble: true,
               openerBubbleId: 'root',
             });
+            registerShell(snapshot.id, 'counter');
           }
         }
       }
     }
 
     forceUpdate((n) => n + 1);
-  }, [activeWorldLine, rewindWorldLine, shells, setShell, setShellWithBubble, removeShell]);
+  }, [activeWorldLine, moveTo, shells, setShell, setShellWithBubble, removeShell, registerShell]);
 
   const formatTimestamp = (timestamp: number) => {
     return new Date(timestamp).toLocaleString('ja-JP', {
@@ -322,7 +388,7 @@ function HistoryPanel() {
                 >
                   {Array.from({ length: branchCount }).map((_, b) => {
                     const shouldDrawLine = sortedDagNodes.some((d, di) => {
-                      const currentIndex = sortedDagNodes.findIndex(n => n.node.timestamp === node.timestamp);
+                      const currentIndex = sortedDagNodes.findIndex(n => n.node.id === node.id);
                       return di > currentIndex && d.branch === b;
                     });
                     if (!shouldDrawLine && b !== branch) return null;
@@ -434,30 +500,28 @@ export default function ObjectShellDemo() {
   return (
     <FocusedObjectProvider>
       <ShellManagerProvider>
-        <HashWorldLineProvider>
-          <HashWorldLineShellBridgeProvider>
-            <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
-              {/* デモコントロールパネル */}
-              <div style={{
-                position: 'absolute',
-                bottom: '20px',
-                left: '20px',
-                zIndex: 1000,
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              }}>
-                <ObjectShellDemoContent />
-              </div>
-
-              {/* Bubble UI - Shellが作成されたBubbleを表示 */}
-              <BubblesUI />
-
-              {/* 履歴パネル */}
-              <HistoryPanel />
+        <AkashicRecordProvider>
+          <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+            {/* デモコントロールパネル */}
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              zIndex: 1000,
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            }}>
+              <ObjectShellDemoContent />
             </div>
-          </HashWorldLineShellBridgeProvider>
-        </HashWorldLineProvider>
+
+            {/* Bubble UI - Shellが作成されたBubbleを表示 */}
+            <BubblesUI />
+
+            {/* 履歴パネル */}
+            <HistoryPanel />
+          </div>
+        </AkashicRecordProvider>
       </ShellManagerProvider>
     </FocusedObjectProvider>
   );

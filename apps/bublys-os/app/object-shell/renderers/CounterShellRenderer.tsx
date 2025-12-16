@@ -10,13 +10,13 @@ import { FC } from 'react';
 import { Counter } from '../../world-line/Counter/domain/Counter';
 import { ObjectShell } from '../domain';
 import { useShellManager } from '../feature/ShellManager';
-import { useShellWorldLineSync } from '../../hash-world-line/feature/HashWorldLineShellBridge';
+import { useShellSync } from '../../akashic-record';
 
 export const CounterShellRenderer: FC<{ shell: ObjectShell<Counter> }> = ({ shell }) => {
   const { setShell } = useShellManager();
 
   // Shellを自動同期対象として登録（イベント駆動で同期される）
-  useShellWorldLineSync(shell.id, 'counter');
+  useShellSync(shell.id, 'counter');
 
   const handleIncrement = () => {
     // ShellProxy経由でcountUp()を呼ぶとイベントが自動発火される

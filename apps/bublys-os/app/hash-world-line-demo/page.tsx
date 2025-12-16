@@ -14,13 +14,12 @@ import { wrap } from '../object-shell/domain';
 import { ShellManagerProvider, useShellManager } from '../object-shell/feature/ShellManager';
 import { registerShellTypes } from '../object-shell/setup/registerShellTypes';
 import {
-  HashWorldLineProvider,
-  useHashWorldLine,
-  HashWorldLineShellBridgeProvider,
-  useHashWorldLineShellBridge,
+  AkashicRecordProvider,
+  useAkashicRecord,
   loadState,
-} from '../hash-world-line';
+} from '../akashic-record';
 import type { ObjectShell } from '../object-shell/domain/ShellProxy';
+import type { HashWorldLine } from '../hash-world-line/domain/HashWorldLine';
 
 // ============================================================================
 // Styles
@@ -136,22 +135,19 @@ const styles: Record<string, CSSProperties> = {
 
 interface CounterCardProps {
   shell: ObjectShell<Counter>;
-  onSync: (shell: ObjectShell<Counter>) => void;
 }
 
-function CounterCard({ shell, onSync }: CounterCardProps) {
+function CounterCard({ shell }: CounterCardProps) {
   const { setShell } = useShellManager();
 
   const handleIncrement = () => {
-    const newShell = shell.countUp();
-    setShell(shell.id, newShell);
-    onSync(newShell);
+    shell.countUp();
+    setShell(shell.id, shell);
   };
 
   const handleDecrement = () => {
-    const newShell = shell.countDown();
-    setShell(shell.id, newShell);
-    onSync(newShell);
+    shell.countDown();
+    setShell(shell.id, shell);
   };
 
   return (
@@ -183,30 +179,74 @@ function CounterCard({ shell, onSync }: CounterCardProps) {
 function DemoContent() {
   const { setShellWithBubble, shells, setShell } = useShellManager();
   const {
-    state: worldLineState,
     activeWorldLine,
+    worldLineList,
+    isInitialized,
     createWorldLine,
     setActiveWorldLine,
-    rewindWorldLine,
-  } = useHashWorldLine();
-  const { syncShellToWorldLine } = useHashWorldLineShellBridge();
+    moveTo,
+    registerShell,
+    record,
+  } = useAkashicRecord();
 
   // 強制再レンダリング用
   const [, forceUpdate] = useState(0);
 
   // 世界線が無ければ作成
   useEffect(() => {
-    if (!worldLineState.isLoading && worldLineState.worldLineList.length === 0) {
-      createWorldLine('main-world-line', 'メイン世界線').then((wl) => {
-        setActiveWorldLine(wl.state.id);
-      });
-    } else if (!worldLineState.isLoading && !worldLineState.activeWorldLineId && worldLineState.worldLineList.length > 0) {
-      setActiveWorldLine(worldLineState.worldLineList[0].id);
-    }
-  }, [worldLineState.isLoading, worldLineState.worldLineList, worldLineState.activeWorldLineId, createWorldLine, setActiveWorldLine]);
+    if (!isInitialized) return;
+
+    const initWorldLine = async () => {
+      if (worldLineList.length === 0) {
+        const wl = await createWorldLine('main-world-line', 'メイン世界線');
+        await setActiveWorldLine(wl.state.id);
+      } else if (!activeWorldLine) {
+        await setActiveWorldLine(worldLineList[0].id);
+      }
+    };
+
+    initWorldLine();
+  }, [isInitialized, worldLineList, activeWorldLine, createWorldLine, setActiveWorldLine]);
+
+  // 世界線がアクティブになったらShellを復元
+  useEffect(() => {
+    if (!activeWorldLine) return;
+
+    const restoreShells = async () => {
+      const currentNode = activeWorldLine.getCurrentHistoryNode();
+      if (!currentNode) return;
+
+      const snapshots = activeWorldLine.getSnapshotsAt(currentNode.id);
+
+      for (const snapshot of snapshots.values()) {
+        if (snapshot.type === 'counter') {
+          const stateData = await loadState<{ id: string; value: number }>(snapshot);
+          if (stateData) {
+            const counter = Counter.fromJSON(stateData);
+            const existingShell = shells.get(snapshot.id);
+
+            if (existingShell) {
+              const newShell = wrap(counter, 'demo-user');
+              setShell(snapshot.id, newShell);
+              registerShell(snapshot.id, 'counter');
+            } else {
+              const newShell = wrap(counter, 'demo-user');
+              setShellWithBubble(snapshot.id, newShell, {
+                shellType: 'counter',
+                createBubble: false,
+              });
+              registerShell(snapshot.id, 'counter');
+            }
+          }
+        }
+      }
+    };
+
+    restoreShells();
+  }, [activeWorldLine?.state.id, activeWorldLine?.getCurrentHistoryIndex()]);
 
   // Counter作成
-  const handleCreateCounter = useCallback(() => {
+  const handleCreateCounter = useCallback(async () => {
     const counterId = `counter-${Date.now()}`;
     const counter = new Counter(counterId, 0);
     const shell = wrap(counter, 'demo-user');
@@ -216,17 +256,12 @@ function DemoContent() {
       createBubble: false,
     });
 
-    // 世界線に同期
-    if (activeWorldLine) {
-      syncShellToWorldLine(shell, 'counter', 'Counter created');
-    }
-  }, [setShellWithBubble, activeWorldLine, syncShellToWorldLine]);
+    // 自動同期対象に登録
+    registerShell(shell.id, 'counter');
 
-  // 世界線に同期
-  const handleSyncToWorldLine = useCallback((shell: ObjectShell<Counter>) => {
-    if (!activeWorldLine) return;
-    syncShellToWorldLine(shell, 'counter', `Counter updated to ${shell.value}`);
-  }, [activeWorldLine, syncShellToWorldLine]);
+    // 初期状態を記録
+    await record(shell, 'counter', 'Counter created');
+  }, [setShellWithBubble, registerShell, record]);
 
   // 世界線の参照位置を移動してShellを復元
   const handleMoveTo = useCallback(async (targetNodeId: string) => {
@@ -236,7 +271,7 @@ function DemoContent() {
     const snapshots = activeWorldLine.getSnapshotsAt(targetNodeId);
 
     // 世界線の参照位置を移動
-    await rewindWorldLine(targetNodeId);
+    await moveTo(targetNodeId);
 
     // スナップショットを使ってIndexedDBから状態を取得し、Shellを復元
     for (const snapshot of snapshots.values()) {
@@ -255,7 +290,7 @@ function DemoContent() {
 
     // UIを強制更新
     forceUpdate((n) => n + 1);
-  }, [activeWorldLine, rewindWorldLine, shells, setShell]);
+  }, [activeWorldLine, moveTo, shells, setShell]);
 
   // 現在の世界線に存在する Counter の Shell のみ抽出
   const counterShells = Array.from(shells.entries())
@@ -297,7 +332,6 @@ function DemoContent() {
                 <CounterCard
                   key={id}
                   shell={shell}
-                  onSync={handleSyncToWorldLine}
                 />
               ))}
             </div>
@@ -341,7 +375,7 @@ function DemoContent() {
 const BRANCH_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
 
 interface HistoryPanelProps {
-  activeWorldLine: ReturnType<typeof useHashWorldLine>['activeWorldLine'];
+  activeWorldLine: HashWorldLine | null;
   onMoveTo: (targetNodeId: string) => void;
 }
 
@@ -380,7 +414,7 @@ function HistoryPanel({ activeWorldLine, onMoveTo }: HistoryPanelProps) {
   const sortedDagNodes = [...dagNodes].sort((a, b) => b.node.timestamp - a.node.timestamp);
 
   // 分岐数を計算
-  const branchCount = Math.max(...dagNodes.map((n) => n.branch)) + 1;
+  const branchCount = dagNodes.length > 0 ? Math.max(...dagNodes.map((n) => n.branch)) + 1 : 1;
 
   return (
     <div>
@@ -555,11 +589,9 @@ export default function HashWorldLineDemo() {
 
   return (
     <ShellManagerProvider>
-      <HashWorldLineProvider>
-        <HashWorldLineShellBridgeProvider>
-          <DemoContent />
-        </HashWorldLineShellBridgeProvider>
-      </HashWorldLineProvider>
+      <AkashicRecordProvider>
+        <DemoContent />
+      </AkashicRecordProvider>
     </ShellManagerProvider>
   );
 }
