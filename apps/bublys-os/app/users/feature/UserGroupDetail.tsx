@@ -7,6 +7,7 @@ import {
   updateUserGroup,
 } from "@bublys-org/state-management";
 import { UserGroup } from "../domain/UserGroup.domain";
+import { EditableText } from "../../../lib/EditableText";
 import { User } from "../domain/User.domain";
 import { UserListView } from "../ui/UserListView";
 import { UserGroupIcon } from "../ui/UserIcon";
@@ -28,6 +29,13 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
   const [_name, _setName] = useState(group?.name ?? "");
   const [_selectedUserId, _setSelectedUserId] = useState("");
   const [sortKey, setSortKey] = useState<"custom" | "age-desc" | "age-asc" | "name-asc" | "name-desc">("custom");
+
+  const handleSaveName = (newName: string) => {
+    if (group) {
+      const updated = group.rename(newName);
+      dispatch(updateUserGroup(updated.toJSON()));
+    }
+  };
 
   const memberUsers = useMemo(
     () =>
@@ -103,7 +111,8 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
           });
         }}
       >
-        <UserGroupIcon fontSize="small" /> {group.name}
+        <UserGroupIcon fontSize="small" />
+        <EditableText value={group.name} onSave={handleSaveName} />
       </h3>
 
       <div style={{ marginBottom: "8px" }}>
