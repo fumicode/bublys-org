@@ -33,7 +33,7 @@
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "out-tsc",
@@ -51,10 +51,19 @@
   ],
   "references": [
     {
+      "path": "../../bublys-libs/hash-world-line"
+    },
+    {
+      "path": "../../bublys-libs/object-shell"
+    },
+    {
       "path": "../../bublys-libs/bubbles-ui-state"
     },
     {
       "path": "../../bublys-libs/bubbles-ui"
+    },
+    {
+      "path": "../../bublys-libs/akashic-record"
     },
     {
       "path": "../../bublys-libs/state-management"

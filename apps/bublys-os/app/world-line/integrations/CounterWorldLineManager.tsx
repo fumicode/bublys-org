@@ -5,7 +5,7 @@ import {
   deserializeCounter,
   createInitialCounter
 } from '../Counter/feature/CounterManager';
-import { Counter } from '../Counter/domain/Counter';
+import { Counter } from '../../counter/Counter';
 
 /**
  * CounterとWorldLineを統合するマネージャーコンポーネント
@@ -33,7 +33,7 @@ export function CounterWorldLineManager({
       objectId={counterId}
       serialize={serializeCounter}
       deserialize={deserializeCounter}
-      createInitialWorldState={() => createInitialCounter(initialValue)}
+      createInitialWorldState={() => createInitialCounter(counterId, initialValue)}
       isBubbleMode={isBubbleMode}
       onOpenWorldLineView={onOpenWorldLineView}
       onCloseWorldLineView={onCloseWorldLineView}

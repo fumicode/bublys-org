@@ -36,18 +36,18 @@ export interface BubbleStateSlice {
 // --- Initial data setup ---
 const initialBubbleInstances: Bubble[] = [
   new Bubble({
-    name: "user-groups",
+    url: "user-groups",
     colorHue: 200,
     type: "user-groups",
   }),
   new Bubble({
-    name: "Element E",
+    url: "Element E",
     colorHue: 100,
     type: "normal",
     size: { width: 300, height: 200 }, // サイズ指定のテスト
   }),
   new Bubble({
-    name: "Element F",
+    url: "Element F",
     colorHue: 300,
     type: "normal",
   }),
@@ -148,10 +148,10 @@ export const bubblesSlice = createSlice({
         relation => relation.openerId !== removingId && relation.openeeId !== removingId
       );
 
-      //TODO: Also remove from process
-      // state.process = BubblesProcess.fromJSON(state.process)
-      //   .removeBubble(id)
-      //   .toJSON();
+      // Remove from process layers
+      state.process.layers = state.process.layers.map(
+        layer => layer.filter(id => id !== removingId)
+      ).filter(layer => layer.length > 0);  // Remove empty layers
     },
     relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
       //重複がないようにチェックが必要そう

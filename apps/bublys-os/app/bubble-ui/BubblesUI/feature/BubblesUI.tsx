@@ -1,5 +1,6 @@
 import { FC, useEffect, useCallback, useState } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
+import { useShellManager } from "@bublys-org/object-shell";
 
 import {
   selectBubblesProcessDPO,
@@ -39,6 +40,7 @@ type BubblesUI = {
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
   const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
+  const shellManager = useShellManager();
 
   // パネルの開閉状態
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
@@ -64,6 +66,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const deleteBubble = (b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
+
+    // Bubble削除 → Shell削除
+    // URL: object-shells/{shellType}/{shellId} の形式から Shell ID を抽出
+    const match = b.url.match(/^object-shells\/([^/]+)\/(.+)$/);
+    if (match) {
+      const [, shellType, shellId] = match;
+      console.log('[BubblesUI] Deleting shell:', { shellId, shellType });
+      shellManager.removeShell(shellId);
+    }
   };
 
   const layerDown = (b: Bubble) => {
@@ -185,7 +196,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               vanishingPoint={globalCoordinateSystem.vanishingPoint}
               onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
               onBubbleClose={deleteBubble}
-              onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.name, bubble.size)}
+              onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
               onCoordinateSystemReady={handleCoordinateSystemReady}

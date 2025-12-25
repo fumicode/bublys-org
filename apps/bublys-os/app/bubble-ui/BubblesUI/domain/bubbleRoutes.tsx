@@ -9,8 +9,8 @@ export type BubbleRoute = {
   Component: BubbleContentRenderer;
 };
 
-export const matchBubbleRoute = (name: string): BubbleRoute | undefined =>
-  bubbleRoutes.find((route) => route.pattern.test(name));
+export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
+  bubbleRoutes.find((route) => route.pattern.test(url));
 
 // ルーティング定義
 import { MobBubble } from "../ui/bubbles/MobBubble";
@@ -59,7 +59,7 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 const UserBubble: BubbleContentRenderer = ({ bubble }) => {
-  const userId = bubble.name.replace("users/", "");
+  const userId = bubble.url.replace("users/", "");
   const { openBubble } = useContext(BubblesContext);
   const handleOpenGroup = (groupId: string, url: string) => {
     openBubble(url, bubble.id);
@@ -93,7 +93,7 @@ const UserCreateBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   const dispatch = useAppDispatch();
-  const userId = bubble.name.replace("users/", "").replace("/delete-confirm", "");
+  const userId = bubble.url.replace("users/", "").replace("/delete-confirm", "");
 
   const closeSelf = () => {
     dispatch(deleteProcessBubble(bubble.id));
@@ -119,7 +119,7 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 
 
 const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
-  const groupId = bubble.name.replace("user-groups/", "");
+  const groupId = bubble.url.replace("user-groups/", "");
   const { openBubble } = useContext(BubblesContext);
   const handleOpenUser = (_userId: string, url: string) => {
     openBubble(url, bubble.id);
@@ -128,7 +128,7 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 // const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
-//   const memoId = bubble.name.replace("memos/", "");
+//   const memoId = bubble.url.replace("memos/", "");
 //   const { openBubble } = useContext(BubblesContext);
 
 //   const MemoBubbleContent = () => {
@@ -208,7 +208,7 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
-  const memoId = bubble.name.replace("memos/", "");
+  const memoId = bubble.url.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
   const handleOpenWorldLineView = () => {
     openBubble(`memos/${memoId}/history`, bubble.id);
@@ -229,7 +229,7 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   const dispatch = useAppDispatch();
-  const memoId = bubble.name.replace("memos/", "").replace("/delete-confirm", "");
+  const memoId = bubble.url.replace("memos/", "").replace("/delete-confirm", "");
 
   const closeSelf = () => {
     dispatch(deleteProcessBubble(bubble.id));
@@ -254,7 +254,7 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
-  const memoId = bubble.name.replace("memos/", "").replace("/history", "");
+  const memoId = bubble.url.replace("memos/", "").replace("/history", "");
   const dispatch = useAppDispatch();
   const handleCloseWorldLineView = () => {
     dispatch(deleteProcessBubble(bubble.id));
@@ -273,11 +273,13 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
+import { ShellBubble } from '../ui/bubbles/ShellBubble';
+
 const routes: BubbleRoute[] = [
-  { 
-    pattern: /^mob$/, 
-    type: "mob", 
-    Component: ({ bubble }) => <MobBubble bubble={bubble} /> 
+  {
+    pattern: /^mob$/,
+    type: "mob",
+    Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
   {
     pattern: /^user-groups$/,
@@ -305,11 +307,18 @@ const routes: BubbleRoute[] = [
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
+  // ObjectShell統合ルート
+  {
+    pattern: /^object-shells\/[^/]+\/[^/]+$/,
+    type: "object-shell",
+    Component: ShellBubble
+  },
+
   { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
-    const appId = bubble.name.replace("iframes/", "");
+    const appId = bubble.url.replace("iframes/", "");
     return (<IframeBubble appId={appId} />);
   } },
 ];
 
 export const bubbleRoutes = routes;
-registerBubbleTypeResolver((name: string) => matchBubbleRoute(name)?.type);
+registerBubbleTypeResolver((url: string) => matchBubbleRoute(url)?.type);
