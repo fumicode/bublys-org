@@ -32,6 +32,7 @@ import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLin
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { StaffCollection } from "@/app/gakkai-shift/feature/StaffCollection";
 import { StaffDetail } from "@/app/gakkai-shift/feature/StaffDetail";
+import { StaffAvailability } from "@/app/gakkai-shift/feature/StaffAvailability";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -289,7 +290,17 @@ const GakkaiShiftStaffsBubble: BubbleContentRenderer = ({ bubble }) => {
 // 学会シフト - スタッフ詳細バブル
 const GakkaiShiftStaffBubble: BubbleContentRenderer = ({ bubble }) => {
   const staffId = bubble.url.replace("gakkai-shift/staffs/", "");
-  return <StaffDetail staffId={staffId} />;
+  const { openBubble } = useContext(BubblesContext);
+  const handleOpenAvailability = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}/availableTimeSlots`, bubble.id);
+  };
+  return <StaffDetail staffId={staffId} onOpenAvailability={handleOpenAvailability} />;
+};
+
+// 学会シフト - スタッフ参加可能時間帯バブル
+const GakkaiShiftStaffAvailabilityBubble: BubbleContentRenderer = ({ bubble }) => {
+  const staffId = bubble.url.replace("gakkai-shift/staffs/", "").replace("/availableTimeSlots", "");
+  return <StaffAvailability staffId={staffId} />;
 };
 
 const routes: BubbleRoute[] = [
@@ -326,6 +337,7 @@ const routes: BubbleRoute[] = [
 
   // 学会シフト
   { pattern: /^gakkai-shift\/staffs$/, type: "gakkai-shift-staffs", Component: GakkaiShiftStaffsBubble },
+  { pattern: /^gakkai-shift\/staffs\/[^/]+\/availableTimeSlots$/, type: "gakkai-shift-staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
   { pattern: /^gakkai-shift\/staffs\/[^/]+$/, type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
 
   // ObjectShell統合ルート

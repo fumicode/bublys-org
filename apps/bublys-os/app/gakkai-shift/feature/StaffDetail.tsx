@@ -10,9 +10,12 @@ import { StaffDetailView } from "../ui/StaffDetailView";
 
 type StaffDetailProps = {
   staffId?: string;
+  onOpenAvailability?: (staffId: string) => void;
 };
 
-export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
+const buildAvailabilityUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}/availableTimeSlots`;
+
+export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenAvailability }) => {
   // staffIdが指定されていればそれを使い、なければ選択中のスタッフを使う
   const selectedStaff = useAppSelector(selectGakkaiShiftSelectedStaff);
   const specificStaff = useAppSelector(
@@ -29,5 +32,11 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
     );
   }
 
-  return <StaffDetailView staff={staff} />;
+  return (
+    <StaffDetailView
+      staff={staff}
+      buildAvailabilityUrl={buildAvailabilityUrl}
+      onOpenAvailability={onOpenAvailability}
+    />
+  );
 };

@@ -4,12 +4,22 @@ import { FC } from "react";
 import styled from "styled-components";
 import { Staff_スタッフ, Role_係 } from "../domain";
 import PersonIcon from "@mui/icons-material/Person";
+import { UrledPlace } from "../../bubble-ui/components";
+import { Button } from "@mui/material";
 
 type StaffDetailViewProps = {
   staff: Staff_スタッフ;
+  buildAvailabilityUrl?: (staffId: string) => string;
+  onOpenAvailability?: (staffId: string) => void;
 };
 
-export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff }) => {
+export const StaffDetailView: FC<StaffDetailViewProps> = ({
+  staff,
+  buildAvailabilityUrl,
+  onOpenAvailability,
+}) => {
+  const availabilityUrl = buildAvailabilityUrl?.(staff.id);
+
   return (
     <StyledStaffDetail>
       <div className="e-header">
@@ -61,6 +71,16 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff }) => {
         <div className="e-slots">
           {staff.availableTimeSlots.length === 0 ? (
             <span className="e-empty">なし</span>
+          ) : availabilityUrl ? (
+            <UrledPlace url={availabilityUrl}>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => onOpenAvailability?.(staff.id)}
+              >
+                {staff.availableTimeSlots.length}枠 (詳細を見る)
+              </Button>
+            </UrledPlace>
           ) : (
             <span>{staff.availableTimeSlots.length}枠</span>
           )}
