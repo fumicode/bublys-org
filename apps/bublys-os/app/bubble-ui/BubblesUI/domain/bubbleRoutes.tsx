@@ -30,6 +30,8 @@ import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { StaffCollection } from "@/app/gakkai-shift/feature/StaffCollection";
+import { StaffDetail } from "@/app/gakkai-shift/feature/StaffDetail";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -275,6 +277,21 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
 
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 
+// 学会シフト - スタッフ一覧バブル
+const GakkaiShiftStaffsBubble: BubbleContentRenderer = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const handleStaffSelect = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id);
+  };
+  return <StaffCollection onStaffSelect={handleStaffSelect} />;
+};
+
+// 学会シフト - スタッフ詳細バブル
+const GakkaiShiftStaffBubble: BubbleContentRenderer = ({ bubble }) => {
+  const staffId = bubble.url.replace("gakkai-shift/staffs/", "");
+  return <StaffDetail staffId={staffId} />;
+};
+
 const routes: BubbleRoute[] = [
   {
     pattern: /^mob$/,
@@ -306,6 +323,10 @@ const routes: BubbleRoute[] = [
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+
+  // 学会シフト
+  { pattern: /^gakkai-shift\/staffs$/, type: "gakkai-shift-staffs", Component: GakkaiShiftStaffsBubble },
+  { pattern: /^gakkai-shift\/staffs\/[^/]+$/, type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
 
   // ObjectShell統合ルート
   {

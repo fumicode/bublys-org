@@ -2,7 +2,7 @@
  * 配置結果ドメインモデル
  */
 
-import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数';
+import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
 
 // ========== 型定義 ==========
 

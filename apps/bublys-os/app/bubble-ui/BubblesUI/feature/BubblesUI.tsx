@@ -28,6 +28,7 @@ import { Box, Button, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import IframeViewer from "../../IframeViewer/IframeViewer";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
@@ -45,6 +46,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // パネルの開閉状態
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [isPocketOpen, setIsPocketOpen] = useState(false);
+  const [isGakkaiShiftPanelOpen, setIsGakkaiShiftPanelOpen] = useState(false);
 
    // ページサイズ管理
   const pageSize = useAppSelector(selectWindowSize);
@@ -211,7 +213,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           sx={{
             position: "fixed",
             bottom: 20,
-            right: 340,
+            right: 560,
             zIndex: 1000,
           }}
         >
@@ -226,7 +228,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           sx={{
             position: "fixed",
             bottom: 20,
-            right: 340,
+            right: 560,
             zIndex: 1000,
             backgroundColor: "rgba(255, 255, 255, 0.8)",
             "&:hover": {
@@ -236,6 +238,54 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           onClick={() => setIsPocketOpen(true)}
         >
           <Inventory2Icon />
+        </IconButton>
+      )}
+
+      {/* Gakkai Shift Panel */}
+      {isGakkaiShiftPanelOpen ? (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: 20,
+            right: 340,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            padding: 2,
+            borderRadius: 1,
+            zIndex: 1000,
+            width: 200,
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold">学会シフト</Typography>
+            <IconButton size="small" onClick={() => setIsGakkaiShiftPanelOpen(false)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Button
+            variant="outlined"
+            onClick={() => popChildOrJoinSibling("gakkai-shift/staffs", "root")}
+            fullWidth
+            sx={{ mb: 1 }}
+          >
+            スタッフ一覧
+          </Button>
+        </Box>
+      ) : (
+        <IconButton
+          sx={{
+            position: "fixed",
+            bottom: 20,
+            right: 340,
+            zIndex: 1000,
+            backgroundColor: "rgba(255, 255, 255, 0.8)",
+            "&:hover": {
+              backgroundColor: "rgba(255, 255, 255, 0.9)",
+            },
+          }}
+          onClick={() => setIsGakkaiShiftPanelOpen(true)}
+        >
+          <EventNoteIcon />
         </IconButton>
       )}
 

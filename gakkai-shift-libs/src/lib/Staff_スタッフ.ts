@@ -2,8 +2,8 @@
  * スタッフドメインモデル
  */
 
-import { Role_係, SkillLevel_スキルレベル } from './Role_係';
-import { DateString_日付, TimeSlotPeriod_時間帯区分 } from './TimeSlot_時間帯';
+import { Role_係, SkillLevel_スキルレベル } from './Role_係.js';
+import { DateString_日付, TimeSlotPeriod_時間帯区分 } from './TimeSlot_時間帯.js';
 
 // ========== 型定義 ==========
 
@@ -61,6 +61,39 @@ export interface StaffState {
   readonly createdAt: string;
   readonly updatedAt: string;
 }
+
+/** Redux/JSON用のシリアライズ型 */
+export type StaffJSON = {
+  id: string;
+  name: string;
+  furigana: string;
+  email: string;
+  phone: string;
+  school: string;
+  grade: string;
+  gender: Gender_性別;
+  skills: {
+    pc: SkillLevel_スキルレベル;
+    zoom: SkillLevel_スキルレベル;
+    english: 'none' | 'daily_conversation';
+    eventExperience: boolean;
+    eventExperienceDetail?: string;
+  };
+  presentation: {
+    hasPresentation: boolean;
+    presentations: Array<{
+      date: DateString_日付;
+      period: TimeSlotPeriod_時間帯区分;
+    }>;
+  };
+  availableTimeSlots: string[];
+  preferredRoles: string[];
+  notes: string;
+  status: StaffStatus_ステータス;
+  aptitudeScore?: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // ========== ドメインクラス ==========
 
@@ -245,6 +278,39 @@ export class Staff_スタッフ {
       ...partial,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  // ========== シリアライズ ==========
+
+  /** Redux/JSON用にシリアライズ */
+  toJSON(): StaffJSON {
+    return {
+      id: this.state.id,
+      name: this.state.name,
+      furigana: this.state.furigana,
+      email: this.state.email,
+      phone: this.state.phone,
+      school: this.state.school,
+      grade: this.state.grade,
+      gender: this.state.gender,
+      skills: { ...this.state.skills },
+      presentation: {
+        hasPresentation: this.state.presentation.hasPresentation,
+        presentations: [...this.state.presentation.presentations],
+      },
+      availableTimeSlots: [...this.state.availableTimeSlots],
+      preferredRoles: [...this.state.preferredRoles],
+      notes: this.state.notes,
+      status: this.state.status,
+      aptitudeScore: this.state.aptitudeScore,
+      createdAt: this.state.createdAt,
+      updatedAt: this.state.updatedAt,
+    };
+  }
+
+  /** JSONからドメインオブジェクトを復元 */
+  static fromJSON(json: StaffJSON): Staff_スタッフ {
+    return new Staff_スタッフ(json);
   }
 
   // ========== 静的メソッド ==========

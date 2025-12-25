@@ -54,6 +54,12 @@
       "path": "../../bublys-libs/hash-world-line"
     },
     {
+      "path": "../../gakkai-shift-libs"
+    },
+    {
+      "path": "../../bublys-libs/akashic-record"
+    },
+    {
       "path": "../../bublys-libs/object-shell"
     },
     {
@@ -61,9 +67,6 @@
     },
     {
       "path": "../../bublys-libs/bubbles-ui"
-    },
-    {
-      "path": "../../bublys-libs/akashic-record"
     },
     {
       "path": "../../bublys-libs/state-management"

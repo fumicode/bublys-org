@@ -3,9 +3,9 @@
  * 全配置を取りまとめて、シフト全体の評価を行う
  */
 
-import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置';
-import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数';
-import { SlotRoleResult_配置結果 } from './SlotRoleResult_配置結果';
+import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
+import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
+import { SlotRoleResult_配置結果 } from './SlotRoleResult_配置結果.js';
 
 // ========== 型定義 ==========
 
