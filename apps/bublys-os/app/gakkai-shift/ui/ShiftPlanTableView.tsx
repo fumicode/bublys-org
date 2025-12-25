@@ -16,11 +16,11 @@ import { IconButton, Tooltip } from "@mui/material";
 import { UrledPlace } from "../../bubble-ui/components";
 
 type ShiftPlanTableViewProps = {
-  timeSlots: TimeSlot_時間帯[];
-  roles: Role_係[];
-  assignments: ShiftAssignment_シフト配置[];
-  staffList: Staff_スタッフ[];
-  violations?: ConstraintViolation[];
+  timeSlots: readonly TimeSlot_時間帯[];
+  roles: readonly Role_係[];
+  assignments: readonly ShiftAssignment_シフト配置[];
+  staffList: readonly Staff_スタッフ[];
+  violations?: readonly ConstraintViolation[];
   buildStaffUrl?: (staffId: string) => string;
   onDropStaff?: (staffId: string, timeSlotId: string, roleId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
@@ -58,11 +58,6 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   /** 配置が制約違反に含まれているかチェック */
   const getViolationForAssignment = (assignmentId: string): ConstraintViolation | undefined => {
     return violations.find((v) => v.assignmentIds.includes(assignmentId));
-  };
-
-  /** 時間帯×スタッフの組み合わせが制約違反かチェック */
-  const getViolationForStaffTimeSlot = (staffId: string, timeSlotId: string): ConstraintViolation | undefined => {
-    return violations.find((v) => v.staffId === staffId && v.timeSlotId === timeSlotId);
   };
 
   const calculateCellScore = (timeSlotId: string, roleId: string): number => {

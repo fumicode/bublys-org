@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import {
   useAppDispatch,
@@ -19,10 +19,13 @@ import {
   ShiftPlan_シフト案,
   ShiftAssignment_シフト配置,
   ConstraintViolation,
+  ShiftMatcher_シフトマッチング,
 } from "../domain";
 import { createSampleStaffList } from "../data/sampleStaff";
 import PersonIcon from "@mui/icons-material/Person";
 import WarningIcon from "@mui/icons-material/Warning";
+import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import { Button } from "@mui/material";
 import { UrledPlace } from "../../bubble-ui/components";
 
 type ShiftPlanEditorProps = {
@@ -61,7 +64,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     if (!shiftPlan) {
       const newPlan = ShiftPlan_シフト案.create("シフト案1");
       // IDを指定して作成
-      const planWithId: ReturnType<typeof newPlan.state> & { id: string } = {
+      const planWithId = {
         ...newPlan.state,
         id: shiftPlanId,
       };
@@ -141,6 +144,38 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     e.dataTransfer.effectAllowed = "copy";
   };
 
+  // 自動シフト配置
+  const handleAutoAssign = () => {
+    if (!shiftPlan) return;
+
+    // staffListは既にStaff_スタッフ[]（selectorがドメインオブジェクトを返す）
+    // 自動マッチングを実行
+    const result = ShiftMatcher_シフトマッチング.autoAssign(
+      staffList,
+      roles,
+      timeSlots,
+      shiftPlan.state.assignments, // 既存配置を維持
+      { preserveExistingAssignments: true }
+    );
+
+    // 新しい配置をReduxに追加（既存配置と重複しないもののみ）
+    const existingIds = new Set(shiftPlan.assignments.map((a) => a.id));
+    const newAssignments = result.assignments.filter(
+      (a) => !existingIds.has(a.id)
+    );
+
+    for (const assignment of newAssignments) {
+      dispatch(
+        addAssignmentToShiftPlan({
+          shiftPlanId,
+          assignment,
+        })
+      );
+    }
+
+    console.log("[AutoAssign] Result:", result.stats);
+  };
+
   if (!shiftPlan) {
     return <div>読み込み中...</div>;
   }
@@ -150,6 +185,15 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       <div className="e-header">
         <h3>{shiftPlan.name}</h3>
         <div className="e-stats">
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AutoFixHighIcon />}
+            onClick={handleAutoAssign}
+            sx={{ mr: 2 }}
+          >
+            自動シフト配置
+          </Button>
           配置数: {shiftPlan.assignments.length}件
           {violations.length > 0 && (
             <span className="e-violation-warning">

@@ -9,3 +9,4 @@ export * from './ShiftAssignment_シフト配置.js';
 export * from './StaffRequirement_必要人数.js';
 export * from './SlotRoleResult_配置結果.js';
 export * from './ShiftPlan_シフト案.js';
+export * from './ShiftMatcher_シフトマッチング.js';
