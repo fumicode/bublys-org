@@ -272,7 +272,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           </Button>
           <Button
             variant="contained"
-            onClick={() => popChildOrJoinSibling("gakkai-shift/shift-plan/default", "root")}
+            onClick={() => popChildOrJoinSibling("gakkai-shift/shift-plans", "root")}
             fullWidth
             sx={{ mb: 1 }}
           >

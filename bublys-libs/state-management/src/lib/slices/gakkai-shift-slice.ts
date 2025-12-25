@@ -106,6 +106,14 @@ export const gakkaiShiftSlice = createSlice({
         plan.updatedAt = new Date().toISOString();
       }
     },
+    deleteShiftPlan: (state, action: PayloadAction<string>) => {
+      if (!state.shiftPlans) state.shiftPlans = [];
+      state.shiftPlans = state.shiftPlans.filter((p) => p.id !== action.payload);
+      // 削除したプランが選択中だった場合、選択を解除
+      if (state.currentShiftPlanId === action.payload) {
+        state.currentShiftPlanId = state.shiftPlans.length > 0 ? state.shiftPlans[0].id : null;
+      }
+    },
   },
 });
 
@@ -117,6 +125,7 @@ export const {
   setSelectedStaffId,
   updateStaffStatus,
   addShiftPlan,
+  deleteShiftPlan,
   setCurrentShiftPlanId,
   addAssignmentToShiftPlan,
   removeAssignmentFromShiftPlan,
