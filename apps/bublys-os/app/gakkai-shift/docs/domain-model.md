@@ -306,6 +306,8 @@ flowchart TD
 
 ## バブルURL構造
 
+学会シフト機能のバブルルートは `app/gakkai-shift/bubbleRoutes.tsx` で定義され、メインの `bubble-ui/BubblesUI/domain/bubbleRoutes.tsx` にインポートされます。
+
 学会シフト機能のバブルナビゲーションURL一覧：
 
 | URL パターン | 表示内容 | 説明 |
@@ -315,7 +317,7 @@ flowchart TD
 | `gakkai-shift/staffs/{staffId}/availableTimeSlots` | 参加可能時間帯 | 時間帯選択UI |
 | `gakkai-shift/shift-plans` | シフト案マネージャー | 複数シフト案のタブ管理 |
 | `gakkai-shift/shift-plan/{shiftPlanId}` | シフト案エディタ | 単一シフト案の編集 |
-| `gakkai-shift/shift-plans/{shiftPlanId}/assignments/{assignmentId}` | **スタッフ配置評価** | スタッフ×時間帯×係のマッチング結果 |
+| `gakkai-shift/shift-plans/{shiftPlanId}/assignments/{assignmentId}/evaluation` | **スタッフ配置評価** | スタッフ×時間帯×係のマッチング結果 |
 
 ### スタッフ配置評価バブルの表示内容
 

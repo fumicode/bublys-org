@@ -21,11 +21,11 @@ type ShiftPlanTableViewProps = {
   assignments: readonly ShiftAssignment_シフト配置[];
   staffList: readonly Staff_スタッフ[];
   violations?: readonly ConstraintViolation[];
-  buildStaffUrl?: (staffId: string) => string;
+  buildAssignmentUrl?: (assignmentId: string) => string;
   onDropStaff?: (staffId: string, timeSlotId: string, roleId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
   onMoveAssignment?: (assignmentId: string, staffId: string, timeSlotId: string, roleId: string) => void;
-  onStaffClick?: (staffId: string) => void;
+  onAssignmentClick?: (assignmentId: string) => void;
 };
 
 export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
@@ -34,11 +34,11 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   assignments,
   staffList,
   violations = [],
-  buildStaffUrl,
+  buildAssignmentUrl,
   onDropStaff,
   onRemoveAssignment,
   onMoveAssignment,
-  onStaffClick,
+  onAssignmentClick,
 }) => {
   const getStaffName = (staffId: string): string => {
     const staff = staffList.find((s) => s.id === staffId);
@@ -177,7 +177,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                         const isAvailable = staff?.isAvailableAt(slot.id) ?? false;
                         const violation = getViolationForAssignment(assignment.id);
                         const hasViolation = !!violation;
-                        const staffUrl = buildStaffUrl?.(assignment.staffId);
+                        const assignmentUrl = buildAssignmentUrl?.(assignment.id);
                         const chipContent = (
                           <div
                             className={`e-staff-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
@@ -191,7 +191,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                             )}
                             <button
                               className="e-staff-name"
-                              onClick={() => onStaffClick?.(assignment.staffId)}
+                              onClick={() => onAssignmentClick?.(assignment.id)}
                             >
                               <PersonIcon fontSize="inherit" />
                               {getStaffName(assignment.staffId)}
@@ -205,8 +205,8 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                             </IconButton>
                           </div>
                         );
-                        return staffUrl ? (
-                          <UrledPlace key={assignment.id} url={staffUrl}>
+                        return assignmentUrl ? (
+                          <UrledPlace key={assignment.id} url={assignmentUrl}>
                             {chipContent}
                           </UrledPlace>
                         ) : (

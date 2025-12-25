@@ -31,11 +31,13 @@ import { UrledPlace } from "../../bubble-ui/components";
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
   onStaffClick?: (staffId: string) => void;
+  onAssignmentClick?: (assignmentId: string) => void;
 };
 
 export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   shiftPlanId,
   onStaffClick,
+  onAssignmentClick,
 }) => {
   const dispatch = useAppDispatch();
   const staffList = useAppSelector(selectGakkaiShiftStaffList);
@@ -241,11 +243,11 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             assignments={shiftPlan.assignments}
             staffList={staffList}
             violations={violations}
-            buildStaffUrl={(staffId) => `gakkai-shift/staffs/${staffId}`}
+            buildAssignmentUrl={(assignmentId) => `gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`}
             onDropStaff={handleDropStaff}
             onRemoveAssignment={handleRemoveAssignment}
             onMoveAssignment={handleMoveAssignment}
-            onStaffClick={onStaffClick}
+            onAssignmentClick={onAssignmentClick}
           />
         </div>
       </div>

@@ -21,10 +21,12 @@ import { IconButton, Tooltip } from "@mui/material";
 
 type ShiftPlanManagerProps = {
   onStaffClick?: (staffId: string) => void;
+  onAssignmentClick?: (shiftPlanId: string, assignmentId: string) => void;
 };
 
 export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
   onStaffClick,
+  onAssignmentClick,
 }) => {
   const dispatch = useAppDispatch();
   const shiftPlans = useAppSelector(selectGakkaiShiftPlans);
@@ -150,6 +152,7 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
             key={selectedPlan.id}
             shiftPlanId={selectedPlan.id}
             onStaffClick={onStaffClick}
+            onAssignmentClick={(assignmentId) => onAssignmentClick?.(selectedPlan.id, assignmentId)}
           />
         ) : (
           <div className="e-empty">シフト案を選択してください</div>
