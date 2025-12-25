@@ -1,5 +1,6 @@
 /**
  * 時間帯ドメインモデル
+ * StaffRequirement（必要人数）を集約として含む
  */
 
 // ========== 型定義 ==========
@@ -15,6 +16,14 @@ export type TimeSlotPeriod_時間帯区分 =
   | 'evening'     // 夕刻
   | 'party';      // 懇親会
 
+/** 必要人数の状態（TimeSlot集約の一部） */
+export interface StaffRequirementState {
+  readonly roleId: string;
+  readonly requiredCount: number;
+  readonly minCount?: number;
+  readonly maxCount?: number;
+}
+
 /** 時間帯の状態 */
 export interface TimeSlotState {
   readonly id: string;           // 例: "2025-03-26_morning"
@@ -24,12 +33,48 @@ export interface TimeSlotState {
   readonly endTime: string;      // "12:00"
   readonly label: string;        // "3/26 午前"
   readonly isOrientation: boolean; // 業務オリエンテーション枠かどうか
+  readonly staffRequirements: ReadonlyArray<StaffRequirementState>;
 }
 
-// ========== ドメインクラス ==========
+// ========== 必要人数クラス ==========
+
+export class StaffRequirement_必要人数 {
+  constructor(
+    readonly state: StaffRequirementState,
+    readonly timeSlotId: string
+  ) {}
+
+  get id(): string {
+    return `${this.timeSlotId}_${this.state.roleId}`;
+  }
+
+  get roleId(): string {
+    return this.state.roleId;
+  }
+
+  get requiredCount(): number {
+    return this.state.requiredCount;
+  }
+
+  get minCount(): number {
+    return this.state.minCount ?? this.state.requiredCount;
+  }
+
+  get maxCount(): number {
+    return this.state.maxCount ?? this.state.requiredCount;
+  }
+}
+
+// ========== 時間帯クラス ==========
 
 export class TimeSlot_時間帯 {
-  constructor(readonly state: TimeSlotState) {}
+  private readonly _requirements: ReadonlyArray<StaffRequirement_必要人数>;
+
+  constructor(readonly state: TimeSlotState) {
+    this._requirements = state.staffRequirements.map(
+      (req) => new StaffRequirement_必要人数(req, state.id)
+    );
+  }
 
   get id(): string {
     return this.state.id;
@@ -49,6 +94,16 @@ export class TimeSlot_時間帯 {
 
   get isOrientation(): boolean {
     return this.state.isOrientation;
+  }
+
+  /** この時間帯の必要人数設定一覧 */
+  get staffRequirements(): ReadonlyArray<StaffRequirement_必要人数> {
+    return this._requirements;
+  }
+
+  /** 特定の係の必要人数を取得 */
+  getRequirementForRole(roleId: string): StaffRequirement_必要人数 | undefined {
+    return this._requirements.find((req) => req.roleId === roleId);
   }
 
   /** 同じ日付かどうか */
@@ -87,8 +142,48 @@ export class TimeSlot_時間帯 {
     return `${date}_${period}`;
   }
 
-  /** 2025年学会のデフォルト時間帯を生成 */
+  /** 2025年学会のデフォルト時間帯を生成（必要人数データ含む） */
   static createDefaultTimeSlots(): TimeSlot_時間帯[] {
+    // 通常の時間帯用の必要人数（会期中）
+    const standardRequirements: StaffRequirementState[] = [
+      { roleId: 'headquarters', requiredCount: 2, minCount: 2, maxCount: 3 },
+      { roleId: 'reception', requiredCount: 3, minCount: 2, maxCount: 4 },
+      { roleId: 'badge_reissue', requiredCount: 2, minCount: 1, maxCount: 3 },
+      { roleId: 'cloakroom', requiredCount: 3, minCount: 2, maxCount: 4 },
+      { roleId: 'venue', requiredCount: 4, minCount: 3, maxCount: 5 },
+      { roleId: 'venue_check', requiredCount: 2, minCount: 1, maxCount: 3 },
+      { roleId: 'preview_room', requiredCount: 2, minCount: 1, maxCount: 2 },
+      { roleId: 'mobile_support', requiredCount: 2, minCount: 1, maxCount: 3 },
+      { roleId: 'exhibition', requiredCount: 2, minCount: 1, maxCount: 3 },
+      { roleId: 'poster', requiredCount: 2, minCount: 1, maxCount: 3 },
+    ];
+
+    // 準備日用の必要人数
+    const prepRequirements: StaffRequirementState[] = [
+      { roleId: 'headquarters', requiredCount: 2, minCount: 1, maxCount: 2 },
+      { roleId: 'setup', requiredCount: 6, minCount: 4, maxCount: 8 },
+    ];
+
+    // 夕刻用の必要人数（少なめ）
+    const eveningRequirements: StaffRequirementState[] = [
+      { roleId: 'headquarters', requiredCount: 2, minCount: 1, maxCount: 2 },
+      { roleId: 'reception', requiredCount: 2, minCount: 1, maxCount: 2 },
+      { roleId: 'venue', requiredCount: 2, minCount: 1, maxCount: 3 },
+      { roleId: 'mobile_support', requiredCount: 1, minCount: 1, maxCount: 2 },
+    ];
+
+    // 懇親会用の必要人数
+    const partyRequirements: StaffRequirementState[] = [
+      { roleId: 'party_cloakroom', requiredCount: 3, minCount: 2, maxCount: 4 },
+      { roleId: 'party_reception', requiredCount: 4, minCount: 3, maxCount: 5 },
+    ];
+
+    // 撤去日用の必要人数
+    const teardownRequirements: StaffRequirementState[] = [
+      { roleId: 'headquarters', requiredCount: 2, minCount: 1, maxCount: 2 },
+      { roleId: 'setup', requiredCount: 8, minCount: 6, maxCount: 10 },
+    ];
+
     const slots: TimeSlotState[] = [
       // 3/24（月）準備日
       {
@@ -99,6 +194,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/24 終日（準備）',
         isOrientation: false,
+        staffRequirements: prepRequirements,
       },
       // 3/25（火）準備日
       {
@@ -109,6 +205,7 @@ export class TimeSlot_時間帯 {
         endTime: '13:00',
         label: '3/25 午前',
         isOrientation: false,
+        staffRequirements: prepRequirements,
       },
       {
         id: '2025-03-25_afternoon',
@@ -118,6 +215,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/25 午後（オリエン）',
         isOrientation: true,
+        staffRequirements: prepRequirements,
       },
       // 3/26（水）会期1日目
       {
@@ -128,6 +226,7 @@ export class TimeSlot_時間帯 {
         endTime: '12:00',
         label: '3/26 午前',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-26_afternoon',
@@ -137,6 +236,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/26 午後',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-26_evening',
@@ -146,6 +246,7 @@ export class TimeSlot_時間帯 {
         endTime: '20:00',
         label: '3/26 夕刻',
         isOrientation: false,
+        staffRequirements: eveningRequirements,
       },
       // 3/27（木）会期2日目
       {
@@ -156,6 +257,7 @@ export class TimeSlot_時間帯 {
         endTime: '12:00',
         label: '3/27 午前',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-27_afternoon',
@@ -165,6 +267,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/27 午後',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-27_evening',
@@ -174,6 +277,7 @@ export class TimeSlot_時間帯 {
         endTime: '20:00',
         label: '3/27 夕刻',
         isOrientation: false,
+        staffRequirements: eveningRequirements,
       },
       {
         id: '2025-03-27_party',
@@ -183,6 +287,7 @@ export class TimeSlot_時間帯 {
         endTime: '20:30',
         label: '3/27 懇親会',
         isOrientation: false,
+        staffRequirements: partyRequirements,
       },
       // 3/28（金）会期3日目
       {
@@ -193,6 +298,7 @@ export class TimeSlot_時間帯 {
         endTime: '12:00',
         label: '3/28 午前',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-28_afternoon',
@@ -202,6 +308,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/28 午後',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-28_evening',
@@ -211,6 +318,7 @@ export class TimeSlot_時間帯 {
         endTime: '20:00',
         label: '3/28 夕刻',
         isOrientation: false,
+        staffRequirements: eveningRequirements,
       },
       // 3/29（土）会期4日目（最終日）
       {
@@ -221,6 +329,7 @@ export class TimeSlot_時間帯 {
         endTime: '12:00',
         label: '3/29 午前',
         isOrientation: false,
+        staffRequirements: standardRequirements,
       },
       {
         id: '2025-03-29_afternoon',
@@ -230,6 +339,7 @@ export class TimeSlot_時間帯 {
         endTime: '17:00',
         label: '3/29 午後（撤去）',
         isOrientation: false,
+        staffRequirements: teardownRequirements,
       },
     ];
 

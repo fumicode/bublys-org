@@ -5,9 +5,8 @@
 
 import { Staff_スタッフ } from '../staff/Staff_スタッフ.js';
 import { Role_係 } from '../master/Role_係.js';
-import { TimeSlot_時間帯 } from '../master/TimeSlot_時間帯.js';
+import { TimeSlot_時間帯, StaffRequirement_必要人数 } from '../master/TimeSlot_時間帯.js';
 import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
-import { StaffRequirement_必要人数 } from '../master/StaffRequirement_必要人数.js';
 import { StaffAssignmentEvaluation_スタッフ配置評価 } from './StaffAssignmentEvaluation_スタッフ配置評価.js';
 
 // ========== 型定義 ==========
@@ -102,7 +101,12 @@ export class ShiftMatcher_シフトマッチング {
         const requirement = this.requirements.find(
           (r) => r.timeSlotId === timeSlot.id && r.roleId === role.id
         );
-        const requiredCount = requirement?.requiredCount ?? 1;
+
+        // 必要人数の設定がない場合はスキップ
+        if (!requirement) {
+          continue;
+        }
+        const requiredCount = requirement.requiredCount;
 
         // 既存配置数を確認
         const existingCount = assignments.filter(
@@ -294,11 +298,8 @@ export class ShiftMatcher_シフトマッチング {
     existingAssignments: ReadonlyArray<ShiftAssignmentState> = [],
     options: Partial<MatchingOptions> = {}
   ): MatchingResult {
-    // 必要人数のデフォルト（各時間帯×係に1人）
-    const requirements = ShiftMatcher_シフトマッチング.createDefaultRequirements(
-      timeSlots,
-      roles
-    );
+    // TimeSlotから必要人数を抽出
+    const requirements = ShiftMatcher_シフトマッチング.extractRequirements(timeSlots);
 
     const matcher = new ShiftMatcher_シフトマッチング(
       staffList,
@@ -311,29 +312,15 @@ export class ShiftMatcher_シフトマッチング {
   }
 
   /**
-   * デフォルトの必要人数を作成（各時間帯×係に1人）
+   * TimeSlotの配列から必要人数を抽出する
    */
-  static createDefaultRequirements(
-    timeSlots: ReadonlyArray<TimeSlot_時間帯>,
-    roles: ReadonlyArray<Role_係>
+  static extractRequirements(
+    timeSlots: ReadonlyArray<TimeSlot_時間帯>
   ): StaffRequirement_必要人数[] {
     const requirements: StaffRequirement_必要人数[] = [];
 
     for (const timeSlot of timeSlots) {
-      for (const role of roles) {
-        // 懇親会専用係は懇親会時間帯のみ
-        if (role.isPartyOnly() && timeSlot.period !== 'party') {
-          continue;
-        }
-        // 懇親会時間帯には懇親会専用係のみ
-        if (!role.isPartyOnly() && timeSlot.period === 'party') {
-          continue;
-        }
-
-        requirements.push(
-          StaffRequirement_必要人数.create(timeSlot.id, role.id, 1)
-        );
-      }
+      requirements.push(...timeSlot.staffRequirements);
     }
 
     return requirements;

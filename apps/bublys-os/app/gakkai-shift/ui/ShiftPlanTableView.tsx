@@ -162,16 +162,28 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
               {roles.map((role) => {
                 const cellAssignments = getAssignmentsForCell(slot.id, role.id);
                 const score = calculateCellScore(slot.id, role.id);
+                const requirement = slot.getRequirementForRole(role.id);
+                const requiredCount = requirement?.requiredCount ?? 0;
+                const assignedCount = cellAssignments.length;
+                const hasRequirement = requiredCount > 0;
+                const isFilled = assignedCount >= requiredCount;
+                const isShortage = hasRequirement && assignedCount < (requirement?.minCount ?? requiredCount);
+                const isExcess = hasRequirement && assignedCount > (requirement?.maxCount ?? requiredCount);
 
                 return (
                   <td
                     key={`${slot.id}_${role.id}`}
-                    className="e-assignment-cell"
+                    className={`e-assignment-cell ${!hasRequirement ? "no-requirement" : ""}`}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, slot.id, role.id)}
                   >
                     <div className="e-cell-content">
+                      {hasRequirement && (
+                        <div className={`e-requirement ${isFilled ? "is-filled" : ""} ${isShortage ? "is-shortage" : ""} ${isExcess ? "is-excess" : ""}`}>
+                          {assignedCount}/{requiredCount}
+                        </div>
+                      )}
                       {cellAssignments.map((assignment) => {
                         const staff = getStaff(assignment.staffId);
                         const isAvailable = staff?.isAvailableAt(slot.id) ?? false;
@@ -307,12 +319,37 @@ const StyledTable = styled.table`
     &.is-drag-over {
       background-color: #e3f2fd;
     }
+
+    &.no-requirement {
+      background-color: #fafafa;
+    }
   }
 
   .e-cell-content {
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .e-requirement {
+    font-size: 0.65em;
+    color: #999;
+    text-align: right;
+    font-weight: 500;
+    line-height: 1;
+
+    &.is-filled {
+      color: #4caf50;
+    }
+
+    &.is-shortage {
+      color: #f44336;
+      font-weight: bold;
+    }
+
+    &.is-excess {
+      color: #ff9800;
+    }
   }
 
   .e-staff-chip {

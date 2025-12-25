@@ -2,10 +2,11 @@
  * ドメイン層エクスポート
  */
 
-// マスターデータ
+// TimeSlot集約（StaffRequirementを含む）
 export * from './master/TimeSlot_時間帯.js';
+
+// Role（マスターデータ）
 export * from './master/Role_係.js';
-export * from './master/StaffRequirement_必要人数.js';
 
 // Staff集約
 export * from './staff/Staff_スタッフ.js';
