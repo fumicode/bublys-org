@@ -9,6 +9,7 @@ export * from './lib/slices/user-slice.js';
 export * from './lib/slices/user-group-slice.js';
 export * from './lib/slices/pocket-slice.js';
 export * from './lib/slices/gakkai-shift-slice.js';
+export * from './lib/slices/shift-plan-slice.js';
 export * from './lib/slices/Memo.js';
 
 export * from './lib/messageDomain/Messages.domain.js';

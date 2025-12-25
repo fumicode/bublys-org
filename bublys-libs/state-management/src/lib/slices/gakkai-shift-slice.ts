@@ -7,43 +7,38 @@ import {
   Staff_スタッフ,
   type StaffJSON,
   type StaffStatus_ステータス,
-  type ShiftAssignmentState,
-  type ShiftPlanState,
-  ShiftPlan_シフト案,
-  ShiftAssignment_シフト配置,
 } from "@bublys-org/gakkai-shift-model";
 
 // Re-export for convenience
-export { Staff_スタッフ, ShiftPlan_シフト案, ShiftAssignment_シフト配置 };
-export type { StaffJSON, StaffStatus_ステータス, ShiftAssignmentState, ShiftPlanState };
+export { Staff_スタッフ };
+export type { StaffJSON, StaffStatus_ステータス };
 
-/** gakkai-shiftスライスの状態（内部はJSON） */
-type GakkaiShiftState = {
+// ShiftPlan関連は shift-plan-slice から再エクスポート（後方互換性）
+export {
+  shiftPlanSlice,
+  addShiftPlan,
+  updateShiftPlan,
+  deleteShiftPlan,
+  setCurrentShiftPlanId,
+  selectShiftPlans as selectGakkaiShiftPlans,
+  selectCurrentShiftPlanId as selectGakkaiShiftCurrentPlanId,
+  selectShiftPlanById as selectGakkaiShiftPlanById,
+  selectCurrentShiftPlan as selectGakkaiShiftCurrentPlan,
+  ShiftPlan_シフト案,
+  type ShiftPlanState,
+} from "./shift-plan-slice.js";
+
+// ========== State ==========
+
+type GakkaiShiftStaffState = {
   staffList: StaffJSON[];
   selectedStaffId: string | null;
-  // ShiftPlan関連
-  shiftPlans: ShiftPlanState[];
-  currentShiftPlanId: string | null;
 };
 
-const initialState: GakkaiShiftState = {
+const initialState: GakkaiShiftStaffState = {
   staffList: [],
   selectedStaffId: null,
-  shiftPlans: [],
-  currentShiftPlanId: null,
 };
-
-// ========== Helper ==========
-
-/** readonlyなShiftPlanStateをmutableに変換（Immer用） */
-const toMutableShiftPlanState = (plan: ShiftPlanState) => ({
-  ...plan,
-  assignments: [...plan.assignments],
-  constraintViolations: (plan.constraintViolations ?? []).map((v) => ({
-    ...v,
-    assignmentIds: [...v.assignmentIds],
-  })),
-});
 
 // ========== Slice ==========
 
@@ -79,34 +74,6 @@ export const gakkaiShiftSlice = createSlice({
         staff.updatedAt = new Date().toISOString();
       }
     },
-    // ShiftPlan関連（リポジトリとしてのCRUD操作のみ）
-    addShiftPlan: (state, action: PayloadAction<ShiftPlanState>) => {
-      if (!state.shiftPlans) {
-        state.shiftPlans = [];
-      }
-      // readonlyをmutableに変換
-      const mutablePlan = toMutableShiftPlanState(action.payload);
-      state.shiftPlans.push(mutablePlan);
-    },
-    updateShiftPlan: (state, action: PayloadAction<ShiftPlanState>) => {
-      if (!state.shiftPlans) state.shiftPlans = [];
-      const index = state.shiftPlans.findIndex((p) => p.id === action.payload.id);
-      if (index !== -1) {
-        // readonlyをmutableに変換
-        state.shiftPlans[index] = toMutableShiftPlanState(action.payload);
-      }
-    },
-    setCurrentShiftPlanId: (state, action: PayloadAction<string | null>) => {
-      state.currentShiftPlanId = action.payload;
-    },
-    deleteShiftPlan: (state, action: PayloadAction<string>) => {
-      if (!state.shiftPlans) state.shiftPlans = [];
-      state.shiftPlans = state.shiftPlans.filter((p) => p.id !== action.payload);
-      // 削除したプランが選択中だった場合、選択を解除
-      if (state.currentShiftPlanId === action.payload) {
-        state.currentShiftPlanId = state.shiftPlans.length > 0 ? state.shiftPlans[0].id : null;
-      }
-    },
   },
 });
 
@@ -117,13 +84,9 @@ export const {
   deleteStaff,
   setSelectedStaffId,
   updateStaffStatus,
-  addShiftPlan,
-  updateShiftPlan,
-  deleteShiftPlan,
-  setCurrentShiftPlanId,
 } = gakkaiShiftSlice.actions;
 
-// ========== Selectors (ドメインオブジェクトを返す) ==========
+// ========== Selectors ==========
 
 /** スタッフ一覧を取得（ドメインオブジェクト） */
 export const selectGakkaiShiftStaffList = (state: RootState): Staff_スタッフ[] =>
@@ -151,30 +114,4 @@ export const selectGakkaiShiftSelectedStaff = (state: RootState): Staff_スタ�
   if (!id) return undefined;
   const json = state.gakkaiShift.staffList.find((s) => s.id === id);
   return json ? Staff_スタッフ.fromJSON(json) : undefined;
-};
-
-// ========== ShiftPlan Selectors ==========
-
-/** シフト案一覧を取得（ドメインオブジェクト） */
-export const selectGakkaiShiftPlans = (state: RootState): ShiftPlan_シフト案[] =>
-  (state.gakkaiShift.shiftPlans ?? []).map((s) => new ShiftPlan_シフト案(s));
-
-/** 現在のシフト案IDを取得 */
-export const selectGakkaiShiftCurrentPlanId = (state: RootState): string | null =>
-  state.gakkaiShift.currentShiftPlanId ?? null;
-
-/** IDでシフト案を取得（ドメインオブジェクト） */
-export const selectGakkaiShiftPlanById = (id: string) => (state: RootState): ShiftPlan_シフト案 | undefined => {
-  const plans = state.gakkaiShift.shiftPlans ?? [];
-  const plan = plans.find((p) => p.id === id);
-  return plan ? new ShiftPlan_シフト案(plan) : undefined;
-};
-
-/** 現在のシフト案を取得（ドメインオブジェクト） */
-export const selectGakkaiShiftCurrentPlan = (state: RootState): ShiftPlan_シフト案 | undefined => {
-  const id = state.gakkaiShift.currentShiftPlanId;
-  if (!id) return undefined;
-  const plans = state.gakkaiShift.shiftPlans ?? [];
-  const plan = plans.find((p) => p.id === id);
-  return plan ? new ShiftPlan_シフト案(plan) : undefined;
 };
