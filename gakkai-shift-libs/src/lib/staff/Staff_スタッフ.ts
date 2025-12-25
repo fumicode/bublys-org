@@ -2,8 +2,8 @@
  * スタッフドメインモデル
  */
 
-import { Role_係, SkillLevel_スキルレベル } from './Role_係.js';
-import { DateString_日付, TimeSlotPeriod_時間帯区分 } from './TimeSlot_時間帯.js';
+import { Role_係, SkillLevel_スキルレベル } from '../master/Role_係.js';
+import { DateString_日付, TimeSlotPeriod_時間帯区分 } from '../master/TimeSlot_時間帯.js';
 
 // ========== 型定義 ==========
 

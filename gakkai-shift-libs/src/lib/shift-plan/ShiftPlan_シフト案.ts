@@ -4,7 +4,7 @@
  */
 
 import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
-import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
+import { StaffRequirement_必要人数 } from '../master/StaffRequirement_必要人数.js';
 import { SlotRoleEvaluation_配置枠評価 } from './SlotRoleEvaluation_配置枠評価.js';
 
 // ========== 型定義 ==========

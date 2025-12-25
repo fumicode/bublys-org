@@ -4,9 +4,9 @@
  */
 
 import { ShiftAssignment_シフト配置 } from './ShiftAssignment_シフト配置.js';
-import { Staff_スタッフ } from './Staff_スタッフ.js';
-import { Role_係, SkillLevel_スキルレベル } from './Role_係.js';
-import { TimeSlot_時間帯 } from './TimeSlot_時間帯.js';
+import { Staff_スタッフ } from '../staff/Staff_スタッフ.js';
+import { Role_係, SkillLevel_スキルレベル } from '../master/Role_係.js';
+import { TimeSlot_時間帯 } from '../master/TimeSlot_時間帯.js';
 
 // ========== 型定義 ==========
 

@@ -3,7 +3,7 @@
  * 時間帯×係（配置枠）レベルでの人員充足状況を評価する
  */
 
-import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
+import { StaffRequirement_必要人数 } from '../master/StaffRequirement_必要人数.js';
 
 // ========== 型定義 ==========
 
