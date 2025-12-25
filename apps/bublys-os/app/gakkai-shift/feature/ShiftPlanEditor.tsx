@@ -8,8 +8,7 @@ import {
   selectGakkaiShiftStaffList,
   selectGakkaiShiftPlanById,
   addShiftPlan,
-  addAssignmentToShiftPlan,
-  removeAssignmentFromShiftPlan,
+  updateShiftPlan,
   setStaffList,
 } from "@bublys-org/state-management";
 import { ShiftPlanTableView } from "../ui/ShiftPlanTableView";
@@ -47,10 +46,10 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   const timeSlots = useMemo(() => TimeSlot_時間帯.createDefaultTimeSlots(), []);
   const roles = useMemo(() => Role_係.createDefaultRoles(), []);
 
-  // 制約違反を検出
-  const violations = useMemo<ConstraintViolation[]>(() => {
+  // 制約違反を取得（状態から）
+  const violations = useMemo<ReadonlyArray<ConstraintViolation>>(() => {
     if (!shiftPlan) return [];
-    return shiftPlan.detectConstraintViolations();
+    return shiftPlan.constraintViolations;
   }, [shiftPlan]);
 
   // 初期データのロード
@@ -75,8 +74,10 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   }, [dispatch, shiftPlan, shiftPlanId]);
 
   const handleDropStaff = (staffId: string, timeSlotId: string, roleId: string) => {
+    if (!shiftPlan) return;
+
     // 既に同じスタッフが同じ時間帯・係に配置されていないかチェック
-    const existingAssignment = shiftPlan?.assignments.find(
+    const existingAssignment = shiftPlan.assignments.find(
       (a) =>
         a.staffId === staffId &&
         a.timeSlotId === timeSlotId &&
@@ -84,33 +85,30 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     );
     if (existingAssignment) return;
 
+    // ドメインオブジェクトで配置を追加
     const assignment = ShiftAssignment_シフト配置.create(
       staffId,
       timeSlotId,
       roleId,
       false // 手動配置
     );
-
-    dispatch(
-      addAssignmentToShiftPlan({
-        shiftPlanId,
-        assignment: assignment.state,
-      })
-    );
+    const updatedPlan = shiftPlan.addAssignment(assignment);
+    dispatch(updateShiftPlan(updatedPlan.state));
   };
 
   const handleRemoveAssignment = (assignmentId: string) => {
-    dispatch(
-      removeAssignmentFromShiftPlan({
-        shiftPlanId,
-        assignmentId,
-      })
-    );
+    if (!shiftPlan) return;
+
+    // ドメインオブジェクトで配置を削除
+    const updatedPlan = shiftPlan.removeAssignment(assignmentId);
+    dispatch(updateShiftPlan(updatedPlan.state));
   };
 
   const handleMoveAssignment = (assignmentId: string, staffId: string, timeSlotId: string, roleId: string) => {
+    if (!shiftPlan) return;
+
     // 同じスタッフが同じ時間帯・係に既に配置されていないかチェック
-    const existingAssignment = shiftPlan?.assignments.find(
+    const existingAssignment = shiftPlan.assignments.find(
       (a) =>
         a.staffId === staffId &&
         a.timeSlotId === timeSlotId &&
@@ -118,27 +116,16 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     );
     if (existingAssignment) return;
 
-    // 元の配置を削除
-    dispatch(
-      removeAssignmentFromShiftPlan({
-        shiftPlanId,
-        assignmentId,
-      })
-    );
-
-    // 新しい位置に配置
+    // ドメインオブジェクトで配置を移動（削除→追加）
+    const planAfterRemove = shiftPlan.removeAssignment(assignmentId);
     const assignment = ShiftAssignment_シフト配置.create(
       staffId,
       timeSlotId,
       roleId,
       false
     );
-    dispatch(
-      addAssignmentToShiftPlan({
-        shiftPlanId,
-        assignment: assignment.state,
-      })
-    );
+    const updatedPlan = planAfterRemove.addAssignment(assignment);
+    dispatch(updateShiftPlan(updatedPlan.state));
   };
 
   const handleDragStart = (e: React.DragEvent, staffId: string) => {
@@ -150,7 +137,6 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   const handleAutoAssign = () => {
     if (!shiftPlan) return;
 
-    // staffListは既にStaff_スタッフ[]（selectorがドメインオブジェクトを返す）
     // 自動マッチングを実行
     const result = ShiftMatcher_シフトマッチング.autoAssign(
       staffList,
@@ -160,21 +146,19 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       { preserveExistingAssignments: true }
     );
 
-    // 新しい配置をReduxに追加（既存配置と重複しないもののみ）
+    // 新しい配置をドメインオブジェクトで追加
     const existingIds = new Set(shiftPlan.assignments.map((a) => a.id));
     const newAssignments = result.assignments.filter(
       (a) => !existingIds.has(a.id)
     );
 
-    for (const assignment of newAssignments) {
-      dispatch(
-        addAssignmentToShiftPlan({
-          shiftPlanId,
-          assignment,
-        })
-      );
+    let updatedPlan = shiftPlan;
+    for (const assignmentState of newAssignments) {
+      const assignment = new ShiftAssignment_シフト配置(assignmentState);
+      updatedPlan = updatedPlan.addAssignment(assignment);
     }
 
+    dispatch(updateShiftPlan(updatedPlan.state));
     console.log("[AutoAssign] Result:", result.stats);
   };
 

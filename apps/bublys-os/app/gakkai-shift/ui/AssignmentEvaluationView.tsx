@@ -5,6 +5,7 @@ import styled from "styled-components";
 import {
   StaffAssignmentEvaluation_スタッフ配置評価,
   SkillMatchDetail,
+  ConstraintViolation,
 } from "../domain";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -18,6 +19,7 @@ type AssignmentEvaluationViewProps = {
   staffName: string;
   timeSlotLabel: string;
   roleName: string;
+  constraintViolations?: ConstraintViolation[];
 };
 
 export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
@@ -25,6 +27,7 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   staffName,
   timeSlotLabel,
   roleName,
+  constraintViolations = [],
 }) => {
   const status = evaluation.getOverallStatus();
   const statusLabel = StaffAssignmentEvaluation_スタッフ配置評価.getStatusLabel(status);
@@ -99,6 +102,19 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
           </span>
         </div>
       </div>
+
+      {constraintViolations.length > 0 && (
+        <div className="e-section e-constraint-violations">
+          <div className="e-section-title">
+            <WarningIcon fontSize="inherit" /> 制約違反
+          </div>
+          <ul className="e-violation-list">
+            {constraintViolations.map((violation, idx) => (
+              <li key={idx}>{violation.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {evaluation.issues.length > 0 && (
         <div className="e-section e-issues">
@@ -254,6 +270,21 @@ const StyledContainer = styled.div`
     &.e-issues {
       background-color: #fff3e0;
       border-color: #ff9800;
+    }
+
+    &.e-constraint-violations {
+      background-color: #fffde7;
+      border-color: #fbc02d;
+    }
+  }
+
+  .e-violation-list {
+    margin: 0;
+    padding-left: 20px;
+
+    li {
+      padding: 2px 0;
+      color: #f57f17;
     }
   }
 

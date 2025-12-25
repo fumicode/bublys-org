@@ -9,11 +9,25 @@ import { SlotRoleEvaluation_配置枠評価 } from './SlotRoleEvaluation_配置�
 
 // ========== 型定義 ==========
 
+/** 制約違反の種類 */
+export type ConstraintViolationType = 'duplicate_staff_in_timeslot';
+
+/** 制約違反 */
+export interface ConstraintViolation {
+  readonly type: ConstraintViolationType;
+  readonly staffId: string;
+  readonly timeSlotId: string;
+  readonly assignmentIds: ReadonlyArray<string>;
+  readonly message: string;
+}
+
 /** シフト案の状態 */
 export interface ShiftPlanState {
   readonly id: string;
   readonly name: string;
   readonly assignments: ReadonlyArray<ShiftAssignmentState>;
+  /** 制約違反（オプショナル: 既存データとの互換性のため） */
+  readonly constraintViolations?: ReadonlyArray<ConstraintViolation>;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -25,18 +39,6 @@ export interface ShiftPlanEvaluation {
   readonly shortageCount: number;
   readonly excessCount: number;
   readonly slotRoleEvaluations: ReadonlyArray<SlotRoleEvaluation_配置枠評価>;
-}
-
-/** 制約違反の種類 */
-export type ConstraintViolationType = 'duplicate_staff_in_timeslot';
-
-/** 制約違反 */
-export interface ConstraintViolation {
-  readonly type: ConstraintViolationType;
-  readonly staffId: string;
-  readonly timeSlotId: string;
-  readonly assignmentIds: ReadonlyArray<string>;
-  readonly message: string;
 }
 
 // ========== ドメインクラス ==========
@@ -54,6 +56,11 @@ export class ShiftPlan_シフト案 {
 
   get assignments(): ReadonlyArray<ShiftAssignment_シフト配置> {
     return this.state.assignments.map((s) => new ShiftAssignment_シフト配置(s));
+  }
+
+  get constraintViolations(): ReadonlyArray<ConstraintViolation> {
+    // 既存データとの互換性: constraintViolationsがなければ計算
+    return this.state.constraintViolations ?? ShiftPlan_シフト案.computeConstraintViolations(this.state.assignments);
   }
 
   /** 特定スタッフの配置を取得 */
@@ -123,27 +130,40 @@ export class ShiftPlan_シフト案 {
     return Math.max(0, score);
   }
 
-  // ========== 制約違反検出 ==========
+  // ========== 制約違反 ==========
 
-  /** 制約違反を検出 */
-  detectConstraintViolations(): ConstraintViolation[] {
+  /** 制約違反を取得 */
+  detectConstraintViolations(): ReadonlyArray<ConstraintViolation> {
+    return this.constraintViolations;
+  }
+
+  /** 制約違反があるかどうか */
+  hasConstraintViolations(): boolean {
+    return this.constraintViolations.length > 0;
+  }
+
+  /** 特定の配置が制約違反に含まれているか */
+  isAssignmentInViolation(assignmentId: string): boolean {
+    return this.constraintViolations.some((v) => v.assignmentIds.includes(assignmentId));
+  }
+
+  /** 特定のスタッフ×時間帯の組み合わせが制約違反か */
+  isStaffTimeSlotInViolation(staffId: string, timeSlotId: string): boolean {
+    return this.constraintViolations.some(
+      (v) => v.staffId === staffId && v.timeSlotId === timeSlotId
+    );
+  }
+
+  /** 配置リストから制約違反を計算 */
+  static computeConstraintViolations(
+    assignments: ReadonlyArray<ShiftAssignmentState>
+  ): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];
 
     // 同一時間帯に同じスタッフが複数配置されている場合を検出
-    const duplicates = this.detectDuplicateStaffInTimeSlot();
-    violations.push(...duplicates);
-
-    return violations;
-  }
-
-  /** 同一時間帯に同じスタッフが複数配置されているケースを検出 */
-  private detectDuplicateStaffInTimeSlot(): ConstraintViolation[] {
-    const violations: ConstraintViolation[] = [];
-
-    // 時間帯ごと、スタッフごとに配置をグループ化
     const groupedByTimeSlotAndStaff = new Map<string, ShiftAssignmentState[]>();
 
-    for (const assignment of this.state.assignments) {
+    for (const assignment of assignments) {
       const key = `${assignment.timeSlotId}:${assignment.staffId}`;
       const existing = groupedByTimeSlotAndStaff.get(key) ?? [];
       existing.push(assignment);
@@ -151,39 +171,20 @@ export class ShiftPlan_シフト案 {
     }
 
     // 2件以上あるものを違反として報告
-    for (const [key, assignments] of groupedByTimeSlotAndStaff) {
-      if (assignments.length > 1) {
+    for (const [key, grouped] of groupedByTimeSlotAndStaff) {
+      if (grouped.length > 1) {
         const [timeSlotId, staffId] = key.split(':');
         violations.push({
           type: 'duplicate_staff_in_timeslot',
           staffId,
           timeSlotId,
-          assignmentIds: assignments.map((a) => a.id),
-          message: `同一時間帯に同じスタッフが${assignments.length}件配置されています`,
+          assignmentIds: grouped.map((a) => a.id),
+          message: `同一時間帯に同じスタッフが${grouped.length}件配置されています`,
         });
       }
     }
 
     return violations;
-  }
-
-  /** 制約違反があるかどうか */
-  hasConstraintViolations(): boolean {
-    return this.detectConstraintViolations().length > 0;
-  }
-
-  /** 特定の配置が制約違反に含まれているか */
-  isAssignmentInViolation(assignmentId: string): boolean {
-    const violations = this.detectConstraintViolations();
-    return violations.some((v) => v.assignmentIds.includes(assignmentId));
-  }
-
-  /** 特定のスタッフ×時間帯の組み合わせが制約違反か */
-  isStaffTimeSlotInViolation(staffId: string, timeSlotId: string): boolean {
-    const violations = this.detectConstraintViolations();
-    return violations.some(
-      (v) => v.staffId === staffId && v.timeSlotId === timeSlotId
-    );
   }
 
   // ========== 状態変更メソッド ==========
@@ -209,9 +210,15 @@ export class ShiftPlan_シフト案 {
 
   /** 内部用：状態更新ヘルパー */
   protected withUpdatedState(partial: Partial<ShiftPlanState>): ShiftPlan_シフト案 {
+    const newAssignments = partial.assignments ?? this.state.assignments;
+    const constraintViolations = partial.assignments
+      ? ShiftPlan_シフト案.computeConstraintViolations(newAssignments)
+      : this.state.constraintViolations;
+
     return new ShiftPlan_シフト案({
       ...this.state,
       ...partial,
+      constraintViolations,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -225,6 +232,7 @@ export class ShiftPlan_シフト案 {
       id: crypto.randomUUID(),
       name,
       assignments: [],
+      constraintViolations: [],
       createdAt: now,
       updatedAt: now,
     });

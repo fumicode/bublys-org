@@ -33,6 +33,18 @@ const initialState: GakkaiShiftState = {
   currentShiftPlanId: null,
 };
 
+// ========== Helper ==========
+
+/** readonlyなShiftPlanStateをmutableに変換（Immer用） */
+const toMutableShiftPlanState = (plan: ShiftPlanState) => ({
+  ...plan,
+  assignments: [...plan.assignments],
+  constraintViolations: (plan.constraintViolations ?? []).map((v) => ({
+    ...v,
+    assignmentIds: [...v.assignmentIds],
+  })),
+});
+
 // ========== Slice ==========
 
 export const gakkaiShiftSlice = createSlice({
@@ -67,44 +79,25 @@ export const gakkaiShiftSlice = createSlice({
         staff.updatedAt = new Date().toISOString();
       }
     },
-    // ShiftPlan関連
+    // ShiftPlan関連（リポジトリとしてのCRUD操作のみ）
     addShiftPlan: (state, action: PayloadAction<ShiftPlanState>) => {
-      // redux-persistで古い状態の場合に初期化
       if (!state.shiftPlans) {
         state.shiftPlans = [];
       }
       // readonlyをmutableに変換
-      const mutablePlan = {
-        ...action.payload,
-        assignments: [...action.payload.assignments],
-      };
+      const mutablePlan = toMutableShiftPlanState(action.payload);
       state.shiftPlans.push(mutablePlan);
+    },
+    updateShiftPlan: (state, action: PayloadAction<ShiftPlanState>) => {
+      if (!state.shiftPlans) state.shiftPlans = [];
+      const index = state.shiftPlans.findIndex((p) => p.id === action.payload.id);
+      if (index !== -1) {
+        // readonlyをmutableに変換
+        state.shiftPlans[index] = toMutableShiftPlanState(action.payload);
+      }
     },
     setCurrentShiftPlanId: (state, action: PayloadAction<string | null>) => {
       state.currentShiftPlanId = action.payload;
-    },
-    addAssignmentToShiftPlan: (
-      state,
-      action: PayloadAction<{ shiftPlanId: string; assignment: ShiftAssignmentState }>
-    ) => {
-      if (!state.shiftPlans) state.shiftPlans = [];
-      const plan = state.shiftPlans.find((p) => p.id === action.payload.shiftPlanId);
-      if (plan) {
-        (plan.assignments as ShiftAssignmentState[]).push(action.payload.assignment);
-        plan.updatedAt = new Date().toISOString();
-      }
-    },
-    removeAssignmentFromShiftPlan: (
-      state,
-      action: PayloadAction<{ shiftPlanId: string; assignmentId: string }>
-    ) => {
-      if (!state.shiftPlans) state.shiftPlans = [];
-      const plan = state.shiftPlans.find((p) => p.id === action.payload.shiftPlanId);
-      if (plan) {
-        (plan as { assignments: ShiftAssignmentState[] }).assignments =
-          plan.assignments.filter((a) => a.id !== action.payload.assignmentId);
-        plan.updatedAt = new Date().toISOString();
-      }
     },
     deleteShiftPlan: (state, action: PayloadAction<string>) => {
       if (!state.shiftPlans) state.shiftPlans = [];
@@ -125,10 +118,9 @@ export const {
   setSelectedStaffId,
   updateStaffStatus,
   addShiftPlan,
+  updateShiftPlan,
   deleteShiftPlan,
   setCurrentShiftPlanId,
-  addAssignmentToShiftPlan,
-  removeAssignmentFromShiftPlan,
 } = gakkaiShiftSlice.actions;
 
 // ========== Selectors (ドメインオブジェクトを返す) ==========

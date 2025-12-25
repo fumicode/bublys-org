@@ -13,6 +13,7 @@ import {
   Staff_スタッフ,
   ShiftAssignment_シフト配置,
   StaffAssignmentEvaluation_スタッフ配置評価,
+  ConstraintViolation,
 } from "../domain";
 
 type AssignmentEvaluationProps = {
@@ -67,6 +68,12 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
     );
   }, [assignment, staff, role, timeSlot]);
 
+  // この配置に関連する制約違反を取得（状態から）
+  const constraintViolations = useMemo<ConstraintViolation[]>(() => {
+    if (!shiftPlan) return [];
+    return shiftPlan.constraintViolations.filter((v) => v.assignmentIds.includes(assignmentId));
+  }, [shiftPlan, assignmentId]);
+
   if (!shiftPlan) {
     return <div>シフト案が見つかりません</div>;
   }
@@ -85,6 +92,7 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
       staffName={staff.name}
       timeSlotLabel={timeSlot.label}
       roleName={role.name}
+      constraintViolations={constraintViolations}
     />
   );
 };
