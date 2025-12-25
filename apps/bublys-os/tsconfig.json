@@ -30,6 +30,8 @@
     "app/**/*.jsx",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
     "next-env.d.ts",
     ".next/types/**/*.ts",
   ],

@@ -3,12 +3,6 @@
   "include": [],
   "references": [
     {
-      "path": "../memo-model"
-    },
-    {
-      "path": "../memo-state"
-    },
-    {
       "path": "./tsconfig.lib.json"
     },
     {
