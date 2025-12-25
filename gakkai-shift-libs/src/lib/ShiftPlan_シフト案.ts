@@ -27,6 +27,18 @@ export interface ShiftPlanEvaluation {
   readonly slotRoleResults: ReadonlyArray<SlotRoleResult_配置結果>;
 }
 
+/** 制約違反の種類 */
+export type ConstraintViolationType = 'duplicate_staff_in_timeslot';
+
+/** 制約違反 */
+export interface ConstraintViolation {
+  readonly type: ConstraintViolationType;
+  readonly staffId: string;
+  readonly timeSlotId: string;
+  readonly assignmentIds: ReadonlyArray<string>;
+  readonly message: string;
+}
+
 // ========== ドメインクラス ==========
 
 export class ShiftPlan_シフト案 {
@@ -109,6 +121,69 @@ export class ShiftPlan_シフト案 {
     score -= evaluation.excessCount * 2; // 過剰1件につき-2点
 
     return Math.max(0, score);
+  }
+
+  // ========== 制約違反検出 ==========
+
+  /** 制約違反を検出 */
+  detectConstraintViolations(): ConstraintViolation[] {
+    const violations: ConstraintViolation[] = [];
+
+    // 同一時間帯に同じスタッフが複数配置されている場合を検出
+    const duplicates = this.detectDuplicateStaffInTimeSlot();
+    violations.push(...duplicates);
+
+    return violations;
+  }
+
+  /** 同一時間帯に同じスタッフが複数配置されているケースを検出 */
+  private detectDuplicateStaffInTimeSlot(): ConstraintViolation[] {
+    const violations: ConstraintViolation[] = [];
+
+    // 時間帯ごと、スタッフごとに配置をグループ化
+    const groupedByTimeSlotAndStaff = new Map<string, ShiftAssignmentState[]>();
+
+    for (const assignment of this.state.assignments) {
+      const key = `${assignment.timeSlotId}:${assignment.staffId}`;
+      const existing = groupedByTimeSlotAndStaff.get(key) ?? [];
+      existing.push(assignment);
+      groupedByTimeSlotAndStaff.set(key, existing);
+    }
+
+    // 2件以上あるものを違反として報告
+    for (const [key, assignments] of groupedByTimeSlotAndStaff) {
+      if (assignments.length > 1) {
+        const [timeSlotId, staffId] = key.split(':');
+        violations.push({
+          type: 'duplicate_staff_in_timeslot',
+          staffId,
+          timeSlotId,
+          assignmentIds: assignments.map((a) => a.id),
+          message: `同一時間帯に同じスタッフが${assignments.length}件配置されています`,
+        });
+      }
+    }
+
+    return violations;
+  }
+
+  /** 制約違反があるかどうか */
+  hasConstraintViolations(): boolean {
+    return this.detectConstraintViolations().length > 0;
+  }
+
+  /** 特定の配置が制約違反に含まれているか */
+  isAssignmentInViolation(assignmentId: string): boolean {
+    const violations = this.detectConstraintViolations();
+    return violations.some((v) => v.assignmentIds.includes(assignmentId));
+  }
+
+  /** 特定のスタッフ×時間帯の組み合わせが制約違反か */
+  isStaffTimeSlotInViolation(staffId: string, timeSlotId: string): boolean {
+    const violations = this.detectConstraintViolations();
+    return violations.some(
+      (v) => v.staffId === staffId && v.timeSlotId === timeSlotId
+    );
   }
 
   // ========== 状態変更メソッド ==========

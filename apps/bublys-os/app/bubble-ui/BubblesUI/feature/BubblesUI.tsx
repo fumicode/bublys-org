@@ -270,6 +270,14 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           >
             スタッフ一覧
           </Button>
+          <Button
+            variant="contained"
+            onClick={() => popChildOrJoinSibling("gakkai-shift/shift-plan/default", "root")}
+            fullWidth
+            sx={{ mb: 1 }}
+          >
+            シフト配置表
+          </Button>
         </Box>
       ) : (
         <IconButton

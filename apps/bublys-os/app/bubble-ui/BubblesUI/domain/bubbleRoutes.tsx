@@ -33,6 +33,7 @@ import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorl
 import { StaffCollection } from "@/app/gakkai-shift/feature/StaffCollection";
 import { StaffDetail } from "@/app/gakkai-shift/feature/StaffDetail";
 import { StaffAvailability } from "@/app/gakkai-shift/feature/StaffAvailability";
+import { ShiftPlanEditor } from "@/app/gakkai-shift/feature/ShiftPlanEditor";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -303,6 +304,17 @@ const GakkaiShiftStaffAvailabilityBubble: BubbleContentRenderer = ({ bubble }) =
   return <StaffAvailability staffId={staffId} />;
 };
 
+// 学会シフト - シフト配置表バブル
+const GakkaiShiftPlanEditorBubble: BubbleContentRenderer = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  // URL: gakkai-shift/shift-plan/[shiftPlanId]
+  const shiftPlanId = bubble.url.replace("gakkai-shift/shift-plan/", "");
+  const handleStaffClick = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id);
+  };
+  return <ShiftPlanEditor shiftPlanId={shiftPlanId} onStaffClick={handleStaffClick} />;
+};
+
 const routes: BubbleRoute[] = [
   {
     pattern: /^mob$/,
@@ -339,6 +351,7 @@ const routes: BubbleRoute[] = [
   { pattern: /^gakkai-shift\/staffs$/, type: "gakkai-shift-staffs", Component: GakkaiShiftStaffsBubble },
   { pattern: /^gakkai-shift\/staffs\/[^/]+\/availableTimeSlots$/, type: "gakkai-shift-staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
   { pattern: /^gakkai-shift\/staffs\/[^/]+$/, type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
+  { pattern: /^gakkai-shift\/shift-plan\/[^/]+$/, type: "gakkai-shift-plan", Component: GakkaiShiftPlanEditorBubble },
 
   // ObjectShell統合ルート
   {
