@@ -4,9 +4,6 @@
   "include": [],
   "references": [
     {
-      "path": "../memo-model"
-    },
-    {
       "path": "./tsconfig.lib.json"
     },
     {

@@ -4,12 +4,6 @@
   "include": [],
   "references": [
     {
-      "path": "../bubbles-ui"
-    },
-    {
-      "path": "../bubbles-ui-state"
-    },
-    {
       "path": "./tsconfig.lib.json"
     },
     {
