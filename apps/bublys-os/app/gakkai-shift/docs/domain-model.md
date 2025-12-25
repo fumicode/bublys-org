@@ -92,9 +92,9 @@ classDiagram
         +create(...)$ StaffRequirement_必要人数
     }
 
-    class SlotRoleResult_配置結果 {
+    class SlotRoleEvaluation_配置枠評価 {
         <<immutable / calculated>>
-        +state: SlotRoleResultState
+        +state: SlotRoleEvaluationState
         +timeSlotId: string
         +roleId: string
         +requiredCount: number
@@ -102,7 +102,28 @@ classDiagram
         +fulfillmentRate: number
         +hasShortage: boolean
         +hasExcess: boolean
-        +calculate(requirement, staffIds)$ SlotRoleResult_配置結果
+        +evaluate(requirement, assignments)$ SlotRoleEvaluation_配置枠評価
+    }
+
+    class StaffAssignmentEvaluation_スタッフ配置評価 {
+        <<immutable / calculated>>
+        +state: StaffAssignmentEvaluationState
+        +assignmentId: string
+        +staffId: string
+        +timeSlotId: string
+        +roleId: string
+        +isAvailable: boolean
+        +meetsRequirements: boolean
+        +isPreferredRole: boolean
+        +preferredRoleRank: number?
+        +hasPresentationConflict: boolean
+        +skillMatches: SkillMatchDetail[]
+        +roleFitScore: number
+        +totalScore: number
+        +issues: string[]
+        +evaluate(assignment, staff, role, timeSlot)$ StaffAssignmentEvaluation_スタッフ配置評価
+        +evaluateCandidate(staff, role, timeSlot)$ StaffAssignmentEvaluation_スタッフ配置評価
+        +getOverallStatus() EvaluationStatus
     }
 
     class ShiftPlan_シフト案 {
@@ -136,11 +157,28 @@ classDiagram
     StaffRequirement_必要人数 "*" --> "1" TimeSlot_時間帯 : timeSlotId
     StaffRequirement_必要人数 "*" --> "1" Role_係 : roleId
 
-    SlotRoleResult_配置結果 ..> StaffRequirement_必要人数 : calculate()
+    SlotRoleEvaluation_配置枠評価 ..> StaffRequirement_必要人数 : evaluate()
+    SlotRoleEvaluation_配置枠評価 ..> ShiftAssignment_シフト配置 : evaluate()
+
+    StaffAssignmentEvaluation_スタッフ配置評価 ..> ShiftAssignment_シフト配置 : evaluate()
+    StaffAssignmentEvaluation_スタッフ配置評価 ..> Staff_スタッフ : evaluate()
+    StaffAssignmentEvaluation_スタッフ配置評価 ..> Role_係 : evaluate()
+    StaffAssignmentEvaluation_スタッフ配置評価 ..> TimeSlot_時間帯 : evaluate()
 
     ShiftPlan_シフト案 "1" *-- "*" ShiftAssignment_シフト配置 : assignments
     ShiftPlan_シフト案 ..> StaffRequirement_必要人数 : evaluate()
-    ShiftPlan_シフト案 ..> SlotRoleResult_配置結果 : evaluate()
+    ShiftPlan_シフト案 ..> SlotRoleEvaluation_配置枠評価 : evaluate()
+
+    class ShiftMatcher_シフトマッチング {
+        <<service>>
+        +match(existingAssignments, options) MatchingResult
+        +autoAssign(...)$ MatchingResult
+    }
+    ShiftMatcher_シフトマッチング ..> Staff_スタッフ : uses
+    ShiftMatcher_シフトマッチング ..> Role_係 : uses
+    ShiftMatcher_シフトマッチング ..> TimeSlot_時間帯 : uses
+    ShiftMatcher_シフトマッチング ..> StaffAssignmentEvaluation_スタッフ配置評価 : evaluateCandidate()
+    ShiftMatcher_シフトマッチング ..> ShiftAssignment_シフト配置 : creates
 ```
 
 ## 型一覧
@@ -153,6 +191,31 @@ classDiagram
 | `RoleFixedness_係の固定性` | 係の固定性 (all_day_fixed/time_slot_ok/concurrent_ok/party_only) |
 | `StaffStatus_ステータス` | スタッフステータス (pending/accepted/waitlist/rejected) |
 | `Gender_性別` | 性別 (male/female/other/prefer_not_to_say) |
+| `EvaluationStatus` | 配置評価ステータス (excellent/good/acceptable/warning/error) |
+| `SkillMatchDetail` | スキルマッチング詳細 (skillName, required, staffHas, isMatch, scoreDiff) |
+
+## 評価クラスの比較
+
+| クラス | 評価対象 | 粒度 | 目的 |
+|--------|----------|------|------|
+| `SlotRoleEvaluation_配置枠評価` | 時間帯×係（配置枠） | 集計レベル | 人員充足率の確認 |
+| `StaffAssignmentEvaluation_スタッフ配置評価` | 個別のスタッフ配置 | 個別レベル | スタッフ適性の詳細確認 |
+
+```mermaid
+flowchart LR
+    subgraph "配置枠レベル"
+        A[SlotRoleEvaluation<br/>配置枠評価]
+        A1["「3/26午前×総合案内」に<br/>2人配置 / 必要3人 = 66%"]
+    end
+
+    subgraph "スタッフ配置レベル"
+        B[StaffAssignmentEvaluation<br/>スタッフ配置評価]
+        B1["「田中さん → 3/26午前×総合案内」<br/>PC:◎ Zoom:○ 英語:△ 希望係:✓"]
+    end
+
+    A --> A1
+    B --> B1
+```
 
 ## 状態遷移図（StaffStatus_ステータス）
 
@@ -194,7 +257,7 @@ flowchart TD
         I[採用/補欠/不採用]
         J[ShiftPlan_シフト案]
         K[ShiftAssignment_シフト配置]
-        L[SlotRoleResult_配置結果]
+        L[SlotRoleEvaluation_配置枠評価]
     end
 
     A --> E
@@ -240,3 +303,44 @@ flowchart TD
 | poster | ポスター係 | 時間帯OK | 50 |
 | party_cloakroom | 懇親会クローク | 懇親会専用 | 40 |
 | party_reception | 懇親会受付 | 懇親会専用 | 40 |
+
+## バブルURL構造
+
+学会シフト機能のバブルナビゲーションURL一覧：
+
+| URL パターン | 表示内容 | 説明 |
+|-------------|----------|------|
+| `gakkai-shift/staffs` | スタッフ一覧 | 全スタッフのリスト |
+| `gakkai-shift/staffs/{staffId}` | スタッフ詳細 | 個人情報・スキル・参加可能時間帯 |
+| `gakkai-shift/staffs/{staffId}/availableTimeSlots` | 参加可能時間帯 | 時間帯選択UI |
+| `gakkai-shift/shift-plans` | シフト案マネージャー | 複数シフト案のタブ管理 |
+| `gakkai-shift/shift-plan/{shiftPlanId}` | シフト案エディタ | 単一シフト案の編集 |
+| `gakkai-shift/shift-plans/{shiftPlanId}/assignments/{assignmentId}` | **スタッフ配置評価** | スタッフ×時間帯×係のマッチング結果 |
+
+### スタッフ配置評価バブルの表示内容
+
+```
+┌─────────────────────────────────────────┐
+│ 配置評価: 田中 太郎                      │
+│ 3/26(水) 午前 → 総合案内                 │
+├─────────────────────────────────────────┤
+│ 総合評価: ★★★★☆ (良好)                 │
+├─────────────────────────────────────────┤
+│ ■ 時間帯                                │
+│   参加可能: ✓                           │
+│   発表重複: なし                         │
+├─────────────────────────────────────────┤
+│ ■ スキルマッチング                       │
+│   PC     : 要求なし    → 上級  ◎ +3     │
+│   Zoom   : 要求なし    → 上級  ◎ +3     │
+│   英語   : あれば優先  → 日常会話 ○ +2  │
+│   経験   : 要求なし    → あり  ◎ +2     │
+├─────────────────────────────────────────┤
+│ ■ その他                                │
+│   希望係: ✓ (第2希望)                   │
+│   適性スコア: +10pt                      │
+├─────────────────────────────────────────┤
+│ ⚠ 注意事項                              │
+│   (なし)                                 │
+└─────────────────────────────────────────┘
+```

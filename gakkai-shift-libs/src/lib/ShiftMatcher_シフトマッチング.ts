@@ -8,6 +8,7 @@ import { Role_係 } from './Role_係.js';
 import { TimeSlot_時間帯 } from './TimeSlot_時間帯.js';
 import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
 import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
+import { StaffAssignmentEvaluation_スタッフ配置評価 } from './StaffAssignmentEvaluation_スタッフ配置評価.js';
 
 // ========== 型定義 ==========
 
@@ -38,7 +39,8 @@ export interface MatchingStats {
 /** スタッフの候補評価 */
 interface StaffCandidate {
   readonly staff: Staff_スタッフ;
-  readonly score: number;
+  readonly evaluation: StaffAssignmentEvaluation_スタッフ配置評価;
+  readonly matchingScore: number; // マッチング用の調整後スコア
   readonly reasons: ReadonlyArray<string>;
 }
 
@@ -166,7 +168,6 @@ export class ShiftMatcher_シフトマッチング {
 
     for (const staff of this.staffList) {
       const reasons: string[] = [];
-      let score = 0;
 
       // 1. 参加可能性チェック（必須）
       if (!staff.isAvailableAt(timeSlot.id)) {
@@ -201,39 +202,47 @@ export class ShiftMatcher_シフトマッチング {
         }
       }
 
-      // 5. 係の要件を満たしているか
-      if (staff.meetsRoleRequirements(role)) {
-        score += 20;
+      // 5. StaffAssignmentEvaluationで評価
+      const evaluation = StaffAssignmentEvaluation_スタッフ配置評価.evaluateCandidate(
+        staff,
+        role,
+        timeSlot
+      );
+
+      // ベーススコア（評価結果から取得）
+      let matchingScore = evaluation.totalScore;
+
+      // マッチング固有の調整を追加
+      if (evaluation.meetsRequirements) {
         reasons.push('要件満たす');
       } else {
-        // 要件を満たさない場合はペナルティ（配置可能だが優先度低）
-        score -= 10;
         reasons.push('要件不足');
       }
 
-      // 6. 適性スコアを加算
-      const fitScore = staff.calculateRoleFitScore(role);
-      score += fitScore;
-      if (fitScore > 0) {
-        reasons.push(`適性+${fitScore}`);
+      if (evaluation.roleFitScore > 0) {
+        reasons.push(`適性+${evaluation.roleFitScore}`);
       }
 
-      // 7. 既存配置数が少ないスタッフを優先（均等配置）
+      if (evaluation.isPreferredRole) {
+        reasons.push(`第${evaluation.preferredRoleRank}希望`);
+      }
+
+      // 6. 既存配置数が少ないスタッフを優先（均等配置）
       const currentCount = staffAssignmentCount.get(staff.id) ?? 0;
-      score -= currentCount * 2;
+      matchingScore -= currentCount * 2;
       if (currentCount === 0) {
         reasons.push('未配置');
       }
 
-      // 8. 参加可能時間帯が多いスタッフを優先（柔軟性）
+      // 7. 参加可能時間帯が多いスタッフを優先（柔軟性）
       const availableCount = staff.availableTimeSlots.length;
-      score += Math.min(availableCount, 5);
+      matchingScore += Math.min(availableCount, 5);
 
-      candidates.push({ staff, score, reasons });
+      candidates.push({ staff, evaluation, matchingScore, reasons });
     }
 
-    // スコア順にソート（高い順）
-    return candidates.sort((a, b) => b.score - a.score);
+    // マッチングスコア順にソート（高い順）
+    return candidates.sort((a, b) => b.matchingScore - a.matchingScore);
   }
 
   /**

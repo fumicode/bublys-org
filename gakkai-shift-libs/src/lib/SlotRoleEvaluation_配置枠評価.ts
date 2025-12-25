@@ -1,13 +1,14 @@
 /**
- * 配置結果ドメインモデル
+ * 配置枠評価ドメインモデル
+ * 時間帯×係（配置枠）レベルでの人員充足状況を評価する
  */
 
 import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
 
 // ========== 型定義 ==========
 
-/** 時間帯×係ごとの配置結果 */
-export interface SlotRoleResultState {
+/** 配置枠評価の状態 */
+export interface SlotRoleEvaluationState {
   readonly timeSlotId: string;
   readonly roleId: string;
   readonly requiredCount: number;
@@ -20,8 +21,8 @@ export interface SlotRoleResultState {
 
 // ========== ドメインクラス ==========
 
-export class SlotRoleResult_配置結果 {
-  constructor(readonly state: SlotRoleResultState) {}
+export class SlotRoleEvaluation_配置枠評価 {
+  constructor(readonly state: SlotRoleEvaluationState) {}
 
   get timeSlotId(): string {
     return this.state.timeSlotId;
@@ -55,19 +56,19 @@ export class SlotRoleResult_配置結果 {
     return this.state.hasExcess;
   }
 
-  // SlotRoleResultは計算結果のため、更新メソッドは提供しない
+  // SlotRoleEvaluationは計算結果のため、更新メソッドは提供しない
 
-  /** 配置状況から結果を計算 */
-  static calculate(
+  /** 配置状況から評価を行う */
+  static evaluate(
     requirement: StaffRequirement_必要人数,
     assignedStaffIds: string[]
-  ): SlotRoleResult_配置結果 {
+  ): SlotRoleEvaluation_配置枠評価 {
     const assignedCount = assignedStaffIds.length;
     const requiredCount = requirement.requiredCount;
     const fulfillmentRate =
       requiredCount > 0 ? (assignedCount / requiredCount) * 100 : 100;
 
-    return new SlotRoleResult_配置結果({
+    return new SlotRoleEvaluation_配置枠評価({
       timeSlotId: requirement.timeSlotId,
       roleId: requirement.roleId,
       requiredCount,

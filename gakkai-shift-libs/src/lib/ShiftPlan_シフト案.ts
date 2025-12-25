@@ -5,7 +5,7 @@
 
 import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
 import { StaffRequirement_必要人数 } from './StaffRequirement_必要人数.js';
-import { SlotRoleResult_配置結果 } from './SlotRoleResult_配置結果.js';
+import { SlotRoleEvaluation_配置枠評価 } from './SlotRoleEvaluation_配置枠評価.js';
 
 // ========== 型定義 ==========
 
@@ -24,7 +24,7 @@ export interface ShiftPlanEvaluation {
   readonly totalFulfillmentRate: number;
   readonly shortageCount: number;
   readonly excessCount: number;
-  readonly slotRoleResults: ReadonlyArray<SlotRoleResult_配置結果>;
+  readonly slotRoleEvaluations: ReadonlyArray<SlotRoleEvaluation_配置枠評価>;
 }
 
 /** 制約違反の種類 */
@@ -80,7 +80,7 @@ export class ShiftPlan_シフト案 {
 
   /** シフト案を評価（必要人数と照合） */
   evaluate(requirements: StaffRequirement_必要人数[]): ShiftPlanEvaluation {
-    const slotRoleResults: SlotRoleResult_配置結果[] = [];
+    const slotRoleEvaluations: SlotRoleEvaluation_配置枠評価[] = [];
 
     for (const req of requirements) {
       const assignedStaffIds = this.getAssignmentsForSlotRole(
@@ -88,18 +88,18 @@ export class ShiftPlan_シフト案 {
         req.roleId
       ).map((a) => a.staffId);
 
-      const result = SlotRoleResult_配置結果.calculate(req, assignedStaffIds);
-      slotRoleResults.push(result);
+      const evaluation = SlotRoleEvaluation_配置枠評価.evaluate(req, assignedStaffIds);
+      slotRoleEvaluations.push(evaluation);
     }
 
     const totalAssignmentCount = this.state.assignments.length;
-    const shortageCount = slotRoleResults.filter((r) => r.hasShortage).length;
-    const excessCount = slotRoleResults.filter((r) => r.hasExcess).length;
+    const shortageCount = slotRoleEvaluations.filter((e) => e.hasShortage).length;
+    const excessCount = slotRoleEvaluations.filter((e) => e.hasExcess).length;
 
     const totalFulfillmentRate =
-      slotRoleResults.length > 0
-        ? slotRoleResults.reduce((sum, r) => sum + r.fulfillmentRate, 0) /
-          slotRoleResults.length
+      slotRoleEvaluations.length > 0
+        ? slotRoleEvaluations.reduce((sum, e) => sum + e.fulfillmentRate, 0) /
+          slotRoleEvaluations.length
         : 100;
 
     return {
@@ -107,7 +107,7 @@ export class ShiftPlan_シフト案 {
       totalFulfillmentRate,
       shortageCount,
       excessCount,
-      slotRoleResults,
+      slotRoleEvaluations,
     };
   }
 
