@@ -395,7 +395,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   }
 
   >.e-bubble-content {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
     padding: 1em;
     font-size: 1em;
     background: white;
