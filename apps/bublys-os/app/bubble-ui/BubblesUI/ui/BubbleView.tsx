@@ -65,31 +65,8 @@ export const BubbleView: FC<BubbleProps> = ({
     }
   });
 
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [sizeMenuAnchor, setSizeMenuAnchor] = useState<null | HTMLElement>(null);
-
-  const handleMouseEnter = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(true);
-    }, 100); // 遅延時間
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsHovered(false);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
+  const [isFocused, setIsFocused] = useState(false);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -138,12 +115,17 @@ export const BubbleView: FC<BubbleProps> = ({
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
+    setIsFocused(true); // ヘッダークリックで最前面に
     if (!onMove) return;
     e.stopPropagation();
     dragStartPosRef.current = { ...bubble.position };
     dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
     document.addEventListener("mousemove", handleDragging);
     document.addEventListener("mouseup", endDrag);
+  };
+
+  const handleMouseLeave = () => {
+    setIsFocused(false);
   };
 
   useEffect(() => {
@@ -158,12 +140,11 @@ export const BubbleView: FC<BubbleProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isHovered ? 100 : zIndex} // ホバー時に最前面に
+      zIndex={isFocused ? 100 : zIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={notifyRendered}
       width={bubble.size ? `${bubble.size.width}px` : undefined}
