@@ -41,10 +41,10 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // URL: gakkai-shift/shift-plan/[shiftPlanId]
   const shiftPlanId = bubble.url.replace("gakkai-shift/shift-plan/", "");
   const handleStaffClick = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id);
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "origin-side");
   };
   const handleAssignmentClick = (assignmentId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id);
+    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
   return <ShiftPlanEditor shiftPlanId={shiftPlanId} onStaffClick={handleStaffClick} onAssignmentClick={handleAssignmentClick} />;
 };
@@ -53,10 +53,10 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const handleStaffClick = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id);
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "origin-side");
   };
   const handleAssignmentClick = (shiftPlanId: string, assignmentId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id);
+    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
   return <ShiftPlanManager onStaffClick={handleStaffClick} onAssignmentClick={handleAssignmentClick} />;
 };
