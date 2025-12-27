@@ -38,6 +38,9 @@
     },
     {
       "path": "./bublys-libs/object-shell"
+    },
+    {
+      "path": "./gakkai-shift-libs"
     }
   ]
 }

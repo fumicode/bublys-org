@@ -30,6 +30,7 @@ import { User } from "@/app/users/domain/User.domain";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -306,6 +307,9 @@ const routes: BubbleRoute[] = [
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+
+  // 学会シフト
+  ...gakkaiShiftBubbleRoutes,
 
   // ObjectShell統合ルート
   {

@@ -22,6 +22,8 @@ import { memoSlice } from "./slices/memo-slice.js";
 import { userSlice } from "./slices/user-slice.js";
 import { userGroupSlice } from "./slices/user-group-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
+import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
+import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -39,6 +41,8 @@ const reducers = combineReducers({
   [userSlice.name]: userSlice.reducer,
   [userGroupSlice.name]: userGroupSlice.reducer,
   [pocketSlice.name]: pocketSlice.reducer,
+  [gakkaiShiftSlice.name]: gakkaiShiftSlice.reducer,
+  [shiftPlanSlice.name]: shiftPlanSlice.reducer,
 
   //iframe-slices
   app: appReducer,
