@@ -31,6 +31,7 @@ import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } fr
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -310,6 +311,9 @@ const routes: BubbleRoute[] = [
 
   // 学会シフト
   ...gakkaiShiftBubbleRoutes,
+
+  // タスク管理
+  ...taskManagementBubbleRoutes,
 
   // ObjectShell統合ルート
   {
