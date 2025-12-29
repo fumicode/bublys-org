@@ -10,7 +10,7 @@ import {
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
 } from './bubbles-slice.js';
-import { convertGlobalPointToLayerLocal } from '@bublys-org/bubbles-ui';
+import { convertGlobalPointToLayerLocal, getOriginRect } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -84,11 +84,13 @@ bubblesListener.startListening({
 });
 
 
-// joinSiblingInProcess 発火後、renderBubble の完了を待ち moveTo → updateBubble を順次実行
+// popChildInProcess 発火後、renderBubble の完了を待ち moveTo → updateBubble を順次実行
 bubblesListener.startListening({
   actionCreator: popChildInProcess,
   effect: async (popChildAction, listenerApi) => {
-    const poppingBubbleId = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
+    const payload = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
+    const poppingBubbleId = payload.bubbleId;
+    const openingPosition = payload.openingPosition ?? "bubble-side";
 
 
     const state = listenerApi.getState() as any;
@@ -142,13 +144,27 @@ bubblesListener.startListening({
     console.log(`Pop: Popped bubble ${openerBubble.id} renderedRect: ${JSON.stringify(openerBubble.renderedRect)}`);
     console.log(`Pop: Popped bubble ${poppingBubble.id} renderedRect: ${JSON.stringify(poppingBubble.renderedRect)}`);
 
-    if(!openerBubble.renderedRect || !poppingBubble.renderedRect) { 
+    if(!openerBubble.renderedRect || !poppingBubble.renderedRect) {
       console.log("Pop: renderedRect not found");
       return;
     }
 
-    const point = openerBubble.renderedRect.calcPositionToOpen(poppingBubble.renderedRect.size);
-    console.log("Pop: Calculated point to open at (global)", point);
+    // openingPositionに応じて基準となるrectを選択
+    let baseRect = openerBubble.renderedRect;
+
+    if (openingPosition === "origin-side") {
+      // UrledPlace要素（クリック元）のrectを取得
+      const originRect = getOriginRect(openerBubble.id, poppingBubble.url);
+      if (originRect) {
+        console.log("Pop: Using origin rect for positioning", originRect.position);
+        baseRect = originRect;
+      } else {
+        console.log("Pop: Origin rect not found, falling back to bubble rect");
+      }
+    }
+
+    const point = baseRect.calcPositionToOpen(poppingBubble.renderedRect.size);
+    console.log("Pop: Calculated point to open at (global)", point, "openingPosition:", openingPosition);
 
 
     if(!point) {

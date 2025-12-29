@@ -16,6 +16,13 @@ type BubblesRelation = {
   openeeId: string;
 }
 
+export type OpeningPosition = "bubble-side" | "origin-side";
+
+export type PopChildPayload = {
+  bubbleId: string;
+  openingPosition?: OpeningPosition;
+}
+
 /**
  * Normalized slice state:
  * - entities: map of BubbleState by ID
@@ -99,9 +106,9 @@ export const bubblesSlice = createSlice({
       state.renderCount += 1;
     },
 
-    popChild: (state, action: PayloadAction<string>) => {
+    popChild: (state, action: PayloadAction<PopChildPayload>) => {
       const process =   BubblesProcess.fromJSON(state.process);
-      const poppedProcess = process.popChild(action.payload);
+      const poppedProcess = process.popChild(action.payload.bubbleId);
       state.process = poppedProcess.toJSON();
       state.renderCount += 1;
     },

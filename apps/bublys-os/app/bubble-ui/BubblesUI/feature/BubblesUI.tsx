@@ -18,6 +18,7 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
+  OpeningPosition,
 } from "@bublys-org/bubbles-ui-state";
 
 import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
@@ -88,11 +89,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   };
 
 
-  const popChild = (b: Bubble, openerBubbleId:string): string => {
+  const popChild = (
+    b: Bubble,
+    openerBubbleId: string,
+    openingPosition: OpeningPosition = "bubble-side"
+  ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
-    dispatch(popChildAction(b.id));
+    dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
 
     return b.id;
   };
@@ -128,7 +133,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // openBubble 用ロジック
   const popChildOrJoinSibling = (
     name: string,
-    openerBubbleId: string
+    openerBubbleId: string,
+    openingPosition: OpeningPosition = "bubble-side"
   ): string => {
     const newBubble = createBubble(name);
     const surface = bubblesDPO.surface;
@@ -137,7 +143,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);
 
-    
+
     if(isNameEndWithHistory) {
       return popChildMax(newBubble, openerBubbleId);
     }
@@ -145,7 +151,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     if (surface?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble, openerBubbleId);
     } else {
-      return popChild(newBubble, openerBubbleId);
+      return popChild(newBubble, openerBubbleId, openingPosition);
     }
   };
 

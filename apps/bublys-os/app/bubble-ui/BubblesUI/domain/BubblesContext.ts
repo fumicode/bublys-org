@@ -1,13 +1,14 @@
 import { createContext } from "react";
 import { Size2, Bubble, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { OpeningPosition } from "@bublys-org/bubbles-ui-state";
 
 type BubblesContextType = {
   pageSize?: Size2;
-  surfaceLeftTop: { x: number, y: number }, 
+  surfaceLeftTop: { x: number, y: number },
   bubbles: Bubble[][];
   coordinateSystem: CoordinateSystem;
 
-  openBubble: (name: string, openerBubbleId: string) => string;
+  openBubble: (name: string, openerBubbleId: string, openingPosition?: OpeningPosition) => string;
   renameBubble: (id: string, newName: string) => string;
 };
 
