@@ -13,6 +13,8 @@ import WarningIcon from "@mui/icons-material/Warning";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StarHalfIcon from "@mui/icons-material/StarHalf";
+import { Button } from "@mui/material";
+import { UrledPlace } from "../../bubble-ui/components";
 
 type AssignmentEvaluationViewProps = {
   evaluation: StaffAssignmentEvaluation_スタッフ配置評価;
@@ -20,6 +22,10 @@ type AssignmentEvaluationViewProps = {
   timeSlotLabel: string;
   roleName: string;
   constraintViolations?: ConstraintViolation[];
+  staffDetailUrl?: string;
+  staffAvailabilityUrl?: string;
+  onStaffClick?: () => void;
+  onTimeSlotClick?: () => void;
 };
 
 export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
@@ -28,6 +34,10 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   timeSlotLabel,
   roleName,
   constraintViolations = [],
+  staffDetailUrl,
+  staffAvailabilityUrl,
+  onStaffClick,
+  onTimeSlotClick,
 }) => {
   const status = evaluation.getOverallStatus();
   const statusLabel = StaffAssignmentEvaluation_スタッフ配置評価.getStatusLabel(status);
@@ -35,8 +45,31 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   return (
     <StyledContainer>
       <div className="e-header">
-        <div className="e-title">配置評価: {staffName}</div>
-        <div className="e-subtitle">{timeSlotLabel} → {roleName}</div>
+        <div className="e-title">
+          配置評価:{" "}
+          {staffDetailUrl ? (
+            <UrledPlace url={staffDetailUrl}>
+              <Button variant="text" size="small" onClick={onStaffClick} className="e-link-button">
+                {staffName}
+              </Button>
+            </UrledPlace>
+          ) : (
+            staffName
+          )}
+        </div>
+        <div className="e-subtitle">
+          {staffAvailabilityUrl ? (
+            <UrledPlace url={staffAvailabilityUrl}>
+              <Button variant="text" size="small" onClick={onTimeSlotClick} className="e-link-button">
+                {timeSlotLabel}
+              </Button>
+            </UrledPlace>
+          ) : (
+            timeSlotLabel
+          )}
+          {" → "}
+          {roleName}
+        </div>
       </div>
 
       <div className="e-overall">
@@ -400,5 +433,14 @@ const StyledContainer = styled.div`
       padding: 2px 0;
       color: #e65100;
     }
+  }
+
+  .e-link-button {
+    padding: 0 4px;
+    min-width: auto;
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    vertical-align: baseline;
   }
 `;

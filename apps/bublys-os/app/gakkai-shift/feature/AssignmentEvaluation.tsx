@@ -19,11 +19,19 @@ import {
 type AssignmentEvaluationProps = {
   shiftPlanId: string;
   assignmentId: string;
+  onStaffClick?: (staffId: string) => void;
+  onTimeSlotClick?: (staffId: string) => void;
+  buildStaffDetailUrl?: (staffId: string) => string;
+  buildStaffAvailabilityUrl?: (staffId: string) => string;
 };
 
 export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   shiftPlanId,
   assignmentId,
+  onStaffClick,
+  onTimeSlotClick,
+  buildStaffDetailUrl,
+  buildStaffAvailabilityUrl,
 }) => {
   const staffList = useAppSelector(selectGakkaiShiftStaffList);
   const shiftPlan = useAppSelector(selectGakkaiShiftPlanById(shiftPlanId));
@@ -93,6 +101,10 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
       timeSlotLabel={timeSlot.label}
       roleName={role.name}
       constraintViolations={constraintViolations}
+      staffDetailUrl={buildStaffDetailUrl?.(staff.id)}
+      staffAvailabilityUrl={buildStaffAvailabilityUrl?.(staff.id)}
+      onStaffClick={() => onStaffClick?.(staff.id)}
+      onTimeSlotClick={() => onTimeSlotClick?.(staff.id)}
     />
   );
 };
