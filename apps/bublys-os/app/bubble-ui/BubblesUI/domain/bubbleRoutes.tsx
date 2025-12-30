@@ -31,6 +31,7 @@ import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } fr
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -310,6 +311,9 @@ const routes: BubbleRoute[] = [
 
   // 学会シフト
   ...gakkaiShiftBubbleRoutes,
+
+  // 囲碁ゲーム
+  ...igoGameBubbleRoutes,
 
   // ObjectShell統合ルート
   {
