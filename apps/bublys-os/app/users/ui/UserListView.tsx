@@ -85,7 +85,6 @@ export const UserListView: FC<UserListViewProps> = ({
               <UrledPlace url={detailUrl}>
                 <button
                   style={{ all: "unset", cursor: "pointer" }}
-                  draggable={false}
                   onClick={() => onUserClick?.(user.id, detailUrl)}
                 >
                   <div className="e-main">

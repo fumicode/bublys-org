@@ -13,6 +13,7 @@ export type TaskJSON = {
   title: string;
   description: string;
   status: TaskStatus_ステータス;
+  assigneeId?: string;  // 担当者のユーザーID
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +27,7 @@ export class Task_タスク {
   get title(): string { return this.state.title; }
   get description(): string { return this.state.description; }
   get status(): TaskStatus_ステータス { return this.state.status; }
+  get assigneeId(): string | undefined { return this.state.assigneeId; }
   get createdAt(): string { return this.state.createdAt; }
   get updatedAt(): string { return this.state.updatedAt; }
 
@@ -55,6 +57,11 @@ export class Task_タスク {
   /** 説明を更新 */
   withDescription(description: string): Task_タスク {
     return this.withUpdatedState({ description });
+  }
+
+  /** 担当者を設定 */
+  withAssignee(assigneeId: string | undefined): Task_タスク {
+    return this.withUpdatedState({ assigneeId });
   }
 
   /** 内部用：状態更新ヘルパー */

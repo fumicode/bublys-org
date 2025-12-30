@@ -17,8 +17,14 @@ const TaskCollectionBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 // タスク管理 - タスク詳細バブル
 const TaskDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   const taskId = bubble.url.replace("task-management/tasks/", "");
-  return <TaskDetail taskId={taskId} />;
+
+  const handleUserClick = (userId: string) => {
+    openBubble(`users/${userId}`, bubble.id, "bubble-side");
+  };
+
+  return <TaskDetail taskId={taskId} onUserClick={handleUserClick} />;
 };
 
 /** タスク管理機能のバブルルート定義 */

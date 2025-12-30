@@ -6,7 +6,9 @@
  * URLの最後のセグメントを取得（通常はID）
  * 例: "users/123" -> "123"
  * 例: "user-groups/abc-def" -> "abc-def"
+ * ※ これは一般的には使えない場合もあるので注意 users/123/profile みたいな場合はprofileが取れる
  */
+
 export function extractIdFromUrl(url: string): string | undefined {
   if (!url) return undefined;
   const segments = url.split('/').filter(Boolean);

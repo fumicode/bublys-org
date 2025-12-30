@@ -8,16 +8,19 @@ import {
   selectTaskById,
   updateTaskStatus,
   updateTask,
+  selectUsers,
   TaskStatus_ステータス,
 } from "@bublys-org/state-management";
 import { TaskDetailView } from "../ui/TaskDetailView";
 
 type TaskDetailProps = {
   taskId?: string;
+  onUserClick?: (userId: string) => void;
 };
 
-export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
+export const TaskDetail: FC<TaskDetailProps> = ({ taskId, onUserClick }) => {
   const dispatch = useAppDispatch();
+  const users = useAppSelector(selectUsers);
 
   // taskIdが指定されていればそれを使い、なければ選択中のタスクを使う
   const selectedTask = useAppSelector(selectSelectedTask);
@@ -50,6 +53,17 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
     }));
   };
 
+  const handleAssigneeChange = (assigneeId: string | undefined) => {
+    if (!task) return;
+    dispatch(updateTask({
+      ...task.toJSON(),
+      assigneeId,
+      updatedAt: new Date().toISOString(),
+    }));
+  };
+
+  const buildUserDetailUrl = (userId: string) => `users/${userId}`;
+
   if (!task) {
     return (
       <div style={{ padding: 16, color: "#666" }}>
@@ -61,9 +75,13 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
   return (
     <TaskDetailView
       task={task}
+      users={users}
       onStatusChange={handleStatusChange}
       onTitleChange={handleTitleChange}
       onDescriptionChange={handleDescriptionChange}
+      onAssigneeChange={handleAssigneeChange}
+      buildUserDetailUrl={buildUserDetailUrl}
+      onUserClick={onUserClick}
     />
   );
 };

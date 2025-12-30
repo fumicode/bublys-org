@@ -2,28 +2,66 @@
 
 import { FC, useState, useRef, useEffect } from "react";
 import styled from "styled-components";
-import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス, UserState } from "@bublys-org/state-management";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import { Button } from "@mui/material";
+import PersonIcon from "@mui/icons-material/Person";
+import { Button, Select, MenuItem, FormControl } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CheckIcon from "@mui/icons-material/Check";
 import ReplayIcon from "@mui/icons-material/Replay";
 import { EditableText } from "@/lib/EditableText";
 import EditIcon from "@mui/icons-material/Edit";
+import { UrledPlace } from "../../bubble-ui/components";
+import { DRAG_DATA_TYPES, parseDragPayload } from "../../bubble-ui/utils/drag-types";
+import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
 
 type TaskDetailViewProps = {
   task: Task_タスク;
+  users?: UserState[];
   onStatusChange?: (status: TaskStatus_ステータス) => void;
   onTitleChange?: (title: string) => void;
   onDescriptionChange?: (description: string) => void;
+  onAssigneeChange?: (assigneeId: string | undefined) => void;
+  buildUserDetailUrl?: (userId: string) => string;
+  onUserClick?: (userId: string) => void;
 };
 
 export const TaskDetailView: FC<TaskDetailViewProps> = ({
   task,
+  users = [],
   onStatusChange,
   onTitleChange,
   onDescriptionChange,
+  onAssigneeChange,
+  buildUserDetailUrl,
+  onUserClick,
 }) => {
+  const assignee = users.find(u => u.id === task.assigneeId);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!onAssigneeChange) return;
+    // Check if drag contains user type (can only check types during dragover, not data)
+    const types = Array.from(e.dataTransfer.types);
+    if (!types.includes(DRAG_DATA_TYPES.user)) return;
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    setIsDragOver(false);
+    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+    const url = payload?.url || e.dataTransfer.getData(DRAG_DATA_TYPES.user);
+    const userId = url ? extractIdFromUrl(url) : undefined;
+    if (!userId) return;
+    e.preventDefault();
+    onAssigneeChange?.(userId);
+  };
+
   return (
     <StyledTaskDetail>
       <div className="e-header">
@@ -38,6 +76,51 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
           <StatusBadge status={task.status} />
         </div>
       </div>
+
+      <section
+        className={`e-section e-assignee-section ${isDragOver ? "is-drag-over" : ""}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <h4>担当者 {isDragOver && <span className="e-drop-hint">ここにドロップ</span>}</h4>
+        <div className="e-assignee">
+          {assignee && buildUserDetailUrl ? (
+            <UrledPlace url={buildUserDetailUrl(assignee.id)}>
+              <Button
+                variant="text"
+                size="small"
+                startIcon={<PersonIcon />}
+                onClick={() => onUserClick?.(assignee.id)}
+                className="e-assignee-link"
+              >
+                {assignee.name}
+              </Button>
+            </UrledPlace>
+          ) : assignee ? (
+            <span className="e-assignee-name">
+              <PersonIcon fontSize="small" /> {assignee.name}
+            </span>
+          ) : null}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select
+              value={task.assigneeId || ""}
+              onChange={(e) => onAssigneeChange?.(e.target.value || undefined)}
+              displayEmpty
+              size="small"
+            >
+              <MenuItem value="">
+                <em>未割当</em>
+              </MenuItem>
+              {users.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
+      </section>
 
       <section className="e-section">
         <h4>説明</h4>
@@ -270,6 +353,43 @@ const StyledTaskDetail = styled.div`
       color: #666;
       border-bottom: 1px solid #eee;
       padding-bottom: 4px;
+    }
+  }
+
+  .e-assignee-section {
+    border-radius: 8px;
+    padding: 12px;
+    margin: -12px;
+    margin-bottom: 4px;
+    transition: background-color 0.2s, border-color 0.2s;
+    border: 2px dashed transparent;
+
+    &.is-drag-over {
+      background-color: #e3f2fd;
+      border-color: #1976d2;
+    }
+
+    .e-drop-hint {
+      font-size: 0.85em;
+      color: #1976d2;
+      font-weight: normal;
+    }
+  }
+
+  .e-assignee {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .e-assignee-link {
+      text-transform: none;
+    }
+
+    .e-assignee-name {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #333;
     }
   }
 
