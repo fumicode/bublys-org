@@ -30,7 +30,8 @@ interface WorldView3DProps<TWorldState> {
   onRegrow: () => void;
   renderWorldState: (
     worldState: TWorldState,
-    onWorldStateChange: (newWorldState: TWorldState) => void
+    onWorldStateChange: (newWorldState: TWorldState) => void,
+    isPreview?: boolean
   ) => React.ReactNode;
 }
 
@@ -258,7 +259,7 @@ function WorldView3D<TWorldState>({
           perspectiveOrigin: '50% 20%',
           overflow: 'hidden',
           position: 'relative',
-          backgroundColor: 'rgba(240, 245, 250, 0.3)',
+          backgroundColor: 'transparent',
         }}
       >
         <div
@@ -296,63 +297,69 @@ function WorldView3D<TWorldState>({
           ))}
         </svg>
 
-        {/* 世界を描画 */}
-        {worldsWithPosition.map(({ world, distance, x, y, z, baseZIndex, isHead, worldLineHeadId }) => {
-          const isFocused = world.worldId === focusedWorldId;
-          const opacity = Math.max(0.3, 1 - distance * 0.15);
-          const scale = Math.max(0.3, 1 - distance * 0.15);
-          
-          // focusedな世界はわずかに手前に
-          const adjustedZ = isFocused ? z + 50 : z;
+        {/* フォーカスがHEADにあるかどうかを判定 */}
+        {(() => {
+          const focusedIsHead = worldsWithPosition.some(w => w.world.worldId === focusedWorldId && w.isHead);
 
-          // 世界線の色を取得
-          const worldLineColor = worldLineHeadId ? worldLineColors.get(worldLineHeadId) : null;
+          return worldsWithPosition.map(({ world, distance, x, y, z, baseZIndex, isHead, worldLineHeadId }) => {
+            const isFocused = world.worldId === focusedWorldId;
+            const baseOpacity = Math.max(0.3, 1 - distance * 0.15);
+            // フォーカスがHEAD以外にある場合、HEADを薄く表示
+            const opacity = (isHead && !isFocused && !focusedIsHead) ? 0.3 : baseOpacity;
+            const scale = Math.max(0.3, 1 - distance * 0.15);
 
-          // HEADはフルカード表示、それ以外はドット表示
-          const isHovered = hoveredWorldId === world.worldId;
-          
-          if (isHead) {
-            return (
-              <div
-                key={world.worldId}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleWorldClick(world.worldId);
-                }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  handleWorldDoubleClick(world.worldId);
-                }}
-                style={{
-                  position: 'absolute',
-                  left: `${x}px`,
-                  top: `${y}px`,
-                  transform: `translate(-50%, -50%) translateZ(${adjustedZ}px) scale(${scale}) rotateX(20deg)`,
-                  transformOrigin: 'center center',
-                  transformStyle: 'preserve-3d',
-                  width: `${containerSize.width * 0.4}px`,
-                  minHeight: '120px',
-                  padding: '1.5rem',
-                  backgroundColor: isFocused
-                    ? 'rgba(255, 255, 255, 0.98)'
-                    : (worldLineColor?.bg || 'rgba(255, 255, 255, 0.92)'),
-                  border: isFocused
-                    ? '3px solid rgba(0, 123, 255, 0.8)'
-                    : `3px solid ${worldLineColor?.border || 'rgba(150, 150, 200, 0.6)'}`,
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  opacity,
-                  pointerEvents: 'auto',
-                  boxShadow: isFocused
-                    ? '0 10px 40px rgba(0, 123, 255, 0.3)'
-                    : '0 8px 24px rgba(0, 0, 0, 0.15)',
-                  zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex + 50),
-                }}
-              >
-                {renderWorldState(world.worldState as TWorldState, () => {})}
-              </div>
-            );
-          } else {
+            // focusedな世界はわずかに手前に
+            const adjustedZ = isFocused ? z + 50 : z;
+
+            // 世界線の色を取得
+            const worldLineColor = worldLineHeadId ? worldLineColors.get(worldLineHeadId) : null;
+
+            // HEADまたはフォーカスされた世界はフルカード表示、それ以外はドット表示
+            const isHovered = hoveredWorldId === world.worldId;
+            const showFullCard = isHead || isFocused;
+
+            if (showFullCard) {
+              return (
+                <div
+                  key={world.worldId}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleWorldClick(world.worldId);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleWorldDoubleClick(world.worldId);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: `${x}px`,
+                    top: `${y}px`,
+                    transform: `translate(-50%, -50%) translateZ(${adjustedZ}px) scale(${scale}) rotateX(20deg)`,
+                    transformOrigin: 'center center',
+                    transformStyle: 'preserve-3d',
+                    width: `${containerSize.width * 0.4}px`,
+                    minHeight: '120px',
+                    padding: '1.5rem',
+                    backgroundColor: isFocused
+                      ? 'rgba(255, 255, 255, 0.98)'
+                      : (worldLineColor?.bg || 'rgba(255, 255, 255, 0.92)'),
+                    border: isFocused
+                      ? '3px solid rgba(0, 123, 255, 0.8)'
+                      : `3px solid ${worldLineColor?.border || 'rgba(150, 150, 200, 0.6)'}`,
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    opacity,
+                    pointerEvents: 'auto',
+                    boxShadow: isFocused
+                      ? '0 10px 40px rgba(0, 123, 255, 0.3)'
+                      : '0 8px 24px rgba(0, 0, 0, 0.15)',
+                    zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex + 50),
+                  }}
+                >
+                  {renderWorldState(world.worldState as TWorldState, () => {}, true)}
+                </div>
+              );
+            } else {
             // ドット表示（ホバー時にカード表示）
             const dotColor = worldLineColor?.border || 'rgba(150, 150, 200, 0.7)';
             
@@ -433,13 +440,14 @@ function WorldView3D<TWorldState>({
                       animation: 'fadeIn 0.2s ease-out',
                     }}
                   >
-                    {renderWorldState(world.worldState as TWorldState, () => {})}
+                    {renderWorldState(world.worldState as TWorldState, () => {}, true)}
                   </div>
                 )}
               </div>
             );
-          }
-        })}
+            }
+          });
+        })()}
         </div>
       </div>
     </>
@@ -454,7 +462,8 @@ interface WorldLineViewProps<TWorldState> {
   /** 世界の状態を表示するレンダー関数 */
   renderWorldState: (
     worldState: TWorldState,
-    onWorldStateChange: (newWorldState: TWorldState) => void
+    onWorldStateChange: (newWorldState: TWorldState) => void,
+    isPreview?: boolean
   ) => React.ReactNode;
 }
 
@@ -525,7 +534,7 @@ export function WorldLineView<TWorldState>({ renderWorldState }: WorldLineViewPr
           style={{ 
             width: `100%`,
             height: `100%`,
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: 'transparent',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',

@@ -238,7 +238,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           </Box>
           <Button
             variant="contained"
-            onClick={() => popChildOrJoinSibling("igo-game", "root")}
+            onClick={() => popChildOrJoinSibling(`igo-game/${crypto.randomUUID()}`, "root")}
             fullWidth
             sx={{ backgroundColor: "#dcb35c", "&:hover": { backgroundColor: "#c9a24e" } }}
           >
