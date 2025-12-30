@@ -381,7 +381,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     overflow: auto;
     padding: 1em;
     font-size: 1em;
-    background: white;
+    background: transparent;
 
     border-radius: 0.5em;
     margin: 0.5em;

@@ -155,7 +155,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         {renderedBubbles}
         <div className="e-underground-curtain">curtain</div>
         <div className="e-debug-visualizations">
-          <div className="e-surface-border">surface</div>
+          <div className="e-surface-border"></div>
           <div className="e-underground-border">underground</div>
           <div className="e-vanishing-point"></div>
         </div>
@@ -214,8 +214,15 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       left: ${({ surface }) => surface.leftTop.x}px;
       width: calc(100% - ${({ surface }) => surface.leftTop.x}px);
       height: calc(100% - ${({ surface }) => surface.leftTop.y}px);
-      border: 2px solid red;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(2px);
+      box-shadow:
+        0 4px 30px rgba(0, 0, 0, 0.05),
+        inset 0 0 20px rgba(255, 255, 255, 0.05);
       pointer-events: none;
+      z-index: ${({ surfaceZIndex }) => (surfaceZIndex || 0) + 1};
     }
     .e-vanishing-point {
       position: absolute;
