@@ -1,6 +1,10 @@
 import { Point2, Size2 } from "./00_Point.js";
 import {SmartRect} from "./SmartRect.js";
 
+export type BubbleOptions = {
+  contentBackground?: string;
+};
+
 export type RectJson = {
   x: number;
   y: number;
@@ -16,6 +20,7 @@ export type BubbleProps = {
   type: string;
   position?: Point2;
   size?: Size2;
+  bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
 
@@ -28,6 +33,7 @@ export type BubbleJson= {
   type: string;
   position?: Point2;
   size?: Size2;
+  bubbleOptions?: BubbleOptions;
 
   renderedRect?: RectJson; //これはシリアライズ可能な型に保つ
 
@@ -40,6 +46,7 @@ export type BubbleState = {
   type: string;
   position?: Point2;
   size?: Size2;
+  bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
 
@@ -88,6 +95,14 @@ export class Bubble {
     return this.state.size;
   }
 
+  get contentBackground(): string | undefined {
+    return this.state.bubbleOptions?.contentBackground;
+  }
+
+  get bubbleOptions(): BubbleOptions | undefined {
+    return this.state.bubbleOptions;
+  }
+
   // 後方互換性のため rename を残す
   rename(newUrl: string): Bubble {
     return new Bubble({ ...this.state, url: newUrl });
@@ -123,6 +138,19 @@ export class Bubble {
 
 }
 
+type BubbleResolvedProps = {
+  type?: string;
+  bubbleOptions?: BubbleOptions;
+};
+
+type BubblePropsResolver = (url: string) => BubbleResolvedProps | undefined;
+let customBubblePropsResolver: BubblePropsResolver | undefined;
+
+export const registerBubblePropsResolver = (resolver: BubblePropsResolver) => {
+  customBubblePropsResolver = resolver;
+};
+
+// 後方互換性のため維持
 type BubbleTypeResolver = (url: string) => string | undefined;
 let customBubbleTypeResolver: BubbleTypeResolver | undefined;
 
@@ -132,10 +160,14 @@ export const registerBubbleTypeResolver = (resolver: BubbleTypeResolver) => {
 
 export const createBubble = (url: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(url);
-  const resolvedType = customBubbleTypeResolver?.(url);
-  const type = resolvedType ?? "normal";
 
-  return new Bubble({ url, colorHue, type, position: pos });
+  // 新しい resolver を優先
+  const resolvedProps = customBubblePropsResolver?.(url);
+  const resolvedType = resolvedProps?.type ?? customBubbleTypeResolver?.(url);
+  const type = resolvedType ?? "normal";
+  const bubbleOptions = resolvedProps?.bubbleOptions;
+
+  return new Bubble({ url, colorHue, type, position: pos, bubbleOptions });
 };
 
 

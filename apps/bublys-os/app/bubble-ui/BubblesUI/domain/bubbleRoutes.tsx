@@ -1,12 +1,13 @@
 "use client";
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
-import { registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
+import { registerBubblePropsResolver, BubbleOptions } from "@bublys-org/bubbles-ui";
 import { useContext } from "react";
 
 export type BubbleRoute = {
   pattern: RegExp;
   type: string;
   Component: BubbleContentRenderer;
+  bubbleOptions?: BubbleOptions;
 };
 
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
@@ -329,4 +330,11 @@ const routes: BubbleRoute[] = [
 ];
 
 export const bubbleRoutes = routes;
-registerBubbleTypeResolver((url: string) => matchBubbleRoute(url)?.type);
+registerBubblePropsResolver((url: string) => {
+  const route = matchBubbleRoute(url);
+  if (!route) return undefined;
+  return {
+    type: route.type,
+    bubbleOptions: route.bubbleOptions,
+  };
+});

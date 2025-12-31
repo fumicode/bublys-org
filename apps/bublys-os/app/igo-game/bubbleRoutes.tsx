@@ -63,10 +63,12 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
     Component: IgoGameWorldLinesBubble,
+    bubbleOptions: { contentBackground: "transparent" },
   },
   {
     pattern: /^igo-game\/[^/]+$/,
     type: "igo-game",
     Component: IgoGameBubble,
+    bubbleOptions: { contentBackground: "transparent" },
   },
 ];
