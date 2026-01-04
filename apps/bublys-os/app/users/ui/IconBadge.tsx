@@ -2,6 +2,7 @@ import React from "react";
 import styled from "styled-components";
 import { UrledPlace } from "../../bubble-ui/components";
 import { DragDataType, useDragPayload } from "../../bubble-ui/utils/drag-types";
+import { ObjectType, getDragType } from "../../bubble-ui/object-view";
 
 type IconBadgeProps = {
   icon: React.ReactNode;
@@ -9,11 +10,15 @@ type IconBadgeProps = {
   onClick?: () => void;
   dataUrl?: string;
   draggable?: boolean;
+  /** @deprecated dragType の代わりに objectType を使用してください */
   dragType?: DragDataType;
+  objectType?: ObjectType;
 };
 
-export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType}: IconBadgeProps) => {
-  const dragPayload = dragType && dataUrl ? { type: dragType, url: dataUrl, label } : null;
+export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType, objectType }: IconBadgeProps) => {
+  // objectType があれば getDragType で変換、なければ legacy の dragType を使用
+  const resolvedDragType = objectType ? getDragType(objectType) as DragDataType : dragType;
+  const dragPayload = resolvedDragType && dataUrl ? { type: resolvedDragType, url: dataUrl, label } : null;
   const { draggable: canDrag, onDragStart } = useDragPayload(dragPayload);
 
   const badge = (

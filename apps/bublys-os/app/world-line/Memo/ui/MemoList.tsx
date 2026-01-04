@@ -8,8 +8,8 @@ import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
 import { UserBadge } from '@/app/users/ui/UserBadge';
 import { selectUsers } from '@bublys-org/state-management';
+import { ObjectView } from '../../../bubble-ui/object-view';
 import { UrledPlace } from '../../../bubble-ui/components';
-import { DRAG_DATA_TYPES, setDragPayload } from '../../../bubble-ui/utils/drag-types';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -55,33 +55,23 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDe
   return (
     <div>
       <StyledMemoList>
-        {memos.map((memo) => (
+        {memos.map((memo) => {
+          const detailUrl = buildDetailUrl(memo.id);
+          const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
+          return (
           <li
             key={memo.id}
             className="e-item"
-            draggable={true}
-            onDragStart={(e) => {
-              const detailUrl = buildDetailUrl(memo.id);
-              const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
-              setDragPayload(e, {
-                type: DRAG_DATA_TYPES.memo,
-                url: detailUrl,
-                label,
-              });
-            }}
           >
-            <UrledPlace url={buildDetailUrl(memo.id)}>
-              <button
-                style={{ all: "unset", cursor: "pointer" }}
-                onClick={() => {
-                  const detailUrl = buildDetailUrl(memo.id);
-                  onMemoClick?.(memo.id, detailUrl);
-                }}
-              >
-                <MemoIcon/>
-                <span>「{memo.blocks[memo.lines?.[0]]?.content}...」</span>
-              </button>
-            </UrledPlace>
+            <ObjectView
+              type="Memo"
+              url={detailUrl}
+              label={label}
+              onClick={() => onMemoClick?.(memo.id, detailUrl)}
+            >
+              <MemoIcon/>
+              <span>「{label}...」</span>
+            </ObjectView>
 
             {memo.authorId && (
               <span style={{ marginLeft: 8 }}>
@@ -115,7 +105,7 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDe
               </UrledPlace>
             </span>
           </li>
-        ))}
+        )})}
       </StyledMemoList>
     </div>
   );

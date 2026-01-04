@@ -214,15 +214,18 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const handleOpenWorldLineView = () => {
     openBubble(`memos/${memoId}/history`, bubble.id);
   };
+  const handleOpenAuthor = (_userId: string, url: string) => {
+    openBubble(url, bubble.id);
+  };
 
   return (
-    <MemoWorldLineManager 
-      memoId={memoId} 
-      isBubbleMode={false} 
-      onOpenWorldLineView={handleOpenWorldLineView} 
+    <MemoWorldLineManager
+      memoId={memoId}
+      isBubbleMode={false}
+      onOpenWorldLineView={handleOpenWorldLineView}
       onCloseWorldLineView={() => {}}
     >
-      <MemoWorldLineIntegration memoId={memoId} />
+      <MemoWorldLineIntegration memoId={memoId} onOpenAuthor={handleOpenAuthor} />
     </MemoWorldLineManager>
   );
 };

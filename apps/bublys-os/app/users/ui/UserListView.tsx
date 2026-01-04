@@ -6,8 +6,9 @@ import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon";
 import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
 import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
-import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "../../bubble-ui/utils/drag-types";
+import { DRAG_DATA_TYPES, parseDragPayload } from "../../bubble-ui/utils/drag-types";
 
 type UserListViewProps = {
   users: User[];
@@ -37,16 +38,6 @@ export const UserListView: FC<UserListViewProps> = ({
           <li
             key={user.id}
             className="e-item"
-            draggable={true}
-            onDragStart={(e) => {
-              console.log('[UserListView] onDragStart', { userId: user.id, userName: user.name, showReorder, detailUrl });
-
-              setDragPayload(e, {
-                type: DRAG_DATA_TYPES.user,
-                url: detailUrl,
-                label: user.name,
-              });
-            }}
             onDragOver={(e) => {
               if (!showReorder) {
                 // リオーダーモードでない場合は、preventDefault()しない（ポケットへのドロップを許可）
@@ -82,23 +73,22 @@ export const UserListView: FC<UserListViewProps> = ({
                   <DragIndicatorIcon fontSize="small" />
                 </span>
               )}
-              <UrledPlace url={detailUrl}>
-                <button
-                  style={{ all: "unset", cursor: "pointer" }}
-                  draggable={false}
-                  onClick={() => onUserClick?.(user.id, detailUrl)}
-                >
-                  <div className="e-main">
-                    <UserIcon fontSize="small" className="e-avatar" />
-                    <div className="e-text">
-                      <div className="e-name">{user.name}</div>
-                      <div className="e-meta">
-                        {user.birthday} / {user.getAge()}歳
-                      </div>
+              <ObjectView
+                type="User"
+                url={detailUrl}
+                label={user.name}
+                onClick={() => onUserClick?.(user.id, detailUrl)}
+              >
+                <div className="e-main">
+                  <UserIcon fontSize="small" className="e-avatar" />
+                  <div className="e-text">
+                    <div className="e-name">{user.name}</div>
+                    <div className="e-meta">
+                      {user.birthday} / {user.getAge()}歳
                     </div>
                   </div>
-                </button>
-              </UrledPlace>
+                </div>
+              </ObjectView>
               <span className="e-button-group">
                 <UrledPlace url={deleteUrl}>
                   <IconButton
