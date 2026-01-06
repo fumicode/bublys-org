@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 
@@ -158,30 +158,46 @@ export const {
 
 // ========== Selectors ==========
 
+// 基本セレクター
+const selectTaskListRaw = (state: RootState) => state.task.taskList;
+
 /** タスク一覧を取得（ドメインオブジェクト） */
-export const selectTaskList = (state: RootState): Task_タスク[] =>
-  state.task.taskList.map((json) => Task_タスク.fromJSON(json));
+export const selectTaskList = createSelector(
+  [selectTaskListRaw],
+  (taskList): Task_タスク[] => taskList.map((json) => Task_タスク.fromJSON(json))
+);
 
 /** 選択中のタスクIDを取得 */
 export const selectSelectedTaskId = (state: RootState): string | null =>
   state.task.selectedTaskId;
 
 /** IDでタスクを取得（ドメインオブジェクト） */
-export const selectTaskById = (id: string) => (state: RootState): Task_タスク | undefined => {
-  const json = state.task.taskList.find((t) => t.id === id);
-  return json ? Task_タスク.fromJSON(json) : undefined;
-};
+export const selectTaskById = (id: string) =>
+  createSelector(
+    [(state: RootState) => state.task.taskList.find((t) => t.id === id)],
+    (json): Task_タスク | undefined => {
+      return json ? Task_タスク.fromJSON(json) : undefined;
+    }
+  );
 
 /** ステータスでタスクを絞り込み（ドメインオブジェクト） */
-export const selectTasksByStatus = (status: TaskStatus_ステータス) => (state: RootState): Task_タスク[] =>
-  state.task.taskList
-    .filter((t) => t.status === status)
-    .map((json) => Task_タスク.fromJSON(json));
+export const selectTasksByStatus = (status: TaskStatus_ステータス) =>
+  createSelector(
+    [selectTaskListRaw],
+    (taskList): Task_タスク[] =>
+      taskList
+        .filter((t) => t.status === status)
+        .map((json) => Task_タスク.fromJSON(json))
+  );
 
 /** 選択中のタスクを取得（ドメインオブジェクト） */
-export const selectSelectedTask = (state: RootState): Task_タスク | undefined => {
-  const id = state.task.selectedTaskId;
-  if (!id) return undefined;
-  const json = state.task.taskList.find((t) => t.id === id);
-  return json ? Task_タスク.fromJSON(json) : undefined;
-};
+export const selectSelectedTask = createSelector(
+  [(state: RootState) => {
+    const id = state.task.selectedTaskId;
+    if (!id) return undefined;
+    return state.task.taskList.find((t) => t.id === id);
+  }],
+  (json): Task_タスク | undefined => {
+    return json ? Task_タスク.fromJSON(json) : undefined;
+  }
+);

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
 import {
   Bubble,
   BubbleJson,
@@ -202,12 +202,19 @@ export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: {
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
-export const selectSurfaceBubbles = (state: { bubbleState: BubbleStateSlice }) => {
-  const process = BubblesProcess.fromJSON(state.bubbleState.process);
-  const bubbles = state.bubbleState.bubbles;
-  const surfaceIds = process.surface || [];
-  return surfaceIds.map(id => Bubble.fromJSON(bubbles[id]));
-}
+// 基本セレクター（入力セレクター）
+const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles;
+const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.process;
+const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbleRelations;
+
+export const selectSurfaceBubbles = createSelector(
+  [selectProcessJson, selectBubblesJson],
+  (processJson, bubblesJson) => {
+    const process = BubblesProcess.fromJSON(processJson);
+    const surfaceIds = process.surface || [];
+    return surfaceIds.map(id => Bubble.fromJSON(bubblesJson[id]));
+  }
+);
 
 export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice }) => {
   return state.bubbleState.bubbleRelations;
@@ -217,16 +224,15 @@ export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStat
   return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
 }
 
-export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
-  const relations = state.bubbleState.bubbleRelations;
-  const bubbles = state.bubbleState.bubbles;
-  return relations.map(relation => {
-    return({
-      opener: Bubble.fromJSON(bubbles[relation.openerId]),
-      openee: Bubble.fromJSON(bubbles[relation.openeeId]),
-    }
-  )});
-}
+export const selectBubblesRelationsWithBubble = createSelector(
+  [selectBubbleRelationsRaw, selectBubblesJson],
+  (relations, bubblesJson) => {
+    return relations.map(relation => ({
+      opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
+      openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
+    }));
+  }
+);
 
 export const selectGlobalCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
   return state.bubbleState.globalCoordinateSystem;
@@ -255,14 +261,15 @@ export const selectBubbleLayerIndex = (state: { bubbleState: BubbleStateSlice },
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.
+ * Memoized to prevent unnecessary re-renders.
  */
-export const selectBubblesProcessDPO = (
-  state: { bubbleState: BubbleStateSlice } //bubbleStateという名前は、bubblesSliceのnameと一致させる
-): BubblesProcessDPO => {
-  const { bubbles: bubblesJson, process: processJson } = state.bubbleState;
-  const bubbles = Object.values(bubblesJson).map((s) => Bubble.fromJSON(s));
-  const processInstance = BubblesProcess.fromJSON(processJson);
-  return new BubblesProcessDPO(processInstance, bubbles);
-};
+export const selectBubblesProcessDPO = createSelector(
+  [selectBubblesJson, selectProcessJson],
+  (bubblesJson, processJson): BubblesProcessDPO => {
+    const bubbles = Object.values(bubblesJson).map((s) => Bubble.fromJSON(s));
+    const processInstance = BubblesProcess.fromJSON(processJson);
+    return new BubblesProcessDPO(processInstance, bubbles);
+  }
+);
 
 export default bubblesSlice.reducer;

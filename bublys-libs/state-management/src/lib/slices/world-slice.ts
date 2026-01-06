@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 
@@ -76,6 +76,11 @@ export const selectApexWorld = (objectId: string) => (state: RootState) => {
 export const selectOperationHistory = (objectId: string) => (state: RootState) => 
   state.worldLine.operationHistory[objectId] || [];
 
+// 基本セレクター
+const selectWorldLines = (state: RootState) => state.worldLine.worldLines;
+
 // すべてのworldLineのobjectIdを取得
-export const selectAllWorldLineObjectIds = (state: RootState) => 
-  Object.keys(state.worldLine.worldLines);
+export const selectAllWorldLineObjectIds = createSelector(
+  [selectWorldLines],
+  (worldLines) => Object.keys(worldLines)
+);

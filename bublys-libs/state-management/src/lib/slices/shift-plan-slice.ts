@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 
@@ -77,26 +77,36 @@ export const {
 
 // ========== Selectors ==========
 
+// 基本セレクター
+const selectShiftPlansRaw = (state: RootState) => state.shiftPlan.shiftPlans ?? [];
+
 /** シフト案一覧を取得（ドメインオブジェクト） */
-export const selectShiftPlans = (state: RootState): ShiftPlan_シフト案[] =>
-  (state.shiftPlan.shiftPlans ?? []).map((s) => new ShiftPlan_シフト案(s));
+export const selectShiftPlans = createSelector(
+  [selectShiftPlansRaw],
+  (shiftPlans): ShiftPlan_シフト案[] => shiftPlans.map((s) => new ShiftPlan_シフト案(s))
+);
 
 /** 現在のシフト案IDを取得 */
 export const selectCurrentShiftPlanId = (state: RootState): string | null =>
   state.shiftPlan.currentShiftPlanId ?? null;
 
 /** IDでシフト案を取得（ドメインオブジェクト） */
-export const selectShiftPlanById = (id: string) => (state: RootState): ShiftPlan_シフト案 | undefined => {
-  const plans = state.shiftPlan.shiftPlans ?? [];
-  const plan = plans.find((p) => p.id === id);
-  return plan ? new ShiftPlan_シフト案(plan) : undefined;
-};
+export const selectShiftPlanById = (id: string) =>
+  createSelector(
+    [(state: RootState) => (state.shiftPlan.shiftPlans ?? []).find((p) => p.id === id)],
+    (plan): ShiftPlan_シフト案 | undefined => {
+      return plan ? new ShiftPlan_シフト案(plan) : undefined;
+    }
+  );
 
 /** 現在のシフト案を取得（ドメインオブジェクト） */
-export const selectCurrentShiftPlan = (state: RootState): ShiftPlan_シフト案 | undefined => {
-  const id = state.shiftPlan.currentShiftPlanId;
-  if (!id) return undefined;
-  const plans = state.shiftPlan.shiftPlans ?? [];
-  const plan = plans.find((p) => p.id === id);
-  return plan ? new ShiftPlan_シフト案(plan) : undefined;
-};
+export const selectCurrentShiftPlan = createSelector(
+  [(state: RootState) => {
+    const id = state.shiftPlan.currentShiftPlanId;
+    if (!id) return undefined;
+    return (state.shiftPlan.shiftPlans ?? []).find((p) => p.id === id);
+  }],
+  (plan): ShiftPlan_シフト案 | undefined => {
+    return plan ? new ShiftPlan_シフト案(plan) : undefined;
+  }
+);

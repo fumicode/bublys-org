@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 
@@ -88,30 +88,46 @@ export const {
 
 // ========== Selectors ==========
 
+// 基本セレクター
+const selectStaffListRaw = (state: RootState) => state.gakkaiShift.staffList;
+
 /** スタッフ一覧を取得（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffList = (state: RootState): Staff_スタッフ[] =>
-  state.gakkaiShift.staffList.map((json) => Staff_スタッフ.fromJSON(json));
+export const selectGakkaiShiftStaffList = createSelector(
+  [selectStaffListRaw],
+  (staffList): Staff_スタッフ[] => staffList.map((json) => Staff_スタッフ.fromJSON(json))
+);
 
 /** 選択中のスタッフIDを取得 */
 export const selectGakkaiShiftSelectedStaffId = (state: RootState): string | null =>
   state.gakkaiShift.selectedStaffId;
 
 /** IDでスタッフを取得（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffById = (id: string) => (state: RootState): Staff_スタッフ | undefined => {
-  const json = state.gakkaiShift.staffList.find((s) => s.id === id);
-  return json ? Staff_スタッフ.fromJSON(json) : undefined;
-};
+export const selectGakkaiShiftStaffById = (id: string) =>
+  createSelector(
+    [(state: RootState) => state.gakkaiShift.staffList.find((s) => s.id === id)],
+    (json): Staff_スタッフ | undefined => {
+      return json ? Staff_スタッフ.fromJSON(json) : undefined;
+    }
+  );
 
 /** ステータスでスタッフを絞り込み（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffByStatus = (status: StaffStatus_ステータス) => (state: RootState): Staff_スタッフ[] =>
-  state.gakkaiShift.staffList
-    .filter((s) => s.status === status)
-    .map((json) => Staff_スタッフ.fromJSON(json));
+export const selectGakkaiShiftStaffByStatus = (status: StaffStatus_ステータス) =>
+  createSelector(
+    [selectStaffListRaw],
+    (staffList): Staff_スタッフ[] =>
+      staffList
+        .filter((s) => s.status === status)
+        .map((json) => Staff_スタッフ.fromJSON(json))
+  );
 
 /** 選択中のスタッフを取得（ドメインオブジェクト） */
-export const selectGakkaiShiftSelectedStaff = (state: RootState): Staff_スタッフ | undefined => {
-  const id = state.gakkaiShift.selectedStaffId;
-  if (!id) return undefined;
-  const json = state.gakkaiShift.staffList.find((s) => s.id === id);
-  return json ? Staff_スタッフ.fromJSON(json) : undefined;
-};
+export const selectGakkaiShiftSelectedStaff = createSelector(
+  [(state: RootState) => {
+    const id = state.gakkaiShift.selectedStaffId;
+    if (!id) return undefined;
+    return state.gakkaiShift.staffList.find((s) => s.id === id);
+  }],
+  (json): Staff_スタッフ | undefined => {
+    return json ? Staff_スタッフ.fromJSON(json) : undefined;
+  }
+);
