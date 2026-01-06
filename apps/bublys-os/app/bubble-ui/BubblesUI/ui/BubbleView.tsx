@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
@@ -10,6 +10,7 @@ import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble } from "@bublys-org/bubbles-ui-state";
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
+import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
 //import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 type BubbleProps = {
@@ -57,6 +58,7 @@ export const BubbleView: FC<BubbleProps> = ({
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
   const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const bubbleRefs = useBubbleRefsOptional();
 
   const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
@@ -136,6 +138,18 @@ export const BubbleView: FC<BubbleProps> = ({
       document.removeEventListener("mouseup", endDrag);
     };
   }, []);
+
+  // DOM参照をContextに登録
+  useLayoutEffect(() => {
+    if (ref.current && bubbleRefs) {
+      bubbleRefs.registerBubbleRef(bubble.id, ref.current);
+    }
+    return () => {
+      if (bubbleRefs) {
+        bubbleRefs.unregisterBubbleRef(bubble.id);
+      }
+    };
+  }, [bubble.id, bubbleRefs, ref]);
 
   return (
     <StyledBubble

@@ -24,6 +24,7 @@ import {
 import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
 import { BubblesContext } from "../domain/BubblesContext";
+import { BubbleRefsProvider } from "../domain/BubbleRefsContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Button, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -201,9 +202,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           },
         }}
       >
-        <PositionDebuggerProvider isShown={false}>
-          <IframeViewer>
-            <BubblesLayeredView
+        <BubbleRefsProvider>
+          <PositionDebuggerProvider isShown={false}>
+            <IframeViewer>
+              <BubblesLayeredView
               bubbles={bubblesDPO.layers}
               vanishingPoint={globalCoordinateSystem.vanishingPoint}
               onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
@@ -212,9 +214,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               onBubbleLayerDown={layerDown}
               onBubbleLayerUp={layerUp}
               onCoordinateSystemReady={handleCoordinateSystemReady}
-            />
-          </IframeViewer>
-        </PositionDebuggerProvider>
+              />
+            </IframeViewer>
+          </PositionDebuggerProvider>
+        </BubbleRefsProvider>
       </BubblesContext.Provider>
 
       {/* Igo Game Panel */}
