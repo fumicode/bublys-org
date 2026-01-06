@@ -32,6 +32,7 @@ import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } fr
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 
 // 各バブルのコンポーネント
@@ -315,6 +316,9 @@ const routes: BubbleRoute[] = [
 
   // 学会シフト
   ...gakkaiShiftBubbleRoutes,
+
+  // タスク管理
+  ...taskManagementBubbleRoutes,
 
   // 囲碁ゲーム
   ...igoGameBubbleRoutes,

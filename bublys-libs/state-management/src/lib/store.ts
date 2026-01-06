@@ -24,6 +24,7 @@ import { userGroupSlice } from "./slices/user-group-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
 import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
 import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
+import { taskSlice } from "./slices/task-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -43,6 +44,7 @@ const reducers = combineReducers({
   [pocketSlice.name]: pocketSlice.reducer,
   [gakkaiShiftSlice.name]: gakkaiShiftSlice.reducer,
   [shiftPlanSlice.name]: shiftPlanSlice.reducer,
+  [taskSlice.name]: taskSlice.reducer,
 
   //iframe-slices
   app: appReducer,
