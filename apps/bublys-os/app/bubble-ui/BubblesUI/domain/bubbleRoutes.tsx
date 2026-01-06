@@ -1,12 +1,13 @@
 "use client";
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
-import { registerBubbleTypeResolver } from "@bublys-org/bubbles-ui";
+import { registerBubblePropsResolver, BubbleOptions } from "@bublys-org/bubbles-ui";
 import { useContext } from "react";
 
 export type BubbleRoute = {
   pattern: RegExp;
   type: string;
   Component: BubbleContentRenderer;
+  bubbleOptions?: BubbleOptions;
 };
 
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
@@ -31,6 +32,7 @@ import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } fr
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -314,6 +316,9 @@ const routes: BubbleRoute[] = [
   // 学会シフト
   ...gakkaiShiftBubbleRoutes,
 
+  // 囲碁ゲーム
+  ...igoGameBubbleRoutes,
+
   // ObjectShell統合ルート
   {
     pattern: /^object-shells\/[^/]+\/[^/]+$/,
@@ -328,4 +333,11 @@ const routes: BubbleRoute[] = [
 ];
 
 export const bubbleRoutes = routes;
-registerBubbleTypeResolver((url: string) => matchBubbleRoute(url)?.type);
+registerBubblePropsResolver((url: string) => {
+  const route = matchBubbleRoute(url);
+  if (!route) return undefined;
+  return {
+    type: route.type,
+    bubbleOptions: route.bubbleOptions,
+  };
+});

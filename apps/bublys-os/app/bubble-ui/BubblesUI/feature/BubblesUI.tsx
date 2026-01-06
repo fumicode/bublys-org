@@ -30,6 +30,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import IframeViewer from "../../IframeViewer/IframeViewer";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
@@ -48,6 +49,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [isPocketOpen, setIsPocketOpen] = useState(false);
   const [isGakkaiShiftPanelOpen, setIsGakkaiShiftPanelOpen] = useState(false);
+  const [isIgoGamePanelOpen, setIsIgoGamePanelOpen] = useState(false);
 
    // ページサイズ管理
   const pageSize = useAppSelector(selectWindowSize);
@@ -212,6 +214,54 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           </IframeViewer>
         </PositionDebuggerProvider>
       </BubblesContext.Provider>
+
+      {/* Igo Game Panel */}
+      {isIgoGamePanelOpen ? (
+        <Box
+          sx={{
+            position: "fixed",
+            bottom: 20,
+            right: 450,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            padding: 2,
+            borderRadius: 1,
+            zIndex: 1000,
+            width: 180,
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold">囲碁バブリ</Typography>
+            <IconButton size="small" onClick={() => setIsIgoGamePanelOpen(false)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Button
+            variant="contained"
+            onClick={() => popChildOrJoinSibling(`igo-game/${crypto.randomUUID()}`, "root")}
+            fullWidth
+            sx={{ backgroundColor: "#dcb35c", "&:hover": { backgroundColor: "#c9a24e" } }}
+          >
+            対局開始
+          </Button>
+        </Box>
+      ) : (
+        <IconButton
+          sx={{
+            position: "fixed",
+            bottom: 20,
+            right: 450,
+            zIndex: 1000,
+            backgroundColor: "rgba(255, 255, 255, 0.8)",
+            "&:hover": {
+              backgroundColor: "rgba(255, 255, 255, 0.9)",
+            },
+          }}
+          onClick={() => setIsIgoGamePanelOpen(true)}
+        >
+          <SportsEsportsIcon />
+        </IconButton>
+      )}
 
       {/* Pocket */}
       {isPocketOpen ? (

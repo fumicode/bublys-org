@@ -20,6 +20,7 @@ type BubbleProps = {
 
   layerIndex?: number;
   zIndex?: number;
+  contentBackground?: string; // コンテンツ背景色（デフォルト: white）
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -35,6 +36,7 @@ export const BubbleView: FC<BubbleProps> = ({
   children,
   layerIndex,
   zIndex,
+  contentBackground = "white",
   position,
   vanishingPoint,
   onClick,
@@ -149,6 +151,7 @@ export const BubbleView: FC<BubbleProps> = ({
       onTransitionEnd={notifyRendered}
       width={bubble.size ? `${bubble.size.width}px` : undefined}
       height={bubble.size ? `${bubble.size.height}px` : undefined}
+      contentBackground={contentBackground}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <Box sx={{ position: "relative", textAlign: "center" }}>
@@ -322,6 +325,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   colorHue: number;
   width?: string; // 幅を指定するためのオプション
   height?: string; // 高さを指定するためのオプション
+  contentBackground?: string; // コンテンツ背景色
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -381,7 +385,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     overflow: auto;
     padding: 1em;
     font-size: 1em;
-    background: white;
+    background: ${({ contentBackground }) => contentBackground || "white"};
 
     border-radius: 0.5em;
     margin: 0.5em;
