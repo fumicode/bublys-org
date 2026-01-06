@@ -129,6 +129,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent, staffId: string) => {
+    console.log("[DragStart] staffId:", staffId);
     e.dataTransfer.setData("text/staff-id", staffId);
     e.dataTransfer.effectAllowed = "copy";
   };

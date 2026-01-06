@@ -9,6 +9,8 @@ export const ObjectTypes = {
   User: { urlPattern: 'users/:id' },
   UserGroup: { urlPattern: 'user-groups/:id' },
   Memo: { urlPattern: 'memos/:id' },
+  Staff: { urlPattern: 'gakkai-shift/staffs/:id' },
+  ShiftAssignment: { urlPattern: 'gakkai-shift/assignments/:id' },
   // 複数形（リスト用）- 将来的に統合検討
   Users: { urlPattern: 'users' },
   UserGroups: { urlPattern: 'user-groups' },

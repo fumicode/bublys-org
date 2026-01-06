@@ -13,7 +13,9 @@ import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
 import WarningIcon from "@mui/icons-material/Warning";
 import { IconButton, Tooltip } from "@mui/material";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
+import { getDragType } from "../../bubble-ui/object-view/domain/ObjectTypeRegistry";
+import { DRAG_KEYS } from "../../bubble-ui/utils/drag-types";
 
 type ShiftPlanTableViewProps = {
   timeSlots: readonly TimeSlot_時間帯[];
@@ -87,8 +89,18 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.add("is-drag-over");
+    // 内部のセル間移動またはObjectViewからのStaffドラッグを受け入れる
+    const types = Array.from(e.dataTransfer.types);
+    const staffDragType = getDragType("Staff");
+    const isInternalMove = types.includes("text/staff-id");
+    const isStaffDrag = types.includes(staffDragType);
+
+    console.log("[DragOver] types:", types, "staffDragType:", staffDragType, "isInternalMove:", isInternalMove, "isStaffDrag:", isStaffDrag);
+
+    if (isInternalMove || isStaffDrag) {
+      e.preventDefault();
+      e.currentTarget.classList.add("is-drag-over");
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -99,15 +111,42 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
     e.preventDefault();
     e.currentTarget.classList.remove("is-drag-over");
 
-    const staffId = e.dataTransfer.getData("text/staff-id");
+    const types = Array.from(e.dataTransfer.types);
+    console.log("[Drop] types:", types);
+
+    // 内部のセル間移動（配置チップのドラッグ）
+    const internalStaffId = e.dataTransfer.getData("text/staff-id");
     const assignmentId = e.dataTransfer.getData("text/assignment-id");
 
-    if (assignmentId && staffId && onMoveAssignment) {
-      // 既存の配置を移動
-      onMoveAssignment(assignmentId, staffId, timeSlotId, roleId);
-    } else if (staffId && onDropStaff) {
-      // 新規配置
-      onDropStaff(staffId, timeSlotId, roleId);
+    console.log("[Drop] internalStaffId:", internalStaffId, "assignmentId:", assignmentId);
+
+    if (assignmentId && internalStaffId && onMoveAssignment) {
+      // 既存配置の移動
+      onMoveAssignment(assignmentId, internalStaffId, timeSlotId, roleId);
+      return;
+    }
+
+    if (internalStaffId && !assignmentId && onDropStaff) {
+      // ShiftPlanEditor内スタッフ一覧からの新規配置
+      console.log("[Drop] internal new assignment, staffId:", internalStaffId);
+      onDropStaff(internalStaffId, timeSlotId, roleId);
+      return;
+    }
+
+    // ObjectViewからのドラッグ（独立バブルのスタッフ一覧からの新規配置）
+    const staffDragType = getDragType("Staff");
+    if (types.includes(staffDragType)) {
+      // staffDragType自体にURLが設定されている
+      const url = e.dataTransfer.getData(staffDragType) || e.dataTransfer.getData(DRAG_KEYS.url);
+      console.log("[Drop] staffDragType found, url:", url);
+      // URLからstaffIdを抽出: "gakkai-shift/staffs/:id"
+      const match = url.match(/gakkai-shift\/staffs?\/([^/]+)/);
+      console.log("[Drop] match:", match);
+      if (match && onDropStaff) {
+        const staffId = match[1];
+        console.log("[Drop] calling onDropStaff with staffId:", staffId);
+        onDropStaff(staffId, timeSlotId, roleId);
+      }
     }
   };
 
@@ -189,40 +228,43 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                         const isAvailable = staff?.isAvailableAt(slot.id) ?? false;
                         const violation = getViolationForAssignment(assignment.id);
                         const hasViolation = !!violation;
-                        const assignmentUrl = buildAssignmentUrl?.(assignment.id);
-                        const chipContent = (
-                          <div
-                            className={`e-staff-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
-                            draggable
-                            onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId)}
+                        const assignmentUrl = buildAssignmentUrl?.(assignment.id) ?? `gakkai-shift/assignments/${assignment.id}`;
+                        const staffName = getStaffName(assignment.staffId);
+                        return (
+                          <ObjectView
+                            key={assignment.id}
+                            type="ShiftAssignment"
+                            url={assignmentUrl}
+                            label={staffName}
+                            draggable={false}
+                            onClick={() => onAssignmentClick?.(assignment.id)}
                           >
-                            {hasViolation && (
-                              <Tooltip title={violation.message} arrow>
-                                <WarningIcon className="e-violation-icon" fontSize="inherit" />
-                              </Tooltip>
-                            )}
-                            <button
-                              className="e-staff-name"
-                              onClick={() => onAssignmentClick?.(assignment.id)}
+                            <div
+                              className={`e-staff-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
+                              draggable
+                              onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId)}
                             >
-                              <PersonIcon fontSize="inherit" />
-                              {getStaffName(assignment.staffId)}
-                            </button>
-                            <IconButton
-                              size="small"
-                              className="e-remove-btn"
-                              onClick={() => onRemoveAssignment?.(assignment.id)}
-                            >
-                              <CloseIcon fontSize="inherit" />
-                            </IconButton>
-                          </div>
-                        );
-                        return assignmentUrl ? (
-                          <UrledPlace key={assignment.id} url={assignmentUrl}>
-                            {chipContent}
-                          </UrledPlace>
-                        ) : (
-                          <div key={assignment.id}>{chipContent}</div>
+                              {hasViolation && (
+                                <Tooltip title={violation.message} arrow>
+                                  <WarningIcon className="e-violation-icon" fontSize="inherit" />
+                                </Tooltip>
+                              )}
+                              <span className="e-staff-name">
+                                <PersonIcon fontSize="inherit" />
+                                {staffName}
+                              </span>
+                              <IconButton
+                                size="small"
+                                className="e-remove-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveAssignment?.(assignment.id);
+                                }}
+                              >
+                                <CloseIcon fontSize="inherit" />
+                              </IconButton>
+                            </div>
+                          </ObjectView>
                         );
                       })}
                       {cellAssignments.length > 0 && (
@@ -393,15 +435,9 @@ const StyledTable = styled.table`
     }
 
     .e-staff-name {
-      all: unset;
-      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 2px;
-
-      &:hover {
-        text-decoration: underline;
-      }
     }
 
     .e-remove-btn {
