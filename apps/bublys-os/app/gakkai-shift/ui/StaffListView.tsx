@@ -4,7 +4,7 @@ import { FC } from "react";
 import styled from "styled-components";
 import { Staff_スタッフ } from "../domain";
 import PersonIcon from "@mui/icons-material/Person";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
 
 type StaffListViewProps = {
   staffList: Staff_スタッフ[];
@@ -31,25 +31,26 @@ export const StaffListView: FC<StaffListViewProps> = ({
               key={staff.id}
               className={`e-item ${selectedStaffId === staff.id ? "is-selected" : ""}`}
             >
-              <UrledPlace url={detailUrl}>
-                <button
-                  style={{ all: "unset", cursor: "pointer", width: "100%" }}
-                  onClick={() => onStaffClick?.(staff.id)}
-                >
-                  <div className="e-content">
-                    <PersonIcon fontSize="small" className="e-avatar" />
-                    <div className="e-text">
-                      <div className="e-name">{staff.name}</div>
-                      <div className="e-meta">
-                        {staff.state.school} / {staff.state.grade}
-                      </div>
-                    </div>
-                    <div className="e-status">
-                      <StatusBadge status={staff.status} />
+              <ObjectView
+                type="Staff"
+                url={detailUrl}
+                label={staff.name}
+                draggable={true}
+                onClick={() => onStaffClick?.(staff.id)}
+              >
+                <div className="e-content">
+                  <PersonIcon fontSize="small" className="e-avatar" />
+                  <div className="e-text">
+                    <div className="e-name">{staff.name}</div>
+                    <div className="e-meta">
+                      {staff.state.school} / {staff.state.grade}
                     </div>
                   </div>
-                </button>
-              </UrledPlace>
+                  <div className="e-status">
+                    <StatusBadge status={staff.status} />
+                  </div>
+                </div>
+              </ObjectView>
             </li>
           );
         })

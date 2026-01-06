@@ -63,11 +63,33 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 // 学会シフト - 配置評価バブル
 const GakkaiShiftAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   // URL: gakkai-shift/shift-plans/[shiftPlanId]/assignments/[assignmentId]/evaluation
   const match = bubble.url.match(/^gakkai-shift\/shift-plans\/([^/]+)\/assignments\/([^/]+)\/evaluation$/);
   const shiftPlanId = match?.[1] ?? "";
   const assignmentId = match?.[2] ?? "";
-  return <AssignmentEvaluation shiftPlanId={shiftPlanId} assignmentId={assignmentId} />;
+
+  const handleStaffClick = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "bubble-side");
+  };
+
+  const handleTimeSlotClick = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}/availableTimeSlots`, bubble.id, "bubble-side");
+  };
+
+  const buildStaffDetailUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}`;
+  const buildStaffAvailabilityUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}/availableTimeSlots`;
+
+  return (
+    <AssignmentEvaluation
+      shiftPlanId={shiftPlanId}
+      assignmentId={assignmentId}
+      onStaffClick={handleStaffClick}
+      onTimeSlotClick={handleTimeSlotClick}
+      buildStaffDetailUrl={buildStaffDetailUrl}
+      buildStaffAvailabilityUrl={buildStaffAvailabilityUrl}
+    />
+  );
 };
 
 /** 学会シフト機能のバブルルート定義 */
