@@ -21,7 +21,6 @@ import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { UserCollection } from "@/app/users/feature/UserCollection";
 import { UserDetail } from "@/app/users/feature/UserDetail";
 import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
-import { IframeBubble } from "../ui/bubbles/IframeBubble";
 import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
 import { BubblesContext } from "./BubblesContext";
@@ -329,11 +328,6 @@ const routes: BubbleRoute[] = [
     type: "object-shell",
     Component: ShellBubble
   },
-
-  { pattern: /^iframes\/.+$/, type: "iframe", Component: ({ bubble }) => {
-    const appId = bubble.url.replace("iframes/", "");
-    return (<IframeBubble appId={appId} />);
-  } },
 ];
 
 export const bubbleRoutes = routes;

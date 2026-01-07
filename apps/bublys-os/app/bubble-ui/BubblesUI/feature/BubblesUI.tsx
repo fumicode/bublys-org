@@ -33,7 +33,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
-import IframeViewer from "../../IframeViewer/IframeViewer";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { DragDataType } from "../../utils/drag-types";
@@ -204,18 +203,18 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       >
         <BubbleRefsProvider>
           <PositionDebuggerProvider isShown={false}>
-            <IframeViewer>
+            <Box sx={{ width: '100%', height: '100vh' }}>
               <BubblesLayeredView
-              bubbles={bubblesDPO.layers}
-              vanishingPoint={globalCoordinateSystem.vanishingPoint}
-              onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-              onBubbleClose={deleteBubble}
-              onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
-              onBubbleLayerDown={layerDown}
-              onBubbleLayerUp={layerUp}
-              onCoordinateSystemReady={handleCoordinateSystemReady}
+                bubbles={bubblesDPO.layers}
+                vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                onBubbleClose={deleteBubble}
+                onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                onBubbleLayerDown={layerDown}
+                onBubbleLayerUp={layerUp}
+                onCoordinateSystemReady={handleCoordinateSystemReady}
               />
-            </IframeViewer>
+            </Box>
           </PositionDebuggerProvider>
         </BubbleRefsProvider>
       </BubblesContext.Provider>
