@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
@@ -32,7 +32,7 @@ type BubbleProps = {
   onResize?: (bubble: Bubble) => void;
 };
 
-export const BubbleView: FC<BubbleProps> = ({
+const BubbleViewInner: FC<BubbleProps> = ({
   bubble,
   children,
   layerIndex,
@@ -60,6 +60,12 @@ export const BubbleView: FC<BubbleProps> = ({
   const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
+  // ドラッグハンドラ用に最新値を保持
+  const surfaceLeftTopRef = useRef(surfaceLeftTop);
+  surfaceLeftTopRef.current = surfaceLeftTop;
+  const vanishingPointRef = useRef(vanishingPoint);
+  vanishingPointRef.current = vanishingPoint;
+
   const { ref, notifyRendered} = useMyRectObserver({ 
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
@@ -74,24 +80,59 @@ export const BubbleView: FC<BubbleProps> = ({
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
+  const currentDragPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const endDrag = () => {
+    // ドラッグ終了時のみRedux更新（パフォーマンス最適化）
+    if (currentDragPosRef.current) {
+      dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON()));
+    }
+    // インラインスタイルをクリア（styled-componentsに制御を戻す）
+    if (ref.current) {
+      ref.current.style.transition = '';
+      ref.current.style.transformOrigin = '';
+    }
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;
+    currentDragPosRef.current = null;
     document.removeEventListener("mousemove", handleDragging);
     document.removeEventListener("mouseup", endDrag);
   };
 
   const handleDragging = (e: MouseEvent) => {
-    if (!dragStartPosRef.current || !dragStartMouseRef.current) return;
+    if (!dragStartPosRef.current || !dragStartMouseRef.current || !ref.current) return;
     const deltaX = e.clientX - dragStartMouseRef.current.x;
     const deltaY = e.clientY - dragStartMouseRef.current.y;
+
+    // layerIndexによるscaleを考慮（奥のレイヤーほど小さい）
+    // StyledBubbleの transform: scale(1 - layerIndex * 0.1) に対応
+    const scale = 1 - (layerIndex || 0) * 0.1;
+
+    // スクリーン座標でのマウス移動量をscaleで割って、実際の位置変化量を計算
     const newPos = {
-      x: dragStartPosRef.current.x + deltaX,
-      y: dragStartPosRef.current.y + deltaY,
+      x: dragStartPosRef.current.x + deltaX / scale,
+      y: dragStartPosRef.current.y + deltaY / scale,
     };
 
-    dispatch(updateBubble(bubble.moveTo(newPos).toJSON()));
+    // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
+    currentDragPosRef.current = newPos;
+    const offset = surfaceLeftTopRef.current;
+    const screenPos = {
+      x: newPos.x + offset.x,
+      y: newPos.y + offset.y,
+    };
+    ref.current.style.left = `${screenPos.x}px`;
+    ref.current.style.top = `${screenPos.y}px`;
+    ref.current.style.transition = 'none'; // ドラッグ中はトランジション無効
+
+    // transform-originも更新（vanishingPointとの相対位置を維持）
+    // これがないと、Redux更新後にtransform-originが再計算されて位置がズレる
+    const vp = vanishingPointRef.current || { x: 0, y: 0 };
+    const newTransformOrigin = {
+      x: vp.x - screenPos.x,
+      y: vp.y - screenPos.y,
+    };
+    ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
   };
 
   const handleSizeMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
@@ -330,6 +371,45 @@ export const BubbleView: FC<BubbleProps> = ({
     </StyledBubble>
   );
 };
+
+// React.memoでメモ化（ドラッグ中に他のバブルが不要に再レンダリングされるのを防ぐ）
+// カスタム比較関数でビジュアルに影響するpropsのみ比較（コールバックは除外）
+export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
+  // bubble自体が変わった場合（位置以外の属性変更）は再レンダリング
+  if (prevProps.bubble !== nextProps.bubble) {
+    // 位置だけが変わった場合はドラッグ中なので再レンダリング不要（DOM直接操作）
+    const prevBubble = prevProps.bubble;
+    const nextBubble = nextProps.bubble;
+    const onlyPositionChanged =
+      prevBubble.id === nextBubble.id &&
+      prevBubble.type === nextBubble.type &&
+      prevBubble.colorHue === nextBubble.colorHue &&
+      prevBubble.size?.width === nextBubble.size?.width &&
+      prevBubble.size?.height === nextBubble.size?.height &&
+      prevBubble.contentBackground === nextBubble.contentBackground;
+
+    if (!onlyPositionChanged) {
+      return false; // 再レンダリングが必要
+    }
+  }
+
+  // position（surfaceLeftTop適用後）が変わった場合も再レンダリング
+  if (prevProps.position?.x !== nextProps.position?.x ||
+      prevProps.position?.y !== nextProps.position?.y) {
+    return false;
+  }
+
+  // その他のビジュアルに影響するprops
+  if (prevProps.layerIndex !== nextProps.layerIndex ||
+      prevProps.zIndex !== nextProps.zIndex ||
+      prevProps.contentBackground !== nextProps.contentBackground ||
+      prevProps.children !== nextProps.children) {
+    return false;
+  }
+
+  // コールバック関数は変わっても再レンダリング不要
+  return true;
+});
 
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
