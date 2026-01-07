@@ -38,6 +38,8 @@ export interface BubbleStateSlice {
   surfaceLeftTop: Point2; // レンダリング時に追加されるオフセット
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
+
+  animatingBubbleIds: string[]; // アニメーション中のバブルID（リンクバブル非表示用）
 }
 
 // --- Initial data setup ---
@@ -79,6 +81,7 @@ const initialState: BubbleStateSlice = {
   globalCoordinateSystem: GLOBAL_COORDINATE_SYSTEM,
   surfaceLeftTop: { x: 100, y: 100 }, // デフォルト値
   renderCount: 0,
+  animatingBubbleIds: [],
 };
 
 export const bubblesSlice = createSlice({
@@ -111,6 +114,10 @@ export const bubblesSlice = createSlice({
       const poppedProcess = process.popChild(action.payload.bubbleId);
       state.process = poppedProcess.toJSON();
       state.renderCount += 1;
+      // アニメーション対象のバブルIDを追加（重複防止）
+      if (!state.animatingBubbleIds.includes(action.payload.bubbleId)) {
+        state.animatingBubbleIds.push(action.payload.bubbleId);
+      }
     },
 
     popChildMax: (state, action: PayloadAction<string>) => {
@@ -120,6 +127,10 @@ export const bubblesSlice = createSlice({
 
       state.process = poppedProcess.toJSON();
       state.renderCount += 1;
+      // アニメーション対象のバブルIDを追加（重複防止）
+      if (!state.animatingBubbleIds.includes(action.payload)) {
+        state.animatingBubbleIds.push(action.payload);
+      }
     },
 
 
@@ -129,6 +140,15 @@ export const bubblesSlice = createSlice({
         .toJSON();
 
       state.renderCount += 1;
+    },
+
+    finishBubbleAnimation: (state, action: PayloadAction<string>) => {
+      state.animatingBubbleIds = state.animatingBubbleIds.filter(id => id !== action.payload);
+    },
+
+    // フォールバック：全てのアニメーション状態をクリア
+    clearAllAnimations: (state) => {
+      state.animatingBubbleIds = [];
     },
 
     // Entity-only actions
@@ -159,6 +179,12 @@ export const bubblesSlice = createSlice({
       state.process.layers = state.process.layers.map(
         layer => layer.filter(id => id !== removingId)
       ).filter(layer => layer.length > 0);  // Remove empty layers
+
+      // レイヤー移動アニメーションが発生するので、ダミーIDを追加
+      // （フォールバックタイマーでクリアされる）
+      if (!state.animatingBubbleIds.includes('__removing__')) {
+        state.animatingBubbleIds.push('__removing__');
+      }
     },
     relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
       //重複がないようにチェックが必要そう
@@ -192,6 +218,8 @@ export const {
   relateBubbles,
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
+  finishBubbleAnimation,
+  clearAllAnimations,
 } = bubblesSlice.actions;
 
 // Selectors
@@ -271,5 +299,9 @@ export const selectBubblesProcessDPO = createSelector(
     return new BubblesProcessDPO(processInstance, bubbles);
   }
 );
+
+export const selectIsLayerAnimating = (state: { bubbleState: BubbleStateSlice }): boolean => {
+  return state.bubbleState.animatingBubbleIds.length > 0;
+}
 
 export default bubblesSlice.reducer;

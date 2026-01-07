@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useContext } from "react";
 import { useWindowSize } from "./01_useWindowSize";
 import { SmartRect, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectRenderCount } from "@bublys-org/bubbles-ui-state";
+import { selectRenderCount, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
 import { BubblesContext } from "../BubblesUI/domain/BubblesContext";
 
 type useMyRectProps  = {
@@ -18,6 +18,7 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const pageSize = useWindowSize();
 
   const renderCount = useAppSelector(selectRenderCount);
+  const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
 
   const saveRect = () => {
@@ -37,11 +38,13 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
     const el = ref.current;
     if (!el) return;
     if (!pageSize) return;
+    // アニメーション中はrect更新をスキップ（中途半端な位置が保存されるのを防ぐ）
+    if (isLayerAnimating) return;
 
 
     saveRect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderCount, pageSize, coordinateSystem]);
+  }, [renderCount, pageSize, coordinateSystem, isLayerAnimating]);
 
 
 

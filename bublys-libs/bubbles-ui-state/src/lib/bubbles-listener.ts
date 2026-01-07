@@ -2,6 +2,8 @@ import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   joinSiblingInProcess,
   popChildInProcess,
+  popChildMaxInProcess,
+  removeBubble,
   renderBubble,
   selectBubble,
   selectBubblesRelationByOpeneeId,
@@ -9,11 +11,26 @@ import {
   updateBubble,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
+  clearAllAnimations,
 } from './bubbles-slice.js';
 import { convertGlobalPointToLayerLocal, getOriginRect } from '@bublys-org/bubbles-ui';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
+
+// フォールバックタイマー（onTransitionEndが発火しなかった場合の保険）
+let animationFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+const ANIMATION_FALLBACK_DURATION = 350; // CSSトランジション(300ms)より少し長め
+
+const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAllAnimations>) => void) => {
+  if (animationFallbackTimer) {
+    clearTimeout(animationFallbackTimer);
+  }
+  animationFallbackTimer = setTimeout(() => {
+    dispatch(clearAllAnimations());
+    animationFallbackTimer = null;
+  }, ANIMATION_FALLBACK_DURATION);
+};
 
 // joinSiblingInProcess 発火後、moveTo → updateBubble を実行
 // 兄弟バブルのrenderedRectがすでにあれば、renderBubbleを待たずに即座に位置を計算
@@ -248,5 +265,28 @@ bubblesListener.startListening({
 
     const moved = newPoppingBubble.moveTo(relativePoint);
     listenerApi.dispatch(updateBubble(moved.toJSON()));
+  },
+});
+
+// フォールバックタイマーをスケジュールするリスナー
+// onTransitionEndが発火しない場合（新規バブル等）の保険
+bubblesListener.startListening({
+  actionCreator: popChildInProcess,
+  effect: (_action, listenerApi) => {
+    scheduleAnimationFallback(listenerApi.dispatch);
+  },
+});
+
+bubblesListener.startListening({
+  actionCreator: popChildMaxInProcess,
+  effect: (_action, listenerApi) => {
+    scheduleAnimationFallback(listenerApi.dispatch);
+  },
+});
+
+bubblesListener.startListening({
+  actionCreator: removeBubble,
+  effect: (_action, listenerApi) => {
+    scheduleAnimationFallback(listenerApi.dispatch);
   },
 });

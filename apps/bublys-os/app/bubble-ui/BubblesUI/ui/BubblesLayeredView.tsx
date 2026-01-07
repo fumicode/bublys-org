@@ -4,7 +4,7 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble, selectGlobalCoordinateSystem, selectSurfaceLeftTop } from "@bublys-org/bubbles-ui-state";
+import { selectBubblesRelationsWithBubble, selectGlobalCoordinateSystem, selectSurfaceLeftTop, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
 import { LinkBubbleView } from "./LinkBubbleView";
 
 type BubblesLayeredViewProps = {
@@ -101,6 +101,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const relations = useAppSelector(selectBubblesRelationsWithBubble);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
+  const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
@@ -161,7 +162,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
           <div className="e-vanishing-point"></div>
         </div>
 
-        {
+        {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
+        {!isLayerAnimating &&
           relations.map(({ opener, openee }) => {
 
             const linkZIndex = bubbleIdToZIndex[openee.id] - 1;

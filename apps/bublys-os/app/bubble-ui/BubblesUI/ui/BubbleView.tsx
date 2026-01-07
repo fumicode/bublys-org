@@ -7,7 +7,7 @@ import HighLightOffIcon from "@mui/icons-material/HighLightOff";
 import AspectRatioIcon from "@mui/icons-material/AspectRatio";
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble } from "@bublys-org/bubbles-ui-state";
+import { renderBubble, updateBubble, finishBubbleAnimation } from "@bublys-org/bubbles-ui-state";
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
@@ -162,7 +162,10 @@ export const BubbleView: FC<BubbleProps> = ({
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
       onMouseLeave={handleMouseLeave}
-      onTransitionEnd={notifyRendered}
+      onTransitionEnd={() => {
+        notifyRendered();
+        dispatch(finishBubbleAnimation(bubble.id));
+      }}
       width={bubble.size ? `${bubble.size.width}px` : undefined}
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
