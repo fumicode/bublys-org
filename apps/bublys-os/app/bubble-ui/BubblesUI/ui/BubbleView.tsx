@@ -109,6 +109,7 @@ type BubbleProps = {
   layerIndex?: number;
   zIndex?: number;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
+  hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -125,6 +126,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   layerIndex,
   zIndex,
   contentBackground = "white",
+  hasLeftLink = false,
   position,
   vanishingPoint,
   onClick,
@@ -296,6 +298,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       width={bubble.size ? `${bubble.size.width}px` : undefined}
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
+      hasLeftLink={hasLeftLink}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -418,7 +421,8 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   // BubbleContent内部は再レンダリングされない。
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
-      prevProps.contentBackground !== nextProps.contentBackground) {
+      prevProps.contentBackground !== nextProps.contentBackground ||
+      prevProps.hasLeftLink !== nextProps.hasLeftLink) {
     return false;
   }
 
@@ -438,6 +442,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   width?: string; // 幅を指定するためのオプション
   height?: string; // 高さを指定するためのオプション
   contentBackground?: string; // コンテンツ背景色
+  hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -486,7 +491,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
 
   border: 1px solid hsla(0, 0%, 100%, 0.3);
-  border-radius: 24px;
+  border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
 
   display: flex;
   flex-direction: column;
@@ -505,7 +510,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       hsla(0, 0%, 100%, 0.05) 50%,
       transparent 100%
     );
-    border-radius: 24px 24px 50% 50%;
+    border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 50% 50%' : '24px 24px 50% 50%'};
     pointer-events: none;
   }
 

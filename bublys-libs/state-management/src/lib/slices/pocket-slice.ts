@@ -12,6 +12,7 @@ export type PocketItemState = {
     | 'type/memo'
     | 'type/memos'
     | 'type/staff'
+    | 'type/staff-availability'
     | 'type/shift-assignment'
     | 'type/generic';
   label?: string;

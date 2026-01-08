@@ -243,6 +243,11 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             },
           }}
           onClick={() => setIsPocketOpen(true)}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setIsPocketOpen(true);
+          }}
+          onDragOver={(e) => e.preventDefault()}
         >
           <Inventory2Icon />
         </IconButton>

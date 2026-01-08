@@ -16,6 +16,8 @@ type ObjectViewProps = {
   onClick?: () => void;
   /** ドラッグ可能にするか（デフォルト: true） */
   draggable?: boolean;
+  /** 幅を100%にするか（デフォルト: false） */
+  fullWidth?: boolean;
 };
 
 /**
@@ -33,6 +35,7 @@ export const ObjectView: FC<ObjectViewProps> = ({
   children,
   onClick,
   draggable = true,
+  fullWidth = false,
 }) => {
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -54,7 +57,11 @@ export const ObjectView: FC<ObjectViewProps> = ({
       <span
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
-        style={{ display: 'inline-flex', cursor: onClick ? 'pointer' : undefined }}
+        style={{
+          display: fullWidth ? 'flex' : 'inline-flex',
+          width: fullWidth ? '100%' : undefined,
+          cursor: onClick ? 'pointer' : undefined,
+        }}
         draggable={draggable}
         onDragStart={draggable ? handleDragStart : undefined}
         onClick={onClick ? handleClick : undefined}

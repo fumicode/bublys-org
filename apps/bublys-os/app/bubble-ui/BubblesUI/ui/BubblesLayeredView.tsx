@@ -23,6 +23,7 @@ type ConnectedBubbleViewProps = {
   zIndex: number;
   vanishingPoint: Point2;
   surfaceLeftTop: Point2;
+  hasLeftLink?: boolean;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
@@ -37,6 +38,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
   zIndex,
   vanishingPoint,
   surfaceLeftTop,
+  hasLeftLink,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
@@ -60,6 +62,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
       zIndex={zIndex}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
+      hasLeftLink={hasLeftLink}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
       onMove={(updated) => onBubbleMove?.(updated)}
@@ -187,11 +190,17 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return result;
   }, [bubbleLayers]);
 
+  // リンクバブルが接続されているopenee IDのSet（左角丸を無効化するため）
+  const openeeIds = useMemo(() => {
+    return new Set(relations.map(r => r.openee.id));
+  }, [relations]);
+
   // 各バブルをConnectedBubbleViewでレンダリング
   const renderedBubbles = bubbleLayers
     .map((layer, layerIndex) =>
       layer.map((bubbleId) => {
         const zIndex = baseZIndex - layerIndex;
+        const hasLeftLink = openeeIds.has(bubbleId);
 
         return (
           <ConnectedBubbleView
@@ -201,6 +210,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             zIndex={zIndex}
             vanishingPoint={undergroundVanishingPoint}
             surfaceLeftTop={surfaceLeftTop}
+            hasLeftLink={hasLeftLink}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
             onBubbleMove={onBubbleMove}
@@ -264,6 +274,14 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
   position: relative;
   overflow: hidden;
   z-index: 0;
+
+  // 上品な藍色のグラデーション背景
+  background: linear-gradient(
+    145deg,
+    hsl(220, 35%, 18%) 0%,
+    hsl(225, 40%, 22%) 40%,
+    hsl(230, 35%, 20%) 100%
+  );
 
   > .e-underground-curtain {
     position: absolute;

@@ -5,6 +5,7 @@ import styled from "styled-components";
 import { Staff_スタッフ, TimeSlot_時間帯 } from "../domain";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import { ObjectView } from "../../bubble-ui/object-view";
 
 type StaffAvailabilityViewProps = {
   staff: Staff_スタッフ;
@@ -29,7 +30,14 @@ export const StaffAvailabilityView: FC<StaffAvailabilityViewProps> = ({
 
   return (
     <StyledContainer>
-      <h3>{staff.name}</h3>
+      <ObjectView
+        type="Staff"
+        url={`gakkai-shift/staffs/${staff.id}`}
+        label={staff.name}
+        draggable={true}
+      >
+        <h3>{staff.name}</h3>
+      </ObjectView>
       <p className="e-subtitle">{staff.state.school} / {staff.state.grade}</p>
 
       <div className="e-summary">

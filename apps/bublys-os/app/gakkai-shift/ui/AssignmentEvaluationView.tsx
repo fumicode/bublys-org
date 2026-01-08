@@ -14,7 +14,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StarHalfIcon from "@mui/icons-material/StarHalf";
 import { Button } from "@mui/material";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
 
 type AssignmentEvaluationViewProps = {
   evaluation: StaffAssignmentEvaluation_スタッフ配置評価;
@@ -48,22 +48,34 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
         <div className="e-title">
           配置評価:{" "}
           {staffDetailUrl ? (
-            <UrledPlace url={staffDetailUrl}>
-              <Button variant="text" size="small" onClick={onStaffClick} className="e-link-button">
+            <ObjectView
+              type="Staff"
+              url={staffDetailUrl}
+              label={staffName}
+              draggable={true}
+              onClick={onStaffClick}
+            >
+              <Button variant="text" size="small" component="span" className="e-link-button">
                 {staffName}
               </Button>
-            </UrledPlace>
+            </ObjectView>
           ) : (
             staffName
           )}
         </div>
         <div className="e-subtitle">
           {staffAvailabilityUrl ? (
-            <UrledPlace url={staffAvailabilityUrl}>
-              <Button variant="text" size="small" onClick={onTimeSlotClick} className="e-link-button">
+            <ObjectView
+              type="StaffAvailability"
+              url={staffAvailabilityUrl}
+              label={`${staffName}の参加可能時間帯`}
+              draggable={true}
+              onClick={onTimeSlotClick}
+            >
+              <Button variant="text" size="small" component="span" className="e-link-button">
                 {timeSlotLabel}
               </Button>
-            </UrledPlace>
+            </ObjectView>
           ) : (
             timeSlotLabel
           )}
