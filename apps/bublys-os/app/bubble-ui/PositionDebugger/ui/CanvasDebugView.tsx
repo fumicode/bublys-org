@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useEffect, useRef } from "react";
-import { SmartRect, Size2, GLOBAL_COORDINATE_SYSTEM, getScale, CoordinateSystem } from "@bublys-org/bubbles-ui";
+import { SmartRect, Size2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 
 export type RectItem = {
   rect: SmartRect;
@@ -26,15 +26,16 @@ const drawCoordinateSystemGrid = (
   rect: SmartRect,
   color: string
 ) => {
-  const coordinateSystem = rect.coordinateSystem;
-  const { offset, vanishingPoint } = coordinateSystem;
-  const scale = getScale(coordinateSystem);
+  const coordSystemData = rect.coordinateSystem;
+  const coordSystem = CoordinateSystem.fromData(coordSystemData);
+  const { offset, vanishingPoint } = coordSystemData;
+  const scale = coordSystem.scale;
   const gridSize = 100; // グリッドの間隔（ローカル座標系）
   const dotRadius = 2;
   const surroundingArea = 300; // 矩形の周辺300px
 
   // 矩形のグローバル座標での位置を取得
-  const globalRect = rect.coordinateSystem === GLOBAL_COORDINATE_SYSTEM
+  const globalRect = rect.coordinateSystem.layerIndex === 0
     ? rect
     : rect.toGlobal();
   const minX = globalRect.x - surroundingArea;
@@ -77,7 +78,7 @@ const drawRectItem = (
   const { rect, color, label } = item;
 
   // ローカル座標系の矩形は、グローバル座標に変換して描画
-  const displayRect = rect.coordinateSystem === GLOBAL_COORDINATE_SYSTEM
+  const displayRect = rect.coordinateSystem.layerIndex === 0
     ? rect
     : rect.toGlobal();
 
@@ -114,7 +115,7 @@ const drawRectItem = (
     // テキスト情報の背景
     const padding = 5;
     const lineHeight = 18;
-    const lines = rect.coordinateSystem !== GLOBAL_COORDINATE_SYSTEM ? 4 : 3;
+    const lines = rect.coordinateSystem.layerIndex !== 0 ? 4 : 3;
     const bgWidth = 140; // 幅を半分に
     const bgHeight = lineHeight * lines + padding * 2;
 
@@ -146,7 +147,7 @@ const drawRectItem = (
     ctx.font = '10px monospace'; // フォントサイズを少し小さく
 
     // ローカル座標の場合は、元のローカル座標も表示
-    if (rect.coordinateSystem !== GLOBAL_COORDINATE_SYSTEM) {
+    if (rect.coordinateSystem.layerIndex !== 0) {
       ctx.fillText(
         `L: (${Math.round(rect.x)}, ${Math.round(rect.y)})`,
         labelX + 5,

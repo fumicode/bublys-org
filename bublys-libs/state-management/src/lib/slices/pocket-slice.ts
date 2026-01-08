@@ -11,6 +11,8 @@ export type PocketItemState = {
     | 'type/user-groups'
     | 'type/memo'
     | 'type/memos'
+    | 'type/staff'
+    | 'type/shift-assignment'
     | 'type/generic';
   label?: string;
   icon?: string;

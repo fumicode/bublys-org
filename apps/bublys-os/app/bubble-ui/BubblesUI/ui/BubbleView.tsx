@@ -1,6 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2 } from "@bublys-org/bubbles-ui";
+import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { Box, IconButton, Stack, Menu, MenuItem } from "@mui/material";
 import HighLightOffIcon from "@mui/icons-material/HighLightOff";
@@ -101,17 +101,20 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
   const handleDragging = (e: MouseEvent) => {
     if (!dragStartPosRef.current || !dragStartMouseRef.current || !ref.current) return;
-    const deltaX = e.clientX - dragStartMouseRef.current.x;
-    const deltaY = e.clientY - dragStartMouseRef.current.y;
+    const screenDelta = {
+      x: e.clientX - dragStartMouseRef.current.x,
+      y: e.clientY - dragStartMouseRef.current.y,
+    };
 
-    // layerIndexによるscaleを考慮（奥のレイヤーほど小さい）
-    // StyledBubbleの transform: scale(1 - layerIndex * 0.1) に対応
-    const scale = 1 - (layerIndex || 0) * 0.1;
+    // CoordinateSystemを使ってスクリーン座標→ローカル座標の変換を行う
+    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndex || 0)
+      .withVanishingPoint(vanishingPointRef.current || { x: 0, y: 0 });
 
-    // スクリーン座標でのマウス移動量をscaleで割って、実際の位置変化量を計算
+    // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
+    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
     const newPos = {
-      x: dragStartPosRef.current.x + deltaX / scale,
-      y: dragStartPosRef.current.y + deltaY / scale,
+      x: dragStartPosRef.current.x + localDelta.x,
+      y: dragStartPosRef.current.y + localDelta.y,
     };
 
     // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
@@ -127,11 +130,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
     // transform-originも更新（vanishingPointとの相対位置を維持）
     // これがないと、Redux更新後にtransform-originが再計算されて位置がズレる
-    const vp = vanishingPointRef.current || { x: 0, y: 0 };
-    const newTransformOrigin = {
-      x: vp.x - screenPos.x,
-      y: vp.y - screenPos.y,
-    };
+    const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
   };
 
@@ -212,6 +211,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
       contentBackground={contentBackground}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
+        <div className="e-address-bar">
+          <input
+            type="text"
+            value={bubble.url}
+            readOnly
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
+        </div>
         <Box sx={{ position: "relative", textAlign: "center" }}>
           <h1 className="e-bubble-name">{bubble.type}</h1>
           <Stack
@@ -447,8 +455,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       : "center center"};
 
   // ここで奥のレイヤーほどスケールを小さくしている。
+  // CoordinateSystem.fromLayerIndex()を使用してscale計算を一箇所に凝集
   transform: scale(
-    ${({ layerIndex }) => (layerIndex !== undefined ? 1 - layerIndex * 0.1 : 1)}
+    ${({ layerIndex }) => CoordinateSystem.fromLayerIndex(layerIndex ?? 0).scale}
   );
 
   max-height: 90vh;//FIXME:突貫対応
@@ -463,6 +472,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   >.e-bubble-header {
     cursor: move;
     user-select: none;
+    position: relative;
 
     .e-bubble-name {
       background: hsla(0, 0%, 100%, 0.5);
@@ -473,6 +483,53 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       text-align: center;
       margin: 0;
       color: hsla(0, 0%, 0%, 0.8);
+    }
+
+    .e-address-bar {
+      position: absolute;
+      left: 50%;
+      bottom: 100%;
+      transform: translateX(-50%);
+      margin-bottom: 8px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+      z-index: 10;
+
+      input {
+        width: 300px;
+        max-width: 80vw;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 20px;
+        background: linear-gradient(
+          135deg,
+          hsla(200, 80%, 90%, 0.95) 0%,
+          hsla(180, 70%, 95%, 0.9) 50%,
+          hsla(220, 60%, 92%, 0.95) 100%
+        );
+        box-shadow:
+          0 4px 16px hsla(200, 50%, 50%, 0.3),
+          0 2px 4px hsla(0, 0%, 0%, 0.1),
+          inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
+        font-size: 0.85em;
+        color: hsla(200, 40%, 30%, 1);
+        text-align: center;
+        outline: none;
+        cursor: text;
+
+        &:focus {
+          box-shadow:
+            0 4px 20px hsla(200, 60%, 50%, 0.4),
+            0 2px 4px hsla(0, 0%, 0%, 0.1),
+            inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
+        }
+      }
+    }
+
+    &:hover .e-address-bar {
+      opacity: 1;
+      visibility: visible;
     }
   }
 

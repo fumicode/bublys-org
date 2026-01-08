@@ -6,7 +6,7 @@ import {
   Direction,
   CornerPosition,
   Side,
-  createLayerCoordinateSystem
+  CoordinateSystemData,
 } from '@bublys-org/bubbles-ui';
 import { RectItem } from './types';
 import { getRandomColor, renderCanvas } from './canvas-utils';
@@ -175,11 +175,11 @@ export default function SmartRectTestPage() {
     const selected = getSelectedRect();
     if (!selected) return;
 
-    const layerCoordSystem = createLayerCoordinateSystem(
+    const layerCoordSystem: CoordinateSystemData = {
       layerIndex,
-      { x: offsetX, y: offsetY },
-      { x: vanishingPointX, y: vanishingPointY }
-    );
+      offset: { x: offsetX, y: offsetY },
+      vanishingPoint: { x: vanishingPointX, y: vanishingPointY },
+    };
 
     const localRect = selected.rect.toLocal(layerCoordSystem);
 

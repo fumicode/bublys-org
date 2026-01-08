@@ -1,4 +1,5 @@
 import { FC } from 'react';
+import { CoordinateSystem } from '@bublys-org/bubbles-ui';
 
 type CoordinateSystemSettingsProps = {
   layerIndex: number;
@@ -33,7 +34,7 @@ export const CoordinateSystemSettings: FC<CoordinateSystemSettingsProps> = ({
 
       <div style={{ marginBottom: '6px' }}>
         <label style={{ display: 'block', fontSize: '11px', marginBottom: '2px' }}>
-          レイヤーIndex: {layerIndex} (scale={(1 - layerIndex * 0.1).toFixed(1)})
+          レイヤーIndex: {layerIndex} (scale={CoordinateSystem.fromLayerIndex(layerIndex).scale.toFixed(1)})
         </label>
         <input
           type="range"

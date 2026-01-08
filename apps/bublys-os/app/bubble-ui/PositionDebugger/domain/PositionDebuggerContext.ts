@@ -1,7 +1,7 @@
 //pointsとrectsを保存するコンテキスト
 
 import { createContext, useContext } from "react";
-import { Point2, SmartRect, CoordinateSystem, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui"
+import { Point2, SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui"
 
 export type PositionDebuggerState = {
   points: Point2[];
@@ -17,7 +17,7 @@ export type PositionDebuggerState = {
 export const PositionDebuggerContext = createContext<PositionDebuggerState>({
   points: [],
   rects: [],
-  coordinateSystem: GLOBAL_COORDINATE_SYSTEM,
+  coordinateSystem: CoordinateSystem.GLOBAL,
 
   addPoints: (points) => {
     console.warn("addPoints not implemented");

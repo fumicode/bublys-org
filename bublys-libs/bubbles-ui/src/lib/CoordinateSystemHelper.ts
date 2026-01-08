@@ -1,17 +1,17 @@
 import { Point2 } from "./00_Point.js";
-import { SmartRect, CoordinateSystem, transformGlobalPointToLocal } from "./SmartRect.js";
+import { SmartRect, CoordinateSystemData, CoordinateSystem } from "./SmartRect.js";
 
 /**
- * レイヤーインデックスと座標設定から CoordinateSystem を生成
+ * レイヤーインデックスと座標設定から CoordinateSystemData を生成
  *
  * @param layerIndex レイヤーのインデックス（0が最前面）
  * @param config グローバルな座標系設定（offset と vanishingPoint）
- * @returns 指定レイヤーの CoordinateSystem
+ * @returns 指定レイヤーの CoordinateSystemData
  */
 export function createCoordinateSystemForLayer(
   layerIndex: number,
   config: { offset: Point2; vanishingPoint: Point2 }
-): CoordinateSystem {
+): CoordinateSystemData {
   return {
     layerIndex,
     offset: config.offset,
@@ -45,8 +45,8 @@ export function convertGlobalPointToLayerLocal(
     coordinateConfig
   );
 
-  // グローバル座標をレイヤーのローカル座標に変換（共通関数を使用）
-  const localPoint = transformGlobalPointToLocal(globalPoint, layerCoordinateSystem);
+  // グローバル座標をレイヤーのローカル座標に変換
+  const localPoint = CoordinateSystem.fromData(layerCoordinateSystem).transformGlobalToLocal(globalPoint);
 
   // レンダリング時に surfaceLeftTop が足されるので、ここで引いておく
   // moveTo() が期待するのは: position + surfaceLeftTop = レンダリング後の座標

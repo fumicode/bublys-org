@@ -1,5 +1,4 @@
 import { FC } from 'react';
-import { GLOBAL_COORDINATE_SYSTEM } from '@bublys-org/bubbles-ui';
 import { RectItem } from './types';
 
 type RectEditorProps = {
@@ -11,7 +10,7 @@ type RectEditorProps = {
 export const RectEditor: FC<RectEditorProps> = ({ selectedRect, canvasSize, onUpdate }) => {
   if (!selectedRect) return null;
 
-  const isLocal = selectedRect.rect.coordinateSystem !== GLOBAL_COORDINATE_SYSTEM;
+  const isLocal = selectedRect.rect.coordinateSystem.layerIndex !== 0;
   const coordLabel = isLocal ? 'ローカル座標' : 'グローバル座標';
 
   return (

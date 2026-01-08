@@ -55,11 +55,11 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         lastOffset = { x: rect.left, y: rect.top };
         lastVanishingPoint = currentVanishingPoint;
 
-        const coordinateSystem: CoordinateSystem = {
-          layerIndex: 0,
-          offset: { x: rect.left, y: rect.top },
-          vanishingPoint: currentVanishingPoint,
-        };
+        const coordinateSystem = new CoordinateSystem(
+          0,  // layerIndex
+          { x: rect.left, y: rect.top },  // offset
+          currentVanishingPoint  // vanishingPoint
+        );
         onCoordinateSystemReady?.(coordinateSystem);
       }
     };

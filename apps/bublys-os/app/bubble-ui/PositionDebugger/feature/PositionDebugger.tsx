@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useState, useContext } from "react";
-import { Point2, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui"
+import { Point2, CoordinateSystem } from "@bublys-org/bubbles-ui"
 import { SmartRect } from "@bublys-org/bubbles-ui";
 import { useWindowSize } from "../../01_Utils/01_useWindowSize";
 import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";
@@ -83,7 +83,7 @@ export const PositionDebuggerProvider: FC<PositionDebuggerProviderProps> = ({
       value={{
         points,
         rects,
-        coordinateSystem: coordinateSystem || GLOBAL_COORDINATE_SYSTEM,
+        coordinateSystem: coordinateSystem || CoordinateSystem.GLOBAL,
         addPoints,
         addRects,
         removeRect,

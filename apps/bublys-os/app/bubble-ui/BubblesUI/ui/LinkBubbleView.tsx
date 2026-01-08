@@ -1,5 +1,5 @@
 import React, { FC, useMemo } from "react";
-import { Bubble, CoordinateSystem, getOriginRect, getElementRect, SmartRect, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { Bubble, CoordinateSystem, getOriginRect, getElementRect, SmartRect } from "@bublys-org/bubbles-ui";
 import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
 
 type LinkBubbleViewProps = {
@@ -24,7 +24,7 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
     if (originEl) {
       const rect = getElementRect(originEl);
       const parentSize = { width: window.innerWidth, height: window.innerHeight };
-      return new SmartRect(rect, parentSize, GLOBAL_COORDINATE_SYSTEM);
+      return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
     }
 
     // Contextになければ、bubble要素内をquerySelectorで探す（フォールバック）
@@ -36,7 +36,7 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
       if (originElInBubble) {
         const rect = getElementRect(originElInBubble);
         const parentSize = { width: window.innerWidth, height: window.innerHeight };
-        return new SmartRect(rect, parentSize, GLOBAL_COORDINATE_SYSTEM);
+        return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
       }
     }
 

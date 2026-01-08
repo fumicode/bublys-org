@@ -1,7 +1,7 @@
 "use client";
 import { useLayoutEffect, useRef, useContext } from "react";
 import { useWindowSize } from "./01_useWindowSize";
-import { SmartRect, GLOBAL_COORDINATE_SYSTEM } from "@bublys-org/bubbles-ui";
+import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
 import { BubblesContext } from "../BubblesUI/domain/BubblesContext";
@@ -26,8 +26,8 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
       return;
     }
 
-    // getBoundingClientRect()はグローバル座標を返すので、まずGLOBAL_COORDINATE_SYSTEMでSmartRectを作成
-    const globalRect = new SmartRect(ref.current.getBoundingClientRect(), pageSize, GLOBAL_COORDINATE_SYSTEM);
+    // getBoundingClientRect()はグローバル座標を返すので、まずグローバル座標系でSmartRectを作成
+    const globalRect = new SmartRect(ref.current.getBoundingClientRect(), pageSize, CoordinateSystem.GLOBAL.toData());
     // その後、ローカル座標系に変換
     const localRect = globalRect.toLocal(coordinateSystem);
     onRectChanged?.(localRect);
