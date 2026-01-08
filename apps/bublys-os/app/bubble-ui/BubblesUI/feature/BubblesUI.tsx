@@ -1,4 +1,4 @@
-import { FC, useEffect, useCallback, useState, useMemo } from "react";
+import { FC, useEffect, useCallback, useState } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 
@@ -65,12 +65,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     return () => window.removeEventListener("resize", update);
   }, [dispatch]);
 
-  // CoordinateSystem (Reduxから取得してクラスに変換、メモ化)
-  const globalCoordinateSystemData = useAppSelector(selectGlobalCoordinateSystem);
-  const globalCoordinateSystem = useMemo(
-    () => CoordinateSystem.fromData(globalCoordinateSystemData),
-    [globalCoordinateSystemData.layerIndex, globalCoordinateSystemData.offset.x, globalCoordinateSystemData.offset.y, globalCoordinateSystemData.vanishingPoint.x, globalCoordinateSystemData.vanishingPoint.y]
-  );
+  // CoordinateSystem (Reduxから取得、createSelectorでメモ化済み)
+  const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // Redux を使ったアクションハンドラ

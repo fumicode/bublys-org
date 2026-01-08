@@ -2,9 +2,52 @@ import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, 
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
-import { Box, IconButton, Stack, Menu, MenuItem } from "@mui/material";
-import HighLightOffIcon from "@mui/icons-material/HighLightOff";
-import AspectRatioIcon from "@mui/icons-material/AspectRatio";
+import { Menu, MenuItem } from "@mui/material";
+
+/**
+ * 泡っぽい閉じるボタンのSVGアイコン
+ */
+const CloseIcon: FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
+    <path
+      d="M8 8L16 16M16 8L8 16"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+/**
+ * 泡っぽいリサイズボタンのSVGアイコン
+ */
+const ResizeIcon: FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
+    <path
+      d="M15 9L9 9L9 15"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9 15L15 9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M9 15L15 15L15 9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeOpacity="0.4"
+    />
+  </svg>
+);
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "@bublys-org/bubbles-ui-state";
@@ -12,6 +55,55 @@ import { SmartRect } from "@bublys-org/bubbles-ui";
 import { BubblesContext } from "../domain/BubblesContext";
 import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
 //import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
+
+/**
+ * 長いslug（UUIDなど）を省略表示する
+ * 20文字以上の場合: 前2文字 + ... + 後4文字
+ */
+const abbreviateSlug = (slug: string): { text: string; isAbbreviated: boolean } => {
+  if (slug.length >= 20) {
+    return {
+      text: `${slug.slice(0, 2)}…${slug.slice(-4)}`,
+      isAbbreviated: true,
+    };
+  }
+  return { text: slug, isAbbreviated: false };
+};
+
+/**
+ * URLをパースしてスタイル付きで表示するコンポーネント
+ */
+const StyledUrl: FC<{ url: string }> = ({ url }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 表示時に右端にスクロール
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollLeft = containerRef.current.scrollWidth;
+    }
+  }, [url]);
+
+  const segments = url.split("/").filter(Boolean);
+
+  return (
+    <div className="e-styled-url" ref={containerRef}>
+      {segments.map((segment, index) => {
+        const { text, isAbbreviated } = abbreviateSlug(segment);
+        return (
+          <span key={index} className="e-url-segment">
+            {index > 0 && <span className="e-url-separator">/</span>}
+            <span
+              className={`e-url-slug ${isAbbreviated ? "e-abbreviated" : ""}`}
+              title={isAbbreviated ? segment : undefined}
+            >
+              {text}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+};
 
 type BubbleProps = {
   bubble: Bubble;
@@ -211,116 +303,35 @@ const BubbleViewInner: FC<BubbleProps> = ({
       contentBackground={contentBackground}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
-        <div className="e-address-bar">
-          <input
-            type="text"
-            value={bubble.url}
-            readOnly
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          />
+        <div
+          className="e-address-bar"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <StyledUrl url={bubble.url} />
         </div>
-        <Box sx={{ position: "relative", textAlign: "center" }}>
-          <h1 className="e-bubble-name">{bubble.type}</h1>
-          <Stack
-            direction="row"
-            spacing={0} // 間隔をさらに詰める（デフォルトは1）
-            sx={{
-              position: "absolute",
-              left: 0,
-              top: "60%",
-              transform: "translateY(-50%)",
-              marginLeft: 0.5,
-            }}
-          >
+        <div className="e-header-content">
+          <div className="e-header-buttons">
             {onCloseClick && (
-              <IconButton
-                size="small" // サイズをsmallに変更
-                sx={{
-                  backgroundColor: "white",
-                  padding: 0.5, // パディングを小さく（デフォルトは1）
-                  "& .MuiSvgIcon-root": {
-                    fontSize: "1.2rem", // アイコンサイズを小さく（デフォルトは1.5rem）
-                  },
-                }}
+              <button
+                className="e-bubble-button e-close-button"
                 onClick={(e) => {
                   e.stopPropagation();
                   onCloseClick?.(bubble);
                 }}
               >
-                <HighLightOffIcon />
-              </IconButton>
+                <CloseIcon size={20} />
+              </button>
             )}
-
-            <IconButton
-              size="small"
-              sx={{
-                backgroundColor: "white",
-                padding: 0.5,
-                "& .MuiSvgIcon-root": {
-                  fontSize: "1.2rem",
-                },
-              }}
+            <button
+              className="e-bubble-button e-resize-button"
               onClick={handleSizeMenuOpen}
             >
-              <AspectRatioIcon />
-            </IconButton>
-
-
-            {/* {onMoveClick && (
-              <IconButton
-                size="small"
-                sx={{
-                  backgroundColor: "white",
-                  padding: 0.5,
-                  "& .MuiSvgIcon-root": {
-                    fontSize: "1.2rem",
-                  },
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveClick?.(bubble);
-                }}
-              >
-                <VerticalAlignTopIcon />
-              </IconButton>
-            )}
-            {onLayerDownClick && (
-              <IconButton
-                size="small"
-                sx={{
-                  backgroundColor: "white",
-                  padding: 0.5,
-                  "& .MuiSvgIcon-root": {
-                    fontSize: "1.2rem",
-                  },
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLayerDownClick?.(bubble);
-                }}
-              >
-                <MoveDownIcon />
-              </IconButton>
-            )}
-            {onLayerUpClick && (
-              <IconButton
-                sx={{
-                  backgroundColor: "white",
-                  padding: 0.5,
-                  "& .MuiSvgIcon-root": {
-                    fontSize: "1.2rem",
-                  },
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLayerUpClick?.(bubble);
-                }}
-              >
-                <MoveUpIcon />
-              </IconButton>
-            )}  */}
-          </Stack>
+              <ResizeIcon size={20} />
+            </button>
+          </div>
+          <h1 className="e-bubble-name">{bubble.type}</h1>
+        </div>
 
           <Menu
             anchorEl={sizeMenuAnchor}
@@ -349,7 +360,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
             }}>最大化</MenuItem>
             <MenuItem onClick={() => handleResizeClick(null, null)}>フィット (自動)</MenuItem>
           </Menu>
-        </Box>
       </header>
 
       <main className="e-bubble-content">
@@ -462,27 +472,125 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   max-height: 90vh;//FIXME:突貫対応
 
-  background-color: hsla(${({ colorHue: color }) => color}, 50%, 50%, 0.5);
+  // 泡っぽいグラデーション背景
+  background: linear-gradient(
+    145deg,
+    hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.6) 0%,
+    hsla(${({ colorHue }) => colorHue}, 50%, 60%, 0.5) 30%,
+    hsla(${({ colorHue }) => colorHue}, 45%, 55%, 0.45) 70%,
+    hsla(${({ colorHue }) => colorHue}, 55%, 65%, 0.55) 100%
+  );
 
-  border-radius: 3em;
+  // 泡っぽいシャドウと光沢
+  box-shadow:
+    0 8px 32px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.3),
+    0 2px 8px hsla(0, 0%, 0%, 0.1),
+    inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
+    inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
+
+  border: 1px solid hsla(0, 0%, 100%, 0.3);
+  border-radius: 24px;
 
   display: flex;
   flex-direction: column;
+
+  // ガラスのような光沢エフェクト（疑似要素）
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(
+      to bottom,
+      hsla(0, 0%, 100%, 0.2) 0%,
+      hsla(0, 0%, 100%, 0.05) 50%,
+      transparent 100%
+    );
+    border-radius: 24px 24px 50% 50%;
+    pointer-events: none;
+  }
 
   >.e-bubble-header {
     cursor: move;
     user-select: none;
     position: relative;
+    padding: 12px 16px 8px;
+
+    .e-header-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .e-header-buttons {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .e-bubble-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: linear-gradient(
+        135deg,
+        hsla(0, 0%, 100%, 0.7) 0%,
+        hsla(0, 0%, 100%, 0.4) 100%
+      );
+      box-shadow:
+        0 2px 6px hsla(0, 0%, 0%, 0.15),
+        inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
+      cursor: pointer;
+      color: hsla(0, 0%, 30%, 0.8);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: linear-gradient(
+          135deg,
+          hsla(0, 0%, 100%, 0.9) 0%,
+          hsla(0, 0%, 100%, 0.6) 100%
+        );
+        transform: scale(1.1);
+        box-shadow:
+          0 3px 8px hsla(0, 0%, 0%, 0.2),
+          inset 0 1px 2px hsla(0, 0%, 100%, 0.9);
+      }
+
+      &:active {
+        transform: scale(0.95);
+      }
+
+      &.e-close-button:hover {
+        color: hsla(0, 70%, 50%, 1);
+      }
+
+      &.e-resize-button:hover {
+        color: hsla(210, 70%, 50%, 1);
+      }
+    }
 
     .e-bubble-name {
-      background: hsla(0, 0%, 100%, 0.5);
-      padding: 0.5em;
-      border-radius: 0.5em;
-      font-size: 1.2em;
-      font-weight: bold;
+      flex: 1;
+      background: linear-gradient(
+        135deg,
+        hsla(0, 0%, 100%, 0.5) 0%,
+        hsla(0, 0%, 100%, 0.3) 100%
+      );
+      padding: 6px 16px;
+      border-radius: 16px;
+      font-size: 1em;
+      font-weight: 600;
       text-align: center;
       margin: 0;
-      color: hsla(0, 0%, 0%, 0.8);
+      color: hsla(0, 0%, 20%, 0.9);
+      box-shadow: inset 0 1px 2px hsla(0, 0%, 100%, 0.5);
     }
 
     .e-address-bar {
@@ -496,9 +604,12 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       transition: opacity 0.2s ease, visibility 0.2s ease;
       z-index: 10;
 
-      input {
-        width: 300px;
-        max-width: 80vw;
+      .e-styled-url {
+        display: flex;
+        align-items: center;
+        max-width: 400px;
+        overflow-x: auto;
+        overflow-y: hidden;
         padding: 8px 16px;
         border: none;
         border-radius: 20px;
@@ -513,16 +624,35 @@ const StyledBubble = styled.div<StyledBubbleProp>`
           0 2px 4px hsla(0, 0%, 0%, 0.1),
           inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
         font-size: 0.85em;
-        color: hsla(200, 40%, 30%, 1);
-        text-align: center;
-        outline: none;
-        cursor: text;
+        white-space: nowrap;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
 
-        &:focus {
-          box-shadow:
-            0 4px 20px hsla(200, 60%, 50%, 0.4),
-            0 2px 4px hsla(0, 0%, 0%, 0.1),
-            inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
+        &::-webkit-scrollbar {
+          display: none;
+        }
+
+        .e-url-segment {
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .e-url-separator {
+          font-size: 0.75em;
+          color: hsla(200, 30%, 50%, 0.5);
+          margin: 0 2px;
+          font-weight: 300;
+        }
+
+        .e-url-slug {
+          color: hsla(200, 40%, 30%, 1);
+          font-weight: 500;
+
+          &.e-abbreviated {
+            color: hsla(200, 30%, 50%, 0.8);
+            font-size: 0.9em;
+            cursor: help;
+          }
         }
       }
     }
@@ -537,13 +667,18 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 1em;
+    padding: 16px;
     font-size: 1em;
-    background: ${({ contentBackground }) => contentBackground || "white"};
-
-    border-radius: 0.5em;
-    margin: 0.5em;
-
+    background: linear-gradient(
+      180deg,
+      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 100%, 0.95)"} 0%,
+      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
+    );
+    border-radius: 16px;
+    margin: 0 12px 12px;
+    box-shadow:
+      inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
+      0 1px 2px hsla(0, 0%, 100%, 0.5);
   }
 
   >.e-debug-rect {
