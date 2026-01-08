@@ -72,38 +72,33 @@ const abbreviateSlug = (slug: string): { text: string; isAbbreviated: boolean } 
 
 /**
  * URLをパースしてスタイル付きで表示するコンポーネント
+ * memo化して不要な再レンダリングを防止
+ * CSSのdirection:rtlで右端から表示（強制リフローを完全に回避）
  */
-const StyledUrl: FC<{ url: string }> = ({ url }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // 表示時に右端にスクロール
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollLeft = containerRef.current.scrollWidth;
-    }
-  }, [url]);
-
-  const segments = url.split("/").filter(Boolean);
+const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
+  const segments = useMemo(() => url.split("/").filter(Boolean), [url]);
 
   return (
-    <div className="e-styled-url" ref={containerRef}>
-      {segments.map((segment, index) => {
-        const { text, isAbbreviated } = abbreviateSlug(segment);
-        return (
-          <span key={index} className="e-url-segment">
-            {index > 0 && <span className="e-url-separator">/</span>}
-            <span
-              className={`e-url-slug ${isAbbreviated ? "e-abbreviated" : ""}`}
-              title={isAbbreviated ? segment : undefined}
-            >
-              {text}
+    <div className="e-styled-url">
+      <div className="e-styled-url-inner">
+        {segments.map((segment, index) => {
+          const { text, isAbbreviated } = abbreviateSlug(segment);
+          return (
+            <span key={index} className="e-url-segment">
+              {index > 0 && <span className="e-url-separator">/</span>}
+              <span
+                className={`e-url-slug ${isAbbreviated ? "e-abbreviated" : ""}`}
+                title={isAbbreviated ? segment : undefined}
+              >
+                {text}
+              </span>
             </span>
-          </span>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
-};
+});
 
 type BubbleProps = {
   bubble: Bubble;
@@ -418,10 +413,12 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   }
 
   // その他のビジュアルに影響するprops
+  // 注: childrenの比較は削除。React要素は毎回新しい参照になるため浅い比較では機能しない。
+  // BubbleContentがmemo化されているので、BubbleView自体が再レンダリングされても
+  // BubbleContent内部は再レンダリングされない。
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
-      prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.children !== nextProps.children) {
+      prevProps.contentBackground !== nextProps.contentBackground) {
     return false;
   }
 
@@ -605,8 +602,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       z-index: 10;
 
       .e-styled-url {
-        display: flex;
-        align-items: center;
         max-width: 400px;
         overflow-x: auto;
         overflow-y: hidden;
@@ -624,12 +619,21 @@ const StyledBubble = styled.div<StyledBubbleProp>`
           0 2px 4px hsla(0, 0%, 0%, 0.1),
           inset 0 1px 2px hsla(0, 0%, 100%, 0.8);
         font-size: 0.85em;
-        white-space: nowrap;
         scrollbar-width: none;
         -ms-overflow-style: none;
+        // direction: rtlで右端から表示（JSでscrollLeftを設定する必要なし）
+        direction: rtl;
 
         &::-webkit-scrollbar {
           display: none;
+        }
+
+        .e-styled-url-inner {
+          display: flex;
+          align-items: center;
+          white-space: nowrap;
+          // テキスト方向を通常に戻す
+          direction: ltr;
         }
 
         .e-url-segment {

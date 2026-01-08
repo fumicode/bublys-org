@@ -1,5 +1,5 @@
-import React, { FC, useMemo } from "react";
-import { Bubble, CoordinateSystem, getOriginRect, getElementRect, SmartRect } from "@bublys-org/bubbles-ui";
+import React, { FC } from "react";
+import { Bubble, CoordinateSystem, getOriginRect } from "@bublys-org/bubbles-ui";
 import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
 
 type LinkBubbleViewProps = {
@@ -17,32 +17,11 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
 }) => {
   const bubbleRefs = useBubbleRefsOptional();
 
-  // Contextから参照を取得してrectを計算
-  const originRect = useMemo(() => {
-    // まずorigin要素（data-url）をContextから探す
-    const originEl = bubbleRefs?.getOriginRef(openee.url);
-    if (originEl) {
-      const rect = getElementRect(originEl);
-      const parentSize = { width: window.innerWidth, height: window.innerHeight };
-      return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
-    }
-
-    // Contextになければ、bubble要素内をquerySelectorで探す（フォールバック）
-    const bubbleEl = bubbleRefs?.getBubbleRef(opener.id);
-    if (bubbleEl) {
-      const escapedUrl = CSS?.escape ? CSS.escape(openee.url) : openee.url;
-      const selector = `[data-url="${escapedUrl}"]`;
-      const originElInBubble = bubbleEl.querySelector(selector) as HTMLElement | null;
-      if (originElInBubble) {
-        const rect = getElementRect(originElInBubble);
-        const parentSize = { width: window.innerWidth, height: window.innerHeight };
-        return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
-      }
-    }
-
-    // それでもなければ従来のgetOriginRectを使う（最終フォールバック）
-    return getOriginRect(opener.id, openee.url);
-  }, [bubbleRefs, opener.id, openee.url]);
+  // キャッシュ付きでorigin rectを取得（強制リフローを最小化）
+  // useMemoは不要 - getOriginRectCachedが内部でキャッシュしている
+  const originRect = bubbleRefs?.getOriginRectCached(openee.url)
+    // フォールバック: 従来のgetOriginRectを使う
+    ?? getOriginRect(opener.id, openee.url);
 
   const baseOpenerRect = originRect || opener.renderedRect;
   const openerRect = baseOpenerRect

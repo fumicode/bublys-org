@@ -3,12 +3,12 @@ import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPoc
 import { useShellManager } from "@bublys-org/object-shell";
 
 import {
-  selectBubblesProcessDPO,
+  selectBubbleLayers,
+  selectSurfaceBubbles,
   addBubble,
   deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
   layerUp as layerUpAction,
-  updateBubble,
   popChildInProcess as popChildAction,
   popChildMaxInProcess,
   joinSiblingInProcess as joinSiblingAction,
@@ -26,13 +26,11 @@ import { PositionDebuggerProvider } from "../../PositionDebugger/feature/Positio
 import { BubblesContext } from "../domain/BubblesContext";
 import { BubbleRefsProvider } from "../domain/BubbleRefsContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
-import { Box, Button, Slider, Typography, IconButton } from "@mui/material";
+import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
-import EventNoteIcon from "@mui/icons-material/EventNote";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
+import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { DragDataType } from "../../utils/drag-types";
@@ -43,15 +41,15 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
-  const bubblesDPO = useAppSelector(selectBubblesProcessDPO);
+  // レイヤー構造（IDの配列のみ）- 各バブルは自分でReduxから取得
+  const bubbleLayers = useAppSelector(selectBubbleLayers);
+  // surface判定用（popChild/joinSibling判定のみに使用）
+  const surfaceBubbles = useAppSelector(selectSurfaceBubbles);
   const shellManager = useShellManager();
 
   // パネルの開閉状態
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [isPocketOpen, setIsPocketOpen] = useState(false);
-  const [isGakkaiShiftPanelOpen, setIsGakkaiShiftPanelOpen] = useState(false);
-  const [isTaskManagementPanelOpen, setIsTaskManagementPanelOpen] = useState(false);
-  const [isIgoGamePanelOpen, setIsIgoGamePanelOpen] = useState(false);
 
    // ページサイズ管理
   const pageSize = useAppSelector(selectWindowSize);
@@ -141,18 +139,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openingPosition: OpeningPosition = "bubble-side"
   ): string => {
     const newBubble = createBubble(name);
-    const surface = bubblesDPO.surface;
-
 
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);
-
 
     if(isNameEndWithHistory) {
       return popChildMax(newBubble, openerBubbleId);
     }
 
-    if (surface?.[0]?.type === newBubble.type) {
+    if (surfaceBubbles?.[0]?.type === newBubble.type) {
       return joinSibling(newBubble, openerBubbleId);
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
@@ -161,7 +156,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
-    dispatch(setGlobalCoordinateSystem(cs));
+    dispatch(setGlobalCoordinateSystem(cs.toData()));
   }, [dispatch]);
 
   // Pocketのドロップハンドラー
@@ -180,92 +175,44 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     popChildOrJoinSibling(url, "root");
   };
 
-  return (
-    <>
-      <BubblesContext.Provider
-        value={{
-          pageSize,
-          surfaceLeftTop,
-          bubbles: bubblesDPO.layers,
-          coordinateSystem: globalCoordinateSystem,
-          openBubble: popChildOrJoinSibling,
-          renameBubble: (id: string, newName: string) => {
-            const existing = bubblesDPO.layers.flat().find((b) => b.id === id);
-            if (!existing) {
-              console.error(`Bubble with id ${id} not found`);
-              return id;
-            }
-            const updated = existing.rename(newName);
-            dispatch(updateBubble(updated.toJSON()));
-            return id;
-          },
-        }}
-      >
-        <BubbleRefsProvider>
-          <PositionDebuggerProvider isShown={false}>
-            <Box sx={{ width: '100%', height: '100vh' }}>
-              <BubblesLayeredView
-                bubbles={bubblesDPO.layers}
-                vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-                onBubbleClose={deleteBubble}
-                onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
-                onBubbleLayerDown={layerDown}
-                onBubbleLayerUp={layerUp}
-                onCoordinateSystemReady={handleCoordinateSystemReady}
-              />
-            </Box>
-          </PositionDebuggerProvider>
-        </BubbleRefsProvider>
-      </BubblesContext.Provider>
+  // Sidebarからのアイテムクリックハンドラー
+  const handleSidebarItemClick = (url: string) => {
+    popChildOrJoinSibling(url, "root");
+  };
 
-      {/* Igo Game Panel */}
-      {isIgoGamePanelOpen ? (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 450,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            padding: 2,
-            borderRadius: 1,
-            zIndex: 1000,
-            width: 180,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+  return (
+    <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
+      {/* Left Sidebar */}
+      <Sidebar onItemClick={handleSidebarItemClick} />
+
+      {/* Main Bubbles Area */}
+      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <BubblesContext.Provider
+          value={{
+            pageSize,
+            surfaceLeftTop,
+            coordinateSystem: globalCoordinateSystem,
+            openBubble: popChildOrJoinSibling,
           }}
         >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">囲碁バブリ</Typography>
-            <IconButton size="small" onClick={() => setIsIgoGamePanelOpen(false)}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <Button
-            variant="contained"
-            onClick={() => popChildOrJoinSibling(`igo-game/${crypto.randomUUID()}`, "root")}
-            fullWidth
-            sx={{ backgroundColor: "#dcb35c", "&:hover": { backgroundColor: "#c9a24e" } }}
-          >
-            対局開始
-          </Button>
-        </Box>
-      ) : (
-        <IconButton
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 450,
-            zIndex: 1000,
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-            },
-          }}
-          onClick={() => setIsIgoGamePanelOpen(true)}
-        >
-          <SportsEsportsIcon />
-        </IconButton>
-      )}
+          <BubbleRefsProvider>
+            <PositionDebuggerProvider isShown={false}>
+              <Box sx={{ width: '100%', height: '100%' }}>
+                <BubblesLayeredView
+                  bubbleLayers={bubbleLayers}
+                  vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                  onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                  onBubbleClose={deleteBubble}
+                  onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                  onBubbleLayerDown={layerDown}
+                  onBubbleLayerUp={layerUp}
+                  onCoordinateSystemReady={handleCoordinateSystemReady}
+                />
+              </Box>
+            </PositionDebuggerProvider>
+          </BubbleRefsProvider>
+        </BubblesContext.Provider>
+      </Box>
 
       {/* Pocket */}
       {isPocketOpen ? (
@@ -273,7 +220,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           sx={{
             position: "fixed",
             bottom: 20,
-            right: 560,
+            right: 80,
             zIndex: 1000,
           }}
         >
@@ -288,7 +235,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           sx={{
             position: "fixed",
             bottom: 20,
-            right: 560,
+            right: 80,
             zIndex: 1000,
             backgroundColor: "rgba(255, 255, 255, 0.8)",
             "&:hover": {
@@ -301,116 +248,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         </IconButton>
       )}
 
-      {/* Task Management Panel */}
-      {isTaskManagementPanelOpen ? (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 620,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            padding: 2,
-            borderRadius: 1,
-            zIndex: 1000,
-            width: 180,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">タスク管理</Typography>
-            <IconButton size="small" onClick={() => setIsTaskManagementPanelOpen(false)}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <Button
-            variant="contained"
-            onClick={() => popChildOrJoinSibling("task-management/tasks", "root")}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            タスク一覧
-          </Button>
-        </Box>
-      ) : (
-        <IconButton
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 620,
-            zIndex: 1000,
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-            },
-          }}
-          onClick={() => setIsTaskManagementPanelOpen(true)}
-        >
-          <AssignmentIcon />
-        </IconButton>
-      )}
-
-      {/* Gakkai Shift Panel */}
-      {isGakkaiShiftPanelOpen ? (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 340,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            padding: 2,
-            borderRadius: 1,
-            zIndex: 1000,
-            width: 200,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">学会シフト</Typography>
-            <IconButton size="small" onClick={() => setIsGakkaiShiftPanelOpen(false)}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-          <Button
-            variant="outlined"
-            onClick={() => popChildOrJoinSibling("gakkai-shift/staffs", "root")}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            スタッフ一覧
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => popChildOrJoinSibling("gakkai-shift/shift-plans", "root")}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            シフト配置表
-          </Button>
-        </Box>
-      ) : (
-        <IconButton
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 340,
-            zIndex: 1000,
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-            },
-          }}
-          onClick={() => setIsGakkaiShiftPanelOpen(true)}
-        >
-          <EventNoteIcon />
-        </IconButton>
-      )}
-
-      {/* Control Panel */}
+      {/* Control Panel - 右上に配置 */}
       {isControlPanelOpen ? (
         <Box
           sx={{
             position: "fixed",
-            bottom: 20,
+            top: 20,
             right: 20,
             backgroundColor: "rgba(255, 255, 255, 0.9)",
             padding: 2,
@@ -482,38 +325,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             }}
             valueLabelDisplay="auto"
           />
-          {/* open user group bubble*/}
-          <Button
-            variant="outlined"
-            onClick={() => popChildOrJoinSibling("user-groups", "root")}
-            fullWidth
-            sx={{ mt: 1, mb: 1 }}
-          >
-            Open User Groups Bubble
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => popChildOrJoinSibling("memos", "root")}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            Open Memos
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => popChildOrJoinSibling("users", "root")}
-            fullWidth
-            sx={{ mb: 1 }}
-          >
-            Open Users
-          </Button>
           {additionalButton}
         </Box>
       ) : (
         <IconButton
           sx={{
             position: "fixed",
-            bottom: 20,
+            top: 20,
             right: 20,
             zIndex: 1000,
             backgroundColor: "rgba(255, 255, 255, 0.8)",
@@ -526,7 +344,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           <TuneIcon />
         </IconButton>
       )}
-
-    </>
+    </Box>
   );
 };

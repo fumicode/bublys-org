@@ -309,4 +309,63 @@ export const selectIsLayerAnimating = (state: { bubbleState: BubbleStateSlice })
   return state.bubbleState.animatingBubbleIds.length > 0;
 }
 
+/**
+ * レイヤー構造（IDの配列のみ）を返す
+ * バブルインスタンスは含まない - 各BubbleViewが個別に取得する
+ */
+export const selectBubbleLayers = createSelector(
+  [selectProcessJson],
+  (processJson): string[][] => {
+    const process = BubblesProcess.fromJSON(processJson);
+    return process.layers;
+  }
+);
+
+/**
+ * 個別バブルをIDで取得するセレクターファクトリー
+ * 各バブルごとにメモ化され、そのバブルが変わった時だけ再計算
+ */
+type BubbleByIdSelector = (state: { bubbleState: BubbleStateSlice }) => Bubble | undefined;
+const bubbleSelectorCache = new Map<string, BubbleByIdSelector>();
+
+export const makeSelectBubbleById = (bubbleId: string): BubbleByIdSelector => {
+  if (!bubbleSelectorCache.has(bubbleId)) {
+    const selector = createSelector(
+      [(state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles[bubbleId]],
+      (bubbleJson): Bubble | undefined => {
+        if (!bubbleJson) return undefined;
+        return Bubble.fromJSON(bubbleJson);
+      }
+    );
+    bubbleSelectorCache.set(bubbleId, selector);
+  }
+  return bubbleSelectorCache.get(bubbleId)!;
+};
+
+/**
+ * 個別バブルのlayerIndexを取得するセレクターファクトリー
+ */
+type LayerIndexSelector = (state: { bubbleState: BubbleStateSlice }) => number;
+const layerIndexSelectorCache = new Map<string, LayerIndexSelector>();
+
+export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector => {
+  if (!layerIndexSelectorCache.has(bubbleId)) {
+    const selector = createSelector(
+      [selectProcessJson],
+      (processJson): number => {
+        const process = BubblesProcess.fromJSON(processJson);
+        const layers = process.layers;
+        for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+          if (layers[layerIndex].includes(bubbleId)) {
+            return layerIndex;
+          }
+        }
+        return -1;
+      }
+    );
+    layerIndexSelectorCache.set(bubbleId, selector);
+  }
+  return layerIndexSelectorCache.get(bubbleId)!;
+};
+
 export default bubblesSlice.reducer;

@@ -1,14 +1,79 @@
-import React, { FC, useRef, useLayoutEffect } from "react";
+import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationsWithBubble, selectGlobalCoordinateSystem, selectSurfaceLeftTop, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
+import {
+  selectBubblesRelationsWithBubble,
+  selectGlobalCoordinateSystem,
+  selectSurfaceLeftTop,
+  selectIsLayerAnimating,
+  makeSelectBubbleById,
+} from "@bublys-org/bubbles-ui-state";
 import { LinkBubbleView } from "./LinkBubbleView";
 
+/**
+ * 個別バブルを自分でReduxから取得するラッパーコンポーネント
+ * このバブルが変わった時だけ再レンダリングされる
+ */
+type ConnectedBubbleViewProps = {
+  bubbleId: string;
+  layerIndex: number;
+  zIndex: number;
+  vanishingPoint: Point2;
+  surfaceLeftTop: Point2;
+  onBubbleClick?: (name: string) => void;
+  onBubbleClose?: (bubble: Bubble) => void;
+  onBubbleMove?: (bubble: Bubble) => void;
+  onBubbleResize?: (bubble: Bubble) => void;
+  onBubbleLayerDown?: (bubble: Bubble) => void;
+  onBubbleLayerUp?: (bubble: Bubble) => void;
+};
+
+const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
+  bubbleId,
+  layerIndex,
+  zIndex,
+  vanishingPoint,
+  surfaceLeftTop,
+  onBubbleClick,
+  onBubbleClose,
+  onBubbleMove,
+  onBubbleResize,
+  onBubbleLayerDown,
+  onBubbleLayerUp,
+}) => {
+  // このバブル専用のセレクターを使用
+  const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
+  const bubble = useAppSelector(selectBubble);
+
+  if (!bubble) return null;
+
+  const pos = new Vec2(bubble.position || { x: 0, y: 0 }).add(surfaceLeftTop);
+
+  return (
+    <BubbleView
+      bubble={bubble}
+      position={pos}
+      layerIndex={layerIndex}
+      zIndex={zIndex}
+      vanishingPoint={vanishingPoint}
+      contentBackground={bubble.contentBackground ?? "white"}
+      onClick={() => onBubbleClick?.(bubble.url)}
+      onCloseClick={() => onBubbleClose?.(bubble)}
+      onMove={(updated) => onBubbleMove?.(updated)}
+      onResize={(updated) => onBubbleResize?.(updated)}
+      onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+      onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+    >
+      <BubbleContent bubble={bubble} />
+    </BubbleView>
+  );
+});
+
 type BubblesLayeredViewProps = {
-  bubbles: Bubble[][];
+  bubbleLayers: string[][];  // IDの配列に変更
   vanishingPoint?: Point2;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
@@ -20,7 +85,7 @@ type BubblesLayeredViewProps = {
 };
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
-  bubbles,
+  bubbleLayers,
   vanishingPoint,
   onBubbleClick,
   onBubbleClose,
@@ -110,38 +175,39 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const baseZIndex = 100;
 
-  const bubbleIdToZIndex: Record<string, number> = {};
+  // bubbleIdToZIndexを計算（LinkBubbleView用）
+  const bubbleIdToZIndex: Record<string, number> = useMemo(() => {
+    const result: Record<string, number> = {};
+    bubbleLayers.forEach((layer, layerIndex) => {
+      const zIndex = baseZIndex - layerIndex;
+      layer.forEach((bubbleId) => {
+        result[bubbleId] = zIndex;
+      });
+    });
+    return result;
+  }, [bubbleLayers]);
 
-  const renderedBubbles = bubbles
+  // 各バブルをConnectedBubbleViewでレンダリング
+  const renderedBubbles = bubbleLayers
     .map((layer, layerIndex) =>
-      layer.map((bubble, _siblingIndex) => {
+      layer.map((bubbleId) => {
         const zIndex = baseZIndex - layerIndex;
 
-        // bubbleIdのレイヤー番号を記録
-        bubbleIdToZIndex[bubble.id] = zIndex;
-
-        // calculate position based on existing bubble properties
-        const pos = new Vec2(bubble.position || { x: 0, y: 0 })
-          .add(surfaceLeftTop);
-
         return (
-          <BubbleView
-            bubble={bubble}
-            position={pos}
-            key={bubble.id}
+          <ConnectedBubbleView
+            key={bubbleId}
+            bubbleId={bubbleId}
             layerIndex={layerIndex}
             zIndex={zIndex}
             vanishingPoint={undergroundVanishingPoint}
-            contentBackground={bubble.contentBackground ?? "white"}
-            onClick={() => onBubbleClick?.(bubble.url)}
-            onCloseClick={() => onBubbleClose?.(bubble)}
-            onMove={(updated) => onBubbleMove?.(updated)}
-            onResize={(updated) => onBubbleResize?.(updated)}
-            onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
-            onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
-          >
-            <BubbleContent bubble={bubble} />
-          </BubbleView>
+            surfaceLeftTop={surfaceLeftTop}
+            onBubbleClick={onBubbleClick}
+            onBubbleClose={onBubbleClose}
+            onBubbleMove={onBubbleMove}
+            onBubbleResize={onBubbleResize}
+            onBubbleLayerDown={onBubbleLayerDown}
+            onBubbleLayerUp={onBubbleLayerUp}
+          />
         );
       })
     )
@@ -155,10 +221,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         surfaceZIndex={baseZIndex - 2}
       >
         {renderedBubbles}
-        <div className="e-underground-curtain">curtain</div>
+        <div className="e-underground-curtain"></div>
         <div className="e-debug-visualizations">
           <div className="e-surface-border"></div>
-          <div className="e-underground-border">underground</div>
+          <div className="e-underground-border"></div>
           <div className="e-vanishing-point"></div>
         </div>
 
