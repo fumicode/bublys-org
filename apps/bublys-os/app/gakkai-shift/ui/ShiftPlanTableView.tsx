@@ -24,10 +24,13 @@ type ShiftPlanTableViewProps = {
   staffList: readonly Staff_スタッフ[];
   violations?: readonly ConstraintViolation[];
   buildAssignmentUrl?: (assignmentId: string) => string;
+  /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
+  buildCellUrl?: (timeSlotId: string, roleId: string) => string;
   onDropStaff?: (staffId: string, timeSlotId: string, roleId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
   onMoveAssignment?: (assignmentId: string, staffId: string, timeSlotId: string, roleId: string) => void;
   onAssignmentClick?: (assignmentId: string) => void;
+  onCellClick?: (timeSlotId: string, roleId: string) => void;
 };
 
 export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
@@ -37,10 +40,12 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   staffList,
   violations = [],
   buildAssignmentUrl,
+  buildCellUrl,
   onDropStaff,
   onRemoveAssignment,
   onMoveAssignment,
   onAssignmentClick,
+  onCellClick,
 }) => {
   const getStaffName = (staffId: string): string => {
     const staff = staffList.find((s) => s.id === staffId);
@@ -209,6 +214,10 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                 const isShortage = hasRequirement && assignedCount < (requirement?.minCount ?? requiredCount);
                 const isExcess = hasRequirement && assignedCount > (requirement?.maxCount ?? requiredCount);
 
+                // 空き枠の数を計算
+                const emptySlotCount = Math.max(0, requiredCount - assignedCount);
+                const cellUrl = buildCellUrl?.(slot.id, role.id);
+
                 return (
                   <td
                     key={`${slot.id}_${role.id}`}
@@ -267,6 +276,18 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                           </ObjectView>
                         );
                       })}
+                      {/* 空き枠のプレースホルダー（必ず1つ以上表示） */}
+                      {hasRequirement && (
+                        <div
+                          className={`e-empty-slot ${emptySlotCount === 0 ? "is-full" : ""}`}
+                          data-url={cellUrl}
+                          onClick={() => onCellClick?.(slot.id, role.id)}
+                        >
+                          <span className="e-empty-label">
+                            {emptySlotCount > 0 ? `+ ${emptySlotCount}名追加` : "+ 追加"}
+                          </span>
+                        </div>
+                      )}
                       {cellAssignments.length > 0 && (
                         <div className={`e-score ${score >= 0 ? "is-positive" : "is-negative"}`}>
                           {score > 0 ? "+" : ""}{score}pt
@@ -371,6 +392,43 @@ const StyledTable = styled.table`
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .e-empty-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    background-color: #fafafa;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+
+    &:hover {
+      background-color: #e3f2fd;
+      border-color: #1976d2;
+    }
+
+    .e-empty-label {
+      font-size: 0.8em;
+      color: #888;
+    }
+
+    &:hover .e-empty-label {
+      color: #1976d2;
+    }
+
+    &.is-full {
+      border-style: dotted;
+      background-color: transparent;
+      padding: 2px 6px;
+
+      .e-empty-label {
+        font-size: 0.7em;
+        color: #aaa;
+      }
+    }
   }
 
   .e-requirement {

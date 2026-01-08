@@ -134,9 +134,9 @@ export const bubblesSlice = createSlice({
     },
 
 
-    joinSibling: (state, action: PayloadAction<string>) => {
+    joinSibling: (state, action: PayloadAction<PopChildPayload>) => {
       state.process = BubblesProcess.fromJSON(state.process)
-        .joinSibling(action.payload)
+        .joinSibling(action.payload.bubbleId)
         .toJSON();
 
       state.renderCount += 1;
@@ -240,7 +240,9 @@ export const selectSurfaceBubbles = createSelector(
   (processJson, bubblesJson) => {
     const process = BubblesProcess.fromJSON(processJson);
     const surfaceIds = process.surface || [];
-    return surfaceIds.map(id => Bubble.fromJSON(bubblesJson[id]));
+    return surfaceIds
+      .filter(id => bubblesJson[id] !== undefined)
+      .map(id => Bubble.fromJSON(bubblesJson[id]));
   }
 );
 
@@ -255,10 +257,12 @@ export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStat
 export const selectBubblesRelationsWithBubble = createSelector(
   [selectBubbleRelationsRaw, selectBubblesJson],
   (relations, bubblesJson) => {
-    return relations.map(relation => ({
-      opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
-      openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
-    }));
+    return relations
+      .filter(relation => bubblesJson[relation.openerId] && bubblesJson[relation.openeeId])
+      .map(relation => ({
+        opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
+        openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
+      }));
   }
 );
 

@@ -33,22 +33,62 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
 };
 
 // joinSiblingInProcess 発火後、moveTo → updateBubble を実行
-// 兄弟バブルのrenderedRectがすでにあれば、renderBubbleを待たずに即座に位置を計算
+// openingPositionが"origin-side"の場合、openerのorigin-rectを基準に配置
+// それ以外の場合は兄弟バブルの隣に配置
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
-    const id = (action as ReturnType<typeof joinSiblingInProcess>).payload;
+    const payload = (action as ReturnType<typeof joinSiblingInProcess>).payload;
+    const id = payload.bubbleId;
+    const openingPosition = payload.openingPosition ?? "bubble-side";
 
     const state = listenerApi.getState() as any;
     const surfaceBubbles = selectSurfaceBubbles(state);
     const otherSiblingBubbles = surfaceBubbles.filter(b => b.id !== id);
+    const thisBubble = selectBubble(state, { id });
 
+    // openingPositionが"origin-side"の場合はpopChildと同様にoriginを基準に配置
+    if (openingPosition === "origin-side") {
+      const relation = selectBubblesRelationByOpeneeId(state, { openeeId: id });
+      if (relation) {
+        const openerBubble = selectBubble(state, { id: relation.openerId });
+        if (openerBubble?.renderedRect) {
+          console.log("JoinSibling (origin-side): Calculating position from origin");
+
+          // origin-sideの場合、opener内のorigin要素を基準にする
+          let baseRect = openerBubble.renderedRect;
+          const originRect = getOriginRect(openerBubble.id, thisBubble.url);
+          if (originRect) {
+            console.log("JoinSibling: Using origin rect for positioning", originRect.position);
+            baseRect = originRect;
+          }
+
+          const point = baseRect.calcPositionToOpen({ width: 0, height: 0 });
+          console.log("JoinSibling: Calculated point to open at (global)", point, "openingPosition:", openingPosition);
+
+          if (point) {
+            const coordinateConfig = selectGlobalCoordinateSystem(state);
+            const surfaceLeftTop = selectSurfaceLeftTop(state);
+            const relativePoint = convertGlobalPointToLayerLocal(
+              point,
+              0,
+              coordinateConfig,
+              surfaceLeftTop
+            );
+            console.log("JoinSibling: Converted to layer-local point", relativePoint);
+            const moved = thisBubble.moveTo(relativePoint);
+            listenerApi.dispatch(updateBubble(moved.toJSON()));
+            return;
+          }
+        }
+      }
+    }
+
+    // bubble-sideの場合、または origin-sideでoriginが見つからない場合は兄弟バブルの隣に配置
     if (!otherSiblingBubbles.length) {
       console.log("JoinSibling: No other siblings, skipping positioning");
       return;
     }
-
-    const thisBubble = selectBubble(state, { id });
 
     // 最後の兄弟バブル（最も右にあると想定）を基準にする
     const brotherBubble = otherSiblingBubbles[otherSiblingBubbles.length - 1];

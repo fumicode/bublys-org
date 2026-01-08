@@ -123,11 +123,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }
 
 
-  const joinSibling = (b: Bubble, openerBubbleId:string): string => {
+  const joinSibling = (
+    b: Bubble,
+    openerBubbleId: string,
+    openingPosition: OpeningPosition = "bubble-side"
+  ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
-    dispatch(joinSiblingAction(b.id));
+    dispatch(joinSiblingAction({ bubbleId: b.id, openingPosition }));
 
     return b.id;
   };
@@ -148,7 +152,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
-      return joinSibling(newBubble, openerBubbleId);
+      return joinSibling(newBubble, openerBubbleId, openingPosition);
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }

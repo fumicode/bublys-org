@@ -21,22 +21,23 @@ import {
   ShiftMatcher_シフトマッチング,
 } from "../domain";
 import { createSampleStaffList } from "../data/sampleStaff";
-import PersonIcon from "@mui/icons-material/Person";
 import WarningIcon from "@mui/icons-material/Warning";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { Button } from "@mui/material";
-import { ObjectView } from "../../bubble-ui/object-view";
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
-  onStaffClick?: (staffId: string) => void;
   onAssignmentClick?: (assignmentId: string) => void;
+  onCellClick?: (timeSlotId: string, roleId: string) => void;
+  /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
+  buildCellUrl?: (timeSlotId: string, roleId: string) => string;
 };
 
 export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   shiftPlanId,
-  onStaffClick,
   onAssignmentClick,
+  onCellClick,
+  buildCellUrl,
 }) => {
   const dispatch = useAppDispatch();
   const staffList = useAppSelector(selectGakkaiShiftStaffList);
@@ -186,37 +187,6 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       </div>
 
       <div className="e-main">
-        {/* スタッフ一覧（ドラッグ元） */}
-        <div className="e-staff-panel">
-          <h4>スタッフ</h4>
-          <div className="e-staff-list">
-            {staffList.map((staff) => {
-              const staffUrl = `gakkai-shift/staffs/${staff.id}`;
-              return (
-                <ObjectView
-                  key={staff.id}
-                  type="Staff"
-                  url={staffUrl}
-                  label={staff.name}
-                  draggable={true}
-                  fullWidth={true}
-                  onClick={() => onStaffClick?.(staff.id)}
-                >
-                  <div className="e-staff-item">
-                    <PersonIcon fontSize="small" />
-                    <div className="e-staff-info">
-                      <div className="e-staff-name">{staff.name}</div>
-                      <div className="e-staff-meta">
-                        {staff.availableTimeSlots.length}枠
-                      </div>
-                    </div>
-                  </div>
-                </ObjectView>
-              );
-            })}
-          </div>
-        </div>
-
         {/* シフト表 */}
         <div className="e-table-panel">
           <ShiftPlanTableView
@@ -226,10 +196,12 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             staffList={staffList}
             violations={violations}
             buildAssignmentUrl={(assignmentId) => `gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`}
+            buildCellUrl={buildCellUrl}
             onDropStaff={handleDropStaff}
             onRemoveAssignment={handleRemoveAssignment}
             onMoveAssignment={handleMoveAssignment}
             onAssignmentClick={onAssignmentClick}
+            onCellClick={onCellClick}
           />
         </div>
       </div>
@@ -277,78 +249,12 @@ const StyledContainer = styled.div`
   }
 
   .e-main {
-    display: flex;
     flex: 1;
     overflow: hidden;
-  }
-
-  .e-staff-panel {
-    width: 180px;
-    flex-shrink: 0;
-    border-right: 1px solid #eee;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-
-    h4 {
-      margin: 0;
-      padding: 8px 12px;
-      font-size: 0.9em;
-      background-color: #f5f5f5;
-      border-bottom: 1px solid #eee;
-    }
-  }
-
-  .e-staff-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-  }
-
-  .e-staff-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 8px;
-    margin-bottom: 4px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background-color: #fff;
-    cursor: pointer;
-    transition: box-shadow 0.15s, background-color 0.15s;
-
-    &:hover {
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      cursor: grabbing;
-    }
-  }
-
-  .e-staff-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .e-staff-name {
-    font-size: 0.85em;
-    font-weight: bold;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .e-staff-meta {
-    font-size: 0.75em;
-    color: #666;
   }
 
   .e-table-panel {
-    flex: 1;
+    height: 100%;
     overflow: auto;
     padding: 8px;
   }
