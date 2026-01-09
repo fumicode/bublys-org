@@ -10,6 +10,7 @@ export const ObjectTypes = {
   UserGroup: { urlPattern: 'user-groups/:id' },
   Memo: { urlPattern: 'memos/:id' },
   Staff: { urlPattern: 'gakkai-shift/staffs/:id' },
+  StaffAvailability: { urlPattern: 'gakkai-shift/staffs/:id/availableTimeSlots' },
   ShiftAssignment: { urlPattern: 'gakkai-shift/assignments/:id' },
   // 複数形（リスト用）- 将来的に統合検討
   Users: { urlPattern: 'users' },

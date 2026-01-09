@@ -25,7 +25,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import WarningIcon from "@mui/icons-material/Warning";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { Button } from "@mui/material";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
@@ -128,12 +128,6 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     dispatch(updateShiftPlan(updatedPlan.state));
   };
 
-  const handleDragStart = (e: React.DragEvent, staffId: string) => {
-    console.log("[DragStart] staffId:", staffId);
-    e.dataTransfer.setData("text/staff-id", staffId);
-    e.dataTransfer.effectAllowed = "copy";
-  };
-
   // 自動シフト配置
   const handleAutoAssign = () => {
     if (!shiftPlan) return;
@@ -199,13 +193,16 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             {staffList.map((staff) => {
               const staffUrl = `gakkai-shift/staffs/${staff.id}`;
               return (
-                <UrledPlace key={staff.id} url={staffUrl}>
-                  <div
-                    className="e-staff-item"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, staff.id)}
-                    onClick={() => onStaffClick?.(staff.id)}
-                  >
+                <ObjectView
+                  key={staff.id}
+                  type="Staff"
+                  url={staffUrl}
+                  label={staff.name}
+                  draggable={true}
+                  fullWidth={true}
+                  onClick={() => onStaffClick?.(staff.id)}
+                >
+                  <div className="e-staff-item">
                     <PersonIcon fontSize="small" />
                     <div className="e-staff-info">
                       <div className="e-staff-name">{staff.name}</div>
@@ -214,7 +211,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
                       </div>
                     </div>
                   </div>
-                </UrledPlace>
+                </ObjectView>
               );
             })}
           </div>
@@ -312,6 +309,8 @@ const StyledContainer = styled.div`
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
     padding: 6px 8px;
     margin-bottom: 4px;
     border: 1px solid #ddd;

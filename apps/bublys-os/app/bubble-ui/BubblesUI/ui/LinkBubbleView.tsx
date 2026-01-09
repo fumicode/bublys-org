@@ -1,5 +1,6 @@
 import React, { FC } from "react";
 import { Bubble, CoordinateSystem, getOriginRect } from "@bublys-org/bubbles-ui";
+import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
 
 type LinkBubbleViewProps = {
   opener: Bubble;
@@ -14,7 +15,14 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   coordinateSystem,
   linkZIndex,
 }) => {
-  const originRect = getOriginRect(opener.id, openee.url);
+  const bubbleRefs = useBubbleRefsOptional();
+
+  // キャッシュ付きでorigin rectを取得（強制リフローを最小化）
+  // useMemoは不要 - getOriginRectCachedが内部でキャッシュしている
+  const originRect = bubbleRefs?.getOriginRectCached(openee.url)
+    // フォールバック: 従来のgetOriginRectを使う
+    ?? getOriginRect(opener.id, openee.url);
+
   const baseOpenerRect = originRect || opener.renderedRect;
   const openerRect = baseOpenerRect
     ? baseOpenerRect.toLocal(coordinateSystem)

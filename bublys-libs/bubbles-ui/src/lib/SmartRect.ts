@@ -1,120 +1,24 @@
 import { Point2, Size2 } from "./00_Point.js";
+import {
+  CoordinateSystem,
+  CoordinateSystemData,
+} from "./CoordinateSystem.js";
 
-/**
- * 座標系情報（2D一次変換）
- * SmartRectがどの座標系で表現されているかを示す
- *
- * 数学的には以下の一次変換を表現：
- * global = vanishingPoint + (local - vanishingPoint) * scale + offset
- *
- * プロパティ:
- * - layerIndex: レイヤーのインデックス（0が最前面、数字が大きいほど奥）
- *   - scaleはlayerIndexから計算される: scale = 1 - layerIndex * 0.1
- * - offset: 平行移動（translation）
- * - vanishingPoint: スケール変換の基準点（transform-origin）
- *
- * 座標系の合成:
- * - withCoordinateSystem(): 部分的なオーバーライド
- * - TODO: 数学的な合成（行列的な合成）を実装する場合はcomposeWith()を追加
- */
-export type CoordinateSystem = {
-  layerIndex: number;
-  offset: Point2;
-  vanishingPoint: Point2;
-};
-
-/**
- * レイヤーインデックスからscaleを計算
- * レイヤーが奥ほどscaleが小さくなる（一点透視図法）
- */
-export function calculateLayerScale(layerIndex: number): number {
-  return 1 - layerIndex * 0.1;
-}
-
-/**
- * CoordinateSystemからscaleを取得
- * layerIndexから計算される
- */
-export function getScale(coordinateSystem: CoordinateSystem): number {
-  return calculateLayerScale(coordinateSystem.layerIndex);
-}
-
-/**
- * レイヤーの座標系を作成
- */
-export function createLayerCoordinateSystem(
-  layerIndex: number,
-  offset: Point2,
-  vanishingPoint: Point2
-): CoordinateSystem {
-  return {
-    layerIndex,
-    offset,
-    vanishingPoint,
-  };
-}
+// 後方互換性のための再エクスポート
+// SmartRect.tsからCoordinateSystem関連をインポートしているコードのため
+export type { CoordinateSystemData };
+export { CoordinateSystem };
 
 /**
  * グローバル座標系（デフォルト）
  * layerIndex=0 (scale=1.0), offset=(0,0), vanishingPoint=(0,0)
+ * 内部使用のみ - 外部からはCoordinateSystem.GLOBALを使用してください
  */
-export const GLOBAL_COORDINATE_SYSTEM: CoordinateSystem = {
+const GLOBAL_COORDINATE_SYSTEM: CoordinateSystemData = {
   layerIndex: 0,
   offset: { x: 0, y: 0 },
   vanishingPoint: { x: 0, y: 0 },
 };
-
-/**
- * ローカル座標の点をグローバル座標系に変換
- *
- * 変換式: global = vanishingPoint + (local - vanishingPoint) * scale + offset
- *
- * @param localPoint ローカル座標系での点
- * @param sourceCoordinateSystem ソース座標系
- * @returns グローバル座標系での座標
- */
-export function transformLocalPointToGlobal(
-  localPoint: Point2,
-  sourceCoordinateSystem: CoordinateSystem
-): Point2 {
-  if (sourceCoordinateSystem === GLOBAL_COORDINATE_SYSTEM) {
-    return localPoint; // 変換不要
-  }
-
-  const { offset, vanishingPoint } = sourceCoordinateSystem;
-  const scale = getScale(sourceCoordinateSystem);
-
-  return {
-    x: vanishingPoint.x + (localPoint.x - vanishingPoint.x) * scale + offset.x,
-    y: vanishingPoint.y + (localPoint.y - vanishingPoint.y) * scale + offset.y,
-  };
-}
-
-/**
- * グローバル座標の点をターゲット座標系のローカル座標に変換
- *
- * 変換式: local = vanishingPoint + (global - offset - vanishingPoint) / scale
- *
- * @param globalPoint グローバル座標系での点
- * @param targetCoordinateSystem ターゲット座標系
- * @returns ターゲット座標系でのローカル座標
- */
-export function transformGlobalPointToLocal(
-  globalPoint: Point2,
-  targetCoordinateSystem: CoordinateSystem
-): Point2 {
-  if (targetCoordinateSystem === GLOBAL_COORDINATE_SYSTEM) {
-    return globalPoint; // 変換不要
-  }
-
-  const { offset, vanishingPoint } = targetCoordinateSystem;
-  const scale = getScale(targetCoordinateSystem);
-
-  return {
-    x: vanishingPoint.x + (globalPoint.x - offset.x - vanishingPoint.x) / scale,
-    y: vanishingPoint.y + (globalPoint.y - offset.y - vanishingPoint.y) / scale,
-  };
-}
 
 export type SmartRectJson = {
   x: number;
@@ -122,7 +26,7 @@ export type SmartRectJson = {
   width: number;
   height: number;
   parentSize: Size2;
-  coordinateSystem?: CoordinateSystem;
+  coordinateSystem?: CoordinateSystemData;
 };
 
 export type Direction = "top" | "right" | "bottom" | "left";
@@ -153,7 +57,7 @@ export class SmartRect implements DOMRectReadOnly {
   constructor(
     readonly domRect: DOMRectReadOnly,
     readonly parentSize: Size2,
-    readonly coordinateSystem: CoordinateSystem = GLOBAL_COORDINATE_SYSTEM
+    readonly coordinateSystem: CoordinateSystemData = GLOBAL_COORDINATE_SYSTEM
   ) {}
 
   get x() {
@@ -475,17 +379,14 @@ export class SmartRect implements DOMRectReadOnly {
       return this; // すでにグローバル座標系
     }
 
-    const scale = getScale(this.coordinateSystem);
+    const coordSystem = CoordinateSystem.fromData(this.coordinateSystem);
 
-    // 位置を変換（共通関数を使用）
-    const globalPosition = transformLocalPointToGlobal(
-      { x: this.x, y: this.y },
-      this.coordinateSystem
-    );
+    // 位置を変換
+    const globalPosition = coordSystem.transformLocalToGlobal({ x: this.x, y: this.y });
 
     // サイズもscaleの影響を受ける
-    const globalWidth = this.width * scale;
-    const globalHeight = this.height * scale;
+    const globalWidth = this.width * coordSystem.scale;
+    const globalHeight = this.height * coordSystem.scale;
 
     const domRect = new DOMRect(globalPosition.x, globalPosition.y, globalWidth, globalHeight);
     return new SmartRect(domRect, this.parentSize, GLOBAL_COORDINATE_SYSTEM);
@@ -496,14 +397,11 @@ export class SmartRect implements DOMRectReadOnly {
    * 現在のレイヤーインデックスから+1したレイヤーのSmartRectを返す
    */
   toLayerBelow(): SmartRect {
-    const belowLayerIndex = this.coordinateSystem.layerIndex + 1;
-
-    // 新しい座標系を作成
-    const newCoordinateSystem = createLayerCoordinateSystem(
-      belowLayerIndex,
-      this.coordinateSystem.offset,
-      this.coordinateSystem.vanishingPoint
-    );
+    const newCoordinateSystem: CoordinateSystemData = {
+      layerIndex: this.coordinateSystem.layerIndex + 1,
+      offset: this.coordinateSystem.offset,
+      vanishingPoint: this.coordinateSystem.vanishingPoint,
+    };
 
     // 同じ位置・サイズで新しい座標系のSmartRectを返す
     const domRect = new DOMRect(this.x, this.y, this.width, this.height);
@@ -524,8 +422,8 @@ export class SmartRect implements DOMRectReadOnly {
    * // 複数のプロパティを変更
    * rect.withCoordinateSystem({ layerIndex: 1, offset: { x: 100, y: 0 } })
    */
-  withCoordinateSystem(override: Partial<CoordinateSystem>): SmartRect {
-    const newCoordinateSystem: CoordinateSystem = {
+  withCoordinateSystem(override: Partial<CoordinateSystemData>): SmartRect {
+    const newCoordinateSystem: CoordinateSystemData = {
       layerIndex: override.layerIndex ?? this.coordinateSystem.layerIndex,
       offset: override.offset ?? this.coordinateSystem.offset,
       vanishingPoint: override.vanishingPoint ?? this.coordinateSystem.vanishingPoint,
@@ -542,7 +440,7 @@ export class SmartRect implements DOMRectReadOnly {
    * 変換式:
    * local = vanishingPoint + (global - offset - vanishingPoint) / scale
    */
-  toLocal(targetCoordinateSystem: CoordinateSystem): SmartRect {
+  toLocal(targetCoordinateSystem: CoordinateSystemData | CoordinateSystem): SmartRect {
     // まずグローバル座標系に変換（現在がローカルの場合）
     const globalRect = this.coordinateSystem === GLOBAL_COORDINATE_SYSTEM
       ? this
@@ -552,20 +450,23 @@ export class SmartRect implements DOMRectReadOnly {
       return globalRect; // グローバル座標系への変換
     }
 
-    const scale = getScale(targetCoordinateSystem);
+    // CoordinateSystemクラスかどうかをチェックしてデータに変換
+    const coordSystemData: CoordinateSystemData =
+      targetCoordinateSystem instanceof CoordinateSystem
+        ? targetCoordinateSystem.toData()
+        : targetCoordinateSystem;
 
-    // 位置を変換（共通関数を使用）
-    const localPosition = transformGlobalPointToLocal(
-      { x: globalRect.x, y: globalRect.y },
-      targetCoordinateSystem
-    );
+    const coordSystem = CoordinateSystem.fromData(coordSystemData);
+
+    // 位置を変換
+    const localPosition = coordSystem.transformGlobalToLocal({ x: globalRect.x, y: globalRect.y });
 
     // サイズもscaleの影響を受ける
-    const localWidth = globalRect.width / scale;
-    const localHeight = globalRect.height / scale;
+    const localWidth = globalRect.width / coordSystem.scale;
+    const localHeight = globalRect.height / coordSystem.scale;
 
     const domRect = new DOMRect(localPosition.x, localPosition.y, localWidth, localHeight);
-    return new SmartRect(domRect, this.parentSize, targetCoordinateSystem);
+    return new SmartRect(domRect, this.parentSize, coordSystemData);
   }
 
   toJSON(): SmartRectJson {

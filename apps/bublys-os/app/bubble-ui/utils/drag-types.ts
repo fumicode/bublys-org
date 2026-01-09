@@ -8,6 +8,7 @@ export const DRAG_DATA_TYPES = {
   memo: "type/memo",
   memos: "type/memos",
   staff: "type/staff",
+  staffAvailability: "type/staff-availability",
   shiftAssignment: "type/shift-assignment",
   generic: "type/generic",
 } as const;
@@ -28,6 +29,7 @@ export const DRAG_DATA_TYPE_LIST: DragDataType[] = [
   DRAG_DATA_TYPES.memo,
   DRAG_DATA_TYPES.memos,
   DRAG_DATA_TYPES.staff,
+  DRAG_DATA_TYPES.staffAvailability,
   DRAG_DATA_TYPES.shiftAssignment,
 ];
 

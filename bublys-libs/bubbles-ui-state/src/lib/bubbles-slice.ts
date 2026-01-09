@@ -1,12 +1,12 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
 import {
   Bubble,
   BubbleJson,
   BubblesProcess,
   BubblesProcessState,
   BubblesProcessDPO,
+  CoordinateSystemData,
   CoordinateSystem,
-  GLOBAL_COORDINATE_SYSTEM,
   Point2,
 } from "@bublys-org/bubbles-ui";
 
@@ -34,10 +34,12 @@ export interface BubbleStateSlice {
 
   bubbleRelations:  BubblesRelation[];
 
-  globalCoordinateSystem: CoordinateSystem;
+  globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // レンダリング時に追加されるオフセット
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
+
+  animatingBubbleIds: string[]; // アニメーション中のバブルID（リンクバブル非表示用）
 }
 
 // --- Initial data setup ---
@@ -76,9 +78,10 @@ const initialState: BubbleStateSlice = {
   bubbles: initialEntities,
   process: initialProcess,
   bubbleRelations: [],
-  globalCoordinateSystem: GLOBAL_COORDINATE_SYSTEM,
+  globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
   surfaceLeftTop: { x: 100, y: 100 }, // デフォルト値
   renderCount: 0,
+  animatingBubbleIds: [],
 };
 
 export const bubblesSlice = createSlice({
@@ -111,6 +114,10 @@ export const bubblesSlice = createSlice({
       const poppedProcess = process.popChild(action.payload.bubbleId);
       state.process = poppedProcess.toJSON();
       state.renderCount += 1;
+      // アニメーション対象のバブルIDを追加（重複防止）
+      if (!state.animatingBubbleIds.includes(action.payload.bubbleId)) {
+        state.animatingBubbleIds.push(action.payload.bubbleId);
+      }
     },
 
     popChildMax: (state, action: PayloadAction<string>) => {
@@ -120,6 +127,10 @@ export const bubblesSlice = createSlice({
 
       state.process = poppedProcess.toJSON();
       state.renderCount += 1;
+      // アニメーション対象のバブルIDを追加（重複防止）
+      if (!state.animatingBubbleIds.includes(action.payload)) {
+        state.animatingBubbleIds.push(action.payload);
+      }
     },
 
 
@@ -129,6 +140,15 @@ export const bubblesSlice = createSlice({
         .toJSON();
 
       state.renderCount += 1;
+    },
+
+    finishBubbleAnimation: (state, action: PayloadAction<string>) => {
+      state.animatingBubbleIds = state.animatingBubbleIds.filter(id => id !== action.payload);
+    },
+
+    // フォールバック：全てのアニメーション状態をクリア
+    clearAllAnimations: (state) => {
+      state.animatingBubbleIds = [];
     },
 
     // Entity-only actions
@@ -159,6 +179,12 @@ export const bubblesSlice = createSlice({
       state.process.layers = state.process.layers.map(
         layer => layer.filter(id => id !== removingId)
       ).filter(layer => layer.length > 0);  // Remove empty layers
+
+      // レイヤー移動アニメーションが発生するので、ダミーIDを追加
+      // （フォールバックタイマーでクリアされる）
+      if (!state.animatingBubbleIds.includes('__removing__')) {
+        state.animatingBubbleIds.push('__removing__');
+      }
     },
     relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
       //重複がないようにチェックが必要そう
@@ -169,7 +195,7 @@ export const bubblesSlice = createSlice({
 
       state.bubbleRelations.push(action.payload);
     },
-    setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystem>) => {
+    setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystemData>) => {
       state.globalCoordinateSystem = action.payload;
     },
     setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
@@ -192,6 +218,8 @@ export const {
   relateBubbles,
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
+  finishBubbleAnimation,
+  clearAllAnimations,
 } = bubblesSlice.actions;
 
 // Selectors
@@ -202,12 +230,19 @@ export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: {
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
-export const selectSurfaceBubbles = (state: { bubbleState: BubbleStateSlice }) => {
-  const process = BubblesProcess.fromJSON(state.bubbleState.process);
-  const bubbles = state.bubbleState.bubbles;
-  const surfaceIds = process.surface || [];
-  return surfaceIds.map(id => Bubble.fromJSON(bubbles[id]));
-}
+// 基本セレクター（入力セレクター）
+const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles;
+const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.process;
+const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbleRelations;
+
+export const selectSurfaceBubbles = createSelector(
+  [selectProcessJson, selectBubblesJson],
+  (processJson, bubblesJson) => {
+    const process = BubblesProcess.fromJSON(processJson);
+    const surfaceIds = process.surface || [];
+    return surfaceIds.map(id => Bubble.fromJSON(bubblesJson[id]));
+  }
+);
 
 export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice }) => {
   return state.bubbleState.bubbleRelations;
@@ -217,20 +252,24 @@ export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStat
   return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
 }
 
-export const selectBubblesRelationsWithBubble = (state: { bubbleState: BubbleStateSlice }) => {
-  const relations = state.bubbleState.bubbleRelations;
-  const bubbles = state.bubbleState.bubbles;
-  return relations.map(relation => {
-    return({
-      opener: Bubble.fromJSON(bubbles[relation.openerId]),
-      openee: Bubble.fromJSON(bubbles[relation.openeeId]),
-    }
-  )});
-}
+export const selectBubblesRelationsWithBubble = createSelector(
+  [selectBubbleRelationsRaw, selectBubblesJson],
+  (relations, bubblesJson) => {
+    return relations.map(relation => ({
+      opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
+      openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
+    }));
+  }
+);
 
-export const selectGlobalCoordinateSystem = (state: { bubbleState: BubbleStateSlice }): CoordinateSystem => {
+const selectGlobalCoordinateSystemData = (state: { bubbleState: BubbleStateSlice }): CoordinateSystemData => {
   return state.bubbleState.globalCoordinateSystem;
 }
+
+export const selectGlobalCoordinateSystem = createSelector(
+  [selectGlobalCoordinateSystemData],
+  (data): CoordinateSystem => CoordinateSystem.fromData(data)
+);
 
 export const selectSurfaceLeftTop = (state: { bubbleState: BubbleStateSlice }): Point2 => {
   return state.bubbleState.surfaceLeftTop;
@@ -255,14 +294,78 @@ export const selectBubbleLayerIndex = (state: { bubbleState: BubbleStateSlice },
 
 /**
  * Returns a BubblesProcessDPO instance for the given state.
+ * Memoized to prevent unnecessary re-renders.
  */
-export const selectBubblesProcessDPO = (
-  state: { bubbleState: BubbleStateSlice } //bubbleStateという名前は、bubblesSliceのnameと一致させる
-): BubblesProcessDPO => {
-  const { bubbles: bubblesJson, process: processJson } = state.bubbleState;
-  const bubbles = Object.values(bubblesJson).map((s) => Bubble.fromJSON(s));
-  const processInstance = BubblesProcess.fromJSON(processJson);
-  return new BubblesProcessDPO(processInstance, bubbles);
+export const selectBubblesProcessDPO = createSelector(
+  [selectBubblesJson, selectProcessJson],
+  (bubblesJson, processJson): BubblesProcessDPO => {
+    const bubbles = Object.values(bubblesJson).map((s) => Bubble.fromJSON(s));
+    const processInstance = BubblesProcess.fromJSON(processJson);
+    return new BubblesProcessDPO(processInstance, bubbles);
+  }
+);
+
+export const selectIsLayerAnimating = (state: { bubbleState: BubbleStateSlice }): boolean => {
+  return state.bubbleState.animatingBubbleIds.length > 0;
+}
+
+/**
+ * レイヤー構造（IDの配列のみ）を返す
+ * バブルインスタンスは含まない - 各BubbleViewが個別に取得する
+ */
+export const selectBubbleLayers = createSelector(
+  [selectProcessJson],
+  (processJson): string[][] => {
+    const process = BubblesProcess.fromJSON(processJson);
+    return process.layers;
+  }
+);
+
+/**
+ * 個別バブルをIDで取得するセレクターファクトリー
+ * 各バブルごとにメモ化され、そのバブルが変わった時だけ再計算
+ */
+type BubbleByIdSelector = (state: { bubbleState: BubbleStateSlice }) => Bubble | undefined;
+const bubbleSelectorCache = new Map<string, BubbleByIdSelector>();
+
+export const makeSelectBubbleById = (bubbleId: string): BubbleByIdSelector => {
+  if (!bubbleSelectorCache.has(bubbleId)) {
+    const selector = createSelector(
+      [(state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles[bubbleId]],
+      (bubbleJson): Bubble | undefined => {
+        if (!bubbleJson) return undefined;
+        return Bubble.fromJSON(bubbleJson);
+      }
+    );
+    bubbleSelectorCache.set(bubbleId, selector);
+  }
+  return bubbleSelectorCache.get(bubbleId)!;
+};
+
+/**
+ * 個別バブルのlayerIndexを取得するセレクターファクトリー
+ */
+type LayerIndexSelector = (state: { bubbleState: BubbleStateSlice }) => number;
+const layerIndexSelectorCache = new Map<string, LayerIndexSelector>();
+
+export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector => {
+  if (!layerIndexSelectorCache.has(bubbleId)) {
+    const selector = createSelector(
+      [selectProcessJson],
+      (processJson): number => {
+        const process = BubblesProcess.fromJSON(processJson);
+        const layers = process.layers;
+        for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+          if (layers[layerIndex].includes(bubbleId)) {
+            return layerIndex;
+          }
+        }
+        return -1;
+      }
+    );
+    layerIndexSelectorCache.set(bubbleId, selector);
+  }
+  return layerIndexSelectorCache.get(bubbleId)!;
 };
 
 export default bubblesSlice.reducer;

@@ -4,7 +4,7 @@ import { FC } from "react";
 import styled from "styled-components";
 import { Staff_スタッフ, Role_係 } from "../domain";
 import PersonIcon from "@mui/icons-material/Person";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "../../bubble-ui/object-view";
 import { Button } from "@mui/material";
 
 type StaffDetailViewProps = {
@@ -25,7 +25,14 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
       <div className="e-header">
         <PersonIcon className="e-avatar" />
         <div className="e-title">
-          <h3 className="e-name">{staff.name}</h3>
+          <ObjectView
+            type="Staff"
+            url={`gakkai-shift/staffs/${staff.id}`}
+            label={staff.name}
+            draggable={true}
+          >
+            <h3 className="e-name">{staff.name}</h3>
+          </ObjectView>
           <div className="e-furigana">{staff.state.furigana}</div>
         </div>
         <StatusBadge status={staff.status} />
@@ -72,15 +79,21 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           {staff.availableTimeSlots.length === 0 ? (
             <span className="e-empty">なし</span>
           ) : availabilityUrl ? (
-            <UrledPlace url={availabilityUrl}>
+            <ObjectView
+              type="StaffAvailability"
+              url={availabilityUrl}
+              label={`${staff.name}の参加可能時間帯`}
+              draggable={true}
+              onClick={() => onOpenAvailability?.(staff.id)}
+            >
               <Button
                 variant="text"
                 size="small"
-                onClick={() => onOpenAvailability?.(staff.id)}
+                component="span"
               >
                 {staff.availableTimeSlots.length}枠 (詳細を見る)
               </Button>
-            </UrledPlace>
+            </ObjectView>
           ) : (
             <span>{staff.availableTimeSlots.length}枠</span>
           )}

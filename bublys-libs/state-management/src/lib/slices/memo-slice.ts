@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
 import { Memo, MemosState, RawMemo } from "./Memo.js";
@@ -36,13 +36,16 @@ export const memoSlice = createSlice({
 
 export const { addMemo, updateMemo, deleteMemo } = memoSlice.actions;
 
-export const selectMemos = (state: RootState) => {
-  //raw memo を class Memo に変換して返す
-  //memosがRecord<string, RawMemo>なので、Object.valuesで配列に変換してからmapで変換
+// 基本セレクター
+const selectMemosRaw = (state: RootState) => state.memo.memos;
 
-  return (
-    Object.values(state.memo.memos).map((m) => Memo.fromJson(m))
-  )
-};
+export const selectMemos = createSelector(
+  [selectMemosRaw],
+  (memos) => Object.values(memos).map((m) => Memo.fromJson(m))
+);
 
-export const selectMemo = (id: string) => (state: RootState) => Memo.fromJson(state.memo.memos[id]);
+export const selectMemo = (id: string) =>
+  createSelector(
+    [(state: RootState) => state.memo.memos[id]],
+    (memo) => memo ? Memo.fromJson(memo) : undefined
+  );

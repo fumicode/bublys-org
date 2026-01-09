@@ -1,4 +1,4 @@
-import { SmartRect, GLOBAL_COORDINATE_SYSTEM } from '../SmartRect.js';
+import { SmartRect, CoordinateSystem } from '../SmartRect.js';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す
@@ -72,5 +72,5 @@ export const getOriginRect = (
   const rect = getElementRect(originEl);
   const parentSize = { width: window.innerWidth, height: window.innerHeight };
 
-  return new SmartRect(rect, parentSize, GLOBAL_COORDINATE_SYSTEM);
+  return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
 };

@@ -332,14 +332,14 @@ describe("SmartRect座標変換", () => {
     });
 
     it("ローカル座標系からグローバル座標系に変換する", () => {
-      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+      const { SmartRect: SR } = require("./SmartRect.js");
 
       // レイヤー0の座標系: scale=1.0, offset=(100, 100), vanishingPoint=(20, 10)
-      const layerCoordinateSystem = createLayerCoordinateSystem(
-        0,
-        { x: 100, y: 100 },
-        { x: 20, y: 10 }
-      );
+      const layerCoordinateSystem = {
+        layerIndex: 0,
+        offset: { x: 100, y: 100 },
+        vanishingPoint: { x: 20, y: 10 },
+      };
 
       // ローカル座標: (50, 60), サイズ: 40x30
       const localRect = new SR(
@@ -360,14 +360,14 @@ describe("SmartRect座標変換", () => {
     });
 
     it("scale=0.9のレイヤーから変換する", () => {
-      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+      const { SmartRect: SR } = require("./SmartRect.js");
 
       // レイヤー1の座標系: scale=0.9, offset=(100, 100), vanishingPoint=(20, 10)
-      const layerCoordinateSystem = createLayerCoordinateSystem(
-        1,
-        { x: 100, y: 100 },
-        { x: 20, y: 10 }
-      );
+      const layerCoordinateSystem = {
+        layerIndex: 1,
+        offset: { x: 100, y: 100 },
+        vanishingPoint: { x: 20, y: 10 },
+      };
 
       // ローカル座標: (50, 60), サイズ: 40x30
       const localRect = new SR(
@@ -388,24 +388,24 @@ describe("SmartRect座標変換", () => {
   });
 
   describe("toLocal", () => {
-    it("グローバル座標系への変換（targetがGLOBAL_COORDINATE_SYSTEM）", () => {
-      const { SmartRect: SR, GLOBAL_COORDINATE_SYSTEM } = require("./SmartRect.js");
+    it("グローバル座標系への変換（targetがグローバル座標系）", () => {
+      const { SmartRect: SR, CoordinateSystem } = require("./SmartRect.js");
 
       const globalRect = new SR(new DOMRect(100, 100, 50, 50), parentSize);
-      const result = globalRect.toLocal(GLOBAL_COORDINATE_SYSTEM);
+      const result = globalRect.toLocal(CoordinateSystem.GLOBAL.toData());
 
       expect(result).toBe(globalRect); // 同じインスタンス
     });
 
     it("グローバル座標系からローカル座標系に変換する", () => {
-      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+      const { SmartRect: SR } = require("./SmartRect.js");
 
       // レイヤー0の座標系
-      const layerCoordinateSystem = createLayerCoordinateSystem(
-        0,
-        { x: 100, y: 100 },
-        { x: 20, y: 10 }
-      );
+      const layerCoordinateSystem = {
+        layerIndex: 0,
+        offset: { x: 100, y: 100 },
+        vanishingPoint: { x: 20, y: 10 },
+      };
 
       // グローバル座標: (150, 160), サイズ: 40x30
       const globalRect = new SR(new DOMRect(150, 160, 40, 30), parentSize);
@@ -422,14 +422,14 @@ describe("SmartRect座標変換", () => {
     });
 
     it("scale=0.9のレイヤーに変換する", () => {
-      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+      const { SmartRect: SR } = require("./SmartRect.js");
 
       // レイヤー1の座標系: scale=0.9
-      const layerCoordinateSystem = createLayerCoordinateSystem(
-        1,
-        { x: 100, y: 100 },
-        { x: 20, y: 10 }
-      );
+      const layerCoordinateSystem = {
+        layerIndex: 1,
+        offset: { x: 100, y: 100 },
+        vanishingPoint: { x: 20, y: 10 },
+      };
 
       // グローバル座標: (147, 155), サイズ: 36x27
       const globalRect = new SR(new DOMRect(147, 155, 36, 27), parentSize);
@@ -447,13 +447,13 @@ describe("SmartRect座標変換", () => {
 
   describe("往復変換", () => {
     it("ローカル→グローバル→ローカルで元に戻る", () => {
-      const { SmartRect: SR, createLayerCoordinateSystem } = require("./SmartRect.js");
+      const { SmartRect: SR } = require("./SmartRect.js");
 
-      const layerCoordinateSystem = createLayerCoordinateSystem(
-        1,
-        { x: 100, y: 100 },
-        { x: 20, y: 10 }
-      );
+      const layerCoordinateSystem = {
+        layerIndex: 1,
+        offset: { x: 100, y: 100 },
+        vanishingPoint: { x: 20, y: 10 },
+      };
 
       // ローカル座標
       const originalLocal = new SR(
