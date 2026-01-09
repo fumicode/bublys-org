@@ -48,17 +48,13 @@ const initialBubbleInstances: Bubble[] = [
     url: "user-groups",
     colorHue: 200,
     type: "user-groups",
+    position: { x: 0, y: 0 },
   }),
   new Bubble({
-    url: "Element E",
-    colorHue: 100,
-    type: "normal",
-    size: { width: 300, height: 200 }, // サイズ指定のテスト
-  }),
-  new Bubble({
-    url: "Element F",
-    colorHue: 300,
-    type: "normal",
+    url: "users",
+    colorHue: 180,
+    type: "users",
+    position: { x: 400, y: 0 },
   }),
 ];
 

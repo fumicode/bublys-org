@@ -167,6 +167,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     if (ref.current) {
       ref.current.style.transition = '';
       ref.current.style.transformOrigin = '';
+      ref.current.style.left = '';
+      ref.current.style.top = '';
     }
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;
