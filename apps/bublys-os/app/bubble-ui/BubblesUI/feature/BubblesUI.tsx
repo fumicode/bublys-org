@@ -1,4 +1,4 @@
-import { FC, useEffect, useCallback, useState } from "react";
+import { FC, useEffect, useCallback, useState, useMemo } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 
@@ -91,7 +91,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   };
 
 
-  const popChild = (
+  const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
     openingPosition: OpeningPosition = "bubble-side"
@@ -102,9 +102,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
 
     return b.id;
-  };
+  }, [dispatch]);
 
-  const popChildMax = (b: Bubble, openerBubbleId:string): string => {
+  const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
     // 利用可能なスペース（グローバル座標系）
     const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
     const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
@@ -120,20 +120,24 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }
+  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
 
 
-  const joinSibling = (b: Bubble, openerBubbleId:string): string => {
+  const joinSibling = useCallback((
+    b: Bubble,
+    openerBubbleId: string,
+    openingPosition: OpeningPosition = "bubble-side"
+  ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
-    dispatch(joinSiblingAction(b.id));
+    dispatch(joinSiblingAction({ bubbleId: b.id, openingPosition }));
 
     return b.id;
-  };
+  }, [dispatch]);
 
-  // openBubble 用ロジック
-  const popChildOrJoinSibling = (
+  // openBubble 用ロジック（useCallbackでメモ化）
+  const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
     openingPosition: OpeningPosition = "bubble-side"
@@ -148,16 +152,24 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
-      return joinSibling(newBubble, openerBubbleId);
+      return joinSibling(newBubble, openerBubbleId, openingPosition);
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }
-  };
+  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
 
   // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
     dispatch(setGlobalCoordinateSystem(cs.toData()));
   }, [dispatch]);
+
+  // BubblesContextの値をメモ化（不要な再レンダリング防止）
+  const bubblesContextValue = useMemo(() => ({
+    pageSize,
+    surfaceLeftTop,
+    coordinateSystem: globalCoordinateSystem,
+    openBubble: popChildOrJoinSibling,
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
 
   // Pocketのドロップハンドラー
   const handlePocketDrop = (url: string, type: DragDataType, label?: string) => {
@@ -187,14 +199,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
       {/* Main Bubbles Area */}
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <BubblesContext.Provider
-          value={{
-            pageSize,
-            surfaceLeftTop,
-            coordinateSystem: globalCoordinateSystem,
-            openBubble: popChildOrJoinSibling,
-          }}
-        >
+        <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>

@@ -134,9 +134,9 @@ export const bubblesSlice = createSlice({
     },
 
 
-    joinSibling: (state, action: PayloadAction<string>) => {
+    joinSibling: (state, action: PayloadAction<PopChildPayload>) => {
       state.process = BubblesProcess.fromJSON(state.process)
-        .joinSibling(action.payload)
+        .joinSibling(action.payload.bubbleId)
         .toJSON();
 
       state.renderCount += 1;
@@ -235,12 +235,49 @@ const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => state.bu
 const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.process;
 const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbleRelations;
 
+/**
+ * サーフェスバブルのIDリストを返す（パフォーマンス最適化版）
+ * Bubbleオブジェクトの生成を避ける
+ */
+export const selectSurfaceBubbleIds = createSelector(
+  [selectProcessJson, selectBubblesJson],
+  (processJson, bubblesJson): string[] => {
+    const process = BubblesProcess.fromJSON(processJson);
+    const surfaceIds = process.surface || [];
+    return surfaceIds.filter(id => bubblesJson[id] !== undefined);
+  }
+);
+
 export const selectSurfaceBubbles = createSelector(
   [selectProcessJson, selectBubblesJson],
   (processJson, bubblesJson) => {
     const process = BubblesProcess.fromJSON(processJson);
     const surfaceIds = process.surface || [];
-    return surfaceIds.map(id => Bubble.fromJSON(bubblesJson[id]));
+    return surfaceIds
+      .filter(id => bubblesJson[id] !== undefined)
+      .map(id => Bubble.fromJSON(bubblesJson[id]));
+  }
+);
+
+/**
+ * 最後の兄弟バブル（サーフェスの最後のバブル）のrenderedRectを取得
+ * joinSiblingリスナー用の最適化セレクター
+ */
+export const selectLastSiblingRenderedRect = createSelector(
+  [selectProcessJson, selectBubblesJson],
+  (processJson, bubblesJson) => {
+    const process = BubblesProcess.fromJSON(processJson);
+    const surfaceIds = process.surface || [];
+    if (surfaceIds.length === 0) return undefined;
+
+    const lastId = surfaceIds[surfaceIds.length - 1];
+    const bubbleJson = bubblesJson[lastId];
+    if (!bubbleJson) return undefined;
+
+    // renderedRectだけを返す（Bubbleオブジェクト全体を作らない）
+    return bubbleJson.renderedRect
+      ? { bubbleId: lastId, renderedRect: Bubble.fromJSON(bubbleJson).renderedRect }
+      : undefined;
   }
 );
 
@@ -252,13 +289,31 @@ export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStat
   return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
 }
 
+/**
+ * @deprecated パフォーマンス問題のため、代わりに selectValidBubbleRelationIds を使用してください
+ */
 export const selectBubblesRelationsWithBubble = createSelector(
   [selectBubbleRelationsRaw, selectBubblesJson],
   (relations, bubblesJson) => {
-    return relations.map(relation => ({
-      opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
-      openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
-    }));
+    return relations
+      .filter(relation => bubblesJson[relation.openerId] && bubblesJson[relation.openeeId])
+      .map(relation => ({
+        opener: Bubble.fromJSON(bubblesJson[relation.openerId]),
+        openee: Bubble.fromJSON(bubblesJson[relation.openeeId]),
+      }));
+  }
+);
+
+/**
+ * 有効なバブル関係のIDペアのみを返す（パフォーマンス最適化版）
+ * Bubbleオブジェクトの生成は各LinkBubbleViewで行う
+ */
+export const selectValidBubbleRelationIds = createSelector(
+  [selectBubbleRelationsRaw, selectBubblesJson],
+  (relations, bubblesJson): Array<{ openerId: string; openeeId: string }> => {
+    return relations.filter(
+      relation => bubblesJson[relation.openerId] && bubblesJson[relation.openeeId]
+    );
   }
 );
 

@@ -5,7 +5,7 @@ import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
 import {
-  selectBubblesRelationsWithBubble,
+  selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
@@ -32,7 +32,7 @@ type ConnectedBubbleViewProps = {
   onBubbleLayerUp?: (bubble: Bubble) => void;
 };
 
-const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
+const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
   bubbleId,
   layerIndex,
   zIndex,
@@ -45,7 +45,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
   onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
-}) => {
+})  {
   // このバブル専用のセレクターを使用
   const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
   const bubble = useAppSelector(selectBubble);
@@ -72,6 +72,41 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(({
     >
       <BubbleContent bubble={bubble} />
     </BubbleView>
+  );
+});
+
+/**
+ * 個別のLinkBubbleを自分でReduxから取得するラッパーコンポーネント
+ * opener/openeeが変わった時だけ再レンダリングされる
+ */
+type ConnectedLinkBubbleViewProps = {
+  openerId: string;
+  openeeId: string;
+  coordinateSystem: CoordinateSystem;
+  linkZIndex: number;
+};
+
+const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
+  openerId,
+  openeeId,
+  coordinateSystem,
+  linkZIndex,
+}) {
+  // 各バブル専用のセレクターを使用
+  const selectOpener = useMemo(() => makeSelectBubbleById(openerId), [openerId]);
+  const selectOpenee = useMemo(() => makeSelectBubbleById(openeeId), [openeeId]);
+  const opener = useAppSelector(selectOpener);
+  const openee = useAppSelector(selectOpenee);
+
+  if (!opener || !openee) return null;
+
+  return (
+    <LinkBubbleView
+      opener={opener}
+      openee={openee}
+      coordinateSystem={coordinateSystem}
+      linkZIndex={linkZIndex}
+    />
   );
 });
 
@@ -166,7 +201,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     };
   }, [onCoordinateSystemReady, vanishingPoint]);
 
-  const relations = useAppSelector(selectBubblesRelationsWithBubble);
+  // IDベースの関係性のみ取得（パフォーマンス最適化）
+  const relationIds = useAppSelector(selectValidBubbleRelationIds);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
@@ -192,8 +228,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   // リンクバブルが接続されているopenee IDのSet（左角丸を無効化するため）
   const openeeIds = useMemo(() => {
-    return new Set(relations.map(r => r.openee.id));
-  }, [relations]);
+    return new Set(relationIds.map(r => r.openeeId));
+  }, [relationIds]);
 
   // 各バブルをConnectedBubbleViewでレンダリング
   const renderedBubbles = bubbleLayers
@@ -240,15 +276,14 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
         {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
         {!isLayerAnimating &&
-          relations.map(({ opener, openee }) => {
-
-            const linkZIndex = bubbleIdToZIndex[openee.id] - 1;
+          relationIds.map(({ openerId, openeeId }) => {
+            const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
 
             return(
-              <LinkBubbleView
-                key={`${opener.id}_${openee.id}`}
-                opener={opener}
-                openee={openee}
+              <ConnectedLinkBubbleView
+                key={`${openerId}_${openeeId}`}
+                openerId={openerId}
+                openeeId={openeeId}
                 coordinateSystem={coordinateSystem}
                 linkZIndex={linkZIndex}
               />
