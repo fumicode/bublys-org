@@ -183,14 +183,14 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   };
 
   // Pocketアイテムのクリックハンドラー
-  const handlePocketItemClick = (url: string) => {
+  const handlePocketItemClick = useCallback((url: string) => {
     popChildOrJoinSibling(url, "root");
-  };
+  }, [popChildOrJoinSibling]);
 
   // Sidebarからのアイテムクリックハンドラー
-  const handleSidebarItemClick = (url: string) => {
+  const handleSidebarItemClick = useCallback((url: string) => {
     popChildOrJoinSibling(url, "root");
-  };
+  }, [popChildOrJoinSibling]);
 
   return (
     <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
