@@ -20,13 +20,16 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { IconButton, Tooltip } from "@mui/material";
 
 type ShiftPlanManagerProps = {
-  onStaffClick?: (staffId: string) => void;
   onAssignmentClick?: (shiftPlanId: string, assignmentId: string) => void;
+  onCellClick?: (timeSlotId: string, roleId: string) => void;
+  /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
+  buildCellUrl?: (timeSlotId: string, roleId: string) => string;
 };
 
 export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
-  onStaffClick,
   onAssignmentClick,
+  onCellClick,
+  buildCellUrl,
 }) => {
   const dispatch = useAppDispatch();
   const shiftPlans = useAppSelector(selectGakkaiShiftPlans);
@@ -151,8 +154,9 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
           <ShiftPlanEditor
             key={selectedPlan.id}
             shiftPlanId={selectedPlan.id}
-            onStaffClick={onStaffClick}
             onAssignmentClick={(assignmentId) => onAssignmentClick?.(selectedPlan.id, assignmentId)}
+            onCellClick={onCellClick}
+            buildCellUrl={buildCellUrl}
           />
         ) : (
           <div className="e-empty">シフト案を選択してください</div>
