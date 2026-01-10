@@ -222,13 +222,16 @@ const getScoreSymbol = (diff: number): string => {
 
 // スキルマッチ行
 const SkillMatchRow: FC<{ match: SkillMatchDetail }> = ({ match }) => {
+  // 要求なしの場合は評価対象外
+  const isNotRequired = match.required === 'none';
+
   return (
     <div className="e-skill-row">
       <span className="e-skill-name">{match.skillName}</span>
       <span className="e-skill-required">{getRequiredLabel(match.required as string)}</span>
       <span className="e-skill-has">{getSkillLevelLabel(match.staffHas as string)}</span>
-      <span className={`e-skill-result ${match.isMatch ? "is-match" : "is-no-match"}`}>
-        {getScoreSymbol(match.scoreDiff)} {match.scoreDiff > 0 ? `+${match.scoreDiff}` : match.scoreDiff}
+      <span className={`e-skill-result ${isNotRequired ? "is-not-required" : match.isMatch ? "is-match" : "is-no-match"}`}>
+        {isNotRequired ? "-" : `${getScoreSymbol(match.scoreDiff)} ${match.scoreDiff > 0 ? `+${match.scoreDiff}` : match.scoreDiff}`}
       </span>
     </div>
   );
@@ -423,6 +426,11 @@ const StyledContainer = styled.div`
 
       &.is-no-match {
         color: #c62828;
+      }
+
+      &.is-not-required {
+        color: #999;
+        font-weight: normal;
       }
     }
   }

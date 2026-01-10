@@ -11,6 +11,7 @@ import { StaffAvailability } from "./feature/StaffAvailability";
 import { ShiftPlanEditor } from "./feature/ShiftPlanEditor";
 import { ShiftPlanManager } from "./feature/ShiftPlanManager";
 import { AssignmentEvaluation } from "./feature/AssignmentEvaluation";
+import { StaffShiftTable } from "./feature/StaffShiftTable";
 
 // 学会シフト - スタッフ絞り込み検索バブル
 const GakkaiShiftStaffFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {
@@ -64,6 +65,10 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
 
+  const handleStaffViewClick = () => {
+    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
+  };
+
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
   const buildFilterUrl = (timeSlotId: string, roleId: string): string => {
     const role = roles.find((r) => r.id === roleId);
@@ -102,6 +107,7 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
       shiftPlanId={shiftPlanId}
       onAssignmentClick={handleAssignmentClick}
       onCellClick={handleCellClick}
+      onStaffViewClick={handleStaffViewClick}
       buildCellUrl={buildFilterUrl}
     />
   );
@@ -114,6 +120,10 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
   const handleAssignmentClick = (shiftPlanId: string, assignmentId: string) => {
     openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
+  };
+
+  const handleStaffViewClick = (shiftPlanId: string) => {
+    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
   };
 
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
@@ -154,6 +164,31 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onAssignmentClick={handleAssignmentClick}
       onCellClick={handleCellClick}
       buildCellUrl={buildFilterUrl}
+      onStaffViewClick={handleStaffViewClick}
+    />
+  );
+};
+
+// 学会シフト - スタッフ別シフト表バブル
+const GakkaiShiftStaffShiftTableBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  // URL: gakkai-shift/shift-plans/[shiftPlanId]/staff-view
+  const match = bubble.url.match(/^gakkai-shift\/shift-plans\/([^/]+)\/staff-view$/);
+  const shiftPlanId = match?.[1] ?? "";
+
+  const handleStaffClick = (staffId: string) => {
+    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "bubble-side");
+  };
+
+  const handleAssignmentClick = (shiftPlanId: string, assignmentId: string) => {
+    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
+  };
+
+  return (
+    <StaffShiftTable
+      shiftPlanId={shiftPlanId}
+      onStaffClick={handleStaffClick}
+      onAssignmentClick={handleAssignmentClick}
     />
   );
 };
@@ -196,6 +231,7 @@ export const gakkaiShiftBubbleRoutes: BubbleRoute[] = [
   { pattern: /^gakkai-shift\/staffs\/[^/]+\/availableTimeSlots$/, type: "gakkai-shift-staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
   { pattern: /^gakkai-shift\/staffs\/[^/]+$/, type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
   { pattern: /^gakkai-shift\/shift-plans$/, type: "gakkai-shift-plans", Component: GakkaiShiftPlanManagerBubble },
+  { pattern: /^gakkai-shift\/shift-plans\/[^/]+\/staff-view$/, type: "gakkai-shift-staff-view", Component: GakkaiShiftStaffShiftTableBubble },
   { pattern: /^gakkai-shift\/shift-plans\/[^/]+\/assignments\/[^/]+\/evaluation$/, type: "gakkai-shift-assignment-evaluation", Component: GakkaiShiftAssignmentEvaluationBubble },
   { pattern: /^gakkai-shift\/shift-plan\/[^/]+$/, type: "gakkai-shift-plan", Component: GakkaiShiftPlanEditorBubble },
 ];
