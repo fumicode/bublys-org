@@ -343,7 +343,8 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
         0 4px 30px rgba(0, 0, 0, 0.05),
         inset 0 0 20px rgba(255, 255, 255, 0.05);
       pointer-events: none;
-      z-index: ${({ surfaceZIndex }) => (surfaceZIndex || 0) + 1};
+      // layerIndex 0,1 はぼかしの上に、layerIndex 2以降はぼかしの下に
+      z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
     }
     .e-vanishing-point {
       position: absolute;
