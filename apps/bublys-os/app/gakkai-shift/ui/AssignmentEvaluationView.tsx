@@ -127,16 +127,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
       <div className="e-section">
         <div className="e-section-title">その他</div>
         <div className="e-row">
-          <span className="e-label">希望係:</span>
-          {evaluation.isPreferredRole ? (
-            <span className="is-good">
-              <CheckCircleIcon fontSize="inherit" /> 第{evaluation.preferredRoleRank}希望
-            </span>
-          ) : (
-            <span className="is-neutral">希望外</span>
-          )}
-        </div>
-        <div className="e-row">
           <span className="e-label">要件充足:</span>
           <EvalIcon ok={evaluation.meetsRequirements} />
         </div>

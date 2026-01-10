@@ -29,7 +29,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-27", period: "afternoon" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_afternoon"),
-      preferredRoles: ["headquarters", "venue_check"],
       notes: "リーダー経験あり",
     }),
     Staff_スタッフ.create({
@@ -51,7 +50,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(2),
-      preferredRoles: ["reception", "cloakroom"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -74,7 +72,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["setup", "cloakroom"],
       notes: "体力に自信あり",
     }),
     Staff_スタッフ.create({
@@ -102,7 +99,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       availableTimeSlots: allSlotIds.filter(
         (id) => id !== "2025-03-26_morning" && id !== "2025-03-28_afternoon"
       ),
-      preferredRoles: ["venue_check", "mobile_support"],
       notes: "英語対応可能",
     }),
     Staff_スタッフ.create({
@@ -124,7 +120,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(5, 12),
-      preferredRoles: ["poster", "exhibition"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -147,7 +142,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["reception", "venue"],
       notes: "コミュニケーション能力高い",
     }),
     Staff_スタッフ.create({
@@ -170,7 +164,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-27", period: "morning" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_morning"),
-      preferredRoles: ["headquarters"],
       notes: "過去に年会本部経験あり",
     }),
     Staff_スタッフ.create({
@@ -192,7 +185,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(2, 10),
-      preferredRoles: ["cloakroom", "party_cloakroom"],
       notes: "懇親会参加可能",
     }),
     // ここから追加スタッフ
@@ -216,7 +208,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-26", period: "afternoon" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_afternoon"),
-      preferredRoles: ["venue_check", "headquarters"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -238,7 +229,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["reception", "venue"],
       notes: "留学経験あり",
     }),
     Staff_スタッフ.create({
@@ -261,7 +251,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-28", period: "morning" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-28_morning"),
-      preferredRoles: ["headquarters", "mobile_support"],
       notes: "複数言語対応可",
     }),
     Staff_スタッフ.create({
@@ -284,7 +273,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(0, 8),
-      preferredRoles: ["cloakroom", "reception"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -306,7 +294,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-27", period: "afternoon" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_afternoon"),
-      preferredRoles: ["poster", "exhibition"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -329,7 +316,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["reception", "venue"],
       notes: "明るい性格",
     }),
     Staff_スタッフ.create({
@@ -351,7 +337,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(4),
-      preferredRoles: ["setup", "cloakroom"],
       notes: "力仕事可能",
     }),
     Staff_スタッフ.create({
@@ -374,7 +359,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-26", period: "morning" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_morning"),
-      preferredRoles: ["headquarters", "venue_check"],
       notes: "リーダーシップあり",
     }),
     Staff_スタッフ.create({
@@ -396,7 +380,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(2, 12),
-      preferredRoles: ["poster", "setup"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -418,7 +401,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["reception", "cloakroom"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -446,7 +428,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       availableTimeSlots: allSlotIds.filter(
         (id) => id !== "2025-03-27_morning" && id !== "2025-03-28_afternoon"
       ),
-      preferredRoles: ["headquarters", "mobile_support"],
       notes: "英語堪能",
     }),
     Staff_スタッフ.create({
@@ -469,7 +450,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(0, 10),
-      preferredRoles: ["venue", "reception"],
       notes: "企画力あり",
     }),
     Staff_スタッフ.create({
@@ -492,7 +472,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-28", period: "morning" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-28_morning"),
-      preferredRoles: ["venue_check", "poster"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -514,7 +493,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(4, 14),
-      preferredRoles: ["cloakroom", "party_cloakroom"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -536,7 +514,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["setup", "poster"],
       notes: "体育会系",
     }),
     Staff_スタッフ.create({
@@ -559,7 +536,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(2),
-      preferredRoles: ["reception", "venue"],
       notes: "外国語対応可",
     }),
     Staff_スタッフ.create({
@@ -582,7 +558,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds,
-      preferredRoles: ["mobile_support", "headquarters"],
       notes: "ITに強い",
     }),
     Staff_スタッフ.create({
@@ -604,7 +579,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(6),
-      preferredRoles: ["cloakroom", "reception"],
       notes: "初参加",
     }),
     Staff_スタッフ.create({
@@ -627,7 +601,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(0, 12),
-      preferredRoles: ["setup", "exhibition"],
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -650,7 +623,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [{ date: "2025-03-26", period: "afternoon" }],
       },
       availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_afternoon"),
-      preferredRoles: ["headquarters", "venue_check"],
       notes: "経験豊富",
     }),
     Staff_スタッフ.create({
@@ -672,7 +644,6 @@ export function createSampleStaffList(): Staff_スタッフ[] {
         presentations: [],
       },
       availableTimeSlots: allSlotIds.slice(4, 14),
-      preferredRoles: ["poster", "setup"],
       notes: "",
     }),
   ];

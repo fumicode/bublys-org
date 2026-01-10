@@ -53,8 +53,6 @@ classDiagram
         +hasPresentationAt(date, period) boolean
         +canAttendOrientation(slotId) boolean
         +meetsRoleRequirements(role) boolean
-        +calculateRoleFitScore(role) number
-        +calculateAptitudeScore(weights) number
         +accept() Staff_スタッフ
         +putOnWaitlist() Staff_スタッフ
         +reject() Staff_スタッフ
@@ -114,8 +112,6 @@ classDiagram
         +roleId: string
         +isAvailable: boolean
         +meetsRequirements: boolean
-        +isPreferredRole: boolean
-        +preferredRoleRank: number?
         +hasPresentationConflict: boolean
         +skillMatches: SkillMatchDetail[]
         +roleFitScore: number
@@ -147,7 +143,6 @@ classDiagram
 
     %% 関連
     Staff_スタッフ "1" --> "*" TimeSlot_時間帯 : availableTimeSlots
-    Staff_スタッフ "1" --> "*" Role_係 : preferredRoles
     Staff_スタッフ ..> Role_係 : meetsRoleRequirements()
 
     ShiftAssignment_シフト配置 "*" --> "1" Staff_スタッフ : staffId
@@ -210,7 +205,7 @@ flowchart LR
 
     subgraph "スタッフ配置レベル"
         B[StaffAssignmentEvaluation<br/>スタッフ配置評価]
-        B1["「田中さん → 3/26午前×総合案内」<br/>PC:◎ Zoom:○ 英語:△ 希望係:✓"]
+        B1["「田中さん → 3/26午前×総合案内」<br/>PC:◎ Zoom:○ 英語:△"]
     end
 
     A --> A1
@@ -339,7 +334,6 @@ flowchart TD
 │   経験   : 要求なし    → あり  ◎ +2     │
 ├─────────────────────────────────────────┤
 │ ■ その他                                │
-│   希望係: ✓ (第2希望)                   │
 │   適性スコア: +10pt                      │
 ├─────────────────────────────────────────┤
 │ ⚠ 注意事項                              │

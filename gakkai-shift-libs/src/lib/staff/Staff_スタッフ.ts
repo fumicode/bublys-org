@@ -31,16 +31,6 @@ export interface PresentationState {
   }>;
 }
 
-/** スコアリング重み設定 */
-export interface ScoringWeightsState {
-  readonly availableSlotCount: number;
-  readonly pcSkill: number;
-  readonly zoomSkill: number;
-  readonly englishSkill: number;
-  readonly eventExperience: number;
-  readonly fullDayAvailability: number;
-}
-
 /** スタッフの状態 */
 export interface StaffState {
   readonly id: string;
@@ -54,7 +44,6 @@ export interface StaffState {
   readonly skills: SkillsState;
   readonly presentation: PresentationState;
   readonly availableTimeSlots: ReadonlyArray<string>;
-  readonly preferredRoles: ReadonlyArray<string>;
   readonly notes: string;
   readonly status: StaffStatus_ステータス;
   readonly aptitudeScore?: number;
@@ -87,7 +76,6 @@ export type StaffJSON = {
     }>;
   };
   availableTimeSlots: string[];
-  preferredRoles: string[];
   notes: string;
   status: StaffStatus_ステータス;
   aptitudeScore?: number;
@@ -188,62 +176,6 @@ export class Staff_スタッフ {
     return true;
   }
 
-  /** 係への適性スコアを計算 */
-  calculateRoleFitScore(role: Role_係): number {
-    let score = 0;
-    const req = role.requirements;
-    const skills = this.state.skills;
-
-    if (req.minPcSkill) {
-      score +=
-        Role_係.skillLevelToNumber(skills.pc) -
-        Role_係.skillLevelToNumber(req.minPcSkill);
-    }
-    if (req.minZoomSkill) {
-      score +=
-        Role_係.skillLevelToNumber(skills.zoom) -
-        Role_係.skillLevelToNumber(req.minZoomSkill);
-    }
-
-    if (skills.english === 'daily_conversation') {
-      score += 2;
-    }
-
-    if (skills.eventExperience) {
-      score += 2;
-    }
-
-    if (req.preferMale && this.state.gender === 'male') {
-      score += 3;
-    }
-
-    return score;
-  }
-
-  /** 適性スコア（採用判定用）を計算 */
-  calculateAptitudeScore(weights: ScoringWeightsState): number {
-    let score = 0;
-    const skills = this.state.skills;
-
-    score += this.state.availableTimeSlots.length * weights.availableSlotCount;
-    score += Role_係.skillLevelToNumber(skills.pc) * weights.pcSkill;
-    score += Role_係.skillLevelToNumber(skills.zoom) * weights.zoomSkill;
-
-    if (skills.english === 'daily_conversation') {
-      score += weights.englishSkill;
-    }
-
-    if (skills.eventExperience) {
-      score += weights.eventExperience;
-    }
-
-    if (this.state.availableTimeSlots.length >= 13) {
-      score += weights.fullDayAvailability;
-    }
-
-    return score;
-  }
-
   // ========== 状態変更メソッド（意味のある操作のみ公開） ==========
 
   /** 採用する */
@@ -299,7 +231,6 @@ export class Staff_スタッフ {
         presentations: [...this.state.presentation.presentations],
       },
       availableTimeSlots: [...this.state.availableTimeSlots],
-      preferredRoles: [...this.state.preferredRoles],
       notes: this.state.notes,
       status: this.state.status,
       aptitudeScore: this.state.aptitudeScore,

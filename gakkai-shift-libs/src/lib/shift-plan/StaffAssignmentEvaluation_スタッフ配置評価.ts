@@ -30,8 +30,6 @@ export interface StaffAssignmentEvaluationState {
   readonly roleId: string;
   readonly isAvailable: boolean;
   readonly meetsRequirements: boolean;
-  readonly isPreferredRole: boolean;
-  readonly preferredRoleRank: number | null; // 第何希望か（1始まり）、希望でなければnull
   readonly hasPresentationConflict: boolean;
   readonly skillMatches: ReadonlyArray<SkillMatchDetail>;
   readonly roleFitScore: number;
@@ -66,14 +64,6 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
 
   get meetsRequirements(): boolean {
     return this.state.meetsRequirements;
-  }
-
-  get isPreferredRole(): boolean {
-    return this.state.isPreferredRole;
-  }
-
-  get preferredRoleRank(): number | null {
-    return this.state.preferredRoleRank;
   }
 
   get hasPresentationConflict(): boolean {
@@ -187,25 +177,14 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
       issues.push('係の要件を満たしていません');
     }
 
-    // 4. 希望係かどうか
-    const preferredRoleIndex = staff.state.preferredRoles.indexOf(role.id);
-    const isPreferredRole = preferredRoleIndex !== -1;
-    const preferredRoleRank = isPreferredRole ? preferredRoleIndex + 1 : null;
-
-    // 5. スキルマッチング詳細
+    // 4. スキルマッチング詳細と適性スコア計算
     const skillMatches = this.evaluateSkillMatches(staff, role);
+    const roleFitScore = skillMatches.reduce((sum, m) => sum + m.scoreDiff, 0);
 
-    // 6. 適性スコア計算
-    const roleFitScore = staff.calculateRoleFitScore(role);
-
-    // 7. 総合スコア計算
+    // 5. 総合スコア計算
     let totalScore = roleFitScore;
-    if (isPreferredRole) {
-      // 第1希望は+5、第2希望は+3、第3希望以降は+1
-      totalScore += preferredRoleRank === 1 ? 5 : preferredRoleRank === 2 ? 3 : 1;
-    }
-    if (!isAvailable) totalScore -= 20;
-    if (hasPresentationConflict) totalScore -= 20;
+    if (!isAvailable) totalScore -= 10;
+    if (hasPresentationConflict) totalScore -= 10;
     if (!meetsRequirements) totalScore -= 10;
 
     return {
@@ -214,8 +193,6 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
       roleId: role.id,
       isAvailable,
       meetsRequirements,
-      isPreferredRole,
-      preferredRoleRank,
       hasPresentationConflict,
       skillMatches,
       roleFitScore,
@@ -233,33 +210,39 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
     const req = role.requirements;
     const skills = staff.skills;
 
-    // PCスキル
+    // PCスキル: 係が求めている場合のみ評価（求めていない場合はscoreDiff: 0）
+    // 要件を満たしていれば差分+1、満たしていなければ差分のまま（ペナルティ）
     const pcRequired = req.minPcSkill ?? 'none';
-    const pcDiff =
-      Role_係.skillLevelToNumber(skills.pc) -
-      Role_係.skillLevelToNumber(pcRequired === 'none' ? 'none' : pcRequired);
+    const pcRawDiff = req.minPcSkill
+      ? Role_係.skillLevelToNumber(skills.pc) -
+        Role_係.skillLevelToNumber(req.minPcSkill)
+      : 0;
+    const pcDiff = req.minPcSkill ? (pcRawDiff >= 0 ? pcRawDiff + 1 : pcRawDiff) : 0;
     matches.push({
       skillName: 'PC',
       required: pcRequired,
       staffHas: skills.pc,
-      isMatch: pcDiff >= 0,
+      isMatch: pcRawDiff >= 0,
       scoreDiff: pcDiff,
     });
 
-    // Zoomスキル
+    // Zoomスキル: 係が求めている場合のみ評価（求めていない場合はscoreDiff: 0）
+    // 要件を満たしていれば差分+1、満たしていなければ差分のまま（ペナルティ）
     const zoomRequired = req.minZoomSkill ?? 'none';
-    const zoomDiff =
-      Role_係.skillLevelToNumber(skills.zoom) -
-      Role_係.skillLevelToNumber(zoomRequired === 'none' ? 'none' : zoomRequired);
+    const zoomRawDiff = req.minZoomSkill
+      ? Role_係.skillLevelToNumber(skills.zoom) -
+        Role_係.skillLevelToNumber(req.minZoomSkill)
+      : 0;
+    const zoomDiff = req.minZoomSkill ? (zoomRawDiff >= 0 ? zoomRawDiff + 1 : zoomRawDiff) : 0;
     matches.push({
       skillName: 'Zoom',
       required: zoomRequired,
       staffHas: skills.zoom,
-      isMatch: zoomDiff >= 0,
+      isMatch: zoomRawDiff >= 0,
       scoreDiff: zoomDiff,
     });
 
-    // 英語スキル
+    // 英語スキル: 係が求めている場合のみ評価（求めていない場合はscoreDiff: 0）
     const englishRequired = req.requireEnglish ? 'any' : 'none';
     const englishMatch = !req.requireEnglish || skills.english === 'daily_conversation';
     matches.push({
@@ -267,10 +250,11 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
       required: englishRequired,
       staffHas: skills.english === 'daily_conversation' ? '日常会話' : 'なし',
       isMatch: englishMatch,
-      scoreDiff: skills.english === 'daily_conversation' ? 2 : 0,
+      // 係が求めている場合のみ加点
+      scoreDiff: req.requireEnglish && skills.english === 'daily_conversation' ? 2 : 0,
     });
 
-    // イベント経験
+    // イベント経験: 係が求めている場合のみ評価（求めていない場合はscoreDiff: 0）
     const expRequired = req.requireEventExperience ? 'any' : 'none';
     const expMatch = !req.requireEventExperience || skills.eventExperience;
     matches.push({
@@ -278,7 +262,21 @@ export class StaffAssignmentEvaluation_スタッフ配置評価 {
       required: expRequired,
       staffHas: skills.eventExperience ? 'あり' : 'なし',
       isMatch: expMatch,
-      scoreDiff: skills.eventExperience ? 2 : 0,
+      // 係が求めている場合のみ加点
+      scoreDiff: req.requireEventExperience && skills.eventExperience ? 2 : 0,
+    });
+
+    // 男性優先: 係が求めている場合のみ評価（求めていない場合はscoreDiff: 0）
+    // 男性なら+2、それ以外でも+1
+    const maleRequired = req.preferMale ? 'any' : 'none';
+    const maleMatch = !req.preferMale || staff.gender === 'male';
+    const maleScore = req.preferMale ? (staff.gender === 'male' ? 2 : 1) : 0;
+    matches.push({
+      skillName: '性別',
+      required: maleRequired,
+      staffHas: staff.gender === 'male' ? '男性' : 'その他',
+      isMatch: maleMatch,
+      scoreDiff: maleScore,
     });
 
     return matches;
