@@ -1,16 +1,26 @@
 'use client';
 
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 import styled from "styled-components";
-import { Staff_スタッフ } from "../domain";
+import { Staff_スタッフ, Role_係, SkillLevel_スキルレベル } from "../domain";
 import PersonIcon from "@mui/icons-material/Person";
 import { ObjectView } from "../../bubble-ui/object-view";
+
+/** フィルターで絞り込まれたスキルの情報 */
+export type FilteredSkills = {
+  pc?: { level: SkillLevel_スキルレベル; operator: '>=' | '=' };
+  zoom?: { level: SkillLevel_スキルレベル; operator: '>=' | '=' };
+  english?: boolean;
+  eventExperience?: boolean;
+};
 
 type StaffListViewProps = {
   staffList: Staff_スタッフ[];
   selectedStaffId?: string | null;
   buildDetailUrl: (staffId: string) => string;
   onStaffClick?: (staffId: string) => void;
+  /** フィルターで絞り込まれたスキル（表示用） */
+  filteredSkills?: FilteredSkills;
 };
 
 export const StaffListView: FC<StaffListViewProps> = ({
@@ -18,7 +28,51 @@ export const StaffListView: FC<StaffListViewProps> = ({
   selectedStaffId,
   buildDetailUrl,
   onStaffClick,
+  filteredSkills,
 }) => {
+  /** フィルターに関連するスキルのバッジを生成 */
+  const renderSkillBadges = (staff: Staff_スタッフ) => {
+    if (!filteredSkills) return null;
+
+    const badges: ReactNode[] = [];
+
+    if (filteredSkills.pc) {
+      const label = Role_係.getSkillLevelLabel(staff.skills.pc);
+      badges.push(
+        <span key="pc" className="e-skill-badge e-skill-badge--pc">
+          PC: {label}
+        </span>
+      );
+    }
+
+    if (filteredSkills.zoom) {
+      const label = Role_係.getSkillLevelLabel(staff.skills.zoom);
+      badges.push(
+        <span key="zoom" className="e-skill-badge e-skill-badge--zoom">
+          Zoom: {label}
+        </span>
+      );
+    }
+
+    if (filteredSkills.english && staff.skills.english === 'daily_conversation') {
+      badges.push(
+        <span key="english" className="e-skill-badge e-skill-badge--english">
+          英語可
+        </span>
+      );
+    }
+
+    if (filteredSkills.eventExperience && staff.skills.eventExperience) {
+      badges.push(
+        <span key="exp" className="e-skill-badge e-skill-badge--exp">
+          経験あり
+        </span>
+      );
+    }
+
+    return badges.length > 0 ? <div className="e-skills">{badges}</div> : null;
+  };
+
   return (
     <StyledStaffList>
       {staffList.length === 0 ? (
@@ -45,9 +99,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
                     <div className="e-meta">
                       {staff.state.school} / {staff.state.grade}
                     </div>
-                  </div>
-                  <div className="e-status">
-                    <StatusBadge status={staff.status} />
+                    {renderSkillBadges(staff)}
                   </div>
                 </div>
               </ObjectView>
@@ -57,11 +109,6 @@ export const StaffListView: FC<StaffListViewProps> = ({
       )}
     </StyledStaffList>
   );
-};
-
-const StatusBadge: FC<{ status: string }> = ({ status }) => {
-  const label = Staff_スタッフ.getStatusLabel(status as 'pending' | 'accepted' | 'waitlist' | 'rejected');
-  return <span className={`e-badge e-badge--${status}`}>{label}</span>;
 };
 
 const StyledStaffList = styled.ul`
@@ -103,6 +150,7 @@ const StyledStaffList = styled.ul`
 
     .e-avatar {
       color: #666;
+      flex-shrink: 0;
     }
 
     .e-text {
@@ -122,35 +170,38 @@ const StyledStaffList = styled.ul`
       font-size: 0.85em;
     }
 
-    .e-status {
-      flex-shrink: 0;
+    .e-skills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
     }
 
-    .e-badge {
+    .e-skill-badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.75em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7em;
       font-weight: bold;
 
-      &.e-badge--pending {
-        background-color: #fff3e0;
-        color: #e65100;
-      }
-
-      &.e-badge--accepted {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-      }
-
-      &.e-badge--waitlist {
+      &.e-skill-badge--pc {
         background-color: #e3f2fd;
         color: #1565c0;
       }
 
-      &.e-badge--rejected {
-        background-color: #fce4ec;
-        color: #c62828;
+      &.e-skill-badge--zoom {
+        background-color: #f3e5f5;
+        color: #7b1fa2;
+      }
+
+      &.e-skill-badge--english {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+      }
+
+      &.e-skill-badge--exp {
+        background-color: #fff3e0;
+        color: #e65100;
       }
     }
   }

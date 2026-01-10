@@ -2,7 +2,6 @@ import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, 
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
-import { Menu, MenuItem } from "@mui/material";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -20,32 +19,21 @@ const CloseIcon: FC<{ size?: number }> = ({ size = 18 }) => (
 );
 
 /**
- * 泡っぽいリサイズボタンのSVGアイコン
+ * 最大化/縮小トグルボタンのSVGアイコン
  */
-const ResizeIcon: FC<{ size?: number }> = ({ size = 18 }) => (
+const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18, isMaximized }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path
-      d="M15 9L9 9L9 15"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M9 15L15 9"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-    <path
-      d="M9 15L15 15L15 9"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeOpacity="0.4"
-    />
+    {isMaximized ? (
+      // 縮小アイコン（内向き矢印）
+      <>
+        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </>
+    ) : (
+      // 最大化アイコン（四角）
+      <rect x="7" y="7" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    )}
   </svg>
 );
 import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
@@ -164,7 +152,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   });
 
-  const [sizeMenuAnchor, setSizeMenuAnchor] = useState<null | HTMLElement>(null);
   const [isFocused, setIsFocused] = useState(false);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -180,6 +167,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     if (ref.current) {
       ref.current.style.transition = '';
       ref.current.style.transformOrigin = '';
+      ref.current.style.left = '';
+      ref.current.style.top = '';
     }
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;
@@ -223,28 +212,27 @@ const BubbleViewInner: FC<BubbleProps> = ({
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
   };
 
-  const handleSizeMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
+  const isMaximized = !!bubble.size;
+
+  const handleToggleSize = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSizeMenuAnchor(e.currentTarget);
-  };
+    if (isMaximized) {
+      // フィットに戻す
+      const resizedBubble = Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
+      dispatch(updateBubble(resizedBubble.toJSON()));
+      onResize?.(resizedBubble);
+    } else {
+      // 最大化
+      if (!pageSize) return;
+      const globalCoordinateSystem = coordinateSystem;
+      const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
+      const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+      const newPosition = { x: 0, y: 0 };
 
-  const handleSizeMenuClose = () => {
-    setSizeMenuAnchor(null);
-  };
-
-  const handleResizeClick = (width: number | null, height: number | null, newPosition?: Point2) => {
-    let resizedBubble = width && height
-      ? bubble.resizeTo({ width, height })
-      : Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
-
-    // 位置も変更する場合
-    if (newPosition) {
-      resizedBubble = resizedBubble.moveTo(newPosition);
+      const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
+      dispatch(updateBubble(resizedBubble.toJSON()));
+      onResize?.(resizedBubble);
     }
-
-    dispatch(updateBubble(resizedBubble.toJSON()));
-    onResize?.(resizedBubble);
-    handleSizeMenuClose();
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
@@ -322,42 +310,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
               </button>
             )}
             <button
-              className="e-bubble-button e-resize-button"
-              onClick={handleSizeMenuOpen}
+              className="e-bubble-button e-toggle-size-button"
+              onClick={handleToggleSize}
+              title={isMaximized ? "フィット" : "最大化"}
             >
-              <ResizeIcon size={20} />
+              <ToggleSizeIcon size={20} isMaximized={isMaximized} />
             </button>
           </div>
           <h1 className="e-bubble-name">{bubble.type}</h1>
         </div>
-
-          <Menu
-            anchorEl={sizeMenuAnchor}
-            open={Boolean(sizeMenuAnchor)}
-            onClose={handleSizeMenuClose}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MenuItem onClick={() => handleResizeClick(300, 200)}>小 (300x200)</MenuItem>
-            <MenuItem onClick={() => handleResizeClick(500, 350)}>中 (500x350)</MenuItem>
-            <MenuItem onClick={() => handleResizeClick(700, 500)}>大 (700x500)</MenuItem>
-            <MenuItem onClick={() => {
-              if (!pageSize) return;
-
-              const globalCoordinateSystem = coordinateSystem;
-              // 利用可能なスペース（グローバル座標系）
-              const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-              const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
-
-              // 位置をoffset分だけマイナス方向に
-              const position = {
-                x: 0,
-                y: 0
-              };
-
-              handleResizeClick(availableWidth, availableHeight, position);
-            }}>最大化</MenuItem>
-            <MenuItem onClick={() => handleResizeClick(null, null)}>フィット (自動)</MenuItem>
-          </Menu>
       </header>
 
       <main className="e-bubble-content">
@@ -573,7 +534,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
         color: hsla(0, 70%, 50%, 1);
       }
 
-      &.e-resize-button:hover {
+      &.e-toggle-size-button:hover {
         color: hsla(210, 70%, 50%, 1);
       }
     }
