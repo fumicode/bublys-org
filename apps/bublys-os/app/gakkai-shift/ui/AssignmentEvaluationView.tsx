@@ -13,6 +13,8 @@ import WarningIcon from "@mui/icons-material/Warning";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import StarHalfIcon from "@mui/icons-material/StarHalf";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PersonIcon from "@mui/icons-material/Person";
 import { Button } from "@mui/material";
 import { ObjectView } from "../../bubble-ui/object-view";
 
@@ -45,67 +47,58 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   return (
     <StyledContainer>
       <div className="e-header">
-        <div className="e-title">
-          配置評価:{" "}
-          {staffDetailUrl ? (
-            <ObjectView
-              type="Staff"
-              url={staffDetailUrl}
-              label={staffName}
-              draggable={true}
-              onClick={onStaffClick}
-            >
-              <Button variant="text" size="small" component="span" className="e-link-button">
-                {staffName}
-              </Button>
-            </ObjectView>
-          ) : (
-            staffName
-          )}
-        </div>
-        <div className="e-subtitle">
-          {staffAvailabilityUrl ? (
-            <ObjectView
-              type="StaffAvailability"
-              url={staffAvailabilityUrl}
-              label={`${staffName}の参加可能時間帯`}
-              draggable={true}
-              onClick={onTimeSlotClick}
-            >
-              <Button variant="text" size="small" component="span" className="e-link-button">
-                {timeSlotLabel}
-              </Button>
-            </ObjectView>
-          ) : (
-            timeSlotLabel
-          )}
-          {" → "}
-          {roleName}
-        </div>
-      </div>
+        <div className="e-assignment-visual">
+          {/* 左側: 時間帯・係のセル */}
+          <div className="e-cell">
+            <div className="e-cell-primary">
+              {staffAvailabilityUrl ? (
+                <ObjectView
+                  type="StaffAvailability"
+                  url={staffAvailabilityUrl}
+                  label={`${staffName}の参加可能時間帯`}
+                  draggable={true}
+                  onClick={onTimeSlotClick}
+                >
+                  <Button variant="text" size="small" component="span" className="e-link-button">
+                    {timeSlotLabel}
+                  </Button>
+                </ObjectView>
+              ) : (
+                <span>{timeSlotLabel}</span>
+              )}
+            </div>
+            <div className="e-cell-secondary">{roleName}</div>
+          </div>
 
-      <div className="e-overall">
-        <div className="e-overall-label">総合評価:</div>
-        <div className={`e-overall-status is-${status}`}>
-          <StarRating score={evaluation.totalScore} />
-          <span className="e-status-label">({statusLabel})</span>
-        </div>
-        <div className="e-total-score">
-          {evaluation.totalScore > 0 ? "+" : ""}{evaluation.totalScore}pt
-        </div>
-      </div>
+          {/* 中央: 総合評価 + 矢印 */}
+          <div className="e-center">
+            <div className={`e-score is-${status}`}>
+              {evaluation.totalScore > 0 ? "+" : ""}{evaluation.totalScore}pt
+            </div>
+            <ArrowBackIcon className="e-arrow" />
+          </div>
 
-      <div className="e-section">
-        <div className="e-section-title">時間帯</div>
-        <div className="e-row">
-          <span className="e-label">参加可能:</span>
-          <EvalIcon ok={evaluation.isAvailable} />
-        </div>
-        <div className="e-row">
-          <span className="e-label">発表重複:</span>
-          <span className={evaluation.hasPresentationConflict ? "is-bad" : "is-good"}>
-            {evaluation.hasPresentationConflict ? "あり" : "なし"}
-          </span>
+          {/* 右側: スタッフ */}
+          <div className="e-cell">
+            <div className="e-cell-primary">
+              <PersonIcon className="e-person-icon" />
+              {staffDetailUrl ? (
+                <ObjectView
+                  type="Staff"
+                  url={staffDetailUrl}
+                  label={staffName}
+                  draggable={true}
+                  onClick={onStaffClick}
+                >
+                  <Button variant="text" size="small" component="span" className="e-link-button">
+                    {staffName}
+                  </Button>
+                </ObjectView>
+              ) : (
+                <span>{staffName}</span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -125,15 +118,15 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
       </div>
 
       <div className="e-section">
-        <div className="e-section-title">その他</div>
+        <div className="e-section-title">時間帯</div>
         <div className="e-row">
-          <span className="e-label">要件充足:</span>
-          <EvalIcon ok={evaluation.meetsRequirements} />
+          <span className="e-label">参加可能:</span>
+          <EvalIcon ok={evaluation.isAvailable} />
         </div>
         <div className="e-row">
-          <span className="e-label">適性スコア:</span>
-          <span className={evaluation.roleFitScore >= 0 ? "is-good" : "is-bad"}>
-            {evaluation.roleFitScore > 0 ? "+" : ""}{evaluation.roleFitScore}pt
+          <span className="e-label">発表重複:</span>
+          <span className={evaluation.hasPresentationConflict ? "is-bad" : "is-good"}>
+            {evaluation.hasPresentationConflict ? "あり" : "なし"}
           </span>
         </div>
       </div>
@@ -243,60 +236,65 @@ const StyledContainer = styled.div`
 
   .e-header {
     margin-bottom: 12px;
-    padding-bottom: 8px;
+    padding-bottom: 12px;
     border-bottom: 2px solid #1976d2;
   }
 
-  .e-title {
-    font-weight: bold;
-    font-size: 1.1em;
-  }
-
-  .e-subtitle {
-    color: #666;
-    font-size: 0.9em;
-    margin-top: 2px;
-  }
-
-  .e-overall {
+  .e-assignment-visual {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
-    background-color: #f5f5f5;
-    border-radius: 6px;
-    margin-bottom: 12px;
+  }
 
-    .e-overall-label {
-      font-weight: bold;
-    }
+  .e-cell {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-width: 0;
+  }
 
-    .e-overall-status {
-      display: flex;
-      align-items: center;
-      gap: 4px;
+  .e-cell-primary {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: bold;
+    font-size: 0.85em;
+    white-space: nowrap;
+  }
 
-      &.is-excellent { color: #2e7d32; }
-      &.is-good { color: #558b2f; }
-      &.is-acceptable { color: #f9a825; }
-      &.is-warning { color: #ef6c00; }
-      &.is-error { color: #c62828; }
-    }
+  .e-cell-secondary {
+    font-size: 0.75em;
+    color: #666;
+    margin-top: 2px;
+  }
 
-    .e-stars {
-      display: flex;
-      color: #ffc107;
-    }
+  .e-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
 
-    .e-status-label {
-      font-size: 0.9em;
-    }
+  .e-score {
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-bottom: 2px;
 
-    .e-total-score {
-      margin-left: auto;
-      font-weight: bold;
-      font-size: 1.1em;
-    }
+    &.is-excellent { color: #2e7d32; }
+    &.is-good { color: #558b2f; }
+    &.is-acceptable { color: #f9a825; }
+    &.is-warning { color: #ef6c00; }
+    &.is-error { color: #c62828; }
+  }
+
+  .e-arrow {
+    color: #999;
+  }
+
+  .e-person-icon {
+    font-size: 1.1em;
+    color: #666;
   }
 
   .e-section {
