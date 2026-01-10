@@ -7,7 +7,8 @@ import {
   renderBubble,
   selectBubble,
   selectBubblesRelationByOpeneeId,
-  selectSurfaceBubbles,
+  selectSurfaceBubbleIds,
+  selectLastSiblingRenderedRect,
   updateBubble,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
@@ -38,16 +39,19 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
-    const payload = (action as ReturnType<typeof joinSiblingInProcess>).payload;
+    const payload = (action as ReturnType<typeof joinSiblingInProcess>).payload as { bubbleId: string; openingPosition?: string };
     const id = payload.bubbleId;
     const openingPosition = payload.openingPosition ?? "bubble-side";
 
     const state = listenerApi.getState() as any;
-    const surfaceBubbles = selectSurfaceBubbles(state);
-    const otherSiblingBubbles = surfaceBubbles.filter(b => b.id !== id);
+
+    // パフォーマンス最適化: IDリストだけを取得
+    const surfaceIds = selectSurfaceBubbleIds(state);
+    const otherSiblingIds = surfaceIds.filter(siblingId => siblingId !== id);
+
     const thisBubble = selectBubble(state, { id });
 
-    // openingPositionが"origin-side"の場合はpopChildと同様にoriginを基準に配置
+    // openingPositionが"origin-side"の場合はopenerを基準に配置
     if (openingPosition === "origin-side") {
       const relation = selectBubblesRelationByOpeneeId(state, { openeeId: id });
       if (relation) {
@@ -85,24 +89,53 @@ bubblesListener.startListening({
     }
 
     // bubble-sideの場合、または origin-sideでoriginが見つからない場合は兄弟バブルの隣に配置
-    if (!otherSiblingBubbles.length) {
+    if (!otherSiblingIds.length) {
       console.log("JoinSibling: No other siblings, skipping positioning");
       return;
     }
 
-    // 最後の兄弟バブル（最も右にあると想定）を基準にする
-    const brotherBubble = otherSiblingBubbles[otherSiblingBubbles.length - 1];
-    const brotherRect = brotherBubble.renderedRect;
+    // パフォーマンス最適化: 最後の兄弟のrenderedRectだけを取得
+    const lastSiblingData = selectLastSiblingRenderedRect(state);
+    const lastSiblingId = (lastSiblingData && lastSiblingData.bubbleId !== id)
+      ? lastSiblingData.bubbleId
+      : (otherSiblingIds.length > 0 ? otherSiblingIds[otherSiblingIds.length - 1] : undefined);
+
+    // 自分自身が最後の場合は、その前のバブルを使う
+    const brotherRect = (lastSiblingData && lastSiblingData.bubbleId !== id)
+      ? lastSiblingData.renderedRect
+      : (otherSiblingIds.length > 0
+          ? selectBubble(state, { id: otherSiblingIds[otherSiblingIds.length - 1] })?.renderedRect
+          : undefined);
 
     // 兄弟バブルのrenderedRectがあれば、即座に位置を計算
     if (brotherRect) {
       console.log("JoinSibling: Calculating position immediately (no render wait)");
 
+      // openingPositionに応じて基準となるrectを選択
+      let baseRect = brotherRect;
+      let useOriginPosition = false;
+
+      if (openingPosition === "origin-side" && lastSiblingId) {
+        // UrledPlace要素（クリック元）のrectを取得
+        const originRect = getOriginRect(lastSiblingId, thisBubble.url);
+        if (originRect) {
+          console.log("JoinSibling: Using origin rect for positioning", originRect.position);
+          baseRect = originRect;
+          useOriginPosition = true;
+        } else {
+          console.log("JoinSibling: Origin rect not found, falling back to sibling positioning");
+        }
+      }
+
       // 兄弟の隣に配置すべき位置を計算（グローバル座標）
       // サイズが不明な場合は兄弟バブルのサイズを使う（類似サイズと仮定）
-      const estimatedSize = thisBubble.renderedRect?.size || brotherRect.size;
-      const globalPoint = brotherRect.calcPositionForSibling(estimatedSize);
-      console.log("JoinSibling: Calculated position (global)", globalPoint);
+      const estimatedSize = thisBubble.renderedRect?.size || baseRect.size;
+      // originRectが見つかった場合のみcalcPositionToOpenを使う
+      // 見つからなかった場合は兄弟の右側に配置
+      const globalPoint = useOriginPosition
+        ? baseRect.calcPositionToOpen(estimatedSize)
+        : baseRect.calcPositionForSibling(estimatedSize);
+      console.log("JoinSibling: Calculated position (global)", globalPoint, "useOriginPosition:", useOriginPosition);
 
       if (!globalPoint) {
         return;
@@ -141,15 +174,18 @@ bubblesListener.startListening({
 
     const newState = listenerApi.getState() as any;
     const newThisBubble = selectBubble(newState, { id });
-    const newSurfaceBubbles = selectSurfaceBubbles(newState);
-    const newOtherSiblings = newSurfaceBubbles.filter(b => b.id !== id);
 
-    if (!newOtherSiblings.length) {
+    // パフォーマンス最適化: IDリストだけを取得
+    const newSurfaceIds = selectSurfaceBubbleIds(newState);
+    const newOtherSiblingIds = newSurfaceIds.filter(siblingId => siblingId !== id);
+
+    if (!newOtherSiblingIds.length) {
       return;
     }
 
-    const newBrotherBubble = newOtherSiblings[newOtherSiblings.length - 1];
-    const newBrotherRect = newBrotherBubble.renderedRect;
+    // 最後の兄弟バブルを取得
+    const newBrotherBubble = selectBubble(newState, { id: newOtherSiblingIds[newOtherSiblingIds.length - 1] });
+    const newBrotherRect = newBrotherBubble?.renderedRect;
 
     if (!newBrotherRect) {
       console.log("JoinSibling: Brother bubble has no renderedRect");

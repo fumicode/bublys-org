@@ -1,14 +1,14 @@
 "use client";
-import { FC, useState } from "react";
+import { FC, useState, memo } from "react";
 import {
   Box,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Tooltip,
   Collapse,
 } from "@mui/material";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import EventNoteIcon from "@mui/icons-material/EventNote";
@@ -69,7 +69,22 @@ type SidebarProps = {
 const SIDEBAR_WIDTH_EXPANDED = 180;
 const SIDEBAR_WIDTH_COLLAPSED = 56;
 
-export const Sidebar: FC<SidebarProps> = ({ onItemClick }) => {
+// Radix Tooltip用のスタイル
+const tooltipContentStyle: React.CSSProperties = {
+  backgroundColor: "rgba(50, 50, 50, 0.95)",
+  color: "white",
+  padding: "6px 12px",
+  borderRadius: "4px",
+  fontSize: "0.75rem",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+  zIndex: 9999,
+};
+
+const tooltipArrowStyle: React.CSSProperties = {
+  fill: "rgba(50, 50, 50, 0.95)",
+};
+
+export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleItemClick = (item: MenuItem) => {
@@ -80,71 +95,79 @@ export const Sidebar: FC<SidebarProps> = ({ onItemClick }) => {
   const width = isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
 
   return (
-    <Box
-      sx={{
-        width,
-        height: "100vh",
-        backgroundColor: "rgba(245, 245, 245, 0.95)",
-        borderRight: "1px solid rgba(0, 0, 0, 0.1)",
-        display: "flex",
-        flexDirection: "column",
-        transition: "width 0.2s ease",
-        overflow: "hidden",
-        flexShrink: 0,
-      }}
-    >
-      <List dense sx={{ flex: 1, pt: 1 }}>
-        {menuItems.map((item) => (
-          <Tooltip
-            key={item.label}
-            title={isExpanded ? "" : item.label}
-            placement="right"
-          >
-            <ListItemButton
-              onClick={() => handleItemClick(item)}
-              sx={{
-                minHeight: 44,
-                px: 2,
-                justifyContent: isExpanded ? "initial" : "center",
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: 0,
-                  mr: isExpanded ? 2 : 0,
-                  justifyContent: "center",
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              <Collapse in={isExpanded} orientation="horizontal">
-                <ListItemText
-                  primary={item.label}
-                  primaryTypographyProps={{
-                    fontSize: "0.875rem",
-                    whiteSpace: "nowrap",
-                  }}
-                />
-              </Collapse>
-            </ListItemButton>
-          </Tooltip>
-        ))}
-      </List>
-
-      {/* Toggle button */}
-      <ListItemButton
-        onClick={() => setIsExpanded(!isExpanded)}
+    <Tooltip.Provider delayDuration={300}>
+      <Box
         sx={{
-          minHeight: 44,
-          px: 2,
-          justifyContent: isExpanded ? "flex-end" : "center",
-          borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+          width,
+          height: "100vh",
+          backgroundColor: "rgba(245, 245, 245, 0.95)",
+          borderRight: "1px solid rgba(0, 0, 0, 0.1)",
+          display: "flex",
+          flexDirection: "column",
+          transition: "width 0.2s ease",
+          overflow: "hidden",
+          flexShrink: 0,
         }}
       >
-        {isExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-      </ListItemButton>
-    </Box>
+        <List dense sx={{ flex: 1, pt: 1 }}>
+          {menuItems.map((item) => (
+            <Tooltip.Root key={item.label}>
+              <Tooltip.Trigger asChild>
+                <ListItemButton
+                  onClick={() => handleItemClick(item)}
+                  sx={{
+                    minHeight: 44,
+                    px: 2,
+                    justifyContent: isExpanded ? "initial" : "center",
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: isExpanded ? 2 : 0,
+                      justifyContent: "center",
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <Collapse in={isExpanded} orientation="horizontal">
+                    <ListItemText
+                      primary={item.label}
+                      primaryTypographyProps={{
+                        fontSize: "0.875rem",
+                        whiteSpace: "nowrap",
+                      }}
+                    />
+                  </Collapse>
+                </ListItemButton>
+              </Tooltip.Trigger>
+              {!isExpanded && (
+                <Tooltip.Portal>
+                  <Tooltip.Content side="right" sideOffset={5} style={tooltipContentStyle}>
+                    {item.label}
+                    <Tooltip.Arrow style={tooltipArrowStyle} />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              )}
+            </Tooltip.Root>
+          ))}
+        </List>
+
+        {/* Toggle button */}
+        <ListItemButton
+          onClick={() => setIsExpanded(!isExpanded)}
+          sx={{
+            minHeight: 44,
+            px: 2,
+            justifyContent: isExpanded ? "flex-end" : "center",
+            borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+          }}
+        >
+          {isExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+        </ListItemButton>
+      </Box>
+    </Tooltip.Provider>
   );
-};
+});
 
 export const SIDEBAR_WIDTH_COLLAPSED_EXPORT = SIDEBAR_WIDTH_COLLAPSED;
