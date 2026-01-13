@@ -1,35 +1,22 @@
-'use client';
-import styled from 'styled-components';
-import { selectCount, useAppDispatch, useAppSelector, decrement, increment } from "@bublys-org/state-management";
+"use client";
 
-const StyledPage = styled.div`
-  .page {
-  }
-`;
+import { useEffect } from 'react';
+import { FocusedObjectProvider } from "./world-line/WorldLine/domain/FocusedObjectContext";
+import { BubblesUI } from "./bubble-ui/BubblesUI/feature/BubblesUI";
+import { ShellManagerProvider } from "@bublys-org/object-shell";
+import { registerShellTypes } from "./counter/registerShellTypes";
 
 export default function Index() {
-  /*
-   * Replace the elements below with your own.
-   *
-   * Note: The corresponding styles are in the ./index.styled-components file.
-   */
+  // 型レジストリの初期化
+  useEffect(() => {
+    registerShellTypes();
+  }, []);
 
-  const dispatch = useAppDispatch();
-  console.log(dispatch);
-  console.log(selectCount);
-  console.log(decrement);
-  console.log(increment);
-  
-  const count = useAppSelector(selectCount);
   return (
-    <StyledPage>
-      <button onClick={() => dispatch(decrement())}>
-        -
-      </button>
-      {count}
-      <button onClick={() => dispatch(increment())}>
-        +
-      </button>
-    </StyledPage>
+    <FocusedObjectProvider>
+      <ShellManagerProvider>
+        <BubblesUI />
+      </ShellManagerProvider>
+    </FocusedObjectProvider>
   );
 }
