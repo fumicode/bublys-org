@@ -23,12 +23,15 @@ import {
 import { createSampleStaffList } from "../data/sampleStaff";
 import WarningIcon from "@mui/icons-material/Warning";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import PeopleIcon from "@mui/icons-material/People";
 import { Button } from "@mui/material";
+import { UrledPlace } from "../../bubble-ui/components";
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
   onAssignmentClick?: (assignmentId: string) => void;
   onCellClick?: (timeSlotId: string, roleId: string) => void;
+  onStaffViewClick?: () => void;
   /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
   buildCellUrl?: (timeSlotId: string, roleId: string) => string;
 };
@@ -37,6 +40,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   shiftPlanId,
   onAssignmentClick,
   onCellClick,
+  onStaffViewClick,
   buildCellUrl,
 }) => {
   const dispatch = useAppDispatch();
@@ -172,10 +176,21 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             size="small"
             startIcon={<AutoFixHighIcon />}
             onClick={handleAutoAssign}
-            sx={{ mr: 2 }}
+            sx={{ mr: 1 }}
           >
             自動シフト配置
           </Button>
+          <UrledPlace url={`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<PeopleIcon />}
+              onClick={onStaffViewClick}
+              sx={{ mr: 2 }}
+            >
+              スタッフ別表示
+            </Button>
+          </UrledPlace>
           配置数: {shiftPlan.assignments.length}件
           {violations.length > 0 && (
             <span className="e-violation-warning">

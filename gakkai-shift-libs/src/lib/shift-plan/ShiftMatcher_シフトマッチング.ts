@@ -227,10 +227,6 @@ export class ShiftMatcher_シフトマッチング {
         reasons.push(`適性+${evaluation.roleFitScore}`);
       }
 
-      if (evaluation.isPreferredRole) {
-        reasons.push(`第${evaluation.preferredRoleRank}希望`);
-      }
-
       // 6. 既存配置数が少ないスタッフを優先（均等配置）
       const currentCount = staffAssignmentCount.get(staff.id) ?? 0;
       matchingScore -= currentCount * 2;

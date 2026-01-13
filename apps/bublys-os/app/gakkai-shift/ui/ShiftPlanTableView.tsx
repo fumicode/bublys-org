@@ -8,6 +8,7 @@ import {
   Staff_スタッフ,
   ShiftAssignment_シフト配置,
   ConstraintViolation,
+  StaffAssignmentEvaluation_スタッフ配置評価,
 } from "../domain";
 import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
@@ -70,24 +71,20 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   const calculateCellScore = (timeSlotId: string, roleId: string): number => {
     const cellAssignments = getAssignmentsForCell(timeSlotId, roleId);
     const role = roles.find((r) => r.id === roleId);
-    if (!role) return 0;
+    const timeSlot = timeSlots.find((t) => t.id === timeSlotId);
+    if (!role || !timeSlot) return 0;
 
     let score = 0;
     for (const assignment of cellAssignments) {
       const staff = getStaff(assignment.staffId);
       if (staff) {
-        // スタッフが参加可能かどうか
-        if (staff.isAvailableAt(timeSlotId)) {
-          score += 10;
-        } else {
-          score -= 20; // 参加不可の時間帯に配置はペナルティ
-        }
-        // 係の要件を満たしているか
-        if (staff.meetsRoleRequirements(role)) {
-          score += 5;
-        }
-        // 適性スコア
-        score += staff.calculateRoleFitScore(role);
+        // StaffAssignmentEvaluationで評価
+        const evaluation = StaffAssignmentEvaluation_スタッフ配置評価.evaluateCandidate(
+          staff,
+          role,
+          timeSlot
+        );
+        score += evaluation.totalScore;
       }
     }
     return score;
