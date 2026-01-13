@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd ../.. && npx nx build @bublys-org/bublys-os --prod",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "npx nx build @bublys-org/bublys-os --prod",
   "framework": "nextjs"
 }
