@@ -10,9 +10,6 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import WarningIcon from "@mui/icons-material/Warning";
-import StarIcon from "@mui/icons-material/Star";
-import StarBorderIcon from "@mui/icons-material/StarBorder";
-import StarHalfIcon from "@mui/icons-material/StarHalf";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PersonIcon from "@mui/icons-material/Person";
 import { Button } from "@mui/material";
@@ -42,7 +39,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   onTimeSlotClick,
 }) => {
   const status = evaluation.getOverallStatus();
-  const statusLabel = StaffAssignmentEvaluation_スタッフ配置評価.getStatusLabel(status);
 
   return (
     <StyledContainer>
@@ -157,27 +153,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
         </div>
       )}
     </StyledContainer>
-  );
-};
-
-// 星評価コンポーネント
-const StarRating: FC<{ score: number }> = ({ score }) => {
-  // スコアを0-5の星に変換（-10以下は0、20以上は5）
-  const normalizedScore = Math.min(5, Math.max(0, (score + 10) / 6));
-  const fullStars = Math.floor(normalizedScore);
-  const hasHalf = normalizedScore - fullStars >= 0.5;
-  const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
-
-  return (
-    <span className="e-stars">
-      {[...Array(fullStars)].map((_, i) => (
-        <StarIcon key={`full-${i}`} fontSize="inherit" />
-      ))}
-      {hasHalf && <StarHalfIcon fontSize="inherit" />}
-      {[...Array(emptyStars)].map((_, i) => (
-        <StarBorderIcon key={`empty-${i}`} fontSize="inherit" />
-      ))}
-    </span>
   );
 };
 
