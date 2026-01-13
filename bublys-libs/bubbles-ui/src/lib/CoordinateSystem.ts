@@ -17,6 +17,13 @@ export type CoordinateSystemData = {
 const SCALE_DECAY_RATE = 0.1;
 
 /**
+ * スケール計算を開始するレイヤーインデックス
+ * このインデックス未満のレイヤーはすべてscale=1.0
+ * これにより、レイヤーが追加されてもクリック位置がずれない
+ */
+const SCALE_START_LAYER_INDEX = 2;
+
+/**
  * 座標系クラス（2D一次変換）
  * SmartRectがどの座標系で表現されているかを示す
  *
@@ -25,7 +32,9 @@ const SCALE_DECAY_RATE = 0.1;
  *
  * プロパティ:
  * - layerIndex: レイヤーのインデックス（0が最前面、数字が大きいほど奥）
- *   - scaleはlayerIndexから計算される: scale = 1 - layerIndex * SCALE_DECAY_RATE
+ *   - scaleはlayerIndexから計算される
+ *   - layerIndex < SCALE_START_LAYER_INDEX の場合: scale = 1.0
+ *   - それ以外: scale = 1 - (layerIndex - SCALE_START_LAYER_INDEX + 1) * SCALE_DECAY_RATE
  * - offset: 平行移動（translation）
  * - vanishingPoint: スケール変換の基準点（transform-origin）
  */
@@ -39,12 +48,14 @@ export class CoordinateSystem {
   /**
    * このレイヤーのスケール値
    * layerIndex=0 → scale=1.0
-   * layerIndex=1 → scale=0.9
-   * layerIndex=2 → scale=0.8
+   * layerIndex=1 → scale=1.0 (SCALE_START_LAYER_INDEX未満は1.0)
+   * layerIndex=2 → scale=0.9
+   * layerIndex=3 → scale=0.8
    * ...
    */
   get scale(): number {
-    return 1 - this.layerIndex * SCALE_DECAY_RATE;
+    const effectiveIndex = Math.max(0, this.layerIndex - SCALE_START_LAYER_INDEX + 1);
+    return 1 - effectiveIndex * SCALE_DECAY_RATE;
   }
 
   /**

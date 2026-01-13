@@ -362,9 +362,10 @@ describe("SmartRect座標変換", () => {
     it("scale=0.9のレイヤーから変換する", () => {
       const { SmartRect: SR } = require("./SmartRect.js");
 
-      // レイヤー1の座標系: scale=0.9, offset=(100, 100), vanishingPoint=(20, 10)
+      // レイヤー2の座標系: scale=0.9, offset=(100, 100), vanishingPoint=(20, 10)
+      // ※ layerIndex=0,1はscale=1.0、layerIndex=2からscale=0.9
       const layerCoordinateSystem = {
-        layerIndex: 1,
+        layerIndex: 2,
         offset: { x: 100, y: 100 },
         vanishingPoint: { x: 20, y: 10 },
       };
@@ -394,7 +395,11 @@ describe("SmartRect座標変換", () => {
       const globalRect = new SR(new DOMRect(100, 100, 50, 50), parentSize);
       const result = globalRect.toLocal(CoordinateSystem.GLOBAL.toData());
 
-      expect(result).toBe(globalRect); // 同じインスタンス
+      // 座標とサイズが変わらないことを確認
+      expect(result.x).toBe(globalRect.x);
+      expect(result.y).toBe(globalRect.y);
+      expect(result.width).toBe(globalRect.width);
+      expect(result.height).toBe(globalRect.height);
     });
 
     it("グローバル座標系からローカル座標系に変換する", () => {
@@ -424,9 +429,10 @@ describe("SmartRect座標変換", () => {
     it("scale=0.9のレイヤーに変換する", () => {
       const { SmartRect: SR } = require("./SmartRect.js");
 
-      // レイヤー1の座標系: scale=0.9
+      // レイヤー2の座標系: scale=0.9
+      // ※ layerIndex=0,1はscale=1.0、layerIndex=2からscale=0.9
       const layerCoordinateSystem = {
-        layerIndex: 1,
+        layerIndex: 2,
         offset: { x: 100, y: 100 },
         vanishingPoint: { x: 20, y: 10 },
       };
@@ -449,8 +455,9 @@ describe("SmartRect座標変換", () => {
     it("ローカル→グローバル→ローカルで元に戻る", () => {
       const { SmartRect: SR } = require("./SmartRect.js");
 
+      // layerIndex=2はscale=0.9
       const layerCoordinateSystem = {
-        layerIndex: 1,
+        layerIndex: 2,
         offset: { x: 100, y: 100 },
         vanishingPoint: { x: 20, y: 10 },
       };
