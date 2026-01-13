@@ -20,23 +20,7 @@
   },
   "nx": {
     "targets": {
-      "dev": {
-        "dependsOn": [
-          {
-            "projects": [
-              "@bublys-org/state-management",
-              "@bublys-org/bubbles-ui",
-              "@bublys-org/bubbles-ui-state",
-              "@bublys-org/object-shell",
-              "@bublys-org/akashic-record",
-              "@bublys-org/hash-world-line",
-              "@bublys-org/gakkai-shift-model"
-            ],
-            "target": "dev"
-          }
-        ],
-        "continuous": true
-      }
+      "dev": { "dependsOn": ["^dev"], "continuous": true }
     }
   }
 }

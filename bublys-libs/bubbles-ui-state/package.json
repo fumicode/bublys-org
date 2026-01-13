@@ -28,15 +28,8 @@
   },
   "nx": {
     "targets": {
-      "build": {
-        "dependsOn": ["^build"]
-      },
-      "dev": {
-        "dependsOn": [
-          {"projects": ["@bublys-org/bubbles-ui"], "target": "dev"}
-        ],
-        "continuous": true
-      }
+      "build": { "dependsOn": ["^build"] },
+      "dev": { "dependsOn": ["^dev"], "continuous": true }
     }
   }
 }

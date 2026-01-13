@@ -24,9 +24,7 @@
   },
   "nx": {
     "targets": {
-      "dev": {
-        "continuous": true
-      }
+      "dev": { "continuous": true }
     }
   }
 }

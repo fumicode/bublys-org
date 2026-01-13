@@ -25,15 +25,8 @@
   },
   "nx": {
     "targets": {
-      "build": {
-        "dependsOn": ["^build"]
-      },
-      "dev": {
-        "dependsOn": [
-          {"projects": ["@bublys-org/object-shell", "@bublys-org/hash-world-line"], "target": "dev"}
-        ],
-        "continuous": true
-      }
+      "build": { "dependsOn": ["^build"] },
+      "dev": { "dependsOn": ["^dev"], "continuous": true }
     }
   }
 }
