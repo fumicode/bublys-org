@@ -6,7 +6,11 @@
     "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -17,15 +21,21 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
-    "types": ["jest", "node"],
+    "types": [
+      "jest",
+      "node"
+    ],
     "outDir": "dist",
     "rootDir": "."
   },
   "include": [
     "../../apps/bublys-os/.next/types/**/*.ts",
     "../../dist/apps/bublys-os/.next/types/**/*.ts",
+    ".next/types/**/*.ts",
     "app/**/*.js",
     "app/**/*.jsx",
     "app/**/*.ts",
@@ -33,7 +43,7 @@
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    "../../apps/bublys-os/.next/.next/types/**/*.ts"
   ],
   "exclude": [
     "out-tsc",

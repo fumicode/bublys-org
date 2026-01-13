@@ -27,13 +27,12 @@
   },
   "nx": {
     "targets": {
+      "build": {
+        "dependsOn": ["^build"]
+      },
       "dev": {
         "dependsOn": [
-          
-          {"projects": [
-            "@bublys-org/bubbles-ui-state"
-          ],
-          "target": "dev"}
+          {"projects": ["@bublys-org/bubbles-ui-state"], "target": "dev"}
         ],
         "continuous": true
       }
