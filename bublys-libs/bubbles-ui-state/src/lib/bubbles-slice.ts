@@ -130,9 +130,9 @@ export const bubblesSlice = createSlice({
     },
 
 
-    joinSibling: (state, action: PayloadAction<PopChildPayload>) => {
+    joinSibling: (state, action: PayloadAction<string>) => {
       state.process = BubblesProcess.fromJSON(state.process)
-        .joinSibling(action.payload.bubbleId)
+        .joinSibling(action.payload)
         .toJSON();
 
       state.renderCount += 1;

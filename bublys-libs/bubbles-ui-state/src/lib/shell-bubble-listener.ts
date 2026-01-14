@@ -34,7 +34,7 @@ shellBubbleListener.startListening({
     }));
 
     // プロセス層に追加（横並びとして）
-    listenerApi.dispatch(joinSiblingInProcess({ bubbleId: newBubble.id }));
+    listenerApi.dispatch(joinSiblingInProcess(newBubble.id));
 
     console.log('[ShellBubble Listener] Bubble created:', newBubble.id);
   }

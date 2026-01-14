@@ -33,15 +33,11 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
   }, ANIMATION_FALLBACK_DURATION);
 };
 
-// joinSiblingInProcess 発火後、moveTo → updateBubble を実行
-// openingPositionが"origin-side"の場合、openerのorigin-rectを基準に配置
-// それ以外の場合は兄弟バブルの隣に配置
+// joinSiblingInProcess 発火後、兄弟バブルの隣に配置
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
-    const payload = (action as ReturnType<typeof joinSiblingInProcess>).payload as { bubbleId: string; openingPosition?: string };
-    const id = payload.bubbleId;
-    const openingPosition = payload.openingPosition ?? "bubble-side";
+    const id = action.payload;
 
     const state = listenerApi.getState() as any;
 
@@ -51,44 +47,6 @@ bubblesListener.startListening({
 
     const thisBubble = selectBubble(state, { id });
 
-    // openingPositionが"origin-side"の場合はopenerを基準に配置
-    if (openingPosition === "origin-side") {
-      const relation = selectBubblesRelationByOpeneeId(state, { openeeId: id });
-      if (relation) {
-        const openerBubble = selectBubble(state, { id: relation.openerId });
-        if (openerBubble?.renderedRect) {
-          console.log("JoinSibling (origin-side): Calculating position from origin");
-
-          // origin-sideの場合、opener内のorigin要素を基準にする
-          let baseRect = openerBubble.renderedRect;
-          const originRect = getOriginRect(openerBubble.id, thisBubble.url);
-          if (originRect) {
-            console.log("JoinSibling: Using origin rect for positioning", originRect.position);
-            baseRect = originRect;
-          }
-
-          const point = baseRect.calcPositionToOpen({ width: 0, height: 0 });
-          console.log("JoinSibling: Calculated point to open at (global)", point, "openingPosition:", openingPosition);
-
-          if (point) {
-            const coordinateConfig = selectGlobalCoordinateSystem(state);
-            const surfaceLeftTop = selectSurfaceLeftTop(state);
-            const relativePoint = convertGlobalPointToLayerLocal(
-              point,
-              0,
-              coordinateConfig,
-              surfaceLeftTop
-            );
-            console.log("JoinSibling: Converted to layer-local point", relativePoint);
-            const moved = thisBubble.moveTo(relativePoint);
-            listenerApi.dispatch(updateBubble(moved.toJSON()));
-            return;
-          }
-        }
-      }
-    }
-
-    // bubble-sideの場合、または origin-sideでoriginが見つからない場合は兄弟バブルの隣に配置
     if (!otherSiblingIds.length) {
       console.log("JoinSibling: No other siblings, skipping positioning");
       return;
@@ -96,9 +54,6 @@ bubblesListener.startListening({
 
     // パフォーマンス最適化: 最後の兄弟のrenderedRectだけを取得
     const lastSiblingData = selectLastSiblingRenderedRect(state);
-    const lastSiblingId = (lastSiblingData && lastSiblingData.bubbleId !== id)
-      ? lastSiblingData.bubbleId
-      : (otherSiblingIds.length > 0 ? otherSiblingIds[otherSiblingIds.length - 1] : undefined);
 
     // 自分自身が最後の場合は、その前のバブルを使う
     const brotherRect = (lastSiblingData && lastSiblingData.bubbleId !== id)
@@ -111,31 +66,10 @@ bubblesListener.startListening({
     if (brotherRect) {
       console.log("JoinSibling: Calculating position immediately (no render wait)");
 
-      // openingPositionに応じて基準となるrectを選択
-      let baseRect = brotherRect;
-      let useOriginPosition = false;
-
-      if (openingPosition === "origin-side" && lastSiblingId) {
-        // UrledPlace要素（クリック元）のrectを取得
-        const originRect = getOriginRect(lastSiblingId, thisBubble.url);
-        if (originRect) {
-          console.log("JoinSibling: Using origin rect for positioning", originRect.position);
-          baseRect = originRect;
-          useOriginPosition = true;
-        } else {
-          console.log("JoinSibling: Origin rect not found, falling back to sibling positioning");
-        }
-      }
-
       // 兄弟の隣に配置すべき位置を計算（グローバル座標）
-      // サイズが不明な場合は兄弟バブルのサイズを使う（類似サイズと仮定）
-      const estimatedSize = thisBubble.renderedRect?.size || baseRect.size;
-      // originRectが見つかった場合のみcalcPositionToOpenを使う
-      // 見つからなかった場合は兄弟の右側に配置
-      const globalPoint = useOriginPosition
-        ? baseRect.calcPositionToOpen(estimatedSize)
-        : baseRect.calcPositionForSibling(estimatedSize);
-      console.log("JoinSibling: Calculated position (global)", globalPoint, "useOriginPosition:", useOriginPosition);
+      const estimatedSize = thisBubble.renderedRect?.size || brotherRect.size;
+      const globalPoint = brotherRect.calcPositionForSibling(estimatedSize);
+      console.log("JoinSibling: Calculated position (global)", globalPoint);
 
       if (!globalPoint) {
         return;
