@@ -28,6 +28,13 @@ export class Counter implements Serializable<{ id: string; value: number }>, Dom
     }
 
     /**
+     * カウンターを0に戻す（新しいインスタンスを返す）
+     */
+    public reset(): Counter {
+      return new Counter(this.id, 0);
+    }
+
+    /**
      * JSON形式に変換
      */
     public toJSON(): { id: string; value: number } {

@@ -54,3 +54,4 @@ vitest.config.*.timestamp*
 
 #  TypeScript
 tsconfig.tsbuildinfo
+.env.local

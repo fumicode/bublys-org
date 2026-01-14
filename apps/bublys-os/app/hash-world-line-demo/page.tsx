@@ -167,6 +167,24 @@ const styles: Record<string, CSSProperties> = {
   historyTime: {
     color: '#666',
   },
+  commandSection: {
+    marginBottom: '24px',
+    padding: '16px',
+    backgroundColor: '#1a1a2e',
+    borderRadius: '8px',
+    border: '1px solid #3b3b5c',
+  },
+  commandInput: {
+    flex: 1,
+    padding: '8px 12px',
+    fontSize: '13px',
+    fontFamily: "'SF Mono', 'Monaco', monospace",
+    backgroundColor: '#252540',
+    border: '1px solid #3b3b5c',
+    borderRadius: '4px',
+    color: '#e0e0e0',
+    outline: 'none',
+  },
 };
 
 // ============================================================================
@@ -424,6 +442,12 @@ function DemoContent() {
       <div style={styles.leftPanel}>
         <h1 style={styles.title}>ハッシュ世界線 デモ</h1>
 
+        {/* コマンド入力 */}
+        <CommandInput
+          shells={new Map(counterShells.map(({ id, shell }) => [id, shell]))}
+          onExecute={() => forceUpdate((n) => n + 1)}
+        />
+
         {/* Counter一覧 */}
         <div style={styles.section}>
           <div style={styles.sectionTitle}>
@@ -488,6 +512,219 @@ function DemoContent() {
           onMoveTo={handleMoveTo}
         />
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// コマンド入力（LLM 操作シミュレーション）
+// ============================================================================
+
+interface CommandInputProps {
+  shells: Map<string, ObjectShell<Counter>>;
+  onExecute: () => void;
+}
+
+function CommandInput({ shells, onExecute }: CommandInputProps) {
+  const [input, setInput] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'natural' | 'code'>('natural');
+  const { setShell } = useShellManager();
+  const { record } = useAkashicRecord();
+
+  // シェルIDを JS 識別子に変換（- → _）
+  const toJsId = (id: string) => id.replace(/-/g, '_');
+
+  // 利用可能なシェル（JS識別子形式）
+  const shellEntries = Array.from(shells.entries()).map(([id, shell]) => ({
+    id,
+    jsId: toJsId(id),
+    shell,
+  }));
+
+  // 自然言語 → コード変換 → 即実行
+  const generateAndExecute = async () => {
+    if (!input.trim()) return;
+
+    setIsLoading(true);
+    setResult(null);
+    setGeneratedCode(null);
+
+    try {
+      const response = await fetch('/api/generate-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: input,
+          availableObjects: shellEntries.map((e) => ({
+            name: e.jsId,
+            type: 'counter',
+            methods: ['countUp', 'countDown', 'reset'],
+            currentValue: e.shell.value,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        setResult(`Error: ${data.error}`);
+        return;
+      }
+
+      // 生成されたコードを表示して即実行
+      setGeneratedCode(data.code);
+      await executeCode(data.code, false);
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // コードを実行
+  const executeCode = async (code: string, clearInput = true) => {
+    if (!code.trim()) return;
+
+    try {
+      const argNames = shellEntries.map((e) => e.jsId);
+      const argValues = shellEntries.map((e) => e.shell);
+
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const fn = new Function(...argNames, code);
+      fn(...argValues);
+
+      for (const { id, shell } of shellEntries) {
+        setShell(id, shell);
+        await record(shell, 'counter', `LLM: ${code}`);
+      }
+
+      setResult(`OK: ${code}`);
+      if (clearInput) {
+        setInput('');
+      }
+      onExecute();
+    } catch (e) {
+      setResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (mode === 'natural') {
+      await generateAndExecute();
+    } else {
+      await executeCode(input);
+    }
+  };
+
+  // シェル一覧（JS識別子形式）
+  const shellList = shellEntries.map((e) => e.jsId);
+
+  return (
+    <div style={styles.commandSection}>
+      <div style={styles.sectionTitle}>
+        <span>LLM 操作</span>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            onClick={() => setMode('natural')}
+            style={{
+              ...styles.button,
+              padding: '4px 8px',
+              fontSize: '10px',
+              ...(mode === 'natural' ? styles.primaryButton : { backgroundColor: '#3b3b5c' }),
+            }}
+          >
+            自然言語
+          </button>
+          <button
+            onClick={() => setMode('code')}
+            style={{
+              ...styles.button,
+              padding: '4px 8px',
+              fontSize: '10px',
+              ...(mode === 'code' ? styles.primaryButton : { backgroundColor: '#3b3b5c' }),
+            }}
+          >
+            コード
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '8px', fontSize: '11px', color: '#888' }}>
+        利用可能: {shellList.length > 0 ? shellList.join(', ') : 'なし'}
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSubmit()}
+          placeholder={
+            mode === 'natural'
+              ? '例: カウンターを3回増やして'
+              : '例: counter_123.countUp()'
+          }
+          style={styles.commandInput}
+          disabled={isLoading}
+        />
+        <button
+          onClick={handleSubmit}
+          style={{ ...styles.button, ...styles.primaryButton }}
+          disabled={isLoading}
+        >
+          {isLoading ? '...' : mode === 'natural' ? '変換' : '実行'}
+        </button>
+      </div>
+
+      {/* 生成されたコード */}
+      {generatedCode && (
+        <div
+          style={{
+            padding: '12px',
+            backgroundColor: '#252540',
+            borderRadius: '4px',
+            marginBottom: '8px',
+          }}
+        >
+          <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>
+            生成されたコード:
+          </div>
+          <div
+            style={{
+              fontFamily: "'SF Mono', 'Monaco', monospace",
+              fontSize: '12px',
+              color: '#10b981',
+              marginBottom: '8px',
+            }}
+          >
+            {generatedCode}
+          </div>
+          <button
+            onClick={() => executeCode(generatedCode)}
+            style={{ ...styles.button, ...styles.successButton }}
+          >
+            このコードを実行
+          </button>
+        </div>
+      )}
+
+      {/* 結果 */}
+      {result && (
+        <div
+          style={{
+            padding: '8px',
+            backgroundColor: result.startsWith('OK') ? '#10b98120' : '#ef444420',
+            borderRadius: '4px',
+            fontSize: '11px',
+            color: result.startsWith('OK') ? '#10b981' : '#ef4444',
+          }}
+        >
+          {result}
+        </div>
+      )}
     </div>
   );
 }
