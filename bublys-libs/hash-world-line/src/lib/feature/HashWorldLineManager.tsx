@@ -19,6 +19,7 @@ import React, {
 } from 'react';
 import { HashWorldLine } from '../domain/HashWorldLine';
 import { createStateSnapshot } from '../domain/StateSnapshot';
+import { computeStateHash } from '../domain/StateHash';
 import {
   saveWorldLine,
   loadWorldLine,
@@ -259,13 +260,13 @@ export function HashWorldLineProvider({
         throw new Error('Active world line not found');
       }
 
-      // タイムスタンプを生成
-      const timestamp = Date.now();
+      // hash を生成
+      const hash = computeStateHash(stateData);
 
       // スナップショットを作成
-      const snapshot = createStateSnapshot(type, id, timestamp);
+      const snapshot = createStateSnapshot(type, id, hash);
 
-      // 状態を IndexedDB に保存
+      // 状態を IndexedDB に保存（CAS: 既存ならスキップ）
       await saveState(snapshot, stateData);
 
       // 世界線を更新（同期処理に変更）

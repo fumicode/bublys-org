@@ -48,29 +48,51 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 /**
- * 状態データを保存
+ * 状態データを保存（CAS パターン）
+ *
+ * 同一 hash が既に存在する場合は保存をスキップする。
+ * これにより同一状態の重複保存を防ぎ、ストレージを節約する。
+ *
  * @param snapshot 状態のスナップショット（ポインタ）
  * @param stateData 実際の状態データ
+ * @returns 保存されたかどうか（既存なら false）
  */
 export async function saveState(
   snapshot: StateSnapshot,
   stateData: unknown
-): Promise<void> {
+): Promise<boolean> {
   const db = await openDatabase();
+  const key = fullSnapshotKey(snapshot);
+
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STATE_STORE, 'readwrite');
     const store = tx.objectStore(STATE_STORE);
-    const key = fullSnapshotKey(snapshot);
 
-    const request = store.put(stateData, key);
+    // 既存チェック
+    const getRequest = store.getKey(key);
 
-    request.onerror = () => {
-      reject(new Error(`Failed to save state: ${request.error?.message}`));
+    getRequest.onsuccess = () => {
+      if (getRequest.result !== undefined) {
+        // 既存のためスキップ
+        db.close();
+        resolve(false);
+        return;
+      }
+
+      // 保存
+      const putRequest = store.put(stateData, key);
+      putRequest.onerror = () => {
+        reject(new Error(`Failed to save state: ${putRequest.error?.message}`));
+      };
+    };
+
+    getRequest.onerror = () => {
+      reject(new Error(`Failed to check state: ${getRequest.error?.message}`));
     };
 
     tx.oncomplete = () => {
       db.close();
-      resolve();
+      resolve(true);
     };
   });
 }

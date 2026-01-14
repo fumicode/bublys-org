@@ -30,7 +30,9 @@ import {
   HashWorldLine,
   loadState,
   createStateSnapshot,
+  computeStateHash,
   saveState,
+  StateSnapshot,
 } from '@bublys-org/hash-world-line';
 
 // ============================================================================
@@ -163,8 +165,9 @@ export function AkashicRecordProvider({
       // ドメインオブジェクトをシリアライズして記録
       const stateData = serializeDomainObject(event.domainObject);
 
-      const timestamp = Date.now();
-      const snapshot = createStateSnapshot(shellType, event.shellId, timestamp);
+      // hash を生成
+      const hash = computeStateHash(stateData);
+      const snapshot = createStateSnapshot(shellType, event.shellId, hash);
 
       await saveState(snapshot, stateData);
 
@@ -327,7 +330,7 @@ export function useRestoreFromAkashicRecord() {
   }, [akashicRecord]);
 
   const loadStateFromSnapshot = useCallback(
-    async <T = unknown>(snapshot: { type: string; id: string; timestamp: number }): Promise<T | undefined> => {
+    async <T = unknown>(snapshot: StateSnapshot): Promise<T | undefined> => {
       return await loadState<T>(snapshot);
     },
     []

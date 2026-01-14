@@ -130,6 +130,43 @@ const styles: Record<string, CSSProperties> = {
     padding: '32px',
     color: '#666',
   },
+  counterHistory: {
+    marginTop: '12px',
+    padding: '8px',
+    backgroundColor: '#1a1a2e',
+    borderRadius: '4px',
+    textAlign: 'left' as const,
+  },
+  historyTitle: {
+    fontSize: '10px',
+    color: '#8b5cf6',
+    marginBottom: '6px',
+    fontWeight: 600,
+  },
+  historyList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  historyItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '10px',
+    color: '#888',
+  },
+  historyValue: {
+    fontWeight: 'bold',
+    color: '#fff',
+    minWidth: '24px',
+  },
+  historyHash: {
+    fontFamily: 'monospace',
+    color: '#10b981',
+    fontSize: '9px',
+  },
+  historyTime: {
+    color: '#666',
+  },
 };
 
 // ============================================================================
@@ -138,10 +175,19 @@ const styles: Record<string, CSSProperties> = {
 
 interface CounterCardProps {
   shell: ObjectShell<Counter>;
+  activeWorldLine: HashWorldLine | null;
 }
 
-function CounterCard({ shell }: CounterCardProps) {
+interface HistoryWithValue {
+  nodeId: string;
+  hash: string;
+  timestamp: number;
+  value: number | null;
+}
+
+function CounterCard({ shell, activeWorldLine }: CounterCardProps) {
   const { setShell } = useShellManager();
+  const [historyWithValues, setHistoryWithValues] = useState<HistoryWithValue[]>([]);
 
   const handleIncrement = () => {
     shell.countUp();
@@ -152,6 +198,47 @@ function CounterCard({ shell }: CounterCardProps) {
     shell.countDown();
     setShell(shell.id, shell);
   };
+
+  // 現在の経路（HEAD から遡る）上で、このカウンターに関連する履歴を抽出
+  const counterHistory = (() => {
+    if (!activeWorldLine) return [];
+
+    const currentNode = activeWorldLine.getCurrentHistoryNode();
+    if (!currentNode) return [];
+
+    // HEAD からルートまでの経路を取得
+    const path = activeWorldLine.getPathTo(currentNode.id);
+
+    // その経路上で、このカウンターを変更したノードだけ抽出
+    return path.filter((node) =>
+      node.changedObjects.some((obj) => obj.id === shell.id)
+    );
+  })();
+
+  // 履歴の値を非同期で取得
+  useEffect(() => {
+    const fetchValues = async () => {
+      const recentHistory = counterHistory.slice(-5);
+      const results: HistoryWithValue[] = [];
+
+      for (const node of recentHistory) {
+        const snapshot = node.changedObjects.find((obj) => obj.id === shell.id);
+        if (snapshot) {
+          const stateData = await loadState<{ id: string; value: number }>(snapshot);
+          results.push({
+            nodeId: node.id,
+            hash: snapshot.hash,
+            timestamp: node.timestamp,
+            value: stateData?.value ?? null,
+          });
+        }
+      }
+
+      setHistoryWithValues(results.reverse());
+    };
+
+    fetchValues();
+  }, [counterHistory.length, shell.id]);
 
   return (
     <div style={styles.counterCard}>
@@ -171,6 +258,30 @@ function CounterCard({ shell }: CounterCardProps) {
         </button>
       </div>
       <div style={styles.counterId}>{shell.id}</div>
+
+      {/* 履歴表示 */}
+      {historyWithValues.length > 0 && (
+        <div style={styles.counterHistory}>
+          <div style={styles.historyTitle}>履歴 ({counterHistory.length})</div>
+          <div style={styles.historyList}>
+            {historyWithValues.map((item) => (
+              <div key={item.nodeId} style={styles.historyItem}>
+                <span style={styles.historyValue}>
+                  {item.value !== null ? item.value : '?'}
+                </span>
+                <span style={styles.historyHash}>{item.hash.slice(0, 8)}</span>
+                <span style={styles.historyTime}>
+                  {new Date(item.timestamp).toLocaleTimeString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -335,6 +446,7 @@ function DemoContent() {
                 <CounterCard
                   key={id}
                   shell={shell}
+                  activeWorldLine={activeWorldLine}
                 />
               ))}
             </div>
@@ -357,6 +469,16 @@ function DemoContent() {
             <div style={styles.infoBox}>世界線がありません</div>
           )}
         </div>
+
+        {/* 現在の世界の内容 */}
+        {activeWorldLine && (
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>
+              <span>現在の世界の状態</span>
+            </div>
+            <WorldStateView worldLine={activeWorldLine} />
+          </div>
+        )}
       </div>
 
       {/* 右パネル: 履歴ビューア */}
@@ -366,6 +488,85 @@ function DemoContent() {
           onMoveTo={handleMoveTo}
         />
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 現在の世界の状態表示
+// ============================================================================
+
+interface WorldStateViewProps {
+  worldLine: HashWorldLine;
+}
+
+function WorldStateView({ worldLine }: WorldStateViewProps) {
+  const [objectValues, setObjectValues] = useState<
+    Array<{ key: string; type: string; id: string; hash: string; value: unknown }>
+  >([]);
+
+  const currentState = worldLine.getCurrentState();
+  const snapshots = currentState.getAllSnapshots();
+
+  useEffect(() => {
+    const fetchValues = async () => {
+      const results: Array<{
+        key: string;
+        type: string;
+        id: string;
+        hash: string;
+        value: unknown;
+      }> = [];
+
+      for (const snapshot of snapshots) {
+        const stateData = await loadState(snapshot);
+        results.push({
+          key: `${snapshot.type}:${snapshot.id}`,
+          type: snapshot.type,
+          id: snapshot.id,
+          hash: snapshot.hash,
+          value: stateData,
+        });
+      }
+
+      setObjectValues(results);
+    };
+
+    fetchValues();
+  }, [snapshots.length, worldLine.getCurrentHistoryIndex()]);
+
+  if (snapshots.length === 0) {
+    return <div style={styles.infoBox}>オブジェクトがありません</div>;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {objectValues.map((obj) => (
+        <div
+          key={obj.key}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: '#252540',
+            borderRadius: '4px',
+            fontSize: '11px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{obj.type}</span>
+            <span style={{ color: '#10b981', fontFamily: 'monospace' }}>
+              {obj.hash.slice(0, 12)}...
+            </span>
+          </div>
+          <div style={{ color: '#888', fontSize: '10px', wordBreak: 'break-all' }}>
+            {obj.id}
+          </div>
+          <div style={{ color: '#fff', marginTop: '4px' }}>
+            {obj.type === 'counter' && typeof obj.value === 'object' && obj.value !== null
+              ? `value: ${(obj.value as { value: number }).value}`
+              : JSON.stringify(obj.value)}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

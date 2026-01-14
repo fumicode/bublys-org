@@ -97,7 +97,7 @@ export class WorldState {
     const snapshots = new Map<string, StateSnapshot>();
     if (json.snapshots) {
       for (const [key, value] of json.snapshots) {
-        snapshots.set(key, createStateSnapshot(value.type, value.id, value.timestamp));
+        snapshots.set(key, createStateSnapshot(value.type, value.id, value.hash));
       }
     }
     return new WorldState({ snapshots });

@@ -16,6 +16,8 @@ import {
   HashWorldLine,
   createStateSnapshot,
   StateSnapshot,
+  fullSnapshotKey,
+  computeStateHash,
   saveWorldLine,
   loadWorldLine,
   listWorldLines,
@@ -207,7 +209,7 @@ export class AkashicRecord {
     // アクティブな世界線を更新
     this._activeWorldLine = worldLine;
 
-    this._emit({ type: 'stateRecorded', snapshot: { type: '', id: '', timestamp: 0 } });
+    this._emit({ type: 'stateRecorded', snapshot: { type: '', id: '', hash: '' } });
   }
 
   // ============================================================================
@@ -230,14 +232,19 @@ export class AkashicRecord {
     const domainObject = shell.dangerouslyGetDomainObject();
     const stateData = serializeDomainObject(domainObject);
 
-    // タイムスタンプを生成
-    const timestamp = Date.now();
+    // hash を生成（CAS のキーとして使用）
+    const hash = computeStateHash(stateData);
 
     // スナップショットを作成
-    const snapshot = createStateSnapshot(shellType, shell.id, timestamp);
+    const snapshot = createStateSnapshot(shellType, shell.id, hash);
 
-    // IndexedDBに状態を保存
-    await saveState(snapshot, stateData);
+    // IndexedDB に状態を保存（CAS: 既存ならスキップ）
+    const saved = await saveState(snapshot, stateData);
+    if (!saved) {
+      console.debug(
+        `[AkashicRecord] State ${fullSnapshotKey(snapshot)} already exists`
+      );
+    }
 
     // 世界線を更新
     this._activeWorldLine = this._activeWorldLine.updateObjectState(
