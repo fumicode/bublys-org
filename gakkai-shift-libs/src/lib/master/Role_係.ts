@@ -117,7 +117,7 @@ export class Role_係 {
     const roles: RoleState[] = [
       {
         id: 'headquarters',
-        name: '年会本部',
+        name: '大会センター',
         description: '運営中枢。PC・Zoom上級、全日程参加必須',
         fixedness: 'all_day_fixed',
         requirements: {
@@ -128,7 +128,7 @@ export class Role_係 {
       },
       {
         id: 'reception',
-        name: '総合案内',
+        name: '受付案内',
         description: '案内対応。英語力あれば優先',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -138,7 +138,7 @@ export class Role_係 {
       },
       {
         id: 'badge_reissue',
-        name: '参加証再発行',
+        name: '名札交換',
         description: 'PC入力中心。正確性重視',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -148,7 +148,7 @@ export class Role_係 {
       },
       {
         id: 'cloakroom',
-        name: 'クローク',
+        name: '手荷物預かり',
         description: '荷物の受け渡し。体力・スピード重視',
         fixedness: 'time_slot_ok',
         requirements: {},
@@ -156,7 +156,7 @@ export class Role_係 {
       },
       {
         id: 'venue',
-        name: '会場係',
+        name: 'ホール係',
         description: '会場案内・進行補助。Zoom中級、英語あれば優先',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -166,7 +166,7 @@ export class Role_係 {
       },
       {
         id: 'venue_check',
-        name: '会場チェック係',
+        name: '配信確認係',
         description: '配信チェック・機材確認。Zoom・PC中級、イベント経験者優先',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -178,7 +178,7 @@ export class Role_係 {
       },
       {
         id: 'preview_room',
-        name: '試写室係',
+        name: 'プレビュー係',
         description: '発表データ確認など、静かな作業',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -188,7 +188,7 @@ export class Role_係 {
       },
       {
         id: 'mobile_support',
-        name: '機動運用係',
+        name: '応援要員',
         description: '欠員・トラブル時の応援要員',
         fixedness: 'time_slot_ok',
         requirements: {
@@ -199,7 +199,7 @@ export class Role_係 {
       },
       {
         id: 'setup',
-        name: '設営係',
+        name: '準備係',
         description: '会場設営。男性優先（力仕事）',
         fixedness: 'concurrent_ok',
         requirements: {
@@ -209,7 +209,7 @@ export class Role_係 {
       },
       {
         id: 'exhibition',
-        name: '展示係',
+        name: 'ブース係',
         description: '企業・展示ブース対応。英語できると尚可',
         fixedness: 'time_slot_ok',
         requirements: {},
@@ -217,7 +217,7 @@ export class Role_係 {
       },
       {
         id: 'poster',
-        name: 'ポスター係',
+        name: '掲示係',
         description: 'ポスター会場案内・誘導',
         fixedness: 'time_slot_ok',
         requirements: {},
@@ -225,7 +225,7 @@ export class Role_係 {
       },
       {
         id: 'party_cloakroom',
-        name: '懇親会クローク',
+        name: '交流会荷物係',
         description: '懇親会時間に参加できるスタッフ',
         fixedness: 'party_only',
         requirements: {},
@@ -233,7 +233,7 @@ export class Role_係 {
       },
       {
         id: 'party_reception',
-        name: '懇親会受付',
+        name: '交流会案内',
         description: '懇親会受付対応',
         fixedness: 'party_only',
         requirements: {},

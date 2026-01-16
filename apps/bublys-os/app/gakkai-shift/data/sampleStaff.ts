@@ -26,9 +26,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-27", period: "afternoon" }],
+        presentations: [{ date: "2025-03-20", period: "afternoon" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_afternoon"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-20_afternoon"),
       notes: "リーダー経験あり",
     }),
     Staff_スタッフ.create({
@@ -92,12 +92,12 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       presentation: {
         hasPresentation: true,
         presentations: [
-          { date: "2025-03-26", period: "morning" },
-          { date: "2025-03-28", period: "afternoon" },
+          { date: "2025-03-19", period: "morning" },
+          { date: "2025-03-21", period: "afternoon" },
         ],
       },
       availableTimeSlots: allSlotIds.filter(
-        (id) => id !== "2025-03-26_morning" && id !== "2025-03-28_afternoon"
+        (id) => id !== "2025-03-19_morning" && id !== "2025-03-21_afternoon"
       ),
       notes: "英語対応可能",
     }),
@@ -161,9 +161,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-27", period: "morning" }],
+        presentations: [{ date: "2025-03-20", period: "morning" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_morning"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-20_morning"),
       notes: "過去に年会本部経験あり",
     }),
     Staff_スタッフ.create({
@@ -205,9 +205,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-26", period: "afternoon" }],
+        presentations: [{ date: "2025-03-19", period: "afternoon" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_afternoon"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-19_afternoon"),
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -248,9 +248,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-28", period: "morning" }],
+        presentations: [{ date: "2025-03-21", period: "morning" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-28_morning"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-21_morning"),
       notes: "複数言語対応可",
     }),
     Staff_スタッフ.create({
@@ -291,9 +291,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-27", period: "afternoon" }],
+        presentations: [{ date: "2025-03-20", period: "afternoon" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-27_afternoon"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-20_afternoon"),
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -356,9 +356,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-26", period: "morning" }],
+        presentations: [{ date: "2025-03-19", period: "morning" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_morning"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-19_morning"),
       notes: "リーダーシップあり",
     }),
     Staff_スタッフ.create({
@@ -421,12 +421,12 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       presentation: {
         hasPresentation: true,
         presentations: [
-          { date: "2025-03-27", period: "morning" },
-          { date: "2025-03-28", period: "afternoon" },
+          { date: "2025-03-20", period: "morning" },
+          { date: "2025-03-21", period: "afternoon" },
         ],
       },
       availableTimeSlots: allSlotIds.filter(
-        (id) => id !== "2025-03-27_morning" && id !== "2025-03-28_afternoon"
+        (id) => id !== "2025-03-20_morning" && id !== "2025-03-21_afternoon"
       ),
       notes: "英語堪能",
     }),
@@ -469,9 +469,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-28", period: "morning" }],
+        presentations: [{ date: "2025-03-21", period: "morning" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-28_morning"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-21_morning"),
       notes: "",
     }),
     Staff_スタッフ.create({
@@ -620,9 +620,9 @@ export function createSampleStaffList(): Staff_スタッフ[] {
       },
       presentation: {
         hasPresentation: true,
-        presentations: [{ date: "2025-03-26", period: "afternoon" }],
+        presentations: [{ date: "2025-03-19", period: "afternoon" }],
       },
-      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-26_afternoon"),
+      availableTimeSlots: allSlotIds.filter((id) => id !== "2025-03-19_afternoon"),
       notes: "経験豊富",
     }),
     Staff_スタッフ.create({
