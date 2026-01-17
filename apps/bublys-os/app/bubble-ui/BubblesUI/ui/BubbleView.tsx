@@ -287,6 +287,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
+      isFocused={isFocused}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -404,6 +405,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   height?: string; // 高さを指定するためのオプション
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
+  isFocused?: boolean; // フォーカス状態（前面表示）
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -649,6 +651,8 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     box-shadow:
       inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
       0 1px 2px hsla(0, 0%, 100%, 0.5);
+    // undergroundのバブル（layerIndex > 0）はコンテンツを半透明に（フォーカス時は除く）
+    opacity: ${({ layerIndex, isFocused }) => (layerIndex && layerIndex > 1 && !isFocused) ? 0.7 : 1};
   }
 
   >.e-debug-rect {

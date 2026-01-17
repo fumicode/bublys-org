@@ -43,16 +43,25 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   const topControlX = (openerRect.x + openeeRect.x) / 2;
   const bottomControlX = (openerRect.left + openeeRect.left) / 2;
 
-  const pathData = [
-    //A: 起点
+  // 全体の形状（fill用）
+  const fillPath = [
     `M ${openerRect.x} ${openerRect.y}`,
-    //B: ベジェ曲線で終点へ
     `C ${topControlX} ${openerRect.y} ${topControlX} ${openeeRect.y} ${openeeRect.x} ${openeeRect.y}`,
-    //D: 直線で終点の下へ
     `L ${openeeRect.left} ${openeeRect.bottom}`,
-    //C: ベジェ曲線で起点の下へ
     `C ${bottomControlX} ${openeeRect.bottom} ${bottomControlX} ${openerRect.bottom} ${openerRect.left} ${openerRect.bottom}`,
     "Z",
+  ].join(" ");
+
+  // 上の曲線（A→B）
+  const topCurvePath = [
+    `M ${openerRect.x} ${openerRect.y}`,
+    `C ${topControlX} ${openerRect.y} ${topControlX} ${openeeRect.y} ${openeeRect.x} ${openeeRect.y}`,
+  ].join(" ");
+
+  // 下の曲線（D→C）
+  const bottomCurvePath = [
+    `M ${openeeRect.left} ${openeeRect.bottom}`,
+    `C ${bottomControlX} ${openeeRect.bottom} ${bottomControlX} ${openerRect.bottom} ${openerRect.left} ${openerRect.bottom}`,
   ].join(" ");
 
   return (
@@ -68,27 +77,29 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
       }}
     >
       <svg width="100%" height="100%">
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="0"
-            refY="3.5"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-          </marker>
-        </defs>
+        {/* 全体の塗り（ストロークなし） */}
         <path
-          d={pathData}
+          d={fillPath}
           stroke="none"
-          strokeWidth="2"
           fill={
             opener.colorHue === undefined
-              ? "rgba(255,0,0,0.5)"
-              : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`
+              ? "rgba(255,0,0,0.05)"
+              : `hsla(${opener.colorHue}, 50%, 50%, 0.05)`
           }
+        />
+        {/* 上の曲線（白ストローク） */}
+        <path
+          d={topCurvePath}
+          stroke="rgba(255, 255, 255, 0.6)"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        {/* 下の曲線（白ストローク、薄め） */}
+        <path
+          d={bottomCurvePath}
+          stroke="rgba(255, 255, 255, 0.25)"
+          strokeWidth="1.5"
+          fill="none"
         />
       </svg>
     </div>
