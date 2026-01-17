@@ -2,6 +2,7 @@ import { FC, useEffect, useCallback, useState, useMemo } from "react";
 import { useAppSelector, useAppDispatch, useAppStore, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 import { MagicWandProvider } from "../../MagicWand/feature/MagicWandProvider";
+import { FloatModeProvider } from "../../FloatMode/feature/FloatModeProvider";
 
 import {
   selectBubbleLayers,
@@ -211,25 +212,27 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       {/* Main Bubbles Area */}
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <MagicWandProvider>
-          <BubblesContext.Provider value={bubblesContextValue}>
-            <BubbleRefsProvider>
-              <PositionDebuggerProvider isShown={false}>
-                <Box sx={{ width: '100%', height: '100%' }}>
-                  <BubblesLayeredView
-                    bubbleLayers={bubbleLayers}
-                    vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                    onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-                    onBubbleClose={deleteBubble}
-                    onMagicWandAction={handleMagicWandDelete}
-                    onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
-                    onBubbleLayerDown={layerDown}
-                    onBubbleLayerUp={layerUp}
-                    onCoordinateSystemReady={handleCoordinateSystemReady}
-                  />
-                </Box>
-              </PositionDebuggerProvider>
-            </BubbleRefsProvider>
-          </BubblesContext.Provider>
+          <FloatModeProvider>
+            <BubblesContext.Provider value={bubblesContextValue}>
+              <BubbleRefsProvider>
+                <PositionDebuggerProvider isShown={false}>
+                  <Box sx={{ width: '100%', height: '100%' }}>
+                    <BubblesLayeredView
+                      bubbleLayers={bubbleLayers}
+                      vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                      onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                      onBubbleClose={deleteBubble}
+                      onMagicWandAction={handleMagicWandDelete}
+                      onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                      onBubbleLayerDown={layerDown}
+                      onBubbleLayerUp={layerUp}
+                      onCoordinateSystemReady={handleCoordinateSystemReady}
+                    />
+                  </Box>
+                </PositionDebuggerProvider>
+              </BubbleRefsProvider>
+            </BubblesContext.Provider>
+          </FloatModeProvider>
         </MagicWandProvider>
       </Box>
 

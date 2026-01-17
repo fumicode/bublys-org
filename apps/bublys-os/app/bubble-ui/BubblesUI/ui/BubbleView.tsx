@@ -4,6 +4,7 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 import { useMagicWandBubble } from "../../MagicWand/feature/useMagicWandBubble";
 import { MagicWandActionCallback } from "../../MagicWand/domain/MagicWandState";
+import { useFloatMode } from "../../FloatMode/feature/FloatModeContext";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -140,6 +141,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
   const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
+  const { isActive: isFloatMode, activateFloatMode, deactivateFloatMode } = useFloatMode();
   const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -180,11 +182,17 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
   const currentDragPosRef = useRef<{ x: number; y: number } | null>(null);
+  const hasDraggedRef = useRef(false); // 実際にドラッグ移動があったかを追跡
+  const wasFloatModeActiveRef = useRef(false); // ドラッグ開始時にFloatModeがアクティブだったか
 
   const endDrag = () => {
     // ドラッグ終了時のみRedux更新（パフォーマンス最適化）
     if (currentDragPosRef.current) {
       dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON()));
+    }
+    // FloatMode中に移動なしでクリック → FloatMode解除
+    if (!hasDraggedRef.current && wasFloatModeActiveRef.current) {
+      deactivateFloatMode();
     }
     // インラインスタイルをクリア（styled-componentsに制御を戻す）
     if (ref.current) {
@@ -196,6 +204,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;
     currentDragPosRef.current = null;
+    hasDraggedRef.current = false;
+    wasFloatModeActiveRef.current = false;
     document.removeEventListener("mousemove", handleDragging);
     document.removeEventListener("mouseup", endDrag);
   };
@@ -206,6 +216,11 @@ const BubbleViewInner: FC<BubbleProps> = ({
       x: e.clientX - dragStartMouseRef.current.x,
       y: e.clientY - dragStartMouseRef.current.y,
     };
+
+    // 少しでも動いたらドラッグ移動があったとマーク
+    if (screenDelta.x !== 0 || screenDelta.y !== 0) {
+      hasDraggedRef.current = true;
+    }
 
     // CoordinateSystemを使ってスクリーン座標→ローカル座標の変換を行う
     const coordSystem = CoordinateSystem.fromLayerIndex(layerIndex || 0)
@@ -262,6 +277,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     setIsFocused(true); // ヘッダークリックで最前面に
     if (!onMove) return;
     e.stopPropagation();
+    activateFloatMode(); // ドラッグ開始と同時にFloatMode発動
+    wasFloatModeActiveRef.current = true;
     dragStartPosRef.current = { ...bubble.position };
     dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
     document.addEventListener("mousemove", handleDragging);
@@ -294,29 +311,51 @@ const BubbleViewInner: FC<BubbleProps> = ({
   // レイヤーホバー時またはフォーカス時は最前面に
   const effectiveZIndex = isFocused ? 200 : isLayerHovered ? 150 : zIndex;
 
+  // FloatMode中はバブル全体でドラッグ可能
+  const handleBubbleMouseDown = (e: React.MouseEvent) => {
+    if (isFloatMode && onMove) {
+      // FloatMode中はバブル全体からドラッグ開始可能
+      e.stopPropagation();
+      wasFloatModeActiveRef.current = true;
+      setIsFocused(true);
+      dragStartPosRef.current = { ...bubble.position };
+      dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
+      document.addEventListener("mousemove", handleDragging);
+      document.addEventListener("mouseup", endDrag);
+    }
+  };
+
+  // バブルクリック時は背景クリックとして伝播させない
+  const handleBubbleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    onClick?.(e);
+  };
+
   return (
-    <StyledBubble
-      ref={ref}
-      data-bubble-id={bubble.id}
-      colorHue={bubble.colorHue}
-      zIndex={effectiveZIndex}
-      layerIndex={layerIndex}
-      position={position}
-      transformOrigin={vanishingPointRelative}
-      onClick={onClick}
-      onMouseLeave={handleMouseLeave}
-      onTransitionEnd={() => {
-        notifyRendered();
-        dispatch(finishBubbleAnimation(bubble.id));
-      }}
-      width={bubble.size ? `${bubble.size.width}px` : undefined}
-      height={bubble.size ? `${bubble.size.height}px` : undefined}
-      contentBackground={contentBackground}
-      hasLeftLink={hasLeftLink}
-      isFocused={isFocused}
-      isLayerHovered={isLayerHovered}
-      isMagicWandTarget={isMagicWandTarget}
-    >
+      <StyledBubble
+        ref={ref}
+        data-bubble-id={bubble.id}
+        colorHue={bubble.colorHue}
+        zIndex={effectiveZIndex}
+        layerIndex={layerIndex}
+        position={position}
+        transformOrigin={vanishingPointRelative}
+        onClick={handleBubbleClick}
+        onMouseLeave={handleMouseLeave}
+        onMouseDown={handleBubbleMouseDown}
+        onTransitionEnd={() => {
+          notifyRendered();
+          dispatch(finishBubbleAnimation(bubble.id));
+        }}
+        width={bubble.size ? `${bubble.size.width}px` : undefined}
+        height={bubble.size ? `${bubble.size.height}px` : undefined}
+        contentBackground={contentBackground}
+        hasLeftLink={hasLeftLink}
+        isFocused={isFocused}
+        isLayerHovered={isLayerHovered}
+        isMagicWandTarget={isMagicWandTarget}
+        isFloatMode={isFloatMode}
+      >
       <header
         className="e-bubble-header"
         onMouseDown={handleHeaderMouseDown}
@@ -353,7 +392,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       </header>
 
       <main className="e-bubble-content">
-        {/* 
+        {/*
         Type: {bubble.type}
         #{bubble.id}
         <br />
@@ -364,6 +403,9 @@ const BubbleViewInner: FC<BubbleProps> = ({
         {children}<br />
         {/* #{bubble.id} */}
       </main>
+
+      {/* FloatMode中のオーバーレイ（泡に包まれている感 + ドラッグ可能を示す） */}
+      {isFloatMode && <div className="e-float-mode-overlay" />}
 
       {
         // bubble.renderedRect && (
@@ -423,6 +465,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   return true;
 });
 
+
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   position?: Point2; // 位置を指定するためのオプション
@@ -439,12 +482,14 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   isFocused?: boolean; // フォーカス状態（前面表示）
   isLayerHovered?: boolean; // レイヤーがホバーされている状態
   isMagicWandTarget?: boolean; // MagicWandモードで削除対象としてホバーされている状態
+  isFloatMode?: boolean; // FloatModeがアクティブな状態
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
 const StyledBubble = styled.div<StyledBubbleProp>`
   position: absolute;
+  cursor: ${({ isFloatMode }) => isFloatMode ? 'grab' : 'auto'};
 
   width: ${({ width }) => (width ? width : "fit-content")};
   height: ${({ height }) => (height ? height : "auto")};
@@ -686,6 +731,31 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       0 1px 2px hsla(0, 0%, 100%, 0.5);
     // undergroundのバブル（layerIndex > 1）はコンテンツを半透明に（フォーカス時・レイヤーホバー時は除く）
     opacity: ${({ layerIndex, isFocused, isLayerHovered }) => (layerIndex && layerIndex > 1 && !isFocused && !isLayerHovered) ? 0.7 : 1};
+    // FloatMode中はコンテンツへの操作を無効化
+    pointer-events: ${({ isFloatMode }) => isFloatMode ? 'none' : 'auto'};
+  }
+
+  /* FloatMode中のオーバーレイ（泡に包まれている感） */
+  >.e-float-mode-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      ellipse at 30% 20%,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.2) 30%,
+      hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.3) 60%,
+      hsla(${({ colorHue }) => colorHue}, 50%, 60%, 0.2) 100%
+    );
+    border: 2px solid hsla(${({ colorHue }) => colorHue}, 50%, 80%, 0.5);
+    box-shadow:
+      inset 0 0 30px rgba(255, 255, 255, 0.3),
+      inset 0 -10px 20px hsla(${({ colorHue }) => colorHue}, 50%, 70%, 0.25);
+    pointer-events: none;
+    z-index: 100;
   }
 
   >.e-debug-rect {

@@ -1,10 +1,11 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState, useCallback } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
 import { MagicWandActionCallback } from "../../MagicWand/domain/MagicWandState";
+import { useFloatMode } from "../../FloatMode/feature/FloatModeContext";
 import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
@@ -230,6 +231,29 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredLayerIndex, setHoveredLayerIndex] = useState<number | null>(null);
   const [lockedLayerIndex, setLockedLayerIndex] = useState<number | null>(null);
+  const { deactivateFloatMode } = useFloatMode();
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // 背景mousedown: クリック開始位置を記録
+  const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  // 背景クリック時のハンドラ（移動がなかった場合のみモード解除）
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    setLockedLayerIndex(null);
+
+    // 移動がなかったクリックのみFloatModeを解除
+    if (mouseDownPosRef.current) {
+      const dx = Math.abs(e.clientX - mouseDownPosRef.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPosRef.current.y);
+      const didMove = dx > 3 || dy > 3; // 3px以上の移動はドラッグとみなす
+      if (!didMove) {
+        deactivateFloatMode();
+      }
+    }
+    mouseDownPosRef.current = null;
+  }, [deactivateFloatMode]);
 
   // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
   useLayoutEffect(() => {
@@ -362,7 +386,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     <div
       ref={containerRef}
       style={{ width: '100%', height: '100%', position: 'relative' }}
-      onClick={() => setLockedLayerIndex(null)}
+      onMouseDown={handleBackgroundMouseDown}
+      onClick={handleBackgroundClick}
     >
       <StyledBubblesLayeredView
         surface={{ leftTop: surfaceLeftTop }}
