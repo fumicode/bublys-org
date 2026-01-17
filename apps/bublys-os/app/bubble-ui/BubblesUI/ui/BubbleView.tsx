@@ -1,7 +1,8 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
+import { useMagicWand } from "../../MagicWand/feature/MagicWandContext";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -161,6 +162,76 @@ const BubbleViewInner: FC<BubbleProps> = ({
     setIsFocused(false);
   }, [layerIndex]);
 
+  // MagicWand（連続削除）機能
+  const {
+    isActive: isMagicWandActive,
+    hoveredBubbleId: magicWandHoveredBubbleId,
+    onBubbleHeaderEnter,
+    onBubbleHeaderLeave,
+    startMagicWand,
+  } = useMagicWand();
+
+  // 削除ボタンのドラッグ検出用
+  const closeButtonDragRef = useRef<{
+    startX: number;
+    startY: number;
+    isDragging: boolean;
+  } | null>(null);
+  const DRAG_THRESHOLD = 5; // 5px動いたらドラッグとみなす
+
+  const handleCloseMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      closeButtonDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        isDragging: false,
+      };
+
+      const handleMouseMove = (moveE: MouseEvent) => {
+        if (!closeButtonDragRef.current) return;
+        const dx = moveE.clientX - closeButtonDragRef.current.startX;
+        const dy = moveE.clientY - closeButtonDragRef.current.startY;
+
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          closeButtonDragRef.current.isDragging = true;
+          startMagicWand(moveE, bubble.id); // MagicWandモード開始（開始バブルも削除対象に）
+          document.removeEventListener("mousemove", handleMouseMove);
+        }
+      };
+
+      const handleMouseUp = () => {
+        if (closeButtonDragRef.current && !closeButtonDragRef.current.isDragging) {
+          // ドラッグしなかった = 通常クリック
+          onCloseClick?.(bubble);
+        }
+        closeButtonDragRef.current = null;
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [bubble, onCloseClick, startMagicWand]
+  );
+
+  // MagicWandモード中のヘッダーホバー検出
+  const handleHeaderMouseEnter = useCallback(() => {
+    if (isMagicWandActive) {
+      onBubbleHeaderEnter(bubble.id);
+    }
+  }, [isMagicWandActive, onBubbleHeaderEnter, bubble.id]);
+
+  const handleHeaderMouseLeave = useCallback(() => {
+    if (isMagicWandActive) {
+      onBubbleHeaderLeave();
+    }
+  }, [isMagicWandActive, onBubbleHeaderLeave]);
+
+  // MagicWandのターゲットかどうか
+  const isMagicWandTarget = isMagicWandActive && magicWandHoveredBubbleId === bubble.id;
+
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
   const currentDragPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -299,8 +370,14 @@ const BubbleViewInner: FC<BubbleProps> = ({
       hasLeftLink={hasLeftLink}
       isFocused={isFocused}
       isLayerHovered={isLayerHovered}
+      isMagicWandTarget={isMagicWandTarget}
     >
-      <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
+      <header
+        className="e-bubble-header"
+        onMouseDown={handleHeaderMouseDown}
+        onMouseEnter={handleHeaderMouseEnter}
+        onMouseLeave={handleHeaderMouseLeave}
+      >
         <div
           className="e-address-bar"
           onClick={(e) => e.stopPropagation()}
@@ -313,10 +390,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
             {onCloseClick && (
               <button
                 className="e-bubble-button e-close-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCloseClick?.(bubble);
-                }}
+                onMouseDown={handleCloseMouseDown}
               >
                 <CloseIcon size={20} />
               </button>
@@ -419,6 +493,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
   isFocused?: boolean; // フォーカス状態（前面表示）
   isLayerHovered?: boolean; // レイヤーがホバーされている状態
+  isMagicWandTarget?: boolean; // MagicWandモードで削除対象としてホバーされている状態
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -684,6 +759,21 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     border: 1px solid blue;
     pointer-events: none;
     box-sizing: border-box;
-    
+
   }
+
+  // MagicWandモードでホバー中のバブルのヘッダーを赤くハイライト
+  ${({ isMagicWandTarget }) =>
+    isMagicWandTarget &&
+    `
+    > .e-bubble-header {
+      background: linear-gradient(
+        135deg,
+        hsla(0, 70%, 60%, 0.4) 0%,
+        hsla(0, 60%, 50%, 0.3) 100%
+      );
+      box-shadow: 0 0 20px hsla(0, 100%, 50%, 0.5);
+      transition: all 0.1s ease;
+    }
+  `}
 `;

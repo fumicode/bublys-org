@@ -1,10 +1,12 @@
 import { FC, useEffect, useCallback, useState, useMemo } from "react";
-import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, useAppStore, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
+import { MagicWandProvider } from "../../MagicWand/feature/MagicWandProvider";
 
 import {
   selectBubbleLayers,
   selectSurfaceBubbles,
+  selectBubble,
   addBubble,
   deleteProcessBubble as deleteBubbleAction,
   layerDown as layerDownAction,
@@ -41,6 +43,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   // レイヤー構造（IDの配列のみ）- 各バブルは自分でReduxから取得
   const bubbleLayers = useAppSelector(selectBubbleLayers);
   // surface判定用（popChild/joinSibling判定のみに使用）
@@ -68,7 +71,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // Redux を使ったアクションハンドラ
-  const deleteBubble = (b: Bubble) => {
+  const deleteBubble = useCallback((b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
 
@@ -80,7 +83,16 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       console.log('[BubblesUI] Deleting shell:', { shellId, shellType });
       shellManager.removeShell(shellId);
     }
-  };
+  }, [dispatch, shellManager]);
+
+  // MagicWand用の削除コールバック（bubbleIdからBubbleを取得して削除）
+  const handleMagicWandDelete = useCallback((bubbleId: string) => {
+    const state = store.getState();
+    const bubble = selectBubble(state, { id: bubbleId });
+    if (bubble) {
+      deleteBubble(bubble);
+    }
+  }, [store, deleteBubble]);
 
   const layerDown = (b: Bubble) => {
     dispatch(layerDownAction(b.id));
@@ -198,24 +210,26 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
       {/* Main Bubbles Area */}
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <BubblesContext.Provider value={bubblesContextValue}>
-          <BubbleRefsProvider>
-            <PositionDebuggerProvider isShown={false}>
-              <Box sx={{ width: '100%', height: '100%' }}>
-                <BubblesLayeredView
-                  bubbleLayers={bubbleLayers}
-                  vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                  onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
-                  onBubbleClose={deleteBubble}
-                  onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
-                  onBubbleLayerDown={layerDown}
-                  onBubbleLayerUp={layerUp}
-                  onCoordinateSystemReady={handleCoordinateSystemReady}
-                />
-              </Box>
-            </PositionDebuggerProvider>
-          </BubbleRefsProvider>
-        </BubblesContext.Provider>
+        <MagicWandProvider onDeleteBubble={handleMagicWandDelete}>
+          <BubblesContext.Provider value={bubblesContextValue}>
+            <BubbleRefsProvider>
+              <PositionDebuggerProvider isShown={false}>
+                <Box sx={{ width: '100%', height: '100%' }}>
+                  <BubblesLayeredView
+                    bubbleLayers={bubbleLayers}
+                    vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                    onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                    onBubbleClose={deleteBubble}
+                    onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                    onBubbleLayerDown={layerDown}
+                    onBubbleLayerUp={layerUp}
+                    onCoordinateSystemReady={handleCoordinateSystemReady}
+                  />
+                </Box>
+              </PositionDebuggerProvider>
+            </BubbleRefsProvider>
+          </BubblesContext.Provider>
+        </MagicWandProvider>
       </Box>
 
       {/* Pocket */}
