@@ -5,17 +5,20 @@
  * 不変データ構造として設計されている。
  */
 
+/** アクションコールバック型 */
+export type MagicWandActionCallback = (bubbleId: string) => void;
+
 export interface MagicWandStateData {
   /** MagicWandモードがアクティブかどうか */
   isActive: boolean;
-  /** カーソルの現在位置（炎エフェクトの表示位置） */
-  cursorPosition: { x: number; y: number } | null;
+  /** 実行するアクション */
+  action: MagicWandActionCallback | null;
   /** 現在ホバー中のバブルID */
   hoveredBubbleId: string | null;
   /** ホバー開始時刻（Date.now()） */
   hoverStartTime: number | null;
-  /** 今回のセッションで削除したバブルID一覧 */
-  deletedBubbleIds: string[];
+  /** 今回のセッションで処理済みのバブルID一覧 */
+  processedBubbleIds: string[];
 }
 
 const DWELL_TIME_MS = 100;
@@ -26,20 +29,20 @@ export class MagicWandState {
   static initial(): MagicWandState {
     return new MagicWandState({
       isActive: false,
-      cursorPosition: null,
+      action: null,
       hoveredBubbleId: null,
       hoverStartTime: null,
-      deletedBubbleIds: [],
+      processedBubbleIds: [],
     });
   }
 
   /** MagicWandモード開始 */
-  activate(cursorPosition: { x: number; y: number }): MagicWandState {
+  activate(action: MagicWandActionCallback): MagicWandState {
     return new MagicWandState({
       ...this.state,
       isActive: true,
-      cursorPosition,
-      deletedBubbleIds: [],
+      action,
+      processedBubbleIds: [],
     });
   }
 
@@ -48,21 +51,12 @@ export class MagicWandState {
     return MagicWandState.initial();
   }
 
-  /** カーソル位置更新 */
-  updateCursorPosition(position: { x: number; y: number }): MagicWandState {
-    if (!this.state.isActive) return this;
-    return new MagicWandState({
-      ...this.state,
-      cursorPosition: position,
-    });
-  }
-
   /** バブルヘッダーにホバー開始 */
   startHoverOnBubble(bubbleId: string): MagicWandState {
     if (!this.state.isActive) return this;
     if (this.state.hoveredBubbleId === bubbleId) return this;
-    // 既に削除済みのバブルには反応しない
-    if (this.state.deletedBubbleIds.includes(bubbleId)) return this;
+    // 既に処理済みのバブルには反応しない
+    if (this.state.processedBubbleIds.includes(bubbleId)) return this;
 
     return new MagicWandState({
       ...this.state,
@@ -80,18 +74,18 @@ export class MagicWandState {
     });
   }
 
-  /** 削除実行をマーク */
-  markBubbleDeleted(bubbleId: string): MagicWandState {
+  /** アクション実行をマーク */
+  markBubbleProcessed(bubbleId: string): MagicWandState {
     return new MagicWandState({
       ...this.state,
       hoveredBubbleId: null,
       hoverStartTime: null,
-      deletedBubbleIds: [...this.state.deletedBubbleIds, bubbleId],
+      processedBubbleIds: [...this.state.processedBubbleIds, bubbleId],
     });
   }
 
-  /** 100ms経過で削除すべきかどうか */
-  shouldDeleteHoveredBubble(currentTime: number = Date.now()): boolean {
+  /** 100ms経過でアクションを実行すべきかどうか */
+  shouldExecuteAction(currentTime: number = Date.now()): boolean {
     if (!this.state.isActive) return false;
     if (!this.state.hoveredBubbleId) return false;
     if (!this.state.hoverStartTime) return false;
@@ -107,7 +101,7 @@ export class MagicWandState {
     return this.state.hoveredBubbleId;
   }
 
-  get cursorPosition(): { x: number; y: number } | null {
-    return this.state.cursorPosition;
+  get action(): MagicWandActionCallback | null {
+    return this.state.action;
   }
 }

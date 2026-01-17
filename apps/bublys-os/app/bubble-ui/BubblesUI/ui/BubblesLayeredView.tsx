@@ -4,6 +4,7 @@ import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
+import { MagicWandActionCallback } from "../../MagicWand/domain/MagicWandState";
 import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
@@ -27,6 +28,7 @@ type ConnectedBubbleViewProps = {
   isLayerHovered?: boolean;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
+  onMagicWandAction?: MagicWandActionCallback;
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
@@ -43,6 +45,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   isLayerHovered,
   onBubbleClick,
   onBubbleClose,
+  onMagicWandAction,
   onBubbleMove,
   onBubbleResize,
   onBubbleLayerDown,
@@ -68,6 +71,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       isLayerHovered={isLayerHovered}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
+      onMagicWandAction={onMagicWandAction}
       onMove={(updated) => onBubbleMove?.(updated)}
       onResize={(updated) => onBubbleResize?.(updated)}
       onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
@@ -203,6 +207,7 @@ type BubblesLayeredViewProps = {
   vanishingPoint?: Point2;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
+  onMagicWandAction?: MagicWandActionCallback;
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
@@ -215,6 +220,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   vanishingPoint,
   onBubbleClick,
   onBubbleClose,
+  onMagicWandAction,
   onBubbleMove,
   onBubbleResize,
   onBubbleLayerDown,
@@ -341,6 +347,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             isLayerHovered={isLayerHovered}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
+            onMagicWandAction={onMagicWandAction}
             onBubbleMove={onBubbleMove}
             onBubbleResize={onBubbleResize}
             onBubbleLayerDown={onBubbleLayerDown}

@@ -1,8 +1,9 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
+import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
-import { useMagicWand } from "../../MagicWand/feature/MagicWandContext";
+import { useMagicWandBubble } from "../../MagicWand/feature/useMagicWandBubble";
+import { MagicWandActionCallback } from "../../MagicWand/domain/MagicWandState";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -104,6 +105,7 @@ type BubbleProps = {
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
   onCloseClick?: (bubble: Bubble) => void;
+  onMagicWandAction?: MagicWandActionCallback; // MagicWandモードで実行するアクション
   onMove?: (bubble: Bubble) => void;
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
@@ -122,6 +124,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   vanishingPoint,
   onClick,
   onCloseClick,
+  onMagicWandAction,
   onLayerDownClick,
   onLayerUpClick,
   onMove,
@@ -164,73 +167,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
   // MagicWand（連続削除）機能
   const {
-    isActive: isMagicWandActive,
-    hoveredBubbleId: magicWandHoveredBubbleId,
-    onBubbleHeaderEnter,
-    onBubbleHeaderLeave,
-    startMagicWand,
-  } = useMagicWand();
-
-  // 削除ボタンのドラッグ検出用
-  const closeButtonDragRef = useRef<{
-    startX: number;
-    startY: number;
-    isDragging: boolean;
-  } | null>(null);
-  const DRAG_THRESHOLD = 5; // 5px動いたらドラッグとみなす
-
-  const handleCloseMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      closeButtonDragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        isDragging: false,
-      };
-
-      const handleMouseMove = (moveE: MouseEvent) => {
-        if (!closeButtonDragRef.current) return;
-        const dx = moveE.clientX - closeButtonDragRef.current.startX;
-        const dy = moveE.clientY - closeButtonDragRef.current.startY;
-
-        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-          closeButtonDragRef.current.isDragging = true;
-          startMagicWand(moveE, bubble.id); // MagicWandモード開始（開始バブルも削除対象に）
-          document.removeEventListener("mousemove", handleMouseMove);
-        }
-      };
-
-      const handleMouseUp = () => {
-        if (closeButtonDragRef.current && !closeButtonDragRef.current.isDragging) {
-          // ドラッグしなかった = 通常クリック
-          onCloseClick?.(bubble);
-        }
-        closeButtonDragRef.current = null;
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-    },
-    [bubble, onCloseClick, startMagicWand]
-  );
-
-  // MagicWandモード中のヘッダーホバー検出
-  const handleHeaderMouseEnter = useCallback(() => {
-    if (isMagicWandActive) {
-      onBubbleHeaderEnter(bubble.id);
-    }
-  }, [isMagicWandActive, onBubbleHeaderEnter, bubble.id]);
-
-  const handleHeaderMouseLeave = useCallback(() => {
-    if (isMagicWandActive) {
-      onBubbleHeaderLeave();
-    }
-  }, [isMagicWandActive, onBubbleHeaderLeave]);
-
-  // MagicWandのターゲットかどうか
-  const isMagicWandTarget = isMagicWandActive && magicWandHoveredBubbleId === bubble.id;
+    handleCloseMouseDown,
+    handleHeaderMouseEnter,
+    handleHeaderMouseLeave,
+    isMagicWandTarget,
+  } = useMagicWandBubble({
+    bubbleId: bubble.id,
+    onCloseClick: onCloseClick ? () => onCloseClick(bubble) : undefined,
+    magicWandAction: onMagicWandAction,
+  });
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);

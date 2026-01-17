@@ -9,25 +9,22 @@ import {
   useRef,
   useMemo,
 } from "react";
-import { MagicWandState } from "../domain/MagicWandState";
+import { MagicWandState, MagicWandActionCallback } from "../domain/MagicWandState";
 import { MagicWandContext } from "./MagicWandContext";
-import { FlameEffectOverlay } from "../ui/FlameEffectOverlay";
+import { FlameEffectOverlay, FlameEffectOverlayHandle } from "../ui/FlameEffectOverlay";
 
 type MagicWandProviderProps = {
   children: ReactNode;
-  /** バブル削除時に呼ばれるコールバック */
-  onDeleteBubble: (bubbleId: string) => void;
 };
 
 /**
  * MagicWand機能を提供するProvider
  *
- * 削除ボタンからドラッグを開始すると、カーソル周りに炎が表示され、
- * バブルのヘッダーを100ms滞在すると削除される。
+ * ドラッグを開始すると、カーソル周りに炎が表示され、
+ * バブルのヘッダーを100ms滞在するとアクションが実行される。
  */
 export const MagicWandProvider: FC<MagicWandProviderProps> = ({
   children,
-  onDeleteBubble,
 }) => {
   const [magicWandState, setMagicWandState] = useState(() =>
     MagicWandState.initial()
@@ -36,7 +33,10 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
   const stateRef = useRef(magicWandState);
   stateRef.current = magicWandState;
 
-  // 100msタイマーで削除チェック
+  // 炎エフェクトへのref（DOM直接操作用）
+  const flameRef = useRef<FlameEffectOverlayHandle>(null);
+
+  // 100msタイマーでアクション実行チェック
   useEffect(() => {
     if (
       !magicWandState.state.hoveredBubbleId ||
@@ -49,19 +49,15 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
       return;
     }
 
-    console.log('[MagicWand] Starting timer for bubble:', magicWandState.state.hoveredBubbleId);
     timerRef.current = setTimeout(() => {
       const currentState = stateRef.current;
-      console.log('[MagicWand] Timer fired, checking delete:', {
-        hoveredBubbleId: currentState.state.hoveredBubbleId,
-        hoverStartTime: currentState.state.hoverStartTime,
-        shouldDelete: currentState.shouldDeleteHoveredBubble(),
-      });
-      if (currentState.shouldDeleteHoveredBubble()) {
+      if (currentState.shouldExecuteAction()) {
         const bubbleId = currentState.state.hoveredBubbleId!;
-        console.log('[MagicWand] Deleting bubble:', bubbleId);
-        onDeleteBubble(bubbleId);
-        setMagicWandState((prev) => prev.markBubbleDeleted(bubbleId));
+        const action = currentState.action;
+        if (action) {
+          action(bubbleId);
+        }
+        setMagicWandState((prev) => prev.markBubbleProcessed(bubbleId));
       }
     }, 100);
 
@@ -74,16 +70,17 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
   }, [
     magicWandState.state.hoveredBubbleId,
     magicWandState.state.hoverStartTime,
-    onDeleteBubble,
   ]);
 
-  // MagicWand開始（削除ボタンからドラッグ開始時に呼ばれる）
-  const startMagicWand = useCallback((e: MouseEvent, startingBubbleId: string) => {
+  // MagicWand開始（ドラッグ開始時に呼ばれる）
+  const startMagicWand = useCallback((e: MouseEvent, startingBubbleId: string, action: MagicWandActionCallback) => {
     setMagicWandState((prev) =>
-      prev
-        .activate({ x: e.clientX, y: e.clientY })
-        .startHoverOnBubble(startingBubbleId)
+      prev.activate(action).startHoverOnBubble(startingBubbleId)
     );
+    // 初期位置を設定（次フレームで実行）
+    requestAnimationFrame(() => {
+      flameRef.current?.updatePosition(e.clientX, e.clientY);
+    });
   }, []);
 
   // MagicWand終了（mouseup時）
@@ -91,11 +88,9 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
     setMagicWandState((prev) => prev.deactivate());
   }, []);
 
-  // カーソル移動
+  // カーソル移動（DOM直接操作でパフォーマンス向上）
   const updateCursor = useCallback((e: MouseEvent) => {
-    setMagicWandState((prev) =>
-      prev.updateCursorPosition({ x: e.clientX, y: e.clientY })
-    );
+    flameRef.current?.updatePosition(e.clientX, e.clientY);
   }, []);
 
   // グローバルmouseup/mousemoveリスナー
@@ -127,7 +122,6 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
   const contextValue = useMemo(
     () => ({
       isActive: magicWandState.isActive,
-      cursorPosition: magicWandState.state.cursorPosition,
       hoveredBubbleId: magicWandState.state.hoveredBubbleId,
       onBubbleHeaderEnter,
       onBubbleHeaderLeave,
@@ -135,7 +129,6 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
     }),
     [
       magicWandState.isActive,
-      magicWandState.state.cursorPosition,
       magicWandState.state.hoveredBubbleId,
       onBubbleHeaderEnter,
       onBubbleHeaderLeave,
@@ -147,7 +140,7 @@ export const MagicWandProvider: FC<MagicWandProviderProps> = ({
     <MagicWandContext.Provider value={contextValue}>
       {children}
       <FlameEffectOverlay
-        cursorPosition={magicWandState.state.cursorPosition}
+        ref={flameRef}
         isActive={magicWandState.isActive}
       />
     </MagicWandContext.Provider>

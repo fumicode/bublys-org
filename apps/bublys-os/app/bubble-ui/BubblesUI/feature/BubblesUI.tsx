@@ -210,7 +210,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
       {/* Main Bubbles Area */}
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <MagicWandProvider onDeleteBubble={handleMagicWandDelete}>
+        <MagicWandProvider>
           <BubblesContext.Provider value={bubblesContextValue}>
             <BubbleRefsProvider>
               <PositionDebuggerProvider isShown={false}>
@@ -220,6 +220,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
                     vanishingPoint={globalCoordinateSystem.vanishingPoint}
                     onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
                     onBubbleClose={deleteBubble}
+                    onMagicWandAction={handleMagicWandDelete}
                     onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
                     onBubbleLayerDown={layerDown}
                     onBubbleLayerUp={layerUp}

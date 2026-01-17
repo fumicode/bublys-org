@@ -1,12 +1,11 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { MagicWandActionCallback } from "../domain/MagicWandState";
 
 export type MagicWandContextType = {
   /** MagicWandモードがアクティブかどうか */
   isActive: boolean;
-  /** カーソルの現在位置 */
-  cursorPosition: { x: number; y: number } | null;
   /** 現在ホバー中のバブルID */
   hoveredBubbleId: string | null;
 
@@ -15,16 +14,17 @@ export type MagicWandContextType = {
   /** バブルヘッダーからホバー終了時に呼ぶ */
   onBubbleHeaderLeave: () => void;
   /** MagicWandモードを開始する（削除ボタンからドラッグ開始時） */
-  startMagicWand: (e: MouseEvent, startingBubbleId: string) => void;
+  startMagicWand: (e: MouseEvent, startingBubbleId: string, action: MagicWandActionCallback) => void;
 };
 
 const defaultContext: MagicWandContextType = {
   isActive: false,
-  cursorPosition: null,
   hoveredBubbleId: null,
   onBubbleHeaderEnter: () => {},
   onBubbleHeaderLeave: () => {},
-  startMagicWand: () => { /* no-op */ },
+  startMagicWand: (_e, _bubbleId, _action) => {
+    /* no-op */
+  },
 };
 
 export const MagicWandContext =
