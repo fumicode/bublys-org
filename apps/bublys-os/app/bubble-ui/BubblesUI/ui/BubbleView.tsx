@@ -98,6 +98,7 @@ type BubbleProps = {
   zIndex?: number;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
+  isLayerHovered?: boolean; // このレイヤーがホバーされているか
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -115,6 +116,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   zIndex,
   contentBackground = "white",
   hasLeftLink = false,
+  isLayerHovered = false,
   position,
   vanishingPoint,
   onClick,
@@ -153,6 +155,11 @@ const BubbleViewInner: FC<BubbleProps> = ({
   });
 
   const [isFocused, setIsFocused] = useState(false);
+
+  // レイヤーが変わったらフォーカスを解除する
+  useEffect(() => {
+    setIsFocused(false);
+  }, [layerIndex]);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
@@ -268,12 +275,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
     };
   }, [bubble.id, bubbleRefs, ref]);
 
+  // レイヤーホバー時またはフォーカス時は最前面に
+  const effectiveZIndex = isFocused ? 200 : isLayerHovered ? 150 : zIndex;
+
   return (
     <StyledBubble
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isFocused ? 100 : zIndex}
+      zIndex={effectiveZIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
@@ -288,6 +298,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
       isFocused={isFocused}
+      isLayerHovered={isLayerHovered}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -384,7 +395,8 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
       prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.hasLeftLink !== nextProps.hasLeftLink) {
+      prevProps.hasLeftLink !== nextProps.hasLeftLink ||
+      prevProps.isLayerHovered !== nextProps.isLayerHovered) {
     return false;
   }
 
@@ -406,6 +418,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
   isFocused?: boolean; // フォーカス状態（前面表示）
+  isLayerHovered?: boolean; // レイヤーがホバーされている状態
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -651,8 +664,8 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     box-shadow:
       inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
       0 1px 2px hsla(0, 0%, 100%, 0.5);
-    // undergroundのバブル（layerIndex > 0）はコンテンツを半透明に（フォーカス時は除く）
-    opacity: ${({ layerIndex, isFocused }) => (layerIndex && layerIndex > 1 && !isFocused) ? 0.7 : 1};
+    // undergroundのバブル（layerIndex > 1）はコンテンツを半透明に（フォーカス時・レイヤーホバー時は除く）
+    opacity: ${({ layerIndex, isFocused, isLayerHovered }) => (layerIndex && layerIndex > 1 && !isFocused && !isLayerHovered) ? 0.7 : 1};
   }
 
   >.e-debug-rect {

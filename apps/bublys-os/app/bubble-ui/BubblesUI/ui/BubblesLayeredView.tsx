@@ -1,4 +1,4 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
+import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
 import { BubbleView } from "./BubbleView";
@@ -24,6 +24,7 @@ type ConnectedBubbleViewProps = {
   vanishingPoint: Point2;
   surfaceLeftTop: Point2;
   hasLeftLink?: boolean;
+  isLayerHovered?: boolean;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
@@ -39,6 +40,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   vanishingPoint,
   surfaceLeftTop,
   hasLeftLink,
+  isLayerHovered,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
@@ -63,6 +65,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}
+      isLayerHovered={isLayerHovered}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
       onMove={(updated) => onBubbleMove?.(updated)}
@@ -110,6 +113,91 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   );
 });
 
+/**
+ * 各レイヤーのcoordinate systemを視覚化するガラス板
+ */
+type LayerGlassProps = {
+  layerIndex: number;
+  surfaceLeftTop: Point2;
+  vanishingPoint: Point2;
+  baseZIndex: number;
+  isHovered?: boolean;
+  isLocked?: boolean;
+  onHover?: (layerIndex: number | null) => void;
+  onLock?: (layerIndex: number | null) => void;
+};
+
+const LayerGlass: FC<LayerGlassProps> = memo(function LayerGlass({
+  layerIndex,
+  surfaceLeftTop,
+  vanishingPoint,
+  baseZIndex,
+  isHovered,
+  isLocked,
+  onHover,
+  onLock,
+}) {
+  const scale = CoordinateSystem.fromLayerIndex(layerIndex).scale;
+  const transformOriginX = vanishingPoint.x - surfaceLeftTop.x;
+  const transformOriginY = vanishingPoint.y - surfaceLeftTop.y;
+  const isSurface = layerIndex === 0;
+  const isHighlighted = isHovered || isLocked;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // コンテナへの伝播を防ぐ
+    // ロック中なら解除、そうでなければロック
+    onLock?.(isLocked ? null : layerIndex);
+  };
+
+  return (
+    <>
+      {/* ガラス板本体（装飾用、イベントなし） */}
+      <div
+        className="e-layer-glass"
+        style={{
+          position: 'absolute',
+          top: surfaceLeftTop.y,
+          left: surfaceLeftTop.x,
+          width: `calc(100% - ${surfaceLeftTop.x}px)`,
+          height: `calc(100% - ${surfaceLeftTop.y}px)`,
+          borderRadius: 24,
+          background: isSurface ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          border: `1px solid rgba(255, 255, 255, ${isSurface ? 0.2 : isHighlighted ? 0.3 : 0.1})`,
+          backdropFilter: isSurface ? 'blur(1px)' : 'none',
+          boxShadow: isSurface
+            ? '0 4px 30px rgba(0, 0, 0, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.05)'
+            : 'none',
+          pointerEvents: 'none',
+          zIndex: baseZIndex - layerIndex - 0.5,
+          transform: `scale(${scale})`,
+          transformOrigin: `${transformOriginX}px ${transformOriginY}px`,
+        }}
+      />
+      {/* 左端のホバー領域（ガラスの外側に配置、棒状） */}
+      <div
+        className="e-layer-glass-handle"
+        style={{
+          position: 'absolute',
+          top: surfaceLeftTop.y,
+          left: surfaceLeftTop.x - 18,
+          width: 12,
+          height: `calc(100% - ${surfaceLeftTop.y}px)`,
+          borderRadius: 6,
+          background: isLocked ? 'rgba(255, 255, 255, 0.5)' : isHovered ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          zIndex: baseZIndex + 10,
+          transform: `scale(${scale})`,
+          transformOrigin: `${transformOriginX + 18}px ${transformOriginY}px`,
+        }}
+        onMouseEnter={() => onHover?.(layerIndex)}
+        onMouseLeave={() => onHover?.(null)}
+        onClick={handleClick}
+      />
+    </>
+  );
+});
+
 type BubblesLayeredViewProps = {
   bubbleLayers: string[][];  // IDの配列に変更
   vanishingPoint?: Point2;
@@ -134,6 +222,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onCoordinateSystemReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredLayerIndex, setHoveredLayerIndex] = useState<number | null>(null);
+  const [lockedLayerIndex, setLockedLayerIndex] = useState<number | null>(null);
 
   // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
   useLayoutEffect(() => {
@@ -237,6 +327,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       layer.map((bubbleId) => {
         const zIndex = baseZIndex - layerIndex;
         const hasLeftLink = openeeIds.has(bubbleId);
+        const isLayerHovered = hoveredLayerIndex === layerIndex || lockedLayerIndex === layerIndex;
 
         return (
           <ConnectedBubbleView
@@ -247,6 +338,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             vanishingPoint={undergroundVanishingPoint}
             surfaceLeftTop={surfaceLeftTop}
             hasLeftLink={hasLeftLink}
+            isLayerHovered={isLayerHovered}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
             onBubbleMove={onBubbleMove}
@@ -260,7 +352,11 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     .flat();
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+      onClick={() => setLockedLayerIndex(null)}
+    >
       <StyledBubblesLayeredView
         surface={{ leftTop: surfaceLeftTop }}
         underground={{ vanishingPoint: undergroundVanishingPoint }}
@@ -268,9 +364,21 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       >
         {renderedBubbles}
         <div className="e-underground-curtain"></div>
-        <div className="e-debug-visualizations">
-          <div className="e-surface-border"></div>
-          <div className="e-underground-border"></div>
+        <div className="e-coordinate-layers">
+          {/* 各レイヤーのcoordinate systemを表すLayerGlass */}
+          {bubbleLayers.map((_, layerIndex) => (
+            <LayerGlass
+              key={`layer-glass-${layerIndex}`}
+              layerIndex={layerIndex}
+              surfaceLeftTop={surfaceLeftTop}
+              vanishingPoint={undergroundVanishingPoint}
+              baseZIndex={baseZIndex}
+              isHovered={hoveredLayerIndex === layerIndex}
+              isLocked={lockedLayerIndex === layerIndex}
+              onHover={setHoveredLayerIndex}
+              onLock={setLockedLayerIndex}
+            />
+          ))}
           <div className="e-vanishing-point"></div>
         </div>
 
@@ -328,24 +436,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     pointer-events: none;
   }
 
-  > .e-debug-visualizations {
-    .e-surface-border {
-      position: absolute;
-      top: ${({ surface }) => surface.leftTop.y}px;
-      left: ${({ surface }) => surface.leftTop.x}px;
-      width: calc(100% - ${({ surface }) => surface.leftTop.x}px);
-      height: calc(100% - ${({ surface }) => surface.leftTop.y}px);
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(1px);
-      box-shadow:
-        0 4px 30px rgba(0, 0, 0, 0.05),
-        inset 0 0 20px rgba(255, 255, 255, 0.05);
-      pointer-events: none;
-      // layerIndex 0,1 はぼかしの上に、layerIndex 2以降はぼかしの下に
-      z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
-    }
+  > .e-coordinate-layers {
     .e-vanishing-point {
       position: absolute;
       top: ${({ underground }) => underground.vanishingPoint?.y || 0}px;

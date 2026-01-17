@@ -19,9 +19,8 @@ const SCALE_DECAY_RATE = 0.1;
 /**
  * スケール計算を開始するレイヤーインデックス
  * このインデックス未満のレイヤーはすべてscale=1.0
- * これにより、レイヤーが追加されてもクリック位置がずれない
  */
-const SCALE_START_LAYER_INDEX = 2;
+const SCALE_START_LAYER_INDEX = 1;
 
 /**
  * 座標系クラス（2D一次変換）
@@ -48,9 +47,9 @@ export class CoordinateSystem {
   /**
    * このレイヤーのスケール値
    * layerIndex=0 → scale=1.0
-   * layerIndex=1 → scale=1.0 (SCALE_START_LAYER_INDEX未満は1.0)
-   * layerIndex=2 → scale=0.9
-   * layerIndex=3 → scale=0.8
+   * layerIndex=1 → scale=0.9
+   * layerIndex=2 → scale=0.8
+   * layerIndex=3 → scale=0.7
    * ...
    */
   get scale(): number {
