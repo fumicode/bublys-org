@@ -8,16 +8,14 @@ import {
   SmartRect,
   BubbleView,
   LinkBubbleView,
-} from "@bublys-org/bubbles-ui";
-import { BubbleContent } from "./BubbleContent";
-import { useAppSelector } from "@bublys-org/state-management";
-import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
-} from "@bublys-org/bubbles-ui-state";
+} from "@bublys-org/bubbles-ui";
+import { BubbleContent } from "./BubbleContent";
+import { useAppSelector } from "@bublys-org/state-management";
 import { usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 
 /**

@@ -1,9 +1,8 @@
 "use client";
 
 import { useContext } from "react";
-import { registerBubblePropsResolver, BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { registerBubblePropsResolver, BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";

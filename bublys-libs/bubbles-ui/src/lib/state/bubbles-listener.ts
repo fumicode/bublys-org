@@ -14,7 +14,8 @@ import {
   selectSurfaceLeftTop,
   clearAllAnimations,
 } from './bubbles-slice.js';
-import { convertGlobalPointToLayerLocal, getOriginRect } from '@bublys-org/bubbles-ui';
+import { convertGlobalPointToLayerLocal } from '../CoordinateSystemHelper.js';
+import { getOriginRect } from '../utils/get-origin-rect.js';
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();

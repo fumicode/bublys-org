@@ -6,7 +6,7 @@ import { CoordinateSystem } from "../CoordinateSystem.js";
 import { SmartRect } from "../SmartRect.js";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "@bublys-org/bubbles-ui-state";
+import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 

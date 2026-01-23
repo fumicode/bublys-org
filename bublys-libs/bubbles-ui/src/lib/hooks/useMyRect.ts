@@ -4,7 +4,7 @@ import { useWindowSize } from "./useWindowSize.js";
 import { SmartRect } from "../SmartRect.js";
 import { CoordinateSystem } from "../CoordinateSystem.js";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectRenderCount, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
+import { selectRenderCount, selectIsLayerAnimating } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 
 type useMyRectProps  = {

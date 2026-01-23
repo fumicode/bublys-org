@@ -30,7 +30,10 @@ npx nx list                       # インストール済みのNxプラグイン
 ```bash
 npx nx g @nx/next:app <name>      # 新しいNext.jsアプリを生成
 npx nx g @nx/react:lib <name>     # 新しいReactライブラリを生成
+npx nx g @nx/js:lib <name>        # 新しいTypeScriptライブラリを生成
 ```
+
+**重要:** 新しいライブラリやアプリを作成する際は、必ずNxのジェネレーターコマンドを使用すること。手動でディレクトリやpackage.jsonを作成しない。Nxが適切な設定ファイル（tsconfig、project.json等）を自動生成し、ワークスペースとの整合性を保証する。
 
 ## 設計哲学
 

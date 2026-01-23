@@ -15,8 +15,10 @@ import storage from "redux-persist/es/storage"; // defaults to localStorage for 
 import { counterSlice } from "./slices/counter-slice.js";
 import {
   bubblesSlice,
-} from "@bublys-org/bubbles-ui-state";
-import { bubblesListener, shellBubbleListener, shellDeletionListener } from "@bublys-org/bubbles-ui-state";
+  bubblesListener,
+  shellBubbleListener,
+  shellDeletionListener,
+} from "@bublys-org/bubbles-ui";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";

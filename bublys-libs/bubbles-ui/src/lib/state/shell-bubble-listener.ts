@@ -4,7 +4,7 @@
  */
 
 import { createListenerMiddleware } from '@reduxjs/toolkit';
-import { createBubble } from '@bublys-org/bubbles-ui';
+import { createBubble } from '../Bubble.domain.js';
 import { addBubble, relateBubbles, joinSiblingInProcess } from './bubbles-slice.js';
 
 export const shellBubbleListener = createListenerMiddleware();

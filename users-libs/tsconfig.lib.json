@@ -16,17 +16,7 @@
     "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "references": [
-    {
-      "path": "../bublys-libs/bubbles-ui-state/tsconfig.lib.json"
-    },
-    {
-      "path": "../bublys-libs/bubbles-ui/tsconfig.lib.json"
-    },
-    {
-      "path": "../bublys-libs/state-management/tsconfig.lib.json"
-    }
-  ],
+  "references": [],
   "exclude": [
     "jest.config.ts",
     "jest.config.cts",

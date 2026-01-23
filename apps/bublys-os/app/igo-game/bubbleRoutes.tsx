@@ -1,11 +1,10 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineManager } from "../world-line/integrations/IgoWorldLineManager";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 
 /**
  * 囲碁ゲーム - メインバブル（世界線統合版）

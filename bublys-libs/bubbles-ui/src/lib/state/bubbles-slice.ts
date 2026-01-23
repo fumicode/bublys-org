@@ -2,13 +2,14 @@ import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
 import {
   Bubble,
   BubbleJson,
+} from "../Bubble.domain.js";
+import {
   BubblesProcess,
   BubblesProcessState,
-  BubblesProcessDPO,
-  CoordinateSystemData,
-  CoordinateSystem,
-  Point2,
-} from "@bublys-org/bubbles-ui";
+} from "../BubblesProcess.domain.js";
+import { BubblesProcessDPO } from "../BubblesProcessDPO.js";
+import { CoordinateSystemData, CoordinateSystem } from "../CoordinateSystem.js";
+import { Point2 } from "../00_Point.js";
 
 
 type BubblesRelation = {
@@ -420,3 +421,9 @@ export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector
 };
 
 export default bubblesSlice.reducer;
+
+// rootReducerにbubblesSliceを動的に注入する関数
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const injectBubblesSlice = (rootReducer: any) => {
+  bubblesSlice.injectInto(rootReducer);
+};

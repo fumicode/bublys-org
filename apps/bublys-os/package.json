@@ -4,7 +4,6 @@
   "private": true,
   "dependencies": {
     "@bublys-org/bubbles-ui": "*",
-    "@bublys-org/bubbles-ui-state": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/akashic-record": "*",

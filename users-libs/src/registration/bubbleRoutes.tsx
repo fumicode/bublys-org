@@ -5,9 +5,11 @@ import {
   BubbleRoute,
   BubbleContentRenderer,
   BubblesContext,
+  selectBubblesRelationByOpeneeId,
+  deleteProcessBubble,
+  removeBubble,
 } from "@bublys-org/bubbles-ui";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 
 import { UserCollection } from "../feature/UserCollection.js";
 import { UserDetail } from "../feature/UserDetail.js";

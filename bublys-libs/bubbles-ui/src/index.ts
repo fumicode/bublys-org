@@ -29,3 +29,6 @@ export * from './lib/context/BubbleRefsContext.js';
 // UI Components
 export * from './lib/ui/BubbleView.js';
 export * from './lib/ui/LinkBubbleView.js';
+
+// State Management (Redux)
+export * from './lib/state/index.js';

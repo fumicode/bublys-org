@@ -3,6 +3,11 @@ import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPoc
 import { useShellManager } from "@bublys-org/object-shell";
 
 import {
+  Bubble,
+  createBubble,
+  CoordinateSystem,
+  BubblesContext,
+  BubbleRefsProvider,
   selectBubbleLayers,
   selectSurfaceBubbles,
   addBubble,
@@ -19,14 +24,6 @@ import {
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
   OpeningPosition,
-} from "@bublys-org/bubbles-ui-state";
-
-import {
-  Bubble,
-  createBubble,
-  CoordinateSystem,
-  BubblesContext,
-  BubbleRefsProvider,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
