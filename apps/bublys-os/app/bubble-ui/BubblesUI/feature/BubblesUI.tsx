@@ -28,7 +28,7 @@ import {
   BubblesContext,
   BubbleRefsProvider,
 } from "@bublys-org/bubbles-ui";
-import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
+import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";

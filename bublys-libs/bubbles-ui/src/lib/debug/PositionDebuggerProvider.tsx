@@ -1,15 +1,13 @@
 "use client";
 
 import { FC, useState, useContext } from "react";
-import {
-  Point2,
-  CoordinateSystem,
-  SmartRect,
-  useWindowSize,
-  BubblesContext,
-} from "@bublys-org/bubbles-ui";
-import { PositionDebuggerContext } from "../domain/PositionDebuggerContext";
-import { PagePointViewer } from "../ui/PagePointViewer";
+import { Point2 } from "../00_Point.js";
+import { CoordinateSystem } from "../CoordinateSystem.js";
+import { SmartRect } from "../SmartRect.js";
+import { useWindowSize } from "../hooks/useWindowSize.js";
+import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
+import { PositionDebuggerContext } from "./PositionDebuggerContext.js";
+import { PagePointViewer } from "./PagePointViewer.js";
 
 type PositionDebuggerProviderProps = {
   children: React.ReactNode;

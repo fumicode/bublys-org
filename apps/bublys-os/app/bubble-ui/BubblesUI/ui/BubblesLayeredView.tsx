@@ -18,7 +18,7 @@ import {
   selectIsLayerAnimating,
   makeSelectBubbleById,
 } from "@bublys-org/bubbles-ui-state";
-import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
+import { usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 
 /**
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント

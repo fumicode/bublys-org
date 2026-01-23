@@ -17,6 +17,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./debug": {
+      "@bublys-org/source": "./src/debug.ts",
+      "types": "./dist/debug.d.ts",
+      "import": "./dist/debug.js",
+      "default": "./dist/debug.js"
     }
   },
   "dependencies": {

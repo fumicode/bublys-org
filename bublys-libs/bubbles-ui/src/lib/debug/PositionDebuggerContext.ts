@@ -1,7 +1,9 @@
 //pointsとrectsを保存するコンテキスト
 
 import { createContext, useContext } from "react";
-import { Point2, SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui"
+import { Point2 } from "../00_Point.js";
+import { SmartRect } from "../SmartRect.js";
+import { CoordinateSystem } from "../CoordinateSystem.js";
 
 export type PositionDebuggerState = {
   points: Point2[];

@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { RectItem } from './CanvasDebugView';
+import { RectItem } from './CanvasDebugView.js';
 
 type RectListProps = {
   rects: RectItem[];
