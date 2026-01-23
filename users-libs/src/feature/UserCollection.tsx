@@ -1,8 +1,9 @@
 import { FC, useEffect } from "react";
-import { useAppDispatch, useAppSelector ,  selectUsers, setUsers } from "@bublys-org/state-management";
-import { UserListView } from "../ui/UserListView";
-import { User } from "../domain/User.domain";
-import { UrledPlace } from "../../bubble-ui/components";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectUsers, setUsers } from "../slice/index.js";
+import { UserListView } from "../ui/UserListView.js";
+import { User } from "../domain/User.domain.js";
+import { UrledPlace } from "@bublys-org/bubbles-ui";
 
 const defaultUsers = [
   new User("2a5d5e9e-5d2b-4e9c-97e0-1d4f7f0db743", "田中 太郎", "2000-04-12"),

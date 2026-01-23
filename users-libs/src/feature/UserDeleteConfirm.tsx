@@ -1,8 +1,8 @@
 import { FC } from "react";
 import { Button, Stack, Typography } from "@mui/material";
-import { useAppDispatch, useAppSelector, deleteUser } from "@bublys-org/state-management";
-import { selectUserById } from "@bublys-org/state-management";
-import { User } from "../domain/User.domain";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectUserById, deleteUser } from "../slice/index.js";
+import { User } from "../domain/User.domain.js";
 
 type UserDeleteConfirmProps = {
   userId: string;

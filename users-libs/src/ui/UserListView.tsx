@@ -1,14 +1,11 @@
 import { FC } from "react";
 import styled from "styled-components";
-import { User } from "../domain/User.domain";
+import { User } from "../domain/User.domain.js";
 import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import { UserIcon } from "./UserIcon";
-import { UrledPlace } from "../../bubble-ui/components";
-import { ObjectView } from "../../bubble-ui/object-view";
-import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
-import { DRAG_DATA_TYPES, parseDragPayload } from "../../bubble-ui/utils/drag-types";
+import { UserIcon } from "./UserIcon.js";
+import { UrledPlace, ObjectView, extractIdFromUrl, DRAG_DATA_TYPES, parseDragPayload } from "@bublys-org/bubbles-ui";
 
 type UserListViewProps = {
   users: User[];

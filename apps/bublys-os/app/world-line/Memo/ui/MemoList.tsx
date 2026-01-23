@@ -6,10 +6,9 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import CloseIcon from '@mui/icons-material/Close';
 import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
-import { UserBadge } from '@/app/users/ui/UserBadge';
+import { UserBadge } from '@bublys-org/users-libs';
 import { selectUsers } from '@bublys-org/state-management';
-import { ObjectView } from '../../../bubble-ui/object-view';
-import { UrledPlace } from '../../../bubble-ui/components';
+import { ObjectView, UrledPlace } from '@bublys-org/bubbles-ui';
 
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;

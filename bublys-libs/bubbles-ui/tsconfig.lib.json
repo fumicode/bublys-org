@@ -10,9 +10,10 @@
     "moduleResolution": "nodenext",
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
-    "lib": ["ES2021", "DOM"]
+    "lib": ["ES2021", "DOM"],
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [],
   "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

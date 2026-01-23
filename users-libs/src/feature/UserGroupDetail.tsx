@@ -1,18 +1,11 @@
 import { FC, useMemo, useState } from "react";
-import {
-  useAppDispatch,
-  useAppSelector,
-  selectUserGroupById,
-  selectUsers,
-  updateUserGroup,
-} from "@bublys-org/state-management";
-import { UserGroup } from "../domain/UserGroup.domain";
-import { EditableText } from "../../../lib/EditableText";
-import { User } from "../domain/User.domain";
-import { UserListView } from "../ui/UserListView";
-import { UserGroupIcon } from "../ui/UserIcon";
-import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
-import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "../../bubble-ui/utils/drag-types";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectUserGroupById, updateUserGroup, selectUsers } from "../slice/index.js";
+import { UserGroup } from "../domain/UserGroup.domain.js";
+import { EditableText, extractIdFromUrl, DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "@bublys-org/bubbles-ui";
+import { User } from "../domain/User.domain.js";
+import { UserListView } from "../ui/UserListView.js";
+import { UserGroupIcon } from "../ui/UserIcon.js";
 
 type UserGroupDetailProps = {
   groupId: string;

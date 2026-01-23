@@ -1,9 +1,10 @@
 import { FC } from "react";
-import { useAppSelector, selectUserById, selectUserGroups } from "@bublys-org/state-management";
-import { User } from "../domain/User.domain";
-import { UserIcon } from "../ui/UserIcon";
-import { UserGroupBadgeView } from "../ui/UserGroupBadgeView";
-import { DRAG_DATA_TYPES, setDragPayload } from "../../bubble-ui/utils/drag-types";
+import { useAppSelector } from "@bublys-org/state-management";
+import { selectUserById, selectUserGroups } from "../slice/index.js";
+import { User } from "../domain/User.domain.js";
+import { UserIcon } from "../ui/UserIcon.js";
+import { UserGroupBadgeView } from "../ui/UserGroupBadgeView.js";
+import { DRAG_DATA_TYPES, setDragPayload } from "@bublys-org/bubbles-ui";
 
 type UserDetailProps = {
   userId: string;

@@ -3,13 +3,12 @@ import { IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { PocketItemState } from '@bublys-org/state-management';
 import styled from 'styled-components';
-import { UserIcon, UserGroupIcon } from '../../../users/ui/UserIcon';
+import { UserIcon, UserGroupIcon } from '@bublys-org/users-libs';
 import { MemoIcon } from '../../../world-line/Memo/ui/MemoIcon';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import PersonIcon from '@mui/icons-material/Person';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import { ObjectView } from '../../object-view/ui/ObjectView';
-import { getObjectType } from '../../object-view/domain/ObjectTypeRegistry';
+import { ObjectView, getObjectType } from '@bublys-org/bubbles-ui';
 
 type PocketItemViewProps = {
   item: PocketItemState;

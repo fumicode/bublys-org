@@ -15,18 +15,12 @@ export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
 
 // ルーティング定義
 import { MobBubble } from "../ui/bubbles/MobBubble";
-import { UserGroupList } from "@/app/users/feature/UserGroupList";
-import { UserGroupDetail } from "@/app/users/feature/UserGroupDetail";
+import { UserGroupList, UserGroupDetail, UserCollection, UserDetail, UserCreateFormView, UserDeleteConfirm } from "@bublys-org/users-libs";
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
-import { UserCollection } from "@/app/users/feature/UserCollection";
-import { UserDetail } from "@/app/users/feature/UserDetail";
-import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
-import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
 import { BubblesContext } from "./BubblesContext";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { addUser } from "@bublys-org/state-management";
-import { User } from "@/app/users/domain/User.domain";
+import { addUser, User } from "@bublys-org/users-libs";
 import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";

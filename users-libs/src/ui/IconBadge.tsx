@@ -1,8 +1,6 @@
 import React from "react";
 import styled from "styled-components";
-import { UrledPlace } from "../../bubble-ui/components";
-import { DragDataType, useDragPayload } from "../../bubble-ui/utils/drag-types";
-import { ObjectType, getDragType } from "../../bubble-ui/object-view";
+import { UrledPlace, DragDataType, useDragPayload, ObjectType, getDragType } from "@bublys-org/bubbles-ui";
 
 type IconBadgeProps = {
   icon: React.ReactNode;

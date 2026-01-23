@@ -6,3 +6,12 @@ export * from './lib/SmartRect.js';
 export * from './lib/CoordinateSystemHelper.js';
 export * from './lib/Bubble.domain.js';
 export * from './lib/utils/get-origin-rect.js';
+
+// バブリ共通ユーティリティ
+export * from './lib/utils/url-props.js';
+export * from './lib/utils/url-parser.js';
+export * from './lib/utils/drag-types.js';
+export * from './lib/components/UrledPlace.js';
+export * from './lib/components/EditableText.js';
+export * from './lib/object-view/ObjectTypeRegistry.js';
+export * from './lib/object-view/ObjectView.js';

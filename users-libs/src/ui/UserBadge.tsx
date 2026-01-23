@@ -1,5 +1,5 @@
-import { UserIcon } from "./UserIcon";
-import { IconBadge } from "./IconBadge";
+import { UserIcon } from "./UserIcon.js";
+import { IconBadge } from "./IconBadge.js";
 
 type UserBadgeProps = {
   label: string;

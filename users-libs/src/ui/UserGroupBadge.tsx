@@ -1,5 +1,5 @@
-import { UserGroupIcon } from "./UserIcon";
-import { IconBadge } from "./IconBadge";
+import { UserGroupIcon } from "./UserIcon.js";
+import { IconBadge } from "./IconBadge.js";
 
 type UserGroupBadgeProps = {
   label: string;

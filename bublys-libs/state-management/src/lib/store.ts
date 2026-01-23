@@ -23,16 +23,14 @@ import { pocketSlice } from "./slices/pocket-slice.js";
 import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
 import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
 import { taskSlice } from "./slices/task-slice.js";
+import { userSlice } from "./slices/user-slice.js";
+import { userGroupSlice } from "./slices/user-group-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
 import exportDataReducer from './iframe-slices/exportData.slice.js';
 import massageReducer from './iframe-slices/massages.slice.js';
 import bublysContainersReducer from './iframe-slices/bublysContainers.slice.js';
-
-// LazyLoadedSlices: 外部ライブラリからinjectIntoで注入されるsliceの型
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface LazyLoadedSlices {}
 
 // Reducers 定義（combineSlicesを使用）
 const rootReducer = combineSlices(
@@ -45,6 +43,8 @@ const rootReducer = combineSlices(
   gakkaiShiftSlice,
   shiftPlanSlice,
   taskSlice,
+  userSlice,
+  userGroupSlice,
   // iframe-slices（単純なreducer）
   {
     app: appReducer,
@@ -52,10 +52,7 @@ const rootReducer = combineSlices(
     massage: massageReducer,
     bublysContainers: bublysContainersReducer,
   }
-).withLazyLoadedSlices<LazyLoadedSlices>();
-
-// rootReducerをエクスポート（外部からinjectIntoで使用）
-export { rootReducer };
+);
 
 const persistConfig = {
   key: 'root',

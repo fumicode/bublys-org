@@ -1,1 +1,1 @@
-export { UserGroupBadge as UserGroupBadgeView } from "./UserGroupBadge";
+export { UserGroupBadge as UserGroupBadgeView } from "./UserGroupBadge.js";

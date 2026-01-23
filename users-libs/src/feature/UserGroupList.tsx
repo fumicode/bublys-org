@@ -1,8 +1,9 @@
 import { FC, useEffect } from "react";
-import { useAppDispatch, useAppSelector, selectUserGroups, setUserGroups, addUserGroup } from "@bublys-org/state-management";
-import { UserGroup } from "../domain/UserGroup.domain";
-import { UserGroupIcon } from "../ui/UserIcon";
-import { ObjectView } from "../../bubble-ui/object-view";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectUserGroups, setUserGroups, addUserGroup } from "../slice/index.js";
+import { UserGroup } from "../domain/UserGroup.domain.js";
+import { UserGroupIcon } from "../ui/UserIcon.js";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;
