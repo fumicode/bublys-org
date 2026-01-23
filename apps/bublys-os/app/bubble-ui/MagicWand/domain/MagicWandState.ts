@@ -1,3 +1,5 @@
+import { SpellModeState, SpellModeStateData } from "../../Spell/domain/SpellModeState";
+
 /**
  * MagicWand（連続アクション）の状態を管理するドメインモデル
  *
@@ -8,9 +10,7 @@
 /** アクションコールバック型 */
 export type MagicWandActionCallback = (bubbleId: string) => void;
 
-export interface MagicWandStateData {
-  /** MagicWandモードがアクティブかどうか */
-  isActive: boolean;
+export interface MagicWandStateData extends SpellModeStateData {
   /** 実行するアクション */
   action: MagicWandActionCallback | null;
   /** 現在ホバー中のバブルID */
@@ -23,7 +23,7 @@ export interface MagicWandStateData {
 
 const DWELL_TIME_MS = 100;
 
-export class MagicWandState {
+export class MagicWandState implements SpellModeState<MagicWandStateData> {
   constructor(readonly state: MagicWandStateData) {}
 
   static initial(): MagicWandState {

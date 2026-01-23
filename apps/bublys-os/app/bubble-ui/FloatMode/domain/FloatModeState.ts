@@ -1,3 +1,5 @@
+import { SpellModeState, SpellModeStateData } from "../../Spell/domain/SpellModeState";
+
 /**
  * FloatMode（バブル移動モード）の状態を管理するドメインモデル
  *
@@ -6,12 +8,9 @@
  * バブル以外をクリックまたはEscで解除。
  */
 
-export interface FloatModeStateData {
-  /** FloatModeがアクティブかどうか */
-  isActive: boolean;
-}
+export interface FloatModeStateData extends SpellModeStateData {}
 
-export class FloatModeState {
+export class FloatModeState implements SpellModeState<FloatModeStateData> {
   constructor(readonly state: FloatModeStateData) {}
 
   static initial(): FloatModeState {

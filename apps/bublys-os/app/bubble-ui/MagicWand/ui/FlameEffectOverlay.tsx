@@ -1,15 +1,10 @@
 "use client";
 
-import { useRef, useImperativeHandle, forwardRef } from "react";
+import { forwardRef } from "react";
 import styled, { keyframes } from "styled-components";
+import { CursorSpellEffect, CursorSpellEffectHandle } from "../../Spell/ui/CursorSpellEffect";
 
-type StyledFlameContainerProps = React.HTMLAttributes<HTMLDivElement> & {
-  ref?: React.RefObject<HTMLDivElement | null>;
-};
-
-export type FlameEffectOverlayHandle = {
-  updatePosition: (x: number, y: number) => void;
-};
+export type FlameEffectOverlayHandle = CursorSpellEffectHandle;
 
 type FlameEffectOverlayProps = {
   isActive: boolean;
@@ -17,28 +12,16 @@ type FlameEffectOverlayProps = {
 
 /**
  * MagicWandモード中にカーソル周りに表示する炎エフェクト
- * DOM直接操作でカーソル位置を更新（パフォーマンス最適化）
  */
 export const FlameEffectOverlay = forwardRef<FlameEffectOverlayHandle, FlameEffectOverlayProps>(
   ({ isActive }, ref) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useImperativeHandle(ref, () => ({
-      updatePosition: (x: number, y: number) => {
-        if (containerRef.current) {
-          containerRef.current.style.left = `${x}px`;
-          containerRef.current.style.top = `${y}px`;
-        }
-      },
-    }));
-
-    if (!isActive) return null;
-
     return (
-      <StyledFlameContainer ref={containerRef}>
-        <div className="core" />
-        <div className="glow" />
-      </StyledFlameContainer>
+      <CursorSpellEffect ref={ref} isActive={isActive}>
+        <StyledFlameVisual>
+          <div className="core" />
+          <div className="glow" />
+        </StyledFlameVisual>
+      </CursorSpellEffect>
     );
   }
 );
@@ -50,10 +33,7 @@ const pulse = keyframes`
   50% { transform: scale(1.15); opacity: 1; }
 `;
 
-const StyledFlameContainer = styled.div<StyledFlameContainerProps>`
-  position: fixed;
-  pointer-events: none;
-  z-index: 99999;
+const StyledFlameVisual = styled.div`
   transform: translate(-50%, -50%);
 
   /* グロー効果 */
