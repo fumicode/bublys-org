@@ -1,8 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
-import { BubblesContext } from "../bubble-ui/BubblesUI/domain/BubblesContext";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { StaffCollection, parseStaffFilter, stringifyStaffFilter, StaffFilter as StaffFilterType } from "./feature/StaffCollection";
 import { Role_係 } from "./domain";
 import { StaffFilter } from "./feature/StaffFilter";

@@ -1,8 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
-import { BubblesContext } from "../bubble-ui/BubblesUI/domain/BubblesContext";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineManager } from "../world-line/integrations/IgoWorldLineManager";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { useAppDispatch } from "@bublys-org/state-management";

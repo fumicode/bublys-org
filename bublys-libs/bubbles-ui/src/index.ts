@@ -15,3 +15,6 @@ export * from './lib/components/UrledPlace.js';
 export * from './lib/components/EditableText.js';
 export * from './lib/object-view/ObjectTypeRegistry.js';
 export * from './lib/object-view/ObjectView.js';
+
+// Bubble Routing
+export * from './lib/bubble-routing/BubbleRouting.js';

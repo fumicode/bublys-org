@@ -1,8 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
-import { BubblesContext } from "../bubble-ui/BubblesUI/domain/BubblesContext";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { TaskCollection } from "./feature/TaskCollection";
 import { TaskDetail } from "./feature/TaskDetail";
 
