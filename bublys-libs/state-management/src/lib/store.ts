@@ -1,5 +1,5 @@
 import {environmentSlice} from "./slices/environment-slice.js";
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import { combineSlices, configureStore } from "@reduxjs/toolkit";
 
 import { persistStore, persistReducer,
   FLUSH,
@@ -19,8 +19,6 @@ import {
 import { bubblesListener, shellBubbleListener, shellDeletionListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
-import { userSlice } from "./slices/user-slice.js";
-import { userGroupSlice } from "./slices/user-group-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
 import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
 import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
@@ -32,26 +30,32 @@ import exportDataReducer from './iframe-slices/exportData.slice.js';
 import massageReducer from './iframe-slices/massages.slice.js';
 import bublysContainersReducer from './iframe-slices/bublysContainers.slice.js';
 
-// Reducers 定義
-const reducers = combineReducers({
-  [counterSlice.reducerPath]: counterSlice.reducer,
-  [bubblesSlice.reducerPath]: bubblesSlice.reducer,
-  [worldSlice.reducerPath]: worldSlice.reducer,
-  [environmentSlice.reducerPath]: environmentSlice.reducer,
-  [memoSlice.reducerPath]: memoSlice.reducer,
-  [userSlice.name]: userSlice.reducer,
-  [userGroupSlice.name]: userGroupSlice.reducer,
-  [pocketSlice.name]: pocketSlice.reducer,
-  [gakkaiShiftSlice.name]: gakkaiShiftSlice.reducer,
-  [shiftPlanSlice.name]: shiftPlanSlice.reducer,
-  [taskSlice.name]: taskSlice.reducer,
+// LazyLoadedSlices: 外部ライブラリからinjectIntoで注入されるsliceの型
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface LazyLoadedSlices {}
 
-  //iframe-slices
-  app: appReducer,
-  exportData: exportDataReducer,
-  massage: massageReducer,
-  bublysContainers: bublysContainersReducer,
-});
+// Reducers 定義（combineSlicesを使用）
+const rootReducer = combineSlices(
+  counterSlice,
+  bubblesSlice,
+  worldSlice,
+  environmentSlice,
+  memoSlice,
+  pocketSlice,
+  gakkaiShiftSlice,
+  shiftPlanSlice,
+  taskSlice,
+  // iframe-slices（単純なreducer）
+  {
+    app: appReducer,
+    exportData: exportDataReducer,
+    massage: massageReducer,
+    bublysContainers: bublysContainersReducer,
+  }
+).withLazyLoadedSlices<LazyLoadedSlices>();
+
+// rootReducerをエクスポート（外部からinjectIntoで使用）
+export { rootReducer };
 
 const persistConfig = {
   key: 'root',
@@ -59,10 +63,10 @@ const persistConfig = {
   blacklist: [bubblesSlice.reducerPath, environmentSlice.reducerPath ],
 }
 
-const persistedReducer = persistReducer(persistConfig, reducers)
+const persistedReducer = persistReducer(persistConfig, rootReducer)
 
-// RootState を reducers から推論
-export type RootState = ReturnType<typeof reducers>;
+// RootState を rootReducer から推論
+export type RootState = ReturnType<typeof rootReducer>;
 
 // Store 作成関数
 export const makeStore = () => {

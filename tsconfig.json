@@ -41,6 +41,9 @@
     },
     {
       "path": "./gakkai-shift-libs"
+    },
+    {
+      "path": "./users-libs"
     }
   ]
 }
