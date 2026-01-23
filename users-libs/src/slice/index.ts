@@ -1,4 +1,3 @@
-// Re-export from state-management
 export {
   userSlice,
   setUsers,
@@ -6,6 +5,9 @@ export {
   deleteUser,
   selectUsers,
   selectUserById,
+} from './user-slice.js';
+
+export {
   userGroupSlice,
   setUserGroups,
   addUserGroup,
@@ -13,4 +15,4 @@ export {
   deleteUserGroup,
   selectUserGroups,
   selectUserGroupById,
-} from '@bublys-org/state-management';
+} from './user-group-slice.js';

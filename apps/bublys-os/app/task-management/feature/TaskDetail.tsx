@@ -8,9 +8,9 @@ import {
   selectTaskById,
   updateTaskStatus,
   updateTask,
-  selectUsers,
   TaskStatus_ステータス,
 } from "@bublys-org/state-management";
+import { selectUsers } from "@bublys-org/users-libs";
 import { TaskDetailView } from "../ui/TaskDetailView";
 
 type TaskDetailProps = {

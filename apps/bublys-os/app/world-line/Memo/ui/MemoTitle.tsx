@@ -2,8 +2,8 @@ import { Memo } from '../domain/Memo';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import { MemoIcon } from './MemoIcon';
-import { useAppSelector, selectUsers } from '@bublys-org/state-management';
-import { UserBadge } from '@bublys-org/users-libs';
+import { useAppSelector } from '@bublys-org/state-management';
+import { UserBadge, selectUsers } from '@bublys-org/users-libs';
 import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from '../../../bubble-ui/utils/drag-types';
 import { extractIdFromUrl } from '../../../bubble-ui/utils/url-parser';
 

@@ -2,7 +2,8 @@
 
 import { FC, useState, useRef, useEffect } from "react";
 import styled from "styled-components";
-import { Task_タスク, TaskStatus_ステータス, UserState } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
+import { UserState } from "@bublys-org/users-libs";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import PersonIcon from "@mui/icons-material/Person";
 import { Button, Select, MenuItem, FormControl } from "@mui/material";

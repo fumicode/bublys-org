@@ -6,8 +6,7 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import CloseIcon from '@mui/icons-material/Close';
 import styled from 'styled-components';
 import { MemoIcon } from './MemoIcon';
-import { UserBadge } from '@bublys-org/users-libs';
-import { selectUsers } from '@bublys-org/state-management';
+import { UserBadge, selectUsers } from '@bublys-org/users-libs';
 import { ObjectView, UrledPlace } from '@bublys-org/bubbles-ui';
 
 type MemoListProps = {
