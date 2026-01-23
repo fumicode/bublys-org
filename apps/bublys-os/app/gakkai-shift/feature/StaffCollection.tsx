@@ -16,7 +16,7 @@ import { Role_係 } from "../domain";
 import styled from "styled-components";
 import { Button } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import { BubblesContext } from "../../bubble-ui/BubblesUI/domain/BubblesContext";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 
 /** フィルター条件の型 */
 export type StaffFilter = {

@@ -1,7 +1,14 @@
 import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
-import { BubbleView } from "./BubbleView";
+import {
+  Bubble,
+  Point2,
+  Vec2,
+  CoordinateSystem,
+  SmartRect,
+  BubbleView,
+  LinkBubbleView,
+} from "@bublys-org/bubbles-ui";
 import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
 import {
@@ -11,7 +18,7 @@ import {
   selectIsLayerAnimating,
   makeSelectBubbleById,
 } from "@bublys-org/bubbles-ui-state";
-import { LinkBubbleView } from "./LinkBubbleView";
+import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
 
 /**
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント
@@ -30,6 +37,7 @@ type ConnectedBubbleViewProps = {
   onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
 
 const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
@@ -45,6 +53,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
+  onDebugRects,
 })  {
   // このバブル専用のセレクターを使用
   const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
@@ -69,6 +78,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       onResize={(updated) => onBubbleResize?.(updated)}
       onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
       onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+      onDebugRects={onDebugRects}
     >
       <BubbleContent bubble={bubble} />
     </BubbleView>
@@ -207,6 +217,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
+  // PositionDebuggerからaddRectsを取得
+  const { addRects } = usePositionDebugger();
+
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
     y: 10,
@@ -253,6 +266,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             onBubbleResize={onBubbleResize}
             onBubbleLayerDown={onBubbleLayerDown}
             onBubbleLayerUp={onBubbleLayerUp}
+            onDebugRects={addRects}
           />
         );
       })

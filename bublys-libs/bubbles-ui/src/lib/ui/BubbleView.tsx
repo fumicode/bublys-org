@@ -1,7 +1,14 @@
 import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
-import { Bubble, Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui";
-import { usePositionDebugger } from "../../PositionDebugger/domain/PositionDebuggerContext";
+import { Bubble } from "../Bubble.domain.js";
+import { Point2, Vec2 } from "../00_Point.js";
+import { CoordinateSystem } from "../CoordinateSystem.js";
+import { SmartRect } from "../SmartRect.js";
+import { useMyRectObserver } from "../hooks/useMyRect.js";
+import { useAppDispatch } from "@bublys-org/state-management";
+import { renderBubble, updateBubble, finishBubbleAnimation } from "@bublys-org/bubbles-ui-state";
+import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
+import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -36,13 +43,6 @@ const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18
     )}
   </svg>
 );
-import { useMyRectObserver } from "../../01_Utils/01_useMyRect";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "@bublys-org/bubbles-ui-state";
-import { SmartRect } from "@bublys-org/bubbles-ui";
-import { BubblesContext } from "../domain/BubblesContext";
-import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
-//import { SmartRectView } from "../../PositionDebugger/ui/SmartRectView";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -106,6 +106,9 @@ type BubbleProps = {
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
   onResize?: (bubble: Bubble) => void;
+
+  // デバッグ用コールバック（オプション）
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
 
 const BubbleViewInner: FC<BubbleProps> = ({
@@ -123,6 +126,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   onLayerUpClick,
   onMove,
   onResize,
+  onDebugRects,
 }) => {
   position = position || { x: 0, y: 0 };
   vanishingPoint = vanishingPoint || new Vec2({ x: 0, y: 0 });
@@ -132,7 +136,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
     [vanishingPoint, position]
   );
 
-  const { addRects } = usePositionDebugger();
   const dispatch = useAppDispatch();
   const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
@@ -143,12 +146,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const vanishingPointRef = useRef(vanishingPoint);
   vanishingPointRef.current = vanishingPoint;
 
-  const { ref, notifyRendered} = useMyRectObserver({ 
+  const { ref, notifyRendered} = useMyRectObserver({
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
       dispatch(renderBubble(updated.toJSON()));
 
-      addRects([rect])
+      onDebugRects?.([rect]);
     }
   });
 
@@ -322,29 +325,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
       </header>
 
       <main className="e-bubble-content">
-        {/* 
-        Type: {bubble.type}
-        #{bubble.id}
-        <br />
-        <br /> */}
-        {/* <div style={{backgroundColor: `hsl(${bubble.colorHue}, 50%, 50%)`}}></div>
-        ({bubble?.position?.x},{bubble?.position?.y})<br />
-        [{bubble.renderedRect?.width}x{bubble.renderedRect?.height}] */}
         {children}<br />
-        {/* #{bubble.id} */}
       </main>
-
-      {
-        // bubble.renderedRect && (
-        //   <SmartRectView rect={bubble.renderedRect} />
-        // )
-      }
-      {/* {bubble.renderedRect && ( // デバッグ用矩形
-        <div className="e-debug-rect"
-          style={{ width: bubble.renderedRect.width  , height: bubble.renderedRect.height  }}>
-        </div>
-      )} */}
-
     </StyledBubble>
   );
 };
@@ -667,6 +649,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     border: 1px solid blue;
     pointer-events: none;
     box-sizing: border-box;
-    
+
   }
 `;

@@ -1,10 +1,11 @@
 "use client";
 import { useRef, useContext, useCallback, useEffect } from "react";
-import { useWindowSize } from "./01_useWindowSize";
-import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui";
+import { useWindowSize } from "./useWindowSize.js";
+import { SmartRect } from "../SmartRect.js";
+import { CoordinateSystem } from "../CoordinateSystem.js";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount, selectIsLayerAnimating } from "@bublys-org/bubbles-ui-state";
-import { BubblesContext } from "../BubblesUI/domain/BubblesContext";
+import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 
 type useMyRectProps  = {
   onRectChanged?: (rect: SmartRect) => void;

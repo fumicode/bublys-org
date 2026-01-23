@@ -18,3 +18,14 @@ export * from './lib/object-view/ObjectView.js';
 
 // Bubble Routing
 export * from './lib/bubble-routing/BubbleRouting.js';
+
+// Hooks
+export * from './lib/hooks/useWindowSize.js';
+export * from './lib/hooks/useMyRect.js';
+
+// Context
+export * from './lib/context/BubbleRefsContext.js';
+
+// UI Components
+export * from './lib/ui/BubbleView.js';
+export * from './lib/ui/LinkBubbleView.js';

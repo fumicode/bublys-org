@@ -4,7 +4,7 @@ import { FC, useState, useContext } from "react";
 import styled from "styled-components";
 import { Button, ToggleButton, ToggleButtonGroup, Checkbox, FormControlLabel } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { BubblesContext } from "../../bubble-ui/BubblesUI/domain/BubblesContext";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { TimeSlot_時間帯 } from "../domain";
 import { StaffFilter as StaffFilterType, stringifyStaffFilter } from "./StaffCollection";
 

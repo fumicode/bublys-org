@@ -1,6 +1,8 @@
-import React, { FC } from "react";
-import { Bubble, CoordinateSystem, getOriginRect } from "@bublys-org/bubbles-ui";
-import { useBubbleRefsOptional } from "../domain/BubbleRefsContext";
+import { FC } from "react";
+import { Bubble } from "../Bubble.domain.js";
+import { CoordinateSystem } from "../CoordinateSystem.js";
+import { getOriginRect } from "../utils/get-origin-rect.js";
+import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 
 type LinkBubbleViewProps = {
   opener: Bubble;

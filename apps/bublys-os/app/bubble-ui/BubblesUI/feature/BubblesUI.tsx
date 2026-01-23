@@ -21,10 +21,14 @@ import {
   OpeningPosition,
 } from "@bublys-org/bubbles-ui-state";
 
-import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
+import {
+  Bubble,
+  createBubble,
+  CoordinateSystem,
+  BubblesContext,
+  BubbleRefsProvider,
+} from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
-import { BubblesContext } from "../domain/BubblesContext";
-import { BubbleRefsProvider } from "../domain/BubbleRefsContext";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -200,7 +204,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
-            <PositionDebuggerProvider isShown={false}>
+            <PositionDebuggerProvider isShown={true}>
               <Box sx={{ width: '100%', height: '100%' }}>
                 <BubblesLayeredView
                   bubbleLayers={bubbleLayers}

@@ -1,7 +1,6 @@
 import { FC } from "react";
-import { SmartRect } from "@bublys-org/bubbles-ui";
+import { SmartRect, useMyRectObserver } from "@bublys-org/bubbles-ui";
 import { usePositionDebugger } from "@/app/bubble-ui/PositionDebugger/domain/PositionDebuggerContext";
-import { useMyRectObserver } from "@/app/bubble-ui/01_Utils/01_useMyRect";
 import IframeAppContent from "@/app/bubble-ui/IframeViewer/IframeAppContent";
 
 
