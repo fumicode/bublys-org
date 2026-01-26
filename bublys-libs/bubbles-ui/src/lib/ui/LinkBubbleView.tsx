@@ -1,6 +1,6 @@
 import { FC } from "react";
 import { Bubble } from "../Bubble.domain.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
+import { CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getOriginRect } from "../utils/get-origin-rect.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 

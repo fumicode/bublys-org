@@ -1,5 +1,4 @@
-import { Point2 } from "./00_Point.js";
-import { SmartRect, CoordinateSystemData, CoordinateSystem } from "./SmartRect.js";
+import { Point2, SmartRect, CoordinateSystemData, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 
 /**
  * レイヤーインデックスと座標設定から CoordinateSystemData を生成

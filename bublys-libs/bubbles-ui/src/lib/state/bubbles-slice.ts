@@ -8,8 +8,7 @@ import {
   BubblesProcessState,
 } from "../BubblesProcess.domain.js";
 import { BubblesProcessDPO } from "../BubblesProcessDPO.js";
-import { CoordinateSystemData, CoordinateSystem } from "../CoordinateSystem.js";
-import { Point2 } from "../00_Point.js";
+import { CoordinateSystemData, CoordinateSystem, Point2 } from "@bublys-org/bubbles-ui-util";
 
 
 type BubblesRelation = {

@@ -8,7 +8,7 @@ class DOMRect {
 (global as any).DOMRect = DOMRect;
 
 import { SmartRect } from "./SmartRect.js";
-import { Size2 } from "./00_Point.js";
+import { Size2 } from "./Point.js";
 
 describe("SmartRect.merge", () => {
   const parentSize: Size2 = { width: 100, height: 100 };

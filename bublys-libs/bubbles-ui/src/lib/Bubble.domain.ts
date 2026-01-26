@@ -1,5 +1,4 @@
-import { Point2, Size2 } from "./00_Point.js";
-import {SmartRect} from "./SmartRect.js";
+import { Point2, Size2, SmartRect } from "@bublys-org/bubbles-ui-util";
 
 export type BubbleOptions = {
   contentBackground?: string;

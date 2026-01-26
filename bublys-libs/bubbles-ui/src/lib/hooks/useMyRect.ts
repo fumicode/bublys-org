@@ -1,8 +1,7 @@
 "use client";
 import { useRef, useContext, useCallback, useEffect } from "react";
 import { useWindowSize } from "./useWindowSize.js";
-import { SmartRect } from "../SmartRect.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
+import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount, selectIsLayerAnimating } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";

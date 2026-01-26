@@ -1,4 +1,4 @@
-import { Point2 } from "./00_Point.js";
+import { Point2 } from "./Point.js";
 
 /**
  * 座標系データ（JSON互換）

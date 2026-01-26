@@ -1,4 +1,4 @@
-import { SmartRect, CoordinateSystem } from '../SmartRect.js';
+import { SmartRect, CoordinateSystem } from '@bublys-org/bubbles-ui-util';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す

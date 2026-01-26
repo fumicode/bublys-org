@@ -1,4 +1,4 @@
-import { Point2, Size2 } from "./00_Point.js";
+import { Point2, Size2 } from "./Point.js";
 import {
   CoordinateSystem,
   CoordinateSystemData,

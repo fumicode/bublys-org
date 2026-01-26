@@ -5,7 +5,7 @@ import { PositionDebuggerContext } from "./PositionDebuggerContext.js";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { CanvasDebugView, RectItem } from "./CanvasDebugView.js";
 import { RectList } from "./RectList.js";
-import { Direction, CornerPosition, Side } from "../SmartRect.js";
+import { Direction, CornerPosition, Side } from "@bublys-org/bubbles-ui-util";
 
 const getColorForIndex = (index: number): string => {
   const colors = ['#ff6b6b', '#4dabf7', '#51cf66', '#ffd43b', '#ff8787', '#94d82d', '#845ef7', '#ff6b9d'];

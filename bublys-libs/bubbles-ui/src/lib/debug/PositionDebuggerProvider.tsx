@@ -1,9 +1,7 @@
 "use client";
 
 import { FC, useState, useContext } from "react";
-import { Point2 } from "../00_Point.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
-import { SmartRect } from "../SmartRect.js";
+import { Point2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { useWindowSize } from "../hooks/useWindowSize.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { PositionDebuggerContext } from "./PositionDebuggerContext.js";

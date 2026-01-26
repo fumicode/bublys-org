@@ -1,7 +1,7 @@
 import { FC } from "react";
 import clsx from "clsx";
 import styled from "styled-components";
-import { SmartRect } from "../SmartRect.js";
+import { SmartRect } from "@bublys-org/bubbles-ui-util";
 
 type SmartRectViewProps = {
   rect: SmartRect; // SmartRectのインスタンス

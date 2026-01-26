@@ -1,7 +1,6 @@
 import { FC, createContext } from "react";
 import { Bubble, BubbleOptions } from "../Bubble.domain.js";
-import { Size2 } from "../00_Point.js";
-import { CoordinateSystem } from "../SmartRect.js";
+import { Size2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { OpeningPosition } from "../state/bubbles-slice.js";
 
 // BubbleContentRenderer型

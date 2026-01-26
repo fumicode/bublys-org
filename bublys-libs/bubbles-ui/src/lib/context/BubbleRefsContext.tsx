@@ -1,7 +1,6 @@
 "use client";
 import { createContext, useContext, useRef, useCallback, ReactNode, FC } from "react";
-import { SmartRect } from "../SmartRect.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
+import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getElementRect } from "../utils/get-origin-rect.js";
 
 type CachedRect = {

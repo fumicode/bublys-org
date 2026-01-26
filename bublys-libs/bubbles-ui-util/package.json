@@ -1,5 +1,5 @@
 {
-  "name": "@bublys-org/bubbles-ui",
+  "name": "@bublys-org/bubbles-ui-util",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -17,16 +17,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./debug": {
-      "@bublys-org/source": "./src/debug.ts",
-      "types": "./dist/debug.d.ts",
-      "import": "./dist/debug.js",
-      "default": "./dist/debug.js"
     }
   },
   "dependencies": {
-    "@bublys-org/bubbles-ui-util": "*"
+    "tslib": "^2.3.0"
   },
   "nx": {
     "targets": {

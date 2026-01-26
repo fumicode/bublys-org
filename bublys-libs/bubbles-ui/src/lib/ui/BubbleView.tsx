@@ -1,9 +1,7 @@
 import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2 } from "../00_Point.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
-import { SmartRect } from "../SmartRect.js";
+import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";

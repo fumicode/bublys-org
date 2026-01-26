@@ -41,6 +41,9 @@
     },
     {
       "path": "./users-libs"
+    },
+    {
+      "path": "./bublys-libs/bubbles-ui-util"
     }
   ]
 }

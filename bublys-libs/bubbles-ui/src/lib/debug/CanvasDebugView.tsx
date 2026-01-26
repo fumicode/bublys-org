@@ -1,9 +1,7 @@
 "use client";
 
 import { FC, useEffect, useRef } from "react";
-import { SmartRect } from "../SmartRect.js";
-import { Size2 } from "../00_Point.js";
-import { CoordinateSystem } from "../CoordinateSystem.js";
+import { SmartRect, Size2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 
 export type RectItem = {
   rect: SmartRect;
