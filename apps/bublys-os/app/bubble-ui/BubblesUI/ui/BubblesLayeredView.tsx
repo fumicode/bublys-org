@@ -14,8 +14,8 @@ import {
   selectIsLayerAnimating,
   makeSelectBubbleById,
 } from "@bublys-org/bubbles-ui";
-import { BubbleContent } from "./BubbleContent";
 import { useAppSelector } from "@bublys-org/state-management";
+import { BubbleContent } from "./BubbleContent";
 import { usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 
 /**

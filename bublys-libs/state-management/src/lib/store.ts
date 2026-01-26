@@ -1,5 +1,5 @@
 import {environmentSlice} from "./slices/environment-slice.js";
-import { combineSlices, configureStore } from "@reduxjs/toolkit";
+import { combineSlices, configureStore, Slice, Middleware } from "@reduxjs/toolkit";
 
 import { persistStore, persistReducer,
   FLUSH,
@@ -13,12 +13,6 @@ import { persistStore, persistReducer,
 import storage from "redux-persist/es/storage"; // defaults to localStorage for web
 
 import { counterSlice } from "./slices/counter-slice.js";
-import {
-  bubblesSlice,
-  bubblesListener,
-  shellBubbleListener,
-  shellDeletionListener,
-} from "@bublys-org/bubbles-ui";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
@@ -33,13 +27,12 @@ import massageReducer from './iframe-slices/massages.slice.js';
 import bublysContainersReducer from './iframe-slices/bublysContainers.slice.js';
 
 // LazyLoadedSlices: 外部ライブラリからinjectIntoで注入されるsliceの型
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-empty-interface
 export interface LazyLoadedSlices {}
 
 // Reducers 定義（combineSlicesを使用）
 export const rootReducer = combineSlices(
   counterSlice,
-  bubblesSlice,
   worldSlice,
   environmentSlice,
   memoSlice,
@@ -56,33 +49,60 @@ export const rootReducer = combineSlices(
   }
 ).withLazyLoadedSlices<LazyLoadedSlices>();
 
-const persistConfig = {
-  key: 'root',
-  storage,
-  blacklist: [bubblesSlice.reducerPath, environmentSlice.reducerPath ],
-}
-
-const persistedReducer = persistReducer(persistConfig, rootReducer)
-
 // RootState を rootReducer から推論
-export type RootState = ReturnType<typeof rootReducer>;
+// LazyLoadedSlicesは必須として扱う（基盤ライブラリは常に注入される前提）
+export type RootState = ReturnType<typeof rootReducer> & LazyLoadedSlices;
+
+// 外部から注入されるsliceとmiddlewareを保持
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const injectedSlices: Slice[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const injectedMiddlewares: Middleware[] = [];
+const injectedBlacklist: string[] = [];
+
+/**
+ * 外部ライブラリからsliceを注入する
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const injectSlice = (slice: Slice) => {
+  injectedSlices.push(slice);
+  slice.injectInto(rootReducer);
+};
+
+/**
+ * 外部ライブラリからmiddlewareを注入する
+ */
+export const injectMiddleware = (middleware: Middleware) => {
+  injectedMiddlewares.push(middleware);
+};
+
+/**
+ * persist blacklistにreducerPathを追加する
+ */
+export const addToBlacklist = (reducerPath: string) => {
+  injectedBlacklist.push(reducerPath);
+};
 
 // Store 作成関数
 export const makeStore = () => {
+  const persistConfig = {
+    key: 'root',
+    storage,
+    blacklist: [environmentSlice.reducerPath, ...injectedBlacklist],
+  };
+
+  const persistedReducer = persistReducer(persistConfig, rootReducer);
+
   const store = configureStore({
-    reducer: persistedReducer ,
+    reducer: persistedReducer,
     middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware( {
+      getDefaultMiddleware({
         serializableCheck: {
           ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
         },
-    })
-      .prepend(bubblesListener.middleware)
-      .prepend(shellBubbleListener.middleware)
-      .prepend(shellDeletionListener.middleware),
+      }).concat(injectedMiddlewares),
   });
   console.log("Store created:", store);
-  
 
   const persistor = persistStore(store);
 

@@ -22,7 +22,7 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.9.0",
     "react-redux": "^9.2.0",
-    "@bublys-org/bubbles-ui": "*"
+    "@bublys-org/bubbles-ui-util": "*"
   },
   "nx": {
     "targets": {

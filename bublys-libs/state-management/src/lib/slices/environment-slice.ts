@@ -1,7 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../store.js";
-import type { Size2 } from "@bublys-org/bubbles-ui";
+import type { Size2 } from "@bublys-org/bubbles-ui-util";
 
 export interface EnvironmentState {
   windowSize: Size2;
