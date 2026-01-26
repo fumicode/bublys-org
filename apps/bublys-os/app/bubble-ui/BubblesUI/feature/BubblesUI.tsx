@@ -24,6 +24,7 @@ import {
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
   OpeningPosition,
+  DragDataType,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
@@ -34,7 +35,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
-import { DragDataType } from "../../utils/drag-types";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;

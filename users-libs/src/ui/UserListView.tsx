@@ -5,7 +5,7 @@ import { IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { UserIcon } from "./UserIcon.js";
-import { UrledPlace, ObjectView, extractIdFromUrl, DRAG_DATA_TYPES, parseDragPayload } from "@bublys-org/bubbles-ui";
+import { UrledPlace, ObjectView, extractIdFromUrl, getDragType, parseDragPayload } from "@bublys-org/bubbles-ui";
 
 type UserListViewProps = {
   users: User[];
@@ -50,7 +50,7 @@ export const UserListView: FC<UserListViewProps> = ({
               }
 
               // URLからユーザーIDを抽出
-              const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+              const payload = parseDragPayload(e, { acceptTypes: [getDragType('User')] });
               if (!payload) return;
               const sourceId = extractIdFromUrl(payload.url);
               if (!sourceId || sourceId === user.id) return;

@@ -17,28 +17,28 @@ type PocketItemViewProps = {
 };
 
 export const PocketItemView: FC<PocketItemViewProps> = ({ item, onRemove, onClick }) => {
+  // getObjectType で kebab-case の型名を取得してアイコンを決定
+  const objectType = getObjectType(item.type); // 'user', 'user-group' など
+
   const getIcon = () => {
-    switch (item.type) {
-      case 'type/user':
-      case 'type/users':
+    switch (objectType) {
+      case 'user':
+      case 'users':
         return <UserIcon fontSize="small" />;
-      case 'type/user-group':
-      case 'type/user-groups':
+      case 'user-group':
+      case 'user-groups':
         return <UserGroupIcon fontSize="small" />;
-      case 'type/memo':
-      case 'type/memos':
+      case 'memo':
+      case 'memos':
         return <MemoIcon />;
-      case 'type/staff':
+      case 'staff':
         return <PersonIcon fontSize="small" />;
-      case 'type/staff-availability':
+      case 'staff-availability':
         return <EventAvailableIcon fontSize="small" />;
       default:
         return <InsertDriveFileIcon fontSize="small" />;
     }
   };
-
-  // DragDataType から ObjectType を逆引き（ドラッグ用）
-  const objectType = getObjectType(item.type);
 
   // ObjectTypeが見つからない場合はドラッグ不可
   const content = (

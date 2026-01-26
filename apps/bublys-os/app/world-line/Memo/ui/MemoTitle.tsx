@@ -4,8 +4,7 @@ import { LuClipboardCopy } from 'react-icons/lu';
 import { MemoIcon } from './MemoIcon';
 import { useAppSelector } from '@bublys-org/state-management';
 import { UserBadge, selectUsers } from '@bublys-org/users-libs';
-import { DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from '../../../bubble-ui/utils/drag-types';
-import { extractIdFromUrl } from '../../../bubble-ui/utils/url-parser';
+import { getDragType, parseDragPayload, setDragPayload, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 
 interface MemoTitleProps {
   memo: Memo;
@@ -21,8 +20,8 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
   const authorName = memo.authorId ? users.find((u) => u.id === memo.authorId)?.name : undefined;
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
-    const url = payload?.url || e.dataTransfer.getData(DRAG_DATA_TYPES.user);
+    const payload = parseDragPayload(e, { acceptTypes: [getDragType('User')] });
+    const url = payload?.url || e.dataTransfer.getData(getDragType('User'));
     const userId = url ? extractIdFromUrl(url) : "";
     if (!userId) return;
     e.preventDefault();
@@ -37,7 +36,7 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
         onDragStart={(e) => {
           const url = `memos/${memo.id}`;
           setDragPayload(e, {
-            type: DRAG_DATA_TYPES.memo,
+            type: getDragType('Memo'),
             url,
             label: content || "メモ",
           });

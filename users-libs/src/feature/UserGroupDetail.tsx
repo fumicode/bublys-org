@@ -2,7 +2,7 @@ import { FC, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { selectUserGroupById, updateUserGroup, selectUsers } from "../slice/index.js";
 import { UserGroup } from "../domain/UserGroup.domain.js";
-import { EditableText, extractIdFromUrl, DRAG_DATA_TYPES, parseDragPayload, setDragPayload } from "@bublys-org/bubbles-ui";
+import { EditableText, extractIdFromUrl, getDragType, parseDragPayload, setDragPayload } from "@bublys-org/bubbles-ui";
 import { User } from "../domain/User.domain.js";
 import { UserListView } from "../ui/UserListView.js";
 import { UserGroupIcon } from "../ui/UserIcon.js";
@@ -58,9 +58,7 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
 
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    console.log("onDrop UserGroupDetail start");
-
-    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
+    const payload = parseDragPayload(e, { acceptTypes: [getDragType('User')] });
     if (!payload) return;
     e.preventDefault();
     const droppedUserId = extractIdFromUrl(payload.url);
@@ -98,7 +96,7 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
         onDragStart={(e) => {
           const url = `user-groups/${group.id}`;
           setDragPayload(e, {
-            type: DRAG_DATA_TYPES.userGroup,
+            type: getDragType('UserGroup'),
             url,
             label: group.name,
           });

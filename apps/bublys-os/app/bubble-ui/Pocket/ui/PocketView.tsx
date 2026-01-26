@@ -5,7 +5,7 @@ import { PocketItemView } from './PocketItemView';
 import { Box, Typography, IconButton } from '@mui/material';
 import WorkspacesIcon from '@mui/icons-material/Workspaces';
 import CloseIcon from '@mui/icons-material/Close';
-import { DragDataType, parseDragPayload } from '../../utils/drag-types';
+import { DragDataType, parseDragPayload } from '@bublys-org/bubbles-ui';
 
 type PocketViewProps = {
   onItemClick?: (url: string) => void;
@@ -31,12 +31,10 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop, onClose }
   };
 
   const handleDragLeave = () => {
-    console.log('[PocketView] handleDragLeave called');
     setIsDragOver(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    console.log('[PocketView] handleDrop called', { types: Array.from(e.dataTransfer.types) });
     const payload = parseDragPayload(e);
     if (!payload) {
       setIsDragOver(false);
@@ -46,12 +44,8 @@ export const PocketView: FC<PocketViewProps> = ({ onItemClick, onDrop, onClose }
     e.stopPropagation();
     setIsDragOver(false);
 
-    console.log('[PocketView] Parsed data', payload);
-
     if (payload.url) {
       onDrop?.(payload.url, payload.type, payload.label);
-    } else {
-      console.warn('[PocketView] No URL found, cannot add to pocket');
     }
   };
 

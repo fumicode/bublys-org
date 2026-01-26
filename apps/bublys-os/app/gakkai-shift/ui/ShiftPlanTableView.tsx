@@ -15,8 +15,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import WarningIcon from "@mui/icons-material/Warning";
 import { IconButton, Tooltip } from "@mui/material";
 import { ObjectView } from "../../bubble-ui/object-view";
-import { getDragType } from "../../bubble-ui/object-view/domain/ObjectTypeRegistry";
-import { DRAG_KEYS } from "../../bubble-ui/utils/drag-types";
+import { getDragType, DRAG_KEYS } from "@bublys-org/bubbles-ui";
 
 type ShiftPlanTableViewProps = {
   timeSlots: readonly TimeSlot_時間帯[];

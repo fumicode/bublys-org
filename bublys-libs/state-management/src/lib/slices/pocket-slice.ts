@@ -4,17 +4,8 @@ import type { RootState } from "../store.js";
 export type PocketItemState = {
   id: string;
   url: string;
-  type:
-    | 'type/user'
-    | 'type/users'
-    | 'type/user-group'
-    | 'type/user-groups'
-    | 'type/memo'
-    | 'type/memos'
-    | 'type/staff'
-    | 'type/staff-availability'
-    | 'type/shift-assignment'
-    | 'type/generic';
+  /** ドラッグ型（動的に登録される、例: 'type/user'） */
+  type: string;
   label?: string;
   icon?: string;
   addedAt: number;

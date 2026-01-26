@@ -10,13 +10,18 @@ import {
   shellBubbleListener,
   shellDeletionListener,
 } from "@bublys-org/bubbles-ui";
+import { registerAppObjectTypes } from "./object-type-registration";
 
-// bubbles-uiのsliceとmiddlewareを注入（Store作成前に実行）
-let bubblesInjected = false;
-function injectBubblesState() {
-  if (bubblesInjected) return;
-  bubblesInjected = true;
+// アプリケーション初期化（Store作成前に実行）
+let appInitialized = false;
+function initializeApp() {
+  if (appInitialized) return;
+  appInitialized = true;
 
+  // オブジェクト型を登録
+  registerAppObjectTypes();
+
+  // bubbles-uiのsliceとmiddlewareを注入
   injectSlice(bubblesSlice);
   injectMiddleware(bubblesListener.middleware);
   injectMiddleware(shellBubbleListener.middleware);
@@ -32,8 +37,8 @@ export default function StoreProvider({
   const storePersistorRef = useRef<{ store: AppStore; persistor: Persistor }>(null);
 
   if (!storePersistorRef.current) {
-    // bubbles-uiを注入してからStore作成
-    injectBubblesState();
+    // アプリケーション初期化してからStore作成
+    initializeApp();
     storePersistorRef.current = makeStore();
   }
 

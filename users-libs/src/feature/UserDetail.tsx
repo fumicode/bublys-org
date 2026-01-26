@@ -4,7 +4,7 @@ import { selectUserById, selectUserGroups } from "../slice/index.js";
 import { User } from "../domain/User.domain.js";
 import { UserIcon } from "../ui/UserIcon.js";
 import { UserGroupBadgeView } from "../ui/UserGroupBadgeView.js";
-import { DRAG_DATA_TYPES, setDragPayload } from "@bublys-org/bubbles-ui";
+import { getDragType, setDragPayload } from "@bublys-org/bubbles-ui";
 
 type UserDetailProps = {
   userId: string;
@@ -24,7 +24,7 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     const userUrl = `users/${user.id}`;
-    setDragPayload(e, { type: DRAG_DATA_TYPES.user, url: userUrl, label: user.name });
+    setDragPayload(e, { type: getDragType('User'), url: userUrl, label: user.name });
   };
 
   return (

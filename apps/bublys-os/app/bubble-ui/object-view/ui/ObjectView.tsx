@@ -1,7 +1,6 @@
 import { FC, ReactNode, useCallback } from 'react';
 import { UrledPlace } from '../../components/UrledPlace';
-import { DragDataType, setDragPayload } from '../../utils/drag-types';
-import { ObjectType, getDragType } from '../domain/ObjectTypeRegistry';
+import { DragDataType, setDragPayload, ObjectType, getDragType } from '@bublys-org/bubbles-ui';
 
 type ObjectViewProps = {
   /** オブジェクトの型 */

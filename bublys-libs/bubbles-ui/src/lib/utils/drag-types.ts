@@ -1,37 +1,30 @@
 import React from "react";
+import { getAllDragTypes } from "../object-view/ObjectTypeRegistry.js";
 
-export const DRAG_DATA_TYPES = {
-  user: "type/user",
-  users: "type/users",
-  userGroup: "type/user-group",
-  userGroups: "type/user-groups",
-  memo: "type/memo",
-  memos: "type/memos",
-  staff: "type/staff",
-  staffAvailability: "type/staff-availability",
-  shiftAssignment: "type/shift-assignment",
-  generic: "type/generic",
-} as const;
+/**
+ * ドラッグ＆ドロップ用のユーティリティ
+ * 具体的な型は ObjectTypeRegistry に登録され、ここでは汎用的な仕組みを提供
+ */
 
 export const DRAG_KEYS = {
   url: "url",
   label: "label",
 } as const;
 
-export type DragDataType = (typeof DRAG_DATA_TYPES)[keyof typeof DRAG_DATA_TYPES];
+// 特殊な組み込みドラッグ型
+export const BUILTIN_DRAG_TYPES = {
+  generic: "type/generic",
+} as const;
+
+export type DragDataType = string;
 export type DragPayload = { type: DragDataType; url: string; label?: string };
 
-export const DRAG_DATA_TYPE_LIST: DragDataType[] = [
-  DRAG_DATA_TYPES.user,
-  DRAG_DATA_TYPES.users,
-  DRAG_DATA_TYPES.userGroup,
-  DRAG_DATA_TYPES.userGroups,
-  DRAG_DATA_TYPES.memo,
-  DRAG_DATA_TYPES.memos,
-  DRAG_DATA_TYPES.staff,
-  DRAG_DATA_TYPES.staffAvailability,
-  DRAG_DATA_TYPES.shiftAssignment,
-];
+/**
+ * 登録済みの全ドラッグ型リストを取得（動的）
+ */
+export const getDragDataTypeList = (): DragDataType[] => {
+  return [...getAllDragTypes(), BUILTIN_DRAG_TYPES.generic];
+};
 
 export const setDragPayload = (
   e: React.DragEvent,
@@ -53,11 +46,11 @@ export const parseDragPayload = (
 ): DragPayload | null => {
   const { acceptTypes } = options ?? {};
   const types = Array.from(e.dataTransfer.types);
-  const targetTypes = acceptTypes && acceptTypes.length > 0 ? acceptTypes : DRAG_DATA_TYPE_LIST;
+  const targetTypes = acceptTypes && acceptTypes.length > 0 ? acceptTypes : getDragDataTypeList();
   const hitType = targetTypes.find((t) => types.includes(t));
   if (!hitType) return null;
 
-  let url = e.dataTransfer.getData(hitType);
+  const url = e.dataTransfer.getData(hitType);
   if (!url) return null;
 
   const label = e.dataTransfer.getData(DRAG_KEYS.label) || undefined;
