@@ -47,6 +47,9 @@
     },
     {
       "path": "./gakkai-shift-bubly/gakkai-shift-libs"
+    },
+    {
+      "path": "./gakkai-shift-bubly/gakkai-shift-app"
     }
   ]
 }

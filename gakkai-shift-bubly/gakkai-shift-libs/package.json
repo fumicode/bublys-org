@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.lib.json",
     "dev": "tsc -p tsconfig.lib.json --watch",
-    "build:bubly": "vite build -c vite.config.bubly.ts"
+    "build:bubly": "vite build -c vite.config.bubly.ts && cp dist-bubly/bubly.js ../gakkai-shift-app/public/bubly.js"
   },
   "exports": {
     "./package.json": "./package.json",

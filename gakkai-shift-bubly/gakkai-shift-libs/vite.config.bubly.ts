@@ -9,7 +9,9 @@ import { resolve } from "path";
  *   npx vite build -c vite.config.bubly.ts
  *
  * 出力:
- *   dist-bubly/gakkai-shift.js
+ *   dist-bubly/bubly.js
+ *
+ * 規約: バブリは {origin}/bubly.js として配信される
  */
 export default defineConfig({
   plugins: [
@@ -29,7 +31,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "src/bubly.ts"),
       name: "GakkaiShiftBubly",
-      fileName: () => "gakkai-shift.js",
+      fileName: () => "bubly.js",
       formats: ["iife"],
     },
     rollupOptions: {

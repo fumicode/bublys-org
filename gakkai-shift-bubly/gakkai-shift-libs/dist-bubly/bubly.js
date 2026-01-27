@@ -4452,4 +4452,4 @@ var GakkaiShiftBubly = function(React$1, EventNoteIcon, bubblesUi, stateManageme
   console.log("[GakkaiShiftBubly] Bubly loaded and registered to window.__BUBLYS_BUBLIES__");
   return GakkaiShiftBubly2;
 }(React, window.__BUBLYS_SHARED__.MuiIcons.EventNote, window.__BUBLYS_SHARED__.BubblesUI, window.__BUBLYS_SHARED__.StateManagement, window.__BUBLYS_SHARED__.Redux, styled, window.__BUBLYS_SHARED__.MuiIcons.Person, window.__BUBLYS_SHARED__.MuiMaterial, window.__BUBLYS_SHARED__.MuiIcons.FilterList, window.__BUBLYS_SHARED__.MuiIcons.Search, window.__BUBLYS_SHARED__.MuiIcons.Check, window.__BUBLYS_SHARED__.MuiIcons.Close, window.__BUBLYS_SHARED__.MuiIcons.Warning, window.__BUBLYS_SHARED__.MuiIcons.AutoFixHigh, window.__BUBLYS_SHARED__.MuiIcons.People, window.__BUBLYS_SHARED__.MuiIcons.Add, window.__BUBLYS_SHARED__.MuiIcons.Delete, window.__BUBLYS_SHARED__.MuiIcons.ContentCopy, window.__BUBLYS_SHARED__.MuiIcons.CheckCircle, window.__BUBLYS_SHARED__.MuiIcons.Cancel, window.__BUBLYS_SHARED__.MuiIcons.ArrowBack);
-//# sourceMappingURL=gakkai-shift.js.map
+//# sourceMappingURL=bubly.js.map

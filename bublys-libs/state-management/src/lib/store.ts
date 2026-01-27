@@ -80,9 +80,9 @@ export const addToBlacklist = (reducerPath: string) => {
 };
 
 // Store 作成関数
-export const makeStore = () => {
+export const makeStore = (options?: { persistKey?: string }) => {
   const persistConfig = {
-    key: 'root',
+    key: options?.persistKey ?? 'root',
     storage,
     blacklist: [environmentSlice.reducerPath, ...injectedBlacklist],
   };

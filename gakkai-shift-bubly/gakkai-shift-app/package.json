@@ -1,0 +1,23 @@
+{
+  "name": "@bublys-org/gakkai-shift-app",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@bublys-org/gakkai-shift-libs": "*",
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "redux-persist": "^6.0.0",
+    "styled-components": "5.3.6"
+  },
+  "nx": {
+    "targets": {
+      "dev": { "dependsOn": ["^dev"], "continuous": true }
+    }
+  }
+}

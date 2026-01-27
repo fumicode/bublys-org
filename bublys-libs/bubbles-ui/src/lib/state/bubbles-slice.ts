@@ -42,47 +42,51 @@ export interface BubbleStateSlice {
   animatingBubbleIds: string[]; // アニメーション中のバブルID（リンクバブル非表示用）
 }
 
-// --- Initial data setup ---
-const initialBubbleInstances: Bubble[] = [
-  new Bubble({
-    url: "user-groups",
-    colorHue: 200,
-    type: "user-groups",
-    position: { x: 0, y: 0 },
-  }),
-  new Bubble({
-    url: "users",
-    colorHue: 180,
-    type: "users",
-    position: { x: 400, y: 0 },
-  }),
-];
+// --- Initial bubbles configuration ---
+// 各アプリがストア作成前に設定可能
+let configuredInitialBubbleUrls: string[] = ["user-groups", "users"];
 
-// Build entities map
-const initialEntities: Record<string, BubbleJson> = {};
-initialBubbleInstances.forEach((b) => {
-  initialEntities[b.id] = b.toJSON();
-});
-
-// Build process.layers of IDs
-const initialProcess: BubblesProcessState = {
-  layers: initialBubbleInstances.map((b) => [b.id]),
+/**
+ * 初期バブルのURLを設定する（slice注入前に呼び出す）
+ */
+export const setInitialBubbleUrls = (urls: string[]) => {
+  configuredInitialBubbleUrls = urls;
 };
 
-// Combined initial state
-const initialState: BubbleStateSlice = {
-  bubbles: initialEntities,
-  process: initialProcess,
-  bubbleRelations: [],
-  globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
-  surfaceLeftTop: { x: 100, y: 100 }, // デフォルト値
-  renderCount: 0,
-  animatingBubbleIds: [],
+// 初期状態を構築する関数（遅延評価）
+const getInitialState = (): BubbleStateSlice => {
+  const bubbleInstances = configuredInitialBubbleUrls.map((url, index) => {
+    return new Bubble({
+      url,
+      colorHue: 200 - index * 20,
+      type: url.split('/')[0],
+      position: { x: index * 400, y: 0 },
+    });
+  });
+
+  const entities: Record<string, BubbleJson> = {};
+  bubbleInstances.forEach((b) => {
+    entities[b.id] = b.toJSON();
+  });
+
+  const process: BubblesProcessState = {
+    layers: bubbleInstances.map((b) => [b.id]),
+  };
+
+  return {
+    bubbles: entities,
+    process,
+    bubbleRelations: [],
+    globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
+    surfaceLeftTop: { x: 100, y: 100 },
+    renderCount: 0,
+    animatingBubbleIds: [],
+  };
 };
 
 export const bubblesSlice = createSlice({
   name: "bubbleState",
-  initialState,
+  initialState: getInitialState,
   reducers: {
     // Process-only actions
     deleteProcessBubble: (state, action: PayloadAction<string>) => {

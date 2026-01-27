@@ -67,7 +67,23 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
 };
 
 /**
+ * オリジンからバブリをロード
+ * 規約: {origin}/bubly.js
+ *
+ * @param origin - オリジン (例: "http://localhost:4001")
+ */
+export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null> => {
+  // 末尾のスラッシュを除去
+  const normalizedOrigin = origin.replace(/\/$/, "");
+  const bublyUrl = `${normalizedOrigin}/bubly.js`;
+
+  console.log(`[BublyLoader] Loading bubly from origin: ${origin}`);
+  return loadBublyFromUrl(bublyUrl);
+};
+
+/**
  * ドメインからマニフェストを取得してバブリをロード
+ * @deprecated loadBublyFromOrigin を使用してください
  */
 export const loadBublyFromDomain = async (domain: string): Promise<Bubly | null> => {
   const manifestUrl = `https://${domain}/bublys-manifest.json`;

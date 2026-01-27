@@ -201,7 +201,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
-            <PositionDebuggerProvider isShown={true}>
+            <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>
                 <BubblesLayeredView
                   bubbleLayers={bubbleLayers}

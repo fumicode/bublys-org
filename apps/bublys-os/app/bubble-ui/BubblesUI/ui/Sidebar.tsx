@@ -21,7 +21,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExtensionIcon from "@mui/icons-material/Extension";
-import { loadBublyFromUrl, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
+import { loadBublyFromOrigin, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
 
 type MenuItem = {
   label: string;
@@ -82,7 +82,9 @@ const tooltipArrowStyle: React.CSSProperties = {
 
 export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [bublyUrl, setBublyUrl] = useState("/bublies/gakkai-shift.js");
+  const [bublyOrigin, setBublyOrigin] = useState(
+    process.env.NEXT_PUBLIC_DEFAULT_BUBLY_ORIGIN ?? ""
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [loadedBublies, setLoadedBublies] = useState<string[]>([]);
   const [dynamicMenuItems, setDynamicMenuItems] = useState<BublyMenuItem[]>([]);
@@ -96,11 +98,11 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
   };
 
   const handleLoadBubly = async () => {
-    if (!bublyUrl.trim()) return;
+    if (!bublyOrigin.trim()) return;
 
     setIsLoading(true);
     try {
-      const bubly = await loadBublyFromUrl(bublyUrl.trim());
+      const bubly = await loadBublyFromOrigin(bublyOrigin.trim());
       if (bubly) {
         setLoadedBublies(Object.keys(getAllBublies()));
         setDynamicMenuItems(getAllMenuItems());
@@ -187,16 +189,16 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
               </Typography>
               <TextField
                 size="small"
-                placeholder="URL"
-                value={bublyUrl}
-                onChange={(e) => setBublyUrl(e.target.value)}
+                placeholder="オリジン (例: http://localhost:4001)"
+                value={bublyOrigin}
+                onChange={(e) => setBublyOrigin(e.target.value)}
                 sx={{ "& input": { fontSize: "0.75rem", py: 0.5 } }}
               />
               <Button
                 size="small"
                 variant="contained"
                 onClick={handleLoadBubly}
-                disabled={isLoading || !bublyUrl.trim()}
+                disabled={isLoading || !bublyOrigin.trim()}
                 sx={{ fontSize: "0.75rem", py: 0.5 }}
               >
                 {isLoading ? <CircularProgress size={16} /> : "ロード"}
