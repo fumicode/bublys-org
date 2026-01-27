@@ -1,12 +1,13 @@
 "use client";
 
 import { useContext } from "react";
-import { registerBubblePropsResolver, BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
+import { registerBubblePropsResolver, BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
-import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
+// gakkai-shiftは動的ロードに移行（プラグインテスト）
+// import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 
@@ -19,8 +20,14 @@ import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfi
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 
-export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
-  bubbleRoutes.find((route) => route.pattern.test(url));
+export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
+  // まず静的ルートを検索
+  const staticMatch = bubbleRoutes.find((route) => route.pattern.test(url));
+  if (staticMatch) return staticMatch;
+
+  // 動的ルートレジストリを検索（プラグインから登録されたルート）
+  return BubbleRouteRegistry.matchRoute(url);
+};
 
 // Memoバブルコンポーネント
 const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -120,8 +127,8 @@ const routes: BubbleRoute[] = [
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
-  // 学会シフト
-  ...gakkaiShiftBubbleRoutes,
+  // 学会シフト（プラグインとして動的ロード）
+  // ...gakkaiShiftBubbleRoutes,
 
   // タスク管理
   ...taskManagementBubbleRoutes,

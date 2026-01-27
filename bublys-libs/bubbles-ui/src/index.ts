@@ -18,6 +18,10 @@ export * from './lib/object-view/ObjectView.js';
 
 // Bubble Routing
 export * from './lib/bubble-routing/BubbleRouting.js';
+export * from './lib/bubble-routing/BubbleRouteRegistry.js';
+
+// Bubly System
+export * from './lib/bubly/index.js';
 
 // Hooks
 export * from './lib/hooks/useWindowSize.js';

@@ -52,9 +52,6 @@
   ],
   "references": [
     {
-      "path": "../../gakkai-shift-bubly/gakkai-shift-model"
-    },
-    {
       "path": "../../bublys-libs/hash-world-line"
     },
     {
@@ -62,9 +59,6 @@
     },
     {
       "path": "../../bublys-libs/object-shell"
-    },
-    {
-      "path": "../../gakkai-shift-bubly/gakkai-shift-libs"
     },
     {
       "path": "../../users-libs"
