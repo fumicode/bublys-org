@@ -6,7 +6,7 @@ import { useAppDispatch } from "@bublys-org/state-management";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
-import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 

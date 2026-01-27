@@ -37,13 +37,16 @@
       "path": "./bublys-libs/object-shell"
     },
     {
-      "path": "./gakkai-shift-libs"
+      "path": "./gakkai-shift-bubly/gakkai-shift-model"
     },
     {
       "path": "./users-libs"
     },
     {
       "path": "./bublys-libs/bubbles-ui-util"
+    },
+    {
+      "path": "./gakkai-shift-bubly/gakkai-shift-libs"
     }
   ]
 }

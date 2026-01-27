@@ -16,8 +16,6 @@ import { counterSlice } from "./slices/counter-slice.js";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
-import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
-import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
 import { taskSlice } from "./slices/task-slice.js";
 
 //iframe-slices
@@ -37,8 +35,6 @@ export const rootReducer = combineSlices(
   environmentSlice,
   memoSlice,
   pocketSlice,
-  gakkaiShiftSlice,
-  shiftPlanSlice,
   taskSlice,
   // iframe-slices（単純なreducer）
   {

@@ -52,16 +52,19 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/hash-world-line"
+      "path": "../../gakkai-shift-bubly/gakkai-shift-model"
     },
     {
-      "path": "../../gakkai-shift-libs"
+      "path": "../../bublys-libs/hash-world-line"
     },
     {
       "path": "../../bublys-libs/akashic-record"
     },
     {
       "path": "../../bublys-libs/object-shell"
+    },
+    {
+      "path": "../../gakkai-shift-bubly/gakkai-shift-libs"
     },
     {
       "path": "../../users-libs"

@@ -9,6 +9,8 @@
     "@bublys-org/akashic-record": "*",
     "@bublys-org/hash-world-line": "*",
     "@bublys-org/gakkai-shift-model": "*",
+    "@bublys-org/gakkai-shift-libs": "*",
+    "@bublys-org/users-libs": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",
