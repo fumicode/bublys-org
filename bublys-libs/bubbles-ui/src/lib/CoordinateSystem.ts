@@ -21,7 +21,7 @@ const SCALE_DECAY_RATE = 0.1;
  * このインデックス未満のレイヤーはすべてscale=1.0
  * これにより、レイヤーが追加されてもクリック位置がずれない
  */
-const SCALE_START_LAYER_INDEX = 2;
+const SCALE_START_LAYER_INDEX = 1;
 
 /**
  * 座標系クラス（2D一次変換）
