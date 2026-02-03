@@ -11,12 +11,15 @@ export type FloatingKyuseiProps = {
     level: number;
   };
   popOutMaxHeight: number; //z px
+
+  onClick: ()=>void;
 };
 
 export const FloatingKyusei: FC<FloatingKyuseiProps> = ({
   kyusei,
   position,
   popOutMaxHeight: popOutMaxHeight,
+  onClick
 }) => {
   const kyuseiObj = KyuseiRepository[kyusei];
 
@@ -25,9 +28,10 @@ export const FloatingKyusei: FC<FloatingKyuseiProps> = ({
       position={position}
       level={position.level}
       popOutHeight={popOutMaxHeight}
+      onClick={onClick}
     >
       {kyusei}
-      <GogyoIcon gogyo={kyuseiObj.gogyo} />
+      <GogyoIcon gogyo={kyuseiObj.gogyo}/>
     </FloatingKyuseiContainer>
   );
 };
@@ -41,6 +45,7 @@ type FloatingKyuseiContainerProps = {
 
   popOutHeight: number;
   children: React.ReactNode;
+  onClick: ()=>void;
 };
 
 const SIZE = 100; // px

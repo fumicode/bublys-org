@@ -7,11 +7,16 @@ import { FloatingKyusei } from "./FloatingKyusei";
 import { Slider } from "@mui/material";
 
 type FloatingKotenTeiibanProps = {
-  centerKyusei: KyuseiName;
+  centerKyusei?: KyuseiName;
+
+  onClickKyusei?: (kyusei: KyuseiName)=>void;
 };
 
 export const FloatingKotenTeiiban: FC<FloatingKotenTeiibanProps> = (
-  { centerKyusei = "五黄" } // default value
+  { 
+    centerKyusei = "五黄",
+    onClickKyusei
+  } // default value
 ) => {
   //3x3のマスを作成
 
@@ -39,6 +44,7 @@ export const FloatingKotenTeiiban: FC<FloatingKotenTeiibanProps> = (
       <tbody>
         <tr>
           <td colSpan={3}>
+            {centerKyusei}
             <Slider
               max={500}
               aria-label="Volume"
@@ -73,46 +79,55 @@ export const FloatingKotenTeiiban: FC<FloatingKotenTeiibanProps> = (
                 kyusei={"一白"}
                 position={rotatedKyuseiPositions.at(0)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("一白" as const) }}
               />
               <FloatingKyusei
                 kyusei={"二黒"}
                 position={rotatedKyuseiPositions.at(1)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("二黒" as const) }}
               />
               <FloatingKyusei
                 kyusei={"三碧"}
                 position={rotatedKyuseiPositions.at(2)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("三碧" as const) }}
               />
               <FloatingKyusei
                 kyusei={"四緑"}
                 position={rotatedKyuseiPositions.at(3)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("四緑" as const) }}
               />
               <FloatingKyusei
                 kyusei={"五黄"}
                 position={rotatedKyuseiPositions.at(4)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("五黄" as const) }}
               />
               <FloatingKyusei
                 kyusei={"六白"}
                 position={rotatedKyuseiPositions.at(5)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("六白" as const) }}
               />
               <FloatingKyusei
                 kyusei={"七赤"}
                 position={rotatedKyuseiPositions.at(6)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("七赤" as const) }}
               />
               <FloatingKyusei
                 kyusei={"八白"}
                 position={rotatedKyuseiPositions.at(7)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("八白" as const) }}
               />
               <FloatingKyusei
                 kyusei={"九紫"}
                 position={rotatedKyuseiPositions.at(8)}
                 popOutMaxHeight={popOutMaxHeight}
+                onClick={()=>{onClickKyusei?.("九紫" as const) }}
               />
             </div>
           </td>

@@ -33,6 +33,7 @@ import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorl
 import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
+import { ekikyoBubbleRoutes } from "@/app/ekikyo/bubbleRoutes";
 
 // 各バブルのコンポーネント
 const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -321,6 +322,9 @@ const routes: BubbleRoute[] = [
 
   // 囲碁ゲーム
   ...igoGameBubbleRoutes,
+
+  // 易経関係
+  ...ekikyoBubbleRoutes,
 
   // ObjectShell統合ルート
   {

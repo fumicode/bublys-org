@@ -4,6 +4,7 @@ import { FC } from "react";
 
 export type GogyoIconProps = {
   gogyo: GogyoName;
+  onClick?: ()=>void;
 };
 
 export const GogyoColors: Record<GogyoName, string> = {
@@ -14,9 +15,24 @@ export const GogyoColors: Record<GogyoName, string> = {
   水: "#40989c",
 };
 
+export const GogyoIcon: FC<GogyoIconProps> = ({ gogyo, onClick }) => {
+  return (
+    <StyledGogyoIcon 
+      gogyo={gogyo} 
+      onClick={()=>{ 
+        onClick?.();
+      }}
+    >
+      {gogyo}
+    </StyledGogyoIcon>
+  );
+};
+
 type StyledGogyoIconProps = {
   gogyo: GogyoName;
   children: React.ReactNode;
+
+  onClick?: ()=>void;
 }
 
 //style
@@ -33,6 +49,3 @@ export const StyledGogyoIcon = styled.span<StyledGogyoIconProps>`
   font-size: 0.8em;
 `;
 
-export const GogyoIcon: FC<GogyoIconProps> = ({ gogyo }) => {
-  return <StyledGogyoIcon gogyo={gogyo}>{gogyo}</StyledGogyoIcon>;
-};
