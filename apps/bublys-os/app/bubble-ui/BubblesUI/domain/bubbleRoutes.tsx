@@ -10,7 +10,8 @@ import { usersBubbleRoutes } from "@bublys-org/users-libs";
 // import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
-import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
+// ekikyoは動的ロードに移行（バブリテスト）
+// import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
 
 // ローカルコンポーネント
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
@@ -137,8 +138,8 @@ const routes: BubbleRoute[] = [
   // 囲碁ゲーム
   ...igoGameBubbleRoutes,
 
-  // 易経関係
-  ...ekikyoBubbleRoutes,
+  // 易経（プラグインとして動的ロード）
+  // ...ekikyoBubbleRoutes,
 
   // ObjectShell統合ルート
   {

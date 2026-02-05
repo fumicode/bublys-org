@@ -53,6 +53,9 @@
     },
     {
       "path": "./ekikyo-bubly/ekikyo-libs"
+    },
+    {
+      "path": "./ekikyo-bubly/ekikyo-app"
     }
   ]
 }
