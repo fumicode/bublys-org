@@ -1,10 +1,11 @@
 'use client';
 import { FC, memo } from "react";
-import { Bubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { Bubble } from "../Bubble.domain.js";
+import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 
 /**
  * BubbleContentコンポーネント
- * ekikyo専用のバブルコンテンツレンダラー
+ * バブルのURLに基づいてコンテンツをレンダリングする
  */
 export const BubbleContent: FC<{ bubble: Bubble }> = memo(({ bubble }) => {
   const route = BubbleRouteRegistry.matchRoute(bubble.url);

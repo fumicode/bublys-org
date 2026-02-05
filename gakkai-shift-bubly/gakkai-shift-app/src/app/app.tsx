@@ -1,43 +1,9 @@
-import { FC, useEffect, useCallback, useMemo } from 'react';
-import { Box, List, ListItemButton, ListItemIcon, ListItemText, Typography } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import EventNoteIcon from '@mui/icons-material/EventNote';
-import { StoreProvider } from '../StoreProvider';
+import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
 
-import {
-  useAppSelector,
-  useAppDispatch,
-  selectWindowSize,
-  setWindowSize,
-} from '@bublys-org/state-management';
-import {
-  Bubble,
-  createBubble,
-  CoordinateSystem,
-  BubblesContext,
-  BubbleRefsProvider,
-  selectBubbleLayers,
-  selectSurfaceBubbles,
-  addBubble,
-  deleteProcessBubble as deleteBubbleAction,
-  layerDown as layerDownAction,
-  layerUp as layerUpAction,
-  popChildInProcess as popChildAction,
-  popChildMaxInProcess,
-  joinSiblingInProcess as joinSiblingAction,
-  relateBubbles,
-  removeBubble,
-  selectGlobalCoordinateSystem,
-  setGlobalCoordinateSystem,
-  selectSurfaceLeftTop,
-  OpeningPosition,
-  BubbleRouteRegistry,
-} from '@bublys-org/bubbles-ui';
-
-// gakkai-shiftのルート登録
+// gakkai-shiftのルート登録（ライブラリimport時にslicesも自動注入される）
 import { gakkaiShiftBubbleRoutes } from '@bublys-org/gakkai-shift-libs';
-
-import { BubblesLayeredView } from './BubblesLayeredView';
 
 // gakkai-shiftのルートを登録
 BubbleRouteRegistry.registerRoutes(gakkaiShiftBubbleRoutes);
@@ -48,183 +14,18 @@ const menuItems = [
   { label: 'シフト配置表', url: 'gakkai-shift/shift-plans', icon: <EventNoteIcon /> },
 ];
 
-const AppContent: FC = () => {
-  const dispatch = useAppDispatch();
-  const bubbleLayers = useAppSelector(selectBubbleLayers);
-  const surfaceBubbles = useAppSelector(selectSurfaceBubbles);
-
-  // ページサイズ管理
-  const pageSize = useAppSelector(selectWindowSize);
-  useEffect(() => {
-    const update = () =>
-      dispatch(
-        setWindowSize({ width: window.innerWidth, height: window.innerHeight })
-      );
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [dispatch]);
-
-  // CoordinateSystem
-  const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
-  const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-
-  // アクションハンドラ
-  const deleteBubble = (b: Bubble) => {
-    dispatch(deleteBubbleAction(b.id));
-    dispatch(removeBubble(b.id));
-  };
-
-  const layerDown = (b: Bubble) => {
-    dispatch(layerDownAction(b.id));
-  };
-
-  const layerUp = (b: Bubble) => {
-    dispatch(layerUpAction(b.id));
-  };
-
-  const popChild = useCallback((
-    b: Bubble,
-    openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
-  ): string => {
-    dispatch(addBubble(b.toJSON()));
-    dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
-    dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
-    return b.id;
-  }, [dispatch]);
-
-  const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
-
-    const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
-
-    dispatch(addBubble(movedBubble.toJSON()));
-    dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));
-    dispatch(popChildMaxInProcess(b.id));
-
-    return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
-
-  const joinSibling = useCallback((
-    b: Bubble,
-    openerBubbleId: string
-  ): string => {
-    dispatch(addBubble(b.toJSON()));
-    dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
-    dispatch(joinSiblingAction(b.id));
-    return b.id;
-  }, [dispatch]);
-
-  const popChildOrJoinSibling = useCallback((
-    name: string,
-    openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
-  ): string => {
-    const newBubble = createBubble(name);
-
-    const isNameEndWithHistory = /\/history$/.test(name);
-
-    if (isNameEndWithHistory) {
-      return popChildMax(newBubble, openerBubbleId);
-    }
-
-    if (surfaceBubbles?.[0]?.type === newBubble.type) {
-      return joinSibling(newBubble, openerBubbleId);
-    } else {
-      return popChild(newBubble, openerBubbleId, openingPosition);
-    }
-  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
-
-  const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
-    dispatch(setGlobalCoordinateSystem(cs.toData()));
-  }, [dispatch]);
-
-  const bubblesContextValue = useMemo(() => ({
-    pageSize,
-    surfaceLeftTop,
-    coordinateSystem: globalCoordinateSystem,
-    openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
-
-  const handleMenuItemClick = (url: string) => {
-    popChildOrJoinSibling(url, 'root');
-  };
-
-  return (
-    <Box sx={{ display: 'flex', width: '100%', height: '100vh' }}>
-      {/* サイドバー */}
-      <Box
-        sx={{
-          width: 200,
-          backgroundColor: 'rgba(30, 30, 40, 0.95)',
-          borderRight: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* ヘッダー */}
-        <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 'bold' }}>
-            学会シフト管理
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-            Standalone • Port 4001
-          </Typography>
-        </Box>
-
-        {/* メニュー */}
-        <List sx={{ flex: 1 }}>
-          {menuItems.map((item) => (
-            <ListItemButton
-              key={item.url}
-              onClick={() => handleMenuItemClick(item.url)}
-              sx={{
-                color: 'rgba(255,255,255,0.8)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)',
-                },
-              }}
-            >
-              <ListItemIcon sx={{ color: 'rgba(255,255,255,0.6)', minWidth: 40 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
-        </List>
-      </Box>
-
-      {/* メインエリア（バブル表示） */}
-      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <BubblesContext.Provider value={bubblesContextValue}>
-          <BubbleRefsProvider>
-            <Box sx={{ width: '100%', height: '100%' }}>
-              <BubblesLayeredView
-                bubbleLayers={bubbleLayers}
-                vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                onBubbleClick={(name) => console.log('Bubble clicked: ' + name)}
-                onBubbleClose={deleteBubble}
-                onBubbleResize={(bubble) => console.log('Bubble resized: ' + bubble.url, bubble.size)}
-                onBubbleLayerDown={layerDown}
-                onBubbleLayerUp={layerUp}
-                onCoordinateSystemReady={handleCoordinateSystemReady}
-              />
-            </Box>
-          </BubbleRefsProvider>
-        </BubblesContext.Provider>
-      </Box>
-    </Box>
-  );
-};
-
 export function App() {
   return (
-    <StoreProvider>
-      <AppContent />
-    </StoreProvider>
+    <BublyStoreProvider
+      persistKey="gakkai-shift-standalone"
+      initialBubbleUrls={['gakkai-shift/staffs', 'gakkai-shift/shift-plans']}
+    >
+      <BublyApp
+        title="学会シフト管理"
+        subtitle="Standalone • Port 4001"
+        menuItems={menuItems}
+      />
+    </BublyStoreProvider>
   );
 }
 

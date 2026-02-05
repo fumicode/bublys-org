@@ -1,20 +1,18 @@
 import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
 import styled from "styled-components";
+import { useAppSelector } from "@bublys-org/state-management";
+import { Bubble } from "../Bubble.domain.js";
+import { Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { BubbleView } from "./BubbleView.js";
+import { LinkBubbleView } from "./LinkBubbleView.js";
+import { BubbleContent } from "./BubbleContent.js";
 import {
-  Bubble,
-  Point2,
-  Vec2,
-  CoordinateSystem,
-  BubbleView,
-  LinkBubbleView,
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
-} from "@bublys-org/bubbles-ui";
-import { useAppSelector } from "@bublys-org/state-management";
-import { BubbleContent } from "./BubbleContent";
+} from "../state/index.js";
 
 /**
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント
@@ -109,7 +107,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   );
 });
 
-type BubblesLayeredViewProps = {
+export type BubblesLayeredViewProps = {
   bubbleLayers: string[][];
   vanishingPoint?: Point2;
   onBubbleClick?: (name: string) => void;
