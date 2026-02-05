@@ -17,6 +17,9 @@
   },
   "nx": {
     "targets": {
+      "build": {
+        "dependsOn": ["^build", "@bublys-org/gakkai-shift-libs:build:bubly"]
+      },
       "dev": { "dependsOn": ["^dev"], "continuous": true }
     }
   }
