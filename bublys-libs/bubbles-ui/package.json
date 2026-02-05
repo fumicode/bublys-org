@@ -26,7 +26,16 @@
     }
   },
   "dependencies": {
-    "@bublys-org/bubbles-ui-util": "*"
+    "@bublys-org/bubbles-ui-util": "*",
+    "@bublys-org/state-management": "*",
+    "@mui/icons-material": "^7.0.0",
+    "@reduxjs/toolkit": "^2.9.0",
+    "clsx": "^2.1.0",
+    "immer": "^10.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-redux": "^9.2.0",
+    "styled-components": "^5.3.6"
   },
   "nx": {
     "targets": {

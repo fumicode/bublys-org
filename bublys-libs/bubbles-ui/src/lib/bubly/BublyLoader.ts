@@ -21,10 +21,9 @@ const createBublyContext = (): BublyContext => ({
   registerBubbleRoutes: (routes) => {
     BubbleRouteRegistry.registerRoutes(routes);
   },
-  injectSlice: (slice) => {
+  injectSlice: (_slice) => {
     // sliceのinjectIntoパターンでは、インポート時に自動注入されるため、
     // 通常この関数は使われない
-    console.log("[BublyLoader] injectSlice called (usually auto-injected)", slice);
   },
 });
 
@@ -32,8 +31,6 @@ const createBublyContext = (): BublyContext => ({
  * バブリをURLからロード
  */
 export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
-  console.log(`[BublyLoader] Loading bubly from: ${url}`);
-
   try {
     await loadScript(url);
 
@@ -58,7 +55,6 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
     const context = createBublyContext();
     bubly.register(context);
 
-    console.log(`[BublyLoader] Bubly "${bubly.name}" v${bubly.version} loaded successfully`);
     return bubly;
   } catch (error) {
     console.error("[BublyLoader] Failed to load bubly:", error);
@@ -77,7 +73,6 @@ export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null>
   const normalizedOrigin = origin.replace(/\/$/, "");
   const bublyUrl = `${normalizedOrigin}/bubly.js`;
 
-  console.log(`[BublyLoader] Loading bubly from origin: ${origin}`);
   return loadBublyFromUrl(bublyUrl);
 };
 
@@ -87,7 +82,6 @@ export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null>
  */
 export const loadBublyFromDomain = async (domain: string): Promise<Bubly | null> => {
   const manifestUrl = `https://${domain}/bublys-manifest.json`;
-  console.log(`[BublyLoader] Fetching manifest from: ${manifestUrl}`);
 
   try {
     const response = await fetch(manifestUrl);
@@ -96,7 +90,6 @@ export const loadBublyFromDomain = async (domain: string): Promise<Bubly | null>
     }
 
     const manifest: BublyManifest = await response.json();
-    console.log(`[BublyLoader] Manifest loaded:`, manifest);
 
     // バブリURLを構築（相対パスの場合はドメインを付与）
     const bublyUrl = manifest.bublyUrl.startsWith("http")

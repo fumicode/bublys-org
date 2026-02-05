@@ -50,6 +50,7 @@ Thumbs.db
 # Next.js
 .next
 out
+next-env.d.ts
 
 test-output
 
@@ -58,3 +59,7 @@ vitest.config.*.timestamp*
 
 #  TypeScript
 tsconfig.tsbuildinfo
+
+# Bubly build outputs
+dist-bubly
+**/public/bubly.js
