@@ -2,6 +2,16 @@ import { Bubly, BublyContext, BublyManifest, BublyMenuItem } from "./BublyTypes.
 import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 
 /**
+ * バブリを登録するAPI
+ * bubly.ts から呼び出される公式API
+ */
+export const registerBubly = (bubly: Bubly): void => {
+  // グローバルレジストリに登録
+  window.__BUBLYS_BUBLIES__ = window.__BUBLYS_BUBLIES__ || {};
+  window.__BUBLYS_BUBLIES__[bubly.name] = bubly;
+};
+
+/**
  * スクリプトを動的にロード
  */
 const loadScript = (url: string): Promise<void> => {

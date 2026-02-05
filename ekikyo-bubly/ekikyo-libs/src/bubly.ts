@@ -6,31 +6,11 @@
  */
 
 import React from "react";
-import type { BubbleRoute } from "@bublys-org/bubbles-ui";
+import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 
 // Bubble Routes
 import { ekikyoBubbleRoutes } from "./registration/index.js";
-
-// バブリインターフェース
-type BublyMenuItem = {
-  label: string;
-  url: string | (() => string);
-  icon: React.ReactNode;
-};
-
-type Bubly = {
-  name: string;
-  version: string;
-  menuItems?: BublyMenuItem[];
-  register: (context: BublyContext) => void;
-  unregister?: () => void;
-};
-
-type BublyContext = {
-  registerBubbleRoutes: (routes: BubbleRoute[]) => void;
-  injectSlice: (slice: unknown) => void;
-};
 
 const EkikyoBubly: Bubly = {
   name: "ekikyo",
@@ -44,7 +24,7 @@ const EkikyoBubly: Bubly = {
     },
   ],
 
-  register(context: BublyContext) {
+  register(context) {
     // Bubble routesを登録
     context.registerBubbleRoutes(ekikyoBubbleRoutes);
   },
@@ -54,14 +34,7 @@ const EkikyoBubly: Bubly = {
   },
 };
 
-// グローバルに登録
-declare global {
-  interface Window {
-    __BUBLYS_BUBLIES__?: Record<string, Bubly>;
-  }
-}
-
-window.__BUBLYS_BUBLIES__ = window.__BUBLYS_BUBLIES__ || {};
-window.__BUBLYS_BUBLIES__["ekikyo"] = EkikyoBubly;
+// 公式APIを使って登録
+registerBubly(EkikyoBubly);
 
 export default EkikyoBubly;
