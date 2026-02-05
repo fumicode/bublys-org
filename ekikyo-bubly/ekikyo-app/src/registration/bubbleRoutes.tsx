@@ -7,8 +7,7 @@ import { FloatingKotenTeiiban, KyuseiName } from "@bublys-org/ekikyo-libs";
 // 易経 - 九星盤バブル
 const FloatingKotenTeiibanBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
-  const match = bubble.url.match(/^ekikyo\/kyuseis\/([^/]+)$/);
-  const kyuseiName = match?.[1] as KyuseiName;
+  const kyuseiName = bubble.params.kyuseiName as KyuseiName;
 
   return (
     <>
@@ -26,7 +25,7 @@ const FloatingKotenTeiibanBubble: BubbleRoute["Component"] = ({ bubble }) => {
 /** 易経機能のバブルルート定義 */
 export const ekikyoBubbleRoutes: BubbleRoute[] = [
   {
-    pattern: /^ekikyo\/kyuseis\/[^/]+$/,
+    pattern: "ekikyo/kyuseis/:kyuseiName",
     type: "kyusei",
     Component: FloatingKotenTeiibanBubble,
   },

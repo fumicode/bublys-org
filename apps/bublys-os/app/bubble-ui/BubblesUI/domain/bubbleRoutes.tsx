@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { registerBubblePropsResolver, BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 
 // 外部バブリのルート
@@ -22,12 +22,8 @@ import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfi
 import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 
+/** BubbleRouteRegistry経由でルートを検索 */
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
-  // まず静的ルートを検索
-  const staticMatch = bubbleRoutes.find((route) => route.pattern.test(url));
-  if (staticMatch) return staticMatch;
-
-  // 動的ルートレジストリを検索（プラグインから登録されたルート）
   return BubbleRouteRegistry.matchRoute(url);
 };
 
@@ -151,11 +147,6 @@ const routes: BubbleRoute[] = [
 
 export const bubbleRoutes = routes;
 
-registerBubblePropsResolver((url: string) => {
-  const route = matchBubbleRoute(url);
-  if (!route) return undefined;
-  return {
-    type: route.type,
-    bubbleOptions: route.bubbleOptions,
-  };
-});
+// 静的ルートをBubbleRouteRegistryに登録
+// （動的ルートより先に登録されるため、優先される）
+BubbleRouteRegistry.registerRoutes(routes);

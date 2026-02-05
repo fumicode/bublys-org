@@ -6,6 +6,7 @@ import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 /**
  * BubbleContentコンポーネント
  * バブルのURLに基づいてコンテンツをレンダリングする
+ * paramsはBubble作成時に解決済み
  */
 export const BubbleContent: FC<{ bubble: Bubble }> = memo(({ bubble }) => {
   const route = BubbleRouteRegistry.matchRoute(bubble.url);

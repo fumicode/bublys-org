@@ -1,4 +1,4 @@
-import { BubbleRoute } from "./BubbleRouting.js";
+import { BubbleRoute, matchesPattern, extractParams } from "./BubbleRouting.js";
 import { registerBubblePropsResolver } from "../Bubble.domain.js";
 
 /**
@@ -32,6 +32,7 @@ class BubbleRouteRegistryClass {
       if (!route) return undefined;
       return {
         type: route.type,
+        params: extractParams(url, route.pattern),
         bubbleOptions: route.bubbleOptions,
       };
     });
@@ -48,7 +49,7 @@ class BubbleRouteRegistryClass {
    * URLに一致するルートを検索
    */
   matchRoute(url: string): BubbleRoute | undefined {
-    return this.routes.find((route) => route.pattern.test(url));
+    return this.routes.find((route) => matchesPattern(url, route.pattern));
   }
 
   /**
