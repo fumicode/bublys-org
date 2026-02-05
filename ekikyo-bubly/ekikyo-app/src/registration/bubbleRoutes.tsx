@@ -2,8 +2,7 @@
 
 import { useContext } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
-import { FloatingKotenTeiiban } from "../view/FloatingKotenTeiiban.js";
-import { KyuseiName } from "../domain/kyusei-types.js";
+import { FloatingKotenTeiiban, KyuseiName } from "@bublys-org/ekikyo-libs";
 
 // 易経 - 九星盤バブル
 const FloatingKotenTeiibanBubble: BubbleRoute["Component"] = ({ bubble }) => {
@@ -28,7 +27,7 @@ const FloatingKotenTeiibanBubble: BubbleRoute["Component"] = ({ bubble }) => {
 export const ekikyoBubbleRoutes: BubbleRoute[] = [
   {
     pattern: /^ekikyo\/kyuseis\/[^/]+$/,
-    type: "gogyo",
+    type: "kyusei",
     Component: FloatingKotenTeiibanBubble,
   },
 ];

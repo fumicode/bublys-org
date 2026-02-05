@@ -2,15 +2,20 @@
 
 import { useContext } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
-import { StaffCollection, parseStaffFilter, stringifyStaffFilter, StaffFilterCriteria as StaffFilterType } from "../feature/StaffCollection.js";
-import { Role_係 } from "../domain/index.js";
-import { StaffFilter } from "../feature/StaffFilter.js";
-import { StaffDetail } from "../feature/StaffDetail.js";
-import { StaffAvailability } from "../feature/StaffAvailability.js";
-import { ShiftPlanEditor } from "../feature/ShiftPlanEditor.js";
-import { ShiftPlanManager } from "../feature/ShiftPlanManager.js";
-import { AssignmentEvaluation } from "../feature/AssignmentEvaluation.js";
-import { StaffShiftTable } from "../feature/StaffShiftTable.js";
+import {
+  StaffCollection,
+  parseStaffFilter,
+  stringifyStaffFilter,
+  StaffFilterCriteria as StaffFilterType,
+  Role_係,
+  StaffFilter,
+  StaffDetail,
+  StaffAvailability,
+  ShiftPlanEditor,
+  ShiftPlanManager,
+  AssignmentEvaluation,
+  StaffShiftTable,
+} from "@bublys-org/gakkai-shift-libs";
 
 // 学会シフト - スタッフ絞り込み検索バブル
 const GakkaiShiftStaffFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {

@@ -1,4 +1,5 @@
 import { BubbleRoute } from "./BubbleRouting.js";
+import { registerBubblePropsResolver } from "../Bubble.domain.js";
 
 /**
  * 動的バブルルートレジストリ
@@ -7,14 +8,33 @@ import { BubbleRoute } from "./BubbleRouting.js";
 class BubbleRouteRegistryClass {
   private routes: BubbleRoute[] = [];
   private listeners: Set<() => void> = new Set();
+  private resolverRegistered = false;
 
   /**
    * ルートを登録
    */
   registerRoutes(routes: BubbleRoute[]): void {
     this.routes.push(...routes);
+    this.ensureResolverRegistered();
     this.notifyListeners();
     console.log(`[BubbleRouteRegistry] Registered ${routes.length} routes. Total: ${this.routes.length}`);
+  }
+
+  /**
+   * BubblePropsResolver を登録（一度だけ）
+   */
+  private ensureResolverRegistered(): void {
+    if (this.resolverRegistered) return;
+    this.resolverRegistered = true;
+
+    registerBubblePropsResolver((url: string) => {
+      const route = this.matchRoute(url);
+      if (!route) return undefined;
+      return {
+        type: route.type,
+        bubbleOptions: route.bubbleOptions,
+      };
+    });
   }
 
   /**

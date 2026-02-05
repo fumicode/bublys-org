@@ -8,8 +8,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.lib.json",
-    "dev": "tsc -p tsconfig.lib.json --watch",
-    "build:bubly": "vite build -c vite.config.bubly.ts && cp dist-bubly/bubly.js ../ekikyo-app/public/bubly.js"
+    "dev": "tsc -p tsconfig.lib.json --watch"
   },
   "exports": {
     "./package.json": "./package.json",

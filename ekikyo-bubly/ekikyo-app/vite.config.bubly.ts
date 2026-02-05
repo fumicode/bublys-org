@@ -3,22 +3,18 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 /**
- * gakkai-shift-libs をスタンドアロンバブリとしてビルドする設定
+ * ekikyo-app をスタンドアロンバブリとしてビルドする設定
  *
  * ビルドコマンド:
  *   npx vite build -c vite.config.bubly.ts
  *
  * 出力:
- *   dist-bubly/bubly.js
+ *   public/bubly.js
  *
  * 規約: バブリは {origin}/bubly.js として配信される
  */
 export default defineConfig({
-  plugins: [
-    react({
-      jsxRuntime: "classic",
-    }),
-  ],
+  plugins: [react()],
 
   define: {
     // styled-componentsなどがprocess.envを参照するため
@@ -27,19 +23,27 @@ export default defineConfig({
   },
 
   build: {
-    outDir: "dist-bubly",
+    outDir: "public",
+    emptyOutDir: false,
     lib: {
       entry: resolve(__dirname, "src/bubly.ts"),
-      name: "GakkaiShiftBubly",
+      name: "EkikyoBubly",
       fileName: () => "bubly.js",
       formats: ["iife"],
     },
     rollupOptions: {
       // 共有依存関係は外部化（ホストアプリから提供される）
-      // gakkai-shift-model はバンドルに含める（完全分離のため）
+      // ekikyo-libs はバンドルに含める（完全分離のため）
       external: (id) => {
-        // gakkai-shift-model はバンドルに含める
-        if (id === "@bublys-org/gakkai-shift-model" || id.startsWith("@bublys-org/gakkai-shift-model/")) {
+        // ekikyo-libs はバンドルに含める
+        if (
+          id === "@bublys-org/ekikyo-libs" ||
+          id.startsWith("@bublys-org/ekikyo-libs/")
+        ) {
+          return false;
+        }
+        // react/jsx-runtime はバンドルに含める（自動 JSX ランタイム用）
+        if (id === "react/jsx-runtime" || id === "react/jsx-dev-runtime") {
           return false;
         }
         if (
@@ -86,12 +90,11 @@ export default defineConfig({
           if (id === "@bublys-org/bubbles-ui" || id.startsWith("@bublys-org/bubbles-ui/")) {
             return "window.__BUBLYS_SHARED__.BubblesUI";
           }
-          // gakkai-shift-model はバンドルに含まれるため、ここには来ない
+          // ekikyo-libs はバンドルに含まれるため、ここには来ない
           // MUI関連
           if (id.startsWith("@mui/material")) {
             return "window.__BUBLYS_SHARED__.MuiMaterial";
           }
-          // @mui/icons-material/FilterList -> window.__BUBLYS_SHARED__.MuiIcons.FilterList
           if (id.startsWith("@mui/icons-material/")) {
             const iconName = id.replace("@mui/icons-material/", "");
             return `window.__BUBLYS_SHARED__.MuiIcons.${iconName}`;

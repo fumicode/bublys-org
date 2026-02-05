@@ -1,10 +1,9 @@
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
 
-// ekikyoのルート登録（ライブラリimport時にslicesも自動注入される）
-import { ekikyoBubbleRoutes } from '@bublys-org/ekikyo-libs';
+// ルート登録（app側で管理）
+import { ekikyoBubbleRoutes } from '../registration/index.js';
 
-// ekikyoのルートを登録
 BubbleRouteRegistry.registerRoutes(ekikyoBubbleRoutes);
 
 // サイドバーのメニュー項目

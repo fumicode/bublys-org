@@ -2,6 +2,9 @@
   "name": "@bublys-org/gakkai-shift-app",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "build:bubly": "vite build -c vite.config.bubly.ts"
+  },
   "dependencies": {
     "@bublys-org/gakkai-shift-libs": "*",
     "@bublys-org/bubbles-ui": "*",
@@ -18,7 +21,10 @@
   "nx": {
     "targets": {
       "build": {
-        "dependsOn": ["^build", "@bublys-org/gakkai-shift-libs:build:bubly"]
+        "dependsOn": ["^build"]
+      },
+      "build:bubly": {
+        "dependsOn": ["^build"]
       },
       "dev": { "dependsOn": ["^dev"], "continuous": true }
     }

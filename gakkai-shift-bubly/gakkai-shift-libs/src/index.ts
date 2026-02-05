@@ -10,8 +10,5 @@ export * from "./feature/index.js";
 // Redux slices
 export * from "./slice/index.js";
 
-// Bubble routes registration
-export * from "./registration/index.js";
-
 // Sample data
 export * from "./data/index.js";

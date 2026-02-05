@@ -25,7 +25,6 @@ const EkikyoBubly: Bubly = {
   ],
 
   register(context) {
-    // Bubble routesを登録
     context.registerBubbleRoutes(ekikyoBubbleRoutes);
   },
 

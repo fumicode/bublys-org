@@ -63,3 +63,4 @@ tsconfig.tsbuildinfo
 # Bubly build outputs
 dist-bubly
 **/public/bubly.js
+**/public/bubly.js.map

@@ -2,6 +2,9 @@
   "name": "@bublys-org/ekikyo-app",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "build:bubly": "vite build -c vite.config.bubly.ts"
+  },
   "dependencies": {
     "@bublys-org/ekikyo-libs": "*",
     "@bublys-org/bubbles-ui": "*",
@@ -18,7 +21,10 @@
   "nx": {
     "targets": {
       "build": {
-        "dependsOn": ["^build", "@bublys-org/ekikyo-libs:build:bubly"]
+        "dependsOn": ["^build"]
+      },
+      "build:bubly": {
+        "dependsOn": ["^build"]
       },
       "dev": { "dependsOn": ["^dev"], "continuous": true }
     }

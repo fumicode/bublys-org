@@ -2,10 +2,12 @@ import PeopleIcon from '@mui/icons-material/People';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
 
-// gakkai-shiftのルート登録（ライブラリimport時にslicesも自動注入される）
-import { gakkaiShiftBubbleRoutes } from '@bublys-org/gakkai-shift-libs';
+// gakkai-shift-libs のslicesをimport（自動注入される）
+import '@bublys-org/gakkai-shift-libs';
 
-// gakkai-shiftのルートを登録
+// ルート登録（app側で管理）
+import { gakkaiShiftBubbleRoutes } from '../registration/index.js';
+
 BubbleRouteRegistry.registerRoutes(gakkaiShiftBubbleRoutes);
 
 // サイドバーのメニュー項目
