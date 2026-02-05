@@ -92,6 +92,7 @@
     "gakkai-shift-bubly/gakkai-shift-model",
     "gakkai-shift-bubly/gakkai-shift-libs",
     "users-libs",
-    "gakkai-shift-bubly/*"
+    "gakkai-shift-bubly/*",
+    "ekikyo-bubly/*"
   ]
 }

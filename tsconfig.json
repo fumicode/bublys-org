@@ -50,6 +50,9 @@
     },
     {
       "path": "./gakkai-shift-bubly/gakkai-shift-app"
+    },
+    {
+      "path": "./ekikyo-bubly/ekikyo-libs"
     }
   ]
 }

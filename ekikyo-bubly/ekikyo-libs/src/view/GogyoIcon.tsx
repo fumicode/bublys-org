@@ -1,10 +1,10 @@
 import styled from "styled-components";
-import { GogyoName } from "../domain/kyusei-types";
+import { GogyoName } from "../domain/kyusei-types.js";
 import { FC } from "react";
 
 export type GogyoIconProps = {
   gogyo: GogyoName;
-  onClick?: ()=>void;
+  onClick?: () => void;
 };
 
 export const GogyoColors: Record<GogyoName, string> = {
@@ -17,9 +17,9 @@ export const GogyoColors: Record<GogyoName, string> = {
 
 export const GogyoIcon: FC<GogyoIconProps> = ({ gogyo, onClick }) => {
   return (
-    <StyledGogyoIcon 
-      gogyo={gogyo} 
-      onClick={()=>{ 
+    <StyledGogyoIcon
+      gogyo={gogyo}
+      onClick={() => {
         onClick?.();
       }}
     >
@@ -31,9 +31,8 @@ export const GogyoIcon: FC<GogyoIconProps> = ({ gogyo, onClick }) => {
 type StyledGogyoIconProps = {
   gogyo: GogyoName;
   children: React.ReactNode;
-
-  onClick?: ()=>void;
-}
+  onClick?: () => void;
+};
 
 //style
 export const StyledGogyoIcon = styled.span<StyledGogyoIconProps>`
@@ -48,4 +47,3 @@ export const StyledGogyoIcon = styled.span<StyledGogyoIconProps>`
   height: 1em;
   font-size: 0.8em;
 `;
-

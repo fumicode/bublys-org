@@ -1,0 +1,33 @@
+{
+  "name": "@bublys-org/ekikyo-libs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "dev": "tsc -p tsconfig.lib.json --watch",
+    "build:bubly": "vite build -c vite.config.bubly.ts"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@bublys-org/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "tslib": "^2.3.0",
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*"
+  },
+  "nx": {
+    "targets": {
+      "dev": { "continuous": true }
+    }
+  }
+}

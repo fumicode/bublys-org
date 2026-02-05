@@ -10,7 +10,7 @@ import { usersBubbleRoutes } from "@bublys-org/users-libs";
 // import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
-import { ekikyoBubbleRoutes } from "@/app/ekikyo/bubbleRoutes";
+import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
 
 // ローカルコンポーネント
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
