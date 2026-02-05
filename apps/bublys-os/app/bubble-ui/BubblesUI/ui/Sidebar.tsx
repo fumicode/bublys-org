@@ -56,6 +56,11 @@ const staticMenuItems: MenuItem[] = [
     url: "users",
     icon: <PersonIcon color="action" />,
   },
+  {
+    label: "九星盤",
+    url: "ekikyo/kyuseis/五黄",
+    icon: <PersonIcon color="action" />,
+  },
 ];
 
 type SidebarProps = {
