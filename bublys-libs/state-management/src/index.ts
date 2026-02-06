@@ -5,11 +5,7 @@ export * from './lib/slices/world-slice.js';
 export * from './lib/slices/counter-slice.js';
 export * from './lib/slices/environment-slice.js';
 export * from './lib/slices/memo-slice.js';
-export * from './lib/slices/user-slice.js';
-export * from './lib/slices/user-group-slice.js';
 export * from './lib/slices/pocket-slice.js';
-export * from './lib/slices/gakkai-shift-slice.js';
-export * from './lib/slices/shift-plan-slice.js';
 export * from './lib/slices/task-slice.js';
 export * from './lib/slices/Memo.js';
 

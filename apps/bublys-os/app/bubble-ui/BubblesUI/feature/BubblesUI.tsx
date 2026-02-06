@@ -3,6 +3,11 @@ import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPoc
 import { useShellManager } from "@bublys-org/object-shell";
 
 import {
+  Bubble,
+  createBubble,
+  CoordinateSystem,
+  BubblesContext,
+  BubbleRefsProvider,
   selectBubbleLayers,
   selectSurfaceBubbles,
   addBubble,
@@ -19,12 +24,9 @@ import {
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
   OpeningPosition,
-} from "@bublys-org/bubbles-ui-state";
-
-import { Bubble, createBubble, CoordinateSystem } from "@bublys-org/bubbles-ui";
-import { PositionDebuggerProvider } from "../../PositionDebugger/feature/PositionDebugger";
-import { BubblesContext } from "../domain/BubblesContext";
-import { BubbleRefsProvider } from "../domain/BubbleRefsContext";
+  DragDataType,
+} from "@bublys-org/bubbles-ui";
+import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -33,7 +35,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
-import { DragDataType } from "../../utils/drag-types";
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;

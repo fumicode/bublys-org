@@ -1,5 +1,5 @@
 import {environmentSlice} from "./slices/environment-slice.js";
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import { combineSlices, configureStore, Slice, Middleware } from "@reduxjs/toolkit";
 
 import { persistStore, persistReducer,
   FLUSH,
@@ -13,17 +13,9 @@ import { persistStore, persistReducer,
 import storage from "redux-persist/es/storage"; // defaults to localStorage for web
 
 import { counterSlice } from "./slices/counter-slice.js";
-import {
-  bubblesSlice,
-} from "@bublys-org/bubbles-ui-state";
-import { bubblesListener, shellBubbleListener, shellDeletionListener } from "@bublys-org/bubbles-ui-state";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
-import { userSlice } from "./slices/user-slice.js";
-import { userGroupSlice } from "./slices/user-group-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
-import { gakkaiShiftSlice } from "./slices/gakkai-shift-slice.js";
-import { shiftPlanSlice } from "./slices/shift-plan-slice.js";
 import { taskSlice } from "./slices/task-slice.js";
 
 //iframe-slices
@@ -32,54 +24,81 @@ import exportDataReducer from './iframe-slices/exportData.slice.js';
 import massageReducer from './iframe-slices/massages.slice.js';
 import bublysContainersReducer from './iframe-slices/bublysContainers.slice.js';
 
-// Reducers 定義
-const reducers = combineReducers({
-  [counterSlice.reducerPath]: counterSlice.reducer,
-  [bubblesSlice.reducerPath]: bubblesSlice.reducer,
-  [worldSlice.reducerPath]: worldSlice.reducer,
-  [environmentSlice.reducerPath]: environmentSlice.reducer,
-  [memoSlice.reducerPath]: memoSlice.reducer,
-  [userSlice.name]: userSlice.reducer,
-  [userGroupSlice.name]: userGroupSlice.reducer,
-  [pocketSlice.name]: pocketSlice.reducer,
-  [gakkaiShiftSlice.name]: gakkaiShiftSlice.reducer,
-  [shiftPlanSlice.name]: shiftPlanSlice.reducer,
-  [taskSlice.name]: taskSlice.reducer,
+// LazyLoadedSlices: 外部ライブラリからinjectIntoで注入されるsliceの型
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-empty-interface
+export interface LazyLoadedSlices {}
 
-  //iframe-slices
-  app: appReducer,
-  exportData: exportDataReducer,
-  massage: massageReducer,
-  bublysContainers: bublysContainersReducer,
-});
+// Reducers 定義（combineSlicesを使用）
+export const rootReducer = combineSlices(
+  counterSlice,
+  worldSlice,
+  environmentSlice,
+  memoSlice,
+  pocketSlice,
+  taskSlice,
+  // iframe-slices（単純なreducer）
+  {
+    app: appReducer,
+    exportData: exportDataReducer,
+    massage: massageReducer,
+    bublysContainers: bublysContainersReducer,
+  }
+).withLazyLoadedSlices<LazyLoadedSlices>();
 
-const persistConfig = {
-  key: 'root',
-  storage,
-  blacklist: [bubblesSlice.reducerPath, environmentSlice.reducerPath ],
-}
+// RootState を rootReducer から推論
+// LazyLoadedSlicesは必須として扱う（基盤ライブラリは常に注入される前提）
+export type RootState = ReturnType<typeof rootReducer> & LazyLoadedSlices;
 
-const persistedReducer = persistReducer(persistConfig, reducers)
+// 外部から注入されるsliceとmiddlewareを保持
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const injectedSlices: Slice[] = [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const injectedMiddlewares: Middleware[] = [];
+const injectedBlacklist: string[] = [];
 
-// RootState を reducers から推論
-export type RootState = ReturnType<typeof reducers>;
+/**
+ * 外部ライブラリからsliceを注入する
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const injectSlice = (slice: Slice) => {
+  injectedSlices.push(slice);
+  slice.injectInto(rootReducer);
+};
+
+/**
+ * 外部ライブラリからmiddlewareを注入する
+ */
+export const injectMiddleware = (middleware: Middleware) => {
+  injectedMiddlewares.push(middleware);
+};
+
+/**
+ * persist blacklistにreducerPathを追加する
+ */
+export const addToBlacklist = (reducerPath: string) => {
+  injectedBlacklist.push(reducerPath);
+};
 
 // Store 作成関数
-export const makeStore = () => {
+export const makeStore = (options?: { persistKey?: string }) => {
+  const persistConfig = {
+    key: options?.persistKey ?? 'root',
+    storage,
+    blacklist: [environmentSlice.reducerPath, ...injectedBlacklist],
+  };
+
+  const persistedReducer = persistReducer(persistConfig, rootReducer);
+
   const store = configureStore({
-    reducer: persistedReducer ,
+    reducer: persistedReducer,
     middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware( {
+      getDefaultMiddleware({
         serializableCheck: {
           ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
         },
-    })
-      .prepend(bubblesListener.middleware)
-      .prepend(shellBubbleListener.middleware)
-      .prepend(shellDeletionListener.middleware),
+      }).concat(injectedMiddlewares),
   });
   console.log("Store created:", store);
-  
 
   const persistor = persistStore(store);
 

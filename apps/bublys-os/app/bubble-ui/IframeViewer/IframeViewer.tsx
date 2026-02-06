@@ -29,7 +29,7 @@ import {
 
 import PostMessageManager from './PostMessageManager';
 import { AppDataAndRef } from './PostMessageManager';
-import { BubblesContext } from '../BubblesUI/domain/BubblesContext';
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 
 type IframeViewerProps = {
   children?: React.ReactNode;

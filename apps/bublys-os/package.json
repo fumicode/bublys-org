@@ -4,12 +4,11 @@
   "private": true,
   "dependencies": {
     "@bublys-org/bubbles-ui": "*",
-    "@bublys-org/bubbles-ui-state": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/akashic-record": "*",
     "@bublys-org/hash-world-line": "*",
-    "@bublys-org/gakkai-shift-model": "*",
+    "@bublys-org/users-libs": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",

@@ -13,9 +13,6 @@
       "path": "./bublys-libs/bubbles-ui"
     },
     {
-      "path": "./bublys-libs/bubbles-ui-state"
-    },
-    {
       "path": "./apps/calculator"
     },
     {
@@ -40,7 +37,25 @@
       "path": "./bublys-libs/object-shell"
     },
     {
-      "path": "./gakkai-shift-libs"
+      "path": "./gakkai-shift-bubly/gakkai-shift-model"
+    },
+    {
+      "path": "./users-libs"
+    },
+    {
+      "path": "./bublys-libs/bubbles-ui-util"
+    },
+    {
+      "path": "./gakkai-shift-bubly/gakkai-shift-libs"
+    },
+    {
+      "path": "./gakkai-shift-bubly/gakkai-shift-app"
+    },
+    {
+      "path": "./ekikyo-bubly/ekikyo-libs"
+    },
+    {
+      "path": "./ekikyo-bubly/ekikyo-app"
     }
   ]
 }

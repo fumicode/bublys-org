@@ -1,5 +1,5 @@
-import { DRAG_DATA_TYPES } from '../../utils/drag-types';
-import type { DragDataType } from '../../utils/drag-types';
+import { BUILTIN_DRAG_TYPES } from "@bublys-org/bubbles-ui";
+import type { DragDataType } from "@bublys-org/bubbles-ui";
 
 /**
  * ポケットに保存されるアイテム
@@ -19,7 +19,7 @@ export type PocketItemState = {
 export class PocketItem {
   constructor(readonly state: PocketItemState) {}
 
-  static create(url: string, type: PocketItemType = DRAG_DATA_TYPES.generic, label?: string): PocketItem {
+  static create(url: string, type: PocketItemType = BUILTIN_DRAG_TYPES.generic, label?: string): PocketItem {
     return new PocketItem({
       id: crypto.randomUUID(),
       url,

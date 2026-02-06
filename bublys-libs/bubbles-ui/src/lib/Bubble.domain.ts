@@ -1,9 +1,11 @@
-import { Point2, Size2 } from "./00_Point.js";
-import {SmartRect} from "./SmartRect.js";
+import { Point2, Size2, SmartRect } from "@bublys-org/bubbles-ui-util";
 
 export type BubbleOptions = {
   contentBackground?: string;
 };
+
+// パスパラメータの型
+export type BubbleParams = Record<string, string>;
 
 export type RectJson = {
   x: number;
@@ -18,6 +20,7 @@ export type BubbleProps = {
   url: string;
   colorHue: number;
   type: string;
+  params?: BubbleParams;
   position?: Point2;
   size?: Size2;
   bubbleOptions?: BubbleOptions;
@@ -31,6 +34,7 @@ export type BubbleJson= {
   url: string;
   colorHue: number;
   type: string;
+  params?: BubbleParams;
   position?: Point2;
   size?: Size2;
   bubbleOptions?: BubbleOptions;
@@ -44,6 +48,7 @@ export type BubbleState = {
   url: string;
   colorHue: number;
   type: string;
+  params: BubbleParams;
   position?: Point2;
   size?: Size2;
   bubbleOptions?: BubbleOptions;
@@ -60,6 +65,7 @@ export class Bubble {
     this.state = {
       ...props,
       id: props.id || crypto.randomUUID(),
+      params: props.params || {},
     };
   }
 
@@ -81,6 +87,10 @@ export class Bubble {
 
   get type(): string {
     return this.state.type;
+  }
+
+  get params(): BubbleParams {
+    return this.state.params;
   }
 
   get position(): Point2 {
@@ -140,14 +150,19 @@ export class Bubble {
 
 type BubbleResolvedProps = {
   type?: string;
+  params?: BubbleParams;
   bubbleOptions?: BubbleOptions;
 };
 
 type BubblePropsResolver = (url: string) => BubbleResolvedProps | undefined;
-let customBubblePropsResolver: BubblePropsResolver | undefined;
+const bubblePropsResolvers: BubblePropsResolver[] = [];
 
+/**
+ * バブルプロパティリゾルバーを登録
+ * 複数のリゾルバーを登録可能。順番に試行され、最初にマッチしたものが使用される。
+ */
 export const registerBubblePropsResolver = (resolver: BubblePropsResolver) => {
-  customBubblePropsResolver = resolver;
+  bubblePropsResolvers.push(resolver);
 };
 
 // 後方互換性のため維持
@@ -161,13 +176,19 @@ export const registerBubbleTypeResolver = (resolver: BubbleTypeResolver) => {
 export const createBubble = (url: string, pos?: Point2): Bubble => {
   const colorHue = getColorHueFromString(url);
 
-  // 新しい resolver を優先
-  const resolvedProps = customBubblePropsResolver?.(url);
+  // 登録されたリゾルバーを順に試す
+  let resolvedProps: BubbleResolvedProps | undefined;
+  for (const resolver of bubblePropsResolvers) {
+    resolvedProps = resolver(url);
+    if (resolvedProps) break;
+  }
+
   const resolvedType = resolvedProps?.type ?? customBubbleTypeResolver?.(url);
   const type = resolvedType ?? "normal";
+  const params = resolvedProps?.params;
   const bubbleOptions = resolvedProps?.bubbleOptions;
 
-  return new Bubble({ url, colorHue, type, position: pos, bubbleOptions });
+  return new Bubble({ url, colorHue, type, params, position: pos, bubbleOptions });
 };
 
 

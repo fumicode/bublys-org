@@ -6,11 +6,7 @@
     "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -21,14 +17,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
-    "types": [
-      "jest",
-      "node"
-    ],
+    "types": ["jest", "node"],
     "outDir": "dist",
     "rootDir": "."
   },
@@ -64,16 +55,13 @@
       "path": "../../bublys-libs/hash-world-line"
     },
     {
-      "path": "../../gakkai-shift-libs"
-    },
-    {
       "path": "../../bublys-libs/akashic-record"
     },
     {
       "path": "../../bublys-libs/object-shell"
     },
     {
-      "path": "../../bublys-libs/bubbles-ui-state"
+      "path": "../../users-libs"
     },
     {
       "path": "../../bublys-libs/bubbles-ui"

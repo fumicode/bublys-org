@@ -6,6 +6,7 @@ import { matchBubbleRoute } from "../domain/bubbleRoutes";
 /**
  * BubbleContentコンポーネント
  * memo化して、bubbleのidとurlが同じなら再レンダリングをスキップ
+ * paramsはBubble作成時に解決済み
  */
 export const BubbleContent: FC<{ bubble: Bubble }> = memo(({ bubble }) => {
   const route = matchBubbleRoute(bubble.url);

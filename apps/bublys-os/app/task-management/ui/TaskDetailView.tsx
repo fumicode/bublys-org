@@ -2,7 +2,8 @@
 
 import { FC, useState, useRef, useEffect } from "react";
 import styled from "styled-components";
-import { Task_タスク, TaskStatus_ステータス, UserState } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
+import { UserState } from "@bublys-org/users-libs";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import PersonIcon from "@mui/icons-material/Person";
 import { Button, Select, MenuItem, FormControl } from "@mui/material";
@@ -12,8 +13,7 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import { EditableText } from "@/lib/EditableText";
 import EditIcon from "@mui/icons-material/Edit";
 import { UrledPlace } from "../../bubble-ui/components";
-import { DRAG_DATA_TYPES, parseDragPayload } from "../../bubble-ui/utils/drag-types";
-import { extractIdFromUrl } from "../../bubble-ui/utils/url-parser";
+import { getDragType, parseDragPayload, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 
 type TaskDetailViewProps = {
   task: Task_タスク;
@@ -43,7 +43,7 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
     if (!onAssigneeChange) return;
     // Check if drag contains user type (can only check types during dragover, not data)
     const types = Array.from(e.dataTransfer.types);
-    if (!types.includes(DRAG_DATA_TYPES.user)) return;
+    if (!types.includes(getDragType('User'))) return;
     e.preventDefault();
     setIsDragOver(true);
   };
@@ -54,8 +54,8 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
 
   const handleDrop = (e: React.DragEvent) => {
     setIsDragOver(false);
-    const payload = parseDragPayload(e, { acceptTypes: [DRAG_DATA_TYPES.user] });
-    const url = payload?.url || e.dataTransfer.getData(DRAG_DATA_TYPES.user);
+    const payload = parseDragPayload(e, { acceptTypes: [getDragType('User')] });
+    const url = payload?.url || e.dataTransfer.getData(getDragType('User'));
     const userId = url ? extractIdFromUrl(url) : undefined;
     if (!userId) return;
     e.preventDefault();

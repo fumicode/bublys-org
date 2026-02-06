@@ -1,195 +1,33 @@
 "use client";
-import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
-import { registerBubblePropsResolver, BubbleOptions } from "@bublys-org/bubbles-ui";
+
 import { useContext } from "react";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { useAppDispatch } from "@bublys-org/state-management";
 
-export type BubbleRoute = {
-  pattern: RegExp;
-  type: string;
-  Component: BubbleContentRenderer;
-  bubbleOptions?: BubbleOptions;
-};
-
-export const matchBubbleRoute = (url: string): BubbleRoute | undefined =>
-  bubbleRoutes.find((route) => route.pattern.test(url));
-
-// ルーティング定義
-import { MobBubble } from "../ui/bubbles/MobBubble";
-import { UserGroupList } from "@/app/users/feature/UserGroupList";
-import { UserGroupDetail } from "@/app/users/feature/UserGroupDetail";
-import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
-import { UserCollection } from "@/app/users/feature/UserCollection";
-import { UserDetail } from "@/app/users/feature/UserDetail";
-import { UserCreateFormView } from "@/app/users/ui/UserCreateFormView";
-import { UserDeleteConfirm } from "@/app/users/feature/UserDeleteConfirm";
-import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
-import { BubblesContext } from "./BubblesContext";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { addUser } from "@bublys-org/state-management";
-import { User } from "@/app/users/domain/User.domain";
-import { selectBubblesRelationByOpeneeId, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui-state";
-import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
-import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
-import { gakkaiShiftBubbleRoutes } from "@/app/gakkai-shift/bubbleRoutes";
+// 外部バブリのルート
+import { usersBubbleRoutes } from "@bublys-org/users-libs";
+// gakkai-shiftは動的ロードに移行（プラグインテスト）
+// import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
+// ekikyoは動的ロードに移行（バブリテスト）
+// import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
 
-// 各バブルのコンポーネント
-const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const buildUserUrl = (id: string) => `users/${id}`;
-  const buildUserDeleteUrl = (id: string) => `users/${id}/delete-confirm`;
-  const buildUserCreateUrl = () => "users/create";
-  const handleUserClick = (_id: string, detailUrl: string) => {
-    openBubble(detailUrl, bubble.id);
-  };
-  const handleCreateClick = (createUrl: string) => {
-    openBubble(createUrl, bubble.id);
-  };
-  const handleUserDelete = (userId: string) => {
-    openBubble(buildUserDeleteUrl(userId), bubble.id);
-  };
-  return (
-    <UserCollection
-      buildDetailUrl={buildUserUrl}
-      buildCreateUrl={buildUserCreateUrl}
-      buildDeleteUrl={buildUserDeleteUrl}
-      onUserClick={handleUserClick}
-      onCreateClick={handleCreateClick}
-      onUserDelete={handleUserDelete}
-    />
-  );
+// ローカルコンポーネント
+import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
+import { MobBubble } from "../ui/bubbles/MobBubble";
+import { ShellBubble } from '../ui/bubbles/ShellBubble';
+import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
+import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
+import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
+import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+
+/** BubbleRouteRegistry経由でルートを検索 */
+export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
+  return BubbleRouteRegistry.matchRoute(url);
 };
 
-const UserBubble: BubbleContentRenderer = ({ bubble }) => {
-  const userId = bubble.url.replace("users/", "");
-  const { openBubble } = useContext(BubblesContext);
-  const handleOpenGroup = (groupId: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
-  return <UserDetail userId={userId} onOpenGroup={handleOpenGroup} />;
-};
-
-const UserCreateBubble: BubbleContentRenderer = ({ bubble }) => {
-  const dispatch = useAppDispatch();
-  const { openBubble } = useContext(BubblesContext);
-  const relation = useAppSelector((state) =>
-    selectBubblesRelationByOpeneeId(state, { openeeId: bubble.id })
-  );
-  const openerId = relation?.openerId || bubble.id;
-
-  const handleSubmit = ({ name, birthday }: { name: string; birthday: string }) => {
-    const newUser = new User(crypto.randomUUID(), name, birthday);
-    dispatch(addUser(newUser.toJSON()));
-    openBubble(`users/${newUser.id}`, openerId);
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
-  return (
-    <div>
-      <h3>ユーザー作成</h3>
-      <UserCreateFormView onSubmit={handleSubmit} />
-    </div>
-  );
-};
-
-const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
-  const dispatch = useAppDispatch();
-  const userId = bubble.url.replace("users/", "").replace("/delete-confirm", "");
-
-  const closeSelf = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
-  const handleDeleted = () => {
-    closeSelf();
-  };
-
-  const handleCancel = () => {
-    closeSelf();
-  };
-
-  return (
-    <UserDeleteConfirm
-      userId={userId}
-      onDeleted={handleDeleted}
-      onCancel={handleCancel}
-    />
-  );
-};
-
-
-const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
-  const groupId = bubble.url.replace("user-groups/", "");
-  const { openBubble } = useContext(BubblesContext);
-  const handleOpenUser = (_userId: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
-  return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
-};
-
-// const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
-//   const memoId = bubble.url.replace("memos/", "");
-//   const { openBubble } = useContext(BubblesContext);
-
-//   const MemoBubbleContent = () => {
-//     const apexWorld = useAppSelector(selectApexWorld(memoId));
-//     const currentWorldLine = useAppSelector((state) => state.worldLine.worldLines[memoId]);
-//     const dispatch = useAppDispatch();
-
-//     const handleMemoChange = (newMemo: Memo) => {
-//       if (!currentWorldLine) return;
-
-//       const newWorldId = crypto.randomUUID();
-//       const newWorld = {
-//         id: newWorldId,
-//         world: {
-//           worldId: newWorldId,
-//           parentWorldId: currentWorldLine.apexWorldId,
-//           worldState: serializeMemo(newMemo),
-//         },
-//       };
-
-//       const newWorldLine: WorldLineState = {
-//         worlds: [...currentWorldLine.worlds, newWorld],
-//         apexWorldId: newWorldId,
-//         rootWorldId: currentWorldLine.rootWorldId,
-//       };
-
-//       dispatch(updateState({
-//         objectId: memoId,
-//         newWorldLine,
-//         operation: 'updateMemo'
-//       }));
-//     };
-
-//     if (!apexWorld || !apexWorld.worldState) {
-//       return <div>メモが見つかりません</div>;
-//     }
-
-//     const memo = deserializeMemo(apexWorld.worldState);
-
-//     return (
-//       <div>
-//         <MemoTitle
-//           memo={memo}
-//           onSetAuthor={(userId) => handleMemoChange(memo.setAuthor(userId))}
-//           onOpenAuthor={(userId, url) => openBubble(url, bubble.id)}
-//         />
-//         <MemoEditor
-//           memoId={memoId}
-//           memo={memo}
-//           onMemoChange={handleMemoChange}
-//         />
-//       </div>
-//     );
-//   };
-
-//   return <MemoBubbleContent />;
-// };
-
+// Memoバブルコンポーネント
 const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const buildMemoUrl = (id: string) => `memos/${id}`;
@@ -232,7 +70,6 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-
 const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   const dispatch = useAppDispatch();
   const memoId = bubble.url.replace("memos/", "").replace("/delete-confirm", "");
@@ -242,19 +79,11 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
     dispatch(removeBubble(bubble.id));
   };
 
-  const handleDeleted = () => {
-    closeSelf();
-  };
-
-  const handleCancel = () => {
-    closeSelf();
-  };
-
   return (
     <MemoDeleteConfirm
       memoId={memoId}
-      onDeleted={handleDeleted}
-      onCancel={handleCancel}
+      onDeleted={closeSelf}
+      onCancel={closeSelf}
     />
   );
 };
@@ -279,48 +108,34 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-import { ShellBubble } from '../ui/bubbles/ShellBubble';
-
+// ルーティング定義
 const routes: BubbleRoute[] = [
   {
     pattern: /^mob$/,
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
-  {
-    pattern: /^user-groups$/,
-    type: "user-groups",
-    Component: ({ bubble }) => {
-      const { openBubble } = useContext(BubblesContext);
-      const buildGroupUrl = (id: string) => `user-groups/${id}`;
-      const handleSelect = (_id: string, url: string) => {
-        openBubble(url, bubble.id);
-      };
-      return (
-        <UserGroupList buildDetailUrl={buildGroupUrl} onSelect={handleSelect} />
-      );
-    },
-  },
-  { pattern: /^user-groups\/.+$/, type: "user-group", Component: UserGroupBubble },
 
-  { pattern: /^users$/, type: "users", Component: UsersBubble },
-  { pattern: /^users\/create$/, type: "user-create", Component: UserCreateBubble },
-  { pattern: /^users\/[^/]+\/delete-confirm$/, type: "user-delete-confirm", Component: UserDeleteConfirmBubble },
-  { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
+  // Users（users-libsから）
+  ...usersBubbleRoutes,
 
+  // Memo
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
-  // 学会シフト
-  ...gakkaiShiftBubbleRoutes,
+  // 学会シフト（プラグインとして動的ロード）
+  // ...gakkaiShiftBubbleRoutes,
 
   // タスク管理
   ...taskManagementBubbleRoutes,
 
   // 囲碁ゲーム
   ...igoGameBubbleRoutes,
+
+  // 易経（プラグインとして動的ロード）
+  // ...ekikyoBubbleRoutes,
 
   // ObjectShell統合ルート
   {
@@ -331,11 +146,7 @@ const routes: BubbleRoute[] = [
 ];
 
 export const bubbleRoutes = routes;
-registerBubblePropsResolver((url: string) => {
-  const route = matchBubbleRoute(url);
-  if (!route) return undefined;
-  return {
-    type: route.type,
-    bubbleOptions: route.bubbleOptions,
-  };
-});
+
+// 静的ルートをBubbleRouteRegistryに登録
+// （動的ルートより先に登録されるため、優先される）
+BubbleRouteRegistry.registerRoutes(routes);
