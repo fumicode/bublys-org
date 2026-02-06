@@ -2,6 +2,8 @@
 
 import ChatIcon from "@mui/icons-material/Chat";
 import PersonIcon from "@mui/icons-material/Person";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { Button } from "@mui/material";
 import {
   BublyApp,
   BublyStoreProvider,
@@ -27,12 +29,41 @@ const menuItems: BublyMenuItem[] = [
   },
 ];
 
+const handleClearLocalStorage = () => {
+  if (window.confirm("ローカルストレージをクリアしますか？")) {
+    localStorage.clear();
+    window.location.reload();
+  }
+};
+
+const sidebarFooter = (
+  <Button
+    variant="outlined"
+    size="small"
+    startIcon={<DeleteIcon />}
+    onClick={handleClearLocalStorage}
+    sx={{
+      color: "rgba(255,255,255,0.6)",
+      borderColor: "rgba(255,255,255,0.3)",
+      fontSize: 12,
+      width: "100%",
+      "&:hover": {
+        borderColor: "rgba(255,255,255,0.5)",
+        backgroundColor: "rgba(255,255,255,0.1)",
+      },
+    }}
+  >
+    キャッシュクリア
+  </Button>
+);
+
 function TailorGenieApp() {
   return (
     <BublyApp
       title="Tailor Genie"
       subtitle="会話アプリ"
       menuItems={menuItems}
+      sidebarFooter={sidebarFooter}
     />
   );
 }

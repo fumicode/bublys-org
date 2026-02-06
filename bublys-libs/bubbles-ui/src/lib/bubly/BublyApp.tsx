@@ -41,6 +41,8 @@ export type BublyAppProps = {
   subtitle?: string;
   /** サイドバーのメニュー項目 */
   menuItems: BublyMenuItem[];
+  /** サイドバーのフッター（オプション） */
+  sidebarFooter?: React.ReactNode;
 };
 
 /**
@@ -51,6 +53,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   title,
   subtitle,
   menuItems,
+  sidebarFooter,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -201,6 +204,13 @@ export const BublyApp: FC<BublyAppProps> = ({
             </ListItemButton>
           ))}
         </List>
+
+        {/* フッター */}
+        {sidebarFooter && (
+          <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            {sidebarFooter}
+          </Box>
+        )}
       </Box>
 
       {/* メインエリア（バブル表示） */}
