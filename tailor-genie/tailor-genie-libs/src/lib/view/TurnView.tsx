@@ -5,41 +5,43 @@ import { Turn } from "@bublys-org/tailor-genie-model";
 
 export type TurnViewProps = {
   turn: Turn;
-  userName?: string;
-  onDelete?: (turnId: string) => void;
+  speakerName?: string;
+  align?: "left" | "right";
 };
 
-export const TurnView: FC<TurnViewProps> = ({ turn, userName, onDelete }) => {
+export const TurnView: FC<TurnViewProps> = ({
+  turn,
+  speakerName,
+  align = "left",
+}) => {
+  const isRight = align === "right";
+
   return (
     <div
       style={{
-        padding: "12px 16px",
-        borderBottom: "1px solid #eee",
+        padding: "8px 16px",
         display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
+        flexDirection: "column",
+        alignItems: isRight ? "flex-end" : "flex-start",
       }}
     >
-      <div>
-        <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-          {userName || turn.userId}
-        </div>
-        <div style={{ fontSize: 14 }}>{turn.message}</div>
+      <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>
+        {speakerName || turn.speakerId}
       </div>
-      {onDelete && (
-        <button
-          onClick={() => onDelete(turn.id)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#999",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          削除
-        </button>
-      )}
+      <div
+        style={{
+          maxWidth: "80%",
+          padding: "10px 14px",
+          borderRadius: isRight ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+          background: isRight ? "#007bff" : "#e9ecef",
+          color: isRight ? "white" : "#333",
+          fontSize: 14,
+          lineHeight: 1.4,
+          wordBreak: "break-word",
+        }}
+      >
+        {turn.message}
+      </div>
     </div>
   );
 };

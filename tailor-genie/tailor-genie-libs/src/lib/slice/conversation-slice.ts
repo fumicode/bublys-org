@@ -3,7 +3,7 @@ import {
   Conversation,
   Turn,
   TurnState,
-  User,
+  Speaker,
 } from "@bublys-org/tailor-genie-model";
 
 /**
@@ -65,30 +65,17 @@ const conversationsSlice = createSlice({
       state,
       action: PayloadAction<{
         conversationId: string;
-        userId: string;
+        speakerId: string;
         message: string;
       }>
     ) => {
-      const { conversationId, userId, message } = action.payload;
+      const { conversationId, speakerId, message } = action.payload;
       const serialized = state.conversations[conversationId];
       if (!serialized) return;
 
       const conversation = deserializeConversation(serialized);
-      const user = new User({ id: userId, name: "" });
-      const updated = conversation.speak(user, message);
-      state.conversations[conversationId] = serializeConversation(updated);
-    },
-
-    removeTurn: (
-      state,
-      action: PayloadAction<{ conversationId: string; turnId: string }>
-    ) => {
-      const { conversationId, turnId } = action.payload;
-      const serialized = state.conversations[conversationId];
-      if (!serialized) return;
-
-      const conversation = deserializeConversation(serialized);
-      const updated = conversation.removeTurn(turnId);
+      const speaker = new Speaker({ id: speakerId, name: "" });
+      const updated = conversation.speak(speaker, message);
       state.conversations[conversationId] = serializeConversation(updated);
     },
 
@@ -123,7 +110,6 @@ export const {
   createConversation,
   setActiveConversation,
   speak,
-  removeTurn,
   updateTurn,
   deleteConversation,
 } = conversationsSlice.actions;

@@ -1,53 +1,48 @@
 "use client";
 
-import { FC, useState } from "react";
+import { FC, useState, useContext } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { User } from "@bublys-org/tailor-genie-model";
+import { Speaker } from "@bublys-org/tailor-genie-model";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { ConversationView } from "../view/ConversationView.js";
 import {
   selectConversationById,
   speak,
-  removeTurn,
 } from "../slice/conversation-slice.js";
 
 export type ConversationFeatureProps = {
-  users: User[];
+  speakers: Speaker[];
   conversationId: string;
 };
 
 export const ConversationFeature: FC<ConversationFeatureProps> = ({
-  users,
+  speakers,
   conversationId,
 }) => {
   const dispatch = useDispatch();
+  const { openBubble } = useContext(BubblesContext);
   const conversation = useSelector((state: any) =>
     selectConversationById(state, conversationId)
   );
-  const [currentUserId, setCurrentUserId] = useState(users[0]?.id || "");
+  const [currentSpeakerId, setCurrentSpeakerId] = useState(speakers[0]?.id || "");
+
+  const handleOpenSpeakerView = (speakerId: string) => {
+    openBubble(`tailor-genie/conversations/${conversationId}/speakers/${speakerId}`, "root");
+  };
 
   const handleSpeak = (message: string) => {
     if (!conversation) return;
     dispatch(
       speak({
         conversationId: conversation.id,
-        userId: currentUserId,
+        speakerId: currentSpeakerId,
         message,
       })
     );
   };
 
-  const handleDeleteTurn = (turnId: string) => {
-    if (!conversation) return;
-    dispatch(
-      removeTurn({
-        conversationId: conversation.id,
-        turnId,
-      })
-    );
-  };
-
-  const handleSelectUser = (userId: string) => {
-    setCurrentUserId(userId);
+  const handleSelectSpeaker = (speakerId: string) => {
+    setCurrentSpeakerId(speakerId);
   };
 
   if (!conversation) {
@@ -70,11 +65,11 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
   return (
     <ConversationView
       conversation={conversation}
-      users={users}
-      currentUserId={currentUserId}
-      onSelectUser={handleSelectUser}
+      speakers={speakers}
+      currentSpeakerId={currentSpeakerId}
+      onSelectSpeaker={handleSelectSpeaker}
       onSpeak={handleSpeak}
-      onDeleteTurn={handleDeleteTurn}
+      onOpenSpeakerView={handleOpenSpeakerView}
     />
   );
 };

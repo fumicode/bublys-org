@@ -5,7 +5,6 @@ export {
   createConversation,
   setActiveConversation,
   speak,
-  removeTurn,
   updateTurn,
   deleteConversation,
   selectConversations,
@@ -24,8 +23,12 @@ export { TurnView } from "./lib/view/TurnView.js";
 export type { TurnViewProps } from "./lib/view/TurnView.js";
 export { ConversationView } from "./lib/view/ConversationView.js";
 export type { ConversationViewProps } from "./lib/view/ConversationView.js";
+export { SpeakerView } from "./lib/view/SpeakerView.js";
+export type { SpeakerViewProps } from "./lib/view/SpeakerView.js";
 
 // Feature
 export { ConversationFeature } from "./lib/feature/ConversationFeature.js";
 export type { ConversationFeatureProps } from "./lib/feature/ConversationFeature.js";
 export { ConversationListFeature } from "./lib/feature/ConversationListFeature.js";
+export { SpeakerFeature } from "./lib/feature/SpeakerFeature.js";
+export type { SpeakerFeatureProps } from "./lib/feature/SpeakerFeature.js";

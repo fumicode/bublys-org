@@ -4,31 +4,25 @@ import { FC, useState, FormEvent, ChangeEvent } from "react";
 import { Conversation, Speaker } from "@bublys-org/tailor-genie-model";
 import { TurnView } from "./TurnView.js";
 
-export type ConversationViewProps = {
+export type SpeakerViewProps = {
   conversation: Conversation;
-  speakers: Speaker[];
-  currentSpeakerId: string;
-  onSelectSpeaker?: (speakerId: string) => void;
+  speaker: Speaker;
+  allSpeakers: Speaker[];
   onSpeak?: (message: string) => void;
-  onOpenSpeakerView?: (speakerId: string) => void;
 };
 
-export const ConversationView: FC<ConversationViewProps> = ({
+export const SpeakerView: FC<SpeakerViewProps> = ({
   conversation,
-  speakers,
-  currentSpeakerId,
-  onSelectSpeaker,
+  speaker,
+  allSpeakers,
   onSpeak,
-  onOpenSpeakerView,
 }) => {
   const [message, setMessage] = useState("");
 
   const getSpeakerName = (speakerId: string): string => {
-    const speaker = speakers.find((s) => s.id === speakerId);
-    return speaker?.name || speakerId;
+    const s = allSpeakers.find((sp) => sp.id === speakerId);
+    return s?.name || speakerId;
   };
-
-  const currentSpeaker = speakers.find((s) => s.id === currentSpeakerId);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -60,27 +54,11 @@ export const ConversationView: FC<ConversationViewProps> = ({
         }}
       >
         <span style={{ fontWeight: "bold" }}>
+          {speaker.name} の画面
+        </span>
+        <span style={{ fontSize: 12, color: "#666" }}>
           会話 #{conversation.id.slice(0, 8)}
         </span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {onOpenSpeakerView && speakers.map((speaker) => (
-            <button
-              key={speaker.id}
-              onClick={() => onOpenSpeakerView(speaker.id)}
-              style={{
-                padding: "4px 8px",
-                background: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-                fontSize: 11,
-              }}
-            >
-              {speaker.name}の画面
-            </button>
-          ))}
-        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
@@ -90,14 +68,13 @@ export const ConversationView: FC<ConversationViewProps> = ({
           </div>
         ) : (
           conversation.turns.map((turn) => {
-            const speakerIndex = speakers.findIndex((s) => s.id === turn.speakerId);
-            const align = speakerIndex === 0 ? "left" : "right";
+            const isSelf = turn.speakerId === speaker.id;
             return (
               <TurnView
                 key={turn.id}
                 turn={turn}
                 speakerName={getSpeakerName(turn.speakerId)}
-                align={align}
+                align={isSelf ? "right" : "left"}
               />
             );
           })
@@ -115,33 +92,13 @@ export const ConversationView: FC<ConversationViewProps> = ({
             alignItems: "center",
           }}
         >
-          <div style={{ display: "flex", gap: 4 }}>
-            {speakers.map((speaker) => (
-              <button
-                key={speaker.id}
-                type="button"
-                onClick={() => onSelectSpeaker?.(speaker.id)}
-                style={{
-                  padding: "6px 12px",
-                  background: speaker.id === currentSpeakerId ? "#007bff" : "#e9ecef",
-                  color: speaker.id === currentSpeakerId ? "white" : "#333",
-                  border: "none",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-              >
-                {speaker.name}
-              </button>
-            ))}
-          </div>
           <input
             type="text"
             value={message}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               setMessage(e.target.value)
             }
-            placeholder={`${currentSpeaker?.name || "スピーカー"}として発言...`}
+            placeholder={`${speaker.name}として発言...`}
             style={{
               flex: 1,
               padding: "8px 12px",

@@ -1,4 +1,4 @@
-import { User } from "./User.js";
+import { Speaker } from "./Speaker.js";
 
 /**
  * ターン（会話の1発言）
@@ -6,7 +6,7 @@ import { User } from "./User.js";
  */
 export type TurnState = {
   readonly id: string;
-  readonly userId: string;
+  readonly speakerId: string;
   readonly message: string;
 };
 
@@ -17,8 +17,8 @@ export class Turn {
     return this.state.id;
   }
 
-  get userId(): string {
-    return this.state.userId;
+  get speakerId(): string {
+    return this.state.speakerId;
   }
 
   get message(): string {
@@ -49,22 +49,15 @@ export class Conversation {
     return this.state.turns;
   }
 
-  speak(user: User, message: string): Conversation {
+  speak(speaker: Speaker, message: string): Conversation {
     const turn = new Turn({
       id: crypto.randomUUID(),
-      userId: user.id,
+      speakerId: speaker.id,
       message,
     });
     return new Conversation({
       ...this.state,
       turns: [...this.state.turns, turn],
-    });
-  }
-
-  removeTurn(turnId: string): Conversation {
-    return new Conversation({
-      ...this.state,
-      turns: this.state.turns.filter((t) => t.id !== turnId),
     });
   }
 

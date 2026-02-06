@@ -1,5 +1,5 @@
-export { User } from "./lib/User.js";
-export type { UserState } from "./lib/User.js";
+export { Speaker } from "./lib/Speaker.js";
+export type { SpeakerState } from "./lib/Speaker.js";
 
 export { Conversation, Turn } from "./lib/Conversation.js";
 export type { ConversationState, TurnState } from "./lib/Conversation.js";
