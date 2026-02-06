@@ -2,18 +2,13 @@
 
 import { FC } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Speaker } from "@bublys-org/tailor-genie-model";
 import { SpeakerView } from "../view/SpeakerView.js";
 import {
   selectConversationById,
-  speak,
+  selectParticipants,
+  selectSpeakerById,
+  saveConversation,
 } from "../slice/conversation-slice.js";
-
-// デモ用スピーカー（実際はpropsや別の方法で渡す）
-const SPEAKERS: Record<string, Speaker> = {
-  "speaker-1": new Speaker({ id: "speaker-1", name: "Alice" }),
-  "speaker-2": new Speaker({ id: "speaker-2", name: "Bob" }),
-};
 
 export type SpeakerFeatureProps = {
   conversationId: string;
@@ -28,17 +23,18 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
   const conversation = useSelector((state: any) =>
     selectConversationById(state, conversationId)
   );
-  const speaker = SPEAKERS[speakerId];
+  const speaker = useSelector((state: any) =>
+    selectSpeakerById(state, speakerId)
+  );
+  const participants = useSelector((state: any) =>
+    selectParticipants(state, conversationId)
+  );
 
   const handleSpeak = (message: string) => {
     if (!conversation || !speaker) return;
-    dispatch(
-      speak({
-        conversationId: conversation.id,
-        speakerId: speaker.id,
-        message,
-      })
-    );
+    // ドメインオブジェクトのメソッドを使用
+    const updated = conversation.speak(speaker, message);
+    dispatch(saveConversation(updated.state));
   };
 
   if (!speaker) {
@@ -57,12 +53,15 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
     );
   }
 
+  // このスピーカーが参加者かどうか
+  const isParticipant = conversation.hasParticipant(speakerId);
+
   return (
     <SpeakerView
       conversation={conversation}
       speaker={speaker}
-      allSpeakers={Object.values(SPEAKERS)}
-      onSpeak={handleSpeak}
+      allSpeakers={participants}
+      onSpeak={isParticipant ? handleSpeak : undefined}
     />
   );
 };

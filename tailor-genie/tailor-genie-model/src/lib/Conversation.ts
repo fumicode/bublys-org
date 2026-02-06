@@ -35,6 +35,7 @@ export class Turn {
  */
 export type ConversationState = {
   readonly id: string;
+  readonly participantIds: string[];
   readonly turns: Turn[];
 };
 
@@ -45,8 +46,33 @@ export class Conversation {
     return this.state.id;
   }
 
+  get participantIds(): string[] {
+    return this.state.participantIds;
+  }
+
   get turns(): Turn[] {
     return this.state.turns;
+  }
+
+  addParticipant(speakerId: string): Conversation {
+    if (this.state.participantIds.includes(speakerId)) {
+      return this;
+    }
+    return new Conversation({
+      ...this.state,
+      participantIds: [...this.state.participantIds, speakerId],
+    });
+  }
+
+  removeParticipant(speakerId: string): Conversation {
+    return new Conversation({
+      ...this.state,
+      participantIds: this.state.participantIds.filter((id) => id !== speakerId),
+    });
+  }
+
+  hasParticipant(speakerId: string): boolean {
+    return this.state.participantIds.includes(speakerId);
   }
 
   speak(speaker: Speaker, message: string): Conversation {

@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useState, FormEvent, ChangeEvent } from "react";
+import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect } from "react";
 import { Conversation, Speaker } from "@bublys-org/tailor-genie-model";
 import { TurnView } from "./TurnView.js";
 
@@ -18,6 +18,26 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
   onSpeak,
 }) => {
   const [message, setMessage] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const wasAtBottomRef = useRef(true);
+
+  // スクロール位置を監視
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const threshold = 50;
+    wasAtBottomRef.current =
+      container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  };
+
+  // 発言が増えたときに自動スクロール
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (wasAtBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [conversation.turns.length]);
 
   const getSpeakerName = (speakerId: string): string => {
     const s = allSpeakers.find((sp) => sp.id === speakerId);
@@ -32,15 +52,19 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
     }
   };
 
+  const isParticipant = conversation.hasParticipant(speaker.id);
+
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        width: 375,
+        height: 667,
         border: "1px solid #ddd",
         borderRadius: 8,
         overflow: "hidden",
+        background: "#fff",
       }}
     >
       <div
@@ -61,7 +85,11 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
         </span>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}
+      >
         {conversation.turns.length === 0 ? (
           <div style={{ padding: 16, color: "#999", textAlign: "center" }}>
             まだ発言がありません
@@ -81,7 +109,20 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
         )}
       </div>
 
-      {onSpeak && (
+      {!isParticipant ? (
+        <div
+          style={{
+            padding: 12,
+            borderTop: "1px solid #ddd",
+            background: "#fff3cd",
+            color: "#856404",
+            fontSize: 13,
+            textAlign: "center",
+          }}
+        >
+          この会話に参加していません
+        </div>
+      ) : onSpeak ? (
         <form
           onSubmit={handleSubmit}
           style={{
@@ -122,7 +163,7 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
             送信
           </button>
         </form>
-      )}
+      ) : null}
     </div>
   );
 };

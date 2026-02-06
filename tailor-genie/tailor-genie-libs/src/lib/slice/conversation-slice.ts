@@ -1,9 +1,11 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import {
   Conversation,
+  ConversationState,
   Turn,
   TurnState,
   Speaker,
+  SpeakerState,
 } from "@bublys-org/tailor-genie-model";
 
 /**
@@ -11,15 +13,23 @@ import {
  */
 type SerializedConversationState = {
   id: string;
+  participantIds: string[];
   turns: TurnState[];
 };
 
 type ConversationsSliceState = {
+  speakers: Record<string, SpeakerState>;
   conversations: Record<string, SerializedConversationState>;
   activeConversationId: string | null;
 };
 
+const DEFAULT_SPEAKERS: SpeakerState[] = [
+  { id: "speaker-1", name: "ジーニー" },
+  { id: "speaker-2", name: "坂口様" },
+];
+
 const initialState: ConversationsSliceState = {
+  speakers: Object.fromEntries(DEFAULT_SPEAKERS.map((s) => [s.id, s])),
   conversations: {},
   activeConversationId: null,
 };
@@ -27,10 +37,11 @@ const initialState: ConversationsSliceState = {
 /**
  * ドメインモデルをシリアライズ
  */
-const serializeConversation = (
+export const serializeConversation = (
   conversation: Conversation
 ): SerializedConversationState => ({
   id: conversation.id,
+  participantIds: conversation.participantIds,
   turns: conversation.turns.map((t) => t.state),
 });
 
@@ -42,58 +53,30 @@ export const deserializeConversation = (
 ): Conversation => {
   return new Conversation({
     id: state.id,
+    participantIds: state.participantIds || [],
     turns: state.turns.map((t) => new Turn(t)),
   });
 };
 
+/**
+ * SpeakerStateからSpeakerドメインモデルを復元
+ */
+export const deserializeSpeaker = (state: SpeakerState): Speaker => {
+  return new Speaker(state);
+};
+
+/**
+ * Sliceはリポジトリとして機能し、集約のCRUD操作のみを提供する
+ * ビジネスロジックはドメインオブジェクトが担当する
+ */
 const conversationsSlice = createSlice({
   name: "conversations",
   initialState,
   reducers: {
-    createConversation: (state, action: PayloadAction<{ id: string }>) => {
-      const { id } = action.payload;
-      const conversation = new Conversation({ id, turns: [] });
-      state.conversations[id] = serializeConversation(conversation);
-      state.activeConversationId = id;
-    },
-
-    setActiveConversation: (state, action: PayloadAction<string>) => {
-      state.activeConversationId = action.payload;
-    },
-
-    speak: (
-      state,
-      action: PayloadAction<{
-        conversationId: string;
-        speakerId: string;
-        message: string;
-      }>
-    ) => {
-      const { conversationId, speakerId, message } = action.payload;
-      const serialized = state.conversations[conversationId];
-      if (!serialized) return;
-
-      const conversation = deserializeConversation(serialized);
-      const speaker = new Speaker({ id: speakerId, name: "" });
-      const updated = conversation.speak(speaker, message);
-      state.conversations[conversationId] = serializeConversation(updated);
-    },
-
-    updateTurn: (
-      state,
-      action: PayloadAction<{
-        conversationId: string;
-        turnId: string;
-        message: string;
-      }>
-    ) => {
-      const { conversationId, turnId, message } = action.payload;
-      const serialized = state.conversations[conversationId];
-      if (!serialized) return;
-
-      const conversation = deserializeConversation(serialized);
-      const updated = conversation.updateTurn(turnId, message);
-      state.conversations[conversationId] = serializeConversation(updated);
+    // Conversation CRUD
+    saveConversation: (state, action: PayloadAction<ConversationState>) => {
+      const conversation = new Conversation(action.payload);
+      state.conversations[conversation.id] = serializeConversation(conversation);
     },
 
     deleteConversation: (state, action: PayloadAction<string>) => {
@@ -103,24 +86,54 @@ const conversationsSlice = createSlice({
         state.activeConversationId = ids.length > 0 ? ids[0] : null;
       }
     },
+
+    setActiveConversation: (state, action: PayloadAction<string>) => {
+      state.activeConversationId = action.payload;
+    },
+
+    // Speaker CRUD
+    saveSpeaker: (state, action: PayloadAction<SpeakerState>) => {
+      state.speakers[action.payload.id] = action.payload;
+    },
+
+    deleteSpeaker: (state, action: PayloadAction<string>) => {
+      delete state.speakers[action.payload];
+    },
   },
 });
 
 export const {
-  createConversation,
-  setActiveConversation,
-  speak,
-  updateTurn,
+  saveConversation,
   deleteConversation,
+  setActiveConversation,
+  saveSpeaker,
+  deleteSpeaker,
 } = conversationsSlice.actions;
 
 export const conversationsReducer = conversationsSlice.reducer;
 export { conversationsSlice };
 
-// Selectors
+// Selectors（stateは常に正規化されているため、undefinedチェック不要）
+export const selectSpeakers = (state: {
+  conversations: ConversationsSliceState;
+}): Speaker[] => {
+  return Object.values(state.conversations.speakers).map(deserializeSpeaker);
+};
+
+export const selectSpeakerById = (
+  state: { conversations: ConversationsSliceState },
+  speakerId: string
+): Speaker | null => {
+  const speakerState = state.conversations.speakers[speakerId];
+  if (!speakerState) return null;
+  return deserializeSpeaker(speakerState);
+};
+
 export const selectConversations = (state: {
   conversations: ConversationsSliceState;
-}) => state.conversations.conversations;
+}): Conversation[] => {
+  return Object.values(state.conversations.conversations).map(deserializeConversation);
+};
 
 export const selectActiveConversationId = (state: {
   conversations: ConversationsSliceState;
@@ -143,4 +156,17 @@ export const selectConversationById = (
   const serialized = state.conversations.conversations[conversationId];
   if (!serialized) return null;
   return deserializeConversation(serialized);
+};
+
+export const selectParticipants = (
+  state: { conversations: ConversationsSliceState },
+  conversationId: string
+): Speaker[] => {
+  const serialized = state.conversations.conversations[conversationId];
+  if (!serialized) return [];
+  const participantIds = serialized.participantIds || [];
+  return participantIds
+    .map((id) => state.conversations.speakers[id])
+    .filter((s): s is SpeakerState => s !== undefined)
+    .map(deserializeSpeaker);
 };

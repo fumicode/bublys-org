@@ -1,6 +1,7 @@
 "use client";
 
 import ChatIcon from "@mui/icons-material/Chat";
+import PersonIcon from "@mui/icons-material/Person";
 import {
   BublyApp,
   BublyStoreProvider,
@@ -18,6 +19,11 @@ const menuItems: BublyMenuItem[] = [
     label: "会話一覧",
     url: "tailor-genie/conversations",
     icon: <ChatIcon />,
+  },
+  {
+    label: "スピーカー一覧",
+    url: "tailor-genie/speakers",
+    icon: <PersonIcon />,
   },
 ];
 

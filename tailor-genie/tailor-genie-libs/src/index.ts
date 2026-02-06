@@ -1,17 +1,22 @@
-// Slice
+// Slice (リポジトリとしてのCRUD操作のみ)
 export {
   conversationsSlice,
   conversationsReducer,
-  createConversation,
-  setActiveConversation,
-  speak,
-  updateTurn,
+  saveConversation,
   deleteConversation,
+  setActiveConversation,
+  saveSpeaker,
+  deleteSpeaker,
   selectConversations,
   selectActiveConversationId,
   selectActiveConversation,
   selectConversationById,
+  selectSpeakers,
+  selectSpeakerById,
+  selectParticipants,
+  serializeConversation,
   deserializeConversation,
+  deserializeSpeaker,
 } from "./lib/slice/conversation-slice.js";
 
 // Bubble Routes (このファイルをimportすると自動登録される)
@@ -25,6 +30,8 @@ export { ConversationView } from "./lib/view/ConversationView.js";
 export type { ConversationViewProps } from "./lib/view/ConversationView.js";
 export { SpeakerView } from "./lib/view/SpeakerView.js";
 export type { SpeakerViewProps } from "./lib/view/SpeakerView.js";
+export { SpeakerDetailView } from "./lib/view/SpeakerDetailView.js";
+export type { SpeakerDetailViewProps } from "./lib/view/SpeakerDetailView.js";
 
 // Feature
 export { ConversationFeature } from "./lib/feature/ConversationFeature.js";
@@ -32,3 +39,6 @@ export type { ConversationFeatureProps } from "./lib/feature/ConversationFeature
 export { ConversationListFeature } from "./lib/feature/ConversationListFeature.js";
 export { SpeakerFeature } from "./lib/feature/SpeakerFeature.js";
 export type { SpeakerFeatureProps } from "./lib/feature/SpeakerFeature.js";
+export { SpeakerListFeature } from "./lib/feature/SpeakerListFeature.js";
+export { SpeakerDetailFeature } from "./lib/feature/SpeakerDetailFeature.js";
+export type { SpeakerDetailFeatureProps } from "./lib/feature/SpeakerDetailFeature.js";

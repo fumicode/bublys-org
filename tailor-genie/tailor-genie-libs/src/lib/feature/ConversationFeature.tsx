@@ -1,22 +1,21 @@
 "use client";
 
-import { FC, useState, useContext } from "react";
+import { FC, useState, useContext, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Speaker } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { ConversationView } from "../view/ConversationView.js";
 import {
   selectConversationById,
-  speak,
+  selectParticipants,
+  selectSpeakerById,
+  saveConversation,
 } from "../slice/conversation-slice.js";
 
 export type ConversationFeatureProps = {
-  speakers: Speaker[];
   conversationId: string;
 };
 
 export const ConversationFeature: FC<ConversationFeatureProps> = ({
-  speakers,
   conversationId,
 }) => {
   const dispatch = useDispatch();
@@ -24,25 +23,42 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
   const conversation = useSelector((state: any) =>
     selectConversationById(state, conversationId)
   );
-  const [currentSpeakerId, setCurrentSpeakerId] = useState(speakers[0]?.id || "");
+  const participants = useSelector((state: any) =>
+    selectParticipants(state, conversationId)
+  );
+  const [currentSpeakerId, setCurrentSpeakerId] = useState("");
+
+  // 現在選択中のスピーカーを取得
+  const currentSpeaker = useSelector((state: any) =>
+    selectSpeakerById(state, currentSpeakerId)
+  );
+
+  useEffect(() => {
+    if (participants.length > 0 && !currentSpeakerId) {
+      setCurrentSpeakerId(participants[0].id);
+    }
+  }, [participants, currentSpeakerId]);
 
   const handleOpenSpeakerView = (speakerId: string) => {
     openBubble(`tailor-genie/conversations/${conversationId}/speakers/${speakerId}`, "root");
   };
 
   const handleSpeak = (message: string) => {
-    if (!conversation) return;
-    dispatch(
-      speak({
-        conversationId: conversation.id,
-        speakerId: currentSpeakerId,
-        message,
-      })
-    );
+    if (!conversation || !currentSpeaker) return;
+    // ドメインオブジェクトのメソッドを使用
+    const updated = conversation.speak(currentSpeaker, message);
+    dispatch(saveConversation(updated.state));
   };
 
   const handleSelectSpeaker = (speakerId: string) => {
     setCurrentSpeakerId(speakerId);
+  };
+
+  const handleAddParticipant = (speakerId: string) => {
+    if (!conversation) return;
+    // ドメインオブジェクトのメソッドを使用（既に参加している場合は内部で弾かれる）
+    const updated = conversation.addParticipant(speakerId);
+    dispatch(saveConversation(updated.state));
   };
 
   if (!conversation) {
@@ -65,11 +81,12 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
   return (
     <ConversationView
       conversation={conversation}
-      speakers={speakers}
+      participants={participants}
       currentSpeakerId={currentSpeakerId}
       onSelectSpeaker={handleSelectSpeaker}
       onSpeak={handleSpeak}
       onOpenSpeakerView={handleOpenSpeakerView}
+      onAddParticipant={handleAddParticipant}
     />
   );
 };

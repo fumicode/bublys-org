@@ -2,10 +2,11 @@
 
 import { FC, useContext } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Conversation } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import {
   selectConversations,
-  createConversation,
+  saveConversation,
   setActiveConversation,
 } from "../slice/conversation-slice.js";
 
@@ -16,7 +17,10 @@ export const ConversationListFeature: FC = () => {
 
   const handleCreateConversation = () => {
     const id = crypto.randomUUID();
-    dispatch(createConversation({ id }));
+    // ドメインオブジェクトを作成
+    const conversation = new Conversation({ id, participantIds: [], turns: [] });
+    dispatch(saveConversation(conversation.state));
+    dispatch(setActiveConversation(id));
     openBubble(`tailor-genie/conversations/${id}`, "root");
   };
 
@@ -24,8 +28,6 @@ export const ConversationListFeature: FC = () => {
     dispatch(setActiveConversation(convId));
     openBubble(`tailor-genie/conversations/${convId}`, "root");
   };
-
-  const conversationList = Object.values(conversations);
 
   return (
     <div style={{ padding: 16, height: "100%", display: "flex", flexDirection: "column" }}>
@@ -47,12 +49,12 @@ export const ConversationListFeature: FC = () => {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {conversationList.length === 0 ? (
+        {conversations.length === 0 ? (
           <div style={{ color: "#999", textAlign: "center", marginTop: 32 }}>
             会話がありません
           </div>
         ) : (
-          conversationList.map((conv) => (
+          conversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => handleOpenConversation(conv.id)}
@@ -66,7 +68,7 @@ export const ConversationListFeature: FC = () => {
                 会話 #{conv.id.slice(0, 8)}
               </div>
               <div style={{ fontSize: 12, color: "#666" }}>
-                {conv.turns.length} 件の発言
+                {conv.turns.length} 件の発言 / {conv.participantIds.length} 人参加
               </div>
             </div>
           ))
