@@ -50,8 +50,8 @@ const conversationsSlice = createSlice({
   name: "conversations",
   initialState,
   reducers: {
-    createConversation: (state) => {
-      const id = crypto.randomUUID();
+    createConversation: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
       const conversation = new Conversation({ id, turns: [] });
       state.conversations[id] = serializeConversation(conversation);
       state.activeConversationId = id;
@@ -129,6 +129,7 @@ export const {
 } = conversationsSlice.actions;
 
 export const conversationsReducer = conversationsSlice.reducer;
+export { conversationsSlice };
 
 // Selectors
 export const selectConversations = (state: {
@@ -145,6 +146,15 @@ export const selectActiveConversation = (state: {
   const { activeConversationId, conversations } = state.conversations;
   if (!activeConversationId) return null;
   const serialized = conversations[activeConversationId];
+  if (!serialized) return null;
+  return deserializeConversation(serialized);
+};
+
+export const selectConversationById = (
+  state: { conversations: ConversationsSliceState },
+  conversationId: string
+): Conversation | null => {
+  const serialized = state.conversations.conversations[conversationId];
   if (!serialized) return null;
   return deserializeConversation(serialized);
 };

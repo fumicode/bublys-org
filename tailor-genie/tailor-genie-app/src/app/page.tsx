@@ -1,28 +1,43 @@
 "use client";
 
-import { User } from "@bublys-org/tailor-genie-model";
-import { ConversationFeature } from "@bublys-org/tailor-genie-libs";
+import ChatIcon from "@mui/icons-material/Chat";
+import {
+  BublyApp,
+  BublyStoreProvider,
+  BublyMenuItem,
+} from "@bublys-org/bubbles-ui";
+import { injectSlice } from "@bublys-org/state-management";
+// tailor-genie-libsをimportすると自動でbubbleRoutesが登録される
+import { conversationsSlice } from "@bublys-org/tailor-genie-libs";
 
-const USERS: User[] = [
-  new User({ id: "user-1", name: "Alice" }),
-  new User({ id: "user-2", name: "Bob" }),
+// sliceを早期に注入
+injectSlice(conversationsSlice);
+
+const menuItems: BublyMenuItem[] = [
+  {
+    label: "会話一覧",
+    url: "tailor-genie/conversations",
+    icon: <ChatIcon />,
+  },
 ];
+
+function TailorGenieApp() {
+  return (
+    <BublyApp
+      title="Tailor Genie"
+      subtitle="会話アプリ"
+      menuItems={menuItems}
+    />
+  );
+}
 
 export default function Index() {
   return (
-    <div
-      style={{
-        maxWidth: 600,
-        margin: "0 auto",
-        padding: 24,
-        height: "100vh",
-        boxSizing: "border-box",
-      }}
+    <BublyStoreProvider
+      persistKey="tailor-genie"
+      initialBubbleUrls={["tailor-genie/conversations"]}
     >
-      <h1 style={{ marginBottom: 24, fontSize: 24 }}>Tailor Genie</h1>
-      <div style={{ height: "calc(100% - 80px)" }}>
-        <ConversationFeature users={USERS} />
-      </div>
-    </div>
+      <TailorGenieApp />
+    </BublyStoreProvider>
   );
 }

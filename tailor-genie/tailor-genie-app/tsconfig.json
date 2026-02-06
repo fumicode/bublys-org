@@ -47,10 +47,13 @@
   ],
   "references": [
     {
-      "path": "../tailor-genie-model"
+      "path": "../tailor-genie-libs"
     },
     {
-      "path": "../tailor-genie-libs"
+      "path": "../../bublys-libs/state-management"
+    },
+    {
+      "path": "../../bublys-libs/bubbles-ui"
     }
   ]
 }

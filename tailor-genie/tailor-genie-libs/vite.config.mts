@@ -38,7 +38,16 @@ export default defineConfig(() => ({
     },
     rollupOptions: {
       // External packages that should not be bundled into your library.
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@bublys-org/bubbles-ui',
+        '@bublys-org/tailor-genie-model',
+        '@bublys-org/state-management',
+        '@reduxjs/toolkit',
+        'react-redux',
+      ],
     },
   },
 }));

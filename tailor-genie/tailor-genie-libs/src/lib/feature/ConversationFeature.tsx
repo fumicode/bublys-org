@@ -5,26 +5,25 @@ import { useDispatch, useSelector } from "react-redux";
 import { User } from "@bublys-org/tailor-genie-model";
 import { ConversationView } from "../view/ConversationView.js";
 import {
-  selectActiveConversation,
+  selectConversationById,
   speak,
   removeTurn,
-  createConversation,
 } from "../slice/conversation-slice.js";
 
 export type ConversationFeatureProps = {
   users: User[];
+  conversationId: string;
 };
 
 export const ConversationFeature: FC<ConversationFeatureProps> = ({
   users,
+  conversationId,
 }) => {
   const dispatch = useDispatch();
-  const conversation = useSelector(selectActiveConversation);
+  const conversation = useSelector((state: any) =>
+    selectConversationById(state, conversationId)
+  );
   const [currentUserId, setCurrentUserId] = useState(users[0]?.id || "");
-
-  const handleCreateConversation = () => {
-    dispatch(createConversation());
-  };
 
   const handleSpeak = (message: string) => {
     if (!conversation) return;
@@ -60,27 +59,10 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
           alignItems: "center",
           justifyContent: "center",
           height: "100%",
-          gap: 16,
+          color: "#666",
         }}
       >
-        <p style={{ color: "#666" }}>会話がありません</p>
-        <p style={{ color: "#999", fontSize: 12 }}>
-          参加者: {users.map((u) => u.name).join(", ")}
-        </p>
-        <button
-          onClick={handleCreateConversation}
-          style={{
-            padding: "12px 24px",
-            background: "#007bff",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-            cursor: "pointer",
-            fontSize: 14,
-          }}
-        >
-          新しい会話を始める
-        </button>
+        会話が見つかりません
       </div>
     );
   }

@@ -15,6 +15,7 @@
     }
   },
   "dependencies": {
+    "@bublys-org/bubbles-ui": "*",
     "@bublys-org/tailor-genie-model": "*",
     "@reduxjs/toolkit": "^2.9.0",
     "react-redux": "^9.2.0"

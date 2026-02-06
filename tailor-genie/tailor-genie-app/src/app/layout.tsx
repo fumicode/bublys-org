@@ -1,10 +1,9 @@
-import './global.css';
-import { StyledComponentsRegistry } from './registry';
-import { StoreProvider } from '../lib/StoreProvider';
+import "./global.css";
+import { StyledComponentsRegistry } from "./registry";
 
 export const metadata = {
-  title: 'Tailor Genie',
-  description: 'Conversation App',
+  title: "Tailor Genie",
+  description: "Conversation App with Bubble UI",
 };
 
 export default function RootLayout({
@@ -15,9 +14,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <StoreProvider>
-          <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
-        </StoreProvider>
+        <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
       </body>
     </html>
   );
