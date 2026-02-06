@@ -56,6 +56,15 @@
     },
     {
       "path": "./ekikyo-bubly/ekikyo-app"
+    },
+    {
+      "path": "./tailor-genie/tailor-genie-model"
+    },
+    {
+      "path": "./tailor-genie/tailor-genie-libs"
+    },
+    {
+      "path": "./tailor-genie/tailor-genie-app"
     }
   ]
 }
