@@ -40,6 +40,9 @@
     },
     {
       "path": "../gakkai-shift-libs/tsconfig.lib.json"
+    },
+    {
+      "path": "../gakkai-shift-model/tsconfig.lib.json"
     }
   ]
 }

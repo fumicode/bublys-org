@@ -61,10 +61,14 @@ export class BubblesProcess {
       const layerIdx = draft.layers.findIndex(layer =>
         layer.includes(id)
       );
-      if (layerIdx < 0 || layerIdx >= draft.layers.length - 1) return;
+      if (layerIdx < 0) return;
       const idx = draft.layers[layerIdx].indexOf(id);
       const [bId] = draft.layers[layerIdx].splice(idx, 1);
-      draft.layers[layerIdx + 1].push(bId);
+      if (layerIdx >= draft.layers.length - 1) {
+        draft.layers.push([bId]);
+      } else {
+        draft.layers[layerIdx + 1].push(bId);
+      }
     });
   }
 
@@ -73,11 +77,15 @@ export class BubblesProcess {
       const layerIdx = draft.layers.findIndex(layer =>
         layer.includes(id)
       );
-      if (layerIdx <= 0) return;
+      if (layerIdx < 0) return;
       const idx = draft.layers[layerIdx].indexOf(id);
       const [bId] = draft.layers[layerIdx].splice(idx, 1);
       if (draft.layers[layerIdx].length === 0) draft.layers.splice(layerIdx, 1);
-      draft.layers[layerIdx - 1].push(bId);
+      if (layerIdx === 0) {
+        draft.layers.unshift([bId]);
+      } else {
+        draft.layers[layerIdx - 1].push(bId);
+      }
     });
   }
 

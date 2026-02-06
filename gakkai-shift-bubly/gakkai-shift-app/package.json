@@ -6,6 +6,7 @@
     "build:bubly": "vite build -c vite.config.bubly.ts"
   },
   "dependencies": {
+    "@bublys-org/gakkai-shift-model": "*",
     "@bublys-org/gakkai-shift-libs": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",

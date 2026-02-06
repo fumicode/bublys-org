@@ -1,4 +1,4 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
+import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
@@ -192,6 +192,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     };
   }, [onCoordinateSystemReady, vanishingPoint]);
 
+  const [showSurfaceBorder, setShowSurfaceBorder] = useState(true);
   const relationIds = useAppSelector(selectValidBubbleRelationIds);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
@@ -256,7 +257,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         {renderedBubbles}
         <div className="e-underground-curtain"></div>
         <div className="e-debug-visualizations">
-          <div className="e-surface-border"></div>
+          <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
+          <button
+            className="e-surface-border-toggle"
+            onClick={() => setShowSurfaceBorder((v) => !v)}
+          >
+            {showSurfaceBorder ? '◻' : '◼'}
+          </button>
         </div>
 
         {!isLayerAnimating &&
@@ -326,6 +333,37 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
         inset 0 0 20px rgba(255, 255, 255, 0.05);
       pointer-events: none;
       z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
+      transform-origin: left bottom;
+      transition: transform 0.35s ease, opacity 0.35s ease;
+
+      &.is-hidden {
+        transform: scale(0);
+        opacity: 0;
+      }
+    }
+
+    .e-surface-border-toggle {
+      position: absolute;
+      bottom: 8px;
+      left: ${({ surface }) => surface.leftTop.x + 8}px;
+      z-index: ${({ surfaceZIndex }) => (surfaceZIndex || 0) + 1};
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.2);
+      }
     }
   }
 `;

@@ -43,6 +43,26 @@ const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18
 );
 
 /**
+ * レイヤー手前へ移動（上向き矢印）
+ */
+const LayerUpIcon: FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
+    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/**
+ * レイヤー奥へ移動（下向き矢印）
+ */
+const LayerDownIcon: FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
+    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/**
  * 長いslug（UUIDなど）を省略表示する
  * 20文字以上の場合: 前2文字 + ... + 後4文字
  */
@@ -317,6 +337,30 @@ const BubbleViewInner: FC<BubbleProps> = ({
             >
               <ToggleSizeIcon size={20} isMaximized={isMaximized} />
             </button>
+            {onLayerDownClick && (
+              <button
+                className="e-bubble-button e-layer-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLayerDownClick(bubble);
+                }}
+                title="奥のレイヤーへ"
+              >
+                <LayerUpIcon size={20} />
+              </button>
+            )}
+            {onLayerUpClick && (
+              <button
+                className="e-bubble-button e-layer-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLayerUpClick(bubble);
+                }}
+                title="手前のレイヤーへ"
+              >
+                <LayerDownIcon size={20} />
+              </button>
+            )}
           </div>
           <h1 className="e-bubble-name">{bubble.type}</h1>
         </div>
@@ -516,6 +560,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
       &.e-toggle-size-button:hover {
         color: hsla(210, 70%, 50%, 1);
+      }
+
+      &.e-layer-button:hover {
+        color: hsla(270, 70%, 50%, 1);
       }
     }
 

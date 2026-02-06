@@ -23,7 +23,7 @@ export function App() {
       initialBubbleUrls={['gakkai-shift/staffs', 'gakkai-shift/shift-plans']}
     >
       <BublyApp
-        title="学会シフト管理"
+        title="シフトパズル"
         subtitle="Standalone • Port 4001"
         menuItems={menuItems}
       />
