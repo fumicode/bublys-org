@@ -39,9 +39,8 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
     }
   }, [conversation.turns.length]);
 
-  const getSpeakerName = (speakerId: string): string => {
-    const s = allSpeakers.find((sp) => sp.id === speakerId);
-    return s?.name || speakerId;
+  const getSpeaker = (speakerId: string) => {
+    return allSpeakers.find((sp) => sp.id === speakerId);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -96,12 +95,14 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
           </div>
         ) : (
           conversation.turns.map((turn) => {
+            const turnSpeaker = getSpeaker(turn.speakerId);
             const isSelf = turn.speakerId === speaker.id;
             return (
               <TurnView
                 key={turn.id}
                 turn={turn}
-                speakerName={getSpeakerName(turn.speakerId)}
+                speakerName={turnSpeaker?.name || turn.speakerId}
+                speakerRole={turnSpeaker?.role}
                 align={isSelf ? "right" : "left"}
               />
             );

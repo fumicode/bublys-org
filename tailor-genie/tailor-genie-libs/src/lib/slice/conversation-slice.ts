@@ -24,8 +24,8 @@ type ConversationsSliceState = {
 };
 
 const DEFAULT_SPEAKERS: SpeakerState[] = [
-  { id: "speaker-1", name: "ジーニー" },
-  { id: "speaker-2", name: "坂口様" },
+  { id: "speaker-1", name: "ジーニー", role: "host" },
+  { id: "speaker-2", name: "坂口様", role: "guest" },
 ];
 
 const initialState: ConversationsSliceState = {

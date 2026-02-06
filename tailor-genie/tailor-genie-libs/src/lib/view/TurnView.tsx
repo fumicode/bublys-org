@@ -1,20 +1,28 @@
 "use client";
 
 import { FC } from "react";
-import { Turn } from "@bublys-org/tailor-genie-model";
+import { Turn, SpeakerRole } from "@bublys-org/tailor-genie-model";
 
 export type TurnViewProps = {
   turn: Turn;
   speakerName?: string;
+  speakerRole?: SpeakerRole;
   align?: "left" | "right";
+};
+
+const BUBBLE_COLORS: Record<SpeakerRole, { bg: string; color: string }> = {
+  host: { bg: "#6f42c1", color: "white" },
+  guest: { bg: "#28a745", color: "white" },
 };
 
 export const TurnView: FC<TurnViewProps> = ({
   turn,
   speakerName,
+  speakerRole = "guest",
   align = "left",
 }) => {
   const isRight = align === "right";
+  const colors = BUBBLE_COLORS[speakerRole];
 
   return (
     <div
@@ -33,8 +41,8 @@ export const TurnView: FC<TurnViewProps> = ({
           maxWidth: "80%",
           padding: "10px 14px",
           borderRadius: isRight ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          background: isRight ? "#007bff" : "#e9ecef",
-          color: isRight ? "white" : "#333",
+          background: colors.bg,
+          color: colors.color,
           fontSize: 14,
           lineHeight: 1.4,
           wordBreak: "break-word",

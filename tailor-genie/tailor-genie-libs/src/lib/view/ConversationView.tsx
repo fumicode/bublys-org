@@ -48,9 +48,8 @@ export const ConversationView: FC<ConversationViewProps> = ({
     }
   }, [conversation.turns.length]);
 
-  const getSpeakerName = (speakerId: string): string => {
-    const speaker = participants.find((s) => s.id === speakerId);
-    return speaker?.name || speakerId;
+  const getSpeaker = (speakerId: string) => {
+    return participants.find((s) => s.id === speakerId);
   };
 
   const currentSpeaker = participants.find((s) => s.id === currentSpeakerId);
@@ -156,13 +155,15 @@ export const ConversationView: FC<ConversationViewProps> = ({
           </div>
         ) : (
           conversation.turns.map((turn) => {
+            const speaker = getSpeaker(turn.speakerId);
             const speakerIndex = participants.findIndex((s) => s.id === turn.speakerId);
             const align = speakerIndex === 0 ? "left" : "right";
             return (
               <TurnView
                 key={turn.id}
                 turn={turn}
-                speakerName={getSpeakerName(turn.speakerId)}
+                speakerName={speaker?.name || turn.speakerId}
+                speakerRole={speaker?.role}
                 align={align}
               />
             );

@@ -2,18 +2,29 @@
 
 import { FC, useContext, useState, FormEvent, ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Speaker } from "@bublys-org/tailor-genie-model";
+import { Speaker, SpeakerRole } from "@bublys-org/tailor-genie-model";
 import { BubblesContext, ObjectView, registerObjectType } from "@bublys-org/bubbles-ui";
 import { selectSpeakers, saveSpeaker } from "../slice/conversation-slice.js";
 
 // Speakerをオブジェクト型として登録
 registerObjectType("Speaker");
 
+const ROLE_LABELS: Record<SpeakerRole, string> = {
+  host: "ホスト",
+  guest: "ゲスト",
+};
+
+const ROLE_COLORS: Record<SpeakerRole, string> = {
+  host: "#6f42c1",
+  guest: "#28a745",
+};
+
 export const SpeakerListFeature: FC = () => {
   const dispatch = useDispatch();
   const speakers = useSelector(selectSpeakers);
   const { openBubble } = useContext(BubblesContext);
   const [newSpeakerName, setNewSpeakerName] = useState("");
+  const [newSpeakerRole, setNewSpeakerRole] = useState<SpeakerRole>("guest");
 
   const handleOpenSpeaker = (speakerId: string) => {
     openBubble(`tailor-genie/speakers/${speakerId}`, "root");
@@ -24,8 +35,11 @@ export const SpeakerListFeature: FC = () => {
     if (!newSpeakerName.trim()) return;
 
     const id = `speaker-${crypto.randomUUID().slice(0, 8)}`;
-    // ドメインオブジェクトを作成
-    const speaker = new Speaker({ id, name: newSpeakerName.trim() });
+    const speaker = new Speaker({
+      id,
+      name: newSpeakerName.trim(),
+      role: newSpeakerRole,
+    });
     dispatch(saveSpeaker(speaker.state));
     setNewSpeakerName("");
   };
@@ -56,6 +70,7 @@ export const SpeakerListFeature: FC = () => {
           display: "flex",
           gap: 8,
           marginBottom: 16,
+          flexWrap: "wrap",
         }}
       >
         <input
@@ -67,12 +82,27 @@ export const SpeakerListFeature: FC = () => {
           placeholder="新しいスピーカー名..."
           style={{
             flex: 1,
+            minWidth: 120,
             padding: "8px 12px",
             border: "1px solid #ddd",
             borderRadius: 4,
             fontSize: 14,
           }}
         />
+        <select
+          value={newSpeakerRole}
+          onChange={(e) => setNewSpeakerRole(e.target.value as SpeakerRole)}
+          style={{
+            padding: "8px 12px",
+            border: "1px solid #ddd",
+            borderRadius: 4,
+            fontSize: 14,
+            background: "white",
+          }}
+        >
+          <option value="host">ホスト</option>
+          <option value="guest">ゲスト</option>
+        </select>
         <button
           type="submit"
           disabled={!newSpeakerName.trim()}
@@ -110,14 +140,31 @@ export const SpeakerListFeature: FC = () => {
                   borderBottom: "1px solid #eee",
                   cursor: "pointer",
                   width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: 4 }}>
-                  {speaker.name}
+                <div>
+                  <div style={{ fontWeight: "bold", marginBottom: 4 }}>
+                    {speaker.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    ID: {speaker.id}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#666" }}>
-                  ID: {speaker.id}
-                </div>
+                <span
+                  style={{
+                    padding: "4px 8px",
+                    background: ROLE_COLORS[speaker.role],
+                    color: "white",
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: "bold",
+                  }}
+                >
+                  {ROLE_LABELS[speaker.role]}
+                </span>
               </div>
             </ObjectView>
           ))
