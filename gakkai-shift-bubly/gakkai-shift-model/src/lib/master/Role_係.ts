@@ -112,7 +112,7 @@ export class Role_係 {
     return labels[level];
   }
 
-  /** 13種類のデフォルト係を生成 */
+  /** 9種類のデフォルト係を生成 */
   static createDefaultRoles(): Role_係[] {
     const roles: RoleState[] = [
       {
@@ -145,14 +145,6 @@ export class Role_係 {
           minPcSkill: 'intermediate',
         },
         priority: 70,
-      },
-      {
-        id: 'cloakroom',
-        name: '手荷物預かり',
-        description: '荷物の受け渡し。体力・スピード重視',
-        fixedness: 'time_slot_ok',
-        requirements: {},
-        priority: 60,
       },
       {
         id: 'venue',
@@ -206,30 +198,6 @@ export class Role_係 {
           preferMale: true,
         },
         priority: 65,
-      },
-      {
-        id: 'exhibition',
-        name: 'ブース係',
-        description: '企業・展示ブース対応。英語できると尚可',
-        fixedness: 'time_slot_ok',
-        requirements: {},
-        priority: 55,
-      },
-      {
-        id: 'poster',
-        name: '掲示係',
-        description: 'ポスター会場案内・誘導',
-        fixedness: 'time_slot_ok',
-        requirements: {},
-        priority: 50,
-      },
-      {
-        id: 'party_cloakroom',
-        name: '交流会荷物係',
-        description: '懇親会時間に参加できるスタッフ',
-        fixedness: 'party_only',
-        requirements: {},
-        priority: 40,
       },
       {
         id: 'party_reception',
