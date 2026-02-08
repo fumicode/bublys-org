@@ -6,14 +6,15 @@
     "build:bubly": "vite build -c vite.config.bubly.ts"
   },
   "dependencies": {
-    "@bublys-org/gakkai-shift-model": "*",
-    "@bublys-org/gakkai-shift-libs": "*",
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/gakkai-shift-libs": "*",
+    "@bublys-org/gakkai-shift-model": "*",
     "@bublys-org/state-management": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
+    "modern-normalize": "^3.0.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "redux-persist": "^6.0.0",
@@ -22,12 +23,21 @@
   "nx": {
     "targets": {
       "build": {
-        "dependsOn": ["^build"]
+        "dependsOn": [
+          "^build"
+        ]
       },
       "build:bubly": {
-        "dependsOn": ["^build"]
+        "dependsOn": [
+          "^build"
+        ]
       },
-      "dev": { "dependsOn": ["^dev"], "continuous": true }
+      "dev": {
+        "dependsOn": [
+          "^dev"
+        ],
+        "continuous": true
+      }
     }
   }
 }
