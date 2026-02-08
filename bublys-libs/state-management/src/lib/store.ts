@@ -112,3 +112,8 @@ export const makeStore = (options?: { persistKey?: string }) => {
 // ストア、ディスパッチ型
 export type AppStore = ReturnType<typeof makeStore>["store"];
 export type AppDispatch = AppStore['dispatch'];
+
+// 現在のストア参照（labelResolver 等からアクセス用）
+let currentStore: AppStore | null = null;
+export const setCurrentStore = (store: AppStore): void => { currentStore = store; };
+export const getCurrentStore = (): AppStore | null => currentStore;

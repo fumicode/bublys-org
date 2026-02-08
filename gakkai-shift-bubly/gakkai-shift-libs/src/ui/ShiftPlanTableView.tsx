@@ -14,7 +14,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import CloseIcon from "@mui/icons-material/Close";
 import WarningIcon from "@mui/icons-material/Warning";
 import { IconButton, Tooltip } from "@mui/material";
-import { ObjectView, getDragType, DRAG_KEYS } from "@bublys-org/bubbles-ui";
+import { ObjectView, getDragType, DRAG_KEYS, setDragPayload } from "@bublys-org/bubbles-ui";
 
 type ShiftPlanTableViewProps = {
   timeSlots: readonly TimeSlot_時間帯[];
@@ -150,10 +150,12 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
     }
   };
 
-  const handleChipDragStart = (e: React.DragEvent, assignmentId: string, staffId: string) => {
+  const handleChipDragStart = (e: React.DragEvent, assignmentId: string, staffId: string, url: string, label: string) => {
+    // セル間移動用の独自データ
     e.dataTransfer.setData("text/staff-id", staffId);
     e.dataTransfer.setData("text/assignment-id", assignmentId);
-    e.dataTransfer.effectAllowed = "move";
+    // ポケット等の汎用ドロップ先で認識できるようにする（copyMove でセル間移動とポケットへのコピー両方を許可）
+    setDragPayload(e, { type: getDragType("ShiftAssignment"), url, label, objectId: assignmentId }, { effectAllowed: "copyMove" });
   };
 
   // 日付でグループ化
@@ -246,7 +248,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                             <div
                               className={`e-staff-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
                               draggable
-                              onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId)}
+                              onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId, assignmentUrl, staffName)}
                             >
                               {hasViolation && (
                                 <Tooltip title={violation.message} arrow>

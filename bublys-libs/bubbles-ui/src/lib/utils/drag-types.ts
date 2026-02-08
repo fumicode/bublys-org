@@ -9,6 +9,7 @@ import { getAllDragTypes } from "../object-view/ObjectTypeRegistry.js";
 export const DRAG_KEYS = {
   url: "url",
   label: "label",
+  objectId: "object-id",
 } as const;
 
 // 特殊な組み込みドラッグ型
@@ -17,7 +18,7 @@ export const BUILTIN_DRAG_TYPES = {
 } as const;
 
 export type DragDataType = string;
-export type DragPayload = { type: DragDataType; url: string; label?: string };
+export type DragPayload = { type: DragDataType; url: string; label?: string; objectId?: string };
 
 /**
  * 登録済みの全ドラッグ型リストを取得（動的）
@@ -38,6 +39,9 @@ export const setDragPayload = (
   if (payload.label) {
     e.dataTransfer.setData(DRAG_KEYS.label, payload.label);
   }
+  if (payload.objectId) {
+    e.dataTransfer.setData(DRAG_KEYS.objectId, payload.objectId);
+  }
 };
 
 export const parseDragPayload = (
@@ -54,8 +58,9 @@ export const parseDragPayload = (
   if (!url) return null;
 
   const label = e.dataTransfer.getData(DRAG_KEYS.label) || undefined;
+  const objectId = e.dataTransfer.getData(DRAG_KEYS.objectId) || undefined;
 
-  return { type: hitType, url, label };
+  return { type: hitType, url, label, objectId };
 };
 
 export const useDragPayload = (

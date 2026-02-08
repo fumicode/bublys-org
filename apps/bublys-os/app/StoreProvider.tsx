@@ -5,7 +5,7 @@ import { Provider } from 'react-redux'
 import * as ReactRedux from 'react-redux'
 import * as Redux from '@reduxjs/toolkit'
 import styled from 'styled-components'
-import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist } from "@bublys-org/state-management";
+import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist, setCurrentStore } from "@bublys-org/state-management";
 import * as StateManagement from "@bublys-org/state-management";
 import { PersistGate } from 'redux-persist/integration/react'
 import { Persistor } from 'redux-persist/lib/types';
@@ -76,6 +76,7 @@ export default function StoreProvider({
     // アプリケーション初期化してからStore作成
     initializeApp();
     storePersistorRef.current = makeStore();
+    setCurrentStore(storePersistorRef.current.store);
   }
 
   const { store, persistor } = storePersistorRef.current;

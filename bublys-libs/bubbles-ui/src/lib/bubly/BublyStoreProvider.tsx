@@ -1,7 +1,7 @@
 'use client';
 import React, { useRef, useEffect } from 'react';
 import { Provider } from 'react-redux';
-import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist } from '@bublys-org/state-management';
+import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist, setCurrentStore } from '@bublys-org/state-management';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Persistor } from 'redux-persist/lib/types';
 import {
@@ -59,6 +59,7 @@ export function BublyStoreProvider({
     setInitialBubbleUrls(initialBubbleUrls);
     initializeApp();
     storePersistorRef.current = makeStore({ persistKey });
+    setCurrentStore(storePersistorRef.current.store);
   }
 
   const { store, persistor } = storePersistorRef.current;
