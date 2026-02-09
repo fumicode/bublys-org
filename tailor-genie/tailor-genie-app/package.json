@@ -13,5 +13,21 @@
     "next": "~16.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": ["^dev"],
+        "continuous": true,
+        "options": {
+          "command": "next dev --port 4003"
+        }
+      },
+      "start": {
+        "options": {
+          "command": "next start --port 4003"
+        }
+      }
+    }
   }
 }
