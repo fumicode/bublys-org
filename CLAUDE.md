@@ -33,7 +33,21 @@ npx nx g @nx/react:lib <name>     # 新しいReactライブラリを生成
 npx nx g @nx/js:lib <name>        # 新しいTypeScriptライブラリを生成
 ```
 
-**重要:** 新しいライブラリやアプリを作成する際は、必ずNxのジェネレーターコマンドを使用すること。手動でディレクトリやpackage.jsonを作成しない。Nxが適切な設定ファイル（tsconfig、project.json等）を自動生成し、ワークスペースとの整合性を保証する。
+**Nx規約:**
+- 新しいライブラリやアプリの作成には必ず上記のNxジェネレーターコマンドを使用すること。手動でディレクトリやpackage.jsonを作成しない
+- Nxターゲット設定は `project.json` を使わず、`package.json` の `"nx"` キーにまとめる
+- アプリの `dev` ターゲットには必ず `"dependsOn": ["^dev"]` と `"continuous": true` を設定し、依存ライブラリが自動でビルドされるようにする
+- 例:
+  ```json
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": ["^dev"],
+        "continuous": true
+      }
+    }
+  }
+  ```
 
 ## 設計哲学
 
