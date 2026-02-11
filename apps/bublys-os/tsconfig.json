@@ -64,6 +64,9 @@
       "path": "../../users-libs"
     },
     {
+      "path": "../../bublys-libs/world-line-graph"
+    },
+    {
       "path": "../../bublys-libs/bubbles-ui"
     },
     {
