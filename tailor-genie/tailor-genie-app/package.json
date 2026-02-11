@@ -6,6 +6,7 @@
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/tailor-genie-libs": "*",
+    "@bublys-org/world-line-graph": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.0",

@@ -1,10 +1,10 @@
 import { useRef, useEffect, useCallback } from 'react';
 import {
-  useWorldLineGraph,
   computeStateHash,
   createStateRef,
   type StateRef,
-} from '@bublys-org/world-line-graph';
+} from '../domain';
+import { useWorldLineGraph } from './WorldLineGraphProvider';
 import { ObjectShell } from './ObjectShell';
 
 // ============================================================================

@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import {
   WorldLineGraphProvider,
   useWorldLineGraph,
+  ObjectShell,
+  useShellManager,
   type WorldNode,
 } from '@bublys-org/world-line-graph';
 import { Counter } from './Counter';
-import { ObjectShell } from './ObjectShell';
-import { useShellManager } from './useShellManager';
 
 // ============================================================================
 // Counter 用の ShellManager 設定

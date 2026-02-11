@@ -1,10 +1,9 @@
 "use client";
 
 import { FC } from "react";
-import { useSelector } from "react-redux";
 import { ObjectView, registerObjectType } from "@bublys-org/bubbles-ui";
 import { SpeakerDetailView } from "../view/SpeakerDetailView.js";
-import { selectSpeakerById } from "../slice/conversation-slice.js";
+import { useTailorGenie } from "./TailorGenieProvider.js";
 
 // Speakerをオブジェクト型として登録
 registerObjectType("Speaker");
@@ -16,9 +15,9 @@ export type SpeakerDetailFeatureProps = {
 export const SpeakerDetailFeature: FC<SpeakerDetailFeatureProps> = ({
   speakerId,
 }) => {
-  const speaker = useSelector((state: any) =>
-    selectSpeakerById(state, speakerId)
-  );
+  const { speakerShells } = useTailorGenie();
+  const speaker =
+    speakerShells.find((s) => s.id === speakerId)?.object ?? null;
 
   if (!speaker) {
     return (

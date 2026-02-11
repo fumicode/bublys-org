@@ -1,14 +1,12 @@
 "use client";
 
 import { FC } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { SpeakerView } from "../view/SpeakerView.js";
 import {
-  selectConversationById,
-  selectParticipants,
-  selectSpeakerById,
-  saveConversation,
-} from "../slice/conversation-slice.js";
+  useTailorGenie,
+  ConversationWorldLineProvider,
+  useConversationShell,
+} from "./TailorGenieProvider.js";
 
 export type SpeakerFeatureProps = {
   conversationId: string;
@@ -19,22 +17,35 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
   conversationId,
   speakerId,
 }) => {
-  const dispatch = useDispatch();
-  const conversation = useSelector((state: any) =>
-    selectConversationById(state, conversationId)
+  return (
+    <ConversationWorldLineProvider conversationId={conversationId}>
+      <SpeakerFeatureInner
+        conversationId={conversationId}
+        speakerId={speakerId}
+      />
+    </ConversationWorldLineProvider>
   );
-  const speaker = useSelector((state: any) =>
-    selectSpeakerById(state, speakerId)
-  );
-  const participants = useSelector((state: any) =>
-    selectParticipants(state, conversationId)
-  );
+};
+
+const SpeakerFeatureInner: FC<SpeakerFeatureProps> = ({
+  conversationId,
+  speakerId,
+}) => {
+  const { speakerShells } = useTailorGenie();
+  const conversationShell = useConversationShell(conversationId);
+  const conversation = conversationShell?.object ?? null;
+
+  const speaker =
+    speakerShells.find((s) => s.id === speakerId)?.object ?? null;
+  const participants = conversation
+    ? speakerShells
+        .map((s) => s.object)
+        .filter((s) => conversation.hasParticipant(s.id))
+    : [];
 
   const handleSpeak = (message: string) => {
-    if (!conversation || !speaker) return;
-    // ドメインオブジェクトのメソッドを使用
-    const updated = conversation.speak(speaker, message);
-    dispatch(saveConversation(updated.state));
+    if (!conversationShell || !speaker) return;
+    conversationShell.update((c) => c.speak(speaker, message));
   };
 
   if (!speaker) {
@@ -53,7 +64,6 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
     );
   }
 
-  // このスピーカーが参加者かどうか
   const isParticipant = conversation.hasParticipant(speakerId);
 
   return (

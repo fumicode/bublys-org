@@ -4,8 +4,11 @@ export {
   setGraph,
   setLoadedStates,
   setLoadedState,
+  createScope,
+  deleteScope,
   selectWorldLineGraph,
   selectLoadedStates,
+  selectScopeIds,
 } from './worldLineGraphSlice';
 export {
   saveStateToIDB,
@@ -18,3 +21,6 @@ export {
 export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
 export { WorldLineGraphProvider, useWorldLineGraph } from './WorldLineGraphProvider';
 export { initWorldLineGraph } from './initWorldLineGraph';
+export { ObjectShell } from './ObjectShell';
+export { useShellManager, type ShellManagerConfig } from './useShellManager';
+export { useScopeManager } from './useScopeManager';

@@ -1,5 +1,5 @@
 /**
- * ObjectShell — 汎用 mutable シェル（ObjectShell プロトタイプ）
+ * ObjectShell — 汎用 mutable シェル
  *
  * immutable なドメインオブジェクトを mutable なコンテナで包む。
  * WorldLineGraph との接続は _bind() で注入された commitFn が担う。

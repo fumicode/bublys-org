@@ -34,6 +34,9 @@
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
+    },
+    {
       "path": "../tailor-genie-model/tsconfig.lib.json"
     }
   ]

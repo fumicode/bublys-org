@@ -75,6 +75,14 @@ export const worldLineGraphSlice = createSlice({
       ensureScope(state, scopeId);
       state.graphs[scopeId].loadedStates[hash] = data;
     },
+
+    createScope(state, action: PayloadAction<string>) {
+      ensureScope(state, action.payload);
+    },
+
+    deleteScope(state, action: PayloadAction<string>) {
+      delete state.graphs[action.payload];
+    },
   },
 });
 
@@ -82,6 +90,8 @@ export const {
   setGraph,
   setLoadedStates,
   setLoadedState,
+  createScope,
+  deleteScope,
 } = worldLineGraphSlice.actions;
 
 // ============================================================================
@@ -102,6 +112,17 @@ export function selectLoadedStates(
   scopeId: string
 ): Record<string, unknown> {
   return state.worldLineGraph?.graphs[scopeId]?.loadedStates ?? {};
+}
+
+export function selectScopeIds(
+  state: RootState,
+  prefix: string
+): string[] {
+  const graphs = state.worldLineGraph?.graphs;
+  if (!graphs) return [];
+  return Object.keys(graphs)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
 }
 
 // ============================================================================

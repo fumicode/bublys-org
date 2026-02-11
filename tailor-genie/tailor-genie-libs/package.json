@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*",
     "@bublys-org/tailor-genie-model": "*",
-    "@reduxjs/toolkit": "^2.9.0",
-    "react-redux": "^9.2.0"
+    "@bublys-org/world-line-graph": "*"
   }
 }
