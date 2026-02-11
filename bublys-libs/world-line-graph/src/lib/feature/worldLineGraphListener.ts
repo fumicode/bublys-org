@@ -1,5 +1,5 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
-import { setGraph, setLoadedStates } from './worldLineGraphSlice';
+import { setGraph, setCasEntries } from './worldLineGraphSlice';
 import { saveStatesToIDB, saveGraphToIDB } from './IndexedDBStore';
 import type { RootState } from '@bublys-org/state-management';
 
@@ -11,16 +11,16 @@ worldLineGraphListenerMiddleware.startListening({
   effect: async (action, listenerApi) => {
     const { scopeId } = action.payload;
     const state = listenerApi.getState() as RootState;
-    const graphJson = state.worldLineGraph?.graphs[scopeId]?.graph;
+    const graphJson = state.worldLineGraph?.graphs[scopeId];
     if (!graphJson) return;
 
     await saveGraphToIDB(scopeId, graphJson);
   },
 });
 
-// setLoadedStates: 状態データをIndexedDBに保存
+// setCasEntries: 状態データをIndexedDBに保存
 worldLineGraphListenerMiddleware.startListening({
-  actionCreator: setLoadedStates,
+  actionCreator: setCasEntries,
   effect: async (action) => {
     const { entries } = action.payload;
     if (entries.length > 0) {

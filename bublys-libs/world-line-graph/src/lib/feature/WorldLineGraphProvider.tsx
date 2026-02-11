@@ -9,10 +9,10 @@ import { WorldLineGraph } from '../domain/WorldLineGraph';
 import type { StateRef } from '../domain/StateRef';
 import {
   setGraph,
-  setLoadedStates,
+  setCasEntries,
   selectWorldLineGraph,
-  selectLoadedStates,
 } from './worldLineGraphSlice';
+import type { RootState } from '@bublys-org/state-management';
 
 // ============================================================================
 // Context
@@ -50,9 +50,7 @@ export function WorldLineGraphProvider({
 }: WorldLineGraphProviderProps) {
   const dispatch = useAppDispatch();
   const graph = useAppSelector((state) => selectWorldLineGraph(state, scopeId));
-  const loadedStates = useAppSelector((state) =>
-    selectLoadedStates(state, scopeId)
-  );
+  const cas = useAppSelector((state: RootState) => state.worldLineGraph?.cas ?? {});
 
   const grow = useCallback(
     (
@@ -62,7 +60,7 @@ export function WorldLineGraphProvider({
       const updated = graph.grow(changedRefs);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
       if (stateEntries.length > 0) {
-        dispatch(setLoadedStates({ scopeId, entries: stateEntries }));
+        dispatch(setCasEntries({ entries: stateEntries }));
       }
     },
     [dispatch, scopeId, graph]
@@ -88,9 +86,9 @@ export function WorldLineGraphProvider({
 
   const getLoadedState = useCallback(
     <T,>(hash: string): T | undefined => {
-      return loadedStates[hash] as T | undefined;
+      return cas[hash] as T | undefined;
     },
-    [loadedStates]
+    [cas]
   );
 
   const getCurrentStates = useCallback((): Record<string, unknown> => {
@@ -98,12 +96,12 @@ export function WorldLineGraphProvider({
     const result: Record<string, unknown> = {};
     for (const ref of refs) {
       const key = `${ref.type}:${ref.id}`;
-      if (loadedStates[ref.hash] !== undefined) {
-        result[key] = loadedStates[ref.hash];
+      if (cas[ref.hash] !== undefined) {
+        result[key] = cas[ref.hash];
       }
     }
     return result;
-  }, [graph, loadedStates]);
+  }, [graph, cas]);
 
   const value = useMemo<WorldLineGraphContextValue>(
     () => ({
@@ -127,7 +125,7 @@ export function WorldLineGraphProvider({
 }
 
 // ============================================================================
-// Hook
+// Hooks
 // ============================================================================
 
 export function useWorldLineGraph(): WorldLineGraphContextValue {
@@ -139,3 +137,4 @@ export function useWorldLineGraph(): WorldLineGraphContextValue {
   }
   return context;
 }
+

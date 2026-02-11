@@ -10,16 +10,12 @@ import type { RootState } from '@bublys-org/state-management';
 // ============================================================================
 
 export interface WorldLineSliceState {
-  graphs: Record<
-    string,
-    {
-      graph: WorldLineGraphJson;
-      loadedStates: Record<string, unknown>;
-    }
-  >;
+  cas: Record<string, unknown>;               // 共有 CAS: hash → data
+  graphs: Record<string, WorldLineGraphJson>;  // WLG DAG のみ
 }
 
 const initialState: WorldLineSliceState = {
+  cas: {},
   graphs: {},
 };
 
@@ -29,10 +25,7 @@ const initialState: WorldLineSliceState = {
 
 function ensureScope(state: WorldLineSliceState, scopeId: string) {
   if (!state.graphs[scopeId]) {
-    state.graphs[scopeId] = {
-      graph: WorldLineGraph.empty().toJSON(),
-      loadedStates: {},
-    };
+    state.graphs[scopeId] = WorldLineGraph.empty().toJSON();
   }
 }
 
@@ -50,30 +43,19 @@ export const worldLineGraphSlice = createSlice({
     ) {
       const { scopeId, graph } = action.payload;
       ensureScope(state, scopeId);
-      state.graphs[scopeId].graph = graph;
+      state.graphs[scopeId] = graph;
     },
 
-    setLoadedStates(
+    setCasEntries(
       state,
       action: PayloadAction<{
-        scopeId: string;
         entries: { hash: string; data: unknown }[];
       }>
     ) {
-      const { scopeId, entries } = action.payload;
-      ensureScope(state, scopeId);
+      const { entries } = action.payload;
       for (const entry of entries) {
-        state.graphs[scopeId].loadedStates[entry.hash] = entry.data;
+        state.cas[entry.hash] = entry.data;
       }
-    },
-
-    setLoadedState(
-      state,
-      action: PayloadAction<{ scopeId: string; hash: string; data: unknown }>
-    ) {
-      const { scopeId, hash, data } = action.payload;
-      ensureScope(state, scopeId);
-      state.graphs[scopeId].loadedStates[hash] = data;
     },
 
     createScope(state, action: PayloadAction<string>) {
@@ -88,8 +70,7 @@ export const worldLineGraphSlice = createSlice({
 
 export const {
   setGraph,
-  setLoadedStates,
-  setLoadedState,
+  setCasEntries,
   createScope,
   deleteScope,
 } = worldLineGraphSlice.actions;
@@ -102,16 +83,24 @@ export function selectWorldLineGraph(
   state: RootState,
   scopeId: string
 ): WorldLineGraph {
-  const scope = state.worldLineGraph?.graphs[scopeId];
-  if (!scope) return WorldLineGraph.empty();
-  return WorldLineGraph.fromJSON(scope.graph);
+  const graphJson = state.worldLineGraph?.graphs[scopeId];
+  if (!graphJson) return WorldLineGraph.empty();
+  return WorldLineGraph.fromJSON(graphJson);
 }
 
-export function selectLoadedStates(
+export function selectCasData(
   state: RootState,
-  scopeId: string
+  hashes: string[]
 ): Record<string, unknown> {
-  return state.worldLineGraph?.graphs[scopeId]?.loadedStates ?? {};
+  const cas = state.worldLineGraph?.cas;
+  if (!cas) return {};
+  const result: Record<string, unknown> = {};
+  for (const hash of hashes) {
+    if (cas[hash] !== undefined) {
+      result[hash] = cas[hash];
+    }
+  }
+  return result;
 }
 
 export function selectScopeIds(

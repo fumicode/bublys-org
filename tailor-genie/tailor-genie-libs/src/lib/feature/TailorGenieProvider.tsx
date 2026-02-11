@@ -1,12 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useMemo } from "react";
+import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
 import {
   WorldLineGraphProvider,
   useShellManager,
-  useScopeManager,
   ObjectShell,
+  createScope as createScopeAction,
+  deleteScope as deleteScopeAction,
 } from "@bublys-org/world-line-graph";
+import { useAppDispatch } from "@bublys-org/state-management";
 import {
   Speaker,
   type SpeakerState,
@@ -34,6 +36,20 @@ function conversationScopeId(conversationId: string): string {
 }
 
 // ============================================================================
+// Conversation meta — グローバルWLGで「会話の存在」を管理するための型
+// ============================================================================
+
+interface ConversationMeta {
+  id: string;
+}
+
+const CONVERSATION_META_CONFIG = {
+  fromJSON: (json: unknown) => json as ConversationMeta,
+  toJSON: (obj: ConversationMeta) => obj,
+  getId: (obj: ConversationMeta) => obj.id,
+};
+
+// ============================================================================
 // Context — 内部実装。公開 API はフック経由
 // ============================================================================
 
@@ -55,7 +71,7 @@ const TailorGenieContext =
   createContext<TailorGenieContextValue | null>(null);
 
 // ============================================================================
-// Inner Provider
+// Inner Provider — グローバル WorldLineGraphProvider の内側で動作
 // ============================================================================
 
 function TailorGenieInner({
@@ -63,11 +79,12 @@ function TailorGenieInner({
 }: {
   children: React.ReactNode;
 }) {
+  const dispatch = useAppDispatch();
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
 
-  // Speaker: グローバルスコープ内のオブジェクト（useShellManager）
+  // Speaker: グローバルWLG内のオブジェクト
   const {
     shells: speakerShells,
     addShell: addSpeaker,
@@ -79,12 +96,35 @@ function TailorGenieInner({
     initialObjects: DEFAULT_SPEAKERS,
   });
 
-  // Conversation: スコープ単位の管理（useScopeManager）
+  // Conversation: グローバルWLGで存在を管理
   const {
-    scopeIds: conversationIds,
-    createScope: addConversation,
-    deleteScope: deleteConversation,
-  } = useScopeManager(CONVERSATION_SCOPE_PREFIX);
+    shells: conversationShells,
+    addShell: addConversationRef,
+    removeShell: removeConversationRef,
+  } = useShellManager<ConversationMeta>("conversation", CONVERSATION_META_CONFIG);
+
+  const conversationIds = useMemo(
+    () => conversationShells.map((s) => s.id),
+    [conversationShells]
+  );
+
+  // 会話作成: グローバルWLGに ref を追加 + ローカルWLGスコープを作成
+  const addConversation = useCallback(
+    (id: string) => {
+      addConversationRef({ id });
+      dispatch(createScopeAction(conversationScopeId(id)));
+    },
+    [addConversationRef, dispatch]
+  );
+
+  // 会話削除: グローバルWLGから ref を tombstone + ローカルWLGスコープを削除
+  const deleteConversation = useCallback(
+    (id: string) => {
+      removeConversationRef(id);
+      dispatch(deleteScopeAction(conversationScopeId(id)));
+    },
+    [removeConversationRef, dispatch]
+  );
 
   const value = useMemo<TailorGenieContextValue>(
     () => ({
@@ -116,7 +156,7 @@ function TailorGenieInner({
 }
 
 // ============================================================================
-// Provider
+// Provider — グローバルWLGでラップ
 // ============================================================================
 
 export function TailorGenieProvider({

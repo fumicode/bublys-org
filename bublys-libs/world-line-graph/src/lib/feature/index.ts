@@ -2,12 +2,11 @@ export {
   worldLineGraphSlice,
   type WorldLineSliceState,
   setGraph,
-  setLoadedStates,
-  setLoadedState,
+  setCasEntries,
   createScope,
   deleteScope,
   selectWorldLineGraph,
-  selectLoadedStates,
+  selectCasData,
   selectScopeIds,
 } from './worldLineGraphSlice';
 export {

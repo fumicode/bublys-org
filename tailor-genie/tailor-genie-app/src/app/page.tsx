@@ -2,6 +2,7 @@
 
 import ChatIcon from "@mui/icons-material/Chat";
 import PersonIcon from "@mui/icons-material/Person";
+import HistoryIcon from "@mui/icons-material/History";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Button } from "@mui/material";
 import {
@@ -25,6 +26,11 @@ const menuItems: BublyMenuItem[] = [
     label: "スピーカー一覧",
     url: "tailor-genie/speakers",
     icon: <PersonIcon />,
+  },
+  {
+    label: "世界線",
+    url: "tailor-genie/world-line",
+    icon: <HistoryIcon />,
   },
 ];
 

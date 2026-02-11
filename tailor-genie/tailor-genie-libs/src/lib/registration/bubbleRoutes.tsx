@@ -6,8 +6,15 @@ import { ConversationListFeature } from "../feature/ConversationListFeature.js";
 import { SpeakerFeature } from "../feature/SpeakerFeature.js";
 import { SpeakerListFeature } from "../feature/SpeakerListFeature.js";
 import { SpeakerDetailFeature } from "../feature/SpeakerDetailFeature.js";
+import { WorldLineControlFeature } from "../feature/WorldLineControlFeature.js";
 
 export const tailorGenieBubbleRoutes: BubbleRoute[] = [
+  // World Line control
+  {
+    pattern: "tailor-genie/world-line",
+    type: "tailor-genie-world-line",
+    Component: () => <WorldLineControlFeature />,
+  },
   // Speaker routes
   {
     pattern: "tailor-genie/speakers/:speakerId",
