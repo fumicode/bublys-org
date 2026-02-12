@@ -71,6 +71,15 @@
     },
     {
       "path": "./bublys-libs/domain-registry"
+    },
+    {
+      "path": "./sekaisen-igo-bubly/sekaisen-igo-model"
+    },
+    {
+      "path": "./sekaisen-igo-bubly/sekaisen-igo-libs"
+    },
+    {
+      "path": "./sekaisen-igo-bubly/sekaisen-igo-app"
     }
   ]
 }
