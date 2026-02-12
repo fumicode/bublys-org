@@ -1,16 +1,20 @@
 "use client";
 
-import { FC, useCallback } from "react";
+import { FC, useCallback, useContext } from "react";
 import { IgoGame_囲碁ゲーム } from "@bublys-org/sekaisen-igo-model";
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { IgoBoardView, GameInfoView } from "../view/IgoBoardView.js";
 import { gameScopeId } from "./IgoGameProvider.js";
 
 export type IgoGameFeatureProps = {
   gameId: string;
+  bubbleId?: string;
 };
 
-export const IgoGameFeature: FC<IgoGameFeatureProps> = ({ gameId }) => {
+export const IgoGameFeature: FC<IgoGameFeatureProps> = ({ gameId, bubbleId }) => {
+  const { openBubble } = useContext(BubblesContext);
+
   const scope = useCasScope(gameScopeId(gameId), {
     initialObjects: [
       {
@@ -45,6 +49,14 @@ export const IgoGameFeature: FC<IgoGameFeatureProps> = ({ gameId }) => {
     if (!gameShell) return;
     gameShell.update(() => IgoGame_囲碁ゲーム.create(gameId, 9));
   }, [gameShell, gameId]);
+
+  // 待った → moveBack + 世界線バブルをpopChild
+  const handleUndo = useCallback(() => {
+    scope.moveBack();
+    if (bubbleId) {
+      openBubble(`sekaisen-igo/games/${gameId}/history`, bubbleId);
+    }
+  }, [scope, openBubble, gameId, bubbleId]);
 
   if (!game) {
     return (
@@ -81,7 +93,7 @@ export const IgoGameFeature: FC<IgoGameFeatureProps> = ({ gameId }) => {
         onNewGame={handleNewGame}
         canUndo={scope.canUndo}
         canRedo={scope.canRedo}
-        onUndo={scope.moveBack}
+        onUndo={handleUndo}
         onRedo={scope.moveForward}
       />
     </div>
