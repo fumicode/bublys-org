@@ -35,8 +35,9 @@ export interface CasScopeValue {
   shells<T>(type: string): ObjectShell<T>[];
   /** 指定した型・IDのシェルを取得 */
   getShell<T>(type: string, id: string): ObjectShell<T> | null;
-  /** オブジェクトを追加して grow */
+  /** オブジェクトを追加して grow（型文字列省略時は instanceof で自動解決） */
   addObject(type: string, obj: unknown): void;
+  addObject(obj: unknown): void;
   /** オブジェクトを削除（tombstone）して grow */
   removeObject(type: string, id: string): void;
   /** 任意ノードのデシリアライズ済みオブジェクトを取得（fork preview 用） */
@@ -214,8 +215,27 @@ export function useCasScope(
     [shellsByType]
   );
 
+  const resolveType = useCallback(
+    (obj: unknown): string => {
+      for (const [type, config] of Object.entries(registryRef.current)) {
+        if (config.class && obj instanceof config.class) return type;
+      }
+      throw new Error('Unknown domain object type: no class matched via instanceof');
+    },
+    []
+  );
+
   const addObject = useCallback(
-    (type: string, obj: unknown) => {
+    (objOrType: string | unknown, maybeObj?: unknown) => {
+      let type: string;
+      let obj: unknown;
+      if (typeof objOrType === 'string') {
+        type = objOrType;
+        obj = maybeObj;
+      } else {
+        type = resolveType(objOrType);
+        obj = objOrType;
+      }
       const config = registryRef.current[type];
       if (!config) throw new Error(`CAS type not registered: ${type}`);
       const id = config.getId(obj);
@@ -224,7 +244,7 @@ export function useCasScope(
       const ref = createStateRef(type, shell.id, hash);
       growRef.current([ref], [{ hash, data: shell.toJSON() }]);
     },
-    []
+    [resolveType]
   );
 
   const removeObject = useCallback(

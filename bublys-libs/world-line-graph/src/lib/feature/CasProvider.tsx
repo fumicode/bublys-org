@@ -7,6 +7,8 @@ import React, { createContext, useContext } from 'react';
 // ============================================================================
 
 export interface CasTypeConfig<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  class?: new (...args: any[]) => T;
   fromJSON: (json: unknown) => T;
   toJSON: (obj: T) => unknown;
   getId: (obj: T) => string;

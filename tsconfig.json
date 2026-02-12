@@ -68,6 +68,9 @@
     },
     {
       "path": "./bublys-libs/world-line-graph"
+    },
+    {
+      "path": "./bublys-libs/domain-registry"
     }
   ]
 }

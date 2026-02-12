@@ -2,25 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  CasProvider,
   useCasScope,
   ObjectShell,
-  type CasRegistry,
   type WorldNode,
 } from '@bublys-org/world-line-graph';
+import { DomainRegistryProvider, defineDomainObjects } from '@bublys-org/domain-registry';
 import { Counter } from './Counter';
 
 // ============================================================================
 // Counter CAS Registry
 // ============================================================================
 
-const COUNTER_REGISTRY: CasRegistry = {
+const COUNTER_DOMAIN_OBJECTS = defineDomainObjects({
   counter: {
+    class: Counter,
     fromJSON: (json) => Counter.fromJSON(json as { id: string; value: number }),
     toJSON: (c: Counter) => c.toJSON(),
     getId: (c: Counter) => c.state.id,
   },
-};
+});
 
 // ============================================================================
 // Counter ID 生成
@@ -99,7 +99,7 @@ function CountersContainer() {
   const { graph, getLoadedState } = scope;
 
   const handleAddCounter = () => {
-    scope.addObject('counter', new Counter({ id: generateCounterId(), value: 0 }));
+    scope.addObject(new Counter({ id: generateCounterId(), value: 0 }));
   };
 
   // ControlPanel inline
@@ -234,7 +234,7 @@ function CountersContainer() {
 
 export default function WorldLineGraphDemoPage() {
   return (
-    <CasProvider registry={COUNTER_REGISTRY}>
+    <DomainRegistryProvider registry={COUNTER_DOMAIN_OBJECTS}>
       <div style={styles.page}>
         <h1 style={styles.pageTitle}>WorldLineGraph Demo</h1>
         <p style={styles.description}>
@@ -244,7 +244,7 @@ export default function WorldLineGraphDemoPage() {
         </p>
         <CountersContainer />
       </div>
-    </CasProvider>
+    </DomainRegistryProvider>
   );
 }
 

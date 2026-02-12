@@ -52,6 +52,9 @@
   ],
   "references": [
     {
+      "path": "../../bublys-libs/domain-registry"
+    },
+    {
       "path": "../../bublys-libs/hash-world-line"
     },
     {

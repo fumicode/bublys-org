@@ -2,13 +2,12 @@
 
 import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
 import {
-  CasProvider,
   useCasScope,
   ObjectShell,
   createScope as createScopeAction,
   deleteScope as deleteScopeAction,
-  type CasRegistry,
 } from "@bublys-org/world-line-graph";
+import { DomainRegistryProvider, defineDomainObjects } from "@bublys-org/domain-registry";
 import { useAppDispatch } from "@bublys-org/state-management";
 import {
   Speaker,
@@ -37,26 +36,29 @@ export function conversationScopeId(conversationId: string): string {
 }
 
 // ============================================================================
-// CAS Registry — 全型のシリアライズ/デシリアライズ設定
+// Domain Objects — 全型のシリアライズ/デシリアライズ設定を1箇所で定義
 // ============================================================================
 
-const TAILOR_GENIE_REGISTRY: CasRegistry = {
+const TAILOR_GENIE_DOMAIN_OBJECTS = defineDomainObjects({
   speaker: {
+    class: Speaker,
     fromJSON: (json) => Speaker.fromJSON(json as SpeakerState),
     toJSON: (s: Speaker) => s.toJSON(),
     getId: (s: Speaker) => s.id,
   },
   conversation: {
+    class: Conversation,
     fromJSON: (json) => Conversation.fromJSON(json as SerializedConversationState),
     toJSON: (c: Conversation) => c.toJSON(),
     getId: (c: Conversation) => c.id,
   },
   "conversation-meta": {
+    class: Object,
     fromJSON: (json) => json as ConversationMeta,
     toJSON: (obj: ConversationMeta) => obj,
     getId: (obj: ConversationMeta) => obj.id,
   },
-};
+});
 
 // ============================================================================
 // Conversation meta — グローバルWLGで「会話の存在」を管理するための型
@@ -110,7 +112,7 @@ function TailorGenieInner({
   const conversationMetaShells = scope.shells<ConversationMeta>("conversation-meta");
 
   const addSpeaker = useCallback(
-    (speaker: Speaker) => scope.addObject("speaker", speaker),
+    (speaker: Speaker) => scope.addObject(speaker),
     [scope]
   );
 
@@ -181,9 +183,9 @@ export function TailorGenieProvider({
   children: React.ReactNode;
 }) {
   return (
-    <CasProvider registry={TAILOR_GENIE_REGISTRY}>
+    <DomainRegistryProvider registry={TAILOR_GENIE_DOMAIN_OBJECTS}>
       <TailorGenieInner>{children}</TailorGenieInner>
-    </CasProvider>
+    </DomainRegistryProvider>
   );
 }
 

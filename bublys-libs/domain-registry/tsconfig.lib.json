@@ -2,32 +2,34 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "lib": ["es2022", "dom", "dom.iterable"],
     "types": [
       "node",
       "@nx/react/typings/cssmodule.d.ts",
-      "@nx/react/typings/image.d.ts",
-      "vite/client"
+      "@nx/react/typings/image.d.ts"
     ],
     "rootDir": "src",
     "jsx": "react-jsx",
-    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2021", "DOM"],
+    "noUnusedLocals": false
   },
   "exclude": [
     "out-tsc",
     "dist",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    "**/*.spec.tsx",
-    "**/*.test.tsx",
-    "**/*.spec.js",
-    "**/*.test.js",
-    "**/*.spec.jsx",
-    "**/*.test.jsx",
     "jest.config.ts",
     "jest.config.cts",
     "src/**/*.spec.ts",
     "src/**/*.test.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.js",
+    "src/**/*.test.js",
+    "src/**/*.spec.jsx",
+    "src/**/*.test.jsx",
     "eslint.config.js",
     "eslint.config.cjs",
     "eslint.config.mjs"
@@ -35,13 +37,7 @@
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
-    },
-    {
-      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
-    },
-    {
-      "path": "../tailor-genie-model/tsconfig.lib.json"
+      "path": "../world-line-graph/tsconfig.lib.json"
     }
   ]
 }
