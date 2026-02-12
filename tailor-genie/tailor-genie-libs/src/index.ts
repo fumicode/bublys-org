@@ -24,4 +24,3 @@ export type { SpeakerDetailFeatureProps } from "./lib/feature/SpeakerDetailFeatu
 
 // Provider
 export { TailorGenieProvider, useTailorGenie, conversationScopeId } from "./lib/feature/TailorGenieProvider.js";
-export { WorldLineControlFeature } from "./lib/feature/WorldLineControlFeature.js";
