@@ -1,9 +1,10 @@
 "use client";
 
 import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect, CSSProperties } from "react";
-import { Conversation, Speaker } from "@bublys-org/tailor-genie-model";
+import { Conversation, Speaker, Turn } from "@bublys-org/tailor-genie-model";
+import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
-import { GhostTurnsView, type BranchPreview } from "./GhostTurnsView.js";
+import { GhostTurnsView } from "./GhostTurnsView.js";
 
 const arrowButtonStyle: CSSProperties = {
   width: 32,
@@ -30,11 +31,7 @@ export type SpeakerViewProps = {
   speaker: Speaker;
   allSpeakers: Speaker[];
   onSpeak?: (message: string) => void;
-  branchPreviews?: BranchPreview[];
-  onUndo?: () => void;
-  onRedo?: () => void;
-  canUndo?: boolean;
-  canRedo?: boolean;
+  wlNav?: WlNavProps<Turn[]>;
 };
 
 export const SpeakerView: FC<SpeakerViewProps> = ({
@@ -42,11 +39,7 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
   speaker,
   allSpeakers,
   onSpeak,
-  branchPreviews = [],
-  onUndo,
-  onRedo,
-  canUndo = false,
-  canRedo = false,
+  wlNav,
 }) => {
   const [message, setMessage] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -139,27 +132,27 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
             );
           })
         )}
-        {(canUndo || canRedo) && (
+        {wlNav && (wlNav.canUndo || wlNav.canRedo) && (
           <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "4px 0" }}>
             <button
-              onClick={onUndo}
-              disabled={!canUndo}
-              style={{ ...arrowButtonStyle, ...(canUndo ? {} : disabledStyle) }}
+              onClick={wlNav.onUndo}
+              disabled={!wlNav.canUndo}
+              style={{ ...arrowButtonStyle, ...(wlNav.canUndo ? {} : disabledStyle) }}
             >
               ↑
             </button>
             <button
-              onClick={onRedo}
-              disabled={!canRedo || branchPreviews.length > 0}
-              style={{ ...arrowButtonStyle, ...(!canRedo || branchPreviews.length > 0 ? disabledStyle : {}) }}
+              onClick={wlNav.onRedo}
+              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0}
+              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 ? disabledStyle : {}) }}
             >
               ↓
             </button>
           </div>
         )}
-        {branchPreviews.length > 0 && (
+        {wlNav && wlNav.forkPreviews.length > 0 && (
           <GhostTurnsView
-            branchPreviews={branchPreviews}
+            forkPreviews={wlNav.forkPreviews}
             getSpeakerName={(id) => getSpeaker(id)?.name || id}
             getSpeakerRole={(id) => getSpeaker(id)?.role}
             getAlign={(id) => (id === speaker.id ? "right" : "left")}

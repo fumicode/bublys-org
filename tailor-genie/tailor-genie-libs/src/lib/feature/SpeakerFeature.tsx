@@ -2,9 +2,8 @@
 
 import { FC, useMemo } from "react";
 import { Turn, SerializedConversationState } from "@bublys-org/tailor-genie-model";
-import { useWorldLineGraph } from "@bublys-org/world-line-graph";
+import { useWorldLineGraph, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
 import { SpeakerView } from "../view/SpeakerView.js";
-import type { BranchPreview } from "../view/GhostTurnsView.js";
 import {
   useTailorGenie,
   ConversationWorldLineProvider,
@@ -48,21 +47,13 @@ const SpeakerFeatureInner: FC<SpeakerFeatureProps> = ({
         .filter((s) => conversation.hasParticipant(s.id))
     : [];
 
-  const apexNode = graph.state.apexNodeId
-    ? graph.state.nodes[graph.state.apexNodeId]
-    : null;
-  const canUndo =
-    apexNode?.parentId !== null && apexNode?.parentId !== undefined;
-  const childrenMap = graph.getChildrenMap();
-  const childIds = apexNode ? (childrenMap[apexNode.id] ?? []) : [];
-  const canRedo = childIds.length > 0;
+  const forkChoices = graph.getForkChoices();
 
-  const branchPreviews = useMemo((): BranchPreview[] => {
-    if (!conversation || !apexNode || childIds.length <= 1) return [];
+  const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
+    if (!conversation || forkChoices.length === 0) return [];
 
-    return childIds.flatMap((childId) => {
-      const childNode = graph.state.nodes[childId];
-      const convRef = childNode.changedRefs.find(
+    return forkChoices.flatMap((choice) => {
+      const convRef = choice.changedRefs.find(
         (r) => r.type === "conversation" && r.id === conversationId
       );
       if (!convRef) return [];
@@ -73,13 +64,21 @@ const SpeakerFeatureInner: FC<SpeakerFeatureProps> = ({
         .map((t) => new Turn(t));
       if (newTurns.length === 0) return [];
       return [{
-        childId,
-        isSameLine: childNode.worldLineId === apexNode.worldLineId,
-        newTurns,
-        onSelect: () => moveTo(childId),
+        nodeId: choice.nodeId,
+        isSameLine: choice.isSameLine,
+        preview: newTurns,
+        onSelect: () => moveTo(choice.nodeId),
       }];
     });
-  }, [graph, conversation, conversationId, apexNode, childIds, getLoadedState, moveTo]);
+  }, [forkChoices, conversation, conversationId, getLoadedState, moveTo]);
+
+  const wlNav = useMemo((): WlNavProps<Turn[]> => ({
+    onUndo: moveBack,
+    onRedo: moveForward,
+    canUndo: graph.canUndo,
+    canRedo: graph.canRedo,
+    forkPreviews,
+  }), [moveBack, moveForward, graph.canUndo, graph.canRedo, forkPreviews]);
 
   const handleSpeak = (message: string) => {
     if (!conversationShell || !speaker) return;
@@ -110,11 +109,7 @@ const SpeakerFeatureInner: FC<SpeakerFeatureProps> = ({
       speaker={speaker}
       allSpeakers={participants}
       onSpeak={isParticipant ? handleSpeak : undefined}
-      branchPreviews={branchPreviews}
-      onUndo={moveBack}
-      onRedo={moveForward}
-      canUndo={canUndo}
-      canRedo={canRedo}
+      wlNav={wlNav}
     />
   );
 };

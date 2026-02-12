@@ -1,6 +1,12 @@
 import { StateRef, stateRefKey } from './StateRef';
 import { WorldNode, createWorldNode } from './WorldNode';
 
+export type ForkChoice = {
+  readonly nodeId: string;
+  readonly isSameLine: boolean;
+  readonly changedRefs: StateRef[];
+};
+
 export interface WorldLineGraphJson {
   nodes: Record<string, WorldNode>;
   apexNodeId: string | null;
@@ -22,6 +28,42 @@ export class WorldLineGraph {
     }
   ) {}
 
+  getApex(): WorldNode | null {
+    return this.state.apexNodeId
+      ? this.state.nodes[this.state.apexNodeId]
+      : null;
+  }
+
+  get canUndo(): boolean {
+    const apex = this.getApex();
+    return apex !== null && apex.parentId !== null;
+  }
+
+  get canRedo(): boolean {
+    const apex = this.getApex();
+    if (!apex) return false;
+    const childrenMap = this.getChildrenMap();
+    return (childrenMap[apex.id]?.length ?? 0) > 0;
+  }
+
+  getForkChoices(nodeId?: string): ForkChoice[] {
+    const targetId = nodeId ?? this.state.apexNodeId;
+    if (!targetId) return [];
+    const target = this.state.nodes[targetId];
+    if (!target) return [];
+    const childrenMap = this.getChildrenMap();
+    const childIds = childrenMap[targetId] ?? [];
+    if (childIds.length <= 1) return [];
+    return childIds.map((childId) => {
+      const childNode = this.state.nodes[childId];
+      return {
+        nodeId: childId,
+        isSameLine: childNode.worldLineId === target.worldLineId,
+        changedRefs: childNode.changedRefs,
+      };
+    });
+  }
+
   static empty(): WorldLineGraph {
     return new WorldLineGraph({
       nodes: {},
@@ -31,9 +73,10 @@ export class WorldLineGraph {
   }
 
   grow(changedRefs: StateRef[]): WorldLineGraph {
-    const { nodes, apexNodeId, rootNodeId } = this.state;
+    const { nodes, rootNodeId } = this.state;
+    const apex = this.getApex();
 
-    if (apexNodeId === null) {
+    if (!apex) {
       const worldLineId = generateWorldLineId();
       const newNode = createWorldNode(null, changedRefs, worldLineId);
       return new WorldLineGraph({
@@ -44,8 +87,7 @@ export class WorldLineGraph {
     }
 
     const childrenMap = this.getChildrenMap();
-    const apexChildren = childrenMap[apexNodeId] ?? [];
-    const apex = nodes[apexNodeId];
+    const apexChildren = childrenMap[apex.id] ?? [];
 
     let worldLineId: string;
     if (apexChildren.length === 0) {
@@ -54,7 +96,7 @@ export class WorldLineGraph {
       worldLineId = generateWorldLineId();
     }
 
-    const newNode = createWorldNode(apexNodeId, changedRefs, worldLineId);
+    const newNode = createWorldNode(apex.id, changedRefs, worldLineId);
     return new WorldLineGraph({
       nodes: { ...nodes, [newNode.id]: newNode },
       apexNodeId: newNode.id,
@@ -73,12 +115,8 @@ export class WorldLineGraph {
   }
 
   moveBack(): WorldLineGraph {
-    const { nodes, apexNodeId } = this.state;
-    if (apexNodeId === null) {
-      return this;
-    }
-    const apex = nodes[apexNodeId];
-    if (apex.parentId === null) {
+    const apex = this.getApex();
+    if (!apex || apex.parentId === null) {
       return this;
     }
     return new WorldLineGraph({
@@ -88,14 +126,14 @@ export class WorldLineGraph {
   }
 
   moveForward(): WorldLineGraph {
-    const { nodes, apexNodeId } = this.state;
-    if (apexNodeId === null) {
+    const { nodes } = this.state;
+    const apex = this.getApex();
+    if (!apex) {
       return this;
     }
 
-    const apex = nodes[apexNodeId];
     const childrenMap = this.getChildrenMap();
-    const children = childrenMap[apexNodeId] ?? [];
+    const children = childrenMap[apex.id] ?? [];
 
     if (children.length === 0) {
       return this;

@@ -23,3 +23,4 @@ export { initWorldLineGraph } from './initWorldLineGraph';
 export { ObjectShell } from './ObjectShell';
 export { useShellManager, type ShellManagerConfig } from './useShellManager';
 export { useScopeManager } from './useScopeManager';
+export { type ForkPreview, type WlNavProps } from './WorldLineNav';

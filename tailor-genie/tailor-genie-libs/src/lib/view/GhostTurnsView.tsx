@@ -2,34 +2,28 @@
 
 import { FC, useState } from "react";
 import { Turn, SpeakerRole } from "@bublys-org/tailor-genie-model";
+import { type ForkPreview } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
 
-export type BranchPreview = {
-  childId: string;
-  isSameLine: boolean;
-  newTurns: Turn[];
-  onSelect: () => void;
-};
-
 export type GhostTurnsViewProps = {
-  branchPreviews: BranchPreview[];
+  forkPreviews: ForkPreview<Turn[]>[];
   getSpeakerName: (speakerId: string) => string;
   getSpeakerRole: (speakerId: string) => SpeakerRole | undefined;
   getAlign: (speakerId: string) => "left" | "right";
 };
 
 export const GhostTurnsView: FC<GhostTurnsViewProps> = ({
-  branchPreviews,
+  forkPreviews,
   getSpeakerName,
   getSpeakerRole,
   getAlign,
 }) => {
   return (
     <div style={{ position: "relative" }}>
-      {branchPreviews.map((branch) => (
+      {forkPreviews.map((fork) => (
         <GhostBranch
-          key={branch.childId}
-          branch={branch}
+          key={fork.nodeId}
+          fork={fork}
           getSpeakerName={getSpeakerName}
           getSpeakerRole={getSpeakerRole}
           getAlign={getAlign}
@@ -40,18 +34,17 @@ export const GhostTurnsView: FC<GhostTurnsViewProps> = ({
 };
 
 const GhostBranch: FC<{
-  branch: BranchPreview;
+  fork: ForkPreview<Turn[]>;
   getSpeakerName: (speakerId: string) => string;
   getSpeakerRole: (speakerId: string) => SpeakerRole | undefined;
   getAlign: (speakerId: string) => "left" | "right";
-}> = ({ branch, getSpeakerName, getSpeakerRole, getAlign }) => {
+}> = ({ fork, getSpeakerName, getSpeakerRole, getAlign }) => {
   const [hovered, setHovered] = useState(false);
-  const baseOpacity = branch.isSameLine ? 0.7 : 0.4;
-  const opacity = hovered ? 1 : baseOpacity;
+  const opacity = hovered ? 1 : 0.4;
 
   return (
     <div
-      onClick={branch.onSelect}
+      onClick={fork.onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -63,7 +56,7 @@ const GhostBranch: FC<{
         marginTop: 4,
       }}
     >
-      {branch.newTurns.map((turn) => (
+      {fork.preview.map((turn) => (
         <TurnView
           key={turn.id}
           turn={turn}
