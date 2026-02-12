@@ -28,6 +28,10 @@ export class Turn {
   updateMessage(message: string): Turn {
     return new Turn({ ...this.state, message });
   }
+
+  toJSON(): TurnState {
+    return this.state;
+  }
 }
 
 /**
@@ -37,6 +41,15 @@ export type ConversationState = {
   readonly id: string;
   readonly participantIds: string[];
   readonly turns: Turn[];
+};
+
+/**
+ * シリアライズ可能な会話状態（Redux/WorldLineGraph 永続化用）
+ */
+export type SerializedConversationState = {
+  readonly id: string;
+  readonly participantIds: string[];
+  readonly turns: TurnState[];
 };
 
 export class Conversation {
@@ -93,6 +106,22 @@ export class Conversation {
       turns: this.state.turns.map((t) =>
         t.id === turnId ? t.updateMessage(message) : t
       ),
+    });
+  }
+
+  toJSON(): SerializedConversationState {
+    return {
+      id: this.id,
+      participantIds: this.participantIds,
+      turns: this.turns.map((t) => t.toJSON()),
+    };
+  }
+
+  static fromJSON(json: SerializedConversationState): Conversation {
+    return new Conversation({
+      id: json.id,
+      participantIds: json.participantIds,
+      turns: json.turns.map((t) => new Turn(t)),
     });
   }
 }

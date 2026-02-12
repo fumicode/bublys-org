@@ -1,24 +1,3 @@
-// Slice (リポジトリとしてのCRUD操作のみ)
-export {
-  conversationsSlice,
-  conversationsReducer,
-  saveConversation,
-  deleteConversation,
-  setActiveConversation,
-  saveSpeaker,
-  deleteSpeaker,
-  selectConversations,
-  selectActiveConversationId,
-  selectActiveConversation,
-  selectConversationById,
-  selectSpeakers,
-  selectSpeakerById,
-  selectParticipants,
-  serializeConversation,
-  deserializeConversation,
-  deserializeSpeaker,
-} from "./lib/slice/conversation-slice.js";
-
 // Bubble Routes (このファイルをimportすると自動登録される)
 import "./lib/registration/bubbleRoutes.js";
 export { tailorGenieBubbleRoutes } from "./lib/registration/bubbleRoutes.js";
@@ -42,3 +21,6 @@ export type { SpeakerFeatureProps } from "./lib/feature/SpeakerFeature.js";
 export { SpeakerListFeature } from "./lib/feature/SpeakerListFeature.js";
 export { SpeakerDetailFeature } from "./lib/feature/SpeakerDetailFeature.js";
 export type { SpeakerDetailFeatureProps } from "./lib/feature/SpeakerDetailFeature.js";
+
+// Provider
+export { TailorGenieProvider, useTailorGenie, conversationScopeId } from "./lib/feature/TailorGenieProvider.js";

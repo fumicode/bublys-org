@@ -65,6 +65,12 @@
     },
     {
       "path": "./tailor-genie/tailor-genie-app"
+    },
+    {
+      "path": "./bublys-libs/world-line-graph"
+    },
+    {
+      "path": "./bublys-libs/domain-registry"
     }
   ]
 }

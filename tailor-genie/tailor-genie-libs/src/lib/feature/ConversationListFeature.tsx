@@ -1,31 +1,26 @@
 "use client";
 
 import { FC, useContext } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { Conversation } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
-import {
-  selectConversations,
-  saveConversation,
-  setActiveConversation,
-} from "../slice/conversation-slice.js";
+import { useTailorGenie } from "./TailorGenieProvider.js";
 
 export const ConversationListFeature: FC = () => {
-  const dispatch = useDispatch();
-  const conversations = useSelector(selectConversations);
   const { openBubble } = useContext(BubblesContext);
+  const {
+    conversationIds,
+    addConversation,
+    setActiveConversationId,
+  } = useTailorGenie();
 
   const handleCreateConversation = () => {
     const id = crypto.randomUUID();
-    // ドメインオブジェクトを作成
-    const conversation = new Conversation({ id, participantIds: [], turns: [] });
-    dispatch(saveConversation(conversation.state));
-    dispatch(setActiveConversation(id));
+    addConversation(id);
+    setActiveConversationId(id);
     openBubble(`tailor-genie/conversations/${id}`, "root");
   };
 
   const handleOpenConversation = (convId: string) => {
-    dispatch(setActiveConversation(convId));
+    setActiveConversationId(convId);
     openBubble(`tailor-genie/conversations/${convId}`, "root");
   };
 
@@ -49,26 +44,23 @@ export const ConversationListFeature: FC = () => {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {conversations.length === 0 ? (
+        {conversationIds.length === 0 ? (
           <div style={{ color: "#999", textAlign: "center", marginTop: 32 }}>
             会話がありません
           </div>
         ) : (
-          conversations.map((conv) => (
+          conversationIds.map((id) => (
             <div
-              key={conv.id}
-              onClick={() => handleOpenConversation(conv.id)}
+              key={id}
+              onClick={() => handleOpenConversation(id)}
               style={{
                 padding: 12,
                 borderBottom: "1px solid #eee",
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontWeight: "bold", marginBottom: 4 }}>
-                会話 #{conv.id.slice(0, 8)}
-              </div>
-              <div style={{ fontSize: 12, color: "#666" }}>
-                {conv.turns.length} 件の発言 / {conv.participantIds.length} 人参加
+              <div style={{ fontWeight: "bold" }}>
+                会話 #{id.slice(0, 8)}
               </div>
             </div>
           ))

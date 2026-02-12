@@ -224,3 +224,9 @@ feature (domain + ui + Reduxに依存)
 3. **テストファイルはソースと同じ場所に配置:**
    - `*.test.ts`または`*.spec.ts`を実装ファイルの隣に配置
    - 例: `memo-slice.ts`の隣に`memo-slice.test.ts`
+
+## 残課題（world-line-graphブランチ）
+
+1. **conversation-metaのinstanceof問題**: plain objectなので`instanceof`解決が使えず、`scope.addObject("conversation-meta", ...)` と型文字列指定が残っている。専用クラスを作るか別の解決策が必要。
+
+2. **bubbleRouteのdomain-registry統合**: bubbleRouteの登録はまだ`BubbleRouteRegistry.registerRoutes()`で個別に行っている。domain-registryに統合して「BublyApp定義1箇所で全部」（A案方向）にするのが次のステップ。

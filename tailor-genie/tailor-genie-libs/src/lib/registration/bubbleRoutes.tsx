@@ -1,6 +1,7 @@
 "use client";
 
 import { BubbleRoute, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { TailorGenieProvider } from "../feature/TailorGenieProvider.js";
 import { ConversationFeature } from "../feature/ConversationFeature.js";
 import { ConversationListFeature } from "../feature/ConversationListFeature.js";
 import { SpeakerFeature } from "../feature/SpeakerFeature.js";
@@ -11,38 +12,52 @@ export const tailorGenieBubbleRoutes: BubbleRoute[] = [
   // Speaker routes
   {
     pattern: "tailor-genie/speakers/:speakerId",
-    type: "tailor-genie-speaker-detail",
+    type: "speaker",
     Component: ({ bubble }) => (
-      <SpeakerDetailFeature speakerId={bubble.params.speakerId} />
+      <TailorGenieProvider>
+        <SpeakerDetailFeature speakerId={bubble.params.speakerId} />
+      </TailorGenieProvider>
     ),
   },
   {
     pattern: "tailor-genie/speakers",
-    type: "tailor-genie-speakers",
-    Component: () => <SpeakerListFeature />,
+    type: "speaker-list",
+    Component: () => (
+      <TailorGenieProvider>
+        <SpeakerListFeature />
+      </TailorGenieProvider>
+    ),
   },
   // Conversation routes
   {
     pattern: "tailor-genie/conversations/:convId/speakers/:speakerId",
-    type: "tailor-genie-conversation-speaker",
+    type: "conversation-speaker",
     Component: ({ bubble }) => (
-      <SpeakerFeature
-        conversationId={bubble.params.convId}
-        speakerId={bubble.params.speakerId}
-      />
+      <TailorGenieProvider>
+        <SpeakerFeature
+          conversationId={bubble.params.convId}
+          speakerId={bubble.params.speakerId}
+        />
+      </TailorGenieProvider>
     ),
   },
   {
     pattern: "tailor-genie/conversations/:convId",
-    type: "tailor-genie-conversation",
+    type: "conversation",
     Component: ({ bubble }) => (
-      <ConversationFeature conversationId={bubble.params.convId} />
+      <TailorGenieProvider>
+        <ConversationFeature conversationId={bubble.params.convId} />
+      </TailorGenieProvider>
     ),
   },
   {
     pattern: "tailor-genie/conversations",
-    type: "tailor-genie-conversations",
-    Component: () => <ConversationListFeature />,
+    type: "conversation-list",
+    Component: () => (
+      <TailorGenieProvider>
+        <ConversationListFeature />
+      </TailorGenieProvider>
+    ),
   },
 ];
 

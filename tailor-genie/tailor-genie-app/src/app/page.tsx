@@ -9,12 +9,11 @@ import {
   BublyStoreProvider,
   BublyMenuItem,
 } from "@bublys-org/bubbles-ui";
-import { injectSlice } from "@bublys-org/state-management";
-// tailor-genie-libsをimportすると自動でbubbleRoutesが登録される
-import { conversationsSlice } from "@bublys-org/tailor-genie-libs";
+import { initWorldLineGraph } from "@bublys-org/world-line-graph";
+import { TailorGenieProvider } from "@bublys-org/tailor-genie-libs";
 
-// sliceを早期に注入
-injectSlice(conversationsSlice);
+// worldLineGraph slice を注入
+initWorldLineGraph();
 
 const menuItems: BublyMenuItem[] = [
   {
@@ -74,7 +73,9 @@ export default function Index() {
       persistKey="tailor-genie"
       initialBubbleUrls={["tailor-genie/conversations"]}
     >
-      <TailorGenieApp />
+      <TailorGenieProvider>
+        <TailorGenieApp />
+      </TailorGenieProvider>
     </BublyStoreProvider>
   );
 }

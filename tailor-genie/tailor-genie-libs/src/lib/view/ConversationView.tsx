@@ -1,10 +1,32 @@
 "use client";
 
-import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect } from "react";
-import { Conversation, Speaker } from "@bublys-org/tailor-genie-model";
+import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect, CSSProperties } from "react";
+import { Conversation, Speaker, Turn } from "@bublys-org/tailor-genie-model";
 import React from "react";
 import { getDragType } from "@bublys-org/bubbles-ui";
+import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
+import { GhostTurnsView } from "./GhostTurnsView.js";
+
+const arrowButtonStyle: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: "50%",
+  border: "1px solid #ddd",
+  background: "#f5f5f5",
+  color: "#999",
+  cursor: "pointer",
+  fontSize: 16,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+};
+
+const disabledStyle: CSSProperties = {
+  opacity: 0.3,
+  cursor: "default",
+};
 
 export type ConversationViewProps = {
   conversation: Conversation;
@@ -14,6 +36,7 @@ export type ConversationViewProps = {
   onSpeak?: (message: string) => void;
   onOpenSpeakerView?: (speakerId: string) => void;
   onAddParticipant?: (speakerId: string) => void;
+  wlNav?: WlNavProps<Turn[]>;
 };
 
 export const ConversationView: FC<ConversationViewProps> = ({
@@ -24,6 +47,7 @@ export const ConversationView: FC<ConversationViewProps> = ({
   onSpeak,
   onOpenSpeakerView,
   onAddParticipant,
+  wlNav,
 }) => {
   const [message, setMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -168,6 +192,35 @@ export const ConversationView: FC<ConversationViewProps> = ({
               />
             );
           })
+        )}
+        {wlNav && (wlNav.canUndo || wlNav.canRedo) && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "4px 0" }}>
+            <button
+              onClick={wlNav.onUndo}
+              disabled={!wlNav.canUndo}
+              style={{ ...arrowButtonStyle, ...(wlNav.canUndo ? {} : disabledStyle) }}
+            >
+              ↑
+            </button>
+            <button
+              onClick={wlNav.onRedo}
+              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0}
+              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 ? disabledStyle : {}) }}
+            >
+              ↓
+            </button>
+          </div>
+        )}
+        {wlNav && wlNav.forkPreviews.length > 0 && (
+          <GhostTurnsView
+            forkPreviews={wlNav.forkPreviews}
+            getSpeakerName={(id) => getSpeaker(id)?.name || id}
+            getSpeakerRole={(id) => getSpeaker(id)?.role}
+            getAlign={(id) => {
+              const idx = participants.findIndex((s) => s.id === id);
+              return idx === 0 ? "left" : "right";
+            }}
+          />
         )}
       </div>
 

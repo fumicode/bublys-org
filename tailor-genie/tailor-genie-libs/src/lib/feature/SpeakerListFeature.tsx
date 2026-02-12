@@ -1,13 +1,9 @@
 "use client";
 
 import { FC, useContext, useState, FormEvent, ChangeEvent } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { Speaker, SpeakerRole } from "@bublys-org/tailor-genie-model";
-import { BubblesContext, ObjectView, registerObjectType } from "@bublys-org/bubbles-ui";
-import { selectSpeakers, saveSpeaker } from "../slice/conversation-slice.js";
-
-// Speakerをオブジェクト型として登録
-registerObjectType("Speaker");
+import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
+import { useTailorGenie } from "./TailorGenieProvider.js";
 
 const ROLE_LABELS: Record<SpeakerRole, string> = {
   host: "ホスト",
@@ -20,9 +16,9 @@ const ROLE_COLORS: Record<SpeakerRole, string> = {
 };
 
 export const SpeakerListFeature: FC = () => {
-  const dispatch = useDispatch();
-  const speakers = useSelector(selectSpeakers);
   const { openBubble } = useContext(BubblesContext);
+  const { speakerShells, addSpeaker } = useTailorGenie();
+  const speakers = speakerShells.map((s) => s.object);
   const [newSpeakerName, setNewSpeakerName] = useState("");
   const [newSpeakerRole, setNewSpeakerRole] = useState<SpeakerRole>("guest");
 
@@ -40,7 +36,7 @@ export const SpeakerListFeature: FC = () => {
       name: newSpeakerName.trim(),
       role: newSpeakerRole,
     });
-    dispatch(saveSpeaker(speaker.state));
+    addSpeaker(speaker);
     setNewSpeakerName("");
   };
 

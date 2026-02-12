@@ -40,4 +40,12 @@ export class Speaker {
   rename(name: string): Speaker {
     return new Speaker({ ...this.state, name });
   }
+
+  toJSON(): SpeakerState {
+    return this.state;
+  }
+
+  static fromJSON(json: SpeakerState): Speaker {
+    return new Speaker(json);
+  }
 }

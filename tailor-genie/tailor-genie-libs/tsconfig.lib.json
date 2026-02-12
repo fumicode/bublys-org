@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
+    "lib": ["es2022", "dom", "dom.iterable"],
     "types": [
       "node",
       "@nx/react/typings/cssmodule.d.ts",
@@ -33,6 +34,12 @@
   ],
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
+    {
+      "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
+    },
     {
       "path": "../tailor-genie-model/tsconfig.lib.json"
     }
