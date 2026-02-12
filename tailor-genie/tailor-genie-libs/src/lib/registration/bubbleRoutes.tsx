@@ -12,26 +12,26 @@ export const tailorGenieBubbleRoutes: BubbleRoute[] = [
   // World Line control
   {
     pattern: "tailor-genie/world-line",
-    type: "tailor-genie-world-line",
+    type: "world-line",
     Component: () => <WorldLineControlFeature />,
   },
   // Speaker routes
   {
     pattern: "tailor-genie/speakers/:speakerId",
-    type: "tailor-genie-speaker-detail",
+    type: "speaker",
     Component: ({ bubble }) => (
       <SpeakerDetailFeature speakerId={bubble.params.speakerId} />
     ),
   },
   {
     pattern: "tailor-genie/speakers",
-    type: "tailor-genie-speakers",
+    type: "speaker-list",
     Component: () => <SpeakerListFeature />,
   },
   // Conversation routes
   {
     pattern: "tailor-genie/conversations/:convId/speakers/:speakerId",
-    type: "tailor-genie-conversation-speaker",
+    type: "conversation-speaker",
     Component: ({ bubble }) => (
       <SpeakerFeature
         conversationId={bubble.params.convId}
@@ -41,14 +41,14 @@ export const tailorGenieBubbleRoutes: BubbleRoute[] = [
   },
   {
     pattern: "tailor-genie/conversations/:convId",
-    type: "tailor-genie-conversation",
+    type: "conversation",
     Component: ({ bubble }) => (
       <ConversationFeature conversationId={bubble.params.convId} />
     ),
   },
   {
     pattern: "tailor-genie/conversations",
-    type: "tailor-genie-conversations",
+    type: "conversation-list",
     Component: () => <ConversationListFeature />,
   },
 ];

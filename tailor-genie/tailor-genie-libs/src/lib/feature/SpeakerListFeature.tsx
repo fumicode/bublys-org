@@ -2,11 +2,8 @@
 
 import { FC, useContext, useState, FormEvent, ChangeEvent } from "react";
 import { Speaker, SpeakerRole } from "@bublys-org/tailor-genie-model";
-import { BubblesContext, ObjectView, registerObjectType } from "@bublys-org/bubbles-ui";
+import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
 import { useTailorGenie } from "./TailorGenieProvider.js";
-
-// Speakerをオブジェクト型として登録
-registerObjectType("Speaker");
 
 const ROLE_LABELS: Record<SpeakerRole, string> = {
   host: "ホスト",

@@ -1,12 +1,9 @@
 "use client";
 
 import { FC } from "react";
-import { ObjectView, registerObjectType } from "@bublys-org/bubbles-ui";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import { SpeakerDetailView } from "../view/SpeakerDetailView.js";
 import { useTailorGenie } from "./TailorGenieProvider.js";
-
-// Speakerをオブジェクト型として登録
-registerObjectType("Speaker");
 
 export type SpeakerDetailFeatureProps = {
   speakerId: string;
