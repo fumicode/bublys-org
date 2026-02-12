@@ -13,7 +13,7 @@ import {
  * useScopeManager — 共通 prefix を持つ WorldLineGraph スコープの管理フック
  *
  * スコープの一覧取得・作成・削除を提供する。
- * 個々のスコープ内のオブジェクト操作は WorldLineGraphProvider + useShellManager で行う。
+ * 個々のスコープ内のオブジェクト操作は useCasScope で行う。
  */
 export function useScopeManager(prefix: string) {
   const dispatch = useAppDispatch();

@@ -1,15 +1,11 @@
 "use client";
 
 import { FC, useState, useContext, useEffect, useMemo } from "react";
-import { Turn, SerializedConversationState } from "@bublys-org/tailor-genie-model";
+import { Conversation, type Turn } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
-import { useWorldLineGraph, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
+import { useCasScope, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
 import { ConversationView } from "../view/ConversationView.js";
-import {
-  useTailorGenie,
-  ConversationWorldLineProvider,
-  useConversationShell,
-} from "./TailorGenieProvider.js";
+import { useTailorGenie, conversationScopeId } from "./TailorGenieProvider.js";
 
 export type ConversationFeatureProps = {
   conversationId: string;
@@ -18,22 +14,19 @@ export type ConversationFeatureProps = {
 export const ConversationFeature: FC<ConversationFeatureProps> = ({
   conversationId,
 }) => {
-  return (
-    <ConversationWorldLineProvider conversationId={conversationId}>
-      <ConversationFeatureInner conversationId={conversationId} />
-    </ConversationWorldLineProvider>
-  );
-};
-
-const ConversationFeatureInner: FC<ConversationFeatureProps> = ({
-  conversationId,
-}) => {
   const { openBubble } = useContext(BubblesContext);
   const { speakerShells } = useTailorGenie();
-  const conversationShell = useConversationShell(conversationId);
+  const scope = useCasScope(conversationScopeId(conversationId), {
+    initialObjects: [
+      {
+        type: "conversation",
+        object: new Conversation({ id: conversationId, participantIds: [], turns: [] }),
+      },
+    ],
+  });
+
+  const conversationShell = scope.getShell<Conversation>("conversation", conversationId);
   const conversation = conversationShell?.object ?? null;
-  const { graph, moveBack, moveForward, moveTo, getLoadedState } =
-    useWorldLineGraph();
 
   const participants = useMemo(
     () =>
@@ -77,38 +70,33 @@ const ConversationFeatureInner: FC<ConversationFeatureProps> = ({
     conversationShell.update((c) => c.addParticipant(speakerId));
   };
 
-  const forkChoices = graph.getForkChoices();
+  const forkChoices = scope.getForkChoices();
 
   const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
     if (!conversation || forkChoices.length === 0) return [];
 
     return forkChoices.flatMap((choice) => {
-      const convRef = choice.changedRefs.find(
-        (r) => r.type === "conversation" && r.id === conversationId
-      );
-      if (!convRef) return [];
-      const convData = getLoadedState<SerializedConversationState>(convRef.hash);
-      if (!convData) return [];
-      const newTurns = convData.turns
-        .slice(conversation.turns.length)
-        .map((t) => new Turn(t));
+      const conv = scope.getObjectAt<Conversation>(choice.nodeId, "conversation", conversationId);
+      if (!conv) return [];
+      const newTurns = conv.turns
+        .slice(conversation.turns.length);
       if (newTurns.length === 0) return [];
       return [{
         nodeId: choice.nodeId,
         isSameLine: choice.isSameLine,
         preview: newTurns,
-        onSelect: () => moveTo(choice.nodeId),
+        onSelect: () => scope.moveTo(choice.nodeId),
       }];
     });
-  }, [forkChoices, conversation, conversationId, getLoadedState, moveTo]);
+  }, [forkChoices, conversation, conversationId, scope]);
 
   const wlNav = useMemo((): WlNavProps<Turn[]> => ({
-    onUndo: moveBack,
-    onRedo: moveForward,
-    canUndo: graph.canUndo,
-    canRedo: graph.canRedo,
+    onUndo: scope.moveBack,
+    onRedo: scope.moveForward,
+    canUndo: scope.canUndo,
+    canRedo: scope.canRedo,
     forkPreviews,
-  }), [moveBack, moveForward, graph.canUndo, graph.canRedo, forkPreviews]);
+  }), [scope.moveBack, scope.moveForward, scope.canUndo, scope.canRedo, forkPreviews]);
 
   if (!conversation) {
     return (

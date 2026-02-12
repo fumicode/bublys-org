@@ -18,9 +18,9 @@ export {
   loadStatesFromIDB,
 } from './IndexedDBStore';
 export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
-export { WorldLineGraphProvider, useWorldLineGraph } from './WorldLineGraphProvider';
 export { initWorldLineGraph } from './initWorldLineGraph';
 export { ObjectShell } from './ObjectShell';
-export { useShellManager, type ShellManagerConfig } from './useShellManager';
 export { useScopeManager } from './useScopeManager';
 export { type ForkPreview, type WlNavProps } from './WorldLineNav';
+export { CasProvider, useCas, type CasTypeConfig, type CasRegistry } from './CasProvider';
+export { useCasScope, type CasScopeOptions, type CasScopeValue } from './useCasScope';

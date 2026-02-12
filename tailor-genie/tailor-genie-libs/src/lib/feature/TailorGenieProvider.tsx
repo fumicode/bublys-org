@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useState, useMemo, useCallback } from "react";
 import {
-  WorldLineGraphProvider,
-  useShellManager,
+  CasProvider,
+  useCasScope,
   ObjectShell,
   createScope as createScopeAction,
   deleteScope as deleteScopeAction,
+  type CasRegistry,
 } from "@bublys-org/world-line-graph";
 import { useAppDispatch } from "@bublys-org/state-management";
 import {
@@ -31,9 +32,31 @@ const DEFAULT_SPEAKERS: Speaker[] = [
 
 const CONVERSATION_SCOPE_PREFIX = "conversation-";
 
-function conversationScopeId(conversationId: string): string {
+export function conversationScopeId(conversationId: string): string {
   return `${CONVERSATION_SCOPE_PREFIX}${conversationId}`;
 }
+
+// ============================================================================
+// CAS Registry — 全型のシリアライズ/デシリアライズ設定
+// ============================================================================
+
+const TAILOR_GENIE_REGISTRY: CasRegistry = {
+  speaker: {
+    fromJSON: (json) => Speaker.fromJSON(json as SpeakerState),
+    toJSON: (s: Speaker) => s.toJSON(),
+    getId: (s: Speaker) => s.id,
+  },
+  conversation: {
+    fromJSON: (json) => Conversation.fromJSON(json as SerializedConversationState),
+    toJSON: (c: Conversation) => c.toJSON(),
+    getId: (c: Conversation) => c.id,
+  },
+  "conversation-meta": {
+    fromJSON: (json) => json as ConversationMeta,
+    toJSON: (obj: ConversationMeta) => obj,
+    getId: (obj: ConversationMeta) => obj.id,
+  },
+};
 
 // ============================================================================
 // Conversation meta — グローバルWLGで「会話の存在」を管理するための型
@@ -42,12 +65,6 @@ function conversationScopeId(conversationId: string): string {
 interface ConversationMeta {
   id: string;
 }
-
-const CONVERSATION_META_CONFIG = {
-  fromJSON: (json: unknown) => json as ConversationMeta,
-  toJSON: (obj: ConversationMeta) => obj,
-  getId: (obj: ConversationMeta) => obj.id,
-};
 
 // ============================================================================
 // Context — 内部実装。公開 API はフック経由
@@ -71,7 +88,7 @@ const TailorGenieContext =
   createContext<TailorGenieContextValue | null>(null);
 
 // ============================================================================
-// Inner Provider — グローバル WorldLineGraphProvider の内側で動作
+// Inner Provider — CasProvider の内側で動作
 // ============================================================================
 
 function TailorGenieInner({
@@ -84,46 +101,45 @@ function TailorGenieInner({
     string | null
   >(null);
 
-  // Speaker: グローバルWLG内のオブジェクト
-  const {
-    shells: speakerShells,
-    addShell: addSpeaker,
-    removeShell: removeSpeaker,
-  } = useShellManager<Speaker>("speaker", {
-    fromJSON: (json) => Speaker.fromJSON(json as SpeakerState),
-    toJSON: (s) => s.toJSON(),
-    getId: (s) => s.id,
-    initialObjects: DEFAULT_SPEAKERS,
+  // グローバルスコープ: Speaker と ConversationMeta を管理
+  const scope = useCasScope("tailor-genie", {
+    initialObjects: DEFAULT_SPEAKERS.map((s) => ({ type: "speaker", object: s })),
   });
 
-  // Conversation: グローバルWLGで存在を管理
-  const {
-    shells: conversationShells,
-    addShell: addConversationRef,
-    removeShell: removeConversationRef,
-  } = useShellManager<ConversationMeta>("conversation", CONVERSATION_META_CONFIG);
+  const speakerShells = scope.shells<Speaker>("speaker");
+  const conversationMetaShells = scope.shells<ConversationMeta>("conversation-meta");
+
+  const addSpeaker = useCallback(
+    (speaker: Speaker) => scope.addObject("speaker", speaker),
+    [scope]
+  );
+
+  const removeSpeaker = useCallback(
+    (id: string) => scope.removeObject("speaker", id),
+    [scope]
+  );
 
   const conversationIds = useMemo(
-    () => conversationShells.map((s) => s.id),
-    [conversationShells]
+    () => conversationMetaShells.map((s) => s.id),
+    [conversationMetaShells]
   );
 
   // 会話作成: グローバルWLGに ref を追加 + ローカルWLGスコープを作成
   const addConversation = useCallback(
     (id: string) => {
-      addConversationRef({ id });
+      scope.addObject("conversation-meta", { id });
       dispatch(createScopeAction(conversationScopeId(id)));
     },
-    [addConversationRef, dispatch]
+    [scope, dispatch]
   );
 
   // 会話削除: グローバルWLGから ref を tombstone + ローカルWLGスコープを削除
   const deleteConversation = useCallback(
     (id: string) => {
-      removeConversationRef(id);
+      scope.removeObject("conversation-meta", id);
       dispatch(deleteScopeAction(conversationScopeId(id)));
     },
-    [removeConversationRef, dispatch]
+    [scope, dispatch]
   );
 
   const value = useMemo<TailorGenieContextValue>(
@@ -156,7 +172,7 @@ function TailorGenieInner({
 }
 
 // ============================================================================
-// Provider — グローバルWLGでラップ
+// Provider — CasProvider でラップ
 // ============================================================================
 
 export function TailorGenieProvider({
@@ -165,9 +181,9 @@ export function TailorGenieProvider({
   children: React.ReactNode;
 }) {
   return (
-    <WorldLineGraphProvider scopeId="tailor-genie">
+    <CasProvider registry={TAILOR_GENIE_REGISTRY}>
       <TailorGenieInner>{children}</TailorGenieInner>
-    </WorldLineGraphProvider>
+    </CasProvider>
   );
 }
 
@@ -190,52 +206,4 @@ function useContextValue(): TailorGenieContextValue {
  */
 export function useTailorGenie(): TailorGenieContextValue {
   return useContextValue();
-}
-
-/**
- * 会話ごとの WorldLineGraphProvider を返すヘルパー
- */
-export function ConversationWorldLineProvider({
-  conversationId,
-  children,
-}: {
-  conversationId: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <WorldLineGraphProvider scopeId={conversationScopeId(conversationId)}>
-      {children}
-    </WorldLineGraphProvider>
-  );
-}
-
-// ============================================================================
-// Conversation shell — ConversationWorldLineProvider の内側で使用
-// ============================================================================
-
-const CONVERSATION_SHELL_CONFIG = {
-  fromJSON: (json: unknown) =>
-    Conversation.fromJSON(json as SerializedConversationState),
-  toJSON: (c: Conversation) => c.toJSON(),
-  getId: (c: Conversation) => c.id,
-} as const;
-
-/**
- * 会話スコープ内で Conversation shell を取得するフック。
- * ConversationWorldLineProvider の内側で使用すること。
- */
-export function useConversationShell(
-  conversationId: string
-): ObjectShell<Conversation> | null {
-  const initialObjects = useMemo(
-    () => [new Conversation({ id: conversationId, participantIds: [], turns: [] })],
-    [conversationId]
-  );
-
-  const { shells } = useShellManager<Conversation>("conversation", {
-    ...CONVERSATION_SHELL_CONFIG,
-    initialObjects,
-  });
-
-  return shells.find((s) => s.id === conversationId) ?? null;
 }

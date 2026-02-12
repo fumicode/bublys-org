@@ -2,16 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  WorldLineGraphProvider,
-  useWorldLineGraph,
+  CasProvider,
+  useCasScope,
   ObjectShell,
-  useShellManager,
+  type CasRegistry,
   type WorldNode,
 } from '@bublys-org/world-line-graph';
 import { Counter } from './Counter';
 
 // ============================================================================
-// Counter 用の ShellManager 設定
+// Counter CAS Registry
+// ============================================================================
+
+const COUNTER_REGISTRY: CasRegistry = {
+  counter: {
+    fromJSON: (json) => Counter.fromJSON(json as { id: string; value: number }),
+    toJSON: (c: Counter) => c.toJSON(),
+    getId: (c: Counter) => c.state.id,
+  },
+};
+
+// ============================================================================
+// Counter ID 生成
 // ============================================================================
 
 let nextCounterIndex = 0;
@@ -25,13 +37,6 @@ const INITIAL_COUNTERS = [
   new Counter({ id: generateCounterId(), value: 0 }),
   new Counter({ id: generateCounterId(), value: 0 }),
 ];
-
-const COUNTER_CONFIG = {
-  fromJSON: (json: unknown) => Counter.fromJSON(json as { id: string; value: number }),
-  toJSON: (c: Counter) => c.toJSON(),
-  getId: (c: Counter) => c.state.id,
-  initialObjects: INITIAL_COUNTERS,
-};
 
 // ============================================================================
 // CounterPanel — 単一カウンターの操作 UI
@@ -82,12 +87,22 @@ function CounterPanel({
 }
 
 // ============================================================================
-// ControlPanel — Undo/Redo + Add Counter
+// CountersContainer — useCasScope で全機能を統合
 // ============================================================================
 
-function ControlPanel({ onAddCounter }: { onAddCounter: () => void }) {
-  const { graph, moveBack, moveForward } = useWorldLineGraph();
+function CountersContainer() {
+  const scope = useCasScope('counter-demo', {
+    initialObjects: INITIAL_COUNTERS.map((c) => ({ type: 'counter', object: c })),
+  });
 
+  const counterShells = scope.shells<Counter>('counter');
+  const { graph, getLoadedState } = scope;
+
+  const handleAddCounter = () => {
+    scope.addObject('counter', new Counter({ id: generateCounterId(), value: 0 }));
+  };
+
+  // ControlPanel inline
   const apexNode = graph.state.apexNodeId
     ? graph.state.nodes[graph.state.apexNodeId]
     : null;
@@ -97,47 +112,8 @@ function ControlPanel({ onAddCounter }: { onAddCounter: () => void }) {
   const canRedo =
     apexNode !== null && (childrenMap[apexNode.id]?.length ?? 0) > 0;
 
-  return (
-    <div style={styles.controlPanel}>
-      <button
-        onClick={moveBack}
-        disabled={!canUndo}
-        style={{ ...styles.smallButton, opacity: canUndo ? 1 : 0.4 }}
-      >
-        Undo
-      </button>
-      <button
-        onClick={moveForward}
-        disabled={!canRedo}
-        style={{ ...styles.smallButton, opacity: canRedo ? 1 : 0.4 }}
-      >
-        Redo
-      </button>
-      <button onClick={onAddCounter} style={styles.addButton}>
-        + Add Counter
-      </button>
-    </div>
-  );
-}
-
-// ============================================================================
-// DAGPanel — ノード一覧の可視化
-// ============================================================================
-
-function DAGPanel() {
-  const { graph, moveTo, getLoadedState } = useWorldLineGraph();
+  // DAG rendering
   const { nodes, apexNodeId, rootNodeId } = graph.state;
-
-  if (rootNodeId === null) {
-    return (
-      <div style={styles.dagPanel}>
-        <h2 style={styles.sectionTitle}>DAG</h2>
-        <p style={styles.emptyText}>No nodes yet</p>
-      </div>
-    );
-  }
-
-  const childrenMap = graph.getChildrenMap();
 
   // worldLineId ごとの色を割り当て
   const worldLineIds = new Set<string>();
@@ -178,7 +154,7 @@ function DAGPanel() {
     return (
       <div key={nodeId} style={{ marginLeft: depth * 20 }}>
         <button
-          onClick={() => moveTo(nodeId)}
+          onClick={() => scope.moveTo(nodeId)}
           style={{
             ...styles.dagNode,
             borderColor: color,
@@ -201,48 +177,53 @@ function DAGPanel() {
   }
 
   return (
-    <div style={styles.dagPanel}>
-      <h2 style={styles.sectionTitle}>DAG</h2>
-      <div style={styles.legend}>
-        {Object.entries(worldLineColors).map(([wlId, color]) => (
-          <span key={wlId} style={styles.legendItem}>
-            <span style={{ ...styles.legendDot, backgroundColor: color }} />
-            {wlId.slice(0, 10)}
-          </span>
-        ))}
-      </div>
-      <div style={styles.dagTree}>{renderNode(rootNodeId, 0)}</div>
-    </div>
-  );
-}
-
-// ============================================================================
-// CountersContainer
-// ============================================================================
-
-function CountersContainer() {
-  const { shells, addShell, removeShell } = useShellManager<Counter>(
-    'counter',
-    COUNTER_CONFIG
-  );
-
-  const handleAddCounter = () => {
-    addShell(new Counter({ id: generateCounterId(), value: 0 }));
-  };
-
-  return (
     <>
       <div style={styles.countersRow}>
-        {shells.map((shell) => (
+        {counterShells.map((shell) => (
           <CounterPanel
             key={shell.id}
             shell={shell}
-            onRemove={() => removeShell(shell.id)}
+            onRemove={() => scope.removeObject('counter', shell.id)}
           />
         ))}
       </div>
-      <ControlPanel onAddCounter={handleAddCounter} />
-      <DAGPanel />
+      <div style={styles.controlPanel}>
+        <button
+          onClick={scope.moveBack}
+          disabled={!canUndo}
+          style={{ ...styles.smallButton, opacity: canUndo ? 1 : 0.4 }}
+        >
+          Undo
+        </button>
+        <button
+          onClick={scope.moveForward}
+          disabled={!canRedo}
+          style={{ ...styles.smallButton, opacity: canRedo ? 1 : 0.4 }}
+        >
+          Redo
+        </button>
+        <button onClick={handleAddCounter} style={styles.addButton}>
+          + Add Counter
+        </button>
+      </div>
+      <div style={styles.dagPanel}>
+        <h2 style={styles.sectionTitle}>DAG</h2>
+        {rootNodeId === null ? (
+          <p style={styles.emptyText}>No nodes yet</p>
+        ) : (
+          <>
+            <div style={styles.legend}>
+              {Object.entries(worldLineColors).map(([wlId, color]) => (
+                <span key={wlId} style={styles.legendItem}>
+                  <span style={{ ...styles.legendDot, backgroundColor: color }} />
+                  {wlId.slice(0, 10)}
+                </span>
+              ))}
+            </div>
+            <div style={styles.dagTree}>{renderNode(rootNodeId, 0)}</div>
+          </>
+        )}
+      </div>
     </>
   );
 }
@@ -253,17 +234,17 @@ function CountersContainer() {
 
 export default function WorldLineGraphDemoPage() {
   return (
-    <div style={styles.page}>
-      <h1 style={styles.pageTitle}>WorldLineGraph Demo</h1>
-      <p style={styles.description}>
-        Counter を操作すると DAG にノードが追加されます。
-        Add Counter でカウンターを増やせます。
-        Undo するとカウンターの追加も巻き戻ります。
-      </p>
-      <WorldLineGraphProvider scopeId="counter-demo">
+    <CasProvider registry={COUNTER_REGISTRY}>
+      <div style={styles.page}>
+        <h1 style={styles.pageTitle}>WorldLineGraph Demo</h1>
+        <p style={styles.description}>
+          Counter を操作すると DAG にノードが追加されます。
+          Add Counter でカウンターを増やせます。
+          Undo するとカウンターの追加も巻き戻ります。
+        </p>
         <CountersContainer />
-      </WorldLineGraphProvider>
-    </div>
+      </div>
+    </CasProvider>
   );
 }
 

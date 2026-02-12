@@ -1,10 +1,10 @@
 "use client";
 
 import { FC } from "react";
-import { useWorldLineGraph } from "@bublys-org/world-line-graph";
+import { useCasScope } from "@bublys-org/world-line-graph";
 
 export const WorldLineControlFeature: FC = () => {
-  const { graph, moveBack, moveForward } = useWorldLineGraph();
+  const scope = useCasScope("tailor-genie");
 
   return (
     <div
@@ -16,30 +16,30 @@ export const WorldLineControlFeature: FC = () => {
       }}
     >
       <button
-        onClick={moveBack}
-        disabled={!graph.canUndo}
+        onClick={scope.moveBack}
+        disabled={!scope.canUndo}
         style={{
           padding: "4px 12px",
           border: "1px solid #ccc",
           borderRadius: 4,
-          background: graph.canUndo ? "#fff" : "#f5f5f5",
-          color: graph.canUndo ? "#333" : "#aaa",
-          cursor: graph.canUndo ? "pointer" : "default",
+          background: scope.canUndo ? "#fff" : "#f5f5f5",
+          color: scope.canUndo ? "#333" : "#aaa",
+          cursor: scope.canUndo ? "pointer" : "default",
           fontSize: 13,
         }}
       >
         Undo
       </button>
       <button
-        onClick={moveForward}
-        disabled={!graph.canRedo}
+        onClick={scope.moveForward}
+        disabled={!scope.canRedo}
         style={{
           padding: "4px 12px",
           border: "1px solid #ccc",
           borderRadius: 4,
-          background: graph.canRedo ? "#fff" : "#f5f5f5",
-          color: graph.canRedo ? "#333" : "#aaa",
-          cursor: graph.canRedo ? "pointer" : "default",
+          background: scope.canRedo ? "#fff" : "#f5f5f5",
+          color: scope.canRedo ? "#333" : "#aaa",
+          cursor: scope.canRedo ? "pointer" : "default",
           fontSize: 13,
         }}
       >
