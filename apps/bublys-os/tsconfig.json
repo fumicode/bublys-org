@@ -52,6 +52,9 @@
   ],
   "references": [
     {
+      "path": "../../bublys-libs/domain-registry"
+    },
+    {
       "path": "../../bublys-libs/hash-world-line"
     },
     {
@@ -62,6 +65,9 @@
     },
     {
       "path": "../../users-libs"
+    },
+    {
+      "path": "../../bublys-libs/world-line-graph"
     },
     {
       "path": "../../bublys-libs/bubbles-ui"

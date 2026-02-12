@@ -222,12 +222,12 @@ const GakkaiShiftAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubbl
 
 /** 学会シフト機能のバブルルート定義 */
 export const gakkaiShiftBubbleRoutes: BubbleRoute[] = [
-  { pattern: "gakkai-shift/staffs/filter", type: "gakkai-shift-staff-filter", Component: GakkaiShiftStaffFilterBubble },
-  { pattern: "gakkai-shift/staffs/:staffId/availableTimeSlots", type: "gakkai-shift-staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
-  { pattern: "gakkai-shift/staffs/:staffId", type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
-  { pattern: "gakkai-shift/staffs", type: "gakkai-shift-staffs", Component: GakkaiShiftStaffsBubble },
-  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/staff-view", type: "gakkai-shift-staff-view", Component: GakkaiShiftStaffShiftTableBubble },
-  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "gakkai-shift-assignment-evaluation", Component: GakkaiShiftAssignmentEvaluationBubble },
-  { pattern: "gakkai-shift/shift-plans", type: "gakkai-shift-plans", Component: GakkaiShiftPlanManagerBubble },
-  { pattern: "gakkai-shift/shift-plan/:shiftPlanId", type: "gakkai-shift-plan", Component: GakkaiShiftPlanEditorBubble },
+  { pattern: "gakkai-shift/staffs/filter", type: "staff-filter", Component: GakkaiShiftStaffFilterBubble },
+  { pattern: "gakkai-shift/staffs/:staffId/availableTimeSlots", type: "staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
+  { pattern: "gakkai-shift/staffs/:staffId", type: "staff", Component: GakkaiShiftStaffBubble },
+  { pattern: "gakkai-shift/staffs", type: "staff-list", Component: GakkaiShiftStaffsBubble },
+  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/staff-view", type: "staff-shift-table", Component: GakkaiShiftStaffShiftTableBubble },
+  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "assignment-evaluation", Component: GakkaiShiftAssignmentEvaluationBubble },
+  { pattern: "gakkai-shift/shift-plans", type: "shift-plan-list", Component: GakkaiShiftPlanManagerBubble },
+  { pattern: "gakkai-shift/shift-plan/:shiftPlanId", type: "shift-plan", Component: GakkaiShiftPlanEditorBubble },
 ];
