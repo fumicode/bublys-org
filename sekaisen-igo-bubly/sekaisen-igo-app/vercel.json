@@ -2,8 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "npx nx build:bubly @bublys-org/sekaisen-igo-app && npx nx build @bublys-org/sekaisen-igo-app",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/bubly.js",

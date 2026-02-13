@@ -2,8 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "npx nx build:bubly @bublys-org/tailor-genie-app && npx nx build @bublys-org/tailor-genie-app",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "framework": "nextjs",
   "headers": [
     {
       "source": "/bubly.js",
