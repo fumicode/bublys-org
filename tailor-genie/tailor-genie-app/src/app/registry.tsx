@@ -18,6 +18,7 @@ export function StyledComponentsRegistry({
 
     // Types are out of date, clearTag is not defined.
     // See: https://github.com/DefinitelyTyped/DefinitelyTyped/issues/65021
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DefinitelyTyped#65021: clearTag not in types
     (styledComponentsStyleSheet.instance as any).clearTag();
 
     return <>{styles}</>;
