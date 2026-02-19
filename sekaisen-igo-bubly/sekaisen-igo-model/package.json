@@ -1,0 +1,39 @@
+{
+  "name": "@bublys-org/sekaisen-igo-model",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@bublys-org/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "nx": {
+    "sourceRoot": "sekaisen-igo-bubly/sekaisen-igo-model/src",
+    "targets": {
+      "build": {
+        "executor": "@nx/js:swc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "sekaisen-igo-bubly/sekaisen-igo-model/dist",
+          "main": "sekaisen-igo-bubly/sekaisen-igo-model/src/index.ts",
+          "tsConfig": "sekaisen-igo-bubly/sekaisen-igo-model/tsconfig.lib.json",
+          "skipTypeCheck": true,
+          "stripLeadingPaths": true
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@swc/helpers": "~0.5.11"
+  }
+}

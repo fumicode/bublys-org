@@ -20,6 +20,8 @@ import * as MuiMaterial from "@mui/material";
 import * as MuiIcons from "@mui/icons-material";
 import { registerAppObjectTypes } from "./object-type-registration";
 import { initWorldLineGraph } from '@bublys-org/world-line-graph';
+import * as WorldLineGraph from '@bublys-org/world-line-graph';
+import * as DomainRegistry from '@bublys-org/domain-registry';
 
 // プラグイン用共有ライブラリをセットアップ
 function setupSharedLibraries() {
@@ -41,6 +43,8 @@ function setupSharedLibraries() {
     BubblesUI,
     MuiMaterial,
     MuiIcons,
+    WorldLineGraph,
+    DomainRegistry,
   };
 
   console.log('[StoreProvider] Shared libraries initialized');
