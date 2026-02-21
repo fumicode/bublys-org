@@ -1,13 +1,12 @@
 "use client";
 
-import { FC, useState, useRef, useEffect, CSSProperties } from "react";
-import { Conversation, Speaker, Turn, type Choice } from "@bublys-org/tailor-genie-model";
+import { FC, useState, useRef, useEffect, useMemo, CSSProperties } from "react";
+import { Conversation, Speaker, Turn } from "@bublys-org/tailor-genie-model";
 import React from "react";
 import { getDragType } from "@bublys-org/bubbles-ui";
 import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
 import { GhostTurnsView } from "./GhostTurnsView.js";
-import { ConversationInput } from "./ConversationInput.js";
 
 const arrowButtonStyle: CSSProperties = {
   width: 32,
@@ -32,11 +31,6 @@ const disabledStyle: CSSProperties = {
 export type ConversationViewProps = {
   conversation: Conversation;
   participants: Speaker[];
-  currentSpeakerId: string;
-  onSelectSpeaker?: (speakerId: string) => void;
-  onSpeak?: (message: string) => void;
-  onAskQuestion?: (question: string, choices: Choice[]) => void;
-  onAnswerQuestion?: (choiceId: string) => void;
   onOpenSpeakerView?: (speakerId: string) => void;
   onAddParticipant?: (speakerId: string) => void;
   wlNav?: WlNavProps<Turn[]>;
@@ -45,11 +39,6 @@ export type ConversationViewProps = {
 export const ConversationView: FC<ConversationViewProps> = ({
   conversation,
   participants,
-  currentSpeakerId,
-  onSelectSpeaker,
-  onSpeak,
-  onAskQuestion,
-  onAnswerQuestion,
   onOpenSpeakerView,
   onAddParticipant,
   wlNav,
@@ -58,16 +47,14 @@ export const ConversationView: FC<ConversationViewProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
 
-  // スクロール位置を監視
   const handleScroll = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const threshold = 50; // 底から50px以内なら「底にいる」とみなす
+    const threshold = 50;
     wasAtBottomRef.current =
       container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
   };
 
-  // 発言が増えたときに自動スクロール
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -80,10 +67,37 @@ export const ConversationView: FC<ConversationViewProps> = ({
     return participants.find((s) => s.id === speakerId);
   };
 
-  const currentSpeaker = participants.find((s) => s.id === currentSpeakerId);
-  const pendingChoices = conversation.availableChoicesForGuest;
-
   const pendingQuestion = conversation.pendingQuestion;
+
+  // forkPreviewsから、未回答質問の選択肢に対応するforkを抽出
+  const { choiceToFork, visitedChoiceIds } = useMemo(() => {
+    const map = new Map<string, () => void>();
+    const ids = new Set<string>();
+    if (pendingQuestion && wlNav) {
+      for (const fork of wlNav.forkPreviews) {
+        const first = fork.preview[0];
+        if (first?.kind === "AnswerTurn" && first.questionTurnId === pendingQuestion.id) {
+          map.set(first.choiceId, fork.onSelect);
+          ids.add(first.choiceId);
+        }
+      }
+    }
+    return { choiceToFork: map, visitedChoiceIds: ids };
+  }, [pendingQuestion, wlNav]);
+
+  // 未回答質問に対応しないforkPreviewsだけ残す
+  const nonAnswerForkPreviews = useMemo(() => {
+    if (!wlNav || !pendingQuestion) return wlNav?.forkPreviews ?? [];
+    return wlNav.forkPreviews.filter((fork) => {
+      const first = fork.preview[0];
+      return !(first?.kind === "AnswerTurn" && first.questionTurnId === pendingQuestion.id);
+    });
+  }, [wlNav, pendingQuestion]);
+
+  const handleChoiceClick = (choiceId: string) => {
+    const forkSelect = choiceToFork.get(choiceId);
+    if (forkSelect) forkSelect();
+  };
 
   const getChoiceText = (turn: Turn): string | undefined => {
     if (turn.kind !== "AnswerTurn") return undefined;
@@ -93,7 +107,6 @@ export const ConversationView: FC<ConversationViewProps> = ({
   const speakerDragType = getDragType("Speaker");
 
   const handleDragOver = (e: React.DragEvent) => {
-    // ドラッグオーバー時はtypesのみチェック（getDataは空を返す場合がある）
     const types = Array.from(e.dataTransfer.types);
     if (types.includes(speakerDragType)) {
       e.preventDefault();
@@ -110,7 +123,6 @@ export const ConversationView: FC<ConversationViewProps> = ({
     const url = e.dataTransfer.getData(speakerDragType);
     if (!url) return;
 
-    // URLからspeakerIdを抽出: "tailor-genie/speakers/{speakerId}"
     const match = url.match(/^tailor-genie\/speakers\/(.+)$/);
     if (match && onAddParticipant) {
       onAddParticipant(match[1]);
@@ -195,11 +207,13 @@ export const ConversationView: FC<ConversationViewProps> = ({
                 align={align}
                 choiceText={getChoiceText(turn)}
                 onChoiceClick={
-                  currentSpeaker?.role === "guest" &&
-                  pendingQuestion &&
-                  turn.id === pendingQuestion.id &&
-                  onAnswerQuestion
-                    ? onAnswerQuestion
+                  pendingQuestion && turn.id === pendingQuestion.id && choiceToFork.size > 0
+                    ? handleChoiceClick
+                    : undefined
+                }
+                visitedChoiceIds={
+                  pendingQuestion && turn.id === pendingQuestion.id
+                    ? visitedChoiceIds
                     : undefined
                 }
               />
@@ -217,16 +231,16 @@ export const ConversationView: FC<ConversationViewProps> = ({
             </button>
             <button
               onClick={wlNav.onRedo}
-              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0}
-              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 ? disabledStyle : {}) }}
+              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0 || !!pendingQuestion}
+              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 || pendingQuestion ? disabledStyle : {}) }}
             >
               ↓
             </button>
           </div>
         )}
-        {wlNav && wlNav.forkPreviews.length > 0 && (
+        {nonAnswerForkPreviews.length > 0 && (
           <GhostTurnsView
-            forkPreviews={wlNav.forkPreviews}
+            forkPreviews={nonAnswerForkPreviews}
             getSpeakerName={(id) => getSpeaker(id)?.name || id}
             getSpeakerRole={(id) => getSpeaker(id)?.role}
             getAlign={(id) => {
@@ -237,39 +251,6 @@ export const ConversationView: FC<ConversationViewProps> = ({
           />
         )}
       </div>
-
-      {participants.length > 0 && (
-        <div style={{ borderTop: "1px solid #ddd" }}>
-          <div style={{ display: "flex", gap: 4, padding: "8px 12px 0" }}>
-            {participants.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => onSelectSpeaker?.(s.id)}
-                style={{
-                  padding: "6px 12px",
-                  background: s.id === currentSpeakerId ? "#007bff" : "#e9ecef",
-                  color: s.id === currentSpeakerId ? "white" : "#333",
-                  border: "none",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-          <ConversationInput
-            speakerName={currentSpeaker?.name || "スピーカー"}
-            speakerRole={currentSpeaker?.role || "guest"}
-            pendingChoices={pendingChoices}
-            onSpeak={onSpeak}
-            onAskQuestion={onAskQuestion}
-            onAnswerQuestion={onAnswerQuestion}
-          />
-        </div>
-      )}
     </div>
   );
 };

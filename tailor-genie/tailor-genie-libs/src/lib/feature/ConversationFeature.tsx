@@ -1,7 +1,7 @@
 "use client";
 
-import { FC, useState, useContext, useEffect, useMemo } from "react";
-import { Conversation, type Turn, type Choice } from "@bublys-org/tailor-genie-model";
+import { FC, useContext, useMemo } from "react";
+import { Conversation, type Turn } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { useCasScope, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
 import { ConversationView } from "../view/ConversationView.js";
@@ -38,41 +38,11 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
     [conversation, speakerShells]
   );
 
-  const [currentSpeakerId, setCurrentSpeakerId] = useState("");
-
-  const currentSpeaker =
-    speakerShells.find((s) => s.id === currentSpeakerId)?.object ?? null;
-
-  useEffect(() => {
-    if (participants.length > 0 && !currentSpeakerId) {
-      setCurrentSpeakerId(participants[0].id);
-    }
-  }, [participants, currentSpeakerId]);
-
   const handleOpenSpeakerView = (speakerId: string) => {
     openBubble(
       `tailor-genie/conversations/${conversationId}/speakers/${speakerId}`,
       "root"
     );
-  };
-
-  const handleSpeak = (message: string) => {
-    if (!conversationShell || !currentSpeaker) return;
-    conversationShell.update((c) => c.speak(currentSpeaker, message));
-  };
-
-  const handleAskQuestion = (question: string, choices: Choice[]) => {
-    if (!conversationShell || !currentSpeaker) return;
-    conversationShell.update((c) => c.askQuestion(currentSpeaker, question, choices));
-  };
-
-  const handleAnswerQuestion = (choiceId: string) => {
-    if (!conversationShell || !currentSpeaker) return;
-    conversationShell.update((c) => c.answerQuestion(currentSpeaker, choiceId));
-  };
-
-  const handleSelectSpeaker = (speakerId: string) => {
-    setCurrentSpeakerId(speakerId);
   };
 
   const handleAddParticipant = (speakerId: string) => {
@@ -82,23 +52,31 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
 
   const forkChoices = scope.getForkChoices();
 
-  const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
-    if (!conversation || forkChoices.length === 0) return [];
+  const childNodeIds = useMemo(() => {
+    if (!conversation?.pendingQuestion) return null;
+    const ids = scope.graph.getApexChildIds();
+    return ids.length > 0 ? ids : null;
+  }, [conversation, scope.graph]);
 
-    return forkChoices.flatMap((choice) => {
-      const conv = scope.getObjectAt<Conversation>(choice.nodeId, "conversation", conversationId);
+  const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
+    if (!conversation) return [];
+
+    const nodeIds = childNodeIds ?? forkChoices.map((c) => c.nodeId);
+    if (nodeIds.length === 0) return [];
+
+    return nodeIds.flatMap((nodeId) => {
+      const conv = scope.getObjectAt<Conversation>(nodeId, "conversation", conversationId);
       if (!conv) return [];
-      const newTurns = conv.turns
-        .slice(conversation.turns.length);
+      const newTurns = conv.turns.slice(conversation.turns.length);
       if (newTurns.length === 0) return [];
       return [{
-        nodeId: choice.nodeId,
-        isSameLine: choice.isSameLine,
+        nodeId,
+        isSameLine: forkChoices.find((c) => c.nodeId === nodeId)?.isSameLine ?? true,
         preview: newTurns,
-        onSelect: () => scope.moveTo(choice.nodeId),
+        onSelect: () => scope.moveTo(nodeId),
       }];
     });
-  }, [forkChoices, conversation, conversationId, scope]);
+  }, [forkChoices, childNodeIds, conversation, conversationId, scope]);
 
   const wlNav = useMemo((): WlNavProps<Turn[]> => ({
     onUndo: scope.moveBack,
@@ -129,11 +107,6 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
     <ConversationView
       conversation={conversation}
       participants={participants}
-      currentSpeakerId={currentSpeakerId}
-      onSelectSpeaker={handleSelectSpeaker}
-      onSpeak={handleSpeak}
-      onAskQuestion={handleAskQuestion}
-      onAnswerQuestion={handleAnswerQuestion}
       onOpenSpeakerView={handleOpenSpeakerView}
       onAddParticipant={handleAddParticipant}
       wlNav={wlNav}

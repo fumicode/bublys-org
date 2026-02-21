@@ -31,23 +31,31 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
 
   const forkChoices = scope.getForkChoices();
 
-  const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
-    if (!conversation || forkChoices.length === 0) return [];
+  const childNodeIds = useMemo(() => {
+    if (!conversation?.pendingQuestion) return null;
+    const ids = scope.graph.getApexChildIds();
+    return ids.length > 0 ? ids : null;
+  }, [conversation, scope.graph]);
 
-    return forkChoices.flatMap((choice) => {
-      const conv = scope.getObjectAt<Conversation>(choice.nodeId, "conversation", conversationId);
+  const forkPreviews = useMemo((): ForkPreview<Turn[]>[] => {
+    if (!conversation) return [];
+
+    const nodeIds = childNodeIds ?? forkChoices.map((c) => c.nodeId);
+    if (nodeIds.length === 0) return [];
+
+    return nodeIds.flatMap((nodeId) => {
+      const conv = scope.getObjectAt<Conversation>(nodeId, "conversation", conversationId);
       if (!conv) return [];
-      const newTurns = conv.turns
-        .slice(conversation.turns.length);
+      const newTurns = conv.turns.slice(conversation.turns.length);
       if (newTurns.length === 0) return [];
       return [{
-        nodeId: choice.nodeId,
-        isSameLine: choice.isSameLine,
+        nodeId,
+        isSameLine: forkChoices.find((c) => c.nodeId === nodeId)?.isSameLine ?? true,
         preview: newTurns,
-        onSelect: () => scope.moveTo(choice.nodeId),
+        onSelect: () => scope.moveTo(nodeId),
       }];
     });
-  }, [forkChoices, conversation, conversationId, scope]);
+  }, [forkChoices, childNodeIds, conversation, conversationId, scope]);
 
   const wlNav = useMemo((): WlNavProps<Turn[]> => ({
     onUndo: scope.moveBack,

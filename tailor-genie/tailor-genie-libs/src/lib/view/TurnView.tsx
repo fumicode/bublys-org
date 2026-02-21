@@ -10,6 +10,7 @@ export type TurnViewProps = {
   align?: "left" | "right";
   choiceText?: string;
   onChoiceClick?: (choiceId: string) => void;
+  visitedChoiceIds?: ReadonlySet<string>;
 };
 
 const BUBBLE_COLORS: Record<SpeakerRole, { bg: string; color: string }> = {
@@ -24,6 +25,7 @@ export const TurnView: FC<TurnViewProps> = ({
   align = "left",
   choiceText,
   onChoiceClick,
+  visitedChoiceIds,
 }) => {
   const isRight = align === "right";
   const colors = BUBBLE_COLORS[speakerRole];
@@ -73,8 +75,9 @@ export const TurnView: FC<TurnViewProps> = ({
           }}
         >
           <div style={{ display: "flex", gap: 8, width: "max-content", paddingRight: 16 }}>
-            {turn.choices.map((c) => (
-              onChoiceClick ? (
+            {turn.choices.map((c) => {
+              const visited = visitedChoiceIds?.has(c.id);
+              return onChoiceClick ? (
                 <button
                   key={c.id}
                   type="button"
@@ -85,7 +88,7 @@ export const TurnView: FC<TurnViewProps> = ({
                     padding: "8px 12px",
                     borderRadius: 16,
                     border: `1.5px solid ${colors.bg}`,
-                    background: "#fff",
+                    background: visited ? `${colors.bg}10` : "#fff",
                     color: colors.bg,
                     fontSize: 13,
                     cursor: "pointer",
@@ -94,6 +97,7 @@ export const TurnView: FC<TurnViewProps> = ({
                     wordBreak: "break-word",
                   }}
                 >
+                  {visited && <span style={{ marginRight: 4, fontSize: 11 }}>✓</span>}
                   {c.text}
                 </button>
               ) : (
@@ -115,10 +119,11 @@ export const TurnView: FC<TurnViewProps> = ({
                     wordBreak: "break-word",
                   }}
                 >
+                  {visited && <span style={{ marginRight: 4, fontSize: 10 }}>✓</span>}
                   {c.text}
                 </span>
-              )
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

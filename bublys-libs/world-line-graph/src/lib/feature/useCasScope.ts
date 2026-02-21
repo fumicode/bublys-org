@@ -176,7 +176,7 @@ export function useCasScope(
   const initializedRef = useRef(false);
   useEffect(() => {
     if (initializedRef.current) return;
-    if (graph.state.rootNodeId !== null) return;
+    if (graph.rootNodeId !== null) return;
     const initials = options?.initialObjects;
     if (!initials?.length) return;
     initializedRef.current = true;
@@ -193,7 +193,7 @@ export function useCasScope(
       entries.push({ hash, data: shell.toJSON() });
     }
     growRef.current(refs, entries);
-  }, [graph.state.rootNodeId]);
+  }, [graph.rootNodeId]);
 
   // ============================================================
   // 公開 API

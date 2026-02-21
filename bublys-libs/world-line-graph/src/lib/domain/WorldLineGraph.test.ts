@@ -5,9 +5,9 @@ describe('WorldLineGraph', () => {
   describe('empty()', () => {
     it('creates a graph with no nodes', () => {
       const graph = WorldLineGraph.empty();
-      expect(graph.state.nodes).toEqual({});
-      expect(graph.state.apexNodeId).toBeNull();
-      expect(graph.state.rootNodeId).toBeNull();
+      expect(graph.toJSON().nodes).toEqual({});
+      expect(graph.apexNodeId).toBeNull();
+      expect(graph.rootNodeId).toBeNull();
     });
   });
 
@@ -16,12 +16,12 @@ describe('WorldLineGraph', () => {
       const ref = createStateRef('counter', '1', 'abc123');
       const graph = WorldLineGraph.empty().grow([ref]);
 
-      expect(graph.state.rootNodeId).not.toBeNull();
-      expect(graph.state.apexNodeId).toBe(graph.state.rootNodeId);
+      expect(graph.rootNodeId).not.toBeNull();
+      expect(graph.apexNodeId).toBe(graph.rootNodeId);
 
-      const rootNode = graph.state.nodes[graph.state.rootNodeId!];
-      expect(rootNode.parentId).toBeNull();
-      expect(rootNode.changedRefs).toEqual([ref]);
+      const rootNode = graph.getNode(graph.rootNodeId!);
+      expect(rootNode!.parentId).toBeNull();
+      expect(rootNode!.changedRefs).toEqual([ref]);
     });
 
     it('subsequent grows chain from apex', () => {
@@ -30,8 +30,8 @@ describe('WorldLineGraph', () => {
 
       const graph = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
 
-      const rootNode = graph.state.nodes[graph.state.rootNodeId!];
-      const apexNode = graph.state.nodes[graph.state.apexNodeId!];
+      const rootNode = graph.getNode(graph.rootNodeId!)!;
+      const apexNode = graph.getNode(graph.apexNodeId!)!;
 
       expect(apexNode.parentId).toBe(rootNode.id);
       expect(apexNode.changedRefs).toEqual([ref2]);
@@ -43,8 +43,8 @@ describe('WorldLineGraph', () => {
 
       const graph = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
 
-      const rootNode = graph.state.nodes[graph.state.rootNodeId!];
-      const apexNode = graph.state.nodes[graph.state.apexNodeId!];
+      const rootNode = graph.getNode(graph.rootNodeId!)!;
+      const apexNode = graph.getNode(graph.apexNodeId!)!;
 
       expect(apexNode.worldLineId).toBe(rootNode.worldLineId);
     });
@@ -59,8 +59,8 @@ describe('WorldLineGraph', () => {
       const movedBack = afterTwo.moveBack();
       const branched = movedBack.grow([ref3]);
 
-      const rootNode = branched.state.nodes[branched.state.rootNodeId!];
-      const branchNode = branched.state.nodes[branched.state.apexNodeId!];
+      const rootNode = branched.getNode(branched.rootNodeId!)!;
+      const branchNode = branched.getNode(branched.apexNodeId!)!;
 
       expect(branchNode.parentId).toBe(rootNode.id);
       expect(branchNode.worldLineId).not.toBe(rootNode.worldLineId);
@@ -73,10 +73,10 @@ describe('WorldLineGraph', () => {
       const ref2 = createStateRef('counter', '1', 'hash2');
 
       const graph = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
-      const rootId = graph.state.rootNodeId!;
+      const rootId = graph.rootNodeId!;
 
       const moved = graph.moveTo(rootId);
-      expect(moved.state.apexNodeId).toBe(rootId);
+      expect(moved.apexNodeId).toBe(rootId);
     });
 
     it('throws on invalid nodeId', () => {
@@ -93,7 +93,7 @@ describe('WorldLineGraph', () => {
       const graph = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
       const moved = graph.moveBack();
 
-      expect(moved.state.apexNodeId).toBe(graph.state.rootNodeId);
+      expect(moved.apexNodeId).toBe(graph.rootNodeId);
     });
 
     it('returns same graph when at root', () => {
@@ -101,7 +101,7 @@ describe('WorldLineGraph', () => {
       const graph = WorldLineGraph.empty().grow([ref]);
       const moved = graph.moveBack();
 
-      expect(moved.state.apexNodeId).toBe(graph.state.apexNodeId);
+      expect(moved.apexNodeId).toBe(graph.apexNodeId);
     });
 
     it('returns same graph when empty', () => {
@@ -117,12 +117,12 @@ describe('WorldLineGraph', () => {
       const ref2 = createStateRef('counter', '1', 'hash2');
 
       const graph = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
-      const apexId = graph.state.apexNodeId!;
+      const apexId = graph.apexNodeId!;
 
       const movedBack = graph.moveBack();
       const movedForward = movedBack.moveForward();
 
-      expect(movedForward.state.apexNodeId).toBe(apexId);
+      expect(movedForward.apexNodeId).toBe(apexId);
     });
 
     it('returns same graph when at leaf', () => {
@@ -130,13 +130,39 @@ describe('WorldLineGraph', () => {
       const graph = WorldLineGraph.empty().grow([ref]);
       const moved = graph.moveForward();
 
-      expect(moved.state.apexNodeId).toBe(graph.state.apexNodeId);
+      expect(moved.apexNodeId).toBe(graph.apexNodeId);
     });
 
     it('returns same graph when empty', () => {
       const graph = WorldLineGraph.empty();
       const moved = graph.moveForward();
       expect(moved).toBe(graph);
+    });
+  });
+
+  describe('getApexChildIds()', () => {
+    it('returns empty array for empty graph', () => {
+      const graph = WorldLineGraph.empty();
+      expect(graph.getApexChildIds()).toEqual([]);
+    });
+
+    it('returns empty array at leaf', () => {
+      const ref = createStateRef('counter', '1', 'hash1');
+      const graph = WorldLineGraph.empty().grow([ref]);
+      expect(graph.getApexChildIds()).toEqual([]);
+    });
+
+    it('returns child ids when children exist', () => {
+      const ref1 = createStateRef('counter', '1', 'hash1');
+      const ref2 = createStateRef('counter', '1', 'hash2');
+      const ref3 = createStateRef('counter', '1', 'hash3');
+
+      const afterTwo = WorldLineGraph.empty().grow([ref1]).grow([ref2]);
+      const movedBack = afterTwo.moveBack();
+      const branched = movedBack.grow([ref3]);
+      const atRoot = branched.moveTo(branched.rootNodeId!);
+
+      expect(atRoot.getApexChildIds()).toHaveLength(2);
     });
   });
 
@@ -150,7 +176,7 @@ describe('WorldLineGraph', () => {
         .grow([refA1, refB1])
         .grow([refA2]);
 
-      const refs = graph.getStateRefsAt(graph.state.apexNodeId!);
+      const refs = graph.getStateRefsAt(graph.apexNodeId!);
 
       const refMap = new Map(refs.map((r) => [stateRefKey(r), r]));
       expect(refMap.get('counter:a')?.hash).toBe('hash3');
@@ -162,7 +188,7 @@ describe('WorldLineGraph', () => {
       const ref = createStateRef('counter', '1', 'hash1');
       const graph = WorldLineGraph.empty().grow([ref]);
 
-      const refs = graph.getStateRefsAt(graph.state.rootNodeId!);
+      const refs = graph.getStateRefsAt(graph.rootNodeId!);
       expect(refs).toEqual([ref]);
     });
   });
@@ -192,7 +218,7 @@ describe('WorldLineGraph', () => {
       const branched = movedBack.grow([ref3]);
 
       const childrenMap = branched.getChildrenMap();
-      const rootId = branched.state.rootNodeId!;
+      const rootId = branched.rootNodeId!;
 
       expect(childrenMap[rootId]).toHaveLength(2);
     });
@@ -214,10 +240,10 @@ describe('WorldLineGraph', () => {
         .grow([ref2])
         .grow([ref3]);
 
-      const path = graph.getPathToNode(graph.state.apexNodeId!);
+      const path = graph.getPathToNode(graph.apexNodeId!);
       expect(path).toHaveLength(3);
-      expect(path[0].id).toBe(graph.state.rootNodeId);
-      expect(path[2].id).toBe(graph.state.apexNodeId);
+      expect(path[0].id).toBe(graph.rootNodeId);
+      expect(path[2].id).toBe(graph.apexNodeId);
     });
   });
 
@@ -231,9 +257,9 @@ describe('WorldLineGraph', () => {
       const json = graph.toJSON();
       const restored = WorldLineGraph.fromJSON(json);
 
-      expect(restored.state.nodes).toEqual(graph.state.nodes);
-      expect(restored.state.apexNodeId).toBe(graph.state.apexNodeId);
-      expect(restored.state.rootNodeId).toBe(graph.state.rootNodeId);
+      expect(restored.toJSON().nodes).toEqual(graph.toJSON().nodes);
+      expect(restored.apexNodeId).toBe(graph.apexNodeId);
+      expect(restored.rootNodeId).toBe(graph.rootNodeId);
     });
 
     it('roundtrips empty graph', () => {
@@ -241,7 +267,7 @@ describe('WorldLineGraph', () => {
       const json = graph.toJSON();
       const restored = WorldLineGraph.fromJSON(json);
 
-      expect(restored.state).toEqual(graph.state);
+      expect(restored.toJSON()).toEqual(graph.toJSON());
     });
   });
 });

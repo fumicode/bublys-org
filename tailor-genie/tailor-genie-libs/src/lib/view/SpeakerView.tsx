@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useRef, useEffect, CSSProperties } from "react";
+import { FC, useRef, useEffect, useMemo, CSSProperties } from "react";
 import { Conversation, Speaker, Turn, type Choice } from "@bublys-org/tailor-genie-model";
 import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
@@ -74,6 +74,39 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
   const pendingChoices = conversation.availableChoicesForGuest;
   const pendingQuestion = conversation.pendingQuestion;
 
+  // forkPreviewsから、未回答質問の選択肢に対応するforkを抽出
+  const { choiceToFork, visitedChoiceIds } = useMemo(() => {
+    const map = new Map<string, () => void>();
+    const ids = new Set<string>();
+    if (pendingQuestion && wlNav) {
+      for (const fork of wlNav.forkPreviews) {
+        const first = fork.preview[0];
+        if (first?.kind === "AnswerTurn" && first.questionTurnId === pendingQuestion.id) {
+          map.set(first.choiceId, fork.onSelect);
+          ids.add(first.choiceId);
+        }
+      }
+    }
+    return { choiceToFork: map, visitedChoiceIds: ids };
+  }, [pendingQuestion, wlNav]);
+
+  const nonAnswerForkPreviews = useMemo(() => {
+    if (!wlNav || !pendingQuestion) return wlNav?.forkPreviews ?? [];
+    return wlNav.forkPreviews.filter((fork) => {
+      const first = fork.preview[0];
+      return !(first?.kind === "AnswerTurn" && first.questionTurnId === pendingQuestion.id);
+    });
+  }, [wlNav, pendingQuestion]);
+
+  const handleChoiceClick = (choiceId: string) => {
+    const forkSelect = choiceToFork.get(choiceId);
+    if (forkSelect) {
+      forkSelect();
+    } else if (onAnswerQuestion) {
+      onAnswerQuestion(choiceId);
+    }
+  };
+
   const getChoiceText = (turn: Turn): string | undefined => {
     if (turn.kind !== "AnswerTurn") return undefined;
     return conversation.getChoiceText(turn.questionTurnId, turn.choiceId);
@@ -136,9 +169,13 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
                 onChoiceClick={
                   speaker.isGuest &&
                   pendingQuestion &&
-                  turn.id === pendingQuestion.id &&
-                  onAnswerQuestion
-                    ? onAnswerQuestion
+                  turn.id === pendingQuestion.id
+                    ? handleChoiceClick
+                    : undefined
+                }
+                visitedChoiceIds={
+                  pendingQuestion && turn.id === pendingQuestion.id
+                    ? visitedChoiceIds
                     : undefined
                 }
               />
@@ -156,16 +193,16 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
             </button>
             <button
               onClick={wlNav.onRedo}
-              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0}
-              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 ? disabledStyle : {}) }}
+              disabled={!wlNav.canRedo || wlNav.forkPreviews.length > 0 || !!pendingQuestion}
+              style={{ ...arrowButtonStyle, ...(!wlNav.canRedo || wlNav.forkPreviews.length > 0 || pendingQuestion ? disabledStyle : {}) }}
             >
               ↓
             </button>
           </div>
         )}
-        {wlNav && wlNav.forkPreviews.length > 0 && (
+        {nonAnswerForkPreviews.length > 0 && (
           <GhostTurnsView
-            forkPreviews={wlNav.forkPreviews}
+            forkPreviews={nonAnswerForkPreviews}
             getSpeakerName={(id) => getSpeaker(id)?.name || id}
             getSpeakerRole={(id) => getSpeaker(id)?.role}
             getAlign={(id) => (id === speaker.id ? "right" : "left")}

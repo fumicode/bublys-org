@@ -21,17 +21,34 @@ function generateWorldLineId(): string {
 
 export class WorldLineGraph {
   constructor(
-    readonly state: {
+    private readonly state: {
       readonly nodes: Record<string, WorldNode>;
       readonly apexNodeId: string | null;
       readonly rootNodeId: string | null;
     }
   ) {}
 
+  get apexNodeId(): string | null {
+    return this.state.apexNodeId;
+  }
+
+  get rootNodeId(): string | null {
+    return this.state.rootNodeId;
+  }
+
+  getNode(nodeId: string): WorldNode | null {
+    return this.state.nodes[nodeId] ?? null;
+  }
+
   getApex(): WorldNode | null {
     return this.state.apexNodeId
       ? this.state.nodes[this.state.apexNodeId]
       : null;
+  }
+
+  getApexChildIds(): string[] {
+    if (!this.state.apexNodeId) return [];
+    return this.getChildrenMap()[this.state.apexNodeId] ?? [];
   }
 
   get canUndo(): boolean {
@@ -40,10 +57,7 @@ export class WorldLineGraph {
   }
 
   get canRedo(): boolean {
-    const apex = this.getApex();
-    if (!apex) return false;
-    const childrenMap = this.getChildrenMap();
-    return (childrenMap[apex.id]?.length ?? 0) > 0;
+    return this.getApexChildIds().length > 0;
   }
 
   getForkChoices(nodeId?: string): ForkChoice[] {
