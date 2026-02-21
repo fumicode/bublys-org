@@ -225,8 +225,10 @@ feature (domain + ui + Reduxに依存)
    - `*.test.ts`または`*.spec.ts`を実装ファイルの隣に配置
    - 例: `memo-slice.ts`の隣に`memo-slice.test.ts`
 
-## 残課題（world-line-graphブランチ）
+## 残課題
 
 1. **conversation-metaのinstanceof問題**: plain objectなので`instanceof`解決が使えず、`scope.addObject("conversation-meta", ...)` と型文字列指定が残っている。専用クラスを作るか別の解決策が必要。
 
 2. **bubbleRouteのdomain-registry統合**: bubbleRouteの登録はまだ`BubbleRouteRegistry.registerRoutes()`で個別に行っている。domain-registryに統合して「BublyApp定義1箇所で全部」（A案方向）にするのが次のステップ。
+
+3. **SpeakerのHostSpeaker/GuestSpeaker分離**: HostにはLLM連携や管理者編集機能、Guestには好みや回答履歴など、将来的にデータ・振る舞いが分かれる予定。構造的な差が出たタイミングでTurnと同じkind+union型パターンで分離する。

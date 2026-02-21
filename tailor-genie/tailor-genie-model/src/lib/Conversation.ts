@@ -1,41 +1,31 @@
 import { Speaker } from "./Speaker.js";
+import { Turn } from "./Turn.js";
+import { Choice } from "./Choice.js";
+import { MessageTurn, MessageTurnState } from "./MessageTurn.js";
+import { QuestionTurn, QuestionTurnState } from "./QuestionTurn.js";
+import { AnswerTurn, AnswerTurnState } from "./AnswerTurn.js";
 
 /**
- * ターン（会話の1発言）
- * Conversation集約のメンバー
+ * ターン状態（Union型）
  */
-export type TurnState = {
-  readonly id: string;
-  readonly speakerId: string;
-  readonly message: string;
-};
+export type TurnState = MessageTurnState | QuestionTurnState | AnswerTurnState;
 
-export class Turn {
-  constructor(readonly state: TurnState) {}
-
-  get id(): string {
-    return this.state.id;
-  }
-
-  get speakerId(): string {
-    return this.state.speakerId;
-  }
-
-  get message(): string {
-    return this.state.message;
-  }
-
-  updateMessage(message: string): Turn {
-    return new Turn({ ...this.state, message });
-  }
-
-  toJSON(): TurnState {
-    return this.state;
+/**
+ * TurnStateから適切なTurnクラスを生成するファクトリ関数
+ */
+export function createTurn(state: TurnState): Turn {
+  switch (state.kind) {
+    case "MessageTurn":
+      return new MessageTurn(state);
+    case "QuestionTurn":
+      return new QuestionTurn(state);
+    case "AnswerTurn":
+      return new AnswerTurn(state);
   }
 }
 
 /**
- * 会話（集約ルート）
+ * 会話の状態
  */
 export type ConversationState = {
   readonly id: string;
@@ -44,14 +34,8 @@ export type ConversationState = {
 };
 
 /**
- * シリアライズ可能な会話状態（Redux/WorldLineGraph 永続化用）
+ * 会話（集約ルート）
  */
-export type SerializedConversationState = {
-  readonly id: string;
-  readonly participantIds: string[];
-  readonly turns: TurnState[];
-};
-
 export class Conversation {
   constructor(readonly state: ConversationState) {}
 
@@ -65,6 +49,41 @@ export class Conversation {
 
   get turns(): Turn[] {
     return this.state.turns;
+  }
+
+  /**
+   * 未回答の質問を取得
+   * 最後の質問ターンで、まだ回答がないものを返す
+   */
+  get pendingQuestion(): QuestionTurn | undefined {
+    // 後ろから質問を探す
+    for (let i = this.state.turns.length - 1; i >= 0; i--) {
+      const turn = this.state.turns[i];
+      if (turn.kind === "QuestionTurn") {
+        // この質問に対する回答があるかチェック
+        const hasAnswer = this.state.turns.some(
+          (t) => t.kind === "AnswerTurn" && t.questionTurnId === turn.id
+        );
+        if (!hasAnswer) {
+          return turn;
+        }
+        // 回答済みの質問が見つかったら、それより前は探さない
+        return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * ゲストが発言可能な選択肢を取得
+   * 未回答の質問がある場合はその選択肢、なければundefined（自由発言可能）
+   */
+  get availableChoicesForGuest(): Choice[] | undefined {
+    const pending = this.pendingQuestion;
+    if (!pending) {
+      return undefined; // 自由発言可能
+    }
+    return pending.choices;
   }
 
   addParticipant(speakerId: string): Conversation {
@@ -88,10 +107,20 @@ export class Conversation {
     return this.state.participantIds.includes(speakerId);
   }
 
+  /**
+   * 通常のメッセージを発言
+   * ゲストは未回答の質問がある場合は発言できない
+   */
   speak(speaker: Speaker, message: string): Conversation {
-    const turn = new Turn({
+    // ゲストで未回答の質問がある場合はエラー
+    if (speaker.isGuest && this.pendingQuestion) {
+      throw new Error("質問に回答してください");
+    }
+
+    const turn = new MessageTurn({
       id: crypto.randomUUID(),
       speakerId: speaker.id,
+      kind: "MessageTurn",
       message,
     });
     return new Conversation({
@@ -100,28 +129,87 @@ export class Conversation {
     });
   }
 
-  updateTurn(turnId: string, message: string): Conversation {
+  /**
+   * ホストが質問を投げる
+   * ホストのみ使用可能
+   */
+  askQuestion(host: Speaker, question: string, choices: Choice[]): Conversation {
+    if (!host.isHost) {
+      throw new Error("ホストのみ質問できます");
+    }
+
+    if (choices.length < 2) {
+      throw new Error("選択肢は2つ以上必要です");
+    }
+
+    // 未回答の質問がある場合はエラー
+    if (this.pendingQuestion) {
+      throw new Error("前の質問に回答されるまで新しい質問はできません");
+    }
+
+    const turn = new QuestionTurn({
+      id: crypto.randomUUID(),
+      speakerId: host.id,
+      kind: "QuestionTurn",
+      question,
+      choices,
+    });
     return new Conversation({
       ...this.state,
-      turns: this.state.turns.map((t) =>
-        t.id === turnId ? t.updateMessage(message) : t
-      ),
+      turns: [...this.state.turns, turn],
     });
   }
 
-  toJSON(): SerializedConversationState {
-    return {
-      id: this.id,
-      participantIds: this.participantIds,
-      turns: this.turns.map((t) => t.toJSON()),
-    };
-  }
+  /**
+   * ゲストが質問に回答
+   * ゲストのみ使用可能
+   */
+  answerQuestion(guest: Speaker, choiceId: string): Conversation {
+    if (!guest.isGuest) {
+      throw new Error("ゲストのみ回答できます");
+    }
 
-  static fromJSON(json: SerializedConversationState): Conversation {
+    const pending = this.pendingQuestion;
+    if (!pending) {
+      throw new Error("回答する質問がありません");
+    }
+
+    // 選択肢が有効かチェック
+    if (!pending.hasChoice(choiceId)) {
+      throw new Error("無効な選択肢です");
+    }
+
+    const turn = new AnswerTurn({
+      id: crypto.randomUUID(),
+      speakerId: guest.id,
+      kind: "AnswerTurn",
+      questionTurnId: pending.id,
+      choiceId,
+    });
     return new Conversation({
-      id: json.id,
-      participantIds: json.participantIds,
-      turns: json.turns.map((t) => new Turn(t)),
+      ...this.state,
+      turns: [...this.state.turns, turn],
     });
+  }
+
+  /**
+   * 質問に対する回答を取得
+   */
+  getAnswerForQuestion(questionTurnId: string): AnswerTurn | undefined {
+    return this.state.turns.find(
+      (t): t is AnswerTurn =>
+        t.kind === "AnswerTurn" && t.questionTurnId === questionTurnId
+    );
+  }
+
+  /**
+   * 選択肢のテキストを取得
+   */
+  getChoiceText(questionTurnId: string, choiceId: string): string | undefined {
+    const turn = this.state.turns.find((t) => t.id === questionTurnId);
+    if (turn?.kind !== "QuestionTurn") {
+      return undefined;
+    }
+    return turn.getChoice(choiceId)?.text;
   }
 }

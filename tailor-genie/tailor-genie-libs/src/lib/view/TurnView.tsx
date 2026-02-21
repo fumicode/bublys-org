@@ -48,7 +48,9 @@ export const TurnView: FC<TurnViewProps> = ({
           wordBreak: "break-word",
         }}
       >
-        {turn.message}
+        {turn.kind === "MessageTurn" && turn.message}
+        {turn.kind === "QuestionTurn" && turn.question}
+        {turn.kind === "AnswerTurn" && `→ ${turn.choiceId}`}
       </div>
     </div>
   );
