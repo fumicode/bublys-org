@@ -10,6 +10,7 @@ export type GhostTurnsViewProps = {
   getSpeakerName: (speakerId: string) => string;
   getSpeakerRole: (speakerId: string) => SpeakerRole | undefined;
   getAlign: (speakerId: string) => "left" | "right";
+  getChoiceText?: (turn: Turn) => string | undefined;
 };
 
 export const GhostTurnsView: FC<GhostTurnsViewProps> = ({
@@ -17,6 +18,7 @@ export const GhostTurnsView: FC<GhostTurnsViewProps> = ({
   getSpeakerName,
   getSpeakerRole,
   getAlign,
+  getChoiceText,
 }) => {
   return (
     <div style={{ position: "relative" }}>
@@ -27,6 +29,7 @@ export const GhostTurnsView: FC<GhostTurnsViewProps> = ({
           getSpeakerName={getSpeakerName}
           getSpeakerRole={getSpeakerRole}
           getAlign={getAlign}
+          getChoiceText={getChoiceText}
         />
       ))}
     </div>
@@ -38,7 +41,8 @@ const GhostBranch: FC<{
   getSpeakerName: (speakerId: string) => string;
   getSpeakerRole: (speakerId: string) => SpeakerRole | undefined;
   getAlign: (speakerId: string) => "left" | "right";
-}> = ({ fork, getSpeakerName, getSpeakerRole, getAlign }) => {
+  getChoiceText?: (turn: Turn) => string | undefined;
+}> = ({ fork, getSpeakerName, getSpeakerRole, getAlign, getChoiceText }) => {
   const [hovered, setHovered] = useState(false);
   const opacity = hovered ? 1 : 0.4;
 
@@ -63,6 +67,7 @@ const GhostBranch: FC<{
           speakerName={getSpeakerName(turn.speakerId)}
           speakerRole={getSpeakerRole(turn.speakerId)}
           align={getAlign(turn.speakerId)}
+          choiceText={getChoiceText?.(turn)}
         />
       ))}
     </div>

@@ -20,4 +20,4 @@ export type { Choice } from "./lib/Choice.js";
 
 // Conversation
 export { Conversation, createTurn } from "./lib/Conversation.js";
-export type { ConversationState, TurnState } from "./lib/Conversation.js";
+export type { ConversationState, SerializedConversationState, TurnState } from "./lib/Conversation.js";

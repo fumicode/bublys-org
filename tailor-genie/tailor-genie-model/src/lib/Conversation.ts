@@ -25,6 +25,15 @@ export function createTurn(state: TurnState): Turn {
 }
 
 /**
+ * シリアライズ済みの会話状態（JSONセーフ）
+ */
+export type SerializedConversationState = {
+  readonly id: string;
+  readonly participantIds: string[];
+  readonly turns: TurnState[];
+};
+
+/**
  * 会話の状態
  */
 export type ConversationState = {
@@ -211,5 +220,21 @@ export class Conversation {
       return undefined;
     }
     return turn.getChoice(choiceId)?.text;
+  }
+
+  toJSON(): SerializedConversationState {
+    return {
+      id: this.state.id,
+      participantIds: this.state.participantIds,
+      turns: this.state.turns.map((t) => t.state as TurnState),
+    };
+  }
+
+  static fromJSON(json: SerializedConversationState): Conversation {
+    return new Conversation({
+      id: json.id,
+      participantIds: json.participantIds,
+      turns: json.turns.map(createTurn),
+    });
   }
 }

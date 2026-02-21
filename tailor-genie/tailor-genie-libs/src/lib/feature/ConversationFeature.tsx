@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useState, useContext, useEffect, useMemo } from "react";
-import { Conversation, type Turn } from "@bublys-org/tailor-genie-model";
+import { Conversation, type Turn, type Choice } from "@bublys-org/tailor-genie-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { useCasScope, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
 import { ConversationView } from "../view/ConversationView.js";
@@ -59,6 +59,16 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
   const handleSpeak = (message: string) => {
     if (!conversationShell || !currentSpeaker) return;
     conversationShell.update((c) => c.speak(currentSpeaker, message));
+  };
+
+  const handleAskQuestion = (question: string, choices: Choice[]) => {
+    if (!conversationShell || !currentSpeaker) return;
+    conversationShell.update((c) => c.askQuestion(currentSpeaker, question, choices));
+  };
+
+  const handleAnswerQuestion = (choiceId: string) => {
+    if (!conversationShell || !currentSpeaker) return;
+    conversationShell.update((c) => c.answerQuestion(currentSpeaker, choiceId));
   };
 
   const handleSelectSpeaker = (speakerId: string) => {
@@ -122,6 +132,8 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
       currentSpeakerId={currentSpeakerId}
       onSelectSpeaker={handleSelectSpeaker}
       onSpeak={handleSpeak}
+      onAskQuestion={handleAskQuestion}
+      onAnswerQuestion={handleAnswerQuestion}
       onOpenSpeakerView={handleOpenSpeakerView}
       onAddParticipant={handleAddParticipant}
       wlNav={wlNav}

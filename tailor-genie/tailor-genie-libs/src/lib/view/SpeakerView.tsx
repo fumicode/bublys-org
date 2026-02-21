@@ -1,10 +1,11 @@
 "use client";
 
-import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect, CSSProperties } from "react";
-import { Conversation, Speaker, Turn } from "@bublys-org/tailor-genie-model";
+import { FC, useRef, useEffect, CSSProperties } from "react";
+import { Conversation, Speaker, Turn, type Choice } from "@bublys-org/tailor-genie-model";
 import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
 import { GhostTurnsView } from "./GhostTurnsView.js";
+import { ConversationInput } from "./ConversationInput.js";
 
 const arrowButtonStyle: CSSProperties = {
   width: 32,
@@ -31,6 +32,8 @@ export type SpeakerViewProps = {
   speaker: Speaker;
   allSpeakers: Speaker[];
   onSpeak?: (message: string) => void;
+  onAskQuestion?: (question: string, choices: Choice[]) => void;
+  onAnswerQuestion?: (choiceId: string) => void;
   wlNav?: WlNavProps<Turn[]>;
 };
 
@@ -39,9 +42,10 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
   speaker,
   allSpeakers,
   onSpeak,
+  onAskQuestion,
+  onAnswerQuestion,
   wlNav,
 }) => {
-  const [message, setMessage] = useState("");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
 
@@ -67,12 +71,12 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
     return allSpeakers.find((sp) => sp.id === speakerId);
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && onSpeak) {
-      onSpeak(message.trim());
-      setMessage("");
-    }
+  const pendingChoices = conversation.availableChoicesForGuest;
+  const pendingQuestion = conversation.pendingQuestion;
+
+  const getChoiceText = (turn: Turn): string | undefined => {
+    if (turn.kind !== "AnswerTurn") return undefined;
+    return conversation.getChoiceText(turn.questionTurnId, turn.choiceId);
   };
 
   const isParticipant = conversation.hasParticipant(speaker.id);
@@ -111,7 +115,7 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}
       >
         {conversation.turns.length === 0 ? (
           <div style={{ padding: 16, color: "#999", textAlign: "center" }}>
@@ -128,6 +132,15 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
                 speakerName={turnSpeaker?.name || turn.speakerId}
                 speakerRole={turnSpeaker?.role}
                 align={isSelf ? "right" : "left"}
+                choiceText={getChoiceText(turn)}
+                onChoiceClick={
+                  speaker.isGuest &&
+                  pendingQuestion &&
+                  turn.id === pendingQuestion.id &&
+                  onAnswerQuestion
+                    ? onAnswerQuestion
+                    : undefined
+                }
               />
             );
           })
@@ -156,6 +169,7 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
             getSpeakerName={(id) => getSpeaker(id)?.name || id}
             getSpeakerRole={(id) => getSpeaker(id)?.role}
             getAlign={(id) => (id === speaker.id ? "right" : "left")}
+            getChoiceText={getChoiceText}
           />
         )}
       </div>
@@ -173,47 +187,15 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
         >
           この会話に参加していません
         </div>
-      ) : onSpeak ? (
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            display: "flex",
-            gap: 8,
-            padding: 12,
-            borderTop: "1px solid #ddd",
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="text"
-            value={message}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setMessage(e.target.value)
-            }
-            placeholder={`${speaker.name}として発言...`}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              fontSize: 14,
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!message.trim()}
-            style={{
-              padding: "8px 16px",
-              background: message.trim() ? "#007bff" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: 4,
-              cursor: message.trim() ? "pointer" : "default",
-            }}
-          >
-            送信
-          </button>
-        </form>
+      ) : (onSpeak || onAskQuestion || onAnswerQuestion) ? (
+        <ConversationInput
+          speakerName={speaker.name}
+          speakerRole={speaker.role}
+          pendingChoices={pendingChoices}
+          onSpeak={onSpeak}
+          onAskQuestion={onAskQuestion}
+          onAnswerQuestion={onAnswerQuestion}
+        />
       ) : null}
     </div>
   );

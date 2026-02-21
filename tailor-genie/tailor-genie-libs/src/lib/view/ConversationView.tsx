@@ -1,12 +1,13 @@
 "use client";
 
-import { FC, useState, FormEvent, ChangeEvent, useRef, useEffect, CSSProperties } from "react";
-import { Conversation, Speaker, Turn } from "@bublys-org/tailor-genie-model";
+import { FC, useState, useRef, useEffect, CSSProperties } from "react";
+import { Conversation, Speaker, Turn, type Choice } from "@bublys-org/tailor-genie-model";
 import React from "react";
 import { getDragType } from "@bublys-org/bubbles-ui";
 import { type WlNavProps } from "@bublys-org/world-line-graph";
 import { TurnView } from "./TurnView.js";
 import { GhostTurnsView } from "./GhostTurnsView.js";
+import { ConversationInput } from "./ConversationInput.js";
 
 const arrowButtonStyle: CSSProperties = {
   width: 32,
@@ -34,6 +35,8 @@ export type ConversationViewProps = {
   currentSpeakerId: string;
   onSelectSpeaker?: (speakerId: string) => void;
   onSpeak?: (message: string) => void;
+  onAskQuestion?: (question: string, choices: Choice[]) => void;
+  onAnswerQuestion?: (choiceId: string) => void;
   onOpenSpeakerView?: (speakerId: string) => void;
   onAddParticipant?: (speakerId: string) => void;
   wlNav?: WlNavProps<Turn[]>;
@@ -45,11 +48,12 @@ export const ConversationView: FC<ConversationViewProps> = ({
   currentSpeakerId,
   onSelectSpeaker,
   onSpeak,
+  onAskQuestion,
+  onAnswerQuestion,
   onOpenSpeakerView,
   onAddParticipant,
   wlNav,
 }) => {
-  const [message, setMessage] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
@@ -77,13 +81,13 @@ export const ConversationView: FC<ConversationViewProps> = ({
   };
 
   const currentSpeaker = participants.find((s) => s.id === currentSpeakerId);
+  const pendingChoices = conversation.availableChoicesForGuest;
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (message.trim() && onSpeak) {
-      onSpeak(message.trim());
-      setMessage("");
-    }
+  const pendingQuestion = conversation.pendingQuestion;
+
+  const getChoiceText = (turn: Turn): string | undefined => {
+    if (turn.kind !== "AnswerTurn") return undefined;
+    return conversation.getChoiceText(turn.questionTurnId, turn.choiceId);
   };
 
   const speakerDragType = getDragType("Speaker");
@@ -167,7 +171,7 @@ export const ConversationView: FC<ConversationViewProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}
+        style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}
       >
         {participants.length === 0 ? (
           <div style={{ padding: 16, color: "#999", textAlign: "center" }}>
@@ -189,6 +193,15 @@ export const ConversationView: FC<ConversationViewProps> = ({
                 speakerName={speaker?.name || turn.speakerId}
                 speakerRole={speaker?.role}
                 align={align}
+                choiceText={getChoiceText(turn)}
+                onChoiceClick={
+                  currentSpeaker?.role === "guest" &&
+                  pendingQuestion &&
+                  turn.id === pendingQuestion.id &&
+                  onAnswerQuestion
+                    ? onAnswerQuestion
+                    : undefined
+                }
               />
             );
           })
@@ -220,71 +233,42 @@ export const ConversationView: FC<ConversationViewProps> = ({
               const idx = participants.findIndex((s) => s.id === id);
               return idx === 0 ? "left" : "right";
             }}
+            getChoiceText={getChoiceText}
           />
         )}
       </div>
 
-      {participants.length > 0 && onSpeak && (
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            display: "flex",
-            gap: 8,
-            padding: 12,
-            borderTop: "1px solid #ddd",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ display: "flex", gap: 4 }}>
-            {participants.map((speaker) => (
+      {participants.length > 0 && (
+        <div style={{ borderTop: "1px solid #ddd" }}>
+          <div style={{ display: "flex", gap: 4, padding: "8px 12px 0" }}>
+            {participants.map((s) => (
               <button
-                key={speaker.id}
+                key={s.id}
                 type="button"
-                onClick={() => onSelectSpeaker?.(speaker.id)}
+                onClick={() => onSelectSpeaker?.(s.id)}
                 style={{
                   padding: "6px 12px",
-                  background: speaker.id === currentSpeakerId ? "#007bff" : "#e9ecef",
-                  color: speaker.id === currentSpeakerId ? "white" : "#333",
+                  background: s.id === currentSpeakerId ? "#007bff" : "#e9ecef",
+                  color: s.id === currentSpeakerId ? "white" : "#333",
                   border: "none",
                   borderRadius: 4,
                   cursor: "pointer",
                   fontSize: 12,
                 }}
               >
-                {speaker.name}
+                {s.name}
               </button>
             ))}
           </div>
-          <input
-            type="text"
-            value={message}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setMessage(e.target.value)
-            }
-            placeholder={`${currentSpeaker?.name || "スピーカー"}として発言...`}
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              fontSize: 14,
-            }}
+          <ConversationInput
+            speakerName={currentSpeaker?.name || "スピーカー"}
+            speakerRole={currentSpeaker?.role || "guest"}
+            pendingChoices={pendingChoices}
+            onSpeak={onSpeak}
+            onAskQuestion={onAskQuestion}
+            onAnswerQuestion={onAnswerQuestion}
           />
-          <button
-            type="submit"
-            disabled={!message.trim()}
-            style={{
-              padding: "8px 16px",
-              background: message.trim() ? "#007bff" : "#ccc",
-              color: "white",
-              border: "none",
-              borderRadius: 4,
-              cursor: message.trim() ? "pointer" : "default",
-            }}
-          >
-            送信
-          </button>
-        </form>
+        </div>
       )}
     </div>
   );

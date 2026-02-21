@@ -30,6 +30,22 @@
           "skipTypeCheck": true,
           "stripLeadingPaths": true
         }
+      },
+      "dev": {
+        "executor": "@nx/js:swc",
+        "cache": false,
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "tailor-genie/tailor-genie-model/dist",
+          "main": "tailor-genie/tailor-genie-model/src/index.ts",
+          "tsConfig": "tailor-genie/tailor-genie-model/tsconfig.lib.json",
+          "skipTypeCheck": true,
+          "stripLeadingPaths": true,
+          "watch": true
+        },
+        "continuous": true
       }
     }
   },

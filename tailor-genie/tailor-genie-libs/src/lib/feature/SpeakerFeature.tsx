@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useMemo } from "react";
-import { Conversation, type Turn } from "@bublys-org/tailor-genie-model";
+import { Conversation, type Turn, type Choice } from "@bublys-org/tailor-genie-model";
 import { useCasScope, type WlNavProps, type ForkPreview } from "@bublys-org/world-line-graph";
 import { SpeakerView } from "../view/SpeakerView.js";
 import { useTailorGenie, conversationScopeId } from "./TailorGenieProvider.js";
@@ -62,6 +62,16 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
     conversationShell.update((c) => c.speak(speaker, message));
   };
 
+  const handleAskQuestion = (question: string, choices: Choice[]) => {
+    if (!conversationShell || !speaker) return;
+    conversationShell.update((c) => c.askQuestion(speaker, question, choices));
+  };
+
+  const handleAnswerQuestion = (choiceId: string) => {
+    if (!conversationShell || !speaker) return;
+    conversationShell.update((c) => c.answerQuestion(speaker, choiceId));
+  };
+
   if (!speaker) {
     return (
       <div style={{ padding: 16, color: "#666" }}>
@@ -86,6 +96,8 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
       speaker={speaker}
       allSpeakers={participants}
       onSpeak={isParticipant ? handleSpeak : undefined}
+      onAskQuestion={isParticipant && speaker.isHost ? handleAskQuestion : undefined}
+      onAnswerQuestion={isParticipant && speaker.isGuest ? handleAnswerQuestion : undefined}
       wlNav={wlNav}
     />
   );
