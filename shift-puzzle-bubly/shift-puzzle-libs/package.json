@@ -23,7 +23,8 @@
     "tslib": "^2.3.0",
     "@bublys-org/shift-puzzle-model": "*",
     "@bublys-org/bubbles-ui": "*",
-    "@bublys-org/state-management": "*"
+    "@bublys-org/state-management": "*",
+    "@mui/icons-material": "*"
   },
   "nx": {
     "targets": {

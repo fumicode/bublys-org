@@ -1,6 +1,7 @@
 'use client';
-import { FC, useEffect, useCallback, useMemo } from 'react';
-import { Box, List, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
+import { FC, useEffect, useCallback, useMemo, useState } from 'react';
+import { Box, List, ListItemButton, ListItemIcon, Tooltip, Typography, IconButton } from '@mui/material';
+import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
   useAppSelector,
   useAppDispatch,
@@ -195,12 +196,10 @@ export const BublyApp: FC<BublyAppProps> = ({
       <Box
         sx={{
           width: 56,
-          width: 56,
           backgroundColor: 'rgba(30, 30, 40, 0.95)',
           borderRight: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
           flexDirection: 'column',
-          flexShrink: 0,
           flexShrink: 0,
         }}
       >
@@ -208,37 +207,12 @@ export const BublyApp: FC<BublyAppProps> = ({
           <Box sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold', fontSize: '0.7rem' }}>
               {title.slice(0, 2)}
-        <Tooltip title={title} placement="right" arrow>
-          <Box sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
-            <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold', fontSize: '0.7rem' }}>
-              {title.slice(0, 2)}
             </Typography>
-          </Box>
-        </Tooltip>
           </Box>
         </Tooltip>
 
         <List sx={{ flex: 1, py: 0.5 }}>
-        <List sx={{ flex: 1, py: 0.5 }}>
           {menuItems.map((item) => (
-            <Tooltip key={item.label} title={item.label} placement="right" arrow>
-              <ListItemButton
-                onClick={() => handleMenuItemClick(item)}
-                sx={{
-                  color: 'rgba(255,255,255,0.8)',
-                  justifyContent: 'center',
-                  px: 0,
-                  minHeight: 48,
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.1)',
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ color: 'rgba(255,255,255,0.6)', minWidth: 0, justifyContent: 'center' }}>
-                  {item.icon}
-                </ListItemIcon>
-              </ListItemButton>
-            </Tooltip>
             <Tooltip key={item.label} title={item.label} placement="right" arrow>
               <ListItemButton
                 onClick={() => handleMenuItemClick(item)}
