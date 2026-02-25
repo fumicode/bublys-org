@@ -6,6 +6,9 @@ import {
   useAppDispatch,
   selectWindowSize,
   setWindowSize,
+  selectPocketItems,
+  addPocketItem,
+  removePocketItem,
 } from '@bublys-org/state-management';
 import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
@@ -29,6 +32,8 @@ import {
   OpeningPosition,
 } from '../state/index.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
+import { PocketView } from '../pocket/PocketView.js';
+import { DragDataType } from '../utils/drag-types.js';
 import { BublyMenuItem } from './BublyTypes.js';
 
 /**
@@ -41,6 +46,8 @@ export type BublyAppProps = {
   subtitle?: string;
   /** サイドバーのメニュー項目 */
   menuItems: BublyMenuItem[];
+  /** サイドバーのフッター（オプション） */
+  sidebarFooter?: React.ReactNode;
 };
 
 /**
@@ -51,6 +58,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   title,
   subtitle,
   menuItems,
+  sidebarFooter,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -152,6 +160,29 @@ export const BublyApp: FC<BublyAppProps> = ({
     openBubble: popChildOrJoinSibling,
   }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
 
+  // Pocket
+  const [isPocketOpen, setIsPocketOpen] = useState(false);
+  const pocketItems = useAppSelector(selectPocketItems);
+
+  const handlePocketDrop = useCallback((url: string, type: DragDataType, label?: string, objectId?: string) => {
+    dispatch(addPocketItem({
+      id: crypto.randomUUID(),
+      url,
+      type,
+      objectId,
+      label,
+      addedAt: Date.now(),
+    }));
+  }, [dispatch]);
+
+  const handlePocketItemClick = useCallback((url: string) => {
+    popChildOrJoinSibling(url, 'root');
+  }, [popChildOrJoinSibling]);
+
+  const handlePocketRemove = useCallback((id: string) => {
+    dispatch(removePocketItem(id));
+  }, [dispatch]);
+
   const handleMenuItemClick = (item: BublyMenuItem) => {
     const url = typeof item.url === 'function' ? item.url() : item.url;
     popChildOrJoinSibling(url, 'root');
@@ -160,13 +191,16 @@ export const BublyApp: FC<BublyAppProps> = ({
   return (
     <Box sx={{ display: 'flex', width: '100%', height: '100vh' }}>
       {/* サイドバー（アイコンのみ、ホバーでラベル表示） */}
+      {/* サイドバー（アイコンのみ、ホバーでラベル表示） */}
       <Box
         sx={{
+          width: 56,
           width: 56,
           backgroundColor: 'rgba(30, 30, 40, 0.95)',
           borderRight: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
           flexDirection: 'column',
+          flexShrink: 0,
           flexShrink: 0,
         }}
       >
@@ -174,10 +208,17 @@ export const BublyApp: FC<BublyAppProps> = ({
           <Box sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold', fontSize: '0.7rem' }}>
               {title.slice(0, 2)}
+        <Tooltip title={title} placement="right" arrow>
+          <Box sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+            <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold', fontSize: '0.7rem' }}>
+              {title.slice(0, 2)}
             </Typography>
           </Box>
         </Tooltip>
+          </Box>
+        </Tooltip>
 
+        <List sx={{ flex: 1, py: 0.5 }}>
         <List sx={{ flex: 1, py: 0.5 }}>
           {menuItems.map((item) => (
             <Tooltip key={item.label} title={item.label} placement="right" arrow>
@@ -198,8 +239,33 @@ export const BublyApp: FC<BublyAppProps> = ({
                 </ListItemIcon>
               </ListItemButton>
             </Tooltip>
+            <Tooltip key={item.label} title={item.label} placement="right" arrow>
+              <ListItemButton
+                onClick={() => handleMenuItemClick(item)}
+                sx={{
+                  color: 'rgba(255,255,255,0.8)',
+                  justifyContent: 'center',
+                  px: 0,
+                  minHeight: 48,
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ color: 'rgba(255,255,255,0.6)', minWidth: 0, justifyContent: 'center' }}>
+                  {item.icon}
+                </ListItemIcon>
+              </ListItemButton>
+            </Tooltip>
           ))}
         </List>
+
+        {/* フッター */}
+        {sidebarFooter && (
+          <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            {sidebarFooter}
+          </Box>
+        )}
       </Box>
 
       {/* メインエリア（バブル表示） */}
@@ -219,6 +285,40 @@ export const BublyApp: FC<BublyAppProps> = ({
           </BubbleRefsProvider>
         </BubblesContext.Provider>
       </Box>
+
+      {/* Pocket */}
+      {isPocketOpen ? (
+        <Box sx={{ position: 'fixed', bottom: 20, right: 80, zIndex: 1000 }}>
+          <PocketView
+            items={pocketItems}
+            onRemove={handlePocketRemove}
+            onDrop={handlePocketDrop}
+            onItemClick={handlePocketItemClick}
+            onClose={() => setIsPocketOpen(false)}
+          />
+        </Box>
+      ) : (
+        <IconButton
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            right: 80,
+            zIndex: 1000,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            },
+          }}
+          onClick={() => setIsPocketOpen(true)}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            setIsPocketOpen(true);
+          }}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          <Inventory2Icon />
+        </IconButton>
+      )}
     </Box>
   );
 };

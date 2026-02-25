@@ -2,6 +2,7 @@ import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
 import {
   Bubble,
   BubbleJson,
+  createBubble,
 } from "../Bubble.domain.js";
 import {
   BubblesProcess,
@@ -56,12 +57,7 @@ export const setInitialBubbleUrls = (urls: string[]) => {
 // 初期状態を構築する関数（遅延評価）
 const getInitialState = (): BubbleStateSlice => {
   const bubbleInstances = configuredInitialBubbleUrls.map((url, index) => {
-    return new Bubble({
-      url,
-      colorHue: 200 - index * 20,
-      type: url.split('/')[0],
-      position: { x: index * 400, y: 0 },
-    });
+    return createBubble(url, { x: index * 400, y: 0 });
   });
 
   const entities: Record<string, BubbleJson> = {};

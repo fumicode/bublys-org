@@ -33,7 +33,21 @@ npx nx g @nx/react:lib <name>     # 新しいReactライブラリを生成
 npx nx g @nx/js:lib <name>        # 新しいTypeScriptライブラリを生成
 ```
 
-**重要:** 新しいライブラリやアプリを作成する際は、必ずNxのジェネレーターコマンドを使用すること。手動でディレクトリやpackage.jsonを作成しない。Nxが適切な設定ファイル（tsconfig、project.json等）を自動生成し、ワークスペースとの整合性を保証する。
+**Nx規約:**
+- 新しいライブラリやアプリの作成には必ず上記のNxジェネレーターコマンドを使用すること。手動でディレクトリやpackage.jsonを作成しない
+- Nxターゲット設定は `project.json` を使わず、`package.json` の `"nx"` キーにまとめる
+- アプリの `dev` ターゲットには必ず `"dependsOn": ["^dev"]` と `"continuous": true` を設定し、依存ライブラリが自動でビルドされるようにする
+- 例:
+  ```json
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": ["^dev"],
+        "continuous": true
+      }
+    }
+  }
+  ```
 
 ## 設計哲学
 
@@ -210,3 +224,9 @@ feature (domain + ui + Reduxに依存)
 3. **テストファイルはソースと同じ場所に配置:**
    - `*.test.ts`または`*.spec.ts`を実装ファイルの隣に配置
    - 例: `memo-slice.ts`の隣に`memo-slice.test.ts`
+
+## 残課題（world-line-graphブランチ）
+
+1. **conversation-metaのinstanceof問題**: plain objectなので`instanceof`解決が使えず、`scope.addObject("conversation-meta", ...)` と型文字列指定が残っている。専用クラスを作るか別の解決策が必要。
+
+2. **bubbleRouteのdomain-registry統合**: bubbleRouteの登録はまだ`BubbleRouteRegistry.registerRoutes()`で個別に行っている。domain-registryに統合して「BublyApp定義1箇所で全部」（A案方向）にするのが次のステップ。

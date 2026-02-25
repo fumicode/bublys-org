@@ -102,6 +102,9 @@ export const makeStore = (options?: { persistKey?: string }) => {
 
   const persistor = persistStore(store);
 
+  // React外のコード（labelResolver等）からstoreにアクセスできるよう参照を保持
+  currentStore = store;
+
   return {
     store,
     persistor
@@ -112,3 +115,7 @@ export const makeStore = (options?: { persistKey?: string }) => {
 // ストア、ディスパッチ型
 export type AppStore = ReturnType<typeof makeStore>["store"];
 export type AppDispatch = AppStore['dispatch'];
+
+// ストア参照（React外のコードからアクセス用）
+let currentStore: AppStore | null = null;
+export const getCurrentStore = (): AppStore | null => currentStore;
