@@ -29,6 +29,11 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
         .filter((s) => conversation.hasParticipant(s.id))
     : [];
 
+  const conversationStateRefHash = useMemo(() => {
+    const refs = scope.graph.getCurrentStateRefs();
+    return refs.find((r) => r.type === "conversation" && r.id === conversationId)?.hash ?? null;
+  }, [scope.graph, conversationId]);
+
   const forkChoices = scope.getForkChoices();
 
   const childNodeIds = useMemo(() => {
@@ -107,6 +112,7 @@ export const SpeakerFeature: FC<SpeakerFeatureProps> = ({
       onAskQuestion={isParticipant && speaker.isHost ? handleAskQuestion : undefined}
       onAnswerQuestion={isParticipant && speaker.isGuest ? handleAnswerQuestion : undefined}
       wlNav={wlNav}
+      stateRefHash={conversationStateRefHash}
     />
   );
 };

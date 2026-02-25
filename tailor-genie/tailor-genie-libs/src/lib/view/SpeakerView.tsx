@@ -35,6 +35,7 @@ export type SpeakerViewProps = {
   onAskQuestion?: (question: string, choices: Choice[]) => void;
   onAnswerQuestion?: (choiceId: string) => void;
   wlNav?: WlNavProps<Turn[]>;
+  stateRefHash?: string | null;
 };
 
 export const SpeakerView: FC<SpeakerViewProps> = ({
@@ -45,6 +46,7 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
   onAskQuestion,
   onAnswerQuestion,
   wlNav,
+  stateRefHash,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
@@ -132,17 +134,19 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
           padding: "12px 16px",
           borderBottom: "1px solid #ddd",
           background: "#f5f5f5",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
         }}
       >
-        <span style={{ fontWeight: "bold" }}>
-          {speaker.name} の画面
-        </span>
-        <span style={{ fontSize: 12, color: "#666" }}>
-          会話 #{conversation.id.slice(0, 8)}
-        </span>
+        <div style={{ fontSize: 10, color: "#999", fontFamily: "monospace", marginBottom: 4 }}>
+          id: {conversation.id} / hash: {stateRefHash ?? "—"}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: "bold" }}>
+            {speaker.name} の画面
+          </span>
+          <span style={{ fontSize: 12, color: "#666" }}>
+            会話 #{conversation.id.slice(0, 8)}
+          </span>
+        </div>
       </div>
 
       <div

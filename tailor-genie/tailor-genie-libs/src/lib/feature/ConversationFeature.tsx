@@ -86,6 +86,11 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
     forkPreviews,
   }), [scope.moveBack, scope.moveForward, scope.canUndo, scope.canRedo, forkPreviews]);
 
+  const conversationStateRefHash = useMemo(() => {
+    const refs = scope.graph.getCurrentStateRefs();
+    return refs.find((r) => r.type === "conversation" && r.id === conversationId)?.hash ?? null;
+  }, [scope.graph, conversationId]);
+
   if (!conversation) {
     return (
       <div
@@ -110,6 +115,7 @@ export const ConversationFeature: FC<ConversationFeatureProps> = ({
       onOpenSpeakerView={handleOpenSpeakerView}
       onAddParticipant={handleAddParticipant}
       wlNav={wlNav}
+      stateRefHash={conversationStateRefHash}
     />
   );
 };

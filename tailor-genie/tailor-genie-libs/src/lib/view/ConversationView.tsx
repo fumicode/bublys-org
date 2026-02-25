@@ -34,6 +34,7 @@ export type ConversationViewProps = {
   onOpenSpeakerView?: (speakerId: string) => void;
   onAddParticipant?: (speakerId: string) => void;
   wlNav?: WlNavProps<Turn[]>;
+  stateRefHash?: string | null;
 };
 
 export const ConversationView: FC<ConversationViewProps> = ({
@@ -42,6 +43,7 @@ export const ConversationView: FC<ConversationViewProps> = ({
   onOpenSpeakerView,
   onAddParticipant,
   wlNav,
+  stateRefHash,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -151,32 +153,34 @@ export const ConversationView: FC<ConversationViewProps> = ({
           padding: "12px 16px",
           borderBottom: "1px solid #ddd",
           background: "#f5f5f5",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
         }}
       >
-        <span style={{ fontWeight: "bold" }}>
-          会話 #{conversation.id.slice(0, 8)}
-        </span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {onOpenSpeakerView && participants.map((speaker) => (
-            <button
-              key={speaker.id}
-              onClick={() => onOpenSpeakerView(speaker.id)}
-              style={{
-                padding: "4px 8px",
-                background: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-                fontSize: 11,
-              }}
-            >
-              {speaker.name}の画面
-            </button>
-          ))}
+        <div style={{ fontSize: 10, color: "#999", fontFamily: "monospace", marginBottom: 4 }}>
+          id: {conversation.id} / hash: {stateRefHash ?? "—"}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: "bold" }}>
+            会話 #{conversation.id.slice(0, 8)}
+          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {onOpenSpeakerView && participants.map((speaker) => (
+              <button
+                key={speaker.id}
+                onClick={() => onOpenSpeakerView(speaker.id)}
+                style={{
+                  padding: "4px 8px",
+                  background: "#6c757d",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+              >
+                {speaker.name}の画面
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
