@@ -1,0 +1,23 @@
+{
+  "name": "@bublys-org/tailor-genie-libs",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@bublys-org/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*",
+    "@bublys-org/tailor-genie-model": "*",
+    "@bublys-org/world-line-graph": "*"
+  }
+}

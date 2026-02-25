@@ -1,4 +1,5 @@
 "use client";
+import 'modern-normalize';
 import './global.css';
 import { StyledComponentsRegistry } from './registry';
 import StoreProvider from './StoreProvider';

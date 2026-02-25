@@ -1,5 +1,5 @@
 import { FC, useEffect, useCallback, useState, useMemo } from "react";
-import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem, selectPocketItems, removePocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 
 import {
@@ -51,6 +51,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // パネルの開閉状態
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [isPocketOpen, setIsPocketOpen] = useState(false);
+  const pocketItems = useAppSelector(selectPocketItems);
 
    // ページサイズ管理
   const pageSize = useAppSelector(selectWindowSize);
@@ -172,11 +173,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
 
   // Pocketのドロップハンドラー
-  const handlePocketDrop = (url: string, type: DragDataType, label?: string) => {
+  const handlePocketDrop = (url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
       id: crypto.randomUUID(),
       url,
       type,
+      objectId,
       label,
       addedAt: Date.now(),
     }));
@@ -186,6 +188,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const handlePocketItemClick = useCallback((url: string) => {
     popChildOrJoinSibling(url, "root");
   }, [popChildOrJoinSibling]);
+
+  const handlePocketRemove = useCallback((id: string) => {
+    dispatch(removePocketItem(id));
+  }, [dispatch]);
 
   // Sidebarからのアイテムクリックハンドラー
   const handleSidebarItemClick = useCallback((url: string) => {
@@ -230,6 +236,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           }}
         >
           <PocketView
+            items={pocketItems}
+            onRemove={handlePocketRemove}
             onDrop={handlePocketDrop}
             onItemClick={handlePocketItemClick}
             onClose={() => setIsPocketOpen(false)}

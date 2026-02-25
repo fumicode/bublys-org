@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "npx nx build:bubly @bublys-org/ekikyo-app && npx nx build @bublys-org/ekikyo-app",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "headers": [
     {
       "source": "/bubly.js",

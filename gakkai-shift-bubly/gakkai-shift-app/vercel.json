@@ -1,5 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "npx nx build:bubly @bublys-org/gakkai-shift-app && npx nx build @bublys-org/gakkai-shift-app",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "headers": [
     {
       "source": "/bubly.js",

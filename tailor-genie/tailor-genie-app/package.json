@@ -1,0 +1,42 @@
+{
+  "name": "@bublys-org/tailor-genie-app",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build:bubly": "vite build -c vite.config.bubly.ts"
+  },
+  "dependencies": {
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/state-management": "*",
+    "@bublys-org/tailor-genie-libs": "*",
+    "@bublys-org/world-line-graph": "*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.0",
+    "@mui/material": "^7.0.0",
+    "next": "~16.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "nx": {
+    "targets": {
+      "build:bubly": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "dev": {
+        "dependsOn": ["^dev"],
+        "continuous": true,
+        "options": {
+          "command": "next dev --port 4003"
+        }
+      },
+      "start": {
+        "options": {
+          "command": "next start --port 4003"
+        }
+      }
+    }
+  }
+}

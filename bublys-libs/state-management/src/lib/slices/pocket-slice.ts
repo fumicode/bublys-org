@@ -6,6 +6,8 @@ export type PocketItemState = {
   url: string;
   /** ドラッグ型（動的に登録される、例: 'type/user'） */
   type: string;
+  /** ドメインオブジェクトのID */
+  objectId?: string;
   label?: string;
   icon?: string;
   addedAt: number;

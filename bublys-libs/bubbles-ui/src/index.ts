@@ -36,5 +36,8 @@ export * from './lib/ui/LinkBubbleView.js';
 export * from './lib/ui/BubbleContent.js';
 export * from './lib/ui/BubblesLayeredView.js';
 
+// Pocket
+export * from './lib/pocket/index.js';
+
 // State Management (Redux)
 export * from './lib/state/index.js';
