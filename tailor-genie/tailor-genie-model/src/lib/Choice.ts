@@ -4,4 +4,5 @@
 export type Choice = {
   readonly id: string;
   readonly text: string;
+  readonly imageUrl?: string;
 };

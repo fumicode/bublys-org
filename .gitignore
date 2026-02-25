@@ -64,3 +64,6 @@ tsconfig.tsbuildinfo
 dist-bubly
 **/public/bubly.js
 **/public/bubly.js.map
+
+# Copied model assets
+**/public/img/

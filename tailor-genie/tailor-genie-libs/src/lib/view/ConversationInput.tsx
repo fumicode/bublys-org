@@ -24,6 +24,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   const [message, setMessage] = useState("");
   const [question, setQuestion] = useState("");
   const [choiceTexts, setChoiceTexts] = useState(["", ""]);
+  const [choiceImageUrls, setChoiceImageUrls] = useState(["", ""]);
 
   // Guest + 未回答質問あり → 選択肢は吹き出し横に表示されるので、ここではヒントのみ
   if (speakerRole === "guest" && pendingChoices) {
@@ -63,17 +64,25 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   if (speakerRole === "host" && mode === "question" && onAskQuestion) {
     const handleAddChoice = () => {
       setChoiceTexts([...choiceTexts, ""]);
+      setChoiceImageUrls([...choiceImageUrls, ""]);
     };
 
     const handleRemoveChoice = (index: number) => {
       if (choiceTexts.length <= 2) return;
       setChoiceTexts(choiceTexts.filter((_, i) => i !== index));
+      setChoiceImageUrls(choiceImageUrls.filter((_, i) => i !== index));
     };
 
     const handleChoiceChange = (index: number, value: string) => {
       const updated = [...choiceTexts];
       updated[index] = value;
       setChoiceTexts(updated);
+    };
+
+    const handleImageUrlChange = (index: number, value: string) => {
+      const updated = [...choiceImageUrls];
+      updated[index] = value;
+      setChoiceImageUrls(updated);
     };
 
     const canSubmit =
@@ -84,11 +93,17 @@ export const ConversationInput: FC<ConversationInputProps> = ({
       e.preventDefault();
       if (!canSubmit) return;
       const choices: Choice[] = choiceTexts
-        .filter((t) => t.trim())
-        .map((text) => ({ id: crypto.randomUUID(), text: text.trim() }));
+        .map((text, i) => ({ text, imageUrl: choiceImageUrls[i] }))
+        .filter((c) => c.text.trim())
+        .map((c) => ({
+          id: crypto.randomUUID(),
+          text: c.text.trim(),
+          ...(c.imageUrl.trim() ? { imageUrl: c.imageUrl.trim() } : {}),
+        }));
       onAskQuestion(question.trim(), choices);
       setQuestion("");
       setChoiceTexts(["", ""]);
+      setChoiceImageUrls(["", ""]);
       setMode("message");
     };
 
@@ -136,39 +151,56 @@ export const ConversationInput: FC<ConversationInputProps> = ({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 11, color: "#888" }}>選択肢</span>
           {choiceTexts.map((text, i) => (
-            <div key={i} style={{ display: "flex", gap: 4 }}>
-              <input
-                type="text"
-                value={text}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  handleChoiceChange(i, e.target.value)
-                }
-                placeholder={`選択肢 ${i + 1}`}
-                style={{
-                  flex: 1,
-                  padding: "6px 10px",
-                  border: "1px solid #ddd",
-                  borderRadius: 4,
-                  fontSize: 13,
-                }}
-              />
-              {choiceTexts.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveChoice(i)}
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", gap: 4 }}>
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    handleChoiceChange(i, e.target.value)
+                  }
+                  placeholder={`選択肢 ${i + 1}`}
                   style={{
-                    padding: "4px 8px",
-                    background: "none",
+                    flex: 1,
+                    padding: "6px 10px",
                     border: "1px solid #ddd",
                     borderRadius: 4,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: "#999",
+                    fontSize: 13,
                   }}
-                >
-                  x
-                </button>
-              )}
+                />
+                {choiceTexts.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveChoice(i)}
+                    style={{
+                      padding: "4px 8px",
+                      background: "none",
+                      border: "1px solid #ddd",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: "#999",
+                    }}
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={choiceImageUrls[i]}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  handleImageUrlChange(i, e.target.value)
+                }
+                placeholder="画像URL（任意）"
+                style={{
+                  padding: "4px 10px",
+                  border: "1px solid #eee",
+                  borderRadius: 4,
+                  fontSize: 11,
+                  color: "#888",
+                }}
+              />
             </div>
           ))}
           <button

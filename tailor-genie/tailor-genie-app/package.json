@@ -20,13 +20,16 @@
   },
   "nx": {
     "targets": {
+      "copy-model-assets": {
+        "command": "mkdir -p tailor-genie/tailor-genie-app/public/img && cp -r tailor-genie/tailor-genie-model/src/img/* tailor-genie/tailor-genie-app/public/img/"
+      },
       "build:bubly": {
         "dependsOn": [
           "^build"
         ]
       },
       "dev": {
-        "dependsOn": ["^dev"],
+        "dependsOn": ["^dev", "copy-model-assets"],
         "continuous": true,
         "options": {
           "command": "next dev --port 4003"

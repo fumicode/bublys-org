@@ -77,6 +77,22 @@ export const TurnView: FC<TurnViewProps> = ({
           <div style={{ display: "flex", gap: 8, width: "max-content", paddingRight: 16 }}>
             {turn.choices.map((c) => {
               const visited = visitedChoiceIds?.has(c.id);
+              const hasImage = !!c.imageUrl;
+              const imageEl = hasImage ? (
+                <img
+                  src={c.imageUrl}
+                  alt={c.text}
+                  style={{
+                    width: "100%",
+                    height: 100,
+                    objectFit: "cover",
+                    borderRadius: onChoiceClick
+                      ? "14px 14px 0 0"
+                      : "10px 10px 0 0",
+                    display: "block",
+                  }}
+                />
+              ) : null;
               return onChoiceClick ? (
                 <button
                   key={c.id}
@@ -84,8 +100,8 @@ export const TurnView: FC<TurnViewProps> = ({
                   onClick={() => onChoiceClick(c.id)}
                   style={{
                     width: 148,
-                    minHeight: 40,
-                    padding: "8px 12px",
+                    minHeight: hasImage ? undefined : 40,
+                    padding: hasImage ? 0 : "8px 12px",
                     borderRadius: 16,
                     border: `1.5px solid ${colors.bg}`,
                     background: visited ? `${colors.bg}10` : "#fff",
@@ -95,21 +111,26 @@ export const TurnView: FC<TurnViewProps> = ({
                     flexShrink: 0,
                     textAlign: "center",
                     wordBreak: "break-word",
+                    overflow: "hidden",
                   }}
                 >
-                  {visited && <span style={{ marginRight: 4, fontSize: 11 }}>✓</span>}
-                  {c.text}
+                  {imageEl}
+                  <div style={{ padding: hasImage ? "6px 8px" : 0 }}>
+                    {visited && <span style={{ marginRight: 4, fontSize: 11 }}>✓</span>}
+                    {c.text}
+                  </div>
                 </button>
               ) : (
                 <span
                   key={c.id}
                   style={{
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
-                    justifyContent: "center",
+                    justifyContent: hasImage ? "flex-start" : "center",
                     width: 148,
-                    minHeight: 36,
-                    padding: "6px 12px",
+                    minHeight: hasImage ? undefined : 36,
+                    padding: hasImage ? 0 : "6px 12px",
                     borderRadius: 12,
                     background: "#e9ecef",
                     color: "#555",
@@ -117,10 +138,14 @@ export const TurnView: FC<TurnViewProps> = ({
                     flexShrink: 0,
                     textAlign: "center",
                     wordBreak: "break-word",
+                    overflow: "hidden",
                   }}
                 >
-                  {visited && <span style={{ marginRight: 4, fontSize: 10 }}>✓</span>}
-                  {c.text}
+                  {imageEl}
+                  <div style={{ padding: hasImage ? "4px 8px" : 0 }}>
+                    {visited && <span style={{ marginRight: 4, fontSize: 10 }}>✓</span>}
+                    {c.text}
+                  </div>
                 </span>
               );
             })}
