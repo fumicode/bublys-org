@@ -39,10 +39,10 @@
       "path": "../../bublys-libs/bubbles-ui"
     },
     {
-      "path": "../gakkai-shift-libs/tsconfig.lib.json"
+      "path": "../shift-puzzle-libs/tsconfig.lib.json"
     },
     {
-      "path": "../gakkai-shift-model/tsconfig.lib.json"
+      "path": "../shift-puzzle-model/tsconfig.lib.json"
     }
   ]
 }

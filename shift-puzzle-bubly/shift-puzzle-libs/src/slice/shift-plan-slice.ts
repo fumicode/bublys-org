@@ -5,7 +5,7 @@ import { rootReducer, type RootState } from "@bublys-org/state-management";
 import {
   type ShiftPlanState,
   ShiftPlan_シフト案,
-} from "@bublys-org/gakkai-shift-model";
+} from "@bublys-org/shift-puzzle-model";
 
 // Re-export for convenience
 export { ShiftPlan_シフト案 };

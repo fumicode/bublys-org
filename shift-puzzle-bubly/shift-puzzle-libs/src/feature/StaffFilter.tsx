@@ -81,7 +81,7 @@ export const StaffFilter: FC<StaffFilterProps> = ({ initialFilter }) => {
     }
 
     const query = stringifyStaffFilter(filter);
-    openBubble(`gakkai-shift/staffs${query}`, 'root');
+    openBubble(`shift-puzzle/staffs${query}`, 'root');
   };
 
   const hasSelection = selectedSkills.length > 0 || selectedTimeSlots.length > 0;

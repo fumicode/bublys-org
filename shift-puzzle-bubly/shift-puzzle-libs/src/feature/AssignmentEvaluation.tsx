@@ -3,8 +3,8 @@
 import { FC, useMemo } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
 import {
-  selectGakkaiShiftStaffList,
-  selectGakkaiShiftPlanById,
+  selectShiftPuzzleStaffList,
+  selectShiftPuzzlePlanById,
 } from "../slice/index.js";
 import { AssignmentEvaluationView } from "../ui/AssignmentEvaluationView.js";
 import {
@@ -33,8 +33,8 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   buildStaffDetailUrl,
   buildStaffAvailabilityUrl,
 }) => {
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
-  const shiftPlan = useAppSelector(selectGakkaiShiftPlanById(shiftPlanId));
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
+  const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   // マスターデータ
   const timeSlots = useMemo(() => TimeSlot_時間帯.createDefaultTimeSlots(), []);

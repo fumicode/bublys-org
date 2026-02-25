@@ -7,7 +7,7 @@ import {
   Staff_スタッフ,
   type StaffJSON,
   type StaffStatus_ステータス,
-} from "@bublys-org/gakkai-shift-model";
+} from "@bublys-org/shift-puzzle-model";
 
 // Re-export for convenience
 export { Staff_スタッフ };
@@ -20,30 +20,30 @@ export {
   updateShiftPlan,
   deleteShiftPlan,
   setCurrentShiftPlanId,
-  selectShiftPlans as selectGakkaiShiftPlans,
-  selectCurrentShiftPlanId as selectGakkaiShiftCurrentPlanId,
-  selectShiftPlanById as selectGakkaiShiftPlanById,
-  selectCurrentShiftPlan as selectGakkaiShiftCurrentPlan,
+  selectShiftPlans as selectShiftPuzzlePlans,
+  selectCurrentShiftPlanId as selectShiftPuzzleCurrentPlanId,
+  selectShiftPlanById as selectShiftPuzzlePlanById,
+  selectCurrentShiftPlan as selectShiftPuzzleCurrentPlan,
   ShiftPlan_シフト案,
   type ShiftPlanState,
 } from "./shift-plan-slice.js";
 
 // ========== State ==========
 
-type GakkaiShiftStaffState = {
+type ShiftPuzzleStaffState = {
   staffList: StaffJSON[];
   selectedStaffId: string | null;
 };
 
-const initialState: GakkaiShiftStaffState = {
+const initialState: ShiftPuzzleStaffState = {
   staffList: [],
   selectedStaffId: null,
 };
 
 // ========== Slice ==========
 
-export const gakkaiShiftSlice = createSlice({
-  name: "gakkaiShift",
+export const shiftPuzzleSlice = createSlice({
+  name: "shiftPuzzle",
   initialState,
   reducers: {
     setStaffList: (state, action: PayloadAction<StaffJSON[]>) => {
@@ -84,45 +84,45 @@ export const {
   deleteStaff,
   setSelectedStaffId,
   updateStaffStatus,
-} = gakkaiShiftSlice.actions;
+} = shiftPuzzleSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加
 declare module "@bublys-org/state-management" {
-  export interface LazyLoadedSlices extends WithSlice<typeof gakkaiShiftSlice> {}
+  export interface LazyLoadedSlices extends WithSlice<typeof shiftPuzzleSlice> {}
 }
 
 // rootReducerに注入（副作用として実行）
-gakkaiShiftSlice.injectInto(rootReducer);
+shiftPuzzleSlice.injectInto(rootReducer);
 
 // ========== Selectors ==========
 
 // セレクター用の型
-type StateWithGakkaiShift = RootState & { gakkaiShift: GakkaiShiftStaffState };
+type StateWithShiftPuzzle = RootState & { shiftPuzzle: ShiftPuzzleStaffState };
 
 // 基本セレクター
-const selectStaffListRaw = (state: StateWithGakkaiShift) => state.gakkaiShift?.staffList ?? [];
+const selectStaffListRaw = (state: StateWithShiftPuzzle) => state.shiftPuzzle?.staffList ?? [];
 
 /** スタッフ一覧を取得（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffList = createSelector(
+export const selectShiftPuzzleStaffList = createSelector(
   [selectStaffListRaw],
   (staffList): Staff_スタッフ[] => staffList.map((json) => Staff_スタッフ.fromJSON(json))
 );
 
 /** 選択中のスタッフIDを取得 */
-export const selectGakkaiShiftSelectedStaffId = (state: StateWithGakkaiShift): string | null =>
-  state.gakkaiShift?.selectedStaffId ?? null;
+export const selectShiftPuzzleSelectedStaffId = (state: StateWithShiftPuzzle): string | null =>
+  state.shiftPuzzle?.selectedStaffId ?? null;
 
 /** IDでスタッフを取得（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffById = (id: string) =>
+export const selectShiftPuzzleStaffById = (id: string) =>
   createSelector(
-    [(state: StateWithGakkaiShift) => (state.gakkaiShift?.staffList ?? []).find((s) => s.id === id)],
+    [(state: StateWithShiftPuzzle) => (state.shiftPuzzle?.staffList ?? []).find((s) => s.id === id)],
     (json): Staff_スタッフ | undefined => {
       return json ? Staff_スタッフ.fromJSON(json) : undefined;
     }
   );
 
 /** ステータスでスタッフを絞り込み（ドメインオブジェクト） */
-export const selectGakkaiShiftStaffByStatus = (status: StaffStatus_ステータス) =>
+export const selectShiftPuzzleStaffByStatus = (status: StaffStatus_ステータス) =>
   createSelector(
     [selectStaffListRaw],
     (staffList): Staff_スタッフ[] =>
@@ -132,11 +132,11 @@ export const selectGakkaiShiftStaffByStatus = (status: StaffStatus_ステータ�
   );
 
 /** 選択中のスタッフを取得（ドメインオブジェクト） */
-export const selectGakkaiShiftSelectedStaff = createSelector(
-  [(state: StateWithGakkaiShift) => {
-    const id = state.gakkaiShift?.selectedStaffId;
+export const selectShiftPuzzleSelectedStaff = createSelector(
+  [(state: StateWithShiftPuzzle) => {
+    const id = state.shiftPuzzle?.selectedStaffId;
     if (!id) return undefined;
-    return (state.gakkaiShift?.staffList ?? []).find((s) => s.id === id);
+    return (state.shiftPuzzle?.staffList ?? []).find((s) => s.id === id);
   }],
   (json): Staff_スタッフ | undefined => {
     return json ? Staff_スタッフ.fromJSON(json) : undefined;

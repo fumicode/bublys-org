@@ -2,7 +2,7 @@
 
 import { FC, useMemo } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectGakkaiShiftStaffList } from "../slice/index.js";
+import { selectShiftPuzzleStaffList } from "../slice/index.js";
 import { StaffAvailabilityView } from "../ui/StaffAvailabilityView.js";
 import { TimeSlot_時間帯 } from "../domain/index.js";
 
@@ -11,7 +11,7 @@ type StaffAvailabilityProps = {
 };
 
 export const StaffAvailability: FC<StaffAvailabilityProps> = ({ staffId }) => {
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
   const staff = staffList.find((s) => s.id === staffId);
 
   // デフォルトの時間帯を取得

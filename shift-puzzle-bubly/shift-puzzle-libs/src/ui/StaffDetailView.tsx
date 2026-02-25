@@ -27,7 +27,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
         <div className="e-title">
           <ObjectView
             type="Staff"
-            url={`gakkai-shift/staffs/${staff.id}`}
+            url={`shift-puzzle/staffs/${staff.id}`}
             label={staff.name}
             draggable={true}
           >

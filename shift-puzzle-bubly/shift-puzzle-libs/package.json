@@ -1,5 +1,5 @@
 {
-  "name": "@bublys-org/gakkai-shift-libs",
+  "name": "@bublys-org/shift-puzzle-libs",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "tslib": "^2.3.0",
-    "@bublys-org/gakkai-shift-model": "*",
+    "@bublys-org/shift-puzzle-model": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*"
   },

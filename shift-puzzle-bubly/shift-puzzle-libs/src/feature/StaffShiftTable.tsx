@@ -4,8 +4,8 @@ import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectGakkaiShiftStaffList,
-  selectGakkaiShiftPlanById,
+  selectShiftPuzzleStaffList,
+  selectShiftPuzzlePlanById,
   setStaffList,
 } from "../slice/index.js";
 import { StaffShiftTableView } from "../ui/StaffShiftTableView.js";
@@ -27,8 +27,8 @@ export const StaffShiftTable: FC<StaffShiftTableProps> = ({
   onAssignmentClick,
 }) => {
   const dispatch = useAppDispatch();
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
-  const shiftPlan = useAppSelector(selectGakkaiShiftPlanById(shiftPlanId));
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
+  const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   // マスターデータ
   const timeSlots = useMemo(() => TimeSlot_時間帯.createDefaultTimeSlots(), []);

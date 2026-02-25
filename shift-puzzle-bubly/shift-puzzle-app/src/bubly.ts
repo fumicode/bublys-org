@@ -1,5 +1,5 @@
 /**
- * Bublys Bubly Entry Point for gakkai-shift
+ * Bublys Bubly Entry Point for shift-puzzle
  *
  * このファイルはスタンドアロンバンドルとしてビルドされ、
  * 動的にロードされるバブリとして動作する
@@ -10,27 +10,27 @@ import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 
 // Bubble Routes
-import { gakkaiShiftBubbleRoutes } from "./registration/index.js";
+import { shiftPuzzleBubbleRoutes } from "./registration/index.js";
 
-const GakkaiShiftBubly: Bubly = {
-  name: "gakkai-shift",
+const ShiftPuzzleBubly: Bubly = {
+  name: "shift-puzzle",
   version: "0.0.1",
 
   menuItems: [
     {
       label: "スタッフ一覧",
-      url: "gakkai-shift/staffs",
+      url: "shift-puzzle/staffs",
       icon: React.createElement(EventNoteIcon, { color: "action" }),
     },
     {
       label: "シフト配置表",
-      url: "gakkai-shift/shift-plans",
+      url: "shift-puzzle/shift-plans",
       icon: React.createElement(EventNoteIcon, { color: "primary" }),
     },
   ],
 
   register(context) {
-    context.registerBubbleRoutes(gakkaiShiftBubbleRoutes);
+    context.registerBubbleRoutes(shiftPuzzleBubbleRoutes);
   },
 
   unregister() {
@@ -39,6 +39,6 @@ const GakkaiShiftBubly: Bubly = {
 };
 
 // 公式APIを使って登録
-registerBubly(GakkaiShiftBubly);
+registerBubly(ShiftPuzzleBubly);
 
-export default GakkaiShiftBubly;
+export default ShiftPuzzleBubly;

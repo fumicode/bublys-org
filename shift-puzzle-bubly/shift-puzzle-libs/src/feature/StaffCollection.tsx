@@ -3,8 +3,8 @@
 import { FC, useEffect, useMemo, useContext } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectGakkaiShiftStaffList,
-  selectGakkaiShiftSelectedStaffId,
+  selectShiftPuzzleStaffList,
+  selectShiftPuzzleSelectedStaffId,
   setStaffList,
   setSelectedStaffId,
 } from "../slice/index.js";
@@ -184,12 +184,12 @@ type StaffCollectionProps = {
   onStaffSelect?: (staffId: string) => void;
 };
 
-const buildDetailUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}`;
+const buildDetailUrl = (staffId: string) => `shift-puzzle/staffs/${staffId}`;
 
 export const StaffCollection: FC<StaffCollectionProps> = ({ filter, onStaffSelect }) => {
   const dispatch = useAppDispatch();
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
-  const selectedStaffId = useAppSelector(selectGakkaiShiftSelectedStaffId);
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
+  const selectedStaffId = useAppSelector(selectShiftPuzzleSelectedStaffId);
   const { openBubble } = useContext(BubblesContext);
 
   // 初期データのロード
@@ -220,7 +220,7 @@ export const StaffCollection: FC<StaffCollectionProps> = ({ filter, onStaffSelec
   const handleOpenFilter = () => {
     // 現在のフィルター条件を引き継いで検索画面を開く
     const currentFilter = filter ? stringifyStaffFilterCriteria(filter) : '';
-    openBubble(`gakkai-shift/staffs/filter${currentFilter}`, 'root');
+    openBubble(`shift-puzzle/staffs/filter${currentFilter}`, 'root');
   };
 
   return (

@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
-  cacheDir: '../../node_modules/.vite/gakkai-shift-bubly/gakkai-shift-app',
+  cacheDir: '../../node_modules/.vite/shift-puzzle-bubly/shift-puzzle-app',
   server: {
     port: 4001,
     host: 'localhost',

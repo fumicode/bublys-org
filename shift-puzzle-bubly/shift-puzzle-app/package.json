@@ -1,13 +1,13 @@
 {
-  "name": "@bublys-org/gakkai-shift-app",
+  "name": "@bublys-org/shift-puzzle-app",
   "version": "0.0.1",
   "private": true,
   "scripts": {
     "build:bubly": "vite build -c vite.config.bubly.ts"
   },
   "dependencies": {
-    "@bublys-org/gakkai-shift-model": "*",
-    "@bublys-org/gakkai-shift-libs": "*",
+    "@bublys-org/shift-puzzle-model": "*",
+    "@bublys-org/shift-puzzle-libs": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
     "@emotion/react": "^11.14.0",

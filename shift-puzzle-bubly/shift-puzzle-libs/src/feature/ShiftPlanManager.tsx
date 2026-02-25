@@ -4,11 +4,11 @@ import { FC, useState, useEffect } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectGakkaiShiftPlans,
+  selectShiftPuzzlePlans,
   addShiftPlan,
   deleteShiftPlan,
   setStaffList,
-  selectGakkaiShiftStaffList,
+  selectShiftPuzzleStaffList,
 } from "../slice/index.js";
 import { ShiftPlanEditor } from "./ShiftPlanEditor.js";
 import { ShiftPlan_シフト案 } from "../domain/index.js";
@@ -34,8 +34,8 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
   onStaffViewClick,
 }) => {
   const dispatch = useAppDispatch();
-  const shiftPlans = useAppSelector(selectGakkaiShiftPlans);
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
+  const shiftPlans = useAppSelector(selectShiftPuzzlePlans);
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
   // 初期データのロード

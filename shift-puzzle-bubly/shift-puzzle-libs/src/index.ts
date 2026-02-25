@@ -1,4 +1,4 @@
-// Domain models (re-exported from @bublys-org/gakkai-shift-model)
+// Domain models (re-exported from @bublys-org/shift-puzzle-model)
 export * from "./domain/index.js";
 
 // UI components

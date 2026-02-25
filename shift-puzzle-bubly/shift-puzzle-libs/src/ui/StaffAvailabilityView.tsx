@@ -32,7 +32,7 @@ export const StaffAvailabilityView: FC<StaffAvailabilityViewProps> = ({
     <StyledContainer>
       <ObjectView
         type="Staff"
-        url={`gakkai-shift/staffs/${staff.id}`}
+        url={`shift-puzzle/staffs/${staff.id}`}
         label={staff.name}
         draggable={true}
       >

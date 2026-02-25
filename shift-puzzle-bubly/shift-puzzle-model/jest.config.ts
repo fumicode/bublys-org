@@ -10,8 +10,8 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 export default {
-  displayName: '@bublys-org/gakkai-shift-model',
-  preset: '../jest.preset.js',
+  displayName: '@bublys-org/shift-puzzle-model',
+  preset: '../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],

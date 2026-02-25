@@ -17,3 +17,6 @@ export * from './shift-plan/ShiftPlan_シフト案.js';
 export * from './shift-plan/ShiftMatcher_シフトマッチング.js';
 export * from './shift-plan/SlotRoleEvaluation_配置枠評価.js';
 export * from './shift-plan/StaffAssignmentEvaluation_スタッフ配置評価.js';
+
+// Timeline
+export * from './timeline/TimelineScale_タイムラインスケール.js';

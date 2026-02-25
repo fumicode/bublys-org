@@ -1,6 +1,6 @@
 /**
  * ドメインモデル再エクスポート
- * @bublys-org/gakkai-shift-model から全てを再エクスポート
+ * @bublys-org/shift-puzzle-model から全てを再エクスポート
  */
 
-export * from '@bublys-org/gakkai-shift-model';
+export * from '@bublys-org/shift-puzzle-model';

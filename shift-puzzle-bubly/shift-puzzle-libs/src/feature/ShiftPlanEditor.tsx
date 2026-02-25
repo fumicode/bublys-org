@@ -1,16 +1,17 @@
 'use client';
 
-import { FC, useEffect, useMemo } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectGakkaiShiftStaffList,
-  selectGakkaiShiftPlanById,
+  selectShiftPuzzleStaffList,
+  selectShiftPuzzlePlanById,
   addShiftPlan,
   updateShiftPlan,
   setStaffList,
 } from "../slice/index.js";
 import { ShiftPlanTableView } from "../ui/ShiftPlanTableView.js";
+import { GanttTimelineView } from "../ui/GanttTimelineView.js";
 import {
   TimeSlot_時間帯,
   Role_係,
@@ -23,8 +24,12 @@ import { createSampleStaffList } from "../data/sampleStaff.js";
 import WarningIcon from "@mui/icons-material/Warning";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import PeopleIcon from "@mui/icons-material/People";
-import { Button } from "@mui/material";
+import TableChartIcon from "@mui/icons-material/TableChart";
+import ViewTimelineIcon from "@mui/icons-material/ViewTimeline";
+import { Button, ToggleButtonGroup, ToggleButton } from "@mui/material";
 import { UrledPlace } from "@bublys-org/bubbles-ui";
+
+type ViewMode = 'table' | 'gantt-role' | 'gantt-staff';
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
@@ -43,8 +48,9 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   buildCellUrl,
 }) => {
   const dispatch = useAppDispatch();
-  const staffList = useAppSelector(selectGakkaiShiftStaffList);
-  const shiftPlan = useAppSelector(selectGakkaiShiftPlanById(shiftPlanId));
+  const staffList = useAppSelector(selectShiftPuzzleStaffList);
+  const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   // マスターデータ
   const timeSlots = useMemo(() => TimeSlot_時間帯.createDefaultTimeSlots(), []);
@@ -170,6 +176,17 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       <div className="e-header">
         <h3>{shiftPlan.name}</h3>
         <div className="e-stats">
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_e, v) => { if (v) setViewMode(v as ViewMode); }}
+            size="small"
+            sx={{ mr: 1 }}
+          >
+            <ToggleButton value="table"><TableChartIcon fontSize="small" /></ToggleButton>
+            <ToggleButton value="gantt-role"><ViewTimelineIcon fontSize="small" /></ToggleButton>
+            <ToggleButton value="gantt-staff"><PeopleIcon fontSize="small" /></ToggleButton>
+          </ToggleButtonGroup>
           <Button
             variant="contained"
             size="small"
@@ -179,7 +196,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
           >
             自動シフト配置
           </Button>
-          <UrledPlace url={`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`}>
+          <UrledPlace url={`shift-puzzle/shift-plans/${shiftPlanId}/staff-view`}>
             <Button
               variant="outlined"
               size="small"
@@ -201,23 +218,40 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       </div>
 
       <div className="e-main">
-        {/* シフト表 */}
-        <div className="e-table-panel">
-          <ShiftPlanTableView
-            timeSlots={timeSlots}
-            roles={roles}
-            assignments={shiftPlan.assignments}
-            staffList={staffList}
-            violations={violations}
-            buildAssignmentUrl={(assignmentId) => `gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`}
-            buildCellUrl={buildCellUrl}
-            onDropStaff={handleDropStaff}
-            onRemoveAssignment={handleRemoveAssignment}
-            onMoveAssignment={handleMoveAssignment}
-            onAssignmentClick={onAssignmentClick}
-            onCellClick={onCellClick}
-          />
-        </div>
+        {viewMode === 'table' ? (
+          <div className="e-table-panel">
+            <ShiftPlanTableView
+              timeSlots={timeSlots}
+              roles={roles}
+              assignments={shiftPlan.assignments}
+              staffList={staffList}
+              violations={violations}
+              buildAssignmentUrl={(assignmentId) => `shift-puzzle/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`}
+              buildCellUrl={buildCellUrl}
+              onDropStaff={handleDropStaff}
+              onRemoveAssignment={handleRemoveAssignment}
+              onMoveAssignment={handleMoveAssignment}
+              onAssignmentClick={onAssignmentClick}
+              onCellClick={onCellClick}
+            />
+          </div>
+        ) : (
+          <div className="e-gantt-panel">
+            <GanttTimelineView
+              timeSlots={timeSlots}
+              roles={roles}
+              assignments={shiftPlan.assignments}
+              staffList={staffList}
+              violations={violations}
+              axisMode={viewMode === 'gantt-role' ? 'role' : 'staff'}
+              onDropStaff={handleDropStaff}
+              onRemoveAssignment={handleRemoveAssignment}
+              onMoveAssignment={handleMoveAssignment}
+              onAssignmentClick={onAssignmentClick}
+              onCellClick={onCellClick}
+            />
+          </div>
+        )}
       </div>
     </StyledContainer>
   );
@@ -270,6 +304,12 @@ const StyledContainer = styled.div`
   .e-table-panel {
     height: 100%;
     overflow: auto;
+    padding: 8px;
+  }
+
+  .e-gantt-panel {
+    height: 100%;
+    overflow: hidden;
     padding: 8px;
   }
 `;

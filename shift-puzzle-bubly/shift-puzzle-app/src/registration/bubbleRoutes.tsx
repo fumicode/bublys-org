@@ -15,10 +15,10 @@ import {
   ShiftPlanManager,
   AssignmentEvaluation,
   StaffShiftTable,
-} from "@bublys-org/gakkai-shift-libs";
+} from "@bublys-org/shift-puzzle-libs";
 
-// 学会シフト - スタッフ絞り込み検索バブル
-const GakkaiShiftStaffFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - スタッフ絞り込み検索バブル
+const ShiftPuzzleStaffFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // URLからクエリ文字列を抽出してフィルターをパース（既存の条件を復元）
   const queryIndex = bubble.url.indexOf('?');
   const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
@@ -27,11 +27,11 @@ const GakkaiShiftStaffFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return <StaffFilter initialFilter={initialFilter} />;
 };
 
-// 学会シフト - スタッフ一覧バブル（フィルター付き）
-const GakkaiShiftStaffsBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - スタッフ一覧バブル（フィルター付き）
+const ShiftPuzzleStaffsBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const handleStaffSelect = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id);
+    openBubble(`shift-puzzle/staffs/${staffId}`, bubble.id);
   };
 
   // URLからクエリ文字列を抽出してフィルターをパース
@@ -42,32 +42,32 @@ const GakkaiShiftStaffsBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return <StaffCollection filter={filter} onStaffSelect={handleStaffSelect} />;
 };
 
-// 学会シフト - スタッフ詳細バブル
-const GakkaiShiftStaffBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - スタッフ詳細バブル
+const ShiftPuzzleStaffBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const handleOpenAvailability = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}/availableTimeSlots`, bubble.id);
+    openBubble(`shift-puzzle/staffs/${staffId}/availableTimeSlots`, bubble.id);
   };
   return <StaffDetail staffId={bubble.params.staffId} onOpenAvailability={handleOpenAvailability} />;
 };
 
-// 学会シフト - スタッフ参加可能時間帯バブル
-const GakkaiShiftStaffAvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - スタッフ参加可能時間帯バブル
+const ShiftPuzzleStaffAvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return <StaffAvailability staffId={bubble.params.staffId} />;
 };
 
-// 学会シフト - シフト配置表バブル（単一シフト案）
-const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - シフト配置表バブル（単一シフト案）
+const ShiftPuzzlePlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const shiftPlanId = bubble.params.shiftPlanId;
   const roles = Role_係.createDefaultRoles();
 
   const handleAssignmentClick = (assignmentId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
+    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
 
   const handleStaffViewClick = () => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
+    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
   };
 
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
@@ -95,7 +95,7 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     const query = stringifyStaffFilter(filter);
     // originCellを追加してURLを一意にする（getOriginRect用）
     const originCell = `&originCell=${timeSlotId}_${roleId}`;
-    return `gakkai-shift/staffs${query}${originCell}`;
+    return `shift-puzzle/staffs${query}${originCell}`;
   };
 
   const handleCellClick = (timeSlotId: string, roleId: string) => {
@@ -114,17 +114,17 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-// 学会シフト - シフト案マネージャー（複数シフト案）
-const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - シフト案マネージャー（複数シフト案）
+const ShiftPuzzlePlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const roles = Role_係.createDefaultRoles();
 
   const handleAssignmentClick = (shiftPlanId: string, assignmentId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
+    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
 
   const handleStaffViewClick = (shiftPlanId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
+    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
   };
 
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
@@ -152,7 +152,7 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
     const query = stringifyStaffFilter(filter);
     // originCellを追加してURLを一意にする（getOriginRect用）
     const originCell = `&originCell=${timeSlotId}_${roleId}`;
-    return `gakkai-shift/staffs${query}${originCell}`;
+    return `shift-puzzle/staffs${query}${originCell}`;
   };
 
   const handleCellClick = (timeSlotId: string, roleId: string) => {
@@ -170,17 +170,17 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-// 学会シフト - スタッフ別シフト表バブル
-const GakkaiShiftStaffShiftTableBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - スタッフ別シフト表バブル
+const ShiftPuzzleStaffShiftTableBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const shiftPlanId = bubble.params.shiftPlanId;
 
   const handleStaffClick = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "bubble-side");
+    openBubble(`shift-puzzle/staffs/${staffId}`, bubble.id, "bubble-side");
   };
 
   const handleAssignmentClick = (shiftPlanId: string, assignmentId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
+    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, "origin-side");
   };
 
   return (
@@ -192,21 +192,21 @@ const GakkaiShiftStaffShiftTableBubble: BubbleRoute["Component"] = ({ bubble }) 
   );
 };
 
-// 学会シフト - 配置評価バブル
-const GakkaiShiftAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubble }) => {
+// シフトパズル - 配置評価バブル
+const ShiftPuzzleAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const { shiftPlanId, assignmentId } = bubble.params;
 
   const handleStaffClick = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}`, bubble.id, "bubble-side");
+    openBubble(`shift-puzzle/staffs/${staffId}`, bubble.id, "bubble-side");
   };
 
   const handleTimeSlotClick = (staffId: string) => {
-    openBubble(`gakkai-shift/staffs/${staffId}/availableTimeSlots`, bubble.id, "bubble-side");
+    openBubble(`shift-puzzle/staffs/${staffId}/availableTimeSlots`, bubble.id, "bubble-side");
   };
 
-  const buildStaffDetailUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}`;
-  const buildStaffAvailabilityUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}/availableTimeSlots`;
+  const buildStaffDetailUrl = (staffId: string) => `shift-puzzle/staffs/${staffId}`;
+  const buildStaffAvailabilityUrl = (staffId: string) => `shift-puzzle/staffs/${staffId}/availableTimeSlots`;
 
   return (
     <AssignmentEvaluation
@@ -220,14 +220,14 @@ const GakkaiShiftAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubbl
   );
 };
 
-/** 学会シフト機能のバブルルート定義 */
-export const gakkaiShiftBubbleRoutes: BubbleRoute[] = [
-  { pattern: "gakkai-shift/staffs/filter", type: "gakkai-shift-staff-filter", Component: GakkaiShiftStaffFilterBubble },
-  { pattern: "gakkai-shift/staffs/:staffId/availableTimeSlots", type: "gakkai-shift-staff-availability", Component: GakkaiShiftStaffAvailabilityBubble },
-  { pattern: "gakkai-shift/staffs/:staffId", type: "gakkai-shift-staff", Component: GakkaiShiftStaffBubble },
-  { pattern: "gakkai-shift/staffs", type: "gakkai-shift-staffs", Component: GakkaiShiftStaffsBubble },
-  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/staff-view", type: "gakkai-shift-staff-view", Component: GakkaiShiftStaffShiftTableBubble },
-  { pattern: "gakkai-shift/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "gakkai-shift-assignment-evaluation", Component: GakkaiShiftAssignmentEvaluationBubble },
-  { pattern: "gakkai-shift/shift-plans", type: "gakkai-shift-plans", Component: GakkaiShiftPlanManagerBubble },
-  { pattern: "gakkai-shift/shift-plan/:shiftPlanId", type: "gakkai-shift-plan", Component: GakkaiShiftPlanEditorBubble },
+/** シフトパズル機能のバブルルート定義 */
+export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
+  { pattern: "shift-puzzle/staffs/filter", type: "shift-puzzle-staff-filter", Component: ShiftPuzzleStaffFilterBubble },
+  { pattern: "shift-puzzle/staffs/:staffId/availableTimeSlots", type: "shift-puzzle-staff-availability", Component: ShiftPuzzleStaffAvailabilityBubble },
+  { pattern: "shift-puzzle/staffs/:staffId", type: "shift-puzzle-staff", Component: ShiftPuzzleStaffBubble },
+  { pattern: "shift-puzzle/staffs", type: "shift-puzzle-staffs", Component: ShiftPuzzleStaffsBubble },
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/staff-view", type: "shift-puzzle-staff-view", Component: ShiftPuzzleStaffShiftTableBubble },
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "shift-puzzle-assignment-evaluation", Component: ShiftPuzzleAssignmentEvaluationBubble },
+  { pattern: "shift-puzzle/shift-plans", type: "shift-puzzle-plans", Component: ShiftPuzzlePlanManagerBubble },
+  { pattern: "shift-puzzle/shift-plan/:shiftPlanId", type: "shift-puzzle-plan", Component: ShiftPuzzlePlanEditorBubble },
 ];

@@ -139,8 +139,8 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
       // staffDragType自体にURLが設定されている
       const url = e.dataTransfer.getData(staffDragType) || e.dataTransfer.getData(DRAG_KEYS.url);
       console.log("[Drop] staffDragType found, url:", url);
-      // URLからstaffIdを抽出: "gakkai-shift/staffs/:id"
-      const match = url.match(/gakkai-shift\/staffs?\/([^/]+)/);
+      // URLからstaffIdを抽出: "shift-puzzle/staffs/:id"
+      const match = url.match(/shift-puzzle\/staffs?\/([^/]+)/);
       console.log("[Drop] match:", match);
       if (match && onDropStaff) {
         const staffId = match[1];
@@ -232,7 +232,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                         const isAvailable = staff?.isAvailableAt(slot.id) ?? false;
                         const violation = getViolationForAssignment(assignment.id);
                         const hasViolation = !!violation;
-                        const assignmentUrl = buildAssignmentUrl?.(assignment.id) ?? `gakkai-shift/assignments/${assignment.id}`;
+                        const assignmentUrl = buildAssignmentUrl?.(assignment.id) ?? `shift-puzzle/assignments/${assignment.id}`;
                         const staffName = getStaffName(assignment.staffId);
                         return (
                           <ObjectView

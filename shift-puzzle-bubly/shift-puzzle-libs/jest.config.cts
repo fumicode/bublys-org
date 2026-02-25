@@ -10,7 +10,7 @@ const swcJestConfig = JSON.parse(
 swcJestConfig.swcrc = false;
 
 module.exports = {
-  displayName: '@bublys-org/gakkai-shift-libs',
+  displayName: '@bublys-org/shift-puzzle-libs',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   transform: {

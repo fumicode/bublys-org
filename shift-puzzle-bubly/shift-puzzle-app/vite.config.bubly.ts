@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
 /**
- * gakkai-shift-app をスタンドアロンバブリとしてビルドする設定
+ * shift-puzzle-app をスタンドアロンバブリとしてビルドする設定
  *
  * ビルドコマンド:
  *   npx vite build -c vite.config.bubly.ts
@@ -27,20 +27,20 @@ export default defineConfig({
     emptyOutDir: false,
     lib: {
       entry: resolve(__dirname, "src/bubly.ts"),
-      name: "GakkaiShiftBubly",
+      name: "ShiftPuzzleBubly",
       fileName: () => "bubly.js",
       formats: ["iife"],
     },
     rollupOptions: {
       // 共有依存関係は外部化（ホストアプリから提供される）
-      // gakkai-shift-libs と gakkai-shift-model はバンドルに含める（完全分離のため）
+      // shift-puzzle-libs と shift-puzzle-model はバンドルに含める（完全分離のため）
       external: (id) => {
-        // gakkai-shift-libs と gakkai-shift-model はバンドルに含める
+        // shift-puzzle-libs と shift-puzzle-model はバンドルに含める
         if (
-          id === "@bublys-org/gakkai-shift-libs" ||
-          id.startsWith("@bublys-org/gakkai-shift-libs/") ||
-          id === "@bublys-org/gakkai-shift-model" ||
-          id.startsWith("@bublys-org/gakkai-shift-model/")
+          id === "@bublys-org/shift-puzzle-libs" ||
+          id.startsWith("@bublys-org/shift-puzzle-libs/") ||
+          id === "@bublys-org/shift-puzzle-model" ||
+          id.startsWith("@bublys-org/shift-puzzle-model/")
         ) {
           return false;
         }
@@ -92,7 +92,7 @@ export default defineConfig({
           if (id === "@bublys-org/bubbles-ui" || id.startsWith("@bublys-org/bubbles-ui/")) {
             return "window.__BUBLYS_SHARED__.BubblesUI";
           }
-          // gakkai-shift-libs はバンドルに含まれるため、ここには来ない
+          // shift-puzzle-libs はバンドルに含まれるため、ここには来ない
           // MUI関連
           if (id.startsWith("@mui/material")) {
             return "window.__BUBLYS_SHARED__.MuiMaterial";

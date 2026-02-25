@@ -11,7 +11,7 @@ describe('App', () => {
   it('should have a greeting as the title', () => {
     const { getAllByText } = render(<App />);
     expect(
-      getAllByText(new RegExp('Welcome @bublys-org/gakkai-shift-app', 'gi'))
+      getAllByText(new RegExp('Welcome @bublys-org/shift-puzzle-app', 'gi'))
         .length > 0
     ).toBeTruthy();
   });
