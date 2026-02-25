@@ -13,7 +13,7 @@ export type BubbleContentRenderer = FC<BubbleContentRendererProps>;
 // BubbleRoute型
 export type BubbleRoute = {
   /** URLパターン（文字列またはRegExp）
-   * 文字列の場合: "gakkai-shift/staffs/:staffId" のように :param でパラメータを指定
+   * 文字列の場合: "shift-puzzle/staffs/:staffId" のように :param でパラメータを指定
    * RegExpの場合: 従来通りの正規表現（後方互換性のため）
    */
   pattern: string | RegExp;
@@ -32,7 +32,7 @@ const getPathPart = (url: string): string => {
 
 /**
  * パスパターン文字列を正規表現に変換
- * 例: "gakkai-shift/staffs/:staffId" → /^gakkai-shift\/staffs\/([^/]+)$/
+ * 例: "shift-puzzle/staffs/:staffId" → /^shift-puzzle\/staffs\/([^/]+)$/
  */
 export const patternToRegex = (pattern: string): RegExp => {
   const escaped = pattern
@@ -43,7 +43,7 @@ export const patternToRegex = (pattern: string): RegExp => {
 
 /**
  * パスパターンからパラメータ名を抽出
- * 例: "gakkai-shift/staffs/:staffId" → ["staffId"]
+ * 例: "shift-puzzle/staffs/:staffId" → ["staffId"]
  */
 export const extractParamNames = (pattern: string): string[] => {
   const matches = pattern.match(/:([a-zA-Z_][a-zA-Z0-9_]*)/g);

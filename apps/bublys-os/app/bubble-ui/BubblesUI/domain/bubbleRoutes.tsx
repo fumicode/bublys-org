@@ -6,8 +6,8 @@ import { useAppDispatch } from "@bublys-org/state-management";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
-// gakkai-shiftは動的ロードに移行（プラグインテスト）
-// import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
+// shift-puzzleは動的ロードに移行（プラグインテスト）
+// import { shiftPuzzleBubbleRoutes } from "@bublys-org/shift-puzzle-libs";
 import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）

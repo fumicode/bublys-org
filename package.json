@@ -89,10 +89,10 @@
     "bublys-libs/*",
     "memo",
     "memo-libs/*",
-    "gakkai-shift-bubly/gakkai-shift-model",
-    "gakkai-shift-bubly/gakkai-shift-libs",
+    "shift-puzzle-bubly/shift-puzzle-model",
+    "shift-puzzle-bubly/shift-puzzle-libs",
     "users-libs",
-    "gakkai-shift-bubly/*",
+    "shift-puzzle-bubly/*",
     "ekikyo-bubly/ekikyo-libs",
     "ekikyo-bubly/ekikyo-app"
   ]

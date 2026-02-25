@@ -37,7 +37,7 @@
       "path": "./bublys-libs/object-shell"
     },
     {
-      "path": "./gakkai-shift-bubly/gakkai-shift-model"
+      "path": "./shift-puzzle-bubly/shift-puzzle-model"
     },
     {
       "path": "./users-libs"
@@ -46,10 +46,10 @@
       "path": "./bublys-libs/bubbles-ui-util"
     },
     {
-      "path": "./gakkai-shift-bubly/gakkai-shift-libs"
+      "path": "./shift-puzzle-bubly/shift-puzzle-libs"
     },
     {
-      "path": "./gakkai-shift-bubly/gakkai-shift-app"
+      "path": "./shift-puzzle-bubly/shift-puzzle-app"
     },
     {
       "path": "./ekikyo-bubly/ekikyo-libs"
