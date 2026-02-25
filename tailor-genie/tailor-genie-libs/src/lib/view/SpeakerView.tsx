@@ -143,9 +143,19 @@ export const SpeakerView: FC<SpeakerViewProps> = ({
           <span style={{ fontWeight: "bold" }}>
             {speaker.name} の画面
           </span>
-          <span style={{ fontSize: 12, color: "#666" }}>
-            会話 #{conversation.id.slice(0, 8)}
-          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <a
+              href={`/convs/${conversation.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 11, color: "#007bff" }}
+            >
+              ページで開く
+            </a>
+            <span style={{ fontSize: 12, color: "#666" }}>
+              会話 #{conversation.id.slice(0, 8)}
+            </span>
+          </div>
         </div>
       </div>
 
