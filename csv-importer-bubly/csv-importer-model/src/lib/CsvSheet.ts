@@ -19,6 +19,17 @@ export type CsvSheetState = {
   readonly updatedAt: string;
 };
 
+// ========== PlaneObject ==========
+
+/** CSVの1行をラベル名ベースのプレーンオブジェクトに変換した型 */
+export type PlaneObject = {
+  /** 行のUUID（CsvRowState.idと同一） */
+  id: string;
+  /** タイトル列の値、未指定時はインデックス番号 */
+  name: string;
+  [key: string]: string;
+};
+
 // ========== Domain Model ==========
 
 export class CsvSheet {
@@ -149,6 +160,37 @@ export class CsvSheet {
 
   rename(name: string): CsvSheet {
     return this.withUpdatedState({ name });
+  }
+
+  // --- PlaneObject変換 ---
+
+  /** 指定行をPlaneObjectに変換する */
+  toPlaneObject(rowId: string, titleColumnId?: string): PlaneObject | undefined {
+    const index = this.state.rows.findIndex((r) => r.id === rowId);
+    if (index === -1) return undefined;
+    return this.buildPlaneObject(this.state.rows[index], index, titleColumnId);
+  }
+
+  /** 全行をPlaneObject配列に変換する */
+  toPlaneObjects(titleColumnId?: string): PlaneObject[] {
+    return this.state.rows.map((row, index) =>
+      this.buildPlaneObject(row, index, titleColumnId)
+    );
+  }
+
+  private buildPlaneObject(
+    row: CsvRowState,
+    index: number,
+    titleColumnId?: string,
+  ): PlaneObject {
+    const name = titleColumnId
+      ? (row.cells[titleColumnId] || `${index}`)
+      : `${index}`;
+    const obj: PlaneObject = { id: row.id, name };
+    for (const col of this.state.columns) {
+      obj[col.name] = row.cells[col.id] ?? "";
+    }
+    return obj;
   }
 
   // --- Export ---

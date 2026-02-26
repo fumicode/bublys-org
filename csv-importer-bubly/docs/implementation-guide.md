@@ -71,6 +71,30 @@ type CsvSheetState = {
 };
 ```
 
+// CSVの1行をラベル名ベースのプレーンオブジェクトに変換した型
+type PlaneObject = {
+  id: string;      // 行のUUID（CsvRowState.idと同一）
+  name: string;    // タイトル列の値、未指定時はインデックス番号
+  [key: string]: string;  // ラベル名 → セル値
+  // 例: { id: "a3f2-...", name: "田中", "名前": "田中", "メール": "tanaka@example.com" }
+};
+```
+
+**PlaneObjectとは？**
+
+CSVの内部データ（columnId → valueの辞書形式）を、**ラベル名をキーとした読みやすいプレーンオブジェクト**に変換した型。`id`は行のUUID（CsvRowState.idと同一）、`name`はタイトル列の値（未指定時はインデックス番号）。残りのプロパティはそのままラベル名がキー。
+
+`id`がrowのUUIDと同一なので、PlaneObject.idをそのままバブルルートのパラメータとして使える（index→UUIDのマッピングが不要）。
+
+```typescript
+// 変換例:
+// row.id = "a3f2-..."
+// columns = [{ id: "abc", name: "名前" }, { id: "def", name: "メール" }]
+// row.cells = { "abc": "田中", "def": "tanaka@ex.com" }
+// titleColumnId = "abc"
+// → { id: "a3f2-...", name: "田中", "名前": "田中", "メール": "tanaka@ex.com" }
+```
+
 **なぜcellsが配列ではなくRecord（辞書）なのか？**
 → 列の追加・削除・並び替えに強いため。配列だと「3番目の値」のような位置依存になるが、辞書なら列IDで紐づくので列順が変わっても安全。
 
@@ -87,6 +111,8 @@ type CsvSheetState = {
 | `sheet.deleteRow(rowId)` | 行を削除 | 新しいCsvSheet |
 | `sheet.updateCell(rowId, columnId, value)` | セルの値を更新 | 新しいCsvSheet |
 | `sheet.rename(name)` | シート名を変更 | 新しいCsvSheet |
+| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換 | PlaneObject \| undefined |
+| `sheet.toPlaneObjects(titleColumnId?)` | 全行をPlaneObject配列に変換 | PlaneObject[] |
 | `sheet.toCsvText()` | CSV形式のテキストに変換（エクスポート用） | 文字列 |
 | `sheet.toJSON()` | 保存用のプレーンオブジェクトに変換 | CsvSheetState |
 | `CsvSheet.fromJSON(json)` | プレーンオブジェクトからCsvSheetを復元 | CsvSheet |
@@ -307,13 +333,14 @@ DomainRegistryProvider（ドメインオブジェクト定義を提供）
 | `onAddColumn` | `(name) => void` | 列追加時 |
 | `onDeleteColumn` | `(columnId) => void` | 列削除時 |
 | `onExportCsv` | `() => void` | 右上の「エクスポート」ボタン押下時（省略可能） |
+| `onOpenObjects` | `() => void` | 右上の「オブジェクト」ボタン押下時（省略可能） |
 | `onOpenWorldLine` | `() => void` | 右上の「世界線」ボタン押下時（省略可能） |
 
 #### 画面構成
 
 ```
 ┌─────────────────────────────────────────────┐
-│ スタッフ一覧      [エクスポート] [世界線] │  ← シート名 + 右上にエクスポート/世界線ボタン
+│ スタッフ一覧  [オブジェクト] [エクスポート] [世界線] │  ← シート名 + 右上にオブジェクト/エクスポート/世界線ボタン
 ├────┬──────────┬──────────────────┬─────┬─────┤
 │ #  │ 名前   × │ メール         × │ + ← │     │  ← ヘッダー行（クリックで編集、×で削除、+で追加）
 ├────┼──────────┼──────────────────┼─────┼─────┤
@@ -554,6 +581,8 @@ interface CsvSheetMeta {
 | `csv-importer/sheets` | SheetListFeature（シート一覧） | なし |
 | `csv-importer/sheets/:sheetId` | SheetEditorFeature（シート編集） | `sheetId` |
 | `csv-importer/sheets/:sheetId/world-line` | WorldLineFeature（世界線ビュー） | `sheetId` |
+| `csv-importer/sheets/:sheetId/objects` | CsvObjectListFeature（オブジェクト一覧） | `sheetId` |
+| `csv-importer/sheets/:sheetId/objects/:rowId` | CsvObjectDetailFeature（オブジェクト詳細） | `sheetId`, `rowId` |
 
 ---
 
@@ -601,6 +630,120 @@ const CsvImporterBubly: Bubly = {
 
 ---
 
+## 8. オブジェクトビュー（csv-importer-libs/ui + feature）
+
+### 概要
+
+CSVシートの各行を`PlaneObject`型に変換して「オブジェクト」として表示する機能。CSVの内部データ（columnId → value）をラベル名ベースのプレーンオブジェクトに変換し、key-value形式で表示する。
+
+#### データフロー
+
+```
+CsvSheet.toPlaneObjects(titleColumnId)
+    ↓ PlaneObject[]
+CsvObjectListView（カードリスト表示）
+    ↓
+CsvSheet.toPlaneObject(rowId, titleColumnId)
+    ↓ PlaneObject
+CsvObjectDetailView（dl グリッド表示 + JSON表示トグル）
+```
+
+#### ナビゲーションフロー
+
+```
+SheetEditorView [「オブジェクト」ボタン]
+    ↓ openBubble("csv-importer/sheets/{sheetId}/objects", bubbleId)
+CsvObjectListFeature → CsvObjectListView
+    ↓ openBubble("csv-importer/sheets/{sheetId}/objects/{rowId}", bubbleId)
+CsvObjectDetailFeature → CsvObjectDetailView
+```
+
+### CsvSheetMeta の拡張
+
+```typescript
+interface CsvSheetMeta {
+  id: string;
+  name: string;
+  googleSheets?: GoogleSheetsLink;
+  titleColumnId?: string;  // オブジェクトのタイトルに使う列
+}
+```
+
+追加されたコンテキストAPI:
+
+| API | 説明 |
+|-----|------|
+| `setTitleColumn(sheetId, columnId)` | タイトル列を設定 |
+
+### `src/ui/CsvObjectDetailView.tsx`
+
+**役割**: PlaneObjectの全プロパティをkey-value形式で表示する。StaffDetailViewの`<dl>`グリッドパターンを参考にした設計。JSON表示トグル付き。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `object` | `PlaneObject` | 表示するオブジェクト |
+
+#### 表示モード
+
+- **プロパティ表示**（デフォルト）: `<dl>` グリッド (`grid-template-columns: auto 1fr`) で`id`/`name`以外のプロパティをkey-value表示
+- **JSON表示**: 右上の「JSON」ボタンをクリックすると `JSON.stringify(object, null, 2)` をダーク背景のpreで表示
+
+### `src/ui/CsvObjectListView.tsx`
+
+**役割**: PlaneObject配列をオブジェクトカードのリストとして表示する。タイトル列の選択ドロップダウン付き。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheetName` | `string` | シート名（タイトル表示） |
+| `columns` | `CsvColumnState[]` | 列の定義（ドロップダウン用） |
+| `objects` | `PlaneObject[]` | 表示するオブジェクト配列 |
+| `titleColumnId` | `string?` | タイトルに使う列ID |
+| `onChangeTitleColumn` | `(columnId) => void` | タイトル列変更時 |
+| `onSelectObject` | `(objectId) => void` | オブジェクト選択時（PlaneObject.idを渡す） |
+| `buildObjectUrl` | `(objectId) => string` | オブジェクトのバブルURLを生成 |
+
+- タイトル未選択時はインデックス番号をnameに表示
+- 各カードにはname + 最初の3プロパティ（`id`/`name`除外）のプレビューを表示
+- ObjectViewでラップしてドラッグ&ドロップ対応
+
+### `src/feature/CsvObjectDetailFeature.tsx`
+
+**役割**: CsvObjectDetailView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+| Props | 型 | 説明 |
+|-------|---|------|
+| `sheetId` | `string` | シートID |
+| `rowId` | `string` | 行ID（UUID） |
+
+- `useCasScope(sheetScopeId(sheetId))` で同じ世界線スコープに接続
+- `sheet.toPlaneObject(rowId, titleColumnId)` でPlaneObjectに変換して渡す
+
+### `src/feature/CsvObjectListFeature.tsx`
+
+**役割**: CsvObjectListView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+| Props | 型 | 説明 |
+|-------|---|------|
+| `sheetId` | `string` | シートID |
+| `bubbleId` | `string?` | バブルID（オブジェクト詳細をpopChildで開くために必要） |
+
+- `sheet.toPlaneObjects(titleColumnId)` でPlaneObject配列に変換して渡す
+- `onSelectObject(objectId)` で PlaneObject.id（= rowのUUID）をそのままバブルURLに使用
+- `getSheetMeta(sheetId)` で titleColumnId 取得
+- `setTitleColumn(sheetId, columnId)` でタイトル列変更
+
+### SheetEditorView / SheetEditorFeature の変更
+
+- SheetEditorViewに `onOpenObjects?: () => void` propを追加
+- ヘッダーの `e-header-actions` に紫系の「オブジェクト」ボタンを追加
+- SheetEditorFeatureに `handleOpenObjects` を追加（handleOpenWorldLineと同パターン）
+
+---
+
 ## ファイル一覧（実装したもののみ）
 
 ```
@@ -619,15 +762,19 @@ csv-importer-libs/
     index.ts              ← エクスポート定義
   src/ui/
     SheetListView.tsx     ← シート一覧の見た目
-    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上に世界線/Sheetsボタン）
+    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上にオブジェクト/世界線/Sheetsボタン）
     WorldLineView.tsx     ← 世界線グラフのDAGツリー表示（汎用）
     GoogleSheetsPanel.tsx ← Google Sheets連携パネルUI（接続/Push/Pull）
+    CsvObjectListView.tsx ← オブジェクト一覧の見た目（タイトル列選択 + カードリスト）
+    CsvObjectDetailView.tsx ← オブジェクト詳細の見た目（key-value dlグリッド）
     index.ts              ← エクスポート定義
   src/feature/
-    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets + Google Sheetsリンク管理）
+    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets + Google Sheetsリンク管理 + タイトル列管理）
     SheetListFeature.tsx  ← シート一覧の世界線グラフ接続
-    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線ビュー起動 + Google Sheets同期）
+    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線/オブジェクトビュー起動 + Google Sheets同期）
     WorldLineFeature.tsx  ← 世界線ビューの世界線グラフ接続（ノード移動・要約表示）
+    CsvObjectListFeature.tsx ← オブジェクト一覧の世界線グラフ接続
+    CsvObjectDetailFeature.tsx ← オブジェクト詳細の世界線グラフ接続
     useGoogleSheetsAuth.ts← Google OAuth2認証フック（GIS動的ロード + トークン管理）
     googleSheetsApi.ts    ← Google Sheets API呼び出し + CsvSheet↔2D配列変換
     index.ts              ← エクスポート定義

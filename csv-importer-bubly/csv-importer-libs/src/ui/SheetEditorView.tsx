@@ -14,6 +14,7 @@ type SheetEditorViewProps = {
   onDeleteRow: (rowId: string) => void;
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
+  onOpenObjects?: () => void;
   onOpenWorldLine?: () => void;
   onExportCsv?: () => void;
   googleSheetsPanel?: ReactNode;
@@ -38,6 +39,7 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteRow,
   onAddColumn,
   onDeleteColumn,
+  onOpenObjects,
   onOpenWorldLine,
   onExportCsv,
   googleSheetsPanel,
@@ -131,6 +133,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
       <div className="e-header">
         <h3 className="e-title">{sheetName}</h3>
         <div className="e-header-actions">
+          {onOpenObjects && (
+            <button className="e-objects-btn" onClick={onOpenObjects}>
+              オブジェクト
+            </button>
+          )}
           {onExportCsv && (
             <button className="e-export-btn" onClick={onExportCsv}>
               エクスポート
@@ -264,6 +271,21 @@ const StyledEditor = styled.div`
   .e-header-actions {
     display: flex;
     gap: 8px;
+  }
+
+  .e-objects-btn {
+    padding: 4px 12px;
+    border: 1px solid #ce93d8;
+    border-radius: 4px;
+    background: #f3e5f5;
+    color: #7b1fa2;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+
+    &:hover {
+      background: #e1bee7;
+    }
   }
 
   .e-export-btn {

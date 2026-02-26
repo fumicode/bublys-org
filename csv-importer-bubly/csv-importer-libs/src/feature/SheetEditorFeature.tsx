@@ -118,6 +118,12 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     URL.revokeObjectURL(url);
   }, [sheet]);
 
+  const handleOpenObjects = useCallback(() => {
+    if (bubbleId) {
+      openBubble(`csv-importer/sheets/${sheetId}/objects`, bubbleId);
+    }
+  }, [openBubble, sheetId, bubbleId]);
+
   const handleOpenWorldLine = useCallback(() => {
     if (bubbleId) {
       openBubble(`csv-importer/sheets/${sheetId}/world-line`, bubbleId);
@@ -191,6 +197,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
       onExportCsv={handleExportCsv}
+      onOpenObjects={bubbleId ? handleOpenObjects : undefined}
       onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
       googleSheetsPanel={
         <GoogleSheetsPanel

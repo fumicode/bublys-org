@@ -50,6 +50,7 @@ export interface CsvSheetMeta {
   id: string;
   name: string;
   googleSheets?: GoogleSheetsLink;
+  titleColumnId?: string;
 }
 
 const CSV_DOMAIN_OBJECTS = defineDomainObjects({
@@ -77,6 +78,7 @@ interface CsvSheetContextValue {
   deleteSheet: (sheetId: string) => void;
   updateSheetMeta: (sheetId: string, name: string) => void;
   getSheetMeta: (sheetId: string) => CsvSheetMeta | undefined;
+  setTitleColumn: (sheetId: string, columnId: string) => void;
   linkGoogleSheets: (sheetId: string, spreadsheetId: string, sheetName?: string) => void;
   unlinkGoogleSheets: (sheetId: string) => void;
   updateLastSyncedAt: (sheetId: string) => void;
@@ -147,6 +149,17 @@ function CsvSheetInner({ children }: { children: React.ReactNode }) {
     [sheetMetas]
   );
 
+  // タイトル列を設定
+  const setTitleColumn = useCallback(
+    (sheetId: string, columnId: string) => {
+      const shell = metaShells.find((s) => s.id === sheetId);
+      if (shell) {
+        shell.update((prev) => ({ ...prev, titleColumnId: columnId }));
+      }
+    },
+    [metaShells]
+  );
+
   // Google Sheetsリンクを設定
   const linkGoogleSheets = useCallback(
     (sheetId: string, spreadsheetId: string, sheetName?: string) => {
@@ -199,11 +212,12 @@ function CsvSheetInner({ children }: { children: React.ReactNode }) {
       deleteSheet,
       updateSheetMeta,
       getSheetMeta,
+      setTitleColumn,
       linkGoogleSheets,
       unlinkGoogleSheets,
       updateLastSyncedAt,
     }),
-    [sheetMetas, addSheet, deleteSheet, updateSheetMeta, getSheetMeta, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt]
+    [sheetMetas, addSheet, deleteSheet, updateSheetMeta, getSheetMeta, setTitleColumn, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt]
   );
 
   return (
