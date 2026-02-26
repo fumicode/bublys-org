@@ -80,6 +80,15 @@
     },
     {
       "path": "./sekaisen-igo-bubly/sekaisen-igo-app"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-model"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-libs"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-app"
     }
   ]
 }
