@@ -30,7 +30,7 @@ const WorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
 /** CSV Importer のバブルルート定義 */
 export const csvImporterBubbleRoutes: BubbleRoute[] = [
   {
-    pattern: "csv-importer/sheets/:sheetId/history",
+    pattern: "csv-importer/sheets/:sheetId/world-line",
     type: "sheet-world-line",
     bubbleOptions: { contentBackground: "transparent" },
     Component: WorldLineBubble,

@@ -96,7 +96,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
 
   const handleOpenWorldLine = useCallback(() => {
     if (bubbleId) {
-      openBubble(`csv-importer/sheets/${sheetId}/history`, bubbleId);
+      openBubble(`csv-importer/sheets/${sheetId}/world-line`, bubbleId);
     }
   }, [openBubble, sheetId, bubbleId]);
 
