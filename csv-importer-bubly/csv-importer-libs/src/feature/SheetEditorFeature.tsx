@@ -94,6 +94,18 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     [sheetShell]
   );
 
+  const handleExportCsv = useCallback(() => {
+    if (!sheet) return;
+    const csvText = sheet.toCsvText();
+    const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${sheet.name}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sheet]);
+
   const handleOpenWorldLine = useCallback(() => {
     if (bubbleId) {
       openBubble(`csv-importer/sheets/${sheetId}/world-line`, bubbleId);
@@ -115,6 +127,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onDeleteRow={handleDeleteRow}
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
+      onExportCsv={handleExportCsv}
       onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
     />
   );

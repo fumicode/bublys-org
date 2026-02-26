@@ -15,7 +15,7 @@ const buildSheetUrl = (sheetId: string) => `csv-importer/sheets/${sheetId}`;
 export const SheetListFeature: FC<SheetListFeatureProps> = ({
   onSheetSelect,
 }) => {
-  const { sheetMetas, addSheet } = useCsvSheets();
+  const { sheetMetas, addSheet, deleteSheet } = useCsvSheets();
   const { openBubble } = useContext(BubblesContext);
 
   const handleCreateSheet = () => {
@@ -30,6 +30,10 @@ export const SheetListFeature: FC<SheetListFeatureProps> = ({
     openBubble(buildSheetUrl(sheet.id), "root");
   };
 
+  const handleDeleteSheet = (sheetId: string) => {
+    deleteSheet(sheetId);
+  };
+
   const handleSheetClick = (sheetId: string) => {
     onSheetSelect?.(sheetId);
   };
@@ -41,6 +45,7 @@ export const SheetListFeature: FC<SheetListFeatureProps> = ({
       onSheetClick={handleSheetClick}
       onCreateSheet={handleCreateSheet}
       onImportCsv={handleImportCsv}
+      onDeleteSheet={handleDeleteSheet}
     />
   );
 };

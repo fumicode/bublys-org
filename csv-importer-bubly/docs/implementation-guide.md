@@ -267,6 +267,7 @@ DomainRegistryProvider（ドメインオブジェクト定義を提供）
 | `onSheetClick` | `(sheetId) => void` | シートクリック時のコールバック |
 | `onCreateSheet` | `() => void` | 「新規作成」ボタン押下時 |
 | `onImportCsv` | `(name, csvText) => void` | CSVインポート完了時 |
+| `onDeleteSheet` | `(sheetId) => void` | シート削除ボタン押下時（省略可能） |
 
 #### 画面構成
 
@@ -274,9 +275,9 @@ DomainRegistryProvider（ドメインオブジェクト定義を提供）
 ┌─────────────────────────────┐
 │ [+ 新規作成] [CSVインポート]  │  ← アクションボタン
 ├─────────────────────────────┤
-│ 📊 スタッフ一覧              │  ← シートカード（ObjectViewでラップ）
+│ 📊 スタッフ一覧           ×  │  ← シートカード（ObjectViewでラップ）+ 削除ボタン
 ├─────────────────────────────┤     ドラッグ&ドロップ対応
-│ 📊 予算表                   │
+│ 📊 予算表                 ×  │
 └─────────────────────────────┘
 ```
 
@@ -305,13 +306,14 @@ DomainRegistryProvider（ドメインオブジェクト定義を提供）
 | `onDeleteRow` | `(rowId) => void` | 行削除時 |
 | `onAddColumn` | `(name) => void` | 列追加時 |
 | `onDeleteColumn` | `(columnId) => void` | 列削除時 |
+| `onExportCsv` | `() => void` | 右上の「エクスポート」ボタン押下時（省略可能） |
 | `onOpenWorldLine` | `() => void` | 右上の「世界線」ボタン押下時（省略可能） |
 
 #### 画面構成
 
 ```
 ┌─────────────────────────────────────────────┐
-│ スタッフ一覧                    [世界線] │  ← シート名 + 右上に世界線ボタン
+│ スタッフ一覧      [エクスポート] [世界線] │  ← シート名 + 右上にエクスポート/世界線ボタン
 ├────┬──────────┬──────────────────┬─────┬─────┤
 │ #  │ 名前   × │ メール         × │ + ← │     │  ← ヘッダー行（クリックで編集、×で削除、+で追加）
 ├────┼──────────┼──────────────────┼─────┼─────┤
@@ -380,6 +382,7 @@ Feature層 → shell.update() → 世界線に自動コミット → 画面再�
 |------------|---------|
 | `handleCreateSheet` | `CsvSheet.create(...)` で新シートを作成 → `addSheet(sheet)` でメタ登録+スコープ作成 → `openBubble(...)` でエディタバブルを開く |
 | `handleImportCsv` | `CsvSheet.fromCsvText(...)` でCSVをパース → `addSheet(sheet)` → エディタバブルを開く |
+| `handleDeleteSheet` | `deleteSheet(sheetId)` でメタ削除+スコープ削除 |
 | `handleSheetClick` | 親コンポーネントに通知するだけ |
 
 ---
@@ -411,6 +414,7 @@ Feature層 → shell.update() → 世界線に自動コミット → 画面再�
 | `handleDeleteRow(rowId)` | `s.deleteRow(rowId)` |
 | `handleAddColumn(name)` | `s.addColumn(name)` |
 | `handleDeleteColumn(colId)` | `s.deleteColumn(colId)` |
+| `handleExportCsv()` | `sheet.toCsvText()` → Blob → `<a>` download でCSVファイルをダウンロード |
 
 **shell.update()の仕組み**:
 ```typescript

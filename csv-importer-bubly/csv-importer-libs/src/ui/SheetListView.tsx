@@ -17,6 +17,7 @@ type SheetListViewProps = {
   onSheetClick?: (sheetId: string) => void;
   onCreateSheet?: () => void;
   onImportCsv?: (name: string, csvText: string) => void;
+  onDeleteSheet?: (sheetId: string) => void;
 };
 
 export const SheetListView: FC<SheetListViewProps> = ({
@@ -25,6 +26,7 @@ export const SheetListView: FC<SheetListViewProps> = ({
   onSheetClick,
   onCreateSheet,
   onImportCsv,
+  onDeleteSheet,
 }) => {
   const handleFileImport = () => {
     const input = document.createElement("input");
@@ -61,20 +63,34 @@ export const SheetListView: FC<SheetListViewProps> = ({
         <ul className="e-list">
           {sheets.map((sheet) => (
             <li key={sheet.id} className="e-item">
-              <ObjectView
-                type="CsvSheet"
-                url={buildSheetUrl(sheet.id)}
-                label={sheet.name}
-                draggable={true}
-                onClick={() => onSheetClick?.(sheet.id)}
-              >
-                <div className="e-content">
-                  <TableChartIcon fontSize="small" className="e-icon" />
-                  <div className="e-text">
-                    <div className="e-name">{sheet.name}</div>
+              <div className="e-item-row">
+                <ObjectView
+                  type="CsvSheet"
+                  url={buildSheetUrl(sheet.id)}
+                  label={sheet.name}
+                  draggable={true}
+                  onClick={() => onSheetClick?.(sheet.id)}
+                >
+                  <div className="e-content">
+                    <TableChartIcon fontSize="small" className="e-icon" />
+                    <div className="e-text">
+                      <div className="e-name">{sheet.name}</div>
+                    </div>
                   </div>
-                </div>
-              </ObjectView>
+                </ObjectView>
+                {onDeleteSheet && (
+                  <button
+                    className="e-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSheet(sheet.id);
+                    }}
+                    title="シートを削除"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -137,6 +153,32 @@ const StyledSheetList = styled.div`
 
     &:last-child {
       border-bottom: none;
+    }
+
+    .e-item-row {
+      display: flex;
+      align-items: center;
+
+      > *:first-child {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .e-delete-btn {
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 1.1em;
+      padding: 2px 6px;
+      margin-left: auto;
+      line-height: 1;
+      flex-shrink: 0;
+
+      &:hover {
+        color: #d32f2f;
+      }
     }
 
     .e-content {

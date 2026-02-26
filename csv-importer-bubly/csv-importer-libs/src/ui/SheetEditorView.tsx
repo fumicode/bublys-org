@@ -15,6 +15,7 @@ type SheetEditorViewProps = {
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
   onOpenWorldLine?: () => void;
+  onExportCsv?: () => void;
 };
 
 type EditingCell = {
@@ -37,6 +38,7 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onAddColumn,
   onDeleteColumn,
   onOpenWorldLine,
+  onExportCsv,
 }) => {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editingHeader, setEditingHeader] = useState<EditingHeader | null>(null);
@@ -125,11 +127,18 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
     <StyledEditor>
       <div className="e-header">
         <h3 className="e-title">{sheetName}</h3>
-        {onOpenWorldLine && (
-          <button className="e-worldline-btn" onClick={onOpenWorldLine}>
-            世界線
-          </button>
-        )}
+        <div className="e-header-actions">
+          {onExportCsv && (
+            <button className="e-export-btn" onClick={onExportCsv}>
+              エクスポート
+            </button>
+          )}
+          {onOpenWorldLine && (
+            <button className="e-worldline-btn" onClick={onOpenWorldLine}>
+              世界線
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="e-table-wrapper">
@@ -237,6 +246,26 @@ const StyledEditor = styled.div`
 
   .e-title {
     margin: 0;
+  }
+
+  .e-header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .e-export-btn {
+    padding: 4px 12px;
+    border: 1px solid #a5d6a7;
+    border-radius: 4px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+
+    &:hover {
+      background: #c8e6c9;
+    }
   }
 
   .e-worldline-btn {
