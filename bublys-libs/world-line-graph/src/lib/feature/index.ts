@@ -18,6 +18,7 @@ export {
   loadStatesFromIDB,
 } from './IndexedDBStore';
 export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
+export { startCrossTabReceiver } from './crossTabSync';
 export { initWorldLineGraph } from './initWorldLineGraph';
 export { ObjectShell } from './ObjectShell';
 export { useScopeManager } from './useScopeManager';
