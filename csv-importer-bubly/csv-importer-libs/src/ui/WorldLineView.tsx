@@ -25,9 +25,6 @@ const COLOR_PALETTE = [
   "#ba68c8", "#4db6ac", "#fff176", "#f06292",
 ];
 
-const MAX_INDENT = 120;
-const INDENT_PER_LEVEL = 16;
-
 // ============================================================================
 // WorldLineView — DAGツリー表示
 // ============================================================================
@@ -85,9 +82,36 @@ export const WorldLineView: FC<WorldLineViewProps> = ({
         if (apex.parentId) onSelectNode(apex.parentId);
         return;
       }
-      // → 子に移動
+      // → 子に移動（同じ世界線を優先）
       if (e.key === "ArrowRight") {
         e.preventDefault();
+        const children = childrenMap[apexNodeId] ?? [];
+        if (children.length > 0) {
+          const sameLine = children.find((id) => nodes[id]?.worldLineId === apex.worldLineId);
+          onSelectNode(sameLine ?? children[0]);
+        }
+        return;
+      }
+      // ↑ 親に移動（←と同じ）
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (apex.parentId) onSelectNode(apex.parentId);
+        return;
+      }
+      // ↓ 分岐点では→と同じ（子に進む）、分岐直後では兄弟間を循環
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        // 分岐直後（親が複数の子を持つ）→ 兄弟間を循環
+        if (apex.parentId) {
+          const siblings = childrenMap[apex.parentId] ?? [];
+          if (siblings.length > 1) {
+            const myIdx = siblings.indexOf(apexNodeId);
+            const nextIdx = (myIdx + 1) % siblings.length;
+            onSelectNode(siblings[nextIdx]);
+            return;
+          }
+        }
+        // 分岐点（自分が複数の子を持つ）→ →と同じ動作
         const children = childrenMap[apexNodeId] ?? [];
         if (children.length > 0) {
           const sameLine = children.find((id) => nodes[id]?.worldLineId === apex.worldLineId);
@@ -104,6 +128,10 @@ export const WorldLineView: FC<WorldLineViewProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [handleKeyDown]);
 
+  /** ノードのボタン高さ（接続線の中心位置計算用） */
+  const NODE_H = 26;
+  const GUTTER_W = 24;
+
   function renderNode(nodeId: string, depth: number): React.ReactNode {
     const node: WorldNode = nodes[nodeId];
     const children = childrenMap[nodeId] ?? [];
@@ -111,30 +139,97 @@ export const WorldLineView: FC<WorldLineViewProps> = ({
     const color = worldLineColors[node.worldLineId] ?? "#aaa";
     const summary = renderNodeSummary ? renderNodeSummary(nodeId) : "";
     const changedLabel = node.changedRefs.map((r) => r.id).join(", ");
-    const indent = Math.min(depth * INDENT_PER_LEVEL, MAX_INDENT);
+    const isFork = children.length > 1;
 
     return (
-      <div key={nodeId} style={{ marginLeft: indent }}>
+      <div key={nodeId}>
         <button
           onClick={() => onSelectNode(nodeId)}
           onDoubleClick={() => onSelectNodeAndClose?.(nodeId)}
           style={{
             ...styles.dagNode,
             borderColor: color,
-            backgroundColor: isApex
-              ? color
-              : "rgba(255, 255, 255, 0.15)",
-            color: isApex ? "#1a1a2e" : color,
+            backgroundColor: isApex ? color : "#fff",
+            color: isApex ? "#fff" : "#333",
             fontWeight: isApex ? "bold" : "normal",
           }}
           title={`Node: ${nodeId.slice(0, 8)}...\nWorldLine: ${node.worldLineId.slice(0, 12)}...\nChanged: ${changedLabel}`}
         >
-          <span style={styles.dagNodeDot}>●</span>
+          <span style={{ ...styles.dagNodeDot, color }}>{"\u25CF"}</span>
           <span style={styles.dagNodeId}>{nodeId.slice(0, 6)}</span>
           {summary && <span style={styles.dagNodeSummary}>[{summary}]</span>}
           {isApex && <span style={styles.apexBadge}>現在</span>}
         </button>
-        {children.map((childId) => renderNode(childId, depth + 1))}
+
+        {/* 分岐表示: CSS border で接続線を描画 */}
+        {isFork ? (
+          <div style={{ marginLeft: 10, marginTop: 2 }}>
+            {children.map((childId, i) => {
+              const childColor = worldLineColors[nodes[childId]?.worldLineId] ?? "#aaa";
+              const isLast = i === children.length - 1;
+              return (
+                <div key={childId} style={{ display: "flex" }}>
+                  {/* ガター: 縦線 + 横線 + 矢印（白地 + 色アウトライン） */}
+                  <div
+                    style={{
+                      width: GUTTER_W,
+                      flexShrink: 0,
+                      position: "relative",
+                    }}
+                  >
+                    {/* 縦線 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: 3,
+                        height: isLast ? NODE_H / 2 + 1 : "100%",
+                        background: childColor,
+                        borderRadius: 1,
+                      }}
+                    />
+                    {/* 横線 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: NODE_H / 2 - 1,
+                        left: 2,
+                        width: GUTTER_W - 8,
+                        height: 3,
+                        background: childColor,
+                        borderRadius: 1,
+                      }}
+                    />
+                    {/* 矢印 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: NODE_H / 2 - 6,
+                        right: 2,
+                        fontSize: 10,
+                        lineHeight: "12px",
+                        color: childColor,
+                      }}
+                    >
+                      {"\u25B6"}
+                    </div>
+                  </div>
+                  {/* ノード本体 */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {renderNode(childId, depth + 1)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          children.map((childId) => (
+            <div key={childId} style={{ marginLeft: 16, marginTop: 2 }}>
+              {renderNode(childId, depth + 1)}
+            </div>
+          ))
+        )}
       </div>
     );
   }
@@ -197,7 +292,7 @@ const styles: Record<string, React.CSSProperties> = {
   dagTree: {
     display: "flex",
     flexDirection: "column",
-    gap: 4,
+    gap: 2,
   },
   dagNode: {
     display: "inline-flex",
