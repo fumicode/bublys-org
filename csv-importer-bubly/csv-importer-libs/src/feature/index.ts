@@ -1,4 +1,13 @@
-export { CsvSheetProvider, useCsvSheets, sheetScopeId } from "./CsvSheetProvider.js";
+export { CsvSheetProvider, useCsvSheets, sheetScopeId, useGoogleClientId } from "./CsvSheetProvider.js";
+export type { CsvSheetMeta, GoogleSheetsLink } from "./CsvSheetProvider.js";
 export { SheetListFeature } from "./SheetListFeature.js";
 export { SheetEditorFeature } from "./SheetEditorFeature.js";
 export { WorldLineFeature } from "./WorldLineFeature.js";
+export { useGoogleSheetsAuth } from "./useGoogleSheetsAuth.js";
+export {
+  pushToGoogleSheets,
+  pullFromGoogleSheets,
+  parseSpreadsheetUrl,
+  csvSheetToValues,
+  valuesToCsvSheet,
+} from "./googleSheetsApi.js";

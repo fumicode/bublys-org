@@ -25,7 +25,7 @@ export function App() {
       persistKey="csv-importer-standalone"
       initialBubbleUrls={['csv-importer/sheets']}
     >
-      <CsvSheetProvider>
+      <CsvSheetProvider googleClientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <BublyApp
           title="表計算"
           subtitle="Standalone • Port 4200"

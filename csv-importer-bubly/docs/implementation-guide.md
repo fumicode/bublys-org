@@ -426,7 +426,124 @@ sheetShell.update((s) => s.updateCell(rowId, columnId, value));
 
 ---
 
-## 6. アプリ設定（csv-importer-app）
+## 6. Google Sheets連携（csv-importer-libs/feature + ui）
+
+### 概要
+
+Google スプレッドシートとの双方向手動同期機能。ブラウザから直接Google Sheets APIを呼び出すサーバーレス（SPA）方式。
+
+#### アーキテクチャ
+
+```
+┌─ UI層 ──────────────────────────────────────┐
+│  SheetEditorView                             │
+│    └─ GoogleSheetsPanel（接続/Push/Pull UI） │
+├─ Feature層 ──────────────────────────────────┤
+│  SheetEditorFeature                          │
+│    ├─ useGoogleSheetsAuth（OAuth2トークン）   │
+│    └─ googleSheetsApi（API呼び出し）          │
+│  CsvSheetProvider                            │
+│    └─ CsvSheetMeta拡張（googleSheets link）  │
+├─ Domain層 ───────────────────────────────────┤
+│  CsvSheet（既存: toJSON/fromJSON）           │
+│  ※ 2D配列変換はgoogleSheetsApi内で実装      │
+└──────────────────────────────────────────────┘
+```
+
+### `src/feature/useGoogleSheetsAuth.ts`
+
+**役割**: Google Identity Services (GIS) を動的ロードしてOAuth2トークンを管理するフック。
+
+#### 提供するAPI
+
+| API | 型 | 説明 |
+|-----|---|------|
+| `accessToken` | `string \| null` | 現在のアクセストークン |
+| `isSignedIn` | `boolean` | 認証済みかどうか |
+| `requestAccess()` | `Promise<string>` | OAuth2ポップアップ→トークン返却 |
+| `signOut()` | `void` | トークン破棄 |
+
+- GISスクリプト（`accounts.google.com/gsi/client`）を動的にロード（1回のみ）
+- スコープ: `https://www.googleapis.com/auth/spreadsheets`
+- クライアントID: `import.meta.env.VITE_GOOGLE_CLIENT_ID`（`.env.example`参照）
+- トークンはメモリ内に保持（セッション単位、永続化しない）
+
+### `src/feature/googleSheetsApi.ts`
+
+**役割**: Google Sheets REST APIの呼び出しとCsvSheet↔2D配列のデータ変換。
+
+#### 関数一覧
+
+| 関数 | 説明 |
+|------|------|
+| `csvSheetToValues(sheet)` | CsvSheet → 2D文字列配列（ヘッダー行 + データ行） |
+| `valuesToCsvSheet(values, existing)` | 2D配列 → CsvSheet（既存のカラムID/行IDを名前/位置で可能な限り再利用） |
+| `parseSpreadsheetUrl(url)` | スプレッドシートURLからIDを抽出（直接ID入力も対応） |
+| `pushToGoogleSheets(token, id, sheet, sheetName?)` | ローカル→Google Sheets（clear + PUT） |
+| `pullFromGoogleSheets(token, id, existing, sheetName?)` | Google Sheets→ローカル |
+
+**Push処理**: 書き込み前に`clear`で既存データをクリア（行数が減った場合のゴミ防止）→ `PUT values`でRAW書き込み。
+**Pull処理**: `GET values`で2D配列を取得 → `valuesToCsvSheet`で既存シートに変換。
+
+### `src/ui/GoogleSheetsPanel.tsx`
+
+**役割**: Google Sheets連携のUIパネル。propsベースの純粋コンポーネント。
+
+#### 2つの表示状態
+
+**未接続状態**: URLテキスト入力 + 「接続」ボタン
+**接続済み状態**: 接続ステータス + 最終同期日時 + Push/Pullボタン + 接続解除ボタン
+
+### CsvSheetMeta の拡張
+
+```typescript
+interface CsvSheetMeta {
+  id: string;
+  name: string;
+  googleSheets?: {       // ← 追加
+    spreadsheetId: string;
+    sheetName?: string;
+    lastSyncedAt?: string;
+  };
+}
+```
+
+追加されたコンテキストAPI:
+
+| API | 説明 |
+|-----|------|
+| `getSheetMeta(sheetId)` | 特定シートのメタを取得 |
+| `linkGoogleSheets(sheetId, spreadsheetId, sheetName?)` | メタにgoogleSheets情報を保存 |
+| `unlinkGoogleSheets(sheetId)` | googleSheets情報を削除 |
+| `updateLastSyncedAt(sheetId)` | 最終同期日時を現在時刻に更新 |
+
+### SheetEditorFeature の変更
+
+以下のSync処理を組み立て:
+- `useGoogleSheetsAuth()` でOAuth2トークンを管理
+- `getSheetMeta(sheetId)` でgoogleSheets情報を取得
+- `handleLink(url)` でURL解析→認証→リンク設定
+- `handlePush()` でローカルデータをGoogle Sheetsに書き込み
+- `handlePull()` でGoogle Sheetsからデータを読み込み→`shell.update()`で反映
+- `GoogleSheetsPanel`をSheetEditorViewの`googleSheetsPanel` propとして渡す
+
+### SheetEditorView の変更
+
+- `googleSheetsPanel?: ReactNode` propを追加
+- ヘッダーの`e-header-actions`内に「Sheets」トグルボタンを追加
+- クリックでGoogleSheetsPanelの表示/非表示を切り替え
+
+### 前提条件（使用するために必要な設定）
+
+1. Google Cloud Consoleでプロジェクトを作成
+2. Google Sheets APIを有効化
+3. OAuth 2.0クライアントID（Webアプリケーション）を作成
+4. 承認済みJavaScriptオリジン: `http://localhost:4200`（開発用）
+5. `.env`に`VITE_GOOGLE_CLIENT_ID`を設定
+
+---
+
+## 7. アプリ設定（csv-importer-app）
 
 ### `src/registration/bubbleRoutes.tsx`
 
@@ -436,7 +553,7 @@ sheetShell.update((s) => s.updateCell(rowId, columnId, value));
 |------------|------------|-----------|
 | `csv-importer/sheets` | SheetListFeature（シート一覧） | なし |
 | `csv-importer/sheets/:sheetId` | SheetEditorFeature（シート編集） | `sheetId` |
-| `csv-importer/sheets/:sheetId/history` | WorldLineFeature（世界線ビュー） | `sheetId` |
+| `csv-importer/sheets/:sheetId/world-line` | WorldLineFeature（世界線ビュー） | `sheetId` |
 
 ---
 
@@ -502,18 +619,22 @@ csv-importer-libs/
     index.ts              ← エクスポート定義
   src/ui/
     SheetListView.tsx     ← シート一覧の見た目
-    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上に世界線ボタン）
+    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上に世界線/Sheetsボタン）
     WorldLineView.tsx     ← 世界線グラフのDAGツリー表示（汎用）
+    GoogleSheetsPanel.tsx ← Google Sheets連携パネルUI（接続/Push/Pull）
     index.ts              ← エクスポート定義
   src/feature/
-    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets）
+    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets + Google Sheetsリンク管理）
     SheetListFeature.tsx  ← シート一覧の世界線グラフ接続
-    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線ビュー起動）
+    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線ビュー起動 + Google Sheets同期）
     WorldLineFeature.tsx  ← 世界線ビューの世界線グラフ接続（ノード移動・要約表示）
+    useGoogleSheetsAuth.ts← Google OAuth2認証フック（GIS動的ロード + トークン管理）
+    googleSheetsApi.ts    ← Google Sheets API呼び出し + CsvSheet↔2D配列変換
     index.ts              ← エクスポート定義
   src/index.ts            ← パッケージエントリポイント
 
 csv-importer-app/
+  .env.example            ← 環境変数テンプレート（VITE_GOOGLE_CLIENT_ID）
   src/registration/
     bubbleRoutes.tsx      ← URLと画面の対応定義
   src/app/

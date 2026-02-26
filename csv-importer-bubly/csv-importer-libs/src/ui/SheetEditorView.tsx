@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState, useRef, useEffect, useCallback } from "react";
+import { FC, ReactNode, useState, useRef, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import type { CsvColumnState, CsvRowState } from "@bublys-org/csv-importer-model";
 
@@ -16,6 +16,7 @@ type SheetEditorViewProps = {
   onDeleteColumn: (columnId: string) => void;
   onOpenWorldLine?: () => void;
   onExportCsv?: () => void;
+  googleSheetsPanel?: ReactNode;
 };
 
 type EditingCell = {
@@ -39,10 +40,12 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteColumn,
   onOpenWorldLine,
   onExportCsv,
+  googleSheetsPanel,
 }) => {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editingHeader, setEditingHeader] = useState<EditingHeader | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [showSheetsPanel, setShowSheetsPanel] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const commitEditing = useCallback(() => {
@@ -133,6 +136,14 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
               エクスポート
             </button>
           )}
+          {googleSheetsPanel && (
+            <button
+              className={`e-sheets-btn ${showSheetsPanel ? "active" : ""}`}
+              onClick={() => setShowSheetsPanel((v) => !v)}
+            >
+              Sheets
+            </button>
+          )}
           {onOpenWorldLine && (
             <button className="e-worldline-btn" onClick={onOpenWorldLine}>
               世界線
@@ -140,6 +151,8 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
           )}
         </div>
       </div>
+
+      {showSheetsPanel && googleSheetsPanel}
 
       <div className="e-table-wrapper">
         <table className="e-table">
@@ -265,6 +278,26 @@ const StyledEditor = styled.div`
 
     &:hover {
       background: #c8e6c9;
+    }
+  }
+
+  .e-sheets-btn {
+    padding: 4px 12px;
+    border: 1px solid #34a853;
+    border-radius: 4px;
+    background: #e6f4ea;
+    color: #137333;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+
+    &:hover {
+      background: #ceead6;
+    }
+
+    &.active {
+      background: #34a853;
+      color: #fff;
     }
   }
 

@@ -40,9 +40,16 @@ export function popPendingSheet(sheetId: string): CsvSheet | undefined {
 // ============================================================================
 
 /** シートメタデータ（グローバルスコープで管理） */
-interface CsvSheetMeta {
+export interface GoogleSheetsLink {
+  spreadsheetId: string;
+  sheetName?: string;
+  lastSyncedAt?: string;
+}
+
+export interface CsvSheetMeta {
   id: string;
   name: string;
+  googleSheets?: GoogleSheetsLink;
 }
 
 const CSV_DOMAIN_OBJECTS = defineDomainObjects({
@@ -69,9 +76,20 @@ interface CsvSheetContextValue {
   addSheet: (sheet: CsvSheet) => void;
   deleteSheet: (sheetId: string) => void;
   updateSheetMeta: (sheetId: string, name: string) => void;
+  getSheetMeta: (sheetId: string) => CsvSheetMeta | undefined;
+  linkGoogleSheets: (sheetId: string, spreadsheetId: string, sheetName?: string) => void;
+  unlinkGoogleSheets: (sheetId: string) => void;
+  updateLastSyncedAt: (sheetId: string) => void;
 }
 
 const CsvSheetContext = createContext<CsvSheetContextValue | null>(null);
+
+/** Google Client ID を子コンポーネントに提供するコンテキスト */
+const GoogleClientIdContext = createContext<string | undefined>(undefined);
+
+export function useGoogleClientId(): string | undefined {
+  return useContext(GoogleClientIdContext);
+}
 
 // ============================================================================
 // Inner Provider — CasProvider の内側で動作
@@ -115,7 +133,60 @@ function CsvSheetInner({ children }: { children: React.ReactNode }) {
     (sheetId: string, name: string) => {
       const shell = metaShells.find((s) => s.id === sheetId);
       if (shell) {
-        shell.update(() => ({ id: sheetId, name }));
+        shell.update((prev) => ({ ...prev, name }));
+      }
+    },
+    [metaShells]
+  );
+
+  // 特定シートのメタを取得
+  const getSheetMeta = useCallback(
+    (sheetId: string): CsvSheetMeta | undefined => {
+      return sheetMetas.find((m) => m.id === sheetId);
+    },
+    [sheetMetas]
+  );
+
+  // Google Sheetsリンクを設定
+  const linkGoogleSheets = useCallback(
+    (sheetId: string, spreadsheetId: string, sheetName?: string) => {
+      const shell = metaShells.find((s) => s.id === sheetId);
+      if (shell) {
+        shell.update((prev) => ({
+          ...prev,
+          googleSheets: { spreadsheetId, sheetName },
+        }));
+      }
+    },
+    [metaShells]
+  );
+
+  // Google Sheetsリンクを解除
+  const unlinkGoogleSheets = useCallback(
+    (sheetId: string) => {
+      const shell = metaShells.find((s) => s.id === sheetId);
+      if (shell) {
+        shell.update((prev) => {
+          const { googleSheets: _, ...rest } = prev;
+          return rest as CsvSheetMeta;
+        });
+      }
+    },
+    [metaShells]
+  );
+
+  // 最終同期日時を更新
+  const updateLastSyncedAt = useCallback(
+    (sheetId: string) => {
+      const shell = metaShells.find((s) => s.id === sheetId);
+      if (shell?.object.googleSheets) {
+        shell.update((prev) => ({
+          ...prev,
+          googleSheets: {
+            ...prev.googleSheets!,
+            lastSyncedAt: new Date().toISOString(),
+          },
+        }));
       }
     },
     [metaShells]
@@ -127,8 +198,12 @@ function CsvSheetInner({ children }: { children: React.ReactNode }) {
       addSheet,
       deleteSheet,
       updateSheetMeta,
+      getSheetMeta,
+      linkGoogleSheets,
+      unlinkGoogleSheets,
+      updateLastSyncedAt,
     }),
-    [sheetMetas, addSheet, deleteSheet, updateSheetMeta]
+    [sheetMetas, addSheet, deleteSheet, updateSheetMeta, getSheetMeta, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt]
   );
 
   return (
@@ -142,10 +217,17 @@ function CsvSheetInner({ children }: { children: React.ReactNode }) {
 // Provider — DomainRegistryProvider でラップ
 // ============================================================================
 
-export function CsvSheetProvider({ children }: { children: React.ReactNode }) {
+type CsvSheetProviderProps = {
+  children: React.ReactNode;
+  googleClientId?: string;
+};
+
+export function CsvSheetProvider({ children, googleClientId }: CsvSheetProviderProps) {
   return (
     <DomainRegistryProvider registry={CSV_DOMAIN_OBJECTS}>
-      <CsvSheetInner>{children}</CsvSheetInner>
+      <GoogleClientIdContext.Provider value={googleClientId}>
+        <CsvSheetInner>{children}</CsvSheetInner>
+      </GoogleClientIdContext.Provider>
     </DomainRegistryProvider>
   );
 }
