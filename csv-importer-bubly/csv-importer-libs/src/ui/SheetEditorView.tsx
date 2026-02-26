@@ -14,7 +14,7 @@ type SheetEditorViewProps = {
   onDeleteRow: (rowId: string) => void;
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
-  onSave?: () => void;
+  onOpenWorldLine?: () => void;
 };
 
 type EditingCell = {
@@ -36,12 +36,23 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteRow,
   onAddColumn,
   onDeleteColumn,
-  onSave,
+  onOpenWorldLine,
 }) => {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editingHeader, setEditingHeader] = useState<EditingHeader | null>(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const commitEditing = useCallback(() => {
+    if (editingCell) {
+      onUpdateCell(editingCell.rowId, editingCell.columnId, editValue);
+      setEditingCell(null);
+    }
+    if (editingHeader) {
+      onRenameColumn(editingHeader.columnId, editValue);
+      setEditingHeader(null);
+    }
+  }, [editingCell, editingHeader, editValue, onUpdateCell, onRenameColumn]);
 
   useEffect(() => {
     if (editingCell || editingHeader) {
@@ -50,26 +61,17 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
     }
   }, [editingCell, editingHeader]);
 
-  // Ctrl+S ハンドラ
+  // Ctrl+S: 編集中のセルを確定（ブラウザのデフォルト保存を防止）
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        // 編集中のセルがあればまずコミット
-        if (editingCell) {
-          onUpdateCell(editingCell.rowId, editingCell.columnId, editValue);
-          setEditingCell(null);
-        }
-        if (editingHeader) {
-          onRenameColumn(editingHeader.columnId, editValue);
-          setEditingHeader(null);
-        }
-        onSave?.();
+        commitEditing();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [editingCell, editingHeader, editValue, onUpdateCell, onRenameColumn, onSave]);
+  }, [commitEditing]);
 
   const handleCellClick = (rowId: string, columnId: string, currentValue: string) => {
     commitEditing();
@@ -82,17 +84,6 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
     setEditingHeader({ columnId });
     setEditValue(currentName);
   };
-
-  const commitEditing = useCallback(() => {
-    if (editingCell) {
-      onUpdateCell(editingCell.rowId, editingCell.columnId, editValue);
-      setEditingCell(null);
-    }
-    if (editingHeader) {
-      onRenameColumn(editingHeader.columnId, editValue);
-      setEditingHeader(null);
-    }
-  }, [editingCell, editingHeader, editValue, onUpdateCell, onRenameColumn]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -132,7 +123,14 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 
   return (
     <StyledEditor>
-      <h3 className="e-title">{sheetName}</h3>
+      <div className="e-header">
+        <h3 className="e-title">{sheetName}</h3>
+        {onOpenWorldLine && (
+          <button className="e-worldline-btn" onClick={onOpenWorldLine}>
+            世界線
+          </button>
+        )}
+      </div>
 
       <div className="e-table-wrapper">
         <table className="e-table">
@@ -230,8 +228,30 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 };
 
 const StyledEditor = styled.div`
+  .e-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
   .e-title {
-    margin: 0 0 12px 0;
+    margin: 0;
+  }
+
+  .e-worldline-btn {
+    padding: 4px 12px;
+    border: 1px solid #90caf9;
+    border-radius: 4px;
+    background: #e3f2fd;
+    color: #1565c0;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+
+    &:hover {
+      background: #bbdefb;
+    }
   }
 
   .e-table-wrapper {

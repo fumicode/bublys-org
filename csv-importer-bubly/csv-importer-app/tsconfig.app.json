@@ -33,16 +33,19 @@
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
+    },
+    {
       "path": "../../bublys-libs/state-management"
     },
     {
-      "path": "../../bublys-libs/bubbles-ui"
+      "path": "../csv-importer-model/tsconfig.lib.json"
     },
     {
       "path": "../csv-importer-libs/tsconfig.lib.json"
     },
     {
-      "path": "../csv-importer-model/tsconfig.lib.json"
+      "path": "../../bublys-libs/bubbles-ui"
     }
   ]
 }

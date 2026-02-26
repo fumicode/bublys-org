@@ -15,6 +15,12 @@
   "references": [
     {
       "path": "../csv-importer-model/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
     }
   ],
   "exclude": [

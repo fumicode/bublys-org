@@ -23,7 +23,9 @@
     "tslib": "^2.3.0",
     "@bublys-org/csv-importer-model": "*",
     "@bublys-org/bubbles-ui": "*",
-    "@bublys-org/state-management": "*"
+    "@bublys-org/state-management": "*",
+    "@bublys-org/world-line-graph": "*",
+    "@bublys-org/domain-registry": "*"
   },
   "nx": {
     "targets": {

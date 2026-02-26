@@ -2,7 +2,11 @@
 
 import { useContext } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
-import { SheetListFeature, SheetEditorFeature } from "@bublys-org/csv-importer-libs";
+import {
+  SheetListFeature,
+  SheetEditorFeature,
+  WorldLineFeature,
+} from "@bublys-org/csv-importer-libs";
 
 // シート一覧バブル
 const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
@@ -15,11 +19,22 @@ const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 // シート編集バブル
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <SheetEditorFeature sheetId={bubble.params.sheetId} />;
+  return <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />;
+};
+
+// 世界線ビューバブル
+const WorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  return <WorldLineFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />;
 };
 
 /** CSV Importer のバブルルート定義 */
 export const csvImporterBubbleRoutes: BubbleRoute[] = [
+  {
+    pattern: "csv-importer/sheets/:sheetId/history",
+    type: "sheet-world-line",
+    bubbleOptions: { contentBackground: "transparent" },
+    Component: WorldLineBubble,
+  },
   { pattern: "csv-importer/sheets/:sheetId", type: "sheet-editor", Component: SheetEditorBubble },
   { pattern: "csv-importer/sheets", type: "sheet-list", Component: SheetListBubble },
 ];

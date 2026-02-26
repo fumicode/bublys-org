@@ -1,68 +1,104 @@
 'use client';
 
-import { FC, useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import {
-  selectCsvSheetById,
-  updateCell,
-  renameColumn,
-  addRow,
-  deleteRow,
-  addColumn,
-  deleteColumn,
-} from "../slice/index.js";
+import { FC, useCallback, useContext, useMemo } from "react";
+import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { SheetEditorView } from "../ui/SheetEditorView.js";
+import { sheetScopeId, popPendingSheet } from "./CsvSheetProvider.js";
 
 type SheetEditorFeatureProps = {
   sheetId: string;
-  onSave?: () => void;
+  bubbleId?: string;
 };
+
+/** sheetId に一致する初期CsvSheetを取得（pending → fallback） */
+function getInitialSheet(sheetId: string): CsvSheet {
+  const pending = popPendingSheet(sheetId);
+  if (pending) return pending;
+
+  // フォールバック: scopeにデータがない場合のデフォルトシート
+  const now = new Date().toISOString();
+  return new CsvSheet({
+    id: sheetId,
+    name: "新しいシート",
+    columns: [
+      { id: crypto.randomUUID(), name: "列1" },
+      { id: crypto.randomUUID(), name: "列2" },
+      { id: crypto.randomUUID(), name: "列3" },
+    ],
+    rows: [],
+    createdAt: now,
+    updatedAt: now,
+  });
+}
 
 export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   sheetId,
-  onSave,
+  bubbleId,
 }) => {
-  const dispatch = useAppDispatch();
-  const sheet = useAppSelector(selectCsvSheetById(sheetId));
+  const { openBubble } = useContext(BubblesContext);
+  // 初期オブジェクトはマウント時に1回だけ生成
+  const initialSheet = useMemo(() => getInitialSheet(sheetId), [sheetId]);
 
+  // シートごとの世界線スコープ
+  const scope = useCasScope(sheetScopeId(sheetId), {
+    initialObjects: [
+      {
+        type: "csv-sheet",
+        object: initialSheet,
+      },
+    ],
+  });
+
+  const sheetShell = scope.getShell<CsvSheet>("csv-sheet", sheetId);
+  const sheet = sheetShell?.object ?? null;
+
+  // セル編集ごとに shell.update() → 自動コミット
   const handleUpdateCell = useCallback(
     (rowId: string, columnId: string, value: string) => {
-      dispatch(updateCell({ sheetId, rowId, columnId, value }));
+      sheetShell?.update((s) => s.updateCell(rowId, columnId, value));
     },
-    [dispatch, sheetId]
+    [sheetShell]
   );
 
   const handleRenameColumn = useCallback(
     (columnId: string, name: string) => {
-      dispatch(renameColumn({ sheetId, columnId, name }));
+      sheetShell?.update((s) => s.renameColumn(columnId, name));
     },
-    [dispatch, sheetId]
+    [sheetShell]
   );
 
   const handleAddRow = useCallback(() => {
-    dispatch(addRow(sheetId));
-  }, [dispatch, sheetId]);
+    sheetShell?.update((s) => s.addRow());
+  }, [sheetShell]);
 
   const handleDeleteRow = useCallback(
     (rowId: string) => {
-      dispatch(deleteRow({ sheetId, rowId }));
+      sheetShell?.update((s) => s.deleteRow(rowId));
     },
-    [dispatch, sheetId]
+    [sheetShell]
   );
 
   const handleAddColumn = useCallback(
     (name: string) => {
-      dispatch(addColumn({ sheetId, columnName: name }));
+      sheetShell?.update((s) => s.addColumn(name));
     },
-    [dispatch, sheetId]
+    [sheetShell]
   );
 
   const handleDeleteColumn = useCallback(
     (columnId: string) => {
-      dispatch(deleteColumn({ sheetId, columnId }));
+      sheetShell?.update((s) => s.deleteColumn(columnId));
     },
-    [dispatch, sheetId]
+    [sheetShell]
   );
+
+  const handleOpenWorldLine = useCallback(() => {
+    if (bubbleId) {
+      openBubble(`csv-importer/sheets/${sheetId}/history`, bubbleId);
+    }
+  }, [openBubble, sheetId, bubbleId]);
 
   if (!sheet) {
     return <div>シートが見つかりません</div>;
@@ -79,7 +115,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onDeleteRow={handleDeleteRow}
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
-      onSave={onSave}
+      onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
     />
   );
 };

@@ -16,19 +16,24 @@ csv-importer-libs/    ← 画面の部品と、データの保存・読み出し
 csv-importer-app/     ← 上記をまとめてアプリとして動かす設定
 ```
 
-データの流れ:
+データの流れ（世界線グラフ統合後）:
 
 ```
 ユーザーがセルをクリックして編集
         ↓
 UI層（SheetEditorView）がコールバックを呼ぶ
         ↓
-Feature層（SheetEditorFeature）がReduxアクションを発行
+Feature層（SheetEditorFeature）が shell.update() を呼ぶ
         ↓
-Slice（csv-importer-slice）がストア内のデータを更新
+世界線グラフが新しいノードを作成（自動コミット）
+        ↓
+CASにハッシュベースで状態を保存（Redux + IndexedDB）
         ↓
 画面が自動的に再描画される
 ```
+
+**ポイント**: セルを1つ編集するたびに世界線に自動コミットされる。
+undo/redoはシートごとに独立して動作する。
 
 ---
 
@@ -83,7 +88,7 @@ type CsvSheetState = {
 | `sheet.updateCell(rowId, columnId, value)` | セルの値を更新 | 新しいCsvSheet |
 | `sheet.rename(name)` | シート名を変更 | 新しいCsvSheet |
 | `sheet.toCsvText()` | CSV形式のテキストに変換（エクスポート用） | 文字列 |
-| `sheet.toJSON()` | Redux保存用のプレーンオブジェクトに変換 | CsvSheetState |
+| `sheet.toJSON()` | 保存用のプレーンオブジェクトに変換 | CsvSheetState |
 | `CsvSheet.fromJSON(json)` | プレーンオブジェクトからCsvSheetを復元 | CsvSheet |
 
 **重要な設計原則: 不変性（イミュータビリティ）**
@@ -98,6 +103,8 @@ const updated = original.addColumn("メール");
 original.columns.length  // → 1
 updated.columns.length   // → 2
 ```
+
+この不変性が世界線グラフとの相性が良い理由。`shell.update(s => s.addColumn("メール"))` のように、現在の状態を受け取って新しい状態を返す関数を渡すだけで自動コミットされる。
 
 #### CSVパーサー（内部ヘルパー関数）
 
@@ -129,66 +136,123 @@ updated.columns.length   // → 2
 
 ---
 
-## 2. Redux Slice（csv-importer-libs/slice）
+## 2. 世界線グラフ統合（csv-importer-libs/feature）
 
-### `src/slice/csv-importer-slice.ts`
+### `src/feature/CsvSheetProvider.tsx`
 
-**役割**: アプリの「中央データベース」にCSVシートのデータを保存・更新・取得するための仕組み。
+**役割**: 世界線グラフシステムとCSVシートを接続するプロバイダー。sekaisen-igo-bublyのIgoGameProviderと同じパターン。
 
-#### ストアの状態構造
+#### 2つのスコープ構造
 
-```typescript
-{
-  csvImporter: {
-    sheets: {
-      "sheet-id-1": { id: "sheet-id-1", name: "スタッフ一覧", columns: [...], rows: [...], ... },
-      "sheet-id-2": { id: "sheet-id-2", name: "予算表", columns: [...], rows: [...], ... },
-    }
-  }
-}
+```
+グローバルスコープ "csv-importer"
+  └─ CsvSheetMeta オブジェクト（id, name）× N枚
+      │
+      ├─ シートスコープ "csv-sheet-{sheetId1}"
+      │    └─ CsvSheet オブジェクト（シートの全データ）
+      │
+      └─ シートスコープ "csv-sheet-{sheetId2}"
+           └─ CsvSheet オブジェクト（シートの全データ）
 ```
 
-#### アクション（データを変更する操作）
+- **グローバルスコープ**: 「どのシートが存在するか」を管理（メタデータのみ）
+- **シートスコープ**: 各シートの中身（列・行・セル）を管理。**undo/redoはシート単位で独立**
 
-| アクション | 引数 | 何をするか |
-|-----------|------|----------|
-| `setSheet(sheetState)` | シート全体のデータ | シートを追加 or 上書き保存 |
-| `deleteSheet(sheetId)` | シートID | シートを削除 |
-| `updateCell({sheetId, rowId, columnId, value})` | 4つの値 | 特定セルの値を更新 |
-| `addRow(sheetId)` | シートID | 空行を末尾に追加 |
-| `deleteRow({sheetId, rowId})` | シートIDと行ID | 行を削除 |
-| `addColumn({sheetId, columnName})` | シートIDと列名 | 列を末尾に追加 |
-| `deleteColumn({sheetId, columnId})` | シートIDと列ID | 列を削除 |
-| `renameColumn({sheetId, columnId, name})` | シートID、列ID、新名 | 列名を変更 |
-
-#### セレクター（データを取得する関数）
-
-| セレクター | 戻り値 | 説明 |
-|-----------|--------|------|
-| `selectCsvSheetList` | `CsvSheet[]` | 全シートをドメインオブジェクトの配列で返す |
-| `selectCsvSheetById(sheetId)` | `CsvSheet \| undefined` | 指定IDのシートを返す（なければundefined） |
-
-セレクターは生のJSONデータを`CsvSheet.fromJSON()`で**ドメインオブジェクトに変換して返す**。
-これにより、UI側では`sheet.name`のようにドメインモデルのAPIを使える。
-
-#### スライス注入パターン
+#### ドメインオブジェクト登録
 
 ```typescript
-// 1. LazyLoadedSlices インターフェースを拡張（型を追加）
-declare module "@bublys-org/state-management" {
-  export interface LazyLoadedSlices extends WithSlice<typeof csvImporterSlice> {}
-}
-
-// 2. rootReducerに注入（このファイルがimportされた瞬間に実行される）
-csvImporterSlice.injectInto(rootReducer);
+const CSV_DOMAIN_OBJECTS = defineDomainObjects({
+  "csv-sheet": {
+    class: CsvSheet,
+    fromJSON: (json) => CsvSheet.fromJSON(json as CsvSheetState),
+    toJSON: (s: CsvSheet) => s.toJSON(),
+    getId: (s: CsvSheet) => s.id,
+  },
+  "csv-sheet-meta": {
+    class: Object,
+    fromJSON: (json) => json as CsvSheetMeta,
+    toJSON: (obj: CsvSheetMeta) => obj,
+    getId: (obj: CsvSheetMeta) => obj.id,
+  },
+});
 ```
 
-この仕組みにより、`import '@bublys-org/csv-importer-libs'` と書くだけで
-自動的にReduxストアにcsvImporterスライスが追加される。
+世界線グラフが`CsvSheet`を保存/復元するための設定。`fromJSON`/`toJSON`で変換、`getId`でオブジェクトを特定。
+
+#### 一時保持マップ（pendingSheets）
+
+シート作成時（SheetListFeature）とエディタ表示時（SheetEditorFeature）は別コンポーネントのため、作成したCsvSheetをエディタに直接渡せない。これを解決するために、モジュールレベルの`pendingSheets` Mapを使用:
+
+```
+SheetListFeature: CsvSheet.create() → addSheet(sheet)
+    ↓ pendingSheets.set(sheet.id, sheet)
+SheetEditorFeature: popPendingSheet(sheetId) → initialObjectsとして使用
+```
+
+- `addSheet(sheet)` はメタ登録+スコープ作成に加え、`pendingSheets`にシートを保存
+- `popPendingSheet(sheetId)` は一時保持されたシートを取得して削除（1回限り）
+- エディタがマウントされた後、世界線グラフが永続化を担当するため一時保持は不要になる
+
+#### コンテキストで提供されるAPI（useCsvSheets フック）
+
+| API | 説明 |
+|-----|------|
+| `sheetMetas` | 全シートのメタデータ配列 `{ id, name }[]` |
+| `addSheet(sheet)` | 新しいシートを追加（メタ登録 + スコープ作成 + 一時保持） |
+| `deleteSheet(sheetId)` | シートを削除（メタ削除 + スコープ削除） |
+| `updateSheetMeta(sheetId, name)` | シート名の更新（一覧表示用） |
+
+#### プロバイダー階層
+
+```
+DomainRegistryProvider（ドメインオブジェクト定義を提供）
+  └─ CsvSheetInner（グローバルスコープ useCasScope("csv-importer") を使用）
+       └─ CsvSheetContext.Provider（子コンポーネントにAPIを提供）
+```
 
 ---
 
-## 3. UIコンポーネント（csv-importer-libs/ui）
+## 3. Redux Slice（csv-importer-libs/slice）
+
+### `src/slice/csv-importer-slice.ts`
+
+**役割**: 現在は世界線グラフに置き換えられたが、将来的な非バージョン管理データ用に残存。
+
+**注意**: シートデータの保存・取得は世界線グラフ（CAS + IndexedDB）が担当するようになったため、このスライスのアクション・セレクターはSheetEditorFeature/SheetListFeatureからは使用されなくなった。
+
+---
+
+## 4. UIコンポーネント（csv-importer-libs/ui）
+
+### `src/ui/WorldLineView.tsx`
+
+**役割**: 世界線グラフのDAGツリーを表示する汎用コンポーネント。sekaisen-igo-libsの同名コンポーネントと同じ設計。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `graph` | `WorldLineGraph` | 表示する世界線グラフ |
+| `onSelectNode` | `(nodeId) => void` | ノードクリック時（そのノードに移動） |
+| `onSelectNodeAndClose` | `(nodeId) => void` | ノードダブルクリック時（移動＋バブルを閉じる） |
+| `renderNodeSummary` | `(nodeId) => string` | ノードの要約テキスト（例: "3列 5行"） |
+
+#### キーボード操作
+
+| キー | 動作 |
+|------|------|
+| Ctrl/Cmd+Z | 親ノードに移動（undo） |
+| Ctrl/Cmd+Shift+Z | 子ノードに移動（redo、同じ世界線を優先） |
+| ArrowLeft | 親ノードに移動 |
+| ArrowRight | 子ノードに移動 |
+
+#### 表示
+
+- 各世界線（worldLineId）に異なる色を割り当て
+- 現在のノード（apex）はハイライト表示 + 「現在」バッジ
+- DAGのインデントで分岐を表現
+
+---
 
 ### `src/ui/SheetListView.tsx`
 
@@ -198,7 +262,7 @@ csvImporterSlice.injectInto(rootReducer);
 
 | プロパティ | 型 | 説明 |
 |-----------|---|------|
-| `sheets` | `CsvSheet[]` | 表示するシートの配列 |
+| `sheets` | `SheetListItem[]` | 表示するシートの配列（`{ id, name }`） |
 | `buildSheetUrl` | `(sheetId) => string` | シートのバブルURLを生成する関数 |
 | `onSheetClick` | `(sheetId) => void` | シートクリック時のコールバック |
 | `onCreateSheet` | `() => void` | 「新規作成」ボタン押下時 |
@@ -211,10 +275,8 @@ csvImporterSlice.injectInto(rootReducer);
 │ [+ 新規作成] [CSVインポート]  │  ← アクションボタン
 ├─────────────────────────────┤
 │ 📊 スタッフ一覧              │  ← シートカード（ObjectViewでラップ）
-│    3列 / 15行               │     ドラッグ&ドロップ対応
-├─────────────────────────────┤
+├─────────────────────────────┤     ドラッグ&ドロップ対応
 │ 📊 予算表                   │
-│    5列 / 8行                │
 └─────────────────────────────┘
 ```
 
@@ -243,13 +305,13 @@ csvImporterSlice.injectInto(rootReducer);
 | `onDeleteRow` | `(rowId) => void` | 行削除時 |
 | `onAddColumn` | `(name) => void` | 列追加時 |
 | `onDeleteColumn` | `(columnId) => void` | 列削除時 |
-| `onSave` | `() => void` | Ctrl+S押下時（世界線コミット用） |
+| `onOpenWorldLine` | `() => void` | 右上の「世界線」ボタン押下時（省略可能） |
 
 #### 画面構成
 
 ```
 ┌─────────────────────────────────────────────┐
-│ スタッフ一覧                                 │  ← シート名
+│ スタッフ一覧                    [世界線] │  ← シート名 + 右上に世界線ボタン
 ├────┬──────────┬──────────────────┬─────┬─────┤
 │ #  │ 名前   × │ メール         × │ + ← │     │  ← ヘッダー行（クリックで編集、×で削除、+で追加）
 ├────┼──────────┼──────────────────┼─────┼─────┤
@@ -261,14 +323,6 @@ csvImporterSlice.injectInto(rootReducer);
 └─────────────────────────────────────────────┘
 ```
 
-#### 内部の状態管理
-
-```typescript
-editingCell    // 今どのセルを編集中か（{ rowId, columnId } or null）
-editingHeader  // 今どのヘッダーを編集中か（{ columnId } or null）
-editValue      // 編集中の入力値（文字列）
-```
-
 #### キーボード操作
 
 | キー | 動作 |
@@ -277,7 +331,7 @@ editValue      // 編集中の入力値（文字列）
 | Enter | 編集を確定して編集モードを終了 |
 | Escape | 編集を破棄して編集モードを終了 |
 | Tab | 編集を確定 → 右隣のセルへ移動（行末なら次の行の先頭へ） |
-| Ctrl+S / Cmd+S | 編集中のセルを確定 → `onSave`コールバックを呼ぶ |
+| Ctrl+S / Cmd+S | 編集中のセルを確定（ブラウザのデフォルト保存を防止） |
 
 #### 編集の確定フロー（commitEditing関数）
 
@@ -292,54 +346,83 @@ commitEditing() が呼ばれる
     ↓
 onUpdateCell(rowId, columnId, editValue) が呼ばれる
     ↓
-Feature層 → Redux → 画面再描画
+Feature層 → shell.update() → 世界線に自動コミット → 画面再描画
 ```
 
 ---
 
-## 4. Feature層（csv-importer-libs/feature）
+## 5. Feature層（csv-importer-libs/feature）
 
-### `src/feature/SheetListFeature.tsx`
+### `src/feature/WorldLineFeature.tsx`
 
-**役割**: SheetListView（見た目）とReduxストア（データ）を橋渡しする。
+**役割**: WorldLineView（見た目）と世界線グラフ（データ）を橋渡しする。囲碁の`WorldLineFeature`と同じパターン。
 
 #### やっていること
 
-1. `useAppSelector(selectCsvSheetList)` でストアからシート一覧を取得
+1. `useCasScope(sheetScopeId(sheetId))` でシートの世界線スコープに接続
+2. `scope.moveTo(nodeId)` でノード選択時に世界線を移動
+3. ダブルクリック時はノード移動 + `removeBubble(bubbleId)` でバブルを閉じる
+4. `renderNodeSummary` でノードの要約を生成（`"3列 5行"` のような表示）
+
+---
+
+### `src/feature/SheetListFeature.tsx`
+
+**役割**: SheetListView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+#### やっていること
+
+1. `useCsvSheets()` でシートメタデータ一覧と操作関数を取得
 2. `useContext(BubblesContext)` でバブル操作関数を取得
 3. 各コールバックを実装:
 
 | コールバック | 処理内容 |
 |------------|---------|
-| `handleCreateSheet` | `CsvSheet.create("新しいシート", ["列1","列2","列3"])` で新シートを作成 → `dispatch(setSheet(...))` でストアに保存 → `openBubble(...)` でエディタバブルを開く |
-| `handleImportCsv` | `CsvSheet.fromCsvText(name, csvText)` でCSVをパース → ストア保存 → エディタバブルを開く |
+| `handleCreateSheet` | `CsvSheet.create(...)` で新シートを作成 → `addSheet(sheet)` でメタ登録+スコープ作成 → `openBubble(...)` でエディタバブルを開く |
+| `handleImportCsv` | `CsvSheet.fromCsvText(...)` でCSVをパース → `addSheet(sheet)` → エディタバブルを開く |
 | `handleSheetClick` | 親コンポーネントに通知するだけ |
 
 ---
 
 ### `src/feature/SheetEditorFeature.tsx`
 
-**役割**: SheetEditorView（見た目）とReduxストア（データ）を橋渡しする。
+**役割**: SheetEditorView（見た目）と世界線グラフ（データ）を橋渡しする。**セル編集ごとに自動コミット**。
+
+#### Props
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheetId` | `string` | 表示・編集するシートのID |
+| `bubbleId` | `string?` | バブルID（世界線ビューをpopChildで開くために必要） |
 
 #### やっていること
 
-1. `useAppSelector(selectCsvSheetById(sheetId))` で該当シートを取得
-2. 各操作を `useCallback` でメモ化してReduxアクションに変換:
+1. `getInitialSheet(sheetId)` で初期CsvSheetを取得（pendingがあればそれを使用、なければフォールバックでデフォルトシートを生成。**フォールバック時のidはsheetIdと一致させる**）
+2. `useCasScope(sheetScopeId(sheetId), { initialObjects })` でシート専用の世界線スコープを取得
+3. `scope.getShell<CsvSheet>("csv-sheet", sheetId)` でシートのシェルを取得
+4. 「世界線」ボタン押下時に `openBubble("csv-importer/sheets/{sheetId}/history", bubbleId)` で世界線ビューをpopChild
+5. 各操作を `shell.update()` で自動コミット:
 
-| UIからのコールバック | ディスパッチするアクション |
-|-------------------|------------------------|
-| `handleUpdateCell(rowId, colId, value)` | `updateCell({ sheetId, rowId, columnId, value })` |
-| `handleRenameColumn(colId, name)` | `renameColumn({ sheetId, columnId, name })` |
-| `handleAddRow()` | `addRow(sheetId)` |
-| `handleDeleteRow(rowId)` | `deleteRow({ sheetId, rowId })` |
-| `handleAddColumn(name)` | `addColumn({ sheetId, columnName: name })` |
-| `handleDeleteColumn(colId)` | `deleteColumn({ sheetId, columnId })` |
+| UIからのコールバック | shell.update()の中身 |
+|-------------------|---------------------|
+| `handleUpdateCell(rowId, colId, value)` | `s.updateCell(rowId, colId, value)` |
+| `handleRenameColumn(colId, name)` | `s.renameColumn(colId, name)` |
+| `handleAddRow()` | `s.addRow()` |
+| `handleDeleteRow(rowId)` | `s.deleteRow(rowId)` |
+| `handleAddColumn(name)` | `s.addColumn(name)` |
+| `handleDeleteColumn(colId)` | `s.deleteColumn(colId)` |
 
-シートが見つからない場合は「シートが見つかりません」と表示。
+**shell.update()の仕組み**:
+```typescript
+sheetShell.update((s) => s.updateCell(rowId, columnId, value));
+//                  ↑ 現在のCsvSheet    ↑ 新しいCsvSheetを返す
+// → 世界線グラフに新しいノードが自動追加される（コミット）
+// → CASにハッシュベースで保存される
+```
 
 ---
 
-## 5. アプリ設定（csv-importer-app）
+## 6. アプリ設定（csv-importer-app）
 
 ### `src/registration/bubbleRoutes.tsx`
 
@@ -349,16 +432,7 @@ Feature層 → Redux → 画面再描画
 |------------|------------|-----------|
 | `csv-importer/sheets` | SheetListFeature（シート一覧） | なし |
 | `csv-importer/sheets/:sheetId` | SheetEditorFeature（シート編集） | `sheetId` |
-
-各バブルコンポーネントの処理:
-
-**SheetListBubble**:
-- SheetListFeatureを表示
-- シートが選択されたら `openBubble("csv-importer/sheets/{sheetId}")` でエディタバブルを開く
-
-**SheetEditorBubble**:
-- URLから `bubble.params.sheetId` を取得
-- SheetEditorFeatureに渡して表示
+| `csv-importer/sheets/:sheetId/history` | WorldLineFeature（世界線ビュー） | `sheetId` |
 
 ---
 
@@ -368,13 +442,17 @@ Feature層 → Redux → 画面再描画
 
 処理の順序:
 1. `import TableChartIcon` — サイドバー用のMUIアイコンをインポート
-2. `import '@bublys-org/csv-importer-libs'` — **副作用**でReduxスライスが注入される
-3. `BubbleRouteRegistry.registerRoutes(...)` — バブルルートを登録
-4. `menuItems` — サイドバーに「シート一覧」メニューを定義（`TableChartIcon`アイコン付き）
-5. `BublyStoreProvider` — Reduxストアを初期化（`persistKey`でlocalStorageに永続化）
-6. `BublyApp` — バブルUIのシェル（サイドバー + メインエリア）を描画
+2. `initWorldLineGraph()` — 世界線グラフのReduxスライスとミドルウェアを注入
+3. `import '@bublys-org/csv-importer-libs'` — csvImporterスライス注入（副作用）
+4. `BubbleRouteRegistry.registerRoutes(...)` — バブルルートを登録
+5. `menuItems` — サイドバーに「シート一覧」メニューを定義（`TableChartIcon`アイコン付き）
 
-起動時に `csv-importer/sheets` バブルが自動で開く（`initialBubbleUrls`）。
+プロバイダー階層:
+```
+BublyStoreProvider（Reduxストア初期化 + redux-persist）
+  └─ CsvSheetProvider（世界線グラフ + ドメインオブジェクト登録）
+       └─ BublyApp（サイドバー + バブル表示エリア）
+```
 
 ---
 
@@ -382,23 +460,21 @@ Feature層 → Redux → 画面再描画
 
 **役割**: bublys-os（メインアプリ）から動的にロードされるバブリとしての登録。
 
-スタンドアロンモード（app.tsx）とは別に、メインアプリに組み込まれる場合のエントリポイント。
-
 ```typescript
 const CsvImporterBubly: Bubly = {
-  name: "csv-importer",       // バブリの識別名
+  name: "csv-importer",
   version: "0.0.1",
-  menuItems: [                 // メインアプリのサイドバーに追加されるメニュー
+  menuItems: [
     {
       label: "シート一覧",
       url: "csv-importer/sheets",
       icon: React.createElement(TableChartIcon, { color: "action" }),
     },
   ],
-  register(context) {          // バブリ登録時に呼ばれる
+  register(context) {
     context.registerBubbleRoutes(csvImporterBubbleRoutes);
   },
-  unregister() {},             // バブリ解除時のクリーンアップ（今は空）
+  unregister() {},
 };
 ```
 
@@ -418,15 +494,18 @@ csv-importer-model/
 
 csv-importer-libs/
   src/slice/
-    csv-importer-slice.ts ← Reduxスライス（データ保存・更新・取得）
+    csv-importer-slice.ts ← Reduxスライス（将来的な非バージョン管理データ用に残存）
     index.ts              ← エクスポート定義
   src/ui/
     SheetListView.tsx     ← シート一覧の見た目
-    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風）
+    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上に世界線ボタン）
+    WorldLineView.tsx     ← 世界線グラフのDAGツリー表示（汎用）
     index.ts              ← エクスポート定義
   src/feature/
-    SheetListFeature.tsx  ← シート一覧のRedux接続
-    SheetEditorFeature.tsx← シート編集のRedux接続
+    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets）
+    SheetListFeature.tsx  ← シート一覧の世界線グラフ接続
+    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線ビュー起動）
+    WorldLineFeature.tsx  ← 世界線ビューの世界線グラフ接続（ノード移動・要約表示）
     index.ts              ← エクスポート定義
   src/index.ts            ← パッケージエントリポイント
 
@@ -434,7 +513,7 @@ csv-importer-app/
   src/registration/
     bubbleRoutes.tsx      ← URLと画面の対応定義
   src/app/
-    app.tsx               ← スタンドアロンアプリの組み立て
+    app.tsx               ← スタンドアロンアプリの組み立て（initWorldLineGraph + CsvSheetProvider）
   src/
     bubly.ts              ← メインアプリ組み込み用の登録
 ```

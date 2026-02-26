@@ -2,12 +2,17 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import { CsvSheet } from "@bublys-org/csv-importer-model";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
+/** シート一覧に表示するための最小情報 */
+export type SheetListItem = {
+  id: string;
+  name: string;
+};
+
 type SheetListViewProps = {
-  sheets: CsvSheet[];
+  sheets: SheetListItem[];
   buildSheetUrl: (sheetId: string) => string;
   onSheetClick?: (sheetId: string) => void;
   onCreateSheet?: () => void;
@@ -67,9 +72,6 @@ export const SheetListView: FC<SheetListViewProps> = ({
                   <TableChartIcon fontSize="small" className="e-icon" />
                   <div className="e-text">
                     <div className="e-name">{sheet.name}</div>
-                    <div className="e-meta">
-                      {sheet.columns.length}列 / {sheet.rows.length}行
-                    </div>
                   </div>
                 </div>
               </ObjectView>
@@ -158,11 +160,6 @@ const StyledSheetList = styled.div`
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .e-meta {
-      color: #666;
-      font-size: 0.85em;
     }
   }
 `;
