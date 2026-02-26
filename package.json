@@ -11,6 +11,7 @@
   },
   "private": true,
   "dependencies": {
+    "@modelcontextprotocol/server-github": "^2025.4.8",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@reduxjs/toolkit": "^2.9.0",
     "modern-normalize": "^3.0.1",
