@@ -1,7 +1,6 @@
 'use client';
 
 import { FC, useState, useCallback, useMemo } from "react";
-import { parseDragPayload } from "@bublys-org/bubbles-ui";
 import {
   MappingRule,
   STAFF_SCHEMA,
@@ -38,6 +37,8 @@ export const MappingEditorFeature: FC<MappingEditorFeatureProps> = () => {
   // ========== ソースドロップ ==========
 
   const handleDragOverSource = useCallback((e: React.DragEvent) => {
+    // デバッグ: ドラッグイベントのtypesを確認
+    console.log("[OT] dragOver types:", Array.from(e.dataTransfer.types));
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
   }, []);
@@ -45,34 +46,34 @@ export const MappingEditorFeature: FC<MappingEditorFeatureProps> = () => {
   const handleDropSource = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const payload = parseDragPayload(e);
-      if (!payload) return;
+      e.stopPropagation();
 
-      // PlaneObjectのURLからデータを取得する想定
-      // 実際のデータはドラッグペイロードのlabel等を使うか、
-      // URLから別途取得する必要がある。
-      // ここでは簡易的にJSON形式のデータを受け取る想定
+      // デバッグ: ドロップイベントのデータを確認
+      console.log("[OT] drop types:", Array.from(e.dataTransfer.types));
       const jsonData = e.dataTransfer.getData("application/json");
-      if (jsonData) {
-        try {
-          const obj = JSON.parse(jsonData) as PlaneObjectLike;
-          setSourceObject(obj);
+      console.log("[OT] drop json:", jsonData);
+      if (!jsonData) return;
 
-          // ターゲットスキーマがあれば提案を生成
-          if (targetSchema) {
-            const sourceKeys = Object.keys(obj).filter(
-              (k) => k !== "id" && k !== "name"
-            );
-            const newSuggestions = suggestMappings(
-              sourceKeys,
-              targetSchema,
-              obj
-            );
-            setSuggestions(newSuggestions);
-          }
-        } catch {
-          // パース失敗は無視
+      try {
+        const obj = JSON.parse(jsonData) as PlaneObjectLike;
+        if (!obj.id || typeof obj.name !== "string") return;
+
+        setSourceObject(obj);
+
+        // ターゲットスキーマがあれば提案を生成
+        if (targetSchema) {
+          const sourceKeys = Object.keys(obj).filter(
+            (k) => k !== "id" && k !== "name"
+          );
+          const newSuggestions = suggestMappings(
+            sourceKeys,
+            targetSchema,
+            obj
+          );
+          setSuggestions(newSuggestions);
         }
+      } catch {
+        // パース失敗は無視
       }
     },
     [targetSchema]

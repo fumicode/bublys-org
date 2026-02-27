@@ -1,15 +1,18 @@
 'use client';
 
-import { FC, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import styled from "styled-components";
 import type { PlaneObject } from "@bublys-org/csv-importer-model";
 
 type CsvObjectDetailViewProps = {
   object: PlaneObject;
+  /** ドラッグ用URL */
+  objectUrl?: string;
 };
 
 export const CsvObjectDetailView: FC<CsvObjectDetailViewProps> = ({
   object,
+  objectUrl,
 }) => {
   const [showJson, setShowJson] = useState(false);
 
@@ -19,16 +22,39 @@ export const CsvObjectDetailView: FC<CsvObjectDetailViewProps> = ({
       .map(([key, value]) => ({ key, value: String(value) }));
   }, [object]);
 
+  const handleDragStart = useCallback(
+    (e: React.DragEvent) => {
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("application/json", JSON.stringify(object));
+      if (objectUrl) {
+        e.dataTransfer.setData("url", objectUrl);
+      }
+    },
+    [object, objectUrl]
+  );
+
   return (
     <StyledDetail>
       <div className="e-header">
         <h3 className="e-title">{object.name}</h3>
-        <button
-          className={`e-json-btn ${showJson ? "active" : ""}`}
-          onClick={() => setShowJson((v) => !v)}
-        >
-          JSON
-        </button>
+        <div className="e-header-actions">
+          {objectUrl && (
+            <span
+              className="e-drag-chip"
+              draggable
+              onDragStart={handleDragStart}
+              title="ドラッグして他のアプリにドロップ"
+            >
+              ⠿ {object.name}
+            </span>
+          )}
+          <button
+            className={`e-json-btn ${showJson ? "active" : ""}`}
+            onClick={() => setShowJson((v) => !v)}
+          >
+            JSON
+          </button>
+        </div>
       </div>
 
       {showJson ? (
@@ -64,6 +90,35 @@ const StyledDetail = styled.div`
   .e-title {
     margin: 0;
     font-size: 1.25em;
+  }
+
+  .e-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .e-drag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px solid #b3d9ff;
+    border-radius: 12px;
+    background: #e3f2fd;
+    color: #1565c0;
+    font-size: 0.8em;
+    cursor: grab;
+    white-space: nowrap;
+    user-select: none;
+
+    &:hover {
+      background: #bbdefb;
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .e-json-btn {

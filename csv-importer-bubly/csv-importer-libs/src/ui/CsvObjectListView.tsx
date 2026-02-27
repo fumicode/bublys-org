@@ -59,7 +59,14 @@ export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
           {objects.map((obj) => {
             const preview = getPreviewProperties(obj);
             return (
-              <li key={obj.id} className="e-item">
+              <li
+                key={obj.id}
+                className="e-item"
+                onDragStart={(e) => {
+                  // ObjectViewの標準ペイロードに加えてPlaneObjectデータを載せる
+                  e.dataTransfer.setData("application/json", JSON.stringify(obj));
+                }}
+              >
                 <ObjectView
                   type="CsvObject"
                   url={buildObjectUrl(obj.id)}

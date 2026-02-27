@@ -30,5 +30,10 @@ export const CsvObjectDetailFeature: FC<CsvObjectDetailFeatureProps> = ({
     return <div>オブジェクトが見つかりません</div>;
   }
 
-  return <CsvObjectDetailView object={planeObject} />;
+  return (
+    <CsvObjectDetailView
+      object={planeObject}
+      objectUrl={`csv-importer/sheets/${sheetId}/objects/${rowId}`}
+    />
+  );
 };
