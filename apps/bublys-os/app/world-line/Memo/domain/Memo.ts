@@ -1,3 +1,5 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
+
 /**
  * Memo クラス
  * メモの内容を管理し、不変性を保つ
@@ -57,7 +59,7 @@ export class Memo {
   }
 
   insertTextBlockAfter(afterId: string, type: string, content = ""): { memo: Memo; newBlockId: string } {
-    const newBlockId = crypto.randomUUID();
+    const newBlockId = uuid();
     const newBlock: MemoBlock = { id: newBlockId, type, content };
     const { id, blocks, lines } = this.state;
     const newBlocks = { ...blocks, [newBlockId]: newBlock };
@@ -112,8 +114,8 @@ export class Memo {
    * 新しいMemoインスタンスを作成
    */
   static create(): Memo {
-    const memoId = crypto.randomUUID();
-    const firstLineId = crypto.randomUUID();
+    const memoId = uuid();
+    const firstLineId = uuid();
     const raw: RawMemo = {
       id: memoId,
       blocks: {

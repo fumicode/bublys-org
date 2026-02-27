@@ -3,6 +3,7 @@
 import { FC, useContext, useState, FormEvent, ChangeEvent } from "react";
 import { Speaker, SpeakerRole } from "@bublys-org/tailor-genie-model";
 import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { useTailorGenie } from "./TailorGenieProvider.js";
 
 const ROLE_LABELS: Record<SpeakerRole, string> = {
@@ -30,7 +31,7 @@ export const SpeakerListFeature: FC = () => {
     e.preventDefault();
     if (!newSpeakerName.trim()) return;
 
-    const id = `speaker-${crypto.randomUUID().slice(0, 8)}`;
+    const id = `speaker-${uuid().slice(0, 8)}`;
     const speaker = new Speaker({
       id,
       name: newSpeakerName.trim(),

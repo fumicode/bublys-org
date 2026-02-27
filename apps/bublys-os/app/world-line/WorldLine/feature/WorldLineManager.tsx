@@ -11,6 +11,7 @@ import {
   type WorldLineState,
   selectApexWorld,
 } from '@bublys-org/state-management';
+import { uuid } from '@bublys-org/bubbles-ui-util';
 import { World } from '../domain/World';
 import { WorldLine } from '../domain/WorldLine';
 
@@ -60,10 +61,10 @@ export function WorldLineManager<TWorldState>({
       // 初期状態でルート世界を作成
       const initialWorldState = createInitialWorldState();
       const rootWorld = new World<TWorldState>(
-        crypto.randomUUID(),
+        uuid(),
         null,
         initialWorldState,
-        crypto.randomUUID()
+        uuid()
       );
       const initialWorldLine = new WorldLine<TWorldState>(
         new Map([[rootWorld.worldId, rootWorld]]),
@@ -99,7 +100,7 @@ export function WorldLineManager<TWorldState>({
     let newWorld: World<TWorldState>;
     
     if (hasChildren) {
-      const newWorldLineId = crypto.randomUUID();
+      const newWorldLineId = uuid();
       newWorld = apexWorld
         .updateCurrentWorldLineId(newWorldLineId)
         .updateWorldState(newWorldState);

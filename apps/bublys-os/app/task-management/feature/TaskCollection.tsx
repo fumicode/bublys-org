@@ -11,6 +11,7 @@ import {
   addTask,
   TaskJSON,
 } from "@bublys-org/state-management";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { TaskListView } from "../ui/TaskListView";
 import { Button, TextField } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -28,7 +29,7 @@ const createSampleTasks = (): TaskJSON[] => {
   const now = new Date().toISOString();
   return [
     {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: "プロジェクト計画書の作成",
       description: "来月のプロジェクト計画書を作成する",
       status: "todo",
@@ -36,7 +37,7 @@ const createSampleTasks = (): TaskJSON[] => {
       updatedAt: now,
     },
     {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: "コードレビュー",
       description: "PRのレビューを完了させる",
       status: "doing",
@@ -44,7 +45,7 @@ const createSampleTasks = (): TaskJSON[] => {
       updatedAt: now,
     },
     {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: "ミーティング資料準備",
       description: "",
       status: "done",
@@ -76,7 +77,7 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ onTaskSelect }) => {
     if (!newTaskTitle.trim()) return;
     const now = new Date().toISOString();
     const newTask: TaskJSON = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: newTaskTitle.trim(),
       description: "",
       status: "todo",

@@ -1,3 +1,5 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
+
 /**
  * シフト配置ドメインモデル
  */
@@ -63,7 +65,7 @@ export class ShiftAssignment_シフト配置 {
     isAutoAssigned = true
   ): ShiftAssignment_シフト配置 {
     return new ShiftAssignment_シフト配置({
-      id: crypto.randomUUID(),
+      id: uuid(),
       staffId,
       timeSlotId,
       roleId,

@@ -52,19 +52,22 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/domain-registry"
-    },
-    {
       "path": "../../bublys-libs/hash-world-line"
     },
     {
       "path": "../../bublys-libs/akashic-record"
     },
     {
+      "path": "../../bublys-libs/bubbles-ui-util"
+    },
+    {
       "path": "../../bublys-libs/object-shell"
     },
     {
       "path": "../../users-libs"
+    },
+    {
+      "path": "../../bublys-libs/domain-registry"
     },
     {
       "path": "../../bublys-libs/world-line-graph"

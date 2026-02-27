@@ -2,6 +2,7 @@
 
 import { FC, useContext } from "react";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { useTailorGenie } from "./TailorGenieProvider.js";
 
 export const ConversationListFeature: FC = () => {
@@ -13,7 +14,7 @@ export const ConversationListFeature: FC = () => {
   } = useTailorGenie();
 
   const handleCreateConversation = () => {
-    const id = crypto.randomUUID();
+    const id = uuid();
     addConversation(id);
     setActiveConversationId(id);
     openBubble(`tailor-genie/conversations/${id}`, "root");

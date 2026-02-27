@@ -19,7 +19,9 @@
       "default": "./dist/index.js"
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "@bublys-org/bubbles-ui-util": "*"
+  },
   "nx": {
     "targets": {
       "dev": {

@@ -1,3 +1,4 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { Speaker } from "./Speaker.js";
 import { Turn } from "./Turn.js";
 import { Choice } from "./Choice.js";
@@ -127,7 +128,7 @@ export class Conversation {
     }
 
     const turn = new MessageTurn({
-      id: crypto.randomUUID(),
+      id: uuid(),
       speakerId: speaker.id,
       kind: "MessageTurn",
       message,
@@ -157,7 +158,7 @@ export class Conversation {
     }
 
     const turn = new QuestionTurn({
-      id: crypto.randomUUID(),
+      id: uuid(),
       speakerId: host.id,
       kind: "QuestionTurn",
       question,
@@ -189,7 +190,7 @@ export class Conversation {
     }
 
     const turn = new AnswerTurn({
-      id: crypto.randomUUID(),
+      id: uuid(),
       speakerId: guest.id,
       kind: "AnswerTurn",
       questionTurnId: pending.id,

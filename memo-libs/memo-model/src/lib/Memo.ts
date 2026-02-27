@@ -1,3 +1,5 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
+
 export type MemoBlock = {
   id: string;
   type: string;
@@ -51,7 +53,7 @@ export class Memo {
   }
 
   insertTextBlockAfter(afterId: string, type: string, content = ""): { memo: Memo; newBlockId: string } {
-    const newBlockId = crypto.randomUUID();
+    const newBlockId = uuid();
     const newBlock: MemoBlock = { id: newBlockId, type, content };
     const { id, blocks, lines } = this.state;
     const newBlocks = { ...blocks, [newBlockId]: newBlock };
@@ -93,8 +95,8 @@ export class Memo {
   }
 
   static create(): Memo {
-    const memoId = crypto.randomUUID();
-    const firstLineId = crypto.randomUUID();
+    const memoId = uuid();
+    const firstLineId = uuid();
     const raw: RawMemo = {
       id: memoId,
       blocks: {

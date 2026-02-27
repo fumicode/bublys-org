@@ -1,5 +1,6 @@
 import { FC, useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { selectUserGroups, setUserGroups, addUserGroup } from "../slice/index.js";
 import { UserGroup } from "../domain/UserGroup.domain.js";
 import { UserGroupIcon } from "../ui/UserIcon.js";
@@ -26,7 +27,7 @@ export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect
   }, [dispatch, groups.length]);
 
   const handleAddGroup = () => {
-    const newGroup = new UserGroup(crypto.randomUUID(), `New Group ${groups.length + 1}`, []);
+    const newGroup = new UserGroup(uuid(), `New Group ${groups.length + 1}`, []);
     dispatch(addUserGroup(newGroup.toJSON()));
   };
 

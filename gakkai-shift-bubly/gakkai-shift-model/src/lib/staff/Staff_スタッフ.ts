@@ -2,6 +2,7 @@
  * スタッフドメインモデル
  */
 
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { Role_係, SkillLevel_スキルレベル } from '../master/Role_係.js';
 import { DateString_日付, TimeSlotPeriod_時間帯区分 } from '../master/TimeSlot_時間帯.js';
 
@@ -275,7 +276,7 @@ export class Staff_スタッフ {
     const now = new Date().toISOString();
     return new Staff_スタッフ({
       ...data,
-      id: crypto.randomUUID(),
+      id: uuid(),
       status: 'pending',
       createdAt: now,
       updatedAt: now,

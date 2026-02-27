@@ -1,4 +1,4 @@
-import { Point2, Size2, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Size2, SmartRect, uuid } from "@bublys-org/bubbles-ui-util";
 
 export type BubbleOptions = {
   contentBackground?: string;
@@ -64,7 +64,7 @@ export class Bubble {
   constructor(props: BubbleProps) {
     this.state = {
       ...props,
-      id: props.id || crypto.randomUUID(),
+      id: props.id || uuid(),
       params: props.params || {},
     };
   }

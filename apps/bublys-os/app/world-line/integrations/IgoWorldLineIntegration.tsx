@@ -2,6 +2,7 @@
 import { WorldLineView } from '../WorldLine/ui/WorldLineView';
 import { IgoBoardView, GameInfoView } from '../../igo-game/ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
+import { uuid } from '@bublys-org/bubbles-ui-util';
 import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 
 /**
@@ -68,7 +69,7 @@ export function IgoWorldLineIntegration({ gameId }: { gameId: string }) {
                   game={game}
                   onPass={() => onGameChange(game.pass())}
                   onResign={() => onGameChange(game.resign())}
-                  onNewGame={() => onGameChange(IgoGame_囲碁ゲーム.create(crypto.randomUUID(), 9))}
+                  onNewGame={() => onGameChange(IgoGame_囲碁ゲーム.create(uuid(), 9))}
                 />
               </div>
             </div>

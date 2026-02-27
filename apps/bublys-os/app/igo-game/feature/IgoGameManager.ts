@@ -1,3 +1,4 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { IgoGame_囲碁ゲーム, IgoGameState_囲碁ゲーム状態 } from '../domain';
 
 /**
@@ -18,5 +19,5 @@ export function deserializeIgoGame(data: IgoGameState_囲碁ゲーム状態): Ig
  * IgoGameの初期状態を作成
  */
 export function createInitialIgoGame(): IgoGame_囲碁ゲーム {
-  return IgoGame_囲碁ゲーム.create(crypto.randomUUID(), 9);
+  return IgoGame_囲碁ゲーム.create(uuid(), 9);
 }

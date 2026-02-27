@@ -3,6 +3,7 @@
  * 全配置を取りまとめて、シフト全体の評価を行う
  */
 
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { ShiftAssignment_シフト配置, ShiftAssignmentState } from './ShiftAssignment_シフト配置.js';
 import { StaffRequirement_必要人数 } from '../master/TimeSlot_時間帯.js';
 import { SlotRoleEvaluation_配置枠評価 } from './SlotRoleEvaluation_配置枠評価.js';
@@ -229,7 +230,7 @@ export class ShiftPlan_シフト案 {
   static create(name: string): ShiftPlan_シフト案 {
     const now = new Date().toISOString();
     return new ShiftPlan_シフト案({
-      id: crypto.randomUUID(),
+      id: uuid(),
       name,
       assignments: [],
       constraintViolations: [],

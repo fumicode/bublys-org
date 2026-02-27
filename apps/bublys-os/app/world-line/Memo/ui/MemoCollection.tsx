@@ -4,6 +4,7 @@ import { Memo } from '../domain/Memo';
 import { serializeMemo } from '../feature/MemoManager';
 import { useAppDispatch, initialize } from '@bublys-org/state-management';
 import { WorldLineState } from '@bublys-org/state-management';
+import { uuid } from '@bublys-org/bubbles-ui-util';
 
 type MemoCollectionProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -21,7 +22,7 @@ export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, on
     const memoId = newMemo.id;
 
     // 世界線の初期状態を作成
-    const rootWorldId = crypto.randomUUID();
+    const rootWorldId = uuid();
     const worldLineState: WorldLineState = {
       worlds: [
         {

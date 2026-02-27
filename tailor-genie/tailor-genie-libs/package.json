@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/bubbles-ui-util": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/tailor-genie-model": "*",
     "@bublys-org/world-line-graph": "*"

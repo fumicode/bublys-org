@@ -26,6 +26,7 @@ import {
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
 import { BubblesLayeredView } from "../ui/BubblesLayeredView";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
@@ -175,7 +176,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // Pocketのドロップハンドラー
   const handlePocketDrop = (url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
-      id: crypto.randomUUID(),
+      id: uuid(),
       url,
       type,
       objectId,

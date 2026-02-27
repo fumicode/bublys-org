@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { uuid } from '@bublys-org/bubbles-ui-util';
 import { CounterWorldLineIntegration } from './integrations/CounterWorldLineIntegration';
 import { CounterWorldLineManager } from './integrations/CounterWorldLineManager';
 import { MemoWorldLineIntegration } from './integrations/MemoWorldLineIntegration';
@@ -14,7 +15,7 @@ export default function Index() {
   const [showMemoList, setShowMemoList] = useState(false);
 
   const handleCreateCounter = () => {
-    const newCounterId = `counter-${crypto.randomUUID()}`;
+    const newCounterId = `counter-${uuid()}`;
     // CounterはReduxに保存しない（世界線システムのみで管理）
     setCounterId(newCounterId);
   };

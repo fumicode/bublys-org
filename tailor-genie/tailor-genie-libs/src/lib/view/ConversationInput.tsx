@@ -2,6 +2,7 @@
 
 import { FC, useState, FormEvent, ChangeEvent } from "react";
 import { type SpeakerRole, type Choice } from "@bublys-org/tailor-genie-model";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 
 export type ConversationInputProps = {
   speakerName: string;
@@ -96,7 +97,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
         .map((text, i) => ({ text, imageUrl: choiceImageUrls[i] }))
         .filter((c) => c.text.trim())
         .map((c) => ({
-          id: crypto.randomUUID(),
+          id: uuid(),
           text: c.text.trim(),
           ...(c.imageUrl.trim() ? { imageUrl: c.imageUrl.trim() } : {}),
         }));

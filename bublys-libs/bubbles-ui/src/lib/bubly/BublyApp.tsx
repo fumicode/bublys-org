@@ -11,7 +11,7 @@ import {
   addPocketItem,
   removePocketItem,
 } from '@bublys-org/state-management';
-import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
+import { CoordinateSystem, uuid } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
@@ -167,7 +167,7 @@ export const BublyApp: FC<BublyAppProps> = ({
 
   const handlePocketDrop = useCallback((url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
-      id: crypto.randomUUID(),
+      id: uuid(),
       url,
       type,
       objectId,

@@ -2,6 +2,7 @@
 
 import { FC, useState, useCallback } from "react";
 import styled from "styled-components";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { IgoGame_囲碁ゲーム } from "../domain";
 import { IgoBoardView, GameInfoView } from "../ui";
 
@@ -18,7 +19,7 @@ type IgoGameFeatureProps = {
  * - ユーザーアクションのハンドリング
  */
 export const IgoGameFeature: FC<IgoGameFeatureProps> = ({
-  gameId = crypto.randomUUID(),
+  gameId = uuid(),
   boardSize = 19,
 }) => {
   const [game, setGame] = useState<IgoGame_囲碁ゲーム>(() =>
@@ -38,7 +39,7 @@ export const IgoGameFeature: FC<IgoGameFeatureProps> = ({
   }, []);
 
   const handleNewGame = useCallback(() => {
-    setGame(IgoGame_囲碁ゲーム.create(crypto.randomUUID(), boardSize));
+    setGame(IgoGame_囲碁ゲーム.create(uuid(), boardSize));
   }, [boardSize]);
 
   return (

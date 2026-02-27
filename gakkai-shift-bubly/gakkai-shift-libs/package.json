@@ -23,6 +23,7 @@
     "tslib": "^2.3.0",
     "@bublys-org/gakkai-shift-model": "*",
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/bubbles-ui-util": "*",
     "@bublys-org/state-management": "*"
   },
   "nx": {

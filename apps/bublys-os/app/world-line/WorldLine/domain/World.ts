@@ -1,3 +1,5 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
+
 /**
  * World クラス(ジェネリック版)
  * 世界の状態を表現し、世界線の概念を含む
@@ -25,7 +27,7 @@ export class World<TWorldState> {
    */
   public updateWorldState(newWorldState: TWorldState): World<TWorldState> {
     return new World(
-      crypto.randomUUID(),
+      uuid(),
       this.worldId,
       newWorldState,
       this.apexWorldLineId

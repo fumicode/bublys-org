@@ -22,6 +22,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import { loadBublyFromOrigin, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 
 type MenuItem = {
   label: string;
@@ -33,7 +34,7 @@ type MenuItem = {
 const staticMenuItems: MenuItem[] = [
   {
     label: "囲碁ゲーム",
-    url: () => `igo-game/${crypto.randomUUID()}`,
+    url: () => `igo-game/${uuid()}`,
     icon: <SportsEsportsIcon sx={{ color: "#dcb35c" }} />,
   },
   {

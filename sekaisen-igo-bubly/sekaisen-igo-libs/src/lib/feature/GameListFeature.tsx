@@ -2,6 +2,7 @@
 
 import { FC, useContext } from "react";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { useIgoGame } from "./IgoGameProvider.js";
 
 export const GameListFeature: FC = () => {
@@ -9,7 +10,7 @@ export const GameListFeature: FC = () => {
   const { gameIds, addGame } = useIgoGame();
 
   const handleCreateGame = () => {
-    const id = crypto.randomUUID();
+    const id = uuid();
     addGame(id);
     openBubble(`sekaisen-igo/games/${id}`, "root");
   };

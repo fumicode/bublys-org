@@ -10,6 +10,7 @@ import {
   removeBubble,
 } from "@bublys-org/bubbles-ui";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 
 import { UserCollection } from "../feature/UserCollection.js";
 import { UserDetail } from "../feature/UserDetail.js";
@@ -70,7 +71,7 @@ const UserCreateBubble: BubbleContentRenderer = ({ bubble }) => {
   const openerId = relation?.openerId || bubble.id;
 
   const handleSubmit = ({ name, birthday }: { name: string; birthday: string }) => {
-    const newUser = new User(crypto.randomUUID(), name, birthday);
+    const newUser = new User(uuid(), name, birthday);
     dispatch(addUser(newUser.toJSON()));
     openBubble(`users/${newUser.id}`, openerId);
     dispatch(deleteProcessBubble(bubble.id));

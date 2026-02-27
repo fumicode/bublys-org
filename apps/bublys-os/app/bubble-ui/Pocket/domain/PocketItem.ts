@@ -1,3 +1,4 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import { BUILTIN_DRAG_TYPES } from "@bublys-org/bubbles-ui";
 import type { DragDataType } from "@bublys-org/bubbles-ui";
 
@@ -21,7 +22,7 @@ export class PocketItem {
 
   static create(url: string, type: PocketItemType = BUILTIN_DRAG_TYPES.generic, label?: string): PocketItem {
     return new PocketItem({
-      id: crypto.randomUUID(),
+      id: uuid(),
       url,
       type,
       label,

@@ -1,3 +1,5 @@
+import { uuid } from "@bublys-org/bubbles-ui-util";
+
 /**
  * タスク管理ドメインモデル
  */
@@ -149,7 +151,7 @@ export class Task_タスク {
   ): Task_タスク {
     const now = new Date().toISOString();
     return new Task_タスク({
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: data.title,
       description: data.description ?? '',
       status: 'todo',

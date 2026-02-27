@@ -3,6 +3,7 @@
 import { FC, useState, useEffect } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { uuid } from "@bublys-org/bubbles-ui-util";
 import {
   selectGakkaiShiftPlans,
   addShiftPlan,
@@ -75,7 +76,7 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
       ...newPlan.state,
       assignments: sourcePlan.state.assignments.map((a) => ({
         ...a,
-        id: crypto.randomUUID(), // 新しいIDを割り当て
+        id: uuid(), // 新しいIDを割り当て
       })),
     };
 

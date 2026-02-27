@@ -20,6 +20,7 @@
     }
   },
   "dependencies": {
+    "@bublys-org/bubbles-ui-util": "*"
   },
   "nx": {
     "targets": {
