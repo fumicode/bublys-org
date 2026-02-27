@@ -65,3 +65,4 @@ tsconfig.tsbuildinfo
 dist-bubly
 **/public/bubly.js
 **/public/bubly.js.map
+package-lock.json

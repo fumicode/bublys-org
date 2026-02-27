@@ -109,6 +109,14 @@ export default defineConfig({
           if (id.startsWith("@emotion/")) {
             return "window.__BUBLYS_SHARED__.Emotion";
           }
+          // world-line-graph
+          if (id === "@bublys-org/world-line-graph" || id.startsWith("@bublys-org/world-line-graph/")) {
+            return "window.__BUBLYS_SHARED__.WorldLineGraph";
+          }
+          // domain-registry
+          if (id === "@bublys-org/domain-registry" || id.startsWith("@bublys-org/domain-registry/")) {
+            return "window.__BUBLYS_SHARED__.DomainRegistry";
+          }
           // その他の@bublys-org パッケージ
           if (id.startsWith("@bublys-org/")) {
             console.warn(`[vite] Unknown @bublys-org package: ${id}`);

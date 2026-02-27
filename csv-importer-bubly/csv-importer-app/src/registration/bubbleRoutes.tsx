@@ -8,6 +8,7 @@ import {
   WorldLineFeature,
   CsvObjectListFeature,
   CsvObjectDetailFeature,
+  CsvSheetProvider,
 } from "@bublys-org/csv-importer-libs";
 
 // シート一覧バブル
@@ -16,27 +17,47 @@ const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const handleSheetSelect = (sheetId: string) => {
     openBubble(`csv-importer/sheets/${sheetId}`, bubble.id);
   };
-  return <SheetListFeature onSheetSelect={handleSheetSelect} />;
+  return (
+    <CsvSheetProvider>
+      <SheetListFeature onSheetSelect={handleSheetSelect} />
+    </CsvSheetProvider>
+  );
 };
 
 // シート編集バブル
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />;
+  return (
+    <CsvSheetProvider>
+      <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+    </CsvSheetProvider>
+  );
 };
 
 // オブジェクト一覧バブル
 const ObjectListBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <CsvObjectListFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />;
+  return (
+    <CsvSheetProvider>
+      <CsvObjectListFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+    </CsvSheetProvider>
+  );
 };
 
 // オブジェクト詳細バブル
 const ObjectDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <CsvObjectDetailFeature sheetId={bubble.params.sheetId} rowId={bubble.params.rowId} />;
+  return (
+    <CsvSheetProvider>
+      <CsvObjectDetailFeature sheetId={bubble.params.sheetId} rowId={bubble.params.rowId} />
+    </CsvSheetProvider>
+  );
 };
 
 // 世界線ビューバブル
 const WorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <WorldLineFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />;
+  return (
+    <CsvSheetProvider>
+      <WorldLineFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+    </CsvSheetProvider>
+  );
 };
 
 /** CSV Importer のバブルルート定義 */
