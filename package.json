@@ -104,6 +104,7 @@
     "ekikyo-bubly/ekikyo-app",
     "tailor-genie/*",
     "sekaisen-igo-bubly/*",
-    "csv-importer-bubly/*"
+    "csv-importer-bubly/*",
+    "object-transformer-bubly/*"
   ]
 }

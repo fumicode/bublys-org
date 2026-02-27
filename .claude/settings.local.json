@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx nx test:*)",
-      "Bash(npx nx build:*)"
+      "Bash(npx nx build:*)",
+      "Bash(npx nx:*)",
+      "Bash(npx jest:*)",
+      "Bash(NODE_OPTIONS=\"--no-experimental-strip-types\" npx jest:*)",
+      "Bash(TS_NODE_COMPILER_OPTIONS='{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}' NODE_OPTIONS=\"--no-experimental-strip-types\" npx jest:*)"
     ]
   }
 }

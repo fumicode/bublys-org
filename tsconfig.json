@@ -89,6 +89,15 @@
     },
     {
       "path": "./csv-importer-bubly/csv-importer-app"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-model"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-libs"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-app"
     }
   ]
 }
