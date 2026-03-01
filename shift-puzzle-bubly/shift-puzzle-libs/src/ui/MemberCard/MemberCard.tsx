@@ -1,6 +1,7 @@
 'use client';
-import React from 'react';
+import React, { useRef } from 'react';
 import styled from 'styled-components';
+import { setDragPayload, getDragType } from '@bublys-org/bubbles-ui';
 import type {
   MemberState,
   TimeSlotState,
@@ -15,6 +16,10 @@ export interface MemberCardProps {
   onDelete?: (memberId: string) => void;
   /** F-4-1: タップで詳細バブルを開く */
   onTap?: (memberId: string) => void;
+  /** F-4-3: ダブルクリックでクイック配置ダイアログを開く */
+  onDoubleClick?: (memberId: string) => void;
+  /** F-4-3: ドラッグ&ドロップ用URL（設定するとカードがドラッグ可能になる） */
+  dragUrl?: string;
 }
 
 /** F-1-1: メンバー情報の表示カード */
@@ -25,7 +30,11 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   onEdit,
   onDelete,
   onTap,
+  onDoubleClick,
+  dragUrl,
 }) => {
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const skillLabels = member.skills
     .map((skillId) => skillDefinitions.find((d) => d.id === skillId)?.label ?? skillId)
     .filter(Boolean);
@@ -33,8 +42,47 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   const availableCount = member.availableSlotIds.length;
   const totalCount = timeSlots.length;
 
+  const handleClick = () => {
+    if (!onTap) return;
+    if (onDoubleClick) {
+      // ダブルクリックと区別するため 250ms 待つ
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        onTap(member.id);
+      }, 250);
+    } else {
+      onTap(member.id);
+    }
+  };
+
+  const handleDoubleClick = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+    onDoubleClick?.(member.id);
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!dragUrl) return;
+    setDragPayload(e, {
+      type: getDragType('Member'),
+      url: dragUrl,
+      objectId: member.id,
+      label: member.name,
+    });
+  };
+
   return (
-    <StyledCard onClick={onTap ? () => onTap(member.id) : undefined} style={onTap ? { cursor: 'pointer' } : undefined}>
+    <StyledCard
+      onClick={onTap ? handleClick : undefined}
+      onDoubleClick={onDoubleClick ? handleDoubleClick : undefined}
+      draggable={!!dragUrl}
+      onDragStart={dragUrl ? handleDragStart : undefined}
+      style={{
+        cursor: dragUrl ? 'grab' : onTap ? 'pointer' : undefined,
+      }}
+    >
       <div className="e-header">
         <div className="e-name">{member.name}</div>
         <div className="e-actions">

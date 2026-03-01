@@ -2,17 +2,22 @@
 import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
-import { Member, type MemberState } from '@bublys-org/shift-puzzle-model';
+import { Assignment, Member, type AssignmentReasonState, type MemberState } from '@bublys-org/shift-puzzle-model';
 import {
   selectMembersForEvent,
   selectEventById,
   selectTimeSlotsForEvent,
+  selectRolesForEvent,
+  selectCurrentShiftPlanId,
+  selectAssignmentsForPlan,
   addMember,
   updateMember,
   deleteMember,
+  addAssignment,
 } from '../slice/index.js';
 import { MemberCard } from '../ui/index.js';
 import { MemberForm } from '../ui/MemberCard/MemberForm.js';
+import { ReasonInputDialog } from '../ui/GanttChart/ReasonInputDialog.js';
 
 interface MemberCollectionProps {
   eventId: string;
@@ -25,14 +30,22 @@ type EditingState =
   | { mode: 'add' }
   | { mode: 'edit'; memberId: string };
 
+type QuickAssignState =
+  | { open: false }
+  | { open: true; memberId: string; selectedRoleId: string; selectedTimeSlotId: string };
+
 /** F-1-1〜F-1-4: メンバー一覧＋CRUD（Redux連携） */
 export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onMemberTap }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectMembersForEvent(eventId));
   const event = useAppSelector(selectEventById(eventId));
   const timeSlots = useAppSelector(selectTimeSlotsForEvent(eventId));
+  const roles = useAppSelector(selectRolesForEvent(eventId));
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+  const assignments = useAppSelector(selectAssignmentsForPlan(currentShiftPlanId ?? ''));
   const [editing, setEditing] = useState<EditingState>({ mode: 'none' });
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [quickAssign, setQuickAssign] = useState<QuickAssignState>({ open: false });
   const [searchText, setSearchText] = useState('');
 
   const skillDefinitions = event?.state.skillDefinitions ?? [];
@@ -82,6 +95,48 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
       dispatch(deleteMember(memberId));
     }
   };
+
+  // F-4-3: ダブルクリック → クイック配置ダイアログ
+  const handleMemberDoubleClick = (memberId: string) => {
+    setQuickAssign({ open: true, memberId, selectedRoleId: '', selectedTimeSlotId: '' });
+  };
+
+  const handleQuickAssignConfirm = (reason: AssignmentReasonState) => {
+    if (!quickAssign.open || !currentShiftPlanId) return;
+    const { memberId, selectedRoleId, selectedTimeSlotId } = quickAssign;
+    if (!selectedRoleId || !selectedTimeSlotId) return;
+
+    // 重複チェック
+    const exists = assignments.some(
+      (a) => a.state.memberId === memberId && a.state.timeSlotId === selectedTimeSlotId && a.state.roleId === selectedRoleId
+    );
+    if (!exists) {
+      const assignment = Assignment.create({
+        memberId,
+        roleId: selectedRoleId,
+        timeSlotId: selectedTimeSlotId,
+        shiftPlanId: currentShiftPlanId,
+        reason,
+      });
+      dispatch(addAssignment({ shiftPlanId: currentShiftPlanId, assignment: assignment.toJSON() }));
+    }
+    setQuickAssign({ open: false });
+  };
+
+  const formatSlotLabel = (slotId: string) => {
+    const slot = timeSlots.find((s) => s.id === slotId);
+    if (!slot) return slotId;
+    const h1 = Math.floor(slot.startMinute / 60);
+    const m1 = slot.startMinute % 60;
+    const end = slot.startMinute + slot.durationMinutes;
+    const h2 = Math.floor(end / 60);
+    const m2 = end % 60;
+    return `${h1}:${String(m1).padStart(2, '0')}〜${h2}:${String(m2).padStart(2, '0')}`;
+  };
+
+  const quickAssignMember = quickAssign.open
+    ? members.find((m) => m.state.id === quickAssign.memberId)
+    : undefined;
 
   return (
     <StyledWrapper>
@@ -166,11 +221,31 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
                 onEdit={(id) => setEditing({ mode: 'edit', memberId: id })}
                 onDelete={handleDelete}
                 onTap={onMemberTap}
+                onDoubleClick={currentShiftPlanId ? handleMemberDoubleClick : undefined}
+                dragUrl={`shift-puzzle/events/${eventId}/members/${m.state.id}`}
               />
             ))
           )}
         </div>
       )}
+
+      {/* F-4-3: ダブルクリック クイック配置ダイアログ */}
+      <ReasonInputDialog
+        open={quickAssign.open}
+        memberName={quickAssignMember?.state.name}
+        roles={roles.map((r) => ({ id: r.state.id, name: r.state.name, color: r.state.color }))}
+        selectedRoleId={quickAssign.open ? quickAssign.selectedRoleId : ''}
+        onRoleChange={(roleId) =>
+          setQuickAssign((s) => s.open ? { ...s, selectedRoleId: roleId } : s)
+        }
+        timeSlots={timeSlots.map((s) => ({ id: s.id, label: formatSlotLabel(s.id) }))}
+        selectedTimeSlotId={quickAssign.open ? quickAssign.selectedTimeSlotId : ''}
+        onTimeSlotChange={(slotId) =>
+          setQuickAssign((s) => s.open ? { ...s, selectedTimeSlotId: slotId } : s)
+        }
+        onConfirm={handleQuickAssignConfirm}
+        onCancel={() => setQuickAssign({ open: false })}
+      />
     </StyledWrapper>
   );
 };

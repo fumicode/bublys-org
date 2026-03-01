@@ -7,10 +7,14 @@ export interface ReasonInputDialogProps {
   open: boolean;
   memberName?: string;
   roleName?: string;
-  /** 役割選択が必要な場合（memberモード時） */
+  /** 役割選択が必要な場合 */
   roles?: Array<{ id: string; name: string; color: string }>;
   selectedRoleId?: string;
   onRoleChange?: (roleId: string) => void;
+  /** 時間帯選択が必要な場合（MemberCardダブルクリック等） */
+  timeSlots?: Array<{ id: string; label: string }>;
+  selectedTimeSlotId?: string;
+  onTimeSlotChange?: (slotId: string) => void;
   onConfirm: (reason: AssignmentReasonState) => void;
   onCancel: () => void;
 }
@@ -31,6 +35,9 @@ export const ReasonInputDialog: React.FC<ReasonInputDialogProps> = ({
   roles,
   selectedRoleId,
   onRoleChange,
+  timeSlots,
+  selectedTimeSlotId,
+  onTimeSlotChange,
   onConfirm,
   onCancel,
 }) => {
@@ -39,7 +46,12 @@ export const ReasonInputDialog: React.FC<ReasonInputDialogProps> = ({
 
   if (!open) return null;
 
+  const canConfirm =
+    (!roles || roles.length === 0 || !!selectedRoleId) &&
+    (!timeSlots || timeSlots.length === 0 || !!selectedTimeSlotId);
+
   const handleConfirm = () => {
+    if (!canConfirm) return;
     onConfirm({
       category,
       text,
@@ -68,7 +80,7 @@ export const ReasonInputDialog: React.FC<ReasonInputDialogProps> = ({
           {roleName && <><span className="e-arrow">→</span><span className="e-chip e-role">{roleName}</span></>}
         </div>
 
-        {/* 役割選択（memberモード時） */}
+        {/* 役割選択 */}
         {roles && roles.length > 0 && (
           <div className="e-field">
             <label className="e-field-label">役割</label>
@@ -80,6 +92,23 @@ export const ReasonInputDialog: React.FC<ReasonInputDialogProps> = ({
               <option value="">選択してください</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* 時間帯選択 */}
+        {timeSlots && timeSlots.length > 0 && (
+          <div className="e-field">
+            <label className="e-field-label">時間帯</label>
+            <select
+              className="e-select"
+              value={selectedTimeSlotId ?? ''}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onTimeSlotChange?.(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {timeSlots.map((s) => (
+                <option key={s.id} value={s.id}>{s.label}</option>
               ))}
             </select>
           </div>
@@ -118,7 +147,7 @@ export const ReasonInputDialog: React.FC<ReasonInputDialogProps> = ({
           <button className="e-btn e-btn-cancel" onClick={handleCancel}>
             キャンセル
           </button>
-          <button className="e-btn e-btn-confirm" onClick={handleConfirm}>
+          <button className="e-btn e-btn-confirm" onClick={handleConfirm} disabled={!canConfirm}>
             配置を確定
           </button>
         </div>
@@ -277,8 +306,13 @@ const StyledPanel = styled.div`
     background: #1976d2;
     color: white;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: #1565c0;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
   }
 ` as React.FC<React.HTMLAttributes<HTMLDivElement>>;
