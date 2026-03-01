@@ -6,6 +6,7 @@ import {
   Role,
   ShiftPlan,
   Assignment,
+  Event,
   ConstraintChecker,
   type EventJSON,
   type MemberJSON,
@@ -239,6 +240,11 @@ export const selectCurrentEventId = (state: StateWithShiftPuzzleMain) =>
 export const selectCurrentEvent = createSelector([selectSlice], (s) =>
   s.events.find((e) => e.id === s.currentEventId) ?? null
 );
+export const selectEventById = (id: string) =>
+  createSelector([selectSlice], (s) => {
+    const json = s.events.find((e) => e.id === id);
+    return json ? new Event(json) : undefined;
+  });
 
 // --- Members ---
 export const selectMembersForEvent = (eventId: string) =>

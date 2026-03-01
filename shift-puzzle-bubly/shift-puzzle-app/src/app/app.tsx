@@ -24,8 +24,22 @@ function getReasonsUrl(): string {
   return "shift-puzzle/reasons";
 }
 
+/** 現在の Redux 状態からメンバー管理 URL を動的生成 */
+function getMembersUrl(): string {
+  const store = getCurrentStore();
+  if (store) {
+    const state = store.getState() as {
+      shiftPuzzleMain?: { currentEventId: string | null };
+    };
+    const eventId = state.shiftPuzzleMain?.currentEventId;
+    if (eventId) return `shift-puzzle/events/${eventId}/members`;
+  }
+  return "shift-puzzle/members";
+}
+
 const menuItems = [
   { label: "シフトパズル", url: "shift-puzzle/editor", icon: null },
+  { label: "メンバー管理", url: getMembersUrl, icon: null },
   { label: "配置理由一覧", url: getReasonsUrl, icon: null },
 ];
 
