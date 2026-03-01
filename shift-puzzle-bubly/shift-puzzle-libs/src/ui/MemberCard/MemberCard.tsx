@@ -13,6 +13,8 @@ export interface MemberCardProps {
   timeSlots?: ReadonlyArray<TimeSlotState>;
   onEdit?: (memberId: string) => void;
   onDelete?: (memberId: string) => void;
+  /** F-4-1: タップで詳細バブルを開く */
+  onTap?: (memberId: string) => void;
 }
 
 /** F-1-1: メンバー情報の表示カード */
@@ -22,6 +24,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   timeSlots = [],
   onEdit,
   onDelete,
+  onTap,
 }) => {
   const skillLabels = member.skills
     .map((skillId) => skillDefinitions.find((d) => d.id === skillId)?.label ?? skillId)
@@ -31,19 +34,19 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   const totalCount = timeSlots.length;
 
   return (
-    <StyledCard>
+    <StyledCard onClick={onTap ? () => onTap(member.id) : undefined} style={onTap ? { cursor: 'pointer' } : undefined}>
       <div className="e-header">
         <div className="e-name">{member.name}</div>
         <div className="e-actions">
           {onEdit && (
-            <button className="e-btn-icon" onClick={() => onEdit(member.id)} title="編集">
+            <button className="e-btn-icon" onClick={(e) => { e.stopPropagation(); onEdit(member.id); }} title="編集">
               ✏️
             </button>
           )}
           {onDelete && (
             <button
               className="e-btn-icon e-btn-delete"
-              onClick={() => onDelete(member.id)}
+              onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}
               title="削除"
             >
               🗑️

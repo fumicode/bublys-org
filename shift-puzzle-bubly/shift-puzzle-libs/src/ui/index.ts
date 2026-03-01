@@ -14,6 +14,12 @@ export { ReasonList } from './ReasonPanel/ReasonList.js';
 export { MemberCard } from './MemberCard/MemberCard.js';
 export { MemberForm } from './MemberCard/MemberForm.js';
 
+// F-4-1: メンバー詳細
+export { MemberDetailView } from './MemberDetail/MemberDetailView.js';
+
+// F-4-2: 役割充足状況
+export { RoleFulfillmentView } from './RoleFulfillment/RoleFulfillmentView.js';
+
 export type { GanttChartViewProps } from './GanttChart/GanttChartView.js';
 export type { ReasonInputDialogProps } from './GanttChart/ReasonInputDialog.js';
 export type { ReasonInputPanelProps } from './ReasonPanel/ReasonInputPanel.js';
@@ -21,3 +27,5 @@ export type { ReasonPopoverProps } from './ReasonPanel/ReasonPopover.js';
 export type { ReasonListProps } from './ReasonPanel/ReasonList.js';
 export type { MemberCardProps } from './MemberCard/MemberCard.js';
 export type { MemberFormProps } from './MemberCard/MemberForm.js';
+export type { MemberDetailViewProps } from './MemberDetail/MemberDetailView.js';
+export type { RoleFulfillmentViewProps } from './RoleFulfillment/RoleFulfillmentView.js';
