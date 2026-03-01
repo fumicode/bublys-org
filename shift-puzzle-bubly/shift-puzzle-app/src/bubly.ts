@@ -5,8 +5,11 @@
  * 動的にロードされるバブリとして動作する
  */
 
-import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
+import { registerBubly, Bubly, registerObjectType } from "@bublys-org/bubbles-ui";
 import { shiftPuzzleBubbleRoutes } from "./registration/index.js";
+
+// F-4-3: ポケット連携のためメンバーオブジェクト型を登録（DragType: 'type/member'）
+registerObjectType("Member");
 
 const ShiftPuzzleBubly: Bubly = {
   name: "shift-puzzle",

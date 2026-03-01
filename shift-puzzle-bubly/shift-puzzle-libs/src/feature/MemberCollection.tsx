@@ -16,6 +16,8 @@ import { MemberForm } from '../ui/MemberCard/MemberForm.js';
 
 interface MemberCollectionProps {
   eventId: string;
+  /** F-4-1: メンバーカードタップで詳細バブルを開くコールバック */
+  onMemberTap?: (memberId: string) => void;
 }
 
 type EditingState =
@@ -24,7 +26,7 @@ type EditingState =
   | { mode: 'edit'; memberId: string };
 
 /** F-1-1〜F-1-4: メンバー一覧＋CRUD（Redux連携） */
-export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId }) => {
+export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onMemberTap }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectMembersForEvent(eventId));
   const event = useAppSelector(selectEventById(eventId));
@@ -163,11 +165,14 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId }) =
                 timeSlots={timeSlots}
                 onEdit={(id) => setEditing({ mode: 'edit', memberId: id })}
                 onDelete={handleDelete}
+                onTap={onMemberTap}
+                dragUrl={`shift-puzzle/events/${eventId}/members/${m.state.id}`}
               />
             ))
           )}
         </div>
       )}
+
     </StyledWrapper>
   );
 };
