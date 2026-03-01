@@ -5,6 +5,7 @@ import { BubbleRoute } from "@bublys-org/bubbles-ui";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
   ShiftPlanGanttEditor,
+  ReasonListFeature,
   selectEvents,
   selectCurrentEventId,
   selectCurrentShiftPlanId,
@@ -194,10 +195,43 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = () => {
   );
 };
 
+/** F-3-3: 配置理由一覧バブル */
+const ReasonListBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  // URL パラメータ優先、なければ Redux の現在選択状態を使用
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const planId = bubble.params.planId ?? currentShiftPlanId;
+
+  if (!eventId || !planId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        イベントまたはシフト案が選択されていません
+      </div>
+    );
+  }
+
+  return <ReasonListFeature shiftPlanId={planId} eventId={eventId} />;
+};
+
 export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   {
     pattern: "shift-puzzle/editor",
     type: "shift-puzzle-editor",
     Component: ShiftPuzzleEditorBubble,
+  },
+  {
+    // F-3-3: 配置理由一覧
+    // パターン: shift-puzzle/events/:eventId/shift-plans/:planId/reasons
+    // または    shift-puzzle/reasons（パラメータなし → Redux状態を使用）
+    pattern: "shift-puzzle/events/:eventId/shift-plans/:planId/reasons",
+    type: "shift-puzzle-reasons",
+    Component: ReasonListBubble,
+  },
+  {
+    pattern: "shift-puzzle/reasons",
+    type: "shift-puzzle-reasons",
+    Component: ReasonListBubble,
   },
 ];

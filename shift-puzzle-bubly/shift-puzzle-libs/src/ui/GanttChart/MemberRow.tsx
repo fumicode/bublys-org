@@ -93,6 +93,8 @@ export const MemberRow: React.FC<MemberRowProps> = ({
               assignment={assignment}
               role={barLabelMode === 'role' ? undefined : role}
               member={barLabelMode === 'member' ? undefined : member}
+              memberName={member?.name}
+              roleName={role?.name}
               left={left}
               width={width}
               rowHeight={rowHeight}

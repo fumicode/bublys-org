@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import type {
   AssignmentState,
@@ -7,6 +7,7 @@ import type {
   MemberState,
   ConstraintViolation,
 } from '@bublys-org/shift-puzzle-model';
+import { ReasonPopover } from '../ReasonPanel/ReasonPopover.js';
 
 interface AssignmentBlockProps {
   assignment: AssignmentState;
@@ -18,6 +19,10 @@ interface AssignmentBlockProps {
   rowHeight: number;
   violation?: ConstraintViolation;
   onClick?: (assignmentId: string) => void;
+  /** F-3-2: ポップオーバーに表示するメンバー名（常に渡す） */
+  memberName?: string;
+  /** F-3-2: ポップオーバーに表示する役割名（常に渡す） */
+  roleName?: string;
 }
 
 /** ガントチャート上の配置ブロック（ドラッグ可能） */
@@ -30,8 +35,11 @@ export const AssignmentBlock: React.FC<AssignmentBlockProps> = ({
   rowHeight,
   violation,
   onClick,
+  memberName,
+  roleName,
 }) => {
   const bgColor = role?.color ?? '#1976d2';
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('text/assignment-id', assignment.id);
@@ -41,8 +49,19 @@ export const AssignmentBlock: React.FC<AssignmentBlockProps> = ({
     e.stopPropagation();
   };
 
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+  };
+
+  const handleMouseLeave = () => setPopoverPos(null);
+
   const hasReason = assignment.reason.text.length > 0;
   const outlineColor = violation ? violationOutlineColor(violation.type) : 'transparent';
+
+  // ポップオーバー用の名前（propsから、なければrole/memberのfallback）
+  const displayMemberName = memberName ?? member?.name ?? '';
+  const displayRoleName = roleName ?? role?.name ?? '';
 
   return (
     <StyledBlock
@@ -59,17 +78,27 @@ export const AssignmentBlock: React.FC<AssignmentBlockProps> = ({
       }}
       draggable
       onDragStart={handleDragStart}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onClick={(e: React.MouseEvent<HTMLDivElement>) => {
         e.stopPropagation();
         onClick?.(assignment.id);
       }}
-      title={buildTooltip(assignment, role, member, violation)}
     >
       <span className="e-label">{role?.name ?? member?.name ?? '?'}</span>
       {hasReason && (
-        <span className="e-reason-dot" title={`理由: ${assignment.reason.text}`}>
-          ●
-        </span>
+        <span className="e-reason-dot">●</span>
+      )}
+
+      {/* F-3-2: ホバーポップオーバー（position:fixed で overflow:hidden を突き抜ける） */}
+      {popoverPos && (
+        <ReasonPopover
+          assignment={assignment}
+          memberName={displayMemberName}
+          roleName={displayRoleName}
+          top={popoverPos.top}
+          left={popoverPos.left}
+        />
       )}
     </StyledBlock>
   );
@@ -84,21 +113,6 @@ function violationOutlineColor(type: ConstraintViolation['type']): string {
   }
 }
 
-function buildTooltip(
-  assignment: AssignmentState,
-  role: RoleState | undefined,
-  member: MemberState | undefined,
-  violation: ConstraintViolation | undefined
-): string {
-  const lines = [
-    `役割: ${role?.name ?? '-'}`,
-    `担当: ${member?.name ?? '-'}`,
-  ];
-  if (assignment.reason.text) lines.push(`理由: ${assignment.reason.text}`);
-  if (violation) lines.push(`⚠ ${violation.message}`);
-  if (assignment.locked) lines.push('🔒 ロック済み');
-  return lines.join('\n');
-}
 
 const StyledBlock = styled.div`
   position: absolute;
