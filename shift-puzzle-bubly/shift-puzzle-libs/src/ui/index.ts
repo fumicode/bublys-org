@@ -20,6 +20,10 @@ export { MemberDetailView } from './MemberDetail/MemberDetailView.js';
 // F-4-2: 役割充足状況
 export { RoleFulfillmentView } from './RoleFulfillment/RoleFulfillmentView.js';
 
+// F-7-1〜F-7-3: 評価サマリー
+export { ShiftPlanSummaryView } from './Summary/ShiftPlanSummaryView.js';
+export type { ShiftPlanSummaryViewProps, MemberWorkloadSummary, RoleFulfillmentSummary, SummaryAlert } from './Summary/ShiftPlanSummaryView.js';
+
 export type { GanttChartViewProps } from './GanttChart/GanttChartView.js';
 export type { ReasonInputDialogProps } from './GanttChart/ReasonInputDialog.js';
 export type { ReasonInputPanelProps } from './ReasonPanel/ReasonInputPanel.js';

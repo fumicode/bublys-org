@@ -9,6 +9,7 @@ import {
   MemberCollection,
   MemberDetailFeature,
   RoleFulfillmentFeature,
+  ShiftPlanSummary,
   selectEvents,
   selectCurrentEventId,
   selectCurrentShiftPlanId,
@@ -167,7 +168,8 @@ function createDemoData(): {
   return { event, members, roles, timeSlots, shiftPlan };
 }
 
-const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = () => {
+const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   const dispatch = useAppDispatch();
   const events = useAppSelector(selectEvents);
   const currentEventId = useAppSelector(selectCurrentEventId);
@@ -190,11 +192,30 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = () => {
     return <div style={{ padding: 24, color: "#666" }}>データを初期化中...</div>;
   }
 
+  const handleOpenSummary = () => {
+    openBubble(
+      `shift-puzzle/events/${currentEventId}/shift-plans/${currentShiftPlanId}/summary`,
+      bubble.id
+    );
+  };
+
   return (
-    <ShiftPlanGanttEditor
-      shiftPlanId={currentShiftPlanId}
-      eventId={currentEventId}
-    />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ padding: "6px 12px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0", display: "flex", gap: 8, flexShrink: 0 }}>
+        <button
+          onClick={handleOpenSummary}
+          style={{ padding: "4px 12px", background: "#1976d2", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.82em", fontWeight: 600 }}
+        >
+          評価サマリー
+        </button>
+      </div>
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <ShiftPlanGanttEditor
+          shiftPlanId={currentShiftPlanId}
+          eventId={currentEventId}
+        />
+      </div>
+    </div>
   );
 };
 
@@ -322,6 +343,25 @@ const RoleFulfillmentBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
+/** F-7-1〜F-7-3: 評価サマリーバブル */
+const ShiftPlanSummaryBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const planId = bubble.params.planId ?? currentShiftPlanId;
+
+  if (!eventId || !planId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        イベントまたはシフト案が選択されていません
+      </div>
+    );
+  }
+
+  return <ShiftPlanSummary eventId={eventId} shiftPlanId={planId} />;
+};
+
 export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   {
     pattern: "shift-puzzle/editor",
@@ -362,6 +402,12 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
     pattern: "shift-puzzle/events/:eventId/roles/:roleId",
     type: "shift-puzzle-role-detail",
     Component: RoleDetailBubble,
+  },
+  {
+    // F-7-1〜F-7-3: 評価サマリー
+    pattern: "shift-puzzle/events/:eventId/shift-plans/:planId/summary",
+    type: "shift-puzzle-summary",
+    Component: ShiftPlanSummaryBubble,
   },
   {
     // F-1-1〜F-1-4: メンバー一覧
