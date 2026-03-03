@@ -10,3 +10,6 @@ export { EventListFeature } from './EventListFeature.js';
 export { EventDetailFeature } from './EventDetailFeature.js';
 export { RoleListFeature } from './RoleListFeature.js';
 export { ShiftPlanListFeature } from './ShiftPlanListFeature.js';
+
+// Issue #41: F-6 シフト案管理
+export { ShiftPlanManager } from './ShiftPlanManager.js';

@@ -13,7 +13,7 @@ import {
   EventListFeature,
   EventDetailFeature,
   RoleListFeature,
-  ShiftPlanListFeature,
+  ShiftPlanManager,
   selectEvents,
   selectCurrentEventId,
   selectCurrentShiftPlanId,
@@ -431,7 +431,7 @@ const RoleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-/** シフト案一覧バブル */
+/** F-6-1〜F-6-3: シフト案管理バブル（Issue #41） */
 const ShiftPlanListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const currentEventId = useAppSelector(selectCurrentEventId);
@@ -446,7 +446,7 @@ const ShiftPlanListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   }
 
   return (
-    <ShiftPlanListFeature
+    <ShiftPlanManager
       eventId={eventId}
       onPlanSelect={(planId) =>
         openBubble(`shift-puzzle/events/${eventId}/shift-plans/${planId}`, bubble.id)
