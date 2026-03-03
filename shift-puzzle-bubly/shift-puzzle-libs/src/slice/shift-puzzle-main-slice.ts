@@ -8,6 +8,7 @@ import {
   Assignment,
   Event,
   ConstraintChecker,
+  MemberFilter,
   type EventJSON,
   type MemberJSON,
   type RoleJSON,
@@ -16,9 +17,16 @@ import {
   type AssignmentJSON,
   type AssignmentReasonState,
   type ConstraintViolation,
+  type MemberFilterState,
 } from '@bublys-org/shift-puzzle-model';
 
 // ========== State ==========
+
+/** F-5: メンバーフィルター初期状態 */
+const EMPTY_MEMBER_FILTER: MemberFilterState = {
+  requiredSkillIds: [],
+  tags: [],
+};
 
 type ShiftPuzzleMainState = {
   events: EventJSON[];
@@ -33,6 +41,8 @@ type ShiftPuzzleMainState = {
   ganttAxisMode: 'role' | 'member';
   /** ガントチャートで表示するdayIndex */
   ganttDayIndex: number;
+  /** F-5: メンバーフィルター状態（バブル遷移後も保持） */
+  memberFilter: MemberFilterState;
 };
 
 const initialState: ShiftPuzzleMainState = {
@@ -46,6 +56,7 @@ const initialState: ShiftPuzzleMainState = {
   ganttHourPx: 80,
   ganttAxisMode: 'role',
   ganttDayIndex: 0,
+  memberFilter: EMPTY_MEMBER_FILTER,
 };
 
 // ========== Helper ==========
@@ -202,6 +213,16 @@ export const shiftPuzzleMainSlice = createSlice({
     setGanttDayIndex: (state, action: PayloadAction<number>) => {
       state.ganttDayIndex = action.payload;
     },
+
+    // --- F-5: メンバーフィルター ---
+    setMemberFilter: (state, action: PayloadAction<Partial<MemberFilterState>>) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      state.memberFilter = { ...state.memberFilter, ...action.payload } as any;
+    },
+    resetMemberFilter: (state) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      state.memberFilter = EMPTY_MEMBER_FILTER as any;
+    },
   },
 });
 
@@ -213,6 +234,7 @@ export const {
   addShiftPlan, updateShiftPlan, deleteShiftPlan, setCurrentShiftPlanId,
   addAssignment, removeAssignment, moveAssignment, updateAssignmentReason,
   setGanttHourPx, setGanttAxisMode, setGanttDayIndex,
+  setMemberFilter, resetMemberFilter,
 } = shiftPuzzleMainSlice.actions;
 
 // LazyLoadedSlicesを拡張
@@ -317,3 +339,29 @@ export const selectGanttAxisMode = (state: StateWithShiftPuzzleMain) =>
   selectSlice(state).ganttAxisMode;
 export const selectGanttDayIndex = (state: StateWithShiftPuzzleMain) =>
   selectSlice(state).ganttDayIndex;
+
+// --- F-5: メンバーフィルター ---
+export const selectMemberFilter = (state: StateWithShiftPuzzleMain): MemberFilterState =>
+  selectSlice(state).memberFilter ?? EMPTY_MEMBER_FILTER;
+
+/** F-5: フィルター適用済みメンバー（memoized） */
+export const selectFilteredMembersForEvent = (eventId: string, planId?: string) =>
+  createSelector([selectSlice], (s): Member[] => {
+    const allMembers = s.members.filter((m) => m.eventId === eventId).map((m) => new Member(m));
+    const filter = new MemberFilter(s.memberFilter ?? EMPTY_MEMBER_FILTER);
+
+    // 配置状況フィルター用: memberId → 配置数マップ
+    let assignedCountMap: ReadonlyMap<string, number> | undefined;
+    if (s.memberFilter?.assignmentStatus && planId) {
+      const plan = s.shiftPlans.find((p) => p.id === planId);
+      if (plan) {
+        const countMap = new Map<string, number>();
+        for (const a of plan.assignments) {
+          countMap.set(a.memberId, (countMap.get(a.memberId) ?? 0) + 1);
+        }
+        assignedCountMap = countMap;
+      }
+    }
+
+    return filter.apply(allMembers, assignedCountMap);
+  });
