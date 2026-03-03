@@ -7,9 +7,14 @@ import {
   selectMembersForEvent,
   selectEventById,
   selectTimeSlotsForEvent,
+  selectFilteredMembersForEvent,
+  selectMemberFilter,
+  selectCurrentShiftPlanId,
   addMember,
   updateMember,
   deleteMember,
+  setMemberFilter,
+  resetMemberFilter,
 } from '../slice/index.js';
 import { MemberCard } from '../ui/index.js';
 import { MemberForm } from '../ui/MemberCard/MemberForm.js';
@@ -25,19 +30,25 @@ type EditingState =
   | { mode: 'add' }
   | { mode: 'edit'; memberId: string };
 
-/** F-1-1〜F-1-4: メンバー一覧＋CRUD（Redux連携） */
+/** F-1-1〜F-1-4 + F-5-1〜F-5-4: メンバー一覧＋CRUD＋フィルタリング（Redux連携） */
 export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onMemberTap }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectMembersForEvent(eventId));
   const event = useAppSelector(selectEventById(eventId));
   const timeSlots = useAppSelector(selectTimeSlotsForEvent(eventId));
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+  const memberFilter = useAppSelector(selectMemberFilter);
+  const filteredMembers = useAppSelector(
+    selectFilteredMembersForEvent(eventId, currentShiftPlanId ?? undefined)
+  );
+
   const [editing, setEditing] = useState<EditingState>({ mode: 'none' });
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const skillDefinitions = event?.state.skillDefinitions ?? [];
 
-  // 全タグ一覧（サジェスト用）
+  // 全タグ一覧
   const allTags = useMemo(() => {
     const set = new Set<string>();
     for (const m of members) {
@@ -46,17 +57,19 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
     return Array.from(set).sort();
   }, [members]);
 
-  // フィルター済みメンバー
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
-      if (tagFilter && !m.state.tags.includes(tagFilter)) return false;
-      if (searchText) {
-        const q = searchText.toLowerCase();
-        if (!m.state.name.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [members, tagFilter, searchText]);
+  // テキスト検索はローカル（高速性優先）
+  const displayMembers = useMemo(() => {
+    if (!searchText.trim()) return filteredMembers;
+    const q = searchText.toLowerCase();
+    return filteredMembers.filter((m) => m.state.name.toLowerCase().includes(q));
+  }, [filteredMembers, searchText]);
+
+  // フィルターが有効かどうか
+  const isFiltered =
+    !!memberFilter.availableAtSlotId ||
+    memberFilter.requiredSkillIds.length > 0 ||
+    memberFilter.tags.length > 0 ||
+    !!memberFilter.assignmentStatus;
 
   const editingMember = editing.mode === 'edit'
     ? members.find((m) => m.state.id === editing.memberId)?.state
@@ -83,6 +96,12 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
     }
   };
 
+  const formatTime = (minutes: number) => {
+    const h = Math.floor(minutes / 60).toString().padStart(2, '0');
+    const m = (minutes % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
   return (
     <StyledWrapper>
       {/* ヘッダー */}
@@ -90,43 +109,150 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
         <div className="e-header-left">
           <span className="e-title">メンバー管理</span>
           <span className="e-count">{members.length}名</span>
+          {isFiltered && (
+            <span className="e-filtered-count">
+              ({displayMembers.length}名表示中)
+            </span>
+          )}
         </div>
         <button
           className="e-add-btn"
           onClick={() => setEditing({ mode: 'add' })}
           disabled={editing.mode !== 'none'}
         >
-          ＋ メンバーを追加
+          ＋ 追加
         </button>
       </div>
 
-      {/* 検索・タグフィルター */}
+      {/* 検索＋フィルターバー */}
       {editing.mode === 'none' && (
         <div className="e-filter-bar">
-          <input
-            className="e-search"
-            type="text"
-            placeholder="名前で検索..."
-            value={searchText}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchText(e.target.value)}
-          />
-          {allTags.length > 0 && (
-            <div className="e-tag-filters">
+          <div className="e-search-row">
+            <input
+              className="e-search"
+              type="text"
+              placeholder="名前で検索..."
+              value={searchText}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchText(e.target.value)}
+            />
+            <button
+              className={`e-filter-toggle ${filterOpen ? 'is-open' : ''} ${isFiltered ? 'is-active' : ''}`}
+              onClick={() => setFilterOpen((v) => !v)}
+            >
+              絞り込み{isFiltered ? ' ●' : ''}
+            </button>
+            {isFiltered && (
               <button
-                className={`e-tag-filter-btn ${tagFilter === null ? 'is-active' : ''}`}
-                onClick={() => setTagFilter(null)}
+                className="e-reset-btn"
+                onClick={() => dispatch(resetMemberFilter())}
+                title="フィルターをリセット"
               >
-                すべて
+                ×
               </button>
-              {allTags.map((tag) => (
-                <button
-                  key={tag}
-                  className={`e-tag-filter-btn ${tagFilter === tag ? 'is-active' : ''}`}
-                  onClick={() => setTagFilter(tag === tagFilter ? null : tag)}
-                >
-                  {tag}
-                </button>
-              ))}
+            )}
+          </div>
+
+          {/* F-5: 詳細フィルターパネル */}
+          {filterOpen && (
+            <div className="e-filter-panel">
+
+              {/* F-5-3: タグフィルター */}
+              {allTags.length > 0 && (
+                <div className="e-filter-section">
+                  <div className="e-filter-label">タグ</div>
+                  <div className="e-chip-row">
+                    {allTags.map((tag) => {
+                      const active = memberFilter.tags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          className={`e-chip ${active ? 'is-active' : ''}`}
+                          onClick={() => {
+                            const next = active
+                              ? memberFilter.tags.filter((t) => t !== tag)
+                              : [...memberFilter.tags, tag];
+                            dispatch(setMemberFilter({ tags: next }));
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* F-5-1: 時間帯フィルター */}
+              {timeSlots.length > 0 && (
+                <div className="e-filter-section">
+                  <div className="e-filter-label">参加可能な時間帯</div>
+                  <select
+                    className="e-select"
+                    value={memberFilter.availableAtSlotId ?? ''}
+                    onChange={(e) =>
+                      dispatch(setMemberFilter({ availableAtSlotId: e.target.value || undefined }))
+                    }
+                  >
+                    <option value="">すべての時間帯</option>
+                    {timeSlots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {formatTime(slot.startMinute)}〜{formatTime(slot.startMinute + slot.durationMinutes)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* F-5-2: スキルフィルター */}
+              {skillDefinitions.length > 0 && (
+                <div className="e-filter-section">
+                  <div className="e-filter-label">必要スキル（AND）</div>
+                  <div className="e-chip-row">
+                    {skillDefinitions.map((skill) => {
+                      const active = memberFilter.requiredSkillIds.includes(skill.id);
+                      return (
+                        <button
+                          key={skill.id}
+                          className={`e-chip ${active ? 'is-active' : ''}`}
+                          onClick={() => {
+                            const next = active
+                              ? memberFilter.requiredSkillIds.filter((id) => id !== skill.id)
+                              : [...memberFilter.requiredSkillIds, skill.id];
+                            dispatch(setMemberFilter({ requiredSkillIds: next }));
+                          }}
+                        >
+                          {skill.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* F-5-4: 配置状況フィルター */}
+              {currentShiftPlanId && (
+                <div className="e-filter-section">
+                  <div className="e-filter-label">配置状況</div>
+                  <div className="e-chip-row">
+                    {(
+                      [
+                        { value: undefined, label: 'すべて' },
+                        { value: 'unassigned', label: '未配置' },
+                        { value: 'assigned', label: '配置済み' },
+                        { value: 'over_assigned', label: '過配置' },
+                      ] as const
+                    ).map(({ value, label }) => (
+                      <button
+                        key={label}
+                        className={`e-chip ${memberFilter.assignmentStatus === value ? 'is-active' : ''}`}
+                        onClick={() => dispatch(setMemberFilter({ assignmentStatus: value }))}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -150,14 +276,14 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
       {/* メンバー一覧 */}
       {editing.mode === 'none' && (
         <div className="e-list">
-          {filteredMembers.length === 0 ? (
+          {displayMembers.length === 0 ? (
             <div className="e-empty">
               {members.length === 0
-                ? 'メンバーがいません。「＋ メンバーを追加」から追加してください。'
+                ? 'メンバーがいません。「＋ 追加」から追加してください。'
                 : '条件に合うメンバーが見つかりません。'}
             </div>
           ) : (
-            filteredMembers.map((m) => (
+            displayMembers.map((m) => (
               <MemberCard
                 key={m.state.id}
                 member={m.state}
@@ -172,7 +298,6 @@ export const MemberCollection: React.FC<MemberCollectionProps> = ({ eventId, onM
           )}
         </div>
       )}
-
     </StyledWrapper>
   );
 };
@@ -198,7 +323,7 @@ const StyledWrapper = styled.div`
   .e-header-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .e-title {
@@ -215,8 +340,14 @@ const StyledWrapper = styled.div`
     font-size: 0.78em;
   }
 
+  .e-filtered-count {
+    font-size: 0.78em;
+    color: #1976d2;
+    font-weight: 500;
+  }
+
   .e-add-btn {
-    padding: 6px 14px;
+    padding: 5px 12px;
     background: #1976d2;
     color: white;
     border: none;
@@ -226,14 +357,8 @@ const StyledWrapper = styled.div`
     font-weight: 500;
     white-space: nowrap;
 
-    &:hover:not(:disabled) {
-      background: #1565c0;
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    &:hover:not(:disabled) { background: #1565c0; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
   }
 
   .e-filter-bar {
@@ -246,14 +371,19 @@ const StyledWrapper = styled.div`
     flex-shrink: 0;
   }
 
+  .e-search-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
   .e-search {
+    flex: 1;
     padding: 6px 10px;
     border: 1px solid #ddd;
     border-radius: 6px;
     font-size: 0.88em;
     font-family: inherit;
-    width: 100%;
-    box-sizing: border-box;
 
     &:focus {
       outline: none;
@@ -261,20 +391,68 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .e-tag-filters {
+  .e-filter-toggle {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.82em;
+    cursor: pointer;
+    color: #555;
+    white-space: nowrap;
+
+    &.is-open { background: #e3f2fd; border-color: #90caf9; }
+    &.is-active { color: #1976d2; font-weight: 600; }
+  }
+
+  .e-reset-btn {
+    padding: 4px 8px;
+    border: none;
+    background: #fce4e4;
+    color: #c62828;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  .e-filter-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 0 4px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .e-filter-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .e-filter-label {
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .e-chip-row {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
   }
 
-  .e-tag-filter-btn {
-    padding: 2px 10px;
+  .e-chip {
+    padding: 3px 10px;
     border: 1px solid #ddd;
     border-radius: 12px;
     background: white;
-    font-size: 0.78em;
+    font-size: 0.8em;
     cursor: pointer;
-    color: #666;
+    color: #555;
 
     &.is-active {
       background: #1976d2;
@@ -286,6 +464,18 @@ const StyledWrapper = styled.div`
       background: #e3f2fd;
       border-color: #90caf9;
     }
+  }
+
+  .e-select {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-family: inherit;
+    background: white;
+    cursor: pointer;
+
+    &:focus { outline: none; border-color: #1976d2; }
   }
 
   .e-form-area {
