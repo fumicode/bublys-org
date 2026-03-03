@@ -268,6 +268,10 @@ export const selectTimeSlotsForEvent = (eventId: string) =>
 export const selectShiftPlans = createSelector([selectSlice], (s) =>
   s.shiftPlans.map((p) => new ShiftPlan(p))
 );
+export const selectShiftPlansForEvent = (eventId: string) =>
+  createSelector([selectSlice], (s) =>
+    s.shiftPlans.filter((p) => p.eventId === eventId).map((p) => new ShiftPlan(p))
+  );
 export const selectCurrentShiftPlanId = (state: StateWithShiftPuzzleMain) =>
   selectSlice(state).currentShiftPlanId;
 export const selectShiftPlanById = (id: string) =>

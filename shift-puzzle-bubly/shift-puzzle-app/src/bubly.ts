@@ -18,7 +18,7 @@ const ShiftPuzzleBubly: Bubly = {
   menuItems: [
     {
       label: "シフトパズル",
-      url: "shift-puzzle/editor",
+      url: "shift-puzzle/events",
       icon: null,
     },
   ],
