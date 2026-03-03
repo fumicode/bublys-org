@@ -167,6 +167,12 @@ bubblesListener.startListening({
       return;
     }
 
+    // openerが store に存在しない場合（'root' 等の仮想ID）はスキップ
+    if (!state.bubbleState?.bubbles?.[relation.openerId]) {
+      console.log("Pop: Opener bubble not found in store (virtual opener), skipping positioning");
+      return;
+    }
+
     const openerBubble = selectBubble(state, { id: relation.openerId });
     const poppingBubble = selectBubble(state, { id: poppingBubbleId });
 

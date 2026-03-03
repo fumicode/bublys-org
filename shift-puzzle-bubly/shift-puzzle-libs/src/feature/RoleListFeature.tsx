@@ -12,6 +12,11 @@ import {
 interface RoleListFeatureProps {
   eventId: string;
   onRoleSelect?: (roleId: string) => void;
+  /**
+   * 読み取り専用モード（ガントチャートから開いた場合）。
+   * true のとき「＋ 追加」「×」ボタンを非表示にし、役割カードをドラッグ可能にする。
+   */
+  readOnly?: boolean;
 }
 
 const ROLE_COLORS = [
@@ -23,6 +28,7 @@ const ROLE_COLORS = [
 export const RoleListFeature: React.FC<RoleListFeatureProps> = ({
   eventId,
   onRoleSelect,
+  readOnly = false,
 }) => {
   const dispatch = useAppDispatch();
   const roles = useAppSelector(selectRolesForEvent(eventId));
@@ -50,9 +56,12 @@ export const RoleListFeature: React.FC<RoleListFeatureProps> = ({
     <StyledWrapper>
       <div className="e-header">
         <span className="e-title">役割一覧</span>
-        <button className="e-create-btn" onClick={() => setCreating(true)}>
-          ＋ 追加
-        </button>
+        {readOnly && <span className="e-readonly-badge">配置用</span>}
+        {!readOnly && (
+          <button className="e-create-btn" onClick={() => setCreating(true)}>
+            ＋ 追加
+          </button>
+        )}
       </div>
 
       {creating && (
@@ -102,8 +111,20 @@ export const RoleListFeature: React.FC<RoleListFeatureProps> = ({
         {roles.length === 0 && !creating && (
           <div className="e-empty">役割が登録されていません。</div>
         )}
+        {readOnly && roles.length > 0 && (
+          <div className="e-drag-hint">役割をガントチャートにドラッグして配置</div>
+        )}
         {roles.map((role) => (
-          <div key={role.id} className="e-role-card">
+          <div
+            key={role.id}
+            className={`e-role-card ${readOnly ? 'is-draggable' : ''}`}
+            draggable={readOnly}
+            onDragStart={readOnly ? (e) => {
+              e.dataTransfer.setData('text/role-id', role.id);
+              e.dataTransfer.setData('text/plain', role.name);
+              e.dataTransfer.effectAllowed = 'copy';
+            } : undefined}
+          >
             <div className="e-role-dot" style={{ background: role.color }} />
             <div className="e-role-info" onClick={() => onRoleSelect?.(role.id)}>
               <div className="e-role-name">{role.name}</div>
@@ -112,13 +133,15 @@ export const RoleListFeature: React.FC<RoleListFeatureProps> = ({
                 {role.maxRequired !== null && `・${role.maxRequired}人以下`}
               </div>
             </div>
-            <button
-              className="e-delete-btn"
-              onClick={() => dispatch(deleteRole(role.id))}
-              title="削除"
-            >
-              ×
-            </button>
+            {!readOnly && (
+              <button
+                className="e-delete-btn"
+                onClick={() => dispatch(deleteRole(role.id))}
+                title="削除"
+              >
+                ×
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -146,6 +169,17 @@ const StyledWrapper = styled.div`
     font-size: 1.05em;
     font-weight: 700;
     color: #222;
+  }
+
+  .e-readonly-badge {
+    margin-left: 8px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 0.72em;
+    font-weight: 600;
   }
 
   .e-create-btn {
@@ -256,6 +290,13 @@ const StyledWrapper = styled.div`
     padding: 24px 0;
   }
 
+  .e-drag-hint {
+    font-size: 0.75em;
+    color: #888;
+    text-align: center;
+    padding: 4px 0 8px;
+  }
+
   .e-role-card {
     display: flex;
     align-items: center;
@@ -264,6 +305,13 @@ const StyledWrapper = styled.div`
     background: white;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
+
+    &.is-draggable {
+      cursor: grab;
+      border-style: dashed;
+      &:hover { background: #f1f8e9; border-color: #a5d6a7; }
+      &:active { cursor: grabbing; }
+    }
   }
 
   .e-role-dot {

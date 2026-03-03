@@ -186,7 +186,9 @@ export const BublyApp: FC<BublyAppProps> = ({
 
   const handleMenuItemClick = (item: BublyMenuItem) => {
     const url = typeof item.url === 'function' ? item.url() : item.url;
-    popChildOrJoinSibling(url, 'root');
+    // 実際のバブルIDをopenerとして使う（'root'はstore内に存在しないため位置計算が失敗する）
+    const opener = surfaceBubbles?.[0]?.id ?? 'root';
+    popChildOrJoinSibling(url, opener);
   };
 
   return (

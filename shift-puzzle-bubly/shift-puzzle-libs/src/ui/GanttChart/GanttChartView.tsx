@@ -161,7 +161,8 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
     const memberDragType = getDragType('Member');
     const isInternal = types.includes('text/assignment-id');
     const isMemberDrag = types.includes(memberDragType);
-    if (isInternal || isMemberDrag || types.includes('text/member-id')) {
+    const isRoleDrag = types.includes('text/role-id');
+    if (isInternal || isMemberDrag || types.includes('text/member-id') || isRoleDrag) {
       e.preventDefault();
     }
   };
@@ -185,9 +186,30 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
       return;
     }
 
+    const types = Array.from(e.dataTransfer.types);
+
+    // 役割リストからのドロップ（メンバービューで役割を配置）
+    if (types.includes('text/role-id') && axisMode === 'member') {
+      const roleId = e.dataTransfer.getData('text/role-id');
+      const memberId = rowId;
+      if (roleId && memberId) {
+        if (!showReasonDialog) {
+          onCreateAssignment?.(memberId, targetSlot.id, roleId, {
+            category: 'other',
+            text: '',
+            createdBy: '',
+            createdAt: new Date().toISOString(),
+          });
+          return;
+        }
+        setPendingDrop({ memberId, timeSlotId: targetSlot.id, rowId });
+        setPendingRoleId(roleId);
+        return;
+      }
+    }
+
     // ObjectViewからのメンバードラッグ（新規配置）
     const memberDragType = getDragType('Member');
-    const types = Array.from(e.dataTransfer.types);
     let memberId: string | null = null;
 
     if (types.includes('text/member-id')) {

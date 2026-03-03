@@ -205,7 +205,7 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
       dispatch(setMemberFilter({ availableAtSlotId: timeSlotId }));
       openBubble(`shift-puzzle/events/${eventId}/members`, bubble.id, "bubble-side");
     } else {
-      openBubble(`shift-puzzle/events/${eventId}/roles`, bubble.id, "bubble-side");
+      openBubble(`shift-puzzle/events/${eventId}/roles?readOnly=true`, bubble.id, "bubble-side");
     }
   };
 
@@ -213,7 +213,7 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     openBubble(
       `shift-puzzle/events/${eventId}/shift-plans/${planId}/member/${memberId}`,
       bubble.id,
-      "bubble-side"
+      "origin-side"
     );
   };
 
@@ -417,6 +417,9 @@ const RoleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
   const eventId = bubble.params.eventId ?? currentEventId;
 
+  // ガントチャートから開いた場合は readOnly モード（URL に ?readOnly=true が付く）
+  const isReadOnly = bubble.url.includes('readOnly=true');
+
   if (!eventId) {
     return (
       <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
@@ -428,6 +431,7 @@ const RoleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <RoleListFeature
       eventId={eventId}
+      readOnly={isReadOnly}
       onRoleSelect={(roleId) => {
         const planId = currentShiftPlanId;
         const url = planId
@@ -495,19 +499,19 @@ const ShiftPlanDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
       dispatch(setMemberFilter({ availableAtSlotId: timeSlotId }));
       openBubble(`shift-puzzle/events/${eventId}/members`, bubble.id, "bubble-side");
     } else {
-      // メンバー行クリック: 役割一覧をバブルで表示
-      openBubble(`shift-puzzle/events/${eventId}/roles`, bubble.id, "bubble-side");
+      // メンバー行クリック: 役割一覧をバブルで表示（readOnlyモード＝D&D配置専用）
+      openBubble(`shift-puzzle/events/${eventId}/roles?readOnly=true`, bubble.id, "bubble-side");
     }
   };
 
   /**
-   * 配置ブロッククリック → メンバー詳細バブルを開く
+   * 配置ブロッククリック → メンバー詳細バブルを開く（クリックしたブロックの位置から展開）
    */
   const handleAssignmentClick = (_assignmentId: string, memberId: string, _roleId: string) => {
     openBubble(
       `shift-puzzle/events/${eventId}/shift-plans/${planId}/member/${memberId}`,
       bubble.id,
-      "bubble-side"
+      "origin-side"
     );
   };
 
