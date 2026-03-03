@@ -1,0 +1,41 @@
+{
+  "name": "@bublys-org/shift-puzzle-app",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:bubly": "vite build -c vite.config.bubly.ts"
+  },
+  "dependencies": {
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/shift-puzzle-libs": "*",
+    "@bublys-org/shift-puzzle-model": "*",
+    "@bublys-org/state-management": "*",
+    "modern-normalize": "^3.0.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-redux": "^9.2.0",
+    "redux-persist": "^6.0.0",
+    "styled-components": "5.3.6"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "dependsOn": ["^build"]
+      },
+      "build:bubly": {
+        "dependsOn": ["^build"]
+      },
+      "dev": {
+        "dependsOn": [
+          {
+            "projects": ["@bublys-org/shift-puzzle-libs", "@bublys-org/shift-puzzle-model"],
+            "target": "dev"
+          }
+        ],
+        "continuous": true
+      }
+    }
+  }
+}
