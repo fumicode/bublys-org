@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
-import { BubbleRoute } from "@bublys-org/bubbles-ui";
+import { useContext, useEffect } from "react";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
   ShiftPlanGanttEditor,
   ReasonListFeature,
   MemberCollection,
+  MemberDetailFeature,
+  RoleFulfillmentFeature,
+  ShiftPlanSummary,
   selectEvents,
   selectCurrentEventId,
   selectCurrentShiftPlanId,
@@ -165,7 +168,8 @@ function createDemoData(): {
   return { event, members, roles, timeSlots, shiftPlan };
 }
 
-const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = () => {
+const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   const dispatch = useAppDispatch();
   const events = useAppSelector(selectEvents);
   const currentEventId = useAppSelector(selectCurrentEventId);
@@ -188,11 +192,30 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = () => {
     return <div style={{ padding: 24, color: "#666" }}>データを初期化中...</div>;
   }
 
+  const handleOpenSummary = () => {
+    openBubble(
+      `shift-puzzle/events/${currentEventId}/shift-plans/${currentShiftPlanId}/summary`,
+      bubble.id
+    );
+  };
+
   return (
-    <ShiftPlanGanttEditor
-      shiftPlanId={currentShiftPlanId}
-      eventId={currentEventId}
-    />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ padding: "6px 12px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0", display: "flex", gap: 8, flexShrink: 0 }}>
+        <button
+          onClick={handleOpenSummary}
+          style={{ padding: "4px 12px", background: "#1976d2", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.82em", fontWeight: 600 }}
+        >
+          評価サマリー
+        </button>
+      </div>
+      <div style={{ flex: 1, overflow: "hidden" }}>
+        <ShiftPlanGanttEditor
+          shiftPlanId={currentShiftPlanId}
+          eventId={currentEventId}
+        />
+      </div>
+    </div>
   );
 };
 
@@ -216,9 +239,11 @@ const ReasonListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return <ReasonListFeature shiftPlanId={planId} eventId={eventId} />;
 };
 
-/** F-1-1〜F-1-4: メンバー一覧バブル */
+/** F-1-1〜F-1-4: メンバー一覧バブル（F-4-1: タップで詳細バブルを開く） */
 const MemberListBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
   const eventId = bubble.params.eventId ?? currentEventId;
 
   if (!eventId) {
@@ -229,7 +254,112 @@ const MemberListBubble: BubbleRoute["Component"] = ({ bubble }) => {
     );
   }
 
-  return <MemberCollection eventId={eventId} />;
+  const handleMemberTap = (memberId: string) => {
+    const planId = currentShiftPlanId;
+    const url = planId
+      ? `shift-puzzle/events/${eventId}/shift-plans/${planId}/member/${memberId}`
+      : `shift-puzzle/events/${eventId}/members/${memberId}`;
+    openBubble(url, bubble.id);
+  };
+
+  return <MemberCollection eventId={eventId} onMemberTap={handleMemberTap} />;
+};
+
+/** F-4-1: メンバー詳細バブル */
+const MemberDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const memberId = bubble.params.memberId;
+  const planId = bubble.params.planId ?? currentShiftPlanId;
+
+  if (!eventId || !memberId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        メンバー情報が指定されていません
+      </div>
+    );
+  }
+
+  return (
+    <MemberDetailFeature
+      eventId={eventId}
+      memberId={memberId}
+      shiftPlanId={planId ?? undefined}
+    />
+  );
+};
+
+/** F-4-2: 役割詳細バブル（イベントレベル） */
+const RoleDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const roleId = bubble.params.roleId;
+  const planId = currentShiftPlanId;
+
+  if (!eventId || !roleId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        役割情報が指定されていません
+      </div>
+    );
+  }
+
+  return (
+    <RoleFulfillmentFeature
+      eventId={eventId}
+      roleId={roleId}
+      shiftPlanId={planId ?? undefined}
+    />
+  );
+};
+
+/** F-4-2: 役割充足詳細バブル（シフト案レベル） */
+const RoleFulfillmentBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const planId = bubble.params.planId ?? currentShiftPlanId;
+  const roleId = bubble.params.roleId;
+
+  if (!eventId || !roleId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        役割情報が指定されていません
+      </div>
+    );
+  }
+
+  return (
+    <RoleFulfillmentFeature
+      eventId={eventId}
+      roleId={roleId}
+      shiftPlanId={planId ?? undefined}
+    />
+  );
+};
+
+/** F-7-1〜F-7-3: 評価サマリーバブル */
+const ShiftPlanSummaryBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const currentEventId = useAppSelector(selectCurrentEventId);
+  const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
+
+  const eventId = bubble.params.eventId ?? currentEventId;
+  const planId = bubble.params.planId ?? currentShiftPlanId;
+
+  if (!eventId || !planId) {
+    return (
+      <div style={{ padding: 24, color: "#888", textAlign: "center" }}>
+        イベントまたはシフト案が選択されていません
+      </div>
+    );
+  }
+
+  return <ShiftPlanSummary eventId={eventId} shiftPlanId={planId} />;
 };
 
 export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
@@ -248,6 +378,36 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
     pattern: "shift-puzzle/reasons",
     type: "shift-puzzle-reasons",
     Component: ReasonListBubble,
+  },
+  {
+    // F-4-1: メンバー詳細（シフト案レベル）
+    pattern: "shift-puzzle/events/:eventId/shift-plans/:planId/member/:memberId",
+    type: "shift-puzzle-member-detail",
+    Component: MemberDetailBubble,
+  },
+  {
+    // F-4-1: メンバー詳細（イベントレベル）
+    pattern: "shift-puzzle/events/:eventId/members/:memberId",
+    type: "shift-puzzle-member-detail",
+    Component: MemberDetailBubble,
+  },
+  {
+    // F-4-2: 役割充足詳細（シフト案レベル）
+    pattern: "shift-puzzle/events/:eventId/shift-plans/:planId/role/:roleId",
+    type: "shift-puzzle-role-fulfillment",
+    Component: RoleFulfillmentBubble,
+  },
+  {
+    // F-4-2: 役割詳細（イベントレベル）
+    pattern: "shift-puzzle/events/:eventId/roles/:roleId",
+    type: "shift-puzzle-role-detail",
+    Component: RoleDetailBubble,
+  },
+  {
+    // F-7-1〜F-7-3: 評価サマリー
+    pattern: "shift-puzzle/events/:eventId/shift-plans/:planId/summary",
+    type: "shift-puzzle-summary",
+    Component: ShiftPlanSummaryBubble,
   },
   {
     // F-1-1〜F-1-4: メンバー一覧

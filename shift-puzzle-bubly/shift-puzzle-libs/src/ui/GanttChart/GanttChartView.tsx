@@ -16,6 +16,7 @@ import type {
 import { TimeAxis } from './TimeAxis.js';
 import { MemberRow } from './MemberRow.js';
 import { ReasonInputDialog } from './ReasonInputDialog.js';
+import { PlacementPickerDialog } from './PlacementPickerDialog.js';
 
 // ========== Props ==========
 
@@ -82,6 +83,9 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
   const [pendingRoleId, setPendingRoleId] = useState<string>('');
+
+  // セルクリックによる配置フロー
+  const [clickedCell, setClickedCell] = useState<{ rowId: string; timeSlotId: string } | null>(null);
 
   // このdayのTimeSlot一覧
   const daySlots = useMemo(
@@ -200,6 +204,63 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
     );
   };
 
+  // ========== セルクリックによる配置 ==========
+
+  const handleRowClick = (e: React.MouseEvent<HTMLDivElement>, rowId: string) => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    const rect = scrollEl.getBoundingClientRect();
+    const px = e.clientX - rect.left + scrollEl.scrollLeft - LABEL_WIDTH;
+    const targetSlot = findSlotAtPx(px);
+    if (!targetSlot) return;
+    setClickedCell({ rowId, timeSlotId: targetSlot.id });
+  };
+
+  const handlePickerSelect = (selectedId: string) => {
+    if (!clickedCell) return;
+    const { rowId, timeSlotId } = clickedCell;
+    setClickedCell(null);
+    if (axisMode === 'role') {
+      // 役割行クリック: rowId=roleId, selectedId=memberId
+      setPendingDrop({ memberId: selectedId, timeSlotId, rowId });
+      setPendingRoleId(rowId);
+    } else {
+      // メンバー行クリック: rowId=memberId, selectedId=roleId
+      setPendingDrop({ memberId: rowId, timeSlotId, rowId });
+      setPendingRoleId(selectedId);
+    }
+  };
+
+  // ピッカーに表示するアイテム
+  const pickerItems = useMemo(() => {
+    if (!clickedCell) return [];
+    if (axisMode === 'role') {
+      // 役割行クリック → 配置可能なメンバー一覧
+      return members
+        .filter(
+          (m) =>
+            m.availableSlotIds.length === 0 ||
+            m.availableSlotIds.includes(clickedCell.timeSlotId)
+        )
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          subtitle:
+            m.availableSlotIds.length > 0 ? `${m.availableSlotIds.length}枠参加可` : undefined,
+        }));
+    } else {
+      // メンバー行クリック → 役割一覧
+      return roles.map((r) => ({
+        id: r.id,
+        name: r.name,
+        color: r.color,
+      }));
+    }
+  }, [clickedCell, axisMode, members, roles]);
+
+  const pickerTitle =
+    axisMode === 'role' ? '配置するメンバーを選択' : '配置する役割を選択';
+
   // 配置確定
   const handleConfirmReason = (reason: AssignmentReasonState) => {
     if (!pendingDrop) return;
@@ -287,10 +348,20 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
               onAssignmentClick={onAssignmentClick}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, row.id)}
+              onRowClick={(e) => handleRowClick(e, row.id)}
             />
           ))}
         </div>
       </div>
+
+      {/* セルクリック: メンバー or 役割ピッカー */}
+      <PlacementPickerDialog
+        open={clickedCell !== null}
+        title={pickerTitle}
+        items={pickerItems}
+        onSelect={handlePickerSelect}
+        onCancel={() => setClickedCell(null)}
+      />
 
       {/* F-2-5: 配置理由入力ダイアログ */}
       <ReasonInputDialog

@@ -30,6 +30,7 @@ interface MemberRowProps {
   onAssignmentClick?: (assignmentId: string) => void;
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onRowClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 /** ガントチャートの1行（メンバー or 役割） */
@@ -48,6 +49,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({
   onAssignmentClick,
   onDragOver,
   onDrop,
+  onRowClick,
 }) => {
   const minutePx = hourPx / 60;
 
@@ -68,6 +70,7 @@ export const MemberRow: React.FC<MemberRowProps> = ({
       style={{ height: rowHeight, width: dayWidth }}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onClick={onRowClick}
     >
       {/* F-2-7: 参加可能時間帯のオーバーレイ */}
       {availableRects.map((rect, i) => (
