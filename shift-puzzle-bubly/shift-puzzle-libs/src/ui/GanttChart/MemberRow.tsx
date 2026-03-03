@@ -27,7 +27,7 @@ interface MemberRowProps {
   dayWidth: number;
   /** バーラベルモード: 役割名 or メンバー名 */
   barLabelMode: 'role' | 'member';
-  onAssignmentClick?: (assignmentId: string) => void;
+  onAssignmentClick?: (assignmentId: string, memberId: string, roleId: string) => void;
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   onRowClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -94,15 +94,17 @@ export const MemberRow: React.FC<MemberRowProps> = ({
           <React.Fragment key={assignment.id}>
             <AssignmentBlock
               assignment={assignment}
-              role={barLabelMode === 'role' ? undefined : role}
-              member={barLabelMode === 'member' ? undefined : member}
+              role={barLabelMode === 'member' ? undefined : role}
+              member={barLabelMode === 'role' ? undefined : member}
               memberName={member?.name}
               roleName={role?.name}
               left={left}
               width={width}
               rowHeight={rowHeight}
               violation={violation}
-              onClick={onAssignmentClick}
+              onClick={(assignmentId) =>
+                onAssignmentClick?.(assignmentId, assignment.memberId, assignment.roleId)
+              }
             />
             {/* F-2-6: 制約違反ハイライト */}
             {violation && (

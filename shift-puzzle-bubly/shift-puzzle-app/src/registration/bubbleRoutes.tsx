@@ -24,6 +24,7 @@ import {
   addShiftPlan,
   setCurrentEventId,
   setCurrentShiftPlanId,
+  setMemberFilter,
 } from "@bublys-org/shift-puzzle-libs";
 import type {
   EventJSON,
@@ -196,27 +197,34 @@ const ShiftPuzzleEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     return <div style={{ padding: 24, color: "#666" }}>データを初期化中...</div>;
   }
 
-  const handleOpenSummary = () => {
+  const eventId = currentEventId;
+  const planId = currentShiftPlanId;
+
+  const handleCellClick = (rowId: string, timeSlotId: string, mode: "role" | "member") => {
+    if (mode === "role") {
+      dispatch(setMemberFilter({ availableAtSlotId: timeSlotId }));
+      openBubble(`shift-puzzle/events/${eventId}/members`, bubble.id, "bubble-side");
+    } else {
+      openBubble(`shift-puzzle/events/${eventId}/roles`, bubble.id, "bubble-side");
+    }
+  };
+
+  const handleAssignmentClick = (_assignmentId: string, memberId: string, _roleId: string) => {
     openBubble(
-      `shift-puzzle/events/${currentEventId}/shift-plans/${currentShiftPlanId}/summary`,
-      bubble.id
+      `shift-puzzle/events/${eventId}/shift-plans/${planId}/member/${memberId}`,
+      bubble.id,
+      "bubble-side"
     );
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "6px 12px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0", display: "flex", gap: 8, flexShrink: 0 }}>
-        <button
-          onClick={handleOpenSummary}
-          style={{ padding: "4px 12px", background: "#1976d2", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.82em", fontWeight: 600 }}
-        >
-          評価サマリー
-        </button>
-      </div>
       <div style={{ flex: 1, overflow: "hidden" }}>
         <ShiftPlanGanttEditor
-          shiftPlanId={currentShiftPlanId}
-          eventId={currentEventId}
+          shiftPlanId={planId}
+          eventId={eventId}
+          onCellClick={handleCellClick}
+          onAssignmentClick={handleAssignmentClick}
         />
       </div>
     </div>
@@ -458,6 +466,7 @@ const ShiftPlanListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 /** シフト案詳細（ガントチャート）バブル */
 const ShiftPlanDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
+  const dispatch = useAppDispatch();
   const currentEventId = useAppSelector(selectCurrentEventId);
   const currentShiftPlanId = useAppSelector(selectCurrentShiftPlanId);
 
@@ -475,6 +484,33 @@ const ShiftPlanDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const handleOpenSummary = () =>
     openBubble(`shift-puzzle/events/${eventId}/shift-plans/${planId}/summary`, bubble.id);
 
+  /**
+   * セルクリック → バブルを開く（gakkai-shift スタイルのダイナミックレイアウト）
+   * 役割ビュー: メンバー一覧を開く（時間帯でフィルター済み）
+   * メンバービュー: 役割一覧を開く
+   */
+  const handleCellClick = (rowId: string, timeSlotId: string, mode: "role" | "member") => {
+    if (mode === "role") {
+      // 役割行クリック: その時間帯に参加可能なメンバー一覧をバブルで表示
+      dispatch(setMemberFilter({ availableAtSlotId: timeSlotId }));
+      openBubble(`shift-puzzle/events/${eventId}/members`, bubble.id, "bubble-side");
+    } else {
+      // メンバー行クリック: 役割一覧をバブルで表示
+      openBubble(`shift-puzzle/events/${eventId}/roles`, bubble.id, "bubble-side");
+    }
+  };
+
+  /**
+   * 配置ブロッククリック → メンバー詳細バブルを開く
+   */
+  const handleAssignmentClick = (_assignmentId: string, memberId: string, _roleId: string) => {
+    openBubble(
+      `shift-puzzle/events/${eventId}/shift-plans/${planId}/member/${memberId}`,
+      bubble.id,
+      "bubble-side"
+    );
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ padding: "6px 12px", background: "#f5f5f5", borderBottom: "1px solid #e0e0e0", display: "flex", gap: 8, flexShrink: 0 }}>
@@ -486,7 +522,12 @@ const ShiftPlanDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
         </button>
       </div>
       <div style={{ flex: 1, overflow: "hidden" }}>
-        <ShiftPlanGanttEditor shiftPlanId={planId} eventId={eventId} />
+        <ShiftPlanGanttEditor
+          shiftPlanId={planId}
+          eventId={eventId}
+          onCellClick={handleCellClick}
+          onAssignmentClick={handleAssignmentClick}
+        />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
 import {
@@ -27,8 +27,13 @@ import { GanttChartView } from '../ui/index.js';
 interface ShiftPlanGanttEditorProps {
   shiftPlanId: string;
   eventId: string;
-  /** 配置クリック時のコールバック（理由詳細表示等） */
-  onAssignmentClick?: (assignmentId: string) => void;
+  /** 配置クリック時のコールバック（memberId・roleIdも含む） */
+  onAssignmentClick?: (assignmentId: string, memberId: string, roleId: string) => void;
+  /**
+   * セルクリック時の外部コールバック（バブル連携用）。
+   * 指定時は呼び出し元がバブルを開く。axisMode も渡される。
+   */
+  onCellClick?: (rowId: string, timeSlotId: string, axisMode: 'role' | 'member') => void;
 }
 
 /** ガントチャート編集画面（Redux連携） */
@@ -36,8 +41,11 @@ export const ShiftPlanGanttEditor: React.FC<ShiftPlanGanttEditorProps> = ({
   shiftPlanId,
   eventId,
   onAssignmentClick,
+  onCellClick,
 }) => {
   const dispatch = useAppDispatch();
+  // 配置理由ダイアログのトグル（デフォルト: 非表示）
+  const [showReasonDialog, setShowReasonDialog] = useState(false);
 
   const shiftPlan = useAppSelector(selectShiftPlanById(shiftPlanId));
   const members = useAppSelector(selectMembersForEvent(eventId));
@@ -163,6 +171,15 @@ export const ShiftPlanGanttEditor: React.FC<ShiftPlanGanttEditorProps> = ({
             <span className="e-violation-badge">⚠ {violations.length}件の違反</span>
           )}
         </div>
+
+        {/* 理由入力トグル */}
+        <button
+          className={`e-reason-toggle ${showReasonDialog ? 'is-active' : ''}`}
+          onClick={() => setShowReasonDialog((v) => !v)}
+          title="配置理由の入力ダイアログを表示するか切り替え"
+        >
+          📝 理由入力
+        </button>
       </div>
 
       {/* ガントチャート本体 */}
@@ -176,11 +193,15 @@ export const ShiftPlanGanttEditor: React.FC<ShiftPlanGanttEditorProps> = ({
           dayIndex={dayIndex}
           hourPx={hourPx}
           axisMode={axisMode}
+          showReasonDialog={showReasonDialog}
           onCreateAssignment={handleCreateAssignment}
           onMoveAssignment={handleMoveAssignment}
-          onAssignmentClick={(id) => {
-            onAssignmentClick?.(id);
-          }}
+          onAssignmentClick={onAssignmentClick}
+          onCellClick={
+            onCellClick
+              ? (rowId, timeSlotId) => onCellClick(rowId, timeSlotId, axisMode)
+              : undefined
+          }
         />
       </div>
     </StyledContainer>
@@ -309,6 +330,27 @@ const StyledContainer = styled.div`
     border-radius: 3px;
     border: 1px solid #ff8f00;
     font-weight: 500;
+  }
+
+  .e-reason-toggle {
+    padding: 3px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.78em;
+    color: #666;
+
+    &.is-active {
+      background: #e8f5e9;
+      border-color: #a5d6a7;
+      color: #2e7d32;
+      font-weight: 600;
+    }
+
+    &:hover:not(.is-active) {
+      background: #f5f5f5;
+    }
   }
 
   .e-gantt-wrapper {

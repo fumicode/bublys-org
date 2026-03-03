@@ -48,8 +48,18 @@ export interface GanttChartViewProps {
   ) => void;
   /** 配置移動コールバック（timeSlotId変更） */
   onMoveAssignment?: (assignmentId: string, newTimeSlotId: string) => void;
-  /** 配置クリックコールバック */
-  onAssignmentClick?: (assignmentId: string) => void;
+  /** 配置クリックコールバック（memberId・roleIdも含む） */
+  onAssignmentClick?: (assignmentId: string, memberId: string, roleId: string) => void;
+  /**
+   * セルクリック時の外部コールバック（バブル連携用）。
+   * 指定時はローカルのPlacementPickerDialogを表示せず、呼び出し元がバブルを開く。
+   */
+  onCellClick?: (rowId: string, timeSlotId: string) => void;
+  /**
+   * 配置理由ダイアログを表示するか。
+   * false（デフォルト）の場合、D&D後に理由なしで即座に配置を確定する。
+   */
+  showReasonDialog?: boolean;
 }
 
 // ========== 内部型 ==========
@@ -79,6 +89,8 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
   onCreateAssignment,
   onMoveAssignment,
   onAssignmentClick,
+  onCellClick,
+  showReasonDialog = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
@@ -193,6 +205,17 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
     // memberモード: ダイアログで役割を選択
     const roleId = axisMode === 'role' ? rowId : '';
 
+    if (!showReasonDialog && roleId) {
+      // 理由ダイアログなし: 即座に配置確定（理由は空）
+      onCreateAssignment?.(memberId, targetSlot.id, roleId, {
+        category: 'other',
+        text: '',
+        createdBy: '',
+        createdAt: new Date().toISOString(),
+      });
+      return;
+    }
+
     setPendingDrop({ memberId, timeSlotId: targetSlot.id, rowId });
     setPendingRoleId(roleId);
   };
@@ -213,7 +236,14 @@ export const GanttChartView: React.FC<GanttChartViewProps> = ({
     const px = e.clientX - rect.left + scrollEl.scrollLeft - LABEL_WIDTH;
     const targetSlot = findSlotAtPx(px);
     if (!targetSlot) return;
-    setClickedCell({ rowId, timeSlotId: targetSlot.id });
+
+    if (onCellClick) {
+      // バブル連携モード: 呼び出し元がバブルを開く
+      onCellClick(rowId, targetSlot.id);
+    } else {
+      // ローカルモーダルモード（後方互換）
+      setClickedCell({ rowId, timeSlotId: targetSlot.id });
+    }
   };
 
   const handlePickerSelect = (selectedId: string) => {
