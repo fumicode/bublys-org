@@ -5,6 +5,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
   useAppSelector,
   useAppDispatch,
+  useAppStore,
   selectWindowSize,
   setWindowSize,
   selectPocketItems,
@@ -30,8 +31,10 @@ import {
   selectGlobalCoordinateSystem,
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
+  selectBubble,
   OpeningPosition,
 } from '../state/index.js';
+import { convertGlobalPointToLayerLocal } from '../CoordinateSystemHelper.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
 import { DragDataType } from '../utils/drag-types.js';
@@ -95,16 +98,32 @@ export const BublyApp: FC<BublyAppProps> = ({
     dispatch(layerUpAction(b.id));
   };
 
+  const store = useAppStore();
+
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
     openingPosition: OpeningPosition = 'bubble-side'
   ): string => {
+    // openerのrenderedRectが既にある場合は事前に初期位置を計算し、表示ジャンプを防ぐ
+    const currentState = store.getState() as any;
+    if (currentState.bubbleState?.bubbles?.[openerBubbleId]) {
+      const openerBubble = selectBubble(currentState, { id: openerBubbleId });
+      if (openerBubble.renderedRect) {
+        const point = openerBubble.renderedRect.calcPositionToOpen({ width: 0, height: 0 });
+        if (point) {
+          const coordinateConfig = selectGlobalCoordinateSystem(currentState);
+          const sfLeft = selectSurfaceLeftTop(currentState);
+          const relativePoint = convertGlobalPointToLayerLocal(point, 0, coordinateConfig, sfLeft);
+          b = b.moveTo(relativePoint);
+        }
+      }
+    }
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
     dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
     return b.id;
-  }, [dispatch]);
+  }, [dispatch, store]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
     const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
