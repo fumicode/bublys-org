@@ -7,6 +7,8 @@ import { ConversationListFeature } from "../feature/ConversationListFeature.js";
 import { SpeakerFeature } from "../feature/SpeakerFeature.js";
 import { SpeakerListFeature } from "../feature/SpeakerListFeature.js";
 import { SpeakerDetailFeature } from "../feature/SpeakerDetailFeature.js";
+import { ServerStateFeature } from "../feature/ServerStateFeature.js";
+import { WorldLineGraphViewFeature } from "../feature/WorldLineGraphViewFeature.js";
 
 export const tailorGenieBubbleRoutes: BubbleRoute[] = [
   // Speaker routes
@@ -58,6 +60,18 @@ export const tailorGenieBubbleRoutes: BubbleRoute[] = [
         <ConversationListFeature />
       </TailorGenieProvider>
     ),
+  },
+  // Server State
+  {
+    pattern: "tailor-genie/server-state",
+    type: "server-state",
+    Component: () => <ServerStateFeature />,
+  },
+  // World-Line Graph View
+  {
+    pattern: "tailor-genie/wlg-view",
+    type: "wlg-view",
+    Component: () => <WorldLineGraphViewFeature />,
   },
 ];
 

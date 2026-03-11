@@ -67,3 +67,6 @@ dist-bubly
 
 # Copied model assets
 **/public/img/
+
+# WLG file-based storage
+.data/

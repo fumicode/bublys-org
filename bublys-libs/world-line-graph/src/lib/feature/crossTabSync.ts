@@ -1,6 +1,6 @@
-import { setGraph, setCasEntries } from './worldLineGraphSlice';
 import { loadStatesFromIDB } from './IndexedDBStore';
 import { getCurrentStore } from '@bublys-org/state-management';
+import { applySyncPayload } from './applySyncPayload';
 import type { WorldLineGraphJson } from '../domain/WorldLineGraph';
 
 const CHANNEL_NAME = 'wlg-sync';
@@ -59,9 +59,6 @@ export function broadcastSyncNotification(notification: SyncNotification): void 
 
 // ============================================================================
 // Receiver — 他タブからの通知を受けてIDBからデータを読みReduxに反映
-//
-// CAS entries を先にディスパッチし、graph を後にすることで
-// 「hash は参照しているがデータ未着」の中間状態を防ぐ。
 // ============================================================================
 
 export function startCrossTabReceiver(): void {
@@ -88,26 +85,14 @@ export function startCrossTabReceiver(): void {
     const cas = store.getState().worldLineGraph?.cas ?? {};
     const missingHashes = Array.from(allHashes).filter((h) => !(h in cas));
 
+    const casEntries: Array<{ hash: string; data: unknown }> = [];
     if (missingHashes.length > 0) {
       const casData = await loadStatesFromIDB(missingHashes);
-      const entries = Array.from(casData.entries()).map(([hash, data]) => ({
-        hash,
-        data,
-      }));
-      if (entries.length > 0) {
-        store.dispatch({
-          ...setCasEntries({ entries }),
-          meta: { fromSync: true },
-        });
+      for (const [hash, data] of casData.entries()) {
+        casEntries.push({ hash, data });
       }
     }
 
-    // Graph更新（CAS反映後）
-    for (const { scopeId, graph } of graphs) {
-      store.dispatch({
-        ...setGraph({ scopeId, graph }),
-        meta: { fromSync: true },
-      });
-    }
+    applySyncPayload({ graphs, casEntries });
   };
 }

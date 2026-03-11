@@ -1,3 +1,4 @@
+// === Redux Slice ===
 export {
   worldLineGraphSlice,
   type WorldLineSliceState,
@@ -9,17 +10,19 @@ export {
   selectCasData,
   selectScopeIds,
 } from './worldLineGraphSlice';
-export {
-  saveStateToIDB,
-  loadStateFromIDB,
-  saveGraphToIDB,
-  loadGraphFromIDB,
-  saveStatesToIDB,
-  loadStatesFromIDB,
-} from './IndexedDBStore';
-export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
-export { startCrossTabReceiver } from './crossTabSync';
+
+// === Initialization ===
 export { initWorldLineGraph } from './initWorldLineGraph';
+export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
+
+// === Sync — Push/Pull Registry & Transports ===
+export { registerSyncTarget, notifySyncTargets, type SyncPayload, type SyncTarget } from './syncTarget';
+export { applySyncPayload, type IncomingSyncData } from './applySyncPayload';
+export { startServerSync } from './serverSync';
+export { pullServerState } from './pullServerState';
+export { startCrossTabReceiver } from './crossTabSync';
+
+// === Domain Hooks ===
 export { ObjectShell } from './ObjectShell';
 export { useScopeManager } from './useScopeManager';
 export { type ForkPreview, type WlNavProps } from './WorldLineNav';

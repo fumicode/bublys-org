@@ -2,6 +2,8 @@
 
 import ChatIcon from "@mui/icons-material/Chat";
 import PersonIcon from "@mui/icons-material/Person";
+import StorageIcon from "@mui/icons-material/Storage";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { Button } from "@mui/material";
 import {
@@ -9,11 +11,17 @@ import {
   BublyStoreProvider,
   BublyMenuItem,
 } from "@bublys-org/bubbles-ui";
-import { initWorldLineGraph } from "@bublys-org/world-line-graph";
+import {
+  initWorldLineGraph,
+  startServerSync,
+} from "@bublys-org/world-line-graph";
 import { TailorGenieProvider } from "@bublys-org/tailor-genie-libs";
 
 // worldLineGraph slice を注入
 initWorldLineGraph();
+
+// サーバーとの世界線状態同期（Push + Pull定期ポーリング）
+startServerSync("/api/wlg/sync");
 
 const menuItems: BublyMenuItem[] = [
   {
@@ -25,6 +33,16 @@ const menuItems: BublyMenuItem[] = [
     label: "スピーカー一覧",
     url: "tailor-genie/speakers",
     icon: <PersonIcon />,
+  },
+  {
+    label: "Server State",
+    url: "tailor-genie/server-state",
+    icon: <StorageIcon />,
+  },
+  {
+    label: "World-Line Graph",
+    url: "tailor-genie/wlg-view",
+    icon: <AccountTreeIcon />,
   },
 ];
 

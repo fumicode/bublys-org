@@ -12,5 +12,5 @@ export function initWorldLineGraph(): void {
   injectSlice(worldLineGraphSlice);
   // IDB永続化 + クロスタブ同期通知を統合したリスナー
   injectMiddleware(worldLineGraphListenerMiddleware.middleware);
-  startCrossTabReceiver();
+  // startCrossTabReceiver(); // サーバー同期の検証のため一時的に無効化
 }

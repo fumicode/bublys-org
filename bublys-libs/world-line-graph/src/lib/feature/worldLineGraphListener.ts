@@ -2,6 +2,7 @@ import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { setGraph, setCasEntries } from './worldLineGraphSlice';
 import { saveStatesToIDB, saveGraphToIDB } from './IndexedDBStore';
 import { broadcastSyncNotification } from './crossTabSync';
+import { notifySyncTargets } from './syncTarget';
 import type { RootState } from '@bublys-org/state-management';
 import type { WorldLineGraphJson } from '../domain/WorldLineGraph';
 
@@ -17,15 +18,20 @@ export const worldLineGraphListenerMiddleware = createListenerMiddleware();
 
 let pendingWrites: Promise<void>[] = [];
 let pendingGraphs: Array<{ scopeId: string; graph: WorldLineGraphJson }> = [];
+let pendingCasEntries: Array<{ hash: string; data: unknown }> = [];
 let flushScheduled = false;
 
 function trackWrite(
   writePromise: Promise<void>,
-  graphInfo?: { scopeId: string; graph: WorldLineGraphJson }
+  graphInfo?: { scopeId: string; graph: WorldLineGraphJson },
+  casEntries?: Array<{ hash: string; data: unknown }>
 ) {
   pendingWrites.push(writePromise);
   if (graphInfo) {
     pendingGraphs.push(graphInfo);
+  }
+  if (casEntries) {
+    pendingCasEntries.push(...casEntries);
   }
 
   if (!flushScheduled) {
@@ -33,13 +39,16 @@ function trackWrite(
     queueMicrotask(async () => {
       const writes = pendingWrites;
       const graphs = pendingGraphs;
+      const cas = pendingCasEntries;
       pendingWrites = [];
       pendingGraphs = [];
+      pendingCasEntries = [];
       flushScheduled = false;
 
       await Promise.all(writes);
       if (graphs.length > 0) {
         broadcastSyncNotification({ graphs });
+        notifySyncTargets({ graphs, casEntries: cas });
       }
     });
   }
@@ -72,7 +81,7 @@ worldLineGraphListenerMiddleware.startListening({
     if (entries.length === 0) return;
 
     const writePromise = saveStatesToIDB(entries);
-    trackWrite(writePromise);
+    trackWrite(writePromise, undefined, entries);
     await writePromise;
   },
 });
