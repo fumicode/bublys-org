@@ -103,6 +103,7 @@
     "ekikyo-bubly/ekikyo-libs",
     "ekikyo-bubly/ekikyo-app",
     "tailor-genie/*",
-    "sekaisen-igo-bubly/*"
+    "sekaisen-igo-bubly/*",
+    "shift-puzzle-bubly/*"
   ]
 }
