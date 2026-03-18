@@ -6,3 +6,5 @@ export * from "./ShiftPlanEditor.js";
 export * from "./ShiftPlanManager.js";
 export * from "./MemberShiftTable.js";
 export * from "./AssignmentEvaluation.js";
+export * from "./TaskCollection.js";
+export * from "./TaskDetail.js";

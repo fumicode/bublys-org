@@ -13,6 +13,7 @@ import { createDefaultTasks, createDefaultTimeSlots } from "./data/sampleData.js
 import PersonIcon from "@mui/icons-material/Person";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import TaskIcon from "@mui/icons-material/Task";
 import React from "react";
 
 // マスターデータ（静的）
@@ -60,3 +61,4 @@ registerObjectType('ShiftAssignment', {
   icon: React.createElement(AssignmentIcon, { fontSize: 'small' }),
   labelResolver: resolveShiftAssignmentLabel,
 });
+registerObjectType('Task', React.createElement(TaskIcon, { fontSize: 'small' }));

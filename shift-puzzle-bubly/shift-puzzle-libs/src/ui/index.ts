@@ -4,3 +4,5 @@ export * from "./MemberAvailabilityView.js";
 export * from "./ShiftPlanTableView.js";
 export * from "./MemberShiftTableView.js";
 export * from "./AssignmentEvaluationView.js";
+export * from "./TaskListView.js";
+export * from "./TaskDetailView.js";

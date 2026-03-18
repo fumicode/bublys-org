@@ -14,6 +14,8 @@ import {
   ShiftPlanManager,
   AssignmentEvaluation,
   MemberShiftTable,
+  TaskCollection,
+  TaskDetail,
 } from "@bublys-org/shift-puzzle-libs";
 
 // シフトパズル - 局員絞り込み検索バブル
@@ -179,6 +181,29 @@ const ShiftPuzzleAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubbl
   );
 };
 
+// シフトパズル - タスク一覧バブル
+const ShiftPuzzleTasksBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+
+  const queryIndex = bubble.url.indexOf('?');
+  const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
+  const params = new URLSearchParams(query);
+  const filterDayType = params.get('dayType') ?? undefined;
+
+  const handleTaskSelect = (taskId: string) => {
+    openBubble(`shift-puzzle/tasks/${taskId}`, bubble.id);
+  };
+
+  return (
+    <TaskCollection filterDayType={filterDayType} onTaskSelect={handleTaskSelect} />
+  );
+};
+
+// シフトパズル - タスク詳細バブル
+const ShiftPuzzleTaskBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  return <TaskDetail taskId={bubble.params.taskId} />;
+};
+
 /** シフトパズル機能のバブルルート定義 */
 export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/members/filter", type: "member-filter", Component: ShiftPuzzleMemberFilterBubble },
@@ -189,4 +214,6 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "assignment-evaluation", Component: ShiftPuzzleAssignmentEvaluationBubble },
   { pattern: "shift-puzzle/shift-plans", type: "shift-plan-list", Component: ShiftPuzzlePlanManagerBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId", type: "shift-plan", Component: ShiftPuzzlePlanEditorBubble },
+  { pattern: "shift-puzzle/tasks/:taskId", type: "task", Component: ShiftPuzzleTaskBubble },
+  { pattern: "shift-puzzle/tasks", type: "task-list", Component: ShiftPuzzleTasksBubble },
 ];
