@@ -9,9 +9,9 @@
 
 ## ファイル構成
 
-- `outline/input-outline.txt` — 石井の思考・アイデアを入力したもの（インプット）。**内容を書き換えてはならない**
-- `outline/ai-organized-outline.md` — input-outlineをAIが構造化・整理したもの
-- `outline/resulting-outline.txt` — 生成されたMDの構造をまとめたもの（アウトプット）
+- `outline/0_input-outline.txt` — 石井の思考・アイデアを入力したもの（インプット）。**内容を書き換えてはならない**
+- `outline/1_ai-organized-outline.md` — input-outlineをAIが構造化・整理したもの
+- `outline/2_resulting-outline.txt` — 生成されたMDの構造をまとめたもの（アウトプット）
 - `sections/00-header.md` 〜 `sections/09-*.md` — セクションごとのMarkdown
 - `style.css` — template.docx準拠の印刷用CSS
 - `build.sh` — pandocによるMD→HTML変換スクリプト

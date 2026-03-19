@@ -135,6 +135,12 @@ th {
   background-color: #f0f0f0;
 }
 
+/* ====== 画像 ====== */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ====== 水平線（セクション区切り） ====== */
 hr {
   border: none;

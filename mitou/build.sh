@@ -29,8 +29,7 @@ build() {
 
   echo "$combined" | pandoc \
     --standalone \
-    --css="$CSS" \
-    --embed-resources \
+    --css="style.css" \
     --metadata title=" " \
     -f markdown \
     -t html5 \
