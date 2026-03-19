@@ -1,0 +1,155 @@
+/* 未踏アドバンスト提案書 - 印刷用CSS */
+/* template.docx準拠: A4, margins top/bottom 20mm, left 25mm, right 20mm */
+
+@page {
+  size: A4;
+  margin: 20mm 20mm 20mm 25mm;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "ＭＳ 明朝", "MS Mincho", "IPAex明朝", "Hiragino Mincho ProN", serif;
+  font-size: 10.5pt;
+  line-height: 1.7;
+  color: #000;
+  margin: 0;
+  padding: 0;
+}
+
+/* 画面表示用: A4用紙風の見た目 */
+@media screen {
+  html {
+    background: #e8e8e8;
+  }
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 20mm auto;
+    padding: 20mm 20mm 20mm 25mm;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* ====== 見出し ====== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: "IPAexゴシック", "ＭＳ ゴシック", "MS Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  font-weight: bold;
+  page-break-after: avoid;
+}
+
+/* 大見出し（①②など セクションタイトル） */
+h2 {
+  font-size: 10.5pt;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  border: none;
+  padding: 0;
+}
+
+/* 中見出し */
+h3 {
+  font-size: 10.5pt;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
+  padding-left: 21pt;
+}
+
+/* 小見出し */
+h4 {
+  font-size: 10.5pt;
+  margin-top: 0.8em;
+  margin-bottom: 0.2em;
+  padding-left: 21pt;
+}
+
+/* 最上位タイトル（文書タイトル） */
+h1 {
+  font-size: 12pt;
+  text-align: center;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+/* ====== ヘッダー（プロジェクト名・提案者名） ====== */
+header + p,
+header + p + p {
+  font-family: "IPAexゴシック", "ＭＳ ゴシック", "MS Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  text-indent: 0;
+  text-align: left;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* pandocが生成する空のtitle-block-headerを非表示 */
+header#title-block-header {
+  display: none;
+}
+
+/* ====== 本文 ====== */
+p {
+  margin: 0;
+  text-indent: 21pt;
+  text-align: justify;
+}
+
+/* 見出し直後の段落はインデント不要にする場合はこちら */
+/* h2 + p, h3 + p, h4 + p { text-indent: 0; } */
+
+/* ====== リスト ====== */
+ul, ol {
+  margin: 0.3em 0;
+  padding-left: 42pt;
+}
+
+li {
+  margin-bottom: 0.2em;
+}
+
+/* ====== 太字 ====== */
+strong {
+  font-family: "IPAexゴシック", "ＭＳ ゴシック", "MS Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+}
+
+/* ====== テーブル ====== */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+  font-size: 10pt;
+}
+
+th, td {
+  border: 1px solid #000;
+  padding: 4pt 6pt;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-family: "IPAexゴシック", "ＭＳ ゴシック", "MS Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  font-weight: bold;
+  background-color: #f0f0f0;
+}
+
+/* ====== 水平線（セクション区切り） ====== */
+hr {
+  border: none;
+  border-top: 1px solid #999;
+  margin: 1em 0;
+}
+
+/* ====== 改ページ制御 ====== */
+h2 {
+  page-break-before: auto;
+}
+
+/* 印刷時に不要な要素を隠す */
+@media print {
+  body {
+    background: none;
+  }
+}
