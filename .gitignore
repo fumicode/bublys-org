@@ -68,3 +68,5 @@ dist-bubly
 package-lock.json
 
 .claude/settings.local.json
+
+.nx/polygraph
