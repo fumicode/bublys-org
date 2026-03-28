@@ -1,0 +1,26 @@
+{
+  "name": "@bublys-org/ai-hackathon",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": ["^dev"],
+        "continuous": true,
+        "options": {
+          "port": 4005
+        }
+      },
+      "start": {
+        "options": {
+          "port": 4005
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "next": "~16.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
