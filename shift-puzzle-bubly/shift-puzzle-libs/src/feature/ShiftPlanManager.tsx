@@ -20,8 +20,8 @@ import { IconButton, Tooltip } from "@mui/material";
 
 type ShiftPlanManagerProps = {
   onAssignmentClick?: (shiftPlanId: string, assignmentId: string) => void;
-  onCellClick?: (timeSlotId: string, taskId: string) => void;
-  buildCellUrl?: (timeSlotId: string, taskId: string) => string;
+  onCellClick?: (shiftId: string) => void;
+  buildCellUrl?: (shiftId: string) => string;
   onMemberViewClick?: (shiftPlanId: string) => void;
 };
 

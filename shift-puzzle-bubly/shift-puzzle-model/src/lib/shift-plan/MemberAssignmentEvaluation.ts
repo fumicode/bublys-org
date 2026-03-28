@@ -5,8 +5,7 @@
 
 import { ShiftAssignment } from './ShiftAssignment.js';
 import { Member } from '../member/Member.js';
-import { Task } from '../master/Task.js';
-import { TimeSlot } from '../master/TimeSlot.js';
+import { Shift } from '../master/Shift.js';
 
 // ========== 型定義 ==========
 
@@ -17,8 +16,7 @@ export type EvaluationStatus = 'excellent' | 'good' | 'acceptable' | 'warning' |
 export interface MemberAssignmentEvaluationState {
   readonly assignmentId: string;
   readonly memberId: string;
-  readonly timeSlotId: string;
-  readonly taskId: string;
+  readonly shiftId: string;
   readonly isAvailable: boolean;
   readonly isDepartmentMatch: boolean;
   readonly totalScore: number;
@@ -30,46 +28,18 @@ export interface MemberAssignmentEvaluationState {
 export class MemberAssignmentEvaluation {
   constructor(readonly state: MemberAssignmentEvaluationState) {}
 
-  get assignmentId(): string {
-    return this.state.assignmentId;
-  }
-
-  get memberId(): string {
-    return this.state.memberId;
-  }
-
-  get timeSlotId(): string {
-    return this.state.timeSlotId;
-  }
-
-  get taskId(): string {
-    return this.state.taskId;
-  }
-
-  get isAvailable(): boolean {
-    return this.state.isAvailable;
-  }
-
-  get isDepartmentMatch(): boolean {
-    return this.state.isDepartmentMatch;
-  }
-
-  get totalScore(): number {
-    return this.state.totalScore;
-  }
-
-  get issues(): readonly string[] {
-    return this.state.issues;
-  }
+  get assignmentId(): string { return this.state.assignmentId; }
+  get memberId(): string { return this.state.memberId; }
+  get shiftId(): string { return this.state.shiftId; }
+  get isAvailable(): boolean { return this.state.isAvailable; }
+  get isDepartmentMatch(): boolean { return this.state.isDepartmentMatch; }
+  get totalScore(): number { return this.state.totalScore; }
+  get issues(): readonly string[] { return this.state.issues; }
 
   /** 総合評価ステータスを取得 */
   getOverallStatus(): EvaluationStatus {
-    if (!this.state.isAvailable) {
-      return 'error';
-    }
-    if (this.state.isDepartmentMatch) {
-      return 'excellent';
-    }
+    if (!this.state.isAvailable) return 'error';
+    if (this.state.isDepartmentMatch) return 'excellent';
     return 'acceptable';
   }
 
@@ -89,10 +59,9 @@ export class MemberAssignmentEvaluation {
   static evaluate(
     assignment: ShiftAssignment,
     member: Member,
-    task: Task,
-    timeSlot: TimeSlot
+    shift: Shift,
   ): MemberAssignmentEvaluation {
-    const result = this.evaluateCore(member, task, timeSlot);
+    const result = this.evaluateCore(member, shift);
     return new MemberAssignmentEvaluation({
       ...result,
       assignmentId: assignment.id,
@@ -105,10 +74,9 @@ export class MemberAssignmentEvaluation {
    */
   static evaluateCandidate(
     member: Member,
-    task: Task,
-    timeSlot: TimeSlot
+    shift: Shift,
   ): MemberAssignmentEvaluation {
-    const result = this.evaluateCore(member, task, timeSlot);
+    const result = this.evaluateCore(member, shift);
     return new MemberAssignmentEvaluation({
       ...result,
       assignmentId: '',
@@ -118,17 +86,16 @@ export class MemberAssignmentEvaluation {
   /** 評価の共通ロジック */
   private static evaluateCore(
     member: Member,
-    task: Task,
-    timeSlot: TimeSlot
+    shift: Shift,
   ): Omit<MemberAssignmentEvaluationState, 'assignmentId'> {
     const issues: string[] = [];
 
-    const isAvailable = member.isAvailableAt(timeSlot.id);
+    const isAvailable = member.isAvailableFor(shift.id);
     if (!isAvailable) {
-      issues.push('この時間帯に参加できません');
+      issues.push('このシフトに参加できません');
     }
 
-    const isDepartmentMatch = task.responsibleDepartment === member.department;
+    const isDepartmentMatch = shift.responsibleDepartment === member.department;
 
     let totalScore = 0;
     if (!isAvailable) totalScore -= 10;
@@ -136,8 +103,7 @@ export class MemberAssignmentEvaluation {
 
     return {
       memberId: member.id,
-      timeSlotId: timeSlot.id,
-      taskId: task.id,
+      shiftId: shift.id,
       isAvailable,
       isDepartmentMatch,
       totalScore,

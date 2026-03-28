@@ -5,9 +5,9 @@ import styled from "styled-components";
 import { Button, Checkbox, FormControlLabel } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
-import { createDefaultTimeSlots, DAY_TYPE_ORDER } from "../data/sampleData.js";
+import { createDefaultShifts, DAY_TYPE_ORDER } from "../data/sampleData.js";
 import { MemberFilterCriteria as MemberFilterType, stringifyMemberFilter } from "./MemberCollection.js";
-import { type DayType } from "../domain/index.js";
+import { type DayType, type Shift } from "../domain/index.js";
 
 // 局一覧（マスターデータとして定義）
 const DEPARTMENTS = ["企画局", "広報局", "技術局", "総務局"];
@@ -18,35 +18,35 @@ type MemberFilterProps = {
 
 export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
   const { openBubble } = useContext(BubblesContext);
-  const timeSlots = createDefaultTimeSlots();
+  const shifts = createDefaultShifts();
 
   // 局フィルターの選択状態
   const [selectedDepartment, setSelectedDepartment] = useState<string>(
     initialFilter?.department ?? ''
   );
 
-  // 時間帯フィルターの選択状態
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>(
-    initialFilter?.availableAt ?? []
+  // シフトフィルターの選択状態
+  const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>(
+    initialFilter?.availableFor ?? []
   );
 
-  const handleTimeSlotToggle = (slotId: string) => {
-    setSelectedTimeSlots((prev) =>
-      prev.includes(slotId)
-        ? prev.filter((id) => id !== slotId)
-        : [...prev, slotId]
+  const handleShiftToggle = (shiftId: string) => {
+    setSelectedShiftIds((prev) =>
+      prev.includes(shiftId)
+        ? prev.filter((id) => id !== shiftId)
+        : [...prev, shiftId]
     );
   };
 
   // dayTypeごとに「全選択」
   const handleSelectDayType = (dayType: string) => {
-    const slotsForDayType = timeSlots.filter((s) => s.dayType === dayType).map((s) => s.id);
-    const allSelected = slotsForDayType.every((id) => selectedTimeSlots.includes(id));
+    const shiftsForDayType = shifts.filter((s) => s.dayType === dayType).map((s) => s.id);
+    const allSelected = shiftsForDayType.every((id) => selectedShiftIds.includes(id));
 
     if (allSelected) {
-      setSelectedTimeSlots((prev) => prev.filter((id) => !slotsForDayType.includes(id)));
+      setSelectedShiftIds((prev) => prev.filter((id) => !shiftsForDayType.includes(id)));
     } else {
-      setSelectedTimeSlots((prev) => [...new Set([...prev, ...slotsForDayType])]);
+      setSelectedShiftIds((prev) => [...new Set([...prev, ...shiftsForDayType])]);
     }
   };
 
@@ -57,26 +57,26 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
     if (selectedDepartment) {
       filter.department = selectedDepartment;
     }
-    if (selectedTimeSlots.length > 0) {
-      filter.availableAt = selectedTimeSlots;
+    if (selectedShiftIds.length > 0) {
+      filter.availableFor = selectedShiftIds;
     }
 
     const query = stringifyMemberFilter(filter);
     openBubble(`shift-puzzle/members${query}`, 'root');
   };
 
-  const hasSelection = selectedDepartment || selectedTimeSlots.length > 0;
+  const hasSelection = selectedDepartment || selectedShiftIds.length > 0;
 
   // dayTypeごとにグループ化
-  const slotsByDayType = timeSlots.reduce((acc, slot) => {
-    if (!acc[slot.dayType]) {
-      acc[slot.dayType] = [];
+  const shiftsByDayType = shifts.reduce((acc, shift) => {
+    if (!acc[shift.dayType]) {
+      acc[shift.dayType] = [];
     }
-    acc[slot.dayType].push(slot);
+    acc[shift.dayType].push(shift);
     return acc;
-  }, {} as Record<DayType, ReturnType<typeof createDefaultTimeSlots>>);
+  }, {} as Record<DayType, Shift[]>);
 
-  const dayTypes = DAY_TYPE_ORDER.filter((dt) => slotsByDayType[dt]);
+  const dayTypes = DAY_TYPE_ORDER.filter((dt) => shiftsByDayType[dt]);
 
   return (
     <StyledContainer>
@@ -112,15 +112,15 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
         </div>
       </section>
 
-      {/* 参加可能日程フィルター */}
+      {/* 参加可能シフトフィルター */}
       <section className="e-section">
-        <h4>参加可能日程（AND条件）</h4>
-        <p className="e-hint">選択した全ての時間帯に参加可能な局員を検索</p>
-        <div className="e-timeslots">
+        <h4>参加可能シフト（AND条件）</h4>
+        <p className="e-hint">選択した全てのシフトに参加可能な局員を検索</p>
+        <div className="e-shifts">
           {dayTypes.map((dayType) => {
-            const slots = slotsByDayType[dayType];
-            const allSelected = slots.every((s) => selectedTimeSlots.includes(s.id));
-            const someSelected = slots.some((s) => selectedTimeSlots.includes(s.id));
+            const dayShifts = shiftsByDayType[dayType];
+            const allSelected = dayShifts.every((s) => selectedShiftIds.includes(s.id));
+            const someSelected = dayShifts.some((s) => selectedShiftIds.includes(s.id));
 
             return (
               <div key={dayType} className="e-daytype-group">
@@ -136,23 +136,23 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
                   label={<span className="e-daytype-label">{dayType}</span>}
                   className="e-daytype-header"
                 />
-                <div className="e-slots">
-                  {slots.map((slot) => (
+                <div className="e-shift-list">
+                  {dayShifts.map((shift) => (
                     <FormControlLabel
-                      key={slot.id}
+                      key={shift.id}
                       control={
                         <Checkbox
-                          checked={selectedTimeSlots.includes(slot.id)}
-                          onChange={() => handleTimeSlotToggle(slot.id)}
+                          checked={selectedShiftIds.includes(shift.id)}
+                          onChange={() => handleShiftToggle(shift.id)}
                           size="small"
                         />
                       }
                       label={
                         <span>
-                          {slot.label.split(' ').slice(1).join(' ')}
+                          {shift.taskName ?? shift.taskId} {shift.startTime}–{shift.endTime}
                         </span>
                       }
-                      className="e-slot-item"
+                      className="e-shift-item"
                     />
                   ))}
                 </div>
@@ -208,7 +208,7 @@ const StyledContainer = styled.div`
     gap: 4px;
   }
 
-  .e-timeslots {
+  .e-shifts {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -228,7 +228,7 @@ const StyledContainer = styled.div`
       }
     }
 
-    .e-slots {
+    .e-shift-list {
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
@@ -236,7 +236,7 @@ const StyledContainer = styled.div`
       margin-top: 4px;
     }
 
-    .e-slot-item {
+    .e-shift-item {
       margin: 0;
 
       .MuiFormControlLabel-label {

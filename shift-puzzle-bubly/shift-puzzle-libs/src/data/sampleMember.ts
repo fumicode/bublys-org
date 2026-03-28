@@ -3,10 +3,10 @@
  */
 
 import { Member } from "../domain/index.js";
-import { createDefaultTimeSlots } from "./sampleData.js";
+import { createDefaultShifts } from "./sampleData.js";
 
-const timeSlots = createDefaultTimeSlots();
-const allSlotIds = timeSlots.map((s) => s.id);
+const shifts = createDefaultShifts();
+const allShiftIds = shifts.map((s) => s.id);
 
 export function createSampleMemberList(): Member[] {
   return [
@@ -31,23 +31,23 @@ export function createSampleMemberList(): Member[] {
     Member.create("池田 航", "技術局", false),
     Member.create("橋本 萌", "総務局", false),
   ].map((member, i) => {
-    // 局員ごとに参加可能時間帯をランダムっぽく割り当て
+    // 局員ごとに参加可能シフトをランダムっぽく割り当て
     const patterns = [
-      allSlotIds,
-      allSlotIds.slice(0, 8),
-      allSlotIds.slice(2),
-      allSlotIds.slice(1, 9),
-      allSlotIds.filter((_, idx) => idx % 2 === 0),
-      allSlotIds.filter((_, idx) => idx % 2 === 1),
-      allSlotIds.slice(3),
-      allSlotIds.slice(0, 10),
-      allSlotIds.slice(2, 9),
-      allSlotIds,
+      allShiftIds,
+      allShiftIds.slice(0, Math.floor(allShiftIds.length * 0.8)),
+      allShiftIds.slice(Math.floor(allShiftIds.length * 0.2)),
+      allShiftIds.slice(Math.floor(allShiftIds.length * 0.1), Math.floor(allShiftIds.length * 0.9)),
+      allShiftIds.filter((_, idx) => idx % 2 === 0),
+      allShiftIds.filter((_, idx) => idx % 2 === 1),
+      allShiftIds.slice(Math.floor(allShiftIds.length * 0.3)),
+      allShiftIds.slice(0, Math.floor(allShiftIds.length * 0.9)),
+      allShiftIds.slice(Math.floor(allShiftIds.length * 0.2), Math.floor(allShiftIds.length * 0.9)),
+      allShiftIds,
     ];
     const pattern = patterns[i % patterns.length];
     return new Member({
       ...member.state,
-      availableTimeSlots: pattern,
+      availableShiftIds: pattern,
     });
   });
 }

@@ -9,7 +9,7 @@ import {
   setMemberList,
 } from "../slice/index.js";
 import { MemberShiftTableView } from "../ui/MemberShiftTableView.js";
-import { createDefaultTimeSlots, createDefaultTasks } from "../data/sampleData.js";
+import { createDefaultShifts } from "../data/sampleData.js";
 import { createSampleMemberList } from "../data/sampleMember.js";
 
 type MemberShiftTableProps = {
@@ -27,8 +27,7 @@ export const MemberShiftTable: FC<MemberShiftTableProps> = ({
   const memberList = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
-  const timeSlots = useMemo(() => createDefaultTimeSlots(), []);
-  const tasks = useMemo(() => createDefaultTasks(), []);
+  const shifts = useMemo(() => createDefaultShifts(), []);
 
   // 初期データのロード
   useEffect(() => {
@@ -54,8 +53,7 @@ export const MemberShiftTable: FC<MemberShiftTableProps> = ({
 
       <div className="e-main">
         <MemberShiftTableView
-          timeSlots={timeSlots}
-          tasks={tasks}
+          shifts={shifts}
           assignments={shiftPlan.assignments}
           memberList={memberList}
           onMemberClick={onMemberClick}

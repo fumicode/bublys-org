@@ -6,9 +6,9 @@ import { Task } from "../domain/index.js";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
-/** タスクが必要な時間帯の情報 */
+/** タスクが必要なシフトの情報 */
 export type TaskScheduleEntry = {
-  timeSlotId: string;
+  shiftId: string;
   dayType: string;
   slotLabel: string;
   requiredCount: number;
@@ -78,7 +78,7 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({ task, scheduleEntries 
                 <div className="e-day-label">{day}</div>
                 <div className="e-slots">
                   {groupedByDay[day].map((entry) => (
-                    <div key={entry.timeSlotId} className="e-slot-row">
+                    <div key={entry.shiftId} className="e-slot-row">
                       <span className="e-slot-label">{entry.slotLabel}</span>
                       <span className="e-count">
                         必要人数: <strong>{entry.requiredCount}名</strong>

@@ -19,7 +19,7 @@ import { BubblesContext } from "@bublys-org/bubbles-ui";
 /** フィルター条件の型 */
 export type MemberFilterCriteria = {
   department?: string;
-  availableAt?: string[];  // 参加可能な時間帯のID配列（AND条件）
+  availableFor?: string[];  // 参加可能なシフトのID配列（AND条件）
 };
 
 /** URLクエリからフィルターをパース */
@@ -34,9 +34,9 @@ export function parseMemberFilter(query: string): MemberFilterCriteria {
     filter.department = department;
   }
 
-  const availableAt = params.get('availableAt');
-  if (availableAt) {
-    filter.availableAt = availableAt.split(',');
+  const availableFor = params.get('availableFor');
+  if (availableFor) {
+    filter.availableFor = availableFor.split(',');
   }
 
   return filter;
@@ -49,8 +49,8 @@ export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
   if (filter.department) {
     params.set('department', filter.department);
   }
-  if (filter.availableAt && filter.availableAt.length > 0) {
-    params.set('availableAt', filter.availableAt.join(','));
+  if (filter.availableFor && filter.availableFor.length > 0) {
+    params.set('availableFor', filter.availableFor.join(','));
   }
 
   const str = params.toString();
@@ -62,8 +62,8 @@ function matchesFilter(member: Member, filter: MemberFilterCriteria): boolean {
   if (filter.department && member.department !== filter.department) {
     return false;
   }
-  if (filter.availableAt && filter.availableAt.length > 0) {
-    const allAvailable = filter.availableAt.every((slotId) => member.isAvailableAt(slotId));
+  if (filter.availableFor && filter.availableFor.length > 0) {
+    const allAvailable = filter.availableFor.every((shiftId) => member.isAvailableFor(shiftId));
     if (!allAvailable) {
       return false;
     }
@@ -77,8 +77,8 @@ function describeFilter(filter: MemberFilterCriteria): string {
   if (filter.department) {
     parts.push(`${filter.department}所属`);
   }
-  if (filter.availableAt && filter.availableAt.length > 0) {
-    parts.push(`${filter.availableAt.length}時間帯参加可能`);
+  if (filter.availableFor && filter.availableFor.length > 0) {
+    parts.push(`${filter.availableFor.length}シフト参加可能`);
   }
   return parts.join('、');
 }

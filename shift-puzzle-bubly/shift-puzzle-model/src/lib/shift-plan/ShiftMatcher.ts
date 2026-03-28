@@ -4,15 +4,14 @@
  */
 
 import { Member } from '../member/Member.js';
-import { Task } from '../master/Task.js';
-import { TimeSlot, TaskRequirement } from '../master/TimeSlot.js';
+import { Shift } from '../master/Shift.js';
 import { ShiftAssignment, ShiftAssignmentState } from './ShiftAssignment.js';
 
 // ========== 型定義 ==========
 
 /** マッチング設定 */
 export interface MatchingOptions {
-  /** 1つの時間帯に同じ局員を配置可能か（兼務） */
+  /** 担当時間が重複する配置を同一局員に許可するか */
   readonly allowConcurrentAssignment: boolean;
   /** 局員1人あたりの最大配置数（0は無制限） */
   readonly maxAssignmentsPerMember: number;
@@ -38,7 +37,6 @@ export interface MatchingStats {
 interface MemberCandidate {
   readonly member: Member;
   readonly matchingScore: number;
-  readonly reasons: readonly string[];
 }
 
 // ========== デフォルト設定 ==========
@@ -54,9 +52,7 @@ const DEFAULT_OPTIONS: MatchingOptions = {
 export class ShiftMatcher {
   constructor(
     private readonly memberList: readonly Member[],
-    private readonly tasks: readonly Task[],
-    private readonly timeSlots: readonly TimeSlot[],
-    private readonly requirements: readonly TaskRequirement[]
+    private readonly shifts: readonly Shift[],
   ) {}
 
   /**
@@ -73,59 +69,36 @@ export class ShiftMatcher {
       : [];
 
     const memberAssignmentCount = new Map<string, number>();
-    const memberTimeSlotAssignments = new Map<string, Set<string>>();
 
     for (const assignment of assignments) {
       const count = memberAssignmentCount.get(assignment.staffId) ?? 0;
       memberAssignmentCount.set(assignment.staffId, count + 1);
-
-      const slots = memberTimeSlotAssignments.get(assignment.staffId) ?? new Set();
-      slots.add(assignment.timeSlotId);
-      memberTimeSlotAssignments.set(assignment.staffId, slots);
     }
 
-    for (const task of this.tasks) {
-      for (const timeSlot of this.timeSlots) {
-        const requirement = this.requirements.find(
-          (r) => r.timeSlotId === timeSlot.id && r.taskId === task.id
+    for (const shift of this.shifts) {
+      const existingCount = assignments.filter((a) => a.shiftId === shift.id).length;
+      const neededCount = Math.max(0, shift.requiredCount - existingCount);
+
+      const candidates = this.evaluateCandidates(
+        shift,
+        assignments,
+        memberAssignmentCount,
+        opts,
+      );
+
+      for (let i = 0; i < neededCount && i < candidates.length; i++) {
+        const candidate = candidates[i];
+        const assignment = ShiftAssignment.create(
+          shift.id,
+          candidate.member.id,
+          shift.startMinute,
+          shift.endMinute,
+          true,
         );
+        assignments.push(assignment.state);
 
-        if (!requirement) continue;
-
-        const existingCount = assignments.filter(
-          (a) => a.timeSlotId === timeSlot.id && a.roleId === task.id
-        ).length;
-
-        const neededCount = Math.max(0, requirement.requiredCount - existingCount);
-
-        const candidates = this.evaluateCandidates(
-          timeSlot,
-          task,
-          assignments,
-          memberAssignmentCount,
-          memberTimeSlotAssignments,
-          opts
-        );
-
-        for (let i = 0; i < neededCount && i < candidates.length; i++) {
-          const candidate = candidates[i];
-
-          const assignment = ShiftAssignment.create(
-            candidate.member.id,
-            timeSlot.id,
-            task.id,
-            true
-          );
-
-          assignments.push(assignment.state);
-
-          const count = memberAssignmentCount.get(candidate.member.id) ?? 0;
-          memberAssignmentCount.set(candidate.member.id, count + 1);
-
-          const slots = memberTimeSlotAssignments.get(candidate.member.id) ?? new Set();
-          slots.add(timeSlot.id);
-          memberTimeSlotAssignments.set(candidate.member.id, slots);
-        }
+        const count = memberAssignmentCount.get(candidate.member.id) ?? 0;
+        memberAssignmentCount.set(candidate.member.id, count + 1);
       }
     }
 
@@ -134,30 +107,33 @@ export class ShiftMatcher {
   }
 
   private evaluateCandidates(
-    timeSlot: TimeSlot,
-    task: Task,
+    shift: Shift,
     currentAssignments: readonly ShiftAssignmentState[],
     memberAssignmentCount: Map<string, number>,
-    memberTimeSlotAssignments: Map<string, Set<string>>,
-    opts: MatchingOptions
+    opts: MatchingOptions,
   ): MemberCandidate[] {
     const candidates: MemberCandidate[] = [];
 
     for (const member of this.memberList) {
-      const reasons: string[] = [];
-
       // 1. 参加可能性チェック（必須）
-      if (!member.isAvailableAt(timeSlot.id)) continue;
+      if (!member.isAvailableFor(shift.id)) continue;
 
-      // 2. 既にこの時間帯×タスクに配置されているかチェック
+      // 2. 既にこのシフトに配置されているかチェック
       const alreadyAssigned = currentAssignments.some(
-        (a) => a.staffId === member.id && a.timeSlotId === timeSlot.id && a.roleId === task.id
+        (a) => a.staffId === member.id && a.shiftId === shift.id,
       );
       if (alreadyAssigned) continue;
 
-      // 3. 同一時間帯への兼務チェック
-      const assignedSlots = memberTimeSlotAssignments.get(member.id);
-      if (assignedSlots?.has(timeSlot.id) && !opts.allowConcurrentAssignment) continue;
+      // 3. 担当時間の重複チェック
+      if (!opts.allowConcurrentAssignment) {
+        const hasOverlap = currentAssignments.some(
+          (a) =>
+            a.staffId === member.id &&
+            a.assignedStartMinute < shift.endMinute &&
+            shift.startMinute < a.assignedEndMinute,
+        );
+        if (hasOverlap) continue;
+      }
 
       // 4. 最大配置数チェック
       if (opts.maxAssignmentsPerMember > 0) {
@@ -168,18 +144,15 @@ export class ShiftMatcher {
       let matchingScore = 0;
 
       // 5. 同局優先
-      const isDepartmentMatch = task.responsibleDepartment === member.department;
-      if (isDepartmentMatch) {
+      if (shift.responsibleDepartment === member.department) {
         matchingScore += 5;
-        reasons.push('同局');
       }
 
       // 6. 配置数が少ない局員を優先（ロードバランス）
       const currentCount = memberAssignmentCount.get(member.id) ?? 0;
       matchingScore -= currentCount * 2;
-      if (currentCount === 0) reasons.push('未配置');
 
-      candidates.push({ member, matchingScore, reasons });
+      candidates.push({ member, matchingScore });
     }
 
     return candidates.sort((a, b) => b.matchingScore - a.matchingScore);
@@ -187,17 +160,14 @@ export class ShiftMatcher {
 
   private calculateStats(
     assignments: readonly ShiftAssignmentState[],
-    memberAssignmentCount: Map<string, number>
+    memberAssignmentCount: Map<string, number>,
   ): MatchingStats {
     let filledSlots = 0;
     let unfilledSlots = 0;
 
-    for (const requirement of this.requirements) {
-      const assignedCount = assignments.filter(
-        (a) => a.timeSlotId === requirement.timeSlotId && a.roleId === requirement.taskId
-      ).length;
-
-      if (assignedCount >= requirement.requiredCount) {
+    for (const shift of this.shifts) {
+      const assignedCount = assignments.filter((a) => a.shiftId === shift.id).length;
+      if (assignedCount >= shift.requiredCount) {
         filledSlots++;
       } else {
         unfilledSlots++;
@@ -219,21 +189,11 @@ export class ShiftMatcher {
 
   static autoAssign(
     memberList: readonly Member[],
-    tasks: readonly Task[],
-    timeSlots: readonly TimeSlot[],
+    shifts: readonly Shift[],
     existingAssignments: readonly ShiftAssignmentState[] = [],
     options: Partial<MatchingOptions> = {}
   ): MatchingResult {
-    const requirements = ShiftMatcher.extractRequirements(timeSlots);
-    const matcher = new ShiftMatcher(memberList, tasks, timeSlots, requirements);
+    const matcher = new ShiftMatcher(memberList, shifts);
     return matcher.match(existingAssignments, options);
-  }
-
-  static extractRequirements(timeSlots: readonly TimeSlot[]): TaskRequirement[] {
-    const requirements: TaskRequirement[] = [];
-    for (const timeSlot of timeSlots) {
-      requirements.push(...timeSlot.taskRequirements);
-    }
-    return requirements;
   }
 }

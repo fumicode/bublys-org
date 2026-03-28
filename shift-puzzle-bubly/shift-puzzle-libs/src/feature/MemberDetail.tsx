@@ -13,7 +13,7 @@ type MemberDetailProps = {
   onOpenAvailability?: (memberId: string) => void;
 };
 
-const buildAvailabilityUrl = (memberId: string) => `shift-puzzle/members/${memberId}/availableTimeSlots`;
+const buildAvailabilityUrl = (memberId: string) => `shift-puzzle/members/${memberId}/availableShifts`;
 
 export const MemberDetail: FC<MemberDetailProps> = ({ memberId, onOpenAvailability }) => {
   // memberIdが指定されていればそれを使い、なければ選択中の局員を使う

@@ -1,221 +1,160 @@
 /**
  * シフトパズル マスターデータ
- * タスクと時間帯の定義
+ * Shift を直接定義する（TimeSlot は廃止）
  */
 
-import { Task, TimeSlot } from "../domain/index.js";
+import { Shift, type DayType } from "../domain/index.js";
+import { createSampleTasks } from "./sampleTask.js";
 
-// ========== タスク（係）定義 ==========
+// ========== シフト定義 ==========
 
-export function createDefaultTasks(): Task[] {
+export function createDefaultShifts(): Shift[] {
+  const tasks = createSampleTasks();
+  const taskMap = new Map(tasks.map((t) => [t.id, t]));
+
+  const s = (
+    id: string,
+    taskId: string,
+    dayType: DayType,
+    startTime: string,
+    endTime: string,
+    count: number,
+    min?: number,
+    max?: number,
+  ): Shift => {
+    const task = taskMap.get(taskId);
+    return new Shift({
+      id,
+      taskId,
+      dayType,
+      startTime,
+      endTime,
+      requiredCount: count,
+      minCount: min ?? Math.max(1, count - 1),
+      maxCount: max ?? count + 1,
+      taskName: task?.name,
+      responsibleDepartment: task?.responsibleDepartment,
+    });
+  };
+
   return [
-    new Task({
-      id: "task-reception",
-      name: "受付",
-      task: "来場者・参加者の受付対応",
-      responsibleDepartment: "総務局",
-      description: "参加登録、名札配布、案内業務",
-    }),
-    new Task({
-      id: "task-setup",
-      name: "設営",
-      task: "会場・機材のセットアップ",
-      responsibleDepartment: "技術局",
-      description: "机・椅子の配置、AV機器の設置・テスト",
-    }),
-    new Task({
-      id: "task-teardown",
-      name: "撤収",
-      task: "会場・機材の片付け",
-      responsibleDepartment: "技術局",
-      description: "机・椅子の撤去、機材の撤収・梱包",
-    }),
-    new Task({
-      id: "task-mc",
-      name: "司会進行",
-      task: "イベント全体の司会・進行",
-      responsibleDepartment: "企画局",
-      description: "開会・閉会宣言、プログラム進行管理",
-    }),
-    new Task({
-      id: "task-record",
-      name: "記録・広報",
-      task: "写真撮影・SNS等の広報対応",
-      responsibleDepartment: "広報局",
-      description: "写真・動画撮影、SNS投稿、記録保管",
-    }),
-    new Task({
-      id: "task-general",
-      name: "総合補助",
-      task: "全体の補助・雑務対応",
-      responsibleDepartment: "総務局",
-      description: "各担当のサポート、臨機応変な対応",
-    }),
+    // ===== 準準備日 午前 =====
+    s('shift-ppm-seisaku-shiki',         'task-seisaku-shiki',          '準準備日', '09:00', '12:00', 1),
+    s('shift-ppm-haisen-shikaikan',      'task-haisen-shikaikan',       '準準備日', '09:00', '12:00', 1),
+    s('shift-ppm-haisen-support',        'task-haisen-support',         '準準備日', '09:00', '12:00', 3),
+    s('shift-ppm-sandan-honbu-setsuei',  'task-sandan-honbu-setsuei',   '準準備日', '09:30', '12:00', 2),
+
+    // ===== 準準備日 午後 =====
+    s('shift-ppa-haisen-support',        'task-haisen-support',         '準準備日', '13:00', '17:00', 3),
+    s('shift-ppa-kaijou-soshi-age',      'task-kaijou-soshi-age',       '準準備日', '13:00', '17:00', 4),
+    s('shift-ppa-zaimu-shiki-junk',      'task-zaimu-shiki-junk',       '準準備日', '13:00', '17:00', 1),
+
+    // ===== 準備日 午前 =====
+    s('shift-pm-seisaku-shiki',          'task-seisaku-shiki',          '準備日', '09:00', '12:00', 1),
+    s('shift-pm-rami-shikaikan',         'task-rami-shikaikan',         '準備日', '09:00', '12:00', 1),
+    s('shift-pm-rami-support',           'task-rami-support',           '準備日', '09:00', '12:00', 4),
+    s('shift-pm-ennichi-setsuei',        'task-ennichi-setsuei',        '準備日', '09:30', '12:00', 3),
+    s('shift-pm-obakeyashiki-setsuei',   'task-obakeyashiki-setsuei',   '準備日', '09:30', '12:00', 3),
+    s('shift-pm-onkyo-setsuei-junk',     'task-onkyo-setsuei-junk',     '準備日', '09:00', '11:00', 2),
+
+    // ===== 準備日 午後 =====
+    s('shift-pa-kaijou-soshi-age',       'task-kaijou-soshi-age',       '準備日', '13:00', '17:00', 4),
+    s('shift-pa-stamp-rally-setsuei',    'task-stamp-rally-setsuei',    '準備日', '13:00', '15:00', 2),
+    s('shift-pa-obakeyashiki-setsuei',   'task-obakeyashiki-setsuei',   '準備日', '13:00', '17:00', 3),
+    s('shift-pa-ennichi-setsuei',        'task-ennichi-setsuei',        '準備日', '13:00', '16:00', 2),
+    s('shift-pa-shikkobu-honbu-setsuei', 'task-shikkobu-honbu-setsuei', '準備日', '13:00', '15:00', 2),
+
+    // ===== 1日目 午前 =====
+    s('shift-d1m-somu-shiki',            'task-somu-shiki',             '1日目', '09:00', '12:00', 1),
+    s('shift-d1m-shogai-shiki',          'task-shogai-shiki',           '1日目', '09:00', '12:00', 1),
+    s('shift-d1m-kaien-mt',              'task-kaien-mt',               '1日目', '09:00', '09:30', 1, 1, 1),
+    s('shift-d1m-sandan-taiou',          'task-sandan-taiou',           '1日目', '09:30', '12:00', 2),
+    s('shift-d1m-kigyo-booth-yobikomi',  'task-kigyo-booth-yobikomi',   '1日目', '10:00', '12:00', 2),
+    s('shift-d1m-kigyo-booth-kanshi',    'task-kigyo-booth-kanshi',     '1日目', '10:00', '12:00', 2),
+    s('shift-d1m-roundman',              'task-roundman',               '1日目', '09:30', '12:00', 3),
+    s('shift-d1m-eisei-taiou',           'task-eisei-taiou',            '1日目', '09:00', '12:00', 1),
+    s('shift-d1m-joho-server',           'task-joho-server-day1',       '1日目', '09:00', '12:00', 1),
+    s('shift-d1m-seeft',                 'task-seeft-day1',             '1日目', '09:30', '12:00', 1),
+    s('shift-d1m-ennichi-unei',          'task-ennichi-unei',           '1日目', '10:00', '12:00', 3),
+    s('shift-d1m-obakeyashiki-unei',     'task-obakeyashiki-unei',      '1日目', '10:00', '12:00', 4),
+    s('shift-d1m-honbu-shiki',           'task-honbu-shiki',            '1日目', '09:00', '12:00', 1),
+    s('shift-d1m-honbu-shiki-hosa',      'task-honbu-shiki-hosa',       '1日目', '09:00', '12:00', 1),
+
+    // ===== 1日目 午後 =====
+    s('shift-d1a-somu-shiki',            'task-somu-shiki',             '1日目', '13:00', '17:00', 1),
+    s('shift-d1a-roundman',              'task-roundman',               '1日目', '13:00', '17:00', 3),
+    s('shift-d1a-sandan-taiou',          'task-sandan-taiou',           '1日目', '13:00', '17:00', 2),
+    s('shift-d1a-kokudan-taiou',         'task-kokudan-taiou',          '1日目', '13:00', '17:00', 1),
+    s('shift-d1a-kigyo-booth-yobikomi',  'task-kigyo-booth-yobikomi',   '1日目', '13:00', '17:00', 2),
+    s('shift-d1a-kigyo-booth-kanshi',    'task-kigyo-booth-kanshi',     '1日目', '13:00', '17:00', 2),
+    s('shift-d1a-ennichi-unei',          'task-ennichi-unei',           '1日目', '13:00', '17:00', 3),
+    s('shift-d1a-obakeyashiki-unei',     'task-obakeyashiki-unei',      '1日目', '13:00', '17:00', 4),
+    s('shift-d1a-game-taikai-unei',      'task-game-taikai-unei',       '1日目', '14:00', '17:00', 3),
+    s('shift-d1a-hero-show-hare',        'task-hero-show-hare',         '1日目', '14:00', '16:30', 3),
+    s('shift-d1a-eisei-taiou',           'task-eisei-taiou',            '1日目', '13:00', '17:00', 1),
+    s('shift-d1a-honbu-shiki',           'task-honbu-shiki',            '1日目', '13:00', '17:00', 1),
+
+    // ===== 1日目 夜 =====
+    s('shift-d1e-roundman',              'task-roundman',               '1日目', '17:00', '19:00', 2),
+    s('shift-d1e-heien-mt',              'task-heien-mt',               '1日目', '17:00', '17:30', 1, 1, 1),
+    s('shift-d1e-choshoku-prep',         'task-choshoku-prep',          '1日目', '17:30', '19:30', 2),
+    s('shift-d1e-zaimu-shiki',           'task-zaimu-shiki-day1',       '1日目', '17:00', '20:00', 1),
+    s('shift-d1e-shikkobu-mt',           'task-shikkobu-mt-day1',       '1日目', '18:00', '19:00', 1, 1, 1),
+    s('shift-d1e-bussan-tent',           'task-bussan-tent-day1',       '1日目', '17:00', '19:30', 2),
+
+    // ===== 2日目 午前 =====
+    s('shift-d2m-somu-shiki',            'task-somu-shiki',             '2日目', '09:00', '12:00', 1),
+    s('shift-d2m-shogai-shiki',          'task-shogai-shiki',           '2日目', '09:00', '12:00', 1),
+    s('shift-d2m-kaien-mt',              'task-kaien-mt',               '2日目', '09:00', '09:30', 1, 1, 1),
+    s('shift-d2m-sandan-taiou',          'task-sandan-taiou',           '2日目', '09:30', '12:00', 2),
+    s('shift-d2m-kigyo-booth-yobikomi',  'task-kigyo-booth-yobikomi',   '2日目', '10:00', '12:00', 2),
+    s('shift-d2m-kigyo-booth-kanshi',    'task-kigyo-booth-kanshi',     '2日目', '10:00', '12:00', 2),
+    s('shift-d2m-roundman',              'task-roundman',               '2日目', '09:30', '12:00', 3),
+    s('shift-d2m-eisei-taiou',           'task-eisei-taiou',            '2日目', '09:00', '12:00', 1),
+    s('shift-d2m-joho-server',           'task-joho-server-day2',       '2日目', '09:00', '12:00', 1),
+    s('shift-d2m-seeft',                 'task-seeft-day2',             '2日目', '09:30', '12:00', 1),
+    s('shift-d2m-bingo-app',             'task-bingo-app',              '2日目', '10:00', '12:00', 1),
+    s('shift-d2m-ennichi-unei',          'task-ennichi-unei',           '2日目', '10:00', '12:00', 3),
+    s('shift-d2m-obakeyashiki-unei',     'task-obakeyashiki-unei',      '2日目', '10:00', '12:00', 4),
+    s('shift-d2m-honbu-shiki',           'task-honbu-shiki',            '2日目', '09:00', '12:00', 1),
+    s('shift-d2m-honbu-shiki-hosa',      'task-honbu-shiki-hosa',       '2日目', '09:00', '12:00', 1),
+
+    // ===== 2日目 午後 =====
+    s('shift-d2a-somu-shiki',            'task-somu-shiki',             '2日目', '13:00', '17:00', 1),
+    s('shift-d2a-roundman',              'task-roundman',               '2日目', '13:00', '17:00', 3),
+    s('shift-d2a-sandan-taiou',          'task-sandan-taiou',           '2日目', '13:00', '17:00', 2),
+    s('shift-d2a-kigudan-taiou',         'task-kigudan-taiou',          '2日目', '13:00', '17:00', 1),
+    s('shift-d2a-kigyo-booth-yobikomi',  'task-kigyo-booth-yobikomi',   '2日目', '13:00', '17:00', 2),
+    s('shift-d2a-kigyo-booth-kanshi',    'task-kigyo-booth-kanshi',     '2日目', '13:00', '17:00', 2),
+    s('shift-d2a-ennichi-unei',          'task-ennichi-unei',           '2日目', '13:00', '17:00', 3),
+    s('shift-d2a-obakeyashiki-unei',     'task-obakeyashiki-unei',      '2日目', '13:00', '17:00', 4),
+    s('shift-d2a-game-taikai-unei',      'task-game-taikai-unei',       '2日目', '14:00', '17:00', 3),
+    s('shift-d2a-hero-show-hare',        'task-hero-show-hare',         '2日目', '14:00', '16:30', 3),
+    s('shift-d2a-eisei-taiou',           'task-eisei-taiou',            '2日目', '13:00', '17:00', 1),
+    s('shift-d2a-honbu-shiki',           'task-honbu-shiki',            '2日目', '13:00', '17:00', 1),
+    s('shift-d2a-zaimu-shiki',           'task-zaimu-shiki-day2',       '2日目', '13:00', '17:00', 1),
+
+    // ===== 片付け日 午前 =====
+    s('shift-cm-seisaku-shiki',          'task-seisaku-shiki',          '片付け日', '09:00', '12:00', 1),
+    s('shift-cm-kaijou-soshi-sage',      'task-kaijou-soshi-sage',      '片付け日', '09:00', '12:00', 4),
+    s('shift-cm-kigyo-booth-kataduke',   'task-kigyo-booth-kataduke',   '片付け日', '09:00', '12:00', 3),
+    s('shift-cm-roundman-final',         'task-roundman-final',         '片付け日', '11:00', '12:00', 1),
+    s('shift-cm-zaimu-shiki-kataduke',   'task-zaimu-shiki-kataduke',   '片付け日', '09:00', '12:00', 1),
+    s('shift-cm-bussan-tent-kataduke',   'task-bussan-tent-kataduke',   '片付け日', '09:00', '11:00', 2),
+
+    // ===== 片付け日 午後 =====
+    s('shift-ca-kaijou-soshi-sage',      'task-kaijou-soshi-sage',      '片付け日', '13:00', '17:00', 3),
+    s('shift-ca-rami-support',           'task-rami-support',           '片付け日', '13:00', '16:00', 2),
+    s('shift-ca-heien-mt',               'task-heien-mt',               '片付け日', '13:00', '13:30', 1, 1, 1),
+    s('shift-ca-kigyo-booth-kataduke',   'task-kigyo-booth-kataduke',   '片付け日', '13:00', '16:00', 2),
+    s('shift-ca-honbu-shiki',            'task-honbu-shiki',            '片付け日', '13:00', '17:00', 1),
   ];
 }
 
-// ========== 時間帯定義 ==========
-
-export function createDefaultTimeSlots(): TimeSlot[] {
-  createDefaultTasks(); // タスク定義の存在確認用
-
-  // 必要人数の設定
-  const makeRequirements = (counts: Record<string, number>) => {
-    return Object.entries(counts).map(([taskId, count]) => ({
-      taskId,
-      requiredCount: count,
-      minCount: Math.max(1, count - 1),
-      maxCount: count + 1,
-    }));
-  };
-
-  const slots: TimeSlot[] = [
-    // ===== 準準備日 =====
-    new TimeSlot({
-      id: "pre-prep_morning",
-      dayType: "準準備日",
-      startTime: "09:00",
-      endTime: "12:00",
-      label: "準準備日 午前",
-      taskRequirements: makeRequirements({
-        "task-setup": 3,
-        "task-general": 2,
-      }),
-    }),
-    new TimeSlot({
-      id: "pre-prep_afternoon",
-      dayType: "準準備日",
-      startTime: "13:00",
-      endTime: "17:00",
-      label: "準準備日 午後",
-      taskRequirements: makeRequirements({
-        "task-setup": 4,
-        "task-record": 1,
-        "task-general": 2,
-      }),
-    }),
-
-    // ===== 準備日 =====
-    new TimeSlot({
-      id: "prep_morning",
-      dayType: "準備日",
-      startTime: "09:00",
-      endTime: "12:00",
-      label: "準備日 午前",
-      taskRequirements: makeRequirements({
-        "task-setup": 5,
-        "task-general": 3,
-      }),
-    }),
-    new TimeSlot({
-      id: "prep_afternoon",
-      dayType: "準備日",
-      startTime: "13:00",
-      endTime: "17:00",
-      label: "準備日 午後",
-      taskRequirements: makeRequirements({
-        "task-setup": 4,
-        "task-reception": 2,
-        "task-record": 1,
-        "task-general": 2,
-      }),
-    }),
-
-    // ===== 1日目 =====
-    new TimeSlot({
-      id: "day1_morning",
-      dayType: "1日目",
-      startTime: "09:00",
-      endTime: "12:00",
-      label: "1日目 午前",
-      taskRequirements: makeRequirements({
-        "task-reception": 4,
-        "task-mc": 2,
-        "task-record": 2,
-        "task-general": 3,
-      }),
-    }),
-    new TimeSlot({
-      id: "day1_afternoon",
-      dayType: "1日目",
-      startTime: "13:00",
-      endTime: "17:00",
-      label: "1日目 午後",
-      taskRequirements: makeRequirements({
-        "task-reception": 3,
-        "task-mc": 2,
-        "task-record": 2,
-        "task-general": 3,
-      }),
-    }),
-    new TimeSlot({
-      id: "day1_evening",
-      dayType: "1日目",
-      startTime: "17:00",
-      endTime: "19:00",
-      label: "1日目 夕方",
-      taskRequirements: makeRequirements({
-        "task-reception": 2,
-        "task-general": 2,
-      }),
-    }),
-
-    // ===== 2日目 =====
-    new TimeSlot({
-      id: "day2_morning",
-      dayType: "2日目",
-      startTime: "09:00",
-      endTime: "12:00",
-      label: "2日目 午前",
-      taskRequirements: makeRequirements({
-        "task-reception": 4,
-        "task-mc": 2,
-        "task-record": 2,
-        "task-general": 3,
-      }),
-    }),
-    new TimeSlot({
-      id: "day2_afternoon",
-      dayType: "2日目",
-      startTime: "13:00",
-      endTime: "17:00",
-      label: "2日目 午後",
-      taskRequirements: makeRequirements({
-        "task-reception": 3,
-        "task-mc": 2,
-        "task-record": 2,
-        "task-general": 3,
-      }),
-    }),
-
-    // ===== 片付け日 =====
-    new TimeSlot({
-      id: "cleanup_morning",
-      dayType: "片付け日",
-      startTime: "09:00",
-      endTime: "12:00",
-      label: "片付け日 午前",
-      taskRequirements: makeRequirements({
-        "task-teardown": 5,
-        "task-general": 3,
-      }),
-    }),
-    new TimeSlot({
-      id: "cleanup_afternoon",
-      dayType: "片付け日",
-      startTime: "13:00",
-      endTime: "17:00",
-      label: "片付け日 午後",
-      taskRequirements: makeRequirements({
-        "task-teardown": 4,
-        "task-record": 1,
-        "task-general": 2,
-      }),
-    }),
-  ];
-
-  return slots;
+/** @deprecated createDefaultShifts() を使用してください */
+export function createDefaultTasks() {
+  return createSampleTasks();
 }
 
 /** dayTypeの表示順 */
-export const DAY_TYPE_ORDER = ["準準備日", "準備日", "1日目", "2日目", "片付け日"] as const;
+export const DAY_TYPE_ORDER = ['準準備日', '準備日', '1日目', '2日目', '片付け日'] as const;

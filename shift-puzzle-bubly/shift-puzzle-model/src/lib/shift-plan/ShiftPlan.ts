@@ -4,8 +4,8 @@
  */
 
 import { ShiftAssignment, ShiftAssignmentState } from './ShiftAssignment.js';
-import { TaskRequirement } from '../master/TimeSlot.js';
-import { SlotTaskEvaluation } from './SlotTaskEvaluation.js';
+import { Shift } from '../master/Shift.js';
+import { ShiftEvaluation } from './ShiftEvaluation.js';
 
 // ========== 型定義 ==========
 
@@ -13,13 +13,12 @@ import { SlotTaskEvaluation } from './SlotTaskEvaluation.js';
 export type WeatherCondition = '晴れ' | '雨';
 
 /** 制約違反の種類 */
-export type ConstraintViolationType = 'duplicate_member_in_timeslot';
+export type ConstraintViolationType = 'overlapping_assignments';
 
 /** 制約違反 */
 export interface ConstraintViolation {
   readonly type: ConstraintViolationType;
   readonly memberId: string;
-  readonly timeSlotId: string;
   readonly assignmentIds: readonly string[];
   readonly message: string;
 }
@@ -41,7 +40,7 @@ export interface ShiftPlanEvaluation {
   readonly totalFulfillmentRate: number;
   readonly shortageCount: number;
   readonly excessCount: number;
-  readonly slotTaskEvaluations: readonly SlotTaskEvaluation[];
+  readonly shiftEvaluations: readonly ShiftEvaluation[];
 }
 
 // ========== ドメインクラス ==========
@@ -49,17 +48,9 @@ export interface ShiftPlanEvaluation {
 export class ShiftPlan {
   constructor(readonly state: ShiftPlanState) {}
 
-  get id(): string {
-    return this.state.id;
-  }
-
-  get name(): string {
-    return this.state.name;
-  }
-
-  get weatherCondition(): WeatherCondition {
-    return this.state.weatherCondition;
-  }
+  get id(): string { return this.state.id; }
+  get name(): string { return this.state.name; }
+  get weatherCondition(): WeatherCondition { return this.state.weatherCondition; }
 
   get assignments(): readonly ShiftAssignment[] {
     return this.state.assignments.map((s) => new ShiftAssignment(s));
@@ -74,45 +65,25 @@ export class ShiftPlan {
     return this.assignments.filter((a) => a.staffId === memberId);
   }
 
-  /** 特定時間帯の配置を取得 */
-  getAssignmentsByTimeSlot(timeSlotId: string): ShiftAssignment[] {
-    return this.assignments.filter((a) => a.timeSlotId === timeSlotId);
+  /** 特定シフトの配置を取得 */
+  getAssignmentsByShift(shiftId: string): ShiftAssignment[] {
+    return this.assignments.filter((a) => a.shiftId === shiftId);
   }
 
-  /** 特定タスクの配置を取得 */
-  getAssignmentsByTask(taskId: string): ShiftAssignment[] {
-    return this.assignments.filter((a) => a.roleId === taskId);
-  }
-
-  /** 特定の時間帯×タスクの配置を取得 */
-  getAssignmentsForSlotTask(timeSlotId: string, taskId: string): ShiftAssignment[] {
-    return this.assignments.filter(
-      (a) => a.timeSlotId === timeSlotId && a.roleId === taskId
+  /** シフト案を評価（Shift マスターと照合） */
+  evaluate(shifts: Shift[]): ShiftPlanEvaluation {
+    const shiftEvaluations = shifts.map((shift) =>
+      ShiftEvaluation.evaluate(shift, this.assignments),
     );
-  }
-
-  /** シフト案を評価（必要人数と照合） */
-  evaluate(requirements: TaskRequirement[]): ShiftPlanEvaluation {
-    const slotTaskEvaluations: SlotTaskEvaluation[] = [];
-
-    for (const req of requirements) {
-      const assignedMemberIds = this.getAssignmentsForSlotTask(
-        req.timeSlotId,
-        req.taskId
-      ).map((a) => a.staffId);
-
-      const evaluation = SlotTaskEvaluation.evaluate(req, assignedMemberIds);
-      slotTaskEvaluations.push(evaluation);
-    }
 
     const totalAssignmentCount = this.state.assignments.length;
-    const shortageCount = slotTaskEvaluations.filter((e) => e.hasShortage).length;
-    const excessCount = slotTaskEvaluations.filter((e) => e.hasExcess).length;
+    const shortageCount = shiftEvaluations.filter((e) => e.hasShortage).length;
+    const excessCount = shiftEvaluations.filter((e) => e.hasExcess).length;
 
     const totalFulfillmentRate =
-      slotTaskEvaluations.length > 0
-        ? slotTaskEvaluations.reduce((sum, e) => sum + e.fulfillmentRate, 0) /
-          slotTaskEvaluations.length
+      shiftEvaluations.length > 0
+        ? shiftEvaluations.reduce((sum, e) => sum + e.fulfillmentRate, 0) /
+          shiftEvaluations.length
         : 100;
 
     return {
@@ -120,18 +91,16 @@ export class ShiftPlan {
       totalFulfillmentRate,
       shortageCount,
       excessCount,
-      slotTaskEvaluations,
+      shiftEvaluations,
     };
   }
 
   /** 総合スコアを計算（高いほど良い） */
-  calculateOverallScore(requirements: TaskRequirement[]): number {
-    const evaluation = this.evaluate(requirements);
-
+  calculateOverallScore(shifts: Shift[]): number {
+    const evaluation = this.evaluate(shifts);
     let score = evaluation.totalFulfillmentRate;
     score -= evaluation.shortageCount * 5;
     score -= evaluation.excessCount * 2;
-
     return Math.max(0, score);
   }
 
@@ -149,35 +118,48 @@ export class ShiftPlan {
     return this.constraintViolations.some((v) => v.assignmentIds.includes(assignmentId));
   }
 
-  isMemberTimeSlotInViolation(memberId: string, timeSlotId: string): boolean {
+  isMemberShiftInViolation(memberId: string, shiftId: string): boolean {
     return this.constraintViolations.some(
-      (v) => v.memberId === memberId && v.timeSlotId === timeSlotId
+      (v) => v.memberId === memberId && v.assignmentIds.some(
+        (id) => this.state.assignments.find((a) => a.id === id)?.shiftId === shiftId,
+      ),
     );
   }
 
+  /**
+   * 制約違反を計算する。
+   * 同一局員が担当時間の重複する配置を複数持っていないかチェック。
+   */
   static computeConstraintViolations(
     assignments: readonly ShiftAssignmentState[]
   ): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];
-    const groupedByTimeSlotAndMember = new Map<string, ShiftAssignmentState[]>();
 
-    for (const assignment of assignments) {
-      const key = `${assignment.timeSlotId}:${assignment.staffId}`;
-      const existing = groupedByTimeSlotAndMember.get(key) ?? [];
-      existing.push(assignment);
-      groupedByTimeSlotAndMember.set(key, existing);
+    // 局員ごとにグループ化
+    const byMember = new Map<string, ShiftAssignmentState[]>();
+    for (const a of assignments) {
+      const list = byMember.get(a.staffId) ?? [];
+      list.push(a);
+      byMember.set(a.staffId, list);
     }
 
-    for (const [key, grouped] of groupedByTimeSlotAndMember) {
-      if (grouped.length > 1) {
-        const [timeSlotId, memberId] = key.split(':');
-        violations.push({
-          type: 'duplicate_member_in_timeslot',
-          memberId,
-          timeSlotId,
-          assignmentIds: grouped.map((a) => a.id),
-          message: `同一時間帯に同じ局員が${grouped.length}件配置されています`,
-        });
+    for (const [memberId, memberAssignments] of byMember) {
+      // 全ペアで時間重複チェック
+      for (let i = 0; i < memberAssignments.length; i++) {
+        for (let j = i + 1; j < memberAssignments.length; j++) {
+          const a1 = memberAssignments[i];
+          const a2 = memberAssignments[j];
+          // 重複: a1.start < a2.end AND a2.start < a1.end
+          if (a1.assignedStartMinute < a2.assignedEndMinute &&
+              a2.assignedStartMinute < a1.assignedEndMinute) {
+            violations.push({
+              type: 'overlapping_assignments',
+              memberId,
+              assignmentIds: [a1.id, a2.id],
+              message: `同じ局員が時間の重複する配置を${2}件持っています`,
+            });
+          }
+        }
       }
     }
 

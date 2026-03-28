@@ -9,9 +9,9 @@ export interface MemberState {
   readonly id: string;
   readonly name: string;
   readonly furigana?: string;
-  readonly department: string;                       // 所属局
-  readonly isNewMember: boolean;                     // 新入生かどうか
-  readonly availableTimeSlots: readonly string[];    // 参加可能時間帯IDリスト
+  readonly department: string;                     // 所属局
+  readonly isNewMember: boolean;                   // 新入生かどうか
+  readonly availableShiftIds: readonly string[];   // 参加可能シフトIDリスト
   readonly notes?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -22,37 +22,17 @@ export interface MemberState {
 export class Member {
   constructor(readonly state: MemberState) {}
 
-  get id(): string {
-    return this.state.id;
-  }
+  get id(): string { return this.state.id; }
+  get name(): string { return this.state.name; }
+  get furigana(): string | undefined { return this.state.furigana; }
+  get department(): string { return this.state.department; }
+  get isNewMember(): boolean { return this.state.isNewMember; }
+  get availableShiftIds(): readonly string[] { return this.state.availableShiftIds; }
+  get notes(): string | undefined { return this.state.notes; }
 
-  get name(): string {
-    return this.state.name;
-  }
-
-  get furigana(): string | undefined {
-    return this.state.furigana;
-  }
-
-  get department(): string {
-    return this.state.department;
-  }
-
-  get isNewMember(): boolean {
-    return this.state.isNewMember;
-  }
-
-  get availableTimeSlots(): readonly string[] {
-    return this.state.availableTimeSlots;
-  }
-
-  get notes(): string | undefined {
-    return this.state.notes;
-  }
-
-  /** 指定時間帯に参加可能かどうか */
-  isAvailableAt(timeSlotId: string): boolean {
-    return this.state.availableTimeSlots.includes(timeSlotId);
+  /** 指定シフトに参加可能かどうか */
+  isAvailableFor(shiftId: string): boolean {
+    return this.state.availableShiftIds.includes(shiftId);
   }
 
   // ========== 状態変更メソッド ==========
@@ -86,7 +66,7 @@ export class Member {
       name,
       department,
       isNewMember,
-      availableTimeSlots: [],
+      availableShiftIds: [],
       createdAt: now,
       updatedAt: now,
     });

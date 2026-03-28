@@ -2,7 +2,7 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import { Member, TimeSlot, type DayType } from "../domain/index.js";
+import { Member, Shift, type DayType } from "../domain/index.js";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import { ObjectView } from "@bublys-org/bubbles-ui";
@@ -10,24 +10,24 @@ import { DAY_TYPE_ORDER } from "../data/sampleData.js";
 
 type MemberAvailabilityViewProps = {
   member: Member;
-  timeSlots: TimeSlot[];
+  shifts: Shift[];
 };
 
 export const MemberAvailabilityView: FC<MemberAvailabilityViewProps> = ({
   member,
-  timeSlots,
+  shifts,
 }) => {
   // dayTypeごとにグループ化
-  const slotsByDayType = timeSlots.reduce((acc, slot) => {
-    const dayType = slot.dayType;
+  const shiftsByDayType = shifts.reduce((acc, shift) => {
+    const dayType = shift.dayType;
     if (!acc[dayType]) {
       acc[dayType] = [];
     }
-    acc[dayType].push(slot);
+    acc[dayType].push(shift);
     return acc;
-  }, {} as Record<DayType, TimeSlot[]>);
+  }, {} as Record<DayType, Shift[]>);
 
-  const dayTypes = DAY_TYPE_ORDER.filter((dt) => slotsByDayType[dt]);
+  const dayTypes = DAY_TYPE_ORDER.filter((dt) => shiftsByDayType[dt]);
 
   return (
     <StyledContainer>
@@ -42,35 +42,35 @@ export const MemberAvailabilityView: FC<MemberAvailabilityViewProps> = ({
       <p className="e-subtitle">{member.department}{member.isNewMember && " (新入生)"}</p>
 
       <div className="e-summary">
-        参加可能: <strong>{member.availableTimeSlots.length}</strong> / {timeSlots.length} 枠
+        参加可能: <strong>{member.availableShiftIds.length}</strong> / {shifts.length} シフト
       </div>
 
       <table className="e-table">
         <thead>
           <tr>
             <th>日程</th>
-            <th>時間帯</th>
+            <th>シフト</th>
             <th>時間</th>
             <th>参加可否</th>
           </tr>
         </thead>
         <tbody>
           {dayTypes.map((dayType) =>
-            slotsByDayType[dayType].map((slot, idx) => (
-              <tr key={slot.id} className={member.isAvailableAt(slot.id) ? "is-available" : "is-unavailable"}>
+            shiftsByDayType[dayType].map((shift, idx) => (
+              <tr key={shift.id} className={member.isAvailableFor(shift.id) ? "is-available" : "is-unavailable"}>
                 {idx === 0 && (
-                  <td rowSpan={slotsByDayType[dayType].length} className="e-day-type">
+                  <td rowSpan={shiftsByDayType[dayType].length} className="e-day-type">
                     {dayType}
                   </td>
                 )}
                 <td className="e-period">
-                  {slot.label.split(' ').slice(1).join(' ')}
+                  {shift.taskName ?? shift.taskId}
                 </td>
                 <td className="e-time">
-                  {slot.state.startTime} - {slot.state.endTime}
+                  {shift.startTime} - {shift.endTime}
                 </td>
                 <td className="e-status">
-                  {member.isAvailableAt(slot.id) ? (
+                  {member.isAvailableFor(shift.id) ? (
                     <span className="e-ok"><CheckIcon fontSize="small" /> 可能</span>
                   ) : (
                     <span className="e-ng"><CloseIcon fontSize="small" /> 不可</span>

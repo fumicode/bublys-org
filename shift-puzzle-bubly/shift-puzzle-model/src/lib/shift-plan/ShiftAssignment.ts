@@ -7,9 +7,10 @@
 /** シフト配置の状態 */
 export interface ShiftAssignmentState {
   readonly id: string;
+  readonly shiftId: string;
   readonly staffId: string;
-  readonly timeSlotId: string;
-  readonly roleId: string;
+  readonly assignedStartMinute: number;
+  readonly assignedEndMinute: number;
   readonly isAutoAssigned: boolean;
   readonly notes?: string;
 }
@@ -23,16 +24,20 @@ export class ShiftAssignment {
     return this.state.id;
   }
 
+  get shiftId(): string {
+    return this.state.shiftId;
+  }
+
   get staffId(): string {
     return this.state.staffId;
   }
 
-  get timeSlotId(): string {
-    return this.state.timeSlotId;
+  get assignedStartMinute(): number {
+    return this.state.assignedStartMinute;
   }
 
-  get roleId(): string {
-    return this.state.roleId;
+  get assignedEndMinute(): number {
+    return this.state.assignedEndMinute;
   }
 
   get isAutoAssigned(): boolean {
@@ -55,16 +60,18 @@ export class ShiftAssignment {
 
   /** 新しい配置を作成 */
   static create(
+    shiftId: string,
     staffId: string,
-    timeSlotId: string,
-    roleId: string,
-    isAutoAssigned = true
+    assignedStartMinute: number,
+    assignedEndMinute: number,
+    isAutoAssigned = false,
   ): ShiftAssignment {
     return new ShiftAssignment({
       id: crypto.randomUUID(),
+      shiftId,
       staffId,
-      timeSlotId,
-      roleId,
+      assignedStartMinute,
+      assignedEndMinute,
       isAutoAssigned,
     });
   }

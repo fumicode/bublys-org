@@ -3,8 +3,7 @@
 import { FC } from "react";
 import styled from "styled-components";
 import {
-  TimeSlot,
-  Task,
+  Shift,
   Member,
   ShiftAssignment,
   ConstraintViolation,
@@ -19,24 +18,22 @@ import { ObjectView, getDragType, DRAG_KEYS, setDragPayload } from "@bublys-org/
 import { DAY_TYPE_ORDER } from "../data/sampleData.js";
 
 type ShiftPlanTableViewProps = {
-  timeSlots: readonly TimeSlot[];
-  tasks: readonly Task[];
+  shifts: readonly Shift[];
   assignments: readonly ShiftAssignment[];
   memberList: readonly Member[];
   violations?: readonly ConstraintViolation[];
   buildAssignmentUrl?: (assignmentId: string) => string;
   /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
-  buildCellUrl?: (timeSlotId: string, taskId: string) => string;
-  onDropMember?: (memberId: string, timeSlotId: string, taskId: string) => void;
+  buildCellUrl?: (shiftId: string) => string;
+  onDropMember?: (memberId: string, shiftId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
-  onMoveAssignment?: (assignmentId: string, memberId: string, timeSlotId: string, taskId: string) => void;
+  onMoveAssignment?: (assignmentId: string, memberId: string, shiftId: string) => void;
   onAssignmentClick?: (assignmentId: string) => void;
-  onCellClick?: (timeSlotId: string, taskId: string) => void;
+  onCellClick?: (shiftId: string) => void;
 };
 
 export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
-  timeSlots,
-  tasks,
+  shifts,
   assignments,
   memberList,
   violations = [],
@@ -57,31 +54,24 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
     return memberList.find((m) => m.id === memberId);
   };
 
-  const getAssignmentsForCell = (timeSlotId: string, taskId: string) => {
-    return assignments.filter(
-      (a) => a.timeSlotId === timeSlotId && a.roleId === taskId
-    );
+  const getAssignmentsForShift = (shiftId: string) => {
+    return assignments.filter((a) => a.shiftId === shiftId);
   };
 
   const getViolationForAssignment = (assignmentId: string): ConstraintViolation | undefined => {
     return violations.find((v) => v.assignmentIds.includes(assignmentId));
   };
 
-  const calculateCellScore = (timeSlotId: string, taskId: string): number => {
-    const cellAssignments = getAssignmentsForCell(timeSlotId, taskId);
-    const task = tasks.find((t) => t.id === taskId);
-    const timeSlot = timeSlots.find((t) => t.id === timeSlotId);
-    if (!task || !timeSlot) return 0;
+  const calculateShiftScore = (shiftId: string): number => {
+    const shift = shifts.find((s) => s.id === shiftId);
+    if (!shift) return 0;
 
+    const shiftAssignments = getAssignmentsForShift(shiftId);
     let score = 0;
-    for (const assignment of cellAssignments) {
+    for (const assignment of shiftAssignments) {
       const member = getMember(assignment.staffId);
       if (member) {
-        const evaluation = MemberAssignmentEvaluation.evaluateCandidate(
-          member,
-          task,
-          timeSlot
-        );
+        const evaluation = MemberAssignmentEvaluation.evaluateCandidate(member, shift);
         score += evaluation.totalScore;
       }
     }
@@ -104,7 +94,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
     e.currentTarget.classList.remove("is-drag-over");
   };
 
-  const handleDrop = (e: React.DragEvent, timeSlotId: string, taskId: string) => {
+  const handleDrop = (e: React.DragEvent, shiftId: string) => {
     e.preventDefault();
     e.currentTarget.classList.remove("is-drag-over");
 
@@ -115,12 +105,12 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
     const assignmentId = e.dataTransfer.getData("text/assignment-id");
 
     if (assignmentId && internalMemberId && onMoveAssignment) {
-      onMoveAssignment(assignmentId, internalMemberId, timeSlotId, taskId);
+      onMoveAssignment(assignmentId, internalMemberId, shiftId);
       return;
     }
 
     if (internalMemberId && !assignmentId && onDropMember) {
-      onDropMember(internalMemberId, timeSlotId, taskId);
+      onDropMember(internalMemberId, shiftId);
       return;
     }
 
@@ -132,7 +122,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
       const match = url.match(/shift-puzzle\/members?\/([^/?]+)/);
       if (match && onDropMember) {
         const memberId = match[1];
-        onDropMember(memberId, timeSlotId, taskId);
+        onDropMember(memberId, shiftId);
       }
     }
   };
@@ -144,139 +134,136 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   };
 
   // dayTypeでグループ化
-  const slotsByDayType = timeSlots.reduce((acc, slot) => {
-    if (!acc[slot.dayType]) {
-      acc[slot.dayType] = [];
+  const shiftsByDayType = shifts.reduce((acc, shift) => {
+    if (!acc[shift.dayType]) {
+      acc[shift.dayType] = [];
     }
-    acc[slot.dayType].push(slot);
+    acc[shift.dayType].push(shift);
     return acc;
-  }, {} as Record<DayType, TimeSlot[]>);
+  }, {} as Record<DayType, Shift[]>);
 
-  const dayTypes = DAY_TYPE_ORDER.filter((dt) => slotsByDayType[dt]);
+  const dayTypes = DAY_TYPE_ORDER.filter((dt) => shiftsByDayType[dt]);
 
   return (
     <StyledTable>
       <thead>
         <tr>
           <th className="e-daytype-header">日程</th>
-          <th className="e-slot-header">時間帯</th>
-          {tasks.map((task) => (
-            <th key={task.id} className="e-task-header">
-              <div className="e-task-name">{task.name}</div>
-              <div className="e-task-dept">{task.responsibleDepartment}</div>
-            </th>
-          ))}
+          <th className="e-shift-header">シフト</th>
+          <th className="e-time-header">時間</th>
+          <th className="e-count-header">人数</th>
+          <th className="e-members-header">配置局員</th>
         </tr>
       </thead>
       <tbody>
         {dayTypes.map((dayType) =>
-          slotsByDayType[dayType].map((slot, slotIdx) => (
-            <tr key={slot.id}>
-              {slotIdx === 0 && (
-                <td rowSpan={slotsByDayType[dayType].length} className="e-daytype-cell">
-                  {dayType}
-                </td>
-              )}
-              <td className="e-slot-cell">
-                <div className="e-slot-label">{slot.label.split(" ").slice(1).join(" ")}</div>
-                <div className="e-slot-time">
-                  {slot.state.startTime} - {slot.state.endTime}
-                </div>
-              </td>
-              {tasks.map((task) => {
-                const cellAssignments = getAssignmentsForCell(slot.id, task.id);
-                const score = calculateCellScore(slot.id, task.id);
-                const requirement = slot.getRequirementForTask(task.id);
-                const requiredCount = requirement?.requiredCount ?? 0;
-                const assignedCount = cellAssignments.length;
-                const hasRequirement = requiredCount > 0;
-                const isFilled = assignedCount >= requiredCount;
-                const isShortage = hasRequirement && assignedCount < (requirement?.minCount ?? requiredCount);
-                const isExcess = hasRequirement && assignedCount > (requirement?.maxCount ?? requiredCount);
+          shiftsByDayType[dayType].map((shift, shiftIdx) => {
+            const shiftAssignments = getAssignmentsForShift(shift.id);
+            const assignedCount = shiftAssignments.length;
+            const requiredCount = shift.requiredCount;
+            const hasRequirement = requiredCount > 0;
+            const isFilled = assignedCount >= requiredCount;
+            const isShortage = hasRequirement && assignedCount < shift.minCount;
+            const isExcess = hasRequirement && assignedCount > shift.maxCount;
+            const emptySlotCount = Math.max(0, requiredCount - assignedCount);
+            const cellUrl = buildCellUrl?.(shift.id);
+            const score = calculateShiftScore(shift.id);
 
-                const emptySlotCount = Math.max(0, requiredCount - assignedCount);
-                const cellUrl = buildCellUrl?.(slot.id, task.id);
-
-                return (
-                  <td
-                    key={`${slot.id}_${task.id}`}
-                    className={`e-assignment-cell ${!hasRequirement ? "no-requirement" : ""}`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, slot.id, task.id)}
-                  >
-                    <div className="e-cell-content">
-                      {hasRequirement && (
-                        <div className={`e-requirement ${isFilled ? "is-filled" : ""} ${isShortage ? "is-shortage" : ""} ${isExcess ? "is-excess" : ""}`}>
-                          {assignedCount}/{requiredCount}
-                        </div>
-                      )}
-                      {cellAssignments.map((assignment) => {
-                        const member = getMember(assignment.staffId);
-                        const isAvailable = member?.isAvailableAt(slot.id) ?? false;
-                        const violation = getViolationForAssignment(assignment.id);
-                        const hasViolation = !!violation;
-                        const assignmentUrl = buildAssignmentUrl?.(assignment.id) ?? `shift-puzzle/assignments/${assignment.id}`;
-                        const memberName = getMemberName(assignment.staffId);
-                        return (
-                          <ObjectView
-                            key={assignment.id}
-                            type="ShiftAssignment"
-                            url={assignmentUrl}
-                            label={memberName}
-                            draggable={false}
-                            onClick={() => onAssignmentClick?.(assignment.id)}
-                          >
-                            <div
-                              className={`e-member-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
-                              draggable
-                              onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId, assignmentUrl, memberName)}
-                            >
-                              {hasViolation && (
-                                <Tooltip title={violation.message} arrow>
-                                  <WarningIcon className="e-violation-icon" fontSize="inherit" />
-                                </Tooltip>
-                              )}
-                              <span className="e-member-name">
-                                <PersonIcon fontSize="inherit" />
-                                {memberName}
-                              </span>
-                              <IconButton
-                                size="small"
-                                className="e-remove-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onRemoveAssignment?.(assignment.id);
-                                }}
-                              >
-                                <CloseIcon fontSize="inherit" />
-                              </IconButton>
-                            </div>
-                          </ObjectView>
-                        );
-                      })}
-                      {hasRequirement && (
-                        <div
-                          className={`e-empty-slot ${emptySlotCount === 0 ? "is-full" : ""}`}
-                          data-url={cellUrl}
-                          onClick={() => onCellClick?.(slot.id, task.id)}
-                        >
-                          <span className="e-empty-label">
-                            {emptySlotCount > 0 ? `+ ${emptySlotCount}名追加` : "+ 追加"}
-                          </span>
-                        </div>
-                      )}
-                      {cellAssignments.length > 0 && (
-                        <div className={`e-score ${score >= 0 ? "is-positive" : "is-negative"}`}>
-                          {score > 0 ? "+" : ""}{score}pt
-                        </div>
-                      )}
-                    </div>
+            return (
+              <tr key={shift.id}>
+                {shiftIdx === 0 && (
+                  <td rowSpan={shiftsByDayType[dayType].length} className="e-daytype-cell">
+                    {dayType}
                   </td>
-                );
-              })}
-            </tr>
-          ))
+                )}
+                <td className="e-shift-cell">
+                  <div className="e-shift-name">{shift.taskName ?? shift.taskId}</div>
+                  {shift.responsibleDepartment && (
+                    <div className="e-shift-dept">{shift.responsibleDepartment}</div>
+                  )}
+                </td>
+                <td className="e-time-cell">
+                  {shift.startTime}–{shift.endTime}
+                </td>
+                <td className="e-count-cell">
+                  {hasRequirement && (
+                    <span className={`e-count ${isFilled ? "is-filled" : ""} ${isShortage ? "is-shortage" : ""} ${isExcess ? "is-excess" : ""}`}>
+                      {assignedCount}/{requiredCount}
+                    </span>
+                  )}
+                </td>
+                <td
+                  className="e-assignment-cell"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, shift.id)}
+                >
+                  <div className="e-cell-content">
+                    {shiftAssignments.map((assignment) => {
+                      const member = getMember(assignment.staffId);
+                      const isAvailable = member?.isAvailableFor(shift.id) ?? false;
+                      const violation = getViolationForAssignment(assignment.id);
+                      const hasViolation = !!violation;
+                      const assignmentUrl = buildAssignmentUrl?.(assignment.id) ?? `shift-puzzle/assignments/${assignment.id}`;
+                      const memberName = getMemberName(assignment.staffId);
+                      return (
+                        <ObjectView
+                          key={assignment.id}
+                          type="ShiftAssignment"
+                          url={assignmentUrl}
+                          label={memberName}
+                          draggable={false}
+                          onClick={() => onAssignmentClick?.(assignment.id)}
+                        >
+                          <div
+                            className={`e-member-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
+                            draggable
+                            onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId, assignmentUrl, memberName)}
+                          >
+                            {hasViolation && (
+                              <Tooltip title={violation.message} arrow>
+                                <WarningIcon className="e-violation-icon" fontSize="inherit" />
+                              </Tooltip>
+                            )}
+                            <span className="e-member-name">
+                              <PersonIcon fontSize="inherit" />
+                              {memberName}
+                            </span>
+                            <IconButton
+                              size="small"
+                              className="e-remove-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveAssignment?.(assignment.id);
+                              }}
+                            >
+                              <CloseIcon fontSize="inherit" />
+                            </IconButton>
+                          </div>
+                        </ObjectView>
+                      );
+                    })}
+                    {hasRequirement && (
+                      <div
+                        className={`e-empty-slot ${emptySlotCount === 0 ? "is-full" : ""}`}
+                        data-url={cellUrl}
+                        onClick={() => onCellClick?.(shift.id)}
+                      >
+                        <span className="e-empty-label">
+                          {emptySlotCount > 0 ? `+ ${emptySlotCount}名追加` : "+ 追加"}
+                        </span>
+                      </div>
+                    )}
+                    {shiftAssignments.length > 0 && (
+                      <div className={`e-score ${score >= 0 ? "is-positive" : "is-negative"}`}>
+                        {score > 0 ? "+" : ""}{score}pt
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })
         )}
       </tbody>
     </StyledTable>
@@ -304,24 +291,27 @@ const StyledTable = styled.table`
     z-index: 10;
   }
 
-  .e-daytype-header,
-  .e-slot-header {
-    width: 80px;
-    min-width: 80px;
+  .e-daytype-header {
+    width: 70px;
+    min-width: 70px;
   }
 
-  .e-task-header {
+  .e-shift-header {
+    min-width: 120px;
+  }
+
+  .e-time-header {
+    width: 100px;
     min-width: 100px;
+  }
 
-    .e-task-name {
-      font-size: 0.9em;
-    }
+  .e-count-header {
+    width: 60px;
+    min-width: 60px;
+  }
 
-    .e-task-dept {
-      font-size: 0.7em;
-      color: #888;
-      font-weight: normal;
-    }
+  .e-members-header {
+    min-width: 200px;
   }
 
   .e-daytype-cell {
@@ -331,43 +321,71 @@ const StyledTable = styled.table`
     vertical-align: middle;
   }
 
-  .e-slot-cell {
-    text-align: center;
-
-    .e-slot-label {
+  .e-shift-cell {
+    .e-shift-name {
       font-weight: bold;
+      font-size: 0.9em;
     }
 
-    .e-slot-time {
-      font-size: 0.8em;
-      color: #666;
+    .e-shift-dept {
+      font-size: 0.75em;
+      color: #888;
+    }
+  }
+
+  .e-time-cell {
+    text-align: center;
+    white-space: nowrap;
+    color: #555;
+    font-size: 0.85em;
+  }
+
+  .e-count-cell {
+    text-align: center;
+
+    .e-count {
+      font-size: 0.85em;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.05);
+
+      &.is-filled {
+        color: #4caf50;
+      }
+
+      &.is-shortage {
+        color: #f44336;
+      }
+
+      &.is-excess {
+        color: #ff9800;
+      }
     }
   }
 
   .e-assignment-cell {
-    min-height: 60px;
+    min-height: 40px;
     transition: background-color 0.15s;
 
     &.is-drag-over {
       background-color: #e3f2fd;
     }
-
-    &.no-requirement {
-      background-color: #fafafa;
-    }
   }
 
   .e-cell-content {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 4px;
+    align-items: center;
   }
 
   .e-empty-slot {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 8px;
+    padding: 2px 8px;
     border: 1px dashed #ccc;
     border-radius: 4px;
     background-color: #fafafa;
@@ -382,6 +400,7 @@ const StyledTable = styled.table`
     .e-empty-label {
       font-size: 0.8em;
       color: #888;
+      white-space: nowrap;
     }
 
     &:hover .e-empty-label {
@@ -397,27 +416,6 @@ const StyledTable = styled.table`
         font-size: 0.7em;
         color: #aaa;
       }
-    }
-  }
-
-  .e-requirement {
-    font-size: 0.65em;
-    color: #999;
-    text-align: right;
-    font-weight: 500;
-    line-height: 1;
-
-    &.is-filled {
-      color: #4caf50;
-    }
-
-    &.is-shortage {
-      color: #f44336;
-      font-weight: bold;
-    }
-
-    &.is-excess {
-      color: #ff9800;
     }
   }
 
@@ -475,7 +473,6 @@ const StyledTable = styled.table`
 
   .e-score {
     font-size: 0.75em;
-    text-align: right;
     font-weight: bold;
 
     &.is-positive {

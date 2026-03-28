@@ -7,14 +7,14 @@ import {
   selectTaskById,
 } from "../slice/index.js";
 import { TaskDetailView, type TaskScheduleEntry } from "../ui/TaskDetailView.js";
-import { createDefaultTimeSlots } from "../data/sampleData.js";
+import { createDefaultShifts } from "../data/sampleData.js";
 
 type TaskDetailProps = {
   taskId?: string;
 };
 
-// タイムスロットはマスターデータとして静的に保持
-const defaultTimeSlots = createDefaultTimeSlots();
+// シフトはマスターデータとして静的に保持
+const defaultShifts = createDefaultShifts();
 
 export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
   const selectedTask = useAppSelector(selectSelectedTask);
@@ -24,27 +24,20 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
 
   const task = taskId ? specificTask : selectedTask;
 
-  // このタスクが必要な時間帯エントリーを計算
+  // このタスクが関係するシフトエントリーを計算
   const scheduleEntries = useMemo((): TaskScheduleEntry[] => {
     if (!task) return [];
 
-    return defaultTimeSlots
-      .flatMap((slot) => {
-        const req = slot.state.taskRequirements.find(
-          (r) => r.taskId === task.id
-        );
-        if (!req) return [];
-        return [
-          {
-            timeSlotId: slot.id,
-            dayType: slot.dayType,
-            slotLabel: slot.label,
-            requiredCount: req.requiredCount,
-            minCount: req.minCount,
-            maxCount: req.maxCount,
-          },
-        ];
-      });
+    return defaultShifts
+      .filter((shift) => shift.taskId === task.id)
+      .map((shift) => ({
+        shiftId: shift.id,
+        dayType: shift.dayType,
+        slotLabel: `${shift.startTime}–${shift.endTime}`,
+        requiredCount: shift.requiredCount,
+        minCount: shift.minCount,
+        maxCount: shift.maxCount,
+      }));
   }, [task]);
 
   if (!task) {

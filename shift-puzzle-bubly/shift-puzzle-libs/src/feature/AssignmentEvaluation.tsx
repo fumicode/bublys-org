@@ -12,7 +12,7 @@ import {
   MemberAssignmentEvaluation,
   ConstraintViolation,
 } from "../domain/index.js";
-import { createDefaultTimeSlots, createDefaultTasks } from "../data/sampleData.js";
+import { createDefaultShifts } from "../data/sampleData.js";
 
 type AssignmentEvaluationProps = {
   shiftPlanId: string;
@@ -34,8 +34,7 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   const memberList = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
-  const timeSlots = useMemo(() => createDefaultTimeSlots(), []);
-  const tasks = useMemo(() => createDefaultTasks(), []);
+  const shifts = useMemo(() => createDefaultShifts(), []);
 
   // 配置を取得
   const assignment = useMemo(() => {
@@ -51,21 +50,16 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
     return memberList.find((m) => m.id === assignment.staffId);
   }, [memberList, assignment]);
 
-  const timeSlot = useMemo(() => {
+  const shift = useMemo(() => {
     if (!assignment) return undefined;
-    return timeSlots.find((t) => t.id === assignment.timeSlotId);
-  }, [timeSlots, assignment]);
-
-  const task = useMemo(() => {
-    if (!assignment) return undefined;
-    return tasks.find((t) => t.id === assignment.roleId);
-  }, [tasks, assignment]);
+    return shifts.find((s) => s.id === assignment.shiftId);
+  }, [shifts, assignment]);
 
   // 評価を計算
   const evaluation = useMemo<MemberAssignmentEvaluation | undefined>(() => {
-    if (!assignment || !member || !task || !timeSlot) return undefined;
-    return MemberAssignmentEvaluation.evaluate(assignment, member, task, timeSlot);
-  }, [assignment, member, task, timeSlot]);
+    if (!assignment || !member || !shift) return undefined;
+    return MemberAssignmentEvaluation.evaluate(assignment, member, shift);
+  }, [assignment, member, shift]);
 
   // この配置に関連する制約違反を取得
   const constraintViolations = useMemo<ConstraintViolation[]>(() => {
@@ -81,7 +75,7 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
     return <div>配置が見つかりません</div>;
   }
 
-  if (!member || !task || !timeSlot || !evaluation) {
+  if (!member || !shift || !evaluation) {
     return <div>データを読み込み中...</div>;
   }
 
@@ -89,8 +83,8 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
     <AssignmentEvaluationView
       evaluation={evaluation}
       memberName={member.name}
-      timeSlotLabel={timeSlot.label}
-      taskName={task.name}
+      timeSlotLabel={`${shift.startTime}–${shift.endTime}`}
+      taskName={shift.taskName ?? shift.taskId}
       constraintViolations={constraintViolations}
       memberDetailUrl={buildMemberDetailUrl?.(member.id)}
       memberAvailabilityUrl={buildMemberAvailabilityUrl?.(member.id)}

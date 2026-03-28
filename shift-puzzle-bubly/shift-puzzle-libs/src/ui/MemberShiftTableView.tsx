@@ -3,16 +3,16 @@
 import { FC } from "react";
 import styled from "styled-components";
 import {
-  TimeSlot,
-  Task,
+  Shift,
   Member,
   ShiftAssignment,
   MemberAssignmentEvaluation,
+  type DayType,
 } from "../domain/index.js";
+import { DAY_TYPE_ORDER } from "../data/sampleData.js";
 
 type MemberShiftTableViewProps = {
-  timeSlots: readonly TimeSlot[];
-  tasks: readonly Task[];
+  shifts: readonly Shift[];
   assignments: readonly ShiftAssignment[];
   memberList: readonly Member[];
   onMemberClick?: (memberId: string) => void;
@@ -20,8 +20,7 @@ type MemberShiftTableViewProps = {
 };
 
 export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
-  timeSlots,
-  tasks,
+  shifts,
   assignments,
   memberList,
   onMemberClick,
@@ -31,30 +30,21 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
     return assignments.filter((a) => a.staffId === memberId);
   };
 
-  const getAssignmentForMemberAndTimeSlot = (memberId: string, timeSlotId: string) => {
-    return assignments.find(
-      (a) => a.staffId === memberId && a.timeSlotId === timeSlotId
+  const getAssignmentsForMemberAndDayType = (memberId: string, dayType: DayType) => {
+    const dayShiftIds = new Set(
+      shifts.filter((s) => s.dayType === dayType).map((s) => s.id)
+    );
+    return assignments.filter(
+      (a) => a.staffId === memberId && dayShiftIds.has(a.shiftId)
     );
   };
 
-  const calculateScore = (
-    member: Member,
-    assignment: ShiftAssignment
-  ): number => {
-    const task = tasks.find((t) => t.id === assignment.roleId);
-    const timeSlot = timeSlots.find((t) => t.id === assignment.timeSlotId);
-    if (!task || !timeSlot) return 0;
+  const calculateScore = (member: Member, assignment: ShiftAssignment): number => {
+    const shift = shifts.find((s) => s.id === assignment.shiftId);
+    if (!shift) return 0;
 
-    const evaluation = MemberAssignmentEvaluation.evaluateCandidate(
-      member,
-      task,
-      timeSlot
-    );
+    const evaluation = MemberAssignmentEvaluation.evaluateCandidate(member, shift);
     return evaluation.totalScore;
-  };
-
-  const getTaskName = (taskId: string): string => {
-    return tasks.find((t) => t.id === taskId)?.name ?? "不明";
   };
 
   // 配置のある局員のみ表示
@@ -62,15 +52,21 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
     (member) => getAssignmentsForMember(member.id).length > 0
   );
 
+  // 配置のある dayType のみ列に表示
+  const activeDayTypes = DAY_TYPE_ORDER.filter((dt) =>
+    assignments.some((a) => {
+      const shift = shifts.find((s) => s.id === a.shiftId);
+      return shift?.dayType === dt;
+    })
+  );
+
   return (
     <StyledTable>
       <thead>
         <tr>
           <th className="e-member-header">局員</th>
-          {timeSlots.map((slot) => (
-            <th key={slot.id} className="e-slot-header">
-              {slot.label}
-            </th>
+          {activeDayTypes.map((dt) => (
+            <th key={dt} className="e-daytype-header">{dt}</th>
           ))}
           <th className="e-total-header">配置数</th>
         </tr>
@@ -87,31 +83,34 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
                 <div className="e-member-name">{member.name}</div>
                 <div className="e-member-dept">{member.department}</div>
               </td>
-              {timeSlots.map((slot) => {
-                const assignment = getAssignmentForMemberAndTimeSlot(member.id, slot.id);
-                const isAvailable = member.isAvailableAt(slot.id);
-
+              {activeDayTypes.map((dayType) => {
+                const dayAssignments = getAssignmentsForMemberAndDayType(member.id, dayType);
                 return (
-                  <td
-                    key={slot.id}
-                    className={`e-slot-cell ${isAvailable ? "is-available" : "is-unavailable"}`}
-                  >
-                    {!isAvailable && (
-                      <div className="e-unavailable-mark">×</div>
-                    )}
-                    {assignment && (
-                      <div
-                        className={`e-assignment ${calculateScore(member, assignment) >= 0 ? "is-positive" : "is-negative"}`}
-                        onClick={() => onAssignmentClick?.(assignment.id)}
-                      >
-                        <div className="e-task">
-                          {getTaskName(assignment.roleId)}
+                  <td key={dayType} className="e-daytype-cell">
+                    {dayAssignments.map((assignment) => {
+                      const shift = shifts.find((s) => s.id === assignment.shiftId);
+                      const score = calculateScore(member, assignment);
+                      const isAvailable = shift ? member.isAvailableFor(shift.id) : false;
+                      return (
+                        <div
+                          key={assignment.id}
+                          className={`e-assignment ${score >= 0 ? "is-positive" : "is-negative"} ${isAvailable ? "" : "is-unavailable"}`}
+                          onClick={() => onAssignmentClick?.(assignment.id)}
+                        >
+                          <div className="e-task">
+                            {shift?.taskName ?? assignment.shiftId}
+                          </div>
+                          <div className="e-time">
+                            {shift ? `${shift.startTime}–${shift.endTime}` : ""}
+                          </div>
+                          <div className="e-score">
+                            {score >= 0 ? "+" : ""}{score}pt
+                          </div>
                         </div>
-                        <div className="e-score">
-                          {calculateScore(member, assignment) >= 0 ? "+" : ""}
-                          {calculateScore(member, assignment)}
-                        </div>
-                      </div>
+                      );
+                    })}
+                    {dayAssignments.length === 0 && (
+                      <div className="e-empty-cell">—</div>
                     )}
                   </td>
                 );
@@ -134,8 +133,8 @@ const StyledTable = styled.table`
   td {
     border: 1px solid #ddd;
     padding: 6px 8px;
-    vertical-align: middle;
-    text-align: center;
+    vertical-align: top;
+    text-align: left;
   }
 
   th {
@@ -144,6 +143,7 @@ const StyledTable = styled.table`
     position: sticky;
     top: 0;
     z-index: 10;
+    text-align: center;
   }
 
   .e-member-header {
@@ -152,20 +152,19 @@ const StyledTable = styled.table`
     text-align: left;
   }
 
-  .e-slot-header {
-    min-width: 80px;
-    font-size: 0.85em;
+  .e-daytype-header {
+    min-width: 130px;
   }
 
   .e-total-header {
     width: 60px;
     min-width: 60px;
+    text-align: center;
   }
 
   .e-member-cell {
     cursor: pointer;
     transition: background-color 0.15s;
-    text-align: left;
 
     &:hover {
       background-color: #e3f2fd;
@@ -181,32 +180,26 @@ const StyledTable = styled.table`
     }
   }
 
-  .e-slot-cell {
-    min-width: 80px;
-    position: relative;
-
-    &.is-unavailable {
-      background-color: #f5f5f5;
-    }
+  .e-daytype-cell {
+    vertical-align: top;
   }
 
-  .e-unavailable-mark {
-    position: absolute;
-    top: 2px;
-    left: 4px;
-    font-size: 0.7em;
-    color: #999;
+  .e-empty-cell {
+    text-align: center;
+    color: #ccc;
+    font-size: 0.9em;
   }
 
   .e-assignment {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: 4px 6px;
+    gap: 1px;
+    padding: 3px 6px;
     border-radius: 4px;
     cursor: pointer;
     transition: opacity 0.15s;
+    margin-bottom: 4px;
+    font-size: 0.9em;
 
     &:hover {
       opacity: 0.8;
@@ -222,9 +215,18 @@ const StyledTable = styled.table`
       border: 1px solid #ef9a9a;
     }
 
+    &.is-unavailable {
+      opacity: 0.6;
+      border-style: dashed;
+    }
+
     .e-task {
       font-weight: 500;
-      font-size: 0.9em;
+    }
+
+    .e-time {
+      font-size: 0.78em;
+      color: #666;
     }
 
     .e-score {
@@ -236,5 +238,7 @@ const StyledTable = styled.table`
   .e-total-cell {
     font-weight: bold;
     background-color: #fafafa;
+    text-align: center;
+    vertical-align: middle;
   }
 `;

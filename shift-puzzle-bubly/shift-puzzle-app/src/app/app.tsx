@@ -1,6 +1,7 @@
 import PeopleIcon from '@mui/icons-material/People';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import TaskIcon from '@mui/icons-material/Task';
+import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
 
 // shift-puzzle-libs のslicesをimport（自動注入される）
@@ -16,6 +17,7 @@ const menuItems = [
   { label: '局員一覧', url: 'shift-puzzle/members', icon: <PeopleIcon /> },
   { label: 'タスク一覧', url: 'shift-puzzle/tasks', icon: <TaskIcon /> },
   { label: 'シフト配置表', url: 'shift-puzzle/shift-plans', icon: <EventNoteIcon /> },
+  { label: 'ガント配置', url: 'shift-puzzle/shift-plans/default/gantt', icon: <CalendarViewWeekIcon /> },
 ];
 
 export function App() {

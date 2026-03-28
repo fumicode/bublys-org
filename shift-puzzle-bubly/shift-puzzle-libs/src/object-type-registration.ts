@@ -9,16 +9,16 @@ import {
   type MemberState,
   Member,
 } from "@bublys-org/shift-puzzle-model";
-import { createDefaultTasks, createDefaultTimeSlots } from "./data/sampleData.js";
+import { createDefaultShifts } from "./data/sampleData.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import TaskIcon from "@mui/icons-material/Task";
+import CalendarViewWeekIcon from "@mui/icons-material/CalendarViewWeek";
 import React from "react";
 
 // マスターデータ（静的）
-const timeSlots = createDefaultTimeSlots();
-const tasks = createDefaultTasks();
+const shifts = createDefaultShifts();
 
 /**
  * ShiftAssignment の ID からラベルを解決する
@@ -39,8 +39,7 @@ const resolveShiftAssignmentLabel = (assignmentId: string): string | undefined =
     .find(a => a.id === assignmentId);
   if (!assignment) return undefined;
 
-  const timeSlot = timeSlots.find(t => t.id === assignment.timeSlotId);
-  const task = tasks.find(t => t.id === assignment.roleId);
+  const shift = shifts.find(s => s.id === assignment.shiftId);
 
   // 局員名を解決
   const memberStateList: MemberState[] = state.shiftPuzzle?.memberList ?? [];
@@ -49,10 +48,11 @@ const resolveShiftAssignmentLabel = (assignmentId: string): string | undefined =
     .find(m => m.id === assignment.staffId);
   const memberName = member?.name ?? "不明";
 
-  const slotLabel = timeSlot?.label ?? "?";
-  const taskName = task?.name ?? "?";
+  const shiftLabel = shift
+    ? `${shift.taskName ?? shift.taskId}(${shift.startTime}–${shift.endTime})`
+    : assignment.shiftId;
 
-  return `${slotLabel}(${taskName})←${memberName}`;
+  return `${shiftLabel}←${memberName}`;
 };
 
 registerObjectType('Member', React.createElement(PersonIcon, { fontSize: 'small' }));
@@ -62,3 +62,4 @@ registerObjectType('ShiftAssignment', {
   labelResolver: resolveShiftAssignmentLabel,
 });
 registerObjectType('Task', React.createElement(TaskIcon, { fontSize: 'small' }));
+registerObjectType('Shift', React.createElement(CalendarViewWeekIcon, { fontSize: 'small' }));

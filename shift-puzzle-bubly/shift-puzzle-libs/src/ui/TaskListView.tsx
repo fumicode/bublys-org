@@ -2,21 +2,37 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import { Task } from "../domain/index.js";
+import { type Shift } from "../domain/index.js";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
+/** タスクとそのシフト一覧をまとめたグループ型 */
+export type GroupedTask = {
+  taskId: string;
+  taskName: string;
+  department: string;
+  shifts: Shift[];
+};
+
 type TaskListViewProps = {
-  taskList: Task[];
+  tasks: GroupedTask[];
   selectedTaskId?: string | null;
   buildDetailUrl: (taskId: string) => string;
   onTaskClick?: (taskId: string) => void;
-  /** アクティブな日程ラベル（フィルター時に表示） */
   activeDayType?: string;
 };
 
+/** dayType 略称 */
+const DAY_SHORT: Record<string, string> = {
+  '準準備日': '準々',
+  '準備日':   '準備',
+  '1日目':    '1日',
+  '2日目':    '2日',
+  '片付け日': '片付',
+};
+
 export const TaskListView: FC<TaskListViewProps> = ({
-  taskList,
+  tasks,
   selectedTaskId,
   buildDetailUrl,
   onTaskClick,
@@ -24,40 +40,45 @@ export const TaskListView: FC<TaskListViewProps> = ({
 }) => {
   return (
     <StyledTaskList>
-      {taskList.length === 0 ? (
+      {tasks.length === 0 ? (
         <li className="e-empty">
           {activeDayType
             ? `${activeDayType}に必要なタスクがありません`
             : "タスクがありません"}
         </li>
       ) : (
-        taskList.map((task) => {
-          const detailUrl = buildDetailUrl(task.id);
+        tasks.map(({ taskId, taskName, department, shifts }) => {
+          const detailUrl = buildDetailUrl(taskId);
           return (
             <li
-              key={task.id}
-              className={`e-item ${selectedTaskId === task.id ? "is-selected" : ""}`}
+              key={taskId}
+              className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
             >
+              {/* タスクヘッダー（クリックで詳細へ） */}
               <ObjectView
                 type="Task"
                 url={detailUrl}
-                label={task.name}
+                label={taskName}
                 draggable={true}
-                onClick={() => onTaskClick?.(task.id)}
+                onClick={() => onTaskClick?.(taskId)}
               >
-                <div className="e-content">
+                <div className="e-task-header">
                   <AssignmentIcon fontSize="small" className="e-icon" />
-                  <div className="e-text">
-                    <div className="e-name">{task.name}</div>
-                    <div className="e-meta">
-                      <span className="e-dept-badge">
-                        {task.responsibleDepartment}
-                      </span>
-                      <span className="e-task">{task.task}</span>
-                    </div>
-                  </div>
+                  <div className="e-task-name">{taskName}</div>
+                  <span className="e-dept-badge">{department}</span>
                 </div>
               </ObjectView>
+
+              {/* シフト一覧（インライン表示） */}
+              <div className="e-shifts">
+                {shifts.map((shift) => (
+                  <div key={shift.id} className="e-shift-chip">
+                    <span className="e-day">{DAY_SHORT[shift.dayType] ?? shift.dayType}</span>
+                    <span className="e-time">{shift.startTime}–{shift.endTime}</span>
+                    <span className="e-count">{shift.requiredCount}名</span>
+                  </div>
+                ))}
+              </div>
             </li>
           );
         })
@@ -70,7 +91,6 @@ const StyledTaskList = styled.ul`
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 400px;
   overflow-y: auto;
 
   > .e-empty {
@@ -80,27 +100,27 @@ const StyledTaskList = styled.ul`
   }
 
   > .e-item {
-    padding: 8px 12px;
     border-bottom: 1px solid #eee;
-    cursor: pointer;
-    transition: background-color 0.15s;
-
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &.is-selected {
-      background-color: #fff3e0;
-    }
 
     &:last-child {
       border-bottom: none;
     }
 
-    > .e-content {
+    &.is-selected > :first-child {
+      background-color: #fff3e0;
+    }
+
+    .e-task-header {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background-color 0.12s;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
     }
 
     .e-icon {
@@ -108,41 +128,58 @@ const StyledTaskList = styled.ul`
       flex-shrink: 0;
     }
 
-    .e-text {
+    .e-task-name {
       flex: 1;
-      min-width: 0;
-    }
-
-    .e-name {
       font-weight: bold;
+      min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-
-    .e-meta {
-      color: #666;
-      font-size: 0.85em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
 
     .e-dept-badge {
       display: inline-block;
-      padding: 1px 6px;
-      border-radius: 3px;
-      font-size: 0.8em;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.78em;
       font-weight: bold;
       background-color: #fff3e0;
       color: #e65100;
       flex-shrink: 0;
+      white-space: nowrap;
     }
 
-    .e-task {
+    .e-shifts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      padding: 0 12px 6px 32px;
+    }
+
+    .e-shift-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 0.75em;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+
+    .e-day {
+      color: #e65100;
+      font-weight: bold;
+    }
+
+    .e-time {
+      color: #555;
+    }
+
+    .e-count {
+      color: #1976d2;
+      font-weight: bold;
     }
   }
 `;

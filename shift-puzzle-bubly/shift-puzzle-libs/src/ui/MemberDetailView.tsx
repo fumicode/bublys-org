@@ -53,15 +53,15 @@ export const MemberDetailView: FC<MemberDetailViewProps> = ({
       </section>
 
       <section className="e-section">
-        <h4>参加可能時間帯</h4>
+        <h4>参加可能シフト</h4>
         <div className="e-slots">
-          {member.availableTimeSlots.length === 0 ? (
+          {member.availableShiftIds.length === 0 ? (
             <span className="e-empty">なし</span>
           ) : availabilityUrl ? (
             <ObjectView
               type="MemberAvailability"
               url={availabilityUrl}
-              label={`${member.name}の参加可能時間帯`}
+              label={`${member.name}の参加可能シフト`}
               draggable={true}
               onClick={() => onOpenAvailability?.(member.id)}
             >
@@ -70,11 +70,11 @@ export const MemberDetailView: FC<MemberDetailViewProps> = ({
                 size="small"
                 component="span"
               >
-                {member.availableTimeSlots.length}枠 (詳細を見る)
+                {member.availableShiftIds.length}件 (詳細を見る)
               </Button>
             </ObjectView>
           ) : (
-            <span>{member.availableTimeSlots.length}枠</span>
+            <span>{member.availableShiftIds.length}件</span>
           )}
         </div>
       </section>

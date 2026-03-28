@@ -48,14 +48,14 @@ export const shiftPuzzleSlice = createSlice({
     setMemberList: (state, action: PayloadAction<MemberState[]>) => {
       state.memberList = action.payload.map((m) => ({
         ...m,
-        availableTimeSlots: [...m.availableTimeSlots],
+        availableShiftIds: [...m.availableShiftIds],
       }));
     },
     addMember: (state, action: PayloadAction<MemberState>) => {
       const m = action.payload;
       state.memberList.push({
         ...m,
-        availableTimeSlots: [...m.availableTimeSlots],
+        availableShiftIds: [...m.availableShiftIds],
       });
     },
     updateMember: (state, action: PayloadAction<MemberState>) => {
@@ -64,7 +64,7 @@ export const shiftPuzzleSlice = createSlice({
         const m = action.payload;
         state.memberList[index] = {
           ...m,
-          availableTimeSlots: [...m.availableTimeSlots],
+          availableShiftIds: [...m.availableShiftIds],
         };
       }
     },

@@ -18,7 +18,7 @@ import {
   ShiftMatcher,
 } from "../domain/index.js";
 import { createSampleMemberList } from "../data/sampleMember.js";
-import { createDefaultTasks, createDefaultTimeSlots } from "../data/sampleData.js";
+import { createDefaultShifts } from "../data/sampleData.js";
 import WarningIcon from "@mui/icons-material/Warning";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import PeopleIcon from "@mui/icons-material/People";
@@ -28,9 +28,9 @@ import { UrledPlace } from "@bublys-org/bubbles-ui";
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
   onAssignmentClick?: (assignmentId: string) => void;
-  onCellClick?: (timeSlotId: string, taskId: string) => void;
+  onCellClick?: (shiftId: string) => void;
   onMemberViewClick?: () => void;
-  buildCellUrl?: (timeSlotId: string, taskId: string) => string;
+  buildCellUrl?: (shiftId: string) => string;
 };
 
 export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
@@ -45,8 +45,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   // マスターデータ
-  const timeSlots = useMemo(() => createDefaultTimeSlots(), []);
-  const tasks = useMemo(() => createDefaultTasks(), []);
+  const shifts = useMemo(() => createDefaultShifts(), []);
 
   // 制約違反を取得（状態から）
   const violations = useMemo<ReadonlyArray<ConstraintViolation>>(() => {
@@ -74,21 +73,22 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     }
   }, [dispatch, shiftPlan, shiftPlanId]);
 
-  const handleDropMember = (memberId: string, timeSlotId: string, taskId: string) => {
+  const handleDropMember = (memberId: string, shiftId: string) => {
     if (!shiftPlan) return;
 
     const existingAssignment = shiftPlan.assignments.find(
-      (a) =>
-        a.staffId === memberId &&
-        a.timeSlotId === timeSlotId &&
-        a.roleId === taskId
+      (a) => a.staffId === memberId && a.shiftId === shiftId
     );
     if (existingAssignment) return;
 
+    const shift = shifts.find((s) => s.id === shiftId);
+    if (!shift) return;
+
     const assignment = ShiftAssignment.create(
+      shiftId,
       memberId,
-      timeSlotId,
-      taskId,
+      shift.startMinute,
+      shift.endMinute,
       false // 手動配置
     );
     const updatedPlan = shiftPlan.addAssignment(assignment);
@@ -102,22 +102,23 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
     dispatch(updateShiftPlan(updatedPlan.state));
   };
 
-  const handleMoveAssignment = (assignmentId: string, memberId: string, timeSlotId: string, taskId: string) => {
+  const handleMoveAssignment = (assignmentId: string, memberId: string, shiftId: string) => {
     if (!shiftPlan) return;
 
     const existingAssignment = shiftPlan.assignments.find(
-      (a) =>
-        a.staffId === memberId &&
-        a.timeSlotId === timeSlotId &&
-        a.roleId === taskId
+      (a) => a.staffId === memberId && a.shiftId === shiftId
     );
     if (existingAssignment) return;
 
+    const shift = shifts.find((s) => s.id === shiftId);
+    if (!shift) return;
+
     const planAfterRemove = shiftPlan.removeAssignment(assignmentId);
     const assignment = ShiftAssignment.create(
+      shiftId,
       memberId,
-      timeSlotId,
-      taskId,
+      shift.startMinute,
+      shift.endMinute,
       false
     );
     const updatedPlan = planAfterRemove.addAssignment(assignment);
@@ -130,8 +131,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
 
     const result = ShiftMatcher.autoAssign(
       memberList,
-      tasks,
-      timeSlots,
+      shifts,
       shiftPlan.state.assignments,
       { preserveExistingAssignments: true }
     );
@@ -193,8 +193,7 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
       <div className="e-main">
         <div className="e-table-panel">
           <ShiftPlanTableView
-            timeSlots={timeSlots}
-            tasks={tasks}
+            shifts={shifts}
             assignments={shiftPlan.assignments}
             memberList={memberList}
             violations={violations}

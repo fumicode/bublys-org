@@ -1,109 +1,197 @@
 'use client';
 
-import { FC, useEffect, useMemo } from "react";
+import { FC, useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectTaskList,
   selectSelectedTaskId,
   setTaskList,
   setSelectedTaskId,
 } from "../slice/index.js";
-import { TaskListView } from "../ui/TaskListView.js";
-import { createDefaultTasks, createDefaultTimeSlots, DAY_TYPE_ORDER } from "../data/sampleData.js";
+import { TaskListView, type GroupedTask } from "../ui/TaskListView.js";
+import { createDefaultShifts, createDefaultTasks, DAY_TYPE_ORDER } from "../data/sampleData.js";
 import styled from "styled-components";
 import { Chip, Stack } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import BusinessIcon from "@mui/icons-material/Business";
+
+// ========== フィルターユーティリティ ==========
+
+/** フィルター条件の型 */
+export type TaskFilterCriteria = {
+  department?: string;
+  dayType?: string;
+};
+
+/** URLクエリからフィルターをパース */
+export function parseTaskFilter(query: string): TaskFilterCriteria {
+  const filter: TaskFilterCriteria = {};
+  if (!query) return filter;
+
+  const params = new URLSearchParams(query);
+
+  const department = params.get('department');
+  if (department) filter.department = department;
+
+  const dayType = params.get('dayType');
+  if (dayType) filter.dayType = dayType;
+
+  return filter;
+}
+
+/** フィルターをURL文字列に変換 */
+export function stringifyTaskFilter(filter: TaskFilterCriteria): string {
+  const params = new URLSearchParams();
+
+  if (filter.department) params.set('department', filter.department);
+  if (filter.dayType) params.set('dayType', filter.dayType);
+
+  const str = params.toString();
+  return str ? `?${str}` : '';
+}
+
+// ========== コンポーネント ==========
 
 type TaskCollectionProps = {
-  /** 日程でフィルターする（指定するとその日に必要なタスクのみ表示） */
-  filterDayType?: string;
+  /** 初期フィルター（URLクエリから） */
+  filter?: TaskFilterCriteria;
   onTaskSelect?: (taskId: string) => void;
 };
 
 const buildDetailUrl = (taskId: string) => `shift-puzzle/tasks/${taskId}`;
 
 export const TaskCollection: FC<TaskCollectionProps> = ({
-  filterDayType,
+  filter = {},
   onTaskSelect,
 }) => {
   const dispatch = useAppDispatch();
-  const taskList = useAppSelector(selectTaskList);
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
 
-  // 初期データのロード
+  const [activeDayType, setActiveDayType] = useState<string | undefined>(filter.dayType);
+  const [activeDepartment, setActiveDepartment] = useState<string | undefined>(filter.department);
+
+  // シフトマスターデータ（表示の主データソース）
+  const shifts = useMemo(() => createDefaultShifts(), []);
+
+  // TaskDetail が使う Redux タスクストアを初期ロード
   useEffect(() => {
-    if (taskList.length === 0) {
-      const defaultTasks = createDefaultTasks();
-      dispatch(setTaskList(defaultTasks.map((t) => t.state)));
+    const tasks = createDefaultTasks();
+    dispatch(setTaskList(tasks.map((t) => t.state)));
+  }, [dispatch]);
+
+  // 全シフトから局一覧を導出（フィルター前）
+  const departments = useMemo(() => {
+    const depts = new Set<string>();
+    shifts.forEach((s) => {
+      if (s.responsibleDepartment) depts.add(s.responsibleDepartment);
+    });
+    return Array.from(depts).sort();
+  }, [shifts]);
+
+  // フィルター適用 → タスクIDでグループ化
+  const groupedTasks = useMemo((): GroupedTask[] => {
+    let filtered = shifts;
+
+    if (activeDayType) {
+      filtered = filtered.filter((s) => s.dayType === activeDayType);
     }
-  }, [dispatch, taskList.length]);
+    if (activeDepartment) {
+      filtered = filtered.filter((s) => s.responsibleDepartment === activeDepartment);
+    }
 
-  // 日程フィルター適用
-  const filteredTaskList = useMemo(() => {
-    if (!filterDayType) return taskList;
-
-    const timeSlots = createDefaultTimeSlots();
-    // その日程のタイムスロットに必要なタスクIDを収集
-    const requiredTaskIds = new Set<string>();
-    timeSlots
-      .filter((slot) => slot.dayType === filterDayType)
-      .forEach((slot) => {
-        slot.state.taskRequirements.forEach((req) => {
-          requiredTaskIds.add(req.taskId);
+    const taskMap = new Map<string, GroupedTask>();
+    for (const shift of filtered) {
+      if (!taskMap.has(shift.taskId)) {
+        taskMap.set(shift.taskId, {
+          taskId: shift.taskId,
+          taskName: shift.taskName,
+          department: shift.responsibleDepartment,
+          shifts: [],
         });
-      });
+      }
+      taskMap.get(shift.taskId)!.shifts.push(shift);
+    }
 
-    return taskList.filter((task) => requiredTaskIds.has(task.id));
-  }, [taskList, filterDayType]);
+    return Array.from(taskMap.values());
+  }, [shifts, activeDayType, activeDepartment]);
+
+  // 全タスク数（フィルター前）
+  const totalTaskCount = useMemo(
+    () => new Set(shifts.map((s) => s.taskId)).size,
+    [shifts],
+  );
 
   const handleTaskClick = (taskId: string) => {
     dispatch(setSelectedTaskId(taskId));
     onTaskSelect?.(taskId);
   };
 
+  const handleDayTypeClick = (day: string) => {
+    setActiveDayType(activeDayType === day ? undefined : day);
+  };
+
+  const handleDepartmentClick = (dept: string) => {
+    setActiveDepartment(activeDepartment === dept ? undefined : dept);
+  };
+
+  const isFiltered = activeDayType || activeDepartment;
+
   return (
     <StyledContainer>
       <div className="e-header">
-        {filterDayType ? (
-          <>
-            <div className="e-filter-description">
-              <p>「{filterDayType}」の</p>
-            </div>
-            <h3>
-              タスク一覧
-              <span className="e-filter-badge">
-                ({filteredTaskList.length}/{taskList.length}件)
-              </span>
-            </h3>
-          </>
-        ) : (
-          <h3>タスク一覧 ({taskList.length}件)</h3>
-        )}
+        <h3>
+          タスク一覧
+          {isFiltered ? (
+            <span className="e-filter-badge">
+              ({groupedTasks.length}/{totalTaskCount}件)
+            </span>
+          ) : (
+            <span className="e-count">({groupedTasks.length}件)</span>
+          )}
+        </h3>
       </div>
 
       {/* 日程フィルターチップ */}
-      <div className="e-day-filter">
+      <div className="e-filter-row">
+        <CalendarTodayIcon fontSize="small" className="e-filter-icon" />
         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          <CalendarTodayIcon fontSize="small" className="e-calendar-icon" />
           {DAY_TYPE_ORDER.map((day) => (
             <Chip
               key={day}
               label={day}
               size="small"
-              variant={filterDayType === day ? "filled" : "outlined"}
-              color={filterDayType === day ? "warning" : "default"}
-              className="e-day-chip"
+              variant={activeDayType === day ? "filled" : "outlined"}
+              color={activeDayType === day ? "warning" : "default"}
+              onClick={() => handleDayTypeClick(day)}
+              className="e-filter-chip"
+            />
+          ))}
+        </Stack>
+      </div>
+
+      {/* 局フィルターチップ */}
+      <div className="e-filter-row">
+        <BusinessIcon fontSize="small" className="e-filter-icon" />
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+          {departments.map((dept) => (
+            <Chip
+              key={dept}
+              label={dept}
+              size="small"
+              variant={activeDepartment === dept ? "filled" : "outlined"}
+              color={activeDepartment === dept ? "primary" : "default"}
+              onClick={() => handleDepartmentClick(dept)}
+              className="e-filter-chip"
             />
           ))}
         </Stack>
       </div>
 
       <TaskListView
-        taskList={filteredTaskList}
+        tasks={groupedTasks}
         selectedTaskId={selectedTaskId}
         buildDetailUrl={buildDetailUrl}
         onTaskClick={handleTaskClick}
-        activeDayType={filterDayType}
+        activeDayType={activeDayType}
       />
     </StyledContainer>
   );
@@ -111,39 +199,41 @@ export const TaskCollection: FC<TaskCollectionProps> = ({
 
 const StyledContainer = styled.div`
   .e-header {
-    margin-bottom: 8px;
+    padding: 8px 12px 4px;
 
     h3 {
       margin: 0;
+      font-size: 1em;
     }
 
-    .e-filter-description {
-      margin: 0 0 4px 0;
-      font-size: 0.85em;
-      color: #e65100;
-
-      p {
-        margin: 0;
-      }
+    .e-count {
+      font-weight: normal;
+      color: #666;
+      margin-left: 4px;
     }
 
     .e-filter-badge {
       font-weight: normal;
       color: #e65100;
+      margin-left: 4px;
     }
   }
 
-  .e-day-filter {
-    margin-bottom: 12px;
+  .e-filter-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 4px 12px;
 
-    .e-calendar-icon {
+    .e-filter-icon {
       color: #999;
+      flex-shrink: 0;
       margin-top: 2px;
     }
 
-    .e-day-chip {
+    .e-filter-chip {
       font-size: 0.75em;
-      cursor: default;
+      cursor: pointer;
     }
   }
 `;
