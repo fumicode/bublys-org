@@ -4,13 +4,10 @@
  */
 
 import { ShiftAssignment, ShiftAssignmentState } from './ShiftAssignment.js';
-import { Shift } from '../master/Shift.js';
+import { Shift, type WeatherCondition } from '../master/Shift.js';
 import { ShiftEvaluation } from './ShiftEvaluation.js';
 
 // ========== 型定義 ==========
-
-/** 天候条件 */
-export type WeatherCondition = '晴れ' | '雨';
 
 /** 制約違反の種類 */
 export type ConstraintViolationType = 'overlapping_assignments';
