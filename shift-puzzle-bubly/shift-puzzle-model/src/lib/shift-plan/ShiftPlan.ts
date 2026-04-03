@@ -177,6 +177,21 @@ export class ShiftPlan {
     });
   }
 
+  /** 配置を移動（担当局員・開始・終了時刻を変更）。制約違反を再計算する。 */
+  moveAssignment(
+    assignmentId: string,
+    newStaffId: string,
+    newStartMinute: number,
+    newEndMinute: number,
+  ): ShiftPlan {
+    const updatedAssignments = this.state.assignments.map((a) =>
+      a.id === assignmentId
+        ? { ...a, staffId: newStaffId, assignedStartMinute: newStartMinute, assignedEndMinute: newEndMinute }
+        : a,
+    );
+    return this.withUpdatedState({ assignments: updatedAssignments });
+  }
+
   withName(name: string): ShiftPlan {
     return this.withUpdatedState({ name });
   }

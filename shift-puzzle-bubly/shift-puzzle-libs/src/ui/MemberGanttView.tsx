@@ -9,9 +9,15 @@
  * - タスクブロック幅: durationMinutes * minutePx
  * - タスクブロック左位置: (startMinute - dayStartMinute) * minutePx
  * - 15分グリッド: CSS repeating-linear-gradient
+ *
+ * インタラクション:
+ * - パレット→ガント D&D: シフト配置
+ * - ブロックドラッグ: 行内/行間移動
+ * - リサイズハンドル: Pointer Events で開始/終了時刻を変更（15分スナップ）
+ * - 制約違反: overlap/unavailable/excess の3段階表示
  */
 
-import React, { FC, useRef, useMemo } from 'react';
+import React, { FC, useRef, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { Shift } from '../domain/index.js';
 import {
@@ -24,7 +30,24 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { IconButton, Tooltip } from '@mui/material';
 import { DRAG_TYPE_SHIFT } from './ShiftPaletteView.js';
 
-// ========== 型定義 ==========
+// ========== 公開定数・型定義 ==========
+
+export const DRAG_TYPE_ASSIGNMENT = 'type/assignment';
+
+/** モジュール変数: 配置ブロックのDnD状態共有（dragover中にgetData不可のため） */
+export let draggingAssignmentId: string | null = null;
+
+/** 行の受け入れ可否 */
+export type RowAvailability = 'available' | 'warning' | 'unavailable';
+
+/** 制約違反レベル */
+export type ViolationLevel = 'overlap' | 'unavailable' | 'excess';
+
+/** ドラッグ中の状態（ShiftPaletteView / GanttShiftBlock どちらから来たかを区別） */
+export type DragState =
+  | { type: 'shift'; shiftId: string; durationMinutes: number; taskId: string }
+  | { type: 'assignment'; assignmentId: string; shiftId: string; durationMinutes: number; taskId: string }
+  | null;
 
 /** ガント表示設定 */
 export interface GanttConfig {
@@ -46,9 +69,20 @@ export type MemberGanttViewProps = {
   selectedDayType?: DayType;
   ganttConfig?: GanttConfig;
   buildAssignmentUrl?: (assignmentId: string) => string;
+  /** シフトパレット→ガント D&D でのドロップ */
   onDropShift?: (memberId: string, shiftId: string, assignedStartMinute: number, assignedEndMinute: number) => void;
+  /** 既存配置の移動（行内/行間） */
+  onMoveAssignment?: (assignmentId: string, newStaffId: string, newStart: number, newEnd: number) => void;
+  /** 既存配置のリサイズ */
+  onResizeAssignment?: (assignmentId: string, newStart: number, newEnd: number) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
   onAssignmentClick?: (assignmentId: string) => void;
+  /** 行の受け入れ可否マップ（ドラッグ中に背景色表示用） */
+  rowAvailabilityMap?: Map<string, RowAvailability>;
+  /** 配置IDごとの違反レベルマップ */
+  violationMap?: Map<string, ViolationLevel>;
+  /** 現在のドラッグ状態（ゴーストブロック・行色表示用） */
+  dragState?: DragState;
 };
 
 // ========== 定数 ==========
@@ -80,46 +114,137 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// ========== サブコンポーネント ==========
+function snapTo15(minutes: number): number {
+  return Math.round(minutes / 15) * 15;
+}
+
+// ========== GanttShiftBlock ==========
 
 type GanttShiftBlockProps = {
   assignment: ShiftAssignment;
   shift: Shift;
   member: Member | undefined;
-  left: number;
-  width: number;
-  isViolation: boolean;
+  minutePx: number;
+  dayStartMinute: number;
+  violationLevel: ViolationLevel | null;
+  isDragging: boolean;
   url: string;
   onRemove: (assignmentId: string) => void;
   onClick: (assignmentId: string) => void;
+  onResize: (assignmentId: string, newStart: number, newEnd: number) => void;
+};
+
+type ResizeState = {
+  handle: 'left' | 'right';
+  initialPointerX: number;
+  previewStart: number;
+  previewEnd: number;
 };
 
 const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
   assignment,
   shift,
   member,
-  left,
-  width,
-  isViolation,
+  minutePx,
+  dayStartMinute,
+  violationLevel,
+  isDragging,
   onRemove,
   onClick,
+  onResize,
 }) => {
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+
   const color = getTaskColor(shift.taskId);
   const isNewMember = member?.isNewMember ?? false;
   const isBreak = shift.taskId === 'task-break';
-  const displayStart = minutesToTime(assignment.assignedStartMinute);
-  const displayEnd = minutesToTime(assignment.assignedEndMinute);
+
+  // リサイズ中はプレビュー値を使用
+  const displayStart = resizeState?.previewStart ?? assignment.assignedStartMinute;
+  const displayEnd = resizeState?.previewEnd ?? assignment.assignedEndMinute;
+  const displayTimeLabel = `${minutesToTime(displayStart)}–${minutesToTime(displayEnd)}`;
+
+  const left = (displayStart - dayStartMinute) * minutePx;
+  const width = Math.max((displayEnd - displayStart) * minutePx - 2, 20);
+
+  // ========== ドラッグ（配置移動） ==========
+
+  const handleDragStart = (e: React.DragEvent) => {
+    if (resizeState) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(DRAG_TYPE_ASSIGNMENT, assignment.id);
+    draggingAssignmentId = assignment.id;
+  };
+
+  const handleDragEnd = () => {
+    draggingAssignmentId = null;
+  };
+
+  // ========== リサイズ（Pointer Events + setPointerCapture） ==========
+  // ハンドル要素でキャプチャを確保し、pointermove/pointerup もハンドル上で処理
+
+  const startResize = (e: React.PointerEvent, handle: 'left' | 'right') => {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setResizeState({
+      handle,
+      initialPointerX: e.clientX,
+      previewStart: assignment.assignedStartMinute,
+      previewEnd: assignment.assignedEndMinute,
+    });
+  };
+
+  const handleResizeMove = (e: React.PointerEvent) => {
+    if (!resizeState) return;
+    const deltaX = e.clientX - resizeState.initialPointerX;
+    const deltaMinutes = deltaX / minutePx;
+
+    if (resizeState.handle === 'right') {
+      const raw = assignment.assignedEndMinute + deltaMinutes;
+      const snapped = Math.max(assignment.assignedStartMinute + 15, snapTo15(raw));
+      setResizeState((s) => s ? { ...s, previewEnd: snapped } : null);
+    } else {
+      const raw = assignment.assignedStartMinute + deltaMinutes;
+      const snapped = Math.min(assignment.assignedEndMinute - 15, snapTo15(raw));
+      setResizeState((s) => s ? { ...s, previewStart: snapped } : null);
+    }
+  };
+
+  const handleResizeUp = (e: React.PointerEvent) => {
+    if (!resizeState) return;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    onResize(assignment.id, resizeState.previewStart, resizeState.previewEnd);
+    setResizeState(null);
+  };
 
   return (
     <StyledShiftBlock
-      style={{ left, width: Math.max(width - 2, 20) }}
+      draggable={!resizeState}
+      style={{ left, width }}
       $bg={color.bg}
       $border={color.border}
       $text={color.text}
-      $isViolation={isViolation}
-      title={`${shift.taskName} (${displayStart}–${displayEnd})`}
-      onClick={() => onClick(assignment.id)}
+      $violationLevel={violationLevel}
+      $isDragging={isDragging}
+      $isResizing={!!resizeState}
+      title={`${shift.taskName} (${displayTimeLabel})`}
+      onClick={() => !resizeState && onClick(assignment.id)}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
+      {/* 左リサイズハンドル */}
+      <StyledResizeHandle
+        side="left"
+        onPointerDown={(e) => startResize(e, 'left')}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeUp}
+        onDragStart={(e) => e.preventDefault()}
+      />
+
       <span className="e-block-name">
         {isBreak ? '休憩' : shift.taskName}
       </span>
@@ -128,8 +253,12 @@ const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
           {isNewMember ? '新' : '経'}
         </span>
       )}
-      {isViolation && (
-        <Tooltip title="制約違反">
+      {violationLevel && (
+        <Tooltip title={
+          violationLevel === 'overlap' ? '時間重複' :
+          violationLevel === 'unavailable' ? '参加不可' :
+          '定員超過'
+        }>
           <WarningAmberIcon className="e-warning" fontSize="inherit" />
         </Tooltip>
       )}
@@ -140,9 +269,20 @@ const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
       >
         <CloseIcon fontSize="inherit" />
       </IconButton>
+
+      {/* 右リサイズハンドル */}
+      <StyledResizeHandle
+        side="right"
+        onPointerDown={(e) => startResize(e, 'right')}
+        onPointerMove={handleResizeMove}
+        onPointerUp={handleResizeUp}
+        onDragStart={(e) => e.preventDefault()}
+      />
     </StyledShiftBlock>
   );
 };
+
+// ========== GanttMemberRow ==========
 
 type GanttMemberRowProps = {
   member: Member;
@@ -151,10 +291,16 @@ type GanttMemberRowProps = {
   dayStartMinute: number;
   minutePx: number;
   totalWidthPx: number;
+  rowAvailability?: RowAvailability;
+  dragState?: DragState;
+  violationMap?: Map<string, ViolationLevel>;
+  draggingAssignmentIdProp?: string | null;
   buildAssignmentUrl: (assignmentId: string) => string;
-  onDrop: (memberId: string, shiftId: string, assignedStartMinute: number, assignedEndMinute: number) => void;
+  onDropShift: (memberId: string, shiftId: string, assignedStartMinute: number, assignedEndMinute: number) => void;
+  onDropAssignment: (assignmentId: string, newStaffId: string, newStart: number, newEnd: number) => void;
   onRemove: (assignmentId: string) => void;
   onClick: (assignmentId: string) => void;
+  onResize: (assignmentId: string, newStart: number, newEnd: number) => void;
 };
 
 const GanttMemberRow: FC<GanttMemberRowProps> = ({
@@ -164,45 +310,103 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
   dayStartMinute,
   minutePx,
   totalWidthPx,
+  rowAvailability,
+  dragState,
+  violationMap,
+  draggingAssignmentIdProp,
   buildAssignmentUrl,
-  onDrop,
+  onDropShift,
+  onDropAssignment,
   onRemove,
   onClick,
+  onResize,
 }) => {
+  const [ghostMinute, setGhostMinute] = useState<number | null>(null);
+
+  // ドラッグ中のシフト情報（ゴーストブロック描画用）
+  const ghostShift = dragState
+    ? shifts.find((s) => s.id === dragState.shiftId)
+    : null;
+
+  const calcSnappedStartFromX = (clientX: number, rowElement: Element): number => {
+    const rect = rowElement.getBoundingClientRect();
+    const dropX = Math.max(0, clientX - rect.left);
+    return snapTo15(dayStartMinute + dropX / minutePx);
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes(DRAG_TYPE_SHIFT)) {
-      e.preventDefault();
-      e.currentTarget.classList.add('is-drag-over');
+    const isShift = e.dataTransfer.types.includes(DRAG_TYPE_SHIFT);
+    const isAssignment = e.dataTransfer.types.includes(DRAG_TYPE_ASSIGNMENT);
+    if (!isShift && !isAssignment) return;
+    e.preventDefault();
+    e.currentTarget.classList.add('is-drag-over');
+
+    if (dragState) {
+      const snapped = calcSnappedStartFromX(e.clientX, e.currentTarget);
+      setGhostMinute(snapped);
     }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.currentTarget.classList.remove('is-drag-over');
+    setGhostMinute(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.currentTarget.classList.remove('is-drag-over');
+    setGhostMinute(null);
+
+    const assignmentId = e.dataTransfer.getData(DRAG_TYPE_ASSIGNMENT);
+    if (assignmentId) {
+      // 既存配置の移動
+      const snappedStart = calcSnappedStartFromX(e.clientX, e.currentTarget);
+      const srcAssignment = rowAssignments.find((a) => a.id === assignmentId)
+        ?? (() => {
+          // 別の行から来た場合は dragState から duration を取得
+          if (dragState?.type === 'assignment') {
+            return { id: assignmentId, assignedStartMinute: 0, assignedEndMinute: dragState.durationMinutes } as unknown as ShiftAssignment;
+          }
+          return null;
+        })();
+      if (!srcAssignment) return;
+      const duration = dragState?.type === 'assignment'
+        ? dragState.durationMinutes
+        : srcAssignment.assignedEndMinute - srcAssignment.assignedStartMinute;
+      onDropAssignment(assignmentId, member.id, snappedStart, snappedStart + duration);
+      return;
+    }
+
     const shiftId = e.dataTransfer.getData(DRAG_TYPE_SHIFT);
     if (!shiftId) return;
 
-    // ドロップ行のDOM左端からのX座標を取得し、15分単位の開始時刻を計算
-    const rect = e.currentTarget.getBoundingClientRect();
-    const dropX = Math.max(0, e.clientX - rect.left);
-    const rawMinute = dayStartMinute + dropX / minutePx;
-    const snappedStartMinute = Math.round(rawMinute / 15) * 15;
-
-    // シフトの時間長を使って終了時刻を算出
+    const snappedStart = calcSnappedStartFromX(e.clientX, e.currentTarget);
     const shift = shifts.find((s) => s.id === shiftId);
     const duration = shift ? shift.durationMinutes : 60;
-    const assignedEndMinute = snappedStartMinute + duration;
+    onDropShift(member.id, shiftId, snappedStart, snappedStart + duration);
+  };
 
-    onDrop(member.id, shiftId, snappedStartMinute, assignedEndMinute);
+  // ゴーストブロックのレンダリング
+  const renderGhost = () => {
+    if (ghostMinute === null || !dragState || !ghostShift) return null;
+    const color = getTaskColor(dragState.taskId);
+    const ghostLeft = (ghostMinute - dayStartMinute) * minutePx;
+    const ghostWidth = Math.max(dragState.durationMinutes * minutePx - 2, 20);
+    return (
+      <StyledGhostBlock
+        style={{ left: ghostLeft, width: ghostWidth }}
+        $bg={color.bg}
+        $border={color.border}
+      >
+        {ghostShift.taskName}
+      </StyledGhostBlock>
+    );
   };
 
   return (
     <StyledMemberRow
       $width={totalWidthPx}
+      $availability={dragState ? (rowAvailability ?? null) : null}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -210,25 +414,26 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
       {rowAssignments.map((assignment) => {
         const shift = shifts.find((s) => s.id === assignment.shiftId);
         if (!shift) return null;
-        const startMin = assignment.assignedStartMinute;
-        const endMin = assignment.assignedEndMinute;
-        const left = (startMin - dayStartMinute) * minutePx;
-        const width = (endMin - startMin) * minutePx;
+        const violationLevel = violationMap?.get(assignment.id) ?? null;
+        const isDragging = draggingAssignmentIdProp === assignment.id;
         return (
           <GanttShiftBlock
             key={assignment.id}
             assignment={assignment}
             shift={shift}
             member={member}
-            left={left}
-            width={width}
-            isViolation={false}
+            minutePx={minutePx}
+            dayStartMinute={dayStartMinute}
+            violationLevel={violationLevel}
+            isDragging={isDragging}
             url={buildAssignmentUrl(assignment.id)}
             onRemove={onRemove}
             onClick={onClick}
+            onResize={onResize}
           />
         );
       })}
+      {renderGhost()}
     </StyledMemberRow>
   );
 };
@@ -243,8 +448,13 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
   ganttConfig = {},
   buildAssignmentUrl,
   onDropShift,
+  onMoveAssignment,
+  onResizeAssignment,
   onRemoveAssignment,
   onAssignmentClick,
+  rowAvailabilityMap,
+  violationMap,
+  dragState,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
   const minuteGranularity = ganttConfig.minuteGranularity ?? 60;
@@ -294,6 +504,10 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
     }
     return map;
   }, [filteredShifts, assignments]);
+
+  // draggingAssignmentId を React state として伝播（re-render を起こすためにprop経由）
+  // 実際には MemberGanttEditor から dragState で渡される
+  const draggingAssignmentIdProp = dragState?.type === 'assignment' ? dragState.assignmentId : null;
 
   const buildUrl = buildAssignmentUrl ?? ((id: string) => `shift-puzzle/assignments/${id}`);
 
@@ -365,10 +579,16 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
                 dayStartMinute={dayStartMinute}
                 minutePx={minutePx}
                 totalWidthPx={totalWidthPx}
+                rowAvailability={rowAvailabilityMap?.get(member.id)}
+                dragState={dragState}
+                violationMap={violationMap}
+                draggingAssignmentIdProp={draggingAssignmentIdProp}
                 buildAssignmentUrl={buildUrl}
-                onDrop={onDropShift ?? (() => { /* noop */ })}
+                onDropShift={onDropShift ?? (() => { /* noop */ })}
+                onDropAssignment={onMoveAssignment ?? (() => {})}
                 onRemove={onRemoveAssignment ?? (() => {})}
                 onClick={onAssignmentClick ?? (() => {})}
+                onResize={onResizeAssignment ?? (() => {})}
               />
             </div>
           );
@@ -542,13 +762,34 @@ const StyledGantt = styled.div`
   }
 `;
 
-type StyledMemberRowProps = React.HTMLAttributes<HTMLDivElement> & { $width: number };
+// 行の可否に応じた背景・左ボーダー色
+function getAvailabilityStyle(availability: RowAvailability | null) {
+  if (!availability) return '';
+  if (availability === 'available') return `
+    border-left: 4px solid #4caf50;
+    background-color: rgba(76, 175, 80, 0.06);
+  `;
+  if (availability === 'warning') return `
+    border-left: 4px solid #ff9800;
+    background-color: rgba(255, 152, 0, 0.06);
+  `;
+  return `
+    border-left: 4px solid #f44336;
+    background-color: rgba(244, 67, 54, 0.06);
+  `;
+}
+
+type StyledMemberRowProps = React.HTMLAttributes<HTMLDivElement> & {
+  $width: number;
+  $availability: RowAvailability | null;
+};
 const StyledMemberRow = styled.div<StyledMemberRowProps>`
   position: relative;
   height: 36px;
   width: ${(p) => p.$width}px;
   flex-shrink: 0;
-  transition: background-color 0.1s;
+  transition: background-color 0.1s, border-left 0.15s;
+  ${(p) => getAvailabilityStyle(p.$availability)}
 
   /* 15/30分グリッド（CSS で描画） */
   background-image: repeating-linear-gradient(
@@ -566,11 +807,31 @@ const StyledMemberRow = styled.div<StyledMemberRowProps>`
   }
 `;
 
+// 違反スタイル
+function getViolationStyle(violationLevel: ViolationLevel | null) {
+  if (!violationLevel) return '';
+  if (violationLevel === 'overlap') return `
+    border: 2px solid #f44336 !important;
+    background: #ffebee !important;
+    animation: gantt-violation-pulse 1.5s ease-in-out infinite;
+  `;
+  if (violationLevel === 'unavailable') return `
+    border: 2px solid #f44336 !important;
+    background: #ffebee !important;
+  `;
+  return `
+    border: 2px dashed #ff9800 !important;
+    background: #fff3e0 !important;
+  `;
+}
+
 type StyledShiftBlockProps = React.HTMLAttributes<HTMLDivElement> & {
   $bg: string;
   $border: string;
   $text: string;
-  $isViolation: boolean;
+  $violationLevel: ViolationLevel | null;
+  $isDragging: boolean;
+  $isResizing: boolean;
 };
 
 const StyledShiftBlock = styled.div<StyledShiftBlockProps>`
@@ -580,28 +841,31 @@ const StyledShiftBlock = styled.div<StyledShiftBlockProps>`
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 0 4px;
+  padding: 0 10px;
   border-radius: 4px;
   border: 1px solid ${(p) => p.$border};
   background: ${(p) => p.$bg};
   color: ${(p) => p.$text};
-  cursor: pointer;
-  overflow: hidden;
+  cursor: ${(p) => p.$isResizing ? 'ew-resize' : 'grab'};
+  overflow: visible;
   box-sizing: border-box;
   transition: box-shadow 0.1s, opacity 0.1s;
   z-index: 5;
+  opacity: ${(p) => p.$isDragging ? 0.4 : 1};
 
-  ${(p) =>
-    p.$isViolation &&
-    `
-    border: 2px solid #ff9800;
-    background: #fff3e0;
-    animation: gantt-violation-pulse 1.5s ease-in-out infinite;
-  `}
+  ${(p) => getViolationStyle(p.$violationLevel)}
 
   &:hover {
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     z-index: 10;
+  }
+
+  &:hover .e-resize-handle {
+    opacity: 1;
+  }
+
+  &:active {
+    cursor: grabbing;
   }
 
   .e-block-name {
@@ -650,7 +914,50 @@ const StyledShiftBlock = styled.div<StyledShiftBlockProps>`
   }
 
   @keyframes gantt-violation-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,152,0,0.4); }
-    50%        { box-shadow: 0 0 0 4px rgba(255,152,0,0.2); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
+    50%        { box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.2); }
   }
+`;
+
+type StyledResizeHandleProps = React.HTMLAttributes<HTMLDivElement> & { side: 'left' | 'right' };
+const StyledResizeHandle = styled.div<StyledResizeHandleProps>`
+  position: absolute;
+  top: 0;
+  ${(p) => p.side === 'left' ? 'left: 0;' : 'right: 0;'}
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+  border-radius: ${(p) => p.side === 'left' ? '4px 0 0 4px' : '0 4px 4px 0'};
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 2;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+`;
+StyledResizeHandle.displayName = 'ResizeHandle';
+
+type StyledGhostBlockProps = React.HTMLAttributes<HTMLDivElement> & { $bg: string; $border: string };
+const StyledGhostBlock = styled.div<StyledGhostBlockProps>`
+  position: absolute;
+  top: 3px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 2px dashed ${(p) => p.$border};
+  background: ${(p) => p.$bg};
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 6;
+  font-size: 0.78em;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
 `;

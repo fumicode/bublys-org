@@ -16,6 +16,9 @@ import { DAY_TYPE_ORDER } from '../data/sampleData.js';
 
 export const DRAG_TYPE_SHIFT = 'type/shift';
 
+/** モジュール変数: HTML5 DnD制約（dragover中にgetData不可）を回避するための状態共有 */
+export let draggingShiftId: string | null = null;
+
 // タスクカテゴリー別カラー（MemberGanttViewと同じ）
 const TASK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   'task-reception': { bg: '#e3f2fd', border: '#1976d2', text: '#0d47a1' },
@@ -58,6 +61,11 @@ export const ShiftPaletteView: FC<ShiftPaletteViewProps> = ({
   const handleDragStart = (e: React.DragEvent, shift: Shift) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData(DRAG_TYPE_SHIFT, shift.dragId);
+    draggingShiftId = shift.id;
+  };
+
+  const handleDragEnd = () => {
+    draggingShiftId = null;
   };
 
   return (
@@ -97,6 +105,7 @@ export const ShiftPaletteView: FC<ShiftPaletteViewProps> = ({
                   key={shift.dragId}
                   draggable
                   onDragStart={(e: React.DragEvent) => handleDragStart(e, shift)}
+                  onDragEnd={handleDragEnd}
                   $bg={color.bg}
                   $border={color.border}
                   $text={color.text}
