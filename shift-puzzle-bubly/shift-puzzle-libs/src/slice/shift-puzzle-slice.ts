@@ -19,6 +19,10 @@ export {
   updateShiftPlan,
   deleteShiftPlan,
   setCurrentShiftPlanId,
+  // プリミティブUI用 BlockList アクション
+  addUserToBlock,
+  removeUserFromBlock,
+  addUserToBlockRange,
   selectShiftPlans as selectShiftPuzzlePlans,
   selectCurrentShiftPlanId as selectShiftPuzzleCurrentPlanId,
   selectShiftPlanById as selectShiftPuzzlePlanById,

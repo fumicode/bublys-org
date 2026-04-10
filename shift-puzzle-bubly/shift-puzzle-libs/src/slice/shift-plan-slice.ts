@@ -7,6 +7,9 @@ import {
   ShiftPlan,
 } from "@bublys-org/shift-puzzle-model";
 
+// Re-export TimeSchedule / BlockList for convenience
+export { TimeSchedule, BlockList } from "@bublys-org/shift-puzzle-model";
+
 // Re-export for convenience
 export { ShiftPlan };
 export type { ShiftPlanState };
@@ -28,10 +31,17 @@ const initialState: ShiftPlanSliceState = {
 /** readonlyなShiftPlanStateをmutableに変換（Immer用） */
 const toMutableShiftPlanState = (plan: ShiftPlanState) => ({
   ...plan,
-  assignments: [...plan.assignments],
+  assignments: [...(plan.assignments ?? [])],
   constraintViolations: (plan.constraintViolations ?? []).map((v) => ({
     ...v,
     assignmentIds: [...v.assignmentIds],
+  })),
+  timeSchedules: (plan.timeSchedules ?? []).map((ts) => ({ ...ts })),
+  shifts: (plan.shifts ?? []).map((s) => ({
+    ...s,
+    blockList: s.blockList
+      ? { blocks: s.blockList.blocks.map((row) => [...row]) }
+      : undefined,
   })),
 });
 
@@ -65,6 +75,47 @@ export const shiftPlanSlice = createSlice({
         state.currentShiftPlanId = state.shiftPlans.length > 0 ? state.shiftPlans[0].id : null;
       }
     },
+
+    // ========== プリミティブUI: BlockList操作 ==========
+
+    addUserToBlock: (
+      state,
+      action: PayloadAction<{ planId: string; shiftId: string; blockIndex: number; userId: string }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shiftId, blockIndex, userId } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const plan = new ShiftPlan(state.shiftPlans[planIndex]);
+      const updated = plan.addUserToBlock(shiftId, blockIndex, userId);
+      state.shiftPlans[planIndex] = toMutableShiftPlanState(updated.state);
+    },
+
+    removeUserFromBlock: (
+      state,
+      action: PayloadAction<{ planId: string; shiftId: string; blockIndex: number; userId: string }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shiftId, blockIndex, userId } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const plan = new ShiftPlan(state.shiftPlans[planIndex]);
+      const updated = plan.removeUserFromBlock(shiftId, blockIndex, userId);
+      state.shiftPlans[planIndex] = toMutableShiftPlanState(updated.state);
+    },
+
+    addUserToBlockRange: (
+      state,
+      action: PayloadAction<{ planId: string; shiftId: string; startBlock: number; endBlock: number; userId: string }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shiftId, startBlock, endBlock, userId } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const plan = new ShiftPlan(state.shiftPlans[planIndex]);
+      const updated = plan.addUserToBlockRange(shiftId, startBlock, endBlock, userId);
+      state.shiftPlans[planIndex] = toMutableShiftPlanState(updated.state);
+    },
   },
 });
 
@@ -73,6 +124,9 @@ export const {
   updateShiftPlan,
   deleteShiftPlan,
   setCurrentShiftPlanId,
+  addUserToBlock,
+  removeUserFromBlock,
+  addUserToBlockRange,
 } = shiftPlanSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加

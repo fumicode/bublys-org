@@ -4,7 +4,8 @@
  */
 
 import { ShiftAssignment, ShiftAssignmentState } from './ShiftAssignment.js';
-import { Shift, type WeatherCondition } from '../master/Shift.js';
+import { Shift, type ShiftState, type WeatherCondition } from '../master/Shift.js';
+import { type TimeScheduleState, TimeSchedule } from '../master/TimeSchedule.js';
 import { ShiftEvaluation } from './ShiftEvaluation.js';
 
 // ========== 型定義 ==========
@@ -25,7 +26,12 @@ export interface ShiftPlanState {
   readonly id: string;
   readonly name: string;
   readonly weatherCondition: WeatherCondition;
-  readonly assignments: readonly ShiftAssignmentState[];
+  // プリミティブUI用フィールド（新規）
+  readonly timeSchedules?: readonly TimeScheduleState[];
+  readonly shifts?: readonly ShiftState[];        // BlockList組み込み
+  // 旧フィールド（既存D&D互換: deprecated）
+  /** @deprecated shifts + blockList ベースに移行 */
+  readonly assignments?: readonly ShiftAssignmentState[];
   readonly constraintViolations?: readonly ConstraintViolation[];
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -50,21 +56,39 @@ export class ShiftPlan {
   get weatherCondition(): WeatherCondition { return this.state.weatherCondition; }
 
   get assignments(): readonly ShiftAssignment[] {
-    return this.state.assignments.map((s) => new ShiftAssignment(s));
+    return (this.state.assignments ?? []).map((s) => new ShiftAssignment(s));
   }
 
   get constraintViolations(): readonly ConstraintViolation[] {
-    return this.state.constraintViolations ?? ShiftPlan.computeConstraintViolations(this.state.assignments);
+    return this.state.constraintViolations ?? ShiftPlan.computeConstraintViolations(this.state.assignments ?? []);
   }
 
-  /** 特定局員の配置を取得 */
+  get timeSchedules(): readonly TimeSchedule[] {
+    return (this.state.timeSchedules ?? []).map((ts) => new TimeSchedule(ts));
+  }
+
+  get shifts(): readonly Shift[] {
+    return (this.state.shifts ?? []).map((s) => new Shift(s));
+  }
+
+  /** 特定局員の配置を取得（旧: assignments ベース） */
   getAssignmentsByMember(memberId: string): ShiftAssignment[] {
     return this.assignments.filter((a) => a.staffId === memberId);
   }
 
-  /** 特定シフトの配置を取得 */
+  /** 特定シフトの配置を取得（旧: assignments ベース） */
   getAssignmentsByShift(shiftId: string): ShiftAssignment[] {
     return this.assignments.filter((a) => a.shiftId === shiftId);
+  }
+
+  /** IDでシフトを取得（新: shifts ベース） */
+  getShiftById(shiftId: string): Shift | undefined {
+    return this.shifts.find((s) => s.id === shiftId);
+  }
+
+  /** IDでTimeScheduleを取得 */
+  getTimeScheduleById(tsId: string): TimeSchedule | undefined {
+    return this.timeSchedules.find((ts) => ts.id === tsId);
   }
 
   /** シフト案を評価（Shift マスターと照合） */
@@ -73,7 +97,7 @@ export class ShiftPlan {
       ShiftEvaluation.evaluate(shift, this.assignments),
     );
 
-    const totalAssignmentCount = this.state.assignments.length;
+    const totalAssignmentCount = (this.state.assignments ?? []).length;
     const shortageCount = shiftEvaluations.filter((e) => e.hasShortage).length;
     const excessCount = shiftEvaluations.filter((e) => e.hasExcess).length;
 
@@ -118,7 +142,7 @@ export class ShiftPlan {
   isMemberShiftInViolation(memberId: string, shiftId: string): boolean {
     return this.constraintViolations.some(
       (v) => v.memberId === memberId && v.assignmentIds.some(
-        (id) => this.state.assignments.find((a) => a.id === id)?.shiftId === shiftId,
+        (id) => (this.state.assignments ?? []).find((a) => a.id === id)?.shiftId === shiftId,
       ),
     );
   }
@@ -167,13 +191,42 @@ export class ShiftPlan {
 
   addAssignment(assignment: ShiftAssignment): ShiftPlan {
     return this.withUpdatedState({
-      assignments: [...this.state.assignments, assignment.state],
+      assignments: [...(this.state.assignments ?? []), assignment.state],
     });
   }
 
   removeAssignment(assignmentId: string): ShiftPlan {
     return this.withUpdatedState({
-      assignments: this.state.assignments.filter((a) => a.id !== assignmentId),
+      assignments: (this.state.assignments ?? []).filter((a) => a.id !== assignmentId),
+    });
+  }
+
+  // ========== プリミティブUI: BlockList操作 ==========
+
+  /** 指定シフトの指定ブロックに局員を追加 */
+  addUserToBlock(shiftId: string, blockIndex: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.addUser(blockIndex, userId));
+  }
+
+  /** 指定シフトの指定ブロックから局員を削除 */
+  removeUserFromBlock(shiftId: string, blockIndex: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.removeUser(blockIndex, userId));
+  }
+
+  /** 指定シフトの範囲ブロックに局員を追加（startBlock 以上 endBlock 未満） */
+  addUserToBlockRange(shiftId: string, startBlock: number, endBlock: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.addUserToRange(startBlock, endBlock, userId));
+  }
+
+  private _updateShift(shiftId: string, fn: (shift: Shift) => Shift): ShiftPlan {
+    const currentShifts = this.state.shifts ?? [];
+    const updatedShifts = currentShifts.map((s) =>
+      s.id === shiftId ? fn(new Shift(s)).state : s
+    );
+    return new ShiftPlan({
+      ...this.state,
+      shifts: updatedShifts,
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -184,7 +237,7 @@ export class ShiftPlan {
     newStartMinute: number,
     newEndMinute: number,
   ): ShiftPlan {
-    const updatedAssignments = this.state.assignments.map((a) =>
+    const updatedAssignments = (this.state.assignments ?? []).map((a) =>
       a.id === assignmentId
         ? { ...a, staffId: newStaffId, assignedStartMinute: newStartMinute, assignedEndMinute: newEndMinute }
         : a,
@@ -201,8 +254,8 @@ export class ShiftPlan {
   }
 
   protected withUpdatedState(partial: Partial<ShiftPlanState>): ShiftPlan {
-    const newAssignments = partial.assignments ?? this.state.assignments;
-    const constraintViolations = partial.assignments
+    const newAssignments = partial.assignments ?? this.state.assignments ?? [];
+    const constraintViolations = partial.assignments !== undefined
       ? ShiftPlan.computeConstraintViolations(newAssignments)
       : this.state.constraintViolations;
 
@@ -223,6 +276,8 @@ export class ShiftPlan {
       name,
       weatherCondition,
       assignments: [],
+      timeSchedules: [],
+      shifts: [],
       constraintViolations: [],
       createdAt: now,
       updatedAt: now,

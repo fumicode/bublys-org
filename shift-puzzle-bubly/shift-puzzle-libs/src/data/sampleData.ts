@@ -3,7 +3,7 @@
  * Shift を直接定義する（TimeSlot は廃止）
  */
 
-import { Shift, type DayType } from "../domain/index.js";
+import { Shift, TimeSchedule, type DayType } from "../domain/index.js";
 import { createSampleTasks } from "./sampleTask.js";
 
 // ========== シフト定義 ==========
@@ -158,3 +158,33 @@ export function createDefaultTasks() {
 
 /** dayTypeの表示順 */
 export const DAY_TYPE_ORDER = ['準準備日', '準備日', '1日目', '2日目', '片付け日'] as const;
+
+// ========== TimeSchedule サンプルデータ ==========
+
+/**
+ * createDefaultShifts() から一意な (dayType, startTime, endTime) の組み合わせを抽出して
+ * TimeSchedule マスターを生成する。
+ */
+export function createDefaultTimeSchedules(): TimeSchedule[] {
+  const shifts = createDefaultShifts();
+
+  // (dayType, startTime, endTime) の一意な組み合わせを収集
+  const seen = new Set<string>();
+  const result: TimeSchedule[] = [];
+
+  for (const shift of shifts) {
+    const key = `${shift.dayType}|${shift.startTime}|${shift.endTime}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      const id = `ts-${shift.dayType}-${shift.startTime.replace(':', '')}-${shift.endTime.replace(':', '')}`;
+      result.push(new TimeSchedule({
+        id,
+        dayType: shift.dayType,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+      }));
+    }
+  }
+
+  return result;
+}

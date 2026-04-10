@@ -5,6 +5,10 @@
  * TimeSlot + TaskRequirement の組み合わせから独立した独自エンティティ。
  */
 
+import { type BlockListState, BlockList } from '../shift-plan/BlockList.js';
+
+export type { BlockListState };
+
 // ========== 型定義 ==========
 
 /** 日種別（5日分） */
@@ -17,6 +21,10 @@ export type WeatherCondition = '晴れ' | '雨';
 export interface ShiftState {
   readonly id: string;
   readonly taskId: string;
+  // プリミティブUI用フィールド（新規）
+  readonly timeScheduleId?: string;   // 紐づく TimeSchedule の id
+  readonly blockList?: BlockListState; // 15分解像度のセル配置
+  // 時間フィールド（旧: 後方互換のため optional 化しない — dayType/startTime/endTime は引き続き必須）
   readonly dayType: DayType;
   readonly weatherCondition?: WeatherCondition;
   readonly startTime: string;      // "09:30"
@@ -90,6 +98,62 @@ export class Shift {
   /** Drag識別子 = shift.id（シンプル化） */
   get dragId(): string { return this.state.id; }
 
+  /** 紐づく TimeSchedule の id */
+  get timeScheduleId(): string | undefined { return this.state.timeScheduleId; }
+
+  /** BlockList（なければ空のBlockListを返す） */
+  get blockList(): BlockList {
+    if (this.state.blockList) return new BlockList(this.state.blockList);
+    const totalBlocks = Math.ceil(this.durationMinutes / 15);
+    return BlockList.createEmpty(totalBlocks);
+  }
+
+  // ========== プリミティブUI操作 ==========
+
+  /** 指定ブロックに局員を追加 */
+  addUser(blockIndex: number, userId: string): Shift {
+    return new Shift({
+      ...this.state,
+      blockList: this.blockList.addUser(blockIndex, userId).state,
+    });
+  }
+
+  /** 指定ブロックから局員を削除 */
+  removeUser(blockIndex: number, userId: string): Shift {
+    return new Shift({
+      ...this.state,
+      blockList: this.blockList.removeUser(blockIndex, userId).state,
+    });
+  }
+
+  /** 範囲内ブロックに局員を追加（startBlock 以上 endBlock 未満） */
+  addUserToRange(startBlock: number, endBlock: number, userId: string): Shift {
+    return new Shift({
+      ...this.state,
+      blockList: this.blockList.addUserToRange(startBlock, endBlock, userId).state,
+    });
+  }
+
+  /** 指定ブロックの局員をトグル（いればremove、いなければadd） */
+  toggleUser(blockIndex: number, userId: string): Shift {
+    if (this.blockList.hasUser(blockIndex, userId)) {
+      return this.removeUser(blockIndex, userId);
+    }
+    return this.addUser(blockIndex, userId);
+  }
+
+  /** BlockList に含まれる全局員IDを取得（重複なし） */
+  getAssignedUserIds(): string[] {
+    const ids = new Set<string>();
+    const bl = this.blockList;
+    for (let i = 0; i < bl.totalBlocks; i++) {
+      for (const uid of bl.getUsersAt(i)) {
+        ids.add(uid);
+      }
+    }
+    return Array.from(ids);
+  }
+
   /** ビューモデルに変換 */
   toView(): ShiftView {
     return {
@@ -108,3 +172,4 @@ export class Shift {
     };
   }
 }
+

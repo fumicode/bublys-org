@@ -39,7 +39,7 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   // 配置を取得
   const assignment = useMemo(() => {
     if (!shiftPlan) return undefined;
-    const assignmentState = shiftPlan.state.assignments.find(
+    const assignmentState = (shiftPlan.state.assignments ?? []).find(
       (a) => a.id === assignmentId
     );
     return assignmentState ? new ShiftAssignment(assignmentState) : undefined;

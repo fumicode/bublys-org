@@ -8,3 +8,5 @@ export * from "./TaskListView.js";
 export * from "./TaskDetailView.js";
 export * from "./MemberGanttView.js";
 export * from "./ShiftPaletteView.js";
+export * from "./TaskSelectionPanelView.js";
+export * from "./PrimitiveGanttView.js";
