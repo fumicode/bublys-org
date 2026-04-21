@@ -70,7 +70,7 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
 
     const copiedState = {
       ...newPlan.state,
-      assignments: sourcePlan.state.assignments.map((a) => ({
+      assignments: (sourcePlan.state.assignments ?? []).map((a) => ({
         ...a,
         id: crypto.randomUUID(),
       })),

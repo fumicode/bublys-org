@@ -9,3 +9,4 @@ export * from "./AssignmentEvaluation.js";
 export * from "./TaskCollection.js";
 export * from "./TaskDetail.js";
 export * from "./MemberGanttEditor.js";
+export * from "./PrimitiveGanttEditor.js";
