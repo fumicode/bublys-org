@@ -6,6 +6,16 @@ import { type Shift } from "../domain/index.js";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
+/** ガント側がタスク種別のドラッグを判別するためのMIME（ObjectView 'Task' と同一） */
+export const DRAG_TYPE_TASK = 'type/task';
+
+/**
+ * モジュール変数: ドラッグ中のtaskId。
+ * HTML5 DnD制約（dragover中にgetData不可）を回避するため、
+ * ガントView/Editorはこれを直接参照してghost/可否表示に使う。
+ */
+export let draggingTaskId: string | null = null;
+
 /** タスクとそのシフト一覧をまとめたグループ型 */
 export type GroupedTask = {
   taskId: string;
@@ -53,6 +63,8 @@ export const TaskListView: FC<TaskListViewProps> = ({
             <li
               key={taskId}
               className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
+              onDragStart={() => { draggingTaskId = taskId; }}
+              onDragEnd={() => { draggingTaskId = null; }}
             >
               {/* タスクヘッダー（クリックで詳細へ） */}
               <ObjectView

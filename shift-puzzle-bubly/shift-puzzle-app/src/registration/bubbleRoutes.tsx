@@ -17,7 +17,6 @@ import {
   TaskCollection,
   TaskDetail,
   MemberGanttEditor,
-  ShiftPalette,
   parseTaskFilter,
   type DayType,
 } from "@bublys-org/shift-puzzle-libs";
@@ -203,9 +202,9 @@ const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     );
   };
 
-  const handleOpenPalette = () => {
+  const handleOpenTaskList = () => {
     openBubble(
-      `shift-puzzle/shifts/palette?shiftPlanId=${shiftPlanId}${initialDayType ? `&dayType=${encodeURIComponent(initialDayType)}` : ''}`,
+      `shift-puzzle/tasks${initialDayType ? `?dayType=${encodeURIComponent(initialDayType)}` : ''}`,
       bubble.id,
       'bubble-side',
     );
@@ -220,24 +219,8 @@ const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
       shiftPlanId={shiftPlanId}
       initialDayType={initialDayType}
       onAssignmentClick={handleAssignmentClick}
-      onOpenPaletteClick={handleOpenPalette}
+      onOpenTaskListClick={handleOpenTaskList}
       onTableViewClick={handleTableView}
-    />
-  );
-};
-
-// シフトパズル - シフトパレットバブル
-const ShiftPuzzleShiftPaletteBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const queryIndex = bubble.url.indexOf('?');
-  const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
-  const params = new URLSearchParams(query);
-  const shiftPlanId = params.get('shiftPlanId') ?? 'default';
-  const initialDayType = (params.get('dayType') ?? undefined) as DayType | undefined;
-
-  return (
-    <ShiftPalette
-      shiftPlanId={shiftPlanId}
-      initialDayType={initialDayType}
     />
   );
 };
@@ -276,8 +259,6 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/gantt", type: "gantt-editor", Component: ShiftPuzzleGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans", type: "shift-plan-list", Component: ShiftPuzzlePlanManagerBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId", type: "shift-plan", Component: ShiftPuzzlePlanEditorBubble },
-  // シフトパレット（:shiftPlanIdの前に配置して優先マッチ）
-  { pattern: "shift-puzzle/shifts/palette", type: "shift-palette", Component: ShiftPuzzleShiftPaletteBubble },
   { pattern: "shift-puzzle/tasks/:taskId", type: "task", Component: ShiftPuzzleTaskBubble },
   { pattern: "shift-puzzle/tasks", type: "task-list", Component: ShiftPuzzleTasksBubble },
 ];

@@ -28,7 +28,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { IconButton, Tooltip } from '@mui/material';
-import { DRAG_TYPE_SHIFT } from './ShiftPaletteView.js';
+import { DRAG_TYPE_TASK } from './TaskListView.js';
 
 // ========== 公開定数・型定義 ==========
 
@@ -41,11 +41,11 @@ export let draggingAssignmentId: string | null = null;
 export type RowAvailability = 'available' | 'warning' | 'unavailable';
 
 /** 制約違反レベル */
-export type ViolationLevel = 'overlap' | 'unavailable' | 'excess';
+export type ViolationLevel = 'overlap' | 'unavailable' | 'excess' | 'outOfRange';
 
-/** ドラッグ中の状態（ShiftPaletteView / GanttShiftBlock どちらから来たかを区別） */
+/** ドラッグ中の状態（task / assignment のどちらから来たかを区別） */
 export type DragState =
-  | { type: 'shift'; shiftId: string; durationMinutes: number; taskId: string }
+  | { type: 'task'; taskId: string }
   | { type: 'assignment'; assignmentId: string; shiftId: string; durationMinutes: number; taskId: string }
   | null;
 
@@ -69,7 +69,7 @@ export type MemberGanttViewProps = {
   selectedDayType?: DayType;
   ganttConfig?: GanttConfig;
   buildAssignmentUrl?: (assignmentId: string) => string;
-  /** シフトパレット→ガント D&D でのドロップ */
+  /** タスク→ガント D&D でのドロップ（taskId と dropX由来の開始時刻、ガント側でshift解決） */
   onDropShift?: (memberId: string, shiftId: string, assignedStartMinute: number, assignedEndMinute: number) => void;
   /** 既存配置の移動（行内/行間） */
   onMoveAssignment?: (assignmentId: string, newStaffId: string, newStart: number, newEnd: number) => void;
@@ -257,6 +257,7 @@ const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
         <Tooltip title={
           violationLevel === 'overlap' ? '時間重複' :
           violationLevel === 'unavailable' ? '参加不可' :
+          violationLevel === 'outOfRange' ? 'タスク時間外' :
           '定員超過'
         }>
           <WarningAmberIcon className="e-warning" fontSize="inherit" />
@@ -290,6 +291,7 @@ type GanttMemberRowProps = {
   shifts: readonly Shift[];
   dayStartMinute: number;
   minutePx: number;
+  minuteGranularity: 60 | 30 | 15;
   totalWidthPx: number;
   rowAvailability?: RowAvailability;
   dragState?: DragState;
@@ -309,6 +311,7 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
   shifts,
   dayStartMinute,
   minutePx,
+  minuteGranularity,
   totalWidthPx,
   rowAvailability,
   dragState,
@@ -323,21 +326,53 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
 }) => {
   const [ghostMinute, setGhostMinute] = useState<number | null>(null);
 
-  // ドラッグ中のシフト情報（ゴーストブロック描画用）
-  const ghostShift = dragState
-    ? shifts.find((s) => s.id === dragState.shiftId)
-    : null;
-
   const calcSnappedStartFromX = (clientX: number, rowElement: Element): number => {
     const rect = rowElement.getBoundingClientRect();
     const dropX = Math.max(0, clientX - rect.left);
     return snapTo15(dayStartMinute + dropX / minutePx);
   };
 
+  /**
+   * タスクIDに対応するshiftをsnappedStart位置で1つ選ぶ。
+   * - 同一dayType内に複数のshiftがある場合：snappedStart を含むshift優先、なければ中点距離が最小のものを採用
+   * - shiftsは selectedDayType で絞り込み済みの前提
+   */
+  const resolveShiftForTask = (taskId: string, snappedStart: number): Shift | null => {
+    const candidates = shifts.filter((s) => s.taskId === taskId);
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+    const containing = candidates.find((s) => snappedStart >= s.startMinute && snappedStart < s.endMinute);
+    if (containing) return containing;
+    return candidates.reduce((best, s) => {
+      const mid = (s.startMinute + s.endMinute) / 2;
+      const bestMid = (best.startMinute + best.endMinute) / 2;
+      return Math.abs(mid - snappedStart) < Math.abs(bestMid - snappedStart) ? s : best;
+    });
+  };
+
+  // ghost用のシフト解決（task drag時はsnappedStart位置で動的に決まる、assignment drag時は固定）
+  const ghostShift: Shift | null = (() => {
+    if (!dragState || ghostMinute === null) return null;
+    if (dragState.type === 'assignment') {
+      return shifts.find((s) => s.id === dragState.shiftId) ?? null;
+    }
+    return resolveShiftForTask(dragState.taskId, ghostMinute);
+  })();
+
+  const ghostDuration: number = (() => {
+    if (!dragState) return 0;
+    if (dragState.type === 'assignment') return dragState.durationMinutes;
+    return ghostShift?.durationMinutes ?? 60;
+  })();
+
   const handleDragOver = (e: React.DragEvent) => {
-    const isShift = e.dataTransfer.types.includes(DRAG_TYPE_SHIFT);
+    const isTask = e.dataTransfer.types.includes(DRAG_TYPE_TASK);
     const isAssignment = e.dataTransfer.types.includes(DRAG_TYPE_ASSIGNMENT);
-    if (!isShift && !isAssignment) return;
+    if (!isTask && !isAssignment) return;
+    // task drag時、selectedDayType未選択（=対応shift解決不可）の場合はドロップ不可
+    if (isTask && dragState?.type === 'task' && shifts.filter((s) => s.taskId === dragState.taskId).length === 0) {
+      return;
+    }
     e.preventDefault();
     e.currentTarget.classList.add('is-drag-over');
 
@@ -377,21 +412,19 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
       return;
     }
 
-    const shiftId = e.dataTransfer.getData(DRAG_TYPE_SHIFT);
-    if (!shiftId) return;
-
+    if (!dragState || dragState.type !== 'task') return;
     const snappedStart = calcSnappedStartFromX(e.clientX, e.currentTarget);
-    const shift = shifts.find((s) => s.id === shiftId);
-    const duration = shift ? shift.durationMinutes : 60;
-    onDropShift(member.id, shiftId, snappedStart, snappedStart + duration);
+    const shift = resolveShiftForTask(dragState.taskId, snappedStart);
+    if (!shift) return;
+    onDropShift(member.id, shift.id, snappedStart, snappedStart + shift.durationMinutes);
   };
 
   // ゴーストブロックのレンダリング
   const renderGhost = () => {
     if (ghostMinute === null || !dragState || !ghostShift) return null;
-    const color = getTaskColor(dragState.taskId);
+    const color = getTaskColor(ghostShift.taskId);
     const ghostLeft = (ghostMinute - dayStartMinute) * minutePx;
-    const ghostWidth = Math.max(dragState.durationMinutes * minutePx - 2, 20);
+    const ghostWidth = Math.max(ghostDuration * minutePx - 2, 20);
     return (
       <StyledGhostBlock
         style={{ left: ghostLeft, width: ghostWidth }}
@@ -407,6 +440,7 @@ const GanttMemberRow: FC<GanttMemberRowProps> = ({
     <StyledMemberRow
       $width={totalWidthPx}
       $availability={dragState ? (rowAvailability ?? null) : null}
+      $gridStepPx={minutePx * minuteGranularity}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -490,21 +524,6 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
     return ticks;
   }, [dayStartMinute, dayEndMinute, minuteGranularity]);
 
-  // シフト充足サマリー（時間軸ヘッダー用）
-  const fulfillmentByShift = useMemo(() => {
-    const map = new Map<string, { assigned: number; required: number; minCount: number; taskName: string }>();
-    for (const shift of filteredShifts) {
-      const shiftAssignments = assignments.filter((a) => a.shiftId === shift.id);
-      map.set(shift.id, {
-        assigned: shiftAssignments.length,
-        required: shift.requiredCount,
-        minCount: shift.minCount,
-        taskName: shift.taskName,
-      });
-    }
-    return map;
-  }, [filteredShifts, assignments]);
-
   // draggingAssignmentId を React state として伝播（re-render を起こすためにprop経由）
   // 実際には MemberGanttEditor から dragState で渡される
   const draggingAssignmentIdProp = dragState?.type === 'assignment' ? dragState.assignmentId : null;
@@ -533,27 +552,6 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
               </div>
             ))}
           </div>
-          {/* シフト充足サマリー */}
-          <div className="e-fulfillment-row" style={{ position: 'relative', height: 20 }}>
-            {filteredShifts.map((shift) => {
-              const f = fulfillmentByShift.get(shift.id);
-              if (!f || shift.requiredCount === 0) return null;
-              const left = (shift.startMinute - dayStartMinute) * minutePx;
-              const width = shift.durationMinutes * minutePx;
-              const isFilled = f.assigned >= f.required;
-              const isShortage = f.assigned < f.minCount;
-              return (
-                <div
-                  key={shift.id}
-                  className={`e-fulfillment-badge ${isFilled ? 'is-filled' : ''} ${isShortage ? 'is-shortage' : ''}`}
-                  style={{ left, width: width - 2 }}
-                  title={`${f.taskName}: ${f.assigned}/${f.required}名`}
-                >
-                  {shift.taskName.slice(0, 2)} {f.assigned}/{f.required}
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
 
@@ -578,6 +576,7 @@ export const MemberGanttView: FC<MemberGanttViewProps> = ({
                 shifts={filteredShifts}
                 dayStartMinute={dayStartMinute}
                 minutePx={minutePx}
+                minuteGranularity={minuteGranularity}
                 totalWidthPx={totalWidthPx}
                 rowAvailability={rowAvailabilityMap?.get(member.id)}
                 dragState={dragState}
@@ -669,40 +668,6 @@ const StyledGantt = styled.div`
     white-space: nowrap;
   }
 
-  .e-fulfillment-row {
-    overflow: hidden;
-  }
-
-  .e-fulfillment-badge {
-    position: absolute;
-    top: 2px;
-    height: 16px;
-    border-radius: 3px;
-    font-size: 0.72em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    white-space: nowrap;
-    background: #eee;
-    border: 1px solid #ccc;
-    color: #666;
-    cursor: default;
-
-    &.is-filled {
-      background: #e8f5e9;
-      border-color: #66bb6a;
-      color: #2e7d32;
-    }
-
-    &.is-shortage {
-      background: #ffebee;
-      border-color: #ef5350;
-      color: #c62828;
-      font-weight: bold;
-    }
-  }
-
   .e-gantt-body {
     flex: 1;
     overflow: auto;
@@ -782,6 +747,8 @@ function getAvailabilityStyle(availability: RowAvailability | null) {
 type StyledMemberRowProps = React.HTMLAttributes<HTMLDivElement> & {
   $width: number;
   $availability: RowAvailability | null;
+  /** グリッド線の周期（ピクセル）。minutePx * minuteGranularity と一致 */
+  $gridStepPx: number;
 };
 const StyledMemberRow = styled.div<StyledMemberRowProps>`
   position: relative;
@@ -791,13 +758,13 @@ const StyledMemberRow = styled.div<StyledMemberRowProps>`
   transition: background-color 0.1s, border-left 0.15s;
   ${(p) => getAvailabilityStyle(p.$availability)}
 
-  /* 15/30分グリッド（CSS で描画） */
+  /* グリッド線（時間軸ヘッダーの目盛りと同周期） */
   background-image: repeating-linear-gradient(
     to right,
     transparent,
-    transparent calc(var(--minute-px, 1px) * 14),
-    #f0f0f0 calc(var(--minute-px, 1px) * 14),
-    #f0f0f0 calc(var(--minute-px, 1px) * 15)
+    transparent ${(p) => p.$gridStepPx - 1}px,
+    #e0e0e0 ${(p) => p.$gridStepPx - 1}px,
+    #e0e0e0 ${(p) => p.$gridStepPx}px
   );
 
   &.is-drag-over {
@@ -818,6 +785,10 @@ function getViolationStyle(violationLevel: ViolationLevel | null) {
   if (violationLevel === 'unavailable') return `
     border: 2px solid #f44336 !important;
     background: #ffebee !important;
+  `;
+  if (violationLevel === 'outOfRange') return `
+    border: 2px dashed #f44336 !important;
+    background: repeating-linear-gradient(45deg, #ffebee, #ffebee 6px, #ffcdd2 6px, #ffcdd2 12px) !important;
   `;
   return `
     border: 2px dashed #ff9800 !important;

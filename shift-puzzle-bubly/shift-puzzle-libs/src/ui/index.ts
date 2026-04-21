@@ -7,4 +7,3 @@ export * from "./AssignmentEvaluationView.js";
 export * from "./TaskListView.js";
 export * from "./TaskDetailView.js";
 export * from "./MemberGanttView.js";
-export * from "./ShiftPaletteView.js";

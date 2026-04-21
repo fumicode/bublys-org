@@ -24,7 +24,7 @@ export function App() {
   return (
     <BublyStoreProvider
       persistKey="shift-puzzle-standalone"
-      initialBubbleUrls={['shift-puzzle/members', 'shift-puzzle/tasks', 'shift-puzzle/shift-plans']}
+      initialBubbleUrls={['shift-puzzle/shift-plans/default/gantt', 'shift-puzzle/tasks']}
     >
       <BublyApp
         title="シフトパズル"

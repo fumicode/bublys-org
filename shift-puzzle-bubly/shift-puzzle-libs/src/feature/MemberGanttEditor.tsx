@@ -35,12 +35,12 @@ import {
   type RowAvailability,
   type ViolationLevel,
 } from '../ui/MemberGanttView.js';
-import { draggingShiftId } from '../ui/ShiftPaletteView.js';
+import { draggingTaskId } from '../ui/TaskListView.js';
 import { draggingAssignmentId } from '../ui/MemberGanttView.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 import WarningIcon from '@mui/icons-material/Warning';
 import TableChartIcon from '@mui/icons-material/TableChart';
-import { Button, Slider, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Button, ToggleButton, ToggleButtonGroup } from '@mui/material';
 
 // ========== 型定義 ==========
 
@@ -48,7 +48,7 @@ type MemberGanttEditorProps = {
   shiftPlanId: string;
   initialDayType?: DayType;
   onAssignmentClick?: (assignmentId: string) => void;
-  onOpenPaletteClick?: () => void;
+  onOpenTaskListClick?: () => void;
   onTableViewClick?: () => void;
 };
 
@@ -58,7 +58,7 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
   shiftPlanId,
   initialDayType,
   onAssignmentClick,
-  onOpenPaletteClick,
+  onOpenTaskListClick,
   onTableViewClick,
 }) => {
   const dispatch = useAppDispatch();
@@ -66,7 +66,6 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
-  const [hourPx, setHourPx] = useState(80);
   const [minuteGranularity, setMinuteGranularity] = useState<GanttConfig['minuteGranularity']>(60);
 
   /** window dragstart/dragend を監視してドラッグ状態を React state に同期 */
@@ -95,19 +94,12 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
   useEffect(() => {
     const handleWindowDragStart = () => {
       // モジュール変数を参照（HTML5 DnD制約でdragover中にgetData不可なため）
-      const shiftId = draggingShiftId;
+      const taskId = draggingTaskId;
       const assignmentId = draggingAssignmentId;
 
-      if (shiftId) {
-        const shift = shifts.find((s) => s.id === shiftId);
-        if (shift) {
-          setDragState({
-            type: 'shift',
-            shiftId: shift.id,
-            durationMinutes: shift.durationMinutes,
-            taskId: shift.taskId,
-          });
-        }
+      // Q3: DayType未選択時はtask dragを受け付けない
+      if (taskId && selectedDayType) {
+        setDragState({ type: 'task', taskId });
       } else if (assignmentId && shiftPlan) {
         const assignment = shiftPlan.assignments.find((a) => a.id === assignmentId);
         if (assignment) {
@@ -135,7 +127,7 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
       window.removeEventListener('dragstart', handleWindowDragStart);
       window.removeEventListener('dragend', handleWindowDragEnd);
     };
-  }, [shifts, shiftPlan]);
+  }, [shifts, shiftPlan, selectedDayType]);
 
   // ---------------------------------------------------------------
   // 制約違反マップの計算
@@ -178,33 +170,54 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
       }
     }
 
+    // 4. outOfRange: 配置時間がShiftの[startMinute, endMinute]からはみ出している
+    const shiftMap = new Map(shifts.map((s) => [s.id, s]));
+    for (const a of shiftPlan.assignments) {
+      if (map.has(a.id)) continue;
+      const shift = shiftMap.get(a.shiftId);
+      if (shift && (a.assignedStartMinute < shift.startMinute || a.assignedEndMinute > shift.endMinute)) {
+        map.set(a.id, 'outOfRange');
+      }
+    }
+
     return map;
   }, [shiftPlan, shifts, memberList]);
 
   // ---------------------------------------------------------------
-  // 行の受け入れ可否マップの計算（パレット→ガント D&D 中のみ）
+  // 行の受け入れ可否マップの計算（タスク→ガント D&D 中のみ）
+  //
+  // taskは選択dayType内に複数Shiftを持ちうる：
+  // - 参加可否：いずれかのshiftに参加可なら available 候補
+  // - 担当局：いずれかのshiftが member.department と一致すれば一致扱い
+  // - 重複：いずれかのshift時間帯と既存配置が重複する場合は unavailable
   // ---------------------------------------------------------------
 
   const rowAvailabilityMap = useMemo((): Map<string, RowAvailability> => {
-    if (!dragState || dragState.type !== 'shift') return new Map();
+    if (!dragState || dragState.type !== 'task') return new Map();
+    if (!selectedDayType) return new Map();
 
-    const shift = shifts.find((s) => s.id === dragState.shiftId);
-    if (!shift) return new Map();
+    const taskShifts = shifts.filter(
+      (s) => s.taskId === dragState.taskId && s.dayType === selectedDayType,
+    );
+    if (taskShifts.length === 0) return new Map();
 
     const map = new Map<string, RowAvailability>();
 
     for (const member of memberList) {
-      // 1. 参加不可（availableShiftIds に含まれていない）
-      if (!member.isAvailableFor(shift.id)) {
+      // 1. 参加可否：いずれかのshiftに参加可ならOK
+      const anyAvailable = taskShifts.some((s) => member.isAvailableFor(s.id));
+      if (!anyAvailable) {
         map.set(member.id, 'unavailable');
         continue;
       }
 
-      // 2. 既存配置との時間重複チェック
+      // 2. 既存配置との時間重複チェック（いずれかのshift時間帯と被ったらNG）
       if (shiftPlan) {
         const memberAssignments = shiftPlan.getAssignmentsByMember(member.id);
-        const wouldOverlap = memberAssignments.some(
-          (a) => shift.startMinute < a.assignedEndMinute && a.assignedStartMinute < shift.endMinute,
+        const wouldOverlap = taskShifts.some((s) =>
+          memberAssignments.some(
+            (a) => s.startMinute < a.assignedEndMinute && a.assignedStartMinute < s.endMinute,
+          ),
         );
         if (wouldOverlap) {
           map.set(member.id, 'unavailable');
@@ -212,8 +225,11 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
         }
       }
 
-      // 3. 担当局が異なる（警告）
-      if (shift.responsibleDepartment && member.department !== shift.responsibleDepartment) {
+      // 3. 担当局：いずれかのshiftが一致すればOK、全部不一致なら警告
+      const departmentMatches = taskShifts.some(
+        (s) => !s.responsibleDepartment || member.department === s.responsibleDepartment,
+      );
+      if (!departmentMatches) {
         map.set(member.id, 'warning');
         continue;
       }
@@ -222,7 +238,7 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
     }
 
     return map;
-  }, [dragState, shifts, memberList, shiftPlan]);
+  }, [dragState, shifts, memberList, shiftPlan, selectedDayType]);
 
   // ---------------------------------------------------------------
   // ハンドラ
@@ -277,8 +293,8 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
   };
 
   const ganttConfig: GanttConfig = useMemo(
-    () => ({ hourPx, minuteGranularity }),
-    [hourPx, minuteGranularity],
+    () => ({ hourPx: 80, minuteGranularity }),
+    [minuteGranularity],
   );
 
   const violations = shiftPlan?.constraintViolations ?? [];
@@ -309,15 +325,15 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
             ))}
           </ToggleButtonGroup>
 
-          {/* シフトパレットを開く */}
-          <UrledPlace url={`shift-puzzle/shifts/palette?shiftPlanId=${shiftPlanId}${selectedDayType ? `&dayType=${encodeURIComponent(selectedDayType)}` : ''}`}>
+          {/* タスク一覧を開く（dayType未選択時はクエリ無し） */}
+          <UrledPlace url={`shift-puzzle/tasks${selectedDayType ? `?dayType=${encodeURIComponent(selectedDayType)}` : ''}`}>
             <Button
               variant="outlined"
               size="small"
-              onClick={onOpenPaletteClick}
+              onClick={onOpenTaskListClick}
               sx={{ ml: 1 }}
             >
-              シフトパレット
+              タスク一覧
             </Button>
           </UrledPlace>
 
@@ -346,19 +362,6 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
 
       {/* ガント設定バー */}
       <div className="e-config-bar">
-        <div className="e-config-item">
-          <span className="e-config-label">スケール</span>
-          <Slider
-            size="small"
-            min={40}
-            max={120}
-            step={10}
-            value={hourPx}
-            onChange={(_, v) => setHourPx(v as number)}
-            sx={{ width: 100, mx: 1 }}
-          />
-          <span className="e-config-value">{hourPx}px/h</span>
-        </div>
         <div className="e-config-item">
           <span className="e-config-label">グリッド粒度</span>
           <ToggleButtonGroup
