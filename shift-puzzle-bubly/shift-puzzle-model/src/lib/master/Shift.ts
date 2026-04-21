@@ -101,11 +101,34 @@ export class Shift {
   /** 紐づく TimeSchedule の id */
   get timeScheduleId(): string | undefined { return this.state.timeScheduleId; }
 
-  /** BlockList（なければ空のBlockListを返す） */
+  /**
+   * BlockList（なければ空のBlockListを返す）。
+   * 注意：BlockList は **TimeSchedule-scoped** であり、
+   * blockIndex 0 は紐づく TimeSchedule.startMinute を起点とする。
+   * 初期化時に正しいサイズで blockList を state に書き込むのは呼び出し側（Editor）の責務。
+   * フォールバック（state.blockList 未設定時）は shift.durationMinutes ベースの暫定生成。
+   */
   get blockList(): BlockList {
     if (this.state.blockList) return new BlockList(this.state.blockList);
     const totalBlocks = Math.ceil(this.durationMinutes / 15);
     return BlockList.createEmpty(totalBlocks);
+  }
+
+  /**
+   * このShiftが TimeSchedule 内で占める「有効ブロック範囲」を返す（半開区間 [start, end)）。
+   * 範囲外のblockIndexに置かれた配置は outOfRange 違反。
+   */
+  validBlockRange(timeSchedule: { startMinute: number }): { start: number; end: number } {
+    const offsetMinutes = this.startMinute - timeSchedule.startMinute;
+    const start = Math.floor(offsetMinutes / 15);
+    const end = start + Math.ceil(this.durationMinutes / 15);
+    return { start, end };
+  }
+
+  /** 指定blockIndexがこのShiftの有効範囲内か */
+  isBlockInRange(blockIndex: number, timeSchedule: { startMinute: number }): boolean {
+    const { start, end } = this.validBlockRange(timeSchedule);
+    return blockIndex >= start && blockIndex < end;
   }
 
   // ========== プリミティブUI操作 ==========

@@ -4,8 +4,8 @@
  * PrimitiveGanttEditor — プリミティブUIガントエディター
  *
  * Redux連携：BlockList ベースのシフト配置データを読み書きする。
- * - TaskSelectionPanelView でタスクをブラシとして選択
- * - PrimitiveGanttView でセルをクリック/ドラッグして局員を配置
+ * - ブラシソース：別バブル（shift-puzzle/tasks の TaskList）からタスクをドラッグ
+ * - PrimitiveGanttView でセルにホバー連続ペイントして局員を配置
  * - 粒度切替（15/30/60分）で表示変更
  * - 既存D&Dガント（MemberGanttEditor）とは独立して共存
  */
@@ -17,12 +17,13 @@ import {
   selectShiftPuzzleMemberList,
   selectShiftPuzzlePlanById,
   addShiftPlan,
+  updateShiftPlan,
   setMemberList,
 } from '../slice/index.js';
 import {
-  addUserToBlock,
-  removeUserFromBlock,
   addUserToBlockRange,
+  removeUserFromBlockRange,
+  moveUserBlocks,
 } from '../slice/shift-plan-slice.js';
 import {
   ShiftPlan,
@@ -30,9 +31,9 @@ import {
 } from '../domain/index.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { createDefaultShifts, createDefaultTimeSchedules, DAY_TYPE_ORDER } from '../data/sampleData.js';
-import { PrimitiveGanttView } from '../ui/PrimitiveGanttView.js';
-import { TaskSelectionPanelView } from '../ui/TaskSelectionPanelView.js';
+import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
+import { draggingTaskId } from '../ui/TaskListView.js';
 import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 
 // ========== 型定義 ==========
@@ -40,6 +41,8 @@ import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 type PrimitiveGanttEditorProps = {
   shiftPlanId: string;
   initialDayType?: DayType;
+  /** セル（既配置）クリックでタスク詳細などへ遷移する callback */
+  onAssignedCellClick?: (taskId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -47,45 +50,81 @@ type PrimitiveGanttEditorProps = {
 export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   shiftPlanId,
   initialDayType,
+  onAssignedCellClick,
 }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
-  const [activeShiftId, setActiveShiftId] = useState<string | null>(null);
   const [minuteGranularity, setMinuteGranularity] = useState<60 | 30 | 15>(15);
-  const [filterDayType, setFilterDayType] = useState<DayType | undefined>(initialDayType);
+
+  /** TaskList ドラッグ中の taskId を購読してブラシ状態に反映 */
+  const [brushTaskId, setBrushTaskId] = useState<string | null>(null);
 
   const allShifts = useMemo(() => createDefaultShifts(), []);
   const allTimeSchedules = useMemo(() => createDefaultTimeSchedules(), []);
 
-  // ShiftPlan がなければ初期化
+  // 初期データロード
   useEffect(() => {
     if (members.length === 0) {
       dispatch(setMemberList(createSampleMemberList().map((m) => m.state)));
     }
   }, [dispatch, members.length]);
 
+  // ShiftPlan 初期化（BlockList は TimeSchedule-scoped で確保）
+  // 既存プランがあっても shifts が空なら BlockList 付きシフトを補充する
+  // （旧D&Dガント版で作成された assignments[] のみのプランとも共存可能にする）
   useEffect(() => {
+    const tsMap = new Map(allTimeSchedules.map((ts) => [ts.id, ts]));
+    const buildShiftsWithBlockList = () => allShifts.map((s) => {
+      const ts = s.timeScheduleId ? tsMap.get(s.timeScheduleId) : undefined;
+      const totalBlocks = ts ? ts.totalBlocks : Math.ceil(s.durationMinutes / 15);
+      return {
+        ...s.state,
+        blockList: { blocks: Array.from({ length: totalBlocks }, () => [] as string[]) },
+      };
+    });
+
     if (!shiftPlan) {
       const plan = ShiftPlan.create('プリミティブガント用プラン', '晴れ');
-      // BlockList付きシフトを追加
-      const shiftsWithBlockList = allShifts.map((s) => ({
-        ...s.state,
-        blockList: { blocks: Array.from({ length: Math.ceil(s.durationMinutes / 15) }, () => [] as string[]) },
-      }));
       const updatedPlan = new ShiftPlan({
         ...plan.state,
         id: shiftPlanId,
-        shifts: shiftsWithBlockList,
+        shifts: buildShiftsWithBlockList(),
         timeSchedules: allTimeSchedules.map((ts) => ts.state),
       });
       dispatch(addShiftPlan(updatedPlan.state));
+      return;
+    }
+
+    // 既存プランで shifts が未初期化 → 補充（assignments等は温存）
+    if (shiftPlan.shifts.length === 0) {
+      dispatch(updateShiftPlan({
+        ...shiftPlan.state,
+        shifts: buildShiftsWithBlockList(),
+        timeSchedules: allTimeSchedules.map((ts) => ts.state),
+      }));
     }
   }, [shiftPlan, shiftPlanId, dispatch, allShifts, allTimeSchedules]);
 
-  // プランのシフト（BlockList付き）を使用
+  // window の dragstart/dragend を監視してブラシ状態を同期
+  useEffect(() => {
+    const handleDragStart = () => {
+      if (draggingTaskId) setBrushTaskId(draggingTaskId);
+    };
+    const handleDragEnd = () => {
+      setBrushTaskId(null);
+    };
+    window.addEventListener('dragstart', handleDragStart);
+    window.addEventListener('dragend', handleDragEnd);
+    return () => {
+      window.removeEventListener('dragstart', handleDragStart);
+      window.removeEventListener('dragend', handleDragEnd);
+    };
+  }, []);
+
+  // プランから shifts / timeSchedules を取得
   const planShifts = useMemo(() => {
     if (!shiftPlan) return allShifts;
     return shiftPlan.shifts.length > 0 ? shiftPlan.shifts : allShifts;
@@ -98,115 +137,127 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   const ganttConfig: GanttConfig = { hourPx: 60, minuteGranularity };
 
-  // 各シフトの配置人数マップ（TaskSelectionPanel 用）
-  const assignedCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const shift of planShifts) {
-      const count = shift.getAssignedUserIds().length;
-      map.set(shift.id, count);
+  /**
+   * 行の受け入れ可否マップ（ブラシ中のみ意味がある）。
+   * - unavailable: ブラシタスクの全シフトに対し参加不可
+   * - warning:     参加可能だが担当局が全シフトと不一致
+   * - available:   参加可能 + 担当局一致あり
+   */
+  const rowAvailabilityMap = useMemo((): Map<string, RowAvailability> => {
+    if (!brushTaskId) return new Map();
+    const taskShifts = planShifts.filter((s) => s.taskId === brushTaskId);
+    if (taskShifts.length === 0) return new Map();
+
+    const map = new Map<string, RowAvailability>();
+    for (const member of members) {
+      const anyAvailable = taskShifts.some((s) => member.isAvailableFor(s.id));
+      if (!anyAvailable) {
+        map.set(member.id, 'unavailable');
+        continue;
+      }
+      const departmentMatches = taskShifts.some(
+        (s) => !s.responsibleDepartment || member.department === s.responsibleDepartment,
+      );
+      map.set(member.id, departmentMatches ? 'available' : 'warning');
     }
     return map;
-  }, [planShifts]);
+  }, [brushTaskId, planShifts, members]);
 
-  // セルクリック（単セルトグル）
-  const handleCellClick = (shiftId: string, memberId: string, blockIndex: number) => {
-    if (!activeShiftId || activeShiftId !== shiftId) return;
-    const shift = planShifts.find((s) => s.id === shiftId);
-    if (!shift) return;
-
-    if (shift.blockList.hasUser(blockIndex, memberId)) {
-      dispatch(removeUserFromBlock({ planId: shiftPlanId, shiftId, blockIndex, userId: memberId }));
-    } else {
-      dispatch(addUserToBlock({ planId: shiftPlanId, shiftId, blockIndex, userId: memberId }));
-    }
+  // 範囲ペイント（drop確定時）
+  const handlePaintRange = (shiftId: string, memberId: string, startBlock: number, endBlock: number) => {
+    dispatch(addUserToBlockRange({ planId: shiftPlanId, shiftId, startBlock, endBlock, userId: memberId }));
   };
 
-  // ドラッグ範囲確定（範囲追加）
-  const handleCellDragRange = (shiftId: string, memberId: string, startBlock: number, endBlock: number) => {
-    if (!activeShiftId || activeShiftId !== shiftId) return;
-    dispatch(addUserToBlockRange({ planId: shiftPlanId, shiftId, startBlock, endBlock, userId: memberId }));
+  // 範囲削除（×ボタン）
+  const handleRemoveRange = (shiftId: string, memberId: string, startBlock: number, endBlock: number) => {
+    dispatch(removeUserFromBlockRange({ planId: shiftPlanId, shiftId, startBlock, endBlock, userId: memberId }));
+  };
+
+  // 既配置バーの移動・リサイズ
+  const handleMoveRun = (
+    shiftId: string,
+    oldMemberId: string,
+    oldStart: number,
+    oldEnd: number,
+    newMemberId: string,
+    newStart: number,
+    newEnd: number,
+  ) => {
+    dispatch(moveUserBlocks({
+      planId: shiftPlanId,
+      shiftId,
+      oldUserId: oldMemberId,
+      oldStart,
+      oldEnd,
+      newUserId: newMemberId,
+      newStart,
+      newEnd,
+    }));
+  };
+
+  // 既配置バークリック → 親に taskId を通知（タスク詳細バブルへ遷移など）
+  const handleAssignedRunClick = (shiftId: string) => {
+    const shift = planShifts.find((s) => s.id === shiftId);
+    if (shift && onAssignedCellClick) onAssignedCellClick(shift.taskId);
   };
 
   return (
     <StyledEditor>
-      {/* サイドパネル: タスク選択 */}
-      <div className="e-side-panel">
-        <TaskSelectionPanelView
-          shifts={allShifts}
-          timeSchedules={allTimeSchedules}
-          assignedCountMap={assignedCountMap}
-          activeShiftId={activeShiftId}
-          filterDayType={filterDayType}
-          onSelectDayType={(dt) => {
-            setFilterDayType(dt);
-            setSelectedDayType(dt);
-          }}
-          onSelectShift={setActiveShiftId}
-        />
+      {/* ツールバー */}
+      <div className="e-toolbar">
+        {/* 日程フィルター */}
+        <div className="e-day-filter">
+          {DAY_TYPE_ORDER.map((dt) => (
+            <button
+              key={dt}
+              className={`e-day-btn ${selectedDayType === dt ? 'is-active' : ''}`}
+              onClick={() => setSelectedDayType(dt)}
+            >
+              {dt}
+            </button>
+          ))}
+        </div>
+
+        {/* 粒度切替 */}
+        <div className="e-granularity">
+          <span className="e-granularity-label">表示粒度:</span>
+          <ToggleButtonGroup
+            value={minuteGranularity}
+            exclusive
+            onChange={(_, v) => v && setMinuteGranularity(v as 60 | 30 | 15)}
+            size="small"
+          >
+            <ToggleButton value={60}>1h</ToggleButton>
+            <ToggleButton value={30}>30m</ToggleButton>
+            <ToggleButton value={15}>15m</ToggleButton>
+          </ToggleButtonGroup>
+        </div>
+
+        {/* ブラシ表示 */}
+        {brushTaskId && (
+          <div className="e-active-brush">
+            <span className="e-brush-label">
+              ブラシ: {planShifts.find((s) => s.taskId === brushTaskId)?.taskName ?? brushTaskId}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* メインガント */}
-      <div className="e-main-area">
-        {/* ツールバー */}
-        <div className="e-toolbar">
-          {/* 日程フィルター */}
-          <div className="e-day-filter">
-            <button
-              className={`e-day-btn ${!selectedDayType ? 'is-active' : ''}`}
-              onClick={() => setSelectedDayType(undefined)}
-            >
-              全日程
-            </button>
-            {DAY_TYPE_ORDER.map((dt) => (
-              <button
-                key={dt}
-                className={`e-day-btn ${selectedDayType === dt ? 'is-active' : ''}`}
-                onClick={() => setSelectedDayType(dt)}
-              >
-                {dt}
-              </button>
-            ))}
-          </div>
-
-          {/* 粒度切替 */}
-          <div className="e-granularity">
-            <span className="e-granularity-label">表示粒度:</span>
-            <ToggleButtonGroup
-              value={minuteGranularity}
-              exclusive
-              onChange={(_, v) => v && setMinuteGranularity(v as 60 | 30 | 15)}
-              size="small"
-            >
-              <ToggleButton value={60}>1h</ToggleButton>
-              <ToggleButton value={30}>30m</ToggleButton>
-              <ToggleButton value={15}>15m</ToggleButton>
-            </ToggleButtonGroup>
-          </div>
-
-          {/* アクティブブラシ表示 */}
-          {activeShiftId && (
-            <div className="e-active-brush">
-              <span className="e-brush-label">
-                ブラシ: {planShifts.find((s) => s.id === activeShiftId)?.taskName ?? activeShiftId}
-              </span>
-              <button className="e-clear-brush" onClick={() => setActiveShiftId(null)}>✕</button>
-            </div>
-          )}
-        </div>
-
-        {/* ガントビュー */}
-        <div className="e-gantt-container">
-          <PrimitiveGanttView
-            shifts={planShifts}
-            timeSchedules={planTimeSchedules}
-            members={members}
-            selectedDayType={selectedDayType}
-            ganttConfig={ganttConfig}
-            activeShiftId={activeShiftId}
-            onCellClick={handleCellClick}
-            onCellDragRange={handleCellDragRange}
-          />
-        </div>
+      {/* ガントビュー */}
+      <div className="e-gantt-container">
+        <PrimitiveGanttView
+          shifts={planShifts}
+          timeSchedules={planTimeSchedules}
+          members={members}
+          selectedDayType={selectedDayType}
+          ganttConfig={ganttConfig}
+          brushTaskId={brushTaskId}
+          onPaintRange={handlePaintRange}
+          onRemoveRange={handleRemoveRange}
+          onMoveRun={handleMoveRun}
+          onAssignedRunClick={handleAssignedRunClick}
+          rowAvailabilityMap={rowAvailabilityMap}
+        />
       </div>
     </StyledEditor>
   );
@@ -216,25 +267,10 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
 const StyledEditor = styled.div`
   display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
   font-size: 0.9em;
-
-  .e-side-panel {
-    width: 200px;
-    flex-shrink: 0;
-    border-right: 2px solid #ddd;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .e-main-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
 
   .e-toolbar {
     display: flex;
@@ -297,21 +333,8 @@ const StyledEditor = styled.div`
     font-weight: 600;
   }
 
-  .e-clear-brush {
-    border: none;
-    background: none;
-    cursor: pointer;
-    color: #1565c0;
-    font-size: 0.85em;
-    padding: 0;
-    line-height: 1;
-
-    &:hover { opacity: 0.7; }
-  }
-
   .e-gantt-container {
     flex: 1;
     overflow: auto;
-    padding: 8px;
   }
 `;

@@ -3,23 +3,39 @@
 /**
  * PrimitiveGanttView — セルグリッド型ガント（プリミティブUI）
  *
- * 既存の MemberGanttView（D&Dブロック操作）とは別コンポーネント。
- * Excelのようにセル単位でクリック/ドラッグして局員を配置する。
+ * レイアウト:
+ *   Y軸 = 局員（行）
+ *   X軸 = 時間（TimeSchedule の startMinute から endMinute まで、15分刻み）
  *
- * レンダリング計算:
- *   displayCells per shift = durationMinutes / minuteGranularity
- *   セル幅 = hourPx / (60 / minuteGranularity)
- *   displayCellIndex → blockIndex変換:
- *     blocksPerCell = minuteGranularity / 15
- *     startBlock = displayCellIndex * blocksPerCell
+ * 配置表示:
+ *   同一タスクの連続セルは1本のバーにマージして表示（名前は中央1つ）
+ *   重複 = 複数シフトに同時参加 → 半透明オーバーレイ＋!バッジ
+ *   範囲外 = シフトの validBlockRange の外 → 縞模様＋赤枠
+ *
+ * 操作（Plan A: drop確定型）:
+ *   TaskList から task をドラッグ → ホバー中はプレビューのみ（commit しない）
+ *   同一行内でドラッグを伸ばすとプレビュー範囲が拡張
+ *   行をまたぐとアンカーリセット
+ *   drop で範囲を一括 commit（onPaintRange）
+ *   ドラッグキャンセル（行外/Esc）でプレビュー破棄
+ *
+ * 削除:
+ *   既配置バーをホバーすると右端に × ボタン表示
+ *   クリックでそのバー（連続範囲）を削除
  */
 
-import React, { FC, useMemo, useState, useCallback } from 'react';
+import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member, type DayType } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
+import { DRAG_TYPE_TASK, draggingTaskId } from './TaskListView.js';
+import CloseIcon from '@mui/icons-material/Close';
 
-// ========== 型定義 ==========
+// 局員行の受け入れ可否型は MemberGanttView と共通（同一定義）
+export type { RowAvailability } from './MemberGanttView.js';
+import type { RowAvailability } from './MemberGanttView.js';
+
+// ========== 公開型 ==========
 
 export type PrimitiveGanttViewProps = {
   shifts: readonly Shift[];
@@ -27,18 +43,37 @@ export type PrimitiveGanttViewProps = {
   members: readonly Member[];
   selectedDayType?: DayType;
   ganttConfig?: GanttConfig;
-  /** 選択中のブラシ（シフトID） */
-  activeShiftId: string | null;
-  onCellClick?: (shiftId: string, memberId: string, blockIndex: number) => void;
-  /** ドラッグ範囲確定時 (startBlock 以上 endBlock 未満) */
-  onCellDragRange?: (shiftId: string, memberId: string, startBlock: number, endBlock: number) => void;
-  /** "shiftId:memberId" → boolean (true=violation) */
-  violationMap?: Map<string, boolean>;
+  /** 範囲 paint 要求（startBlock 以上 endBlock 未満） */
+  onPaintRange?: (shiftId: string, memberId: string, startBlock: number, endBlock: number) => void;
+  /** 範囲 remove 要求（startBlock 以上 endBlock 未満） */
+  onRemoveRange?: (shiftId: string, memberId: string, startBlock: number, endBlock: number) => void;
+  /**
+   * 既配置バーの移動・リサイズ確定通知。
+   * 同一userId/shiftIdで [oldStart..oldEnd) → [newStart..newEnd) への置き換えを意味する。
+   * 局員変更（クロス行ムーブ）時は newMemberId が異なる。
+   */
+  onMoveRun?: (
+    shiftId: string,
+    oldMemberId: string,
+    oldStart: number,
+    oldEnd: number,
+    newMemberId: string,
+    newStart: number,
+    newEnd: number,
+  ) => void;
+  /** 既配置バークリック（タスク詳細を開くなど） */
+  onAssignedRunClick?: (shiftId: string, memberId: string, startBlock: number) => void;
+  /** ブラシ対象タスクID（TaskListドラッグ中に外部から指定。ビジュアル用） */
+  brushTaskId?: string | null;
+  /** 局員行の受け入れ可否マップ（ブラシ中のみ意味がある） */
+  rowAvailabilityMap?: Map<string, RowAvailability>;
 };
 
 // ========== 定数 ==========
 
 const MEMBER_COLUMN_WIDTH = 130;
+const ROW_HEIGHT = 32;
+
 const TASK_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   'task-reception': { bg: '#e3f2fd', border: '#1976d2', text: '#0d47a1' },
   'task-setup':     { bg: '#e8f5e9', border: '#388e3c', text: '#1b5e20' },
@@ -60,287 +95,611 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-// ========== セル塗りつぶし判定 ==========
+// ========== 配置情報の計算 ==========
 
-function isCellFilled(
-  shift: Shift,
-  memberId: string,
-  displayCellIndex: number,
-  minuteGranularity: number,
-): boolean {
-  const blocksPerCell = minuteGranularity / 15;
-  const startBlock = displayCellIndex * blocksPerCell;
-  const bl = shift.blockList;
-  for (let b = startBlock; b < startBlock + blocksPerCell; b++) {
-    if (bl.hasUser(b, memberId)) return true;
+type CellPlacement = {
+  shift: Shift;
+  isOutOfRange: boolean;
+};
+
+/** 各 (memberId, blockIndex) → そのセルに置かれている配置リスト */
+function buildPlacementMap(
+  shifts: readonly Shift[],
+  timeSchedule: TimeSchedule,
+): Map<string, CellPlacement[]> {
+  const map = new Map<string, CellPlacement[]>();
+  for (const shift of shifts) {
+    const bl = shift.blockList;
+    for (let blockIndex = 0; blockIndex < bl.totalBlocks; blockIndex++) {
+      const userIds = bl.getUsersAt(blockIndex);
+      if (userIds.length === 0) continue;
+      const isOutOfRange = !shift.isBlockInRange(blockIndex, timeSchedule);
+      for (const userId of userIds) {
+        const key = `${userId}:${blockIndex}`;
+        const list = map.get(key) ?? [];
+        list.push({ shift, isOutOfRange });
+        map.set(key, list);
+      }
+    }
   }
-  return false;
+  return map;
 }
 
-// ========== ShiftHeaderRow ==========
-
-type ShiftHeaderRowProps = {
+/**
+ * 1局員の連続バー（run）を計算する。
+ * primary = 各セルの placements[0]（最初に置かれたシフト）。
+ * 同一 shift.id が連続するセル群を1つの run として束ねる。
+ */
+type RunBar = {
   shift: Shift;
-  cellWidth: number;
-  displayCells: number;
-  minuteGranularity: number;
+  startBlock: number;
+  endBlock: number; // 半開区間
+  isOverlap: boolean;
+  isOutOfRange: boolean; // run 内のいずれかが範囲外なら true
 };
 
-const ShiftHeaderRow: FC<ShiftHeaderRowProps> = ({
-  shift,
-  cellWidth,
-  displayCells,
-  minuteGranularity,
-}) => {
-  const color = getTaskColor(shift.taskId);
-  const totalWidth = cellWidth * displayCells;
+function buildRunsForMember(
+  memberId: string,
+  totalBlocks: number,
+  placementMap: Map<string, CellPlacement[]>,
+): RunBar[] {
+  const runs: RunBar[] = [];
+  let cur: RunBar | null = null;
+  for (let b = 0; b < totalBlocks; b++) {
+    const placements = placementMap.get(`${memberId}:${b}`) ?? [];
+    const primary = placements[0];
+    if (!primary) {
+      if (cur) {
+        runs.push(cur);
+        cur = null;
+      }
+      continue;
+    }
+    const isOverlap = placements.length > 1;
+    if (cur && cur.shift.id === primary.shift.id) {
+      cur.endBlock = b + 1;
+      cur.isOverlap = cur.isOverlap || isOverlap;
+      cur.isOutOfRange = cur.isOutOfRange || primary.isOutOfRange;
+    } else {
+      if (cur) runs.push(cur);
+      cur = {
+        shift: primary.shift,
+        startBlock: b,
+        endBlock: b + 1,
+        isOverlap,
+        isOutOfRange: primary.isOutOfRange,
+      };
+    }
+  }
+  if (cur) runs.push(cur);
+  return runs;
+}
 
-  return (
-    <StyledShiftHeader
-      $bg={color.bg}
-      $border={color.border}
-      $text={color.text}
-      style={{ width: totalWidth }}
-    >
-      <span className="e-shift-name">{shift.taskName}</span>
-      <span className="e-shift-time">{shift.startTime}–{shift.endTime}</span>
-      <div className="e-time-cells">
-        {Array.from({ length: displayCells }).map((_, i) => {
-          const minute = shift.startMinute + i * minuteGranularity;
-          return (
-            <div key={i} className="e-time-cell" style={{ width: cellWidth }}>
-              <span className="e-time-label">{minutesToTime(minute)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </StyledShiftHeader>
-  );
-};
+/**
+ * brushTaskId に対応するシフトを blockIndex 位置から1つ選ぶ。
+ */
+function resolveShiftForTaskAt(
+  candidates: Shift[],
+  blockIndex: number,
+  timeSchedule: TimeSchedule,
+): Shift | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+  const containing = candidates.find((s) => s.isBlockInRange(blockIndex, timeSchedule));
+  if (containing) return containing;
+  return candidates.reduce((best, s) => {
+    const r = s.validBlockRange(timeSchedule);
+    const mid = (r.start + r.end) / 2;
+    const bestR = best.validBlockRange(timeSchedule);
+    const bestMid = (bestR.start + bestR.end) / 2;
+    return Math.abs(mid - blockIndex) < Math.abs(bestMid - blockIndex) ? s : best;
+  });
+}
 
-// ========== MemberShiftRow ==========
+// ========== プレビュー状態 ==========
 
-type DragInfo = {
-  shiftId: string;
+/**
+ * ドラッグ中の予定範囲。アンカー＝ドラッグで最初に入ったセル、current = 現在のホバーセル。
+ * 同一行内のみ範囲を構築する。行をまたぐと anchor は新しい行の現在セルへリセット。
+ */
+type PreviewState = {
   memberId: string;
-  startCell: number;
-  currentCell: number;
-  mode: 'add' | 'remove';
-};
-
-type MemberShiftRowProps = {
-  member: Member;
-  shift: Shift;
-  cellWidth: number;
-  displayCells: number;
-  minuteGranularity: number;
-  isViolation: boolean;
-  activeBrush: boolean;
-  dragInfo: DragInfo | null;
-  onPointerDown: (shiftId: string, memberId: string, cellIndex: number, e: React.PointerEvent) => void;
-  onPointerEnter: (shiftId: string, memberId: string, cellIndex: number) => void;
-  onPointerUp: () => void;
-};
-
-const MemberShiftRow: FC<MemberShiftRowProps> = ({
-  member,
-  shift,
-  cellWidth,
-  displayCells,
-  minuteGranularity,
-  isViolation,
-  activeBrush,
-  dragInfo,
-  onPointerDown,
-  onPointerEnter,
-  onPointerUp,
-}) => {
-  const color = getTaskColor(shift.taskId);
-
-  const isInDragPreview = (cellIndex: number): boolean => {
-    if (!dragInfo || dragInfo.shiftId !== shift.id || dragInfo.memberId !== member.id) return false;
-    const lo = Math.min(dragInfo.startCell, dragInfo.currentCell);
-    const hi = Math.max(dragInfo.startCell, dragInfo.currentCell);
-    return cellIndex >= lo && cellIndex <= hi;
-  };
-
-  return (
-    <StyledMemberShiftRow $activeBrush={activeBrush}>
-      {Array.from({ length: displayCells }).map((_, cellIndex) => {
-        const filled = isCellFilled(shift, member.id, cellIndex, minuteGranularity);
-        const inPreview = isInDragPreview(cellIndex);
-        const previewMode = dragInfo?.mode ?? 'add';
-
-        return (
-          <StyledCell
-            key={cellIndex}
-            $width={cellWidth}
-            $filled={filled}
-            $inPreview={inPreview}
-            $previewMode={previewMode}
-            $bg={color.bg}
-            $border={color.border}
-            $isViolation={isViolation}
-            $activeBrush={activeBrush}
-            onPointerDown={(e) => onPointerDown(shift.id, member.id, cellIndex, e)}
-            onPointerEnter={() => onPointerEnter(shift.id, member.id, cellIndex)}
-            onPointerUp={onPointerUp}
-          />
-        );
-      })}
-    </StyledMemberShiftRow>
-  );
+  anchorBlock: number;
+  currentBlock: number;
 };
 
 // ========== メインコンポーネント ==========
 
 export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   shifts,
-  timeSchedules: _timeSchedules,
+  timeSchedules,
   members,
   selectedDayType,
   ganttConfig = {},
-  activeShiftId,
-  onCellClick,
-  onCellDragRange,
-  violationMap,
+  onPaintRange,
+  onRemoveRange,
+  onMoveRun,
+  onAssignedRunClick,
+  brushTaskId,
+  rowAvailabilityMap,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
-  const minuteGranularity = ganttConfig.minuteGranularity ?? 15;
-  const cellWidth = (hourPx / 60) * minuteGranularity;
+  const minutePx = hourPx / 60;
+  const blockPx = minutePx * 15;
 
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const activeTimeSchedule = useMemo(() => {
+    if (!selectedDayType) return timeSchedules[0] ?? null;
+    return timeSchedules.find((ts) => ts.dayType === selectedDayType) ?? null;
+  }, [timeSchedules, selectedDayType]);
 
+  const activeShifts = useMemo(() => {
+    if (!activeTimeSchedule) return [] as Shift[];
+    return shifts.filter((s) => s.timeScheduleId === activeTimeSchedule.id);
+  }, [shifts, activeTimeSchedule]);
 
-  // dayType でフィルタ
-  const filteredShifts = useMemo(() => {
-    if (!selectedDayType) return shifts;
-    return shifts.filter((s) => s.dayType === selectedDayType);
-  }, [shifts, selectedDayType]);
+  const placementMap = useMemo(
+    () => activeTimeSchedule
+      ? buildPlacementMap(activeShifts, activeTimeSchedule)
+      : new Map<string, CellPlacement[]>(),
+    [activeShifts, activeTimeSchedule],
+  );
 
-  const handlePointerDown = useCallback(
-    (shiftId: string, memberId: string, cellIndex: number, e: React.PointerEvent) => {
-      if (!activeShiftId || activeShiftId !== shiftId) return;
+  // ブラシ候補シフト（state優先、無ければ draggingTaskId モジュール変数）
+  const resolveActiveBrush = useCallback((): { taskId: string; candidates: Shift[] } | null => {
+    if (!activeTimeSchedule) return null;
+    const taskId = brushTaskId ?? draggingTaskId;
+    if (!taskId) return null;
+    const candidates = activeShifts.filter((s) => s.taskId === taskId);
+    if (candidates.length === 0) return null;
+    return { taskId, candidates };
+  }, [brushTaskId, activeTimeSchedule, activeShifts]);
+
+  // ブラシシフト群の「有効blockIndex」集合
+  const brushValidBlocks = useMemo(() => {
+    const brush = resolveActiveBrush();
+    if (!brush || !activeTimeSchedule) return null;
+    const set = new Set<number>();
+    for (const s of brush.candidates) {
+      const r = s.validBlockRange(activeTimeSchedule);
+      for (let i = r.start; i < r.end; i++) set.add(i);
+    }
+    return set;
+  }, [resolveActiveBrush, activeTimeSchedule]);
+
+  const isPainting = brushValidBlocks !== null && brushValidBlocks.size > 0;
+
+  // ========== ブラシペイントプレビュー ==========
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+
+  // ========== 移動・リサイズプレビュー ==========
+  /**
+   * 既配置バーに対する編集操作。
+   * - move      = バー本体ドラッグ（行内時刻シフト + クロス行で局員変更）
+   * - resize-L  = 左エッジドラッグで開始時刻を変更
+   * - resize-R  = 右エッジドラッグで終了時刻を変更
+   */
+  type EditState = {
+    kind: 'move' | 'resize-L' | 'resize-R';
+    shiftId: string;
+    oldMemberId: string;
+    oldStart: number;
+    oldEnd: number;
+    initialPointerX: number;
+    initialPointerY: number;
+    /** プレビュー後の値（commit時の値） */
+    previewStart: number;
+    previewEnd: number;
+    /** クロス行ムーブ時の現ターゲット行 */
+    targetMemberId: string;
+    /** 実際にドラッグが動いたか（クリック検出用） */
+    moved: boolean;
+  };
+  const [editState, setEditState] = useState<EditState | null>(null);
+  /** 直近の pointerup でドラッグが起きたら、その後の click を抑制するフラグ */
+  const suppressClickRef = useRef(false);
+
+  // ========== ヘルパー: 行から member.id を引く（クロス行ムーブ用） ==========
+  const findMemberIdAtPoint = useCallback((clientX: number, clientY: number): string | null => {
+    const el = document.elementFromPoint(clientX, clientY);
+    if (!el) return null;
+    const row = (el as Element).closest('[data-member-id]');
+    return row ? row.getAttribute('data-member-id') : null;
+  }, []);
+
+  // ドラッグ終了で必ずプレビュークリア（drop/cancel 共通）
+  useEffect(() => {
+    const handleDragEnd = () => setPreview(null);
+    window.addEventListener('dragend', handleDragEnd);
+    return () => window.removeEventListener('dragend', handleDragEnd);
+  }, []);
+
+  // brushTaskId が変わったら（drop後など）プレビュークリア
+  useEffect(() => {
+    if (!brushTaskId) setPreview(null);
+  }, [brushTaskId]);
+
+  const calcBlockIndex = useCallback(
+    (clientX: number, rowEl: Element): number => {
+      const rect = rowEl.getBoundingClientRect();
+      const x = Math.max(0, clientX - rect.left);
+      return Math.min(Math.floor(x / blockPx), (activeTimeSchedule?.totalBlocks ?? 1) - 1);
+    },
+    [blockPx, activeTimeSchedule],
+  );
+
+  const handleRowDragOver = useCallback(
+    (memberId: string, e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
+      const brush = resolveActiveBrush();
+      if (!brush) return;
+      // pointer編集中はブラシのドロップを優先しない
+      if (editState) return;
       e.preventDefault();
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-
-      const shift = filteredShifts.find((s) => s.id === shiftId);
-      if (!shift) return;
-
-      const blocksPerCell = minuteGranularity / 15;
-      const startBlock = cellIndex * blocksPerCell;
-      const filled = shift.blockList.hasUser(startBlock, memberId);
-
-      setDragInfo({
-        shiftId,
-        memberId,
-        startCell: cellIndex,
-        currentCell: cellIndex,
-        mode: filled ? 'remove' : 'add',
+      e.dataTransfer.dropEffect = 'copy';
+      const blockIndex = calcBlockIndex(e.clientX, e.currentTarget);
+      // プレビュー更新：行をまたいだらアンカーリセット
+      setPreview((prev) => {
+        if (!prev || prev.memberId !== memberId) {
+          return { memberId, anchorBlock: blockIndex, currentBlock: blockIndex };
+        }
+        if (prev.currentBlock === blockIndex) return prev;
+        return { ...prev, currentBlock: blockIndex };
       });
     },
-    [activeShiftId, filteredShifts, minuteGranularity]
+    [resolveActiveBrush, calcBlockIndex, editState],
   );
 
-  const handlePointerEnter = useCallback(
-    (shiftId: string, memberId: string, cellIndex: number) => {
-      setDragInfo((prev) => {
-        if (!prev || prev.shiftId !== shiftId || prev.memberId !== memberId) return prev;
-        return { ...prev, currentCell: cellIndex };
-      });
-    },
-    []
-  );
-
-  const handlePointerUp = useCallback(() => {
-    if (!dragInfo) return;
-    const { shiftId, memberId, startCell, currentCell, mode } = dragInfo;
-    const lo = Math.min(startCell, currentCell);
-    const hi = Math.max(startCell, currentCell);
-
-    if (lo === hi) {
-      // 単セルクリック
-      const blocksPerCell = minuteGranularity / 15;
-      const blockIndex = lo * blocksPerCell;
-      onCellClick?.(shiftId, memberId, blockIndex);
-    } else {
-      // 範囲ドラッグ（modeに関わらずonCellDragRangeで通知、外部でadd/remove判定）
-      const blocksPerCell = minuteGranularity / 15;
-      const startBlock = lo * blocksPerCell;
-      const endBlock = (hi + 1) * blocksPerCell;
-      if (mode === 'add') {
-        onCellDragRange?.(shiftId, memberId, startBlock, endBlock);
-      } else {
-        // remove: 各ブロックを onCellClick で通知（外部が remove として扱う）
-        for (let b = startBlock; b < endBlock; b++) {
-          onCellClick?.(shiftId, memberId, b);
+  const handleRowDrop = useCallback(
+    (memberId: string, e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
+      const brush = resolveActiveBrush();
+      if (!brush || !activeTimeSchedule) {
+        setPreview(null);
+        return;
+      }
+      e.preventDefault();
+      const blockIndex = calcBlockIndex(e.clientX, e.currentTarget);
+      // 確定範囲を計算：preview があればそれを採用、なければ単セル
+      let startBlock = blockIndex;
+      let endBlockExclusive = blockIndex + 1;
+      if (preview && preview.memberId === memberId) {
+        startBlock = Math.min(preview.anchorBlock, blockIndex);
+        endBlockExclusive = Math.max(preview.anchorBlock, blockIndex) + 1;
+      }
+      // 範囲内の各cellに対し対応shiftを解決（範囲が複数shiftに跨る可能性あり）
+      // シフトごとにグルーピングして commit
+      const byShift = new Map<string, { shift: Shift; blocks: number[] }>();
+      for (let b = startBlock; b < endBlockExclusive; b++) {
+        const shift = resolveShiftForTaskAt(brush.candidates, b, activeTimeSchedule);
+        if (!shift) continue;
+        const entry = byShift.get(shift.id) ?? { shift, blocks: [] };
+        entry.blocks.push(b);
+        byShift.set(shift.id, entry);
+      }
+      // 連続範囲ごとに onPaintRange 呼び出し
+      for (const { shift, blocks } of byShift.values()) {
+        // blocks は昇順。連続区間に分割
+        let runStart = blocks[0];
+        let runPrev = blocks[0];
+        for (let i = 1; i <= blocks.length; i++) {
+          if (i === blocks.length || blocks[i] !== runPrev + 1) {
+            onPaintRange?.(shift.id, memberId, runStart, runPrev + 1);
+            if (i < blocks.length) {
+              runStart = blocks[i];
+              runPrev = blocks[i];
+            }
+          } else {
+            runPrev = blocks[i];
+          }
         }
       }
+      setPreview(null);
+    },
+    [preview, resolveActiveBrush, activeTimeSchedule, calcBlockIndex, onPaintRange],
+  );
+
+  const handleRowDragLeave = useCallback((memberId: string, e: React.DragEvent) => {
+    // currentTarget の外に出たらプレビュー消す（同一memberの行内移動では発火しないようにrelatedTargetチェック）
+    const related = e.relatedTarget as Node | null;
+    if (related && (e.currentTarget as Element).contains(related)) return;
+    // 別行に移動した可能性 → preview側で memberId mismatch を検出してリセット
+    // 完全に行外に出た場合：preview を残しておくと別行に行ったときに紛らわしいのでここでクリアしない
+    void memberId;
+  }, []);
+
+  const handleRunClick = useCallback(
+    (run: RunBar, memberId: string, e: React.MouseEvent) => {
+      // 直前にドラッグ移動/リサイズが起きていたらクリック動作（詳細遷移）を抑制
+      if (suppressClickRef.current) {
+        suppressClickRef.current = false;
+        return;
+      }
+      if (e.defaultPrevented) return;
+      onAssignedRunClick?.(run.shift.id, memberId, run.startBlock);
+    },
+    [onAssignedRunClick],
+  );
+
+  // ========== 移動・リサイズ pointer handlers ==========
+
+  const startEdit = useCallback(
+    (
+      kind: EditState['kind'],
+      run: RunBar,
+      memberId: string,
+      e: React.PointerEvent<HTMLElement>,
+    ) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setEditState({
+        kind,
+        shiftId: run.shift.id,
+        oldMemberId: memberId,
+        oldStart: run.startBlock,
+        oldEnd: run.endBlock,
+        initialPointerX: e.clientX,
+        initialPointerY: e.clientY,
+        previewStart: run.startBlock,
+        previewEnd: run.endBlock,
+        targetMemberId: memberId,
+        moved: false,
+      });
+    },
+    [],
+  );
+
+  const handleEditMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (!editState) return;
+    e.preventDefault();
+    const dxBlocks = Math.round((e.clientX - editState.initialPointerX) / blockPx);
+    const dxPx = e.clientX - editState.initialPointerX;
+    const dyPx = e.clientY - editState.initialPointerY;
+    const moved = editState.moved || Math.abs(dxPx) >= 3 || Math.abs(dyPx) >= 3;
+
+    if (editState.kind === 'move') {
+      const newStart = editState.oldStart + dxBlocks;
+      const newEnd = editState.oldEnd + dxBlocks;
+      // ターゲット行をポインタ位置から検出（行をまたいだら局員変更）
+      const targetId = findMemberIdAtPoint(e.clientX, e.clientY) ?? editState.targetMemberId;
+      setEditState({ ...editState, previewStart: newStart, previewEnd: newEnd, targetMemberId: targetId, moved });
+    } else if (editState.kind === 'resize-R') {
+      const newEnd = Math.max(editState.oldStart + 1, editState.oldEnd + dxBlocks);
+      setEditState({ ...editState, previewEnd: newEnd, moved });
+    } else {
+      // resize-L
+      const newStart = Math.min(editState.oldEnd - 1, editState.oldStart + dxBlocks);
+      setEditState({ ...editState, previewStart: newStart, moved });
+    }
+  }, [editState, blockPx, findMemberIdAtPoint]);
+
+  const handleEditUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (!editState) return;
+    e.preventDefault();
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
     }
 
-    setDragInfo(null);
-  }, [dragInfo, minuteGranularity, onCellClick, onCellDragRange]);
+    if (editState.moved) {
+      // commit
+      const targetId = editState.kind === 'move' ? editState.targetMemberId : editState.oldMemberId;
+      const noChange =
+        targetId === editState.oldMemberId &&
+        editState.previewStart === editState.oldStart &&
+        editState.previewEnd === editState.oldEnd;
+      if (!noChange) {
+        onMoveRun?.(
+          editState.shiftId,
+          editState.oldMemberId,
+          editState.oldStart,
+          editState.oldEnd,
+          targetId,
+          editState.previewStart,
+          editState.previewEnd,
+        );
+        suppressClickRef.current = true; // 次の click 動作は抑制
+      }
+    }
+    setEditState(null);
+  }, [editState, onMoveRun]);
 
-  if (filteredShifts.length === 0) {
+  const handleEditCancel = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (!editState) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setEditState(null);
+  }, [editState]);
+
+  const handleRunRemove = useCallback(
+    (run: RunBar, memberId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onRemoveRange?.(run.shift.id, memberId, run.startBlock, run.endBlock);
+    },
+    [onRemoveRange],
+  );
+
+  if (!activeTimeSchedule) {
     return (
       <StyledGantt>
-        <div className="e-empty">表示するシフトがありません</div>
+        <div className="e-empty">DayTypeを選んでください</div>
       </StyledGantt>
     );
   }
 
+  const totalBlocks = activeTimeSchedule.totalBlocks;
+  const totalWidth = totalBlocks * blockPx;
+  const dayStartMinute = activeTimeSchedule.startMinute;
+
   return (
     <StyledGantt>
-      {filteredShifts.map((shift) => {
-        const displayCells = Math.ceil(shift.durationMinutes / minuteGranularity);
-        const isActiveBrush = activeShiftId === shift.id;
+      {/* 時間軸ヘッダー */}
+      <div className="e-header-row">
+        <div className="e-member-col-header" style={{ width: MEMBER_COLUMN_WIDTH }}>局員</div>
+        <div className="e-time-axis" style={{ width: totalWidth }}>
+          {Array.from({ length: totalBlocks + 1 }).map((_, i) => {
+            const minute = dayStartMinute + i * 15;
+            const isHour = minute % 60 === 0;
+            return (
+              <div
+                key={i}
+                className={`e-tick ${isHour ? 'is-hour' : ''}`}
+                style={{ left: i * blockPx }}
+              >
+                {isHour && <span className="e-tick-label">{minutesToTime(minute)}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-        return (
-          <div key={shift.id} className="e-shift-section">
-            {/* シフトヘッダー */}
-            <div className="e-shift-header-row">
-              <div className="e-member-col-header" style={{ width: MEMBER_COLUMN_WIDTH }} />
-              <ShiftHeaderRow
-                shift={shift}
-                cellWidth={cellWidth}
-                displayCells={displayCells}
-                minuteGranularity={minuteGranularity}
-              />
-            </div>
+      {/* 局員行 */}
+      <div className="e-body">
+        {members.map((member) => {
+          const availability = isPainting ? (rowAvailabilityMap?.get(member.id) ?? null) : null;
+          const runs = buildRunsForMember(member.id, totalBlocks, placementMap);
+          const previewActive = preview && preview.memberId === member.id;
+          const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
+          const previewEnd = previewActive ? Math.max(preview.anchorBlock, preview.currentBlock) + 1 : -1;
 
-            {/* 局員行 */}
-            {members.map((member) => {
-              const violationKey = `${shift.id}:${member.id}`;
-              const isViolation = violationMap?.get(violationKey) ?? false;
+          // 編集プレビュー: クロス行ムーブの target row なら preview bar を出す
+          const editPreviewInThisRow =
+            editState && editState.moved && editState.kind === 'move' && editState.targetMemberId === member.id
+              ? { start: editState.previewStart, end: editState.previewEnd, shift: shifts.find((s) => s.id === editState.shiftId) }
+              : null;
 
-              return (
-                <div key={member.id} className="e-gantt-row">
-                  {/* 局員ラベル（固定列） */}
-                  <div className="e-member-label" style={{ width: MEMBER_COLUMN_WIDTH }}>
-                    <span className="e-member-name">{member.name}</span>
-                    {member.isNewMember && <span className="e-new-badge">新</span>}
-                    <span className="e-dept-badge">{member.state.department.slice(0, 2)}</span>
-                  </div>
-                  {/* セルグリッド行 */}
-                  <MemberShiftRow
-                    member={member}
-                    shift={shift}
-                    cellWidth={cellWidth}
-                    displayCells={displayCells}
-                    minuteGranularity={minuteGranularity}
-                    isViolation={isViolation}
-                    activeBrush={isActiveBrush}
-                    dragInfo={dragInfo}
-                    onPointerDown={handlePointerDown}
-                    onPointerEnter={handlePointerEnter}
-                    onPointerUp={handlePointerUp}
+          return (
+            <StyledMemberRow
+              key={member.id}
+              $availability={availability}
+              style={{ height: ROW_HEIGHT }}
+              data-member-id={member.id}
+            >
+              <div className="e-member-label" style={{ width: MEMBER_COLUMN_WIDTH }}>
+                <span className="e-member-name">{member.name}</span>
+                {member.isNewMember && <span className="e-new-badge">新</span>}
+                <span className="e-dept-badge">{member.state.department.slice(0, 2)}</span>
+              </div>
+              <div
+                className="e-cell-strip"
+                style={{ width: totalWidth }}
+                onDragOver={(e) => handleRowDragOver(member.id, e)}
+                onDrop={(e) => handleRowDrop(member.id, e)}
+                onDragLeave={(e) => handleRowDragLeave(member.id, e)}
+              >
+                {/* グリッド背景線（15分粒度） */}
+                {Array.from({ length: totalBlocks }).map((_, b) => {
+                  const isHour = ((dayStartMinute + b * 15) % 60) === 0;
+                  const isInBrushRange = brushValidBlocks?.has(b) ?? false;
+                  return (
+                    <StyledGridCell
+                      key={b}
+                      $left={b * blockPx}
+                      $width={blockPx}
+                      $isHour={isHour}
+                      $isInBrushRange={isInBrushRange}
+                    />
+                  );
+                })}
+
+                {/* 連結バー（既配置） */}
+                {runs.map((run) => {
+                  const color = getTaskColor(run.shift.taskId);
+                  // この run が編集中なら preview を反映
+                  const isBeingEdited =
+                    editState &&
+                    editState.shiftId === run.shift.id &&
+                    editState.oldMemberId === member.id &&
+                    editState.oldStart === run.startBlock &&
+                    editState.oldEnd === run.endBlock;
+                  // クロス行ムーブで別行に飛んだら、元の位置のバーは半透明で残す（ゴースト）
+                  const isMovingToOtherRow =
+                    isBeingEdited &&
+                    editState.kind === 'move' &&
+                    editState.targetMemberId !== member.id;
+                  const start = isBeingEdited && !isMovingToOtherRow ? editState.previewStart : run.startBlock;
+                  const end = isBeingEdited && !isMovingToOtherRow ? editState.previewEnd : run.endBlock;
+                  const left = start * blockPx;
+                  const width = (end - start) * blockPx;
+                  return (
+                    <StyledRunBar
+                      key={`${run.shift.id}-${run.startBlock}`}
+                      $left={left}
+                      $width={width}
+                      $bg={color.bg}
+                      $border={color.border}
+                      $text={color.text}
+                      $isOutOfRange={run.isOutOfRange}
+                      $isOverlap={run.isOverlap}
+                      $isGhost={!!isMovingToOtherRow}
+                      title={`${run.shift.taskName}${run.isOutOfRange ? '（タスク時間外）' : ''}${run.isOverlap ? '（重複あり）' : ''}`}
+                      onClick={(e) => handleRunClick(run, member.id, e)}
+                      onPointerDown={(e) => startEdit('move', run, member.id, e)}
+                      onPointerMove={handleEditMove}
+                      onPointerUp={handleEditUp}
+                      onPointerCancel={handleEditCancel}
+                    >
+                      <StyledResizeHandle
+                        $side="left"
+                        onPointerDown={(e) => startEdit('resize-L', run, member.id, e)}
+                        onPointerMove={handleEditMove}
+                        onPointerUp={handleEditUp}
+                        onPointerCancel={handleEditCancel}
+                      />
+                      <span className="e-run-label">{run.shift.taskName}</span>
+                      {run.isOverlap && <span className="e-overlap-badge">!</span>}
+                      <button
+                        type="button"
+                        className="e-remove-btn"
+                        title="削除"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => handleRunRemove(run, member.id, e)}
+                      >
+                        <CloseIcon style={{ fontSize: 14 }} />
+                      </button>
+                      <StyledResizeHandle
+                        $side="right"
+                        onPointerDown={(e) => startEdit('resize-R', run, member.id, e)}
+                        onPointerMove={handleEditMove}
+                        onPointerUp={handleEditUp}
+                        onPointerCancel={handleEditCancel}
+                      />
+                    </StyledRunBar>
+                  );
+                })}
+
+                {/* クロス行ムーブの転送先プレビュー */}
+                {editPreviewInThisRow && editPreviewInThisRow.shift && (
+                  <StyledRunBar
+                    $left={editPreviewInThisRow.start * blockPx}
+                    $width={(editPreviewInThisRow.end - editPreviewInThisRow.start) * blockPx}
+                    $bg={getTaskColor(editPreviewInThisRow.shift.taskId).bg}
+                    $border={getTaskColor(editPreviewInThisRow.shift.taskId).border}
+                    $text={getTaskColor(editPreviewInThisRow.shift.taskId).text}
+                    $isOutOfRange={false}
+                    $isOverlap={false}
+                    $isGhost={false}
+                    style={{ opacity: 0.65, pointerEvents: 'none' }}
+                  >
+                    <span className="e-run-label">{editPreviewInThisRow.shift.taskName}</span>
+                  </StyledRunBar>
+                )}
+
+                {/* プレビュー（ドラッグ中の塗り予告） */}
+                {previewActive && previewStart >= 0 && (
+                  <StyledPreviewBar
+                    style={{
+                      left: previewStart * blockPx,
+                      width: (previewEnd - previewStart) * blockPx,
+                    }}
                   />
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                )}
+              </div>
+            </StyledMemberRow>
+          );
+        })}
+      </div>
     </StyledGantt>
   );
 };
@@ -364,18 +723,15 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     font-size: 1.1em;
   }
 
-  .e-shift-section {
-    margin-bottom: 8px;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .e-shift-header-row {
+  .e-header-row {
     display: flex;
     align-items: stretch;
+    border-bottom: 2px solid #ddd;
     background: #f8f8f8;
-    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-shrink: 0;
   }
 
   .e-member-col-header {
@@ -388,22 +744,40 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     padding: 4px;
     color: #555;
     font-size: 0.85em;
+    position: sticky;
+    left: 0;
+    z-index: 25;
     background: #f8f8f8;
   }
 
-  .e-gantt-row {
-    display: flex;
-    align-items: stretch;
-    border-bottom: 1px solid #f0f0f0;
-    min-height: 28px;
+  .e-time-axis {
+    position: relative;
+    height: 24px;
+    flex-shrink: 0;
+  }
 
-    &:last-child {
-      border-bottom: none;
-    }
+  .e-tick {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-left: 1px solid #e0e0e0;
 
-    &:hover {
-      background-color: #fafafa;
+    &.is-hour {
+      border-left: 1px solid #bbb;
     }
+  }
+
+  .e-tick-label {
+    position: absolute;
+    left: 3px;
+    top: 4px;
+    font-size: 0.78em;
+    color: #666;
+    white-space: nowrap;
+  }
+
+  .e-body {
+    flex: 1;
   }
 
   .e-member-label {
@@ -411,13 +785,12 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 6px;
+    padding: 4px 6px;
     border-right: 2px solid #ddd;
     position: sticky;
     left: 0;
     z-index: 10;
     background: inherit;
-    min-height: 28px;
 
     .e-member-name {
       font-weight: 500;
@@ -447,106 +820,192 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
       flex-shrink: 0;
     }
   }
+
+  .e-cell-strip {
+    position: relative;
+    flex-shrink: 0;
+  }
 `;
 
-type StyledShiftHeaderProps = React.HTMLAttributes<HTMLDivElement> & {
+// 行の availability に応じた背景・左ボーダー色
+function getAvailabilityStyle(availability: RowAvailability | null) {
+  if (!availability) return '';
+  if (availability === 'available') return `
+    border-left: 4px solid #4caf50;
+    background-color: rgba(76, 175, 80, 0.06);
+  `;
+  if (availability === 'warning') return `
+    border-left: 4px solid #ff9800;
+    background-color: rgba(255, 152, 0, 0.06);
+  `;
+  return `
+    border-left: 4px solid #f44336;
+    background-color: rgba(244, 67, 54, 0.06);
+  `;
+}
+
+type StyledMemberRowProps = React.HTMLAttributes<HTMLDivElement> & {
+  $availability: RowAvailability | null;
+};
+
+const StyledMemberRow = styled.div<StyledMemberRowProps>`
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.1s, border-left 0.15s;
+  ${(p) => getAvailabilityStyle(p.$availability)}
+
+  &:hover {
+    background-color: #fafafa;
+  }
+`;
+
+type StyledGridCellProps = React.HTMLAttributes<HTMLDivElement> & {
+  $left: number;
+  $width: number;
+  $isHour: boolean;
+  $isInBrushRange: boolean;
+};
+
+/** 背景グリッド（クリック対象ではない・装飾のみ） */
+const StyledGridCell = styled.div<StyledGridCellProps>`
+  position: absolute;
+  top: 0;
+  left: ${(p) => p.$left}px;
+  width: ${(p) => p.$width}px;
+  height: 100%;
+  border-left: 1px solid ${(p) => p.$isHour ? '#d0d0d0' : '#f0f0f0'};
+  pointer-events: none;
+  ${(p) => p.$isInBrushRange && `
+    background: rgba(25, 118, 210, 0.06);
+  `}
+`;
+
+type StyledRunBarProps = React.HTMLAttributes<HTMLDivElement> & {
+  $left: number;
+  $width: number;
   $bg: string;
   $border: string;
   $text: string;
+  $isOutOfRange: boolean;
+  $isOverlap: boolean;
+  $isGhost: boolean;
 };
-const StyledShiftHeader = styled.div<StyledShiftHeaderProps>`
-  display: flex;
-  flex-direction: column;
-  padding: 2px 4px;
-  background: ${(p) => p.$bg};
-  border-left: 3px solid ${(p) => p.$border};
-  color: ${(p) => p.$text};
-  flex-shrink: 0;
 
-  .e-shift-name {
-    font-weight: 600;
-    font-size: 0.9em;
+/** 既配置の連結バー（既配置の単位） */
+const StyledRunBar = styled.div<StyledRunBarProps>`
+  position: absolute;
+  top: 2px;
+  left: ${(p) => p.$left}px;
+  width: ${(p) => p.$width}px;
+  height: ${ROW_HEIGHT - 4}px;
+  background: ${(p) => p.$bg};
+  border: 1px solid ${(p) => p.$border};
+  border-radius: 3px;
+  color: ${(p) => p.$text};
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: grab;
+  overflow: hidden;
+  box-sizing: border-box;
+  z-index: 2;
+  user-select: none;
+  touch-action: none;
+
+  ${(p) => p.$isGhost && `
+    opacity: 0.35;
+    border-style: dashed;
+  `}
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  ${(p) => p.$isOutOfRange && `
+    background: repeating-linear-gradient(
+      45deg,
+      ${p.$bg},
+      ${p.$bg} 5px,
+      #ffcdd2 5px,
+      #ffcdd2 10px
+    );
+    border: 1px dashed #f44336;
+  `}
+
+  ${(p) => p.$isOverlap && `
+    box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.45);
+  `}
+
+  &:hover {
+    filter: brightness(0.96);
+    .e-remove-btn { opacity: 1; }
+  }
+
+  .e-run-label {
+    flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .e-shift-time {
-    font-size: 0.78em;
-    opacity: 0.75;
+  .e-overlap-badge {
+    color: #d32f2f;
+    font-weight: 800;
+    margin-right: 4px;
   }
 
-  .e-time-cells {
-    display: flex;
-    margin-top: 2px;
-  }
-
-  .e-time-cell {
+  .e-remove-btn {
     flex-shrink: 0;
-    border-left: 1px solid rgba(0,0,0,0.1);
-    font-size: 0.68em;
-    color: rgba(0,0,0,0.5);
-    padding-left: 2px;
-    height: 12px;
-    overflow: hidden;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.7);
+    color: #d32f2f;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.1s, background 0.1s;
 
-    .e-time-label {
-      white-space: nowrap;
+    &:hover {
+      background: #fff;
     }
   }
 `;
 
-const StyledMemberShiftRow = styled.div<React.HTMLAttributes<HTMLDivElement> & { $activeBrush: boolean }>`
-  display: flex;
-  align-items: center;
-  height: 28px;
-  cursor: ${(p) => p.$activeBrush ? 'crosshair' : 'default'};
-`;
-
-type StyledCellProps = React.HTMLAttributes<HTMLDivElement> & {
-  $width: number;
-  $filled: boolean;
-  $inPreview: boolean;
-  $previewMode: 'add' | 'remove';
-  $bg: string;
-  $border: string;
-  $isViolation: boolean;
-  $activeBrush: boolean;
-};
-
-const StyledCell = styled.div<StyledCellProps>`
-  width: ${(p) => p.$width}px;
-  height: 22px;
-  flex-shrink: 0;
-  border-right: 1px solid #e8e8e8;
-  border-top: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
-  box-sizing: border-box;
-  cursor: ${(p) => p.$activeBrush ? 'crosshair' : 'default'};
-  transition: background-color 0.05s;
-
-  background-color: ${(p) => {
-    if (p.$inPreview) {
-      return p.$previewMode === 'add' ? `${p.$border}55` : '#ffebee';
-    }
-    if (p.$filled) {
-      return p.$isViolation ? '#ffebee' : p.$bg;
-    }
-    return 'transparent';
-  }};
-
-  border: ${(p) => {
-    if (p.$filled && p.$isViolation) return '1px solid #f44336';
-    if (p.$filled) return `1px solid ${p.$border}`;
-    return '1px solid transparent';
-  }};
-
-  border-right: 1px solid #e8e8e8;
+/** リサイズハンドル（バー左右端） */
+type StyledResizeHandleProps = React.HTMLAttributes<HTMLDivElement> & { $side: 'left' | 'right' };
+const StyledResizeHandle = styled.div<StyledResizeHandleProps>`
+  position: absolute;
+  top: 0;
+  ${(p) => p.$side === 'left' ? 'left: 0;' : 'right: 0;'}
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 3;
+  background: transparent;
+  border-radius: ${(p) => p.$side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0'};
+  transition: background 0.1s;
 
   &:hover {
-    background-color: ${(p) => {
-      if (!p.$activeBrush) return p.$filled ? p.$bg : 'transparent';
-      return p.$filled ? `${p.$border}44` : `${p.$border}22`;
-    }};
+    background: rgba(0, 0, 0, 0.2);
   }
+`;
+
+/** ドロップ前のプレビュー帯 */
+const StyledPreviewBar = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: absolute;
+  top: 2px;
+  height: ${ROW_HEIGHT - 4}px;
+  background: rgba(25, 118, 210, 0.20);
+  border: 2px dashed #1976d2;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 3;
 `;

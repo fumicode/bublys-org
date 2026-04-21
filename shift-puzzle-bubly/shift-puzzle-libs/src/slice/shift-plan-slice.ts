@@ -116,6 +116,47 @@ export const shiftPlanSlice = createSlice({
       const updated = plan.addUserToBlockRange(shiftId, startBlock, endBlock, userId);
       state.shiftPlans[planIndex] = toMutableShiftPlanState(updated.state);
     },
+
+    removeUserFromBlockRange: (
+      state,
+      action: PayloadAction<{ planId: string; shiftId: string; startBlock: number; endBlock: number; userId: string }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shiftId, startBlock, endBlock, userId } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const plan = new ShiftPlan(state.shiftPlans[planIndex]);
+      const updated = plan.removeUserFromBlockRange(shiftId, startBlock, endBlock, userId);
+      state.shiftPlans[planIndex] = toMutableShiftPlanState(updated.state);
+    },
+
+    /**
+     * 既配置の移動・リサイズ用アトミック操作。
+     * - 同一userId: 移動 or リサイズ
+     * - 異なるuserId: 局員変更（旧userIdを除去、新userIdで追加）
+     */
+    moveUserBlocks: (
+      state,
+      action: PayloadAction<{
+        planId: string;
+        shiftId: string;
+        oldUserId: string;
+        oldStart: number;
+        oldEnd: number;
+        newUserId: string;
+        newStart: number;
+        newEnd: number;
+      }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shiftId, oldUserId, oldStart, oldEnd, newUserId, newStart, newEnd } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      let plan = new ShiftPlan(state.shiftPlans[planIndex]);
+      plan = plan.removeUserFromBlockRange(shiftId, oldStart, oldEnd, oldUserId);
+      plan = plan.addUserToBlockRange(shiftId, newStart, newEnd, newUserId);
+      state.shiftPlans[planIndex] = toMutableShiftPlanState(plan.state);
+    },
   },
 });
 
@@ -127,6 +168,8 @@ export const {
   addUserToBlock,
   removeUserFromBlock,
   addUserToBlockRange,
+  removeUserFromBlockRange,
+  moveUserBlocks,
 } = shiftPlanSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加

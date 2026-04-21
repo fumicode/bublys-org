@@ -9,6 +9,7 @@ import React from "react";
 import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import TaskIcon from '@mui/icons-material/Task';
 import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
+import GridOnIcon from '@mui/icons-material/GridOn';
 
 // Bubble Routes
 import { shiftPuzzleBubbleRoutes } from "./registration/index.js";
@@ -27,6 +28,11 @@ const ShiftPuzzleBubly: Bubly = {
       label: "ガント配置",
       url: "shift-puzzle/shift-plans/default/gantt",
       icon: React.createElement(CalendarViewWeekIcon, { color: "action" }),
+    },
+    {
+      label: "プリミティブガント",
+      url: "shift-puzzle/shift-plans/default-primitive/primitive-gantt",
+      icon: React.createElement(GridOnIcon, { color: "action" }),
     },
   ],
 

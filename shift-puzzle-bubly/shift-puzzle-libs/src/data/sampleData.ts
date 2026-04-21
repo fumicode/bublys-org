@@ -8,6 +8,9 @@ import { createSampleTasks } from "./sampleTask.js";
 
 // ========== シフト定義 ==========
 
+/** dayType ごとの TimeSchedule ID（dayType単位の広い時間枠） */
+export const timeScheduleIdForDayType = (dayType: DayType): string => `ts-${dayType}`;
+
 export function createDefaultShifts(): Shift[] {
   const tasks = createSampleTasks();
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
@@ -27,6 +30,7 @@ export function createDefaultShifts(): Shift[] {
       id,
       taskId,
       dayType,
+      timeScheduleId: timeScheduleIdForDayType(dayType),
       startTime,
       endTime,
       requiredCount: count,
@@ -161,30 +165,42 @@ export const DAY_TYPE_ORDER = ['準準備日', '準備日', '1日目', '2日目'
 
 // ========== TimeSchedule サンプルデータ ==========
 
+const minutesToTimeStr = (min: number): string => {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
 /**
- * createDefaultShifts() から一意な (dayType, startTime, endTime) の組み合わせを抽出して
- * TimeSchedule マスターを生成する。
+ * dayType 単位に1つの TimeSchedule を生成する。
+ * 範囲はその dayType に存在する全シフトの開始～終了の包絡。
+ *
+ * BlockList は TimeSchedule-scoped で持つ設計のため、TimeSchedule は
+ * 「その日の局員配置タイムライン全体」を表す広い枠でなければならない。
  */
 export function createDefaultTimeSchedules(): TimeSchedule[] {
   const shifts = createDefaultShifts();
-
-  // (dayType, startTime, endTime) の一意な組み合わせを収集
-  const seen = new Set<string>();
-  const result: TimeSchedule[] = [];
+  const envelopeByDayType = new Map<DayType, { start: number; end: number }>();
 
   for (const shift of shifts) {
-    const key = `${shift.dayType}|${shift.startTime}|${shift.endTime}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      const id = `ts-${shift.dayType}-${shift.startTime.replace(':', '')}-${shift.endTime.replace(':', '')}`;
-      result.push(new TimeSchedule({
-        id,
-        dayType: shift.dayType,
-        startTime: shift.startTime,
-        endTime: shift.endTime,
-      }));
+    const cur = envelopeByDayType.get(shift.dayType);
+    if (!cur) {
+      envelopeByDayType.set(shift.dayType, { start: shift.startMinute, end: shift.endMinute });
+    } else {
+      cur.start = Math.min(cur.start, shift.startMinute);
+      cur.end = Math.max(cur.end, shift.endMinute);
     }
   }
 
-  return result;
+  return DAY_TYPE_ORDER
+    .filter((dt) => envelopeByDayType.has(dt))
+    .map((dt) => {
+      const { start, end } = envelopeByDayType.get(dt)!;
+      return new TimeSchedule({
+        id: timeScheduleIdForDayType(dt),
+        dayType: dt,
+        startTime: minutesToTimeStr(start),
+        endTime: minutesToTimeStr(end),
+      });
+    });
 }

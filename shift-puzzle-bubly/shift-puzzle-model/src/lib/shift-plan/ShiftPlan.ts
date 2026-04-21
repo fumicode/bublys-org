@@ -218,6 +218,17 @@ export class ShiftPlan {
     return this._updateShift(shiftId, (shift) => shift.addUserToRange(startBlock, endBlock, userId));
   }
 
+  /** 指定シフトの範囲ブロックから局員を削除（startBlock 以上 endBlock 未満） */
+  removeUserFromBlockRange(shiftId: string, startBlock: number, endBlock: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => {
+      let bl = shift.blockList;
+      for (let b = startBlock; b < endBlock; b++) {
+        bl = bl.removeUser(b, userId);
+      }
+      return new Shift({ ...shift.state, blockList: bl.state });
+    });
+  }
+
   private _updateShift(shiftId: string, fn: (shift: Shift) => Shift): ShiftPlan {
     const currentShifts = this.state.shifts ?? [];
     const updatedShifts = currentShifts.map((s) =>
