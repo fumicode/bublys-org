@@ -7,10 +7,10 @@
  * を算出する。
  *
  * 制約は「既存データから計算可能なもの」に限定する：
- *   - availability    : Member.availableShiftIds
- *   - department      : Member.department vs Shift.responsibleDepartment
+ *   - availability    : Member.availability（DayType毎の15分刻み）— 配置ブロック毎に判定
  *   - taskConflict    : 同一局員が他Shiftと時間重複
  *   - noLeader        : Shift配置メンバーに経験者(!isNewMember)が一人もいない（shift単位）
+ *   - department 不整合はあえて違反扱いしない（参考情報）
  *
  * 未整備の制約（スキル / 勤務時間 / 休憩時間）は型として列挙のみしておき、
  * 判定ロジックは実装しない（呼び出し側がスタブ表示する）。
@@ -228,22 +228,34 @@ function computeMemberViolations(
     return violations;
   }
 
-  // availability
-  if (!member.isAvailableFor(shift.id)) {
+  // availability: 配置されているブロック毎に member.isAvailableAt で判定
+  const unavailableRanges: Array<{ start: number; end: number }> = [];
+  for (const run of runs) {
+    let curStart: number | null = null;
+    for (let m = run.startMinute; m < run.endMinute; m += 15) {
+      const ok = member.isAvailableAt(shift.dayType, m);
+      if (!ok) {
+        if (curStart === null) curStart = m;
+      } else if (curStart !== null) {
+        unavailableRanges.push({ start: curStart, end: m });
+        curStart = null;
+      }
+    }
+    if (curStart !== null) {
+      unavailableRanges.push({ start: curStart, end: run.endMinute });
+    }
+  }
+  if (unavailableRanges.length > 0) {
+    const label = unavailableRanges
+      .map((r) => `${minToHHMM(r.start)}-${minToHHMM(r.end)}`)
+      .join(', ');
     violations.push({
       category: 'availability',
-      message: 'このシフトへの参加可能フラグが立っていません',
+      message: `参加可能時間外に配置されています（${label}）`,
     });
   }
 
-  // department
-  const responsibleDept = shift.responsibleDepartment;
-  if (responsibleDept && member.department !== responsibleDept) {
-    violations.push({
-      category: 'department',
-      message: `担当局が不一致（${member.department} ≠ ${responsibleDept}）`,
-    });
-  }
+  // department 不整合は参考情報扱い（違反として出さない）
 
   // taskConflict: 他shiftで同時間帯に配置されている
   const conflict = findTaskConflict(member.id, shift, runs, allShifts);

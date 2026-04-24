@@ -53,29 +53,36 @@ export const MemberDetailView: FC<MemberDetailViewProps> = ({
       </section>
 
       <section className="e-section">
-        <h4>参加可能シフト</h4>
+        <h4>参加可能時間</h4>
         <div className="e-slots">
-          {member.availableShiftIds.length === 0 ? (
-            <span className="e-empty">なし</span>
-          ) : availabilityUrl ? (
-            <ObjectView
-              type="MemberAvailability"
-              url={availabilityUrl}
-              label={`${member.name}の参加可能シフト`}
-              draggable={true}
-              onClick={() => onOpenAvailability?.(member.id)}
-            >
-              <Button
-                variant="text"
-                size="small"
-                component="span"
-              >
-                {member.availableShiftIds.length}件 (詳細を見る)
-              </Button>
-            </ObjectView>
-          ) : (
-            <span>{member.availableShiftIds.length}件</span>
-          )}
+          {(() => {
+            const dayTypes = Object.keys(member.availability) as (keyof typeof member.availability)[];
+            const totalMinutes = dayTypes.reduce((acc, dt) => {
+              const ranges = member.getAvailableRanges(dt);
+              return acc + ranges.reduce((s, r) => s + (r.endMinute - r.startMinute), 0);
+            }, 0);
+            const summary = `${dayTypes.length}日分 / 計 ${Math.round(totalMinutes / 60 * 10) / 10}h`;
+
+            if (dayTypes.length === 0) {
+              return <span className="e-empty">なし</span>;
+            }
+            if (availabilityUrl) {
+              return (
+                <ObjectView
+                  type="MemberAvailability"
+                  url={availabilityUrl}
+                  label={`${member.name}の参加可能時間`}
+                  draggable={true}
+                  onClick={() => onOpenAvailability?.(member.id)}
+                >
+                  <Button variant="text" size="small" component="span">
+                    {summary}（詳細を見る）
+                  </Button>
+                </ObjectView>
+              );
+            }
+            return <span>{summary}</span>;
+          })()}
         </div>
       </section>
 

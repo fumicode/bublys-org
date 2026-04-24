@@ -27,6 +27,11 @@ type ShiftStatusProps = {
   /** 親バブル用：AカードとBカードをそれぞれ昇格させる */
   onExpandMembers?: () => void;
   onExpandCoverage?: () => void;
+  /** 配置メンバー → 局員/参加可能シフトバブル展開 */
+  buildMemberUrl?: (memberId: string) => string;
+  buildMemberAvailabilityUrl?: (memberId: string) => string;
+  onMemberClick?: (memberId: string) => void;
+  onAvailabilityClick?: (memberId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -37,6 +42,10 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
   variant = 'full',
   onExpandMembers,
   onExpandCoverage,
+  buildMemberUrl,
+  buildMemberAvailabilityUrl,
+  onMemberClick,
+  onAvailabilityClick,
 }) => {
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const plan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
@@ -96,6 +105,10 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
           memberSummaries={status.memberSummaries}
           shiftViolations={status.shiftViolations}
           density="full"
+          buildMemberUrl={buildMemberUrl}
+          buildAvailabilityUrl={buildMemberAvailabilityUrl}
+          onMemberClick={onMemberClick}
+          onAvailabilityClick={onAvailabilityClick}
         />
       </StyledSingle>
     );
@@ -122,6 +135,10 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
       memberNameMap={memberNameMap}
       onExpandMembers={onExpandMembers}
       onExpandCoverage={onExpandCoverage}
+      buildMemberUrl={buildMemberUrl}
+      buildMemberAvailabilityUrl={buildMemberAvailabilityUrl}
+      onMemberClick={onMemberClick}
+      onAvailabilityClick={onAvailabilityClick}
     />
   );
 };

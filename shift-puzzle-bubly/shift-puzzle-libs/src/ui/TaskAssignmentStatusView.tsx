@@ -24,6 +24,11 @@ export type TaskAssignmentStatusViewProps = {
   /** AカードまたはBカードをバブルとして昇格するコールバック */
   onExpandMembers?: () => void;
   onExpandCoverage?: () => void;
+  /** 配置メンバー → 局員/参加可能シフトバブル展開 */
+  buildMemberUrl?: (memberId: string) => string;
+  buildMemberAvailabilityUrl?: (memberId: string) => string;
+  onMemberClick?: (memberId: string) => void;
+  onAvailabilityClick?: (memberId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -34,6 +39,10 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
   memberNameMap,
   onExpandMembers,
   onExpandCoverage,
+  buildMemberUrl,
+  buildMemberAvailabilityUrl,
+  onMemberClick,
+  onAvailabilityClick,
 }) => {
   const rate = Math.round(status.fulfillmentRate);
   const rateColor = rate >= 100 ? '#2e7d32' : rate >= 60 ? '#ef6c00' : '#c62828';
@@ -75,6 +84,10 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
             shiftViolations={status.shiftViolations}
             density="compact"
             onExpand={onExpandMembers}
+            buildMemberUrl={buildMemberUrl}
+            buildAvailabilityUrl={buildMemberAvailabilityUrl}
+            onMemberClick={onMemberClick}
+            onAvailabilityClick={onAvailabilityClick}
           />
         </section>
 
@@ -152,12 +165,9 @@ const StyledStatus = styled.div`
   }
 
   .ts-cards {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
-    @media (max-width: 680px) {
-      grid-template-columns: 1fr;
-    }
   }
   .ts-card {
     border: 1px solid #e0e0e0;

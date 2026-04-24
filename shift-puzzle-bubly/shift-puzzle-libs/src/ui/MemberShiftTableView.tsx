@@ -90,7 +90,7 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
                     {dayAssignments.map((assignment) => {
                       const shift = shifts.find((s) => s.id === assignment.shiftId);
                       const score = calculateScore(member, assignment);
-                      const isAvailable = shift ? member.isAvailableFor(shift.id) : false;
+                      const isAvailable = shift ? member.isAvailableForShift(shift) : false;
                       return (
                         <div
                           key={assignment.id}

@@ -1,22 +1,95 @@
 /**
  * シフトパズル タスクサンプルデータ
- * 技大祭の実際のタスクから代表的なものを抜粋（60件）
+ * 昨年度の技大祭タスクを基に、8局体制に合わせて整理したサンプル。
+ *
+ * 管轄局: 制作局 / 総務局 / 財務局 / 渉外局 / 産学局 / 企画局 / 情報局 / 執行部
  *
  * 実運用では500件程度になる想定。
- * 管轄局: 渉外局 / 産学局 / 総務局 / 財務局 / 制作局 / 情報局 / 執行部 / 実行委員
  */
 
 import { Task } from "../domain/index.js";
 
 export function createSampleTasks(): Task[] {
   return [
-    // ========== 総務局 (10件) ==========
+    // ========== 制作局 ==========
+    new Task({
+      id: "task-seisaku-shiki",
+      name: "制作指揮",
+      task: "制作局全体の指揮・統括",
+      responsibleDepartment: "制作局",
+      description: "装飾・配線・ラミ貼など制作業務全般の指揮",
+    }),
+    new Task({
+      id: "task-seisaku-mt",
+      name: "制作MT",
+      task: "制作局内ミーティング",
+      responsibleDepartment: "制作局",
+      description: "制作局員への当日指示・進捗共有",
+    }),
+    new Task({
+      id: "task-haisen-shikaikan",
+      name: "配線(指揮官)",
+      task: "会場内電気配線作業の指揮",
+      responsibleDepartment: "制作局",
+      description: "電源ルート確認、配線班への指示、安全確認",
+    }),
+    new Task({
+      id: "task-haisen-support",
+      name: "配線(サポート)",
+      task: "会場内電気配線作業のサポート",
+      responsibleDepartment: "制作局",
+      description: "配線ケーブル敷設、テーピング、機材接続作業",
+    }),
+    new Task({
+      id: "task-rami-shikaikan",
+      name: "ラミ貼(指揮官)",
+      task: "ラミネートシール貼り作業の指揮",
+      responsibleDepartment: "制作局",
+      description: "貼り付け箇所の確認・指示、品質チェック",
+    }),
+    new Task({
+      id: "task-rami-support",
+      name: "ラミ貼(サポート)",
+      task: "ラミネートシール貼り作業",
+      responsibleDepartment: "制作局",
+      description: "指定箇所へのラミネートシール貼り付け作業",
+    }),
+    new Task({
+      id: "task-kaijou-soshi-age",
+      name: "会場装飾立ち上げ",
+      task: "会場全体の装飾設置",
+      responsibleDepartment: "制作局",
+      description: "横断幕・バナー・装飾物の設置、装飾効果の確認",
+    }),
+    new Task({
+      id: "task-kaijou-soshi-sage",
+      name: "会場装飾立ち下げ",
+      task: "会場全体の装飾撤去",
+      responsibleDepartment: "制作局",
+      description: "横断幕・バナー・装飾物の撤去、資材の回収・保管",
+    }),
+    new Task({
+      id: "task-soshoku-mimawari",
+      name: "装飾見回り",
+      task: "会場装飾の巡回・点検",
+      responsibleDepartment: "制作局",
+      description: "装飾の破損・落下確認、補修対応",
+    }),
+
+    // ========== 総務局 ==========
     new Task({
       id: "task-somu-shiki",
       name: "総務指揮",
       task: "総務局全体の指揮・調整",
       responsibleDepartment: "総務局",
       description: "各担当への指示出し、状況把握、トラブル対応",
+    }),
+    new Task({
+      id: "task-somu-shiki-hosa",
+      name: "総務指揮補佐",
+      task: "総務指揮のサポート",
+      responsibleDepartment: "総務局",
+      description: "指揮官補佐、情報整理、連絡調整",
     }),
     new Task({
       id: "task-sandan-taiou",
@@ -81,8 +154,36 @@ export function createSampleTasks(): Task[] {
       responsibleDepartment: "総務局",
       description: "参加団体向け本部テントの設置・備品準備",
     }),
+    new Task({
+      id: "task-buppin-taiou",
+      name: "物品対応",
+      task: "備品・物品の貸出・回収対応",
+      responsibleDepartment: "総務局",
+      description: "物品倉庫管理、貸出記録、返却確認",
+    }),
+    new Task({
+      id: "task-chushajo-kanri",
+      name: "駐車場管理",
+      task: "来場者駐車場の誘導・管理",
+      responsibleDepartment: "総務局",
+      description: "車両誘導、満車時対応、トラブル処理",
+    }),
+    new Task({
+      id: "task-hanazono-service",
+      name: "花園サービス対応",
+      task: "花園エリアのサービス業務",
+      responsibleDepartment: "総務局",
+      description: "来場者対応、案内、エリア内秩序維持",
+    }),
+    new Task({
+      id: "task-okunai-junkai",
+      name: "屋内巡回",
+      task: "屋内エリアの巡回監視",
+      responsibleDepartment: "総務局",
+      description: "屋内展示エリアの見回り、来場者対応",
+    }),
 
-    // ========== 財務局 (8件) ==========
+    // ========== 財務局 ==========
     new Task({
       id: "task-zaimu-shiki-junk",
       name: "財務指揮（準準備日）",
@@ -127,115 +228,83 @@ export function createSampleTasks(): Task[] {
     }),
     new Task({
       id: "task-choshoku-prep",
-      name: "朝ご飯準備・運営",
+      name: "朝食事（1日目）",
       task: "実行委員向け朝食の準備・提供",
       responsibleDepartment: "財務局",
-      description: "食材調達確認、配膳準備、食事提供・後片付け",
+      description: "食材確認、配膳、食事提供・後片付け",
     }),
     new Task({
       id: "task-chushoku-prep",
-      name: "昼ご飯準備・運営",
+      name: "昼食事",
       task: "実行委員向け昼食の準備・提供",
       responsibleDepartment: "財務局",
       description: "業者ケータリング受け取り、配膳、食事提供・後片付け",
     }),
-
-    // ========== 制作局 (7件) ==========
     new Task({
-      id: "task-seisaku-shiki",
-      name: "制作指揮",
-      task: "制作局全体の指揮・統括",
-      responsibleDepartment: "制作局",
-      description: "装飾・配線・ラミ貼など制作業務全般の指揮",
+      id: "task-yushoku-prep",
+      name: "夜食事（1日目）",
+      task: "実行委員向け夕食の準備・管理・片付け",
+      responsibleDepartment: "財務局",
+      description: "夕食の準備、配膳、片付け作業",
     }),
     new Task({
-      id: "task-haisen-shikaikan",
-      name: "配線(指揮官)",
-      task: "会場内電気配線作業の指揮",
-      responsibleDepartment: "制作局",
-      description: "電源ルート確認、配線班への指示、安全確認",
+      id: "task-yoru-catering",
+      name: "夜業者向けケータリング",
+      task: "業者向け夜食ケータリング",
+      responsibleDepartment: "財務局",
+      description: "業者向け食事の受け取り・配送",
     }),
     new Task({
-      id: "task-haisen-support",
-      name: "配線(サポート)",
-      task: "会場内電気配線作業のサポート",
-      responsibleDepartment: "制作局",
-      description: "配線ケーブル敷設、テーピング、機材接続作業",
+      id: "task-kori-konyu",
+      name: "氷購入（1日目朝）",
+      task: "当日使用する氷の購入・搬入",
+      responsibleDepartment: "財務局",
+      description: "指定店舗からの氷購入・会場搬入",
     }),
     new Task({
-      id: "task-rami-shikaikan",
-      name: "ラミ貼(指揮官)",
-      task: "ラミネートシール貼り作業の指揮",
-      responsibleDepartment: "制作局",
-      description: "貼り付け箇所の確認・指示、品質チェック",
+      id: "task-kokunai-choriba",
+      name: "国内調理場管理",
+      task: "国内団体調理場の管理・巡回",
+      responsibleDepartment: "財務局",
+      description: "衛生管理、食材チェック、トラブル対応",
     }),
     new Task({
-      id: "task-rami-support",
-      name: "ラミ貼(サポート)",
-      task: "ラミネートシール貼り作業",
-      responsibleDepartment: "制作局",
-      description: "指定箇所へのラミネートシール貼り付け作業",
+      id: "task-kokunai-kaiten-check",
+      name: "国内開店チェック",
+      task: "国内団体ブースの開店前点検",
+      responsibleDepartment: "財務局",
+      description: "準備状況確認、衛生・安全チェック",
     }),
     new Task({
-      id: "task-kaijou-soshi-age",
-      name: "会場装飾立ち上げ",
-      task: "会場全体の装飾設置",
-      responsibleDepartment: "制作局",
-      description: "横断幕・バナー・装飾物の設置、装飾効果の確認",
+      id: "task-kokunai-heiten-check",
+      name: "国内閉店チェック",
+      task: "国内団体ブースの閉店後点検",
+      responsibleDepartment: "財務局",
+      description: "清掃・片付け確認、備品返却確認",
     }),
     new Task({
-      id: "task-kaijou-soshi-sage",
-      name: "会場装飾立ち下げ",
-      task: "会場全体の装飾撤去",
-      responsibleDepartment: "制作局",
-      description: "横断幕・バナー・装飾物の撤去、資材の回収・保管",
-    }),
-
-    // ========== 情報局 (6件) ==========
-    new Task({
-      id: "task-joho-server-day1",
-      name: "情報局サーバー運営1日目",
-      task: "技大祭公式サーバーの監視・運用（1日目）",
-      responsibleDepartment: "情報局",
-      description: "Webサイト・アプリのサーバー監視、障害対応、ログ確認",
+      id: "task-kokusai-choriba",
+      name: "国際調理場管理",
+      task: "国際団体調理場の管理・巡回",
+      responsibleDepartment: "財務局",
+      description: "衛生管理、食材チェック、多言語対応サポート",
     }),
     new Task({
-      id: "task-joho-server-day2",
-      name: "情報局サーバー運営2日目",
-      task: "技大祭公式サーバーの監視・運用（2日目）",
-      responsibleDepartment: "情報局",
-      description: "Webサイト・アプリのサーバー監視、障害対応、ログ確認",
+      id: "task-kokusai-kaiten-check",
+      name: "国際開店チェック",
+      task: "国際団体ブースの開店前点検",
+      responsibleDepartment: "財務局",
+      description: "準備状況確認、衛生・安全チェック",
     }),
     new Task({
-      id: "task-seeft-day1",
-      name: "SeeFTアプリ運営1日目",
-      task: "SeeFTアプリの運用サポート（1日目）",
-      responsibleDepartment: "情報局",
-      description: "来場者向けアプリの動作確認、不具合対応、FAQ対応",
-    }),
-    new Task({
-      id: "task-seeft-day2",
-      name: "SeeFTアプリ運営2日目",
-      task: "SeeFTアプリの運用サポート（2日目）",
-      responsibleDepartment: "情報局",
-      description: "来場者向けアプリの動作確認、不具合対応、FAQ対応",
-    }),
-    new Task({
-      id: "task-ar-hanabi-day1",
-      name: "AR花火準備補佐1日目",
-      task: "AR花火コンテンツの準備・補佐（1日目）",
-      responsibleDepartment: "情報局",
-      description: "AR表示の動作確認、来場者向け案内サポート",
-    }),
-    new Task({
-      id: "task-bingo-app",
-      name: "Bingoアプリ運営",
-      task: "ビンゴ大会向けアプリの運用",
-      responsibleDepartment: "情報局",
-      description: "ビンゴアプリの設定・動作確認、当日の操作補佐",
+      id: "task-kokusai-heiten-check",
+      name: "国際閉店チェック",
+      task: "国際団体ブースの閉店後点検",
+      responsibleDepartment: "財務局",
+      description: "清掃・片付け確認、備品返却確認",
     }),
 
-    // ========== 渉外局 (7件) ==========
+    // ========== 渉外局 ==========
     new Task({
       id: "task-shogai-shiki",
       name: "渉外指揮",
@@ -285,8 +354,50 @@ export function createSampleTasks(): Task[] {
       responsibleDepartment: "渉外局",
       description: "企業担当者の荷物搬出補佐、ブースエリアの清掃確認",
     }),
+    new Task({
+      id: "task-guest-seirihaifu-1",
+      name: "ゲスト整理券配布（1回目）",
+      task: "ゲスト整理券の準備・配布・宣伝（1回目）",
+      responsibleDepartment: "渉外局",
+      description: "整理券準備、来場者への配布、列整理、案内",
+    }),
+    new Task({
+      id: "task-guest-seirihaifu-2",
+      name: "ゲスト整理券配布（2回目）",
+      task: "ゲスト整理券の準備・配布・宣伝（2回目）",
+      responsibleDepartment: "渉外局",
+      description: "整理券準備、来場者への配布、列整理、案内",
+    }),
+    new Task({
+      id: "task-guest-seiriken-tekkyo",
+      name: "ゲスト整理券撤去",
+      task: "ゲスト整理券配布場所の撤収",
+      responsibleDepartment: "渉外局",
+      description: "配布場所片付け、残券回収、集計",
+    }),
+    new Task({
+      id: "task-guest-hikaeshitsu",
+      name: "ゲスト控室準備",
+      task: "ゲスト用控室の準備",
+      responsibleDepartment: "渉外局",
+      description: "控室レイアウト、備品準備、飲食物配置",
+    }),
+    new Task({
+      id: "task-inkou-kanri",
+      name: "院講管理",
+      task: "院生・講師向けエリアの管理",
+      responsibleDepartment: "渉外局",
+      description: "院生・講師受付、エリア内案内、要望対応",
+    }),
+    new Task({
+      id: "task-inkou-taiki",
+      name: "院講待機",
+      task: "院生・講師対応の待機",
+      responsibleDepartment: "渉外局",
+      description: "問い合わせ対応、必要時のサポート",
+    }),
 
-    // ========== 産学局 (5件) ==========
+    // ========== 産学局 ==========
     new Task({
       id: "task-chiki-taida-setsuei",
       name: "地域他大設営",
@@ -323,7 +434,158 @@ export function createSampleTasks(): Task[] {
       description: "課外活動団体エリアの秩序維持、問い合わせ対応",
     }),
 
-    // ========== 執行部 (7件) ==========
+    // ========== 企画局 ==========
+    new Task({
+      id: "task-kikaku-shiki",
+      name: "企画指揮",
+      task: "企画エリア全体の指揮・統括",
+      responsibleDepartment: "企画局",
+      description: "各企画担当への指示出し、タイムスケジュール管理",
+    }),
+    new Task({
+      id: "task-ennichi-setsuei",
+      name: "縁日設営",
+      task: "縁日エリアの設営",
+      responsibleDepartment: "企画局",
+      description: "縁日ブース・物品の配置、装飾設置",
+    }),
+    new Task({
+      id: "task-ennichi-unei",
+      name: "縁日運営",
+      task: "縁日エリアの運営",
+      responsibleDepartment: "企画局",
+      description: "来場者対応、ゲーム進行、景品管理",
+    }),
+    new Task({
+      id: "task-obakeyashiki-setsuei",
+      name: "お化け屋敷設営",
+      task: "お化け屋敷の設営・準備",
+      responsibleDepartment: "企画局",
+      description: "内装・演出機材の設置、動線・安全確認",
+    }),
+    new Task({
+      id: "task-obakeyashiki-unei",
+      name: "お化け屋敷運営",
+      task: "お化け屋敷の運営",
+      responsibleDepartment: "企画局",
+      description: "入場案内、演者対応、来場者への安全誘導",
+    }),
+    new Task({
+      id: "task-game-taikai-unei",
+      name: "ゲーム大会運営",
+      task: "ゲーム大会の進行・運営",
+      responsibleDepartment: "企画局",
+      description: "参加者受付、対戦進行、機器トラブル対応",
+    }),
+    new Task({
+      id: "task-mikoshi-ninau-1",
+      name: "神輿 運営① 担ぐ",
+      task: "第1回神輿運行の担ぎ手担当",
+      responsibleDepartment: "企画局",
+      description: "神輿担ぎ、掛け声合わせ、ルートに沿った運行",
+    }),
+    new Task({
+      id: "task-hero-show-hare",
+      name: "ヒーローショー運営 晴れ",
+      task: "晴れ時のヒーローショー進行補佐",
+      responsibleDepartment: "企画局",
+      description: "ステージ周辺の来場者整理、演者サポート、機材確認",
+    }),
+    new Task({
+      id: "task-onkyo-setsuei-junk",
+      name: "音響機器 設営 準備日",
+      task: "準備日の音響機器設置",
+      responsibleDepartment: "企画局",
+      description: "スピーカー・アンプ等の設置、音響テスト実施",
+    }),
+    new Task({
+      id: "task-stamp-rally-setsuei",
+      name: "スタンプラリー設営",
+      task: "スタンプラリーの設営準備",
+      responsibleDepartment: "企画局",
+      description: "スタンプ台の設置、台紙・景品の準備、設置場所の確認",
+    }),
+    new Task({
+      id: "task-musinuts-hare",
+      name: "MusiNuts参加（晴れ）",
+      task: "MusiNutsステージ運営（晴れ時）",
+      responsibleDepartment: "企画局",
+      description: "ステージ進行、観客整理、機材オペレート",
+    }),
+    new Task({
+      id: "task-musinuts-ame",
+      name: "MusiNuts参加（雨）",
+      task: "MusiNutsステージ運営（雨天時）",
+      responsibleDepartment: "企画局",
+      description: "屋内振替会場での進行、観客整理、機材オペレート",
+    }),
+
+    // ========== 情報局 ==========
+    new Task({
+      id: "task-joho-server-day1",
+      name: "情報局サーバー運営1日目",
+      task: "技大祭公式サーバーの監視・運用（1日目）",
+      responsibleDepartment: "情報局",
+      description: "Webサイト・アプリのサーバー監視、障害対応、ログ確認",
+    }),
+    new Task({
+      id: "task-joho-server-day2",
+      name: "情報局サーバー運営2日目",
+      task: "技大祭公式サーバーの監視・運用（2日目）",
+      responsibleDepartment: "情報局",
+      description: "Webサイト・アプリのサーバー監視、障害対応、ログ確認",
+    }),
+    new Task({
+      id: "task-seeft-day1",
+      name: "SeeFTアプリ運営1日目",
+      task: "SeeFTアプリの運用サポート（1日目）",
+      responsibleDepartment: "情報局",
+      description: "来場者向けアプリの動作確認、不具合対応、FAQ対応",
+    }),
+    new Task({
+      id: "task-seeft-day2",
+      name: "SeeFTアプリ運営2日目",
+      task: "SeeFTアプリの運用サポート（2日目）",
+      responsibleDepartment: "情報局",
+      description: "来場者向けアプリの動作確認、不具合対応、FAQ対応",
+    }),
+    new Task({
+      id: "task-ar-hanabi-day1",
+      name: "AR花火準備補佐1日目",
+      task: "AR花火コンテンツの準備・補佐（1日目）",
+      responsibleDepartment: "情報局",
+      description: "AR表示の動作確認、来場者向け案内サポート",
+    }),
+    new Task({
+      id: "task-bingo-app",
+      name: "Bingoアプリ運営",
+      task: "ビンゴ大会向けアプリの運用",
+      responsibleDepartment: "情報局",
+      description: "ビンゴアプリの設定・動作確認、当日の操作補佐",
+    }),
+    new Task({
+      id: "task-camera-junkai",
+      name: "カメラ巡回",
+      task: "会場内撮影・記録",
+      responsibleDepartment: "情報局",
+      description: "公式記録用写真撮影、SNS用素材取得",
+    }),
+    new Task({
+      id: "task-kaiden-taiou",
+      name: "会電対応",
+      task: "会場電源・電気トラブル対応",
+      responsibleDepartment: "情報局",
+      description: "電源切替、配電盤確認、故障対応",
+    }),
+    new Task({
+      id: "task-kaijou-announce",
+      name: "会場アナウンス",
+      task: "館内放送・アナウンス対応",
+      responsibleDepartment: "情報局",
+      description: "定時アナウンス、緊急放送、呼び出し対応",
+    }),
+
+    // ========== 執行部 ==========
     new Task({
       id: "task-honbu-shiki",
       name: "本部指揮",
@@ -373,77 +635,12 @@ export function createSampleTasks(): Task[] {
       responsibleDepartment: "執行部",
       description: "2日目状況確認、片付け日に向けた指示事項の共有",
     }),
-
-    // ========== 実行委員 (10件) ==========
     new Task({
-      id: "task-kikaku-shiki",
-      name: "企画指揮",
-      task: "企画エリア全体の指揮・統括",
-      responsibleDepartment: "実行委員",
-      description: "各企画担当への指示出し、タイムスケジュール管理",
-    }),
-    new Task({
-      id: "task-ennichi-setsuei",
-      name: "縁日設営",
-      task: "縁日エリアの設営",
-      responsibleDepartment: "実行委員",
-      description: "縁日ブース・物品の配置、装飾設置",
-    }),
-    new Task({
-      id: "task-ennichi-unei",
-      name: "縁日 運営",
-      task: "縁日エリアの運営",
-      responsibleDepartment: "実行委員",
-      description: "来場者対応、ゲーム進行、景品管理",
-    }),
-    new Task({
-      id: "task-obakeyashiki-setsuei",
-      name: "お化け屋敷設営",
-      task: "お化け屋敷の設営・準備",
-      responsibleDepartment: "実行委員",
-      description: "内装・演出機材の設置、動線・安全確認",
-    }),
-    new Task({
-      id: "task-obakeyashiki-unei",
-      name: "お化け屋敷 運営",
-      task: "お化け屋敷の運営",
-      responsibleDepartment: "実行委員",
-      description: "入場案内、演者対応、来場者への安全誘導",
-    }),
-    new Task({
-      id: "task-game-taikai-unei",
-      name: "ゲーム大会運営",
-      task: "ゲーム大会の進行・運営",
-      responsibleDepartment: "実行委員",
-      description: "参加者受付、対戦進行、機器トラブル対応",
-    }),
-    new Task({
-      id: "task-mikoshi-ninau-1",
-      name: "神輿 運営① 担ぐ",
-      task: "第1回神輿運行の担ぎ手担当",
-      responsibleDepartment: "実行委員",
-      description: "神輿担ぎ、掛け声合わせ、ルートに沿った運行",
-    }),
-    new Task({
-      id: "task-hero-show-hare",
-      name: "ヒーローショー運営 晴れ",
-      task: "晴れ時のヒーローショー進行補佐",
-      responsibleDepartment: "実行委員",
-      description: "ステージ周辺の来場者整理、演者サポート、機材確認",
-    }),
-    new Task({
-      id: "task-onkyo-setsuei-junk",
-      name: "音響機器 設営 準備日",
-      task: "準備日の音響機器設置",
-      responsibleDepartment: "実行委員",
-      description: "スピーカー・アンプ等の設置、音響テスト実施",
-    }),
-    new Task({
-      id: "task-stamp-rally-setsuei",
-      name: "スタンプラリー設営",
-      task: "スタンプラリーの設営準備",
-      responsibleDepartment: "実行委員",
-      description: "スタンプ台の設置、台紙・景品の準備、設置場所の確認",
+      id: "task-kaikai-shiki-sanka",
+      name: "開会式参加",
+      task: "開会式への参加・進行補佐",
+      responsibleDepartment: "執行部",
+      description: "開会式ステージ進行、来賓案内、来場者整理",
     }),
   ];
 }

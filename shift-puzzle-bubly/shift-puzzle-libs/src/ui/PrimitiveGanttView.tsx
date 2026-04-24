@@ -30,6 +30,7 @@ import { Shift, TimeSchedule, Member, type DayType } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
 import { DRAG_TYPE_TASK, draggingTaskId } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
+import { UrledPlace } from '@bublys-org/bubbles-ui';
 
 // 局員行の受け入れ可否型は MemberGanttView と共通（同一定義）
 export type { RowAvailability } from './MemberGanttView.js';
@@ -63,6 +64,8 @@ export type PrimitiveGanttViewProps = {
   ) => void;
   /** 既配置バークリック（タスク詳細を開くなど） */
   onAssignedRunClick?: (shiftId: string, memberId: string, startBlock: number) => void;
+  /** 既配置バーを「バブル展開元」としてマークするための URL ビルダ（LinkBubbleの曲線を有効化） */
+  buildRunUrl?: (shiftId: string) => string;
   /** ブラシ対象タスクID（TaskListドラッグ中に外部から指定。ビジュアル用） */
   brushTaskId?: string | null;
   /** 局員行の受け入れ可否マップ（ブラシ中のみ意味がある） */
@@ -129,24 +132,33 @@ function buildPlacementMap(
  * 1局員の連続バー（run）を計算する。
  * primary = 各セルの placements[0]（最初に置かれたシフト）。
  * 同一 shift.id が連続するセル群を1つの run として束ねる。
+ *
+ * run レベルではフラグを持たず、制約違反は「どの blockIndex で違反しているか」という
+ * セル単位のリストで保持する（outOfRangeBlocks / unavailableBlocks）。
+ * ビジュアルも run 全体を塗るのではなくブロック単位で重ねるため、
+ * 例えば「概ね時間内だが右端だけ1セルはみ出た」ようなケースが
+ * そのまま理解できる形で表示される。
  */
 type RunBar = {
   shift: Shift;
   startBlock: number;
   endBlock: number; // 半開区間
   isOverlap: boolean;
-  isOutOfRange: boolean; // run 内のいずれかが範囲外なら true
+  outOfRangeBlocks: number[];  // shift の valid 範囲外に置かれた絶対 blockIndex
+  unavailableBlocks: number[]; // 参加不可時間に該当する絶対 blockIndex
 };
 
 function buildRunsForMember(
-  memberId: string,
+  member: Member,
+  timeSchedule: TimeSchedule,
   totalBlocks: number,
   placementMap: Map<string, CellPlacement[]>,
 ): RunBar[] {
   const runs: RunBar[] = [];
   let cur: RunBar | null = null;
+  const dayType = timeSchedule.dayType;
   for (let b = 0; b < totalBlocks; b++) {
-    const placements = placementMap.get(`${memberId}:${b}`) ?? [];
+    const placements = placementMap.get(`${member.id}:${b}`) ?? [];
     const primary = placements[0];
     if (!primary) {
       if (cur) {
@@ -156,10 +168,14 @@ function buildRunsForMember(
       continue;
     }
     const isOverlap = placements.length > 1;
+    const blockMinute = timeSchedule.startMinute + b * 15;
+    const isUnavailable = !member.isAvailableAt(dayType, blockMinute);
+    const isOutOfRange = primary.isOutOfRange;
     if (cur && cur.shift.id === primary.shift.id) {
       cur.endBlock = b + 1;
       cur.isOverlap = cur.isOverlap || isOverlap;
-      cur.isOutOfRange = cur.isOutOfRange || primary.isOutOfRange;
+      if (isOutOfRange) cur.outOfRangeBlocks.push(b);
+      if (isUnavailable) cur.unavailableBlocks.push(b);
     } else {
       if (cur) runs.push(cur);
       cur = {
@@ -167,7 +183,8 @@ function buildRunsForMember(
         startBlock: b,
         endBlock: b + 1,
         isOverlap,
-        isOutOfRange: primary.isOutOfRange,
+        outOfRangeBlocks: isOutOfRange ? [b] : [],
+        unavailableBlocks: isUnavailable ? [b] : [],
       };
     }
   }
@@ -220,6 +237,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   onRemoveRange,
   onMoveRun,
   onAssignedRunClick,
+  buildRunUrl,
   brushTaskId,
   rowAvailabilityMap,
 }) => {
@@ -558,7 +576,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       <div className="e-body">
         {members.map((member) => {
           const availability = isPainting ? (rowAvailabilityMap?.get(member.id) ?? null) : null;
-          const runs = buildRunsForMember(member.id, totalBlocks, placementMap);
+          const runs = buildRunsForMember(member, activeTimeSchedule, totalBlocks, placementMap);
           const previewActive = preview && preview.memberId === member.id;
           const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
           const previewEnd = previewActive ? Math.max(preview.anchorBlock, preview.currentBlock) + 1 : -1;
@@ -622,7 +640,14 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                   const end = isBeingEdited && !isMovingToOtherRow ? editState.previewEnd : run.endBlock;
                   const left = start * blockPx;
                   const width = (end - start) * blockPx;
-                  return (
+                  const runUrl = buildRunUrl?.(run.shift.id);
+                  const hasUnavailable = run.unavailableBlocks.length > 0;
+                  const hasOutOfRange = run.outOfRangeBlocks.length > 0;
+                  const titleParts = [run.shift.taskName];
+                  if (hasOutOfRange) titleParts.push('（タスク時間外に配置）');
+                  if (run.isOverlap) titleParts.push('（重複あり）');
+                  if (hasUnavailable) titleParts.push('（参加不可時間に配置）');
+                  const runBar = (
                     <StyledRunBar
                       key={`${run.shift.id}-${run.startBlock}`}
                       $left={left}
@@ -630,10 +655,11 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                       $bg={color.bg}
                       $border={color.border}
                       $text={color.text}
-                      $isOutOfRange={run.isOutOfRange}
+                      $isOutOfRange={hasOutOfRange}
                       $isOverlap={run.isOverlap}
                       $isGhost={!!isMovingToOtherRow}
-                      title={`${run.shift.taskName}${run.isOutOfRange ? '（タスク時間外）' : ''}${run.isOverlap ? '（重複あり）' : ''}`}
+                      $isUnavailable={hasUnavailable}
+                      title={titleParts.join('')}
                       onClick={(e) => handleRunClick(run, member.id, e)}
                       onPointerDown={(e) => startEdit('move', run, member.id, e)}
                       onPointerMove={handleEditMove}
@@ -647,7 +673,31 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                         onPointerUp={handleEditUp}
                         onPointerCancel={handleEditCancel}
                       />
+                      {/* 参加不可ブロック毎のオーバーレイ（15分粒度） */}
+                      {run.unavailableBlocks.map((b) => (
+                        <StyledUnavailableBlock
+                          key={`ua-${b}`}
+                          style={{
+                            left: (b - run.startBlock) * blockPx,
+                            width: blockPx,
+                          }}
+                          aria-label="参加不可時間"
+                        />
+                      ))}
+                      {/* タスク時間外ブロック毎のオーバーレイ（15分粒度） */}
+                      {run.outOfRangeBlocks.map((b) => (
+                        <StyledOutOfRangeBlock
+                          key={`oor-${b}`}
+                          style={{
+                            left: (b - run.startBlock) * blockPx,
+                            width: blockPx,
+                          }}
+                          aria-label="タスク時間外"
+                        />
+                      ))}
                       <span className="e-run-label">{run.shift.taskName}</span>
+                      {hasOutOfRange && <span className="e-out-badge" aria-label="タスク時間外に配置">⧗</span>}
+                      {hasUnavailable && <span className="e-unavailable-badge" aria-label="参加不可時間に配置">🚫</span>}
                       {run.isOverlap && <span className="e-overlap-badge">!</span>}
                       <button
                         type="button"
@@ -667,6 +717,13 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                       />
                     </StyledRunBar>
                   );
+                  return runUrl ? (
+                    <UrledPlace key={`${run.shift.id}-${run.startBlock}`} url={runUrl}>
+                      {runBar}
+                    </UrledPlace>
+                  ) : (
+                    runBar
+                  );
                 })}
 
                 {/* クロス行ムーブの転送先プレビュー */}
@@ -680,6 +737,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                     $isOutOfRange={false}
                     $isOverlap={false}
                     $isGhost={false}
+                    $isUnavailable={false}
                     style={{ opacity: 0.65, pointerEvents: 'none' }}
                   >
                     <span className="e-run-label">{editPreviewInThisRow.shift.taskName}</span>
@@ -890,6 +948,7 @@ type StyledRunBarProps = React.HTMLAttributes<HTMLDivElement> & {
   $isOutOfRange: boolean;
   $isOverlap: boolean;
   $isGhost: boolean;
+  $isUnavailable: boolean;
 };
 
 /** 既配置の連結バー（既配置の単位） */
@@ -924,19 +983,22 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
     cursor: grabbing;
   }
 
+  /* タスク時間外ブロックを1つ以上含む：赤の点線ボーダーで run を強調
+     （実際に問題のあるブロックは StyledOutOfRangeBlock が重なって表示） */
   ${(p) => p.$isOutOfRange && `
-    background: repeating-linear-gradient(
-      45deg,
-      ${p.$bg},
-      ${p.$bg} 5px,
-      #ffcdd2 5px,
-      #ffcdd2 10px
-    );
-    border: 1px dashed #f44336;
+    border-color: #f44336;
+    border-style: dashed;
   `}
 
   ${(p) => p.$isOverlap && `
     box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.45);
+  `}
+
+  /* 参加不可時間に配置：out-of-range と同時の時は赤を優先、
+     参加不可単独ならアンバー点線ボーダーにする */
+  ${(p) => p.$isUnavailable && !p.$isOutOfRange && `
+    border-color: #ff8f00;
+    border-style: dashed;
   `}
 
   &:hover {
@@ -949,12 +1011,32 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    position: relative;
+    z-index: 1;
   }
 
   .e-overlap-badge {
     color: #d32f2f;
     font-weight: 800;
     margin-right: 4px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .e-unavailable-badge {
+    font-size: 0.95em;
+    margin-right: 4px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .e-out-badge {
+    color: #c62828;
+    font-weight: 800;
+    font-size: 1em;
+    margin-right: 4px;
+    position: relative;
+    z-index: 1;
   }
 
   .e-remove-btn {
@@ -996,6 +1078,47 @@ const StyledResizeHandle = styled.div<StyledResizeHandleProps>`
   &:hover {
     background: rgba(0, 0, 0, 0.2);
   }
+`;
+
+/**
+ * タスク時間外ブロック オーバーレイ（15分単位）
+ * 赤の斜め縞で当該ブロックが「タスク（shift）の valid 範囲外」であることを示す。
+ * run 全体を塗らずに該当ブロックだけ赤く重ねるため、
+ * 「概ね時間内だが末端1セルだけはみ出た」ようなケースがひと目で分かる。
+ */
+const StyledOutOfRangeBlock = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(244, 67, 54, 0.55),
+    rgba(244, 67, 54, 0.55) 3px,
+    rgba(255, 205, 210, 0.55) 3px,
+    rgba(255, 205, 210, 0.55) 6px
+  );
+`;
+
+/**
+ * 参加不可ブロック オーバーレイ（15分単位）
+ * 黄/オレンジの斜め縞で当該ブロックが「局員の参加可能時間外」であることを示す。
+ * バー本体の色を残しつつ可視化するため半透明＋ストライプ。
+ */
+const StyledUnavailableBlock = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: absolute;
+  top: 0;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 143, 0, 0.55),
+    rgba(255, 143, 0, 0.55) 3px,
+    rgba(255, 224, 130, 0.55) 3px,
+    rgba(255, 224, 130, 0.55) 6px
+  );
 `;
 
 /** ドロップ前のプレビュー帯 */

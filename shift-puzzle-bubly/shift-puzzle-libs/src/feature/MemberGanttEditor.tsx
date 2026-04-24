@@ -160,12 +160,14 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
       }
     }
 
-    // 3. unavailable: member.isAvailableFor(shiftId) === false
+    // 3. unavailable: member が該当 shift の時間帯を全て参加可能とは限らない
     const memberMap = new Map(memberList.map((m) => [m.id, m]));
+    const shiftMapForAvail = new Map(shifts.map((s) => [s.id, s]));
     for (const a of shiftPlan.assignments) {
       if (map.has(a.id)) continue; // 上位違反がある場合はスキップ
       const member = memberMap.get(a.staffId);
-      if (member && !member.isAvailableFor(a.shiftId)) {
+      const shift = shiftMapForAvail.get(a.shiftId);
+      if (member && shift && !member.isAvailableForShift(shift)) {
         map.set(a.id, 'unavailable');
       }
     }
@@ -205,7 +207,7 @@ export const MemberGanttEditor: FC<MemberGanttEditorProps> = ({
 
     for (const member of memberList) {
       // 1. 参加可否：いずれかのshiftに参加可ならOK
-      const anyAvailable = taskShifts.some((s) => member.isAvailableFor(s.id));
+      const anyAvailable = taskShifts.some((s) => member.isAvailableForShift(s));
       if (!anyAvailable) {
         map.set(member.id, 'unavailable');
         continue;

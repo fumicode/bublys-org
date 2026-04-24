@@ -10,7 +10,8 @@ import {
 } from "../slice/index.js";
 import { MemberListView } from "../ui/MemberListView.js";
 import { createSampleMemberList } from "../data/sampleMember.js";
-import { Member } from "../domain/index.js";
+import { createDefaultShifts } from "../data/sampleData.js";
+import { Member, Shift } from "../domain/index.js";
 import styled from "styled-components";
 import { Button } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -58,12 +59,19 @@ export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
 }
 
 /** フィルター条件にマッチするか判定 */
-function matchesFilter(member: Member, filter: MemberFilterCriteria): boolean {
+function matchesFilter(
+  member: Member,
+  filter: MemberFilterCriteria,
+  shiftsById: ReadonlyMap<string, Shift>,
+): boolean {
   if (filter.department && member.department !== filter.department) {
     return false;
   }
   if (filter.availableFor && filter.availableFor.length > 0) {
-    const allAvailable = filter.availableFor.every((shiftId) => member.isAvailableFor(shiftId));
+    const allAvailable = filter.availableFor.every((shiftId) => {
+      const shift = shiftsById.get(shiftId);
+      return shift ? member.isAvailableForShift(shift) : false;
+    });
     if (!allAvailable) {
       return false;
     }
@@ -96,21 +104,33 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
   const selectedMemberId = useAppSelector(selectShiftPuzzleSelectedMemberId);
   const { openBubble } = useContext(BubblesContext);
 
-  // 初期データのロード
+  // 初期データのロード（Redux Persist の旧スキーマ検出 → サンプル再投入）
   useEffect(() => {
-    if (memberList.length === 0) {
+    const needsReload =
+      memberList.length === 0 ||
+      memberList.some((m) => {
+        const raw = m.state as unknown as Record<string, unknown>;
+        // 旧スキーマ: availableShiftIds を持つ / 新スキーマ: availability を持つ
+        return !('availability' in raw) || 'availableShiftIds' in raw;
+      });
+    if (needsReload) {
       const sampleData = createSampleMemberList();
       dispatch(setMemberList(sampleData.map((m) => m.state)));
     }
-  }, [dispatch, memberList.length]);
+  }, [dispatch, memberList]);
 
-  // フィルター適用
+  // フィルター適用（availableFor 判定にシフト定義が必要）
+  const shiftsById = useMemo(() => {
+    if (!filter?.availableFor || filter.availableFor.length === 0) return new Map();
+    return new Map(createDefaultShifts().map((s) => [s.id, s]));
+  }, [filter?.availableFor]);
+
   const filteredMemberList = useMemo(() => {
     if (!filter || Object.keys(filter).length === 0) {
       return memberList;
     }
-    return memberList.filter((member) => matchesFilter(member, filter));
-  }, [memberList, filter]);
+    return memberList.filter((member) => matchesFilter(member, filter, shiftsById));
+  }, [memberList, filter, shiftsById]);
 
   const handleMemberClick = (memberId: string) => {
     dispatch(setSelectedMemberId(memberId));

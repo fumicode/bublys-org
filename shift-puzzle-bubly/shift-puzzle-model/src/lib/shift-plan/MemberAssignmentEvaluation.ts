@@ -90,7 +90,7 @@ export class MemberAssignmentEvaluation {
   ): Omit<MemberAssignmentEvaluationState, 'assignmentId'> {
     const issues: string[] = [];
 
-    const isAvailable = member.isAvailableFor(shift.id);
+    const isAvailable = member.isAvailableForShift(shift);
     if (!isAvailable) {
       issues.push('このシフトに参加できません');
     }

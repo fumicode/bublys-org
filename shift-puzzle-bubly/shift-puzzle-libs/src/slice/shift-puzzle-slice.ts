@@ -43,6 +43,19 @@ const initialState: ShiftPuzzleMemberState = {
   selectedMemberId: null,
 };
 
+// ========== 内部ユーティリティ ==========
+
+/** availability の DayType→TimeRange[] を深くクローンする（Reduxのserializable性保持のため） */
+const cloneMemberState = (m: MemberState): MemberState => ({
+  ...m,
+  availability: Object.fromEntries(
+    Object.entries(m.availability ?? {}).map(([dt, ranges]) => [
+      dt,
+      (ranges ?? []).map((r) => ({ ...r })),
+    ]),
+  ) as MemberState['availability'],
+});
+
 // ========== Slice ==========
 
 export const shiftPuzzleSlice = createSlice({
@@ -50,26 +63,15 @@ export const shiftPuzzleSlice = createSlice({
   initialState,
   reducers: {
     setMemberList: (state, action: PayloadAction<MemberState[]>) => {
-      state.memberList = action.payload.map((m) => ({
-        ...m,
-        availableShiftIds: [...m.availableShiftIds],
-      }));
+      state.memberList = action.payload.map(cloneMemberState);
     },
     addMember: (state, action: PayloadAction<MemberState>) => {
-      const m = action.payload;
-      state.memberList.push({
-        ...m,
-        availableShiftIds: [...m.availableShiftIds],
-      });
+      state.memberList.push(cloneMemberState(action.payload));
     },
     updateMember: (state, action: PayloadAction<MemberState>) => {
       const index = state.memberList.findIndex((m) => m.id === action.payload.id);
       if (index !== -1) {
-        const m = action.payload;
-        state.memberList[index] = {
-          ...m,
-          availableShiftIds: [...m.availableShiftIds],
-        };
+        state.memberList[index] = cloneMemberState(action.payload);
       }
     },
     deleteMember: (state, action: PayloadAction<string>) => {

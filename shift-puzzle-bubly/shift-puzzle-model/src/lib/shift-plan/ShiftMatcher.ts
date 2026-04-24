@@ -116,7 +116,7 @@ export class ShiftMatcher {
 
     for (const member of this.memberList) {
       // 1. 参加可能性チェック（必須）
-      if (!member.isAvailableFor(shift.id)) continue;
+      if (!member.isAvailableForShift(shift)) continue;
 
       // 2. 既にこのシフトに配置されているかチェック
       const alreadyAssigned = currentAssignments.some(

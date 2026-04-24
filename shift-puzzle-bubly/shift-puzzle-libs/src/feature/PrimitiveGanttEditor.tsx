@@ -16,6 +16,8 @@ import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
 import {
   selectShiftPuzzleMemberList,
   selectShiftPuzzlePlanById,
+  selectSelectedTaskId,
+  setSelectedTaskId,
   addShiftPlan,
   updateShiftPlan,
   setMemberList,
@@ -28,6 +30,8 @@ import {
 import {
   ShiftPlan,
   type DayType,
+  type ShiftState,
+  type BlockListState,
 } from '../domain/index.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { createDefaultShifts, createDefaultTimeSchedules, DAY_TYPE_ORDER } from '../data/sampleData.js';
@@ -42,6 +46,8 @@ type PrimitiveGanttEditorProps = {
   initialDayType?: DayType;
   /** 既配置run（バー）クリックで配置状況バブル等へ遷移する callback */
   onAssignedRunOpen?: (shiftId: string, taskId: string) => void;
+  /** 既配置run を展開元としてマークするための URL ビルダ。LinkBubbleの曲線描画に利用 */
+  buildRunUrl?: (shiftId: string) => string;
 };
 
 // ========== コンポーネント ==========
@@ -50,15 +56,23 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   shiftPlanId,
   initialDayType,
   onAssignedRunOpen,
+  buildRunUrl,
 }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
+  const selectedTaskId = useAppSelector(selectSelectedTaskId);
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
 
-  /** TaskList ドラッグ中の taskId を購読してブラシ状態に反映 */
-  const [brushTaskId, setBrushTaskId] = useState<string | null>(null);
+  /** TaskList ドラッグ中の taskId（ブラシ優先度：ドラッグ > クリック選択） */
+  const [dragBrushTaskId, setDragBrushTaskId] = useState<string | null>(null);
+
+  /**
+   * 実効ブラシ ID：ドラッグ中はドラッグ対象を、そうでなければ TaskList のクリック選択を使う。
+   * これによりクリックで選択したタスクでも配置可能セルがハイライトされる。
+   */
+  const brushTaskId = dragBrushTaskId ?? selectedTaskId;
 
   const allShifts = useMemo(() => createDefaultShifts(), []);
   const allTimeSchedules = useMemo(() => createDefaultTimeSchedules(), []);
@@ -70,49 +84,76 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }
   }, [dispatch, members.length]);
 
-  // ShiftPlan 初期化（BlockList は TimeSchedule-scoped で確保）
-  // 既存プランがあっても shifts が空なら BlockList 付きシフトを補充する
-  // （旧D&Dガント版で作成された assignments[] のみのプランとも共存可能にする）
+  // ShiftPlan 初期化 & master への同期
+  //
+  // 永続化された plan.shifts が master（sampleData）と乖離すると、
+  // TaskList には載るがドラッグ時に配置場所が highlight されないタスクが発生する
+  // （candidates フィルタが shift.taskId で空になるため）。
+  // このため master の shift 集合を「単一の source of truth」として扱い、
+  // 既存プランの blockList だけを id でマッピングして引き継ぐ。
   useEffect(() => {
     const tsMap = new Map(allTimeSchedules.map((ts) => [ts.id, ts]));
-    const buildShiftsWithBlockList = () => allShifts.map((s) => {
-      const ts = s.timeScheduleId ? tsMap.get(s.timeScheduleId) : undefined;
-      const totalBlocks = ts ? ts.totalBlocks : Math.ceil(s.durationMinutes / 15);
-      return {
-        ...s.state,
-        blockList: { blocks: Array.from({ length: totalBlocks }, () => [] as string[]) },
-      };
-    });
+
+    const buildShiftsFromMaster = (existing: readonly ShiftState[] = []): ShiftState[] => {
+      const existingBLMap = new Map<string, BlockListState>();
+      for (const s of existing) {
+        if (s.blockList) existingBLMap.set(s.id, s.blockList);
+      }
+      return allShifts.map((s) => {
+        const ts = s.timeScheduleId ? tsMap.get(s.timeScheduleId) : undefined;
+        const totalBlocks = ts ? ts.totalBlocks : Math.ceil(s.durationMinutes / 15);
+        const existingBL = existingBLMap.get(s.id);
+        // TimeSchedule の範囲が変わって totalBlocks が変わった場合はリセット
+        const bl: BlockListState = existingBL && existingBL.blocks.length === totalBlocks
+          ? existingBL
+          : { blocks: Array.from({ length: totalBlocks }, () => [] as string[]) };
+        return {
+          ...s.state,
+          blockList: bl,
+        };
+      });
+    };
 
     if (!shiftPlan) {
       const plan = ShiftPlan.create('プリミティブガント用プラン', '晴れ');
       const updatedPlan = new ShiftPlan({
         ...plan.state,
         id: shiftPlanId,
-        shifts: buildShiftsWithBlockList(),
+        shifts: buildShiftsFromMaster(),
         timeSchedules: allTimeSchedules.map((ts) => ts.state),
       });
       dispatch(addShiftPlan(updatedPlan.state));
       return;
     }
 
-    // 既存プランで shifts が未初期化 → 補充（assignments等は温存）
-    if (shiftPlan.shifts.length === 0) {
+    // 既存プラン → master と同期が必要か判定
+    const planShiftStates = shiftPlan.state.shifts ?? [];
+    const masterIds = new Set(allShifts.map((s) => s.id));
+    const planIds = new Set(planShiftStates.map((s) => s.id));
+    const hasMissing = allShifts.some((s) => !planIds.has(s.id));
+    const hasOrphan = planShiftStates.some((s) => !masterIds.has(s.id));
+
+    const planTsStates = shiftPlan.state.timeSchedules ?? [];
+    const planTsIds = new Set(planTsStates.map((t) => t.id));
+    const tsMismatch = planTsStates.length !== allTimeSchedules.length
+      || allTimeSchedules.some((t) => !planTsIds.has(t.id));
+
+    if (hasMissing || hasOrphan || tsMismatch) {
       dispatch(updateShiftPlan({
         ...shiftPlan.state,
-        shifts: buildShiftsWithBlockList(),
+        shifts: buildShiftsFromMaster(planShiftStates),
         timeSchedules: allTimeSchedules.map((ts) => ts.state),
       }));
     }
   }, [shiftPlan, shiftPlanId, dispatch, allShifts, allTimeSchedules]);
 
-  // window の dragstart/dragend を監視してブラシ状態を同期
+  // window の dragstart/dragend を監視してドラッグ中ブラシを同期
   useEffect(() => {
     const handleDragStart = () => {
-      if (draggingTaskId) setBrushTaskId(draggingTaskId);
+      if (draggingTaskId) setDragBrushTaskId(draggingTaskId);
     };
     const handleDragEnd = () => {
-      setBrushTaskId(null);
+      setDragBrushTaskId(null);
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
@@ -148,7 +189,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
     const map = new Map<string, RowAvailability>();
     for (const member of members) {
-      const anyAvailable = taskShifts.some((s) => member.isAvailableFor(s.id));
+      const anyAvailable = taskShifts.some((s) => member.isAvailableForShift(s));
       if (!anyAvailable) {
         map.set(member.id, 'unavailable');
         continue;
@@ -216,12 +257,22 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           ))}
         </div>
 
-        {/* ブラシ表示 */}
+        {/* ブラシ表示（クリック選択中はクリアボタンを併設） */}
         {brushTaskId && (
           <div className="e-active-brush">
             <span className="e-brush-label">
               ブラシ: {planShifts.find((s) => s.taskId === brushTaskId)?.taskName ?? brushTaskId}
             </span>
+            {!dragBrushTaskId && selectedTaskId && (
+              <button
+                type="button"
+                className="e-brush-clear"
+                onClick={() => dispatch(setSelectedTaskId(null))}
+                aria-label="ブラシを解除"
+              >
+                ×
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -239,6 +290,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           onRemoveRange={handleRemoveRange}
           onMoveRun={handleMoveRun}
           onAssignedRunClick={handleAssignedRunClick}
+          buildRunUrl={buildRunUrl}
           rowAvailabilityMap={rowAvailabilityMap}
         />
       </div>
@@ -314,6 +366,20 @@ const StyledEditor = styled.div`
     font-size: 0.82em;
     color: #1565c0;
     font-weight: 600;
+  }
+
+  .e-brush-clear {
+    border: none;
+    background: transparent;
+    color: #1565c0;
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    border-radius: 10px;
+    &:hover {
+      background: rgba(21, 101, 192, 0.15);
+    }
   }
 
   .e-gantt-container {

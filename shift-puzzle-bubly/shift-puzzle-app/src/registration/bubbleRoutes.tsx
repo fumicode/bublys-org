@@ -57,7 +57,10 @@ const ShiftPuzzleMemberBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 // シフトパズル - 局員参加可能シフトバブル
 const ShiftPuzzleMemberAvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <MemberAvailability memberId={bubble.params.memberId} />;
+  const queryIndex = bubble.url.indexOf('?');
+  const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
+  const shiftPlanId = new URLSearchParams(query).get('shiftPlanId') ?? undefined;
+  return <MemberAvailability memberId={bubble.params.memberId} shiftPlanId={shiftPlanId} />;
 };
 
 // シフトパズル - シフト配置表バブル（単一シフト案）
@@ -237,12 +240,11 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
   const params = new URLSearchParams(query);
   const initialDayType = (params.get('dayType') ?? undefined) as DayType | undefined;
 
+  const buildRunUrl = (shiftId: string) =>
+    `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status`;
+
   const handleAssignedRunOpen = (shiftId: string) => {
-    openBubble(
-      `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status`,
-      bubble.id,
-      'origin-side',
-    );
+    openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side');
   };
 
   return (
@@ -250,6 +252,7 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
       shiftPlanId={shiftPlanId}
       initialDayType={initialDayType}
       onAssignedRunOpen={handleAssignedRunOpen}
+      buildRunUrl={buildRunUrl}
     />
   );
 };
@@ -271,6 +274,15 @@ const ShiftPuzzleShiftStatusBubble: BubbleRoute["Component"] = ({ bubble }) => {
       bubble.id,
     );
   };
+  const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
+  const buildMemberAvailabilityUrl = (memberId: string) =>
+    `shift-puzzle/members/${memberId}/availableShifts?shiftPlanId=${shiftPlanId}`;
+  const handleMemberClick = (memberId: string) => {
+    openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side');
+  };
+  const handleAvailabilityClick = (memberId: string) => {
+    openBubble(buildMemberAvailabilityUrl(memberId), bubble.id, 'bubble-side');
+  };
 
   return (
     <ShiftStatus
@@ -279,18 +291,38 @@ const ShiftPuzzleShiftStatusBubble: BubbleRoute["Component"] = ({ bubble }) => {
       variant="full"
       onExpandMembers={handleExpandMembers}
       onExpandCoverage={handleExpandCoverage}
+      buildMemberUrl={buildMemberUrl}
+      buildMemberAvailabilityUrl={buildMemberAvailabilityUrl}
+      onMemberClick={handleMemberClick}
+      onAvailabilityClick={handleAvailabilityClick}
     />
   );
 };
 
 // シフトパズル - 配置メンバー単独バブル（Aの昇格先）
 const ShiftPuzzleShiftStatusMembersBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   const { shiftPlanId, shiftId } = bubble.params;
+
+  const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
+  const buildMemberAvailabilityUrl = (memberId: string) =>
+    `shift-puzzle/members/${memberId}/availableShifts?shiftPlanId=${shiftPlanId}`;
+  const handleMemberClick = (memberId: string) => {
+    openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side');
+  };
+  const handleAvailabilityClick = (memberId: string) => {
+    openBubble(buildMemberAvailabilityUrl(memberId), bubble.id, 'bubble-side');
+  };
+
   return (
     <ShiftStatus
       shiftPlanId={shiftPlanId}
       shiftId={shiftId}
       variant="members-only"
+      buildMemberUrl={buildMemberUrl}
+      buildMemberAvailabilityUrl={buildMemberAvailabilityUrl}
+      onMemberClick={handleMemberClick}
+      onAvailabilityClick={handleAvailabilityClick}
     />
   );
 };
