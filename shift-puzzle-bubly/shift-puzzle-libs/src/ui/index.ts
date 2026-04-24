@@ -9,3 +9,6 @@ export * from "./TaskDetailView.js";
 export * from "./MemberGanttView.js";
 export * from "./TaskSelectionPanelView.js";
 export * from "./PrimitiveGanttView.js";
+export * from "./AssignedMembersView.js";
+export * from "./CoverageTetrisView.js";
+export * from "./TaskAssignmentStatusView.js";

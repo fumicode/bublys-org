@@ -10,3 +10,4 @@ export * from "./TaskCollection.js";
 export * from "./TaskDetail.js";
 export * from "./MemberGanttEditor.js";
 export * from "./PrimitiveGanttEditor.js";
+export * from "./ShiftAssignmentStatus.js";

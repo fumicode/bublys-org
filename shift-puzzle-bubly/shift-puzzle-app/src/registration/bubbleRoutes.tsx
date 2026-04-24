@@ -18,6 +18,7 @@ import {
   TaskDetail,
   MemberGanttEditor,
   PrimitiveGanttEditor,
+  ShiftStatus,
   parseTaskFilter,
   type DayType,
 } from "@bublys-org/shift-puzzle-libs";
@@ -236,15 +237,72 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
   const params = new URLSearchParams(query);
   const initialDayType = (params.get('dayType') ?? undefined) as DayType | undefined;
 
-  const handleAssignedCellClick = (taskId: string) => {
-    openBubble(`shift-puzzle/tasks/${taskId}`, bubble.id, 'origin-side');
+  const handleAssignedRunOpen = (shiftId: string) => {
+    openBubble(
+      `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status`,
+      bubble.id,
+      'origin-side',
+    );
   };
 
   return (
     <PrimitiveGanttEditor
       shiftPlanId={shiftPlanId}
       initialDayType={initialDayType}
-      onAssignedCellClick={handleAssignedCellClick}
+      onAssignedRunOpen={handleAssignedRunOpen}
+    />
+  );
+};
+
+// シフトパズル - シフト配置状況バブル（親：A+Bカード内包）
+const ShiftPuzzleShiftStatusBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const { shiftPlanId, shiftId } = bubble.params;
+
+  const handleExpandMembers = () => {
+    openBubble(
+      `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status/members`,
+      bubble.id,
+    );
+  };
+  const handleExpandCoverage = () => {
+    openBubble(
+      `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status/coverage`,
+      bubble.id,
+    );
+  };
+
+  return (
+    <ShiftStatus
+      shiftPlanId={shiftPlanId}
+      shiftId={shiftId}
+      variant="full"
+      onExpandMembers={handleExpandMembers}
+      onExpandCoverage={handleExpandCoverage}
+    />
+  );
+};
+
+// シフトパズル - 配置メンバー単独バブル（Aの昇格先）
+const ShiftPuzzleShiftStatusMembersBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { shiftPlanId, shiftId } = bubble.params;
+  return (
+    <ShiftStatus
+      shiftPlanId={shiftPlanId}
+      shiftId={shiftId}
+      variant="members-only"
+    />
+  );
+};
+
+// シフトパズル - 人数充足テトリス単独バブル（Bの昇格先）
+const ShiftPuzzleShiftStatusCoverageBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { shiftPlanId, shiftId } = bubble.params;
+  return (
+    <ShiftStatus
+      shiftPlanId={shiftPlanId}
+      shiftId={shiftId}
+      variant="coverage-only"
     />
   );
 };
@@ -282,6 +340,10 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // ガントビュー（:shiftPlanIdの前に配置して優先マッチ）
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/gantt", type: "gantt-editor", Component: ShiftPuzzleGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/primitive-gantt", type: "primitive-gantt-editor", Component: ShiftPuzzlePrimitiveGanttEditorBubble },
+  // Shift配置状況系（具体ルートを先に配置）
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/members", type: "shift-status-members", Component: ShiftPuzzleShiftStatusMembersBubble },
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/coverage", type: "shift-status-coverage", Component: ShiftPuzzleShiftStatusCoverageBubble },
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status", type: "shift-status", Component: ShiftPuzzleShiftStatusBubble },
   { pattern: "shift-puzzle/shift-plans", type: "shift-plan-list", Component: ShiftPuzzlePlanManagerBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId", type: "shift-plan", Component: ShiftPuzzlePlanEditorBubble },
   { pattern: "shift-puzzle/tasks/:taskId", type: "task", Component: ShiftPuzzleTaskBubble },

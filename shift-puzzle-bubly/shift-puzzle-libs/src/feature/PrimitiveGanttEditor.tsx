@@ -34,15 +34,14 @@ import { createDefaultShifts, createDefaultTimeSchedules, DAY_TYPE_ORDER } from 
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingTaskId } from '../ui/TaskListView.js';
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 
 // ========== 型定義 ==========
 
 type PrimitiveGanttEditorProps = {
   shiftPlanId: string;
   initialDayType?: DayType;
-  /** セル（既配置）クリックでタスク詳細などへ遷移する callback */
-  onAssignedCellClick?: (taskId: string) => void;
+  /** 既配置run（バー）クリックで配置状況バブル等へ遷移する callback */
+  onAssignedRunOpen?: (shiftId: string, taskId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -50,14 +49,13 @@ type PrimitiveGanttEditorProps = {
 export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   shiftPlanId,
   initialDayType,
-  onAssignedCellClick,
+  onAssignedRunOpen,
 }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
-  const [minuteGranularity, setMinuteGranularity] = useState<60 | 30 | 15>(15);
 
   /** TaskList ドラッグ中の taskId を購読してブラシ状態に反映 */
   const [brushTaskId, setBrushTaskId] = useState<string | null>(null);
@@ -135,7 +133,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     return shiftPlan.timeSchedules.length > 0 ? shiftPlan.timeSchedules : allTimeSchedules;
   }, [shiftPlan, allTimeSchedules]);
 
-  const ganttConfig: GanttConfig = { hourPx: 60, minuteGranularity };
+  const ganttConfig: GanttConfig = { hourPx: 60 };
 
   /**
    * 行の受け入れ可否マップ（ブラシ中のみ意味がある）。
@@ -195,10 +193,10 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }));
   };
 
-  // 既配置バークリック → 親に taskId を通知（タスク詳細バブルへ遷移など）
+  // 既配置バー（run）クリック → 親に shiftId + taskId を通知（配置状況バブルへ遷移など）
   const handleAssignedRunClick = (shiftId: string) => {
     const shift = planShifts.find((s) => s.id === shiftId);
-    if (shift && onAssignedCellClick) onAssignedCellClick(shift.taskId);
+    if (shift && onAssignedRunOpen) onAssignedRunOpen(shift.id, shift.taskId);
   };
 
   return (
@@ -216,21 +214,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
               {dt}
             </button>
           ))}
-        </div>
-
-        {/* 粒度切替 */}
-        <div className="e-granularity">
-          <span className="e-granularity-label">表示粒度:</span>
-          <ToggleButtonGroup
-            value={minuteGranularity}
-            exclusive
-            onChange={(_, v) => v && setMinuteGranularity(v as 60 | 30 | 15)}
-            size="small"
-          >
-            <ToggleButton value={60}>1h</ToggleButton>
-            <ToggleButton value={30}>30m</ToggleButton>
-            <ToggleButton value={15}>15m</ToggleButton>
-          </ToggleButtonGroup>
         </div>
 
         {/* ブラシ表示 */}
