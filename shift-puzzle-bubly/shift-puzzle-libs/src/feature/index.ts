@@ -10,4 +10,6 @@ export * from "./TaskCollection.js";
 export * from "./TaskDetail.js";
 export * from "./MemberGanttEditor.js";
 export * from "./PrimitiveGanttEditor.js";
+export * from "./ShiftPlanTabs.js";
+export * from "./ShiftPlanWorldLineGraphView.js";
 export * from "./ShiftAssignmentStatus.js";

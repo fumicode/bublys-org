@@ -12,7 +12,7 @@
 
 import { FC, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
+import { useAppDispatch, useAppSelector, useAppStore } from '@bublys-org/state-management';
 import {
   selectShiftPuzzleMemberList,
   selectShiftPuzzlePlanById,
@@ -38,6 +38,8 @@ import { createDefaultShifts, createDefaultTimeSchedules, DAY_TYPE_ORDER } from 
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingTaskId } from '../ui/TaskListView.js';
+import { ShiftPlanTabs, type ComparisonMode } from './ShiftPlanTabs.js';
+import { selectShiftsAtTab, moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
 
@@ -59,11 +61,17 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   buildRunUrl,
 }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
+
+  /** 比較対象タブのノード ID（null = 比較オフ） */
+  const [comparisonNodeId, setComparisonNodeId] = useState<string | null>(null);
+  /** 表示モード */
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('normal');
 
   /** TaskList ドラッグ中の taskId（ブラシ優先度：ドラッグ > クリック選択） */
   const [dragBrushTaskId, setDragBrushTaskId] = useState<string | null>(null);
@@ -163,6 +171,32 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     };
   }, []);
 
+  // Ctrl+Z / Ctrl+Shift+Z（Mac は Cmd）で世界線を undo/redo。
+  // - apex を 1 ステップ移動 + そのノード時点の shifts を完全復元
+  // - 入力フォーカス中は無視（ブラウザ標準の編集 undo を尊重）
+  useEffect(() => {
+    const isEditableTarget = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (el.isContentEditable) return true;
+      return false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key !== 'z' && e.key !== 'Z') return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        moveForwardInPlan(shiftPlanId)(store.dispatch, store.getState);
+      } else {
+        moveBackInPlan(shiftPlanId)(store.dispatch, store.getState);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [shiftPlanId, store]);
+
   // プランから shifts / timeSchedules を取得
   const planShifts = useMemo(() => {
     if (!shiftPlan) return allShifts;
@@ -173,6 +207,17 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     if (!shiftPlan) return allTimeSchedules;
     return shiftPlan.timeSchedules.length > 0 ? shiftPlan.timeSchedules : allTimeSchedules;
   }, [shiftPlan, allTimeSchedules]);
+
+  // 比較タブの shifts（CAS から復元）。比較オフなら空配列。
+  // タブ＝アンカー（命名時点）ではなく、その系譜の最新 leaf を比較対象として使う
+  // （Git ブランチ風モデル）。
+  const comparisonShiftStates = useAppSelector((s) =>
+    selectShiftsAtTab(s, shiftPlanId, comparisonNodeId)
+  );
+  const effectiveComparisonMode: ComparisonMode =
+    comparisonNodeId === null || comparisonShiftStates.length === 0
+      ? 'normal'
+      : comparisonMode;
 
   const ganttConfig: GanttConfig = { hourPx: 60 };
 
@@ -242,6 +287,15 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   return (
     <StyledEditor>
+      {/* 世界線タブ + 比較コントロール */}
+      <ShiftPlanTabs
+        planId={shiftPlanId}
+        comparisonNodeId={comparisonNodeId}
+        comparisonMode={comparisonMode}
+        onChangeComparison={setComparisonNodeId}
+        onChangeMode={setComparisonMode}
+      />
+
       {/* ツールバー */}
       <div className="e-toolbar">
         {/* 日程フィルター */}
@@ -292,6 +346,8 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           onAssignedRunClick={handleAssignedRunClick}
           buildRunUrl={buildRunUrl}
           rowAvailabilityMap={rowAvailabilityMap}
+          comparisonShifts={comparisonShiftStates}
+          comparisonMode={effectiveComparisonMode}
         />
       </div>
     </StyledEditor>

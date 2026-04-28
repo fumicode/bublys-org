@@ -27,6 +27,7 @@
 import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member, type DayType } from '../domain/index.js';
+import type { ShiftState } from '@bublys-org/shift-puzzle-model';
 import { type GanttConfig } from './MemberGanttView.js';
 import { DRAG_TYPE_TASK, draggingTaskId } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
@@ -70,6 +71,13 @@ export type PrimitiveGanttViewProps = {
   brushTaskId?: string | null;
   /** 局員行の受け入れ可否マップ（ブラシ中のみ意味がある） */
   rowAvailabilityMap?: Map<string, RowAvailability>;
+  /**
+   * 比較対象タブの shifts（CAS 由来 ShiftState を渡す）。
+   * comparisonMode が 'diff' / 'overlay' の時に視覚化に使う。
+   */
+  comparisonShifts?: readonly ShiftState[];
+  /** 比較表示モード。'normal' は比較なし、'overlay' / 'diff' は比較表示 */
+  comparisonMode?: 'normal' | 'overlay' | 'diff';
 };
 
 // ========== 定数 ==========
@@ -147,6 +155,73 @@ type RunBar = {
   outOfRangeBlocks: number[];  // shift の valid 範囲外に置かれた絶対 blockIndex
   unavailableBlocks: number[]; // 参加不可時間に該当する絶対 blockIndex
 };
+
+/**
+ * 各 (userId, blockIndex, shiftId) を string key で集合化（diff 比較用）。
+ * key 形式: `${userId}:${blockIndex}:${shiftId}`
+ */
+function buildShiftCellSet(
+  shifts: readonly Shift[],
+  totalBlocks: number,
+): Set<string> {
+  const set = new Set<string>();
+  for (const shift of shifts) {
+    const bl = shift.blockList;
+    const limit = Math.min(bl.totalBlocks, totalBlocks);
+    for (let b = 0; b < limit; b++) {
+      for (const uid of bl.getUsersAt(b)) {
+        set.add(`${uid}:${b}:${shift.id}`);
+      }
+    }
+  }
+  return set;
+}
+
+/**
+ * comparison にしか居ない (member, blockIndex, shiftId) を run 化して返す。
+ * current と同じ shift の連続ブロックを 1 run にまとめ、他の差分は分離する。
+ */
+function buildRemovedRunsForMember(
+  member: Member,
+  totalBlocks: number,
+  comparisonShifts: readonly Shift[],
+  currentCellSet: Set<string>,
+): RunBar[] {
+  const runs: RunBar[] = [];
+  let cur: RunBar | null = null;
+  for (let b = 0; b < totalBlocks; b++) {
+    // 1ブロック内で「member が居て、かつ current に同じ (m,b,shiftId) が無い」
+    // 最初のシフトを primary とする（current と同じ tie-break ルール）
+    let primary: Shift | null = null;
+    for (const s of comparisonShifts) {
+      const bl = s.blockList;
+      if (b >= bl.totalBlocks) continue;
+      if (!bl.getUsersAt(b).includes(member.id)) continue;
+      if (currentCellSet.has(`${member.id}:${b}:${s.id}`)) continue;
+      primary = s;
+      break;
+    }
+    if (!primary) {
+      if (cur) { runs.push(cur); cur = null; }
+      continue;
+    }
+    if (cur && cur.shift.id === primary.id) {
+      cur.endBlock = b + 1;
+    } else {
+      if (cur) runs.push(cur);
+      cur = {
+        shift: primary,
+        startBlock: b,
+        endBlock: b + 1,
+        isOverlap: false,
+        outOfRangeBlocks: [],
+        unavailableBlocks: [],
+      };
+    }
+  }
+  if (cur) runs.push(cur);
+  return runs;
+}
 
 function buildRunsForMember(
   member: Member,
@@ -240,6 +315,8 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   buildRunUrl,
   brushTaskId,
   rowAvailabilityMap,
+  comparisonShifts,
+  comparisonMode = 'normal',
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
   const minutePx = hourPx / 60;
@@ -261,6 +338,80 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       : new Map<string, CellPlacement[]>(),
     [activeShifts, activeTimeSchedule],
   );
+
+  // ========== 比較データ ==========
+  // comparisonShifts (CAS 由来 ShiftState[]) を Shift インスタンス化し、
+  // 現 TimeSchedule のものだけ抽出。差分／オーバーレイの両モードで使う。
+  const activeComparisonShifts = useMemo<Shift[]>(() => {
+    if (!activeTimeSchedule || !comparisonShifts || comparisonShifts.length === 0) return [];
+    const tsId = activeTimeSchedule.id;
+    return comparisonShifts
+      .filter((s) => s.timeScheduleId === tsId)
+      .map((s) => new Shift(s));
+  }, [comparisonShifts, activeTimeSchedule]);
+
+  const totalBlocksForDiff = activeTimeSchedule?.totalBlocks ?? 0;
+
+  // 現在の (userId, blockIndex, shiftId) 集合（diff 比較で使う）
+  const currentCellSet = useMemo(() => {
+    if (comparisonMode === 'normal' || activeComparisonShifts.length === 0) {
+      return new Set<string>();
+    }
+    return buildShiftCellSet(activeShifts, totalBlocksForDiff);
+  }, [activeShifts, totalBlocksForDiff, activeComparisonShifts.length, comparisonMode]);
+
+  // 比較側の (userId, blockIndex, shiftId) 集合
+  const comparisonCellSet = useMemo(() => {
+    if (comparisonMode === 'normal' || activeComparisonShifts.length === 0) {
+      return new Set<string>();
+    }
+    return buildShiftCellSet(activeComparisonShifts, totalBlocksForDiff);
+  }, [activeComparisonShifts, totalBlocksForDiff, comparisonMode]);
+
+  const diffActive = comparisonMode === 'diff' && activeComparisonShifts.length > 0;
+  const overlayActive = comparisonMode === 'overlay' && activeComparisonShifts.length > 0;
+
+  // 比較側 placementMap（オーバーレイで全 run を再現するために必要）
+  const comparisonPlacementMap = useMemo(
+    () => activeTimeSchedule && overlayActive
+      ? buildPlacementMap(activeComparisonShifts, activeTimeSchedule)
+      : new Map<string, CellPlacement[]>(),
+    [activeComparisonShifts, activeTimeSchedule, overlayActive],
+  );
+
+  // 比較側の各局員 run（オーバーレイ表示用）
+  const comparisonRunsByMember = useMemo(() => {
+    if (!overlayActive || !activeTimeSchedule || totalBlocksForDiff === 0) {
+      return new Map<string, RunBar[]>();
+    }
+    const map = new Map<string, RunBar[]>();
+    for (const member of members) {
+      const runs = buildRunsForMember(
+        member,
+        activeTimeSchedule,
+        totalBlocksForDiff,
+        comparisonPlacementMap,
+      );
+      if (runs.length > 0) map.set(member.id, runs);
+    }
+    return map;
+  }, [overlayActive, members, activeTimeSchedule, totalBlocksForDiff, comparisonPlacementMap]);
+
+  // 比較側にしか居ない (member, b, shiftId) を run 化（差分モードで使うゴースト用）
+  const removedRunsByMember = useMemo(() => {
+    if (!diffActive || totalBlocksForDiff === 0) return new Map<string, RunBar[]>();
+    const map = new Map<string, RunBar[]>();
+    for (const member of members) {
+      const removed = buildRemovedRunsForMember(
+        member,
+        totalBlocksForDiff,
+        activeComparisonShifts,
+        currentCellSet,
+      );
+      if (removed.length > 0) map.set(member.id, removed);
+    }
+    return map;
+  }, [diffActive, members, totalBlocksForDiff, activeComparisonShifts, currentCellSet]);
 
   // ブラシ候補シフト（state優先、無ければ draggingTaskId モジュール変数）
   const resolveActiveBrush = useCallback((): { taskId: string; candidates: Shift[] } | null => {
@@ -643,10 +794,21 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                   const runUrl = buildRunUrl?.(run.shift.id);
                   const hasUnavailable = run.unavailableBlocks.length > 0;
                   const hasOutOfRange = run.outOfRangeBlocks.length > 0;
+                  // 差分モード: comparison に居なかったブロック = added
+                  const addedBlocks: number[] = diffActive
+                    ? Array.from(
+                        { length: run.endBlock - run.startBlock },
+                        (_, i) => run.startBlock + i,
+                      ).filter(
+                        (b) =>
+                          !comparisonCellSet.has(`${member.id}:${b}:${run.shift.id}`),
+                      )
+                    : [];
                   const titleParts = [run.shift.taskName];
                   if (hasOutOfRange) titleParts.push('（タスク時間外に配置）');
                   if (run.isOverlap) titleParts.push('（重複あり）');
                   if (hasUnavailable) titleParts.push('（参加不可時間に配置）');
+                  if (addedBlocks.length > 0) titleParts.push('（追加）');
                   const runBar = (
                     <StyledRunBar
                       key={`${run.shift.id}-${run.startBlock}`}
@@ -695,6 +857,17 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                           aria-label="タスク時間外"
                         />
                       ))}
+                      {/* 差分モード: 追加されたブロック（comparison に居なかった） */}
+                      {addedBlocks.map((b) => (
+                        <StyledDiffAddedBlock
+                          key={`add-${b}`}
+                          style={{
+                            left: (b - run.startBlock) * blockPx,
+                            width: blockPx,
+                          }}
+                          aria-label="追加されたブロック"
+                        />
+                      ))}
                       <span className="e-run-label">{run.shift.taskName}</span>
                       {hasOutOfRange && <span className="e-out-badge" aria-label="タスク時間外に配置">⧗</span>}
                       {hasUnavailable && <span className="e-unavailable-badge" aria-label="参加不可時間に配置">🚫</span>}
@@ -723,6 +896,43 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                     </UrledPlace>
                   ) : (
                     runBar
+                  );
+                })}
+
+                {/* オーバーレイモード: comparison の全 run を上端ゴーストで重ね描画 */}
+                {overlayActive && comparisonRunsByMember.get(member.id)?.map((run) => {
+                  const c = getTaskColor(run.shift.taskId);
+                  return (
+                    <StyledOverlayGhostRun
+                      key={`ov-${run.shift.id}-${run.startBlock}`}
+                      style={{
+                        left: run.startBlock * blockPx,
+                        width: (run.endBlock - run.startBlock) * blockPx,
+                      }}
+                      $bg={c.bg}
+                      $border={c.border}
+                      $text={c.text}
+                      title={`${run.shift.taskName}（比較）`}
+                      aria-label="比較側の配置"
+                    >
+                      <span className="ov-label">{run.shift.taskName}</span>
+                    </StyledOverlayGhostRun>
+                  );
+                })}
+
+                {/* 差分モード: comparison にしか無かった配置をゴーストで表示 */}
+                {diffActive && removedRunsByMember.get(member.id)?.map((run) => {
+                  const left = run.startBlock * blockPx;
+                  const width = (run.endBlock - run.startBlock) * blockPx;
+                  return (
+                    <StyledRemovedGhostRun
+                      key={`rm-${run.shift.id}-${run.startBlock}`}
+                      style={{ left, width }}
+                      title={`${run.shift.taskName}（削除）`}
+                      aria-label="削除された配置"
+                    >
+                      <span className="rg-label">{run.shift.taskName}</span>
+                    </StyledRemovedGhostRun>
                   );
                 })}
 
@@ -1119,6 +1329,84 @@ const StyledUnavailableBlock = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     rgba(255, 224, 130, 0.55) 3px,
     rgba(255, 224, 130, 0.55) 6px
   );
+`;
+
+/**
+ * 差分: 追加されたブロック（current にあって comparison に無い）。
+ * バー本体に重ねる緑の上端ストライプ。バー色を残しつつ「ここ追加した」が分かる。
+ */
+const StyledDiffAddedBlock = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: absolute;
+  top: 0;
+  height: 4px;
+  pointer-events: none;
+  z-index: 2;
+  background: #2e7d32;
+  box-shadow: 0 1px 0 rgba(46, 125, 50, 0.4);
+`;
+
+/**
+ * 差分: 削除されたブロック群（comparison にあって current に無い）。
+ * 行内のバーとは独立して bottom に薄く赤いゴーストとして表示される。
+ * pointer-events: none で操作対象にしない。
+ */
+const StyledRemovedGhostRun = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: absolute;
+  bottom: 2px;
+  height: 10px;
+  background: rgba(229, 115, 115, 0.18);
+  border: 1px dashed #c62828;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: 0.65em;
+  color: #c62828;
+
+  .rg-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+`;
+
+/**
+ * オーバーレイモード: 比較側の run を上端 12px のゴーストとして重ね描画。
+ * task カラーを薄めに使い、現在側のバー（行下方）と縦位置で住み分ける。
+ */
+type OverlayGhostProps = React.HTMLAttributes<HTMLDivElement> & {
+  $bg: string;
+  $border: string;
+  $text: string;
+};
+const StyledOverlayGhostRun = styled.div<OverlayGhostProps>`
+  position: absolute;
+  top: 0;
+  height: 12px;
+  background: ${(p) => p.$bg};
+  border: 1px dashed ${(p) => p.$border};
+  border-bottom: none;
+  border-radius: 2px 2px 0 0;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  overflow: hidden;
+  font-size: 0.6em;
+  color: ${(p) => p.$text};
+
+  .ov-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
 `;
 
 /** ドロップ前のプレビュー帯 */

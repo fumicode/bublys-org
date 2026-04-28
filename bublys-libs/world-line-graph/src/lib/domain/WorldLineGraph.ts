@@ -114,6 +114,69 @@ export class WorldLineGraph {
     });
   }
 
+  /** ノードに表示名（ラベル）を設定/更新する。空文字を渡すと解除。 */
+  setNodeLabel(nodeId: string, label: string | undefined): WorldLineGraph {
+    const node = this.state.nodes[nodeId];
+    if (!node) {
+      throw new Error(`Node not found: ${nodeId}`);
+    }
+    const next: WorldNode = label
+      ? { ...node, label }
+      : (() => {
+          const { label: _, ...rest } = node;
+          return rest as WorldNode;
+        })();
+    return new WorldLineGraph({
+      ...this.state,
+      nodes: { ...this.state.nodes, [nodeId]: next },
+    });
+  }
+
+  /** ラベル付きノードのみ抽出（タブ表示用） */
+  getLabeledNodes(): WorldNode[] {
+    return Object.values(this.state.nodes).filter((n) => !!n.label);
+  }
+
+  /**
+   * アンカーから派生した leaf 群のうち timestamp が最大のものを返す。
+   * 派生が無ければアンカー自身を返す。
+   * 「ラベル付きアンカー = 動くブランチ」モデルでクリック時の遷移先を解決するのに使う。
+   */
+  getLatestDescendantLeaf(anchorId: string): string {
+    const anchor = this.state.nodes[anchorId];
+    if (!anchor) return anchorId;
+    const childrenMap = this.getChildrenMap();
+    let bestLeaf = anchorId;
+    let bestTime = anchor.timestamp;
+    const visit = (id: string): void => {
+      const children = childrenMap[id] ?? [];
+      if (children.length === 0) {
+        const ts = this.state.nodes[id]?.timestamp ?? 0;
+        if (ts >= bestTime) {
+          bestLeaf = id;
+          bestTime = ts;
+        }
+        return;
+      }
+      for (const c of children) visit(c);
+    };
+    visit(anchorId);
+    return bestLeaf;
+  }
+
+  /**
+   * apex がアンカーの系譜内にあるか（apex == anchor または apex の祖先のいずれかが anchor）。
+   * 「タブが現在アクティブか」の判定に使う。
+   */
+  isInLineage(apexId: string, anchorId: string): boolean {
+    let cur: string | null = apexId;
+    while (cur !== null) {
+      if (cur === anchorId) return true;
+      cur = this.state.nodes[cur]?.parentId ?? null;
+    }
+    return false;
+  }
+
   moveBack(): WorldLineGraph {
     const apex = this.getApex();
     if (!apex || apex.parentId === null) {
