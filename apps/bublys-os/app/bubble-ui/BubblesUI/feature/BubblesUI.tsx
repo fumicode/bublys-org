@@ -1,4 +1,4 @@
-import { FC, useEffect, useCallback, useState, useMemo } from "react";
+import { FC, useEffect, useCallback, useState, useMemo, useRef } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem, selectPocketItems, removePocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 
@@ -52,6 +52,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
   const [isPocketOpen, setIsPocketOpen] = useState(false);
   const pocketItems = useAppSelector(selectPocketItems);
+
+  // 無限キャンバス用 zoom/pan refs（ref なので変更しても再レンダリングしない）
+  const canvasZoomRef = useRef(1);
+  const canvasPanRef = useRef({ x: 0, y: 0 });
 
    // ページサイズ管理
   const pageSize = useAppSelector(selectWindowSize);
@@ -107,9 +111,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
-    // 利用可能なスペース（グローバル座標系）
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+    // 利用可能なスペース（screen座標系 → canvas座標系へ変換）
+    const canvasZoom = canvasZoomRef.current;
+    const availableWidth = (pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x) / canvasZoom;
+    const availableHeight = (pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y) / canvasZoom;
 
 
     // サイズと位置を設定
@@ -165,12 +170,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   // BubblesContextの値をメモ化（不要な再レンダリング防止）
+  // canvasZoomRef / canvasPanRef はrefなので依存配列に含めない（refは常に同一オブジェクト）
   const bubblesContextValue = useMemo(() => ({
     pageSize,
     surfaceLeftTop,
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
+    canvasZoomRef,
+    canvasPanRef,
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pocketのドロップハンドラー
   const handlePocketDrop = (url: string, type: DragDataType, label?: string, objectId?: string) => {
@@ -218,6 +226,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}
+                  canvasZoomRef={canvasZoomRef}
+                  canvasPanRef={canvasPanRef}
                 />
               </Box>
             </PositionDebuggerProvider>

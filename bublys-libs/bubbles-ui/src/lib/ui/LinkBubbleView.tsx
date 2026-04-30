@@ -1,14 +1,37 @@
-import { FC } from "react";
+import { FC, useContext } from "react";
 import { Bubble } from "../Bubble.domain.js";
-import { CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { getOriginRect } from "../utils/get-origin-rect.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
+import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 
 type LinkBubbleViewProps = {
   opener: Bubble;
   openee: Bubble;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
+};
+
+/**
+ * screen-within-container 座標（getBoundingClientRect - containerOffset）を
+ * canvas 座標（CSS transform の逆変換）に変換する。
+ *
+ * 変換式: canvasX = (localX - panX) / zoom
+ *
+ * getBoundingClientRect は CSS transform を含む screen 座標を返すため、
+ * canvas の transform（translate + scale）の逆変換が必要。
+ */
+const toCanvasRect = (rect: SmartRect, panX: number, panY: number, zoom: number): SmartRect => {
+  return new SmartRect(
+    new DOMRect(
+      (rect.x - panX) / zoom,
+      (rect.y - panY) / zoom,
+      rect.width / zoom,
+      rect.height / zoom,
+    ),
+    rect.parentSize,
+    rect.coordinateSystem,
+  );
 };
 
 export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
@@ -18,25 +41,32 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   linkZIndex,
 }) => {
   const bubbleRefs = useBubbleRefsOptional();
+  const { canvasZoomRef, canvasPanRef } = useContext(BubblesContext);
 
   // キャッシュ付きでorigin rectを取得（強制リフローを最小化）
-  // useMemoは不要 - getOriginRectCachedが内部でキャッシュしている
   const originRect = bubbleRefs?.getOriginRectCached(openee.url)
     // フォールバック: 従来のgetOriginRectを使う
     ?? getOriginRect(opener.id, openee.url);
 
   const baseOpenerRect = originRect || opener.renderedRect;
-  const openerRect = baseOpenerRect
+
+  // toLocal で「screen-within-container」座標に変換し、さらに canvas 逆変換を適用
+  const canvasZoom = canvasZoomRef?.current ?? 1;
+  const canvasPan = canvasPanRef?.current ?? { x: 0, y: 0 };
+
+  const rawOpenerRect = baseOpenerRect
     ? baseOpenerRect.toLocal(coordinateSystem)
     : undefined;
 
-  const openeeRect = openee.renderedRect
+  const rawOpeneeRect = openee.renderedRect
     ? openee.renderedRect.toLocal(coordinateSystem)
     : undefined;
 
-  if (!openerRect || !openeeRect) return null;
+  if (!rawOpenerRect || !rawOpeneeRect) return null;
 
-
+  // canvas 座標系へ逆変換
+  const openerRect = toCanvasRect(rawOpenerRect, canvasPan.x, canvasPan.y, canvasZoom);
+  const openeeRect = toCanvasRect(rawOpeneeRect, canvasPan.x, canvasPan.y, canvasZoom);
 
   //A 〜 B
   //|    |
@@ -67,9 +97,12 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
         width: "100%",
         height: "100%",
         pointerEvents: "none",
+        // SVGのoverflow:visibleを有効にするため、親divもvisibleにする
+        overflow: "visible",
       }}
     >
-      <svg width="100%" height="100%">
+      {/* overflow: visible でキャンバス境界外のパスもクリップしない */}
+      <svg width="100%" height="100%" style={{ overflow: "visible" }}>
         <defs>
           <marker
             id="arrowhead"

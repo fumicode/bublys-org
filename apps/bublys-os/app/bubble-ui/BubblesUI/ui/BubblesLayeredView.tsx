@@ -1,4 +1,4 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
+import React, { FC, useRef, useLayoutEffect, useEffect, useCallback, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
   Bubble,
@@ -119,7 +119,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
 });
 
 type BubblesLayeredViewProps = {
-  bubbleLayers: string[][];  // IDの配列に変更
+  bubbleLayers: string[][];
   vanishingPoint?: Point2;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
@@ -128,6 +128,10 @@ type BubblesLayeredViewProps = {
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
+  /** キャンバスズーム用ref（BubblesUIから受け取り、ドラッグ計算に使用） */
+  canvasZoomRef?: React.MutableRefObject<number>;
+  /** キャンバスパン用ref（BubblesUIから受け取り） */
+  canvasPanRef?: React.MutableRefObject<Point2>;
 };
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
@@ -140,10 +144,134 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerDown,
   onBubbleLayerUp,
   onCoordinateSystemReady,
+  canvasZoomRef: externalZoomRef,
+  canvasPanRef: externalPanRef,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
-  // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
+  // 外部refが渡されない場合のローカルfallback
+  const localZoomRef = useRef(1);
+  const localPanRef = useRef<Point2>({ x: 0, y: 0 });
+  const zoomRef = externalZoomRef ?? localZoomRef;
+  const panRef = externalPanRef ?? localPanRef;
+
+  // Space キーによるパンモードの状態（カーソル表示用のみ）
+  const [isPanMode, setIsPanMode] = useState(false);
+  const isSpaceDownRef = useRef(false);
+
+  // キャンバスのCSS transformを直接DOM更新（Reactの再レンダリングを避けてパフォーマンス向上）
+  const applyCanvasTransform = useCallback(() => {
+    if (!canvasRef.current) return;
+    const { x, y } = panRef.current;
+    const zoom = zoomRef.current;
+    canvasRef.current.style.transform = `translate(${x}px, ${y}px) scale(${zoom})`;
+  }, [panRef, zoomRef]);
+
+  // ── ホイールイベント（zoom / trackpad pan）──────────────────────────────
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // バブルのコンテンツ内スクロールはキャンバス操作に変換しない
+      const target = e.target as HTMLElement;
+      if (target.closest('.e-bubble-content')) return;
+
+      e.preventDefault();
+
+      if (e.ctrlKey) {
+        // ピンチジェスチャー / Ctrl+スクロール → ズーム
+        const zoomFactor = Math.exp(-e.deltaY * 0.005);
+        const oldZoom = zoomRef.current;
+        const newZoom = Math.max(0.1, Math.min(8, oldZoom * zoomFactor));
+
+        // カーソル位置を中心にズーム
+        const rect = container.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+        const oldPan = panRef.current;
+
+        zoomRef.current = newZoom;
+        panRef.current = {
+          x: cursorX - ((cursorX - oldPan.x) / oldZoom) * newZoom,
+          y: cursorY - ((cursorY - oldPan.y) / oldZoom) * newZoom,
+        };
+      } else {
+        // 二本指スクロール → パン
+        panRef.current = {
+          x: panRef.current.x - e.deltaX,
+          y: panRef.current.y - e.deltaY,
+        };
+      }
+
+      applyCanvasTransform();
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [zoomRef, panRef, applyCanvasTransform]);
+
+  // ── Space キー（パンモード切替）──────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.code === 'Space' &&
+        !e.repeat &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        isSpaceDownRef.current = true;
+        setIsPanMode(true);
+        e.preventDefault();
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpaceDownRef.current = false;
+        setIsPanMode(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // ── マウスドラッグによるパン（中ボタン or Space+左ボタン）──────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const isMiddle = e.button === 1;
+    const isSpaceDrag = e.button === 0 && isSpaceDownRef.current;
+    if (!isMiddle && !isSpaceDrag) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startPanX = panRef.current.x;
+    const startPanY = panRef.current.y;
+
+    const handleMove = (e: MouseEvent) => {
+      panRef.current = {
+        x: startPanX + (e.clientX - startMouseX),
+        y: startPanY + (e.clientY - startMouseY),
+      };
+      applyCanvasTransform();
+    };
+
+    const handleUp = () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }, [panRef, applyCanvasTransform]);
+
+  // ── CoordinateSystem の更新（コンテナ位置変更時）──────────────────────
   useLayoutEffect(() => {
     let lastOffset = { x: 0, y: 0 };
     let lastVanishingPoint = { x: 0, y: 0 };
@@ -153,7 +281,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         const rect = containerRef.current.getBoundingClientRect();
         const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
 
-        // 座標またはvanishingPointが変更された場合のみ更新（無限ループ防止）
         if (
           rect.left === lastOffset.x &&
           rect.top === lastOffset.y &&
@@ -167,18 +294,16 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         lastVanishingPoint = currentVanishingPoint;
 
         const coordinateSystem = new CoordinateSystem(
-          0,  // layerIndex
-          { x: rect.left, y: rect.top },  // offset
-          currentVanishingPoint  // vanishingPoint
+          0,
+          { x: rect.left, y: rect.top },
+          currentVanishingPoint
         );
         onCoordinateSystemReady?.(coordinateSystem);
       }
     };
 
-    // 初期設定
     updateCoordinateSystem();
 
-    // ResizeObserverでサイズ変更を監視
     const resizeObserver = new ResizeObserver(() => {
       updateCoordinateSystem();
     });
@@ -187,8 +312,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       resizeObserver.observe(containerRef.current);
     }
 
-    // windowのresizeイベントで位置変更も検出（サイドバー幅変更など）
-    // requestAnimationFrameでスロットリング
     let rafId: number | null = null;
     const handleResize = () => {
       if (rafId !== null) return;
@@ -209,23 +332,17 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     };
   }, [onCoordinateSystemReady, vanishingPoint]);
 
-  // IDベースの関係性のみ取得（パフォーマンス最適化）
+  // ── Redux からのデータ取得 ─────────────────────────────────────────────
   const relationIds = useAppSelector(selectValidBubbleRelationIds);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
-  // PositionDebuggerからaddRectsを取得
   const { addRects } = usePositionDebugger();
 
-  const undergroundVanishingPoint: Point2 = vanishingPoint || {
-    x: 20,
-    y: 10,
-  };
-
+  const undergroundVanishingPoint: Point2 = vanishingPoint || { x: 20, y: 10 };
   const baseZIndex = 100;
 
-  // bubbleIdToZIndexを計算（LinkBubbleView用）
   const bubbleIdToZIndex: Record<string, number> = useMemo(() => {
     const result: Record<string, number> = {};
     bubbleLayers.forEach((layer, layerIndex) => {
@@ -237,12 +354,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return result;
   }, [bubbleLayers]);
 
-  // リンクバブルが接続されているopenee IDのSet（左角丸を無効化するため）
   const openeeIds = useMemo(() => {
     return new Set(relationIds.map(r => r.openeeId));
   }, [relationIds]);
 
-  // 各バブルをConnectedBubbleViewでレンダリング
   const renderedBubbles = bubbleLayers
     .map((layer, layerIndex) =>
       layer.map((bubbleId) => {
@@ -271,102 +386,91 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     )
     .flat();
 
+  // styled-components v5 は ref を直接受け取れないため、
+  // plain div を外側に置いて containerRef を持たせる
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <StyledBubblesLayeredView
-        surface={{ leftTop: surfaceLeftTop }}
-        underground={{ vanishingPoint: undergroundVanishingPoint }}
-        surfaceZIndex={baseZIndex - 2}
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%' }}
+    >
+      <StyledViewport
+        isPanMode={isPanMode}
+        onMouseDown={handleMouseDown}
       >
-        {renderedBubbles}
-        <div className="e-underground-curtain"></div>
-        <div className="e-debug-visualizations">
-          <div className="e-surface-border"></div>
-          <div className="e-underground-border"></div>
-          <div className="e-vanishing-point"></div>
+        {/* キャンバス層：CSS transform で pan/zoom を実現 */}
+        <div
+          ref={canvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            transformOrigin: '0 0',
+            // 初期 transform（applyCanvasTransform で直接更新される）
+            transform: 'translate(0px, 0px) scale(1)',
+          }}
+        >
+          <StyledCanvas>
+            {renderedBubbles}
+
+            {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
+            {!isLayerAnimating &&
+              relationIds.map(({ openerId, openeeId }) => {
+                const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+                return (
+                  <ConnectedLinkBubbleView
+                    key={`${openerId}_${openeeId}`}
+                    openerId={openerId}
+                    openeeId={openeeId}
+                    coordinateSystem={coordinateSystem}
+                    linkZIndex={linkZIndex}
+                  />
+                );
+              })
+            }
+          </StyledCanvas>
         </div>
-
-        {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
-        {!isLayerAnimating &&
-          relationIds.map(({ openerId, openeeId }) => {
-            const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
-
-            return(
-              <ConnectedLinkBubbleView
-                key={`${openerId}_${openeeId}`}
-                openerId={openerId}
-                openeeId={openeeId}
-                coordinateSystem={coordinateSystem}
-                linkZIndex={linkZIndex}
-              />
-            );
-          })
-        }
-
-      </StyledBubblesLayeredView>
+      </StyledViewport>
     </div>
   );
 };
 
-type StyledBubblesLayeredViewProps = {
-  surface: { leftTop: Point2 };
-  underground: { vanishingPoint?: Point2 };
-  surfaceZIndex?: number;
-  children?: React.ReactNode;
-};
+// ── Styled Components ──────────────────────────────────────────────────────
 
-const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
+/**
+ * 画面に見えるビューポート。クリッピングと背景を担当。
+ * overflow: hidden でキャンバス外のバブルを非表示にする。
+ */
+const StyledViewport = styled.div<React.HTMLAttributes<HTMLDivElement> & { isPanMode: boolean }>`
   width: 100%;
   height: 100%;
   position: relative;
   overflow: hidden;
-  z-index: 0;
+  cursor: ${({ isPanMode }) => isPanMode ? 'grab' : 'default'};
 
-  // 上品な藍色のグラデーション背景
+  // 上品な藍色のグラデーション背景（固定。キャンバスパンに追従しない）
   background: linear-gradient(
     145deg,
     hsl(220, 35%, 18%) 0%,
     hsl(225, 40%, 22%) 40%,
     hsl(230, 35%, 20%) 100%
   );
+`;
 
-  > .e-underground-curtain {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-  }
+type StyledCanvasProps = {
+  children?: React.ReactNode;
+};
 
-  > .e-debug-visualizations {
-    .e-surface-border {
-      position: absolute;
-      top: ${({ surface }) => surface.leftTop.y}px;
-      left: ${({ surface }) => surface.leftTop.x}px;
-      width: calc(100% - ${({ surface }) => surface.leftTop.x}px);
-      height: calc(100% - ${({ surface }) => surface.leftTop.y}px);
-      border-radius: 24px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(1px);
-      box-shadow:
-        0 4px 30px rgba(0, 0, 0, 0.05),
-        inset 0 0 20px rgba(255, 255, 255, 0.05);
-      pointer-events: none;
-      // layerIndex 0,1 はぼかしの上に、layerIndex 2以降はぼかしの下に
-      z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
-    }
-    .e-vanishing-point {
-      position: absolute;
-      top: ${({ underground }) => underground.vanishingPoint?.y || 0}px;
-      left: ${({ underground }) => underground.vanishingPoint?.x || 0}px;
-      width: 8px;
-      height: 8px;
-      background: blue;
-      border-radius: 50%;
-      pointer-events: none;
-    }
-  }
+/**
+ * キャンバス本体。バブルを配置する空間。
+ * overflow: visible でキャンバス外への配置を許容（ビューポートがクリップする）。
+ */
+const StyledCanvas = styled.div<StyledCanvasProps>`
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: visible;
+  z-index: 0;
+  background: transparent;
 `;
