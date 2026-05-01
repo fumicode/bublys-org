@@ -1,5 +1,5 @@
 'use client';
-import { FC, useState, useEffect, useCallback, useMemo } from 'react';
+import { FC, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Box, IconButton, List, ListItemButton, ListItemIcon, Tooltip, Typography } from '@mui/material';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
@@ -154,12 +154,18 @@ export const BublyApp: FC<BublyAppProps> = ({
     dispatch(setGlobalCoordinateSystem(cs.toData()));
   }, [dispatch]);
 
+  // BublyApp は独自のキャンバス操作を持たないが、BubblesContextType の要件を満たすために ref を提供
+  const canvasZoomRef = useRef(1);
+  const canvasPanRef = useRef({ x: 0, y: 0 });
+
   const bubblesContextValue = useMemo(() => ({
     pageSize,
     surfaceLeftTop,
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
+    canvasZoomRef,
+    canvasPanRef,
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pocket
   const [isPocketOpen, setIsPocketOpen] = useState(false);

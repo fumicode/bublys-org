@@ -1,4 +1,4 @@
-import { FC, createContext } from "react";
+import { FC, createContext, MutableRefObject } from "react";
 import { Bubble, BubbleOptions, BubbleParams } from "../Bubble.domain.js";
 import { Size2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { OpeningPosition } from "../state/bubbles-slice.js";
@@ -92,6 +92,10 @@ export type BubblesContextType = {
   surfaceLeftTop: { x: number; y: number };
   coordinateSystem: CoordinateSystem;
   openBubble: (name: string, openerBubbleId: string, openingPosition?: OpeningPosition) => string;
+  /** キャンバスズームの現在値への同期的アクセス用ref。ドラッグ計算・座標変換に使用。 */
+  canvasZoomRef: MutableRefObject<number>;
+  /** キャンバスパンの現在値への同期的アクセス用ref。LinkBubble座標変換に使用。 */
+  canvasPanRef: MutableRefObject<{ x: number; y: number }>;
 };
 
 export const BubblesContext = createContext<BubblesContextType>({
@@ -102,6 +106,8 @@ export const BubblesContext = createContext<BubblesContextType>({
     console.warn("openBubble not implemented");
     return "void_id";
   },
+  canvasZoomRef: { current: 1 },
+  canvasPanRef: { current: { x: 0, y: 0 } },
 });
 
 // ルートマッチングユーティリティ

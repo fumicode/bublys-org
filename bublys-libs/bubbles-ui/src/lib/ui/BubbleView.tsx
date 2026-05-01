@@ -155,7 +155,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   );
 
   const dispatch = useAppDispatch();
-  const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const { coordinateSystem, pageSize, surfaceLeftTop, canvasZoomRef } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
   // ドラッグハンドラ用に最新値を保持
@@ -205,12 +205,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
       y: e.clientY - dragStartMouseRef.current.y,
     };
 
-    // CoordinateSystemを使ってスクリーン座標→ローカル座標の変換を行う
-    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndex || 0)
-      .withVanishingPoint(vanishingPointRef.current || { x: 0, y: 0 });
-
-    // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
-    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
+    // screen座標 → canvas座標 → layer local座標 の2段階変換
+    // canvasZoom: キャンバス全体のズーム倍率（無限キャンバス用）
+    // layerScale: レイヤーの奥行きによるスケール
+    const canvasZoom = canvasZoomRef?.current ?? 1;
+    const layerScale = CoordinateSystem.fromLayerIndex(layerIndex || 0).scale;
+    const localDelta = {
+      x: screenDelta.x / (canvasZoom * layerScale),
+      y: screenDelta.y / (canvasZoom * layerScale),
+    };
     const newPos = {
       x: dragStartPosRef.current.x + localDelta.x,
       y: dragStartPosRef.current.y + localDelta.y,
@@ -229,7 +232,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
     // transform-originも更新（vanishingPointとの相対位置を維持）
     // これがないと、Redux更新後にtransform-originが再計算されて位置がズレる
-    const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
+    // calculateTransformOrigin の実装: vanishingPoint - elementCanvasPosition
+    const vp = vanishingPointRef.current || { x: 0, y: 0 };
+    const newTransformOrigin = {
+      x: vp.x - screenPos.x,
+      y: vp.y - screenPos.y,
+    };
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
   };
 
@@ -243,11 +251,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
       dispatch(updateBubble(resizedBubble.toJSON()));
       onResize?.(resizedBubble);
     } else {
-      // 最大化
+      // 最大化（screen座標をcanvas座標に変換）
       if (!pageSize) return;
       const globalCoordinateSystem = coordinateSystem;
-      const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-      const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+      const canvasZoom = canvasZoomRef?.current ?? 1;
+      const availableWidth = (pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x) / canvasZoom;
+      const availableHeight = (pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y) / canvasZoom;
       const newPosition = { x: 0, y: 0 };
 
       const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
@@ -456,8 +465,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   transform: scale(
     ${({ layerIndex }) => CoordinateSystem.fromLayerIndex(layerIndex ?? 0).scale}
   );
-
-  max-height: 90vh;//FIXME:突貫対応
 
   // 泡っぽいグラデーション背景
   background: linear-gradient(
