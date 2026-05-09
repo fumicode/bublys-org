@@ -1,4 +1,7 @@
 import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
+
+const CANVAS_WIDTH = 20000;
+const CANVAS_HEIGHT = 5000;
 import styled from "styled-components";
 import {
   Bubble,
@@ -141,6 +144,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerUp,
   onCoordinateSystemReady,
 }) => {
+  // scrollContainerRef: ビューポートサイズのスクロール可能な外側コンテナ
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // containerRef: 大きなキャンバス（内側div）。スクロールで動くのでgetBoundingClientRect()がoffsetを正確に反映する
   const containerRef = useRef<HTMLDivElement>(null);
 
   // コンテナの位置を取得してCoordinateSystemを設定（サイズ・位置変更時も更新）
@@ -167,9 +173,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         lastVanishingPoint = currentVanishingPoint;
 
         const coordinateSystem = new CoordinateSystem(
-          0,  // layerIndex
-          { x: rect.left, y: rect.top },  // offset
-          currentVanishingPoint  // vanishingPoint
+          0,
+          { x: rect.left, y: rect.top },
+          currentVanishingPoint
         );
         onCoordinateSystemReady?.(coordinateSystem);
       }
@@ -178,13 +184,20 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     // 初期設定
     updateCoordinateSystem();
 
-    // ResizeObserverでサイズ変更を監視
+    // スクロール時にキャンバスdivのviewport位置が変わるのでoffsetを更新
+    const scrollContainer = scrollContainerRef.current;
+    const handleScroll = () => {
+      updateCoordinateSystem();
+    };
+    scrollContainer?.addEventListener('scroll', handleScroll);
+
+    // サイドバー幅変更などによるレイアウト変化を検知
     const resizeObserver = new ResizeObserver(() => {
       updateCoordinateSystem();
     });
 
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
+    if (scrollContainerRef.current) {
+      resizeObserver.observe(scrollContainerRef.current);
     }
 
     // windowのresizeイベントで位置変更も検出（サイドバー幅変更など）
@@ -203,6 +216,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
+      scrollContainer?.removeEventListener('scroll', handleScroll);
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
       }
@@ -272,38 +286,40 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     .flat();
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <StyledBubblesLayeredView
-        surface={{ leftTop: surfaceLeftTop }}
-        underground={{ vanishingPoint: undergroundVanishingPoint }}
-        surfaceZIndex={baseZIndex - 2}
-      >
-        {renderedBubbles}
-        <div className="e-underground-curtain"></div>
-        <div className="e-debug-visualizations">
-          <div className="e-surface-border"></div>
-          <div className="e-underground-border"></div>
-          <div className="e-vanishing-point"></div>
-        </div>
+    <div ref={scrollContainerRef} style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+      <div ref={containerRef} style={{ position: 'relative', width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}>
+        <StyledBubblesLayeredView
+          surface={{ leftTop: surfaceLeftTop }}
+          underground={{ vanishingPoint: undergroundVanishingPoint }}
+          surfaceZIndex={baseZIndex - 2}
+        >
+          {renderedBubbles}
+          <div className="e-underground-curtain"></div>
+          <div className="e-debug-visualizations">
+            <div className="e-surface-border"></div>
+            <div className="e-underground-border"></div>
+            <div className="e-vanishing-point"></div>
+          </div>
 
-        {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
-        {!isLayerAnimating &&
-          relationIds.map(({ openerId, openeeId }) => {
-            const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+          {/* アニメーション中はLinkBubbleを非表示にする（位置ズレ防止） */}
+          {!isLayerAnimating &&
+            relationIds.map(({ openerId, openeeId }) => {
+              const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
 
-            return(
-              <ConnectedLinkBubbleView
-                key={`${openerId}_${openeeId}`}
-                openerId={openerId}
-                openeeId={openeeId}
-                coordinateSystem={coordinateSystem}
-                linkZIndex={linkZIndex}
-              />
-            );
-          })
-        }
+              return(
+                <ConnectedLinkBubbleView
+                  key={`${openerId}_${openeeId}`}
+                  openerId={openerId}
+                  openeeId={openeeId}
+                  coordinateSystem={coordinateSystem}
+                  linkZIndex={linkZIndex}
+                />
+              );
+            })
+          }
 
-      </StyledBubblesLayeredView>
+        </StyledBubblesLayeredView>
+      </div>
     </div>
   );
 };
@@ -319,7 +335,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
   width: 100%;
   height: 100%;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   z-index: 0;
 
   // 上品な藍色のグラデーション背景
