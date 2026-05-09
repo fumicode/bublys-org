@@ -8,6 +8,8 @@ import {
   CoordinateSystem,
   BubblesContext,
   BubbleRefsProvider,
+  BubblesLayeredView,
+  BubblesLayeredViewProps,
   selectBubbleLayers,
   selectSurfaceBubbles,
   addBubble,
@@ -26,8 +28,8 @@ import {
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
-import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
-import { BubblesLayeredView } from "../ui/BubblesLayeredView";
+import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
+import { BubbleContent } from "../ui/BubbleContent";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
@@ -35,6 +37,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+
+const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
+
+const BubblesLayeredViewWithDebugger: FC<BubblesLayeredViewProps> = (props) => {
+  const { addRects } = usePositionDebugger();
+  return <BubblesLayeredView {...props} onDebugRects={addRects} />;
+};
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -209,9 +218,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>
-                <BubblesLayeredView
+                <BubblesLayeredViewWithDebugger
                   bubbleLayers={bubbleLayers}
                   vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                  renderBubbleContent={renderAppsBubbleContent}
                   onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
                   onBubbleClose={deleteBubble}
                   onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}

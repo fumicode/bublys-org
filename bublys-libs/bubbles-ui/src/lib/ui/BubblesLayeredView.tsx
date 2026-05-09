@@ -1,8 +1,8 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
@@ -24,12 +24,14 @@ type ConnectedBubbleViewProps = {
   vanishingPoint: Point2;
   surfaceLeftTop: Point2;
   hasLeftLink?: boolean;
+  renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
 
 const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
@@ -39,12 +41,14 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   vanishingPoint,
   surfaceLeftTop,
   hasLeftLink,
+  renderBubbleContent,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
   onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
+  onDebugRects,
 })  {
   const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
   const bubble = useAppSelector(selectBubble);
@@ -68,8 +72,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       onResize={(updated) => onBubbleResize?.(updated)}
       onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
       onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+      onDebugRects={onDebugRects}
     >
-      <BubbleContent bubble={bubble} />
+      {renderBubbleContent(bubble)}
     </BubbleView>
   );
 });
@@ -110,6 +115,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
 export type BubblesLayeredViewProps = {
   bubbleLayers: string[][];
   vanishingPoint?: Point2;
+  renderBubbleContent?: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
@@ -117,11 +123,17 @@ export type BubblesLayeredViewProps = {
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
+
+const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
+  <BubbleContent bubble={bubble} />
+);
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   bubbleLayers,
   vanishingPoint,
+  renderBubbleContent = defaultRenderBubbleContent,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
@@ -129,6 +141,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerDown,
   onBubbleLayerUp,
   onCoordinateSystemReady,
+  onDebugRects,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -235,12 +248,14 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             vanishingPoint={undergroundVanishingPoint}
             surfaceLeftTop={surfaceLeftTop}
             hasLeftLink={hasLeftLink}
+            renderBubbleContent={renderBubbleContent}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
             onBubbleMove={onBubbleMove}
             onBubbleResize={onBubbleResize}
             onBubbleLayerDown={onBubbleLayerDown}
             onBubbleLayerUp={onBubbleLayerUp}
+            onDebugRects={onDebugRects}
           />
         );
       })
