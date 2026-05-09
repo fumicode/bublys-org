@@ -1,7 +1,4 @@
 import React, { FC, useRef, useLayoutEffect, memo, useMemo } from "react";
-
-const CANVAS_WIDTH = 20000;
-const CANVAS_HEIGHT = 5000;
 import styled from "styled-components";
 import {
   Bubble,
@@ -16,8 +13,9 @@ import {
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
+  selectBubblesMaxExtent,
 } from "@bublys-org/bubbles-ui";
-import { useAppSelector } from "@bublys-org/state-management";
+import { useAppSelector, selectWindowSize } from "@bublys-org/state-management";
 import { BubbleContent } from "./BubbleContent";
 import { usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 
@@ -229,6 +227,12 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
+  // キャンバスサイズ: バブルの配置範囲とビューポートサイズの大きい方に広がる
+  const pageSize = useAppSelector(selectWindowSize);
+  const bubblesExtent = useAppSelector(selectBubblesMaxExtent);
+  const canvasWidth = Math.max(pageSize.width, bubblesExtent.width);
+  const canvasHeight = Math.max(pageSize.height, bubblesExtent.height);
+
   // PositionDebuggerからaddRectsを取得
   const { addRects } = usePositionDebugger();
 
@@ -287,7 +291,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   return (
     <div ref={scrollContainerRef} style={{ width: '100%', height: '100%', overflow: 'auto' }}>
-      <div ref={containerRef} style={{ position: 'relative', width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}>
+      <div ref={containerRef} style={{ position: 'relative', width: `${canvasWidth}px`, height: `${canvasHeight}px` }}>
         <StyledBubblesLayeredView
           surface={{ leftTop: surfaceLeftTop }}
           underground={{ vanishingPoint: undergroundVanishingPoint }}

@@ -419,6 +419,39 @@ export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector
   return layerIndexSelectorCache.get(bubbleId)!;
 };
 
+/** バブルのサイズが未知の場合のフォールバック値 */
+const FALLBACK_BUBBLE_WIDTH = 400;
+const FALLBACK_BUBBLE_HEIGHT = 300;
+/** キャンバス端に確保する余白 */
+const CANVAS_PADDING = 200;
+
+/**
+ * 全バブルの配置から必要なキャンバスの最小サイズを計算する
+ * バブルが右方向に展開していくたびにキャンバスが広がるよう使用する
+ */
+export const selectBubblesMaxExtent = createSelector(
+  [selectBubblesJson, selectSurfaceLeftTop],
+  (bubblesJson, surfaceLeftTop): { width: number; height: number } => {
+    let maxRight = 0;
+    let maxBottom = 0;
+
+    for (const bubbleJson of Object.values(bubblesJson)) {
+      const x = (bubbleJson.position?.x ?? 0) + surfaceLeftTop.x;
+      const y = (bubbleJson.position?.y ?? 0) + surfaceLeftTop.y;
+      const width = bubbleJson.renderedRect?.width ?? bubbleJson.size?.width ?? FALLBACK_BUBBLE_WIDTH;
+      const height = bubbleJson.renderedRect?.height ?? bubbleJson.size?.height ?? FALLBACK_BUBBLE_HEIGHT;
+
+      maxRight = Math.max(maxRight, x + width);
+      maxBottom = Math.max(maxBottom, y + height);
+    }
+
+    return {
+      width: maxRight + CANVAS_PADDING,
+      height: maxBottom + CANVAS_PADDING,
+    };
+  }
+);
+
 export default bubblesSlice.reducer;
 
 // rootReducerにbubblesSliceを動的に注入する関数
