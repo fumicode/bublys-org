@@ -143,15 +143,15 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onCoordinateSystemReady,
   onDebugRects,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     let lastOffset = { x: 0, y: 0 };
     let lastVanishingPoint = { x: 0, y: 0 };
 
     const updateCoordinateSystem = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
+      if (viewportRef.current) {
+        const rect = viewportRef.current.getBoundingClientRect();
         const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
 
         if (
@@ -181,8 +181,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       updateCoordinateSystem();
     });
 
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
+    if (viewportRef.current) {
+      resizeObserver.observe(viewportRef.current);
     }
 
     let rafId: number | null = null;
@@ -263,13 +263,33 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     .flat();
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <StyledBubblesLayeredView
+    <StyledFrame>
+      <StyledViewport ref={viewportRef}>
+        <StyledUniverse>
+          {renderedBubbles}
+
+          {!isLayerAnimating &&
+            relationIds.map(({ openerId, openeeId }) => {
+              const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+
+              return(
+                <ConnectedLinkBubbleView
+                  key={`${openerId}_${openeeId}`}
+                  openerId={openerId}
+                  openeeId={openeeId}
+                  coordinateSystem={coordinateSystem}
+                  linkZIndex={linkZIndex}
+                />
+              );
+            })
+          }
+        </StyledUniverse>
+      </StyledViewport>
+
+      <StyledHeadsUpDisplay
         surface={{ leftTop: surfaceLeftTop }}
-        underground={{ vanishingPoint: undergroundVanishingPoint }}
         surfaceZIndex={baseZIndex - 2}
       >
-        {renderedBubbles}
         <div className="e-underground-curtain"></div>
         <div className="e-debug-visualizations">
           <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
@@ -280,35 +300,17 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             {showSurfaceBorder ? '◻' : '◼'}
           </button>
         </div>
-
-        {!isLayerAnimating &&
-          relationIds.map(({ openerId, openeeId }) => {
-            const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
-
-            return(
-              <ConnectedLinkBubbleView
-                key={`${openerId}_${openeeId}`}
-                openerId={openerId}
-                openeeId={openeeId}
-                coordinateSystem={coordinateSystem}
-                linkZIndex={linkZIndex}
-              />
-            );
-          })
-        }
-      </StyledBubblesLayeredView>
-    </div>
+      </StyledHeadsUpDisplay>
+    </StyledFrame>
   );
 };
 
-type StyledBubblesLayeredViewProps = {
-  surface: { leftTop: Point2 };
-  underground: { vanishingPoint?: Point2 };
-  surfaceZIndex?: number;
-  children?: React.ReactNode;
-};
+const UNIVERSE_SIZE = 50000;
 
-const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
+type DivProps = React.HTMLAttributes<HTMLDivElement>;
+type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
+
+const StyledFrame = styled.div<DivProps>`
   width: 100%;
   height: 100%;
   position: relative;
@@ -321,6 +323,30 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     hsl(225, 40%, 22%) 40%,
     hsl(230, 35%, 20%) 100%
   );
+`;
+
+const StyledViewport = styled.div<DivPropsWithRef>`
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+`;
+
+const StyledUniverse = styled.div<DivProps>`
+  position: relative;
+  width: ${UNIVERSE_SIZE}px;
+  height: ${UNIVERSE_SIZE}px;
+`;
+
+type StyledHeadsUpDisplayProps = {
+  surface: { leftTop: Point2 };
+  surfaceZIndex?: number;
+  children?: React.ReactNode;
+};
+
+const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 
   > .e-underground-curtain {
     position: absolute;
@@ -329,7 +355,6 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
     width: 100%;
     height: 100%;
-    pointer-events: none;
   }
 
   > .e-debug-visualizations {
@@ -346,7 +371,6 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       box-shadow:
         0 4px 30px rgba(0, 0, 0, 0.05),
         inset 0 0 20px rgba(255, 255, 255, 0.05);
-      pointer-events: none;
       z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
       transform-origin: left bottom;
       transition: transform 0.35s ease, opacity 0.35s ease;
@@ -374,6 +398,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       cursor: pointer;
       opacity: 0.4;
       transition: opacity 0.2s;
+      pointer-events: auto;
 
       &:hover {
         opacity: 1;
