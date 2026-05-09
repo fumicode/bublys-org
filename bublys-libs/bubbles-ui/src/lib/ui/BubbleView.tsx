@@ -212,8 +212,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
     const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
     const newPos = {
-      x: dragStartPosRef.current.x + localDelta.x,
-      y: dragStartPosRef.current.y + localDelta.y,
+      x: Math.max(-surfaceLeftTopRef.current.x, dragStartPosRef.current.x + localDelta.x),
+      y: Math.max(-surfaceLeftTopRef.current.y, dragStartPosRef.current.y + localDelta.y),
     };
 
     // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
