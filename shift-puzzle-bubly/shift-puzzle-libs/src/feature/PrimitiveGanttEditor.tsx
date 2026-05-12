@@ -38,8 +38,7 @@ import { createDefaultShifts, createDefaultTimeSchedules, DAY_TYPE_ORDER } from 
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingTaskId } from '../ui/TaskListView.js';
-import { ShiftPlanTabs, type ComparisonMode } from './ShiftPlanTabs.js';
-import { selectShiftsAtTab, moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
+import { moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
 
@@ -50,6 +49,8 @@ type PrimitiveGanttEditorProps = {
   onAssignedRunOpen?: (shiftId: string, taskId: string) => void;
   /** 既配置run を展開元としてマークするための URL ビルダ。LinkBubbleの曲線描画に利用 */
   buildRunUrl?: (shiftId: string) => string;
+  /** 履歴ボタン押下時に呼ばれる callback（世界線バブルを開くなど、親が処理する） */
+  onHistoryOpen?: () => void;
 };
 
 // ========== コンポーネント ==========
@@ -59,6 +60,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   initialDayType,
   onAssignedRunOpen,
   buildRunUrl,
+  onHistoryOpen,
 }) => {
   const dispatch = useAppDispatch();
   const store = useAppStore();
@@ -67,11 +69,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
 
   const [selectedDayType, setSelectedDayType] = useState<DayType | undefined>(initialDayType);
-
-  /** 比較対象タブのノード ID（null = 比較オフ） */
-  const [comparisonNodeId, setComparisonNodeId] = useState<string | null>(null);
-  /** 表示モード */
-  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('normal');
 
   /** TaskList ドラッグ中の taskId（ブラシ優先度：ドラッグ > クリック選択） */
   const [dragBrushTaskId, setDragBrushTaskId] = useState<string | null>(null);
@@ -208,17 +205,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     return shiftPlan.timeSchedules.length > 0 ? shiftPlan.timeSchedules : allTimeSchedules;
   }, [shiftPlan, allTimeSchedules]);
 
-  // 比較タブの shifts（CAS から復元）。比較オフなら空配列。
-  // タブ＝アンカー（命名時点）ではなく、その系譜の最新 leaf を比較対象として使う
-  // （Git ブランチ風モデル）。
-  const comparisonShiftStates = useAppSelector((s) =>
-    selectShiftsAtTab(s, shiftPlanId, comparisonNodeId)
-  );
-  const effectiveComparisonMode: ComparisonMode =
-    comparisonNodeId === null || comparisonShiftStates.length === 0
-      ? 'normal'
-      : comparisonMode;
-
   const ganttConfig: GanttConfig = { hourPx: 60 };
 
   /**
@@ -287,15 +273,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   return (
     <StyledEditor>
-      {/* 世界線タブ + 比較コントロール */}
-      <ShiftPlanTabs
-        planId={shiftPlanId}
-        comparisonNodeId={comparisonNodeId}
-        comparisonMode={comparisonMode}
-        onChangeComparison={setComparisonNodeId}
-        onChangeMode={setComparisonMode}
-      />
-
       {/* ツールバー */}
       <div className="e-toolbar">
         {/* 日程フィルター */}
@@ -329,6 +306,16 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
             )}
           </div>
         )}
+
+        {/* 履歴ボタン */}
+        <button
+          type="button"
+          className="e-history-btn"
+          onClick={onHistoryOpen}
+          title="世界線の履歴を表示"
+        >
+          履歴
+        </button>
       </div>
 
       {/* ガントビュー */}
@@ -346,8 +333,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           onAssignedRunClick={handleAssignedRunClick}
           buildRunUrl={buildRunUrl}
           rowAvailabilityMap={rowAvailabilityMap}
-          comparisonShifts={comparisonShiftStates}
-          comparisonMode={effectiveComparisonMode}
         />
       </div>
     </StyledEditor>
@@ -435,6 +420,21 @@ const StyledEditor = styled.div`
     border-radius: 10px;
     &:hover {
       background: rgba(21, 101, 192, 0.15);
+    }
+  }
+
+  .e-history-btn {
+    padding: 2px 10px;
+    border: 1px solid #b0bec5;
+    border-radius: 12px;
+    background: #fff;
+    color: #455a64;
+    font-size: 0.82em;
+    cursor: pointer;
+    white-space: nowrap;
+    &:hover {
+      background: #eceff1;
+      border-color: #607d8b;
     }
   }
 
