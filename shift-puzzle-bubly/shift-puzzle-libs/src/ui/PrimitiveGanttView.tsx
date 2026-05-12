@@ -26,7 +26,7 @@
 
 import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { Shift, TimeSchedule, Member, type DayType } from '../domain/index.js';
+import { Shift, TimeSchedule, Member } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
 import { DRAG_TYPE_TASK, draggingTaskId } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
@@ -42,7 +42,6 @@ export type PrimitiveGanttViewProps = {
   shifts: readonly Shift[];
   timeSchedules: readonly TimeSchedule[];
   members: readonly Member[];
-  selectedDayType?: DayType;
   ganttConfig?: GanttConfig;
   /** 範囲 paint 要求（startBlock 以上 endBlock 未満） */
   onPaintRange?: (shiftId: string, memberId: string, startBlock: number, endBlock: number) => void;
@@ -231,7 +230,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   shifts,
   timeSchedules,
   members,
-  selectedDayType,
   ganttConfig = {},
   onPaintRange,
   onRemoveRange,
@@ -245,10 +243,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   const minutePx = hourPx / 60;
   const blockPx = minutePx * 15;
 
-  const activeTimeSchedule = useMemo(() => {
-    if (!selectedDayType) return timeSchedules[0] ?? null;
-    return timeSchedules.find((ts) => ts.dayType === selectedDayType) ?? null;
-  }, [timeSchedules, selectedDayType]);
+  const activeTimeSchedule = useMemo(() => timeSchedules[0] ?? null, [timeSchedules]);
 
   const activeShifts = useMemo(() => {
     if (!activeTimeSchedule) return [] as Shift[];
@@ -541,7 +536,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   if (!activeTimeSchedule) {
     return (
       <StyledGantt>
-        <div className="e-empty">DayTypeを選んでください</div>
+        <div className="e-empty">スケジュールが設定されていません</div>
       </StyledGantt>
     );
   }

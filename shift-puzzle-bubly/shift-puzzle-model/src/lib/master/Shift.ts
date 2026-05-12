@@ -11,8 +11,8 @@ export type { BlockListState };
 
 // ========== 型定義 ==========
 
-/** 日種別（5日分） */
-export type DayType = '準準備日' | '準備日' | '1日目' | '2日目' | '片付け日';
+/** 日種別（自由テキスト） */
+export type DayType = string;
 
 /** 天候条件 */
 export type WeatherCondition = '晴れ' | '雨';

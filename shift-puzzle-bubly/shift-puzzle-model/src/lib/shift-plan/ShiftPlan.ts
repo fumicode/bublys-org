@@ -25,7 +25,7 @@ export interface ConstraintViolation {
 export interface ShiftPlanState {
   readonly id: string;
   readonly name: string;
-  readonly weatherCondition: WeatherCondition;
+  readonly weatherCondition?: WeatherCondition;
   // プリミティブUI用フィールド（新規）
   readonly timeSchedules?: readonly TimeScheduleState[];
   readonly shifts?: readonly ShiftState[];        // BlockList組み込み
@@ -53,7 +53,7 @@ export class ShiftPlan {
 
   get id(): string { return this.state.id; }
   get name(): string { return this.state.name; }
-  get weatherCondition(): WeatherCondition { return this.state.weatherCondition; }
+  get weatherCondition(): WeatherCondition | undefined { return this.state.weatherCondition; }
 
   get assignments(): readonly ShiftAssignment[] {
     return (this.state.assignments ?? []).map((s) => new ShiftAssignment(s));
@@ -280,7 +280,7 @@ export class ShiftPlan {
 
   // ========== 静的メソッド ==========
 
-  static create(name: string, weatherCondition: WeatherCondition): ShiftPlan {
+  static create(name: string, weatherCondition?: WeatherCondition): ShiftPlan {
     const now = new Date().toISOString();
     return new ShiftPlan({
       id: crypto.randomUUID(),
@@ -289,6 +289,26 @@ export class ShiftPlan {
       assignments: [],
       timeSchedules: [],
       shifts: [],
+      constraintViolations: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /** TimeSchedule付きで空のシフト計画を作成する */
+  static createWithSchedule(name: string, startTime: string, endTime: string): ShiftPlan {
+    const now = new Date().toISOString();
+    return new ShiftPlan({
+      id: crypto.randomUUID(),
+      name,
+      timeSchedules: [{
+        id: crypto.randomUUID(),
+        dayType: name,
+        startTime,
+        endTime,
+      }],
+      shifts: [],
+      assignments: [],
       constraintViolations: [],
       createdAt: now,
       updatedAt: now,
