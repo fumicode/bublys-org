@@ -10,17 +10,22 @@ import {
 } from "../slice/index.js";
 import { MemberListView } from "../ui/MemberListView.js";
 import { createSampleMemberList } from "../data/sampleMember.js";
-import { createDefaultShifts } from "../data/sampleData.js";
-import { Member, Shift } from "../domain/index.js";
+import { Member, type DayType } from "../domain/index.js";
 import styled from "styled-components";
 import { Button } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 
 /** フィルター条件の型 */
 export type MemberFilterCriteria = {
-  department?: string;
-  availableFor?: string[];  // 参加可能なシフトのID配列（AND条件）
+  departments?: string[];  // 複数選択（OR条件）
+  newMemberOnly?: boolean;
+  availableAt?: {
+    dayType: DayType;
+    startMinute: number;
+    endMinute: number;
+  };
 };
 
 /** URLクエリからフィルターをパース */
@@ -30,14 +35,20 @@ export function parseMemberFilter(query: string): MemberFilterCriteria {
 
   const params = new URLSearchParams(query);
 
-  const department = params.get('department');
-  if (department) {
-    filter.department = department;
-  }
+  const departments = params.get('departments');
+  if (departments) filter.departments = departments.split(',');
 
-  const availableFor = params.get('availableFor');
-  if (availableFor) {
-    filter.availableFor = availableFor.split(',');
+  if (params.get('newMemberOnly') === '1') filter.newMemberOnly = true;
+
+  const dayType = params.get('availableAtDayType') as DayType | null;
+  const start = params.get('availableAtStart');
+  const end = params.get('availableAtEnd');
+  if (dayType && start && end) {
+    filter.availableAt = {
+      dayType,
+      startMinute: parseInt(start, 10),
+      endMinute: parseInt(end, 10),
+    };
   }
 
   return filter;
@@ -47,11 +58,14 @@ export function parseMemberFilter(query: string): MemberFilterCriteria {
 export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
   const params = new URLSearchParams();
 
-  if (filter.department) {
-    params.set('department', filter.department);
+  if (filter.departments && filter.departments.length > 0) {
+    params.set('departments', filter.departments.join(','));
   }
-  if (filter.availableFor && filter.availableFor.length > 0) {
-    params.set('availableFor', filter.availableFor.join(','));
+  if (filter.newMemberOnly) params.set('newMemberOnly', '1');
+  if (filter.availableAt) {
+    params.set('availableAtDayType', filter.availableAt.dayType);
+    params.set('availableAtStart', String(filter.availableAt.startMinute));
+    params.set('availableAtEnd', String(filter.availableAt.endMinute));
   }
 
   const str = params.toString();
@@ -59,34 +73,34 @@ export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
 }
 
 /** フィルター条件にマッチするか判定 */
-function matchesFilter(
-  member: Member,
-  filter: MemberFilterCriteria,
-  shiftsById: ReadonlyMap<string, Shift>,
-): boolean {
-  if (filter.department && member.department !== filter.department) {
-    return false;
-  }
-  if (filter.availableFor && filter.availableFor.length > 0) {
-    const allAvailable = filter.availableFor.every((shiftId) => {
-      const shift = shiftsById.get(shiftId);
-      return shift ? member.isAvailableForShift(shift) : false;
-    });
-    if (!allAvailable) {
-      return false;
-    }
+function matchesFilter(member: Member, filter: MemberFilterCriteria): boolean {
+  if (filter.departments && filter.departments.length > 0 && !filter.departments.includes(member.department)) return false;
+  if (filter.newMemberOnly && !member.isNewMember) return false;
+  if (filter.availableAt) {
+    const { dayType, startMinute, endMinute } = filter.availableAt;
+    const ranges = member.getAvailableRanges(dayType);
+    const covers = ranges.some(r => r.startMinute <= startMinute && r.endMinute >= endMinute);
+    if (!covers) return false;
   }
   return true;
+}
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 /** フィルター条件を説明 */
 function describeFilter(filter: MemberFilterCriteria): string {
   const parts: string[] = [];
-  if (filter.department) {
-    parts.push(`${filter.department}所属`);
+  if (filter.departments && filter.departments.length > 0) {
+    parts.push(`${filter.departments.join('・')}所属`);
   }
-  if (filter.availableFor && filter.availableFor.length > 0) {
-    parts.push(`${filter.availableFor.length}シフト参加可能`);
+  if (filter.newMemberOnly) parts.push('新入生のみ');
+  if (filter.availableAt) {
+    const { dayType, startMinute, endMinute } = filter.availableAt;
+    parts.push(`${dayType} ${minutesToTime(startMinute)}〜${minutesToTime(endMinute)}参加可能`);
   }
   return parts.join('、');
 }
@@ -110,7 +124,6 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
       memberList.length === 0 ||
       memberList.some((m) => {
         const raw = m.state as unknown as Record<string, unknown>;
-        // 旧スキーマ: availableShiftIds を持つ / 新スキーマ: availability を持つ
         return !('availability' in raw) || 'availableShiftIds' in raw;
       });
     if (needsReload) {
@@ -119,18 +132,10 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
     }
   }, [dispatch, memberList]);
 
-  // フィルター適用（availableFor 判定にシフト定義が必要）
-  const shiftsById = useMemo(() => {
-    if (!filter?.availableFor || filter.availableFor.length === 0) return new Map();
-    return new Map(createDefaultShifts().map((s) => [s.id, s]));
-  }, [filter?.availableFor]);
-
   const filteredMemberList = useMemo(() => {
-    if (!filter || Object.keys(filter).length === 0) {
-      return memberList;
-    }
-    return memberList.filter((member) => matchesFilter(member, filter, shiftsById));
-  }, [memberList, filter, shiftsById]);
+    if (!filter || Object.keys(filter).length === 0) return memberList;
+    return memberList.filter((member) => matchesFilter(member, filter));
+  }, [memberList, filter]);
 
   const handleMemberClick = (memberId: string) => {
     dispatch(setSelectedMemberId(memberId));
@@ -140,7 +145,6 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
   const hasFilter = filter && Object.keys(filter).length > 0;
   const filterDescription = hasFilter ? describeFilter(filter) : null;
 
-  // 絞り込み検索バブルを開く
   const handleOpenFilter = () => {
     const currentFilter = filter ? stringifyMemberFilter(filter) : '';
     openBubble(`shift-puzzle/members/filter${currentFilter}`, 'root');
@@ -166,7 +170,6 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
         )}
       </div>
 
-      {/* 絞り込み検索ボタン */}
       <div className="e-filter-section">
         <Button
           variant="outlined"
@@ -179,12 +182,28 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
         </Button>
       </div>
 
+      {filteredMemberList.length > 0 && (
+        <div
+          className="e-drag-handle"
+          draggable
+          onDragStart={(e) => {
+            draggingMemberIds = filteredMemberList.map(m => m.id);
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData(DRAG_TYPE_MEMBER_LIST, '');
+          }}
+          onDragEnd={() => { draggingMemberIds = null; }}
+        >
+          <DragIndicatorIcon fontSize="small" />
+          {filteredMemberList.length}名をガントへドラッグ
+        </div>
+      )}
+
       <MemberListView
         memberList={filteredMemberList}
         selectedMemberId={selectedMemberId}
         buildDetailUrl={buildDetailUrl}
         onMemberClick={handleMemberClick}
-        filteredDepartment={hasFilter ? filter.department : undefined}
+        filteredDepartment={hasFilter && filter.departments?.length === 1 ? filter.departments[0] : undefined}
       />
     </StyledContainer>
   );
@@ -215,11 +234,41 @@ const StyledContainer = styled.div`
   }
 
   .e-filter-section {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 
     .e-filter-button {
       font-size: 0.85em;
       text-transform: none;
     }
   }
+
+  .e-drag-handle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    background: #f0f4ff;
+    border: 1px dashed #7986cb;
+    border-radius: 4px;
+    cursor: grab;
+    font-size: 0.82em;
+    color: #3949ab;
+    user-select: none;
+
+    &:hover {
+      background: #e8ecff;
+      border-color: #3949ab;
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
 `;
+
+// ========== ドラッグ転送用モジュール変数 ==========
+// PrimitiveGanttEditor からimportして、drop 時に局員IDリストを受け取る
+
+export const DRAG_TYPE_MEMBER_LIST = 'type/member-list';
+export let draggingMemberIds: string[] | null = null;

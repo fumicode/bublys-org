@@ -258,12 +258,20 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
     openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/history`, bubble.id, 'bubble-side');
   };
 
+  const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
+
+  const handleMemberClick = (memberId: string) => {
+    openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side');
+  };
+
   return (
     <PrimitiveGanttEditor
       shiftPlanId={shiftPlanId}
       onAssignedRunOpen={handleAssignedRunOpen}
       buildRunUrl={buildRunUrl}
       onHistoryOpen={handleHistoryOpen}
+      onMemberClick={handleMemberClick}
+      buildMemberUrl={buildMemberUrl}
     />
   );
 };

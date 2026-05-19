@@ -65,6 +65,10 @@ export type PrimitiveGanttViewProps = {
   onAssignedRunClick?: (shiftId: string, memberId: string, startBlock: number) => void;
   /** 既配置バーを「バブル展開元」としてマークするための URL ビルダ（LinkBubbleの曲線を有効化） */
   buildRunUrl?: (shiftId: string) => string;
+  /** 局員ラベルクリック時のコールバック */
+  onMemberClick?: (memberId: string) => void;
+  /** 局員ラベルの URL ビルダー（UrledPlace の curve 起点に使用） */
+  buildMemberUrl?: (memberId: string) => string;
   /** ブラシ対象タスクID（TaskListドラッグ中に外部から指定。ビジュアル用） */
   brushTaskId?: string | null;
   /** 局員行の受け入れ可否マップ（ブラシ中のみ意味がある） */
@@ -236,6 +240,8 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   onMoveRun,
   onAssignedRunClick,
   buildRunUrl,
+  onMemberClick,
+  buildMemberUrl,
   brushTaskId,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
@@ -596,13 +602,26 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
               ? { start: editState.previewStart, end: editState.previewEnd, shift: shifts.find((s) => s.id === editState.shiftId) }
               : null;
 
+          const memberUrl = buildMemberUrl?.(member.id);
+          const memberLabel = (
+            <div
+              className={`e-member-label${onMemberClick ? ' is-clickable' : ''}`}
+              data-member-id={member.id}
+              onClick={() => onMemberClick?.(member.id)}
+            >
+              <span className="e-member-name">{member.name}</span>
+              {member.isNewMember && <span className="e-new-badge">新</span>}
+              <span className="e-dept-badge">{member.state.department.slice(0, 2)}</span>
+            </div>
+          );
+
           return (
             <React.Fragment key={member.id}>
-              <div className="e-member-label" data-member-id={member.id}>
-                <span className="e-member-name">{member.name}</span>
-                {member.isNewMember && <span className="e-new-badge">新</span>}
-                <span className="e-dept-badge">{member.state.department.slice(0, 2)}</span>
-              </div>
+              {memberUrl ? (
+                <UrledPlace url={memberUrl}>{memberLabel}</UrledPlace>
+              ) : (
+                memberLabel
+              )}
               <div
                 className="e-cell-strip"
                 style={{ width: totalWidth }}
@@ -879,6 +898,13 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
       padding: 0 3px;
       font-size: 0.72em;
       flex-shrink: 0;
+    }
+
+    &.is-clickable {
+      cursor: pointer;
+      &:hover {
+        background: #f0f4ff;
+      }
     }
   }
 
