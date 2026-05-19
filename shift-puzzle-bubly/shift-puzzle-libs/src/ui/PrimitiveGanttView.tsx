@@ -237,7 +237,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   onAssignedRunClick,
   buildRunUrl,
   brushTaskId,
-  rowAvailabilityMap,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
   const minutePx = hourPx / 60;
@@ -256,38 +255,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       : new Map<string, CellPlacement[]>(),
     [activeShifts, activeTimeSchedule],
   );
-
-  // ブラシ候補シフト（state優先、無ければ draggingTaskId モジュール変数）
-  const resolveActiveBrush = useCallback((): { taskId: string; candidates: Shift[] } | null => {
-    if (!activeTimeSchedule) return null;
-    const taskId = brushTaskId ?? draggingTaskId;
-    if (!taskId) return null;
-    let candidates = activeShifts.filter((s) => s.taskId === taskId);
-    // 日付付きドラッグ: タスクの日付がシフト表の日付と異なる場合は配置を禁止
-    const date = draggingDate;
-    if (date) {
-      candidates = candidates.filter((s) => s.state.date === date);
-    }
-    if (candidates.length === 0) return null;
-    return { taskId, candidates };
-  }, [brushTaskId, activeTimeSchedule, activeShifts]);
-
-  // ブラシシフト群の「有効blockIndex」集合
-  const brushValidBlocks = useMemo(() => {
-    const brush = resolveActiveBrush();
-    if (!brush || !activeTimeSchedule) return null;
-    const set = new Set<number>();
-    for (const s of brush.candidates) {
-      const r = s.validBlockRange(activeTimeSchedule);
-      for (let i = r.start; i < r.end; i++) set.add(i);
-    }
-    return set;
-  }, [resolveActiveBrush, activeTimeSchedule]);
-
-  const isPainting = brushValidBlocks !== null && brushValidBlocks.size > 0;
-
-  // ========== ブラシペイントプレビュー ==========
-  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   // ========== 移動・リサイズプレビュー ==========
   /**
@@ -315,6 +282,49 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   const [editState, setEditState] = useState<EditState | null>(null);
   /** 直近の pointerup でドラッグが起きたら、その後の click を抑制するフラグ */
   const suppressClickRef = useRef(false);
+
+  // ブラシ候補シフト（外部タスクドラッグ / クリック選択 / 既配置バー編集中 の順で解決）
+  const resolveActiveBrush = useCallback((): { taskId: string; candidates: Shift[] } | null => {
+    if (!activeTimeSchedule) return null;
+    // 外部タスクドラッグ or クリック選択ブラシ
+    const taskId = brushTaskId ?? draggingTaskId;
+    if (taskId) {
+      let candidates = activeShifts.filter((s) => s.taskId === taskId);
+      // 日付付きドラッグ: タスクの日付がシフト表の日付と異なる場合は配置を禁止
+      const date = draggingDate;
+      if (date) {
+        candidates = candidates.filter((s) => s.state.date === date);
+      }
+      if (candidates.length > 0) return { taskId, candidates };
+    }
+    // 既配置バーのドラッグ/リサイズ中: 編集中シフトの taskId からブラシを導出
+    if (editState) {
+      const editedShift = activeShifts.find((s) => s.id === editState.shiftId);
+      if (editedShift) {
+        const editTaskId = editedShift.taskId;
+        const candidates = activeShifts.filter((s) => s.taskId === editTaskId);
+        if (candidates.length > 0) return { taskId: editTaskId, candidates };
+      }
+    }
+    return null;
+  }, [brushTaskId, activeTimeSchedule, activeShifts, editState]);
+
+  // ブラシシフト群の「有効blockIndex」集合
+  const brushValidBlocks = useMemo(() => {
+    const brush = resolveActiveBrush();
+    if (!brush || !activeTimeSchedule) return null;
+    const set = new Set<number>();
+    for (const s of brush.candidates) {
+      const r = s.validBlockRange(activeTimeSchedule);
+      for (let i = r.start; i < r.end; i++) set.add(i);
+    }
+    return set;
+  }, [resolveActiveBrush, activeTimeSchedule]);
+
+  const isPainting = brushValidBlocks !== null && brushValidBlocks.size > 0;
+
+  // ========== ブラシペイントプレビュー ==========
+  const [preview, setPreview] = useState<PreviewState | null>(null);
 
   // ========== ヘルパー: 行から member.id を引く（クロス行ムーブ用） ==========
   const findMemberIdAtPoint = useCallback((clientX: number, clientY: number): string | null => {
@@ -470,26 +480,29 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   const handleEditMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (!editState) return;
     e.preventDefault();
+    const tb = activeTimeSchedule?.totalBlocks ?? 1;
     const dxBlocks = Math.round((e.clientX - editState.initialPointerX) / blockPx);
     const dxPx = e.clientX - editState.initialPointerX;
     const dyPx = e.clientY - editState.initialPointerY;
     const moved = editState.moved || Math.abs(dxPx) >= 3 || Math.abs(dyPx) >= 3;
 
     if (editState.kind === 'move') {
-      const newStart = editState.oldStart + dxBlocks;
-      const newEnd = editState.oldEnd + dxBlocks;
+      const runLen = editState.oldEnd - editState.oldStart;
+      const newStart = Math.max(0, Math.min(tb - runLen, editState.oldStart + dxBlocks));
+      const newEnd = newStart + runLen;
       // ターゲット行をポインタ位置から検出（行をまたいだら局員変更）
       const targetId = findMemberIdAtPoint(e.clientX, e.clientY) ?? editState.targetMemberId;
       setEditState({ ...editState, previewStart: newStart, previewEnd: newEnd, targetMemberId: targetId, moved });
     } else if (editState.kind === 'resize-R') {
-      const newEnd = Math.max(editState.oldStart + 1, editState.oldEnd + dxBlocks);
+      // endBlock は半開区間なので tb が上限（最後の有効 index は tb-1）
+      const newEnd = Math.min(tb, Math.max(editState.oldStart + 1, editState.oldEnd + dxBlocks));
       setEditState({ ...editState, previewEnd: newEnd, moved });
     } else {
       // resize-L
-      const newStart = Math.min(editState.oldEnd - 1, editState.oldStart + dxBlocks);
+      const newStart = Math.max(0, Math.min(editState.oldEnd - 1, editState.oldStart + dxBlocks));
       setEditState({ ...editState, previewStart: newStart, moved });
     }
-  }, [editState, blockPx, findMemberIdAtPoint]);
+  }, [editState, blockPx, findMemberIdAtPoint, activeTimeSchedule]);
 
   const handleEditUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (!editState) return;
@@ -552,10 +565,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
 
   return (
     <StyledGantt>
-      {/* 時間軸ヘッダー */}
-      <div className="e-header-row">
-        <div className="e-member-col-header" style={{ width: MEMBER_COLUMN_WIDTH }}>局員</div>
-        <div className="e-time-axis" style={{ width: totalWidth }}>
+      {/* ヘッダー行（grid row 1） */}
+      <div className="e-member-col-header">局員</div>
+      <div className="e-time-axis" style={{ width: totalWidth }}>
           {Array.from({ length: totalBlocks + 1 }).map((_, i) => {
             const minute = dayStartMinute + i * 15;
             const isHour = minute % 60 === 0;
@@ -570,11 +582,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
             );
           })}
         </div>
-      </div>
 
-      {/* 局員行 */}
-      <div className="e-body">
-        {members.map((member) => {
+      {/* 局員行（grid row 2 以降） */}
+      {members.map((member) => {
           const runs = buildRunsForMember(member, activeTimeSchedule, totalBlocks, placementMap);
           const previewActive = preview && preview.memberId === member.id;
           const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
@@ -587,12 +597,8 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
               : null;
 
           return (
-            <StyledMemberRow
-              key={member.id}
-              style={{ height: ROW_HEIGHT }}
-              data-member-id={member.id}
-            >
-              <div className="e-member-label" style={{ width: MEMBER_COLUMN_WIDTH }}>
+            <React.Fragment key={member.id}>
+              <div className="e-member-label" data-member-id={member.id}>
                 <span className="e-member-name">{member.name}</span>
                 {member.isNewMember && <span className="e-new-badge">新</span>}
                 <span className="e-dept-badge">{member.state.department.slice(0, 2)}</span>
@@ -600,6 +606,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
               <div
                 className="e-cell-strip"
                 style={{ width: totalWidth }}
+                data-member-id={member.id}
                 onDragOver={(e) => handleRowDragOver(member.id, e)}
                 onDrop={(e) => handleRowDrop(member.id, e)}
                 onDragLeave={(e) => handleRowDragLeave(member.id, e)}
@@ -758,10 +765,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                   />
                 )}
               </div>
-            </StyledMemberRow>
+            </React.Fragment>
           );
         })}
-      </div>
     </StyledGantt>
   );
 };
@@ -769,53 +775,49 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
 // ========== スタイル ==========
 
 const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: ${MEMBER_COLUMN_WIDTH}px auto;
+  grid-template-rows: 24px;
+  grid-auto-rows: ${ROW_HEIGHT}px;
   height: 100%;
   overflow: auto;
   font-size: 0.82em;
   user-select: none;
 
   .e-empty {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
     color: #aaa;
     font-size: 1.1em;
   }
 
-  .e-header-row {
-    display: flex;
-    align-items: stretch;
-    border-bottom: 2px solid #ddd;
-    background: #f8f8f8;
+  /* col 1 / row 1: 両方向にstickyな角セル */
+  .e-member-col-header {
     position: sticky;
     top: 0;
-    z-index: 20;
-    flex-shrink: 0;
-  }
-
-  .e-member-col-header {
-    flex-shrink: 0;
+    left: 0;
+    z-index: 25;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
     border-right: 2px solid #ddd;
+    border-bottom: 2px solid #ddd;
     padding: 4px;
     color: #555;
     font-size: 0.85em;
-    position: sticky;
-    left: 0;
-    z-index: 25;
     background: #f8f8f8;
   }
 
+  /* col 2 / row 1: 上方向にstickyなヘッダー */
   .e-time-axis {
-    position: relative;
-    height: 24px;
-    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f8f8f8;
+    border-bottom: 2px solid #ddd;
   }
 
   .e-tick {
@@ -838,21 +840,18 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     white-space: nowrap;
   }
 
-  .e-body {
-    flex: 1;
-  }
-
+  /* col 1 / row 2+: 左方向にstickyな局員ラベル */
   .e-member-label {
-    flex-shrink: 0;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #fff;
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 4px 6px;
     border-right: 2px solid #ddd;
-    position: sticky;
-    left: 0;
-    z-index: 10;
-    background: inherit;
+    border-bottom: 1px solid #eee;
 
     .e-member-name {
       font-weight: 500;
@@ -883,20 +882,14 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     }
   }
 
+  /* col 2 / row 2+: セル描画エリア */
   .e-cell-strip {
     position: relative;
-    flex-shrink: 0;
-  }
-`;
+    border-bottom: 1px solid #eee;
 
-const StyledMemberRow = styled.div<React.HTMLAttributes<HTMLDivElement>>`
-  display: flex;
-  align-items: stretch;
-  border-bottom: 1px solid #eee;
-  transition: background-color 0.1s;
-
-  &:hover {
-    background-color: #fafafa;
+    &:hover {
+      background-color: #fafafa;
+    }
   }
 `;
 

@@ -23,6 +23,7 @@ import {
   addUserToBlockRange,
   removeUserFromBlockRange,
   moveUserBlocks,
+  ensureBlockListSizes,
 } from '../slice/shift-plan-slice.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
@@ -113,6 +114,13 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   const planShifts = useMemo(() => shiftPlan?.shifts ?? [], [shiftPlan]);
   const planTimeSchedules = useMemo(() => shiftPlan?.timeSchedules ?? [], [shiftPlan]);
+
+  // BlockList サイズを TimeSchedule の totalBlocks に揃える（フォールバックの修正）
+  const activeScheduleTotalBlocks = planTimeSchedules[0]?.totalBlocks;
+  useEffect(() => {
+    if (!activeScheduleTotalBlocks) return;
+    dispatch(ensureBlockListSizes({ planId: shiftPlanId, totalBlocks: activeScheduleTotalBlocks }));
+  }, [dispatch, shiftPlanId, activeScheduleTotalBlocks]);
 
   const ganttConfig: GanttConfig = { hourPx: 60 };
 

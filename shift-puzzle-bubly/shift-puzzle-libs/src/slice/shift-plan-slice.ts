@@ -160,6 +160,34 @@ export const shiftPlanSlice = createSlice({
     },
 
     /**
+     * 各 Shift の BlockList サイズを TimeSchedule の totalBlocks に揃える。
+     * フォールバック（blockList 未設定 or shift.durationMinutes ベースの小サイズ）を修正する。
+     * 既存配置データは保持し、末尾に空ブロックを追加するだけ。縮小はしない。
+     */
+    ensureBlockListSizes: (
+      state,
+      action: PayloadAction<{ planId: string; totalBlocks: number }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, totalBlocks } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const plan = state.shiftPlans[planIndex];
+      if (!plan.shifts) return;
+      let changed = false;
+      const newShifts = plan.shifts.map((s) => {
+        const currentLen = s.blockList?.blocks.length ?? 0;
+        if (currentLen >= totalBlocks) return s;
+        changed = true;
+        const existingBlocks = s.blockList?.blocks.map((row) => [...row]) ?? [];
+        const padding = Array.from({ length: totalBlocks - currentLen }, (): string[] => []);
+        return { ...s, blockList: { blocks: [...existingBlocks, ...padding] } };
+      });
+      if (!changed) return;
+      state.shiftPlans[planIndex] = { ...plan, shifts: newShifts };
+    },
+
+    /**
      * 既配置の移動・リサイズ用アトミック操作。
      * - 同一userId: 移動 or リサイズ
      * - 異なるuserId: 局員変更（旧userIdを除去、新userIdで追加）
@@ -198,6 +226,7 @@ export const {
   removeUserFromBlock,
   addUserToBlockRange,
   removeUserFromBlockRange,
+  ensureBlockListSizes,
   moveUserBlocks,
   restoreShiftPlanFromWorldLine,
 } = shiftPlanSlice.actions;
