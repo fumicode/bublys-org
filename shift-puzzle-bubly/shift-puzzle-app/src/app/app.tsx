@@ -17,16 +17,14 @@ BubbleRouteRegistry.registerRoutes(shiftPuzzleBubbleRoutes);
 const menuItems = [
   { label: '局員一覧', url: 'shift-puzzle/members', icon: <PeopleIcon /> },
   { label: 'タスク一覧', url: 'shift-puzzle/tasks', icon: <TaskIcon /> },
-  { label: 'シフト配置表', url: 'shift-puzzle/shift-plans', icon: <EventNoteIcon /> },
-  { label: 'ガント配置', url: 'shift-puzzle/shift-plans/default/gantt', icon: <CalendarViewWeekIcon /> },
-  { label: 'プリミティブガント', url: 'shift-puzzle/shift-plans/default/primitive-gantt', icon: <GridOnIcon /> },
+  { label: 'シフト表リスト', url: 'shift-puzzle/shift-plans', icon: <GridOnIcon /> },
 ];
 
 export function App() {
   return (
     <BublyStoreProvider
       persistKey="shift-puzzle-standalone"
-      initialBubbleUrls={['shift-puzzle/shift-plans/default/primitive-gantt', 'shift-puzzle/tasks']}
+      initialBubbleUrls={['shift-puzzle/shift-plans', 'shift-puzzle/tasks']}
     >
       <BublyApp
         title="シフトパズル"

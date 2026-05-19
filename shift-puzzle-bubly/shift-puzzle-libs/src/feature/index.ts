@@ -12,3 +12,4 @@ export * from "./MemberGanttEditor.js";
 export * from "./PrimitiveGanttEditor.js";
 export * from "./ShiftPlanWorldLineGraphView.js";
 export * from "./ShiftAssignmentStatus.js";
+export * from "./ShiftPlanList.js";

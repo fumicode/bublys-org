@@ -60,17 +60,17 @@ export class Member {
     return this.state.availability[dayType] ?? [];
   }
 
-  /** 指定時刻(絶対分)に参加可能か */
+  /** 指定時刻(絶対分)に参加可能か。その日の可用性データが無い場合は参加可能とみなす */
   isAvailableAt(dayType: DayType, minute: number): boolean {
-    return this.getAvailableRanges(dayType).some(
-      (r) => r.startMinute <= minute && minute < r.endMinute,
-    );
+    const ranges = this.getAvailableRanges(dayType);
+    if (ranges.length === 0) return true;
+    return ranges.some((r) => r.startMinute <= minute && minute < r.endMinute);
   }
 
-  /** シフトの全時間帯を通して参加可能か（15分刻みで全ブロック available であれば true） */
+  /** シフトの全時間帯を通して参加可能か。可用性データが無い場合は参加可能とみなす */
   isAvailableForShift(shift: ShiftLike): boolean {
     const ranges = this.getAvailableRanges(shift.dayType);
-    if (ranges.length === 0) return false;
+    if (ranges.length === 0) return true;
     for (let m = shift.startMinute; m < shift.endMinute; m += 15) {
       if (!ranges.some((r) => r.startMinute <= m && m < r.endMinute)) return false;
     }
