@@ -15,6 +15,7 @@ import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
+import { getUniverseScrollOffset } from '../context/UniverseContext.js';
 import {
   selectBubbleLayers,
   selectSurfaceBubbles,
@@ -112,8 +113,11 @@ export const BublyApp: FC<BublyAppProps> = ({
     const availableWidth = viewportSize.width - surfaceLeftTop.x;
     const availableHeight = viewportSize.height - surfaceLeftTop.y;
 
+    // 現在のスクロール位置(= 可視領域の左上 universe 座標)に最大化バブルを開く
+    const newPosition = getUniverseScrollOffset();
+
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
+    const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));

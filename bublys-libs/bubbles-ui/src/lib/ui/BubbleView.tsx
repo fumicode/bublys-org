@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation, selectViewportSize } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
+import { getUniverseScrollOffset } from "../context/UniverseContext.js";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -244,11 +245,18 @@ const BubbleViewInner: FC<BubbleProps> = ({
       dispatch(updateBubble(resizedBubble.toJSON()));
       onResize?.(resizedBubble);
     } else {
-      // 最大化
+      // 最大化: ユーザーに今見えている viewport 領域いっぱいに広げる。
+      // universe 座標(0,0)固定だとスクロール時に画面外へ出てしまうので、
+      // スクロール量を加味して「現在の可視領域の左上(surface インセット後)」に配置する。
       if (!pageSize) return;
       const availableWidth = viewportSize.width - surfaceLeftTop.x;
       const availableHeight = viewportSize.height - surfaceLeftTop.y;
-      const newPosition = { x: 0, y: 0 };
+
+      // scroll 量 = 「viewport 左上の universe 座標」。
+      // bubble.position は surface 相対(universe = position + surfaceLeftTop)。
+      // 可視領域左上を universe 座標(scroll + surfaceLeftTop)に置きたいので
+      // position = scroll になる。
+      const newPosition = getUniverseScrollOffset();
 
       const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
       dispatch(updateBubble(resizedBubble.toJSON()));

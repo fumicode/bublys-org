@@ -26,6 +26,7 @@ import {
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
   selectViewportSize,
+  getUniverseScrollOffset,
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
@@ -122,9 +123,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     const availableWidth = viewportSize.width - surfaceLeftTop.x;
     const availableHeight = viewportSize.height - surfaceLeftTop.y;
 
+    // 現在のスクロール位置(= 可視領域の左上 universe 座標)に最大化バブルを開く
+    const newPosition = getUniverseScrollOffset();
+
     // サイズと位置を設定
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
+    const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: movedBubble.id}));
