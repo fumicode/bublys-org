@@ -6,6 +6,7 @@ import {
   type ShiftPlanState,
   ShiftPlan,
 } from "@bublys-org/shift-puzzle-model";
+import type { ShiftState } from "@bublys-org/shift-puzzle-model";
 
 // Re-export TimeSchedule / BlockList for convenience
 export { TimeSchedule, BlockList } from "@bublys-org/shift-puzzle-model";
@@ -131,6 +132,34 @@ export const shiftPlanSlice = createSlice({
     },
 
     /**
+     * world-line タブ切替時の shifts 復元。
+     *
+     * payload.shifts は **完全な置換対象** として扱う（マージしない）。
+     * 呼び出し側 thunk は、CAS にあるシフトはその版、CAS に無いシフトは
+     * blockList を空にリセットしたものを並べて全 shift 配列を作って渡す責務を持つ。
+     * これにより「ノード時点の正確な状態」を再現できる（部分マージだと、
+     * 比較対象に無い shift の placement が残ってしまい、後続の差分表示で誤検知される）。
+     *
+     * 注意: 本アクションは world-line listener の matcher に含めない。
+     * （含めると復元 → 再記録 → 復元 ... の無限ループになる）
+     */
+    restoreShiftPlanFromWorldLine: (
+      state,
+      action: PayloadAction<{ planId: string; shifts: ShiftState[] }>
+    ) => {
+      if (!state.shiftPlans) return;
+      const { planId, shifts } = action.payload;
+      const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) return;
+      const current = state.shiftPlans[planIndex];
+      state.shiftPlans[planIndex] = toMutableShiftPlanState({
+        ...current,
+        shifts,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+
+    /**
      * 既配置の移動・リサイズ用アトミック操作。
      * - 同一userId: 移動 or リサイズ
      * - 異なるuserId: 局員変更（旧userIdを除去、新userIdで追加）
@@ -170,6 +199,7 @@ export const {
   addUserToBlockRange,
   removeUserFromBlockRange,
   moveUserBlocks,
+  restoreShiftPlanFromWorldLine,
 } = shiftPlanSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加

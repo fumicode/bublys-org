@@ -12,3 +12,4 @@ export * from "./PrimitiveGanttView.js";
 export * from "./AssignedMembersView.js";
 export * from "./CoverageTetrisView.js";
 export * from "./TaskAssignmentStatusView.js";
+export * from "./ShiftPlanListView.js";

@@ -13,6 +13,18 @@ import { createSampleTasks } from "./sampleTask.js";
 /** dayType ごとの TimeSchedule ID（dayType単位の広い時間枠） */
 export const timeScheduleIdForDayType = (dayType: DayType): string => `ts-${dayType}`;
 
+/**
+ * 技大祭の実施日程: dayType → 'YYYY-MM-DD'
+ * 実際の開催年度に合わせて変更してください。
+ */
+export const FESTIVAL_DATES: Record<string, string> = {
+  '準準備日': '2026-09-17',
+  '準備日':   '2026-09-18',
+  '1日目':    '2026-09-19',
+  '2日目':    '2026-09-20',
+  '片付け日': '2026-09-21',
+};
+
 export function createDefaultShifts(): Shift[] {
   const tasks = createSampleTasks();
   const taskMap = new Map(tasks.map((t) => [t.id, t]));
@@ -38,6 +50,7 @@ export function createDefaultShifts(): Shift[] {
       id,
       taskId,
       dayType,
+      date: FESTIVAL_DATES[dayType],
       timeScheduleId: timeScheduleIdForDayType(dayType),
       startTime,
       endTime,
@@ -256,6 +269,18 @@ export function createDefaultShifts(): Shift[] {
     s('shift-c-heien-mt',              'task-heien-mt',              '片付け日', '13:00', '13:30', 1, fixed(1)),
     s('shift-c-taida-miokuri',         'task-taida-miokuri',         '片付け日', '10:00', '12:00', 3),
   ];
+}
+
+/** 指定日付のマスターシフトを返す。FESTIVAL_DATES に含まれない日付は空配列。 */
+export function shiftsForDate(date: string): Shift[] {
+  return createDefaultShifts().filter((s) => s.state.date === date);
+}
+
+/** 指定日付の TimeSchedule を返す。FESTIVAL_DATES に含まれない日付は空配列。 */
+export function timeSchedulesForDate(date: string): TimeSchedule[] {
+  const dayType = Object.entries(FESTIVAL_DATES).find(([, d]) => d === date)?.[0];
+  if (!dayType) return [];
+  return createDefaultTimeSchedules().filter((ts) => ts.dayType === dayType);
 }
 
 /** @deprecated createDefaultShifts() を使用してください */
