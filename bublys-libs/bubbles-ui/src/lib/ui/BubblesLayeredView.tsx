@@ -2,7 +2,7 @@ import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState 
 import styled from "styled-components";
 import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
@@ -24,7 +24,7 @@ type ConnectedBubbleViewProps = {
   layerIndex: number;
   zIndex: number;
   vanishingPoint: Point2;
-  surfaceLeftTop: Point2;
+  surfaceLayer: Layer;
   hasLeftLink?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
@@ -41,7 +41,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   layerIndex,
   zIndex,
   vanishingPoint,
-  surfaceLeftTop,
+  surfaceLayer,
   hasLeftLink,
   renderBubbleContent,
   onBubbleClick,
@@ -57,7 +57,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
 
   if (!bubble) return null;
 
-  const pos = new Vec2(bubble.position || { x: 0, y: 0 }).add(surfaceLeftTop);
+  // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
+  const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
   return (
     <BubbleView
@@ -244,6 +245,12 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return new Set(relationIds.map(r => r.openeeId));
   }, [relationIds]);
 
+  // surface（最前面）レイヤー。bubble.position(layer-local) ⇄ universe 変換を担う
+  const surfaceLayer = useMemo(
+    () => new Layer(0, surfaceLeftTop, coordinateSystem.vanishingPoint),
+    [surfaceLeftTop, coordinateSystem],
+  );
+
   const renderedBubbles = bubbleLayers
     .map((layer, layerIndex) =>
       layer.map((bubbleId) => {
@@ -257,7 +264,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             layerIndex={layerIndex}
             zIndex={zIndex}
             vanishingPoint={undergroundVanishingPoint}
-            surfaceLeftTop={surfaceLeftTop}
+            surfaceLayer={surfaceLayer}
             hasLeftLink={hasLeftLink}
             renderBubbleContent={renderBubbleContent}
             onBubbleClick={onBubbleClick}
