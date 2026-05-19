@@ -235,10 +235,11 @@ const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
 // シフトパズル - シフト表リストバブル
 const ShiftPuzzleShiftPlanListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
+  const buildPlanUrl = (planId: string) => `shift-puzzle/shift-plans/${planId}/primitive-gantt`;
   const handleOpen = (planId: string) => {
-    openBubble(`shift-puzzle/shift-plans/${planId}/primitive-gantt`, bubble.id, 'bubble-side');
+    openBubble(buildPlanUrl(planId), bubble.id, 'bubble-side');
   };
-  return <ShiftPlanList onOpen={handleOpen} />;
+  return <ShiftPlanList onOpen={handleOpen} buildPlanUrl={buildPlanUrl} />;
 };
 
 // シフトパズル - プリミティブガントエディタバブル（セルグリッド型・BlockListベース）

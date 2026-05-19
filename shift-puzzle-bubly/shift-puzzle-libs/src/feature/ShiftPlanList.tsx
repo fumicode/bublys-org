@@ -8,9 +8,10 @@ import { shiftsForDate, timeSchedulesForDate } from '../data/sampleData.js';
 
 type ShiftPlanListProps = {
   onOpen: (planId: string) => void;
+  buildPlanUrl?: (planId: string) => string;
 };
 
-export const ShiftPlanList: FC<ShiftPlanListProps> = ({ onOpen }) => {
+export const ShiftPlanList: FC<ShiftPlanListProps> = ({ onOpen, buildPlanUrl }) => {
   const dispatch = useAppDispatch();
   const plans = useAppSelector(selectShiftPuzzlePlans);
 
@@ -48,5 +49,5 @@ export const ShiftPlanList: FC<ShiftPlanListProps> = ({ onOpen }) => {
     dispatch(deleteShiftPlan(planId));
   };
 
-  return <ShiftPlanListView plans={plans} onCreate={handleCreate} onOpen={onOpen} onDelete={handleDelete} />;
+  return <ShiftPlanListView plans={plans} onCreate={handleCreate} onOpen={onOpen} onDelete={handleDelete} buildPlanUrl={buildPlanUrl} />;
 };

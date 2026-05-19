@@ -3,15 +3,18 @@
 import { FC, useState } from 'react';
 import styled from 'styled-components';
 import { ShiftPlan } from '../domain/index.js';
+import { UrledPlace } from '@bublys-org/bubbles-ui';
 
 export type ShiftPlanListViewProps = {
   plans: readonly ShiftPlan[];
   onCreate: (name: string, date: string, startTime: string, endTime: string) => void;
   onOpen: (planId: string) => void;
   onDelete?: (planId: string) => void;
+  /** カードを UrledPlace でラップするための URL ビルダー（LinkBubble 曲線の起点に使用） */
+  buildPlanUrl?: (planId: string) => string;
 };
 
-export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen, onDelete }) => {
+export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen, onDelete, buildPlanUrl }) => {
   const [name, setName] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState('00:00');
@@ -86,34 +89,29 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
           plans.map((plan) => {
             const ts = plan.timeSchedules[0];
             return (
-              <div key={plan.id} className="sp-plan-item">
-                <div className="sp-plan-info">
-                  <span className="sp-plan-name">{plan.name}</span>
-                  <span className="sp-plan-meta">
-                    <span className="sp-plan-date">{plan.date || '日付未設定'}</span>
-                    {ts && (
-                      <span className="sp-plan-time">{ts.startTime}〜{ts.endTime}</span>
-                    )}
-                  </span>
+              <UrledPlace key={plan.id} url={buildPlanUrl ? buildPlanUrl(plan.id) : ''}>
+                <div className="sp-plan-item" onClick={() => onOpen(plan.id)}>
+                  <div className="sp-plan-info">
+                    <span className="sp-plan-name">{plan.name}</span>
+                    <span className="sp-plan-meta">
+                      <span className="sp-plan-date">{plan.date || '日付未設定'}</span>
+                      {ts && (
+                        <span className="sp-plan-time">{ts.startTime}〜{ts.endTime}</span>
+                      )}
+                    </span>
+                  </div>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      className="sp-delete-btn"
+                      onClick={(e) => { e.stopPropagation(); onDelete?.(plan.id); }}
+                      title="削除"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  className="sp-open-btn"
-                  onClick={() => onOpen(plan.id)}
-                >
-                  開く
-                </button>
-                {onDelete && (
-                  <button
-                    type="button"
-                    className="sp-delete-btn"
-                    onClick={() => onDelete(plan.id)}
-                    title="削除"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+              </UrledPlace>
             );
           })
         )}
@@ -257,10 +255,16 @@ const StyledContainer = styled.div`
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     background: #fff;
-    transition: box-shadow 0.1s;
+    cursor: pointer;
+    transition: box-shadow 0.1s, background 0.1s;
 
     &:hover {
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      background: #f5f9ff;
+    }
+
+    &:hover .sp-delete-btn {
+      opacity: 1;
     }
   }
 
@@ -297,23 +301,6 @@ const StyledContainer = styled.div`
     color: #757575;
   }
 
-  .sp-open-btn {
-    flex-shrink: 0;
-    padding: 4px 12px;
-    border: 1px solid #1976d2;
-    border-radius: 6px;
-    background: #fff;
-    color: #1976d2;
-    font-size: 0.85em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.1s;
-
-    &:hover {
-      background: #e3f2fd;
-    }
-  }
-
   .sp-delete-btn {
     flex-shrink: 0;
     width: 28px;
@@ -327,7 +314,8 @@ const StyledContainer = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    opacity: 0;
+    transition: background 0.1s, color 0.1s, border-color 0.1s, opacity 0.1s;
 
     &:hover {
       background: #ffebee;
