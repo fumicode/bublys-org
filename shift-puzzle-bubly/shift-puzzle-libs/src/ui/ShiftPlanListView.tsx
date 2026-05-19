@@ -6,19 +6,20 @@ import { ShiftPlan } from '../domain/index.js';
 
 export type ShiftPlanListViewProps = {
   plans: readonly ShiftPlan[];
-  onCreate: (name: string, startTime: string, endTime: string) => void;
+  onCreate: (name: string, date: string, startTime: string, endTime: string) => void;
   onOpen: (planId: string) => void;
 };
 
 export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen }) => {
   const [name, setName] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startTime, setStartTime] = useState('00:00');
+  const [endTime, setEndTime] = useState('23:59');
 
   const handleCreate = () => {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    onCreate(trimmed, startTime, endTime);
+    if (!trimmed || !date) return;
+    onCreate(trimmed, date, startTime, endTime);
     setName('');
   };
 
@@ -41,7 +42,18 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
           onKeyDown={handleKeyDown}
           className="sp-name-input"
         />
+        <div className="sp-date-row">
+          <label className="sp-field-label">日付</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="sp-date-input"
+            required
+          />
+        </div>
         <div className="sp-time-row">
+          <label className="sp-field-label">時間</label>
           <input
             type="time"
             value={startTime}
@@ -59,7 +71,7 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
             type="button"
             className="sp-create-btn"
             onClick={handleCreate}
-            disabled={!name.trim()}
+            disabled={!name.trim() || !date}
           >
             作成
           </button>
@@ -76,9 +88,12 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
               <div key={plan.id} className="sp-plan-item">
                 <div className="sp-plan-info">
                   <span className="sp-plan-name">{plan.name}</span>
-                  {ts && (
-                    <span className="sp-plan-time">{ts.startTime}〜{ts.endTime}</span>
-                  )}
+                  <span className="sp-plan-meta">
+                    <span className="sp-plan-date">{plan.date || '日付未設定'}</span>
+                    {ts && (
+                      <span className="sp-plan-time">{ts.startTime}〜{ts.endTime}</span>
+                    )}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -140,10 +155,32 @@ const StyledContainer = styled.div`
     }
   }
 
+  .sp-date-row,
   .sp-time-row {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .sp-field-label {
+    font-size: 0.8em;
+    color: #666;
+    flex-shrink: 0;
+    width: 2.4em;
+    text-align: right;
+  }
+
+  .sp-date-input {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.88em;
+    outline: none;
+
+    &:focus {
+      border-color: #1976d2;
+    }
   }
 
   .sp-time-input {
@@ -230,6 +267,18 @@ const StyledContainer = styled.div`
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .sp-plan-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sp-plan-date {
+    font-size: 0.8em;
+    color: #1976d2;
+    font-weight: 500;
   }
 
   .sp-plan-time {

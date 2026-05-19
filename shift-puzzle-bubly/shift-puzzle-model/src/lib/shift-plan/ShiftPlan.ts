@@ -25,6 +25,7 @@ export interface ConstraintViolation {
 export interface ShiftPlanState {
   readonly id: string;
   readonly name: string;
+  readonly date: string;
   readonly weatherCondition?: WeatherCondition;
   // プリミティブUI用フィールド（新規）
   readonly timeSchedules?: readonly TimeScheduleState[];
@@ -53,6 +54,7 @@ export class ShiftPlan {
 
   get id(): string { return this.state.id; }
   get name(): string { return this.state.name; }
+  get date(): string { return this.state.date; }
   get weatherCondition(): WeatherCondition | undefined { return this.state.weatherCondition; }
 
   get assignments(): readonly ShiftAssignment[] {
@@ -280,11 +282,12 @@ export class ShiftPlan {
 
   // ========== 静的メソッド ==========
 
-  static create(name: string, weatherCondition?: WeatherCondition): ShiftPlan {
+  static create(name: string, date = '', weatherCondition?: WeatherCondition): ShiftPlan {
     const now = new Date().toISOString();
     return new ShiftPlan({
       id: crypto.randomUUID(),
       name,
+      date,
       weatherCondition,
       assignments: [],
       timeSchedules: [],
@@ -296,11 +299,17 @@ export class ShiftPlan {
   }
 
   /** TimeSchedule付きで空のシフト計画を作成する */
-  static createWithSchedule(name: string, startTime: string, endTime: string): ShiftPlan {
+  static createWithSchedule(
+    name: string,
+    date: string,
+    startTime = '00:00',
+    endTime = '23:59',
+  ): ShiftPlan {
     const now = new Date().toISOString();
     return new ShiftPlan({
       id: crypto.randomUUID(),
       name,
+      date,
       timeSchedules: [{
         id: crypto.randomUUID(),
         dayType: name,
@@ -308,6 +317,29 @@ export class ShiftPlan {
         endTime,
       }],
       shifts: [],
+      assignments: [],
+      constraintViolations: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /** 世界線の状態から新しいシフト計画を作成する（配置済みシフトを引き継ぐ） */
+  static createFromWorldLine(
+    name: string,
+    date: string,
+    shifts: readonly ShiftState[],
+    timeSchedules: readonly TimeScheduleState[],
+    weatherCondition?: WeatherCondition,
+  ): ShiftPlan {
+    const now = new Date().toISOString();
+    return new ShiftPlan({
+      id: crypto.randomUUID(),
+      name,
+      date,
+      weatherCondition,
+      shifts: shifts.map((s) => ({ ...s })),
+      timeSchedules: timeSchedules.map((ts) => ({ ...ts })),
       assignments: [],
       constraintViolations: [],
       createdAt: now,

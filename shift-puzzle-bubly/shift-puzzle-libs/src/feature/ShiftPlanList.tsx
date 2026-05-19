@@ -1,8 +1,8 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
-import { selectShiftPuzzlePlans, addShiftPlan, ShiftPlan } from '../slice/index.js';
+import { selectShiftPuzzlePlans, addShiftPlan, deleteShiftPlan, ShiftPlan } from '../slice/index.js';
 import { ShiftPlanListView } from '../ui/ShiftPlanListView.js';
 
 type ShiftPlanListProps = {
@@ -13,8 +13,13 @@ export const ShiftPlanList: FC<ShiftPlanListProps> = ({ onOpen }) => {
   const dispatch = useAppDispatch();
   const plans = useAppSelector(selectShiftPuzzlePlans);
 
-  const handleCreate = (name: string, startTime: string, endTime: string) => {
-    const plan = ShiftPlan.createWithSchedule(name, startTime, endTime);
+  useEffect(() => {
+    plans.filter((p) => !p.date).forEach((p) => dispatch(deleteShiftPlan(p.id)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCreate = (name: string, date: string, startTime: string, endTime: string) => {
+    const plan = ShiftPlan.createWithSchedule(name, date, startTime, endTime);
     dispatch(addShiftPlan(plan.state));
   };
 
