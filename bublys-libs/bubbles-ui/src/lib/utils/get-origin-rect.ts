@@ -1,4 +1,5 @@
 import { SmartRect, CoordinateSystem } from '@bublys-org/bubbles-ui-util';
+import { measureViewport } from './measure-viewport.js';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す
@@ -44,29 +45,23 @@ export const getElementRect = (element: HTMLElement): DOMRect => {
 };
 
 /**
- * universe（StyledUniverse）要素を DOM から取得する
- * SmartRect の "GLOBAL" 座標系 = universe 座標系という今の取り決めに合わせ、
- * screen 座標を universe 座標に補正するために使う
+ * screen 座標の DOMRect を universe 座標に変換する。
+ * 変換は Viewport（measureViewport で DOM 計測）に委譲する。
+ * universe 要素が無い場合は screen 座標のまま返す（後方互換）。
  */
-const getUniverseElement = (): HTMLElement | null => {
-  if (typeof document === "undefined") return null;
-  return document.querySelector('[data-bubble-universe]') as HTMLElement | null;
-};
+const toUniverseRect = (screenRect: DOMRect): DOMRect => {
+  const viewport = measureViewport();
+  if (!viewport) return screenRect;
 
-/**
- * screen 座標の DOMRect を universe 座標に変換する
- * universe 要素がスクロールで動いても、両者の差分（= universe 座標）は不変
- */
-const toUniverseRect = (screenRect_vp: DOMRect): DOMRect => {
-  const universeEl = getUniverseElement();
-  if (!universeEl) return screenRect_vp;
-
-  const universeRect_vp = universeEl.getBoundingClientRect();
+  const topLeft = viewport.screenToUniverse({
+    x: screenRect.x,
+    y: screenRect.y,
+  });
   return new DOMRect(
-    screenRect_vp.x - universeRect_vp.x,
-    screenRect_vp.y - universeRect_vp.y,
-    screenRect_vp.width,
-    screenRect_vp.height,
+    topLeft.x,
+    topLeft.y,
+    screenRect.width,
+    screenRect.height,
   );
 };
 

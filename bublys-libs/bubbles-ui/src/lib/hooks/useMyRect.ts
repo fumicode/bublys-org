@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useContext, useCallback, useEffect } from "react";
 import { useWindowSize } from "./useWindowSize.js";
-import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { SmartRect, CoordinateSystem, Viewport } from "@bublys-org/bubbles-ui-util";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount, selectIsLayerAnimating } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
@@ -11,13 +11,13 @@ type useMyRectProps  = {
   onRectChanged?: (rect: SmartRect) => void;
 }
 
-// バッチ処理用のグローバルキュー - 読み取りと書き込みを分離
-// universe rect も一緒に取得して、universe 相対座標を計算する
-// 命名規則: _vp = screen 座標 (browser viewport 起点), _uv = universe 座標
+// バッチ処理用のグローバルキュー - 読み取りと書き込みを分離。
+// universe / スクロール容器の rect も一括取得し Viewport を構築して
+// screen → universe 変換に使う（生の座標減算は Viewport に集約）。
 type PendingUpdate = {
   el: HTMLElement;
   universeEl?: HTMLElement | null;
-  callback: (bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => void;
+  callback: (bubbleScreenRect: DOMRect, viewport: Viewport | null) => void;
 };
 let pendingUpdates: PendingUpdate[] = [];
 let rafId: number | null = null;
@@ -25,7 +25,7 @@ let rafId: number | null = null;
 const scheduleRectUpdate = (
   el: HTMLElement,
   universeEl: HTMLElement | null | undefined,
-  callback: (bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => void
+  callback: (bubbleScreenRect: DOMRect, viewport: Viewport | null) => void
 ) => {
   pendingUpdates.push({ el, universeEl, callback });
 
@@ -36,14 +36,23 @@ const scheduleRectUpdate = (
       rafId = null;
 
       // ステップ1: 全要素の rect を一括で読み取り（1回のリフローで済む）
-      const results = updates.map(({ el, universeEl }) => ({
-        bubbleRect_vp: el.getBoundingClientRect(),
-        universeRect_vp: universeEl ? universeEl.getBoundingClientRect() : null,
-      }));
+      const results = updates.map(({ el, universeEl }) => {
+        const bubbleScreenRect = el.getBoundingClientRect();
+        // universe の親 = スクロール容器(StyledViewport)
+        const scrollEl = universeEl?.parentElement ?? null;
+        const viewport =
+          universeEl && scrollEl
+            ? Viewport.fromMeasuredRects(
+                universeEl.getBoundingClientRect(),
+                scrollEl.getBoundingClientRect(),
+              )
+            : null;
+        return { bubbleScreenRect, viewport };
+      });
 
       // ステップ2: 読み取り完了後、全てのコールバックを実行
       updates.forEach(({ callback }, index) => {
-        callback(results[index].bubbleRect_vp, results[index].universeRect_vp);
+        callback(results[index].bubbleScreenRect, results[index].viewport);
       });
     });
   }
@@ -64,24 +73,23 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const onRectChangedRef = useRef(onRectChanged);
   onRectChangedRef.current = onRectChanged;
 
-  const processRect = useCallback((bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => {
+  const processRect = useCallback((bubbleScreenRect: DOMRect, viewport: Viewport | null) => {
     const currentPageSize = pageSizeRef.current;
     const currentCoordinateSystem = coordinateSystemRef.current;
 
-    // bubble.getBoundingClientRect() と universe.getBoundingClientRect() は
-    // どちらも screen 座標 (_vp)。ネイティブスクロールで両者は同じだけ動くので、
-    // 差分（= universe 座標 _uv）はスクロール不変。
-    // universeRect が取れない場合（Provider 外）は screen 座標のまま扱う（後方互換）。
-    const universeOffsetX = universeRect_vp ? universeRect_vp.x : 0;
-    const universeOffsetY = universeRect_vp ? universeRect_vp.y : 0;
-    const bubbleRect_uv = new DOMRect(
-      bubbleRect_vp.x - universeOffsetX,
-      bubbleRect_vp.y - universeOffsetY,
-      bubbleRect_vp.width,
-      bubbleRect_vp.height,
+    // screen 座標 → universe 座標。Viewport がスクロール不変な変換を担う。
+    // Viewport が無い場合（Provider 外）は screen 座標のまま扱う（後方互換）。
+    const topLeftUniverse = viewport
+      ? viewport.screenToUniverse({ x: bubbleScreenRect.x, y: bubbleScreenRect.y })
+      : { x: bubbleScreenRect.x, y: bubbleScreenRect.y };
+    const bubbleUniverseRect = new DOMRect(
+      topLeftUniverse.x,
+      topLeftUniverse.y,
+      bubbleScreenRect.width,
+      bubbleScreenRect.height,
     );
 
-    const globalRect = new SmartRect(bubbleRect_uv, currentPageSize, CoordinateSystem.GLOBAL.toData());
+    const globalRect = new SmartRect(bubbleUniverseRect, currentPageSize, CoordinateSystem.GLOBAL.toData());
     const localRect = globalRect.toLocal(currentCoordinateSystem);
     onRectChangedRef.current?.(localRect);
   }, []);
