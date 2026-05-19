@@ -25,6 +25,7 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
+  selectViewportSize,
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
@@ -77,6 +78,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // CoordinateSystem (Reduxから取得、createSelectorでメモ化済み)
   const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
+  const viewportSize = useAppSelector(selectViewportSize);
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
@@ -116,10 +118,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
-    // 利用可能なスペース（グローバル座標系）
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
-
+    // viewport の可視領域から surface インセットを引いた、最大化バブルのサイズ
+    const availableWidth = viewportSize.width - surfaceLeftTop.x;
+    const availableHeight = viewportSize.height - surfaceLeftTop.y;
 
     // サイズと位置を設定
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
@@ -131,7 +132,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
+  }, [dispatch, viewportSize, surfaceLeftTop]);
 
 
   const joinSibling = useCallback((

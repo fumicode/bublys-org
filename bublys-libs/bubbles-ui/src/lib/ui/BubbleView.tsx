@@ -3,8 +3,8 @@ import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { renderBubble, updateBubble, finishBubbleAnimation, selectViewportSize } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 
@@ -155,7 +155,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
   );
 
   const dispatch = useAppDispatch();
-  const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const viewportSize = useAppSelector(selectViewportSize);
   const bubbleRefs = useBubbleRefsOptional();
 
   // ドラッグハンドラ用に最新値を保持
@@ -245,9 +246,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     } else {
       // 最大化
       if (!pageSize) return;
-      const globalCoordinateSystem = coordinateSystem;
-      const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-      const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+      const availableWidth = viewportSize.width - surfaceLeftTop.x;
+      const availableHeight = viewportSize.height - surfaceLeftTop.y;
       const newPosition = { x: 0, y: 0 };
 
       const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);

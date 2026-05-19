@@ -24,7 +24,7 @@ export const mergeDOMRects = (rects: DOMRect[]): DOMRect => {
 };
 
 /**
- * 要素のBoundingClientRectを取得する
+ * 要素のBoundingClientRectを取得する（screen 座標 = browser viewport 起点）
  * display:contentsの要素の場合は、直接の子要素すべてのrectをマージして返す
  */
 export const getElementRect = (element: HTMLElement): DOMRect => {
@@ -44,11 +44,38 @@ export const getElementRect = (element: HTMLElement): DOMRect => {
 };
 
 /**
+ * universe（StyledUniverse）要素を DOM から取得する
+ * SmartRect の "GLOBAL" 座標系 = universe 座標系という今の取り決めに合わせ、
+ * screen 座標を universe 座標に補正するために使う
+ */
+const getUniverseElement = (): HTMLElement | null => {
+  if (typeof document === "undefined") return null;
+  return document.querySelector('[data-bubble-universe]') as HTMLElement | null;
+};
+
+/**
+ * screen 座標の DOMRect を universe 座標に変換する
+ * universe 要素がスクロールで動いても、両者の差分（= universe 座標）は不変
+ */
+const toUniverseRect = (screenRect_vp: DOMRect): DOMRect => {
+  const universeEl = getUniverseElement();
+  if (!universeEl) return screenRect_vp;
+
+  const universeRect_vp = universeEl.getBoundingClientRect();
+  return new DOMRect(
+    screenRect_vp.x - universeRect_vp.x,
+    screenRect_vp.y - universeRect_vp.y,
+    screenRect_vp.width,
+    screenRect_vp.height,
+  );
+};
+
+/**
  * opener bubble内のUrledPlace要素（data-url属性を持つ要素）のrectを取得する
  *
  * @param openerBubbleId - opener bubbleのID
  * @param targetUrl - 検索対象のURL（data-url属性の値）
- * @returns SmartRect（グローバル座標系）またはundefined
+ * @returns SmartRect（universe 座標系 = GLOBAL）またはundefined
  */
 export const getOriginRect = (
   openerBubbleId: string,
@@ -69,8 +96,9 @@ export const getOriginRect = (
 
   if (!originEl) return undefined;
 
-  const rect = getElementRect(originEl);
+  const rect_vp = getElementRect(originEl);
+  const rect_uv = toUniverseRect(rect_vp);
   const parentSize = { width: window.innerWidth, height: window.innerHeight };
 
-  return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
+  return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());
 };

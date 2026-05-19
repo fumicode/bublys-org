@@ -1,17 +1,19 @@
 import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
-import { useAppSelector } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
+import { UniverseContext } from "../context/UniverseContext.js";
 import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
+  setViewportSize,
 } from "../state/index.js";
 
 /**
@@ -144,41 +146,50 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onDebugRects,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const universeRef = useRef<HTMLDivElement>(null);
+  const dispatch = useAppDispatch();
 
   useLayoutEffect(() => {
-    let lastOffset = { x: 0, y: 0 };
+    let lastSize = { width: 0, height: 0 };
     let lastVanishingPoint = { x: 0, y: 0 };
+    let coordinateSystemEmitted = false;
 
-    const updateCoordinateSystem = () => {
-      if (viewportRef.current) {
-        const rect = viewportRef.current.getBoundingClientRect();
-        const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
+    const updateOnViewportChange = () => {
+      if (!viewportRef.current) return;
 
-        if (
-          rect.left === lastOffset.x &&
-          rect.top === lastOffset.y &&
-          currentVanishingPoint.x === lastVanishingPoint.x &&
-          currentVanishingPoint.y === lastVanishingPoint.y
-        ) {
-          return;
-        }
+      const rect = viewportRef.current.getBoundingClientRect();
+      const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
 
-        lastOffset = { x: rect.left, y: rect.top };
-        lastVanishingPoint = currentVanishingPoint;
-
-        const coordinateSystem = new CoordinateSystem(
-          0,
-          { x: rect.left, y: rect.top },
-          currentVanishingPoint
-        );
-        onCoordinateSystemReady?.(coordinateSystem);
+      // viewport の実DOM寸法を Redux に保存（max-bubble-size 等の計算用）
+      if (rect.width !== lastSize.width || rect.height !== lastSize.height) {
+        lastSize = { width: rect.width, height: rect.height };
+        dispatch(setViewportSize({ width: rect.width, height: rect.height }));
       }
+
+      // CoordinateSystem は universe 座標系を表現する。offset は常に 0
+      // （universe 起点 = 「global」起点）。vanishingPoint は universe 座標で指定。
+      if (
+        coordinateSystemEmitted &&
+        currentVanishingPoint.x === lastVanishingPoint.x &&
+        currentVanishingPoint.y === lastVanishingPoint.y
+      ) {
+        return;
+      }
+      lastVanishingPoint = currentVanishingPoint;
+      coordinateSystemEmitted = true;
+
+      const coordinateSystem = new CoordinateSystem(
+        0,
+        { x: 0, y: 0 },
+        currentVanishingPoint
+      );
+      onCoordinateSystemReady?.(coordinateSystem);
     };
 
-    updateCoordinateSystem();
+    updateOnViewportChange();
 
     const resizeObserver = new ResizeObserver(() => {
-      updateCoordinateSystem();
+      updateOnViewportChange();
     });
 
     if (viewportRef.current) {
@@ -189,7 +200,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     const handleResize = () => {
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
-        updateCoordinateSystem();
+        updateOnViewportChange();
         rafId = null;
       });
     };
@@ -203,7 +214,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         cancelAnimationFrame(rafId);
       }
     };
-  }, [onCoordinateSystemReady, vanishingPoint]);
+  }, [onCoordinateSystemReady, vanishingPoint, dispatch]);
 
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(true);
   const relationIds = useAppSelector(selectValidBubbleRelationIds);
@@ -262,46 +273,50 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     )
     .flat();
 
+  const universeContextValue = useMemo(() => ({ universeRef }), []);
+
   return (
-    <StyledFrame>
-      <StyledViewport ref={viewportRef}>
-        <StyledUniverse>
-          {renderedBubbles}
+    <UniverseContext.Provider value={universeContextValue}>
+      <StyledFrame>
+        <StyledViewport ref={viewportRef}>
+          <StyledUniverse ref={universeRef}>
+            {renderedBubbles}
 
-          {!isLayerAnimating &&
-            relationIds.map(({ openerId, openeeId }) => {
-              const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+            {!isLayerAnimating &&
+              relationIds.map(({ openerId, openeeId }) => {
+                const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
 
-              return(
-                <ConnectedLinkBubbleView
-                  key={`${openerId}_${openeeId}`}
-                  openerId={openerId}
-                  openeeId={openeeId}
-                  coordinateSystem={coordinateSystem}
-                  linkZIndex={linkZIndex}
-                />
-              );
-            })
-          }
-        </StyledUniverse>
-      </StyledViewport>
+                return(
+                  <ConnectedLinkBubbleView
+                    key={`${openerId}_${openeeId}`}
+                    openerId={openerId}
+                    openeeId={openeeId}
+                    coordinateSystem={coordinateSystem}
+                    linkZIndex={linkZIndex}
+                  />
+                );
+              })
+            }
+          </StyledUniverse>
+        </StyledViewport>
 
-      <StyledHeadsUpDisplay
-        surface={{ leftTop: surfaceLeftTop }}
-        surfaceZIndex={baseZIndex - 2}
-      >
-        <div className="e-underground-curtain"></div>
-        <div className="e-debug-visualizations">
-          <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
-          <button
-            className="e-surface-border-toggle"
-            onClick={() => setShowSurfaceBorder((v) => !v)}
-          >
-            {showSurfaceBorder ? '◻' : '◼'}
-          </button>
-        </div>
-      </StyledHeadsUpDisplay>
-    </StyledFrame>
+        <StyledHeadsUpDisplay
+          surface={{ leftTop: surfaceLeftTop }}
+          surfaceZIndex={baseZIndex - 2}
+        >
+          <div className="e-underground-curtain"></div>
+          <div className="e-debug-visualizations">
+            <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
+            <button
+              className="e-surface-border-toggle"
+              onClick={() => setShowSurfaceBorder((v) => !v)}
+            >
+              {showSurfaceBorder ? '◻' : '◼'}
+            </button>
+          </div>
+        </StyledHeadsUpDisplay>
+      </StyledFrame>
+    </UniverseContext.Provider>
   );
 };
 
@@ -331,7 +346,7 @@ const StyledViewport = styled.div<DivPropsWithRef>`
   overflow: auto;
 `;
 
-const StyledUniverse = styled.div<DivProps>`
+const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<DivPropsWithRef>`
   position: relative;
   width: ${UNIVERSE_SIZE}px;
   height: ${UNIVERSE_SIZE}px;

@@ -30,6 +30,7 @@ import {
   selectGlobalCoordinateSystem,
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
+  selectViewportSize,
   OpeningPosition,
 } from '../state/index.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
@@ -80,6 +81,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   // CoordinateSystem
   const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
+  const viewportSize = useAppSelector(selectViewportSize);
 
   // アクションハンドラ
   const deleteBubble = (b: Bubble) => {
@@ -107,8 +109,8 @@ export const BublyApp: FC<BublyAppProps> = ({
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+    const availableWidth = viewportSize.width - surfaceLeftTop.x;
+    const availableHeight = viewportSize.height - surfaceLeftTop.y;
 
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
     const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
@@ -118,7 +120,7 @@ export const BublyApp: FC<BublyAppProps> = ({
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
+  }, [dispatch, viewportSize, surfaceLeftTop]);
 
   const joinSibling = useCallback((
     b: Bubble,

@@ -5,21 +5,29 @@ import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectRenderCount, selectIsLayerAnimating } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
+import { useUniverseContext } from "../context/UniverseContext.js";
 
 type useMyRectProps  = {
   onRectChanged?: (rect: SmartRect) => void;
 }
 
 // バッチ処理用のグローバルキュー - 読み取りと書き込みを分離
+// universe rect も一緒に取得して、universe 相対座標を計算する
+// 命名規則: _vp = screen 座標 (browser viewport 起点), _uv = universe 座標
 type PendingUpdate = {
   el: HTMLElement;
-  callback: (rect: DOMRect) => void;
+  universeEl?: HTMLElement | null;
+  callback: (bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => void;
 };
 let pendingUpdates: PendingUpdate[] = [];
 let rafId: number | null = null;
 
-const scheduleRectUpdate = (el: HTMLElement, callback: (rect: DOMRect) => void) => {
-  pendingUpdates.push({ el, callback });
+const scheduleRectUpdate = (
+  el: HTMLElement,
+  universeEl: HTMLElement | null | undefined,
+  callback: (bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => void
+) => {
+  pendingUpdates.push({ el, universeEl, callback });
 
   if (rafId === null) {
     rafId = requestAnimationFrame(() => {
@@ -27,12 +35,15 @@ const scheduleRectUpdate = (el: HTMLElement, callback: (rect: DOMRect) => void) 
       pendingUpdates = [];
       rafId = null;
 
-      // ステップ1: 全ての要素のrectを一括で読み取り（1回のリフローで済む）
-      const rects = updates.map(({ el }) => el.getBoundingClientRect());
+      // ステップ1: 全要素の rect を一括で読み取り（1回のリフローで済む）
+      const results = updates.map(({ el, universeEl }) => ({
+        bubbleRect_vp: el.getBoundingClientRect(),
+        universeRect_vp: universeEl ? universeEl.getBoundingClientRect() : null,
+      }));
 
       // ステップ2: 読み取り完了後、全てのコールバックを実行
       updates.forEach(({ callback }, index) => {
-        callback(rects[index]);
+        callback(results[index].bubbleRect_vp, results[index].universeRect_vp);
       });
     });
   }
@@ -41,6 +52,7 @@ const scheduleRectUpdate = (el: HTMLElement, callback: (rect: DOMRect) => void) 
 export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const { coordinateSystem } = useContext(BubblesContext);
+  const universeContext = useUniverseContext();
   const pageSize = useWindowSize();
   const renderCount = useAppSelector(selectRenderCount);
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
@@ -52,11 +64,24 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
   const onRectChangedRef = useRef(onRectChanged);
   onRectChangedRef.current = onRectChanged;
 
-  const processRect = useCallback((domRect: DOMRect) => {
+  const processRect = useCallback((bubbleRect_vp: DOMRect, universeRect_vp: DOMRect | null) => {
     const currentPageSize = pageSizeRef.current;
     const currentCoordinateSystem = coordinateSystemRef.current;
 
-    const globalRect = new SmartRect(domRect, currentPageSize, CoordinateSystem.GLOBAL.toData());
+    // bubble.getBoundingClientRect() と universe.getBoundingClientRect() は
+    // どちらも screen 座標 (_vp)。ネイティブスクロールで両者は同じだけ動くので、
+    // 差分（= universe 座標 _uv）はスクロール不変。
+    // universeRect が取れない場合（Provider 外）は screen 座標のまま扱う（後方互換）。
+    const universeOffsetX = universeRect_vp ? universeRect_vp.x : 0;
+    const universeOffsetY = universeRect_vp ? universeRect_vp.y : 0;
+    const bubbleRect_uv = new DOMRect(
+      bubbleRect_vp.x - universeOffsetX,
+      bubbleRect_vp.y - universeOffsetY,
+      bubbleRect_vp.width,
+      bubbleRect_vp.height,
+    );
+
+    const globalRect = new SmartRect(bubbleRect_uv, currentPageSize, CoordinateSystem.GLOBAL.toData());
     const localRect = globalRect.toLocal(currentCoordinateSystem);
     onRectChangedRef.current?.(localRect);
   }, []);
@@ -70,15 +95,15 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
     if (isLayerAnimating) return;
 
     // バッチ処理にスケジュール
-    scheduleRectUpdate(el, processRect);
-  }, [renderCount, pageSize, coordinateSystem, isLayerAnimating, processRect]);
+    scheduleRectUpdate(el, universeContext?.universeRef.current, processRect);
+  }, [renderCount, pageSize, coordinateSystem, isLayerAnimating, processRect, universeContext]);
 
   // onTransitionEndで呼ばれる - バッチ処理でまとめて実行
   const notifyRendered = useCallback(() => {
     if (ref.current) {
-      scheduleRectUpdate(ref.current, processRect);
+      scheduleRectUpdate(ref.current, universeContext?.universeRef.current, processRect);
     }
-  }, [processRect]);
+  }, [processRect, universeContext]);
 
   return { ref, notifyRendered };
 };

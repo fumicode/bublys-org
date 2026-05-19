@@ -29,6 +29,7 @@ export * from './lib/hooks/useMyRect.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';
+export * from './lib/context/UniverseContext.js';
 
 // UI Components
 export * from './lib/ui/BubbleView.js';
