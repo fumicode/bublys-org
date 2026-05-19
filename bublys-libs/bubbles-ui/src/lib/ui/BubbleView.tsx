@@ -213,14 +213,18 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
     // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
     const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
+
+    // universe の上端/左端(= universe 座標 0,0)より外へバブルを出さない。
+    // universe 座標 = position + surfaceLeftTop なので position >= -surfaceLeftTop に制限する。
+    // （越えるとスクロールで追えず、ヘッダーを掴めなくなって戻せなくなるため）
+    const offset = surfaceLeftTopRef.current;
     const newPos = {
-      x: dragStartPosRef.current.x + localDelta.x,
-      y: dragStartPosRef.current.y + localDelta.y,
+      x: Math.max(dragStartPosRef.current.x + localDelta.x, -offset.x),
+      y: Math.max(dragStartPosRef.current.y + localDelta.y, -offset.y),
     };
 
     // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
     currentDragPosRef.current = newPos;
-    const offset = surfaceLeftTopRef.current;
     const screenPos = {
       x: newPos.x + offset.x,
       y: newPos.y + offset.y,
