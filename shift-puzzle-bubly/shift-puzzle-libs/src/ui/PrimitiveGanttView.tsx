@@ -28,7 +28,7 @@ import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 're
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
-import { DRAG_TYPE_TASK, draggingTaskId } from './TaskListView.js';
+import { DRAG_TYPE_TASK, draggingTaskId, draggingDate } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 
@@ -262,7 +262,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     if (!activeTimeSchedule) return null;
     const taskId = brushTaskId ?? draggingTaskId;
     if (!taskId) return null;
-    const candidates = activeShifts.filter((s) => s.taskId === taskId);
+    let candidates = activeShifts.filter((s) => s.taskId === taskId);
+    // 日付付きドラッグ: タスクの日付がシフト表の日付と異なる場合は配置を禁止
+    const date = draggingDate;
+    if (date) {
+      candidates = candidates.filter((s) => s.state.date === date);
+    }
     if (candidates.length === 0) return null;
     return { taskId, candidates };
   }, [brushTaskId, activeTimeSchedule, activeShifts]);
@@ -570,7 +575,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       {/* 局員行 */}
       <div className="e-body">
         {members.map((member) => {
-          const availability = isPainting ? (rowAvailabilityMap?.get(member.id) ?? null) : null;
           const runs = buildRunsForMember(member, activeTimeSchedule, totalBlocks, placementMap);
           const previewActive = preview && preview.memberId === member.id;
           const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
@@ -585,7 +589,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
           return (
             <StyledMemberRow
               key={member.id}
-              $availability={availability}
               style={{ height: ROW_HEIGHT }}
               data-member-id={member.id}
             >
@@ -604,14 +607,20 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                 {/* グリッド背景線（15分粒度） */}
                 {Array.from({ length: totalBlocks }).map((_, b) => {
                   const isHour = ((dayStartMinute + b * 15) % 60) === 0;
-                  const isInBrushRange = brushValidBlocks?.has(b) ?? false;
+                  let brushState: 'available' | 'unavailable' | null = null;
+                  if (isPainting && brushValidBlocks?.has(b)) {
+                    const minute = activeTimeSchedule.startMinute + b * 15;
+                    brushState = member.isAvailableAt(activeTimeSchedule.dayType, minute)
+                      ? 'available'
+                      : 'unavailable';
+                  }
                   return (
                     <StyledGridCell
                       key={b}
                       $left={b * blockPx}
                       $width={blockPx}
                       $isHour={isHour}
-                      $isInBrushRange={isInBrushRange}
+                      $brushState={brushState}
                     />
                   );
                 })}
@@ -880,33 +889,11 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
   }
 `;
 
-// 行の availability に応じた背景・左ボーダー色
-function getAvailabilityStyle(availability: RowAvailability | null) {
-  if (!availability) return '';
-  if (availability === 'available') return `
-    border-left: 4px solid #4caf50;
-    background-color: rgba(76, 175, 80, 0.06);
-  `;
-  if (availability === 'warning') return `
-    border-left: 4px solid #ff9800;
-    background-color: rgba(255, 152, 0, 0.06);
-  `;
-  return `
-    border-left: 4px solid #f44336;
-    background-color: rgba(244, 67, 54, 0.06);
-  `;
-}
-
-type StyledMemberRowProps = React.HTMLAttributes<HTMLDivElement> & {
-  $availability: RowAvailability | null;
-};
-
-const StyledMemberRow = styled.div<StyledMemberRowProps>`
+const StyledMemberRow = styled.div<React.HTMLAttributes<HTMLDivElement>>`
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid #eee;
-  transition: background-color 0.1s, border-left 0.15s;
-  ${(p) => getAvailabilityStyle(p.$availability)}
+  transition: background-color 0.1s;
 
   &:hover {
     background-color: #fafafa;
@@ -917,7 +904,7 @@ type StyledGridCellProps = React.HTMLAttributes<HTMLDivElement> & {
   $left: number;
   $width: number;
   $isHour: boolean;
-  $isInBrushRange: boolean;
+  $brushState: 'available' | 'unavailable' | null;
 };
 
 /** 背景グリッド（クリック対象ではない・装飾のみ） */
@@ -929,9 +916,8 @@ const StyledGridCell = styled.div<StyledGridCellProps>`
   height: 100%;
   border-left: 1px solid ${(p) => p.$isHour ? '#d0d0d0' : '#f0f0f0'};
   pointer-events: none;
-  ${(p) => p.$isInBrushRange && `
-    background: rgba(25, 118, 210, 0.06);
-  `}
+  ${(p) => p.$brushState === 'available' && `background: rgba(76, 175, 80, 0.18);`}
+  ${(p) => p.$brushState === 'unavailable' && `background: rgba(244, 67, 54, 0.10);`}
 `;
 
 type StyledRunBarProps = React.HTMLAttributes<HTMLDivElement> & {

@@ -8,9 +8,10 @@ export type ShiftPlanListViewProps = {
   plans: readonly ShiftPlan[];
   onCreate: (name: string, date: string, startTime: string, endTime: string) => void;
   onOpen: (planId: string) => void;
+  onDelete?: (planId: string) => void;
 };
 
-export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen }) => {
+export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen, onDelete }) => {
   const [name, setName] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState('00:00');
@@ -102,6 +103,16 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
                 >
                   開く
                 </button>
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="sp-delete-btn"
+                    onClick={() => onDelete(plan.id)}
+                    title="削除"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             );
           })
@@ -300,6 +311,28 @@ const StyledContainer = styled.div`
 
     &:hover {
       background: #e3f2fd;
+    }
+  }
+
+  .sp-delete-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: #fff;
+    color: #9e9e9e;
+    font-size: 0.8em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #ffebee;
+      color: #c62828;
+      border-color: #ef9a9a;
     }
   }
 `;

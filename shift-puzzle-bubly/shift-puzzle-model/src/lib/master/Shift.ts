@@ -21,6 +21,7 @@ export type WeatherCondition = '晴れ' | '雨';
 export interface ShiftState {
   readonly id: string;
   readonly taskId: string;
+  readonly date?: string;             // 'YYYY-MM-DD' — 技大祭の実施日
   // プリミティブUI用フィールド（新規）
   readonly timeScheduleId?: string;   // 紐づく TimeSchedule の id
   readonly blockList?: BlockListState; // 15分解像度のセル配置
