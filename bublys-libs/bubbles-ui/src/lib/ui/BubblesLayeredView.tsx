@@ -1,6 +1,6 @@
 import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
-import { useAppSelector, useAppDispatch } from "@bublys-org/state-management";
+import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
@@ -14,7 +14,6 @@ import {
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
-  setViewportSize,
 } from "../state/index.js";
 
 /**
@@ -149,24 +148,15 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const universeRef = useRef<HTMLDivElement>(null);
-  const dispatch = useAppDispatch();
 
   useLayoutEffect(() => {
-    let lastSize = { width: 0, height: 0 };
     let lastVanishingPoint = { x: 0, y: 0 };
     let coordinateSystemEmitted = false;
 
     const updateOnViewportChange = () => {
       if (!viewportRef.current) return;
 
-      const rect = viewportRef.current.getBoundingClientRect();
       const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
-
-      // viewport の実DOM寸法を Redux に保存（max-bubble-size 等の計算用）
-      if (rect.width !== lastSize.width || rect.height !== lastSize.height) {
-        lastSize = { width: rect.width, height: rect.height };
-        dispatch(setViewportSize({ width: rect.width, height: rect.height }));
-      }
 
       // CoordinateSystem は universe 座標系を表現する。offset は常に 0
       // （universe 起点 = 「global」起点）。vanishingPoint は universe 座標で指定。
@@ -216,7 +206,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         cancelAnimationFrame(rafId);
       }
     };
-  }, [onCoordinateSystemReady, vanishingPoint, dispatch]);
+  }, [onCoordinateSystemReady, vanishingPoint]);
 
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(true);
   const relationIds = useAppSelector(selectValidBubbleRelationIds);

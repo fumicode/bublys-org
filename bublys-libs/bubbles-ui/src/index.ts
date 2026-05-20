@@ -1,6 +1,5 @@
 export * from './lib/BubblesProcess.domain.js';
 export * from './lib/BubblesProcessDPO.js';
-export * from './lib/CoordinateSystemHelper.js';
 
 // 2D Geometry (bubbles-ui-utilから再エクスポート)
 export * from '@bublys-org/bubbles-ui-util';

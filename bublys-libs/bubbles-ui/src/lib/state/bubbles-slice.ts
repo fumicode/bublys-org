@@ -9,7 +9,7 @@ import {
   BubblesProcessState,
 } from "../BubblesProcess.domain.js";
 import { BubblesProcessDPO } from "../BubblesProcessDPO.js";
-import { CoordinateSystemData, CoordinateSystem, Point2, Size2 } from "@bublys-org/bubbles-ui-util";
+import { CoordinateSystemData, CoordinateSystem, Point2 } from "@bublys-org/bubbles-ui-util";
 
 
 type BubblesRelation = {
@@ -37,7 +37,6 @@ export interface BubbleStateSlice {
 
   globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
-  viewportSize: Size2; // viewport（可視窓）の実DOM寸法。max-bubble-size 等の計算に使う
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 
@@ -76,7 +75,6 @@ const getInitialState = (): BubbleStateSlice => {
     bubbleRelations: [],
     globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
     surfaceLeftTop: { x: 100, y: 100 },
-    viewportSize: { width: 0, height: 0 },
     renderCount: 0,
     animatingBubbleIds: [],
   };
@@ -198,9 +196,6 @@ export const bubblesSlice = createSlice({
     },
     setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
       state.surfaceLeftTop = action.payload;
-    },
-    setViewportSize: (state, action: PayloadAction<Size2>) => {
-      state.viewportSize = action.payload;
     }
   },
 });
@@ -219,7 +214,6 @@ export const {
   relateBubbles,
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
-  setViewportSize,
   finishBubbleAnimation,
   clearAllAnimations,
 } = bubblesSlice.actions;
@@ -330,10 +324,6 @@ export const selectGlobalCoordinateSystem = createSelector(
 
 export const selectSurfaceLeftTop = (state: { bubbleState: BubbleStateSlice }): Point2 => {
   return state.bubbleState.surfaceLeftTop;
-}
-
-export const selectViewportSize = (state: { bubbleState: BubbleStateSlice }): Size2 => {
-  return state.bubbleState.viewportSize;
 }
 
 /**
