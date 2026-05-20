@@ -6,8 +6,11 @@ import {
   Bubble,
   createBubble,
   CoordinateSystem,
+  Layer,
   BubblesContext,
   BubbleRefsProvider,
+  BubblesLayeredView,
+  BubblesLayeredViewProps,
   selectBubbleLayers,
   selectSurfaceBubbles,
   addBubble,
@@ -23,11 +26,12 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
+  measureViewport,
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
-import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
-import { BubblesLayeredView } from "../ui/BubblesLayeredView";
+import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
+import { BubbleContent } from "../ui/BubbleContent";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
@@ -35,6 +39,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+
+const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
+
+const BubblesLayeredViewWithDebugger: FC<BubblesLayeredViewProps> = (props) => {
+  const { addRects } = usePositionDebugger();
+  return <BubblesLayeredView {...props} onDebugRects={addRects} />;
+};
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -107,14 +118,20 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
-    // 利用可能なスペース（グローバル座標系）
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+    const viewport = measureViewport();
+    const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
+    const visible = viewport?.visibleRegion() ?? {
+      origin: { x: 0, y: 0 },
+      size: { width: 0, height: 0 },
+    };
 
+    // 可視 surface 領域いっぱいに最大化して開く
+    const newPosition = visible.origin;
+    const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+    const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    // サイズと位置を設定
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
+    const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: movedBubble.id}));
@@ -122,7 +139,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
+  }, [dispatch, surfaceLeftTop, globalCoordinateSystem]);
 
 
   const joinSibling = useCallback((
@@ -209,9 +226,10 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>
-                <BubblesLayeredView
+                <BubblesLayeredViewWithDebugger
                   bubbleLayers={bubbleLayers}
                   vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                  renderBubbleContent={renderAppsBubbleContent}
                   onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
                   onBubbleClose={deleteBubble}
                   onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}

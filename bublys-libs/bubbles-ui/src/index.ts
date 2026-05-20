@@ -1,6 +1,5 @@
 export * from './lib/BubblesProcess.domain.js';
 export * from './lib/BubblesProcessDPO.js';
-export * from './lib/CoordinateSystemHelper.js';
 
 // 2D Geometry (bubbles-ui-utilから再エクスポート)
 export * from '@bublys-org/bubbles-ui-util';
@@ -29,6 +28,11 @@ export * from './lib/hooks/useMyRect.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';
+export * from './lib/context/UniverseContext.js';
+
+// Universe / Viewport glue
+export * from './lib/universe-config.js';
+export * from './lib/utils/measure-viewport.js';
 
 // UI Components
 export * from './lib/ui/BubbleView.js';

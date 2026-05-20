@@ -36,7 +36,7 @@ export interface BubbleStateSlice {
   bubbleRelations:  BubblesRelation[];
 
   globalCoordinateSystem: CoordinateSystemData;
-  surfaceLeftTop: Point2; // レンダリング時に追加されるオフセット
+  surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 
