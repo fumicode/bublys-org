@@ -11,11 +11,11 @@ import {
   addPocketItem,
   removePocketItem,
 } from '@bublys-org/state-management';
-import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
+import { CoordinateSystem, Layer } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
-import { getUniverseScrollOffset } from '../context/UniverseContext.js';
+import { measureViewport } from '../utils/measure-viewport.js';
 import {
   selectBubbleLayers,
   selectSurfaceBubbles,
@@ -31,7 +31,6 @@ import {
   selectGlobalCoordinateSystem,
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
-  selectViewportSize,
   OpeningPosition,
 } from '../state/index.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
@@ -82,7 +81,6 @@ export const BublyApp: FC<BublyAppProps> = ({
   // CoordinateSystem
   const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-  const viewportSize = useAppSelector(selectViewportSize);
 
   // アクションハンドラ
   const deleteBubble = (b: Bubble) => {
@@ -110,11 +108,17 @@ export const BublyApp: FC<BublyAppProps> = ({
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
-    const availableWidth = viewportSize.width - surfaceLeftTop.x;
-    const availableHeight = viewportSize.height - surfaceLeftTop.y;
+    const viewport = measureViewport();
+    const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
+    const visible = viewport?.visibleRegion() ?? {
+      origin: { x: 0, y: 0 },
+      size: { width: 0, height: 0 },
+    };
 
-    // 現在のスクロール位置(= 可視領域の左上 universe 座標)に最大化バブルを開く
-    const newPosition = getUniverseScrollOffset();
+    // 可視 surface 領域いっぱいに最大化して開く
+    const newPosition = visible.origin;
+    const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+    const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
     const movedBubble = resizedBubble.moveTo(newPosition);
@@ -124,7 +128,7 @@ export const BublyApp: FC<BublyAppProps> = ({
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, viewportSize, surfaceLeftTop]);
+  }, [dispatch, surfaceLeftTop, globalCoordinateSystem]);
 
   const joinSibling = useCallback((
     b: Bubble,

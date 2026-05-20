@@ -6,6 +6,7 @@ import {
   Bubble,
   createBubble,
   CoordinateSystem,
+  Layer,
   BubblesContext,
   BubbleRefsProvider,
   BubblesLayeredView,
@@ -25,8 +26,7 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
-  selectViewportSize,
-  getUniverseScrollOffset,
+  measureViewport,
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
@@ -79,7 +79,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // CoordinateSystem (Reduxから取得、createSelectorでメモ化済み)
   const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-  const viewportSize = useAppSelector(selectViewportSize);
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = (b: Bubble) => {
@@ -119,14 +118,18 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
-    // viewport の可視領域から surface インセットを引いた、最大化バブルのサイズ
-    const availableWidth = viewportSize.width - surfaceLeftTop.x;
-    const availableHeight = viewportSize.height - surfaceLeftTop.y;
+    const viewport = measureViewport();
+    const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
+    const visible = viewport?.visibleRegion() ?? {
+      origin: { x: 0, y: 0 },
+      size: { width: 0, height: 0 },
+    };
 
-    // 現在のスクロール位置(= 可視領域の左上 universe 座標)に最大化バブルを開く
-    const newPosition = getUniverseScrollOffset();
+    // 可視 surface 領域いっぱいに最大化して開く
+    const newPosition = visible.origin;
+    const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+    const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    // サイズと位置を設定
     const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
     const movedBubble = resizedBubble.moveTo(newPosition);
 
@@ -136,7 +139,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, viewportSize, surfaceLeftTop]);
+  }, [dispatch, surfaceLeftTop, globalCoordinateSystem]);
 
 
   const joinSibling = useCallback((

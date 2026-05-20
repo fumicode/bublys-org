@@ -31,6 +31,10 @@ export * from './lib/hooks/useMyRect.js';
 export * from './lib/context/BubbleRefsContext.js';
 export * from './lib/context/UniverseContext.js';
 
+// Universe / Viewport glue
+export * from './lib/universe-config.js';
+export * from './lib/utils/measure-viewport.js';
+
 // UI Components
 export * from './lib/ui/BubbleView.js';
 export * from './lib/ui/LinkBubbleView.js';

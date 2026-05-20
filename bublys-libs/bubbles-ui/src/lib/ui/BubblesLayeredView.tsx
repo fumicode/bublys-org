@@ -7,6 +7,7 @@ import { BubbleView } from "./BubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
+import { UNIVERSE_SIZE } from "../universe-config.js";
 import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
@@ -327,7 +328,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   );
 };
 
-const UNIVERSE_SIZE = 50000;
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
