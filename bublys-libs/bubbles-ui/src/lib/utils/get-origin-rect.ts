@@ -1,4 +1,5 @@
 import { SmartRect, CoordinateSystem } from '@bublys-org/bubbles-ui-util';
+import { measureViewport } from './measure-viewport.js';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す
@@ -24,7 +25,7 @@ export const mergeDOMRects = (rects: DOMRect[]): DOMRect => {
 };
 
 /**
- * 要素のBoundingClientRectを取得する
+ * 要素のBoundingClientRectを取得する（screen 座標 = browser viewport 起点）
  * display:contentsの要素の場合は、直接の子要素すべてのrectをマージして返す
  */
 export const getElementRect = (element: HTMLElement): DOMRect => {
@@ -44,11 +45,32 @@ export const getElementRect = (element: HTMLElement): DOMRect => {
 };
 
 /**
+ * screen 座標の DOMRect を universe 座標に変換する。
+ * 変換は Viewport（measureViewport で DOM 計測）に委譲する。
+ * universe 要素が無い場合は screen 座標のまま返す（後方互換）。
+ */
+const toUniverseRect = (screenRect: DOMRect): DOMRect => {
+  const viewport = measureViewport();
+  if (!viewport) return screenRect;
+
+  const topLeft = viewport.screenToUniverse({
+    x: screenRect.x,
+    y: screenRect.y,
+  });
+  return new DOMRect(
+    topLeft.x,
+    topLeft.y,
+    screenRect.width,
+    screenRect.height,
+  );
+};
+
+/**
  * opener bubble内のUrledPlace要素（data-url属性を持つ要素）のrectを取得する
  *
  * @param openerBubbleId - opener bubbleのID
  * @param targetUrl - 検索対象のURL（data-url属性の値）
- * @returns SmartRect（グローバル座標系）またはundefined
+ * @returns SmartRect（universe 座標系 = GLOBAL）またはundefined
  */
 export const getOriginRect = (
   openerBubbleId: string,
@@ -69,8 +91,9 @@ export const getOriginRect = (
 
   if (!originEl) return undefined;
 
-  const rect = getElementRect(originEl);
+  const rect_vp = getElementRect(originEl);
+  const rect_uv = toUniverseRect(rect_vp);
   const parentSize = { width: window.innerWidth, height: window.innerHeight };
 
-  return new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
+  return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());
 };

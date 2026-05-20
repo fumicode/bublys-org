@@ -1,11 +1,13 @@
-import React, { FC, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
+import { UniverseContext } from "../context/UniverseContext.js";
+import { UNIVERSE_SIZE } from "../universe-config.js";
 import {
   selectValidBubbleRelationIds,
   selectGlobalCoordinateSystem,
@@ -22,14 +24,16 @@ type ConnectedBubbleViewProps = {
   layerIndex: number;
   zIndex: number;
   vanishingPoint: Point2;
-  surfaceLeftTop: Point2;
+  surfaceLayer: Layer;
   hasLeftLink?: boolean;
+  renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
   onBubbleResize?: (bubble: Bubble) => void;
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
 
 const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
@@ -37,21 +41,24 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   layerIndex,
   zIndex,
   vanishingPoint,
-  surfaceLeftTop,
+  surfaceLayer,
   hasLeftLink,
+  renderBubbleContent,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
   onBubbleResize,
   onBubbleLayerDown,
   onBubbleLayerUp,
+  onDebugRects,
 })  {
   const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
   const bubble = useAppSelector(selectBubble);
 
   if (!bubble) return null;
 
-  const pos = new Vec2(bubble.position || { x: 0, y: 0 }).add(surfaceLeftTop);
+  // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
+  const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
   return (
     <BubbleView
@@ -68,8 +75,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       onResize={(updated) => onBubbleResize?.(updated)}
       onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
       onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+      onDebugRects={onDebugRects}
     >
-      <BubbleContent bubble={bubble} />
+      {renderBubbleContent(bubble)}
     </BubbleView>
   );
 });
@@ -110,6 +118,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
 export type BubblesLayeredViewProps = {
   bubbleLayers: string[][];
   vanishingPoint?: Point2;
+  renderBubbleContent?: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
   onBubbleMove?: (bubble: Bubble) => void;
@@ -117,11 +126,17 @@ export type BubblesLayeredViewProps = {
   onBubbleLayerDown?: (bubble: Bubble) => void;
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
 };
+
+const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
+  <BubbleContent bubble={bubble} />
+);
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   bubbleLayers,
   vanishingPoint,
+  renderBubbleContent = defaultRenderBubbleContent,
   onBubbleClick,
   onBubbleClose,
   onBubbleMove,
@@ -129,54 +144,55 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerDown,
   onBubbleLayerUp,
   onCoordinateSystemReady,
+  onDebugRects,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const universeRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    let lastOffset = { x: 0, y: 0 };
     let lastVanishingPoint = { x: 0, y: 0 };
+    let coordinateSystemEmitted = false;
 
-    const updateCoordinateSystem = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
+    const updateOnViewportChange = () => {
+      if (!viewportRef.current) return;
 
-        if (
-          rect.left === lastOffset.x &&
-          rect.top === lastOffset.y &&
-          currentVanishingPoint.x === lastVanishingPoint.x &&
-          currentVanishingPoint.y === lastVanishingPoint.y
-        ) {
-          return;
-        }
+      const currentVanishingPoint = vanishingPoint || { x: 0, y: 0 };
 
-        lastOffset = { x: rect.left, y: rect.top };
-        lastVanishingPoint = currentVanishingPoint;
-
-        const coordinateSystem = new CoordinateSystem(
-          0,
-          { x: rect.left, y: rect.top },
-          currentVanishingPoint
-        );
-        onCoordinateSystemReady?.(coordinateSystem);
+      // CoordinateSystem は universe 座標系を表現する。offset は常に 0
+      // （universe 起点 = 「global」起点）。vanishingPoint は universe 座標で指定。
+      if (
+        coordinateSystemEmitted &&
+        currentVanishingPoint.x === lastVanishingPoint.x &&
+        currentVanishingPoint.y === lastVanishingPoint.y
+      ) {
+        return;
       }
+      lastVanishingPoint = currentVanishingPoint;
+      coordinateSystemEmitted = true;
+
+      const coordinateSystem = new CoordinateSystem(
+        0,
+        { x: 0, y: 0 },
+        currentVanishingPoint
+      );
+      onCoordinateSystemReady?.(coordinateSystem);
     };
 
-    updateCoordinateSystem();
+    updateOnViewportChange();
 
     const resizeObserver = new ResizeObserver(() => {
-      updateCoordinateSystem();
+      updateOnViewportChange();
     });
 
-    if (containerRef.current) {
-      resizeObserver.observe(containerRef.current);
+    if (viewportRef.current) {
+      resizeObserver.observe(viewportRef.current);
     }
 
     let rafId: number | null = null;
     const handleResize = () => {
       if (rafId !== null) return;
       rafId = requestAnimationFrame(() => {
-        updateCoordinateSystem();
+        updateOnViewportChange();
         rafId = null;
       });
     };
@@ -220,6 +236,12 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return new Set(relationIds.map(r => r.openeeId));
   }, [relationIds]);
 
+  // surface（最前面）レイヤー。bubble.position(layer-local) ⇄ universe 変換を担う
+  const surfaceLayer = useMemo(
+    () => new Layer(0, surfaceLeftTop, coordinateSystem.vanishingPoint),
+    [surfaceLeftTop, coordinateSystem],
+  );
+
   const renderedBubbles = bubbleLayers
     .map((layer, layerIndex) =>
       layer.map((bubbleId) => {
@@ -233,67 +255,74 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             layerIndex={layerIndex}
             zIndex={zIndex}
             vanishingPoint={undergroundVanishingPoint}
-            surfaceLeftTop={surfaceLeftTop}
+            surfaceLayer={surfaceLayer}
             hasLeftLink={hasLeftLink}
+            renderBubbleContent={renderBubbleContent}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
             onBubbleMove={onBubbleMove}
             onBubbleResize={onBubbleResize}
             onBubbleLayerDown={onBubbleLayerDown}
             onBubbleLayerUp={onBubbleLayerUp}
+            onDebugRects={onDebugRects}
           />
         );
       })
     )
     .flat();
 
+  const universeContextValue = useMemo(() => ({ universeRef }), []);
+
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <StyledBubblesLayeredView
-        surface={{ leftTop: surfaceLeftTop }}
-        underground={{ vanishingPoint: undergroundVanishingPoint }}
-        surfaceZIndex={baseZIndex - 2}
-      >
-        {renderedBubbles}
-        <div className="e-underground-curtain"></div>
-        <div className="e-debug-visualizations">
-          <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
-          <button
-            className="e-surface-border-toggle"
-            onClick={() => setShowSurfaceBorder((v) => !v)}
-          >
-            {showSurfaceBorder ? '◻' : '◼'}
-          </button>
-        </div>
+    <UniverseContext.Provider value={universeContextValue}>
+      <StyledFrame>
+        <StyledViewport ref={viewportRef}>
+          <StyledUniverse ref={universeRef}>
+            {renderedBubbles}
 
-        {!isLayerAnimating &&
-          relationIds.map(({ openerId, openeeId }) => {
-            const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+            {!isLayerAnimating &&
+              relationIds.map(({ openerId, openeeId }) => {
+                const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
 
-            return(
-              <ConnectedLinkBubbleView
-                key={`${openerId}_${openeeId}`}
-                openerId={openerId}
-                openeeId={openeeId}
-                coordinateSystem={coordinateSystem}
-                linkZIndex={linkZIndex}
-              />
-            );
-          })
-        }
-      </StyledBubblesLayeredView>
-    </div>
+                return(
+                  <ConnectedLinkBubbleView
+                    key={`${openerId}_${openeeId}`}
+                    openerId={openerId}
+                    openeeId={openeeId}
+                    coordinateSystem={coordinateSystem}
+                    linkZIndex={linkZIndex}
+                  />
+                );
+              })
+            }
+          </StyledUniverse>
+        </StyledViewport>
+
+        <StyledHeadsUpDisplay
+          surface={{ leftTop: surfaceLeftTop }}
+          surfaceZIndex={baseZIndex - 2}
+        >
+          <div className="e-underground-curtain"></div>
+          <div className="e-debug-visualizations">
+            <div className={`e-surface-border ${showSurfaceBorder ? '' : 'is-hidden'}`}></div>
+            <button
+              className="e-surface-border-toggle"
+              onClick={() => setShowSurfaceBorder((v) => !v)}
+            >
+              {showSurfaceBorder ? '◻' : '◼'}
+            </button>
+          </div>
+        </StyledHeadsUpDisplay>
+      </StyledFrame>
+    </UniverseContext.Provider>
   );
 };
 
-type StyledBubblesLayeredViewProps = {
-  surface: { leftTop: Point2 };
-  underground: { vanishingPoint?: Point2 };
-  surfaceZIndex?: number;
-  children?: React.ReactNode;
-};
 
-const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
+type DivProps = React.HTMLAttributes<HTMLDivElement>;
+type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
+
+const StyledFrame = styled.div<DivProps>`
   width: 100%;
   height: 100%;
   position: relative;
@@ -306,6 +335,30 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     hsl(225, 40%, 22%) 40%,
     hsl(230, 35%, 20%) 100%
   );
+`;
+
+const StyledViewport = styled.div<DivPropsWithRef>`
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+`;
+
+const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<DivPropsWithRef>`
+  position: relative;
+  width: ${UNIVERSE_SIZE}px;
+  height: ${UNIVERSE_SIZE}px;
+`;
+
+type StyledHeadsUpDisplayProps = {
+  surface: { leftTop: Point2 };
+  surfaceZIndex?: number;
+  children?: React.ReactNode;
+};
+
+const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 
   > .e-underground-curtain {
     position: absolute;
@@ -314,7 +367,6 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
     z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
     width: 100%;
     height: 100%;
-    pointer-events: none;
   }
 
   > .e-debug-visualizations {
@@ -331,7 +383,6 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       box-shadow:
         0 4px 30px rgba(0, 0, 0, 0.05),
         inset 0 0 20px rgba(255, 255, 255, 0.05);
-      pointer-events: none;
       z-index: ${({ surfaceZIndex }) => surfaceZIndex || 0};
       transform-origin: left bottom;
       transition: transform 0.35s ease, opacity 0.35s ease;
@@ -359,6 +410,7 @@ const StyledBubblesLayeredView = styled.div<StyledBubblesLayeredViewProps>`
       cursor: pointer;
       opacity: 0.4;
       transition: opacity 0.2s;
+      pointer-events: auto;
 
       &:hover {
         opacity: 1;

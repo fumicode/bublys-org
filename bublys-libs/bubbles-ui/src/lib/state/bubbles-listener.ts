@@ -14,7 +14,7 @@ import {
   selectSurfaceLeftTop,
   clearAllAnimations,
 } from './bubbles-slice.js';
-import { convertGlobalPointToLayerLocal } from '../CoordinateSystemHelper.js';
+import { Layer } from '@bublys-org/bubbles-ui-util';
 import { getOriginRect } from '../utils/get-origin-rect.js';
 
 // Listener ミドルウェアを定義
@@ -80,13 +80,10 @@ bubblesListener.startListening({
       const coordinateConfig = selectGlobalCoordinateSystem(state);
       const surfaceLeftTop = selectSurfaceLeftTop(state);
 
-      // グローバル座標をトップレイヤーのローカル座標に変換
-      const relativePoint = convertGlobalPointToLayerLocal(
-        globalPoint,
-        0, // joinSiblingはトップレイヤー（surface）に配置される
-        coordinateConfig,
-        surfaceLeftTop
-      );
+      // universe 座標を surface レイヤー(index=0)の layer-local 座標に変換
+      // （joinSibling はトップレイヤー＝surface に配置される）
+      const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+      const relativePoint = surfaceLayer.locate(globalPoint);
 
       console.log("JoinSibling: Converted to layer-local point", relativePoint);
 
@@ -137,12 +134,8 @@ bubblesListener.startListening({
     const coordinateConfig = selectGlobalCoordinateSystem(newState);
     const surfaceLeftTop = selectSurfaceLeftTop(newState);
 
-    const relativePoint = convertGlobalPointToLayerLocal(
-      globalPoint,
-      0,
-      coordinateConfig,
-      surfaceLeftTop
-    );
+    const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+    const relativePoint = surfaceLayer.locate(globalPoint);
 
     const moved = newThisBubble.moveTo(relativePoint);
     listenerApi.dispatch(updateBubble(moved.toJSON()));
@@ -202,14 +195,11 @@ bubblesListener.startListening({
       const coordinateConfig = selectGlobalCoordinateSystem(state);
       const surfaceLeftTop = selectSurfaceLeftTop(state);
 
-      // calcPositionToOpenはglobal座標を返す
-      // これをトップレイヤー（layerIndex=0）のローカル座標に変換
-      const relativePoint = convertGlobalPointToLayerLocal(
-        point,
-        0, // poppingBubbleはトップレイヤー（surface）に配置される
-        coordinateConfig,
-        surfaceLeftTop
-      );
+      // calcPositionToOpen は universe 座標を返す。
+      // surface レイヤー(index=0)の layer-local 座標に変換する
+      // （poppingBubble はトップレイヤー＝surface に配置される）
+      const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+      const relativePoint = surfaceLayer.locate(point);
 
       console.log("Pop: Converted to layer-local point", relativePoint);
 
@@ -267,12 +257,8 @@ bubblesListener.startListening({
     const coordinateConfig = selectGlobalCoordinateSystem(newState);
     const surfaceLeftTop = selectSurfaceLeftTop(newState);
 
-    const relativePoint = convertGlobalPointToLayerLocal(
-      point,
-      0,
-      coordinateConfig,
-      surfaceLeftTop
-    );
+    const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+    const relativePoint = surfaceLayer.locate(point);
 
     const moved = newPoppingBubble.moveTo(relativePoint);
     listenerApi.dispatch(updateBubble(moved.toJSON()));

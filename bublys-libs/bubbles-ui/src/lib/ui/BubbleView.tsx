@@ -1,12 +1,14 @@
 import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
+import { measureViewport } from "../utils/measure-viewport.js";
+import { createUniverse } from "../universe-config.js";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -155,7 +157,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   );
 
   const dispatch = useAppDispatch();
-  const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
   // ドラッグハンドラ用に最新値を保持
@@ -211,18 +213,26 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
     // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
     const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
-    const newPos = {
+
+    const rawLocal = {
       x: dragStartPosRef.current.x + localDelta.x,
       y: dragStartPosRef.current.y + localDelta.y,
     };
 
+    // universe の縁より外へ出さない。レイアウトは surface レイヤーで行われるので
+    // surface 経由で universe 座標へ写し、Universe.clamp で範囲内に収め、
+    // layer-local に戻す。（越えるとスクロールで追えずヘッダーを掴めなくなる）
+    const surfaceLayer = new Layer(
+      0,
+      surfaceLeftTopRef.current,
+      vanishingPointRef.current || { x: 0, y: 0 },
+    );
+    const universe = createUniverse();
+    const newPos = surfaceLayer.locate(universe.clamp(surfaceLayer.place(rawLocal)));
+
     // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
     currentDragPosRef.current = newPos;
-    const offset = surfaceLeftTopRef.current;
-    const screenPos = {
-      x: newPos.x + offset.x,
-      y: newPos.y + offset.y,
-    };
+    const screenPos = surfaceLayer.place(newPos);
     ref.current.style.left = `${screenPos.x}px`;
     ref.current.style.top = `${screenPos.y}px`;
     ref.current.style.transition = 'none'; // ドラッグ中はトランジション無効
@@ -243,12 +253,26 @@ const BubbleViewInner: FC<BubbleProps> = ({
       dispatch(updateBubble(resizedBubble.toJSON()));
       onResize?.(resizedBubble);
     } else {
-      // 最大化
+      // 最大化: ユーザーに今見えている viewport の surface 領域いっぱいに広げる。
       if (!pageSize) return;
-      const globalCoordinateSystem = coordinateSystem;
-      const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-      const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
-      const newPosition = { x: 0, y: 0 };
+      const viewport = measureViewport();
+      if (!viewport) return;
+
+      const surfaceLayer = new Layer(
+        0,
+        surfaceLeftTop,
+        vanishingPointRef.current || { x: 0, y: 0 },
+      );
+      const visible = viewport.visibleRegion();
+
+      // visible.origin = viewport 左上の universe 座標(= スクロール量)。
+      // surface レイヤーでは position(layer-local) = visible.origin になる
+      // （place(visible.origin) = visible.origin + surfaceOrigin = surface 枠の左上）。
+      const newPosition = visible.origin;
+
+      // サイズ = 可視ピクセルから surface インセット(= レイヤー原点)を引いた分
+      const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+      const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
       const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
       dispatch(updateBubble(resizedBubble.toJSON()));

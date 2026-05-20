@@ -2,6 +2,7 @@
 import { createContext, useContext, useRef, useCallback, ReactNode, FC } from "react";
 import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getElementRect } from "../utils/get-origin-rect.js";
+import { measureViewport } from "../utils/measure-viewport.js";
 
 type CachedRect = {
   rect: SmartRect;
@@ -75,9 +76,21 @@ export const BubbleRefsProvider: FC<{ children: ReactNode }> = ({ children }) =>
     const originEl = originRefs.current.get(url);
     if (!originEl) return undefined;
 
-    const rect = getElementRect(originEl);
+    // screen 座標 → universe 座標に補正してから SmartRect 化
+    // （SmartRect.GLOBAL は universe 座標系を表す。変換は Viewport に委譲）
+    const screenRect = getElementRect(originEl);
+    const viewport = measureViewport();
+    const topLeft = viewport
+      ? viewport.screenToUniverse({ x: screenRect.x, y: screenRect.y })
+      : { x: screenRect.x, y: screenRect.y };
+    const universeRect = new DOMRect(
+      topLeft.x,
+      topLeft.y,
+      screenRect.width,
+      screenRect.height,
+    );
     const parentSize = { width: window.innerWidth, height: window.innerHeight };
-    const smartRect = new SmartRect(rect, parentSize, CoordinateSystem.GLOBAL.toData());
+    const smartRect = new SmartRect(universeRect, parentSize, CoordinateSystem.GLOBAL.toData());
 
     // キャッシュに保存
     originRectCache.current.set(url, { rect: smartRect, timestamp: now });
