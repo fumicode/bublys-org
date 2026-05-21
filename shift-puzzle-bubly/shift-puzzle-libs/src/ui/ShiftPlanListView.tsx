@@ -1,9 +1,11 @@
 'use client';
 
-import { FC, useState } from 'react';
+import { FC, useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { ShiftPlan } from '../domain/index.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
+
+type FestivalDay = { label: string; date: string };
 
 export type ShiftPlanListViewProps = {
   plans: readonly ShiftPlan[];
@@ -12,13 +14,25 @@ export type ShiftPlanListViewProps = {
   onDelete?: (planId: string) => void;
   /** カードを UrledPlace でラップするための URL ビルダー（LinkBubble 曲線の起点に使用） */
   buildPlanUrl?: (planId: string) => string;
+  /** 技大祭日程リスト（提供時は日程セレクトを表示し日付を自動設定） */
+  festivalDays?: readonly FestivalDay[];
 };
 
-export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen, onDelete, buildPlanUrl }) => {
+export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate, onOpen, onDelete, buildPlanUrl, festivalDays }) => {
   const [name, setName] = useState('');
+  const [selectedDayLabel, setSelectedDayLabel] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
+
+  // 技大祭日程が渡された場合は先頭（1日目）をデフォルト選択
+  useEffect(() => {
+    if (festivalDays && festivalDays.length > 0 && !selectedDayLabel) {
+      setSelectedDayLabel(festivalDays[0].label);
+      setDate(festivalDays[0].date);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [festivalDays]);
 
   const handleCreate = () => {
     const trimmed = name.trim();
@@ -46,12 +60,37 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
           onKeyDown={handleKeyDown}
           className="sp-name-input"
         />
+        {festivalDays && festivalDays.length > 0 && (
+          <div className="sp-day-row">
+            <label className="sp-field-label">日程</label>
+            <select
+              value={selectedDayLabel}
+              onChange={(e) => {
+                const label = e.target.value;
+                setSelectedDayLabel(label);
+                const day = festivalDays.find((d) => d.label === label);
+                if (day) setDate(day.date);
+              }}
+              className="sp-day-select"
+            >
+              {festivalDays.map((d) => (
+                <option key={d.label} value={d.label}>
+                  {d.label}（{d.date}）
+                </option>
+              ))}
+              <option value="">カスタム日付</option>
+            </select>
+          </div>
+        )}
         <div className="sp-date-row">
           <label className="sp-field-label">日付</label>
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setSelectedDayLabel('');
+            }}
             className="sp-date-input"
             required
           />
@@ -164,11 +203,26 @@ const StyledContainer = styled.div`
     }
   }
 
+  .sp-day-row,
   .sp-date-row,
   .sp-time-row {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .sp-day-select {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.88em;
+    outline: none;
+    background: #fff;
+
+    &:focus {
+      border-color: #1976d2;
+    }
   }
 
   .sp-field-label {

@@ -197,6 +197,31 @@ function buildRunsForMember(
 }
 
 /**
+ * ドラッグ中タスクが配置できない理由を文字列で返す。配置可能なら null。
+ * draggingDate / draggingTaskId はモジュール変数を呼び出し時点で読む。
+ */
+function computeDragWarning(taskId: string, activeShifts: readonly Shift[]): string {
+  if (activeShifts.length === 0) {
+    return 'このシフト表にはシフトが設定されていません。シフト表リストで日付を設定したシフト表を選択してください。';
+  }
+  const shiftsForTask = activeShifts.filter((s) => s.taskId === taskId);
+  const date = draggingDate; // module var, read at call time
+  if (date) {
+    const planDates = [...new Set(
+      activeShifts.map((s) => s.state.date).filter((d): d is string => !!d)
+    )];
+    if (!planDates.includes(date)) {
+      const planDateStr = planDates.length > 0 ? planDates.join('・') : '（未設定）';
+      return `このタスクは ${date} のシフトです。表示中のシフト表は ${planDateStr} 用のため配置できません。`;
+    }
+  }
+  if (shiftsForTask.length === 0) {
+    return 'このタスクに対応するシフトがこのシフト表に含まれていません。';
+  }
+  return '配置可能なシフトが見つかりませんでした。';
+}
+
+/**
  * brushTaskId に対応するシフトを blockIndex 位置から1つ選ぶ。
  */
 function resolveShiftForTaskAt(
@@ -343,6 +368,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   // ========== ブラシペイントプレビュー ==========
   const [preview, setPreview] = useState<PreviewState | null>(null);
 
+  // ドラッグ中に配置不可の場合に表示する理由メッセージ
+  const [dragWarning, setDragWarning] = useState<string | null>(null);
+
   // ========== ヘルパー: 行から member.id を引く（クロス行ムーブ用） ==========
   const findMemberIdAtPoint = useCallback((clientX: number, clientY: number): string | null => {
     const el = document.elementFromPoint(clientX, clientY);
@@ -351,9 +379,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     return row ? row.getAttribute('data-member-id') : null;
   }, []);
 
-  // ドラッグ終了で必ずプレビュークリア（drop/cancel 共通）
+  // ドラッグ終了で必ずプレビュー・警告クリア（drop/cancel 共通）
   useEffect(() => {
-    const handleDragEnd = () => setPreview(null);
+    const handleDragEnd = () => {
+      setPreview(null);
+      setDragWarning(null);
+    };
     window.addEventListener('dragend', handleDragEnd);
     return () => window.removeEventListener('dragend', handleDragEnd);
   }, []);
@@ -376,7 +407,13 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     (memberId: string, e: React.DragEvent) => {
       if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
       const brush = resolveActiveBrush();
-      if (!brush) return;
+      if (!brush) {
+        // 配置不可の理由を表示
+        const taskId = draggingTaskId ?? brushTaskId;
+        if (taskId) setDragWarning(computeDragWarning(taskId, activeShifts));
+        return;
+      }
+      setDragWarning(null);
       // pointer編集中はブラシのドロップを優先しない
       if (editState) return;
       e.preventDefault();
@@ -391,7 +428,20 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
         return { ...prev, currentBlock: blockIndex };
       });
     },
-    [resolveActiveBrush, calcBlockIndex, editState],
+    [resolveActiveBrush, calcBlockIndex, editState, brushTaskId, activeShifts],
+  );
+
+  // ガント全体へのDragOverハンドラ（局員行以外のエリアでも警告を表示するため）
+  const handleContainerDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
+      const brush = resolveActiveBrush();
+      if (!brush) {
+        const taskId = draggingTaskId ?? brushTaskId;
+        if (taskId) setDragWarning(computeDragWarning(taskId, activeShifts));
+      }
+    },
+    [resolveActiveBrush, brushTaskId, activeShifts],
   );
 
   const handleRowDrop = useCallback(
@@ -606,7 +656,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   const dayStartMinute = activeTimeSchedule.startMinute;
 
   return (
-    <StyledGantt>
+    <StyledGantt onDragOver={handleContainerDragOver}>
       {/* ヘッダー行（grid row 1） */}
       <div className="e-member-col-header">局員</div>
       <div className="e-time-axis" style={{ width: totalWidth }}>
@@ -624,6 +674,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
             );
           })}
         </div>
+
+      {/* ドラッグ配置不可の理由トースト: body に portal で描画 */}
+      {dragWarning && createPortal(
+        <StyledDragWarning>{dragWarning}</StyledDragWarning>,
+        document.body,
+      )}
 
       {/* ホバー時アクションパネル（削除）: body に portal で描画 */}
       {hoveredRunInfo && !editState && createPortal(
@@ -1212,6 +1268,30 @@ const StyledRunActionPanel = styled.div<React.HTMLAttributes<HTMLDivElement>>`
         background: #ffebee;
       }
     }
+  }
+`;
+
+/** ドラッグ配置不可の理由トースト（画面下部固定） */
+const StyledDragWarning = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff8e1;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.86em;
+  color: #5d4037;
+  z-index: 9999;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  max-width: 520px;
+  text-align: center;
+  white-space: pre-wrap;
+
+  &::before {
+    content: '⚠ ';
   }
 `;
 

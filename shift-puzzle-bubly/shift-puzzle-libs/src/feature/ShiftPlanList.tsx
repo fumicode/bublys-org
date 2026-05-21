@@ -4,7 +4,13 @@ import { FC, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@bublys-org/state-management';
 import { selectShiftPuzzlePlans, addShiftPlan, deleteShiftPlan, updateShiftPlan, ShiftPlan } from '../slice/index.js';
 import { ShiftPlanListView } from '../ui/ShiftPlanListView.js';
-import { shiftsForDate, timeSchedulesForDate } from '../data/sampleData.js';
+import { shiftsForDate, timeSchedulesForDate, FESTIVAL_DATES } from '../data/sampleData.js';
+
+/** 技大祭日程セレクト用リスト（本番日を先頭に）*/
+const FESTIVAL_DAYS_ORDERED = ['準準備日', '準備日', '1日目', '2日目', '片付け日'] as const;
+const festivalDays = FESTIVAL_DAYS_ORDERED
+  .filter((dt) => dt in FESTIVAL_DATES)
+  .map((dt) => ({ label: dt, date: FESTIVAL_DATES[dt] }));
 
 type ShiftPlanListProps = {
   onOpen: (planId: string) => void;
@@ -49,5 +55,5 @@ export const ShiftPlanList: FC<ShiftPlanListProps> = ({ onOpen, buildPlanUrl }) 
     dispatch(deleteShiftPlan(planId));
   };
 
-  return <ShiftPlanListView plans={plans} onCreate={handleCreate} onOpen={onOpen} onDelete={handleDelete} buildPlanUrl={buildPlanUrl} />;
+  return <ShiftPlanListView plans={plans} onCreate={handleCreate} onOpen={onOpen} onDelete={handleDelete} buildPlanUrl={buildPlanUrl} festivalDays={festivalDays} />;
 };
