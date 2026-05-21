@@ -30,6 +30,7 @@ import { Shift, TimeSchedule, Member } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
 import { DRAG_TYPE_TASK, draggingTaskId, draggingDate } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
+import { createPortal } from 'react-dom';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 
 // 局員行の受け入れ可否型は MemberGanttView と共通（同一定義）
@@ -286,8 +287,18 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     moved: boolean;
   };
   const [editState, setEditState] = useState<EditState | null>(null);
-  /** 直近の pointerup でドラッグが起きたら、その後の click を抑制するフラグ */
+  /** 直近のドラッグ直後に click/dblclick を抑制するフラグ（タイマー自動解除） */
   const suppressClickRef = useRef(false);
+
+  /** ホバー中の run 情報（アクションパネル表示に使用） */
+  type HoveredRunInfo = {
+    key: string;
+    run: RunBar;
+    memberId: string;
+    rect: DOMRect;
+  };
+  const [hoveredRunInfo, setHoveredRunInfo] = useState<HoveredRunInfo | null>(null);
+  const hoverLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ブラシ候補シフト（外部タスクドラッグ / クリック選択 / 既配置バー編集中 の順で解決）
   const resolveActiveBrush = useCallback((): { taskId: string; candidates: Shift[] } | null => {
@@ -441,18 +452,43 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     void memberId;
   }, []);
 
-  const handleRunClick = useCallback(
+  /** ダブルクリックでrunの詳細を開く（ドラッグ直後は抑制） */
+  const handleRunDoubleClick = useCallback(
     (run: RunBar, memberId: string, e: React.MouseEvent) => {
-      // 直前にドラッグ移動/リサイズが起きていたらクリック動作（詳細遷移）を抑制
-      if (suppressClickRef.current) {
-        suppressClickRef.current = false;
-        return;
-      }
+      if (suppressClickRef.current) return;
       if (e.defaultPrevented) return;
       onAssignedRunClick?.(run.shift.id, memberId, run.startBlock);
     },
     [onAssignedRunClick],
   );
+
+  /** run bar にマウスが入ったときホバー情報を記録（アクションパネル用） */
+  const handleRunMouseEnter = useCallback(
+    (run: RunBar, memberId: string, e: React.MouseEvent<HTMLElement>) => {
+      if (hoverLeaveTimerRef.current) {
+        clearTimeout(hoverLeaveTimerRef.current);
+        hoverLeaveTimerRef.current = null;
+      }
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoveredRunInfo({ key: `${run.shift.id}-${run.startBlock}-${memberId}`, run, memberId, rect });
+    },
+    [],
+  );
+
+  /** run bar からマウスが出たら遅延後にパネルを消す（パネルへの移動時はキャンセル） */
+  const scheduleHoverLeave = useCallback(() => {
+    hoverLeaveTimerRef.current = setTimeout(() => {
+      setHoveredRunInfo(null);
+      hoverLeaveTimerRef.current = null;
+    }, 120);
+  }, []);
+
+  const cancelHoverLeave = useCallback(() => {
+    if (hoverLeaveTimerRef.current) {
+      clearTimeout(hoverLeaveTimerRef.current);
+      hoverLeaveTimerRef.current = null;
+    }
+  }, []);
 
   // ========== 移動・リサイズ pointer handlers ==========
 
@@ -466,6 +502,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       e.preventDefault();
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
+      // ドラッグ開始時はアクションパネルを消す
+      if (hoverLeaveTimerRef.current) {
+        clearTimeout(hoverLeaveTimerRef.current);
+        hoverLeaveTimerRef.current = null;
+      }
+      setHoveredRunInfo(null);
       setEditState({
         kind,
         shiftId: run.shift.id,
@@ -534,7 +576,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
           editState.previewStart,
           editState.previewEnd,
         );
-        suppressClickRef.current = true; // 次の click 動作は抑制
+        // ドラッグ後 400ms 以内の click/dblclick を抑制
+        suppressClickRef.current = true;
+        setTimeout(() => { suppressClickRef.current = false; }, 400);
       }
     }
     setEditState(null);
@@ -548,14 +592,6 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     setEditState(null);
   }, [editState]);
 
-  const handleRunRemove = useCallback(
-    (run: RunBar, memberId: string, e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onRemoveRange?.(run.shift.id, memberId, run.startBlock, run.endBlock);
-    },
-    [onRemoveRange],
-  );
 
   if (!activeTimeSchedule) {
     return (
@@ -588,6 +624,41 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
             );
           })}
         </div>
+
+      {/* ホバー時アクションパネル（削除）: body に portal で描画 */}
+      {hoveredRunInfo && !editState && createPortal(
+        <StyledRunActionPanel
+          style={{
+            position: 'fixed',
+            left: hoveredRunInfo.rect.left + hoveredRunInfo.rect.width / 2,
+            top: hoveredRunInfo.rect.top > 40
+              ? hoveredRunInfo.rect.top - 32
+              : hoveredRunInfo.rect.bottom + 4,
+          }}
+          onMouseEnter={cancelHoverLeave}
+          onMouseLeave={() => setHoveredRunInfo(null)}
+        >
+          <button
+            type="button"
+            className="e-action-btn e-action-btn--delete"
+            title="削除"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveRange?.(
+                hoveredRunInfo.run.shift.id,
+                hoveredRunInfo.memberId,
+                hoveredRunInfo.run.startBlock,
+                hoveredRunInfo.run.endBlock,
+              );
+              setHoveredRunInfo(null);
+            }}
+          >
+            <CloseIcon style={{ fontSize: 13 }} />
+          </button>
+        </StyledRunActionPanel>,
+        document.body,
+      )}
 
       {/* 局員行（grid row 2 以降） */}
       {members.map((member) => {
@@ -690,7 +761,9 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                       $isGhost={!!isMovingToOtherRow}
                       $isUnavailable={hasUnavailable}
                       title={titleParts.join('')}
-                      onClick={(e) => handleRunClick(run, member.id, e)}
+                      onDoubleClick={(e) => handleRunDoubleClick(run, member.id, e)}
+                      onMouseEnter={(e) => handleRunMouseEnter(run, member.id, e)}
+                      onMouseLeave={scheduleHoverLeave}
                       onPointerDown={(e) => startEdit('move', run, member.id, e)}
                       onPointerMove={handleEditMove}
                       onPointerUp={handleEditUp}
@@ -702,6 +775,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                         onPointerMove={handleEditMove}
                         onPointerUp={handleEditUp}
                         onPointerCancel={handleEditCancel}
+                        onDoubleClick={(e) => e.stopPropagation()}
                       />
                       {/* 参加不可ブロック毎のオーバーレイ（15分粒度） */}
                       {run.unavailableBlocks.map((b) => (
@@ -729,21 +803,13 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                       {hasOutOfRange && <span className="e-out-badge" aria-label="タスク時間外に配置">⧗</span>}
                       {hasUnavailable && <span className="e-unavailable-badge" aria-label="参加不可時間に配置">🚫</span>}
                       {run.isOverlap && <span className="e-overlap-badge">!</span>}
-                      <button
-                        type="button"
-                        className="e-remove-btn"
-                        title="削除"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => handleRunRemove(run, member.id, e)}
-                      >
-                        <CloseIcon style={{ fontSize: 14 }} />
-                      </button>
                       <StyledResizeHandle
                         $side="right"
                         onPointerDown={(e) => startEdit('resize-R', run, member.id, e)}
                         onPointerMove={handleEditMove}
                         onPointerUp={handleEditUp}
                         onPointerCancel={handleEditCancel}
+                        onDoubleClick={(e) => e.stopPropagation()}
                       />
                     </StyledRunBar>
                   );
@@ -916,6 +982,7 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     &:hover {
       background-color: #fafafa;
     }
+
   }
 `;
 
@@ -1003,7 +1070,6 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
 
   &:hover {
     filter: brightness(0.96);
-    .e-remove-btn { opacity: 1; }
   }
 
   .e-run-label {
@@ -1039,27 +1105,8 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
     z-index: 1;
   }
 
-  .e-remove-btn {
-    flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    border: none;
-    background: rgba(255, 255, 255, 0.7);
-    color: #d32f2f;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.1s, background 0.1s;
-
-    &:hover {
-      background: #fff;
-    }
-  }
 `;
+
 
 /** リサイズハンドル（バー左右端） */
 type StyledResizeHandleProps = React.HTMLAttributes<HTMLDivElement> & { $side: 'left' | 'right' };
@@ -1119,6 +1166,53 @@ const StyledUnavailableBlock = styled.div<React.HTMLAttributes<HTMLDivElement>>`
     rgba(255, 224, 130, 0.55) 3px,
     rgba(255, 224, 130, 0.55) 6px
   );
+`;
+
+/** ホバー時に body に描画されるアクションパネル（削除） */
+const StyledRunActionPanel = styled.div<React.HTMLAttributes<HTMLDivElement>>`
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  animation: pgFadeIn 0.13s ease;
+  pointer-events: all;
+  z-index: 9999;
+
+  @keyframes pgFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .e-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+    color: #555;
+    padding: 0;
+
+    &:hover {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    &.e-action-btn--delete {
+      color: #c62828;
+      &:hover {
+        background: #ffebee;
+      }
+    }
+  }
 `;
 
 /** ドロップ前のプレビュー帯 */
