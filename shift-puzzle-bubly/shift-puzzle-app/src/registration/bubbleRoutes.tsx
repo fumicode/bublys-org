@@ -15,6 +15,7 @@ import {
   AssignmentEvaluation,
   MemberShiftTable,
   TaskCollection,
+  TaskFilter,
   TaskDetail,
   MemberGanttEditor,
   PrimitiveGanttEditor,
@@ -22,6 +23,7 @@ import {
   ShiftPlanList,
   ShiftStatus,
   parseTaskFilter,
+  stringifyTaskFilter,
   type DayType,
 } from "@bublys-org/shift-puzzle-libs";
 
@@ -210,11 +212,8 @@ const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   };
 
   const handleOpenTaskList = () => {
-    openBubble(
-      `shift-puzzle/tasks${initialDayType ? `?dayType=${encodeURIComponent(initialDayType)}` : ''}`,
-      bubble.id,
-      'bubble-side',
-    );
+    const query = initialDayType ? stringifyTaskFilter({ dayTypes: [initialDayType] }) : '';
+    openBubble(`shift-puzzle/tasks${query}`, bubble.id, 'bubble-side');
   };
 
   const handleTableView = () => {
@@ -358,6 +357,14 @@ const ShiftPuzzleShiftStatusCoverageBubble: BubbleRoute["Component"] = ({ bubble
   );
 };
 
+// シフトパズル - タスク絞り込み検索バブル
+const ShiftPuzzleTaskFilterBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const queryIndex = bubble.url.indexOf('?');
+  const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
+  const initialFilter = parseTaskFilter(query);
+  return <TaskFilter initialFilter={initialFilter} />;
+};
+
 // シフトパズル - タスク一覧バブル
 const ShiftPuzzleTasksBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
@@ -402,6 +409,7 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/coverage", type: "shift-status-coverage", Component: ShiftPuzzleShiftStatusCoverageBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status", type: "shift-status", Component: ShiftPuzzleShiftStatusBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId", type: "shift-plan", Component: ShiftPuzzlePlanEditorBubble },
+  { pattern: "shift-puzzle/tasks/filter", type: "task-filter", Component: ShiftPuzzleTaskFilterBubble },
   { pattern: "shift-puzzle/tasks/:taskId", type: "task", Component: ShiftPuzzleTaskBubble },
   { pattern: "shift-puzzle/tasks", type: "task-list", Component: ShiftPuzzleTasksBubble },
 ];

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useEffect, useMemo, useContext } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
   selectSelectedTaskId,
@@ -10,96 +10,152 @@ import {
 import { TaskListView, type GroupedTask } from "../ui/TaskListView.js";
 import { createDefaultShifts, createDefaultTasks, DAY_TYPE_ORDER } from "../data/sampleData.js";
 import styled from "styled-components";
-import { Chip, Stack } from "@mui/material";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import BusinessIcon from "@mui/icons-material/Business";
+import { Button } from "@mui/material";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
 
-// ========== フィルターユーティリティ ==========
+// ========== フィルター型 ==========
 
-/** フィルター条件の型 */
+/**
+ * タスクリストのフィルター条件。
+ * - departments / dayTypes は OR 条件。未指定（空配列 or undefined）で全件表示。
+ * - timeRange: シフトの時間帯がこの範囲とオーバーラップするタスクを抽出。
+ * - 日付を持たないタスク（将来対応）は dayTypes フィルターを常に通過させる。
+ */
 export type TaskFilterCriteria = {
-  department?: string;
-  dayType?: string;
+  departments?: string[];
+  dayTypes?: string[];
+  timeRange?: {
+    startTime: string; // 'HH:MM'
+    endTime: string;   // 'HH:MM'
+  };
 };
 
-/** URLクエリからフィルターをパース */
+/** URLクエリからフィルターをパース（旧 dayType/department 単一値も後方互換） */
 export function parseTaskFilter(query: string): TaskFilterCriteria {
   const filter: TaskFilterCriteria = {};
   if (!query) return filter;
-
   const params = new URLSearchParams(query);
 
-  const department = params.get('department');
-  if (department) filter.department = department;
+  const departments = params.get('departments');
+  if (departments) {
+    filter.departments = departments.split(',').filter(Boolean);
+  } else {
+    const department = params.get('department'); // legacy
+    if (department) filter.departments = [department];
+  }
 
-  const dayType = params.get('dayType');
-  if (dayType) filter.dayType = dayType;
+  const dayTypes = params.get('dayTypes');
+  if (dayTypes) {
+    filter.dayTypes = dayTypes.split(',').filter(Boolean);
+  } else {
+    const dayType = params.get('dayType'); // legacy
+    if (dayType) filter.dayTypes = [dayType];
+  }
+
+  const startTime = params.get('startTime');
+  const endTime = params.get('endTime');
+  if (startTime && endTime) filter.timeRange = { startTime, endTime };
 
   return filter;
 }
 
-/** フィルターをURL文字列に変換 */
+/** フィルターをURLクエリ文字列に変換 */
 export function stringifyTaskFilter(filter: TaskFilterCriteria): string {
   const params = new URLSearchParams();
-
-  if (filter.department) params.set('department', filter.department);
-  if (filter.dayType) params.set('dayType', filter.dayType);
-
+  if (filter.departments && filter.departments.length > 0) {
+    params.set('departments', filter.departments.join(','));
+  }
+  if (filter.dayTypes && filter.dayTypes.length > 0) {
+    params.set('dayTypes', filter.dayTypes.join(','));
+  }
+  if (filter.timeRange) {
+    params.set('startTime', filter.timeRange.startTime);
+    params.set('endTime', filter.timeRange.endTime);
+  }
   const str = params.toString();
   return str ? `?${str}` : '';
+}
+
+// ========== フィルター判定 ==========
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + (m ?? 0);
+}
+
+/** タスクがフィルター条件にマッチするか判定 */
+export function matchesTaskFilter(task: GroupedTask, filter: TaskFilterCriteria): boolean {
+  // 所属局フィルター
+  if (filter.departments && filter.departments.length > 0) {
+    if (!task.department || !filter.departments.includes(task.department)) return false;
+  }
+
+  // 日程フィルター（dayType を持たないタスクは将来対応・常に通過）
+  if (filter.dayTypes && filter.dayTypes.length > 0) {
+    const taskDayTypes = task.shifts.map((s) => s.dayType).filter(Boolean);
+    if (taskDayTypes.length > 0) {
+      const hasMatch = task.shifts.some((s) => filter.dayTypes!.includes(s.dayType));
+      if (!hasMatch) return false;
+    }
+  }
+
+  // 時間帯フィルター（シフトの時間がフィルター範囲とオーバーラップするか）
+  if (filter.timeRange) {
+    const filterStart = timeToMinutes(filter.timeRange.startTime);
+    const filterEnd = timeToMinutes(filter.timeRange.endTime);
+    if (filterStart < filterEnd) {
+      const hasOverlap = task.shifts.some(
+        (s) => s.startMinute < filterEnd && s.endMinute > filterStart,
+      );
+      if (!hasOverlap) return false;
+    }
+  }
+
+  return true;
+}
+
+/** フィルター条件の説明文を生成 */
+function describeTaskFilter(filter: TaskFilterCriteria): string {
+  const parts: string[] = [];
+  if (filter.departments && filter.departments.length > 0) {
+    parts.push(`${filter.departments.join('・')}所属`);
+  }
+  if (filter.dayTypes && filter.dayTypes.length > 0) {
+    parts.push(filter.dayTypes.join('・'));
+  }
+  if (filter.timeRange) {
+    parts.push(`${filter.timeRange.startTime}〜${filter.timeRange.endTime}`);
+  }
+  return parts.join('、');
 }
 
 // ========== コンポーネント ==========
 
 type TaskCollectionProps = {
-  /** 初期フィルター（URLクエリから） */
   filter?: TaskFilterCriteria;
   onTaskSelect?: (taskId: string) => void;
 };
 
 const buildDetailUrl = (taskId: string) => `shift-puzzle/tasks/${taskId}`;
 
-export const TaskCollection: FC<TaskCollectionProps> = ({
-  filter = {},
-  onTaskSelect,
-}) => {
+export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSelect }) => {
   const dispatch = useAppDispatch();
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
+  const { openBubble } = useContext(BubblesContext);
 
-  const [activeDayType, setActiveDayType] = useState<string | undefined>(filter.dayType);
-  const [activeDepartment, setActiveDepartment] = useState<string | undefined>(filter.department);
-
-  // シフトマスターデータ（表示の主データソース）
   const shifts = useMemo(() => createDefaultShifts(), []);
 
-  // TaskDetail が使う Redux タスクストアを初期ロード
   useEffect(() => {
     const tasks = createDefaultTasks();
     dispatch(setTaskList(tasks.map((t) => t.state)));
   }, [dispatch]);
 
-  // 全シフトから局一覧を導出（フィルター前）
-  const departments = useMemo(() => {
-    const depts = new Set<string>();
-    shifts.forEach((s) => {
-      if (s.responsibleDepartment) depts.add(s.responsibleDepartment);
-    });
-    return Array.from(depts).sort();
-  }, [shifts]);
-
-  // フィルター適用 → タスクIDでグループ化
-  const groupedTasks = useMemo((): GroupedTask[] => {
-    let filtered = shifts;
-
-    if (activeDayType) {
-      filtered = filtered.filter((s) => s.dayType === activeDayType);
-    }
-    if (activeDepartment) {
-      filtered = filtered.filter((s) => s.responsibleDepartment === activeDepartment);
-    }
-
+  // 全シフトから taskId でグループ化（フィルター前）
+  const allGroupedTasks = useMemo((): GroupedTask[] => {
     const taskMap = new Map<string, GroupedTask>();
-    for (const shift of filtered) {
+    for (const shift of shifts) {
       if (!taskMap.has(shift.taskId)) {
         taskMap.set(shift.taskId, {
           taskId: shift.taskId,
@@ -110,81 +166,83 @@ export const TaskCollection: FC<TaskCollectionProps> = ({
       }
       taskMap.get(shift.taskId)!.shifts.push(shift);
     }
-
     return Array.from(taskMap.values());
-  }, [shifts, activeDayType, activeDepartment]);
+  }, [shifts]);
 
-  // 全タスク数（フィルター前）
-  const totalTaskCount = useMemo(
-    () => new Set(shifts.map((s) => s.taskId)).size,
-    [shifts],
+  // フィルター適用
+  const groupedTasks = useMemo(() => {
+    const hasFilter = Object.keys(filter).some(
+      (k) => (filter as Record<string, unknown>)[k] !== undefined,
+    );
+    if (!hasFilter) return allGroupedTasks;
+    return allGroupedTasks.filter((task) => matchesTaskFilter(task, filter));
+  }, [allGroupedTasks, filter]);
+
+  const hasFilter = Object.values(filter).some(
+    (v) => v !== undefined && (Array.isArray(v) ? v.length > 0 : true),
   );
+  const filterDescription = hasFilter ? describeTaskFilter(filter) : null;
 
   const handleTaskClick = (taskId: string) => {
     dispatch(setSelectedTaskId(taskId));
     onTaskSelect?.(taskId);
   };
 
-  const handleDayTypeClick = (day: string) => {
-    setActiveDayType(activeDayType === day ? undefined : day);
+  const handleOpenFilter = () => {
+    const query = stringifyTaskFilter(filter);
+    openBubble(`shift-puzzle/tasks/filter${query}`, 'root');
   };
 
-  const handleDepartmentClick = (dept: string) => {
-    setActiveDepartment(activeDepartment === dept ? undefined : dept);
-  };
-
-  const isFiltered = activeDayType || activeDepartment;
+  // 絞り込み後の dayType（単一の場合のみ TaskListView の activeDayType に渡す）
+  const activeDayType = filter.dayTypes?.length === 1 ? filter.dayTypes[0] : undefined;
 
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>
-          タスク一覧
-          {isFiltered ? (
-            <span className="e-filter-badge">
-              ({groupedTasks.length}/{totalTaskCount}件)
-            </span>
-          ) : (
-            <span className="e-count">({groupedTasks.length}件)</span>
-          )}
-        </h3>
+        {hasFilter && filterDescription ? (
+          <>
+            <div className="e-filter-description">
+              <p>「{filterDescription}」に関連する</p>
+            </div>
+            <h3>
+              タスク一覧
+              <span className="e-filter-badge">
+                ({groupedTasks.length}/{allGroupedTasks.length}件)
+              </span>
+            </h3>
+          </>
+        ) : (
+          <h3>タスク一覧 ({allGroupedTasks.length}件)</h3>
+        )}
       </div>
 
-      {/* 日程フィルターチップ */}
-      <div className="e-filter-row">
-        <CalendarTodayIcon fontSize="small" className="e-filter-icon" />
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          {DAY_TYPE_ORDER.map((day) => (
-            <Chip
-              key={day}
-              label={day}
-              size="small"
-              variant={activeDayType === day ? "filled" : "outlined"}
-              color={activeDayType === day ? "warning" : "default"}
-              onClick={() => handleDayTypeClick(day)}
-              className="e-filter-chip"
-            />
-          ))}
-        </Stack>
+      <div className="e-filter-section">
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<FilterListIcon />}
+          onClick={handleOpenFilter}
+          className="e-filter-button"
+        >
+          絞り込み検索
+        </Button>
       </div>
 
-      {/* 局フィルターチップ */}
-      <div className="e-filter-row">
-        <BusinessIcon fontSize="small" className="e-filter-icon" />
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-          {departments.map((dept) => (
-            <Chip
-              key={dept}
-              label={dept}
-              size="small"
-              variant={activeDepartment === dept ? "filled" : "outlined"}
-              color={activeDepartment === dept ? "primary" : "default"}
-              onClick={() => handleDepartmentClick(dept)}
-              className="e-filter-chip"
-            />
-          ))}
-        </Stack>
-      </div>
+      {groupedTasks.length > 0 && (
+        <div
+          className="e-drag-handle"
+          draggable
+          onDragStart={(e) => {
+            draggingTaskGroups = groupedTasks;
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData(DRAG_TYPE_TASK_LIST, '');
+          }}
+          onDragEnd={() => { draggingTaskGroups = null; }}
+        >
+          <DragIndicatorIcon fontSize="small" />
+          {groupedTasks.length}件のタスクをガントへドラッグ（AIシフト配置）
+        </div>
+      )}
 
       <TaskListView
         tasks={groupedTasks}
@@ -198,18 +256,26 @@ export const TaskCollection: FC<TaskCollectionProps> = ({
 };
 
 const StyledContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+
   .e-header {
     padding: 8px 12px 4px;
+    flex-shrink: 0;
 
     h3 {
       margin: 0;
       font-size: 1em;
     }
 
-    .e-count {
-      font-weight: normal;
-      color: #666;
-      margin-left: 4px;
+    .e-filter-description {
+      margin: 0 0 2px 0;
+      font-size: 0.85em;
+      color: #1976d2;
+
+      p { margin: 0; }
     }
 
     .e-filter-badge {
@@ -219,21 +285,47 @@ const StyledContainer = styled.div`
     }
   }
 
-  .e-filter-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 4px 12px;
+  .e-filter-section {
+    padding: 0 12px 8px;
+    flex-shrink: 0;
 
-    .e-filter-icon {
-      color: #999;
-      flex-shrink: 0;
-      margin-top: 2px;
+    .e-filter-button {
+      font-size: 0.85em;
+      text-transform: none;
+    }
+  }
+
+  .e-drag-handle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    margin: 0 12px 8px;
+    background: #fff8e1;
+    border: 1px dashed #ffa000;
+    border-radius: 4px;
+    cursor: grab;
+    font-size: 0.82em;
+    color: #e65100;
+    user-select: none;
+    flex-shrink: 0;
+
+    &:hover {
+      background: #fff3cd;
+      border-color: #e65100;
     }
 
-    .e-filter-chip {
-      font-size: 0.75em;
-      cursor: pointer;
+    &:active {
+      cursor: grabbing;
     }
   }
 `;
+
+// ========== AIシフト配置用ドラッグ転送変数 ==========
+// PrimitiveGanttEditor からimportしてdrop時にタスクグループを受け取る（将来実装）
+
+export const DRAG_TYPE_TASK_LIST = 'type/task-list';
+export let draggingTaskGroups: GroupedTask[] | null = null;
+
+// DAY_TYPE_ORDER を re-export（TaskFilter で使用）
+export { DAY_TYPE_ORDER };
