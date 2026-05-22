@@ -39,6 +39,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+import { BubbleViewWorldLineControls } from "../../world-line/BubbleViewWorldLineControls";
 
 const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
 
@@ -217,6 +218,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
+      {/* 表示状態を world-line に同期し undo/redo を提供 */}
+      <BubbleViewWorldLineControls />
+
       {/* Left Sidebar */}
       <Sidebar onItemClick={handleSidebarItemClick} />
 

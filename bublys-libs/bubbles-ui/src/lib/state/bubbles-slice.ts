@@ -12,9 +12,21 @@ import { BubblesProcessDPO } from "../BubblesProcessDPO.js";
 import { CoordinateSystemData, CoordinateSystem, Point2 } from "@bublys-org/bubbles-ui-util";
 
 
-type BubblesRelation = {
+export type BubblesRelation = {
   openerId: string;
   openeeId: string;
+}
+
+/**
+ * バブルUIの「表示状態」= arrangement。
+ * world-line-graph に1つのオブジェクトとして commit/復元する単位。
+ * カメラ/設定(surfaceLeftTop, globalCoordinateSystem)や transient(renderCount,
+ * animatingBubbleIds)は含めない。
+ */
+export type BubbleViewStateJson = {
+  bubbles: Record<string, BubbleJson>;
+  bubbleRelations: BubblesRelation[];
+  process: BubblesProcessState;
 }
 
 export type OpeningPosition = "bubble-side" | "origin-side";
@@ -196,6 +208,13 @@ export const bubblesSlice = createSlice({
     },
     setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
       state.surfaceLeftTop = action.payload;
+    },
+    // world-line から復元した arrangement を丸ごと差し戻す
+    replaceBubbleViewState: (state, action: PayloadAction<BubbleViewStateJson>) => {
+      state.bubbles = action.payload.bubbles;
+      state.bubbleRelations = action.payload.bubbleRelations;
+      state.process = action.payload.process;
+      state.renderCount += 1;
     }
   },
 });
@@ -214,6 +233,7 @@ export const {
   relateBubbles,
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
+  replaceBubbleViewState,
   finishBubbleAnimation,
   clearAllAnimations,
 } = bubblesSlice.actions;
@@ -230,6 +250,26 @@ export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
 const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles;
 const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.process;
 const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbleRelations;
+
+/**
+ * world-line に commit する arrangement（= 表示状態）を返す。
+ * メモ化済み: bubbles / relations / process のいずれかが変わった時だけ再計算。
+ *
+ * 各バブルの renderedRect は「計測由来の派生値」で毎フレーム更新されるため、
+ * arrangement からは除外する（含めると測定のたびに commit が走ってしまう）。
+ * 復元後はレンダリングで再計測されるので失われても問題ない。
+ */
+export const selectBubbleViewState = createSelector(
+  [selectBubblesJson, selectBubbleRelationsRaw, selectProcessJson],
+  (bubbles, bubbleRelations, process): BubbleViewStateJson => {
+    const arrangementBubbles: Record<string, BubbleJson> = {};
+    for (const [id, bubbleJson] of Object.entries(bubbles)) {
+      const { renderedRect: _renderedRect, ...rest } = bubbleJson;
+      arrangementBubbles[id] = rest;
+    }
+    return { bubbles: arrangementBubbles, bubbleRelations, process };
+  }
+);
 
 /**
  * サーフェスバブルのIDリストを返す（パフォーマンス最適化版）
