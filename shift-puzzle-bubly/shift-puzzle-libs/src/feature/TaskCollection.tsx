@@ -7,7 +7,7 @@ import {
   setTaskList,
   setSelectedTaskId,
 } from "../slice/index.js";
-import { TaskListView, type GroupedTask } from "../ui/TaskListView.js";
+import { TaskListView, type GroupedTask, DRAG_TYPE_TASK_LIST } from "../ui/TaskListView.js";
 import { createDefaultShifts, createDefaultTasks, DAY_TYPE_ORDER } from "../data/sampleData.js";
 import styled from "styled-components";
 import { Button } from "@mui/material";
@@ -321,11 +321,9 @@ const StyledContainer = styled.div`
   }
 `;
 
-// ========== AIシフト配置用ドラッグ転送変数 ==========
-// PrimitiveGanttEditor からimportしてdrop時にタスクグループを受け取る（将来実装）
-
-export const DRAG_TYPE_TASK_LIST = 'type/task-list';
-export let draggingTaskGroups: GroupedTask[] | null = null;
-
 // DAY_TYPE_ORDER を re-export（TaskFilter で使用）
 export { DAY_TYPE_ORDER };
+
+// ========== AIシフト配置用ドラッグ転送変数 ==========
+
+export let draggingTaskGroups: GroupedTask[] | null = null;

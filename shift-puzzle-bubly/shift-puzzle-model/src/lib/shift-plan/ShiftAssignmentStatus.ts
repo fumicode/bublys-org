@@ -129,16 +129,18 @@ export class ShiftAssignmentStatus {
 
   /**
    * 計算エントリーポイント。
-   * @param shift         対象シフト（blockList を持つ）
-   * @param timeSchedule  shift.timeScheduleId に対応する TimeSchedule
-   * @param members       全局員（name/department/isNewMember 参照用）
-   * @param allShifts     競合判定用：同一 ShiftPlan 内の全シフト（対象shift自身も含む）
+   * @param shift             対象シフト（blockList を持つ）
+   * @param timeSchedule      shift.timeScheduleId に対応する TimeSchedule
+   * @param members           全局員（name/department/isNewMember 参照用）
+   * @param allShifts         競合判定用：同一 ShiftPlan 内の全シフト（対象shift自身も含む）
+   * @param allTimeSchedules  ブロック→絶対時刻変換用：ShiftPlan の全 TimeSchedule
    */
   static compute(
     shift: Shift,
     timeSchedule: TimeSchedule,
     members: readonly Member[],
     allShifts: readonly Shift[],
+    allTimeSchedules: readonly TimeSchedule[] = [],
   ): ShiftAssignmentStatus {
     const memberById = new Map(members.map((m) => [m.id, m]));
     const validRange = shift.validBlockRange({ startMinute: timeSchedule.startMinute });
@@ -169,6 +171,7 @@ export class ShiftAssignmentStatus {
         runs,
         allShifts,
         memberById,
+        allTimeSchedules,
       );
       return {
         memberId: uid,
@@ -216,6 +219,7 @@ function computeMemberViolations(
   runs: readonly MemberRun[],
   allShifts: readonly Shift[],
   memberById: Map<string, Member>,
+  allTimeSchedules: readonly TimeSchedule[] = [],
 ): AssignmentViolation[] {
   const violations: AssignmentViolation[] = [];
 
@@ -258,7 +262,7 @@ function computeMemberViolations(
   // department 不整合は参考情報扱い（違反として出さない）
 
   // taskConflict: 他shiftで同時間帯に配置されている
-  const conflict = findTaskConflict(member.id, shift, runs, allShifts);
+  const conflict = findTaskConflict(member.id, shift, runs, allShifts, allTimeSchedules);
   if (conflict) {
     violations.push({
       category: 'taskConflict',
@@ -286,24 +290,25 @@ function findTaskConflict(
   targetShift: Shift,
   targetRuns: readonly MemberRun[],
   allShifts: readonly Shift[],
+  allTimeSchedules: readonly TimeSchedule[] = [],
 ): string | null {
   if (targetRuns.length === 0) return null;
+
+  const tsMap = new Map(allTimeSchedules.map((ts) => [ts.id, ts]));
 
   for (const other of allShifts) {
     if (other.id === targetShift.id) continue;
     if (other.taskId === targetShift.taskId) continue; // 同タスク別シフトは競合とみなさない
     if (other.dayType !== targetShift.dayType) continue;
 
-    // otherのblockListを絶対時刻の区間に変換
-    const otherBl = other.blockList;
-    const otherBlocks = otherBl.getBlocksForUser(memberId);
+    const otherBlocks = other.blockList.getBlocksForUser(memberId);
     if (otherBlocks.length === 0) continue;
 
-    // otherが持つ TimeSchedule.startMinute は不明なので、shift.startMinute起点で近似
-    // （BlockList の正確な絶対時刻計算は timeSchedule を要するが、
-    //  ここでは shift 同士の dayType一致 + 自身の startMinute から推定）
-    // 安全側: shift.startMinute を起点にする
-    const otherRanges = blocksToMinuteRanges(otherBlocks, other.startMinute);
+    // BlockListのブロックインデックスはTimeScheduleのstartMinute基点なので、
+    // other.timeScheduleId に対応するTimeScheduleのstartMinuteを使う
+    const otherTs = other.timeScheduleId ? tsMap.get(other.timeScheduleId) : undefined;
+    const baseMinute = otherTs?.startMinute ?? other.startMinute;
+    const otherRanges = blocksToMinuteRanges(otherBlocks, baseMinute);
 
     for (const tr of targetRuns) {
       for (const or of otherRanges) {

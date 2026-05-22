@@ -73,6 +73,7 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
       timeSchedule,
       members,
       plan.shifts,
+      timeSchedules,
     );
 
     const memberNameMap = new Map(members.map((m) => [m.id, m.name]));

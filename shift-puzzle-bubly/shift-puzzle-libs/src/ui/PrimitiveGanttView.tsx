@@ -28,7 +28,7 @@ import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 're
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
-import { DRAG_TYPE_TASK, draggingTaskId, draggingDate } from './TaskListView.js';
+import { DRAG_TYPE_TASK, DRAG_TYPE_TASK_LIST, draggingTaskId, draggingDate } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
 import { createPortal } from 'react-dom';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
@@ -74,6 +74,8 @@ export type PrimitiveGanttViewProps = {
   brushTaskId?: string | null;
   /** 局員行の受け入れ可否マップ（ブラシ中のみ意味がある） */
   rowAvailabilityMap?: Map<string, RowAvailability>;
+  /** タスクリストまとめドロップ時コールバック（AI配置トリガー） */
+  onTaskListDrop?: () => void;
 };
 
 // ========== 定数 ==========
@@ -158,42 +160,99 @@ function buildRunsForMember(
   totalBlocks: number,
   placementMap: Map<string, CellPlacement[]>,
 ): RunBar[] {
-  const runs: RunBar[] = [];
-  let cur: RunBar | null = null;
   const dayType = timeSchedule.dayType;
+
+  // シフトごとに担当ブロックを収集（bの昇順で追加されるため昇順保証）
+  type ShiftEntry = {
+    shift: Shift;
+    blocks: number[];
+    outOfRangeSet: Set<number>;
+    overlapSet: Set<number>;
+  };
+  const shiftMap = new Map<string, ShiftEntry>();
+
   for (let b = 0; b < totalBlocks; b++) {
     const placements = placementMap.get(`${member.id}:${b}`) ?? [];
-    const primary = placements[0];
-    if (!primary) {
-      if (cur) {
-        runs.push(cur);
-        cur = null;
+    if (placements.length === 0) continue;
+    const hasOverlap = placements.length > 1;
+    for (const { shift, isOutOfRange } of placements) {
+      if (!shiftMap.has(shift.id)) {
+        shiftMap.set(shift.id, { shift, blocks: [], outOfRangeSet: new Set(), overlapSet: new Set() });
       }
-      continue;
-    }
-    const isOverlap = placements.length > 1;
-    const blockMinute = timeSchedule.startMinute + b * 15;
-    const isUnavailable = !member.isAvailableAt(dayType, blockMinute);
-    const isOutOfRange = primary.isOutOfRange;
-    if (cur && cur.shift.id === primary.shift.id) {
-      cur.endBlock = b + 1;
-      cur.isOverlap = cur.isOverlap || isOverlap;
-      if (isOutOfRange) cur.outOfRangeBlocks.push(b);
-      if (isUnavailable) cur.unavailableBlocks.push(b);
-    } else {
-      if (cur) runs.push(cur);
-      cur = {
-        shift: primary.shift,
-        startBlock: b,
-        endBlock: b + 1,
-        isOverlap,
-        outOfRangeBlocks: isOutOfRange ? [b] : [],
-        unavailableBlocks: isUnavailable ? [b] : [],
-      };
+      const entry = shiftMap.get(shift.id)!;
+      entry.blocks.push(b);
+      if (isOutOfRange) entry.outOfRangeSet.add(b);
+      if (hasOverlap) entry.overlapSet.add(b);
     }
   }
-  if (cur) runs.push(cur);
+
+  const runs: RunBar[] = [];
+
+  for (const { shift, blocks, outOfRangeSet, overlapSet } of shiftMap.values()) {
+    if (blocks.length === 0) continue;
+    // 連続ブロックをrunにまとめる
+    let runStart = blocks[0];
+    let runPrev = blocks[0];
+    const oorBlocks: number[] = [];
+    const unaBlocks: number[] = [];
+    let isOverlap = false;
+
+    const accumulate = (b: number) => {
+      if (outOfRangeSet.has(b)) oorBlocks.push(b);
+      if (!member.isAvailableAt(dayType, timeSchedule.startMinute + b * 15)) unaBlocks.push(b);
+      if (overlapSet.has(b)) isOverlap = true;
+    };
+    accumulate(blocks[0]);
+
+    for (let i = 1; i <= blocks.length; i++) {
+      if (i === blocks.length || blocks[i] !== runPrev + 1) {
+        runs.push({ shift, startBlock: runStart, endBlock: runPrev + 1, isOverlap, outOfRangeBlocks: [...oorBlocks], unavailableBlocks: [...unaBlocks] });
+        if (i < blocks.length) {
+          runStart = blocks[i];
+          runPrev = blocks[i];
+          oorBlocks.length = 0;
+          unaBlocks.length = 0;
+          isOverlap = false;
+          accumulate(blocks[i]);
+        }
+      } else {
+        runPrev = blocks[i];
+        accumulate(blocks[i]);
+      }
+    }
+  }
+
+  // startBlock順に並べて描画順を安定させる
+  runs.sort((a, b) => a.startBlock - b.startBlock || a.shift.id.localeCompare(b.shift.id));
   return runs;
+}
+
+/**
+ * 時間軸が重なるrunにスタックレベルを割り当てる（greedy interval coloring）。
+ * level 0 = 通常バー、level 1+ = 重複バー（小さく底部に表示）。
+ */
+function computeRunLevels(runs: RunBar[]): number[] {
+  const levels = new Array<number>(runs.length).fill(0);
+  // levelEndBlock[lvl] = そのレベルで確保済みの最後のendBlock
+  const levelEnds: number[] = [];
+
+  for (let i = 0; i < runs.length; i++) {
+    const { startBlock, endBlock } = runs[i];
+    let assigned = -1;
+    for (let lvl = 0; lvl < levelEnds.length; lvl++) {
+      if (levelEnds[lvl] <= startBlock) {
+        assigned = lvl;
+        levelEnds[lvl] = endBlock;
+        break;
+      }
+    }
+    if (assigned === -1) {
+      assigned = levelEnds.length;
+      levelEnds.push(endBlock);
+    }
+    levels[i] = assigned;
+  }
+  return levels;
 }
 
 /**
@@ -269,6 +328,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   onMemberClick,
   buildMemberUrl,
   brushTaskId,
+  onTaskListDrop,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
   const minutePx = hourPx / 60;
@@ -405,6 +465,11 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
 
   const handleRowDragOver = useCallback(
     (memberId: string, e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        return;
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
       const brush = resolveActiveBrush();
       if (!brush) {
@@ -434,6 +499,10 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   // ガント全体へのDragOverハンドラ（局員行以外のエリアでも警告を表示するため）
   const handleContainerDragOver = useCallback(
     (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+        e.preventDefault();
+        return;
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
       const brush = resolveActiveBrush();
       if (!brush) {
@@ -446,6 +515,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
 
   const handleRowDrop = useCallback(
     (memberId: string, e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+        e.preventDefault();
+        setPreview(null);
+        onTaskListDrop?.();
+        return;
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
       const brush = resolveActiveBrush();
       if (!brush || !activeTimeSchedule) {
@@ -490,7 +565,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       }
       setPreview(null);
     },
-    [preview, resolveActiveBrush, activeTimeSchedule, calcBlockIndex, onPaintRange],
+    [preview, resolveActiveBrush, activeTimeSchedule, calcBlockIndex, onPaintRange, onTaskListDrop],
   );
 
   const handleRowDragLeave = useCallback((memberId: string, e: React.DragEvent) => {
@@ -719,6 +794,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
       {/* 局員行（grid row 2 以降） */}
       {members.map((member) => {
           const runs = buildRunsForMember(member, activeTimeSchedule, totalBlocks, placementMap);
+          const runLevels = computeRunLevels(runs);
           const previewActive = preview && preview.memberId === member.id;
           const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
           const previewEnd = previewActive ? Math.max(preview.anchorBlock, preview.currentBlock) + 1 : -1;
@@ -779,10 +855,12 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                 })}
 
                 {/* 連結バー（既配置） */}
-                {runs.map((run) => {
+                {runs.map((run, runIdx) => {
+                  const stackLevel = runLevels[runIdx] ?? 0;
                   const color = getTaskColor(run.shift.taskId);
-                  // この run が編集中なら preview を反映
+                  // この run が編集中なら preview を反映（重複バーは編集対象外）
                   const isBeingEdited =
+                    stackLevel === 0 &&
                     editState &&
                     editState.shiftId === run.shift.id &&
                     editState.oldMemberId === member.id &&
@@ -797,7 +875,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                   const end = isBeingEdited && !isMovingToOtherRow ? editState.previewEnd : run.endBlock;
                   const left = start * blockPx;
                   const width = (end - start) * blockPx;
-                  const runUrl = buildRunUrl?.(run.shift.id);
+                  const runUrl = stackLevel === 0 ? buildRunUrl?.(run.shift.id) : undefined;
                   const hasUnavailable = run.unavailableBlocks.length > 0;
                   const hasOutOfRange = run.outOfRangeBlocks.length > 0;
                   const titleParts = [run.shift.taskName];
@@ -806,7 +884,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                   if (hasUnavailable) titleParts.push('（参加不可時間に配置）');
                   const runBar = (
                     <StyledRunBar
-                      key={`${run.shift.id}-${run.startBlock}`}
+                      key={`${run.shift.id}-${run.startBlock}-${stackLevel}`}
                       $left={left}
                       $width={width}
                       $bg={color.bg}
@@ -816,25 +894,30 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                       $isOverlap={run.isOverlap}
                       $isGhost={!!isMovingToOtherRow}
                       $isUnavailable={hasUnavailable}
+                      $stackLevel={stackLevel}
                       title={titleParts.join('')}
-                      onDoubleClick={(e) => handleRunDoubleClick(run, member.id, e)}
-                      onMouseEnter={(e) => handleRunMouseEnter(run, member.id, e)}
-                      onMouseLeave={scheduleHoverLeave}
-                      onPointerDown={(e) => startEdit('move', run, member.id, e)}
-                      onPointerMove={handleEditMove}
-                      onPointerUp={handleEditUp}
-                      onPointerCancel={handleEditCancel}
+                      {...(stackLevel === 0 ? {
+                        onDoubleClick: (e: React.MouseEvent) => handleRunDoubleClick(run, member.id, e as React.MouseEvent<HTMLElement>),
+                        onMouseEnter: (e: React.MouseEvent<HTMLElement>) => handleRunMouseEnter(run, member.id, e),
+                        onMouseLeave: scheduleHoverLeave,
+                        onPointerDown: (e: React.PointerEvent<HTMLElement>) => startEdit('move', run, member.id, e),
+                        onPointerMove: handleEditMove,
+                        onPointerUp: handleEditUp,
+                        onPointerCancel: handleEditCancel,
+                      } : {})}
                     >
-                      <StyledResizeHandle
-                        $side="left"
-                        onPointerDown={(e) => startEdit('resize-L', run, member.id, e)}
-                        onPointerMove={handleEditMove}
-                        onPointerUp={handleEditUp}
-                        onPointerCancel={handleEditCancel}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                      />
+                      {stackLevel === 0 && (
+                        <StyledResizeHandle
+                          $side="left"
+                          onPointerDown={(e) => startEdit('resize-L', run, member.id, e)}
+                          onPointerMove={handleEditMove}
+                          onPointerUp={handleEditUp}
+                          onPointerCancel={handleEditCancel}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                       {/* 参加不可ブロック毎のオーバーレイ（15分粒度） */}
-                      {run.unavailableBlocks.map((b) => (
+                      {stackLevel === 0 && run.unavailableBlocks.map((b) => (
                         <StyledUnavailableBlock
                           key={`ua-${b}`}
                           style={{
@@ -845,7 +928,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                         />
                       ))}
                       {/* タスク時間外ブロック毎のオーバーレイ（15分粒度） */}
-                      {run.outOfRangeBlocks.map((b) => (
+                      {stackLevel === 0 && run.outOfRangeBlocks.map((b) => (
                         <StyledOutOfRangeBlock
                           key={`oor-${b}`}
                           style={{
@@ -856,17 +939,19 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                         />
                       ))}
                       <span className="e-run-label">{run.shift.taskName}</span>
-                      {hasOutOfRange && <span className="e-out-badge" aria-label="タスク時間外に配置">⧗</span>}
-                      {hasUnavailable && <span className="e-unavailable-badge" aria-label="参加不可時間に配置">🚫</span>}
+                      {stackLevel === 0 && hasOutOfRange && <span className="e-out-badge" aria-label="タスク時間外に配置">⧗</span>}
+                      {stackLevel === 0 && hasUnavailable && <span className="e-unavailable-badge" aria-label="参加不可時間に配置">🚫</span>}
                       {run.isOverlap && <span className="e-overlap-badge">!</span>}
-                      <StyledResizeHandle
-                        $side="right"
-                        onPointerDown={(e) => startEdit('resize-R', run, member.id, e)}
-                        onPointerMove={handleEditMove}
-                        onPointerUp={handleEditUp}
-                        onPointerCancel={handleEditCancel}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                      />
+                      {stackLevel === 0 && (
+                        <StyledResizeHandle
+                          $side="right"
+                          onPointerDown={(e) => startEdit('resize-R', run, member.id, e)}
+                          onPointerMove={handleEditMove}
+                          onPointerUp={handleEditUp}
+                          onPointerCancel={handleEditCancel}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        />
+                      )}
                     </StyledRunBar>
                   );
                   return runUrl ? (
@@ -890,6 +975,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
                     $isOverlap={false}
                     $isGhost={false}
                     $isUnavailable={false}
+                    $stackLevel={0}
                     style={{ opacity: 0.65, pointerEvents: 'none' }}
                   >
                     <span className="e-run-label">{editPreviewInThisRow.shift.taskName}</span>
@@ -1072,15 +1158,14 @@ type StyledRunBarProps = React.HTMLAttributes<HTMLDivElement> & {
   $isOverlap: boolean;
   $isGhost: boolean;
   $isUnavailable: boolean;
+  $stackLevel: number;
 };
 
 /** 既配置の連結バー（既配置の単位） */
 const StyledRunBar = styled.div<StyledRunBarProps>`
   position: absolute;
-  top: 2px;
   left: ${(p) => p.$left}px;
   width: ${(p) => p.$width}px;
-  height: ${ROW_HEIGHT - 4}px;
   background: ${(p) => p.$bg};
   border: 1px solid ${(p) => p.$border};
   border-radius: 3px;
@@ -1090,12 +1175,28 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
   padding: 0 6px;
   font-size: 0.78em;
   font-weight: 600;
-  cursor: grab;
   overflow: hidden;
   box-sizing: border-box;
-  z-index: 2;
   user-select: none;
   touch-action: none;
+
+  /* stackLevel 0: 通常バー（フル高さ）。stackLevel 1+: 重複バー（底部に小さく表示） */
+  ${(p) => p.$stackLevel === 0 ? `
+    top: 2px;
+    height: ${ROW_HEIGHT - 4}px;
+    cursor: grab;
+    z-index: 2;
+  ` : `
+    top: ${ROW_HEIGHT - 12}px;
+    height: 10px;
+    cursor: default;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0.85;
+    font-size: 0.72em;
+    padding: 0 4px;
+    border-radius: 2px;
+  `}
 
   ${(p) => p.$isGhost && `
     opacity: 0.35;

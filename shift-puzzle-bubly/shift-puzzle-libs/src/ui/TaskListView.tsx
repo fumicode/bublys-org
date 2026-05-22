@@ -9,12 +9,16 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 /** ガント側がタスク種別のドラッグを判別するためのMIME（ObjectView 'Task' と同一） */
 export const DRAG_TYPE_TASK = 'type/task';
 
+/** タスクリストまとめドラッグ用MIME */
+export const DRAG_TYPE_TASK_LIST = 'type/task-list';
+
 /**
  * モジュール変数: ドラッグ中のtaskId。
  * HTML5 DnD制約（dragover中にgetData不可）を回避するため、
  * ガントView/Editorはこれを直接参照してghost/可否表示に使う。
  */
 export let draggingTaskId: string | null = null;
+
 
 /**
  * モジュール変数: ドラッグ中タスクの日付（'YYYY-MM-DD'）。

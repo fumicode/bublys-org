@@ -30,6 +30,8 @@ import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttVi
 import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingTaskId } from '../ui/TaskListView.js';
 import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
+import { draggingTaskGroups } from './TaskCollection.js';
+import { computeAiPlacements } from './aiShiftPlacement.js';
 import { moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
@@ -69,6 +71,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   /** MemberList ドラッグ中かどうか（ドロップゾーンオーバーレイ表示用） */
   const [isMemberListDragging, setIsMemberListDragging] = useState(false);
+
 
   /** ガントに表示する局員IDのフィルター（null = 全局員） */
   const [filteredMemberIds, setFilteredMemberIds] = useState<string[] | null>(null);
@@ -200,6 +203,25 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }));
   };
 
+  const handleTaskListDrop = () => {
+    if (!draggingTaskGroups || !planTimeSchedules[0]) return;
+    const actions = computeAiPlacements(
+      draggingTaskGroups,
+      planShifts,
+      members,
+      planTimeSchedules[0],
+    );
+    for (const action of actions) {
+      dispatch(addUserToBlockRange({
+        planId: shiftPlanId,
+        shiftId: action.shiftId,
+        startBlock: action.startBlock,
+        endBlock: action.endBlock,
+        userId: action.memberId,
+      }));
+    }
+  };
+
   const handleAssignedRunClick = (shiftId: string) => {
     const shift = planShifts.find((s) => s.id === shiftId);
     if (shift && onAssignedRunOpen) onAssignedRunOpen(shift.id, shift.taskId);
@@ -293,6 +315,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           onMemberClick={onMemberClick}
           buildMemberUrl={buildMemberUrl}
           rowAvailabilityMap={rowAvailabilityMap}
+          onTaskListDrop={handleTaskListDrop}
         />
       </div>
     </StyledEditor>
