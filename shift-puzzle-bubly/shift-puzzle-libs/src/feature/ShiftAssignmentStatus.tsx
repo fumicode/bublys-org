@@ -12,7 +12,7 @@ import {
   ShiftAssignmentStatus as ShiftAssignmentStatusDomain,
 } from '../domain/index.js';
 import { createDefaultTimeSchedules } from '../data/sampleData.js';
-import { TaskAssignmentStatusView } from '../ui/TaskAssignmentStatusView.js';
+import { UnifiedShiftStatusView } from '../ui/UnifiedShiftStatusView.js';
 import { AssignedMembersView } from '../ui/AssignedMembersView.js';
 import { CoverageTetrisView } from '../ui/CoverageTetrisView.js';
 
@@ -130,7 +130,7 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
   }
 
   return (
-    <TaskAssignmentStatusView
+    <UnifiedShiftStatusView
       header={header}
       status={status}
       memberNameMap={memberNameMap}

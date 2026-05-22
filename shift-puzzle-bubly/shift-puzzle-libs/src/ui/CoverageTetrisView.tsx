@@ -2,6 +2,7 @@
 
 import React, { FC } from 'react';
 import styled from 'styled-components';
+import { ObjectView } from '@bublys-org/bubbles-ui';
 import { type BlockCoverage } from '../domain/index.js';
 
 // ========== 型定義 ==========
@@ -16,6 +17,10 @@ export type CoverageTetrisViewProps = {
   density?: 'compact' | 'full';
   /** 右上の「拡大」コールバック（カード時のみ） */
   onExpand?: () => void;
+  /** 配置セルを ObjectView bubbleLink として展開するための URL ビルダー */
+  buildMemberUrl?: (memberId: string) => string;
+  /** 配置セルクリック時のコールバック（メンバーバブル展開用） */
+  onMemberClick?: (memberId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -26,6 +31,8 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
   memberNameMap,
   density = 'compact',
   onExpand,
+  buildMemberUrl,
+  onMemberClick,
 }) => {
   // 表示する最大段数：必要人数 + 実最大超過人数（余剰も可視化）
   const maxCount = blockCoverages.reduce((m, c) => Math.max(m, c.count), 0);
@@ -89,9 +96,22 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
                   width: blockPx,
                   height: rowPx,
                   background: uid ? colorFor(uid) : undefined,
+                  cursor: uid && (buildMemberUrl || onMemberClick) ? 'pointer' : undefined,
                 }}
                 title={uid ? `${memberNameMap.get(uid) ?? uid} @ ${fmt(blockCoverages[bi].minute)}` : undefined}
+                onClick={uid && !buildMemberUrl && onMemberClick ? () => onMemberClick(uid) : undefined}
               >
+                {uid && buildMemberUrl && (
+                  <ObjectView
+                    type="Member"
+                    url={buildMemberUrl(uid)}
+                    label={memberNameMap.get(uid) ?? uid}
+                    draggable
+                    onClick={() => onMemberClick?.(uid)}
+                  >
+                    <span className="tt-cell-overlay" />
+                  </ObjectView>
+                )}
                 {density === 'full' && uid && (
                   <span className="tt-cell-label">{(memberNameMap.get(uid) ?? uid).slice(0, 2)}</span>
                 )}
@@ -215,8 +235,16 @@ const StyledTetris = styled.div<StyledTetrisProps>`
     }
   }
 
+  .tt-cell-overlay {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+
   .tt-cell-label {
     pointer-events: none;
+    position: relative; /* overlay の上に出す */
+    z-index: 1;
   }
 
   .tt-required-line {
