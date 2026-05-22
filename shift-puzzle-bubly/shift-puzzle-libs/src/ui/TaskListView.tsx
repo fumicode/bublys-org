@@ -63,8 +63,11 @@ export const TaskListView: FC<TaskListViewProps> = ({
               className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
               onDragStart={() => {
                 draggingTaskId = taskId;
-                // 全シフトが同一日付の場合のみ draggingDate をセット（dayTypeフィルター適用時）
-                const dateSet = new Set(shifts.map(s => s.state.date).filter((d): d is string => !!d));
+                // activeDayType で絞り込むことで、GroupedTask.shifts が複数日を含む場合も単一日付を確定できる
+                const relevantShifts = activeDayType
+                  ? shifts.filter((s) => s.dayType === activeDayType)
+                  : shifts;
+                const dateSet = new Set(relevantShifts.map(s => s.state.date).filter((d): d is string => !!d));
                 draggingDate = dateSet.size === 1 ? (dateSet.values().next().value as string) : null;
               }}
               onDragEnd={() => {
