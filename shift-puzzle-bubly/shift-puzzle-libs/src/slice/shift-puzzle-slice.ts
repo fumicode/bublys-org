@@ -6,7 +6,12 @@ import { rootReducer, type RootState } from "@bublys-org/state-management";
 import {
   Member,
   type MemberState,
+  ShiftPreference,
+  type ShiftPreferenceState,
 } from "@bublys-org/shift-puzzle-model";
+
+export { ShiftPreference };
+export type { ShiftPreferenceState };
 
 // Re-export for convenience
 export { Member };
@@ -36,11 +41,13 @@ export {
 type ShiftPuzzleMemberState = {
   memberList: MemberState[];
   selectedMemberId: string | null;
+  shiftPreferences: ShiftPreferenceState[];
 };
 
 const initialState: ShiftPuzzleMemberState = {
   memberList: [],
   selectedMemberId: null,
+  shiftPreferences: [],
 };
 
 // ========== 内部ユーティリティ ==========
@@ -80,6 +87,21 @@ export const shiftPuzzleSlice = createSlice({
     setSelectedMemberId: (state, action: PayloadAction<string | null>) => {
       state.selectedMemberId = action.payload;
     },
+    setShiftPreference: (state, action: PayloadAction<ShiftPreferenceState>) => {
+      const cloned = {
+        ...action.payload,
+        entries: action.payload.entries.map((e) => ({ ...e, availableRanges: [...e.availableRanges] })),
+      };
+      const idx = state.shiftPreferences.findIndex((p) => p.memberId === cloned.memberId);
+      if (idx >= 0) {
+        state.shiftPreferences[idx] = cloned;
+      } else {
+        state.shiftPreferences.push(cloned);
+      }
+    },
+    removeShiftPreference: (state, action: PayloadAction<string /* memberId */>) => {
+      state.shiftPreferences = state.shiftPreferences.filter((p) => p.memberId !== action.payload);
+    },
   },
 });
 
@@ -89,6 +111,8 @@ export const {
   updateMember,
   deleteMember,
   setSelectedMemberId,
+  setShiftPreference,
+  removeShiftPreference,
 } = shiftPuzzleSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加
@@ -137,3 +161,10 @@ export const selectShiftPuzzleSelectedMember = createSelector(
     return memberState ? new Member(memberState) : undefined;
   }
 );
+
+/** メンバーIDでシフト希望を取得（ドメインオブジェクト） */
+export const selectShiftPreferenceByMemberId = (memberId: string) =>
+  (state: StateWithShiftPuzzle): ShiftPreference | undefined => {
+    const found = (state.shiftPuzzle?.shiftPreferences ?? []).find((p) => p.memberId === memberId);
+    return found ? new ShiftPreference(found) : undefined;
+  };

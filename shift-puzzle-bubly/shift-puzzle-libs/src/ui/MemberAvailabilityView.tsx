@@ -2,7 +2,7 @@
 
 import { FC, useMemo } from "react";
 import styled from "styled-components";
-import { Member, Shift, TimeSchedule, type DayType } from "../domain/index.js";
+import { Member, Shift, TimeSchedule, ShiftPreference, type DayType } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { DAY_TYPE_ORDER } from "../data/sampleData.js";
@@ -13,6 +13,8 @@ type MemberAvailabilityViewProps = {
   member: Member;
   shifts: readonly Shift[];
   timeSchedules: readonly TimeSchedule[];
+  /** 局員が提出したシフト希望。あればPreferenceベースで表示、なければMember.availabilityにフォールバック */
+  shiftPreference?: ShiftPreference;
 };
 
 /** 1ブロックの状態 */
@@ -34,10 +36,18 @@ function computeLanes(
   member: Member,
   shifts: readonly Shift[],
   timeSchedules: readonly TimeSchedule[],
+  shiftPreference?: ShiftPreference,
 ): DayTypeLane[] {
   const lanes: DayTypeLane[] = [];
 
-  for (const dayType of DAY_TYPE_ORDER) {
+  // 表示対象 dayType の決定：
+  //   希望あり → 提出されたエントリーの dayType 順
+  //   希望なし → DAY_TYPE_ORDER（フォールバック）
+  const targetDayTypes: readonly DayType[] = shiftPreference
+    ? shiftPreference.entries.map((e) => e.dayType)
+    : DAY_TYPE_ORDER;
+
+  for (const dayType of targetDayTypes) {
     const ts = timeSchedules.find((t) => t.dayType === dayType);
     if (!ts) continue;
 
@@ -46,10 +56,13 @@ function computeLanes(
       .fill(null)
       .map(() => ({ kind: 'unavailable' as const }));
 
-    // Step 1: DayType 全ブロックを走査し、member.isAvailableAt で参加可能ブロックを "free" に
+    // Step 1: 可用性判定（希望ありなら preference、なければ member.availability）
     for (let b = 0; b < totalBlocks; b++) {
       const minute = ts.startMinute + b * 15;
-      if (member.isAvailableAt(dayType, minute)) {
+      const isAvailable = shiftPreference
+        ? shiftPreference.isAvailableAt(dayType, minute)
+        : member.isAvailableAt(dayType, minute);
+      if (isAvailable) {
         blocks[b] = { kind: 'free' };
       }
     }
@@ -92,10 +105,11 @@ export const MemberAvailabilityView: FC<MemberAvailabilityViewProps> = ({
   member,
   shifts,
   timeSchedules,
+  shiftPreference,
 }) => {
   const lanes = useMemo(
-    () => computeLanes(member, shifts, timeSchedules),
-    [member, shifts, timeSchedules],
+    () => computeLanes(member, shifts, timeSchedules, shiftPreference),
+    [member, shifts, timeSchedules, shiftPreference],
   );
 
   const availableMinutes = lanes.reduce(
@@ -129,6 +143,11 @@ export const MemberAvailabilityView: FC<MemberAvailabilityViewProps> = ({
           </h3>
         </ObjectView>
         <span className="mv-dept">{member.department}</span>
+        {shiftPreference ? (
+          <span className="mv-badge mv-badge--submitted">希望提出済</span>
+        ) : (
+          <span className="mv-badge mv-badge--not-submitted">希望未提出</span>
+        )}
       </header>
 
       <div className="mv-stats">
@@ -313,6 +332,14 @@ const StyledContainer = styled.div`
     &--new {
       background: #ffe082;
       color: #6d4c00;
+    }
+    &--submitted {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+    &--not-submitted {
+      background: #fce4ec;
+      color: #880e4f;
     }
   }
   .mv-dept {

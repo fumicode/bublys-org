@@ -24,3 +24,4 @@ export * from './shift-plan/ShiftMatcher.js';
 export * from './shift-plan/ShiftEvaluation.js';
 export * from './shift-plan/MemberAssignmentEvaluation.js';
 export * from './shift-plan/ShiftAssignmentStatus.js';
+export * from './shift-plan/ShiftPreference.js';

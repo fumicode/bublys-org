@@ -7,6 +7,7 @@ import {
   selectShiftPuzzlePlanById,
   selectShiftPuzzleCurrentPlan,
   selectShiftPuzzlePlans,
+  selectShiftPreferenceByMemberId,
 } from "../slice/index.js";
 import { MemberAvailabilityView } from "../ui/MemberAvailabilityView.js";
 import { createDefaultShifts, createDefaultTimeSchedules } from "../data/sampleData.js";
@@ -20,24 +21,39 @@ type MemberAvailabilityProps = {
 
 export const MemberAvailability: FC<MemberAvailabilityProps> = ({ memberId, shiftPlanId }) => {
   const memberList = useAppSelector(selectShiftPuzzleMemberList);
+  const allPlans = useAppSelector(selectShiftPuzzlePlans);
+  const shiftPreference = useAppSelector(selectShiftPreferenceByMemberId(memberId));
+
+  // shiftPlanId が指定されていれば参照用に取得（表示対象は全プラン）
   const explicitPlan = useAppSelector(
     shiftPlanId ? selectShiftPuzzlePlanById(shiftPlanId) : () => undefined,
   );
   const currentPlan = useAppSelector(selectShiftPuzzleCurrentPlan);
-  const allPlans = useAppSelector(selectShiftPuzzlePlans);
 
   const member = memberList.find((m) => m.id === memberId);
 
-  const plan = explicitPlan ?? currentPlan ?? allPlans[0];
-
-  // プランに紐づく shifts / timeSchedules（無ければサンプルデータにフォールバック）
   const fallbackShifts = useMemo(() => createDefaultShifts(), []);
   const fallbackTimeSchedules = useMemo(() => createDefaultTimeSchedules(), []);
 
-  const shifts: readonly Shift[] =
-    plan && plan.shifts.length > 0 ? plan.shifts : fallbackShifts;
+  // 全プランの shifts を結合して全日程の配置状況を渡す
+  const allShifts = useMemo(
+    () => allPlans.flatMap((p) => p.shifts),
+    [allPlans],
+  );
+  const allTimeSchedules = useMemo(() => {
+    const seen = new Map<string, TimeSchedule>();
+    allPlans.flatMap((p) => p.timeSchedules).forEach((ts) => seen.set(ts.id, ts));
+    return Array.from(seen.values());
+  }, [allPlans]);
+
+  // shiftPlanId 指定時はそのプランのTimeScheduleを優先（フォールバック用）
+  const refPlan = explicitPlan ?? currentPlan ?? allPlans[0];
+
+  const shifts: readonly Shift[] = allShifts.length > 0 ? allShifts : fallbackShifts;
   const timeSchedules: readonly TimeSchedule[] =
-    plan && plan.timeSchedules.length > 0 ? plan.timeSchedules : fallbackTimeSchedules;
+    allTimeSchedules.length > 0
+      ? allTimeSchedules
+      : (refPlan?.timeSchedules.length ? refPlan.timeSchedules : fallbackTimeSchedules);
 
   if (!member) {
     return <div>局員が見つかりません</div>;
@@ -48,6 +64,7 @@ export const MemberAvailability: FC<MemberAvailabilityProps> = ({ memberId, shif
       member={member}
       shifts={shifts}
       timeSchedules={timeSchedules}
+      shiftPreference={shiftPreference}
     />
   );
 };
