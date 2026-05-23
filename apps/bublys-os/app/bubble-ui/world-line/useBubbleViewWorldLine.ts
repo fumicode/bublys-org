@@ -68,11 +68,25 @@ export function useBubbleViewWorldLine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apexId]);
 
+  // 各ノードの arrangement を要約（WorldLineView のノードラベル用）
+  const summarizeNode = (nodeId: string): string => {
+    const v = scope.getObjectAt<BubbleViewState>(
+      nodeId,
+      BUBBLE_VIEW_TYPE,
+      BUBBLE_VIEW_ID,
+    );
+    if (!v) return "";
+    const count = Object.keys(v.bubbles ?? {}).length;
+    return `${count}`;
+  };
+
   return {
     moveBack: scope.moveBack,
     moveForward: scope.moveForward,
+    moveTo: scope.moveTo,
     canUndo: scope.canUndo,
     canRedo: scope.canRedo,
     graph: scope.graph,
+    summarizeNode,
   };
 }

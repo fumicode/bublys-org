@@ -80,6 +80,9 @@
     },
     {
       "path": "./sekaisen-igo-bubly/sekaisen-igo-app"
+    },
+    {
+      "path": "./shift-puzzle-bubly/shift-puzzle-model"
     }
   ]
 }
