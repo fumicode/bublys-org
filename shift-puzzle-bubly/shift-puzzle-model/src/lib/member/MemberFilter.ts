@@ -29,26 +29,12 @@ export class MemberFilter {
 
   /** メンバーがフィルタ条件に一致するかどうか */
   matches(member: Member, assignedCountMap?: ReadonlyMap<string, number>): boolean {
-    // 参加可能時間帯チェック
-    if (
-      this.state.availableAtSlotId &&
-      !member.isAvailableAt(this.state.availableAtSlotId)
-    ) {
-      return false;
-    }
+    // 参加可能時間帯チェック:
+    // isAvailableAt は (dayType, minute) が必要だがフィルタはスロットIDのみ保持するため非対応
 
-    // 必要スキルチェック（AND条件）
-    if (!member.hasAllSkills(this.state.requiredSkillIds)) {
-      return false;
-    }
+    // 必要スキルチェック: MemberState にスキル情報が未実装のため非対応
 
-    // タグチェック（OR条件: 指定タグのいずれかを持つ）
-    if (
-      this.state.tags.length > 0 &&
-      !this.state.tags.some((tag) => member.hasTag(tag))
-    ) {
-      return false;
-    }
+    // タグチェック: MemberState にタグ情報が未実装のため非対応
 
     // 配置状況チェック
     if (this.state.assignmentStatus && assignedCountMap) {

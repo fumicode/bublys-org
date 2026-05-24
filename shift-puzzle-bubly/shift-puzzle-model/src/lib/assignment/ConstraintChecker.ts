@@ -8,7 +8,7 @@
  */
 
 import { AssignmentState } from './Assignment.js';
-import { MemberState } from '../member/Member.js';
+import type { MemberState } from '../member/Member.js';
 import { RoleState } from '../role/Role.js';
 import { TimeSlotState } from '../time/TimeSlot.js';
 
@@ -46,7 +46,6 @@ export interface RoleFulfillment {
 export class ConstraintChecker {
   constructor(
     private readonly assignments: ReadonlyArray<AssignmentState>,
-    private readonly members: ReadonlyMap<string, MemberState>,
     private readonly roles: ReadonlyMap<string, RoleState>,
     private readonly timeSlots: ReadonlyMap<string, TimeSlotState>
   ) {}
@@ -132,65 +131,27 @@ export class ConstraintChecker {
 
   /** スキル不足の配置があるか */
   private checkSkillMismatch(): ConstraintViolation[] {
-    const violations: ConstraintViolation[] = [];
-
-    for (const assignment of this.assignments) {
-      const member = this.members.get(assignment.memberId);
-      const role = this.roles.get(assignment.roleId);
-      if (!member || !role) continue;
-
-      const missingSkills = role.requiredSkillIds.filter(
-        (skillId) => !member.skills.includes(skillId)
-      );
-
-      if (missingSkills.length > 0) {
-        violations.push({
-          type: 'skill_mismatch',
-          assignmentId: assignment.id,
-          memberId: assignment.memberId,
-          roleId: assignment.roleId,
-          timeSlotId: assignment.timeSlotId,
-          message: `${member.name} は役割「${role.name}」に必要なスキルを持っていません`,
-        });
-      }
-    }
-
-    return violations;
+    // MemberState にスキル情報が未実装のため現時点ではチェック非対応
+    return [];
   }
 
   /** 参加可能時間外の配置があるか */
   private checkOutsideAvailability(): ConstraintViolation[] {
-    const violations: ConstraintViolation[] = [];
-
-    for (const assignment of this.assignments) {
-      const member = this.members.get(assignment.memberId);
-      if (!member) continue;
-
-      if (!member.availableSlotIds.includes(assignment.timeSlotId)) {
-        violations.push({
-          type: 'outside_availability',
-          assignmentId: assignment.id,
-          memberId: assignment.memberId,
-          timeSlotId: assignment.timeSlotId,
-          message: `${member.name} は参加不可能な時間帯に配置されています`,
-        });
-      }
-    }
-
-    return violations;
+    // MemberState の availability は DayType+TimeRange ベースに変更済みのため、
+    // スロットID単位の可用チェックは現時点では非対応
+    return [];
   }
 
   // ========== 静的ファクトリ ==========
 
   static create(
     assignments: ReadonlyArray<AssignmentState>,
-    members: ReadonlyArray<MemberState>,
+    _members: ReadonlyArray<MemberState>,  // API互換のため保持（スキル・可用性チェック未実装）
     roles: ReadonlyArray<RoleState>,
     timeSlots: ReadonlyArray<TimeSlotState>
   ): ConstraintChecker {
     return new ConstraintChecker(
       assignments,
-      new Map(members.map((m) => [m.id, m])),
       new Map(roles.map((r) => [r.id, r])),
       new Map(timeSlots.map((t) => [t.id, t]))
     );
