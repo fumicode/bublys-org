@@ -28,11 +28,15 @@ export interface BlockCoverage {
   readonly blockIndex: number;
   /** そのブロックの絶対時刻（分） */
   readonly minute: number;
-  /** 配置されている局員ID群 */
+  /** 配置されている局員ID群（エラーメンバー含む） */
   readonly userIds: readonly string[];
-  /** 配置人数 */
+  /** 配置人数（エラー含む） */
   readonly count: number;
-  /** requiredCount に対する不足数（正: 不足, 0: 充足, 負: 超過） */
+  /** 配置エラーのあるメンバーID群 */
+  readonly errorUserIds: readonly string[];
+  /** エラーを除いた有効な配置人数 */
+  readonly validCount: number;
+  /** requiredCount に対する不足数（validCount基準）（正: 不足, 0: 充足, 負: 超過） */
   readonly shortage: number;
 }
 
@@ -81,7 +85,9 @@ export interface ShiftAssignmentStatusState {
   readonly memberSummaries: readonly MemberAssignmentSummary[];
   /** Shift 単位の違反（noLeader 等、メンバー個別でない違反） */
   readonly shiftViolations: readonly AssignmentViolation[];
-  /** 全ブロック中で必要人数を満たしているブロックの割合（0-100） */
+  /** 配置エラー（非スタブ違反）のあるメンバーID群 */
+  readonly violatingMemberIds: readonly string[];
+  /** 全ブロック中で必要人数（validCount基準）を満たしているブロックの割合（0-100） */
   readonly fulfillmentRate: number;
 }
 
@@ -125,6 +131,7 @@ export class ShiftAssignmentStatus {
   get blockCoverages(): readonly BlockCoverage[] { return this.state.blockCoverages; }
   get memberSummaries(): readonly MemberAssignmentSummary[] { return this.state.memberSummaries; }
   get shiftViolations(): readonly AssignmentViolation[] { return this.state.shiftViolations; }
+  get violatingMemberIds(): readonly string[] { return this.state.violatingMemberIds; }
   get fulfillmentRate(): number { return this.state.fulfillmentRate; }
 
   /**
@@ -144,42 +151,55 @@ export class ShiftAssignmentStatus {
   ): ShiftAssignmentStatus {
     const memberById = new Map(members.map((m) => [m.id, m]));
     const validRange = shift.validBlockRange({ startMinute: timeSchedule.startMinute });
-
-    // ---- BlockCoverage: shift の有効範囲のみを対象に集計 ----
-    const blockCoverages: BlockCoverage[] = [];
     const bl = shift.blockList;
+    const assignedIds = shift.getAssignedUserIds();
+
+    // ---- 第1パス: violations を先に計算して violatingSet を構築 ----
+    type MemberData = { runs: MemberRun[]; violations: AssignmentViolation[] };
+    const memberDataMap = new Map<string, MemberData>();
+    for (const uid of assignedIds) {
+      const member = memberById.get(uid);
+      const blocks = bl.getBlocksForUser(uid);
+      const runs = blocksToRuns(blocks, timeSchedule.startMinute);
+      const violations = computeMemberViolations(
+        member, shift, runs, allShifts, memberById, allTimeSchedules,
+      );
+      memberDataMap.set(uid, { runs, violations });
+    }
+    // 非スタブ違反があるメンバーは「エラー」扱い
+    const violatingSet = new Set<string>();
+    for (const [uid, data] of memberDataMap) {
+      if (data.violations.some((v) => !v.isStub)) violatingSet.add(uid);
+    }
+
+    // ---- BlockCoverage: validCount / errorUserIds を付加 ----
+    const blockCoverages: BlockCoverage[] = [];
     for (let b = validRange.start; b < validRange.end; b++) {
       const userIds = bl.getUsersAt(b);
+      const errorUserIds = userIds.filter((uid) => violatingSet.has(uid));
+      const validCount = userIds.length - errorUserIds.length;
       blockCoverages.push({
         blockIndex: b,
         minute: timeSchedule.startMinute + b * 15,
         userIds: [...userIds],
         count: userIds.length,
-        shortage: shift.requiredCount - userIds.length,
+        errorUserIds: [...errorUserIds],
+        validCount,
+        shortage: shift.requiredCount - validCount,
       });
     }
 
-    // ---- Member毎のrun + 違反 ----
-    const assignedIds = shift.getAssignedUserIds();
+    // ---- MemberSummaries ----
     const memberSummaries: MemberAssignmentSummary[] = assignedIds.map((uid) => {
       const member = memberById.get(uid);
-      const blocks = bl.getBlocksForUser(uid);
-      const runs = blocksToRuns(blocks, timeSchedule.startMinute);
-      const violations = computeMemberViolations(
-        member,
-        shift,
-        runs,
-        allShifts,
-        memberById,
-        allTimeSchedules,
-      );
+      const data = memberDataMap.get(uid)!;
       return {
         memberId: uid,
         memberName: member?.name ?? uid,
         department: member?.department ?? '',
         isNewMember: member?.isNewMember ?? false,
-        runs,
-        violations,
+        runs: data.runs,
+        violations: data.violations,
       };
     });
 
@@ -193,8 +213,8 @@ export class ShiftAssignmentStatus {
       });
     }
 
-    // ---- 充足率 ----
-    const satisfied = blockCoverages.filter((c) => c.shortage <= 0).length;
+    // ---- 充足率（validCount基準） ----
+    const satisfied = blockCoverages.filter((c) => c.validCount >= shift.requiredCount).length;
     const fulfillmentRate = blockCoverages.length > 0
       ? (satisfied / blockCoverages.length) * 100
       : 100;
@@ -206,6 +226,7 @@ export class ShiftAssignmentStatus {
       blockCoverages,
       memberSummaries,
       shiftViolations,
+      violatingMemberIds: [...violatingSet],
       fulfillmentRate,
     });
   }
