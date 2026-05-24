@@ -1,7 +1,8 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, useMemo } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { useAppSelector } from "@bublys-org/state-management";
 import {
   MemberCollection,
   parseMemberFilter,
@@ -24,6 +25,7 @@ import {
   ShiftStatus,
   parseTaskFilter,
   stringifyTaskFilter,
+  selectShiftPuzzlePlans,
   type DayType,
 } from "@bublys-org/shift-puzzle-libs";
 
@@ -212,8 +214,10 @@ const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   };
 
   const handleOpenTaskList = () => {
-    const query = initialDayType ? stringifyTaskFilter({ dayTypes: [initialDayType] }) : '';
-    openBubble(`shift-puzzle/tasks${query}`, bubble.id, 'bubble-side');
+    const params = new URLSearchParams();
+    if (initialDayType) params.set('dayTypes', initialDayType);
+    params.set('shiftPlanId', shiftPlanId);
+    openBubble(`shift-puzzle/tasks?${params.toString()}`, bubble.id, 'bubble-side');
   };
 
   const handleTableView = () => {
@@ -371,20 +375,59 @@ const ShiftPuzzleTasksBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
   const queryIndex = bubble.url.indexOf('?');
   const query = queryIndex >= 0 ? bubble.url.slice(queryIndex + 1) : '';
-  const filter = parseTaskFilter(query);
+  const shiftPlanId = new URLSearchParams(query).get('shiftPlanId') ?? undefined;
+  const filter = parseTaskFilter(query); // shiftPlanId は parseTaskFilter に無視される
 
   const handleTaskSelect = (taskId: string) => {
-    openBubble(`shift-puzzle/tasks/${taskId}`, bubble.id);
+    const suffix = shiftPlanId ? `?shiftPlanId=${shiftPlanId}` : '';
+    openBubble(`shift-puzzle/tasks/${taskId}${suffix}`, bubble.id);
   };
 
   return (
-    <TaskCollection filter={filter} onTaskSelect={handleTaskSelect} />
+    <TaskCollection filter={filter} shiftPlanId={shiftPlanId} onTaskSelect={handleTaskSelect} />
   );
 };
 
 // シフトパズル - タスク詳細バブル
 const ShiftPuzzleTaskBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <TaskDetail taskId={bubble.params.taskId} />;
+  const { openBubble } = useContext(BubblesContext);
+  const plans = useAppSelector(selectShiftPuzzlePlans);
+
+  // shiftId → planId の逆引きマップ（全プランを検索、複数プランに同じshiftがある場合は最初のプランを優先）
+  const shiftToPlanId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const plan of plans) {
+      for (const shift of plan.shifts) {
+        if (!map.has(shift.id)) map.set(shift.id, plan.id);
+      }
+    }
+    return map;
+  }, [plans]);
+
+  const buildStatusUrl = (shiftId: string) => {
+    const planId = shiftToPlanId.get(shiftId);
+    return planId
+      ? `shift-puzzle/shift-plans/${planId}/shifts/${shiftId}/status`
+      : undefined;
+  };
+
+  const handleSlotClick = (shiftId: string) => {
+    const planId = shiftToPlanId.get(shiftId);
+    if (!planId) return;
+    openBubble(
+      `shift-puzzle/shift-plans/${planId}/shifts/${shiftId}/status`,
+      bubble.id,
+      'origin-side',
+    );
+  };
+
+  return (
+    <TaskDetail
+      taskId={bubble.params.taskId}
+      buildStatusUrl={buildStatusUrl}
+      onSlotClick={handleSlotClick}
+    />
+  );
 };
 
 // シフトパズル - 世界線履歴バブル

@@ -19,12 +19,21 @@ export type TaskScheduleEntry = {
 type TaskDetailViewProps = {
   task: Task;
   scheduleEntries: TaskScheduleEntry[];
+  /** シフトIDからshift-statusバブルURLを生成（planが見つからない場合はundefined） */
+  buildStatusUrl?: (shiftId: string) => string | undefined;
+  /** 配置状況バブルを開くコールバック */
+  onSlotClick?: (shiftId: string) => void;
 };
 
 /** dayTypeの表示順 */
 const DAY_TYPE_ORDER = ["準準備日", "準備日", "1日目", "2日目", "片付け日"] as const;
 
-export const TaskDetailView: FC<TaskDetailViewProps> = ({ task, scheduleEntries }) => {
+export const TaskDetailView: FC<TaskDetailViewProps> = ({
+  task,
+  scheduleEntries,
+  buildStatusUrl,
+  onSlotClick,
+}) => {
   // dayTypeごとにグループ化
   const groupedByDay = DAY_TYPE_ORDER.reduce<Record<string, TaskScheduleEntry[]>>(
     (acc, day) => {
@@ -77,17 +86,35 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({ task, scheduleEntries 
               <div key={day} className="e-day-group">
                 <div className="e-day-label">{day}</div>
                 <div className="e-slots">
-                  {groupedByDay[day].map((entry) => (
-                    <div key={entry.shiftId} className="e-slot-row">
-                      <span className="e-slot-label">{entry.slotLabel}</span>
-                      <span className="e-count">
-                        必要人数: <strong>{entry.requiredCount}名</strong>
-                        <span className="e-count-range">
-                          ({entry.minCount}〜{entry.maxCount}名)
+                  {groupedByDay[day].map((entry) => {
+                    const statusUrl = buildStatusUrl?.(entry.shiftId);
+                    const inner = (
+                      <div className={`e-slot-row${statusUrl ? ' e-slot-row--clickable' : ''}`}>
+                        <span className="e-slot-label">{entry.slotLabel}</span>
+                        <span className="e-count">
+                          必要人数: <strong>{entry.requiredCount}名</strong>
+                          <span className="e-count-range">
+                            ({entry.minCount}〜{entry.maxCount}名)
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                  ))}
+                      </div>
+                    );
+                    return statusUrl ? (
+                      <ObjectView
+                        key={entry.shiftId}
+                        type="ShiftStatus"
+                        url={statusUrl}
+                        label={entry.slotLabel}
+                        draggable
+                        fullWidth
+                        onClick={() => onSlotClick?.(entry.shiftId)}
+                      >
+                        {inner}
+                      </ObjectView>
+                    ) : (
+                      <div key={entry.shiftId}>{inner}</div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -200,7 +227,15 @@ const StyledTaskDetail = styled.div`
     &:not(:last-child) {
       border-bottom: 1px solid #f5f5f5;
     }
+
+    &--clickable {
+      cursor: pointer;
+      &:hover {
+        background: #fff8e1;
+      }
+    }
   }
+
 
   .e-slot-label {
     color: #333;
