@@ -4,6 +4,8 @@ import { FC } from 'react';
 import styled from 'styled-components';
 import { type TaskAssignmentStatusViewProps } from './TaskAssignmentStatusView.js';
 import { CoverageTetrisView } from './CoverageTetrisView.js';
+import { ObjectView } from '@bublys-org/bubbles-ui';
+import { setDraggingTaskId } from './TaskListView.js';
 
 export type UnifiedShiftStatusViewProps = TaskAssignmentStatusViewProps;
 
@@ -13,15 +15,39 @@ export const UnifiedShiftStatusView: FC<UnifiedShiftStatusViewProps> = ({
   memberNameMap,
   buildMemberUrl,
   onMemberClick,
+  onTaskSelect,
 }) => {
   const rate = Math.round(status.fulfillmentRate);
   const rateColor = rate >= 100 ? '#2e7d32' : rate >= 60 ? '#ef6c00' : '#c62828';
+
+  const memberViolations = new Map<string, readonly string[]>();
+  for (const s of status.memberSummaries) {
+    const msgs = s.violations.filter((v) => !v.isStub).map((v) => v.message);
+    if (msgs.length > 0) memberViolations.set(s.memberId, msgs);
+  }
 
   return (
     <StyledUnified>
       <header className="us-header">
         <div className="us-header-main">
-          <h3 className="us-task">{header.taskName}</h3>
+          <div
+            className="us-task-drag"
+            onDragStart={() => {
+              setDraggingTaskId(header.taskId);
+              onTaskSelect?.(header.taskId);
+            }}
+            onDragEnd={() => setDraggingTaskId(null)}
+          >
+            <ObjectView
+              type="Task"
+              url={`shift-puzzle/tasks/${header.taskId}`}
+              label={header.taskName}
+              draggable
+              onClick={() => onTaskSelect?.(header.taskId)}
+            >
+              <h3 className="us-task">{header.taskName}</h3>
+            </ObjectView>
+          </div>
           <span className="us-meta">
             {header.dayType} · {header.startTime}–{header.endTime}
           </span>
@@ -54,6 +80,7 @@ export const UnifiedShiftStatusView: FC<UnifiedShiftStatusViewProps> = ({
         density="full"
         buildMemberUrl={buildMemberUrl}
         onMemberClick={onMemberClick}
+        memberViolations={memberViolations}
       />
     </StyledUnified>
   );
@@ -80,6 +107,10 @@ const StyledUnified = styled.div`
     align-items: baseline;
     gap: 10px;
     flex-wrap: wrap;
+  }
+  .us-task-drag {
+    cursor: grab;
+    &:active { cursor: grabbing; }
   }
   .us-task {
     margin: 0;

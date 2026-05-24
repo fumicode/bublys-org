@@ -19,6 +19,9 @@ export const DRAG_TYPE_TASK_LIST = 'type/task-list';
  */
 export let draggingTaskId: string | null = null;
 
+export function setDraggingTaskId(id: string | null): void {
+  draggingTaskId = id;
+}
 
 /**
  * モジュール変数: ドラッグ中タスクの日付（'YYYY-MM-DD'）。
@@ -40,6 +43,7 @@ type TaskListViewProps = {
   selectedTaskId?: string | null;
   buildDetailUrl: (taskId: string) => string;
   onTaskClick?: (taskId: string) => void;
+  onTaskDragStart?: (taskId: string) => void;
   activeDayType?: string;
 };
 
@@ -48,6 +52,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
   selectedTaskId,
   buildDetailUrl,
   onTaskClick,
+  onTaskDragStart,
   activeDayType,
 }) => {
   return (
@@ -67,6 +72,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
               className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
               onDragStart={() => {
                 draggingTaskId = taskId;
+                onTaskDragStart?.(taskId);
                 // activeDayType で絞り込むことで、GroupedTask.shifts が複数日を含む場合も単一日付を確定できる
                 const relevantShifts = activeDayType
                   ? shifts.filter((s) => s.dayType === activeDayType)

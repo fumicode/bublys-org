@@ -136,11 +136,15 @@ function describeTaskFilter(filter: TaskFilterCriteria): string {
 type TaskCollectionProps = {
   filter?: TaskFilterCriteria;
   onTaskSelect?: (taskId: string) => void;
+  /** shift-status リンクを生成するための shift plan ID */
+  shiftPlanId?: string;
 };
 
-const buildDetailUrl = (taskId: string) => `shift-puzzle/tasks/${taskId}`;
-
-export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSelect }) => {
+export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSelect, shiftPlanId }) => {
+  const buildDetailUrl = (taskId: string) =>
+    shiftPlanId
+      ? `shift-puzzle/tasks/${taskId}?shiftPlanId=${shiftPlanId}`
+      : `shift-puzzle/tasks/${taskId}`;
   const dispatch = useAppDispatch();
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
   const { openBubble } = useContext(BubblesContext);
@@ -249,6 +253,7 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSel
         selectedTaskId={selectedTaskId}
         buildDetailUrl={buildDetailUrl}
         onTaskClick={handleTaskClick}
+        onTaskDragStart={(taskId) => dispatch(setSelectedTaskId(taskId))}
         activeDayType={activeDayType}
       />
     </StyledContainer>

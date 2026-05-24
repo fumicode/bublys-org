@@ -1,11 +1,12 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
-import { useAppSelector } from '@bublys-org/state-management';
+import { useAppSelector, useAppDispatch } from '@bublys-org/state-management';
 import {
   selectShiftPuzzleMemberList,
   selectShiftPuzzlePlanById,
+  setSelectedTaskId,
 } from '../slice/index.js';
 import {
   Shift,
@@ -47,8 +48,13 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
   onMemberClick,
   onAvailabilityClick,
 }) => {
+  const dispatch = useAppDispatch();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const plan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
+
+  const handleTaskSelect = useCallback((taskId: string) => {
+    dispatch(setSelectedTaskId(taskId));
+  }, [dispatch]);
 
   // TimeSchedule群はマスター扱い（ShiftPlan に保存されたものがあればそれを使う）
   const fallbackTimeSchedules = useMemo(() => createDefaultTimeSchedules(), []);
@@ -91,6 +97,7 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
 
   const { shift, status, memberNameMap } = computed;
   const header = {
+    taskId: shift.taskId,
     taskName: shift.taskName,
     dayType: shift.dayType,
     startTime: shift.startTime,
@@ -116,6 +123,11 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
   }
 
   if (variant === 'coverage-only') {
+    const memberViolations = new Map<string, readonly string[]>();
+    for (const s of status.memberSummaries) {
+      const msgs = s.violations.filter((v) => !v.isStub).map((v) => v.message);
+      if (msgs.length > 0) memberViolations.set(s.memberId, msgs);
+    }
     return (
       <StyledSingle>
         <SingleHeader shift={shift} status={status} />
@@ -124,6 +136,7 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
           requiredCount={status.requiredCount}
           memberNameMap={memberNameMap}
           density="full"
+          memberViolations={memberViolations}
         />
       </StyledSingle>
     );
@@ -140,6 +153,7 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
       buildMemberAvailabilityUrl={buildMemberAvailabilityUrl}
       onMemberClick={onMemberClick}
       onAvailabilityClick={onAvailabilityClick}
+      onTaskSelect={handleTaskSelect}
     />
   );
 };

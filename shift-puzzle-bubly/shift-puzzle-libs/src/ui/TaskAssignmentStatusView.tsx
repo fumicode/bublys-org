@@ -7,12 +7,15 @@ import {
 } from '../domain/index.js';
 import { AssignedMembersView } from './AssignedMembersView.js';
 import { CoverageTetrisView } from './CoverageTetrisView.js';
+import { ObjectView } from '@bublys-org/bubbles-ui';
+import { setDraggingTaskId } from './TaskListView.js';
 
 // ========== 型定義 ==========
 
 export type TaskAssignmentStatusViewProps = {
   /** Shift表示用のヘッダ情報 */
   header: {
+    taskId: string;
     taskName: string;
     dayType: string;
     startTime: string;
@@ -29,6 +32,8 @@ export type TaskAssignmentStatusViewProps = {
   buildMemberAvailabilityUrl?: (memberId: string) => string;
   onMemberClick?: (memberId: string) => void;
   onAvailabilityClick?: (memberId: string) => void;
+  /** タスク名クリック時のコールバック（ブラシ選択用） */
+  onTaskSelect?: (taskId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -43,6 +48,7 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
   buildMemberAvailabilityUrl,
   onMemberClick,
   onAvailabilityClick,
+  onTaskSelect,
 }) => {
   const rate = Math.round(status.fulfillmentRate);
   const rateColor = rate >= 100 ? '#2e7d32' : rate >= 60 ? '#ef6c00' : '#c62828';
@@ -51,7 +57,24 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
     <StyledStatus>
       <header className="ts-header">
         <div className="ts-header-main">
-          <h3 className="ts-task">{header.taskName}</h3>
+          <div
+            className="ts-task-drag"
+            onDragStart={() => {
+              setDraggingTaskId(header.taskId);
+              onTaskSelect?.(header.taskId);
+            }}
+            onDragEnd={() => setDraggingTaskId(null)}
+          >
+            <ObjectView
+              type="Task"
+              url={`shift-puzzle/tasks/${header.taskId}`}
+              label={header.taskName}
+              draggable
+              onClick={() => onTaskSelect?.(header.taskId)}
+            >
+              <h3 className="ts-task">{header.taskName}</h3>
+            </ObjectView>
+          </div>
           <span className="ts-meta">
             {header.dayType} · {header.startTime}–{header.endTime}
           </span>
@@ -128,6 +151,10 @@ const StyledStatus = styled.div`
     align-items: baseline;
     gap: 10px;
     flex-wrap: wrap;
+  }
+  .ts-task-drag {
+    cursor: grab;
+    &:active { cursor: grabbing; }
   }
   .ts-task {
     margin: 0;
