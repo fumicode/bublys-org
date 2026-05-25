@@ -197,6 +197,7 @@ export const shiftPlanSlice = createSlice({
       action: PayloadAction<{
         planId: string;
         shiftId: string;
+        newShiftId?: string;
         oldUserId: string;
         oldStart: number;
         oldEnd: number;
@@ -206,12 +207,13 @@ export const shiftPlanSlice = createSlice({
       }>
     ) => {
       if (!state.shiftPlans) return;
-      const { planId, shiftId, oldUserId, oldStart, oldEnd, newUserId, newStart, newEnd } = action.payload;
+      const { planId, shiftId, newShiftId, oldUserId, oldStart, oldEnd, newUserId, newStart, newEnd } = action.payload;
+      const targetShiftId = newShiftId ?? shiftId;
       const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
       if (planIndex === -1) return;
       let plan = new ShiftPlan(state.shiftPlans[planIndex]);
       plan = plan.removeUserFromBlockRange(shiftId, oldStart, oldEnd, oldUserId);
-      plan = plan.addUserToBlockRange(shiftId, newStart, newEnd, newUserId);
+      plan = plan.addUserToBlockRange(targetShiftId, newStart, newEnd, newUserId);
       state.shiftPlans[planIndex] = toMutableShiftPlanState(plan.state);
     },
   },
