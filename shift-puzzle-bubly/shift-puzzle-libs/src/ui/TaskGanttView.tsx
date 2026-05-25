@@ -640,9 +640,6 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                   {shift.responsibleDepartment && (
                     <span className="e-dept-badge">{shift.responsibleDepartment.slice(0, 2)}</span>
                   )}
-                  {rowAvailability === 'available' && <span className="e-avail-dot is-available" />}
-                  {rowAvailability === 'warning' && <span className="e-avail-dot is-warning" />}
-                  {rowAvailability === 'unavailable' && <span className="e-avail-dot is-unavailable" />}
                 </div>
               </UrledPlace>
             ) : (
@@ -654,9 +651,6 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                 {shift.responsibleDepartment && (
                   <span className="e-dept-badge">{shift.responsibleDepartment.slice(0, 2)}</span>
                 )}
-                {rowAvailability === 'available' && <span className="e-avail-dot is-available" />}
-                {rowAvailability === 'warning' && <span className="e-avail-dot is-warning" />}
-                {rowAvailability === 'unavailable' && <span className="e-avail-dot is-unavailable" />}
               </div>
             )}
 
@@ -931,32 +925,6 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
       flex-shrink: 0;
     }
 
-    .e-avail-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      flex-shrink: 0;
-
-      &.is-available {
-        background: #4caf50;
-      }
-      &.is-warning {
-        background: #ff9800;
-      }
-      &.is-unavailable {
-        background: #f44336;
-      }
-    }
-
-    &.availability-available {
-      background: rgba(76, 175, 80, 0.07);
-    }
-    &.availability-unavailable {
-      background: rgba(244, 67, 54, 0.06);
-    }
-    &.availability-warning {
-      background: rgba(255, 152, 0, 0.07);
-    }
     &.is-clickable {
       cursor: pointer;
       &:hover { background: #f0f4ff; }
