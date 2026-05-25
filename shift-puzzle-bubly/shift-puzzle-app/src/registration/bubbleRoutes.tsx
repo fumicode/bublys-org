@@ -257,8 +257,10 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
     openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side');
   };
 
+  const buildHistoryUrl = () => `shift-puzzle/shift-plans/${shiftPlanId}/history`;
+
   const handleHistoryOpen = () => {
-    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/history`, bubble.id, 'bubble-side');
+    openBubble(buildHistoryUrl(), bubble.id, 'bubble-side');
   };
 
   const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
@@ -273,6 +275,7 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
       onAssignedRunOpen={handleAssignedRunOpen}
       buildRunUrl={buildRunUrl}
       onHistoryOpen={handleHistoryOpen}
+      buildHistoryUrl={buildHistoryUrl}
       onMemberClick={handleMemberClick}
       buildMemberUrl={buildMemberUrl}
     />
@@ -432,7 +435,8 @@ const ShiftPuzzleTaskBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 // シフトパズル - 世界線履歴バブル
 const ShiftPuzzleShiftPlanHistoryBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <ShiftPlanWorldLineGraphView planId={bubble.params.shiftPlanId} />;
+  const shiftPlanId = bubble.params.shiftPlanId;
+  return <ShiftPlanWorldLineGraphView planId={shiftPlanId} />;
 };
 
 /** シフトパズル機能のバブルルート定義 */

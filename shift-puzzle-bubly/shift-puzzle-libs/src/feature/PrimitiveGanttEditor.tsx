@@ -27,6 +27,7 @@ import {
 } from '../slice/shift-plan-slice.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
+import { UrledPlace } from '@bublys-org/bubbles-ui';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingTaskId } from '../ui/TaskListView.js';
 import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
@@ -44,6 +45,8 @@ type PrimitiveGanttEditorProps = {
   buildRunUrl?: (shiftId: string) => string;
   /** 履歴ボタン押下時に呼ばれる callback（世界線バブルを開くなど、親が処理する） */
   onHistoryOpen?: () => void;
+  /** 履歴バブルの URL ビルダー（UrledPlace の curve 起点に使用） */
+  buildHistoryUrl?: () => string;
   /** 局員ラベルクリック時のコールバック（親バブルが bubble.id を使って openBubble する） */
   onMemberClick?: (memberId: string) => void;
   /** 局員ラベルの URL ビルダー（UrledPlace の curve 起点に使用） */
@@ -57,6 +60,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   onAssignedRunOpen,
   buildRunUrl,
   onHistoryOpen,
+  buildHistoryUrl,
   onMemberClick,
   buildMemberUrl,
 }) => {
@@ -274,14 +278,27 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
         )}
 
         {/* 履歴ボタン */}
-        <button
-          type="button"
-          className="e-history-btn"
-          onClick={onHistoryOpen}
-          title="世界線の履歴を表示"
-        >
-          履歴
-        </button>
+        {buildHistoryUrl ? (
+          <UrledPlace url={buildHistoryUrl()}>
+            <button
+              type="button"
+              className="e-history-btn"
+              onClick={onHistoryOpen}
+              title="世界線の履歴を表示"
+            >
+              履歴
+            </button>
+          </UrledPlace>
+        ) : (
+          <button
+            type="button"
+            className="e-history-btn"
+            onClick={onHistoryOpen}
+            title="世界線の履歴を表示"
+          >
+            履歴
+          </button>
+        )}
       </div>
 
       {/* ガントビュー */}

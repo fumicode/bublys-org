@@ -19,7 +19,7 @@ import {
   selectShiftPlanGraph,
   selectCurrentApexNodeId,
   selectShiftsAtNode,
-  switchToTab,
+  switchToTabAnchor,
 } from '../world-line/index.js';
 import { selectShiftPlanById, addShiftPlan, ShiftPlan } from '../slice/index.js';
 import type { WeatherCondition } from '@bublys-org/shift-puzzle-model';
@@ -83,7 +83,7 @@ export const ShiftPlanWorldLineGraphView: FC<Props> = ({ planId }) => {
 
   const handleSelect = (nodeId: string) => {
     if (nodeId === apexNodeId) return;
-    switchToTab(planId, nodeId)(store.dispatch, store.getState);
+    switchToTabAnchor(planId, nodeId)(store.dispatch, store.getState);
   };
 
   if (!rootNodeId) {
@@ -271,7 +271,7 @@ const StyledNodeBtn = styled.button<NodeBtnProps>`
   background: ${(p) => (p.$isApex ? p.$color : '#fff')};
   color: ${(p) => (p.$isApex ? '#fff' : p.$color)};
   border-radius: 4px;
-  cursor: pointer;
+  cursor: ${(p) => (p.$isApex ? 'default' : 'pointer')};
   font-size: 0.78em;
   font-weight: ${(p) => (p.$isApex ? 700 : 500)};
   transition: background 0.1s;
