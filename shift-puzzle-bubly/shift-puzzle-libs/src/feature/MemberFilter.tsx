@@ -48,8 +48,8 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>(
     initialFilter?.departments ?? [],
   );
-  const [newMemberOnly, setNewMemberOnly] = useState<boolean>(
-    initialFilter?.newMemberOnly ?? false,
+  const [memberType, setMemberType] = useState<'all' | 'new' | 'veteran'>(
+    initialFilter?.newMemberOnly ? 'new' : initialFilter?.veteranOnly ? 'veteran' : 'all',
   );
   const [availableAtDayType, setAvailableAtDayType] = useState<DayType | ''>(
     initialFilter?.availableAt?.dayType ?? '',
@@ -61,7 +61,7 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
     initialFilter?.availableAt?.endMinute ?? 840,
   );
 
-  const hasSelection = selectedDepartments.length > 0 || newMemberOnly || availableAtDayType;
+  const hasSelection = selectedDepartments.length > 0 || memberType !== 'all' || availableAtDayType;
 
   const toggleDepartment = (dept: string) => {
     setSelectedDepartments(prev =>
@@ -72,7 +72,8 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
   const handleSearch = () => {
     const filter: MemberFilterType = {};
     if (selectedDepartments.length > 0) filter.departments = selectedDepartments;
-    if (newMemberOnly) filter.newMemberOnly = true;
+    if (memberType === 'new') filter.newMemberOnly = true;
+    if (memberType === 'veteran') filter.veteranOnly = true;
     if (availableAtDayType) {
       filter.availableAt = {
         dayType: availableAtDayType,
@@ -118,19 +119,41 @@ export const MemberFilter: FC<MemberFilterProps> = ({ initialFilter }) => {
         </div>
       </section>
 
-      {/* 新入生 */}
+      {/* 新入生 / 経験者 */}
       <section className="e-section">
-        <h4>新入生</h4>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={newMemberOnly}
-              onChange={(e) => setNewMemberOnly(e.target.checked)}
-              size="small"
-            />
-          }
-          label="新入生のみ表示"
-        />
+        <h4>新入生 / 経験者</h4>
+        <div className="e-dept-list">
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={memberType === 'all'}
+                onChange={() => setMemberType('all')}
+                size="small"
+              />
+            }
+            label="すべて"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={memberType === 'new'}
+                onChange={() => setMemberType('new')}
+                size="small"
+              />
+            }
+            label="新入生のみ"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={memberType === 'veteran'}
+                onChange={() => setMemberType('veteran')}
+                size="small"
+              />
+            }
+            label="経験者のみ"
+          />
+        </div>
       </section>
 
       {/* 参加可能時間帯 */}

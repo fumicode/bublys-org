@@ -21,6 +21,7 @@ import { BubblesContext } from "@bublys-org/bubbles-ui";
 export type MemberFilterCriteria = {
   departments?: string[];  // 複数選択（OR条件）
   newMemberOnly?: boolean;
+  veteranOnly?: boolean;
   availableAt?: {
     dayType: DayType;
     startMinute: number;
@@ -39,6 +40,7 @@ export function parseMemberFilter(query: string): MemberFilterCriteria {
   if (departments) filter.departments = departments.split(',');
 
   if (params.get('newMemberOnly') === '1') filter.newMemberOnly = true;
+  if (params.get('veteranOnly') === '1') filter.veteranOnly = true;
 
   const dayType = params.get('availableAtDayType') as DayType | null;
   const start = params.get('availableAtStart');
@@ -62,6 +64,7 @@ export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
     params.set('departments', filter.departments.join(','));
   }
   if (filter.newMemberOnly) params.set('newMemberOnly', '1');
+  if (filter.veteranOnly) params.set('veteranOnly', '1');
   if (filter.availableAt) {
     params.set('availableAtDayType', filter.availableAt.dayType);
     params.set('availableAtStart', String(filter.availableAt.startMinute));
@@ -76,6 +79,7 @@ export function stringifyMemberFilter(filter: MemberFilterCriteria): string {
 function matchesFilter(member: Member, filter: MemberFilterCriteria): boolean {
   if (filter.departments && filter.departments.length > 0 && !filter.departments.includes(member.department)) return false;
   if (filter.newMemberOnly && !member.isNewMember) return false;
+  if (filter.veteranOnly && member.isNewMember) return false;
   if (filter.availableAt) {
     const { dayType, startMinute, endMinute } = filter.availableAt;
     const ranges = member.getAvailableRanges(dayType);
@@ -98,6 +102,7 @@ function describeFilter(filter: MemberFilterCriteria): string {
     parts.push(`${filter.departments.join('・')}所属`);
   }
   if (filter.newMemberOnly) parts.push('新入生のみ');
+  if (filter.veteranOnly) parts.push('経験者のみ');
   if (filter.availableAt) {
     const { dayType, startMinute, endMinute } = filter.availableAt;
     parts.push(`${dayType} ${minutesToTime(startMinute)}〜${minutesToTime(endMinute)}参加可能`);
