@@ -47,6 +47,10 @@ type PrimitiveGanttEditorProps = {
   onHistoryOpen?: () => void;
   /** 履歴バブルの URL ビルダー（UrledPlace の curve 起点に使用） */
   buildHistoryUrl?: () => string;
+  /** タスクガントボタン押下時に呼ばれる callback */
+  onTaskGanttOpen?: () => void;
+  /** タスクガントバブルの URL ビルダー（UrledPlace の curve 起点に使用） */
+  buildTaskGanttUrl?: () => string;
   /** 局員ラベルクリック時のコールバック（親バブルが bubble.id を使って openBubble する） */
   onMemberClick?: (memberId: string) => void;
   /** 局員ラベルの URL ビルダー（UrledPlace の curve 起点に使用） */
@@ -61,6 +65,8 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   buildRunUrl,
   onHistoryOpen,
   buildHistoryUrl,
+  onTaskGanttOpen,
+  buildTaskGanttUrl,
   onMemberClick,
   buildMemberUrl,
 }) => {
@@ -277,6 +283,29 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           </button>
         )}
 
+        {/* タスクガントボタン */}
+        {buildTaskGanttUrl ? (
+          <UrledPlace url={buildTaskGanttUrl()}>
+            <button
+              type="button"
+              className="e-task-gantt-btn"
+              onClick={onTaskGanttOpen}
+              title="タスク軸ガントを開く"
+            >
+              タスク軸
+            </button>
+          </UrledPlace>
+        ) : onTaskGanttOpen ? (
+          <button
+            type="button"
+            className="e-task-gantt-btn"
+            onClick={onTaskGanttOpen}
+            title="タスク軸ガントを開く"
+          >
+            タスク軸
+          </button>
+        ) : null}
+
         {/* 履歴ボタン */}
         {buildHistoryUrl ? (
           <UrledPlace url={buildHistoryUrl()}>
@@ -405,6 +434,21 @@ const StyledEditor = styled.div`
     border-radius: 10px;
     &:hover {
       background: rgba(21, 101, 192, 0.15);
+    }
+  }
+
+  .e-task-gantt-btn {
+    padding: 2px 10px;
+    border: 1px solid #a5d6a7;
+    border-radius: 12px;
+    background: #f1f8e9;
+    color: #33691e;
+    font-size: 0.82em;
+    cursor: pointer;
+    white-space: nowrap;
+    &:hover {
+      background: #dcedc8;
+      border-color: #558b2f;
     }
   }
 
