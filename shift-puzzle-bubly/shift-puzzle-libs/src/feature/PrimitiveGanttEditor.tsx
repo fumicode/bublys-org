@@ -208,7 +208,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     const actions = computeAiPlacements(
       draggingTaskGroups,
       planShifts,
-      members,
+      displayMembers,
       planTimeSchedules[0],
     );
     for (const action of actions) {
