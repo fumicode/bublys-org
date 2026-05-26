@@ -27,7 +27,9 @@ import { createSampleMemberList } from '../data/sampleMember.js';
 import { TaskGanttView, type RowAvailability } from '../ui/TaskGanttView.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
-import { draggingMemberId } from '../ui/MemberListView.js';
+import { draggingMemberId, DRAG_TYPE_MEMBER_INDIVIDUAL } from '../ui/MemberListView.js';
+import { draggingTaskGroups } from './TaskCollection.js';
+import { DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
 import { moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
@@ -64,6 +66,11 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
 
   /** MemberCollection の個別カードドラッグ中のmemberId */
   const [dragBrushMemberId, setDragBrushMemberId] = useState<string | null>(null);
+  /** task-list からドロップされたフィルター済みタスクID */
+  const [filteredTaskIds, setFilteredTaskIds] = useState<Set<string> | null>(null);
+
+  /** TaskCollection まとめドラッグ中かどうか（フィルタードロップゾーン表示用） */
+  const [isTaskListDragging, setIsTaskListDragging] = useState(false);
   const brushMemberId = dragBrushMemberId;
 
   // 初期データロード
@@ -80,6 +87,7 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
     };
     const handleDragEnd = () => {
       setDragBrushMemberId(null);
+      setIsTaskListDragging(false);
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
@@ -115,6 +123,11 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
 
   const planShifts = useMemo(() => shiftPlan?.shifts ?? [], [shiftPlan]);
   const planTimeSchedules = useMemo(() => shiftPlan?.timeSchedules ?? [], [shiftPlan]);
+
+  const visibleShifts = useMemo(() => {
+    if (!filteredTaskIds) return planShifts;
+    return planShifts.filter((s) => filteredTaskIds.has(s.taskId));
+  }, [planShifts, filteredTaskIds]);
 
   // BlockList サイズを TimeSchedule の totalBlocks に揃える
   const activeScheduleTotalBlocks = planTimeSchedules[0]?.totalBlocks;
@@ -200,6 +213,13 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
       <div className="e-toolbar">
         <span className="e-plan-name">{shiftPlan.name}</span>
 
+        {filteredTaskIds && (
+          <div className="e-filter-badge">
+            <span>{filteredTaskIds.size}件フィルター中</span>
+            <button type="button" className="e-filter-clear" onClick={() => setFilteredTaskIds(null)}>✕</button>
+          </div>
+        )}
+
         {brushMemberName && (
           <div className="e-active-brush">
             <span className="e-brush-label">ブラシ: {brushMemberName}</span>
@@ -221,9 +241,43 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
       </div>
 
       {/* ガントビュー */}
-      <div className="e-gantt-container">
+      <div
+        className="e-gantt-container"
+        onDragOver={(e) => {
+          const types = e.dataTransfer.types;
+          if (types.includes(DRAG_TYPE_TASK_LIST)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!isTaskListDragging) setIsTaskListDragging(true);
+            return;
+          }
+          if (types.includes(DRAG_TYPE_MEMBER_INDIVIDUAL)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+          }
+        }}
+        onDrop={(e) => {
+          if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+            e.preventDefault();
+            if (draggingTaskGroups && draggingTaskGroups.length > 0) {
+              setFilteredTaskIds(new Set(draggingTaskGroups.map((g) => g.taskId)));
+            }
+            setIsTaskListDragging(false);
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setIsTaskListDragging(false);
+          }
+        }}
+      >
+        {isTaskListDragging && (
+          <div className="e-task-list-drop-overlay">
+            ここにドロップしてタスク行をフィルタリング
+          </div>
+        )}
         <TaskGanttView
-          shifts={planShifts}
+          shifts={visibleShifts}
           timeSchedules={planTimeSchedules}
           members={members}
           ganttConfig={ganttConfig}
@@ -283,6 +337,30 @@ const StyledEditor = styled.div`
     white-space: nowrap;
   }
 
+  .e-filter-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px 2px 8px;
+    background: #fff3e0;
+    border: 1px solid #ffa000;
+    border-radius: 12px;
+    font-size: 0.82em;
+    color: #e65100;
+    font-weight: 600;
+
+    .e-filter-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #e65100;
+      font-size: 0.85em;
+      padding: 0 2px;
+      line-height: 1;
+      &:hover { color: #bf360c; }
+    }
+  }
+
   .e-active-brush {
     display: flex;
     align-items: center;
@@ -318,5 +396,20 @@ const StyledEditor = styled.div`
     flex: 1;
     overflow: auto;
     position: relative;
+  }
+
+  .e-task-list-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(230, 81, 0, 0.12);
+    border: 2px dashed #e65100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #e65100;
+    pointer-events: none;
   }
 `;

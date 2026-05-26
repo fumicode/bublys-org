@@ -25,6 +25,7 @@ import styled from 'styled-components';
 import { Shift, TimeSchedule, Member } from '../domain/index.js';
 import { type GanttConfig } from './MemberGanttView.js';
 import { DRAG_TYPE_MEMBER_INDIVIDUAL, draggingMemberId } from './MemberListView.js';
+import { DRAG_TYPE_TASK_LIST } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
 import { createPortal } from 'react-dom';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
@@ -61,12 +62,18 @@ export type TaskGanttViewProps = {
   buildTaskUrl?: (taskId: string) => string;
   onMemberClick?: (memberId: string) => void;
   buildMemberUrl?: (memberId: string) => string;
+  /** task-list からドラッグしてドロップした際のコールバック */
+  onTaskListDrop?: () => void;
 };
 
 // ========== 定数 ==========
 
 const SHIFT_LABEL_WIDTH = 180;
-const ROW_HEIGHT = 32;
+const BAR_HEIGHT = 26;
+const BAR_STRIDE = 28; // BAR_HEIGHT + 2px gap between stacked bars
+const ROW_V_PAD = 3;
+const barTop = (level: number) => ROW_V_PAD + level * BAR_STRIDE;
+const computeRowHeight = (maxLevel: number) => barTop(maxLevel) + BAR_HEIGHT + ROW_V_PAD;
 
 // ========== ユーティリティ ==========
 
@@ -95,7 +102,6 @@ type ShiftRunBar = {
   memberId: string;
   startBlock: number;
   endBlock: number; // 半開区間
-  isOverlap: boolean;
   outOfRangeBlocks: number[];
   unavailableBlocks: number[];
   crossConflictBlocks: number[]; // 別シフトでも同時刻に配置されているブロック
@@ -142,7 +148,6 @@ function buildRunsForShift(
   type UserEntry = {
     blocks: number[];
     outOfRangeSet: Set<number>;
-    overlapSet: Set<number>;
   };
   const userMap = new Map<string, UserEntry>();
 
@@ -150,21 +155,19 @@ function buildRunsForShift(
     const userIds = bl.getUsersAt(b);
     if (userIds.length === 0) continue;
     const isOutOfRange = !shift.isBlockInRange(b, timeSchedule);
-    const hasOverlap = userIds.length > 1;
     for (const userId of userIds) {
       if (!userMap.has(userId)) {
-        userMap.set(userId, { blocks: [], outOfRangeSet: new Set(), overlapSet: new Set() });
+        userMap.set(userId, { blocks: [], outOfRangeSet: new Set() });
       }
       const entry = userMap.get(userId)!;
       entry.blocks.push(b);
       if (isOutOfRange) entry.outOfRangeSet.add(b);
-      if (hasOverlap) entry.overlapSet.add(b);
     }
   }
 
   const runs: ShiftRunBar[] = [];
 
-  for (const [userId, { blocks, outOfRangeSet, overlapSet }] of userMap.entries()) {
+  for (const [userId, { blocks, outOfRangeSet }] of userMap.entries()) {
     if (blocks.length === 0) continue;
     const member = memberMap.get(userId);
 
@@ -173,12 +176,10 @@ function buildRunsForShift(
     const oorBlocks: number[] = [];
     const unaBlocks: number[] = [];
     const crossBlocks: number[] = [];
-    let isOverlap = false;
 
     const accumulate = (b: number) => {
       if (outOfRangeSet.has(b)) oorBlocks.push(b);
       if (member && !member.isAvailableAt(dayType, timeSchedule.startMinute + b * 15)) unaBlocks.push(b);
-      if (overlapSet.has(b)) isOverlap = true;
       if (crossConflictSet.has(`${userId}:${b}`)) crossBlocks.push(b);
     };
     accumulate(blocks[0]);
@@ -189,7 +190,6 @@ function buildRunsForShift(
           memberId: userId,
           startBlock: runStart,
           endBlock: runPrev + 1,
-          isOverlap,
           outOfRangeBlocks: [...oorBlocks],
           unavailableBlocks: [...unaBlocks],
           crossConflictBlocks: [...crossBlocks],
@@ -200,7 +200,6 @@ function buildRunsForShift(
           oorBlocks.length = 0;
           unaBlocks.length = 0;
           crossBlocks.length = 0;
-          isOverlap = false;
           accumulate(blocks[i]);
         }
       } else {
@@ -262,6 +261,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
   buildTaskUrl,
   onMemberClick,
   buildMemberUrl,
+  onTaskListDrop,
 }) => {
   const hourPx = ganttConfig.hourPx ?? 60;
   const minutePx = hourPx / 60;
@@ -371,6 +371,13 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
 
   const handleRowDragOver = useCallback(
     (shiftId: string, e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+        if (onTaskListDrop) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+        return;
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_INDIVIDUAL)) return;
       if (!brushMember) return;
       if (editState) return;
@@ -385,11 +392,17 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
         return { ...prev, currentBlock: blockIndex };
       });
     },
-    [brushMember, calcBlockIndex, editState],
+    [brushMember, calcBlockIndex, editState, onTaskListDrop],
   );
 
   const handleRowDrop = useCallback(
     (shiftId: string, e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+        e.preventDefault();
+        setPreview(null);
+        onTaskListDrop?.();
+        return;
+      }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_INDIVIDUAL)) return;
       const memberId = draggingMemberId;
       if (!memberId || !activeTimeSchedule) {
@@ -407,7 +420,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
       onPaintRange?.(shiftId, memberId, startBlock, endBlockExclusive);
       setPreview(null);
     },
-    [preview, activeTimeSchedule, calcBlockIndex, onPaintRange],
+    [preview, activeTimeSchedule, calcBlockIndex, onPaintRange, onTaskListDrop],
   );
 
   const handleRunDoubleClick = useCallback(
@@ -558,7 +571,20 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
   const dayStartMinute = activeTimeSchedule.startMinute;
 
   return (
-    <StyledGantt>
+    <StyledGantt
+      onDragOver={(e) => {
+        if (onTaskListDrop && e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      }}
+      onDrop={(e) => {
+        if (!onTaskListDrop) return;
+        if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) return;
+        e.preventDefault();
+        onTaskListDrop();
+      }}
+    >
       {/* ヘッダー行（grid row 1） */}
       <div className="e-shift-col-header">タスク</div>
       <div className="e-time-axis" style={{ width: totalWidth }}>
@@ -612,6 +638,8 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
       {activeShifts.map((shift) => {
         const runs = buildRunsForShift(shift, members, activeTimeSchedule, totalBlocks, crossConflictSet);
         const runLevels = computeRunLevels(runs);
+        const maxLevel = runLevels.length > 0 ? Math.max(0, ...runLevels) : 0;
+        const rowHeight = computeRowHeight(maxLevel);
         const previewActive = preview && preview.shiftId === shift.id;
         const previewStart = previewActive ? Math.min(preview.anchorBlock, preview.currentBlock) : -1;
         const previewEnd = previewActive ? Math.max(preview.anchorBlock, preview.currentBlock) + 1 : -1;
@@ -632,6 +660,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                 <div
                   className={`e-shift-label availability-${rowAvailability ?? 'none'} is-clickable`}
                   data-shift-id={shift.id}
+                  style={{ height: rowHeight }}
                   onClick={() => onTaskClick?.(shift.taskId)}
                 >
                   <span className="e-task-name">
@@ -646,6 +675,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
               <div
                 className={`e-shift-label availability-${rowAvailability ?? 'none'}`}
                 data-shift-id={shift.id}
+                style={{ height: rowHeight }}
               >
                 <span className="e-task-name">{shift.taskName ?? shift.taskId}</span>
                 {shift.responsibleDepartment && (
@@ -657,7 +687,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
             {/* セル描画エリア */}
             <div
               className="e-cell-strip"
-              style={{ width: totalWidth }}
+              style={{ width: totalWidth, height: rowHeight }}
               data-shift-id={shift.id}
               onDragOver={(e) => handleRowDragOver(shift.id, e)}
               onDrop={(e) => handleRowDrop(shift.id, e)}
@@ -690,19 +720,18 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                 const memberName = members.find((m) => m.id === run.memberId)?.name ?? run.memberId;
 
                 const isBeingEdited =
-                  stackLevel === 0 &&
-                  editState &&
+                  editState !== null &&
                   editState.shiftId === shift.id &&
                   editState.oldMemberId === run.memberId &&
                   editState.oldStart === run.startBlock &&
                   editState.oldEnd === run.endBlock;
                 const isMovingToOtherRow =
-                  isBeingEdited && editState.kind === 'move' && editState.targetShiftId !== shift.id;
-                const start = isBeingEdited && !isMovingToOtherRow ? editState.previewStart : run.startBlock;
-                const end = isBeingEdited && !isMovingToOtherRow ? editState.previewEnd : run.endBlock;
+                  isBeingEdited && editState!.kind === 'move' && editState!.targetShiftId !== shift.id;
+                const start = isBeingEdited && !isMovingToOtherRow ? editState!.previewStart : run.startBlock;
+                const end = isBeingEdited && !isMovingToOtherRow ? editState!.previewEnd : run.endBlock;
                 const left = start * blockPx;
                 const width = (end - start) * blockPx;
-                const runUrl = stackLevel === 0 ? buildRunUrl?.(shift.id, run.memberId) : undefined;
+                const runUrl = buildRunUrl?.(shift.id, run.memberId);
                 const hasUnavailable = run.unavailableBlocks.length > 0;
                 const hasOutOfRange = run.outOfRangeBlocks.length > 0;
                 const hasCrossConflict = run.crossConflictBlocks.length > 0;
@@ -716,65 +745,57 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                     $border={color.border}
                     $text={color.text}
                     $isOutOfRange={hasOutOfRange}
-                    $isOverlap={run.isOverlap}
                     $isGhost={!!isMovingToOtherRow}
                     $isUnavailable={hasUnavailable}
                     $isCrossConflict={hasCrossConflict}
-                    $stackLevel={stackLevel}
-                    title={`${memberName}${hasOutOfRange ? '（タスク時間外）' : ''}${run.isOverlap ? '（同行重複）' : ''}${hasCrossConflict ? '（時間帯競合：他タスクと重複）' : ''}`}
-                    {...(stackLevel === 0 ? {
-                      onDoubleClick: (e: React.MouseEvent) => handleRunDoubleClick(run, shift.id, e as React.MouseEvent<HTMLElement>),
-                      onMouseEnter: (e: React.MouseEvent<HTMLElement>) => handleRunMouseEnter(run, shift.id, e),
-                      onMouseLeave: scheduleHoverLeave,
-                      onPointerDown: (e: React.PointerEvent<HTMLElement>) => startEdit('move', run, shift.id, e),
-                      onPointerMove: handleEditMove,
-                      onPointerUp: handleEditUp,
-                      onPointerCancel: handleEditCancel,
-                    } : {})}
+                    $top={barTop(stackLevel)}
+                    title={`${memberName}${hasOutOfRange ? '（タスク時間外）' : ''}${hasCrossConflict ? '（時間帯競合：他タスクと重複）' : ''}`}
+                    onDoubleClick={(e: React.MouseEvent) => handleRunDoubleClick(run, shift.id, e as React.MouseEvent<HTMLElement>)}
+                    onMouseEnter={(e: React.MouseEvent<HTMLElement>) => handleRunMouseEnter(run, shift.id, e)}
+                    onMouseLeave={scheduleHoverLeave}
+                    onPointerDown={(e: React.PointerEvent<HTMLElement>) => startEdit('move', run, shift.id, e)}
+                    onPointerMove={handleEditMove}
+                    onPointerUp={handleEditUp}
+                    onPointerCancel={handleEditCancel}
                   >
-                    {stackLevel === 0 && (
-                      <StyledResizeHandle
-                        $side="left"
-                        onPointerDown={(e) => startEdit('resize-L', run, shift.id, e)}
-                        onPointerMove={handleEditMove}
-                        onPointerUp={handleEditUp}
-                        onPointerCancel={handleEditCancel}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                      />
-                    )}
-                    {stackLevel === 0 && run.unavailableBlocks.map((b) => (
+                    <StyledResizeHandle
+                      $side="left"
+                      onPointerDown={(e) => startEdit('resize-L', run, shift.id, e)}
+                      onPointerMove={handleEditMove}
+                      onPointerUp={handleEditUp}
+                      onPointerCancel={handleEditCancel}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    />
+                    {run.unavailableBlocks.map((b) => (
                       <StyledUnavailableBlock
                         key={`ua-${b}`}
                         style={{ left: (b - run.startBlock) * blockPx, width: blockPx }}
                       />
                     ))}
-                    {stackLevel === 0 && run.outOfRangeBlocks.map((b) => (
+                    {run.outOfRangeBlocks.map((b) => (
                       <StyledOutOfRangeBlock
                         key={`oor-${b}`}
                         style={{ left: (b - run.startBlock) * blockPx, width: blockPx }}
                       />
                     ))}
-                    {stackLevel === 0 && run.crossConflictBlocks.map((b) => (
+                    {run.crossConflictBlocks.map((b) => (
                       <StyledCrossConflictBlock
                         key={`cc-${b}`}
                         style={{ left: (b - run.startBlock) * blockPx, width: blockPx }}
                       />
                     ))}
                     <span className="e-run-label">{memberName}</span>
-                    {run.isOverlap && <span className="e-overlap-badge">!</span>}
-                    {stackLevel === 0 && hasCrossConflict && (
+                    {hasCrossConflict && (
                       <span className="e-cross-conflict-badge" title="他タスクと時間帯が競合">⚡</span>
                     )}
-                    {stackLevel === 0 && (
-                      <StyledResizeHandle
-                        $side="right"
-                        onPointerDown={(e) => startEdit('resize-R', run, shift.id, e)}
-                        onPointerMove={handleEditMove}
-                        onPointerUp={handleEditUp}
-                        onPointerCancel={handleEditCancel}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                      />
-                    )}
+                    <StyledResizeHandle
+                      $side="right"
+                      onPointerDown={(e) => startEdit('resize-R', run, shift.id, e)}
+                      onPointerMove={handleEditMove}
+                      onPointerUp={handleEditUp}
+                      onPointerCancel={handleEditCancel}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    />
                   </StyledRunBar>
                 );
 
@@ -796,11 +817,10 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                     $border={color.border}
                     $text={color.text}
                     $isOutOfRange={false}
-                    $isOverlap={false}
                     $isGhost={false}
                     $isUnavailable={false}
                     $isCrossConflict={false}
-                    $stackLevel={0}
+                    $top={barTop(0)}
                     style={{ opacity: 0.65, pointerEvents: 'none' }}
                   >
                     <span className="e-run-label">
@@ -830,7 +850,7 @@ const StyledGantt = styled.div<React.HTMLAttributes<HTMLDivElement>>`
   display: grid;
   grid-template-columns: ${SHIFT_LABEL_WIDTH}px auto;
   grid-template-rows: 24px;
-  grid-auto-rows: ${ROW_HEIGHT}px;
+  grid-auto-rows: auto;
   height: 100%;
   overflow: auto;
   font-size: 0.82em;
@@ -967,11 +987,10 @@ type StyledRunBarProps = React.HTMLAttributes<HTMLDivElement> & {
   $border: string;
   $text: string;
   $isOutOfRange: boolean;
-  $isOverlap: boolean;
   $isGhost: boolean;
   $isUnavailable: boolean;
   $isCrossConflict: boolean;
-  $stackLevel: number;
+  $top: number;
 };
 
 const StyledRunBar = styled.div<StyledRunBarProps>`
@@ -992,29 +1011,16 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
   user-select: none;
   touch-action: none;
 
-  ${(p) => p.$stackLevel === 0 ? `
-    top: 2px;
-    height: ${ROW_HEIGHT - 4}px;
-    cursor: grab;
-    z-index: 2;
-  ` : `
-    top: ${ROW_HEIGHT - 12}px;
-    height: 10px;
-    cursor: default;
-    z-index: 3;
-    pointer-events: none;
-    opacity: 0.85;
-    font-size: 0.72em;
-    padding: 0 4px;
-    border-radius: 2px;
-  `}
+  top: ${(p) => p.$top}px;
+  height: ${BAR_HEIGHT}px;
+  cursor: grab;
+  z-index: 2;
 
   ${(p) => p.$isGhost && `opacity: 0.35; border-style: dashed;`}
 
   &:active { cursor: grabbing; }
 
   ${(p) => p.$isOutOfRange && `border-color: #f44336; border-style: dashed;`}
-  ${(p) => p.$isOverlap && !p.$isCrossConflict && `box-shadow: inset 0 0 0 1px rgba(244, 67, 54, 0.45);`}
   ${(p) => p.$isUnavailable && !p.$isOutOfRange && `border-color: #ff8f00; border-style: dashed;`}
   ${(p) => p.$isCrossConflict && `border: 2px solid #9c27b0 !important; box-shadow: 0 0 4px rgba(156, 39, 176, 0.5);`}
 
@@ -1025,14 +1031,6 @@ const StyledRunBar = styled.div<StyledRunBarProps>`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    position: relative;
-    z-index: 3;
-  }
-
-  .e-overlap-badge {
-    color: #d32f2f;
-    font-weight: 800;
-    margin-right: 4px;
     position: relative;
     z-index: 3;
   }
@@ -1146,8 +1144,8 @@ const StyledRunActionPanel = styled.div<React.HTMLAttributes<HTMLDivElement>>`
 
 const StyledPreviewBar = styled.div<React.HTMLAttributes<HTMLDivElement>>`
   position: absolute;
-  top: 2px;
-  height: ${ROW_HEIGHT - 4}px;
+  top: ${barTop(0)}px;
+  height: ${BAR_HEIGHT}px;
   background: rgba(25, 118, 210, 0.20);
   border: 2px dashed #1976d2;
   border-radius: 3px;

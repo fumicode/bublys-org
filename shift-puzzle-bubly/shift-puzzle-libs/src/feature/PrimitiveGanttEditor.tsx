@@ -29,7 +29,7 @@ import { createSampleMemberList } from '../data/sampleMember.js';
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
-import { draggingTaskId } from '../ui/TaskListView.js';
+import { draggingTaskId, DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
 import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
 import { draggingTaskGroups } from './TaskCollection.js';
 import { computeAiPlacements } from './aiShiftPlacement.js';
@@ -82,6 +82,9 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   /** MemberList ドラッグ中かどうか（ドロップゾーンオーバーレイ表示用） */
   const [isMemberListDragging, setIsMemberListDragging] = useState(false);
 
+  /** TaskCollection まとめドラッグ中かどうか（AI配置ドロップゾーン表示用） */
+  const [isTaskListDragging, setIsTaskListDragging] = useState(false);
+
 
   /** ガントに表示する局員IDのフィルター（null = 全局員） */
   const [filteredMemberIds, setFilteredMemberIds] = useState<string[] | null>(null);
@@ -107,6 +110,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     const handleDragEnd = () => {
       setDragBrushTaskId(null);
       setIsMemberListDragging(false);
+      setIsTaskListDragging(false);
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
@@ -331,20 +335,50 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
       </div>
 
       {/* ガントビュー */}
-      <div className="e-gantt-container">
+      <div
+        className="e-gantt-container"
+        onDragOver={(e) => {
+          const types = e.dataTransfer.types;
+          if (types.includes(DRAG_TYPE_MEMBER_LIST)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!isMemberListDragging) setIsMemberListDragging(true);
+            return;
+          }
+          if (types.includes(DRAG_TYPE_TASK_LIST)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!isTaskListDragging) setIsTaskListDragging(true);
+          }
+        }}
+        onDrop={(e) => {
+          if (e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_LIST)) {
+            e.preventDefault();
+            if (draggingMemberIds) setFilteredMemberIds([...draggingMemberIds]);
+            setIsMemberListDragging(false);
+            return;
+          }
+          if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
+            e.preventDefault();
+            handleTaskListDrop();
+            setIsTaskListDragging(false);
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setIsMemberListDragging(false);
+            setIsTaskListDragging(false);
+          }
+        }}
+      >
         {isMemberListDragging && (
-          <div
-            className="e-member-drop-overlay"
-            onDragOver={(e) => {
-              if (e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_LIST)) e.preventDefault();
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (draggingMemberIds) setFilteredMemberIds([...draggingMemberIds]);
-              setIsMemberListDragging(false);
-            }}
-          >
+          <div className="e-member-drop-overlay">
             ここにドロップして局員を絞り込む
+          </div>
+        )}
+        {isTaskListDragging && (
+          <div className="e-task-list-drop-overlay">
+            ここにドロップしてAI配置
           </div>
         )}
         <PrimitiveGanttView
@@ -361,7 +395,6 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
           onMemberClick={onMemberClick}
           buildMemberUrl={buildMemberUrl}
           rowAvailabilityMap={rowAvailabilityMap}
-          onTaskListDrop={handleTaskListDrop}
         />
       </div>
     </StyledEditor>
@@ -500,6 +533,21 @@ const StyledEditor = styled.div`
     font-size: 1.1em;
     font-weight: 600;
     color: #3949ab;
-    pointer-events: all;
+    pointer-events: none;
+  }
+
+  .e-task-list-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(230, 81, 0, 0.12);
+    border: 2px dashed #e65100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #e65100;
+    pointer-events: none;
   }
 `;
