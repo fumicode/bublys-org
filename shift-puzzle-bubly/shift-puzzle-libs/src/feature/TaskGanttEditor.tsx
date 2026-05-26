@@ -30,6 +30,8 @@ import { type GanttConfig } from '../ui/MemberGanttView.js';
 import { draggingMemberId, DRAG_TYPE_MEMBER_INDIVIDUAL } from '../ui/MemberListView.js';
 import { draggingTaskGroups } from './TaskCollection.js';
 import { DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
+import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
+import { computeAiMemberPlacements } from './aiMemberPlacement.js';
 import { moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
@@ -71,6 +73,8 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
 
   /** TaskCollection まとめドラッグ中かどうか（フィルタードロップゾーン表示用） */
   const [isTaskListDragging, setIsTaskListDragging] = useState(false);
+  /** MemberCollection まとめドラッグ中かどうか（AIメンバー配置ドロップゾーン表示用） */
+  const [isMemberListDragging, setIsMemberListDragging] = useState(false);
   const brushMemberId = dragBrushMemberId;
 
   // 初期データロード
@@ -84,10 +88,12 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
   useEffect(() => {
     const handleDragStart = () => {
       if (draggingMemberId) setDragBrushMemberId(draggingMemberId);
+      if (draggingMemberIds) setIsMemberListDragging(true);
     };
     const handleDragEnd = () => {
       setDragBrushMemberId(null);
       setIsTaskListDragging(false);
+      setIsMemberListDragging(false);
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
@@ -190,6 +196,26 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
     }));
   };
 
+  const handleMemberListDrop = () => {
+    if (!draggingMemberIds || !planTimeSchedules[0]) return;
+    const actions = computeAiMemberPlacements(
+      draggingMemberIds,
+      planShifts,
+      visibleShifts,
+      members,
+      planTimeSchedules[0],
+    );
+    for (const action of actions) {
+      dispatch(addUserToBlockRange({
+        planId: shiftPlanId,
+        shiftId: action.shiftId,
+        startBlock: action.startBlock,
+        endBlock: action.endBlock,
+        userId: action.memberId,
+      }));
+    }
+  };
+
   const handleAssignedRunClick = (shiftId: string, memberId: string) => {
     if (onAssignedRunOpen) onAssignedRunOpen(shiftId, memberId);
   };
@@ -245,6 +271,12 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
         className="e-gantt-container"
         onDragOver={(e) => {
           const types = e.dataTransfer.types;
+          if (types.includes(DRAG_TYPE_MEMBER_LIST)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            if (!isMemberListDragging) setIsMemberListDragging(true);
+            return;
+          }
           if (types.includes(DRAG_TYPE_TASK_LIST)) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -257,6 +289,12 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
           }
         }}
         onDrop={(e) => {
+          if (e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_LIST)) {
+            e.preventDefault();
+            handleMemberListDrop();
+            setIsMemberListDragging(false);
+            return;
+          }
           if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
             e.preventDefault();
             if (draggingTaskGroups && draggingTaskGroups.length > 0) {
@@ -268,9 +306,15 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
             setIsTaskListDragging(false);
+            setIsMemberListDragging(false);
           }
         }}
       >
+        {isMemberListDragging && (
+          <div className="e-member-list-drop-overlay">
+            ここにドロップしてAIメンバー配置
+          </div>
+        )}
         {isTaskListDragging && (
           <div className="e-task-list-drop-overlay">
             ここにドロップしてタスク行をフィルタリング
@@ -396,6 +440,21 @@ const StyledEditor = styled.div`
     flex: 1;
     overflow: auto;
     position: relative;
+  }
+
+  .e-member-list-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(27, 94, 32, 0.12);
+    border: 2px dashed #2e7d32;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #2e7d32;
+    pointer-events: none;
   }
 
   .e-task-list-drop-overlay {
