@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * PrimitiveGanttEditor — プリミティブUIガントエディター
+ * TaskGanttEditor — タスク軸×時間軸ガントエディター
  *
- * Redux連携：BlockList ベースのシフト配置データを読み書きする。
- * - ブラシソース：別バブル（shift-puzzle/tasks の TaskList）からタスクをドラッグ
- * - PrimitiveGanttView でセルにホバー連続ペイントして局員を配置
- * - シフト表はシフト表リストから作成し、このエディターは表示のみ担当
+ * PrimitiveGanttEditor の逆転版:
+ *   Y軸=シフト(タスク)行、X軸=時間
+ *   MemberCollection からメンバーカードをドラッグしてシフト行に配置
+ *   ブラシ: ドラッグ中メンバーの参加可能時間とシフト時間のマッチを緑色で表示
  */
 
 import { FC, useEffect, useMemo, useState } from 'react';
@@ -15,8 +15,6 @@ import { useAppDispatch, useAppSelector, useAppStore } from '@bublys-org/state-m
 import {
   selectShiftPuzzleMemberList,
   selectShiftPuzzlePlanById,
-  selectSelectedTaskId,
-  setSelectedTaskId,
   setMemberList,
 } from '../slice/index.js';
 import {
@@ -26,47 +24,40 @@ import {
   ensureBlockListSizes,
 } from '../slice/shift-plan-slice.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
-import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
+import { TaskGanttView, type RowAvailability } from '../ui/TaskGanttView.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 import { type GanttConfig } from '../ui/MemberGanttView.js';
-import { draggingTaskId, DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
-import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
+import { draggingMemberId, DRAG_TYPE_MEMBER_INDIVIDUAL } from '../ui/MemberListView.js';
 import { draggingTaskGroups } from './TaskCollection.js';
-import { computeAiPlacements } from './aiShiftPlacement.js';
+import { DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
+import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
+import { computeAiMemberPlacements } from './aiMemberPlacement.js';
 import { moveBackInPlan, moveForwardInPlan } from '../world-line/index.js';
 
 // ========== 型定義 ==========
 
-type PrimitiveGanttEditorProps = {
+type TaskGanttEditorProps = {
   shiftPlanId: string;
-  /** 既配置run（バー）クリックで配置状況バブル等へ遷移する callback */
-  onAssignedRunOpen?: (shiftId: string, taskId: string) => void;
-  /** 既配置run を展開元としてマークするための URL ビルダ。LinkBubbleの曲線描画に利用 */
-  buildRunUrl?: (shiftId: string) => string;
-  /** 履歴ボタン押下時に呼ばれる callback（世界線バブルを開くなど、親が処理する） */
+  onAssignedRunOpen?: (shiftId: string, memberId: string) => void;
+  buildRunUrl?: (shiftId: string, memberId: string) => string;
+  onTaskClick?: (taskId: string) => void;
+  buildTaskUrl?: (taskId: string) => string;
   onHistoryOpen?: () => void;
-  /** 履歴バブルの URL ビルダー（UrledPlace の curve 起点に使用） */
   buildHistoryUrl?: () => string;
-  /** タスクガントボタン押下時に呼ばれる callback */
-  onTaskGanttOpen?: () => void;
-  /** タスクガントバブルの URL ビルダー（UrledPlace の curve 起点に使用） */
-  buildTaskGanttUrl?: () => string;
-  /** 局員ラベルクリック時のコールバック（親バブルが bubble.id を使って openBubble する） */
   onMemberClick?: (memberId: string) => void;
-  /** 局員ラベルの URL ビルダー（UrledPlace の curve 起点に使用） */
   buildMemberUrl?: (memberId: string) => string;
 };
 
 // ========== コンポーネント ==========
 
-export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
+export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
   shiftPlanId,
   onAssignedRunOpen,
   buildRunUrl,
+  onTaskClick,
+  buildTaskUrl,
   onHistoryOpen,
   buildHistoryUrl,
-  onTaskGanttOpen,
-  buildTaskGanttUrl,
   onMemberClick,
   buildMemberUrl,
 }) => {
@@ -74,25 +65,17 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   const store = useAppStore();
   const members = useAppSelector(selectShiftPuzzleMemberList);
   const shiftPlan = useAppSelector(selectShiftPuzzlePlanById(shiftPlanId));
-  const selectedTaskId = useAppSelector(selectSelectedTaskId);
 
-  /** TaskList ドラッグ中の taskId（ブラシ優先度：ドラッグ > クリック選択） */
-  const [dragBrushTaskId, setDragBrushTaskId] = useState<string | null>(null);
+  /** MemberCollection の個別カードドラッグ中のmemberId */
+  const [dragBrushMemberId, setDragBrushMemberId] = useState<string | null>(null);
+  /** task-list からドロップされたフィルター済みタスクID */
+  const [filteredTaskIds, setFilteredTaskIds] = useState<Set<string> | null>(null);
 
-  /** MemberList ドラッグ中かどうか（ドロップゾーンオーバーレイ表示用） */
-  const [isMemberListDragging, setIsMemberListDragging] = useState(false);
-
-  /** TaskCollection まとめドラッグ中かどうか（AI配置ドロップゾーン表示用） */
+  /** TaskCollection まとめドラッグ中かどうか（フィルタードロップゾーン表示用） */
   const [isTaskListDragging, setIsTaskListDragging] = useState(false);
-
-
-  /** ガントに表示する局員IDのフィルター（null = 全局員） */
-  const [filteredMemberIds, setFilteredMemberIds] = useState<string[] | null>(null);
-
-  /**
-   * 実効ブラシ ID：ドラッグ中はドラッグ対象を、そうでなければ TaskList のクリック選択を使う。
-   */
-  const brushTaskId = dragBrushTaskId ?? selectedTaskId;
+  /** MemberCollection まとめドラッグ中かどうか（AIメンバー配置ドロップゾーン表示用） */
+  const [isMemberListDragging, setIsMemberListDragging] = useState(false);
+  const brushMemberId = dragBrushMemberId;
 
   // 初期データロード
   useEffect(() => {
@@ -101,16 +84,16 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }
   }, [dispatch, members.length]);
 
-  // window の dragstart/dragend を監視してドラッグ中ブラシ・局員ドラッグを同期
+  // window の dragstart/dragend を監視してブラシを同期
   useEffect(() => {
     const handleDragStart = () => {
-      if (draggingTaskId) setDragBrushTaskId(draggingTaskId);
+      if (draggingMemberId) setDragBrushMemberId(draggingMemberId);
       if (draggingMemberIds) setIsMemberListDragging(true);
     };
     const handleDragEnd = () => {
-      setDragBrushTaskId(null);
-      setIsMemberListDragging(false);
+      setDragBrushMemberId(null);
       setIsTaskListDragging(false);
+      setIsMemberListDragging(false);
     };
     window.addEventListener('dragstart', handleDragStart);
     window.addEventListener('dragend', handleDragEnd);
@@ -120,7 +103,7 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     };
   }, []);
 
-  // Ctrl+Z / Ctrl+Shift+Z（Mac は Cmd）で世界線を undo/redo。
+  // Ctrl+Z / Ctrl+Shift+Z で世界線を undo/redo
   useEffect(() => {
     const isEditableTarget = (el: EventTarget | null): boolean => {
       if (!(el instanceof HTMLElement)) return false;
@@ -147,7 +130,12 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   const planShifts = useMemo(() => shiftPlan?.shifts ?? [], [shiftPlan]);
   const planTimeSchedules = useMemo(() => shiftPlan?.timeSchedules ?? [], [shiftPlan]);
 
-  // BlockList サイズを TimeSchedule の totalBlocks に揃える（フォールバックの修正）
+  const visibleShifts = useMemo(() => {
+    if (!filteredTaskIds) return planShifts;
+    return planShifts.filter((s) => filteredTaskIds.has(s.taskId));
+  }, [planShifts, filteredTaskIds]);
+
+  // BlockList サイズを TimeSchedule の totalBlocks に揃える
   const activeScheduleTotalBlocks = planTimeSchedules[0]?.totalBlocks;
   useEffect(() => {
     if (!activeScheduleTotalBlocks) return;
@@ -156,37 +144,26 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
   const ganttConfig: GanttConfig = { hourPx: 60 };
 
-  /** 表示する局員（フィルター適用済み） */
-  const displayMembers = useMemo(() => {
-    if (!filteredMemberIds) return members;
-    return filteredMemberIds.flatMap(id => {
-      const m = members.find(m => m.id === id);
-      return m ? [m] : [];
-    });
-  }, [members, filteredMemberIds]);
-
   /**
    * 行の受け入れ可否マップ（ブラシ中のみ意味がある）。
+   * key = shiftId
    */
   const rowAvailabilityMap = useMemo((): Map<string, RowAvailability> => {
-    if (!brushTaskId) return new Map();
-    const taskShifts = planShifts.filter((s) => s.taskId === brushTaskId);
-    if (taskShifts.length === 0) return new Map();
-
+    if (!brushMemberId) return new Map();
+    const member = members.find((m) => m.id === brushMemberId);
+    if (!member) return new Map();
     const map = new Map<string, RowAvailability>();
-    for (const member of displayMembers) {
-      const anyAvailable = taskShifts.some((s) => member.isAvailableForShift(s));
+    for (const shift of planShifts) {
+      const anyAvailable = member.isAvailableForShift(shift);
       if (!anyAvailable) {
-        map.set(member.id, 'unavailable');
+        map.set(shift.id, 'unavailable');
         continue;
       }
-      const departmentMatches = taskShifts.some(
-        (s) => !s.responsibleDepartment || member.department === s.responsibleDepartment,
-      );
-      map.set(member.id, departmentMatches ? 'available' : 'warning');
+      const deptOk = !shift.responsibleDepartment || member.department === shift.responsibleDepartment;
+      map.set(shift.id, deptOk ? 'available' : 'warning');
     }
     return map;
-  }, [brushTaskId, planShifts, members]);
+  }, [brushMemberId, planShifts, members]);
 
   const handlePaintRange = (shiftId: string, memberId: string, startBlock: number, endBlock: number) => {
     dispatch(addUserToBlockRange({ planId: shiftPlanId, shiftId, startBlock, endBlock, userId: memberId }));
@@ -197,17 +174,19 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
   };
 
   const handleMoveRun = (
-    shiftId: string,
+    oldShiftId: string,
     oldMemberId: string,
     oldStart: number,
     oldEnd: number,
+    newShiftId: string,
     newMemberId: string,
     newStart: number,
     newEnd: number,
   ) => {
     dispatch(moveUserBlocks({
       planId: shiftPlanId,
-      shiftId,
+      shiftId: oldShiftId,
+      newShiftId: newShiftId !== oldShiftId ? newShiftId : undefined,
       oldUserId: oldMemberId,
       oldStart,
       oldEnd,
@@ -217,12 +196,13 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }));
   };
 
-  const handleTaskListDrop = () => {
-    if (!draggingTaskGroups || !planTimeSchedules[0]) return;
-    const actions = computeAiPlacements(
-      draggingTaskGroups,
+  const handleMemberListDrop = () => {
+    if (!draggingMemberIds || !planTimeSchedules[0]) return;
+    const actions = computeAiMemberPlacements(
+      draggingMemberIds,
       planShifts,
-      displayMembers,
+      visibleShifts,
+      members,
       planTimeSchedules[0],
     );
     for (const action of actions) {
@@ -236,10 +216,14 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     }
   };
 
-  const handleAssignedRunClick = (shiftId: string) => {
-    const shift = planShifts.find((s) => s.id === shiftId);
-    if (shift && onAssignedRunOpen) onAssignedRunOpen(shift.id, shift.taskId);
+  const handleAssignedRunClick = (shiftId: string, memberId: string) => {
+    if (onAssignedRunOpen) onAssignedRunOpen(shiftId, memberId);
   };
+
+  const brushMemberName = useMemo(() => {
+    if (!brushMemberId) return null;
+    return members.find((m) => m.id === brushMemberId)?.name ?? null;
+  }, [brushMemberId, members]);
 
   if (!shiftPlan) {
     return (
@@ -253,82 +237,30 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
     <StyledEditor>
       {/* ツールバー */}
       <div className="e-toolbar">
-        {/* タイトル */}
         <span className="e-plan-name">{shiftPlan.name}</span>
 
-        {/* ブラシ表示（クリック選択中はクリアボタンを併設） */}
-        {brushTaskId && (
-          <div className="e-active-brush">
-            <span className="e-brush-label">
-              ブラシ: {planShifts.find((s) => s.taskId === brushTaskId)?.taskName ?? brushTaskId}
-            </span>
-            {!dragBrushTaskId && selectedTaskId && (
-              <button
-                type="button"
-                className="e-brush-clear"
-                onClick={() => dispatch(setSelectedTaskId(null))}
-                aria-label="ブラシを解除"
-              >
-                ×
-              </button>
-            )}
+        {filteredTaskIds && (
+          <div className="e-filter-badge">
+            <span>{filteredTaskIds.size}件フィルター中</span>
+            <button type="button" className="e-filter-clear" onClick={() => setFilteredTaskIds(null)}>✕</button>
           </div>
         )}
 
-        {/* 局員フィルターリセットボタン */}
-        {filteredMemberIds && (
-          <button
-            type="button"
-            className="e-member-filter-reset"
-            onClick={() => setFilteredMemberIds(null)}
-            title="全局員表示に戻す"
-          >
-            👥 {filteredMemberIds.length}名 → 全員表示に戻す
-          </button>
+        {brushMemberName && (
+          <div className="e-active-brush">
+            <span className="e-brush-label">ブラシ: {brushMemberName}</span>
+          </div>
         )}
-
-        {/* タスクガントボタン */}
-        {buildTaskGanttUrl ? (
-          <UrledPlace url={buildTaskGanttUrl()}>
-            <button
-              type="button"
-              className="e-task-gantt-btn"
-              onClick={onTaskGanttOpen}
-              title="タスク軸ガントを開く"
-            >
-              タスク軸
-            </button>
-          </UrledPlace>
-        ) : onTaskGanttOpen ? (
-          <button
-            type="button"
-            className="e-task-gantt-btn"
-            onClick={onTaskGanttOpen}
-            title="タスク軸ガントを開く"
-          >
-            タスク軸
-          </button>
-        ) : null}
 
         {/* 履歴ボタン */}
         {buildHistoryUrl ? (
           <UrledPlace url={buildHistoryUrl()}>
-            <button
-              type="button"
-              className="e-history-btn"
-              onClick={onHistoryOpen}
-              title="世界線の履歴を表示"
-            >
+            <button type="button" className="e-history-btn" onClick={onHistoryOpen} title="世界線の履歴を表示">
               履歴
             </button>
           </UrledPlace>
         ) : (
-          <button
-            type="button"
-            className="e-history-btn"
-            onClick={onHistoryOpen}
-            title="世界線の履歴を表示"
-          >
+          <button type="button" className="e-history-btn" onClick={onHistoryOpen} title="世界線の履歴を表示">
             履歴
           </button>
         )}
@@ -349,52 +281,61 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
             if (!isTaskListDragging) setIsTaskListDragging(true);
+            return;
+          }
+          if (types.includes(DRAG_TYPE_MEMBER_INDIVIDUAL)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
           }
         }}
         onDrop={(e) => {
           if (e.dataTransfer.types.includes(DRAG_TYPE_MEMBER_LIST)) {
             e.preventDefault();
-            if (draggingMemberIds) setFilteredMemberIds([...draggingMemberIds]);
+            handleMemberListDrop();
             setIsMemberListDragging(false);
             return;
           }
           if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
             e.preventDefault();
-            handleTaskListDrop();
+            if (draggingTaskGroups && draggingTaskGroups.length > 0) {
+              setFilteredTaskIds(new Set(draggingTaskGroups.map((g) => g.taskId)));
+            }
             setIsTaskListDragging(false);
           }
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-            setIsMemberListDragging(false);
             setIsTaskListDragging(false);
+            setIsMemberListDragging(false);
           }
         }}
       >
         {isMemberListDragging && (
-          <div className="e-member-drop-overlay">
-            ここにドロップして局員を絞り込む
+          <div className="e-member-list-drop-overlay">
+            ここにドロップしてAIメンバー配置
           </div>
         )}
         {isTaskListDragging && (
           <div className="e-task-list-drop-overlay">
-            ここにドロップしてAI配置
+            ここにドロップしてタスク行をフィルタリング
           </div>
         )}
-        <PrimitiveGanttView
-          shifts={planShifts}
+        <TaskGanttView
+          shifts={visibleShifts}
           timeSchedules={planTimeSchedules}
-          members={displayMembers}
+          members={members}
           ganttConfig={ganttConfig}
-          brushTaskId={brushTaskId}
+          brushMemberId={brushMemberId}
+          rowAvailabilityMap={rowAvailabilityMap}
           onPaintRange={handlePaintRange}
           onRemoveRange={handleRemoveRange}
           onMoveRun={handleMoveRun}
           onAssignedRunClick={handleAssignedRunClick}
           buildRunUrl={buildRunUrl}
+          onTaskClick={onTaskClick}
+          buildTaskUrl={buildTaskUrl}
           onMemberClick={onMemberClick}
           buildMemberUrl={buildMemberUrl}
-          rowAvailabilityMap={rowAvailabilityMap}
         />
       </div>
     </StyledEditor>
@@ -440,49 +381,44 @@ const StyledEditor = styled.div`
     white-space: nowrap;
   }
 
+  .e-filter-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px 2px 8px;
+    background: #fff3e0;
+    border: 1px solid #ffa000;
+    border-radius: 12px;
+    font-size: 0.82em;
+    color: #e65100;
+    font-weight: 600;
+
+    .e-filter-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #e65100;
+      font-size: 0.85em;
+      padding: 0 2px;
+      line-height: 1;
+      &:hover { color: #bf360c; }
+    }
+  }
+
   .e-active-brush {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 2px 8px;
-    background: #e3f2fd;
-    border: 1px solid #90caf9;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
     border-radius: 12px;
   }
 
   .e-brush-label {
     font-size: 0.82em;
-    color: #1565c0;
+    color: #1b5e20;
     font-weight: 600;
-  }
-
-  .e-brush-clear {
-    border: none;
-    background: transparent;
-    color: #1565c0;
-    font-size: 1.1em;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 2px;
-    border-radius: 10px;
-    &:hover {
-      background: rgba(21, 101, 192, 0.15);
-    }
-  }
-
-  .e-task-gantt-btn {
-    padding: 2px 10px;
-    border: 1px solid #a5d6a7;
-    border-radius: 12px;
-    background: #f1f8e9;
-    color: #33691e;
-    font-size: 0.82em;
-    cursor: pointer;
-    white-space: nowrap;
-    &:hover {
-      background: #dcedc8;
-      border-color: #558b2f;
-    }
   }
 
   .e-history-btn {
@@ -500,39 +436,24 @@ const StyledEditor = styled.div`
     }
   }
 
-  .e-member-filter-reset {
-    padding: 2px 10px;
-    border: 1px solid #7986cb;
-    border-radius: 12px;
-    background: #e8eaf6;
-    color: #3949ab;
-    font-size: 0.82em;
-    cursor: pointer;
-    white-space: nowrap;
-    &:hover {
-      background: #c5cae9;
-      border-color: #3949ab;
-    }
-  }
-
   .e-gantt-container {
     flex: 1;
     overflow: auto;
     position: relative;
   }
 
-  .e-member-drop-overlay {
+  .e-member-list-drop-overlay {
     position: absolute;
     inset: 0;
     z-index: 10;
-    background: rgba(57, 73, 171, 0.15);
-    border: 2px dashed #3949ab;
+    background: rgba(27, 94, 32, 0.12);
+    border: 2px dashed #2e7d32;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.1em;
     font-weight: 600;
-    color: #3949ab;
+    color: #2e7d32;
     pointer-events: none;
   }
 

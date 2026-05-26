@@ -20,6 +20,7 @@ import {
   TaskDetail,
   MemberGanttEditor,
   PrimitiveGanttEditor,
+  TaskGanttEditor,
   ShiftPlanWorldLineGraphView,
   ShiftPlanList,
   ShiftStatus,
@@ -257,8 +258,16 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
     openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side');
   };
 
+  const buildHistoryUrl = () => `shift-puzzle/shift-plans/${shiftPlanId}/history`;
+
   const handleHistoryOpen = () => {
-    openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/history`, bubble.id, 'bubble-side');
+    openBubble(buildHistoryUrl(), bubble.id, 'bubble-side');
+  };
+
+  const buildTaskGanttUrl = () => `shift-puzzle/shift-plans/${shiftPlanId}/task-gantt`;
+
+  const handleTaskGanttOpen = () => {
+    openBubble(buildTaskGanttUrl(), bubble.id, 'bubble-side');
   };
 
   const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
@@ -273,6 +282,9 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
       onAssignedRunOpen={handleAssignedRunOpen}
       buildRunUrl={buildRunUrl}
       onHistoryOpen={handleHistoryOpen}
+      buildHistoryUrl={buildHistoryUrl}
+      onTaskGanttOpen={handleTaskGanttOpen}
+      buildTaskGanttUrl={buildTaskGanttUrl}
       onMemberClick={handleMemberClick}
       buildMemberUrl={buildMemberUrl}
     />
@@ -430,9 +442,52 @@ const ShiftPuzzleTaskBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
+// シフトパズル - タスクガントエディタバブル（タスク軸×時間軸・メンバー配置）
+const ShiftPuzzleTaskGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const shiftPlanId = bubble.params.shiftPlanId;
+
+  const buildRunUrl = (shiftId: string) =>
+    `shift-puzzle/shift-plans/${shiftPlanId}/shifts/${shiftId}/status`;
+
+  const handleAssignedRunOpen = (shiftId: string) => {
+    openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side');
+  };
+
+  const buildHistoryUrl = () => `shift-puzzle/shift-plans/${shiftPlanId}/history`;
+  const handleHistoryOpen = () => {
+    openBubble(buildHistoryUrl(), bubble.id, 'bubble-side');
+  };
+
+  const buildTaskUrl = (taskId: string) => `shift-puzzle/tasks/${taskId}`;
+  const handleTaskClick = (taskId: string) => {
+    openBubble(buildTaskUrl(taskId), bubble.id, 'bubble-side');
+  };
+
+  const buildMemberUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
+  const handleMemberClick = (memberId: string) => {
+    openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side');
+  };
+
+  return (
+    <TaskGanttEditor
+      shiftPlanId={shiftPlanId}
+      onAssignedRunOpen={handleAssignedRunOpen}
+      buildRunUrl={buildRunUrl}
+      onTaskClick={handleTaskClick}
+      buildTaskUrl={buildTaskUrl}
+      onHistoryOpen={handleHistoryOpen}
+      buildHistoryUrl={buildHistoryUrl}
+      onMemberClick={handleMemberClick}
+      buildMemberUrl={buildMemberUrl}
+    />
+  );
+};
+
 // シフトパズル - 世界線履歴バブル
 const ShiftPuzzleShiftPlanHistoryBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <ShiftPlanWorldLineGraphView planId={bubble.params.shiftPlanId} />;
+  const shiftPlanId = bubble.params.shiftPlanId;
+  return <ShiftPlanWorldLineGraphView planId={shiftPlanId} />;
 };
 
 /** シフトパズル機能のバブルルート定義 */
@@ -446,6 +501,7 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // ガントビュー（:shiftPlanIdの前に配置して優先マッチ）
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/gantt", type: "gantt-editor", Component: ShiftPuzzleGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/primitive-gantt", type: "primitive-gantt-editor", Component: ShiftPuzzlePrimitiveGanttEditorBubble },
+  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/task-gantt", type: "task-gantt-editor", Component: ShiftPuzzleTaskGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/history", type: "shift-plan-history", Component: ShiftPuzzleShiftPlanHistoryBubble },
   { pattern: "shift-puzzle/shift-plans", type: "shift-plan-list", Component: ShiftPuzzleShiftPlanListBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/members", type: "shift-status-members", Component: ShiftPuzzleShiftStatusMembersBubble },

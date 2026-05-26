@@ -277,3 +277,4 @@ const StyledContainer = styled.div`
 
 export const DRAG_TYPE_MEMBER_LIST = 'type/member-list';
 export let draggingMemberIds: string[] | null = null;
+

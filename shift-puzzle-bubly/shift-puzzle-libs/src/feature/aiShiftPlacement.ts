@@ -83,7 +83,7 @@ export function computeAiPlacements(
   return consolidateToRanges(flat);
 }
 
-function consolidateToRanges(
+export function consolidateToRanges(
   flat: { shiftId: string; memberId: string; blockIndex: number }[],
 ): AiPlacementAction[] {
   const grouped = new Map<string, number[]>(); // `${shiftId}::${memberId}` → blockIndex[]

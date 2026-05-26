@@ -6,6 +6,15 @@ import { Member } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
+// ========== ドラッグ転送用モジュール変数 ==========
+// TaskGanttView が個別メンバーカードドラッグを検出するための変数
+// （TaskListView の draggingTaskId と同じパターン）
+
+export const DRAG_TYPE_MEMBER_INDIVIDUAL = 'type/member-individual';
+export let draggingMemberId: string | null = null;
+
+// ========== 型定義 ==========
+
 type MemberListViewProps = {
   memberList: Member[];
   selectedMemberId?: string | null;
@@ -32,6 +41,13 @@ export const MemberListView: FC<MemberListViewProps> = ({
           return (
             <li
               key={member.id}
+              draggable
+              onDragStart={(e) => {
+                draggingMemberId = member.id;
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData(DRAG_TYPE_MEMBER_INDIVIDUAL, member.id);
+              }}
+              onDragEnd={() => { draggingMemberId = null; }}
               className={`e-item ${selectedMemberId === member.id ? "is-selected" : ""}`}
             >
               <ObjectView

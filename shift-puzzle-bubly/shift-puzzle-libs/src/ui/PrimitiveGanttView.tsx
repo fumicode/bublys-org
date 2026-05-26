@@ -501,6 +501,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
     (e: React.DragEvent) => {
       if (e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
         return;
       }
       if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK)) return;
@@ -731,7 +732,14 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
   const dayStartMinute = activeTimeSchedule.startMinute;
 
   return (
-    <StyledGantt onDragOver={handleContainerDragOver}>
+    <StyledGantt
+      onDragOver={handleContainerDragOver}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes(DRAG_TYPE_TASK_LIST)) return;
+        e.preventDefault();
+        onTaskListDrop?.();
+      }}
+    >
       {/* ヘッダー行（grid row 1） */}
       <div className="e-member-col-header">局員</div>
       <div className="e-time-axis" style={{ width: totalWidth }}>

@@ -14,3 +14,4 @@ export * from "./CoverageTetrisView.js";
 export * from "./TaskAssignmentStatusView.js";
 export * from "./UnifiedShiftStatusView.js";
 export * from "./ShiftPlanListView.js";
+export * from "./TaskGanttView.js";
