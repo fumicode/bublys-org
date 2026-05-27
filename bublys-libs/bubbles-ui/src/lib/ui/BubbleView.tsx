@@ -9,6 +9,7 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { createUniverse } from "../universe-config.js";
+import { useUniverseId } from "../context/UniverseContext.js";
 
 /**
  * 泡っぽい閉じるボタンのSVGアイコン
@@ -157,6 +158,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   );
 
   const dispatch = useAppDispatch();
+  const universeId = useUniverseId();
   const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -169,7 +171,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { ref, notifyRendered} = useMyRectObserver({
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
-      dispatch(renderBubble(updated.toJSON()));
+      dispatch(renderBubble(updated.toJSON(), universeId));
 
       onDebugRects?.([rect]);
     }
@@ -184,7 +186,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const endDrag = () => {
     // ドラッグ終了時のみRedux更新（パフォーマンス最適化）
     if (currentDragPosRef.current) {
-      dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON()));
+      dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON(), universeId));
     }
     // インラインスタイルをクリア（styled-componentsに制御を戻す）
     if (ref.current) {
@@ -250,7 +252,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
     if (isMaximized) {
       // フィットに戻す
       const resizedBubble = Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
-      dispatch(updateBubble(resizedBubble.toJSON()));
+      dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     } else {
       // 最大化: ユーザーに今見えている viewport の surface 領域いっぱいに広げる。
@@ -275,7 +277,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
       const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
-      dispatch(updateBubble(resizedBubble.toJSON()));
+      dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     }
   };

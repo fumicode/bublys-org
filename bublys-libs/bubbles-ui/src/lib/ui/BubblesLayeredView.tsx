@@ -9,11 +9,11 @@ import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
 import { UNIVERSE_SIZE } from "../universe-config.js";
 import {
-  selectValidBubbleRelationIds,
-  selectGlobalCoordinateSystem,
-  selectSurfaceLeftTop,
+  makeSelectValidBubbleRelationIds,
+  makeSelectGlobalCoordinateSystem,
+  makeSelectSurfaceLeftTop,
   selectIsLayerAnimating,
-  makeSelectBubbleById,
+  makeSelectBubbleByIdInUniverse,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -21,6 +21,7 @@ import {
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント
  */
 type ConnectedBubbleViewProps = {
+  universeId: string;
   bubbleId: string;
   layerIndex: number;
   zIndex: number;
@@ -38,6 +39,7 @@ type ConnectedBubbleViewProps = {
 };
 
 const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
+  universeId,
   bubbleId,
   layerIndex,
   zIndex,
@@ -53,7 +55,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   onBubbleLayerUp,
   onDebugRects,
 })  {
-  const selectBubble = useMemo(() => makeSelectBubbleById(bubbleId), [bubbleId]);
+  const selectBubble = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, bubbleId), [universeId, bubbleId]);
   const bubble = useAppSelector(selectBubble);
 
   if (!bubble) return null;
@@ -87,6 +89,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
  * 個別のLinkBubbleを自分でReduxから取得するラッパーコンポーネント
  */
 type ConnectedLinkBubbleViewProps = {
+  universeId: string;
   openerId: string;
   openeeId: string;
   coordinateSystem: CoordinateSystem;
@@ -94,13 +97,14 @@ type ConnectedLinkBubbleViewProps = {
 };
 
 const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
+  universeId,
   openerId,
   openeeId,
   coordinateSystem,
   linkZIndex,
 }) {
-  const selectOpener = useMemo(() => makeSelectBubbleById(openerId), [openerId]);
-  const selectOpenee = useMemo(() => makeSelectBubbleById(openeeId), [openeeId]);
+  const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
+  const selectOpenee = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openeeId), [universeId, openeeId]);
   const opener = useAppSelector(selectOpener);
   const openee = useAppSelector(selectOpenee);
 
@@ -213,9 +217,9 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   }, [onCoordinateSystemReady, vanishingPoint]);
 
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(true);
-  const relationIds = useAppSelector(selectValidBubbleRelationIds);
-  const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
-  const coordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
+  const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
+  const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
+  const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
@@ -255,6 +259,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         return (
           <ConnectedBubbleView
             key={bubbleId}
+            universeId={universeId}
             bubbleId={bubbleId}
             layerIndex={layerIndex}
             zIndex={zIndex}
@@ -291,6 +296,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
                 return(
                   <ConnectedLinkBubbleView
                     key={`${openerId}_${openeeId}`}
+                    universeId={universeId}
                     openerId={openerId}
                     openeeId={openeeId}
                     coordinateSystem={coordinateSystem}
