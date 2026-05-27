@@ -114,11 +114,10 @@ const getInitialState = (): BubbleStateSlice => {
   };
 };
 
-// draft state から universe を取得（無ければ作る）。
-// Step 1 では呼び出しは常に root。Step 2 で universeId を引数に通す。
+// draft state から universe を取得（無ければ作る）
 const draftUniverse = (
   state: BubbleStateSlice,
-  universeId: string = ROOT_UNIVERSE_ID,
+  universeId: string,
 ): UniverseState => {
   let u = state.universes[universeId];
   if (!u) {
@@ -128,67 +127,100 @@ const draftUniverse = (
   return u;
 };
 
+// 各 universe スコープのアクションは meta に universeId を載せる（省略時 root）。
+// これにより既存の dispatch(addBubble(json)) は root のまま、
+// ネストは dispatch(addBubble(json, universeId)) で対象 universe を指定できる。
+type UniverseMeta = { universeId: string };
+const withU = <P>(payload: P, universeId: string = ROOT_UNIVERSE_ID) => ({
+  payload,
+  meta: { universeId },
+});
+// 型付き prepare（payload 型を具体化しないと action creator の payload が unknown になる）
+const prepStr = (payload: string, universeId?: string) => withU(payload, universeId);
+const prepBubble = (payload: BubbleJson, universeId?: string) => withU(payload, universeId);
+const prepRelation = (payload: BubblesRelation, universeId?: string) => withU(payload, universeId);
+const prepPopChild = (payload: PopChildPayload, universeId?: string) => withU(payload, universeId);
+const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(payload, universeId);
+const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
+const prepView = (payload: BubbleViewStateJson, universeId?: string) => withU(payload, universeId);
+
 export const bubblesSlice = createSlice({
   name: "bubbleState",
   initialState: getInitialState,
   reducers: {
     // Process-only actions
-    deleteProcessBubble: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      u.process = BubblesProcess.fromJSON(u.process)
-        .deleteBubble(action.payload)
-        .toJSON();
-      state.renderCount += 1;
+    deleteProcessBubble: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process)
+          .deleteBubble(action.payload)
+          .toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepStr,
     },
-    layerDown: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      u.process = BubblesProcess.fromJSON(u.process)
-        .layerDown(action.payload)
-        .toJSON();
-
-      state.renderCount += 1;
+    layerDown: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process)
+          .layerDown(action.payload)
+          .toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepStr,
     },
-    layerUp: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      u.process = BubblesProcess.fromJSON(u.process)
-        .layerUp(action.payload)
-        .toJSON();
-      state.renderCount += 1;
-    },
-
-    popChild: (state, action: PayloadAction<PopChildPayload>) => {
-      const u = draftUniverse(state);
-      const process = BubblesProcess.fromJSON(u.process);
-      const poppedProcess = process.popChild(action.payload.bubbleId);
-      u.process = poppedProcess.toJSON();
-      state.renderCount += 1;
-      // アニメーション対象のバブルIDを追加（重複防止）
-      if (!state.animatingBubbleIds.includes(action.payload.bubbleId)) {
-        state.animatingBubbleIds.push(action.payload.bubbleId);
-      }
+    layerUp: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process)
+          .layerUp(action.payload)
+          .toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepStr,
     },
 
-    popChildMax: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      const process = BubblesProcess.fromJSON(u.process);
-      const poppedProcess = process.popChild(action.payload);
+    popChild: {
+      reducer: (state, action: PayloadAction<PopChildPayload, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const process = BubblesProcess.fromJSON(u.process);
+        const poppedProcess = process.popChild(action.payload.bubbleId);
+        u.process = poppedProcess.toJSON();
+        state.renderCount += 1;
+        // アニメーション対象のバブルIDを追加（重複防止）
+        if (!state.animatingBubbleIds.includes(action.payload.bubbleId)) {
+          state.animatingBubbleIds.push(action.payload.bubbleId);
+        }
+      },
+      prepare: prepPopChild,
+    },
 
-      u.process = poppedProcess.toJSON();
-      state.renderCount += 1;
-      // アニメーション対象のバブルIDを追加（重複防止）
-      if (!state.animatingBubbleIds.includes(action.payload)) {
-        state.animatingBubbleIds.push(action.payload);
-      }
+    popChildMax: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const process = BubblesProcess.fromJSON(u.process);
+        const poppedProcess = process.popChild(action.payload);
+
+        u.process = poppedProcess.toJSON();
+        state.renderCount += 1;
+        // アニメーション対象のバブルIDを追加（重複防止）
+        if (!state.animatingBubbleIds.includes(action.payload)) {
+          state.animatingBubbleIds.push(action.payload);
+        }
+      },
+      prepare: prepStr,
     },
 
 
-    joinSibling: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      u.process = BubblesProcess.fromJSON(u.process)
-        .joinSibling(action.payload)
-        .toJSON();
-
-      state.renderCount += 1;
+    joinSibling: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process)
+          .joinSibling(action.payload)
+          .toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepStr,
     },
 
     finishBubbleAnimation: (state, action: PayloadAction<string>) => {
@@ -201,70 +233,91 @@ export const bubblesSlice = createSlice({
     },
 
     // Entity-only actions
-    addBubble: (state, action: PayloadAction<BubbleJson>) => {
-      const u = draftUniverse(state);
-      u.bubbles[action.payload.id] = action.payload;
-
-      state.renderCount += 1;
+    addBubble: {
+      reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbles[action.payload.id] = action.payload;
+        state.renderCount += 1;
+      },
+      prepare: prepBubble,
     },
-    updateBubble: (state, action: PayloadAction<BubbleJson>) => {
-      const u = draftUniverse(state);
-      u.bubbles[action.payload.id] = action.payload;
-      state.renderCount += 1;
+    updateBubble: {
+      reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbles[action.payload.id] = action.payload;
+        state.renderCount += 1;
+      },
+      prepare: prepBubble,
     },
-    renderBubble: (state, action: PayloadAction<BubbleJson>) => {
-      const u = draftUniverse(state);
-      u.bubbles[action.payload.id] = action.payload;
+    renderBubble: {
+      reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbles[action.payload.id] = action.payload;
+      },
+      prepare: prepBubble,
     },
 
     // Combined action
-    removeBubble: (state, action: PayloadAction<string>) => {
-      const u = draftUniverse(state);
-      const removingId = action.payload;
-      delete u.bubbles[removingId];
-      state.renderCount += 1;
+    removeBubble: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const removingId = action.payload;
+        delete u.bubbles[removingId];
+        state.renderCount += 1;
 
-      u.bubbleRelations = u.bubbleRelations.filter(
-        relation => relation.openerId !== removingId && relation.openeeId !== removingId
-      );
+        u.bubbleRelations = u.bubbleRelations.filter(
+          relation => relation.openerId !== removingId && relation.openeeId !== removingId
+        );
 
-      // Remove from process layers
-      u.process.layers = u.process.layers.map(
-        layer => layer.filter(id => id !== removingId)
-      ).filter(layer => layer.length > 0);  // Remove empty layers
+        // Remove from process layers
+        u.process.layers = u.process.layers.map(
+          layer => layer.filter(id => id !== removingId)
+        ).filter(layer => layer.length > 0);  // Remove empty layers
 
-      // レイヤー移動アニメーションが発生するので、ダミーIDを追加
-      // （フォールバックタイマーでクリアされる）
-      if (!state.animatingBubbleIds.includes('__removing__')) {
-        state.animatingBubbleIds.push('__removing__');
-      }
+        // レイヤー移動アニメーションが発生するので、ダミーIDを追加
+        // （フォールバックタイマーでクリアされる）
+        if (!state.animatingBubbleIds.includes('__removing__')) {
+          state.animatingBubbleIds.push('__removing__');
+        }
+      },
+      prepare: prepStr,
     },
-    relateBubbles: (state, action: PayloadAction<BubblesRelation>) => {
-      //重複がないようにチェックが必要そう
-
-      if(action.payload.openerId === "root") {
-        return ;
-      }
-
-      const u = draftUniverse(state);
-      u.bubbleRelations.push(action.payload);
+    relateBubbles: {
+      reducer: (state, action: PayloadAction<BubblesRelation, string, UniverseMeta>) => {
+        //重複がないようにチェックが必要そう
+        if (action.payload.openerId === "root") {
+          return;
+        }
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbleRelations.push(action.payload);
+      },
+      prepare: prepRelation,
     },
-    setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystemData>) => {
-      const u = draftUniverse(state);
-      u.globalCoordinateSystem = action.payload;
+    setGlobalCoordinateSystem: {
+      reducer: (state, action: PayloadAction<CoordinateSystemData, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.globalCoordinateSystem = action.payload;
+      },
+      prepare: prepCoord,
     },
-    setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
-      const u = draftUniverse(state);
-      u.surfaceLeftTop = action.payload;
+    setSurfaceLeftTop: {
+      reducer: (state, action: PayloadAction<Point2, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.surfaceLeftTop = action.payload;
+      },
+      prepare: prepPoint,
     },
     // world-line から復元した arrangement を丸ごと差し戻す
-    replaceBubbleViewState: (state, action: PayloadAction<BubbleViewStateJson>) => {
-      const u = draftUniverse(state);
-      u.bubbles = action.payload.bubbles;
-      u.bubbleRelations = action.payload.bubbleRelations;
-      u.process = action.payload.process;
-      state.renderCount += 1;
-    }
+    replaceBubbleViewState: {
+      reducer: (state, action: PayloadAction<BubbleViewStateJson, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbles = action.payload.bubbles;
+        u.bubbleRelations = action.payload.bubbleRelations;
+        u.process = action.payload.process;
+        state.renderCount += 1;
+      },
+      prepare: prepView,
+    },
   },
 });
 
@@ -290,22 +343,55 @@ export const {
 // ============================================================================
 // Selectors
 //
-// Step 1: 読み取りは常に root universe。Step 2 で universeId を通す。
+// universe スコープのセレクタは make...(universeId) ファクトリ（universeId ごとに
+// メモ化）。既存の selectX / 入力セレクタは root universe を指す別名で、
+// 呼び出し側は無変更のまま動く。
 // ============================================================================
 
-const rootUniverse = (state: { bubbleState: BubbleStateSlice }): UniverseState =>
-  state.bubbleState.universes[ROOT_UNIVERSE_ID];
+// 未生成 universe を読んでも壊れないよう安定した空 universe を返す
+const EMPTY_UNIVERSE: UniverseState = createEmptyUniverse();
+const universeOf = (
+  state: { bubbleState: BubbleStateSlice },
+  universeId: string,
+): UniverseState => state.bubbleState.universes[universeId] ?? EMPTY_UNIVERSE;
 
-export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
-  Bubble.fromJSON(rootUniverse(state).bubbles[id]);
+const rootUniverse = (state: { bubbleState: BubbleStateSlice }): UniverseState =>
+  universeOf(state, ROOT_UNIVERSE_ID);
+
+// universeId でメモ化するファクトリヘルパー
+const memoizeByUniverse = <T>(build: (universeId: string) => T) => {
+  const cache = new Map<string, T>();
+  return (universeId: string): T => {
+    let v = cache.get(universeId);
+    if (v === undefined) {
+      v = build(universeId);
+      cache.set(universeId, v);
+    }
+    return v;
+  };
+};
+
+export const selectBubble = (
+  state: { bubbleState: BubbleStateSlice },
+  { id, universeId = ROOT_UNIVERSE_ID }: { id: string; universeId?: string },
+) => Bubble.fromJSON(universeOf(state, universeId).bubbles[id]);
 
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
-// 基本セレクター（入力セレクター）
-const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).bubbles;
-const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).process;
-const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).bubbleRelations;
+// 基本セレクター（入力セレクター）: universeId ファクトリ + root 別名
+const makeSelectBubblesJson = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).bubbles,
+);
+const makeSelectProcessJson = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).process,
+);
+const makeSelectBubbleRelationsRaw = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).bubbleRelations,
+);
+const selectBubblesJson = makeSelectBubblesJson(ROOT_UNIVERSE_ID);
+const selectProcessJson = makeSelectProcessJson(ROOT_UNIVERSE_ID);
+const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
 
 /**
  * world-line に commit する arrangement（= 表示状態）を返す。
@@ -513,6 +599,94 @@ export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector
     layerIndexSelectorCache.set(bubbleId, selector);
   }
   return layerIndexSelectorCache.get(bubbleId)!;
+};
+
+// ============================================================================
+// universe スコープのセレクタファクトリ（ネストした universe のレンダリング用）
+// 上の root 用 selectX は make...(ROOT) と等価。
+// ============================================================================
+
+export const makeSelectBubbleLayers = memoizeByUniverse((uid) =>
+  createSelector([makeSelectProcessJson(uid)], (processJson): string[][] =>
+    BubblesProcess.fromJSON(processJson).layers,
+  ),
+);
+
+export const makeSelectValidBubbleRelationIds = memoizeByUniverse((uid) =>
+  createSelector(
+    [makeSelectBubbleRelationsRaw(uid), makeSelectBubblesJson(uid)],
+    (relations, bubblesJson): Array<{ openerId: string; openeeId: string }> =>
+      relations.filter((r) => bubblesJson[r.openerId] && bubblesJson[r.openeeId]),
+  ),
+);
+
+export const makeSelectGlobalCoordinateSystem = memoizeByUniverse((uid) =>
+  createSelector(
+    [(state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).globalCoordinateSystem],
+    (data): CoordinateSystem => CoordinateSystem.fromData(data),
+  ),
+);
+
+export const makeSelectSurfaceLeftTop = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }): Point2 => universeOf(state, uid).surfaceLeftTop,
+);
+
+export const makeSelectSurfaceBubbles = memoizeByUniverse((uid) =>
+  createSelector([makeSelectProcessJson(uid), makeSelectBubblesJson(uid)], (processJson, bubblesJson) => {
+    const process = BubblesProcess.fromJSON(processJson);
+    const surfaceIds = process.surface || [];
+    return surfaceIds
+      .filter((id) => bubblesJson[id] !== undefined)
+      .map((id) => Bubble.fromJSON(bubblesJson[id]));
+  }),
+);
+
+export const makeSelectBubbleViewStateForUniverse = memoizeByUniverse((uid) =>
+  createSelector(
+    [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid)],
+    (bubbles, bubbleRelations, process): BubbleViewStateJson => {
+      const arrangementBubbles: Record<string, BubbleJson> = {};
+      for (const [id, bubbleJson] of Object.entries(bubbles)) {
+        const { renderedRect: _renderedRect, ...rest } = bubbleJson;
+        arrangementBubbles[id] = rest;
+      }
+      return { bubbles: arrangementBubbles, bubbleRelations, process };
+    },
+  ),
+);
+
+// --- universe スコープの個別バブルセレクタ（cache キー = universeId:bubbleId） ---
+const universeBubbleByIdCache = new Map<string, BubbleByIdSelector>();
+export const makeSelectBubbleByIdInUniverse = (universeId: string, bubbleId: string): BubbleByIdSelector => {
+  const key = `${universeId}:${bubbleId}`;
+  if (!universeBubbleByIdCache.has(key)) {
+    universeBubbleByIdCache.set(
+      key,
+      createSelector(
+        [(state: { bubbleState: BubbleStateSlice }) => universeOf(state, universeId).bubbles[bubbleId]],
+        (bubbleJson): Bubble | undefined => (bubbleJson ? Bubble.fromJSON(bubbleJson) : undefined),
+      ),
+    );
+  }
+  return universeBubbleByIdCache.get(key)!;
+};
+
+const universeLayerIndexCache = new Map<string, LayerIndexSelector>();
+export const makeSelectBubbleLayerIndexInUniverse = (universeId: string, bubbleId: string): LayerIndexSelector => {
+  const key = `${universeId}:${bubbleId}`;
+  if (!universeLayerIndexCache.has(key)) {
+    universeLayerIndexCache.set(
+      key,
+      createSelector([makeSelectProcessJson(universeId)], (processJson): number => {
+        const layers = BubblesProcess.fromJSON(processJson).layers;
+        for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+          if (layers[layerIndex].includes(bubbleId)) return layerIndex;
+        }
+        return -1;
+      }),
+    );
+  }
+  return universeLayerIndexCache.get(key)!;
 };
 
 export default bubblesSlice.reducer;

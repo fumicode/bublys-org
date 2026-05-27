@@ -14,6 +14,7 @@ import {
   selectSurfaceLeftTop,
   selectIsLayerAnimating,
   makeSelectBubbleById,
+  ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
 /**
@@ -117,6 +118,8 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
 
 export type BubblesLayeredViewProps = {
   bubbleLayers: string[][];
+  /** この universe の ID（省略時 root）。ネストした universe で別 ID を渡す */
+  universeId?: string;
   vanishingPoint?: Point2;
   renderBubbleContent?: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
@@ -135,6 +138,7 @@ const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
 
 export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   bubbleLayers,
+  universeId = ROOT_UNIVERSE_ID,
   vanishingPoint,
   renderBubbleContent = defaultRenderBubbleContent,
   onBubbleClick,
@@ -271,7 +275,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     )
     .flat();
 
-  const universeContextValue = useMemo(() => ({ universeRef }), []);
+  const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
 
   return (
     <UniverseContext.Provider value={universeContextValue}>
