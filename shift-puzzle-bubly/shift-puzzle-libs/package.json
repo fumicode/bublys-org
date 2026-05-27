@@ -28,6 +28,7 @@
   },
   "nx": {
     "targets": {
+      "build": { "dependsOn": ["^build"] },
       "dev": { "continuous": true }
     }
   }
