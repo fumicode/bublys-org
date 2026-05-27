@@ -1,5 +1,5 @@
 import { SmartRect, CoordinateSystem } from '@bublys-org/bubbles-ui-util';
-import { measureViewport } from './measure-viewport.js';
+import { measureViewportForElement } from './measure-viewport.js';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す
@@ -45,12 +45,12 @@ export const getElementRect = (element: HTMLElement): DOMRect => {
 };
 
 /**
- * screen 座標の DOMRect を universe 座標に変換する。
- * 変換は Viewport（measureViewport で DOM 計測）に委譲する。
+ * screen 座標の DOMRect を、origin 要素が属する universe の座標に変換する。
+ * ネストした universe では origin 要素の最寄り universe を基準にする。
  * universe 要素が無い場合は screen 座標のまま返す（後方互換）。
  */
-const toUniverseRect = (screenRect: DOMRect): DOMRect => {
-  const viewport = measureViewport();
+const toUniverseRect = (screenRect: DOMRect, originEl: HTMLElement): DOMRect => {
+  const viewport = measureViewportForElement(originEl);
   if (!viewport) return screenRect;
 
   const topLeft = viewport.screenToUniverse({
@@ -92,7 +92,7 @@ export const getOriginRect = (
   if (!originEl) return undefined;
 
   const rect_vp = getElementRect(originEl);
-  const rect_uv = toUniverseRect(rect_vp);
+  const rect_uv = toUniverseRect(rect_vp, originEl);
   const parentSize = { width: window.innerWidth, height: window.innerHeight };
 
   return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());

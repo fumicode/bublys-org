@@ -2,7 +2,7 @@
 import { createContext, useContext, useRef, useCallback, ReactNode, FC } from "react";
 import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getElementRect } from "../utils/get-origin-rect.js";
-import { measureViewport } from "../utils/measure-viewport.js";
+import { measureViewportForElement } from "../utils/measure-viewport.js";
 
 type CachedRect = {
   rect: SmartRect;
@@ -79,7 +79,8 @@ export const BubbleRefsProvider: FC<{ children: ReactNode }> = ({ children }) =>
     // screen 座標 → universe 座標に補正してから SmartRect 化
     // （SmartRect.GLOBAL は universe 座標系を表す。変換は Viewport に委譲）
     const screenRect = getElementRect(originEl);
-    const viewport = measureViewport();
+    // origin 要素が属する universe（ネストでは最寄り）を基準に screen→universe 変換
+    const viewport = measureViewportForElement(originEl);
     const topLeft = viewport
       ? viewport.screenToUniverse({ x: screenRect.x, y: screenRect.y })
       : { x: screenRect.x, y: screenRect.y };

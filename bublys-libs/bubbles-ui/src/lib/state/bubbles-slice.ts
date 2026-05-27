@@ -463,8 +463,11 @@ export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice })
   return rootUniverse(state).bubbleRelations;
 }
 
-export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStateSlice }, { openeeId }: { openeeId: string }) => {
-  return rootUniverse(state).bubbleRelations.find(relation => relation.openeeId === openeeId);
+export const selectBubblesRelationByOpeneeId = (
+  state: { bubbleState: BubbleStateSlice },
+  { openeeId, universeId = ROOT_UNIVERSE_ID }: { openeeId: string; universeId?: string },
+) => {
+  return universeOf(state, universeId).bubbleRelations.find(relation => relation.openeeId === openeeId);
 }
 
 /**
@@ -638,6 +641,26 @@ export const makeSelectSurfaceBubbles = memoizeByUniverse((uid) =>
     return surfaceIds
       .filter((id) => bubblesJson[id] !== undefined)
       .map((id) => Bubble.fromJSON(bubblesJson[id]));
+  }),
+);
+
+export const makeSelectSurfaceBubbleIds = memoizeByUniverse((uid) =>
+  createSelector([makeSelectProcessJson(uid), makeSelectBubblesJson(uid)], (processJson, bubblesJson): string[] => {
+    const surfaceIds = BubblesProcess.fromJSON(processJson).surface || [];
+    return surfaceIds.filter((id) => bubblesJson[id] !== undefined);
+  }),
+);
+
+export const makeSelectLastSiblingRenderedRect = memoizeByUniverse((uid) =>
+  createSelector([makeSelectProcessJson(uid), makeSelectBubblesJson(uid)], (processJson, bubblesJson) => {
+    const surfaceIds = BubblesProcess.fromJSON(processJson).surface || [];
+    if (surfaceIds.length === 0) return undefined;
+    const lastId = surfaceIds[surfaceIds.length - 1];
+    const bubbleJson = bubblesJson[lastId];
+    if (!bubbleJson) return undefined;
+    return bubbleJson.renderedRect
+      ? { bubbleId: lastId, renderedRect: Bubble.fromJSON(bubbleJson).renderedRect }
+      : undefined;
   }),
 );
 

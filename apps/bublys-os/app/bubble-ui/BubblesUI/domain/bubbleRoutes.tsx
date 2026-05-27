@@ -1,8 +1,9 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
+import { BubbleContent } from "../ui/BubbleContent";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -108,6 +109,21 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
+// 再帰的 universe バブル: バブルの中に独立した universe を描く
+const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
+  const parentUniverseId = useUniverseId();
+  const childUniverseId = `${parentUniverseId}/${bubble.id}`;
+  return (
+    <div style={{ width: 600, height: 400, position: "relative" }}>
+      <UniverseView
+        universeId={childUniverseId}
+        renderBubbleContent={(b) => <BubbleContent bubble={b} />}
+        initialBubbleUrls={["users"]}
+      />
+    </div>
+  );
+};
+
 // ルーティング定義
 const routes: BubbleRoute[] = [
   {
@@ -115,6 +131,9 @@ const routes: BubbleRoute[] = [
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
+
+  // 再帰的 universe（バブルの中の universe）
+  { pattern: /^universe$/, type: "universe", Component: UniverseBubble },
 
   // Users（users-libsから）
   ...usersBubbleRoutes,

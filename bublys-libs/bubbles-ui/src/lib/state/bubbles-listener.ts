@@ -7,15 +7,20 @@ import {
   renderBubble,
   selectBubble,
   selectBubblesRelationByOpeneeId,
-  selectSurfaceBubbleIds,
-  selectLastSiblingRenderedRect,
+  makeSelectSurfaceBubbleIds,
+  makeSelectLastSiblingRenderedRect,
   updateBubble,
-  selectGlobalCoordinateSystem,
-  selectSurfaceLeftTop,
+  makeSelectGlobalCoordinateSystem,
+  makeSelectSurfaceLeftTop,
   clearAllAnimations,
+  ROOT_UNIVERSE_ID,
 } from './bubbles-slice.js';
 import { Layer } from '@bublys-org/bubbles-ui-util';
 import { getOriginRect } from '../utils/get-origin-rect.js';
+
+// アクションの meta から universeId を取り出す（無ければ root）
+const universeIdOf = (action: { meta?: { universeId?: string } }): string =>
+  action.meta?.universeId ?? ROOT_UNIVERSE_ID;
 
 // Listener ミドルウェアを定義
 export const bubblesListener = createListenerMiddleware();
@@ -39,14 +44,15 @@ bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
     const id = action.payload;
+    const universeId = universeIdOf(action);
 
     const state = listenerApi.getState() as any;
 
     // パフォーマンス最適化: IDリストだけを取得
-    const surfaceIds = selectSurfaceBubbleIds(state);
+    const surfaceIds = makeSelectSurfaceBubbleIds(universeId)(state);
     const otherSiblingIds = surfaceIds.filter(siblingId => siblingId !== id);
 
-    const thisBubble = selectBubble(state, { id });
+    const thisBubble = selectBubble(state, { id, universeId });
 
     if (!otherSiblingIds.length) {
       console.log("JoinSibling: No other siblings, skipping positioning");
@@ -54,13 +60,13 @@ bubblesListener.startListening({
     }
 
     // パフォーマンス最適化: 最後の兄弟のrenderedRectだけを取得
-    const lastSiblingData = selectLastSiblingRenderedRect(state);
+    const lastSiblingData = makeSelectLastSiblingRenderedRect(universeId)(state);
 
     // 自分自身が最後の場合は、その前のバブルを使う
     const brotherRect = (lastSiblingData && lastSiblingData.bubbleId !== id)
       ? lastSiblingData.renderedRect
       : (otherSiblingIds.length > 0
-          ? selectBubble(state, { id: otherSiblingIds[otherSiblingIds.length - 1] })?.renderedRect
+          ? selectBubble(state, { id: otherSiblingIds[otherSiblingIds.length - 1], universeId })?.renderedRect
           : undefined);
 
     // 兄弟バブルのrenderedRectがあれば、即座に位置を計算
@@ -77,8 +83,8 @@ bubblesListener.startListening({
       }
 
       // グローバル座標系の設定を取得
-      const coordinateConfig = selectGlobalCoordinateSystem(state);
-      const surfaceLeftTop = selectSurfaceLeftTop(state);
+      const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(state);
+      const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
 
       // universe 座標を surface レイヤー(index=0)の layer-local 座標に変換
       // （joinSibling はトップレイヤー＝surface に配置される）
@@ -90,7 +96,7 @@ bubblesListener.startListening({
       const moved = thisBubble.moveTo(relativePoint);
 
       // バブルを更新
-      listenerApi.dispatch(updateBubble(moved.toJSON()));
+      listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
       return;
     }
 
@@ -100,15 +106,15 @@ bubblesListener.startListening({
     await listenerApi.take(
       (otherAction): otherAction is ReturnType<typeof renderBubble> => {
         const oa = otherAction as ReturnType<typeof renderBubble>;
-        return oa.type === renderBubble.type && oa.payload.id === id;
+        return oa.type === renderBubble.type && oa.payload.id === id && universeIdOf(oa) === universeId;
       }
     );
 
     const newState = listenerApi.getState() as any;
-    const newThisBubble = selectBubble(newState, { id });
+    const newThisBubble = selectBubble(newState, { id, universeId });
 
     // パフォーマンス最適化: IDリストだけを取得
-    const newSurfaceIds = selectSurfaceBubbleIds(newState);
+    const newSurfaceIds = makeSelectSurfaceBubbleIds(universeId)(newState);
     const newOtherSiblingIds = newSurfaceIds.filter(siblingId => siblingId !== id);
 
     if (!newOtherSiblingIds.length) {
@@ -116,7 +122,7 @@ bubblesListener.startListening({
     }
 
     // 最後の兄弟バブルを取得
-    const newBrotherBubble = selectBubble(newState, { id: newOtherSiblingIds[newOtherSiblingIds.length - 1] });
+    const newBrotherBubble = selectBubble(newState, { id: newOtherSiblingIds[newOtherSiblingIds.length - 1], universeId });
     const newBrotherRect = newBrotherBubble?.renderedRect;
 
     if (!newBrotherRect) {
@@ -131,14 +137,14 @@ bubblesListener.startListening({
       return;
     }
 
-    const coordinateConfig = selectGlobalCoordinateSystem(newState);
-    const surfaceLeftTop = selectSurfaceLeftTop(newState);
+    const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(newState);
+    const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(newState);
 
     const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
     const relativePoint = surfaceLayer.locate(globalPoint);
 
     const moved = newThisBubble.moveTo(relativePoint);
-    listenerApi.dispatch(updateBubble(moved.toJSON()));
+    listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
   },
 });
 
@@ -151,17 +157,18 @@ bubblesListener.startListening({
     const payload = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
     const poppingBubbleId = payload.bubbleId;
     const openingPosition = payload.openingPosition ?? "bubble-side";
+    const universeId = universeIdOf(popChildAction);
 
     const state = listenerApi.getState() as any;
 
-    const relation = selectBubblesRelationByOpeneeId(state, { openeeId: poppingBubbleId });
+    const relation = selectBubblesRelationByOpeneeId(state, { openeeId: poppingBubbleId, universeId });
     if(!relation) {
       console.log("Pop: No relation found");
       return;
     }
 
-    const openerBubble = selectBubble(state, { id: relation.openerId });
-    const poppingBubble = selectBubble(state, { id: poppingBubbleId });
+    const openerBubble = selectBubble(state, { id: relation.openerId, universeId });
+    const poppingBubble = selectBubble(state, { id: poppingBubbleId, universeId });
 
     // openerのrenderedRectがあれば、即座に位置を計算
     // calcPositionToOpenはtoLayerBelow().toGlobal()という純粋な数学的変換を使うので、
@@ -192,8 +199,8 @@ bubblesListener.startListening({
       }
 
       // グローバル座標系の設定を取得
-      const coordinateConfig = selectGlobalCoordinateSystem(state);
-      const surfaceLeftTop = selectSurfaceLeftTop(state);
+      const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(state);
+      const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
 
       // calcPositionToOpen は universe 座標を返す。
       // surface レイヤー(index=0)の layer-local 座標に変換する
@@ -206,7 +213,7 @@ bubblesListener.startListening({
       const moved = poppingBubble.moveTo(relativePoint);
 
       // バブルを更新
-      listenerApi.dispatch(updateBubble(moved.toJSON()));
+      listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
       return;
     }
 
@@ -217,13 +224,13 @@ bubblesListener.startListening({
       listenerApi.take(
         (otherAction): otherAction is ReturnType<typeof renderBubble> => {
           const oa = otherAction as ReturnType<typeof renderBubble>;
-          return oa.type === renderBubble.type && oa.payload.id === relation.openerId;
+          return oa.type === renderBubble.type && oa.payload.id === relation.openerId && universeIdOf(oa) === universeId;
         }
       ),
       listenerApi.take(
         (otherAction): otherAction is ReturnType<typeof renderBubble> => {
           const oa = otherAction as ReturnType<typeof renderBubble>;
-          return oa.type === renderBubble.type && oa.payload.id === poppingBubbleId;
+          return oa.type === renderBubble.type && oa.payload.id === poppingBubbleId && universeIdOf(oa) === universeId;
         }
       )
     ]);
@@ -231,8 +238,8 @@ bubblesListener.startListening({
     console.log("Pop: opener and openee rendered!", results);
 
     const newState = listenerApi.getState() as any;
-    const newPoppingBubble = selectBubble(newState, { id: poppingBubbleId });
-    const newOpenerBubble = selectBubble(newState, { id: relation.openerId });
+    const newPoppingBubble = selectBubble(newState, { id: poppingBubbleId, universeId });
+    const newOpenerBubble = selectBubble(newState, { id: relation.openerId, universeId });
 
     if(!newOpenerBubble.renderedRect || !newPoppingBubble.renderedRect) {
       console.log("Pop: renderedRect not found");
@@ -254,14 +261,14 @@ bubblesListener.startListening({
       return;
     }
 
-    const coordinateConfig = selectGlobalCoordinateSystem(newState);
-    const surfaceLeftTop = selectSurfaceLeftTop(newState);
+    const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(newState);
+    const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(newState);
 
     const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
     const relativePoint = surfaceLayer.locate(point);
 
     const moved = newPoppingBubble.moveTo(relativePoint);
-    listenerApi.dispatch(updateBubble(moved.toJSON()));
+    listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
   },
 });
 

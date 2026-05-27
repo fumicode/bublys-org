@@ -21,6 +21,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExtensionIcon from "@mui/icons-material/Extension";
+import PublicIcon from "@mui/icons-material/Public";
 import { loadBublyFromOrigin, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
 
 type MenuItem = {
@@ -55,6 +56,11 @@ const staticMenuItems: MenuItem[] = [
     label: "ユーザー",
     url: "users",
     icon: <PersonIcon color="action" />,
+  },
+  {
+    label: "universe（再帰）",
+    url: "universe",
+    icon: <PublicIcon sx={{ color: "#7e9bd4" }} />,
   },
   // 九星盤は動的ロードのバブリとして提供
 ];

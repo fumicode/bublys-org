@@ -40,6 +40,7 @@ export * from './lib/ui/BubbleView.js';
 export * from './lib/ui/LinkBubbleView.js';
 export * from './lib/ui/BubbleContent.js';
 export * from './lib/ui/BubblesLayeredView.js';
+export * from './lib/ui/UniverseView.js';
 
 // Pocket
 export * from './lib/pocket/index.js';
