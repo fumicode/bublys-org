@@ -245,13 +245,13 @@ const BubbleViewInner: FC<BubbleProps> = ({
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
   };
 
-  const isMaximized = !!bubble.size;
+  const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isMaximized) {
-      // フィットに戻す
-      const resizedBubble = Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
+      // 最大化を解除。通常は fit-content、fillsContainer な窓は既定の窓サイズに戻る。
+      const resizedBubble = bubble.restore();
       dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     } else {
@@ -276,7 +276,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
       const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-      const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
+      const resizedBubble = bubble.maximizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
       dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     }
@@ -413,6 +413,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
       prevBubble.colorHue === nextBubble.colorHue &&
       prevBubble.size?.width === nextBubble.size?.width &&
       prevBubble.size?.height === nextBubble.size?.height &&
+      prevBubble.isMaximized === nextBubble.isMaximized &&
       prevBubble.contentBackground === nextBubble.contentBackground;
 
     if (!onlyPositionChanged) {
