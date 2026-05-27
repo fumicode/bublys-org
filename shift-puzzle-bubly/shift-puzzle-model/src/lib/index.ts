@@ -1,25 +1,27 @@
 /**
- * shift-puzzle-model ドメイン層エクスポート
+ * ドメイン層エクスポート
  */
 
-// イベント・スキル定義
-export * from './event/Event.js';
-export * from './event/SkillDefinition.js';
+// Task（マスターデータ）
+export * from './master/Task.js';
 
-// メンバー
+// TimeSchedule（時間帯マスター）
+export * from './master/TimeSchedule.js';
+
+// Shift（第一級エンティティ）: 時刻・人数・役割を直接持つ
+export * from './master/Shift.js';
+
+// Member集約
 export * from './member/Member.js';
-export * from './member/MemberFilter.js';
 
-// 役割
-export * from './role/Role.js';
+// BlockList（プリミティブUIデータ基盤）
+export * from './shift-plan/BlockList.js';
 
-// 時間帯
-export * from './time/TimeSlot.js';
-
-// 配置・制約
-export * from './assignment/AssignmentReason.js';
-export * from './assignment/Assignment.js';
-export * from './assignment/ConstraintChecker.js';
-
-// シフト案
+// ShiftPlan集約
+export * from './shift-plan/ShiftAssignment.js';
 export * from './shift-plan/ShiftPlan.js';
+export * from './shift-plan/ShiftMatcher.js';
+export * from './shift-plan/ShiftEvaluation.js';
+export * from './shift-plan/MemberAssignmentEvaluation.js';
+export * from './shift-plan/ShiftAssignmentStatus.js';
+export * from './shift-plan/ShiftPreference.js';

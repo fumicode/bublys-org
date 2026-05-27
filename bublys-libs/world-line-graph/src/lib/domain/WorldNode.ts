@@ -6,6 +6,8 @@ export interface WorldNode {
   readonly timestamp: number;
   readonly changedRefs: StateRef[];
   readonly worldLineId: string;
+  /** ユーザーがつけた表示名。タブ等のラベル付きビューに用いる。 */
+  readonly label?: string;
 }
 
 function generateNodeId(): string {

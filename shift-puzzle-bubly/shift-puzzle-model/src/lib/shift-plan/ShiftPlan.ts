@@ -1,246 +1,347 @@
 /**
  * シフト案ドメインモデル
- * gakkai-shiftのShiftPlan_シフト案を汎用化:
- *   - scenarioLabel（シナリオラベル）追加
- *   - Assignment（AssignmentReason必須版）を使用
+ * 全配置を取りまとめて、シフト全体の評価を行う
  */
 
-import { Assignment, AssignmentState } from '../assignment/Assignment.js';
-import { AssignmentReason } from '../assignment/AssignmentReason.js';
-import { ConstraintChecker, ConstraintViolation, RoleFulfillment } from '../assignment/ConstraintChecker.js';
-import { MemberState } from '../member/Member.js';
-import { RoleState } from '../role/Role.js';
-import { TimeSlotState } from '../time/TimeSlot.js';
+import { ShiftAssignment, ShiftAssignmentState } from './ShiftAssignment.js';
+import { Shift, type ShiftState, type WeatherCondition } from '../master/Shift.js';
+import { type TimeScheduleState, TimeSchedule } from '../master/TimeSchedule.js';
+import { ShiftEvaluation } from './ShiftEvaluation.js';
 
 // ========== 型定義 ==========
+
+/** 制約違反の種類 */
+export type ConstraintViolationType = 'overlapping_assignments';
+
+/** 制約違反 */
+export interface ConstraintViolation {
+  readonly type: ConstraintViolationType;
+  readonly memberId: string;
+  readonly assignmentIds: readonly string[];
+  readonly message: string;
+}
 
 /** シフト案の状態 */
 export interface ShiftPlanState {
   readonly id: string;
   readonly name: string;
-  readonly scenarioLabel: string;   // 例: "晴天用", "雨天用", "人数削減版"
-  readonly assignments: ReadonlyArray<AssignmentState>;
-  readonly eventId: string;
+  readonly date: string;
+  readonly weatherCondition?: WeatherCondition;
+  // プリミティブUI用フィールド（新規）
+  readonly timeSchedules?: readonly TimeScheduleState[];
+  readonly shifts?: readonly ShiftState[];        // BlockList組み込み
+  // 旧フィールド（既存D&D互換: deprecated）
+  /** @deprecated shifts + blockList ベースに移行 */
+  readonly assignments?: readonly ShiftAssignmentState[];
+  readonly constraintViolations?: readonly ConstraintViolation[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-/** Redux/JSON用のシリアライズ型 */
-export type ShiftPlanJSON = {
-  id: string;
-  name: string;
-  scenarioLabel: string;
-  assignments: AssignmentState[];
-  eventId: string;
-  createdAt: string;
-  updatedAt: string;
-};
+/** シフト案の評価結果 */
+export interface ShiftPlanEvaluation {
+  readonly totalAssignmentCount: number;
+  readonly totalFulfillmentRate: number;
+  readonly shortageCount: number;
+  readonly excessCount: number;
+  readonly shiftEvaluations: readonly ShiftEvaluation[];
+}
 
 // ========== ドメインクラス ==========
 
 export class ShiftPlan {
   constructor(readonly state: ShiftPlanState) {}
 
-  get id(): string {
-    return this.state.id;
+  get id(): string { return this.state.id; }
+  get name(): string { return this.state.name; }
+  get date(): string { return this.state.date; }
+  get weatherCondition(): WeatherCondition | undefined { return this.state.weatherCondition; }
+
+  get assignments(): readonly ShiftAssignment[] {
+    return (this.state.assignments ?? []).map((s) => new ShiftAssignment(s));
   }
 
-  get name(): string {
-    return this.state.name;
+  get constraintViolations(): readonly ConstraintViolation[] {
+    return this.state.constraintViolations ?? ShiftPlan.computeConstraintViolations(this.state.assignments ?? []);
   }
 
-  get scenarioLabel(): string {
-    return this.state.scenarioLabel;
+  get timeSchedules(): readonly TimeSchedule[] {
+    return (this.state.timeSchedules ?? []).map((ts) => new TimeSchedule(ts));
   }
 
-  get eventId(): string {
-    return this.state.eventId;
+  get shifts(): readonly Shift[] {
+    return (this.state.shifts ?? []).map((s) => new Shift(s));
   }
 
-  get assignments(): ReadonlyArray<Assignment> {
-    return this.state.assignments.map((s) => new Assignment(s));
+  /** 特定局員の配置を取得（旧: assignments ベース） */
+  getAssignmentsByMember(memberId: string): ShiftAssignment[] {
+    return this.assignments.filter((a) => a.staffId === memberId);
   }
 
-  /** 特定メンバーの配置を取得 */
-  getAssignmentsByMember(memberId: string): Assignment[] {
-    return this.assignments.filter((a) => a.memberId === memberId);
+  /** 特定シフトの配置を取得（旧: assignments ベース） */
+  getAssignmentsByShift(shiftId: string): ShiftAssignment[] {
+    return this.assignments.filter((a) => a.shiftId === shiftId);
   }
 
-  /** 特定時間帯の配置を取得 */
-  getAssignmentsByTimeSlot(timeSlotId: string): Assignment[] {
-    return this.assignments.filter((a) => a.timeSlotId === timeSlotId);
+  /** IDでシフトを取得（新: shifts ベース） */
+  getShiftById(shiftId: string): Shift | undefined {
+    return this.shifts.find((s) => s.id === shiftId);
   }
 
-  /** 特定役割の配置を取得 */
-  getAssignmentsByRole(roleId: string): Assignment[] {
-    return this.assignments.filter((a) => a.roleId === roleId);
+  /** IDでTimeScheduleを取得 */
+  getTimeScheduleById(tsId: string): TimeSchedule | undefined {
+    return this.timeSchedules.find((ts) => ts.id === tsId);
   }
 
-  /** 特定の時間帯 × 役割の配置を取得 */
-  getAssignmentsForSlotRole(timeSlotId: string, roleId: string): Assignment[] {
-    return this.assignments.filter(
-      (a) => a.timeSlotId === timeSlotId && a.roleId === roleId
+  /** シフト案を評価（Shift マスターと照合） */
+  evaluate(shifts: Shift[]): ShiftPlanEvaluation {
+    const shiftEvaluations = shifts.map((shift) =>
+      ShiftEvaluation.evaluate(shift, this.assignments),
     );
-  }
 
-  /** メンバーの総拘束分数を計算 */
-  getMemberTotalMinutes(
-    memberId: string,
-    timeSlots: ReadonlyMap<string, TimeSlotState>
-  ): number {
-    return this.getAssignmentsByMember(memberId).reduce((total, assignment) => {
-      const slot = timeSlots.get(assignment.timeSlotId);
-      return total + (slot?.durationMinutes ?? 0);
-    }, 0);
-  }
+    const totalAssignmentCount = (this.state.assignments ?? []).length;
+    const shortageCount = shiftEvaluations.filter((e) => e.hasShortage).length;
+    const excessCount = shiftEvaluations.filter((e) => e.hasExcess).length;
 
-  // ========== 制約チェック ==========
+    const totalFulfillmentRate =
+      shiftEvaluations.length > 0
+        ? shiftEvaluations.reduce((sum, e) => sum + e.fulfillmentRate, 0) /
+          shiftEvaluations.length
+        : 100;
 
-  /** 制約違反を検出 */
-  computeConstraintViolations(
-    members: ReadonlyArray<MemberState>,
-    roles: ReadonlyArray<RoleState>,
-    timeSlots: ReadonlyArray<TimeSlotState>
-  ): ConstraintViolation[] {
-    const checker = ConstraintChecker.create(
-      this.state.assignments,
-      members,
-      roles,
-      timeSlots
-    );
-    return checker.computeViolations();
-  }
-
-  /** 役割充足状況を計算 */
-  computeRoleFulfillments(
-    roles: ReadonlyArray<RoleState>,
-    timeSlots: ReadonlyArray<TimeSlotState>
-  ): RoleFulfillment[] {
-    const checker = ConstraintChecker.create(
-      this.state.assignments,
-      [],
-      roles,
-      timeSlots
-    );
-    return checker.computeRoleFulfillments();
+    return {
+      totalAssignmentCount,
+      totalFulfillmentRate,
+      shortageCount,
+      excessCount,
+      shiftEvaluations,
+    };
   }
 
   /** 総合スコアを計算（高いほど良い） */
-  calculateOverallScore(
-    roles: ReadonlyArray<RoleState>,
-    timeSlots: ReadonlyArray<TimeSlotState>
-  ): number {
-    const fulfillments = this.computeRoleFulfillments(roles, timeSlots);
-    if (fulfillments.length === 0) return 100;
+  calculateOverallScore(shifts: Shift[]): number {
+    const evaluation = this.evaluate(shifts);
+    let score = evaluation.totalFulfillmentRate;
+    score -= evaluation.shortageCount * 5;
+    score -= evaluation.excessCount * 2;
+    return Math.max(0, score);
+  }
 
-    const fulfillmentRate =
-      fulfillments.filter((f) => f.isFulfilled).length / fulfillments.length * 100;
-    const overFillPenalty = fulfillments.filter((f) => f.isOverFilled).length * 2;
+  // ========== 制約違反 ==========
 
-    return Math.max(0, fulfillmentRate - overFillPenalty);
+  detectConstraintViolations(): readonly ConstraintViolation[] {
+    return this.constraintViolations;
+  }
+
+  hasConstraintViolations(): boolean {
+    return this.constraintViolations.length > 0;
+  }
+
+  isAssignmentInViolation(assignmentId: string): boolean {
+    return this.constraintViolations.some((v) => v.assignmentIds.includes(assignmentId));
+  }
+
+  isMemberShiftInViolation(memberId: string, shiftId: string): boolean {
+    return this.constraintViolations.some(
+      (v) => v.memberId === memberId && v.assignmentIds.some(
+        (id) => (this.state.assignments ?? []).find((a) => a.id === id)?.shiftId === shiftId,
+      ),
+    );
+  }
+
+  /**
+   * 制約違反を計算する。
+   * 同一局員が担当時間の重複する配置を複数持っていないかチェック。
+   */
+  static computeConstraintViolations(
+    assignments: readonly ShiftAssignmentState[]
+  ): ConstraintViolation[] {
+    const violations: ConstraintViolation[] = [];
+
+    // 局員ごとにグループ化
+    const byMember = new Map<string, ShiftAssignmentState[]>();
+    for (const a of assignments) {
+      const list = byMember.get(a.staffId) ?? [];
+      list.push(a);
+      byMember.set(a.staffId, list);
+    }
+
+    for (const [memberId, memberAssignments] of byMember) {
+      // 全ペアで時間重複チェック
+      for (let i = 0; i < memberAssignments.length; i++) {
+        for (let j = i + 1; j < memberAssignments.length; j++) {
+          const a1 = memberAssignments[i];
+          const a2 = memberAssignments[j];
+          // 重複: a1.start < a2.end AND a2.start < a1.end
+          if (a1.assignedStartMinute < a2.assignedEndMinute &&
+              a2.assignedStartMinute < a1.assignedEndMinute) {
+            violations.push({
+              type: 'overlapping_assignments',
+              memberId,
+              assignmentIds: [a1.id, a2.id],
+              message: `同じ局員が時間の重複する配置を${2}件持っています`,
+            });
+          }
+        }
+      }
+    }
+
+    return violations;
   }
 
   // ========== 状態変更メソッド ==========
 
-  /** 配置を追加（reasonは必須） */
-  addAssignment(assignment: Assignment): ShiftPlan {
+  addAssignment(assignment: ShiftAssignment): ShiftPlan {
     return this.withUpdatedState({
-      assignments: [...this.state.assignments, assignment.state],
+      assignments: [...(this.state.assignments ?? []), assignment.state],
     });
   }
 
-  /** 配置を削除 */
   removeAssignment(assignmentId: string): ShiftPlan {
-    const target = this.state.assignments.find((a) => a.id === assignmentId);
-    if (target?.locked) {
-      throw new Error(`配置 ${assignmentId} はロックされているため削除できません`);
-    }
     return this.withUpdatedState({
-      assignments: this.state.assignments.filter((a) => a.id !== assignmentId),
+      assignments: (this.state.assignments ?? []).filter((a) => a.id !== assignmentId),
     });
   }
 
-  /** 配置理由を更新 */
-  updateAssignmentReason(assignmentId: string, reason: AssignmentReason): ShiftPlan {
-    return this.withUpdatedState({
-      assignments: this.state.assignments.map((a) =>
-        a.id === assignmentId
-          ? new Assignment(a).withReason(reason).state
-          : a
-      ),
+  // ========== プリミティブUI: BlockList操作 ==========
+
+  /** 指定シフトの指定ブロックに局員を追加 */
+  addUserToBlock(shiftId: string, blockIndex: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.addUser(blockIndex, userId));
+  }
+
+  /** 指定シフトの指定ブロックから局員を削除 */
+  removeUserFromBlock(shiftId: string, blockIndex: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.removeUser(blockIndex, userId));
+  }
+
+  /** 指定シフトの範囲ブロックに局員を追加（startBlock 以上 endBlock 未満） */
+  addUserToBlockRange(shiftId: string, startBlock: number, endBlock: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => shift.addUserToRange(startBlock, endBlock, userId));
+  }
+
+  /** 指定シフトの範囲ブロックから局員を削除（startBlock 以上 endBlock 未満） */
+  removeUserFromBlockRange(shiftId: string, startBlock: number, endBlock: number, userId: string): ShiftPlan {
+    return this._updateShift(shiftId, (shift) => {
+      let bl = shift.blockList;
+      for (let b = startBlock; b < endBlock; b++) {
+        bl = bl.removeUser(b, userId);
+      }
+      return new Shift({ ...shift.state, blockList: bl.state });
     });
   }
 
-  /** シフト案名を変更 */
+  private _updateShift(shiftId: string, fn: (shift: Shift) => Shift): ShiftPlan {
+    const currentShifts = this.state.shifts ?? [];
+    const updatedShifts = currentShifts.map((s) =>
+      s.id === shiftId ? fn(new Shift(s)).state : s
+    );
+    return new ShiftPlan({
+      ...this.state,
+      shifts: updatedShifts,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /** 配置を移動（担当局員・開始・終了時刻を変更）。制約違反を再計算する。 */
+  moveAssignment(
+    assignmentId: string,
+    newStaffId: string,
+    newStartMinute: number,
+    newEndMinute: number,
+  ): ShiftPlan {
+    const updatedAssignments = (this.state.assignments ?? []).map((a) =>
+      a.id === assignmentId
+        ? { ...a, staffId: newStaffId, assignedStartMinute: newStartMinute, assignedEndMinute: newEndMinute }
+        : a,
+    );
+    return this.withUpdatedState({ assignments: updatedAssignments });
+  }
+
   withName(name: string): ShiftPlan {
     return this.withUpdatedState({ name });
   }
 
-  /** シナリオラベルを変更 */
-  withScenarioLabel(label: string): ShiftPlan {
-    return this.withUpdatedState({ scenarioLabel: label });
+  withWeatherCondition(weatherCondition: WeatherCondition): ShiftPlan {
+    return this.withUpdatedState({ weatherCondition });
   }
 
-  /** このシフト案をコピーして新しい案を作成（配置・理由ごとコピー） */
-  fork(newName: string, newScenarioLabel = ''): ShiftPlan {
-    const now = new Date().toISOString();
+  protected withUpdatedState(partial: Partial<ShiftPlanState>): ShiftPlan {
+    const newAssignments = partial.assignments ?? this.state.assignments ?? [];
+    const constraintViolations = partial.assignments !== undefined
+      ? ShiftPlan.computeConstraintViolations(newAssignments)
+      : this.state.constraintViolations;
+
     return new ShiftPlan({
       ...this.state,
+      ...partial,
+      constraintViolations,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // ========== 静的メソッド ==========
+
+  static create(name: string, date = '', weatherCondition?: WeatherCondition): ShiftPlan {
+    const now = new Date().toISOString();
+    return new ShiftPlan({
       id: crypto.randomUUID(),
-      name: newName,
-      scenarioLabel: newScenarioLabel,
-      // 配置はIDを新規発行してコピー
-      assignments: this.state.assignments.map((a) => ({
-        ...a,
-        id: crypto.randomUUID(),
-        shiftPlanId: crypto.randomUUID(), // 仮、後でIDを差し替える
-        createdAt: now,
-        updatedAt: now,
-      })),
+      name,
+      date,
+      weatherCondition,
+      assignments: [],
+      timeSchedules: [],
+      shifts: [],
+      constraintViolations: [],
       createdAt: now,
       updatedAt: now,
     });
   }
 
-  /** 内部用：状態更新ヘルパー */
-  protected withUpdatedState(partial: Partial<ShiftPlanState>): ShiftPlan {
-    return new ShiftPlan({
-      ...this.state,
-      ...partial,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  // ========== シリアライズ ==========
-
-  toJSON(): ShiftPlanJSON {
-    return {
-      id: this.state.id,
-      name: this.state.name,
-      scenarioLabel: this.state.scenarioLabel,
-      assignments: [...this.state.assignments],
-      eventId: this.state.eventId,
-      createdAt: this.state.createdAt,
-      updatedAt: this.state.updatedAt,
-    };
-  }
-
-  static fromJSON(json: ShiftPlanJSON): ShiftPlan {
-    return new ShiftPlan(json);
-  }
-
-  /** 新しいシフト案を作成 */
-  static create(
-    data: Pick<ShiftPlanState, 'name' | 'eventId'> &
-      Partial<Pick<ShiftPlanState, 'scenarioLabel'>>
+  /** TimeSchedule付きで空のシフト計画を作成する */
+  static createWithSchedule(
+    name: string,
+    date: string,
+    startTime = '00:00',
+    endTime = '23:59',
   ): ShiftPlan {
     const now = new Date().toISOString();
     return new ShiftPlan({
       id: crypto.randomUUID(),
-      name: data.name,
-      scenarioLabel: data.scenarioLabel ?? '',
+      name,
+      date,
+      timeSchedules: [{
+        id: crypto.randomUUID(),
+        dayType: name,
+        startTime,
+        endTime,
+      }],
+      shifts: [],
       assignments: [],
-      eventId: data.eventId,
+      constraintViolations: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  /** 世界線の状態から新しいシフト計画を作成する（配置済みシフトを引き継ぐ） */
+  static createFromWorldLine(
+    name: string,
+    date: string,
+    shifts: readonly ShiftState[],
+    timeSchedules: readonly TimeScheduleState[],
+    weatherCondition?: WeatherCondition,
+  ): ShiftPlan {
+    const now = new Date().toISOString();
+    return new ShiftPlan({
+      id: crypto.randomUUID(),
+      name,
+      date,
+      weatherCondition,
+      shifts: shifts.map((s) => ({ ...s })),
+      timeSchedules: timeSchedules.map((ts) => ({ ...ts })),
+      assignments: [],
+      constraintViolations: [],
       createdAt: now,
       updatedAt: now,
     });
