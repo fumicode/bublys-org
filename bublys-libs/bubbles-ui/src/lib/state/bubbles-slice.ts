@@ -37,18 +37,27 @@ export type PopChildPayload = {
 }
 
 /**
- * Normalized slice state:
- * - entities: map of BubbleState by ID
- * - process: BubblesProcessState holding layers of Bubble IDs
+ * 1つの universe（バブルが住む空間）の状態。
+ * 再帰的 universe に向け、universe ごとにこの単位を持つ。
  */
-export interface BubbleStateSlice {
+export interface UniverseState {
   bubbles: Record<string, BubbleJson>;
   process: BubblesProcessState;
-
-  bubbleRelations:  BubblesRelation[];
-
+  bubbleRelations: BubblesRelation[];
   globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
+}
+
+/** ルート universe の ID。ネストした universe は別 ID を持つ。 */
+export const ROOT_UNIVERSE_ID = "root";
+
+/**
+ * Normalized slice state:
+ * - universes: universeId ごとの UniverseState
+ * - renderCount / animatingBubbleIds: universe をまたぐ transient な状態
+ */
+export interface BubbleStateSlice {
+  universes: Record<string, UniverseState>;
 
   renderCount: number; //レンダリングが発生した回数。UIの強制再レンダリングに使う
 
@@ -66,6 +75,15 @@ export const setInitialBubbleUrls = (urls: string[]) => {
   configuredInitialBubbleUrls = urls;
 };
 
+/** 空の universe を作る */
+const createEmptyUniverse = (): UniverseState => ({
+  bubbles: {},
+  process: { layers: [] },
+  bubbleRelations: [],
+  globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
+  surfaceLeftTop: { x: 100, y: 100 },
+});
+
 // 初期状態を構築する関数（遅延評価）
 const getInitialState = (): BubbleStateSlice => {
   const bubbleInstances = configuredInitialBubbleUrls.map((url, index) => {
@@ -82,14 +100,32 @@ const getInitialState = (): BubbleStateSlice => {
   };
 
   return {
-    bubbles: entities,
-    process,
-    bubbleRelations: [],
-    globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
-    surfaceLeftTop: { x: 100, y: 100 },
+    universes: {
+      [ROOT_UNIVERSE_ID]: {
+        bubbles: entities,
+        process,
+        bubbleRelations: [],
+        globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
+        surfaceLeftTop: { x: 100, y: 100 },
+      },
+    },
     renderCount: 0,
     animatingBubbleIds: [],
   };
+};
+
+// draft state から universe を取得（無ければ作る）。
+// Step 1 では呼び出しは常に root。Step 2 で universeId を引数に通す。
+const draftUniverse = (
+  state: BubbleStateSlice,
+  universeId: string = ROOT_UNIVERSE_ID,
+): UniverseState => {
+  let u = state.universes[universeId];
+  if (!u) {
+    u = createEmptyUniverse();
+    state.universes[universeId] = u;
+  }
+  return u;
 };
 
 export const bubblesSlice = createSlice({
@@ -98,29 +134,33 @@ export const bubblesSlice = createSlice({
   reducers: {
     // Process-only actions
     deleteProcessBubble: (state, action: PayloadAction<string>) => {
-      state.process = BubblesProcess.fromJSON(state.process)
+      const u = draftUniverse(state);
+      u.process = BubblesProcess.fromJSON(u.process)
         .deleteBubble(action.payload)
         .toJSON();
       state.renderCount += 1;
     },
     layerDown: (state, action: PayloadAction<string>) => {
-      state.process = BubblesProcess.fromJSON(state.process)
+      const u = draftUniverse(state);
+      u.process = BubblesProcess.fromJSON(u.process)
         .layerDown(action.payload)
         .toJSON();
 
       state.renderCount += 1;
     },
     layerUp: (state, action: PayloadAction<string>) => {
-      state.process = BubblesProcess.fromJSON(state.process)
+      const u = draftUniverse(state);
+      u.process = BubblesProcess.fromJSON(u.process)
         .layerUp(action.payload)
         .toJSON();
       state.renderCount += 1;
     },
 
     popChild: (state, action: PayloadAction<PopChildPayload>) => {
-      const process =   BubblesProcess.fromJSON(state.process);
+      const u = draftUniverse(state);
+      const process = BubblesProcess.fromJSON(u.process);
       const poppedProcess = process.popChild(action.payload.bubbleId);
-      state.process = poppedProcess.toJSON();
+      u.process = poppedProcess.toJSON();
       state.renderCount += 1;
       // アニメーション対象のバブルIDを追加（重複防止）
       if (!state.animatingBubbleIds.includes(action.payload.bubbleId)) {
@@ -129,11 +169,11 @@ export const bubblesSlice = createSlice({
     },
 
     popChildMax: (state, action: PayloadAction<string>) => {
-
-      const process = BubblesProcess.fromJSON(state.process);
+      const u = draftUniverse(state);
+      const process = BubblesProcess.fromJSON(u.process);
       const poppedProcess = process.popChild(action.payload);
 
-      state.process = poppedProcess.toJSON();
+      u.process = poppedProcess.toJSON();
       state.renderCount += 1;
       // アニメーション対象のバブルIDを追加（重複防止）
       if (!state.animatingBubbleIds.includes(action.payload)) {
@@ -143,7 +183,8 @@ export const bubblesSlice = createSlice({
 
 
     joinSibling: (state, action: PayloadAction<string>) => {
-      state.process = BubblesProcess.fromJSON(state.process)
+      const u = draftUniverse(state);
+      u.process = BubblesProcess.fromJSON(u.process)
         .joinSibling(action.payload)
         .toJSON();
 
@@ -161,30 +202,34 @@ export const bubblesSlice = createSlice({
 
     // Entity-only actions
     addBubble: (state, action: PayloadAction<BubbleJson>) => {
-      state.bubbles[action.payload.id] = action.payload;
+      const u = draftUniverse(state);
+      u.bubbles[action.payload.id] = action.payload;
 
       state.renderCount += 1;
     },
     updateBubble: (state, action: PayloadAction<BubbleJson>) => {
-      state.bubbles[action.payload.id] = action.payload;
+      const u = draftUniverse(state);
+      u.bubbles[action.payload.id] = action.payload;
       state.renderCount += 1;
     },
     renderBubble: (state, action: PayloadAction<BubbleJson>) => {
-      state.bubbles[action.payload.id] = action.payload;
+      const u = draftUniverse(state);
+      u.bubbles[action.payload.id] = action.payload;
     },
 
     // Combined action
     removeBubble: (state, action: PayloadAction<string>) => {
+      const u = draftUniverse(state);
       const removingId = action.payload;
-      delete state.bubbles[removingId];
+      delete u.bubbles[removingId];
       state.renderCount += 1;
 
-      state.bubbleRelations = state.bubbleRelations.filter(
+      u.bubbleRelations = u.bubbleRelations.filter(
         relation => relation.openerId !== removingId && relation.openeeId !== removingId
       );
 
       // Remove from process layers
-      state.process.layers = state.process.layers.map(
+      u.process.layers = u.process.layers.map(
         layer => layer.filter(id => id !== removingId)
       ).filter(layer => layer.length > 0);  // Remove empty layers
 
@@ -201,19 +246,23 @@ export const bubblesSlice = createSlice({
         return ;
       }
 
-      state.bubbleRelations.push(action.payload);
+      const u = draftUniverse(state);
+      u.bubbleRelations.push(action.payload);
     },
     setGlobalCoordinateSystem: (state, action: PayloadAction<CoordinateSystemData>) => {
-      state.globalCoordinateSystem = action.payload;
+      const u = draftUniverse(state);
+      u.globalCoordinateSystem = action.payload;
     },
     setSurfaceLeftTop: (state, action: PayloadAction<Point2>) => {
-      state.surfaceLeftTop = action.payload;
+      const u = draftUniverse(state);
+      u.surfaceLeftTop = action.payload;
     },
     // world-line から復元した arrangement を丸ごと差し戻す
     replaceBubbleViewState: (state, action: PayloadAction<BubbleViewStateJson>) => {
-      state.bubbles = action.payload.bubbles;
-      state.bubbleRelations = action.payload.bubbleRelations;
-      state.process = action.payload.process;
+      const u = draftUniverse(state);
+      u.bubbles = action.payload.bubbles;
+      u.bubbleRelations = action.payload.bubbleRelations;
+      u.process = action.payload.process;
       state.renderCount += 1;
     }
   },
@@ -238,18 +287,25 @@ export const {
   clearAllAnimations,
 } = bubblesSlice.actions;
 
+// ============================================================================
 // Selectors
-export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
-  Bubble.fromJSON(state.bubbleState.bubbles[id]);
+//
+// Step 1: 読み取りは常に root universe。Step 2 で universeId を通す。
+// ============================================================================
 
-// Selectors
+const rootUniverse = (state: { bubbleState: BubbleStateSlice }): UniverseState =>
+  state.bubbleState.universes[ROOT_UNIVERSE_ID];
+
+export const selectBubble = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }) =>
+  Bubble.fromJSON(rootUniverse(state).bubbles[id]);
+
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
 // 基本セレクター（入力セレクター）
-const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles;
-const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.process;
-const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbleRelations;
+const selectBubblesJson = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).bubbles;
+const selectProcessJson = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).process;
+const selectBubbleRelationsRaw = (state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).bubbleRelations;
 
 /**
  * world-line に commit する arrangement（= 表示状態）を返す。
@@ -318,11 +374,11 @@ export const selectLastSiblingRenderedRect = createSelector(
 );
 
 export const selectBubblesRelations = (state: { bubbleState: BubbleStateSlice }) => {
-  return state.bubbleState.bubbleRelations;
+  return rootUniverse(state).bubbleRelations;
 }
 
 export const selectBubblesRelationByOpeneeId = (state: { bubbleState: BubbleStateSlice }, { openeeId }: { openeeId: string }) => {
-  return state.bubbleState.bubbleRelations.find(relation => relation.openeeId === openeeId);
+  return rootUniverse(state).bubbleRelations.find(relation => relation.openeeId === openeeId);
 }
 
 /**
@@ -354,7 +410,7 @@ export const selectValidBubbleRelationIds = createSelector(
 );
 
 const selectGlobalCoordinateSystemData = (state: { bubbleState: BubbleStateSlice }): CoordinateSystemData => {
-  return state.bubbleState.globalCoordinateSystem;
+  return rootUniverse(state).globalCoordinateSystem;
 }
 
 export const selectGlobalCoordinateSystem = createSelector(
@@ -363,7 +419,7 @@ export const selectGlobalCoordinateSystem = createSelector(
 );
 
 export const selectSurfaceLeftTop = (state: { bubbleState: BubbleStateSlice }): Point2 => {
-  return state.bubbleState.surfaceLeftTop;
+  return rootUniverse(state).surfaceLeftTop;
 }
 
 /**
@@ -371,7 +427,7 @@ export const selectSurfaceLeftTop = (state: { bubbleState: BubbleStateSlice }): 
  * Returns -1 if the bubble is not found in any layer.
  */
 export const selectBubbleLayerIndex = (state: { bubbleState: BubbleStateSlice }, { id }: { id: string }): number => {
-  const process = BubblesProcess.fromJSON(state.bubbleState.process);
+  const process = BubblesProcess.fromJSON(rootUniverse(state).process);
   const layers = process.layers;
 
   for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
@@ -422,7 +478,7 @@ const bubbleSelectorCache = new Map<string, BubbleByIdSelector>();
 export const makeSelectBubbleById = (bubbleId: string): BubbleByIdSelector => {
   if (!bubbleSelectorCache.has(bubbleId)) {
     const selector = createSelector(
-      [(state: { bubbleState: BubbleStateSlice }) => state.bubbleState.bubbles[bubbleId]],
+      [(state: { bubbleState: BubbleStateSlice }) => rootUniverse(state).bubbles[bubbleId]],
       (bubbleJson): Bubble | undefined => {
         if (!bubbleJson) return undefined;
         return Bubble.fromJSON(bubbleJson);

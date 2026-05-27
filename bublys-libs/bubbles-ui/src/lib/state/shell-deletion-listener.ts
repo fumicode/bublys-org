@@ -4,7 +4,7 @@
  */
 
 import { createListenerMiddleware } from '@reduxjs/toolkit';
-import { removeBubble } from './bubbles-slice.js';
+import { removeBubble, ROOT_UNIVERSE_ID } from './bubbles-slice.js';
 
 export const shellDeletionListener = createListenerMiddleware();
 
@@ -23,9 +23,9 @@ shellDeletionListener.startListening({
     // URLを構築
     const url = `object-shells/${shellType}/${shellId}`;
 
-    // 現在の状態から該当するBubbleを検索
+    // 現在の状態から該当するBubbleを検索（root universe）
     const state = listenerApi.getState() as any;
-    const bubbles = state.bubbleState.bubbles;
+    const bubbles = state.bubbleState.universes[ROOT_UNIVERSE_ID].bubbles;
 
     // URLが一致するBubbleを見つける
     const matchingBubble = Object.values(bubbles).find(
