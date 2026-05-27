@@ -1,9 +1,10 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, FC, type CSSProperties } from "react";
 import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { BubbleContent } from "../ui/BubbleContent";
+import { useUniverseWorldLine } from "../../world-line/useUniverseWorldLine";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -109,17 +110,41 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-// 再帰的 universe バブル: バブルの中に独立した universe を描く
+// ネスト universe の戻る/進む（universe に対して absolute 配置で重ねる）
+const UniverseWorldLineToolbar: FC<{ universeId: string }> = ({ universeId }) => {
+  const { moveBack, moveForward, canUndo, canRedo } = useUniverseWorldLine(universeId);
+  const btn = (disabled: boolean): CSSProperties => ({
+    border: "1px solid rgba(255,255,255,0.3)",
+    borderRadius: 4,
+    background: "rgba(20,22,30,0.6)",
+    color: "rgba(230,235,255,0.9)",
+    cursor: disabled ? "default" : "pointer",
+    opacity: disabled ? 0.3 : 1,
+    padding: "2px 8px",
+    fontSize: 14,
+  });
+  return (
+    <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, display: "flex", gap: 4 }}>
+      <button style={btn(!canUndo)} disabled={!canUndo} onClick={moveBack} title="戻る">←</button>
+      <button style={btn(!canRedo)} disabled={!canRedo} onClick={moveForward} title="進む">→</button>
+    </div>
+  );
+};
+
+// 再帰的 universe バブル: バブルの中に独立した universe を描く。
+// universe バブルは常にサイズ付きで開かれる（popChildMax）ので content 領域は
+// 常に definite。コンテナは一律 100%×100% でバブル内側にぴったり追従する。
 const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
   const parentUniverseId = useUniverseId();
   const childUniverseId = `${parentUniverseId}/${bubble.id}`;
   return (
-    <div style={{ width: 600, height: 400, position: "relative" }}>
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
       <UniverseView
         universeId={childUniverseId}
         renderBubbleContent={(b) => <BubbleContent bubble={b} />}
         initialBubbleUrls={["users"]}
       />
+      <UniverseWorldLineToolbar universeId={childUniverseId} />
     </div>
   );
 };
@@ -133,7 +158,14 @@ const routes: BubbleRoute[] = [
   },
 
   // 再帰的 universe（バブルの中の universe）
-  { pattern: /^universe$/, type: "universe", Component: UniverseBubble },
+  // universe は固有サイズを持たない「窓」なので fillsContainer 指定。
+  // 生成時は defaultSize の窓で開き、最大化解除でこのサイズに戻る。
+  {
+    pattern: /^universe$/,
+    type: "universe",
+    Component: UniverseBubble,
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 560, height: 440 } },
+  },
 
   // Users（users-libsから）
   ...usersBubbleRoutes,

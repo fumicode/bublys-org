@@ -132,7 +132,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
     const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
+    const resizedBubble = b.maximizeTo({ width: availableWidth, height: availableHeight });
     const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
@@ -167,7 +167,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);
 
-    if(isNameEndWithHistory) {
+    if (isNameEndWithHistory) {
       return popChildMax(newBubble, openerBubbleId);
     }
 
