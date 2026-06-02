@@ -79,18 +79,27 @@ export const BubbleRefsProvider: FC<{ children: ReactNode }> = ({ children }) =>
     // screen 座標 → universe 座標に補正してから SmartRect 化
     // （SmartRect.GLOBAL は universe 座標系を表す。変換は Viewport に委譲）
     const screenRect = getElementRect(originEl);
-    // origin 要素が属する universe（ネストでは最寄り）を基準に screen→universe 変換
+    // origin 要素が属する universe（ネストでは最寄り）を基準に screen→universe 変換。
+    // Viewport は親 CSS scale も吸収するので、ネストで奥のレイヤーに居る universe
+    // 内の origin でも universe 単位で正しく取れる。
     const viewport = measureViewportForElement(originEl);
     const topLeft = viewport
       ? viewport.screenToUniverse({ x: screenRect.x, y: screenRect.y })
       : { x: screenRect.x, y: screenRect.y };
+    const universeSize = viewport
+      ? viewport.screenSizeToUniverse({ width: screenRect.width, height: screenRect.height })
+      : { width: screenRect.width, height: screenRect.height };
     const universeRect = new DOMRect(
       topLeft.x,
       topLeft.y,
-      screenRect.width,
-      screenRect.height,
+      universeSize.width,
+      universeSize.height,
     );
-    const parentSize = { width: window.innerWidth, height: window.innerHeight };
+    // 親サイズ = SmartRect の空きスペース計算の基準。ネスト時はその universe の
+    // 可視サイズを使い、Provider 外なら window を使う（useMyRect と同じ方針）。
+    const parentSize = viewport
+      ? viewport.size
+      : { width: window.innerWidth, height: window.innerHeight };
     const smartRect = new SmartRect(universeRect, parentSize, CoordinateSystem.GLOBAL.toData());
 
     // キャッシュに保存

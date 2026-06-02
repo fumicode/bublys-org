@@ -4,9 +4,17 @@ import { Viewport } from "@bublys-org/bubbles-ui-util";
 const viewportFromUniverseEl = (universeEl: HTMLElement | null): Viewport | null => {
   const scrollEl = universeEl?.parentElement ?? null;
   if (!universeEl || !scrollEl) return null;
+  // この universe DOM に親から効いている CSS scale を bbcr.width/offsetWidth で推定。
+  // 例: universe バブル自身が root の奥のレイヤーに居て scale(0.9) されている場合、
+  //  bbcr.width = offsetWidth * 0.9。これを Viewport に渡すことで screen⇄universe
+  //  変換が縮小ぶんを吸収し、内側の popChild 位置などがズレなくなる。
+  const bbcr = universeEl.getBoundingClientRect();
+  const intrinsicW = universeEl.offsetWidth;
+  const parentScale = intrinsicW > 0 ? bbcr.width / intrinsicW : 1;
   return Viewport.fromMeasuredRects(
-    universeEl.getBoundingClientRect(),
+    bbcr,
     scrollEl.getBoundingClientRect(),
+    parentScale,
   );
 };
 

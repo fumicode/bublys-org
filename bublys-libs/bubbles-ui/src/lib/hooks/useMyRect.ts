@@ -40,13 +40,20 @@ const scheduleRectUpdate = (
         const bubbleScreenRect = el.getBoundingClientRect();
         // universe の親 = スクロール容器(StyledViewport)
         const scrollEl = universeEl?.parentElement ?? null;
-        const viewport =
-          universeEl && scrollEl
-            ? Viewport.fromMeasuredRects(
-                universeEl.getBoundingClientRect(),
-                scrollEl.getBoundingClientRect(),
-              )
-            : null;
+        let viewport: Viewport | null = null;
+        if (universeEl && scrollEl) {
+          // universe バブル自身が root の奥のレイヤーに居ると CSS scale が効くので
+          // bbcr.width / offsetWidth で推定して Viewport に渡す（screen⇄universe
+          // 変換と viewport.size をその scale ぶん補正）。
+          const universeBbcr = universeEl.getBoundingClientRect();
+          const intrinsicW = universeEl.offsetWidth;
+          const parentScale = intrinsicW > 0 ? universeBbcr.width / intrinsicW : 1;
+          viewport = Viewport.fromMeasuredRects(
+            universeBbcr,
+            scrollEl.getBoundingClientRect(),
+            parentScale,
+          );
+        }
         return { bubbleScreenRect, viewport };
       });
 
@@ -82,11 +89,15 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
     const topLeftUniverse = viewport
       ? viewport.screenToUniverse({ x: bubbleScreenRect.x, y: bubbleScreenRect.y })
       : { x: bubbleScreenRect.x, y: bubbleScreenRect.y };
+    // bbcr の width/height も screen pixel（親 scale 込み）なので universe 単位に直す。
+    const bubbleUniverseSize = viewport
+      ? viewport.screenSizeToUniverse({ width: bubbleScreenRect.width, height: bubbleScreenRect.height })
+      : { width: bubbleScreenRect.width, height: bubbleScreenRect.height };
     const bubbleUniverseRect = new DOMRect(
       topLeftUniverse.x,
       topLeftUniverse.y,
-      bubbleScreenRect.width,
-      bubbleScreenRect.height,
+      bubbleUniverseSize.width,
+      bubbleUniverseSize.height,
     );
 
     // 親サイズ = SmartRect の空きスペース/隅領域計算の基準。ネスト universe の中では
