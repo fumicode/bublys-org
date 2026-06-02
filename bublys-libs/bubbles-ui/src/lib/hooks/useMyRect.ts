@@ -89,7 +89,11 @@ export const useMyRectObserver = ({ onRectChanged }: useMyRectProps) => {
       bubbleScreenRect.height,
     );
 
-    const globalRect = new SmartRect(bubbleUniverseRect, currentPageSize, CoordinateSystem.GLOBAL.toData());
+    // 親サイズ = SmartRect の空きスペース/隅領域計算の基準。ネスト universe の中では
+    // ネスト viewport のピクセルサイズを使う（root の window size だと popChild 位置が
+    // ネスト viewport の外＝root の右上などに飛ぶ）。Viewport が無い場合は従来通り。
+    const parentSize = viewport ? viewport.size : currentPageSize;
+    const globalRect = new SmartRect(bubbleUniverseRect, parentSize, CoordinateSystem.GLOBAL.toData());
     const localRect = globalRect.toLocal(currentCoordinateSystem);
     onRectChangedRef.current?.(localRect);
   }, []);
