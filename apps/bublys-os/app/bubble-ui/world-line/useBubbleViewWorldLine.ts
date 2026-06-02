@@ -86,6 +86,10 @@ export function useBubbleViewWorldLine() {
   // （popstate リスナーが古い graph を掴まないように）
   const moveToRef = useRef(scope.moveTo);
   moveToRef.current = scope.moveTo;
+  // URL のノードがこのグラフに実在するか（stale/foreign な hash で moveTo が
+  // throw するのを防ぐ）。最新グラフを掴むため毎レンダー更新。
+  const hasNodeRef = useRef<(id: string) => boolean>(() => false);
+  hasNodeRef.current = (id: string) => !!scope.graph.state.nodes[id];
   // apex 変化が popstate（戻る/進む）由来かどうか。由来なら pushState しない。
   const fromPopstateRef = useRef(false);
 
@@ -110,7 +114,7 @@ export function useBubbleViewWorldLine() {
     if (!initializedRef.current) {
       initializedRef.current = true;
       const urlNode = parseNodeFromUrl();
-      if (urlNode && urlNode !== apexId) {
+      if (urlNode && urlNode !== apexId && hasNodeRef.current(urlNode)) {
         // ディープリンク: URL のノードへ移動（apex がまた変わるので次回に任せる）
         fromPopstateRef.current = true;
         trailRef.current = [urlNode];
@@ -119,7 +123,8 @@ export function useBubbleViewWorldLine() {
         refreshNav();
         return;
       }
-      // 初回: URL を現 apex に揃える（履歴は置換してエントリを増やさない）
+      // 初回 or URL のノードが実在しない（stale hash）: URL を現 apex に揃える
+      // （履歴は置換してエントリを増やさない）
       history.replaceState({ [URL_KEY]: apexId }, "", target);
       trailRef.current = [apexId];
       indexRef.current = 0;
@@ -145,7 +150,7 @@ export function useBubbleViewWorldLine() {
   useEffect(() => {
     const onPopstate = () => {
       const id = parseNodeFromUrl();
-      if (!id) return;
+      if (!id || !hasNodeRef.current(id)) return; // 実在しないノードは無視（throw 回避）
       fromPopstateRef.current = true;
       moveToRef.current(id);
       const i = trailRef.current.indexOf(id);
