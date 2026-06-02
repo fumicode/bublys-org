@@ -245,6 +245,9 @@ export const bubblesSlice = createSlice({
     updateBubble: {
       reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
+        // 既存バブルのみ更新。world-line rehydrate で削除済みのバブルへ向けて
+        // stale な async listener が dispatch しても復活させない（履歴トレイル汚染を防ぐ）。
+        if (!u.bubbles[action.payload.id]) return;
         u.bubbles[action.payload.id] = action.payload;
         state.renderCount += 1;
       },
@@ -253,6 +256,8 @@ export const bubblesSlice = createSlice({
     renderBubble: {
       reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
+        // 同上: 削除済みバブルへの renderedRect 通知は無視。
+        if (!u.bubbles[action.payload.id]) return;
         u.bubbles[action.payload.id] = action.payload;
       },
       prepare: prepBubble,
