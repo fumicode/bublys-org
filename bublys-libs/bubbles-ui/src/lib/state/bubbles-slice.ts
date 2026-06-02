@@ -143,6 +143,7 @@ const prepPopChild = (payload: PopChildPayload, universeId?: string) => withU(pa
 const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(payload, universeId);
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleViewStateJson, universeId?: string) => withU(payload, universeId);
+const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
 
 export const bubblesSlice = createSlice({
   name: "bubbleState",
@@ -256,6 +257,18 @@ export const bubblesSlice = createSlice({
       },
       prepare: prepBubble,
     },
+    // バブルの url 遷移（ナビゲーション）: 既存バブルの url だけを差し替える。
+    // url はルート解決の入力なので、これで中身が別ビューへ遷移する。
+    navigateBubble: {
+      reducer: (state, action: PayloadAction<{ id: string; url: string }, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const b = u.bubbles[action.payload.id];
+        if (!b || b.url === action.payload.url) return;
+        b.url = action.payload.url;
+        state.renderCount += 1;
+      },
+      prepare: prepNavigate,
+    },
 
     // Combined action
     removeBubble: {
@@ -331,6 +344,7 @@ export const {
   addBubble,
   updateBubble,
   renderBubble,
+  navigateBubble,
   removeBubble,
   relateBubbles,
   setGlobalCoordinateSystem,

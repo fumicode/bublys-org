@@ -409,6 +409,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
     const nextBubble = nextProps.bubble;
     const onlyPositionChanged =
       prevBubble.id === nextBubble.id &&
+      prevBubble.url === nextBubble.url &&
       prevBubble.type === nextBubble.type &&
       prevBubble.colorHue === nextBubble.colorHue &&
       prevBubble.size?.width === nextBubble.size?.width &&
