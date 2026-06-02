@@ -334,6 +334,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
+      fillsContainer={bubble.fillsContainer}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -456,6 +457,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   height?: string; // 高さを指定するためのオプション
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
+  fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -692,7 +694,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   >.e-bubble-content {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    // 窓型コンテンツ（universeなど）は自前のviewportを持つので、外側の
+    // .e-bubble-content はスクロールしない（二重スクロールバーを避ける）。
+    overflow: ${({ fillsContainer }) => (fillsContainer ? "hidden" : "auto")};
     padding: 16px;
     font-size: 1em;
     background: linear-gradient(
