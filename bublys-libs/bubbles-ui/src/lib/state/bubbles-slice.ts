@@ -415,8 +415,56 @@ const selectProcessJson = makeSelectProcessJson(ROOT_UNIVERSE_ID);
 const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
 
 /**
+ * 「いま universe に居る = process.layers に出現する」バブル ID の集合を計算する。
+ *
+ * これに含まれないバブルは「孤児」とみなして arrangement から落とす。世界線への
+ * commit/rehydrate サイクルで「見えているものとデータが揃う」状態に収束する。
+ */
+const collectLivingIds = (process: BubblesProcessState): Set<string> => {
+  const ids = new Set<string>();
+  for (const layer of process.layers) {
+    for (const id of layer) ids.add(id);
+  }
+  return ids;
+};
+
+/**
+ * 生のスライス状態から「universe の今の見かけ」と一致する arrangement を作る。
+ *
+ * - bubbles: process.layers に居る ID だけ残す（孤児を捨てる）
+ *   ＋ renderedRect は計測由来の派生値なので落とす（含めると commit ループ）
+ * - bubbleRelations: opener / openee がともに生きている関係だけ残す
+ *
+ * 結果として「`bubbles` のキー集合 ⊇ `process.layers` のID集合」
+ * かつ「`bubbleRelations` の両端が `bubbles` に存在」というインバリアントが
+ * 出力に成立する（このセレクタの出力を世界線に乗せ、復元時に
+ * replaceBubbleArrangement で書き戻せば、in-memory state も同じ形に収束する）。
+ */
+const projectArrangement = (
+  bubbles: Record<string, BubbleJson>,
+  bubbleRelations: BubblesRelation[],
+  process: BubblesProcessState,
+): BubbleArrangementState => {
+  const living = collectLivingIds(process);
+  const arrangementBubbles: Record<string, BubbleJson> = {};
+  for (const id of living) {
+    const b = bubbles[id];
+    if (!b) continue; // ID は layer に居るが entity が消えている → 落とす
+    const { renderedRect: _renderedRect, ...rest } = b;
+    arrangementBubbles[id] = rest;
+  }
+  const livingRelations = bubbleRelations.filter(
+    (r) => living.has(r.openerId) && living.has(r.openeeId),
+  );
+  return { bubbles: arrangementBubbles, bubbleRelations: livingRelations, process };
+};
+
+/**
  * world-line に commit する arrangement（= 表示状態）を返す。
  * メモ化済み: bubbles / relations / process のいずれかが変わった時だけ再計算。
+ *
+ * 「`process.layers` に居ないバブル = 孤児」は捨てて、見えているものとデータを
+ * 揃える（commit/rehydrate サイクルで in-memory state も収束する）。
  *
  * 各バブルの renderedRect は「計測由来の派生値」で毎フレーム更新されるため、
  * arrangement からは除外する（含めると測定のたびに commit が走ってしまう）。
@@ -424,14 +472,7 @@ const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
  */
 export const selectBubbleArrangement = createSelector(
   [selectBubblesJson, selectBubbleRelationsRaw, selectProcessJson],
-  (bubbles, bubbleRelations, process): BubbleArrangementState => {
-    const arrangementBubbles: Record<string, BubbleJson> = {};
-    for (const [id, bubbleJson] of Object.entries(bubbles)) {
-      const { renderedRect: _renderedRect, ...rest } = bubbleJson;
-      arrangementBubbles[id] = rest;
-    }
-    return { bubbles: arrangementBubbles, bubbleRelations, process };
-  }
+  projectArrangement,
 );
 
 /**
@@ -688,14 +729,7 @@ export const makeSelectLastSiblingRenderedRect = memoizeByUniverse((uid) =>
 export const makeSelectBubbleArrangementForUniverse = memoizeByUniverse((uid) =>
   createSelector(
     [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid)],
-    (bubbles, bubbleRelations, process): BubbleArrangementState => {
-      const arrangementBubbles: Record<string, BubbleJson> = {};
-      for (const [id, bubbleJson] of Object.entries(bubbles)) {
-        const { renderedRect: _renderedRect, ...rest } = bubbleJson;
-        arrangementBubbles[id] = rest;
-      }
-      return { bubbles: arrangementBubbles, bubbleRelations, process };
-    },
+    projectArrangement,
   ),
 );
 
