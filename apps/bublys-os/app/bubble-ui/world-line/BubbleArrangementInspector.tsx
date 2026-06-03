@@ -4,12 +4,12 @@ import { Box, IconButton } from "@mui/material";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubbleViewState } from "@bublys-org/bubbles-ui";
+import { selectBubbleArrangement } from "@bublys-org/bubbles-ui";
 import {
   WorldLineGraph,
   type WorldLineGraphJson,
 } from "@bublys-org/world-line-graph";
-import { BUBBLE_VIEW_SCOPE } from "./bubbleViewDomain";
+import { BUBBLE_ARRANGEMENT_SCOPE } from "./bubbleArrangementDomain";
 
 type WlState = {
   worldLineGraph?: {
@@ -62,15 +62,15 @@ const preSx = {
  *
  * world-line は Redux から read-only で読むだけ（同期ロジックは走らせない）。
  */
-export const BubbleViewStateInspector: FC = () => {
+export const BubbleArrangementInspector: FC = () => {
   const [open, setOpen] = useState(true);
 
-  const view = useAppSelector(selectBubbleViewState);
+  const view = useAppSelector(selectBubbleArrangement);
   const viewJson = JSON.stringify(view, null, 2);
 
   // 生 JSON を選び、useMemo で WorldLineGraph を再構築（毎レンダーの再生成を防ぐ）
   const graphJson = useAppSelector(
-    (s: WlState) => s.worldLineGraph?.graphs?.[BUBBLE_VIEW_SCOPE]
+    (s: WlState) => s.worldLineGraph?.graphs?.[BUBBLE_ARRANGEMENT_SCOPE]
   );
   const graph = useMemo(
     () => (graphJson ? WorldLineGraph.fromJSON(graphJson) : WorldLineGraph.empty()),
@@ -156,7 +156,7 @@ export const BubbleViewStateInspector: FC = () => {
 
       {/* 右: world-line */}
       <Box sx={panelSx}>
-        <Box sx={headerSx}>world line ({BUBBLE_VIEW_SCOPE})</Box>
+        <Box sx={headerSx}>world line ({BUBBLE_ARRANGEMENT_SCOPE})</Box>
         <Box component="pre" sx={preSx}>
           {worldLineText}
         </Box>

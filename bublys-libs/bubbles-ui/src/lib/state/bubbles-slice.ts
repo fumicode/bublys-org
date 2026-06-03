@@ -18,12 +18,14 @@ export type BubblesRelation = {
 }
 
 /**
- * バブルUIの「表示状態」= arrangement。
- * world-line-graph に1つのオブジェクトとして commit/復元する単位。
+ * 1つの universe の中で「どのバブルがどこに開いていて、どう繋がっているか」を
+ * ひとまとめに表す plain state。{@link BubbleArrangement} クラスの内部状態。
+ *
+ * world-line-graph に1オブジェクトとして commit/復元する単位でもある。
  * カメラ/設定(surfaceLeftTop, globalCoordinateSystem)や transient(renderCount,
  * animatingBubbleIds)は含めない。
  */
-export type BubbleViewStateJson = {
+export type BubbleArrangementState = {
   bubbles: Record<string, BubbleJson>;
   bubbleRelations: BubblesRelation[];
   process: BubblesProcessState;
@@ -142,7 +144,7 @@ const prepRelation = (payload: BubblesRelation, universeId?: string) => withU(pa
 const prepPopChild = (payload: PopChildPayload, universeId?: string) => withU(payload, universeId);
 const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(payload, universeId);
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
-const prepView = (payload: BubbleViewStateJson, universeId?: string) => withU(payload, universeId);
+const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
 
 export const bubblesSlice = createSlice({
@@ -326,8 +328,8 @@ export const bubblesSlice = createSlice({
       prepare: prepPoint,
     },
     // world-line から復元した arrangement を丸ごと差し戻す
-    replaceBubbleViewState: {
-      reducer: (state, action: PayloadAction<BubbleViewStateJson, string, UniverseMeta>) => {
+    replaceBubbleArrangement: {
+      reducer: (state, action: PayloadAction<BubbleArrangementState, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
         u.bubbles = action.payload.bubbles;
         u.bubbleRelations = action.payload.bubbleRelations;
@@ -354,7 +356,7 @@ export const {
   relateBubbles,
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
-  replaceBubbleViewState,
+  replaceBubbleArrangement,
   finishBubbleAnimation,
   clearAllAnimations,
 } = bubblesSlice.actions;
@@ -420,9 +422,9 @@ const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
  * arrangement からは除外する（含めると測定のたびに commit が走ってしまう）。
  * 復元後はレンダリングで再計測されるので失われても問題ない。
  */
-export const selectBubbleViewState = createSelector(
+export const selectBubbleArrangement = createSelector(
   [selectBubblesJson, selectBubbleRelationsRaw, selectProcessJson],
-  (bubbles, bubbleRelations, process): BubbleViewStateJson => {
+  (bubbles, bubbleRelations, process): BubbleArrangementState => {
     const arrangementBubbles: Record<string, BubbleJson> = {};
     for (const [id, bubbleJson] of Object.entries(bubbles)) {
       const { renderedRect: _renderedRect, ...rest } = bubbleJson;
@@ -683,10 +685,10 @@ export const makeSelectLastSiblingRenderedRect = memoizeByUniverse((uid) =>
   }),
 );
 
-export const makeSelectBubbleViewStateForUniverse = memoizeByUniverse((uid) =>
+export const makeSelectBubbleArrangementForUniverse = memoizeByUniverse((uid) =>
   createSelector(
     [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid)],
-    (bubbles, bubbleRelations, process): BubbleViewStateJson => {
+    (bubbles, bubbleRelations, process): BubbleArrangementState => {
       const arrangementBubbles: Record<string, BubbleJson> = {};
       for (const [id, bubbleJson] of Object.entries(bubbles)) {
         const { renderedRect: _renderedRect, ...rest } = bubbleJson;

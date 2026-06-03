@@ -7,15 +7,15 @@ import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { WorldLineView } from "@bublys-org/world-line-graph";
-import { useBubbleViewWorldLine } from "./useBubbleViewWorldLine";
+import { useBubbleArrangementWorldLine } from "./useBubbleArrangementWorldLine";
 
 /**
  * bubble-ui の表示状態を world-line に同期し、undo/redo と
  * （ドラッグで動かせる）世界線グラフ表示を提供する。
  */
-export const BubbleViewWorldLineControls: FC = () => {
+export const BubbleArrangementWorldLineControls: FC = () => {
   const { moveBack, moveForward, moveTo, canUndo, canRedo, graph, summarizeNode } =
-    useBubbleViewWorldLine();
+    useBubbleArrangementWorldLine();
   const [showGraph, setShowGraph] = useState(false);
 
   // --- ドラッグで移動できるパネル ---

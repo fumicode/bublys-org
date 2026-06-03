@@ -2,16 +2,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  selectBubbleViewState,
-  replaceBubbleViewState,
-  BubbleViewState,
+  selectBubbleArrangement,
+  replaceBubbleArrangement,
+  BubbleArrangement,
 } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import {
-  BUBBLE_VIEW_TYPE,
-  BUBBLE_VIEW_ID,
-  BUBBLE_VIEW_SCOPE,
-} from "./bubbleViewDomain";
+  BUBBLE_ARRANGEMENT_TYPE,
+  BUBBLE_ARRANGEMENT_ID,
+  BUBBLE_ARRANGEMENT_SCOPE,
+} from "./bubbleArrangementDomain";
 import { WL_URL_KEY } from "./wl-url";
 
 const parseNodeFromUrl = (): string | null => {
@@ -24,7 +24,7 @@ const parseNodeFromUrl = (): string | null => {
  * bubble-ui の表示状態(arrangement)を world-line-graph に commit / 復元する橋渡し。
  *
  * - [commit] bubbleState(arrangement)が変わったら world-line に記録
- * - [rehydrate] apex が変わったら replaceBubbleViewState で Redux に流し込む
+ * - [rehydrate] apex が変わったら replaceBubbleArrangement で Redux に流し込む
  * - [URL] apex ⇄ ブラウザ履歴。通常ナビは「1本の線形タイムライン」として扱う
  *   （undo/redo ボタン = ブラウザの戻る/進む）。枝（他の世界線）は
  *   WorldLineGraph に保持され、特別な DAG ビューからのみジャンプできる。
@@ -33,12 +33,12 @@ const parseNodeFromUrl = (): string | null => {
  *
  * 注: DomainRegistryProvider の内側で使うこと。
  */
-export function useBubbleViewWorldLine() {
+export function useBubbleArrangementWorldLine() {
   const dispatch = useAppDispatch();
-  const view = useAppSelector(selectBubbleViewState);
+  const view = useAppSelector(selectBubbleArrangement);
 
-  const scope = useCasScope(BUBBLE_VIEW_SCOPE, {
-    initialObjects: [{ type: BUBBLE_VIEW_TYPE, object: new BubbleViewState(view) }],
+  const scope = useCasScope(BUBBLE_ARRANGEMENT_SCOPE, {
+    initialObjects: [{ type: BUBBLE_ARRANGEMENT_TYPE, object: new BubbleArrangement(view) }],
   });
 
   // 直近に world-line と同期した view の署名。初期 view は initialObjects が
@@ -53,11 +53,11 @@ export function useBubbleViewWorldLine() {
 
     // 既存の view オブジェクトは update で更新する。
     // （addObject はキャッシュ済み shell を返し新 obj を無視するため、更新には使えない）
-    const shell = scope.getShell<BubbleViewState>(BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID);
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (shell) {
-      shell.update(() => new BubbleViewState(view));
+      shell.update(() => new BubbleArrangement(view));
     } else {
-      scope.addObject(BUBBLE_VIEW_TYPE, new BubbleViewState(view));
+      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(view));
     }
     // scope は毎レンダー新インスタンスなので依存に入れない（view 駆動）
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,13 +66,13 @@ export function useBubbleViewWorldLine() {
   // [rehydrate] apex が変わったら、その view を Redux に流し込む
   const apexId = scope.graph.getApex()?.id ?? null;
   useEffect(() => {
-    const shell = scope.getShell<BubbleViewState>(BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID);
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (!shell) return;
     const incoming = shell.object.toJSON();
     const signature = JSON.stringify(incoming);
     if (signature === syncedSignatureRef.current) return;
     syncedSignatureRef.current = signature;
-    dispatch(replaceBubbleViewState(incoming));
+    dispatch(replaceBubbleArrangement(incoming));
     // apexId の変化のみで発火させる
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apexId]);
@@ -166,10 +166,10 @@ export function useBubbleViewWorldLine() {
 
   // 各ノードの arrangement を要約（WorldLineView のノードラベル用）
   const summarizeNode = (nodeId: string): string => {
-    const v = scope.getObjectAt<BubbleViewState>(
+    const v = scope.getObjectAt<BubbleArrangement>(
       nodeId,
-      BUBBLE_VIEW_TYPE,
-      BUBBLE_VIEW_ID,
+      BUBBLE_ARRANGEMENT_TYPE,
+      BUBBLE_ARRANGEMENT_ID,
     );
     if (!v) return "";
     const count = Object.keys(v.bubbles ?? {}).length;

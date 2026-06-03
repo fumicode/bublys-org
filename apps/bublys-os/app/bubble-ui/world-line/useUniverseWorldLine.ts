@@ -2,13 +2,13 @@
 import { useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
-  makeSelectBubbleViewStateForUniverse,
-  replaceBubbleViewState,
+  makeSelectBubbleArrangementForUniverse,
+  replaceBubbleArrangement,
   navigateBubble,
-  BubbleViewState,
+  BubbleArrangement,
 } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID } from "./bubbleViewDomain";
+import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangementDomain";
 import { WL_URL_KEY } from "./wl-url";
 
 const UNIVERSE_BASE = "universe";
@@ -48,10 +48,10 @@ export type UniverseLink = {
  */
 export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
   const dispatch = useAppDispatch();
-  const view = useAppSelector(makeSelectBubbleViewStateForUniverse(universeId));
+  const view = useAppSelector(makeSelectBubbleArrangementForUniverse(universeId));
 
   const scope = useCasScope(universeId, {
-    initialObjects: [{ type: BUBBLE_VIEW_TYPE, object: new BubbleViewState(view) }],
+    initialObjects: [{ type: BUBBLE_ARRANGEMENT_TYPE, object: new BubbleArrangement(view) }],
   });
 
   const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
@@ -61,11 +61,11 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
     const signature = JSON.stringify(view);
     if (signature === syncedSignatureRef.current) return;
     syncedSignatureRef.current = signature;
-    const shell = scope.getShell<BubbleViewState>(BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID);
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (shell) {
-      shell.update(() => new BubbleViewState(view));
+      shell.update(() => new BubbleArrangement(view));
     } else {
-      scope.addObject(BUBBLE_VIEW_TYPE, new BubbleViewState(view));
+      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(view));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
@@ -73,13 +73,13 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
   // [rehydrate] apex 変化 → この universe に流し込む
   const apexId = scope.graph.getApex()?.id ?? null;
   useEffect(() => {
-    const shell = scope.getShell<BubbleViewState>(BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID);
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (!shell) return;
     const incoming = shell.object.toJSON();
     const signature = JSON.stringify(incoming);
     if (signature === syncedSignatureRef.current) return;
     syncedSignatureRef.current = signature;
-    dispatch(replaceBubbleViewState(incoming, universeId));
+    dispatch(replaceBubbleArrangement(incoming, universeId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apexId]);
 

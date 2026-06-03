@@ -20,9 +20,9 @@ import {
   layerDown as layerDownAction,
   layerUp as layerUpAction,
   setGlobalCoordinateSystem,
-  replaceBubbleViewState,
+  replaceBubbleArrangement,
   type OpeningPosition,
-  type BubbleViewStateJson,
+  type BubbleArrangementState,
 } from "../state/index.js";
 
 export type UniverseViewProps = {
@@ -57,14 +57,14 @@ export const UniverseView: FC<UniverseViewProps> = ({
   useEffect(() => {
     if (bubbleLayers.length > 0) return;
     if (!initialBubbleUrls?.length) return;
-    const bubbles: BubbleViewStateJson["bubbles"] = {};
+    const bubbles: BubbleArrangementState["bubbles"] = {};
     const layers: string[][] = [];
     initialBubbleUrls.forEach((url, i) => {
       const b = createBubble(url, { x: i * 400, y: 0 });
       bubbles[b.id] = b.toJSON();
       layers.push([b.id]);
     });
-    dispatch(replaceBubbleViewState({ bubbles, bubbleRelations: [], process: { layers } }, universeId));
+    dispatch(replaceBubbleArrangement({ bubbles, bubbleRelations: [], process: { layers } }, universeId));
     // 初回・空のときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
