@@ -9,19 +9,10 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangementDomain";
-import { WL_URL_KEY } from "./wl-url";
+import { buildUniverseUrl, readUniverseAt } from "./snapshot-url";
 
-const UNIVERSE_BASE = "universe";
-
-/** ネスト universe の現在ノードを表す universe バブルの url を組み立てる。 */
-export const buildUniverseUrl = (node?: string | null): string =>
-  node ? `${UNIVERSE_BASE}?${WL_URL_KEY}=${node}` : UNIVERSE_BASE;
-
-/** universe バブルの url から wl=<node> を読み取る。 */
-export const readUniverseWl = (url: string): string | null => {
-  const m = url.match(new RegExp(`[?&]${WL_URL_KEY}=([^&]+)`));
-  return m ? m[1] : null;
-};
+// re-export so importers don't need to know where the helpers live
+export { buildUniverseUrl, readUniverseAt };
 
 /** 親バブル（この universe を表示しているバブル）への接続情報。 */
 export type UniverseLink = {
@@ -37,11 +28,11 @@ export type UniverseLink = {
  * scope = universeId（universe ごとに独立した世界線）。
  *
  * `link` を渡すと、この universe の「現在ノード(apex)」を親バブルの url
- * (`universe?wl=<node>`) に双方向バインドする：
- *  - apex 変化 → 親バブルの url を更新（→ 親 view が変わり親世界線が記録 → … → root の #wl=）
+ * (`universe@<node>`) に双方向バインドする：
+ *  - apex 変化 → 親バブルの url を更新（→ 親 view が変わり親世界線が記録 → … → root の /universe@）
  *  - 親バブルの url 変化（親のブラウザ戻る等）→ その node へ moveTo（中身は rehydrate で反映）
- * これにより「universe のアドレスは常に wl=<node>。root はブラウザ、ネストは親バブルの url」
- * という統一形が再帰的に成立する。
+ * 「universe@<node>」という同じ文法が root のブラウザ url とネスト窓 url の両方で
+ * 使われ、空間×時間の入れ子が再帰的に成立する。
  *
  * 注: DomainRegistryProvider の内側で使うこと。1 universe につき 1 回だけ呼ぶこと
  *     （二重に呼ぶと commit/rehydrate が重複する）。
@@ -84,7 +75,7 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
   }, [apexId]);
 
   // ============================================================
-  // [URL バインド] apex ⇄ 親バブルの url（universe?wl=<node>）
+  // [URL バインド] apex ⇄ 親バブルの url（universe@<node>）
   //
   // apex と url が「最後に合意したノード(syncedNodeRef)」から
   // どちらが離れたかで駆動方向を判定し、A/B が綱引きしないようにする：
@@ -98,7 +89,7 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
 
   useEffect(() => {
     if (!link) return;
-    const urlNode = readUniverseWl(link.bubbleUrl);
+    const urlNode = readUniverseAt(link.bubbleUrl);
 
     if (apexId && apexId !== syncedNodeRef.current) {
       // 内部ナビ: apex が進んだ → url を追従させる

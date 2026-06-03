@@ -12,13 +12,19 @@ import {
   BUBBLE_ARRANGEMENT_ID,
   BUBBLE_ARRANGEMENT_SCOPE,
 } from "./bubbleArrangementDomain";
-import { WL_URL_KEY } from "./wl-url";
+import { buildUniverseUrl, readUniverseAt } from "./snapshot-url";
 
+/** 現 location から「いま居るノード」を取り出す。"/" や "/universe" は null。 */
 const parseNodeFromUrl = (): string | null => {
   if (typeof location === "undefined") return null;
-  const m = location.hash.match(new RegExp(`${WL_URL_KEY}=([^&]+)`));
-  return m ? decodeURIComponent(m[1]) : null;
+  // location.pathname は先頭スラッシュ付き ("/universe@<node>")
+  const segment = location.pathname.replace(/^\//, "");
+  return readUniverseAt(segment);
 };
+
+/** node から root のブラウザ url を組み立てる（query/hash は維持）。 */
+const buildRootPath = (node: string): string =>
+  `/${buildUniverseUrl(node)}${location.search}${location.hash}`;
 
 /**
  * bubble-ui の表示状態(arrangement)を world-line-graph に commit / 復元する橋渡し。
@@ -108,7 +114,7 @@ export function useBubbleArrangementWorldLine() {
   // apex → URL（新規訪問なら push、popstate 由来なら何もしない）
   useEffect(() => {
     if (!apexId) return;
-    const target = `#${WL_URL_KEY}=${encodeURIComponent(apexId)}`;
+    const target = buildRootPath(apexId);
 
     if (!initializedRef.current) {
       initializedRef.current = true;
@@ -122,9 +128,9 @@ export function useBubbleArrangementWorldLine() {
         refreshNav();
         return;
       }
-      // 初回 or URL のノードが実在しない（stale hash）: URL を現 apex に揃える
+      // 初回 or URL のノードが実在しない（stale url）: URL を現 apex に揃える
       // （履歴は置換してエントリを増やさない）
-      history.replaceState({ [WL_URL_KEY]: apexId }, "", target);
+      history.replaceState({ node: apexId }, "", target);
       trailRef.current = [apexId];
       indexRef.current = 0;
       refreshNav();
@@ -135,10 +141,10 @@ export function useBubbleArrangementWorldLine() {
       fromPopstateRef.current = false;
       return;
     }
-    if (location.hash === target) return;
+    if (location.pathname === `/${buildUniverseUrl(apexId)}`) return;
 
     // 新規訪問: 前方を切り捨てて push（線形に見せる。枝は graph 側に残る）
-    history.pushState({ [WL_URL_KEY]: apexId }, "", target);
+    history.pushState({ node: apexId }, "", target);
     trailRef.current = trailRef.current.slice(0, indexRef.current + 1);
     trailRef.current.push(apexId);
     indexRef.current = trailRef.current.length - 1;

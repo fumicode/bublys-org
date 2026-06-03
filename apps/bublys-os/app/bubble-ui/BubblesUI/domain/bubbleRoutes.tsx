@@ -142,8 +142,9 @@ const UniverseWorldLineToolbar: FC<UniverseNav> = ({ moveBack, moveForward, canU
 const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
   const parentUniverseId = useUniverseId();
   const childUniverseId = `${parentUniverseId}/${bubble.id}`;
-  // この universe の現在ノードを、この universe バブルの url(`universe?wl=<node>`)に
-  // 双方向バインドする。url は親 view の一部なので、ネストの移動が親世界線（→root の #wl=）に伝播する。
+  // この universe の現在ノードを、この universe バブルの url(`universe@<node>`)に
+  // 双方向バインドする。url は親 view の一部なので、ネストの移動が親世界線
+  // （→root のブラウザ url `/universe@<node>`）に再帰的に伝播する。
   const nav = useUniverseWorldLine(childUniverseId, {
     parentUniverseId,
     bubbleId: bubble.id,
@@ -172,8 +173,9 @@ const routes: BubbleRoute[] = [
   // 再帰的 universe（バブルの中の universe）
   // universe は固有サイズを持たない「窓」なので fillsContainer 指定。
   // 生成時は defaultSize の窓で開き、最大化解除でこのサイズに戻る。
+  // url: "universe" だけなら未訪問、"universe@<node>" でその node に居る。
   {
-    pattern: /^universe(\?wl=[^&]+)?$/,
+    pattern: /^universe(@[^/?#&]+)?$/,
     type: "universe",
     Component: UniverseBubble,
     bubbleOptions: { fillsContainer: true, defaultSize: { width: 560, height: 440 } },
