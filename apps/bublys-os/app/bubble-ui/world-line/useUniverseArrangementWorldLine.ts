@@ -119,7 +119,10 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
   }, [apexId, bubbleUrl]);
 
   return {
-    // nest 用 toolbar が直接使うショートカット（既存呼び出しと互換）
+    // nest 用 toolbar が直接使うショートカット（既存呼び出しと互換）。
+    // canUndo/canRedo は DAG ベース（apex に parent/child が居るか）で、
+    // moveBack/moveForward は DAG を辿る。root ラッパーはこれを使わずに
+    // ブラウザ履歴ベースで自前計算する（意図的な非対称、docs の C 参照）。
     moveBack: scope.moveBack,
     moveForward: scope.moveForward,
     canUndo: scope.canUndo,

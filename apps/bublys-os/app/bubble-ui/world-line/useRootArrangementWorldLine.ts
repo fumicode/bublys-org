@@ -54,8 +54,16 @@ export function useRootArrangementWorldLine() {
   // apex 変化が popstate（戻る/進む）由来かどうか。由来なら pushState しない。
   const fromPopstateRef = useRef(false);
 
-  // 訪問トレイル（線形）: undo/redo ボタンの活性判定用。
-  // ブラウザ履歴スタックは中身を読めないので自前で push/pop をミラーする。
+  // 訪問トレイル（線形）: undo/redo ボタンの活性判定用。ブラウザ履歴スタックは
+  // **中身を読めない**（length は取れるが現在位置は不明）ので、push/popstate を
+  // 自前ミラーする。これにより nav.canUndo/canRedo が「ブラウザの戻る/進むが
+  // 効くかどうか」と1対1で対応する。
+  //
+  // この判定は nest hook (`useUniverseArrangementWorldLine`) の DAG ベースの
+  // canUndo/canRedo とは意図的に違う：root はブラウザ履歴モデル（前方切り捨て
+  // あり）、nest は DAG モデル（枝分かれを保持）。詳しくは
+  // docs/recursive-universe.md「C. root と nest で undo/redo の判断軸が違う」
+  // を参照。
   const trailRef = useRef<string[]>([]);
   const indexRef = useRef(-1);
   const initializedRef = useRef(false);
