@@ -190,7 +190,7 @@ const routes: BubbleRoute[] = [
     base: "universe",
     type: "universe",
     Component: UniverseBubble,
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 560, height: 440 } },
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 420, height: 320 } },
   }),
 
   // ===== bubly = 1 universe バブル = 独立した世界線を持つ「アプリ境界」 =====
@@ -202,28 +202,28 @@ const routes: BubbleRoute[] = [
     type: "users-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["users"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
   }),
   makeBublyRoute({
     base: "groups-bubly",
     type: "groups-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["user-groups"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
   }),
   makeBublyRoute({
     base: "memo-bubly",
     type: "memo-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["memos"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
   }),
   makeBublyRoute({
     base: "task-bubly",
     type: "task-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["task-management/tasks"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
   }),
 
   // Users（users-libsから）

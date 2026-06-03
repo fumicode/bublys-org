@@ -362,12 +362,9 @@ const StyledFrame = styled.div<DivProps>`
   overflow: hidden;
   z-index: 0;
 
-  background: linear-gradient(
-    145deg,
-    hsl(220, 35%, 18%) 0%,
-    hsl(225, 40%, 22%) 40%,
-    hsl(230, 35%, 20%) 100%
-  );
+  /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
+     全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */
+  background: transparent;
 `;
 
 const StyledViewport = styled.div<DivPropsWithRef>`

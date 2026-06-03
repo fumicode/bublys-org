@@ -40,7 +40,7 @@ import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
-import { BubbleArrangementInspector } from "../../world-line/BubbleArrangementInspector";
+// import { BubbleArrangementInspector } from "../../world-line/BubbleArrangementInspector";
 
 const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
 
@@ -222,13 +222,21 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       {/* 表示状態を world-line に同期し undo/redo を提供 */}
       <BubbleArrangementWorldLineControls />
       {/* 現在の view 状態の JSON を左下に表示（開発用） */}
-      <BubbleArrangementInspector />
+      {/* <BubbleArrangementInspector /> */}
 
       {/* Left Sidebar */}
       <Sidebar onItemClick={handleSidebarItemClick} />
 
-      {/* Main Bubbles Area */}
-      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      {/* Main Bubbles Area — universe（root も nested も）は透明にして、
+          ここがすべての universe の「夜空」backdrop として 1 段大きく塗る。 */}
+      <Box
+        sx={{
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+          background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+        }}
+      >
         <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>

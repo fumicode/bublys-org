@@ -274,14 +274,15 @@ const StyledWindow = styled.div<StyledWindowProps>`
   flex-direction: column;
   overflow: hidden;
 
-  /* 中の universe が自前で背景を持ち、シェル＝ヘッダーだけが見えるように
-     パディング・枠・面塗りは置かない。窓のサイズ感は box-shadow だけで示す。 */
+  /* シェル本体は完全に透明だが、backdrop-filter でガラス越しの「ぼやけた向こう側」
+     感を出す。universe の中身（透明）越しに backdrop が blur されて見える。 */
   background: transparent;
   border: none;
   border-radius: 14px;
   box-shadow:
     0 16px 48px hsla(0, 0%, 0%, 0.5),
     0 2px 8px hsla(0, 0%, 0%, 0.25);
+  backdrop-filter: blur(10px) saturate(1.15);
 
   > .e-window-header {
     cursor: move;
