@@ -29,6 +29,7 @@ export * from './lib/bubly/index.js';
 // Hooks
 export * from './lib/hooks/useWindowSize.js';
 export * from './lib/hooks/useMyRect.js';
+export * from './lib/hooks/useBubbleDrag.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';
@@ -40,6 +41,7 @@ export * from './lib/utils/measure-viewport.js';
 
 // UI Components
 export * from './lib/ui/BubbleView.js';
+export * from './lib/ui/UniverseBubbleView.js';
 export * from './lib/ui/LinkBubbleView.js';
 export * from './lib/ui/BubbleContent.js';
 export * from './lib/ui/BubblesLayeredView.js';

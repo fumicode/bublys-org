@@ -4,6 +4,7 @@ import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
+import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
@@ -62,6 +63,28 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
 
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
+
+  // fillsContainer な窓型バブル（universe / iframe / 等）は専用シェルで描く。
+  // 透明な content と窓っぽいヘッダーで「親が透けて見える窓」として表現する。
+  if (bubble.fillsContainer) {
+    return (
+      <UniverseBubbleView
+        bubble={bubble}
+        position={pos}
+        layerIndex={layerIndex}
+        zIndex={zIndex}
+        vanishingPoint={vanishingPoint}
+        onClick={() => onBubbleClick?.(bubble.url)}
+        onCloseClick={() => onBubbleClose?.(bubble)}
+        onResize={(updated) => onBubbleResize?.(updated)}
+        onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+        onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+        onDebugRects={onDebugRects}
+      >
+        {renderBubbleContent(bubble)}
+      </UniverseBubbleView>
+    );
+  }
 
   return (
     <BubbleView
@@ -216,7 +239,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     };
   }, [onCoordinateSystemReady, vanishingPoint]);
 
-  const [showSurfaceBorder, setShowSurfaceBorder] = useState(true);
+  const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
   const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));

@@ -1,14 +1,14 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
+import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
-import { createUniverse } from "../universe-config.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 
 /**
@@ -183,12 +183,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
-  // ドラッグハンドラ用に最新値を保持
-  const surfaceLeftTopRef = useRef(surfaceLeftTop);
-  surfaceLeftTopRef.current = surfaceLeftTop;
-  const vanishingPointRef = useRef(vanishingPoint);
-  vanishingPointRef.current = vanishingPoint;
-
   const { ref, notifyRendered} = useMyRectObserver({
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
@@ -198,73 +192,9 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   });
 
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+
   const [isFocused, setIsFocused] = useState(false);
-
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
-  const currentDragPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  const endDrag = () => {
-    // ドラッグ終了時のみRedux更新（パフォーマンス最適化）
-    if (currentDragPosRef.current) {
-      dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON(), universeId));
-    }
-    // インラインスタイルをクリア（styled-componentsに制御を戻す）
-    if (ref.current) {
-      ref.current.style.transition = '';
-      ref.current.style.transformOrigin = '';
-      ref.current.style.left = '';
-      ref.current.style.top = '';
-    }
-    dragStartPosRef.current = null;
-    dragStartMouseRef.current = null;
-    currentDragPosRef.current = null;
-    document.removeEventListener("mousemove", handleDragging);
-    document.removeEventListener("mouseup", endDrag);
-  };
-
-  const handleDragging = (e: MouseEvent) => {
-    if (!dragStartPosRef.current || !dragStartMouseRef.current || !ref.current) return;
-    const screenDelta = {
-      x: e.clientX - dragStartMouseRef.current.x,
-      y: e.clientY - dragStartMouseRef.current.y,
-    };
-
-    // CoordinateSystemを使ってスクリーン座標→ローカル座標の変換を行う
-    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndex || 0)
-      .withVanishingPoint(vanishingPointRef.current || { x: 0, y: 0 });
-
-    // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
-    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
-
-    const rawLocal = {
-      x: dragStartPosRef.current.x + localDelta.x,
-      y: dragStartPosRef.current.y + localDelta.y,
-    };
-
-    // universe の縁より外へ出さない。レイアウトは surface レイヤーで行われるので
-    // surface 経由で universe 座標へ写し、Universe.clamp で範囲内に収め、
-    // layer-local に戻す。（越えるとスクロールで追えずヘッダーを掴めなくなる）
-    const surfaceLayer = new Layer(
-      0,
-      surfaceLeftTopRef.current,
-      vanishingPointRef.current || { x: 0, y: 0 },
-    );
-    const universe = createUniverse();
-    const newPos = surfaceLayer.locate(universe.clamp(surfaceLayer.place(rawLocal)));
-
-    // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
-    currentDragPosRef.current = newPos;
-    const screenPos = surfaceLayer.place(newPos);
-    ref.current.style.left = `${screenPos.x}px`;
-    ref.current.style.top = `${screenPos.y}px`;
-    ref.current.style.transition = 'none'; // ドラッグ中はトランジション無効
-
-    // transform-originも更新（vanishingPointとの相対位置を維持）
-    // これがないと、Redux更新後にtransform-originが再計算されて位置がズレる
-    const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
-    ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
-  };
 
   const isMaximized = bubble.isMaximized;
 
@@ -284,7 +214,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       const surfaceLayer = new Layer(
         0,
         surfaceLeftTop,
-        vanishingPointRef.current || { x: 0, y: 0 },
+        vanishingPoint || { x: 0, y: 0 },
       );
       const visible = viewport.visibleRegion();
 
@@ -306,23 +236,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
     setIsFocused(true); // ヘッダークリックで最前面に
     if (!onMove) return;
-    e.stopPropagation();
-    dragStartPosRef.current = { ...bubble.position };
-    dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
-    document.addEventListener("mousemove", handleDragging);
-    document.addEventListener("mouseup", endDrag);
+    onDragStart(e);
   };
 
   const handleMouseLeave = () => {
     setIsFocused(false);
   };
-
-  useEffect(() => {
-    return () => {
-      document.removeEventListener("mousemove", handleDragging);
-      document.removeEventListener("mouseup", endDrag);
-    };
-  }, []);
 
   // DOM参照をContextに登録
   useLayoutEffect(() => {
