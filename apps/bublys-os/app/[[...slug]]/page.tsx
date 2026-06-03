@@ -12,7 +12,7 @@ import { BubblesUI } from "../bubble-ui/BubblesUI/feature/BubblesUI";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { registerShellTypes } from "../counter/registerShellTypes";
-import { BUBBLE_ARRANGEMENT_DOMAIN } from "../bubble-ui/world-line/bubbleArrangementDomain";
+import { BUBBLE_ARRANGEMENT_DOMAIN } from "@bublys-org/bubbles-ui";
 
 export default function Index() {
   // 型レジストリの初期化

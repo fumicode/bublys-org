@@ -52,3 +52,6 @@ export * from './lib/pocket/index.js';
 
 // State Management (Redux)
 export * from './lib/state/index.js';
+
+// World-line integration (per-universe BubbleArrangement ⇄ world-line-graph)
+export * from './lib/world-line/index.js';

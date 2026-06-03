@@ -1,12 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ROOT_UNIVERSE_ID, BubbleArrangement } from "@bublys-org/bubbles-ui";
 import {
+  ROOT_UNIVERSE_ID,
+  BubbleArrangement,
   BUBBLE_ARRANGEMENT_TYPE,
   BUBBLE_ARRANGEMENT_ID,
-} from "./bubbleArrangementDomain";
+  useUniverseArrangementWorldLine,
+} from "@bublys-org/bubbles-ui";
 import { rootBrowserSnapshotCodec } from "./snapshot-url";
-import { useUniverseArrangementWorldLine } from "./useUniverseArrangementWorldLine";
 
 /** 現 location から「いま居るノード」を取り出す。"/" や "/universe" は null。 */
 const parseNodeFromUrl = (): string | null => {

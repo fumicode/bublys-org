@@ -1,6 +1,6 @@
 import type { BubbleOptions } from "../Bubble.domain.js";
 import type { BubbleContentRenderer, BubbleRoute } from "./BubbleRouting.js";
-import type { SnapshotCodec } from "./SnapshotCodec.js";
+import { makeSnapshotCodec } from "./SnapshotCodec.js";
 
 /** `<base>@<snapshot>` の区切り文字。git/docker/npm 等と同じ「at this snapshot」イデオム。 */
 const AT_PREFIX = "@";
@@ -34,16 +34,11 @@ export const makeSnapshotRoute = (config: {
   bubbleOptions?: BubbleOptions;
 }): BubbleRoute => {
   const { base, type, Component, bubbleOptions } = config;
-  const prefix = `${base}${AT_PREFIX}`;
-  const snapshot: SnapshotCodec = {
-    encode: (node) => `${prefix}${node}`,
-    decode: (url) => (url.startsWith(prefix) ? url.slice(prefix.length) : null),
-  };
   return {
     pattern: new RegExp(`^${escapeRegex(base)}(${AT_PREFIX}[^/?#&]+)?$`),
     type,
     Component,
     bubbleOptions,
-    snapshot,
+    snapshot: makeSnapshotCodec(base),
   };
 };

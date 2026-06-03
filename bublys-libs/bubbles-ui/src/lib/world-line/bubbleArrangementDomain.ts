@@ -1,5 +1,6 @@
 import { defineDomainObjects } from "@bublys-org/domain-registry";
-import { BubbleArrangement, BubbleArrangementState } from "@bublys-org/bubbles-ui";
+import { BubbleArrangement } from "../BubbleArrangement.domain.js";
+import type { BubbleArrangementState } from "../state/bubbles-slice.js";
 
 /** view オブジェクトの型名（CAS の StateRef.type） */
 export const BUBBLE_ARRANGEMENT_TYPE = "bubble-arrangement";

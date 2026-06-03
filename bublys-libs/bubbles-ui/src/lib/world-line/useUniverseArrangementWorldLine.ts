@@ -1,15 +1,15 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import {
   makeSelectBubbleArrangementForUniverse,
   replaceBubbleArrangement,
   navigateBubble,
-  BubbleArrangement,
-  type SnapshotCodec,
-} from "@bublys-org/bubbles-ui";
-import { useCasScope } from "@bublys-org/world-line-graph";
-import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangementDomain";
+} from "../state/bubbles-slice.js";
+import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
+import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangementDomain.js";
 
 /**
  * 親バブル（この universe を表示しているバブル）への接続情報。
@@ -37,9 +37,9 @@ export type UniverseLink = {
  *  - 親バブルの url 変化（親のブラウザ戻る等）→ その node へ moveTo（中身は rehydrate で反映）
  * `link.snapshot` から `<base>` 名（"universe"等）が来るので、hook はそれを知らない。
  *
- * root universe には `useRootArrangementWorldLine` が**この hook をラップして**
- * ブラウザ URL / 履歴調整を追加で乗せる。よって commit/rehydrate ループの実装は
- * この1ヶ所にしか書かれていない。
+ * root universe は別途このコアをラップしてブラウザ URL / 履歴調整を追加で乗せる
+ * （アプリ側の useRootArrangementWorldLine 等）。よって commit/rehydrate ループの
+ * 実装はこの 1 ヶ所にしか書かれていない。
  *
  * 注: DomainRegistryProvider の内側で使うこと。1 universe につき 1 回だけ呼ぶこと
  *     （二重に呼ぶと commit/rehydrate が重複する）。

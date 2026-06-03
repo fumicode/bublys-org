@@ -1,10 +1,9 @@
 "use client";
 
 import { useContext, FC, type CSSProperties } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute, makeBublyRoute } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute, makeBublyRoute, useUniverseArrangementWorldLine } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { BubbleContent } from "../ui/BubbleContent";
-import { useUniverseArrangementWorldLine } from "../../world-line/useUniverseArrangementWorldLine";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";

@@ -15,3 +15,21 @@ export type SnapshotCodec = {
   /** url 文字列から node を取り出す。snapshot 指定子が無ければ null。 */
   decode: (url: string) => string | null;
 };
+
+/** `<base>@<snapshot>` の区切り文字。git/docker/npm 等と同じ「at this snapshot」イデオム。 */
+const AT_PREFIX = "@";
+
+/**
+ * `<base>@<node>` 文法の {@link SnapshotCodec} を base 文字列から生成する。
+ *
+ * バブルルート（{@link makeSnapshotRoute}）は url パターンも一緒に派生させるが、
+ * ルートを介さない URL（例: root universe のブラウザパス `/universe@<node>`）でも
+ * 同じ文法を使いたいので codec だけここで切り出す。
+ */
+export const makeSnapshotCodec = (base: string): SnapshotCodec => {
+  const prefix = `${base}${AT_PREFIX}`;
+  return {
+    encode: (node) => `${prefix}${node}`,
+    decode: (url) => (url.startsWith(prefix) ? url.slice(prefix.length) : null),
+  };
+};

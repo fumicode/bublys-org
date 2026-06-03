@@ -1,4 +1,4 @@
-import type { SnapshotCodec } from "@bublys-org/bubbles-ui";
+import { makeSnapshotCodec } from "@bublys-org/bubbles-ui";
 
 /**
  * root のブラウザ url 用 SnapshotCodec。
@@ -8,14 +8,7 @@ import type { SnapshotCodec } from "@bublys-org/bubbles-ui";
  * 経由しない**（`/universe@<node>` はブラウザ url で、`useRootArrangementWorldLine`
  * が直接読み書きする）。そのため root 用の SnapshotCodec はここで独立に定義する。
  *
- * 中身は同じ `<base>@<node>` 文法で、たまたま base 文字列 "universe" もバブル
- * ルートと一致しているが、概念的には独立した定義。
+ * 文法は lib の {@link makeSnapshotCodec} で同じ `<base>@<node>` から派生させる。
+ * base 文字列 "universe" もバブルルートと一致しているが、概念的にはアプリ規約。
  */
-const ROOT_URL_BASE = "universe";
-const AT_PREFIX = "@";
-const PREFIX = `${ROOT_URL_BASE}${AT_PREFIX}`;
-
-export const rootBrowserSnapshotCodec: SnapshotCodec = {
-  encode: (node) => `${PREFIX}${node}`,
-  decode: (url) => (url.startsWith(PREFIX) ? url.slice(PREFIX.length) : null),
-};
+export const rootBrowserSnapshotCodec = makeSnapshotCodec("universe");
