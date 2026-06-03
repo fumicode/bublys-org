@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, FC, type CSSProperties } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute, makeBublyRoute } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { BubbleContent } from "../ui/BubbleContent";
 import { useUniverseArrangementWorldLine } from "../../world-line/useUniverseArrangementWorldLine";
@@ -139,11 +139,15 @@ const UniverseWorldLineToolbar: FC<UniverseNav> = ({ moveBack, moveForward, canU
 // 再帰的 universe バブル: バブルの中に独立した universe を描く。
 // universe バブルは常にサイズ付きで開かれる（popChildMax）ので content 領域は
 // 常に definite。コンテナは一律 100%×100% でバブル内側にぴったり追従する。
+//
+// 自分のルート定義（registry）から
+//   - snapshot codec        → 世界線 hook に注入（base 名を知らずに済む）
+//   - initialBubbleUrls     → UniverseView の初期 seed
+// を引いてくる。これにより同じ Component で users-bubly / task-bubly / memo-bubly
+// など「初期 seed が違うだけの bubly ルート」を増やせる。
 const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
   const parentUniverseId = useUniverseId();
   const childUniverseId = `${parentUniverseId}/${bubble.id}`;
-  // 自分のルート定義から snapshot codec を引いて世界線 hook に注入する。
-  // hook は base 文字列("universe" 等)を知らない設計。
   const route = BubbleRouteRegistry.matchRoute(bubble.url);
   // この universe の現在ノードを、自分の url (`<base>@<node>`)に双方向バインド。
   // url は親 view の一部なので、ネストの移動が親世界線（→root のブラウザ url）に
@@ -164,7 +168,7 @@ const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
       <UniverseView
         universeId={childUniverseId}
         renderBubbleContent={(b) => <BubbleContent bubble={b} />}
-        initialBubbleUrls={["users"]}
+        initialBubbleUrls={route?.initialBubbleUrls ?? ["users"]}
       />
       <UniverseWorldLineToolbar {...nav} />
     </div>
@@ -179,16 +183,47 @@ const routes: BubbleRoute[] = [
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
 
-  // 再帰的 universe（バブルの中の universe）
-  // universe は固有サイズを持たない「窓」なので fillsContainer 指定。
-  // 生成時は defaultSize の窓で開き、最大化解除でこのサイズに戻る。
+  // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
   // url: "universe" だけなら未訪問、"universe@<node>" でその node に居る。
-  // makeSnapshotRoute は pattern と snapshot codec を base 1個から派生させる。
+  // 初期 seed は UniverseBubble のフォールバック ("users") が当たる。
   makeSnapshotRoute({
     base: "universe",
     type: "universe",
     Component: UniverseBubble,
     bubbleOptions: { fillsContainer: true, defaultSize: { width: 560, height: 440 } },
+  }),
+
+  // ===== bubly = 1 universe バブル = 独立した世界線を持つ「アプリ境界」 =====
+  // それぞれのサイドバー項目から開く想定。複数同時に開けば、それぞれ独立した
+  // 世界線とアドレス（root の bubble.url が <bubly>@<nestNode>）を持つ。
+  // root のブラウザ url (/<bubly>@<rootNode>) はその外側で 1 段大きく追従する。
+  makeBublyRoute({
+    base: "users-bubly",
+    type: "users-bubly",
+    Component: UniverseBubble,
+    initialBubbleUrls: ["users"],
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+  }),
+  makeBublyRoute({
+    base: "groups-bubly",
+    type: "groups-bubly",
+    Component: UniverseBubble,
+    initialBubbleUrls: ["user-groups"],
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+  }),
+  makeBublyRoute({
+    base: "memo-bubly",
+    type: "memo-bubly",
+    Component: UniverseBubble,
+    initialBubbleUrls: ["memos"],
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
+  }),
+  makeBublyRoute({
+    base: "task-bubly",
+    type: "task-bubly",
+    Component: UniverseBubble,
+    initialBubbleUrls: ["task-management/tasks"],
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 720, height: 560 } },
   }),
 
   // Users（users-libsから）

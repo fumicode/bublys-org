@@ -28,6 +28,12 @@ export type BubbleRoute = {
    * 通常は {@link makeSnapshotRoute} 経由で url パターンと一緒に派生させる。
    */
   snapshot?: SnapshotCodec;
+  /**
+   * universe を内包するルート用：universe が空のときに初期 seed として
+   * 投入するバブル url の一覧。`UniverseView.initialBubbleUrls` に渡される。
+   * 通常は `makeBublyRoute` 経由で snapshot codec と一緒に付与される。
+   */
+  initialBubbleUrls?: string[];
 };
 
 /**
