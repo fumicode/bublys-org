@@ -113,6 +113,13 @@ bubblesListener.startListening({
     const newState = listenerApi.getState() as any;
     const newThisBubble = selectBubble(newState, { id, universeId });
 
+    // self-abort: await の間に rehydrate で自分のバブルが state から消えていたら
+    // もう関係ない仕事なので何もしない（不是 D 対策、docs/popchild-flow.md 参照）。
+    if (!newThisBubble) {
+      console.log("JoinSibling: stale (bubble removed during await)");
+      return;
+    }
+
     // パフォーマンス最適化: IDリストだけを取得
     const newSurfaceIds = makeSelectSurfaceBubbleIds(universeId)(newState);
     const newOtherSiblingIds = newSurfaceIds.filter(siblingId => siblingId !== id);
@@ -240,6 +247,15 @@ bubblesListener.startListening({
     const newState = listenerApi.getState() as any;
     const newPoppingBubble = selectBubble(newState, { id: poppingBubbleId, universeId });
     const newOpenerBubble = selectBubble(newState, { id: relation.openerId, universeId });
+
+    // self-abort: await の間に rehydrate（世界線の戻る等）で対象バブルが state
+    // から消えていたら、自分はもう関係ない仕事になっているので何もしない。
+    // ここで return しないと、updateBubble が削除済バブルへ向けて投げられ、
+    // 履歴トレイル汚染（不是 D）を起こす。詳細は docs/popchild-flow.md 参照。
+    if (!newPoppingBubble || !newOpenerBubble) {
+      console.log("Pop: stale (bubble removed during await)");
+      return;
+    }
 
     if(!newOpenerBubble.renderedRect || !newPoppingBubble.renderedRect) {
       console.log("Pop: renderedRect not found");
