@@ -83,7 +83,17 @@ const abbreviateSlug = (slug: string): { text: string; isAbbreviated: boolean } 
  * URLをパースしてスタイル付きで表示するコンポーネント
  * memo化して不要な再レンダリングを防止
  * CSSのdirection:rtlで右端から表示（強制リフローを完全に回避）
+ *
+ * 文法: 各セグメントは `<name>` または `<name>@<snapshot>` で、`@<snapshot>` は
+ * 「at this snapshot」を表すスナップショット指定子（universe@<node> 等）。
+ * @ とその後ろを専用スタイルで描き、name と区別する。
  */
+const splitAtSnapshot = (segment: string): { name: string; snapshot: string | null } => {
+  const i = segment.indexOf("@");
+  if (i < 0) return { name: segment, snapshot: null };
+  return { name: segment.slice(0, i), snapshot: segment.slice(i + 1) };
+};
+
 const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
   const segments = useMemo(() => url.split("/").filter(Boolean), [url]);
 
@@ -91,16 +101,27 @@ const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
     <div className="e-styled-url">
       <div className="e-styled-url-inner">
         {segments.map((segment, index) => {
-          const { text, isAbbreviated } = abbreviateSlug(segment);
+          const { name, snapshot } = splitAtSnapshot(segment);
+          const { text: nameText, isAbbreviated: nameAbbr } = abbreviateSlug(name);
+          const snapshotAbbr = snapshot !== null ? abbreviateSlug(snapshot) : null;
           return (
             <span key={index} className="e-url-segment">
               {index > 0 && <span className="e-url-separator">/</span>}
               <span
-                className={`e-url-slug ${isAbbreviated ? "e-abbreviated" : ""}`}
-                title={isAbbreviated ? segment : undefined}
+                className={`e-url-slug ${nameAbbr ? "e-abbreviated" : ""}`}
+                title={nameAbbr ? name : undefined}
               >
-                {text}
+                {nameText}
               </span>
+              {snapshot !== null && snapshotAbbr !== null && (
+                <span
+                  className="e-url-snapshot"
+                  title={snapshotAbbr.isAbbreviated ? snapshot : undefined}
+                >
+                  <span className="e-url-at">@</span>
+                  <span className="e-url-snapshot-node">{snapshotAbbr.text}</span>
+                </span>
+              )}
             </span>
           );
         })}
@@ -681,6 +702,34 @@ const StyledBubble = styled.div<StyledBubbleProp>`
             font-size: 0.9em;
             cursor: help;
           }
+        }
+
+        // "@<snapshot>" は git の HEAD@{N} / docker の image@digest と同じ
+        // 「at this snapshot」イデオム。pill 状にまとめてスナップショット指定子
+        // であることを視覚的に明示する。
+        .e-url-snapshot {
+          display: inline-flex;
+          align-items: baseline;
+          margin-left: 3px;
+          padding: 1px 6px 1px 4px;
+          border-radius: 8px;
+          background: hsla(220, 60%, 88%, 0.55);
+          border: 1px solid hsla(220, 50%, 70%, 0.35);
+          font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+          font-size: 0.82em;
+          line-height: 1.4;
+          cursor: help;
+        }
+
+        .e-url-at {
+          color: hsla(220, 60%, 45%, 0.85);
+          font-weight: 700;
+          margin-right: 2px;
+        }
+
+        .e-url-snapshot-node {
+          color: hsla(220, 40%, 28%, 0.9);
+          letter-spacing: 0.02em;
         }
       }
     }
