@@ -12,12 +12,11 @@ import {
   BUBBLE_VIEW_ID,
   BUBBLE_VIEW_SCOPE,
 } from "./bubbleViewDomain";
-
-const URL_KEY = "wl";
+import { WL_URL_KEY } from "./wl-url";
 
 const parseNodeFromUrl = (): string | null => {
   if (typeof location === "undefined") return null;
-  const m = location.hash.match(new RegExp(`${URL_KEY}=([^&]+)`));
+  const m = location.hash.match(new RegExp(`${WL_URL_KEY}=([^&]+)`));
   return m ? decodeURIComponent(m[1]) : null;
 };
 
@@ -109,7 +108,7 @@ export function useBubbleViewWorldLine() {
   // apex → URL（新規訪問なら push、popstate 由来なら何もしない）
   useEffect(() => {
     if (!apexId) return;
-    const target = `#${URL_KEY}=${encodeURIComponent(apexId)}`;
+    const target = `#${WL_URL_KEY}=${encodeURIComponent(apexId)}`;
 
     if (!initializedRef.current) {
       initializedRef.current = true;
@@ -125,7 +124,7 @@ export function useBubbleViewWorldLine() {
       }
       // 初回 or URL のノードが実在しない（stale hash）: URL を現 apex に揃える
       // （履歴は置換してエントリを増やさない）
-      history.replaceState({ [URL_KEY]: apexId }, "", target);
+      history.replaceState({ [WL_URL_KEY]: apexId }, "", target);
       trailRef.current = [apexId];
       indexRef.current = 0;
       refreshNav();
@@ -139,7 +138,7 @@ export function useBubbleViewWorldLine() {
     if (location.hash === target) return;
 
     // 新規訪問: 前方を切り捨てて push（線形に見せる。枝は graph 側に残る）
-    history.pushState({ [URL_KEY]: apexId }, "", target);
+    history.pushState({ [WL_URL_KEY]: apexId }, "", target);
     trailRef.current = trailRef.current.slice(0, indexRef.current + 1);
     trailRef.current.push(apexId);
     indexRef.current = trailRef.current.length - 1;

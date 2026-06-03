@@ -9,16 +9,17 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { BUBBLE_VIEW_TYPE, BUBBLE_VIEW_ID } from "./bubbleViewDomain";
+import { WL_URL_KEY } from "./wl-url";
 
 const UNIVERSE_BASE = "universe";
 
 /** ネスト universe の現在ノードを表す universe バブルの url を組み立てる。 */
 export const buildUniverseUrl = (node?: string | null): string =>
-  node ? `${UNIVERSE_BASE}?wl=${node}` : UNIVERSE_BASE;
+  node ? `${UNIVERSE_BASE}?${WL_URL_KEY}=${node}` : UNIVERSE_BASE;
 
 /** universe バブルの url から wl=<node> を読み取る。 */
 export const readUniverseWl = (url: string): string | null => {
-  const m = url.match(/[?&]wl=([^&]+)/);
+  const m = url.match(new RegExp(`[?&]${WL_URL_KEY}=([^&]+)`));
   return m ? m[1] : null;
 };
 
