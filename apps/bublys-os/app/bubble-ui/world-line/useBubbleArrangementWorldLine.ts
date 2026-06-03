@@ -12,19 +12,19 @@ import {
   BUBBLE_ARRANGEMENT_ID,
   BUBBLE_ARRANGEMENT_SCOPE,
 } from "./bubbleArrangementDomain";
-import { buildUniverseUrl, readUniverseAt } from "./snapshot-url";
+import { rootBrowserSnapshotCodec } from "./snapshot-url";
 
 /** 現 location から「いま居るノード」を取り出す。"/" や "/universe" は null。 */
 const parseNodeFromUrl = (): string | null => {
   if (typeof location === "undefined") return null;
   // location.pathname は先頭スラッシュ付き ("/universe@<node>")
   const segment = location.pathname.replace(/^\//, "");
-  return readUniverseAt(segment);
+  return rootBrowserSnapshotCodec.decode(segment);
 };
 
 /** node から root のブラウザ url を組み立てる（query/hash は維持）。 */
 const buildRootPath = (node: string): string =>
-  `/${buildUniverseUrl(node)}${location.search}${location.hash}`;
+  `/${rootBrowserSnapshotCodec.encode(node)}${location.search}${location.hash}`;
 
 /**
  * bubble-ui の表示状態(arrangement)を world-line-graph に commit / 復元する橋渡し。
@@ -141,7 +141,7 @@ export function useBubbleArrangementWorldLine() {
       fromPopstateRef.current = false;
       return;
     }
-    if (location.pathname === `/${buildUniverseUrl(apexId)}`) return;
+    if (location.pathname === `/${rootBrowserSnapshotCodec.encode(apexId)}`) return;
 
     // 新規訪問: 前方を切り捨てて push（線形に見せる。枝は graph 側に残る）
     history.pushState({ node: apexId }, "", target);

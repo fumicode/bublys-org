@@ -6,19 +6,24 @@ import {
   replaceBubbleArrangement,
   navigateBubble,
   BubbleArrangement,
+  type SnapshotCodec,
 } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangementDomain";
-import { buildUniverseUrl, readUniverseAt } from "./snapshot-url";
 
-// re-export so importers don't need to know where the helpers live
-export { buildUniverseUrl, readUniverseAt };
-
-/** 親バブル（この universe を表示しているバブル）への接続情報。 */
+/**
+ * 親バブル（この universe を表示しているバブル）への接続情報。
+ *
+ * `snapshot` は親バブルの url を「`<base>@<node>`」に出し入れする codec。
+ * 呼び出し側（typically: BubbleRouteRegistry から自分のルート定義を引いた
+ * UniverseBubble）が、ルートに紐付いた codec を渡す。これにより
+ * useUniverseWorldLine は "universe" などの具体名を知らない。
+ */
 export type UniverseLink = {
   parentUniverseId: string;
   bubbleId: string;
   bubbleUrl: string;
+  snapshot: SnapshotCodec;
 };
 
 /**
@@ -89,14 +94,14 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
 
   useEffect(() => {
     if (!link) return;
-    const urlNode = readUniverseAt(link.bubbleUrl);
+    const urlNode = link.snapshot.decode(link.bubbleUrl);
 
     if (apexId && apexId !== syncedNodeRef.current) {
       // 内部ナビ: apex が進んだ → url を追従させる
       syncedNodeRef.current = apexId;
       if (urlNode !== apexId) {
         dispatch(
-          navigateBubble({ id: link.bubbleId, url: buildUniverseUrl(apexId) }, link.parentUniverseId)
+          navigateBubble({ id: link.bubbleId, url: link.snapshot.encode(apexId) }, link.parentUniverseId)
         );
       }
       return;

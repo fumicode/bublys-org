@@ -1,32 +1,21 @@
+import type { SnapshotCodec } from "@bublys-org/bubbles-ui";
+
 /**
- * universe URL grammar — `<name>@<node>` という単一文法で「universe を
- * このスナップショットで見ている」を表す。
+ * root のブラウザ url 用 SnapshotCodec。
  *
- * - **ブラウザのアドレスバー**:
- *     /universe@<node>
- *     ↑ root universe を node ノードで見ている
+ * バブルの世界線対応ルート（`makeSnapshotRoute({ base: "universe", ... })`）は
+ * `BubbleRouteRegistry` 経由で自分の codec を持つが、**root はバブルルートを
+ * 経由しない**（`/universe@<node>` はブラウザ url で、`useBubbleArrangementWorldLine`
+ * が直接読み書きする）。そのため root 用の SnapshotCodec はここで独立に定義する。
  *
- * - **ネスト universe バブルの url**:
- *     universe@<node>
- *     ↑ そのネスト universe を node ノードで見ている
- *
- * root も nest も同じ「universe@<node>」で揃う。`@` は git の `HEAD@{N}` /
- * docker の `image@digest` / npm の `pkg@version` と同じ「at this snapshot」
- * イデオム。<name>@<node> という1つの読みでブラウザ url とバブル url の両方を貫く。
+ * 中身は同じ `<base>@<node>` 文法で、たまたま base 文字列 "universe" もバブル
+ * ルートと一致しているが、概念的には独立した定義。
  */
+const ROOT_URL_BASE = "universe";
+const AT_PREFIX = "@";
+const PREFIX = `${ROOT_URL_BASE}${AT_PREFIX}`;
 
-/** snapshot 指定子の prefix。 */
-export const AT_PREFIX = "@";
-
-/** universe を表す名前（root のブラウザ url・ネスト universe バブル url の両方）。 */
-export const UNIVERSE_URL_BASE = "universe";
-
-/** `universe@<node>` を組み立てる。node 省略時はベースのみ（未スナップショット）。 */
-export const buildUniverseUrl = (node?: string | null): string =>
-  node ? `${UNIVERSE_URL_BASE}${AT_PREFIX}${node}` : UNIVERSE_URL_BASE;
-
-/** `universe@<node>` 文字列から node を取り出す。`universe` だけなら null。 */
-export const readUniverseAt = (url: string): string | null => {
-  const prefix = `${UNIVERSE_URL_BASE}${AT_PREFIX}`;
-  return url.startsWith(prefix) ? url.slice(prefix.length) : null;
+export const rootBrowserSnapshotCodec: SnapshotCodec = {
+  encode: (node) => `${PREFIX}${node}`,
+  decode: (url) => (url.startsWith(PREFIX) ? url.slice(PREFIX.length) : null),
 };
