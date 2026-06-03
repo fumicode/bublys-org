@@ -4,7 +4,7 @@ import { useContext, FC, type CSSProperties } from "react";
 import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { BubbleContent } from "../ui/BubbleContent";
-import { useUniverseWorldLine } from "../../world-line/useUniverseWorldLine";
+import { useUniverseArrangementWorldLine } from "../../world-line/useUniverseArrangementWorldLine";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -148,7 +148,7 @@ const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
   // この universe の現在ノードを、自分の url (`<base>@<node>`)に双方向バインド。
   // url は親 view の一部なので、ネストの移動が親世界線（→root のブラウザ url）に
   // 再帰的に伝播する。
-  const nav = useUniverseWorldLine(
+  const nav = useUniverseArrangementWorldLine(
     childUniverseId,
     route?.snapshot
       ? {

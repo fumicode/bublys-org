@@ -23,7 +23,7 @@ export type BubbleRoute = {
   bubbleOptions?: BubbleOptions;
   /**
    * このルートが `<base>@<snapshot>` 形式の snapshot pointer を持つときの codec。
-   * 世界線まわりの hook（{@link useUniverseWorldLine} 等）はこの codec から url の
+   * 世界線まわりの hook（{@link useUniverseArrangementWorldLine} 等）はこの codec から url の
    * 読み書きを行うので、特定の base 名（"universe" など）を hook 側で知らずに済む。
    * 通常は {@link makeSnapshotRoute} 経由で url パターンと一緒に派生させる。
    */

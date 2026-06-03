@@ -2,7 +2,7 @@
 
 // optional catch-all `[[...slug]]` で / と /universe@<node> の両方を同じ SPA に流す。
 // /world-line, /bubble-ui 等の specific page は Next.js の優先度ルールで先に当たる。
-// slug の中身は useBubbleArrangementWorldLine 側で location.pathname を直接読むので
+// slug の中身は useRootArrangementWorldLine 側で location.pathname を直接読むので
 // ここでは params を使わない（client component なのと、再帰なルーティングで深いパスも
 // 受けるため）。
 

@@ -5,7 +5,7 @@ import type { SnapshotCodec } from "@bublys-org/bubbles-ui";
  *
  * バブルの世界線対応ルート（`makeSnapshotRoute({ base: "universe", ... })`）は
  * `BubbleRouteRegistry` 経由で自分の codec を持つが、**root はバブルルートを
- * 経由しない**（`/universe@<node>` はブラウザ url で、`useBubbleArrangementWorldLine`
+ * 経由しない**（`/universe@<node>` はブラウザ url で、`useRootArrangementWorldLine`
  * が直接読み書きする）。そのため root 用の SnapshotCodec はここで独立に定義する。
  *
  * 中身は同じ `<base>@<node>` 文法で、たまたま base 文字列 "universe" もバブル

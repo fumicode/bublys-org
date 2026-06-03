@@ -4,12 +4,11 @@ import { Box, IconButton } from "@mui/material";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectBubbleArrangement } from "@bublys-org/bubbles-ui";
+import { selectBubbleArrangement, ROOT_UNIVERSE_ID } from "@bublys-org/bubbles-ui";
 import {
   WorldLineGraph,
   type WorldLineGraphJson,
 } from "@bublys-org/world-line-graph";
-import { BUBBLE_ARRANGEMENT_SCOPE } from "./bubbleArrangementDomain";
 
 type WlState = {
   worldLineGraph?: {
@@ -70,7 +69,7 @@ export const BubbleArrangementInspector: FC = () => {
 
   // 生 JSON を選び、useMemo で WorldLineGraph を再構築（毎レンダーの再生成を防ぐ）
   const graphJson = useAppSelector(
-    (s: WlState) => s.worldLineGraph?.graphs?.[BUBBLE_ARRANGEMENT_SCOPE]
+    (s: WlState) => s.worldLineGraph?.graphs?.[ROOT_UNIVERSE_ID]
   );
   const graph = useMemo(
     () => (graphJson ? WorldLineGraph.fromJSON(graphJson) : WorldLineGraph.empty()),
@@ -156,7 +155,7 @@ export const BubbleArrangementInspector: FC = () => {
 
       {/* 右: world-line */}
       <Box sx={panelSx}>
-        <Box sx={headerSx}>world line ({BUBBLE_ARRANGEMENT_SCOPE})</Box>
+        <Box sx={headerSx}>world line ({ROOT_UNIVERSE_ID})</Box>
         <Box component="pre" sx={preSx}>
           {worldLineText}
         </Box>

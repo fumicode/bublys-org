@@ -1,18 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import {
-  selectBubbleArrangement,
-  replaceBubbleArrangement,
-  BubbleArrangement,
-} from "@bublys-org/bubbles-ui";
-import { useCasScope } from "@bublys-org/world-line-graph";
+import { ROOT_UNIVERSE_ID, BubbleArrangement } from "@bublys-org/bubbles-ui";
 import {
   BUBBLE_ARRANGEMENT_TYPE,
   BUBBLE_ARRANGEMENT_ID,
-  BUBBLE_ARRANGEMENT_SCOPE,
 } from "./bubbleArrangementDomain";
 import { rootBrowserSnapshotCodec } from "./snapshot-url";
+import { useUniverseArrangementWorldLine } from "./useUniverseArrangementWorldLine";
 
 /** 現 location から「いま居るノード」を取り出す。"/" や "/universe" は null。 */
 const parseNodeFromUrl = (): string | null => {
@@ -27,71 +21,33 @@ const buildRootPath = (node: string): string =>
   `/${rootBrowserSnapshotCodec.encode(node)}${location.search}${location.hash}`;
 
 /**
- * bubble-ui の表示状態(arrangement)を world-line-graph に commit / 復元する橋渡し。
+ * root universe の BubbleArrangement と世界線を、ブラウザの URL と履歴に紐付ける。
  *
- * - [commit] bubbleState(arrangement)が変わったら world-line に記録
- * - [rehydrate] apex が変わったら replaceBubbleArrangement で Redux に流し込む
- * - [URL] apex ⇄ ブラウザ履歴。通常ナビは「1本の線形タイムライン」として扱う
- *   （undo/redo ボタン = ブラウザの戻る/進む）。枝（他の世界線）は
- *   WorldLineGraph に保持され、特別な DAG ビューからのみジャンプできる。
+ * 中身は {@link useUniverseArrangementWorldLine}(ROOT_UNIVERSE_ID) を呼んだうえで、
+ * その apex を **ブラウザのパス `/universe@<node>` + 履歴**にバインドする薄い
+ * 特殊化。commit/rehydrate ループの実装はコア hook 側にしか書かれていない。
  *
- * 双方向の無限ループは「直近に同期した view の署名」で防ぐ。
+ * 機能：
+ *  - [URL push] apex が変わったら `/universe@<node>` を pushState
+ *  - [popstate] ブラウザの戻る/進むで URL のノードへ moveTo
+ *  - [self-heal] URL に乗っているが現グラフに無いノードは現 apex に揃える
+ *  - [trail] 訪問トレイルを自前ミラーし undo/redo ボタンの活性を計算
+ *    （ブラウザ履歴スタックは中身を読めないため）
  *
- * 注: DomainRegistryProvider の内側で使うこと。
+ * 通常ナビは「1本の線形タイムライン」として扱う（undo/redo ボタン = ブラウザの
+ * 戻る/進む）。枝（他の世界線）は WorldLineGraph に保持され、DAG ビューからのみ
+ * ジャンプできる。
+ *
+ * 注: DomainRegistryProvider の内側で使うこと。1 アプリにつき 1 回だけ呼ぶこと。
  */
-export function useBubbleArrangementWorldLine() {
-  const dispatch = useAppDispatch();
-  const view = useAppSelector(selectBubbleArrangement);
-
-  const scope = useCasScope(BUBBLE_ARRANGEMENT_SCOPE, {
-    initialObjects: [{ type: BUBBLE_ARRANGEMENT_TYPE, object: new BubbleArrangement(view) }],
-  });
-
-  // 直近に world-line と同期した view の署名。初期 view は initialObjects が
-  // root として commit するので、最初の commit effect はスキップさせる。
-  const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
-
-  // [commit] view が変わったら world-line に記録（rehydrate 由来・重複は署名でスキップ）
-  useEffect(() => {
-    const signature = JSON.stringify(view);
-    if (signature === syncedSignatureRef.current) return;
-    syncedSignatureRef.current = signature;
-
-    // 既存の view オブジェクトは update で更新する。
-    // （addObject はキャッシュ済み shell を返し新 obj を無視するため、更新には使えない）
-    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    if (shell) {
-      shell.update(() => new BubbleArrangement(view));
-    } else {
-      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(view));
-    }
-    // scope は毎レンダー新インスタンスなので依存に入れない（view 駆動）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-
-  // [rehydrate] apex が変わったら、その view を Redux に流し込む
-  const apexId = scope.graph.getApex()?.id ?? null;
-  useEffect(() => {
-    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    if (!shell) return;
-    const incoming = shell.object.toJSON();
-    const signature = JSON.stringify(incoming);
-    if (signature === syncedSignatureRef.current) return;
-    syncedSignatureRef.current = signature;
-    dispatch(replaceBubbleArrangement(incoming));
-    // apexId の変化のみで発火させる
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apexId]);
-
-  // ============================================================
-  // [URL/線形ナビ] ブラウザ履歴を唯一の線形タイムラインにする
-  // ============================================================
+export function useRootArrangementWorldLine() {
+  const { apexId, scope } = useUniverseArrangementWorldLine(ROOT_UNIVERSE_ID);
 
   // moveTo は毎レンダー最新の graph を掴むので ref で保持
   // （popstate リスナーが古い graph を掴まないように）
   const moveToRef = useRef(scope.moveTo);
   moveToRef.current = scope.moveTo;
-  // URL のノードがこのグラフに実在するか（stale/foreign な hash で moveTo が
+  // URL のノードがこのグラフに実在するか（stale/foreign な url で moveTo が
   // throw するのを防ぐ）。最新グラフを掴むため毎レンダー更新。
   const hasNodeRef = useRef<(id: string) => boolean>(() => false);
   hasNodeRef.current = (id: string) => !!scope.graph.state.nodes[id];

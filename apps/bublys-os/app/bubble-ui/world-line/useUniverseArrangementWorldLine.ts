@@ -17,7 +17,7 @@ import { BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID } from "./bubbleArrangem
  * `snapshot` は親バブルの url を「`<base>@<node>`」に出し入れする codec。
  * 呼び出し側（typically: BubbleRouteRegistry から自分のルート定義を引いた
  * UniverseBubble）が、ルートに紐付いた codec を渡す。これにより
- * useUniverseWorldLine は "universe" などの具体名を知らない。
+ * useUniverseArrangementWorldLine は "universe" などの具体名を知らない。
  */
 export type UniverseLink = {
   parentUniverseId: string;
@@ -27,22 +27,24 @@ export type UniverseLink = {
 };
 
 /**
- * 任意の universe（特にネスト universe）の表示状態を world-line に commit / 復元し、
- * in-app の undo/redo を提供する。
+ * 任意の universe の BubbleArrangement を世界線に commit / 復元する**コア hook**。
  *
  * scope = universeId（universe ごとに独立した世界線）。
  *
  * `link` を渡すと、この universe の「現在ノード(apex)」を親バブルの url
- * (`universe@<node>`) に双方向バインドする：
- *  - apex 変化 → 親バブルの url を更新（→ 親 view が変わり親世界線が記録 → … → root の /universe@）
+ * (`<base>@<node>`) に双方向バインドする：
+ *  - apex 変化 → 親バブルの url を更新（→ 親 view が変わり親世界線が記録 → …）
  *  - 親バブルの url 変化（親のブラウザ戻る等）→ その node へ moveTo（中身は rehydrate で反映）
- * 「universe@<node>」という同じ文法が root のブラウザ url とネスト窓 url の両方で
- * 使われ、空間×時間の入れ子が再帰的に成立する。
+ * `link.snapshot` から `<base>` 名（"universe"等）が来るので、hook はそれを知らない。
+ *
+ * root universe には `useRootArrangementWorldLine` が**この hook をラップして**
+ * ブラウザ URL / 履歴調整を追加で乗せる。よって commit/rehydrate ループの実装は
+ * この1ヶ所にしか書かれていない。
  *
  * 注: DomainRegistryProvider の内側で使うこと。1 universe につき 1 回だけ呼ぶこと
  *     （二重に呼ぶと commit/rehydrate が重複する）。
  */
-export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
+export function useUniverseArrangementWorldLine(universeId: string, link?: UniverseLink) {
   const dispatch = useAppDispatch();
   const view = useAppSelector(makeSelectBubbleArrangementForUniverse(universeId));
 
@@ -117,9 +119,13 @@ export function useUniverseWorldLine(universeId: string, link?: UniverseLink) {
   }, [apexId, bubbleUrl]);
 
   return {
+    // nest 用 toolbar が直接使うショートカット（既存呼び出しと互換）
     moveBack: scope.moveBack,
     moveForward: scope.moveForward,
     canUndo: scope.canUndo,
     canRedo: scope.canRedo,
+    // root 特化ラッパー（useRootArrangementWorldLine）が追加 URL バインドのために使う
+    apexId,
+    scope,
   };
 }
