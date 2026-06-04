@@ -8,11 +8,11 @@ import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
-import { UNIVERSE_SIZE } from "../universe-config.js";
 import {
   makeSelectValidBubbleRelationIds,
   makeSelectGlobalCoordinateSystem,
   makeSelectSurfaceLeftTop,
+  makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
   ROOT_UNIVERSE_ID,
@@ -306,12 +306,18 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
 
   const isNested = universeId !== ROOT_UNIVERSE_ID;
+  const universeSize = useAppSelector(makeSelectUniverseDimensions(universeId));
 
   return (
     <UniverseContext.Provider value={universeContextValue}>
       <StyledFrame $nested={isNested}>
         <StyledViewport ref={viewportRef} $nested={isNested}>
-          <StyledUniverse ref={universeRef} $nested={isNested}>
+          <StyledUniverse
+            ref={universeRef}
+            $nested={isNested}
+            $width={universeSize.width}
+            $height={universeSize.height}
+          >
             {renderedBubbles}
 
             {!isLayerAnimating &&
@@ -386,10 +392,14 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   ${({ $nested }) => $nested && `pointer-events: none;`}
 `;
 
-const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<DivPropsWithRef & { $nested?: boolean }>`
+const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<
+  DivPropsWithRef & { $nested?: boolean; $width: number; $height: number }
+>`
   position: relative;
-  width: ${UNIVERSE_SIZE}px;
-  height: ${UNIVERSE_SIZE}px;
+  /* スクロール可能領域はバブル配置から動的に算出される（最低値 + 各バブル右下端
+     + 100px padding）。何も無い void に scroll で迷い込んでバブルを見失う事態を防ぐ。 */
+  width: ${({ $width }) => $width}px;
+  height: ${({ $height }) => $height}px;
   /* ネストされた universe では universe 自体も透過。直接の子（個別バブル）は
      default の pointer-events: auto を持つので、バブルの本体・ヘッダーは
      これまで通りクリック/ドラッグできる。 */
