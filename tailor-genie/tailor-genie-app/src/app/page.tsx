@@ -63,6 +63,7 @@ function TailorGenieApp() {
       subtitle="会話アプリ"
       menuItems={menuItems}
       sidebarFooter={sidebarFooter}
+      backdropColor="hsl(35, 50%, 22%)"
     />
   );
 }

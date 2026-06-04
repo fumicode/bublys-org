@@ -33,6 +33,13 @@ export type Bubly = {
   version: string;
   /** サイドバーに表示するメニュー項目（オプション） */
   menuItems?: BublyMenuItem[];
+  /**
+   * このバブリの「夜空」色。任意の CSS color 文字列。
+   * - スタンドアロン実行時（BublyApp）はメインエリア背景
+   * - bublys-os にネストされたとき UniverseBubbleView シェルの色
+   * 個別のバブリルートで `bubbleOptions.backdropColor` を上書きすることも可能。
+   */
+  backdropColor?: string;
   /** バブリ登録時に呼ばれる */
   register: (context: BublyContext) => void;
   /** バブリ解除時に呼ばれる（オプション） */

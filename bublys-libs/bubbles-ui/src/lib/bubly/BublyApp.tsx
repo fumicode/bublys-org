@@ -50,6 +50,12 @@ export type BublyAppProps = {
   menuItems: BublyMenuItem[];
   /** サイドバーのフッター（オプション） */
   sidebarFooter?: React.ReactNode;
+  /**
+   * このバブリの「夜空」色。バブル表示エリアの背景に塗られる。
+   * 任意の CSS color 文字列。未指定なら透明（白背景）。
+   * bublys-os にネストされたときも UniverseBubbleView 経由で同じ色が使われる想定。
+   */
+  backdropColor?: string;
 };
 
 /**
@@ -61,6 +67,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   subtitle,
   menuItems,
   sidebarFooter,
+  backdropColor,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -251,8 +258,16 @@ export const BublyApp: FC<BublyAppProps> = ({
         )}
       </Box>
 
-      {/* メインエリア（バブル表示） */}
-      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      {/* メインエリア（バブル表示）。backdropColor がこの bubly の「夜空」。
+          OS にネストされたときの UniverseBubbleView シェル色と同じ色を使う想定。 */}
+      <Box
+        sx={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          background: backdropColor ?? 'transparent',
+        }}
+      >
         <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
             <Box sx={{ width: '100%', height: '100%' }}>

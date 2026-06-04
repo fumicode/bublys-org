@@ -26,6 +26,7 @@ export function App() {
         title="シフトパズル"
         subtitle="Standalone • Port 4001"
         menuItems={menuItems}
+        backdropColor="hsl(210, 35%, 22%)"
       />
     </BublyStoreProvider>
   );

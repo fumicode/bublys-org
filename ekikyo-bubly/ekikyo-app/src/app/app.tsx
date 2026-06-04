@@ -23,6 +23,7 @@ export function App() {
         title="易経 - 九星盤"
         subtitle="Standalone • Port 4002"
         menuItems={menuItems}
+        backdropColor="hsl(355, 50%, 22%)"
       />
     </BublyStoreProvider>
   );

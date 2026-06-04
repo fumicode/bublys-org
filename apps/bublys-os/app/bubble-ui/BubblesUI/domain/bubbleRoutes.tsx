@@ -201,28 +201,44 @@ const routes: BubbleRoute[] = [
     type: "users-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["users"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(190, 50%, 22%)",
+    },
   }),
   makeBublyRoute({
     base: "groups-bubly",
     type: "groups-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["user-groups"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(270, 45%, 26%)",
+    },
   }),
   makeBublyRoute({
     base: "memo-bubly",
     type: "memo-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["memos"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(40, 55%, 26%)",
+    },
   }),
   makeBublyRoute({
     base: "task-bubly",
     type: "task-bubly",
     Component: UniverseBubble,
     initialBubbleUrls: ["task-management/tasks"],
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 480, height: 360 } },
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(140, 45%, 22%)",
+    },
   }),
 
   // Users（users-libsから）

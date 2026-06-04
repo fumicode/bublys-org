@@ -164,6 +164,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       }}
       $width={bubble.size ? `${bubble.size.width}px` : undefined}
       $height={bubble.size ? `${bubble.size.height}px` : undefined}
+      $backdropColor={bubble.backdropColor}
     >
       <header className="e-window-header" onMouseDown={handleHeaderMouseDown}>
         <div className="e-window-buttons-left">
@@ -250,6 +251,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $colorHue: number;
   $width?: string;
   $height?: string;
+  $backdropColor?: string;
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -274,9 +276,10 @@ const StyledWindow = styled.div<StyledWindowProps>`
   flex-direction: column;
   overflow: hidden;
 
-  /* シェル本体は完全に透明だが、backdrop-filter でガラス越しの「ぼやけた向こう側」
-     感を出す。universe の中身（透明）越しに backdrop が blur されて見える。 */
-  background: transparent;
+  /* シェル本体は backdropColor（バブリ宣言の「夜空」色）で塗る。指定が無ければ
+     透明で、外側 OS の夜空がそのまま透けて見える。
+     backdrop-filter でガラス越しの「ぼやけた向こう側」感も乗せる。 */
+  background: ${({ $backdropColor }) => $backdropColor ?? "transparent"};
   border: none;
   border-radius: 14px;
   box-shadow:

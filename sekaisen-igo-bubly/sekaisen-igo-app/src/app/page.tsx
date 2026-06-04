@@ -56,6 +56,7 @@ function SekaisenIgoApp() {
       title="世界線囲碁"
       menuItems={menuItems}
       sidebarFooter={sidebarFooter}
+      backdropColor="hsl(155, 30%, 18%)"
     />
   );
 }

@@ -10,6 +10,13 @@ export type BubbleOptions = {
   fillsContainer?: boolean;
   /** fillsContainer のとき、生成時／最大化解除時に使う既定の窓サイズ。 */
   defaultSize?: Size2;
+  /**
+   * このバブルが universe バブル（= 1 bubly）のとき、その universe の「夜空」色。
+   * - スタンドアロン実行時（BublyApp）はメインエリアの背景に塗られる
+   * - bublys-os にネストされたときは UniverseBubbleView のガラス越しに見える「向こう側」の色
+   * 任意の CSS color 文字列（"hsl(...)" / "rgb(...)" / "#..." 等）。
+   */
+  backdropColor?: string;
 };
 
 /** fillsContainer なバブルの既定の窓サイズ（route が defaultSize を指定しない場合のフォールバック）。 */
@@ -140,6 +147,11 @@ export class Bubble {
 
   get contentBackground(): string | undefined {
     return this.state.bubbleOptions?.contentBackground;
+  }
+
+  /** バブリの「夜空」色（universe バブルとして使う想定。任意の CSS color 文字列）。 */
+  get backdropColor(): string | undefined {
+    return this.state.bubbleOptions?.backdropColor;
   }
 
   get bubbleOptions(): BubbleOptions | undefined {
