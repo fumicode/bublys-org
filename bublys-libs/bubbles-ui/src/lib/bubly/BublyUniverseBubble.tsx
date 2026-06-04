@@ -43,6 +43,8 @@ const UniverseWorldLineToolbar: FC<UniverseNav> = ({
         zIndex: 10,
         display: "flex",
         gap: 4,
+        // 親 universe（nested）が pointer-events: none なので、ここだけ explicit auto。
+        pointerEvents: "auto",
       }}
     >
       <button
