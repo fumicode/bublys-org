@@ -715,14 +715,13 @@ export const makeSelectSurfaceBubbleIds = memoizeByUniverse((uid) =>
 
 /**
  * バブルの配置から universe のスクロール可能領域サイズを計算する。
- * 「無限スクロール」だが、バブルが置かれている範囲＋少しの padding までで止まり、
- * 何もない void に scroll してバブルを見失う事態を防ぐ。
+ * 「無限スクロール」だが、バブルが置かれている範囲までで止まり、何もない void に
+ * scroll してバブルを見失う事態を防ぐ。
  *
  * bubble.position は surface 層 local。表示上は surfaceLeftTop を加えた値で
  * StyledUniverse 内に絶対配置される。サイズが未確定（renderedRect 無し）の
  * バブルは仮サイズ DEFAULT_FALLBACK_BUBBLE_SIZE で見積もる。
  */
-const UNIVERSE_PADDING = 100;
 const UNIVERSE_MIN_SIZE: Size2 = { width: 2000, height: 1500 };
 const DEFAULT_FALLBACK_BUBBLE_SIZE: Size2 = { width: 400, height: 300 };
 
@@ -737,9 +736,8 @@ export const makeSelectUniverseDimensions = memoizeByUniverse((uid) =>
         const y = b.position?.y ?? 0;
         const w = b.size?.width ?? b.renderedRect?.width ?? DEFAULT_FALLBACK_BUBBLE_SIZE.width;
         const h = b.size?.height ?? b.renderedRect?.height ?? DEFAULT_FALLBACK_BUBBLE_SIZE.height;
-        // bubble の右下端（universe 座標） + padding
-        const right = surfaceLeftTop.x + x + w + UNIVERSE_PADDING;
-        const bottom = surfaceLeftTop.y + y + h + UNIVERSE_PADDING;
+        const right = surfaceLeftTop.x + x + w;
+        const bottom = surfaceLeftTop.y + y + h;
         if (right > maxRight) maxRight = right;
         if (bottom > maxBottom) maxBottom = bottom;
       }
