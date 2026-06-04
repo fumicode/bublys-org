@@ -405,6 +405,10 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
 const StyledBubble = styled.div<StyledBubbleProp>`
   position: absolute;
 
+  /* pointer-events は CSS で inherited なので、ネスト universe の none を
+     継承しないようにバブル自身は常に auto を明示する。 */
+  pointer-events: auto;
+
   width: ${({ width }) => (width ? width : "fit-content")};
   height: ${({ height }) => (height ? height : "auto")};
 

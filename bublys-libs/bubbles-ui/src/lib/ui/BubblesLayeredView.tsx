@@ -305,11 +305,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
 
+  const isNested = universeId !== ROOT_UNIVERSE_ID;
+
   return (
     <UniverseContext.Provider value={universeContextValue}>
-      <StyledFrame>
-        <StyledViewport ref={viewportRef}>
-          <StyledUniverse ref={universeRef}>
+      <StyledFrame $nested={isNested}>
+        <StyledViewport ref={viewportRef} $nested={isNested}>
+          <StyledUniverse ref={universeRef} $nested={isNested}>
             {renderedBubbles}
 
             {!isLayerAnimating &&
@@ -355,7 +357,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
 
-const StyledFrame = styled.div<DivProps>`
+const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
   width: 100%;
   height: 100%;
   position: relative;
@@ -365,18 +367,28 @@ const StyledFrame = styled.div<DivProps>`
   /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
      全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */
   background: transparent;
+
+  /* ネスト universe の「背景」はマウスイベントを取らない（中のバブルは個別に
+     auto を保つ）。クリックが空 universe 領域を貫通し、親 universe に届く。
+     root は据え置きでスクロール・ホイール・パン可能。 */
+  ${({ $nested }) => $nested && `pointer-events: none;`}
 `;
 
-const StyledViewport = styled.div<DivPropsWithRef>`
+const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   position: absolute;
   inset: 0;
-  overflow: auto;
+  overflow: ${({ $nested }) => ($nested ? "visible" : "auto")};
+  ${({ $nested }) => $nested && `pointer-events: none;`}
 `;
 
-const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<DivPropsWithRef>`
+const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<DivPropsWithRef & { $nested?: boolean }>`
   position: relative;
   width: ${UNIVERSE_SIZE}px;
   height: ${UNIVERSE_SIZE}px;
+  /* ネストされた universe では universe 自体も透過。直接の子（個別バブル）は
+     default の pointer-events: auto を持つので、バブルの本体・ヘッダーは
+     これまで通りクリック/ドラッグできる。 */
+  ${({ $nested }) => $nested && `pointer-events: none;`}
 `;
 
 type StyledHeadsUpDisplayProps = {

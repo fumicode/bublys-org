@@ -257,6 +257,12 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
 
 const StyledWindow = styled.div<StyledWindowProps>`
   position: absolute;
+
+  /* universe バブル自身の「色付きガラス」は背後を透視可能にする ─ クリックは
+     奥（親 universe のオブジェクト）にも届く。ヘッダーだけ explicit auto で
+     受け止めて、body や content の素地は none に流す。 */
+  pointer-events: none;
+
   width: ${({ $width }) => $width || "fit-content"};
   height: ${({ $height }) => $height || "auto"};
   z-index: ${({ $zIndex }) => ($zIndex !== undefined ? $zIndex : 0)};
@@ -292,6 +298,8 @@ const StyledWindow = styled.div<StyledWindowProps>`
   backdrop-filter: blur(10px) saturate(1.15);
 
   > .e-window-header {
+    /* StyledWindow が none なので、操作を受けるヘッダーは explicit に auto。 */
+    pointer-events: auto;
     cursor: move;
     user-select: none;
     flex: 0 0 auto;
@@ -369,5 +377,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
     /* コンテンツ側（universe など）が自前で背景を塗るので、ここは透明。 */
     background: transparent;
     position: relative;
+    /* StyledWindow 経由で none を継承しているが、奥が貫通可能であることを明示。 */
+    pointer-events: none;
   }
 `;
