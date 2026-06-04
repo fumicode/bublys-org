@@ -276,10 +276,14 @@ const StyledWindow = styled.div<StyledWindowProps>`
   flex-direction: column;
   overflow: hidden;
 
-  /* シェル本体は backdropColor（バブリ宣言の「夜空」色）で塗る。指定が無ければ
-     透明で、外側 OS の夜空がそのまま透けて見える。
-     backdrop-filter でガラス越しの「ぼやけた向こう側」感も乗せる。 */
-  background: ${({ $backdropColor }) => $backdropColor ?? "transparent"};
+  /* シェル本体は backdropColor（バブリ宣言の「夜空」色）の半透明ガラスとして塗る。
+     色は color-mix で 55% に薄め、backdrop-filter blur と合わせて「色付きフロスト
+     ガラス越しに親 universe が透けて見える」感を出す。
+     指定が無ければ完全に透明で、外側 OS の夜空がそのまま透けて見える。 */
+  background: ${({ $backdropColor }) =>
+    $backdropColor
+      ? `color-mix(in srgb, ${$backdropColor} 55%, transparent)`
+      : "transparent"};
   border: none;
   border-radius: 14px;
   box-shadow:
