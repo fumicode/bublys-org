@@ -137,12 +137,17 @@ export class Bubble {
   }
 
   /**
-   * 最大化中か。明示フラグを優先し、無ければ「明示サイズを持つか」で判定（後方互換）。
-   * fillsContainer な窓は既定サイズ時 maximized=false を明示的に持つので、
-   * サイズがあっても最大化扱いにならない。
+   * 最大化中か。明示フラグだけを見る。
+   *
+   * バブルのサイズ状態は 3 つ:
+   *  - fit-content: size なし、maximized 偽 — 中身に追従（非 fillsContainer 規定）
+   *  - user-resized: size あり、maximized 偽 — ユーザーが手で決めた sticky なサイズ
+   *  - maximized: maximized 真 — viewport いっぱい
+   * 「size があるかどうか」だけでは user-resized と maximized を区別できないので、
+   * フラグを採用する。
    */
   get isMaximized(): boolean {
-    return this.state.maximized ?? !!this.state.size;
+    return !!this.state.maximized;
   }
 
   get contentBackground(): string | undefined {

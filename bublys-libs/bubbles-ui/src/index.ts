@@ -30,6 +30,7 @@ export * from './lib/bubly/index.js';
 export * from './lib/hooks/useWindowSize.js';
 export * from './lib/hooks/useMyRect.js';
 export * from './lib/hooks/useBubbleDrag.js';
+export * from './lib/hooks/useBubbleResize.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';

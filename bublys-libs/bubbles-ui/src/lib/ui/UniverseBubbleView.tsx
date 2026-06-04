@@ -5,6 +5,7 @@ import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
+import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
@@ -102,6 +103,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);
 
@@ -219,6 +221,13 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       </header>
 
       <main className="e-window-content">{children}</main>
+
+      {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
+      <div
+        className="e-resize-handle"
+        onMouseDown={onResizeStart}
+        title="サイズ調整"
+      />
     </StyledWindow>
   );
 };
@@ -379,5 +388,26 @@ const StyledWindow = styled.div<StyledWindowProps>`
     position: relative;
     /* StyledWindow 経由で none を継承しているが、奥が貫通可能であることを明示。 */
     pointer-events: none;
+  }
+
+  /* 右下リサイズハンドル: StyledWindow が pointer-events: none なので explicit auto。 */
+  > .e-resize-handle {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 18px;
+    height: 18px;
+    cursor: nwse-resize;
+    z-index: 5;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    background:
+      linear-gradient(135deg, transparent 0%, transparent 45%, hsla(0, 0%, 100%, 0.6) 45%, hsla(0, 0%, 100%, 0.6) 55%, transparent 55%) no-repeat,
+      linear-gradient(135deg, transparent 0%, transparent 65%, hsla(0, 0%, 100%, 0.4) 65%, hsla(0, 0%, 100%, 0.4) 75%, transparent 75%) no-repeat;
+  }
+
+  &:hover > .e-resize-handle {
+    opacity: 1;
   }
 `;

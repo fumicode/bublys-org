@@ -4,6 +4,7 @@ import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
+import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
@@ -193,6 +194,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);
 
@@ -336,6 +338,13 @@ const BubbleViewInner: FC<BubbleProps> = ({
       <main className="e-bubble-content">
         {children}<br />
       </main>
+
+      {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
+      <div
+        className="e-resize-handle"
+        onMouseDown={onResizeStart}
+        title="サイズ調整"
+      />
     </StyledBubble>
   );
 };
@@ -700,5 +709,26 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     pointer-events: none;
     box-sizing: border-box;
 
+  }
+
+  /* 右下リサイズハンドル: 普段は透明、ホバー時に薄く現れる「斜線つまみ」。 */
+  > .e-resize-handle {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    /* 斜線 2 本（macOS 風のつまみ） */
+    background:
+      linear-gradient(135deg, transparent 0%, transparent 45%, hsla(0, 0%, 30%, 0.45) 45%, hsla(0, 0%, 30%, 0.45) 55%, transparent 55%) no-repeat,
+      linear-gradient(135deg, transparent 0%, transparent 65%, hsla(0, 0%, 30%, 0.30) 65%, hsla(0, 0%, 30%, 0.30) 75%, transparent 75%) no-repeat;
+  }
+
+  &:hover > .e-resize-handle {
+    opacity: 1;
   }
 `;
