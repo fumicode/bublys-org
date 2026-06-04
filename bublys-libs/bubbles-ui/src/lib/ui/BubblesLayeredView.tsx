@@ -377,7 +377,10 @@ const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
 const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   position: absolute;
   inset: 0;
-  overflow: ${({ $nested }) => ($nested ? "visible" : "auto")};
+  overflow: auto;
+  /* nested は pointer-events: none。空白領域は奥に貫通するが、内側のバブル（auto）
+     上でホイールを回すと、その wheel イベントが祖先の overflow:auto まで届いて
+     ネイティブにスクロールが起きる。スクロールバー自体はつまめない。 */
   ${({ $nested }) => $nested && `pointer-events: none;`}
 `;
 
