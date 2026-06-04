@@ -16,6 +16,10 @@ import { tailorGenieBubbleRoutes } from "@bublys-org/tailor-genie-libs";
 const TailorGenieBubly: Bubly = {
   name: "tailor-genie",
   version: "0.0.1",
+  label: "Tailor Genie",
+  icon: React.createElement(ChatIcon, { color: "primary" }),
+  initialBubbleUrls: ["tailor-genie/conversations", "tailor-genie/speakers"],
+  backdropColor: "hsl(35, 50%, 22%)",
 
   menuItems: [
     {

@@ -1,9 +1,8 @@
 "use client";
 
-import { useContext, FC, type CSSProperties } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, UniverseView, useUniverseId, makeSnapshotRoute, makeBublyRoute, useUniverseArrangementWorldLine } from "@bublys-org/bubbles-ui";
+import { useContext } from "react";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { BubbleContent } from "../ui/BubbleContent";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -109,70 +108,9 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-// ネスト universe の戻る/進む（universe に対して absolute 配置で重ねる）
-type UniverseNav = {
-  moveBack: () => void;
-  moveForward: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-};
-const UniverseWorldLineToolbar: FC<UniverseNav> = ({ moveBack, moveForward, canUndo, canRedo }) => {
-  const btn = (disabled: boolean): CSSProperties => ({
-    border: "1px solid rgba(255,255,255,0.3)",
-    borderRadius: 4,
-    background: "rgba(20,22,30,0.6)",
-    color: "rgba(230,235,255,0.9)",
-    cursor: disabled ? "default" : "pointer",
-    opacity: disabled ? 0.3 : 1,
-    padding: "2px 8px",
-    fontSize: 14,
-  });
-  return (
-    <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, display: "flex", gap: 4 }}>
-      <button style={btn(!canUndo)} disabled={!canUndo} onClick={moveBack} title="戻る">←</button>
-      <button style={btn(!canRedo)} disabled={!canRedo} onClick={moveForward} title="進む">→</button>
-    </div>
-  );
-};
-
-// 再帰的 universe バブル: バブルの中に独立した universe を描く。
-// universe バブルは常にサイズ付きで開かれる（popChildMax）ので content 領域は
-// 常に definite。コンテナは一律 100%×100% でバブル内側にぴったり追従する。
-//
-// 自分のルート定義（registry）から
-//   - snapshot codec        → 世界線 hook に注入（base 名を知らずに済む）
-//   - initialBubbleUrls     → UniverseView の初期 seed
-// を引いてくる。これにより同じ Component で users-bubly / task-bubly / memo-bubly
-// など「初期 seed が違うだけの bubly ルート」を増やせる。
-const UniverseBubble: BubbleContentRenderer = ({ bubble }) => {
-  const parentUniverseId = useUniverseId();
-  const childUniverseId = `${parentUniverseId}/${bubble.id}`;
-  const route = BubbleRouteRegistry.matchRoute(bubble.url);
-  // この universe の現在ノードを、自分の url (`<base>@<node>`)に双方向バインド。
-  // url は親 view の一部なので、ネストの移動が親世界線（→root のブラウザ url）に
-  // 再帰的に伝播する。
-  const nav = useUniverseArrangementWorldLine(
-    childUniverseId,
-    route?.snapshot
-      ? {
-          parentUniverseId,
-          bubbleId: bubble.id,
-          bubbleUrl: bubble.url,
-          snapshot: route.snapshot,
-        }
-      : undefined,
-  );
-  return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <UniverseView
-        universeId={childUniverseId}
-        renderBubbleContent={(b) => <BubbleContent bubble={b} />}
-        initialBubbleUrls={route?.initialBubbleUrls ?? ["users"]}
-      />
-      <UniverseWorldLineToolbar {...nav} />
-    </div>
-  );
-};
+// 再帰的 universe バブル（バブルの中の universe）は lib 提供の
+// {@link BublyUniverseBubble} を使う。各ルートで `initialBubbleUrls` と
+// `bubbleOptions.backdropColor` を渡し分けるだけで色違いの bubly を生やせる。
 
 // ルーティング定義
 const routes: BubbleRoute[] = [
@@ -188,7 +126,7 @@ const routes: BubbleRoute[] = [
   makeSnapshotRoute({
     base: "universe",
     type: "universe",
-    Component: UniverseBubble,
+    Component: BublyUniverseBubble,
     bubbleOptions: { fillsContainer: true, defaultSize: { width: 420, height: 320 } },
   }),
 
@@ -199,7 +137,7 @@ const routes: BubbleRoute[] = [
   makeBublyRoute({
     base: "users-bubly",
     type: "users-bubly",
-    Component: UniverseBubble,
+    Component: BublyUniverseBubble,
     initialBubbleUrls: ["users"],
     bubbleOptions: {
       fillsContainer: true,
@@ -210,7 +148,7 @@ const routes: BubbleRoute[] = [
   makeBublyRoute({
     base: "groups-bubly",
     type: "groups-bubly",
-    Component: UniverseBubble,
+    Component: BublyUniverseBubble,
     initialBubbleUrls: ["user-groups"],
     bubbleOptions: {
       fillsContainer: true,
@@ -221,7 +159,7 @@ const routes: BubbleRoute[] = [
   makeBublyRoute({
     base: "memo-bubly",
     type: "memo-bubly",
-    Component: UniverseBubble,
+    Component: BublyUniverseBubble,
     initialBubbleUrls: ["memos"],
     bubbleOptions: {
       fillsContainer: true,
@@ -232,7 +170,7 @@ const routes: BubbleRoute[] = [
   makeBublyRoute({
     base: "task-bubly",
     type: "task-bubly",
-    Component: UniverseBubble,
+    Component: BublyUniverseBubble,
     initialBubbleUrls: ["task-management/tasks"],
     bubbleOptions: {
       fillsContainer: true,
