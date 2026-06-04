@@ -1,7 +1,5 @@
 import PeopleIcon from '@mui/icons-material/People';
-import EventNoteIcon from '@mui/icons-material/EventNote';
 import TaskIcon from '@mui/icons-material/Task';
-import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import GridOnIcon from '@mui/icons-material/GridOn';
 import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
 
@@ -28,8 +26,9 @@ export function App() {
     >
       <BublyApp
         title="シフトパズル"
-        subtitle="Standalone • Port 4002"
+        subtitle="Standalone • Port 4005"
         menuItems={menuItems}
+        backdropColor="hsl(20, 40%, 22%)"
       />
     </BublyStoreProvider>
   );
