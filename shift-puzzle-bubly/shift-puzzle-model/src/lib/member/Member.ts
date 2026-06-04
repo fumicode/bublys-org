@@ -1,140 +1,100 @@
 /**
- * メンバードメインモデル
- * gakkai-shiftのStaff_スタッフを汎用化:
- *   - スキルを動的定義（SkillDefinition参照）に変更
- *   - tags（部門・学年等のグループラベル）追加
- *   - memo（内部メモ）追加
+ * 局員ドメインモデル
  */
+
+import type { DayType } from '../master/Shift.js';
 
 // ========== 型定義 ==========
 
-/** メンバーの状態 */
+/**
+ * 時間帯（絶対分、半開区間 [startMinute, endMinute)）。15分刻みを想定。
+ *
+ * 注: Redux Toolkit (Immer) の WritableDraft との互換性のため readonly を付けない。
+ * 変更は Member class の `withAvailability` 等を通してのみ行うこと。
+ */
+export interface TimeRange {
+  startMinute: number;
+  endMinute: number;
+}
+
+/** DayType → その日に参加可能な時間帯（複数可） */
+export type AvailabilityByDayType = Partial<Record<DayType, TimeRange[]>>;
+
+/** 局員の状態 */
 export interface MemberState {
   readonly id: string;
   readonly name: string;
-  readonly tags: ReadonlyArray<string>;          // 部門・学年・役職等のグループラベル
-  readonly skills: ReadonlyArray<string>;        // SkillDefinition.id への参照
-  readonly availableSlotIds: ReadonlyArray<string>; // 参加可能な TimeSlot.id 一覧
-  readonly memo: string;                         // 性格・相性等の非公式情報（シフト表には非表示）
-  readonly eventId: string;
+  readonly furigana?: string;
+  readonly department: string;                     // 所属局
+  readonly isNewMember: boolean;                   // 新入生かどうか
+  /** DayType 毎の参加可能時間帯（15分刻み） */
+  readonly availability: AvailabilityByDayType;
+  readonly notes?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
-/** Redux/JSON用のシリアライズ型 */
-export type MemberJSON = {
-  id: string;
-  name: string;
-  tags: string[];
-  skills: string[];
-  availableSlotIds: string[];
-  memo: string;
-  eventId: string;
-  createdAt: string;
-  updatedAt: string;
-};
+// ========== 類似Shift型（domain層を逆依存させないための最小構造） ==========
+
+export interface ShiftLike {
+  readonly dayType: DayType;
+  readonly startMinute: number;
+  readonly endMinute: number;
+}
 
 // ========== ドメインクラス ==========
 
 export class Member {
   constructor(readonly state: MemberState) {}
 
-  get id(): string {
-    return this.state.id;
+  get id(): string { return this.state.id; }
+  get name(): string { return this.state.name; }
+  get furigana(): string | undefined { return this.state.furigana; }
+  get department(): string { return this.state.department; }
+  get isNewMember(): boolean { return this.state.isNewMember; }
+  get availability(): AvailabilityByDayType { return this.state.availability; }
+  get notes(): string | undefined { return this.state.notes; }
+
+  /** 指定 DayType の参加可能時間帯 */
+  getAvailableRanges(dayType: DayType): readonly TimeRange[] {
+    return this.state.availability[dayType] ?? [];
   }
 
-  get name(): string {
-    return this.state.name;
+  /** 指定時刻(絶対分)に参加可能か。その日の可用性データが無い場合は参加可能とみなす */
+  isAvailableAt(dayType: DayType, minute: number): boolean {
+    const ranges = this.getAvailableRanges(dayType);
+    if (ranges.length === 0) return true;
+    return ranges.some((r) => r.startMinute <= minute && minute < r.endMinute);
   }
 
-  get tags(): ReadonlyArray<string> {
-    return this.state.tags;
-  }
-
-  get skills(): ReadonlyArray<string> {
-    return this.state.skills;
-  }
-
-  get availableSlotIds(): ReadonlyArray<string> {
-    return this.state.availableSlotIds;
-  }
-
-  get memo(): string {
-    return this.state.memo;
-  }
-
-  get eventId(): string {
-    return this.state.eventId;
-  }
-
-  /** 指定時間帯に参加可能かどうか */
-  isAvailableAt(slotId: string): boolean {
-    return this.state.availableSlotIds.includes(slotId);
-  }
-
-  /** 指定スキルを持っているかどうか */
-  hasSkill(skillId: string): boolean {
-    return this.state.skills.includes(skillId);
-  }
-
-  /** 指定スキルをすべて持っているかどうか */
-  hasAllSkills(skillIds: ReadonlyArray<string>): boolean {
-    return skillIds.every((id) => this.hasSkill(id));
-  }
-
-  /** 指定タグを持っているかどうか */
-  hasTag(tag: string): boolean {
-    return this.state.tags.includes(tag);
+  /** シフトの全時間帯を通して参加可能か。可用性データが無い場合は参加可能とみなす */
+  isAvailableForShift(shift: ShiftLike): boolean {
+    const ranges = this.getAvailableRanges(shift.dayType);
+    if (ranges.length === 0) return true;
+    for (let m = shift.startMinute; m < shift.endMinute; m += 15) {
+      if (!ranges.some((r) => r.startMinute <= m && m < r.endMinute)) return false;
+    }
+    return true;
   }
 
   // ========== 状態変更メソッド ==========
 
-  /** スキルを追加 */
-  addSkill(skillId: string): Member {
-    if (this.hasSkill(skillId)) return this;
-    return this.withUpdatedState({
-      skills: [...this.state.skills, skillId],
-    });
+  withDepartment(department: string): Member {
+    return this.withUpdatedState({ department });
   }
 
-  /** スキルを削除 */
-  removeSkill(skillId: string): Member {
-    return this.withUpdatedState({
-      skills: this.state.skills.filter((id) => id !== skillId),
-    });
+  withIsNewMember(isNewMember: boolean): Member {
+    return this.withUpdatedState({ isNewMember });
   }
 
-  /** タグを追加 */
-  addTag(tag: string): Member {
-    if (this.hasTag(tag)) return this;
-    return this.withUpdatedState({
-      tags: [...this.state.tags, tag],
-    });
+  withNotes(notes: string): Member {
+    return this.withUpdatedState({ notes });
   }
 
-  /** タグを削除 */
-  removeTag(tag: string): Member {
-    return this.withUpdatedState({
-      tags: this.state.tags.filter((t) => t !== tag),
-    });
+  withAvailability(availability: AvailabilityByDayType): Member {
+    return this.withUpdatedState({ availability });
   }
 
-  /** 参加可能時間帯を設定 */
-  withAvailableSlots(slotIds: ReadonlyArray<string>): Member {
-    return this.withUpdatedState({ availableSlotIds: slotIds });
-  }
-
-  /** メモを更新 */
-  withMemo(memo: string): Member {
-    return this.withUpdatedState({ memo });
-  }
-
-  /** 名前を更新 */
-  withName(name: string): Member {
-    return this.withUpdatedState({ name });
-  }
-
-  /** 内部用：状態更新ヘルパー */
   protected withUpdatedState(partial: Partial<MemberState>): Member {
     return new Member({
       ...this.state,
@@ -143,40 +103,16 @@ export class Member {
     });
   }
 
-  // ========== シリアライズ ==========
+  // ========== 静的メソッド ==========
 
-  toJSON(): MemberJSON {
-    return {
-      id: this.state.id,
-      name: this.state.name,
-      tags: [...this.state.tags],
-      skills: [...this.state.skills],
-      availableSlotIds: [...this.state.availableSlotIds],
-      memo: this.state.memo,
-      eventId: this.state.eventId,
-      createdAt: this.state.createdAt,
-      updatedAt: this.state.updatedAt,
-    };
-  }
-
-  static fromJSON(json: MemberJSON): Member {
-    return new Member(json);
-  }
-
-  /** 新しいメンバーを作成 */
-  static create(
-    data: Pick<MemberState, 'name' | 'eventId'> &
-      Partial<Pick<MemberState, 'tags' | 'skills' | 'availableSlotIds' | 'memo'>>
-  ): Member {
+  static create(name: string, department: string, isNewMember: boolean): Member {
     const now = new Date().toISOString();
     return new Member({
       id: crypto.randomUUID(),
-      name: data.name,
-      eventId: data.eventId,
-      tags: data.tags ?? [],
-      skills: data.skills ?? [],
-      availableSlotIds: data.availableSlotIds ?? [],
-      memo: data.memo ?? '',
+      name,
+      department,
+      isNewMember,
+      availability: {},
       createdAt: now,
       updatedAt: now,
     });

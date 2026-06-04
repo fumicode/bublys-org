@@ -83,6 +83,12 @@
     },
     {
       "path": "./shift-puzzle-bubly/shift-puzzle-model"
+    },
+    {
+      "path": "./shift-puzzle-bubly/shift-puzzle-libs"
+    },
+    {
+      "path": "./shift-puzzle-bubly/shift-puzzle-app"
     }
   ]
 }
