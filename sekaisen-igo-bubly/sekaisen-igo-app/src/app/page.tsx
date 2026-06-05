@@ -7,12 +7,10 @@ import {
   BublyApp,
   BublyStoreProvider,
   BublyMenuItem,
+  BUBBLE_ARRANGEMENT_DOMAIN,
+  makeSnapshotCodec,
 } from "@bublys-org/bubbles-ui";
-import { initWorldLineGraph } from "@bublys-org/world-line-graph";
 import { IgoGameProvider } from "@bublys-org/sekaisen-igo-libs";
-
-// worldLineGraph slice を注入
-initWorldLineGraph();
 
 const menuItems: BublyMenuItem[] = [
   {
@@ -66,6 +64,9 @@ export default function Index() {
     <BublyStoreProvider
       persistKey="sekaisen-igo"
       initialBubbleUrls={["sekaisen-igo/games"]}
+      enableWorldLine
+      domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
+      urlBinding={makeSnapshotCodec("universe")}
     >
       <IgoGameProvider>
         <SekaisenIgoApp />

@@ -8,12 +8,10 @@ import {
   BublyApp,
   BublyStoreProvider,
   BublyMenuItem,
+  BUBBLE_ARRANGEMENT_DOMAIN,
+  makeSnapshotCodec,
 } from "@bublys-org/bubbles-ui";
-import { initWorldLineGraph } from "@bublys-org/world-line-graph";
 import { TailorGenieProvider } from "@bublys-org/tailor-genie-libs";
-
-// worldLineGraph slice を注入
-initWorldLineGraph();
 
 const menuItems: BublyMenuItem[] = [
   {
@@ -73,6 +71,9 @@ export default function Index() {
     <BublyStoreProvider
       persistKey="tailor-genie"
       initialBubbleUrls={["tailor-genie/conversations"]}
+      enableWorldLine
+      domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
+      urlBinding={makeSnapshotCodec("universe")}
     >
       <TailorGenieProvider>
         <TailorGenieApp />

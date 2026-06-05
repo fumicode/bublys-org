@@ -1,6 +1,12 @@
 import PeopleIcon from '@mui/icons-material/People';
 import EventNoteIcon from '@mui/icons-material/EventNote';
-import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
+import {
+  BublyApp,
+  BublyStoreProvider,
+  BubbleRouteRegistry,
+  BUBBLE_ARRANGEMENT_DOMAIN,
+  makeSnapshotCodec,
+} from '@bublys-org/bubbles-ui';
 
 // gakkai-shift-libs のslicesをimport（自動注入される）
 import '@bublys-org/gakkai-shift-libs';
@@ -21,6 +27,9 @@ export function App() {
     <BublyStoreProvider
       persistKey="gakkai-shift-standalone"
       initialBubbleUrls={['gakkai-shift/staffs', 'gakkai-shift/shift-plans']}
+      enableWorldLine
+      domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
+      urlBinding={makeSnapshotCodec('universe')}
     >
       <BublyApp
         title="シフトパズル"

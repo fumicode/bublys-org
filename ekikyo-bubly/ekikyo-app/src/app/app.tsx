@@ -1,5 +1,11 @@
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
+import {
+  BublyApp,
+  BublyStoreProvider,
+  BubbleRouteRegistry,
+  BUBBLE_ARRANGEMENT_DOMAIN,
+  makeSnapshotCodec,
+} from '@bublys-org/bubbles-ui';
 
 // ルート登録（app側で管理）
 import { ekikyoBubbleRoutes } from '../registration/index.js';
@@ -18,6 +24,9 @@ export function App() {
     <BublyStoreProvider
       persistKey="ekikyo-standalone"
       initialBubbleUrls={['ekikyo/kyuseis/五黄']}
+      enableWorldLine
+      domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
+      urlBinding={makeSnapshotCodec('universe')}
     >
       <BublyApp
         title="易経 - 九星盤"
