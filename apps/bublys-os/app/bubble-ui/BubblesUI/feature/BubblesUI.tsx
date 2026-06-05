@@ -219,8 +219,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
-      {/* 表示状態を world-line に同期し undo/redo を提供 */}
-      <BubbleArrangementWorldLineControls />
       {/* 現在の view 状態の JSON を左下に表示（開発用） */}
       {/* <BubbleArrangementInspector /> */}
 
@@ -238,6 +236,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
         }}
       >
         <BubblesContext.Provider value={bubblesContextValue}>
+          {/* 表示状態を world-line に同期し undo/redo + 世界線グラフ起動を提供。
+              openBubble を使うため BubblesContext.Provider の内側に配置する。 */}
+          <BubbleArrangementWorldLineControls />
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>

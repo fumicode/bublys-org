@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 
 // 外部バブリのルート
@@ -118,6 +118,14 @@ const routes: BubbleRoute[] = [
     pattern: /^mob$/,
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
+  },
+
+  // いま居る universe の世界線を canvas で表示するビューバブル
+  {
+    pattern: /^world-lines$/,
+    type: "world-lines",
+    Component: WorldLinesBubble,
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 640, height: 380 } },
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
