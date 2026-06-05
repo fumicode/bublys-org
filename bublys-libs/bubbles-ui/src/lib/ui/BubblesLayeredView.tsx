@@ -260,8 +260,15 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   useEffect(() => {
     if (universeId !== ROOT_UNIVERSE_ID) return;
     const onWheel = (e: WheelEvent) => {
+      // wheel target が root viewport の DOM サブツリー外（例: 世界線グラフパネル、
+      // サイドバー、その他 position:fixed のオーバーレイ）なら、こちらでは横取り
+      // しない。これにより overlay 側の自前 overflow:auto を尊重する。
+      const root = viewportRef.current;
+      if (!root || !(e.target instanceof Node) || !root.contains(e.target)) return;
+
+      // 内側まで対象を絞ったうえで shell 群を hit-test する。
       const shells = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
+        root.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
       );
       const matching = shells.filter((shell) => {
         const r = shell.getBoundingClientRect();
