@@ -7,6 +7,7 @@ import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 type MemoWorldLineIntegrationProps = {
   memoId: string;
   onOpenAuthor?: (userId: string, detailUrl: string) => void;
+  onOpenWorldLineView?: () => void;
 };
 
 /**
@@ -18,7 +19,7 @@ type MemoWorldLineIntegrationProps = {
  * scope（= world-line）が未初期化のとき（scope が空、apex 無し）は対象 memo が
  * まだ存在しないことを示すプレースホルダを出す。
  */
-export function MemoWorldLineIntegration({ memoId, onOpenAuthor }: MemoWorldLineIntegrationProps) {
+export function MemoWorldLineIntegration({ memoId, onOpenAuthor, onOpenWorldLineView }: MemoWorldLineIntegrationProps) {
   const { setFocusedObjectId } = useFocusedObject();
   const { apexMemo, update } = useMemoWorldLine(memoId);
 
@@ -36,6 +37,7 @@ export function MemoWorldLineIntegration({ memoId, onOpenAuthor }: MemoWorldLine
         memo={apexMemo}
         onSetAuthor={(userId) => update((current) => current.setAuthor(userId))}
         onOpenAuthor={onOpenAuthor}
+        onOpenWorldLineView={onOpenWorldLineView}
       />
       <MemoEditor
         memo={apexMemo}

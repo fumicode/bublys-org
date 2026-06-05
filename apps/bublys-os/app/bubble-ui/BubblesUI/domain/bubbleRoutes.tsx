@@ -55,7 +55,16 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const handleOpenAuthor = (_userId: string, url: string) => {
     openBubble(url, bubble.id);
   };
-  return <MemoWorldLineIntegration memoId={memoId} onOpenAuthor={handleOpenAuthor} />;
+  const handleOpenWorldLineView = () => {
+    openBubble(`memos/${memoId}/history`, bubble.id);
+  };
+  return (
+    <MemoWorldLineIntegration
+      memoId={memoId}
+      onOpenAuthor={handleOpenAuthor}
+      onOpenWorldLineView={handleOpenWorldLineView}
+    />
+  );
 };
 
 const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
