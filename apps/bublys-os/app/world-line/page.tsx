@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { CounterWorldLineIntegration } from './integrations/CounterWorldLineIntegration';
 import { CounterWorldLineManager } from './integrations/CounterWorldLineManager';
 import { MemoWorldLineIntegration } from './integrations/MemoWorldLineIntegration';
-import { MemoWorldLineManager } from './integrations/MemoWorldLineManager';
 import { Memo } from './Memo/domain/Memo';
 import { MemoList } from './Memo/ui/MemoList';
 import { FocusedObjectProvider } from './WorldLine/domain/FocusedObjectContext';
@@ -130,17 +129,10 @@ export default function Index() {
         </div>
       )}
 
-      {/* Memo: 独立した世界線 */}
+      {/* Memo: 独立した世界線（world-line-graph scope per memoId） */}
       {memoId && (
         <div style={{ flex: '1 1 400px', minWidth: '400px' }}>
-          <MemoWorldLineManager
-            memoId={memoId}
-            isBubbleMode={false}
-            onOpenWorldLineView={() => {}}
-            onCloseWorldLineView={() => {}}
-          >
-            <MemoWorldLineIntegration memoId={memoId} />
-          </MemoWorldLineManager>
+          <MemoWorldLineIntegration memoId={memoId} />
         </div>
       )}
       </div>

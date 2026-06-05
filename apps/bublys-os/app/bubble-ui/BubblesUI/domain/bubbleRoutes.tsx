@@ -1,8 +1,9 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
+import { useCasScope } from "@bublys-org/world-line-graph";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -19,8 +20,8 @@ import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
-import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { memoScopeId } from "@/app/world-line/Memo/domain/MemoDomain";
 
 /** BubbleRouteRegistry経由でルートを検索 */
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
@@ -51,23 +52,10 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
-  const handleOpenWorldLineView = () => {
-    openBubble(`memos/${memoId}/history`, bubble.id);
-  };
   const handleOpenAuthor = (_userId: string, url: string) => {
     openBubble(url, bubble.id);
   };
-
-  return (
-    <MemoWorldLineManager
-      memoId={memoId}
-      isBubbleMode={false}
-      onOpenWorldLineView={handleOpenWorldLineView}
-      onCloseWorldLineView={() => {}}
-    >
-      <MemoWorldLineIntegration memoId={memoId} onOpenAuthor={handleOpenAuthor} />
-    </MemoWorldLineManager>
-  );
+  return <MemoWorldLineIntegration memoId={memoId} onOpenAuthor={handleOpenAuthor} />;
 };
 
 const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -88,23 +76,20 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
+// Memo の世界線を canvas で表示。click でそのノードに移動できる。
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "").replace("/history", "");
-  const dispatch = useAppDispatch();
-  const handleCloseWorldLineView = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
+  const scope = useCasScope(memoScopeId(memoId));
+  const apexId = scope.graph.getApex()?.id ?? null;
   return (
-    <MemoWorldLineManager
-      memoId={memoId}
-      isBubbleMode={true}
-      onOpenWorldLineView={() => {}}
-      onCloseWorldLineView={handleCloseWorldLineView}
-    >
-      <MemoWorldLineIntegration memoId={memoId} />
-    </MemoWorldLineManager>
+    <div style={{ width: 600, height: 320, maxWidth: "80vw", maxHeight: "70vh" }}>
+      <WorldLinesCanvasView
+        graph={scope.graph}
+        apexNodeId={apexId}
+        onSelectNode={scope.moveTo}
+        background="rgba(15,18,28,0.85)"
+      />
+    </div>
   );
 };
 
