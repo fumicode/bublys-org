@@ -1,4 +1,4 @@
-import React, { FC, ReactNode, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
@@ -238,6 +238,52 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       }
     };
   }, [onCoordinateSystemReady, vanishingPoint]);
+
+  /**
+   * universe バブルの shell / 中身は pointer-events: none で「クリック貫通」だが、
+   * その副作用としてホイールでネイティブスクロールも効かなくなっている。
+   * ここで window レベルの wheel listener を 1 個だけ立てて、wheel 位置に
+   * universe バブルの shell があれば、その中の StyledViewport を scrollBy で
+   * 手動スクロールする（root の listener 1 個でネスト含めて全部を肩代わりする）。
+   *
+   * 注: document.elementsFromPoint は実装上 pointer-events: none を尊重して
+   * none の shell を返してくれないので、全 shell を querySelectorAll で取って
+   * 個別に getBoundingClientRect で hit-test する。
+   *
+   * 「最前面の shell」の選び方:
+   *  - ネスト: 子 shell は親 shell の子孫。同じ点で複数マッチしたら、子が前面。
+   *    → 「他のマッチ shell を contains しているもの」は除外
+   *  - 兄弟: 同階層に並ぶ universe バブルは layer 0 が最前面（z-index 高い）。
+   *    DOM 上は layer 0 が先頭に来る（renderedBubbles の生成順）ので、leaves の
+   *    中で「DOM 順で最初」を採用する
+   */
+  useEffect(() => {
+    if (universeId !== ROOT_UNIVERSE_ID) return;
+    const onWheel = (e: WheelEvent) => {
+      const shells = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
+      );
+      const matching = shells.filter((shell) => {
+        const r = shell.getBoundingClientRect();
+        return (
+          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+        );
+      });
+      // 内側に別の matching shell を持つもの（= 親）を除外
+      const leaves = matching.filter(
+        (shell) => !matching.some((other) => other !== shell && shell.contains(other)),
+      );
+      const target = leaves[0] ?? null;
+      if (!target) return;
+      const viewport = target.querySelector<HTMLElement>('[class*="StyledViewport"]');
+      if (!viewport) return;
+      viewport.scrollLeft += e.deltaX;
+      viewport.scrollTop += e.deltaY;
+      e.preventDefault();
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
+  }, [universeId]);
 
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
