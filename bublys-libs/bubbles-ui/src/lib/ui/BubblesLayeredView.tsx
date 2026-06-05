@@ -259,6 +259,18 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
    */
   useEffect(() => {
     if (universeId !== ROOT_UNIVERSE_ID) return;
+
+    // 直近の wheel hit-test 結果をキャッシュ。連続するホイール（≒ 同じ位置で
+    // 高速に飛んでくる wheel イベント）は再 hit-test しない。世界線グラフ等で
+    // DOM が大きいときの getBoundingClientRect 連発による layout 強制を抑える。
+    let cachedTarget: HTMLElement | null = null;
+    let cachedViewport: HTMLElement | null = null;
+    let cachedX = Number.NEGATIVE_INFINITY;
+    let cachedY = Number.NEGATIVE_INFINITY;
+    let cachedAt = 0;
+    const HIT_REFRESH_PX = 8;
+    const HIT_REFRESH_MS = 200;
+
     const onWheel = (e: WheelEvent) => {
       // wheel target が root viewport の DOM サブツリー外（例: 世界線グラフパネル、
       // サイドバー、その他 position:fixed のオーバーレイ）なら、こちらでは横取り
@@ -266,28 +278,53 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       const root = viewportRef.current;
       if (!root || !(e.target instanceof Node) || !root.contains(e.target)) return;
 
-      // 内側まで対象を絞ったうえで shell 群を hit-test する。
-      const shells = Array.from(
-        root.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
-      );
-      const matching = shells.filter((shell) => {
-        const r = shell.getBoundingClientRect();
-        return (
-          e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+      const now = performance.now();
+      const dx = Math.abs(e.clientX - cachedX);
+      const dy = Math.abs(e.clientY - cachedY);
+      let target: HTMLElement | null;
+      let viewport: HTMLElement | null;
+
+      const cacheHit =
+        cachedTarget &&
+        cachedTarget.isConnected &&
+        cachedViewport &&
+        cachedViewport.isConnected &&
+        dx < HIT_REFRESH_PX &&
+        dy < HIT_REFRESH_PX &&
+        now - cachedAt < HIT_REFRESH_MS;
+
+      if (cacheHit) {
+        target = cachedTarget;
+        viewport = cachedViewport;
+      } else {
+        const shells = Array.from(
+          root.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
         );
-      });
-      // 内側に別の matching shell を持つもの（= 親）を除外
-      const leaves = matching.filter(
-        (shell) => !matching.some((other) => other !== shell && shell.contains(other)),
-      );
-      const target = leaves[0] ?? null;
-      if (!target) return;
-      const viewport = target.querySelector<HTMLElement>('[class*="StyledViewport"]');
-      if (!viewport) return;
+        const matching = shells.filter((shell) => {
+          const r = shell.getBoundingClientRect();
+          return (
+            e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
+          );
+        });
+        // 内側に別の matching shell を持つもの（= 親）を除外
+        const leaves = matching.filter(
+          (shell) => !matching.some((other) => other !== shell && shell.contains(other)),
+        );
+        target = leaves[0] ?? null;
+        viewport = target ? target.querySelector<HTMLElement>('[class*="StyledViewport"]') : null;
+        cachedTarget = target;
+        cachedViewport = viewport;
+        cachedX = e.clientX;
+        cachedY = e.clientY;
+        cachedAt = now;
+      }
+
+      if (!target || !viewport) return;
       viewport.scrollLeft += e.deltaX;
       viewport.scrollTop += e.deltaY;
       e.preventDefault();
     };
+
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => window.removeEventListener('wheel', onWheel);
   }, [universeId]);
