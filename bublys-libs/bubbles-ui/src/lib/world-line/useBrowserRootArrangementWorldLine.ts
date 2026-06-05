@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import { ROOT_UNIVERSE_ID } from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
@@ -138,17 +138,33 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   const moveBack = useCallback(() => history.back(), []);
   const moveForward = useCallback(() => history.forward(), []);
 
-  // 各ノードの arrangement を要約（WorldLineView のノードラベル用）
-  const summarizeNode = (nodeId: string): string => {
-    const v = scope.getObjectAt<BubbleArrangement>(
-      nodeId,
-      BUBBLE_ARRANGEMENT_TYPE,
-      BUBBLE_ARRANGEMENT_ID,
-    );
-    if (!v) return "";
-    const count = Object.keys(v.bubbles ?? {}).length;
-    return `${count}`;
-  };
+  // 各ノードの arrangement を要約（WorldLineView のノードラベル用）。
+  //
+  // 素朴に毎ノード `scope.getObjectAt(nodeId)` を呼ぶと、内部で
+  // `graph.getPathToNode(nodeId)` がノードを root から辿るため 1 ノードあたり
+  // O(depth)。WorldLineView は N ノードに対して renderNodeSummary を 1 回ずつ
+  // 呼ぶので、素朴な毎レンダー再評価は O(N²) になる。
+  //
+  // ここで graph / cas が変わったときだけ全ノード分の summary を 1 回作って
+  // Map に詰めておき、renderNodeSummary は Map 引き O(1) で返す。これで頻繁な
+  // 微小な再レンダー（例: finishBubbleAnimation dispatch）でも O(N²) 走査が
+  // 起きなくなる。
+  const summaries = useMemo(() => {
+    const map = new Map<string, string>();
+    const nodes = scope.graph.state.nodes;
+    for (const id of Object.keys(nodes)) {
+      const v = scope.getObjectAt<BubbleArrangement>(id, BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
+      map.set(id, v ? `${Object.keys(v.bubbles ?? {}).length}` : "");
+    }
+    return map;
+    // scope.getObjectAt の dep が [graph, cas, registry] なので、これらが変わる
+    // たびに getObjectAt の参照が更新される。それを再計算トリガーとして使う。
+  }, [scope.graph, scope.getObjectAt]);
+
+  const summarizeNode = useCallback(
+    (nodeId: string): string => summaries.get(nodeId) ?? "",
+    [summaries],
+  );
 
   return {
     moveBack,
