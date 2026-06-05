@@ -120,12 +120,14 @@ const routes: BubbleRoute[] = [
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
 
-  // いま居る universe の世界線を canvas で表示するビューバブル
+  // 世界線 view の標準 UI は BubbleArrangementWorldLineControls 側の overlay。
+  // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
+  // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
+  // も消える挙動になる点だけ要注意。
   {
     pattern: /^world-lines$/,
     type: "world-lines",
     Component: WorldLinesBubble,
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 640, height: 380 } },
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
