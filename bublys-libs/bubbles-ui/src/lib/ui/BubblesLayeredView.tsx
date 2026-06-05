@@ -260,16 +260,16 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   useEffect(() => {
     if (universeId !== ROOT_UNIVERSE_ID) return;
 
-    // 直近の wheel hit-test 結果をキャッシュ。連続するホイール（≒ 同じ位置で
-    // 高速に飛んでくる wheel イベント）は再 hit-test しない。世界線グラフ等で
-    // DOM が大きいときの getBoundingClientRect 連発による layout 強制を抑える。
+    // 直近 hit-test 結果と「その時の target shell の矩形」をキャッシュ。
+    // 次の wheel 位置が同じ矩形内なら hit-test を完全スキップして
+    // getBoundingClientRect を呼ばずに済む（世界線グラフ等で DOM が大きいときの
+    // layout 強制が wheel ごとに走らないように）。
     let cachedTarget: HTMLElement | null = null;
     let cachedViewport: HTMLElement | null = null;
-    let cachedX = Number.NEGATIVE_INFINITY;
-    let cachedY = Number.NEGATIVE_INFINITY;
+    let cachedRect: { left: number; right: number; top: number; bottom: number } | null = null;
     let cachedAt = 0;
-    const HIT_REFRESH_PX = 8;
-    const HIT_REFRESH_MS = 200;
+    // 矩形は drag やリサイズで動きうるので、しばらく経ったら再検証する保険。
+    const CACHE_TTL_MS = 500;
 
     const onWheel = (e: WheelEvent) => {
       // wheel target が root viewport の DOM サブツリー外（例: 世界線グラフパネル、
@@ -279,8 +279,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       if (!root || !(e.target instanceof Node) || !root.contains(e.target)) return;
 
       const now = performance.now();
-      const dx = Math.abs(e.clientX - cachedX);
-      const dy = Math.abs(e.clientY - cachedY);
       let target: HTMLElement | null;
       let viewport: HTMLElement | null;
 
@@ -289,9 +287,12 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         cachedTarget.isConnected &&
         cachedViewport &&
         cachedViewport.isConnected &&
-        dx < HIT_REFRESH_PX &&
-        dy < HIT_REFRESH_PX &&
-        now - cachedAt < HIT_REFRESH_MS;
+        cachedRect &&
+        now - cachedAt < CACHE_TTL_MS &&
+        e.clientX >= cachedRect.left &&
+        e.clientX <= cachedRect.right &&
+        e.clientY >= cachedRect.top &&
+        e.clientY <= cachedRect.bottom;
 
       if (cacheHit) {
         target = cachedTarget;
@@ -300,8 +301,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         const shells = Array.from(
           root.querySelectorAll<HTMLElement>('[data-window-style="universe"]'),
         );
+        const rects = new Map<HTMLElement, DOMRect>();
         const matching = shells.filter((shell) => {
           const r = shell.getBoundingClientRect();
+          rects.set(shell, r);
           return (
             e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom
           );
@@ -314,8 +317,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         viewport = target ? target.querySelector<HTMLElement>('[class*="StyledViewport"]') : null;
         cachedTarget = target;
         cachedViewport = viewport;
-        cachedX = e.clientX;
-        cachedY = e.clientY;
+        const r = target ? rects.get(target) ?? null : null;
+        cachedRect = r
+          ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+          : null;
         cachedAt = now;
       }
 
