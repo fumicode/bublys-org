@@ -1,6 +1,7 @@
 import { Memo } from '../domain/Memo';
-import { IconButton } from '@mui/material';
+import { IconButton, Tooltip } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { MemoIcon } from './MemoIcon';
 import { useAppSelector } from '@bublys-org/state-management';
 import { UserBadge, selectUsers } from '@bublys-org/users-libs';
@@ -10,9 +11,10 @@ interface MemoTitleProps {
   memo: Memo;
   onSetAuthor?: (userId: string) => void;
   onOpenAuthor?: (userId: string, detailUrl: string) => void;
+  onOpenWorldLineView?: () => void;
 }
 
-export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
+export function MemoTitle({ memo, onSetAuthor, onOpenAuthor, onOpenWorldLineView }: MemoTitleProps) {
   const users = useAppSelector(selectUsers);
   const firstBlockId = memo.lines[0];
   const firstBlock = firstBlockId ? memo.blocks[firstBlockId] : null;
@@ -47,6 +49,13 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor }: MemoTitleProps) {
         <IconButton onClick={() => navigator.clipboard.writeText(content)}>
           <LuClipboardCopy />
         </IconButton>
+        {onOpenWorldLineView && (
+          <Tooltip title="世界線（履歴）" arrow>
+            <IconButton onClick={onOpenWorldLineView}>
+              <AccountTreeIcon />
+            </IconButton>
+          </Tooltip>
+        )}
       </h2>
       <div
         style={{ display: "flex", alignItems: "center", gap: 6, color: "#555" }}

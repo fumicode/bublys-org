@@ -1,4 +1,5 @@
 import { BubbleRoute } from "../bubble-routing/BubbleRouting.js";
+import type { Size2 } from "@bublys-org/bubbles-ui-util";
 
 /**
  * バブリが提供するメニュー項目
@@ -27,12 +28,35 @@ export type BublyContext = {
  * バブリインターフェース
  */
 export type Bubly = {
-  /** バブリ名（識別子） */
+  /** バブリ名（識別子）。OS にロードされたとき `<name>-bubly` 形式の universe バブル
+      ルートが自動登録される。`name` が既に `-bubly` で終わっていればそのまま使う。 */
   name: string;
   /** バージョン */
   version: string;
-  /** サイドバーに表示するメニュー項目（オプション） */
+  /** サイドバーに表示する表示名（任意。省略時は name） */
+  label?: string;
+  /** サイドバーに表示するアイコン（任意） */
+  icon?: React.ReactNode;
+  /**
+   * 旧式のサイドバーメニュー項目（任意）。指定すると OS の動的メニューに追加され、
+   * クリックで直接 inner bubble URL を開く。新しいバブリは原則 universe バブルだけ
+   * 提供するため、ここに inner shortcut を増やすケースは少ない。
+   */
   menuItems?: BublyMenuItem[];
+  /**
+   * OS が自動登録する `<name>-bubly` universe バブル内に最初に開かれるバブルの url 群。
+   * 空のときは何も seed しない。
+   */
+  initialBubbleUrls?: string[];
+  /** 自動登録される universe バブルの既定サイズ（任意） */
+  defaultSize?: Size2;
+  /**
+   * このバブリの「夜空」色。任意の CSS color 文字列。
+   * - スタンドアロン実行時（BublyApp）はメインエリア背景
+   * - bublys-os にネストされたとき UniverseBubbleView シェルの色
+   * 個別のバブリルートで `bubbleOptions.backdropColor` を上書きすることも可能。
+   */
+  backdropColor?: string;
   /** バブリ登録時に呼ばれる */
   register: (context: BublyContext) => void;
   /** バブリ解除時に呼ばれる（オプション） */

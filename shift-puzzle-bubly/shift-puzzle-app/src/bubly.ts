@@ -16,6 +16,13 @@ import { shiftPuzzleBubbleRoutes } from "./registration/index.js";
 const ShiftPuzzleBubly: Bubly = {
   name: "shift-puzzle",
   version: "0.0.1",
+  label: "シフトパズル",
+  icon: React.createElement(GridOnIcon, { color: "primary" }),
+  initialBubbleUrls: [
+    "shift-puzzle/shift-plans",
+    "shift-puzzle/tasks",
+  ],
+  backdropColor: "hsl(20, 40%, 22%)",
 
   menuItems: [
     {

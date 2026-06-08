@@ -1,9 +1,8 @@
 import { Button } from '@mui/material';
 import { MemoList } from './MemoList';
 import { Memo } from '../domain/Memo';
-import { serializeMemo } from '../feature/MemoManager';
-import { useAppDispatch, initialize } from '@bublys-org/state-management';
-import { WorldLineState } from '@bublys-org/state-management';
+import { useAppDispatch } from '@bublys-org/state-management';
+import { dispatchCreateMemo } from '../feature/memoActions';
 
 type MemoCollectionProps = {
   buildDetailUrl: (memoId: string) => string;
@@ -16,33 +15,11 @@ export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, on
   const dispatch = useAppDispatch();
 
   const handleAddMemo = () => {
-    // 新しいメモを作成
     const newMemo = Memo.create();
-    const memoId = newMemo.id;
-
-    // 世界線の初期状態を作成
-    const rootWorldId = crypto.randomUUID();
-    const worldLineState: WorldLineState = {
-      worlds: [
-        {
-          id: rootWorldId,
-          world: {
-            worldId: rootWorldId,
-            parentWorldId: null,
-            worldState: serializeMemo(newMemo),
-          },
-        },
-      ],
-      apexWorldId: rootWorldId,
-      rootWorldId: rootWorldId,
-    };
-
-    // 世界線システムに初期化
-    dispatch(initialize({ objectId: memoId, worldLine: worldLineState }));
-
+    // world-line-graph に scope と初期 memo を seed する
+    dispatchCreateMemo(dispatch, newMemo);
     // 新しいメモのバブルを開く
-    const detailUrl = buildDetailUrl(memoId);
-    onMemoClick?.(memoId, detailUrl);
+    onMemoClick?.(newMemo.id, buildDetailUrl(newMemo.id));
   };
 
   const handleDelete = (memoId: string) => {

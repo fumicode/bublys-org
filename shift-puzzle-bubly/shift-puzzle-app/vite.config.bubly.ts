@@ -92,6 +92,12 @@ export default defineConfig({
           if (id === "@bublys-org/bubbles-ui" || id.startsWith("@bublys-org/bubbles-ui/")) {
             return "window.__BUBLYS_SHARED__.BubblesUI";
           }
+          if (id === "@bublys-org/world-line-graph" || id.startsWith("@bublys-org/world-line-graph/")) {
+            return "window.__BUBLYS_SHARED__.WorldLineGraph";
+          }
+          if (id === "@bublys-org/domain-registry" || id.startsWith("@bublys-org/domain-registry/")) {
+            return "window.__BUBLYS_SHARED__.DomainRegistry";
+          }
           // shift-puzzle-libs はバンドルに含まれるため、ここには来ない
           // MUI関連
           if (id.startsWith("@mui/material")) {
