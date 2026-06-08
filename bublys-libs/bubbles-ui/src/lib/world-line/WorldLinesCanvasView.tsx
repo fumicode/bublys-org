@@ -169,6 +169,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   background,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 同じ state なら layout 自体を再利用して描画もスキップする
   const layout = useMemo(() => computeLayout(graph), [graph.state]);
@@ -187,6 +188,21 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     draw(ctx, layout, apexNodeId, summarize, layout.width, layout.height, background);
   }, [layout, apexNodeId, summarize, background]);
+
+  // 現在 apex の位置にスクロールして中央へ寄せる。
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || !apexNodeId) return;
+    const pos = layout.nodes.get(apexNodeId);
+    if (!pos) return;
+    const targetX = pos.x + PADDING + NODE_RADIUS;
+    const targetY = pos.y + PADDING + NODE_RADIUS;
+    container.scrollTo({
+      left: Math.max(0, targetX - container.clientWidth / 2),
+      top: Math.max(0, targetY - container.clientHeight / 2),
+      behavior: "smooth",
+    });
+  }, [layout, apexNodeId]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -210,7 +226,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   );
 
   return (
-    <div style={{ overflow: "auto", width: "100%", height: "100%" }}>
+    <div ref={scrollRef} style={{ overflow: "auto", width: "100%", height: "100%" }}>
       <canvas ref={canvasRef} onClick={handleClick} style={{ display: "block" }} />
     </div>
   );
