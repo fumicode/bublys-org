@@ -189,39 +189,22 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     draw(ctx, layout, apexNodeId, summarize, layout.width, layout.height, background);
   }, [layout, apexNodeId, summarize, background]);
 
-  // 現在 apex の位置にスクロールして中央へ寄せる。
-  // 初回マウント時はコンテナの clientWidth/Height がまだ確定していないことが
-  // あるので requestAnimationFrame で 1 frame 待つ。初回は instant、それ以降は
-  // smooth で寄せる。
+  // apex 位置のマーカー座標。canvas の上に absolute 配置で 1x1 の透明 div を
+  // 置いて、それを scrollIntoView することでスクロールコンテナの自動寄せを
+  // ブラウザのネイティブ実装に委ねる（タイミング・サイズ確定問題を回避）。
+  const apexMarkerRef = useRef<HTMLDivElement>(null);
+  const apexPos = apexNodeId ? layout.nodes.get(apexNodeId) ?? null : null;
   const initialScrollDoneRef = useRef(false);
   useEffect(() => {
-    if (!apexNodeId) return;
-    const pos = layout.nodes.get(apexNodeId);
-    if (!pos) return;
-
-    let rafId: number | null = null;
-    const tryScroll = () => {
-      const container = scrollRef.current;
-      if (!container) return;
-      // コンテナがまだ 0 サイズなら次の frame に持ち越す
-      if (container.clientWidth === 0 && container.clientHeight === 0) {
-        rafId = requestAnimationFrame(tryScroll);
-        return;
-      }
-      const targetX = pos.x + PADDING + NODE_RADIUS;
-      const targetY = pos.y + PADDING + NODE_RADIUS;
-      container.scrollTo({
-        left: Math.max(0, targetX - container.clientWidth / 2),
-        top: Math.max(0, targetY - container.clientHeight / 2),
-        behavior: initialScrollDoneRef.current ? "smooth" : "auto",
-      });
-      initialScrollDoneRef.current = true;
-    };
-    rafId = requestAnimationFrame(tryScroll);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [layout, apexNodeId]);
+    const marker = apexMarkerRef.current;
+    if (!marker) return;
+    marker.scrollIntoView({
+      behavior: initialScrollDoneRef.current ? "smooth" : "auto",
+      block: "center",
+      inline: "center",
+    });
+    initialScrollDoneRef.current = true;
+  }, [apexPos?.x, apexPos?.y]);
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -246,7 +229,23 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
 
   return (
     <div ref={scrollRef} style={{ overflow: "auto", width: "100%", height: "100%" }}>
-      <canvas ref={canvasRef} onClick={handleClick} style={{ display: "block" }} />
+      <div style={{ position: "relative", width: layout.width, height: layout.height }}>
+        <canvas ref={canvasRef} onClick={handleClick} style={{ display: "block" }} />
+        {apexPos && (
+          <div
+            ref={apexMarkerRef}
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: apexPos.x + PADDING + NODE_RADIUS,
+              top: apexPos.y + PADDING + NODE_RADIUS,
+              width: 1,
+              height: 1,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 };
