@@ -190,18 +190,37 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   }, [layout, apexNodeId, summarize, background]);
 
   // 現在 apex の位置にスクロールして中央へ寄せる。
+  // 初回マウント時はコンテナの clientWidth/Height がまだ確定していないことが
+  // あるので requestAnimationFrame で 1 frame 待つ。初回は instant、それ以降は
+  // smooth で寄せる。
+  const initialScrollDoneRef = useRef(false);
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !apexNodeId) return;
+    if (!apexNodeId) return;
     const pos = layout.nodes.get(apexNodeId);
     if (!pos) return;
-    const targetX = pos.x + PADDING + NODE_RADIUS;
-    const targetY = pos.y + PADDING + NODE_RADIUS;
-    container.scrollTo({
-      left: Math.max(0, targetX - container.clientWidth / 2),
-      top: Math.max(0, targetY - container.clientHeight / 2),
-      behavior: "smooth",
-    });
+
+    let rafId: number | null = null;
+    const tryScroll = () => {
+      const container = scrollRef.current;
+      if (!container) return;
+      // コンテナがまだ 0 サイズなら次の frame に持ち越す
+      if (container.clientWidth === 0 && container.clientHeight === 0) {
+        rafId = requestAnimationFrame(tryScroll);
+        return;
+      }
+      const targetX = pos.x + PADDING + NODE_RADIUS;
+      const targetY = pos.y + PADDING + NODE_RADIUS;
+      container.scrollTo({
+        left: Math.max(0, targetX - container.clientWidth / 2),
+        top: Math.max(0, targetY - container.clientHeight / 2),
+        behavior: initialScrollDoneRef.current ? "smooth" : "auto",
+      });
+      initialScrollDoneRef.current = true;
+    };
+    rafId = requestAnimationFrame(tryScroll);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, [layout, apexNodeId]);
 
   const handleClick = useCallback(
