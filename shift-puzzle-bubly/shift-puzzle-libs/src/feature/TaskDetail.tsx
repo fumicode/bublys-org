@@ -12,13 +12,12 @@ import { createDefaultShifts } from "../data/sampleData.js";
 type TaskDetailProps = {
   taskId?: string;
   buildStatusUrl?: (shiftId: string) => string | undefined;
-  onSlotClick?: (shiftId: string) => void;
 };
 
 // シフトはマスターデータとして静的に保持
 const defaultShifts = createDefaultShifts();
 
-export const TaskDetail: FC<TaskDetailProps> = ({ taskId, buildStatusUrl, onSlotClick }) => {
+export const TaskDetail: FC<TaskDetailProps> = ({ taskId, buildStatusUrl }) => {
   const selectedTask = useAppSelector(selectSelectedTask);
   const specificTask = useAppSelector(
     taskId ? selectTaskById(taskId) : () => undefined
@@ -55,7 +54,6 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId, buildStatusUrl, onSlot
       task={task}
       scheduleEntries={scheduleEntries}
       buildStatusUrl={buildStatusUrl}
-      onSlotClick={onSlotClick}
     />
   );
 };

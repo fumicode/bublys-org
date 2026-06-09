@@ -1,7 +1,7 @@
 /**
  * shift-puzzle 固有のオブジェクト型をレジストリに登録する
  */
-import { registerObjectType } from "@bublys-org/bubbles-ui";
+import { registerObjectType, registerObjectBubble } from "@bublys-org/bubbles-ui";
 import { getCurrentStore } from "@bublys-org/state-management";
 import {
   ShiftPlan,
@@ -63,3 +63,9 @@ registerObjectType('ShiftAssignment', {
 });
 registerObjectType('Task', React.createElement(TaskIcon, { fontSize: 'small' }));
 registerObjectType('Shift', React.createElement(CalendarViewWeekIcon, { fontSize: 'small' }));
+
+registerObjectBubble('Member',             { openingPosition: 'bubble-side' });
+registerObjectBubble('Task',               { openingPosition: 'bubble-side' });
+registerObjectBubble('MemberAvailability', { openingPosition: 'bubble-side' });
+registerObjectBubble('ShiftStatus',        { openingPosition: 'origin-side' });
+registerObjectBubble('ShiftAssignment',    { openingPosition: 'origin-side' });

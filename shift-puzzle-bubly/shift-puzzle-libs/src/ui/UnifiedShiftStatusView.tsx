@@ -14,7 +14,6 @@ export const UnifiedShiftStatusView: FC<UnifiedShiftStatusViewProps> = ({
   status,
   memberNameMap,
   buildMemberUrl,
-  onMemberClick,
   onTaskSelect,
 }) => {
   const rate = Math.round(status.fulfillmentRate);
@@ -79,7 +78,6 @@ export const UnifiedShiftStatusView: FC<UnifiedShiftStatusViewProps> = ({
         memberNameMap={memberNameMap}
         density="full"
         buildMemberUrl={buildMemberUrl}
-        onMemberClick={onMemberClick}
         memberViolations={memberViolations}
       />
     </StyledUnified>

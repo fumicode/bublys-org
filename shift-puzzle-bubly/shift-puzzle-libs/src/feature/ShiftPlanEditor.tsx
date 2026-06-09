@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
@@ -27,7 +28,6 @@ import { UrledPlace } from "@bublys-org/bubbles-ui";
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
-  onAssignmentClick?: (assignmentId: string) => void;
   onCellClick?: (shiftId: string) => void;
   onMemberViewClick?: () => void;
   buildCellUrl?: (shiftId: string) => string;
@@ -35,7 +35,6 @@ type ShiftPlanEditorProps = {
 
 export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   shiftPlanId,
-  onAssignmentClick,
   onCellClick,
   onMemberViewClick,
   buildCellUrl,
@@ -202,7 +201,6 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             onDropMember={handleDropMember}
             onRemoveAssignment={handleRemoveAssignment}
             onMoveAssignment={handleMoveAssignment}
-            onAssignmentClick={onAssignmentClick}
             onCellClick={onCellClick}
           />
         </div>

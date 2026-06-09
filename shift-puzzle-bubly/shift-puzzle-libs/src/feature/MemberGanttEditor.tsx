@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 /**
  * MemberGanttEditor — 局員ガントビューフィーチャー

@@ -48,6 +48,7 @@ export const MemberListView: FC<MemberListViewProps> = ({
                 e.dataTransfer.setData(DRAG_TYPE_MEMBER_INDIVIDUAL, member.id);
               }}
               onDragEnd={() => { draggingMemberId = null; }}
+              onClick={() => onMemberClick?.(member.id)}
               className={`e-item ${selectedMemberId === member.id ? "is-selected" : ""}`}
             >
               <ObjectView
@@ -55,7 +56,6 @@ export const MemberListView: FC<MemberListViewProps> = ({
                 url={detailUrl}
                 label={member.name}
                 draggable={true}
-                onClick={() => onMemberClick?.(member.id)}
               >
                 <div className="e-content">
                   <PersonIcon fontSize="small" className="e-avatar" />

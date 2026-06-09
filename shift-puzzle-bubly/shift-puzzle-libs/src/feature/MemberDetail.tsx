@@ -10,12 +10,11 @@ import { MemberDetailView } from "../ui/MemberDetailView.js";
 
 type MemberDetailProps = {
   memberId?: string;
-  onOpenAvailability?: (memberId: string) => void;
 };
 
 const buildAvailabilityUrl = (memberId: string) => `shift-puzzle/members/${memberId}/availableShifts`;
 
-export const MemberDetail: FC<MemberDetailProps> = ({ memberId, onOpenAvailability }) => {
+export const MemberDetail: FC<MemberDetailProps> = ({ memberId }) => {
   // memberIdが指定されていればそれを使い、なければ選択中の局員を使う
   const selectedMember = useAppSelector(selectShiftPuzzleSelectedMember);
   const specificMember = useAppSelector(
@@ -36,7 +35,6 @@ export const MemberDetail: FC<MemberDetailProps> = ({ memberId, onOpenAvailabili
     <MemberDetailView
       member={member}
       buildAvailabilityUrl={buildAvailabilityUrl}
-      onOpenAvailability={onOpenAvailability}
     />
   );
 };

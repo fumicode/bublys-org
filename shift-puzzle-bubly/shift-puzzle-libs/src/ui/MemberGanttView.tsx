@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 /**
  * MemberGanttView — 局員×時間のガントチャートビュー（ピクセルベース）
@@ -232,7 +233,7 @@ const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
       $isDragging={isDragging}
       $isResizing={!!resizeState}
       title={`${shift.taskName} (${displayTimeLabel})`}
-      onClick={() => !resizeState && onClick(assignment.id)}
+      onDoubleClick={() => !resizeState && onClick(assignment.id)}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -267,6 +268,7 @@ const GanttShiftBlock: FC<GanttShiftBlockProps> = ({
         className="e-remove-btn"
         size="small"
         onClick={(e) => { e.stopPropagation(); onRemove(assignment.id); }}
+        onDoubleClick={(e) => e.stopPropagation()}
       >
         <CloseIcon fontSize="inherit" />
       </IconButton>

@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 import { FC } from "react";
 import styled from "styled-components";
@@ -78,7 +79,7 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
             <tr key={member.id}>
               <td
                 className="e-member-cell"
-                onClick={() => onMemberClick?.(member.id)}
+                onDoubleClick={() => onMemberClick?.(member.id)}
               >
                 <div className="e-member-name">{member.name}</div>
                 <div className="e-member-dept">{member.department}</div>
@@ -95,7 +96,7 @@ export const MemberShiftTableView: FC<MemberShiftTableViewProps> = ({
                         <div
                           key={assignment.id}
                           className={`e-assignment ${score >= 0 ? "is-positive" : "is-negative"} ${isAvailable ? "" : "is-unavailable"}`}
-                          onClick={() => onAssignmentClick?.(assignment.id)}
+                          onDoubleClick={() => onAssignmentClick?.(assignment.id)}
                         >
                           <div className="e-task">
                             {shift?.taskName ?? assignment.shiftId}

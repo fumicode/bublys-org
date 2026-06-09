@@ -8,6 +8,7 @@
  */
 
 import type { ReactNode } from 'react';
+import type { OpeningPosition } from '../state/bubbles-slice.js';
 
 // 登録された型名のセット
 const registeredTypes: Set<string> = new Set();
@@ -114,3 +115,15 @@ export const getAllDragTypes = (): string[] => {
 
 // 後方互換性のための型エイリアス
 export type ObjectType = string;
+
+// オブジェクト型ごとのバブル展開設定
+type ObjectBubbleConfig = { openingPosition?: OpeningPosition };
+const registeredBubbleConfigs = new Map<string, ObjectBubbleConfig>();
+
+export const registerObjectBubble = (typeName: string, config: ObjectBubbleConfig): void => {
+  registeredBubbleConfigs.set(toKebabCase(typeName), config);
+};
+
+export const getObjectBubbleConfig = (typeName: string): ObjectBubbleConfig | undefined => {
+  return registeredBubbleConfigs.get(toKebabCase(typeName));
+};

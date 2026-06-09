@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 import { FC, useMemo } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
@@ -17,8 +18,6 @@ import { createDefaultShifts } from "../data/sampleData.js";
 type AssignmentEvaluationProps = {
   shiftPlanId: string;
   assignmentId: string;
-  onMemberClick?: (memberId: string) => void;
-  onTimeSlotClick?: (memberId: string) => void;
   buildMemberDetailUrl?: (memberId: string) => string;
   buildMemberAvailabilityUrl?: (memberId: string) => string;
 };
@@ -26,8 +25,6 @@ type AssignmentEvaluationProps = {
 export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   shiftPlanId,
   assignmentId,
-  onMemberClick,
-  onTimeSlotClick,
   buildMemberDetailUrl,
   buildMemberAvailabilityUrl,
 }) => {
@@ -88,8 +85,6 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
       constraintViolations={constraintViolations}
       memberDetailUrl={buildMemberDetailUrl?.(member.id)}
       memberAvailabilityUrl={buildMemberAvailabilityUrl?.(member.id)}
-      onMemberClick={() => onMemberClick?.(member.id)}
-      onTimeSlotClick={() => onTimeSlotClick?.(member.id)}
     />
   );
 };

@@ -112,12 +112,11 @@ function describeFilter(filter: MemberFilterCriteria): string {
 
 type MemberCollectionProps = {
   filter?: MemberFilterCriteria;
-  onMemberSelect?: (memberId: string) => void;
 };
 
 const buildDetailUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
 
-export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSelect }) => {
+export const MemberCollection: FC<MemberCollectionProps> = ({ filter }) => {
   const dispatch = useAppDispatch();
   const memberList = useAppSelector(selectShiftPuzzleMemberList);
   const selectedMemberId = useAppSelector(selectShiftPuzzleSelectedMemberId);
@@ -144,7 +143,6 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter, onMemberSe
 
   const handleMemberClick = (memberId: string) => {
     dispatch(setSelectedMemberId(memberId));
-    onMemberSelect?.(memberId);
   };
 
   const hasFilter = filter && Object.keys(filter).length > 0;

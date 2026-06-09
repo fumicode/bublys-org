@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 import { FC } from "react";
 import styled from "styled-components";
@@ -22,8 +23,6 @@ type AssignmentEvaluationViewProps = {
   constraintViolations?: ConstraintViolation[];
   memberDetailUrl?: string;
   memberAvailabilityUrl?: string;
-  onMemberClick?: () => void;
-  onTimeSlotClick?: () => void;
 };
 
 export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
@@ -34,8 +33,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   constraintViolations = [],
   memberDetailUrl,
   memberAvailabilityUrl,
-  onMemberClick,
-  onTimeSlotClick,
 }) => {
   const status = evaluation.getOverallStatus();
 
@@ -52,7 +49,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
                   url={memberAvailabilityUrl}
                   label={`${memberName}の参加可能時間帯`}
                   draggable={true}
-                  onClick={onTimeSlotClick}
                 >
                   <Button variant="text" size="small" component="span" className="e-link-button">
                     {timeSlotLabel}
@@ -83,7 +79,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
                   url={memberDetailUrl}
                   label={memberName}
                   draggable={true}
-                  onClick={onMemberClick}
                 >
                   <Button variant="text" size="small" component="span" className="e-link-button">
                     {memberName}

@@ -1,4 +1,5 @@
 'use client';
+/* 未使用: shift-plan-list / member-list / task-list から到達不可 */
 
 import { FC } from "react";
 import styled from "styled-components";
@@ -28,7 +29,6 @@ type ShiftPlanTableViewProps = {
   onDropMember?: (memberId: string, shiftId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
   onMoveAssignment?: (assignmentId: string, memberId: string, shiftId: string) => void;
-  onAssignmentClick?: (assignmentId: string) => void;
   onCellClick?: (shiftId: string) => void;
 };
 
@@ -42,7 +42,6 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   onDropMember,
   onRemoveAssignment,
   onMoveAssignment,
-  onAssignmentClick,
   onCellClick,
 }) => {
   const getMemberName = (memberId: string): string => {
@@ -213,7 +212,6 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                           url={assignmentUrl}
                           label={memberName}
                           draggable={false}
-                          onClick={() => onAssignmentClick?.(assignment.id)}
                         >
                           <div
                             className={`e-member-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
@@ -236,6 +234,7 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                                 e.stopPropagation();
                                 onRemoveAssignment?.(assignment.id);
                               }}
+                              onDoubleClick={(e) => e.stopPropagation()}
                             >
                               <CloseIcon fontSize="inherit" />
                             </IconButton>

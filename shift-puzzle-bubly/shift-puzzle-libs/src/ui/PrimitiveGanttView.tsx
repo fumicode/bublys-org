@@ -818,7 +818,7 @@ export const PrimitiveGanttView: FC<PrimitiveGanttViewProps> = ({
             <div
               className={`e-member-label${onMemberClick ? ' is-clickable' : ''}`}
               data-member-id={member.id}
-              onClick={() => onMemberClick?.(member.id)}
+              onDoubleClick={() => onMemberClick?.(member.id)}
             >
               <span className="e-member-name">{member.name}</span>
               {member.isNewMember && <span className="e-new-badge">新</span>}

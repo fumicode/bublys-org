@@ -661,7 +661,7 @@ export const TaskGanttView: FC<TaskGanttViewProps> = ({
                   className={`e-shift-label availability-${rowAvailability ?? 'none'} is-clickable`}
                   data-shift-id={shift.id}
                   style={{ height: rowHeight }}
-                  onClick={() => onTaskClick?.(shift.taskId)}
+                  onDoubleClick={() => onTaskClick?.(shift.taskId)}
                 >
                   <span className="e-task-name">
                     {shift.taskName ?? shift.taskId}

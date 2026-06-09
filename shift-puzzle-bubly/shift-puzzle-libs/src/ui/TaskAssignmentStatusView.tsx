@@ -30,8 +30,6 @@ export type TaskAssignmentStatusViewProps = {
   /** 配置メンバー → 局員/参加可能シフトバブル展開 */
   buildMemberUrl?: (memberId: string) => string;
   buildMemberAvailabilityUrl?: (memberId: string) => string;
-  onMemberClick?: (memberId: string) => void;
-  onAvailabilityClick?: (memberId: string) => void;
   /** タスク名クリック時のコールバック（ブラシ選択用） */
   onTaskSelect?: (taskId: string) => void;
 };
@@ -46,8 +44,6 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
   onExpandCoverage,
   buildMemberUrl,
   buildMemberAvailabilityUrl,
-  onMemberClick,
-  onAvailabilityClick,
   onTaskSelect,
 }) => {
   const rate = Math.round(status.fulfillmentRate);
@@ -109,8 +105,6 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
             onExpand={onExpandMembers}
             buildMemberUrl={buildMemberUrl}
             buildAvailabilityUrl={buildMemberAvailabilityUrl}
-            onMemberClick={onMemberClick}
-            onAvailabilityClick={onAvailabilityClick}
           />
         </section>
 
