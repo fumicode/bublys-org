@@ -6,18 +6,12 @@ import { useAppSelector } from "@bublys-org/state-management";
 import {
   MemberCollection,
   parseMemberFilter,
-  stringifyMemberFilter,
-  MemberFilterCriteria as MemberFilterType,
   MemberFilter,
   MemberDetail,
   MemberAvailability,
-  ShiftPlanEditor,
-  AssignmentEvaluation,
-  MemberShiftTable,
   TaskCollection,
   TaskFilter,
   TaskDetail,
-  MemberGanttEditor,
   PrimitiveGanttEditor,
   TaskGanttEditor,
   ShiftPlanWorldLineGraphView,
@@ -26,7 +20,6 @@ import {
   parseTaskFilter,
   stringifyTaskFilter,
   selectShiftPuzzlePlans,
-  type DayType,
 } from "@bublys-org/shift-puzzle-libs";
 
 // --- URLヘルパー ---
@@ -58,81 +51,6 @@ const ShiftPuzzleMemberBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const ShiftPuzzleMemberAvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const shiftPlanId = new URLSearchParams(getQuery(bubble.url)).get('shiftPlanId') ?? undefined;
   return <MemberAvailability memberId={bubble.params.memberId} shiftPlanId={shiftPlanId} />;
-};
-
-// シフトパズル - シフト配置表バブル（単一シフト案）
-const ShiftPuzzlePlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const shiftPlanId = bubble.params.shiftPlanId;
-
-  const buildFilterUrl = (shiftId: string): string => {
-    const filter: MemberFilterType = { availableFor: [shiftId] };
-    return `shift-puzzle/members${stringifyMemberFilter(filter)}&originCell=${shiftId}`;
-  };
-
-  return (
-    <ShiftPlanEditor
-      shiftPlanId={shiftPlanId}
-      onCellClick={(shiftId) => openBubble(buildFilterUrl(shiftId), bubble.id, 'origin-side')}
-      onMemberViewClick={() => openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/member-view`, bubble.id, 'origin-side')}
-      buildCellUrl={buildFilterUrl}
-    />
-  );
-};
-
-// シフトパズル - 局員別シフト表バブル
-const ShiftPuzzleMemberShiftTableBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const shiftPlanId = bubble.params.shiftPlanId;
-
-  return (
-    <MemberShiftTable
-      shiftPlanId={shiftPlanId}
-      onMemberClick={(memberId) => openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side')}
-      onAssignmentClick={(planId, assignmentId) =>
-        openBubble(`shift-puzzle/shift-plans/${planId}/assignments/${assignmentId}/evaluation`, bubble.id, 'origin-side')
-      }
-    />
-  );
-};
-
-// シフトパズル - 配置評価バブル
-const ShiftPuzzleAssignmentEvaluationBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { shiftPlanId, assignmentId } = bubble.params;
-  return (
-    <AssignmentEvaluation
-      shiftPlanId={shiftPlanId}
-      assignmentId={assignmentId}
-      buildMemberDetailUrl={buildMemberUrl}
-      buildMemberAvailabilityUrl={(memberId) => `shift-puzzle/members/${memberId}/availableShifts`}
-    />
-  );
-};
-
-// シフトパズル - 局員ガントビューバブル
-const ShiftPuzzleGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const shiftPlanId = bubble.params.shiftPlanId;
-  const initialDayType = (new URLSearchParams(getQuery(bubble.url)).get('dayType') ?? undefined) as DayType | undefined;
-
-  const handleOpenTaskList = () => {
-    const params = new URLSearchParams();
-    if (initialDayType) params.set('dayTypes', initialDayType);
-    params.set('shiftPlanId', shiftPlanId);
-    openBubble(`shift-puzzle/tasks?${params.toString()}`, bubble.id, 'bubble-side');
-  };
-
-  return (
-    <MemberGanttEditor
-      shiftPlanId={shiftPlanId}
-      initialDayType={initialDayType}
-      onAssignmentClick={(assignmentId) =>
-        openBubble(`shift-puzzle/shift-plans/${shiftPlanId}/assignments/${assignmentId}/evaluation`, bubble.id, 'origin-side')
-      }
-      onOpenTaskListClick={handleOpenTaskList}
-      onTableViewClick={() => openBubble(`shift-puzzle/shift-plans/${shiftPlanId}`, bubble.id)}
-    />
-  );
 };
 
 // シフトパズル - シフト表リストバブル
@@ -296,10 +214,6 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/members/:memberId/availableShifts", type: "member-availability", Component: ShiftPuzzleMemberAvailabilityBubble },
   { pattern: "shift-puzzle/members/:memberId", type: "member", Component: ShiftPuzzleMemberBubble },
   { pattern: "shift-puzzle/members", type: "member-list", Component: ShiftPuzzleMembersBubble },
-  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/member-view", type: "member-shift-table", Component: ShiftPuzzleMemberShiftTableBubble },
-  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/assignments/:assignmentId/evaluation", type: "assignment-evaluation", Component: ShiftPuzzleAssignmentEvaluationBubble },
-  // ガントビュー（:shiftPlanIdの前に配置して優先マッチ）
-  { pattern: "shift-puzzle/shift-plans/:shiftPlanId/gantt", type: "gantt-editor", Component: ShiftPuzzleGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/primitive-gantt", type: "primitive-gantt-editor", Component: ShiftPuzzlePrimitiveGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/task-gantt", type: "task-gantt-editor", Component: ShiftPuzzleTaskGanttEditorBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/history", type: "shift-plan-history", Component: ShiftPuzzleShiftPlanHistoryBubble },
@@ -307,7 +221,6 @@ export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/members", type: "shift-status-members", Component: ShiftPuzzleShiftStatusMembersBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status/coverage", type: "shift-status-coverage", Component: ShiftPuzzleShiftStatusCoverageBubble },
   { pattern: "shift-puzzle/shift-plans/:shiftPlanId/shifts/:shiftId/status", type: "shift-status", Component: ShiftPuzzleShiftStatusBubble },
-  { pattern: "shift-puzzle/shift-plans/:shiftPlanId", type: "shift-plan", Component: ShiftPuzzlePlanEditorBubble },
   { pattern: "shift-puzzle/tasks/filter", type: "task-filter", Component: ShiftPuzzleTaskFilterBubble },
   { pattern: "shift-puzzle/tasks/:taskId", type: "task", Component: ShiftPuzzleTaskBubble },
   { pattern: "shift-puzzle/tasks", type: "task-list", Component: ShiftPuzzleTasksBubble },

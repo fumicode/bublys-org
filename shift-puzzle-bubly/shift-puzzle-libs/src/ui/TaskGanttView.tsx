@@ -23,15 +23,12 @@
 import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member } from '../domain/index.js';
-import { type GanttConfig } from './MemberGanttView.js';
+import { type GanttConfig, type RowAvailability } from './ganttTypes.js';
 import { DRAG_TYPE_MEMBER_INDIVIDUAL, draggingMemberId } from './MemberListView.js';
 import { DRAG_TYPE_TASK_LIST } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
 import { createPortal } from 'react-dom';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
-
-export type { RowAvailability } from './MemberGanttView.js';
-import type { RowAvailability } from './MemberGanttView.js';
 
 // ========== 公開型 ==========
 

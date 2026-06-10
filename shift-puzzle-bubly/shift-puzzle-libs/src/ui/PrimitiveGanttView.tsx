@@ -27,15 +27,13 @@
 import React, { FC, useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Shift, TimeSchedule, Member } from '../domain/index.js';
-import { type GanttConfig } from './MemberGanttView.js';
+import { type GanttConfig, type RowAvailability } from './ganttTypes.js';
 import { DRAG_TYPE_TASK, DRAG_TYPE_TASK_LIST, draggingTaskId, draggingDate } from './TaskListView.js';
 import CloseIcon from '@mui/icons-material/Close';
 import { createPortal } from 'react-dom';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
 
-// 局員行の受け入れ可否型は MemberGanttView と共通（同一定義）
-export type { RowAvailability } from './MemberGanttView.js';
-import type { RowAvailability } from './MemberGanttView.js';
+export type { RowAvailability } from './ganttTypes.js';
 
 // ========== 公開型 ==========
 
