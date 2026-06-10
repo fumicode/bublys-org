@@ -12,7 +12,7 @@
 ドメインの中心は **ShiftPlan（シフト案）** であり、一つの案を試行錯誤しながら編集します。
 
 - **BlockList**（15分解像度のセル配置）が配置データの唯一の真実
-- Assignment（旧 D&D UI）は廃止方向。新規機能は BlockList ベースで作る
+- 旧 D&D UI（Assignment ベース）は削除済み。すべての配置操作は BlockList ベース
 - シフト案は世界線グラフで履歴管理され、過去の状態に戻れる
 
 ### バブルナビゲーション
@@ -105,11 +105,6 @@ shift-puzzle-app（libs + bubbles-ui）
   ```
 - **BlockList の解像度は常に15分**。TimeSchedule スコープで相対インデックス
 
-### ShiftAssignment について
-
-`ShiftAssignment` は旧 D&D UI の互換性のために残っています。
-**新機能は BlockList ベースで実装してください。**
-
 ---
 
 ## Redux スライス
@@ -140,26 +135,22 @@ dispatch(restoreShiftPlanFromWorldLine({ planId, shifts }))
 
 ## バブルルート一覧
 
-| URL パターン | 機能 | エントリーから到達可能? |
-|---|---|---|
-| `shift-puzzle/shift-plans` | シフト案一覧 | ✅ エントリー |
-| `shift-puzzle/shift-plans/:id/primitive-gantt` | セルグリッドガント | ✅ |
-| `shift-puzzle/shift-plans/:id/task-gantt` | タスク軸ガント | ✅ |
-| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status` | 配置状況（統合） | ✅ |
-| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status/members` | 配置メンバーのみ | ✅ |
-| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status/coverage` | 充足テトリスのみ | ✅ |
-| `shift-puzzle/shift-plans/:id/history` | 世界線グラフ | ✅ |
-| `shift-puzzle/members` | 局員一覧 | ✅ エントリー |
-| `shift-puzzle/members/filter` | 局員フィルター検索 | ✅ |
-| `shift-puzzle/members/:memberId` | 局員詳細 | ✅ |
-| `shift-puzzle/members/:memberId/availableShifts` | 参加可能シフト | ✅ |
-| `shift-puzzle/tasks` | タスク一覧 | ✅ エントリー |
-| `shift-puzzle/tasks/filter` | タスクフィルター検索 | ✅ |
-| `shift-puzzle/tasks/:taskId` | タスク詳細 | ✅ |
-| `shift-puzzle/shift-plans/:id` | 配置表（旧 D&D） | ❌ 未使用 |
-| `shift-puzzle/shift-plans/:id/member-view` | 局員別シフト表 | ❌ 未使用 |
-| `shift-puzzle/shift-plans/:id/gantt` | 局員ガント（旧） | ❌ 未使用 |
-| `shift-puzzle/shift-plans/:id/assignments/:aId/evaluation` | 配置評価（旧） | ❌ 未使用 |
+| URL パターン | 機能 |
+|---|---|
+| `shift-puzzle/shift-plans` | シフト案一覧（エントリー） |
+| `shift-puzzle/shift-plans/:id/primitive-gantt` | セルグリッドガント |
+| `shift-puzzle/shift-plans/:id/task-gantt` | タスク軸ガント |
+| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status` | 配置状況（統合） |
+| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status/members` | 配置メンバーのみ |
+| `shift-puzzle/shift-plans/:id/shifts/:shiftId/status/coverage` | 充足テトリスのみ |
+| `shift-puzzle/shift-plans/:id/history` | 世界線グラフ |
+| `shift-puzzle/members` | 局員一覧（エントリー） |
+| `shift-puzzle/members/filter` | 局員フィルター検索 |
+| `shift-puzzle/members/:memberId` | 局員詳細 |
+| `shift-puzzle/members/:memberId/availableShifts` | 参加可能シフト |
+| `shift-puzzle/tasks` | タスク一覧（エントリー） |
+| `shift-puzzle/tasks/filter` | タスクフィルター検索 |
+| `shift-puzzle/tasks/:taskId` | タスク詳細 |
 
 ---
 
@@ -169,10 +160,6 @@ dispatch(restoreShiftPlanFromWorldLine({ planId, shifts }))
 1. `shift-puzzle/shift-plans` — シフト案一覧から始まる配置編集
 2. `shift-puzzle/members` — 局員一覧から始まる局員管理
 3. `shift-puzzle/tasks` — タスク一覧から始まるタスク管理
-
-**未使用コンポーネント（到達不可）**：
-`feature/index.ts` と `ui/index.ts` の下部セクションに分類済み。
-ファイル先頭に `/* 未使用: ... */` コメントあり。削除の前に要確認。
 
 ---
 
@@ -281,8 +268,7 @@ your-event-bubly/
 ### 最小構成で始める手順
 
 1. **`shift-puzzle-model` をコピーしてドメインを整理**
-   - 不要なクラス（ShiftAssignment など旧 UI 依存）を削除
-   - イベント固有のドメインクラスを追加
+   - イベント固有のドメインクラスを追加・変更
 
 2. **Redux スライスを定義**（`your-event-libs/src/slice/`）
    - `injectInto(rootReducer)` で bublys-os の store に注入
