@@ -70,6 +70,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
             <li
               key={taskId}
               className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
+              onClick={() => onTaskClick?.(taskId)}
               onDragStart={() => {
                 draggingTaskId = taskId;
                 onTaskDragStart?.(taskId);
@@ -91,7 +92,6 @@ export const TaskListView: FC<TaskListViewProps> = ({
                 url={detailUrl}
                 label={taskName}
                 draggable={true}
-                onClick={() => onTaskClick?.(taskId)}
               >
                 <div className="e-task-header">
                   <AssignmentIcon fontSize="small" className="e-icon" />

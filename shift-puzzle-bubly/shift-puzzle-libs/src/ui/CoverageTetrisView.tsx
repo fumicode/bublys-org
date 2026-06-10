@@ -19,8 +19,6 @@ export type CoverageTetrisViewProps = {
   onExpand?: () => void;
   /** 配置セルを ObjectView bubbleLink として展開するための URL ビルダー */
   buildMemberUrl?: (memberId: string) => string;
-  /** 配置セルクリック時のコールバック（メンバーバブル展開用） */
-  onMemberClick?: (memberId: string) => void;
   /** エラーメンバーID → 違反メッセージ一覧（非スタブのみ）。full 密度時にリスト表示 */
   memberViolations?: ReadonlyMap<string, readonly string[]>;
 };
@@ -49,7 +47,6 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
   density = 'compact',
   onExpand,
   buildMemberUrl,
-  onMemberClick,
   memberViolations,
 }) => {
   // 表示する最大段数：必要人数 + 実最大超過人数（余剰も可視化）
@@ -135,10 +132,9 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
                   width: w,
                   height: rowPx,
                   background: isError ? undefined : colorFor(uid),
-                  cursor: buildMemberUrl || onMemberClick ? 'pointer' : undefined,
+                  cursor: buildMemberUrl ? 'pointer' : undefined,
                 }}
                 title={titleText}
-                onClick={!buildMemberUrl && onMemberClick ? () => onMemberClick(uid) : undefined}
               >
                 {buildMemberUrl && (
                   <ObjectView
@@ -146,7 +142,6 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
                     url={buildMemberUrl(uid)}
                     label={label}
                     draggable
-                    onClick={() => onMemberClick?.(uid)}
                   >
                     <span className="tt-cell-overlay" />
                   </ObjectView>

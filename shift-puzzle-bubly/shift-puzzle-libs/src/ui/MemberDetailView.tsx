@@ -10,13 +10,11 @@ import { Button } from "@mui/material";
 type MemberDetailViewProps = {
   member: Member;
   buildAvailabilityUrl?: (memberId: string) => string;
-  onOpenAvailability?: (memberId: string) => void;
 };
 
 export const MemberDetailView: FC<MemberDetailViewProps> = ({
   member,
   buildAvailabilityUrl,
-  onOpenAvailability,
 }) => {
   const availabilityUrl = buildAvailabilityUrl?.(member.id);
 
@@ -73,7 +71,6 @@ export const MemberDetailView: FC<MemberDetailViewProps> = ({
                   url={availabilityUrl}
                   label={`${member.name}の参加可能時間`}
                   draggable={true}
-                  onClick={() => onOpenAvailability?.(member.id)}
                 >
                   <Button variant="text" size="small" component="span">
                     {summary}（詳細を見る）

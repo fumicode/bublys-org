@@ -21,8 +21,6 @@ type TaskDetailViewProps = {
   scheduleEntries: TaskScheduleEntry[];
   /** シフトIDからshift-statusバブルURLを生成（planが見つからない場合はundefined） */
   buildStatusUrl?: (shiftId: string) => string | undefined;
-  /** 配置状況バブルを開くコールバック */
-  onSlotClick?: (shiftId: string) => void;
 };
 
 /** dayTypeの表示順 */
@@ -32,7 +30,6 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
   task,
   scheduleEntries,
   buildStatusUrl,
-  onSlotClick,
 }) => {
   // dayTypeごとにグループ化
   const groupedByDay = DAY_TYPE_ORDER.reduce<Record<string, TaskScheduleEntry[]>>(
@@ -107,7 +104,6 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
                         label={entry.slotLabel}
                         draggable
                         fullWidth
-                        onClick={() => onSlotClick?.(entry.shiftId)}
                       >
                         {inner}
                       </ObjectView>

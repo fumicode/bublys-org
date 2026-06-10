@@ -129,7 +129,7 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
             const ts = plan.timeSchedules[0];
             return (
               <UrledPlace key={plan.id} url={buildPlanUrl ? buildPlanUrl(plan.id) : ''}>
-                <div className="sp-plan-item" onClick={() => onOpen(plan.id)}>
+                <div className="sp-plan-item" onDoubleClick={() => onOpen(plan.id)}>
                   <div className="sp-plan-info">
                     <span className="sp-plan-name">{plan.name}</span>
                     <span className="sp-plan-meta">
@@ -144,6 +144,7 @@ export const ShiftPlanListView: FC<ShiftPlanListViewProps> = ({ plans, onCreate,
                       type="button"
                       className="sp-delete-btn"
                       onClick={(e) => { e.stopPropagation(); onDelete?.(plan.id); }}
+                      onDoubleClick={(e) => e.stopPropagation()}
                       title="削除"
                     >
                       ✕

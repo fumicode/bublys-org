@@ -31,8 +31,6 @@ type ShiftStatusProps = {
   /** 配置メンバー → 局員/参加可能シフトバブル展開 */
   buildMemberUrl?: (memberId: string) => string;
   buildMemberAvailabilityUrl?: (memberId: string) => string;
-  onMemberClick?: (memberId: string) => void;
-  onAvailabilityClick?: (memberId: string) => void;
 };
 
 // ========== コンポーネント ==========
@@ -45,8 +43,6 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
   onExpandCoverage,
   buildMemberUrl,
   buildMemberAvailabilityUrl,
-  onMemberClick,
-  onAvailabilityClick,
 }) => {
   const dispatch = useAppDispatch();
   const members = useAppSelector(selectShiftPuzzleMemberList);
@@ -115,8 +111,6 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
           density="full"
           buildMemberUrl={buildMemberUrl}
           buildAvailabilityUrl={buildMemberAvailabilityUrl}
-          onMemberClick={onMemberClick}
-          onAvailabilityClick={onAvailabilityClick}
         />
       </StyledSingle>
     );
@@ -151,8 +145,6 @@ export const ShiftStatus: FC<ShiftStatusProps> = ({
       onExpandCoverage={onExpandCoverage}
       buildMemberUrl={buildMemberUrl}
       buildMemberAvailabilityUrl={buildMemberAvailabilityUrl}
-      onMemberClick={onMemberClick}
-      onAvailabilityClick={onAvailabilityClick}
       onTaskSelect={handleTaskSelect}
     />
   );

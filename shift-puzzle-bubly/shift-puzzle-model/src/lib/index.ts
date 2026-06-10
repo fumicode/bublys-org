@@ -18,10 +18,6 @@ export * from './member/Member.js';
 export * from './shift-plan/BlockList.js';
 
 // ShiftPlan集約
-export * from './shift-plan/ShiftAssignment.js';
 export * from './shift-plan/ShiftPlan.js';
-export * from './shift-plan/ShiftMatcher.js';
-export * from './shift-plan/ShiftEvaluation.js';
-export * from './shift-plan/MemberAssignmentEvaluation.js';
 export * from './shift-plan/ShiftAssignmentStatus.js';
 export * from './shift-plan/ShiftPreference.js';

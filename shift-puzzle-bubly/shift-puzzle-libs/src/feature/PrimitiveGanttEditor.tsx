@@ -28,7 +28,7 @@ import {
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
 import { UrledPlace } from '@bublys-org/bubbles-ui';
-import { type GanttConfig } from '../ui/MemberGanttView.js';
+import { type GanttConfig } from '../ui/ganttTypes.js';
 import { draggingTaskId, DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
 import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
 import { draggingTaskGroups } from './TaskCollection.js';
