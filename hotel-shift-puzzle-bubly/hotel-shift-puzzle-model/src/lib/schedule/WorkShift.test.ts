@@ -19,6 +19,18 @@ describe('WorkShift（勤務帯）', () => {
     expect(WorkShift.of('b', 'B', { hour: 9, minute: 30 }).startMinute).toBe(570);
   });
 
+  test('rename / changeStart は新しいインスタンスを返す（不変）', () => {
+    const base = WorkShift.of('early', '早番', { hour: 7 });
+
+    const renamed = base.rename('朝番');
+    expect(renamed.name).toBe('朝番');
+    expect(base.name).toBe('早番'); // 元は不変
+
+    const moved = base.changeStart({ hour: 8, minute: 30 });
+    expect(moved.startTimeLabel).toBe('8:30');
+    expect(base.startTimeLabel).toBe('7:00'); // 元は不変
+  });
+
   test('標準の勤務帯は早番(7:00)/中番(9:00)/遅番(13:00)', () => {
     const shifts = createDefaultWorkShifts();
     expect(shifts.map((s) => [s.name, s.startTimeLabel])).toEqual([

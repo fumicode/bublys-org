@@ -153,6 +153,18 @@ export class MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({ ...this.state, assignments });
   }
 
+  /**
+   * 1セル（スタッフ×稼働日）の勤務割当を、指定の状態へ変更する。不変。
+   * - work      : その勤務帯で出勤
+   * - day-off   : 休み
+   * - undecided : 未定（割当を取り除く）
+   */
+  setCell(staffId: string, day: WorkingDay, to: ShiftCell): MonthlyStaffSchedule {
+    if (to.kind === "work") return this.assignShift(staffId, day, to.shiftId);
+    if (to.kind === "day-off") return this.assignDayOff(staffId, day);
+    return this.clearAssignment(staffId, day);
+  }
+
   private withAssignment(
     staffId: string,
     day: WorkingDay,

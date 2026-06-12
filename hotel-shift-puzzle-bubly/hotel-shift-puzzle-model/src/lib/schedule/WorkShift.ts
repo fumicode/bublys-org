@@ -73,6 +73,19 @@ export class WorkShift {
   get startTimeLabel(): string {
     return `${this.startHour}:${String(this.startMinuteOfHour).padStart(2, "0")}`;
   }
+
+  /** 名前を変更した新しい WorkShift を返す */
+  rename(name: string): WorkShift {
+    return new WorkShift({ ...this.state, name });
+  }
+
+  /** 開始時刻を変更した新しい WorkShift を返す（時・分指定、分は省略可） */
+  changeStart(start: { hour: number; minute?: number }): WorkShift {
+    return new WorkShift({
+      ...this.state,
+      startMinute: start.hour * 60 + (start.minute ?? 0),
+    });
+  }
 }
 
 /** 例として用意する標準の勤務帯（早番・中番・遅番） */

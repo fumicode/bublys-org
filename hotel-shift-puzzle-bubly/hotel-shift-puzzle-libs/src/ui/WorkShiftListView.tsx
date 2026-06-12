@@ -10,7 +10,7 @@ import { WorkShift } from "../domain/index.js";
 type WorkShiftListViewProps = {
   workShifts: WorkShift[];
   onRename: (id: string, name: string) => void;
-  onChangeStartMinute: (id: string, startMinute: number) => void;
+  onChangeStart: (id: string, start: { hour: number; minute: number }) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
 };
@@ -22,17 +22,17 @@ const toTimeValue = (startMinute: number): string => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
-/** "HH:MM" → startMinute */
-const fromTimeValue = (value: string): number | null => {
+/** "HH:MM" → { hour, minute } */
+const fromTimeValue = (value: string): { hour: number; minute: number } | null => {
   const [h, m] = value.split(":").map((s) => parseInt(s, 10));
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
+  return { hour: h, minute: m };
 };
 
 export const WorkShiftListView: FC<WorkShiftListViewProps> = ({
   workShifts,
   onRename,
-  onChangeStartMinute,
+  onChangeStart,
   onAdd,
   onRemove,
 }) => {
@@ -59,8 +59,8 @@ export const WorkShiftListView: FC<WorkShiftListViewProps> = ({
                 type="time"
                 value={toTimeValue(shift.startMinute)}
                 onChange={(e) => {
-                  const min = fromTimeValue(e.target.value);
-                  if (min !== null) onChangeStartMinute(shift.id, min);
+                  const start = fromTimeValue(e.target.value);
+                  if (start) onChangeStart(shift.id, start);
                 }}
               />
               <IconButton

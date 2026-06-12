@@ -1,14 +1,16 @@
 'use client';
 
-import { FC, Fragment } from "react";
+import { FC, Fragment, useState } from "react";
 import styled from "styled-components";
 import PersonIcon from "@mui/icons-material/Person";
+import { Menu, MenuItem, ListItemText } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
+  type ShiftCell,
 } from "../domain/index.js";
 
 type ScheduleGridViewProps = {
@@ -17,6 +19,8 @@ type ScheduleGridViewProps = {
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
   buildStaffUrl: (staffId: string) => string;
+  /** セルの勤務割当を変更する */
+  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
 };
 
 // 勤務帯ごとの色（背景・文字）
@@ -34,38 +38,73 @@ const SHIFT_FG: Record<string, string> = {
 const STAFF_COL_WIDTH = 132;
 const DAY_COL_WIDTH = 60;
 
+type EditingCell = {
+  anchor: HTMLElement;
+  staffId: string;
+  day: WorkingDay;
+};
+
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
   buildStaffUrl,
+  onChangeCell,
 }) => {
   const days = schedule.workingDays();
 
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
+  // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
+  const shiftOptions = schedule.workShiftIds
+    .map((id) => shiftMap.get(id))
+    .filter((w): w is WorkShift => !!w);
+
+  const [editing, setEditing] = useState<EditingCell | null>(null);
+
+  const applyChange = (to: ShiftCell) => {
+    if (editing) onChangeCell(editing.staffId, editing.day, to);
+    setEditing(null);
+  };
+
   const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px)`;
 
   const renderCell = (staff: Staff, day: WorkingDay) => {
     const cell = schedule.statusOf(staff.id, day);
+    let className = "e-cell";
+    let style: React.CSSProperties | undefined;
+    let content: React.ReactNode;
+
     if (cell.kind === "work") {
       const id = cell.shiftId;
       const shift = shiftMap.get(id);
-      return (
-        <div
-          className="e-cell e-work"
-          style={{ background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" }}
-        >
+      className += " e-work";
+      style = { background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" };
+      content = (
+        <>
           <span className="e-shift-name">{shift?.name ?? id}</span>
           {shift && <span className="e-shift-time">{shift.startTimeLabel}</span>}
-        </div>
+        </>
       );
+    } else if (cell.kind === "day-off") {
+      className += " e-off";
+      content = "休";
+    } else {
+      className += " e-undecided";
+      content = "·";
     }
-    if (cell.kind === "day-off") {
-      return <div className="e-cell e-off">休</div>;
-    }
-    return <div className="e-cell e-undecided">·</div>;
+
+    return (
+      <div
+        className={className}
+        style={style}
+        role="button"
+        onClick={(e) => setEditing({ anchor: e.currentTarget, staffId: staff.id, day })}
+      >
+        {content}
+      </div>
+    );
   };
 
   return (
@@ -116,6 +155,25 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           </Fragment>
         ))}
       </div>
+
+      {/* セル編集メニュー */}
+      <Menu
+        anchorEl={editing?.anchor ?? null}
+        open={!!editing}
+        onClose={() => setEditing(null)}
+      >
+        {shiftOptions.map((shift) => (
+          <MenuItem key={shift.id} onClick={() => applyChange({ kind: "work", shiftId: shift.id })}>
+            <ListItemText primary={shift.name} secondary={shift.startTimeLabel} />
+          </MenuItem>
+        ))}
+        <MenuItem onClick={() => applyChange({ kind: "day-off" })}>
+          <ListItemText primary="休み" />
+        </MenuItem>
+        <MenuItem onClick={() => applyChange({ kind: "undecided" })}>
+          <ListItemText primary="未定（クリア）" />
+        </MenuItem>
+      </Menu>
     </StyledWrap>
   );
 };
@@ -222,6 +280,12 @@ const StyledWrap = styled.div`
     justify-content: center;
     padding: 2px;
     min-height: 36px;
+    cursor: pointer;
+    transition: box-shadow 0.1s;
+
+    &:hover {
+      box-shadow: inset 0 0 0 2px #90caf9;
+    }
   }
   .e-work {
     .e-shift-name {

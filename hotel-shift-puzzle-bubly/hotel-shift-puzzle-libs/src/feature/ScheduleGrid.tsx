@@ -3,6 +3,7 @@
 import { FC, useEffect } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import type { WorkingDay, ShiftCell } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   selectStaffList,
   setStaffList,
@@ -10,6 +11,7 @@ import {
   setWorkShiftList,
   selectScheduleList,
   setScheduleList,
+  updateSchedule,
 } from "../slice/index.js";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
@@ -50,6 +52,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId }) => {
     ? scheduleList.find((s) => s.id === scheduleId)
     : scheduleList[0];
 
+  const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
+    if (!schedule) return;
+    // 集約のメソッドで状態を更新し、リポジトリ（スライス）へ保存する
+    dispatch(updateSchedule(schedule.setCell(staffId, day, to).toPlain()));
+  };
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -66,6 +74,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId }) => {
         staffList={staffList}
         workShifts={workShifts}
         buildStaffUrl={buildStaffDetailUrl}
+        onChangeCell={handleChangeCell}
       />
     </StyledContainer>
   );

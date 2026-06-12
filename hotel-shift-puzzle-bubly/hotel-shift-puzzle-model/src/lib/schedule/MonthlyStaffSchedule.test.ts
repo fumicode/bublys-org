@@ -139,6 +139,22 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(on1.map((a) => a.staffId).sort()).toEqual(['staff-A', 'staff-B', 'staff-C']);
   });
 
+  test('setCell でセルの割当を出勤／休み／未定に切り替えられる', () => {
+    const base = createJuneSchedule();
+
+    const working = base.setCell('staff-A', june1, { kind: 'work', shiftId: 'late' });
+    expect(working.getShiftIdFor('staff-A', june1)).toBe('late');
+
+    const off = working.setCell('staff-A', june1, { kind: 'day-off' });
+    expect(off.isDayOff('staff-A', june1)).toBe(true);
+
+    const undecided = off.setCell('staff-A', june1, { kind: 'undecided' });
+    expect(undecided.isUndecided('staff-A', june1)).toBe(true);
+
+    // 不変
+    expect(base.isUndecided('staff-A', june1)).toBe(true);
+  });
+
   test('6月の稼働日は30日ある', () => {
     const days = createJuneSchedule().workingDays();
     expect(days).toHaveLength(30);

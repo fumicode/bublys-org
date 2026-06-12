@@ -3,6 +3,7 @@
 import { FC, useEffect } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { WorkShift } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   selectWorkShiftList,
   setWorkShiftList,
@@ -29,19 +30,20 @@ export const WorkShiftCollection: FC = () => {
   }, [dispatch, workShifts.length]);
 
   const handleAdd = () => {
-    dispatch(addWorkShift({ id: newWorkShiftId(), name: "新しい勤務帯", startMinute: 9 * 60 }));
+    const shift = WorkShift.of(newWorkShiftId(), "新しい勤務帯", { hour: 9 });
+    dispatch(addWorkShift(shift.state));
   };
 
   const handleRename = (id: string, name: string) => {
     const shift = workShifts.find((w) => w.id === id);
     if (!shift) return;
-    dispatch(updateWorkShift({ ...shift.state, name }));
+    dispatch(updateWorkShift(shift.rename(name).state));
   };
 
-  const handleChangeStartMinute = (id: string, startMinute: number) => {
+  const handleChangeStart = (id: string, start: { hour: number; minute: number }) => {
     const shift = workShifts.find((w) => w.id === id);
     if (!shift) return;
-    dispatch(updateWorkShift({ ...shift.state, startMinute }));
+    dispatch(updateWorkShift(shift.changeStart(start).state));
   };
 
   const handleRemove = (id: string) => {
@@ -56,7 +58,7 @@ export const WorkShiftCollection: FC = () => {
       <WorkShiftListView
         workShifts={workShifts}
         onRename={handleRename}
-        onChangeStartMinute={handleChangeStartMinute}
+        onChangeStart={handleChangeStart}
         onAdd={handleAdd}
         onRemove={handleRemove}
       />
