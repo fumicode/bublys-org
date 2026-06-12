@@ -246,7 +246,7 @@ url バインド「外部ナビ」: ネスト世界線 moveTo → rehydrate
 | [`bubble-ui/world-line/bubbleArrangementDomain.ts`](../apps/bublys-os/app/bubble-ui/world-line/bubbleArrangementDomain.ts) | `BubbleArrangement` を world-line に乗せるための型登録 |
 | [`bubble-ui/world-line/useUniverseArrangementWorldLine.ts`](../apps/bublys-os/app/bubble-ui/world-line/useUniverseArrangementWorldLine.ts) | **コア hook**：任意 universe の commit/rehydrate + （任意）親バブル url との双方向バインド |
 | [`bubble-ui/world-line/useRootArrangementWorldLine.ts`](../apps/bublys-os/app/bubble-ui/world-line/useRootArrangementWorldLine.ts) | root 用ラッパー：コア hook を `ROOT_UNIVERSE_ID` で呼んだうえに、ブラウザ url/履歴調整（stale self-heal、popstate→moveTo、apex→pushState、訪問trail）を被せる |
-| [`bubble-ui/world-line/BubbleArrangementWorldLineControls.tsx`](../apps/bublys-os/app/bubble-ui/world-line/BubbleArrangementWorldLineControls.tsx) | undo/redo ボタンと世界線 DAG ビュー（ドラッグできるフローティングパネル） |
+| [`bubble-ui/world-line/BubbleArrangementWorldLineControls.tsx`](../apps/bublys-os/app/bubble-ui/world-line/BubbleArrangementWorldLineControls.tsx) | 世界線 DAG ビュー（ドラッグできるフローティングパネル）と戻る/進むボタン。パネルが開いている間は**矢印キーで世界線を移動**（←=親へ / →=同 worldLine の子へ / ↑↓=同じ親の兄弟枝を切替）。**Cmd+Z は使わない**（データの undo に予約。下記 G 参照） |
 | [`bubble-ui/world-line/BubbleArrangementInspector.tsx`](../apps/bublys-os/app/bubble-ui/world-line/BubbleArrangementInspector.tsx) | 現 view の JSON を左下に表示する開発用パネル |
 | [`bubble-ui/BubblesUI/domain/bubbleRoutes.tsx`](../apps/bublys-os/app/bubble-ui/BubblesUI/domain/bubbleRoutes.tsx) | バブル url → 中身のルーティング。`universe` ルートで `UniverseBubble`（`UniverseView` + `useUniverseArrangementWorldLine`）を返す |
 
@@ -429,6 +429,29 @@ listener が rehydrate を跨いで生きている事実そのものは変わっ
 非推奨ではないが、他のドメインオブジェクトと同じ自然形に揃う）。
 
 `removeObject(type, id)` 側は API 上常に type 文字列が必要なのでそのまま。
+
+### G. 世界線ビューの移動は矢印キーのみ。Cmd+Z はデータ undo に予約 — **設計ルールとして明記**
+
+**ルール: `Cmd+Z`（`Ctrl+Z`）はデータそのものへの変更（undo）にだけ使う。**
+
+世界線（`WorldLineGraph`）には性質の違う2種類がある：
+
+- **データの世界線** — 会話・メモなど、**ドメインデータそのもの**をバージョン管理する。ここで巻き戻す＝データの undo なので、`Cmd+Z` が自然（[world-line-graph-design.md](world-line-graph-design.md) の会話例はこちら）。
+- **arrangement の世界線**（このドキュメントの主題）— 「どのバブルが、どのレイヤーに開いているか」という **view 状態**を記録する。ユーザーが編集している「データ」ではない。
+
+`BubbleArrangement` の世界線は後者なので、その世界線ビュー（`BubbleArrangementWorldLineControls` のフローティングパネル）での移動には **`Cmd+Z` を割り当てない**。`Cmd+Z` を view の移動に使うと「データを undo したつもりが画面のバブル配置だけ戻る」という、ユーザーのメンタルモデルと食い違う挙動になるため。
+
+代わりに**矢印キー**で移動する（パネルが open のときだけ window で拾う。テキスト入力中は無視）：
+
+| キー | 動作 | 実装 |
+|---|---|---|
+| `←` | 親ノードへ（moveBack） | root はブラウザ履歴、nest は DAG（§C 参照） |
+| `→` | 同 worldLine の子へ（moveForward） | 同上 |
+| `↑` / `↓` | 同じ親の**兄弟枝**を切替（分岐間移動） | `scope.moveTo(sibling)` |
+
+戻る/進むボタン（パネル上の Undo/Redo アイコン）は明示操作なので残す。`Cmd+Z` を外したのは「キーボードショートカット」からだけで、ボタンや矢印キーでの世界線移動はそのまま使える。
+
+> なお、データの世界線（会話・メモ等）側では `Cmd+Z`＝データ undo が引き続き正しい。`Cmd+Z` の意味は「その世界線が**データを追っているか view を追っているか**」で決まる、と読むのが正確。
 
 ---
 
