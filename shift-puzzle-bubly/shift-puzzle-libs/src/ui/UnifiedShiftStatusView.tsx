@@ -28,25 +28,23 @@ export const UnifiedShiftStatusView: FC<UnifiedShiftStatusViewProps> = ({
   return (
     <StyledUnified>
       <header className="us-header">
-        <div className="us-header-main">
-          <div
-            className="us-task-drag"
-            onDragStart={() => {
-              setDraggingTaskId(header.taskId);
-              onTaskSelect?.(header.taskId);
-            }}
-            onDragEnd={() => setDraggingTaskId(null)}
+        <div
+          className="us-header-main"
+          onDragStart={() => {
+            setDraggingTaskId(header.taskId);
+            onTaskSelect?.(header.taskId);
+          }}
+          onDragEnd={() => setDraggingTaskId(null)}
+        >
+          <ObjectView
+            type="Task"
+            url={`shift-puzzle/tasks/${header.taskId}`}
+            label={header.taskName}
+            draggable
+            onClick={() => onTaskSelect?.(header.taskId)}
           >
-            <ObjectView
-              type="Task"
-              url={`shift-puzzle/tasks/${header.taskId}`}
-              label={header.taskName}
-              draggable
-              onClick={() => onTaskSelect?.(header.taskId)}
-            >
-              <h3 className="us-task">{header.taskName}</h3>
-            </ObjectView>
-          </div>
+            <h3 className="us-task">{header.taskName}</h3>
+          </ObjectView>
           <span className="us-meta">
             {header.dayType} · {header.startTime}–{header.endTime}
           </span>
@@ -105,10 +103,6 @@ const StyledUnified = styled.div`
     align-items: baseline;
     gap: 10px;
     flex-wrap: wrap;
-  }
-  .us-task-drag {
-    cursor: grab;
-    &:active { cursor: grabbing; }
   }
   .us-task {
     margin: 0;

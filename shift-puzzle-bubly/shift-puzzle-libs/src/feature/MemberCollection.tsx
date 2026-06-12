@@ -4,9 +4,7 @@ import { FC, useEffect, useMemo, useContext } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
   selectShiftPuzzleMemberList,
-  selectShiftPuzzleSelectedMemberId,
   setMemberList,
-  setSelectedMemberId,
 } from "../slice/index.js";
 import { MemberListView } from "../ui/MemberListView.js";
 import { createSampleMemberList } from "../data/sampleMember.js";
@@ -119,7 +117,6 @@ const buildDetailUrl = (memberId: string) => `shift-puzzle/members/${memberId}`;
 export const MemberCollection: FC<MemberCollectionProps> = ({ filter }) => {
   const dispatch = useAppDispatch();
   const memberList = useAppSelector(selectShiftPuzzleMemberList);
-  const selectedMemberId = useAppSelector(selectShiftPuzzleSelectedMemberId);
   const { openBubble } = useContext(BubblesContext);
 
   // 初期データのロード（Redux Persist の旧スキーマ検出 → サンプル再投入）
@@ -140,10 +137,6 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter }) => {
     if (!filter || Object.keys(filter).length === 0) return memberList;
     return memberList.filter((member) => matchesFilter(member, filter));
   }, [memberList, filter]);
-
-  const handleMemberClick = (memberId: string) => {
-    dispatch(setSelectedMemberId(memberId));
-  };
 
   const hasFilter = filter && Object.keys(filter).length > 0;
   const filterDescription = hasFilter ? describeFilter(filter) : null;
@@ -203,9 +196,7 @@ export const MemberCollection: FC<MemberCollectionProps> = ({ filter }) => {
 
       <MemberListView
         memberList={filteredMemberList}
-        selectedMemberId={selectedMemberId}
         buildDetailUrl={buildDetailUrl}
-        onMemberClick={handleMemberClick}
         filteredDepartment={hasFilter && filter.departments?.length === 1 ? filter.departments[0] : undefined}
       />
     </StyledContainer>
