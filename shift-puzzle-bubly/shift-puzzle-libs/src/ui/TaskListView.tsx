@@ -117,6 +117,11 @@ const StyledTaskList = styled.ul`
 
   > .e-item {
     border-bottom: 1px solid #eee;
+    transition: background-color 0.12s;
+
+    &:hover {
+      background-color: #f5f5f5;
+    }
 
     &:last-child {
       border-bottom: none;
@@ -128,11 +133,6 @@ const StyledTaskList = styled.ul`
       gap: 8px;
       padding: 8px 12px;
       cursor: pointer;
-      transition: background-color 0.12s;
-
-      &:hover {
-        background-color: #f5f5f5;
-      }
     }
 
     .e-icon {

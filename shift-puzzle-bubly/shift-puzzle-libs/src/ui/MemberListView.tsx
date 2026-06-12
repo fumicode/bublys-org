@@ -90,13 +90,19 @@ const StyledMemberList = styled.ul`
   > .e-item {
     padding: 8px 12px;
     border-bottom: 1px solid #eee;
+    transition: background-color 0.15s;
+
+    &:hover {
+      background-color: #f5f5f5;
+    }
 
     &:last-child {
       border-bottom: none;
     }
 
-    > .e-content {
+    .e-content {
       display: flex;
+      flex-direction: row;
       align-items: center;
       gap: 8px;
     }
