@@ -32,11 +32,6 @@ const initialState: ShiftPlanSliceState = {
 /** readonlyなShiftPlanStateをmutableに変換（Immer用） */
 const toMutableShiftPlanState = (plan: ShiftPlanState) => ({
   ...plan,
-  assignments: [...(plan.assignments ?? [])],
-  constraintViolations: (plan.constraintViolations ?? []).map((v) => ({
-    ...v,
-    assignmentIds: [...v.assignmentIds],
-  })),
   timeSchedules: (plan.timeSchedules ?? []).map((ts) => ({ ...ts })),
   shifts: (plan.shifts ?? []).map((s) => ({
     ...s,

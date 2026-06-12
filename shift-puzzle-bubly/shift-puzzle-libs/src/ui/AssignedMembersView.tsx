@@ -22,10 +22,8 @@ export type AssignedMembersViewProps = {
 
   /** 局員バブル展開用 */
   buildMemberUrl?: (memberId: string) => string;
-  onMemberClick?: (memberId: string) => void;
   /** 参加可能シフトバブル展開用 */
   buildAvailabilityUrl?: (memberId: string) => string;
-  onAvailabilityClick?: (memberId: string) => void;
 };
 
 // ========== 違反カテゴリ → 表示情報 ==========
@@ -57,9 +55,7 @@ export const AssignedMembersView: FC<AssignedMembersViewProps> = ({
   density = 'compact',
   onExpand,
   buildMemberUrl,
-  onMemberClick,
   buildAvailabilityUrl,
-  onAvailabilityClick,
 }) => {
   const fmt = (m: number) =>
     `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -134,7 +130,6 @@ export const AssignedMembersView: FC<AssignedMembersViewProps> = ({
                       url={memberUrl}
                       label={s.memberName}
                       draggable
-                      onClick={() => onMemberClick?.(s.memberId)}
                     >
                       <span className="am-name am-name--link">
                         <PersonIcon fontSize="inherit" className="am-name-icon" />
@@ -166,7 +161,6 @@ export const AssignedMembersView: FC<AssignedMembersViewProps> = ({
                       url={availabilityUrl}
                       label={`${s.memberName}の参加可能時間帯`}
                       draggable
-                      onClick={() => onAvailabilityClick?.(s.memberId)}
                     >
                       <button
                         type="button"

@@ -135,12 +135,11 @@ function describeTaskFilter(filter: TaskFilterCriteria): string {
 
 type TaskCollectionProps = {
   filter?: TaskFilterCriteria;
-  onTaskSelect?: (taskId: string) => void;
   /** shift-status リンクを生成するための shift plan ID */
   shiftPlanId?: string;
 };
 
-export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSelect, shiftPlanId }) => {
+export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, shiftPlanId }) => {
   const buildDetailUrl = (taskId: string) =>
     shiftPlanId
       ? `shift-puzzle/tasks/${taskId}?shiftPlanId=${shiftPlanId}`
@@ -189,7 +188,6 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, onTaskSel
 
   const handleTaskClick = (taskId: string) => {
     dispatch(setSelectedTaskId(taskId));
-    onTaskSelect?.(taskId);
   };
 
   const handleOpenFilter = () => {

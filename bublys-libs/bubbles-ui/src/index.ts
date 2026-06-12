@@ -35,6 +35,7 @@ export * from './lib/hooks/useBubbleResize.js';
 // Context
 export * from './lib/context/BubbleRefsContext.js';
 export * from './lib/context/UniverseContext.js';
+export * from './lib/context/CurrentBubbleContext.js';
 
 // Universe / Viewport glue
 export * from './lib/universe-config.js';

@@ -1,6 +1,14 @@
-import { FC, ReactNode, useCallback } from 'react';
+import { FC, ReactNode, useCallback, useContext } from 'react';
 import { UrledPlace } from '../../components/UrledPlace';
-import { DragDataType, setDragPayload, ObjectType, getDragType } from '@bublys-org/bubbles-ui';
+import {
+  DragDataType,
+  setDragPayload,
+  ObjectType,
+  getDragType,
+  getObjectBubbleConfig,
+  BubblesContext,
+  CurrentBubbleContext,
+} from '@bublys-org/bubbles-ui';
 
 type ObjectViewProps = {
   /** オブジェクトの型 */
@@ -13,6 +21,8 @@ type ObjectViewProps = {
   children: ReactNode;
   /** クリック時のコールバック */
   onClick?: () => void;
+  /** ダブルクリック時のコールバック（明示指定時はレジストリより優先） */
+  onDoubleClick?: () => void;
   /** ドラッグ可能にするか（デフォルト: true） */
   draggable?: boolean;
   /** 幅を100%にするか（デフォルト: false） */
@@ -25,7 +35,8 @@ type ObjectViewProps = {
  * 以下の機能を提供:
  * - UrledPlace: LinkBubbleの対象となる
  * - draggable: ドラッグ可能（型情報を自動設定）
- * - onClick: クリックでバブルを開く（openBubbleは呼び出し側で実装）
+ * - ダブルクリック: registerObjectBubble で登録された設定に基づき自動でバブルを開く
+ *   （onDoubleClick prop が渡された場合はそちらを優先）
  */
 export const ObjectView: FC<ObjectViewProps> = ({
   type,
@@ -33,9 +44,14 @@ export const ObjectView: FC<ObjectViewProps> = ({
   label,
   children,
   onClick,
+  onDoubleClick,
   draggable = true,
   fullWidth = false,
 }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const currentBubbleId = useContext(CurrentBubbleContext);
+  const bubbleConfig = getObjectBubbleConfig(type);
+
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       setDragPayload(e, {
@@ -51,21 +67,33 @@ export const ObjectView: FC<ObjectViewProps> = ({
     onClick?.();
   }, [onClick]);
 
+  const handleDoubleClick = useCallback(() => {
+    if (onDoubleClick) {
+      onDoubleClick();
+    } else if (bubbleConfig) {
+      openBubble(url, currentBubbleId, bubbleConfig.openingPosition);
+    }
+  }, [onDoubleClick, bubbleConfig, openBubble, url, currentBubbleId]);
+
+  const isInteractive = !!onClick || !!onDoubleClick || !!bubbleConfig;
+  const hasDoubleClickAction = !!onDoubleClick || !!bubbleConfig;
+
   return (
     <UrledPlace url={url}>
       <span
-        role={onClick ? 'button' : undefined}
-        tabIndex={onClick ? 0 : undefined}
+        role={isInteractive ? 'button' : undefined}
+        tabIndex={isInteractive ? 0 : undefined}
         style={{
           display: fullWidth ? 'flex' : 'inline-flex',
           width: fullWidth ? '100%' : undefined,
-          cursor: onClick ? 'pointer' : undefined,
+          cursor: isInteractive ? 'pointer' : undefined,
         }}
         draggable={draggable}
         onDragStart={draggable ? handleDragStart : undefined}
         onClick={onClick ? handleClick : undefined}
+        onDoubleClick={hasDoubleClickAction ? handleDoubleClick : undefined}
         onKeyDown={
-          onClick
+          isInteractive
             ? (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
