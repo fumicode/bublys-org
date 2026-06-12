@@ -15,6 +15,10 @@ import { ekikyoBubbleRoutes } from "./registration/index.js";
 const EkikyoBubly: Bubly = {
   name: "ekikyo",
   version: "0.0.1",
+  label: "易経 - 九星盤",
+  icon: React.createElement(AutoAwesomeIcon, { color: "primary" }),
+  initialBubbleUrls: ["ekikyo/kyuseis/五黄"],
+  backdropColor: "hsl(355, 50%, 22%)",
 
   menuItems: [
     {

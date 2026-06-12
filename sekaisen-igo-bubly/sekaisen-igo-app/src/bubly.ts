@@ -15,6 +15,10 @@ import { sekaisenIgoBubbleRoutes } from "@bublys-org/sekaisen-igo-libs";
 const SekaisenIgoBubly: Bubly = {
   name: "sekaisen-igo",
   version: "0.0.1",
+  label: "世界線囲碁",
+  icon: React.createElement(SportsEsportsIcon, { color: "primary" }),
+  initialBubbleUrls: ["sekaisen-igo/games"],
+  backdropColor: "hsl(155, 30%, 18%)",
 
   menuItems: [
     {

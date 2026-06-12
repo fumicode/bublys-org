@@ -7,8 +7,8 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.lib.json",
-    "dev": "tsc -p tsconfig.lib.json --watch"
+    "build": "tsc -b tsconfig.lib.json",
+    "dev": "tsc -b tsconfig.lib.json --watch"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -27,7 +27,9 @@
   },
   "dependencies": {
     "@bublys-org/bubbles-ui-util": "*",
+    "@bublys-org/domain-registry": "*",
     "@bublys-org/state-management": "*",
+    "@bublys-org/world-line-graph": "*",
     "@mui/icons-material": "^7.0.0",
     "@reduxjs/toolkit": "^2.9.0",
     "clsx": "^2.1.0",

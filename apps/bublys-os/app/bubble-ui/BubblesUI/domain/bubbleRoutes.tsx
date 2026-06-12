@@ -1,8 +1,9 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
+import { useCasScope } from "@bublys-org/world-line-graph";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -19,8 +20,8 @@ import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
-import { MemoWorldLineManager } from "@/app/world-line/integrations/MemoWorldLineManager";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
+import { memoScopeId } from "@/app/world-line/Memo/domain/MemoDomain";
 
 /** BubbleRouteRegistry経由でルートを検索 */
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
@@ -51,22 +52,18 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
-  const handleOpenWorldLineView = () => {
-    openBubble(`memos/${memoId}/history`, bubble.id);
-  };
   const handleOpenAuthor = (_userId: string, url: string) => {
     openBubble(url, bubble.id);
   };
-
+  const handleOpenWorldLineView = () => {
+    openBubble(`memos/${memoId}/history`, bubble.id);
+  };
   return (
-    <MemoWorldLineManager
+    <MemoWorldLineIntegration
       memoId={memoId}
-      isBubbleMode={false}
+      onOpenAuthor={handleOpenAuthor}
       onOpenWorldLineView={handleOpenWorldLineView}
-      onCloseWorldLineView={() => {}}
-    >
-      <MemoWorldLineIntegration memoId={memoId} onOpenAuthor={handleOpenAuthor} />
-    </MemoWorldLineManager>
+    />
   );
 };
 
@@ -88,25 +85,26 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
+// Memo の世界線を canvas で表示。click でそのノードに移動できる。
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "").replace("/history", "");
-  const dispatch = useAppDispatch();
-  const handleCloseWorldLineView = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
+  const scope = useCasScope(memoScopeId(memoId));
+  const apexId = scope.graph.getApex()?.id ?? null;
   return (
-    <MemoWorldLineManager
-      memoId={memoId}
-      isBubbleMode={true}
-      onOpenWorldLineView={() => {}}
-      onCloseWorldLineView={handleCloseWorldLineView}
-    >
-      <MemoWorldLineIntegration memoId={memoId} />
-    </MemoWorldLineManager>
+    <div style={{ width: 600, height: 320, maxWidth: "80vw", maxHeight: "70vh" }}>
+      <WorldLinesCanvasView
+        graph={scope.graph}
+        apexNodeId={apexId}
+        onSelectNode={scope.moveTo}
+        background="rgba(15,18,28,0.85)"
+      />
+    </div>
   );
 };
+
+// 再帰的 universe バブル（バブルの中の universe）は lib 提供の
+// {@link BublyUniverseBubble} を使う。各ルートで `initialBubbleUrls` と
+// `bubbleOptions.backdropColor` を渡し分けるだけで色違いの bubly を生やせる。
 
 // ルーティング定義
 const routes: BubbleRoute[] = [
@@ -115,6 +113,75 @@ const routes: BubbleRoute[] = [
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
   },
+
+  // 世界線 view の標準 UI は BubbleArrangementWorldLineControls 側の overlay。
+  // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
+  // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
+  // も消える挙動になる点だけ要注意。
+  {
+    pattern: /^world-lines$/,
+    type: "world-lines",
+    Component: WorldLinesBubble,
+  },
+
+  // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
+  // url: "universe" だけなら未訪問、"universe@<node>" でその node に居る。
+  // 初期 seed は UniverseBubble のフォールバック ("users") が当たる。
+  makeSnapshotRoute({
+    base: "universe",
+    type: "universe",
+    Component: BublyUniverseBubble,
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 420, height: 320 } },
+  }),
+
+  // ===== bubly = 1 universe バブル = 独立した世界線を持つ「アプリ境界」 =====
+  // それぞれのサイドバー項目から開く想定。複数同時に開けば、それぞれ独立した
+  // 世界線とアドレス（root の bubble.url が <bubly>@<nestNode>）を持つ。
+  // root のブラウザ url (/<bubly>@<rootNode>) はその外側で 1 段大きく追従する。
+  makeBublyRoute({
+    base: "users-bubly",
+    type: "users-bubly",
+    Component: BublyUniverseBubble,
+    initialBubbleUrls: ["users"],
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(190, 50%, 22%)",
+    },
+  }),
+  makeBublyRoute({
+    base: "groups-bubly",
+    type: "groups-bubly",
+    Component: BublyUniverseBubble,
+    initialBubbleUrls: ["user-groups"],
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(270, 45%, 26%)",
+    },
+  }),
+  makeBublyRoute({
+    base: "memo-bubly",
+    type: "memo-bubly",
+    Component: BublyUniverseBubble,
+    initialBubbleUrls: ["memos"],
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(40, 55%, 26%)",
+    },
+  }),
+  makeBublyRoute({
+    base: "task-bubly",
+    type: "task-bubly",
+    Component: BublyUniverseBubble,
+    initialBubbleUrls: ["task-management/tasks"],
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: { width: 480, height: 360 },
+      backdropColor: "hsl(140, 45%, 22%)",
+    },
+  }),
 
   // Users（users-libsから）
   ...usersBubbleRoutes,
