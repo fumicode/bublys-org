@@ -5,8 +5,8 @@
   "type": "module",
 
   "scripts": {
-    "build": "tsc -p tsconfig.lib.json",
-    "dev": "tsc -p tsconfig.lib.json --watch"
+    "build": "tsc -b tsconfig.lib.json",
+    "dev": "tsc -b tsconfig.lib.json --watch"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
