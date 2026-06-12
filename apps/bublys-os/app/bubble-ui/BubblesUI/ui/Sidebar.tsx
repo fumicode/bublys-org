@@ -59,7 +59,7 @@ const staticMenuItems: MenuItem[] = [
     icon: <PersonIcon color="action" />,
   },
   {
-    label: "universe（素）",
+    label: "ユニバース",
     url: "universe",
     icon: <PublicIcon sx={{ color: "#7e9bd4" }} />,
   },
