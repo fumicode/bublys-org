@@ -20,7 +20,7 @@ const HotelShiftPuzzleBubly: Bubly = {
   version: "0.0.1",
   label: "Hotel Shift Puzzle",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
-  initialBubbleUrls: ["hotel-shift-puzzle/schedule"],
+  initialBubbleUrls: ["hotel-shift-puzzle/schedules"],
   backdropColor: "hsl(20, 40%, 22%)",
 
   menuItems: [
@@ -36,7 +36,7 @@ const HotelShiftPuzzleBubly: Bubly = {
     },
     {
       label: "勤務表",
-      url: "hotel-shift-puzzle/schedule",
+      url: "hotel-shift-puzzle/schedules",
       icon: React.createElement(CalendarMonthIcon, { color: "action" }),
     },
   ],

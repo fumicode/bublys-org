@@ -6,4 +6,5 @@
 export * from "./StaffListView.js";
 export * from "./StaffDetailView.js";
 export * from "./WorkShiftListView.js";
+export * from "./ScheduleListView.js";
 export * from "./ScheduleGridView.js";

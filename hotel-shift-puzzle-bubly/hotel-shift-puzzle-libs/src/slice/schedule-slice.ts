@@ -35,15 +35,29 @@ export const scheduleSlice = createSlice({
     setCurrentScheduleId: (state, action: PayloadAction<string | null>) => {
       state.currentScheduleId = action.payload;
     },
+    /** 勤務表（集約）を新規追加する。リポジトリの add 相当 */
+    addSchedule: (state, action: PayloadAction<MonthlyStaffSchedulePlain>) => {
+      state.scheduleList.push(action.payload);
+    },
     /** 勤務表（集約）を丸ごと保存する（ID で置換）。リポジトリの save 相当 */
     updateSchedule: (state, action: PayloadAction<MonthlyStaffSchedulePlain>) => {
       const index = state.scheduleList.findIndex((s) => s.id === action.payload.id);
       if (index >= 0) state.scheduleList[index] = action.payload;
     },
+    /** 勤務表（集約）を削除する。リポジトリの remove 相当 */
+    removeSchedule: (state, action: PayloadAction<string>) => {
+      state.scheduleList = state.scheduleList.filter((s) => s.id !== action.payload);
+    },
   },
 });
 
-export const { setScheduleList, setCurrentScheduleId, updateSchedule } = scheduleSlice.actions;
+export const {
+  setScheduleList,
+  setCurrentScheduleId,
+  addSchedule,
+  updateSchedule,
+  removeSchedule,
+} = scheduleSlice.actions;
 
 declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof scheduleSlice> {}

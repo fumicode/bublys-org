@@ -22,14 +22,14 @@ BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 const menuItems: BublyMenuItem[] = [
   { label: 'スタッフ一覧', url: 'hotel-shift-puzzle/staffs', icon: <PeopleIcon /> },
   { label: '勤務帯', url: 'hotel-shift-puzzle/work-shifts', icon: <ScheduleIcon /> },
-  { label: '勤務表', url: 'hotel-shift-puzzle/schedule', icon: <CalendarMonthIcon /> },
+  { label: '勤務表', url: 'hotel-shift-puzzle/schedules', icon: <CalendarMonthIcon /> },
 ];
 
 export function App() {
   return (
     <BublyStoreProvider
       persistKey="hotel-shift-puzzle-standalone"
-      initialBubbleUrls={['hotel-shift-puzzle/schedule']}
+      initialBubbleUrls={['hotel-shift-puzzle/schedules']}
       enableWorldLine
       domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
       urlBinding={makeSnapshotCodec('universe')}

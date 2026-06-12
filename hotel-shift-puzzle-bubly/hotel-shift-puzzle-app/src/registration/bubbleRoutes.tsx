@@ -5,6 +5,7 @@ import {
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
+  ScheduleCollection,
   ScheduleGrid,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
@@ -23,7 +24,12 @@ const WorkShiftListBubble: BubbleRoute["Component"] = () => {
   return <WorkShiftCollection />;
 };
 
-// --- 月間スタッフ勤務表バブル ---
+// --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
+const ScheduleListBubble: BubbleRoute["Component"] = () => {
+  return <ScheduleCollection />;
+};
+
+// --- 月間スタッフ勤務表バブル（グリッド） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return <ScheduleGrid scheduleId={bubble.params.scheduleId} />;
 };
@@ -34,5 +40,5 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
-  { pattern: "hotel-shift-puzzle/schedule", type: "schedule", Component: ScheduleBubble },
+  { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
 ];
