@@ -1,9 +1,8 @@
 'use client';
 
 import { FC, useEffect, useMemo, useContext } from "react";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { useAppDispatch } from "@bublys-org/state-management";
 import {
-  selectSelectedTaskId,
   setTaskList,
   setSelectedTaskId,
 } from "../slice/index.js";
@@ -145,7 +144,6 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, shiftPlan
       ? `shift-puzzle/tasks/${taskId}?shiftPlanId=${shiftPlanId}`
       : `shift-puzzle/tasks/${taskId}`;
   const dispatch = useAppDispatch();
-  const selectedTaskId = useAppSelector(selectSelectedTaskId);
   const { openBubble } = useContext(BubblesContext);
 
   const shifts = useMemo(() => createDefaultShifts(), []);
@@ -185,10 +183,6 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, shiftPlan
     (v) => v !== undefined && (Array.isArray(v) ? v.length > 0 : true),
   );
   const filterDescription = hasFilter ? describeTaskFilter(filter) : null;
-
-  const handleTaskClick = (taskId: string) => {
-    dispatch(setSelectedTaskId(taskId));
-  };
 
   const handleOpenFilter = () => {
     const query = stringifyTaskFilter(filter);
@@ -248,9 +242,7 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ filter = {}, shiftPlan
 
       <TaskListView
         tasks={groupedTasks}
-        selectedTaskId={selectedTaskId}
         buildDetailUrl={buildDetailUrl}
-        onTaskClick={handleTaskClick}
         onTaskDragStart={(taskId) => dispatch(setSelectedTaskId(taskId))}
         activeDayType={activeDayType}
       />

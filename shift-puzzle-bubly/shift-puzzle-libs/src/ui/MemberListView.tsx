@@ -17,18 +17,14 @@ export let draggingMemberId: string | null = null;
 
 type MemberListViewProps = {
   memberList: Member[];
-  selectedMemberId?: string | null;
   buildDetailUrl: (memberId: string) => string;
-  onMemberClick?: (memberId: string) => void;
   /** フィルターで絞り込まれた局（表示用） */
   filteredDepartment?: string;
 };
 
 export const MemberListView: FC<MemberListViewProps> = ({
   memberList,
-  selectedMemberId,
   buildDetailUrl,
-  onMemberClick,
   filteredDepartment,
 }) => {
   return (
@@ -41,21 +37,20 @@ export const MemberListView: FC<MemberListViewProps> = ({
           return (
             <li
               key={member.id}
-              draggable
               onDragStart={(e) => {
                 draggingMemberId = member.id;
                 e.dataTransfer.effectAllowed = 'copy';
                 e.dataTransfer.setData(DRAG_TYPE_MEMBER_INDIVIDUAL, member.id);
               }}
               onDragEnd={() => { draggingMemberId = null; }}
-              onClick={() => onMemberClick?.(member.id)}
-              className={`e-item ${selectedMemberId === member.id ? "is-selected" : ""}`}
+              className="e-item"
             >
               <ObjectView
                 type="Member"
                 url={detailUrl}
                 label={member.name}
                 draggable={true}
+                fullWidth={true}
               >
                 <div className="e-content">
                   <PersonIcon fontSize="small" className="e-avatar" />
@@ -95,16 +90,6 @@ const StyledMemberList = styled.ul`
   > .e-item {
     padding: 8px 12px;
     border-bottom: 1px solid #eee;
-    cursor: pointer;
-    transition: background-color 0.15s;
-
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &.is-selected {
-      background-color: #e3f2fd;
-    }
 
     &:last-child {
       border-bottom: none;

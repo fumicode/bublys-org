@@ -52,25 +52,23 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
   return (
     <StyledStatus>
       <header className="ts-header">
-        <div className="ts-header-main">
-          <div
-            className="ts-task-drag"
-            onDragStart={() => {
-              setDraggingTaskId(header.taskId);
-              onTaskSelect?.(header.taskId);
-            }}
-            onDragEnd={() => setDraggingTaskId(null)}
+        <div
+          className="ts-header-main"
+          onDragStart={() => {
+            setDraggingTaskId(header.taskId);
+            onTaskSelect?.(header.taskId);
+          }}
+          onDragEnd={() => setDraggingTaskId(null)}
+        >
+          <ObjectView
+            type="Task"
+            url={`shift-puzzle/tasks/${header.taskId}`}
+            label={header.taskName}
+            draggable
+            onClick={() => onTaskSelect?.(header.taskId)}
           >
-            <ObjectView
-              type="Task"
-              url={`shift-puzzle/tasks/${header.taskId}`}
-              label={header.taskName}
-              draggable
-              onClick={() => onTaskSelect?.(header.taskId)}
-            >
-              <h3 className="ts-task">{header.taskName}</h3>
-            </ObjectView>
-          </div>
+            <h3 className="ts-task">{header.taskName}</h3>
+          </ObjectView>
           <span className="ts-meta">
             {header.dayType} · {header.startTime}–{header.endTime}
           </span>
@@ -145,10 +143,6 @@ const StyledStatus = styled.div`
     align-items: baseline;
     gap: 10px;
     flex-wrap: wrap;
-  }
-  .ts-task-drag {
-    cursor: grab;
-    &:active { cursor: grabbing; }
   }
   .ts-task {
     margin: 0;

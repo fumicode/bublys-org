@@ -40,18 +40,14 @@ export type GroupedTask = {
 
 type TaskListViewProps = {
   tasks: GroupedTask[];
-  selectedTaskId?: string | null;
   buildDetailUrl: (taskId: string) => string;
-  onTaskClick?: (taskId: string) => void;
   onTaskDragStart?: (taskId: string) => void;
   activeDayType?: string;
 };
 
 export const TaskListView: FC<TaskListViewProps> = ({
   tasks,
-  selectedTaskId,
   buildDetailUrl,
-  onTaskClick,
   onTaskDragStart,
   activeDayType,
 }) => {
@@ -69,8 +65,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
           return (
             <li
               key={taskId}
-              className={`e-item ${selectedTaskId === taskId ? "is-selected" : ""}`}
-              onClick={() => onTaskClick?.(taskId)}
+              className="e-item"
               onDragStart={() => {
                 draggingTaskId = taskId;
                 onTaskDragStart?.(taskId);
@@ -92,6 +87,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
                 url={detailUrl}
                 label={taskName}
                 draggable={true}
+                fullWidth={true}
               >
                 <div className="e-task-header">
                   <AssignmentIcon fontSize="small" className="e-icon" />
@@ -124,10 +120,6 @@ const StyledTaskList = styled.ul`
 
     &:last-child {
       border-bottom: none;
-    }
-
-    &.is-selected > :first-child {
-      background-color: #fff3e0;
     }
 
     .e-task-header {
