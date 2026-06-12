@@ -39,6 +39,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
+// import { BubbleArrangementInspector } from "../../world-line/BubbleArrangementInspector";
 
 const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
 
@@ -130,7 +132,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
     const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
+    const resizedBubble = b.maximizeTo({ width: availableWidth, height: availableHeight });
     const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
@@ -165,7 +167,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);
 
-    if(isNameEndWithHistory) {
+    if (isNameEndWithHistory) {
       return popChildMax(newBubble, openerBubbleId);
     }
 
@@ -217,12 +219,26 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
+      {/* 現在の view 状態の JSON を左下に表示（開発用） */}
+      {/* <BubbleArrangementInspector /> */}
+
       {/* Left Sidebar */}
       <Sidebar onItemClick={handleSidebarItemClick} />
 
-      {/* Main Bubbles Area */}
-      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      {/* Main Bubbles Area — universe（root も nested も）は透明にして、
+          ここがすべての universe の「夜空」backdrop として 1 段大きく塗る。 */}
+      <Box
+        sx={{
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+          background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+        }}
+      >
         <BubblesContext.Provider value={bubblesContextValue}>
+          {/* 表示状態を world-line に同期し undo/redo + 世界線グラフ起動を提供。
+              openBubble を使うため BubblesContext.Provider の内側に配置する。 */}
+          <BubbleArrangementWorldLineControls />
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>

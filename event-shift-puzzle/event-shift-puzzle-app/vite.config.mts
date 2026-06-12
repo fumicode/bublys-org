@@ -6,7 +6,7 @@ export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/event-shift-puzzle/event-shift-puzzle-app',
   server: {
-    port: 4002,
+    port: 4005,
     host: 'localhost',
     // CORSヘッダーを追加（他のオリジンからバブリを読み込めるように）
     cors: {
@@ -16,7 +16,7 @@ export default defineConfig(() => ({
     },
   },
   preview: {
-    port: 4002,
+    port: 4005,
     host: 'localhost',
     cors: true,
   },

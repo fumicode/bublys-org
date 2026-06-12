@@ -1,1 +1,2 @@
-// UI layer - placeholder for future world line graph visualization components
+// UI layer — world line graph 可視化コンポーネント
+export { WorldLineView, type WorldLineViewProps } from "./WorldLineView.js";

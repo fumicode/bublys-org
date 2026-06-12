@@ -1,5 +1,6 @@
 export * from './lib/BubblesProcess.domain.js';
 export * from './lib/BubblesProcessDPO.js';
+export * from './lib/BubbleArrangement.domain.js';
 
 // 2D Geometry (bubbles-ui-utilから再エクスポート)
 export * from '@bublys-org/bubbles-ui-util';
@@ -18,6 +19,9 @@ export * from './lib/object-view/ObjectView.js';
 // Bubble Routing
 export * from './lib/bubble-routing/BubbleRouting.js';
 export * from './lib/bubble-routing/BubbleRouteRegistry.js';
+export * from './lib/bubble-routing/SnapshotCodec.js';
+export * from './lib/bubble-routing/makeSnapshotRoute.js';
+export * from './lib/bubble-routing/makeBublyRoute.js';
 
 // Bubly System
 export * from './lib/bubly/index.js';
@@ -25,6 +29,8 @@ export * from './lib/bubly/index.js';
 // Hooks
 export * from './lib/hooks/useWindowSize.js';
 export * from './lib/hooks/useMyRect.js';
+export * from './lib/hooks/useBubbleDrag.js';
+export * from './lib/hooks/useBubbleResize.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';
@@ -37,12 +43,17 @@ export * from './lib/utils/measure-viewport.js';
 
 // UI Components
 export * from './lib/ui/BubbleView.js';
+export * from './lib/ui/UniverseBubbleView.js';
 export * from './lib/ui/LinkBubbleView.js';
 export * from './lib/ui/BubbleContent.js';
 export * from './lib/ui/BubblesLayeredView.js';
+export * from './lib/ui/UniverseView.js';
 
 // Pocket
 export * from './lib/pocket/index.js';
 
 // State Management (Redux)
 export * from './lib/state/index.js';
+
+// World-line integration (per-universe BubbleArrangement ⇄ world-line-graph)
+export * from './lib/world-line/index.js';

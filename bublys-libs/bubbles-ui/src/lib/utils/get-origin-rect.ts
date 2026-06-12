@@ -1,5 +1,5 @@
 import { SmartRect, CoordinateSystem } from '@bublys-org/bubbles-ui-util';
-import { measureViewport } from './measure-viewport.js';
+import { measureViewportForElement } from './measure-viewport.js';
 
 /**
  * 複数のDOMRectをマージして、それらを包含する最小の矩形を返す
@@ -45,24 +45,32 @@ export const getElementRect = (element: HTMLElement): DOMRect => {
 };
 
 /**
- * screen 座標の DOMRect を universe 座標に変換する。
- * 変換は Viewport（measureViewport で DOM 計測）に委譲する。
+ * screen 座標の DOMRect を、origin 要素が属する universe の座標に変換する。
+ * ネストした universe では origin 要素の最寄り universe を基準にする。
  * universe 要素が無い場合は screen 座標のまま返す（後方互換）。
+ *
+ * Viewport は親 CSS scale も吸収するので、ネストの奥のレイヤーに居る universe
+ * 内の要素でも universe 単位で正しく取れる（位置・サイズとも scale ぶん補正）。
  */
-const toUniverseRect = (screenRect: DOMRect): DOMRect => {
-  const viewport = measureViewport();
-  if (!viewport) return screenRect;
+const toUniverseRect = (
+  screenRect: DOMRect,
+  originEl: HTMLElement,
+): { rect: DOMRect; viewport: ReturnType<typeof measureViewportForElement> } => {
+  const viewport = measureViewportForElement(originEl);
+  if (!viewport) return { rect: screenRect, viewport: null };
 
   const topLeft = viewport.screenToUniverse({
     x: screenRect.x,
     y: screenRect.y,
   });
-  return new DOMRect(
-    topLeft.x,
-    topLeft.y,
-    screenRect.width,
-    screenRect.height,
-  );
+  const universeSize = viewport.screenSizeToUniverse({
+    width: screenRect.width,
+    height: screenRect.height,
+  });
+  return {
+    rect: new DOMRect(topLeft.x, topLeft.y, universeSize.width, universeSize.height),
+    viewport,
+  };
 };
 
 /**
@@ -92,8 +100,12 @@ export const getOriginRect = (
   if (!originEl) return undefined;
 
   const rect_vp = getElementRect(originEl);
-  const rect_uv = toUniverseRect(rect_vp);
-  const parentSize = { width: window.innerWidth, height: window.innerHeight };
+  const { rect: rect_uv, viewport } = toUniverseRect(rect_vp, originEl);
+  // 親サイズ = SmartRect の空きスペース計算の基準。ネスト時はその universe の
+  // 可視サイズ（universe 単位）、Provider 外なら window を使う。
+  const parentSize = viewport
+    ? viewport.size
+    : { width: window.innerWidth, height: window.innerHeight };
 
   return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());
 };

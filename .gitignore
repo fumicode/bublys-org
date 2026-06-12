@@ -58,7 +58,9 @@ vite.config.*.timestamp*
 vitest.config.*.timestamp*
 
 #  TypeScript
-tsconfig.tsbuildinfo
+# tsc -b(build モード)が各 tsconfig の隣に書き出す差分ビルドキャッシュ。
+# tsconfig.lib.tsbuildinfo など名前が複数あるので glob で一括除外する。
+*.tsbuildinfo
 
 # Bubly build outputs
 dist-bubly

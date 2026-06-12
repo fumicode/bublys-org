@@ -1,9 +1,13 @@
 import PeopleIcon from '@mui/icons-material/People';
-import EventNoteIcon from '@mui/icons-material/EventNote';
 import TaskIcon from '@mui/icons-material/Task';
-import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeek';
 import GridOnIcon from '@mui/icons-material/GridOn';
-import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
+import {
+  BublyApp,
+  BublyStoreProvider,
+  BubbleRouteRegistry,
+  BUBBLE_ARRANGEMENT_DOMAIN,
+  makeSnapshotCodec,
+} from '@bublys-org/bubbles-ui';
 
 // shift-puzzle-libs のslicesをimport（自動注入される）
 import '@bublys-org/event-shift-puzzle-libs';
@@ -25,11 +29,15 @@ export function App() {
     <BublyStoreProvider
       persistKey="shift-puzzle-standalone"
       initialBubbleUrls={['shift-puzzle/shift-plans', 'shift-puzzle/tasks']}
+      enableWorldLine
+      domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
+      urlBinding={makeSnapshotCodec('universe')}
     >
       <BublyApp
         title="シフトパズル"
-        subtitle="Standalone • Port 4002"
+        subtitle="Standalone • Port 4005"
         menuItems={menuItems}
+        backdropColor="hsl(20, 40%, 22%)"
       />
     </BublyStoreProvider>
   );

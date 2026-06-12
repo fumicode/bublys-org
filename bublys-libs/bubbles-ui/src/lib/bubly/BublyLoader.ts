@@ -1,5 +1,35 @@
 import { Bubly, BublyContext, BublyManifest, BublyMenuItem } from "./BublyTypes.js";
 import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
+import { makeBublyRoute } from "../bubble-routing/makeBublyRoute.js";
+import { BublyUniverseBubble } from "./BublyUniverseBubble.js";
+
+/** `<name>-bubly` 形式に揃える。既に `-bubly` で終わっていればそのまま。 */
+const toBublyRouteBase = (name: string): string =>
+  name.endsWith("-bubly") ? name : `${name}-bubly`;
+
+/** デフォルトの universe バブル既定サイズ */
+const DEFAULT_BUBLY_WINDOW_SIZE = { width: 480, height: 360 };
+
+/**
+ * このバブリ用の `<name>-bubly` universe バブルルートを登録する。
+ * BublyContext.registerBubbleRoutes ではなく BublyLoader が直接登録するので、
+ * bubly 側の register 関数で書き忘れても OS にロードした時点で自動的に窓が出る。
+ */
+const registerBublyUniverseRoute = (bubly: Bubly): void => {
+  const base = toBublyRouteBase(bubly.name);
+  const route = makeBublyRoute({
+    base,
+    type: base,
+    Component: BublyUniverseBubble,
+    initialBubbleUrls: bubly.initialBubbleUrls ?? [],
+    bubbleOptions: {
+      fillsContainer: true,
+      defaultSize: bubly.defaultSize ?? DEFAULT_BUBLY_WINDOW_SIZE,
+      backdropColor: bubly.backdropColor,
+    },
+  });
+  BubbleRouteRegistry.registerRoutes([route]);
+};
 
 /**
  * バブリを登録するAPI
@@ -65,6 +95,9 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
     const context = createBublyContext();
     bubly.register(context);
 
+    // このバブリの `<name>-bubly` universe バブルルートを自動登録
+    registerBublyUniverseRoute(bubly);
+
     return bubly;
   } catch (error) {
     console.error("[BublyLoader] Failed to load bubly:", error);
@@ -128,9 +161,21 @@ export const getAllBublies = (): Record<string, Bubly> => {
 };
 
 /**
- * ロード済みのすべてのバブリからメニュー項目を取得
+ * ロード済みのすべてのバブリからメニュー項目を取得。
+ *
+ * 各バブリにつき:
+ *  1. `<name>-bubly` の universe バブルを開く「窓」エントリ（bubly.icon / label / name から派生）
+ *  2. レガシーの `bubly.menuItems`（任意）。inner bubble に直接行くショートカット
+ * の順で並ぶ。
  */
 export const getAllMenuItems = (): BublyMenuItem[] => {
   const bublies = getAllBublies();
-  return Object.values(bublies).flatMap((bubly) => bubly.menuItems ?? []);
+  return Object.values(bublies).flatMap((bubly) => {
+    const universeEntry: BublyMenuItem = {
+      label: bubly.label ?? bubly.name,
+      url: toBublyRouteBase(bubly.name),
+      icon: bubly.icon ?? null,
+    };
+    return [universeEntry, ...(bubly.menuItems ?? [])];
+  });
 };

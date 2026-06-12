@@ -21,6 +21,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExtensionIcon from "@mui/icons-material/Extension";
+import PublicIcon from "@mui/icons-material/Public";
 import { loadBublyFromOrigin, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
 
 type MenuItem = {
@@ -30,6 +31,7 @@ type MenuItem = {
 };
 
 // 静的メニュー項目（常に表示）
+// 各 bubly = 独立した universe バブル = 独立した世界線。複数同時に開ける。
 const staticMenuItems: MenuItem[] = [
   {
     label: "囲碁ゲーム",
@@ -38,23 +40,28 @@ const staticMenuItems: MenuItem[] = [
   },
   {
     label: "タスク管理",
-    url: "task-management/tasks",
+    url: "task-bubly",
     icon: <AssignmentIcon color="primary" />,
   },
   {
     label: "グループ",
-    url: "user-groups",
+    url: "groups-bubly",
     icon: <GroupsIcon color="action" />,
   },
   {
     label: "メモ",
-    url: "memos",
+    url: "memo-bubly",
     icon: <NoteIcon color="action" />,
   },
   {
     label: "ユーザー",
-    url: "users",
+    url: "users-bubly",
     icon: <PersonIcon color="action" />,
+  },
+  {
+    label: "ユニバース",
+    url: "universe",
+    icon: <PublicIcon sx={{ color: "#7e9bd4" }} />,
   },
   // 九星盤は動的ロードのバブリとして提供
 ];
