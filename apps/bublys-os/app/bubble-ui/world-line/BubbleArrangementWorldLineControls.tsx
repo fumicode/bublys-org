@@ -75,26 +75,18 @@ export const BubbleArrangementWorldLineControls: FC = () => {
   );
 
   // キーボード: パネルが open のときだけ window 全体で拾う。
-  //  - Cmd/Ctrl+Z, ← : moveBack（parent へ）
-  //  - Cmd/Ctrl+Shift+Z, → : moveForward（同 worldLine の子へ）
+  //  - ← : moveBack（parent へ）
+  //  - → : moveForward（同 worldLine の子へ）
   //  - ↑ / ↓ : 同じ親の兄弟を切替（分岐間移動）
+  //
+  // Cmd/Ctrl+Z はデータ変更の undo に予約されているため、世界線ビューでの
+  // ナビゲーションには使わない（矢印キーのみ）。
   useEffect(() => {
     if (!showGraph) return;
     const onKey = (e: KeyboardEvent) => {
       // テキスト入力中は無視
       const tgt = e.target as HTMLElement | null;
       if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) {
-        return;
-      }
-      const meta = e.ctrlKey || e.metaKey;
-      if (meta && !e.shiftKey && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        moveBack();
-        return;
-      }
-      if (meta && e.shiftKey && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        moveForward();
         return;
       }
       if (e.key === "ArrowLeft") {
@@ -144,14 +136,14 @@ export const BubbleArrangementWorldLineControls: FC = () => {
           boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         }}
       >
-        <Tooltip title="戻る（世界線 / Cmd+Z）" arrow>
+        <Tooltip title="戻る（世界線 / ←）" arrow>
           <span>
             <IconButton size="small" onClick={moveBack} disabled={!canUndo}>
               <UndoIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>
-        <Tooltip title="進む（世界線 / Cmd+Shift+Z）" arrow>
+        <Tooltip title="進む（世界線 / →）" arrow>
           <span>
             <IconButton size="small" onClick={moveForward} disabled={!canRedo}>
               <RedoIcon fontSize="small" />
