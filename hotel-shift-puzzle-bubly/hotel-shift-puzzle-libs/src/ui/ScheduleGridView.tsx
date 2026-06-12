@@ -7,12 +7,15 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   MonthlyStaffSchedule,
+  WorkShift,
   WorkingDay,
 } from "../domain/index.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
   staffList: Staff[];
+  /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
+  workShifts: WorkShift[];
   buildStaffUrl: (staffId: string) => string;
 };
 
@@ -34,23 +37,28 @@ const DAY_COL_WIDTH = 60;
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
+  workShifts,
   buildStaffUrl,
 }) => {
   const days = schedule.workingDays();
+
+  // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
+  const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
   const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px)`;
 
   const renderCell = (staff: Staff, day: WorkingDay) => {
     const cell = schedule.statusOf(staff.id, day);
     if (cell.kind === "work") {
-      const id = cell.shift.id;
+      const id = cell.shiftId;
+      const shift = shiftMap.get(id);
       return (
         <div
           className="e-cell e-work"
           style={{ background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" }}
         >
-          <span className="e-shift-name">{cell.shift.name}</span>
-          <span className="e-shift-time">{cell.shift.startTimeLabel}</span>
+          <span className="e-shift-name">{shift?.name ?? id}</span>
+          {shift && <span className="e-shift-time">{shift.startTimeLabel}</span>}
         </div>
       );
     }

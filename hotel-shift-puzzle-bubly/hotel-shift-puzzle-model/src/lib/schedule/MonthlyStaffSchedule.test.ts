@@ -1,31 +1,29 @@
 import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
-import { WorkShift, createDefaultWorkShifts } from './WorkShift.js';
+import { createDefaultWorkShifts } from './WorkShift.js';
 import { ShiftAssignment, DAY_OFF } from './ShiftAssignment.js';
 
 describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', () => {
-  // 店舗 store-1 の 2026年6月の勤務表を、早番・中番・遅番つきで用意する
+  // この勤務表で使える勤務帯ID（WorkShift は独立集約。ここでは ID だけ参照する）
+  const workShiftIds = createDefaultWorkShifts().map((s) => s.id); // ['early','middle','late']
+
+  // 店舗 store-1 の 2026年6月の勤務表
   const createJuneSchedule = () =>
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShifts: createDefaultWorkShifts(),
+      workShiftIds,
     });
 
   const june1 = WorkingDay.of(2026, 6, 1);
 
-  test('勤務帯（早番・中番・遅番）を持つ', () => {
+  test('使える勤務帯を ID で参照する', () => {
     const schedule = createJuneSchedule();
-    expect(schedule.workShifts.map((s) => s.name)).toEqual(['早番', '中番', '遅番']);
-
-    const early = schedule.getWorkShift('early');
-    expect(early?.name).toBe('早番');
-    expect(early?.startMinute).toBe(420);
-    expect(early?.startTimeLabel).toBe('7:00');
-
-    expect(schedule.getWorkShift('late')?.startTimeLabel).toBe('13:00');
+    expect(schedule.workShiftIds).toEqual(['early', 'middle', 'late']);
+    expect(schedule.hasWorkShift('early')).toBe(true);
+    expect(schedule.hasWorkShift('unknown')).toBe(false);
   });
 
   test('6/1 に Aさん=早番、Bさん=休み、Cさん=遅番 を割り当てる', () => {
@@ -34,25 +32,21 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
       .assignDayOff('staff-B', june1)
       .assignShift('staff-C', june1, 'late');
 
-    // Aさんは早番（7:00 から）
-    const aShift = schedule.getWorkShiftFor('staff-A', june1);
-    expect(aShift).toBeInstanceOf(WorkShift);
-    expect(aShift?.name).toBe('早番');
-    expect(aShift?.startTimeLabel).toBe('7:00');
+    // Aさんは早番（勤務帯ID で参照）
+    expect(schedule.getShiftIdFor('staff-A', june1)).toBe('early');
     expect(schedule.isWorking('staff-A', june1)).toBe(true);
 
     // Bさんは休み（DAY_OFF）
     expect(schedule.isDayOff('staff-B', june1)).toBe(true);
     expect(schedule.isWorking('staff-B', june1)).toBe(false);
-    expect(schedule.getWorkShiftFor('staff-B', june1)).toBeUndefined();
+    expect(schedule.getShiftIdFor('staff-B', june1)).toBeUndefined();
     expect(schedule.getAssignment('staff-B', june1)?.shift).toBe(DAY_OFF);
 
-    // Cさんは遅番（13:00 から）
-    expect(schedule.getWorkShiftFor('staff-C', june1)?.name).toBe('遅番');
-    expect(schedule.getWorkShiftFor('staff-C', june1)?.startTimeLabel).toBe('13:00');
+    // Cさんは遅番
+    expect(schedule.getShiftIdFor('staff-C', june1)).toBe('late');
   });
 
-  test('statusOf でセルの状態（出勤／休み／未定）を判別できる', () => {
+  test('statusOf でセルの状態（出勤[勤務帯ID]／休み／未定）を判別できる', () => {
     const schedule = createJuneSchedule()
       .assignShift('staff-A', june1, 'early')
       .assignDayOff('staff-B', june1)
@@ -60,7 +54,7 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
 
     const a = schedule.statusOf('staff-A', june1);
     expect(a.kind).toBe('work');
-    expect(a.kind === 'work' && a.shift.name).toBe('早番');
+    expect(a.kind === 'work' && a.shiftId).toBe('early');
 
     expect(schedule.statusOf('staff-B', june1)).toEqual({ kind: 'day-off' });
     expect(schedule.statusOf('staff-C', june1)).toEqual({ kind: 'undecided' });
@@ -95,7 +89,7 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
       .assignShift('staff-A', june1, 'early')
       .assignShift('staff-A', june1, 'late');
 
-    expect(schedule.getWorkShiftFor('staff-A', june1)?.name).toBe('遅番');
+    expect(schedule.getShiftIdFor('staff-A', june1)).toBe('late');
     // 割当は1件のまま（重複しない）
     expect(schedule.assignmentsForStaff('staff-A')).toHaveLength(1);
   });
@@ -152,11 +146,11 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(days[29].label).toBe('6/30');
   });
 
-  test('state は plain ではなくインスタンスを保持する', () => {
+  test('state は割当をインスタンスで保持する（勤務帯は ID 参照）', () => {
     const schedule = createJuneSchedule().assignShift('staff-A', june1, 'early');
 
-    // 勤務帯はインスタンス
-    expect(schedule.state.workShifts[0]).toBeInstanceOf(WorkShift);
+    // 勤務帯は ID 参照（文字列）
+    expect(schedule.state.workShiftIds).toEqual(['early', 'middle', 'late']);
     // 割当はインスタンスで、入れ子の稼働日も WorkingDay インスタンス
     const assignment = schedule.state.assignments[0];
     expect(assignment).toBeInstanceOf(ShiftAssignment);
@@ -171,15 +165,15 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
 
     const plain = original.toPlain();
 
-    // plain は入れ子まで素のオブジェクト（インスタンスでない）
-    expect(plain.workShifts[0]).not.toBeInstanceOf(WorkShift);
+    // plain は入れ子まで素のオブジェクト（勤務帯は ID、割当の稼働日も plain）
+    expect(plain.workShiftIds).toEqual(['early', 'middle', 'late']);
     expect(plain.assignments[0].day).toEqual({ year: 2026, month: 6, day: 1 });
     // JSON シリアライズ可能であること
     expect(() => JSON.stringify(plain)).not.toThrow();
 
     // 往復後も内容が保たれる
     const restored = MonthlyStaffSchedule.fromPlain(plain);
-    expect(restored.getWorkShiftFor('staff-A', june1)?.name).toBe('早番');
+    expect(restored.getShiftIdFor('staff-A', june1)).toBe('early');
     expect(restored.isDayOff('staff-B', june1)).toBe(true);
     expect(restored.isUndecided('staff-C', june1)).toBe(true);
     expect(restored.state.assignments[0]).toBeInstanceOf(ShiftAssignment);

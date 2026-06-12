@@ -6,11 +6,14 @@ import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
   selectStaffList,
   setStaffList,
+  selectWorkShiftList,
+  setWorkShiftList,
   selectScheduleList,
   setScheduleList,
 } from "../slice/index.js";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
+import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
 import { buildStaffDetailUrl } from "./StaffCollection.js";
 
@@ -21,6 +24,7 @@ type ScheduleGridProps = {
 export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId }) => {
   const dispatch = useAppDispatch();
   const staffList = useAppSelector(selectStaffList);
+  const workShifts = useAppSelector(selectWorkShiftList);
   const scheduleList = useAppSelector(selectScheduleList);
 
   // 初期データのロード（空ならサンプルを投入）
@@ -29,6 +33,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId }) => {
       dispatch(setStaffList(createSampleStaffList().map((s) => s.state)));
     }
   }, [dispatch, staffList.length]);
+
+  useEffect(() => {
+    if (workShifts.length === 0) {
+      dispatch(setWorkShiftList(createSampleWorkShifts().map((w) => w.state)));
+    }
+  }, [dispatch, workShifts.length]);
 
   useEffect(() => {
     if (scheduleList.length === 0) {
@@ -54,6 +64,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId }) => {
       <ScheduleGridView
         schedule={schedule}
         staffList={staffList}
+        workShifts={workShifts}
         buildStaffUrl={buildStaffDetailUrl}
       />
     </StyledContainer>

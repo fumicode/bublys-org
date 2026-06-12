@@ -5,17 +5,19 @@
  * 例: 6/1 に Aさん=早番、Bさん=休み、Cさん=遅番。
  *
  * 各セル（スタッフ×稼働日）は次のいずれか:
- *   - 出勤   : いずれかの勤務帯（WorkShift）
+ *   - 出勤   : いずれかの勤務帯（勤務帯ID で参照）
  *   - 休み   : DAY_OFF
  *   - 未定   : null（割当レコードが無い場合も未定として扱う）
  *
- * state は勤務帯・割当をインスタンス（WorkShift / ShiftAssignment）として保持する。
+ * 勤務帯（WorkShift）は独立した集約であり、この勤務表は勤務帯を ID で参照する。
+ * 勤務帯ID → WorkShift の解決は上位層（WorkShift 集約のストア）で行う。
+ *
+ * state は割当をインスタンス（ShiftAssignment）として保持する。
  * シリアライズ用に、入れ子まで全部 plain な MonthlyStaffSchedulePlain を別途定義し、
  * toPlain() / fromPlain() で橋渡しする。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { WorkingDay } from "./WorkingDay.js";
-import { WorkShift, type WorkShiftState } from "./WorkShift.js";
 import {
   ShiftAssignment,
   type ShiftAssignmentPlain,
@@ -23,7 +25,7 @@ import {
   DAY_OFF,
 } from "./ShiftAssignment.js";
 
-/** state：勤務帯・割当はインスタンスで保持する */
+/** state：割当はインスタンスで保持する */
 export type MonthlyStaffScheduleState = {
   id: string;
   /** 店舗ID */
@@ -32,8 +34,8 @@ export type MonthlyStaffScheduleState = {
   year: number;
   /** 対象月 1-12 */
   month: number;
-  /** この勤務表で使える勤務帯（早番・中番・遅番など） */
-  workShifts: WorkShift[];
+  /** この勤務表で使える勤務帯のID（早番・中番・遅番など）。WorkShift は独立集約 */
+  workShiftIds: string[];
   /** スタッフ×稼働日 の勤務割当 */
   assignments: ShiftAssignment[];
 };
@@ -44,13 +46,13 @@ export type MonthlyStaffSchedulePlain = {
   storeId: string;
   year: number;
   month: number;
-  workShifts: WorkShiftState[];
+  workShiftIds: string[];
   assignments: ShiftAssignmentPlain[];
 };
 
-/** セルの状態（出勤／休み／未定） */
+/** セルの状態（出勤／休み／未定）。出勤は勤務帯ID で表す */
 export type ShiftCell =
-  | { kind: "work"; shift: WorkShift }
+  | { kind: "work"; shiftId: string }
   | { kind: "day-off" }
   | { kind: "undecided" };
 
@@ -63,14 +65,14 @@ export class MonthlyStaffSchedule {
     storeId: string;
     year: number;
     month: number;
-    workShifts: WorkShift[];
+    workShiftIds: string[];
   }): MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
       id: params.id,
       storeId: params.storeId,
       year: params.year,
       month: params.month,
-      workShifts: params.workShifts,
+      workShiftIds: params.workShiftIds,
       assignments: [],
     });
   }
@@ -92,14 +94,15 @@ export class MonthlyStaffSchedule {
     return this.state.month;
   }
 
-  // ========== 勤務帯 ==========
+  // ========== 勤務帯（ID 参照） ==========
 
-  get workShifts(): WorkShift[] {
-    return this.state.workShifts;
+  /** この勤務表で使える勤務帯のID一覧 */
+  get workShiftIds(): string[] {
+    return this.state.workShiftIds;
   }
 
-  getWorkShift(shiftId: string): WorkShift | undefined {
-    return this.state.workShifts.find((w) => w.id === shiftId);
+  hasWorkShift(shiftId: string): boolean {
+    return this.state.workShiftIds.includes(shiftId);
   }
 
   // ========== 稼働日 ==========
@@ -126,7 +129,7 @@ export class MonthlyStaffSchedule {
 
   /** 勤務帯を割り当てる（既存割当は上書き）。不変。 */
   assignShift(staffId: string, day: WorkingDay, shiftId: string): MonthlyStaffSchedule {
-    if (!this.state.workShifts.some((w) => w.id === shiftId)) {
+    if (!this.hasWorkShift(shiftId)) {
       throw new Error(`未知の勤務帯です: ${shiftId}`);
     }
     return this.withAssignment(staffId, day, shiftId);
@@ -170,24 +173,27 @@ export class MonthlyStaffSchedule {
   /**
    * そのセルの状態を返す。
    * 割当レコードが無い場合・null の場合はどちらも "undecided"（未定）。
+   * 出勤の場合は勤務帯ID を返す（WorkShift の解決は上位層で行う）。
    */
   statusOf(staffId: string, day: WorkingDay): ShiftCell {
-    const shift = this.getWorkShiftFor(staffId, day);
-    if (shift) return { kind: "work", shift };
-    if (this.isDayOff(staffId, day)) return { kind: "day-off" };
+    const assignment = this.getAssignment(staffId, day);
+    if (assignment?.isWorking) {
+      return { kind: "work", shiftId: assignment.shiftId as string };
+    }
+    if (assignment?.isDayOff) {
+      return { kind: "day-off" };
+    }
     return { kind: "undecided" };
   }
 
-  /** 出勤のときの勤務帯を返す（休み・未定なら undefined） */
-  getWorkShiftFor(staffId: string, day: WorkingDay): WorkShift | undefined {
-    const assignment = this.getAssignment(staffId, day);
-    if (!assignment || !assignment.isWorking) return undefined;
-    return this.getWorkShift(assignment.shiftId as string);
+  /** 出勤のときの勤務帯ID を返す（休み・未定なら undefined） */
+  getShiftIdFor(staffId: string, day: WorkingDay): string | undefined {
+    return this.getAssignment(staffId, day)?.shiftId;
   }
 
   /** 出勤（いずれかの勤務帯）かどうか */
   isWorking(staffId: string, day: WorkingDay): boolean {
-    return this.getWorkShiftFor(staffId, day) !== undefined;
+    return this.getAssignment(staffId, day)?.isWorking === true;
   }
 
   /** 休みかどうか */
@@ -219,7 +225,7 @@ export class MonthlyStaffSchedule {
       storeId: this.state.storeId,
       year: this.state.year,
       month: this.state.month,
-      workShifts: this.state.workShifts.map((w) => w.state),
+      workShiftIds: [...this.state.workShiftIds],
       assignments: this.state.assignments.map((a) => a.toPlain()),
     };
   }
@@ -230,7 +236,7 @@ export class MonthlyStaffSchedule {
       storeId: plain.storeId,
       year: plain.year,
       month: plain.month,
-      workShifts: plain.workShifts.map((w) => new WorkShift(w)),
+      workShiftIds: [...plain.workShiftIds],
       assignments: plain.assignments.map((a) => ShiftAssignment.fromPlain(a)),
     });
   }
