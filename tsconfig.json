@@ -89,6 +89,15 @@
     },
     {
       "path": "./shift-puzzle-bubly/shift-puzzle-app"
+    },
+    {
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-model"
+    },
+    {
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-libs"
+    },
+    {
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-app"
     }
   ]
 }
