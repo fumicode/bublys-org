@@ -5,3 +5,4 @@
  */
 export * from "./StaffListView.js";
 export * from "./StaffDetailView.js";
+export * from "./ScheduleGridView.js";
