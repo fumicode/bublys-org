@@ -82,13 +82,13 @@
       "path": "./sekaisen-igo-bubly/sekaisen-igo-app"
     },
     {
-      "path": "./shift-puzzle-bubly/shift-puzzle-model"
+      "path": "./event-shift-puzzle/event-shift-puzzle-model"
     },
     {
-      "path": "./shift-puzzle-bubly/shift-puzzle-libs"
+      "path": "./event-shift-puzzle/event-shift-puzzle-libs"
     },
     {
-      "path": "./shift-puzzle-bubly/shift-puzzle-app"
+      "path": "./event-shift-puzzle/event-shift-puzzle-app"
     }
   ]
 }

@@ -104,6 +104,6 @@
     "ekikyo-bubly/ekikyo-app",
     "tailor-genie/*",
     "sekaisen-igo-bubly/*",
-    "shift-puzzle-bubly/*"
+    "event-shift-puzzle/*"
   ]
 }

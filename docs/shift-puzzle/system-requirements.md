@@ -1,4 +1,4 @@
-# shift-puzzle-bubly システム要件定義書
+# event-shift-puzzle システム要件定義書
 
 **バージョン**: 1.0.0
 **作成日**: 2026-02-26
@@ -463,7 +463,7 @@ events/:id/shift-plans/:planId        （ガントチャートにドロップ）
 既存の3層DDD構造に従ったディレクトリ構成。
 
 ```
-shift-puzzle-model/                ← ドメイン層（純粋TypeScript、React/Redux不使用）
+event-shift-puzzle-model/                ← ドメイン層（純粋TypeScript、React/Redux不使用）
   member/
     Member.ts                      ← Staff_スタッフを汎用化
     MemberFilter.ts
@@ -484,7 +484,7 @@ shift-puzzle-model/                ← ドメイン層（純粋TypeScript、Reac
     Event.ts                       ← 新規
     SkillDefinition.ts             ← 新規（カスタムスキル）
 
-shift-puzzle-libs/                 ← UI + Feature層
+event-shift-puzzle-libs/                 ← UI + Feature層
   ui/
     GanttChart/                    ← fuzzy-session参考の新規実装
       GanttChartView.tsx           ← メインガントチャートコンテナ
@@ -507,7 +507,7 @@ shift-puzzle-libs/                 ← UI + Feature層
   slice/
     shift-puzzle-slice.ts          ← イベント・メンバー・シフト案を統合
 
-shift-puzzle-app/                  ← Bubly定義
+event-shift-puzzle-app/                  ← Bubly定義
   bubly.ts
   registration/bubbleRoutes.tsx
 ```
@@ -553,7 +553,7 @@ class Assignment {
 
 ### 8.1 機能差分
 
-| 項目 | gakkai-shift-bubly | shift-puzzle-bubly | 変更理由 |
+| 項目 | gakkai-shift-bubly | event-shift-puzzle | 変更理由 |
 |------|-------------------|--------------------|---------|
 | イベント概念 | なし（単一学会固定） | `Event`で複数イベント管理 | 大学祭・飲食等の汎用化 |
 | スキル定義 | ハードコード（pc/zoom/english） | `SkillDefinition`で動的定義 | 用途によりスキルが異なる |
