@@ -1,2 +1,6 @@
-export * from "./sampleData.js";
-export * from "./sampleMember.js";
+/**
+ * サンプルデータ
+ *
+ * 例: export * from './sampleStaff.js';
+ */
+export {};

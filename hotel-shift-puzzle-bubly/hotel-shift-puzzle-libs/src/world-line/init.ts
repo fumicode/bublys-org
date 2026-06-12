@@ -1,13 +1,12 @@
 /**
  * world-line 機能の初期化（副作用）
  *
- * 本ファイルを import するだけで以下が行われる:
- * - worldLineGraphSlice + worldLineGraph 標準 listener の注入
- * - shift-plan mutation を記録する独自 listener の注入
+ * 本ファイルを import するだけで worldLineGraphSlice +
+ * worldLineGraph 標準 listener が store に注入される。
+ *
+ * ドメイン固有の mutation を世界線に記録したい場合は、
+ * 専用 listener を作成して injectMiddleware(...) を追記する。
  */
-import { injectMiddleware } from "@bublys-org/state-management";
 import { initWorldLineGraph } from "@bublys-org/world-line-graph";
-import { shiftPlanWorldLineListener } from "./shiftPlanWorldLineListener.js";
 
 initWorldLineGraph();
-injectMiddleware(shiftPlanWorldLineListener.middleware);

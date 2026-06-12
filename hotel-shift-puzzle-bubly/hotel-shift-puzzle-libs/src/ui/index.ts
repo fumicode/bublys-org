@@ -1,12 +1,7 @@
-export * from "./MemberListView.js";
-export * from "./MemberDetailView.js";
-export * from "./MemberAvailabilityView.js";
-export * from "./AssignedMembersView.js";
-export * from "./CoverageTetrisView.js";
-export * from "./TaskAssignmentStatusView.js";
-export * from "./UnifiedShiftStatusView.js";
-export * from "./ShiftPlanListView.js";
-export * from "./PrimitiveGanttView.js";
-export * from "./TaskGanttView.js";
-export * from "./TaskListView.js";
-export * from "./TaskDetailView.js";
+/**
+ * UI 層（プレゼンテーショナルコンポーネント）
+ *
+ * Redux を直接使わず props で受け取る純粋な表示コンポーネントを置く。
+ * 例: export * from './StaffListView.js';
+ */
+export {};

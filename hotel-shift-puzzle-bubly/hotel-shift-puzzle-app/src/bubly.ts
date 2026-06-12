@@ -7,7 +7,6 @@
 
 import React from "react";
 import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
-import TaskIcon from '@mui/icons-material/Task';
 import GridOnIcon from '@mui/icons-material/GridOn';
 
 // Bubble Routes
@@ -16,26 +15,12 @@ import { hotelShiftPuzzleBubbleRoutes } from "./registration/index.js";
 const HotelShiftPuzzleBubly: Bubly = {
   name: "hotel-shift-puzzle",
   version: "0.0.1",
-  label: "シフトパズル",
+  label: "Hotel Shift Puzzle",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
-  initialBubbleUrls: [
-    "hotel-shift-puzzle/shift-plans",
-    "hotel-shift-puzzle/tasks",
-  ],
+  initialBubbleUrls: [],
   backdropColor: "hsl(20, 40%, 22%)",
 
-  menuItems: [
-    {
-      label: "タスク一覧",
-      url: "hotel-shift-puzzle/tasks",
-      icon: React.createElement(TaskIcon, { color: "action" }),
-    },
-    {
-      label: "プリミティブガント",
-      url: "hotel-shift-puzzle/shift-plans/default-primitive/primitive-gantt",
-      icon: React.createElement(GridOnIcon, { color: "action" }),
-    },
-  ],
+  menuItems: [],
 
   register(context) {
     context.registerBubbleRoutes(hotelShiftPuzzleBubbleRoutes);
