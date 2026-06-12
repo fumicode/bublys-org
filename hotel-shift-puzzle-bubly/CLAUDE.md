@@ -69,6 +69,13 @@ hotel-shift-puzzle-app/src/
   ```
 - **層の依存方向を守る**：domain ← ui ← feature。ui は Redux を直接触らない
 - スライスは `slice.injectInto(rootReducer)` を副作用で実行し、bublys-os の store に自動注入される
+- **Reduxスライスは集約のリポジトリに徹する**：スライスは集約の保存・取得のみ
+  （`setList` / `add` / `update`（IDで丸ごと置換）/ `remove(id)`）。
+  ドメインのビジネスロジックは集約オブジェクトのメソッドに生やし、reducer には書かない。
+  更新は feature 層で「集約をセレクタで取得 → 集約のメソッドで新インスタンス → `toPlain()`
+  → `update` reducer で保存」する。
+  例: `dispatch(updateSchedule(schedule.setCell(staffId, day, to).toPlain()))`
+  （`setCell` は `MonthlyStaffSchedule` のメソッド。スライスに `setCell` を書かない）
 
 ---
 
