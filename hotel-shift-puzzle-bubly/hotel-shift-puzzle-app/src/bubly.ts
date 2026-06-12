@@ -8,6 +8,7 @@
 import React from "react";
 import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import GridOnIcon from '@mui/icons-material/GridOn';
+import PeopleIcon from '@mui/icons-material/People';
 
 // Bubble Routes
 import { hotelShiftPuzzleBubbleRoutes } from "./registration/index.js";
@@ -17,10 +18,16 @@ const HotelShiftPuzzleBubly: Bubly = {
   version: "0.0.1",
   label: "Hotel Shift Puzzle",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
-  initialBubbleUrls: [],
+  initialBubbleUrls: ["hotel-shift-puzzle/staffs"],
   backdropColor: "hsl(20, 40%, 22%)",
 
-  menuItems: [],
+  menuItems: [
+    {
+      label: "スタッフ一覧",
+      url: "hotel-shift-puzzle/staffs",
+      icon: React.createElement(PeopleIcon, { color: "action" }),
+    },
+  ],
 
   register(context) {
     context.registerBubbleRoutes(hotelShiftPuzzleBubbleRoutes);

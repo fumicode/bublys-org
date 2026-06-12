@@ -1,6 +1,4 @@
 /**
  * サンプルデータ
- *
- * 例: export * from './sampleStaff.js';
  */
-export {};
+export * from "./sampleStaff.js";

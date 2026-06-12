@@ -1,3 +1,4 @@
+import PeopleIcon from '@mui/icons-material/People';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -16,13 +17,15 @@ import { hotelShiftPuzzleBubbleRoutes } from '../registration/index.js';
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
 // サイドバーのメニュー項目（ルートを追加したらここに対応エントリーを足す）
-const menuItems: BublyMenuItem[] = [];
+const menuItems: BublyMenuItem[] = [
+  { label: 'スタッフ一覧', url: 'hotel-shift-puzzle/staffs', icon: <PeopleIcon /> },
+];
 
 export function App() {
   return (
     <BublyStoreProvider
       persistKey="hotel-shift-puzzle-standalone"
-      initialBubbleUrls={[]}
+      initialBubbleUrls={['hotel-shift-puzzle/staffs']}
       enableWorldLine
       domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
       urlBinding={makeSnapshotCodec('universe')}
