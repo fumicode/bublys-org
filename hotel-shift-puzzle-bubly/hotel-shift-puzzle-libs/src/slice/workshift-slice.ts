@@ -26,10 +26,21 @@ export const workShiftSlice = createSlice({
     setWorkShiftList: (state, action: PayloadAction<WorkShiftState[]>) => {
       state.workShiftList = action.payload;
     },
+    addWorkShift: (state, action: PayloadAction<WorkShiftState>) => {
+      state.workShiftList.push(action.payload);
+    },
+    updateWorkShift: (state, action: PayloadAction<WorkShiftState>) => {
+      const index = state.workShiftList.findIndex((w) => w.id === action.payload.id);
+      if (index >= 0) state.workShiftList[index] = action.payload;
+    },
+    removeWorkShift: (state, action: PayloadAction<string>) => {
+      state.workShiftList = state.workShiftList.filter((w) => w.id !== action.payload);
+    },
   },
 });
 
-export const { setWorkShiftList } = workShiftSlice.actions;
+export const { setWorkShiftList, addWorkShift, updateWorkShift, removeWorkShift } =
+  workShiftSlice.actions;
 
 declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof workShiftSlice> {}

@@ -10,6 +10,7 @@ import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import GridOnIcon from '@mui/icons-material/GridOn';
 import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 // Bubble Routes
 import { hotelShiftPuzzleBubbleRoutes } from "./registration/index.js";
@@ -27,6 +28,11 @@ const HotelShiftPuzzleBubly: Bubly = {
       label: "スタッフ一覧",
       url: "hotel-shift-puzzle/staffs",
       icon: React.createElement(PeopleIcon, { color: "action" }),
+    },
+    {
+      label: "勤務帯",
+      url: "hotel-shift-puzzle/work-shifts",
+      icon: React.createElement(ScheduleIcon, { color: "action" }),
     },
     {
       label: "勤務表",

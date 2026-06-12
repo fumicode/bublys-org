@@ -3,4 +3,5 @@
  */
 export * from "./StaffCollection.js";
 export * from "./StaffDetail.js";
+export * from "./WorkShiftCollection.js";
 export * from "./ScheduleGrid.js";
