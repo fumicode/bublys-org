@@ -1,22 +1,17 @@
 'use client';
 
 import { FC } from "react";
-import { useAppSelector } from "@bublys-org/state-management";
-import { selectStaffById, selectSelectedStaff } from "../slice/index.js";
+import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
+import { useObject } from "../objects/repository.js";
+import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
 type StaffDetailProps = {
   staffId?: string;
 };
 
 export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
-  // staffId が指定されていればそれを使い、なければ選択中のスタッフを使う
-  const selectedStaff = useAppSelector(selectSelectedStaff);
-  const specificStaff = useAppSelector(
-    staffId ? selectStaffById(staffId) : () => undefined
-  );
-
-  const staff = staffId ? specificStaff : selectedStaff;
+  const staff = useObject<Staff>(STAFF_TYPE, staffId);
 
   if (!staff) {
     return (

@@ -1,9 +1,8 @@
 /**
  * Redux スライス
  *
- * 各スライスは `slice.injectInto(rootReducer)` を副作用で実行して
- * bublys-os の store に自動注入される。
+ * ドメインオブジェクトの CRUD は per-domain スライスを手書きせず、
+ * objects/repository.ts の汎用リポジトリ（useObjects / useObject / useObjectRepo）に一本化した。
+ * 世界線CAS（worldLineGraph slice）は world-line/init.ts 経由で注入される。
  */
-export * from "./staff-slice.js";
-export * from "./workshift-slice.js";
-export * from "./schedule-slice.js";
+export {};

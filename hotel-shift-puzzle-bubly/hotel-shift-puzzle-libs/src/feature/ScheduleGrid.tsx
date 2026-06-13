@@ -1,29 +1,18 @@
 'use client';
 
-import { FC, useEffect } from "react";
+import { FC } from "react";
 import styled from "styled-components";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import {
+  Staff,
+  WorkShift,
   MonthlyStaffSchedule,
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import {
-  selectStaffList,
-  setStaffList,
-  selectWorkShiftList,
-  setWorkShiftList,
-  selectScheduleList,
-  selectScheduleById,
-  setScheduleList,
-  updateSchedule,
-} from "../slice/index.js";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import { createSampleStaffList } from "../data/sampleStaff.js";
-import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
-import { createSampleSchedule } from "../data/sampleSchedule.js";
-import { useObjectShell } from "../objects/framework.js";
-import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
+import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
+import { useSeedHotelData } from "../objects/seed.js";
+import { STAFF_TYPE, WORKSHIFT_TYPE, SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
@@ -32,81 +21,23 @@ type ScheduleGridProps = {
 };
 
 /**
- * 勤務表グリッド。世界線スコープ（useCasScope）を編集の源泉とし、
- * 集約メソッド経由で編集（shell.update(s => s.setCell(...))）して履歴を記録する。
+ * 勤務表グリッド。取得も保存も統一リポジトリ経由。
+ * セル編集は集約メソッドを呼んで save するだけで、自動的に世界線へ記録される。
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId, onOpenHistory }) => {
-  const dispatch = useAppDispatch();
-  const staffList = useAppSelector(selectStaffList);
-  const workShifts = useAppSelector(selectWorkShiftList);
-  const scheduleList = useAppSelector(selectScheduleList);
-  const initialSchedule = useAppSelector(
-    scheduleId ? selectScheduleById(scheduleId) : () => undefined
-  );
+  useSeedHotelData();
+  const staffList = useObjects<Staff>(STAFF_TYPE);
+  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
+  const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
 
-  // 初期データのロード（空ならサンプルを投入）
-  useEffect(() => {
-    if (staffList.length === 0) {
-      dispatch(setStaffList(createSampleStaffList().map((s) => s.state)));
-    }
-  }, [dispatch, staffList.length]);
-
-  useEffect(() => {
-    if (workShifts.length === 0) {
-      dispatch(setWorkShiftList(createSampleWorkShifts().map((w) => w.state)));
-    }
-  }, [dispatch, workShifts.length]);
-
-  useEffect(() => {
-    if (scheduleList.length === 0) {
-      dispatch(setScheduleList([createSampleSchedule().toPlain()]));
-    }
-  }, [dispatch, scheduleList.length]);
-
-  if (!scheduleId || !initialSchedule) {
+  if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // 初期勤務表が確定してから内部を mount（useCasScope の初期化に初期オブジェクトが必要）
-  return (
-    <ScheduleGridInner
-      scheduleId={scheduleId}
-      initialSchedule={initialSchedule}
-      staffList={staffList}
-      workShifts={workShifts}
-      onOpenHistory={onOpenHistory}
-    />
-  );
-};
-
-type InnerProps = {
-  scheduleId: string;
-  initialSchedule: MonthlyStaffSchedule;
-  staffList: ReturnType<typeof selectStaffList>;
-  workShifts: ReturnType<typeof selectWorkShiftList>;
-  onOpenHistory?: () => void;
-};
-
-const ScheduleGridInner: FC<InnerProps> = ({
-  scheduleId,
-  initialSchedule,
-  staffList,
-  workShifts,
-  onOpenHistory,
-}) => {
-  const dispatch = useAppDispatch();
-
-  // 世界線スコープに載せて編集する。slice は現在(apex)状態の射影なので onApex に1行。
-  const { object: current, update } = useObjectShell(
-    SCHEDULE_TYPE,
-    scheduleId,
-    initialSchedule,
-    (s) => dispatch(updateSchedule(s.toPlain()))
-  );
-
-  // セル編集: 集約のメソッドを呼ぶだけで世界線に記録される
+  // セル編集: 集約のメソッドを呼んで save → 自動で世界線に記録される
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    update((s) => s.setCell(staffId, day, to));
+    scheduleActions.save(schedule.setCell(staffId, day, to));
   };
 
   return (
@@ -115,7 +46,7 @@ const ScheduleGridInner: FC<InnerProps> = ({
         <h3>
           勤務表{" "}
           <span className="e-sub">
-            {current.year}年{current.month}月 / {current.storeId}
+            {schedule.year}年{schedule.month}月 / {schedule.storeId}
           </span>
         </h3>
         {onOpenHistory && (
@@ -125,7 +56,7 @@ const ScheduleGridInner: FC<InnerProps> = ({
         )}
       </div>
       <ScheduleGridView
-        schedule={current}
+        schedule={schedule}
         staffList={staffList}
         workShifts={workShifts}
         onChangeCell={handleChangeCell}

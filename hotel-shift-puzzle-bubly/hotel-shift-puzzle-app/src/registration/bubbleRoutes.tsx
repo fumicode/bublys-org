@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext } from "react";
+import { useContext, type ReactNode } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import {
   StaffCollection,
@@ -12,54 +12,46 @@ import {
   ScheduleWorldLineView,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
+// 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
+// HotelObjectsProvider（CASレジストリ）配下に置く。
+const withObjects = (node: ReactNode) => (
+  <HotelObjectsProvider>{node}</HotelObjectsProvider>
+);
+
 // --- スタッフ一覧バブル ---
-const StaffListBubble: BubbleRoute["Component"] = () => {
-  return <StaffCollection />;
-};
+const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollection />);
 
 // --- スタッフ詳細バブル ---
-const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return <StaffDetail staffId={bubble.params.staffId} />;
-};
+const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<StaffDetail staffId={bubble.params.staffId} />);
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
-const WorkShiftListBubble: BubbleRoute["Component"] = () => {
-  return <WorkShiftCollection />;
-};
+const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
-const ScheduleListBubble: BubbleRoute["Component"] = () => {
-  return <ScheduleCollection />;
-};
+const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<ScheduleCollection />);
 
 // --- 月間スタッフ勤務表バブル（グリッド + 世界線ビューへのリンク） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
-  return (
-    <HotelObjectsProvider>
-      <ScheduleGrid
-        scheduleId={scheduleId}
-        onOpenHistory={() =>
-          openBubble(
-            `hotel-shift-puzzle/schedules/${scheduleId}/history`,
-            bubble.id,
-            "bubble-side"
-          )
-        }
-      />
-    </HotelObjectsProvider>
+  return withObjects(
+    <ScheduleGrid
+      scheduleId={scheduleId}
+      onOpenHistory={() =>
+        openBubble(
+          `hotel-shift-puzzle/schedules/${scheduleId}/history`,
+          bubble.id,
+          "bubble-side"
+        )
+      }
+    />
   );
 };
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
-const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  return (
-    <HotelObjectsProvider>
-      <ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />
-    </HotelObjectsProvider>
-  );
-};
+const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [

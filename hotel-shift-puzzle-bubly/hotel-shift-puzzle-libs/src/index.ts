@@ -4,8 +4,9 @@ import "./object-type-registration.js";
 // World-line graph 初期化（副作用）
 import "./world-line/init.js";
 
-// オブジェクト記述子フレームワーク + このバブリのオブジェクト定義
+// オブジェクト記述子フレームワーク + リポジトリ + このバブリのオブジェクト定義
 export * from "./objects/framework.js";
+export * from "./objects/repository.js";
 export * from "./objects/hotelObjects.js";
 
 // Domain models (re-exported from @bublys-org/hotel-shift-puzzle-model)

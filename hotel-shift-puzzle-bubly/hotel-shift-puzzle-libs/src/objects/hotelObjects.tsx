@@ -14,6 +14,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import {
   Staff,
+  WorkShift,
   MonthlyStaffSchedule,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -25,7 +26,12 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     url: (id) => `hotel-shift-puzzle/staffs/${id}`,
-    // serialize 無し → ドラッグ/表示のみ（世界線記録の対象外）
+    // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
+  },
+  WorkShift: {
+    class: WorkShift,
+    getId: (w: WorkShift) => w.id,
+    // 表示専用ではなくリポジトリ保存用に登録（state-object 規約で plain 化）
   },
   Schedule: {
     class: MonthlyStaffSchedule,
@@ -45,4 +51,5 @@ export const HotelObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
 
 /** オブジェクト型名 */
 export const STAFF_TYPE = "Staff";
+export const WORKSHIFT_TYPE = "WorkShift";
 export const SCHEDULE_TYPE = "Schedule";

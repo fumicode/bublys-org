@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * ScheduleWorldLineView — 勤務表の世界線（canvas版）
+ * ScheduleWorldLineView — アプリ全体の世界線（canvas版）
  *
- * useCasScope で勤務表スコープの DAG を読み、WorldLinesCanvasView（canvas）で描画する。
- * ノードをクリック / 矢印キーで過去・分岐の状態に時間移動する。
+ * 全オブジェクトはアプリ全体の世界線スコープに載るため、これは「アプリの履歴」を描く。
+ * ノードをクリック / 矢印キーでその時点のアプリ状態に時間移動する。
+ * 各ノードの要約には、起点となった勤務表の割当件数を表示する。
  * （Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ）
  */
 import { FC, useEffect, useMemo } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
-import { objectScopeId } from "../objects/framework.js";
+import { APP_SCOPE_ID } from "../objects/repository.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type Props = {
@@ -19,7 +20,7 @@ type Props = {
 };
 
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
-  const scope = useCasScope(objectScopeId(SCHEDULE_TYPE, scheduleId));
+  const scope = useCasScope(APP_SCOPE_ID);
   const apexId = scope.graph.getApex()?.id ?? null;
 
   // ノードごとの要約（割当件数）
