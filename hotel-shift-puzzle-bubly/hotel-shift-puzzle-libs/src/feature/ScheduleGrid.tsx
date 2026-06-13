@@ -3,7 +3,6 @@
 import { FC, useEffect } from "react";
 import styled from "styled-components";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import {
   MonthlyStaffSchedule,
   type WorkingDay,
@@ -24,7 +23,8 @@ import { createSampleStaffList } from "../data/sampleStaff.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
 import { buildStaffDetailUrl } from "./StaffCollection.js";
-import { scheduleScopeId, SCHEDULE_OBJECT_TYPE } from "./ScheduleWorldLineProvider.js";
+import { useObjectShell } from "../objects/framework.js";
+import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
@@ -97,24 +97,17 @@ const ScheduleGridInner: FC<InnerProps> = ({
 }) => {
   const dispatch = useAppDispatch();
 
-  // 世界線スコープ。空なら初期勤務表で root ノードを作る
-  const scope = useCasScope(scheduleScopeId(scheduleId), {
-    initialObjects: [{ type: SCHEDULE_OBJECT_TYPE, object: initialSchedule }],
-  });
+  // 世界線スコープに載せて編集する。slice は現在(apex)状態の射影なので onApex に1行。
+  const { object: current, update } = useObjectShell(
+    SCHEDULE_TYPE,
+    scheduleId,
+    initialSchedule,
+    (s) => dispatch(updateSchedule(s.toPlain()))
+  );
 
-  const shell = scope.getShell<MonthlyStaffSchedule>(SCHEDULE_OBJECT_TYPE, scheduleId);
-  const current = shell?.object ?? initialSchedule;
-  const apexId = scope.graph.getApex()?.id ?? null;
-
-  // 現在のスコープ状態を一覧用リポジトリ（slice）へ射影（apex 変化時に保存）
-  useEffect(() => {
-    if (shell) dispatch(updateSchedule(shell.object.toPlain()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apexId]);
-
-  // セル編集: 集約のメソッドを shell 経由で呼び、世界線に記録する
+  // セル編集: 集約のメソッドを呼ぶだけで世界線に記録される
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    shell?.update((s) => s.setCell(staffId, day, to));
+    update((s) => s.setCell(staffId, day, to));
   };
 
   return (

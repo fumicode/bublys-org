@@ -139,6 +139,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 url={buildStaffUrl(staff.id)}
                 label={staff.name}
                 draggable={true}
+                openingPosition="bubble-side"
                 fullWidth={true}
               >
                 <div className="e-staff">

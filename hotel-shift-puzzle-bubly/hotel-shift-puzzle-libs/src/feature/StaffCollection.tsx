@@ -6,10 +6,11 @@ import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { selectStaffList, setStaffList } from "../slice/index.js";
 import { StaffListView } from "../ui/StaffListView.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
+import { objectUrl } from "../objects/framework.js";
+import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
-/** スタッフ詳細バブルの URL を組み立てる */
-export const buildStaffDetailUrl = (staffId: string) =>
-  `hotel-shift-puzzle/staffs/${staffId}`;
+/** スタッフ詳細バブルの URL を組み立てる（型に登録されたデフォルトURL） */
+export const buildStaffDetailUrl = (staffId: string) => objectUrl(STAFF_TYPE, staffId);
 
 export const StaffCollection: FC = () => {
   const dispatch = useAppDispatch();

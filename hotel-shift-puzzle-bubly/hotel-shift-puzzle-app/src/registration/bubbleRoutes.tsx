@@ -8,7 +8,7 @@ import {
   WorkShiftCollection,
   ScheduleCollection,
   ScheduleGrid,
-  ScheduleWorldLineProvider,
+  HotelObjectsProvider,
   ScheduleWorldLineView,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
@@ -37,7 +37,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
   return (
-    <ScheduleWorldLineProvider>
+    <HotelObjectsProvider>
       <ScheduleGrid
         scheduleId={scheduleId}
         onOpenHistory={() =>
@@ -48,16 +48,16 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           )
         }
       />
-    </ScheduleWorldLineProvider>
+    </HotelObjectsProvider>
   );
 };
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
-    <ScheduleWorldLineProvider>
+    <HotelObjectsProvider>
       <ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />
-    </ScheduleWorldLineProvider>
+    </HotelObjectsProvider>
   );
 };
 

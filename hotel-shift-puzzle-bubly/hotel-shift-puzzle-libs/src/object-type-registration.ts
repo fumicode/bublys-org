@@ -1,15 +1,9 @@
 /**
- * このバブリ固有のオブジェクト型をレジストリに登録する（副作用）
+ * このバブリのオブジェクト型を登録する（副作用）。
  *
- * ObjectView でダブルクリック展開・ドラッグを使うオブジェクト型をここで登録する。
+ * 型の定義は objects/hotelObjects.ts に1箇所集約。ここでは登録を実行するだけ。
  */
-import { registerObjectType, registerObjectBubble } from "@bublys-org/bubbles-ui";
-import PersonIcon from "@mui/icons-material/Person";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import React from "react";
+import { registerObjects } from "./objects/framework.js";
+import { HOTEL_OBJECTS } from "./objects/hotelObjects.js";
 
-registerObjectType('Staff', React.createElement(PersonIcon, { fontSize: 'small' }));
-registerObjectBubble('Staff', { openingPosition: 'bubble-side' });
-
-registerObjectType('Schedule', React.createElement(CalendarMonthIcon, { fontSize: 'small' }));
-registerObjectBubble('Schedule', { openingPosition: 'bubble-side' });
+registerObjects(HOTEL_OBJECTS);

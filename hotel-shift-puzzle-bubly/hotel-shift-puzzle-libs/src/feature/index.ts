@@ -6,5 +6,4 @@ export * from "./StaffDetail.js";
 export * from "./WorkShiftCollection.js";
 export * from "./ScheduleCollection.js";
 export * from "./ScheduleGrid.js";
-export * from "./ScheduleWorldLineProvider.js";
 export * from "./ScheduleWorldLineView.js";

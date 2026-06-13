@@ -26,6 +26,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
             url={buildDetailUrl(staff.id)}
             label={staff.name}
             draggable={true}
+            openingPosition="bubble-side"
           >
             <h3 className="e-name">{staff.name}</h3>
           </ObjectView>

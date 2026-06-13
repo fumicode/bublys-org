@@ -11,14 +11,15 @@ import { FC, useEffect, useMemo } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
-import { scheduleScopeId, SCHEDULE_OBJECT_TYPE } from "./ScheduleWorldLineProvider.js";
+import { objectScopeId } from "../objects/framework.js";
+import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type Props = {
   scheduleId: string;
 };
 
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
-  const scope = useCasScope(scheduleScopeId(scheduleId));
+  const scope = useCasScope(objectScopeId(SCHEDULE_TYPE, scheduleId));
   const apexId = scope.graph.getApex()?.id ?? null;
 
   // ノードごとの要約（割当件数）
@@ -27,7 +28,7 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     for (const id of Object.keys(scope.graph.state.nodes)) {
       const s = scope.getObjectAt<MonthlyStaffSchedule>(
         id,
-        SCHEDULE_OBJECT_TYPE,
+        SCHEDULE_TYPE,
         scheduleId
       );
       map.set(id, s ? `${s.assignments.length}件` : "");

@@ -15,9 +15,11 @@ import {
 import { ScheduleListView } from "../ui/ScheduleListView.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
+import { objectUrl } from "../objects/framework.js";
+import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
-/** 勤務表グリッドバブルの URL を組み立てる */
-export const buildScheduleUrl = (id: string) => `hotel-shift-puzzle/schedules/${id}`;
+/** 勤務表グリッドバブルの URL を組み立てる（型に登録されたデフォルトURL） */
+export const buildScheduleUrl = (id: string) => objectUrl(SCHEDULE_TYPE, id);
 
 /** 新しい勤務表の ID を生成する */
 const newScheduleId = (): string =>

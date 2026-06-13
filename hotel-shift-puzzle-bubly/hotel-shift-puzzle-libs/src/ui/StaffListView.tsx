@@ -28,6 +28,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
               url={buildDetailUrl(staff.id)}
               label={staff.name}
               draggable={true}
+              openingPosition="bubble-side"
               fullWidth={true}
             >
               <div className="e-content">

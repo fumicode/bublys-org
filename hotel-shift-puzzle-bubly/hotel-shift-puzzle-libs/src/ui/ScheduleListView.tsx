@@ -44,6 +44,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                 url={buildScheduleUrl(schedule.id)}
                 label={`${schedule.year}年${schedule.month}月`}
                 draggable={true}
+                openingPosition="bubble-side"
                 fullWidth={true}
               >
                 <div className="e-content">

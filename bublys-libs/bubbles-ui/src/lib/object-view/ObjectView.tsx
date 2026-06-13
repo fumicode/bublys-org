@@ -4,6 +4,7 @@ import { DragDataType, setDragPayload } from '../utils/drag-types.js';
 import { ObjectType, getDragType, getObjectBubbleConfig } from './ObjectTypeRegistry.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { CurrentBubbleContext } from '../context/CurrentBubbleContext.js';
+import type { OpeningPosition } from '../state/bubbles-slice.js';
 
 type ObjectViewProps = {
   /** オブジェクトの型 */
@@ -18,6 +19,12 @@ type ObjectViewProps = {
   onClick?: () => void;
   /** ダブルクリック時のコールバック（明示指定時はレジストリより優先） */
   onDoubleClick?: () => void;
+  /**
+   * ダブルクリックでバブルを開く際の展開位置。
+   * 展開位置は「型」ではなく「使う場所（シチュエーション）」で決まるため、
+   * 使用箇所でここに指定する。未指定時はレジストリ設定（registerObjectBubble）にフォールバック。
+   */
+  openingPosition?: OpeningPosition;
   /** ドラッグ可能にするか（デフォルト: true） */
   draggable?: boolean;
   /** 幅を100%にするか（デフォルト: false） */
@@ -40,12 +47,16 @@ export const ObjectView: FC<ObjectViewProps> = ({
   children,
   onClick,
   onDoubleClick,
+  openingPosition,
   draggable = true,
   fullWidth = false,
 }) => {
   const { openBubble } = useContext(BubblesContext);
   const currentBubbleId = useContext(CurrentBubbleContext);
   const bubbleConfig = getObjectBubbleConfig(type);
+  // 使用箇所の指定を優先し、無ければレジストリ設定にフォールバック
+  const resolvedPosition = openingPosition ?? bubbleConfig?.openingPosition;
+  const canOpenBubble = openingPosition !== undefined || bubbleConfig !== undefined;
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -65,13 +76,13 @@ export const ObjectView: FC<ObjectViewProps> = ({
   const handleDoubleClick = useCallback(() => {
     if (onDoubleClick) {
       onDoubleClick();
-    } else if (bubbleConfig) {
-      openBubble(url, currentBubbleId, bubbleConfig.openingPosition);
+    } else if (canOpenBubble) {
+      openBubble(url, currentBubbleId, resolvedPosition);
     }
-  }, [onDoubleClick, bubbleConfig, openBubble, url, currentBubbleId]);
+  }, [onDoubleClick, canOpenBubble, resolvedPosition, openBubble, url, currentBubbleId]);
 
-  const isInteractive = !!onClick || !!onDoubleClick || !!bubbleConfig;
-  const hasDoubleClickAction = !!onDoubleClick || !!bubbleConfig;
+  const isInteractive = !!onClick || !!onDoubleClick || canOpenBubble;
+  const hasDoubleClickAction = !!onDoubleClick || canOpenBubble;
 
   return (
     <UrledPlace url={url}>
