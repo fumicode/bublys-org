@@ -20,8 +20,7 @@ export const StaffListView: FC<StaffListViewProps> = ({ staffList }) => {
           <li key={staff.id} className="e-item">
             {/* ObjectView: ダブルクリックで詳細バブルを開く / ドラッグでポケットへ */}
             <ObjectView
-              type="Staff"
-              id={staff.id}
+              object={staff}
               label={staff.name}
               draggable={true}
               openingPosition="bubble-side"

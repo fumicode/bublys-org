@@ -38,8 +38,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
             <li key={schedule.id} className="e-item">
               {/* ObjectView: ダブルクリックで勤務表グリッドを開く / ドラッグでポケットへ */}
               <ObjectView
-                type="Schedule"
-                id={schedule.id}
+                object={schedule}
                 label={`${schedule.year}年${schedule.month}月`}
                 draggable={true}
                 openingPosition="bubble-side"

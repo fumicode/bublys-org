@@ -18,8 +18,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff }) => {
         <div className="e-title">
           {/* ObjectView: 詳細自身もダブルクリック展開 / ドラッグでポケットへ */}
           <ObjectView
-            type="Staff"
-            id={staff.id}
+            object={staff}
             label={staff.name}
             draggable={true}
             openingPosition="bubble-side"

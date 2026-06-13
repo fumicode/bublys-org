@@ -11,15 +11,19 @@
  *   - 使う場所で変わるもの（openingPosition） … ObjectView の使用箇所で指定
  */
 import React, { useEffect } from "react";
-import { registerObjectType, registerObjectUrl, getObjectUrl } from "@bublys-org/bubbles-ui";
+import {
+  registerObjectType,
+  registerObjectUrl,
+  registerObjectIdentity,
+  getObjectUrl,
+} from "@bublys-org/bubbles-ui";
 import { DomainRegistryProvider, defineDomainObjects } from "@bublys-org/domain-registry";
 import { useCasScope } from "@bublys-org/world-line-graph";
 
-/** 世界線/CAS シリアライズ設定 */
+/** 世界線/CAS シリアライズ設定（永続化）。getId は識別子なので記述子トップに置く */
 export type ObjectSerialize<T> = {
   toJSON: (obj: T) => unknown;
   fromJSON: (json: unknown) => T;
-  getId: (obj: T) => string;
 };
 
 /**
@@ -31,6 +35,8 @@ export type ObjectDescriptor<T = unknown> = {
   /** ドメインクラス（instanceof 解決・CAS class） */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   class: new (...args: any[]) => T;
+  /** オブジェクトから id を取り出す（同一性）。ObjectView へ object を渡したときの解決に使う */
+  getId: (obj: T) => string;
   /** ObjectView・メニューのアイコン */
   icon?: React.ReactNode;
   /** ダブルクリックで開くデフォルトのバブルURL（id → url）。型に固有なので事前登録する */
@@ -55,6 +61,10 @@ export function defineObjects<R extends ObjectRegistry>(registry: R): R {
 export function registerObjects(registry: ObjectRegistry): void {
   for (const [type, d] of Object.entries(registry)) {
     registerObjectType(type, d.icon);
+    registerObjectIdentity(type, {
+      class: d.class,
+      getId: (obj) => d.getId(obj),
+    });
     if (d.url) registerObjectUrl(type, d.url);
   }
 }
@@ -77,7 +87,7 @@ function toDomainRegistry(registry: ObjectRegistry) {
       icon: d.icon,
       fromJSON: d.serialize.fromJSON,
       toJSON: d.serialize.toJSON,
-      getId: d.serialize.getId,
+      getId: d.getId,
     };
   }
   return defineDomainObjects(out);

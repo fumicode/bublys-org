@@ -133,8 +133,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ */}
             <div className="e-staff-cell">
               <ObjectView
-                type="Staff"
-                id={staff.id}
+                object={staff}
                 label={staff.name}
                 draggable={true}
                 openingPosition="origin-side"

@@ -1,15 +1,27 @@
 import { FC, ReactNode, useCallback, useContext } from 'react';
 import { UrledPlace } from '../components/UrledPlace.js';
 import { DragDataType, setDragPayload } from '../utils/drag-types.js';
-import { ObjectType, getDragType, getObjectBubbleConfig, getObjectUrl } from './ObjectTypeRegistry.js';
+import {
+  ObjectType,
+  getDragType,
+  getObjectBubbleConfig,
+  getObjectUrl,
+  resolveObjectType,
+  getObjectId,
+} from './ObjectTypeRegistry.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { CurrentBubbleContext } from '../context/CurrentBubbleContext.js';
 import type { OpeningPosition } from '../state/bubbles-slice.js';
 
 type ObjectViewProps = {
-  /** オブジェクトの型 */
-  type: ObjectType;
-  /** オブジェクトのURL（例: 'users/123'）。省略時は id + 型登録のデフォルトURLから導出 */
+  /**
+   * ドメインオブジェクトそのもの。これを渡すと型・id・URL をレジストリから自動解決する
+   * （registerObjectIdentity / registerObjectUrl）。type/id/url を個別に渡す必要がなくなる。
+   */
+  object?: unknown;
+  /** オブジェクトの型（object を渡さない場合に指定） */
+  type?: ObjectType;
+  /** オブジェクトのURL（例: 'users/123'）。省略時は type+id 登録のデフォルトURLから導出 */
   url?: string;
   /** オブジェクトID。url 省略時に型のデフォルトURL（registerObjectUrl）を導出するのに使う */
   id?: string;
@@ -43,6 +55,7 @@ type ObjectViewProps = {
  *   （onDoubleClick prop が渡された場合はそちらを優先）
  */
 export const ObjectView: FC<ObjectViewProps> = ({
+  object,
   type,
   url,
   id,
@@ -56,9 +69,22 @@ export const ObjectView: FC<ObjectViewProps> = ({
 }) => {
   const { openBubble } = useContext(BubblesContext);
   const currentBubbleId = useContext(CurrentBubbleContext);
-  const bubbleConfig = getObjectBubbleConfig(type);
-  // url 明示指定を優先し、無ければ型登録のデフォルトURL（id 必須）を導出
-  const resolvedUrl = url ?? (id !== undefined ? getObjectUrl(type, id) : undefined);
+
+  // object を渡された場合は型・id をレジストリから解決（instanceof / getId）
+  const effectiveType = object !== undefined ? resolveObjectType(object) : type;
+  const effectiveId =
+    id ??
+    (object !== undefined && effectiveType !== undefined
+      ? getObjectId(effectiveType, object)
+      : undefined);
+
+  const bubbleConfig = effectiveType !== undefined ? getObjectBubbleConfig(effectiveType) : undefined;
+  // url 明示指定を優先し、無ければ型登録のデフォルトURL（type+id）を導出
+  const resolvedUrl =
+    url ??
+    (effectiveType !== undefined && effectiveId !== undefined
+      ? getObjectUrl(effectiveType, effectiveId)
+      : undefined);
   // 展開位置は使用箇所の指定を優先し、無ければレジストリ設定にフォールバック
   const resolvedPosition = openingPosition ?? bubbleConfig?.openingPosition;
   const canOpenBubble =
@@ -66,13 +92,14 @@ export const ObjectView: FC<ObjectViewProps> = ({
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
+      if (!effectiveType) return;
       setDragPayload(e, {
-        type: getDragType(type) as DragDataType,
+        type: getDragType(effectiveType) as DragDataType,
         url: resolvedUrl ?? '',
         label,
       });
     },
-    [type, resolvedUrl, label]
+    [effectiveType, resolvedUrl, label]
   );
 
   const handleClick = useCallback(() => {

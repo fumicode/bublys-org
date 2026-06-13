@@ -22,19 +22,20 @@ import { defineObjects, makeObjectsProvider } from "./framework.js";
 export const HOTEL_OBJECTS = defineObjects({
   Staff: {
     class: Staff,
+    getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     url: (id) => `hotel-shift-puzzle/staffs/${id}`,
     // serialize 無し → ドラッグ/表示のみ（世界線記録の対象外）
   },
   Schedule: {
     class: MonthlyStaffSchedule,
+    getId: (s: MonthlyStaffSchedule) => s.state.id,
     icon: React.createElement(CalendarMonthIcon, { fontSize: "small" }),
     url: (id) => `hotel-shift-puzzle/schedules/${id}`,
     // serialize 有り → 世界線記録の対象（toPlain/fromPlain をそのまま使う）
     serialize: {
       toJSON: (s: MonthlyStaffSchedule) => s.toPlain(),
       fromJSON: (j) => MonthlyStaffSchedule.fromPlain(j as MonthlyStaffSchedulePlain),
-      getId: (s: MonthlyStaffSchedule) => s.state.id,
     },
   },
 });
