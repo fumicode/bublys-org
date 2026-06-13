@@ -24,7 +24,8 @@
     "@bublys-org/hotel-shift-puzzle-model": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
-    "@bublys-org/world-line-graph": "*"
+    "@bublys-org/world-line-graph": "*",
+    "@bublys-org/domain-registry": "*"
   },
   "nx": {
     "targets": {
