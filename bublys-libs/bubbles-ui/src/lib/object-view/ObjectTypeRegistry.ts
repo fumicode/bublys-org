@@ -127,3 +127,16 @@ export const registerObjectBubble = (typeName: string, config: ObjectBubbleConfi
 export const getObjectBubbleConfig = (typeName: string): ObjectBubbleConfig | undefined => {
   return registeredBubbleConfigs.get(toKebabCase(typeName));
 };
+
+// オブジェクト型ごとの「デフォルトで開くバブルURL」ビルダー（id → url）
+// 開く対象（どのバブルか）は型に固有なので事前登録する。
+const registeredUrlBuilders = new Map<string, (id: string) => string>();
+
+export const registerObjectUrl = (typeName: string, builder: (id: string) => string): void => {
+  registeredUrlBuilders.set(toKebabCase(typeName), builder);
+};
+
+/** 型 + id から登録済みのデフォルト開きURLを導出する（未登録なら undefined） */
+export const getObjectUrl = (typeName: string, id: string): string | undefined => {
+  return registeredUrlBuilders.get(toKebabCase(typeName))?.(id);
+};

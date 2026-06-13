@@ -4,7 +4,6 @@ import { FC } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
 import { selectStaffById, selectSelectedStaff } from "../slice/index.js";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
-import { buildStaffDetailUrl } from "./StaffCollection.js";
 
 type StaffDetailProps = {
   staffId?: string;
@@ -27,5 +26,5 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
     );
   }
 
-  return <StaffDetailView staff={staff} buildDetailUrl={buildStaffDetailUrl} />;
+  return <StaffDetailView staff={staff} />;
 };

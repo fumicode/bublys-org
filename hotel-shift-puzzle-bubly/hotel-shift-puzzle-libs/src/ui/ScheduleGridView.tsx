@@ -18,7 +18,6 @@ type ScheduleGridViewProps = {
   staffList: Staff[];
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
-  buildStaffUrl: (staffId: string) => string;
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
 };
@@ -48,7 +47,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  buildStaffUrl,
   onChangeCell,
 }) => {
   const days = schedule.workingDays();
@@ -136,10 +134,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <div className="e-staff-cell">
               <ObjectView
                 type="Staff"
-                url={buildStaffUrl(staff.id)}
+                id={staff.id}
                 label={staff.name}
                 draggable={true}
-                openingPosition="bubble-side"
+                openingPosition="origin-side"
                 fullWidth={true}
               >
                 <div className="e-staff">

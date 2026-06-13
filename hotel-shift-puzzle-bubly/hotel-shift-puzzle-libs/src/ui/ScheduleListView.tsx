@@ -11,14 +11,12 @@ import { MonthlyStaffSchedule } from "../domain/index.js";
 
 type ScheduleListViewProps = {
   schedules: MonthlyStaffSchedule[];
-  buildScheduleUrl: (id: string) => string;
   onCreate: (params: { storeId: string; year: number; month: number }) => void;
   onRemove: (id: string) => void;
 };
 
 export const ScheduleListView: FC<ScheduleListViewProps> = ({
   schedules,
-  buildScheduleUrl,
   onCreate,
   onRemove,
 }) => {
@@ -41,7 +39,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
               {/* ObjectView: ダブルクリックで勤務表グリッドを開く / ドラッグでポケットへ */}
               <ObjectView
                 type="Schedule"
-                url={buildScheduleUrl(schedule.id)}
+                id={schedule.id}
                 label={`${schedule.year}年${schedule.month}月`}
                 draggable={true}
                 openingPosition="bubble-side"

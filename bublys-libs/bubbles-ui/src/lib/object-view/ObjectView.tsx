@@ -1,7 +1,7 @@
 import { FC, ReactNode, useCallback, useContext } from 'react';
 import { UrledPlace } from '../components/UrledPlace.js';
 import { DragDataType, setDragPayload } from '../utils/drag-types.js';
-import { ObjectType, getDragType, getObjectBubbleConfig } from './ObjectTypeRegistry.js';
+import { ObjectType, getDragType, getObjectBubbleConfig, getObjectUrl } from './ObjectTypeRegistry.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { CurrentBubbleContext } from '../context/CurrentBubbleContext.js';
 import type { OpeningPosition } from '../state/bubbles-slice.js';
@@ -9,8 +9,10 @@ import type { OpeningPosition } from '../state/bubbles-slice.js';
 type ObjectViewProps = {
   /** オブジェクトの型 */
   type: ObjectType;
-  /** オブジェクトのURL（例: 'users/123'） */
-  url: string;
+  /** オブジェクトのURL（例: 'users/123'）。省略時は id + 型登録のデフォルトURLから導出 */
+  url?: string;
+  /** オブジェクトID。url 省略時に型のデフォルトURL（registerObjectUrl）を導出するのに使う */
+  id?: string;
   /** ドラッグ時に表示するラベル */
   label?: string;
   /** 子要素 */
@@ -43,6 +45,7 @@ type ObjectViewProps = {
 export const ObjectView: FC<ObjectViewProps> = ({
   type,
   url,
+  id,
   label,
   children,
   onClick,
@@ -54,19 +57,22 @@ export const ObjectView: FC<ObjectViewProps> = ({
   const { openBubble } = useContext(BubblesContext);
   const currentBubbleId = useContext(CurrentBubbleContext);
   const bubbleConfig = getObjectBubbleConfig(type);
-  // 使用箇所の指定を優先し、無ければレジストリ設定にフォールバック
+  // url 明示指定を優先し、無ければ型登録のデフォルトURL（id 必須）を導出
+  const resolvedUrl = url ?? (id !== undefined ? getObjectUrl(type, id) : undefined);
+  // 展開位置は使用箇所の指定を優先し、無ければレジストリ設定にフォールバック
   const resolvedPosition = openingPosition ?? bubbleConfig?.openingPosition;
-  const canOpenBubble = openingPosition !== undefined || bubbleConfig !== undefined;
+  const canOpenBubble =
+    !!resolvedUrl && (openingPosition !== undefined || bubbleConfig !== undefined);
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       setDragPayload(e, {
         type: getDragType(type) as DragDataType,
-        url,
+        url: resolvedUrl ?? '',
         label,
       });
     },
-    [type, url, label]
+    [type, resolvedUrl, label]
   );
 
   const handleClick = useCallback(() => {
@@ -76,16 +82,16 @@ export const ObjectView: FC<ObjectViewProps> = ({
   const handleDoubleClick = useCallback(() => {
     if (onDoubleClick) {
       onDoubleClick();
-    } else if (canOpenBubble) {
-      openBubble(url, currentBubbleId, resolvedPosition);
+    } else if (canOpenBubble && resolvedUrl) {
+      openBubble(resolvedUrl, currentBubbleId, resolvedPosition);
     }
-  }, [onDoubleClick, canOpenBubble, resolvedPosition, openBubble, url, currentBubbleId]);
+  }, [onDoubleClick, canOpenBubble, resolvedUrl, resolvedPosition, openBubble, currentBubbleId]);
 
   const isInteractive = !!onClick || !!onDoubleClick || canOpenBubble;
   const hasDoubleClickAction = !!onDoubleClick || canOpenBubble;
 
   return (
-    <UrledPlace url={url}>
+    <UrledPlace url={resolvedUrl ?? ''}>
       <span
         role={isInteractive ? 'button' : undefined}
         tabIndex={isInteractive ? 0 : undefined}

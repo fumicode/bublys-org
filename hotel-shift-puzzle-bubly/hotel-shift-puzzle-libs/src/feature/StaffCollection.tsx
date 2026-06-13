@@ -6,11 +6,6 @@ import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { selectStaffList, setStaffList } from "../slice/index.js";
 import { StaffListView } from "../ui/StaffListView.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
-import { objectUrl } from "../objects/framework.js";
-import { STAFF_TYPE } from "../objects/hotelObjects.js";
-
-/** スタッフ詳細バブルの URL を組み立てる（型に登録されたデフォルトURL） */
-export const buildStaffDetailUrl = (staffId: string) => objectUrl(STAFF_TYPE, staffId);
 
 export const StaffCollection: FC = () => {
   const dispatch = useAppDispatch();
@@ -29,7 +24,7 @@ export const StaffCollection: FC = () => {
       <div className="e-header">
         <h3>スタッフ一覧 ({staffList.length}名)</h3>
       </div>
-      <StaffListView staffList={staffList} buildDetailUrl={buildStaffDetailUrl} />
+      <StaffListView staffList={staffList} />
     </StyledContainer>
   );
 };

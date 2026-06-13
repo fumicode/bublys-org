@@ -11,7 +11,7 @@
  *   - 使う場所で変わるもの（openingPosition） … ObjectView の使用箇所で指定
  */
 import React, { useEffect } from "react";
-import { registerObjectType } from "@bublys-org/bubbles-ui";
+import { registerObjectType, registerObjectUrl, getObjectUrl } from "@bublys-org/bubbles-ui";
 import { DomainRegistryProvider, defineDomainObjects } from "@bublys-org/domain-registry";
 import { useCasScope } from "@bublys-org/world-line-graph";
 
@@ -47,9 +47,6 @@ export function defineObjects<R extends ObjectRegistry>(registry: R): R {
   return registry;
 }
 
-// 型 → デフォルト開きURL ビルダー
-const urlBuilders = new Map<string, (id: string) => string>();
-
 /**
  * ObjectType（ドラッグ種別・アイコン）とデフォルト開きURLをグローバルに登録する（副作用）。
  * ObjectTypeRegistry はグローバル singleton なので Provider 不要。
@@ -58,15 +55,15 @@ const urlBuilders = new Map<string, (id: string) => string>();
 export function registerObjects(registry: ObjectRegistry): void {
   for (const [type, d] of Object.entries(registry)) {
     registerObjectType(type, d.icon);
-    if (d.url) urlBuilders.set(type, d.url);
+    if (d.url) registerObjectUrl(type, d.url);
   }
 }
 
-/** 登録済みのデフォルト開きURLを解決する */
+/** 登録済みのデフォルト開きURLを解決する（コードから url を組み立てたいとき用） */
 export function objectUrl(type: string, id: string): string {
-  const builder = urlBuilders.get(type);
-  if (!builder) throw new Error(`objectUrl: type "${type}" に url が登録されていません`);
-  return builder(id);
+  const url = getObjectUrl(type, id);
+  if (!url) throw new Error(`objectUrl: type "${type}" に url が登録されていません`);
+  return url;
 }
 
 /** serialize を持つ型（=世界線対象）だけを集めて DomainRegistry を作る */

@@ -22,7 +22,6 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
-import { buildStaffDetailUrl } from "./StaffCollection.js";
 import { useObjectShell } from "../objects/framework.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
@@ -129,7 +128,6 @@ const ScheduleGridInner: FC<InnerProps> = ({
         schedule={current}
         staffList={staffList}
         workShifts={workShifts}
-        buildStaffUrl={buildStaffDetailUrl}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>

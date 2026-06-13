@@ -8,13 +8,9 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type StaffDetailViewProps = {
   staff: Staff;
-  buildDetailUrl: (staffId: string) => string;
 };
 
-export const StaffDetailView: FC<StaffDetailViewProps> = ({
-  staff,
-  buildDetailUrl,
-}) => {
+export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff }) => {
   return (
     <StyledStaffDetail>
       <div className="e-header">
@@ -23,7 +19,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           {/* ObjectView: 詳細自身もダブルクリック展開 / ドラッグでポケットへ */}
           <ObjectView
             type="Staff"
-            url={buildDetailUrl(staff.id)}
+            id={staff.id}
             label={staff.name}
             draggable={true}
             openingPosition="bubble-side"
