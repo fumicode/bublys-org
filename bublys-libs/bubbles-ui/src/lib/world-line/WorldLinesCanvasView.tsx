@@ -383,6 +383,9 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     if (!canvas) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // 背景（universe viewport）の wheel パンへ伝播させない。
+      // これがないと canvas 上のスクロールで後ろのバブル空間も一緒に動く。
+      e.stopPropagation();
       const horizontalIntent = e.shiftKey ? e.deltaY : e.deltaX;
       const verticalIntent = e.shiftKey ? 0 : e.deltaY;
       const t = targetRef.current;
