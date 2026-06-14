@@ -56,7 +56,9 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
     Component: IgoGameWorldLinesBubble,
-    bubbleOptions: { contentBackground: "transparent" },
+    // 中身（世界線 canvas）が固有サイズを持たず窓いっぱいに広がる窓型バブル。
+    // canvas は親（窓）のサイズに追従し、最大化で全画面にもできる。
+    bubbleOptions: { fillsContainer: true, defaultSize: { width: 760, height: 460 } },
   },
   {
     pattern: /^igo-game\/[^/]+$/,
