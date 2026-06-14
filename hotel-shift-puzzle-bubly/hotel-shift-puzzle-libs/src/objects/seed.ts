@@ -48,6 +48,5 @@ export function useSeedHotelData(): void {
     }
     if (items.length > 0) scope.addObjects(items); // 1回の grow でまとめて投入
     // 初回マウント時に一度だけ
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from "react";
+import { FC, useEffect } from "react";
 import styled from "styled-components";
 import {
   Staff,
@@ -12,6 +12,7 @@ import {
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
+import { useScheduleHistory } from "./useScheduleHistory.js";
 import { STAFF_TYPE, WORKSHIFT_TYPE, SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleGridProps = {
@@ -30,14 +31,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({ scheduleId, onOpenHistory 
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
+  const history = useScheduleHistory(scheduleId ?? "");
+
+  // この勤務表のローカル世界線を現在状態で初期化（空なら最初のノード）
+  const scheduleKey = schedule?.id;
+  useEffect(() => {
+    if (schedule) history.seed(schedule);
+  }, [scheduleKey]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: 集約のメソッドを呼んで save → 自動で世界線に記録される
+  // セル編集: アプリ全体リポジトリへ保存（グリッド反映）＋ 勤務表ローカル世界線にも記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    scheduleActions.save(schedule.setCell(staffId, day, to));
+    const updated = schedule.setCell(staffId, day, to);
+    scheduleActions.save(updated);
+    history.record(updated);
   };
 
   return (

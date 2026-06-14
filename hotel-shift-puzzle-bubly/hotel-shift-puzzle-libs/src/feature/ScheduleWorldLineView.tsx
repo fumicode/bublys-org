@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * ScheduleWorldLineView — アプリ全体の世界線（canvas版）
+ * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
- * 全オブジェクトはアプリ全体の世界線スコープに載るため、これは「アプリの履歴」を描く。
- * ノードをクリック / 矢印キーでその時点のアプリ状態に時間移動する。
- * 各ノードの要約には、起点となった勤務表の割当件数を表示する。
+ * 勤務表専用のローカル世界線スコープ（schedule:${id}）を描く。
+ * ノードをクリック / 矢印キーでその時点の勤務表状態へ時間移動する（restore で
+ * アプリ全体リポジトリへ反映するので、グリッドの表示も戻る）。
+ * 各ノードの要約には勤務表の割当件数を表示する。
  * （Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ）
  */
 import { FC, useEffect, useMemo } from "react";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
-import { APP_SCOPE_ID } from "../objects/repository.js";
+import { useScheduleHistory } from "./useScheduleHistory.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type Props = {
@@ -20,48 +20,45 @@ type Props = {
 };
 
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
-  const scope = useCasScope(APP_SCOPE_ID);
+  const { scope, restore } = useScheduleHistory(scheduleId);
   const apexId = scope.graph.getApex()?.id ?? null;
 
   // ノードごとの要約（割当件数）
   const summaries = useMemo(() => {
     const map = new Map<string, string>();
     for (const id of Object.keys(scope.graph.state.nodes)) {
-      const s = scope.getObjectAt<MonthlyStaffSchedule>(
-        id,
-        SCHEDULE_TYPE,
-        scheduleId
-      );
+      const s = scope.getObjectAt<MonthlyStaffSchedule>(id, SCHEDULE_TYPE, scheduleId);
       map.set(id, s ? `${s.assignments.length}件` : "");
     }
     return map;
   }, [scope.graph, scope.getObjectAt, scheduleId]);
 
-  // 矢印キーで時間移動（← 戻る / → 進む / ↑↓ 分岐の兄弟切替）
+  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。すべて restore 経由。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const apex = scope.graph.getApex();
+      if (!apex) return;
+      let target: string | undefined;
       if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        scope.moveBack();
+        target = apex.parentId ?? undefined;
       } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        scope.moveForward();
+        target = (scope.graph.getChildrenMap()[apex.id] ?? [])[0];
       } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        const apex = scope.graph.getApex();
-        if (!apex || apex.parentId === null) return;
+        if (apex.parentId === null) return;
         const siblings = scope.graph.getChildrenMap()[apex.parentId] ?? [];
         const idx = siblings.indexOf(apex.id);
-        if (idx < 0) return;
-        const next = siblings[idx + (e.key === "ArrowUp" ? -1 : 1)];
-        if (next) {
-          e.preventDefault();
-          scope.moveTo(next);
-        }
+        if (idx >= 0) target = siblings[idx + (e.key === "ArrowUp" ? -1 : 1)];
+      } else {
+        return;
+      }
+      if (target) {
+        e.preventDefault();
+        restore(target);
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [scope]);
+  }, [scope, restore]);
 
   if (!scope.graph.state.rootNodeId) {
     return (
@@ -77,7 +74,7 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
         graph={scope.graph}
         apexNodeId={apexId}
         getNodeSummary={(id) => summaries.get(id) ?? ""}
-        onSelectNode={scope.moveTo}
+        onSelectNode={restore}
         background="rgba(15,18,28,0.9)"
       />
     </div>
