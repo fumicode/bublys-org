@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineManager } from "../world-line/integrations/IgoWorldLineManager";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
+import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
 import { useAppDispatch } from "@bublys-org/state-management";
 
 /**
@@ -48,7 +49,7 @@ const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenWorldLineView={() => {}}
       onCloseWorldLineView={handleCloseWorldLineView}
     >
-      <IgoWorldLineIntegration gameId={gameId} />
+      <IgoWorldLineCanvas gameId={gameId} />
     </IgoWorldLineManager>
   );
 };
