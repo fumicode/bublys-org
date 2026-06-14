@@ -56,9 +56,10 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
     Component: IgoGameWorldLinesBubble,
-    // 中身（世界線 canvas）が固有サイズを持たず窓いっぱいに広がる窓型バブル。
-    // canvas は親（窓）のサイズに追従し、最大化で全画面にもできる。
-    bubbleOptions: { fillsContainer: true, defaultSize: { width: 760, height: 460 } },
+    // 他のバブルと同じ通常 BubbleView で描画する（fillsContainer は使わない）。
+    // サイズは popChildViewPortBelow が明示的に与える（画面下部ストリップ）。
+    // 中身は dark な canvas なので、コンテンツ背景も合わせて暗くしておく。
+    bubbleOptions: { contentBackground: "rgba(15,18,28,0.92)" },
   },
   {
     pattern: /^igo-game\/[^/]+$/,

@@ -91,7 +91,9 @@ const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const scope = useCasScope(memoScopeId(memoId));
   const apexId = scope.graph.getApex()?.id ?? null;
   return (
-    <div style={{ width: 600, height: 320, maxWidth: "80vw", maxHeight: "70vh" }}>
+    // バブルのコンテンツ領域いっぱいに canvas を広げる（サイズはバブル側が決める）。
+    // 履歴は /history なので popChildViewPortBelow で画面下部ストリップとして開く。
+    <div style={{ width: "100%", height: "100%" }}>
       <WorldLinesCanvasView
         graph={scope.graph}
         apexNodeId={apexId}
@@ -189,7 +191,7 @@ const routes: BubbleRoute[] = [
   // Memo
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
-  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
+  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.92)" } },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
   // 学会シフト（プラグインとして動的ロード）

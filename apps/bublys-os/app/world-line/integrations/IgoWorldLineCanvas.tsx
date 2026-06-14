@@ -64,9 +64,8 @@ export function IgoWorldLineCanvas({ gameId }: { gameId: string }) {
   }, [focusedObjectId, gameId, scope]);
 
   return (
-    // 窓型バブル（fillsContainer）の中身。canvas を窓いっぱいに広げる。
-    // 親 .e-window-content は pointer-events:none なので auto に戻す。
-    <div style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}>
+    // バブルのコンテンツ領域いっぱいに canvas を広げる（サイズはバブル側が決める）。
+    <div style={{ width: '100%', height: '100%' }}>
       <WorldLinesCanvasView
         graph={scope.graph}
         apexNodeId={apexId}
