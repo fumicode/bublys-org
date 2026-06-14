@@ -16,9 +16,17 @@ import {
   Staff,
   WorkShift,
   MonthlyStaffSchedule,
+  ScheduleAvailability,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
+import { localScopeId } from "./commit.js";
+
+/** オブジェクト型名 */
+export const STAFF_TYPE = "Staff";
+export const WORKSHIFT_TYPE = "WorkShift";
+export const SCHEDULE_TYPE = "Schedule";
+export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 
 export const HOTEL_OBJECTS = defineObjects({
   Staff: {
@@ -43,15 +51,16 @@ export const HOTEL_OBJECTS = defineObjects({
       toJSON: (s: MonthlyStaffSchedule) => s.toPlain(),
       fromJSON: (j) => MonthlyStaffSchedule.fromPlain(j as MonthlyStaffSchedulePlain),
     },
-    // 勤務表は個別単位で巻き戻したいのでローカル世界線でも監視する
-    localHistory: true,
+    // 勤務表ごとのローカル世界線（自分のスコープ）
+    localScope: (s: MonthlyStaffSchedule) => localScopeId(SCHEDULE_TYPE, s.state.id),
+  },
+  ScheduleAvailability: {
+    class: ScheduleAvailability,
+    getId: (a: ScheduleAvailability) => a.id,
+    // 親 Schedule のローカル世界線に束ねる（case B）
+    localScope: (a: ScheduleAvailability) => localScopeId(SCHEDULE_TYPE, a.scheduleId),
   },
 });
 
 /** 世界線対象オブジェクトをまとめた Provider（バブリ全体で1つ） */
 export const HotelObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
-
-/** オブジェクト型名 */
-export const STAFF_TYPE = "Staff";
-export const WORKSHIFT_TYPE = "WorkShift";
-export const SCHEDULE_TYPE = "Schedule";

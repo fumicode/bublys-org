@@ -15,9 +15,15 @@ import {
   Staff,
   WorkShift,
   MonthlyStaffSchedule,
+  ScheduleAvailability,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects, APP_SCOPE_ID } from "./repository.js";
-import { STAFF_TYPE, WORKSHIFT_TYPE, SCHEDULE_TYPE } from "./hotelObjects.js";
+import {
+  STAFF_TYPE,
+  WORKSHIFT_TYPE,
+  SCHEDULE_TYPE,
+  SCHEDULE_AVAILABILITY_TYPE,
+} from "./hotelObjects.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
@@ -44,7 +50,16 @@ export function useSeedHotelData(): void {
       );
     }
     if (schedules.length === 0) {
-      items.push({ type: SCHEDULE_TYPE, object: createSampleSchedule() });
+      const schedule = createSampleSchedule();
+      items.push({ type: SCHEDULE_TYPE, object: schedule });
+      // 可能勤務帯の初期値（全スタッフが全勤務帯OK）。勤務表に紐づく別集約
+      const staffIds = createSampleStaffList().map((s) => s.id);
+      const availability = ScheduleAvailability.create(
+        schedule.id,
+        staffIds,
+        schedule.workShiftIds
+      );
+      items.push({ type: SCHEDULE_AVAILABILITY_TYPE, object: availability });
     }
     if (items.length > 0) scope.addObjects(items); // 1回の grow でまとめて投入
     // 初回マウント時に一度だけ

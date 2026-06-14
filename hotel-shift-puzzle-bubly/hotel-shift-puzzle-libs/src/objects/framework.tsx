@@ -48,11 +48,13 @@ export type ObjectDescriptor<T = unknown> = {
    */
   serialize?: ObjectSerialize<T>;
   /**
-   * このオブジェクトを個別単位（type:id）のローカル世界線でも監視するか。
-   * true にすると、save 時にアプリ全体に加えてローカル世界線にも記録され、
-   * 個別に巻き戻せる（例: Schedule）。
+   * このオブジェクトが属するローカル世界線スコープID（無ければアプリ全体のみ）。
+   * 自分のスコープを持つ集約も、親集約のスコープに相乗りするオブジェクトもここで宣言する:
+   *   - Schedule:           (s) => `Schedule:${s.id}`     … 自分のローカル世界線
+   *   - ScheduleAvailability:(a) => `Schedule:${a.scheduleId}` … 親 Schedule の世界線に束ねる（case B）
+   * save 時、アプリ全体に加えてこのスコープにも記録され、まとめて巻き戻せる。
    */
-  localHistory?: boolean;
+  localScope?: (obj: T) => string | undefined;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

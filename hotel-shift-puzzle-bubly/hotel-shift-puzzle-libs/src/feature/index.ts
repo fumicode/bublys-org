@@ -7,3 +7,4 @@ export * from "./WorkShiftCollection.js";
 export * from "./ScheduleCollection.js";
 export * from "./ScheduleGrid.js";
 export * from "./ScheduleWorldLineView.js";
+export * from "./AvailabilityEditor.js";

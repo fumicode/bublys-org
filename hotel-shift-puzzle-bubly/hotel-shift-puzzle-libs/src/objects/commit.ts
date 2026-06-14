@@ -95,18 +95,21 @@ export function readFromScope<T>(
 
 /**
  * オブジェクトを「監視している世界線すべて」へ保存する。
- * localHistory の型は、初回はローカル世界線の起点を「編集前の状態」で作ってから記録する。
+ * 記述子の localScope が示すローカル世界線にも記録する（複数オブジェクトが同じスコープに
+ * 相乗りする＝case B）。各オブジェクトがそのスコープに初登場するときは、編集前の状態を
+ * 起点として先に記録する（まとめて巻き戻したとき元に戻れる）。
  */
 export function saveObject(store: StoreLike, type: string, obj: unknown): void {
   const d = getDescriptor(type);
   if (!d) throw new Error(`save: type "${type}" が未登録です`);
-  const id = d.getId(obj);
 
-  if (d.localHistory) {
-    const localId = localScopeId(type, id);
-    if (isScopeEmpty(store, localId)) {
+  const localId = d.localScope?.(obj);
+  if (localId) {
+    const id = d.getId(obj);
+    const alreadyInScope = readFromScope(store, localId, type, id) !== undefined;
+    if (!alreadyInScope) {
       const prev = readFromScope(store, APP_SCOPE_ID, type, id);
-      if (prev !== undefined) commitToScope(store, localId, type, prev); // 起点=編集前
+      if (prev !== undefined) commitToScope(store, localId, type, prev); // この型の起点
     }
     commitToScope(store, localId, type, obj);
   }

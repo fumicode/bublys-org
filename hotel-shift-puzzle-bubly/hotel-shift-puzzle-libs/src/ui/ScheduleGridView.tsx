@@ -10,6 +10,7 @@ import {
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
+  ScheduleAvailability,
   type ShiftCell,
 } from "../domain/index.js";
 
@@ -18,6 +19,8 @@ type ScheduleGridViewProps = {
   staffList: Staff[];
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
+  /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
+  availability?: ScheduleAvailability;
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
 };
@@ -47,6 +50,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
+  availability,
   onChangeCell,
 }) => {
   const days = schedule.workingDays();
@@ -154,17 +158,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         ))}
       </div>
 
-      {/* セル編集メニュー */}
+      {/* セル編集メニュー（可能勤務帯があれば、そのスタッフが入れる勤務帯に絞る） */}
       <Menu
         anchorEl={editing?.anchor ?? null}
         open={!!editing}
         onClose={() => setEditing(null)}
       >
-        {shiftOptions.map((shift) => (
-          <MenuItem key={shift.id} onClick={() => applyChange({ kind: "work", shiftId: shift.id })}>
-            <ListItemText primary={shift.name} secondary={shift.startTimeLabel} />
-          </MenuItem>
-        ))}
+        {shiftOptions
+          .filter(
+            (shift) =>
+              !availability ||
+              !editing ||
+              availability.isAllowed(editing.staffId, shift.id)
+          )
+          .map((shift) => (
+            <MenuItem
+              key={shift.id}
+              onClick={() => applyChange({ kind: "work", shiftId: shift.id })}
+            >
+              <ListItemText primary={shift.name} secondary={shift.startTimeLabel} />
+            </MenuItem>
+          ))}
         <MenuItem onClick={() => applyChange({ kind: "day-off" })}>
           <ListItemText primary="休み" />
         </MenuItem>

@@ -10,6 +10,7 @@ import {
   ScheduleGrid,
   HotelObjectsProvider,
   ScheduleWorldLineView,
+  AvailabilityEditor,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -31,7 +32,7 @@ const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShi
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<ScheduleCollection />);
 
-// --- 月間スタッフ勤務表バブル（グリッド + 世界線ビューへのリンク） ---
+// --- 月間スタッフ勤務表バブル（グリッド + 世界線ビュー / 可能勤務帯へのリンク） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
@@ -45,6 +46,13 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
+      onOpenAvailability={() =>
+        openBubble(
+          `hotel-shift-puzzle/schedules/${scheduleId}/availability`,
+          bubble.id,
+          "bubble-side"
+        )
+      }
     />
   );
 };
@@ -53,12 +61,17 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
+// --- 可能勤務帯エディタバブル ---
+const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/history", type: "schedule-history", Component: ScheduleWorldLineBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
 ];

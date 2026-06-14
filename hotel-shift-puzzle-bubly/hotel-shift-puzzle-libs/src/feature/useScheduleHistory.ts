@@ -12,12 +12,7 @@
  */
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { useAppStore } from "@bublys-org/state-management";
-import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
-import {
-  APP_SCOPE_ID,
-  localScopeId,
-  commitToScope,
-} from "../objects/commit.js";
+import { APP_SCOPE_ID, localScopeId, commitToScope } from "../objects/commit.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 export function useScheduleHistory(scheduleId: string) {
@@ -25,14 +20,15 @@ export function useScheduleHistory(scheduleId: string) {
   const store = useAppStore();
 
   const restore = (nodeId: string) => {
-    const schedule = scope.getObjectAt<MonthlyStaffSchedule>(
-      nodeId,
-      SCHEDULE_TYPE,
-      scheduleId
-    );
     scope.moveTo(nodeId);
-    // アプリ全体スコープのみに反映（ローカルには追記しない）
-    if (schedule) commitToScope(store, APP_SCOPE_ID, SCHEDULE_TYPE, schedule);
+    // このローカル世界線に属する「全オブジェクト」（Schedule + ScheduleAvailability 等）を
+    // その時点の状態でアプリ全体スコープへ反映する（まとめて巻き戻し）。
+    for (const ref of scope.graph.getStateRefsAt(nodeId)) {
+      const obj = scope.getObjectAt<unknown>(nodeId, ref.type, ref.id);
+      if (obj !== null && obj !== undefined) {
+        commitToScope(store, APP_SCOPE_ID, ref.type, obj);
+      }
+    }
   };
 
   return { scope, restore };
