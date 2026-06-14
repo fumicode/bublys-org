@@ -8,6 +8,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import { MemoIcon } from "./world-line/Memo/ui/MemoIcon";
+import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import React from "react";
 
 // 登録済みフラグ
@@ -25,6 +26,7 @@ export const registerAppObjectTypes = (): void => {
   registerObjectType('User', React.createElement(UserIcon, { fontSize: 'small' }));
   registerObjectType('UserGroup', React.createElement(UserGroupIcon, { fontSize: 'small' }));
   registerObjectType('Memo', React.createElement(MemoIcon));
+  registerObjectType('IgoGame', React.createElement(SportsEsportsIcon, { fontSize: 'small', sx: { color: '#dcb35c' } }));
   registerObjectType('Staff', React.createElement(PersonIcon, { fontSize: 'small' }));
   registerObjectType('StaffAvailability', React.createElement(EventAvailableIcon, { fontSize: 'small' }));
   registerObjectType('ShiftAssignment', React.createElement(InsertDriveFileIcon, { fontSize: 'small' }));

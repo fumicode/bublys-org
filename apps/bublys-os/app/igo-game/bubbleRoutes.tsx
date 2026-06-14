@@ -4,6 +4,7 @@ import { useContext } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
+import { IgoGameCollection } from "./ui";
 
 /**
  * 囲碁ゲーム - メインバブル（world-line-graph 統合版）
@@ -30,9 +31,27 @@ const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
 };
 
 /**
+ * 囲碁ゲーム - 対局一覧バブル
+ */
+const IgoGamesBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  return (
+    <IgoGameCollection
+      buildDetailUrl={(gameId) => `igo-game/${gameId}`}
+      onGameClick={(_gameId, detailUrl) => openBubble(detailUrl, bubble.id)}
+    />
+  );
+};
+
+/**
  * 囲碁ゲーム機能のバブルルート定義
  */
 export const igoGameBubbleRoutes: BubbleRoute[] = [
+  {
+    pattern: /^igo-games$/,
+    type: "igo-games",
+    Component: IgoGamesBubble,
+  },
   {
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
