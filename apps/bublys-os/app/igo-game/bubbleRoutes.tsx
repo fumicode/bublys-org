@@ -1,14 +1,12 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
-import { IgoWorldLineManager } from "../world-line/integrations/IgoWorldLineManager";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
-import { useAppDispatch } from "@bublys-org/state-management";
 
 /**
- * 囲碁ゲーム - メインバブル（世界線統合版）
+ * 囲碁ゲーム - メインバブル（world-line-graph 統合版）
  */
 const IgoGameBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const gameId = bubble.url.replace("igo-game/", "");
@@ -19,39 +17,16 @@ const IgoGameBubble: BubbleRoute["Component"] = ({ bubble }) => {
   };
 
   return (
-    <IgoWorldLineManager
-      gameId={gameId}
-      isBubbleMode={false}
-      onOpenWorldLineView={handleOpenWorldLineView}
-      onCloseWorldLineView={() => {}}
-    >
-      <IgoWorldLineIntegration gameId={gameId} />
-    </IgoWorldLineManager>
+    <IgoWorldLineIntegration gameId={gameId} onOpenWorldLineView={handleOpenWorldLineView} />
   );
 };
 
 /**
- * 囲碁ゲーム - 世界線ビューバブル
+ * 囲碁ゲーム - 世界線ビューバブル（canvas）
  */
 const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const gameId = bubble.url.replace("igo-game/", "").replace("/history", "");
-  const dispatch = useAppDispatch();
-
-  const handleCloseWorldLineView = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
-  return (
-    <IgoWorldLineManager
-      gameId={gameId}
-      isBubbleMode={true}
-      onOpenWorldLineView={() => {}}
-      onCloseWorldLineView={handleCloseWorldLineView}
-    >
-      <IgoWorldLineCanvas gameId={gameId} />
-    </IgoWorldLineManager>
-  );
+  return <IgoWorldLineCanvas gameId={gameId} />;
 };
 
 /**
