@@ -21,6 +21,12 @@ export class WorkingDay {
     return new WorkingDay({ year, month, day });
   }
 
+  /** key（"2026-06-01"）から復元する */
+  static fromKey(key: string): WorkingDay {
+    const [year, month, day] = key.split("-").map((s) => Number(s));
+    return new WorkingDay({ year, month, day });
+  }
+
   get year(): number {
     return this.state.year;
   }

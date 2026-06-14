@@ -24,6 +24,8 @@ import {
   type ShiftValue,
   DAY_OFF,
 } from "./ShiftAssignment.js";
+import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import type { ConstraintViolation } from "./ConstraintViolation.js";
 
 /** state：割当はインスタンスで保持する */
 export type MonthlyStaffScheduleState = {
@@ -227,6 +229,17 @@ export class MonthlyStaffSchedule {
   /** そのスタッフの全割当 */
   assignmentsForStaff(staffId: string): ShiftAssignment[] {
     return this.state.assignments.filter((a) => a.staffId === staffId);
+  }
+
+  // ========== 制約チェック ==========
+
+  /**
+   * 与えられた制約すべてでこの勤務表をチェックし、違反箇所を返す。
+   * 純粋・不変（state は変えない）。変更のたびに呼び直して再計算する想定。
+   * 制約は勤務表に保存せず、呼び出し側（feature 層）が注入する。
+   */
+  checkConstraints(constraints: ScheduleConstraint[]): ConstraintViolation[] {
+    return constraints.flatMap((c) => c.check(this));
   }
 
   // ========== シリアライズ ==========
