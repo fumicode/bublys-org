@@ -3,33 +3,29 @@
 /**
  * オブジェクトリポジトリ（統一アクセス）
  *
- * 全ドメインオブジェクトは「アプリ全体の世界線スコープ（CAS）」1つに載る。
- * Redux に独立の per-domain スライスや射影は持たない（CAS 自体が worldLineGraph slice
- * として永続化されるため、それを直接読む）。取得は世界線を一切意識しない:
+ * 全ドメインオブジェクトはアプリ全体の世界線スコープ（CAS）に載る。取得は世界線を意識しない。
  *   - useObjects(type)        … 一覧（クエリ・購読）
- *   - useObject(type, id)     … 単体（クエリ・購読）
- *   - useObjectRepo(type)  … save / remove / setAll（コマンド・命令）
+ *   - useObject(type, id)     … 単体（クエリ・購読、読み取り専用）
+ *   - useObjectShell(type, id)… シェル。object（現在値）と update（メソッド実行→自動保存）
+ *   - useObjectRepo(type)     … 新規作成・削除（save / remove）
  *
- * save するだけで自動的に世界線に記録される（= どのオブジェクトでも後から戻せる）。
- * 「repository」は React hook ではなく、裏側の世界線CASストアの概念名。
+ * 編集はシェル経由：update(s => s.method()) を呼ぶだけで、その型を「監視している世界線
+ * すべて」（アプリ全体＋ localHistory のローカル）へ自動保存される（commit.ts が fan-out）。
  */
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { useAppStore } from "@bublys-org/state-management";
+import { APP_SCOPE_ID, saveObject, removeObject } from "./commit.js";
 
-/** アプリ全体の世界線スコープID */
-export const APP_SCOPE_ID = "hotel";
+export { APP_SCOPE_ID };
 
 /** その型の全オブジェクトを取得（クエリ・購読） */
 export function useObjects<T>(type: string): T[] {
   const scope = useCasScope(APP_SCOPE_ID);
-  return useMemo(
-    () => scope.shells<T>(type).map((s) => s.object),
-    // scope は更新毎に変わるため毎回再計算（小規模なので許容。必要なら後でメモ化）
-    [scope, type]
-  );
+  return useMemo(() => scope.shells<T>(type).map((s) => s.object), [scope, type]);
 }
 
-/** IDで単体取得（クエリ・購読。無ければ undefined） */
+/** IDで単体取得（クエリ・購読、読み取り専用） */
 export function useObject<T>(type: string, id: string | undefined): T | undefined {
   const scope = useCasScope(APP_SCOPE_ID);
   return useMemo(() => {
@@ -38,21 +34,37 @@ export function useObject<T>(type: string, id: string | undefined): T | undefine
   }, [scope, type, id]);
 }
 
-/** その型への命令（保存・削除・一括投入）。save は自動で世界線に記録される */
+/**
+ * シェル。object（現在値）と update（メソッド実行→自動保存）を返す。
+ * update(s => s.method()) を呼ぶだけで監視している世界線すべてへ保存される。
+ */
+export function useObjectShell<T>(
+  type: string,
+  id: string | undefined
+): { object: T | undefined; update: (fn: (obj: T) => T) => void } {
+  const object = useObject<T>(type, id);
+  const store = useAppStore();
+  const update = useCallback(
+    (fn: (obj: T) => T) => {
+      if (object === undefined) return;
+      saveObject(store, type, fn(object));
+    },
+    [store, type, object]
+  );
+  return { object, update };
+}
+
+/** 新規作成・削除（save は監視している世界線すべてへ保存） */
 export function useObjectRepo<T>(type: string): {
   save: (obj: T) => void;
   remove: (id: string) => void;
-  setAll: (objs: T[]) => void;
 } {
-  const scope = useCasScope(APP_SCOPE_ID);
+  const store = useAppStore();
   return useMemo(
     () => ({
-      save: (obj: T) => scope.addObject(type, obj),
-      remove: (id: string) => scope.removeObject(type, id),
-      // 1回の grow でまとめて追加（forEach addObject は stale graph で上書きし合うため不可）
-      setAll: (objs: T[]) =>
-        scope.addObjects(objs.map((obj) => ({ type, object: obj }))),
+      save: (obj: T) => saveObject(store, type, obj),
+      remove: (id: string) => removeObject(store, type, id),
     }),
-    [scope, type]
+    [store, type]
   );
 }

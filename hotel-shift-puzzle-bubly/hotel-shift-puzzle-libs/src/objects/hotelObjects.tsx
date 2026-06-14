@@ -38,11 +38,13 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (s: MonthlyStaffSchedule) => s.state.id,
     icon: React.createElement(CalendarMonthIcon, { fontSize: "small" }),
     url: (id) => `hotel-shift-puzzle/schedules/${id}`,
-    // serialize 有り → 世界線記録の対象（toPlain/fromPlain をそのまま使う）
+    // 入れ子にインスタンスを持つので codec を明示
     serialize: {
       toJSON: (s: MonthlyStaffSchedule) => s.toPlain(),
       fromJSON: (j) => MonthlyStaffSchedule.fromPlain(j as MonthlyStaffSchedulePlain),
     },
+    // 勤務表は個別単位で巻き戻したいのでローカル世界線でも監視する
+    localHistory: true,
   },
 });
 

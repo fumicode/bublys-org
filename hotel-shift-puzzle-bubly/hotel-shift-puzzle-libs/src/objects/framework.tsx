@@ -47,6 +47,12 @@ export type ObjectDescriptor<T = unknown> = {
    * 入れ子にインスタンスを持つ等で規約が使えない型だけ明示する（例: Schedule）。
    */
   serialize?: ObjectSerialize<T>;
+  /**
+   * このオブジェクトを個別単位（type:id）のローカル世界線でも監視するか。
+   * true にすると、save 時にアプリ全体に加えてローカル世界線にも記録され、
+   * 個別に巻き戻せる（例: Schedule）。
+   */
+  localHistory?: boolean;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,11 +63,20 @@ export function defineObjects<R extends ObjectRegistry>(registry: R): R {
   return registry;
 }
 
+// 登録済みの記述子（書き込み層が getId/codec/localHistory を引くために保持）
+let descriptorRegistry: ObjectRegistry = {};
+
+/** 登録済みの記述子を取得する */
+export function getDescriptor(type: string): ObjectDescriptor | undefined {
+  return descriptorRegistry[type];
+}
+
 /**
  * ObjectType（ドラッグ種別・アイコン）・同一性（class+getId）・デフォルト開きURLを
  * グローバルに登録する（副作用）。ObjectTypeRegistry はグローバル singleton なので Provider 不要。
  */
 export function registerObjects(registry: ObjectRegistry): void {
+  descriptorRegistry = registry;
   for (const [type, d] of Object.entries(registry)) {
     registerObjectType(type, d.icon);
     registerObjectIdentity(type, { class: d.class, getId: (obj) => d.getId(obj) });

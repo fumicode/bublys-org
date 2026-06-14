@@ -1,39 +1,29 @@
 'use client';
 
 /**
- * useScheduleHistory — 勤務表ごとのローカル世界線
+ * useScheduleHistory — 勤務表ごとのローカル世界線（ビュー用）
  *
- * 全オブジェクトはアプリ全体スコープに載るが、勤務表は「個別単位で戻したい」ので
- * 勤務表ごとに専用のローカル世界線スコープ（schedule:${id}）も持つ。
+ * 記録は repository（シェルの save）が自動で行うため、ここは「読む・戻す」だけ:
+ * - scope:   ローカル世界線スコープ（canvas 描画用）
+ * - restore(nodeId): そのノードへ移動し、状態をアプリ全体リポジトリへ反映（グリッドに戻る）
  *
- * - record(schedule): 編集をローカル世界線にも記録（空なら最初のノードを作る）
- * - restore(nodeId): ローカル世界線のノードへ移動し、その状態をアプリ全体リポジトリへ反映
- *   （グリッド等はアプリ全体スコープを読むため、これで表示が戻る）
- * - scope: ローカル世界線スコープ（ビュー描画用）
+ * restore はローカル世界線を moveTo するだけで、新しいローカルノードは増やさない。
+ * アプリ全体へは「巻き戻した状態」を1件記録する（アプリ全体は変更の平坦なログ）。
  */
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { useAppStore } from "@bublys-org/state-management";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
-import { useObjectRepo } from "../objects/repository.js";
+import {
+  APP_SCOPE_ID,
+  localScopeId,
+  commitToScope,
+} from "../objects/commit.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
-/** 勤務表ごとのローカル世界線スコープID */
-export const scheduleScopeId = (scheduleId: string): string => `schedule:${scheduleId}`;
-
 export function useScheduleHistory(scheduleId: string) {
-  const scope = useCasScope(scheduleScopeId(scheduleId));
-  const repo = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
+  const scope = useCasScope(localScopeId(SCHEDULE_TYPE, scheduleId));
+  const store = useAppStore();
 
-  /** 編集をこの勤務表のローカル世界線に記録する */
-  const record = (schedule: MonthlyStaffSchedule) => {
-    scope.addObject(SCHEDULE_TYPE, schedule);
-  };
-
-  /** 空ならローカル世界線を現在状態で初期化する（最初のノード） */
-  const seed = (schedule: MonthlyStaffSchedule) => {
-    if (!scope.graph.state.rootNodeId) scope.addObject(SCHEDULE_TYPE, schedule);
-  };
-
-  /** ローカル世界線のノードへ移動し、その状態をアプリ全体リポジトリへ反映 */
   const restore = (nodeId: string) => {
     const schedule = scope.getObjectAt<MonthlyStaffSchedule>(
       nodeId,
@@ -41,8 +31,9 @@ export function useScheduleHistory(scheduleId: string) {
       scheduleId
     );
     scope.moveTo(nodeId);
-    if (schedule) repo.save(schedule);
+    // アプリ全体スコープのみに反映（ローカルには追記しない）
+    if (schedule) commitToScope(store, APP_SCOPE_ID, SCHEDULE_TYPE, schedule);
   };
 
-  return { scope, record, seed, restore };
+  return { scope, restore };
 }
