@@ -1,4 +1,5 @@
 'use client';
+import { useEffect } from 'react';
 import { MemoEditor } from '../Memo/ui/MemoEditor';
 import { MemoTitle } from '../Memo/ui/MemoTitle';
 import { useMemoWorldLine } from '../Memo/feature/useMemoWorldLine';
@@ -20,8 +21,24 @@ type MemoWorldLineIntegrationProps = {
  * まだ存在しないことを示すプレースホルダを出す。
  */
 export function MemoWorldLineIntegration({ memoId, onOpenAuthor, onOpenWorldLineView }: MemoWorldLineIntegrationProps) {
-  const { setFocusedObjectId } = useFocusedObject();
-  const { apexMemo, update } = useMemoWorldLine(memoId);
+  const { focusedObjectId, setFocusedObjectId } = useFocusedObject();
+  const { apexMemo, update, moveBack, moveForward } = useMemoWorldLine(memoId);
+
+  // Cmd/Ctrl+Z でデータ undo（= 世界線の親ノードへ moveBack）、
+  // Cmd/Ctrl+Shift+Z で redo（moveForward）。フォーカス中の memo にだけ効かせる。
+  // これにより apex が動き、世界線ビューの塗り点も追従する。
+  useEffect(() => {
+    if (focusedObjectId !== memoId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta || e.key.toLowerCase() !== 'z') return;
+      e.preventDefault();
+      if (e.shiftKey) moveForward();
+      else moveBack();
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [focusedObjectId, memoId, moveBack, moveForward]);
 
   if (!apexMemo) {
     return <div style={{ opacity: 0.7 }}>このメモは見つからないか、まだ初期化されていません。</div>;
