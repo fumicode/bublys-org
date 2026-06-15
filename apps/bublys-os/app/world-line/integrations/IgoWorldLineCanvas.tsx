@@ -39,5 +39,5 @@ export function IgoWorldLineCanvas({ gameId }: { gameId: string }) {
     [focused, scope],
   );
 
-  return <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />;
+  return <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} nameable />;
 }

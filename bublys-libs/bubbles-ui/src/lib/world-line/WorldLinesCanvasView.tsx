@@ -17,10 +17,17 @@ import type { WorldLineGraph } from "@bublys-org/world-line-graph";
 export type WorldLinesCanvasViewProps = {
   graph: WorldLineGraph;
   apexNodeId: string | null;
-  /** ノード ID → ラベル要約。省略時は空文字（描画なし）。memo 化推奨。 */
+  /** ノード ID → 状態要約（手数・バブル数など）。ノード脇に小さく描く。 */
   getNodeSummary?: (nodeId: string) => string;
+  /** ノード ID → ユーザーがつけた名前（ラベル）。あればノード上に吹き出しで描く。 */
+  getNodeLabel?: (nodeId: string) => string;
   /** ノードクリック時のハンドラ。 */
   onSelectNode: (nodeId: string) => void;
+  /**
+   * apex ノードの画面座標（CSS px, canvas 左上基準）を毎フレーム通知する。
+   * apex が無い/画面外のときは null。ラベル入力欄をノード近くに寄せる用途。
+   */
+  onApexScreenPos?: (pos: { x: number; y: number } | null) => void;
   /** 背景色（任意。デフォルト透明）。 */
   background?: string;
 };
@@ -45,7 +52,8 @@ const DISTORT = 4; // 大きいほど中心が強拡大される（Sarkar-Brown 
 const REF_FLOOR = COL_DX * 4; // 正規化基準の下限（過去がこれより短い間は引き伸ばさない）
 const MIN_SCALE = 0.32; // 最遠ノードのスケール
 const FALLOFF_POW = 1.4; // スケール減衰カーブ
-const LABEL_SCALE_THRESHOLD = 0.62; // これ未満のスケールではラベルを省略
+const LABEL_SCALE_THRESHOLD = 0.62; // これ未満のスケールでは状態要約を省略
+const LABEL_BUBBLE_SCALE_THRESHOLD = 0.4; // これ未満のスケールでは名前の吹き出しを省略
 
 // --- スクロール感度 ---
 const SENS_X = 0.55; // wheel deltaX → focusX(world)
@@ -165,6 +173,7 @@ function draw(
   project: ReturnType<typeof makeProjector>,
   apexNodeId: string | null,
   getSummary: (id: string) => string,
+  getLabel: (id: string) => string,
   vw: number,
   vh: number,
   background: string | undefined,
@@ -237,13 +246,60 @@ function draw(
       ctx.fillText(summary, s.sx + r + 4, s.sy);
     }
   }
+
+  // ラベル（ユーザーがつけた名前）はノードの上に吹き出しで。要約とは別レイヤーで
+  // 最後に描いて他ノードに隠れないようにする。
+  ctx.textBaseline = "middle";
+  for (const [id, s] of screen) {
+    if (s.sx < -60 || s.sx > vw + 60 || s.sy < -60 || s.sy > vh + 60) continue;
+    if (s.scale < LABEL_BUBBLE_SCALE_THRESHOLD) continue;
+    const label = getLabel(id);
+    if (!label) continue;
+
+    const r = NODE_RADIUS * s.scale;
+    const fontSize = Math.max(10, Math.round(11 * s.scale));
+    ctx.font = `${fontSize}px ui-sans-serif, -apple-system, sans-serif`;
+    const padX = 6;
+    const padY = 3;
+    const tw = ctx.measureText(label).width;
+    const bw = tw + padX * 2;
+    const bh = fontSize + padY * 2;
+    const tail = 5;
+    const bx = s.sx - bw / 2;
+    const by = s.sy - r - 4 - tail - bh; // ノードの上
+
+    // 吹き出し本体（角丸）
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 5);
+    ctx.fillStyle = "rgba(250,250,255,0.96)";
+    ctx.fill();
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 下向きの尻尾（ノードを指す）
+    ctx.beginPath();
+    ctx.moveTo(s.sx - 4, by + bh);
+    ctx.lineTo(s.sx + 4, by + bh);
+    ctx.lineTo(s.sx, by + bh + tail);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(250,250,255,0.96)";
+    ctx.fill();
+
+    // テキスト
+    ctx.fillStyle = "#1a1a2e";
+    ctx.textAlign = "center";
+    ctx.fillText(label, s.sx, by + bh / 2);
+  }
 }
 
 export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   graph,
   apexNodeId,
   getNodeSummary,
+  getNodeLabel,
   onSelectNode,
+  onApexScreenPos,
   background,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,6 +309,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   // 同じ state なら layout を再利用
   const layout = useMemo(() => computeLayout(graph), [graph.state]);
   const summarize = getNodeSummary ?? ((_: string) => "");
+  const labelize = getNodeLabel ?? ((_: string) => "");
 
   // フォーカス（ビューポート中央に来る world 座標）。current を target へ追従させる。
   const focusRef = useRef({ x: 0, y: 0 });
@@ -269,8 +326,12 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   apexRef.current = apexNodeId;
   const summarizeRef = useRef(summarize);
   summarizeRef.current = summarize;
+  const labelizeRef = useRef(labelize);
+  labelizeRef.current = labelize;
   const backgroundRef = useRef(background);
   backgroundRef.current = background;
+  const onApexScreenPosRef = useRef(onApexScreenPos);
+  onApexScreenPosRef.current = onApexScreenPos;
 
   const renderFrame = useCallback(() => {
     const canvas = canvasRef.current;
@@ -285,7 +346,21 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       w,
       h,
     );
-    draw(ctx, layoutRef.current, project, apexRef.current, summarizeRef.current, w, h, backgroundRef.current);
+    draw(ctx, layoutRef.current, project, apexRef.current, summarizeRef.current, labelizeRef.current, w, h, backgroundRef.current);
+
+    // apex の画面座標を通知（ラベル入力欄をノード近くに置く用途）
+    const cb = onApexScreenPosRef.current;
+    if (cb) {
+      const apexId = apexRef.current;
+      const apexNode = apexId ? layoutRef.current.nodes.get(apexId) : null;
+      if (apexNode) {
+        const p = project(apexNode.x, apexNode.y);
+        const inView = p.sx >= -20 && p.sx <= w + 20 && p.sy >= -20 && p.sy <= h + 20;
+        cb(inView ? { x: p.sx, y: p.sy } : null);
+      } else {
+        cb(null);
+      }
+    }
   }, []);
 
   // current を target へイージングしながら描画するループ。落ち着いたら止まる。
@@ -372,10 +447,10 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     renderFrame();
   }, [layout, apexNodeId, setTarget, renderFrame]);
 
-  // summary だけの変化（フォーカスは動かさず描画だけ更新）
+  // summary / label だけの変化（フォーカスは動かさず描画だけ更新）
   useEffect(() => {
     renderFrame();
-  }, [summarize, renderFrame]);
+  }, [summarize, labelize, renderFrame]);
 
   // 自前スクロール: wheel でフォーカスを動かす（横＝魚眼軸 / 縦＝パン）
   useEffect(() => {

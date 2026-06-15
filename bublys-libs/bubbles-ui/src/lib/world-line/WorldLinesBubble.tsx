@@ -59,6 +59,7 @@ export const WorldLinesBubble: FC = () => {
       scope={scope}
       getNodeSummary={getNodeSummary}
       keyBindings={keyBindings}
+      nameable
       style={{ width: 600, height: 320, maxWidth: "80vw", maxHeight: "70vh" }}
     />
   );
