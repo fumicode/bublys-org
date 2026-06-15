@@ -155,6 +155,21 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(base.isUndecided('staff-A', june1)).toBe(true);
   });
 
+  test('countWorkingByShift でその日の勤務帯ID別の人数を数える（休み・未定は除く）', () => {
+    const schedule = createJuneSchedule()
+      .assignShift('staff-A', june1, 'early')
+      .assignShift('staff-B', june1, 'early')
+      .assignShift('staff-C', june1, 'late')
+      .assignDayOff('staff-D', june1)
+      .markUndecided('staff-E', june1);
+
+    const counts = schedule.countWorkingByShift(june1);
+    expect(counts.get('early')).toBe(2);
+    expect(counts.get('late')).toBe(1);
+    expect(counts.get('middle')).toBeUndefined(); // 誰も入っていない
+    expect(counts.has('day-off')).toBe(false); // 休み・未定は数えない
+  });
+
   test('6月の稼働日は30日ある', () => {
     const days = createJuneSchedule().workingDays();
     expect(days).toHaveLength(30);

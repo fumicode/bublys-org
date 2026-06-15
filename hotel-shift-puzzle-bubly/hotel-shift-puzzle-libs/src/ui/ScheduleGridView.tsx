@@ -74,6 +74,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     .map((id) => shiftMap.get(id))
     .filter((w): w is WorkShift => !!w);
 
+  // 集計用：勤務帯を「名前」で束ねる（名前が同じなら同一勤務帯とみなす）。
+  // 出現順を保ちつつ、同名の勤務帯ID をまとめる。
+  const shiftGroups: { name: string; shiftIds: string[] }[] = [];
+  const groupIndexByName = new Map<string, number>();
+  for (const w of shiftOptions) {
+    let idx = groupIndexByName.get(w.name);
+    if (idx === undefined) {
+      idx = shiftGroups.length;
+      groupIndexByName.set(w.name, idx);
+      shiftGroups.push({ name: w.name, shiftIds: [] });
+    }
+    shiftGroups[idx].shiftIds.push(w.id);
+  }
+
+  // 各稼働日の勤務帯ID別人数（集約のクエリ）。名前でのグルーピングは上で済ませる。
+  const countsByDay = days.map((day) => schedule.countWorkingByShift(day));
+
+  // グループ g の、d 日目の人数（同名勤務帯ID の合計）
+  const countFor = (g: { shiftIds: string[] }, dayIndex: number): number =>
+    g.shiftIds.reduce((sum, id) => sum + (countsByDay[dayIndex].get(id) ?? 0), 0);
+
   const [editing, setEditing] = useState<EditingCell | null>(null);
 
   const applyChange = (to: ShiftCell) => {
@@ -181,6 +202,24 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             ))}
           </Fragment>
         ))}
+
+        {/* 勤務帯ごとの人数集計（スタッフ行の後）。名前が同じ勤務帯は合算する */}
+        {shiftGroups.map((g) => (
+          <Fragment key={`sum:${g.name}`}>
+            <div className="e-sum-head">{g.name}</div>
+            {days.map((day, i) => {
+              const n = countFor(g, i);
+              return (
+                <div
+                  key={`sum:${g.name}:${day.key}`}
+                  className={`e-sum-cell${n === 0 ? " is-zero" : ""}`}
+                >
+                  {n}
+                </div>
+              );
+            })}
+          </Fragment>
+        ))}
       </div>
 
       {/* セル編集メニュー（可能勤務帯があれば、そのスタッフが入れる勤務帯に絞る） */}
@@ -231,10 +270,43 @@ const StyledWrap = styled.div`
   .e-corner,
   .e-day-head,
   .e-staff-cell,
-  .e-cell {
+  .e-cell,
+  .e-sum-head,
+  .e-sum-cell {
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 勤務帯ごとの人数集計行 */
+  .e-sum-head {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #eceff1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    color: #455a64;
+    border-top: 2px solid #cfd8dc;
+  }
+  .e-sum-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    background: #f5f7f8;
+    color: #37474f;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    border-top: 2px solid #cfd8dc;
+
+    &.is-zero {
+      color: #cfd5d8;
+      font-weight: normal;
+    }
   }
 
   /* 左上の角（縦横どちらにも固定） */

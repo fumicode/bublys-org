@@ -231,6 +231,20 @@ export class MonthlyStaffSchedule {
     return this.state.assignments.filter((a) => a.staffId === staffId);
   }
 
+  /**
+   * その稼働日に、各勤務帯ID で何人が出勤予定かを数える（休み・未定は除く）。
+   * 勤務帯の「名前でのグルーピング（早番が同じ名前なら同一とみなす）」は WorkShift の
+   * 解決が要るので上位層で行う。ここは勤務帯ID 単位の素の集計に徹する。
+   */
+  countWorkingByShift(day: WorkingDay): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const a of this.assignmentsOn(day)) {
+      const shiftId = a.shiftId;
+      if (shiftId) counts.set(shiftId, (counts.get(shiftId) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   // ========== 制約チェック ==========
 
   /**
