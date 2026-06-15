@@ -12,8 +12,15 @@ import {
   WorkingDay,
   ScheduleAvailability,
   ConstraintViolation,
+  StaffMonthlyShiftWish,
   type ShiftCell,
 } from "../domain/index.js";
+import {
+  DAY_OFF_WISH,
+  isWorkWish,
+  workWishName,
+  wishOptionLabel,
+} from "./shiftWishOptions.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -22,6 +29,8 @@ type ScheduleGridViewProps = {
   workShifts: WorkShift[];
   /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
   availability?: ScheduleAvailability;
+  /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
+  wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
   violations?: ConstraintViolation[];
   /** セルの勤務割当を変更する */
@@ -60,6 +69,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   staffList,
   workShifts,
   availability,
+  wishByStaff,
   violations = [],
   onChangeCell,
   onOpenViolation,
@@ -74,6 +84,43 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
+
+  // 勤務帯名 → 文字色（希望マーカーの色に使う。同名は先勝ち）
+  const shiftColorByName = new Map<string, string>();
+  for (const w of workShifts) {
+    if (!shiftColorByName.has(w.name)) {
+      shiftColorByName.set(w.name, SHIFT_FG[w.id] ?? "#607d8b");
+    }
+  }
+
+  // そのセルのシフト希望を 1つのマーカー（色・記号・説明）に要約する
+  const wishMarkerFor = (
+    staffId: string,
+    day: WorkingDay
+  ): { color: string; filled: boolean; title: string } | null => {
+    const wishes = wishByStaff?.get(staffId)?.wishesOn(day);
+    if (!wishes) return null;
+    const entries = Object.entries(wishes);
+    if (entries.length === 0) return null;
+
+    const wants = entries.filter(([, p]) => p === "want").map(([k]) => k);
+    const colorOf = (key: string) =>
+      key === DAY_OFF_WISH
+        ? "#9e9e9e"
+        : isWorkWish(key)
+        ? shiftColorByName.get(workWishName(key)) ?? "#607d8b"
+        : "#607d8b";
+
+    // ○希望があれば塗りつぶしマーカー（先頭の希望色）、×のみなら赤い輪郭
+    const primary = wants[0];
+    const color = primary ? colorOf(primary) : "#e53935";
+    const title =
+      "希望: " +
+      entries
+        .map(([k, p]) => `${wishOptionLabel(k)} ${p === "want" ? "○" : "×"}`)
+        .join(" / ");
+    return { color, filled: wants.length > 0, title };
+  };
 
   // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
   const shiftOptions = schedule.workShiftIds
@@ -190,6 +237,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     const violation = violationAt(staff.id, day);
     if (violation) className += " is-violation";
 
+    const wishMark = wishMarkerFor(staff.id, day);
+
     return (
       <div
         className={className}
@@ -198,6 +247,17 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         onClick={(e) => setEditing({ anchor: e.currentTarget, staffId: staff.id, day })}
       >
         {content}
+        {wishMark && (
+          <span
+            className="e-wish-mark"
+            title={wishMark.title}
+            style={
+              wishMark.filled
+                ? { background: wishMark.color, borderColor: wishMark.color }
+                : { background: "transparent", borderColor: wishMark.color }
+            }
+          />
+        )}
         {violation && (
           <span
             className="e-violation-bar"
@@ -596,6 +656,20 @@ const StyledWrap = styled.div`
     &:hover {
       box-shadow: inset 0 0 0 2px #90caf9;
     }
+  }
+
+  /* シフト希望マーカー（セル右上の小さな丸）。塗り=○したい / 輪郭のみ=×避けたい */
+  .e-wish-mark {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid;
+    box-sizing: border-box;
+    z-index: 1;
+    pointer-events: auto;
   }
 
   /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */

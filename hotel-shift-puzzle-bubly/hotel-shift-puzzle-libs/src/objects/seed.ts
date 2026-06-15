@@ -16,6 +16,7 @@ import {
   WorkShift,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  StaffMonthlyShiftWish,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects, APP_SCOPE_ID } from "./repository.js";
 import {
@@ -23,10 +24,12 @@ import {
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  STAFF_SHIFT_WISH_TYPE,
 } from "./hotelObjects.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
 import { createSampleSchedule } from "../data/sampleSchedule.js";
+import { createSampleShiftWishes } from "../data/sampleShiftWishes.js";
 
 let seeded = false;
 
@@ -35,6 +38,7 @@ export function useSeedHotelData(): void {
   const staff = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
+  const wishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
 
   useEffect(() => {
     if (seeded) return;
@@ -60,6 +64,11 @@ export function useSeedHotelData(): void {
         schedule.workShiftIds
       );
       items.push({ type: SCHEDULE_AVAILABILITY_TYPE, object: availability });
+    }
+    if (wishes.length === 0) {
+      items.push(
+        ...createSampleShiftWishes().map((o) => ({ type: STAFF_SHIFT_WISH_TYPE, object: o }))
+      );
     }
     if (items.length > 0) scope.addObjects(items); // 1回の grow でまとめて投入
     // 初回マウント時に一度だけ

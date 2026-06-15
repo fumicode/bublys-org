@@ -8,9 +8,11 @@ import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
 type StaffDetailProps = {
   staffId?: string;
+  /** 指定した年月のシフト希望エディタを開く */
+  onOpenWish?: (year: number, month: number) => void;
 };
 
-export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
+export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
 
   if (!staff) {
@@ -21,5 +23,5 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId }) => {
     );
   }
 
-  return <StaffDetailView staff={staff} />;
+  return <StaffDetailView staff={staff} onOpenWish={onOpenWish} />;
 };

@@ -17,6 +17,7 @@ import {
   WorkShift,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  StaffMonthlyShiftWish,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -27,6 +28,7 @@ export const STAFF_TYPE = "Staff";
 export const WORKSHIFT_TYPE = "WorkShift";
 export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
+export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
 
 export const HOTEL_OBJECTS = defineObjects({
   Staff: {
@@ -59,6 +61,12 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (a: ScheduleAvailability) => a.id,
     // 親 Schedule のローカル世界線に束ねる（case B）
     localScope: (a: ScheduleAvailability) => localScopeId(SCHEDULE_TYPE, a.scheduleId),
+  },
+  StaffMonthlyShiftWish: {
+    class: StaffMonthlyShiftWish,
+    getId: (w: StaffMonthlyShiftWish) => w.id,
+    // スタッフ×月で1つ。店舗・勤務表には依存しないのでアプリ全体スコープのみ。
+    // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
   },
 });
 

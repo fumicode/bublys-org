@@ -12,6 +12,7 @@ import {
   ScheduleWorldLineView,
   AvailabilityEditor,
   ScheduleViolationView,
+  ShiftWishEditor,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -24,8 +25,32 @@ const withObjects = (node: ReactNode) => (
 const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollection />);
 
 // --- スタッフ詳細バブル ---
-const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<StaffDetail staffId={bubble.params.staffId} />);
+const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const staffId = bubble.params.staffId;
+  return withObjects(
+    <StaffDetail
+      staffId={staffId}
+      onOpenWish={(year, month) =>
+        openBubble(
+          `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`,
+          bubble.id,
+          "bubble-side"
+        )
+      }
+    />
+  );
+};
+
+// --- スタッフ月別シフト希望エディタバブル ---
+const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ShiftWishEditor
+      staffId={bubble.params.staffId}
+      year={Number(bubble.params.year)}
+      month={Number(bubble.params.month)}
+    />
+  );
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
@@ -84,6 +109,7 @@ const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
 
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
+  { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },

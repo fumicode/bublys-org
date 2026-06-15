@@ -7,6 +7,7 @@ import {
   WorkShift,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  StaffMonthlyShiftWish,
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -19,6 +20,7 @@ import {
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
 type ScheduleGridProps = {
@@ -48,6 +50,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     SCHEDULE_AVAILABILITY_TYPE,
     scheduleId
   );
+  const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
     SCHEDULE_TYPE,
     scheduleId
@@ -58,6 +61,19 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     () => schedule?.checkConstraints(defaultScheduleConstraints()) ?? [],
     [schedule]
   );
+
+  // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
+  const wishByStaff = useMemo(() => {
+    const map = new Map<string, StaffMonthlyShiftWish>();
+    if (schedule) {
+      for (const w of allWishes) {
+        if (w.year === schedule.year && w.month === schedule.month) {
+          map.set(w.staffId, w);
+        }
+      }
+    }
+    return map;
+  }, [allWishes, schedule]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -103,6 +119,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         staffList={staffList}
         workShifts={workShifts}
         availability={availability}
+        wishByStaff={wishByStaff}
         violations={violations}
         onChangeCell={handleChangeCell}
         onOpenViolation={(v) => onOpenViolation?.(v.key)}

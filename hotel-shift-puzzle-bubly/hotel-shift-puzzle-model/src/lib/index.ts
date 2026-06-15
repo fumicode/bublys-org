@@ -10,6 +10,7 @@ export * from './schedule/WorkingDay.js';
 export * from './schedule/WorkShift.js';
 export * from './schedule/ShiftAssignment.js';
 export * from './schedule/RequiredStaffing.js';
+export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/ScheduleAvailability.js';
 

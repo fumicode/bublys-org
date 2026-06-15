@@ -10,3 +10,5 @@ export * from "./ScheduleListView.js";
 export * from "./ScheduleGridView.js";
 export * from "./AvailabilityGridView.js";
 export * from "./ConstraintViolationView.js";
+export * from "./ShiftWishGridView.js";
+export * from "./shiftWishOptions.js";
