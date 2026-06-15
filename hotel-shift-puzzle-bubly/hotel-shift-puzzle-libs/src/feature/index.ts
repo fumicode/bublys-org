@@ -10,4 +10,5 @@ export * from "./ScheduleWorldLineView.js";
 export * from "./AvailabilityEditor.js";
 export * from "./ScheduleViolationView.js";
 export * from "./scheduleConstraints.js";
+export * from "./ShiftWishConstraint.js";
 export * from "./ShiftWishEditor.js";

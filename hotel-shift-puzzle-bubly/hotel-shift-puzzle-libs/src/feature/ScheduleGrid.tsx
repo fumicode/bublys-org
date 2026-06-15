@@ -14,7 +14,7 @@ import {
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { defaultScheduleConstraints } from "./scheduleConstraints.js";
+import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -56,12 +56,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     scheduleId
   );
 
-  // 制約チェックは変更のたびに再計算する（schedule が変わるたび）
-  const violations = useMemo(
-    () => schedule?.checkConstraints(defaultScheduleConstraints()) ?? [],
-    [schedule]
-  );
-
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
     const map = new Map<string, StaffMonthlyShiftWish>();
@@ -74,6 +68,16 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     }
     return map;
   }, [allWishes, schedule]);
+
+  // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
+  // 連勤などに加え、シフト希望との食い違いも違反として拾う（希望の文脈を注入）。
+  const violations = useMemo(() => {
+    if (!schedule) return [];
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    return schedule.checkConstraints(
+      buildScheduleConstraints({ wishByStaff, shiftNameById })
+    );
+  }, [schedule, wishByStaff, workShifts]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;

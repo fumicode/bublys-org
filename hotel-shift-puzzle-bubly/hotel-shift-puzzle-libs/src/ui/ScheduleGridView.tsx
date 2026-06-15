@@ -15,12 +15,7 @@ import {
   StaffMonthlyShiftWish,
   type ShiftCell,
 } from "../domain/index.js";
-import {
-  DAY_OFF_WISH,
-  isWorkWish,
-  workWishName,
-  wishOptionLabel,
-} from "./shiftWishOptions.js";
+import { wishOptionLabel } from "./shiftWishOptions.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -78,49 +73,23 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 }) => {
   const days = schedule.workingDays();
 
-  // そのセルを含む違反（最初の1件）を返す
-  const violationAt = (staffId: string, day: WorkingDay): ConstraintViolation | undefined =>
-    violations.find((v) => v.coversCell(staffId, day));
-
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
-  // 勤務帯名 → 文字色（希望マーカーの色に使う。同名は先勝ち）
-  const shiftColorByName = new Map<string, string>();
-  for (const w of workShifts) {
-    if (!shiftColorByName.has(w.name)) {
-      shiftColorByName.set(w.name, SHIFT_FG[w.id] ?? "#607d8b");
-    }
-  }
-
-  // そのセルのシフト希望を 1つのマーカー（色・記号・説明）に要約する
-  const wishMarkerFor = (
+  // そのセルのシフト希望を {ラベル, 希望(○/×)} の配列に要約する。
+  // 薄い表示（未割当セル）と、スタッフ展開時の希望行で共有する。
+  const wishEntriesFor = (
     staffId: string,
     day: WorkingDay
-  ): { color: string; filled: boolean; title: string } | null => {
+  ): { label: string; pref: "want" | "avoid" }[] => {
     const wishes = wishByStaff?.get(staffId)?.wishesOn(day);
-    if (!wishes) return null;
-    const entries = Object.entries(wishes);
-    if (entries.length === 0) return null;
-
-    const wants = entries.filter(([, p]) => p === "want").map(([k]) => k);
-    const colorOf = (key: string) =>
-      key === DAY_OFF_WISH
-        ? "#9e9e9e"
-        : isWorkWish(key)
-        ? shiftColorByName.get(workWishName(key)) ?? "#607d8b"
-        : "#607d8b";
-
-    // ○希望があれば塗りつぶしマーカー（先頭の希望色）、×のみなら赤い輪郭
-    const primary = wants[0];
-    const color = primary ? colorOf(primary) : "#e53935";
-    const title =
-      "希望: " +
-      entries
-        .map(([k, p]) => `${wishOptionLabel(k)} ${p === "want" ? "○" : "×"}`)
-        .join(" / ");
-    return { color, filled: wants.length > 0, title };
+    if (!wishes) return [];
+    return Object.entries(wishes).map(([k, p]) => ({ label: wishOptionLabel(k), pref: p }));
   };
+
+  // 希望を短いテキストに（○=ラベル / ×=×ラベル）
+  const wishText = (e: { label: string; pref: "want" | "avoid" }) =>
+    e.pref === "want" ? e.label : `×${e.label}`;
 
   // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
   const shiftOptions = schedule.workShiftIds
@@ -180,6 +149,16 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   const [editing, setEditing] = useState<EditingCell | null>(null);
 
+  // 希望と割当を並べて見るために展開中のスタッフID
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (staffId: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(staffId)) next.delete(staffId);
+      else next.add(staffId);
+      return next;
+    });
+
   // 必要スタッフ数の編集メニュー。day=null は「全稼働日に一括」。
   const [editingRequired, setEditingRequired] = useState<{
     anchor: HTMLElement;
@@ -230,14 +209,20 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       className += " e-off";
       content = "休";
     } else {
+      // 未割当: 希望があれば薄く表示（書き込むと隠れる）。無ければ "·"
+      const wishes = wishEntriesFor(staff.id, day);
       className += " e-undecided";
-      content = "·";
+      content = wishes.length > 0 ? wishes.map(wishText).join(" ") : "·";
+      if (wishes.length > 0) className += " has-wish-hint";
     }
 
-    const violation = violationAt(staff.id, day);
-    if (violation) className += " is-violation";
-
-    const wishMark = wishMarkerFor(staff.id, day);
+    // 違反の表示を2種に分ける:
+    //  - 範囲（連勤など、複数日にまたがる）→ 下端の赤い帯
+    //  - 単日（シフト希望の食い違いなど）   → 右上の ⊿ マーカー
+    const covering = violations.filter((v) => v.coversCell(staff.id, day));
+    const rangeViolation = covering.find((v) => v.days.length > 1);
+    const pointViolation = covering.find((v) => v.days.length === 1);
+    if (covering.length > 0) className += " is-violation";
 
     return (
       <div
@@ -247,25 +232,25 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         onClick={(e) => setEditing({ anchor: e.currentTarget, staffId: staff.id, day })}
       >
         {content}
-        {wishMark && (
+        {pointViolation && (
           <span
-            className="e-wish-mark"
-            title={wishMark.title}
-            style={
-              wishMark.filled
-                ? { background: wishMark.color, borderColor: wishMark.color }
-                : { background: "transparent", borderColor: wishMark.color }
-            }
+            className="e-wish-flag"
+            role="button"
+            title={pointViolation.message}
+            onClick={(e) => {
+              e.stopPropagation(); // セル編集は開かず、違反バブルを開く
+              onOpenViolation?.(pointViolation);
+            }}
           />
         )}
-        {violation && (
+        {rangeViolation && (
           <span
             className="e-violation-bar"
             role="button"
-            title={violation.message}
+            title={rangeViolation.message}
             onClick={(e) => {
-              e.stopPropagation(); // セル編集メニューは開かず、違反バブルを開く
-              onOpenViolation?.(violation);
+              e.stopPropagation();
+              onOpenViolation?.(rangeViolation);
             }}
           />
         )}
@@ -298,7 +283,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {/* スタッフ行 */}
         {staffList.map((staff) => (
           <Fragment key={staff.id}>
-            {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ */}
+            {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
+                名前クリックで希望行の開閉。 */}
             <div className="e-staff-cell">
               <ObjectView
                 object={staff}
@@ -307,7 +293,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 openingPosition="origin-side"
                 fullWidth={true}
               >
-                <div className="e-staff">
+                <div
+                  className="e-staff"
+                  role="button"
+                  title="クリックで希望を表示/非表示"
+                  onClick={() => toggleExpanded(staff.id)}
+                >
+                  <span className="e-caret">{expanded.has(staff.id) ? "▾" : "▸"}</span>
                   <PersonIcon fontSize="small" className="e-staff-icon" />
                   <span className="e-staff-name">{staff.name}</span>
                 </div>
@@ -318,6 +310,32 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             {days.map((day) => (
               <Fragment key={`${staff.id}:${day.key}`}>{renderCell(staff, day)}</Fragment>
             ))}
+
+            {/* 展開時: 希望行（割当行の真下に並べて比較できる） */}
+            {expanded.has(staff.id) && (
+              <Fragment>
+                <div className="e-wish-row-head">（希望）</div>
+                {days.map((day) => {
+                  const entries = wishEntriesFor(staff.id, day);
+                  return (
+                    <div key={`wish:${staff.id}:${day.key}`} className="e-wish-row-cell">
+                      {entries.length > 0 ? (
+                        entries.map((e, i) => (
+                          <span
+                            key={i}
+                            className={e.pref === "want" ? "is-want" : "is-avoid"}
+                          >
+                            {wishText(e)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="e-empty">・</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </Fragment>
+            )}
           </Fragment>
         ))}
 
@@ -628,6 +646,17 @@ const StyledWrap = styled.div`
       padding: 4px 8px;
       width: 100%;
       box-sizing: border-box;
+      cursor: pointer;
+
+      &:hover {
+        background: #f5f7f8;
+      }
+    }
+    .e-caret {
+      color: #90a4ae;
+      font-size: 0.85em;
+      flex-shrink: 0;
+      width: 10px;
     }
     .e-staff-icon {
       color: #888;
@@ -638,6 +667,46 @@ const StyledWrap = styled.div`
       overflow: hidden;
       text-overflow: ellipsis;
       font-weight: bold;
+    }
+  }
+
+  /* 希望行（スタッフ展開時。割当行の真下に並ぶ） */
+  .e-wish-row-head {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fcfcf7;
+    color: #8d6e63;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 2px 8px;
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+  }
+  .e-wish-row-cell {
+    background: #fcfcf7;
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px;
+    font-size: 0.78em;
+    min-height: 24px;
+
+    .is-want {
+      color: #2e7d32;
+    }
+    .is-avoid {
+      color: #c62828;
+    }
+    .e-empty {
+      color: #ddd;
     }
   }
 
@@ -658,18 +727,29 @@ const StyledWrap = styled.div`
     }
   }
 
-  /* シフト希望マーカー（セル右上の小さな丸）。塗り=○したい / 輪郭のみ=×避けたい */
-  .e-wish-mark {
+  /* 希望との食い違い（制約違反）: 右上の角に ⊿（オレンジの三角）。クリックで違反バブル */
+  .e-wish-flag {
     position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border: 1.5px solid;
-    box-sizing: border-box;
-    z-index: 1;
-    pointer-events: auto;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 13px 13px 0;
+    border-color: transparent #ef6c00 transparent transparent;
+    cursor: pointer;
+    z-index: 2;
+
+    &:hover {
+      border-width: 0 16px 16px 0;
+    }
+  }
+
+  /* 未割当セルに薄く表示する希望ヒント */
+  .e-undecided.has-wish-hint {
+    color: #b4b4b4;
+    font-size: 0.82em;
+    font-weight: normal;
   }
 
   /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */

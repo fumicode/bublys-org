@@ -10,12 +10,33 @@
 import {
   ScheduleConstraint,
   MaxConsecutiveWorkdaysConstraint,
+  StaffMonthlyShiftWish,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { ShiftWishConstraint } from "./ShiftWishConstraint.js";
 
 /** 連勤上限（日数）。いまは固定。 */
 export const MAX_CONSECUTIVE_WORKDAYS_LIMIT = 5;
 
-/** いま適用する制約の一覧 */
-export const defaultScheduleConstraints = (): ScheduleConstraint[] => [
-  new MaxConsecutiveWorkdaysConstraint(MAX_CONSECUTIVE_WORKDAYS_LIMIT),
-];
+/** シフト希望との食い違い判定に必要な文脈（希望と勤務帯名）。 */
+export type ScheduleConstraintContext = {
+  wishByStaff: Map<string, StaffMonthlyShiftWish>;
+  shiftNameById: Map<string, string>;
+};
+
+/**
+ * 勤務表に適用する制約一覧。グリッドと違反バブルの両方が同じものを使う。
+ * 希望の文脈（ctx）が与えられればシフト希望違反も含める。
+ */
+export const buildScheduleConstraints = (
+  ctx?: ScheduleConstraintContext
+): ScheduleConstraint[] => {
+  const constraints: ScheduleConstraint[] = [
+    new MaxConsecutiveWorkdaysConstraint(MAX_CONSECUTIVE_WORKDAYS_LIMIT),
+  ];
+  if (ctx) constraints.push(new ShiftWishConstraint(ctx));
+  return constraints;
+};
+
+/** 後方互換：希望なしの既定制約。 */
+export const defaultScheduleConstraints = (): ScheduleConstraint[] =>
+  buildScheduleConstraints();
