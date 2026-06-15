@@ -56,7 +56,10 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
     Component: IgoGameWorldLinesBubble,
-    bubbleOptions: { contentBackground: "transparent" },
+    // 他のバブルと同じ通常 BubbleView で描画する（fillsContainer は使わない）。
+    // サイズは popChildViewPortBelow が明示的に与える（画面下部ストリップ）。
+    // canvas は透明。背景は半透明の黒にして、後ろを透かしつつ世界線を見やすく。
+    bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" },
   },
   {
     pattern: /^igo-game\/[^/]+$/,

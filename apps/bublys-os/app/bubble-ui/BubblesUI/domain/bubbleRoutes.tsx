@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLineScopeView } from "@bublys-org/bubbles-ui";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { useCasScope } from "@bublys-org/world-line-graph";
 
@@ -86,20 +86,11 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 };
 
 // Memo の世界線を canvas で表示。click でそのノードに移動できる。
+// 履歴は /history なので popChildViewPortBelow で画面下部ストリップとして開く。
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "").replace("/history", "");
   const scope = useCasScope(memoScopeId(memoId));
-  const apexId = scope.graph.getApex()?.id ?? null;
-  return (
-    <div style={{ width: 600, height: 320, maxWidth: "80vw", maxHeight: "70vh" }}>
-      <WorldLinesCanvasView
-        graph={scope.graph}
-        apexNodeId={apexId}
-        onSelectNode={scope.moveTo}
-        background="rgba(15,18,28,0.85)"
-      />
-    </div>
-  );
+  return <WorldLineScopeView scope={scope} />;
 };
 
 // 再帰的 universe バブル（バブルの中の universe）は lib 提供の
@@ -189,7 +180,7 @@ const routes: BubbleRoute[] = [
   // Memo
   { pattern: /^memos$/, type: "memos", Component: MemosBubble },
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
-  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble },
+  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
 
   // 学会シフト（プラグインとして動的ロード）
