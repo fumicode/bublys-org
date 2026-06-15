@@ -245,6 +245,11 @@ export class MonthlyStaffSchedule {
     return counts;
   }
 
+  /** その稼働日に休みの人数を数える（出勤・未定は除く） */
+  countDayOffOn(day: WorkingDay): number {
+    return this.assignmentsOn(day).filter((a) => a.isDayOff).length;
+  }
+
   // ========== 制約チェック ==========
 
   /**

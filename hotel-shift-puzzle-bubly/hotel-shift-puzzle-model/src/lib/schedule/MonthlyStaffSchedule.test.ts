@@ -170,6 +170,16 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(counts.has('day-off')).toBe(false); // 休み・未定は数えない
   });
 
+  test('countDayOffOn でその日の休み人数を数える（出勤・未定は除く）', () => {
+    const schedule = createJuneSchedule()
+      .assignDayOff('staff-A', june1)
+      .assignDayOff('staff-B', june1)
+      .assignShift('staff-C', june1, 'early')
+      .markUndecided('staff-D', june1);
+
+    expect(schedule.countDayOffOn(june1)).toBe(2);
+  });
+
   test('6月の稼働日は30日ある', () => {
     const days = createJuneSchedule().workingDays();
     expect(days).toHaveLength(30);

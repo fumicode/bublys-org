@@ -75,7 +75,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     .filter((w): w is WorkShift => !!w);
 
   // 集計用：勤務帯を「名前」で束ねる（名前が同じなら同一勤務帯とみなす）。
-  // 出現順を保ちつつ、同名の勤務帯ID をまとめる。
+  // 出現順を保ちつつ、同名の勤務帯ID をまとめる。色は代表（先頭）勤務帯ID から引く。
   const shiftGroups: { name: string; shiftIds: string[] }[] = [];
   const groupIndexByName = new Map<string, number>();
   for (const w of shiftOptions) {
@@ -88,12 +88,38 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     shiftGroups[idx].shiftIds.push(w.id);
   }
 
-  // 各稼働日の勤務帯ID別人数（集約のクエリ）。名前でのグルーピングは上で済ませる。
+  // 各稼働日の勤務帯ID別人数 / 休み人数（集約のクエリ）。
   const countsByDay = days.map((day) => schedule.countWorkingByShift(day));
+  const dayOffByDay = days.map((day) => schedule.countDayOffOn(day));
 
-  // グループ g の、d 日目の人数（同名勤務帯ID の合計）
-  const countFor = (g: { shiftIds: string[] }, dayIndex: number): number =>
-    g.shiftIds.reduce((sum, id) => sum + (countsByDay[dayIndex].get(id) ?? 0), 0);
+  // 集計行（勤務帯ごと＋休み）。勤務帯はセルと同じ色で色分けする。
+  type SummaryRow = {
+    key: string;
+    label: string;
+    bg: string;
+    fg: string;
+    count: (dayIndex: number) => number;
+  };
+  const summaryRows: SummaryRow[] = [
+    ...shiftGroups.map((g) => {
+      const colorId = g.shiftIds[0];
+      return {
+        key: `shift:${g.name}`,
+        label: g.name,
+        bg: SHIFT_BG[colorId] ?? "#eceff1",
+        fg: SHIFT_FG[colorId] ?? "#455a64",
+        count: (i: number) =>
+          g.shiftIds.reduce((sum, id) => sum + (countsByDay[i].get(id) ?? 0), 0),
+      };
+    }),
+    {
+      key: "day-off",
+      label: "休み",
+      bg: "#f5f5f5",
+      fg: "#9e9e9e",
+      count: (i: number) => dayOffByDay[i],
+    },
+  ];
 
   const [editing, setEditing] = useState<EditingCell | null>(null);
 
@@ -203,16 +229,25 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           </Fragment>
         ))}
 
-        {/* 勤務帯ごとの人数集計（スタッフ行の後）。名前が同じ勤務帯は合算する */}
-        {shiftGroups.map((g) => (
-          <Fragment key={`sum:${g.name}`}>
-            <div className="e-sum-head">{g.name}</div>
+        {/* 勤務帯ごと＋休みの人数集計（スタッフ行の後）。名前が同じ勤務帯は合算し、
+            セルと同じ色で色分けする */}
+        {summaryRows.map((row, rowIndex) => (
+          <Fragment key={`sum:${row.key}`}>
+            <div
+              className={`e-sum-head${rowIndex === 0 ? " is-first" : ""}`}
+              style={{ background: row.bg, color: row.fg }}
+            >
+              {row.label}
+            </div>
             {days.map((day, i) => {
-              const n = countFor(g, i);
+              const n = row.count(i);
               return (
                 <div
-                  key={`sum:${g.name}:${day.key}`}
-                  className={`e-sum-cell${n === 0 ? " is-zero" : ""}`}
+                  key={`sum:${row.key}:${day.key}`}
+                  className={`e-sum-cell${rowIndex === 0 ? " is-first" : ""}${
+                    n === 0 ? " is-zero" : ""
+                  }`}
+                  style={n === 0 ? undefined : { background: row.bg, color: row.fg }}
                 >
                   {n}
                 </div>
@@ -278,35 +313,36 @@ const StyledWrap = styled.div`
     box-sizing: border-box;
   }
 
-  /* 勤務帯ごとの人数集計行 */
+  /* 勤務帯ごと＋休みの人数集計行（背景・文字色は行ごとにインラインで色分け） */
   .e-sum-head {
     position: sticky;
     left: 0;
     z-index: 1;
-    background: #eceff1;
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 4px 8px;
     font-weight: bold;
-    color: #455a64;
-    border-top: 2px solid #cfd8dc;
   }
   .e-sum-cell {
     display: flex;
     align-items: center;
     justify-content: center;
     min-height: 28px;
-    background: #f5f7f8;
-    color: #37474f;
     font-weight: bold;
     font-variant-numeric: tabular-nums;
-    border-top: 2px solid #cfd8dc;
 
     &.is-zero {
+      background: #fafafa;
       color: #cfd5d8;
       font-weight: normal;
     }
+  }
+
+  /* 集計ブロックの先頭行だけ、スタッフ行との区切り罫線を引く */
+  .e-sum-head.is-first,
+  .e-sum-cell.is-first {
+    border-top: 2px solid #b0bec5;
   }
 
   /* 左上の角（縦横どちらにも固定） */
