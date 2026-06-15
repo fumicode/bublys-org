@@ -180,6 +180,21 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(schedule.countDayOffOn(june1)).toBe(2);
   });
 
+  test('必要スタッフ数を稼働日×勤務帯名で持てる（requiredFor / setRequired）', () => {
+    const base = createJuneSchedule();
+    // 既定は未設定（0）
+    expect(base.requiredFor(june1, '早番')).toBe(0);
+
+    const updated = base.setRequired(june1, '早番', 2);
+    expect(updated.requiredFor(june1, '早番')).toBe(2);
+    // 不変
+    expect(base.requiredFor(june1, '早番')).toBe(0);
+
+    // toPlain/fromPlain で必要スタッフ数も往復する
+    const restored = MonthlyStaffSchedule.fromPlain(updated.toPlain());
+    expect(restored.requiredFor(june1, '早番')).toBe(2);
+  });
+
   test('6月の稼働日は30日ある', () => {
     const days = createJuneSchedule().workingDays();
     expect(days).toHaveLength(30);

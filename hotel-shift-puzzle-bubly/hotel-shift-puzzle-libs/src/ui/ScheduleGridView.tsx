@@ -93,12 +93,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const dayOffByDay = days.map((day) => schedule.countDayOffOn(day));
 
   // 集計行（勤務帯ごと＋休み）。勤務帯はセルと同じ色で色分けする。
+  // 勤務帯行は必要スタッフ数（分母）を持ち、達成度を背景バーで表す。
   type SummaryRow = {
     key: string;
     label: string;
     bg: string;
     fg: string;
     count: (dayIndex: number) => number;
+    /** 必要人数（分母）。休みなど必要数の概念が無い行は undefined */
+    required?: (dayIndex: number) => number;
   };
   const summaryRows: SummaryRow[] = [
     ...shiftGroups.map((g) => {
@@ -110,6 +113,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         fg: SHIFT_FG[colorId] ?? "#455a64",
         count: (i: number) =>
           g.shiftIds.reduce((sum, id) => sum + (countsByDay[i].get(id) ?? 0), 0),
+        required: (i: number) => schedule.requiredFor(days[i], g.name),
       };
     }),
     {
@@ -241,6 +245,34 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             </div>
             {days.map((day, i) => {
               const n = row.count(i);
+              const req = row.required?.(i) ?? 0;
+
+              // 必要数あり: 「現在/必要」を分母付きで表示し、達成度を背景バーで表す
+              if (req > 0) {
+                const pct = Math.min(100, Math.round((n / req) * 100));
+                const met = n >= req;
+                // 満たした分は勤務帯色、不足分は薄い赤で「足りていない」を可視化
+                const fill = row.bg;
+                const track = met ? row.bg : "#ffe0e0";
+                return (
+                  <div
+                    key={`sum:${row.key}:${day.key}`}
+                    className={`e-sum-cell is-ratio${rowIndex === 0 ? " is-first" : ""}${
+                      met ? " is-met" : " is-under"
+                    }`}
+                    style={{
+                      background: `linear-gradient(to right, ${fill} ${pct}%, ${track} ${pct}%)`,
+                      color: met ? row.fg : "#c62828",
+                    }}
+                    title={`${row.label}: ${n}/${req}名`}
+                  >
+                    <span className="e-cur">{n}</span>
+                    <span className="e-den">/{req}</span>
+                  </div>
+                );
+              }
+
+              // 必要数なし（休み等）: 人数のみ
               return (
                 <div
                   key={`sum:${row.key}:${day.key}`}
@@ -326,7 +358,7 @@ const StyledWrap = styled.div`
   }
   .e-sum-cell {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: center;
     min-height: 28px;
     font-weight: bold;
@@ -336,6 +368,19 @@ const StyledWrap = styled.div`
       background: #fafafa;
       color: #cfd5d8;
       font-weight: normal;
+    }
+
+    /* 現在/必要 の分母表示 */
+    .e-cur {
+      font-size: 1em;
+    }
+    .e-den {
+      font-size: 0.75em;
+      opacity: 0.7;
+    }
+    /* 不足している日は枠で強調 */
+    &.is-under {
+      box-shadow: inset 0 0 0 1px #ef9a9a;
     }
   }
 

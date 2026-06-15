@@ -1,4 +1,8 @@
-import { MonthlyStaffSchedule, WorkingDay } from "@bublys-org/hotel-shift-puzzle-model";
+import {
+  MonthlyStaffSchedule,
+  RequiredStaffing,
+  WorkingDay,
+} from "@bublys-org/hotel-shift-puzzle-model";
 import { createSampleStaffList } from "./sampleStaff.js";
 import { createSampleWorkShifts } from "./sampleWorkShifts.js";
 
@@ -12,12 +16,22 @@ import { createSampleWorkShifts } from "./sampleWorkShifts.js";
 export function createSampleSchedule(): MonthlyStaffSchedule {
   const workShiftIds = createSampleWorkShifts().map((w) => w.id); // ['early','middle','late']
 
+  // 必要スタッフ数（稼働日×勤務帯名）。全稼働日に同じ必要人数を入れておく。
+  // 勤務帯は「名前」で参照する（早番・中番・遅番）。
+  const days = Array.from({ length: 30 }, (_, i) => WorkingDay.of(2026, 6, i + 1));
+  const requiredStaffing = RequiredStaffing.uniform(days, {
+    早番: 2,
+    中番: 1,
+    遅番: 1,
+  });
+
   let schedule = MonthlyStaffSchedule.create({
     id: "sched-2026-06",
     storeId: "store-1",
     year: 2026,
     month: 6,
     workShiftIds,
+    requiredStaffing,
   });
 
   const staffIds = createSampleStaffList().map((s) => s.id);

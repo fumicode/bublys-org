@@ -24,6 +24,10 @@ import {
   type ShiftValue,
   DAY_OFF,
 } from "./ShiftAssignment.js";
+import {
+  RequiredStaffing,
+  type RequiredStaffingPlain,
+} from "./RequiredStaffing.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { ConstraintViolation } from "./ConstraintViolation.js";
 
@@ -40,6 +44,8 @@ export type MonthlyStaffScheduleState = {
   workShiftIds: string[];
   /** スタッフ×稼働日 の勤務割当 */
   assignments: ShiftAssignment[];
+  /** 稼働日×勤務帯名 の必要スタッフ数 */
+  requiredStaffing: RequiredStaffing;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -50,6 +56,7 @@ export type MonthlyStaffSchedulePlain = {
   month: number;
   workShiftIds: string[];
   assignments: ShiftAssignmentPlain[];
+  requiredStaffing: RequiredStaffingPlain;
 };
 
 /** セルの状態（出勤／休み／未定）。出勤は勤務帯ID で表す */
@@ -61,13 +68,14 @@ export type ShiftCell =
 export class MonthlyStaffSchedule {
   constructor(readonly state: MonthlyStaffScheduleState) {}
 
-  /** 空の勤務表（全セル未定）を作る */
+  /** 空の勤務表（全セル未定）を作る。必要スタッフ数は省略時は未設定。 */
   static create(params: {
     id: string;
     storeId: string;
     year: number;
     month: number;
     workShiftIds: string[];
+    requiredStaffing?: RequiredStaffing;
   }): MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
       id: params.id,
@@ -76,6 +84,7 @@ export class MonthlyStaffSchedule {
       month: params.month,
       workShiftIds: params.workShiftIds,
       assignments: [],
+      requiredStaffing: params.requiredStaffing ?? RequiredStaffing.empty(),
     });
   }
 
@@ -250,6 +259,29 @@ export class MonthlyStaffSchedule {
     return this.assignmentsOn(day).filter((a) => a.isDayOff).length;
   }
 
+  // ========== 必要スタッフ数 ==========
+
+  /** 必要スタッフ数（稼働日×勤務帯名） */
+  get requiredStaffing(): RequiredStaffing {
+    return this.state.requiredStaffing;
+  }
+
+  /** その稼働日・その勤務帯名の必要人数（未設定は0） */
+  requiredFor(day: WorkingDay, shiftName: string): number {
+    return this.state.requiredStaffing.requiredFor(day, shiftName);
+  }
+
+  /**
+   * その稼働日・その勤務帯名の必要人数を設定した新しい勤務表を返す。不変。
+   * count <= 0 ならその設定を取り除く。
+   */
+  setRequired(day: WorkingDay, shiftName: string, count: number): MonthlyStaffSchedule {
+    return new MonthlyStaffSchedule({
+      ...this.state,
+      requiredStaffing: this.state.requiredStaffing.setRequired(day, shiftName, count),
+    });
+  }
+
   // ========== 制約チェック ==========
 
   /**
@@ -271,6 +303,7 @@ export class MonthlyStaffSchedule {
       month: this.state.month,
       workShiftIds: [...this.state.workShiftIds],
       assignments: this.state.assignments.map((a) => a.toPlain()),
+      requiredStaffing: this.state.requiredStaffing.toPlain(),
     };
   }
 
@@ -282,6 +315,7 @@ export class MonthlyStaffSchedule {
       month: plain.month,
       workShiftIds: [...plain.workShiftIds],
       assignments: plain.assignments.map((a) => ShiftAssignment.fromPlain(a)),
+      requiredStaffing: RequiredStaffing.fromPlain(plain.requiredStaffing),
     });
   }
 }
