@@ -26,6 +26,11 @@ export function useKeyBindings(bindings: KeyBinding[]): void {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // テキスト入力中（input / textarea / contentEditable）はキー操作を奪わない。
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
+        return;
+      }
       const meta = e.ctrlKey || e.metaKey;
       for (const b of ref.current) {
         if (e.key.toLowerCase() !== b.key.toLowerCase()) continue;

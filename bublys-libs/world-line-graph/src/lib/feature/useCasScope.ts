@@ -50,6 +50,8 @@ export interface CasScopeValue {
   moveForward(): void;
   /** 指定ノードに移動 */
   moveTo(nodeId: string): void;
+  /** ノードに表示名（ラベル）を設定/更新する。空文字で解除。 */
+  setNodeLabel(nodeId: string, label: string | undefined): void;
   /** undo 可能かどうか */
   canUndo: boolean;
   /** redo 可能かどうか */
@@ -109,6 +111,14 @@ export function useCasScope(
   const moveTo = useCallback(
     (nodeId: string) => {
       const updated = graph.moveTo(nodeId);
+      dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
+    },
+    [dispatch, scopeId, graph]
+  );
+
+  const setNodeLabel = useCallback(
+    (nodeId: string, label: string | undefined) => {
+      const updated = graph.setNodeLabel(nodeId, label);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
     },
     [dispatch, scopeId, graph]
@@ -319,6 +329,7 @@ export function useCasScope(
     moveBack,
     moveForward,
     moveTo,
+    setNodeLabel,
     canUndo: graph.canUndo,
     canRedo: graph.canRedo,
     getForkChoices,

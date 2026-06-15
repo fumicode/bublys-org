@@ -90,7 +90,7 @@ const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
 const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "").replace("/history", "");
   const scope = useCasScope(memoScopeId(memoId));
-  return <WorldLineScopeView scope={scope} />;
+  return <WorldLineScopeView scope={scope} nameable />;
 };
 
 // 再帰的 universe バブル（バブルの中の universe）は lib 提供の
