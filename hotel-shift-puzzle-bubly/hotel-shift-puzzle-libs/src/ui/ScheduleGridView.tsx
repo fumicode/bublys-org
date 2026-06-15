@@ -247,13 +247,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
               const n = row.count(i);
               const req = row.required?.(i) ?? 0;
 
-              // 必要数あり: 「現在/必要」を分母付きで表示し、達成度を背景バーで表す
+              // 必要数あり: 「現在/必要」を分母付きで表示。色は勤務帯ではなく
+              // 「満たされているか」で決める（達成=緑 / 不足=赤）。
+              // 背景バーは充足率ぶんを下から上に伸ばす。
               if (req > 0) {
                 const pct = Math.min(100, Math.round((n / req) * 100));
                 const met = n >= req;
-                // 満たした分は勤務帯色、不足分は薄い赤で「足りていない」を可視化
-                const fill = row.bg;
-                const track = met ? row.bg : "#ffe0e0";
+                const fill = met ? "#c8e6c9" : "#ffcdd2"; // 達成=緑 / 不足=赤
+                const track = "#f7f7f7"; // 未充足ぶん（上側）
                 return (
                   <div
                     key={`sum:${row.key}:${day.key}`}
@@ -261,10 +262,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                       met ? " is-met" : " is-under"
                     }`}
                     style={{
-                      background: `linear-gradient(to right, ${fill} ${pct}%, ${track} ${pct}%)`,
-                      color: met ? row.fg : "#c62828",
+                      background: `linear-gradient(to top, ${fill} ${pct}%, ${track} ${pct}%)`,
                     }}
-                    title={`${row.label}: ${n}/${req}名`}
+                    title={`${row.label}: ${n}/${req}名（${met ? "達成" : "不足"}）`}
                   >
                     <span className="e-cur">{n}</span>
                     <span className="e-den">/{req}</span>
@@ -272,14 +272,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 );
               }
 
-              // 必要数なし（休み等）: 人数のみ
+              // 必要数なし（休み等）: 人数のみ（時間帯色は付けない）
               return (
                 <div
                   key={`sum:${row.key}:${day.key}`}
                   className={`e-sum-cell${rowIndex === 0 ? " is-first" : ""}${
                     n === 0 ? " is-zero" : ""
                   }`}
-                  style={n === 0 ? undefined : { background: row.bg, color: row.fg }}
                 >
                   {n}
                 </div>
@@ -378,9 +377,12 @@ const StyledWrap = styled.div`
       font-size: 0.75em;
       opacity: 0.7;
     }
-    /* 不足している日は枠で強調 */
+    /* 達成/不足を文字色でも表す（勤務帯色は使わない） */
+    &.is-met {
+      color: #2e7d32;
+    }
     &.is-under {
-      box-shadow: inset 0 0 0 1px #ef9a9a;
+      color: #c62828;
     }
   }
 
