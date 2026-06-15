@@ -195,6 +195,12 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(restored.requiredFor(june1, '早番')).toBe(2);
   });
 
+  test('setRequiredForAllDays は全稼働日に必要人数を設定する', () => {
+    const schedule = createJuneSchedule().setRequiredForAllDays('早番', 3);
+    expect(schedule.requiredFor(WorkingDay.of(2026, 6, 1), '早番')).toBe(3);
+    expect(schedule.requiredFor(WorkingDay.of(2026, 6, 30), '早番')).toBe(3);
+  });
+
   test('6月の稼働日は30日ある', () => {
     const days = createJuneSchedule().workingDays();
     expect(days).toHaveLength(30);

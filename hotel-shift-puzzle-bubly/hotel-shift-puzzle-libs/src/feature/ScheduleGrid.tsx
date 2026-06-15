@@ -68,6 +68,14 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setCell(staffId, day, to));
   };
 
+  // 必要スタッフ数の編集（その日・全日）。同じくシェル経由で保存される
+  const handleChangeRequired = (day: WorkingDay, shiftName: string, count: number) => {
+    update((s) => s.setRequired(day, shiftName, count));
+  };
+  const handleChangeRequiredAllDays = (shiftName: string, count: number) => {
+    update((s) => s.setRequiredForAllDays(shiftName, count));
+  };
+
   return (
     <StyledContainer>
       <div className="e-header">
@@ -98,6 +106,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         violations={violations}
         onChangeCell={handleChangeCell}
         onOpenViolation={(v) => onOpenViolation?.(v.key)}
+        onChangeRequired={handleChangeRequired}
+        onChangeRequiredAllDays={handleChangeRequiredAllDays}
       />
     </StyledContainer>
   );

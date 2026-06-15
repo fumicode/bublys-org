@@ -28,6 +28,10 @@ type ScheduleGridViewProps = {
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 違反（赤線）をクリックしたとき */
   onOpenViolation?: (violation: ConstraintViolation) => void;
+  /** 必要スタッフ数を変更する（その日・その勤務帯名） */
+  onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
+  /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
+  onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
 };
 
 // 勤務帯ごとの色（背景・文字）
@@ -59,6 +63,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   violations = [],
   onChangeCell,
   onOpenViolation,
+  onChangeRequired,
+  onChangeRequiredAllDays,
 }) => {
   const days = schedule.workingDays();
 
@@ -126,6 +132,28 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   ];
 
   const [editing, setEditing] = useState<EditingCell | null>(null);
+
+  // 必要スタッフ数の編集メニュー。day=null は「全稼働日に一括」。
+  const [editingRequired, setEditingRequired] = useState<{
+    anchor: HTMLElement;
+    shiftName: string;
+    day: WorkingDay | null;
+    current: number;
+  } | null>(null);
+
+  // 必要人数として選べる最大値（スタッフ総数まで）
+  const maxRequired = Math.max(staffList.length, 1);
+
+  const applyRequired = (count: number) => {
+    if (editingRequired) {
+      if (editingRequired.day) {
+        onChangeRequired?.(editingRequired.day, editingRequired.shiftName, count);
+      } else {
+        onChangeRequiredAllDays?.(editingRequired.shiftName, count);
+      }
+    }
+    setEditingRequired(null);
+  };
 
   const applyChange = (to: ShiftCell) => {
     if (editing) onChangeCell(editing.staffId, editing.day, to);
@@ -235,11 +263,29 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
         {/* 勤務帯ごと＋休みの人数集計（スタッフ行の後）。名前が同じ勤務帯は合算し、
             セルと同じ色で色分けする */}
-        {summaryRows.map((row, rowIndex) => (
+        {summaryRows.map((row, rowIndex) => {
+          // 必要数を持つ行（勤務帯）だけ編集できる
+          const editable = !!row.required && (onChangeRequired || onChangeRequiredAllDays);
+          return (
           <Fragment key={`sum:${row.key}`}>
             <div
-              className={`e-sum-head${rowIndex === 0 ? " is-first" : ""}`}
+              className={`e-sum-head${rowIndex === 0 ? " is-first" : ""}${
+                editable ? " is-editable" : ""
+              }`}
               style={{ background: row.bg, color: row.fg }}
+              role={editable ? "button" : undefined}
+              title={editable ? `${row.label}の必要人数を全日まとめて設定` : undefined}
+              onClick={
+                editable
+                  ? (e) =>
+                      setEditingRequired({
+                        anchor: e.currentTarget,
+                        shiftName: row.label,
+                        day: null,
+                        current: row.required?.(0) ?? 0,
+                      })
+                  : undefined
+              }
             >
               {row.label}
             </div>
@@ -260,11 +306,25 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                     key={`sum:${row.key}:${day.key}`}
                     className={`e-sum-cell is-ratio${rowIndex === 0 ? " is-first" : ""}${
                       met ? " is-met" : " is-under"
-                    }`}
+                    }${editable ? " is-editable" : ""}`}
                     style={{
                       background: `linear-gradient(to top, ${fill} ${pct}%, ${track} ${pct}%)`,
                     }}
-                    title={`${row.label}: ${n}/${req}名（${met ? "達成" : "不足"}）`}
+                    title={`${row.label} ${day.label}: ${n}/${req}名（${
+                      met ? "達成" : "不足"
+                    }）${editable ? " — クリックで必要人数を変更" : ""}`}
+                    role={editable ? "button" : undefined}
+                    onClick={
+                      editable
+                        ? (e) =>
+                            setEditingRequired({
+                              anchor: e.currentTarget,
+                              shiftName: row.label,
+                              day,
+                              current: req,
+                            })
+                        : undefined
+                    }
                   >
                     <span className="e-cur">{n}</span>
                     <span className="e-den">/{req}</span>
@@ -272,20 +332,35 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 );
               }
 
-              // 必要数なし（休み等）: 人数のみ（時間帯色は付けない）
+              // 必要数なし: 人数のみ（時間帯色は付けない）。
+              // 勤務帯行（editable）なら、まだ必要数 0 の日もクリックで設定できる。
               return (
                 <div
                   key={`sum:${row.key}:${day.key}`}
                   className={`e-sum-cell${rowIndex === 0 ? " is-first" : ""}${
                     n === 0 ? " is-zero" : ""
-                  }`}
+                  }${editable ? " is-editable" : ""}`}
+                  role={editable ? "button" : undefined}
+                  title={editable ? `${row.label} ${day.label}: 必要人数を設定` : undefined}
+                  onClick={
+                    editable
+                      ? (e) =>
+                          setEditingRequired({
+                            anchor: e.currentTarget,
+                            shiftName: row.label,
+                            day,
+                            current: 0,
+                          })
+                      : undefined
+                  }
                 >
                   {n}
                 </div>
               );
             })}
           </Fragment>
-        ))}
+          );
+        })}
       </div>
 
       {/* セル編集メニュー（可能勤務帯があれば、そのスタッフが入れる勤務帯に絞る） */}
@@ -315,6 +390,36 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         <MenuItem onClick={() => applyChange({ kind: "undecided" })}>
           <ListItemText primary="未定（クリア）" />
         </MenuItem>
+      </Menu>
+
+      {/* 必要スタッフ数の編集メニュー（0〜スタッフ総数） */}
+      <Menu
+        anchorEl={editingRequired?.anchor ?? null}
+        open={!!editingRequired}
+        onClose={() => setEditingRequired(null)}
+      >
+        {editingRequired && (
+          <div
+            style={{
+              padding: "4px 16px 6px",
+              fontSize: "0.8em",
+              color: "#888",
+              borderBottom: "1px solid #eee",
+            }}
+          >
+            {editingRequired.shiftName}・必要人数
+            {editingRequired.day ? `（${editingRequired.day.label}）` : "（全稼働日）"}
+          </div>
+        )}
+        {Array.from({ length: maxRequired + 1 }, (_, count) => (
+          <MenuItem
+            key={count}
+            selected={count === editingRequired?.current}
+            onClick={() => applyRequired(count)}
+          >
+            <ListItemText primary={count === 0 ? "0（設定なし）" : `${count} 名`} />
+          </MenuItem>
+        ))}
       </Menu>
     </StyledWrap>
   );
@@ -354,6 +459,18 @@ const StyledWrap = styled.div`
     gap: 4px;
     padding: 4px 8px;
     font-weight: bold;
+  }
+
+  /* 必要人数を編集できるセル / 見出し */
+  .e-sum-head.is-editable,
+  .e-sum-cell.is-editable {
+    cursor: pointer;
+  }
+  .e-sum-cell.is-editable:hover {
+    box-shadow: inset 0 0 0 2px #90a4ae;
+  }
+  .e-sum-head.is-editable:hover {
+    filter: brightness(0.96);
   }
   .e-sum-cell {
     display: flex;

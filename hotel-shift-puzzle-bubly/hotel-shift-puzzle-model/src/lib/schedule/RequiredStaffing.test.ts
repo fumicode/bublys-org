@@ -30,6 +30,19 @@ describe('RequiredStaffing（必要スタッフ数）の使い方', () => {
     expect(cleared.requiredFor(d1, '中番')).toBe(3); // 他は残る
   });
 
+  test('setRequiredForDays は複数日にまとめて設定する（不変）', () => {
+    const base = RequiredStaffing.empty();
+    const set = base.setRequiredForDays([d1, d2], '早番', 2);
+    expect(set.requiredFor(d1, '早番')).toBe(2);
+    expect(set.requiredFor(d2, '早番')).toBe(2);
+    expect(base.requiredFor(d1, '早番')).toBe(0); // 元は不変
+
+    // 0 でまとめて取り除く
+    const cleared = set.setRequiredForDays([d1, d2], '早番', 0);
+    expect(cleared.requiredFor(d1, '早番')).toBe(0);
+    expect(cleared.requiredFor(d2, '早番')).toBe(0);
+  });
+
   test('toPlain / fromPlain でラウンドトリップできる', () => {
     const req = RequiredStaffing.uniform([d1, d2], { 早番: 2, 中番: 1 });
     const restored = RequiredStaffing.fromPlain(req.toPlain());

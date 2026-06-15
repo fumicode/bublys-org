@@ -282,6 +282,21 @@ export class MonthlyStaffSchedule {
     });
   }
 
+  /**
+   * その勤務帯名の必要人数を、この勤務表の全稼働日にまとめて設定した
+   * 新しい勤務表を返す。不変。count <= 0 なら取り除く。
+   */
+  setRequiredForAllDays(shiftName: string, count: number): MonthlyStaffSchedule {
+    return new MonthlyStaffSchedule({
+      ...this.state,
+      requiredStaffing: this.state.requiredStaffing.setRequiredForDays(
+        this.workingDays(),
+        shiftName,
+        count
+      ),
+    });
+  }
+
   // ========== 制約チェック ==========
 
   /**
