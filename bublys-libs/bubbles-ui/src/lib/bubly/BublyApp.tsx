@@ -114,7 +114,9 @@ export const BublyApp: FC<BublyAppProps> = ({
     return b.id;
   }, [dispatch]);
 
-  const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
+  // 可視 surface 領域の「下部」に、左右いっぱいのストリップとして開く（世界線ビュー等）。
+  // UniverseView の popChildViewPortBelow と同じ振る舞いに揃える（最大化ではなく下部ストリップ）。
+  const popChildViewPortBelow = useCallback((b: Bubble, openerBubbleId: string): string => {
     const viewport = measureViewport();
     const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
     const visible = viewport?.visibleRegion() ?? {
@@ -122,16 +124,20 @@ export const BublyApp: FC<BublyAppProps> = ({
       size: { width: 0, height: 0 },
     };
 
-    // 可視 surface 領域いっぱいに最大化して開く
-    const newPosition = visible.origin;
     const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
     const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
+    const height = Math.round(availableHeight * 0.45);
+    const newPosition = {
+      x: visible.origin.x,
+      y: visible.origin.y + (availableHeight - height),
+    };
 
-    const resizedBubble = b.maximizeTo({ width: availableWidth, height: availableHeight });
+    const resizedBubble = b.resizeTo({ width: availableWidth, height });
     const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));
+    // popChildMaxInProcess を再利用（前面化＋アニメのみ。再配置リスナーは走らない）。
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
@@ -157,7 +163,7 @@ export const BublyApp: FC<BublyAppProps> = ({
     const isNameEndWithHistory = /\/history$/.test(name);
 
     if (isNameEndWithHistory) {
-      return popChildMax(newBubble, openerBubbleId);
+      return popChildViewPortBelow(newBubble, openerBubbleId);
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
@@ -165,7 +171,7 @@ export const BublyApp: FC<BublyAppProps> = ({
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }
-  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
+  }, [surfaceBubbles, popChild, popChildViewPortBelow, joinSibling]);
 
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
     dispatch(setGlobalCoordinateSystem(cs.toData()));

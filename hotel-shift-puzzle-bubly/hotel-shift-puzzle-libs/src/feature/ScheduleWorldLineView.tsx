@@ -68,14 +68,15 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     );
   }
 
+  // canvas はバブルいっぱいに張る（履歴は popChildViewPortBelow で画面下部の
+  // 左右いっぱいストリップとして開かれる）。背景はルートの contentBackground 側に任せる。
   return (
-    <div style={{ width: 600, height: 360, maxWidth: "80vw", maxHeight: "70vh" }}>
+    <div style={{ width: "100%", height: "100%" }}>
       <WorldLinesCanvasView
         graph={scope.graph}
         apexNodeId={apexId}
         getNodeSummary={(id) => summaries.get(id) ?? ""}
         onSelectNode={restore}
-        background="rgba(15,18,28,0.9)"
       />
     </div>
   );
