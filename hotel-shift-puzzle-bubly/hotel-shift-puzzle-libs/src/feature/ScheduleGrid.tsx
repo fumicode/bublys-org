@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   Staff,
@@ -13,6 +13,7 @@ import {
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
+import { defaultScheduleConstraints } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -26,6 +27,8 @@ type ScheduleGridProps = {
   onOpenHistory?: () => void;
   /** 可能勤務帯エディタを開くハンドラ */
   onOpenAvailability?: () => void;
+  /** 制約違反（赤線）クリック時のハンドラ。違反 key を渡す */
+  onOpenViolation?: (violationKey: string) => void;
 };
 
 /**
@@ -36,6 +39,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenAvailability,
+  onOpenViolation,
 }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -47,6 +51,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
     SCHEDULE_TYPE,
     scheduleId
+  );
+
+  // 制約チェックは変更のたびに再計算する（schedule が変わるたび）
+  const violations = useMemo(
+    () => schedule?.checkConstraints(defaultScheduleConstraints()) ?? [],
+    [schedule]
   );
 
   if (!schedule) {
@@ -85,7 +95,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         staffList={staffList}
         workShifts={workShifts}
         availability={availability}
+        violations={violations}
         onChangeCell={handleChangeCell}
+        onOpenViolation={(v) => onOpenViolation?.(v.key)}
       />
     </StyledContainer>
   );

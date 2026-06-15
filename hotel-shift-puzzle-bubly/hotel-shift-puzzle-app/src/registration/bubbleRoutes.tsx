@@ -11,6 +11,7 @@ import {
   HotelObjectsProvider,
   ScheduleWorldLineView,
   AvailabilityEditor,
+  ScheduleViolationView,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -53,9 +54,25 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
+      onOpenViolation={(violationKey) =>
+        openBubble(
+          `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`,
+          bubble.id,
+          "bubble-side"
+        )
+      }
     />
   );
 };
+
+// --- 制約違反バブル（赤線クリックで開く） ---
+const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ScheduleViolationView
+      scheduleId={bubble.params.scheduleId}
+      violationKey={bubble.params.violationKey}
+    />
+  );
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -72,6 +89,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/history", type: "schedule-history", Component: ScheduleWorldLineBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
 ];

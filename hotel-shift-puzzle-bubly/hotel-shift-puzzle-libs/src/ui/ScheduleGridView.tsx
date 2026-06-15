@@ -11,6 +11,7 @@ import {
   WorkShift,
   WorkingDay,
   ScheduleAvailability,
+  ConstraintViolation,
   type ShiftCell,
 } from "../domain/index.js";
 
@@ -21,8 +22,12 @@ type ScheduleGridViewProps = {
   workShifts: WorkShift[];
   /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
   availability?: ScheduleAvailability;
+  /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
+  violations?: ConstraintViolation[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /** 違反（赤線）をクリックしたとき */
+  onOpenViolation?: (violation: ConstraintViolation) => void;
 };
 
 // 勤務帯ごとの色（背景・文字）
@@ -51,9 +56,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   staffList,
   workShifts,
   availability,
+  violations = [],
   onChangeCell,
+  onOpenViolation,
 }) => {
   const days = schedule.workingDays();
+
+  // そのセルを含む違反（最初の1件）を返す
+  const violationAt = (staffId: string, day: WorkingDay): ConstraintViolation | undefined =>
+    violations.find((v) => v.coversCell(staffId, day));
 
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
@@ -97,6 +108,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       content = "·";
     }
 
+    const violation = violationAt(staff.id, day);
+    if (violation) className += " is-violation";
+
     return (
       <div
         className={className}
@@ -105,6 +119,17 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         onClick={(e) => setEditing({ anchor: e.currentTarget, staffId: staff.id, day })}
       >
         {content}
+        {violation && (
+          <span
+            className="e-violation-bar"
+            role="button"
+            title={violation.message}
+            onClick={(e) => {
+              e.stopPropagation(); // セル編集メニューは開かず、違反バブルを開く
+              onOpenViolation?.(violation);
+            }}
+          />
+        )}
       </div>
     );
   };
@@ -286,6 +311,7 @@ const StyledWrap = styled.div`
 
   /* データセル */
   .e-cell {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -297,6 +323,23 @@ const StyledWrap = styled.div`
 
     &:hover {
       box-shadow: inset 0 0 0 2px #90caf9;
+    }
+  }
+
+  /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */
+  .e-violation-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background: #e53935;
+    cursor: pointer;
+    z-index: 1;
+    transition: height 0.1s;
+
+    &:hover {
+      height: 7px;
     }
   }
   .e-work {
