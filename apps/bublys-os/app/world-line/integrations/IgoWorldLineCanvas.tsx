@@ -1,78 +1,43 @@
 'use client';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useCasScope } from '@bublys-org/world-line-graph';
-import { WorldLinesCanvasView } from '@bublys-org/bubbles-ui';
+import { WorldLineScopeView, useScopeNodeSummaries, moveToSiblingBranch } from '@bublys-org/bubbles-ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
 import { IGO_GAME_TYPE, igoScopeId } from '../../igo-game/domain/IgoGameDomain';
 import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
 
+// 各ノードの要約 = その局面の手数。
+const formatMoves = (g: unknown) => {
+  const n = (g as IgoGame_囲碁ゲーム).state.moveHistory.length;
+  return n > 0 ? `${n}手` : '';
+};
+
 /**
- * 囲碁の世界線を bubbles-ui の canvas ビュー（左→右・分岐は下・横魚眼・自前
- * スクロール）で表示する。world-line-graph の scope を直接読む（memo の履歴
- * バブルと同じ作り）。
+ * 囲碁の世界線を共通の {@link WorldLineScopeView}（canvas: 左→右・分岐は下・
+ * 横魚眼・自前スクロール）で表示する。scope は world-line-graph から直読み。
  *  - ノードクリック → moveTo（その世界へ移動）
- *  - ← 親 / → 子 / ↑↓ 兄弟（フォーカス中のゲームのみ）
+ *  - ← 親 / → 子 / ↑↓ 兄弟（フォーカス中のゲームのみ。Cmd+Z は編集側が担当）
  *  - 要約は手数
  */
 export function IgoWorldLineCanvas({ gameId }: { gameId: string }) {
   const { focusedObjectId } = useFocusedObject();
   const scope = useCasScope(igoScopeId(gameId));
-  const apexId = scope.graph.getApex()?.id ?? null;
+  const getNodeSummary = useScopeNodeSummaries(scope, IGO_GAME_TYPE, gameId, formatMoves);
 
-  const summaries = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const id of Object.keys(scope.graph.state.nodes)) {
-      const game = scope.getObjectAt<IgoGame_囲碁ゲーム>(id, IGO_GAME_TYPE, gameId);
-      const moves = game?.state.moveHistory.length ?? 0;
-      m.set(id, moves > 0 ? `${moves}手` : '');
-    }
-    return m;
-  }, [scope.graph, scope.getObjectAt, gameId]);
-
-  // 矢印キーで世界線を移動（フォーカス中のゲームのみ）
-  useEffect(() => {
-    if (focusedObjectId !== gameId) return;
-    const onKey = (e: KeyboardEvent) => {
-      const apex = scope.graph.getApex();
-      if (!apex) return;
-      const childrenMap = scope.graph.getChildrenMap();
-      if (e.key === 'ArrowLeft') {
-        if (!apex.parentId) return;
-        e.preventDefault();
-        scope.moveTo(apex.parentId);
-      } else if (e.key === 'ArrowRight') {
-        const children = childrenMap[apex.id] ?? [];
-        if (children.length === 0) return;
-        e.preventDefault();
-        const sameLine = children.find(
-          (id) => scope.graph.state.nodes[id]?.worldLineId === apex.worldLineId,
-        );
-        scope.moveTo(sameLine ?? children[0]);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        if (!apex.parentId) return;
-        const siblings = childrenMap[apex.parentId] ?? [];
-        const idx = siblings.indexOf(apex.id);
-        if (idx < 0) return;
-        const next = siblings[idx + (e.key === 'ArrowUp' ? -1 : 1)];
-        if (!next) return;
-        e.preventDefault();
-        scope.moveTo(next);
-      }
-    };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [focusedObjectId, gameId, scope]);
-
-  return (
-    // バブルのコンテンツ領域いっぱいに canvas を広げる（サイズはバブル側が決める）。
-    <div style={{ width: '100%', height: '100%' }}>
-      <WorldLinesCanvasView
-        graph={scope.graph}
-        apexNodeId={apexId}
-        getNodeSummary={(id) => summaries.get(id) ?? ''}
-        onSelectNode={scope.moveTo}
-        background="rgba(15,18,28,0.85)"
-      />
-    </div>
+  // 矢印のみ・フォーカス中のゲーム限定（Cmd+Z は編集側 IgoWorldLineIntegration が担当）。
+  const focused = focusedObjectId === gameId;
+  const keyBindings = useMemo(
+    () =>
+      focused
+        ? [
+            { key: 'ArrowLeft', run: scope.moveBack },
+            { key: 'ArrowRight', run: scope.moveForward },
+            { key: 'ArrowUp', run: () => moveToSiblingBranch(scope, -1) },
+            { key: 'ArrowDown', run: () => moveToSiblingBranch(scope, 1) },
+          ]
+        : [],
+    [focused, scope],
   );
+
+  return <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />;
 }

@@ -58,8 +58,8 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     Component: IgoGameWorldLinesBubble,
     // 他のバブルと同じ通常 BubbleView で描画する（fillsContainer は使わない）。
     // サイズは popChildViewPortBelow が明示的に与える（画面下部ストリップ）。
-    // 中身は dark な canvas なので、コンテンツ背景も合わせて暗くしておく。
-    bubbleOptions: { contentBackground: "rgba(15,18,28,0.92)" },
+    // canvas は透明。背景は半透明の黒にして、後ろを透かしつつ世界線を見やすく。
+    bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" },
   },
   {
     pattern: /^igo-game\/[^/]+$/,
