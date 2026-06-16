@@ -41,6 +41,11 @@ export type WorldLineScopeViewProps = {
   keyBindings?: KeyBinding[];
   /** true で apex（選択中の世界）に名前をつけるテキストボックスを出す。 */
   nameable?: boolean;
+  /**
+   * ノードクリック時の動作。既定は scope.moveTo（その世界へ移動）。
+   * 別スコープへ反映してから移動するなど、ドメイン固有の遷移を差し込みたいときに渡す。
+   */
+  onSelectNode?: (nodeId: string) => void;
   /** ラッパの style。既定はバブルいっぱい（100%）。 */
   style?: CSSProperties;
 };
@@ -50,6 +55,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   getNodeSummary,
   keyBindings,
   nameable = false,
+  onSelectNode,
   style,
 }) => {
   useKeyBindings(keyBindings ?? EMPTY_BINDINGS);
@@ -109,7 +115,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
         apexNodeId={apexId}
         getNodeSummary={getNodeSummary}
         getNodeLabel={getNodeLabel}
-        onSelectNode={scope.moveTo}
+        onSelectNode={onSelectNode ?? scope.moveTo}
         onApexScreenPos={nameable ? placeInput : undefined}
       />
     </div>
