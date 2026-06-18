@@ -7,7 +7,7 @@ import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -58,6 +58,7 @@ type UniverseBubbleViewProps = {
   vanishingPoint?: Point2;
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
   children?: React.ReactNode;
@@ -74,6 +75,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
   headerExtras,
@@ -105,7 +107,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const [isDragFocused, setIsDragFocused] = useState(false);
 
   const isMaximized = bubble.isMaximized;
 
@@ -130,12 +132,16 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     }
   };
 
+  const handleMouseDown = () => {
+    dispatch(focusBubble(bubble.id, universeId));
+  };
+
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    setIsFocused(true);
+    setIsDragFocused(true);
     onDragStart(e);
   };
 
-  const handleMouseLeave = () => setIsFocused(false);
+  const handleMouseLeave = () => setIsDragFocused(false);
 
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -154,11 +160,12 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       data-bubble-id={bubble.id}
       data-window-style="universe"
       $colorHue={bubble.colorHue}
-      $zIndex={isFocused ? 100 : zIndex}
+      $zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
       onClick={onClick}
+      onMouseDown={handleMouseDown}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();

@@ -14,7 +14,7 @@ export type CoordinateSystemData = {
  * スケール計算の定数
  * レイヤーごとのスケール減少率
  */
-const SCALE_DECAY_RATE = 0.1;
+const SCALE_DECAY_RATE = 0;
 
 /**
  * スケール計算を開始するレイヤーインデックス

@@ -6,7 +6,7 @@ import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -139,6 +139,7 @@ type BubbleProps = {
 
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean; // Reduxのフォーカス状態（クリックで最前面）
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
 
@@ -159,6 +160,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   contentBackground = "white",
   hasLeftLink = false,
   position,
@@ -196,7 +198,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const [isDragFocused, setIsDragFocused] = useState(false);
 
   const isMaximized = bubble.isMaximized;
 
@@ -235,14 +237,18 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   };
 
+  const handleMouseDown = () => {
+    dispatch(focusBubble(bubble.id, universeId));
+  };
+
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
-    setIsFocused(true); // ヘッダークリックで最前面に
+    setIsDragFocused(true);
     if (!onMove) return;
     onDragStart(e);
   };
 
   const handleMouseLeave = () => {
-    setIsFocused(false);
+    setIsDragFocused(false);
   };
 
   // DOM参照をContextに登録
@@ -262,11 +268,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isFocused ? 100 : zIndex}
+      zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
+      onMouseDown={handleMouseDown}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
