@@ -15,6 +15,7 @@ import {
   makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
+  makeSelectFocusedBubbleId,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -58,11 +59,17 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
 })  {
   const selectBubble = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, bubbleId), [universeId, bubbleId]);
   const bubble = useAppSelector(selectBubble);
+  const selectFocusedBubbleId = useMemo(() => makeSelectFocusedBubbleId(universeId), [universeId]);
+  const focusedBubbleId = useAppSelector(selectFocusedBubbleId);
+  const isFocused = focusedBubbleId === bubbleId;
 
   if (!bubble) return null;
 
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
+
+  // フォーカスされたバブルは全レイヤーより前面に表示
+  const effectiveZIndex = isFocused ? 101 : zIndex;
 
   // fillsContainer な窓型バブル（universe / iframe / 等）は専用シェルで描く。
   // 透明な content と窓っぽいヘッダーで「親が透けて見える窓」として表現する。
@@ -72,7 +79,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         bubble={bubble}
         position={pos}
         layerIndex={layerIndex}
-        zIndex={zIndex}
+        zIndex={effectiveZIndex}
+        isFocused={isFocused}
         vanishingPoint={vanishingPoint}
         onClick={() => onBubbleClick?.(bubble.url)}
         onCloseClick={() => onBubbleClose?.(bubble)}
@@ -91,7 +99,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       bubble={bubble}
       position={pos}
       layerIndex={layerIndex}
-      zIndex={zIndex}
+      zIndex={effectiveZIndex}
+      isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}

@@ -1,5 +1,5 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
+import { FC, useContext, useLayoutEffect, useEffect, useMemo, useState, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
@@ -7,7 +7,7 @@ import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -52,12 +52,15 @@ const LayerDownIcon: FC<{ size?: number }> = ({ size = 16 }) => (
   </svg>
 );
 
+const HEADER_PROXIMITY_THRESHOLD = 40;
+
 type UniverseBubbleViewProps = {
   bubble: Bubble;
   position?: Point2;
   vanishingPoint?: Point2;
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
   children?: React.ReactNode;
@@ -74,6 +77,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
   headerExtras,
@@ -105,8 +109,24 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const [isDragFocused, setIsDragFocused] = useState(false);
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [headerOffset, setHeaderOffset] = useState(0);
 
+  const isHeaderVisible = isFocused || isMouseNearTop;
+
+  const updateHeaderSafeZone = () => {
+    const bubbleRect = ref.current?.getBoundingClientRect();
+    if (!bubbleRect) return;
+    const headerEl = ref.current?.querySelector('.e-window-header');
+    const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
+    const headerTopInViewport = bubbleRect.top - 4 - headerHeight;
+    setHeaderOffset(Math.max(0, -headerTopInViewport));
+  };
+
+  useEffect(() => {
+    if (isFocused) updateHeaderSafeZone();
+  }, [isFocused]);
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -130,12 +150,26 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     }
   };
 
+  const handleMouseDown = () => {
+    dispatch(focusBubble(bubble.id, universeId));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
+    updateHeaderSafeZone();
+  };
+
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    setIsFocused(true);
+    setIsDragFocused(true);
     onDragStart(e);
   };
 
-  const handleMouseLeave = () => setIsFocused(false);
+  const handleMouseLeave = () => {
+    setIsDragFocused(false);
+    setIsMouseNearTop(false);
+  };
 
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -154,11 +188,15 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       data-bubble-id={bubble.id}
       data-window-style="universe"
       $colorHue={bubble.colorHue}
-      $zIndex={isFocused ? 100 : zIndex}
+      $zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
+      $headerVisible={isHeaderVisible}
+      $headerOffset={headerOffset}
       onClick={onClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
@@ -248,6 +286,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   }
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
+  if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
   return true;
 });
@@ -261,6 +300,8 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $width?: string;
   $height?: string;
   $backdropColor?: string;
+  $headerVisible?: boolean;
+  $headerOffset?: number;
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -289,7 +330,6 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 
   /* シェル本体は backdropColor（バブリ宣言の「夜空」色）の半透明ガラスとして塗る。
      色は color-mix で 55% に薄め、backdrop-filter blur と合わせて「色付きフロスト
@@ -307,23 +347,29 @@ const StyledWindow = styled.div<StyledWindowProps>`
   backdrop-filter: blur(10px) saturate(1.15);
 
   > .e-window-header {
-    /* StyledWindow が none なので、操作を受けるヘッダーは explicit に auto。 */
-    pointer-events: auto;
+    position: absolute;
+    bottom: 100%;
+    margin-bottom: 4px;
+    left: 0;
+    right: 0;
+    z-index: 1;
     cursor: move;
     user-select: none;
-    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    background: linear-gradient(
-      180deg,
-      hsla(${({ $colorHue }) => $colorHue}, 35%, 30%, 0.65) 0%,
-      hsla(${({ $colorHue }) => $colorHue}, 30%, 22%, 0.45) 100%
-    );
-    border-bottom: 1px solid hsla(${({ $colorHue }) => $colorHue}, 40%, 70%, 0.25);
+    border-radius: 14px;
+    background: hsla(0, 0%, 10%, 0.55);
+    backdrop-filter: blur(8px);
     color: hsla(0, 0%, 100%, 0.9);
     font-size: 0.8em;
+
+    opacity: ${({ $headerVisible }) => $headerVisible ? 1 : 0};
+    pointer-events: ${({ $headerVisible }) => $headerVisible ? 'auto' : 'none'};
+    transform: ${({ $headerVisible, $headerOffset = 0 }) =>
+      $headerVisible ? `translateY(${$headerOffset}px)` : `translateY(${$headerOffset + 6}px)`};
+    transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-window-buttons-left,
     .e-window-buttons-right {
@@ -377,6 +423,13 @@ const StyledWindow = styled.div<StyledWindowProps>`
         background: hsla(270, 60%, 60%, 0.45);
       }
     }
+  }
+
+  /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     transform は JS 管理（$headerOffset 込み）なので上書きしない。 */
+  &:focus-within > .e-window-header {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   > .e-window-content {
