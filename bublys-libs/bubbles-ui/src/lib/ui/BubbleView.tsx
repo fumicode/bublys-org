@@ -481,7 +481,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   max-height: 90vh;//FIXME:突貫対応
 
-  // 泡っぽいグラデーション背景
   background: linear-gradient(
     145deg,
     hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.6) 0%,
@@ -490,36 +489,15 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     hsla(${({ colorHue }) => colorHue}, 55%, 65%, 0.55) 100%
   );
 
-  // 泡っぽいシャドウと光沢
   box-shadow:
     0 8px 32px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.3),
-    0 2px 8px hsla(0, 0%, 0%, 0.1),
-    inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
-    inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
+    0 2px 8px hsla(0, 0%, 0%, 0.1);
 
-  border: 1px solid hsla(0, 0%, 100%, 0.3);
+  border: 1px solid hsla(${({ colorHue }) => colorHue}, 60%, 65%, 0.45);
   border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
 
   display: flex;
   flex-direction: column;
-
-  // ガラスのような光沢エフェクト（疑似要素）
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background: linear-gradient(
-      to bottom,
-      hsla(0, 0%, 100%, 0.2) 0%,
-      hsla(0, 0%, 100%, 0.05) 50%,
-      transparent 100%
-    );
-    border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 50% 50%' : '24px 24px 50% 50%'};
-    pointer-events: none;
-  }
 
   >.e-bubble-header {
     cursor: move;
@@ -532,8 +510,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     z-index: 1;
     padding: 8px 12px;
     border-radius: 16px;
-    background: hsla(0, 0%, 10%, 0.55);
+    background: hsla(${({ colorHue }) => colorHue}, 45%, 20%, 0.7);
     backdrop-filter: blur(8px);
+    border: 1px solid hsla(${({ colorHue }) => colorHue}, 50%, 50%, 0.35);
     color: hsla(0, 0%, 100%, 0.9);
 
     opacity: ${({ headerVisible }) => headerVisible ? 1 : 0};
@@ -747,7 +726,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
     );
     border-radius: 16px;
-    margin: 0 12px 12px;
+    margin: 12px;
     box-shadow:
       inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
       0 1px 2px hsla(0, 0%, 100%, 0.5);

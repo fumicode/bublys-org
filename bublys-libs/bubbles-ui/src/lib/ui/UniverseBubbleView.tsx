@@ -331,20 +331,15 @@ const StyledWindow = styled.div<StyledWindowProps>`
   display: flex;
   flex-direction: column;
 
-  /* シェル本体は backdropColor（バブリ宣言の「夜空」色）の半透明ガラスとして塗る。
-     色は color-mix で 55% に薄め、backdrop-filter blur と合わせて「色付きフロスト
-     ガラス越しに親 universe が透けて見える」感を出す。
-     指定が無ければ完全に透明で、外側 OS の夜空がそのまま透けて見える。 */
-  background: ${({ $backdropColor }) =>
+  background: ${({ $backdropColor, $colorHue }) =>
     $backdropColor
       ? `color-mix(in srgb, ${$backdropColor} 55%, transparent)`
-      : "transparent"};
-  border: none;
+      : `hsla(${$colorHue}, 50%, 60%, 0.45)`};
+  border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 60%, 65%, 0.45);
   border-radius: 14px;
   box-shadow:
-    0 16px 48px hsla(0, 0%, 0%, 0.5),
-    0 2px 8px hsla(0, 0%, 0%, 0.25);
-  backdrop-filter: blur(10px) saturate(1.15);
+    0 8px 32px hsla(${({ $colorHue }) => $colorHue}, 50%, 30%, 0.3),
+    0 2px 8px hsla(0, 0%, 0%, 0.1);
 
   > .e-window-header {
     position: absolute;
@@ -360,8 +355,9 @@ const StyledWindow = styled.div<StyledWindowProps>`
     gap: 8px;
     padding: 6px 10px;
     border-radius: 14px;
-    background: hsla(0, 0%, 10%, 0.55);
+    background: hsla(${({ $colorHue }) => $colorHue}, 45%, 20%, 0.7);
     backdrop-filter: blur(8px);
+    border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 50%, 50%, 0.35);
     color: hsla(0, 0%, 100%, 0.9);
     font-size: 0.8em;
 
@@ -439,6 +435,8 @@ const StyledWindow = styled.div<StyledWindowProps>`
     /* コンテンツ側（universe など）が自前で背景を塗るので、ここは透明。 */
     background: transparent;
     position: relative;
+    margin: 8px;
+    border-radius: 8px;
     /* StyledWindow 経由で none を継承しているが、奥が貫通可能であることを明示。 */
     pointer-events: none;
   }
