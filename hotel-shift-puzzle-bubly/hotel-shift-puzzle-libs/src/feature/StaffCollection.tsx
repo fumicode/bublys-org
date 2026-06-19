@@ -21,12 +21,26 @@ export const StaffCollection: FC = () => {
     actions.save(new Staff({ id: newStaffId(), name }));
   };
 
+  const handleRename = (id: string, name: string) => {
+    const staff = staffList.find((s) => s.id === id);
+    if (staff) actions.save(staff.rename(name));
+  };
+
+  const handleRemove = (id: string) => {
+    actions.remove(id);
+  };
+
   return (
     <StyledContainer>
       <div className="e-header">
         <h3>スタッフ一覧 ({staffList.length}名)</h3>
       </div>
-      <StaffListView staffList={staffList} onCreate={handleCreate} />
+      <StaffListView
+        staffList={staffList}
+        onCreate={handleCreate}
+        onRename={handleRename}
+        onRemove={handleRemove}
+      />
     </StyledContainer>
   );
 };
