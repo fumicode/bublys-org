@@ -259,6 +259,11 @@ export class MonthlyStaffSchedule {
     return this.assignmentsOn(day).filter((a) => a.isDayOff).length;
   }
 
+  /** そのスタッフの月内の休み日数を数える（出勤・未定は除く） */
+  countDayOffForStaff(staffId: string): number {
+    return this.assignmentsForStaff(staffId).filter((a) => a.isDayOff).length;
+  }
+
   // ========== 必要スタッフ数 ==========
 
   /** 必要スタッフ数（稼働日×勤務帯名） */

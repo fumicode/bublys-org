@@ -52,6 +52,7 @@ const SHIFT_FG: Record<string, string> = {
 
 const STAFF_COL_WIDTH = 132;
 const DAY_COL_WIDTH = 60;
+const OFF_COL_WIDTH = 48; // 右端「休（合計）」列
 
 type EditingCell = {
   anchor: HTMLElement;
@@ -186,7 +187,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     setEditing(null);
   };
 
-  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px)`;
+  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px`;
 
   const renderCell = (staff: Staff, day: WorkingDay) => {
     const cell = schedule.statusOf(staff.id, day);
@@ -280,6 +281,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           );
         })}
 
+        {/* 右上の角（休合計列のヘッダ。縦横どちらにも固定） */}
+        <div className="e-off-head">休</div>
+
         {/* スタッフ行 */}
         {staffList.map((staff) => (
           <Fragment key={staff.id}>
@@ -311,6 +315,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
               <Fragment key={`${staff.id}:${day.key}`}>{renderCell(staff, day)}</Fragment>
             ))}
 
+            {/* 右端: そのスタッフの月内休み合計 */}
+            <div
+              className="e-off-total"
+              title={`${staff.name} の休み合計`}
+            >
+              {schedule.countDayOffForStaff(staff.id)}
+            </div>
+
             {/* 展開時: 希望行（割当行の真下に並べて比較できる） */}
             {expanded.has(staff.id) && (
               <Fragment>
@@ -334,6 +346,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                     </div>
                   );
                 })}
+                {/* 休合計列ぶんの空セル（グリッド整列用） */}
+                <div className="e-off-total e-off-filler" />
               </Fragment>
             )}
           </Fragment>
@@ -436,6 +450,19 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 </div>
               );
             })}
+            {/* 右端: 休み行だけ月内の総休み数（＝休列の合計）。他行は空 */}
+            {row.key === "day-off" ? (
+              <div
+                className={`e-off-total e-off-sum${rowIndex === 0 ? " is-first" : ""}`}
+                title="全スタッフの休み合計"
+              >
+                {days.reduce((sum, _day, i) => sum + row.count(i), 0)}
+              </div>
+            ) : (
+              <div
+                className={`e-off-total e-off-filler${rowIndex === 0 ? " is-first" : ""}`}
+              />
+            )}
           </Fragment>
           );
         })}
@@ -521,10 +548,49 @@ const StyledWrap = styled.div`
   .e-staff-cell,
   .e-cell,
   .e-sum-head,
-  .e-sum-cell {
+  .e-sum-cell,
+  .e-off-head,
+  .e-off-total {
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 右端「休（合計）」列。横スクロールしても右に固定して見えるようにする */
+  .e-off-head {
+    position: sticky;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #9e9e9e;
+    border-left: 1px solid #e0e0e0;
+  }
+  .e-off-total {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #fbfbfb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #616161;
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid #e0e0e0;
+  }
+  .e-off-total.e-off-filler {
+    background: #fafafa;
+  }
+  .e-off-total.e-off-sum {
+    color: #455a64;
+  }
+  .e-off-total.is-first {
+    border-top: 2px solid #b0bec5;
   }
 
   /* 勤務帯ごと＋休みの人数集計行（背景・文字色は行ごとにインラインで色分け） */
