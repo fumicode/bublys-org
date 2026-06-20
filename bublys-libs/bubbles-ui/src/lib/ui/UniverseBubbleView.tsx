@@ -1,5 +1,5 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
+import { FC, useContext, useLayoutEffect, useMemo, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
@@ -107,8 +107,6 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isDragFocused, setIsDragFocused] = useState(false);
-
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -137,11 +135,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    setIsDragFocused(true);
     onDragStart(e);
   };
-
-  const handleMouseLeave = () => setIsDragFocused(false);
 
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -160,13 +155,12 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       data-bubble-id={bubble.id}
       data-window-style="universe"
       $colorHue={bubble.colorHue}
-      $zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
+      $zIndex={isFocused ? 101 : zIndex}
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
       onClick={onClick}
       onMouseDown={handleMouseDown}
-      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));

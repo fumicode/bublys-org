@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -198,8 +198,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isDragFocused, setIsDragFocused] = useState(false);
-
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -242,13 +240,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
-    setIsDragFocused(true);
     if (!onMove) return;
     onDragStart(e);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragFocused(false);
   };
 
   // DOM参照をContextに登録
@@ -268,13 +261,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
+      zIndex={isFocused ? 101 : zIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
       onMouseDown={handleMouseDown}
-      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));
