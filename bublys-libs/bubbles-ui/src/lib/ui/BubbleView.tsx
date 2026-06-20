@@ -147,6 +147,7 @@ type BubbleProps = {
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
   onCloseClick?: (bubble: Bubble) => void;
   onMove?: (bubble: Bubble) => void;
+  onDragActivity?: () => void; // ドラッグ中・終了時に呼ばれる（deferred timer リセット用）
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
   onResize?: (bubble: Bubble) => void;
@@ -170,6 +171,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   onLayerDownClick,
   onLayerUpClick,
   onMove,
+  onDragActivity,
   onResize,
   onDebugRects,
 }) => {
@@ -195,7 +197,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragActivity });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);

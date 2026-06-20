@@ -104,6 +104,7 @@ const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function Deferred
         lightweightMode={lightweightMode}
         onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
         onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
+        onDragActivity={handleActivate}
         onResize={(updated) => { handleActivate(); onBubbleResize?.(updated); }}
         onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
         onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}
@@ -126,7 +127,8 @@ const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function Deferred
       lightweightMode={lightweightMode}
       onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
       onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
-      onMove={(updated) => { handleActivate(); onBubbleMove?.(updated); }}
+      onMove={(updated) => { onBubbleMove?.(updated); }}
+      onDragActivity={handleActivate}
       onResize={(updated) => { handleActivate(); onBubbleResize?.(updated); }}
       onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
       onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}

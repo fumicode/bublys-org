@@ -64,6 +64,7 @@ type UniverseBubbleViewProps = {
   children?: React.ReactNode;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onCloseClick?: (bubble: Bubble) => void;
+  onDragActivity?: () => void; // ドラッグ中・終了時に呼ばれる（deferred timer リセット用）
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
   onResize?: (bubble: Bubble) => void;
@@ -81,6 +82,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   lightweightMode = false,
   onClick,
   onCloseClick,
+  onDragActivity,
   onLayerDownClick,
   onLayerUpClick,
   onResize,
@@ -104,7 +106,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     },
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragActivity });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);
