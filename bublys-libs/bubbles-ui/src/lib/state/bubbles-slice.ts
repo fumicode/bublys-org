@@ -48,6 +48,7 @@ export interface UniverseState {
   bubbleRelations: BubblesRelation[];
   globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
+  lastActiveAt: Record<string, number>; // bubbleId → そのバブルが最後にアクティブだった時刻 (Date.now() ms)
 }
 
 /** ルート universe の ID。ネストした universe は別 ID を持つ。 */
@@ -84,6 +85,7 @@ const createEmptyUniverse = (): UniverseState => ({
   bubbleRelations: [],
   globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
   surfaceLeftTop: { x: 100, y: 100 },
+  lastActiveAt: {},
 });
 
 // 初期状態を構築する関数（遅延評価）
@@ -109,6 +111,7 @@ const getInitialState = (): BubbleStateSlice => {
         bubbleRelations: [],
         globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
         surfaceLeftTop: { x: 100, y: 100 },
+        lastActiveAt: {},
       },
     },
     renderCount: 0,
@@ -146,6 +149,7 @@ const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
+const prepActivate = (payload: { bubbleId: string; timestamp: number }, universeId?: string) => withU(payload, universeId);
 
 export const bubblesSlice = createSlice({
   name: "bubbleState",
@@ -224,6 +228,18 @@ export const bubblesSlice = createSlice({
         state.renderCount += 1;
       },
       prepare: prepStr,
+    },
+
+    // バブルがユーザーにアクティブに操作された時刻 (ms) を記録する。
+    // layerIndex > 0 のバブルが「最後にアクティブだったのが何 ms 前か」を計算でき、
+    // 長期未操作バブルの遅延描画（deferred rendering）の判定に使う。
+    activateBubble: {
+      reducer: (state, action: PayloadAction<{ bubbleId: string; timestamp: number }, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        if (!u.lastActiveAt) u.lastActiveAt = {};
+        u.lastActiveAt[action.payload.bubbleId] = action.payload.timestamp;
+      },
+      prepare: prepActivate,
     },
 
     finishBubbleAnimation: (state, action: PayloadAction<string>) => {
@@ -359,6 +375,7 @@ export const {
   replaceBubbleArrangement,
   finishBubbleAnimation,
   clearAllAnimations,
+  activateBubble,
 } = bubblesSlice.actions;
 
 // ============================================================================
@@ -758,6 +775,20 @@ export const makeSelectLastSiblingRenderedRect = memoizeByUniverse((uid) =>
       : undefined;
   }),
 );
+
+const EMPTY_LAST_ACTIVE_AT: Record<string, number> = {};
+
+export const makeSelectLastActiveAt = memoizeByUniverse((uid) =>
+  createSelector(
+    [(state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).lastActiveAt],
+    (at): Record<string, number> => at ?? EMPTY_LAST_ACTIVE_AT,
+  ),
+);
+
+/** 特定バブルの lastActiveAt だけを選択する。プリミティブ返却なので他バブルの activate で再レンダーしない。 */
+export const makeSelectBubbleLastActiveAt = (universeId: string, bubbleId: string) =>
+  (state: { bubbleState: BubbleStateSlice }): number =>
+    universeOf(state, universeId).lastActiveAt?.[bubbleId] ?? 0;
 
 export const makeSelectBubbleArrangementForUniverse = memoizeByUniverse((uid) =>
   createSelector(

@@ -1,12 +1,13 @@
-import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useEffect, useReducer, useRef, useLayoutEffect, memo, useMemo, useState, useCallback } from "react";
 import styled from "styled-components";
-import { useAppSelector } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
+import { BubbleSkeleton } from "./BubbleSkeleton.js";
 import { UniverseContext } from "../context/UniverseContext.js";
 import {
   makeSelectValidBubbleRelationIds,
@@ -15,11 +16,138 @@ import {
   makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
+  makeSelectBubbleLastActiveAt,
+  activateBubble,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
+/** 背面バブルを遅延描画に切り替えるまでの非アクティブ時間 (ms) */
+const DEFERRED_AFTER_MS = 1 * 60 * 1000; // 5分
+
 /**
- * 個別バブルを自分でReduxから取得するラッパーコンポーネント
+ * 遅延描画の判定とアクティベートを担う内部コンポーネント。
+ * lastActiveAt (タイムスタンプ) と Date.now() を比較し、
+ * DEFERRED_AFTER_MS 以上非アクティブな背面バブルをスケルトン化する。
+ */
+type DeferredBubbleGuardProps = {
+  universeId: string;
+  bubbleId: string;
+  layerIndex: number;
+  zIndex: number;
+  vanishingPoint: Point2;
+  bubble: Bubble;
+  pos: Point2;
+  hasLeftLink?: boolean;
+  lightweightMode?: boolean;
+  renderBubbleContent: (bubble: Bubble) => ReactNode;
+  onBubbleClick?: (name: string) => void;
+  onBubbleClose?: (bubble: Bubble) => void;
+  onBubbleMove?: (bubble: Bubble) => void;
+  onBubbleResize?: (bubble: Bubble) => void;
+  onBubbleLayerDown?: (bubble: Bubble) => void;
+  onBubbleLayerUp?: (bubble: Bubble) => void;
+  onDebugRects?: (rects: SmartRect[]) => void;
+};
+
+const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function DeferredBubbleGuard({
+  universeId,
+  bubbleId,
+  layerIndex,
+  zIndex,
+  vanishingPoint,
+  bubble,
+  pos,
+  hasLeftLink,
+  lightweightMode,
+  renderBubbleContent,
+  onBubbleClick,
+  onBubbleClose,
+  onBubbleMove,
+  onBubbleResize,
+  onBubbleLayerDown,
+  onBubbleLayerUp,
+  onDebugRects,
+}) {
+  const dispatch = useAppDispatch();
+
+  // per-bubble セレクター: 他バブルの activate では再レンダーしない（プリミティブ比較）
+  const selectLastActiveAt = useMemo(
+    () => makeSelectBubbleLastActiveAt(universeId, bubbleId),
+    [universeId, bubbleId],
+  );
+  const lastActiveAt = useAppSelector(selectLastActiveAt);
+
+  // lastActiveAt === 0 は「まだ一度も明示的にアクティブにされていない」= defer しない
+  const isDeferred = layerIndex > 0 && lastActiveAt > 0 && (Date.now() - lastActiveAt) > DEFERRED_AFTER_MS;
+
+  // deferred に切り替わるべき時刻に自分だけ再レンダーする（全バブルの cascade を避ける）
+  const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    if (layerIndex === 0 || lastActiveAt === 0) return;
+    const elapsed = Date.now() - lastActiveAt;
+    if (elapsed >= DEFERRED_AFTER_MS) return; // すでに deferred 対象
+    const id = setTimeout(forceUpdate, DEFERRED_AFTER_MS - elapsed + 100);
+    return () => clearTimeout(id);
+  }, [layerIndex, lastActiveAt]);
+
+  const handleActivate = useCallback(() => {
+    dispatch(activateBubble({ bubbleId, timestamp: Date.now() }, universeId));
+  }, [dispatch, bubbleId, universeId]);
+
+  // isDeferred / bubble が変わらない限り content を安定させる
+  const content = useMemo(
+    () => isDeferred ? <BubbleSkeleton bubble={bubble} /> : renderBubbleContent(bubble),
+    [isDeferred, bubble, renderBubbleContent],
+  );
+
+  if (bubble.fillsContainer) {
+    return (
+      <UniverseBubbleView
+        bubble={bubble}
+        position={pos}
+        layerIndex={layerIndex}
+        zIndex={zIndex}
+        vanishingPoint={vanishingPoint}
+        lightweightMode={lightweightMode}
+        onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
+        onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
+        onResize={(updated) => { onBubbleResize?.(updated); }}
+        onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+        onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}
+        onDebugRects={onDebugRects}
+      >
+        {content}
+      </UniverseBubbleView>
+    );
+  }
+
+  return (
+    <BubbleView
+      bubble={bubble}
+      position={pos}
+      layerIndex={layerIndex}
+      zIndex={zIndex}
+      vanishingPoint={vanishingPoint}
+      contentBackground={bubble.contentBackground ?? "white"}
+      hasLeftLink={hasLeftLink}
+      lightweightMode={lightweightMode}
+      onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
+      onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
+      onMove={(updated) => { onBubbleMove?.(updated); }}
+      onResize={(updated) => { onBubbleResize?.(updated); }}
+      onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+      onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}
+      onDebugRects={onDebugRects}
+    >
+      {content}
+    </BubbleView>
+  );
+});
+
+/**
+ * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
+ * per-bubble selector のみを購読し、world-line 操作では再 render しない。
+ * 遅延描画の判定は DeferredBubbleGuard に委譲する。
  */
 type ConnectedBubbleViewProps = {
   universeId: string;
@@ -29,6 +157,7 @@ type ConnectedBubbleViewProps = {
   vanishingPoint: Point2;
   surfaceLayer: Layer;
   hasLeftLink?: boolean;
+  lightweightMode?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
@@ -47,6 +176,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   vanishingPoint,
   surfaceLayer,
   hasLeftLink,
+  lightweightMode,
   renderBubbleContent,
   onBubbleClick,
   onBubbleClose,
@@ -55,7 +185,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   onBubbleLayerDown,
   onBubbleLayerUp,
   onDebugRects,
-})  {
+}) {
   const selectBubble = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, bubbleId), [universeId, bubbleId]);
   const bubble = useAppSelector(selectBubble);
 
@@ -64,47 +194,26 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
-  // fillsContainer な窓型バブル（universe / iframe / 等）は専用シェルで描く。
-  // 透明な content と窓っぽいヘッダーで「親が透けて見える窓」として表現する。
-  if (bubble.fillsContainer) {
-    return (
-      <UniverseBubbleView
-        bubble={bubble}
-        position={pos}
-        layerIndex={layerIndex}
-        zIndex={zIndex}
-        vanishingPoint={vanishingPoint}
-        onClick={() => onBubbleClick?.(bubble.url)}
-        onCloseClick={() => onBubbleClose?.(bubble)}
-        onResize={(updated) => onBubbleResize?.(updated)}
-        onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
-        onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
-        onDebugRects={onDebugRects}
-      >
-        {renderBubbleContent(bubble)}
-      </UniverseBubbleView>
-    );
-  }
-
   return (
-    <BubbleView
-      bubble={bubble}
-      position={pos}
+    <DeferredBubbleGuard
+      universeId={universeId}
+      bubbleId={bubbleId}
       layerIndex={layerIndex}
       zIndex={zIndex}
       vanishingPoint={vanishingPoint}
-      contentBackground={bubble.contentBackground ?? "white"}
+      bubble={bubble}
+      pos={pos}
       hasLeftLink={hasLeftLink}
-      onClick={() => onBubbleClick?.(bubble.url)}
-      onCloseClick={() => onBubbleClose?.(bubble)}
-      onMove={(updated) => onBubbleMove?.(updated)}
-      onResize={(updated) => onBubbleResize?.(updated)}
-      onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
-      onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+      lightweightMode={lightweightMode}
+      renderBubbleContent={renderBubbleContent}
+      onBubbleClick={onBubbleClick}
+      onBubbleClose={onBubbleClose}
+      onBubbleMove={onBubbleMove}
+      onBubbleResize={onBubbleResize}
+      onBubbleLayerDown={onBubbleLayerDown}
+      onBubbleLayerUp={onBubbleLayerUp}
       onDebugRects={onDebugRects}
-    >
-      {renderBubbleContent(bubble)}
-    </BubbleView>
+    />
   );
 });
 
@@ -117,6 +226,7 @@ type ConnectedLinkBubbleViewProps = {
   openeeId: string;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
+  lightweightMode?: boolean;
 };
 
 const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
@@ -125,6 +235,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   openeeId,
   coordinateSystem,
   linkZIndex,
+  lightweightMode,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
   const selectOpenee = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openeeId), [universeId, openeeId]);
@@ -139,6 +250,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       openee={openee}
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
+      lightweightMode={lightweightMode}
     />
   );
 });
@@ -334,11 +446,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return () => window.removeEventListener('wheel', onWheel);
   }, [universeId]);
 
+  const dispatch = useAppDispatch();
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
   const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
+  const lightweightMode = useAppSelector(selectLightweightMode);
 
   const undergroundVanishingPoint: Point2 = vanishingPoint || {
     x: 20,
@@ -384,6 +498,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             vanishingPoint={undergroundVanishingPoint}
             surfaceLayer={surfaceLayer}
             hasLeftLink={hasLeftLink}
+            lightweightMode={lightweightMode}
             renderBubbleContent={renderBubbleContent}
             onBubbleClick={onBubbleClick}
             onBubbleClose={onBubbleClose}
@@ -427,6 +542,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
                     openeeId={openeeId}
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
+                    lightweightMode={lightweightMode}
                   />
                 );
               })
@@ -446,6 +562,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
               onClick={() => setShowSurfaceBorder((v) => !v)}
             >
               {showSurfaceBorder ? '◻' : '◼'}
+            </button>
+            <button
+              className="e-lightweight-toggle"
+              onClick={() => dispatch(toggleLightweightMode())}
+              title={lightweightMode ? '通常描画モードへ' : '軽量描画モードへ'}
+            >
+              {lightweightMode ? '精' : '速'}
             </button>
           </div>
         </StyledHeadsUpDisplay>
@@ -558,6 +681,31 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
       background: rgba(255, 255, 255, 0.1);
       color: rgba(255, 255, 255, 0.5);
       font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+      pointer-events: auto;
+
+      &:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    .e-lightweight-toggle {
+      position: absolute;
+      bottom: 8px;
+      left: ${({ surface }) => surface.leftTop.x + 40}px;
+      z-index: ${({ surfaceZIndex }) => (surfaceZIndex || 0) + 1};
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
       line-height: 1;
       cursor: pointer;
       opacity: 0.4;
