@@ -9,6 +9,7 @@ type LinkBubbleViewProps = {
   openee: Bubble;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
+  lightweightMode?: boolean;
 };
 
 export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
@@ -16,6 +17,7 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   openee,
   coordinateSystem,
   linkZIndex,
+  lightweightMode = false,
 }) => {
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -84,13 +86,21 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
         </defs>
         <path
           d={pathData}
-          stroke="none"
-          strokeWidth="2"
           fill={
-            opener.colorHue === undefined
-              ? "rgba(255,0,0,0.5)"
-              : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`
+            lightweightMode
+              ? "none"
+              : opener.colorHue === undefined
+                ? "rgba(255,0,0,0.5)"
+                : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`
           }
+          stroke={
+            lightweightMode
+              ? opener.colorHue === undefined
+                ? "rgba(255,0,0,0.7)"
+                : `hsla(${opener.colorHue}, 50%, 50%, 0.7)`
+              : "none"
+          }
+          strokeWidth={lightweightMode ? "1.5" : "0"}
         />
       </svg>
     </div>

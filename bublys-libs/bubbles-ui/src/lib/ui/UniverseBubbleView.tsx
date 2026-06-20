@@ -60,6 +60,7 @@ type UniverseBubbleViewProps = {
   zIndex?: number;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
+  lightweightMode?: boolean;
   children?: React.ReactNode;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onCloseClick?: (bubble: Bubble) => void;
@@ -77,6 +78,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
   headerExtras,
+  lightweightMode = false,
   onClick,
   onCloseClick,
   onLayerDownClick,
@@ -167,6 +169,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $width={bubble.size ? `${bubble.size.width}px` : undefined}
       $height={bubble.size ? `${bubble.size.height}px` : undefined}
       $backdropColor={bubble.backdropColor}
+      $lightweightMode={lightweightMode}
     >
       <header className="e-window-header" onMouseDown={handleHeaderMouseDown}>
         <div className="e-window-buttons-left">
@@ -249,6 +252,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
+  if (prev.lightweightMode !== next.lightweightMode) return false;
   return true;
 });
 
@@ -261,6 +265,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $width?: string;
   $height?: string;
   $backdropColor?: string;
+  $lightweightMode?: boolean;
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -279,7 +284,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
   top: ${({ $position }) => ($position ? `${$position.y}px` : "0")};
 
   transition-property: left top transform;
-  transition: 0.3s ease-in-out;
+  transition: ${({ $lightweightMode }) => $lightweightMode ? 'none' : '0.3s ease-in-out'};
 
   transform-origin: ${({ $transformOrigin }) =>
     $transformOrigin ? `${$transformOrigin.x}px ${$transformOrigin.y}px` : "center center"};
@@ -301,10 +306,10 @@ const StyledWindow = styled.div<StyledWindowProps>`
       : "transparent"};
   border: none;
   border-radius: 14px;
-  box-shadow:
-    0 16px 48px hsla(0, 0%, 0%, 0.5),
-    0 2px 8px hsla(0, 0%, 0%, 0.25);
-  backdrop-filter: blur(10px) saturate(1.15);
+  box-shadow: ${({ $lightweightMode }) => $lightweightMode
+    ? 'none'
+    : '0 16px 48px hsla(0, 0%, 0%, 0.5), 0 2px 8px hsla(0, 0%, 0%, 0.25)'};
+  backdrop-filter: ${({ $lightweightMode }) => $lightweightMode ? 'none' : 'blur(10px) saturate(1.15)'};
 
   > .e-window-header {
     /* StyledWindow が none なので、操作を受けるヘッダーは explicit に auto。 */

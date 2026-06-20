@@ -141,6 +141,7 @@ type BubbleProps = {
   zIndex?: number;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
+  lightweightMode?: boolean; // 軽量モード: box-shadow・transition・backdrop-filter を省略
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -161,6 +162,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   zIndex,
   contentBackground = "white",
   hasLeftLink = false,
+  lightweightMode = false,
   position,
   vanishingPoint,
   onClick,
@@ -277,6 +279,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
       fillsContainer={bubble.fillsContainer}
+      lightweightMode={lightweightMode}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -385,7 +388,8 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
       prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.hasLeftLink !== nextProps.hasLeftLink) {
+      prevProps.hasLeftLink !== nextProps.hasLeftLink ||
+      prevProps.lightweightMode !== nextProps.lightweightMode) {
     return false;
   }
 
@@ -407,6 +411,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
   fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
+  lightweightMode?: boolean; // 軽量モード
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -427,7 +432,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   top: ${({ position }) => (position ? `${position.y}px` : "0")};
 
   transition-property: left top transform;
-  transition: 0.3s ease-in-out;
+  transition: ${({ lightweightMode }) => lightweightMode ? 'none' : '0.3s ease-in-out'};
 
   transform-origin: ${({ transformOrigin }) =>
     transformOrigin
@@ -442,21 +447,25 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   max-height: 90vh;//FIXME:突貫対応
 
-  // 泡っぽいグラデーション背景
-  background: linear-gradient(
-    145deg,
-    hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.6) 0%,
-    hsla(${({ colorHue }) => colorHue}, 50%, 60%, 0.5) 30%,
-    hsla(${({ colorHue }) => colorHue}, 45%, 55%, 0.45) 70%,
-    hsla(${({ colorHue }) => colorHue}, 55%, 65%, 0.55) 100%
-  );
+  // 通常モードは泡っぽいグラデーション背景、軽量モードは単色（アルファ合成コスト削減）
+  background: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? `hsl(${colorHue}, 35%, 50%)`
+    : `linear-gradient(
+        145deg,
+        hsla(${colorHue}, 60%, 70%, 0.6) 0%,
+        hsla(${colorHue}, 50%, 60%, 0.5) 30%,
+        hsla(${colorHue}, 45%, 55%, 0.45) 70%,
+        hsla(${colorHue}, 55%, 65%, 0.55) 100%
+      )`
+  };
 
-  // 泡っぽいシャドウと光沢
-  box-shadow:
-    0 8px 32px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.3),
-    0 2px 8px hsla(0, 0%, 0%, 0.1),
-    inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
-    inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
+  box-shadow: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? 'none'
+    : `0 8px 32px hsla(${colorHue}, 50%, 30%, 0.3),
+       0 2px 8px hsla(0, 0%, 0%, 0.1),
+       inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
+       inset 0 -1px 2px hsla(${colorHue}, 50%, 30%, 0.2)`
+  };
 
   border: 1px solid hsla(0, 0%, 100%, 0.3);
   border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
