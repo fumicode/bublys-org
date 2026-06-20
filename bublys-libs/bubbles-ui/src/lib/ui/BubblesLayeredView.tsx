@@ -1,4 +1,4 @@
-import React, { FC, ReactNode, useEffect, useReducer, useRef, useLayoutEffect, memo, useMemo, useState, useCallback } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState, useCallback } from "react";
 import styled from "styled-components";
 import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
@@ -16,8 +16,6 @@ import {
   makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
-  makeSelectBubbleLastActiveAt,
-  activateBubble,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -30,8 +28,6 @@ const DEFERRED_AFTER_MS = 1 * 60 * 1000; // 5分
  * DEFERRED_AFTER_MS 以上非アクティブな背面バブルをスケルトン化する。
  */
 type DeferredBubbleGuardProps = {
-  universeId: string;
-  bubbleId: string;
   layerIndex: number;
   zIndex: number;
   vanishingPoint: Point2;
@@ -50,8 +46,6 @@ type DeferredBubbleGuardProps = {
 };
 
 const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function DeferredBubbleGuard({
-  universeId,
-  bubbleId,
   layerIndex,
   zIndex,
   vanishingPoint,
@@ -68,31 +62,30 @@ const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function Deferred
   onBubbleLayerUp,
   onDebugRects,
 }) {
-  const dispatch = useAppDispatch();
+  // 背面に入った瞬間からタイマーを起動し、DEFERRED_AFTER_MS 後にスケルトン化する。
+  // layerIndex が変わるたびにタイマーをリセット（前面復帰で即フル表示）。
+  const [isDeferred, setIsDeferred] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // per-bubble セレクター: 他バブルの activate では再レンダーしない（プリミティブ比較）
-  const selectLastActiveAt = useMemo(
-    () => makeSelectBubbleLastActiveAt(universeId, bubbleId),
-    [universeId, bubbleId],
-  );
-  const lastActiveAt = useAppSelector(selectLastActiveAt);
-
-  // lastActiveAt === 0 は「まだ一度も明示的にアクティブにされていない」= defer しない
-  const isDeferred = layerIndex > 0 && lastActiveAt > 0 && (Date.now() - lastActiveAt) > DEFERRED_AFTER_MS;
-
-  // deferred に切り替わるべき時刻に自分だけ再レンダーする（全バブルの cascade を避ける）
-  const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
   useEffect(() => {
-    if (layerIndex === 0 || lastActiveAt === 0) return;
-    const elapsed = Date.now() - lastActiveAt;
-    if (elapsed >= DEFERRED_AFTER_MS) return; // すでに deferred 対象
-    const id = setTimeout(forceUpdate, DEFERRED_AFTER_MS - elapsed + 100);
-    return () => clearTimeout(id);
-  }, [layerIndex, lastActiveAt]);
+    setIsDeferred(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (layerIndex > 0) {
+      timerRef.current = setTimeout(() => setIsDeferred(true), DEFERRED_AFTER_MS);
+    } else {
+      timerRef.current = null;
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [layerIndex]);
 
+  // ユーザーが明示的に背面バブルを操作したらタイマーをリセット（猶予を延長）
   const handleActivate = useCallback(() => {
-    dispatch(activateBubble({ bubbleId, timestamp: Date.now() }, universeId));
-  }, [dispatch, bubbleId, universeId]);
+    setIsDeferred(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setIsDeferred(true), DEFERRED_AFTER_MS);
+  }, []);
 
   // isDeferred / bubble が変わらない限り content を安定させる
   const content = useMemo(
@@ -196,8 +189,6 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
 
   return (
     <DeferredBubbleGuard
-      universeId={universeId}
-      bubbleId={bubbleId}
       layerIndex={layerIndex}
       zIndex={zIndex}
       vanishingPoint={vanishingPoint}
