@@ -155,7 +155,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       data-bubble-id={bubble.id}
       data-window-style="universe"
       $colorHue={bubble.colorHue}
-      $zIndex={isFocused ? 101 : zIndex}
+      $zIndex={zIndex}
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
@@ -249,6 +249,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   }
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
+  if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
   return true;
 });

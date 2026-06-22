@@ -694,6 +694,11 @@ export const makeSelectFocusedBubbleId = memoizeByUniverse(
     universeOf(state, uid).process.focusedBubbleId,
 );
 
+export const makeSelectZOrderStack = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }): string[] =>
+    universeOf(state, uid).process.zOrderStack ?? [],
+);
+
 export const makeSelectBubbleLayers = memoizeByUniverse((uid) =>
   createSelector([makeSelectProcessJson(uid)], (processJson): string[][] =>
     BubblesProcess.fromJSON(processJson).layers,

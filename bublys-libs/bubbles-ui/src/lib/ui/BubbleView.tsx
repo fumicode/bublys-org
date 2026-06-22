@@ -261,7 +261,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isFocused ? 101 : zIndex}
+      zIndex={zIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
@@ -383,6 +383,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   // BubbleContent内部は再レンダリングされない。
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
+      prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
       prevProps.hasLeftLink !== nextProps.hasLeftLink) {
     return false;
