@@ -256,6 +256,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
         </div>
       </header>
 
+      <div className="e-header-hover-trigger" />
+
       <main className="e-window-content">{children}</main>
 
       {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
@@ -434,6 +436,15 @@ const StyledWindow = styled.div<StyledWindowProps>`
     position: relative;
     padding: 8px;
     border-radius: 8px;
+  }
+
+  > .e-header-hover-trigger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: ${HEADER_PROXIMITY_THRESHOLD}px;
+    pointer-events: auto;
   }
 
   /* 右下リサイズハンドル: StyledWindow が pointer-events: none なので explicit auto。 */
