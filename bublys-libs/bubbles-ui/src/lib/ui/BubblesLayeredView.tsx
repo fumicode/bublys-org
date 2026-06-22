@@ -375,7 +375,6 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     [surfaceLeftTop, coordinateSystem],
   );
 
-  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const zOrderStack = useAppSelector(makeSelectZOrderStack(universeId));
 
   // フォーカス履歴（zOrderStack）に基づいて DOM 順と z-index を決定する。
