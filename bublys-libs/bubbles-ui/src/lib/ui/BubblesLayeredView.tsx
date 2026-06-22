@@ -16,6 +16,7 @@ import {
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
   makeSelectFocusedBubbleId,
+  makeSelectZOrderStack,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -79,7 +80,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         bubble={bubble}
         position={pos}
         layerIndex={layerIndex}
-        zIndex={effectiveZIndex}
+        zIndex={zIndex}
         isFocused={isFocused}
         vanishingPoint={vanishingPoint}
         onClick={() => onBubbleClick?.(bubble.url)}
@@ -99,7 +100,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       bubble={bubble}
       position={pos}
       layerIndex={layerIndex}
-      zIndex={effectiveZIndex}
+      zIndex={zIndex}
       isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
@@ -377,35 +378,59 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     [surfaceLeftTop, coordinateSystem],
   );
 
-  const renderedBubbles = bubbleLayers
-    .map((layer, layerIndex) =>
-      layer.map((bubbleId) => {
-        const zIndex = baseZIndex - layerIndex;
-        const hasLeftLink = openeeIds.has(bubbleId);
+  const zOrderStack = useAppSelector(makeSelectZOrderStack(universeId));
 
-        return (
-          <ConnectedBubbleView
-            key={bubbleId}
-            universeId={universeId}
-            bubbleId={bubbleId}
-            layerIndex={layerIndex}
-            zIndex={zIndex}
-            vanishingPoint={undergroundVanishingPoint}
-            surfaceLayer={surfaceLayer}
-            hasLeftLink={hasLeftLink}
-            renderBubbleContent={renderBubbleContent}
-            onBubbleClick={onBubbleClick}
-            onBubbleClose={onBubbleClose}
-            onBubbleMove={onBubbleMove}
-            onBubbleResize={onBubbleResize}
-            onBubbleLayerDown={onBubbleLayerDown}
-            onBubbleLayerUp={onBubbleLayerUp}
-            onDebugRects={onDebugRects}
-          />
-        );
-      })
-    )
-    .flat();
+  // フォーカス履歴（zOrderStack）に基づいて DOM 順と z-index を決定する。
+  // スタック位置 0（最近フォーカス）が最も高い z-index を持ち、DOM でも最後に描画される。
+  // スタック外のバブルはレイヤーの自然な順序で描画・z-index が決まる。
+  const allBubbleEntries: Array<{ layerIndex: number; bubbleId: string }> = [];
+  bubbleLayers.forEach((layer, layerIndex) => {
+    layer.forEach((bubbleId) => {
+      allBubbleEntries.push({ layerIndex, bubbleId });
+    });
+  });
+
+  // スタック外のバブルを先に、スタック内のバブルを後に（スタック位置降順＝最近順に後ろへ）
+  const sortedBubbleEntries = [...allBubbleEntries].sort((a, b) => {
+    const ai = zOrderStack.indexOf(a.bubbleId);
+    const bi = zOrderStack.indexOf(b.bubbleId);
+    if (ai < 0 && bi < 0) return 0;
+    if (ai < 0) return -1;
+    if (bi < 0) return 1;
+    return bi - ai;
+  });
+
+  const renderedBubbles = sortedBubbleEntries.map(({ layerIndex, bubbleId }) => {
+    const naturalZIndex = baseZIndex - layerIndex;
+    const stackIndex = zOrderStack.indexOf(bubbleId);
+    // スタック内のバブルは baseZIndex+1 以上の z-index を付与（自然な層より必ず前面）。
+    // スタック位置 0（最近）が最大: baseZIndex + stackLength
+    const zIndex = stackIndex >= 0
+      ? baseZIndex + (zOrderStack.length - stackIndex)
+      : naturalZIndex;
+    const hasLeftLink = openeeIds.has(bubbleId);
+
+    return (
+      <ConnectedBubbleView
+        key={bubbleId}
+        universeId={universeId}
+        bubbleId={bubbleId}
+        layerIndex={layerIndex}
+        zIndex={zIndex}
+        vanishingPoint={undergroundVanishingPoint}
+        surfaceLayer={surfaceLayer}
+        hasLeftLink={hasLeftLink}
+        renderBubbleContent={renderBubbleContent}
+        onBubbleClick={onBubbleClick}
+        onBubbleClose={onBubbleClose}
+        onBubbleMove={onBubbleMove}
+        onBubbleResize={onBubbleResize}
+        onBubbleLayerDown={onBubbleLayerDown}
+        onBubbleLayerUp={onBubbleLayerUp}
+        onDebugRects={onDebugRects}
+      />
+    );
+  });
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
 

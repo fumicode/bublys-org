@@ -6,6 +6,9 @@ export interface BubblesProcessState {
   // e.g.
   // [["A"], ["B", "C"], ["D"]]
   focusedBubbleId?: string;
+  // z-order stack: ordered from most recently focused to least recently focused.
+  // Used to compute z-indices that preserve focus history ordering.
+  zOrderStack?: string[];
 }
 
 
@@ -15,13 +18,21 @@ export class BubblesProcess {
   constructor(props: BubblesProcessState) {
     const layers = props.layers;
     //空のレイヤーがあったら削除する
-    this.state = { layers: layers.filter(layer => layer.length > 0), focusedBubbleId: props.focusedBubbleId };
+    this.state = {
+      layers: layers.filter(layer => layer.length > 0),
+      focusedBubbleId: props.focusedBubbleId,
+      zOrderStack: props.zOrderStack ?? [],
+    };
   }
 
   /** Create from JSON with ID layers */
   static fromJSON(state: BubblesProcessState): BubblesProcess {
     // layers is string[][]
-    return new BubblesProcess({ layers: state.layers.map(layer => [...layer]), focusedBubbleId: state.focusedBubbleId });
+    return new BubblesProcess({
+      layers: state.layers.map(layer => [...layer]),
+      focusedBubbleId: state.focusedBubbleId,
+      zOrderStack: state.zOrderStack ? [...state.zOrderStack] : [],
+    });
   }
 
   /** Expose layers of IDs */
@@ -39,9 +50,17 @@ export class BubblesProcess {
     return this.state.focusedBubbleId;
   }
 
+  get zOrderStack(): string[] {
+    return [...(this.state.zOrderStack ?? [])];
+  }
+
   /** Serialize to JSON */
   toJSON(): BubblesProcessState {
-    return { layers: this.layers.map(layer => [...layer]), focusedBubbleId: this.state.focusedBubbleId };
+    return {
+      layers: this.layers.map(layer => [...layer]),
+      focusedBubbleId: this.state.focusedBubbleId,
+      zOrderStack: [...(this.state.zOrderStack ?? [])],
+    };
   }
 
   /** Immer producer helper */
@@ -57,6 +76,9 @@ export class BubblesProcess {
       for (let i = draft.layers.length - 1; i >= 0; --i) {
         draft.layers[i] = draft.layers[i].filter(bId => bId !== id);
         if (draft.layers[i].length === 0) draft.layers.splice(i, 1);
+      }
+      if (draft.zOrderStack) {
+        draft.zOrderStack = draft.zOrderStack.filter(x => x !== id);
       }
     });
   }
@@ -111,7 +133,9 @@ export class BubblesProcess {
   }
 
   focus(id: string): BubblesProcess {
-    return new BubblesProcess({ ...this.state, focusedBubbleId: id });
+    const prevStack = this.state.zOrderStack ?? [];
+    const zOrderStack = [id, ...prevStack.filter(x => x !== id)];
+    return new BubblesProcess({ ...this.state, focusedBubbleId: id, zOrderStack });
   }
 
   blur(): BubblesProcess {

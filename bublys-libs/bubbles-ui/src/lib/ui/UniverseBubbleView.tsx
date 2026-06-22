@@ -1,5 +1,5 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useEffect, useMemo, useState, memo } from "react";
+import { FC, useContext, useLayoutEffect, useMemo, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
@@ -109,25 +109,6 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isDragFocused, setIsDragFocused] = useState(false);
-  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
-  const [headerOffset, setHeaderOffset] = useState(0);
-
-  const isHeaderVisible = isFocused || isMouseNearTop;
-
-  const updateHeaderSafeZone = () => {
-    const bubbleRect = ref.current?.getBoundingClientRect();
-    if (!bubbleRect) return;
-    const headerEl = ref.current?.querySelector('.e-window-header');
-    const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
-    const headerTopInViewport = bubbleRect.top - headerHeight;
-    setHeaderOffset(Math.max(0, -headerTopInViewport));
-  };
-
-  useEffect(() => {
-    if (isFocused) updateHeaderSafeZone();
-  }, [isFocused]);
-  
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -155,21 +136,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     dispatch(focusBubble(bubble.id, universeId));
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
-    updateHeaderSafeZone();
-  };
-
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    setIsDragFocused(true);
     onDragStart(e);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragFocused(false);
-    setIsMouseNearTop(false);
   };
 
   useLayoutEffect(() => {
@@ -189,7 +157,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       data-bubble-id={bubble.id}
       data-window-style="universe"
       $colorHue={bubble.colorHue}
-      $zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
+      $zIndex={zIndex}
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
@@ -197,8 +165,6 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $headerOffset={headerOffset}
       onClick={onClick}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));

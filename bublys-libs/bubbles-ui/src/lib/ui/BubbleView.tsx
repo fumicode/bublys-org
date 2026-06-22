@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useContext, useLayoutEffect, useEffect, memo } from "react";
+import { FC, useMemo, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -139,7 +139,7 @@ type BubbleProps = {
 
   layerIndex?: number;
   zIndex?: number;
-  isFocused?: boolean; // Reduxのフォーカス状態（クリックで最前面・ヘッダー表示）
+  isFocused?: boolean; // Reduxのフォーカス状態（クリックで最前面）
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
 
@@ -200,24 +200,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isDragFocused, setIsDragFocused] = useState(false);
-  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
-  const [headerOffset, setHeaderOffset] = useState(0);
-
-  const isHeaderVisible = isFocused || isMouseNearTop;
-
-  const updateHeaderSafeZone = () => {
-    const bubbleRect = ref.current?.getBoundingClientRect();
-    if (!bubbleRect) return;
-    const headerEl = ref.current?.querySelector('.e-bubble-header');
-    const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
-    const headerTopInViewport = bubbleRect.top - 4 - headerHeight;
-    setHeaderOffset(Math.max(0, -headerTopInViewport));
-  };
-
-  useEffect(() => {
-    if (isFocused) updateHeaderSafeZone();
-  }, [isFocused]);
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -259,22 +241,9 @@ const BubbleViewInner: FC<BubbleProps> = ({
     dispatch(focusBubble(bubble.id, universeId));
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
-    updateHeaderSafeZone();
-  };
-
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
-    setIsDragFocused(true);
     if (!onMove) return;
     onDragStart(e);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragFocused(false);
-    setIsMouseNearTop(false);
   };
 
   // DOM参照をContextに登録
@@ -294,7 +263,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       colorHue={bubble.colorHue}
-      zIndex={isFocused ? 101 : isDragFocused ? 100 : zIndex}
+      zIndex={zIndex}
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
@@ -302,8 +271,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
       headerOffset={headerOffset}
       onClick={onClick}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));
