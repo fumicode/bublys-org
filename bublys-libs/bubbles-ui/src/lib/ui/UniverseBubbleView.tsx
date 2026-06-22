@@ -120,13 +120,14 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     if (!bubbleRect) return;
     const headerEl = ref.current?.querySelector('.e-window-header');
     const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
-    const headerTopInViewport = bubbleRect.top - 4 - headerHeight;
+    const headerTopInViewport = bubbleRect.top - headerHeight;
     setHeaderOffset(Math.max(0, -headerTopInViewport));
   };
 
   useEffect(() => {
     if (isFocused) updateHeaderSafeZone();
   }, [isFocused]);
+  
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -344,7 +345,6 @@ const StyledWindow = styled.div<StyledWindowProps>`
   > .e-window-header {
     position: absolute;
     bottom: 100%;
-    margin-bottom: 4px;
     left: 0;
     right: 0;
     z-index: 1;

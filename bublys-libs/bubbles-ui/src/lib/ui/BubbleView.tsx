@@ -504,7 +504,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     user-select: none;
     position: absolute;
     bottom: 100%;
-    margin-bottom: 4px;
     left: 0;
     right: 0;
     z-index: 1;
