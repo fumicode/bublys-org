@@ -435,10 +435,8 @@ const StyledWindow = styled.div<StyledWindowProps>`
     /* コンテンツ側（universe など）が自前で背景を塗るので、ここは透明。 */
     background: transparent;
     position: relative;
-    margin: 8px;
+    padding: 8px;
     border-radius: 8px;
-    /* StyledWindow 経由で none を継承しているが、奥が貫通可能であることを明示。 */
-    pointer-events: none;
   }
 
   /* 右下リサイズハンドル: StyledWindow が pointer-events: none なので explicit auto。 */
