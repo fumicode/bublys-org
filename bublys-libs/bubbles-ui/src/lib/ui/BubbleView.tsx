@@ -1,4 +1,4 @@
-import { FC, useMemo, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useContext, useLayoutEffect, useEffect, useState, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -200,6 +200,24 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  const isHeaderVisible = isFocused || isMouseNearTop;
+
+  const updateHeaderSafeZone = () => {
+    const bubbleRect = ref.current?.getBoundingClientRect();
+    if (!bubbleRect) return;
+    const headerEl = ref.current?.querySelector('.e-bubble-header');
+    const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
+    const headerTopInViewport = bubbleRect.top - 4 - headerHeight;
+    setHeaderOffset(Math.max(0, -headerTopInViewport));
+  };
+
+  useEffect(() => {
+    if (isFocused) updateHeaderSafeZone();
+  }, [isFocused]);
+
   const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
@@ -241,6 +259,17 @@ const BubbleViewInner: FC<BubbleProps> = ({
     dispatch(focusBubble(bubble.id, universeId));
   };
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
+    updateHeaderSafeZone();
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseNearTop(false);
+  };
+
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
     if (!onMove) return;
     onDragStart(e);
@@ -271,6 +300,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
       headerOffset={headerOffset}
       onClick={onClick}
       onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));

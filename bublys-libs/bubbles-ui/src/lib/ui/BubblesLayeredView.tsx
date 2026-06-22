@@ -69,9 +69,6 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
-  // フォーカスされたバブルは全レイヤーより前面に表示
-  const effectiveZIndex = isFocused ? 101 : zIndex;
-
   // fillsContainer な窓型バブル（universe / iframe / 等）は専用シェルで描く。
   // 透明な content と窓っぽいヘッダーで「親が透けて見える窓」として表現する。
   if (bubble.fillsContainer) {
