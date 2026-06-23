@@ -119,7 +119,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     return b.id;
   }, [dispatch]);
 
-  const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
+  // 今の画面の「下」に、左右いっぱい・ビューポート下部のストリップとして開く。
+  // popChildMax が可視領域を丸ごと埋めるのに対し、こちらは幅は同じだが高さを
+  // 下部の一部に絞り、下端に貼り付ける（横長の世界線などに向く）。
+  // maximizeTo（=最大化扱い）ではなく resizeTo（=明示サイズ）で開くので、
+  // 窓の「最大化/フィット」トグルとも整合する。
+  const popChildViewPortBelow = useCallback((b: Bubble, openerBubbleId: string): string => {
     const viewport = measureViewport();
     const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
     const visible = viewport?.visibleRegion() ?? {
@@ -127,17 +132,23 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       size: { width: 0, height: 0 },
     };
 
-    // 可視 surface 領域いっぱいに最大化して開く
-    const newPosition = visible.origin;
     const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
     const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    const resizedBubble = b.maximizeTo({ width: availableWidth, height: availableHeight });
+    // 下部ストリップの高さ（可視高さの約 45%）。横はいっぱい。
+    const height = Math.round(availableHeight * 0.45);
+    const newPosition = {
+      x: visible.origin.x,
+      y: visible.origin.y + (availableHeight - height),
+    };
+
+    const resizedBubble = b.resizeTo({ width: availableWidth, height });
     const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
-    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: movedBubble.id}));
+    dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));
 
+    // popChildMaxInProcess を再利用（前面化＋アニメのみ。再配置リスナーは走らない）。
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
@@ -168,7 +179,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     const isNameEndWithHistory = /\/history$/.test(name);
 
     if (isNameEndWithHistory) {
-      return popChildMax(newBubble, openerBubbleId);
+      // 履歴は画面下部の左右いっぱいストリップとして開く
+      return popChildViewPortBelow(newBubble, openerBubbleId);
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
@@ -176,7 +188,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }
-  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
+  }, [surfaceBubbles, popChild, popChildViewPortBelow, joinSibling]);
 
   // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {

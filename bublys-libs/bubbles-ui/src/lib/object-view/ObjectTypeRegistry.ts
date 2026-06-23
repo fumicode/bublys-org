@@ -127,3 +127,42 @@ export const registerObjectBubble = (typeName: string, config: ObjectBubbleConfi
 export const getObjectBubbleConfig = (typeName: string): ObjectBubbleConfig | undefined => {
   return registeredBubbleConfigs.get(toKebabCase(typeName));
 };
+
+// オブジェクト型ごとの「デフォルトで開くバブルURL」ビルダー（id → url）
+// 開く対象（どのバブルか）は型に固有なので事前登録する。
+const registeredUrlBuilders = new Map<string, (id: string) => string>();
+
+export const registerObjectUrl = (typeName: string, builder: (id: string) => string): void => {
+  registeredUrlBuilders.set(toKebabCase(typeName), builder);
+};
+
+/** 型 + id から登録済みのデフォルト開きURLを導出する（未登録なら undefined） */
+export const getObjectUrl = (typeName: string, id: string): string | undefined => {
+  return registeredUrlBuilders.get(toKebabCase(typeName))?.(id);
+};
+
+// オブジェクト型ごとの同一性解決（class による型判定・getId）
+type ObjectIdentity = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  class?: new (...args: any[]) => unknown;
+  getId?: (obj: unknown) => string;
+};
+const registeredIdentities = new Map<string, ObjectIdentity>();
+
+/** 型の同一性（class・getId）を登録する。ObjectView にオブジェクトを渡して解決させるのに使う */
+export const registerObjectIdentity = (typeName: string, identity: ObjectIdentity): void => {
+  registeredIdentities.set(typeName, identity);
+};
+
+/** オブジェクトから型名を解決する（登録済み class への instanceof 判定） */
+export const resolveObjectType = (obj: unknown): string | undefined => {
+  for (const [type, identity] of registeredIdentities) {
+    if (identity.class && obj instanceof identity.class) return type;
+  }
+  return undefined;
+};
+
+/** 型 + オブジェクトから id を取得する */
+export const getObjectId = (typeName: string, obj: unknown): string | undefined => {
+  return registeredIdentities.get(typeName)?.getId?.(obj);
+};

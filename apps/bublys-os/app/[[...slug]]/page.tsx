@@ -14,10 +14,12 @@ import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { registerShellTypes } from "../counter/registerShellTypes";
 import { BUBBLE_ARRANGEMENT_DOMAIN } from "@bublys-org/bubbles-ui";
 import { MEMO_DOMAIN } from "../world-line/Memo/domain/MemoDomain";
+import { IGO_GAME_DOMAIN } from "../igo-game/domain/IgoGameDomain";
 
 const APP_DOMAIN_REGISTRY = {
   ...BUBBLE_ARRANGEMENT_DOMAIN,
   ...MEMO_DOMAIN,
+  ...IGO_GAME_DOMAIN,
 };
 
 export default function Index() {

@@ -38,6 +38,8 @@ export interface CasScopeValue {
   /** オブジェクトを追加して grow（型文字列省略時は instanceof で自動解決） */
   addObject(type: string, obj: unknown): void;
   addObject(obj: unknown): void;
+  /** 複数オブジェクトを 1回の grow でまとめて追加（シード等。type 省略時は instanceof 解決） */
+  addObjects(items: { type?: string; object: unknown }[]): void;
   /** オブジェクトを削除（tombstone）して grow */
   removeObject(type: string, id: string): void;
   /** 任意ノードのデシリアライズ済みオブジェクトを取得（fork preview 用） */
@@ -48,6 +50,8 @@ export interface CasScopeValue {
   moveForward(): void;
   /** 指定ノードに移動 */
   moveTo(nodeId: string): void;
+  /** ノードに表示名（ラベル）を設定/更新する。空文字で解除。 */
+  setNodeLabel(nodeId: string, label: string | undefined): void;
   /** undo 可能かどうか */
   canUndo: boolean;
   /** redo 可能かどうか */
@@ -107,6 +111,14 @@ export function useCasScope(
   const moveTo = useCallback(
     (nodeId: string) => {
       const updated = graph.moveTo(nodeId);
+      dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
+    },
+    [dispatch, scopeId, graph]
+  );
+
+  const setNodeLabel = useCallback(
+    (nodeId: string, label: string | undefined) => {
+      const updated = graph.setNodeLabel(nodeId, label);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
     },
     [dispatch, scopeId, graph]
@@ -240,9 +252,34 @@ export function useCasScope(
       if (!config) throw new Error(`CAS type not registered: ${type}`);
       const id = config.getId(obj);
       const shell = getOrCreateShell(type, id, obj);
+      shell._replaceObject(obj); // 既存シェルの場合に渡したオブジェクトで更新（upsert）
       const hash = computeStateHash(shell.toJSON());
       const ref = createStateRef(type, shell.id, hash);
       growRef.current([ref], [{ hash, data: shell.toJSON() }]);
+    },
+    [resolveType]
+  );
+
+  // 複数オブジェクトを「1回の grow」でまとめて追加する。
+  // addObject を同期ループで呼ぶと各 grow が同じ stale graph から派生して
+  // 互いに上書きするため、まとめ追加（シード等）はこちらを使う。
+  const addObjects = useCallback(
+    (items: { type?: string; object: unknown }[]) => {
+      const refs: StateRef[] = [];
+      const entries: { hash: string; data: unknown }[] = [];
+      for (const item of items) {
+        const type =
+          typeof item.type === 'string' ? item.type : resolveType(item.object);
+        const config = registryRef.current[type];
+        if (!config) throw new Error(`CAS type not registered: ${type}`);
+        const id = config.getId(item.object);
+        const shell = getOrCreateShell(type, id, item.object);
+        shell._replaceObject(item.object); // 既存シェルの場合に渡したオブジェクトで更新（upsert）
+        const hash = computeStateHash(shell.toJSON());
+        refs.push(createStateRef(type, id, hash));
+        entries.push({ hash, data: shell.toJSON() });
+      }
+      if (refs.length > 0) growRef.current(refs, entries);
     },
     [resolveType]
   );
@@ -286,11 +323,13 @@ export function useCasScope(
     shells,
     getShell,
     addObject,
+    addObjects,
     removeObject,
     getObjectAt,
     moveBack,
     moveForward,
     moveTo,
+    setNodeLabel,
     canUndo: graph.canUndo,
     canRedo: graph.canRedo,
     getForkChoices,

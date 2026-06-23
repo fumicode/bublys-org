@@ -35,7 +35,7 @@ type MenuItem = {
 const staticMenuItems: MenuItem[] = [
   {
     label: "囲碁ゲーム",
-    url: () => `igo-game/${crypto.randomUUID()}`,
+    url: "igo-games",
     icon: <SportsEsportsIcon sx={{ color: "#dcb35c" }} />,
   },
   {
