@@ -67,6 +67,108 @@ describe('WorldLineGraph', () => {
     });
   });
 
+  describe('grow() 打ち消しスナップ', () => {
+    it('操作→打ち消しで元状態に戻ると、新ノードを作らず親へ戻る（枝だけ残る）', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const s1 = createStateRef('counter', '1', 'hash1');
+
+      const base = WorldLineGraph.empty().grow([s0]); // 初期状態 S0
+      const rootId = base.state.rootNodeId!;
+      const edited = base.grow([s1]); // 操作: S0 -> S1
+      const editedApexId = edited.state.apexNodeId!;
+
+      // 打ち消し: S1 -> S0（root と同じ状態に戻る）
+      const undone = edited.grow([s0]);
+
+      // apex は root に戻り、新ノードは増えていない
+      expect(undone.state.apexNodeId).toBe(rootId);
+      expect(Object.keys(undone.state.nodes)).toHaveLength(2);
+      // 伸びた枝 S1 は子として残る
+      expect(undone.getChildrenMap()[rootId]).toEqual([editedApexId]);
+    });
+
+    it('複数オブジェクトのうち全体が一致して初めて戻る（途中の別変更があれば伸びる）', () => {
+      const a0 = createStateRef('counter', 'a', 'a0');
+      const a1 = createStateRef('counter', 'a', 'a1');
+      const b1 = createStateRef('memo', 'b', 'b1');
+
+      const base = WorldLineGraph.empty().grow([a0]); // {a:a0}
+      const g1 = base.grow([a1]); // {a:a1}
+      const g2 = g1.grow([b1]); // {a:a1, b:b1}
+
+      // a を a0 に戻しても、b:b1 が残っているので全体は過去のどれとも一致しない → 伸びる
+      const g3 = g2.grow([a0]); // {a:a0, b:b1}
+      expect(Object.keys(g3.state.nodes)).toHaveLength(4);
+      expect(g3.state.apexNodeId).not.toBe(base.state.rootNodeId);
+    });
+
+    it('打ち消した操作をやり直すと、重複ノードを作らず既存の子の枝へ合流（前進）する', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const s1 = createStateRef('counter', '1', 'hash1');
+
+      const base = WorldLineGraph.empty().grow([s0]); // S0
+      const rootId = base.state.rootNodeId!;
+      const edited = base.grow([s1]); // 操作: S0 -> S1（枝 N1 = S1）
+      const n1Id = edited.state.apexNodeId!;
+      const undone = edited.grow([s0]); // 打ち消し: apex は root(S0) に戻る
+      expect(undone.state.apexNodeId).toBe(rootId);
+
+      // 同じ操作をやり直す: S0 -> S1。既存の子 N1 と同じ状態 → N1 へ前進
+      const redone = undone.grow([s1]);
+
+      expect(redone.state.apexNodeId).toBe(n1Id);
+      expect(Object.keys(redone.state.nodes)).toHaveLength(2); // 重複ノードは増えない
+    });
+
+    it('子が居ても状態が違えば合流せず、新しい枝として伸びる', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const s1 = createStateRef('counter', '1', 'hash1');
+      const s2 = createStateRef('counter', '1', 'hash2');
+
+      const base = WorldLineGraph.empty().grow([s0]); // S0
+      const rootId = base.state.rootNodeId!;
+      const withChild = base.grow([s1]); // 子 N1 = S1
+      const atRoot = withChild.moveTo(rootId);
+
+      // S0 -> S2。子 N1 は S1 なので一致せず → 新しい枝
+      const branched = atRoot.grow([s2]);
+      expect(Object.keys(branched.state.nodes)).toHaveLength(3);
+      expect(branched.state.nodes[branched.state.apexNodeId!].parentId).toBe(rootId);
+    });
+
+    it('stateHash を持たない旧データでもフォールバック計算でスナップする', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const s1 = createStateRef('counter', '1', 'hash1');
+
+      const built = WorldLineGraph.empty().grow([s0]).grow([s1]);
+      const rootId = built.state.rootNodeId!;
+
+      // 旧データを模して全ノードから stateHash を剥がす
+      const legacyNodes: Record<string, typeof built.state.nodes[string]> = {};
+      for (const [id, node] of Object.entries(built.state.nodes)) {
+        const { stateHash: _drop, ...rest } = node;
+        legacyNodes[id] = rest;
+      }
+      const legacy = new WorldLineGraph({ ...built.state, nodes: legacyNodes });
+
+      // 打ち消し: S1 -> S0。stateHash が無くても root(S0) に戻れる
+      const undone = legacy.grow([s0]);
+      expect(undone.state.apexNodeId).toBe(rootId);
+      expect(Object.keys(undone.state.nodes)).toHaveLength(2);
+    });
+
+    it('状態が変わらない no-op 保存は新ノードを作らない', () => {
+      const s0 = createStateRef('counter', '1', 'hash0');
+      const base = WorldLineGraph.empty().grow([s0]);
+      const apexId = base.state.apexNodeId!;
+
+      const again = base.grow([s0]); // 同じ状態を保存
+
+      expect(again.state.apexNodeId).toBe(apexId);
+      expect(Object.keys(again.state.nodes)).toHaveLength(1);
+    });
+  });
+
   describe('moveTo()', () => {
     it('moves apex to specified node', () => {
       const ref1 = createStateRef('counter', '1', 'hash1');
