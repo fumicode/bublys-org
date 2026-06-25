@@ -14,6 +14,12 @@ export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/ScheduleAvailability.js';
 
+// 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
+export * from './schedule/autoShiftStep.js';
+export * from './schedule/fulfillWishesStep.js';
+export * from './schedule/fillDemandStep.js';
+export * from './schedule/autoShiftSteps.js';
+
 // 制約（シフト表が満たすべきルール）
 export * from './schedule/ConstraintViolation.js';
 export * from './schedule/ScheduleConstraint.js';

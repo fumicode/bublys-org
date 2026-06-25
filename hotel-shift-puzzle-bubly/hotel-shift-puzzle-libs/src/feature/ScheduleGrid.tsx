@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
   Staff,
@@ -15,6 +15,7 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -44,6 +45,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenViolation,
 }) => {
   useSeedHotelData();
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const availability = useObject<ScheduleAvailability>(
@@ -96,6 +98,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setRequiredForAllDays(shiftName, count));
   };
 
+  // 段階的な自動シフト：選んだステップ（コマンド）を1つ実行する。
+  // 人間入力済みのセルは上書きしない／休み希望の人は勤務させない（各ステップ共通の原則）。
+  const handleRunStep = (step: AutoShiftStep) => {
+    const result = runAutoShiftStep(step, {
+      schedule,
+      staffList,
+      workShifts,
+      wishByStaff,
+      availability,
+    });
+    update(() => result.schedule);
+    setAutoMessage(`${step.label}: ${result.message}`);
+  };
+
   return (
     <StyledContainer>
       <div className="e-header">
@@ -118,6 +134,34 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           )}
         </div>
       </div>
+      <div className="e-auto-bar">
+        <span className="e-auto-label">🪄 自動シフト</span>
+        {AUTO_SHIFT_STEPS.map((step, i) => (
+          <button
+            key={step.key}
+            type="button"
+            className="e-link e-auto"
+            title={step.description}
+            onClick={() => handleRunStep(step)}
+          >
+            <span className="e-auto-num">{i + 1}</span>
+            {step.label}
+          </button>
+        ))}
+      </div>
+      {autoMessage && (
+        <div className="e-auto-message">
+          {autoMessage}
+          <button
+            type="button"
+            className="e-auto-close"
+            aria-label="閉じる"
+            onClick={() => setAutoMessage(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <ScheduleGridView
         schedule={schedule}
         staffList={staffList}
@@ -168,6 +212,80 @@ const StyledContainer = styled.div`
       &:hover {
         background: #eceff1;
         border-color: #90a4ae;
+      }
+    }
+  }
+
+  .e-auto-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    .e-auto-label {
+      font-size: 0.8em;
+      font-weight: 600;
+      color: #5e35b1;
+      margin-right: 2px;
+    }
+    .e-auto {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #b39ddb;
+      border-radius: 6px;
+      background: #fff;
+      color: #5e35b1;
+      font-size: 0.8em;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #ede7f6;
+        border-color: #9575cd;
+      }
+    }
+    .e-auto-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ede7f6;
+      color: #5e35b1;
+      font-size: 0.85em;
+      line-height: 1;
+    }
+  }
+
+  .e-auto-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #ede7f6;
+    border: 1px solid #d1c4e9;
+    border-radius: 6px;
+    color: #4527a0;
+    font-size: 0.82em;
+
+    .e-auto-close {
+      margin-left: auto;
+      border: none;
+      background: transparent;
+      color: #7e57c2;
+      font-size: 1.1em;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+
+      &:hover {
+        color: #4527a0;
       }
     }
   }

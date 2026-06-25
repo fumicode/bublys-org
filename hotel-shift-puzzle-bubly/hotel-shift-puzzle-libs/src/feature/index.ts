@@ -12,3 +12,4 @@ export * from "./ScheduleViolationView.js";
 export * from "./scheduleConstraints.js";
 export * from "./ShiftWishConstraint.js";
 export * from "./ShiftWishEditor.js";
+export * from "./autoShift.js";
