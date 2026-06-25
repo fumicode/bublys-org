@@ -12,6 +12,7 @@ type StaffDetailProps = {
   onOpenWish?: (year: number, month: number) => void;
 };
 
+
 export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
@@ -36,3 +37,5 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
     />
   );
 };
+
+// コメントアウト
