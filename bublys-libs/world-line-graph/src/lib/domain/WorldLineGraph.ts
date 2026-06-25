@@ -1,5 +1,6 @@
 import { StateRef, stateRefKey } from './StateRef';
 import { WorldNode, createWorldNode } from './WorldNode';
+import { computeStateHash } from './StateHash';
 
 export type ForkChoice = {
   readonly nodeId: string;
@@ -17,6 +18,26 @@ function generateWorldLineId(): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).slice(2, 8);
   return `wl-${timestamp}-${random}`;
+}
+
+function refMapOf(refs: StateRef[]): Map<string, StateRef> {
+  const map = new Map<string, StateRef>();
+  for (const ref of refs) {
+    map.set(stateRefKey(ref), ref);
+  }
+  return map;
+}
+
+/**
+ * 「世界全体の状態」を表すハッシュを作る。type:id ごとの hash を集めてソートし、
+ * まとめて1個のハッシュにしたもの。ハッシュが一致する2ノードは同じ全体状態。
+ * 入力は既存の ref.hash で、新しくオブジェクトを hash し直すわけではない。
+ */
+function combinedStateHash(refMap: Map<string, StateRef>): string {
+  const entries = Array.from(refMap.values())
+    .map((ref): [string, string] => [stateRefKey(ref), ref.hash])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return computeStateHash(entries);
 }
 
 export class WorldLineGraph {
@@ -78,12 +99,31 @@ export class WorldLineGraph {
 
     if (!apex) {
       const worldLineId = generateWorldLineId();
-      const newNode = createWorldNode(null, changedRefs, worldLineId);
+      // root の全体状態 = changedRefs そのもの
+      const stateHash = combinedStateHash(refMapOf(changedRefs));
+      const newNode = createWorldNode(null, changedRefs, worldLineId, stateHash);
       return new WorldLineGraph({
         nodes: { ...nodes, [newNode.id]: newNode },
         apexNodeId: newNode.id,
         rootNodeId: newNode.id,
       });
+    }
+
+    // grow 後の「世界全体の状態」= apex の全体状態 + changedRefs。そのハッシュを1回だけ計算。
+    const prospect = this.getStateRefMapAt(apex.id);
+    for (const ref of changedRefs) {
+      prospect.set(stateRefKey(ref), ref);
+    }
+    const prospectHash = combinedStateHash(prospect);
+
+    // 打ち消しスナップ：見込み状態が apex の1ステップ隣（apex→root の祖先＝戻る／
+    // apex の既存の子＝進む）と一致するなら、新ノードを作らず apex をそのノードへ移す。
+    //   - 「操作 → 打ち消し → 元の状態」で祖先に戻り、世界線が無駄に伸びない。
+    //   - 「打ち消した操作をもう一度」で既存の枝に合流し、重複ノードを作らない。
+    // 各ノードに焼いた stateHash と1回比較するだけなので O(祖先数)。
+    const snapTarget = this.findSnapTarget(apex.id, prospectHash);
+    if (snapTarget !== null) {
+      return this.moveTo(snapTarget);
     }
 
     const childrenMap = this.getChildrenMap();
@@ -96,12 +136,51 @@ export class WorldLineGraph {
       worldLineId = generateWorldLineId();
     }
 
-    const newNode = createWorldNode(apex.id, changedRefs, worldLineId);
+    const newNode = createWorldNode(apex.id, changedRefs, worldLineId, prospectHash);
     return new WorldLineGraph({
       nodes: { ...nodes, [newNode.id]: newNode },
       apexNodeId: newNode.id,
       rootNodeId,
     });
+  }
+
+  /**
+   * 見込み状態（prospectHash）と同じ全体状態のノードが apex の1ステップ隣
+   * （apex→root の祖先、または apex の直近の子）にあれば、その nodeId を返す（無ければ
+   * null）。各ノードに焼いた stateHash と比較するだけ。
+   *   - 祖先＝「戻る」：複数一致時は最も apex 寄り（深い）祖先を選び履歴を多く残す。
+   *   - 子＝「進む」：打ち消した操作をやり直したとき既存の枝へ合流させ重複を防ぐ。
+   * 祖先（apex 自身の no-op を含む）を子より優先する。
+   */
+  private findSnapTarget(apexId: string, prospectHash: string): string | null {
+    // 1) 祖先（apex 含む）を apex 寄り（深い側）から探す
+    const path = this.getPathToNode(apexId); // root..apex
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (this.nodeStateHash(path[i]) === prospectHash) {
+        return path[i].id;
+      }
+    }
+
+    // 2) apex の直近の子を探す
+    const childIds = this.getChildrenMap()[apexId] ?? [];
+    for (const childId of childIds) {
+      if (this.nodeStateHash(this.state.nodes[childId]) === prospectHash) {
+        return childId;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * ノードの全体状態ハッシュを返す。grow 時に焼いた stateHash があればそれを使い（O(1)）、
+   * 無い旧データのノードは root からの全 changedRefs を畳み込んで都度計算する。
+   */
+  private nodeStateHash(node: WorldNode): string {
+    if (node.stateHash) {
+      return node.stateHash;
+    }
+    return combinedStateHash(this.getStateRefMapAt(node.id));
   }
 
   moveTo(nodeId: string): WorldLineGraph {
@@ -219,15 +298,19 @@ export class WorldLineGraph {
     });
   }
 
-  getStateRefsAt(nodeId: string): StateRef[] {
-    const path = this.getPathToNode(nodeId);
+  /** root→nodeId の changedRefs を畳み込んだ「全体状態」を type:id→ref の Map で返す（後勝ち） */
+  getStateRefMapAt(nodeId: string): Map<string, StateRef> {
     const refMap = new Map<string, StateRef>();
-    for (const node of path) {
+    for (const node of this.getPathToNode(nodeId)) {
       for (const ref of node.changedRefs) {
         refMap.set(stateRefKey(ref), ref);
       }
     }
-    return Array.from(refMap.values());
+    return refMap;
+  }
+
+  getStateRefsAt(nodeId: string): StateRef[] {
+    return Array.from(this.getStateRefMapAt(nodeId).values());
   }
 
   getCurrentStateRefs(): StateRef[] {

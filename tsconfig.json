@@ -88,9 +88,6 @@
       "path": "./event-shift-puzzle/event-shift-puzzle-libs"
     },
     {
-      "path": "./event-shift-puzzle-bubly/event-shift-puzzle-app"
-    },
-    {
       "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-model"
     },
     {
@@ -98,6 +95,9 @@
     },
     {
       "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-app"
+    },
+    {
+      "path": "./event-shift-puzzle/event-shift-puzzle-app"
     }
   ]
 }
