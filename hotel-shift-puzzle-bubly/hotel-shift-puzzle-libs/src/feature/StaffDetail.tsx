@@ -3,7 +3,7 @@
 import { FC } from "react";
 import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
-import { useObject } from "../objects/repository.js";
+import { useObject, useObjectRepo } from "../objects/repository.js";
 import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
 type StaffDetailProps = {
@@ -14,6 +14,7 @@ type StaffDetailProps = {
 
 export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
+  const actions = useObjectRepo<Staff>(STAFF_TYPE);
 
   if (!staff) {
     return (
@@ -23,5 +24,15 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
     );
   }
 
-  return <StaffDetailView staff={staff} onOpenWish={onOpenWish} />;
+  const handleChangeDepartment = (department: string) => {
+    actions.save(staff.changeDepartment(department));
+  };
+
+  return (
+    <StaffDetailView
+      staff={staff}
+      onChangeDepartment={handleChangeDepartment}
+      onOpenWish={onOpenWish}
+    />
+  );
 };

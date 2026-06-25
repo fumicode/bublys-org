@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState } from "react";
+import { FC, Fragment, useState } from "react";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -31,6 +31,8 @@ type ScheduleGridViewProps = {
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
   violations?: ConstraintViolation[];
+  /** true のとき部署別にグループ化して表示する */
+  groupByDepartment?: boolean;
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 違反（赤線）をクリックしたとき */
@@ -40,6 +42,33 @@ type ScheduleGridViewProps = {
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
   onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
 };
+
+/**
+ * スタッフを部署でグループ化した配列（順序付き）を返す。
+ * 部署未設定のスタッフは最後の "（未設定）" グループに入る。
+ */
+function groupStaffByDepartment(
+  staffList: Staff[]
+): Array<{ dept: string; members: Staff[] }> {
+  const map = new Map<string, Staff[]>();
+  for (const staff of staffList) {
+    const dept = staff.department || "";
+    if (!map.has(dept)) map.set(dept, []);
+    map.get(dept)!.push(staff);
+  }
+  // 未設定を末尾に
+  const groups: Array<{ dept: string; members: Staff[] }> = [];
+  let unset: Staff[] | undefined;
+  for (const [dept, members] of map) {
+    if (dept === "") {
+      unset = members;
+    } else {
+      groups.push({ dept, members });
+    }
+  }
+  if (unset) groups.push({ dept: "", members: unset });
+  return groups;
+}
 
 /**
  * 勤務表グリッド（行=スタッフ / 列=日）のオーケストレーター。
@@ -53,6 +82,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   availability,
   wishByStaff,
   violations = [],
+  groupByDepartment = false,
   onChangeCell,
   onOpenViolation,
   onChangeRequired,
@@ -111,6 +141,57 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px`;
 
+  // 部署グルーピング時は department ヘッダー行を挿入してスタッフ行を並べる
+  const renderStaffRows = () => {
+    if (!groupByDepartment) {
+      return staffList.map((staff) => (
+        <StaffScheduleRow
+          key={staff.id}
+          staff={staff}
+          days={days}
+          schedule={schedule}
+          shiftMap={shiftMap}
+          violations={violations}
+          getWishEntries={getWishEntries}
+          expanded={expanded.has(staff.id)}
+          onToggleExpand={toggleExpanded}
+          onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
+          onOpenViolation={onOpenViolation}
+        />
+      ));
+    }
+
+    const groups = groupStaffByDepartment(staffList);
+    // Fragment を使って grid の直接の子として展開する（span で包むとグリッドが崩れる）
+    return groups.flatMap(({ dept, members }) => [
+      <Fragment key={`dept-header:${dept || "__none__"}`}>
+        {/* 部署名（左固定） ＋ 日列分のセパレーター */}
+        <div className="e-dept-label">
+          {dept || "（部署未設定）"}
+        </div>
+        <div
+          className="e-dept-sep"
+          style={{ gridColumn: `2 / ${days.length + 3}` }}
+        />
+      </Fragment>,
+      ...members.map((staff) => (
+        <StaffScheduleRow
+          key={staff.id}
+          staff={staff}
+          days={days}
+          schedule={schedule}
+          shiftMap={shiftMap}
+          violations={violations}
+          getWishEntries={getWishEntries}
+          expanded={expanded.has(staff.id)}
+          onToggleExpand={toggleExpanded}
+          onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
+          onOpenViolation={onOpenViolation}
+        />
+      )),
+    ]);
+  };
+
   return (
     <StyledWrap>
       <div className="e-grid" style={{ gridTemplateColumns }}>
@@ -132,22 +213,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         })}
         <div className="e-off-head">休</div>
 
-        {/* スタッフ行 */}
-        {staffList.map((staff) => (
-          <StaffScheduleRow
-            key={staff.id}
-            staff={staff}
-            days={days}
-            schedule={schedule}
-            shiftMap={shiftMap}
-            violations={violations}
-            getWishEntries={getWishEntries}
-            expanded={expanded.has(staff.id)}
-            onToggleExpand={toggleExpanded}
-            onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
-            onOpenViolation={onOpenViolation}
-          />
-        ))}
+        {/* スタッフ行（部署グルーピングあり/なし） */}
+        {renderStaffRows()}
 
         {/* 勤務帯ごと＋休みの人数集計（スタッフ行の後） */}
         {summaryRows.map((row, rowIndex) => (
