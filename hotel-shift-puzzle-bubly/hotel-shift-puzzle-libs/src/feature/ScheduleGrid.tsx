@@ -1,7 +1,8 @@
 'use client';
 
-import { FC, useMemo, useState } from "react";
+import { FC, ReactNode, useMemo, useState } from "react";
 import styled from "styled-components";
+import { UrledPlace } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   WorkShift,
@@ -16,36 +17,6 @@ import { useObjects, useObject, useObjectShell } from "../objects/repository.js"
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
-import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
-
-/**
- * 自動シフトのツールバー項目。group を持たないステップは単独ボタン、
- * 同じ group のステップ群は「戦略を切り替えるトグル＋実行ボタン」の1組にまとめる。
- * AUTO_SHIFT_STEPS は定数なので一度だけ組み立てる。
- */
-type AutoBarItem =
-  | { kind: "single"; step: AutoShiftStep }
-  | { kind: "group"; key: string; label: string; variants: AutoShiftStep[] };
-
-const AUTO_BAR_ITEMS: AutoBarItem[] = (() => {
-  const items: AutoBarItem[] = [];
-  const seen = new Set<string>();
-  for (const step of AUTO_SHIFT_STEPS) {
-    if (!step.group) {
-      items.push({ kind: "single", step });
-      continue;
-    }
-    if (seen.has(step.group)) continue;
-    seen.add(step.group);
-    items.push({
-      kind: "group",
-      key: step.group,
-      label: step.groupLabel ?? step.group,
-      variants: AUTO_SHIFT_STEPS.filter((s) => s.group === step.group),
-    });
-  }
-  return items;
-})();
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -56,10 +27,20 @@ import {
 
 type ScheduleGridProps = {
   scheduleId?: string;
-  /** 世界線ビューを開くハンドラ（ヘッダ右上のリンク用） */
+  /** 世界線ビュー（左下）を開くハンドラ */
   onOpenHistory?: () => void;
-  /** 可能勤務帯エディタを開くハンドラ */
+  /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
+  /** 自動シフトパネル（右上）を開くハンドラ */
+  onOpenAutoShift?: () => void;
+  /**
+   * 各アクションバブルの URL（data-url アンカー用）。ボタンを UrledPlace で包むと、
+   * そのボタンから link bubble が伸びる。openBubble する URL と一致させる。
+   * URL スキームは app 層の関心事なので注入で受ける。
+   */
+  worldLineUrl?: string;
+  availabilityUrl?: string;
+  autoShiftUrl?: string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -77,13 +58,14 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenAvailability,
+  onOpenAutoShift,
+  worldLineUrl,
+  availabilityUrl,
+  autoShiftUrl,
   dayBubbleUrl,
   violationBubbleUrl,
 }) => {
   useSeedHotelData();
-  const [autoMessage, setAutoMessage] = useState<string | null>(null);
-  // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
-  const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const availability = useObject<ScheduleAvailability>(
@@ -162,19 +144,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setRequiredForAllDays(shiftName, count));
   };
 
-  // 段階的な自動シフト：選んだステップ（コマンド）を1つ実行する。
-  // 人間入力済みのセルは上書きしない／休み希望の人は勤務させない（各ステップ共通の原則）。
-  const handleRunStep = (step: AutoShiftStep) => {
-    const result = runAutoShiftStep(step, {
-      schedule,
-      staffList,
-      workShifts,
-      wishByStaff,
-      availability,
-    });
-    update(() => result.schedule);
-    setAutoMessage(`${step.label}: ${result.message}`);
-  };
+  // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
+  // link bubble がこのボタンから伸びる（openBubble する URL と一致している必要がある）。
+  const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
+    url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
 
   return (
     <StyledContainer>
@@ -185,7 +158,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             {schedule.year}年{schedule.month}月 / {schedule.storeId}
           </span>
         </h3>
-        <div className="e-actions">
+
+        {/* 左：スタッフ（左列）に関わる操作をまとめる */}
+        <div className="e-actions e-actions-left">
           {/* 部署別グルーピングトグル */}
           <button
             type="button"
@@ -213,84 +188,32 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             </select>
           )}
 
-          {onOpenAvailability && (
-            <button type="button" className="e-link" onClick={onOpenAvailability}>
-              可能勤務帯
-            </button>
-          )}
-          {onOpenHistory && (
-            <button type="button" className="e-link" onClick={onOpenHistory}>
-              🌐 世界線ビュー
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="e-auto-bar">
-        <span className="e-auto-label">🪄 自動シフト</span>
-        {AUTO_BAR_ITEMS.map((item, i) => {
-          const num = <span className="e-auto-num">{i + 1}</span>;
-          if (item.kind === "single") {
-            return (
-              <button
-                key={item.step.key}
-                type="button"
-                className="e-link e-auto"
-                title={item.step.description}
-                onClick={() => handleRunStep(item.step)}
-              >
-                {num}
-                {item.step.label}
+          {onOpenAvailability &&
+            withUrl(
+              availabilityUrl,
+              <button type="button" className="e-link" onClick={onOpenAvailability}>
+                可能勤務帯
               </button>
-            );
-          }
-          // group: 戦略トグル ＋ 実行ボタン（切り替えて使う代替アルゴリズム）
-          const selectedKey = selectedVariant[item.key] ?? item.variants[0].key;
-          const selectedStep =
-            item.variants.find((v) => v.key === selectedKey) ?? item.variants[0];
-          return (
-            <div key={item.key} className="e-auto-group">
-              {num}
-              <span className="e-auto-glabel">{item.label}</span>
-              <div className="e-seg" role="group" aria-label={`${item.label}の方式`}>
-                {item.variants.map((v) => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    className={"e-seg-btn" + (v.key === selectedKey ? " is-on" : "")}
-                    title={v.description}
-                    onClick={() =>
-                      setSelectedVariant((prev) => ({ ...prev, [item.key]: v.key }))
-                    }
-                  >
-                    {v.variantLabel ?? v.label}
-                  </button>
-                ))}
-              </div>
+            )}
+        </div>
+
+        {/* 右：自動シフトは独立バブル。ここはそれを開くボタンだけ */}
+        <div className="e-actions e-actions-right">
+          {onOpenAutoShift &&
+            withUrl(
+              autoShiftUrl,
               <button
                 type="button"
-                className="e-link e-auto e-run"
-                title={selectedStep.description}
-                onClick={() => handleRunStep(selectedStep)}
+                className="e-link e-auto-open"
+                onClick={onOpenAutoShift}
+                title="自動シフトのパネルを開く"
               >
-                実行
+                🪄 自動シフト
               </button>
-            </div>
-          );
-        })}
-      </div>
-      {autoMessage && (
-        <div className="e-auto-message">
-          {autoMessage}
-          <button
-            type="button"
-            className="e-auto-close"
-            aria-label="閉じる"
-            onClick={() => setAutoMessage(null)}
-          >
-            ×
-          </button>
+            )}
         </div>
-      )}
+      </div>
+
       <ScheduleGridView
         schedule={schedule}
         staffList={filteredStaffList}
@@ -308,6 +231,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
         }
       />
+
+      {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
+      {onOpenHistory && (
+        <div className="e-footer">
+          {withUrl(
+            worldLineUrl,
+            <button
+              type="button"
+              className="e-link e-worldline"
+              onClick={onOpenHistory}
+              title="この勤務表の世界線ビューを開く"
+            >
+              🌐 世界線ビュー
+            </button>
+          )}
+        </div>
+      )}
     </StyledContainer>
   );
 };
@@ -316,7 +256,6 @@ const StyledContainer = styled.div`
   .e-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
     margin-bottom: 8px;
 
@@ -334,27 +273,9 @@ const StyledContainer = styled.div`
       gap: 6px;
       flex-shrink: 0;
     }
-    .e-link {
-      border: 1px solid #cfd8dc;
-      border-radius: 6px;
-      background: #fff;
-      color: #37474f;
-      font-size: 0.8em;
-      padding: 4px 10px;
-      cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
-
-      &:hover {
-        background: #eceff1;
-        border-color: #90a4ae;
-      }
-
-      &.is-active {
-        background: #e8eaf6;
-        border-color: #3949ab;
-        color: #3949ab;
-        font-weight: bold;
-      }
+    /* スタッフ関連の操作は左に、自動シフトは右に寄せる */
+    .e-actions-right {
+      margin-left: auto;
     }
     .e-dept-select {
       border: 1px solid #cfd8dc;
@@ -373,132 +294,46 @@ const StyledContainer = styled.div`
         border-color: #3949ab;
       }
     }
-  }
-
-  .e-auto-bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 8px;
-
-    .e-auto-label {
-      font-size: 0.8em;
-      font-weight: 600;
+    /* 自動シフトを開くボタンは紫系で自動シフトらしさを出す */
+    .e-auto-open {
+      border-color: #b39ddb;
       color: #5e35b1;
-      margin-right: 2px;
-    }
-    .e-auto {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid #b39ddb;
-      border-radius: 6px;
-      background: #fff;
-      color: #5e35b1;
-      font-size: 0.8em;
       font-weight: 600;
-      padding: 4px 10px;
-      cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
-
       &:hover {
         background: #ede7f6;
         border-color: #9575cd;
       }
     }
-    .e-auto-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #ede7f6;
-      color: #5e35b1;
-      font-size: 0.85em;
-      line-height: 1;
-    }
-
-    /* group: 戦略トグル ＋ 実行ボタン */
-    .e-auto-group {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid #d1c4e9;
-      border-radius: 8px;
-      background: #faf7ff;
-      padding: 3px 6px;
-
-      .e-auto-glabel {
-        font-size: 0.8em;
-        font-weight: 600;
-        color: #5e35b1;
-      }
-      .e-auto-num {
-        background: #fff;
-      }
-    }
-    /* セグメント（戦略の切り替え）。選択中を塗りで示す */
-    .e-seg {
-      display: inline-flex;
-      border: 1px solid #b39ddb;
-      border-radius: 6px;
-      overflow: hidden;
-
-      .e-seg-btn {
-        border: none;
-        border-left: 1px solid #d1c4e9;
-        background: #fff;
-        color: #6a4bb0;
-        font-size: 0.78em;
-        padding: 4px 10px;
-        cursor: pointer;
-        transition: background 0.1s, color 0.1s;
-
-        &:first-child {
-          border-left: none;
-        }
-        &:hover {
-          background: #ede7f6;
-        }
-        &.is-on {
-          background: #7e57c2;
-          color: #fff;
-          font-weight: 600;
-        }
-      }
-    }
-    .e-run {
-      background: #ede7f6;
-    }
   }
 
-  .e-auto-message {
+  /* 左下：世界線ビュー */
+  .e-footer {
+    margin-top: 8px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    background: #ede7f6;
-    border: 1px solid #d1c4e9;
+  }
+
+  /* ヘッダ・フッタ共通のリンク風ボタン */
+  .e-link {
+    border: 1px solid #cfd8dc;
     border-radius: 6px;
-    color: #4527a0;
-    font-size: 0.82em;
+    background: #fff;
+    color: #37474f;
+    font-size: 0.8em;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
 
-    .e-auto-close {
-      margin-left: auto;
-      border: none;
-      background: transparent;
-      color: #7e57c2;
-      font-size: 1.1em;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 2px;
+    &:hover {
+      background: #eceff1;
+      border-color: #90a4ae;
+    }
 
-      &:hover {
-        color: #4527a0;
-      }
+    &.is-active {
+      background: #e8eaf6;
+      border-color: #3949ab;
+      color: #3949ab;
+      font-weight: bold;
     }
   }
 `;

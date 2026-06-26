@@ -22,6 +22,21 @@ export const staffUrl = (staffId: string): string =>
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;
 
+/** 可能勤務帯エディタバブル */
+export const scheduleAvailabilityUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/availability`;
+
+/**
+ * 世界線ビューバブル。`/history` で終わると bubbles-ui 側で画面下部ストリップ展開に
+ * 特別扱いされるため、通常の bubble-side popChild にしたいこのバブルは別名（world-line）にする。
+ */
+export const scheduleWorldLineUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/world-line`;
+
+/** 自動シフト パネルバブル */
+export const scheduleAutoShiftUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/auto-shift`;
+
 /** 稼働日詳細バブル（勤務表の日付ヘッダから開く） */
 export const scheduleDayUrl = (scheduleId: string, dayKey: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
