@@ -1,4 +1,5 @@
-import { FC } from "react";
+import { FC, ReactNode } from "react";
+import { UrledPlace } from "@bublys-org/bubbles-ui";
 import type { WorkShift, ConstraintViolation, ShiftCell } from "../../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
@@ -17,6 +18,12 @@ type ScheduleDataCellProps = {
   /** クリックでセル編集メニューを開く */
   onClick: (anchor: HTMLElement) => void;
   onOpenViolation?: (violation: ConstraintViolation) => void;
+  /**
+   * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）に data-url として埋め、
+   * origin-side で開いたバブルがそのマーカーの近くに出るようにする
+   * （openBubble の URL と一致させる）。
+   */
+  violationUrl?: (violation: ConstraintViolation) => string;
 };
 
 /**
@@ -32,6 +39,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   pointViolation,
   onClick,
   onOpenViolation,
+  violationUrl,
 }) => {
   let className = "e-cell";
   let style: React.CSSProperties | undefined;
@@ -58,6 +66,11 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
 
   if (pointViolation || rangeViolation) className += " is-violation";
 
+  // 違反マーカーを描く。origin-side で「クリックしたマーカーの近く」に違反バブルを
+  // 出すため、violationUrl があればマーカーを UrledPlace（data-url）で包む。
+  const withUrl = (violation: ConstraintViolation, node: ReactNode): ReactNode =>
+    violationUrl ? <UrledPlace url={violationUrl(violation)}>{node}</UrledPlace> : node;
+
   return (
     <div
       className={className}
@@ -67,28 +80,32 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       onClick={(e) => onClick(e.currentTarget)}
     >
       {content}
-      {pointViolation && (
-        <span
-          className="e-wish-flag"
-          role="button"
-          title={pointViolation.message}
-          onClick={(e) => {
-            e.stopPropagation(); // セル編集は開かず、違反バブルを開く
-            onOpenViolation?.(pointViolation);
-          }}
-        />
-      )}
-      {rangeViolation && (
-        <span
-          className="e-violation-bar"
-          role="button"
-          title={rangeViolation.message}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenViolation?.(rangeViolation);
-          }}
-        />
-      )}
+      {pointViolation &&
+        withUrl(
+          pointViolation,
+          <span
+            className="e-wish-flag"
+            role="button"
+            title={pointViolation.message}
+            onClick={(e) => {
+              e.stopPropagation(); // セル編集は開かず、違反バブルを開く
+              onOpenViolation?.(pointViolation);
+            }}
+          />
+        )}
+      {rangeViolation &&
+        withUrl(
+          rangeViolation,
+          <span
+            className="e-violation-bar"
+            role="button"
+            title={rangeViolation.message}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenViolation?.(rangeViolation);
+            }}
+          />
+        )}
     </div>
   );
 };

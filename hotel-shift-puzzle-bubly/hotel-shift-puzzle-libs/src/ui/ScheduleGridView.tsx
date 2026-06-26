@@ -41,6 +41,8 @@ type ScheduleGridViewProps = {
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 違反（赤線）をクリックしたとき */
   onOpenViolation?: (violation: ConstraintViolation) => void;
+  /** 違反バブルの URL を作る（マーカーの data-url に使い、origin-side で近くに出す） */
+  violationUrl?: (violation: ConstraintViolation) => string;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
   onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
@@ -97,6 +99,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   leaderRoles = [],
   onChangeCell,
   onOpenViolation,
+  violationUrl,
   onChangeRequired,
   onChangeRequiredAllDays,
   onOpenDay,
@@ -178,6 +181,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
           onOpenViolation={onOpenViolation}
+          violationUrl={violationUrl}
         />
       ));
     }
@@ -208,6 +212,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
           onOpenViolation={onOpenViolation}
+          violationUrl={violationUrl}
         />
       )),
     ]);

@@ -63,10 +63,12 @@ const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<Schedule
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
-  // 稼働日詳細バブルのURL。origin-side で「クリックした日付の近く」に出すため、
-  // 日付ヘッダの data-url（dayBubbleUrl）と openBubble の URL を同じものに揃える。
+  // origin-side で「クリックした要素の近く」に出すため、マーカー側の data-url
+  // （dayBubbleUrl / violationBubbleUrl）と openBubble の URL を同じものに揃える。
   const dayUrl = (dayKey: string) =>
     `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
+  const violationUrl = (violationKey: string) =>
+    `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
@@ -84,12 +86,9 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
+      violationBubbleUrl={violationUrl}
       onOpenViolation={(violationKey) =>
-        openBubble(
-          `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`,
-          bubble.id,
-          "bubble-side"
-        )
+        openBubble(violationUrl(violationKey), bubble.id, "origin-side")
       }
       dayBubbleUrl={dayUrl}
       onOpenDay={(dayKey) => openBubble(dayUrl(dayKey), bubble.id, "origin-side")}

@@ -62,6 +62,11 @@ type ScheduleGridProps = {
   onOpenAvailability?: () => void;
   /** 制約違反（赤線）クリック時のハンドラ。違反 key を渡す */
   onOpenViolation?: (violationKey: string) => void;
+  /**
+   * 違反バブルの URL を作る。違反マーカーの data-url に使い、origin-side で開いた
+   * バブルがそのマーカーの近くに出るようにする（openBubble の URL と一致させる）。
+   */
+  violationBubbleUrl?: (violationKey: string) => string;
   /** 日付ヘッダクリック時のハンドラ。稼働日キー（"2026-06-01"）を渡す */
   onOpenDay?: (dayKey: string) => void;
   /**
@@ -80,6 +85,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenHistory,
   onOpenAvailability,
   onOpenViolation,
+  violationBubbleUrl,
   onOpenDay,
   dayBubbleUrl,
 }) => {
@@ -307,6 +313,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         onOpenDay={onOpenDay ? (day) => onOpenDay(day.key) : undefined}
         dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
         onOpenViolation={(v) => onOpenViolation?.(v.key)}
+        violationUrl={violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined}
         onChangeRequired={handleChangeRequired}
         onChangeRequiredAllDays={handleChangeRequiredAllDays}
       />
