@@ -120,6 +120,19 @@ export const StyledWrap = styled.div`
     &.is-under {
       color: #c62828;
     }
+
+    /* 責任者行（昼責/夜責）: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤） */
+    &.is-leader {
+      font-weight: bold;
+      &.is-present {
+        color: #2e7d32;
+        background: #e8f5e9;
+      }
+      &.is-absent {
+        color: #c62828;
+        background: #ffebee;
+      }
+    }
   }
 
   /* 集計ブロックの先頭行だけ、スタッフ行との区切り罫線を引く */
@@ -171,6 +184,15 @@ export const StyledWrap = styled.div`
     &.is-sat .e-day-wd {
       color: #1976d2;
     }
+
+    /* クリックでその日の詳細バブルを開ける */
+    &.is-clickable {
+      cursor: pointer;
+      &:hover {
+        background: #eceff1;
+        box-shadow: inset 0 0 0 2px #90caf9;
+      }
+    }
   }
 
   /* スタッフ名（左に固定） */
@@ -208,6 +230,27 @@ export const StyledWrap = styled.div`
       overflow: hidden;
       text-overflow: ellipsis;
       font-weight: bold;
+    }
+    /* 責任者バッジ（昼責=中番責任者 / 夜責=夜番責任者） */
+    .e-leader-badge {
+      flex-shrink: 0;
+      font-size: 0.72em;
+      font-weight: bold;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      white-space: nowrap;
+
+      &.is-middle {
+        background: #fff3e0;
+        color: #ef6c00;
+        border: 1px solid #ffcc80;
+      }
+      &.is-night {
+        background: #ede7f6;
+        color: #5e35b1;
+        border: 1px solid #b39ddb;
+      }
     }
   }
 
@@ -330,12 +373,10 @@ export const StyledWrap = styled.div`
   }
 
   .e-work {
-    .e-shift-name {
+    .e-shift-hour {
       font-weight: bold;
-    }
-    .e-shift-time {
-      font-size: 0.78em;
-      opacity: 0.8;
+      font-size: 1.15em;
+      font-variant-numeric: tabular-nums;
     }
   }
   .e-off {

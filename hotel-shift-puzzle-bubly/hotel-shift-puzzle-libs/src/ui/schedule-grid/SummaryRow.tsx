@@ -53,6 +53,24 @@ export const SummaryRow: FC<SummaryRowProps> = ({
       </div>
 
       {days.map((day, i) => {
+        // 責任者行: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤）。
+        if (row.leaderPresent) {
+          const present = row.leaderPresent(i);
+          return (
+            <div
+              key={`sum:${row.key}:${day.key}`}
+              className={`e-sum-cell is-leader${firstCls}${
+                present ? " is-present" : " is-absent"
+              }`}
+              title={`${row.label} ${day.label}: ${
+                present ? "責任者あり" : "責任者なし"
+              }`}
+            >
+              {present ? "◯" : "✕"}
+            </div>
+          );
+        }
+
         const n = row.count(i);
         const req = row.required?.(i) ?? 0;
 

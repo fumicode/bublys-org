@@ -15,6 +15,7 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
 
 /**
@@ -61,6 +62,13 @@ type ScheduleGridProps = {
   onOpenAvailability?: () => void;
   /** 制約違反（赤線）クリック時のハンドラ。違反 key を渡す */
   onOpenViolation?: (violationKey: string) => void;
+  /** 日付ヘッダクリック時のハンドラ。稼働日キー（"2026-06-01"）を渡す */
+  onOpenDay?: (dayKey: string) => void;
+  /**
+   * 稼働日詳細バブルの URL を作る。日付ヘッダの data-url に使い、origin-side で
+   * 開いたバブルがクリックした日付の近くに出るようにする（openBubble の URL と一致させる）。
+   */
+  dayBubbleUrl?: (dayKey: string) => string;
 };
 
 /**
@@ -72,6 +80,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenHistory,
   onOpenAvailability,
   onOpenViolation,
+  onOpenDay,
+  dayBubbleUrl,
 }) => {
   useSeedHotelData();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
@@ -107,6 +117,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     if (!deptFilter) return staffList;
     return staffList.filter((s) => s.department === deptFilter);
   }, [staffList, deptFilter]);
+
+  // 責任者ロール（昼責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
+  // （会計を絞ると昼責が常に✕になる、といった取りこぼしを防ぐ）。
+  const leaderRoles = useMemo(
+    () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
+    [staffList]
+  );
 
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
@@ -285,7 +302,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         wishByStaff={wishByStaff}
         violations={violations}
         groupByDepartment={groupByDept}
+        leaderRoles={leaderRoles}
         onChangeCell={handleChangeCell}
+        onOpenDay={onOpenDay ? (day) => onOpenDay(day.key) : undefined}
+        dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
         onOpenViolation={(v) => onOpenViolation?.(v.key)}
         onChangeRequired={handleChangeRequired}
         onChangeRequiredAllDays={handleChangeRequiredAllDays}

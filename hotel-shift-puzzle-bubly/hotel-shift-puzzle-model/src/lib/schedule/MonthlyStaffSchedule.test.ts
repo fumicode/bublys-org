@@ -241,4 +241,33 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(restored.state.assignments[0]).toBeInstanceOf(ShiftAssignment);
     expect(restored.toPlain()).toEqual(plain);
   });
+
+  describe('isAnyAssignedToShifts（責任者が担当勤務帯に入っているか）', () => {
+    test('責任者の誰かが指定の勤務帯で出勤していれば true', () => {
+      const schedule = createJuneSchedule()
+        .assignShift('leader-A', june1, 'middle')
+        .assignDayOff('leader-B', june1);
+
+      // 中番（middle）に leader-A が入っている → true
+      expect(
+        schedule.isAnyAssignedToShifts(['leader-A', 'leader-B'], june1, ['middle'])
+      ).toBe(true);
+    });
+
+    test('責任者が休み・未定・別の勤務帯のときは false', () => {
+      const schedule = createJuneSchedule()
+        .assignShift('leader-A', june1, 'early') // 中番ではなく早番
+        .assignDayOff('leader-B', june1);
+
+      // 中番（middle）には誰も入っていない → false
+      expect(
+        schedule.isAnyAssignedToShifts(['leader-A', 'leader-B'], june1, ['middle'])
+      ).toBe(false);
+    });
+
+    test('責任者IDが空なら常に false', () => {
+      const schedule = createJuneSchedule().assignShift('staff-X', june1, 'middle');
+      expect(schedule.isAnyAssignedToShifts([], june1, ['middle'])).toBe(false);
+    });
+  });
 });

@@ -21,7 +21,7 @@ type ScheduleDataCellProps = {
 
 /**
  * 勤務表の 1 セル（スタッフ×日）の純粋表示。
- * 出勤＝勤務帯名＋開始時刻、休み＝「休」、未定＝希望ヒント or「·」。
+ * 出勤＝開始時刻の「時」だけ（勤務帯は背景色で区別）、休み＝「休」、未定＝希望ヒント or「·」。
  * 違反は範囲（下端の赤帯）と単日（右上の ⊿）の 2 種に描き分ける。
  */
 export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
@@ -36,17 +36,16 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   let className = "e-cell";
   let style: React.CSSProperties | undefined;
   let content: React.ReactNode;
+  let title: string | undefined;
 
   if (cell.kind === "work") {
     const id = cell.shiftId;
     className += " e-work";
     style = { background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" };
-    content = (
-      <>
-        <span className="e-shift-name">{shift?.name ?? id}</span>
-        {shift && <span className="e-shift-time">{shift.startTimeLabel}</span>}
-      </>
-    );
+    // 勤務帯は背景色で区別できるので、セルは開始時刻の「時」だけを大きく出す。
+    // 勤務帯名・開始時刻はホバーで分かるよう title に入れる。
+    content = <span className="e-shift-hour">{shift ? shift.startHour : id}</span>;
+    if (shift) title = `${shift.name}（${shift.startTimeLabel}）`;
   } else if (cell.kind === "day-off") {
     className += " e-off";
     content = "休";
@@ -64,6 +63,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       className={className}
       style={style}
       role="button"
+      title={title}
       onClick={(e) => onClick(e.currentTarget)}
     >
       {content}

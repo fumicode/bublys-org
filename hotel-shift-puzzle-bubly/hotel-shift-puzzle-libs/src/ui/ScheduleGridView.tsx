@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, Fragment, useState } from "react";
+import { UrledPlace } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -10,6 +11,7 @@ import {
   ConstraintViolation,
   StaffMonthlyShiftWish,
   type ShiftCell,
+  type ShiftLeaderRole,
 } from "../domain/index.js";
 import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
@@ -33,6 +35,8 @@ type ScheduleGridViewProps = {
   violations?: ConstraintViolation[];
   /** true のとき部署別にグループ化して表示する */
   groupByDepartment?: boolean;
+  /** 責任者ロール（解決済み）。footer 先頭に昼責/夜責などの ◯/✕ 行を出す */
+  leaderRoles?: ShiftLeaderRole[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 違反（赤線）をクリックしたとき */
@@ -41,6 +45,13 @@ type ScheduleGridViewProps = {
   onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
   onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
+  /** 日付ヘッダをクリックしたとき（その稼働日の詳細バブルを開く） */
+  onOpenDay?: (day: WorkingDay) => void;
+  /**
+   * 稼働日詳細バブルの URL を作る。日付ヘッダに data-url として埋め、origin-side で
+   * 開いたバブルがその日付ヘッダの近くに出るようにする（openBubble の URL と一致させる）。
+   */
+  dayBubbleUrl?: (day: WorkingDay) => string;
 };
 
 /**
@@ -83,10 +94,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   wishByStaff,
   violations = [],
   groupByDepartment = false,
+  leaderRoles = [],
   onChangeCell,
   onOpenViolation,
   onChangeRequired,
   onChangeRequiredAllDays,
+  onOpenDay,
+  dayBubbleUrl,
 }) => {
   const days = schedule.workingDays();
 
@@ -101,7 +115,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // 各稼働日の勤務帯ID別人数 / 休み人数（集約のクエリ）→ 集計行を組み立てる。
   const countsByDay = days.map((day) => schedule.countWorkingByShift(day));
   const dayOffByDay = days.map((day) => schedule.countDayOffOn(day));
-  const summaryRows = buildSummaryRows(schedule, days, shiftOptions, countsByDay, dayOffByDay);
+  const summaryRows = buildSummaryRows(
+    schedule,
+    days,
+    shiftOptions,
+    countsByDay,
+    dayOffByDay,
+    leaderRoles
+  );
 
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day);
@@ -201,14 +222,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         </div>
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
-          return (
+          const head = (
             <div
-              key={day.key}
-              className={`e-day-head${wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""}`}
+              className={`e-day-head${wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""}${
+                onOpenDay ? " is-clickable" : ""
+              }`}
+              role={onOpenDay ? "button" : undefined}
+              title={onOpenDay ? `${day.label} の詳細を開く` : undefined}
+              onClick={onOpenDay ? () => onOpenDay(day) : undefined}
             >
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
             </div>
+          );
+          // data-url を埋めておくと、origin-side で開いたバブルがこの日付ヘッダの
+          // 近くに配置される（openBubble の URL と data-url が一致する必要がある）。
+          return dayBubbleUrl ? (
+            <UrledPlace key={day.key} url={dayBubbleUrl(day)}>
+              {head}
+            </UrledPlace>
+          ) : (
+            <Fragment key={day.key}>{head}</Fragment>
           );
         })}
         <div className="e-off-head">休</div>

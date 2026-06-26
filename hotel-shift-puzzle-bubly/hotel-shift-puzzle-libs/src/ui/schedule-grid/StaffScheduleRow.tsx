@@ -65,6 +65,16 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <span className="e-caret">{expanded ? "▾" : "▸"}</span>
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
+            {staff.isMiddleShiftLeader && (
+              <span className="e-leader-badge is-middle" title="中番責任者（昼責）">
+                昼責
+              </span>
+            )}
+            {staff.isNightShiftLeader && (
+              <span className="e-leader-badge is-night" title="夜番責任者（夜責）">
+                夜責
+              </span>
+            )}
           </div>
         </ObjectView>
       </div>

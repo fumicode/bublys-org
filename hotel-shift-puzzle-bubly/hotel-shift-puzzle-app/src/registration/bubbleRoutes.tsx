@@ -8,6 +8,7 @@ import {
   WorkShiftCollection,
   ScheduleCollection,
   ScheduleGrid,
+  ScheduleDayDetail,
   HotelObjectsProvider,
   ScheduleWorldLineView,
   AvailabilityEditor,
@@ -62,6 +63,10 @@ const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<Schedule
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
+  // 稼働日詳細バブルのURL。origin-side で「クリックした日付の近く」に出すため、
+  // 日付ヘッダの data-url（dayBubbleUrl）と openBubble の URL を同じものに揃える。
+  const dayUrl = (dayKey: string) =>
+    `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
@@ -86,9 +91,20 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
+      dayBubbleUrl={dayUrl}
+      onOpenDay={(dayKey) => openBubble(dayUrl(dayKey), bubble.id, "origin-side")}
     />
   );
 };
+
+// --- 稼働日 詳細バブル（勤務表の日付ヘッダクリックで開く） ---
+const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ScheduleDayDetail
+      scheduleId={bubble.params.scheduleId}
+      dayKey={bubble.params.dayKey}
+    />
+  );
 
 // --- 制約違反バブル（赤線クリックで開く） ---
 const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -118,6 +134,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/history", type: "schedule-history", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
 ];

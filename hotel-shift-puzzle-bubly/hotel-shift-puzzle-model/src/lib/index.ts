@@ -14,6 +14,9 @@ export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/ScheduleAvailability.js';
 
+// 責任者ロール（勤務帯ごとに「責任者が各稼働日に最低1人いる」要件）
+export * from './schedule/ShiftLeaderRole.js';
+
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';
 export * from './schedule/fulfillWishesStep.js';
