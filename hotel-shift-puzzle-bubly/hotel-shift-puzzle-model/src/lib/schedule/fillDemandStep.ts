@@ -1,8 +1,10 @@
 /**
- * fillDemandStep — 自動シフトのステップ「必要人数を埋める」
+ * fillDemandStep — 自動シフトのステップ「必要人数を埋める（早番から順に）」
  *
  * 必要人数（需要）に足りていない勤務帯へ、とりあえずスタッフを入れてみる段階。
- * 「希望を叶える」の次に実行する想定。
+ * 「希望を叶える」の次に実行する想定。これは**勤務帯の並び順（早番→中番→遅番）に
+ * 前から詰める貪欲版**。手前の帯から先に埋まるので、人数が足りないときは後ろの帯
+ * （遅番）が枯れやすい。均等に配りたいときは fillDemandBalancedStep を使う。
  *
  * 割り当ての候補は、その日「希望なし(neutral)」かつ「未定」かつ「その帯に入れる」かつ
  * 「連勤上限を超えない」スタッフ。需要の不足分だけ、勤務帯ごとに貪欲に割り当てる。
@@ -22,10 +24,13 @@ import { wouldExceedConsecutive, countWorkingByName } from "./autoShiftStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
 export const fillDemandStep: AutoShiftStep = {
-  key: "fill-demand",
-  label: "必要人数を埋める",
+  key: "fill-demand-ordered",
+  label: "必要人数を埋める（早番から順に）",
+  group: "fill-demand",
+  groupLabel: "必要人数を埋める",
+  variantLabel: "早番から順に",
   description:
-    "必要人数に足りない勤務帯へ、希望なしで空いているスタッフを割り当てます。休み希望の人は入れず、人間入力済みのセルも触りません。",
+    "必要人数に足りない勤務帯へ、勤務帯の並び順（早番→中番→遅番）に前から詰めます。人数が足りないと後ろの帯（遅番）が枯れやすい。休み希望の人は入れず、人間入力済みのセルも触りません。",
 
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
     const max = ctx.maxConsecutive ?? 5;

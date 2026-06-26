@@ -63,6 +63,16 @@ export interface AutoShiftStep {
   readonly label: string;
   /** 説明（ツールチップ） */
   readonly description: string;
+  /**
+   * 同じ目的の別戦略をまとめるグループキー（任意）。
+   * 同じ group を持つステップ同士は「切り替えて使う代替アルゴリズム」とみなし、
+   * UI はトグルで切り替えられる1組として表示する（例: 必要人数を埋める = 早番から順に / まんべんなく）。
+   */
+  readonly group?: string;
+  /** グループの表示名（同 group のステップで共通。UI は最初の1つを使う） */
+  readonly groupLabel?: string;
+  /** トグル内でこの戦略を表す短いラベル（例: "まんべんなく"） */
+  readonly variantLabel?: string;
   /** 実行。純粋・不変で、新しい勤務表と結果を返す */
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult;
 }

@@ -4,6 +4,7 @@ import { WorkingDay } from './WorkingDay.js';
 import { createDefaultWorkShifts } from './WorkShift.js';
 import { fulfillWishesStep } from './fulfillWishesStep.js';
 import { fillDemandStep } from './fillDemandStep.js';
+import { fillDemandBalancedStep } from './fillDemandBalancedStep.js';
 import { AUTO_SHIFT_STEPS } from './autoShiftSteps.js';
 import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
@@ -49,8 +50,20 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       expect(new Set(keys).size).toBe(keys.length);
     });
 
-    test('実行順は「希望を叶える」→「必要人数を埋める」', () => {
-      expect(AUTO_SHIFT_STEPS.map((s) => s.key)).toEqual(['fulfill-wishes', 'fill-demand']);
+    test('実行順は 希望→需要(早番から順に)→需要(まんべんなく)', () => {
+      expect(AUTO_SHIFT_STEPS.map((s) => s.key)).toEqual([
+        'fulfill-wishes',
+        'fill-demand-ordered',
+        'fill-demand-balanced',
+      ]);
+    });
+
+    test('需要充足の2戦略は同じ group で束ねられている（切り替え用）', () => {
+      const group = AUTO_SHIFT_STEPS.filter((s) => s.group === 'fill-demand');
+      expect(group.map((s) => s.key)).toEqual(['fill-demand-ordered', 'fill-demand-balanced']);
+      // 同 group は同じ groupLabel、別の variantLabel を持つ
+      expect(new Set(group.map((s) => s.groupLabel))).toEqual(new Set(['必要人数を埋める']));
+      expect(group.map((s) => s.variantLabel)).toEqual(['早番から順に', 'まんべんなく']);
     });
   });
 
@@ -160,6 +173,50 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       const ctx = ctxOf(['s1'], {}, { maxConsecutive: 5 });
       const { schedule } = fillDemandStep.run(base, ctx);
       expect(schedule.isUndecided('s1', day(6))).toBe(true);
+    });
+  });
+
+  describe('fillDemandBalancedStep（まんべんなく）と早番から順に版の違い', () => {
+    test('早番から順に版は手前の帯に偏る（早番満杯・遅番ゼロ）', () => {
+      // 早番2・遅番2 必要、候補は s1,s2 の2人（どちらも全帯OK）
+      const required = RequiredStaffing.uniform([day(1)], { 早番: 2, 遅番: 2 });
+      const ctx = ctxOf(['s1', 's2'], {});
+      const { schedule } = fillDemandStep.run(emptySchedule(required), ctx);
+
+      const counts = schedule.countWorkingByShift(day(1));
+      expect(counts.get('early')).toBe(2); // 早番に2人吸われる
+      expect(counts.get('late') ?? 0).toBe(0); // 遅番は枯れる
+    });
+
+    test('まんべんなく版は帯に均等に配る（早番1・遅番1）', () => {
+      const required = RequiredStaffing.uniform([day(1)], { 早番: 2, 遅番: 2 });
+      const ctx = ctxOf(['s1', 's2'], {});
+      const { schedule } = fillDemandBalancedStep.run(emptySchedule(required), ctx);
+
+      const counts = schedule.countWorkingByShift(day(1));
+      expect(counts.get('early')).toBe(1);
+      expect(counts.get('late')).toBe(1);
+    });
+
+    test('まんべんなく版は可能勤務帯を考慮し、融通の利かない人を先に充てる', () => {
+      // 早番1・遅番1 必要。s1=全帯OK、s2=遅番に入れない。
+      // 早番に s1 を入れてしまうと遅番が埋まらない。まんべんなく版は s2→早番, s1→遅番 にする。
+      const required = RequiredStaffing.uniform([day(1)], { 早番: 1, 遅番: 1 });
+      const ctx = ctxOf(['s1', 's2'], {}, {
+        isAvailable: (s, shiftId) => !(s === 's2' && shiftId === 'late'),
+      });
+      const { schedule } = fillDemandBalancedStep.run(emptySchedule(required), ctx);
+
+      expect(schedule.getShiftIdFor('s2', day(1))).toBe('early');
+      expect(schedule.getShiftIdFor('s1', day(1))).toBe('late');
+    });
+
+    test('まんべんなく版も大原則は同じ（休み希望は入れない・連勤上限を守る）', () => {
+      const required = RequiredStaffing.uniform([day(1)], { 早番: 1 });
+      const ctx = ctxOf(['s1', 's2'], { [`s1|${day(1).key}`]: { kind: 'day-off' } });
+      const { schedule } = fillDemandBalancedStep.run(emptySchedule(required), ctx);
+      expect(schedule.isUndecided('s1', day(1))).toBe(true);
+      expect(schedule.getShiftIdFor('s2', day(1))).toBe('early');
     });
   });
 

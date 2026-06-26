@@ -7,5 +7,11 @@
 import type { AutoShiftStep } from "./autoShiftStep.js";
 import { fulfillWishesStep } from "./fulfillWishesStep.js";
 import { fillDemandStep } from "./fillDemandStep.js";
+import { fillDemandBalancedStep } from "./fillDemandBalancedStep.js";
 
-export const AUTO_SHIFT_STEPS: AutoShiftStep[] = [fulfillWishesStep, fillDemandStep];
+export const AUTO_SHIFT_STEPS: AutoShiftStep[] = [
+  fulfillWishesStep,
+  // 「必要人数を埋める」は2戦略（同じ group "fill-demand"）。UI でトグル切り替え。
+  fillDemandStep,
+  fillDemandBalancedStep,
+];

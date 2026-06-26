@@ -16,6 +16,35 @@ import { useObjects, useObject, useObjectShell } from "../objects/repository.js"
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
+
+/**
+ * 自動シフトのツールバー項目。group を持たないステップは単独ボタン、
+ * 同じ group のステップ群は「戦略を切り替えるトグル＋実行ボタン」の1組にまとめる。
+ * AUTO_SHIFT_STEPS は定数なので一度だけ組み立てる。
+ */
+type AutoBarItem =
+  | { kind: "single"; step: AutoShiftStep }
+  | { kind: "group"; key: string; label: string; variants: AutoShiftStep[] };
+
+const AUTO_BAR_ITEMS: AutoBarItem[] = (() => {
+  const items: AutoBarItem[] = [];
+  const seen = new Set<string>();
+  for (const step of AUTO_SHIFT_STEPS) {
+    if (!step.group) {
+      items.push({ kind: "single", step });
+      continue;
+    }
+    if (seen.has(step.group)) continue;
+    seen.add(step.group);
+    items.push({
+      kind: "group",
+      key: step.group,
+      label: step.groupLabel ?? step.group,
+      variants: AUTO_SHIFT_STEPS.filter((s) => s.group === step.group),
+    });
+  }
+  return items;
+})();
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -46,6 +75,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 }) => {
   useSeedHotelData();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
+  const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const availability = useObject<ScheduleAvailability>(
@@ -136,18 +167,56 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       </div>
       <div className="e-auto-bar">
         <span className="e-auto-label">🪄 自動シフト</span>
-        {AUTO_SHIFT_STEPS.map((step, i) => (
-          <button
-            key={step.key}
-            type="button"
-            className="e-link e-auto"
-            title={step.description}
-            onClick={() => handleRunStep(step)}
-          >
-            <span className="e-auto-num">{i + 1}</span>
-            {step.label}
-          </button>
-        ))}
+        {AUTO_BAR_ITEMS.map((item, i) => {
+          const num = <span className="e-auto-num">{i + 1}</span>;
+          if (item.kind === "single") {
+            return (
+              <button
+                key={item.step.key}
+                type="button"
+                className="e-link e-auto"
+                title={item.step.description}
+                onClick={() => handleRunStep(item.step)}
+              >
+                {num}
+                {item.step.label}
+              </button>
+            );
+          }
+          // group: 戦略トグル ＋ 実行ボタン（切り替えて使う代替アルゴリズム）
+          const selectedKey = selectedVariant[item.key] ?? item.variants[0].key;
+          const selectedStep =
+            item.variants.find((v) => v.key === selectedKey) ?? item.variants[0];
+          return (
+            <div key={item.key} className="e-auto-group">
+              {num}
+              <span className="e-auto-glabel">{item.label}</span>
+              <div className="e-seg" role="group" aria-label={`${item.label}の方式`}>
+                {item.variants.map((v) => (
+                  <button
+                    key={v.key}
+                    type="button"
+                    className={"e-seg-btn" + (v.key === selectedKey ? " is-on" : "")}
+                    title={v.description}
+                    onClick={() =>
+                      setSelectedVariant((prev) => ({ ...prev, [item.key]: v.key }))
+                    }
+                  >
+                    {v.variantLabel ?? v.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="e-link e-auto e-run"
+                title={selectedStep.description}
+                onClick={() => handleRunStep(selectedStep)}
+              >
+                実行
+              </button>
+            </div>
+          );
+        })}
       </div>
       {autoMessage && (
         <div className="e-auto-message">
@@ -259,6 +328,59 @@ const StyledContainer = styled.div`
       color: #5e35b1;
       font-size: 0.85em;
       line-height: 1;
+    }
+
+    /* group: 戦略トグル ＋ 実行ボタン */
+    .e-auto-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #d1c4e9;
+      border-radius: 8px;
+      background: #faf7ff;
+      padding: 3px 6px;
+
+      .e-auto-glabel {
+        font-size: 0.8em;
+        font-weight: 600;
+        color: #5e35b1;
+      }
+      .e-auto-num {
+        background: #fff;
+      }
+    }
+    /* セグメント（戦略の切り替え）。選択中を塗りで示す */
+    .e-seg {
+      display: inline-flex;
+      border: 1px solid #b39ddb;
+      border-radius: 6px;
+      overflow: hidden;
+
+      .e-seg-btn {
+        border: none;
+        border-left: 1px solid #d1c4e9;
+        background: #fff;
+        color: #6a4bb0;
+        font-size: 0.78em;
+        padding: 4px 10px;
+        cursor: pointer;
+        transition: background 0.1s, color 0.1s;
+
+        &:first-child {
+          border-left: none;
+        }
+        &:hover {
+          background: #ede7f6;
+        }
+        &.is-on {
+          background: #7e57c2;
+          color: #fff;
+          font-weight: 600;
+        }
+      }
+    }
+    .e-run {
+      background: #ede7f6;
     }
   }
 
