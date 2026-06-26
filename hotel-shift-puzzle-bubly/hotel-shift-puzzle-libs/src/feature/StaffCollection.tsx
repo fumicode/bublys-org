@@ -17,8 +17,8 @@ export const StaffCollection: FC = () => {
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
 
-  const handleCreate = (name: string) => {
-    actions.save(new Staff({ id: newStaffId(), name }));
+  const handleCreate = (name: string, department: string) => {
+    actions.save(new Staff({ id: newStaffId(), name, department: department || undefined }));
   };
 
   const handleRename = (id: string, name: string) => {
