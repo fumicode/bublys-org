@@ -30,12 +30,14 @@ export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
 
+// 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
+// オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
 export const HOTEL_OBJECTS = defineObjects({
   Staff: {
     class: Staff,
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
-    url: (id) => `hotel-shift-puzzle/staffs/${id}`,
+    // url は app 層（registration/bubbleUrls.ts）で登録する
     // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
   },
   WorkShift: {
@@ -47,7 +49,7 @@ export const HOTEL_OBJECTS = defineObjects({
     class: MonthlyStaffSchedule,
     getId: (s: MonthlyStaffSchedule) => s.state.id,
     icon: React.createElement(CalendarMonthIcon, { fontSize: "small" }),
-    url: (id) => `hotel-shift-puzzle/schedules/${id}`,
+    // url は app 層（registration/bubbleUrls.ts）で登録する
     // 入れ子にインスタンスを持つので codec を明示
     serialize: {
       toJSON: (s: MonthlyStaffSchedule) => s.toPlain(),

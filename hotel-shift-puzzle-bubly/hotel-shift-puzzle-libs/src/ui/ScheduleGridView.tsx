@@ -1,7 +1,7 @@
 'use client';
 
 import { FC, Fragment, useState } from "react";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -39,21 +39,17 @@ type ScheduleGridViewProps = {
   leaderRoles?: ShiftLeaderRole[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
-  /** 違反（赤線）をクリックしたとき */
-  onOpenViolation?: (violation: ConstraintViolation) => void;
-  /** 違反バブルの URL を作る（マーカーの data-url に使い、origin-side で近くに出す） */
-  violationUrl?: (violation: ConstraintViolation) => string;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
   onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
   onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
-  /** 日付ヘッダをクリックしたとき（その稼働日の詳細バブルを開く） */
-  onOpenDay?: (day: WorkingDay) => void;
   /**
-   * 稼働日詳細バブルの URL を作る。日付ヘッダに data-url として埋め、origin-side で
-   * 開いたバブルがその日付ヘッダの近くに出るようにする（openBubble の URL と一致させる）。
+   * 稼働日詳細バブルの URL。日付ヘッダの ObjectView に渡す（ダブルクリックで開く＋
+   * origin-side で近くに出す data-url）。URL スキームは app 層の関心事なので注入で受ける。
    */
   dayBubbleUrl?: (day: WorkingDay) => string;
+  /** 違反バブルの URL。違反マーカーの ObjectView に渡す（同上・app 層から注入）。 */
+  violationUrl?: (violation: ConstraintViolation) => string;
 };
 
 /**
@@ -98,12 +94,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   groupByDepartment = false,
   leaderRoles = [],
   onChangeCell,
-  onOpenViolation,
-  violationUrl,
   onChangeRequired,
   onChangeRequiredAllDays,
-  onOpenDay,
   dayBubbleUrl,
+  violationUrl,
 }) => {
   const days = schedule.workingDays();
 
@@ -180,7 +174,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           expanded={expanded.has(staff.id)}
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
-          onOpenViolation={onOpenViolation}
           violationUrl={violationUrl}
         />
       ));
@@ -211,7 +204,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           expanded={expanded.has(staff.id)}
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
-          onOpenViolation={onOpenViolation}
           violationUrl={violationUrl}
         />
       )),
@@ -227,27 +219,34 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         </div>
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
-          const head = (
-            <div
-              className={`e-day-head${wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""}${
-                onOpenDay ? " is-clickable" : ""
-              }`}
-              role={onOpenDay ? "button" : undefined}
-              title={onOpenDay ? `${day.label} の詳細を開く` : undefined}
-              onClick={onOpenDay ? () => onOpenDay(day) : undefined}
-            >
+          const inner = (
+            <span className="e-day-inner" title={`${day.label} の詳細を開く（ダブルクリック）`}>
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
-            </div>
+            </span>
           );
-          // data-url を埋めておくと、origin-side で開いたバブルがこの日付ヘッダの
-          // 近くに配置される（openBubble の URL と data-url が一致する必要がある）。
-          return dayBubbleUrl ? (
-            <UrledPlace key={day.key} url={dayBubbleUrl(day)}>
-              {head}
-            </UrledPlace>
-          ) : (
-            <Fragment key={day.key}>{head}</Fragment>
+          return (
+            <div
+              key={day.key}
+              className={`e-day-head${dayBubbleUrl ? " is-clickable" : ""}${
+                wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""
+              }`}
+            >
+              {/* ObjectView がダブルクリックでの展開・data-url（origin-side で近くに出す）を担う。
+                  展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
+              {dayBubbleUrl ? (
+                <ObjectView
+                  url={dayBubbleUrl(day)}
+                  openingPosition="origin-side"
+                  draggable={false}
+                  fullWidth
+                >
+                  {inner}
+                </ObjectView>
+              ) : (
+                inner
+              )}
+            </div>
           );
         })}
         <div className="e-off-head">休</div>

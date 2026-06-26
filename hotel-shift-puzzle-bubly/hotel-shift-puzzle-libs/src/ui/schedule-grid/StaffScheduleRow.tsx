@@ -24,8 +24,7 @@ type StaffScheduleRowProps = {
   expanded: boolean;
   onToggleExpand: (staffId: string) => void;
   onEditCell: (anchor: HTMLElement, staffId: string, day: WorkingDay) => void;
-  onOpenViolation?: (violation: ConstraintViolation) => void;
-  /** 違反バブルの URL を作る（マーカーの data-url に使い、origin-side で近くに出す） */
+  /** 違反バブルの URL を作る。ObjectView がこれで開く（origin-side でマーカーの近くに出す） */
   violationUrl?: (violation: ConstraintViolation) => string;
 };
 
@@ -44,7 +43,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   expanded,
   onToggleExpand,
   onEditCell,
-  onOpenViolation,
   violationUrl,
 }) => {
   return (
@@ -96,7 +94,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             rangeViolation={covering.find((v) => v.days.length > 1)}
             pointViolation={covering.find((v) => v.days.length === 1)}
             onClick={(anchor) => onEditCell(anchor, staff.id, day)}
-            onOpenViolation={onOpenViolation}
             violationUrl={violationUrl}
           />
         );

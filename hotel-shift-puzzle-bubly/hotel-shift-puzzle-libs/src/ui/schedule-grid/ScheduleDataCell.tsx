@@ -1,5 +1,5 @@
-import { FC, ReactNode } from "react";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { FC } from "react";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { WorkShift, ConstraintViolation, ShiftCell } from "../../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
@@ -17,11 +17,10 @@ type ScheduleDataCellProps = {
   pointViolation?: ConstraintViolation;
   /** クリックでセル編集メニューを開く */
   onClick: (anchor: HTMLElement) => void;
-  onOpenViolation?: (violation: ConstraintViolation) => void;
   /**
-   * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）に data-url として埋め、
-   * origin-side で開いたバブルがそのマーカーの近くに出るようにする
-   * （openBubble の URL と一致させる）。
+   * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）を ObjectView で包んで渡し、
+   * ダブルクリックで違反バブルを開く。ObjectView が data-url も埋めるので、
+   * origin-side で開いたバブルがそのマーカーの近くに出る。
    */
   violationUrl?: (violation: ConstraintViolation) => string;
 };
@@ -38,7 +37,6 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   rangeViolation,
   pointViolation,
   onClick,
-  onOpenViolation,
   violationUrl,
 }) => {
   let className = "e-cell";
@@ -66,10 +64,24 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
 
   if (pointViolation || rangeViolation) className += " is-violation";
 
-  // 違反マーカーを描く。origin-side で「クリックしたマーカーの近く」に違反バブルを
-  // 出すため、violationUrl があればマーカーを UrledPlace（data-url）で包む。
-  const withUrl = (violation: ConstraintViolation, node: ReactNode): ReactNode =>
-    violationUrl ? <UrledPlace url={violationUrl(violation)}>{node}</UrledPlace> : node;
+  // 違反マーカー（赤帯・⊿）。ObjectView がダブルクリックでの違反バブル展開と data-url
+  // （origin-side でマーカーの近くに出す）を担う。単クリックはセル編集を開かないよう止める。
+  const violationMarker = (violation: ConstraintViolation, markerClass: string) => {
+    const marker = (
+      <span
+        className={markerClass}
+        title={`${violation.message}（ダブルクリックで詳細）`}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+    return violationUrl ? (
+      <ObjectView url={violationUrl(violation)} openingPosition="origin-side" draggable={false}>
+        {marker}
+      </ObjectView>
+    ) : (
+      marker
+    );
+  };
 
   return (
     <div
@@ -80,32 +92,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       onClick={(e) => onClick(e.currentTarget)}
     >
       {content}
-      {pointViolation &&
-        withUrl(
-          pointViolation,
-          <span
-            className="e-wish-flag"
-            role="button"
-            title={pointViolation.message}
-            onClick={(e) => {
-              e.stopPropagation(); // セル編集は開かず、違反バブルを開く
-              onOpenViolation?.(pointViolation);
-            }}
-          />
-        )}
-      {rangeViolation &&
-        withUrl(
-          rangeViolation,
-          <span
-            className="e-violation-bar"
-            role="button"
-            title={rangeViolation.message}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenViolation?.(rangeViolation);
-            }}
-          />
-        )}
+      {pointViolation && violationMarker(pointViolation, "e-wish-flag")}
+      {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
     </div>
   );
 };

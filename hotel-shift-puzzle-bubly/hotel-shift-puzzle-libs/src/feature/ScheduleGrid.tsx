@@ -60,20 +60,13 @@ type ScheduleGridProps = {
   onOpenHistory?: () => void;
   /** 可能勤務帯エディタを開くハンドラ */
   onOpenAvailability?: () => void;
-  /** 制約違反（赤線）クリック時のハンドラ。違反 key を渡す */
-  onOpenViolation?: (violationKey: string) => void;
   /**
-   * 違反バブルの URL を作る。違反マーカーの data-url に使い、origin-side で開いた
-   * バブルがそのマーカーの近くに出るようにする（openBubble の URL と一致させる）。
-   */
-  violationBubbleUrl?: (violationKey: string) => string;
-  /** 日付ヘッダクリック時のハンドラ。稼働日キー（"2026-06-01"）を渡す */
-  onOpenDay?: (dayKey: string) => void;
-  /**
-   * 稼働日詳細バブルの URL を作る。日付ヘッダの data-url に使い、origin-side で
-   * 開いたバブルがクリックした日付の近くに出るようにする（openBubble の URL と一致させる）。
+   * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
+   * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
    */
   dayBubbleUrl?: (dayKey: string) => string;
+  /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
+  violationBubbleUrl?: (violationKey: string) => string;
 };
 
 /**
@@ -84,10 +77,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenAvailability,
-  onOpenViolation,
-  violationBubbleUrl,
-  onOpenDay,
   dayBubbleUrl,
+  violationBubbleUrl,
 }) => {
   useSeedHotelData();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
@@ -310,12 +301,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         groupByDepartment={groupByDept}
         leaderRoles={leaderRoles}
         onChangeCell={handleChangeCell}
-        onOpenDay={onOpenDay ? (day) => onOpenDay(day.key) : undefined}
-        dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
-        onOpenViolation={(v) => onOpenViolation?.(v.key)}
-        violationUrl={violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined}
         onChangeRequired={handleChangeRequired}
         onChangeRequiredAllDays={handleChangeRequiredAllDays}
+        dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
+        violationUrl={
+          violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
+        }
       />
     </StyledContainer>
   );

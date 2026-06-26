@@ -185,13 +185,18 @@ export const StyledWrap = styled.div`
       color: #1976d2;
     }
 
-    /* クリックでその日の詳細バブルを開ける */
-    &.is-clickable {
-      cursor: pointer;
-      &:hover {
-        background: #eceff1;
-        box-shadow: inset 0 0 0 2px #90caf9;
-      }
+    /* ダブルクリックでその日の詳細バブルを開ける（中身は ObjectView） */
+    &.is-clickable:hover {
+      background: #eceff1;
+      box-shadow: inset 0 0 0 2px #90caf9;
+    }
+    /* ObjectView の中身。日番号＋曜日を縦に積んでセル全体をクリック対象にする */
+    .e-day-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
     }
   }
 

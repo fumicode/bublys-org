@@ -15,6 +15,9 @@ import {
   ScheduleViolationView,
   ShiftWishEditor,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+// バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
+// registerObjectUrl 副作用も走る。
+import { scheduleDayUrl, scheduleViolationUrl } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
 // HotelObjectsProvider（CASレジストリ）配下に置く。
@@ -63,12 +66,9 @@ const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<Schedule
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
-  // origin-side で「クリックした要素の近く」に出すため、マーカー側の data-url
-  // （dayBubbleUrl / violationBubbleUrl）と openBubble の URL を同じものに揃える。
-  const dayUrl = (dayKey: string) =>
-    `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
-  const violationUrl = (violationKey: string) =>
-    `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
+  // バブル URL のスキームは app 層（ここ）の関心事。稼働日詳細・違反バブルは
+  // グリッド内の ObjectView がダブルクリックで直接開く（opener / origin / openBubble は
+  // ObjectView が解決）。ここでは URL の作り方だけ注入する。
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
@@ -86,12 +86,10 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
-      violationBubbleUrl={violationUrl}
-      onOpenViolation={(violationKey) =>
-        openBubble(violationUrl(violationKey), bubble.id, "origin-side")
+      dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
+      violationBubbleUrl={(violationKey) =>
+        scheduleViolationUrl(scheduleId, violationKey)
       }
-      dayBubbleUrl={dayUrl}
-      onOpenDay={(dayKey) => openBubble(dayUrl(dayKey), bubble.id, "origin-side")}
     />
   );
 };
