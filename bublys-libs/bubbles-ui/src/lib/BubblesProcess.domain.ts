@@ -5,6 +5,7 @@ export interface BubblesProcessState {
   layers: string[][];
   // e.g.
   // [["A"], ["B", "C"], ["D"]]
+  focusedBubbleId?: string;
 }
 
 
@@ -14,13 +15,19 @@ export class BubblesProcess {
   constructor(props: BubblesProcessState) {
     const layers = props.layers;
     //空のレイヤーがあったら削除する
-    this.state = { layers: layers.filter(layer => layer.length > 0) };
+    this.state = {
+      layers: layers.filter(layer => layer.length > 0),
+      focusedBubbleId: props.focusedBubbleId,
+    };
   }
 
   /** Create from JSON with ID layers */
   static fromJSON(state: BubblesProcessState): BubblesProcess {
     // layers is string[][]
-    return new BubblesProcess({ layers: state.layers.map(layer => [...layer]) });
+    return new BubblesProcess({
+      layers: state.layers.map(layer => [...layer]),
+      focusedBubbleId: state.focusedBubbleId,
+    });
   }
 
   /** Expose layers of IDs */
@@ -34,9 +41,16 @@ export class BubblesProcess {
     return this.layers[0];
   }
 
+  get focusedId(): string | undefined {
+    return this.state.focusedBubbleId;
+  }
+
   /** Serialize to JSON */
   toJSON(): BubblesProcessState {
-    return { layers: this.layers.map(layer => [...layer]) };
+    return {
+      layers: this.layers.map(layer => [...layer]),
+      focusedBubbleId: this.state.focusedBubbleId,
+    };
   }
 
   /** Immer producer helper */
@@ -103,5 +117,9 @@ export class BubblesProcess {
         draft.layers[0].push(id);
       }
     });
+  }
+
+  focus(id: string): BubblesProcess {
+    return new BubblesProcess({ ...this.state, focusedBubbleId: id });
   }
 }

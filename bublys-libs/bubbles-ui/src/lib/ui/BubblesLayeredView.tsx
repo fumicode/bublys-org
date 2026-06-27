@@ -15,6 +15,7 @@ import {
   makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
+  makeSelectFocusedBubbleId,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -26,6 +27,7 @@ type ConnectedBubbleViewProps = {
   bubbleId: string;
   layerIndex: number;
   zIndex: number;
+  isFocused: boolean;
   vanishingPoint: Point2;
   surfaceLayer: Layer;
   hasLeftLink?: boolean;
@@ -44,6 +46,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   bubbleId,
   layerIndex,
   zIndex,
+  isFocused,
   vanishingPoint,
   surfaceLayer,
   hasLeftLink,
@@ -73,6 +76,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         position={pos}
         layerIndex={layerIndex}
         zIndex={zIndex}
+        isFocused={isFocused}
         vanishingPoint={vanishingPoint}
         onClick={() => onBubbleClick?.(bubble.url)}
         onCloseClick={() => onBubbleClose?.(bubble)}
@@ -92,6 +96,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       position={pos}
       layerIndex={layerIndex}
       zIndex={zIndex}
+      isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}
@@ -335,6 +340,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   }, [universeId]);
 
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
+  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
   const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
@@ -373,6 +379,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
       layer.map((bubbleId) => {
         const zIndex = baseZIndex - layerIndex;
         const hasLeftLink = openeeIds.has(bubbleId);
+        const isFocused = focusedBubbleId === bubbleId;
 
         return (
           <ConnectedBubbleView
@@ -381,6 +388,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             bubbleId={bubbleId}
             layerIndex={layerIndex}
             zIndex={zIndex}
+            isFocused={isFocused}
             vanishingPoint={undergroundVanishingPoint}
             surfaceLayer={surfaceLayer}
             hasLeftLink={hasLeftLink}
