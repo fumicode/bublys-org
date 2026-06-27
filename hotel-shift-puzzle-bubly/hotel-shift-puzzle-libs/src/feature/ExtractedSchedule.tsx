@@ -64,14 +64,14 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
   const idSet = useMemo(() => new Set(staffIds), [staffIds]);
   const subset = useMemo(() => allStaff.filter((s) => idSet.has(s.id)), [allStaff, idSet]);
 
-  // 責任者ロールは全スタッフから解決し、subset に関係するロールだけ footer に出す
-  const allLeaderRoles = useMemo(
+  // 責任者ルールは全スタッフから解決し、subset に関係するルールだけ footer に出す
+  const allLeaderRules = useMemo(
     () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, allStaff),
     [allStaff]
   );
-  const relevantRoles = useMemo(
-    () => allLeaderRoles.filter((r) => r.leaderStaffIds.some((id) => idSet.has(id))),
-    [allLeaderRoles, idSet]
+  const relevantRules = useMemo(
+    () => allLeaderRules.filter((r) => r.leaderStaffIds.some((id) => idSet.has(id))),
+    [allLeaderRules, idSet]
   );
 
   const wishByStaff = useMemo(() => {
@@ -89,8 +89,8 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
   // この subset 向けの自動シフトコマンド。相方裏は早責ルールそのものから導出する
   // （表示の ◯/✕ と同じ ShiftLeaderRule に基づく）。
   const earlyRule = useMemo(
-    () => allLeaderRoles.find((r) => r.key === "early"),
-    [allLeaderRoles]
+    () => allLeaderRules.find((r) => r.key === "early"),
+    [allLeaderRules]
   );
   const steps = useMemo<AutoShiftStep[]>(() => {
     const list: AutoShiftStep[] = [fulfillWishesStep];
@@ -177,7 +177,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
         availability={availability}
         wishByStaff={wishByStaff}
         violations={violations}
-        leaderRoles={relevantRoles}
+        leaderRules={relevantRules}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>

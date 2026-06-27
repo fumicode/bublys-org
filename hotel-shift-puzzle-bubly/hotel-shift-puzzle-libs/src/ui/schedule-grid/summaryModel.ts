@@ -32,7 +32,7 @@ export type SummaryRow = {
  * 勤務帯は「名前」で束ねる（同名なら同一勤務帯とみなす）。出現順を保ちつつ同名 ID をまとめ、
  * 色は代表（先頭）勤務帯 ID から引く。
  *
- * leaderRoles は解決済み（leaderStaffIds 入り）。担当勤務帯名 → 勤務帯ID群へは
+ * leaderRules は解決済み（leaderStaffIds 入り）。担当勤務帯名 → 勤務帯ID群へは
  * shiftOptions のグルーピングで解決し、その勤務帯に責任者が入っているかを判定する。
  */
 export function buildSummaryRows(
@@ -41,7 +41,7 @@ export function buildSummaryRows(
   shiftOptions: WorkShift[],
   countsByDay: Map<string, number>[],
   dayOffByDay: number[],
-  leaderRoles: ShiftLeaderRule[] = []
+  leaderRules: ShiftLeaderRule[] = []
 ): SummaryRow[] {
   const shiftGroups: { name: string; shiftIds: string[] }[] = [];
   const groupIndexByName = new Map<string, number>();
@@ -62,17 +62,17 @@ export function buildSummaryRows(
 
   // 責任者ロール行（早責/夜責 など）。充足判定は宣言的ルール（ShiftLeaderRule）に委ねる。
   // 相方裏コマンドと同じ rule.isSatisfiedOn から導出するので、表示とロジックがズレない。
-  const leaderRows: SummaryRow[] = leaderRoles.map((role) => ({
-    key: `leader:${role.key}`,
-    label: role.label,
+  const leaderRows: SummaryRow[] = leaderRules.map((rule) => ({
+    key: `leader:${rule.key}`,
+    label: rule.label,
     bg: "#eceff1",
     fg: "#455a64",
     count: () => 0, // 責任者行は人数表示を使わない（leaderPresent を見る）
     leaderPresent: (i: number) =>
-      role.isSatisfiedOn(
+      rule.isSatisfiedOn(
         schedule,
         days[i],
-        shiftIdsByName.get(role.shiftName) ?? new Set<string>()
+        shiftIdsByName.get(rule.shiftName) ?? new Set<string>()
       ),
   }));
 

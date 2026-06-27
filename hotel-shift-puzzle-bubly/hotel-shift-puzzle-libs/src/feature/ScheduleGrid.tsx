@@ -118,9 +118,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return staffList.filter((s) => s.department === deptFilter);
   }, [staffList, deptFilter]);
 
-  // 責任者ロール（早責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
+  // 責任者ルール（早責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
   // （会計を絞ると早責が常に✕になる、といった取りこぼしを防ぐ）。
-  const leaderRoles = useMemo(
+  const leaderRules = useMemo(
     () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
     [staffList]
   );
@@ -268,7 +268,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         wishByStaff={wishByStaff}
         violations={violations}
         groupByDepartment={groupByDept}
-        leaderRoles={leaderRoles}
+        leaderRules={leaderRules}
         selectedStaffIds={selectedStaffIds}
         onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
         onChangeCell={handleChangeCell}

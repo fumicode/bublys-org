@@ -36,7 +36,7 @@ type ScheduleGridViewProps = {
   /** true のとき部署別にグループ化して表示する */
   groupByDepartment?: boolean;
   /** 責任者の宣言的ルール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
-  leaderRoles?: ShiftLeaderRule[];
+  leaderRules?: ShiftLeaderRule[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
@@ -96,7 +96,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   wishByStaff,
   violations = [],
   groupByDepartment = false,
-  leaderRoles = [],
+  leaderRules = [],
   onChangeCell,
   onChangeRequired,
   onChangeRequiredAllDays,
@@ -124,7 +124,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     shiftOptions,
     countsByDay,
     dayOffByDay,
-    leaderRoles
+    leaderRules
   );
 
   const getWishEntries = (staffId: string, day: WorkingDay) =>
