@@ -26,6 +26,10 @@ type StaffScheduleRowProps = {
   onEditCell: (anchor: HTMLElement, staffId: string, day: WorkingDay) => void;
   /** 違反バブルの URL を作る。ObjectView がこれで開く（origin-side でマーカーの近くに出す） */
   violationUrl?: (violation: ConstraintViolation) => string;
+  /** このスタッフが抽出対象に選択されているか（onToggleSelected があるときだけ表示） */
+  selected?: boolean;
+  /** スタッフの選択をトグルする。渡されたときだけ名前左にチェックボックスを出す */
+  onToggleSelected?: (staffId: string) => void;
 };
 
 /**
@@ -44,12 +48,24 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onToggleExpand,
   onEditCell,
   violationUrl,
+  selected,
+  onToggleSelected,
 }) => {
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
-          名前クリックで希望行の開閉。 */}
+          名前クリックで希望行の開閉。左に抽出用チェックボックス（任意）。 */}
       <div className="e-staff-cell">
+        {onToggleSelected && (
+          <input
+            type="checkbox"
+            className="e-staff-check"
+            checked={!!selected}
+            title="抽出対象として選択"
+            onChange={() => onToggleSelected(staff.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
         <ObjectView
           object={staff}
           label={staff.name}

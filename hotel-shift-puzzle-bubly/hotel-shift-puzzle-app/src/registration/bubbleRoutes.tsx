@@ -10,6 +10,7 @@ import {
   ScheduleGrid,
   ScheduleDayDetail,
   AutoShiftPanel,
+  ExtractedSchedule,
   HotelObjectsProvider,
   ScheduleWorldLineView,
   AvailabilityEditor,
@@ -24,6 +25,7 @@ import {
   scheduleAvailabilityUrl,
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
+  scheduleExtractUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -89,6 +91,8 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       autoShiftUrl={autoShiftUrl}
+      onOpenExtract={(staffIds) => openSide(scheduleExtractUrl(scheduleId, staffIds))}
+      extractBubbleUrl={(staffIds) => scheduleExtractUrl(scheduleId, staffIds)}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)
@@ -100,6 +104,15 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
 // --- 自動シフト パネルバブル（勤務表の「🪄 自動シフト」ボタンから開く） ---
 const AutoShiftBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AutoShiftPanel scheduleId={bubble.params.scheduleId} />);
+
+// --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
+const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ExtractedSchedule
+      scheduleId={bubble.params.scheduleId}
+      staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
+    />
+  );
 
 // --- 稼働日 詳細バブル（勤務表の日付ヘッダクリックで開く） ---
 const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -138,6 +151,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },

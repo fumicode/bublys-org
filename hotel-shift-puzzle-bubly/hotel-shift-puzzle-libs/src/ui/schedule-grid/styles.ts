@@ -200,17 +200,27 @@ export const StyledWrap = styled.div`
     }
   }
 
-  /* スタッフ名（左に固定） */
+  /* スタッフ名（左に固定）。抽出チェックボックスがあるときは横並び */
   .e-staff-cell {
     position: sticky;
     left: 0;
     z-index: 1;
     background: #fff;
+    display: flex;
+    align-items: center;
+
+    /* 抽出用チェックボックス（任意）。クリックは選択トグルのみ（行展開はしない） */
+    .e-staff-check {
+      flex: 0 0 auto;
+      margin: 0 0 0 6px;
+      cursor: pointer;
+    }
 
     .e-staff {
       display: flex;
       align-items: center;
       gap: 4px;
+      min-width: 0;
       padding: 4px 8px;
       width: 100%;
       box-sizing: border-box;

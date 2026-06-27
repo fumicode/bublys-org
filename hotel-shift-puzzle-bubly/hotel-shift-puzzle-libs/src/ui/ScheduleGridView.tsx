@@ -50,6 +50,10 @@ type ScheduleGridViewProps = {
   dayBubbleUrl?: (day: WorkingDay) => string;
   /** 違反バブルの URL。違反マーカーの ObjectView に渡す（同上・app 層から注入）。 */
   violationUrl?: (violation: ConstraintViolation) => string;
+  /** 抽出対象として選択中のスタッフID。onToggleStaffSelected があるとき名前左にチェックを出す */
+  selectedStaffIds?: Set<string>;
+  /** スタッフの抽出選択をトグルする */
+  onToggleStaffSelected?: (staffId: string) => void;
 };
 
 /**
@@ -98,6 +102,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onChangeRequiredAllDays,
   dayBubbleUrl,
   violationUrl,
+  selectedStaffIds,
+  onToggleStaffSelected,
 }) => {
   const days = schedule.workingDays();
 
@@ -175,6 +181,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
           violationUrl={violationUrl}
+          selected={selectedStaffIds?.has(staff.id)}
+          onToggleSelected={onToggleStaffSelected}
         />
       ));
     }
@@ -205,6 +213,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleExpand={toggleExpanded}
           onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
           violationUrl={violationUrl}
+          selected={selectedStaffIds?.has(staff.id)}
+          onToggleSelected={onToggleStaffSelected}
         />
       )),
     ]);

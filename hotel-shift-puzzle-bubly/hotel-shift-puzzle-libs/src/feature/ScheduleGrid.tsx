@@ -48,6 +48,10 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
+  /** 抽出バブルを開くハンドラ。選択中スタッフID群を渡す */
+  onOpenExtract?: (staffIds: string[]) => void;
+  /** 抽出バブルの URL を作る（選択中スタッフID群）。抽出ボタンの data-url に使う */
+  extractBubbleUrl?: (staffIds: string[]) => string;
 };
 
 /**
@@ -64,6 +68,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   autoShiftUrl,
   dayBubbleUrl,
   violationBubbleUrl,
+  onOpenExtract,
+  extractBubbleUrl,
 }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -81,6 +87,21 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
   const [deptFilter, setDeptFilter] = useState<string>(""); // "" = 全部署
+
+  // ----- 抽出のためのスタッフ選択状態 -----
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
+  const toggleStaffSelected = (staffId: string) =>
+    setSelectedStaffIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(staffId)) next.delete(staffId);
+      else next.add(staffId);
+      return next;
+    });
+  // 選択中スタッフID（勤務表の並び順を保つ。URL/抽出の引数を安定させる）
+  const selectedIds = useMemo(
+    () => staffList.filter((s) => selectedStaffIds.has(s.id)).map((s) => s.id),
+    [staffList, selectedStaffIds]
+  );
 
   // 重複なしの部署一覧（未設定を除く）
   const departments = useMemo(() => {
@@ -214,6 +235,31 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         </div>
       </div>
 
+      {/* スタッフを選択しているときだけ浮かぶ「抽出」バー（選択スタッフだけの勤務表を開く） */}
+      {onOpenExtract && selectedIds.length > 0 && (
+        <div className="e-extract-bar">
+          {withUrl(
+            extractBubbleUrl?.(selectedIds),
+            <button
+              type="button"
+              className="e-link e-extract"
+              onClick={() => onOpenExtract(selectedIds)}
+              title="選択したスタッフだけの勤務表を開く"
+            >
+              抽出 ({selectedIds.length})
+            </button>
+          )}
+          <button
+            type="button"
+            className="e-link e-extract-clear"
+            onClick={() => setSelectedStaffIds(new Set())}
+            title="選択を解除"
+          >
+            選択解除
+          </button>
+        </div>
+      )}
+
       <ScheduleGridView
         schedule={schedule}
         staffList={filteredStaffList}
@@ -223,6 +269,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         violations={violations}
         groupByDepartment={groupByDept}
         leaderRoles={leaderRoles}
+        selectedStaffIds={selectedStaffIds}
+        onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
         onChangeCell={handleChangeCell}
         onChangeRequired={handleChangeRequired}
         onChangeRequiredAllDays={handleChangeRequiredAllDays}
@@ -303,6 +351,33 @@ const StyledContainer = styled.div`
         background: #ede7f6;
         border-color: #9575cd;
       }
+    }
+  }
+
+  /* 選択中だけ浮かぶ抽出バー（左寄せ） */
+  .e-extract-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 8px;
+    width: fit-content;
+
+    .e-extract {
+      background: #43a047;
+      border-color: #2e7d32;
+      color: #fff;
+      font-weight: 600;
+      &:hover {
+        background: #388e3c;
+      }
+    }
+    .e-extract-clear {
+      font-size: 0.78em;
+      color: #555;
     }
   }
 
