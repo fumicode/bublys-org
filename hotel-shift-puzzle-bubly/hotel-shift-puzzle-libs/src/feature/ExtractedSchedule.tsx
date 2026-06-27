@@ -17,7 +17,7 @@ import {
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { buildScheduleConstraints, MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
 import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import {
@@ -166,6 +166,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
         violations={violations}
         leaderRules={relevantRules}
         leaderRulesOnlyFooter
+        minDayOff={MIN_MONTHLY_DAY_OFF}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>

@@ -17,6 +17,9 @@ import { ShiftWishConstraint } from "./ShiftWishConstraint.js";
 /** 連勤上限（日数）。いまは固定。 */
 export const MAX_CONSECUTIVE_WORKDAYS_LIMIT = 5;
 
+/** スタッフが月に休まなければならない最低日数。いまは固定（将来は会社ごとに注入）。 */
+export const MIN_MONTHLY_DAY_OFF = 8;
+
 /** シフト希望との食い違い判定に必要な文脈（希望と勤務帯名）。 */
 export type ScheduleConstraintContext = {
   wishByStaff: Map<string, StaffMonthlyShiftWish>;

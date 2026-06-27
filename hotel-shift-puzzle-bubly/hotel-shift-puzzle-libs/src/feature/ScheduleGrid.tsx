@@ -16,7 +16,7 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { buildScheduleConstraints, MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
 import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import {
   STAFF_TYPE,
@@ -248,52 +248,56 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         <LeaderRulesView rules={leaderRules} nameOf={nameOf} />
       </div>
 
-      {/* スタッフを選択しているときだけ浮かぶ「抽出」バー（選択スタッフだけの勤務表を開く） */}
-      {onOpenExtract && selectedIds.length > 0 && (
-        <div className="e-extract-bar">
-          {withUrl(
-            extractBubbleUrl?.(selectedIds),
+      {/* グリッド領域。選択中はスタッフ列の左に「抽出」ボタンを absolute で浮かべる */}
+      <div className="e-grid-area">
+        {onOpenExtract && selectedIds.length > 0 && (
+          <div className="e-extract-float">
+            {withUrl(
+              extractBubbleUrl?.(selectedIds),
+              <button
+                type="button"
+                className="e-extract"
+                onClick={() => onOpenExtract(selectedIds)}
+                title="選択したスタッフだけの勤務表を開く"
+              >
+                抽出 ({selectedIds.length})
+              </button>
+            )}
             <button
               type="button"
-              className="e-link e-extract"
-              onClick={() => onOpenExtract(selectedIds)}
-              title="選択したスタッフだけの勤務表を開く"
+              className="e-extract-clear"
+              onClick={() => setSelectedStaffIds(new Set())}
+              title="選択を解除"
+              aria-label="選択を解除"
             >
-              抽出 ({selectedIds.length})
+              ×
             </button>
-          )}
-          <button
-            type="button"
-            className="e-link e-extract-clear"
-            onClick={() => setSelectedStaffIds(new Set())}
-            title="選択を解除"
-          >
-            選択解除
-          </button>
-        </div>
-      )}
+          </div>
+        )}
 
-      <ScheduleGridView
-        schedule={schedule}
-        staffList={filteredStaffList}
-        workShifts={workShifts}
-        availability={availability}
-        wishByStaff={wishByStaff}
-        violations={violations}
-        groupByDepartment={groupByDept}
-        leaderRules={leaderRules}
-        selectedStaffIds={selectedStaffIds}
-        onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
-        onOpenExtract={onOpenExtract}
-        extractBubbleUrl={extractBubbleUrl}
-        onChangeCell={handleChangeCell}
-        onChangeRequired={handleChangeRequired}
-        onChangeRequiredAllDays={handleChangeRequiredAllDays}
-        dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
-        violationUrl={
-          violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
-        }
-      />
+        <ScheduleGridView
+          schedule={schedule}
+          staffList={filteredStaffList}
+          workShifts={workShifts}
+          availability={availability}
+          wishByStaff={wishByStaff}
+          violations={violations}
+          groupByDepartment={groupByDept}
+          leaderRules={leaderRules}
+          selectedStaffIds={selectedStaffIds}
+          onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
+          onOpenExtract={onOpenExtract}
+          extractBubbleUrl={extractBubbleUrl}
+          minDayOff={MIN_MONTHLY_DAY_OFF}
+          onChangeCell={handleChangeCell}
+          onChangeRequired={handleChangeRequired}
+          onChangeRequiredAllDays={handleChangeRequiredAllDays}
+          dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}
+          violationUrl={
+            violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
+          }
+        />
+      </div>
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
       {onOpenHistory && (
@@ -374,30 +378,50 @@ const StyledContainer = styled.div`
     margin-bottom: 8px;
   }
 
-  /* 選択中だけ浮かぶ抽出バー（左寄せ） */
-  .e-extract-bar {
+  /* グリッド領域。抽出フロートの absolute 基準 */
+  .e-grid-area {
+    position: relative;
+  }
+
+  /* 選択中だけ、スタッフ列の左に浮かぶ抽出ボタン（absolute・フローに影響しない） */
+  .e-extract-float {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    z-index: 20;
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    padding: 4px 8px;
+    gap: 4px;
+    padding: 3px 4px 3px 6px;
     background: #e8f5e9;
     border: 1px solid #a5d6a7;
-    border-radius: 8px;
-    width: fit-content;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px hsla(0, 0%, 0%, 0.18);
 
     .e-extract {
+      border: none;
+      border-radius: 999px;
       background: #43a047;
-      border-color: #2e7d32;
       color: #fff;
-      font-weight: 600;
+      font-size: 0.8em;
+      font-weight: 700;
+      padding: 4px 12px;
+      cursor: pointer;
       &:hover {
         background: #388e3c;
       }
     }
     .e-extract-clear {
-      font-size: 0.78em;
-      color: #555;
+      border: none;
+      background: transparent;
+      color: #2e7d32;
+      font-size: 1.1em;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+      &:hover {
+        color: #1b5e20;
+      }
     }
   }
 

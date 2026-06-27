@@ -37,6 +37,8 @@ type StaffScheduleRowProps = {
   onOpenExtract?: (staffIds: string[]) => void;
   /** 抽出バブルの URL（バッジの data-url アンカー用。link bubble がバッジから伸びる） */
   extractBubbleUrl?: (staffIds: string[]) => string;
+  /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
+  minDayOff?: number;
 };
 
 /**
@@ -60,6 +62,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   leaderRules = [],
   onOpenExtract,
   extractBubbleUrl,
+  minDayOff,
 }) => {
   // このスタッフが属する責任者ルール → 名前横のバッジ。クリックでその関係者を抽出。
   const myRules = leaderRules.filter((r) => r.leaderStaffIds.includes(staff.id));
@@ -149,10 +152,23 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })}
 
-      {/* 右端: そのスタッフの月内休み合計 */}
-      <div className="e-off-total" title={`${staff.name} の休み合計`}>
-        {schedule.countDayOffForStaff(staff.id)}
-      </div>
+      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くする（制約の可視化） */}
+      {(() => {
+        const offCount = schedule.countDayOffForStaff(staff.id);
+        const underMin = minDayOff !== undefined && offCount < minDayOff;
+        return (
+          <div
+            className={`e-off-total${underMin ? " is-under-min" : ""}`}
+            title={
+              underMin
+                ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）`
+                : `${staff.name} の休み合計`
+            }
+          >
+            {offCount}
+          </div>
+        );
+      })()}
 
       {/* 展開時: 希望行（割当行の真下に並べて比較できる） */}
       {expanded && (

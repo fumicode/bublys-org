@@ -64,6 +64,12 @@ export const StyledWrap = styled.div`
   .e-off-total.e-off-sum {
     color: #455a64;
   }
+  /* 月の最低休日数に満たないスタッフの休み合計（制約違反の可視化） */
+  .e-off-total.is-under-min {
+    color: #c62828;
+    background: #ffebee;
+    font-weight: bold;
+  }
   .e-off-total.is-first {
     border-top: 2px solid #b0bec5;
   }

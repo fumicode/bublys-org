@@ -23,6 +23,7 @@ export * from './schedule/fulfillWishesStep.js';
 export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';
 export * from './schedule/partnerCoverStep.js';
+export * from './schedule/minDayOffStep.js';
 export * from './schedule/autoShiftSteps.js';
 
 // 制約（シフト表が満たすべきルール）
