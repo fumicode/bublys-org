@@ -8,10 +8,10 @@
  * いまはホテルの既定値をハードコードしているが、いずれは会社ごとの設定から
  * ShiftLeaderRoleConfig[] を組み立てて差し替えられるよう、ここに解決の入口を集約する。
  *
- * ドメイン（ShiftLeaderRole）は解決済みの leaderStaffIds だけを知っていればよいので、
- * resolveShiftLeaderRoles でスタッフ一覧から責任者IDを解決して渡す。
+ * resolveShiftLeaderRoles はスタッフ一覧から責任者IDを解決し、宣言的ルール
+ * `ShiftLeaderRule`（表示も相方裏コマンドもこの同じルールから導出）を組み立てて返す。
  */
-import { Staff, type ShiftLeaderRole } from "@bublys-org/hotel-shift-puzzle-model";
+import { Staff, ShiftLeaderRule } from "@bublys-org/hotel-shift-puzzle-model";
 
 /** 責任者ロールの定義。どのスタッフを責任者とみなすかを述語で持つ。 */
 export type ShiftLeaderRoleConfig = {
@@ -23,6 +23,8 @@ export type ShiftLeaderRoleConfig = {
   shiftName: string;
   /** このスタッフがこの役割の責任者か */
   isLeader: (staff: Staff) => boolean;
+  /** 充足に必要な最低人数（既定 1＝「いずれか1人」） */
+  minCount?: number;
 };
 
 /**
@@ -46,15 +48,19 @@ export const HOTEL_SHIFT_LEADER_ROLES: ShiftLeaderRoleConfig[] = [
   },
 ];
 
-/** ロール定義とスタッフ一覧から、解決済みの ShiftLeaderRole[] を作る。 */
+/** ロール定義とスタッフ一覧から、解決済みの ShiftLeaderRule[] を作る。 */
 export function resolveShiftLeaderRoles(
   configs: ShiftLeaderRoleConfig[],
   staffList: Staff[]
-): ShiftLeaderRole[] {
-  return configs.map((c) => ({
-    key: c.key,
-    label: c.label,
-    shiftName: c.shiftName,
-    leaderStaffIds: staffList.filter(c.isLeader).map((s) => s.id),
-  }));
+): ShiftLeaderRule[] {
+  return configs.map(
+    (c) =>
+      new ShiftLeaderRule({
+        key: c.key,
+        label: c.label,
+        shiftName: c.shiftName,
+        leaderStaffIds: staffList.filter(c.isLeader).map((s) => s.id),
+        minCount: c.minCount,
+      })
+  );
 }

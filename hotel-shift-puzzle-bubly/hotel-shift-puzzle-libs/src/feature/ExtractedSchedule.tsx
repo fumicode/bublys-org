@@ -86,16 +86,17 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
     return map;
   }, [allWishes, schedule]);
 
-  // この subset 向けの自動シフトコマンド。相方裏は早責ロールの担当勤務帯（早番）で埋める
-  const earlyRole = useMemo(
+  // この subset 向けの自動シフトコマンド。相方裏は早責ルールそのものから導出する
+  // （表示の ◯/✕ と同じ ShiftLeaderRule に基づく）。
+  const earlyRule = useMemo(
     () => allLeaderRoles.find((r) => r.key === "early"),
     [allLeaderRoles]
   );
   const steps = useMemo<AutoShiftStep[]>(() => {
     const list: AutoShiftStep[] = [fulfillWishesStep];
-    if (earlyRole) list.push(makePartnerCoverStep(earlyRole.shiftName));
+    if (earlyRule) list.push(makePartnerCoverStep(earlyRule));
     return list;
-  }, [earlyRole]);
+  }, [earlyRule]);
 
   const violations = useMemo(() => {
     if (!schedule) return [];

@@ -254,22 +254,6 @@ export class MonthlyStaffSchedule {
     return counts;
   }
 
-  /**
-   * 指定スタッフのいずれかが、その稼働日に「指定の勤務帯ID群のどれか」で出勤しているか。
-   * 責任者要件（早番に早番責任者がいるか 等）の判定に使う純粋なクエリ。
-   */
-  isAnyAssignedToShifts(
-    staffIds: string[],
-    day: WorkingDay,
-    shiftIds: Iterable<string>
-  ): boolean {
-    const set = shiftIds instanceof Set ? shiftIds : new Set(shiftIds);
-    return staffIds.some((staffId) => {
-      const shiftId = this.getShiftIdFor(staffId, day);
-      return shiftId !== undefined && set.has(shiftId);
-    });
-  }
-
   /** その稼働日に休みの人数を数える（出勤・未定は除く） */
   countDayOffOn(day: WorkingDay): number {
     return this.assignmentsOn(day).filter((a) => a.isDayOff).length;

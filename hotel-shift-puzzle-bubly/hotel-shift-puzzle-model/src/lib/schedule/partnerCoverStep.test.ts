@@ -2,6 +2,7 @@ import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
 import { createDefaultWorkShifts } from './WorkShift.js';
 import { makePartnerCoverStep } from './partnerCoverStep.js';
+import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
 describe('makePartnerCoverStep（相方裏）', () => {
@@ -33,8 +34,14 @@ describe('makePartnerCoverStep（相方裏）', () => {
     ...extra,
   });
 
-  // 早責ペア（A・B）を対象に、早番を裏として埋める
-  const step = makePartnerCoverStep('早番');
+  // 早責ペア（A・B）を対象に、早番を裏として埋める宣言的ルール
+  const earlyRule = new ShiftLeaderRule({
+    key: 'early',
+    label: '早責',
+    shiftName: '早番',
+    leaderStaffIds: ['A', 'B'],
+  });
+  const step = makePartnerCoverStep(earlyRule);
 
   test('一方が休みで相方が未定なら、相方を早番に入れる', () => {
     const schedule = emptySchedule().assignDayOff('A', june1); // A休み、B未定
@@ -101,5 +108,33 @@ describe('makePartnerCoverStep（相方裏）', () => {
     const result = step.run(schedule, ctxOf(['A', 'B']));
 
     expect(result.assigned).toBe(0);
+  });
+
+  test('対象はルールの leaderStaffIds（ctx.staffIds と違っても）', () => {
+    // A休み・B未定。ctx.staffIds は別人（X・Y）でも、ルールの A・B を対象に動く
+    const schedule = emptySchedule().assignDayOff('A', june1);
+    const result = step.run(schedule, ctxOf(['X', 'Y']));
+
+    expect(result.assigned).toBe(1);
+    expect(result.schedule.getShiftIdFor('B', june1)).toBe('early');
+  });
+
+  test('minCount=2: 一方が休みの日に、未定の相方を充足まで（=この例は1人）埋める', () => {
+    // A・B・C の3人ルール、最低2人早番。A休み・B早番済み・C未定 → C を足して2人にする
+    const rule2 = new ShiftLeaderRule({
+      key: 'early',
+      label: '早責',
+      shiftName: '早番',
+      leaderStaffIds: ['A', 'B', 'C'],
+      minCount: 2,
+    });
+    const step2 = makePartnerCoverStep(rule2);
+    const schedule = emptySchedule()
+      .assignDayOff('A', june1)
+      .assignShift('B', june1, 'early'); // 既に1人。minCount=2 には1人足りない
+    const result = step2.run(schedule, ctxOf(['A', 'B', 'C']));
+
+    expect(result.assigned).toBe(1);
+    expect(result.schedule.getShiftIdFor('C', june1)).toBe('early');
   });
 });

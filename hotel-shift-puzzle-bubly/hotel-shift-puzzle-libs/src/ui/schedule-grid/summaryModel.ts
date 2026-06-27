@@ -2,7 +2,7 @@ import type {
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
-  ShiftLeaderRole,
+  ShiftLeaderRule,
 } from "../../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 
@@ -41,7 +41,7 @@ export function buildSummaryRows(
   shiftOptions: WorkShift[],
   countsByDay: Map<string, number>[],
   dayOffByDay: number[],
-  leaderRoles: ShiftLeaderRole[] = []
+  leaderRoles: ShiftLeaderRule[] = []
 ): SummaryRow[] {
   const shiftGroups: { name: string; shiftIds: string[] }[] = [];
   const groupIndexByName = new Map<string, number>();
@@ -60,7 +60,8 @@ export function buildSummaryRows(
     shiftGroups.map((g) => [g.name, new Set(g.shiftIds)] as const)
   );
 
-  // 責任者ロール行（早責/夜責 など）。担当勤務帯に責任者が1人でも入っていれば ◯。
+  // 責任者ロール行（早責/夜責 など）。充足判定は宣言的ルール（ShiftLeaderRule）に委ねる。
+  // 相方裏コマンドと同じ rule.isSatisfiedOn から導出するので、表示とロジックがズレない。
   const leaderRows: SummaryRow[] = leaderRoles.map((role) => ({
     key: `leader:${role.key}`,
     label: role.label,
@@ -68,8 +69,8 @@ export function buildSummaryRows(
     fg: "#455a64",
     count: () => 0, // 責任者行は人数表示を使わない（leaderPresent を見る）
     leaderPresent: (i: number) =>
-      schedule.isAnyAssignedToShifts(
-        role.leaderStaffIds,
+      role.isSatisfiedOn(
+        schedule,
         days[i],
         shiftIdsByName.get(role.shiftName) ?? new Set<string>()
       ),

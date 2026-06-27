@@ -11,7 +11,7 @@ import {
   ConstraintViolation,
   StaffMonthlyShiftWish,
   type ShiftCell,
-  type ShiftLeaderRole,
+  ShiftLeaderRule,
 } from "../domain/index.js";
 import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
@@ -35,8 +35,8 @@ type ScheduleGridViewProps = {
   violations?: ConstraintViolation[];
   /** true のとき部署別にグループ化して表示する */
   groupByDepartment?: boolean;
-  /** 責任者ロール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
-  leaderRoles?: ShiftLeaderRole[];
+  /** 責任者の宣言的ルール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
+  leaderRoles?: ShiftLeaderRule[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
