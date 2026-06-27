@@ -266,6 +266,14 @@ export const StyledWrap = styled.div`
         color: #5e35b1;
         border: 1px solid #b39ddb;
       }
+      /* クリックで関係者を抽出できるバッジ */
+      &.is-clickable {
+        cursor: pointer;
+      }
+      &.is-clickable:hover {
+        filter: brightness(0.95);
+        box-shadow: 0 0 0 1px currentColor inset;
+      }
     }
   }
 

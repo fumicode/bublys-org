@@ -41,7 +41,9 @@ export function buildSummaryRows(
   shiftOptions: WorkShift[],
   countsByDay: Map<string, number>[],
   dayOffByDay: number[],
-  leaderRules: ShiftLeaderRule[] = []
+  leaderRules: ShiftLeaderRule[] = [],
+  /** true なら責任者行（◯/✕）だけ返す（必要人数・休み行は出さない）。抽出ビュー用 */
+  leaderOnly = false
 ): SummaryRow[] {
   const shiftGroups: { name: string; shiftIds: string[] }[] = [];
   const groupIndexByName = new Map<string, number>();
@@ -75,6 +77,9 @@ export function buildSummaryRows(
         shiftIdsByName.get(rule.shiftName) ?? new Set<string>()
       ),
   }));
+
+  // 抽出ビューなど：該当制約（責任者ルール）の充足行だけ出す
+  if (leaderOnly) return leaderRows;
 
   return [
     ...leaderRows,

@@ -37,6 +37,8 @@ type ScheduleGridViewProps = {
   groupByDepartment?: boolean;
   /** 責任者の宣言的ルール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
   leaderRules?: ShiftLeaderRule[];
+  /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
+  leaderRulesOnlyFooter?: boolean;
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
@@ -54,6 +56,10 @@ type ScheduleGridViewProps = {
   selectedStaffIds?: Set<string>;
   /** スタッフの抽出選択をトグルする */
   onToggleStaffSelected?: (staffId: string) => void;
+  /** 責任者バッジをクリックしたとき、そのルールの関係者だけを抽出する */
+  onOpenExtract?: (staffIds: string[]) => void;
+  /** 抽出バブルの URL（バッジ・抽出ボタンの data-url アンカー用） */
+  extractBubbleUrl?: (staffIds: string[]) => string;
 };
 
 /**
@@ -97,6 +103,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   violations = [],
   groupByDepartment = false,
   leaderRules = [],
+  leaderRulesOnlyFooter = false,
   onChangeCell,
   onChangeRequired,
   onChangeRequiredAllDays,
@@ -104,6 +111,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   violationUrl,
   selectedStaffIds,
   onToggleStaffSelected,
+  onOpenExtract,
+  extractBubbleUrl,
 }) => {
   const days = schedule.workingDays();
 
@@ -124,7 +133,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     shiftOptions,
     countsByDay,
     dayOffByDay,
-    leaderRules
+    leaderRules,
+    leaderRulesOnlyFooter
   );
 
   const getWishEntries = (staffId: string, day: WorkingDay) =>
@@ -183,6 +193,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
+          leaderRules={leaderRules}
+          onOpenExtract={onOpenExtract}
+          extractBubbleUrl={extractBubbleUrl}
         />
       ));
     }
@@ -215,6 +228,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
+          leaderRules={leaderRules}
+          onOpenExtract={onOpenExtract}
+          extractBubbleUrl={extractBubbleUrl}
         />
       )),
     ]);

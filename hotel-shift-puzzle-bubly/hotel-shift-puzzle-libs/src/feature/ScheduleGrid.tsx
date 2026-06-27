@@ -13,6 +13,7 @@ import {
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import { LeaderRulesView } from "../ui/LeaderRulesView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
@@ -125,6 +126,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [staffList]
   );
 
+  // 責任者ルールを人が読める形で描く用。名前は絞り込み前の全スタッフから引く
+  // （部署フィルタで責任者が消えても名前を解決できるように）。
+  const nameOf = useMemo(() => {
+    const map = new Map(staffList.map((s) => [s.id, s.name]));
+    return (id: string) => map.get(id) ?? id;
+  }, [staffList]);
+
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
     const map = new Map<string, StaffMonthlyShiftWish>();
@@ -235,6 +243,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         </div>
       </div>
 
+      {/* 適用中の宣言的ルール（早責/夜責）を人が読める形で描く */}
+      <div className="e-rules-strip">
+        <LeaderRulesView rules={leaderRules} nameOf={nameOf} />
+      </div>
+
       {/* スタッフを選択しているときだけ浮かぶ「抽出」バー（選択スタッフだけの勤務表を開く） */}
       {onOpenExtract && selectedIds.length > 0 && (
         <div className="e-extract-bar">
@@ -271,6 +284,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         leaderRules={leaderRules}
         selectedStaffIds={selectedStaffIds}
         onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
+        onOpenExtract={onOpenExtract}
+        extractBubbleUrl={extractBubbleUrl}
         onChangeCell={handleChangeCell}
         onChangeRequired={handleChangeRequired}
         onChangeRequiredAllDays={handleChangeRequiredAllDays}
@@ -352,6 +367,11 @@ const StyledContainer = styled.div`
         border-color: #9575cd;
       }
     }
+  }
+
+  /* 適用ルールの帯 */
+  .e-rules-strip {
+    margin-bottom: 8px;
   }
 
   /* 選択中だけ浮かぶ抽出バー（左寄せ） */

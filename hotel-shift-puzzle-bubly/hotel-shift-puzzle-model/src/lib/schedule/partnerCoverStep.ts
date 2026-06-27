@@ -26,7 +26,7 @@ import { ShiftLeaderRule } from "./ShiftLeaderRule.js";
 export function makePartnerCoverStep(rule: ShiftLeaderRule): AutoShiftStep {
   return {
     key: `partner-cover:${rule.key}`,
-    label: "相方裏",
+    label: `相方裏（${rule.label}）`,
     description: `${rule.label}ペアの一方が休みの日に、もう一方を${rule.shiftName}に入れて穴を埋めます（両方出られる日は触りません）。`,
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {

@@ -86,17 +86,16 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
     return map;
   }, [allWishes, schedule]);
 
-  // この subset 向けの自動シフトコマンド。相方裏は早責ルールそのものから導出する
-  // （表示の ◯/✕ と同じ ShiftLeaderRule に基づく）。
-  const earlyRule = useMemo(
-    () => allLeaderRules.find((r) => r.key === "early"),
-    [allLeaderRules]
+  // 自動シフトコマンド。相方裏は「この選択に関係する責任者ルール」ごとに作る。
+  // 早番固定ではなく各ルール（早責→早番 / 夜責→遅番）から導出し、関係するルールが
+  // 無ければ相方裏ボタンは出ない（選択が責任者ペアとは限らないため）。
+  const steps = useMemo<AutoShiftStep[]>(
+    () => [
+      fulfillWishesStep,
+      ...relevantRules.map((rule) => makePartnerCoverStep(rule)),
+    ],
+    [relevantRules]
   );
-  const steps = useMemo<AutoShiftStep[]>(() => {
-    const list: AutoShiftStep[] = [fulfillWishesStep];
-    if (earlyRule) list.push(makePartnerCoverStep(earlyRule));
-    return list;
-  }, [earlyRule]);
 
   const violations = useMemo(() => {
     if (!schedule) return [];
@@ -129,19 +128,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
 
   return (
     <StyledContainer>
-      <div className="e-header">
-        <h3>
-          抽出{" "}
-          <span className="e-sub">
-            {subset.map((s) => s.name).join(" / ") || "（対象なし）"} ／ {schedule.year}年
-            {schedule.month}月
-          </span>
-        </h3>
-        <p className="e-note">
-          この {subset.length} 名だけを対象に自動シフトを組めます。編集は元の勤務表にも反映されます。
-        </p>
-      </div>
-
+      {/* 必要最低限：自動コマンド・日付・人・該当制約の充足行だけ。見出し/説明は出さない */}
       <div className="e-auto-bar">
         {steps.map((step) => (
           <button
@@ -178,6 +165,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}
+        leaderRulesOnlyFooter
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>
@@ -185,23 +173,6 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
 };
 
 const StyledContainer = styled.div`
-  .e-header {
-    margin-bottom: 8px;
-    h3 {
-      margin: 0;
-    }
-    .e-sub {
-      font-weight: normal;
-      font-size: 0.8em;
-      color: #777;
-    }
-    .e-note {
-      margin: 4px 0 0;
-      font-size: 0.78em;
-      color: #888;
-    }
-  }
-
   .e-auto-bar {
     display: flex;
     align-items: center;
