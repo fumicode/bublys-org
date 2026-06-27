@@ -173,6 +173,26 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
 };
 
 const StyledContainer = styled.div`
+  /* 半透明（バブル側 contentBackground で付与）に合わせ、中の白い面も半透明にして
+     裏がうっすら見えるようにする。ぼかしは無し。 */
+
+  /* グリッドの白い面を半透明へ上書き（&& で StyledWrap のルールより優先） */
+  && {
+    .e-grid {
+      background: transparent;
+    }
+    .e-corner,
+    .e-day-head,
+    .e-off-head,
+    .e-off-total,
+    .e-staff-cell {
+      background: hsla(0, 0%, 100%, 0.4);
+    }
+    .e-off {
+      background: hsla(0, 0%, 100%, 0.2);
+    }
+  }
+
   .e-auto-bar {
     display: flex;
     align-items: center;
@@ -183,7 +203,7 @@ const StyledContainer = styled.div`
     .e-auto {
       border: 1px solid #b39ddb;
       border-radius: 6px;
-      background: #fff;
+      background: hsla(0, 0%, 100%, 0.55);
       color: #5e35b1;
       font-size: 0.8em;
       font-weight: 600;
