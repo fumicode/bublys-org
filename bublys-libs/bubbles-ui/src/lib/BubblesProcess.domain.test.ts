@@ -48,3 +48,26 @@ describe('BubblesProcess - focus', () => {
     expect(afterLayerDown.focusedId).toBe('A');
   });
 });
+
+describe('BubblesProcess - popChild', () => {
+  it('popChild() moves bubble to surface layer', () => {
+    const process = makeProcess([['A', 'B'], ['C']]);
+    const popped = process.popChild('C');
+
+    expect(popped.layers[0]).toContain('C');
+  });
+
+  it('popChild() sets focusedId to the popped bubble', () => {
+    const process = makeProcess([['A', 'B'], ['C']]);
+    const popped = process.popChild('C');
+
+    expect(popped.focusedId).toBe('C');
+  });
+
+  it('popChild() replaces previous focusedId', () => {
+    const process = makeProcess([['A', 'B'], ['C']]).focus('A');
+    const popped = process.popChild('C');
+
+    expect(popped.focusedId).toBe('C');
+  });
+});

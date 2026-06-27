@@ -1,13 +1,13 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useEffect, useMemo, useState, memo } from "react";
+import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble, makeSelectFocusedBubbleId } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -95,6 +95,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
+  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -124,9 +125,10 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     setHeaderOffset(Math.max(0, -headerTopInViewport));
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isFocused) updateHeaderSafeZone();
-  }, [isFocused]);
+    else setIsMouseNearTop(false);
+  }, [isFocused, focusedBubbleId]);
 
   const isMaximized = bubble.isMaximized;
 
@@ -345,8 +347,10 @@ const StyledWindow = styled.div<StyledWindowProps>`
   backdrop-filter: blur(10px) saturate(1.15);
 
   /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     :focus-within ではなく :has(:focus-visible) を使うことで、
+     マウスクリックによる一時的なフォーカスではトリガーされない。
      transform は JS 管理（$headerOffset 込み）なので上書きしない。 */
-  &:focus-within > .e-window-header {
+  &:has(:focus-visible) > .e-window-header {
     opacity: 1;
     pointer-events: auto;
   }

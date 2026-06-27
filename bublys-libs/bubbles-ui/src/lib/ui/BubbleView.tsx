@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useEffect, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -214,7 +214,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
     setHeaderOffset(Math.max(0, -headerTopInViewport));
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isFocused) updateHeaderSafeZone();
   }, [isFocused]);
 
@@ -255,7 +255,9 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   };
 
-  const handleMouseDown = () => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // UrledPlace内のクリックはpopChildがフォーカスを担うためスキップ
+    if ((e.target as Element).closest('[data-url]')) return;
     dispatch(focusBubble(bubble.id, universeId));
   };
 
@@ -521,8 +523,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   }
 
   /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     :focus-within ではなく :has(:focus-visible) を使うことで、
+     マウスクリックによる一時的なフォーカスではトリガーされない。
      transform は JS 管理（headerOffset 込み）なので上書きしない。 */
-  &:focus-within >.e-bubble-header {
+  &:has(:focus-visible) >.e-bubble-header {
     opacity: 1;
     pointer-events: auto;
   }

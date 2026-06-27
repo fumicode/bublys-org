@@ -106,6 +106,7 @@ export class BubblesProcess {
   popChild(id: string): BubblesProcess {
     return this.apply(draft => {
       draft.layers.unshift([id]);
+      draft.focusedBubbleId = id;
     });
   }
 
@@ -116,6 +117,7 @@ export class BubblesProcess {
       } else {
         draft.layers[0].push(id);
       }
+      draft.focusedBubbleId = id;
     });
   }
 
