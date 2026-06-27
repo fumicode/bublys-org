@@ -10,6 +10,7 @@ import {
   StaffMonthlyShiftWish,
   fulfillWishesStep,
   makePartnerCoverStep,
+  makeMinDayOffStep,
   type AutoShiftStep,
   type WorkingDay,
   type ShiftCell,
@@ -93,6 +94,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
     () => [
       fulfillWishesStep,
       ...relevantRules.map((rule) => makePartnerCoverStep(rule)),
+      makeMinDayOffStep(MIN_MONTHLY_DAY_OFF),
     ],
     [relevantRules]
   );
