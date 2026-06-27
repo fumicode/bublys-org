@@ -121,7 +121,7 @@ export const StyledWrap = styled.div`
       color: #c62828;
     }
 
-    /* 責任者行（昼責/夜責）: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤） */
+    /* 責任者行（早責/夜責）: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤） */
     &.is-leader {
       font-weight: bold;
       &.is-present {
@@ -236,7 +236,7 @@ export const StyledWrap = styled.div`
       text-overflow: ellipsis;
       font-weight: bold;
     }
-    /* 責任者バッジ（昼責=中番責任者 / 夜責=夜番責任者） */
+    /* 責任者バッジ（早責=早番責任者 / 夜責=夜番責任者）。早番＝青系・夜番＝紫系で勤務帯色に揃える */
     .e-leader-badge {
       flex-shrink: 0;
       font-size: 0.72em;
@@ -246,10 +246,10 @@ export const StyledWrap = styled.div`
       border-radius: 4px;
       white-space: nowrap;
 
-      &.is-middle {
-        background: #fff3e0;
-        color: #ef6c00;
-        border: 1px solid #ffcc80;
+      &.is-early {
+        background: #e3f2fd;
+        color: #1565c0;
+        border: 1px solid #90caf9;
       }
       &.is-night {
         background: #ede7f6;

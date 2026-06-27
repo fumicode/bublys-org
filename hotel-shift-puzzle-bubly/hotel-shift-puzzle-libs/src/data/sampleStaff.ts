@@ -3,11 +3,11 @@ import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
 /**
  * サンプルのスタッフ一覧を生成する。
  *
- * 責任者ロール（昼責=中番責任者 / 夜責=夜番責任者）を持つスタッフを含む:
+ * 責任者ロール（早責=早番責任者 / 夜責=夜番責任者）を持つスタッフを含む:
  *   - 土屋（管理部・男性）… 夜番責任者（夜責）。一覧の一番上。
  *   - 中村（フロント・男性）… 夜番責任者（夜責）。もう1人の夜責。
- *   - 会計の女性2人 … 中番責任者（昼責）。
- * 各ロールは「2人のうち1人は必ず該当勤務帯にいる」ことを footer の昼責/夜責欄で可視化する。
+ *   - 会計の女性2人 … 早番責任者（早責）。
+ * 各ロールは「2人のうち1人は必ず該当勤務帯にいる」ことを footer の早責/夜責欄で可視化する。
  */
 export function createSampleStaffList(): Staff[] {
   return [
@@ -30,18 +30,18 @@ export function createSampleStaffList(): Staff[] {
       department: "フロント",
       isNightShiftLeader: true,
     }),
-    // 中番責任者（昼責）。会計の女性2人。
+    // 早番責任者（早責）。会計の女性2人。
     new Staff({
       id: "staff-7",
       name: "山本 由美",
       department: "会計",
-      isMiddleShiftLeader: true,
+      isEarlyShiftLeader: true,
     }),
     new Staff({
       id: "staff-8",
       name: "小林 恵",
       department: "会計",
-      isMiddleShiftLeader: true,
+      isEarlyShiftLeader: true,
     }),
   ];
 }

@@ -256,7 +256,7 @@ export class MonthlyStaffSchedule {
 
   /**
    * 指定スタッフのいずれかが、その稼働日に「指定の勤務帯ID群のどれか」で出勤しているか。
-   * 責任者要件（中番に中番責任者がいるか 等）の判定に使う純粋なクエリ。
+   * 責任者要件（早番に早番責任者がいるか 等）の判定に使う純粋なクエリ。
    */
   isAnyAssignedToShifts(
     staffIds: string[],

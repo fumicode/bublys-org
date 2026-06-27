@@ -97,8 +97,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return staffList.filter((s) => s.department === deptFilter);
   }, [staffList, deptFilter]);
 
-  // 責任者ロール（昼責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
-  // （会計を絞ると昼責が常に✕になる、といった取りこぼしを防ぐ）。
+  // 責任者ロール（早責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
+  // （会計を絞ると早責が常に✕になる、といった取りこぼしを防ぐ）。
   const leaderRoles = useMemo(
     () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
     [staffList]

@@ -11,10 +11,10 @@ export type StaffState = {
   /** 所属部署。未設定のスタッフは空文字列として扱う */
   department?: string;
   /**
-   * 中番責任者（昼責）かどうか。
-   * 「中番には中番責任者が各稼働日に最低1人いる」責任者要件で参照する。
+   * 早番責任者（早責）かどうか。
+   * 「早番には早番責任者が各稼働日に最低1人いる」責任者要件で参照する。
    */
-  isMiddleShiftLeader?: boolean;
+  isEarlyShiftLeader?: boolean;
   /**
    * 夜番責任者（夜責）かどうか。
    * 「夜番（運用上は遅番）には夜番責任者が各稼働日に最低1人いる」責任者要件で参照する。
@@ -38,9 +38,9 @@ export class Staff {
     return this.state.department ?? "";
   }
 
-  /** 中番責任者（昼責）かどうか */
-  get isMiddleShiftLeader(): boolean {
-    return this.state.isMiddleShiftLeader ?? false;
+  /** 早番責任者（早責）かどうか */
+  get isEarlyShiftLeader(): boolean {
+    return this.state.isEarlyShiftLeader ?? false;
   }
 
   /** 夜番責任者（夜責）かどうか */
@@ -58,9 +58,9 @@ export class Staff {
     return new Staff({ ...this.state, department });
   }
 
-  /** 中番責任者（昼責）フラグを変更した新しい Staff を返す */
-  withMiddleShiftLeader(value: boolean): Staff {
-    return new Staff({ ...this.state, isMiddleShiftLeader: value });
+  /** 早番責任者（早責）フラグを変更した新しい Staff を返す */
+  withEarlyShiftLeader(value: boolean): Staff {
+    return new Staff({ ...this.state, isEarlyShiftLeader: value });
   }
 
   /** 夜番責任者（夜責）フラグを変更した新しい Staff を返す */

@@ -35,7 +35,7 @@ type ScheduleGridViewProps = {
   violations?: ConstraintViolation[];
   /** true のとき部署別にグループ化して表示する */
   groupByDepartment?: boolean;
-  /** 責任者ロール（解決済み）。footer 先頭に昼責/夜責などの ◯/✕ 行を出す */
+  /** 責任者ロール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
   leaderRoles?: ShiftLeaderRole[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;

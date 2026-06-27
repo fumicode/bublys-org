@@ -27,7 +27,7 @@ export type SummaryRow = {
 
 /**
  * 集計行を組み立てる。
- * 先頭に責任者ロール行（昼責/夜責 など）を ◯/✕ で並べ、続いて勤務帯ごとの人数（現在/必要）、
+ * 先頭に責任者ロール行（早責/夜責 など）を ◯/✕ で並べ、続いて勤務帯ごとの人数（現在/必要）、
  * 最後に「休み」行を足す。
  * 勤務帯は「名前」で束ねる（同名なら同一勤務帯とみなす）。出現順を保ちつつ同名 ID をまとめ、
  * 色は代表（先頭）勤務帯 ID から引く。
@@ -60,7 +60,7 @@ export function buildSummaryRows(
     shiftGroups.map((g) => [g.name, new Set(g.shiftIds)] as const)
   );
 
-  // 責任者ロール行（昼責/夜責 など）。担当勤務帯に責任者が1人でも入っていれば ◯。
+  // 責任者ロール行（早責/夜責 など）。担当勤務帯に責任者が1人でも入っていれば ◯。
   const leaderRows: SummaryRow[] = leaderRoles.map((role) => ({
     key: `leader:${role.key}`,
     label: role.label,

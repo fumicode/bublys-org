@@ -81,9 +81,9 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
             <tr key={staff.id}>
               <td className="e-staff">
                 <span className="e-staff-name">{staff.name}</span>
-                {staff.isMiddleShiftLeader && (
-                  <span className="e-leader-badge is-middle" title="中番責任者（昼責）">
-                    昼責
+                {staff.isEarlyShiftLeader && (
+                  <span className="e-leader-badge is-early" title="早番責任者（早責）">
+                    早責
                   </span>
                 )}
                 {staff.isNightShiftLeader && (
@@ -214,7 +214,7 @@ const StyledTable = styled.table`
     .e-staff-name {
       font-weight: bold;
     }
-    /* 責任者バッジ（昼責=中番責任者 / 夜責=夜番責任者） */
+    /* 責任者バッジ（早責=早番責任者 / 夜責=夜番責任者）。早番＝青系・夜番＝紫系で勤務帯色に揃える */
     .e-leader-badge {
       margin-left: 4px;
       font-size: 0.72em;
@@ -224,10 +224,10 @@ const StyledTable = styled.table`
       border-radius: 4px;
       white-space: nowrap;
 
-      &.is-middle {
-        background: #fff3e0;
-        color: #ef6c00;
-        border: 1px solid #ffcc80;
+      &.is-early {
+        background: #e3f2fd;
+        color: #1565c0;
+        border: 1px solid #90caf9;
       }
       &.is-night {
         background: #ede7f6;

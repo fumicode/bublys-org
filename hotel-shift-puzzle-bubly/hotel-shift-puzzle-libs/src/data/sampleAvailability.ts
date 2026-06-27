@@ -9,7 +9,7 @@ import { ScheduleAvailability } from "@bublys-org/hotel-shift-puzzle-model";
  *   - 高橋・伊藤 : 早番・中番のみ（遅番＝夜は入れない）
  *   - 田中       : 中番・遅番のみ（朝が苦手で早番に入れない）
  *   - 土屋・中村 : 夜番責任者（夜責）。遅番に入れる（中村は全帯OK）
- *   - 山本・小林 : 中番責任者（昼責）。中番に入れる（会計なので昼間中心）
+ *   - 山本・小林 : 早番責任者（早責）。早番に入れる（早番を担えるよう早番可）
  */
 const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-tsuchiya": ["middle", "late"], // 夜責: 中番・遅番（夜＝遅番を担う）
@@ -19,8 +19,8 @@ const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-4": ["middle", "late"],
   "staff-5": ["early", "middle"],
   "staff-6": ["early", "middle", "late"], // 夜責: 全帯OK（フロント）
-  "staff-7": ["early", "middle"], // 昼責: 早番・中番（会計）
-  "staff-8": ["middle", "late"], // 昼責: 中番・遅番（会計）
+  "staff-7": ["early", "middle"], // 早責: 早番・中番（会計）
+  "staff-8": ["early", "middle"], // 早責: 早番・中番（早番を担えるよう早番可）
 };
 
 /** 指定した勤務表IDに紐づく、人ごとにばらけた可能勤務帯を作る */

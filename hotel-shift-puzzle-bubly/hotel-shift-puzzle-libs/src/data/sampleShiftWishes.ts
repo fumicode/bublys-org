@@ -84,21 +84,21 @@ function juneWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(25), DAY_OFF_WISH, "want")
     .setPreference(d(12), workWishKey("遅番"), "want");
 
-  // 山本 由美（昼責）: 休み 1(月)9(火)16(火)23(火) / 中番がいい 6(土)
+  // 山本 由美（早責）: 休み 1(月)9(火)16(火)23(火) / 早番がいい 6(土)
   const yamamoto = StaffMonthlyShiftWish.create({ staffId: "staff-7", year: 2026, month: 6 })
     .setPreference(d(1), DAY_OFF_WISH, "want")
     .setPreference(d(9), DAY_OFF_WISH, "want")
     .setPreference(d(16), DAY_OFF_WISH, "want")
     .setPreference(d(23), DAY_OFF_WISH, "want")
-    .setPreference(d(6), workWishKey("中番"), "want");
+    .setPreference(d(6), workWishKey("早番"), "want");
 
-  // 小林 恵（昼責）: 休み 3(水)15(月)17(水)24(水) / 中番がいい 13(土)
+  // 小林 恵（早責）: 休み 3(水)15(月)17(水)24(水) / 早番がいい 13(土)
   const kobayashi = StaffMonthlyShiftWish.create({ staffId: "staff-8", year: 2026, month: 6 })
     .setPreference(d(3), DAY_OFF_WISH, "want")
     .setPreference(d(15), DAY_OFF_WISH, "want")
     .setPreference(d(17), DAY_OFF_WISH, "want")
     .setPreference(d(24), DAY_OFF_WISH, "want")
-    .setPreference(d(13), workWishKey("中番"), "want");
+    .setPreference(d(13), workWishKey("早番"), "want");
 
   return [sato, suzuki, takahashi, tanaka, ito, tsuchiya, nakamura, yamamoto, kobayashi];
 }
@@ -161,21 +161,21 @@ function julyWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(22), DAY_OFF_WISH, "want")
     .setPreference(d(4), workWishKey("遅番"), "want");
 
-  // 山本 由美（昼責）: 休み 3(金)9(水)16(水)23(水) / 中番がいい 5(日)
+  // 山本 由美（早責）: 休み 3(金)9(水)16(水)23(水) / 早番がいい 5(日)
   const yamamoto = StaffMonthlyShiftWish.create({ staffId: "staff-7", year: 2026, month: 7 })
     .setPreference(d(3), DAY_OFF_WISH, "want")
     .setPreference(d(9), DAY_OFF_WISH, "want")
     .setPreference(d(16), DAY_OFF_WISH, "want")
     .setPreference(d(23), DAY_OFF_WISH, "want")
-    .setPreference(d(5), workWishKey("中番"), "want");
+    .setPreference(d(5), workWishKey("早番"), "want");
 
-  // 小林 恵（昼責）: 休み 6(月)13(月)20(月)27(月) / 中番がいい 12(日)
+  // 小林 恵（早責）: 休み 6(月)13(月)20(月)27(月) / 早番がいい 12(日)
   const kobayashi = StaffMonthlyShiftWish.create({ staffId: "staff-8", year: 2026, month: 7 })
     .setPreference(d(6), DAY_OFF_WISH, "want")
     .setPreference(d(13), DAY_OFF_WISH, "want")
     .setPreference(d(20), DAY_OFF_WISH, "want")
     .setPreference(d(27), DAY_OFF_WISH, "want")
-    .setPreference(d(12), workWishKey("中番"), "want");
+    .setPreference(d(12), workWishKey("早番"), "want");
 
   return [sato, suzuki, takahashi, tanaka, ito, tsuchiya, nakamura, yamamoto, kobayashi];
 }
