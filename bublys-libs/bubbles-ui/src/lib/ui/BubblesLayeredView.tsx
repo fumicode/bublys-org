@@ -375,8 +375,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   );
 
   const renderedBubbles = bubbleLayers
-    .map((layer, layerIndex) =>
-      layer.map((bubbleId) => {
+    .map((layer, layerIndex) => {
+      // フォーカスされたバブルを同レイヤー内の最後尾に移動し、DOM 順で最前面に来るようにする
+      const orderedLayer =
+        focusedBubbleId && layer.includes(focusedBubbleId)
+          ? [...layer.filter((id) => id !== focusedBubbleId), focusedBubbleId]
+          : layer;
+      return orderedLayer.map((bubbleId) => {
         const zIndex = baseZIndex - layerIndex;
         const hasLeftLink = openeeIds.has(bubbleId);
         const isFocused = focusedBubbleId === bubbleId;
@@ -402,8 +407,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             onDebugRects={onDebugRects}
           />
         );
-      })
-    )
+      });
+    })
     .flat();
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
