@@ -1,5 +1,5 @@
 "use client";
-import { FC } from "react";
+import { FC, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 
@@ -7,12 +7,12 @@ type BubbleSkeletonProps = {
   bubble: Bubble;
 };
 
-export const BubbleSkeleton: FC<BubbleSkeletonProps> = ({ bubble }) => (
+export const BubbleSkeleton: FC<BubbleSkeletonProps> = memo(({ bubble }) => (
   <StyledSkeleton>
     <span className="e-type">{bubble.type}</span>
     <span className="e-url">{bubble.url}</span>
   </StyledSkeleton>
-);
+));
 
 const StyledSkeleton = styled.div`
   padding: 12px 16px;

@@ -1,4 +1,4 @@
-import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useCallback, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
@@ -180,7 +180,7 @@ const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
   <BubbleContent bubble={bubble} />
 );
 
-export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
+const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   bubbleLayers,
   universeId = ROOT_UNIVERSE_ID,
   vanishingPoint,
@@ -359,10 +359,10 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
   const lightweightMode = useAppSelector(selectLightweightMode);
 
-  const undergroundVanishingPoint: Point2 = vanishingPoint || {
-    x: 20,
-    y: 10,
-  };
+  const undergroundVanishingPoint: Point2 = useMemo(
+    () => vanishingPoint || { x: 20, y: 10 },
+    [vanishingPoint],
+  );
 
   const baseZIndex = 100;
 
@@ -387,38 +387,87 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     [surfaceLeftTop, coordinateSystem],
   );
 
-  const renderedBubbles = bubbleLayers
-    .map((layer, layerIndex) =>
-      layer.map((bubbleId) => {
-        const zIndex = baseZIndex - layerIndex;
-        const hasLeftLink = openeeIds.has(bubbleId);
+  const stableOnBubbleClick = useCallback(
+    (name: string) => onBubbleClick?.(name),
+    [onBubbleClick],
+  );
+  const stableOnBubbleClose = useCallback(
+    (bubble: Bubble) => onBubbleClose?.(bubble),
+    [onBubbleClose],
+  );
+  const stableOnBubbleMove = useCallback(
+    (bubble: Bubble) => onBubbleMove?.(bubble),
+    [onBubbleMove],
+  );
+  const stableOnBubbleResize = useCallback(
+    (bubble: Bubble) => onBubbleResize?.(bubble),
+    [onBubbleResize],
+  );
+  const stableOnBubbleLayerDown = useCallback(
+    (bubble: Bubble) => onBubbleLayerDown?.(bubble),
+    [onBubbleLayerDown],
+  );
+  const stableOnBubbleLayerUp = useCallback(
+    (bubble: Bubble) => onBubbleLayerUp?.(bubble),
+    [onBubbleLayerUp],
+  );
+  const stableOnDebugRects = useCallback(
+    (rects: SmartRect[]) => onDebugRects?.(rects),
+    [onDebugRects],
+  );
 
-        return (
-          <ConnectedBubbleView
-            key={bubbleId}
-            universeId={universeId}
-            bubbleId={bubbleId}
-            layerIndex={layerIndex}
-            zIndex={zIndex}
-            vanishingPoint={undergroundVanishingPoint}
-            surfaceLayer={surfaceLayer}
-            hasLeftLink={hasLeftLink}
-            lightweightMode={lightweightMode}
-            renderBubbleContent={renderBubbleContent}
-            onBubbleClick={onBubbleClick}
-            onBubbleClose={onBubbleClose}
-            onBubbleMove={onBubbleMove}
-            onBubbleResize={onBubbleResize}
-            onBubbleLayerDown={onBubbleLayerDown}
-            onBubbleLayerUp={onBubbleLayerUp}
-            onDebugRects={onDebugRects}
-          />
-        );
-      })
-    )
-    .flat();
+  const renderedBubbles = useMemo(
+    () =>
+      bubbleLayers
+        .map((layer, layerIndex) =>
+          layer.map((bubbleId) => {
+            const zIndex = baseZIndex - layerIndex;
+            const hasLeftLink = openeeIds.has(bubbleId);
+
+            return (
+              <ConnectedBubbleView
+                key={bubbleId}
+                universeId={universeId}
+                bubbleId={bubbleId}
+                layerIndex={layerIndex}
+                zIndex={zIndex}
+                vanishingPoint={undergroundVanishingPoint}
+                surfaceLayer={surfaceLayer}
+                hasLeftLink={hasLeftLink}
+                lightweightMode={lightweightMode}
+                renderBubbleContent={renderBubbleContent}
+                onBubbleClick={stableOnBubbleClick}
+                onBubbleClose={stableOnBubbleClose}
+                onBubbleMove={stableOnBubbleMove}
+                onBubbleResize={stableOnBubbleResize}
+                onBubbleLayerDown={stableOnBubbleLayerDown}
+                onBubbleLayerUp={stableOnBubbleLayerUp}
+                onDebugRects={stableOnDebugRects}
+              />
+            );
+          })
+        )
+        .flat(),
+    [
+      bubbleLayers,
+      openeeIds,
+      surfaceLayer,
+      lightweightMode,
+      universeId,
+      undergroundVanishingPoint,
+      renderBubbleContent,
+      stableOnBubbleClick,
+      stableOnBubbleClose,
+      stableOnBubbleMove,
+      stableOnBubbleResize,
+      stableOnBubbleLayerDown,
+      stableOnBubbleLayerUp,
+      stableOnDebugRects,
+    ],
+  );
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
+  const hudSurface = useMemo(() => ({ leftTop: surfaceLeftTop }), [surfaceLeftTop]);
 
   const isNested = universeId !== ROOT_UNIVERSE_ID;
   const universeSize = useAppSelector(makeSelectUniverseDimensions(universeId));
@@ -456,7 +505,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         </StyledViewport>
 
         <StyledHeadsUpDisplay
-          surface={{ leftTop: surfaceLeftTop }}
+          surface={hudSurface}
           surfaceZIndex={baseZIndex - 2}
         >
           <div className="e-underground-curtain"></div>
@@ -482,6 +531,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   );
 };
 
+
+export const BubblesLayeredView = memo(BubblesLayeredViewInner);
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
