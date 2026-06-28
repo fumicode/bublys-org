@@ -2,7 +2,7 @@
 import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
@@ -12,7 +12,7 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
-import { Layer } from "@bublys-org/bubbles-ui-util";
+import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
 
 /**
  * Universe（window 型）バブルの専用シェル。
@@ -20,37 +20,6 @@ import { Layer } from "@bublys-org/bubbles-ui-util";
  * 「窓」として扱う。コンテンツ領域は透明で、中の universe / iframe / 等が
  * そのまま見える。
  */
-
-const CloseIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M7 7L17 17M17 7L7 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-const MaximizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 16, isMaximized }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {isMaximized ? (
-      <>
-        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    ) : (
-      <rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-    )}
-  </svg>
-);
-
-const LayerUpIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const LayerDownIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 type UniverseBubbleViewProps = {
   bubble: Bubble;
@@ -190,7 +159,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
             onClick={handleToggleSize}
             title={isMaximized ? "フィット" : "最大化"}
           >
-            <MaximizeIcon isMaximized={isMaximized} />
+            <ToggleSizeIcon isMaximized={isMaximized} />
           </button>
         </div>
         <div className="e-window-title">{bubble.type}</div>

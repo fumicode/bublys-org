@@ -11,60 +11,7 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
-
-/**
- * 泡っぽい閉じるボタンのSVGアイコン
- */
-const CloseIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path
-      d="M8 8L16 16M16 8L8 16"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-/**
- * 最大化/縮小トグルボタンのSVGアイコン
- */
-const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18, isMaximized }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    {isMaximized ? (
-      // 縮小アイコン（内向き矢印）
-      <>
-        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    ) : (
-      // 最大化アイコン（四角）
-      <rect x="7" y="7" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-    )}
-  </svg>
-);
-
-/**
- * レイヤー手前へ移動（上向き矢印）
- */
-const LayerUpIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-/**
- * レイヤー奥へ移動（下向き矢印）
- */
-const LayerDownIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
