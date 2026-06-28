@@ -1,4 +1,4 @@
-import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState, useCallback } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
@@ -19,130 +19,14 @@ import {
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
-/** 背面バブルを遅延描画に切り替えるまでの非アクティブ時間 (ms) */
-const DEFERRED_AFTER_MS = 1 * 60 * 1000; // 5分
-
-/**
- * 遅延描画の判定とアクティベートを担う内部コンポーネント。
- * lastActiveAt (タイムスタンプ) と Date.now() を比較し、
- * DEFERRED_AFTER_MS 以上非アクティブな背面バブルをスケルトン化する。
- */
-type DeferredBubbleGuardProps = {
-  layerIndex: number;
-  zIndex: number;
-  vanishingPoint: Point2;
-  bubble: Bubble;
-  pos: Point2;
-  hasLeftLink?: boolean;
-  lightweightMode?: boolean;
-  renderBubbleContent: (bubble: Bubble) => ReactNode;
-  onBubbleClick?: (name: string) => void;
-  onBubbleClose?: (bubble: Bubble) => void;
-  onBubbleMove?: (bubble: Bubble) => void;
-  onBubbleResize?: (bubble: Bubble) => void;
-  onBubbleLayerDown?: (bubble: Bubble) => void;
-  onBubbleLayerUp?: (bubble: Bubble) => void;
-  onDebugRects?: (rects: SmartRect[]) => void;
-};
-
-const DeferredBubbleGuard: FC<DeferredBubbleGuardProps> = memo(function DeferredBubbleGuard({
-  layerIndex,
-  zIndex,
-  vanishingPoint,
-  bubble,
-  pos,
-  hasLeftLink,
-  lightweightMode,
-  renderBubbleContent,
-  onBubbleClick,
-  onBubbleClose,
-  onBubbleMove,
-  onBubbleResize,
-  onBubbleLayerDown,
-  onBubbleLayerUp,
-  onDebugRects,
-}) {
-  // 背面に入った瞬間からタイマーを起動し、DEFERRED_AFTER_MS 後にスケルトン化する。
-  // layerIndex が変わるたびにタイマーをリセット（前面復帰で即フル表示）。
-  const [isDeferred, setIsDeferred] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setIsDeferred(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (layerIndex > 0) {
-      timerRef.current = setTimeout(() => setIsDeferred(true), DEFERRED_AFTER_MS);
-    } else {
-      timerRef.current = null;
-    }
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [layerIndex]);
-
-  // ユーザーが明示的に背面バブルを操作したらタイマーをリセット（猶予を延長）
-  const handleActivate = useCallback(() => {
-    setIsDeferred(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setIsDeferred(true), DEFERRED_AFTER_MS);
-  }, []);
-
-  // isDeferred / bubble が変わらない限り content を安定させる
-  const content = useMemo(
-    () => isDeferred ? <BubbleSkeleton bubble={bubble} /> : renderBubbleContent(bubble),
-    [isDeferred, bubble, renderBubbleContent],
-  );
-
-  if (bubble.fillsContainer) {
-    return (
-      <UniverseBubbleView
-        bubble={bubble}
-        position={pos}
-        layerIndex={layerIndex}
-        zIndex={zIndex}
-        vanishingPoint={vanishingPoint}
-        lightweightMode={lightweightMode}
-        onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
-        onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
-        onDragActivity={handleActivate}
-        onResize={(updated) => { handleActivate(); onBubbleResize?.(updated); }}
-        onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
-        onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}
-        onDebugRects={onDebugRects}
-      >
-        {content}
-      </UniverseBubbleView>
-    );
-  }
-
-  return (
-    <BubbleView
-      bubble={bubble}
-      position={pos}
-      layerIndex={layerIndex}
-      zIndex={zIndex}
-      vanishingPoint={vanishingPoint}
-      contentBackground={bubble.contentBackground ?? "white"}
-      hasLeftLink={hasLeftLink}
-      lightweightMode={lightweightMode}
-      onClick={(e) => { handleActivate(); onBubbleClick?.(bubble.url); }}
-      onCloseClick={() => { handleActivate(); onBubbleClose?.(bubble); }}
-      onMove={(updated) => { onBubbleMove?.(updated); }}
-      onDragActivity={handleActivate}
-      onResize={(updated) => { handleActivate(); onBubbleResize?.(updated); }}
-      onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
-      onLayerUpClick={() => { handleActivate(); onBubbleLayerUp?.(bubble); }}
-      onDebugRects={onDebugRects}
-    >
-      {content}
-    </BubbleView>
-  );
-});
-
 /**
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
  * per-bubble selector のみを購読し、world-line 操作では再 render しない。
- * 遅延描画の判定は DeferredBubbleGuard に委譲する。
+ *
+ * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため、
+ * コンテンツを BubbleSkeleton（見出しのみ）に差し替えてレンダリングコストを削減する。
+ * layer 0〜2 はコンテンツをそのまま維持するため、popChild 直後の親バブルは
+ * 引き続き参照できる。
  */
 type ConnectedBubbleViewProps = {
   universeId: string;
@@ -189,24 +73,52 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
+  // layer 3+ (scale ≤ 0.8) は内容が読めないためスケルトン表示に切り替える
+  const content = layerIndex >= 3
+    ? <BubbleSkeleton bubble={bubble} />
+    : renderBubbleContent(bubble);
+
+  if (bubble.fillsContainer) {
+    return (
+      <UniverseBubbleView
+        bubble={bubble}
+        position={pos}
+        layerIndex={layerIndex}
+        zIndex={zIndex}
+        vanishingPoint={vanishingPoint}
+        lightweightMode={lightweightMode}
+        onClick={() => onBubbleClick?.(bubble.url)}
+        onCloseClick={() => onBubbleClose?.(bubble)}
+        onResize={(updated) => onBubbleResize?.(updated)}
+        onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+        onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
+        onDebugRects={onDebugRects}
+      >
+        {content}
+      </UniverseBubbleView>
+    );
+  }
+
   return (
-    <DeferredBubbleGuard
+    <BubbleView
+      bubble={bubble}
+      position={pos}
       layerIndex={layerIndex}
       zIndex={zIndex}
       vanishingPoint={vanishingPoint}
-      bubble={bubble}
-      pos={pos}
+      contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}
       lightweightMode={lightweightMode}
-      renderBubbleContent={renderBubbleContent}
-      onBubbleClick={onBubbleClick}
-      onBubbleClose={onBubbleClose}
-      onBubbleMove={onBubbleMove}
-      onBubbleResize={onBubbleResize}
-      onBubbleLayerDown={onBubbleLayerDown}
-      onBubbleLayerUp={onBubbleLayerUp}
+      onClick={() => onBubbleClick?.(bubble.url)}
+      onCloseClick={() => onBubbleClose?.(bubble)}
+      onMove={(updated) => onBubbleMove?.(updated)}
+      onResize={(updated) => onBubbleResize?.(updated)}
+      onLayerDownClick={() => onBubbleLayerDown?.(bubble)}
+      onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
       onDebugRects={onDebugRects}
-    />
+    >
+      {content}
+    </BubbleView>
   );
 });
 

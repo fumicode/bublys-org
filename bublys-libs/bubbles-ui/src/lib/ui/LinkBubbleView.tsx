@@ -72,18 +72,6 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
       }}
     >
       <svg width="100%" height="100%">
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="0"
-            refY="3.5"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-          </marker>
-        </defs>
         <path
           d={pathData}
           fill={

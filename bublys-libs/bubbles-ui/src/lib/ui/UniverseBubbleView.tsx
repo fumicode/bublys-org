@@ -64,7 +64,6 @@ type UniverseBubbleViewProps = {
   children?: React.ReactNode;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onCloseClick?: (bubble: Bubble) => void;
-  onDragActivity?: () => void; // ドラッグ中・終了時に呼ばれる（deferred timer リセット用）
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
   onResize?: (bubble: Bubble) => void;
@@ -82,7 +81,6 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   lightweightMode = false,
   onClick,
   onCloseClick,
-  onDragActivity,
   onLayerDownClick,
   onLayerUpClick,
   onResize,
@@ -106,7 +104,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     },
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragActivity });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);
@@ -157,10 +155,10 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       data-window-style="universe"
+      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       $colorHue={bubble.colorHue}
       $zIndex={isFocused ? 100 : zIndex}
       $layerIndex={layerIndex}
-      $position={position}
       $transformOrigin={vanishingPointRelative}
       onClick={onClick}
       onMouseLeave={handleMouseLeave}
@@ -259,7 +257,6 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
 });
 
 type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
-  $position?: Point2;
   $layerIndex?: number;
   $zIndex?: number;
   $transformOrigin?: Vec2;
@@ -282,8 +279,6 @@ const StyledWindow = styled.div<StyledWindowProps>`
   width: ${({ $width }) => $width || "fit-content"};
   height: ${({ $height }) => $height || "auto"};
   z-index: ${({ $zIndex }) => ($zIndex !== undefined ? $zIndex : 0)};
-  left: ${({ $position }) => ($position ? `${$position.x}px` : "0")};
-  top: ${({ $position }) => ($position ? `${$position.y}px` : "0")};
 
   transition-property: left top transform;
   transition: ${({ $lightweightMode }) => $lightweightMode ? 'none' : '0.3s ease-in-out'};

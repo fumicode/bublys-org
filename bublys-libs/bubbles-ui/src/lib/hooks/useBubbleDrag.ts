@@ -13,7 +13,6 @@ type UseBubbleDragArgs = {
   ref: React.RefObject<HTMLElement | null>;
   layerIndex?: number;
   vanishingPoint?: Point2;
-  onDragActivity?: () => void; // ドラッグ中・終了時に呼ばれる（deferred timer リセット用）
 };
 
 /**
@@ -25,7 +24,7 @@ type UseBubbleDragArgs = {
  *  - ドラッグ終了時に 1 回だけ updateBubble を dispatch
  *  - universe 端は createUniverse().clamp() でクランプ
  */
-export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragActivity }: UseBubbleDragArgs) {
+export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBubbleDragArgs) {
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
   const { surfaceLeftTop } = useContext(BubblesContext);
@@ -38,9 +37,6 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragA
   bubbleRef.current = bubble;
   const layerIndexRef = useRef(layerIndex);
   layerIndexRef.current = layerIndex;
-  const onDragActivityRef = useRef(onDragActivity);
-  onDragActivityRef.current = onDragActivity;
-
   const dragStartPosRef = useRef<Point2 | null>(null);
   const dragStartMouseRef = useRef<Point2 | null>(null);
   const currentDragPosRef = useRef<Point2 | null>(null);
@@ -79,19 +75,15 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragA
     const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
 
-    onDragActivityRef.current?.();
   };
 
   const endDrag = () => {
     if (currentDragPosRef.current) {
       dispatch(updateBubble(bubbleRef.current.moveTo(currentDragPosRef.current).toJSON(), universeId));
-      onDragActivityRef.current?.();
     }
     if (ref.current) {
       ref.current.style.transition = "";
       ref.current.style.transformOrigin = "";
-      ref.current.style.left = "";
-      ref.current.style.top = "";
     }
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;

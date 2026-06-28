@@ -147,7 +147,6 @@ type BubbleProps = {
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
   onCloseClick?: (bubble: Bubble) => void;
   onMove?: (bubble: Bubble) => void;
-  onDragActivity?: () => void; // ドラッグ中・終了時に呼ばれる（deferred timer リセット用）
   onLayerDownClick?: (bubble: Bubble) => void;
   onLayerUpClick?: (bubble: Bubble) => void;
   onResize?: (bubble: Bubble) => void;
@@ -171,7 +170,6 @@ const BubbleViewInner: FC<BubbleProps> = ({
   onLayerDownClick,
   onLayerUpClick,
   onMove,
-  onDragActivity,
   onResize,
   onDebugRects,
 }) => {
@@ -197,7 +195,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, onDragActivity });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
   const [isFocused, setIsFocused] = useState(false);
@@ -265,10 +263,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
     <StyledBubble
       ref={ref}
       data-bubble-id={bubble.id}
+      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       colorHue={bubble.colorHue}
       zIndex={isFocused ? 100 : zIndex}
       layerIndex={layerIndex}
-      position={position}
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
       onMouseLeave={handleMouseLeave}
@@ -401,7 +399,6 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
 
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
-  position?: Point2; // 位置を指定するためのオプション
   layerIndex?: number; // レイヤーのインデックス = zIndex * -1
   zIndex?: number; // = - layerIndex
 
@@ -429,9 +426,6 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   height: ${({ height }) => (height ? height : "auto")};
 
   z-index: ${({ zIndex }) => (zIndex !== undefined ? zIndex : 0)};
-
-  left: ${({ position }) => (position ? `${position.x}px` : "0")};
-  top: ${({ position }) => (position ? `${position.y}px` : "0")};
 
   transition-property: left top transform;
   transition: ${({ lightweightMode }) => lightweightMode ? 'none' : '0.3s ease-in-out'};
@@ -475,9 +469,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   display: flex;
   flex-direction: column;
 
-  // ガラスのような光沢エフェクト（疑似要素）
+  // ガラスのような光沢エフェクト（疑似要素）— 軽量モードでは非表示
   &::before {
-    content: '';
+    content: ${({ lightweightMode }) => lightweightMode ? 'none' : "''"} ;
     position: absolute;
     top: 0;
     left: 0;
@@ -563,11 +557,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
     .e-bubble-name {
       flex: 1;
-      background: linear-gradient(
-        135deg,
-        hsla(0, 0%, 100%, 0.5) 0%,
-        hsla(0, 0%, 100%, 0.3) 100%
-      );
+      background: ${({ lightweightMode }) => lightweightMode
+        ? 'hsla(0, 0%, 100%, 0.3)'
+        : 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.5) 0%, hsla(0, 0%, 100%, 0.3) 100%)'
+      };
       padding: 6px 16px;
       border-radius: 16px;
       font-size: 1em;
@@ -575,7 +568,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       text-align: center;
       margin: 0;
       color: hsla(0, 0%, 20%, 0.9);
-      box-shadow: inset 0 1px 2px hsla(0, 0%, 100%, 0.5);
+      box-shadow: ${({ lightweightMode }) => lightweightMode ? 'none' : 'inset 0 1px 2px hsla(0, 0%, 100%, 0.5)'};
     }
 
     .e-address-bar {
@@ -691,16 +684,21 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     overflow: ${({ fillsContainer }) => (fillsContainer ? "hidden" : "auto")};
     padding: 16px;
     font-size: 1em;
-    background: linear-gradient(
-      180deg,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 100%, 0.95)"} 0%,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
-    );
+    background: ${({ lightweightMode, contentBackground }) => lightweightMode
+      ? (contentBackground || 'hsla(0, 0%, 100%, 0.95)')
+      : `linear-gradient(
+          180deg,
+          ${contentBackground || 'hsla(0, 0%, 100%, 0.95)'} 0%,
+          ${contentBackground || 'hsla(0, 0%, 98%, 0.9)'} 100%
+        )`
+    };
     border-radius: 16px;
     margin: 0 12px 12px;
-    box-shadow:
-      inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
-      0 1px 2px hsla(0, 0%, 100%, 0.5);
+    box-shadow: ${({ lightweightMode }) => lightweightMode
+      ? 'none'
+      : `inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
+         0 1px 2px hsla(0, 0%, 100%, 0.5)`
+    };
   }
 
   >.e-debug-rect {
