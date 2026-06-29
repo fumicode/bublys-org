@@ -4,25 +4,24 @@
  * 「早番には早番責任者（早責）が、夜番（運用上は遅番）には夜番責任者（夜責）が、
  *  各稼働日に最低1人いる」という責任者要件を、勤務表の footer（早責/夜責欄）で可視化する。
  *
- * ロール定義（ShiftLeaderRoleConfig）は「どのスタッフフラグを見て責任者を選ぶか」を持つ。
- * いまはホテルの既定値をハードコードしているが、いずれは会社ごとの設定から
- * ShiftLeaderRoleConfig[] を組み立てて差し替えられるよう、ここに解決の入口を集約する。
+ * ロール定義（ShiftLeaderRoleConfig）は「キー・表示ラベル・担当勤務帯・最低人数」を持つ素朴な
+ * データ。どのスタッフが責任者かは Staff.leaderRoleKeys（汎用の役割キー）で表すので、役割ごとの
+ * 述語は不要——どのロールも `staff.isLeaderOf(key)` という同じコードで解決する。
+ * いまはホテルの既定値をハードコードしているが、いずれは会社設定から差し替える入口にする。
  *
  * resolveShiftLeaderRoles はスタッフ一覧から責任者IDを解決し、宣言的ルール
  * `ShiftLeaderRule`（表示も相方裏コマンドもこの同じルールから導出）を組み立てて返す。
  */
 import { Staff, ShiftLeaderRule } from "@bublys-org/hotel-shift-puzzle-model";
 
-/** 責任者ロールの定義。どのスタッフを責任者とみなすかを述語で持つ。 */
+/** 責任者ロールの定義（役割ごとの差は config データだけ。コードは共通）。 */
 export type ShiftLeaderRoleConfig = {
-  /** 一意キー（例: "early" / "night"） */
+  /** 一意キー（Staff.leaderRoleKeys と対応。例: "early" / "night"） */
   key: string;
   /** 表示ラベル（例: "早責" / "夜責"） */
   label: string;
   /** 担当する勤務帯の名前（例: "早番" / "遅番"） */
   shiftName: string;
-  /** このスタッフがこの役割の責任者か */
-  isLeader: (staff: Staff) => boolean;
   /** 充足に必要な最低人数（既定 1＝「いずれか1人」） */
   minCount?: number;
 };
@@ -31,21 +30,11 @@ export type ShiftLeaderRoleConfig = {
  * ホテルの既定の責任者ロール。
  *   - 早責: 早番責任者（早番に最低1人）
  *   - 夜責: 夜番責任者（運用上は遅番に最低1人）
- * いまはハードコード。将来は会社設定から組み立てて差し替える。
+ * 早責・夜責は同じ形の config エントリ違いにすぎない（コードは共通）。
  */
 export const HOTEL_SHIFT_LEADER_ROLES: ShiftLeaderRoleConfig[] = [
-  {
-    key: "early",
-    label: "早責",
-    shiftName: "早番",
-    isLeader: (s) => s.isEarlyShiftLeader,
-  },
-  {
-    key: "night",
-    label: "夜責",
-    shiftName: "遅番",
-    isLeader: (s) => s.isNightShiftLeader,
-  },
+  { key: "early", label: "早責", shiftName: "早番" },
+  { key: "night", label: "夜責", shiftName: "遅番" },
 ];
 
 /** ロール定義とスタッフ一覧から、解決済みの ShiftLeaderRule[] を作る。 */
@@ -59,7 +48,7 @@ export function resolveShiftLeaderRoles(
         key: c.key,
         label: c.label,
         shiftName: c.shiftName,
-        leaderStaffIds: staffList.filter(c.isLeader).map((s) => s.id),
+        leaderStaffIds: staffList.filter((s) => s.isLeaderOf(c.key)).map((s) => s.id),
         minCount: c.minCount,
       })
   );

@@ -1,6 +1,6 @@
-import { FC, Fragment } from "react";
+import { FC } from "react";
 import PersonIcon from "@mui/icons-material/Person";
-import { ObjectView, UrledPlace } from "@bublys-org/bubbles-ui";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import type {
   Staff,
   MonthlyStaffSchedule,
@@ -10,6 +10,7 @@ import type {
   ShiftLeaderRule,
 } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
+import { LeaderBadges } from "../LeaderBadges.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
 
 type StaffScheduleRowProps = {
@@ -64,8 +65,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   extractBubbleUrl,
   minDayOff,
 }) => {
-  // このスタッフが属する責任者ルール → 名前横のバッジ。クリックでその関係者を抽出。
-  const myRules = leaderRules.filter((r) => r.leaderStaffIds.includes(staff.id));
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
@@ -97,38 +96,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <span className="e-caret">{expanded ? "▾" : "▸"}</span>
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
-            {myRules.map((rule) => {
-              const clickable = !!onOpenExtract;
-              const badge = (
-                <span
-                  className={`e-leader-badge is-${rule.key}${clickable ? " is-clickable" : ""}`}
-                  title={
-                    clickable
-                      ? `${rule.label}の関係者だけを抽出`
-                      : `${rule.label}（${rule.shiftName}責任者）`
-                  }
-                  role={clickable ? "button" : undefined}
-                  onClick={
-                    clickable
-                      ? (e) => {
-                          e.stopPropagation(); // 行展開やスタッフ展開はしない
-                          onOpenExtract(rule.leaderStaffIds);
-                        }
-                      : undefined
-                  }
-                >
-                  {rule.label}
-                </span>
-              );
-              // data-url を埋めると、抽出バブルがこのバッジから link bubble で伸びる
-              return clickable && extractBubbleUrl ? (
-                <UrledPlace key={rule.key} url={extractBubbleUrl(rule.leaderStaffIds)}>
-                  {badge}
-                </UrledPlace>
-              ) : (
-                <Fragment key={rule.key}>{badge}</Fragment>
-              );
-            })}
+            <LeaderBadges
+              rules={leaderRules}
+              staffId={staff.id}
+              onOpenExtract={onOpenExtract}
+              extractBubbleUrl={extractBubbleUrl}
+            />
           </div>
         </ObjectView>
       </div>

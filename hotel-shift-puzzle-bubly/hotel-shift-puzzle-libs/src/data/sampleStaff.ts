@@ -16,7 +16,7 @@ export function createSampleStaffList(): Staff[] {
       id: "staff-tsuchiya",
       name: "土屋 健司",
       department: "管理部",
-      isNightShiftLeader: true,
+      leaderRoleKeys: ["night"],
     }),
     new Staff({ id: "staff-1", name: "佐藤 花子", department: "フロント" }),
     new Staff({ id: "staff-2", name: "鈴木 一郎", department: "レストラン" }),
@@ -28,20 +28,20 @@ export function createSampleStaffList(): Staff[] {
       id: "staff-6",
       name: "中村 大輔",
       department: "フロント",
-      isNightShiftLeader: true,
+      leaderRoleKeys: ["night"],
     }),
     // 早番責任者（早責）。会計の女性2人。
     new Staff({
       id: "staff-7",
       name: "山本 由美",
       department: "会計",
-      isEarlyShiftLeader: true,
+      leaderRoleKeys: ["early"],
     }),
     new Staff({
       id: "staff-8",
       name: "小林 恵",
       department: "会計",
-      isEarlyShiftLeader: true,
+      leaderRoleKeys: ["early"],
     }),
   ];
 }

@@ -8,9 +8,11 @@ import {
   WorkShift,
   WorkingDay,
   ScheduleAvailability,
+  ShiftLeaderRule,
   type ShiftCell,
 } from "../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
+import { LeaderBadges } from "./LeaderBadges.js";
 
 type ScheduleDayViewProps = {
   /** 表示する稼働日 */
@@ -22,6 +24,8 @@ type ScheduleDayViewProps = {
   workShifts: WorkShift[];
   /** 可能勤務帯。あれば入れない勤務帯セルを無効化する */
   availability?: ScheduleAvailability;
+  /** 責任者ルール（解決済み）。名前横に早責/夜責バッジを出す */
+  leaderRules?: ShiftLeaderRule[];
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, to: ShiftCell) => void;
 };
@@ -40,6 +44,7 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
   staffList,
   workShifts,
   availability,
+  leaderRules = [],
   onChangeCell,
 }) => {
   const wd = day.weekday;
@@ -81,16 +86,7 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
             <tr key={staff.id}>
               <td className="e-staff">
                 <span className="e-staff-name">{staff.name}</span>
-                {staff.isEarlyShiftLeader && (
-                  <span className="e-leader-badge is-early" title="早番責任者（早責）">
-                    早責
-                  </span>
-                )}
-                {staff.isNightShiftLeader && (
-                  <span className="e-leader-badge is-night" title="夜番責任者（夜責）">
-                    夜責
-                  </span>
-                )}
+                <LeaderBadges rules={leaderRules} staffId={staff.id} />
               </td>
 
               {workShifts.map((w) => {

@@ -11,15 +11,11 @@ export type StaffState = {
   /** 所属部署。未設定のスタッフは空文字列として扱う */
   department?: string;
   /**
-   * 早番責任者（早責）かどうか。
-   * 「早番には早番責任者が各稼働日に最低1人いる」責任者要件で参照する。
+   * このスタッフが持つ責任者ロールのキー（例: "early"＝早責 / "night"＝夜責）。
+   * 役割ごとに boolean を生やさず、汎用のキー集合で持つ（責任者ルールは ShiftLeaderRule に
+   * 一元化されており、どのロールも同じコードで扱う）。ロールを増やしてもこの形のまま。
    */
-  isEarlyShiftLeader?: boolean;
-  /**
-   * 夜番責任者（夜責）かどうか。
-   * 「夜番（運用上は遅番）には夜番責任者が各稼働日に最低1人いる」責任者要件で参照する。
-   */
-  isNightShiftLeader?: boolean;
+  leaderRoleKeys?: string[];
 };
 
 export class Staff {
@@ -38,14 +34,14 @@ export class Staff {
     return this.state.department ?? "";
   }
 
-  /** 早番責任者（早責）かどうか */
-  get isEarlyShiftLeader(): boolean {
-    return this.state.isEarlyShiftLeader ?? false;
+  /** このスタッフが持つ責任者ロールのキー一覧 */
+  get leaderRoleKeys(): string[] {
+    return this.state.leaderRoleKeys ?? [];
   }
 
-  /** 夜番責任者（夜責）かどうか */
-  get isNightShiftLeader(): boolean {
-    return this.state.isNightShiftLeader ?? false;
+  /** このスタッフが指定の責任者ロール（roleKey）を持つか */
+  isLeaderOf(roleKey: string): boolean {
+    return this.leaderRoleKeys.includes(roleKey);
   }
 
   /** 名前を変更した新しい Staff を返す */
@@ -58,13 +54,8 @@ export class Staff {
     return new Staff({ ...this.state, department });
   }
 
-  /** 早番責任者（早責）フラグを変更した新しい Staff を返す */
-  withEarlyShiftLeader(value: boolean): Staff {
-    return new Staff({ ...this.state, isEarlyShiftLeader: value });
-  }
-
-  /** 夜番責任者（夜責）フラグを変更した新しい Staff を返す */
-  withNightShiftLeader(value: boolean): Staff {
-    return new Staff({ ...this.state, isNightShiftLeader: value });
+  /** 責任者ロールのキー一覧を差し替えた新しい Staff を返す */
+  withLeaderRoleKeys(keys: string[]): Staff {
+    return new Staff({ ...this.state, leaderRoleKeys: keys });
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   Staff,
@@ -13,6 +13,7 @@ import {
 import { ScheduleDayView } from "../ui/ScheduleDayView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
+import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -43,6 +44,12 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
   const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
     SCHEDULE_TYPE,
     scheduleId
+  );
+
+  // 責任者ルール（早責/夜責）。名前横のバッジに使う
+  const leaderRules = useMemo(
+    () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
+    [staffList]
   );
 
   if (!schedule) {
@@ -76,6 +83,7 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
         staffList={staffList}
         workShifts={shiftOptions}
         availability={availability}
+        leaderRules={leaderRules}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>
