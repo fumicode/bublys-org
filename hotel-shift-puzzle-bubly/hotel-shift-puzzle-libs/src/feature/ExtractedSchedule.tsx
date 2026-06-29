@@ -106,8 +106,6 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     () => [
       fulfillWishesStep,
       ...relevantRules.map((rule) => makePartnerCoverStep(rule)),
-      makeSatisfyLeaderRulesStep(relevantRules),
-      makeMinDayOffStep(MIN_MONTHLY_DAY_OFF),
     ],
     [relevantRules]
   );

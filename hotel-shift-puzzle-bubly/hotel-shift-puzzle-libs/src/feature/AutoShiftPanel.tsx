@@ -8,12 +8,10 @@ import {
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
-  makeMinDayOffStep,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
-import { MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -31,16 +29,10 @@ type AutoBarItem =
   | { kind: "single"; step: AutoShiftStep }
   | { kind: "group"; key: string; label: string; variants: AutoShiftStep[] };
 
-// パネルで使うステップ：共通ステップ＋「月◯日休む」（最低休日数の制約を満たすコマンド）
-const PANEL_STEPS: AutoShiftStep[] = [
-  ...AUTO_SHIFT_STEPS,
-  makeMinDayOffStep(MIN_MONTHLY_DAY_OFF),
-];
-
 const AUTO_BAR_ITEMS: AutoBarItem[] = (() => {
   const items: AutoBarItem[] = [];
   const seen = new Set<string>();
-  for (const step of PANEL_STEPS) {
+  for (const step of AUTO_SHIFT_STEPS) {
     if (!step.group) {
       items.push({ kind: "single", step });
       continue;
@@ -51,7 +43,7 @@ const AUTO_BAR_ITEMS: AutoBarItem[] = (() => {
       kind: "group",
       key: step.group,
       label: step.groupLabel ?? step.group,
-      variants: PANEL_STEPS.filter((s) => s.group === step.group),
+      variants: AUTO_SHIFT_STEPS.filter((s) => s.group === step.group),
     });
   }
   return items;
