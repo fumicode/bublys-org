@@ -20,6 +20,12 @@ export const MAX_CONSECUTIVE_WORKDAYS_LIMIT = 5;
 /** スタッフが月に休まなければならない最低日数。いまは固定（将来は会社ごとに注入）。 */
 export const MIN_MONTHLY_DAY_OFF = 8;
 
+/** 1日に休んでよい人数の上限。これを超えないよう休みを配分する（将来は会社ごとに注入）。 */
+export const MAX_DAY_OFF_PER_DAY = 8;
+
+/** 休みの複数案を何案つくるか（世界線で見比べる） */
+export const DAY_OFF_CANDIDATE_COUNT = 3;
+
 /** シフト希望との食い違い判定に必要な文脈（希望と勤務帯名）。 */
 export type ScheduleConstraintContext = {
   wishByStaff: Map<string, StaffMonthlyShiftWish>;

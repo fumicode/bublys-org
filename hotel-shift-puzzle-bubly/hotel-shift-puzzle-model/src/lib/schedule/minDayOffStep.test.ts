@@ -75,4 +75,26 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
 
     expect(result.assigned).toBe(0);
   });
+
+  test('maxPerDay: 1日の休み人数が上限を超えない', () => {
+    // 3人×各8日休み。1日上限1人 → どの日も休みは1人以下
+    const capped = makeMinDayOffStep(8, { maxPerDay: 1 });
+    const result = capped.run(emptySchedule(), ctxOf(['A', 'B', 'C']));
+
+    for (const day of result.schedule.workingDays()) {
+      expect(result.schedule.countDayOffOn(day)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('phase を変えると別の休み配分（案）になる', () => {
+    const p0 = makeMinDayOffStep(8, { phase: 0 }).run(emptySchedule(), ctxOf(['A']));
+    const p1 = makeMinDayOffStep(8, { phase: 1 }).run(emptySchedule(), ctxOf(['A']));
+
+    const offDays = (s: ReturnType<typeof emptySchedule>) =>
+      s.workingDays().filter((d) => s.isDayOff('A', d)).map((d) => d.key).join(",");
+    // どちらも8日休みだが、入る日が違う
+    expect(p0.schedule.countDayOffForStaff('A')).toBe(8);
+    expect(p1.schedule.countDayOffForStaff('A')).toBe(8);
+    expect(offDays(p0.schedule)).not.toBe(offDays(p1.schedule));
+  });
 });

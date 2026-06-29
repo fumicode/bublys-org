@@ -10,10 +10,16 @@ import {
   StaffMonthlyShiftWish,
   makeMinDayOffStep,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { useAppStore } from "@bublys-org/state-management";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
+import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
-import { MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
+import {
+  MIN_MONTHLY_DAY_OFF,
+  MAX_DAY_OFF_PER_DAY,
+  DAY_OFF_CANDIDATE_COUNT,
+} from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -59,6 +65,8 @@ const AUTO_BAR_ITEMS: AutoBarItem[] = (() => {
 
 type AutoShiftPanelProps = {
   scheduleId?: string;
+  /** 休みの複数案を書いたあとに世界線ビューを開く（比較用） */
+  onOpenWorldLine?: () => void;
 };
 
 /**
@@ -67,8 +75,12 @@ type AutoShiftPanelProps = {
  * update(() => result.schedule) を呼ぶだけで、その勤務表を監視している世界線すべて
  * （アプリ全体＋ローカル）へ自動保存され、グリッド側の表示にも反映される。
  */
-export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
+export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({
+  scheduleId,
+  onOpenWorldLine,
+}) => {
   useSeedHotelData();
+  const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
@@ -114,6 +126,28 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
     });
     update(() => result.schedule);
     setAutoMessage(`${step.label}: ${result.message}`);
+  };
+
+  // 休みの複数案：解が一意でない「休みの配分」を、phase を変えて N 案つくり、
+  // それぞれを独立した世界線（兄弟ブランチ）に書き込んで見比べられるようにする。
+  const handleGenerateDayOffCandidates = () => {
+    if (!scheduleId) return;
+    const params = { schedule, staffList, workShifts, wishByStaff, availability };
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
+      const step = makeMinDayOffStep(MIN_MONTHLY_DAY_OFF, {
+        maxPerDay: MAX_DAY_OFF_PER_DAY,
+        phase: i,
+      });
+      return {
+        obj: runAutoShiftStep(step, params).schedule,
+        label: `休み案${i + 1}`,
+      };
+    });
+    commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
+    setAutoMessage(
+      `休みの${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成しました。世界線ビューで見比べて選んでください。`
+    );
+    onOpenWorldLine?.();
   };
 
   return (
@@ -183,6 +217,18 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
         })}
       </div>
 
+      {/* 休みの配分は解が一意でないので、複数案を独立した世界線に書いて見比べる */}
+      <div className="e-candidates">
+        <button
+          type="button"
+          className="e-link e-candidate-run"
+          title={`休みの入れ方を ${DAY_OFF_CANDIDATE_COUNT} 案つくり、それぞれ別の世界線に書いて見比べます（月${MIN_MONTHLY_DAY_OFF}日以上・1日${MAX_DAY_OFF_PER_DAY}人まで）。`}
+          onClick={handleGenerateDayOffCandidates}
+        >
+          🌱 休みの複数案を世界線に作る
+        </button>
+      </div>
+
       {autoMessage && (
         <div className="e-auto-message">
           {autoMessage}
@@ -202,6 +248,28 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
 
 const StyledContainer = styled.div`
   padding: 8px;
+
+  /* 複数案（世界線）生成ボタン */
+  .e-candidates {
+    margin-top: 8px;
+
+    .e-candidate-run {
+      border: 1px solid #a5d6a7;
+      border-radius: 6px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 0.8em;
+      font-weight: 600;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #c8e6c9;
+        border-color: #66bb6a;
+      }
+    }
+  }
 
   .e-header {
     margin-bottom: 8px;

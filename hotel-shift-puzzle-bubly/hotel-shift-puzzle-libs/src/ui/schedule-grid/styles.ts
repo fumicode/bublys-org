@@ -110,6 +110,12 @@ export const StyledWrap = styled.div`
       color: #cfd5d8;
       font-weight: normal;
     }
+    /* 1日の休み上限を超えた日（休み行）の警告 */
+    &.is-over {
+      background: #ffebee;
+      color: #c62828;
+      font-weight: bold;
+    }
 
     /* 現在/必要 の分母表示 */
     .e-cur {

@@ -113,15 +113,23 @@ export const SummaryRow: FC<SummaryRowProps> = ({
         }
 
         // 必要数なし: 人数のみ（時間帯色は付けない）。
+        // 休み行などで warnOver を超えた日は赤く警告する（1日の休み上限）。
         // 勤務帯行（editable）なら、まだ必要数 0 の日もクリックで設定できる。
+        const over = row.warnOver !== undefined && n > row.warnOver;
         return (
           <div
             key={`sum:${row.key}:${day.key}`}
             className={`e-sum-cell${firstCls}${n === 0 ? " is-zero" : ""}${
-              editable ? " is-editable" : ""
-            }`}
+              over ? " is-over" : ""
+            }${editable ? " is-editable" : ""}`}
             role={editable ? "button" : undefined}
-            title={editable ? `${row.label} ${day.label}: 必要人数を設定` : undefined}
+            title={
+              over
+                ? `${row.label} ${day.label}: ${n}人（上限${row.warnOver}人を超過）`
+                : editable
+                ? `${row.label} ${day.label}: 必要人数を設定`
+                : undefined
+            }
             onClick={
               editable
                 ? (e) =>

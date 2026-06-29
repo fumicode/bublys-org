@@ -62,6 +62,8 @@ type ScheduleGridViewProps = {
   extractBubbleUrl?: (staffIds: string[]) => string;
   /** 月の最低休日数。これ未満のスタッフは右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 1日の休み人数の上限。footer の休み行でこれを超えた日を赤くする */
+  maxDayOffPerDay?: number;
 };
 
 /**
@@ -116,6 +118,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onOpenExtract,
   extractBubbleUrl,
   minDayOff,
+  maxDayOffPerDay,
 }) => {
   const days = schedule.workingDays();
 
@@ -137,7 +140,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     countsByDay,
     dayOffByDay,
     leaderRules,
-    leaderRulesOnlyFooter
+    leaderRulesOnlyFooter,
+    maxDayOffPerDay
   );
 
   const getWishEntries = (staffId: string, day: WorkingDay) =>

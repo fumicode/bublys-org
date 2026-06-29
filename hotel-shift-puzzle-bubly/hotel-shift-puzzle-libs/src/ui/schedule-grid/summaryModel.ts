@@ -23,6 +23,8 @@ export type SummaryRow = {
    * これが定義されている行は人数（count）ではなく ◯/✕ を表示する。
    */
   leaderPresent?: (dayIndex: number) => boolean;
+  /** この人数を超えた日は赤く警告する（休み行の「1日の休み上限」など） */
+  warnOver?: number;
 };
 
 /**
@@ -43,7 +45,9 @@ export function buildSummaryRows(
   dayOffByDay: number[],
   leaderRules: ShiftLeaderRule[] = [],
   /** true なら責任者行（◯/✕）だけ返す（必要人数・休み行は出さない）。抽出ビュー用 */
-  leaderOnly = false
+  leaderOnly = false,
+  /** 1日の休み人数の上限。これを超えた日は休み行を赤く警告する */
+  maxDayOffPerDay?: number
 ): SummaryRow[] {
   const shiftGroups: { name: string; shiftIds: string[] }[] = [];
   const groupIndexByName = new Map<string, number>();
@@ -101,6 +105,7 @@ export function buildSummaryRows(
       bg: "#f5f5f5",
       fg: "#9e9e9e",
       count: (i: number) => dayOffByDay[i],
+      warnOver: maxDayOffPerDay,
     },
   ];
 }

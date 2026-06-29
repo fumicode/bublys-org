@@ -16,7 +16,11 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { buildScheduleConstraints, MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
+import {
+  buildScheduleConstraints,
+  MIN_MONTHLY_DAY_OFF,
+  MAX_DAY_OFF_PER_DAY,
+} from "./scheduleConstraints.js";
 import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import {
   STAFF_TYPE,
@@ -289,6 +293,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           onOpenExtract={onOpenExtract}
           extractBubbleUrl={extractBubbleUrl}
           minDayOff={MIN_MONTHLY_DAY_OFF}
+          maxDayOffPerDay={MAX_DAY_OFF_PER_DAY}
           onChangeCell={handleChangeCell}
           onChangeRequired={handleChangeRequired}
           onChangeRequiredAllDays={handleChangeRequiredAllDays}
