@@ -104,19 +104,8 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
 };
 
 // --- 自動シフト パネルバブル（勤務表の「🪄 自動シフト」ボタンから開く） ---
-const AutoShiftBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const scheduleId = bubble.params.scheduleId;
-  return withObjects(
-    <AutoShiftPanel
-      scheduleId={scheduleId}
-      // 休みの複数案を作ったあと、世界線ビューを開いて見比べられるようにする
-      onOpenWorldLine={() =>
-        openBubble(scheduleWorldLineUrl(scheduleId), bubble.id, "bubble-side")
-      }
-    />
-  );
-};
+const AutoShiftBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<AutoShiftPanel scheduleId={bubble.params.scheduleId} />);
 
 // --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
 const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>

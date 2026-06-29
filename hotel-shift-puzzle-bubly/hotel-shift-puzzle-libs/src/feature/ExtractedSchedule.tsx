@@ -16,10 +16,17 @@ import {
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { buildScheduleConstraints, MIN_MONTHLY_DAY_OFF } from "./scheduleConstraints.js";
+import { commitCandidates, localScopeId } from "../objects/commit.js";
+import {
+  buildScheduleConstraints,
+  MIN_MONTHLY_DAY_OFF,
+  MAX_DAY_OFF_PER_DAY,
+  DAY_OFF_CANDIDATE_COUNT,
+} from "./scheduleConstraints.js";
 import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import {
@@ -46,9 +53,13 @@ type ExtractedScheduleProps = {
  *   - 相方裏（早責ペアの一方が休みの日にもう一方を早番に入れる）
  * 対象スタッフ＝抽出した subset を staffList として渡すことで、各ステップが自然に subset 限定になる。
  */
-export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staffIds }) => {
+export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
+  scheduleId,
+  staffIds,
+}) => {
   useSeedHotelData();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  const store = useAppStore();
 
   const allStaff = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
@@ -130,6 +141,41 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 
+  // 完成案の複数生成：抽出中の人について「毎日 担当勤務帯に責任者が最低1人いる（責任者ルール）」
+  // かつ「全員が月◯日休む（1日◯人まで）」を満たす完成案を、phase 違いで N 案つくり、
+  // それぞれ独立した世界線（兄弟ブランチ）に書く。world-line バブルは開かない
+  // （たいてい既に開いているため）。
+  const handleGenerateCandidates = () => {
+    if (!scheduleId) return;
+    const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
+      runAutoShiftStep(step, {
+        schedule: sched,
+        staffList: subset,
+        workShifts,
+        wishByStaff,
+        availability,
+      }).schedule;
+    // 1案 = 希望を叶える → 責任者を満たす（担当は輪番・phase で交代） → 月の休みを入れる（phase）
+    const buildCandidate = (phase: number): MonthlyStaffSchedule => {
+      let s = schedule;
+      s = runOn(s, fulfillWishesStep);
+      s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
+      s = runOn(
+        s,
+        makeMinDayOffStep(MIN_MONTHLY_DAY_OFF, { maxPerDay: MAX_DAY_OFF_PER_DAY, phase })
+      );
+      return s;
+    };
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
+      obj: buildCandidate(i),
+      label: `案${i + 1}`,
+    }));
+    commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
+    setAutoMessage(
+      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成しました。世界線ビューで見比べて選んでください。`
+    );
+  };
+
   return (
     <StyledContainer>
       {/* 必要最低限：表（日付・人・該当制約の充足行）→ その下に自動コマンド。見出し/説明は出さない */}
@@ -158,6 +204,14 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
             {step.label}
           </button>
         ))}
+        <button
+          type="button"
+          className="e-candidate-run"
+          title={`この ${subset.length} 名について「毎日 責任者が入る＋全員 月${MIN_MONTHLY_DAY_OFF}日休む（1日${MAX_DAY_OFF_PER_DAY}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          onClick={handleGenerateCandidates}
+        >
+          🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る
+        </button>
       </div>
 
       {autoMessage && (
@@ -219,6 +273,24 @@ const StyledContainer = styled.div`
       &:hover {
         background: #ede7f6;
         border-color: #9575cd;
+      }
+    }
+
+    /* 複数案（世界線）生成ボタン */
+    .e-candidate-run {
+      border: 1px solid #a5d6a7;
+      border-radius: 6px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 0.8em;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #c8e6c9;
+        border-color: #66bb6a;
       }
     }
   }
