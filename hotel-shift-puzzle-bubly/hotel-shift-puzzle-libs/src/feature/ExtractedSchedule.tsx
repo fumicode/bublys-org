@@ -10,6 +10,7 @@ import {
   StaffMonthlyShiftWish,
   fulfillWishesStep,
   makePartnerCoverStep,
+  makeSatisfyLeaderRulesStep,
   makeMinDayOffStep,
   type AutoShiftStep,
   type WorkingDay,
@@ -94,6 +95,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
     () => [
       fulfillWishesStep,
       ...relevantRules.map((rule) => makePartnerCoverStep(rule)),
+      makeSatisfyLeaderRulesStep(relevantRules),
       makeMinDayOffStep(MIN_MONTHLY_DAY_OFF),
     ],
     [relevantRules]
@@ -130,7 +132,20 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
 
   return (
     <StyledContainer>
-      {/* 必要最低限：自動コマンド・日付・人・該当制約の充足行だけ。見出し/説明は出さない */}
+      {/* 必要最低限：表（日付・人・該当制約の充足行）→ その下に自動コマンド。見出し/説明は出さない */}
+      <ScheduleGridView
+        schedule={schedule}
+        staffList={subset}
+        workShifts={workShifts}
+        availability={availability}
+        wishByStaff={wishByStaff}
+        violations={violations}
+        leaderRules={relevantRules}
+        leaderRulesOnlyFooter
+        minDayOff={MIN_MONTHLY_DAY_OFF}
+        onChangeCell={handleChangeCell}
+      />
+
       <div className="e-auto-bar">
         {steps.map((step) => (
           <button
@@ -158,19 +173,6 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({ scheduleId, staf
           </button>
         </div>
       )}
-
-      <ScheduleGridView
-        schedule={schedule}
-        staffList={subset}
-        workShifts={workShifts}
-        availability={availability}
-        wishByStaff={wishByStaff}
-        violations={violations}
-        leaderRules={relevantRules}
-        leaderRulesOnlyFooter
-        minDayOff={MIN_MONTHLY_DAY_OFF}
-        onChangeCell={handleChangeCell}
-      />
     </StyledContainer>
   );
 };
@@ -201,7 +203,7 @@ const StyledContainer = styled.div`
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    margin-bottom: 8px;
+    margin-top: 8px;
 
     .e-auto {
       border: 1px solid #b39ddb;
@@ -225,7 +227,7 @@ const StyledContainer = styled.div`
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-top: 8px;
     padding: 6px 10px;
     background: #ede7f6;
     border: 1px solid #d1c4e9;
