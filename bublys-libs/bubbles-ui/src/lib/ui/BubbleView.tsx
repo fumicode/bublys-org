@@ -6,7 +6,7 @@ import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -131,6 +131,8 @@ const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
   );
 });
 
+const HEADER_PROXIMITY_THRESHOLD = 40;
+
 type BubbleProps = {
   bubble: Bubble;
 
@@ -139,6 +141,7 @@ type BubbleProps = {
 
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
 
@@ -159,6 +162,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   contentBackground = "white",
   hasLeftLink = false,
   position,
@@ -196,7 +200,23 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  const isHeaderVisible = isFocused || isMouseNearTop;
+
+  const updateHeaderSafeZone = () => {
+    const bubbleRect = ref.current?.getBoundingClientRect();
+    if (!bubbleRect) return;
+    const headerEl = ref.current?.querySelector('.e-bubble-header');
+    const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
+    const headerTopInViewport = bubbleRect.top - headerHeight;
+    setHeaderOffset(Math.max(0, -headerTopInViewport));
+  };
+
+  useLayoutEffect(() => {
+    if (isFocused) updateHeaderSafeZone();
+  }, [isFocused]);
 
   const isMaximized = bubble.isMaximized;
 
@@ -235,14 +255,27 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   };
 
-  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
-    setIsFocused(true); // ヘッダークリックで最前面に
-    if (!onMove) return;
-    onDragStart(e);
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // UrledPlace内のクリックはpopChildがフォーカスを担うためスキップ
+    if ((e.target as Element).closest('[data-url]')) return;
+    dispatch(focusBubble(bubble.id, universeId));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
+    updateHeaderSafeZone();
   };
 
   const handleMouseLeave = () => {
-    setIsFocused(false);
+    setIsMouseNearTop(false);
+  };
+
+  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
+    dispatch(focusBubble(bubble.id, universeId));
+    if (!onMove) return;
+    onDragStart(e);
   };
 
   // DOM参照をContextに登録
@@ -266,7 +299,11 @@ const BubbleViewInner: FC<BubbleProps> = ({
       layerIndex={layerIndex}
       position={position}
       transformOrigin={vanishingPointRelative}
+      headerVisible={isHeaderVisible}
+      headerOffset={headerOffset}
       onClick={onClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
@@ -384,6 +421,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   // BubbleContent内部は再レンダリングされない。
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
+      prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
       prevProps.hasLeftLink !== nextProps.hasLeftLink) {
     return false;
@@ -407,6 +445,8 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
   fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
+  headerVisible?: boolean;
+  headerOffset?: number; // バブル上端がビューポート外にかかる場合のヘッダー押し下げ量(px)
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -482,11 +522,35 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     pointer-events: none;
   }
 
+  /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     :focus-within ではなく :has(:focus-visible) を使うことで、
+     マウスクリックによる一時的なフォーカスではトリガーされない。
+     transform は JS 管理（headerOffset 込み）なので上書きしない。 */
+  &:has(:focus-visible) >.e-bubble-header {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   >.e-bubble-header {
     cursor: move;
     user-select: none;
-    position: relative;
-    padding: 12px 16px 8px;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background: hsla(${({ colorHue }) => colorHue}, 45%, 20%, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid hsla(${({ colorHue }) => colorHue}, 50%, 50%, 0.35);
+    color: hsla(0, 0%, 100%, 0.9);
+
+    opacity: ${({ headerVisible }) => headerVisible ? 1 : 0};
+    pointer-events: ${({ headerVisible }) => headerVisible ? 'auto' : 'none'};
+    transform: ${({ headerVisible, headerOffset = 0 }) =>
+      headerVisible ? `translateY(${headerOffset}px)` : `translateY(${headerOffset + 6}px)`};
+    transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-header-content {
       display: flex;
@@ -686,7 +750,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
     );
     border-radius: 16px;
-    margin: 0 12px 12px;
+    margin: 12px;
     box-shadow:
       inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
       0 1px 2px hsla(0, 0%, 100%, 0.5);

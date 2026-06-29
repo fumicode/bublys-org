@@ -219,7 +219,6 @@ bubblesListener.startListening({
 
       const moved = poppingBubble.moveTo(relativePoint);
 
-      // バブルを更新
       listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
       return;
     }
