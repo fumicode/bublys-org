@@ -170,7 +170,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     }));
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
     setAutoMessage(
-      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成しました。世界線ビューで見比べて選んでください。`
+      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
     );
   };
 

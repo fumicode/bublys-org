@@ -123,6 +123,8 @@ export function saveObject(store: StoreLike, type: string, obj: unknown): void {
  * - スコープが空なら baseObj を root として置き、それを共通の親にする。空でなければ現在の apex を親とする。
  * - 各案は共通の親から grow する：apex に子ができると grow が自動でブランチを作る仕様なので、
  *   2案目以降は親へ moveTo してから grow すると兄弟になる。各ノードに label を付ける。
+ * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移し、その状態をアプリ全体
+ *   スコープへも反映する（世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
  * 返り値: 親ノードIDと、書き込んだ各案のノードID。
  */
 export function commitCandidates(
@@ -152,6 +154,20 @@ export function commitCandidates(
       store.dispatch(setGraph({ scopeId, graph: g.setNodeLabel(apex, c.label).toJSON() }));
     }
   });
+
+  // 案1に着地：ローカル apex を案1へ移し、そのノードの全オブジェクトをアプリ全体へ反映する
+  const landing = nodeIds[0];
+  if (landing) {
+    store.dispatch(setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landing).toJSON() }));
+    const g = graphOf(store, scopeId);
+    for (const ref of g.getStateRefsAt(landing)) {
+      const d = getDescriptor(ref.type);
+      if (!d) continue;
+      const data = store.getState().worldLineGraph?.cas?.[ref.hash];
+      if (data === undefined || data === null) continue;
+      commitToScope(store, APP_SCOPE_ID, ref.type, codecOf(d).fromJSON(data));
+    }
+  }
 
   return { parentNodeId, nodeIds };
 }
