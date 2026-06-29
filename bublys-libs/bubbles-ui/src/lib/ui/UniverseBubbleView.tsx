@@ -6,8 +6,8 @@ import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-u
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble, makeSelectFocusedBubbleId } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
@@ -52,12 +52,15 @@ const LayerDownIcon: FC<{ size?: number }> = ({ size = 16 }) => (
   </svg>
 );
 
+const HEADER_PROXIMITY_THRESHOLD = 40;
+
 type UniverseBubbleViewProps = {
   bubble: Bubble;
   position?: Point2;
   vanishingPoint?: Point2;
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
   children?: React.ReactNode;
@@ -74,6 +77,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
   headerExtras,
@@ -91,6 +95,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
+  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -105,7 +110,25 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  const isHeaderVisible = isFocused || isMouseNearTop || isHeaderHovered;
+
+  const updateHeaderSafeZone = () => {
+    const bubbleRect = ref.current?.getBoundingClientRect();
+    if (!bubbleRect) return;
+    const headerEl = ref.current?.querySelector('.e-window-header');
+    const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
+    const headerTopInViewport = bubbleRect.top - headerHeight;
+    setHeaderOffset(Math.max(0, -headerTopInViewport));
+  };
+
+  useLayoutEffect(() => {
+    if (isFocused) updateHeaderSafeZone();
+    else setIsMouseNearTop(false);
+  }, [isFocused, focusedBubbleId]);
 
   const isMaximized = bubble.isMaximized;
 
@@ -131,11 +154,9 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLElement>) => {
-    setIsFocused(true);
+    dispatch(focusBubble(bubble.id, universeId));
     onDragStart(e);
   };
-
-  const handleMouseLeave = () => setIsFocused(false);
 
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -158,8 +179,9 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $layerIndex={layerIndex}
       $position={position}
       $transformOrigin={vanishingPointRelative}
+      $headerVisible={isHeaderVisible}
+      $headerOffset={headerOffset}
       onClick={onClick}
-      onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));
@@ -168,7 +190,20 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $height={bubble.size ? `${bubble.size.height}px` : undefined}
       $backdropColor={bubble.backdropColor}
     >
-      <header className="e-window-header" onMouseDown={handleHeaderMouseDown}>
+      {/* pointer-events: none の StyledWindow に代わりヘッダー近接を検知するホットゾーン */}
+      <div
+        className="e-window-hotzone"
+        onMouseEnter={() => { setIsMouseNearTop(true); updateHeaderSafeZone(); }}
+        onMouseLeave={() => setIsMouseNearTop(false)}
+        onMouseDown={() => dispatch(focusBubble(bubble.id, universeId))}
+      />
+
+      <header
+        className="e-window-header"
+        onMouseDown={handleHeaderMouseDown}
+        onMouseEnter={() => setIsHeaderHovered(true)}
+        onMouseLeave={() => setIsHeaderHovered(false)}
+      >
         <div className="e-window-buttons-left">
           {onCloseClick && (
             <button
@@ -248,6 +283,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   }
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
+  if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
   return true;
 });
@@ -261,6 +297,8 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $width?: string;
   $height?: string;
   $backdropColor?: string;
+  $headerVisible?: boolean;
+  $headerOffset?: number;
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -289,7 +327,9 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* overflow: hidden は書かない。header が bottom: 100% でコンテナ外に浮くため、
+     hidden にすると header がクリップされて見えなくなる。
+     コンテンツのクリップは .e-window-content 自身の overflow: hidden に委ねる。 */
 
   /* シェル本体は backdropColor（バブリ宣言の「夜空」色）の半透明ガラスとして塗る。
      色は color-mix で 55% に薄め、backdrop-filter blur と合わせて「色付きフロスト
@@ -299,31 +339,59 @@ const StyledWindow = styled.div<StyledWindowProps>`
     $backdropColor
       ? `color-mix(in srgb, ${$backdropColor} 55%, transparent)`
       : "transparent"};
-  border: none;
+  border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 50%, 60%, 0.45);
   border-radius: 14px;
   box-shadow:
     0 16px 48px hsla(0, 0%, 0%, 0.5),
     0 2px 8px hsla(0, 0%, 0%, 0.25);
   backdrop-filter: blur(10px) saturate(1.15);
 
-  > .e-window-header {
-    /* StyledWindow が none なので、操作を受けるヘッダーは explicit に auto。 */
+  /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     :focus-within ではなく :has(:focus-visible) を使うことで、
+     マウスクリックによる一時的なフォーカスではトリガーされない。
+     transform は JS 管理（$headerOffset 込み）なので上書きしない。 */
+  &:has(:focus-visible) > .e-window-header {
+    opacity: 1;
     pointer-events: auto;
+  }
+
+  /* マウス近接検知用の透明ストリップ。StyledWindow が pointer-events: none のため
+     ここで明示的に auto を設定して onMouseEnter/Leave を受け取る。 */
+  > .e-window-hotzone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: ${HEADER_PROXIMITY_THRESHOLD}px;
+    pointer-events: auto;
+    z-index: 0;
+    background: transparent;
+  }
+
+  > .e-window-header {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1;
     cursor: move;
     user-select: none;
-    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    background: linear-gradient(
-      180deg,
-      hsla(${({ $colorHue }) => $colorHue}, 35%, 30%, 0.65) 0%,
-      hsla(${({ $colorHue }) => $colorHue}, 30%, 22%, 0.45) 100%
-    );
-    border-bottom: 1px solid hsla(${({ $colorHue }) => $colorHue}, 40%, 70%, 0.25);
+    border-radius: 14px;
+    background: hsla(${({ $colorHue }) => $colorHue}, 45%, 20%, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 50%, 50%, 0.35);
     color: hsla(0, 0%, 100%, 0.9);
     font-size: 0.8em;
+
+    opacity: ${({ $headerVisible }) => $headerVisible ? 1 : 0};
+    pointer-events: ${({ $headerVisible }) => $headerVisible ? 'auto' : 'none'};
+    transform: ${({ $headerVisible, $headerOffset = 0 }) =>
+      $headerVisible ? `translateY(${$headerOffset}px)` : `translateY(${$headerOffset + 6}px)`};
+    transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-window-buttons-left,
     .e-window-buttons-right {
