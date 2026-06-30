@@ -11,6 +11,12 @@ export type BubbleOptions = {
   /** fillsContainer のとき、生成時／最大化解除時に使う既定の窓サイズ。 */
   defaultSize?: Size2;
   /**
+   * 普通のバブル（非 fillsContainer）に、生成時の初期サイズを与える（= 最初から user-resized
+   * 状態にする）。fit-content では潰れる「容器いっぱいに広がる中身」（canvas など）を、
+   * universe 化せずにリサイズ可能な窓として開きたいときに使う。以後ユーザーが手で伸縮できる。
+   */
+  initialSize?: Size2;
+  /**
    * このバブルが universe バブル（= 1 bubly）のとき、その universe の「夜空」色。
    * - スタンドアロン実行時（BublyApp）はメインエリアの背景に塗られる
    * - bublys-os にネストされたときは UniverseBubbleView のガラス越しに見える「向こう側」の色
@@ -255,10 +261,11 @@ export const createBubble = (url: string, pos?: Point2): Bubble => {
 
   // fillsContainer な窓は固有サイズが無いため、生成時から既定の窓サイズを持つ
   // （maximized=false を明示し、最大化扱いにならないようにする）。
+  // 普通のバブルは既定 fit-content だが、initialSize 指定時はその初期サイズ（user-resized）で開く。
   const fillsContainer = bubbleOptions?.fillsContainer ?? false;
   const size = fillsContainer
     ? bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE
-    : undefined;
+    : bubbleOptions?.initialSize;
   const maximized = fillsContainer ? false : undefined;
 
   return new Bubble({ url, colorHue, type, params, position: pos, bubbleOptions, size, maximized });

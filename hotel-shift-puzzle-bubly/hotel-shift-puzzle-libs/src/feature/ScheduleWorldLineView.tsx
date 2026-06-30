@@ -78,8 +78,9 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     );
   }
 
-  // canvas はバブルいっぱい（履歴は popChildViewPortBelow で画面下部の左右いっぱい
-  // ストリップとして開かれる）。nameable で選択中の世界に名前をつけられる。
+  // canvas はバブルいっぱい（WorldLineScopeView が 100% に広がる）。バブルの初期サイズは
+  // route の bubbleOptions.initialSize で与え、リサイズすると canvas も伸縮する。
+  // nameable で選択中の世界に名前をつけられる。
   return (
     <WorldLineScopeView
       scope={scope}
