@@ -18,7 +18,7 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  *   base: "universe",
  *   type: "universe",
  *   Component: UniverseBubble,
- *   bubbleOptions: { fillsContainer: true, defaultSize: {...} },
+ *   bubbleOptions: { universe: true, defaultSize: {...} },
  * })
  *
  * これで以下が同じ "universe" から生まれる：
