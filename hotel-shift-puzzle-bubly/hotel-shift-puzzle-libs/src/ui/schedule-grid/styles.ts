@@ -258,7 +258,7 @@ export const StyledWrap = styled.div`
       text-overflow: ellipsis;
       font-weight: bold;
     }
-    /* 責任者バッジ（早責=早番責任者 / 夜責=夜番責任者）。早番＝青系・夜番＝紫系で勤務帯色に揃える */
+    /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
       flex-shrink: 0;
       font-size: 0.72em;
@@ -268,16 +268,6 @@ export const StyledWrap = styled.div`
       border-radius: 4px;
       white-space: nowrap;
 
-      &.is-early {
-        background: #e3f2fd;
-        color: #1565c0;
-        border: 1px solid #90caf9;
-      }
-      &.is-night {
-        background: #ede7f6;
-        color: #5e35b1;
-        border: 1px solid #b39ddb;
-      }
       /* クリックで関係者を抽出できるバッジ */
       &.is-clickable {
         cursor: pointer;

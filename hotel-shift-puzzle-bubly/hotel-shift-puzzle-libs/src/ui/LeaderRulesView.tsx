@@ -3,6 +3,7 @@
 import { FC } from "react";
 import styled from "styled-components";
 import { ShiftLeaderRule } from "../domain/index.js";
+import { leaderRoleStyle } from "./LeaderBadges.js";
 
 type LeaderRulesViewProps = {
   /** 描画する宣言的ルール（解決済み） */
@@ -32,7 +33,9 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({ rules, nameOf }) => 
             rule.minCount <= 1 ? "のうちいずれか1人" : `のうち最低${rule.minCount}人`;
           return (
             <li key={rule.key} className="e-rule">
-              <span className={`e-rule-chip is-${rule.key}`}>{rule.label}</span>
+              <span className="e-rule-chip" style={leaderRoleStyle(rule.key)}>
+                {rule.label}
+              </span>
               <span className="e-rule-text">
                 {rule.shiftName}に <strong>{who}</strong> {quota}
               </span>
@@ -76,24 +79,13 @@ const StyledRules = styled.div`
     gap: 6px;
   }
 
-  /* 責任者チップ。名前バッジ／footer と同じ色味で揃える（早番=青・遅番=紫） */
+  /* 責任者チップ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
   .e-rule-chip {
     flex-shrink: 0;
     font-weight: bold;
     line-height: 1;
     padding: 2px 6px;
     border-radius: 4px;
-
-    &.is-early {
-      background: #e3f2fd;
-      color: #1565c0;
-      border: 1px solid #90caf9;
-    }
-    &.is-night {
-      background: #ede7f6;
-      color: #5e35b1;
-      border: 1px solid #b39ddb;
-    }
   }
 
   .e-rule-text {

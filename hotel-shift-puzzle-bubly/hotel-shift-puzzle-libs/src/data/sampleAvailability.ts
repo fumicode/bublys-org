@@ -16,7 +16,7 @@ const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-1": ["early", "middle", "late"],
   "staff-2": ["early", "middle", "late"],
   "staff-3": ["early", "middle"],
-  "staff-4": ["middle", "late"],
+  "staff-4": ["early", "middle", "late"], // 予責（予約責任者）なので早番にも入れる
   "staff-5": ["early", "middle"],
   "staff-6": ["early", "middle", "late"], // 夜責: 全帯OK（フロント）
   "staff-7": ["early", "middle"], // 早責: 早番・中番（会計）

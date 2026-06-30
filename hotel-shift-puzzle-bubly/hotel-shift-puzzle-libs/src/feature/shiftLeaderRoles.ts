@@ -27,13 +27,14 @@ export type ShiftLeaderRoleConfig = {
 };
 
 /**
- * ホテルの既定の責任者ロール。
+ * ホテルの既定の責任者ロール。すべて同じ形の config エントリ違いにすぎない（コードは共通）。
  *   - 早責: 早番責任者（早番に最低1人）
+ *   - 予責: 予約責任者（早番に最低1人）
  *   - 夜責: 夜番責任者（運用上は遅番に最低1人）
- * 早責・夜責は同じ形の config エントリ違いにすぎない（コードは共通）。
  */
 export const HOTEL_SHIFT_LEADER_ROLES: ShiftLeaderRoleConfig[] = [
   { key: "early", label: "早責", shiftName: "早番" },
+  { key: "reservation", label: "予責", shiftName: "早番" },
   { key: "night", label: "夜責", shiftName: "遅番" },
 ];
 
