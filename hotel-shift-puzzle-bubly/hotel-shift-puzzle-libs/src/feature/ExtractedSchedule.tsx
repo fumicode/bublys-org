@@ -77,13 +77,19 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   const idSet = useMemo(() => new Set(staffIds), [staffIds]);
   const subset = useMemo(() => allStaff.filter((s) => idSet.has(s.id)), [allStaff, idSet]);
 
-  // 責任者ルールは全スタッフから解決し、subset に関係するルールだけ footer に出す
+  // 責任者ルールは全スタッフから解決する。
+  // 抽出ビューで「対象」とするのは、メンバー全員が抽出 subset に含まれるルールだけ。
+  // （例: 早責3人を抽出 → 早責は対象。予責は山本が兼務でも田中が subset 外なので対象外
+  //   ＝ subset 外の人を動かさない。予責は予責メンバーを抽出したとき別途満たす。）
   const allLeaderRules = useMemo(
     () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, allStaff),
     [allStaff]
   );
   const relevantRules = useMemo(
-    () => allLeaderRules.filter((r) => r.leaderStaffIds.some((id) => idSet.has(id))),
+    () =>
+      allLeaderRules.filter(
+        (r) => r.leaderStaffIds.length > 0 && r.leaderStaffIds.every((id) => idSet.has(id))
+      ),
     [allLeaderRules, idSet]
   );
 
