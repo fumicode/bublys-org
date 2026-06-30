@@ -106,7 +106,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
+    openingPosition: OpeningPosition = 'right-side'
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
@@ -156,7 +156,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
+    openingPosition: OpeningPosition = 'right-side'
   ): string => {
     const newBubble = createBubble(name);
 

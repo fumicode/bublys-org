@@ -17,6 +17,14 @@ import {
 } from './bubbles-slice.js';
 import { Layer } from '@bublys-org/bubbles-ui-util';
 import { getOriginRect } from '../utils/get-origin-rect.js';
+import type { OpeningPosition } from './bubbles-slice.js';
+
+const toDirection = (pos: OpeningPosition): 'right' | 'left' | 'top' | 'bottom' => {
+  if (pos === 'left-side')   return 'left';
+  if (pos === 'top-side')    return 'top';
+  if (pos === 'bottom-side') return 'bottom';
+  return 'right';
+};
 
 // アクションの meta から universeId を取り出す（無ければ root）
 const universeIdOf = (action: { meta?: { universeId?: string } }): string =>
@@ -163,7 +171,7 @@ bubblesListener.startListening({
   effect: async (popChildAction, listenerApi) => {
     const payload = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
     const poppingBubbleId = payload.bubbleId;
-    const openingPosition = payload.openingPosition ?? "bubble-side";
+    const openingPosition = payload.openingPosition ?? "right-side";
     const universeId = universeIdOf(popChildAction);
 
     const state = listenerApi.getState() as any;
@@ -198,7 +206,7 @@ bubblesListener.startListening({
       }
 
       // calcPositionToOpenはopeningSizeを使わないので、ダミー値でOK
-      const point = baseRect.calcPositionToOpen({ width: 0, height: 0 });
+      const point = baseRect.calcPositionToOpen({ width: 0, height: 0 }, toDirection(openingPosition));
       console.log("Pop: Calculated point to open at (global)", point, "openingPosition:", openingPosition);
 
       if (!point) {
@@ -270,7 +278,7 @@ bubblesListener.startListening({
       }
     }
 
-    const point = baseRect.calcPositionToOpen(newPoppingBubble.renderedRect.size);
+    const point = baseRect.calcPositionToOpen(newPoppingBubble.renderedRect.size, toDirection(openingPosition));
 
     if(!point) {
       return;

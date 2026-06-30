@@ -74,7 +74,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   }, []);
 
   const popChild = useCallback(
-    (b: Bubble, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side"): string => {
+    (b: Bubble, openerBubbleId: string, openingPosition: OpeningPosition = "right-side"): string => {
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
       dispatch(popChildInProcess({ bubbleId: b.id, openingPosition }, universeId));
@@ -127,7 +127,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   );
 
   const openBubble = useCallback(
-    (name: string, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side"): string => {
+    (name: string, openerBubbleId: string, openingPosition: OpeningPosition = "right-side"): string => {
       const newBubble = createBubble(name);
       // 履歴は画面（この universe）下部の左右いっぱいストリップで開く
       if (/\/history$/.test(name)) {
