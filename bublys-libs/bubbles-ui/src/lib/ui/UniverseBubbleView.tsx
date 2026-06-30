@@ -108,7 +108,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
-  const { onResizeStart } = useBubbleResize({ bubble, ref });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
