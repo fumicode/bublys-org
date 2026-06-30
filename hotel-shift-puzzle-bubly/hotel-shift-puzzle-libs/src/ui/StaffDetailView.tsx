@@ -26,7 +26,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff, onOpenWish })
             object={staff}
             label={staff.name}
             draggable={true}
-            openingPosition="bubble-side"
+            openingPosition="left-side"
           >
             <h3 className="e-name">{staff.name}</h3>
           </ObjectView>

@@ -9,7 +9,7 @@ import { TaskDetail } from "./feature/TaskDetail";
 const TaskCollectionBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const handleTaskSelect = (taskId: string) => {
-    openBubble(`task-management/tasks/${taskId}`, bubble.id, "bubble-side");
+    openBubble(`task-management/tasks/${taskId}`, bubble.id, "right-side");
   };
   return <TaskCollection onTaskSelect={handleTaskSelect} />;
 };
@@ -20,7 +20,7 @@ const TaskDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const taskId = bubble.url.replace("task-management/tasks/", "");
 
   const handleUserClick = (userId: string) => {
-    openBubble(`users/${userId}`, bubble.id, "bubble-side");
+    openBubble(`users/${userId}`, bubble.id, "right-side");
   };
 
   return <TaskDetail taskId={taskId} onUserClick={handleUserClick} />;

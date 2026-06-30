@@ -41,7 +41,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                 object={schedule}
                 label={`${schedule.year}年${schedule.month}月`}
                 draggable={true}
-                openingPosition="bubble-side"
+                openingPosition="right-side"
                 fullWidth={true}
               >
                 <div className="e-content">
