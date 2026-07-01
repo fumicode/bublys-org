@@ -23,6 +23,8 @@ export type SummaryRow = {
    * これが定義されている行は人数（count）ではなく ◯/✕ を表示する。
    */
   leaderPresent?: (dayIndex: number) => boolean;
+  /** 責任者行のロールキー（例: "early"）。未充足 ✕ から違反バブルを開く導線に使う。 */
+  ruleKey?: string;
   /** この人数を超えた日は赤く警告する（休み行の「1日の休み上限」など） */
   warnOver?: number;
 };
@@ -70,6 +72,7 @@ export function buildSummaryRows(
   // 相方裏コマンドと同じ rule.isSatisfiedOn から導出するので、表示とロジックがズレない。
   const leaderRows: SummaryRow[] = leaderRules.map((rule) => ({
     key: `leader:${rule.key}`,
+    ruleKey: rule.key,
     label: rule.label,
     bg: "#eceff1",
     fg: "#455a64",

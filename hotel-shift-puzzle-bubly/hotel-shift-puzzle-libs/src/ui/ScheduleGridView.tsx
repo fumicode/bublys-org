@@ -12,6 +12,7 @@ import {
   StaffMonthlyShiftWish,
   type ShiftCell,
   ShiftLeaderRule,
+  SHIFT_LEADER_CONSTRAINT,
 } from "../domain/index.js";
 import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
@@ -144,17 +145,29 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // 日単位の違反（責任者不在など、staffId なし）を稼働日キーごとにまとめる。日付ヘッダの
   // 列警告に使う（スタッフ×日の違反は従来どおり行の赤線で出る）。
   const dayWarnings = useMemo(() => {
-    const m = new Map<string, string[]>();
+    const m = new Map<string, ConstraintViolation[]>();
     for (const v of violations) {
       if (!v.isDayScoped) continue;
       for (const d of v.days) {
         const arr = m.get(d.key) ?? [];
-        arr.push(v.message);
+        arr.push(v);
         m.set(d.key, arr);
       }
     }
     return m;
   }, [violations]);
+
+  // 責任者行の未充足 ✕（rule×day）に対応する違反 → その URL を引く。footer の ✕ の導線に使う。
+  const leaderViolationUrl = useMemo(() => {
+    if (!violationUrl) return undefined;
+    return (ruleKey: string, day: WorkingDay): string | undefined => {
+      const type = `${SHIFT_LEADER_CONSTRAINT}:${ruleKey}`;
+      const v = violations.find(
+        (x) => x.constraintType === type && x.coversDay(day)
+      );
+      return v ? violationUrl(v) : undefined;
+    };
+  }, [violations, violationUrl]);
 
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day);
@@ -278,11 +291,29 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""
               }${warns ? " is-warn" : ""}`}
             >
-              {warns && (
-                <span className="e-day-warn" title={warns.join("\n")}>
-                  ⚠
-                </span>
-              )}
+              {warns &&
+                (() => {
+                  const mark = (
+                    <span
+                      className="e-day-warn"
+                      title={warns.map((v) => v.message).join("\n")}
+                    >
+                      ⚠
+                    </span>
+                  );
+                  // ダブルクリックでその日の（先頭の）違反バブルを開く
+                  return violationUrl ? (
+                    <ObjectView
+                      url={violationUrl(warns[0])}
+                      openingPosition="origin-side"
+                      draggable={false}
+                    >
+                      {mark}
+                    </ObjectView>
+                  ) : (
+                    mark
+                  );
+                })()}
               {/* ObjectView がダブルクリックでの展開・data-url（origin-side で近くに出す）を担う。
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (
@@ -314,6 +345,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             rowIndex={rowIndex}
             editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
             onEditRequired={setEditingRequired}
+            leaderViolationUrl={leaderViolationUrl}
           />
         ))}
       </div>

@@ -144,6 +144,17 @@ export const StyledWrap = styled.div`
         color: #c62828;
         background: #ffebee;
       }
+      /* ✕（未充足）はダブルクリックで違反バブルを開ける。中身は ObjectView */
+      &.is-clickable {
+        cursor: pointer;
+      }
+      &.is-clickable:hover {
+        box-shadow: inset 0 0 0 2px #ef9a9a;
+      }
+      .e-leader-mark {
+        width: 100%;
+        text-align: center;
+      }
     }
   }
 
