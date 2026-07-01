@@ -309,6 +309,26 @@ export const StyledWrap = styled.div`
       height: 7px;
     }
   }
+  /* 部署グループヘッダー行（全カラムスパン） */
+  .e-dept-label {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #e8eaf6;
+    color: #3949ab;
+    font-weight: bold;
+    font-size: 0.85em;
+    padding: 3px 8px;
+    border-right: 1px solid #c5cae9;
+    border-bottom: 1px solid #c5cae9;
+    box-sizing: border-box;
+  }
+  .e-dept-sep {
+    background: #e8eaf6;
+    border-bottom: 1px solid #c5cae9;
+    box-sizing: border-box;
+  }
+
   .e-work {
     .e-shift-name {
       font-weight: bold;

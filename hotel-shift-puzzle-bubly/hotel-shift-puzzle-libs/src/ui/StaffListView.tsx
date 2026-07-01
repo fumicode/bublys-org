@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState } from "react";
+import { FC, useRef, useState } from "react";
 import styled from "styled-components";
 import { Staff } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
@@ -14,7 +14,7 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type StaffListViewProps = {
   staffList: Staff[];
-  onCreate: (name: string) => void;
+  onCreate: (name: string, department: string) => void;
   /** スタッフ名を変更する */
   onRename?: (id: string, name: string) => void;
   /** スタッフを削除する */
@@ -28,14 +28,17 @@ export const StaffListView: FC<StaffListViewProps> = ({
   onRemove,
 }) => {
   const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
+  const deptRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
   const handleCreate = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    onCreate(trimmed);
+    onCreate(trimmed, department.trim());
     setName("");
+    setDepartment("");
   };
 
   const startEdit = (staff: Staff) => {
@@ -105,7 +108,12 @@ export const StaffListView: FC<StaffListViewProps> = ({
                 >
                   <div className="e-content">
                     <PersonIcon fontSize="small" className="e-avatar" />
-                    <div className="e-name">{staff.name}</div>
+                    <div className="e-info">
+                      <div className="e-name">{staff.name}</div>
+                      {staff.department && (
+                        <div className="e-dept">{staff.department}</div>
+                      )}
+                    </div>
                   </div>
                 </ObjectView>
                 {onRename && (
@@ -143,8 +151,20 @@ export const StaffListView: FC<StaffListViewProps> = ({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) deptRef.current?.focus();
+          }}
+        />
+        <TextField
+          className="e-dept-input"
+          variant="standard"
+          size="small"
+          label="部署"
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          onKeyDown={(e) => {
             if (e.key === "Enter") handleCreate();
           }}
+          inputRef={deptRef}
         />
         <Button
           variant="outlined"
@@ -169,6 +189,10 @@ const StyledContainer = styled.div`
     border-top: 1px solid #eee;
 
     .e-name-input {
+      flex: 2;
+    }
+
+    .e-dept-input {
       flex: 1;
     }
   }
@@ -221,8 +245,22 @@ const StyledStaffList = styled.ul`
       flex-shrink: 0;
     }
 
+    .e-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
     .e-name {
       font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .e-dept {
+      font-size: 0.78em;
+      color: #3949ab;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
