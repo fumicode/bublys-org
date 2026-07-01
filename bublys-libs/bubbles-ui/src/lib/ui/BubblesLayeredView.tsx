@@ -7,7 +7,6 @@ import { BubbleView } from "./BubbleView.js";
 import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
-import { BubbleSkeleton } from "./BubbleSkeleton.js";
 import { UniverseContext } from "../context/UniverseContext.js";
 import {
   makeSelectValidBubbleRelationIds,
@@ -23,10 +22,9 @@ import {
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
  * per-bubble selector のみを購読し、world-line 操作では再 render しない。
  *
- * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため、
- * コンテンツを BubbleSkeleton（見出しのみ）に差し替えてレンダリングコストを削減する。
- * layer 0〜2 はコンテンツをそのまま維持するため、popChild 直後の親バブルは
- * 引き続き参照できる。
+ * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため BubbleSkeleton で表示する。
+ * ただしフォーカス時（ヘッダークリック・キーボードフォーカス）はスケルトンを解除してフルコンテンツを表示する。
+ * このスケルトン切り替えは BubbleView の内部状態（isFocused）で管理される。
  */
 type ConnectedBubbleViewProps = {
   universeId: string;
@@ -73,10 +71,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
-  // layer 3+ (scale ≤ 0.8) は内容が読めないためスケルトン表示に切り替える
-  const content = layerIndex >= 3
-    ? <BubbleSkeleton bubble={bubble} />
-    : renderBubbleContent(bubble);
+  const content = renderBubbleContent(bubble);
 
   if (bubble.fillsContainer) {
     return (

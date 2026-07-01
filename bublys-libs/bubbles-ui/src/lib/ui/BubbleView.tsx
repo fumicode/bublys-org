@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -12,6 +12,7 @@ import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
+import { BubbleSkeleton } from "./BubbleSkeleton.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -194,6 +195,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
     setIsFocused(false);
   };
 
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
   // DOM参照をContextに登録
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -216,6 +221,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       layerIndex={layerIndex}
       transformOrigin={vanishingPointRelative}
       onClick={onClick}
+      onFocus={handleFocus}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
@@ -286,7 +292,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       </header>
 
       <main className="e-bubble-content">
-        {children}<br />
+        {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
       {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
