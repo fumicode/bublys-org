@@ -234,6 +234,14 @@ export const bubblesSlice = createSlice({
       state.animatingBubbleIds = [];
     },
 
+    focusBubble: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process).focus(action.payload).toJSON();
+      },
+      prepare: prepStr,
+    },
+
     // Entity-only actions
     addBubble: {
       reducer: (state, action: PayloadAction<BubbleJson, string, UniverseMeta>) => {
@@ -358,6 +366,7 @@ export const {
   replaceBubbleArrangement,
   finishBubbleAnimation,
   clearAllAnimations,
+  focusBubble,
 } = bubblesSlice.actions;
 
 // ============================================================================
@@ -669,6 +678,11 @@ export const makeSelectBubbleLayerIndex = (bubbleId: string): LayerIndexSelector
 // universe スコープのセレクタファクトリ（ネストした universe のレンダリング用）
 // 上の root 用 selectX は make...(ROOT) と等価。
 // ============================================================================
+
+export const makeSelectFocusedBubbleId = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }): string | undefined =>
+    universeOf(state, uid).process.focusedBubbleId,
+);
 
 export const makeSelectBubbleLayers = memoizeByUniverse((uid) =>
   createSelector([makeSelectProcessJson(uid)], (processJson): string[][] =>

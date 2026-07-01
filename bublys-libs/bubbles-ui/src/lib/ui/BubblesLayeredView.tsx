@@ -15,6 +15,7 @@ import {
   makeSelectUniverseDimensions,
   selectIsLayerAnimating,
   makeSelectBubbleByIdInUniverse,
+  makeSelectFocusedBubbleId,
   ROOT_UNIVERSE_ID,
 } from "../state/index.js";
 
@@ -31,6 +32,7 @@ type ConnectedBubbleViewProps = {
   bubbleId: string;
   layerIndex: number;
   zIndex: number;
+  isFocused: boolean;
   vanishingPoint: Point2;
   surfaceLayer: Layer;
   hasLeftLink?: boolean;
@@ -50,6 +52,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   bubbleId,
   layerIndex,
   zIndex,
+  isFocused,
   vanishingPoint,
   surfaceLayer,
   hasLeftLink,
@@ -80,6 +83,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         position={pos}
         layerIndex={layerIndex}
         zIndex={zIndex}
+        isFocused={isFocused}
         vanishingPoint={vanishingPoint}
         lightweightMode={lightweightMode}
         onClick={() => onBubbleClick?.(bubble.url)}
@@ -100,6 +104,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       position={pos}
       layerIndex={layerIndex}
       zIndex={zIndex}
+      isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}
@@ -348,6 +353,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
 
   const dispatch = useAppDispatch();
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
+  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
   const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
@@ -414,10 +420,16 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   const renderedBubbles = useMemo(
     () =>
       bubbleLayers
-        .map((layer, layerIndex) =>
-          layer.map((bubbleId) => {
+        .map((layer, layerIndex) => {
+          // フォーカスされたバブルを同レイヤー内の最後尾に移動し、DOM 順で最前面に来るようにする
+          const orderedLayer =
+            focusedBubbleId && layer.includes(focusedBubbleId)
+              ? [...layer.filter((id) => id !== focusedBubbleId), focusedBubbleId]
+              : layer;
+          return orderedLayer.map((bubbleId) => {
             const zIndex = baseZIndex - layerIndex;
             const hasLeftLink = openeeIds.has(bubbleId);
+            const isFocused = focusedBubbleId === bubbleId;
 
             return (
               <ConnectedBubbleView
@@ -426,6 +438,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                 bubbleId={bubbleId}
                 layerIndex={layerIndex}
                 zIndex={zIndex}
+                isFocused={isFocused}
                 vanishingPoint={undergroundVanishingPoint}
                 surfaceLayer={surfaceLayer}
                 hasLeftLink={hasLeftLink}
@@ -440,8 +453,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                 onDebugRects={stableOnDebugRects}
               />
             );
-          })
-        )
+          });
+        })
         .flat(),
     [
       bubbleLayers,
@@ -451,6 +464,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       universeId,
       undergroundVanishingPoint,
       renderBubbleContent,
+      focusedBubbleId,
       stableOnBubbleClick,
       stableOnBubbleClose,
       stableOnBubbleMove,
