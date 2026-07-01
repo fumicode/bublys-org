@@ -1,4 +1,5 @@
 import { ShiftLeaderRule, type ShiftLeaderRuleState } from "./ShiftLeaderRule.js";
+import { ShiftLeaderConstraint } from "./ShiftLeaderConstraint.js";
 
 /**
  * ScheduleConstraints — 勤務表ごとの「制約」集約
@@ -37,6 +38,17 @@ export class ScheduleConstraints {
   leaderRule(key: string): ShiftLeaderRule | undefined {
     const s = this.state.leaderRules.find((r) => r.key === key);
     return s ? new ShiftLeaderRule(s) : undefined;
+  }
+
+  /**
+   * 責任者ルールを「違反を出す制約（ShiftLeaderConstraint）」に変換して返す。
+   * 担当勤務帯名 → 勤務帯ID集合の解決は勤務表側の事情なので shiftIdsOf で受ける。
+   * grid はこれを他の制約と一緒に checkConstraints に渡し、未充足日を違反として表に出す。
+   */
+  leaderConstraints(shiftIdsOf: (shiftName: string) => string[]): ShiftLeaderConstraint[] {
+    return this.leaderRules.map(
+      (rule) => new ShiftLeaderConstraint(rule, shiftIdsOf(rule.shiftName))
+    );
   }
 
   /** そのルールの候補者に staffId を加える（重複は無視）。新インスタンスを返す。 */

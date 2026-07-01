@@ -14,8 +14,11 @@ import { WorkingDay } from "./WorkingDay.js";
 export type ConstraintViolationState = {
   /** 制約の種別識別子（例: "max-consecutive-workdays"） */
   constraintType: string;
-  /** 違反しているスタッフ */
-  staffId: string;
+  /**
+   * 違反しているスタッフ。省略時は「スタッフに紐づかない日単位の違反」（例: 責任者が
+   * その日どの勤務帯にもいない）。行の赤線ではなく、日（列）の警告として扱う。
+   */
+  staffId?: string;
   /** 違反している稼働日範囲（昇順） */
   days: WorkingDay[];
   /** 人が読める説明（例: "6連勤（上限5連勤）"） */
@@ -25,7 +28,7 @@ export type ConstraintViolationState = {
 /** シリアライズ用：入れ子まで全部 plain */
 export type ConstraintViolationPlain = {
   constraintType: string;
-  staffId: string;
+  staffId?: string;
   /** WorkingDay.key の配列（"2026-06-01" 形式、昇順） */
   dayKeys: string[];
   message: string;
@@ -38,8 +41,14 @@ export class ConstraintViolation {
     return this.state.constraintType;
   }
 
-  get staffId(): string {
+  /** 違反しているスタッフ（日単位の違反では undefined）。 */
+  get staffId(): string | undefined {
     return this.state.staffId;
+  }
+
+  /** スタッフに紐づかない日単位の違反か（列の警告として扱う）。 */
+  get isDayScoped(): boolean {
+    return this.state.staffId === undefined;
   }
 
   /** 違反している稼働日範囲（昇順） */
@@ -55,7 +64,7 @@ export class ConstraintViolation {
   get key(): string {
     const first = this.state.days[0]?.key ?? "";
     const last = this.state.days[this.state.days.length - 1]?.key ?? "";
-    return `${this.state.constraintType}:${this.state.staffId}:${first}_${last}`;
+    return `${this.state.constraintType}:${this.state.staffId ?? "-"}:${first}_${last}`;
   }
 
   /** その稼働日が違反範囲に含まれるか */

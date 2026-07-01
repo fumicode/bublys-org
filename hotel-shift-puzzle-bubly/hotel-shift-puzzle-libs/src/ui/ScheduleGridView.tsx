@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, Fragment, useState } from "react";
+import { FC, Fragment, useMemo, useState } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
@@ -141,6 +141,21 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     maxDayOffPerDay
   );
 
+  // 日単位の違反（責任者不在など、staffId なし）を稼働日キーごとにまとめる。日付ヘッダの
+  // 列警告に使う（スタッフ×日の違反は従来どおり行の赤線で出る）。
+  const dayWarnings = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const v of violations) {
+      if (!v.isDayScoped) continue;
+      for (const d of v.days) {
+        const arr = m.get(d.key) ?? [];
+        arr.push(v.message);
+        m.set(d.key, arr);
+      }
+    }
+    return m;
+  }, [violations]);
+
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day);
 
@@ -249,6 +264,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         </div>
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
+          const warns = dayWarnings.get(day.key);
           const inner = (
             <span className="e-day-inner" title={`${day.label} の詳細を開く（ダブルクリック）`}>
               <span className="e-day-num">{day.day}</span>
@@ -260,8 +276,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
               key={day.key}
               className={`e-day-head${dayBubbleUrl ? " is-clickable" : ""}${
                 wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""
-              }`}
+              }${warns ? " is-warn" : ""}`}
             >
+              {warns && (
+                <span className="e-day-warn" title={warns.join("\n")}>
+                  ⚠
+                </span>
+              )}
               {/* ObjectView がダブルクリックでの展開・data-url（origin-side で近くに出す）を担う。
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (

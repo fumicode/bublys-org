@@ -155,14 +155,19 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   }, [allWishes, schedule]);
 
   // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
-  // 連勤などに加え、シフト希望との食い違いも違反として拾う（希望の文脈を注入）。
+  // 連勤・希望に加え、責任者ルールの未充足（担当勤務帯に minCount 未満の日）も同じ違反
+  // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
   const violations = useMemo(() => {
     if (!schedule) return [];
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    return schedule.checkConstraints(
-      buildScheduleConstraints({ wishByStaff, shiftNameById })
-    );
-  }, [schedule, wishByStaff, workShifts]);
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const leaderConstraints = constraints?.leaderConstraints(shiftIdsOf) ?? [];
+    return schedule.checkConstraints([
+      ...buildScheduleConstraints({ wishByStaff, shiftNameById }),
+      ...leaderConstraints,
+    ]);
+  }, [schedule, wishByStaff, workShifts, constraints]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
