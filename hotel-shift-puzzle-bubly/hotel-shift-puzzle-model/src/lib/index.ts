@@ -16,6 +16,8 @@ export * from './schedule/ScheduleAvailability.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
 export * from './schedule/ShiftLeaderRule.js';
+// 勤務表ごとの制約集約（責任者ルールを保持。将来は他の制約も同居可）
+export * from './schedule/ScheduleConstraints.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';

@@ -143,7 +143,12 @@ const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
 
 // --- 責任者ルール可視化バブル（上部ルール行のクリックで開く） ---
 const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<LeaderRuleView ruleKey={bubble.params.ruleKey} />);
+  withObjects(
+    <LeaderRuleView
+      scheduleId={bubble.params.scheduleId}
+      ruleKey={bubble.params.ruleKey}
+    />
+  );
 
 // --- 可能勤務帯エディタバブル ---
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>

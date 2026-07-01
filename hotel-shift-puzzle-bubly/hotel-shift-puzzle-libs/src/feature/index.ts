@@ -14,7 +14,6 @@ export * from "./LeaderRuleView.js";
 export * from "./AvailabilityEditor.js";
 export * from "./ScheduleViolationView.js";
 export * from "./scheduleConstraints.js";
-export * from "./shiftLeaderRoles.js";
 export * from "./ShiftWishConstraint.js";
 export * from "./ShiftWishEditor.js";
 export * from "./autoShift.js";

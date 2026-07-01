@@ -8,6 +8,7 @@ import {
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
+  ScheduleConstraints,
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
@@ -27,13 +28,13 @@ import {
   MAX_DAY_OFF_PER_DAY,
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
-import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -77,14 +78,15 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   const idSet = useMemo(() => new Set(staffIds), [staffIds]);
   const subset = useMemo(() => allStaff.filter((s) => idSet.has(s.id)), [allStaff, idSet]);
 
-  // 責任者ルールは全スタッフから解決する。
+  // 責任者ルールは勤務表ごとの制約オブジェクトから読む。
   // 抽出ビューで「対象」とするのは、メンバー全員が抽出 subset に含まれるルールだけ。
   // （例: 早責3人を抽出 → 早責は対象。予責は山本が兼務でも田中が subset 外なので対象外
   //   ＝ subset 外の人を動かさない。予責は予責メンバーを抽出したとき別途満たす。）
-  const allLeaderRules = useMemo(
-    () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, allStaff),
-    [allStaff]
+  const constraints = useObject<ScheduleConstraints>(
+    SCHEDULE_CONSTRAINTS_TYPE,
+    scheduleId
   );
+  const allLeaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
   const relevantRules = useMemo(
     () =>
       allLeaderRules.filter(

@@ -7,18 +7,19 @@ import {
   WorkShift,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  ScheduleConstraints,
   WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleDayView } from "../ui/ScheduleDayView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_CONSTRAINTS_TYPE,
 } from "../objects/hotelObjects.js";
 
 type ScheduleDayDetailProps = {
@@ -46,11 +47,12 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
     scheduleId
   );
 
-  // 責任者ルール（早責/夜責）。名前横のバッジに使う
-  const leaderRules = useMemo(
-    () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
-    [staffList]
+  // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む。名前横のバッジに使う
+  const constraints = useObject<ScheduleConstraints>(
+    SCHEDULE_CONSTRAINTS_TYPE,
+    scheduleId
   );
+  const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;

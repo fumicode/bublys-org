@@ -9,6 +9,7 @@ import {
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
+  ScheduleConstraints,
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -21,12 +22,12 @@ import {
   MIN_MONTHLY_DAY_OFF,
   MAX_DAY_OFF_PER_DAY,
 } from "./scheduleConstraints.js";
-import { HOTEL_SHIFT_LEADER_ROLES, resolveShiftLeaderRoles } from "./shiftLeaderRoles.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -126,12 +127,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return staffList.filter((s) => s.department === deptFilter);
   }, [staffList, deptFilter]);
 
-  // 責任者ルール（早責/夜責）。部署フィルタに関わらず全スタッフから責任者を解決する
-  // （会計を絞ると早責が常に✕になる、といった取りこぼしを防ぐ）。
-  const leaderRules = useMemo(
-    () => resolveShiftLeaderRoles(HOTEL_SHIFT_LEADER_ROLES, staffList),
-    [staffList]
+  // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む（世界線に載る）。
+  const constraints = useObject<ScheduleConstraints>(
+    SCHEDULE_CONSTRAINTS_TYPE,
+    scheduleId
   );
+  const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
 
   // 責任者ルールを人が読める形で描く用。名前は絞り込み前の全スタッフから引く
   // （部署フィルタで責任者が消えても名前を解決できるように）。

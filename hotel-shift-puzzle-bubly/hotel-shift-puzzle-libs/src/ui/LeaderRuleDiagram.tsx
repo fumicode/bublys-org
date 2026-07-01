@@ -1,9 +1,10 @@
 'use client';
 
-import { FC, useMemo } from "react";
-import type { LiHTMLAttributes, SVGProps } from "react";
+import { DragEvent, FC, useMemo, useState } from "react";
+import type { CSSProperties, HTMLAttributes, LiHTMLAttributes, SVGProps } from "react";
 import styled, { css, keyframes } from "styled-components";
 import type { Keyframes } from "styled-components";
+import { parseDragPayload } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule } from "../domain/index.js";
 import { leaderRoleStyle } from "./LeaderBadges.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
@@ -18,6 +19,13 @@ type LeaderRuleDiagramProps = {
    * 制約の色ではなく「入るべき勤務帯の色」で塗るため、勤務帯 id を受けて SHIFT_BG/FG で色付ける。
    */
   shiftId?: string;
+  /**
+   * 人（Staff）の URL をドロップしたとき呼ぶ。渡すと図が drop を受け付け、その人を候補に加えられる。
+   * dropAcceptTypes と併せて指定する。
+   */
+  onDropUrl?: (url: string) => void;
+  /** 受け付けるドラッグ型（例: Staff の drag type）。 */
+  dropAcceptTypes?: string[];
 };
 
 // 行のレイアウト寸法（名前カラムと SVG で座標を共有するため JS 側で持つ）
@@ -61,10 +69,35 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
   rule,
   nameOf,
   shiftId,
+  onDropUrl,
+  dropAcceptTypes,
 }) => {
   const ids = rule.leaderStaffIds;
   const n = ids.length;
   const animated = n > 1;
+
+  // 人（Staff）をドロップして候補に追加する drop ゾーン。
+  const [dragOver, setDragOver] = useState(false);
+  const droppable = !!onDropUrl;
+  const handleDragOver = (e: DragEvent) => {
+    if (!onDropUrl) return;
+    // dragover 中はブラウザのセキュリティ制約で getData() が空を返すため、payload は読めない。
+    // 受け入れ可否は dataTransfer.types（型キーだけは読める）で判定する。
+    const types = Array.from(e.dataTransfer.types);
+    if (!(dropAcceptTypes ?? []).some((t) => types.includes(t))) return;
+    e.preventDefault(); // drop を許可
+    e.dataTransfer.dropEffect = "copy";
+    if (!dragOver) setDragOver(true);
+  };
+  const handleDragLeave = () => setDragOver(false);
+  const handleDrop = (e: DragEvent) => {
+    const payload = parseDragPayload(e, { acceptTypes: dropAcceptTypes });
+    if (!payload || !onDropUrl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    onDropUrl(payload.url);
+  };
 
   // 流れの色 = 入るべき勤務帯の色（早番＝青 …）。制約（早責/予責/夜責）の色ではない。
   const shiftBg = (shiftId && SHIFT_BG[shiftId]) || "#eceff1";
@@ -91,7 +124,13 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
       : `最低${rule.minCount}人はいなければならない`;
 
   return (
-    <StyledDiagram>
+    <StyledDiagram
+      className={droppable && dragOver ? "is-dragover" : undefined}
+      style={droppable ? ({ "--drop-accent": shiftFg } as CSSProperties) : undefined}
+      onDragOver={droppable ? handleDragOver : undefined}
+      onDragLeave={droppable ? handleDragLeave : undefined}
+      onDrop={droppable ? handleDrop : undefined}
+    >
       <div className="e-head">
         <span className="e-chip" style={leaderRoleStyle(rule.key)}>
           {rule.label}
@@ -161,6 +200,10 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
           </span>
         </div>
       </div>
+
+      {droppable && (
+        <div className="e-drop-hint">＋ ここに人をドロップで候補に追加</div>
+      )}
     </StyledDiagram>
   );
 };
@@ -225,11 +268,29 @@ const ArmPath = styled.path<
         `}
 `;
 
-const StyledDiagram = styled.div`
+const StyledDiagram = styled.div<HTMLAttributes<HTMLDivElement>>`
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 14px 16px;
+  border-radius: 8px;
+  outline: 2px dashed transparent;
+  outline-offset: -4px;
+  transition: outline-color 0.12s ease, background 0.12s ease;
+
+  /* 人をドラッグして上に乗せているときの受け入れハイライト（勤務帯色） */
+  &.is-dragover {
+    outline-color: var(--drop-accent, #90a4ae);
+    background: color-mix(in srgb, var(--drop-accent, #90a4ae) 8%, transparent);
+  }
+
+  .e-drop-hint {
+    margin-top: 2px;
+    font-size: 0.78em;
+    color: #90a4ae;
+    border-top: 1px dashed #e0e4e7;
+    padding-top: 8px;
+  }
   font-size: 0.86em;
   color: #37474f;
 
