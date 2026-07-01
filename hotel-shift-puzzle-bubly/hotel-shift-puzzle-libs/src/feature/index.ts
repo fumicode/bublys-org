@@ -10,6 +10,7 @@ export * from "./ScheduleDayDetail.js";
 export * from "./AutoShiftPanel.js";
 export * from "./ExtractedSchedule.js";
 export * from "./ScheduleWorldLineView.js";
+export * from "./LeaderRuleView.js";
 export * from "./AvailabilityEditor.js";
 export * from "./ScheduleViolationView.js";
 export * from "./scheduleConstraints.js";

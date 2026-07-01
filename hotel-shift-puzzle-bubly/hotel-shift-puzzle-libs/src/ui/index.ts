@@ -10,6 +10,7 @@ export * from "./ScheduleListView.js";
 export * from "./ScheduleGridView.js";
 export * from "./ScheduleDayView.js";
 export * from "./LeaderRulesView.js";
+export * from "./LeaderRuleDiagram.js";
 export * from "./LeaderBadges.js";
 export * from "./AvailabilityGridView.js";
 export * from "./ConstraintViolationView.js";

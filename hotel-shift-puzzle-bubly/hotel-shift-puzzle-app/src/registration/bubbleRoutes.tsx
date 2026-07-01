@@ -16,6 +16,7 @@ import {
   AvailabilityEditor,
   ScheduleViolationView,
   ShiftWishEditor,
+  LeaderRuleView,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
@@ -26,6 +27,7 @@ import {
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
   scheduleExtractUrl,
+  scheduleLeaderRuleUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -95,6 +97,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       autoShiftUrl={autoShiftUrl}
       onOpenExtract={(staffIds) => openOrigin(scheduleExtractUrl(scheduleId, staffIds))}
       extractBubbleUrl={(staffIds) => scheduleExtractUrl(scheduleId, staffIds)}
+      ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)
@@ -138,6 +141,10 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
+// --- 責任者ルール可視化バブル（上部ルール行のクリックで開く） ---
+const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<LeaderRuleView ruleKey={bubble.params.ruleKey} />);
+
 // --- 可能勤務帯エディタバブル ---
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
@@ -153,6 +160,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
   // ので普通の BubbleView（クリック可）として描かれ、窓をリサイズすると canvas も伸縮する。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 400, height: 300 } } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）

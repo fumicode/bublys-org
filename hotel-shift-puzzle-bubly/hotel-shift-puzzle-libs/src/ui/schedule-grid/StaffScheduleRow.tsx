@@ -34,9 +34,7 @@ type StaffScheduleRowProps = {
   onToggleSelected?: (staffId: string) => void;
   /** 責任者ルール（解決済み）。このスタッフが属するルールを名前横のバッジに出す */
   leaderRules?: ShiftLeaderRule[];
-  /** 責任者バッジをクリックしたとき、そのルールの関係者だけを抽出する */
-  onOpenExtract?: (staffIds: string[]) => void;
-  /** 抽出バブルの URL（バッジの data-url アンカー用。link bubble がバッジから伸びる） */
+  /** 抽出バブルの URL（責任者バッジの ObjectView に渡す。ダブルクリックで関係者を抽出） */
   extractBubbleUrl?: (staffIds: string[]) => string;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
@@ -61,7 +59,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   selected,
   onToggleSelected,
   leaderRules = [],
-  onOpenExtract,
   extractBubbleUrl,
   minDayOff,
 }) => {
@@ -99,7 +96,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <LeaderBadges
               rules={leaderRules}
               staffId={staff.id}
-              onOpenExtract={onOpenExtract}
               extractBubbleUrl={extractBubbleUrl}
             />
           </div>

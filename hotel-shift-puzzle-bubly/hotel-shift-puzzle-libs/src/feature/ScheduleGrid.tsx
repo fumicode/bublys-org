@@ -57,6 +57,8 @@ type ScheduleGridProps = {
   onOpenExtract?: (staffIds: string[]) => void;
   /** 抽出バブルの URL を作る（選択中スタッフID群）。抽出ボタンの data-url に使う */
   extractBubbleUrl?: (staffIds: string[]) => string;
+  /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
+  ruleBubbleUrl?: (ruleKey: string) => string;
 };
 
 /**
@@ -75,6 +77,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   violationBubbleUrl,
   onOpenExtract,
   extractBubbleUrl,
+  ruleBubbleUrl,
 }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -249,7 +252,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
       {/* 適用中の宣言的ルール（早責/夜責）を人が読める形で描く */}
       <div className="e-rules-strip">
-        <LeaderRulesView rules={leaderRules} nameOf={nameOf} />
+        <LeaderRulesView
+          rules={leaderRules}
+          nameOf={nameOf}
+          ruleBubbleUrl={ruleBubbleUrl}
+        />
       </div>
 
       {/* グリッド領域。選択中はスタッフ列の左に「抽出」ボタンを absolute で浮かべる */}
@@ -290,7 +297,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           leaderRules={leaderRules}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
-          onOpenExtract={onOpenExtract}
           extractBubbleUrl={extractBubbleUrl}
           minDayOff={MIN_MONTHLY_DAY_OFF}
           maxDayOffPerDay={MAX_DAY_OFF_PER_DAY}

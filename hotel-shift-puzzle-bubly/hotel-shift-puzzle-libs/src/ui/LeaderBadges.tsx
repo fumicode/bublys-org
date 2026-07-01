@@ -1,7 +1,7 @@
 'use client';
 
 import { CSSProperties, FC, Fragment } from "react";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule } from "../domain/index.js";
 
 /**
@@ -30,11 +30,10 @@ type LeaderBadgesProps = {
   /** バッジを出す対象スタッフ */
   staffId: string;
   /**
-   * 指定するとバッジがクリック可能になり、押すとそのルールの関係者だけを抽出する。
-   * 省略時は表示専用。
+   * 抽出バブルの URL を作る（そのルールの関係者ID群）。渡すとバッジが ObjectView になり、
+   * ダブルクリックで関係者だけの抽出バブルを開ける（展開・data-url・opener は ObjectView に一任）。
+   * 省略時は表示専用。URL スキームは app 層の関心事なので注入で受ける。
    */
-  onOpenExtract?: (staffIds: string[]) => void;
-  /** 抽出バブルの URL（クリック可能時の data-url アンカー。link bubble がバッジから伸びる） */
   extractBubbleUrl?: (staffIds: string[]) => string;
 };
 
@@ -46,11 +45,10 @@ type LeaderBadgesProps = {
 export const LeaderBadges: FC<LeaderBadgesProps> = ({
   rules,
   staffId,
-  onOpenExtract,
   extractBubbleUrl,
 }) => {
   const myRules = rules.filter((r) => r.leaderStaffIds.includes(staffId));
-  const clickable = !!onOpenExtract;
+  const clickable = !!extractBubbleUrl;
 
   return (
     <>
@@ -61,27 +59,31 @@ export const LeaderBadges: FC<LeaderBadgesProps> = ({
             style={leaderRoleStyle(rule.key)}
             title={
               clickable
-                ? `${rule.label}の関係者だけを抽出`
+                ? `${rule.label}の関係者だけを抽出（ダブルクリック）`
                 : `${rule.label}（${rule.shiftName}責任者）`
-            }
-            role={clickable ? "button" : undefined}
-            onClick={
-              clickable
-                ? (e) => {
-                    e.stopPropagation(); // 行展開やスタッフ展開はしない
-                    onOpenExtract(rule.leaderStaffIds);
-                  }
-                : undefined
             }
           >
             {rule.label}
           </span>
         );
-        // data-url を埋めると、抽出バブルがこのバッジから link bubble で伸びる
+        // ObjectView が data-url・ダブルクリック展開・opener（origin-side で近くに出す）を担う。
+        // バッジは「スタッフ展開(.e-staff の onClick)」「スタッフ詳細(外側 ObjectView の dblclick)」の
+        // 内側にあるので、クリック/ダブルクリックを止めてバッジ自身の抽出だけを起こす。
         return clickable && extractBubbleUrl ? (
-          <UrledPlace key={rule.key} url={extractBubbleUrl(rule.leaderStaffIds)}>
-            {badge}
-          </UrledPlace>
+          <span
+            key={rule.key}
+            style={{ display: "inline-flex" }}
+            onClick={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            <ObjectView
+              url={extractBubbleUrl(rule.leaderStaffIds)}
+              openingPosition="origin-side"
+              draggable={false}
+            >
+              {badge}
+            </ObjectView>
+          </span>
         ) : (
           <Fragment key={rule.key}>{badge}</Fragment>
         );

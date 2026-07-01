@@ -56,9 +56,7 @@ type ScheduleGridViewProps = {
   selectedStaffIds?: Set<string>;
   /** スタッフの抽出選択をトグルする */
   onToggleStaffSelected?: (staffId: string) => void;
-  /** 責任者バッジをクリックしたとき、そのルールの関係者だけを抽出する */
-  onOpenExtract?: (staffIds: string[]) => void;
-  /** 抽出バブルの URL（バッジ・抽出ボタンの data-url アンカー用） */
+  /** 抽出バブルの URL（責任者バッジの ObjectView の data-url アンカー用） */
   extractBubbleUrl?: (staffIds: string[]) => string;
   /** 月の最低休日数。これ未満のスタッフは右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
@@ -115,7 +113,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   violationUrl,
   selectedStaffIds,
   onToggleStaffSelected,
-  onOpenExtract,
   extractBubbleUrl,
   minDayOff,
   maxDayOffPerDay,
@@ -201,7 +198,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
-          onOpenExtract={onOpenExtract}
           extractBubbleUrl={extractBubbleUrl}
           minDayOff={minDayOff}
         />
@@ -237,7 +233,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
-          onOpenExtract={onOpenExtract}
           extractBubbleUrl={extractBubbleUrl}
           minDayOff={minDayOff}
         />

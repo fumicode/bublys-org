@@ -49,6 +49,12 @@ export const scheduleExtractUrl = (scheduleId: string, staffIds: string[]): stri
 export const scheduleDayUrl = (scheduleId: string, dayKey: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
 
+/** 責任者ルール可視化バブル（上部ルール行のクリックで開く。ロールキーを乗せる） */
+export const scheduleLeaderRuleUrl = (
+  scheduleId: string,
+  ruleKey: string
+): string => `hotel-shift-puzzle/schedules/${scheduleId}/leader-rules/${ruleKey}`;
+
 /** 制約違反バブル（赤帯・⊿マーカーから開く） */
 export const scheduleViolationUrl = (
   scheduleId: string,

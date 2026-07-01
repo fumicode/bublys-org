@@ -1,7 +1,8 @@
 'use client';
 
-import { FC } from "react";
+import { FC, Fragment } from "react";
 import styled from "styled-components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule } from "../domain/index.js";
 import { leaderRoleStyle } from "./LeaderBadges.js";
 
@@ -10,6 +11,12 @@ type LeaderRulesViewProps = {
   rules: ShiftLeaderRule[];
   /** スタッフID → 表示名（未解決は ID をそのまま） */
   nameOf: (staffId: string) => string;
+  /**
+   * ルール可視化バブルの URL を作る（ロールキー）。渡すと各ルールが ObjectView になり、
+   * ダブルクリックでそのルールの図バブルを開ける（展開・data-url・opener は ObjectView に一任）。
+   * 省略時は表示専用。URL スキームは app 層の関心事なので注入で受ける。
+   */
+  ruleBubbleUrl?: (ruleKey: string) => string;
 };
 
 /**
@@ -19,8 +26,14 @@ type LeaderRulesViewProps = {
  * footer の ◯/✕ も相方裏コマンドも同じ ShiftLeaderRule から導出されるので、ここはその
  * 「定義そのもの」の表示。
  */
-export const LeaderRulesView: FC<LeaderRulesViewProps> = ({ rules, nameOf }) => {
+export const LeaderRulesView: FC<LeaderRulesViewProps> = ({
+  rules,
+  nameOf,
+  ruleBubbleUrl,
+}) => {
   if (rules.length === 0) return null;
+
+  const clickable = !!ruleBubbleUrl;
 
   return (
     <StyledRules>
@@ -31,8 +44,11 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({ rules, nameOf }) => 
           const who = names.length > 0 ? names.join("・") : "（該当者なし）";
           const quota =
             rule.minCount <= 1 ? "のうちいずれか1人" : `のうち最低${rule.minCount}人`;
-          return (
-            <li key={rule.key} className="e-rule">
+          const row = (
+            <li
+              className={`e-rule${clickable ? " is-clickable" : ""}`}
+              title={clickable ? `${rule.label}のルールを図で見る（ダブルクリック）` : undefined}
+            >
               <span className="e-rule-chip" style={leaderRoleStyle(rule.key)}>
                 {rule.label}
               </span>
@@ -40,6 +56,19 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({ rules, nameOf }) => 
                 {rule.shiftName}に <strong>{who}</strong> {quota}
               </span>
             </li>
+          );
+          // ObjectView が data-url・ダブルクリック展開・opener（origin-side で近くに出す）を担う。
+          return clickable && ruleBubbleUrl ? (
+            <ObjectView
+              key={rule.key}
+              url={ruleBubbleUrl(rule.key)}
+              openingPosition="origin-side"
+              draggable={false}
+            >
+              {row}
+            </ObjectView>
+          ) : (
+            <Fragment key={rule.key}>{row}</Fragment>
           );
         })}
       </ul>
@@ -77,6 +106,14 @@ const StyledRules = styled.div`
     display: flex;
     align-items: center;
     gap: 6px;
+    border-radius: 4px;
+    padding: 1px 3px;
+  }
+  .e-rule.is-clickable {
+    cursor: pointer;
+  }
+  .e-rule.is-clickable:hover {
+    background: #eceff1;
   }
 
   /* 責任者チップ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
