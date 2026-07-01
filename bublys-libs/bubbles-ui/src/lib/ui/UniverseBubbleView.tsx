@@ -6,6 +6,7 @@ import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-u
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
+import { useWheelLayerNavigation } from "../hooks/useWheelLayerNavigation.js";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble, makeSelectFocusedBubbleId } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
@@ -109,6 +110,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
+  const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
@@ -200,6 +202,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
       <header
         className="e-window-header"
+        ref={headerRef}
         onMouseDown={handleHeaderMouseDown}
         onMouseEnter={() => setIsHeaderHovered(true)}
         onMouseLeave={() => setIsHeaderHovered(false)}
