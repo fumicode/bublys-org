@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState } from "react";
+import { FC, useRef, useState } from "react";
 import styled from "styled-components";
 import { Staff } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
@@ -29,6 +29,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
+  const deptRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
@@ -150,7 +151,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreate();
+            if (e.key === "Enter" && name.trim()) deptRef.current?.focus();
           }}
         />
         <TextField
@@ -163,6 +164,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
           onKeyDown={(e) => {
             if (e.key === "Enter") handleCreate();
           }}
+          inputRef={deptRef}
         />
         <Button
           variant="outlined"
