@@ -1,6 +1,6 @@
-import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useState } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useCallback, useState } from "react";
 import styled from "styled-components";
-import { useAppSelector } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
@@ -20,7 +20,12 @@ import {
 } from "../state/index.js";
 
 /**
- * 個別バブルを自分でReduxから取得するラッパーコンポーネント
+ * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
+ * per-bubble selector のみを購読し、world-line 操作では再 render しない。
+ *
+ * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため BubbleSkeleton で表示する。
+ * ただしフォーカス時（ヘッダークリック・キーボードフォーカス）はスケルトンを解除してフルコンテンツを表示する。
+ * このスケルトン切り替えは BubbleView の内部状態（isFocused）で管理される。
  */
 type ConnectedBubbleViewProps = {
   universeId: string;
@@ -31,6 +36,7 @@ type ConnectedBubbleViewProps = {
   vanishingPoint: Point2;
   surfaceLayer: Layer;
   hasLeftLink?: boolean;
+  lightweightMode?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
   onBubbleClose?: (bubble: Bubble) => void;
@@ -50,6 +56,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   vanishingPoint,
   surfaceLayer,
   hasLeftLink,
+  lightweightMode,
   renderBubbleContent,
   onBubbleClick,
   onBubbleClose,
@@ -58,7 +65,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   onBubbleLayerDown,
   onBubbleLayerUp,
   onDebugRects,
-})  {
+}) {
   const selectBubble = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, bubbleId), [universeId, bubbleId]);
   const bubble = useAppSelector(selectBubble);
 
@@ -67,8 +74,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
-  // fillsContainer な窓型バブル（universe / iframe / 等）は専用シェルで描く。
-  // 透明な content と窓っぽいヘッダーで「親が透けて見える窓」として表現する。
+  const content = renderBubbleContent(bubble);
+
   if (bubble.fillsContainer) {
     return (
       <UniverseBubbleView
@@ -78,6 +85,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         zIndex={zIndex}
         isFocused={isFocused}
         vanishingPoint={vanishingPoint}
+        lightweightMode={lightweightMode}
         onClick={() => onBubbleClick?.(bubble.url)}
         onCloseClick={() => onBubbleClose?.(bubble)}
         onResize={(updated) => onBubbleResize?.(updated)}
@@ -85,7 +93,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
         onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
         onDebugRects={onDebugRects}
       >
-        {renderBubbleContent(bubble)}
+        {content}
       </UniverseBubbleView>
     );
   }
@@ -100,6 +108,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
       hasLeftLink={hasLeftLink}
+      lightweightMode={lightweightMode}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
       onMove={(updated) => onBubbleMove?.(updated)}
@@ -108,7 +117,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       onLayerUpClick={() => onBubbleLayerUp?.(bubble)}
       onDebugRects={onDebugRects}
     >
-      {renderBubbleContent(bubble)}
+      {content}
     </BubbleView>
   );
 });
@@ -122,6 +131,7 @@ type ConnectedLinkBubbleViewProps = {
   openeeId: string;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
+  lightweightMode?: boolean;
 };
 
 const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
@@ -130,6 +140,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   openeeId,
   coordinateSystem,
   linkZIndex,
+  lightweightMode,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
   const selectOpenee = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openeeId), [universeId, openeeId]);
@@ -144,6 +155,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       openee={openee}
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
+      lightweightMode={lightweightMode}
     />
   );
 });
@@ -168,7 +180,7 @@ const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
   <BubbleContent bubble={bubble} />
 );
 
-export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
+const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   bubbleLayers,
   universeId = ROOT_UNIVERSE_ID,
   vanishingPoint,
@@ -339,17 +351,19 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     return () => window.removeEventListener('wheel', onWheel);
   }, [universeId]);
 
+  const dispatch = useAppDispatch();
   const [showSurfaceBorder, setShowSurfaceBorder] = useState(false);
   const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
   const relationIds = useAppSelector(makeSelectValidBubbleRelationIds(universeId));
   const surfaceLeftTop = useAppSelector(makeSelectSurfaceLeftTop(universeId));
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
+  const lightweightMode = useAppSelector(selectLightweightMode);
 
-  const undergroundVanishingPoint: Point2 = vanishingPoint || {
-    x: 20,
-    y: 10,
-  };
+  const undergroundVanishingPoint: Point2 = useMemo(
+    () => vanishingPoint || { x: 20, y: 10 },
+    [vanishingPoint],
+  );
 
   const baseZIndex = 100;
 
@@ -374,44 +388,95 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
     [surfaceLeftTop, coordinateSystem],
   );
 
-  const renderedBubbles = bubbleLayers
-    .map((layer, layerIndex) => {
-      // フォーカスされたバブルを同レイヤー内の最後尾に移動し、DOM 順で最前面に来るようにする
-      const orderedLayer =
-        focusedBubbleId && layer.includes(focusedBubbleId)
-          ? [...layer.filter((id) => id !== focusedBubbleId), focusedBubbleId]
-          : layer;
-      return orderedLayer.map((bubbleId) => {
-        const zIndex = baseZIndex - layerIndex;
-        const hasLeftLink = openeeIds.has(bubbleId);
-        const isFocused = focusedBubbleId === bubbleId;
+  const stableOnBubbleClick = useCallback(
+    (name: string) => onBubbleClick?.(name),
+    [onBubbleClick],
+  );
+  const stableOnBubbleClose = useCallback(
+    (bubble: Bubble) => onBubbleClose?.(bubble),
+    [onBubbleClose],
+  );
+  const stableOnBubbleMove = useCallback(
+    (bubble: Bubble) => onBubbleMove?.(bubble),
+    [onBubbleMove],
+  );
+  const stableOnBubbleResize = useCallback(
+    (bubble: Bubble) => onBubbleResize?.(bubble),
+    [onBubbleResize],
+  );
+  const stableOnBubbleLayerDown = useCallback(
+    (bubble: Bubble) => onBubbleLayerDown?.(bubble),
+    [onBubbleLayerDown],
+  );
+  const stableOnBubbleLayerUp = useCallback(
+    (bubble: Bubble) => onBubbleLayerUp?.(bubble),
+    [onBubbleLayerUp],
+  );
+  const stableOnDebugRects = useCallback(
+    (rects: SmartRect[]) => onDebugRects?.(rects),
+    [onDebugRects],
+  );
 
-        return (
-          <ConnectedBubbleView
-            key={bubbleId}
-            universeId={universeId}
-            bubbleId={bubbleId}
-            layerIndex={layerIndex}
-            zIndex={zIndex}
-            isFocused={isFocused}
-            vanishingPoint={undergroundVanishingPoint}
-            surfaceLayer={surfaceLayer}
-            hasLeftLink={hasLeftLink}
-            renderBubbleContent={renderBubbleContent}
-            onBubbleClick={onBubbleClick}
-            onBubbleClose={onBubbleClose}
-            onBubbleMove={onBubbleMove}
-            onBubbleResize={onBubbleResize}
-            onBubbleLayerDown={onBubbleLayerDown}
-            onBubbleLayerUp={onBubbleLayerUp}
-            onDebugRects={onDebugRects}
-          />
-        );
-      });
-    })
-    .flat();
+  const renderedBubbles = useMemo(
+    () =>
+      bubbleLayers
+        .map((layer, layerIndex) => {
+          // フォーカスされたバブルを同レイヤー内の最後尾に移動し、DOM 順で最前面に来るようにする
+          const orderedLayer =
+            focusedBubbleId && layer.includes(focusedBubbleId)
+              ? [...layer.filter((id) => id !== focusedBubbleId), focusedBubbleId]
+              : layer;
+          return orderedLayer.map((bubbleId) => {
+            const zIndex = baseZIndex - layerIndex;
+            const hasLeftLink = openeeIds.has(bubbleId);
+            const isFocused = focusedBubbleId === bubbleId;
+
+            return (
+              <ConnectedBubbleView
+                key={bubbleId}
+                universeId={universeId}
+                bubbleId={bubbleId}
+                layerIndex={layerIndex}
+                zIndex={zIndex}
+                isFocused={isFocused}
+                vanishingPoint={undergroundVanishingPoint}
+                surfaceLayer={surfaceLayer}
+                hasLeftLink={hasLeftLink}
+                lightweightMode={lightweightMode}
+                renderBubbleContent={renderBubbleContent}
+                onBubbleClick={stableOnBubbleClick}
+                onBubbleClose={stableOnBubbleClose}
+                onBubbleMove={stableOnBubbleMove}
+                onBubbleResize={stableOnBubbleResize}
+                onBubbleLayerDown={stableOnBubbleLayerDown}
+                onBubbleLayerUp={stableOnBubbleLayerUp}
+                onDebugRects={stableOnDebugRects}
+              />
+            );
+          });
+        })
+        .flat(),
+    [
+      bubbleLayers,
+      openeeIds,
+      surfaceLayer,
+      lightweightMode,
+      universeId,
+      undergroundVanishingPoint,
+      renderBubbleContent,
+      focusedBubbleId,
+      stableOnBubbleClick,
+      stableOnBubbleClose,
+      stableOnBubbleMove,
+      stableOnBubbleResize,
+      stableOnBubbleLayerDown,
+      stableOnBubbleLayerUp,
+      stableOnDebugRects,
+    ],
+  );
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
+  const hudSurface = useMemo(() => ({ leftTop: surfaceLeftTop }), [surfaceLeftTop]);
 
   const isNested = universeId !== ROOT_UNIVERSE_ID;
   const universeSize = useAppSelector(makeSelectUniverseDimensions(universeId));
@@ -440,6 +505,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
                     openeeId={openeeId}
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
+                    lightweightMode={lightweightMode}
                   />
                 );
               })
@@ -448,7 +514,7 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
         </StyledViewport>
 
         <StyledHeadsUpDisplay
-          surface={{ leftTop: surfaceLeftTop }}
+          surface={hudSurface}
           surfaceZIndex={baseZIndex - 2}
         >
           <div className="e-underground-curtain"></div>
@@ -460,6 +526,13 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
             >
               {showSurfaceBorder ? '◻' : '◼'}
             </button>
+            <button
+              className="e-lightweight-toggle"
+              onClick={() => dispatch(toggleLightweightMode())}
+              title={lightweightMode ? '通常描画モードへ' : '軽量描画モードへ'}
+            >
+              {lightweightMode ? '精' : '速'}
+            </button>
           </div>
         </StyledHeadsUpDisplay>
       </StyledFrame>
@@ -467,6 +540,8 @@ export const BubblesLayeredView: FC<BubblesLayeredViewProps> = ({
   );
 };
 
+
+export const BubblesLayeredView = memo(BubblesLayeredViewInner);
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
@@ -571,6 +646,31 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
       background: rgba(255, 255, 255, 0.1);
       color: rgba(255, 255, 255, 0.5);
       font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+      pointer-events: auto;
+
+      &:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    .e-lightweight-toggle {
+      position: absolute;
+      bottom: 8px;
+      left: ${({ surface }) => surface.leftTop.x + 40}px;
+      z-index: ${({ surfaceZIndex }) => (surfaceZIndex || 0) + 1};
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
       line-height: 1;
       cursor: pointer;
       opacity: 0.4;

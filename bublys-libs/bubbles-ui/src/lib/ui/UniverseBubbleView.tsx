@@ -2,7 +2,7 @@
 import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
@@ -12,7 +12,9 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
-import { Layer } from "@bublys-org/bubbles-ui-util";
+import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
+
+const HEADER_PROXIMITY_THRESHOLD = 40;
 
 /**
  * Universe（window 型）バブルの専用シェル。
@@ -20,39 +22,6 @@ import { Layer } from "@bublys-org/bubbles-ui-util";
  * 「窓」として扱う。コンテンツ領域は透明で、中の universe / iframe / 等が
  * そのまま見える。
  */
-
-const CloseIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M7 7L17 17M17 7L7 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-const MaximizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 16, isMaximized }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    {isMaximized ? (
-      <>
-        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    ) : (
-      <rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-    )}
-  </svg>
-);
-
-const LayerUpIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const LayerDownIcon: FC<{ size?: number }> = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const HEADER_PROXIMITY_THRESHOLD = 40;
 
 type UniverseBubbleViewProps = {
   bubble: Bubble;
@@ -63,6 +32,7 @@ type UniverseBubbleViewProps = {
   isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
+  lightweightMode?: boolean;
   children?: React.ReactNode;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onCloseClick?: (bubble: Bubble) => void;
@@ -81,6 +51,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
   headerExtras,
+  lightweightMode = false,
   onClick,
   onCloseClick,
   onLayerDownClick,
@@ -174,10 +145,10 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       data-window-style="universe"
+      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       $colorHue={bubble.colorHue}
       $zIndex={isFocused ? 100 : zIndex}
       $layerIndex={layerIndex}
-      $position={position}
       $transformOrigin={vanishingPointRelative}
       $headerVisible={isHeaderVisible}
       $headerOffset={headerOffset}
@@ -189,6 +160,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $width={bubble.size ? `${bubble.size.width}px` : undefined}
       $height={bubble.size ? `${bubble.size.height}px` : undefined}
       $backdropColor={bubble.backdropColor}
+      $lightweightMode={lightweightMode}
     >
       {/* pointer-events: none の StyledWindow に代わりヘッダー近接を検知するホットゾーン */}
       <div
@@ -222,7 +194,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
             onClick={handleToggleSize}
             title={isMaximized ? "フィット" : "最大化"}
           >
-            <MaximizeIcon isMaximized={isMaximized} />
+            <ToggleSizeIcon isMaximized={isMaximized} />
           </button>
         </div>
         <div className="e-window-title">{bubble.type}</div>
@@ -285,11 +257,11 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
   if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
+  if (prev.lightweightMode !== next.lightweightMode) return false;
   return true;
 });
 
 type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
-  $position?: Point2;
   $layerIndex?: number;
   $zIndex?: number;
   $transformOrigin?: Vec2;
@@ -297,6 +269,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $width?: string;
   $height?: string;
   $backdropColor?: string;
+  $lightweightMode?: boolean;
   $headerVisible?: boolean;
   $headerOffset?: number;
   ref: React.RefObject<HTMLDivElement | null>;
@@ -313,11 +286,9 @@ const StyledWindow = styled.div<StyledWindowProps>`
   width: ${({ $width }) => $width || "fit-content"};
   height: ${({ $height }) => $height || "auto"};
   z-index: ${({ $zIndex }) => ($zIndex !== undefined ? $zIndex : 0)};
-  left: ${({ $position }) => ($position ? `${$position.x}px` : "0")};
-  top: ${({ $position }) => ($position ? `${$position.y}px` : "0")};
 
   transition-property: left top transform;
-  transition: 0.3s ease-in-out;
+  transition: ${({ $lightweightMode }) => $lightweightMode ? 'none' : '0.3s ease-in-out'};
 
   transform-origin: ${({ $transformOrigin }) =>
     $transformOrigin ? `${$transformOrigin.x}px ${$transformOrigin.y}px` : "center center"};
@@ -341,10 +312,10 @@ const StyledWindow = styled.div<StyledWindowProps>`
       : "transparent"};
   border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 50%, 60%, 0.45);
   border-radius: 14px;
-  box-shadow:
-    0 16px 48px hsla(0, 0%, 0%, 0.5),
-    0 2px 8px hsla(0, 0%, 0%, 0.25);
-  backdrop-filter: blur(10px) saturate(1.15);
+  box-shadow: ${({ $lightweightMode }) => $lightweightMode
+    ? 'none'
+    : '0 16px 48px hsla(0, 0%, 0%, 0.5), 0 2px 8px hsla(0, 0%, 0%, 0.25)'};
+  backdrop-filter: ${({ $lightweightMode }) => $lightweightMode ? 'none' : 'blur(10px) saturate(1.15)'};
 
   /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
      :focus-within ではなく :has(:focus-visible) を使うことで、

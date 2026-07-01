@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -11,60 +11,8 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
-
-/**
- * 泡っぽい閉じるボタンのSVGアイコン
- */
-const CloseIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path
-      d="M8 8L16 16M16 8L8 16"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-/**
- * 最大化/縮小トグルボタンのSVGアイコン
- */
-const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18, isMaximized }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    {isMaximized ? (
-      // 縮小アイコン（内向き矢印）
-      <>
-        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    ) : (
-      // 最大化アイコン（四角）
-      <rect x="7" y="7" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-    )}
-  </svg>
-);
-
-/**
- * レイヤー手前へ移動（上向き矢印）
- */
-const LayerUpIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-/**
- * レイヤー奥へ移動（下向き矢印）
- */
-const LayerDownIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
+import { BubbleSkeleton } from "./BubbleSkeleton.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -144,6 +92,7 @@ type BubbleProps = {
   isFocused?: boolean;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
+  lightweightMode?: boolean; // 軽量モード: box-shadow・transition・backdrop-filter を省略
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -165,6 +114,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   isFocused = false,
   contentBackground = "white",
   hasLeftLink = false,
+  lightweightMode = false,
   position,
   vanishingPoint,
   onClick,
@@ -278,6 +228,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
     onDragStart(e);
   };
 
+  const handleFocus = useCallback(() => {
+    dispatch(focusBubble(bubble.id, universeId));
+  }, [bubble.id, universeId, dispatch]);
+
   // DOM参照をContextに登録
   useLayoutEffect(() => {
     if (ref.current && bubbleRefs) {
@@ -294,14 +248,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
     <StyledBubble
       ref={ref}
       data-bubble-id={bubble.id}
+      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       colorHue={bubble.colorHue}
       zIndex={isFocused ? 100 : zIndex}
       layerIndex={layerIndex}
-      position={position}
       transformOrigin={vanishingPointRelative}
       headerVisible={isHeaderVisible}
       headerOffset={headerOffset}
       onClick={onClick}
+      onFocus={handleFocus}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -314,6 +269,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
       fillsContainer={bubble.fillsContainer}
+      lightweightMode={lightweightMode}
     >
       <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
         <div
@@ -373,7 +329,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       </header>
 
       <main className="e-bubble-content">
-        {children}<br />
+        {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
       {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
@@ -423,7 +379,8 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
       prevProps.zIndex !== nextProps.zIndex ||
       prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.hasLeftLink !== nextProps.hasLeftLink) {
+      prevProps.hasLeftLink !== nextProps.hasLeftLink ||
+      prevProps.lightweightMode !== nextProps.lightweightMode) {
     return false;
   }
 
@@ -433,7 +390,6 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
 
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
-  position?: Point2; // 位置を指定するためのオプション
   layerIndex?: number; // レイヤーのインデックス = zIndex * -1
   zIndex?: number; // = - layerIndex
 
@@ -445,6 +401,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
   fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
+  lightweightMode?: boolean; // 軽量モード
   headerVisible?: boolean;
   headerOffset?: number; // バブル上端がビューポート外にかかる場合のヘッダー押し下げ量(px)
 
@@ -463,11 +420,8 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   z-index: ${({ zIndex }) => (zIndex !== undefined ? zIndex : 0)};
 
-  left: ${({ position }) => (position ? `${position.x}px` : "0")};
-  top: ${({ position }) => (position ? `${position.y}px` : "0")};
-
   transition-property: left top transform;
-  transition: 0.3s ease-in-out;
+  transition: ${({ lightweightMode }) => lightweightMode ? 'none' : '0.3s ease-in-out'};
 
   transform-origin: ${({ transformOrigin }) =>
     transformOrigin
@@ -482,21 +436,25 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   max-height: 90vh;//FIXME:突貫対応
 
-  // 泡っぽいグラデーション背景
-  background: linear-gradient(
-    145deg,
-    hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.6) 0%,
-    hsla(${({ colorHue }) => colorHue}, 50%, 60%, 0.5) 30%,
-    hsla(${({ colorHue }) => colorHue}, 45%, 55%, 0.45) 70%,
-    hsla(${({ colorHue }) => colorHue}, 55%, 65%, 0.55) 100%
-  );
+  // 通常モードは泡っぽいグラデーション背景、軽量モードは単色（アルファ合成コスト削減）
+  background: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? `hsl(${colorHue}, 35%, 50%)`
+    : `linear-gradient(
+        145deg,
+        hsla(${colorHue}, 60%, 70%, 0.6) 0%,
+        hsla(${colorHue}, 50%, 60%, 0.5) 30%,
+        hsla(${colorHue}, 45%, 55%, 0.45) 70%,
+        hsla(${colorHue}, 55%, 65%, 0.55) 100%
+      )`
+  };
 
-  // 泡っぽいシャドウと光沢
-  box-shadow:
-    0 8px 32px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.3),
-    0 2px 8px hsla(0, 0%, 0%, 0.1),
-    inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
-    inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
+  box-shadow: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? 'none'
+    : `0 8px 32px hsla(${colorHue}, 50%, 30%, 0.3),
+       0 2px 8px hsla(0, 0%, 0%, 0.1),
+       inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
+       inset 0 -1px 2px hsla(${colorHue}, 50%, 30%, 0.2)`
+  };
 
   border: 1px solid hsla(0, 0%, 100%, 0.3);
   border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
@@ -504,9 +462,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   display: flex;
   flex-direction: column;
 
-  // ガラスのような光沢エフェクト（疑似要素）
+  // ガラスのような光沢エフェクト（疑似要素）— 軽量モードでは非表示
   &::before {
-    content: '';
+    content: ${({ lightweightMode }) => lightweightMode ? 'none' : "''"} ;
     position: absolute;
     top: 0;
     left: 0;
@@ -616,11 +574,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
     .e-bubble-name {
       flex: 1;
-      background: linear-gradient(
-        135deg,
-        hsla(0, 0%, 100%, 0.5) 0%,
-        hsla(0, 0%, 100%, 0.3) 100%
-      );
+      background: ${({ lightweightMode }) => lightweightMode
+        ? 'hsla(0, 0%, 100%, 0.3)'
+        : 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.5) 0%, hsla(0, 0%, 100%, 0.3) 100%)'
+      };
       padding: 6px 16px;
       border-radius: 16px;
       font-size: 1em;
@@ -628,7 +585,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       text-align: center;
       margin: 0;
       color: hsla(0, 0%, 20%, 0.9);
-      box-shadow: inset 0 1px 2px hsla(0, 0%, 100%, 0.5);
+      box-shadow: ${({ lightweightMode }) => lightweightMode ? 'none' : 'inset 0 1px 2px hsla(0, 0%, 100%, 0.5)'};
     }
 
     .e-address-bar {
@@ -744,11 +701,14 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     overflow: ${({ fillsContainer }) => (fillsContainer ? "hidden" : "auto")};
     padding: 16px;
     font-size: 1em;
-    background: linear-gradient(
-      180deg,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 100%, 0.95)"} 0%,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
-    );
+    background: ${({ lightweightMode, contentBackground }) => lightweightMode
+      ? (contentBackground || 'hsla(0, 0%, 100%, 0.95)')
+      : `linear-gradient(
+          180deg,
+          ${contentBackground || 'hsla(0, 0%, 100%, 0.95)'} 0%,
+          ${contentBackground || 'hsla(0, 0%, 98%, 0.9)'} 100%
+        )`
+    };
     border-radius: 16px;
     margin: 12px;
     box-shadow:

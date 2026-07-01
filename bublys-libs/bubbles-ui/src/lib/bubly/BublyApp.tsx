@@ -90,18 +90,18 @@ export const BublyApp: FC<BublyAppProps> = ({
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // アクションハンドラ
-  const deleteBubble = (b: Bubble) => {
+  const deleteBubble = useCallback((b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
-  };
+  }, [dispatch]);
 
-  const layerDown = (b: Bubble) => {
+  const layerDown = useCallback((b: Bubble) => {
     dispatch(layerDownAction(b.id));
-  };
+  }, [dispatch]);
 
-  const layerUp = (b: Bubble) => {
+  const layerUp = useCallback((b: Bubble) => {
     dispatch(layerUpAction(b.id));
-  };
+  }, [dispatch]);
 
   const popChild = useCallback((
     b: Bubble,
