@@ -162,11 +162,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     const shiftIdsOf = (shiftName: string) =>
       workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    const leaderConstraints = constraints?.leaderConstraints(shiftIdsOf) ?? [];
-    return schedule.checkConstraints([
-      ...buildScheduleConstraints({ wishByStaff, shiftNameById }),
-      ...leaderConstraints,
-    ]);
+    return schedule.checkConstraints(
+      buildScheduleConstraints({
+        maxConsecutiveWorkdays: constraints?.maxConsecutiveWorkdays,
+        leaderConstraints: constraints?.leaderConstraints(shiftIdsOf),
+        wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+      })
+    );
   }, [schedule, wishByStaff, workShifts, constraints]);
 
   if (!schedule) {

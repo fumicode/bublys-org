@@ -9,13 +9,12 @@
  */
 import {
   ScheduleConstraint,
+  ShiftLeaderConstraint,
   MaxConsecutiveWorkdaysConstraint,
   StaffMonthlyShiftWish,
+  DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishConstraint } from "./ShiftWishConstraint.js";
-
-/** 連勤上限（日数）。いまは固定。 */
-export const MAX_CONSECUTIVE_WORKDAYS_LIMIT = 5;
 
 /** スタッフが月に休まなければならない最低日数。いまは固定（将来は会社ごとに注入）。 */
 export const MIN_MONTHLY_DAY_OFF = 8;
@@ -33,19 +32,31 @@ export type ScheduleConstraintContext = {
 };
 
 /**
- * 勤務表に適用する制約一覧。グリッドと違反バブルの両方が同じものを使う。
- * 希望の文脈（ctx）が与えられればシフト希望違反も含める。
+ * 勤務表に適用する制約一覧を組み立てる（グリッド・違反バブルが共有）。
+ *
+ * 制約の設定値（連勤上限・希望を見るか・責任者ルール）は勤務表ごとの ScheduleConstraints 集約
+ * （世界線に載る）が持つ。ここはその設定＋実行時の文脈（希望データ）から ScheduleConstraint[]
+ * を「組み立てる」だけ。希望違反（ShiftWishConstraint）は feature 層＋実行時データ依存なので
+ * ここで足す。
  */
-export const buildScheduleConstraints = (
-  ctx?: ScheduleConstraintContext
-): ScheduleConstraint[] => {
-  const constraints: ScheduleConstraint[] = [
-    new MaxConsecutiveWorkdaysConstraint(MAX_CONSECUTIVE_WORKDAYS_LIMIT),
-  ];
-  if (ctx) constraints.push(new ShiftWishConstraint(ctx));
-  return constraints;
+export type BuildScheduleConstraintsArgs = {
+  /** 連勤上限（日数）。省略時 既定値。 */
+  maxConsecutiveWorkdays?: number;
+  /** 責任者制約（未充足日を違反にする）。集約から解決して渡す。省略時なし。 */
+  leaderConstraints?: ShiftLeaderConstraint[];
+  /** 希望違反も見るなら希望の文脈を渡す（省略時は希望チェックなし）。 */
+  wish?: ScheduleConstraintContext;
 };
 
-/** 後方互換：希望なしの既定制約。 */
-export const defaultScheduleConstraints = (): ScheduleConstraint[] =>
-  buildScheduleConstraints();
+export const buildScheduleConstraints = (
+  args: BuildScheduleConstraintsArgs = {}
+): ScheduleConstraint[] => {
+  const constraints: ScheduleConstraint[] = [
+    new MaxConsecutiveWorkdaysConstraint(
+      args.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS
+    ),
+    ...(args.leaderConstraints ?? []),
+  ];
+  if (args.wish) constraints.push(new ShiftWishConstraint(args.wish));
+  return constraints;
+};

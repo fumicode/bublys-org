@@ -28,11 +28,16 @@ const SAMPLE_LEADERS_BY_ROLE: Record<string, string[]> = {
   night: ["staff-tsuchiya", "staff-6"], // 土屋・中村
 };
 
-/** 指定した勤務表IDの制約（責任者ルール一式）を作る。 */
+/** 指定した勤務表IDの制約（責任者ルール＋連勤上限＋希望チェック）を作る。 */
 export function createSampleConstraintsFor(scheduleId: string): ScheduleConstraints {
   const leaderRules: ShiftLeaderRuleState[] = LEADER_ROLE_DEFS.map((def) => ({
     ...def,
     leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
   }));
-  return new ScheduleConstraints({ scheduleId, leaderRules });
+  return new ScheduleConstraints({
+    scheduleId,
+    leaderRules,
+    maxConsecutiveWorkdays: 5,
+    checkShiftWish: true,
+  });
 }

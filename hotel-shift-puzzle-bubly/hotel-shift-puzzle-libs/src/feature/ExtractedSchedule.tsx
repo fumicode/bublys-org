@@ -118,13 +118,18 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     [relevantRules]
   );
 
+  // 抽出ビューは subset に絞った勤務表なので、責任者違反（全体視点）は出さない
+  // （footer は relevantRules のみ）。連勤・希望は集約の設定に従う。
   const violations = useMemo(() => {
     if (!schedule) return [];
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     return schedule.checkConstraints(
-      buildScheduleConstraints({ wishByStaff, shiftNameById })
+      buildScheduleConstraints({
+        maxConsecutiveWorkdays: constraints?.maxConsecutiveWorkdays,
+        wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+      })
     );
-  }, [schedule, wishByStaff, workShifts]);
+  }, [schedule, wishByStaff, workShifts, constraints]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;

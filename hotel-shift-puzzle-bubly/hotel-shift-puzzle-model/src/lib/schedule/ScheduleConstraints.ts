@@ -15,7 +15,14 @@ export type ScheduleConstraintsState = {
   scheduleId: string;
   /** 責任者ルール。定義（key/label/shiftName/minCount）＋候補者(leaderStaffIds)を丸ごと持つ。 */
   leaderRules: ShiftLeaderRuleState[];
+  /** 連勤上限（日数）。省略時 5。 */
+  maxConsecutiveWorkdays?: number;
+  /** シフト希望との食い違いを違反として見るか。省略時 true。 */
+  checkShiftWish?: boolean;
 };
+
+/** 連勤上限の既定値。 */
+export const DEFAULT_MAX_CONSECUTIVE_WORKDAYS = 5;
 
 export class ScheduleConstraints {
   constructor(readonly state: ScheduleConstraintsState) {}
@@ -27,6 +34,16 @@ export class ScheduleConstraints {
 
   get scheduleId(): string {
     return this.state.scheduleId;
+  }
+
+  /** 連勤上限（日数）。既定 5。 */
+  get maxConsecutiveWorkdays(): number {
+    return this.state.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS;
+  }
+
+  /** シフト希望との食い違いを違反として見るか。既定 true。 */
+  get checkShiftWish(): boolean {
+    return this.state.checkShiftWish ?? true;
   }
 
   /** 責任者ルールを ShiftLeaderRule インスタンスとして得る。 */
