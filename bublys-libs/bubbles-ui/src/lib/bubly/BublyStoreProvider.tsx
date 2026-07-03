@@ -11,6 +11,7 @@ import {
   bubblesListener,
   shellBubbleListener,
   shellDeletionListener,
+  bubbleSelectorCacheListener,
   setInitialBubbleUrls,
 } from '../state/index.js';
 import type { SnapshotCodec } from '../bubble-routing/SnapshotCodec.js';
@@ -60,6 +61,7 @@ function initializeApp(enableWorldLine: boolean) {
     injectMiddleware(bubblesListener.middleware);
     injectMiddleware(shellBubbleListener.middleware);
     injectMiddleware(shellDeletionListener.middleware);
+    injectMiddleware(bubbleSelectorCacheListener.middleware);
     addToBlacklist(bubblesSlice.reducerPath);
   }
   if (enableWorldLine && !worldLineInitialized) {
