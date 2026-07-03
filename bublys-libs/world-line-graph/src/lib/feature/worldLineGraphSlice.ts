@@ -29,6 +29,36 @@ function ensureScope(state: WorldLineSliceState, scopeId: string) {
   }
 }
 
+/**
+ * Redux 上に保持する CAS エントリ数の上限。
+ *
+ * 全ての世界の状態は IndexedDB（`IndexedDBStore.ts`）に永続化され続ける
+ * （アカシックレコード）ため、Redux/ブラウザメモリ上は「直近使われたもの」
+ * だけに絞ってよい。溢れた分は evict しても、必要になった時点で
+ * `useCasScope` がオンデマンドで IndexedDB から再取得し復元する。
+ */
+export const MAX_CAS_ENTRIES = 300;
+
+/**
+ * `cas` のキー数が上限を超えていたら、挿入順で古いものから削除する。
+ * `protectHashes` に含まれるハッシュ（＝現在表示中の世界が参照しているデータ）は
+ * 削除対象から除外する。
+ */
+function evictCas(state: WorldLineSliceState, protectHashes: readonly string[]) {
+  const keys = Object.keys(state.cas);
+  const overflow = keys.length - MAX_CAS_ENTRIES;
+  if (overflow <= 0) return;
+
+  const protectedSet = new Set(protectHashes);
+  let removed = 0;
+  for (const key of keys) {
+    if (removed >= overflow) break;
+    if (protectedSet.has(key)) continue;
+    delete state.cas[key];
+    removed++;
+  }
+}
+
 // ============================================================================
 // Slice — リポジトリ役: 受け取ったデータを保存するだけ
 // ============================================================================
@@ -50,12 +80,15 @@ export const worldLineGraphSlice = createSlice({
       state,
       action: PayloadAction<{
         entries: { hash: string; data: unknown }[];
+        /** 削除対象から保護したいハッシュ（現在表示中の世界が参照しているデータなど） */
+        protectHashes?: string[];
       }>
     ) {
-      const { entries } = action.payload;
+      const { entries, protectHashes } = action.payload;
       for (const entry of entries) {
         state.cas[entry.hash] = entry.data;
       }
+      evictCas(state, protectHashes ?? []);
     },
 
     createScope(state, action: PayloadAction<string>) {
