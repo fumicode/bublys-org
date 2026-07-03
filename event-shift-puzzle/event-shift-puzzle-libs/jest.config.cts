@@ -18,4 +18,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
+  // redux-persist は node_modules 内で ESM (import文) のまま配布されているため、
+  // デフォルトの transformIgnorePatterns (node_modules 除外) だとJestが構文解析できない。
+  // @bublys-org/state-management 経由で redux-persist に依存するテストのために変換対象に含める。
+  transformIgnorePatterns: ['/node_modules/(?!(redux-persist)/)'],
 };
