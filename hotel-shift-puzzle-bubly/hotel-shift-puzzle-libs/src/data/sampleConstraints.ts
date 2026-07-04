@@ -39,5 +39,7 @@ export function createSampleConstraintsFor(scheduleId: string): ScheduleConstrai
     leaderRules,
     maxConsecutiveWorkdays: 5,
     checkShiftWish: true,
+    minMonthlyDayOff: 8,
+    maxDayOffPerDay: 8,
   });
 }

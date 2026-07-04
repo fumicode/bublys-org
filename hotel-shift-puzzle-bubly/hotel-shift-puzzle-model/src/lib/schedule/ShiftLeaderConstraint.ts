@@ -18,6 +18,7 @@ export const SHIFT_LEADER_CONSTRAINT = "shift-leader";
 
 export class ShiftLeaderConstraint implements ScheduleConstraint {
   readonly type: string;
+  readonly label: string;
 
   /**
    * @param rule     解決済みの責任者ルール（leaderStaffIds 入り）
@@ -28,6 +29,13 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
     readonly shiftIds: string[]
   ) {
     this.type = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
+    this.label = rule.label;
+  }
+
+  describe(): string {
+    const who =
+      this.rule.minCount <= 1 ? "誰か一人" : `最低${this.rule.minCount}人`;
+    return `${this.rule.shiftName}に${who}（${this.rule.label}）`;
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {

@@ -9,6 +9,7 @@ import type {
   ConstraintViolation,
   ShiftLeaderRule,
 } from "../../domain/index.js";
+import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
@@ -121,20 +122,43 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })}
 
-      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くする（制約の可視化） */}
+      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くし、違反バブルを開ける */}
       {(() => {
         const offCount = schedule.countDayOffForStaff(staff.id);
         const underMin = minDayOff !== undefined && offCount < minDayOff;
+        const violation = underMin
+          ? violations.find(
+              (v) =>
+                v.constraintType === MIN_MONTHLY_DAY_OFF_CONSTRAINT &&
+                v.staffId === staff.id
+            )
+          : undefined;
+        const url = violation && violationUrl ? violationUrl(violation) : undefined;
         return (
           <div
-            className={`e-off-total${underMin ? " is-under-min" : ""}`}
+            className={`e-off-total${underMin ? " is-under-min" : ""}${
+              url ? " is-clickable" : ""
+            }`}
             title={
               underMin
-                ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）`
+                ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）${
+                    url ? "。ダブルクリックで違反を開く" : ""
+                  }`
                 : `${staff.name} の休み合計`
             }
           >
-            {offCount}
+            {url ? (
+              <ObjectView
+                url={url}
+                openingPosition="origin-side"
+                draggable={false}
+                fullWidth
+              >
+                <span className="e-off-mark">{offCount}</span>
+              </ObjectView>
+            ) : (
+              offCount
+            )}
           </div>
         );
       })()}

@@ -58,8 +58,7 @@ export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) =
     return schedule
       .checkConstraints(
         buildScheduleConstraints({
-          maxConsecutiveWorkdays: constraints?.maxConsecutiveWorkdays,
-          leaderConstraints: constraints?.leaderConstraints(shiftIdsOf),
+          modelConstraints: constraints?.modelConstraints(shiftIdsOf),
           wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
         })
       )

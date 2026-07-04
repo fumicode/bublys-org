@@ -70,6 +70,18 @@ export const StyledWrap = styled.div`
     background: #ffebee;
     font-weight: bold;
   }
+  /* 最低休日数未満は違反。ダブルクリックで違反バブルを開ける */
+  .e-off-total.is-clickable {
+    cursor: pointer;
+  }
+  .e-off-total.is-clickable:hover {
+    box-shadow: inset 0 0 0 2px #ef9a9a;
+  }
+  .e-off-total .e-off-mark {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
   .e-off-total.is-first {
     border-top: 2px solid #b0bec5;
   }

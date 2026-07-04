@@ -9,6 +9,7 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  MaxConsecutiveWorkdaysConstraint,
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
@@ -24,8 +25,6 @@ import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
   buildScheduleConstraints,
-  MIN_MONTHLY_DAY_OFF,
-  MAX_DAY_OFF_PER_DAY,
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { runAutoShiftStep } from "./autoShift.js";
@@ -86,6 +85,9 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
+  // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
+  const minDayOff = constraints?.minMonthlyDayOff ?? 8;
+  const maxPerDay = constraints?.maxDayOffPerDay ?? 8;
   const allLeaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
   const relevantRules = useMemo(
     () =>
@@ -125,7 +127,9 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     return schedule.checkConstraints(
       buildScheduleConstraints({
-        maxConsecutiveWorkdays: constraints?.maxConsecutiveWorkdays,
+        modelConstraints: [
+          new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
+        ],
         wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
       })
     );
@@ -173,7 +177,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
       s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
       s = runOn(
         s,
-        makeMinDayOffStep(MIN_MONTHLY_DAY_OFF, { maxPerDay: MAX_DAY_OFF_PER_DAY, phase })
+        makeMinDayOffStep(minDayOff, { maxPerDay, phase })
       );
       return s;
     };
@@ -199,7 +203,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
         violations={violations}
         leaderRules={relevantRules}
         leaderRulesOnlyFooter
-        minDayOff={MIN_MONTHLY_DAY_OFF}
+        minDayOff={minDayOff}
         onChangeCell={handleChangeCell}
       />
 
@@ -218,7 +222,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
         <button
           type="button"
           className="e-candidate-run"
-          title={`この ${subset.length} 名について「毎日 責任者が入る＋全員 月${MIN_MONTHLY_DAY_OFF}日休む（1日${MAX_DAY_OFF_PER_DAY}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          title={`この ${subset.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
           onClick={handleGenerateCandidates}
         >
           🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る

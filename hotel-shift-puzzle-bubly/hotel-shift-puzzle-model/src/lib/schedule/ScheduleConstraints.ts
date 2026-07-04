@@ -1,5 +1,9 @@
 import { ShiftLeaderRule, type ShiftLeaderRuleState } from "./ShiftLeaderRule.js";
 import { ShiftLeaderConstraint } from "./ShiftLeaderConstraint.js";
+import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
+import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
+import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
+import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 
 /**
  * ScheduleConstraints — 勤務表ごとの「制約」集約
@@ -19,10 +23,16 @@ export type ScheduleConstraintsState = {
   maxConsecutiveWorkdays?: number;
   /** シフト希望との食い違いを違反として見るか。省略時 true。 */
   checkShiftWish?: boolean;
+  /** 月の最低休日数。省略時 8。 */
+  minMonthlyDayOff?: number;
+  /** 1日に休んでよい人数の上限。省略時 8。 */
+  maxDayOffPerDay?: number;
 };
 
-/** 連勤上限の既定値。 */
+/** 各制約設定の既定値。 */
 export const DEFAULT_MAX_CONSECUTIVE_WORKDAYS = 5;
+export const DEFAULT_MIN_MONTHLY_DAY_OFF = 8;
+export const DEFAULT_MAX_DAY_OFF_PER_DAY = 8;
 
 export class ScheduleConstraints {
   constructor(readonly state: ScheduleConstraintsState) {}
@@ -44,6 +54,31 @@ export class ScheduleConstraints {
   /** シフト希望との食い違いを違反として見るか。既定 true。 */
   get checkShiftWish(): boolean {
     return this.state.checkShiftWish ?? true;
+  }
+
+  /** 月の最低休日数。既定 8。 */
+  get minMonthlyDayOff(): number {
+    return this.state.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF;
+  }
+
+  /** 1日に休んでよい人数の上限。既定 8。 */
+  get maxDayOffPerDay(): number {
+    return this.state.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY;
+  }
+
+  /**
+   * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
+   * （責任者・連勤上限・月最低休日・1日の休み上限。希望違反は feature 層＋実行時データ依存
+   *  なので含まない——feature 側で足す。）
+   * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
+   */
+  modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
+    return [
+      new MaxConsecutiveWorkdaysConstraint(this.maxConsecutiveWorkdays),
+      ...this.leaderConstraints(shiftIdsOf),
+      new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
+      new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
+    ];
   }
 
   /** 責任者ルールを ShiftLeaderRule インスタンスとして得る。 */

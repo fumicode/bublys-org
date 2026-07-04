@@ -10,6 +10,7 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  SHIFT_LEADER_CONSTRAINT,
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -17,11 +18,7 @@ import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import {
-  buildScheduleConstraints,
-  MIN_MONTHLY_DAY_OFF,
-  MAX_DAY_OFF_PER_DAY,
-} from "./scheduleConstraints.js";
+import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -141,29 +138,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (id: string) => map.get(id) ?? id;
   }, [staffList]);
 
-  // 責任者以外のルール（連勤・希望・休日）も勤務表の上にまとめて表示する。
-  const otherRules = useMemo(() => {
-    const list: { key: string; label: string; text: string }[] = [
-      {
-        key: "max-consecutive",
-        label: "連勤",
-        text: `連勤は最大${constraints?.maxConsecutiveWorkdays ?? 5}日まで`,
-      },
-    ];
-    if (constraints?.checkShiftWish ?? true) {
-      list.push({ key: "wish", label: "希望", text: "できるだけシフト希望に沿う" });
-    }
-    list.push(
-      { key: "min-dayoff", label: "休日", text: `月に${MIN_MONTHLY_DAY_OFF}日以上休む` },
-      {
-        key: "dayoff-cap",
-        label: "休み上限",
-        text: `1日に休めるのは${MAX_DAY_OFF_PER_DAY}人まで`,
-      }
-    );
-    return list;
-  }, [constraints]);
-
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
     const map = new Map<string, StaffMonthlyShiftWish>();
@@ -180,19 +154,31 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
   // 連勤・希望に加え、責任者ルールの未充足（担当勤務帯に minCount 未満の日）も同じ違反
   // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
-  const violations = useMemo(() => {
-    if (!schedule) return [];
+  // この勤務表に効く「すべての制約」を宣言的オブジェクトとして1本に組み立てる。
+  // 表示（上部ルール）も違反も、この同じ制約リストから導出する（手書き文字列なし）。
+  const allConstraints = useMemo(() => {
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     const shiftIdsOf = (shiftName: string) =>
       workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    return schedule.checkConstraints(
-      buildScheduleConstraints({
-        maxConsecutiveWorkdays: constraints?.maxConsecutiveWorkdays,
-        leaderConstraints: constraints?.leaderConstraints(shiftIdsOf),
-        wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-      })
-    );
-  }, [schedule, wishByStaff, workShifts, constraints]);
+    return buildScheduleConstraints({
+      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+    });
+  }, [workShifts, constraints, wishByStaff]);
+
+  const violations = useMemo(
+    () => (schedule ? schedule.checkConstraints(allConstraints) : []),
+    [schedule, allConstraints]
+  );
+
+  // 上部「📋 ルール」の責任者以外の行は、各制約が自己記述する describe() から導出する。
+  const otherRules = useMemo(
+    () =>
+      allConstraints
+        .filter((c) => !c.type.startsWith(SHIFT_LEADER_CONSTRAINT))
+        .map((c) => ({ key: c.type, label: c.label, text: c.describe() })),
+    [allConstraints]
+  );
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -330,8 +316,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
           extractBubbleUrl={extractBubbleUrl}
-          minDayOff={MIN_MONTHLY_DAY_OFF}
-          maxDayOffPerDay={MAX_DAY_OFF_PER_DAY}
+          minDayOff={constraints?.minMonthlyDayOff}
+          maxDayOffPerDay={constraints?.maxDayOffPerDay}
           onChangeCell={handleChangeCell}
           onChangeRequired={handleChangeRequired}
           onChangeRequiredAllDays={handleChangeRequiredAllDays}

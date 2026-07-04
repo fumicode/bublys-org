@@ -35,3 +35,5 @@ export * from './schedule/autoShiftSteps.js';
 export * from './schedule/ConstraintViolation.js';
 export * from './schedule/ScheduleConstraint.js';
 export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
+export * from './schedule/MinMonthlyDayOffConstraint.js';
+export * from './schedule/MaxDayOffPerDayConstraint.js';

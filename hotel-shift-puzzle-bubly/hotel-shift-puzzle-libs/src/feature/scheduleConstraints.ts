@@ -9,18 +9,9 @@
  */
 import {
   ScheduleConstraint,
-  ShiftLeaderConstraint,
-  MaxConsecutiveWorkdaysConstraint,
   StaffMonthlyShiftWish,
-  DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishConstraint } from "./ShiftWishConstraint.js";
-
-/** スタッフが月に休まなければならない最低日数。いまは固定（将来は会社ごとに注入）。 */
-export const MIN_MONTHLY_DAY_OFF = 8;
-
-/** 1日に休んでよい人数の上限。これを超えないよう休みを配分する（将来は会社ごとに注入）。 */
-export const MAX_DAY_OFF_PER_DAY = 8;
 
 /** 休みの複数案を何案つくるか（世界線で見比べる） */
 export const DAY_OFF_CANDIDATE_COUNT = 3;
@@ -34,16 +25,14 @@ export type ScheduleConstraintContext = {
 /**
  * 勤務表に適用する制約一覧を組み立てる（グリッド・違反バブルが共有）。
  *
- * 制約の設定値（連勤上限・希望を見るか・責任者ルール）は勤務表ごとの ScheduleConstraints 集約
- * （世界線に載る）が持つ。ここはその設定＋実行時の文脈（希望データ）から ScheduleConstraint[]
- * を「組み立てる」だけ。希望違反（ShiftWishConstraint）は feature 層＋実行時データ依存なので
- * ここで足す。
+ * 各制約は宣言的オブジェクト（ScheduleConstraint）で、その設定値は勤務表ごとの
+ * ScheduleConstraints 集約（世界線に載る）が持つ。model 層で完結する制約（責任者・連勤・
+ * 月最低休日・1日の休み上限）は集約の modelConstraints() から渡し、ここでは希望違反
+ * （ShiftWishConstraint。feature 層＋実行時データ依存）だけを足して組み立てる。
  */
 export type BuildScheduleConstraintsArgs = {
-  /** 連勤上限（日数）。省略時 既定値。 */
-  maxConsecutiveWorkdays?: number;
-  /** 責任者制約（未充足日を違反にする）。集約から解決して渡す。省略時なし。 */
-  leaderConstraints?: ShiftLeaderConstraint[];
+  /** model 層の制約（集約の modelConstraints() から渡す）。 */
+  modelConstraints?: ScheduleConstraint[];
   /** 希望違反も見るなら希望の文脈を渡す（省略時は希望チェックなし）。 */
   wish?: ScheduleConstraintContext;
 };
@@ -51,12 +40,7 @@ export type BuildScheduleConstraintsArgs = {
 export const buildScheduleConstraints = (
   args: BuildScheduleConstraintsArgs = {}
 ): ScheduleConstraint[] => {
-  const constraints: ScheduleConstraint[] = [
-    new MaxConsecutiveWorkdaysConstraint(
-      args.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS
-    ),
-    ...(args.leaderConstraints ?? []),
-  ];
+  const constraints: ScheduleConstraint[] = [...(args.modelConstraints ?? [])];
   if (args.wish) constraints.push(new ShiftWishConstraint(args.wish));
   return constraints;
 };
