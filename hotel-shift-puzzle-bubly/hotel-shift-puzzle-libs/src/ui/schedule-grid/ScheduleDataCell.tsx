@@ -15,8 +15,16 @@ type ScheduleDataCellProps = {
   rangeViolation?: ConstraintViolation;
   /** 単日違反（希望の食い違いなど）。右上の ⊿ で表す */
   pointViolation?: ConstraintViolation;
-  /** クリックでセル編集メニューを開く */
-  onClick: (anchor: HTMLElement) => void;
+  /** セルを一意に指すキー（"staffId:dayKey"）。候補ドロップダウンのアンカー特定に使う */
+  cellKey: string;
+  /** キーボード操作でフォーカス中のセルか */
+  selected?: boolean;
+  /** 入力中バッファ（このセルで打ち込み中の文字列）。null なら非表示 */
+  inputBuffer?: string | null;
+  /** シングルクリックでこのセルを選択する */
+  onSelect: () => void;
+  /** ダブルクリックで候補ドロップダウンを開く（マウス操作用） */
+  onOpenEditor: () => void;
   /**
    * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）を ObjectView で包んで渡し、
    * ダブルクリックで違反バブルを開く。ObjectView が data-url も埋めるので、
@@ -29,6 +37,7 @@ type ScheduleDataCellProps = {
  * 勤務表の 1 セル（スタッフ×日）の純粋表示。
  * 出勤＝開始時刻の「時」だけ（勤務帯は背景色で区別）、休み＝「休」、未定＝希望ヒント or「·」。
  * 違反は範囲（下端の赤帯）と単日（右上の ⊿）の 2 種に描き分ける。
+ * シングルクリックで選択、ダブルクリックで候補ドロップダウン（キーボード操作と共通）。
  */
 export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   cell,
@@ -36,7 +45,11 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   wishEntries,
   rangeViolation,
   pointViolation,
-  onClick,
+  cellKey,
+  selected = false,
+  inputBuffer = null,
+  onSelect,
+  onOpenEditor,
   violationUrl,
 }) => {
   let className = "e-cell";
@@ -63,23 +76,33 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   }
 
   if (pointViolation || rangeViolation) className += " is-violation";
+  if (selected) className += " is-selected";
 
   // 違反マーカー（赤帯・⊿）。ObjectView がダブルクリックでの違反バブル展開と data-url
-  // （origin-side でマーカーの近くに出す）を担う。単クリックはセル編集を開かないよう止める。
+  // （origin-side でマーカーの近くに出す）を担う。セルは単クリック=選択 / ダブルクリック=候補なので、
+  // マーカー上の操作はセルへ伝播させない（ラッパで stopPropagation）。
   const violationMarker = (violation: ConstraintViolation, markerClass: string) => {
     const marker = (
       <span
         className={markerClass}
         title={`${violation.message}（ダブルクリックで詳細）`}
-        onClick={(e) => e.stopPropagation()}
       />
     );
-    return violationUrl ? (
-      <ObjectView url={violationUrl(violation)} openingPosition="origin-side" draggable={false}>
-        {marker}
-      </ObjectView>
-    ) : (
-      marker
+    if (!violationUrl) return marker;
+    return (
+      <span
+        style={{ display: "contents" }}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        <ObjectView
+          url={violationUrl(violation)}
+          openingPosition="origin-side"
+          draggable={false}
+        >
+          {marker}
+        </ObjectView>
+      </span>
     );
   };
 
@@ -89,9 +112,12 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       style={style}
       role="button"
       title={title}
-      onClick={(e) => onClick(e.currentTarget)}
+      data-cell-key={cellKey}
+      onClick={onSelect}
+      onDoubleClick={onOpenEditor}
     >
       {content}
+      {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
       {pointViolation && violationMarker(pointViolation, "e-wish-flag")}
       {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
     </div>

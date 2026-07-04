@@ -1,52 +1,6 @@
 import { FC } from "react";
 import { Menu, MenuItem, ListItemText } from "@mui/material";
-import type {
-  WorkShift,
-  ScheduleAvailability,
-  ShiftCell,
-} from "../../domain/index.js";
-import type { EditingCell, EditingRequired } from "./types.js";
-
-type CellEditMenuProps = {
-  editing: EditingCell | null;
-  /** 選べる勤務帯 */
-  shiftOptions: WorkShift[];
-  /** あれば「そのスタッフが入れる勤務帯」に絞る */
-  availability?: ScheduleAvailability;
-  onClose: () => void;
-  onApply: (to: ShiftCell) => void;
-};
-
-/** セルの勤務割当を選ぶメニュー（勤務帯 / 休み / 未定）。 */
-export const CellEditMenu: FC<CellEditMenuProps> = ({
-  editing,
-  shiftOptions,
-  availability,
-  onClose,
-  onApply,
-}) => (
-  <Menu anchorEl={editing?.anchor ?? null} open={!!editing} onClose={onClose}>
-    {shiftOptions
-      .filter(
-        (shift) =>
-          !availability || !editing || availability.isAllowed(editing.staffId, shift.id)
-      )
-      .map((shift) => (
-        <MenuItem
-          key={shift.id}
-          onClick={() => onApply({ kind: "work", shiftId: shift.id })}
-        >
-          <ListItemText primary={shift.name} secondary={shift.startTimeLabel} />
-        </MenuItem>
-      ))}
-    <MenuItem onClick={() => onApply({ kind: "day-off" })}>
-      <ListItemText primary="休み" />
-    </MenuItem>
-    <MenuItem onClick={() => onApply({ kind: "undecided" })}>
-      <ListItemText primary="未定（クリア）" />
-    </MenuItem>
-  </Menu>
-);
+import type { EditingRequired } from "./types.js";
 
 type RequiredEditMenuProps = {
   editingRequired: EditingRequired | null;

@@ -15,6 +15,12 @@ export const StyledWrap = styled.div`
     border-radius: 6px;
     background: #fff;
     font-size: 0.8em;
+
+    /* キーボード操作のためグリッド自体を focusable にしている。
+       選択はセルの枠線で示すので、コンテナ自身のフォーカス枠は消す。 */
+    &:focus {
+      outline: none;
+    }
   }
 
   /* 共通セル */
@@ -370,6 +376,41 @@ export const StyledWrap = styled.div`
 
     &:hover {
       box-shadow: inset 0 0 0 2px #90caf9;
+    }
+
+    /* キーボードでフォーカス中のセル。hover より強い枠で示す */
+    &.is-selected {
+      box-shadow: inset 0 0 0 2px #1976d2;
+      z-index: 1;
+    }
+  }
+
+  /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
+  .e-cell .e-input {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(25, 118, 210, 0.08);
+    color: #0d47a1;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+
+    &::after {
+      content: "";
+      width: 1px;
+      height: 1em;
+      margin-left: 1px;
+      background: #0d47a1;
+      animation: e-caret-blink 1s step-end infinite;
+    }
+  }
+
+  @keyframes e-caret-blink {
+    50% {
+      opacity: 0;
     }
   }
 

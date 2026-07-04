@@ -20,8 +20,10 @@ import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
 import { StaffScheduleRow } from "./schedule-grid/StaffScheduleRow.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
-import { CellEditMenu, RequiredEditMenu } from "./schedule-grid/EditMenus.js";
-import type { EditingCell, EditingRequired } from "./schedule-grid/types.js";
+import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
+import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
+import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
+import type { EditingRequired } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -94,8 +96,8 @@ function groupStaffByDepartment(
 
 /**
  * 勤務表グリッド（行=スタッフ / 列=日）のオーケストレーター。
- * 派生データの算出と編集状態の保持に徹し、見た目は schedule-grid/ 配下の
- * 子コンポーネント（行・セル・集計行・メニュー）に委ねる。
+ * 派生データの算出と描画に徹し、キーボード操作（選択・入力・候補）は
+ * useCellKeyboardEditing に、見た目は schedule-grid/ 配下の子コンポーネントに委ねる。
  */
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
@@ -172,9 +174,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day);
 
-  // ----- 編集状態 -----
-  const [editing, setEditing] = useState<EditingCell | null>(null);
-  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
+  // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
+  const kb = useCellKeyboardEditing({
+    staffList,
+    days,
+    shiftOptions,
+    availability,
+    onChangeCell,
+  });
 
   // 希望と割当を並べて見るために展開中のスタッフID
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -186,14 +193,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       return next;
     });
 
+  // ----- 必要人数の編集メニュー -----
+  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
   // 必要人数として選べる最大値（スタッフ総数まで）
   const maxRequired = Math.max(staffList.length, 1);
-
-  const applyChange = (to: ShiftCell) => {
-    if (editing) onChangeCell(editing.staffId, editing.day, to);
-    setEditing(null);
-  };
-
   const applyRequired = (count: number) => {
     if (editingRequired) {
       if (editingRequired.day) {
@@ -221,7 +224,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           expanded={expanded.has(staff.id)}
           onToggleExpand={toggleExpanded}
-          onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
+          selection={kb.selection}
+          inputBuffer={kb.inputBuffer}
+          onSelectCell={kb.selectCell}
+          onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
@@ -256,7 +262,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           expanded={expanded.has(staff.id)}
           onToggleExpand={toggleExpanded}
-          onEditCell={(anchor, staffId, day) => setEditing({ anchor, staffId, day })}
+          selection={kb.selection}
+          inputBuffer={kb.inputBuffer}
+          onSelectCell={kb.selectCell}
+          onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
@@ -270,7 +279,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   return (
     <StyledWrap>
-      <div className="e-grid" style={{ gridTemplateColumns }}>
+      <div
+        className="e-grid"
+        style={{ gridTemplateColumns }}
+        ref={kb.gridRef}
+        tabIndex={0}
+        role="grid"
+        onKeyDown={kb.handleKeyDown}
+      >
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
         <div className="e-corner">
           {schedule.year}年{schedule.month}月
@@ -350,18 +366,20 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         ))}
       </div>
 
-      <CellEditMenu
-        editing={editing}
-        shiftOptions={shiftOptions}
-        availability={availability}
-        onClose={() => setEditing(null)}
-        onApply={applyChange}
-      />
       <RequiredEditMenu
         editingRequired={editingRequired}
         maxRequired={maxRequired}
         onClose={() => setEditingRequired(null)}
         onApply={applyRequired}
+      />
+
+      {/* 勤務割当を選ぶ統合ドロップダウン（キーボード入力の候補 / ダブルクリックの選択肢を一本化） */}
+      <ShiftSuggestionDropdown
+        open={kb.editing}
+        anchorEl={kb.anchorEl}
+        suggestions={kb.suggestions}
+        activeIndex={kb.activeIndex}
+        onPick={kb.applySuggestion}
       />
     </StyledWrap>
   );

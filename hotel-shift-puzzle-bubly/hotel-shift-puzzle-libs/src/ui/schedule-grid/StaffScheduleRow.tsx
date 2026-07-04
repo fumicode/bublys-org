@@ -13,6 +13,7 @@ import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
+import type { CellSelection } from "./types.js";
 
 type StaffScheduleRowProps = {
   staff: Staff;
@@ -25,8 +26,15 @@ type StaffScheduleRowProps = {
   getWishEntries: (staffId: string, day: WorkingDay) => WishEntry[];
   /** 希望行を開いているか */
   expanded: boolean;
+  /** キーボード操作でフォーカス中のセル（無ければ null） */
+  selection: CellSelection | null;
+  /** 選択セルで入力中のバッファ（Enter 確定前の文字列。null は非入力） */
+  inputBuffer: string | null;
   onToggleExpand: (staffId: string) => void;
-  onEditCell: (anchor: HTMLElement, staffId: string, day: WorkingDay) => void;
+  /** セルをシングルクリックで選択 */
+  onSelectCell: (staffId: string, day: WorkingDay) => void;
+  /** セルをダブルクリックで候補ドロップダウンを開く */
+  onOpenEditor: (staffId: string, day: WorkingDay) => void;
   /** 違反バブルの URL を作る。ObjectView がこれで開く（origin-side でマーカーの近くに出す） */
   violationUrl?: (violation: ConstraintViolation) => string;
   /** このスタッフが抽出対象に選択されているか（onToggleSelected があるときだけ表示） */
@@ -54,8 +62,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   violations,
   getWishEntries,
   expanded,
+  selection,
+  inputBuffer,
   onToggleExpand,
-  onEditCell,
+  onSelectCell,
+  onOpenEditor,
   violationUrl,
   selected,
   onToggleSelected,
@@ -108,6 +119,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         const cell = schedule.statusOf(staff.id, day);
         const shift = cell.kind === "work" ? shiftMap.get(cell.shiftId) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
+        const isSelected =
+          selection?.staffId === staff.id && selection.day.equals(day);
         return (
           <ScheduleDataCell
             key={`${staff.id}:${day.key}`}
@@ -116,7 +129,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             wishEntries={getWishEntries(staff.id, day)}
             rangeViolation={covering.find((v) => v.days.length > 1)}
             pointViolation={covering.find((v) => v.days.length === 1)}
-            onClick={(anchor) => onEditCell(anchor, staff.id, day)}
+            cellKey={`${staff.id}:${day.key}`}
+            selected={isSelected}
+            inputBuffer={isSelected ? inputBuffer : null}
+            onSelect={() => onSelectCell(staff.id, day)}
+            onOpenEditor={() => onOpenEditor(staff.id, day)}
             violationUrl={violationUrl}
           />
         );
