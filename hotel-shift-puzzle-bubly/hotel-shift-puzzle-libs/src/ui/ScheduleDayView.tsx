@@ -9,10 +9,12 @@ import {
   WorkingDay,
   ScheduleAvailability,
   ShiftLeaderRule,
+  StaffMonthlyShiftWish,
   type ShiftCell,
 } from "../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
-import { LeaderBadges } from "./LeaderBadges.js";
+import { LeaderBadges, leaderRoleStyle } from "./LeaderBadges.js";
+import { wishEntriesFor, wishText } from "./schedule-grid/wishSummary.js";
 
 type ScheduleDayViewProps = {
   /** 表示する稼働日 */
@@ -26,6 +28,8 @@ type ScheduleDayViewProps = {
   availability?: ScheduleAvailability;
   /** 責任者ルール（解決済み）。名前横に早責/夜責バッジを出す */
   leaderRules?: ShiftLeaderRule[];
+  /** この年月のシフト希望（staffId 別）。スタッフ名の下にその日の希望を出す */
+  wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** セルの勤務割当を変更する */
   onChangeCell: (staffId: string, to: ShiftCell) => void;
 };
@@ -45,11 +49,21 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
   workShifts,
   availability,
   leaderRules = [],
+  wishByStaff,
   onChangeCell,
 }) => {
   const wd = day.weekday;
   const countByShift = schedule.countWorkingByShift(day);
   const dayOffCount = schedule.countDayOffOn(day);
+
+  // 責任者制約（早責/予責/夜責）のこの日の充足。担当勤務帯名 → 勤務帯ID群。
+  const shiftIdsByName = new Map<string, string[]>();
+  for (const w of workShifts) {
+    const arr = shiftIdsByName.get(w.name) ?? [];
+    arr.push(w.id);
+    shiftIdsByName.set(w.name, arr);
+  }
+  const nameOf = (id: string) => staffList.find((s) => s.id === id)?.name ?? id;
 
   const toggle = (staffId: string, selected: boolean, to: ShiftCell) =>
     onChangeCell(staffId, selected ? { kind: "undecided" } : to);
@@ -87,6 +101,14 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
               <td className="e-staff">
                 <span className="e-staff-name">{staff.name}</span>
                 <LeaderBadges rules={leaderRules} staffId={staff.id} />
+                {(() => {
+                  const wishes = wishEntriesFor(wishByStaff, staff.id, day);
+                  return wishes.length > 0 ? (
+                    <span className="e-staff-wish" title="この日の本人の希望">
+                      希望: {wishes.map(wishText).join(" / ")}
+                    </span>
+                  ) : null;
+                })()}
               </td>
 
               {workShifts.map((w) => {
@@ -152,6 +174,43 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
             {dayOffCount}
           </td>
         </tr>
+
+        {/* 責任者制約（早責/予責/夜責）のこの日の充足。担当勤務帯の列に ◯/✕ */}
+        {leaderRules.map((rule) => {
+          const shiftIds = shiftIdsByName.get(rule.shiftName) ?? [];
+          const covering = rule.leaderStaffIds.filter((id) => {
+            const sid = schedule.getShiftIdFor(id, day);
+            return sid !== undefined && shiftIds.includes(sid);
+          });
+          const present = covering.length >= rule.minCount;
+          return (
+            <tr key={`leader:${rule.key}`}>
+              <td className="e-foot-label">
+                <span className="e-leader-chip" style={leaderRoleStyle(rule.key)}>
+                  {rule.label}
+                </span>
+              </td>
+              {workShifts.map((w) =>
+                w.name === rule.shiftName ? (
+                  <td
+                    key={w.id}
+                    className={`e-foot e-leader-cell ${present ? "is-present" : "is-absent"}`}
+                    title={
+                      present
+                        ? `${rule.label}: ${covering.map(nameOf).join("・")} が${rule.shiftName}を担当`
+                        : `${rule.label}: ${rule.shiftName}に不在`
+                    }
+                  >
+                    {present ? "◯" : "✕"}
+                  </td>
+                ) : (
+                  <td key={w.id} className="e-foot e-leader-cell" />
+                )
+              )}
+              <td className="e-foot e-off-col" />
+            </tr>
+          );
+        })}
       </tfoot>
     </StyledTable>
   );
@@ -209,6 +268,14 @@ const StyledTable = styled.table`
 
     .e-staff-name {
       font-weight: bold;
+    }
+    /* この日の本人の希望（○=したい / ×=避けたい） */
+    .e-staff-wish {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.78em;
+      font-weight: normal;
+      color: #8d6e63;
     }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
@@ -281,5 +348,27 @@ const StyledTable = styled.table`
   }
   .e-foot.e-off-col {
     color: #616161;
+  }
+
+  /* 責任者制約行（早責/予責/夜責）: 担当勤務帯の列に ◯（緑）/✕（赤） */
+  .e-leader-chip {
+    display: inline-block;
+    font-weight: bold;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .e-leader-cell {
+    font-weight: bold;
+    background: #fbfbfb;
+    &.is-present {
+      color: #2e7d32;
+      background: #e8f5e9;
+    }
+    &.is-absent {
+      color: #c62828;
+      background: #ffebee;
+    }
   }
 `;

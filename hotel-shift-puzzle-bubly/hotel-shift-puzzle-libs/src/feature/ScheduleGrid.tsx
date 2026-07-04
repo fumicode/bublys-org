@@ -141,6 +141,29 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (id: string) => map.get(id) ?? id;
   }, [staffList]);
 
+  // 責任者以外のルール（連勤・希望・休日）も勤務表の上にまとめて表示する。
+  const otherRules = useMemo(() => {
+    const list: { key: string; label: string; text: string }[] = [
+      {
+        key: "max-consecutive",
+        label: "連勤",
+        text: `連勤は最大${constraints?.maxConsecutiveWorkdays ?? 5}日まで`,
+      },
+    ];
+    if (constraints?.checkShiftWish ?? true) {
+      list.push({ key: "wish", label: "希望", text: "できるだけシフト希望に沿う" });
+    }
+    list.push(
+      { key: "min-dayoff", label: "休日", text: `月に${MIN_MONTHLY_DAY_OFF}日以上休む` },
+      {
+        key: "dayoff-cap",
+        label: "休み上限",
+        text: `1日に休めるのは${MAX_DAY_OFF_PER_DAY}人まで`,
+      }
+    );
+    return list;
+  }, [constraints]);
+
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
     const map = new Map<string, StaffMonthlyShiftWish>();
@@ -264,6 +287,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           rules={leaderRules}
           nameOf={nameOf}
           ruleBubbleUrl={ruleBubbleUrl}
+          otherRules={otherRules}
         />
       </div>
 

@@ -6,32 +6,44 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule } from "../domain/index.js";
 import { leaderRoleStyle } from "./LeaderBadges.js";
 
+/** 責任者以外のルール（連勤・希望・休日など）の1行ぶん。 */
+export type OtherRule = {
+  /** 一意キー */
+  key: string;
+  /** 短いラベル（チップに出す。例: "連勤" / "希望"） */
+  label: string;
+  /** 人が読める1文（例: "連勤は最大5日まで"） */
+  text: string;
+};
+
 type LeaderRulesViewProps = {
-  /** 描画する宣言的ルール（解決済み） */
+  /** 描画する責任者ルール（解決済み） */
   rules: ShiftLeaderRule[];
   /** スタッフID → 表示名（未解決は ID をそのまま） */
   nameOf: (staffId: string) => string;
   /**
-   * ルール可視化バブルの URL を作る（ロールキー）。渡すと各ルールが ObjectView になり、
+   * ルール可視化バブルの URL を作る（ロールキー）。渡すと各責任者ルールが ObjectView になり、
    * ダブルクリックでそのルールの図バブルを開ける（展開・data-url・opener は ObjectView に一任）。
    * 省略時は表示専用。URL スキームは app 層の関心事なので注入で受ける。
    */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /** 責任者以外のルール（連勤・希望・休日など）。責任者ルールの下に文章で並べる。 */
+  otherRules?: OtherRule[];
 };
 
 /**
- * 責任者の宣言的ルールを「人が読める1文」で描画する。
- * ルールが label・shiftName・leaderStaffIds・minCount を全部持っているので、名前を解決すれば
- * そのまま文章化できる（例: 「早責: 早番に 山本 由美・小林 恵 のうちいずれか1人」）。
- * footer の ◯/✕ も相方裏コマンドも同じ ShiftLeaderRule から導出されるので、ここはその
- * 「定義そのもの」の表示。
+ * 勤務表に効いている「すべてのルール」を勤務表の上に1文ずつ並べて描く。
+ *   - 責任者ルール（早責/予責/夜責）: label・shiftName・leaderStaffIds・minCount から文章化。
+ *     クリックで OR 図バブルを開ける。footer の ◯/✕ も同じ ShiftLeaderRule から導出。
+ *   - その他のルール（連勤上限・希望・月最低休日・1日の休み上限）: otherRules を文章で表示。
  */
 export const LeaderRulesView: FC<LeaderRulesViewProps> = ({
   rules,
   nameOf,
   ruleBubbleUrl,
+  otherRules = [],
 }) => {
-  if (rules.length === 0) return null;
+  if (rules.length === 0 && otherRules.length === 0) return null;
 
   const clickable = !!ruleBubbleUrl;
 
@@ -71,6 +83,14 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({
             <Fragment key={rule.key}>{row}</Fragment>
           );
         })}
+
+        {/* 責任者以外のルール（連勤・希望・休日など）を文章で並べる */}
+        {otherRules.map((r) => (
+          <li key={r.key} className="e-rule">
+            <span className="e-rule-chip is-other">{r.label}</span>
+            <span className="e-rule-text">{r.text}</span>
+          </li>
+        ))}
       </ul>
     </StyledRules>
   );
@@ -123,6 +143,12 @@ const StyledRules = styled.div`
     line-height: 1;
     padding: 2px 6px;
     border-radius: 4px;
+  }
+  /* 責任者以外のルール（連勤・希望など）の中立チップ */
+  .e-rule-chip.is-other {
+    background: #eceff1;
+    color: #546e7a;
+    border: 1px solid #cfd8dc;
   }
 
   .e-rule-text {

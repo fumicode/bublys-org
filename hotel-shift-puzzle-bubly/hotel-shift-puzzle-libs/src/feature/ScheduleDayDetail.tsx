@@ -8,6 +8,7 @@ import {
   MonthlyStaffSchedule,
   ScheduleAvailability,
   ScheduleConstraints,
+  StaffMonthlyShiftWish,
   WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -20,6 +21,7 @@ import {
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
+  STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
 type ScheduleDayDetailProps = {
@@ -54,6 +56,20 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
 
+  // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする（本人の希望表示用）
+  const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
+  const wishByStaff = useMemo(() => {
+    const map = new Map<string, StaffMonthlyShiftWish>();
+    if (schedule) {
+      for (const w of allWishes) {
+        if (w.year === schedule.year && w.month === schedule.month) {
+          map.set(w.staffId, w);
+        }
+      }
+    }
+    return map;
+  }, [allWishes, schedule]);
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -86,6 +102,7 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
         workShifts={shiftOptions}
         availability={availability}
         leaderRules={leaderRules}
+        wishByStaff={wishByStaff}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>
