@@ -14,8 +14,16 @@ type ScheduleDataCellProps = {
   rangeViolation?: ConstraintViolation;
   /** 単日違反（希望の食い違いなど）。右上の ⊿ で表す */
   pointViolation?: ConstraintViolation;
-  /** クリックでセル編集メニューを開く */
-  onClick: (anchor: HTMLElement) => void;
+  /** セルを一意に指すキー（"staffId:dayKey"）。候補ドロップダウンのアンカー特定に使う */
+  cellKey: string;
+  /** キーボード操作でフォーカス中のセルか */
+  selected?: boolean;
+  /** 入力中バッファ（このセルで打ち込み中の文字列）。null なら非表示 */
+  inputBuffer?: string | null;
+  /** シングルクリックでこのセルを選択する */
+  onSelect: () => void;
+  /** ダブルクリックで候補ドロップダウンを開く（マウス操作用） */
+  onOpenEditor: () => void;
   onOpenViolation?: (violation: ConstraintViolation) => void;
 };
 
@@ -30,7 +38,11 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   wishEntries,
   rangeViolation,
   pointViolation,
-  onClick,
+  cellKey,
+  selected = false,
+  inputBuffer = null,
+  onSelect,
+  onOpenEditor,
   onOpenViolation,
 }) => {
   let className = "e-cell";
@@ -58,15 +70,19 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   }
 
   if (pointViolation || rangeViolation) className += " is-violation";
+  if (selected) className += " is-selected";
 
   return (
     <div
       className={className}
       style={style}
       role="button"
-      onClick={(e) => onClick(e.currentTarget)}
+      data-cell-key={cellKey}
+      onClick={onSelect}
+      onDoubleClick={onOpenEditor}
     >
       {content}
+      {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
       {pointViolation && (
         <span
           className="e-wish-flag"

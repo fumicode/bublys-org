@@ -21,6 +21,12 @@ export type WorkShiftState = {
   name: string;
   /** 開始時刻（0:00 からの通算分）。例: 7:00 → 420 */
   startMinute: number;
+  /**
+   * 入力用の別名（ローマ字読みなど）。キーボードでこの勤務帯を指すときに打つ語。
+   * 例: 早番 → ["hayaban", "haya"]。数字（開始時刻）や name・id は別名を書かなくても
+   * 解決できるので、ここには主にローマ字読みを入れる。
+   */
+  aliases?: string[];
 };
 
 export class WorkShift {
@@ -28,18 +34,21 @@ export class WorkShift {
 
   /**
    * 勤務帯を作る。開始時刻は時・分で指定する（分は省略可・デフォルト0）。
-   * 例: WorkShift.of("early", "早番", { hour: 7 })            // 7:00
-   *     WorkShift.of("mid",   "中番", { hour: 9, minute: 30 }) // 9:30
+   * 例: WorkShift.of("early", "早番", { hour: 7 })                          // 7:00
+   *     WorkShift.of("mid",   "中番", { hour: 9, minute: 30 })              // 9:30
+   *     WorkShift.of("early", "早番", { hour: 7 }, { aliases: ["hayaban"] }) // 別名つき
    */
   static of(
     id: string,
     name: string,
-    start: { hour: number; minute?: number }
+    start: { hour: number; minute?: number },
+    opts?: { aliases?: string[] }
   ): WorkShift {
     return new WorkShift({
       id,
       name,
       startMinute: start.hour * 60 + (start.minute ?? 0),
+      aliases: opts?.aliases,
     });
   }
 
@@ -49,6 +58,11 @@ export class WorkShift {
 
   get name(): string {
     return this.state.name;
+  }
+
+  /** 入力用の別名（ローマ字読みなど）。未設定なら空配列。 */
+  get aliases(): string[] {
+    return this.state.aliases ?? [];
   }
 
   /** 開始時刻（0:00 からの通算分） */
@@ -91,8 +105,8 @@ export class WorkShift {
 /** 例として用意する標準の勤務帯（早番・中番・遅番） */
 export function createDefaultWorkShifts(): WorkShift[] {
   return [
-    WorkShift.of("early", "早番", { hour: 7 }), // 7:00
-    WorkShift.of("middle", "中番", { hour: 9 }), // 9:00
-    WorkShift.of("late", "遅番", { hour: 13 }), // 13:00
+    WorkShift.of("early", "早番", { hour: 7 }, { aliases: ["hayaban", "haya"] }), // 7:00
+    WorkShift.of("middle", "中番", { hour: 9 }, { aliases: ["nakaban", "naka"] }), // 9:00
+    WorkShift.of("late", "遅番", { hour: 13 }, { aliases: ["osoban", "oso"] }), // 13:00
   ];
 }
