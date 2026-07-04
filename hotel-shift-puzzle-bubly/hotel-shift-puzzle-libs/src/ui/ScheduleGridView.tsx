@@ -1,7 +1,6 @@
 'use client';
 
-import { FC, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Popper, Paper, MenuList, MenuItem, ListItemText } from "@mui/material";
+import { FC, useState } from "react";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -10,9 +9,7 @@ import {
   ScheduleAvailability,
   ConstraintViolation,
   StaffMonthlyShiftWish,
-  suggestShiftInputs,
   type ShiftCell,
-  type ShiftSuggestion,
 } from "../domain/index.js";
 import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
@@ -21,7 +18,9 @@ import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
 import { StaffScheduleRow } from "./schedule-grid/StaffScheduleRow.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
-import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
+import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
+import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
+import type { EditingRequired } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -46,8 +45,8 @@ type ScheduleGridViewProps = {
 
 /**
  * 勤務表グリッド（行=スタッフ / 列=日）のオーケストレーター。
- * 派生データの算出と編集状態の保持に徹し、見た目は schedule-grid/ 配下の
- * 子コンポーネント（行・セル・集計行・メニュー）に委ねる。
+ * 派生データの算出と描画に徹し、キーボード操作（選択・入力・候補）は
+ * useCellKeyboardEditing に、見た目は schedule-grid/ 配下の子コンポーネントに委ねる。
  */
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
@@ -79,8 +78,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day);
 
-  // ----- 編集状態 -----
-  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
+  // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
+  const kb = useCellKeyboardEditing({
+    staffList,
+    days,
+    shiftOptions,
+    availability,
+    onChangeCell,
+  });
 
   // 希望と割当を並べて見るために展開中のスタッフID
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -92,194 +97,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       return next;
     });
 
-  // ----- キーボード操作（セル選択 + 打ち込みで勤務帯を確定）-----
-  const gridRef = useRef<HTMLDivElement>(null);
-  // フォーカス中のセル（1 セル分。いずれ範囲選択へ広げる想定）
-  const [selection, setSelection] = useState<CellSelection | null>(null);
-  // 選択セルで打ち込み中のバッファ。null は非入力（＝ドロップダウンを閉じている）、
-  // "" 以上は入力中（＝ドロップダウンを開いている。"" は全候補を表示）
-  const [inputBuffer, setInputBuffer] = useState<string | null>(null);
-  // ドロップダウン内でハイライト中の候補インデックス（矢印キーで移動）
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば。旧メニューと同じ絞り込み）
-  const selectableShiftOptions =
-    availability && selection
-      ? shiftOptions.filter((w) => availability.isAllowed(selection.staffId, w.id))
-      : shiftOptions;
-
-  // 打ち込み中の入力候補（前方一致）。バッファが null（非入力）なら候補は出さない
-  const suggestions: ShiftSuggestion[] =
-    inputBuffer !== null ? suggestShiftInputs(inputBuffer, selectableShiftOptions) : [];
-  // 候補が減ったときに範囲外を指さないようクランプした実効インデックス
-  const activeClamped = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
-
-  // 候補ドロップダウンのアンカー要素。選択セルの DOM を data 属性から引く
-  // （クリック選択・矢印移動どちらでも同じ経路で取れる）
-  const selectionKey = selection ? `${selection.staffId}:${selection.day.key}` : null;
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    if (!selectionKey || !gridRef.current) {
-      setAnchorEl(null);
-      return;
-    }
-    setAnchorEl(
-      gridRef.current.querySelector<HTMLElement>(`[data-cell-key="${selectionKey}"]`)
-    );
-  }, [selectionKey]);
-
-  // セルを選択し、キー入力を受け取れるようグリッドへフォーカスを移す（ドロップダウンは閉じる）
-  const selectCell = (staffId: string, day: WorkingDay) => {
-    setSelection({ staffId, day });
-    setInputBuffer(null);
-    gridRef.current?.focus();
-  };
-
-  // セルを選択して候補ドロップダウンを開く（ダブルクリック / Enter で全候補表示）
-  const openEditor = (staffId: string, day: WorkingDay) => {
-    setSelection({ staffId, day });
-    setInputBuffer("");
-    setActiveIndex(0);
-    gridRef.current?.focus();
-  };
-
-  // 候補を割当に変換する
-  const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
-    if (s.kind === "work") return { kind: "work", shiftId: s.shift.id };
-    if (s.kind === "day-off") return { kind: "day-off" };
-    return { kind: "undecided" };
-  };
-
-  // 候補を適用（クリック / Enter）。適用後はドロップダウンを閉じグリッドへフォーカスを戻す
-  const applySuggestion = (s: ShiftSuggestion) => {
-    if (selection) onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
-    setInputBuffer(null);
-    gridRef.current?.focus();
-  };
-
-  // 選択を dStaff 行・dDay 列ぶん動かす（端でクランプ）。入力中バッファは破棄
-  const moveSelection = (dStaff: number, dDay: number) => {
-    setInputBuffer(null);
-    setSelection((prev) => {
-      if (staffList.length === 0 || days.length === 0) return prev;
-      if (!prev) return { staffId: staffList[0].id, day: days[0] };
-      const si = staffList.findIndex((s) => s.id === prev.staffId);
-      const di = days.findIndex((d) => d.key === prev.day.key);
-      if (si < 0 || di < 0) return { staffId: staffList[0].id, day: days[0] };
-      const ns = Math.min(Math.max(si + dStaff, 0), staffList.length - 1);
-      const nd = Math.min(Math.max(di + dDay, 0), days.length - 1);
-      return { staffId: staffList[ns].id, day: days[nd] };
-    });
-  };
-
-  const editing = inputBuffer !== null;
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    // 修飾キー付きはブラウザ/OS のショートカットに委ねる
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-    // ----- ドロップダウンを開いている間: 矢印は候補移動、Enter で確定 -----
-    if (editing && selection) {
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setActiveIndex((i) =>
-            suggestions.length === 0 ? 0 : Math.min(i + 1, suggestions.length - 1)
-          );
-          return;
-        case "ArrowUp":
-          e.preventDefault();
-          setActiveIndex((i) => Math.max(i - 1, 0));
-          return;
-        case "ArrowLeft":
-          // 横移動はドロップダウンを閉じて隣のセルへ（表計算的に編集を抜ける）
-          e.preventDefault();
-          moveSelection(0, -1);
-          return;
-        case "ArrowRight":
-          e.preventDefault();
-          moveSelection(0, 1);
-          return;
-        case "Enter":
-          e.preventDefault();
-          if (suggestions.length > 0) applySuggestion(suggestions[activeClamped]);
-          else setInputBuffer(null);
-          return;
-        case "Escape":
-          e.preventDefault();
-          setInputBuffer(null); // 打ち込みを取り消してドロップダウンを閉じる（選択は残す）
-          return;
-        case "Backspace":
-          e.preventDefault();
-          if (inputBuffer && inputBuffer.length > 0) {
-            setInputBuffer(inputBuffer.slice(0, -1));
-            setActiveIndex(0);
-          } else {
-            // 空の状態でさらに消したらセルを未定（クリア）にして閉じる
-            onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
-            setInputBuffer(null);
-          }
-          return;
-        default:
-          if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
-            e.preventDefault();
-            setInputBuffer((prev) => (prev ?? "") + e.key);
-            setActiveIndex(0);
-          }
-          return;
-      }
-    }
-
-    // ----- ドロップダウンを閉じている間: 矢印はセル移動 -----
-    switch (e.key) {
-      case "ArrowUp":
-        e.preventDefault();
-        moveSelection(-1, 0);
-        return;
-      case "ArrowDown":
-        e.preventDefault();
-        moveSelection(1, 0);
-        return;
-      case "ArrowLeft":
-        e.preventDefault();
-        moveSelection(0, -1);
-        return;
-      case "ArrowRight":
-        e.preventDefault();
-        moveSelection(0, 1);
-        return;
-    }
-
-    if (!selection) return;
-
-    switch (e.key) {
-      case "Enter":
-        // 選択セルでドロップダウンを開く（全候補を表示）
-        e.preventDefault();
-        openEditor(selection.staffId, selection.day);
-        return;
-      case "Backspace":
-        // 打ち込まずにセルを未定（クリア）に戻す
-        e.preventDefault();
-        onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
-        return;
-      case "Escape":
-        e.preventDefault();
-        setSelection(null);
-        return;
-      default:
-        // 英数字を打ち始めたらドロップダウンを開き、その文字をバッファに入れる
-        if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
-          e.preventDefault();
-          setInputBuffer(e.key);
-          setActiveIndex(0);
-        }
-    }
-  };
-
+  // ----- 必要人数の編集メニュー -----
+  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
   // 必要人数として選べる最大値（スタッフ総数まで）
   const maxRequired = Math.max(staffList.length, 1);
-
   const applyRequired = (count: number) => {
     if (editingRequired) {
       if (editingRequired.day) {
@@ -298,10 +119,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       <div
         className="e-grid"
         style={{ gridTemplateColumns }}
-        ref={gridRef}
+        ref={kb.gridRef}
         tabIndex={0}
         role="grid"
-        onKeyDown={handleKeyDown}
+        onKeyDown={kb.handleKeyDown}
       >
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
         <div className="e-corner">
@@ -332,11 +153,11 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             violations={violations}
             getWishEntries={getWishEntries}
             expanded={expanded.has(staff.id)}
-            selection={selection}
-            inputBuffer={inputBuffer}
+            selection={kb.selection}
+            inputBuffer={kb.inputBuffer}
             onToggleExpand={toggleExpanded}
-            onSelectCell={selectCell}
-            onOpenEditor={openEditor}
+            onSelectCell={kb.selectCell}
+            onOpenEditor={kb.openEditor}
             onOpenViolation={onOpenViolation}
           />
         ))}
@@ -361,37 +182,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         onApply={applyRequired}
       />
 
-      {/* 勤務割当を選ぶ統合ドロップダウン（キーボード入力の候補 / ダブルクリックの選択肢を一本化）。
-          矢印↑↓でハイライト移動、Enter・クリックで確定。空バッファ時は全候補（勤務帯＋休み＋未定）。
-          グリッドのフォーカスを奪わないよう Popper を使う。 */}
-      <Popper
-        open={!!anchorEl && editing && suggestions.length > 0}
-        anchorEl={anchorEl}
-        placement="bottom-start"
-        style={{ zIndex: 1300 }}
-      >
-        <Paper elevation={4} sx={{ mt: 0.5, minWidth: 120, maxHeight: 240, overflowY: "auto" }}>
-          <MenuList dense disablePadding>
-            {suggestions.map((s, i) => (
-              <MenuItem
-                key={s.kind === "work" ? s.shift.id : s.kind}
-                selected={i === activeClamped}
-                // クリックでグリッドの blur → 確定前に消えるのを防ぎ、確実に適用する
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => applySuggestion(s)}
-              >
-                {s.kind === "work" ? (
-                  <ListItemText primary={s.shift.name} secondary={s.shift.startTimeLabel} />
-                ) : s.kind === "day-off" ? (
-                  <ListItemText primary="休み" />
-                ) : (
-                  <ListItemText primary="未定（クリア）" />
-                )}
-              </MenuItem>
-            ))}
-          </MenuList>
-        </Paper>
-      </Popper>
+      {/* 勤務割当を選ぶ統合ドロップダウン（キーボード入力の候補 / ダブルクリックの選択肢を一本化） */}
+      <ShiftSuggestionDropdown
+        open={kb.editing}
+        anchorEl={kb.anchorEl}
+        suggestions={kb.suggestions}
+        activeIndex={kb.activeIndex}
+        onPick={kb.applySuggestion}
+      />
     </StyledWrap>
   );
 };
