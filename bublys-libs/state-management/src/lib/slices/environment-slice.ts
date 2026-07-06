@@ -5,10 +5,12 @@ import type { Size2 } from "@bublys-org/bubbles-ui-util";
 
 export interface EnvironmentState {
   windowSize: Size2;
+  lightweightMode: boolean;
 }
 
 const initialState: EnvironmentState = {
   windowSize: { width: 0, height: 0 },
+  lightweightMode: false,
 };
 
 export const environmentSlice = createSlice({
@@ -18,11 +20,17 @@ export const environmentSlice = createSlice({
     setWindowSize: (state, action: PayloadAction<Size2>) => {
       state.windowSize = action.payload;
     },
+    toggleLightweightMode: (state) => {
+      state.lightweightMode = !state.lightweightMode;
+    },
   },
 });
 
-export const { setWindowSize } = environmentSlice.actions;
+export const { setWindowSize, toggleLightweightMode } = environmentSlice.actions;
 
 export const selectWindowSize = (state: RootState) =>
   state.environment.windowSize;
+
+export const selectLightweightMode = (state: RootState) =>
+  state.environment.lightweightMode;
 

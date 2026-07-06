@@ -146,7 +146,6 @@ const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
-
 export const bubblesSlice = createSlice({
   name: "bubbleState",
   initialState: getInitialState,

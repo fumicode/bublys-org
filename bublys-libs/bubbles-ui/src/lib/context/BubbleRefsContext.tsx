@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useRef, useCallback, ReactNode, FC } from "react";
+import { createContext, useContext, useRef, useCallback, useMemo, ReactNode, FC } from "react";
 import { SmartRect, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getElementRect } from "../utils/get-origin-rect.js";
 import { measureViewportForElement } from "../utils/measure-viewport.js";
@@ -116,20 +116,30 @@ export const BubbleRefsProvider: FC<{ children: ReactNode }> = ({ children }) =>
     originRectCache.current.clear();
   }, []);
 
+  const contextValue = useMemo(() => ({
+    registerBubbleRef,
+    unregisterBubbleRef,
+    getBubbleRef,
+    registerOriginRef,
+    unregisterOriginRef,
+    getOriginRef,
+    getOriginRectCached,
+    invalidateOriginRectCache,
+    invalidateAllOriginRectCache,
+  }), [
+    registerBubbleRef,
+    unregisterBubbleRef,
+    getBubbleRef,
+    registerOriginRef,
+    unregisterOriginRef,
+    getOriginRef,
+    getOriginRectCached,
+    invalidateOriginRectCache,
+    invalidateAllOriginRectCache,
+  ]);
+
   return (
-    <BubbleRefsContext.Provider
-      value={{
-        registerBubbleRef,
-        unregisterBubbleRef,
-        getBubbleRef,
-        registerOriginRef,
-        unregisterOriginRef,
-        getOriginRef,
-        getOriginRectCached,
-        invalidateOriginRectCache,
-        invalidateAllOriginRectCache,
-      }}
-    >
+    <BubbleRefsContext.Provider value={contextValue}>
       {children}
     </BubbleRefsContext.Provider>
   );

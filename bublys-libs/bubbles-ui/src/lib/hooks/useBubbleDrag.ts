@@ -37,7 +37,6 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBu
   bubbleRef.current = bubble;
   const layerIndexRef = useRef(layerIndex);
   layerIndexRef.current = layerIndex;
-
   const dragStartPosRef = useRef<Point2 | null>(null);
   const dragStartMouseRef = useRef<Point2 | null>(null);
   const currentDragPosRef = useRef<Point2 | null>(null);
@@ -75,6 +74,7 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBu
 
     const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
     ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
+
   };
 
   const endDrag = () => {
@@ -84,8 +84,6 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBu
     if (ref.current) {
       ref.current.style.transition = "";
       ref.current.style.transformOrigin = "";
-      ref.current.style.left = "";
-      ref.current.style.top = "";
     }
     dragStartPosRef.current = null;
     dragStartMouseRef.current = null;
