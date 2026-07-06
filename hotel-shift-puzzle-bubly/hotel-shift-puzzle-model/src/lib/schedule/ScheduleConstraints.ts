@@ -120,6 +120,39 @@ export class ScheduleConstraints {
     }));
   }
 
+  /** 責任者ルールを新規追加する（同じ key が既にあれば無視）。新インスタンスを返す。 */
+  addRule(rule: ShiftLeaderRuleState): ScheduleConstraints {
+    if (this.state.leaderRules.some((r) => r.key === rule.key)) return this;
+    return new ScheduleConstraints({
+      ...this.state,
+      leaderRules: [...this.state.leaderRules, rule],
+    });
+  }
+
+  /** 責任者ルールを丸ごと削除する。新インスタンスを返す。 */
+  removeRule(ruleKey: string): ScheduleConstraints {
+    return new ScheduleConstraints({
+      ...this.state,
+      leaderRules: this.state.leaderRules.filter((r) => r.key !== ruleKey),
+    });
+  }
+
+  /** ルールの担当勤務帯（名前＝入るべき時間帯）を変える。新インスタンスを返す。 */
+  setRuleShift(ruleKey: string, shiftName: string): ScheduleConstraints {
+    return this.mapRule(ruleKey, (r) => ({ ...r, shiftName }));
+  }
+
+  /** ルールの表示ラベルを変える。新インスタンスを返す。 */
+  setRuleLabel(ruleKey: string, label: string): ScheduleConstraints {
+    return this.mapRule(ruleKey, (r) => ({ ...r, label }));
+  }
+
+  /** ルールの最低必要人数を変える（1 以上に丸める）。新インスタンスを返す。 */
+  setRuleMinCount(ruleKey: string, minCount: number): ScheduleConstraints {
+    const n = Math.max(1, Math.floor(minCount));
+    return this.mapRule(ruleKey, (r) => ({ ...r, minCount: n }));
+  }
+
   private mapRule(
     ruleKey: string,
     fn: (r: ShiftLeaderRuleState) => ShiftLeaderRuleState

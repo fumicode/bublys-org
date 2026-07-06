@@ -29,6 +29,11 @@ type LeaderRulesViewProps = {
   ruleBubbleUrl?: (ruleKey: string) => string;
   /** 責任者以外のルール（連勤・希望・休日など）。責任者ルールの下に文章で並べる。 */
   otherRules?: OtherRule[];
+  /**
+   * 責任者ルールを新規追加する。渡すと末尾に「＋ 責任者ルールを追加」ボタンが出る。
+   * 追加は勤務表ごとの制約なので、どの勤務表かは feature 層が閉じ込めて注入する。
+   */
+  onAddRule?: () => void;
 };
 
 /**
@@ -42,8 +47,9 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({
   nameOf,
   ruleBubbleUrl,
   otherRules = [],
+  onAddRule,
 }) => {
-  if (rules.length === 0 && otherRules.length === 0) return null;
+  if (rules.length === 0 && otherRules.length === 0 && !onAddRule) return null;
 
   const clickable = !!ruleBubbleUrl;
 
@@ -91,6 +97,15 @@ export const LeaderRulesView: FC<LeaderRulesViewProps> = ({
             <span className="e-rule-text">{r.text}</span>
           </li>
         ))}
+
+        {/* 責任者ルールを後から足す */}
+        {onAddRule && (
+          <li className="e-rule">
+            <button type="button" className="e-add-rule" onClick={onAddRule}>
+              ＋ 責任者ルールを追加
+            </button>
+          </li>
+        )}
       </ul>
     </StyledRules>
   );
@@ -155,6 +170,22 @@ const StyledRules = styled.div`
     color: #455a64;
     strong {
       color: #263238;
+    }
+  }
+
+  /* 責任者ルールを追加するボタン（ルール一覧の末尾） */
+  .e-add-rule {
+    border: 1px dashed #b0bec5;
+    border-radius: 6px;
+    background: #fff;
+    color: #546e7a;
+    font-size: 0.95em;
+    padding: 2px 8px;
+    cursor: pointer;
+    &:hover {
+      background: #eceff1;
+      border-color: #78909c;
+      color: #37474f;
     }
   }
 `;

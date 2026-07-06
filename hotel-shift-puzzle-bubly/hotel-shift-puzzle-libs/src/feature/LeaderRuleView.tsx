@@ -46,6 +46,47 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
     [workShifts, rule]
   );
 
+  // 「入るべき時間帯」セレクトの選択肢＝重複を除いた勤務帯名の一覧。
+  const shiftNames = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const w of workShifts) {
+      if (!seen.has(w.name)) {
+        seen.add(w.name);
+        names.push(w.name);
+      }
+    }
+    return names;
+  }, [workShifts]);
+
+  // 編集は「集約のメソッドで新インスタンス → repo.save」で世界線に載せる（スライスにロジックを書かない）。
+  const editRule = useCallback(
+    (next: ScheduleConstraints | undefined) => {
+      if (next) constraintsRepo.save(next);
+    },
+    [constraintsRepo]
+  );
+  const handleChangeShift = useCallback(
+    (shiftName: string) => editRule(constraints?.setRuleShift(ruleKey, shiftName)),
+    [constraints, ruleKey, editRule]
+  );
+  const handleChangeLabel = useCallback(
+    (label: string) => editRule(constraints?.setRuleLabel(ruleKey, label)),
+    [constraints, ruleKey, editRule]
+  );
+  const handleChangeMinCount = useCallback(
+    (minCount: number) => editRule(constraints?.setRuleMinCount(ruleKey, minCount)),
+    [constraints, ruleKey, editRule]
+  );
+  const handleRemoveStaff = useCallback(
+    (staffId: string) => editRule(constraints?.removeLeader(ruleKey, staffId)),
+    [constraints, ruleKey, editRule]
+  );
+  const handleDeleteRule = useCallback(
+    () => editRule(constraints?.removeRule(ruleKey)),
+    [constraints, ruleKey, editRule]
+  );
+
   const nameOf = useMemo(() => {
     const byId = new Map(staffList.map((s) => [s.id, s.name]));
     return (id: string) => byId.get(id) ?? id;
@@ -78,6 +119,12 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
       shiftId={shiftId}
       onDropUrl={handleDropStaffUrl}
       dropAcceptTypes={[getDragType(STAFF_TYPE)]}
+      shiftNames={shiftNames}
+      onChangeShift={handleChangeShift}
+      onChangeLabel={handleChangeLabel}
+      onChangeMinCount={handleChangeMinCount}
+      onRemoveStaff={handleRemoveStaff}
+      onDeleteRule={handleDeleteRule}
     />
   );
 };

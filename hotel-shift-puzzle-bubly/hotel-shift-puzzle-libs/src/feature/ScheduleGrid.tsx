@@ -16,7 +16,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
-import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
+import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import {
@@ -57,7 +57,16 @@ type ScheduleGridProps = {
   extractBubbleUrl?: (staffIds: string[]) => string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /**
+   * 責任者ルールを追加したあと、その編集バブルを開くハンドラ（ロールキーを渡す）。
+   * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
+   */
+  onOpenRule?: (ruleKey: string) => void;
 };
+
+/** 新しい責任者ルールの一意キーを生成する。 */
+const newLeaderRuleKey = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `leader-${Date.now()}`;
 
 /**
  * 勤務表グリッド。編集はシェル経由：update(s => s.setCell(...)) を呼ぶだけで、
@@ -76,6 +85,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenExtract,
   extractBubbleUrl,
   ruleBubbleUrl,
+  onOpenRule,
 }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -129,7 +139,27 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
+  const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+
+  // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
+  // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
+  const handleAddRule = () => {
+    if (!scheduleId) return;
+    const key = newLeaderRuleKey();
+    const base =
+      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    constraintsRepo.save(
+      base.addRule({
+        key,
+        label: "新責任者",
+        shiftName: workShifts[0]?.name ?? "",
+        leaderStaffIds: [],
+        minCount: 1,
+      })
+    );
+    onOpenRule?.(key);
+  };
 
   // 責任者ルールを人が読める形で描く用。名前は絞り込み前の全スタッフから引く
   // （部署フィルタで責任者が消えても名前を解決できるように）。
@@ -274,6 +304,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           nameOf={nameOf}
           ruleBubbleUrl={ruleBubbleUrl}
           otherRules={otherRules}
+          onAddRule={scheduleId && onOpenRule ? handleAddRule : undefined}
         />
       </div>
 

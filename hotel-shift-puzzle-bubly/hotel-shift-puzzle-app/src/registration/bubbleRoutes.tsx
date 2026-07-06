@@ -98,6 +98,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenExtract={(staffIds) => openOrigin(scheduleExtractUrl(scheduleId, staffIds))}
       extractBubbleUrl={(staffIds) => scheduleExtractUrl(scheduleId, staffIds)}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
+      onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)

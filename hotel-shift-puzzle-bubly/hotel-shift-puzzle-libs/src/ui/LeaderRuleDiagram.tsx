@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, FC, useMemo, useState } from "react";
+import { DragEvent, FC, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, HTMLAttributes, LiHTMLAttributes, SVGProps } from "react";
 import styled, { css, keyframes } from "styled-components";
 import type { Keyframes } from "styled-components";
@@ -26,6 +26,20 @@ type LeaderRuleDiagramProps = {
   onDropUrl?: (url: string) => void;
   /** 受け付けるドラッグ型（例: Staff の drag type）。 */
   dropAcceptTypes?: string[];
+
+  // --- 編集（編集用コールバックを渡すと、その項目が編集可能になる） ---
+  /** 選べる勤務帯名の一覧（「入るべき時間帯」セレクトの選択肢）。onChangeShift と併せて渡す。 */
+  shiftNames?: string[];
+  /** 担当勤務帯（入るべき時間帯）を変えたとき呼ぶ。渡すとバッジがセレクトになる。 */
+  onChangeShift?: (shiftName: string) => void;
+  /** 表示ラベルを変えたとき呼ぶ。渡すとチップが入力欄になる。 */
+  onChangeLabel?: (label: string) => void;
+  /** 最低必要人数を変えたとき呼ぶ。渡すと人数が数値入力になる。 */
+  onChangeMinCount?: (minCount: number) => void;
+  /** 候補者から人を外すとき呼ぶ。渡すと各候補者に × が付く。 */
+  onRemoveStaff?: (staffId: string) => void;
+  /** ルールを丸ごと削除するとき呼ぶ。渡すと削除ボタンが出る。 */
+  onDeleteRule?: () => void;
 };
 
 // 行のレイアウト寸法（名前カラムと SVG で座標を共有するため JS 側で持つ）
@@ -71,10 +85,31 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
   shiftId,
   onDropUrl,
   dropAcceptTypes,
+  shiftNames,
+  onChangeShift,
+  onChangeLabel,
+  onChangeMinCount,
+  onRemoveStaff,
+  onDeleteRule,
 }) => {
   const ids = rule.leaderStaffIds;
   const n = ids.length;
   const animated = n > 1;
+
+  // ラベルは打鍵ごとに保存すると世界線にノードが増えるので、下書きを持って blur/Enter で確定する。
+  const [labelDraft, setLabelDraft] = useState(rule.label);
+  useEffect(() => setLabelDraft(rule.label), [rule.key, rule.label]);
+  const commitLabel = () => {
+    const next = labelDraft.trim();
+    if (next && next !== rule.label) onChangeLabel?.(next);
+    else setLabelDraft(rule.label);
+  };
+
+  // 勤務帯セレクトの選択肢。現在値が一覧に無い場合（新規ルール等）は先頭に補って必ず選べるようにする。
+  const shiftOptions = useMemo(() => {
+    const base = shiftNames ?? [];
+    return base.includes(rule.shiftName) ? base : [rule.shiftName, ...base];
+  }, [shiftNames, rule.shiftName]);
 
   // 人（Staff）をドロップして候補に追加する drop ゾーン。
   const [dragOver, setDragOver] = useState(false);
@@ -132,12 +167,42 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
       onDrop={droppable ? handleDrop : undefined}
     >
       <div className="e-head">
-        <span className="e-chip" style={leaderRoleStyle(rule.key)}>
-          {rule.label}
-        </span>
-        <span className="e-cond">
-          「{rule.shiftName}」に <strong>{quota}</strong>
-        </span>
+        {onChangeLabel ? (
+          <input
+            className="e-chip-input"
+            style={leaderRoleStyle(rule.key)}
+            value={labelDraft}
+            onChange={(e) => setLabelDraft(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            aria-label="責任者ラベル"
+          />
+        ) : (
+          <span className="e-chip" style={leaderRoleStyle(rule.key)}>
+            {rule.label}
+          </span>
+        )}
+        {onChangeMinCount ? (
+          <span className="e-cond">
+            担当勤務帯に 最低{" "}
+            <input
+              className="e-min-input"
+              type="number"
+              min={1}
+              value={rule.minCount}
+              onChange={(e) => onChangeMinCount(Number(e.target.value))}
+              aria-label="最低必要人数"
+            />{" "}
+            人
+          </span>
+        ) : (
+          <span className="e-cond">
+            「{rule.shiftName}」に <strong>{quota}</strong>
+          </span>
+        )}
       </div>
 
       <div className="e-body">
@@ -154,7 +219,18 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
               $onFg={shiftFg}
               $onBorder={shiftBorder}
             >
-              {nameOf(id)}
+              <span className="e-name-text">{nameOf(id)}</span>
+              {onRemoveStaff && (
+                <button
+                  type="button"
+                  className="e-remove"
+                  onClick={() => onRemoveStaff(id)}
+                  title={`${nameOf(id)} を候補から外す`}
+                  aria-label={`${nameOf(id)} を候補から外す`}
+                >
+                  ×
+                </button>
+              )}
             </NameItem>
           ))}
         </ul>
@@ -195,14 +271,43 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
         </svg>
 
         <div className="e-target">
-          <span className="e-leader-badge" style={shiftBadgeStyle}>
-            {rule.shiftName}
-          </span>
+          {onChangeShift ? (
+            <select
+              className="e-shift-select"
+              style={shiftBadgeStyle}
+              value={rule.shiftName}
+              onChange={(e) => onChangeShift(e.target.value)}
+              aria-label="入るべき時間帯（勤務帯）"
+            >
+              {shiftOptions.map((nm) => (
+                <option key={nm} value={nm}>
+                  {nm || "（勤務帯を選択）"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="e-leader-badge" style={shiftBadgeStyle}>
+              {rule.shiftName}
+            </span>
+          )}
         </div>
       </div>
 
       {droppable && (
         <div className="e-drop-hint">＋ ここに人をドロップで候補に追加</div>
+      )}
+
+      {onDeleteRule && (
+        <div className="e-actions">
+          <button
+            type="button"
+            className="e-delete-rule"
+            onClick={onDeleteRule}
+            title="この責任者ルールを削除する"
+          >
+            🗑 このルールを削除
+          </button>
+        </div>
       )}
     </StyledDiagram>
   );
@@ -222,9 +327,10 @@ const NameItem = styled.li<
 >`
   display: flex;
   align-items: center;
+  gap: 6px;
   box-sizing: border-box;
   height: ${ROW_H}px;
-  padding: 0 10px;
+  padding: 0 8px 0 10px;
   border-radius: 6px;
   white-space: nowrap;
   font-weight: 600;
@@ -244,6 +350,25 @@ const NameItem = styled.li<
           color: ${$onFg};
           border: 1px solid ${$onBorder};
         `}
+
+  .e-name-text {
+    flex: 1;
+  }
+  /* 候補者を外す × ボタン。控えめに置き、hover で目立たせる。 */
+  .e-remove {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: currentColor;
+    opacity: 0.5;
+    font-size: 1.1em;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    &:hover {
+      opacity: 1;
+    }
+  }
 `;
 
 /** 候補者→合流点の腕。animated のときは CSS keyframes で巡回点灯、単独のときは静的に点灯。 */
@@ -306,8 +431,35 @@ const StyledDiagram = styled.div<HTMLAttributes<HTMLDivElement>>`
     padding: 3px 7px;
     border-radius: 4px;
   }
+  /* 編集時のラベル入力（チップと同じ配色を inline style で受ける） */
+  .e-chip-input {
+    flex-shrink: 0;
+    width: 6em;
+    font-weight: bold;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    outline: none;
+    &:focus {
+      filter: brightness(0.97);
+    }
+  }
   .e-cond strong {
     color: #263238;
+  }
+  /* 編集時の最低人数入力 */
+  .e-min-input {
+    width: 3em;
+    text-align: center;
+    font-weight: 700;
+    padding: 2px 4px;
+    border: 1px solid #cfd8dc;
+    border-radius: 4px;
+    outline: none;
+    &:focus {
+      border-color: #3949ab;
+    }
   }
 
   .e-body {
@@ -342,5 +494,36 @@ const StyledDiagram = styled.div<HTMLAttributes<HTMLDivElement>>`
     padding: 4px 9px;
     border-radius: 6px;
     font-size: 1.05em;
+  }
+  /* 編集時の勤務帯セレクト（バッジと同じ配色を inline style で受ける） */
+  .e-shift-select {
+    font-weight: bold;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 1.05em;
+    cursor: pointer;
+    outline: none;
+    appearance: auto;
+  }
+
+  /* ルール削除など、ルール単位の操作 */
+  .e-actions {
+    margin-top: 2px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .e-delete-rule {
+    border: 1px solid #ef9a9a;
+    border-radius: 6px;
+    background: #fff;
+    color: #c62828;
+    font-size: 0.82em;
+    padding: 3px 10px;
+    cursor: pointer;
+    &:hover {
+      background: #ffebee;
+      border-color: #e57373;
+    }
   }
 `;
