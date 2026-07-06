@@ -5,6 +5,7 @@ import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bu
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
+import { useWheelLayerNavigation } from "../hooks/useWheelLayerNavigation.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
@@ -149,6 +150,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
   const { onResizeStart } = useBubbleResize({ bubble, ref });
+  const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
   const [headerOffset, setHeaderOffset] = useState(0);
@@ -271,7 +273,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       fillsContainer={bubble.fillsContainer}
       lightweightMode={lightweightMode}
     >
-      <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
+      <header className="e-bubble-header" ref={headerRef} onMouseDown={handleHeaderMouseDown}>
         <div
           className="e-address-bar"
           onClick={(e) => e.stopPropagation()}
