@@ -84,3 +84,13 @@ export const selectAllWorldLineObjectIds = createSelector(
   [selectWorldLines],
   (worldLines) => Object.keys(worldLines)
 );
+
+// 全operationHistoryの総操作数（論理クロック）。
+// バブルの「最終アクティブ時の seq」と比較することで、
+// 長期間未操作かどうかを判定できる。
+const selectOperationHistoryMap = (state: RootState) => state.worldLine.operationHistory;
+export const selectGlobalOperationSeq = createSelector(
+  [selectOperationHistoryMap],
+  (operationHistory) =>
+    Object.values(operationHistory).reduce((sum, ops) => sum + ops.length, 0),
+);

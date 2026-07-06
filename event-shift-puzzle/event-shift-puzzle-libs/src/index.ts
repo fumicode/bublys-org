@@ -4,6 +4,9 @@ import "./object-type-registration.js";
 // World-line graph 初期化（副作用）
 import "./world-line/init.js";
 
+// Listener middleware 初期化（副作用）
+import "./listener/init.js";
+
 // Domain models (re-exported from @bublys-org/event-shift-puzzle-model)
 export * from "./domain/index.js";
 

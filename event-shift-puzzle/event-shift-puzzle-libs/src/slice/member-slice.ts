@@ -3,51 +3,21 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { rootReducer, type RootState } from "@bublys-org/state-management";
 
 // ドメインモデルからインポート
-import {
-  Member,
-  type MemberState,
-  ShiftPreference,
-  type ShiftPreferenceState,
-} from "@bublys-org/event-shift-puzzle-model";
+import { Member, type MemberState } from "@bublys-org/event-shift-puzzle-model";
 
-export { ShiftPreference };
-export type { ShiftPreferenceState };
-
-// Re-export for convenience
 export { Member };
 export type { MemberState };
 
-// ShiftPlan関連は shift-plan-slice から再エクスポート（後方互換性）
-export {
-  shiftPlanSlice,
-  addShiftPlan,
-  updateShiftPlan,
-  deleteShiftPlan,
-  setCurrentShiftPlanId,
-  // プリミティブUI用 BlockList アクション
-  addUserToBlock,
-  removeUserFromBlock,
-  addUserToBlockRange,
-  selectShiftPlans as selectShiftPuzzlePlans,
-  selectCurrentShiftPlanId as selectShiftPuzzleCurrentPlanId,
-  selectShiftPlanById as selectShiftPuzzlePlanById,
-  selectCurrentShiftPlan as selectShiftPuzzleCurrentPlan,
-  ShiftPlan,
-  type ShiftPlanState,
-} from "./shift-plan-slice.js";
-
 // ========== State ==========
 
-type ShiftPuzzleMemberState = {
+type MemberSliceState = {
   memberList: MemberState[];
   selectedMemberId: string | null;
-  shiftPreferences: ShiftPreferenceState[];
 };
 
-const initialState: ShiftPuzzleMemberState = {
+const initialState: MemberSliceState = {
   memberList: [],
   selectedMemberId: null,
-  shiftPreferences: [],
 };
 
 // ========== 内部ユーティリティ ==========
@@ -65,8 +35,8 @@ const cloneMemberState = (m: MemberState): MemberState => ({
 
 // ========== Slice ==========
 
-export const shiftPuzzleSlice = createSlice({
-  name: "shiftPuzzle",
+export const memberSlice = createSlice({
+  name: "member",
   initialState,
   reducers: {
     setMemberList: (state, action: PayloadAction<MemberState[]>) => {
@@ -87,21 +57,6 @@ export const shiftPuzzleSlice = createSlice({
     setSelectedMemberId: (state, action: PayloadAction<string | null>) => {
       state.selectedMemberId = action.payload;
     },
-    setShiftPreference: (state, action: PayloadAction<ShiftPreferenceState>) => {
-      const cloned = {
-        ...action.payload,
-        entries: action.payload.entries.map((e) => ({ ...e, availableRanges: [...e.availableRanges] })),
-      };
-      const idx = state.shiftPreferences.findIndex((p) => p.memberId === cloned.memberId);
-      if (idx >= 0) {
-        state.shiftPreferences[idx] = cloned;
-      } else {
-        state.shiftPreferences.push(cloned);
-      }
-    },
-    removeShiftPreference: (state, action: PayloadAction<string /* memberId */>) => {
-      state.shiftPreferences = state.shiftPreferences.filter((p) => p.memberId !== action.payload);
-    },
   },
 });
 
@@ -111,25 +66,23 @@ export const {
   updateMember,
   deleteMember,
   setSelectedMemberId,
-  setShiftPreference,
-  removeShiftPreference,
-} = shiftPuzzleSlice.actions;
+} = memberSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加
 declare module "@bublys-org/state-management" {
-  export interface LazyLoadedSlices extends WithSlice<typeof shiftPuzzleSlice> {}
+  export interface LazyLoadedSlices extends WithSlice<typeof memberSlice> {}
 }
 
 // rootReducerに注入（副作用として実行）
-shiftPuzzleSlice.injectInto(rootReducer);
+memberSlice.injectInto(rootReducer);
 
 // ========== Selectors ==========
 
 // セレクター用の型
-type StateWithShiftPuzzle = RootState & { shiftPuzzle: ShiftPuzzleMemberState };
+type StateWithMember = RootState & { member: MemberSliceState };
 
 // 基本セレクター
-const selectMemberListRaw = (state: StateWithShiftPuzzle) => state.shiftPuzzle?.memberList ?? [];
+const selectMemberListRaw = (state: StateWithMember) => state.member?.memberList ?? [];
 
 /** 局員一覧を取得（ドメインオブジェクト） */
 export const selectShiftPuzzleMemberList = createSelector(
@@ -138,13 +91,13 @@ export const selectShiftPuzzleMemberList = createSelector(
 );
 
 /** 選択中の局員IDを取得 */
-export const selectShiftPuzzleSelectedMemberId = (state: StateWithShiftPuzzle): string | null =>
-  state.shiftPuzzle?.selectedMemberId ?? null;
+export const selectShiftPuzzleSelectedMemberId = (state: StateWithMember): string | null =>
+  state.member?.selectedMemberId ?? null;
 
 /** IDで局員を取得（ドメインオブジェクト） */
 export const selectShiftPuzzleMemberById = (id: string) =>
   createSelector(
-    [(state: StateWithShiftPuzzle) => (state.shiftPuzzle?.memberList ?? []).find((m) => m.id === id)],
+    [(state: StateWithMember) => (state.member?.memberList ?? []).find((m) => m.id === id)],
     (memberState): Member | undefined => {
       return memberState ? new Member(memberState) : undefined;
     }
@@ -152,19 +105,12 @@ export const selectShiftPuzzleMemberById = (id: string) =>
 
 /** 選択中の局員を取得（ドメインオブジェクト） */
 export const selectShiftPuzzleSelectedMember = createSelector(
-  [(state: StateWithShiftPuzzle) => {
-    const id = state.shiftPuzzle?.selectedMemberId;
+  [(state: StateWithMember) => {
+    const id = state.member?.selectedMemberId;
     if (!id) return undefined;
-    return (state.shiftPuzzle?.memberList ?? []).find((m) => m.id === id);
+    return (state.member?.memberList ?? []).find((m) => m.id === id);
   }],
   (memberState): Member | undefined => {
     return memberState ? new Member(memberState) : undefined;
   }
 );
-
-/** メンバーIDでシフト希望を取得（ドメインオブジェクト） */
-export const selectShiftPreferenceByMemberId = (memberId: string) =>
-  (state: StateWithShiftPuzzle): ShiftPreference | undefined => {
-    const found = (state.shiftPuzzle?.shiftPreferences ?? []).find((p) => p.memberId === memberId);
-    return found ? new ShiftPreference(found) : undefined;
-  };

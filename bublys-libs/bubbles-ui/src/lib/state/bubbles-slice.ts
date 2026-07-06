@@ -146,7 +146,6 @@ const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
-
 export const bubblesSlice = createSlice({
   name: "bubbleState",
   initialState: getInitialState,
@@ -647,6 +646,18 @@ export const makeSelectBubbleById = (bubbleId: string): BubbleByIdSelector => {
     bubbleSelectorCache.set(bubbleId, selector);
   }
   return bubbleSelectorCache.get(bubbleId)!;
+};
+
+/**
+ * バブルが削除された時に、そのバブルに関するセレクタキャッシュを解放する。
+ * キャッシュしないと、セッション中に作成・削除されたバブルの数だけ
+ * Map エントリ（reselect の memoize クロージャ）が消えずに残り続ける。
+ */
+export const evictBubbleSelectorCache = (bubbleId: string, universeId: string): void => {
+  bubbleSelectorCache.delete(bubbleId);
+  layerIndexSelectorCache.delete(bubbleId);
+  universeBubbleByIdCache.delete(`${universeId}:${bubbleId}`);
+  universeLayerIndexCache.delete(`${universeId}:${bubbleId}`);
 };
 
 /**
