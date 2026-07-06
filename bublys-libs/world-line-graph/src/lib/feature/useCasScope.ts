@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { shallowEqual } from 'react-redux';
 import {
   useAppDispatch,
   useAppSelector,
@@ -13,10 +14,10 @@ import { WorldLineGraph, type ForkChoice } from '../domain/WorldLineGraph';
 import {
   setGraph,
   setCasEntries,
-  selectWorldLineGraph,
 } from './worldLineGraphSlice';
 import { ObjectShell } from './ObjectShell';
 import { useCas } from './CasProvider';
+import { loadStatesFromIDB } from './IndexedDBStore';
 
 // ============================================================================
 // Options
@@ -78,10 +79,38 @@ export function useCasScope(
   const dispatch = useAppDispatch();
   const { registry } = useCas();
 
-  const graph = useAppSelector((state) => selectWorldLineGraph(state, scopeId));
-  const cas = useAppSelector(
-    (state: RootState) => state.worldLineGraph?.cas ?? {}
+  // graphJson は Immer の構造共有により、他 scope への dispatch では参照が
+  // 変わらない。selectWorldLineGraph のように毎回 fromJSON すると常に新しい
+  // インスタンスになり無関係な更新でも再レンダリングされてしまうため、
+  // JSON 参照が変わった時だけ WorldLineGraph を作り直す。
+  const graphJson = useAppSelector(
+    (state: RootState) => state.worldLineGraph?.graphs[scopeId]
   );
+  const graph = useMemo(
+    () => (graphJson ? WorldLineGraph.fromJSON(graphJson) : WorldLineGraph.empty()),
+    [graphJson]
+  );
+
+  // このscope自身の世界線が過去に参照した hash だけに絞って cas を購読する。
+  // cas はアプリ全体で共有された単一の CAS（他の universe/ShiftPlan/メモ等も
+  // 同じ Record を共有）なので、絞り込まずに購読すると無関係な scope の commit
+  // でもこの hook を使う全コンポーネントが再レンダリングされてしまう。
+  const scopeHashes = useMemo(() => {
+    const hashes: string[] = [];
+    for (const node of Object.values(graph.state.nodes)) {
+      for (const ref of node.changedRefs) hashes.push(ref.hash);
+    }
+    return hashes;
+  }, [graph]);
+
+  const cas = useAppSelector((state: RootState) => {
+    const fullCas = state.worldLineGraph?.cas ?? {};
+    const subset: Record<string, unknown> = {};
+    for (const hash of scopeHashes) {
+      if (fullCas[hash] !== undefined) subset[hash] = fullCas[hash];
+    }
+    return subset;
+  }, shallowEqual);
 
   // ============================================================
   // grow / navigation — Redux dispatch
@@ -92,7 +121,9 @@ export function useCasScope(
       const updated = graph.grow(changedRefs);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
       if (stateEntries.length > 0) {
-        dispatch(setCasEntries({ entries: stateEntries }));
+        // 直後に必要になる「現在の世界」が参照するハッシュは evict 対象から保護する
+        const protectHashes = updated.getCurrentStateRefs().map((ref) => ref.hash);
+        dispatch(setCasEntries({ entries: stateEntries, protectHashes }));
       }
     },
     [dispatch, scopeId, graph]
@@ -180,6 +211,35 @@ export function useCasScope(
     }
     return map;
   }, [currentRefs, cas, registry]);
+
+  // ============================================================
+  // オンデマンド取得（アカシックレコード）
+  //
+  // 現在の世界が参照しているはずのハッシュが Redux の cas に無い場合、
+  // evict済み（＝IndexedDBにのみ存在する）とみなして裏で取得し、
+  // setCasEntries で Redux に再水和する。
+  // ============================================================
+
+  const missingHashes = useMemo(() => {
+    const missing: string[] = [];
+    for (const ref of currentRefs) {
+      if (cas[ref.hash] === undefined) missing.push(ref.hash);
+    }
+    return missing;
+  }, [currentRefs, cas]);
+
+  useEffect(() => {
+    if (missingHashes.length === 0) return;
+    let cancelled = false;
+    loadStatesFromIDB(missingHashes).then((loaded) => {
+      if (cancelled || loaded.size === 0) return;
+      const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
+      dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [missingHashes, dispatch]);
 
   // ============================================================
   // 初回: root ノードを initialObjects で作成

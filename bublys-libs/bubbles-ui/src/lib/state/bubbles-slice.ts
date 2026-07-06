@@ -649,6 +649,18 @@ export const makeSelectBubbleById = (bubbleId: string): BubbleByIdSelector => {
 };
 
 /**
+ * バブルが削除された時に、そのバブルに関するセレクタキャッシュを解放する。
+ * キャッシュしないと、セッション中に作成・削除されたバブルの数だけ
+ * Map エントリ（reselect の memoize クロージャ）が消えずに残り続ける。
+ */
+export const evictBubbleSelectorCache = (bubbleId: string, universeId: string): void => {
+  bubbleSelectorCache.delete(bubbleId);
+  layerIndexSelectorCache.delete(bubbleId);
+  universeBubbleByIdCache.delete(`${universeId}:${bubbleId}`);
+  universeLayerIndexCache.delete(`${universeId}:${bubbleId}`);
+};
+
+/**
  * 個別バブルのlayerIndexを取得するセレクターファクトリー
  */
 type LayerIndexSelector = (state: { bubbleState: BubbleStateSlice }) => number;
