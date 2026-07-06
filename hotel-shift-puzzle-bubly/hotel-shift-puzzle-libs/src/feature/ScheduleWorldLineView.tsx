@@ -3,8 +3,9 @@
 /**
  * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
- * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、囲碁などと同じ共通ビュー
- * {@link WorldLineScopeView} で描く。
+ * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、共通ラッパ
+ * {@link WorldLineScopeView} ＋ ホテル専用の下→上・木登りビュー
+ * {@link ClimberWorldLineCanvasView}（renderCanvas で差し替え）で描く。
  *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
  *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
@@ -18,6 +19,7 @@ import {
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
+import { ClimberWorldLineCanvasView } from "../ui/ClimberWorldLineCanvasView.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
@@ -37,9 +39,9 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     formatAssignments
   );
 
-  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。すべて restore 経由で
-  // アプリ全体スコープへ反映する（共通の moveToSiblingBranch は scope.moveTo を使うので
-  // ここでは restore 版を自前で持つ）。
+  // 矢印キーで時間移動（下→上の木登りビューに合わせる: ↑ 子＝未来へ登る / ↓ 親＝過去へ降りる
+  // / ←→ 分岐の兄弟切替）。すべて restore 経由でアプリ全体スコープへ反映する
+  // （共通の moveToSiblingBranch は scope.moveTo を使うのでここでは restore 版を自前で持つ）。
   const keyBindings = useMemo<KeyBinding[]>(() => {
     const restoreSibling = (delta: number) => {
       const apex = scope.graph.getApex();
@@ -51,22 +53,22 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     };
     return [
       {
-        key: "ArrowLeft",
+        key: "ArrowDown",
         run: () => {
           const apex = scope.graph.getApex();
           if (apex?.parentId) restore(apex.parentId);
         },
       },
       {
-        key: "ArrowRight",
+        key: "ArrowUp",
         run: () => {
           const apex = scope.graph.getApex();
           const child = apex && scope.graph.getChildrenMap()[apex.id]?.[0];
           if (child) restore(child);
         },
       },
-      { key: "ArrowUp", run: () => restoreSibling(-1) },
-      { key: "ArrowDown", run: () => restoreSibling(1) },
+      { key: "ArrowLeft", run: () => restoreSibling(-1) },
+      { key: "ArrowRight", run: () => restoreSibling(1) },
     ];
   }, [scope, restore]);
 
@@ -88,6 +90,7 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
       keyBindings={keyBindings}
       onSelectNode={restore}
       nameable
+      renderCanvas={(p) => <ClimberWorldLineCanvasView {...p} />}
     />
   );
 };
