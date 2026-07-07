@@ -10,6 +10,7 @@ import {
   ScheduleGrid,
   HotelObjectsProvider,
   ScheduleWorldLineView,
+  ScheduleWorldLineTreeView,
   AvailabilityEditor,
   ScheduleViolationView,
   ShiftWishEditor,
@@ -72,6 +73,13 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
           "bubble-side"
         )
       }
+      onOpenTree={() =>
+        openBubble(
+          `hotel-shift-puzzle/schedules/${scheduleId}/tree`,
+          bubble.id,
+          "bubble-side"
+        )
+      }
       onOpenAvailability={() =>
         openBubble(
           `hotel-shift-puzzle/schedules/${scheduleId}/availability`,
@@ -103,6 +111,10 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
+// --- 勤務表の完成木ビューバブル（SVG版・読み取り専用） ---
+const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleWorldLineTreeView scheduleId={bubble.params.scheduleId} />);
+
 // --- 可能勤務帯エディタバブル ---
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
@@ -116,6 +128,8 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // 世界線ビューは画面下部の左右いっぱいストリップ（popChildViewPortBelow）で開く。
   // canvas を透かすため背景は半透明ダーク（igo の世界線ビューに揃える）。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/history", type: "schedule-history", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
+  // 完成木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },

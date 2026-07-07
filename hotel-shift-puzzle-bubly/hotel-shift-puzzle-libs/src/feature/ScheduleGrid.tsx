@@ -27,6 +27,8 @@ type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビューを開くハンドラ（ヘッダ右上のリンク用） */
   onOpenHistory?: () => void;
+  /** 完成木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
+  onOpenTree?: () => void;
   /** 可能勤務帯エディタを開くハンドラ */
   onOpenAvailability?: () => void;
   /** 制約違反（赤線）クリック時のハンドラ。違反 key を渡す */
@@ -40,6 +42,7 @@ type ScheduleGridProps = {
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
+  onOpenTree,
   onOpenAvailability,
   onOpenViolation,
 }) => {
@@ -114,6 +117,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           {onOpenHistory && (
             <button type="button" className="e-link" onClick={onOpenHistory}>
               🌐 世界線ビュー
+            </button>
+          )}
+          {onOpenTree && (
+            <button type="button" className="e-link" onClick={onOpenTree}>
+              🌳 木で見る
             </button>
           )}
         </div>
