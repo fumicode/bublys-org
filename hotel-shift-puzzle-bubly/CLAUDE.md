@@ -104,7 +104,7 @@ Redux を使わず props で受ける純粋な表示 component。`ui/index.ts` �
 ### 6. ObjectView ダブルクリック展開（hotel-shift-puzzle-libs/src/object-type-registration.ts）
 ```typescript
 registerObjectType('Staff', <StaffIcon fontSize="small" />);
-registerObjectBubble('Staff', { openingPosition: 'bubble-side' });
+registerObjectBubble('Staff', { openingPosition: 'bubble-side-right' });
 ```
 UI 側は `<ObjectView type="Staff" url={...}>` とするだけで自動展開。
 

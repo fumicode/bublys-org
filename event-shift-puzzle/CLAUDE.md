@@ -38,7 +38,7 @@ shift-plan-list
 
 ```typescript
 // object-type-registration.ts で登録
-registerObjectBubble('Member', { openingPosition: 'bubble-side' });
+registerObjectBubble('Member', { openingPosition: 'bubble-side-right' });
 
 // UI 側はこれだけ
 <ObjectView type="Member" url={buildMemberUrl(member.id)} label={member.name}>
@@ -231,7 +231,7 @@ const MyFeatureBubble: BubbleRoute["Component"] = ({ bubble }) => {
 ```typescript
 // 新しいオブジェクト型を登録
 registerObjectType('MyType', <MyIcon fontSize="small" />);
-registerObjectBubble('MyType', { openingPosition: 'bubble-side' });
+registerObjectBubble('MyType', { openingPosition: 'bubble-side-right' });
 ```
 
 UI 側では `<ObjectView type="MyType" url={...}>` とするだけで自動展開。

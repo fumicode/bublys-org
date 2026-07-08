@@ -35,7 +35,7 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
         openBubble(
           `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`,
           bubble.id,
-          "right-side"
+          "bubble-side-right"
         )
       }
     />
@@ -69,21 +69,21 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         openBubble(
           `hotel-shift-puzzle/schedules/${scheduleId}/history`,
           bubble.id,
-          "bottom-side"
+          "bubble-side-bottom"
         )
       }
       onOpenAvailability={() =>
         openBubble(
           `hotel-shift-puzzle/schedules/${scheduleId}/availability`,
           bubble.id,
-          "right-side"
+          "bubble-side-right"
         )
       }
       onOpenViolation={(violationKey) =>
         openBubble(
           `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`,
           bubble.id,
-          "top-side"
+          "bubble-side-top"
         )
       }
     />

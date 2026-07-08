@@ -53,7 +53,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           object={staff}
           label={staff.name}
           draggable={true}
-          openingPosition="left-side"
+          openingPosition="bubble-side-left"
           fullWidth={true}
         >
           <div

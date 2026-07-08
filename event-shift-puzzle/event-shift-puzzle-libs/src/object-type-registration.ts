@@ -13,7 +13,7 @@ registerObjectType('MemberAvailability', React.createElement(EventAvailableIcon,
 registerObjectType('Task', React.createElement(TaskIcon, { fontSize: 'small' }));
 registerObjectType('Shift', React.createElement(CalendarViewWeekIcon, { fontSize: 'small' }));
 
-registerObjectBubble('Member',             { openingPosition: 'right-side' });
-registerObjectBubble('Task',               { openingPosition: 'right-side' });
-registerObjectBubble('MemberAvailability', { openingPosition: 'right-side' });
+registerObjectBubble('Member',             { openingPosition: 'bubble-side-right' });
+registerObjectBubble('Task',               { openingPosition: 'bubble-side-right' });
+registerObjectBubble('MemberAvailability', { openingPosition: 'bubble-side-right' });
 registerObjectBubble('ShiftStatus',        { openingPosition: 'origin-side' });

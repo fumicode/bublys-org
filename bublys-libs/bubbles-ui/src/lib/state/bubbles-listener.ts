@@ -20,9 +20,9 @@ import { getOriginRect } from '../utils/get-origin-rect.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
 const toDirection = (pos: OpeningPosition): 'right' | 'left' | 'top' | 'bottom' => {
-  if (pos === 'left-side')   return 'left';
-  if (pos === 'top-side')    return 'top';
-  if (pos === 'bottom-side') return 'bottom';
+  if (pos === 'bubble-side-left')   return 'left';
+  if (pos === 'bubble-side-top')    return 'top';
+  if (pos === 'bubble-side-bottom') return 'bottom';
   return 'right';
 };
 
@@ -171,7 +171,7 @@ bubblesListener.startListening({
   effect: async (popChildAction, listenerApi) => {
     const payload = (popChildAction as ReturnType<typeof popChildInProcess>).payload;
     const poppingBubbleId = payload.bubbleId;
-    const openingPosition = payload.openingPosition ?? "right-side";
+    const openingPosition = payload.openingPosition ?? "bubble-side-right";
     const universeId = universeIdOf(popChildAction);
 
     const state = listenerApi.getState() as any;
