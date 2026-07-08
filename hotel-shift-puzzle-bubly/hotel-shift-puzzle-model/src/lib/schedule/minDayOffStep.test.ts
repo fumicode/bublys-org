@@ -97,4 +97,56 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
     expect(p1.schedule.countDayOffForStaff('A')).toBe(8);
     expect(offDays(p0.schedule)).not.toBe(offDays(p1.schedule));
   });
+
+  // 「休みでない日」（＝出勤 or 未定）が連続する最長区間の長さ。
+  // 未定を出勤で埋めた将来でも連勤が上限を超えないよう、この長さが maxConsecutive 以下であるべき。
+  const longestNonOffRun = (
+    s: ReturnType<typeof emptySchedule>,
+    staffId: string
+  ): number => {
+    let max = 0;
+    let run = 0;
+    for (const d of s.workingDays()) {
+      if (s.isDayOff(staffId, d)) {
+        run = 0;
+      } else {
+        run += 1;
+        if (run > max) max = run;
+      }
+    }
+    return max;
+  };
+
+  test('休みを暦全体に散らし、休みでない日が連勤上限(5)より長く続かない', () => {
+    // 30日の月に8日休み。空きを全部出勤で埋めても連勤6以上にならない配置になっているべき。
+    const result = step.run(emptySchedule(), ctxOf(['A']));
+
+    expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+    // 8日休みなら休みでない日の最長連続は 5 以下（＝将来 連勤6 が生まれない）
+    expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+  });
+
+  test('スタッフの並び順が後ろの人でも連勤上限(5)を超えない（月末に連勤を残さない）', () => {
+    // 旧実装は splitDay のズラしが区間の端に飛んで偏り、並び順 i が大きい人（例: 6人目）で
+    // 月末に6連勤が残っていた（山本・小林さんの症状）。全員について最長連続が5以下であるべき。
+    const ids = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    const result = step.run(emptySchedule(), ctxOf(ids));
+
+    for (const id of ids) {
+      expect(result.schedule.countDayOffForStaff(id)).toBe(8);
+      expect(longestNonOffRun(result.schedule, id)).toBeLessThanOrEqual(5);
+    }
+  });
+
+  test('確定出勤が飛び飛びにあっても、暦全体で連勤上限(5)を超えさせない', () => {
+    // 偶数日を早番で確定（＝飛び飛びの出勤）。奇数日は未定で休みを入れられる。
+    // 旧実装は「未定セルの添字空間」で均していたため、暦上の連勤（出勤＋未定の連続）を
+    // 意識できなかった。新実装は暦の最長連続区間から割るので、奇数日に休みが散って連勤が割れる。
+    let schedule = emptySchedule();
+    for (let d = 2; d <= 30; d += 2) schedule = schedule.assignShift('A', day(d), 'early');
+    const result = step.run(schedule, ctxOf(['A']));
+
+    expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+    expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+  });
 });
