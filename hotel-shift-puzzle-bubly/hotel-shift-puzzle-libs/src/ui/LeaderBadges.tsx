@@ -1,7 +1,6 @@
 'use client';
 
 import { CSSProperties, FC, Fragment } from "react";
-import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ShiftLeaderRule } from "../domain/index.js";
 
 /**
@@ -30,11 +29,11 @@ type LeaderBadgesProps = {
   /** バッジを出す対象スタッフ */
   staffId: string;
   /**
-   * 抽出バブルの URL を作る（そのルールの関係者ID群）。渡すとバッジが ObjectView になり、
-   * ダブルクリックで関係者だけの抽出バブルを開ける（展開・data-url・opener は ObjectView に一任）。
-   * 省略時は表示専用。URL スキームは app 層の関心事なので注入で受ける。
+   * バッジをクリックしたときに、そのルールの関係者ID群を渡すコールバック。渡すとバッジが
+   * クリック可能になり、押すと関係者を（表の中で）選択・強調して操作対象にできる。
+   * 省略時は表示専用（別バブルは開かない）。
    */
-  extractBubbleUrl?: (staffIds: string[]) => string;
+  onSelectRule?: (staffIds: string[]) => void;
 };
 
 /**
@@ -45,10 +44,10 @@ type LeaderBadgesProps = {
 export const LeaderBadges: FC<LeaderBadgesProps> = ({
   rules,
   staffId,
-  extractBubbleUrl,
+  onSelectRule,
 }) => {
   const myRules = rules.filter((r) => r.leaderStaffIds.includes(staffId));
-  const clickable = !!extractBubbleUrl;
+  const clickable = !!onSelectRule;
 
   return (
     <>
@@ -59,30 +58,27 @@ export const LeaderBadges: FC<LeaderBadgesProps> = ({
             style={leaderRoleStyle(rule.key)}
             title={
               clickable
-                ? `${rule.label}の関係者だけを抽出（ダブルクリック）`
+                ? `${rule.label}の関係者を選択（クリック）`
                 : `${rule.label}（${rule.shiftName}責任者）`
             }
           >
             {rule.label}
           </span>
         );
-        // ObjectView が data-url・ダブルクリック展開・opener（origin-side で近くに出す）を担う。
         // バッジは「スタッフ展開(.e-staff の onClick)」「スタッフ詳細(外側 ObjectView の dblclick)」の
-        // 内側にあるので、クリック/ダブルクリックを止めてバッジ自身の抽出だけを起こす。
-        return clickable && extractBubbleUrl ? (
+        // 内側にあるので、クリック/ダブルクリックを止めてバッジ自身の選択だけを起こす。
+        return clickable && onSelectRule ? (
           <span
             key={rule.key}
             style={{ display: "inline-flex" }}
-            onClick={(e) => e.stopPropagation()}
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectRule(rule.leaderStaffIds);
+            }}
             onDoubleClick={(e) => e.stopPropagation()}
           >
-            <ObjectView
-              url={extractBubbleUrl(rule.leaderStaffIds)}
-              openingPosition="origin-side"
-              draggable={false}
-            >
-              {badge}
-            </ObjectView>
+            {badge}
           </span>
         ) : (
           <Fragment key={rule.key}>{badge}</Fragment>

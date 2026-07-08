@@ -26,7 +26,6 @@ import {
   scheduleAvailabilityUrl,
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
-  scheduleExtractUrl,
   scheduleLeaderRuleUrl,
 } from "./bubbleUrls.js";
 
@@ -95,8 +94,6 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       autoShiftUrl={autoShiftUrl}
-      onOpenExtract={(staffIds) => openOrigin(scheduleExtractUrl(scheduleId, staffIds))}
-      extractBubbleUrl={(staffIds) => scheduleExtractUrl(scheduleId, staffIds)}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}

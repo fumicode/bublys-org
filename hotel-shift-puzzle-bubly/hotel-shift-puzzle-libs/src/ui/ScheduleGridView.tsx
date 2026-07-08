@@ -59,8 +59,8 @@ type ScheduleGridViewProps = {
   selectedStaffIds?: Set<string>;
   /** スタッフの抽出選択をトグルする */
   onToggleStaffSelected?: (staffId: string) => void;
-  /** 抽出バブルの URL（責任者バッジの ObjectView の data-url アンカー用） */
-  extractBubbleUrl?: (staffIds: string[]) => string;
+  /** 責任者バッジのクリックで、そのルールの関係者を選択させるコールバック */
+  onSelectRule?: (staffIds: string[]) => void;
   /** 月の最低休日数。これ未満のスタッフは右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
   /** 1日の休み人数の上限。footer の休み行でこれを超えた日を赤くする */
@@ -116,11 +116,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   violationUrl,
   selectedStaffIds,
   onToggleStaffSelected,
-  extractBubbleUrl,
+  onSelectRule,
   minDayOff,
   maxDayOffPerDay,
 }) => {
   const days = schedule.workingDays();
+
+  // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
+  const focusActive = (selectedStaffIds?.size ?? 0) > 0;
 
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
@@ -232,7 +235,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
-          extractBubbleUrl={extractBubbleUrl}
+          onSelectRule={onSelectRule}
+          focused={focusActive && !!selectedStaffIds?.has(staff.id)}
+          dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
         />
       ));
@@ -270,7 +275,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           selected={selectedStaffIds?.has(staff.id)}
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
-          extractBubbleUrl={extractBubbleUrl}
+          onSelectRule={onSelectRule}
+          focused={focusActive && !!selectedStaffIds?.has(staff.id)}
+          dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
         />
       )),

@@ -31,6 +31,8 @@ type ScheduleDataCellProps = {
    * origin-side で開いたバブルがそのマーカーの近くに出る。
    */
   violationUrl?: (violation: ConstraintViolation) => string;
+  /** 行の強調/減光用に付ける追加クラス（選択モード時の is-focused / is-dimmed）。 */
+  cellClassName?: string;
 };
 
 /**
@@ -51,8 +53,10 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   onSelect,
   onOpenEditor,
   violationUrl,
+  cellClassName,
 }) => {
   let className = "e-cell";
+  if (cellClassName) className += ` ${cellClassName}`;
   let style: React.CSSProperties | undefined;
   let content: React.ReactNode;
   let title: string | undefined;

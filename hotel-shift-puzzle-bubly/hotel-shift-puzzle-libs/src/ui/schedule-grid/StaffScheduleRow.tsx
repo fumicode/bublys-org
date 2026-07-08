@@ -43,8 +43,12 @@ type StaffScheduleRowProps = {
   onToggleSelected?: (staffId: string) => void;
   /** 責任者ルール（解決済み）。このスタッフが属するルールを名前横のバッジに出す */
   leaderRules?: ShiftLeaderRule[];
-  /** 抽出バブルの URL（責任者バッジの ObjectView に渡す。ダブルクリックで関係者を抽出） */
-  extractBubbleUrl?: (staffIds: string[]) => string;
+  /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
+  onSelectRule?: (staffIds: string[]) => void;
+  /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
+  focused?: boolean;
+  /** 選択モード中で、この行が対象外（減光＝blur でぼかす） */
+  dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
 };
@@ -71,14 +75,19 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   selected,
   onToggleSelected,
   leaderRules = [],
-  extractBubbleUrl,
+  onSelectRule,
+  focused,
+  dimmed,
   minDayOff,
 }) => {
+  // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
+  // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
+  const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
           名前クリックで希望行の開閉。左に抽出用チェックボックス（任意）。 */}
-      <div className="e-staff-cell">
+      <div className={`e-staff-cell${rowMod}`}>
         {onToggleSelected && (
           <input
             type="checkbox"
@@ -108,7 +117,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <LeaderBadges
               rules={leaderRules}
               staffId={staff.id}
-              extractBubbleUrl={extractBubbleUrl}
+              onSelectRule={onSelectRule}
             />
           </div>
         </ObjectView>
@@ -135,6 +144,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onSelect={() => onSelectCell(staff.id, day)}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             violationUrl={violationUrl}
+            cellClassName={rowMod.trim() || undefined}
           />
         );
       })}
@@ -155,7 +165,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           <div
             className={`e-off-total${underMin ? " is-under-min" : ""}${
               url ? " is-clickable" : ""
-            }`}
+            }${rowMod}`}
             title={
               underMin
                 ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）${

@@ -11,14 +11,22 @@ import {
   StaffMonthlyShiftWish,
   ScheduleConstraints,
   SHIFT_LEADER_CONSTRAINT,
+  fulfillWishesStep,
+  makePartnerCoverStep,
+  makeSatisfyLeaderRulesStep,
+  makeMinDayOffStep,
+  type AutoShiftStep,
   type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { commitCandidates, localScopeId } from "../objects/commit.js";
+import { runAutoShiftStep } from "./autoShift.js";
+import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
@@ -51,10 +59,6 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
-  /** 抽出バブルを開くハンドラ。選択中スタッフID群を渡す */
-  onOpenExtract?: (staffIds: string[]) => void;
-  /** 抽出バブルの URL を作る（選択中スタッフID群）。抽出ボタンの data-url に使う */
-  extractBubbleUrl?: (staffIds: string[]) => string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
   /**
@@ -82,12 +86,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   autoShiftUrl,
   dayBubbleUrl,
   violationBubbleUrl,
-  onOpenExtract,
-  extractBubbleUrl,
   ruleBubbleUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
+  const store = useAppStore();
+  const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
   const availability = useObject<ScheduleAvailability>(
@@ -141,6 +145,44 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
   const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+
+  // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
+  const minDayOff = constraints?.minMonthlyDayOff ?? 8;
+  const maxPerDay = constraints?.maxDayOffPerDay ?? 8;
+
+  // 責任者バッジのクリック: そのルールの担当者を選択に足す（全員入っていれば外す＝トグル）。
+  const selectRuleStaff = (ids: string[]) =>
+    setSelectedStaffIds((prev) => {
+      const next = new Set(prev);
+      const allIn = ids.length > 0 && ids.every((id) => next.has(id));
+      if (allIn) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+
+  // 自動シフトの操作対象（subset）: 選択があればその人たち、無ければ全員。並び順は勤務表順を保つ。
+  const subsetStaff = useMemo(
+    () =>
+      selectedStaffIds.size > 0
+        ? staffList.filter((s) => selectedStaffIds.has(s.id))
+        : staffList,
+    [staffList, selectedStaffIds]
+  );
+
+  // 操作対象に関係する責任者ルール（メンバー全員が subset に含まれるものだけ）。
+  // 選択が空＝全員のときは、担当者のいるルールすべてが対象になる。相方裏ボタンはこれごとに出す。
+  const relevantRules = useMemo(() => {
+    const idSet = new Set(subsetStaff.map((s) => s.id));
+    return leaderRules.filter(
+      (r) => r.leaderStaffIds.length > 0 && r.leaderStaffIds.every((id) => idSet.has(id))
+    );
+  }, [leaderRules, subsetStaff]);
+
+  // 自動シフトコマンド（希望を叶える＋関係ルールごとの相方裏）。ExtractedSchedule と同じ組み立て。
+  const steps = useMemo<AutoShiftStep[]>(
+    () => [fulfillWishesStep, ...relevantRules.map((rule) => makePartnerCoverStep(rule))],
+    [relevantRules]
+  );
 
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
@@ -217,6 +259,55 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // セル編集: シェルにメソッドを実行するだけ → 監視している世界線すべてへ自動保存
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
     update((s) => s.setCell(staffId, day, to));
+  };
+
+  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる
+  const handleRunStep = (step: AutoShiftStep) => {
+    const result = runAutoShiftStep(step, {
+      schedule,
+      staffList: subsetStaff,
+      workShifts,
+      wishByStaff,
+      availability,
+    });
+    update(() => result.schedule);
+    setAutoMessage(`${step.label}: ${result.message}`);
+  };
+
+  // 完成案の複数生成：対象スタッフについて「毎日 担当勤務帯に責任者が最低1人いる」かつ
+  // 「全員が月◯日休む（1日◯人まで）」を満たす完成案を phase 違いで N 案つくり、
+  // それぞれ独立した世界線（兄弟ブランチ）に書く。
+  const handleGenerateCandidates = () => {
+    if (!scheduleId) return;
+    const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
+      runAutoShiftStep(step, {
+        schedule: sched,
+        staffList: subsetStaff,
+        workShifts,
+        wishByStaff,
+        availability,
+      }).schedule;
+    const buildCandidate = (phase: number): MonthlyStaffSchedule => {
+      let s = schedule;
+      s = runOn(s, fulfillWishesStep);
+      s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
+      s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
+      return s;
+    };
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
+      obj: buildCandidate(i),
+      label: `案${i + 1}`,
+    }));
+    commitCandidates(
+      store,
+      localScopeId(SCHEDULE_TYPE, scheduleId),
+      SCHEDULE_TYPE,
+      schedule,
+      candidates
+    );
+    setAutoMessage(
+      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
+    );
   };
 
   // 必要スタッフ数の編集（その日・全日）。同じくシェル経由で保存される
@@ -308,33 +399,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         />
       </div>
 
-      {/* グリッド領域。選択中はスタッフ列の左に「抽出」ボタンを absolute で浮かべる */}
+      {/* グリッド領域 */}
       <div className="e-grid-area">
-        {onOpenExtract && selectedIds.length > 0 && (
-          <div className="e-extract-float">
-            {withUrl(
-              extractBubbleUrl?.(selectedIds),
-              <button
-                type="button"
-                className="e-extract"
-                onClick={() => onOpenExtract(selectedIds)}
-                title="選択したスタッフだけの勤務表を開く"
-              >
-                抽出 ({selectedIds.length})
-              </button>
-            )}
-            <button
-              type="button"
-              className="e-extract-clear"
-              onClick={() => setSelectedStaffIds(new Set())}
-              title="選択を解除"
-              aria-label="選択を解除"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
         <ScheduleGridView
           schedule={schedule}
           staffList={filteredStaffList}
@@ -345,8 +411,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           leaderRules={leaderRules}
           selectedStaffIds={selectedStaffIds}
-          onToggleStaffSelected={onOpenExtract ? toggleStaffSelected : undefined}
-          extractBubbleUrl={extractBubbleUrl}
+          onToggleStaffSelected={toggleStaffSelected}
+          onSelectRule={selectRuleStaff}
           minDayOff={constraints?.minMonthlyDayOff}
           maxDayOffPerDay={constraints?.maxDayOffPerDay}
           onChangeCell={handleChangeCell}
@@ -358,6 +424,61 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           }
         />
       </div>
+
+      {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
+      <div className="e-auto-bar">
+        <span className="e-auto-target">
+          対象:{" "}
+          {selectedIds.length > 0 ? (
+            <>
+              選択 {selectedIds.length} 名
+              <button
+                type="button"
+                className="e-auto-clear"
+                onClick={() => setSelectedStaffIds(new Set())}
+                title="選択を解除"
+              >
+                解除
+              </button>
+            </>
+          ) : (
+            "全員"
+          )}
+        </span>
+        {steps.map((step) => (
+          <button
+            key={step.key}
+            type="button"
+            className="e-auto"
+            title={step.description}
+            onClick={() => handleRunStep(step)}
+          >
+            {step.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="e-candidate-run"
+          title={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          onClick={handleGenerateCandidates}
+        >
+          🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る
+        </button>
+      </div>
+
+      {autoMessage && (
+        <div className="e-auto-message">
+          {autoMessage}
+          <button
+            type="button"
+            className="e-auto-close"
+            aria-label="閉じる"
+            onClick={() => setAutoMessage(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
       {onOpenHistory && (
@@ -443,44 +564,97 @@ const StyledContainer = styled.div`
     position: relative;
   }
 
-  /* 選択中だけ、スタッフ列の左に浮かぶ抽出ボタン（absolute・フローに影響しない） */
-  .e-extract-float {
-    position: absolute;
-    left: 4px;
-    top: 4px;
-    z-index: 20;
+  /* 自動シフト操作バー（グリッド下）。対象＝選択スタッフ（無ければ全員）に対して実行する */
+  .e-auto-bar {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 4px 3px 6px;
-    background: #e8f5e9;
-    border: 1px solid #a5d6a7;
-    border-radius: 999px;
-    box-shadow: 0 2px 8px hsla(0, 0%, 0%, 0.18);
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
 
-    .e-extract {
-      border: none;
-      border-radius: 999px;
-      background: #43a047;
-      color: #fff;
+    .e-auto-target {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       font-size: 0.8em;
-      font-weight: 700;
-      padding: 4px 12px;
+      color: #455a64;
+      margin-right: 2px;
+    }
+    .e-auto-clear {
+      border: 1px solid #cfd8dc;
+      border-radius: 999px;
+      background: #fff;
+      color: #607d8b;
+      font-size: 0.85em;
+      line-height: 1;
+      padding: 2px 8px;
       cursor: pointer;
       &:hover {
-        background: #388e3c;
+        background: #eceff1;
+        border-color: #90a4ae;
       }
     }
-    .e-extract-clear {
+
+    .e-auto {
+      border: 1px solid #b39ddb;
+      border-radius: 6px;
+      background: #fff;
+      color: #5e35b1;
+      font-size: 0.8em;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #ede7f6;
+        border-color: #9575cd;
+      }
+    }
+
+    /* 複数案（世界線）生成ボタン */
+    .e-candidate-run {
+      border: 1px solid #a5d6a7;
+      border-radius: 6px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 0.8em;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #c8e6c9;
+        border-color: #66bb6a;
+      }
+    }
+  }
+
+  .e-auto-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #ede7f6;
+    border: 1px solid #d1c4e9;
+    border-radius: 6px;
+    color: #4527a0;
+    font-size: 0.82em;
+
+    .e-auto-close {
+      margin-left: auto;
       border: none;
       background: transparent;
-      color: #2e7d32;
+      color: #7e57c2;
       font-size: 1.1em;
       line-height: 1;
       cursor: pointer;
-      padding: 0 4px;
+      padding: 0 2px;
+
       &:hover {
-        color: #1b5e20;
+        color: #4527a0;
       }
     }
   }

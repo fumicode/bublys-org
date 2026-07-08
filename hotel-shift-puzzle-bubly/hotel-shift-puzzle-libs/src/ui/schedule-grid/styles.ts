@@ -23,6 +23,25 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 選択モード（責任者バッジ/チェックで対象を選択中）の行の見た目。
+     行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルへ同じクラスを付けて表現する。
+     - is-dimmed: 対象外の行。blur でぼかし薄くして背景に退かせる（クリックは可能なまま）。
+     - is-focused: 対象の行。うっすら黄色く強調して少し浮かせる（sticky セルを崩さないよう transform は使わない）。 */
+  .e-staff-cell.is-dimmed,
+  .e-cell.is-dimmed,
+  .e-off-total.is-dimmed {
+    filter: blur(1.4px);
+    opacity: 0.4;
+  }
+  .e-staff-cell.is-focused {
+    background: #fffde7;
+    box-shadow: inset 3px 0 0 #fbc02d;
+  }
+  .e-cell.is-focused,
+  .e-off-total.is-focused {
+    background: #fffdf3;
+  }
+
   /* 共通セル */
   .e-corner,
   .e-day-head,
