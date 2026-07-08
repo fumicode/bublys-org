@@ -1,8 +1,9 @@
 'use client';
 
-import React, { FC, useMemo } from 'react';
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { WorldLineGraph } from '../domain/WorldLineGraph.js';
 import { computeTreeLayout } from './treeLayout.js';
+import { computeOrganicTree, OrganicEdge } from './organicTree.js';
 
 // ============================================================================
 // Types
@@ -25,23 +26,28 @@ export type WorldLineTreeViewProps = {
 
 const PADDING = 28;
 const NODE_RADIUS = 6;
-const APEX_RING_GAP = 2.5;
-const EDGE_BASE_WIDTH = 1.2;
+const APEX_GLOW_RADIUS = 16;
+const FADE_MS = 380;
+
+const edgeKey = (from: string, to: string) => `${from}->${to}`;
+const leafKey = (nodeId: string) => `leaf:${nodeId}`;
+const nodeKey = (nodeId: string) => `node:${nodeId}`;
 
 // ============================================================================
-// WorldLineTreeView — 木のビジュアル化（SVG・静的/軽インタラクティブ）
+// WorldLineTreeView — 成果木（有機的な木のビジュアル・SVG・読み取り専用）
 // ============================================================================
 
 /**
  * world-line グラフを「根が下、世代が進むほど上に伸びる木」として SVG に描く、
- * 完成した世界線の全体像を眺めて特徴を掴むための読み取り専用ビュー。
+ * 完成した世界線の全体像を眺めて達成感を味わうための読み取り専用ビュー（UI上は「成果木」）。
  *
- * {@link WorldLinesCanvasView}（bubbles-ui、編集中の操作用）とは目的が異なる:
- * こちらは apex 追従の魚眼カメラを持たず、木全体を一目で見せることを優先する。
- * SVG の viewBox + preserveAspectRatio="xMidYMid meet" により、木の高さ
- * （treeLayout の既定 TREE_HEIGHT）は与えられたバブルの実際の描画サイズに
- * 収まるよう自動的に縮小表示される——バブルのサイズ自体をこの component が
- * 決めようとはしない（バブルの既定サイズはバブル側の関心事）。
+ * 分岐構造の可読性より情緒的な見た目を優先し、computeOrganicTree で生成した
+ * ジッター・テーパー付きの枝と葉の花/実の装飾を、開いたときに root 側から
+ * timestamp 順で伸びるアニメーションとともに描く。ジッターはノード/エッジIDから
+ * 決定的にシードされるため、同じグラフ状態なら再レンダリングしても同じ見た目になる。
+ *
+ * 開いている間に編集が進んで新しい枝/葉が増えた場合は、その場でアニメーションを
+ * 巻き戻さず即座にフル表示にする（「開いた瞬間の履歴だけが育つ演出の対象」というルール）。
  */
 export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
   graph,
@@ -50,8 +56,44 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
 }) => {
   const layout = useMemo(() => computeTreeLayout(graph), [graph.state]);
   const apexNodeId = graph.state.apexNodeId;
-
   const labelize = getNodeLabel ?? (() => '');
+
+  const nodeTimestamps = useMemo(
+    () => new Map(Object.values(graph.state.nodes).map((n) => [n.id, n.timestamp])),
+    [graph.state]
+  );
+  const organic = useMemo(
+    () => computeOrganicTree(layout, apexNodeId, nodeTimestamps),
+    [layout, apexNodeId, nodeTimestamps]
+  );
+
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // マウント後に最初に育っていた枝/葉/ノードだけをアニメーション対象として記録する。
+  // それ以降に増えたものは delay 無しでその場にフル表示にする。
+  const initialKeysRef = useRef<Set<string> | null>(null);
+  if (initialKeysRef.current === null && layout.nodes.size > 0) {
+    const keys = new Set<string>();
+    for (const edge of organic.edges) keys.add(edgeKey(edge.from, edge.to));
+    for (const leaf of organic.leaves) keys.add(leafKey(leaf.nodeId));
+    for (const id of layout.nodes.keys()) keys.add(nodeKey(id));
+    initialKeysRef.current = keys;
+  }
+  const isAnimated = (key: string) => initialKeysRef.current?.has(key) ?? false;
+
+  const edgeCompletionByTo = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const edge of organic.edges) map.set(edge.to, edge.delayMs + edge.durationMs);
+    return map;
+  }, [organic.edges]);
+  const leafByNodeId = useMemo(
+    () => new Map(organic.leaves.map((leaf) => [leaf.nodeId, leaf])),
+    [organic.leaves]
+  );
 
   if (layout.nodes.size === 0) {
     return <div style={styles.root}><div style={styles.emptyText}>履歴がありません。編集すると記録されます。</div></div>;
@@ -63,37 +105,29 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
 
   return (
     <div style={styles.root}>
+      <style>{`
+        @keyframes bublys-achievement-tree-apex-pulse {
+          0%, 100% { opacity: 0.35; }
+          50% { opacity: 0.7; }
+        }
+      `}</style>
       <svg viewBox={viewBox} preserveAspectRatio="xMidYMid meet" style={styles.svg}>
-        {layout.edges.map((edge) => {
-          const from = layout.nodes.get(edge.from);
-          const to = layout.nodes.get(edge.to);
-          if (!from || !to) return null;
-          const cpx = from.x + (to.x - from.x) * 0.15;
-          const cpy = from.y + (to.y - from.y) * 0.75;
-          // 分岐の広がり（subtreeWidth）だけでなく、この枝1本に畳み込まれた元の
-          // 編集回数（editCount）でも太くする——分岐が無くても、同じ一本道で
-          // 何度も編集を重ねた枝は幹らしく太く見える。
-          const widthFactor =
-            1 +
-            Math.log2(1 + to.subtreeWidth) * 0.8 +
-            Math.log2(1 + edge.editCount) * 0.6;
-          return (
-            <path
-              key={`${edge.from}->${edge.to}`}
-              d={`M ${from.x} ${from.y} Q ${cpx} ${cpy} ${to.x} ${to.y}`}
-              fill="none"
-              stroke={to.color}
-              strokeOpacity={0.65}
-              strokeWidth={EDGE_BASE_WIDTH * widthFactor}
-              strokeLinecap="round"
-            />
-          );
+        {organic.edges.map((edge) => {
+          const animated = isAnimated(edgeKey(edge.from, edge.to));
+          return <OrganicEdgeView key={edgeKey(edge.from, edge.to)} edge={edge} started={started} animated={animated} />;
         })}
 
         {Array.from(layout.nodes.entries()).map(([id, node]) => {
           const isApex = id === apexNodeId;
           const label = labelize(id);
           const title = label || id.slice(-6);
+          const revealAtMs = edgeCompletionByTo.get(id) ?? 0;
+          const animated = isAnimated(nodeKey(id));
+          const fadeStyle: React.CSSProperties = {
+            opacity: started ? 1 : 0,
+            transition: animated ? `opacity ${FADE_MS}ms ease-out ${revealAtMs}ms` : 'none',
+          };
+          const leaf = node.isLeaf ? leafByNodeId.get(id) : undefined;
 
           return (
             <g
@@ -102,32 +136,52 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
               style={onSelectNode ? styles.clickable : undefined}
             >
               <title>{title}</title>
+
               {isApex && (
                 <circle
                   cx={node.x}
                   cy={node.y}
-                  r={NODE_RADIUS + APEX_RING_GAP}
-                  fill="none"
-                  stroke={node.color}
-                  strokeOpacity={0.5}
-                  strokeWidth={1.5}
+                  r={APEX_GLOW_RADIUS}
+                  fill={node.color}
+                  style={{
+                    ...fadeStyle,
+                    filter: 'blur(4px)',
+                    animation: started ? 'bublys-achievement-tree-apex-pulse 2.4s ease-in-out infinite' : undefined,
+                    animationDelay: `${revealAtMs}ms`,
+                  }}
                 />
               )}
-              <circle
-                cx={node.x}
-                cy={node.y}
-                r={node.isLeaf ? NODE_RADIUS * 0.75 : NODE_RADIUS}
-                fill={isApex ? node.color : node.isLeaf ? 'rgba(126,231,135,0.35)' : 'rgba(20,22,30,0.85)'}
-                stroke={node.color}
-                strokeWidth={isApex ? 1.5 : 1}
-              />
+
+              {leaf ? (
+                <g style={fadeStyle}>
+                  {leaf.petals.map((petal, i) => (
+                    <circle
+                      key={i}
+                      cx={node.x + petal.dx}
+                      cy={node.y + petal.dy}
+                      r={petal.r}
+                      fill={leaf.color}
+                      fillOpacity={0.85}
+                    />
+                  ))}
+                </g>
+              ) : (
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r={NODE_RADIUS * 0.6}
+                  fill="rgba(20,22,30,0.85)"
+                  stroke={node.color}
+                  strokeWidth={isApex ? 1.5 : 1}
+                  style={fadeStyle}
+                />
+              )}
+
+              {/* クリック当たり判定（装飾の見た目に関わらず一定サイズを確保） */}
+              <circle cx={node.x} cy={node.y} r={NODE_RADIUS + 4} fill="transparent" style={{ pointerEvents: 'all' }} />
+
               {label && (
-                <text
-                  x={node.x}
-                  y={node.y - NODE_RADIUS - 4}
-                  textAnchor="middle"
-                  style={styles.labelText}
-                >
+                <text x={node.x} y={node.y - NODE_RADIUS - 4} textAnchor="middle" style={{ ...styles.labelText, ...fadeStyle }}>
                   {label}
                 </text>
               )}
@@ -136,6 +190,40 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
         })}
       </svg>
     </div>
+  );
+};
+
+// ============================================================================
+// 枝1本の描画（中心線が伸びるアニメーション → テーパー付き輪郭のフェードイン）
+// ============================================================================
+
+const OrganicEdgeView: FC<{ edge: OrganicEdge; started: boolean; animated: boolean }> = ({
+  edge,
+  started,
+  animated,
+}) => {
+  const centerlineStyle: React.CSSProperties = {
+    strokeDashoffset: started ? 0 : edge.approxLength,
+    transition: animated ? `stroke-dashoffset ${edge.durationMs}ms ease-out ${edge.delayMs}ms` : 'none',
+  };
+  const outlineStyle: React.CSSProperties = {
+    opacity: started ? 1 : 0,
+    transition: animated ? `opacity ${edge.durationMs}ms ease-out ${edge.delayMs + edge.durationMs}ms` : 'none',
+  };
+
+  return (
+    <>
+      <path
+        d={edge.centerlinePath}
+        fill="none"
+        stroke={edge.barkColor}
+        strokeWidth={Math.max(1, edge.widthTo * 0.6)}
+        strokeLinecap="round"
+        strokeDasharray={edge.approxLength}
+        style={centerlineStyle}
+      />
+      <path d={edge.outlinePath} fill={edge.barkColor} style={outlineStyle} />
+    </>
   );
 };
 

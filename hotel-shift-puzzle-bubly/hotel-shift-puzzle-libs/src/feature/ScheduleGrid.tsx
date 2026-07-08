@@ -121,7 +121,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           )}
           {onOpenTree && (
             <button type="button" className="e-link" onClick={onOpenTree}>
-              🌳 木で見る
+              🌳 成果木で見る
             </button>
           )}
         </div>

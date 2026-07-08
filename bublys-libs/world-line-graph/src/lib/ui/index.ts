@@ -7,3 +7,13 @@ export {
   type TreeNodeLayout,
   type TreeEdge,
 } from "./treeLayout.js";
+export {
+  computeOrganicTree,
+  DEFAULT_ORGANIC_TREE_OPTIONS,
+  type OrganicTree,
+  type OrganicEdge,
+  type OrganicLeaf,
+  type OrganicApex,
+  type OrganicPetal,
+  type OrganicTreeOptions,
+} from "./organicTree.js";

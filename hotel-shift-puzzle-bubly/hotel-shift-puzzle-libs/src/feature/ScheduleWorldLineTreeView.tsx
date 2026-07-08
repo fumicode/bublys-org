@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * ScheduleWorldLineTreeView — 勤務表の完成木ビュー（読み取り専用）
+ * ScheduleWorldLineTreeView — 勤務表の成果木ビュー（読み取り専用）
  *
  * ScheduleWorldLineView（世界線ビュー・canvas版、編集中の操作向け）とは別に、
  * 「作成後の評価」として世界線グラフを木のビジュアルに変換して見せるビュー。
- * ノードクリックはローカルの詳細パネル表示のみで、勤務表の状態は変更しない
- * （restore を呼ばない）。
+ * ノードクリックで詳細パネルを開閉（同じノードをもう一度クリック、または
+ * 閉じるボタンで閉じる）するだけで、勤務表の状態は変更しない（restore を呼ばない）。
  */
 import { FC, useState } from "react";
 import styled from "styled-components";
@@ -25,6 +25,10 @@ export const ScheduleWorldLineTreeView: FC<Props> = ({ scheduleId }) => {
   const apexNodeId = scope.graph.state.apexNodeId;
   const selectedNode = selectedNodeId ? scope.graph.state.nodes[selectedNodeId] : null;
 
+  const handleSelectNode = (id: string) => {
+    setSelectedNodeId((prev) => (prev === id ? null : id));
+  };
+
   if (!scope.graph.state.rootNodeId) {
     return (
       <StyledEmpty>履歴がありません。勤務表を編集すると記録されます。</StyledEmpty>
@@ -37,11 +41,19 @@ export const ScheduleWorldLineTreeView: FC<Props> = ({ scheduleId }) => {
         <WorldLineTreeView
           graph={scope.graph}
           getNodeLabel={getNodeLabel}
-          onSelectNode={setSelectedNodeId}
+          onSelectNode={handleSelectNode}
         />
       </div>
       {selectedNode && (
         <StyledDetailPanel>
+          <button
+            type="button"
+            className="d-close"
+            onClick={() => setSelectedNodeId(null)}
+            aria-label="閉じる"
+          >
+            ×
+          </button>
           <div className="d-row">
             <span className="d-key">状態</span>
             <span className="d-val">
@@ -99,6 +111,23 @@ const StyledDetailPanel = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.15);
   font-size: 0.78em;
   color: rgba(230, 235, 255, 0.92);
+
+  .d-close {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    border: none;
+    background: transparent;
+    color: rgba(230, 235, 255, 0.6);
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+
+    &:hover {
+      color: rgba(230, 235, 255, 0.95);
+    }
+  }
 
   .d-row {
     display: flex;
