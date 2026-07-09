@@ -1,19 +1,33 @@
 "use client";
 
 import { useContext, type ReactNode } from "react";
-import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, type OpeningPosition } from "@bublys-org/bubbles-ui";
 import {
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
   ScheduleCollection,
   ScheduleGrid,
+  ScheduleDayDetail,
+  AutoShiftPanel,
+  ExtractedSchedule,
   HotelObjectsProvider,
   ScheduleWorldLineView,
   AvailabilityEditor,
   ScheduleViolationView,
   ShiftWishEditor,
+  LeaderRuleView,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+// バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
+// registerObjectUrl 副作用も走る。
+import {
+  scheduleDayUrl,
+  scheduleViolationUrl,
+  scheduleAvailabilityUrl,
+  scheduleWorldLineUrl,
+  scheduleAutoShiftUrl,
+  scheduleLeaderRuleUrl,
+} from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
 // HotelObjectsProvider（CASレジストリ）配下に置く。
@@ -58,37 +72,61 @@ const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShi
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<ScheduleCollection />);
 
-// --- 月間スタッフ勤務表バブル（グリッド + 世界線ビュー / 可能勤務帯へのリンク） ---
+// --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
+  // バブル URL のスキームは app 層（ここ）の関心事。
+  // 可能勤務帯・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
+  // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
+  const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
+  const worldLineUrl = scheduleWorldLineUrl(scheduleId);
+  const autoShiftUrl = scheduleAutoShiftUrl(scheduleId);
+  // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
+  const openSide = (url: string, position: OpeningPosition) =>
+    openBubble(url, bubble.id, position);
+  // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
+  const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
-      onOpenHistory={() =>
-        openBubble(
-          `hotel-shift-puzzle/schedules/${scheduleId}/history`,
-          bubble.id,
-          "bubble-side-bottom"
-        )
-      }
-      onOpenAvailability={() =>
-        openBubble(
-          `hotel-shift-puzzle/schedules/${scheduleId}/availability`,
-          bubble.id,
-          "bubble-side-right"
-        )
-      }
-      onOpenViolation={(violationKey) =>
-        openBubble(
-          `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`,
-          bubble.id,
-          "bubble-side-top"
-        )
+      onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
+      onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
+      onOpenAutoShift={() => openSide(autoShiftUrl, "bubble-side-right")}
+      availabilityUrl={availabilityUrl}
+      worldLineUrl={worldLineUrl}
+      autoShiftUrl={autoShiftUrl}
+      ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
+      onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
+      dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
+      violationBubbleUrl={(violationKey) =>
+        scheduleViolationUrl(scheduleId, violationKey)
       }
     />
   );
 };
+
+// --- 自動シフト パネルバブル（勤務表の「🪄 自動シフト」ボタンから開く） ---
+const AutoShiftBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<AutoShiftPanel scheduleId={bubble.params.scheduleId} />);
+
+// --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
+const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ExtractedSchedule
+      scheduleId={bubble.params.scheduleId}
+      staffIds={(bubble.params.staffIds ?? "").split(",").filter(Boolean)}
+    />
+  );
+
+// --- 稼働日 詳細バブル（勤務表の日付ヘッダクリックで開く） ---
+const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ScheduleDayDetail
+      scheduleId={bubble.params.scheduleId}
+      dayKey={bubble.params.dayKey}
+    />
+  );
 
 // --- 制約違反バブル（赤線クリックで開く） ---
 const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -103,6 +141,15 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
+// --- 責任者ルール可視化バブル（上部ルール行のクリックで開く） ---
+const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <LeaderRuleView
+      scheduleId={bubble.params.scheduleId}
+      ruleKey={bubble.params.ruleKey}
+    />
+  );
+
 // --- 可能勤務帯エディタバブル ---
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
@@ -113,11 +160,18 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
-  // 世界線ビューは画面下部の左右いっぱいストリップ（popChildViewPortBelow）で開く。
-  // canvas を透かすため背景は半透明ダーク（igo の世界線ビューに揃える）。
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/history", type: "schedule-history", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
+  // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
+  // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。
+  // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
+  // ので普通の BubbleView（クリック可）として描かれ、窓をリサイズすると canvas も伸縮する。
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 400, height: 300 } } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },
+  // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
 ];

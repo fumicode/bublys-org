@@ -19,9 +19,14 @@ export const MAX_CONSECUTIVE_WORKDAYS = "max-consecutive-workdays";
 
 export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   readonly type = MAX_CONSECUTIVE_WORKDAYS;
+  readonly label = "連勤";
 
   /** @param maxConsecutive 許容する連勤日数の上限（既定 5） */
   constructor(readonly maxConsecutive: number = 5) {}
+
+  describe(): string {
+    return `連勤は最大${this.maxConsecutive}日まで`;
+  }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];

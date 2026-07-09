@@ -83,7 +83,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // Redux を使ったアクションハンドラ
-  const deleteBubble = (b: Bubble) => {
+  const deleteBubble = useCallback((b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
 
@@ -95,15 +95,15 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       console.log('[BubblesUI] Deleting shell:', { shellId, shellType });
       shellManager.removeShell(shellId);
     }
-  };
+  }, [dispatch, shellManager]);
 
-  const layerDown = (b: Bubble) => {
+  const layerDown = useCallback((b: Bubble) => {
     dispatch(layerDownAction(b.id));
-  };
+  }, [dispatch]);
 
-  const layerUp = (b: Bubble) => {
+  const layerUp = useCallback((b: Bubble) => {
     dispatch(layerUpAction(b.id));
-  };
+  }, [dispatch]);
 
 
   const popChild = useCallback((
@@ -203,8 +203,16 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openBubble: popChildOrJoinSibling,
   }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
 
+  const handleBubbleClick = useCallback((name: string) => {
+    console.log("Bubble clicked: " + name);
+  }, []);
+
+  const handleBubbleResize = useCallback((bubble: Bubble) => {
+    console.log("Bubble resized: " + bubble.url, bubble.size);
+  }, []);
+
   // Pocketのドロップハンドラー
-  const handlePocketDrop = (url: string, type: DragDataType, label?: string, objectId?: string) => {
+  const handlePocketDrop = useCallback((url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
       id: crypto.randomUUID(),
       url,
@@ -213,7 +221,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       label,
       addedAt: Date.now(),
     }));
-  };
+  }, [dispatch]);
 
   // Pocketアイテムのクリックハンドラー
   const handlePocketItemClick = useCallback((url: string) => {
@@ -258,9 +266,9 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
                   bubbleLayers={bubbleLayers}
                   vanishingPoint={globalCoordinateSystem.vanishingPoint}
                   renderBubbleContent={renderAppsBubbleContent}
-                  onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                  onBubbleClick={handleBubbleClick}
                   onBubbleClose={deleteBubble}
-                  onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                  onBubbleResize={handleBubbleResize}
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}

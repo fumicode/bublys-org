@@ -14,6 +14,7 @@ import {
   bubblesListener,
   shellBubbleListener,
   shellDeletionListener,
+  bubbleSelectorCacheListener,
 } from "@bublys-org/bubbles-ui";
 import * as BubblesUI from "@bublys-org/bubbles-ui";
 import * as MuiMaterial from "@mui/material";
@@ -70,6 +71,7 @@ function initializeApp() {
   injectMiddleware(bubblesListener.middleware);
   injectMiddleware(shellBubbleListener.middleware);
   injectMiddleware(shellDeletionListener.middleware);
+  injectMiddleware(bubbleSelectorCacheListener.middleware);
   addToBlacklist(bubblesSlice.reducerPath);
 }
 
@@ -87,7 +89,6 @@ export default function StoreProvider({
   }
 
   const { store, persistor } = storePersistorRef.current;
-
 
   return (
     <Provider store={store}>

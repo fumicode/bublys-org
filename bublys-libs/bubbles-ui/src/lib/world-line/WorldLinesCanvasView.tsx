@@ -473,9 +473,14 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const px = e.clientX - rect.left;
-      const py = e.clientY - rect.top;
       const { w, h } = viewportRef.current;
+      // getBoundingClientRect は CSS transform（奥レイヤーの拡大縮小）後の実寸を返すが、
+      // 描画/当たり判定はレイアウト座標（viewport.w/h = clientWidth/Height）で行う。
+      // 表示スケール（rect 実寸 / レイアウト寸）でクリック位置を割り戻して座標系を合わせる。
+      const fx = rect.width / w || 1;
+      const fy = rect.height / h || 1;
+      const px = (e.clientX - rect.left) / fx;
+      const py = (e.clientY - rect.top) / fy;
       const project = makeProjector(layoutRef.current, focusRef.current.x, focusRef.current.y, w, h);
       let bestId: string | null = null;
       let bestD2 = Infinity;

@@ -4,17 +4,43 @@ import { FC, useState } from "react";
 import styled from "styled-components";
 import { Staff } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
+import EditIcon from "@mui/icons-material/Edit";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import { IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type StaffDetailViewProps = {
   staff: Staff;
+  /** 部署を変更する */
+  onChangeDepartment?: (department: string) => void;
   /** 指定した年月のシフト希望エディタを開く */
   onOpenWish?: (year: number, month: number) => void;
 };
 
-export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff, onOpenWish }) => {
+export const StaffDetailView: FC<StaffDetailViewProps> = ({
+  staff,
+  onChangeDepartment,
+  onOpenWish,
+}) => {
   const [year, setYear] = useState(2026);
   const [month, setMonth] = useState(6);
+  const [editingDept, setEditingDept] = useState(false);
+  const [deptValue, setDeptValue] = useState("");
+
+  const startEditDept = () => {
+    setDeptValue(staff.department);
+    setEditingDept(true);
+  };
+
+  const commitDept = () => {
+    onChangeDepartment?.(deptValue.trim());
+    setEditingDept(false);
+  };
+
+  const cancelDept = () => {
+    setEditingDept(false);
+  };
 
   return (
     <StyledStaffDetail>
@@ -40,6 +66,47 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({ staff, onOpenWish })
           <dd>{staff.id}</dd>
           <dt>名前</dt>
           <dd>{staff.name}</dd>
+          <dt>部署</dt>
+          <dd className="e-dept-row">
+            {editingDept ? (
+              <>
+                <TextField
+                  variant="standard"
+                  size="small"
+                  autoFocus
+                  value={deptValue}
+                  onChange={(e) => setDeptValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitDept();
+                    if (e.key === "Escape") cancelDept();
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <IconButton size="small" aria-label="保存" onClick={commitDept}>
+                  <CheckIcon fontSize="small" sx={{ color: "#2e7d32" }} />
+                </IconButton>
+                <IconButton size="small" aria-label="キャンセル" onClick={cancelDept}>
+                  <CloseIcon fontSize="small" sx={{ color: "#999" }} />
+                </IconButton>
+              </>
+            ) : (
+              <>
+                <span className="e-dept-label">
+                  {staff.department || "（未設定）"}
+                </span>
+                {onChangeDepartment && (
+                  <IconButton
+                    size="small"
+                    aria-label="部署を編集"
+                    onClick={startEditDept}
+                    sx={{ color: "#b0b0b0", "&:hover": { color: "#1976d2" } }}
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </>
+            )}
+          </dd>
         </dl>
       </section>
 
@@ -126,6 +193,17 @@ const StyledStaffDetail = styled.div`
 
     dd {
       margin: 0;
+    }
+
+    .e-dept-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      .e-dept-label {
+        flex: 1;
+        color: #3949ab;
+      }
     }
   }
 

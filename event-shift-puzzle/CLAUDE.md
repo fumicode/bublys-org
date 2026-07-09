@@ -112,8 +112,12 @@ event-shift-puzzle-app（libs + bubbles-ui）
 | スライス | 管理対象 |
 |---|---|
 | `shift-plan-slice` | ShiftPlan[] + currentShiftPlanId |
-| `shift-puzzle-slice` | Member[] + selectedMemberId + ShiftPreference[] |
+| `member-slice` | Member[] + selectedMemberId |
+| `shift-preference-slice` | ShiftPreference[]（`memberId`で局員に紐づく独立エンティティ） |
 | `task-slice` | Task[] + selectedTaskId |
+
+局員削除時は `member-shift-preference-listener`（`event-shift-puzzle-libs/src/listener/`）が
+`deleteMember` を監視し、紐づく `ShiftPreference` を連動削除する（スライス分割によりreducer単体では完結しないため）。
 
 ### 主要アクション（BlockList 操作）
 

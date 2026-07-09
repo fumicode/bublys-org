@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useAppDispatch } from "@bublys-org/state-management";
-import type { Size2 } from "@bublys-org/bubbles-ui-util";
+import { CoordinateSystem, type Size2 } from "@bublys-org/bubbles-ui-util";
 import { Bubble } from "../Bubble.domain.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { updateBubble } from "../state/bubbles-slice.js";
@@ -9,6 +9,8 @@ import { updateBubble } from "../state/bubbles-slice.js";
 type UseBubbleResizeArgs = {
   bubble: Bubble;
   ref: React.RefObject<HTMLElement | null>;
+  /** このバブルが属するレイヤー。奥レイヤーは scale で縮小表示されるため変換に必要。 */
+  layerIndex?: number;
 };
 
 const MIN_SIZE: Size2 = { width: 160, height: 100 };
@@ -23,23 +25,32 @@ const MIN_SIZE: Size2 = { width: 160, height: 100 };
  *    同時に maximized: false を立てて「ユーザーがサイズを決めた」状態に遷移する
  *    （最大化状態だった場合はそれが解除される）
  */
-export function useBubbleResize({ bubble, ref }: UseBubbleResizeArgs) {
+export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs) {
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
 
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
+  const layerIndexRef = useRef(layerIndex);
+  layerIndexRef.current = layerIndex;
 
+  // サイズはレイヤーローカル座標で扱う（style.width/height はローカル、bubble.size もローカル）。
   const startSizeRef = useRef<Size2 | null>(null);
   const startMouseRef = useRef<{ x: number; y: number } | null>(null);
   const currentSizeRef = useRef<Size2 | null>(null);
 
   const handleResizing = (e: MouseEvent) => {
     if (!startSizeRef.current || !startMouseRef.current || !ref.current) return;
-    const dx = e.clientX - startMouseRef.current.x;
-    const dy = e.clientY - startMouseRef.current.y;
-    const w = Math.max(MIN_SIZE.width, startSizeRef.current.width + dx);
-    const h = Math.max(MIN_SIZE.height, startSizeRef.current.height + dy);
+    // マウス移動は画面座標。奥レイヤーは scale で縮むので、ドラッグと同じ CoordinateSystem の核で
+    // 画面 delta → レイヤーローカル delta に変換してからローカルの起点サイズに足す。
+    const screenDelta = {
+      x: e.clientX - startMouseRef.current.x,
+      y: e.clientY - startMouseRef.current.y,
+    };
+    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);
+    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
+    const w = Math.max(MIN_SIZE.width, startSizeRef.current.width + localDelta.x);
+    const h = Math.max(MIN_SIZE.height, startSizeRef.current.height + localDelta.y);
     currentSizeRef.current = { width: w, height: h };
     ref.current.style.width = `${w}px`;
     ref.current.style.height = `${h}px`;
@@ -74,7 +85,10 @@ export function useBubbleResize({ bubble, ref }: UseBubbleResizeArgs) {
     e.preventDefault?.();
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    startSizeRef.current = { width: rect.width, height: rect.height };
+    // getBoundingClientRect は画面座標（scale 後）。style.width/height はローカル座標なので、
+    // scale で割ってローカルの起点サイズにそろえる（奥レイヤーで scale<1 のときズレないように）。
+    const { scale } = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);
+    startSizeRef.current = { width: rect.width / scale, height: rect.height / scale };
     startMouseRef.current = { x: e.clientX, y: e.clientY };
     document.addEventListener("mousemove", handleResizing);
     document.addEventListener("mouseup", endResize);

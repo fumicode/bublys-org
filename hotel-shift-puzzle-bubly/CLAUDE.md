@@ -76,6 +76,15 @@ hotel-shift-puzzle-app/src/
   → `update` reducer で保存」する。
   例: `dispatch(updateSchedule(schedule.setCell(staffId, day, to).toPlain()))`
   （`setCell` は `MonthlyStaffSchedule` のメソッド。スライスに `setCell` を書かない）
+- **バブル URL スキームは app 層に置く**（オブジェクトの正規 URL も含む）。
+  libs（domain/ui/feature）に `hotel-shift-puzzle/...` の URL 文字列を書かない。
+  - ルート/サブビューの URL ビルダーは `registration/bubbleUrls.ts` に定義し、route の
+    pattern（`bubbleRoutes.tsx`）と隣り合わせる。feature へは props で注入する
+  - オブジェクトの正規 URL（Staff/Schedule 等）も app から `registerObjectUrl(type, …)`
+    で登録する（記述子 `defineObjects` の `url` は使わない）。`url` は型固有の属性ではなく
+    routing 束縛なので app の関心事。`getId`/`serialize` 等の intrinsic な側面だけ libs に残す
+  - UI 側は `ObjectView` に URL を渡すだけ。展開・data-url・openBubble・opener 解決は
+    ObjectView に一任する（自前で UrledPlace＋openBubble を組まない）
 
 ---
 
@@ -98,7 +107,9 @@ Redux を使わず props で受ける純粋な表示 component。`ui/index.ts` �
 `useAppSelector` / `useAppDispatch` で Redux と UI をつなぐ。`feature/index.ts` から export。
 
 ### 5. バブルルート（hotel-shift-puzzle-app/src/registration/bubbleRoutes.tsx）
-`hotelShiftPuzzleBubbleRoutes` 配列にルートを追加。必要なら `app/app.tsx` の `menuItems` と
+`hotelShiftPuzzleBubbleRoutes` 配列にルートを追加。URL ビルダーは `registration/bubbleUrls.ts`
+に書き（pattern と隣り合わせる）、オブジェクトの URL なら同ファイルで `registerObjectUrl` 登録、
+サブビューの URL なら feature へ props で注入する。必要なら `app/app.tsx` の `menuItems` と
 `bubly.ts` の `menuItems` / `initialBubbleUrls` にもエントリーを足す。
 
 ### 6. ObjectView ダブルクリック展開（hotel-shift-puzzle-libs/src/object-type-registration.ts）
