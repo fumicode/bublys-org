@@ -1,12 +1,16 @@
 import { FC, RefObject, useLayoutEffect, useState } from "react";
-import { SHIFT_FG } from "./constants.js";
+import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 
-/** ホバー中セルと制約関係にある相手（1責任者ルール分）。 */
+/** ホバー中セルの人が属する1責任者ルール分の関係（勤務帯→全メンバー）。 */
 export type ConstraintHoverGroup = {
-  /** 担当勤務帯の id（線の色に使う。未解決なら既定色）。 */
+  /** 担当勤務帯の id（色に使う。未解決なら既定色）。 */
   shiftId?: string;
-  /** 同じルールの相手スタッフID（ホバー中の本人は除く。表示中の人だけ）。 */
-  partnerIds: string[];
+  /** 担当勤務帯の表示名（起点ノードのラベル。例: 早番）。 */
+  shiftName: string;
+  /** ルールの全メンバー（表示中の人だけ。本人も含む）。 */
+  memberIds: string[];
+  /** その日にルールが満たされているか（✅/⚠️ の切り替え）。 */
+  satisfied: boolean;
 };
 
 type Props = {
@@ -14,38 +18,60 @@ type Props = {
   gridRef: RefObject<HTMLDivElement | null>;
   /** ホバー中の日（列）の key。 */
   dayKey: string;
-  /** ホバー中のスタッフID（線の起点）。 */
-  hoveredStaffId: string;
-  /** ホバー中の本人を含む各責任者ルールの相手集合。 */
+  /** ホバー中セルの人が属する責任者ルール群。 */
   groups: ConstraintHoverGroup[];
 };
 
-type Geom = {
+type Ribbon = { d: string; color: string };
+type Node = {
+  x: number;
+  y: number;
   w: number;
   h: number;
-  lines: Array<{ d: string; color: string }>;
-  dots: Array<{ x: number; y: number; color: string; strong: boolean }>;
+  bg: string;
+  fg: string;
+  label: string;
+  icon: string;
+};
+type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[] };
+
+const DEFAULT_FG = "#607d8b";
+const DEFAULT_BG = "#eceff1";
+const RIBBON_W = 7; // リボン（面）の太さ
+const NODE_GAP = 40; // 列の右端から勤務帯ノードまでの距離
+const NODE_H = 22;
+const RULE_STRIDE = 104; // 複数ルールのときノードを右へずらす量
+
+/** 太さ RIBBON_W の半透明リボン（面）のパスを作る。start（セル右端）→ node（勤務帯）を結ぶ。 */
+const ribbonPath = (
+  sx: number,
+  sy: number,
+  nx: number,
+  ny: number
+): string => {
+  const half = RIBBON_W / 2;
+  const c1x = sx + (nx - sx) * 0.45;
+  const c2x = nx - (nx - sx) * 0.25;
+  // 上辺（セル右端 → ノード）を C 曲線で、下辺を逆向きに戻して閉じる＝帯状の面。
+  return (
+    `M ${sx} ${sy - half} ` +
+    `C ${c1x} ${sy - half}, ${c2x} ${ny - half}, ${nx} ${ny - half} ` +
+    `L ${nx} ${ny + half} ` +
+    `C ${c2x} ${ny + half}, ${c1x} ${sy + half}, ${sx} ${sy + half} Z`
+  );
 };
 
-const DEFAULT_COLOR = "#607d8b";
-
 /**
- * 勤務表グリッドにホバー中だけ重なる、制約関係の可視化オーバーレイ。
+ * 勤務表グリッドにホバー中だけ重なる、責任者制約の関係オーバーレイ。
  *
- * ホバーしたセル（その人・その日）から、同じ責任者ルールの相手の「同じ日のセル」へ曲線を引く。
- * 線の色は担当勤務帯の色（LeaderRuleDiagram と同じ SHIFT_FG）。同じ列＝縦に並ぶので、数字を
- * 隠さないよう右側へ膨らませる。複数ルール（早責＋予責など）は色ぶんだけ膨らみをずらす。
+ * ルールビューと同じ「勤務帯（早番など）から候補者みんなへ」の構造を、表の中にコンパクトに描く。
+ * ホバー中の日の列で、担当勤務帯のノードを列の右に置き、そこから各メンバーのセル右端へ
+ * 半透明の面（リボン）を等しく伸ばす。ノードには ✅/⚠️ でその日の充足/未充足を出す。
  *
- * 座標は各セルの offsetLeft/offsetTop（.e-grid を基準にした content 座標）で測る。SVG も
- * content サイズで .e-grid 内に絶対配置するため、グリッドのスクロールに自然に追従する。
- * pointer-events:none なのでホバー判定やセル操作の邪魔をしない。
+ * セルは一切隠さない：リボンはセルの右端から外側（列の右の余白）へ出る。座標は各セルの
+ * offsetLeft/Top（.e-grid 基準の content 座標）で測るので、行展開やスクロールでもズレない。
  */
-export const ConstraintHoverOverlay: FC<Props> = ({
-  gridRef,
-  dayKey,
-  hoveredStaffId,
-  groups,
-}) => {
+export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) => {
   const [geom, setGeom] = useState<Geom | null>(null);
 
   useLayoutEffect(() => {
@@ -54,46 +80,49 @@ export const ConstraintHoverOverlay: FC<Props> = ({
       setGeom(null);
       return;
     }
-    const rectOf = (staffId: string) => {
+    // セルの「右端・上下中央」の座標を返す。
+    const edgeOf = (staffId: string) => {
       const el = grid.querySelector<HTMLElement>(
         `[data-cell-key="${staffId}:${dayKey}"]`
       );
       if (!el) return null;
-      return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+      return { rx: el.offsetLeft + el.offsetWidth, cy: el.offsetTop + el.offsetHeight / 2 };
     };
 
-    const anchor = rectOf(hoveredStaffId);
-    if (!anchor) {
+    const ribbons: Ribbon[] = [];
+    const nodes: Node[] = [];
+
+    groups.forEach((g, gi) => {
+      const pts = g.memberIds
+        .map(edgeOf)
+        .filter((p): p is { rx: number; cy: number } => !!p);
+      if (pts.length === 0) return;
+
+      const fg = (g.shiftId && SHIFT_FG[g.shiftId]) || DEFAULT_FG;
+      const bg = (g.shiftId && SHIFT_BG[g.shiftId]) || DEFAULT_BG;
+      const colRight = Math.max(...pts.map((p) => p.rx));
+      const ys = pts.map((p) => p.cy);
+      const ny = (Math.min(...ys) + Math.max(...ys)) / 2; // メンバーの上下中央に勤務帯ノード
+      const nx = colRight + NODE_GAP + gi * RULE_STRIDE;
+
+      for (const p of pts) {
+        ribbons.push({ d: ribbonPath(p.rx, p.cy, nx, ny), color: fg });
+      }
+
+      const icon = g.satisfied ? "✅" : "⚠️";
+      const label = `${g.shiftName} ${icon}`;
+      const w = 18 + label.length * 12;
+      nodes.push({ x: nx, y: ny - NODE_H / 2, w, h: NODE_H, bg, fg, label, icon });
+    });
+
+    if (ribbons.length === 0) {
       setGeom(null);
       return;
     }
-    const ax = anchor.x + anchor.w / 2;
-    const ay = anchor.y + anchor.h / 2;
-    const colRight = anchor.x + anchor.w;
+    setGeom({ w: grid.scrollWidth, h: grid.scrollHeight, ribbons, nodes });
+  }, [gridRef, dayKey, groups]);
 
-    const lines: Geom["lines"] = [];
-    const dots: Geom["dots"] = [{ x: ax, y: ay, color: "#37474f", strong: true }];
-
-    groups.forEach((g, gi) => {
-      const color = (g.shiftId && SHIFT_FG[g.shiftId]) || DEFAULT_COLOR;
-      for (const pid of g.partnerIds) {
-        const r = rectOf(pid);
-        if (!r) continue;
-        const px = r.x + r.w / 2;
-        const py = r.y + r.h / 2;
-        const dist = Math.abs(py - ay);
-        // 同じ列なので右側へ弓なりに膨らませる（縦距離に応じて・ルールごとに少しずらす）。
-        const bulge = colRight + 8 + Math.min(28, dist * 0.28) + gi * 7;
-        const my = (ay + py) / 2;
-        lines.push({ d: `M ${ax} ${ay} Q ${bulge} ${my} ${px} ${py}`, color });
-        dots.push({ x: px, y: py, color, strong: false });
-      }
-    });
-
-    setGeom({ w: grid.scrollWidth, h: grid.scrollHeight, lines, dots });
-  }, [gridRef, dayKey, hoveredStaffId, groups]);
-
-  if (!geom || geom.lines.length === 0) return null;
+  if (!geom) return null;
 
   return (
     <svg
@@ -110,27 +139,32 @@ export const ConstraintHoverOverlay: FC<Props> = ({
       }}
       aria-hidden
     >
-      {geom.lines.map((l, i) => (
-        <path
-          key={`l${i}`}
-          d={l.d}
-          fill="none"
-          stroke={l.color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          opacity={0.9}
-        />
+      {geom.ribbons.map((r, i) => (
+        <path key={`r${i}`} d={r.d} fill={r.color} opacity={0.3} />
       ))}
-      {geom.dots.map((dt, i) => (
-        <circle
-          key={`d${i}`}
-          cx={dt.x}
-          cy={dt.y}
-          r={dt.strong ? 4.5 : 3.5}
-          fill={dt.color}
-          stroke="#fff"
-          strokeWidth={1.5}
-        />
+      {geom.nodes.map((n, i) => (
+        <g key={`n${i}`}>
+          <rect
+            x={n.x}
+            y={n.y}
+            width={n.w}
+            height={n.h}
+            rx={n.h / 2}
+            fill={n.bg}
+            stroke={n.fg}
+            strokeOpacity={0.5}
+          />
+          <text
+            x={n.x + 10}
+            y={n.y + n.h / 2}
+            dominantBaseline="central"
+            fontSize={12}
+            fontWeight={700}
+            fill={n.fg}
+          >
+            {n.label}
+          </text>
+        </g>
       ))}
     </svg>
   );

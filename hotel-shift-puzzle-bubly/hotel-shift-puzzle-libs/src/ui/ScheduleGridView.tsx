@@ -141,26 +141,37 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   // ホバー中セル（"staffId:dayKey"）。制約関係オーバーレイの起点。
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
-  // ホバー中セルの人と、同じ責任者ルールに属する相手（同日の相手セルへ線を引く）を導く。
+  // ホバー中セルの人が属する責任者ルールごとに、担当勤務帯（早番など）から全メンバーへ
+  // ブレースを描くための情報を導く。制約がその日に満たされているかも添える。
   const hoverInfo = useMemo(() => {
     if (!hoveredCell) return null;
     const sep = hoveredCell.indexOf(":");
     if (sep < 0) return null;
     const staffId = hoveredCell.slice(0, sep);
     const dayKey = hoveredCell.slice(sep + 1);
+    const day = days.find((d) => d.key === dayKey);
     const visible = new Set(staffList.map((s) => s.id));
     const groups: ConstraintHoverGroup[] = [];
     for (const rule of leaderRules) {
       if (!rule.leaderStaffIds.includes(staffId)) continue;
-      const partnerIds = rule.leaderStaffIds.filter(
-        (id) => id !== staffId && visible.has(id)
-      );
-      if (partnerIds.length === 0) continue;
-      groups.push({ shiftId: shiftIdByName.get(rule.shiftName), partnerIds });
+      // 起点は「勤務帯」なので、本人も含めた表示中の全メンバーへ等しく線を伸ばす。
+      const memberIds = rule.leaderStaffIds.filter((id) => visible.has(id));
+      if (memberIds.length === 0) continue;
+      // その日に責任者ルールが未充足なら違反が立つ（列警告と同じ導出）。無ければ充足。
+      const vtype = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
+      const satisfied = day
+        ? !violations.some((v) => v.constraintType === vtype && v.coversDay(day))
+        : true;
+      groups.push({
+        shiftId: shiftIdByName.get(rule.shiftName),
+        shiftName: rule.shiftName,
+        memberIds,
+        satisfied,
+      });
     }
     if (groups.length === 0) return null;
-    return { staffId, dayKey, groups };
-  }, [hoveredCell, leaderRules, staffList, shiftIdByName]);
+    return { dayKey, groups };
+  }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations]);
 
   // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
   const shiftOptions = schedule.workShiftIds
@@ -418,7 +429,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           <ConstraintHoverOverlay
             gridRef={kb.gridRef}
             dayKey={hoverInfo.dayKey}
-            hoveredStaffId={hoverInfo.staffId}
             groups={hoverInfo.groups}
           />
         )}
