@@ -59,7 +59,7 @@ const ShiftPuzzleShiftPlanListBubble: BubbleRoute["Component"] = ({ bubble }) =>
   const buildPlanUrl = (planId: string) => `shift-puzzle/shift-plans/${planId}/primitive-gantt`;
   return (
     <ShiftPlanList
-      onOpen={(planId) => openBubble(buildPlanUrl(planId), bubble.id, 'bubble-side')}
+      onOpen={(planId) => openBubble(buildPlanUrl(planId), bubble.id, 'bubble-side-right')}
       buildPlanUrl={buildPlanUrl}
     />
   );
@@ -81,11 +81,11 @@ const ShiftPuzzlePrimitiveGanttEditorBubble: BubbleRoute["Component"] = ({ bubbl
       buildRunUrl={buildRunUrl}
       onAssignedRunOpen={(shiftId) => openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side')}
       buildHistoryUrl={buildHistoryUrl}
-      onHistoryOpen={() => openBubble(buildHistoryUrl(), bubble.id, 'bubble-side')}
+      onHistoryOpen={() => openBubble(buildHistoryUrl(), bubble.id, 'bubble-side-right')}
       buildTaskGanttUrl={buildTaskGanttUrl}
-      onTaskGanttOpen={() => openBubble(buildTaskGanttUrl(), bubble.id, 'bubble-side')}
+      onTaskGanttOpen={() => openBubble(buildTaskGanttUrl(), bubble.id, 'bubble-side-right')}
       buildMemberUrl={buildMemberUrl}
-      onMemberClick={(memberId) => openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side')}
+      onMemberClick={(memberId) => openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side-right')}
     />
   );
 };
@@ -194,11 +194,11 @@ const ShiftPuzzleTaskGanttEditorBubble: BubbleRoute["Component"] = ({ bubble }) 
       buildRunUrl={buildRunUrl}
       onAssignedRunOpen={(shiftId) => openBubble(buildRunUrl(shiftId), bubble.id, 'origin-side')}
       buildTaskUrl={buildTaskUrl}
-      onTaskClick={(taskId) => openBubble(buildTaskUrl(taskId), bubble.id, 'bubble-side')}
+      onTaskClick={(taskId) => openBubble(buildTaskUrl(taskId), bubble.id, 'bubble-side-right')}
       buildHistoryUrl={buildHistoryUrl}
-      onHistoryOpen={() => openBubble(buildHistoryUrl(), bubble.id, 'bubble-side')}
+      onHistoryOpen={() => openBubble(buildHistoryUrl(), bubble.id, 'bubble-side-right')}
       buildMemberUrl={buildMemberUrl}
-      onMemberClick={(memberId) => openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side')}
+      onMemberClick={(memberId) => openBubble(buildMemberUrl(memberId), bubble.id, 'bubble-side-right')}
     />
   );
 };

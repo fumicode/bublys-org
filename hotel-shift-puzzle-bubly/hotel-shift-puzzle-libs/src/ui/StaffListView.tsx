@@ -102,7 +102,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
                   object={staff}
                   label={staff.name}
                   draggable={true}
-                  openingPosition="bubble-side"
+                  openingPosition="bubble-side-left"
                   fullWidth={true}
                 >
                   <div className="e-content">
