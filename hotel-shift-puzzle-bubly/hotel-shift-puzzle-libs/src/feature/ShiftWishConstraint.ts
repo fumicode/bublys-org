@@ -32,8 +32,13 @@ type Context = {
 
 export class ShiftWishConstraint implements ScheduleConstraint {
   readonly type = SHIFT_WISH_MISMATCH;
+  readonly label = "希望";
 
   constructor(private readonly ctx: Context) {}
+
+  describe(): string {
+    return "できるだけシフト希望に沿う";
+  }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
     const violations: ConstraintViolation[] = [];

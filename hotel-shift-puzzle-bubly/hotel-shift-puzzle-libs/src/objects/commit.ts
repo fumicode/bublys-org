@@ -117,6 +117,61 @@ export function saveObject(store: StoreLike, type: string, obj: unknown): void {
   commitToScope(store, APP_SCOPE_ID, type, obj);
 }
 
+/**
+ * 同じ親から複数の「案」を兄弟ブランチとして記録する（世界線で見比べる用）。
+ * - 書き込み先はローカル世界線スコープのみ（アプリ全体は現状のまま）。
+ * - スコープが空なら baseObj を root として置き、それを共通の親にする。空でなければ現在の apex を親とする。
+ * - 各案は共通の親から grow する：apex に子ができると grow が自動でブランチを作る仕様なので、
+ *   2案目以降は親へ moveTo してから grow すると兄弟になる。各ノードに label を付ける。
+ * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移し、その状態をアプリ全体
+ *   スコープへも反映する（世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
+ * 返り値: 親ノードIDと、書き込んだ各案のノードID。
+ */
+export function commitCandidates(
+  store: StoreLike,
+  scopeId: string,
+  type: string,
+  baseObj: unknown,
+  candidates: { obj: unknown; label?: string }[]
+): { parentNodeId: string; nodeIds: string[] } {
+  if (isScopeEmpty(store, scopeId)) {
+    commitToScope(store, scopeId, type, baseObj); // root = 現状（共通の親）
+  }
+  const parentNodeId = graphOf(store, scopeId).state.apexNodeId as string;
+  const nodeIds: string[] = [];
+
+  candidates.forEach((c, i) => {
+    if (i > 0) {
+      // 親へ戻してから grow → 兄弟ブランチになる
+      const moved = graphOf(store, scopeId).moveTo(parentNodeId);
+      store.dispatch(setGraph({ scopeId, graph: moved.toJSON() }));
+    }
+    commitToScope(store, scopeId, type, c.obj);
+    const g = graphOf(store, scopeId);
+    const apex = g.state.apexNodeId as string;
+    nodeIds.push(apex);
+    if (c.label) {
+      store.dispatch(setGraph({ scopeId, graph: g.setNodeLabel(apex, c.label).toJSON() }));
+    }
+  });
+
+  // 案1に着地：ローカル apex を案1へ移し、そのノードの全オブジェクトをアプリ全体へ反映する
+  const landing = nodeIds[0];
+  if (landing) {
+    store.dispatch(setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landing).toJSON() }));
+    const g = graphOf(store, scopeId);
+    for (const ref of g.getStateRefsAt(landing)) {
+      const d = getDescriptor(ref.type);
+      if (!d) continue;
+      const data = store.getState().worldLineGraph?.cas?.[ref.hash];
+      if (data === undefined || data === null) continue;
+      commitToScope(store, APP_SCOPE_ID, ref.type, codecOf(d).fromJSON(data));
+    }
+  }
+
+  return { parentNodeId, nodeIds };
+}
+
 /** アプリ全体スコープからオブジェクトを削除（tombstone） */
 export function removeObject(store: StoreLike, type: string, id: string): void {
   const hash = computeStateHash(null);

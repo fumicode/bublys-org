@@ -23,7 +23,7 @@ const registerBublyUniverseRoute = (bubly: Bubly): void => {
     Component: BublyUniverseBubble,
     initialBubbleUrls: bubly.initialBubbleUrls ?? [],
     bubbleOptions: {
-      fillsContainer: true,
+      universe: true,
       defaultSize: bubly.defaultSize ?? DEFAULT_BUBLY_WINDOW_SIZE,
       backdropColor: bubly.backdropColor,
     },

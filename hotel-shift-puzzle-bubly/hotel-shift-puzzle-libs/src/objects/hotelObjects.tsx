@@ -18,6 +18,7 @@ import {
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
+  ScheduleConstraints,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -29,13 +30,16 @@ export const WORKSHIFT_TYPE = "WorkShift";
 export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
+export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
 
+// 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
+// オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
 export const HOTEL_OBJECTS = defineObjects({
   Staff: {
     class: Staff,
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
-    url: (id) => `hotel-shift-puzzle/staffs/${id}`,
+    // url は app 層（registration/bubbleUrls.ts）で登録する
     // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
   },
   WorkShift: {
@@ -47,7 +51,7 @@ export const HOTEL_OBJECTS = defineObjects({
     class: MonthlyStaffSchedule,
     getId: (s: MonthlyStaffSchedule) => s.state.id,
     icon: React.createElement(CalendarMonthIcon, { fontSize: "small" }),
-    url: (id) => `hotel-shift-puzzle/schedules/${id}`,
+    // url は app 層（registration/bubbleUrls.ts）で登録する
     // 入れ子にインスタンスを持つので codec を明示
     serialize: {
       toJSON: (s: MonthlyStaffSchedule) => s.toPlain(),
@@ -67,6 +71,14 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (w: StaffMonthlyShiftWish) => w.id,
     // スタッフ×月で1つ。店舗・勤務表には依存しないのでアプリ全体スコープのみ。
     // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
+  },
+  ScheduleConstraints: {
+    class: ScheduleConstraints,
+    getId: (c: ScheduleConstraints) => c.id,
+    // 勤務表ごとの制約。親 Schedule のローカル世界線に束ねる（case B）。
+    // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
+    // state が plain（scheduleId ＋ ルール states 配列）なので serialize 不要。
+    localScope: (c: ScheduleConstraints) => localScopeId(SCHEDULE_TYPE, c.scheduleId),
   },
 });
 

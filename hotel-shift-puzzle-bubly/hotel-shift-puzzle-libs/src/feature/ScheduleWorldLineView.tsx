@@ -4,7 +4,7 @@
  * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
  * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、囲碁などと同じ共通ビュー
- * {@link WorldLineScopeView} で描く。
+ * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。
  *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
  *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
@@ -78,8 +78,9 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     );
   }
 
-  // canvas はバブルいっぱい（履歴は popChildViewPortBelow で画面下部の左右いっぱい
-  // ストリップとして開かれる）。nameable で選択中の世界に名前をつけられる。
+  // canvas はバブルいっぱい（WorldLineScopeView が 100% に広がる）。バブルの初期サイズは
+  // route の bubbleOptions.initialSize で与え、リサイズすると canvas も伸縮する。
+  // nameable で選択中の世界に名前をつけられる。
   return (
     <WorldLineScopeView
       scope={scope}
