@@ -15,7 +15,6 @@ import {
   Staff,
   WorkShift,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   StaffMonthlyShiftWish,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects, APP_SCOPE_ID } from "./repository.js";
@@ -24,12 +23,15 @@ import {
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "./hotelObjects.js";
 import { createSampleStaffList } from "../data/sampleStaff.js";
 import { createSampleWorkShifts } from "../data/sampleWorkShifts.js";
-import { createSampleSchedule } from "../data/sampleSchedule.js";
+import { createSampleSchedules } from "../data/sampleSchedule.js";
 import { createSampleShiftWishes } from "../data/sampleShiftWishes.js";
+import { createSampleAvailabilityFor } from "../data/sampleAvailability.js";
+import { createSampleConstraintsFor } from "../data/sampleConstraints.js";
 
 let seeded = false;
 
@@ -54,16 +56,19 @@ export function useSeedHotelData(): void {
       );
     }
     if (schedules.length === 0) {
-      const schedule = createSampleSchedule();
-      items.push({ type: SCHEDULE_TYPE, object: schedule });
-      // 可能勤務帯の初期値（全スタッフが全勤務帯OK）。勤務表に紐づく別集約
-      const staffIds = createSampleStaffList().map((s) => s.id);
-      const availability = ScheduleAvailability.create(
-        schedule.id,
-        staffIds,
-        schedule.workShiftIds
-      );
-      items.push({ type: SCHEDULE_AVAILABILITY_TYPE, object: availability });
+      // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
+      for (const schedule of createSampleSchedules()) {
+        items.push({ type: SCHEDULE_TYPE, object: schedule });
+        items.push({
+          type: SCHEDULE_AVAILABILITY_TYPE,
+          object: createSampleAvailabilityFor(schedule.id),
+        });
+        // 制約（責任者ルール）も勤務表に紐づく別集約として投入
+        items.push({
+          type: SCHEDULE_CONSTRAINTS_TYPE,
+          object: createSampleConstraintsFor(schedule.id),
+        });
+      }
     }
     if (wishes.length === 0) {
       items.push(

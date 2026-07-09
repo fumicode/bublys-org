@@ -3,12 +3,19 @@ import { Point2, Size2, SmartRect } from "@bublys-org/bubbles-ui-util";
 export type BubbleOptions = {
   contentBackground?: string;
   /**
-   * 中身が固有サイズを持たず、常にバブルいっぱいに広がる「窓」型コンテンツ
-   * （例: 再帰 universe）。true のとき fit-content 状態を持たず、
-   * 常に明示サイズの窓として扱う（最大化解除 = 既定の窓サイズに戻る）。
+   * 【レイアウト】中身が固有サイズを持たず常にバブルいっぱいに広がる「窓」型コンテンツ
+   * （canvas など）。true のとき fit-content 状態を持たず、常に明示サイズの窓として扱う
+   * （最大化解除 = 既定の窓サイズに戻る／中身は overflow hidden で容器に追従）。
+   * これは純粋にレイアウトの性質で、中身が universe かどうかとは独立（普通の BubbleView でも使える）。
    */
   fillsContainer?: boolean;
-  /** fillsContainer のとき、生成時／最大化解除時に使う既定の窓サイズ。 */
+  /**
+   * 【中身の種別】このバブルが universe（= 入れ子のバブルサーフェス／1 bubly）かどうか。
+   * true のとき UniverseBubbleView（ガラス越しの夜空・クリック貫通の入れ子サーフェス）で描く。
+   * universe は固有サイズを持たないので常に窓型（= fillsContainer 相当）として扱う。
+   */
+  universe?: boolean;
+  /** 窓型（fillsContainer / universe）のとき、生成時／最大化解除時に使う既定の窓サイズ。 */
   defaultSize?: Size2;
   /**
    * このバブルが universe バブル（= 1 bubly）のとき、その universe の「夜空」色。
@@ -126,12 +133,25 @@ export class Bubble {
     return this.state.size;
   }
 
-  /** 中身が固有サイズを持たない窓型コンテンツか（常に明示サイズの窓として扱う）。 */
+  /** 【レイアウト】中身が容器いっぱいに広がる窓型コンテンツか（純粋にレイアウトの性質）。 */
   get fillsContainer(): boolean {
     return this.state.bubbleOptions?.fillsContainer ?? false;
   }
 
-  /** fillsContainer のときの既定の窓サイズ。 */
+  /** 【中身の種別】このバブルが universe（入れ子のバブルサーフェス）か。描画コンポーネントを分ける。 */
+  get isUniverse(): boolean {
+    return this.state.bubbleOptions?.universe ?? false;
+  }
+
+  /**
+   * 窓型（= 固有サイズを持たず明示サイズの窓として扱う）か。
+   * fillsContainer（レイアウト）か universe（種別。常に窓型）のどちらかなら窓型。
+   */
+  get isWindowed(): boolean {
+    return this.fillsContainer || this.isUniverse;
+  }
+
+  /** 窓型のときの既定の窓サイズ。 */
   get defaultSize(): Size2 {
     return this.state.bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE;
   }
@@ -188,11 +208,11 @@ export class Bubble {
 
   /**
    * 最大化を解除する。
-   * fillsContainer な窓は固有サイズが無いので既定の窓サイズに戻す（サイズ維持）。
+   * 窓型（fillsContainer / universe）は固有サイズが無いので既定の窓サイズに戻す（サイズ維持）。
    * 通常のバブルはサイズ無し（fit-content）に戻す。
    */
   restore(): Bubble {
-    const size = this.fillsContainer ? this.defaultSize : undefined;
+    const size = this.isWindowed ? this.defaultSize : undefined;
     return new Bubble({ ...this.state, size, maximized: false });
   }
 
@@ -253,13 +273,12 @@ export const createBubble = (url: string, pos?: Point2): Bubble => {
   const params = resolvedProps?.params;
   const bubbleOptions = resolvedProps?.bubbleOptions;
 
-  // fillsContainer な窓は固有サイズが無いため、生成時から既定の窓サイズを持つ
-  // （maximized=false を明示し、最大化扱いにならないようにする）。
-  const fillsContainer = bubbleOptions?.fillsContainer ?? false;
-  const size = fillsContainer
-    ? bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE
-    : undefined;
-  const maximized = fillsContainer ? false : undefined;
+  // 窓型（fillsContainer / universe）は固有サイズが無いため、生成時から既定の窓サイズを持つ
+  // （maximized=false を明示し、最大化扱いにならないようにする）。普通のバブルは fit-content。
+  const windowed =
+    (bubbleOptions?.fillsContainer ?? false) || (bubbleOptions?.universe ?? false);
+  const size = windowed ? bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE : undefined;
+  const maximized = windowed ? false : undefined;
 
   return new Bubble({ url, colorHue, type, params, position: pos, bubbleOptions, size, maximized });
 };

@@ -8,6 +8,7 @@ import styled from "styled-components";
 export const StyledWrap = styled.div`
   .e-grid {
     display: grid;
+    position: relative; /* 制約オーバーレイ（絶対配置 SVG）と各セルの offset 座標の基準 */
     max-height: 70vh;
     max-width: 100%;
     overflow: auto;
@@ -15,6 +16,31 @@ export const StyledWrap = styled.div`
     border-radius: 6px;
     background: #fff;
     font-size: 0.8em;
+
+    /* キーボード操作のためグリッド自体を focusable にしている。
+       選択はセルの枠線で示すので、コンテナ自身のフォーカス枠は消す。 */
+    &:focus {
+      outline: none;
+    }
+  }
+
+  /* 選択モード（責任者バッジ/チェックで対象を選択中）の行の見た目。
+     行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルへ同じクラスを付けて表現する。
+     - is-dimmed: 対象外の行。blur でぼかし薄くして背景に退かせる（クリックは可能なまま）。
+     - is-focused: 対象の行。うっすら黄色く強調して少し浮かせる（sticky セルを崩さないよう transform は使わない）。 */
+  .e-staff-cell.is-dimmed,
+  .e-cell.is-dimmed,
+  .e-off-total.is-dimmed {
+    filter: blur(1.4px);
+    opacity: 0.4;
+  }
+  .e-staff-cell.is-focused {
+    background: #fffde7;
+    box-shadow: inset 3px 0 0 #fbc02d;
+  }
+  .e-cell.is-focused,
+  .e-off-total.is-focused {
+    background: #fffdf3;
   }
 
   /* 共通セル */
@@ -64,6 +90,24 @@ export const StyledWrap = styled.div`
   .e-off-total.e-off-sum {
     color: #455a64;
   }
+  /* 月の最低休日数に満たないスタッフの休み合計（制約違反の可視化） */
+  .e-off-total.is-under-min {
+    color: #c62828;
+    background: #ffebee;
+    font-weight: bold;
+  }
+  /* 最低休日数未満は違反。ダブルクリックで違反バブルを開ける */
+  .e-off-total.is-clickable {
+    cursor: pointer;
+  }
+  .e-off-total.is-clickable:hover {
+    box-shadow: inset 0 0 0 2px #ef9a9a;
+  }
+  .e-off-total .e-off-mark {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
   .e-off-total.is-first {
     border-top: 2px solid #b0bec5;
   }
@@ -104,6 +148,12 @@ export const StyledWrap = styled.div`
       color: #cfd5d8;
       font-weight: normal;
     }
+    /* 1日の休み上限を超えた日（休み行）の警告 */
+    &.is-over {
+      background: #ffebee;
+      color: #c62828;
+      font-weight: bold;
+    }
 
     /* 現在/必要 の分母表示 */
     .e-cur {
@@ -119,6 +169,30 @@ export const StyledWrap = styled.div`
     }
     &.is-under {
       color: #c62828;
+    }
+
+    /* 責任者行（早責/夜責）: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤） */
+    &.is-leader {
+      font-weight: bold;
+      &.is-present {
+        color: #2e7d32;
+        background: #e8f5e9;
+      }
+      &.is-absent {
+        color: #c62828;
+        background: #ffebee;
+      }
+      /* ✕（未充足）はダブルクリックで違反バブルを開ける。中身は ObjectView */
+      &.is-clickable {
+        cursor: pointer;
+      }
+      &.is-clickable:hover {
+        box-shadow: inset 0 0 0 2px #ef9a9a;
+      }
+      .e-leader-mark {
+        width: 100%;
+        text-align: center;
+      }
     }
   }
 
@@ -155,6 +229,20 @@ export const StyledWrap = styled.div`
     justify-content: center;
     padding: 4px 0;
 
+    /* 日単位の制約違反（責任者不在など）がある日は列ヘッダを警告色にし、⚠ を重ねる */
+    &.is-warn {
+      background: #fff3e0;
+    }
+    .e-day-warn {
+      position: absolute;
+      top: 0;
+      right: 1px;
+      font-size: 0.7em;
+      line-height: 1;
+      color: #e65100;
+      pointer-events: none;
+    }
+
     .e-day-num {
       font-weight: bold;
     }
@@ -171,19 +259,43 @@ export const StyledWrap = styled.div`
     &.is-sat .e-day-wd {
       color: #1976d2;
     }
+
+    /* ダブルクリックでその日の詳細バブルを開ける（中身は ObjectView） */
+    &.is-clickable:hover {
+      background: #eceff1;
+      box-shadow: inset 0 0 0 2px #90caf9;
+    }
+    /* ObjectView の中身。日番号＋曜日を縦に積んでセル全体をクリック対象にする */
+    .e-day-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
   }
 
-  /* スタッフ名（左に固定） */
+  /* スタッフ名（左に固定）。抽出チェックボックスがあるときは横並び */
   .e-staff-cell {
     position: sticky;
     left: 0;
     z-index: 1;
     background: #fff;
+    display: flex;
+    align-items: center;
+
+    /* 抽出用チェックボックス（任意）。クリックは選択トグルのみ（行展開はしない） */
+    .e-staff-check {
+      flex: 0 0 auto;
+      margin: 0 0 0 6px;
+      cursor: pointer;
+    }
 
     .e-staff {
       display: flex;
       align-items: center;
       gap: 4px;
+      min-width: 0;
       padding: 4px 8px;
       width: 100%;
       box-sizing: border-box;
@@ -208,6 +320,25 @@ export const StyledWrap = styled.div`
       overflow: hidden;
       text-overflow: ellipsis;
       font-weight: bold;
+    }
+    /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
+    .e-leader-badge {
+      flex-shrink: 0;
+      font-size: 0.72em;
+      font-weight: bold;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      white-space: nowrap;
+
+      /* クリックで関係者を抽出できるバッジ */
+      &.is-clickable {
+        cursor: pointer;
+      }
+      &.is-clickable:hover {
+        filter: brightness(0.95);
+        box-shadow: 0 0 0 1px currentColor inset;
+      }
     }
   }
 
@@ -266,6 +397,41 @@ export const StyledWrap = styled.div`
     &:hover {
       box-shadow: inset 0 0 0 2px #90caf9;
     }
+
+    /* キーボードでフォーカス中のセル。hover より強い枠で示す */
+    &.is-selected {
+      box-shadow: inset 0 0 0 2px #1976d2;
+      z-index: 1;
+    }
+  }
+
+  /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
+  .e-cell .e-input {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(25, 118, 210, 0.08);
+    color: #0d47a1;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+
+    &::after {
+      content: "";
+      width: 1px;
+      height: 1em;
+      margin-left: 1px;
+      background: #0d47a1;
+      animation: e-caret-blink 1s step-end infinite;
+    }
+  }
+
+  @keyframes e-caret-blink {
+    50% {
+      opacity: 0;
+    }
   }
 
   /* 希望との食い違い（制約違反）: 右上の角に ⊿（オレンジの三角）。クリックで違反バブル */
@@ -309,13 +475,31 @@ export const StyledWrap = styled.div`
       height: 7px;
     }
   }
+  /* 部署グループヘッダー行（全カラムスパン） */
+  .e-dept-label {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #e8eaf6;
+    color: #3949ab;
+    font-weight: bold;
+    font-size: 0.85em;
+    padding: 3px 8px;
+    border-right: 1px solid #c5cae9;
+    border-bottom: 1px solid #c5cae9;
+    box-sizing: border-box;
+  }
+  .e-dept-sep {
+    background: #e8eaf6;
+    border-bottom: 1px solid #c5cae9;
+    box-sizing: border-box;
+  }
+
   .e-work {
-    .e-shift-name {
+    .e-shift-hour {
       font-weight: bold;
-    }
-    .e-shift-time {
-      font-size: 0.78em;
-      opacity: 0.8;
+      font-size: 1.15em;
+      font-variant-numeric: tabular-nums;
     }
   }
   .e-off {

@@ -31,16 +31,23 @@ export const ConstraintViolationView: FC<ConstraintViolationViewProps> = ({
       </div>
 
       <dl className="e-detail">
-        <dt>スタッフ</dt>
-        <dd>{staffName ?? violation.staffId}</dd>
+        {/* 日単位の違反（責任者不在など）はスタッフに紐づかないので「スタッフ」は出さない */}
+        {!violation.isDayScoped && (
+          <>
+            <dt>スタッフ</dt>
+            <dd>{staffName ?? violation.staffId}</dd>
+          </>
+        )}
 
         <dt>内容</dt>
         <dd className="e-message">{violation.message}</dd>
 
-        <dt>範囲</dt>
+        <dt>{violation.isDayScoped ? "日付" : "範囲"}</dt>
         <dd>
           {first && last
-            ? `${first.label} 〜 ${last.label}（${days.length}日間）`
+            ? violation.isDayScoped && days.length === 1
+              ? first.label
+              : `${first.label} 〜 ${last.label}（${days.length}日間）`
             : "—"}
         </dd>
       </dl>

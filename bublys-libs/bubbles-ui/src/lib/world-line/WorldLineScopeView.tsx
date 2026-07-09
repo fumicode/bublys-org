@@ -1,8 +1,8 @@
 "use client";
-import { CSSProperties, FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CasScopeValue } from "@bublys-org/world-line-graph";
 import { useKeyBindings, type KeyBinding } from "../hooks/useKeyBindings.js";
-import { WorldLinesCanvasView } from "./WorldLinesCanvasView.js";
+import { WorldLinesCanvasView, type WorldLinesCanvasViewProps } from "./WorldLinesCanvasView.js";
 
 const EMPTY_BINDINGS: KeyBinding[] = [];
 
@@ -48,6 +48,13 @@ export type WorldLineScopeViewProps = {
   onSelectNode?: (nodeId: string) => void;
   /** ラッパの style。既定はバブルいっぱい（100%）。 */
   style?: CSSProperties;
+  /**
+   * canvas 描画を差し替える（任意）。既定は共通の {@link WorldLinesCanvasView}
+   * （左→右・分岐は下）。ドメイン固有の見せ方をしたいときだけ渡す
+   * （例: ホテルの下→上・木登りビュー）。名前入力欄やキーバインドなどの
+   * ラッパ機能はそのまま共有できる。
+   */
+  renderCanvas?: (props: WorldLinesCanvasViewProps) => ReactNode;
 };
 
 export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
@@ -57,6 +64,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   nameable = false,
   onSelectNode,
   style,
+  renderCanvas,
 }) => {
   useKeyBindings(keyBindings ?? EMPTY_BINDINGS);
   const apexId = scope.graph.getApex()?.id ?? null;
@@ -110,14 +118,14 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
           style={nameInputStyle}
         />
       )}
-      <WorldLinesCanvasView
-        graph={scope.graph}
-        apexNodeId={apexId}
-        getNodeSummary={getNodeSummary}
-        getNodeLabel={getNodeLabel}
-        onSelectNode={onSelectNode ?? scope.moveTo}
-        onApexScreenPos={nameable ? placeInput : undefined}
-      />
+      {(renderCanvas ?? ((p) => <WorldLinesCanvasView {...p} />))({
+        graph: scope.graph,
+        apexNodeId: apexId,
+        getNodeSummary,
+        getNodeLabel,
+        onSelectNode: onSelectNode ?? scope.moveTo,
+        onApexScreenPos: nameable ? placeInput : undefined,
+      })}
     </div>
   );
 };
