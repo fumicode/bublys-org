@@ -1,12 +1,9 @@
 import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
-import { createDefaultWorkShifts } from './WorkShift.js';
 import { ShiftAssignment, DAY_OFF } from './ShiftAssignment.js';
 
 describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', () => {
-  // この勤務表で使える勤務帯ID（WorkShift は独立集約。ここでは ID だけ参照する）
-  const workShiftIds = createDefaultWorkShifts().map((s) => s.id); // ['early','middle','late']
-
+  // 勤務帯（WorkShift）は勤務表とは別集約（WorkShiftSet）。勤務表は割当で勤務帯IDを参照するだけ。
   // 店舗 store-1 の 2026年6月の勤務表
   const createJuneSchedule = () =>
     MonthlyStaffSchedule.create({
@@ -14,17 +11,9 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds,
     });
 
   const june1 = WorkingDay.of(2026, 6, 1);
-
-  test('使える勤務帯を ID で参照する', () => {
-    const schedule = createJuneSchedule();
-    expect(schedule.workShiftIds).toEqual(['early', 'middle', 'late']);
-    expect(schedule.hasWorkShift('early')).toBe(true);
-    expect(schedule.hasWorkShift('unknown')).toBe(false);
-  });
 
   test('6/1 に Aさん=早番、Bさん=休み、Cさん=遅番 を割り当てる', () => {
     const schedule = createJuneSchedule()
@@ -102,11 +91,6 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(schedule.isWorking('staff-A', june1)).toBe(false);
     expect(schedule.isDayOff('staff-A', june1)).toBe(true);
     expect(schedule.assignmentsForStaff('staff-A')).toHaveLength(1);
-  });
-
-  test('未知の勤務帯を割り当てようとするとエラー', () => {
-    const schedule = createJuneSchedule();
-    expect(() => schedule.assignShift('staff-A', june1, 'unknown')).toThrow();
   });
 
   test('割当を取り消すと未定に戻る', () => {
@@ -211,8 +195,6 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
   test('state は割当をインスタンスで保持する（勤務帯は ID 参照）', () => {
     const schedule = createJuneSchedule().assignShift('staff-A', june1, 'early');
 
-    // 勤務帯は ID 参照（文字列）
-    expect(schedule.state.workShiftIds).toEqual(['early', 'middle', 'late']);
     // 割当はインスタンスで、入れ子の稼働日も WorkingDay インスタンス
     const assignment = schedule.state.assignments[0];
     expect(assignment).toBeInstanceOf(ShiftAssignment);
@@ -227,8 +209,7 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
 
     const plain = original.toPlain();
 
-    // plain は入れ子まで素のオブジェクト（勤務帯は ID、割当の稼働日も plain）
-    expect(plain.workShiftIds).toEqual(['early', 'middle', 'late']);
+    // plain は入れ子まで素のオブジェクト（割当の稼働日も plain）
     expect(plain.assignments[0].day).toEqual({ year: 2026, month: 6, day: 1 });
     // JSON シリアライズ可能であること
     expect(() => JSON.stringify(plain)).not.toThrow();

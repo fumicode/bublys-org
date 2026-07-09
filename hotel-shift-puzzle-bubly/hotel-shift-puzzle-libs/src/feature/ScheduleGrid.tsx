@@ -5,7 +5,7 @@ import styled from "styled-components";
 import { UrledPlace } from "@bublys-org/bubbles-ui";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
@@ -29,7 +29,7 @@ import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
@@ -93,7 +93,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
     scheduleId

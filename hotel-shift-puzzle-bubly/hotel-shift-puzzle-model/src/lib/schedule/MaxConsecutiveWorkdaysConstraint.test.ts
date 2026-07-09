@@ -17,7 +17,6 @@ describe('MaxConsecutiveWorkdaysConstraint（連勤上限制約）の使い方',
       storeId: 'store-1',
       year: YEAR,
       month: MONTH,
-      workShiftIds: [SHIFT],
     });
 
   const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
@@ -110,7 +109,6 @@ describe('MonthlyStaffSchedule.checkConstraints（制約の注入）', () => {
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: ['early'],
     });
 
   const workRange = (

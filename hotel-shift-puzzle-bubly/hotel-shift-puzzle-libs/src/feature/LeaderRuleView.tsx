@@ -2,13 +2,13 @@
 
 import { FC, useCallback, useMemo } from "react";
 import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
-import { Staff, WorkShift, ScheduleConstraints } from "@bublys-org/hotel-shift-puzzle-model";
+import { Staff, WorkShiftSet, ScheduleConstraints } from "@bublys-org/hotel-shift-puzzle-model";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -28,7 +28,8 @@ type LeaderRuleViewProps = {
 export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const constraints = useObject<ScheduleConstraints>(
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId

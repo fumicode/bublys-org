@@ -1,10 +1,8 @@
 import { MonthlyStaffSchedule } from './MonthlyStaffSchedule.js';
 import { WorkingDay } from './WorkingDay.js';
-import { createDefaultWorkShifts } from './WorkShift.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 
 describe('ShiftLeaderRule（責任者の宣言的ルール ＝ ORルール）', () => {
-  const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
   const june1 = WorkingDay.of(2026, 6, 1);
 
   const emptySchedule = () =>
@@ -13,7 +11,6 @@ describe('ShiftLeaderRule（責任者の宣言的ルール ＝ ORルール）', 
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: workShifts.map((w) => w.id),
     });
 
   // 早責: A・B のうち1人が早番に入っていればよい

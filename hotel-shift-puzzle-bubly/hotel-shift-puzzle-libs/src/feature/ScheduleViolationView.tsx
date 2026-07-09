@@ -10,7 +10,7 @@
 import { FC, useMemo } from "react";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
@@ -19,7 +19,7 @@ import { ConstraintViolationView } from "../ui/ConstraintViolationView.js";
 import { useObject, useObjects } from "../objects/repository.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -35,7 +35,8 @@ type Props = {
 export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) => {
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const constraints = useObject<ScheduleConstraints>(
     SCHEDULE_CONSTRAINTS_TYPE,

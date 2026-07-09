@@ -14,7 +14,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
@@ -26,7 +26,9 @@ import { localScopeId } from "./commit.js";
 
 /** オブジェクト型名 */
 export const STAFF_TYPE = "Staff";
-export const WORKSHIFT_TYPE = "WorkShift";
+export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
+/** グローバルの勤務帯セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
+export const GLOBAL_WORKSHIFT_SET_ID = "global";
 export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
@@ -42,10 +44,15 @@ export const HOTEL_OBJECTS = defineObjects({
     // url は app 層（registration/bubbleUrls.ts）で登録する
     // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
   },
-  WorkShift: {
-    class: WorkShift,
-    getId: (w: WorkShift) => w.id,
-    // 表示専用ではなくリポジトリ保存用に登録（state-object 規約で plain 化）
+  WorkShiftSet: {
+    class: WorkShiftSet,
+    getId: (s: WorkShiftSet) => s.id,
+    // 2通りの使われ方をする集約:
+    //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
+    //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）
+    // state が完全 plain（id ＋ 勤務帯 state 配列）なので serialize 不要。
+    localScope: (s: WorkShiftSet) =>
+      s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id),
   },
   Schedule: {
     class: MonthlyStaffSchedule,

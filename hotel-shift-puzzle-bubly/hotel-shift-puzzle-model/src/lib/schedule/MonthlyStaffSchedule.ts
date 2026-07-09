@@ -40,8 +40,6 @@ export type MonthlyStaffScheduleState = {
   year: number;
   /** 対象月 1-12 */
   month: number;
-  /** この勤務表で使える勤務帯のID（早番・中番・遅番など）。WorkShift は独立集約 */
-  workShiftIds: string[];
   /** スタッフ×稼働日 の勤務割当 */
   assignments: ShiftAssignment[];
   /** 稼働日×勤務帯名 の必要スタッフ数 */
@@ -54,7 +52,6 @@ export type MonthlyStaffSchedulePlain = {
   storeId: string;
   year: number;
   month: number;
-  workShiftIds: string[];
   assignments: ShiftAssignmentPlain[];
   requiredStaffing: RequiredStaffingPlain;
 };
@@ -74,7 +71,6 @@ export class MonthlyStaffSchedule {
     storeId: string;
     year: number;
     month: number;
-    workShiftIds: string[];
     requiredStaffing?: RequiredStaffing;
   }): MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
@@ -82,7 +78,6 @@ export class MonthlyStaffSchedule {
       storeId: params.storeId,
       year: params.year,
       month: params.month,
-      workShiftIds: params.workShiftIds,
       assignments: [],
       requiredStaffing: params.requiredStaffing ?? RequiredStaffing.empty(),
     });
@@ -103,17 +98,6 @@ export class MonthlyStaffSchedule {
   /** 対象月 1-12 */
   get month(): number {
     return this.state.month;
-  }
-
-  // ========== 勤務帯（ID 参照） ==========
-
-  /** この勤務表で使える勤務帯のID一覧 */
-  get workShiftIds(): string[] {
-    return this.state.workShiftIds;
-  }
-
-  hasWorkShift(shiftId: string): boolean {
-    return this.state.workShiftIds.includes(shiftId);
   }
 
   // ========== 稼働日 ==========
@@ -138,11 +122,9 @@ export class MonthlyStaffSchedule {
     );
   }
 
-  /** 勤務帯を割り当てる（既存割当は上書き）。不変。 */
+  /** 勤務帯を割り当てる（既存割当は上書き）。不変。
+   *  勤務帯の妥当性（この勤務表の WorkShiftSet に含まれるか）は上位層の関心事。 */
   assignShift(staffId: string, day: WorkingDay, shiftId: string): MonthlyStaffSchedule {
-    if (!this.hasWorkShift(shiftId)) {
-      throw new Error(`未知の勤務帯です: ${shiftId}`);
-    }
     return this.withAssignment(staffId, day, shiftId);
   }
 
@@ -321,7 +303,6 @@ export class MonthlyStaffSchedule {
       storeId: this.state.storeId,
       year: this.state.year,
       month: this.state.month,
-      workShiftIds: [...this.state.workShiftIds],
       assignments: this.state.assignments.map((a) => a.toPlain()),
       requiredStaffing: this.state.requiredStaffing.toPlain(),
     };
@@ -333,7 +314,6 @@ export class MonthlyStaffSchedule {
       storeId: plain.storeId,
       year: plain.year,
       month: plain.month,
-      workShiftIds: [...plain.workShiftIds],
       assignments: plain.assignments.map((a) => ShiftAssignment.fromPlain(a)),
       requiredStaffing: RequiredStaffing.fromPlain(plain.requiredStaffing),
     });

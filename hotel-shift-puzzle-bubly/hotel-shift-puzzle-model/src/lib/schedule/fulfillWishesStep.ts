@@ -35,7 +35,7 @@ export const fulfillWishesStep: AutoShiftStep = {
           assigned++;
         } else if (pref.kind === "work") {
           // 可能勤務帯で、この勤務表が使う帯のときだけ転記する（でなければ人間へ）
-          if (isAvailable(staffId, pref.shiftId) && result.hasWorkShift(pref.shiftId)) {
+          if (isAvailable(staffId, pref.shiftId) && ctx.shiftNameById.has(pref.shiftId)) {
             result = result.assignShift(staffId, day, pref.shiftId);
             assigned++;
           }

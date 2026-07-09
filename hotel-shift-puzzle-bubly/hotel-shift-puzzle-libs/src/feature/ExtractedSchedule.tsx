@@ -4,7 +4,7 @@ import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
@@ -30,7 +30,7 @@ import {
 import { runAutoShiftStep } from "./autoShift.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
@@ -62,7 +62,8 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   const store = useAppStore();
 
   const allStaff = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
     scheduleId

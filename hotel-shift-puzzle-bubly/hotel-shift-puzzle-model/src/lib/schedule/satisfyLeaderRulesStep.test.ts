@@ -17,7 +17,6 @@ describe('makeSatisfyLeaderRulesStep（責任者制約を満たす）', () => {
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: workShifts.map((w) => w.id),
     });
 
   const ctxOf = (

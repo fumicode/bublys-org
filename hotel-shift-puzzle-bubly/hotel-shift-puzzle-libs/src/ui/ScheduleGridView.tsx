@@ -173,10 +173,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     return { dayKey, groups };
   }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations]);
 
-  // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
-  const shiftOptions = schedule.workShiftIds
-    .map((id) => shiftMap.get(id))
-    .filter((w): w is WorkShift => !!w);
+  // この勤務表で選べる勤務帯（勤務表の WorkShiftSet から渡される。開始時刻昇順）
+  const shiftOptions = workShifts;
 
   // 各稼働日の勤務帯ID別人数 / 休み人数（集約のクエリ）→ 集計行を組み立てる。
   const countsByDay = days.map((day) => schedule.countWorkingByShift(day));

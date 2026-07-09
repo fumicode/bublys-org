@@ -16,7 +16,6 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: workShifts.map((w) => w.id),
     });
 
   const ctxOf = (
