@@ -19,6 +19,10 @@ import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
 import { StaffScheduleRow } from "./schedule-grid/StaffScheduleRow.js";
+import {
+  ConstraintHoverOverlay,
+  type ConstraintHoverGroup,
+} from "./schedule-grid/ConstraintHoverOverlay.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
@@ -127,6 +131,36 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
+
+  // 勤務帯名 → id（責任者ルールの担当勤務帯の色を引くため）
+  const shiftIdByName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const w of workShifts) if (!m.has(w.name)) m.set(w.name, w.id);
+    return m;
+  }, [workShifts]);
+
+  // ホバー中セル（"staffId:dayKey"）。制約関係オーバーレイの起点。
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  // ホバー中セルの人と、同じ責任者ルールに属する相手（同日の相手セルへ線を引く）を導く。
+  const hoverInfo = useMemo(() => {
+    if (!hoveredCell) return null;
+    const sep = hoveredCell.indexOf(":");
+    if (sep < 0) return null;
+    const staffId = hoveredCell.slice(0, sep);
+    const dayKey = hoveredCell.slice(sep + 1);
+    const visible = new Set(staffList.map((s) => s.id));
+    const groups: ConstraintHoverGroup[] = [];
+    for (const rule of leaderRules) {
+      if (!rule.leaderStaffIds.includes(staffId)) continue;
+      const partnerIds = rule.leaderStaffIds.filter(
+        (id) => id !== staffId && visible.has(id)
+      );
+      if (partnerIds.length === 0) continue;
+      groups.push({ shiftId: shiftIdByName.get(rule.shiftName), partnerIds });
+    }
+    if (groups.length === 0) return null;
+    return { staffId, dayKey, groups };
+  }, [hoveredCell, leaderRules, staffList, shiftIdByName]);
 
   // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
   const shiftOptions = schedule.workShiftIds
@@ -293,6 +327,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         tabIndex={0}
         role="grid"
         onKeyDown={kb.handleKeyDown}
+        onMouseOver={(e) => {
+          const el = (e.target as HTMLElement).closest("[data-cell-key]");
+          const key = el?.getAttribute("data-cell-key") ?? null;
+          setHoveredCell((prev) => (prev === key ? prev : key));
+        }}
+        onMouseLeave={() => setHoveredCell(null)}
       >
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
         <div className="e-corner">
@@ -371,6 +411,17 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             leaderViolationUrl={leaderViolationUrl}
           />
         ))}
+
+        {/* ホバー中セルの制約関係（同じ責任者ルールの相手へ線を引く）を重ねる。
+            .e-grid を基準に content 座標で絶対配置するので、スクロールに追従する。 */}
+        {hoverInfo && (
+          <ConstraintHoverOverlay
+            gridRef={kb.gridRef}
+            dayKey={hoverInfo.dayKey}
+            hoveredStaffId={hoverInfo.staffId}
+            groups={hoverInfo.groups}
+          />
+        )}
       </div>
 
       <RequiredEditMenu

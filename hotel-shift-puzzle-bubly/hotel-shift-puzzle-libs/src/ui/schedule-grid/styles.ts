@@ -8,6 +8,7 @@ import styled from "styled-components";
 export const StyledWrap = styled.div`
   .e-grid {
     display: grid;
+    position: relative; /* 制約オーバーレイ（絶対配置 SVG）と各セルの offset 座標の基準 */
     max-height: 70vh;
     max-width: 100%;
     overflow: auto;
