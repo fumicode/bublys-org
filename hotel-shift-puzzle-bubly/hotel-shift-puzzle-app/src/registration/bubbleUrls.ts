@@ -12,7 +12,11 @@
  * 並べてズレないようにする。
  */
 import { registerObjectUrl } from "@bublys-org/bubbles-ui";
-import { STAFF_TYPE, SCHEDULE_TYPE } from "@bublys-org/hotel-shift-puzzle-libs";
+import {
+  STAFF_TYPE,
+  SCHEDULE_TYPE,
+  SCHEDULE_REPORT_TYPE,
+} from "@bublys-org/hotel-shift-puzzle-libs";
 
 /** スタッフ詳細バブル */
 export const staffUrl = (staffId: string): string =>
@@ -61,8 +65,16 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
+/** シフト完成レポートバブル（世界線ビューの「確定してレポート作成」から開く） */
+export const scheduleReportUrl = (reportId: string): string =>
+  `hotel-shift-puzzle/schedule-reports/${reportId}`;
+
+/** シフト完成レポート一覧バブル（次回シフト作成前の参照用。勤務表一覧から開く） */
+export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-reports`;
+
 // オブジェクトの正規 URL を registry に登録（副作用）。libs の記述子からは url を外したので、
 // ObjectView(object=...) の url 解決はこの登録が担う。このモジュールは bubbleRoutes から
 // import されるため、ルート登録と同じタイミングで一度だけ走る。
 registerObjectUrl(STAFF_TYPE, staffUrl);
 registerObjectUrl(SCHEDULE_TYPE, scheduleUrl);
+registerObjectUrl(SCHEDULE_REPORT_TYPE, scheduleReportUrl);
