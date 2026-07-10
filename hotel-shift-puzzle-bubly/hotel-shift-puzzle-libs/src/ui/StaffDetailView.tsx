@@ -52,7 +52,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
             object={staff}
             label={staff.name}
             draggable={true}
-            openingPosition="bubble-side"
+            openingPosition="bubble-side-left"
           >
             <h3 className="e-name">{staff.name}</h3>
           </ObjectView>

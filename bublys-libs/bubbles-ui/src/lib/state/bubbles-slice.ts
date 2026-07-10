@@ -31,7 +31,7 @@ export type BubbleArrangementState = {
   process: BubblesProcessState;
 }
 
-export type OpeningPosition = "bubble-side" | "origin-side";
+export type OpeningPosition = "bubble-side-right" | "bubble-side-left" | "bubble-side-top" | "bubble-side-bottom" | "origin-side";
 
 export type PopChildPayload = {
   bubbleId: string;

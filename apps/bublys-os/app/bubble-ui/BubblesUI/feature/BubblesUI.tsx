@@ -109,7 +109,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side"
+    openingPosition: OpeningPosition = "bubble-side-right"
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
@@ -171,7 +171,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side"
+    openingPosition: OpeningPosition = "bubble-side-right"
   ): string => {
     const newBubble = createBubble(name);
 

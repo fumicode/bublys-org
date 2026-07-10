@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext, type ReactNode } from "react";
-import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubblesContext, type OpeningPosition } from "@bublys-org/bubbles-ui";
 import {
   StaffCollection,
   StaffDetail,
@@ -51,7 +51,7 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
         openBubble(
           `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`,
           bubble.id,
-          "bubble-side"
+          "bubble-side-right"
         )
       }
     />
@@ -84,17 +84,19 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const autoShiftUrl = scheduleAutoShiftUrl(scheduleId);
-  const openSide = (url: string) => openBubble(url, bubble.id, "bubble-side");
+  // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
+  const openSide = (url: string, position: OpeningPosition) =>
+    openBubble(url, bubble.id, position);
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
-      onOpenAvailability={() => openSide(availabilityUrl)}
-      onOpenHistory={() => openSide(worldLineUrl)}
-      onOpenTree={() => openSide(treeUrl)}
-      onOpenAutoShift={() => openSide(autoShiftUrl)}
+      onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
+      onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
+      onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
+      onOpenAutoShift={() => openSide(autoShiftUrl, "bubble-side-right")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
