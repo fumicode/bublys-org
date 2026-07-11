@@ -114,11 +114,13 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             <span className="e-caret">{expanded ? "▾" : "▸"}</span>
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
-            <LeaderBadges
-              rules={leaderRules}
-              staffId={staff.id}
-              onSelectRule={onSelectRule}
-            />
+            <span className="e-staff-badges">
+              <LeaderBadges
+                rules={leaderRules}
+                staffId={staff.id}
+                onSelectRule={onSelectRule}
+              />
+            </span>
           </div>
         </ObjectView>
       </div>

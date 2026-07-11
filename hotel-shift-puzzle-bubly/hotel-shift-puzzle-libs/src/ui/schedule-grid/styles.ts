@@ -316,19 +316,32 @@ export const StyledWrap = styled.div`
       flex-shrink: 0;
     }
     .e-staff-name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* 名前を優先して表示（バッジに押し出されて隠れないように）。
+         入れば1行、入らなければ空白で折り返す（文字の途中では切らない・切り捨てない）。 */
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      line-height: 1.15;
       font-weight: bold;
+    }
+    /* 責任者バッジは名前を隠さないよう、右端に極小サイズで縦に積む */
+    .e-staff-badges {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
     }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
       flex-shrink: 0;
-      font-size: 0.72em;
+      font-size: 0.55em;
       font-weight: bold;
-      line-height: 1;
-      padding: 2px 4px;
-      border-radius: 4px;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
       white-space: nowrap;
 
       /* クリックで関係者を抽出できるバッジ */
