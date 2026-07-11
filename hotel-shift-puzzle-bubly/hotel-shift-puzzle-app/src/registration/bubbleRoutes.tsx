@@ -13,6 +13,7 @@ import {
   ExtractedSchedule,
   HotelObjectsProvider,
   ScheduleWorldLineView,
+  ScheduleWorldLineTreeView,
   AvailabilityEditor,
   ScheduleViolationView,
   ShiftWishEditor,
@@ -27,6 +28,7 @@ import {
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
   scheduleLeaderRuleUrl,
+  scheduleWorldLineTreeUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -87,14 +89,17 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     openBubble(url, bubble.id, position);
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
+  const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
       onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
+      onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
       onOpenAutoShift={() => openSide(autoShiftUrl, "bubble-side-right")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
+      treeUrl={treeUrl}
       autoShiftUrl={autoShiftUrl}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
@@ -141,6 +146,10 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
+// --- 勤務表の完成木ビューバブル（SVG版・読み取り専用） ---
+const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleWorldLineTreeView scheduleId={bubble.params.scheduleId} />);
+
 // --- 責任者ルール可視化バブル（上部ルール行のクリックで開く） ---
 const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(
@@ -165,6 +174,8 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
   // ので普通の BubbleView（クリック可）として描かれ、窓をリサイズすると canvas も伸縮する。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 400, height: 300 } } },
+  // 完成木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },
