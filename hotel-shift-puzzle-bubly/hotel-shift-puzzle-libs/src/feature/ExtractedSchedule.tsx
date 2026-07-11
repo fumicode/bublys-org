@@ -9,6 +9,7 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  ScheduleReport,
   MaxConsecutiveWorkdaysConstraint,
   fulfillWishesStep,
   makePartnerCoverStep,
@@ -28,12 +29,14 @@ import {
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { runAutoShiftStep } from "./autoShift.js";
+import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
+  SCHEDULE_REPORT_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -86,6 +89,13 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
+  // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
+  // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは reportPriority.ts）。
+  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const linkedReports = useMemo(() => {
+    const ids = constraints?.linkedReportIds ?? [];
+    return allReports.filter((r) => ids.includes(r.id));
+  }, [allReports, constraints]);
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
   const minDayOff = constraints?.minMonthlyDayOff ?? 8;
   const maxPerDay = constraints?.maxDayOffPerDay ?? 8;
@@ -148,7 +158,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: subset,
+      staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
       workShifts,
       wishByStaff,
       availability,
@@ -163,10 +173,11 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   // （たいてい既に開いているため）。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
+    const prioritizedStaff = prioritizeStaffByLinkedReports(subset, linkedReports);
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
-        staffList: subset,
+        staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
         availability,

@@ -17,6 +17,7 @@ import {
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   ConstraintViolation,
+  WorkingDay,
   type ScheduleConstraint,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { DAY_OFF_WISH, workWishKey, wishOptionLabel } from "../ui/shiftWishOptions.js";
@@ -29,6 +30,46 @@ type Context = {
   /** 勤務帯ID → 勤務帯名（割当を希望オプションキーに変換するため） */
   shiftNameById: Map<string, string>;
 };
+
+export type WishMismatch = {
+  /** 人が読める希望テキスト（例: "早番○・休み×"） */
+  wishText: string;
+  /** 人が読める実割当テキスト（例: "休み"） */
+  assignedText: string;
+};
+
+/**
+ * ある稼働日・あるスタッフについて、希望と実際の割当（オプションキー）が食い違っているかを判定する。
+ * 食い違いの定義:
+ *   - 割当が「避けたい(×)」オプションに一致する          → 食い違い
+ *   - 「したい(○)」が1つ以上あるのに、割当がそのどれでもない → 食い違い
+ *   - その日に希望が無ければ判定しない
+ * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの妥協検出
+ * （buildScheduleReport）の両方から呼ばれる共通ロジック。
+ */
+export function wishMismatchFor(
+  day: WorkingDay,
+  wish: StaffMonthlyShiftWish,
+  assignedOptionKey: string
+): WishMismatch | null {
+  const wishes = wish.wishesOn(day);
+  const keys = Object.keys(wishes);
+  if (keys.length === 0) return null;
+
+  const wants = keys.filter((k) => wishes[k] === "want");
+  const avoids = keys.filter((k) => wishes[k] === "avoid");
+
+  const violatesAvoid = avoids.includes(assignedOptionKey);
+  const violatesWant = wants.length > 0 && !wants.includes(assignedOptionKey);
+  if (!violatesAvoid && !violatesWant) return null;
+
+  const wishText = keys
+    .map((k) => `${wishOptionLabel(k)}${wishes[k] === "want" ? "○" : "×"}`)
+    .join("・");
+  const assignedText = wishOptionLabel(assignedOptionKey);
+
+  return { wishText, assignedText };
+}
 
 export class ShiftWishConstraint implements ScheduleConstraint {
   readonly type = SHIFT_WISH_MISMATCH;
@@ -45,10 +86,6 @@ export class ShiftWishConstraint implements ScheduleConstraint {
 
     for (const day of schedule.workingDays()) {
       for (const [staffId, wish] of this.ctx.wishByStaff) {
-        const wishes = wish.wishesOn(day);
-        const keys = Object.keys(wishes);
-        if (keys.length === 0) continue;
-
         const status = schedule.statusOf(staffId, day);
         if (status.kind === "undecided") continue; // 未割当は判定しない
 
@@ -57,24 +94,15 @@ export class ShiftWishConstraint implements ScheduleConstraint {
             ? DAY_OFF_WISH
             : workWishKey(this.ctx.shiftNameById.get(status.shiftId) ?? status.shiftId);
 
-        const wants = keys.filter((k) => wishes[k] === "want");
-        const avoids = keys.filter((k) => wishes[k] === "avoid");
-
-        const violatesAvoid = avoids.includes(assigned);
-        const violatesWant = wants.length > 0 && !wants.includes(assigned);
-        if (!violatesAvoid && !violatesWant) continue;
-
-        const wishText = keys
-          .map((k) => `${wishOptionLabel(k)}${wishes[k] === "want" ? "○" : "×"}`)
-          .join("・");
-        const assignedLabel = wishOptionLabel(assigned);
+        const mismatch = wishMismatchFor(day, wish, assigned);
+        if (!mismatch) continue;
 
         violations.push(
           new ConstraintViolation({
             constraintType: SHIFT_WISH_MISMATCH,
             staffId,
             days: [day],
-            message: `希望と異なる割当です（希望: ${wishText} ／ 割当: ${assignedLabel}）`,
+            message: `希望と異なる割当です（希望: ${mismatch.wishText} ／ 割当: ${mismatch.assignedText}）`,
           })
         );
       }

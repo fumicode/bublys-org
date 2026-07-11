@@ -12,6 +12,7 @@
 import React from "react";
 import PersonIcon from "@mui/icons-material/Person";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
   Staff,
   WorkShiftSet,
@@ -19,6 +20,7 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  ScheduleReport,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -33,6 +35,7 @@ export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
 export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
+export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
@@ -86,6 +89,14 @@ export const HOTEL_OBJECTS = defineObjects({
     // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
     // state が plain（scheduleId ＋ ルール states 配列）なので serialize 不要。
     localScope: (c: ScheduleConstraints) => localScopeId(SCHEDULE_TYPE, c.scheduleId),
+  },
+  ScheduleReport: {
+    class: ScheduleReport,
+    getId: (r: ScheduleReport) => r.state.id,
+    icon: React.createElement(AssessmentIcon, { fontSize: "small" }),
+    // 確定時点のスナップショット。勤務表のローカル世界線には相乗りさせない
+    // （相乗りさせると時間移動のたびに現れたり消えたりして確定記録の意味が壊れるため）。
+    // state が完全 plain → serialize 不要。localScope も指定しない＝アプリ全体ログのみ。
   },
 });
 

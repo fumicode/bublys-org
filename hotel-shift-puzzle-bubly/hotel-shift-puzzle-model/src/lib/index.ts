@@ -15,6 +15,7 @@ export * from './schedule/RequiredStaffing.js';
 export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
 export * from './schedule/ScheduleAvailability.js';
+export * from './schedule/ScheduleReport.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
 export * from './schedule/ShiftLeaderRule.js';

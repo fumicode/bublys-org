@@ -26,7 +26,12 @@ import {
 const newScheduleId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `sched-${Date.now()}`;
 
-export const ScheduleCollection: FC = () => {
+type ScheduleCollectionProps = {
+  /** シフト完成レポート一覧バブルを開くハンドラ（次回シフト作成前の参照用） */
+  onOpenReports?: () => void;
+};
+
+export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ onOpenReports }) => {
   useSeedHotelData();
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
@@ -71,6 +76,11 @@ export const ScheduleCollection: FC = () => {
     <StyledContainer>
       <div className="e-header">
         <h3>勤務表一覧 ({schedules.length})</h3>
+        {onOpenReports && (
+          <button type="button" className="e-reports" onClick={onOpenReports}>
+            📋 シフト完成レポート一覧
+          </button>
+        )}
       </div>
       <ScheduleListView
         schedules={schedules}
@@ -83,10 +93,30 @@ export const ScheduleCollection: FC = () => {
 
 const StyledContainer = styled.div`
   .e-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 4px;
 
     h3 {
       margin: 0;
+    }
+
+    .e-reports {
+      margin-left: auto;
+      border: 1px solid #cfd8dc;
+      border-radius: 6px;
+      background: #fff;
+      color: #37474f;
+      font-size: 0.8em;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+
+      &:hover {
+        background: #eceff1;
+        border-color: #90a4ae;
+      }
     }
   }
 `;
