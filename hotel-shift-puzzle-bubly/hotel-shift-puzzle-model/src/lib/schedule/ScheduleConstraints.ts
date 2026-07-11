@@ -27,6 +27,8 @@ export type ScheduleConstraintsState = {
   minMonthlyDayOff?: number;
   /** 1日に休んでよい人数の上限。省略時 8。 */
   maxDayOffPerDay?: number;
+  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。省略時 []。 */
+  linkedReportIds?: string[];
 };
 
 /** 各制約設定の既定値。 */
@@ -64,6 +66,28 @@ export class ScheduleConstraints {
   /** 1日に休んでよい人数の上限。既定 8。 */
   get maxDayOffPerDay(): number {
     return this.state.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY;
+  }
+
+  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。既定 []。 */
+  get linkedReportIds(): string[] {
+    return this.state.linkedReportIds ?? [];
+  }
+
+  /** レポートを紐づける（既に紐づいていれば何もしない）。新インスタンスを返す。 */
+  linkReport(reportId: string): ScheduleConstraints {
+    if (this.linkedReportIds.includes(reportId)) return this;
+    return new ScheduleConstraints({
+      ...this.state,
+      linkedReportIds: [...this.linkedReportIds, reportId],
+    });
+  }
+
+  /** レポートの紐づけを解除する。新インスタンスを返す。 */
+  unlinkReport(reportId: string): ScheduleConstraints {
+    return new ScheduleConstraints({
+      ...this.state,
+      linkedReportIds: this.linkedReportIds.filter((id) => id !== reportId),
+    });
   }
 
   /**
