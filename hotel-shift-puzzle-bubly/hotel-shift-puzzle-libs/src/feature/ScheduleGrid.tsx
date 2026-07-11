@@ -10,7 +10,6 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
-  SHIFT_LEADER_CONSTRAINT,
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
@@ -21,7 +20,10 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import { LeaderRulesView } from "../ui/LeaderRulesView.js";
+import {
+  ScheduleConstraintsBar,
+  shiftColorById,
+} from "../ui/ScheduleConstraintsBar.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
@@ -245,14 +247,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [schedule, allConstraints]
   );
 
-  // 上部「📋 ルール」の責任者以外の行は、各制約が自己記述する describe() から導出する。
-  const otherRules = useMemo(
-    () =>
-      allConstraints
-        .filter((c) => !c.type.startsWith(SHIFT_LEADER_CONSTRAINT))
-        .map((c) => ({ key: c.type, label: c.label, text: c.describe() })),
-    [allConstraints]
-  );
+  // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
+  const shiftColorOf = useMemo(() => {
+    const idByName = new Map<string, string>();
+    for (const w of workShifts) if (!idByName.has(w.name)) idByName.set(w.name, w.id);
+    return (shiftName: string) => shiftColorById(idByName.get(shiftName));
+  }, [workShifts]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -390,14 +390,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         </div>
       </div>
 
-      {/* 適用中の宣言的ルール（早責/夜責）を人が読める形で描く */}
+      {/* 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体） */}
       <div className="e-rules-strip">
-        <LeaderRulesView
-          rules={leaderRules}
+        <ScheduleConstraintsBar
+          leaderRules={leaderRules}
           nameOf={nameOf}
+          shiftColorOf={shiftColorOf}
+          onSelectRule={selectRuleStaff}
+          selectedStaffIds={selectedStaffIds}
           ruleBubbleUrl={ruleBubbleUrl}
-          otherRules={otherRules}
           onAddRule={scheduleId && onOpenRule ? handleAddRule : undefined}
+          maxConsecutive={constraints?.maxConsecutiveWorkdays ?? 5}
+          minDayOff={minDayOff}
+          maxPerDay={maxPerDay}
+          checkShiftWish={constraints?.checkShiftWish ?? true}
         />
       </div>
 

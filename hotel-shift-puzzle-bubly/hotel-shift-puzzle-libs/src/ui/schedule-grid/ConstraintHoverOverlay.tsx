@@ -1,5 +1,11 @@
-import { FC, RefObject, useLayoutEffect, useState } from "react";
+import { FC, RefObject, useLayoutEffect, useMemo, useState } from "react";
+import type { SVGProps } from "react";
+import styled, { css, keyframes } from "styled-components";
+import type { Keyframes } from "styled-components";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
+
+/** ルールのメンバー1人分。covering＝その日に担当勤務帯へ実際に入っている（＝充足に寄与）か。 */
+export type ConstraintHoverMember = { staffId: string; covering: boolean };
 
 /** ホバー中セルの人が属する1責任者ルール分の関係（勤務帯→全メンバー）。 */
 export type ConstraintHoverGroup = {
@@ -8,7 +14,7 @@ export type ConstraintHoverGroup = {
   /** 担当勤務帯の表示名（起点ノードのラベル。例: 早番）。 */
   shiftName: string;
   /** ルールの全メンバー（表示中の人だけ。本人も含む）。 */
-  memberIds: string[];
+  members: ConstraintHoverMember[];
   /** その日にルールが満たされているか（✅/⚠️ の切り替え）。 */
   satisfied: boolean;
 };
@@ -22,7 +28,16 @@ type Props = {
   groups: ConstraintHoverGroup[];
 };
 
-type Ribbon = { d: string; color: string };
+/** リボン（面）の描画モード。solid=入っている人（濃く）/ faint=薄く / blink=巡回点灯（誰か入って） */
+type RibbonMode = "solid" | "faint" | "blink";
+type Ribbon = {
+  d: string;
+  color: string;
+  mode: RibbonMode;
+  /** blink 用: グループ内の点灯順 index と、巡回する本数 count。 */
+  index: number;
+  count: number;
+};
 type Node = {
   x: number;
   y: number;
@@ -31,28 +46,32 @@ type Node = {
   bg: string;
   fg: string;
   label: string;
-  icon: string;
 };
-type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[] };
+type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[]; clip: string };
 
 const DEFAULT_FG = "#607d8b";
 const DEFAULT_BG = "#eceff1";
-const RIBBON_W = 7; // リボン（面）の太さ
+const RIBBON_W = 12; // リボン（面）の基本の太さ
+const RIBBON_W_STRONG = 18; // 入っている人（covering）の太さ
 const NODE_GAP = 40; // 列の右端から勤務帯ノードまでの距離
 const NODE_H = 22;
 const RULE_STRIDE = 104; // 複数ルールのときノードを右へずらす量
+const SLOT_MS = 700; // 巡回1本あたりの点灯スロット
 
-/** 太さ RIBBON_W の半透明リボン（面）のパスを作る。start（セル右端）→ node（勤務帯）を結ぶ。 */
+const OP_HIGH = 0.62; // 濃い（入っている／点灯中）
+const OP_LOW = 0.12; // 薄い（入っていない／消灯中）
+
+/** 太さ width の半透明リボン（面）のパスを作る。start（セル右端）→ node（勤務帯）を結ぶ。 */
 const ribbonPath = (
   sx: number,
   sy: number,
   nx: number,
-  ny: number
+  ny: number,
+  width: number
 ): string => {
-  const half = RIBBON_W / 2;
+  const half = width / 2;
   const c1x = sx + (nx - sx) * 0.45;
   const c2x = nx - (nx - sx) * 0.25;
-  // 上辺（セル右端 → ノード）を C 曲線で、下辺を逆向きに戻して閉じる＝帯状の面。
   return (
     `M ${sx} ${sy - half} ` +
     `C ${c1x} ${sy - half}, ${c2x} ${ny - half}, ${nx} ${ny - half} ` +
@@ -61,15 +80,27 @@ const ribbonPath = (
   );
 };
 
+/** 巡回点灯（LeaderRuleDiagram と同じ発想）。on 窓は先頭 1/count に置き、arm ごとに delay をずらす。 */
+const blinkKeyframes = (count: number) => {
+  const onPct = count > 0 ? 100 / count : 100;
+  return keyframes`
+    0% { opacity: ${OP_LOW}; }
+    ${(onPct * 0.15).toFixed(2)}% { opacity: ${OP_HIGH}; }
+    ${(onPct * 0.85).toFixed(2)}% { opacity: ${OP_HIGH}; }
+    ${onPct.toFixed(2)}% { opacity: ${OP_LOW}; }
+    100% { opacity: ${OP_LOW}; }
+  `;
+};
+
 /**
  * 勤務表グリッドにホバー中だけ重なる、責任者制約の関係オーバーレイ。
  *
- * ルールビューと同じ「勤務帯（早番など）から候補者みんなへ」の構造を、表の中にコンパクトに描く。
- * ホバー中の日の列で、担当勤務帯のノードを列の右に置き、そこから各メンバーのセル右端へ
- * 半透明の面（リボン）を等しく伸ばす。ノードには ✅/⚠️ でその日の充足/未充足を出す。
- *
- * セルは一切隠さない：リボンはセルの右端から外側（列の右の余白）へ出る。座標は各セルの
- * offsetLeft/Top（.e-grid 基準の content 座標）で測るので、行展開やスクロールでもズレない。
+ * 担当勤務帯（早番など）のノードを列の右に置き、そこから各メンバーのセル右端へ面（リボン）を伸ばす。
+ * さらに「中身」を描く:
+ *   - 入っている人（担当勤務帯に割当済み＝充足に寄与）… 太く濃い面（solid）。
+ *   - 充足済みで入っていない人 … 薄い面（faint）。
+ *   - 未充足のとき入っていない候補 … 制約バブルと同じくパッパッと巡回点灯（blink）＝「誰か入って」。
+ * 面の背後は backdrop blur でぼかし、関係を浮き立たせる（面の形に clip-path）。
  */
 export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) => {
   const [geom, setGeom] = useState<Geom | null>(null);
@@ -80,7 +111,6 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
       setGeom(null);
       return;
     }
-    // セルの「右端・上下中央」の座標を返す。
     const edgeOf = (staffId: string) => {
       const el = grid.querySelector<HTMLElement>(
         `[data-cell-key="${staffId}:${dayKey}"]`
@@ -93,79 +123,158 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
     const nodes: Node[] = [];
 
     groups.forEach((g, gi) => {
-      const pts = g.memberIds
-        .map(edgeOf)
-        .filter((p): p is { rx: number; cy: number } => !!p);
+      const pts = g.members
+        .map((m) => {
+          const e = edgeOf(m.staffId);
+          return e ? { ...e, covering: m.covering } : null;
+        })
+        .filter((p): p is { rx: number; cy: number; covering: boolean } => !!p);
       if (pts.length === 0) return;
 
       const fg = (g.shiftId && SHIFT_FG[g.shiftId]) || DEFAULT_FG;
       const bg = (g.shiftId && SHIFT_BG[g.shiftId]) || DEFAULT_BG;
       const colRight = Math.max(...pts.map((p) => p.rx));
       const ys = pts.map((p) => p.cy);
-      const ny = (Math.min(...ys) + Math.max(...ys)) / 2; // メンバーの上下中央に勤務帯ノード
+      const ny = (Math.min(...ys) + Math.max(...ys)) / 2;
       const nx = colRight + NODE_GAP + gi * RULE_STRIDE;
 
+      // 未充足のときに巡回させる対象＝入っていない候補。
+      const blinkCount = g.satisfied ? 0 : pts.filter((p) => !p.covering).length;
+      let blinkIdx = 0;
+
       for (const p of pts) {
-        ribbons.push({ d: ribbonPath(p.rx, p.cy, nx, ny), color: fg });
+        const width = p.covering ? RIBBON_W_STRONG : RIBBON_W;
+        const d = ribbonPath(p.rx, p.cy, nx, ny, width);
+        if (p.covering) {
+          ribbons.push({ d, color: fg, mode: "solid", index: 0, count: 0 });
+        } else if (g.satisfied) {
+          ribbons.push({ d, color: fg, mode: "faint", index: 0, count: 0 });
+        } else {
+          ribbons.push({ d, color: fg, mode: "blink", index: blinkIdx++, count: blinkCount });
+        }
       }
 
       const icon = g.satisfied ? "✅" : "⚠️";
       const label = `${g.shiftName} ${icon}`;
       const w = 18 + label.length * 12;
-      nodes.push({ x: nx, y: ny - NODE_H / 2, w, h: NODE_H, bg, fg, label, icon });
+      nodes.push({ x: nx, y: ny - NODE_H / 2, w, h: NODE_H, bg, fg, label });
     });
 
     if (ribbons.length === 0) {
       setGeom(null);
       return;
     }
-    setGeom({ w: grid.scrollWidth, h: grid.scrollHeight, ribbons, nodes });
+    setGeom({
+      w: grid.scrollWidth,
+      h: grid.scrollHeight,
+      ribbons,
+      nodes,
+      clip: ribbons.map((r) => r.d).join(" "),
+    });
   }, [gridRef, dayKey, groups]);
+
+  // blink に使う keyframes を本数ごとに用意する（同じ本数は使い回す）。
+  const blinkKfByCount = useMemo(() => {
+    const map = new Map<number, Keyframes>();
+    for (const r of geom?.ribbons ?? []) {
+      if (r.mode === "blink" && !map.has(r.count)) map.set(r.count, blinkKeyframes(r.count));
+    }
+    return map;
+  }, [geom]);
 
   if (!geom) return null;
 
   return (
-    <svg
-      className="e-constraint-overlay"
-      width={geom.w}
-      height={geom.h}
-      style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        pointerEvents: "none",
-        overflow: "visible",
-        zIndex: 4,
-      }}
-      aria-hidden
-    >
-      {geom.ribbons.map((r, i) => (
-        <path key={`r${i}`} d={r.d} fill={r.color} opacity={0.3} />
-      ))}
-      {geom.nodes.map((n, i) => (
-        <g key={`n${i}`}>
-          <rect
-            x={n.x}
-            y={n.y}
-            width={n.w}
-            height={n.h}
-            rx={n.h / 2}
-            fill={n.bg}
-            stroke={n.fg}
-            strokeOpacity={0.5}
-          />
-          <text
-            x={n.x + 10}
-            y={n.y + n.h / 2}
-            dominantBaseline="central"
-            fontSize={12}
-            fontWeight={700}
-            fill={n.fg}
-          >
-            {n.label}
-          </text>
-        </g>
-      ))}
-    </svg>
+    <>
+      {/* 面の背後をぼかす（面の形に切り抜いた backdrop blur）。 */}
+      <div
+        className="e-constraint-blur"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: geom.w,
+          height: geom.h,
+          pointerEvents: "none",
+          zIndex: 3,
+          backdropFilter: "blur(2.5px)",
+          WebkitBackdropFilter: "blur(2.5px)",
+          clipPath: `path('${geom.clip}')`,
+          WebkitClipPath: `path('${geom.clip}')`,
+        }}
+        aria-hidden
+      />
+      <svg
+        className="e-constraint-overlay"
+        width={geom.w}
+        height={geom.h}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          pointerEvents: "none",
+          overflow: "visible",
+          zIndex: 4,
+        }}
+        aria-hidden
+      >
+        {geom.ribbons.map((r, i) => {
+          if (r.mode === "blink") {
+            return (
+              <BlinkRibbon
+                key={`r${i}`}
+                d={r.d}
+                fill={r.color}
+                $anim={blinkKfByCount.get(r.count) as Keyframes}
+                $dur={Math.max(1, r.count) * SLOT_MS}
+                $delay={r.index * SLOT_MS}
+              />
+            );
+          }
+          return (
+            <path
+              key={`r${i}`}
+              d={r.d}
+              fill={r.color}
+              opacity={r.mode === "solid" ? OP_HIGH : OP_LOW}
+            />
+          );
+        })}
+        {geom.nodes.map((n, i) => (
+          <g key={`n${i}`}>
+            <rect
+              x={n.x}
+              y={n.y}
+              width={n.w}
+              height={n.h}
+              rx={n.h / 2}
+              fill={n.bg}
+              stroke={n.fg}
+              strokeOpacity={0.5}
+            />
+            <text
+              x={n.x + 10}
+              y={n.y + n.h / 2}
+              dominantBaseline="central"
+              fontSize={12}
+              fontWeight={700}
+              fill={n.fg}
+            >
+              {n.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </>
   );
 };
+
+/** 未充足のとき巡回点灯する面。opacity を keyframes で切り替える。 */
+const BlinkRibbon = styled.path<
+  SVGProps<SVGPathElement> & { $anim: Keyframes; $dur: number; $delay: number }
+>`
+  ${({ $anim, $dur, $delay }) => css`
+    opacity: ${OP_LOW};
+    animation: ${$anim} ${$dur}ms linear ${$delay}ms infinite;
+  `}
+`;

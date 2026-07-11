@@ -151,12 +151,20 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     const dayKey = hoveredCell.slice(sep + 1);
     const day = days.find((d) => d.key === dayKey);
     const visible = new Set(staffList.map((s) => s.id));
+    const shiftNameByIdLocal = new Map(workShifts.map((w) => [w.id, w.name]));
     const groups: ConstraintHoverGroup[] = [];
     for (const rule of leaderRules) {
       if (!rule.leaderStaffIds.includes(staffId)) continue;
       // 起点は「勤務帯」なので、本人も含めた表示中の全メンバーへ等しく線を伸ばす。
       const memberIds = rule.leaderStaffIds.filter((id) => visible.has(id));
       if (memberIds.length === 0) continue;
+      // 各メンバーが「その日に担当勤務帯へ入っているか（充足に寄与しているか）」を添える。
+      const members = memberIds.map((id) => {
+        const st = day ? schedule.statusOf(id, day) : { kind: "undecided" as const };
+        const covering =
+          st.kind === "work" && shiftNameByIdLocal.get(st.shiftId) === rule.shiftName;
+        return { staffId: id, covering };
+      });
       // その日に責任者ルールが未充足なら違反が立つ（列警告と同じ導出）。無ければ充足。
       const vtype = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
       const satisfied = day
@@ -165,13 +173,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
-        memberIds,
+        members,
         satisfied,
       });
     }
     if (groups.length === 0) return null;
     return { dayKey, groups };
-  }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations]);
+  }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations, schedule, workShifts]);
 
   // この勤務表で選べる勤務帯（勤務表の WorkShiftSet から渡される。開始時刻昇順）
   const shiftOptions = workShifts;
