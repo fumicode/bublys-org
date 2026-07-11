@@ -19,3 +19,4 @@ export * from "./shiftWishOptions.js";
 export * from "./ClimberWorldLineCanvasView.js";
 export * from "./ScheduleReportView.js";
 export * from "./ScheduleReportListView.js";
+export * from "./LinkedReportsView.js";
