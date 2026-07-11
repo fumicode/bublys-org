@@ -17,6 +17,8 @@ export type ConstraintHoverGroup = {
   members: ConstraintHoverMember[];
   /** その日にルールが満たされているか（✅/⚠️ の切り替え）。 */
   satisfied: boolean;
+  /** メンバー全員がその日に休み（＝誰も入れず絶対に満たせない）。特別な黄色・同時点滅で警告する。 */
+  allDayOff: boolean;
 };
 
 type Props = {
@@ -28,8 +30,12 @@ type Props = {
   groups: ConstraintHoverGroup[];
 };
 
-/** リボン（面）の描画モード。solid=入っている人（濃く）/ faint=薄く / blink=巡回点灯（誰か入って） */
-type RibbonMode = "solid" | "faint" | "blink";
+/**
+ * リボン（面）の描画モード。
+ *   solid=入っている人（濃く）/ faint=薄く / blink=巡回点灯（誰か入って）/
+ *   sync=全員休みの警告（黄色・全体同時点滅）
+ */
+type RibbonMode = "solid" | "faint" | "blink" | "sync";
 type Ribbon = {
   d: string;
   color: string;
@@ -46,6 +52,8 @@ type Node = {
   bg: string;
   fg: string;
   label: string;
+  /** 全員休みの警告ノード（黄色・同時点滅）か。 */
+  sync?: boolean;
 };
 type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[]; clip: string };
 
@@ -60,6 +68,17 @@ const SLOT_MS = 700; // 巡回1本あたりの点灯スロット
 
 const OP_HIGH = 0.62; // 濃い（入っている／点灯中）
 const OP_LOW = 0.12; // 薄い（入っていない／消灯中）
+
+// 全員休み（絶対に満たせない）の警告色。黄色。
+const WARN_FG = "#f9a825";
+const WARN_BG = "#fff8e1";
+const SYNC_MS = 800; // 同時点滅の周期
+
+/** 全体が同時に点滅（巡回ではなく一斉に明滅）。 */
+const syncBlink = keyframes`
+  0%, 100% { opacity: ${OP_LOW}; }
+  50% { opacity: 0.85; }
+`;
 
 /** 太さ width の半透明リボン（面）のパスを作る。start（セル右端）→ node（勤務帯）を結ぶ。 */
 const ribbonPath = (
@@ -137,6 +156,27 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
       const ys = pts.map((p) => p.cy);
       const ny = (Math.min(...ys) + Math.max(...ys)) / 2;
       const nx = colRight + NODE_GAP + gi * RULE_STRIDE;
+
+      if (g.allDayOff) {
+        // 全員休み＝誰も入れず絶対に満たせない。黄色の面を全体同時に点滅させる。
+        for (const p of pts) {
+          const d = ribbonPath(p.rx, p.cy, nx, ny, RIBBON_W);
+          ribbons.push({ d, color: WARN_FG, mode: "sync", index: 0, count: 0 });
+        }
+        const label = `${g.shiftName} ⚠️`;
+        const w = 18 + label.length * 12;
+        nodes.push({
+          x: nx,
+          y: ny - NODE_H / 2,
+          w,
+          h: NODE_H,
+          bg: WARN_BG,
+          fg: WARN_FG,
+          label,
+          sync: true,
+        });
+        return;
+      }
 
       // 未充足のときに巡回させる対象＝入っていない候補。
       const blinkCount = g.satisfied ? 0 : pts.filter((p) => !p.covering).length;
@@ -219,6 +259,9 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
         aria-hidden
       >
         {geom.ribbons.map((r, i) => {
+          if (r.mode === "sync") {
+            return <SyncRibbon key={`r${i}`} d={r.d} fill={r.color} />;
+          }
           if (r.mode === "blink") {
             return (
               <BlinkRibbon
@@ -240,8 +283,10 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
             />
           );
         })}
-        {geom.nodes.map((n, i) => (
-          <g key={`n${i}`}>
+        {geom.nodes.map((n, i) => {
+          const NodeGroup = n.sync ? SyncNodeGroup : "g";
+          return (
+          <NodeGroup key={`n${i}`}>
             <rect
               x={n.x}
               y={n.y}
@@ -262,8 +307,9 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
             >
               {n.label}
             </text>
-          </g>
-        ))}
+          </NodeGroup>
+          );
+        })}
       </svg>
     </>
   );
@@ -277,4 +323,15 @@ const BlinkRibbon = styled.path<
     opacity: ${OP_LOW};
     animation: ${$anim} ${$dur}ms linear ${$delay}ms infinite;
   `}
+`;
+
+/** 全員休みの警告面。黄色で全体同時に点滅する（delay 無し＝一斉）。 */
+const SyncRibbon = styled.path<SVGProps<SVGPathElement>>`
+  opacity: ${OP_LOW};
+  animation: ${syncBlink} ${SYNC_MS}ms ease-in-out infinite;
+`;
+
+/** 全員休みの警告ノード。面と同じ周期・タイミングで一斉に点滅する。 */
+const SyncNodeGroup = styled.g`
+  animation: ${syncBlink} ${SYNC_MS}ms ease-in-out infinite;
 `;

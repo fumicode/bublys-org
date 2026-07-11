@@ -170,11 +170,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       const satisfied = day
         ? !violations.some((v) => v.constraintType === vtype && v.coversDay(day))
         : true;
+      // メンバー全員がその日に休み＝誰も入れず絶対に満たせない（黄色・同時点滅で警告）。
+      const allDayOff = !!day && memberIds.every((id) => schedule.isDayOff(id, day));
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
         members,
         satisfied,
+        allDayOff,
       });
     }
     if (groups.length === 0) return null;
