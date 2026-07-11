@@ -37,6 +37,10 @@ export const scheduleAvailabilityUrl = (scheduleId: string): string =>
 export const scheduleWorldLineUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/world-line`;
 
+/** 完成木ビューバブル（SVG版・読み取り専用） */
+export const scheduleWorldLineTreeUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/tree`;
+
 /** 自動シフト パネルバブル */
 export const scheduleAutoShiftUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/auto-shift`;
