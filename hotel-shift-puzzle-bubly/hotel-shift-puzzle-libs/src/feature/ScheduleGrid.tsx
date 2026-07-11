@@ -2,7 +2,7 @@
 
 import { FC, ReactNode, useMemo, useState } from "react";
 import styled from "styled-components";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   WorkShift,
@@ -10,6 +10,7 @@ import {
   ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  ScheduleReport,
   SHIFT_LEADER_CONSTRAINT,
   fulfillWishesStep,
   makePartnerCoverStep,
@@ -22,17 +23,20 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { LeaderRulesView } from "../ui/LeaderRulesView.js";
+import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
+import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
+  SCHEDULE_REPORT_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -145,6 +149,26 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
   const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+
+  // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
+  // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
+  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const linkedReports = useMemo(() => {
+    const ids = constraints?.linkedReportIds ?? [];
+    return allReports.filter((r) => ids.includes(r.id));
+  }, [allReports, constraints]);
+
+  const handleDropReportUrl = (url: string) => {
+    const reportId = extractIdFromUrl(url);
+    if (!reportId || !scheduleId) return;
+    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
+    constraintsRepo.save(base.linkReport(reportId));
+  };
+  const handleUnlinkReport = (reportId: string) => {
+    if (!constraints) return;
+    constraintsRepo.save(constraints.unlinkReport(reportId));
+  };
 
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
   const minDayOff = constraints?.minMonthlyDayOff ?? 8;
@@ -261,11 +285,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setCell(staffId, day, to));
   };
 
-  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる
+  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
+  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: subsetStaff,
+      staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
       workShifts,
       wishByStaff,
       availability,
@@ -279,10 +304,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // それぞれ独立した世界線（兄弟ブランチ）に書く。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
+    // 紐づけたレポートで妥協が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
-        staffList: subsetStaff,
+        staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
         availability,
@@ -387,6 +414,15 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             )}
         </div>
       </div>
+
+      {/* 参考として紐づけたシフト完成レポート。ルール帯とは別エリア（レポート一覧バブルから
+          ドラッグで紐づけ、自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
+      <LinkedReportsView
+        reports={linkedReports}
+        onDropUrl={handleDropReportUrl}
+        dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
+        onUnlink={handleUnlinkReport}
+      />
 
       {/* 適用中の宣言的ルール（早責/夜責）を人が読める形で描く */}
       <div className="e-rules-strip">
