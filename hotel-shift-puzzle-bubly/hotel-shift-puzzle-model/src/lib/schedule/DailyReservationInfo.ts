@@ -1,59 +1,97 @@
 /**
- * DailyReservationInfo — 勤務表ごとの「稼働日ごとの予約状況」
+ * DailyReservationInfo — 勤務表ごとの「稼働日ごとの予約・稼働情報」
  *
- * ある勤務表（シフト表）について、稼働日ごとに「宿泊人数」「部屋数」を持つ。
- * 勤務表に紐づく別集約（id は scheduleId を兼ねる）。ただし予約状況は「実際の予約」という
- * 外部の実データであり、シフト作成の試行錯誤とは別物なので、勤務表のローカル世界線には
- * 相乗りさせない（時間移動で予約状況が変わったり戻ったりしない）。世界線の束ねは
- * オブジェクト登録側（hotelObjects の localScope）で決める。
+ * 元 Excel の日付ヘッダより上のブロックに対応する。中 / 夕 / 泊 の3グループがあり、
+ * それぞれ「宿泊人数」「部屋数」を持つ。さらに 婚礼（件数）と 備考（フリーテキスト）を持つ。
+ * 勤務表に紐づく別集約（id は scheduleId を兼ねる）。ただしこれは「実際の予約」という外部の
+ * 実データなので、勤務表のローカル世界線には相乗りさせない（登録側 hotelObjects の localScope で決める）。
  *
  * 【店ごとの付け替えについて】
- * 「稼働日ごとに何を記録するか」は店によって全く違う。ここでは "汎用の数値フィールド束" のような
- * 制約付きの汎用は作らず、ホテルの要件（宿泊人数・部屋数）を素直に具体化している。
- * 別の店で違う項目が要るときは、この集約と対の UI（ReservationInfoRows / ScheduleReservationInfoView）を
- * その店用の具体モジュールとして差し替える。＝付け替えの境界は「モジュール」で、ランタイム設定ではない。
+ * 「稼働日ごとに何を記録するか」は店によって全く違う。ここでは汎用のフィールド束にはせず、
+ * ホテルの元表（中・夕・泊の宿泊人数/部屋数・婚礼・備考）を素直に具体化している。別の店で
+ * 違う項目が要るときは、この集約と対の UI をその店用の具体モジュールとして差し替える。
  *
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { WorkingDay } from "./WorkingDay.js";
 
-/** 稼働日1日ぶんの予約状況（未入力の項目は undefined） */
-export type DailyReservationInfoEntry = {
+/** 中/夕/泊 の各グループが持つ値 */
+export type GuestsRooms = {
   /** 宿泊人数 */
   guests?: number;
   /** 部屋数 */
   rooms?: number;
 };
 
+/** 宿泊人数・部屋数を持つグループ（中 / 夕 / 泊） */
+export type ReservationGroup = "naka" | "yu" | "haku";
+/** グループ内のフィールド */
+export type GuestsRoomsField = "guests" | "rooms";
+
+/** 稼働日1日ぶんの予約・稼働情報（未入力の項目は undefined） */
+export type DailyReservationInfoEntry = {
+  /** 中（役割不明。宿泊人数・部屋数を持つ） */
+  naka?: GuestsRooms;
+  /** 夕（役割不明。宿泊人数・部屋数を持つ） */
+  yu?: GuestsRooms;
+  /** 泊（宿泊人数・部屋数を持つ） */
+  haku?: GuestsRooms;
+  /** 婚礼（フリーテキスト。件名・時間など） */
+  weddings?: string;
+  /** 備考（フリーテキスト） */
+  note?: string;
+};
+
 export type DailyReservationInfoState = {
-  /** 紐づく勤務表ID（この集約のIDも兼ねる：1勤務表=1予約状況） */
+  /** 紐づく勤務表ID（この集約のIDも兼ねる：1勤務表=1予約・稼働情報） */
   scheduleId: string;
-  /** 稼働日キー("2026-06-01") → その日の予約状況 */
+  /** 稼働日キー("2026-06-01") → その日の情報 */
   byDay: Record<string, DailyReservationInfoEntry>;
 };
 
 /** シリアライズ用（state がそのまま plain） */
 export type DailyReservationInfoPlain = DailyReservationInfoState;
 
+const cloneGroup = (g: GuestsRooms | undefined): GuestsRooms | undefined =>
+  g ? { ...g } : undefined;
+
+const cloneEntry = (e: DailyReservationInfoEntry): DailyReservationInfoEntry => ({
+  naka: cloneGroup(e.naka),
+  yu: cloneGroup(e.yu),
+  haku: cloneGroup(e.haku),
+  weddings: e.weddings,
+  note: e.note,
+});
+
 const cloneByDay = (
   byDay: Record<string, DailyReservationInfoEntry>
 ): Record<string, DailyReservationInfoEntry> => {
   const out: Record<string, DailyReservationInfoEntry> = {};
-  for (const [dayKey, entry] of Object.entries(byDay)) out[dayKey] = { ...entry };
+  for (const [dayKey, entry] of Object.entries(byDay)) out[dayKey] = cloneEntry(entry);
   return out;
 };
 
 /** 入力値を「0以上の整数」または undefined（未入力）に正規化する */
 const normalize = (value: number | undefined): number | undefined => {
   if (value === undefined || Number.isNaN(value)) return undefined;
-  const n = Math.max(0, Math.round(value));
-  return n;
+  return Math.max(0, Math.round(value));
 };
+
+const isEmptyGroup = (g: GuestsRooms | undefined): boolean =>
+  !g || (g.guests === undefined && g.rooms === undefined);
+
+/** その日のエントリが実質空か（全グループ空・婚礼なし・備考なし） */
+const isEmptyEntry = (e: DailyReservationInfoEntry): boolean =>
+  isEmptyGroup(e.naka) &&
+  isEmptyGroup(e.yu) &&
+  isEmptyGroup(e.haku) &&
+  (e.weddings === undefined || e.weddings === "") &&
+  (e.note === undefined || e.note === "");
 
 export class DailyReservationInfo {
   constructor(readonly state: DailyReservationInfoState) {}
 
-  /** 何も入力されていない予約状況を作る */
+  /** 何も入力されていない情報を作る */
   static empty(scheduleId: string): DailyReservationInfo {
     return new DailyReservationInfo({ scheduleId, byDay: {} });
   }
@@ -66,43 +104,69 @@ export class DailyReservationInfo {
     return this.state.scheduleId;
   }
 
-  /** その稼働日の予約状況（未入力は空オブジェクト） */
+  /** その稼働日の情報（未入力は空オブジェクト） */
   entryOn(day: WorkingDay): DailyReservationInfoEntry {
     return this.state.byDay[day.key] ?? {};
   }
 
-  /** その稼働日の宿泊人数（未入力は undefined） */
-  guestsOn(day: WorkingDay): number | undefined {
-    return this.state.byDay[day.key]?.guests;
-  }
-
-  /** その稼働日の部屋数（未入力は undefined） */
-  roomsOn(day: WorkingDay): number | undefined {
-    return this.state.byDay[day.key]?.rooms;
-  }
-
-  /** その稼働日の宿泊人数を設定した新インスタンスを返す。不変。undefined で未入力に戻す。 */
-  setGuests(day: WorkingDay, value: number | undefined): DailyReservationInfo {
-    return this.setField(day, "guests", value);
-  }
-
-  /** その稼働日の部屋数を設定した新インスタンスを返す。不変。undefined で未入力に戻す。 */
-  setRooms(day: WorkingDay, value: number | undefined): DailyReservationInfo {
-    return this.setField(day, "rooms", value);
-  }
-
-  private setField(
+  // ---- グループ（中/夕/泊）の宿泊人数・部屋数 ----
+  /** その稼働日・グループ・フィールドの値（未入力は undefined） */
+  numberOn(
     day: WorkingDay,
-    field: keyof DailyReservationInfoEntry,
+    group: ReservationGroup,
+    field: GuestsRoomsField
+  ): number | undefined {
+    return this.state.byDay[day.key]?.[group]?.[field];
+  }
+
+  /** その稼働日・グループ・フィールドを設定した新インスタンスを返す。不変。undefined で未入力に戻す。 */
+  setNumber(
+    day: WorkingDay,
+    group: ReservationGroup,
+    field: GuestsRoomsField,
     value: number | undefined
   ): DailyReservationInfo {
     const byDay = cloneByDay(this.state.byDay);
     const entry = { ...(byDay[day.key] ?? {}) };
+    const g: GuestsRooms = { ...(entry[group] ?? {}) };
     const v = normalize(value);
-    if (v === undefined) delete entry[field];
-    else entry[field] = v;
-    // 両項目とも未入力になったら、その日ごと取り除いて疎に保つ
-    if (entry.guests === undefined && entry.rooms === undefined) delete byDay[day.key];
+    if (v === undefined) delete g[field];
+    else g[field] = v;
+    if (isEmptyGroup(g)) delete entry[group];
+    else entry[group] = g;
+    if (isEmptyEntry(entry)) delete byDay[day.key];
+    else byDay[day.key] = entry;
+    return new DailyReservationInfo({ ...this.state, byDay });
+  }
+
+  // ---- 婚礼（フリーテキスト） ----
+  weddingsOn(day: WorkingDay): string | undefined {
+    return this.state.byDay[day.key]?.weddings;
+  }
+
+  setWeddings(day: WorkingDay, value: string | undefined): DailyReservationInfo {
+    const byDay = cloneByDay(this.state.byDay);
+    const entry = { ...(byDay[day.key] ?? {}) };
+    const text = value?.trim() ? value : undefined;
+    if (text === undefined) delete entry.weddings;
+    else entry.weddings = text;
+    if (isEmptyEntry(entry)) delete byDay[day.key];
+    else byDay[day.key] = entry;
+    return new DailyReservationInfo({ ...this.state, byDay });
+  }
+
+  // ---- 備考（フリーテキスト） ----
+  noteOn(day: WorkingDay): string | undefined {
+    return this.state.byDay[day.key]?.note;
+  }
+
+  setNote(day: WorkingDay, value: string | undefined): DailyReservationInfo {
+    const byDay = cloneByDay(this.state.byDay);
+    const entry = { ...(byDay[day.key] ?? {}) };
+    const text = value?.trim() ? value : undefined;
+    if (text === undefined) delete entry.note;
+    else entry.note = text;
+    if (isEmptyEntry(entry)) delete byDay[day.key];
     else byDay[day.key] = entry;
     return new DailyReservationInfo({ ...this.state, byDay });
   }

@@ -75,6 +75,13 @@ export const StyledWrap = styled.div`
     color: #5d4037;
     background: #fff8f0;
     white-space: nowrap;
+
+    &.is-clickable {
+      cursor: pointer;
+    }
+    &.is-clickable:hover {
+      background: #ffefdd;
+    }
   }
   .e-res-cell {
     display: flex;
@@ -101,6 +108,25 @@ export const StyledWrap = styled.div`
     }
     &:hover {
       box-shadow: inset 0 0 0 2px #ffcc80;
+    }
+
+    /* 備考は複数行テキストをそのまま折り返して表示する（狭い日列なので縦に伸びる） */
+    &.is-note {
+      align-items: flex-start;
+      justify-content: flex-start;
+      font-weight: normal;
+      font-size: 0.62em;
+      line-height: 1.25;
+      padding: 2px 3px;
+
+      .e-res-note {
+        display: block;
+        width: 100%;
+        white-space: pre-wrap;
+        word-break: break-all;
+        text-align: left;
+        color: #6d4c41;
+      }
     }
   }
   .e-res-filler {

@@ -5,7 +5,6 @@ import styled from "styled-components";
 import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
-  type WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReservationInfoView } from "../ui/ScheduleReservationInfoView.js";
 import { useObject, useObjectRepo } from "../objects/repository.js";
@@ -22,7 +21,7 @@ type ScheduleReservationInfoDetailProps = {
  *
  * 予約状況は勤務表に紐づく姉妹集約 DailyReservationInfo（id=scheduleId）。まだ無ければ
  * 最初の入力時に空から作って保存する（ScheduleConstraints と同じ遅延生成パターン）。
- * 保存は勤務表のローカル世界線に載る＝時間移動で一緒に戻る。
+ * 予約は外部の実データなので勤務表の世界線には載せない（アプリ全体スコープのみ）。
  */
 export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProps> = ({
   scheduleId,
@@ -43,14 +42,9 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
   const sid = schedule.id;
   const days = schedule.workingDays();
 
-  // 現在値（未作成なら空）を起点に、集約のメソッドで新インスタンスを作って保存する。
-  const current = reservationInfo ?? DailyReservationInfo.empty(sid);
-  const handleChangeGuests = (day: WorkingDay, value: number | undefined) => {
-    repo.save(current.setGuests(day, value));
-  };
-  const handleChangeRooms = (day: WorkingDay, value: number | undefined) => {
-    repo.save(current.setRooms(day, value));
-  };
+  // 現在値（未作成なら空）を起点に渡し、View 側が集約メソッドで作った新インスタンスを保存する。
+  const info = reservationInfo ?? DailyReservationInfo.empty(sid);
+  const handleSave = (next: DailyReservationInfo) => repo.save(next);
 
   return (
     <StyledContainer>
@@ -61,14 +55,9 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
             {schedule.year}年{schedule.month}月 / {schedule.storeId}
           </span>
         </h3>
-        <p className="e-note">稼働日ごとの宿泊人数・部屋数を入力します。</p>
+        <p className="e-note">稼働日ごとの中・夕・宿泊人数・部屋数・備考・婚礼を入力します。</p>
       </div>
-      <ScheduleReservationInfoView
-        days={days}
-        reservationInfo={reservationInfo}
-        onChangeGuests={handleChangeGuests}
-        onChangeRooms={handleChangeRooms}
-      />
+      <ScheduleReservationInfoView days={days} info={info} onSave={handleSave} />
     </StyledContainer>
   );
 };
