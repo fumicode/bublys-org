@@ -8,6 +8,7 @@ import {
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
   ScheduleReport,
@@ -37,6 +38,7 @@ import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -68,6 +70,11 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
+  /**
+   * 予約状況（宿泊人数・部屋数）編集バブルの URL。渡すと日付ヘッダの上に予約行を出し、
+   * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
+   */
+  reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
   /**
@@ -98,6 +105,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  reservationInfoUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
@@ -109,6 +117,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
+    scheduleId
+  );
+  // 稼働日ごとの予約状況（宿泊人数・部屋数）。未作成なら undefined（予約行は空表示）。
+  const reservationInfo = useObject<DailyReservationInfo>(
+    SCHEDULE_RESERVATION_INFO_TYPE,
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
@@ -455,6 +468,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           staffList={filteredStaffList}
           workShifts={workShifts}
           availability={availability}
+          reservationInfo={reservationInfo}
+          reservationInfoUrl={reservationInfoUrl}
           wishByStaff={wishByStaff}
           violations={violations}
           groupByDepartment={groupByDept}

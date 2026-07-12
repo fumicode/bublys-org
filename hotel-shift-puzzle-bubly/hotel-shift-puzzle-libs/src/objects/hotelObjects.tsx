@@ -18,6 +18,7 @@ import {
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
   ScheduleReport,
@@ -33,6 +34,8 @@ export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
 export const GLOBAL_WORKSHIFT_SET_ID = "global";
 export const SCHEDULE_TYPE = "Schedule";
 export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
+/** 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表ごとに1つ（id=scheduleId）。 */
+export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
 export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
@@ -75,6 +78,14 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (a: ScheduleAvailability) => a.id,
     // 親 Schedule のローカル世界線に束ねる（case B）
     localScope: (a: ScheduleAvailability) => localScopeId(SCHEDULE_TYPE, a.scheduleId),
+  },
+  ScheduleReservationInfo: {
+    class: DailyReservationInfo,
+    getId: (r: DailyReservationInfo) => r.id,
+    // 稼働日ごとの予約状況（宿泊人数・部屋数）。親 Schedule のローカル世界線に束ねる（case B）。
+    // 予約状況を編集すると勤務表の世界線にノードが増え、時間移動で一緒に戻る。
+    // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
+    localScope: (r: DailyReservationInfo) => localScopeId(SCHEDULE_TYPE, r.scheduleId),
   },
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,

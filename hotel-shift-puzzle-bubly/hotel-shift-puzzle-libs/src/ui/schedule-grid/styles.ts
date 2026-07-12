@@ -51,10 +51,64 @@ export const StyledWrap = styled.div`
   .e-sum-head,
   .e-sum-cell,
   .e-off-head,
-  .e-off-total {
+  .e-off-total,
+  .e-res-head,
+  .e-res-cell,
+  .e-res-filler {
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 稼働日ごとの予約状況（宿泊人数・部屋数）。日付ヘッダの上に読み取り専用で並ぶ。
+     左見出しは横スクロールで固定（e-sum-head と同じ流儀）、右端はフィラー。編集は専用バブルで。 */
+  .e-res-head {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #5d4037;
+    background: #fff8f0;
+    white-space: nowrap;
+  }
+  .e-res-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    font-size: 0.78em;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    color: #5d4037;
+    background: #fffdf9;
+    cursor: pointer;
+
+    &.is-empty {
+      color: #d7ccc8;
+      font-weight: normal;
+      background: #fafafa;
+    }
+    &.is-sun {
+      background: #fff5f5;
+    }
+    &.is-sat {
+      background: #f5f9ff;
+    }
+    &:hover {
+      box-shadow: inset 0 0 0 2px #ffcc80;
+    }
+  }
+  .e-res-filler {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #fff8f0;
+    border-left: 1px solid #e0e0e0;
   }
 
   /* 右端「休（合計）」列。横スクロールしても右に固定して見えるようにする */

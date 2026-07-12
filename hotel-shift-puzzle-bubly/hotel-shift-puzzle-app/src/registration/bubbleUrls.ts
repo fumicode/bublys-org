@@ -30,6 +30,10 @@ export const scheduleUrl = (scheduleId: string): string =>
 export const scheduleAvailabilityUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/availability`;
 
+/** 予約状況（宿泊人数・部屋数）編集バブル（勤務表の予約行から開く） */
+export const scheduleReservationInfoUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/reservation-info`;
+
 /**
  * 世界線ビューバブル。`/history` で終わると bubbles-ui 側で画面下部ストリップ展開に
  * 特別扱いされるため、通常の bubble-side popChild にしたいこのバブルは別名（world-line）にする。

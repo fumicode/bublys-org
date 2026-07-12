@@ -9,6 +9,7 @@ import {
   ScheduleCollection,
   ScheduleGrid,
   ScheduleDayDetail,
+  ScheduleReservationInfoDetail,
   AutoShiftPanel,
   ExtractedSchedule,
   HotelObjectsProvider,
@@ -27,6 +28,7 @@ import {
   scheduleDayUrl,
   scheduleViolationUrl,
   scheduleAvailabilityUrl,
+  scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
   scheduleLeaderRuleUrl,
@@ -121,6 +123,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)
       }
+      reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
     />
   );
 };
@@ -146,6 +149,10 @@ const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
       dayKey={bubble.params.dayKey}
     />
   );
+
+// --- 予約状況 詳細バブル（勤務表の予約行クリックで開く。稼働日ごとの宿泊人数・部屋数を入力） ---
+const ScheduleReservationInfoBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleReservationInfoDetail scheduleId={bubble.params.scheduleId} />);
 
 // --- 制約違反バブル（赤線クリックで開く） ---
 const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -216,6 +223,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/reservation-info", type: "schedule-reservation-info", Component: ScheduleReservationInfoBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
   // シフト完成レポート（#86〜#89）。list は `/schedule-reports`、単体は `/schedule-reports/:reportId`

@@ -8,6 +8,7 @@ import {
   WorkShift,
   WorkingDay,
   ScheduleAvailability,
+  DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
   type ShiftCell,
@@ -24,6 +25,7 @@ import {
   type ConstraintHoverGroup,
 } from "./schedule-grid/ConstraintHoverOverlay.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
+import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
@@ -36,6 +38,16 @@ type ScheduleGridViewProps = {
   workShifts: WorkShift[];
   /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
   availability?: ScheduleAvailability;
+  /**
+   * 稼働日ごとの予約状況（宿泊人数・部屋数）。あれば日付ヘッダの上に読み取り専用の行を出す。
+   * 店ごとに付け替える想定の姉妹モジュール。未指定なら予約行を出さない。
+   */
+  reservationInfo?: DailyReservationInfo;
+  /**
+   * 予約状況の編集バブル URL。渡すと予約行のセルがダブルクリックで編集バブルを開く。
+   * URL スキームは app 層の関心事なので注入で受ける（dayBubbleUrl と同じ流儀）。
+   */
+  reservationInfoUrl?: string;
   /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
@@ -108,6 +120,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   staffList,
   workShifts,
   availability,
+  reservationInfo,
+  reservationInfoUrl,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
@@ -354,6 +368,16 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         }}
         onMouseLeave={() => setHoveredCell(null)}
       >
+        {/* 予約状況（宿泊人数・部屋数）を日付ヘッダの「上」に読み取り専用で出す。
+            入力は専用バブルで行う（reservationInfoUrl を渡すとダブルクリックで開く）。 */}
+        {reservationInfoUrl && (
+          <ReservationInfoRows
+            days={days}
+            reservationInfo={reservationInfo}
+            reservationInfoUrl={reservationInfoUrl}
+          />
+        )}
+
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
         <div className="e-corner">
           {schedule.year}年{schedule.month}月

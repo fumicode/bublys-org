@@ -9,6 +9,7 @@ export * from "./WorkShiftListView.js";
 export * from "./ScheduleListView.js";
 export * from "./ScheduleGridView.js";
 export * from "./ScheduleDayView.js";
+export * from "./ScheduleReservationInfoView.js";
 export * from "./ScheduleConstraintsBar.js";
 export * from "./LeaderRuleDiagram.js";
 export * from "./LeaderBadges.js";
