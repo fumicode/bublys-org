@@ -6,7 +6,17 @@ import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
+
+// buildScheduleReport.ts の重み定数と一致させる（COMPROMISE_WEIGHT/BUSY_DAY_WEIGHT）。
+// ui層は feature層に依存できない（ドメイン層のみに依存する規約）ため、ここにローカル複製する。
+const COMPROMISE_WEIGHT = 2;
+const BUSY_DAY_WEIGHT = 1;
+
+// スコアバーのセグメント色。妥協・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
+const COMPROMISE_COLOR = "#6d4c41";
+const BUSY_DAY_COLOR = "#e64a19";
 
 type ScheduleReportViewProps = {
   report: ScheduleReport;
@@ -22,8 +32,9 @@ type ScheduleReportViewProps = {
 
 /**
  * シフト完成レポートの表示（プレゼンテーショナル）。
- * 妥協してくれた人（#87）・繁忙日に入ってくれた人（#88）・貢献度スコア（#89）を並べ、
- * 最後にスタッフごとの自由記述の配慮メモ欄を置く。
+ * スタッフごとに1行（貢献度スコア＋妥協/繁忙日の内訳を色分けしたバー）にまとめる。
+ * 行をクリックして展開すると、妥協（#87）・繁忙日対応（#88）の詳細と配慮メモの編集欄が出る
+ * （複数行を同時に展開できる）。
  */
 export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   report,
@@ -41,8 +52,16 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
     return dayKeys.length === 1 ? first : `${first}〜${last}`;
   };
 
-  // 配慮メモは対象スタッフをトグルで1人選び、その人の分だけ編集欄を出す。
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  // 行の展開状態。クリックした行だけをトグルし、複数行を同時に開ける。
+  const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (staffId: string) => {
+    setExpandedStaffIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(staffId)) next.delete(staffId);
+      else next.add(staffId);
+      return next;
+    });
+  };
 
   // タイトル編集（世界線ビューの nameable 入力と同じ素直な制御 input。IME は触らない）。
   // report が別のレポートに切り替わったとき（同じコンポーネントインスタンスの再利用時）は
@@ -60,10 +79,12 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
     compromisesByStaff.set(c.staffId, list);
   }
 
-  const busyDayCountByStaff = new Map<string, number>();
+  const busyDaysByStaff = new Map<string, typeof report.busyDayContributions>();
   for (const day of report.busyDayContributions) {
     for (const staffId of day.workedStaffIds) {
-      busyDayCountByStaff.set(staffId, (busyDayCountByStaff.get(staffId) ?? 0) + 1);
+      const list = busyDaysByStaff.get(staffId) ?? [];
+      list.push(day);
+      busyDaysByStaff.set(staffId, list);
     }
   }
 
@@ -102,134 +123,132 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </span>
       </div>
 
-      {/* #87 妥協してくれた人 */}
-      <section className="e-section">
-        <h4>
-          <HandshakeIcon fontSize="small" className="e-icon e-icon-compromise" />
-          妥協してくれた人
-        </h4>
-        {compromisesByStaff.size === 0 ? (
-          <p className="e-empty">連勤・休日・希望などのルール違反はありませんでした。</p>
-        ) : (
-          <ul className="e-compromise-list">
-            {Array.from(compromisesByStaff.entries()).map(([staffId, entries]) => (
-              <li key={staffId} className="e-compromise-item">
-                <div className="e-compromise-head">
-                  <span className="e-name">{nameOf(staffId)}</span>
-                  <span className="e-badge">{entries.length}件</span>
-                </div>
-                <ul className="e-compromise-days">
-                  {entries.map((e, i) => {
-                    const range = dayRangeLabel(e.dayKeys);
-                    return (
-                      <li key={i}>
-                        <span className="e-compromise-tag">{e.label}</span>
-                        {range && <span className="e-compromise-range">{range}: </span>}
-                        {e.message}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* #88 繁忙日に入ってくれた人 */}
-      <section className="e-section">
-        <h4>
-          <LocalFireDepartmentIcon fontSize="small" className="e-icon e-icon-busy" />
-          繁忙日に入ってくれた人
-        </h4>
-        {report.busyDayContributions.length === 0 ? (
-          <p className="e-empty">繁忙日はありませんでした。</p>
-        ) : (
-          <ul className="e-busy-list">
-            {report.busyDayContributions.map((day) => (
-              <li key={day.dayKey} className="e-busy-item">
-                <span className="e-busy-day">
-                  {dayLabel(day.dayKey)}（必要{day.requiredCount}人）
-                </span>
-                <span className="e-busy-names">
-                  {day.workedStaffIds.length === 0
-                    ? "出勤者なし"
-                    : day.workedStaffIds.map((id) => nameOf(id)).join("・")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* #89 貢献度スコア */}
+      {/* 貢献度: #87妥協・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
       <section className="e-section">
         <h4>
           <EmojiEventsIcon fontSize="small" className="e-icon e-icon-score" />
-          貢献度スコア
+          貢献度
         </h4>
+        <p className="e-legend">
+          <span className="e-legend-item">
+            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協
+          </span>
+          <span className="e-legend-item">
+            <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日
+          </span>
+        </p>
+
         {report.contributionScores.length === 0 ? (
           <p className="e-empty">対象スタッフがいません。</p>
         ) : (
-          <ul className="e-score-list">
-            {report.contributionScores.map((s, rank) => (
-              <li key={s.staffId} className="e-score-item">
-                <span className="e-rank">{rank + 1}</span>
-                <span className="e-score-name">{nameOf(s.staffId)}</span>
-                <div className="e-score-bar-track">
-                  <div
-                    className="e-score-bar"
-                    style={{ width: `${(s.score / maxScore) * 100}%` }}
-                  />
-                </div>
-                <span className="e-score-value">{s.score}</span>
-                <span className="e-score-detail">
-                  妥協{s.compromiseCount}・繁忙{s.busyDayCount}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <ul className="e-person-list">
+            {report.contributionScores.map((s) => {
+              const expanded = expandedStaffIds.has(s.staffId);
+              const hasNote = report.noteFor(s.staffId).trim().length > 0;
+              const compromisePortion = s.compromiseCount * COMPROMISE_WEIGHT;
+              const busyDayPortion = s.busyDayCount * BUSY_DAY_WEIGHT;
+              const compromises = compromisesByStaff.get(s.staffId) ?? [];
+              const busyDays = busyDaysByStaff.get(s.staffId) ?? [];
 
-      {/* 配慮メモ（自由記述、確定後も編集可）。人物をトグルで1人選んでからコメントする。 */}
-      <section className="e-section">
-        <h4>配慮メモ</h4>
-        <p className="e-hint">制約からは算出できない配慮を、次回のために書き残せます。</p>
-        <div className="e-note-toggles">
-          {report.contributionScores.map((s) => {
-            const hasNote = report.noteFor(s.staffId).trim().length > 0;
-            const active = selectedStaffId === s.staffId;
-            return (
-              <button
-                key={s.staffId}
-                type="button"
-                className={`e-note-toggle${active ? " is-active" : ""}${
-                  hasNote ? " has-note" : ""
-                }`}
-                onClick={() => setSelectedStaffId(active ? null : s.staffId)}
-              >
-                {nameOf(s.staffId)}
-                {hasNote && <span className="e-note-dot" />}
-              </button>
-            );
-          })}
-        </div>
-        {selectedStaffId ? (
-          <div className="e-note-editor">
-            <span className="e-note-name">{nameOf(selectedStaffId)}へのメモ</span>
-            <textarea
-              className="e-note-input"
-              rows={3}
-              autoFocus
-              placeholder="例: 来月は休み希望を優先してあげたい"
-              value={report.noteFor(selectedStaffId)}
-              onChange={(e) => onChangeNote(selectedStaffId, e.target.value)}
-              data-busy={busyDayCountByStaff.get(selectedStaffId) ?? 0}
-            />
-          </div>
-        ) : (
-          <p className="e-empty">上の名前をクリックすると、その人への配慮メモを書けます。</p>
+              return (
+                <li key={s.staffId} className="e-person">
+                  <button
+                    type="button"
+                    className="e-person-row"
+                    onClick={() => toggleExpanded(s.staffId)}
+                    aria-expanded={expanded}
+                  >
+                    <ChevronRightIcon
+                      fontSize="small"
+                      className={`e-chevron${expanded ? " is-expanded" : ""}`}
+                    />
+                    <span className="e-person-name">
+                      {nameOf(s.staffId)}
+                      {hasNote && <span className="e-note-dot" />}
+                    </span>
+                    <div className="e-score-bar-track">
+                      {compromisePortion > 0 && (
+                        <div
+                          className="e-score-bar-segment"
+                          style={{
+                            width: `${(compromisePortion / maxScore) * 100}%`,
+                            background: COMPROMISE_COLOR,
+                          }}
+                        />
+                      )}
+                      {busyDayPortion > 0 && (
+                        <div
+                          className="e-score-bar-segment"
+                          style={{
+                            width: `${(busyDayPortion / maxScore) * 100}%`,
+                            background: BUSY_DAY_COLOR,
+                          }}
+                        />
+                      )}
+                    </div>
+                    <span className="e-score-value">{s.score}</span>
+                  </button>
+
+                  {expanded && (
+                    <div className="e-person-detail">
+                      <div className="e-detail-block">
+                        <span className="e-detail-label">
+                          <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協
+                        </span>
+                        {compromises.length === 0 ? (
+                          <p className="e-empty">特になし</p>
+                        ) : (
+                          <ul className="e-compromise-days">
+                            {compromises.map((c, i) => {
+                              const range = dayRangeLabel(c.dayKeys);
+                              return (
+                                <li key={i}>
+                                  <span className="e-compromise-tag">{c.label}</span>
+                                  {range && (
+                                    <span className="e-compromise-range">{range}: </span>
+                                  )}
+                                  {c.message}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="e-detail-block">
+                        <span className="e-detail-label">
+                          <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" />{" "}
+                          繁忙日対応
+                        </span>
+                        {busyDays.length === 0 ? (
+                          <p className="e-empty">特になし</p>
+                        ) : (
+                          <ul className="e-busy-days">
+                            {busyDays.map((day) => (
+                              <li key={day.dayKey}>
+                                {dayLabel(day.dayKey)}（必要{day.requiredCount}人）
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="e-detail-block">
+                        <span className="e-detail-label">配慮メモ</span>
+                        <textarea
+                          className="e-note-input"
+                          rows={3}
+                          placeholder="例: 来月は休み希望を優先してあげたい"
+                          value={report.noteFor(s.staffId)}
+                          onChange={(e) => onChangeNote(s.staffId, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
     </StyledWrap>
@@ -314,19 +333,14 @@ const StyledWrap = styled.div`
       margin: 0 0 6px;
       font-size: 0.9em;
     }
-    .e-icon-compromise {
-      color: #6d4c41;
-    }
-    .e-icon-busy {
-      color: #e64a19;
-    }
     .e-icon-score {
       color: #f9a825;
     }
-    .e-hint {
-      margin: 0 0 6px;
-      font-size: 0.78em;
-      color: #888;
+    .e-icon-compromise {
+      color: ${COMPROMISE_COLOR};
+    }
+    .e-icon-busy {
+      color: ${BUSY_DAY_COLOR};
     }
     .e-empty {
       margin: 0;
@@ -335,156 +349,73 @@ const StyledWrap = styled.div`
     }
   }
 
-  .e-compromise-list,
-  .e-busy-list,
-  .e-score-list {
+  .e-legend {
+    display: flex;
+    gap: 12px;
+    margin: 0 0 8px;
+    font-size: 0.76em;
+    color: #888;
+
+    .e-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+  }
+
+  .e-person-list {
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
-  .e-compromise-item {
-    padding: 6px 0;
+  .e-person {
     border-bottom: 1px solid #eee;
 
     &:last-child {
       border-bottom: none;
     }
-
-    .e-compromise-head {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .e-name {
-      font-weight: bold;
-    }
-    .e-badge {
-      border-radius: 999px;
-      background: #efebe9;
-      color: #6d4c41;
-      font-size: 0.75em;
-      padding: 1px 8px;
-    }
-    .e-compromise-days {
-      list-style: none;
-      margin: 4px 0 0;
-      padding: 0 0 0 4px;
-      font-size: 0.8em;
-      color: #555;
-
-      .e-compromise-tag {
-        display: inline-block;
-        border-radius: 4px;
-        background: #efebe9;
-        color: #6d4c41;
-        font-size: 0.85em;
-        padding: 0 5px;
-        margin-right: 4px;
-      }
-      .e-compromise-range {
-        color: #888;
-      }
-    }
   }
 
-  .e-busy-item {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 4px 0;
-    font-size: 0.85em;
-    border-bottom: 1px solid #eee;
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .e-busy-day {
-      color: #d84315;
-      flex-shrink: 0;
-    }
-    .e-busy-names {
-      text-align: right;
-      color: #444;
-    }
-  }
-
-  .e-score-item {
+  .e-person-row {
     display: grid;
-    grid-template-columns: 18px 64px 1fr 28px auto;
+    grid-template-columns: 20px 96px 1fr 24px;
     align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    font-size: 0.82em;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    background: transparent;
+    padding: 6px 2px;
+    font: inherit;
+    font-size: 0.85em;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
 
-    .e-rank {
-      color: #999;
-      text-align: center;
+    &:hover {
+      background: #f7f7f7;
     }
-    .e-score-name {
+
+    .e-chevron {
+      color: #999;
+      transition: transform 0.12s ease;
+
+      &.is-expanded {
+        transform: rotate(90deg);
+      }
+    }
+
+    .e-person-name {
       font-weight: bold;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .e-score-bar-track {
-      height: 8px;
-      background: #f5f5f5;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .e-score-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #ffd54f, #f9a825);
-    }
-    .e-score-value {
-      text-align: right;
-      font-weight: bold;
-      color: #f57f17;
-    }
-    .e-score-detail {
-      color: #999;
-      font-size: 0.85em;
-    }
-  }
-
-  .e-note-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .e-note-toggle {
-    position: relative;
-    border: 1px solid #cfd8dc;
-    border-radius: 999px;
-    background: #fff;
-    color: #37474f;
-    font-size: 0.8em;
-    padding: 4px 12px 4px 10px;
-    cursor: pointer;
-    transition: background 0.1s, border-color 0.1s;
-
-    &:hover {
-      background: #eceff1;
-      border-color: #90a4ae;
-    }
-
-    &.is-active {
-      background: #e8eaf6;
-      border-color: #3949ab;
-      color: #3949ab;
-      font-weight: bold;
-    }
-
-    &.has-note .e-note-dot {
-      display: inline-block;
-    }
 
     .e-note-dot {
-      display: none;
+      display: inline-block;
       width: 6px;
       height: 6px;
       margin-left: 5px;
@@ -492,31 +423,86 @@ const StyledWrap = styled.div`
       background: #f9a825;
       vertical-align: middle;
     }
+
+    .e-score-bar-track {
+      display: flex;
+      height: 8px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .e-score-bar-segment {
+      height: 100%;
+    }
+
+    .e-score-value {
+      text-align: right;
+      font-weight: bold;
+      color: #555;
+    }
   }
 
-  .e-note-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  .e-person-detail {
+    padding: 4px 4px 12px 28px;
 
-    .e-note-name {
-      font-size: 0.82em;
-      font-weight: bold;
-    }
-    .e-note-input {
-      width: 100%;
-      box-sizing: border-box;
-      border: 1px solid #dcdcdc;
-      border-radius: 6px;
-      padding: 6px 8px;
-      font-size: 0.82em;
-      font-family: inherit;
-      resize: vertical;
+    .e-detail-block {
+      margin-bottom: 10px;
 
-      &:focus {
-        outline: none;
-        border-color: #90a4ae;
+      &:last-child {
+        margin-bottom: 0;
       }
+    }
+
+    .e-detail-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78em;
+      font-weight: bold;
+      color: #666;
+      margin-bottom: 4px;
+    }
+  }
+
+  .e-compromise-days,
+  .e-busy-days {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8em;
+    color: #555;
+
+    li {
+      padding: 2px 0;
+    }
+  }
+
+  .e-compromise-tag {
+    display: inline-block;
+    border-radius: 4px;
+    background: #efebe9;
+    color: ${COMPROMISE_COLOR};
+    font-size: 0.85em;
+    padding: 0 5px;
+    margin-right: 4px;
+  }
+  .e-compromise-range {
+    color: #888;
+  }
+
+  .e-note-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dcdcdc;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.82em;
+    font-family: inherit;
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: #90a4ae;
     }
   }
 `;
