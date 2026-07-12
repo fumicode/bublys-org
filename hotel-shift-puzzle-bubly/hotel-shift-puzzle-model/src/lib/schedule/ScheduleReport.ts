@@ -4,12 +4,19 @@
  * 確定した勤務表（世界線の apex）について、妥協（#87）・繁忙日対応（#88）・
  * 貢献度スコア（#89）を確定時点のスナップショットとして保持する。
  * 以降スタッフの希望や勤務表が変わっても、このレポートの内容は変化しない（確定記録）。
- * 自由記述の配慮メモ（considerationNotes）とタイトル（title）だけは確定後も編集できる。
+ * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・妥協/繁忙日の重み
+ * （compromiseWeight/busyDayWeight）だけは確定後も編集できる。
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
  * なので、ここにはメソッドを持たない。
  *
+ * 重みはシフト管理者によって貢献度の感じ方が異なるため直接編集できるようにしている。
+ * reweight() は妥協・繁忙日の生データ（compromises/busyDayContributions/各エントリの
+ * compromiseCount/busyDayCount）は変えず、重みと contributionScores の score だけを
+ * 再計算する（「何が起きたか」という事実は確定時点のまま、「どう評価するか」という
+ * 重みだけを後から調整できる）。
+ *
  * state は完全に plain なので、state がそのまま plain 形式を兼ねる。
- * 不変。setNote / rename 以外の更新手段は無い（compromises 等は create 時に一括で決まる）。
+ * 不変。setNote / rename / reweight 以外の更新手段は無い（compromises 等は create 時に一括で決まる）。
  */
 
 /**
@@ -45,6 +52,11 @@ export type ContributionScoreEntry = {
   score: number;
 };
 
+/** 妥協1件あたりの重みの既定値（#89 スコア算出） */
+export const DEFAULT_COMPROMISE_WEIGHT = 2;
+/** 繁忙日出勤1回あたりの重みの既定値（#89 スコア算出） */
+export const DEFAULT_BUSY_DAY_WEIGHT = 1;
+
 export type ScheduleReportState = {
   id: string;
   scheduleId: string;
@@ -61,6 +73,10 @@ export type ScheduleReportState = {
   contributionScores: ContributionScoreEntry[];
   /** staffId → 自由記述の配慮メモ（確定後も編集可） */
   considerationNotes: Record<string, string>;
+  /** 妥協1件あたりの重み（確定後も reweight で編集可） */
+  compromiseWeight: number;
+  /** 繁忙日出勤1回あたりの重み（確定後も reweight で編集可） */
+  busyDayWeight: number;
 };
 
 /** シリアライズ用（state がそのまま plain） */
@@ -102,6 +118,8 @@ export class ScheduleReport {
       busyDayContributions: params.busyDayContributions,
       contributionScores: params.contributionScores,
       considerationNotes: {},
+      compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
+      busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
     });
   }
 
@@ -158,6 +176,34 @@ export class ScheduleReport {
     return this.state.contributionScores;
   }
 
+  get compromiseWeight(): number {
+    return this.state.compromiseWeight;
+  }
+
+  get busyDayWeight(): number {
+    return this.state.busyDayWeight;
+  }
+
+  /**
+   * 妥協・繁忙日の重みを変更し、貢献度スコア（contributionScores の score、降順の並び）を
+   * 再計算した新インスタンスを返す。不変。負の重みは 0 に丸める。
+   * 生データ（compromises/busyDayContributions/各エントリの compromiseCount/busyDayCount）は
+   * 変えない（「何が起きたか」は確定時点のまま、「どう評価するか」だけを調整する）。
+   */
+  reweight(compromiseWeight: number, busyDayWeight: number): ScheduleReport {
+    const w1 = Math.max(0, compromiseWeight);
+    const w2 = Math.max(0, busyDayWeight);
+    const contributionScores = this.state.contributionScores
+      .map((s) => ({ ...s, score: s.compromiseCount * w1 + s.busyDayCount * w2 }))
+      .sort((a, b) => b.score - a.score);
+    return new ScheduleReport({
+      ...this.state,
+      compromiseWeight: w1,
+      busyDayWeight: w2,
+      contributionScores,
+    });
+  }
+
   get considerationNotes(): Record<string, string> {
     return this.state.considerationNotes;
   }
@@ -194,6 +240,8 @@ export class ScheduleReport {
       })),
       contributionScores: this.state.contributionScores.map((s) => ({ ...s })),
       considerationNotes: { ...this.state.considerationNotes },
+      compromiseWeight: this.state.compromiseWeight,
+      busyDayWeight: this.state.busyDayWeight,
     };
   }
 
@@ -213,6 +261,8 @@ export class ScheduleReport {
       })),
       contributionScores: plain.contributionScores.map((s) => ({ ...s })),
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
+      compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
+      busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,
     });
   }
 }
