@@ -9,11 +9,6 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
 
-// buildScheduleReport.ts の重み定数と一致させる（COMPROMISE_WEIGHT/BUSY_DAY_WEIGHT）。
-// ui層は feature層に依存できない（ドメイン層のみに依存する規約）ため、ここにローカル複製する。
-const COMPROMISE_WEIGHT = 2;
-const BUSY_DAY_WEIGHT = 1;
-
 // スコアバーのセグメント色。妥協・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
 const COMPROMISE_COLOR = "#6d4c41";
 const BUSY_DAY_COLOR = "#e64a19";
@@ -26,6 +21,8 @@ type ScheduleReportViewProps = {
   onChangeNote: (staffId: string, text: string) => void;
   /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る） */
   onRename: (title: string) => void;
+  /** 妥協・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される */
+  onChangeWeights: (compromiseWeight: number, busyDayWeight: number) => void;
   /** レポートの削除。渡すと見出しに削除ボタンが出る */
   onDelete?: () => void;
 };
@@ -41,6 +38,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   nameOf,
   onChangeNote,
   onRename,
+  onChangeWeights,
   onDelete,
 }) => {
   const dayLabel = (dayKey: string) => WorkingDay.fromKey(dayKey).label;
@@ -71,6 +69,19 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
     setTitleDraft(report.title);
   }, [report.id, report.title]);
   const commitTitle = () => onRename(titleDraft);
+
+  // 重み編集（同じく下書き→blur/Enterで確定。数値のみ・0未満は入力させない）。
+  const [compromiseWeightDraft, setCompromiseWeightDraft] = useState(String(report.compromiseWeight));
+  const [busyDayWeightDraft, setBusyDayWeightDraft] = useState(String(report.busyDayWeight));
+  useEffect(() => {
+    setCompromiseWeightDraft(String(report.compromiseWeight));
+    setBusyDayWeightDraft(String(report.busyDayWeight));
+  }, [report.id, report.compromiseWeight, report.busyDayWeight]);
+  const commitWeights = () => {
+    const w1 = Number(compromiseWeightDraft);
+    const w2 = Number(busyDayWeightDraft);
+    onChangeWeights(Number.isFinite(w1) ? w1 : report.compromiseWeight, Number.isFinite(w2) ? w2 : report.busyDayWeight);
+  };
 
   const compromisesByStaff = new Map<string, typeof report.compromises>();
   for (const c of report.compromises) {
@@ -129,13 +140,44 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
           <EmojiEventsIcon fontSize="small" className="e-icon e-icon-score" />
           貢献度
         </h4>
-        <p className="e-legend">
-          <span className="e-legend-item">
-            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協
-          </span>
-          <span className="e-legend-item">
-            <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日
-          </span>
+        <div className="e-legend">
+          <label className="e-legend-item">
+            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協 ×
+            <input
+              type="number"
+              className="e-weight-input"
+              min={0}
+              step={0.5}
+              value={compromiseWeightDraft}
+              onChange={(e) => setCompromiseWeightDraft(e.target.value)}
+              onBlur={commitWeights}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              aria-label="妥協の重み"
+            />
+          </label>
+          <label className="e-legend-item">
+            <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日 ×
+            <input
+              type="number"
+              className="e-weight-input"
+              min={0}
+              step={0.5}
+              value={busyDayWeightDraft}
+              onChange={(e) => setBusyDayWeightDraft(e.target.value)}
+              onBlur={commitWeights}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              aria-label="繁忙日の重み"
+            />
+          </label>
+        </div>
+        <p className="e-hint">
+          重みはこのレポート限定の設定です。
         </p>
 
         {report.contributionScores.length === 0 ? (
@@ -145,8 +187,8 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
             {report.contributionScores.map((s) => {
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
-              const compromisePortion = s.compromiseCount * COMPROMISE_WEIGHT;
-              const busyDayPortion = s.busyDayCount * BUSY_DAY_WEIGHT;
+              const compromisePortion = s.compromiseCount * report.compromiseWeight;
+              const busyDayPortion = s.busyDayCount * report.busyDayWeight;
               const compromises = compromisesByStaff.get(s.staffId) ?? [];
               const busyDays = busyDaysByStaff.get(s.staffId) ?? [];
 
@@ -351,16 +393,38 @@ const StyledWrap = styled.div`
 
   .e-legend {
     display: flex;
-    gap: 12px;
-    margin: 0 0 8px;
-    font-size: 0.76em;
-    color: #888;
+    gap: 14px;
+    margin: 0 0 4px;
+    font-size: 0.78em;
+    color: #666;
 
     .e-legend-item {
       display: inline-flex;
       align-items: center;
       gap: 3px;
     }
+
+    .e-weight-input {
+      width: 3.2em;
+      border: 1px solid #dcdcdc;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 1em;
+      font-family: inherit;
+      color: inherit;
+      background: #fff;
+
+      &:focus {
+        outline: none;
+        border-color: #90a4ae;
+      }
+    }
+  }
+
+  .e-hint {
+    margin: 0 0 8px;
+    font-size: 0.74em;
+    color: #999;
   }
 
   .e-person-list {

@@ -12,9 +12,10 @@ type ScheduleReportPanelProps = {
 
 /**
  * シフト完成レポートバブル。確定時に保存された ScheduleReport をシェル経由で表示・編集する。
- * 編集できるのはタイトル・自由記述の配慮メモ・削除のみ（妥協・繁忙日対応・スコアは確定時の
- * スナップショットで変更不可）。削除後はこのバブル自体は自動で閉じない
- * （bubbles-ui にその仕組みが無いため）ので、見つからない旨を表示するに留める。
+ * 編集できるのはタイトル・自由記述の配慮メモ・妥協/繁忙日の重み・削除のみ（妥協・繁忙日対応の
+ * 生データは確定時のスナップショットで変更不可。重みを変えると貢献度スコアだけ再計算される）。
+ * 削除後はこのバブル自体は自動で閉じない（bubbles-ui にその仕組みが無いため）ので、
+ * 見つからない旨を表示するに留める。
  */
 export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = ({ reportId }) => {
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -35,6 +36,10 @@ export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = ({ reportId }) 
     update((r) => r.rename(title));
   };
 
+  const handleChangeWeights = (compromiseWeight: number, busyDayWeight: number) => {
+    update((r) => r.reweight(compromiseWeight, busyDayWeight));
+  };
+
   const handleDelete = () => {
     reportRepo.remove(reportId);
   };
@@ -53,6 +58,7 @@ export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = ({ reportId }) 
       nameOf={nameOf}
       onChangeNote={handleChangeNote}
       onRename={handleRename}
+      onChangeWeights={handleChangeWeights}
       onDelete={handleDelete}
     />
   );

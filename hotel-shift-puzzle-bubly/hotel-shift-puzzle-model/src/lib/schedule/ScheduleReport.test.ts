@@ -75,4 +75,65 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
     const renamed = create().rename('6月案A').rename('   ');
     expect(renamed.title).toBe('2026年6月');
   });
+
+  test('重みは既定で妥協×2・繁忙日×1', () => {
+    const base = create();
+    expect(base.compromiseWeight).toBe(2);
+    expect(base.busyDayWeight).toBe(1);
+  });
+
+  test('reweight で重みを変えると貢献度スコアが再計算される（不変）', () => {
+    const base = create();
+    // staff-A: 妥協1・繁忙日1, staff-B: 妥協0・繁忙日1
+    const reweighted = base.reweight(1, 3);
+
+    expect(reweighted.compromiseWeight).toBe(1);
+    expect(reweighted.busyDayWeight).toBe(3);
+    expect(reweighted.contributionScores).toEqual([
+      { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 4 }, // 1*1+1*3
+      { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 3 }, // 0*1+1*3
+    ]);
+    // 生データ（妥協・繁忙日の事実）は変わらない
+    expect(reweighted.compromises).toEqual(base.compromises);
+    expect(reweighted.busyDayContributions).toEqual(base.busyDayContributions);
+    // 元は不変
+    expect(base.compromiseWeight).toBe(2);
+  });
+
+  test('reweight は貢献度スコアの降順で並べ直す', () => {
+    // 繁忙日の重みを上げると staff-B（繁忙日のみ）が staff-A を上回る場合がある
+    const base = create();
+    const reweighted = base.reweight(0, 5);
+
+    expect(reweighted.contributionScores).toEqual([
+      { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 5 },
+      { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 5 },
+    ]);
+  });
+
+  test('reweight に負の重みを渡すと 0 に丸める', () => {
+    const reweighted = create().reweight(-1, -2);
+    expect(reweighted.compromiseWeight).toBe(0);
+    expect(reweighted.busyDayWeight).toBe(0);
+    expect(reweighted.contributionScores.every((s) => s.score === 0)).toBe(true);
+  });
+
+  test('重みも toPlain / fromPlain でラウンドトリップできる', () => {
+    const r = create().reweight(1, 3);
+    const restored = ScheduleReport.fromPlain(r.toPlain());
+    expect(restored.compromiseWeight).toBe(1);
+    expect(restored.busyDayWeight).toBe(3);
+  });
+
+  test('fromPlain は重みが無い旧データを既定値で補う（後方互換）', () => {
+    const plain = create().toPlain();
+    // 旧データを模して重みフィールドを取り除く
+    const legacyPlain = { ...plain } as Partial<typeof plain>;
+    delete legacyPlain.compromiseWeight;
+    delete legacyPlain.busyDayWeight;
+
+    const restored = ScheduleReport.fromPlain(legacyPlain as typeof plain);
+    expect(restored.compromiseWeight).toBe(2);
+    expect(restored.busyDayWeight).toBe(1);
+  });
 });

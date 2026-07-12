@@ -9,21 +9,19 @@
  *     違反（ConstraintViolation.staffId が付くもの）をすべて妥協として数える。
  *     責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は個人の妥協に含めない。
  *   - #88 繁忙日: 稼働日ごとの必要人数合計が平均を上回る日を自動的に繁忙日とする。
- *   - #89 貢献度スコア: 妥協回数・繁忙日出勤回数の加重合計（シンプルな加重合計。
- *     重みは定数として持つ）。
+ *   - #89 貢献度スコア: 妥協回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
+ *     model層の DEFAULT_COMPROMISE_WEIGHT/DEFAULT_BUSY_DAY_WEIGHT を確定時点の初期値として
+ *     使う（確定後は ScheduleReport.reweight() でシフト管理者が調整できる）。
  */
 import {
   MonthlyStaffSchedule,
+  DEFAULT_COMPROMISE_WEIGHT,
+  DEFAULT_BUSY_DAY_WEIGHT,
   type ScheduleConstraint,
   type CompromiseEntry,
   type BusyDayEntry,
   type ContributionScoreEntry,
 } from "@bublys-org/hotel-shift-puzzle-model";
-
-/** 妥協1件あたりの重み（#89 スコア算出） */
-export const COMPROMISE_WEIGHT = 2;
-/** 繁忙日出勤1回あたりの重み（#89 スコア算出） */
-export const BUSY_DAY_WEIGHT = 1;
 
 export type BuildScheduleReportArgs = {
   schedule: MonthlyStaffSchedule;
@@ -112,7 +110,7 @@ function computeContributionScores(
         staffId,
         compromiseCount,
         busyDayCount,
-        score: compromiseCount * COMPROMISE_WEIGHT + busyDayCount * BUSY_DAY_WEIGHT,
+        score: compromiseCount * DEFAULT_COMPROMISE_WEIGHT + busyDayCount * DEFAULT_BUSY_DAY_WEIGHT,
       };
     })
     .sort((a, b) => b.score - a.score);
