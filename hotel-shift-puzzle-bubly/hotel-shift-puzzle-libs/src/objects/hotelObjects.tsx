@@ -82,10 +82,11 @@ export const HOTEL_OBJECTS = defineObjects({
   ScheduleReservationInfo: {
     class: DailyReservationInfo,
     getId: (r: DailyReservationInfo) => r.id,
-    // 稼働日ごとの予約状況（宿泊人数・部屋数）。親 Schedule のローカル世界線に束ねる（case B）。
-    // 予約状況を編集すると勤務表の世界線にノードが増え、時間移動で一緒に戻る。
+    // 稼働日ごとの予約状況（宿泊人数・部屋数）は「実際の予約」という外部の実データ。
+    // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、勤務表のローカル世界線には
+    // 相乗りさせない（localScope を指定しない）＝アプリ全体スコープのみ。時間移動しても
+    // 予約状況は変わらない（ScheduleReport と同じ考え方）。
     // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
-    localScope: (r: DailyReservationInfo) => localScopeId(SCHEDULE_TYPE, r.scheduleId),
   },
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,
