@@ -44,6 +44,8 @@ type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビュー（左下）を開くハンドラ */
   onOpenHistory?: () => void;
+  /** 完成木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
+  onOpenTree?: () => void;
   /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
   /** 自動シフトパネル（右上）を開くハンドラ */
@@ -54,6 +56,7 @@ type ScheduleGridProps = {
    * URL スキームは app 層の関心事なので注入で受ける。
    */
   worldLineUrl?: string;
+  treeUrl?: string;
   availabilityUrl?: string;
   autoShiftUrl?: string;
   /**
@@ -83,9 +86,11 @@ const newLeaderRuleKey = (): string =>
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
+  onOpenTree,
   onOpenAvailability,
   onOpenAutoShift,
   worldLineUrl,
+  treeUrl,
   availabilityUrl,
   autoShiftUrl,
   dayBubbleUrl,
@@ -530,6 +535,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
               🌐 世界線ビュー
             </button>
           )}
+          {onOpenTree &&
+            withUrl(
+              treeUrl,
+              <button type="button" className="e-link" onClick={onOpenTree}>
+                🌳 成果木で見る
+              </button>
+            )}
         </div>
       )}
     </StyledContainer>
