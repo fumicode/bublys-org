@@ -54,10 +54,47 @@ export const StyledWrap = styled.div`
   .e-off-total,
   .e-res-head,
   .e-res-cell,
-  .e-res-filler {
+  .e-res-filler,
+  .e-res-toggle,
+  .e-res-toggle-bar {
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 予約情報ブロックの折りたたみトグル行（予約行の上）。左見出しは横スクロールで固定、
+     右側は帯として全日列を覆う。クリックで開閉。 */
+  .e-res-toggle {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #8d6e63;
+    background: #fbeee0;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+
+    .e-res-caret {
+      font-size: 0.9em;
+      color: #a1887f;
+    }
+    &:hover {
+      background: #f6e2cd;
+    }
+  }
+  .e-res-toggle-bar {
+    background: #fbeee0;
+    cursor: pointer;
+
+    &:hover {
+      background: #f6e2cd;
+    }
   }
 
   /* 稼働日ごとの予約状況（宿泊人数・部屋数）。日付ヘッダの上に読み取り専用で並ぶ。

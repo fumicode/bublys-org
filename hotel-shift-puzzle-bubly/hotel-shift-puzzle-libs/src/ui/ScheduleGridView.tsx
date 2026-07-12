@@ -140,6 +140,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 }) => {
   const days = schedule.workingDays();
 
+  // 予約情報ブロック（日付の上の 中/夕/泊・備考・婚礼）の折りたたみ状態
+  const [reservationCollapsed, setReservationCollapsed] = useState(false);
+
   // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
   const focusActive = (selectedStaffIds?.size ?? 0) > 0;
 
@@ -368,14 +371,34 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         }}
         onMouseLeave={() => setHoveredCell(null)}
       >
-        {/* 予約状況（宿泊人数・部屋数）を日付ヘッダの「上」に読み取り専用で出す。
-            入力は専用バブルで行う（reservationInfoUrl を渡すとダブルクリックで開く）。 */}
+        {/* 予約情報（中/夕/泊・備考・婚礼）を日付ヘッダの「上」に読み取り専用で出す。
+            嵩張るので折りたためるようにする。入力は専用バブルで行う（reservationInfoUrl を
+            渡すとダブルクリックで開く）。 */}
         {reservationInfoUrl && (
-          <ReservationInfoRows
-            days={days}
-            reservationInfo={reservationInfo}
-            reservationInfoUrl={reservationInfoUrl}
-          />
+          <>
+            <div
+              className="e-res-toggle"
+              role="button"
+              title="予約情報の表示/折りたたみ"
+              onClick={() => setReservationCollapsed((v) => !v)}
+            >
+              <span className="e-res-caret">{reservationCollapsed ? "▶" : "▼"}</span>
+              予約情報
+            </div>
+            <div
+              className="e-res-toggle-bar"
+              style={{ gridColumn: `2 / ${days.length + 3}` }}
+              title="予約情報の表示/折りたたみ"
+              onClick={() => setReservationCollapsed((v) => !v)}
+            />
+            {!reservationCollapsed && (
+              <ReservationInfoRows
+                days={days}
+                reservationInfo={reservationInfo}
+                reservationInfoUrl={reservationInfoUrl}
+              />
+            )}
+          </>
         )}
 
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
