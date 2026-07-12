@@ -124,4 +124,9 @@ export class BubblesProcess {
   focus(id: string): BubblesProcess {
     return new BubblesProcess({ ...this.state, focusedBubbleId: id });
   }
+
+  /** 何もないところ（背景）をクリックしたときなど、フォーカスを解除する。 */
+  unfocus(): BubblesProcess {
+    return new BubblesProcess({ ...this.state, focusedBubbleId: undefined });
+  }
 }

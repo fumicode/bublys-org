@@ -210,6 +210,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // UrledPlace内のクリックはpopChildがフォーカスを担うためスキップ
     if ((e.target as Element).closest('[data-url]')) return;
+    // ドラッグ&ドロップ（ObjectView の draggable 要素）の mousedown はフォーカスさせない。
+    // ここでフォーカスすると（フォーカス中バブルを同レイヤー最前面へ移動する処理により）
+    // ドラッグ中のバブルがドロップ先の上に重なってしまい、ドロップ先が隠れてしまうため。
+    if ((e.target as Element).closest('[draggable="true"]')) return;
     dispatch(focusBubble(bubble.id, universeId));
   };
 
@@ -230,9 +234,19 @@ const BubbleViewInner: FC<BubbleProps> = ({
     onDragStart(e);
   };
 
-  const handleFocus = useCallback(() => {
-    dispatch(focusBubble(bubble.id, universeId));
-  }, [bubble.id, universeId, dispatch]);
+  const handleFocus = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      // handleMouseDown と同じ理由・同じガード。draggable な ObjectView 要素は
+      // tabIndex={0} を持つため、mousedown 時にブラウザ既定動作でその要素へ DOM
+      // フォーカスが移り、focusin がバブリングしてここに届いてしまう
+      // （handleMouseDown 側のガードは mousedown イベントにしか効かないため素通りする）。
+      // ドラッグ中はここでもフォーカスさせない。
+      if ((e.target as Element).closest('[data-url]')) return;
+      if ((e.target as Element).closest('[draggable="true"]')) return;
+      dispatch(focusBubble(bubble.id, universeId));
+    },
+    [bubble.id, universeId, dispatch]
+  );
 
   // DOM参照をContextに登録
   useLayoutEffect(() => {
