@@ -2,12 +2,14 @@
 
 import { FC } from "react";
 import styled from "styled-components";
+import { useKeyBindings } from "@bublys-org/bubbles-ui";
+import { useCasScope } from "@bublys-org/world-line-graph";
 import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReservationInfoView } from "../ui/ScheduleReservationInfoView.js";
-import { useObject, useObjectRepo } from "../objects/repository.js";
+import { useObject, useObjectRepo, APP_SCOPE_ID } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { SCHEDULE_TYPE, SCHEDULE_RESERVATION_INFO_TYPE } from "../objects/hotelObjects.js";
 
@@ -35,6 +37,16 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
   );
   const repo = useObjectRepo<DailyReservationInfo>(SCHEDULE_RESERVATION_INFO_TYPE);
 
+  // 予約の編集はアプリ全体の世界線（APP_SCOPE）に積まれる。Cmd/Ctrl+Z で元に戻し、
+  // Cmd/Ctrl+Shift+Z（や Ctrl+Y）でやり直す。useKeyBindings はこのバブルにフォーカスが
+  // 当たっているときだけ効き、テキスト入力中はブラウザ標準のundoに任せる（横取りしない）。
+  const worldLine = useCasScope(APP_SCOPE_ID);
+  useKeyBindings([
+    { key: "z", meta: true, run: worldLine.moveBack },
+    { key: "z", meta: true, shift: true, run: worldLine.moveForward },
+    { key: "y", meta: true, run: worldLine.moveForward },
+  ]);
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -55,7 +67,11 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
             {schedule.year}年{schedule.month}月 / {schedule.storeId}
           </span>
         </h3>
-        <p className="e-note">稼働日ごとの中・夕・宿泊人数・部屋数・備考・婚礼を入力します。</p>
+        <p className="e-note">
+          稼働日ごとの中・夕・泊（人数・部屋数）・備考・婚礼を入力します。
+          <br />
+          ⌘/Ctrl+Z で元に戻す、⌘/Ctrl+Shift+Z でやり直し。
+        </p>
       </div>
       <ScheduleReservationInfoView days={days} info={info} onSave={handleSave} />
     </StyledContainer>
