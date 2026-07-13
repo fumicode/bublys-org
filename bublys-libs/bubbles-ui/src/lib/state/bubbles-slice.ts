@@ -146,6 +146,7 @@ const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
+const prepVoid = (universeId?: string) => withU(undefined, universeId);
 export const bubblesSlice = createSlice({
   name: "bubbleState",
   initialState: getInitialState,
@@ -240,6 +241,15 @@ export const bubblesSlice = createSlice({
         u.process = BubblesProcess.fromJSON(u.process).focus(action.payload).toJSON();
       },
       prepare: prepStr,
+    },
+
+    // 何もないところ（背景）をクリックしたときにフォーカスを解除する。
+    unfocusBubble: {
+      reducer: (state, action: PayloadAction<undefined, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process).unfocus().toJSON();
+      },
+      prepare: prepVoid,
     },
 
     // Entity-only actions
@@ -367,6 +377,7 @@ export const {
   finishBubbleAnimation,
   clearAllAnimations,
   focusBubble,
+  unfocusBubble,
 } = bubblesSlice.actions;
 
 // ============================================================================

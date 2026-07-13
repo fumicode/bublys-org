@@ -4,14 +4,19 @@ import { FC } from "react";
 import styled from "styled-components";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   StaffMonthlyShiftWish,
   type WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishGridView } from "../ui/ShiftWishGridView.js";
 import { buildWishOptions } from "../ui/shiftWishOptions.js";
-import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
-import { STAFF_TYPE, WORKSHIFT_TYPE, STAFF_SHIFT_WISH_TYPE } from "../objects/hotelObjects.js";
+import { useObject, useObjectRepo } from "../objects/repository.js";
+import {
+  STAFF_TYPE,
+  WORKSHIFT_SET_TYPE,
+  GLOBAL_WORKSHIFT_SET_ID,
+  STAFF_SHIFT_WISH_TYPE,
+} from "../objects/hotelObjects.js";
 
 type Props = {
   staffId: string;
@@ -25,7 +30,9 @@ type Props = {
  */
 export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  // 希望は勤務表に紐づかない（スタッフ×月）ので、グローバルの勤務帯セットから選択肢を作る
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID);
+  const workShifts = workShiftSet?.shifts ?? [];
   const wishId = StaffMonthlyShiftWish.idOf(staffId, year, month);
   const stored = useObject<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE, wishId);
   const repo = useObjectRepo<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);

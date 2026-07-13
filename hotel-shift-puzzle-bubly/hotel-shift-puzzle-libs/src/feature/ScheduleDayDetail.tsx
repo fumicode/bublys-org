@@ -4,7 +4,7 @@ import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   ScheduleConstraints,
@@ -17,7 +17,7 @@ import { useObjects, useObject, useObjectShell } from "../objects/repository.js"
 import { useSeedHotelData } from "../objects/seed.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
@@ -39,7 +39,7 @@ type ScheduleDayDetailProps = {
 export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
   useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const allWorkShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
     scheduleId
@@ -76,10 +76,8 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
 
   const day = WorkingDay.fromKey(dayKey);
 
-  // この勤務表で使える勤務帯（workShiftIds を解決）
-  const shiftOptions = schedule.workShiftIds
-    .map((id) => allWorkShifts.find((w) => w.id === id))
-    .filter((w): w is WorkShift => !!w);
+  // この勤務表で使える勤務帯（勤務表の WorkShiftSet。開始時刻昇順）
+  const shiftOptions = workShiftSet?.shifts ?? [];
 
   const handleChangeCell = (staffId: string, to: ShiftCell) => {
     update((s) => s.setCell(staffId, day, to));

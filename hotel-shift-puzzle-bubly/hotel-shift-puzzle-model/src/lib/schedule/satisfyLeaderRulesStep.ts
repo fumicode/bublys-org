@@ -47,7 +47,7 @@ export function makeSatisfyLeaderRulesStep(
       schedule.workingDays().forEach((day, dayIndex) => {
         for (const rule of rules) {
           const coverShiftId = ctx.shiftIdByName.get(rule.shiftName);
-          if (!coverShiftId || !result.hasWorkShift(coverShiftId)) continue;
+          if (!coverShiftId || !ctx.shiftNameById.has(coverShiftId)) continue;
           const coverShiftIds = new Set([coverShiftId]);
 
           // 充足するまで（minCount 人埋まるまで／候補が尽きるまで）責任者を入れる。

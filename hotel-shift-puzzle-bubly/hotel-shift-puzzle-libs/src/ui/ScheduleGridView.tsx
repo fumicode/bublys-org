@@ -8,6 +8,7 @@ import {
   WorkShift,
   WorkingDay,
   ScheduleAvailability,
+  DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
   type ShiftCell,
@@ -24,6 +25,7 @@ import {
   type ConstraintHoverGroup,
 } from "./schedule-grid/ConstraintHoverOverlay.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
+import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
@@ -36,6 +38,16 @@ type ScheduleGridViewProps = {
   workShifts: WorkShift[];
   /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
   availability?: ScheduleAvailability;
+  /**
+   * 稼働日ごとの予約状況（宿泊人数・部屋数）。あれば日付ヘッダの上に読み取り専用の行を出す。
+   * 店ごとに付け替える想定の姉妹モジュール。未指定なら予約行を出さない。
+   */
+  reservationInfo?: DailyReservationInfo;
+  /**
+   * 予約状況の編集バブル URL。渡すと予約行のセルがダブルクリックで編集バブルを開く。
+   * URL スキームは app 層の関心事なので注入で受ける（dayBubbleUrl と同じ流儀）。
+   */
+  reservationInfoUrl?: string;
   /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
@@ -108,6 +120,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   staffList,
   workShifts,
   availability,
+  reservationInfo,
+  reservationInfoUrl,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
@@ -125,6 +139,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   maxDayOffPerDay,
 }) => {
   const days = schedule.workingDays();
+
+  // 予約情報ブロック（日付の上の 中/夕/泊・備考・婚礼）の折りたたみ状態
+  const [reservationCollapsed, setReservationCollapsed] = useState(false);
 
   // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
   const focusActive = (selectedStaffIds?.size ?? 0) > 0;
@@ -151,32 +168,41 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     const dayKey = hoveredCell.slice(sep + 1);
     const day = days.find((d) => d.key === dayKey);
     const visible = new Set(staffList.map((s) => s.id));
+    const shiftNameByIdLocal = new Map(workShifts.map((w) => [w.id, w.name]));
     const groups: ConstraintHoverGroup[] = [];
     for (const rule of leaderRules) {
       if (!rule.leaderStaffIds.includes(staffId)) continue;
       // 起点は「勤務帯」なので、本人も含めた表示中の全メンバーへ等しく線を伸ばす。
       const memberIds = rule.leaderStaffIds.filter((id) => visible.has(id));
       if (memberIds.length === 0) continue;
+      // 各メンバーが「その日に担当勤務帯へ入っているか（充足に寄与しているか）」を添える。
+      const members = memberIds.map((id) => {
+        const st = day ? schedule.statusOf(id, day) : { kind: "undecided" as const };
+        const covering =
+          st.kind === "work" && shiftNameByIdLocal.get(st.shiftId) === rule.shiftName;
+        return { staffId: id, covering };
+      });
       // その日に責任者ルールが未充足なら違反が立つ（列警告と同じ導出）。無ければ充足。
       const vtype = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
       const satisfied = day
         ? !violations.some((v) => v.constraintType === vtype && v.coversDay(day))
         : true;
+      // メンバー全員がその日に休み＝誰も入れず絶対に満たせない（黄色・同時点滅で警告）。
+      const allDayOff = !!day && memberIds.every((id) => schedule.isDayOff(id, day));
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
-        memberIds,
+        members,
         satisfied,
+        allDayOff,
       });
     }
     if (groups.length === 0) return null;
     return { dayKey, groups };
-  }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations]);
+  }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations, schedule, workShifts]);
 
-  // この勤務表で選べる勤務帯（workShiftIds を解決したもの）
-  const shiftOptions = schedule.workShiftIds
-    .map((id) => shiftMap.get(id))
-    .filter((w): w is WorkShift => !!w);
+  // この勤務表で選べる勤務帯（勤務表の WorkShiftSet から渡される。開始時刻昇順）
+  const shiftOptions = workShifts;
 
   // 各稼働日の勤務帯ID別人数 / 休み人数（集約のクエリ）→ 集計行を組み立てる。
   const countsByDay = days.map((day) => schedule.countWorkingByShift(day));
@@ -345,6 +371,36 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         }}
         onMouseLeave={() => setHoveredCell(null)}
       >
+        {/* 予約情報（中/夕/泊・備考・婚礼）を日付ヘッダの「上」に読み取り専用で出す。
+            嵩張るので折りたためるようにする。入力は専用バブルで行う（reservationInfoUrl を
+            渡すとダブルクリックで開く）。 */}
+        {reservationInfoUrl && (
+          <>
+            <div
+              className="e-res-toggle"
+              role="button"
+              title="予約情報の表示/折りたたみ"
+              onClick={() => setReservationCollapsed((v) => !v)}
+            >
+              <span className="e-res-caret">{reservationCollapsed ? "▶" : "▼"}</span>
+              予約情報
+            </div>
+            <div
+              className="e-res-toggle-bar"
+              style={{ gridColumn: `2 / ${days.length + 3}` }}
+              title="予約情報の表示/折りたたみ"
+              onClick={() => setReservationCollapsed((v) => !v)}
+            />
+            {!reservationCollapsed && (
+              <ReservationInfoRows
+                days={days}
+                reservationInfo={reservationInfo}
+                reservationInfoUrl={reservationInfoUrl}
+              />
+            )}
+          </>
+        )}
+
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
         <div className="e-corner">
           {schedule.year}年{schedule.month}月

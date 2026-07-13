@@ -17,6 +17,7 @@ import {
   makeSelectBubbleByIdInUniverse,
   makeSelectFocusedBubbleId,
   ROOT_UNIVERSE_ID,
+  unfocusBubble,
 } from "../state/index.js";
 
 /**
@@ -485,6 +486,17 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   const isNested = universeId !== ROOT_UNIVERSE_ID;
   const universeSize = useAppSelector(makeSelectUniverseDimensions(universeId));
 
+  // 何もないところ（バブルが無い背景）をクリックしたらフォーカスを解除する。
+  // e.target === e.currentTarget で「クリックが StyledUniverse 自身に当たった」ときだけ反応させる
+  // （バブル上のクリックはイベントバブリングで通過するだけなので target がバブル側の子要素になる）。
+  const handleBackgroundMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target !== e.currentTarget) return;
+      dispatch(unfocusBubble(universeId));
+    },
+    [dispatch, universeId]
+  );
+
   return (
     <UniverseContext.Provider value={universeContextValue}>
       <StyledFrame $nested={isNested}>
@@ -494,6 +506,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
             $nested={isNested}
             $width={universeSize.width}
             $height={universeSize.height}
+            onMouseDown={handleBackgroundMouseDown}
           >
             {renderedBubbles}
 

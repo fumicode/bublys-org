@@ -3,7 +3,6 @@ import {
   RequiredStaffing,
   WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { createSampleWorkShifts } from "./sampleWorkShifts.js";
 
 /**
  * 需要の波（必要スタッフ数）を曜日で表す。
@@ -21,15 +20,13 @@ function demandFor(weekday: number): Record<string, number> {
 /**
  * 指定した年月の、需要の波を持つ「空の」勤務表を生成する。
  * 割当は入れず（全セル未定）、自動シフト／手動で埋めていく前提のまっさらな状態。
- * 勤務帯（WorkShift）は独立集約なので、ここでは ID だけ参照する。
+ * 勤務帯（WorkShiftSet）は勤務表ごとの別集約（id=scheduleId）なので、勤務表自身は持たない。
  */
 export function createSampleScheduleFor(
   year: number,
   month: number,
   id: string
 ): MonthlyStaffSchedule {
-  const workShiftIds = createSampleWorkShifts().map((w) => w.id); // ['early','middle','late']
-
   // 各稼働日に、その曜日の需要を設定する（土日多め）
   const lastDay = new Date(year, month, 0).getDate();
   let requiredStaffing = RequiredStaffing.empty();
@@ -46,7 +43,6 @@ export function createSampleScheduleFor(
     storeId: "store-1",
     year,
     month,
-    workShiftIds,
     requiredStaffing,
   });
 }

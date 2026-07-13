@@ -1,5 +1,6 @@
 import bubblesReducer, {
   focusBubble,
+  unfocusBubble,
   makeSelectFocusedBubbleId,
   ROOT_UNIVERSE_ID,
   BubbleStateSlice,
@@ -33,6 +34,23 @@ describe('focusBubble action', () => {
     const second = bubblesReducer(first, focusBubble('bubble-2'));
 
     expect(second.universes[ROOT_UNIVERSE_ID].process.focusedBubbleId).toBe('bubble-2');
+  });
+});
+
+describe('unfocusBubble action', () => {
+  it('clears focusedBubbleId in the process', () => {
+    const state = emptyState();
+    const focused = bubblesReducer(state, focusBubble('bubble-1'));
+    const unfocused = bubblesReducer(focused, unfocusBubble());
+
+    expect(unfocused.universes[ROOT_UNIVERSE_ID].process.focusedBubbleId).toBeUndefined();
+  });
+
+  it('is a no-op when nothing is focused', () => {
+    const state = emptyState();
+    const next = bubblesReducer(state, unfocusBubble());
+
+    expect(next.universes[ROOT_UNIVERSE_ID].process.focusedBubbleId).toBeUndefined();
   });
 });
 

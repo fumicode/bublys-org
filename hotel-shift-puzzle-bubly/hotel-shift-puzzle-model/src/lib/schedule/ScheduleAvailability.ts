@@ -45,6 +45,17 @@ export class ScheduleAvailability {
     return this.allowedShiftIds(staffId).includes(shiftId);
   }
 
+  /** 指定スタッフ全員にその勤務帯を許可した新しいインスタンスを返す。不変。
+   *  可能勤務帯バブルで勤務帯を追加したとき、既定で全員許可にするために使う。 */
+  allowForAll(staffIds: string[], shiftId: string): ScheduleAvailability {
+    const byStaff = { ...this.state.byStaff };
+    for (const staffId of staffIds) {
+      const current = byStaff[staffId] ?? [];
+      if (!current.includes(shiftId)) byStaff[staffId] = [...current, shiftId];
+    }
+    return new ScheduleAvailability({ ...this.state, byStaff });
+  }
+
   /** 1つの可否をトグルした新しいインスタンスを返す。不変。 */
   toggle(staffId: string, shiftId: string): ScheduleAvailability {
     const current = this.allowedShiftIds(staffId);

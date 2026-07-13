@@ -118,6 +118,31 @@ export function saveObject(store: StoreLike, type: string, obj: unknown): void {
 }
 
 /**
+ * グローバル（APP_SCOPE）の型オブジェクトを、新しい origin（勤務表など）のスコープへ取り込む。
+ *
+ * 「グローバルにもテンプレートがあり、新しい世界線オリジンが作られるときにグローバルのものを
+ *  スコープ内へコピーして独自版にする」という、よくあるパターンの標準 API。
+ * 使い方: 取り込む型に localScope（origin スコープへ束ねる規約）を付けておき、origin 作成時に
+ *   adoptGlobalObject(store, WORKSHIFT_SET_TYPE, set => set.withId(scheduleId), GLOBAL_ID)
+ * を呼ぶ。transform でグローバル値の id を origin 用へ差し替えると、saveObject が記述子の
+ * localScope を見て origin スコープ＋APP_SCOPE の両方へ記録する（以後 origin の世界線に載る）。
+ *
+ * グローバル値が未投入なら undefined を返す（呼び出し側で既定生成へフォールバック可能）。
+ */
+export function adoptGlobalObject<T>(
+  store: StoreLike,
+  type: string,
+  transform: (global: T) => T,
+  globalId: string
+): T | undefined {
+  const global = readFromScope<T>(store, APP_SCOPE_ID, type, globalId);
+  if (global === undefined) return undefined;
+  const adopted = transform(global);
+  saveObject(store, type, adopted);
+  return adopted;
+}
+
+/**
  * 同じ親から複数の「案」を兄弟ブランチとして記録する（世界線で見比べる用）。
  * - 書き込み先はローカル世界線スコープのみ（アプリ全体は現状のまま）。
  * - スコープが空なら baseObj を root として置き、それを共通の親にする。空でなければ現在の apex を親とする。

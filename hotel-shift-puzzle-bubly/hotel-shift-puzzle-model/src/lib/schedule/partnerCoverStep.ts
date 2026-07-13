@@ -31,7 +31,7 @@ export function makePartnerCoverStep(rule: ShiftLeaderRule): AutoShiftStep {
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
       const coverShiftId = ctx.shiftIdByName.get(rule.shiftName);
-      if (!coverShiftId || !schedule.hasWorkShift(coverShiftId)) {
+      if (!coverShiftId || !ctx.shiftNameById.has(coverShiftId)) {
         return {
           schedule,
           assigned: 0,

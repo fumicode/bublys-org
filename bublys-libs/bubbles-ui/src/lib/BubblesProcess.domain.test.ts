@@ -47,6 +47,28 @@ describe('BubblesProcess - focus', () => {
 
     expect(afterLayerDown.focusedId).toBe('A');
   });
+
+  it('unfocus() clears focusedId', () => {
+    const process = makeProcess([['A', 'B']]).focus('A');
+    const unfocused = process.unfocus();
+
+    expect(unfocused.focusedId).toBeUndefined();
+  });
+
+  it('unfocus() returns a new instance (immutable)', () => {
+    const process = makeProcess([['A', 'B']]).focus('A');
+    const unfocused = process.unfocus();
+
+    expect(unfocused).not.toBe(process);
+    expect(process.focusedId).toBe('A');
+  });
+
+  it('unfocus() is a no-op when nothing is focused', () => {
+    const process = makeProcess([['A', 'B']]);
+    const unfocused = process.unfocus();
+
+    expect(unfocused.focusedId).toBeUndefined();
+  });
 });
 
 describe('BubblesProcess - popChild', () => {

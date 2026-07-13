@@ -11,6 +11,6 @@ export const SHIFT_FG: Record<string, string> = {
 };
 
 // グリッドの列幅
-export const STAFF_COL_WIDTH = 132;
+export const STAFF_COL_WIDTH = 168;
 export const DAY_COL_WIDTH = 40;
 export const OFF_COL_WIDTH = 40; // 右端「休（合計）」列

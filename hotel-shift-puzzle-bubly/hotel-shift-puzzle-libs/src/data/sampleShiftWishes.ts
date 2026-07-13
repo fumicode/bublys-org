@@ -84,10 +84,11 @@ function juneWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(25), DAY_OFF_WISH, "want")
     .setPreference(d(12), workWishKey("遅番"), "want");
 
-  // 山本 由美（早責）: 休み 1(月)9(火)16(火)23(火) / 早番がいい 6(土)
+  // 山本 由美（早責）: 休み 1(月)9(火)14(日)16(火)23(火) / 早番がいい 6(土)
   const yamamoto = StaffMonthlyShiftWish.create({ staffId: "staff-7", year: 2026, month: 6 })
     .setPreference(d(1), DAY_OFF_WISH, "want")
     .setPreference(d(9), DAY_OFF_WISH, "want")
+    .setPreference(d(14), DAY_OFF_WISH, "want")
     .setPreference(d(16), DAY_OFF_WISH, "want")
     .setPreference(d(23), DAY_OFF_WISH, "want")
     .setPreference(d(6), workWishKey("早番"), "want");
@@ -161,10 +162,11 @@ function julyWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(22), DAY_OFF_WISH, "want")
     .setPreference(d(4), workWishKey("遅番"), "want");
 
-  // 山本 由美（早責）: 休み 3(金)9(水)16(水)23(水) / 早番がいい 5(日)
+  // 山本 由美（早責）: 休み 3(金)9(水)15(水)16(水)23(水) / 早番がいい 5(日)
   const yamamoto = StaffMonthlyShiftWish.create({ staffId: "staff-7", year: 2026, month: 7 })
     .setPreference(d(3), DAY_OFF_WISH, "want")
     .setPreference(d(9), DAY_OFF_WISH, "want")
+    .setPreference(d(15), DAY_OFF_WISH, "want")
     .setPreference(d(16), DAY_OFF_WISH, "want")
     .setPreference(d(23), DAY_OFF_WISH, "want")
     .setPreference(d(5), workWishKey("早番"), "want");

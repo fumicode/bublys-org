@@ -85,6 +85,22 @@ hotel-shift-puzzle-app/src/
     routing 束縛なので app の関心事。`getId`/`serialize` 等の intrinsic な側面だけ libs に残す
   - UI 側は `ObjectView` に URL を渡すだけ。展開・data-url・openBubble・opener 解決は
     ObjectView に一任する（自前で UrledPlace＋openBubble を組まない）
+- **グローバル型を origin スコープへ取り込むパターン**（テンプレート → 世界線独自コピー）：
+  「グローバルにもテンプレートがあり、新しい origin（勤務表など＝世界線の起点）が作られるとき、
+  グローバルのものをその origin のスコープ内へコピーして独自版にする」よくある形。
+  - 取り込む型は、id が origin 用のときだけ origin のローカル世界線へ束ねるよう `localScope` を
+    宣言する（グローバル固定IDのときは `undefined`）。例（`objects/hotelObjects.tsx` の `WorkShiftSet`）:
+    `localScope: (s) => s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id)`
+  - グローバルのテンプレートは固定ID（例 `"global"`）で1つ持ち、専用バブルで編集する。
+  - origin 作成時に **`adoptGlobalObject(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
+    （`objects/commit.ts`）を呼ぶ。これはグローバル現在値を読み、id を origin 用へ差し替えて
+    `saveObject` するだけ。`saveObject` が `localScope` を見て origin スコープ＋APP_SCOPE の両方へ
+    記録するので、以後その型の編集は origin の世界線に載る（時間移動で一緒に戻る）。
+  - 集約側には id を差し替えつつ中身（子の id 等）を保つコピー用メソッド（例 `WorkShiftSet.withId`）を
+    生やす。ドメインは新規 id を採番しない（採番は feature 層）。
+  - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と
+    勤務表ごと（id=scheduleId）の2通りで存在する。勤務表は勤務帯を `workShiftIds` で持たず、
+    自分の `WorkShiftSet` を唯一の真実とする。
 
 ---
 

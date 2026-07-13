@@ -4,19 +4,25 @@ import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   StaffMonthlyShiftWish,
+  ScheduleConstraints,
+  ScheduleReport,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
+import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_CONSTRAINTS_TYPE,
+  SCHEDULE_REPORT_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -66,7 +72,8 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
 
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
     scheduleId
@@ -76,6 +83,15 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
     SCHEDULE_TYPE,
     scheduleId
   );
+
+  // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
+  // ここでは読み取り専用表示のみ（紐づけの追加/解除はグリッド側で行う）。
+  const constraints = useObject<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE, scheduleId);
+  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const linkedReports = useMemo(() => {
+    const ids = constraints?.linkedReportIds ?? [];
+    return allReports.filter((r) => ids.includes(r.id));
+  }, [allReports, constraints]);
 
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする
   const wishByStaff = useMemo(() => {
@@ -99,7 +115,7 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList,
+      staffList: prioritizeStaffByLinkedReports(staffList, linkedReports),
       workShifts,
       wishByStaff,
       availability,
@@ -121,6 +137,8 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
           上から順に実行すると埋まっていきます。人間が入力済みのセルは上書きしません。
         </p>
       </div>
+
+      <LinkedReportsView reports={linkedReports} />
 
       <div className="e-auto-bar">
         {AUTO_BAR_ITEMS.map((item, i) => {

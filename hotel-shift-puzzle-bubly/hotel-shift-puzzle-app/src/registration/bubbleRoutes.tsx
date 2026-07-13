@@ -9,6 +9,7 @@ import {
   ScheduleCollection,
   ScheduleGrid,
   ScheduleDayDetail,
+  ScheduleReservationInfoDetail,
   AutoShiftPanel,
   ExtractedSchedule,
   HotelObjectsProvider,
@@ -18,6 +19,8 @@ import {
   ScheduleViolationView,
   ShiftWishEditor,
   LeaderRuleView,
+  ScheduleReportPanel,
+  ScheduleReportList,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
@@ -25,9 +28,12 @@ import {
   scheduleDayUrl,
   scheduleViolationUrl,
   scheduleAvailabilityUrl,
+  scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
   scheduleAutoShiftUrl,
   scheduleLeaderRuleUrl,
+  scheduleReportUrl,
+  scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
 } from "./bubbleUrls.js";
 
@@ -72,7 +78,17 @@ const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
-const ScheduleListBubble: BubbleRoute["Component"] = () => withObjects(<ScheduleCollection />);
+// 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
+const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  return withObjects(
+    <ScheduleCollection
+      onOpenReports={() =>
+        openBubble(scheduleReportListUrl(), bubble.id, "bubble-side-right")
+      }
+    />
+  );
+};
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
@@ -107,6 +123,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)
       }
+      reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
     />
   );
 };
@@ -133,6 +150,10 @@ const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
     />
   );
 
+// --- 予約状況 詳細バブル（勤務表の予約行クリックで開く。稼働日ごとの宿泊人数・部屋数を入力） ---
+const ScheduleReservationInfoBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleReservationInfoDetail scheduleId={bubble.params.scheduleId} />);
+
 // --- 制約違反バブル（赤線クリックで開く） ---
 const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(
@@ -143,8 +164,27 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
   );
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
-const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
+// 「確定してレポート作成」で新しいシフト完成レポートバブルを開く（勤務表バブルを opener に）。
+const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const scheduleId = bubble.params.scheduleId;
+  return withObjects(
+    <ScheduleWorldLineView
+      scheduleId={scheduleId}
+      onConfirm={(reportId) =>
+        openBubble(scheduleReportUrl(reportId), bubble.id, "bubble-side-right")
+      }
+    />
+  );
+};
+
+// --- シフト完成レポートバブル（世界線ビューの「確定してレポート作成」から開く） ---
+const ScheduleReportBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleReportPanel reportId={bubble.params.reportId} />);
+
+// --- シフト完成レポート一覧バブル（勤務表一覧の「シフト完成レポート一覧」から開く） ---
+const ScheduleReportListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ScheduleReportList />);
 
 // --- 勤務表の完成木ビューバブル（SVG版・読み取り専用） ---
 const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -183,6 +223,11 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/reservation-info", type: "schedule-reservation-info", Component: ScheduleReservationInfoBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
+  // シフト完成レポート（#86〜#89）。list は `/schedule-reports`、単体は `/schedule-reports/:reportId`
+  // （schedules/schedule-list と同じ命名パターン）。
+  { pattern: "hotel-shift-puzzle/schedule-reports/:reportId", type: "schedule-report", Component: ScheduleReportBubble },
+  { pattern: "hotel-shift-puzzle/schedule-reports", type: "schedule-report-list", Component: ScheduleReportListBubble },
 ];

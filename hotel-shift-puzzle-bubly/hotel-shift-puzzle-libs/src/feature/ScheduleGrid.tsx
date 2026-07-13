@@ -2,15 +2,16 @@
 
 import { FC, ReactNode, useMemo, useState } from "react";
 import styled from "styled-components";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   Staff,
-  WorkShift,
+  WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
+  DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
-  SHIFT_LEADER_CONSTRAINT,
+  ScheduleReport,
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
@@ -21,18 +22,25 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import { LeaderRulesView } from "../ui/LeaderRulesView.js";
+import {
+  ScheduleConstraintsBar,
+  shiftColorById,
+} from "../ui/ScheduleConstraintsBar.js";
+import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
+import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
   STAFF_TYPE,
-  WORKSHIFT_TYPE,
+  WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
+  SCHEDULE_REPORT_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -62,6 +70,11 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
+  /**
+   * 予約状況（宿泊人数・部屋数）編集バブルの URL。渡すと日付ヘッダの上に予約行を出し、
+   * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
+   */
+  reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
   /**
@@ -92,15 +105,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  reservationInfoUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
-  const workShifts = useObjects<WorkShift>(WORKSHIFT_TYPE);
+  // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
+  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
     SCHEDULE_AVAILABILITY_TYPE,
+    scheduleId
+  );
+  // 稼働日ごとの予約状況（宿泊人数・部屋数）。未作成なら undefined（予約行は空表示）。
+  const reservationInfo = useObject<DailyReservationInfo>(
+    SCHEDULE_RESERVATION_INFO_TYPE,
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
@@ -150,6 +171,26 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
   const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+
+  // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
+  // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
+  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const linkedReports = useMemo(() => {
+    const ids = constraints?.linkedReportIds ?? [];
+    return allReports.filter((r) => ids.includes(r.id));
+  }, [allReports, constraints]);
+
+  const handleDropReportUrl = (url: string) => {
+    const reportId = extractIdFromUrl(url);
+    if (!reportId || !scheduleId) return;
+    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
+    constraintsRepo.save(base.linkReport(reportId));
+  };
+  const handleUnlinkReport = (reportId: string) => {
+    if (!constraints) return;
+    constraintsRepo.save(constraints.unlinkReport(reportId));
+  };
 
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
   const minDayOff = constraints?.minMonthlyDayOff ?? 8;
@@ -248,14 +289,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [schedule, allConstraints]
   );
 
-  // 上部「📋 ルール」の責任者以外の行は、各制約が自己記述する describe() から導出する。
-  const otherRules = useMemo(
-    () =>
-      allConstraints
-        .filter((c) => !c.type.startsWith(SHIFT_LEADER_CONSTRAINT))
-        .map((c) => ({ key: c.type, label: c.label, text: c.describe() })),
-    [allConstraints]
-  );
+  // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
+  const shiftColorOf = useMemo(() => {
+    const idByName = new Map<string, string>();
+    for (const w of workShifts) if (!idByName.has(w.name)) idByName.set(w.name, w.id);
+    return (shiftName: string) => shiftColorById(idByName.get(shiftName));
+  }, [workShifts]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -266,11 +305,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setCell(staffId, day, to));
   };
 
-  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる
+  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
+  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: subsetStaff,
+      staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
       workShifts,
       wishByStaff,
       availability,
@@ -284,10 +324,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // それぞれ独立した世界線（兄弟ブランチ）に書く。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
+    // 紐づけたレポートで妥協が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
-        staffList: subsetStaff,
+        staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
         availability,
@@ -393,14 +435,29 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         </div>
       </div>
 
-      {/* 適用中の宣言的ルール（早責/夜責）を人が読める形で描く */}
+      {/* 参考として紐づけたシフト完成レポート。ルール帯とは別エリア（レポート一覧バブルから
+          ドラッグで紐づけ、自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
+      <LinkedReportsView
+        reports={linkedReports}
+        onDropUrl={handleDropReportUrl}
+        dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
+        onUnlink={handleUnlinkReport}
+      />
+
+      {/* 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体） */}
       <div className="e-rules-strip">
-        <LeaderRulesView
-          rules={leaderRules}
+        <ScheduleConstraintsBar
+          leaderRules={leaderRules}
           nameOf={nameOf}
+          shiftColorOf={shiftColorOf}
+          onSelectRule={selectRuleStaff}
+          selectedStaffIds={selectedStaffIds}
           ruleBubbleUrl={ruleBubbleUrl}
-          otherRules={otherRules}
           onAddRule={scheduleId && onOpenRule ? handleAddRule : undefined}
+          maxConsecutive={constraints?.maxConsecutiveWorkdays ?? 5}
+          minDayOff={minDayOff}
+          maxPerDay={maxPerDay}
+          checkShiftWish={constraints?.checkShiftWish ?? true}
         />
       </div>
 
@@ -411,6 +468,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           staffList={filteredStaffList}
           workShifts={workShifts}
           availability={availability}
+          reservationInfo={reservationInfo}
+          reservationInfoUrl={reservationInfoUrl}
           wishByStaff={wishByStaff}
           violations={violations}
           groupByDepartment={groupByDept}

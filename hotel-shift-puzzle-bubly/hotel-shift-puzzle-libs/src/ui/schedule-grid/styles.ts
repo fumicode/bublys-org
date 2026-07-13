@@ -51,10 +51,127 @@ export const StyledWrap = styled.div`
   .e-sum-head,
   .e-sum-cell,
   .e-off-head,
-  .e-off-total {
+  .e-off-total,
+  .e-res-head,
+  .e-res-cell,
+  .e-res-filler,
+  .e-res-toggle,
+  .e-res-toggle-bar {
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 予約情報ブロックの折りたたみトグル行（予約行の上）。左見出しは横スクロールで固定、
+     右側は帯として全日列を覆う。クリックで開閉。 */
+  .e-res-toggle {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #8d6e63;
+    background: #fbeee0;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+
+    .e-res-caret {
+      font-size: 0.9em;
+      color: #a1887f;
+    }
+    &:hover {
+      background: #f6e2cd;
+    }
+  }
+  .e-res-toggle-bar {
+    background: #fbeee0;
+    cursor: pointer;
+
+    &:hover {
+      background: #f6e2cd;
+    }
+  }
+
+  /* 稼働日ごとの予約状況（宿泊人数・部屋数）。日付ヘッダの上に読み取り専用で並ぶ。
+     左見出しは横スクロールで固定（e-sum-head と同じ流儀）、右端はフィラー。編集は専用バブルで。 */
+  .e-res-head {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #5d4037;
+    background: #fff8f0;
+    white-space: nowrap;
+
+    &.is-clickable {
+      cursor: pointer;
+    }
+    &.is-clickable:hover {
+      background: #ffefdd;
+    }
+  }
+  .e-res-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    font-size: 0.78em;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    color: #5d4037;
+    background: #fffdf9;
+    cursor: pointer;
+
+    &.is-empty {
+      color: #d7ccc8;
+      font-weight: normal;
+      background: #fafafa;
+    }
+    &.is-sun {
+      background: #fff5f5;
+    }
+    &.is-sat {
+      background: #f5f9ff;
+    }
+    &:hover {
+      box-shadow: inset 0 0 0 2px #ffcc80;
+    }
+
+    /* 備考は複数行テキストをそのまま折り返して表示する（狭い日列なので縦に伸びる） */
+    &.is-note {
+      align-items: flex-start;
+      justify-content: flex-start;
+      font-weight: normal;
+      font-size: 0.62em;
+      line-height: 1.25;
+      padding: 2px 3px;
+
+      .e-res-note {
+        display: block;
+        width: 100%;
+        white-space: pre-wrap;
+        word-break: break-all;
+        text-align: left;
+        color: #6d4c41;
+      }
+    }
+  }
+  .e-res-filler {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #fff8f0;
+    border-left: 1px solid #e0e0e0;
   }
 
   /* 右端「休（合計）」列。横スクロールしても右に固定して見えるようにする */
@@ -316,19 +433,32 @@ export const StyledWrap = styled.div`
       flex-shrink: 0;
     }
     .e-staff-name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      /* 名前を優先して表示（バッジに押し出されて隠れないように）。
+         入れば1行、入らなければ空白で折り返す（文字の途中では切らない・切り捨てない）。 */
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      line-height: 1.15;
       font-weight: bold;
+    }
+    /* 責任者バッジは名前を隠さないよう、右端に極小サイズで縦に積む */
+    .e-staff-badges {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
     }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
       flex-shrink: 0;
-      font-size: 0.72em;
+      font-size: 0.55em;
       font-weight: bold;
-      line-height: 1;
-      padding: 2px 4px;
-      border-radius: 4px;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
       white-space: nowrap;
 
       /* クリックで関係者を抽出できるバッジ */

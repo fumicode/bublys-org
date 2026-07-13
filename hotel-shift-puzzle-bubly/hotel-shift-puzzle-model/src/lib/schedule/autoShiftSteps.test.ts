@@ -21,7 +21,6 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: workShifts.map((w) => w.id),
       requiredStaffing: required,
     });
 
