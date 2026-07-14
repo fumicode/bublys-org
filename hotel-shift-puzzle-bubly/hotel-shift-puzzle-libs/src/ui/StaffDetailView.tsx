@@ -2,7 +2,7 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, type CompromiseEntry, type BusyDayEntry } from "../domain/index.js";
+import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
@@ -28,7 +28,7 @@ type StaffDetailViewProps = {
   onChangeDepartment?: (department: string) => void;
   /** 指定した年月のシフト希望エディタを開く */
   onOpenWish?: (year: number, month: number) => void;
-  /** このスタッフに関する参照レポートの評価（貢献度スコア・妥協/繁忙日・配慮メモ）。読み取り専用 */
+  /** このスタッフに関する参照レポートの評価（貢献度スコア・譲歩/繁忙日・配慮メモ）。読み取り専用 */
   linkedReportSummaries?: StaffLinkedReportSummary[];
 };
 
@@ -55,6 +55,15 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
 
   const cancelDept = () => {
     setEditingDept(false);
+  };
+
+  const dayLabel = (dayKey: string) => WorkingDay.fromKey(dayKey).label;
+  // 月単位の違反（休日不足など）は dayKeys が空。1日なら単日、複数日なら範囲で示す。
+  const dayRangeLabel = (dayKeys: string[]) => {
+    if (dayKeys.length === 0) return null;
+    const first = dayLabel(dayKeys[0]);
+    const last = dayLabel(dayKeys[dayKeys.length - 1]);
+    return dayKeys.length === 1 ? first : `${first}〜${last}`;
   };
 
   return (
@@ -174,21 +183,45 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
                   </ObjectView>
                   <span className="e-linked-report-score">スコア {score}</span>
                 </div>
-                <div className="e-linked-report-counts">
-                  {compromises.length > 0 && (
-                    <span className="e-count-item">
-                      <HandshakeIcon fontSize="inherit" className="e-icon-compromise" />
-                      妥協 {compromises.length}件
+                {compromises.length > 0 && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">
+                      <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩
                     </span>
-                  )}
-                  {busyDays.length > 0 && (
-                    <span className="e-count-item">
-                      <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" />
-                      繁忙日対応 {busyDays.length}件
+                    <ul className="e-compromise-days">
+                      {compromises.map((c, i) => {
+                        const range = dayRangeLabel(c.dayKeys);
+                        return (
+                          <li key={i}>
+                            <span className="e-compromise-tag">{c.label}</span>
+                            {range && <span className="e-compromise-range">{range}: </span>}
+                            {c.message}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {busyDays.length > 0 && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">
+                      <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日対応
                     </span>
-                  )}
-                </div>
-                {note && <p className="e-linked-report-note">{note}</p>}
+                    <ul className="e-busy-days">
+                      {busyDays.map((day) => (
+                        <li key={day.dayKey}>
+                          {dayLabel(day.dayKey)}（必要{day.requiredCount}人）
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {note && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">配慮メモ</span>
+                    <p className="e-linked-report-note">{note}</p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -339,20 +372,6 @@ const StyledStaffDetail = styled.div`
     flex-shrink: 0;
   }
 
-  .e-linked-report-counts {
-    display: flex;
-    gap: 12px;
-    margin-top: 2px;
-    font-size: 0.78em;
-    color: #666;
-  }
-
-  .e-count-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-  }
-
   .e-icon-compromise {
     color: #6d4c41;
   }
@@ -361,8 +380,48 @@ const StyledStaffDetail = styled.div`
     color: #e64a19;
   }
 
+  .e-detail-block {
+    margin-top: 6px;
+  }
+
+  .e-detail-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78em;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 2px;
+  }
+
+  .e-compromise-days,
+  .e-busy-days {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8em;
+    color: #555;
+
+    li {
+      padding: 2px 0;
+    }
+  }
+
+  .e-compromise-tag {
+    display: inline-block;
+    border-radius: 4px;
+    background: #efebe9;
+    color: #6d4c41;
+    font-size: 0.85em;
+    padding: 0 5px;
+    margin-right: 4px;
+  }
+  .e-compromise-range {
+    color: #888;
+  }
+
   .e-linked-report-note {
-    margin: 4px 0 0;
+    margin: 0;
     font-size: 0.8em;
     color: #555;
     white-space: pre-wrap;
