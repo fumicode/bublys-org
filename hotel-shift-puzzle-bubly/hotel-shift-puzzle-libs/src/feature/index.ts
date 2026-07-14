@@ -8,7 +8,6 @@ export * from "./ScheduleCollection.js";
 export * from "./ScheduleGrid.js";
 export * from "./ScheduleDayDetail.js";
 export * from "./ScheduleReservationInfoDetail.js";
-export * from "./AutoShiftPanel.js";
 export * from "./ExtractedSchedule.js";
 export * from "./ScheduleWorldLineView.js";
 export * from "./ScheduleWorldLineTreeView.js";

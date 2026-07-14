@@ -12,7 +12,7 @@
  *
  * 実際に効果があるのは makeMinDayOffStep だけ（休みの取得優先権。maxPerDay が有限リソース
  * のため早い者勝ちになる）。fulfillWishesStep は人数上限チェックが無いため並び順の影響を
- * 受けない。satisfyLeaderRulesStep / makePartnerCoverStep は ctx.staffIds ではなく
+ * 受けない。satisfyLeaderRulesStep は ctx.staffIds ではなく
  * rule.leaderStaffIds（責任者ルールの候補者リスト）を見るため、この並べ替えでは
  * 「貢献した人に仕事・責任者番を優先的に割り当てる」ことは起きない。
  */

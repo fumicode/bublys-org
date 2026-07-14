@@ -13,9 +13,9 @@ import {
   ScheduleConstraints,
   ScheduleReport,
   fulfillWishesStep,
-  makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
   makeMinDayOffStep,
+  AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type WorkingDay,
   type ShiftCell,
@@ -26,6 +26,7 @@ import {
   ScheduleConstraintsBar,
   shiftColorById,
 } from "../ui/ScheduleConstraintsBar.js";
+import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
@@ -52,8 +53,6 @@ type ScheduleGridProps = {
   onOpenTree?: () => void;
   /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
-  /** 自動シフトパネル（右上）を開くハンドラ */
-  onOpenAutoShift?: () => void;
   /**
    * 各アクションバブルの URL（data-url アンカー用）。ボタンを UrledPlace で包むと、
    * そのボタンから link bubble が伸びる。openBubble する URL と一致させる。
@@ -62,7 +61,6 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   availabilityUrl?: string;
-  autoShiftUrl?: string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -97,11 +95,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenHistory,
   onOpenTree,
   onOpenAvailability,
-  onOpenAutoShift,
   worldLineUrl,
   treeUrl,
   availabilityUrl,
-  autoShiftUrl,
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
@@ -216,7 +212,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
 
   // 操作対象に関係する責任者ルール（メンバー全員が subset に含まれるものだけ）。
-  // 選択が空＝全員のときは、担当者のいるルールすべてが対象になる。相方裏ボタンはこれごとに出す。
+  // 選択が空＝全員のときは、担当者のいるルールすべてが対象になる。＝解決案生成が解く制約。
   const relevantRules = useMemo(() => {
     const idSet = new Set(subsetStaff.map((s) => s.id));
     return leaderRules.filter(
@@ -224,11 +220,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     );
   }, [leaderRules, subsetStaff]);
 
-  // 自動シフトコマンド（希望を叶える＋関係ルールごとの相方裏）。ExtractedSchedule と同じ組み立て。
-  const steps = useMemo<AutoShiftStep[]>(
-    () => [fulfillWishesStep, ...relevantRules.map((rule) => makePartnerCoverStep(rule))],
-    [relevantRules]
-  );
+  // 解決案ボタンのラベルには「いま解こうとしている制約の名前」を入れる（例:「早責」解決案生成）。
+  // 何案つくるか・世界線に書くことは説明（tooltip）に回し、ボタンは目的だけを短く言う。
+  const candidateLabel = useMemo(() => {
+    const names = relevantRules.map((r) => r.label);
+    return names.length > 0 ? `「${names.join("・")}」解決案生成` : "解決案生成";
+  }, [relevantRules]);
 
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
@@ -314,6 +311,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       workShifts,
       wishByStaff,
       availability,
+      // 「必要人数を埋める」はこれを見て、先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
+      minDayOff,
+      maxDayOffPerDay: maxPerDay,
+      maxConsecutive: constraints?.maxConsecutiveWorkdays,
     });
     update(() => result.schedule);
     setAutoMessage(`${step.label}: ${result.message}`);
@@ -418,21 +419,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             )}
         </div>
 
-        {/* 右：自動シフトは独立バブル。ここはそれを開くボタンだけ */}
-        <div className="e-actions e-actions-right">
-          {onOpenAutoShift &&
-            withUrl(
-              autoShiftUrl,
-              <button
-                type="button"
-                className="e-link e-auto-open"
-                onClick={onOpenAutoShift}
-                title="自動シフトのパネルを開く"
-              >
-                🪄 自動シフト
-              </button>
-            )}
-        </div>
       </div>
 
       {/* 参考として紐づけたシフト完成レポート。ルール帯とは別エリア（レポート一覧バブルから
@@ -444,7 +430,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         onUnlink={handleUnlinkReport}
       />
 
-      {/* 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体） */}
+      {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
+          右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
           leaderRules={leaderRules}
@@ -458,6 +445,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           minDayOff={minDayOff}
           maxPerDay={maxPerDay}
           checkShiftWish={constraints?.checkShiftWish ?? true}
+        />
+        <ShiftCommandsBar
+          targetCount={subsetStaff.length}
+          selectedCount={selectedIds.length}
+          onClearSelection={
+            selectedIds.length > 0 ? () => setSelectedStaffIds(new Set()) : undefined
+          }
+          steps={AUTO_SHIFT_STEPS}
+          onRunStep={handleRunStep}
+          onGenerateCandidates={handleGenerateCandidates}
+          candidateLabel={candidateLabel}
+          candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
         />
       </div>
 
@@ -487,47 +486,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
           }
         />
-      </div>
-
-      {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
-      <div className="e-auto-bar">
-        <span className="e-auto-target">
-          対象:{" "}
-          {selectedIds.length > 0 ? (
-            <>
-              選択 {selectedIds.length} 名
-              <button
-                type="button"
-                className="e-auto-clear"
-                onClick={() => setSelectedStaffIds(new Set())}
-                title="選択を解除"
-              >
-                解除
-              </button>
-            </>
-          ) : (
-            "全員"
-          )}
-        </span>
-        {steps.map((step) => (
-          <button
-            key={step.key}
-            type="button"
-            className="e-auto"
-            title={step.description}
-            onClick={() => handleRunStep(step)}
-          >
-            {step.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="e-candidate-run"
-          title={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
-          onClick={handleGenerateCandidates}
-        >
-          🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る
-        </button>
       </div>
 
       {autoMessage && (
@@ -592,10 +550,6 @@ const StyledContainer = styled.div`
       gap: 6px;
       flex-shrink: 0;
     }
-    /* スタッフ関連の操作は左に、自動シフトは右に寄せる */
-    .e-actions-right {
-      margin-left: auto;
-    }
     .e-dept-select {
       border: 1px solid #cfd8dc;
       border-radius: 6px;
@@ -613,21 +567,15 @@ const StyledContainer = styled.div`
         border-color: #3949ab;
       }
     }
-    /* 自動シフトを開くボタンは紫系で自動シフトらしさを出す */
-    .e-auto-open {
-      border-color: #b39ddb;
-      color: #5e35b1;
-      font-weight: 600;
-      &:hover {
-        background: #ede7f6;
-        border-color: #9575cd;
-      }
-    }
   }
 
-  /* 適用ルールの帯 */
+  /* 適用ルールの帯（左）＋ シフトコマンド（右）。横に並べて、制約を見ながら操作できるようにする */
   .e-rules-strip {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
     margin-bottom: 8px;
+    flex-wrap: wrap;
   }
 
   /* グリッド領域。抽出フロートの absolute 基準 */

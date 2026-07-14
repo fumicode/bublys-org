@@ -10,7 +10,6 @@ import {
   ScheduleGrid,
   ScheduleDayDetail,
   ScheduleReservationInfoDetail,
-  AutoShiftPanel,
   ExtractedSchedule,
   HotelObjectsProvider,
   ScheduleWorldLineView,
@@ -30,7 +29,6 @@ import {
   scheduleAvailabilityUrl,
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
-  scheduleAutoShiftUrl,
   scheduleLeaderRuleUrl,
   scheduleReportUrl,
   scheduleReportListUrl,
@@ -99,7 +97,6 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
   const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
-  const autoShiftUrl = scheduleAutoShiftUrl(scheduleId);
   // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
   const openSide = (url: string, position: OpeningPosition) =>
     openBubble(url, bubble.id, position);
@@ -112,11 +109,9 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
-      onOpenAutoShift={() => openSide(autoShiftUrl, "bubble-side-right")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
-      autoShiftUrl={autoShiftUrl}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
@@ -127,10 +122,6 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     />
   );
 };
-
-// --- 自動シフト パネルバブル（勤務表の「🪄 自動シフト」ボタンから開く） ---
-const AutoShiftBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<AutoShiftPanel scheduleId={bubble.params.scheduleId} />);
 
 // --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
 const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -218,7 +209,6 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },

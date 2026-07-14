@@ -45,10 +45,6 @@ export const scheduleWorldLineUrl = (scheduleId: string): string =>
 export const scheduleWorldLineTreeUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/tree`;
 
-/** 自動シフト パネルバブル */
-export const scheduleAutoShiftUrl = (scheduleId: string): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/auto-shift`;
-
 /**
  * 抽出勤務表バブル（選択スタッフだけの勤務表）。
  * 選択スタッフID群をカンマ連結して URL に乗せる。同じ URL を抽出ボタンの data-url にも使う
