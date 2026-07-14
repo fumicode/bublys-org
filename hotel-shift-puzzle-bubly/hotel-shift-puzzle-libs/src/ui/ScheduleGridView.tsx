@@ -266,16 +266,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     onChangeCell,
   });
 
-  // 希望と割当を並べて見るために展開中のスタッフID
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (staffId: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(staffId)) next.delete(staffId);
-      else next.add(staffId);
-      return next;
-    });
-
   // ----- 必要人数の編集メニュー -----
   const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
   // 必要人数として選べる最大値（スタッフ総数まで）
@@ -305,8 +295,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           shiftMap={shiftMap}
           violations={violations}
           getWishEntries={getWishEntries}
-          expanded={expanded.has(staff.id)}
-          onToggleExpand={toggleExpanded}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
           onSelectCell={kb.selectCell}
@@ -345,8 +333,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           shiftMap={shiftMap}
           violations={violations}
           getWishEntries={getWishEntries}
-          expanded={expanded.has(staff.id)}
-          onToggleExpand={toggleExpanded}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
           onSelectCell={kb.selectCell}

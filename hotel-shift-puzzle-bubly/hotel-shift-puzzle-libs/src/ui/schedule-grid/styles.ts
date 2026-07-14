@@ -422,12 +422,6 @@ export const StyledWrap = styled.div`
         background: #f5f7f8;
       }
     }
-    .e-caret {
-      color: #90a4ae;
-      font-size: 0.85em;
-      flex-shrink: 0;
-      width: 10px;
-    }
     .e-staff-icon {
       color: #888;
       flex-shrink: 0;
@@ -472,45 +466,6 @@ export const StyledWrap = styled.div`
     }
   }
 
-  /* 希望行（スタッフ展開時。割当行の真下に並ぶ） */
-  .e-wish-row-head {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: #fcfcf7;
-    color: #8d6e63;
-    font-size: 0.85em;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 2px 8px;
-    border-right: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-  }
-  .e-wish-row-cell {
-    background: #fcfcf7;
-    border-right: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    padding: 2px;
-    font-size: 0.78em;
-    min-height: 24px;
-
-    .is-want {
-      color: #2e7d32;
-    }
-    .is-avoid {
-      color: #c62828;
-    }
-    .e-empty {
-      color: #ddd;
-    }
-  }
 
   /* データセル */
   .e-cell {
