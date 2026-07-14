@@ -30,7 +30,9 @@ export const StyledWrap = styled.div`
      - is-focused: 対象の行。うっすら黄色く強調して少し浮かせる（sticky セルを崩さないよう transform は使わない）。 */
   .e-staff-cell.is-dimmed,
   .e-cell.is-dimmed,
-  .e-off-total.is-dimmed {
+  .e-off-total.is-dimmed,
+  .e-sum-head.is-dimmed,
+  .e-sum-cell.is-dimmed {
     filter: blur(1.4px);
     opacity: 0.4;
   }

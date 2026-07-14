@@ -146,6 +146,21 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
   const focusActive = (selectedStaffIds?.size ?? 0) > 0;
 
+  // いまフォーカス中の責任者ルール（担当者が全員選ばれているルール）。
+  // スタッフ行と同じ考え方で、集計行も「そのルールの行だけをはっきり見せ、他は退かせる」。
+  const focusedRuleKeys = useMemo(() => {
+    if (!focusActive || !selectedStaffIds) return new Set<string>();
+    return new Set(
+      leaderRules
+        .filter(
+          (r) =>
+            r.leaderStaffIds.length > 0 &&
+            r.leaderStaffIds.every((id) => selectedStaffIds.has(id))
+        )
+        .map((r) => r.key)
+    );
+  }, [focusActive, selectedStaffIds, leaderRules]);
+
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
@@ -469,6 +484,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             days={days}
             rowIndex={rowIndex}
             editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
+            // フォーカス中は、フォーカスしている責任者ルールの行だけを残して他の集計行を減光する
+            dimmed={focusActive && !(row.ruleKey && focusedRuleKeys.has(row.ruleKey))}
             onEditRequired={setEditingRequired}
             leaderViolationUrl={leaderViolationUrl}
           />
