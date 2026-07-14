@@ -375,10 +375,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     <StyledContainer>
       <div className="e-header">
         <h3>
-          勤務表{" "}
-          <span className="e-sub">
-            {schedule.year}年{schedule.month}月 / {schedule.storeId}
-          </span>
+          {schedule.year}年{schedule.month}月の勤務表{" "}
+          <span className="e-sub">{schedule.storeId}</span>
         </h3>
 
         {/* 左：スタッフ（左列）に関わる操作をまとめる */}
@@ -457,6 +455,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           onGenerateCandidates={handleGenerateCandidates}
           candidateLabel={candidateLabel}
           candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          message={autoMessage}
+          onCloseMessage={() => setAutoMessage(null)}
         />
       </div>
 
@@ -487,20 +487,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           }
         />
       </div>
-
-      {autoMessage && (
-        <div className="e-auto-message">
-          {autoMessage}
-          <button
-            type="button"
-            className="e-auto-close"
-            aria-label="閉じる"
-            onClick={() => setAutoMessage(null)}
-          >
-            ×
-          </button>
-        </div>
-      )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
       {onOpenHistory && (
@@ -650,33 +636,6 @@ const StyledContainer = styled.div`
     }
   }
 
-  .e-auto-message {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 6px 10px;
-    background: #ede7f6;
-    border: 1px solid #d1c4e9;
-    border-radius: 6px;
-    color: #4527a0;
-    font-size: 0.82em;
-
-    .e-auto-close {
-      margin-left: auto;
-      border: none;
-      background: transparent;
-      color: #7e57c2;
-      font-size: 1.1em;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 2px;
-
-      &:hover {
-        color: #4527a0;
-      }
-    }
-  }
 
   /* 左下：世界線ビュー */
   .e-footer {

@@ -6,10 +6,11 @@
  * 制約一覧（ScheduleConstraintsBar）の右に置き、制約を見ながらコマンドを打てるようにする。
  * 制約が「どうあるべきか（宣言）」なら、こちらは「それを満たすために何をするか（操作）」。
  *
- * 表示はステップ一覧（AutoShiftStep[]）のリスト駆動:
- *   - group を持たないステップ … 単独ボタン（例: 希望を叶える）
- *   - 同じ group のステップ群 … 「戦略トグル ＋ 実行」の1組（例: 必要人数を埋める＝早番から順に/まんべんなく）
- * 新しいコマンドが増えてもここは変更不要。加えて、責任者ルールの解決案生成ボタンを1つ持つ。
+ * 表示はステップ一覧（AutoShiftStep[]）のリスト駆動で、2行に分けて並べる:
+ *   - 1行目 … group を持たない単独ステップ（例: 希望を叶える）＋ 解決案生成
+ *   - 2行目 … 同じ group のステップ群＝「戦略トグル ＋ 実行」の1組
+ *             （例: 必要人数を埋める＝早番から順に/まんべんなく）
+ * 新しいコマンドが増えてもここは変更不要（単独なら1行目、戦略つきなら2行目に並ぶ）。
  *
  * コマンドの対象は「選択中のスタッフ（無ければ全員）」。解決案生成のラベルには、いま対象に
  * なっている制約の名前がそのまま入る（例:「早責」解決案生成）ので、何を解こうとしているのかが
@@ -64,6 +65,11 @@ type ShiftCommandsBarProps = {
   candidateLabel: string;
   /** 解決案ボタンの説明（ツールチップ） */
   candidateTitle?: string;
+
+  /** コマンドの実行結果メッセージ（ボタンのすぐ下に出す）。null なら出さない。 */
+  message?: string | null;
+  /** 実行結果メッセージを閉じる */
+  onCloseMessage?: () => void;
 };
 
 export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
@@ -75,8 +81,19 @@ export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
   onGenerateCandidates,
   candidateLabel,
   candidateTitle,
+  message,
+  onCloseMessage,
 }) => {
   const items = useMemo(() => toItems(steps), [steps]);
+  // 1行目＝単独コマンド（＋解決案生成）、2行目＝戦略トグルを持つグループ、に分けて並べる。
+  const singles = useMemo(
+    () => items.filter((i): i is Extract<CommandItem, { kind: "single" }> => i.kind === "single"),
+    [items]
+  );
+  const groups = useMemo(
+    () => items.filter((i): i is Extract<CommandItem, { kind: "group" }> => i.kind === "group"),
+    [items]
+  );
   // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
 
@@ -106,54 +123,19 @@ export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
         </span>
       </span>
 
+      {/* 1行目: 単独コマンド（希望を叶える）＋ 解決案生成 */}
       <div className="e-cmds">
-        {items.map((item) => {
-          if (item.kind === "single") {
-            return (
-              <button
-                key={item.step.key}
-                type="button"
-                className="e-cmd"
-                title={item.step.description}
-                onClick={() => onRunStep(item.step)}
-              >
-                {item.step.label}
-              </button>
-            );
-          }
-          // group: 戦略トグル ＋ 実行ボタン（切り替えて使う代替アルゴリズム）
-          const selectedKey = selectedVariant[item.key] ?? item.variants[0].key;
-          const selectedStep =
-            item.variants.find((v) => v.key === selectedKey) ?? item.variants[0];
-          return (
-            <div key={item.key} className="e-cmd-group">
-              <span className="e-cmd-glabel">{item.label}</span>
-              <div className="e-seg" role="group" aria-label={`${item.label}の方式`}>
-                {item.variants.map((v) => (
-                  <button
-                    key={v.key}
-                    type="button"
-                    className={"e-seg-btn" + (v.key === selectedKey ? " is-on" : "")}
-                    title={v.description}
-                    onClick={() =>
-                      setSelectedVariant((prev) => ({ ...prev, [item.key]: v.key }))
-                    }
-                  >
-                    {v.variantLabel ?? v.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                className="e-cmd e-run"
-                title={selectedStep.description}
-                onClick={() => onRunStep(selectedStep)}
-              >
-                実行
-              </button>
-            </div>
-          );
-        })}
+        {singles.map((item) => (
+          <button
+            key={item.step.key}
+            type="button"
+            className="e-cmd"
+            title={item.step.description}
+            onClick={() => onRunStep(item.step)}
+          >
+            {item.step.label}
+          </button>
+        ))}
 
         <button
           type="button"
@@ -164,6 +146,62 @@ export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
           🌱 {candidateLabel}
         </button>
       </div>
+
+      {/* 2行目: 戦略を切り替えて使うコマンド（必要人数を埋める＝トグル＋実行） */}
+      {groups.length > 0 && (
+        <div className="e-cmds">
+          {groups.map((item) => {
+            const selectedKey = selectedVariant[item.key] ?? item.variants[0].key;
+            const selectedStep =
+              item.variants.find((v) => v.key === selectedKey) ?? item.variants[0];
+            return (
+              <div key={item.key} className="e-cmd-group">
+                <span className="e-cmd-glabel">{item.label}</span>
+                <div className="e-seg" role="group" aria-label={`${item.label}の方式`}>
+                  {item.variants.map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      className={"e-seg-btn" + (v.key === selectedKey ? " is-on" : "")}
+                      title={v.description}
+                      onClick={() =>
+                        setSelectedVariant((prev) => ({ ...prev, [item.key]: v.key }))
+                      }
+                    >
+                      {v.variantLabel ?? v.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="e-cmd e-run"
+                  title={selectedStep.description}
+                  onClick={() => onRunStep(selectedStep)}
+                >
+                  実行
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* コマンドの実行結果。押したボタンのすぐ下に出す（表の下ではなく手元で読めるように） */}
+      {message && (
+        <div className="e-cmd-message">
+          {message}
+          {onCloseMessage && (
+            <button
+              type="button"
+              className="e-cmd-message-close"
+              aria-label="閉じる"
+              onClick={onCloseMessage}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
     </StyledBar>
   );
 };
@@ -176,7 +214,8 @@ const StyledBar = styled.div`
   background: #faf7ff;
   border: 1px solid #e4dcf5;
   border-radius: 8px;
-  flex-shrink: 0;
+  flex: 1; /* 制約一覧の右で、残りの幅いっぱいに広がる */
+  min-width: 0;
 
   .e-group-label {
     display: inline-flex;
@@ -284,6 +323,36 @@ const StyledBar = styled.div`
   }
   .e-run {
     background: #ede7f6;
+  }
+
+  /* コマンドの実行結果メッセージ（ボタンのすぐ下） */
+  .e-cmd-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+    padding: 5px 8px;
+    background: #ede7f6;
+    border: 1px solid #d1c4e9;
+    border-radius: 6px;
+    color: #4527a0;
+    font-size: 0.78em;
+    line-height: 1.4;
+  }
+  .e-cmd-message-close {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: #7e57c2;
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+    flex-shrink: 0;
+
+    &:hover {
+      color: #4527a0;
+    }
   }
 
   /* 完成案（世界線に複数案を書く）は結果が大きいので緑で区別する */
