@@ -247,8 +247,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     };
   }, [violations, violationUrl]);
 
+  // 勤務帯名 → 勤務帯。希望を「実際の割当と同じ1文字（開始時刻の時）」で出すために渡す。
+  const shiftByName = useMemo(() => {
+    const m = new Map<string, WorkShift>();
+    for (const w of workShifts) if (!m.has(w.name)) m.set(w.name, w);
+    return m;
+  }, [workShifts]);
+
   const getWishEntries = (staffId: string, day: WorkingDay) =>
-    wishEntriesFor(wishByStaff, staffId, day);
+    wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name));
 
   // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
   const kb = useCellKeyboardEditing({
