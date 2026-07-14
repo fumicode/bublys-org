@@ -19,7 +19,7 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, onOpenWish }) => {
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
 
   // 参照レポート（どの勤務表かは問わず、紐づけ済みの ScheduleReport 全部）から
-  // このスタッフに関係する分だけを取り出す（貢献度スコア・妥協/繁忙日・配慮メモ）。
+  // このスタッフに関係する分だけを取り出す（貢献度スコア・譲歩/繁忙日・配慮メモ）。
   const allConstraints = useObjects<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const linkedReports = useMemo(() => {
