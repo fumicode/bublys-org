@@ -33,6 +33,8 @@ import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { buildScheduleReport } from "./buildScheduleReport.js";
+import { useScheduleHistory } from "./useScheduleHistory.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -48,10 +50,12 @@ type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビュー（左下）を開くハンドラ */
   onOpenHistory?: () => void;
-  /** 完成木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
+  /** キセキの木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
   onOpenTree?: () => void;
   /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
+  /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
+  onConfirm?: (reportId: string) => void;
   /** 自動シフトパネル（右上）を開くハンドラ */
   onOpenAutoShift?: () => void;
   /**
@@ -98,6 +102,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenTree,
   onOpenAvailability,
   onOpenAutoShift,
+  onConfirm,
   worldLineUrl,
   treeUrl,
   availabilityUrl,
@@ -110,6 +115,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 }) => {
   useSeedHotelData();
   const store = useAppStore();
+  const { scope } = useScheduleHistory(scheduleId ?? "");
+  const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
@@ -175,6 +182,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
   // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const linkedReports = useMemo(() => {
     const ids = constraints?.linkedReportIds ?? [];
     return allReports.filter((r) => ids.includes(r.id));
@@ -365,10 +373,78 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setRequiredForAllDays(shiftName, count));
   };
 
+  // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
+  // apex に確定ラベルを付ける（未命名なら既定ラベルを自動生成。既に名前が
+  // 付いていれば尊重してそのまま残す）。レポート＋キセキの木を開くのは app 層（onConfirm）の関心事。
+  const handleConfirm = () => {
+    if (!scheduleId || !apex) return;
+    const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
+      apex.id,
+      SCHEDULE_TYPE,
+      scheduleId
+    );
+    if (!apexSchedule) return;
+
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    const wishByStaffForApex = new Map<string, StaffMonthlyShiftWish>();
+    for (const w of allWishes) {
+      if (w.year === apexSchedule.year && w.month === apexSchedule.month) {
+        wishByStaffForApex.set(w.staffId, w);
+      }
+    }
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const reportConstraints = buildScheduleConstraints({
+      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+      wish: (constraints?.checkShiftWish ?? true)
+        ? { wishByStaff: wishByStaffForApex, shiftNameById }
+        : undefined,
+    });
+
+    const draft = buildScheduleReport({
+      schedule: apexSchedule,
+      staffIds: staffList.map((s) => s.id),
+      constraints: reportConstraints,
+    });
+
+    const report = ScheduleReport.create({
+      scheduleId,
+      worldLineNodeId: apex.id,
+      year: apexSchedule.year,
+      month: apexSchedule.month,
+      storeId: apexSchedule.storeId,
+      ...draft,
+    });
+    reportRepo.save(report);
+
+    if (!apex.label) {
+      scope.setNodeLabel(apex.id, `確定: ${apexSchedule.year}年${apexSchedule.month}月`);
+    }
+
+    // レポートを開いたら、その隣にキセキの木も開く（横並び。app 層が
+    // report → tree の順にチェインして positioning する）。
+    onConfirm?.(report.id);
+  };
+
   // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
   // link bubble がこのボタンから伸びる（openBubble する URL と一致している必要がある）。
   const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
     url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
+
+  // 「完成レポートを作成」ボタン。schedule-tree の bubble link はここから伸びる
+  // （schedule-report は schedule-tree を opener にして横並びで開くため、そちらの
+  // link は schedule-tree から伸びる）。
+  const confirmButton = withUrl(
+    treeUrl,
+    <button
+      type="button"
+      className="e-confirm"
+      onClick={handleConfirm}
+      title="今表示している勤務表を確定し、妥協・繁忙日対応・貢献度のレポートを作成します"
+    >
+      🏁 完成レポートを作成
+    </button>
+  );
 
   return (
     <StyledContainer>
@@ -558,13 +634,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
               🌐 世界線ビュー
             </button>
           )}
-          {onOpenTree &&
-            withUrl(
-              treeUrl,
-              <button type="button" className="e-link" onClick={onOpenTree}>
-                🌳 成果木で見る
-              </button>
-            )}
+          {onOpenTree && (
+            <button type="button" className="e-link" onClick={onOpenTree}>
+              🌳 キセキの木で見る
+            </button>
+          )}
+          {confirmButton}
         </div>
       )}
     </StyledContainer>
@@ -730,11 +805,30 @@ const StyledContainer = styled.div`
     }
   }
 
-  /* 左下：世界線ビュー */
+  /* 左下：世界線ビュー・キセキの木・完成レポート */
   .e-footer {
     margin-top: 8px;
     display: flex;
     align-items: center;
+    gap: 8px;
+  }
+
+  /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */
+  .e-confirm {
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    background: #fff;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #e8f5e9;
+      border-color: #388e3c;
+    }
   }
 
   /* ヘッダ・フッタ共通のリンク風ボタン */

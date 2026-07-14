@@ -41,7 +41,7 @@ export const scheduleReservationInfoUrl = (scheduleId: string): string =>
 export const scheduleWorldLineUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/world-line`;
 
-/** 完成木ビューバブル（SVG版・読み取り専用） */
+/** キセキの木ビューバブル（SVG版・読み取り専用） */
 export const scheduleWorldLineTreeUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/tree`;
 
@@ -73,7 +73,7 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
-/** シフト完成レポートバブル（世界線ビューの「確定してレポート作成」から開く） */
+/** シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） */
 export const scheduleReportUrl = (reportId: string): string =>
   `hotel-shift-puzzle/schedule-reports/${reportId}`;
 
