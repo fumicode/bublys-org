@@ -192,6 +192,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
+        ruleLabel: rule.label,
+        minCount: rule.minCount,
         members,
         satisfied,
         allDayOff,
