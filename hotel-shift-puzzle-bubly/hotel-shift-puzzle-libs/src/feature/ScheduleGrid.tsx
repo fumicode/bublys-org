@@ -82,6 +82,13 @@ type ScheduleGridProps = {
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
   /**
+   * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
+   * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
+   * 確定前でも「今クリックしたら作られるレポート」の URL を先読みして「完成レポートを
+   * 作成」ボタンに付けられる（そのボタン自身が schedule-report の bubble link 起点になる）。
+   */
+  reportBubbleUrl?: (reportId: string) => string;
+  /**
    * 責任者ルールを追加したあと、その編集バブルを開くハンドラ（ロールキーを渡す）。
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
    */
@@ -110,6 +117,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
 }) => {
@@ -314,7 +322,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 紐づけたレポートで譲歩が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
@@ -332,7 +340,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // それぞれ独立した世界線（兄弟ブランチ）に書く。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 紐づけたレポートで妥協が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
+    // 紐づけたレポートで譲歩が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
     const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -375,7 +383,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
   // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
   // apex に確定ラベルを付ける（未命名なら既定ラベルを自動生成。既に名前が
-  // 付いていれば尊重してそのまま残す）。レポート＋キセキの木を開くのは app 層（onConfirm）の関心事。
+  // 付いていれば尊重してそのまま残す）。レポートを開くのは app 層（onConfirm）の関心事。
   const handleConfirm = () => {
     if (!scheduleId || !apex) return;
     const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
@@ -421,8 +429,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       scope.setNodeLabel(apex.id, `確定: ${apexSchedule.year}年${apexSchedule.month}月`);
     }
 
-    // レポートを開いたら、その隣にキセキの木も開く（横並び。app 層が
-    // report → tree の順にチェインして positioning する）。
     onConfirm?.(report.id);
   };
 
@@ -431,16 +437,22 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
     url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
 
-  // 「完成レポートを作成」ボタン。schedule-tree の bubble link はここから伸びる
-  // （schedule-report は schedule-tree を opener にして横並びで開くため、そちらの
-  // link は schedule-tree から伸びる）。
+  // 「完成レポートを作成」ボタン。レポート ID は scheduleId + 現在の apex ノード ID で決まる
+  // （ScheduleReport.idOf）ので、クリック前でも「今押したら作られるレポート」の URL を
+  // 先読みしてボタンに付けられる。これにより schedule-report の bubble link はこのボタン
+  // 自身から伸びる（キセキの木の link が「キセキの木で見る」ボタンから伸びるのと対称）。
+  const pendingReportUrl =
+    scheduleId && apex && reportBubbleUrl
+      ? reportBubbleUrl(ScheduleReport.idOf(scheduleId, apex.id))
+      : undefined;
+
   const confirmButton = withUrl(
-    treeUrl,
+    pendingReportUrl,
     <button
       type="button"
       className="e-confirm"
       onClick={handleConfirm}
-      title="今表示している勤務表を確定し、妥協・繁忙日対応・貢献度のレポートを作成します"
+      title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
     >
       🏁 完成レポートを作成
     </button>
@@ -634,11 +646,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
               🌐 世界線ビュー
             </button>
           )}
-          {onOpenTree && (
-            <button type="button" className="e-link" onClick={onOpenTree}>
-              🌳 キセキの木で見る
-            </button>
-          )}
+          {onOpenTree &&
+            withUrl(
+              treeUrl,
+              <button type="button" className="e-link" onClick={onOpenTree}>
+                🌳 キセキの木で見る
+              </button>
+            )}
           {confirmButton}
         </div>
       )}

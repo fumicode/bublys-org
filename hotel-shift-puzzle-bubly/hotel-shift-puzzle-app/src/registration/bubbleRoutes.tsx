@@ -91,9 +91,9 @@ const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 };
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
-// 「完成レポートを作成」で新しいシフト完成レポートバブル＋キセキの木バブルを開く
-// （勤務表バブルを opener に）。キセキの木→レポートの順で開き、レポートは
-// キセキの木バブルを opener にして bubble-side-right で開くことで横並びにする。
+// キセキの木と完成レポートは、それぞれ独立したボタンから勤務表バブルを opener にして
+// 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
+// チェイン opener はやめてどちらも単独開きにしている）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
@@ -116,15 +116,13 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
       onOpenAutoShift={() => openSide(autoShiftUrl, "bubble-side-right")}
-      onConfirm={(reportId) => {
-        const treeBubbleId = openSide(treeUrl, "bubble-side-bottom");
-        openBubble(scheduleReportUrl(reportId), treeBubbleId, "bubble-side-right");
-      }}
+      onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       autoShiftUrl={autoShiftUrl}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
+      reportBubbleUrl={scheduleReportUrl}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
