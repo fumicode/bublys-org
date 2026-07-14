@@ -98,14 +98,17 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
   );
 };
 
+/**
+ * ヘッダ行（可能勤務帯の右）にインラインで並ぶ想定なので、独立行だった頃の
+ * margin-bottom は持たない（縦を食わないようにする）。
+ */
 const StyledWrap = styled.div<HTMLAttributes<HTMLDivElement>>`
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
-  padding: 4px 6px;
-  margin-bottom: 8px;
+  padding: 3px 6px;
   border-radius: 8px;
+  min-width: 0;
   outline: 2px dashed transparent;
   outline-offset: -3px;
   transition: outline-color 0.12s ease, background 0.12s ease;

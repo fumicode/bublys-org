@@ -415,18 +415,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
                 可能勤務帯
               </button>
             )}
+
+          {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
+              自動シフトの優先度に使う。詳しくは reportPriority.ts）。
+              独立した行にすると縦を食うので、可能勤務帯の右に並べて高さを抑える。 */}
+          <LinkedReportsView
+            reports={linkedReports}
+            onDropUrl={handleDropReportUrl}
+            dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
+            onUnlink={handleUnlinkReport}
+          />
         </div>
-
       </div>
-
-      {/* 参考として紐づけたシフト完成レポート。ルール帯とは別エリア（レポート一覧バブルから
-          ドラッグで紐づけ、自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
-      <LinkedReportsView
-        reports={linkedReports}
-        onDropUrl={handleDropReportUrl}
-        dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
-        onUnlink={handleUnlinkReport}
-      />
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
           右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
@@ -519,6 +519,7 @@ const StyledContainer = styled.div`
   .e-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap; /* 参照レポートが増えても溢れず折り返す */
     gap: 12px;
     margin-bottom: 8px;
 
@@ -530,11 +531,13 @@ const StyledContainer = styled.div`
       font-size: 0.8em;
       color: #777;
     }
+    /* 可能勤務帯などの操作＋参照レポートのドロップ欄を1行に収めて縦を抑える */
     .e-actions {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
-      flex-shrink: 0;
+      min-width: 0;
     }
     .e-dept-select {
       border: 1px solid #cfd8dc;
