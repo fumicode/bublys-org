@@ -44,7 +44,7 @@ export type WishMismatch = {
  *   - 割当が「避けたい(×)」オプションに一致する          → 食い違い
  *   - 「したい(○)」が1つ以上あるのに、割当がそのどれでもない → 食い違い
  *   - その日に希望が無ければ判定しない
- * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの妥協検出
+ * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの譲歩検出
  * （buildScheduleReport）の両方から呼ばれる共通ロジック。
  */
 export function wishMismatchFor(

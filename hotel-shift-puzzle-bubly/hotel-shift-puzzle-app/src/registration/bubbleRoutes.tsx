@@ -89,6 +89,9 @@ const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 };
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
+// キセキの木と完成レポートは、それぞれ独立したボタンから勤務表バブルを opener にして
+// 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
+// チェイン opener はやめてどちらも単独開きにしている）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
@@ -109,10 +112,12 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
+      onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
+      reportBubbleUrl={scheduleReportUrl}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
@@ -155,21 +160,10 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
   );
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
-// 「確定してレポート作成」で新しいシフト完成レポートバブルを開く（勤務表バブルを opener に）。
-const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const scheduleId = bubble.params.scheduleId;
-  return withObjects(
-    <ScheduleWorldLineView
-      scheduleId={scheduleId}
-      onConfirm={(reportId) =>
-        openBubble(scheduleReportUrl(reportId), bubble.id, "bubble-side-right")
-      }
-    />
-  );
-};
+const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
 
-// --- シフト完成レポートバブル（世界線ビューの「確定してレポート作成」から開く） ---
+// --- シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） ---
 const ScheduleReportBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleReportPanel reportId={bubble.params.reportId} />);
 
@@ -177,7 +171,7 @@ const ScheduleReportBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleReportListBubble: BubbleRoute["Component"] = () =>
   withObjects(<ScheduleReportList />);
 
-// --- 勤務表の完成木ビューバブル（SVG版・読み取り専用） ---
+// --- 勤務表のキセキの木ビューバブル（SVG版・読み取り専用） ---
 const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineTreeView scheduleId={bubble.params.scheduleId} />);
 
@@ -205,8 +199,9 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
   // ので普通の BubbleView（クリック可）として描かれ、窓をリサイズすると canvas も伸縮する。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 400, height: 300 } } },
-  // 完成木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
+  // キセキの木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
+  // 木の全体像をゆったり眺められるよう、世界線ビューより大きめの窓（fillsContainer）で開く。
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 700, height: 500 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）

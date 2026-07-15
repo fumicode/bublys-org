@@ -22,3 +22,4 @@ export * from "./buildScheduleReport.js";
 export * from "./ScheduleReportPanel.js";
 export * from "./ScheduleReportList.js";
 export * from "./reportPriority.js";
+export * from "./staffLinkedReports.js";
