@@ -76,7 +76,7 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
               object={report}
               label={report.title}
               draggable={false}
-              openingPosition="bubble-side-right"
+              openingPosition="origin-side"
             >
               <span className="e-chip-text">{report.title}</span>
             </ObjectView>
