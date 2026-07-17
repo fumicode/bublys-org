@@ -11,10 +11,13 @@ import {
   ScheduleConstraints,
   ScheduleReport,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
+import { useAppStore } from "@bublys-org/state-management";
+import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { AUTO_SHIFT_STEPS, runAutoShiftStep, type AutoShiftStep } from "./autoShift.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { recordAutoStep } from "./recordScheduleEdit.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import {
   STAFF_TYPE,
@@ -61,12 +64,12 @@ type AutoShiftPanelProps = {
 
 /**
  * 自動シフト パネル（独立バブル）。
- * 勤務表グリッドから切り出した段階的な自動シフトのコマンド群。実行はシェル経由：
- * update(() => result.schedule) を呼ぶだけで、その勤務表を監視している世界線すべて
- * （アプリ全体＋ローカル）へ自動保存され、グリッド側の表示にも反映される。
+ * 勤務表グリッドから切り出した段階的な自動シフトのコマンド群。
+ * 実行は recordAutoStep 経由で Schedule + EditLog を同一世界線ノードに記録する。
  */
 export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
   useSeedHotelData();
+  const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
@@ -79,10 +82,7 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
-    SCHEDULE_TYPE,
-    scheduleId
-  );
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
   // ここでは読み取り専用表示のみ（紐づけの追加/解除はグリッド側で行う）。
@@ -106,6 +106,16 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
     return map;
   }, [allWishes, schedule]);
 
+  const allConstraints = useMemo(() => {
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    return buildScheduleConstraints({
+      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+    });
+  }, [workShifts, constraints, wishByStaff]);
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -120,7 +130,14 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
       wishByStaff,
       availability,
     });
-    update(() => result.schedule);
+    recordAutoStep(store, {
+      schedule,
+      next: result.schedule,
+      constraints: allConstraints,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
+    });
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 

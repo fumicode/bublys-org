@@ -2,13 +2,22 @@
 
 import { FC, useCallback, useMemo } from "react";
 import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
-import { Staff, WorkShiftSet, ScheduleConstraints } from "@bublys-org/hotel-shift-puzzle-model";
+import {
+  Staff,
+  WorkShiftSet,
+  ScheduleConstraints,
+  MonthlyStaffSchedule,
+} from "@bublys-org/hotel-shift-puzzle-model";
+import { useAppStore } from "@bublys-org/state-management";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
-import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
+import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
+import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
+  SCHEDULE_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -27,14 +36,15 @@ type LeaderRuleViewProps = {
  */
 export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
   useSeedHotelData();
+  const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const constraints = useObject<ScheduleConstraints>(
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
-  const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
 
   const rule = useMemo(
     () => constraints?.leaderRule(ruleKey),
@@ -60,38 +70,66 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
     return names;
   }, [workShifts]);
 
-  // 編集は「集約のメソッドで新インスタンス → repo.save」で世界線に載せる（スライスにロジックを書かない）。
+  const shiftIdsOf = useCallback(
+    (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id),
+    [workShifts]
+  );
+
+  // 編集は EditLog 付きで Constraints を同一世界線ノードに記録する。
   const editRule = useCallback(
-    (next: ScheduleConstraints | undefined) => {
-      if (next) constraintsRepo.save(next);
+    (next: ScheduleConstraints | undefined, summary: string) => {
+      if (!next) return;
+      recordConstraintEdit(store, {
+        schedule,
+        beforeConstraints: buildScheduleConstraints({
+          modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+        }),
+        afterConstraints: buildScheduleConstraints({
+          modelConstraints: next.modelConstraints(shiftIdsOf),
+        }),
+        nextConstraints: next,
+        summary,
+      });
     },
-    [constraintsRepo]
-  );
-  const handleChangeShift = useCallback(
-    (shiftName: string) => editRule(constraints?.setRuleShift(ruleKey, shiftName)),
-    [constraints, ruleKey, editRule]
-  );
-  const handleChangeLabel = useCallback(
-    (label: string) => editRule(constraints?.setRuleLabel(ruleKey, label)),
-    [constraints, ruleKey, editRule]
-  );
-  const handleChangeMinCount = useCallback(
-    (minCount: number) => editRule(constraints?.setRuleMinCount(ruleKey, minCount)),
-    [constraints, ruleKey, editRule]
-  );
-  const handleRemoveStaff = useCallback(
-    (staffId: string) => editRule(constraints?.removeLeader(ruleKey, staffId)),
-    [constraints, ruleKey, editRule]
-  );
-  const handleDeleteRule = useCallback(
-    () => editRule(constraints?.removeRule(ruleKey)),
-    [constraints, ruleKey, editRule]
+    [store, schedule, constraints, shiftIdsOf]
   );
 
   const nameOf = useMemo(() => {
     const byId = new Map(staffList.map((s) => [s.id, s.name]));
     return (id: string) => byId.get(id) ?? id;
   }, [staffList]);
+
+  const handleChangeShift = useCallback(
+    (shiftName: string) =>
+      editRule(constraints?.setRuleShift(ruleKey, shiftName), `担当勤務帯を変更: ${shiftName}`),
+    [constraints, ruleKey, editRule]
+  );
+  const handleChangeLabel = useCallback(
+    (label: string) =>
+      editRule(constraints?.setRuleLabel(ruleKey, label), `ラベルを変更: ${label}`),
+    [constraints, ruleKey, editRule]
+  );
+  const handleChangeMinCount = useCallback(
+    (minCount: number) =>
+      editRule(
+        constraints?.setRuleMinCount(ruleKey, minCount),
+        `最小人数を変更: ${minCount}`
+      ),
+    [constraints, ruleKey, editRule]
+  );
+  const handleRemoveStaff = useCallback(
+    (staffId: string) =>
+      editRule(
+        constraints?.removeLeader(ruleKey, staffId),
+        `責任者候補を削除: ${nameOf(staffId)}`
+      ),
+    [constraints, ruleKey, editRule, nameOf]
+  );
+  const handleDeleteRule = useCallback(
+    () => editRule(constraints?.removeRule(ruleKey), "ルール削除"),
+    [constraints, ruleKey, editRule]
+  );
 
   // 人（Staff）をドロップしたら、その人をこのルールの候補に加える
   // （＝ 制約オブジェクトの該当ルールに staffId を足して保存 → 勤務表の世界線に載る）。
@@ -100,9 +138,12 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
       const staffId = extractIdFromUrl(url);
       if (!staffId || !constraints || !rule) return;
       if (rule.leaderStaffIds.includes(staffId)) return; // 既に候補なら何もしない
-      constraintsRepo.save(constraints.addLeader(ruleKey, staffId));
+      editRule(
+        constraints.addLeader(ruleKey, staffId),
+        `責任者候補を追加: ${nameOf(staffId)}`
+      );
     },
-    [constraints, rule, ruleKey, constraintsRepo]
+    [constraints, rule, ruleKey, editRule, nameOf]
   );
 
   if (!rule) {

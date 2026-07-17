@@ -17,7 +17,11 @@ import type { WorldLineGraph } from "@bublys-org/world-line-graph";
 export type WorldLinesCanvasViewProps = {
   graph: WorldLineGraph;
   apexNodeId: string | null;
-  /** ノード ID → 状態要約（手数・バブル数など）。ノード脇に小さく描く。 */
+  /**
+   * ノード ID → 状態要約（手数・バブル数など）。
+   * この既定ビューでは描画しない（要約は操作履歴パネルで見る）。ドメイン固有の
+   * renderCanvas 実装が使いたい場合のために型だけ残している。
+   */
   getNodeSummary?: (nodeId: string) => string;
   /** ノード ID → ユーザーがつけた名前（ラベル）。あればノード上に吹き出しで描く。 */
   getNodeLabel?: (nodeId: string) => string;
@@ -54,7 +58,6 @@ const MARGIN = 28; // ビューポート端の余白（魚眼の左右端がこ�
 const GEN_PX = 56;
 const MIN_SCALE = 0.32; // 最遠ノードのスケール
 const FALLOFF_POW = 1.4; // スケール減衰カーブ
-const LABEL_SCALE_THRESHOLD = 0.62; // これ未満のスケールでは状態要約を省略
 const LABEL_BUBBLE_SCALE_THRESHOLD = 0.4; // これ未満のスケールでは名前の吹き出しを省略
 
 // --- スクロール感度 ---
@@ -137,7 +140,6 @@ const clamp = (v: number, lo: number, hi: number) =>
  * ほど近傍が詰まっていた。
  */
 function makeProjector(
-  layout: Layout,
   focusX: number,
   focusY: number,
   vw: number,
@@ -169,7 +171,6 @@ function draw(
   layout: Layout,
   project: ReturnType<typeof makeProjector>,
   apexNodeId: string | null,
-  getSummary: (id: string) => string,
   getLabel: (id: string) => string,
   vw: number,
   vh: number,
@@ -235,13 +236,6 @@ function draw(
       ctx.globalAlpha = 1;
     }
 
-    const summary = getSummary(id);
-    if (summary && s.scale >= LABEL_SCALE_THRESHOLD) {
-      ctx.fillStyle = "rgba(230,235,255,0.78)";
-      ctx.textAlign = "left";
-      ctx.font = `${Math.round(11 * s.scale)}px ui-sans-serif, -apple-system, sans-serif`;
-      ctx.fillText(summary, s.sx + r + 4, s.sy);
-    }
   }
 
   // ラベル（ユーザーがつけた名前）はノードの上に吹き出しで。要約とは別レイヤーで
@@ -293,7 +287,6 @@ function draw(
 export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   graph,
   apexNodeId,
-  getNodeSummary,
   getNodeLabel,
   onSelectNode,
   onApexScreenPos,
@@ -305,7 +298,6 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
 
   // 同じ state なら layout を再利用
   const layout = useMemo(() => computeLayout(graph), [graph.state]);
-  const summarize = getNodeSummary ?? ((_: string) => "");
   const labelize = getNodeLabel ?? ((_: string) => "");
 
   // フォーカス（ビューポート中央に来る world 座標）。current を target へ追従させる。
@@ -321,8 +313,6 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
   viewportRef.current = viewport;
   const apexRef = useRef(apexNodeId);
   apexRef.current = apexNodeId;
-  const summarizeRef = useRef(summarize);
-  summarizeRef.current = summarize;
   const labelizeRef = useRef(labelize);
   labelizeRef.current = labelize;
   const backgroundRef = useRef(background);
@@ -337,13 +327,12 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     if (!ctx) return;
     const { w, h } = viewportRef.current;
     const project = makeProjector(
-      layoutRef.current,
       focusRef.current.x,
       focusRef.current.y,
       w,
       h,
     );
-    draw(ctx, layoutRef.current, project, apexRef.current, summarizeRef.current, labelizeRef.current, w, h, backgroundRef.current);
+    draw(ctx, layoutRef.current, project, apexRef.current, labelizeRef.current, w, h, backgroundRef.current);
 
     // apex の画面座標を通知（ラベル入力欄をノード近くに置く用途）
     const cb = onApexScreenPosRef.current;
@@ -444,10 +433,10 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     renderFrame();
   }, [layout, apexNodeId, setTarget, renderFrame]);
 
-  // summary / label だけの変化（フォーカスは動かさず描画だけ更新）
+  // label だけの変化（フォーカスは動かさず描画だけ更新）
   useEffect(() => {
     renderFrame();
-  }, [summarize, labelize, renderFrame]);
+  }, [labelize, renderFrame]);
 
   // 自前スクロール: wheel でフォーカスを動かす（横＝魚眼軸 / 縦＝パン）
   useEffect(() => {
@@ -481,7 +470,7 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       const fy = rect.height / h || 1;
       const px = (e.clientX - rect.left) / fx;
       const py = (e.clientY - rect.top) / fy;
-      const project = makeProjector(layoutRef.current, focusRef.current.x, focusRef.current.y, w, h);
+      const project = makeProjector(focusRef.current.x, focusRef.current.y, w, h);
       let bestId: string | null = null;
       let bestD2 = Infinity;
       for (const [id, pos] of layoutRef.current.nodes) {

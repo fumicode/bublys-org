@@ -55,6 +55,8 @@ export function isScopeEmpty(store: StoreLike, scopeId: string): boolean {
   return graphOf(store, scopeId).state.rootNodeId === null;
 }
 
+type BundleItem = { type: string; obj: unknown };
+
 /** 1オブジェクトを1スコープへ記録（grow）する */
 export function commitToScope(
   store: StoreLike,
@@ -62,16 +64,35 @@ export function commitToScope(
   type: string,
   obj: unknown
 ): void {
-  const d = getDescriptor(type);
-  if (!d) throw new Error(`commit: type "${type}" が未登録です`);
-  const codec = codecOf(d);
-  const id = d.getId(obj);
-  const data = codec.toJSON(obj);
-  const hash = computeStateHash(data);
-  const ref = createStateRef(type, id, hash);
-  const updated = graphOf(store, scopeId).grow([ref]);
+  commitBundle(store, scopeId, [{ type, obj }]);
+}
+
+/**
+ * 複数オブジェクトを同一ノードの grow で記録する。
+ * Schedule + ScheduleEditLog のように「操作と結果状態」を同じ世界線ノードに載せるときに使う。
+ * saveObject を連続呼びするとノードが分かれるため、編集記録時はこちらを使う。
+ */
+export function commitBundle(
+  store: StoreLike,
+  scopeId: string,
+  items: BundleItem[]
+): void {
+  if (items.length === 0) return;
+  const refs = [];
+  const casEntries: { hash: string; data: unknown }[] = [];
+  for (const { type, obj } of items) {
+    const d = getDescriptor(type);
+    if (!d) throw new Error(`commit: type "${type}" が未登録です`);
+    const codec = codecOf(d);
+    const id = d.getId(obj);
+    const data = codec.toJSON(obj);
+    const hash = computeStateHash(data);
+    refs.push(createStateRef(type, id, hash));
+    casEntries.push({ hash, data });
+  }
+  const updated = graphOf(store, scopeId).grow(refs);
   store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
-  store.dispatch(setCasEntries({ entries: [{ hash, data }] }));
+  store.dispatch(setCasEntries({ entries: casEntries }));
 }
 
 /** スコープの apex から型・IDのオブジェクトを読む */
@@ -105,16 +126,46 @@ export function saveObject(store: StoreLike, type: string, obj: unknown): void {
 
   const localId = d.localScope?.(obj);
   if (localId) {
-    const id = d.getId(obj);
-    const alreadyInScope = readFromScope(store, localId, type, id) !== undefined;
-    if (!alreadyInScope) {
-      const prev = readFromScope(store, APP_SCOPE_ID, type, id);
-      if (prev !== undefined) commitToScope(store, localId, type, prev); // この型の起点
-    }
+    ensureLocalBaseline(store, localId, type, obj);
     commitToScope(store, localId, type, obj);
   }
 
   commitToScope(store, APP_SCOPE_ID, type, obj);
+}
+
+/**
+ * 複数オブジェクトをローカル世界線の同一ノードに載せ、それぞれ APP スコープにも反映する。
+ * Schedule + ScheduleEditLog（＋必要なら Constraints）を1操作で記録するときに使う。
+ * ローカルは1 grow、APP はオブジェクトごとに1 grow（平坦な変更ログ）。
+ */
+export function saveLocalBundle(
+  store: StoreLike,
+  localScopeIdValue: string,
+  items: BundleItem[]
+): void {
+  for (const { type, obj } of items) {
+    ensureLocalBaseline(store, localScopeIdValue, type, obj);
+  }
+  commitBundle(store, localScopeIdValue, items);
+  for (const { type, obj } of items) {
+    commitToScope(store, APP_SCOPE_ID, type, obj);
+  }
+}
+
+/** ローカルスコープに初登場なら、APP の現在値を起点として先に記録する */
+function ensureLocalBaseline(
+  store: StoreLike,
+  localId: string,
+  type: string,
+  obj: unknown
+): void {
+  const d = getDescriptor(type);
+  if (!d) throw new Error(`save: type "${type}" が未登録です`);
+  const id = d.getId(obj);
+  const alreadyInScope = readFromScope(store, localId, type, id) !== undefined;
+  if (alreadyInScope) return;
+  const prev = readFromScope(store, APP_SCOPE_ID, type, id);
+  if (prev !== undefined) commitToScope(store, localId, type, prev);
 }
 
 /**
@@ -148,6 +199,7 @@ export function adoptGlobalObject<T>(
  * - スコープが空なら baseObj を root として置き、それを共通の親にする。空でなければ現在の apex を親とする。
  * - 各案は共通の親から grow する：apex に子ができると grow が自動でブランチを作る仕様なので、
  *   2案目以降は親へ moveTo してから grow すると兄弟になる。各ノードに label を付ける。
+ * - extras があればその案の Schedule と同一ノードに載せる（例: ScheduleEditLog）。
  * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移し、その状態をアプリ全体
  *   スコープへも反映する（世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
  * 返り値: 親ノードIDと、書き込んだ各案のノードID。
@@ -157,7 +209,7 @@ export function commitCandidates(
   scopeId: string,
   type: string,
   baseObj: unknown,
-  candidates: { obj: unknown; label?: string }[]
+  candidates: { obj: unknown; label?: string; extras?: BundleItem[] }[]
 ): { parentNodeId: string; nodeIds: string[] } {
   if (isScopeEmpty(store, scopeId)) {
     commitToScope(store, scopeId, type, baseObj); // root = 現状（共通の親）
@@ -171,7 +223,8 @@ export function commitCandidates(
       const moved = graphOf(store, scopeId).moveTo(parentNodeId);
       store.dispatch(setGraph({ scopeId, graph: moved.toJSON() }));
     }
-    commitToScope(store, scopeId, type, c.obj);
+    const items: BundleItem[] = [{ type, obj: c.obj }, ...(c.extras ?? [])];
+    commitBundle(store, scopeId, items);
     const g = graphOf(store, scopeId);
     const apex = g.state.apexNodeId as string;
     nodeIds.push(apex);

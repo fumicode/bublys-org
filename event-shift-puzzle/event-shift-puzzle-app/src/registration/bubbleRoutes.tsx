@@ -18,7 +18,6 @@ import {
   ShiftPlanList,
   ShiftStatus,
   parseTaskFilter,
-  stringifyTaskFilter,
   selectShiftPuzzlePlans,
 } from "@bublys-org/event-shift-puzzle-libs";
 

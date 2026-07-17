@@ -27,12 +27,19 @@ import {
   shiftColorById,
 } from "../ui/ScheduleConstraintsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
-import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
+import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import {
+  recordSetCell,
+  recordAutoStep,
+  recordRequiredEdit,
+  recordConstraintEdit,
+  buildCandidateEditLog,
+} from "./recordScheduleEdit.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -41,6 +48,7 @@ import {
   SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
+  SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -63,6 +71,10 @@ type ScheduleGridProps = {
   treeUrl?: string;
   availabilityUrl?: string;
   autoShiftUrl?: string;
+  /** 操作履歴（ノウハウ）バブルの URL */
+  editLogUrl?: string;
+  /** 操作履歴バブルを開くハンドラ */
+  onOpenEditLog?: () => void;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -89,8 +101,8 @@ const newLeaderRuleKey = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `leader-${Date.now()}`;
 
 /**
- * 勤務表グリッド。編集はシェル経由：update(s => s.setCell(...)) を呼ぶだけで、
- * その勤務表を監視している世界線すべて（アプリ全体＋ローカル）へ自動保存される。
+ * 勤務表グリッド。セル編集・自動ステップ等は recordScheduleEdit 経由で
+ * Schedule + EditLog を同一世界線ノードに記録する。
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
@@ -98,10 +110,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenTree,
   onOpenAvailability,
   onOpenAutoShift,
+  onOpenEditLog,
   worldLineUrl,
   treeUrl,
   availabilityUrl,
   autoShiftUrl,
+  editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
@@ -125,10 +139,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
-    SCHEDULE_TYPE,
-    scheduleId
-  );
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
@@ -169,7 +180,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
-  const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
 
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
@@ -179,18 +189,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const ids = constraints?.linkedReportIds ?? [];
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
-
-  const handleDropReportUrl = (url: string) => {
-    const reportId = extractIdFromUrl(url);
-    if (!reportId || !scheduleId) return;
-    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
-    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
-    constraintsRepo.save(base.linkReport(reportId));
-  };
-  const handleUnlinkReport = (reportId: string) => {
-    if (!constraints) return;
-    constraintsRepo.save(constraints.unlinkReport(reportId));
-  };
 
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
   const minDayOff = constraints?.minMonthlyDayOff ?? 8;
@@ -230,25 +228,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [relevantRules]
   );
 
-  // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
-  // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
-  const handleAddRule = () => {
-    if (!scheduleId) return;
-    const key = newLeaderRuleKey();
-    const base =
-      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
-    constraintsRepo.save(
-      base.addRule({
-        key,
-        label: "新責任者",
-        shiftName: workShifts[0]?.name ?? "",
-        leaderStaffIds: [],
-        minCount: 1,
-      })
-    );
-    onOpenRule?.(key);
-  };
-
   // 責任者ルールを人が読める形で描く用。名前は絞り込み前の全スタッフから引く
   // （部署フィルタで責任者が消えても名前を解決できるように）。
   const nameOf = useMemo(() => {
@@ -274,6 +253,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
   // この勤務表に効く「すべての制約」を宣言的オブジェクトとして1本に組み立てる。
   // 表示（上部ルール）も違反も、この同じ制約リストから導出する（手書き文字列なし）。
+  // ※ handleDropReportUrl / handleAddRule より前に定義する（use-before-define 回避）。
   const allConstraints = useMemo(() => {
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     const shiftIdsOf = (shiftName: string) =>
@@ -283,6 +263,74 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
     });
   }, [workShifts, constraints, wishByStaff]);
+
+  const handleDropReportUrl = (url: string) => {
+    const reportId = extractIdFromUrl(url);
+    if (!reportId || !scheduleId) return;
+    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
+    const next = base.linkReport(reportId);
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `レポートを紐づけ: ${reportId}`,
+    });
+  };
+  const handleUnlinkReport = (reportId: string) => {
+    if (!constraints) return;
+    const next = constraints.unlinkReport(reportId);
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `レポートの紐づけを解除: ${reportId}`,
+    });
+  };
+
+  // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
+  // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
+  const handleAddRule = () => {
+    if (!scheduleId) return;
+    const key = newLeaderRuleKey();
+    const base =
+      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const next = base.addRule({
+      key,
+      label: "新責任者",
+      shiftName: workShifts[0]?.name ?? "",
+      leaderStaffIds: [],
+      minCount: 1,
+    });
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `責任者ルールを追加: ${key}`,
+    });
+    onOpenRule?.(key);
+  };
 
   const violations = useMemo(
     () => (schedule ? schedule.checkConstraints(allConstraints) : []),
@@ -300,9 +348,16 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: シェルにメソッドを実行するだけ → 監視している世界線すべてへ自動保存
+  // セル編集: EditLog 付きで同一世界線ノードに記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    update((s) => s.setCell(staffId, day, to));
+    recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId,
+      staffName: nameOf(staffId),
+      day,
+      to,
+    });
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
@@ -315,7 +370,14 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       wishByStaff,
       availability,
     });
-    update(() => result.schedule);
+    recordAutoStep(store, {
+      schedule,
+      next: result.schedule,
+      constraints: allConstraints,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
+    });
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 
@@ -341,10 +403,25 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
       return s;
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
-      obj: buildCandidate(i),
-      label: `案${i + 1}`,
-    }));
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
+      const obj = buildCandidate(i);
+      const label = `案${i + 1}`;
+      return {
+        obj,
+        label,
+        extras: [
+          {
+            type: SCHEDULE_EDIT_LOG_TYPE,
+            obj: buildCandidateEditLog(store, {
+              baseSchedule: schedule,
+              candidate: obj,
+              constraints: allConstraints,
+              label,
+            }),
+          },
+        ],
+      };
+    });
     commitCandidates(
       store,
       localScopeId(SCHEDULE_TYPE, scheduleId),
@@ -357,12 +434,25 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     );
   };
 
-  // 必要スタッフ数の編集（その日・全日）。同じくシェル経由で保存される
+  // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
   const handleChangeRequired = (day: WorkingDay, shiftName: string, count: number) => {
-    update((s) => s.setRequired(day, shiftName, count));
+    recordRequiredEdit(store, {
+      schedule,
+      constraints: allConstraints,
+      transform: (s) => s.setRequired(day, shiftName, count),
+      summary: `${day.day}日 ${shiftName} の必要人数 → ${count}`,
+      dayKey: day.key,
+      shiftName,
+    });
   };
   const handleChangeRequiredAllDays = (shiftName: string, count: number) => {
-    update((s) => s.setRequiredForAllDays(shiftName, count));
+    recordRequiredEdit(store, {
+      schedule,
+      constraints: allConstraints,
+      transform: (s) => s.setRequiredForAllDays(shiftName, count),
+      summary: `全日 ${shiftName} の必要人数 → ${count}`,
+      shiftName,
+    });
   };
 
   // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
@@ -545,19 +635,32 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {onOpenHistory && (
+      {(onOpenHistory || onOpenEditLog) && (
         <div className="e-footer">
-          {withUrl(
-            worldLineUrl,
-            <button
-              type="button"
-              className="e-link e-worldline"
-              onClick={onOpenHistory}
-              title="この勤務表の世界線ビューを開く"
-            >
-              🌐 世界線ビュー
-            </button>
-          )}
+          {onOpenHistory &&
+            withUrl(
+              worldLineUrl,
+              <button
+                type="button"
+                className="e-link e-worldline"
+                onClick={onOpenHistory}
+                title="この勤務表の世界線ビューを開く"
+              >
+                🌐 世界線ビュー
+              </button>
+            )}
+          {onOpenEditLog &&
+            withUrl(
+              editLogUrl,
+              <button
+                type="button"
+                className="e-link"
+                onClick={onOpenEditLog}
+                title="操作履歴（ノウハウ）を開く"
+              >
+                📝 操作履歴
+              </button>
+            )}
           {onOpenTree &&
             withUrl(
               treeUrl,

@@ -21,7 +21,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import { useObjects, useObject, useObjectShell } from "../objects/repository.js";
+import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
@@ -31,12 +31,18 @@ import {
 import { runAutoShiftStep } from "./autoShift.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
+  recordSetCell,
+  recordAutoStep,
+  buildCandidateEditLog,
+} from "./recordScheduleEdit.js";
+import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
+  SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -49,7 +55,8 @@ type ExtractedScheduleProps = {
 /**
  * 抽出勤務表バブル。
  * 元の勤務表（同じ MonthlyStaffSchedule 集約）を、選択したスタッフだけに絞って表示・編集する
- * ビュー。編集・自動シフトはシェル経由で同じ集約へ保存されるため、元のグリッドにも即反映される。
+ * ビュー。セル編集・自動シフトは recordSetCell / recordAutoStep 経由で同じ集約へ保存されるため、
+ * 元のグリッドにも即反映される（EditLog も同一ノードに載る）。
  *
  * 「その選択スタッフだけ」を対象に自動シフトのコマンドを実行できる:
  *   - 希望を叶える（既存ステップ。対象スタッフだけに限定）
@@ -72,10 +79,10 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
-    SCHEDULE_TYPE,
-    scheduleId
-  );
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
+
+  const nameOf = (staffId: string): string =>
+    allStaff.find((s) => s.id === staffId)?.name ?? staffId;
 
   // 抽出対象（元の並び順を保つ）
   const idSet = useMemo(() => new Set(staffIds), [staffIds]);
@@ -120,6 +127,17 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     return map;
   }, [allWishes, schedule]);
 
+  // EditLog 用：勤務表全体に効く制約（ScheduleGrid と同じ組み立て）。
+  const allConstraints = useMemo(() => {
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    return buildScheduleConstraints({
+      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+    });
+  }, [workShifts, constraints, wishByStaff]);
+
   // 自動シフトコマンド。相方裏は「この選択に関係する責任者ルール」ごとに作る。
   // 早番固定ではなく各ルール（早責→早番 / 夜責→遅番）から導出し、関係するルールが
   // 無ければ相方裏ボタンは出ない（選択が責任者ペアとは限らないため）。
@@ -150,8 +168,16 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
+  // セル編集: ScheduleGrid と同じく EditLog 付きで同一世界線ノードに記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    update((s) => s.setCell(staffId, day, to));
+    recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId,
+      staffName: nameOf(staffId),
+      day,
+      to,
+    });
   };
 
   // 自動シフト：対象スタッフ（subset）だけを staffList として渡す → ステップが subset 限定になる
@@ -163,7 +189,14 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
       wishByStaff,
       availability,
     });
-    update(() => result.schedule);
+    recordAutoStep(store, {
+      schedule,
+      next: result.schedule,
+      constraints: allConstraints,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
+    });
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 
@@ -193,10 +226,25 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
       );
       return s;
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
-      obj: buildCandidate(i),
-      label: `案${i + 1}`,
-    }));
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
+      const obj = buildCandidate(i);
+      const label = `案${i + 1}`;
+      return {
+        obj,
+        label,
+        extras: [
+          {
+            type: SCHEDULE_EDIT_LOG_TYPE,
+            obj: buildCandidateEditLog(store, {
+              baseSchedule: schedule,
+              candidate: obj,
+              constraints: allConstraints,
+              label,
+            }),
+          },
+        ],
+      };
+    });
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
     setAutoMessage(
       `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`

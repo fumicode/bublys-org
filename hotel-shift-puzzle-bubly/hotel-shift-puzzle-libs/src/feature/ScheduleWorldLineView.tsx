@@ -8,7 +8,7 @@
  *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
  *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
- *   - 各ノードの要約は勤務表の割当件数。
+ *   - ノード要約は出さない（操作の詳細は操作履歴パネルで見る）。
  *   - Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ。
  *
  * 「確定してレポート作成」ボタン: apex の勤務表状態からシフト完成レポート
@@ -19,7 +19,6 @@ import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   WorldLineScopeView,
-  useScopeNodeSummaries,
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
 import {
@@ -49,17 +48,8 @@ type Props = {
   onConfirm?: (reportId: string) => void;
 };
 
-const formatAssignments = (s: unknown) =>
-  `${(s as MonthlyStaffSchedule).assignments.length}件`;
-
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId, onConfirm }) => {
   const { scope, restore } = useScheduleHistory(scheduleId);
-  const getNodeSummary = useScopeNodeSummaries(
-    scope,
-    SCHEDULE_TYPE,
-    scheduleId,
-    formatAssignments
-  );
 
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -175,7 +165,6 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId, onConfirm }) => {
     <StyledWrap>
       <WorldLineScopeView
         scope={scope}
-        getNodeSummary={getNodeSummary}
         keyBindings={keyBindings}
         onSelectNode={restore}
         nameable
