@@ -14,6 +14,7 @@ import {
   type ScheduleConstraint,
   type ScheduleEditActor,
   type ScheduleEditKind,
+  type ScheduleEditSource,
   type ScheduleEditTargets,
   type ShiftCell,
   type WorkingDay,
@@ -46,6 +47,9 @@ export type RecordEditMeta = {
   kind: ScheduleEditKind;
   summary: string;
   targets?: ScheduleEditTargets;
+  source?: ScheduleEditSource;
+  suggestionId?: string;
+  rejectedSuggestionId?: string;
 };
 
 /**
@@ -129,6 +133,9 @@ export function recordScheduleMutation(
     summary,
     targets: args.meta.targets ?? {},
     constraintDelta: delta,
+    source: args.meta.source,
+    suggestionId: args.meta.suggestionId,
+    rejectedSuggestionId: args.meta.rejectedSuggestionId,
   });
   saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
     { type: SCHEDULE_TYPE, obj: next },
@@ -147,10 +154,17 @@ export function recordSetCell(
     staffName?: string;
     day: WorkingDay;
     to: ShiftCell;
+    /** 提案採用時 */
+    suggestionId?: string;
+    /** 提案を拒否して別の値を入れたとき */
+    rejectedSuggestionId?: string;
   }
 ): MonthlyStaffSchedule {
   const name = args.staffName ?? args.staffId;
   const dayLabel = `${args.day.day}日`;
+  const source: ScheduleEditSource = args.suggestionId
+    ? "suggestion"
+    : "manual";
   return recordScheduleMutation(store, {
     schedule: args.schedule,
     constraints: args.constraints,
@@ -164,6 +178,9 @@ export function recordSetCell(
         dayKey: args.day.key,
         shiftId: args.to.kind === "work" ? args.to.shiftId : undefined,
       },
+      source,
+      suggestionId: args.suggestionId,
+      rejectedSuggestionId: args.rejectedSuggestionId,
     },
   });
 }
@@ -219,6 +236,7 @@ export function recordAutoStep(
     summary,
     targets: { stepId: args.stepId, label: args.stepLabel },
     constraintDelta: delta,
+    source: "autoStep",
   });
   saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
     { type: SCHEDULE_TYPE, obj: args.next },

@@ -35,6 +35,9 @@ export type ConstraintDeltaPlain = {
   concessions: ConstraintViolationPlain[];
 };
 
+/** 操作の由来（学習フィードバック用） */
+export type ScheduleEditSource = "manual" | "suggestion" | "autoStep";
+
 export type ScheduleEditEntryPlain = {
   id: string;
   at: string;
@@ -43,6 +46,12 @@ export type ScheduleEditEntryPlain = {
   summary: string;
   targets: ScheduleEditTargets;
   constraintDelta: ConstraintDeltaPlain;
+  /** 操作の由来。省略時は manual 相当 */
+  source?: ScheduleEditSource;
+  /** 提案を採用したときの提案ID */
+  suggestionId?: string;
+  /** 提案を拒否して別の値を入れたときの提案ID */
+  rejectedSuggestionId?: string;
 };
 
 export type ScheduleEditLogState = {
@@ -140,6 +149,9 @@ export class ScheduleEditLog {
       summary: entry.summary,
       targets: entry.targets,
       constraintDelta: entry.constraintDelta,
+      source: entry.source,
+      suggestionId: entry.suggestionId,
+      rejectedSuggestionId: entry.rejectedSuggestionId,
     };
     return new ScheduleEditLog({
       ...this.state,

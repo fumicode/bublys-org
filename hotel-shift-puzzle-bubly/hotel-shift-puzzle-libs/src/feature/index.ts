@@ -25,3 +25,4 @@ export * from "./ScheduleReportList.js";
 export * from "./reportPriority.js";
 export * from "./ScheduleEditLogPanel.js";
 export * from "./recordScheduleEdit.js";
+export * from "./shiftSuggestion/index.js";

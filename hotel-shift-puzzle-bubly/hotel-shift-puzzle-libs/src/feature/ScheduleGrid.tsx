@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
@@ -16,12 +16,14 @@ import {
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
   makeMinDayOffStep,
+  WorkingDay,
+  shiftCellsEqual,
   type AutoShiftStep,
-  type WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import { CellSuggestionPanel } from "../ui/CellSuggestionPanel.js";
 import {
   ScheduleConstraintsBar,
   shiftColorById,
@@ -30,7 +32,16 @@ import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
-import { runAutoShiftStep } from "./autoShift.js";
+import { runAutoShiftStep, decodeWishForStaff } from "./autoShift.js";
+import {
+  HeuristicSuggestionPolicy,
+  LearnedSuggestionPolicy,
+  CompositeSuggestionPolicy,
+  suggestNextUndecided,
+  loadShiftPolicyWeights,
+  busyDayKeysOf,
+  type ShiftPolicyWeights,
+} from "./shiftSuggestion/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
@@ -125,6 +136,32 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   useSeedHotelData();
   const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  const [focusCell, setFocusCell] = useState<{
+    staffId: string;
+    dayKey: string;
+  } | null>(null);
+  const [learnedWeights, setLearnedWeights] = useState<ShiftPolicyWeights | null>(
+    null
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    loadShiftPolicyWeights().then((weights) => {
+      if (!cancelled) setLearnedWeights(weights);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const suggestionPolicy = useMemo(
+    () =>
+      new CompositeSuggestionPolicy(
+        new HeuristicSuggestionPolicy(),
+        learnedWeights ? new LearnedSuggestionPolicy(learnedWeights) : null
+      ),
+    [learnedWeights]
+  );
   const staffList = useObjects<Staff>(STAFF_TYPE);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -337,6 +374,103 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [schedule, allConstraints]
   );
 
+  const shiftIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const w of workShifts) {
+      if (!map.has(w.name)) map.set(w.name, w.id);
+    }
+    return map;
+  }, [workShifts]);
+
+  const preferenceOf = useCallback(
+    (staffId: string, day: WorkingDay) =>
+      decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
+    [wishByStaff, shiftIdByName]
+  );
+
+  const isAvailable = useMemo(
+    () =>
+      availability
+        ? (staffId: string, shiftId: string) =>
+            availability.isAllowed(staffId, shiftId)
+        : undefined,
+    [availability]
+  );
+
+  const linkedReportScoreOf = useMemo(() => {
+    const totalScoreByStaff = new Map<string, number>();
+    for (const report of linkedReports) {
+      for (const s of report.contributionScores) {
+        totalScoreByStaff.set(
+          s.staffId,
+          (totalScoreByStaff.get(s.staffId) ?? 0) + s.score
+        );
+      }
+    }
+    return (staffId: string) => totalScoreByStaff.get(staffId) ?? 0;
+  }, [linkedReports]);
+
+  const isBusyDay = useMemo(() => {
+    if (!schedule) return () => false;
+    const keys = busyDayKeysOf(schedule);
+    return (dayKey: string) => keys.has(dayKey);
+  }, [schedule]);
+
+  const focusDay = useMemo(
+    () => (focusCell ? WorkingDay.fromKey(focusCell.dayKey) : null),
+    [focusCell]
+  );
+
+  const cellSuggestions = useMemo(() => {
+    if (!schedule || !focusCell || !focusDay) return [];
+    return suggestionPolicy.rankCellCandidates({
+      schedule,
+      constraints: allConstraints,
+      staffId: focusCell.staffId,
+      day: focusDay,
+      workShifts,
+      preferenceOf,
+      isAvailable,
+      linkedReportScoreOf,
+      isBusyDay,
+    });
+  }, [
+    schedule,
+    focusCell,
+    focusDay,
+    suggestionPolicy,
+    allConstraints,
+    workShifts,
+    preferenceOf,
+    isAvailable,
+    linkedReportScoreOf,
+    isBusyDay,
+  ]);
+
+  useEffect(() => {
+    if (!schedule || focusCell) return;
+    const next = suggestNextUndecided(
+      schedule,
+      staffList.map((s) => s.id)
+    );
+    if (next) {
+      setFocusCell({ staffId: next.staffId, dayKey: next.day.key });
+    }
+  }, [schedule, focusCell, staffList]);
+
+  const advanceFocusAfterEdit = useCallback(
+    (nextSchedule: MonthlyStaffSchedule) => {
+      const next = suggestNextUndecided(
+        nextSchedule,
+        staffList.map((s) => s.id)
+      );
+      setFocusCell(
+        next ? { staffId: next.staffId, dayKey: next.day.key } : null
+      );
+    },
+    [staffList]
+  );
+
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => {
     const idByName = new Map<string, string>();
@@ -350,14 +484,42 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
   // セル編集: EditLog 付きで同一世界線ノードに記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    recordSetCell(store, {
+    let rejectedSuggestionId: string | undefined;
+    if (
+      focusCell?.staffId === staffId &&
+      focusCell.dayKey === day.key &&
+      cellSuggestions.length > 0
+    ) {
+      const top = cellSuggestions[0];
+      if (!shiftCellsEqual(top.cell, to)) {
+        rejectedSuggestionId = top.id;
+      }
+    }
+    const next = recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
       staffName: nameOf(staffId),
       day,
       to,
+      rejectedSuggestionId,
     });
+    setFocusCell({ staffId, dayKey: day.key });
+    advanceFocusAfterEdit(next);
+  };
+
+  const handleAcceptSuggestion = (suggestion: (typeof cellSuggestions)[number]) => {
+    if (!focusCell || !focusDay) return;
+    const next = recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId: focusCell.staffId,
+      staffName: nameOf(focusCell.staffId),
+      day: focusDay,
+      to: suggestion.cell,
+      suggestionId: suggestion.id,
+    });
+    advanceFocusAfterEdit(next);
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
@@ -553,6 +715,14 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
       {/* グリッド領域 */}
       <div className="e-grid-area">
+        {focusCell && focusDay && cellSuggestions.length > 0 && (
+          <CellSuggestionPanel
+            staffName={nameOf(focusCell.staffId)}
+            dayLabel={`${focusDay.day}日`}
+            suggestions={cellSuggestions}
+            onAccept={handleAcceptSuggestion}
+          />
+        )}
         <ScheduleGridView
           schedule={schedule}
           staffList={filteredStaffList}
