@@ -1,0 +1,25 @@
+{
+  "name": "@bublys-org/hotel-shift-puzzle-training",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export-corpus": "tsx src/exportCorpus.ts",
+    "train-ranker": "tsx src/trainRanker.ts"
+  },
+  "dependencies": {
+    "@bublys-org/hotel-shift-puzzle-model": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.2"
+  },
+  "nx": {
+    "targets": {
+      "export-corpus": {},
+      "train-ranker": {
+        "dependsOn": []
+      }
+    }
+  }
+}

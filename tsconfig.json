@@ -98,6 +98,9 @@
     },
     {
       "path": "./event-shift-puzzle/event-shift-puzzle-app"
+    },
+    {
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-training"
     }
   ]
 }
