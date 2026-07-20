@@ -1,0 +1,24 @@
+{
+  "bias": 0.9724489511538579,
+  "weights": [
+    0,
+    0,
+    0.9724489511538579,
+    0,
+    0,
+    -4.172543935396272,
+    0,
+    0
+  ],
+  "version": "1",
+  "featureNames": [
+    "wishMatch",
+    "fillsDemand",
+    "availabilityOk",
+    "linkedReportScore",
+    "isBusyDay",
+    "isDayOff",
+    "isUndecided",
+    "wouldConcede"
+  ]
+}
