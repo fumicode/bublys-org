@@ -44,3 +44,6 @@ export * from './schedule/ScheduleConstraint.js';
 export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
+
+// 学習コーパス（世界線 + EditLog から抽出）
+export * from './learning/index.js';
