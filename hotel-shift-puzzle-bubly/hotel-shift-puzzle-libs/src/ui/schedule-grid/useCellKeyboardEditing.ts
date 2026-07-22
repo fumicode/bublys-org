@@ -27,6 +27,9 @@ type UseCellKeyboardEditingParams = {
   availability?: ScheduleAvailability;
   /** セルの勤務割当を変更する（確定時に呼ぶ）。 */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
+  selection?: CellSelection | null;
+  onSelectionChange?: (selection: CellSelection | null) => void;
 };
 
 export type CellKeyboardEditing = {
@@ -76,9 +79,27 @@ export function useCellKeyboardEditing({
   shiftOptions,
   availability,
   onChangeCell,
+  selection: controlledSelection,
+  onSelectionChange,
 }: UseCellKeyboardEditingParams): CellKeyboardEditing {
   const gridRef = useRef<HTMLDivElement>(null);
-  const [selection, setSelection] = useState<CellSelection | null>(null);
+  const [internalSelection, setInternalSelection] =
+    useState<CellSelection | null>(null);
+  const selection =
+    controlledSelection === undefined
+      ? internalSelection
+      : controlledSelection;
+  const setSelection = (
+    next:
+      | CellSelection
+      | null
+      | ((previous: CellSelection | null) => CellSelection | null)
+  ) => {
+    const resolved =
+      typeof next === "function" ? next(selection) : next;
+    if (controlledSelection === undefined) setInternalSelection(resolved);
+    onSelectionChange?.(resolved);
+  };
   const [inputBuffer, setInputBuffer] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 

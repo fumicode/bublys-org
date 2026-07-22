@@ -15,7 +15,7 @@
  * （妥協・繁忙日対応・貢献度スコア）を計算して保存し、apex に確定ラベルを付ける
  * （＝成果木への追加。既存の setNodeLabel をそのまま「確定」印として使う）。
  */
-import { FC, useMemo } from "react";
+import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
   WorldLineScopeView,
@@ -32,7 +32,10 @@ import {
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { ClimberWorldLineCanvasView } from "../ui/ClimberWorldLineCanvasView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
+import { pruneUnusedForecastBranches, localScopeId } from "../objects/commit.js";
+import { useAppStore } from "@bublys-org/state-management";
 import {
   SCHEDULE_TYPE,
   STAFF_TYPE,
@@ -49,7 +52,10 @@ type Props = {
 };
 
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId, onConfirm }) => {
+  const store = useAppStore();
   const { scope, restore } = useScheduleHistory(scheduleId);
+  const [showForecasts, setShowForecasts] = useState(false);
+  const [pruneMessage, setPruneMessage] = useState<string | null>(null);
 
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -167,8 +173,47 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId, onConfirm }) => {
         scope={scope}
         keyBindings={keyBindings}
         onSelectNode={restore}
+        renderCanvas={(props) => (
+          <ClimberWorldLineCanvasView
+            {...props}
+            showForecasts={showForecasts}
+          />
+        )}
         nameable
       />
+      <button
+        type="button"
+        className="e-forecast-toggle"
+        onClick={() => setShowForecasts((visible) => !visible)}
+      >
+        {showForecasts ? "予測を折りたたむ" : "予測を展開"}
+      </button>
+      <button
+        type="button"
+        className="e-forecast-prune"
+        title="今いる地点の可能性枝以外の古い予測ノードを削除します"
+        onClick={() => {
+          const { removed } = pruneUnusedForecastBranches(
+            store,
+            localScopeId(SCHEDULE_TYPE, scheduleId)
+          );
+          setPruneMessage(
+            removed > 0
+              ? `使われていない予測を${removed}件削除しました`
+              : "削除する予測はありませんでした"
+          );
+        }}
+      >
+        使っていない予測を削除
+      </button>
+      {pruneMessage && (
+        <div className="e-prune-msg">
+          {pruneMessage}
+          <button type="button" onClick={() => setPruneMessage(null)}>
+            ×
+          </button>
+        </div>
+      )}
       <button
         type="button"
         className="e-confirm"
@@ -204,6 +249,56 @@ const StyledWrap = styled.div`
     &:hover {
       background: rgba(56, 142, 60, 0.95);
       border-color: rgba(255, 255, 255, 0.55);
+    }
+  }
+
+  .e-forecast-toggle {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    background: rgba(63, 81, 181, 0.72);
+    color: #fff;
+    font-size: 0.76em;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+
+  .e-forecast-prune {
+    position: absolute;
+    left: 10px;
+    bottom: 44px;
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(55, 71, 79, 0.75);
+    color: #fff;
+    font-size: 0.72em;
+    padding: 5px 9px;
+    cursor: pointer;
+  }
+
+  .e-prune-msg {
+    position: absolute;
+    left: 10px;
+    bottom: 78px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(20, 22, 30, 0.85);
+    color: rgba(235, 240, 255, 0.95);
+    font-size: 0.72em;
+
+    button {
+      border: none;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
     }
   }
 `;

@@ -22,6 +22,7 @@ import {
   ScheduleReportPanel,
   ScheduleReportList,
   ScheduleEditLogPanel,
+  SchedulePossibilityPanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
@@ -37,6 +38,7 @@ import {
   scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
   scheduleEditLogUrl,
+  schedulePossibilityUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -129,6 +131,14 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
+      possibilityBubbleUrl={(baseNodeId, staffId, dayKey) =>
+        schedulePossibilityUrl(
+          scheduleId,
+          baseNodeId,
+          staffId,
+          dayKey
+        )
+      }
     />
   );
 };
@@ -212,6 +222,16 @@ const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleEditLogPanel scheduleId={bubble.params.scheduleId} />);
 
+const SchedulePossibilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <SchedulePossibilityPanel
+      scheduleId={bubble.params.scheduleId}
+      baseNodeId={bubble.params.baseNodeId}
+      staffId={bubble.params.staffId}
+      dayKey={bubble.params.dayKey}
+    />
+  );
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -226,6 +246,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // 完成木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/edit-log", type: "schedule-edit-log", Component: ScheduleEditLogBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/possibilities/:baseNodeId/:staffId/:dayKey", type: "schedule-possibility", Component: SchedulePossibilityBubble, bubbleOptions: { defaultSize: { width: 520, height: 480 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/auto-shift", type: "schedule-auto-shift", Component: AutoShiftBubble },

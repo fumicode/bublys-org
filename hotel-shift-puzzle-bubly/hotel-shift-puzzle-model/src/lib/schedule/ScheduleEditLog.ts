@@ -36,7 +36,11 @@ export type ConstraintDeltaPlain = {
 };
 
 /** 操作の由来（学習フィードバック用） */
-export type ScheduleEditSource = "manual" | "suggestion" | "autoStep";
+export type ScheduleEditSource =
+  | "manual"
+  | "suggestion"
+  | "autoStep"
+  | "forecast";
 
 export type ScheduleEditEntryPlain = {
   id: string;
@@ -52,6 +56,10 @@ export type ScheduleEditEntryPlain = {
   suggestionId?: string;
   /** 提案を拒否して別の値を入れたときの提案ID */
   rejectedSuggestionId?: string;
+  /** 未来予測に属する場合の予測ID */
+  forecastId?: string;
+  /** 予測枝の入口か、ロールアウト後の見通しか */
+  forecastRole?: "decision" | "forecast";
 };
 
 export type ScheduleEditLogState = {
@@ -152,6 +160,8 @@ export class ScheduleEditLog {
       source: entry.source,
       suggestionId: entry.suggestionId,
       rejectedSuggestionId: entry.rejectedSuggestionId,
+      forecastId: entry.forecastId,
+      forecastRole: entry.forecastRole,
     };
     return new ScheduleEditLog({
       ...this.state,

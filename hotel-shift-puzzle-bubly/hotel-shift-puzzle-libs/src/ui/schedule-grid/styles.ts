@@ -535,6 +535,40 @@ export const StyledWrap = styled.div`
     }
   }
 
+  .e-possibility-anchor {
+    position: absolute;
+    right: 2px;
+    bottom: 1px;
+    z-index: 3;
+    line-height: 1;
+  }
+
+  .e-possibility-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    border: 1px solid rgba(57, 73, 171, 0.35);
+    border-radius: 50%;
+    background: rgba(245, 245, 255, 0.9);
+    color: #5c6bc0;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.72;
+
+    &:hover {
+      opacity: 1;
+      border-color: #5c6bc0;
+    }
+
+    &.is-risk {
+      border-color: rgba(239, 108, 0, 0.55);
+      color: #ef6c00;
+      background: rgba(255, 248, 225, 0.94);
+    }
+  }
+
   /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
   .e-cell .e-input {
     position: absolute;

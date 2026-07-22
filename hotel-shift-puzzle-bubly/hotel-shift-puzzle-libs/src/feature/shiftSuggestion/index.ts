@@ -7,3 +7,4 @@ export * from "./suggestNextUndecided.js";
 export * from "./suggestAutoStep.js";
 export * from "./loadWeights.js";
 export * from "./busyDay.js";
+export * from "./forecastSchedule.js";

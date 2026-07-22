@@ -19,11 +19,12 @@ import {
   WorkingDay,
   shiftCellsEqual,
   type AutoShiftStep,
+  type AutoShiftStepResult,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
+import { useCasScope } from "@bublys-org/world-line-graph";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import { CellSuggestionPanel } from "../ui/CellSuggestionPanel.js";
 import {
   ScheduleConstraintsBar,
   shiftColorById,
@@ -93,6 +94,12 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
+  /** セルを起点にした可能性バブルURL。 */
+  possibilityBubbleUrl?: (
+    baseNodeId: string,
+    staffId: string,
+    dayKey: string
+  ) => string;
   /**
    * 予約状況（宿泊人数・部屋数）編集バブルの URL。渡すと日付ヘッダの上に予約行を出し、
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
@@ -129,16 +136,22 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
+  possibilityBubbleUrl,
   ruleBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
+  const localScope = useCasScope(localScopeId(SCHEDULE_TYPE, scheduleId ?? ""));
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
-  const [focusCell, setFocusCell] = useState<{
+  const [stepPreview, setStepPreview] = useState<{
+    step: AutoShiftStep;
+    result: AutoShiftStepResult;
+  } | null>(null);
+  const [cellSelection, setCellSelection] = useState<{
     staffId: string;
-    dayKey: string;
+    day: WorkingDay;
   } | null>(null);
   const [learnedWeights, setLearnedWeights] = useState<ShiftPolicyWeights | null>(
     null
@@ -416,18 +429,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (dayKey: string) => keys.has(dayKey);
   }, [schedule]);
 
-  const focusDay = useMemo(
-    () => (focusCell ? WorkingDay.fromKey(focusCell.dayKey) : null),
-    [focusCell]
-  );
-
   const cellSuggestions = useMemo(() => {
-    if (!schedule || !focusCell || !focusDay) return [];
+    if (!schedule || !cellSelection) return [];
     return suggestionPolicy.rankCellCandidates({
       schedule,
       constraints: allConstraints,
-      staffId: focusCell.staffId,
-      day: focusDay,
+      staffId: cellSelection.staffId,
+      day: cellSelection.day,
       workShifts,
       preferenceOf,
       isAvailable,
@@ -436,8 +444,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     });
   }, [
     schedule,
-    focusCell,
-    focusDay,
+    cellSelection,
     suggestionPolicy,
     allConstraints,
     workShifts,
@@ -448,15 +455,15 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   ]);
 
   useEffect(() => {
-    if (!schedule || focusCell) return;
+    if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
       schedule,
       staffList.map((s) => s.id)
     );
     if (next) {
-      setFocusCell({ staffId: next.staffId, dayKey: next.day.key });
+      setCellSelection({ staffId: next.staffId, day: next.day });
     }
-  }, [schedule, focusCell, staffList]);
+  }, [schedule, cellSelection, staffList]);
 
   const advanceFocusAfterEdit = useCallback(
     (nextSchedule: MonthlyStaffSchedule) => {
@@ -464,8 +471,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         nextSchedule,
         staffList.map((s) => s.id)
       );
-      setFocusCell(
-        next ? { staffId: next.staffId, dayKey: next.day.key } : null
+      setCellSelection(
+        next ? { staffId: next.staffId, day: next.day } : null
       );
     },
     [staffList]
@@ -486,8 +493,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
     let rejectedSuggestionId: string | undefined;
     if (
-      focusCell?.staffId === staffId &&
-      focusCell.dayKey === day.key &&
+      cellSelection?.staffId === staffId &&
+      cellSelection.day.key === day.key &&
       cellSuggestions.length > 0
     ) {
       const top = cellSuggestions[0];
@@ -504,26 +511,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       to,
       rejectedSuggestionId,
     });
-    setFocusCell({ staffId, dayKey: day.key });
+    setCellSelection({ staffId, day });
     advanceFocusAfterEdit(next);
   };
 
-  const handleAcceptSuggestion = (suggestion: (typeof cellSuggestions)[number]) => {
-    if (!focusCell || !focusDay) return;
-    const next = recordSetCell(store, {
-      schedule,
-      constraints: allConstraints,
-      staffId: focusCell.staffId,
-      staffName: nameOf(focusCell.staffId),
-      day: focusDay,
-      to: suggestion.cell,
-      suggestionId: suggestion.id,
-    });
-    advanceFocusAfterEdit(next);
-  };
-
-  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 自動シフト：即実行せず、見通しを出してから確認する（AutoShiftPanel と同型）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
@@ -532,20 +524,26 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       wishByStaff,
       availability,
     });
-    recordAutoStep(store, {
-      schedule,
-      next: result.schedule,
-      constraints: allConstraints,
-      stepId: step.key,
-      stepLabel: step.label,
-      message: result.message,
-    });
-    setAutoMessage(`${step.label}: ${result.message}`);
+    setStepPreview({ step, result });
   };
 
-  // 完成案の複数生成：対象スタッフについて「毎日 担当勤務帯に責任者が最低1人いる」かつ
-  // 「全員が月◯日休む（1日◯人まで）」を満たす完成案を phase 違いで N 案つくり、
-  // それぞれ独立した世界線（兄弟ブランチ）に書く。
+  const handleConfirmStep = () => {
+    if (!stepPreview) return;
+    recordAutoStep(store, {
+      schedule,
+      next: stepPreview.result.schedule,
+      constraints: allConstraints,
+      stepId: stepPreview.step.key,
+      stepLabel: stepPreview.step.label,
+      message: stepPreview.result.message,
+    });
+    setAutoMessage(
+      `${stepPreview.step.label}: ${stepPreview.result.message}`
+    );
+    setStepPreview(null);
+  };
+
+  // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
     // 紐づけたレポートで妥協が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
@@ -592,8 +590,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       candidates
     );
     setAutoMessage(
-      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
+      `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
     );
+    onOpenHistory?.();
   };
 
   // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
@@ -715,14 +714,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
       {/* グリッド領域 */}
       <div className="e-grid-area">
-        {focusCell && focusDay && cellSuggestions.length > 0 && (
-          <CellSuggestionPanel
-            staffName={nameOf(focusCell.staffId)}
-            dayLabel={`${focusDay.day}日`}
-            suggestions={cellSuggestions}
-            onAccept={handleAcceptSuggestion}
-          />
-        )}
         <ScheduleGridView
           schedule={schedule}
           staffList={filteredStaffList}
@@ -746,10 +737,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           violationUrl={
             violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
           }
+          selection={cellSelection}
+          onSelectionChange={setCellSelection}
+          possibilityUrl={(staffId, day) => {
+            const baseNodeId = localScope.graph.state.apexNodeId;
+            return baseNodeId && possibilityBubbleUrl
+              ? possibilityBubbleUrl(baseNodeId, staffId, day.key)
+              : undefined;
+          }}
+          possibilityRisk={(staffId, day) =>
+            cellSelection?.staffId === staffId &&
+            cellSelection.day.key === day.key &&
+            (cellSuggestions[0]?.wouldConcede ?? false)
+          }
         />
       </div>
 
-      {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
+      {/* クイック自動ステップ（プレビュー確認後に適用）と世界線比較ツール */}
       <div className="e-auto-bar">
         <span className="e-auto-target">
           対象:{" "}
@@ -777,18 +781,33 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             title={step.description}
             onClick={() => handleRunStep(step)}
           >
-            {step.label}
+            {step.label}の見通し
           </button>
         ))}
         <button
           type="button"
           className="e-candidate-run"
-          title={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          title={`この ${subsetStaff.length} 名について完成案を ${DAY_OFF_CANDIDATE_COUNT} つ世界線に置き、枝を見比べます（AI提案ではなく比較用ツール）。`}
           onClick={handleGenerateCandidates}
         >
-          🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る
+          世界線で完成案を{DAY_OFF_CANDIDATE_COUNT}つ比較
         </button>
       </div>
+
+      {stepPreview && (
+        <div className="e-step-preview">
+          <strong>{stepPreview.step.label} の見通し</strong>
+          <span>{stepPreview.result.message}</span>
+          <div className="e-step-preview-actions">
+            <button type="button" onClick={handleConfirmStep}>
+              まずこの一手を選ぶ
+            </button>
+            <button type="button" onClick={() => setStepPreview(null)}>
+              戻る
+            </button>
+          </div>
+        </div>
+      )}
 
       {autoMessage && (
         <div className="e-auto-message">
@@ -909,6 +928,38 @@ const StyledContainer = styled.div`
   }
 
   /* 自動シフト操作バー（グリッド下）。対象＝選択スタッフ（無ければ全員）に対して実行する */
+  .e-step-preview {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid #c5cae9;
+    border-radius: 8px;
+    background: #f5f5ff;
+    font-size: 0.8em;
+    color: #3949ab;
+
+    .e-step-preview-actions {
+      display: flex;
+      gap: 6px;
+
+      button {
+        border: 1px solid #7986cb;
+        border-radius: 6px;
+        background: #eef0ff;
+        color: #3949ab;
+        font-size: 0.9em;
+        font-weight: 600;
+        padding: 4px 10px;
+        cursor: pointer;
+
+        &:hover {
+          background: #c5cae9;
+        }
+      }
+    }
+  }
+
   .e-auto-bar {
     display: flex;
     align-items: center;

@@ -22,4 +22,4 @@ export * from "./ScheduleReportView.js";
 export * from "./ScheduleReportListView.js";
 export * from "./LinkedReportsView.js";
 export * from "./ScheduleEditLogView.js";
-export * from "./CellSuggestionPanel.js";
+export * from "./SchedulePossibilityView.js";

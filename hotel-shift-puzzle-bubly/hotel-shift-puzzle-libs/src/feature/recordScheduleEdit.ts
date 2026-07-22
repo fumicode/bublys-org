@@ -11,6 +11,7 @@ import {
   ScheduleEditLog,
   computeConstraintDelta,
   emptyConstraintDelta,
+  type ScheduleForecast,
   type ScheduleConstraint,
   type ScheduleEditActor,
   type ScheduleEditKind,
@@ -50,6 +51,8 @@ export type RecordEditMeta = {
   source?: ScheduleEditSource;
   suggestionId?: string;
   rejectedSuggestionId?: string;
+  forecastId?: string;
+  forecastRole?: "decision" | "forecast";
 };
 
 /**
@@ -136,6 +139,8 @@ export function recordScheduleMutation(
     source: args.meta.source,
     suggestionId: args.meta.suggestionId,
     rejectedSuggestionId: args.meta.rejectedSuggestionId,
+    forecastId: args.meta.forecastId,
+    forecastRole: args.meta.forecastRole,
   });
   saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
     { type: SCHEDULE_TYPE, obj: next },
@@ -311,4 +316,60 @@ export function buildCandidateEditLog(
     targets: { label: args.label },
     constraintDelta: delta,
   });
+}
+
+export function buildForecastEditLogs(
+  store: StoreLike,
+  args: {
+    forecast: ScheduleForecast;
+    baseSchedule: MonthlyStaffSchedule;
+    decisionSchedule: MonthlyStaffSchedule;
+    projectedSchedule: MonthlyStaffSchedule;
+    constraints: ScheduleConstraint[];
+    decisionLabel: string;
+  }
+): { decisionLog: ScheduleEditLog; forecastLog: ScheduleEditLog } {
+  const scheduleId = args.baseSchedule.state.id;
+  const baseViolations = args.baseSchedule.checkConstraints(args.constraints);
+  const decisionViolations =
+    args.decisionSchedule.checkConstraints(args.constraints);
+  const projectedViolations =
+    args.projectedSchedule.checkConstraints(args.constraints);
+  const decisionDelta = computeConstraintDelta(
+    baseViolations,
+    decisionViolations
+  );
+  const decisionLog = loadEditLog(store, scheduleId).append({
+    actor: "auto",
+    kind: "candidate",
+    summary: `可能性「${args.decisionLabel}」の入口を生成`,
+    targets: {
+      staffId: args.forecast.state.staffId,
+      dayKey: args.forecast.state.dayKey,
+      shiftId:
+        args.forecast.decision.kind === "work"
+          ? args.forecast.decision.shiftId
+          : undefined,
+      label: args.decisionLabel,
+    },
+    constraintDelta: decisionDelta,
+    source: "forecast",
+    forecastId: args.forecast.id,
+    forecastRole: "decision",
+  });
+  const forecastDelta = computeConstraintDelta(
+    decisionViolations,
+    projectedViolations
+  );
+  const forecastLog = decisionLog.append({
+    actor: "auto",
+    kind: "candidate",
+    summary: `可能性「${args.decisionLabel}」の先を予測`,
+    targets: { label: args.decisionLabel },
+    constraintDelta: forecastDelta,
+    source: "forecast",
+    forecastId: args.forecast.id,
+    forecastRole: "forecast",
+  });
+  return { decisionLog, forecastLog };
 }

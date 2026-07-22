@@ -29,7 +29,7 @@ import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
-import type { EditingRequired } from "./schedule-grid/types.js";
+import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -81,6 +81,13 @@ type ScheduleGridViewProps = {
   minDayOff?: number;
   /** 1日の休み人数の上限。footer の休み行でこれを超えた日を赤くする */
   maxDayOffPerDay?: number;
+  /** feature 層と共有する現在セル。AIの分岐入口とキーボード選択を同じ状態にする。 */
+  selection?: CellSelection | null;
+  onSelectionChange?: (selection: CellSelection | null) => void;
+  /** 選択中の未定セルから開く可能性バブルURL。 */
+  possibilityUrl?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** 一手評価で将来リスクが見つかったセル。 */
+  possibilityRisk?: (staffId: string, day: WorkingDay) => boolean;
 };
 
 /**
@@ -137,6 +144,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onSelectRule,
   minDayOff,
   maxDayOffPerDay,
+  selection,
+  onSelectionChange,
+  possibilityUrl,
+  possibilityRisk,
 }) => {
   const days = schedule.workingDays();
 
@@ -255,6 +266,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     shiftOptions,
     availability,
     onChangeCell,
+    selection,
+    onSelectionChange,
   });
 
   // 希望と割当を並べて見るために展開中のスタッフID
@@ -310,6 +323,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          possibilityUrl={possibilityUrl}
+          possibilityRisk={possibilityRisk}
         />
       ));
     }
@@ -350,6 +365,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          possibilityUrl={possibilityUrl}
+          possibilityRisk={possibilityRisk}
         />
       )),
     ]);

@@ -19,10 +19,10 @@ type ScheduleEditLogViewProps = {
 
 const KIND_LABEL: Record<ScheduleEditKind, string> = {
   setCell: "セル",
-  autoStep: "自動",
+  autoStep: "自動一手",
   constraintEdit: "制約",
   requiredEdit: "必要人数",
-  candidate: "案",
+  candidate: "比較案",
 };
 
 function formatShortTime(iso: string): string {
@@ -51,8 +51,8 @@ export const ScheduleEditLogView: FC<ScheduleEditLogViewProps> = ({
   return (
     <StyledWrap>
       <div className="e-head">
-        <span className="e-kicker">ノウハウ</span>
-        <h3 className="e-title">操作履歴（ノウハウ）</h3>
+        <span className="e-kicker">操作の記録</span>
+        <h3 className="e-title">操作履歴</h3>
         <label className="e-filter">
           <input
             type="checkbox"
@@ -76,10 +76,28 @@ export const ScheduleEditLogView: FC<ScheduleEditLogViewProps> = ({
                 <div className="e-row-main">
                   <span className="e-summary">{entry.summary}</span>
                   <span
-                    className={`e-actor ${entry.actor === "human" ? "is-human" : "is-auto"}`}
+                    className={`e-actor ${
+                      entry.source === "forecast"
+                        ? "is-forecast"
+                        : entry.actor === "human"
+                          ? "is-human"
+                          : "is-auto"
+                    }`}
                   >
-                    {entry.actor === "human" ? "人間" : "自動"}
+                    {entry.source === "forecast"
+                      ? entry.forecastRole === "decision"
+                        ? "未来の入口"
+                        : "未来の見通し"
+                      : entry.actor === "human"
+                        ? "人間"
+                        : "自動"}
                   </span>
+                  {entry.source === "suggestion" && (
+                    <span className="e-source">この一手を選んだ</span>
+                  )}
+                  {entry.rejectedSuggestionId && (
+                    <span className="e-source is-diverged">見通しと異なる判断</span>
+                  )}
                   <span className="e-kind">{KIND_LABEL[entry.kind] ?? entry.kind}</span>
                   <span className="e-time">{formatShortTime(entry.at)}</span>
                 </div>
@@ -202,6 +220,24 @@ const StyledWrap = styled.div`
       background: #f3e5f5;
       color: #6a1b9a;
     }
+
+    &.is-forecast {
+      background: #e8eaf6;
+      color: #3949ab;
+    }
+  }
+
+  .e-source {
+    border-radius: 4px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 1px 6px;
+    font-size: 0.74em;
+  }
+
+  .e-source.is-diverged {
+    background: #fff3e0;
+    color: #e65100;
   }
 
   .e-kind {
