@@ -77,20 +77,10 @@ export const ScheduleEditLogView: FC<ScheduleEditLogViewProps> = ({
                   <span className="e-summary">{entry.summary}</span>
                   <span
                     className={`e-actor ${
-                      entry.source === "forecast"
-                        ? "is-forecast"
-                        : entry.actor === "human"
-                          ? "is-human"
-                          : "is-auto"
+                      entry.actor === "human" ? "is-human" : "is-auto"
                     }`}
                   >
-                    {entry.source === "forecast"
-                      ? entry.forecastRole === "decision"
-                        ? "未来の入口"
-                        : "未来の見通し"
-                      : entry.actor === "human"
-                        ? "人間"
-                        : "自動"}
+                    {entry.actor === "human" ? "人間" : "自動"}
                   </span>
                   {entry.source === "suggestion" && (
                     <span className="e-source">この一手を選んだ</span>
@@ -219,11 +209,6 @@ const StyledWrap = styled.div`
     &.is-auto {
       background: #f3e5f5;
       color: #6a1b9a;
-    }
-
-    &.is-forecast {
-      background: #e8eaf6;
-      color: #3949ab;
     }
   }
 

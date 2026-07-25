@@ -23,7 +23,6 @@ import {
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import {
   ScheduleConstraintsBar,
@@ -36,12 +35,10 @@ import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep, decodeWishForStaff } from "./autoShift.js";
 import {
   HeuristicSuggestionPolicy,
-  LearnedSuggestionPolicy,
-  CompositeSuggestionPolicy,
   suggestNextUndecided,
-  loadShiftPolicyWeights,
   busyDayKeysOf,
-  type ShiftPolicyWeights,
+  suggestConstraintFix,
+  suggestStaffingFix,
 } from "./shiftSuggestion/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
@@ -94,12 +91,6 @@ type ScheduleGridProps = {
   dayBubbleUrl?: (dayKey: string) => string;
   /** 違反バブルの URL を作る（違反 key を渡す）。同上・app 層から注入。 */
   violationBubbleUrl?: (violationKey: string) => string;
-  /** セルを起点にした可能性バブルURL。 */
-  possibilityBubbleUrl?: (
-    baseNodeId: string,
-    staffId: string,
-    dayKey: string
-  ) => string;
   /**
    * 予約状況（宿泊人数・部屋数）編集バブルの URL。渡すと日付ヘッダの上に予約行を出し、
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
@@ -136,14 +127,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
-  possibilityBubbleUrl,
   ruleBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
-  const localScope = useCasScope(localScopeId(SCHEDULE_TYPE, scheduleId ?? ""));
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [stepPreview, setStepPreview] = useState<{
     step: AutoShiftStep;
@@ -153,28 +142,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     staffId: string;
     day: WorkingDay;
   } | null>(null);
-  const [learnedWeights, setLearnedWeights] = useState<ShiftPolicyWeights | null>(
-    null
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    loadShiftPolicyWeights().then((weights) => {
-      if (!cancelled) setLearnedWeights(weights);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const suggestionPolicy = useMemo(
-    () =>
-      new CompositeSuggestionPolicy(
-        new HeuristicSuggestionPolicy(),
-        learnedWeights ? new LearnedSuggestionPolicy(learnedWeights) : null
-      ),
-    [learnedWeights]
-  );
+  const suggestionPolicy = useMemo(() => new HeuristicSuggestionPolicy(), []);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -453,6 +421,165 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     linkedReportScoreOf,
     isBusyDay,
   ]);
+
+  // ホバー中セルに今出ている制約エラーの解消案。世界線分岐やバブルは開かず、
+  // その場でクリック適用できる「ふわっとしたヒント」用（ScheduleGridView 側で描画）。
+  // 違反が無いセルは undefined（無理に提案しない）。
+  // 3種類のスコープを対象にする:
+  //   - 横の制約: そのスタッフ・その日に紐づく違反（連勤・希望など）→ coversCell
+  //   - 縦の制約: staffId を持たない日単位の違反（責任者未充足・休み上限など）→ isDayScoped
+  //   - 月単位の制約: そのスタッフに紐づくが特定の日を持たない違反（月の最低休日数など、
+  //     days が空）→ どの日を変えても直しうるので、そのスタッフの全セルを対象にする
+  const suggestConstraintFixFor = useCallback(
+    (staffId: string, day: WorkingDay) => {
+      const relevant =
+        schedule &&
+        violations.some(
+          (v) =>
+            v.coversCell(staffId, day) ||
+            (v.isDayScoped && v.coversDay(day)) ||
+            (v.staffId === staffId && v.days.length === 0)
+        );
+      if (!schedule || !relevant) {
+        return undefined;
+      }
+      const suggestions = suggestionPolicy.rankCellCandidates({
+        schedule,
+        constraints: allConstraints,
+        staffId,
+        day,
+        workShifts,
+        preferenceOf,
+        isAvailable,
+        linkedReportScoreOf,
+        isBusyDay,
+      });
+      const fix = suggestConstraintFix({
+        schedule,
+        staffId,
+        day,
+        constraints: allConstraints,
+        suggestions,
+        staffList,
+        workShifts,
+        wishByStaff,
+        availability,
+        preferenceOf,
+        isAvailable,
+        linkedReportScoreOf,
+        isBusyDay,
+      });
+      if (!fix) return undefined;
+      const fixCell = fix.cell;
+      const shiftNameOf = (id: string) => workShifts.find((w) => w.id === id)?.name ?? id;
+      const toLabel =
+        fixCell.kind === "work"
+          ? shiftNameOf(fixCell.shiftId)
+          : fixCell.kind === "day-off"
+            ? "休み"
+            : "未定";
+      // この一手の副作用（人数不足）を、さらに数手先で解消する見通しがあれば理由文に添える
+      // （適用するのは最初の一手だけ。続きは次にそのセルをホバーしたときの提案に委ねる）。
+      const followUpText =
+        fix.followUpSteps.length > 0
+          ? `（この後、${fix.followUpSteps
+              .map((s) => `${nameOf(s.staffId)}を${shiftNameOf(s.shiftId)}に`)
+              .join("、")}動かせば解消する見通しです）`
+          : "";
+      return {
+        summary: `${toLabel}にすると解消できそうです（違反 ${fix.violationsBefore}→${fix.violationsAfter} 件）${followUpText}`,
+        onApply: () => {
+          recordSetCell(store, {
+            schedule,
+            constraints: allConstraints,
+            staffId,
+            staffName: nameOf(staffId),
+            day,
+            to: fix.cell,
+            suggestionId: fix.id,
+          });
+        },
+      };
+    },
+    [
+      schedule,
+      violations,
+      suggestionPolicy,
+      allConstraints,
+      workShifts,
+      preferenceOf,
+      isAvailable,
+      linkedReportScoreOf,
+      isBusyDay,
+      staffList,
+      wishByStaff,
+      availability,
+      store,
+      nameOf,
+    ]
+  );
+
+  // ホバー中の人数不足セル（集計行の shiftId×day）に対する解消案。
+  // suggestConstraintFix とは逆向きの探索（値ではなく、動かすスタッフを探す）だが、
+  // 「ふわっと出す→クリックでその場に適用」という体験は同じにする。
+  const suggestStaffingFixFor = useCallback(
+    (shiftId: string, day: WorkingDay) => {
+      if (!schedule) return undefined;
+      const fix = suggestStaffingFix({
+        schedule,
+        day,
+        shiftId,
+        constraints: allConstraints,
+        staffList,
+        workShifts,
+        wishByStaff,
+        availability,
+        preferenceOf,
+        isAvailable,
+        linkedReportScoreOf,
+        isBusyDay,
+      });
+      if (!fix) return undefined;
+      const shiftNameOf = (id: string) => workShifts.find((w) => w.id === id)?.name ?? id;
+      const shiftName = shiftNameOf(shiftId);
+      // 動かした先で新たに生じる不足を、さらに数手先で解消する見通しがあれば理由文に添える
+      // （適用するのは最初の一手だけ。続きは次にそのセルをホバーしたときの提案に委ねる）。
+      const followUpText =
+        fix.followUpSteps.length > 0
+          ? `（この後、${fix.followUpSteps
+              .map((s) => `${nameOf(s.staffId)}を${shiftNameOf(s.shiftId)}に`)
+              .join("、")}動かせば解消する見通しです）`
+          : "";
+      return {
+        summary: `${nameOf(fix.staffId)}を${shiftName}にすると人数を埋められそうです（不足 ${fix.gapBefore}→${fix.gapAfter}）${followUpText}`,
+        onApply: () => {
+          recordSetCell(store, {
+            schedule,
+            constraints: allConstraints,
+            staffId: fix.staffId,
+            staffName: nameOf(fix.staffId),
+            day,
+            to: fix.cell,
+            suggestionId: `staffing:${shiftId}:${day.key}:${fix.staffId}`,
+          });
+        },
+      };
+    },
+    [
+      schedule,
+      allConstraints,
+      staffList,
+      workShifts,
+      wishByStaff,
+      availability,
+      preferenceOf,
+      isAvailable,
+      linkedReportScoreOf,
+      isBusyDay,
+      store,
+      nameOf,
+    ]
+  );
 
   useEffect(() => {
     if (!schedule || cellSelection) return;
@@ -739,17 +866,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           }
           selection={cellSelection}
           onSelectionChange={setCellSelection}
-          possibilityUrl={(staffId, day) => {
-            const baseNodeId = localScope.graph.state.apexNodeId;
-            return baseNodeId && possibilityBubbleUrl
-              ? possibilityBubbleUrl(baseNodeId, staffId, day.key)
-              : undefined;
-          }}
-          possibilityRisk={(staffId, day) =>
-            cellSelection?.staffId === staffId &&
-            cellSelection.day.key === day.key &&
-            (cellSuggestions[0]?.wouldConcede ?? false)
-          }
+          suggestConstraintFix={suggestConstraintFixFor}
+          suggestStaffingFix={suggestStaffingFixFor}
         />
       </div>
 

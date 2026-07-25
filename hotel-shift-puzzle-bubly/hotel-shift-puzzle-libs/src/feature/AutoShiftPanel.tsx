@@ -20,7 +20,6 @@ import {
   type AutoShiftStep,
   type AutoShiftStepResult,
 } from "./autoShift.js";
-import { suggestAutoStep } from "./shiftSuggestion/suggestAutoStep.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordAutoStep } from "./recordScheduleEdit.js";
@@ -126,18 +125,6 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
     });
   }, [workShifts, constraints, wishByStaff]);
 
-  const stepSuggestion = useMemo(() => {
-    if (!schedule) return null;
-    return suggestAutoStep({
-      schedule,
-      constraints: allConstraints,
-      steps: AUTO_SHIFT_STEPS,
-    });
-  }, [schedule, allConstraints]);
-
-  const isSuggestedStep = (stepKey: string) =>
-    stepSuggestion?.stepKey === stepKey;
-
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -187,12 +174,6 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
 
       <LinkedReportsView reports={linkedReports} />
 
-      {stepSuggestion && (
-        <p className="e-suggest-reason">
-          おすすめの次の一手: {stepSuggestion.reason}
-        </p>
-      )}
-
       {preview && (
         <div className="e-step-preview">
           <strong>{preview.step.label} の見通し</strong>
@@ -212,18 +193,16 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
         {AUTO_BAR_ITEMS.map((item, i) => {
           const num = <span className="e-auto-num">{i + 1}</span>;
           if (item.kind === "single") {
-            const suggested = isSuggestedStep(item.step.key);
             return (
               <button
                 key={item.step.key}
                 type="button"
-                className={"e-link e-auto" + (suggested ? " is-suggested" : "")}
+                className="e-link e-auto"
                 title={item.step.description}
                 onClick={() => handleRunStep(item.step)}
               >
                 {num}
                 {item.step.label}
-                {suggested && <span className="e-suggest-badge">次の一手</span>}
               </button>
             );
           }
@@ -231,19 +210,10 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
           const selectedKey = selectedVariant[item.key] ?? item.variants[0].key;
           const selectedStep =
             item.variants.find((v) => v.key === selectedKey) ?? item.variants[0];
-          const groupSuggested = item.variants.some((v) => isSuggestedStep(v.key));
           return (
-            <div
-              key={item.key}
-              className={"e-auto-group" + (groupSuggested ? " is-suggested" : "")}
-            >
+            <div key={item.key} className="e-auto-group">
               {num}
-              <span className="e-auto-glabel">
-                {item.label}
-                {groupSuggested && (
-                  <span className="e-suggest-badge">次の一手</span>
-                )}
-              </span>
+              <span className="e-auto-glabel">{item.label}</span>
               <div className="e-seg" role="group" aria-label={`${item.label}の方式`}>
                 {item.variants.map((v) => (
                   <button
@@ -307,15 +277,6 @@ const StyledContainer = styled.div`
       font-size: 0.78em;
       color: #888;
     }
-    .e-suggest-reason {
-      margin: 0 0 8px;
-      padding: 6px 10px;
-      background: #fff8e1;
-      border: 1px solid #ffe082;
-      border-radius: 6px;
-      font-size: 0.8em;
-      color: #f57f17;
-    }
   }
 
   .e-step-preview {
@@ -354,26 +315,10 @@ const StyledContainer = styled.div`
       cursor: pointer;
       transition: background 0.1s, border-color 0.1s;
 
-      &.is-suggested {
-        border-color: #ffb300;
-        background: #fff8e1;
-      }
-
       &:hover {
         background: #ede7f6;
         border-color: #9575cd;
       }
-    }
-    .e-suggest-badge {
-      display: inline-block;
-      margin-left: 4px;
-      padding: 1px 6px;
-      border-radius: 999px;
-      background: #ffb300;
-      color: #fff;
-      font-size: 0.75em;
-      font-weight: 700;
-      line-height: 1.4;
     }
     .e-auto-num {
       display: inline-flex;
@@ -397,11 +342,6 @@ const StyledContainer = styled.div`
       border-radius: 8px;
       background: #faf7ff;
       padding: 3px 6px;
-
-      &.is-suggested {
-        border-color: #ffb300;
-        background: #fff8e1;
-      }
 
       .e-auto-glabel {
         font-size: 0.8em;

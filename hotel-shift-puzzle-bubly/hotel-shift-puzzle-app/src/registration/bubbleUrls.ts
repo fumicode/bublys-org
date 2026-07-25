@@ -84,15 +84,6 @@ export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-
 export const scheduleEditLogUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;
 
-/** セルを起点に、現在の世界線ノードから未来の分岐を見るバブル */
-export const schedulePossibilityUrl = (
-  scheduleId: string,
-  baseNodeId: string,
-  staffId: string,
-  dayKey: string
-): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/possibilities/${baseNodeId}/${staffId}/${dayKey}`;
-
 // オブジェクトの正規 URL を registry に登録（副作用）。libs の記述子からは url を外したので、
 // ObjectView(object=...) の url 解決はこの登録が担う。このモジュールは bubbleRoutes から
 // import されるため、ルート登録と同じタイミングで一度だけ走る。

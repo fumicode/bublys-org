@@ -2,7 +2,6 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorldLineGraph } from "@bublys-org/world-line-graph";
 import type { WorldLinesCanvasViewProps } from "@bublys-org/bubbles-ui";
-import { ScheduleForecast } from "@bublys-org/hotel-shift-puzzle-model";
 
 /**
  * ClimberWorldLineCanvasView — 勤務表ローカル世界線の「木登り」ビュー（ホテル専用）。
@@ -20,7 +19,7 @@ import { ScheduleForecast } from "@bublys-org/hotel-shift-puzzle-model";
  * props は共通版と同一（{@link WorldLinesCanvasViewProps}）なので差し替え可能。
  */
 
-type NodePos = { x: number; y: number; color: string; collapsedForecasts: number };
+type NodePos = { x: number; y: number; color: string };
 type Layout = {
   /** world 座標でのノード位置（0,0 起点。x=分岐, y=世代） */
   nodes: Map<string, NodePos>;
@@ -63,7 +62,7 @@ const COLOR_PALETTE = [
   "#ff8a65",
 ];
 
-function computeLayout(graph: WorldLineGraph, showForecasts: boolean): Layout {
+function computeLayout(graph: WorldLineGraph): Layout {
   const { nodes, rootNodeId } = graph.state;
   if (!rootNodeId || !nodes[rootNodeId]) {
     return { nodes: new Map(), edges: [], rootId: null, maxX: 0, maxY: 0 };
@@ -94,22 +93,9 @@ function computeLayout(graph: WorldLineGraph, showForecasts: boolean): Layout {
       x: branch * BRANCH_DX,
       y: depth * GEN_DY,
       color: wlColors.get(node.worldLineId) ?? "#888",
-      collapsedForecasts: 0,
     });
     const children = childrenMap[nodeId] ?? [];
-    const visibleChildren = children.filter((cid) => {
-      const parsed = ScheduleForecast.parseNodeLabel(nodes[cid]?.label);
-      if (
-        !showForecasts &&
-        (parsed?.kind === "forecast" || parsed?.kind === "forecast-end")
-      ) {
-        const pos = positions.get(nodeId);
-        if (pos) pos.collapsedForecasts++;
-        return false;
-      }
-      return true;
-    });
-    visibleChildren.forEach((cid, i) => {
+    children.forEach((cid, i) => {
       edges.push({ from: nodeId, to: cid });
       const childBranch = i === 0 ? branch : ++nextBranch;
       visit(cid, depth + 1, childBranch);
@@ -242,21 +228,11 @@ function draw(
 
   const screen = new Map<
     string,
-    {
-      sx: number;
-      sy: number;
-      scale: number;
-      color: string;
-      collapsedForecasts: number;
-    }
+    { sx: number; sy: number; scale: number; color: string }
   >();
   for (const [id, pos] of layout.nodes) {
     const p = project(pos.x, pos.y);
-    screen.set(id, {
-      ...p,
-      color: pos.color,
-      collapsedForecasts: pos.collapsedForecasts,
-    });
+    screen.set(id, { ...p, color: pos.color });
   }
 
   // edges（ノードより先に描いて下に敷く）。幹は縦、分岐は横に枝分かれ。
@@ -320,32 +296,7 @@ function draw(
       ctx.lineWidth = 1.6 * Math.max(0.6, s.scale);
       ctx.stroke();
     }
-    if (s.collapsedForecasts > 0) {
-      ctx.save();
-      ctx.strokeStyle = s.color;
-      ctx.fillStyle = s.color;
-      ctx.globalAlpha = 0.38;
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      ctx.moveTo(s.sx, s.sy - r);
-      ctx.lineTo(s.sx, s.sy - r - 14 * s.scale);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      for (let i = 0; i < Math.min(3, s.collapsedForecasts + 1); i++) {
-        ctx.beginPath();
-        ctx.arc(
-          s.sx + (i - 1) * 4 * s.scale,
-          s.sy - r - 17 * s.scale,
-          Math.max(1, 1.3 * s.scale),
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-      }
-      ctx.restore();
-    }
     // apex はノードの代わりにクライマーを（他ノードの上に載るよう）後段でまとめて描く。
-
   }
 
   // apex のクライマーを最後に描いて他ノードに隠れないようにする。
@@ -362,9 +313,7 @@ function draw(
   for (const [id, s] of screen) {
     if (s.sx < -60 || s.sx > vw + 60 || s.sy < -60 || s.sy > vh + 60) continue;
     if (s.scale < LABEL_BUBBLE_SCALE_THRESHOLD) continue;
-    const rawLabel = getLabel(id);
-    const label =
-      ScheduleForecast.parseNodeLabel(rawLabel)?.displayLabel ?? rawLabel;
+    const label = getLabel(id);
     if (!label) continue;
 
     const r = NODE_RADIUS * s.scale;
@@ -422,9 +371,7 @@ function draw(
   }
 }
 
-type ClimberWorldLineCanvasViewProps = WorldLinesCanvasViewProps & {
-  showForecasts?: boolean;
-};
+type ClimberWorldLineCanvasViewProps = WorldLinesCanvasViewProps;
 
 export const ClimberWorldLineCanvasView: FC<ClimberWorldLineCanvasViewProps> = ({
   graph,
@@ -433,17 +380,13 @@ export const ClimberWorldLineCanvasView: FC<ClimberWorldLineCanvasViewProps> = (
   onSelectNode,
   onApexScreenPos,
   background,
-  showForecasts = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState({ w: 1, h: 1 });
 
   // 同じ state なら layout を再利用
-  const layout = useMemo(
-    () => computeLayout(graph, showForecasts),
-    [graph.state, showForecasts]
-  );
+  const layout = useMemo(() => computeLayout(graph), [graph.state]);
   const labelize = getNodeLabel ?? ((_: string) => "");
 
   // フォーカス（ビューポート中央に来る world 座標）。current を target へ追従させる。

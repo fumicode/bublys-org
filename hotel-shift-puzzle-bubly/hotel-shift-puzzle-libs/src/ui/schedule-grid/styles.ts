@@ -535,40 +535,6 @@ export const StyledWrap = styled.div`
     }
   }
 
-  .e-possibility-anchor {
-    position: absolute;
-    right: 2px;
-    bottom: 1px;
-    z-index: 3;
-    line-height: 1;
-  }
-
-  .e-possibility-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 17px;
-    height: 17px;
-    border: 1px solid rgba(57, 73, 171, 0.35);
-    border-radius: 50%;
-    background: rgba(245, 245, 255, 0.9);
-    color: #5c6bc0;
-    font-size: 12px;
-    cursor: pointer;
-    opacity: 0.72;
-
-    &:hover {
-      opacity: 1;
-      border-color: #5c6bc0;
-    }
-
-    &.is-risk {
-      border-color: rgba(239, 108, 0, 0.55);
-      color: #ef6c00;
-      background: rgba(255, 248, 225, 0.94);
-    }
-  }
-
   /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
   .e-cell .e-input {
     position: absolute;
@@ -639,6 +605,44 @@ export const StyledWrap = styled.div`
       height: 7px;
     }
   }
+
+  /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
+     クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
+     （ScheduleGridView 側のホバー検出を参照）。 */
+  .e-constraint-fix-hint {
+    position: absolute;
+    transform: translate(-50%, 6px);
+    z-index: 5;
+    max-width: 220px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 253, 245, 0.98);
+    border: 1px solid rgba(239, 108, 0, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    font-size: 0.95em;
+    color: #5d4037;
+    line-height: 1.4;
+
+    p {
+      margin: 0 0 6px;
+    }
+
+    button {
+      border: 1px solid #ef6c00;
+      border-radius: 5px;
+      background: #fff3e0;
+      color: #e65100;
+      font-size: 0.95em;
+      font-weight: 600;
+      padding: 3px 8px;
+      cursor: pointer;
+
+      &:hover {
+        background: #ffe0b2;
+      }
+    }
+  }
+
   /* 部署グループヘッダー行（全カラムスパン） */
   .e-dept-label {
     position: sticky;

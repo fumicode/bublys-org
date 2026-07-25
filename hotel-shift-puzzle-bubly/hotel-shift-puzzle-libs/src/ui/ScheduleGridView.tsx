@@ -15,7 +15,12 @@ import {
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
 } from "../domain/index.js";
-import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
+import {
+  STAFF_COL_WIDTH,
+  DAY_COL_WIDTH,
+  OFF_COL_WIDTH,
+  DEMAND_CELL_KEY_PREFIX,
+} from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
@@ -24,6 +29,7 @@ import {
   ConstraintHoverOverlay,
   type ConstraintHoverGroup,
 } from "./schedule-grid/ConstraintHoverOverlay.js";
+import { ConstraintFixHint } from "./schedule-grid/ConstraintFixHint.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
@@ -84,10 +90,22 @@ type ScheduleGridViewProps = {
   /** feature 層と共有する現在セル。AIの分岐入口とキーボード選択を同じ状態にする。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
-  /** 選択中の未定セルから開く可能性バブルURL。 */
-  possibilityUrl?: (staffId: string, day: WorkingDay) => string | undefined;
-  /** 一手評価で将来リスクが見つかったセル。 */
-  possibilityRisk?: (staffId: string, day: WorkingDay) => boolean;
+  /**
+   * ホバー中セルに今出ている制約エラーを解消できそうな代替案があれば返す。
+   * 無ければ何も出さない（緩い提案＝押し付けない）。
+   */
+  suggestConstraintFix?: (
+    staffId: string,
+    day: WorkingDay
+  ) => { summary: string; onApply: () => void } | undefined;
+  /**
+   * ホバー中の人数不足セル（集計行の shiftId×day）を埋められそうな代替スタッフがいれば返す。
+   * 無ければ何も出さない（緩い提案＝押し付けない）。
+   */
+  suggestStaffingFix?: (
+    shiftId: string,
+    day: WorkingDay
+  ) => { summary: string; onApply: () => void } | undefined;
 };
 
 /**
@@ -146,8 +164,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   maxDayOffPerDay,
   selection,
   onSelectionChange,
-  possibilityUrl,
-  possibilityRisk,
+  suggestConstraintFix,
+  suggestStaffingFix,
 }) => {
   const days = schedule.workingDays();
 
@@ -172,7 +190,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // ホバー中セルの人が属する責任者ルールごとに、担当勤務帯（早番など）から全メンバーへ
   // ブレースを描くための情報を導く。制約がその日に満たされているかも添える。
   const hoverInfo = useMemo(() => {
-    if (!hoveredCell) return null;
+    if (!hoveredCell || hoveredCell.startsWith(DEMAND_CELL_KEY_PREFIX)) return null;
     const sep = hoveredCell.indexOf(":");
     if (sep < 0) return null;
     const staffId = hoveredCell.slice(0, sep);
@@ -211,6 +229,42 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     if (groups.length === 0) return null;
     return { dayKey, groups };
   }, [hoveredCell, leaderRules, staffList, shiftIdByName, days, violations, schedule, workShifts]);
+
+  // ホバー中セルに制約エラーの解消案があれば、ふわっと出すヒントカードの元データにする。
+  // "demand:" 始まりは人数不足セル（集計行）のキーなので、こちらのスタッフ×日セル向けの
+  // 解消案は評価しない（下の hoveredStaffingFix が担当する）。
+  const hoveredFix = useMemo(() => {
+    if (!hoveredCell || hoveredCell.startsWith(DEMAND_CELL_KEY_PREFIX) || !suggestConstraintFix) {
+      return null;
+    }
+    const sep = hoveredCell.indexOf(":");
+    if (sep < 0) return null;
+    const staffId = hoveredCell.slice(0, sep);
+    const dayKey = hoveredCell.slice(sep + 1);
+    const day = days.find((d) => d.key === dayKey);
+    if (!day) return null;
+    const suggestion = suggestConstraintFix(staffId, day);
+    return suggestion
+      ? { cellKey: `${staffId}:${dayKey}`, ...suggestion }
+      : null;
+  }, [hoveredCell, suggestConstraintFix, days]);
+
+  // ホバー中セルが人数不足セル（"demand:shiftId:dayKey"）なら、埋められそうな代替スタッフの
+  // 解消案があるか見る。同じ理由で "緩い提案"（無ければ何も出さない）。
+  const hoveredStaffingFix = useMemo(() => {
+    if (!hoveredCell || !hoveredCell.startsWith(DEMAND_CELL_KEY_PREFIX) || !suggestStaffingFix) {
+      return null;
+    }
+    const rest = hoveredCell.slice(DEMAND_CELL_KEY_PREFIX.length);
+    const sep = rest.lastIndexOf(":");
+    if (sep < 0) return null;
+    const shiftId = rest.slice(0, sep);
+    const dayKey = rest.slice(sep + 1);
+    const day = days.find((d) => d.key === dayKey);
+    if (!day) return null;
+    const suggestion = suggestStaffingFix(shiftId, day);
+    return suggestion ? { cellKey: hoveredCell, ...suggestion } : null;
+  }, [hoveredCell, suggestStaffingFix, days]);
 
   // この勤務表で選べる勤務帯（勤務表の WorkShiftSet から渡される。開始時刻昇順）
   const shiftOptions = workShifts;
@@ -323,8 +377,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
-          possibilityUrl={possibilityUrl}
-          possibilityRisk={possibilityRisk}
         />
       ));
     }
@@ -365,8 +417,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
-          possibilityUrl={possibilityUrl}
-          possibilityRisk={possibilityRisk}
         />
       )),
     ]);
@@ -503,6 +553,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             gridRef={kb.gridRef}
             dayKey={hoverInfo.dayKey}
             groups={hoverInfo.groups}
+          />
+        )}
+
+        {/* ホバー中セルの制約エラーを解消できそうな代替案を、ふわっと出す。
+            クリックでその場に適用（世界線分岐やバブルは開かない）。 */}
+        {hoveredFix && (
+          <ConstraintFixHint
+            gridRef={kb.gridRef}
+            cellKey={hoveredFix.cellKey}
+            summary={hoveredFix.summary}
+            onApply={hoveredFix.onApply}
+          />
+        )}
+
+        {/* ホバー中の人数不足セルを埋められそうな代替スタッフを、同じ形でふわっと出す。 */}
+        {hoveredStaffingFix && (
+          <ConstraintFixHint
+            gridRef={kb.gridRef}
+            cellKey={hoveredStaffingFix.cellKey}
+            summary={hoveredStaffingFix.summary}
+            onApply={hoveredStaffingFix.onApply}
           />
         )}
       </div>

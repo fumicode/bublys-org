@@ -62,6 +62,16 @@ export type ShiftCell =
   | { kind: "day-off" }
   | { kind: "undecided" };
 
+/** ShiftCell を JSON 比較可能なキーにする */
+export function shiftCellKey(cell: ShiftCell): string {
+  if (cell.kind === "work") return `work:${cell.shiftId}`;
+  return cell.kind;
+}
+
+export function shiftCellsEqual(a: ShiftCell, b: ShiftCell): boolean {
+  return shiftCellKey(a) === shiftCellKey(b);
+}
+
 export class MonthlyStaffSchedule {
   constructor(readonly state: MonthlyStaffScheduleState) {}
 

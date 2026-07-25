@@ -33,10 +33,6 @@ type ScheduleDataCellProps = {
   violationUrl?: (violation: ConstraintViolation) => string;
   /** 行の強調/減光用に付ける追加クラス（選択モード時の is-focused / is-dimmed）。 */
   cellClassName?: string;
-  /** 選択中の未定セルから開く可能性バブル。 */
-  possibilityUrl?: string;
-  /** 軽量評価で将来リスクがあるとき、入口へ静かな警告を添える。 */
-  possibilityRisk?: boolean;
 };
 
 /**
@@ -58,8 +54,6 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   onOpenEditor,
   violationUrl,
   cellClassName,
-  possibilityUrl,
-  possibilityRisk = false,
 }) => {
   let className = "e-cell";
   if (cellClassName) className += ` ${cellClassName}`;
@@ -130,30 +124,6 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
       {pointViolation && violationMarker(pointViolation, "e-wish-flag")}
       {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
-      {possibilityUrl && (
-        <span
-          className="e-possibility-anchor"
-          onClick={(e) => e.stopPropagation()}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <ObjectView
-            url={possibilityUrl}
-            openingPosition="origin-side"
-            draggable={false}
-          >
-            <span
-              className={`e-possibility-mark${possibilityRisk ? " is-risk" : ""}`}
-              title={
-                possibilityRisk
-                  ? "未来を見る（先で制約リスクがあります）"
-                  : "未来を見る → 見通しを比較 → この一手を選ぶ"
-              }
-            >
-              ⑂
-            </span>
-          </ObjectView>
-        </span>
-      )}
     </div>
   );
 };

@@ -31,22 +31,6 @@ describe("ScheduleEditLog", () => {
     expect(next.latest?.at).toBeTruthy();
   });
 
-  it("append は予測メタデータを保持する", () => {
-    const next = ScheduleEditLog.empty("sched-1").append({
-      actor: "auto",
-      kind: "candidate",
-      summary: "可能性の入口",
-      targets: { staffId: "s1", dayKey: "2026-06-01" },
-      constraintDelta: emptyConstraintDelta(),
-      source: "forecast",
-      forecastId: "sched-1:node:s1:2026-06-01:1:wish-first",
-      forecastRole: "decision",
-    });
-    expect(next.latest?.source).toBe("forecast");
-    expect(next.latest?.forecastRole).toBe("decision");
-    expect(next.latest?.forecastId).toContain("wish-first");
-  });
-
   it("entriesWithConcessions は譲歩のあるものだけ返す", () => {
     const withConcession = ScheduleEditLog.empty("s")
       .append({

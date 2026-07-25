@@ -51,8 +51,6 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
-  possibilityUrl?: (staffId: string, day: WorkingDay) => string | undefined;
-  possibilityRisk?: (staffId: string, day: WorkingDay) => boolean;
 };
 
 /**
@@ -81,8 +79,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
-  possibilityUrl,
-  possibilityRisk,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
@@ -151,16 +147,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}
-            possibilityUrl={
-              isSelected && cell.kind === "undecided"
-                ? possibilityUrl?.(staff.id, day)
-                : undefined
-            }
-            possibilityRisk={
-              isSelected &&
-              cell.kind === "undecided" &&
-              (possibilityRisk?.(staff.id, day) ?? false)
-            }
           />
         );
       })}
