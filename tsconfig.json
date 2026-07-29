@@ -98,6 +98,24 @@
     },
     {
       "path": "./event-shift-puzzle/event-shift-puzzle-app"
+    },
+    {
+      "path": "./construction-shift-puzzle-bubly/construction-shift-puzzle-model"
+    },
+    {
+      "path": "./construction-shift-puzzle-bubly/construction-shift-puzzle-libs"
+    },
+    {
+      "path": "./construction-shift-puzzle-bubly/construction-shift-puzzle-app"
+    },
+    {
+      "path": "./construction-cost-bubly/construction-cost-model"
+    },
+    {
+      "path": "./construction-cost-bubly/construction-cost-libs"
+    },
+    {
+      "path": "./construction-cost-bubly/construction-cost-app"
     }
   ]
 }
