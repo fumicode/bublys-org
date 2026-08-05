@@ -17,11 +17,13 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import PersonIcon from "@mui/icons-material/Person";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import GridOnIcon from "@mui/icons-material/GridOn";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import {
   Site,
   Employee,
   Machine,
   PlacementBoard,
+  MachineRequest,
   type PlacementBoardPlain,
 } from "@bublys-org/construction-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -32,6 +34,7 @@ export const SITE_TYPE = "Site";
 export const EMPLOYEE_TYPE = "Employee";
 export const MACHINE_TYPE = "Machine";
 export const PLACEMENT_BOARD_TYPE = "PlacementBoard";
+export const MACHINE_REQUEST_TYPE = "MachineRequest";
 
 /** 全社で1枚の配置表の固定ID（初回は単一ボード運用） */
 export const MAIN_BOARD_ID = "main";
@@ -64,6 +67,13 @@ export const CONSTRUCTION_OBJECTS = defineObjects({
     },
     // 配置表ごとのローカル世界線（自分のスコープ）＝配置編集を時間移動できる
     localScope: (b: PlacementBoard) => localScopeId(PLACEMENT_BOARD_TYPE, b.id),
+  },
+  MachineRequest: {
+    class: MachineRequest,
+    getId: (r: MachineRequest) => r.id,
+    icon: React.createElement(HourglassEmptyIcon, { fontSize: "small" }),
+    // state が完全 plain（id/siteId/machineId/from/to）なので serialize 省略（state 規約）。
+    // 希望は配置表の割り当てタイムラインとは別の一覧。アプリ全体スコープのみ（localScope 無し）。
   },
 });
 

@@ -27,6 +27,10 @@ export const machinesUrl = (): string => `construction-shift-puzzle/machines`;
 /** 配置表グリッドバブル（全社1枚） */
 export const boardUrl = (): string => `construction-shift-puzzle/board`;
 
+/** ある日の状態ビューバブル（日ヘッダのダブルクリックで開く） */
+export const dayUrl = (dayKey: string): string =>
+  `construction-shift-puzzle/days/${dayKey}`;
+
 /** 社員オブジェクトの正規 URL（ドラッグ配置の id 抽出に使う） */
 export const employeeUrl = (id: string): string =>
   `construction-shift-puzzle/employees/${id}`;

@@ -16,6 +16,7 @@ import {
   Employee,
   Machine,
   PlacementBoard,
+  MachineRequest,
 } from "@bublys-org/construction-shift-puzzle-model";
 import { useObjects, APP_SCOPE_ID } from "./repository.js";
 import {
@@ -23,12 +24,14 @@ import {
   EMPLOYEE_TYPE,
   MACHINE_TYPE,
   PLACEMENT_BOARD_TYPE,
+  MACHINE_REQUEST_TYPE,
 } from "./constructionObjects.js";
 import {
   createSampleSites,
   createSampleEmployees,
   createSampleMachines,
   createSampleBoard,
+  createSampleMachineRequests,
 } from "../data/sampleData.js";
 
 let seeded = false;
@@ -39,6 +42,7 @@ export function useSeedConstructionData(): void {
   const employees = useObjects<Employee>(EMPLOYEE_TYPE);
   const machines = useObjects<Machine>(MACHINE_TYPE);
   const boards = useObjects<PlacementBoard>(PLACEMENT_BOARD_TYPE);
+  const requests = useObjects<MachineRequest>(MACHINE_REQUEST_TYPE);
 
   useEffect(() => {
     if (seeded) return;
@@ -60,6 +64,11 @@ export function useSeedConstructionData(): void {
     }
     if (boards.length === 0) {
       items.push({ type: PLACEMENT_BOARD_TYPE, object: createSampleBoard() });
+    }
+    if (requests.length === 0) {
+      items.push(
+        ...createSampleMachineRequests().map((o) => ({ type: MACHINE_REQUEST_TYPE, object: o }))
+      );
     }
     if (items.length > 0) scope.addObjects(items); // 1回の grow でまとめて投入
     // 初回マウント時に一度だけ

@@ -5,3 +5,4 @@
  */
 export * from "./EntityListView.js";
 export * from "./PlacementBoardGridView.js";
+export * from "./DaySiteMapView.js";

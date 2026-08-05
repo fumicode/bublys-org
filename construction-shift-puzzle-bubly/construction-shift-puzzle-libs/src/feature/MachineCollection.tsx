@@ -12,9 +12,9 @@ const newId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `mac-${Date.now()}`;
 
 const KIND_OPTIONS = [
-  MachineKind.Truck,
-  MachineKind.Excavator,
-  MachineKind.Crane,
+  MachineKind.Dump,
+  MachineKind.Backhoe,
+  MachineKind.Pump,
   MachineKind.Roller,
   MachineKind.Other,
 ];

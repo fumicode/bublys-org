@@ -7,11 +7,11 @@
 
 /** 機械種別の代表値（自由文字列だが、UI やシードでこれらを使う） */
 export const MachineKind = {
-  Truck: "truck",
-  Excavator: "excavator",
-  Crane: "crane",
-  Roller: "roller",
-  Other: "other",
+  Dump: "ダンプ",
+  Backhoe: "バックホー",
+  Pump: "水中ポンプ",
+  Roller: "特殊ローラー",
+  Other: "その他",
 } as const;
 export type MachineKind = string;
 

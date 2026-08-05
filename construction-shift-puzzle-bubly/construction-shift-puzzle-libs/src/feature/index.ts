@@ -5,3 +5,4 @@ export * from "./SiteCollection.js";
 export * from "./EmployeeCollection.js";
 export * from "./MachineCollection.js";
 export * from "./PlacementBoardGrid.js";
+export * from "./DayView.js";
