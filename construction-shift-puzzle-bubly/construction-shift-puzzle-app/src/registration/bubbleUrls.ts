@@ -31,6 +31,13 @@ export const boardUrl = (): string => `construction-shift-puzzle/board`;
 export const dayUrl = (dayKey: string): string =>
   `construction-shift-puzzle/days/${dayKey}`;
 
+/**
+ * 配置表の世界線ビューバブル（配置の編集履歴・時間移動）。
+ * `/history` で終わると bubbles-ui が下部ストリップに特別扱いするため別名（world-line）にする。
+ */
+export const boardWorldLineUrl = (): string =>
+  `construction-shift-puzzle/board/world-line`;
+
 /** 社員オブジェクトの正規 URL（ドラッグ配置の id 抽出に使う） */
 export const employeeUrl = (id: string): string =>
   `construction-shift-puzzle/employees/${id}`;

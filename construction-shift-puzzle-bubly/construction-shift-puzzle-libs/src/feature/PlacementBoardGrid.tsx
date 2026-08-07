@@ -35,6 +35,8 @@ type PlacementBoardGridProps = {
   onOpenDay?: (dayKey: string) => void;
   /** 日の状態ビューの URL ビルダー（リンクバブルの起点に使う data-url 用） */
   dayBubbleUrl?: (dayKey: string) => string;
+  /** 世界線ビュー（配置の編集履歴・時間移動）を開く */
+  onOpenHistory?: () => void;
 };
 
 const newId = (prefix: string): string =>
@@ -44,6 +46,7 @@ export const PlacementBoardGrid: FC<PlacementBoardGridProps> = ({
   boardId = MAIN_BOARD_ID,
   onOpenDay,
   dayBubbleUrl,
+  onOpenHistory,
 }) => {
   useSeedConstructionData();
   const sites = useObjects<Site>(SITE_TYPE);
@@ -119,6 +122,13 @@ export const PlacementBoardGrid: FC<PlacementBoardGridProps> = ({
         onOpenDay={onOpenDay}
         dayBubbleUrl={dayBubbleUrl}
       />
+      {onOpenHistory && (
+        <div className="e-footer">
+          <button type="button" className="e-history" onClick={onOpenHistory} title="配置の編集履歴（世界線）を開く">
+            🕰 世界線
+          </button>
+        </div>
+      )}
     </StyledContainer>
   );
 };
@@ -169,6 +179,22 @@ const StyledContainer = styled.div`
       font-size: 0.75em;
       color: #90a4ae;
       margin-left: auto;
+    }
+  }
+
+  .e-footer {
+    margin-top: 6px;
+    display: flex;
+
+    .e-history {
+      font-size: 0.82em;
+      padding: 3px 12px;
+      border: 1px solid #cfd8dc;
+      border-radius: 999px;
+      background: #fff;
+      color: #37474f;
+      cursor: pointer;
+      &:hover { background: #eceff1; border-color: #90a4ae; }
     }
   }
 `;
