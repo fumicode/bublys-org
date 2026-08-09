@@ -56,6 +56,8 @@ type StaffScheduleRowProps = {
    * 無ければ空配列（何も出さない＝押し付けない）。
    */
   pendingLeaderCandidatesOf?: (staffId: string, day: WorkingDay) => string[];
+  /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
+  candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
 };
 
 /**
@@ -85,6 +87,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   dimmed,
   minDayOff,
   pendingLeaderCandidatesOf,
+  candidateHintOf,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
@@ -152,6 +155,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onSelect={() => onSelectCell(staff.id, day)}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             pendingLeaderLabels={pendingLeaderCandidatesOf?.(staff.id, day) ?? []}
+            candidateHint={candidateHintOf?.(staff.id, day)}
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}
           />

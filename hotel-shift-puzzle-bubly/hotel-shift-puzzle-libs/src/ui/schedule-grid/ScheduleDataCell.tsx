@@ -20,6 +20,11 @@ type ScheduleDataCellProps = {
    * ルールラベル一覧（例: ["早責"]）。空なら何も出さない。左上の小さなヒントで表す。
    */
   pendingLeaderLabels?: string[];
+  /**
+   * まだ決まっていないセルに入れられる値（候補集合）の説明文。ホバーで内容が見えるよう
+   * title に添える。確定済みセル・候補集合が無いときは undefined。
+   */
+  candidateHint?: string;
   /** セルを一意に指すキー（"staffId:dayKey"）。候補ドロップダウンのアンカー特定に使う */
   cellKey: string;
   /** キーボード操作でフォーカス中のセルか */
@@ -54,6 +59,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   rangeViolation,
   pointViolation,
   pendingLeaderLabels = [],
+  candidateHint,
   cellKey,
   selected = false,
   inputBuffer = null,
@@ -85,6 +91,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
     content = wishEntries.length > 0 ? wishEntries.map(wishText).join(" ") : "·";
     if (wishEntries.length > 0) className += " has-wish-hint";
   }
+
+  if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
 
   const showPendingLeaderHint = cell.kind === "undecided" && pendingLeaderLabels.length > 0;
   // セル幅が狭いので、複数ルールにまたがる場合はフルラベルだと入り切らない。

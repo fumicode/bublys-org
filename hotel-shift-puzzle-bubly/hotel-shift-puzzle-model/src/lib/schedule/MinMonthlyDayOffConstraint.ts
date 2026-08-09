@@ -22,7 +22,7 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
   readonly scope = "staff" as const;
 
   /** @param minDays 月の最低休日数（既定 8） */
-  constructor(readonly minDays: number = 8) {}
+  constructor(readonly minDays = 8) {}
 
   describe(): string {
     return `月に${this.minDays}日以上休む`;

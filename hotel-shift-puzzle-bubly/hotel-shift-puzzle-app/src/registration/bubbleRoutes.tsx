@@ -92,6 +92,16 @@ const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
+/**
+ * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
+ * bundler 依存なので、バブル URL と同じく app 層の関心事として ここ に置き、
+ * ScheduleGrid へは関数として注入する。
+ */
+const createCandidatesWorker = () =>
+  new Worker(new URL("../workers/candidates.worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
@@ -129,6 +139,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
+      createCandidatesWorker={createCandidatesWorker}
     />
   );
 };

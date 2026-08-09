@@ -33,6 +33,7 @@ import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
+import { useScheduleCandidates } from "./candidates/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
@@ -96,6 +97,11 @@ type ScheduleGridProps = {
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
    */
   onOpenRule?: (ruleKey: string) => void;
+  /**
+   * 候補集合を計算する worker を作る。worker の作り方は bundler 依存なので app 層から
+   * 注入する（URL スキームと同じ流儀）。渡さなければ main thread で同期計算する。
+   */
+  createCandidatesWorker?: () => Worker;
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -123,6 +129,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   ruleBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
+  createCandidatesWorker,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
@@ -132,6 +139,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     day: WorkingDay;
   } | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
+  const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
@@ -374,6 +383,37 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const violations = useMemo(
     () => (schedule ? schedule.checkConstraints(allConstraints) : []),
     [schedule, allConstraints]
+  );
+
+  // まだ決まっていないセルに入れられる値（候補集合）。確定のたびに影響範囲だけ計算し直す。
+  // 表示（薄い確定提案・詰み警告）は別 Issue。ここではセルの title で中身を確認できるようにする。
+  const { candidates } = useScheduleCandidates({
+    schedule,
+    constraints,
+    checkShiftWish: constraints?.checkShiftWish ?? true,
+    wishByStaff,
+    workShifts,
+    staffIds,
+    createWorker: createCandidatesWorker,
+  });
+
+  const candidateHintOf = useCallback(
+    (staffId: string, day: WorkingDay): string | undefined => {
+      const options = candidates.candidatesOf(staffId, day);
+      if (!options) return undefined; // 確定済み（候補集合は未定セルの分だけ持つ）
+      if (options.length === 0) return "候補なし（このままではこのセルを埋められません）";
+      const labelOf = (cell: ShiftCell) =>
+        cell.kind === "work"
+          ? (workShifts.find((w) => w.id === cell.shiftId)?.name ?? cell.shiftId)
+          : cell.kind === "day-off"
+            ? "休み"
+            : "未定";
+      const values = options.map(labelOf).join(" / ");
+      return options.length === 1
+        ? `候補は${values}だけ（ここは一意に決まります）`
+        : `候補${options.length}件: ${values}`;
+    },
+    [candidates, workShifts]
   );
 
   useEffect(() => {
@@ -654,6 +694,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           selection={cellSelection}
           onSelectionChange={setCellSelection}
           pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
+          candidateHintOf={candidateHintOf}
         />
       </div>
 

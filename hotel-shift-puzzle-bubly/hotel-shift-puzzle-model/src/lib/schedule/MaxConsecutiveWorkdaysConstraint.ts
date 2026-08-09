@@ -24,7 +24,7 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   readonly scope = "staff" as const;
 
   /** @param maxConsecutive 許容する連勤日数の上限（既定 5） */
-  constructor(readonly maxConsecutive: number = 5) {}
+  constructor(readonly maxConsecutive = 5) {}
 
   describe(): string {
     return `連勤は最大${this.maxConsecutive}日まで`;

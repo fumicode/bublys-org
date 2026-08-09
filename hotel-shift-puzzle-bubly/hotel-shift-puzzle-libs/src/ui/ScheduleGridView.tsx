@@ -94,6 +94,11 @@ type ScheduleGridViewProps = {
    * そのルールラベル一覧を返す。無ければ空配列（何も出さない＝押し付けない）。
    */
   pendingLeaderCandidatesOf?: (staffId: string, day: WorkingDay) => string[];
+  /**
+   * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
+   * 確定済みセルには何も返さない。
+   */
+  candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
 };
 
 /**
@@ -153,6 +158,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   selection,
   onSelectionChange,
   pendingLeaderCandidatesOf,
+  candidateHintOf,
 }) => {
   const days = schedule.workingDays();
 
@@ -329,6 +335,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
+          candidateHintOf={candidateHintOf}
         />
       ));
     }
@@ -370,6 +377,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
+          candidateHintOf={candidateHintOf}
         />
       )),
     ]);

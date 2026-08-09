@@ -1,11 +1,9 @@
-import {
-  MonthlyStaffSchedule,
-  WorkShift,
-  WorkingDay,
-  MaxConsecutiveWorkdaysConstraint,
-  MaxDayOffPerDayConstraint,
-} from "@bublys-org/hotel-shift-puzzle-model";
-import { legalCandidatesFor } from "./legalCandidates.js";
+import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
+import { WorkShift } from "./WorkShift.js";
+import { WorkingDay } from "./WorkingDay.js";
+import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
+import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
+import { legalCandidatesFor } from "./cellCandidates.js";
 
 describe("legalCandidatesFor", () => {
   const early = WorkShift.of("early", "早番", { hour: 7 });

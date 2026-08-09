@@ -46,3 +46,9 @@ export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
 export * from './schedule/RequiredStaffingConstraint.js';
+
+// 候補集合（まだ決まっていないセルに入れられる値を、制約から絞り込んで持つ）
+export * from './schedule/cellCandidates.js';
+export * from './schedule/affectedCells.js';
+export * from './schedule/ScheduleCandidates.js';
+export * from './schedule/computeCandidates.js';

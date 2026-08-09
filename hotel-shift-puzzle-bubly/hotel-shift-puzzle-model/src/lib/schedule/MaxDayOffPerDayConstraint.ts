@@ -17,7 +17,7 @@ export class MaxDayOffPerDayConstraint implements ScheduleConstraint {
   readonly scope = "day" as const;
 
   /** @param maxPerDay 1日に休んでよい人数の上限（既定 8） */
-  constructor(readonly maxPerDay: number = 8) {}
+  constructor(readonly maxPerDay = 8) {}
 
   describe(): string {
     return `1日に休めるのは${this.maxPerDay}人まで`;

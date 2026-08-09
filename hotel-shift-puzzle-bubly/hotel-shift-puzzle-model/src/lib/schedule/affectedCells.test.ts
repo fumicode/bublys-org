@@ -1,10 +1,8 @@
-import {
-  MonthlyStaffSchedule,
-  WorkingDay,
-  MaxConsecutiveWorkdaysConstraint,
-  MaxDayOffPerDayConstraint,
-  type ScheduleConstraint,
-} from "@bublys-org/hotel-shift-puzzle-model";
+import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
+import { WorkingDay } from "./WorkingDay.js";
+import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
+import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
+import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { affectedCells } from "./affectedCells.js";
 
 describe("affectedCells", () => {
