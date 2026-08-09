@@ -51,6 +51,11 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /**
+   * 未定セルが、責任者ルールの「保留中」候補になっている場合、そのルールラベル一覧を返す。
+   * 無ければ空配列（何も出さない＝押し付けない）。
+   */
+  pendingLeaderCandidatesOf?: (staffId: string, day: WorkingDay) => string[];
 };
 
 /**
@@ -79,6 +84,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  pendingLeaderCandidatesOf,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
@@ -145,6 +151,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             inputBuffer={isSelected ? inputBuffer : null}
             onSelect={() => onSelectCell(staff.id, day)}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
+            pendingLeaderLabels={pendingLeaderCandidatesOf?.(staff.id, day) ?? []}
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}
           />

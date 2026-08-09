@@ -15,6 +15,11 @@ type ScheduleDataCellProps = {
   rangeViolation?: ConstraintViolation;
   /** 単日違反（希望の食い違いなど）。右上の ⊿ で表す */
   pointViolation?: ConstraintViolation;
+  /**
+   * 責任者ルールが一意に決め切れず「保留中」に残した候補としてこのセルが挙がっている場合の
+   * ルールラベル一覧（例: ["早責"]）。空なら何も出さない。左上の小さなヒントで表す。
+   */
+  pendingLeaderLabels?: string[];
   /** セルを一意に指すキー（"staffId:dayKey"）。候補ドロップダウンのアンカー特定に使う */
   cellKey: string;
   /** キーボード操作でフォーカス中のセルか */
@@ -39,6 +44,7 @@ type ScheduleDataCellProps = {
  * 勤務表の 1 セル（スタッフ×日）の純粋表示。
  * 出勤＝開始時刻の「時」だけ（勤務帯は背景色で区別）、休み＝「休」、未定＝希望ヒント or「·」。
  * 違反は範囲（下端の赤帯）と単日（右上の ⊿）の 2 種に描き分ける。
+ * 未定セルが責任者ルールの保留中候補なら、左上に小さくルールラベルを出す。
  * シングルクリックで選択、ダブルクリックで候補ドロップダウン（キーボード操作と共通）。
  */
 export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
@@ -47,6 +53,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   wishEntries,
   rangeViolation,
   pointViolation,
+  pendingLeaderLabels = [],
   cellKey,
   selected = false,
   inputBuffer = null,
@@ -78,6 +85,14 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
     content = wishEntries.length > 0 ? wishEntries.map(wishText).join(" ") : "·";
     if (wishEntries.length > 0) className += " has-wish-hint";
   }
+
+  const showPendingLeaderHint = cell.kind === "undecided" && pendingLeaderLabels.length > 0;
+  // セル幅が狭いので、複数ルールにまたがる場合はフルラベルだと入り切らない。
+  // 1件なら全文字、2件以上は先頭1文字ずつに略す（詳細は title のツールチップで見せる）。
+  const pendingLeaderHintText =
+    pendingLeaderLabels.length === 1
+      ? pendingLeaderLabels[0]
+      : pendingLeaderLabels.map((l) => l.charAt(0)).join("/");
 
   if (pointViolation || rangeViolation) className += " is-violation";
   if (selected) className += " is-selected";
@@ -122,6 +137,14 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
     >
       {content}
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
+      {showPendingLeaderHint && (
+        <span
+          className="e-pending-leader-hint"
+          title={`責任者ルールの候補（未定・保留中）: ${pendingLeaderLabels.join("・")}`}
+        >
+          {pendingLeaderHintText}
+        </span>
+      )}
       {pointViolation && violationMarker(pointViolation, "e-wish-flag")}
       {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
     </div>

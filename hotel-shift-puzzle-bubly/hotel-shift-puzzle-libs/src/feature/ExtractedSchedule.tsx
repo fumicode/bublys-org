@@ -14,6 +14,7 @@ import {
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
+  makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   type AutoShiftStep,
   type WorkingDay,
@@ -215,11 +216,23 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
         wishByStaff,
         availability,
       }).schedule;
-    // 1案 = 希望を叶える → 責任者を満たす（担当は輪番・phase で交代） → 月の休みを入れる（phase）
+    // 1案 = 希望を叶える → 責任者を満たす（他ルールとの兼務を考慮し、一意に決まる枠だけ確定）
+    //     → 残った枠を phase 違いで決める → 月の休みを入れる（phase）
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
       s = runOn(s, fulfillWishesStep);
-      s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
+
+      // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
+      const leaderFill = runAutoShiftStep(
+        makeSatisfyLeaderRulesStep(relevantRules, allLeaderRules),
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+      );
+      s = leaderFill.schedule;
+
+      s = runOn(
+        s,
+        makeResolveAmbiguousLeaderSlotsStep(leaderFill.ambiguousLeaderSlots ?? [], { phase })
+      );
       s = runOn(
         s,
         makeMinDayOffStep(minDayOff, { maxPerDay, phase })

@@ -35,6 +35,7 @@ export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';
 export * from './schedule/partnerCoverStep.js';
 export * from './schedule/satisfyLeaderRulesStep.js';
+export * from './schedule/resolveAmbiguousLeaderSlotsStep.js';
 export * from './schedule/minDayOffStep.js';
 export * from './schedule/autoShiftSteps.js';
 
@@ -44,3 +45,4 @@ export * from './schedule/ScheduleConstraint.js';
 export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
+export * from './schedule/RequiredStaffingConstraint.js';

@@ -18,7 +18,6 @@ import {
   AUTO_SHIFT_STEPS,
   runAutoShiftStep,
   type AutoShiftStep,
-  type AutoShiftStepResult,
 } from "./autoShift.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
@@ -76,10 +75,6 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
   useSeedHotelData();
   const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    step: AutoShiftStep;
-    result: AutoShiftStepResult;
-  } | null>(null);
   // グループ（同目的の別戦略）ごとに、選択中の戦略キーを保持する
   const [selectedVariant, setSelectedVariant] = useState<Record<string, string>>({});
 
@@ -139,23 +134,15 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
       wishByStaff,
       availability,
     });
-    setPreview({ step, result });
-  };
-
-  const handleConfirmStep = () => {
-    if (!preview) return;
     recordAutoStep(store, {
       schedule,
-      next: preview.result.schedule,
+      next: result.schedule,
       constraints: allConstraints,
-      stepId: preview.step.key,
-      stepLabel: preview.step.label,
-      message: preview.result.message,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
     });
-    setAutoMessage(
-      `${preview.step.label}: ${preview.result.message}`
-    );
-    setPreview(null);
+    setAutoMessage(`${step.label}: ${result.message}`);
   };
 
   return (
@@ -168,26 +155,11 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
           </span>
         </h3>
         <p className="e-note">
-          未来を見る → 見通しを比較 → この一手を選ぶ。実行前に結果を確認します。人間が入力済みのセルは上書きしません。
+          上から順に実行すると埋まっていきます。人間が入力済みのセルは上書きしません。
         </p>
       </div>
 
       <LinkedReportsView reports={linkedReports} />
-
-      {preview && (
-        <div className="e-step-preview">
-          <strong>{preview.step.label} の見通し</strong>
-          <span>{preview.result.message}</span>
-          <div>
-            <button type="button" onClick={handleConfirmStep}>
-              まずこの一手を選ぶ
-            </button>
-            <button type="button" onClick={() => setPreview(null)}>
-              戻る
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="e-auto-bar">
         {AUTO_BAR_ITEMS.map((item, i) => {
@@ -235,7 +207,7 @@ export const AutoShiftPanel: FC<AutoShiftPanelProps> = ({ scheduleId }) => {
                 title={selectedStep.description}
                 onClick={() => handleRunStep(selectedStep)}
               >
-                先を見る
+                実行
               </button>
             </div>
           );
@@ -276,22 +248,6 @@ const StyledContainer = styled.div`
       margin: 4px 0 0;
       font-size: 0.78em;
       color: #888;
-    }
-  }
-
-  .e-step-preview {
-    display: grid;
-    gap: 6px;
-    margin-bottom: 10px;
-    padding: 10px;
-    border: 1px solid #c5cae9;
-    border-radius: 8px;
-    background: #f5f5ff;
-    font-size: 0.8em;
-
-    div {
-      display: flex;
-      gap: 6px;
     }
   }
 

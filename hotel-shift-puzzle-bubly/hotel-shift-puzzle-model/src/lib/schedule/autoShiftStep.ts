@@ -46,6 +46,24 @@ export type AutoShiftContext = {
   maxConsecutive?: number;
 };
 
+/**
+ * makeSatisfyLeaderRulesStep が「他の責任者ルールとの兼ね合いで一意に決め切れず、
+ * 未定のまま残した」責任者枠。resolveAmbiguousLeaderSlotsStep がこれを受けて
+ * phase違いで複数案（世界線の兄弟ブランチ）を作るのに使う。
+ */
+export type AmbiguousLeaderSlot = {
+  day: WorkingDay;
+  ruleKey: string;
+  /** 担当勤務帯ID（解決済み。resolver がルールを引き直さなくて済むように） */
+  shiftId: string;
+  /** なお必要な人数（minCount - 現在の充足数） */
+  remainingNeed: number;
+  /** 他ルールで必要な人を除外した後もなお残る候補（空 = 全員が他ルールで必要） */
+  candidates: string[];
+  /** 除外前の候補（candidates が remainingNeed に足りないときのフォールバック） */
+  fallbackCandidates: string[];
+};
+
 export type AutoShiftStepResult = {
   /** このステップ実行後の勤務表 */
   schedule: MonthlyStaffSchedule;
@@ -53,6 +71,8 @@ export type AutoShiftStepResult = {
   assigned: number;
   /** 人間向けの結果メッセージ */
   message: string;
+  /** makeSatisfyLeaderRulesStep 専用。他のステップは省略する */
+  ambiguousLeaderSlots?: AmbiguousLeaderSlot[];
 };
 
 /** 段階的に実行できる自動シフトの1ステップ（コマンド） */

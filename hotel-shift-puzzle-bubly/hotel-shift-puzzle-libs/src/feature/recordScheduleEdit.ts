@@ -25,6 +25,7 @@ import {
   saveLocalBundle,
   commitToScope,
   APP_SCOPE_ID,
+  type BundleItem,
 } from "../objects/commit.js";
 import {
   SCHEDULE_TYPE,
@@ -106,9 +107,7 @@ function appendConcessionHint(
   return `${summary}（譲歩${concessionCount}）`;
 }
 
-/**
- * 勤務表を変換し、違反差分付きの操作ログを同一ノードに記録する。
- */
+/** 勤務表を変換し、違反差分付きの操作ログを同一ノードに記録する。 */
 export function recordScheduleMutation(
   store: StoreLike,
   args: {
@@ -120,8 +119,8 @@ export function recordScheduleMutation(
 ): MonthlyStaffSchedule {
   const scheduleId = args.schedule.state.id;
   const before = args.schedule.checkConstraints(args.constraints);
-  const next = args.transform(args.schedule);
-  const after = next.checkConstraints(args.constraints);
+  const transformed = args.transform(args.schedule);
+  const after = transformed.checkConstraints(args.constraints);
   const delta = computeConstraintDelta(before, after);
   const summary = appendConcessionHint(
     args.meta.summary,
@@ -137,14 +136,15 @@ export function recordScheduleMutation(
     suggestionId: args.meta.suggestionId,
     rejectedSuggestionId: args.meta.rejectedSuggestionId,
   });
+
   saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
-    { type: SCHEDULE_TYPE, obj: next },
+    { type: SCHEDULE_TYPE, obj: transformed },
     { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
   ]);
-  return next;
+  return transformed;
 }
 
-/** セル編集を記録 */
+/** セル編集を記録。 */
 export function recordSetCell(
   store: StoreLike,
   args: {
@@ -185,7 +185,7 @@ export function recordSetCell(
   });
 }
 
-/** 必要人数変更を記録 */
+/** 必要人数変更を記録。 */
 export function recordRequiredEdit(
   store: StoreLike,
   args: {
@@ -278,10 +278,13 @@ export function recordConstraintEdit(
     targets: {},
     constraintDelta: delta,
   });
-  saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
+
+  const items: BundleItem[] = [
     { type: SCHEDULE_CONSTRAINTS_TYPE, obj: args.nextConstraints },
-    { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
-  ]);
+  ];
+
+  items.push({ type: SCHEDULE_EDIT_LOG_TYPE, obj: log });
+  saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), items);
 }
 
 /**

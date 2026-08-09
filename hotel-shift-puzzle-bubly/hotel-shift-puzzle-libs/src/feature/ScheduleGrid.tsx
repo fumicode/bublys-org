@@ -15,11 +15,10 @@ import {
   fulfillWishesStep,
   makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
+  makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   WorkingDay,
-  shiftCellsEqual,
   type AutoShiftStep,
-  type AutoShiftStepResult,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
@@ -32,14 +31,8 @@ import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
-import { runAutoShiftStep, decodeWishForStaff } from "./autoShift.js";
-import {
-  HeuristicSuggestionPolicy,
-  suggestNextUndecided,
-  busyDayKeysOf,
-  suggestConstraintFix,
-  suggestStaffingFix,
-} from "./shiftSuggestion/index.js";
+import { runAutoShiftStep } from "./autoShift.js";
+import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
@@ -134,15 +127,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   useSeedHotelData();
   const store = useAppStore();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
-  const [stepPreview, setStepPreview] = useState<{
-    step: AutoShiftStep;
-    result: AutoShiftStepResult;
-  } | null>(null);
   const [cellSelection, setCellSelection] = useState<{
     staffId: string;
     day: WorkingDay;
   } | null>(null);
-  const suggestionPolicy = useMemo(() => new HeuristicSuggestionPolicy(), []);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -266,6 +254,39 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return map;
   }, [allWishes, schedule]);
 
+  // 責任者ルールが一意に決め切れず「保留中」に残す枠（hidden-single判定の副産物）を試算する。
+  // 勤務表は変更せず、読み取り専用（makeSatisfyLeaderRulesStep は不変オブジェクトを返すだけ）。
+  const ambiguousLeaderSlots = useMemo(() => {
+    if (!schedule || relevantRules.length === 0) return [];
+    return (
+      runAutoShiftStep(makeSatisfyLeaderRulesStep(relevantRules, leaderRules), {
+        schedule,
+        staffList: subsetStaff,
+        workShifts,
+        wishByStaff,
+        availability,
+      }).ambiguousLeaderSlots ?? []
+    );
+  }, [schedule, relevantRules, leaderRules, subsetStaff, workShifts, wishByStaff, availability]);
+
+  // セル（staffId×day）→ そのセルが候補になっている責任者ルールのラベル一覧。
+  // グリッド側で未定セルの隅に「保留中の候補」ヒントとして出す。
+  const pendingLeaderCandidatesOf = useMemo(() => {
+    const ruleLabelByKey = new Map(leaderRules.map((r) => [r.key, r.label]));
+    const map = new Map<string, string[]>();
+    for (const slot of ambiguousLeaderSlots) {
+      const pool = slot.candidates.length > 0 ? slot.candidates : slot.fallbackCandidates;
+      const label = ruleLabelByKey.get(slot.ruleKey) ?? slot.ruleKey;
+      for (const staffId of pool) {
+        const key = `${staffId}:${slot.day.key}`;
+        const list = map.get(key);
+        if (list) list.push(label);
+        else map.set(key, [label]);
+      }
+    }
+    return (staffId: string, day: WorkingDay): string[] => map.get(`${staffId}:${day.key}`) ?? [];
+  }, [ambiguousLeaderSlots, leaderRules]);
+
   // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
   // 連勤・希望に加え、責任者ルールの未充足（担当勤務帯に minCount 未満の日）も同じ違反
   // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
@@ -355,232 +376,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     [schedule, allConstraints]
   );
 
-  const shiftIdByName = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const w of workShifts) {
-      if (!map.has(w.name)) map.set(w.name, w.id);
-    }
-    return map;
-  }, [workShifts]);
-
-  const preferenceOf = useCallback(
-    (staffId: string, day: WorkingDay) =>
-      decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    [wishByStaff, shiftIdByName]
-  );
-
-  const isAvailable = useMemo(
-    () =>
-      availability
-        ? (staffId: string, shiftId: string) =>
-            availability.isAllowed(staffId, shiftId)
-        : undefined,
-    [availability]
-  );
-
-  const linkedReportScoreOf = useMemo(() => {
-    const totalScoreByStaff = new Map<string, number>();
-    for (const report of linkedReports) {
-      for (const s of report.contributionScores) {
-        totalScoreByStaff.set(
-          s.staffId,
-          (totalScoreByStaff.get(s.staffId) ?? 0) + s.score
-        );
-      }
-    }
-    return (staffId: string) => totalScoreByStaff.get(staffId) ?? 0;
-  }, [linkedReports]);
-
-  const isBusyDay = useMemo(() => {
-    if (!schedule) return () => false;
-    const keys = busyDayKeysOf(schedule);
-    return (dayKey: string) => keys.has(dayKey);
-  }, [schedule]);
-
-  const cellSuggestions = useMemo(() => {
-    if (!schedule || !cellSelection) return [];
-    return suggestionPolicy.rankCellCandidates({
-      schedule,
-      constraints: allConstraints,
-      staffId: cellSelection.staffId,
-      day: cellSelection.day,
-      workShifts,
-      preferenceOf,
-      isAvailable,
-      linkedReportScoreOf,
-      isBusyDay,
-    });
-  }, [
-    schedule,
-    cellSelection,
-    suggestionPolicy,
-    allConstraints,
-    workShifts,
-    preferenceOf,
-    isAvailable,
-    linkedReportScoreOf,
-    isBusyDay,
-  ]);
-
-  // ホバー中セルに今出ている制約エラーの解消案。世界線分岐やバブルは開かず、
-  // その場でクリック適用できる「ふわっとしたヒント」用（ScheduleGridView 側で描画）。
-  // 違反が無いセルは undefined（無理に提案しない）。
-  // 3種類のスコープを対象にする:
-  //   - 横の制約: そのスタッフ・その日に紐づく違反（連勤・希望など）→ coversCell
-  //   - 縦の制約: staffId を持たない日単位の違反（責任者未充足・休み上限など）→ isDayScoped
-  //   - 月単位の制約: そのスタッフに紐づくが特定の日を持たない違反（月の最低休日数など、
-  //     days が空）→ どの日を変えても直しうるので、そのスタッフの全セルを対象にする
-  const suggestConstraintFixFor = useCallback(
-    (staffId: string, day: WorkingDay) => {
-      const relevant =
-        schedule &&
-        violations.some(
-          (v) =>
-            v.coversCell(staffId, day) ||
-            (v.isDayScoped && v.coversDay(day)) ||
-            (v.staffId === staffId && v.days.length === 0)
-        );
-      if (!schedule || !relevant) {
-        return undefined;
-      }
-      const suggestions = suggestionPolicy.rankCellCandidates({
-        schedule,
-        constraints: allConstraints,
-        staffId,
-        day,
-        workShifts,
-        preferenceOf,
-        isAvailable,
-        linkedReportScoreOf,
-        isBusyDay,
-      });
-      const fix = suggestConstraintFix({
-        schedule,
-        staffId,
-        day,
-        constraints: allConstraints,
-        suggestions,
-        staffList,
-        workShifts,
-        wishByStaff,
-        availability,
-        preferenceOf,
-        isAvailable,
-        linkedReportScoreOf,
-        isBusyDay,
-      });
-      if (!fix) return undefined;
-      const fixCell = fix.cell;
-      const shiftNameOf = (id: string) => workShifts.find((w) => w.id === id)?.name ?? id;
-      const toLabel =
-        fixCell.kind === "work"
-          ? shiftNameOf(fixCell.shiftId)
-          : fixCell.kind === "day-off"
-            ? "休み"
-            : "未定";
-      // この一手の副作用（人数不足）を、さらに数手先で解消する見通しがあれば理由文に添える
-      // （適用するのは最初の一手だけ。続きは次にそのセルをホバーしたときの提案に委ねる）。
-      const followUpText =
-        fix.followUpSteps.length > 0
-          ? `（この後、${fix.followUpSteps
-              .map((s) => `${nameOf(s.staffId)}を${shiftNameOf(s.shiftId)}に`)
-              .join("、")}動かせば解消する見通しです）`
-          : "";
-      return {
-        summary: `${toLabel}にすると解消できそうです（違反 ${fix.violationsBefore}→${fix.violationsAfter} 件）${followUpText}`,
-        onApply: () => {
-          recordSetCell(store, {
-            schedule,
-            constraints: allConstraints,
-            staffId,
-            staffName: nameOf(staffId),
-            day,
-            to: fix.cell,
-            suggestionId: fix.id,
-          });
-        },
-      };
-    },
-    [
-      schedule,
-      violations,
-      suggestionPolicy,
-      allConstraints,
-      workShifts,
-      preferenceOf,
-      isAvailable,
-      linkedReportScoreOf,
-      isBusyDay,
-      staffList,
-      wishByStaff,
-      availability,
-      store,
-      nameOf,
-    ]
-  );
-
-  // ホバー中の人数不足セル（集計行の shiftId×day）に対する解消案。
-  // suggestConstraintFix とは逆向きの探索（値ではなく、動かすスタッフを探す）だが、
-  // 「ふわっと出す→クリックでその場に適用」という体験は同じにする。
-  const suggestStaffingFixFor = useCallback(
-    (shiftId: string, day: WorkingDay) => {
-      if (!schedule) return undefined;
-      const fix = suggestStaffingFix({
-        schedule,
-        day,
-        shiftId,
-        constraints: allConstraints,
-        staffList,
-        workShifts,
-        wishByStaff,
-        availability,
-        preferenceOf,
-        isAvailable,
-        linkedReportScoreOf,
-        isBusyDay,
-      });
-      if (!fix) return undefined;
-      const shiftNameOf = (id: string) => workShifts.find((w) => w.id === id)?.name ?? id;
-      const shiftName = shiftNameOf(shiftId);
-      // 動かした先で新たに生じる不足を、さらに数手先で解消する見通しがあれば理由文に添える
-      // （適用するのは最初の一手だけ。続きは次にそのセルをホバーしたときの提案に委ねる）。
-      const followUpText =
-        fix.followUpSteps.length > 0
-          ? `（この後、${fix.followUpSteps
-              .map((s) => `${nameOf(s.staffId)}を${shiftNameOf(s.shiftId)}に`)
-              .join("、")}動かせば解消する見通しです）`
-          : "";
-      return {
-        summary: `${nameOf(fix.staffId)}を${shiftName}にすると人数を埋められそうです（不足 ${fix.gapBefore}→${fix.gapAfter}）${followUpText}`,
-        onApply: () => {
-          recordSetCell(store, {
-            schedule,
-            constraints: allConstraints,
-            staffId: fix.staffId,
-            staffName: nameOf(fix.staffId),
-            day,
-            to: fix.cell,
-            suggestionId: `staffing:${shiftId}:${day.key}:${fix.staffId}`,
-          });
-        },
-      };
-    },
-    [
-      schedule,
-      allConstraints,
-      staffList,
-      workShifts,
-      wishByStaff,
-      availability,
-      preferenceOf,
-      isAvailable,
-      linkedReportScoreOf,
-      isBusyDay,
-      store,
-      nameOf,
-    ]
-  );
-
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -618,17 +413,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
 
   // セル編集: EditLog 付きで同一世界線ノードに記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    let rejectedSuggestionId: string | undefined;
-    if (
-      cellSelection?.staffId === staffId &&
-      cellSelection.day.key === day.key &&
-      cellSuggestions.length > 0
-    ) {
-      const top = cellSuggestions[0];
-      if (!shiftCellsEqual(top.cell, to)) {
-        rejectedSuggestionId = top.id;
-      }
-    }
     const next = recordSetCell(store, {
       schedule,
       constraints: allConstraints,
@@ -636,13 +420,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffName: nameOf(staffId),
       day,
       to,
-      rejectedSuggestionId,
     });
     setCellSelection({ staffId, day });
     advanceFocusAfterEdit(next);
   };
 
-  // 自動シフト：即実行せず、見通しを出してから確認する（AutoShiftPanel と同型）。
+  // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
+  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
@@ -651,23 +435,15 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       wishByStaff,
       availability,
     });
-    setStepPreview({ step, result });
-  };
-
-  const handleConfirmStep = () => {
-    if (!stepPreview) return;
     recordAutoStep(store, {
       schedule,
-      next: stepPreview.result.schedule,
+      next: result.schedule,
       constraints: allConstraints,
-      stepId: stepPreview.step.key,
-      stepLabel: stepPreview.step.label,
-      message: stepPreview.result.message,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
     });
-    setAutoMessage(
-      `${stepPreview.step.label}: ${stepPreview.result.message}`
-    );
-    setStepPreview(null);
+    setAutoMessage(`${step.label}: ${result.message}`);
   };
 
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
@@ -686,7 +462,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
       s = runOn(s, fulfillWishesStep);
-      s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
+
+      // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
+      const leaderFill = runAutoShiftStep(
+        makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+      );
+      s = leaderFill.schedule;
+
+      s = runOn(
+        s,
+        makeResolveAmbiguousLeaderSlotsStep(leaderFill.ambiguousLeaderSlots ?? [], { phase })
+      );
       s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
       return s;
     };
@@ -866,12 +653,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           }
           selection={cellSelection}
           onSelectionChange={setCellSelection}
-          suggestConstraintFix={suggestConstraintFixFor}
-          suggestStaffingFix={suggestStaffingFixFor}
+          pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
         />
       </div>
 
-      {/* クイック自動ステップ（プレビュー確認後に適用）と世界線比較ツール */}
+      {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
       <div className="e-auto-bar">
         <span className="e-auto-target">
           対象:{" "}
@@ -899,7 +685,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             title={step.description}
             onClick={() => handleRunStep(step)}
           >
-            {step.label}の見通し
+            {step.label}
           </button>
         ))}
         <button
@@ -911,21 +697,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           世界線で完成案を{DAY_OFF_CANDIDATE_COUNT}つ比較
         </button>
       </div>
-
-      {stepPreview && (
-        <div className="e-step-preview">
-          <strong>{stepPreview.step.label} の見通し</strong>
-          <span>{stepPreview.result.message}</span>
-          <div className="e-step-preview-actions">
-            <button type="button" onClick={handleConfirmStep}>
-              まずこの一手を選ぶ
-            </button>
-            <button type="button" onClick={() => setStepPreview(null)}>
-              戻る
-            </button>
-          </div>
-        </div>
-      )}
 
       {autoMessage && (
         <div className="e-auto-message">
@@ -1046,38 +817,6 @@ const StyledContainer = styled.div`
   }
 
   /* 自動シフト操作バー（グリッド下）。対象＝選択スタッフ（無ければ全員）に対して実行する */
-  .e-step-preview {
-    display: grid;
-    gap: 6px;
-    margin-top: 8px;
-    padding: 10px 12px;
-    border: 1px solid #c5cae9;
-    border-radius: 8px;
-    background: #f5f5ff;
-    font-size: 0.8em;
-    color: #3949ab;
-
-    .e-step-preview-actions {
-      display: flex;
-      gap: 6px;
-
-      button {
-        border: 1px solid #7986cb;
-        border-radius: 6px;
-        background: #eef0ff;
-        color: #3949ab;
-        font-size: 0.9em;
-        font-weight: 600;
-        padding: 4px 10px;
-        cursor: pointer;
-
-        &:hover {
-          background: #c5cae9;
-        }
-      }
-    }
-  }
-
   .e-auto-bar {
     display: flex;
     align-items: center;

@@ -589,6 +589,28 @@ export const StyledWrap = styled.div`
     font-weight: normal;
   }
 
+  /* 責任者ルールが一意に決め切れず「保留中」に残した候補であることを示す、左上の小さなラベル。
+     押し付けない緩いヒントなので、e-wish-flag（右上）・e-violation-bar（下端）とは重ならない
+     左上に置く。クリック等の操作は無く、ホバーで詳細を title に出すだけ。 */
+  .e-pending-leader-hint {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    max-width: calc(100% - 2px);
+    padding: 0 3px;
+    border-radius: 3px;
+    background: rgba(94, 53, 177, 0.14);
+    color: #5e35b1;
+    font-size: 0.62em;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */
   .e-violation-bar {
     position: absolute;
