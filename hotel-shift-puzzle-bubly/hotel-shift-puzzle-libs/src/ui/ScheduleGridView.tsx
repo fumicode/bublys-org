@@ -90,11 +90,6 @@ type ScheduleGridViewProps = {
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
   /**
-   * 未定セルが、責任者ルールの「保留中（一意に決め切れず未定のまま残した）」候補になっている場合、
-   * そのルールラベル一覧を返す。無ければ空配列（何も出さない＝押し付けない）。
-   */
-  pendingLeaderCandidatesOf?: (staffId: string, day: WorkingDay) => string[];
-  /**
    * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
    * 確定済みセルには何も返さない。
    */
@@ -157,7 +152,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   maxDayOffPerDay,
   selection,
   onSelectionChange,
-  pendingLeaderCandidatesOf,
   candidateHintOf,
 }) => {
   const days = schedule.workingDays();
@@ -334,7 +328,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
-          pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
           candidateHintOf={candidateHintOf}
         />
       ));
@@ -376,7 +369,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
-          pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
           candidateHintOf={candidateHintOf}
         />
       )),

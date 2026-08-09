@@ -263,39 +263,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return map;
   }, [allWishes, schedule]);
 
-  // 責任者ルールが一意に決め切れず「保留中」に残す枠（hidden-single判定の副産物）を試算する。
-  // 勤務表は変更せず、読み取り専用（makeSatisfyLeaderRulesStep は不変オブジェクトを返すだけ）。
-  const ambiguousLeaderSlots = useMemo(() => {
-    if (!schedule || relevantRules.length === 0) return [];
-    return (
-      runAutoShiftStep(makeSatisfyLeaderRulesStep(relevantRules, leaderRules), {
-        schedule,
-        staffList: subsetStaff,
-        workShifts,
-        wishByStaff,
-        availability,
-      }).ambiguousLeaderSlots ?? []
-    );
-  }, [schedule, relevantRules, leaderRules, subsetStaff, workShifts, wishByStaff, availability]);
-
-  // セル（staffId×day）→ そのセルが候補になっている責任者ルールのラベル一覧。
-  // グリッド側で未定セルの隅に「保留中の候補」ヒントとして出す。
-  const pendingLeaderCandidatesOf = useMemo(() => {
-    const ruleLabelByKey = new Map(leaderRules.map((r) => [r.key, r.label]));
-    const map = new Map<string, string[]>();
-    for (const slot of ambiguousLeaderSlots) {
-      const pool = slot.candidates.length > 0 ? slot.candidates : slot.fallbackCandidates;
-      const label = ruleLabelByKey.get(slot.ruleKey) ?? slot.ruleKey;
-      for (const staffId of pool) {
-        const key = `${staffId}:${slot.day.key}`;
-        const list = map.get(key);
-        if (list) list.push(label);
-        else map.set(key, [label]);
-      }
-    }
-    return (staffId: string, day: WorkingDay): string[] => map.get(`${staffId}:${day.key}`) ?? [];
-  }, [ambiguousLeaderSlots, leaderRules]);
-
   // 制約チェックは変更のたびに再計算する（割当・希望が変わるたび）。
   // 連勤・希望に加え、責任者ルールの未充足（担当勤務帯に minCount 未満の日）も同じ違反
   // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
@@ -693,7 +660,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           }
           selection={cellSelection}
           onSelectionChange={setCellSelection}
-          pendingLeaderCandidatesOf={pendingLeaderCandidatesOf}
           candidateHintOf={candidateHintOf}
         />
       </div>
