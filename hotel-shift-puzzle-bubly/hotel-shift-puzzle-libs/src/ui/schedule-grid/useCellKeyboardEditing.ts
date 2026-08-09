@@ -30,6 +30,10 @@ type UseCellKeyboardEditingParams = {
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
+  /** そのセルが制約から一意に決まるなら、その値（確定提案）。無ければ undefined。 */
+  forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /** 確定提案を承認する（Tab）。承認後のフォーカス移動は呼び出し側が決める。 */
+  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
 };
 
 export type CellKeyboardEditing = {
@@ -81,6 +85,8 @@ export function useCellKeyboardEditing({
   onChangeCell,
   selection: controlledSelection,
   onSelectionChange,
+  forcedCellOf,
+  onApproveForced,
 }: UseCellKeyboardEditingParams): CellKeyboardEditing {
   const gridRef = useRef<HTMLDivElement>(null);
   const [internalSelection, setInternalSelection] =
@@ -242,6 +248,17 @@ export function useCellKeyboardEditing({
     }
 
     if (!selection) return;
+
+    // Tab: そのセルが制約から一意に決まるなら、その値を承認して書き込む。
+    // 提案が無いセルでは何もしない＝ブラウザ本来のフォーカス移動に任せる。
+    if (e.key === "Tab" && !e.shiftKey) {
+      const forced = forcedCellOf?.(selection.staffId, selection.day);
+      if (forced) {
+        e.preventDefault();
+        onApproveForced?.(selection.staffId, selection.day, forced);
+      }
+      return;
+    }
 
     switch (e.key) {
       case "Enter":

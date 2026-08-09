@@ -18,6 +18,7 @@ import {
   makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   WorkingDay,
+  shiftCellKey,
   type AutoShiftStep,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -33,7 +34,11 @@ import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
-import { useScheduleCandidates } from "./candidates/index.js";
+import {
+  useScheduleCandidates,
+  orderForcedCells,
+  nextForcedCellAfter,
+} from "./candidates/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import {
@@ -353,8 +358,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
 
   // まだ決まっていないセルに入れられる値（候補集合）。確定のたびに影響範囲だけ計算し直す。
-  // 表示（薄い確定提案・詰み警告）は別 Issue。ここではセルの title で中身を確認できるようにする。
-  const { candidates } = useScheduleCandidates({
+  const { candidates, computing } = useScheduleCandidates({
     schedule,
     constraints,
     checkShiftWish: constraints?.checkShiftWish ?? true,
@@ -382,6 +386,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     },
     [candidates, workShifts]
   );
+
+  // 候補が1つに絞られたセル＝制約から一意に決まる手。承認するまで勤務表には入れない。
+  // 再計算中は前回の（古いかもしれない）提案を出さない。承認直後に古い値を書かないため。
+  const orderedForcedCells = useMemo(
+    () => (computing ? [] : orderForcedCells(candidates.forcedCells(), staffIds)),
+    [candidates, computing, staffIds]
+  );
+
+  const forcedCellOf = useMemo(() => {
+    const byCell = new Map(
+      orderedForcedCells.map((forced) => [
+        `${forced.staffId}:${forced.day.key}`,
+        forced.cell,
+      ])
+    );
+    return (staffId: string, day: WorkingDay) => byCell.get(`${staffId}:${day.key}`);
+  }, [orderedForcedCells]);
 
   useEffect(() => {
     if (!schedule || cellSelection) return;
@@ -430,6 +451,33 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     });
     setCellSelection({ staffId, day });
     advanceFocusAfterEdit(next);
+  };
+
+  // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
+  // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  const handleApproveForced = (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell
+  ) => {
+    const next = nextForcedCellAfter(orderedForcedCells, {
+      staffId,
+      dayKey: day.key,
+    });
+    const nextSchedule = recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId,
+      staffName: nameOf(staffId),
+      day,
+      to: cell,
+      suggestionId: `forced:${staffId}:${day.key}:${shiftCellKey(cell)}`,
+    });
+    if (next) {
+      setCellSelection({ staffId: next.staffId, day: next.day });
+      return;
+    }
+    advanceFocusAfterEdit(nextSchedule);
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
@@ -661,6 +709,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           selection={cellSelection}
           onSelectionChange={setCellSelection}
           candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
+          onApproveForced={handleApproveForced}
         />
       </div>
 

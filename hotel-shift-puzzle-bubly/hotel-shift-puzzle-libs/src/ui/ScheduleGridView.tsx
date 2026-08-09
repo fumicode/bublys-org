@@ -94,6 +94,13 @@ type ScheduleGridViewProps = {
    * 確定済みセルには何も返さない。
    */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /**
+   * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
+   * セルに薄く描かれ、Tab で承認できる。
+   */
+  forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /** 選択セルの確定提案を承認する（Tab）。承認後のフォーカス移動は feature 層が決める。 */
+  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
 };
 
 /**
@@ -153,6 +160,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   selection,
   onSelectionChange,
   candidateHintOf,
+  forcedCellOf,
+  onApproveForced,
 }) => {
   const days = schedule.workingDays();
 
@@ -273,6 +282,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     onChangeCell,
     selection,
     onSelectionChange,
+    forcedCellOf,
+    onApproveForced,
   });
 
   // 希望と割当を並べて見るために展開中のスタッフID
@@ -329,6 +340,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
         />
       ));
     }
@@ -370,6 +382,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
         />
       )),
     ]);
