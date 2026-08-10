@@ -21,14 +21,6 @@ export const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-6": ["early", "middle", "late"], // 夜責: 全帯OK（フロント）
   "staff-7": ["early", "middle"], // 早責: 早番・中番（会計）
   "staff-8": ["early", "middle"], // 早責: 早番・中番（早番を担えるよう早番可）
-  // 一般スタッフ。全帯OKばかりだと候補が絞れないので、実際と同じように入れる帯を偏らせる。
-  "staff-9": ["early", "middle", "late"],
-  "staff-10": ["middle", "late"], // 夜が得意（早番に入れない）
-  "staff-11": ["middle", "late"],
-  "staff-12": ["early", "middle"], // 清掃は朝が中心
-  "staff-13": ["early", "middle"],
-  "staff-14": ["early", "middle", "late"],
-  "staff-15": ["middle", "late"],
 };
 
 /** 指定した勤務表IDに紐づく、人ごとにばらけた可能勤務帯を作る */

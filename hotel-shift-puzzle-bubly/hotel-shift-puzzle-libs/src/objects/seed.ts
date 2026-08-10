@@ -32,11 +32,7 @@ import { createSampleSchedules } from "../data/sampleSchedule.js";
 import { createSampleShiftWishes } from "../data/sampleShiftWishes.js";
 import { createSampleAvailabilityFor } from "../data/sampleAvailability.js";
 import { createSampleConstraintsFor } from "../data/sampleConstraints.js";
-import {
-  createMidMonthSchedule,
-  createEndgameSchedule,
-  ENDGAME_SCHEDULE_ID,
-} from "../data/sampleScenarios.js";
+import { createMidMonthSchedule } from "../data/sampleScenarios.js";
 import { ALLOWED_SHIFT_IDS_BY_STAFF } from "../data/sampleAvailability.js";
 
 let seeded = false;
@@ -81,7 +77,6 @@ export function useSeedHotelData(): void {
     const sampleSchedules = [
       ...createSampleSchedules(),
       createMidMonthSchedule(scenarioParams),
-      createEndgameSchedule(scenarioParams),
     ];
     const knownScheduleIds = new Set(schedules.map((s) => s.id));
     for (const schedule of sampleSchedules) {
@@ -97,14 +92,10 @@ export function useSeedHotelData(): void {
         type: SCHEDULE_AVAILABILITY_TYPE,
         object: createSampleAvailabilityFor(schedule.id),
       });
-      // 制約（責任者ルール）も勤務表に紐づく別集約として投入。
-      // 終盤シナリオは「1日の休み上限」を絞って、詰みが起きる状況を作る。
+      // 制約（責任者ルール）も勤務表に紐づく別集約として投入
       items.push({
         type: SCHEDULE_CONSTRAINTS_TYPE,
-        object: createSampleConstraintsFor(
-          schedule.id,
-          schedule.id === ENDGAME_SCHEDULE_ID ? { maxDayOffPerDay: 5 } : {}
-        ),
+        object: createSampleConstraintsFor(schedule.id),
       });
     }
 
