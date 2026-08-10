@@ -28,8 +28,16 @@ const SAMPLE_LEADERS_BY_ROLE: Record<string, string[]> = {
   night: ["staff-tsuchiya", "staff-6"], // 土屋・中村
 };
 
+/** 勤務表ごとに変えたい制約値（シナリオ勤務表で 1日の休み上限を絞るなど）。 */
+export type SampleConstraintOverrides = {
+  maxDayOffPerDay?: number;
+};
+
 /** 指定した勤務表IDの制約（責任者ルール＋連勤上限＋希望チェック）を作る。 */
-export function createSampleConstraintsFor(scheduleId: string): ScheduleConstraints {
+export function createSampleConstraintsFor(
+  scheduleId: string,
+  overrides: SampleConstraintOverrides = {}
+): ScheduleConstraints {
   const leaderRules: ShiftLeaderRuleState[] = LEADER_ROLE_DEFS.map((def) => ({
     ...def,
     leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
@@ -40,6 +48,6 @@ export function createSampleConstraintsFor(scheduleId: string): ScheduleConstrai
     maxConsecutiveWorkdays: 5,
     checkShiftWish: true,
     minMonthlyDayOff: 8,
-    maxDayOffPerDay: 8,
+    maxDayOffPerDay: overrides.maxDayOffPerDay ?? 8,
   });
 }

@@ -126,10 +126,42 @@ export class MonthlyStaffSchedule {
     return this.state.assignments;
   }
 
+  /**
+   * 割当の索引（セル／日／スタッフ）。初回の問い合わせで作って以後使い回す。
+   *
+   * 勤務表は不変なので、一度作った索引が古くなることはない。制約チェックは
+   * 「全スタッフ×全稼働日」でセルを引くため、線形探索のままだと1回のチェックが
+   * O(セル数 × 割当数) になり、候補集合の計算（セルごと・候補ごとにチェックする）で
+   * 現実的な速度が出ない。
+   */
+  private assignmentIndex?: {
+    byCell: Map<string, ShiftAssignment>;
+    byDay: Map<string, ShiftAssignment[]>;
+    byStaff: Map<string, ShiftAssignment[]>;
+  };
+
+  private get index(): NonNullable<MonthlyStaffSchedule["assignmentIndex"]> {
+    if (!this.assignmentIndex) {
+      const byCell = new Map<string, ShiftAssignment>();
+      const byDay = new Map<string, ShiftAssignment[]>();
+      const byStaff = new Map<string, ShiftAssignment[]>();
+      for (const assignment of this.state.assignments) {
+        const dayKey = assignment.day.key;
+        byCell.set(`${assignment.staffId}:${dayKey}`, assignment);
+        const dayBucket = byDay.get(dayKey);
+        if (dayBucket) dayBucket.push(assignment);
+        else byDay.set(dayKey, [assignment]);
+        const staffBucket = byStaff.get(assignment.staffId);
+        if (staffBucket) staffBucket.push(assignment);
+        else byStaff.set(assignment.staffId, [assignment]);
+      }
+      this.assignmentIndex = { byCell, byDay, byStaff };
+    }
+    return this.assignmentIndex;
+  }
+
   getAssignment(staffId: string, day: WorkingDay): ShiftAssignment | undefined {
-    return this.state.assignments.find(
-      (a) => a.staffId === staffId && a.day.equals(day)
-    );
+    return this.index.byCell.get(`${staffId}:${day.key}`);
   }
 
   /** 勤務帯を割り当てる（既存割当は上書き）。不変。
@@ -224,12 +256,12 @@ export class MonthlyStaffSchedule {
 
   /** その稼働日の全割当 */
   assignmentsOn(day: WorkingDay): ShiftAssignment[] {
-    return this.state.assignments.filter((a) => a.day.equals(day));
+    return this.index.byDay.get(day.key) ?? [];
   }
 
   /** そのスタッフの全割当 */
   assignmentsForStaff(staffId: string): ShiftAssignment[] {
-    return this.state.assignments.filter((a) => a.staffId === staffId);
+    return this.index.byStaff.get(staffId) ?? [];
   }
 
   /**

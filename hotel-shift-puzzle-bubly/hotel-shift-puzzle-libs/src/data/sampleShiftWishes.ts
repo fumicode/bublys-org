@@ -18,7 +18,67 @@ import { DAY_OFF_WISH, workWishKey } from "../ui/shiftWishOptions.js";
  * - 特定の勤務帯は避けたい : workWishKey(名前) を "avoid"
  */
 export function createSampleShiftWishes(): StaffMonthlyShiftWish[] {
-  return [...juneWishes(), ...julyWishes()];
+  return [...juneWishes(), ...julyWishes(), ...augustWishes(), ...septemberWishes()];
+}
+
+/**
+ * シナリオ勤務表（8月＝作成途中 / 9月＝終盤）用の希望。
+ * 全員が出すわけではない（出さない人がいるのも実際どおり）。盤面を埋めるローテーションは
+ * この休み希望を尊重するので、出来上がりが「希望を汲んだ後の勤務表」に近くなる。
+ */
+function augustWishes(): StaffMonthlyShiftWish[] {
+  const d = (day: number) => WorkingDay.of(2026, 8, day);
+  const wish = (staffId: string) =>
+    StaffMonthlyShiftWish.create({ staffId, year: 2026, month: 8 });
+
+  return [
+    // 佐藤: お盆前後に連休を取りたい
+    wish("staff-1")
+      .setPreference(d(13), DAY_OFF_WISH, "want")
+      .setPreference(d(14), DAY_OFF_WISH, "want")
+      .setPreference(d(25), DAY_OFF_WISH, "want"),
+    // 鈴木: 火曜が休みたい。遅番は歓迎
+    wish("staff-2")
+      .setPreference(d(4), DAY_OFF_WISH, "want")
+      .setPreference(d(18), DAY_OFF_WISH, "want")
+      .setPreference(d(11), workWishKey("遅番"), "want"),
+    // 高橋（早責）: 月曜まわりで休みたい
+    wish("staff-3")
+      .setPreference(d(3), DAY_OFF_WISH, "want")
+      .setPreference(d(17), DAY_OFF_WISH, "want")
+      .setPreference(d(24), DAY_OFF_WISH, "want"),
+    // 山本（早責・予責）: 21日に休みたい（この日の責任者が誰になるかが焦点になる）
+    wish("staff-7")
+      .setPreference(d(6), DAY_OFF_WISH, "want")
+      .setPreference(d(21), DAY_OFF_WISH, "want"),
+    // 土屋（夜責）: 21日に休みたい
+    wish("staff-tsuchiya")
+      .setPreference(d(7), DAY_OFF_WISH, "want")
+      .setPreference(d(21), DAY_OFF_WISH, "want"),
+    // 森: 早番を避けたい（可能勤務帯とは別に、本人の希望として）
+    wish("staff-9")
+      .setPreference(d(10), DAY_OFF_WISH, "want")
+      .setPreference(d(28), DAY_OFF_WISH, "want")
+      .setPreference(d(5), workWishKey("早番"), "avoid"),
+  ];
+}
+
+function septemberWishes(): StaffMonthlyShiftWish[] {
+  const d = (day: number) => WorkingDay.of(2026, 9, day);
+  const wish = (staffId: string) =>
+    StaffMonthlyShiftWish.create({ staffId, year: 2026, month: 9 });
+
+  return [
+    wish("staff-1")
+      .setPreference(d(9), DAY_OFF_WISH, "want")
+      .setPreference(d(23), DAY_OFF_WISH, "want"),
+    wish("staff-5")
+      .setPreference(d(15), DAY_OFF_WISH, "want")
+      .setPreference(d(29), DAY_OFF_WISH, "want"),
+    wish("staff-8")
+      .setPreference(d(7), DAY_OFF_WISH, "want")
+      .setPreference(d(21), DAY_OFF_WISH, "want"),
+  ];
 }
 
 // ---------------- 2026年6月（土日: 6,7,13,14,20,21,27,28） ----------------

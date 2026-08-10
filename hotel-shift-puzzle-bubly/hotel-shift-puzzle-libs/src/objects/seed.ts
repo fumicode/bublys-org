@@ -32,6 +32,12 @@ import { createSampleSchedules } from "../data/sampleSchedule.js";
 import { createSampleShiftWishes } from "../data/sampleShiftWishes.js";
 import { createSampleAvailabilityFor } from "../data/sampleAvailability.js";
 import { createSampleConstraintsFor } from "../data/sampleConstraints.js";
+import {
+  createMidMonthSchedule,
+  createEndgameSchedule,
+  ENDGAME_SCHEDULE_ID,
+} from "../data/sampleScenarios.js";
+import { ALLOWED_SHIFT_IDS_BY_STAFF } from "../data/sampleAvailability.js";
 
 let seeded = false;
 
@@ -47,38 +53,70 @@ export function useSeedHotelData(): void {
     seeded = true;
 
     const items: { type: string; object: unknown }[] = [];
-    if (staff.length === 0) {
-      items.push(...createSampleStaffList().map((o) => ({ type: STAFF_TYPE, object: o })));
-    }
+
+    // スタッフは「まだ居ない人だけ」足す。既に触ったデータがある環境でも、
+    // サンプルを増やしたぶんが入るようにする（全部揃うまで何も入らない、を避ける）。
+    const knownStaffIds = new Set(staff.map((s) => s.id));
+    items.push(
+      ...createSampleStaffList()
+        .filter((s) => !knownStaffIds.has(s.id))
+        .map((o) => ({ type: STAFF_TYPE, object: o }))
+    );
+
     if (workShiftSets.length === 0) {
       // グローバルの勤務帯セット（テンプレート）。勤務表作成時にこれをコピーする。
       items.push({ type: WORKSHIFT_SET_TYPE, object: createSampleWorkShiftSet() });
     }
-    if (schedules.length === 0) {
+
+    // 勤務表も ID 単位で「まだ無いものだけ」足す。
+    //   - 空の勤務表（6月・7月）: 自動シフトを一から動かす用
+    //   - 作成途中（8月）      : 候補集合・確定提案を見る用（実際に人が触る状態）
+    //   - 終盤・詰みあり（9月）: 埋められないセルがある状態
+    const scenarioParams = {
+      staffIds: createSampleStaffList().map((s) => s.id),
+      allowedShiftIds: ALLOWED_SHIFT_IDS_BY_STAFF,
+      wishes: createSampleShiftWishes(),
+      maxConsecutive: 5,
+    };
+    const sampleSchedules = [
+      ...createSampleSchedules(),
+      createMidMonthSchedule(scenarioParams),
+      createEndgameSchedule(scenarioParams),
+    ];
+    const knownScheduleIds = new Set(schedules.map((s) => s.id));
+    for (const schedule of sampleSchedules) {
+      if (knownScheduleIds.has(schedule.id)) continue;
+      items.push({ type: SCHEDULE_TYPE, object: schedule });
+      // 勤務表ごとの独自勤務帯セット（グローバルのコピー。id=scheduleId）
+      items.push({
+        type: WORKSHIFT_SET_TYPE,
+        object: createSampleWorkShiftSet().withId(schedule.id),
+      });
       // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
-      for (const schedule of createSampleSchedules()) {
-        items.push({ type: SCHEDULE_TYPE, object: schedule });
-        // 勤務表ごとの独自勤務帯セット（グローバルのコピー。id=scheduleId）
-        items.push({
-          type: WORKSHIFT_SET_TYPE,
-          object: createSampleWorkShiftSet().withId(schedule.id),
-        });
-        items.push({
-          type: SCHEDULE_AVAILABILITY_TYPE,
-          object: createSampleAvailabilityFor(schedule.id),
-        });
-        // 制約（責任者ルール）も勤務表に紐づく別集約として投入
-        items.push({
-          type: SCHEDULE_CONSTRAINTS_TYPE,
-          object: createSampleConstraintsFor(schedule.id),
-        });
-      }
+      items.push({
+        type: SCHEDULE_AVAILABILITY_TYPE,
+        object: createSampleAvailabilityFor(schedule.id),
+      });
+      // 制約（責任者ルール）も勤務表に紐づく別集約として投入。
+      // 終盤シナリオは「1日の休み上限」を絞って、詰みが起きる状況を作る。
+      items.push({
+        type: SCHEDULE_CONSTRAINTS_TYPE,
+        object: createSampleConstraintsFor(
+          schedule.id,
+          schedule.id === ENDGAME_SCHEDULE_ID ? { maxDayOffPerDay: 5 } : {}
+        ),
+      });
     }
-    if (wishes.length === 0) {
-      items.push(
-        ...createSampleShiftWishes().map((o) => ({ type: STAFF_SHIFT_WISH_TYPE, object: o }))
-      );
-    }
+
+    // 希望も「まだ無い月・人だけ」足す
+    const knownWishKeys = new Set(
+      wishes.map((w) => `${w.staffId}:${w.year}-${w.month}`)
+    );
+    items.push(
+      ...createSampleShiftWishes()
+        .filter((w) => !knownWishKeys.has(`${w.staffId}:${w.year}-${w.month}`))
+        .map((o) => ({ type: STAFF_SHIFT_WISH_TYPE, object: o }))
+    );
     // 既に永続化された勤務表（旧データや別経路で作成）に独自勤務帯セットが無ければ補う。
     // 旧モデルの勤務帯ID（early/middle/late）と既定セットの id が一致するので割当は有効なまま。
     const setIds = new Set(workShiftSets.map((s) => s.id));
