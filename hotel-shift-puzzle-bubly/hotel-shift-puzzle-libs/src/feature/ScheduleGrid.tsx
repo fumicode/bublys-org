@@ -350,6 +350,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         workShifts,
         wishByStaff,
         availability,
+        // handleRunStep と同じく連勤上限を渡す。渡さないと ctx.maxConsecutive が undefined に
+        // なってステップ側の既定値 5 で走り、連勤上限を 5 未満にしている勤務表では
+        // 生成した案が全て連勤違反になってしまう。
+        maxConsecutive: constraints?.maxConsecutiveWorkdays,
       }).schedule;
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
@@ -385,8 +389,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
   // apex に確定ラベルを付ける（未命名なら既定ラベルを自動生成。既に名前が
   // 付いていれば尊重してそのまま残す）。レポートを開くのは app 層（onConfirm）の関心事。
+  //
+  // レポートは「確定時点のスナップショット」（ScheduleReport 参照）なので、同じ apex に対して
+  // 既に作られていれば作り直さず、そのまま開く。このボタンは pendingReportUrl でレポートを
+  // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
+  // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
+  // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
   const handleConfirm = () => {
     if (!scheduleId || !apex) return;
+
+    const existing = allReports.find(
+      (r) => r.id === ScheduleReport.idOf(scheduleId, apex.id)
+    );
+    if (existing) {
+      onConfirm?.(existing.id);
+      return;
+    }
+
     const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
       apex.id,
       SCHEDULE_TYPE,
