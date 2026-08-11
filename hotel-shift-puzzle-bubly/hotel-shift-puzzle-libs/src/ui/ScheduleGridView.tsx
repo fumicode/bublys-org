@@ -484,8 +484,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             days={days}
             rowIndex={rowIndex}
             editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
-            // フォーカス中は、フォーカスしている責任者ルールの行だけを残して他の集計行を減光する
-            dimmed={focusActive && !(row.ruleKey && focusedRuleKeys.has(row.ruleKey))}
+            // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。
+            // 人数の行（必要人数・休み）はどのロールを見ているときも充足を読み取る土台なので減光しない。
+            dimmed={focusActive && !!row.ruleKey && !focusedRuleKeys.has(row.ruleKey)}
             onEditRequired={setEditingRequired}
             leaderViolationUrl={leaderViolationUrl}
           />
