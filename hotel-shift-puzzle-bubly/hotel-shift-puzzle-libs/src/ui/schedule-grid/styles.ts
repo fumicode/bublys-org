@@ -603,6 +603,26 @@ export const StyledWrap = styled.div`
     opacity: 0;
   }
 
+  /* いま見ているセル（hover / キーボード選択中）は「希望を読むモード」にする。
+     平常時は情報量を抑えて省略しているものを、見ているセルだけ読めるまで開く。
+
+     - 未割当で希望が複数あるセル … 円が横に並ぶとセル幅に収まらず端が切れて読めないので、
+       クリップを外して（overflow: visible）隣の列の上へはみ出させる。円の背景は白なので
+       下のセルに重なっても読める。手前に出すため z-index はグリッド内で最も高くする
+       （制約ホバーの すりガラス=3 / リボン=4 より上。同じセルをホバーすると両方出るので、
+       これらの下だと右へはみ出した円が隠れてしまう）。
+     - 値が入ったセル … 角に残した円の文字（＝叶った希望）を戻す。円のクリップは
+       そのまま（角の弧という見た目を崩さない）。 */
+  .e-cell.has-wish-hint:hover,
+  .e-cell.has-wish-hint.is-selected {
+    overflow: visible;
+    z-index: 5;
+  }
+  .e-cell:hover .e-wish-marks.is-corner .e-wish-badge .e-wish-char,
+  .e-cell.is-selected .e-wish-marks.is-corner .e-wish-badge .e-wish-char {
+    opacity: 1;
+  }
+
   /* ×（避けたい）希望は破線の円＋取り消し線で区別する */
   .e-wish-badge.is-avoid {
     border-style: dashed;
