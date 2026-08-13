@@ -8,6 +8,7 @@ import {
 import type { WorkShift, ConstraintViolation, ShiftCell } from "../../domain/index.js";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
+import { DAY_OFF_WISH, workWishKey } from "../shiftWishOptions.js";
 
 type ScheduleDataCellProps = {
   /** セルの状態（出勤・休み・未定） */
@@ -46,8 +47,10 @@ type ScheduleDataCellProps = {
  * 出勤＝開始時刻の「時」だけ（勤務帯は背景色で区別）、休み＝「休」、未定＝希望 or「·」。
  *
  * シフト希望は、実際の割当と同じ1文字（休 / 7 …）を「文字色と同じ色の円」で囲んで出す。
- *   - まだ何も入っていないセル … 円を中央に、通常サイズで
- *   - 実際の値が入ったセル       … 円は小さくなって左上の角へ退避（角から少しはみ出す）
+ *   - まだ何も入っていないセル … 希望の候補すべてを円で横に並べる（中央・通常サイズ）
+ *   - 実際の値が入ったセル       … 円は1つだけに絞り、小さくなって左上の角へ退避
+ *                                 （角から少しはみ出す）。残すのは「その割当に対応する希望」
+ *                                 ＝叶ったシフトの色の円
  *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
  * 範囲違反（連勤など）は従来どおり下端の赤帯。
@@ -104,6 +107,23 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   // 希望と違う勤務帯になったか。判定は宣言的な制約（希望違反）から導く（表示側で再実装しない）。
   const wishMismatch = !!pointViolation;
 
+  // 値が入ったセルの左上に残す円は1つだけ。「その割当に対応する希望」＝叶ったシフトの円を残す。
+  // 割当が決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
+  // 叶っていないとき（希望違反）は、破った × 希望 → 叶わなかった ○ 希望 の順に代表を1つ選び、
+  // 警告色（is-mismatch）の円として残す＝違反バブルへの導線も1つに集まる。
+  const assignedWishKey =
+    cell.kind === "day-off"
+      ? DAY_OFF_WISH
+      : cell.kind === "work"
+        ? workWishKey(shift?.name ?? cell.shiftId)
+        : undefined;
+  const cornerWishEntry =
+    wishEntries.find((e) => e.key === assignedWishKey) ??
+    wishEntries.find((e) => e.pref === "want") ??
+    wishEntries[0];
+  const shownWishEntries: WishEntry[] =
+    hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
+
   // 違反マーカー（赤帯・⊿）。ObjectView がダブルクリックでの違反バブル展開と data-url
   // （origin-side でマーカーの近くに出す）を担う。セルは単クリック=選択 / ダブルクリック=候補なので、
   // マーカー上の操作はセルへ伝播させない（ラッパで stopPropagation）。
@@ -146,14 +166,14 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   // ラッパではなく、この span 自身の data-url + ダブルクリック（openBubble）で持たせる。
   const wishMarks = wishEntries.length > 0 && (
     <span className={`e-wish-marks${hasValue ? " is-corner" : ""}`}>
-      {wishEntries.map((e, i) => {
+      {shownWishEntries.map((e, i) => {
         // 見た目（背景・線幅・不透明度）は状態ごとに CSS 側で決める。ここは色と位置だけ渡す。
         const style = {
           // 希望の色（勤務帯色 / 休みはグレー）。文字色・線色に使う
           ["--wish-color" as string]: e.color,
           // 複数希望を横に並べるための位置（CSS 側で calc に使う）
           ["--i" as string]: i,
-          ["--n" as string]: wishEntries.length,
+          ["--n" as string]: shownWishEntries.length,
         } as React.CSSProperties;
         return (
           <span
