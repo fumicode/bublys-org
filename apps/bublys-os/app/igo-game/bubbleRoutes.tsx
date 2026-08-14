@@ -1,13 +1,13 @@
 "use client";
 
 import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble } from "@bublys-org/bubbles-ui";
-import { IgoWorldLineManager } from "../world-line/integrations/IgoWorldLineManager";
+import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
-import { useAppDispatch } from "@bublys-org/state-management";
+import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
+import { IgoGameCollection } from "./ui";
 
 /**
- * 囲碁ゲーム - メインバブル（世界線統合版）
+ * 囲碁ゲーム - メインバブル（world-line-graph 統合版）
  */
 const IgoGameBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const gameId = bubble.url.replace("igo-game/", "");
@@ -18,38 +18,28 @@ const IgoGameBubble: BubbleRoute["Component"] = ({ bubble }) => {
   };
 
   return (
-    <IgoWorldLineManager
-      gameId={gameId}
-      isBubbleMode={false}
-      onOpenWorldLineView={handleOpenWorldLineView}
-      onCloseWorldLineView={() => {}}
-    >
-      <IgoWorldLineIntegration gameId={gameId} />
-    </IgoWorldLineManager>
+    <IgoWorldLineIntegration gameId={gameId} onOpenWorldLineView={handleOpenWorldLineView} />
   );
 };
 
 /**
- * 囲碁ゲーム - 世界線ビューバブル
+ * 囲碁ゲーム - 世界線ビューバブル（canvas）
  */
 const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const gameId = bubble.url.replace("igo-game/", "").replace("/history", "");
-  const dispatch = useAppDispatch();
+  return <IgoWorldLineCanvas gameId={gameId} />;
+};
 
-  const handleCloseWorldLineView = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
+/**
+ * 囲碁ゲーム - 対局一覧バブル
+ */
+const IgoGamesBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
   return (
-    <IgoWorldLineManager
-      gameId={gameId}
-      isBubbleMode={true}
-      onOpenWorldLineView={() => {}}
-      onCloseWorldLineView={handleCloseWorldLineView}
-    >
-      <IgoWorldLineIntegration gameId={gameId} />
-    </IgoWorldLineManager>
+    <IgoGameCollection
+      buildDetailUrl={(gameId) => `igo-game/${gameId}`}
+      onGameClick={(_gameId, detailUrl) => openBubble(detailUrl, bubble.id)}
+    />
   );
 };
 
@@ -58,10 +48,18 @@ const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
  */
 export const igoGameBubbleRoutes: BubbleRoute[] = [
   {
+    pattern: /^igo-games$/,
+    type: "igo-games",
+    Component: IgoGamesBubble,
+  },
+  {
     pattern: /^igo-game\/[^/]+\/history$/,
     type: "igo-game-history",
     Component: IgoGameWorldLinesBubble,
-    bubbleOptions: { contentBackground: "transparent" },
+    // 他のバブルと同じ通常 BubbleView で描画する（fillsContainer は使わない）。
+    // サイズは popChildViewPortBelow が明示的に与える（画面下部ストリップ）。
+    // canvas は透明。背景は半透明の黒にして、後ろを透かしつつ世界線を見やすく。
+    bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" },
   },
   {
     pattern: /^igo-game\/[^/]+$/,

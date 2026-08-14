@@ -36,6 +36,29 @@ export function conversationScopeId(conversationId: string): string {
 }
 
 // ============================================================================
+// Conversation meta — グローバルWLGで「会話の存在」だけを管理する軽量ドメイン
+// オブジェクト。他のドメインオブジェクト（Speaker / Conversation）と同じく
+// 「Xxxx class + 内部 XxxxState (plain)」規約に揃えてあるので、domain-registry
+// に class: ConversationMeta で登録すれば addObject(new ConversationMeta(...))
+// と instanceof 経由で型解決できる（class: Object フォールバックは不要）。
+// ============================================================================
+
+type ConversationMetaState = { readonly id: string };
+
+class ConversationMeta {
+  constructor(readonly state: ConversationMetaState) {}
+  get id(): string {
+    return this.state.id;
+  }
+  toJSON(): ConversationMetaState {
+    return this.state;
+  }
+  static fromJSON(json: ConversationMetaState): ConversationMeta {
+    return new ConversationMeta(json);
+  }
+}
+
+// ============================================================================
 // Domain Objects — 全型のシリアライズ/デシリアライズ設定を1箇所で定義
 // ============================================================================
 
@@ -53,20 +76,12 @@ const TAILOR_GENIE_DOMAIN_OBJECTS = defineDomainObjects({
     getId: (c: Conversation) => c.id,
   },
   "conversation-meta": {
-    class: Object,
-    fromJSON: (json) => json as ConversationMeta,
-    toJSON: (obj: ConversationMeta) => obj,
-    getId: (obj: ConversationMeta) => obj.id,
+    class: ConversationMeta,
+    fromJSON: (json) => ConversationMeta.fromJSON(json as ConversationMetaState),
+    toJSON: (m: ConversationMeta) => m.toJSON(),
+    getId: (m: ConversationMeta) => m.id,
   },
 });
-
-// ============================================================================
-// Conversation meta — グローバルWLGで「会話の存在」を管理するための型
-// ============================================================================
-
-interface ConversationMeta {
-  id: string;
-}
 
 // ============================================================================
 // Context — 内部実装。公開 API はフック経由
@@ -129,7 +144,7 @@ function TailorGenieInner({
   // 会話作成: グローバルWLGに ref を追加 + ローカルWLGスコープを作成
   const addConversation = useCallback(
     (id: string) => {
-      scope.addObject("conversation-meta", { id });
+      scope.addObject(new ConversationMeta({ id }));
       dispatch(createScopeAction(conversationScopeId(id)));
     },
     [scope, dispatch]

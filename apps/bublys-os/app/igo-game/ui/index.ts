@@ -3,3 +3,5 @@
  */
 
 export * from './IgoBoardView';
+export * from './IgoGameList';
+export * from './IgoGameCollection';

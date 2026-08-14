@@ -6,8 +6,11 @@ import {
   Bubble,
   createBubble,
   CoordinateSystem,
+  Layer,
   BubblesContext,
   BubbleRefsProvider,
+  BubblesLayeredView,
+  BubblesLayeredViewProps,
   selectBubbleLayers,
   selectSurfaceBubbles,
   addBubble,
@@ -23,11 +26,12 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   setSurfaceLeftTop,
+  measureViewport,
   OpeningPosition,
   DragDataType,
 } from "@bublys-org/bubbles-ui";
-import { PositionDebuggerProvider } from "@bublys-org/bubbles-ui/debug";
-import { BubblesLayeredView } from "../ui/BubblesLayeredView";
+import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
+import { BubbleContent } from "../ui/BubbleContent";
 import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
@@ -35,6 +39,15 @@ import CloseIcon from "@mui/icons-material/Close";
 import { Sidebar } from "../ui/Sidebar";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
+import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
+// import { BubbleArrangementInspector } from "../../world-line/BubbleArrangementInspector";
+
+const renderAppsBubbleContent = (bubble: Bubble) => <BubbleContent bubble={bubble} />;
+
+const BubblesLayeredViewWithDebugger: FC<BubblesLayeredViewProps> = (props) => {
+  const { addRects } = usePositionDebugger();
+  return <BubblesLayeredView {...props} onDebugRects={addRects} />;
+};
 
 type BubblesUI = {
   additionalButton?: React.ReactNode;
@@ -70,7 +83,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // Redux を使ったアクションハンドラ
-  const deleteBubble = (b: Bubble) => {
+  const deleteBubble = useCallback((b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
 
@@ -82,21 +95,21 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       console.log('[BubblesUI] Deleting shell:', { shellId, shellType });
       shellManager.removeShell(shellId);
     }
-  };
+  }, [dispatch, shellManager]);
 
-  const layerDown = (b: Bubble) => {
+  const layerDown = useCallback((b: Bubble) => {
     dispatch(layerDownAction(b.id));
-  };
+  }, [dispatch]);
 
-  const layerUp = (b: Bubble) => {
+  const layerUp = useCallback((b: Bubble) => {
     dispatch(layerUpAction(b.id));
-  };
+  }, [dispatch]);
 
 
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side"
+    openingPosition: OpeningPosition = "bubble-side-right"
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
@@ -106,23 +119,40 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     return b.id;
   }, [dispatch]);
 
-  const popChildMax = useCallback((b: Bubble, openerBubbleId:string): string => {
-    // 利用可能なスペース（グローバル座標系）
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+  // 今の画面の「下」に、左右いっぱい・ビューポート下部のストリップとして開く。
+  // popChildMax が可視領域を丸ごと埋めるのに対し、こちらは幅は同じだが高さを
+  // 下部の一部に絞り、下端に貼り付ける（横長の世界線などに向く）。
+  // maximizeTo（=最大化扱い）ではなく resizeTo（=明示サイズ）で開くので、
+  // 窓の「最大化/フィット」トグルとも整合する。
+  const popChildViewPortBelow = useCallback((b: Bubble, openerBubbleId: string): string => {
+    const viewport = measureViewport();
+    const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
+    const visible = viewport?.visibleRegion() ?? {
+      origin: { x: 0, y: 0 },
+      size: { width: 0, height: 0 },
+    };
 
+    const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+    const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
 
-    // サイズと位置を設定
-    const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
+    // 下部ストリップの高さ（可視高さの約 45%）。横はいっぱい。
+    const height = Math.round(availableHeight * 0.45);
+    const newPosition = {
+      x: visible.origin.x,
+      y: visible.origin.y + (availableHeight - height),
+    };
+
+    const resizedBubble = b.resizeTo({ width: availableWidth, height });
+    const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
-    dispatch(relateBubbles({openerId: openerBubbleId, openeeId: movedBubble.id}));
+    dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));
 
+    // popChildMaxInProcess を再利用（前面化＋アニメのみ。再配置リスナーは走らない）。
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
+  }, [dispatch, surfaceLeftTop, globalCoordinateSystem]);
 
 
   const joinSibling = useCallback((
@@ -141,15 +171,16 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side"
+    openingPosition: OpeningPosition = "bubble-side-right"
   ): string => {
     const newBubble = createBubble(name);
 
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);
 
-    if(isNameEndWithHistory) {
-      return popChildMax(newBubble, openerBubbleId);
+    if (isNameEndWithHistory) {
+      // 履歴は画面下部の左右いっぱいストリップとして開く
+      return popChildViewPortBelow(newBubble, openerBubbleId);
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
@@ -157,7 +188,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }
-  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
+  }, [surfaceBubbles, popChild, popChildViewPortBelow, joinSibling]);
 
   // CoordinateSystemの更新ハンドラー（useCallbackで安定化）
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
@@ -172,8 +203,16 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openBubble: popChildOrJoinSibling,
   }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
 
+  const handleBubbleClick = useCallback((name: string) => {
+    console.log("Bubble clicked: " + name);
+  }, []);
+
+  const handleBubbleResize = useCallback((bubble: Bubble) => {
+    console.log("Bubble resized: " + bubble.url, bubble.size);
+  }, []);
+
   // Pocketのドロップハンドラー
-  const handlePocketDrop = (url: string, type: DragDataType, label?: string, objectId?: string) => {
+  const handlePocketDrop = useCallback((url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
       id: crypto.randomUUID(),
       url,
@@ -182,7 +221,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       label,
       addedAt: Date.now(),
     }));
-  };
+  }, [dispatch]);
 
   // Pocketアイテムのクリックハンドラー
   const handlePocketItemClick = useCallback((url: string) => {
@@ -200,21 +239,36 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   return (
     <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
+      {/* 現在の view 状態の JSON を左下に表示（開発用） */}
+      {/* <BubbleArrangementInspector /> */}
+
       {/* Left Sidebar */}
       <Sidebar onItemClick={handleSidebarItemClick} />
 
-      {/* Main Bubbles Area */}
-      <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      {/* Main Bubbles Area — universe（root も nested も）は透明にして、
+          ここがすべての universe の「夜空」backdrop として 1 段大きく塗る。 */}
+      <Box
+        sx={{
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+          background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+        }}
+      >
         <BubblesContext.Provider value={bubblesContextValue}>
+          {/* 表示状態を world-line に同期し undo/redo + 世界線グラフ起動を提供。
+              openBubble を使うため BubblesContext.Provider の内側に配置する。 */}
+          <BubbleArrangementWorldLineControls />
           <BubbleRefsProvider>
             <PositionDebuggerProvider isShown={false}>
               <Box sx={{ width: '100%', height: '100%' }}>
-                <BubblesLayeredView
+                <BubblesLayeredViewWithDebugger
                   bubbleLayers={bubbleLayers}
                   vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                  onBubbleClick={(name) => console.log("Bubble clicked: " + name)}
+                  renderBubbleContent={renderAppsBubbleContent}
+                  onBubbleClick={handleBubbleClick}
                   onBubbleClose={deleteBubble}
-                  onBubbleResize={(bubble) => console.log("Bubble resized: " + bubble.url, bubble.size)}
+                  onBubbleResize={handleBubbleResize}
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}

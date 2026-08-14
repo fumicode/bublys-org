@@ -2,6 +2,7 @@ import { FC, createContext } from "react";
 import { Bubble, BubbleOptions, BubbleParams } from "../Bubble.domain.js";
 import { Size2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { OpeningPosition } from "../state/bubbles-slice.js";
+import type { SnapshotCodec } from "./SnapshotCodec.js";
 
 // BubbleContentRenderer型
 export type BubbleContentRendererProps = {
@@ -20,6 +21,19 @@ export type BubbleRoute = {
   type: string;
   Component: BubbleContentRenderer;
   bubbleOptions?: BubbleOptions;
+  /**
+   * このルートが `<base>@<snapshot>` 形式の snapshot pointer を持つときの codec。
+   * 世界線まわりの hook（{@link useUniverseArrangementWorldLine} 等）はこの codec から url の
+   * 読み書きを行うので、特定の base 名（"universe" など）を hook 側で知らずに済む。
+   * 通常は {@link makeSnapshotRoute} 経由で url パターンと一緒に派生させる。
+   */
+  snapshot?: SnapshotCodec;
+  /**
+   * universe を内包するルート用：universe が空のときに初期 seed として
+   * 投入するバブル url の一覧。`UniverseView.initialBubbleUrls` に渡される。
+   * 通常は `makeBublyRoute` 経由で snapshot codec と一緒に付与される。
+   */
+  initialBubbleUrls?: string[];
 };
 
 /**

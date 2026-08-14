@@ -1,6 +1,6 @@
 'use client';
 import { FC, memo } from "react";
-import { Bubble } from "@bublys-org/bubbles-ui";
+import { Bubble, CurrentBubbleContext } from "@bublys-org/bubbles-ui";
 import { matchBubbleRoute } from "../domain/bubbleRoutes";
 
 /**
@@ -13,7 +13,11 @@ export const BubbleContent: FC<{ bubble: Bubble }> = memo(({ bubble }) => {
   const Renderer = route?.Component;
 
   if (Renderer) {
-    return <Renderer bubble={bubble} />;
+    return (
+      <CurrentBubbleContext.Provider value={bubble.id}>
+        <Renderer bubble={bubble} />
+      </CurrentBubbleContext.Provider>
+    );
   }
 
   return <div>Unknown bubble type: {bubble.type}</div>;

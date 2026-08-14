@@ -11,10 +11,11 @@ import {
   addPocketItem,
   removePocketItem,
 } from '@bublys-org/state-management';
-import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
+import { CoordinateSystem, Layer } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
+import { measureViewport } from '../utils/measure-viewport.js';
 import {
   selectBubbleLayers,
   selectSurfaceBubbles,
@@ -49,6 +50,12 @@ export type BublyAppProps = {
   menuItems: BublyMenuItem[];
   /** サイドバーのフッター（オプション） */
   sidebarFooter?: React.ReactNode;
+  /**
+   * このバブリの「夜空」色。バブル表示エリアの背景に塗られる。
+   * 任意の CSS color 文字列。未指定なら透明（白背景）。
+   * bublys-os にネストされたときも UniverseBubbleView 経由で同じ色が使われる想定。
+   */
+  backdropColor?: string;
 };
 
 /**
@@ -60,6 +67,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   subtitle,
   menuItems,
   sidebarFooter,
+  backdropColor,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -82,23 +90,23 @@ export const BublyApp: FC<BublyAppProps> = ({
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
 
   // アクションハンドラ
-  const deleteBubble = (b: Bubble) => {
+  const deleteBubble = useCallback((b: Bubble) => {
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
-  };
+  }, [dispatch]);
 
-  const layerDown = (b: Bubble) => {
+  const layerDown = useCallback((b: Bubble) => {
     dispatch(layerDownAction(b.id));
-  };
+  }, [dispatch]);
 
-  const layerUp = (b: Bubble) => {
+  const layerUp = useCallback((b: Bubble) => {
     dispatch(layerUpAction(b.id));
-  };
+  }, [dispatch]);
 
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
+    openingPosition: OpeningPosition = 'bubble-side-right'
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
@@ -106,19 +114,34 @@ export const BublyApp: FC<BublyAppProps> = ({
     return b.id;
   }, [dispatch]);
 
-  const popChildMax = useCallback((b: Bubble, openerBubbleId: string): string => {
-    const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-    const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
+  // 可視 surface 領域の「下部」に、左右いっぱいのストリップとして開く（世界線ビュー等）。
+  // UniverseView の popChildViewPortBelow と同じ振る舞いに揃える（最大化ではなく下部ストリップ）。
+  const popChildViewPortBelow = useCallback((b: Bubble, openerBubbleId: string): string => {
+    const viewport = measureViewport();
+    const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
+    const visible = viewport?.visibleRegion() ?? {
+      origin: { x: 0, y: 0 },
+      size: { width: 0, height: 0 },
+    };
 
-    const resizedBubble = b.resizeTo({ width: availableWidth, height: availableHeight });
-    const movedBubble = resizedBubble.moveTo({ x: 0, y: 0 });
+    const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+    const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
+    const height = Math.round(availableHeight * 0.45);
+    const newPosition = {
+      x: visible.origin.x,
+      y: visible.origin.y + (availableHeight - height),
+    };
+
+    const resizedBubble = b.resizeTo({ width: availableWidth, height });
+    const movedBubble = resizedBubble.moveTo(newPosition);
 
     dispatch(addBubble(movedBubble.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: movedBubble.id }));
+    // popChildMaxInProcess を再利用（前面化＋アニメのみ。再配置リスナーは走らない）。
     dispatch(popChildMaxInProcess(b.id));
 
     return b.id;
-  }, [dispatch, pageSize, globalCoordinateSystem, surfaceLeftTop]);
+  }, [dispatch, surfaceLeftTop, globalCoordinateSystem]);
 
   const joinSibling = useCallback((
     b: Bubble,
@@ -133,14 +156,14 @@ export const BublyApp: FC<BublyAppProps> = ({
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side'
+    openingPosition: OpeningPosition = 'bubble-side-right'
   ): string => {
     const newBubble = createBubble(name);
 
     const isNameEndWithHistory = /\/history$/.test(name);
 
     if (isNameEndWithHistory) {
-      return popChildMax(newBubble, openerBubbleId);
+      return popChildViewPortBelow(newBubble, openerBubbleId);
     }
 
     if (surfaceBubbles?.[0]?.type === newBubble.type) {
@@ -148,7 +171,7 @@ export const BublyApp: FC<BublyAppProps> = ({
     } else {
       return popChild(newBubble, openerBubbleId, openingPosition);
     }
-  }, [surfaceBubbles, popChild, popChildMax, joinSibling]);
+  }, [surfaceBubbles, popChild, popChildViewPortBelow, joinSibling]);
 
   const handleCoordinateSystemReady = useCallback((cs: CoordinateSystem) => {
     dispatch(setGlobalCoordinateSystem(cs.toData()));
@@ -241,8 +264,16 @@ export const BublyApp: FC<BublyAppProps> = ({
         )}
       </Box>
 
-      {/* メインエリア（バブル表示） */}
-      <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      {/* メインエリア（バブル表示）。backdropColor がこの bubly の「夜空」。
+          OS にネストされたときの UniverseBubbleView シェル色と同じ色を使う想定。 */}
+      <Box
+        sx={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'hidden',
+          background: backdropColor ?? 'transparent',
+        }}
+      >
         <BubblesContext.Provider value={bubblesContextValue}>
           <BubbleRefsProvider>
             <Box sx={{ width: '100%', height: '100%' }}>

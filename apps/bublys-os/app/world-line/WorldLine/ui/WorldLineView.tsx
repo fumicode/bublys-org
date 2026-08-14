@@ -154,37 +154,67 @@ function WorldView3D<TWorldState>({
       headPositions.set(headId, { index, total: headsList.length });
     });
 
-    // 各世界の位置を計算（消失点に向かって配置）
+    // ===== apexを中心に歪める曲線 =====
+    // 距離はHEADからの距離で測られているので、apex自身の距離を引いて
+    // 「apexからの符号付き深さ e」に変換する（apex=0が常に最前面・最も疎）。
+    //   e > 0 : apexより過去（祖先方向）→ 上の消失点へ後退
+    //   e < 0 : apexより未来（子孫方向）→ 下へ後退
+    const apexDepth = distances.get(apexWorldId) ?? 0;
+
+    // apexから遠ざかるほど飽和する曲線 g(t) = (2/π)·atan(t/k)。
+    // 曲率kは「apex近傍の隣り合うノード間隔が最低 minGapPx になる」よう逆算する。
+    // これにより世界線がどれだけ長くても apex 付近の間隔は一定（≒重ならない）に保たれ、
+    // 圧縮は遠方（消失点側）に寄る。
+    const minGapPx = 28; // ⭕️(16px)が重ならない中心間距離（余白込み）
+    const pastSpan = Math.max(1, apexPosition.y - vanishingPoint.y); // 過去側の振れ幅
+    const futureSpan = Math.max(1, containerSize.height * 0.95 - apexPosition.y); // 未来側の振れ幅
+    // span·(g(1)-g(0)) = minGapPx を満たす k を解く（apex隣接の最小間隔を保証）。
+    // 過去側/未来側で振れ幅が違うため、それぞれ別の k を使い両側で間隔を担保する。
+    const solveK = (span: number) => {
+      const th = Math.min((Math.PI / 2) * 0.9, (Math.PI / 2) * (minGapPx / span));
+      return 1 / Math.tan(th);
+    };
+    const kPast = solveK(pastSpan);
+    const kFuture = solveK(futureSpan);
+    const sat = (t: number, k: number) => (2 / Math.PI) * Math.atan(t / k);
+
+    // 各世界の位置を計算（apexを最前面に、両方向へ後退）
     return worlds
       .map((world) => {
         const distance = distances.get(world.worldId) ?? 999;
         const worldLineHeadId = worldLineMap.get(world.worldId);
         const headPos = worldLineHeadId ? headPositions.get(worldLineHeadId) : null;
-        
-        // 距離に応じて消失点との間の位置を計算
-        // distance=0(HEAD): apexPosition
-        // distance=∞: vanishingPoint
-        const ratio = distance === 0 ? 1 : 1 / (distance + 1);
-        
-        let x = vanishingPoint.x + (apexPosition.x - vanishingPoint.x) * ratio;
-        const y = vanishingPoint.y + (apexPosition.y - vanishingPoint.y) * ratio;
-        
-        // 各世界線を横に広げる（中央を基準に均等配置）
+
+        // apexからの符号付き深さと、その絶対値（偏心）
+        const depth = distance - apexDepth;
+        const ecc = Math.abs(depth);
+        const g = sat(ecc, depth >= 0 ? kPast : kFuture); // 0(apex) → 1(無限遠)
+        const conv = 1 - g;          // apexで1、遠方で0（横の収束・スケール用）
+
+        // 縦位置: apexを基準に過去は上、未来は下へ。apex近傍ほど間隔が広い。
+        const y = depth >= 0
+          ? apexPosition.y - pastSpan * g
+          : apexPosition.y + futureSpan * g;
+
+        // 横位置: 遠方ほど中央（消失点）へ収束
+        let x = vanishingPoint.x + (apexPosition.x - vanishingPoint.x) * conv;
+
+        // 各世界線を横に広げる（中央を基準に均等配置、遠方ほど狭まる）
         if (headPos && headPos.total > 1) {
           const spreadWidth = Math.min(containerSize.width * 0.4, containerSize.width);
-          const offset = ((headPos.index - (headPos.total - 1) / 2) / headPos.total) * spreadWidth * ratio;
+          const offset = ((headPos.index - (headPos.total - 1) / 2) / headPos.total) * spreadWidth * conv;
           x += offset;
         }
-        
-        // Z軸: 距離による奥行き（数値が大きいほど手前）
-        const z = distance * -120;
-        
-        // 基本のzIndex（距離が近いほど手前）
-        const baseZIndex = 100 - distance;
-        
+
+        // Z軸: apexから離れるほど奥へ後退（apexが最も手前）
+        const z = -ecc * 120;
+
+        // 基本のzIndex（apexに近いほど手前）
+        const baseZIndex = 100 - ecc;
+
         return {
           world,
-          distance,
+          ecc,
           x,
           y,
           z,
@@ -193,7 +223,7 @@ function WorldView3D<TWorldState>({
           isHead: worldLineHeads.has(world.worldId),
         };
       });
-  }, [worlds, apexWorldId, worldLineHeads]);
+  }, [worlds, apexWorldId, worldLineHeads, containerSize.width, containerSize.height]);
 
   // 世界間の接続線を計算
   const connections = useMemo(() => {
@@ -301,12 +331,12 @@ function WorldView3D<TWorldState>({
         {(() => {
           const focusedIsHead = worldsWithPosition.some(w => w.world.worldId === focusedWorldId && w.isHead);
 
-          return worldsWithPosition.map(({ world, distance, x, y, z, baseZIndex, isHead, worldLineHeadId }) => {
+          return worldsWithPosition.map(({ world, ecc, x, y, z, baseZIndex, isHead, worldLineHeadId }) => {
             const isFocused = world.worldId === focusedWorldId;
-            const baseOpacity = Math.max(0.3, 1 - distance * 0.15);
+            const baseOpacity = Math.max(0.3, 1 - ecc * 0.15);
             // フォーカスがHEAD以外にある場合、HEADを薄く表示
             const opacity = (isHead && !isFocused && !focusedIsHead) ? 0.3 : baseOpacity;
-            const scale = Math.max(0.3, 1 - distance * 0.15);
+            const scale = Math.max(0.3, 1 - ecc * 0.15);
 
             // focusedな世界はわずかに手前に
             const adjustedZ = isFocused ? z + 50 : z;

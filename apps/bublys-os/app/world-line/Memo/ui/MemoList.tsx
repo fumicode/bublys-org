@@ -1,6 +1,6 @@
-import { useAppSelector, selectAllWorldLineObjectIds } from '@bublys-org/state-management';
+import { useAppSelector } from '@bublys-org/state-management';
+import { selectMemoIds, selectMemoAtApex } from '../feature/memoSelectors';
 import { Memo } from '../domain/Memo';
-import { deserializeMemo } from '../feature/MemoManager';
 import { IconButton } from '@mui/material';
 import { LuClipboardCopy } from 'react-icons/lu';
 import CloseIcon from '@mui/icons-material/Close';
@@ -16,39 +16,16 @@ type MemoListProps = {
   onMemoDelete?: (memoId: string) => void;
 };
 
-// Memoかどうかを判定する関数
-function isMemo(worldState: any): worldState is { blocks: any; lines: string[]; id: string } {
-  return worldState &&
-    typeof worldState === 'object' && 
-    'blocks' in worldState && 
-    'lines' in worldState && 
-    'id' in worldState;
-}
-
 export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoListProps) {
-  // world-sliceからすべてのobjectIdを取得
-  const objectIds = useAppSelector(selectAllWorldLineObjectIds);
+  // world-line-graph slice の scopeId 一覧（`memo:` プレフィックス）から ID を取り、
+  // 各 ID の scope の apex に置かれている Memo を読む。
+  const memoIds = useAppSelector(selectMemoIds);
   const users = useAppSelector(selectUsers);
-
-  // すべての世界線状態を取得
-  const worldLines = useAppSelector((state) => state.worldLine.worldLines);
-
-  // 各objectIdのapexWorldを取得し、Memoかどうかを判定
-  const memos = objectIds
-    .map(objectId => {
-      const worldLine = worldLines[objectId];
-      if (!worldLine || !worldLine.apexWorldId) return null;
-
-      const worldEntry = worldLine.worlds.find(w => w.id === worldLine.apexWorldId);
-      if (!worldEntry) return null;
-
-      const apexWorld = worldEntry.world;
-      if (apexWorld && isMemo(apexWorld.worldState)) {
-        return deserializeMemo(apexWorld.worldState);
-      }
-      return null;
-    })
-    .filter((memo): memo is Memo => memo !== null);
+  const memos = useAppSelector((state) =>
+    memoIds
+      .map((id) => selectMemoAtApex(id)(state))
+      .filter((m): m is Memo => m !== null),
+  );
 
   return (
     <div>

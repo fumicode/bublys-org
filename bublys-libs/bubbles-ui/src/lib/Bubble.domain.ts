@@ -2,7 +2,32 @@ import { Point2, Size2, SmartRect } from "@bublys-org/bubbles-ui-util";
 
 export type BubbleOptions = {
   contentBackground?: string;
+  /**
+   * 【レイアウト】中身が固有サイズを持たず常にバブルいっぱいに広がる「窓」型コンテンツ
+   * （canvas など）。true のとき fit-content 状態を持たず、常に明示サイズの窓として扱う
+   * （最大化解除 = 既定の窓サイズに戻る／中身は overflow hidden で容器に追従）。
+   * これは純粋にレイアウトの性質で、中身が universe かどうかとは独立（普通の BubbleView でも使える）。
+   */
+  fillsContainer?: boolean;
+  /**
+   * 【中身の種別】このバブルが universe（= 入れ子のバブルサーフェス／1 bubly）かどうか。
+   * true のとき UniverseBubbleView（ガラス越しの夜空・クリック貫通の入れ子サーフェス）で描く。
+   * universe は固有サイズを持たないので常に窓型（= fillsContainer 相当）として扱う。
+   */
+  universe?: boolean;
+  /** 窓型（fillsContainer / universe）のとき、生成時／最大化解除時に使う既定の窓サイズ。 */
+  defaultSize?: Size2;
+  /**
+   * このバブルが universe バブル（= 1 bubly）のとき、その universe の「夜空」色。
+   * - スタンドアロン実行時（BublyApp）はメインエリアの背景に塗られる
+   * - bublys-os にネストされたときは UniverseBubbleView のガラス越しに見える「向こう側」の色
+   * 任意の CSS color 文字列（"hsl(...)" / "rgb(...)" / "#..." 等）。
+   */
+  backdropColor?: string;
 };
+
+/** fillsContainer なバブルの既定の窓サイズ（route が defaultSize を指定しない場合のフォールバック）。 */
+export const DEFAULT_WINDOW_SIZE: Size2 = { width: 520, height: 400 };
 
 // パスパラメータの型
 export type BubbleParams = Record<string, string>;
@@ -23,6 +48,7 @@ export type BubbleProps = {
   params?: BubbleParams;
   position?: Point2;
   size?: Size2;
+  maximized?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
@@ -37,6 +63,7 @@ export type BubbleJson= {
   params?: BubbleParams;
   position?: Point2;
   size?: Size2;
+  maximized?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: RectJson; //これはシリアライズ可能な型に保つ
@@ -51,6 +78,7 @@ export type BubbleState = {
   params: BubbleParams;
   position?: Point2;
   size?: Size2;
+  maximized?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
@@ -105,8 +133,50 @@ export class Bubble {
     return this.state.size;
   }
 
+  /** 【レイアウト】中身が容器いっぱいに広がる窓型コンテンツか（純粋にレイアウトの性質）。 */
+  get fillsContainer(): boolean {
+    return this.state.bubbleOptions?.fillsContainer ?? false;
+  }
+
+  /** 【中身の種別】このバブルが universe（入れ子のバブルサーフェス）か。描画コンポーネントを分ける。 */
+  get isUniverse(): boolean {
+    return this.state.bubbleOptions?.universe ?? false;
+  }
+
+  /**
+   * 窓型（= 固有サイズを持たず明示サイズの窓として扱う）か。
+   * fillsContainer（レイアウト）か universe（種別。常に窓型）のどちらかなら窓型。
+   */
+  get isWindowed(): boolean {
+    return this.fillsContainer || this.isUniverse;
+  }
+
+  /** 窓型のときの既定の窓サイズ。 */
+  get defaultSize(): Size2 {
+    return this.state.bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE;
+  }
+
+  /**
+   * 最大化中か。明示フラグだけを見る。
+   *
+   * バブルのサイズ状態は 3 つ:
+   *  - fit-content: size なし、maximized 偽 — 中身に追従（非 fillsContainer 規定）
+   *  - user-resized: size あり、maximized 偽 — ユーザーが手で決めた sticky なサイズ
+   *  - maximized: maximized 真 — viewport いっぱい
+   * 「size があるかどうか」だけでは user-resized と maximized を区別できないので、
+   * フラグを採用する。
+   */
+  get isMaximized(): boolean {
+    return !!this.state.maximized;
+  }
+
   get contentBackground(): string | undefined {
     return this.state.bubbleOptions?.contentBackground;
+  }
+
+  /** バブリの「夜空」色（universe バブルとして使う想定。任意の CSS color 文字列）。 */
+  get backdropColor(): string | undefined {
+    return this.state.bubbleOptions?.backdropColor;
   }
 
   get bubbleOptions(): BubbleOptions | undefined {
@@ -129,6 +199,21 @@ export class Bubble {
 
   resizeTo(size: Size2): Bubble {
     return new Bubble({ ...this.state, size });
+  }
+
+  /** 最大化する（明示サイズ + maximized=true）。 */
+  maximizeTo(size: Size2): Bubble {
+    return new Bubble({ ...this.state, size, maximized: true });
+  }
+
+  /**
+   * 最大化を解除する。
+   * 窓型（fillsContainer / universe）は固有サイズが無いので既定の窓サイズに戻す（サイズ維持）。
+   * 通常のバブルはサイズ無し（fit-content）に戻す。
+   */
+  restore(): Bubble {
+    const size = this.isWindowed ? this.defaultSize : undefined;
+    return new Bubble({ ...this.state, size, maximized: false });
   }
 
   toJSON(): BubbleJson {
@@ -188,7 +273,14 @@ export const createBubble = (url: string, pos?: Point2): Bubble => {
   const params = resolvedProps?.params;
   const bubbleOptions = resolvedProps?.bubbleOptions;
 
-  return new Bubble({ url, colorHue, type, params, position: pos, bubbleOptions });
+  // 窓型（fillsContainer / universe）は固有サイズが無いため、生成時から既定の窓サイズを持つ
+  // （maximized=false を明示し、最大化扱いにならないようにする）。普通のバブルは fit-content。
+  const windowed =
+    (bubbleOptions?.fillsContainer ?? false) || (bubbleOptions?.universe ?? false);
+  const size = windowed ? bubbleOptions?.defaultSize ?? DEFAULT_WINDOW_SIZE : undefined;
+  const maximized = windowed ? false : undefined;
+
+  return new Bubble({ url, colorHue, type, params, position: pos, bubbleOptions, size, maximized });
 };
 
 

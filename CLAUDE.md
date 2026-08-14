@@ -161,6 +161,31 @@ feature (domain + ui + Reduxに依存)
    - `bubbles-ui-state`でクロススライスインタラクションに使用
    - 複数の状態スライスにまたがる非同期操作を処理
 
+5. **Reduxスライスは集約のリポジトリに徹する（重要）:**
+   - スライスの役割は集約（ドメインオブジェクト）の**保存・取得だけ**。
+     reducerは `setList` / `add` / `update`（集約丸ごとをIDで置換）/ `remove(id)` のような
+     永続化操作のみを持つ
+   - **ドメインのビジネスロジック（集約に属するメソッド）は集約オブジェクトに生やす**。
+     reducerの中に集約内部のロジックを書かない
+   - 更新の流れ：feature層が「セレクタで集約を取得 → 集約のメソッドを呼んで新インスタンスを得る
+     → `toPlain()` でplain化 → リポジトリreducer（`update`）で保存」する
+   - 例（NG → OK）:
+     ```typescript
+     // NG: スライスに集約のロジック（setCell）を書く
+     setCell: (state, { payload }) => {
+       const s = MonthlyStaffSchedule.fromPlain(state.list[i]);
+       state.list[i] = s.assignShift(...).toPlain();  // ← ロジックがスライスに漏れている
+     }
+
+     // OK: 集約にメソッドを生やし、スライスは保存のみ
+     // 集約: schedule.setCell(staffId, day, to) が新インスタンスを返す
+     updateSchedule: (state, { payload }) => {          // リポジトリの save 相当
+       const i = state.list.findIndex(s => s.id === payload.id);
+       if (i >= 0) state.list[i] = payload;
+     }
+     // feature: dispatch(updateSchedule(schedule.setCell(...).toPlain()))
+     ```
+
 ### 技術スタック
 
 **コア:**

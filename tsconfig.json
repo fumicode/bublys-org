@@ -82,22 +82,22 @@
       "path": "./sekaisen-igo-bubly/sekaisen-igo-app"
     },
     {
-      "path": "./csv-importer-bubly/csv-importer-model"
+      "path": "./event-shift-puzzle/event-shift-puzzle-model"
     },
     {
-      "path": "./csv-importer-bubly/csv-importer-libs"
+      "path": "./event-shift-puzzle/event-shift-puzzle-libs"
     },
     {
-      "path": "./csv-importer-bubly/csv-importer-app"
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-model"
     },
     {
-      "path": "./object-transformer-bubly/object-transformer-model"
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-libs"
     },
     {
-      "path": "./object-transformer-bubly/object-transformer-libs"
+      "path": "./hotel-shift-puzzle-bubly/hotel-shift-puzzle-app"
     },
     {
-      "path": "./object-transformer-bubly/object-transformer-app"
+      "path": "./event-shift-puzzle/event-shift-puzzle-app"
     }
   ]
 }

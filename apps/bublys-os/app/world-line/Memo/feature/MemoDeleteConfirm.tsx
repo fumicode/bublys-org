@@ -1,7 +1,8 @@
 import { FC } from "react";
 import { Button, Stack, Typography } from "@mui/material";
-import { useAppDispatch, useAppSelector, deleteWorldLine, selectApexWorld } from "@bublys-org/state-management";
-import { deserializeMemo } from "./MemoManager";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { selectMemoAtApex } from "./memoSelectors";
+import { dispatchDeleteMemo } from "./memoActions";
 
 type MemoDeleteConfirmProps = {
   memoId: string;
@@ -11,11 +12,10 @@ type MemoDeleteConfirmProps = {
 
 export const MemoDeleteConfirm: FC<MemoDeleteConfirmProps> = ({ memoId, onCancel, onDeleted }) => {
   const dispatch = useAppDispatch();
-  const apexWorldState = useAppSelector(selectApexWorld(memoId));
-  const memo = apexWorldState ? deserializeMemo(apexWorldState.worldState) : undefined;
+  const memo = useAppSelector(selectMemoAtApex(memoId));
 
   const handleDelete = () => {
-    dispatch(deleteWorldLine(memoId));
+    dispatchDeleteMemo(dispatch, memoId);
     onDeleted?.();
   };
 

@@ -57,25 +57,31 @@ const injectedMiddlewares: Middleware[] = [];
 const injectedBlacklist: string[] = [];
 
 /**
- * 外部ライブラリからsliceを注入する
+ * 外部ライブラリから slice を注入する。
+ * 同じ slice を二重注入しても 1 回しか登録しない（複数のバブリ／ライブラリが
+ * 同じ slice の初期化関数を呼ぶケースに耐えるため）。
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const injectSlice = (slice: Slice) => {
+  if (injectedSlices.includes(slice)) return;
   injectedSlices.push(slice);
   slice.injectInto(rootReducer);
 };
 
 /**
- * 外部ライブラリからmiddlewareを注入する
+ * 外部ライブラリから middleware を注入する。
+ * 同じ middleware を二重注入しても 1 回しか登録しない。
  */
 export const injectMiddleware = (middleware: Middleware) => {
+  if (injectedMiddlewares.includes(middleware)) return;
   injectedMiddlewares.push(middleware);
 };
 
 /**
- * persist blacklistにreducerPathを追加する
+ * persist blacklist に reducerPath を追加する（重複は無視）。
  */
 export const addToBlacklist = (reducerPath: string) => {
+  if (injectedBlacklist.includes(reducerPath)) return;
   injectedBlacklist.push(reducerPath);
 };
 

@@ -1,66 +1,19 @@
-import { FC, useEffect, useMemo, useRef, useState, useContext, useLayoutEffect, memo } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
+import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
+import { useBubbleResize } from "../hooks/useBubbleResize.js";
+import { useWheelLayerNavigation } from "../hooks/useWheelLayerNavigation.js";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { renderBubble, updateBubble, finishBubbleAnimation } from "../state/bubbles-slice.js";
+import { renderBubble, updateBubble, finishBubbleAnimation, focusBubble } from "../state/bubbles-slice.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
-
-/**
- * 泡っぽい閉じるボタンのSVGアイコン
- */
-const CloseIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path
-      d="M8 8L16 16M16 8L8 16"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-/**
- * 最大化/縮小トグルボタンのSVGアイコン
- */
-const ToggleSizeIcon: FC<{ size?: number; isMaximized: boolean }> = ({ size = 18, isMaximized }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    {isMaximized ? (
-      // 縮小アイコン（内向き矢印）
-      <>
-        <path d="M8 8L10 10M16 16L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M16 8L14 10M8 16L10 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </>
-    ) : (
-      // 最大化アイコン（四角）
-      <rect x="7" y="7" width="10" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-    )}
-  </svg>
-);
-
-/**
- * レイヤー手前へ移動（上向き矢印）
- */
-const LayerUpIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 14L12 9L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-/**
- * レイヤー奥へ移動（下向き矢印）
- */
-const LayerDownIcon: FC<{ size?: number }> = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.15" />
-    <path d="M8 10L12 15L16 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+import { measureViewport } from "../utils/measure-viewport.js";
+import { useUniverseId } from "../context/UniverseContext.js";
+import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
+import { BubbleSkeleton } from "./BubbleSkeleton.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -80,7 +33,17 @@ const abbreviateSlug = (slug: string): { text: string; isAbbreviated: boolean } 
  * URLをパースしてスタイル付きで表示するコンポーネント
  * memo化して不要な再レンダリングを防止
  * CSSのdirection:rtlで右端から表示（強制リフローを完全に回避）
+ *
+ * 文法: 各セグメントは `<name>` または `<name>@<snapshot>` で、`@<snapshot>` は
+ * 「at this snapshot」を表すスナップショット指定子（universe@<node> 等）。
+ * @ とその後ろを専用スタイルで描き、name と区別する。
  */
+const splitAtSnapshot = (segment: string): { name: string; snapshot: string | null } => {
+  const i = segment.indexOf("@");
+  if (i < 0) return { name: segment, snapshot: null };
+  return { name: segment.slice(0, i), snapshot: segment.slice(i + 1) };
+};
+
 const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
   const segments = useMemo(() => url.split("/").filter(Boolean), [url]);
 
@@ -88,16 +51,27 @@ const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
     <div className="e-styled-url">
       <div className="e-styled-url-inner">
         {segments.map((segment, index) => {
-          const { text, isAbbreviated } = abbreviateSlug(segment);
+          const { name, snapshot } = splitAtSnapshot(segment);
+          const { text: nameText, isAbbreviated: nameAbbr } = abbreviateSlug(name);
+          const snapshotAbbr = snapshot !== null ? abbreviateSlug(snapshot) : null;
           return (
             <span key={index} className="e-url-segment">
               {index > 0 && <span className="e-url-separator">/</span>}
               <span
-                className={`e-url-slug ${isAbbreviated ? "e-abbreviated" : ""}`}
-                title={isAbbreviated ? segment : undefined}
+                className={`e-url-slug ${nameAbbr ? "e-abbreviated" : ""}`}
+                title={nameAbbr ? name : undefined}
               >
-                {text}
+                {nameText}
               </span>
+              {snapshot !== null && snapshotAbbr !== null && (
+                <span
+                  className="e-url-snapshot"
+                  title={snapshotAbbr.isAbbreviated ? snapshot : undefined}
+                >
+                  <span className="e-url-at">@</span>
+                  <span className="e-url-snapshot-node">{snapshotAbbr.text}</span>
+                </span>
+              )}
             </span>
           );
         })}
@@ -105,6 +79,8 @@ const StyledUrl: FC<{ url: string }> = memo(({ url }) => {
     </div>
   );
 });
+
+const HEADER_PROXIMITY_THRESHOLD = 40;
 
 type BubbleProps = {
   bubble: Bubble;
@@ -114,8 +90,10 @@ type BubbleProps = {
 
   layerIndex?: number;
   zIndex?: number;
+  isFocused?: boolean;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
+  lightweightMode?: boolean; // 軽量モード: box-shadow・transition・backdrop-filter を省略
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void; // クリックイベントハンドラ
@@ -134,8 +112,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
   children,
   layerIndex,
   zIndex,
+  isFocused = false,
   contentBackground = "white",
   hasLeftLink = false,
+  lightweightMode = false,
   position,
   vanishingPoint,
   onClick,
@@ -155,127 +135,118 @@ const BubbleViewInner: FC<BubbleProps> = ({
   );
 
   const dispatch = useAppDispatch();
-  const { coordinateSystem, pageSize, surfaceLeftTop } = useContext(BubblesContext);
+  const universeId = useUniverseId();
+  const { pageSize, surfaceLeftTop } = useContext(BubblesContext);
   const bubbleRefs = useBubbleRefsOptional();
-
-  // ドラッグハンドラ用に最新値を保持
-  const surfaceLeftTopRef = useRef(surfaceLeftTop);
-  surfaceLeftTopRef.current = surfaceLeftTop;
-  const vanishingPointRef = useRef(vanishingPoint);
-  vanishingPointRef.current = vanishingPoint;
 
   const { ref, notifyRendered} = useMyRectObserver({
     onRectChanged: (rect: SmartRect) => {
       const updated = bubble.rendered(rect);
-      dispatch(renderBubble(updated.toJSON()));
+      dispatch(renderBubble(updated.toJSON(), universeId));
 
       onDebugRects?.([rect]);
     }
   });
 
-  const [isFocused, setIsFocused] = useState(false);
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex });
+  const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
-  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const dragStartMouseRef = useRef<{ x: number; y: number } | null>(null);
-  const currentDragPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [headerOffset, setHeaderOffset] = useState(0);
 
-  const endDrag = () => {
-    // ドラッグ終了時のみRedux更新（パフォーマンス最適化）
-    if (currentDragPosRef.current) {
-      dispatch(updateBubble(bubble.moveTo(currentDragPosRef.current).toJSON()));
-    }
-    // インラインスタイルをクリア（styled-componentsに制御を戻す）
-    if (ref.current) {
-      ref.current.style.transition = '';
-      ref.current.style.transformOrigin = '';
-      ref.current.style.left = '';
-      ref.current.style.top = '';
-    }
-    dragStartPosRef.current = null;
-    dragStartMouseRef.current = null;
-    currentDragPosRef.current = null;
-    document.removeEventListener("mousemove", handleDragging);
-    document.removeEventListener("mouseup", endDrag);
+  const isHeaderVisible = isFocused || isMouseNearTop;
+
+  const updateHeaderSafeZone = () => {
+    const bubbleRect = ref.current?.getBoundingClientRect();
+    if (!bubbleRect) return;
+    const headerEl = ref.current?.querySelector('.e-bubble-header');
+    const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
+    const headerTopInViewport = bubbleRect.top - headerHeight;
+    setHeaderOffset(Math.max(0, -headerTopInViewport));
   };
 
-  const handleDragging = (e: MouseEvent) => {
-    if (!dragStartPosRef.current || !dragStartMouseRef.current || !ref.current) return;
-    const screenDelta = {
-      x: e.clientX - dragStartMouseRef.current.x,
-      y: e.clientY - dragStartMouseRef.current.y,
-    };
+  useLayoutEffect(() => {
+    if (isFocused) updateHeaderSafeZone();
+  }, [isFocused]);
 
-    // CoordinateSystemを使ってスクリーン座標→ローカル座標の変換を行う
-    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndex || 0)
-      .withVanishingPoint(vanishingPointRef.current || { x: 0, y: 0 });
-
-    // スクリーン座標でのマウス移動量をローカル座標系での移動量に変換
-    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
-    const newPos = {
-      x: dragStartPosRef.current.x + localDelta.x,
-      y: dragStartPosRef.current.y + localDelta.y,
-    };
-
-    // ドラッグ中はDOM直接操作（Redux更新を避けてパフォーマンス向上）
-    currentDragPosRef.current = newPos;
-    const offset = surfaceLeftTopRef.current;
-    const screenPos = {
-      x: newPos.x + offset.x,
-      y: newPos.y + offset.y,
-    };
-    ref.current.style.left = `${screenPos.x}px`;
-    ref.current.style.top = `${screenPos.y}px`;
-    ref.current.style.transition = 'none'; // ドラッグ中はトランジション無効
-
-    // transform-originも更新（vanishingPointとの相対位置を維持）
-    // これがないと、Redux更新後にtransform-originが再計算されて位置がズレる
-    const newTransformOrigin = coordSystem.calculateTransformOrigin(screenPos);
-    ref.current.style.transformOrigin = `${newTransformOrigin.x}px ${newTransformOrigin.y}px`;
-  };
-
-  const isMaximized = !!bubble.size;
+  const isMaximized = bubble.isMaximized;
 
   const handleToggleSize = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isMaximized) {
-      // フィットに戻す
-      const resizedBubble = Bubble.fromJSON({ ...bubble.toJSON(), size: undefined });
-      dispatch(updateBubble(resizedBubble.toJSON()));
+      // 最大化を解除。通常は fit-content、fillsContainer な窓は既定の窓サイズに戻る。
+      const resizedBubble = bubble.restore();
+      dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     } else {
-      // 最大化
+      // 最大化: ユーザーに今見えている viewport の surface 領域いっぱいに広げる。
       if (!pageSize) return;
-      const globalCoordinateSystem = coordinateSystem;
-      const availableWidth = pageSize.width - globalCoordinateSystem.offset.x - surfaceLeftTop.x;
-      const availableHeight = pageSize.height - globalCoordinateSystem.offset.y - surfaceLeftTop.y;
-      const newPosition = { x: 0, y: 0 };
+      const viewport = measureViewport();
+      if (!viewport) return;
 
-      const resizedBubble = bubble.resizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
-      dispatch(updateBubble(resizedBubble.toJSON()));
+      const surfaceLayer = new Layer(
+        0,
+        surfaceLeftTop,
+        vanishingPoint || { x: 0, y: 0 },
+      );
+      const visible = viewport.visibleRegion();
+
+      // visible.origin = viewport 左上の universe 座標(= スクロール量)。
+      // surface レイヤーでは position(layer-local) = visible.origin になる
+      // （place(visible.origin) = visible.origin + surfaceOrigin = surface 枠の左上）。
+      const newPosition = visible.origin;
+
+      // サイズ = 可視ピクセルから surface インセット(= レイヤー原点)を引いた分
+      const availableWidth = visible.size.width - surfaceLayer.surfaceOrigin.x;
+      const availableHeight = visible.size.height - surfaceLayer.surfaceOrigin.y;
+
+      const resizedBubble = bubble.maximizeTo({ width: availableWidth, height: availableHeight }).moveTo(newPosition);
+      dispatch(updateBubble(resizedBubble.toJSON(), universeId));
       onResize?.(resizedBubble);
     }
   };
 
-  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
-    setIsFocused(true); // ヘッダークリックで最前面に
-    if (!onMove) return;
-    e.stopPropagation();
-    dragStartPosRef.current = { ...bubble.position };
-    dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
-    document.addEventListener("mousemove", handleDragging);
-    document.addEventListener("mouseup", endDrag);
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // UrledPlace内のクリックはpopChildがフォーカスを担うためスキップ
+    if ((e.target as Element).closest('[data-url]')) return;
+    // ドラッグ&ドロップ（ObjectView の draggable 要素）の mousedown はフォーカスさせない。
+    // ここでフォーカスすると（フォーカス中バブルを同レイヤー最前面へ移動する処理により）
+    // ドラッグ中のバブルがドロップ先の上に重なってしまい、ドロップ先が隠れてしまうため。
+    if ((e.target as Element).closest('[draggable="true"]')) return;
+    dispatch(focusBubble(bubble.id, universeId));
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
+    updateHeaderSafeZone();
   };
 
   const handleMouseLeave = () => {
-    setIsFocused(false);
+    setIsMouseNearTop(false);
   };
 
-  useEffect(() => {
-    return () => {
-      document.removeEventListener("mousemove", handleDragging);
-      document.removeEventListener("mouseup", endDrag);
-    };
-  }, []);
+  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
+    dispatch(focusBubble(bubble.id, universeId));
+    if (!onMove) return;
+    onDragStart(e);
+  };
+
+  const handleFocus = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      // handleMouseDown と同じ理由・同じガード。draggable な ObjectView 要素は
+      // tabIndex={0} を持つため、mousedown 時にブラウザ既定動作でその要素へ DOM
+      // フォーカスが移り、focusin がバブリングしてここに届いてしまう
+      // （handleMouseDown 側のガードは mousedown イベントにしか効かないため素通りする）。
+      // ドラッグ中はここでもフォーカスさせない。
+      if ((e.target as Element).closest('[data-url]')) return;
+      if ((e.target as Element).closest('[draggable="true"]')) return;
+      dispatch(focusBubble(bubble.id, universeId));
+    },
+    [bubble.id, universeId, dispatch]
+  );
 
   // DOM参照をContextに登録
   useLayoutEffect(() => {
@@ -293,12 +264,17 @@ const BubbleViewInner: FC<BubbleProps> = ({
     <StyledBubble
       ref={ref}
       data-bubble-id={bubble.id}
+      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       colorHue={bubble.colorHue}
       zIndex={isFocused ? 100 : zIndex}
       layerIndex={layerIndex}
-      position={position}
       transformOrigin={vanishingPointRelative}
+      headerVisible={isHeaderVisible}
+      headerOffset={headerOffset}
       onClick={onClick}
+      onFocus={handleFocus}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
         notifyRendered();
@@ -308,8 +284,10 @@ const BubbleViewInner: FC<BubbleProps> = ({
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
       hasLeftLink={hasLeftLink}
+      fillsContainer={bubble.fillsContainer}
+      lightweightMode={lightweightMode}
     >
-      <header className="e-bubble-header" onMouseDown={handleHeaderMouseDown}>
+      <header className="e-bubble-header" ref={headerRef} onMouseDown={handleHeaderMouseDown}>
         <div
           className="e-address-bar"
           onClick={(e) => e.stopPropagation()}
@@ -367,8 +345,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
       </header>
 
       <main className="e-bubble-content">
-        {children}<br />
+        {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
+
+      {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
+      <div
+        className="e-resize-handle"
+        onMouseDown={onResizeStart}
+        title="サイズ調整"
+      />
     </StyledBubble>
   );
 };
@@ -383,10 +368,12 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
     const nextBubble = nextProps.bubble;
     const onlyPositionChanged =
       prevBubble.id === nextBubble.id &&
+      prevBubble.url === nextBubble.url &&
       prevBubble.type === nextBubble.type &&
       prevBubble.colorHue === nextBubble.colorHue &&
       prevBubble.size?.width === nextBubble.size?.width &&
       prevBubble.size?.height === nextBubble.size?.height &&
+      prevBubble.isMaximized === nextBubble.isMaximized &&
       prevBubble.contentBackground === nextBubble.contentBackground;
 
     if (!onlyPositionChanged) {
@@ -406,8 +393,10 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
   // BubbleContent内部は再レンダリングされない。
   if (prevProps.layerIndex !== nextProps.layerIndex ||
       prevProps.zIndex !== nextProps.zIndex ||
+      prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.hasLeftLink !== nextProps.hasLeftLink) {
+      prevProps.hasLeftLink !== nextProps.hasLeftLink ||
+      prevProps.lightweightMode !== nextProps.lightweightMode) {
     return false;
   }
 
@@ -417,7 +406,6 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
 
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
-  position?: Point2; // 位置を指定するためのオプション
   layerIndex?: number; // レイヤーのインデックス = zIndex * -1
   zIndex?: number; // = - layerIndex
 
@@ -428,6 +416,10 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   height?: string; // 高さを指定するためのオプション
   contentBackground?: string; // コンテンツ背景色
   hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
+  fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
+  lightweightMode?: boolean; // 軽量モード
+  headerVisible?: boolean;
+  headerOffset?: number; // バブル上端がビューポート外にかかる場合のヘッダー押し下げ量(px)
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -435,16 +427,17 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
 const StyledBubble = styled.div<StyledBubbleProp>`
   position: absolute;
 
+  /* pointer-events は CSS で inherited なので、ネスト universe の none を
+     継承しないようにバブル自身は常に auto を明示する。 */
+  pointer-events: auto;
+
   width: ${({ width }) => (width ? width : "fit-content")};
   height: ${({ height }) => (height ? height : "auto")};
 
   z-index: ${({ zIndex }) => (zIndex !== undefined ? zIndex : 0)};
 
-  left: ${({ position }) => (position ? `${position.x}px` : "0")};
-  top: ${({ position }) => (position ? `${position.y}px` : "0")};
-
   transition-property: left top transform;
-  transition: 0.3s ease-in-out;
+  transition: ${({ lightweightMode }) => lightweightMode ? 'none' : '0.3s ease-in-out'};
 
   transform-origin: ${({ transformOrigin }) =>
     transformOrigin
@@ -459,21 +452,25 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   max-height: 90vh;//FIXME:突貫対応
 
-  // 泡っぽいグラデーション背景
-  background: linear-gradient(
-    145deg,
-    hsla(${({ colorHue }) => colorHue}, 60%, 70%, 0.6) 0%,
-    hsla(${({ colorHue }) => colorHue}, 50%, 60%, 0.5) 30%,
-    hsla(${({ colorHue }) => colorHue}, 45%, 55%, 0.45) 70%,
-    hsla(${({ colorHue }) => colorHue}, 55%, 65%, 0.55) 100%
-  );
+  // 通常モードは泡っぽいグラデーション背景、軽量モードは単色（アルファ合成コスト削減）
+  background: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? `hsl(${colorHue}, 35%, 50%)`
+    : `linear-gradient(
+        145deg,
+        hsla(${colorHue}, 60%, 70%, 0.6) 0%,
+        hsla(${colorHue}, 50%, 60%, 0.5) 30%,
+        hsla(${colorHue}, 45%, 55%, 0.45) 70%,
+        hsla(${colorHue}, 55%, 65%, 0.55) 100%
+      )`
+  };
 
-  // 泡っぽいシャドウと光沢
-  box-shadow:
-    0 8px 32px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.3),
-    0 2px 8px hsla(0, 0%, 0%, 0.1),
-    inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
-    inset 0 -1px 2px hsla(${({ colorHue }) => colorHue}, 50%, 30%, 0.2);
+  box-shadow: ${({ lightweightMode, colorHue }) => lightweightMode
+    ? 'none'
+    : `0 8px 32px hsla(${colorHue}, 50%, 30%, 0.3),
+       0 2px 8px hsla(0, 0%, 0%, 0.1),
+       inset 0 2px 4px hsla(0, 0%, 100%, 0.4),
+       inset 0 -1px 2px hsla(${colorHue}, 50%, 30%, 0.2)`
+  };
 
   border: 1px solid hsla(0, 0%, 100%, 0.3);
   border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
@@ -481,9 +478,9 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   display: flex;
   flex-direction: column;
 
-  // ガラスのような光沢エフェクト（疑似要素）
+  // ガラスのような光沢エフェクト（疑似要素）— 軽量モードでは非表示
   &::before {
-    content: '';
+    content: ${({ lightweightMode }) => lightweightMode ? 'none' : "''"} ;
     position: absolute;
     top: 0;
     left: 0;
@@ -499,11 +496,35 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     pointer-events: none;
   }
 
+  /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
+     :focus-within ではなく :has(:focus-visible) を使うことで、
+     マウスクリックによる一時的なフォーカスではトリガーされない。
+     transform は JS 管理（headerOffset 込み）なので上書きしない。 */
+  &:has(:focus-visible) >.e-bubble-header {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   >.e-bubble-header {
     cursor: move;
     user-select: none;
-    position: relative;
-    padding: 12px 16px 8px;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background: hsla(${({ colorHue }) => colorHue}, 45%, 20%, 0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid hsla(${({ colorHue }) => colorHue}, 50%, 50%, 0.35);
+    color: hsla(0, 0%, 100%, 0.9);
+
+    opacity: ${({ headerVisible }) => headerVisible ? 1 : 0};
+    pointer-events: ${({ headerVisible }) => headerVisible ? 'auto' : 'none'};
+    transform: ${({ headerVisible, headerOffset = 0 }) =>
+      headerVisible ? `translateY(${headerOffset}px)` : `translateY(${headerOffset + 6}px)`};
+    transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-header-content {
       display: flex;
@@ -569,11 +590,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
     .e-bubble-name {
       flex: 1;
-      background: linear-gradient(
-        135deg,
-        hsla(0, 0%, 100%, 0.5) 0%,
-        hsla(0, 0%, 100%, 0.3) 100%
-      );
+      background: ${({ lightweightMode }) => lightweightMode
+        ? 'hsla(0, 0%, 100%, 0.3)'
+        : 'linear-gradient(135deg, hsla(0, 0%, 100%, 0.5) 0%, hsla(0, 0%, 100%, 0.3) 100%)'
+      };
       padding: 6px 16px;
       border-radius: 16px;
       font-size: 1em;
@@ -581,7 +601,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       text-align: center;
       margin: 0;
       color: hsla(0, 0%, 20%, 0.9);
-      box-shadow: inset 0 1px 2px hsla(0, 0%, 100%, 0.5);
+      box-shadow: ${({ lightweightMode }) => lightweightMode ? 'none' : 'inset 0 1px 2px hsla(0, 0%, 100%, 0.5)'};
     }
 
     .e-address-bar {
@@ -652,6 +672,34 @@ const StyledBubble = styled.div<StyledBubbleProp>`
             cursor: help;
           }
         }
+
+        // "@<snapshot>" は git の HEAD@{N} / docker の image@digest と同じ
+        // 「at this snapshot」イデオム。pill 状にまとめてスナップショット指定子
+        // であることを視覚的に明示する。
+        .e-url-snapshot {
+          display: inline-flex;
+          align-items: baseline;
+          margin-left: 3px;
+          padding: 1px 6px 1px 4px;
+          border-radius: 8px;
+          background: hsla(220, 60%, 88%, 0.55);
+          border: 1px solid hsla(220, 50%, 70%, 0.35);
+          font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+          font-size: 0.82em;
+          line-height: 1.4;
+          cursor: help;
+        }
+
+        .e-url-at {
+          color: hsla(220, 60%, 45%, 0.85);
+          font-weight: 700;
+          margin-right: 2px;
+        }
+
+        .e-url-snapshot-node {
+          color: hsla(220, 40%, 28%, 0.9);
+          letter-spacing: 0.02em;
+        }
       }
     }
 
@@ -664,16 +712,21 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   >.e-bubble-content {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    // 窓型コンテンツ（universeなど）は自前のviewportを持つので、外側の
+    // .e-bubble-content はスクロールしない（二重スクロールバーを避ける）。
+    overflow: ${({ fillsContainer }) => (fillsContainer ? "hidden" : "auto")};
     padding: 16px;
     font-size: 1em;
-    background: linear-gradient(
-      180deg,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 100%, 0.95)"} 0%,
-      ${({ contentBackground }) => contentBackground || "hsla(0, 0%, 98%, 0.9)"} 100%
-    );
+    background: ${({ lightweightMode, contentBackground }) => lightweightMode
+      ? (contentBackground || 'hsla(0, 0%, 100%, 0.95)')
+      : `linear-gradient(
+          180deg,
+          ${contentBackground || 'hsla(0, 0%, 100%, 0.95)'} 0%,
+          ${contentBackground || 'hsla(0, 0%, 98%, 0.9)'} 100%
+        )`
+    };
     border-radius: 16px;
-    margin: 0 12px 12px;
+    margin: 12px;
     box-shadow:
       inset 0 2px 4px hsla(0, 0%, 0%, 0.05),
       0 1px 2px hsla(0, 0%, 100%, 0.5);
@@ -696,5 +749,26 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     pointer-events: none;
     box-sizing: border-box;
 
+  }
+
+  /* 右下リサイズハンドル: 普段は透明、ホバー時に薄く現れる「斜線つまみ」。 */
+  > .e-resize-handle {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    /* 斜線 2 本（macOS 風のつまみ） */
+    background:
+      linear-gradient(135deg, transparent 0%, transparent 45%, hsla(0, 0%, 30%, 0.45) 45%, hsla(0, 0%, 30%, 0.45) 55%, transparent 55%) no-repeat,
+      linear-gradient(135deg, transparent 0%, transparent 65%, hsla(0, 0%, 30%, 0.30) 65%, hsla(0, 0%, 30%, 0.30) 75%, transparent 75%) no-repeat;
+  }
+
+  &:hover > .e-resize-handle {
+    opacity: 1;
   }
 `;

@@ -5,4 +5,4 @@ export * from './lib/domain';
 export * from './lib/feature';
 
 // UI
-// export * from './lib/ui';  // placeholder - no exports yet
+export * from './lib/ui';
