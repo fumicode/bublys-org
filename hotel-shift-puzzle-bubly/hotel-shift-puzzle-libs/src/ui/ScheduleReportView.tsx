@@ -9,7 +9,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
 
-// スコアバーのセグメント色。妥協・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
+// スコアバーのセグメント色。譲歩・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
 const COMPROMISE_COLOR = "#6d4c41";
 const BUSY_DAY_COLOR = "#e64a19";
 
@@ -21,7 +21,7 @@ type ScheduleReportViewProps = {
   onChangeNote: (staffId: string, text: string) => void;
   /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る） */
   onRename: (title: string) => void;
-  /** 妥協・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される */
+  /** 譲歩・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される */
   onChangeWeights: (compromiseWeight: number, busyDayWeight: number) => void;
   /** レポートの削除。渡すと見出しに削除ボタンが出る */
   onDelete?: () => void;
@@ -29,8 +29,8 @@ type ScheduleReportViewProps = {
 
 /**
  * シフト完成レポートの表示（プレゼンテーショナル）。
- * スタッフごとに1行（貢献度スコア＋妥協/繁忙日の内訳を色分けしたバー）にまとめる。
- * 行をクリックして展開すると、妥協（#87）・繁忙日対応（#88）の詳細と配慮メモの編集欄が出る
+ * スタッフごとに1行（貢献度スコア＋譲歩/繁忙日の内訳を色分けしたバー）にまとめる。
+ * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモの編集欄が出る
  * （複数行を同時に展開できる）。
  */
 export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
@@ -134,7 +134,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </span>
       </div>
 
-      {/* 貢献度: #87妥協・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
+      {/* 貢献度: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
       <section className="e-section">
         <h4>
           <EmojiEventsIcon fontSize="small" className="e-icon e-icon-score" />
@@ -142,7 +142,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </h4>
         <div className="e-legend">
           <label className="e-legend-item">
-            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協 ×
+            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩 ×
             <input
               type="number"
               className="e-weight-input"
@@ -155,7 +155,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
                 if (e.nativeEvent.isComposing) return;
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              aria-label="妥協の重み"
+              aria-label="譲歩の重み"
             />
           </label>
           <label className="e-legend-item">
@@ -235,7 +235,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
                     <div className="e-person-detail">
                       <div className="e-detail-block">
                         <span className="e-detail-label">
-                          <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 妥協
+                          <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩
                         </span>
                         {compromises.length === 0 ? (
                           <p className="e-empty">特になし</p>

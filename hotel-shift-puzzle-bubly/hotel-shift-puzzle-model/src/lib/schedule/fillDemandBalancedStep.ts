@@ -10,10 +10,16 @@
  * 「まだ足りない帯のうち入れる帯が少ない人（＝融通の利かない人）」を優先して充てることで、
  * 何でも入れる人を後の帯のために温存する。
  *
+ * 実行の流れは早番から順に版と同じ3段:
+ *   1. 休みの確保（ctx.minDayOff があれば先に各自の休みを置く）
+ *   2. 需要を埋める（最も足りない帯へ1人ずつ＝まんべんなく）
+ *   3. 空きを埋め切る（需要を満たしてもなお未定で残る人を、いま人数が一番少ない帯へ入れる）
+ *      ＝完成した勤務表に「何も入っていないセル」を残さない（必要人数は超えうる）。
+ *
  * 候補・制約・大原則は早番から順に版と同じ:
  *   - 候補は「希望なし(neutral) & 未定 & その帯に入れる & 連勤上限内」のスタッフ
  *   - 休み希望など希望のある人は触らない／人間入力済みのセルは触らない
- *   - 候補が足りなければ入れられるだけ入れ、残りは未定のまま（人間が調整）
+ *   - 候補が足りなければ入れられるだけ入れる（需要は満たしきれないことがある）
  */
 import type {
   AutoShiftStep,
@@ -21,6 +27,7 @@ import type {
   AutoShiftStepResult,
 } from "./autoShiftStep.js";
 import { wouldExceedConsecutive, countWorkingByName } from "./autoShiftStep.js";
+import { placeMinDayOffs } from "./minDayOffStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
 export const fillDemandBalancedStep: AutoShiftStep = {
@@ -30,13 +37,23 @@ export const fillDemandBalancedStep: AutoShiftStep = {
   groupLabel: "必要人数を埋める",
   variantLabel: "まんべんなく",
   description:
-    "必要人数に足りない勤務帯へ、全帯の充足率が均等になるよう最も足りない帯から1人ずつ配ります。早番だけ満杯で遅番ゼロ、になりにくい。休み希望の人は入れず、人間入力済みのセルも触りません。",
+    "先に各スタッフの休み（月◯日）を確保し、必要人数に足りない勤務帯へ、全帯の充足率が均等になるよう最も足りない帯から1人ずつ配ります。需要を満たしたあとに残る空きセルも、いま人数が一番少ない帯へ入れて埋め切ります（未定を残さない）。早番だけ満杯で遅番ゼロ、になりにくい。休み希望の人は入れず、人間入力済みのセルも触りません。",
 
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
     const max = ctx.maxConsecutive ?? 5;
     const isAvailable = ctx.isAvailable ?? (() => true);
     let result = schedule;
     let assigned = 0;
+
+    // 需要で埋め切ると空きセルが無くなって月◯日休めなくなるので、先に休みを確保しておく。
+    let dayOffAssigned = 0;
+    if (ctx.minDayOff !== undefined && ctx.minDayOff > 0) {
+      const placed = placeMinDayOffs(result, ctx, ctx.minDayOff, {
+        maxPerDay: ctx.maxDayOffPerDay,
+      });
+      result = placed.schedule;
+      dayOffAssigned = placed.assigned;
+    }
 
     for (const day of schedule.workingDays()) {
       // その日の候補プール（希望なし & 未定）。割り当てるたびに減らす
@@ -86,10 +103,40 @@ export const fillDemandBalancedStep: AutoShiftStep = {
       }
     }
 
+    // 需要を満たしてもなお未定のまま残るセル（＝その日の必要人数を超えるぶんの人）を埋める。
+    // まんべんなく版なので、その人が入れる帯のうち「いま人数が一番少ない帯」へ入れる。
+    let extra = 0;
+    for (const day of schedule.workingDays()) {
+      for (const s of ctx.staffIds) {
+        if (!result.isUndecided(s, day)) continue;
+        if (ctx.preferenceOf(s, day).kind !== "neutral") continue; // 希望のある人は触らない
+        if (wouldExceedConsecutive(result, s, day, max)) continue; // 連勤上限は守る
+
+        const counts = countWorkingByName(result, day, ctx.shiftNameById);
+        let best: { shiftId: string; n: number } | null = null;
+        for (const [name, shiftId] of ctx.shiftIdByName) {
+          if (!isAvailable(s, shiftId)) continue;
+          const n = counts.get(name) ?? 0;
+          if (!best || n < best.n) best = { shiftId, n };
+        }
+        if (!best) continue; // 入れる帯が無い人は未定のまま
+
+        result = result.assignShift(s, day, best.shiftId);
+        extra++;
+      }
+    }
+
+    const parts: string[] = [];
+    if (dayOffAssigned > 0) {
+      parts.push(`休みを ${dayOffAssigned}件（各自月${ctx.minDayOff}日）先に確保`);
+    }
+    parts.push(`需要から ${assigned}件を確定`);
+    if (extra > 0) parts.push(`残りの空きを ${extra}件 埋めました（まんべんなく）`);
+
     return {
       schedule: result,
-      assigned,
-      message: `需要から ${assigned}件を確定しました（まんべんなく）。`,
+      assigned: assigned + dayOffAssigned + extra,
+      message: `${parts.join("し、")}。`,
     };
   },
 };

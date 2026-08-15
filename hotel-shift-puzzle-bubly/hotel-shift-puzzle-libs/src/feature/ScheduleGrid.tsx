@@ -13,9 +13,9 @@ import {
   ScheduleConstraints,
   ScheduleReport,
   fulfillWishesStep,
-  makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
   makeMinDayOffStep,
+  AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type WorkingDay,
   type ShiftCell,
@@ -26,6 +26,7 @@ import {
   ScheduleConstraintsBar,
   shiftColorById,
 } from "../ui/ScheduleConstraintsBar.js";
+import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
@@ -33,6 +34,8 @@ import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { buildScheduleReport } from "./buildScheduleReport.js";
+import { useScheduleHistory } from "./useScheduleHistory.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -48,12 +51,12 @@ type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビュー（左下）を開くハンドラ */
   onOpenHistory?: () => void;
-  /** 完成木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
+  /** キセキの木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
   onOpenTree?: () => void;
   /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
-  /** 自動シフトパネル（右上）を開くハンドラ */
-  onOpenAutoShift?: () => void;
+  /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
+  onConfirm?: (reportId: string) => void;
   /**
    * 各アクションバブルの URL（data-url アンカー用）。ボタンを UrledPlace で包むと、
    * そのボタンから link bubble が伸びる。openBubble する URL と一致させる。
@@ -62,7 +65,6 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   availabilityUrl?: string;
-  autoShiftUrl?: string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -77,6 +79,13 @@ type ScheduleGridProps = {
   reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /**
+   * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
+   * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
+   * 確定前でも「今クリックしたら作られるレポート」の URL を先読みして「完成レポートを
+   * 作成」ボタンに付けられる（そのボタン自身が schedule-report の bubble link 起点になる）。
+   */
+  reportBubbleUrl?: (reportId: string) => string;
   /**
    * 責任者ルールを追加したあと、その編集バブルを開くハンドラ（ロールキーを渡す）。
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
@@ -97,19 +106,21 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenHistory,
   onOpenTree,
   onOpenAvailability,
-  onOpenAutoShift,
+  onConfirm,
   worldLineUrl,
   treeUrl,
   availabilityUrl,
-  autoShiftUrl,
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
+  const { scope } = useScheduleHistory(scheduleId ?? "");
+  const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
@@ -175,6 +186,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
   // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const linkedReports = useMemo(() => {
     const ids = constraints?.linkedReportIds ?? [];
     return allReports.filter((r) => ids.includes(r.id));
@@ -216,7 +228,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
 
   // 操作対象に関係する責任者ルール（メンバー全員が subset に含まれるものだけ）。
-  // 選択が空＝全員のときは、担当者のいるルールすべてが対象になる。相方裏ボタンはこれごとに出す。
+  // 選択が空＝全員のときは、担当者のいるルールすべてが対象になる。＝解決案生成が解く制約。
   const relevantRules = useMemo(() => {
     const idSet = new Set(subsetStaff.map((s) => s.id));
     return leaderRules.filter(
@@ -224,11 +236,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     );
   }, [leaderRules, subsetStaff]);
 
-  // 自動シフトコマンド（希望を叶える＋関係ルールごとの相方裏）。ExtractedSchedule と同じ組み立て。
-  const steps = useMemo<AutoShiftStep[]>(
-    () => [fulfillWishesStep, ...relevantRules.map((rule) => makePartnerCoverStep(rule))],
-    [relevantRules]
-  );
+  // 解決案ボタンのラベルには「いま解こうとしている制約の名前」を入れる（例:「早責」解決案生成）。
+  // 何案つくるか・世界線に書くことは説明（tooltip）に回し、ボタンは目的だけを短く言う。
+  const candidateLabel = useMemo(() => {
+    const names = relevantRules.map((r) => r.label);
+    return names.length > 0 ? `「${names.join("・")}」解決案生成` : "解決案生成";
+  }, [relevantRules]);
 
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
@@ -306,7 +319,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 紐づけたレポートで妥協が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 紐づけたレポートで譲歩が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
   const handleRunStep = (step: AutoShiftStep) => {
     const result = runAutoShiftStep(step, {
       schedule,
@@ -314,6 +327,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       workShifts,
       wishByStaff,
       availability,
+      // 「必要人数を埋める」はこれを見て、先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
+      minDayOff,
+      maxDayOffPerDay: maxPerDay,
+      maxConsecutive: constraints?.maxConsecutiveWorkdays,
     });
     update(() => result.schedule);
     setAutoMessage(`${step.label}: ${result.message}`);
@@ -324,7 +341,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // それぞれ独立した世界線（兄弟ブランチ）に書く。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 紐づけたレポートで妥協が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
+    // 紐づけたレポートで譲歩が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
     const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -333,6 +350,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         workShifts,
         wishByStaff,
         availability,
+        // handleRunStep と同じく連勤上限を渡す。渡さないと ctx.maxConsecutive が undefined に
+        // なってステップ側の既定値 5 で走り、連勤上限を 5 未満にしている勤務表では
+        // 生成した案が全て連勤違反になってしまう。
+        maxConsecutive: constraints?.maxConsecutiveWorkdays,
       }).schedule;
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
@@ -365,19 +386,104 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     update((s) => s.setRequiredForAllDays(shiftName, count));
   };
 
+  // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
+  // apex に確定ラベルを付ける（未命名なら既定ラベルを自動生成。既に名前が
+  // 付いていれば尊重してそのまま残す）。レポートを開くのは app 層（onConfirm）の関心事。
+  //
+  // レポートは「確定時点のスナップショット」（ScheduleReport 参照）なので、同じ apex に対して
+  // 既に作られていれば作り直さず、そのまま開く。このボタンは pendingReportUrl でレポートを
+  // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
+  // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
+  // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
+  const handleConfirm = () => {
+    if (!scheduleId || !apex) return;
+
+    const existing = allReports.find(
+      (r) => r.id === ScheduleReport.idOf(scheduleId, apex.id)
+    );
+    if (existing) {
+      onConfirm?.(existing.id);
+      return;
+    }
+
+    const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
+      apex.id,
+      SCHEDULE_TYPE,
+      scheduleId
+    );
+    if (!apexSchedule) return;
+
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    const wishByStaffForApex = new Map<string, StaffMonthlyShiftWish>();
+    for (const w of allWishes) {
+      if (w.year === apexSchedule.year && w.month === apexSchedule.month) {
+        wishByStaffForApex.set(w.staffId, w);
+      }
+    }
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const reportConstraints = buildScheduleConstraints({
+      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
+      wish: (constraints?.checkShiftWish ?? true)
+        ? { wishByStaff: wishByStaffForApex, shiftNameById }
+        : undefined,
+    });
+
+    const draft = buildScheduleReport({
+      schedule: apexSchedule,
+      staffIds: staffList.map((s) => s.id),
+      constraints: reportConstraints,
+    });
+
+    const report = ScheduleReport.create({
+      scheduleId,
+      worldLineNodeId: apex.id,
+      year: apexSchedule.year,
+      month: apexSchedule.month,
+      storeId: apexSchedule.storeId,
+      ...draft,
+    });
+    reportRepo.save(report);
+
+    if (!apex.label) {
+      scope.setNodeLabel(apex.id, `確定: ${apexSchedule.year}年${apexSchedule.month}月`);
+    }
+
+    onConfirm?.(report.id);
+  };
+
   // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
   // link bubble がこのボタンから伸びる（openBubble する URL と一致している必要がある）。
   const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
     url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
 
+  // 「完成レポートを作成」ボタン。レポート ID は scheduleId + 現在の apex ノード ID で決まる
+  // （ScheduleReport.idOf）ので、クリック前でも「今押したら作られるレポート」の URL を
+  // 先読みしてボタンに付けられる。これにより schedule-report の bubble link はこのボタン
+  // 自身から伸びる（キセキの木の link が「キセキの木で見る」ボタンから伸びるのと対称）。
+  const pendingReportUrl =
+    scheduleId && apex && reportBubbleUrl
+      ? reportBubbleUrl(ScheduleReport.idOf(scheduleId, apex.id))
+      : undefined;
+
+  const confirmButton = withUrl(
+    pendingReportUrl,
+    <button
+      type="button"
+      className="e-confirm"
+      onClick={handleConfirm}
+      title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
+    >
+      🏁 完成レポートを作成
+    </button>
+  );
+
   return (
     <StyledContainer>
       <div className="e-header">
         <h3>
-          勤務表{" "}
-          <span className="e-sub">
-            {schedule.year}年{schedule.month}月 / {schedule.storeId}
-          </span>
+          {schedule.year}年{schedule.month}月の勤務表{" "}
+          <span className="e-sub">{schedule.storeId}</span>
         </h3>
 
         {/* 左：スタッフ（左列）に関わる操作をまとめる */}
@@ -416,35 +522,21 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
                 可能勤務帯
               </button>
             )}
-        </div>
 
-        {/* 右：自動シフトは独立バブル。ここはそれを開くボタンだけ */}
-        <div className="e-actions e-actions-right">
-          {onOpenAutoShift &&
-            withUrl(
-              autoShiftUrl,
-              <button
-                type="button"
-                className="e-link e-auto-open"
-                onClick={onOpenAutoShift}
-                title="自動シフトのパネルを開く"
-              >
-                🪄 自動シフト
-              </button>
-            )}
+          {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
+              自動シフトの優先度に使う。詳しくは reportPriority.ts）。
+              独立した行にすると縦を食うので、可能勤務帯の右に並べて高さを抑える。 */}
+          <LinkedReportsView
+            reports={linkedReports}
+            onDropUrl={handleDropReportUrl}
+            dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
+            onUnlink={handleUnlinkReport}
+          />
         </div>
       </div>
 
-      {/* 参考として紐づけたシフト完成レポート。ルール帯とは別エリア（レポート一覧バブルから
-          ドラッグで紐づけ、自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
-      <LinkedReportsView
-        reports={linkedReports}
-        onDropUrl={handleDropReportUrl}
-        dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
-        onUnlink={handleUnlinkReport}
-      />
-
-      {/* 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体） */}
+      {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
+          右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
           leaderRules={leaderRules}
@@ -458,6 +550,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           minDayOff={minDayOff}
           maxPerDay={maxPerDay}
           checkShiftWish={constraints?.checkShiftWish ?? true}
+        />
+        <ShiftCommandsBar
+          targetCount={subsetStaff.length}
+          selectedCount={selectedIds.length}
+          onClearSelection={
+            selectedIds.length > 0 ? () => setSelectedStaffIds(new Set()) : undefined
+          }
+          steps={AUTO_SHIFT_STEPS}
+          onRunStep={handleRunStep}
+          onGenerateCandidates={handleGenerateCandidates}
+          candidateLabel={candidateLabel}
+          candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          message={autoMessage}
+          onCloseMessage={() => setAutoMessage(null)}
         />
       </div>
 
@@ -489,61 +595,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         />
       </div>
 
-      {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
-      <div className="e-auto-bar">
-        <span className="e-auto-target">
-          対象:{" "}
-          {selectedIds.length > 0 ? (
-            <>
-              選択 {selectedIds.length} 名
-              <button
-                type="button"
-                className="e-auto-clear"
-                onClick={() => setSelectedStaffIds(new Set())}
-                title="選択を解除"
-              >
-                解除
-              </button>
-            </>
-          ) : (
-            "全員"
-          )}
-        </span>
-        {steps.map((step) => (
-          <button
-            key={step.key}
-            type="button"
-            className="e-auto"
-            title={step.description}
-            onClick={() => handleRunStep(step)}
-          >
-            {step.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          className="e-candidate-run"
-          title={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
-          onClick={handleGenerateCandidates}
-        >
-          🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る
-        </button>
-      </div>
-
-      {autoMessage && (
-        <div className="e-auto-message">
-          {autoMessage}
-          <button
-            type="button"
-            className="e-auto-close"
-            aria-label="閉じる"
-            onClick={() => setAutoMessage(null)}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
       {onOpenHistory && (
         <div className="e-footer">
@@ -562,9 +613,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             withUrl(
               treeUrl,
               <button type="button" className="e-link" onClick={onOpenTree}>
-                🌳 成果木で見る
+                🌳 キセキの木で見る
               </button>
             )}
+          {confirmButton}
         </div>
       )}
     </StyledContainer>
@@ -575,6 +627,7 @@ const StyledContainer = styled.div`
   .e-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap; /* 参照レポートが増えても溢れず折り返す */
     gap: 12px;
     margin-bottom: 8px;
 
@@ -586,15 +639,13 @@ const StyledContainer = styled.div`
       font-size: 0.8em;
       color: #777;
     }
+    /* 可能勤務帯などの操作＋参照レポートのドロップ欄を1行に収めて縦を抑える */
     .e-actions {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
-      flex-shrink: 0;
-    }
-    /* スタッフ関連の操作は左に、自動シフトは右に寄せる */
-    .e-actions-right {
-      margin-left: auto;
+      min-width: 0;
     }
     .e-dept-select {
       border: 1px solid #cfd8dc;
@@ -613,21 +664,15 @@ const StyledContainer = styled.div`
         border-color: #3949ab;
       }
     }
-    /* 自動シフトを開くボタンは紫系で自動シフトらしさを出す */
-    .e-auto-open {
-      border-color: #b39ddb;
-      color: #5e35b1;
-      font-weight: 600;
-      &:hover {
-        background: #ede7f6;
-        border-color: #9575cd;
-      }
-    }
   }
 
-  /* 適用ルールの帯 */
+  /* 適用ルールの帯（左）＋ シフトコマンド（右）。横に並べて、制約を見ながら操作できるようにする */
   .e-rules-strip {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
     margin-bottom: 8px;
+    flex-wrap: wrap;
   }
 
   /* グリッド領域。抽出フロートの absolute 基準 */
@@ -702,39 +747,31 @@ const StyledContainer = styled.div`
     }
   }
 
-  .e-auto-message {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    padding: 6px 10px;
-    background: #ede7f6;
-    border: 1px solid #d1c4e9;
-    border-radius: 6px;
-    color: #4527a0;
-    font-size: 0.82em;
 
-    .e-auto-close {
-      margin-left: auto;
-      border: none;
-      background: transparent;
-      color: #7e57c2;
-      font-size: 1.1em;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0 2px;
-
-      &:hover {
-        color: #4527a0;
-      }
-    }
-  }
-
-  /* 左下：世界線ビュー */
+  /* 左下：世界線ビュー・キセキの木・完成レポート */
   .e-footer {
     margin-top: 8px;
     display: flex;
     align-items: center;
+    gap: 8px;
+  }
+
+  /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */
+  .e-confirm {
+    border: 1px solid #2e7d32;
+    border-radius: 6px;
+    background: #fff;
+    color: #2e7d32;
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+
+    &:hover {
+      background: #e8f5e9;
+      border-color: #388e3c;
+    }
   }
 
   /* ヘッダ・フッタ共通のリンク風ボタン */

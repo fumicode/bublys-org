@@ -18,6 +18,20 @@ function demandFor(weekday: number): Record<string, number> {
 }
 
 /**
+ * 曜日の波では表せない、日ごとの必要人数の個別調整。
+ * 稼働日キー("2026-07-05") → 勤務帯名 → 必要人数。曜日の既定値に上書きする
+ * （書いた勤務帯だけ差し替え、書かない勤務帯は曜日の既定値のまま）。
+ */
+const DEMAND_OVERRIDES: Record<string, Record<string, number>> = {
+  "2026-07-05": { 早番: 2, 遅番: 1 }, // 日
+  "2026-07-10": { 遅番: 1 }, // 金
+  "2026-07-11": { 早番: 2 }, // 土
+  "2026-07-12": { 早番: 2 }, // 日
+  "2026-07-18": { 早番: 2, 遅番: 1 }, // 土
+  "2026-07-19": { 早番: 2 }, // 日
+};
+
+/**
  * 指定した年月の、需要の波を持つ「空の」勤務表を生成する。
  * 割当は入れず（全セル未定）、自動シフト／手動で埋めていく前提のまっさらな状態。
  * 勤務帯（WorkShiftSet）は勤務表ごとの別集約（id=scheduleId）なので、勤務表自身は持たない。
@@ -27,12 +41,12 @@ export function createSampleScheduleFor(
   month: number,
   id: string
 ): MonthlyStaffSchedule {
-  // 各稼働日に、その曜日の需要を設定する（土日多め）
+  // 各稼働日に、その曜日の需要を設定する（土日多め）。日ごとの個別調整があれば上書きする。
   const lastDay = new Date(year, month, 0).getDate();
   let requiredStaffing = RequiredStaffing.empty();
   for (let d = 1; d <= lastDay; d++) {
     const day = WorkingDay.of(year, month, d);
-    const demand = demandFor(day.weekday);
+    const demand = { ...demandFor(day.weekday), ...(DEMAND_OVERRIDES[day.key] ?? {}) };
     for (const [name, count] of Object.entries(demand)) {
       requiredStaffing = requiredStaffing.setRequired(day, name, count);
     }

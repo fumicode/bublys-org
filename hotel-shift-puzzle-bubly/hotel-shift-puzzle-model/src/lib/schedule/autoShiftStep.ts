@@ -44,6 +44,13 @@ export type AutoShiftContext = {
   isAvailable?: (staffId: string, shiftId: string) => boolean;
   /** 連勤上限。これを超える出勤割当はしない（既定 5） */
   maxConsecutive?: number;
+  /**
+   * 月の最低休日数。指定すると「必要人数を埋める」は先にこの日数の休みを確保してから埋める。
+   * （先に需要で埋め切ってしまうと、空きセルが無くなって月◯日休めなくなるため）
+   */
+  minDayOff?: number;
+  /** 1日に休んでよい人数の上限。休みを入れるときにこれを超えない。 */
+  maxDayOffPerDay?: number;
 };
 
 export type AutoShiftStepResult = {
