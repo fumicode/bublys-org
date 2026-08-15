@@ -98,6 +98,24 @@
     },
     {
       "path": "./event-shift-puzzle/event-shift-puzzle-app"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-model"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-libs"
+    },
+    {
+      "path": "./object-transformer-bubly/object-transformer-app"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-model"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-libs"
+    },
+    {
+      "path": "./csv-importer-bubly/csv-importer-app"
     }
   ]
 }
