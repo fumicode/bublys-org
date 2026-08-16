@@ -15,14 +15,10 @@ import { objectTransformerBubbleRoutes } from "./registration/index.js";
 const ObjectTransformerBubly: Bubly = {
   name: "object-transformer",
   version: "0.0.1",
-
-  menuItems: [
-    {
-      label: "変換エディタ",
-      url: "object-transformer/editor",
-      icon: React.createElement(TransformIcon, { color: "action" }),
-    },
-  ],
+  label: "変換エディタ",
+  icon: React.createElement(TransformIcon, { color: "primary" }),
+  initialBubbleUrls: ["object-transformer/editor"],
+  backdropColor: "hsl(270, 30%, 22%)",
 
   register(context) {
     context.registerBubbleRoutes(objectTransformerBubbleRoutes);

@@ -633,17 +633,19 @@ BublyStoreProvider（Reduxストア初期化 + redux-persist、persistKey: "obje
 
 **役割**: bublys-os（メインアプリ）から動的にロードされるバブリとしての登録。
 
+**universe first 方式**: bublys-os では `registerBubly` した瞬間に `<name>-bubly` universe
+ルートが自動発行される。object-transformer はこの universe を主入口として使い、
+`initialBubbleUrls` で「変換エディタ」を seed する。`menuItems` は universe と重複する
+ので指定しない。
+
 ```typescript
 const ObjectTransformerBubly: Bubly = {
   name: "object-transformer",
   version: "0.0.1",
-  menuItems: [
-    {
-      label: "変換エディタ",
-      url: "object-transformer/editor",
-      icon: React.createElement(TransformIcon, { color: "action" }),
-    },
-  ],
+  label: "変換エディタ",
+  icon: React.createElement(TransformIcon, { color: "primary" }),
+  initialBubbleUrls: ["object-transformer/editor"],
+  backdropColor: "hsl(270, 30%, 22%)",
   register(context) {
     context.registerBubbleRoutes(objectTransformerBubbleRoutes);
   },
@@ -652,6 +654,9 @@ const ObjectTransformerBubly: Bubly = {
 
 registerBubly(ObjectTransformerBubly);
 ```
+
+サイドバーには `変換エディタ`（universe エントリ）1 個だけが並ぶ。クリックで universe
+バブルが開き、その中に自動で `object-transformer/editor` バブルが seed される。
 
 ---
 

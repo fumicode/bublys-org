@@ -610,23 +610,28 @@ BublyStoreProvider（Reduxストア初期化 + redux-persist）
 
 **役割**: bublys-os（メインアプリ）から動的にロードされるバブリとしての登録。
 
+**universe first 方式**: bublys-os では `registerBubly` した瞬間に `<name>-bubly` universe
+ルートが自動発行される。csv-importer はこの universe を主入口として使い、
+`initialBubbleUrls` で「シート一覧」を seed する。`menuItems` は universe と重複するので
+指定しない。
+
 ```typescript
 const CsvImporterBubly: Bubly = {
   name: "csv-importer",
   version: "0.0.1",
-  menuItems: [
-    {
-      label: "シート一覧",
-      url: "csv-importer/sheets",
-      icon: React.createElement(TableChartIcon, { color: "action" }),
-    },
-  ],
+  label: "CSV インポーター",
+  icon: React.createElement(TableChartIcon, { color: "primary" }),
+  initialBubbleUrls: ["csv-importer/sheets"],
+  backdropColor: "hsl(180, 35%, 22%)",
   register(context) {
     context.registerBubbleRoutes(csvImporterBubbleRoutes);
   },
   unregister() {},
 };
 ```
+
+サイドバーには `CSV インポーター`（universe エントリ）1 個だけが並ぶ。クリックで
+universe バブルが開き、その中に自動で `csv-importer/sheets` バブルが seed される。
 
 ---
 

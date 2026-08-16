@@ -18,14 +18,10 @@ import { csvImporterBubbleRoutes } from "./registration/index.js";
 const CsvImporterBubly: Bubly = {
   name: "csv-importer",
   version: "0.0.1",
-
-  menuItems: [
-    {
-      label: "シート一覧",
-      url: "csv-importer/sheets",
-      icon: React.createElement(TableChartIcon, { color: "action" }),
-    },
-  ],
+  label: "CSV インポーター",
+  icon: React.createElement(TableChartIcon, { color: "primary" }),
+  initialBubbleUrls: ["csv-importer/sheets"],
+  backdropColor: "hsl(180, 35%, 22%)",
 
   register(context) {
     context.registerBubbleRoutes(csvImporterBubbleRoutes);
