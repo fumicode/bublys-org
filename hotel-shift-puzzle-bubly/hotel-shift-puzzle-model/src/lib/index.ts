@@ -33,7 +33,6 @@ export * from './schedule/autoShiftStep.js';
 export * from './schedule/fulfillWishesStep.js';
 export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';
-export * from './schedule/partnerCoverStep.js';
 export * from './schedule/satisfyLeaderRulesStep.js';
 export * from './schedule/resolveAmbiguousLeaderSlotsStep.js';
 export * from './schedule/minDayOffStep.js';

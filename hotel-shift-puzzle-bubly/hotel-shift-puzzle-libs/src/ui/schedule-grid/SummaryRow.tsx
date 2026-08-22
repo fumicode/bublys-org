@@ -12,6 +12,12 @@ type SummaryRowProps = {
   rowIndex: number;
   /** 必要人数を編集できる行か（勤務帯行のみ） */
   editable: boolean;
+  /**
+   * 選択モード中で、この行がフォーカス対象外（減光＝blur でぼかす）。
+   * スタッフ行と同じ扱い: 責任者ルールにフォーカスしているとき、そのルールの行だけを
+   * はっきり見せ、他の集計行は後ろへ退かせる。
+   */
+  dimmed?: boolean;
   /** 必要人数編集メニューを開く */
   onEditRequired: (params: EditingRequired) => void;
   /**
@@ -31,17 +37,20 @@ export const SummaryRow: FC<SummaryRowProps> = ({
   days,
   rowIndex,
   editable,
+  dimmed,
   onEditRequired,
   leaderViolationUrl,
 }) => {
   const isFirst = rowIndex === 0;
   const firstCls = isFirst ? " is-first" : "";
+  // 行は grid の直接の子（見出し＋各日セル＋右端）なので、各セルへ同じクラスを付ける
+  const dimCls = dimmed ? " is-dimmed" : "";
   const isDayOff = row.key === "day-off";
 
   return (
     <>
       <div
-        className={`e-sum-head${firstCls}${editable ? " is-editable" : ""}`}
+        className={`e-sum-head${firstCls}${dimCls}${editable ? " is-editable" : ""}`}
         style={{ background: row.bg, color: row.fg }}
         role={editable ? "button" : undefined}
         title={editable ? `${row.label}の必要人数を全日まとめて設定` : undefined}
@@ -72,7 +81,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
           return (
             <div
               key={`sum:${row.key}:${day.key}`}
-              className={`e-sum-cell is-leader${firstCls}${
+              className={`e-sum-cell is-leader${firstCls}${dimCls}${
                 present ? " is-present" : " is-absent"
               }${url ? " is-clickable" : ""}`}
               title={`${row.label} ${day.label}: ${
@@ -110,7 +119,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
           return (
             <div
               key={`sum:${row.key}:${day.key}`}
-              className={`e-sum-cell is-ratio${firstCls}${met ? " is-met" : " is-under"}${
+              className={`e-sum-cell is-ratio${firstCls}${dimCls}${met ? " is-met" : " is-under"}${
                 editable ? " is-editable" : ""
               }`}
               style={{
@@ -148,7 +157,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
         return (
           <div
             key={`sum:${row.key}:${day.key}`}
-            className={`e-sum-cell${firstCls}${n === 0 ? " is-zero" : ""}${
+            className={`e-sum-cell${firstCls}${dimCls}${n === 0 ? " is-zero" : ""}${
               over ? " is-over" : ""
             }${editable ? " is-editable" : ""}`}
             role={editable ? "button" : undefined}
@@ -178,11 +187,11 @@ export const SummaryRow: FC<SummaryRowProps> = ({
 
       {/* 右端: 休み行だけ月内の総休み数（＝休列の合計）。他行は空 */}
       {isDayOff ? (
-        <div className={`e-off-total e-off-sum${firstCls}`} title="全スタッフの休み合計">
+        <div className={`e-off-total e-off-sum${firstCls}${dimCls}`} title="全スタッフの休み合計">
           {days.reduce((sum, _day, i) => sum + row.count(i), 0)}
         </div>
       ) : (
-        <div className={`e-off-total e-off-filler${firstCls}`} />
+        <div className={`e-off-total e-off-filler${firstCls}${dimCls}`} />
       )}
     </>
   );

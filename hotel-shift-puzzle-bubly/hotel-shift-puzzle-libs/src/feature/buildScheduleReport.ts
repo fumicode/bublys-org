@@ -4,12 +4,12 @@
  * 世界線ビューの「確定してレポート作成」から一度だけ呼ばれる純粋関数。
  * ScheduleReport（model層の不変集約）へそのまま渡せる draft を返す。
  *
- *   - #87 妥協: 連勤・休日・希望など、勤務表に適用する制約一式（グリッドと同じ組み立て。
+ *   - #87 譲歩: 連勤・休日・希望など、勤務表に適用する制約一式（グリッドと同じ組み立て。
  *     `constraints` として渡す）を schedule.checkConstraints() にかけ、スタッフに紐づく
- *     違反（ConstraintViolation.staffId が付くもの）をすべて妥協として数える。
- *     責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は個人の妥協に含めない。
+ *     違反（ConstraintViolation.staffId が付くもの）をすべて譲歩として数える。
+ *     責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は個人の譲歩に含めない。
  *   - #88 繁忙日: 稼働日ごとの必要人数合計が平均を上回る日を自動的に繁忙日とする。
- *   - #89 貢献度スコア: 妥協回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
+ *   - #89 貢献度スコア: 譲歩回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
  *     model層の DEFAULT_COMPROMISE_WEIGHT/DEFAULT_BUSY_DAY_WEIGHT を確定時点の初期値として
  *     使う（確定後は ScheduleReport.reweight() でシフト管理者が調整できる）。
  */
@@ -25,7 +25,7 @@ import {
 
 export type BuildScheduleReportArgs = {
   schedule: MonthlyStaffSchedule;
-  /** スコアに含める全スタッフID（妥協・繁忙日出勤が0件でもスコア0として載せる） */
+  /** スコアに含める全スタッフID（譲歩・繁忙日出勤が0件でもスコア0として載せる） */
   staffIds: string[];
   /** 勤務表に適用する制約一式（連勤・休日・希望など。グリッドと同じ組み立てを渡す） */
   constraints: ScheduleConstraint[];
@@ -38,7 +38,7 @@ export type ScheduleReportDraft = {
 };
 
 /**
- * #87: ルール違反のうちスタッフに紐づくものを妥協として数える。
+ * #87: ルール違反のうちスタッフに紐づくものを譲歩として数える。
  * 責任者不足・休み上限超過など日単位（staffId なし）の違反は、誰のせいでもないので除外する。
  */
 function computeCompromises(
@@ -84,7 +84,7 @@ function computeBusyDayContributions(schedule: MonthlyStaffSchedule): BusyDayEnt
     }));
 }
 
-/** #89: スタッフごとに妥協回数・繁忙日出勤回数を集計し、加重合計でスコアを出す（降順） */
+/** #89: スタッフごとに譲歩回数・繁忙日出勤回数を集計し、加重合計でスコアを出す（降順） */
 function computeContributionScores(
   staffIds: string[],
   compromises: CompromiseEntry[],
@@ -116,7 +116,7 @@ function computeContributionScores(
     .sort((a, b) => b.score - a.score);
 }
 
-/** 確定時に呼ぶ: 妥協・繁忙日対応・貢献度スコアをまとめて計算する */
+/** 確定時に呼ぶ: 譲歩・繁忙日対応・貢献度スコアをまとめて計算する */
 export function buildScheduleReport(args: BuildScheduleReportArgs): ScheduleReportDraft {
   const compromises = computeCompromises(args.schedule, args.constraints);
   const busyDayContributions = computeBusyDayContributions(args.schedule);

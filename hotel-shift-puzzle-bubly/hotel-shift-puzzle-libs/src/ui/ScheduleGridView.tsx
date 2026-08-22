@@ -177,6 +177,21 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
   const focusActive = (selectedStaffIds?.size ?? 0) > 0;
 
+  // いまフォーカス中の責任者ルール（担当者が全員選ばれているルール）。
+  // スタッフ行と同じ考え方で、集計行も「そのルールの行だけをはっきり見せ、他は退かせる」。
+  const focusedRuleKeys = useMemo(() => {
+    if (!focusActive || !selectedStaffIds) return new Set<string>();
+    return new Set(
+      leaderRules
+        .filter(
+          (r) =>
+            r.leaderStaffIds.length > 0 &&
+            r.leaderStaffIds.every((id) => selectedStaffIds.has(id))
+        )
+        .map((r) => r.key)
+    );
+  }, [focusActive, selectedStaffIds, leaderRules]);
+
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
@@ -223,6 +238,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
+        ruleLabel: rule.label,
+        minCount: rule.minCount,
         members,
         satisfied,
         allDayOff,
@@ -276,8 +293,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     };
   }, [violations, violationUrl]);
 
+  // 勤務帯名 → 勤務帯。希望を「実際の割当と同じ1文字（開始時刻の時）」で出すために渡す。
+  const shiftByName = useMemo(() => {
+    const m = new Map<string, WorkShift>();
+    for (const w of workShifts) if (!m.has(w.name)) m.set(w.name, w);
+    return m;
+  }, [workShifts]);
+
   const getWishEntries = (staffId: string, day: WorkingDay) =>
-    wishEntriesFor(wishByStaff, staffId, day);
+    wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name));
 
   // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
   const kb = useCellKeyboardEditing({
@@ -291,16 +315,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     forcedCellOf,
     onApproveForced,
   });
-
-  // 希望と割当を並べて見るために展開中のスタッフID
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (staffId: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(staffId)) next.delete(staffId);
-      else next.add(staffId);
-      return next;
-    });
 
   // ----- 必要人数の編集メニュー -----
   const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
@@ -331,8 +345,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           shiftMap={shiftMap}
           violations={violations}
           getWishEntries={getWishEntries}
-          expanded={expanded.has(staff.id)}
-          onToggleExpand={toggleExpanded}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
           onSelectCell={kb.selectCell}
@@ -374,8 +386,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           shiftMap={shiftMap}
           violations={violations}
           getWishEntries={getWishEntries}
-          expanded={expanded.has(staff.id)}
-          onToggleExpand={toggleExpanded}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
           onSelectCell={kb.selectCell}
@@ -515,6 +525,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             days={days}
             rowIndex={rowIndex}
             editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
+            // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。
+            // 人数の行（必要人数・休み）はどのロールを見ているときも充足を読み取る土台なので減光しない。
+            dimmed={focusActive && !!row.ruleKey && !focusedRuleKeys.has(row.ruleKey)}
             onEditRequired={setEditingRequired}
             leaderViolationUrl={leaderViolationUrl}
           />

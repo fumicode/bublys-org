@@ -67,11 +67,26 @@ export type AutoShiftParams = {
   availability?: ScheduleAvailability;
   /** 連勤上限（既定 5） */
   maxConsecutive?: number;
+  /**
+   * 月の最低休日数。渡すと「必要人数を埋める」は先にこの日数の休みを確保してから埋める
+   * （先に需要で埋め切ると空きセルが無くなって月◯日休めなくなるため）。
+   */
+  minDayOff?: number;
+  /** 1日に休んでよい人数の上限（休みを入れるときに超えない） */
+  maxDayOffPerDay?: number;
 };
 
 /** params から各ステップ共通の文脈を組む（希望のデコード・可能勤務帯の述語化） */
 const buildContext = (params: AutoShiftParams): AutoShiftContext => {
-  const { staffList, workShifts, wishByStaff, availability, maxConsecutive } = params;
+  const {
+    staffList,
+    workShifts,
+    wishByStaff,
+    availability,
+    maxConsecutive,
+    minDayOff,
+    maxDayOffPerDay,
+  } = params;
 
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
   // 勤務帯名 → 実体ID。同名が複数あれば最初の1つ（需要は名前粒度なので代表IDで埋める）
@@ -90,6 +105,8 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
       ? (staffId, shiftId) => availability.isAllowed(staffId, shiftId)
       : undefined,
     maxConsecutive,
+    minDayOff,
+    maxDayOffPerDay,
   };
 };
 

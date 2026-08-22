@@ -30,7 +30,9 @@ export const StyledWrap = styled.div`
      - is-focused: 対象の行。うっすら黄色く強調して少し浮かせる（sticky セルを崩さないよう transform は使わない）。 */
   .e-staff-cell.is-dimmed,
   .e-cell.is-dimmed,
-  .e-off-total.is-dimmed {
+  .e-off-total.is-dimmed,
+  .e-sum-head.is-dimmed,
+  .e-sum-cell.is-dimmed {
     filter: blur(1.4px);
     opacity: 0.4;
   }
@@ -422,12 +424,6 @@ export const StyledWrap = styled.div`
         background: #f5f7f8;
       }
     }
-    .e-caret {
-      color: #90a4ae;
-      font-size: 0.85em;
-      flex-shrink: 0;
-      width: 10px;
-    }
     .e-staff-icon {
       color: #888;
       flex-shrink: 0;
@@ -472,49 +468,12 @@ export const StyledWrap = styled.div`
     }
   }
 
-  /* 希望行（スタッフ展開時。割当行の真下に並ぶ） */
-  .e-wish-row-head {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: #fcfcf7;
-    color: #8d6e63;
-    font-size: 0.85em;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 2px 8px;
-    border-right: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-  }
-  .e-wish-row-cell {
-    background: #fcfcf7;
-    border-right: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    padding: 2px;
-    font-size: 0.78em;
-    min-height: 24px;
-
-    .is-want {
-      color: #2e7d32;
-    }
-    .is-avoid {
-      color: #c62828;
-    }
-    .e-empty {
-      color: #ddd;
-    }
-  }
 
   /* データセル */
   .e-cell {
     position: relative;
+    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -564,25 +523,133 @@ export const StyledWrap = styled.div`
     }
   }
 
-  /* 希望との食い違い（制約違反）: 右上の角に ⊿（オレンジの三角）。クリックで違反バブル */
-  .e-wish-flag {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-style: solid;
-    border-width: 0 13px 13px 0;
-    border-color: transparent #ef6c00 transparent transparent;
-    cursor: pointer;
-    z-index: 2;
-
-    &:hover {
-      border-width: 0 16px 16px 0;
-    }
-  }
 
   /* 未割当セルに薄く表示する希望ヒント */
+  /* シフト希望の円。実際の割当と同じ1文字（休 / 7 …）を、文字色と同じ色の線で囲む。
+     色は --wish-color（勤務帯色 / 休みはグレー）で inline から入る。見た目（背景・線幅・
+     不透明度）は状態ごとにここで決める。
+
+     円と中の文字は別要素にして「独立して」動かす:
+       - 何も入っていないセル … 円は中央・通常サイズ、文字も中央（しっかり見せる）
+       - 実際の値が入ったセル … 円は大きくなり、中心がセルの左上角へ移動する
+         （overflow:hidden でクリップされ、円の 1/4 だけが角から覗く）。文字は円と別に
+         「見えている右下の1/4」の中へ移動して読めるまま残る。すでに決まった情報なので
+         背景は透明・線は細く・薄く（叶っていれば opacity 0.7）して控えめにする。
+       - 希望が叶わなかった円だけは背景赤・文字白のまま強く出す（アラート）。
+     left/top を % で持つので、状態が変わると transition でなめらかに動く。 */
+  .e-wish-marks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none; /* セルの選択を邪魔しない（叶わなかった円だけ下で戻す） */
+  }
+
+  .e-wish-badge {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    /* 複数希望は横に並べる（--i=何番目 / --n=総数） */
+    margin-left: calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 22px);
+    width: 20px;
+    height: 20px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--wish-color, #607d8b);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--wish-color, #607d8b);
+    transform: translate(-50%, -50%);
+    transition: left 0.24s ease, top 0.24s ease, width 0.24s ease, height 0.24s ease,
+      margin-left 0.24s ease, background 0.18s ease, border-color 0.18s ease,
+      border-width 0.18s ease, color 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  /* 中の文字。円とは独立に動く（円が角へ逃げても、文字は見える側へ寄る）。細字で。 */
+  .e-wish-char {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.78em;
+    font-weight: 400;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: left 0.24s ease, top 0.24s ease, font-size 0.24s ease, opacity 0.18s ease;
+  }
+
+  /* 実際の値が入ったセル: 円は中心が左上角へ（＝1/4だけ覗く）。控えめに。 */
+  .e-wish-marks.is-corner .e-wish-badge {
+    left: 0%;
+    top: 0%;
+    width: 30px;
+    height: 30px;
+    margin-left: calc(var(--i, 0) * 15px);
+    background: transparent; /* すでに決まった情報なので背景は敷かない */
+    border-width: 1px; /* 線も細く */
+    opacity: 0.7;
+  }
+  /* 文字は円の「見えている右下1/4」の中へ寄せる */
+  .e-wish-marks.is-corner .e-wish-char {
+    left: 68%;
+    top: 68%;
+    font-size: 0.6em;
+  }
+
+  /* 希望どおりに入ったセル: もう決まった情報なので、中の文字は消して小さな弧だけ角に残す。
+     （叶わなかった円だけは下のルールで文字ごと強く出す） */
+  .e-wish-marks.is-corner .e-wish-badge:not(.is-mismatch) {
+    width: 22px;
+    height: 22px;
+  }
+  .e-wish-marks.is-corner .e-wish-badge:not(.is-mismatch) .e-wish-char {
+    opacity: 0;
+  }
+
+  /* いま見ているセル（hover / キーボード選択中）は「希望を読むモード」にする。
+     平常時は情報量を抑えて省略しているものを、見ているセルだけ読めるまで開く。
+
+     - 未割当で希望が複数あるセル … 円が横に並ぶとセル幅に収まらず端が切れて読めないので、
+       クリップを外して（overflow: visible）隣の列の上へはみ出させる。円の背景は白なので
+       下のセルに重なっても読める。手前に出すため z-index はグリッド内で最も高くする
+       （制約ホバーの すりガラス=3 / リボン=4 より上。同じセルをホバーすると両方出るので、
+       これらの下だと右へはみ出した円が隠れてしまう）。
+     - 値が入ったセル … 角に残した円の文字（＝叶った希望）を戻す。円のクリップは
+       そのまま（角の弧という見た目を崩さない）。 */
+  .e-cell.has-wish-hint:hover,
+  .e-cell.has-wish-hint.is-selected {
+    overflow: visible;
+    z-index: 5;
+  }
+  .e-cell:hover .e-wish-marks.is-corner .e-wish-badge .e-wish-char,
+  .e-cell.is-selected .e-wish-marks.is-corner .e-wish-badge .e-wish-char {
+    opacity: 1;
+  }
+
+  /* ×（避けたい）希望は破線の円＋取り消し線で区別する */
+  .e-wish-badge.is-avoid {
+    border-style: dashed;
+  }
+  .e-wish-badge.is-avoid .e-wish-char {
+    text-decoration: line-through;
+  }
+
+  /* 希望が叶わなかった円（旧・右上の ⊿ の代わり）。角へ寄っても背景赤・文字白のまま強く出す。
+     ダブルクリックで違反バブルを開ける導線もここが担う。 */
+  .e-wish-badge.is-mismatch,
+  .e-wish-marks.is-corner .e-wish-badge.is-mismatch {
+    background: #e53935;
+    border: 1.5px solid #c62828;
+    color: #fff;
+    opacity: 1;
+    pointer-events: auto;
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.22);
+  }
+  .e-wish-badge.is-mismatch .e-wish-char {
+    font-weight: 700; /* 警告なので文字はしっかり */
+  }
+  .e-wish-badge.is-mismatch:hover {
+    box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.35);
+  }
+
   .e-undecided.has-wish-hint {
     color: #b4b4b4;
     font-size: 0.82em;

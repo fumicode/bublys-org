@@ -42,6 +42,97 @@ export type MinDayOffOptions = {
   phase?: number;
 };
 
+/**
+ * 各スタッフに「月 minDayOff 日の休み」が入るよう、足りない分を空きセルへ置く（純粋・不変）。
+ *
+ * ステップ本体（makeMinDayOffStep）と、「必要人数を埋める」（fillDemand 系が埋める前に休みを
+ * 先に確保するため）の両方から使う共有ロジック。置き方の方針は上のドキュメントコメントの通り。
+ */
+export function placeMinDayOffs(
+  schedule: MonthlyStaffSchedule,
+  ctx: AutoShiftContext,
+  minDayOff: number,
+  opts: MinDayOffOptions = {}
+): { schedule: MonthlyStaffSchedule; assigned: number } {
+  const { maxPerDay, phase = 0 } = opts;
+  const days = schedule.workingDays();
+  let result = schedule;
+  let assigned = 0;
+
+  ctx.staffIds.forEach((staffId, i) => {
+    const need = minDayOff - result.countDayOffForStaff(staffId);
+    if (need <= 0) return;
+
+    // 「休みでない日」（出勤 or 未定＝将来 出勤になる）が連続する区間を、暦順に列挙する。
+    // 既にある休みで区間は途切れる。区間 = [s, e]（days の添字）。
+    const nonOffRuns = (): Array<{ s: number; e: number }> => {
+      const out: Array<{ s: number; e: number }> = [];
+      let s = -1;
+      days.forEach((d, idx) => {
+        const off = result.isDayOff(staffId, d);
+        if (!off && s === -1) s = idx;
+        if (off && s !== -1) {
+          out.push({ s, e: idx - 1 });
+          s = -1;
+        }
+      });
+      if (s !== -1) out.push({ s, e: days.length - 1 });
+      return out;
+    };
+
+    // 区間 [s, e] の中で休みを入れられる日を1つ選ぶ。
+    // 必ず「区間の中央」を割る（最長の連勤を半分にして最大連勤を最小化する）。案ごとの差は
+    // 中央から ±1 の小さなズラしに留める（端まで飛ばすと区間が偏って長い連勤が残るため）。
+    // ズラし量は (phase + 並び順) から {-1,0,+1} を作り、案の違い＋スタッフ間の分散に使う。
+    // 中央が休めない日（出勤希望・確定・maxPerDay 上限）なら、中央の近い順に外へ探す（巻回しない）。
+    // 休みを入れられる = 未定 かつ 出勤希望でない かつ maxPerDay 未満。無ければ null。
+    const splitDay = (s: number, e: number): number | null => {
+      const len = e - s + 1;
+      const mid = Math.floor((s + e) / 2);
+      const bias = (((phase + i) % 3) + 3) % 3 - 1; // -1, 0, +1
+      let center = mid + bias;
+      if (center < s) center = s;
+      if (center > e) center = e;
+      const eligible = (idx: number): boolean => {
+        const d = days[idx];
+        return (
+          result.isUndecided(staffId, d) &&
+          ctx.preferenceOf(staffId, d).kind !== "work" &&
+          (maxPerDay === undefined || result.countDayOffOn(d) < maxPerDay)
+        );
+      };
+      for (let dist = 0; dist <= len; dist++) {
+        const cands = dist === 0 ? [center] : [center + dist, center - dist];
+        for (const idx of cands) {
+          if (idx < s || idx > e) continue; // 区間外は捨てる（巻回しない）
+          if (eligible(idx)) return idx;
+        }
+      }
+      return null;
+    };
+
+    let placed = 0;
+    while (placed < need) {
+      // 一番長い区間から割る（＝最長の連勤を優先して縮める）。同長は暦の早い方から。
+      const runs = nonOffRuns().sort((a, b) => b.e - b.s - (a.e - a.s) || a.s - b.s);
+      let didPlace = false;
+      for (const r of runs) {
+        const idx = splitDay(r.s, r.e);
+        if (idx !== null) {
+          result = result.assignDayOff(staffId, days[idx]);
+          assigned++;
+          placed++;
+          didPlace = true;
+          break;
+        }
+      }
+      if (!didPlace) break; // どの区間にも休める日が無い → これ以上置けない
+    }
+  });
+
+  return { schedule: result, assigned };
+}
+
 export function makeMinDayOffStep(
   minDayOff: number,
   opts: MinDayOffOptions = {}
@@ -55,83 +146,7 @@ export function makeMinDayOffStep(
     }。連勤を作らないよう、休みでない日が一番長く続く区間から順に休みを割り込みます（人間入力・出勤希望は尊重）。`,
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
-      const days = schedule.workingDays();
-      let result = schedule;
-      let assigned = 0;
-
-      ctx.staffIds.forEach((staffId, i) => {
-        const need = minDayOff - result.countDayOffForStaff(staffId);
-        if (need <= 0) return;
-
-        // 「休みでない日」（出勤 or 未定＝将来 出勤になる）が連続する区間を、暦順に列挙する。
-        // 既にある休みで区間は途切れる。区間 = [s, e]（days の添字）。
-        const nonOffRuns = (): Array<{ s: number; e: number }> => {
-          const out: Array<{ s: number; e: number }> = [];
-          let s = -1;
-          days.forEach((d, idx) => {
-            const off = result.isDayOff(staffId, d);
-            if (!off && s === -1) s = idx;
-            if (off && s !== -1) {
-              out.push({ s, e: idx - 1 });
-              s = -1;
-            }
-          });
-          if (s !== -1) out.push({ s, e: days.length - 1 });
-          return out;
-        };
-
-        // 区間 [s, e] の中で休みを入れられる日を1つ選ぶ。
-        // 必ず「区間の中央」を割る（最長の連勤を半分にして最大連勤を最小化する）。案ごとの差は
-        // 中央から ±1 の小さなズラしに留める（端まで飛ばすと区間が偏って長い連勤が残るため）。
-        // ズラし量は (phase + 並び順) から {-1,0,+1} を作り、案の違い＋スタッフ間の分散に使う。
-        // 中央が休めない日（出勤希望・確定・maxPerDay 上限）なら、中央の近い順に外へ探す（巻回しない）。
-        // 休みを入れられる = 未定 かつ 出勤希望でない かつ maxPerDay 未満。無ければ null。
-        const splitDay = (s: number, e: number): number | null => {
-          const len = e - s + 1;
-          const mid = Math.floor((s + e) / 2);
-          const bias = (((phase + i) % 3) + 3) % 3 - 1; // -1, 0, +1
-          let center = mid + bias;
-          if (center < s) center = s;
-          if (center > e) center = e;
-          const eligible = (idx: number): boolean => {
-            const d = days[idx];
-            return (
-              result.isUndecided(staffId, d) &&
-              ctx.preferenceOf(staffId, d).kind !== "work" &&
-              (maxPerDay === undefined || result.countDayOffOn(d) < maxPerDay)
-            );
-          };
-          for (let dist = 0; dist <= len; dist++) {
-            const cands = dist === 0 ? [center] : [center + dist, center - dist];
-            for (const idx of cands) {
-              if (idx < s || idx > e) continue; // 区間外は捨てる（巻回しない）
-              if (eligible(idx)) return idx;
-            }
-          }
-          return null;
-        };
-
-        let placed = 0;
-        while (placed < need) {
-          // 一番長い区間から割る（＝最長の連勤を優先して縮める）。同長は暦の早い方から。
-          const runs = nonOffRuns().sort(
-            (a, b) => b.e - b.s - (a.e - a.s) || a.s - b.s
-          );
-          let didPlace = false;
-          for (const r of runs) {
-            const idx = splitDay(r.s, r.e);
-            if (idx !== null) {
-              result = result.assignDayOff(staffId, days[idx]);
-              assigned++;
-              placed++;
-              didPlace = true;
-              break;
-            }
-          }
-          if (!didPlace) break; // どの区間にも休める日が無い → これ以上置けない
-        }
-      });
-
+      const { schedule: result, assigned } = placeMinDayOffs(schedule, ctx, minDayOff, opts);
       return {
         schedule: result,
         assigned,

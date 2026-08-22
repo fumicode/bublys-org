@@ -215,12 +215,12 @@ function julyWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(24), DAY_OFF_WISH, "want")
     .setPreference(d(31), workWishKey("早番"), "want");
 
-  // 田中 健太: 休み 1(水)8(水)15(水)22(水)
+  // 田中 健太: 休み 1(水)6(月)15(水)18(土)
   const tanaka = StaffMonthlyShiftWish.create({ staffId: "staff-4", year: 2026, month: 7 })
     .setPreference(d(1), DAY_OFF_WISH, "want")
-    .setPreference(d(8), DAY_OFF_WISH, "want")
+    .setPreference(d(6), DAY_OFF_WISH, "want")
     .setPreference(d(15), DAY_OFF_WISH, "want")
-    .setPreference(d(22), DAY_OFF_WISH, "want");
+    .setPreference(d(18), DAY_OFF_WISH, "want");
 
   // 伊藤 さくら: 休み 6(月)13(月)27(月) / 11(土)はどうしても休みたい
   const ito = StaffMonthlyShiftWish.create({ staffId: "staff-5", year: 2026, month: 7 })

@@ -1,16 +1,16 @@
 /**
  * ScheduleReport — シフト表完成レポート
  *
- * 確定した勤務表（世界線の apex）について、妥協（#87）・繁忙日対応（#88）・
+ * 確定した勤務表（世界線の apex）について、譲歩（#87）・繁忙日対応（#88）・
  * 貢献度スコア（#89）を確定時点のスナップショットとして保持する。
  * 以降スタッフの希望や勤務表が変わっても、このレポートの内容は変化しない（確定記録）。
- * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・妥協/繁忙日の重み
+ * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・譲歩/繁忙日の重み
  * （compromiseWeight/busyDayWeight）だけは確定後も編集できる。
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
  * なので、ここにはメソッドを持たない。
  *
  * 重みはシフト管理者によって貢献度の感じ方が異なるため直接編集できるようにしている。
- * reweight() は妥協・繁忙日の生データ（compromises/busyDayContributions/各エントリの
+ * reweight() は譲歩・繁忙日の生データ（compromises/busyDayContributions/各エントリの
  * compromiseCount/busyDayCount）は変えず、重みと contributionScores の score だけを
  * 再計算する（「何が起きたか」という事実は確定時点のまま、「どう評価するか」という
  * 重みだけを後から調整できる）。
@@ -20,8 +20,8 @@
  */
 
 /**
- * 妥協エントリ。#87
- * 連勤・休日・希望など、スタッフに紐づくルール違反（ConstraintViolation）を1件=1妥協として表す。
+ * 譲歩エントリ。#87
+ * 連勤・休日・希望など、スタッフに紐づくルール違反（ConstraintViolation）を1件=1譲歩として表す。
  * 責任者不足・休み上限超過など、誰のせいでもない日単位の違反は含まない。
  */
 export type CompromiseEntry = {
@@ -44,7 +44,7 @@ export type BusyDayEntry = {
   workedStaffIds: string[];
 };
 
-/** スタッフごとの貢献度スコア（妥協回数・繁忙日出勤回数の加重合計）。#89 */
+/** スタッフごとの貢献度スコア（譲歩回数・繁忙日出勤回数の加重合計）。#89 */
 export type ContributionScoreEntry = {
   staffId: string;
   compromiseCount: number;
@@ -52,7 +52,7 @@ export type ContributionScoreEntry = {
   score: number;
 };
 
-/** 妥協1件あたりの重みの既定値（#89 スコア算出） */
+/** 譲歩1件あたりの重みの既定値（#89 スコア算出） */
 export const DEFAULT_COMPROMISE_WEIGHT = 2;
 /** 繁忙日出勤1回あたりの重みの既定値（#89 スコア算出） */
 export const DEFAULT_BUSY_DAY_WEIGHT = 1;
@@ -73,7 +73,7 @@ export type ScheduleReportState = {
   contributionScores: ContributionScoreEntry[];
   /** staffId → 自由記述の配慮メモ（確定後も編集可） */
   considerationNotes: Record<string, string>;
-  /** 妥協1件あたりの重み（確定後も reweight で編集可） */
+  /** 譲歩1件あたりの重み（確定後も reweight で編集可） */
   compromiseWeight: number;
   /** 繁忙日出勤1回あたりの重み（確定後も reweight で編集可） */
   busyDayWeight: number;
@@ -185,7 +185,7 @@ export class ScheduleReport {
   }
 
   /**
-   * 妥協・繁忙日の重みを変更し、貢献度スコア（contributionScores の score、降順の並び）を
+   * 譲歩・繁忙日の重みを変更し、貢献度スコア（contributionScores の score、降順の並び）を
    * 再計算した新インスタンスを返す。不変。負の重みは 0 に丸める。
    * 生データ（compromises/busyDayContributions/各エントリの compromiseCount/busyDayCount）は
    * 変えない（「何が起きたか」は確定時点のまま、「どう評価するか」だけを調整する）。

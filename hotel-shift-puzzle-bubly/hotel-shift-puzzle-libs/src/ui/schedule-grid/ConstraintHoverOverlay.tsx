@@ -11,8 +11,12 @@ export type ConstraintHoverMember = { staffId: string; covering: boolean };
 export type ConstraintHoverGroup = {
   /** 担当勤務帯の id（色に使う。未解決なら既定色）。 */
   shiftId?: string;
-  /** 担当勤務帯の表示名（起点ノードのラベル。例: 早番）。 */
+  /** 担当勤務帯の表示名（例: 早番）。 */
   shiftName: string;
+  /** ルール名（タイトル。例: 早責）。ノードの見出しとして出す。 */
+  ruleLabel: string;
+  /** 最低必要人数（ノードの◯の中に入れる）。 */
+  minCount: number;
   /** ルールの全メンバー（表示中の人だけ。本人も含む）。 */
   members: ConstraintHoverMember[];
   /** その日にルールが満たされているか（✅/⚠️ の切り替え）。 */
@@ -51,20 +55,34 @@ type Node = {
   h: number;
   bg: string;
   fg: string;
-  label: string;
+  /** ルール名（タイトル。例: 早責） */
+  ruleLabel: string;
+  /** 担当勤務帯名（例: 早番） */
+  shiftName: string;
+  /** 充足アイコン（✅ / ⚠️） */
+  icon: string;
+  /** ◯の中に入れる最低必要人数 */
+  minCount: number;
   /** 全員休みの警告ノード（黄色・同時点滅）か。 */
   sync?: boolean;
 };
-type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[]; clip: string };
+/** 制約全体（リボン＋ノード）を包む矩形。この下の表を backdrop blur でぼかす。 */
+type Box = { x: number; y: number; w: number; h: number };
+type Geom = { w: number; h: number; ribbons: Ribbon[]; nodes: Node[]; box: Box };
 
 const DEFAULT_FG = "#607d8b";
 const DEFAULT_BG = "#eceff1";
 const RIBBON_W = 12; // リボン（面）の基本の太さ
 const RIBBON_W_STRONG = 18; // 入っている人（covering）の太さ
 const NODE_GAP = 40; // 列の右端から勤務帯ノードまでの距離
-const NODE_H = 22;
-const RULE_STRIDE = 104; // 複数ルールのときノードを右へずらす量
+const NODE_H = 26; // ◯（最低人数バッジ）が収まる高さ
+const NODE_MARGIN = 12; // 複数ルールのノードを右へ並べるときの間隔
 const SLOT_MS = 700; // 巡回1本あたりの点灯スロット
+const BOX_PAD = 14; // 制約全体を包む矩形の余白
+
+/** ノード幅（◯バッジ ＋ ルール名 ＋ 勤務帯名 ＋ 充足アイコン が収まる幅）。 */
+const nodeWidth = (ruleLabel: string, shiftName: string): number =>
+  NODE_H + 6 + ruleLabel.length * 13 + 8 + shiftName.length * 12 + 20 + 12;
 
 const OP_HIGH = 0.62; // 濃い（入っている／点灯中）
 const OP_LOW = 0.12; // 薄い（入っていない／消灯中）
@@ -140,8 +158,22 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
 
     const ribbons: Ribbon[] = [];
     const nodes: Node[] = [];
+    // 複数ルールのノードは実幅ぶんずらして右へ並べる（幅が可変なので重ならないように）。
+    let offset = 0;
 
-    groups.forEach((g, gi) => {
+    // 制約全体を包む矩形（この下の表を blur でぼかす）。リボンの端点とノードから求める。
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const touch = (x1: number, y1: number, x2: number, y2: number) => {
+      minX = Math.min(minX, x1);
+      minY = Math.min(minY, y1);
+      maxX = Math.max(maxX, x2);
+      maxY = Math.max(maxY, y2);
+    };
+
+    groups.forEach((g) => {
       const pts = g.members
         .map((m) => {
           const e = edgeOf(m.staffId);
@@ -155,7 +187,24 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
       const colRight = Math.max(...pts.map((p) => p.rx));
       const ys = pts.map((p) => p.cy);
       const ny = (Math.min(...ys) + Math.max(...ys)) / 2;
-      const nx = colRight + NODE_GAP + gi * RULE_STRIDE;
+      const nx = colRight + NODE_GAP + offset;
+      const w = nodeWidth(g.ruleLabel, g.shiftName);
+      offset += w + NODE_MARGIN;
+
+      // 包む矩形の範囲を広げる（リボンの起点セル端＋太さ / ノードの矩形）。
+      const half = RIBBON_W_STRONG / 2;
+      for (const p of pts) touch(p.rx, p.cy - half, p.rx, p.cy + half);
+      touch(nx, ny - NODE_H / 2, nx + w, ny + NODE_H / 2);
+
+      const base = {
+        x: nx,
+        y: ny - NODE_H / 2,
+        w,
+        h: NODE_H,
+        ruleLabel: g.ruleLabel,
+        shiftName: g.shiftName,
+        minCount: g.minCount,
+      };
 
       if (g.allDayOff) {
         // 全員休み＝誰も入れず絶対に満たせない。黄色の面を全体同時に点滅させる。
@@ -163,18 +212,7 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
           const d = ribbonPath(p.rx, p.cy, nx, ny, RIBBON_W);
           ribbons.push({ d, color: WARN_FG, mode: "sync", index: 0, count: 0 });
         }
-        const label = `${g.shiftName} ⚠️`;
-        const w = 18 + label.length * 12;
-        nodes.push({
-          x: nx,
-          y: ny - NODE_H / 2,
-          w,
-          h: NODE_H,
-          bg: WARN_BG,
-          fg: WARN_FG,
-          label,
-          sync: true,
-        });
+        nodes.push({ ...base, bg: WARN_BG, fg: WARN_FG, icon: "⚠️", sync: true });
         return;
       }
 
@@ -194,13 +232,10 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
         }
       }
 
-      const icon = g.satisfied ? "✅" : "⚠️";
-      const label = `${g.shiftName} ${icon}`;
-      const w = 18 + label.length * 12;
-      nodes.push({ x: nx, y: ny - NODE_H / 2, w, h: NODE_H, bg, fg, label });
+      nodes.push({ ...base, bg, fg, icon: g.satisfied ? "✅" : "⚠️" });
     });
 
-    if (ribbons.length === 0) {
+    if (ribbons.length === 0 || !Number.isFinite(minX)) {
       setGeom(null);
       return;
     }
@@ -209,7 +244,15 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
       h: grid.scrollHeight,
       ribbons,
       nodes,
-      clip: ribbons.map((r) => r.d).join(" "),
+      // 制約全体を包む矩形。この1枚に backdrop blur をかけて下の表をぼかす。
+      // 左だけ余白を付けない：リボンはホバー中セルの右端から始まるので、左へ広げると
+      // そのセル自身がぼかしに隠れてしまう。上下右にだけ余白を取る。
+      box: {
+        x: minX,
+        y: Math.max(0, minY - BOX_PAD),
+        w: maxX - minX + BOX_PAD,
+        h: maxY - minY + BOX_PAD * 2,
+      },
     });
   }, [gridRef, dayKey, groups]);
 
@@ -226,21 +269,23 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
 
   return (
     <>
-      {/* 面の背後をぼかす（面の形に切り抜いた backdrop blur）。 */}
+      {/* 制約全体を包む1枚のパネル。ここに backdrop blur をかけて、下の表をぼかす。
+          リボン・ノードはこの上に描かれ、ノード自体も半透明なので すりガラス に見える。 */}
       <div
         className="e-constraint-blur"
         style={{
           position: "absolute",
-          left: 0,
-          top: 0,
-          width: geom.w,
-          height: geom.h,
+          left: geom.box.x,
+          top: geom.box.y,
+          width: geom.box.w,
+          height: geom.box.h,
           pointerEvents: "none",
           zIndex: 3,
-          backdropFilter: "blur(2.5px)",
-          WebkitBackdropFilter: "blur(2.5px)",
-          clipPath: `path('${geom.clip}')`,
-          WebkitClipPath: `path('${geom.clip}')`,
+          // 左辺はホバー中セルの右端にぴったり付くので角を落とさない（右側だけ角丸）。
+          borderRadius: "0 14px 14px 0",
+          backdropFilter: "blur(2px)",
+          WebkitBackdropFilter: "blur(2px)",
+          background: "rgba(255, 255, 255, 0.22)",
         }}
         aria-hidden
       />
@@ -285,29 +330,51 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
         })}
         {geom.nodes.map((n, i) => {
           const NodeGroup = n.sync ? SyncNodeGroup : "g";
+          const cy = n.y + n.h / 2;
+          const badgeCx = n.x + n.h / 2;
+          const badgeR = n.h / 2 - 3;
           return (
-          <NodeGroup key={`n${i}`}>
-            <rect
-              x={n.x}
-              y={n.y}
-              width={n.w}
-              height={n.h}
-              rx={n.h / 2}
-              fill={n.bg}
-              stroke={n.fg}
-              strokeOpacity={0.5}
-            />
-            <text
-              x={n.x + 10}
-              y={n.y + n.h / 2}
-              dominantBaseline="central"
-              fontSize={12}
-              fontWeight={700}
-              fill={n.fg}
-            >
-              {n.label}
-            </text>
-          </NodeGroup>
+            <NodeGroup key={`n${i}`}>
+              {/* 背後は blur で切り抜き済み。ノード自体は半透明にして「透明でぼんやり」見せる。 */}
+              <rect
+                x={n.x}
+                y={n.y}
+                width={n.w}
+                height={n.h}
+                rx={n.h / 2}
+                fill={n.bg}
+                fillOpacity={0.55}
+                stroke={n.fg}
+                strokeOpacity={0.5}
+              />
+              {/* 最低必要人数を◯の中に入れる（③ のような見た目） */}
+              <circle cx={badgeCx} cy={cy} r={badgeR} fill={n.fg} />
+              <text
+                x={badgeCx}
+                y={cy}
+                dominantBaseline="central"
+                textAnchor="middle"
+                fontSize={11}
+                fontWeight={700}
+                fill="#fff"
+              >
+                {Math.max(1, n.minCount)}
+              </text>
+              {/* ルール名（タイトル）＋ 担当勤務帯 ＋ 充足アイコン */}
+              <text
+                x={n.x + n.h + 4}
+                y={cy}
+                dominantBaseline="central"
+                fontSize={12}
+                fontWeight={700}
+                fill={n.fg}
+              >
+                {n.ruleLabel}
+                <tspan dx={6} fontSize={11} fontWeight={600} fillOpacity={0.8}>
+                  {n.shiftName} {n.icon}
+                </tspan>
+              </text>
+            </NodeGroup>
           );
         })}
       </svg>
