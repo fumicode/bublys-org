@@ -701,4 +701,26 @@ export const StyledWrap = styled.div`
   .e-forced.is-selected .e-forced-value {
     opacity: 0.75;
   }
+
+  /* 詰みセル: 候補が1つも無い＝この先どうやっても埋められない。
+     違反マーカー（右上の ⊿・下端の赤帯）は「今の割当が違反している」印なので、
+     こちらは地を斜線ハッチにして「入れる値が無い」ことを別の見た目で言い分ける。 */
+  .e-dead {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(211, 47, 47, 0.06),
+      rgba(211, 47, 47, 0.06) 3px,
+      rgba(211, 47, 47, 0.16) 3px,
+      rgba(211, 47, 47, 0.16) 6px
+    );
+    .e-dead-mark {
+      color: #d32f2f;
+      opacity: 0.65;
+      font-weight: bold;
+      font-size: 1.05em;
+    }
+  }
+  .e-dead.is-selected .e-dead-mark {
+    opacity: 0.9;
+  }
 `;

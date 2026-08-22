@@ -59,6 +59,8 @@ type StaffScheduleRowProps = {
    * 渡された値は薄く描かれ、Tab で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */
+  isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
 };
 
 /**
@@ -89,6 +91,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   minDayOff,
   candidateHintOf,
   forcedCellOf,
+  isDeadCell,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
@@ -141,6 +144,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         const shift = cell.kind === "work" ? shiftMap.get(cell.shiftId) : undefined;
         const forced =
           cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
+        const dead =
+          cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
         const isSelected =
           selection?.staffId === staff.id && selection.day.equals(day);
@@ -159,6 +164,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             candidateHint={candidateHintOf?.(staff.id, day)}
             forcedCandidate={forced}
+            dead={dead}
             forcedShift={
               forced?.kind === "work" ? shiftMap.get(forced.shiftId) : undefined
             }

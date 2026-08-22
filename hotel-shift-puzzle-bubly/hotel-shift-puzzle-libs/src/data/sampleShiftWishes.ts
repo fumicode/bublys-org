@@ -18,7 +18,7 @@ import { DAY_OFF_WISH, workWishKey } from "../ui/shiftWishOptions.js";
  * - 特定の勤務帯は避けたい : workWishKey(名前) を "avoid"
  */
 export function createSampleShiftWishes(): StaffMonthlyShiftWish[] {
-  return [...juneWishes(), ...julyWishes(), ...augustWishes()];
+  return [...juneWishes(), ...julyWishes(), ...augustWishes(), ...septemberWishes()];
 }
 
 /**
@@ -261,6 +261,77 @@ function julyWishes(): StaffMonthlyShiftWish[] {
     .setPreference(d(20), DAY_OFF_WISH, "want")
     .setPreference(d(27), DAY_OFF_WISH, "want")
     .setPreference(d(12), workWishKey("早番"), "want");
+
+  return [sato, suzuki, takahashi, tanaka, ito, tsuchiya, nakamura, yamamoto, kobayashi];
+}
+
+// ---------------- 2026年9月（土日: 5,6,12,13,19,20,26,27） ----------------
+/**
+ * 終盤シナリオ（sampleScenarios.ts の createEndgameSchedule）の月の希望。
+ *
+ * 8月ほど細かくは入っておらず、各自の「いつもの休み曜日」が3件ずつ入っている程度。
+ * 終盤の詰みは連勤上限と休み上限だけで成立するようにしてあるので、ここの希望には依存しない
+ * （希望が seed されていない環境でも同じ盤面になる）。盤面の見た目を実際らしくするためのもの。
+ */
+function septemberWishes(): StaffMonthlyShiftWish[] {
+  const d = (day: number) => WorkingDay.of(2026, 9, day);
+  const wish = (staffId: string) =>
+    StaffMonthlyShiftWish.create({ staffId, year: 2026, month: 9 });
+
+  // 佐藤 花子: 休み 2(水)9(水)22(火)
+  // 22日の休みは、23日から始まる5連勤（終盤の詰みの原因）の起点でもある
+  const sato = wish("staff-1")
+    .setPreference(d(2), DAY_OFF_WISH, "want")
+    .setPreference(d(9), DAY_OFF_WISH, "want")
+    .setPreference(d(22), DAY_OFF_WISH, "want");
+
+  // 鈴木 一郎: 休み 1(火)8(火)15(火)
+  const suzuki = wish("staff-2")
+    .setPreference(d(1), DAY_OFF_WISH, "want")
+    .setPreference(d(8), DAY_OFF_WISH, "want")
+    .setPreference(d(15), DAY_OFF_WISH, "want");
+
+  // 高橋 美里（早責）: 休み 3(木)10(木)17(木)
+  const takahashi = wish("staff-3")
+    .setPreference(d(3), DAY_OFF_WISH, "want")
+    .setPreference(d(10), DAY_OFF_WISH, "want")
+    .setPreference(d(17), DAY_OFF_WISH, "want");
+
+  // 田中 健太（予責）: 休み 4(金)11(金)18(金)
+  const tanaka = wish("staff-4")
+    .setPreference(d(4), DAY_OFF_WISH, "want")
+    .setPreference(d(11), DAY_OFF_WISH, "want")
+    .setPreference(d(18), DAY_OFF_WISH, "want");
+
+  // 伊藤 さくら: 休み 7(月)14(月)21(月)
+  const ito = wish("staff-5")
+    .setPreference(d(7), DAY_OFF_WISH, "want")
+    .setPreference(d(14), DAY_OFF_WISH, "want")
+    .setPreference(d(21), DAY_OFF_WISH, "want");
+
+  // 土屋 健司（夜責）: 休み 6(日)13(日)20(日)
+  const tsuchiya = wish("staff-tsuchiya")
+    .setPreference(d(6), DAY_OFF_WISH, "want")
+    .setPreference(d(13), DAY_OFF_WISH, "want")
+    .setPreference(d(20), DAY_OFF_WISH, "want");
+
+  // 中村 大輔（夜責）: 休み 2(水)9(水)16(水)
+  const nakamura = wish("staff-6")
+    .setPreference(d(2), DAY_OFF_WISH, "want")
+    .setPreference(d(9), DAY_OFF_WISH, "want")
+    .setPreference(d(16), DAY_OFF_WISH, "want");
+
+  // 山本 由美（早責・予責）: 休み 1(火)8(火)15(火)
+  const yamamoto = wish("staff-7")
+    .setPreference(d(1), DAY_OFF_WISH, "want")
+    .setPreference(d(8), DAY_OFF_WISH, "want")
+    .setPreference(d(15), DAY_OFF_WISH, "want");
+
+  // 小林 恵（早責）: 休み 3(木)10(木)17(木)
+  const kobayashi = wish("staff-8")
+    .setPreference(d(3), DAY_OFF_WISH, "want")
+    .setPreference(d(10), DAY_OFF_WISH, "want")
+    .setPreference(d(17), DAY_OFF_WISH, "want");
 
   return [sato, suzuki, takahashi, tanaka, ito, tsuchiya, nakamura, yamamoto, kobayashi];
 }

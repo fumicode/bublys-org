@@ -27,6 +27,12 @@ type ScheduleDataCellProps = {
   forcedCandidate?: ShiftCell;
   /** forcedCandidate が出勤のとき解決済みの勤務帯（色と開始時刻を確定済みセルと揃える） */
   forcedShift?: WorkShift;
+  /**
+   * 詰み（候補が1つも無い＝何を入れても制約に反する）セルか。
+   * 違反マーカー（赤帯・⊿）は「今ある割当が違反している」印だが、これは「この先どうやっても
+   * 埋められない」印なので、セルの地の描き方そのものを変えて言い分ける。
+   */
+  dead?: boolean;
   /** セルを一意に指すキー（"staffId:dayKey"）。候補ドロップダウンのアンカー特定に使う */
   cellKey: string;
   /** キーボード操作でフォーカス中のセルか */
@@ -62,6 +68,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   candidateHint,
   forcedCandidate,
   forcedShift,
+  dead = false,
   cellKey,
   selected = false,
   inputBuffer = null,
@@ -87,6 +94,11 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   } else if (cell.kind === "day-off") {
     className += " e-off";
     content = "休";
+  } else if (dead) {
+    // 詰み: 何を入れてもどれかの制約に反する。承認できる手が無いので値は描かず、
+    // 「ここは埋まらない」ことだけを示す（理由は candidateHint が title に添える）。
+    className += " e-undecided e-dead";
+    content = <span className="e-dead-mark">×</span>;
   } else if (forcedCandidate) {
     // 未割当だが制約から一意に決まる: 確定済みと同じ形（勤務帯色＋開始時刻の「時」/「休」）を
     // 薄く破線で描く。承認すればこうなる、が一目で分かり、確定済みとは見間違えない。

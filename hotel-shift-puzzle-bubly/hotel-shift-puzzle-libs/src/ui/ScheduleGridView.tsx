@@ -99,6 +99,11 @@ type ScheduleGridViewProps = {
    * セルに薄く描かれ、Tab で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /**
+   * そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。
+   * 埋められないセルを抱えたまま作業が進むのを防ぐため、セル自身に描く。
+   */
+  isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
   /** 選択セルの確定提案を承認する（Tab）。承認後のフォーカス移動は feature 層が決める。 */
   onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
 };
@@ -161,6 +166,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onSelectionChange,
   candidateHintOf,
   forcedCellOf,
+  isDeadCell,
   onApproveForced,
 }) => {
   const days = schedule.workingDays();
@@ -341,6 +347,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           minDayOff={minDayOff}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
         />
       ));
     }
@@ -383,6 +390,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           minDayOff={minDayOff}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
         />
       )),
     ]);

@@ -16,6 +16,21 @@
  *
  * 確定済みのセルは触らない。「後から見ると別の値が正しかった」場合は、人がそのセルを
  * 書き換える（世界線で戻る）前提で、ソフトウェアからは巻き戻さない。
+ *
+ * ## 不変条件：候補集合は盤面だけの関数
+ *
+ *   recomputeCandidates(prev, input, changed)  ===  computeAllCandidates(input)
+ *
+ * 差分計算をしても、そこに至る編集の順番に結果が左右されてはいけない（同じ盤面なら
+ * 常に同じ提案が出る。世界線で戻れば戻る前と同じ提案になる）。そのために、
+ *
+ *   - 差分で引き継ぐのは 1 の結果（legalByCell）**だけ**。制約の scope 宣言から
+ *     影響範囲が閉じているので、範囲外のセルの合法候補は変わらないと言い切れる
+ *   - 2 の絞り込みは毎回、今の盤面の全違反から掛け直す。前回の絞り込み結果を
+ *     土台にして更に絞ることはしない（絞り込みは違反から導かれる派生でしかない）
+ *
+ * 絞り込みは1パスだけ行う（絞った結果を使ってさらに絞る連鎖はしない）。連鎖は人が承認して
+ * セルが確定したときに、次の再計算として自然に起きる。
  */
 import type { ConstraintViolation } from "./ConstraintViolation.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
@@ -38,11 +53,11 @@ export type CandidateComputationInput = {
 export function computeAllCandidates(
   input: CandidateComputationInput
 ): ScheduleCandidates {
-  const byCell: Record<string, ShiftCell[]> = {};
+  const legalByCell: Record<string, ShiftCell[]> = {};
   for (const staffId of input.staffIds) {
     for (const day of input.schedule.workingDays()) {
       if (!input.schedule.isUndecided(staffId, day)) continue;
-      byCell[candidateCellKey(staffId, day.key)] = legalCandidatesFor(
+      legalByCell[candidateCellKey(staffId, day.key)] = legalCandidatesFor(
         input.schedule,
         input.constraints,
         staffId,
@@ -51,18 +66,22 @@ export function computeAllCandidates(
       );
     }
   }
-  const naked = new ScheduleCandidates({
-    scheduleId: input.schedule.id,
-    byCell,
-  });
-  return narrowByUnsatisfiedConstraints(naked, input);
+  return narrowByUnsatisfiedConstraints(
+    ScheduleCandidates.fromLegal(input.schedule.id, legalByCell),
+    input
+  );
 }
 
 /**
  * 変更されたセルの影響範囲だけを計算し直した候補集合を返す（セル編集時）。
  *
- * 範囲は制約の scope 宣言から求める（affectedCells）。範囲外のセルは前回の候補をそのまま
+ * 差分で引き継ぐのは合法候補（prev.state.legalByCell）だけで、絞り込みは全体に掛け直す。
+ * 範囲は制約の scope 宣言から求める（affectedCells）。範囲外のセルは前回の合法候補をそのまま
  * 引き継ぐので、盤面全体の再計算を避けられる。
+ *
+ * 未定 → 確定（承認）、確定 → 別の値（書き換え）、確定 → 未定（差し戻し）のいずれも
+ * 同じ経路で扱える。確定したセルは候補集合から外れ、未定に戻ったセルは合法候補を得て戻る。
+ *
  * prev が別の勤務表のものだった場合は、安全側に倒して全計算し直す。
  */
 export function recomputeCandidates(
@@ -84,14 +103,14 @@ export function recomputeCandidates(
     }
   }
 
-  const byCell = { ...prev.state.byCell };
+  const legalByCell = { ...prev.state.legalByCell };
   for (const cell of affected.values()) {
     const key = candidateCellKey(cell.staffId, cell.day.key);
     if (!input.schedule.isUndecided(cell.staffId, cell.day)) {
-      delete byCell[key]; // 確定したセルは候補集合から外れる
+      delete legalByCell[key]; // 確定したセルは候補集合から外れる
       continue;
     }
-    byCell[key] = legalCandidatesFor(
+    legalByCell[key] = legalCandidatesFor(
       input.schedule,
       input.constraints,
       cell.staffId,
@@ -100,11 +119,10 @@ export function recomputeCandidates(
     );
   }
 
-  const naked = new ScheduleCandidates({
-    scheduleId: input.schedule.id,
-    byCell,
-  });
-  return narrowByUnsatisfiedConstraints(naked, input, [...affected.values()]);
+  return narrowByUnsatisfiedConstraints(
+    ScheduleCandidates.fromLegal(input.schedule.id, legalByCell),
+    input
+  );
 }
 
 /**
@@ -116,14 +134,12 @@ export function recomputeCandidates(
  * 1手では解消できない違反（責任者が2人不足など）は、解消できる候補が1つも見つからないので
  * 何も絞らない＝無理に決めつけない。
  *
- * 絞り込みは1パスだけ行う（絞った結果を使ってさらに絞る連鎖はしない）。連鎖は人が承認して
- * セルが確定したときに、次の再計算として自然に起きる。
+ * 入力は必ず絞り込み前の合法候補（ScheduleCandidates.fromLegal で作ったもの）を渡すこと。
+ * 絞り込み済みの集合を渡すと、絞り込みが積み重なって編集の順番に結果が依存する。
  */
 function narrowByUnsatisfiedConstraints(
   candidates: ScheduleCandidates,
-  input: CandidateComputationInput,
-  /** 指定すると、この範囲に関わる違反だけを見る（差分再計算用） */
-  onlyTouching?: ScheduleCellRef[]
+  input: CandidateComputationInput
 ): ScheduleCandidates {
   const violations = input.schedule.checkConstraints(input.constraints);
   if (violations.length === 0) return candidates;
@@ -135,20 +151,12 @@ function narrowByUnsatisfiedConstraints(
     }
   }
 
-  const touchedKeys = onlyTouching
-    ? new Set(onlyTouching.map((c) => cellRefKey(c)))
-    : undefined;
-
   let result = candidates;
   for (const violation of violations) {
     const constraint = constraintByType.get(violation.constraintType);
     if (!constraint) continue;
 
     const scopeCells = cellsInScopeOf(violation, constraint, input);
-    if (touchedKeys && !scopeCells.some((c) => touchedKeys.has(cellRefKey(c)))) {
-      continue; // この違反は今回の変更に関係しない
-    }
-
     const fix = singleFixingCellFor(violation, constraint, scopeCells, result, input);
     if (fix) {
       result = result.withCell(fix.staffId, fix.day, fix.cells);
