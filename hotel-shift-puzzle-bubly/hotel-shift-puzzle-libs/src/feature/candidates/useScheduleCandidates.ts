@@ -12,18 +12,29 @@
  * 計算は重い（未定セル数 × 候補数 × 盤面全体の制約チェック）ので、worker を注入できる。
  * worker の作り方は bundler 依存なので app 層から createWorker で渡す。渡されなければ
  * 同じ計算を main thread で同期に行う（結果は同じ・体感が変わるだけ）。
+ *
+ * 詰みセルの診断（解消案の探索）も同じ worker で受ける。こちらは盤面を総当たりするので
+ * 候補集合の計算よりさらに重く、編集のたびには走らせない。人が求めたときだけ
+ * diagnoseDeadCell() で依頼する。
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  deadCellDiagnosisFromPlain,
   MonthlyStaffSchedule,
   ScheduleCandidates,
   ScheduleConstraints,
   StaffMonthlyShiftWish,
   WorkShift,
   diffScheduleCells,
+  type DeadCellDiagnosis,
   type ScheduleCandidatesPlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { computeCandidatesFor, type CandidateRequest } from "./candidateRequest.js";
+import {
+  computeCandidatesFor,
+  diagnoseDeadCellFor,
+  type CandidateCellRefPlain,
+  type CandidateRequest,
+} from "./candidateRequest.js";
 import type {
   CandidateWorkerRequest,
   CandidateWorkerResponse,
@@ -48,6 +59,15 @@ export type ScheduleCandidatesResult = {
   computing: boolean;
   /** 実際に走っている計算経路 */
   mode: "worker" | "sync";
+  /**
+   * 詰みセルの診断を依頼する（重いので押されたときだけ走る）。
+   * 勤務表が変わると結果は破棄される（別の盤面についての診断になってしまうため）。
+   */
+  diagnoseDeadCell: (cell: CandidateCellRefPlain) => void;
+  /** 直近の診断結果。まだ依頼していない・盤面が変わったなら null */
+  diagnosis: DeadCellDiagnosis | null;
+  /** 診断の応答待ちか */
+  diagnosing: boolean;
 };
 
 export function useScheduleCandidates({
@@ -62,6 +82,8 @@ export function useScheduleCandidates({
   const [candidates, setCandidates] = useState(() => ScheduleCandidates.empty(""));
   const [computing, setComputing] = useState(false);
   const [workerReady, setWorkerReady] = useState(false);
+  const [diagnosis, setDiagnosis] = useState<DeadCellDiagnosis | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
 
   /** 今の candidates を計算したときの勤務表（差分の基準） */
   const baselineRef = useRef<{
@@ -69,12 +91,22 @@ export function useScheduleCandidates({
     candidates: ScheduleCandidates;
   } | null>(null);
   const requestIdRef = useRef(0);
+  const diagnoseIdRef = useRef(0);
+  /** 直近に投げた依頼の素材。診断は同じ素材を使い回す */
+  const lastRequestRef = useRef<CandidateRequest | null>(null);
   const requestScheduleRef = useRef(new Map<number, MonthlyStaffSchedule>());
   const workerRef = useRef<Worker | null>(null);
 
   // 応答の取り込み。連番が最新でないものは古い計算結果なので捨てる。
   const acceptRef = useRef<(response: CandidateWorkerResponse) => void>(() => undefined);
-  acceptRef.current = ({ requestId, candidates: plain }: CandidateWorkerResponse) => {
+  acceptRef.current = (response: CandidateWorkerResponse) => {
+    if (response.kind === "diagnose") {
+      if (response.requestId !== diagnoseIdRef.current) return;
+      setDiagnosis(deadCellDiagnosisFromPlain(response.diagnosis));
+      setDiagnosing(false);
+      return;
+    }
+    const { requestId, candidates: plain } = response;
     if (requestId !== requestIdRef.current) return;
     const requested = requestScheduleRef.current.get(requestId);
     requestScheduleRef.current.clear();
@@ -162,17 +194,21 @@ export function useScheduleCandidates({
 
     const requestId = ++requestIdRef.current;
     requestScheduleRef.current.set(requestId, schedule);
+    lastRequestRef.current = request;
+    // 盤面が変わったので、前の盤面についての診断は捨てる
+    setDiagnosis(null);
+    setDiagnosing(false);
 
     const worker = workerRef.current;
     if (worker) {
       setComputing(true);
-      const message: CandidateWorkerRequest = { requestId, request };
+      const message: CandidateWorkerRequest = { kind: "candidates", requestId, request };
       worker.postMessage(message);
       return;
     }
 
     const plain: ScheduleCandidatesPlain = computeCandidatesFor(request);
-    acceptRef.current({ requestId, candidates: plain });
+    acceptRef.current({ kind: "candidates", requestId, candidates: plain });
   }, [
     schedule,
     contextVersion,
@@ -183,9 +219,37 @@ export function useScheduleCandidates({
     wishByStaff,
   ]);
 
+  const diagnoseDeadCell = useCallback((cell: CandidateCellRefPlain) => {
+    const request = lastRequestRef.current;
+    if (!request) return;
+    const requestId = ++diagnoseIdRef.current;
+    setDiagnosing(true);
+
+    const worker = workerRef.current;
+    if (worker) {
+      const message: CandidateWorkerRequest = {
+        kind: "diagnose",
+        requestId,
+        request,
+        deadCell: cell,
+      };
+      worker.postMessage(message);
+      return;
+    }
+    // worker が無い環境では main thread で走る（数秒固まる。結果は同じ）
+    acceptRef.current({
+      kind: "diagnose",
+      requestId,
+      diagnosis: diagnoseDeadCellFor(request, cell),
+    });
+  }, []);
+
   return {
     candidates,
     computing,
     mode: workerReady ? "worker" : "sync",
+    diagnoseDeadCell,
+    diagnosis,
+    diagnosing,
   };
 }

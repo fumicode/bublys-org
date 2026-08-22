@@ -3,12 +3,15 @@
  *
  * 「まだ決まっていないセルに入れられる値」の計算は、未定セル数 × 候補数 × 盤面全体の
  * 制約チェックになるので、main thread でやるとグリッドの操作が固まる。ここで受けて返す。
+ * 詰みセルの診断（解消案の探索）はさらに重いので、同じ worker で受けるが人が求めたときだけ走る。
  *
- * 計算そのものは libs 側の computeCandidatesFor（React に依存しないエントリ）を呼ぶだけで、
- * 同期フォールバックと同じ経路を通る。worker の作り方だけが bundler 依存なので app 層に置く。
+ * 計算そのものは libs 側の computeCandidatesFor / diagnoseDeadCellFor（React に依存しない
+ * エントリ）を呼ぶだけで、同期フォールバックと同じ経路を通る。
+ * worker の作り方だけが bundler 依存なので app 層に置く。
  */
 import {
   computeCandidatesFor,
+  diagnoseDeadCellFor,
   type CandidateWorkerRequest,
   type CandidateWorkerResponse,
 } from "@bublys-org/hotel-shift-puzzle-libs/candidates";
@@ -20,6 +23,18 @@ const ctx = globalThis as unknown as {
 };
 
 ctx.onmessage = (event) => {
-  const { requestId, request } = event.data;
-  ctx.postMessage({ requestId, candidates: computeCandidatesFor(request) });
+  const message = event.data;
+  if (message.kind === "diagnose") {
+    ctx.postMessage({
+      kind: "diagnose",
+      requestId: message.requestId,
+      diagnosis: diagnoseDeadCellFor(message.request, message.deadCell),
+    });
+    return;
+  }
+  ctx.postMessage({
+    kind: "candidates",
+    requestId: message.requestId,
+    candidates: computeCandidatesFor(message.request),
+  });
 };

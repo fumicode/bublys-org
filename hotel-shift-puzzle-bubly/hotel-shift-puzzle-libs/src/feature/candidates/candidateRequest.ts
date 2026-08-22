@@ -16,9 +16,12 @@ import {
   WorkShift,
   WorkingDay,
   computeAllCandidates,
+  deadCellDiagnosisToPlain,
+  findRepairsForDeadCell,
   recomputeCandidates,
   type CandidateComputationInput,
   type MonthlyStaffSchedulePlain,
+  type DeadCellDiagnosisPlain,
   type ScheduleCandidatesPlain,
   type ScheduleConstraintsState,
   type StaffMonthlyShiftWishPlain,
@@ -97,4 +100,21 @@ export function computeCandidatesFor(
   }
 
   return computeAllCandidates(input).toPlain();
+}
+
+/**
+ * 詰みセルの診断（なぜどの値も入らないのか・どこを書き換えれば入るのか）を実行する。
+ * 候補集合の計算と同じ素材（CandidateRequest）から文脈を組み立て直すので、
+ * worker でも main thread でも同じ結果になる。
+ */
+export function diagnoseDeadCellFor(
+  request: CandidateRequest,
+  deadCell: CandidateCellRefPlain
+): DeadCellDiagnosisPlain {
+  return deadCellDiagnosisToPlain(
+    findRepairsForDeadCell(rebuildInput(request), {
+      staffId: deadCell.staffId,
+      day: WorkingDay.fromKey(deadCell.dayKey),
+    })
+  );
 }

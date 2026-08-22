@@ -20,6 +20,7 @@ import {
   WorkingDay,
   shiftCellKey,
   type AutoShiftStep,
+  type ScheduleRepair,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
@@ -29,6 +30,7 @@ import {
   shiftColorById,
 } from "../ui/ScheduleConstraintsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
+import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
@@ -358,7 +360,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   );
 
   // まだ決まっていないセルに入れられる値（候補集合）。確定のたびに影響範囲だけ計算し直す。
-  const { candidates, computing } = useScheduleCandidates({
+  const { candidates, computing, diagnoseDeadCell, diagnosis, diagnosing } =
+    useScheduleCandidates({
     schedule,
     constraints,
     checkShiftWish: constraints?.checkShiftWish ?? true,
@@ -368,23 +371,29 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     createWorker: createCandidatesWorker,
   });
 
+  /** セルの値 → 人が読むラベル（"早番" / "休み"） */
+  const cellLabelOf = useCallback(
+    (cell: ShiftCell) =>
+      cell.kind === "work"
+        ? (workShifts.find((w) => w.id === cell.shiftId)?.name ?? cell.shiftId)
+        : cell.kind === "day-off"
+          ? "休み"
+          : "未定",
+    [workShifts]
+  );
+
   const candidateHintOf = useCallback(
     (staffId: string, day: WorkingDay): string | undefined => {
       const options = candidates.candidatesOf(staffId, day);
       if (!options) return undefined; // 確定済み（候補集合は未定セルの分だけ持つ）
       if (options.length === 0) return "候補なし（このままではこのセルを埋められません）";
-      const labelOf = (cell: ShiftCell) =>
-        cell.kind === "work"
-          ? (workShifts.find((w) => w.id === cell.shiftId)?.name ?? cell.shiftId)
-          : cell.kind === "day-off"
-            ? "休み"
-            : "未定";
+      const labelOf = cellLabelOf;
       const values = options.map(labelOf).join(" / ");
       return options.length === 1
         ? `候補は${values}だけ（ここは一意に決まります）`
         : `候補${options.length}件: ${values}`;
     },
-    [candidates, workShifts]
+    [candidates, cellLabelOf]
   );
 
   // 候補が1つに絞られたセル＝制約から一意に決まる手。承認するまで勤務表には入れない。
@@ -403,6 +412,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     );
     return (staffId: string, day: WorkingDay) => byCell.get(`${staffId}:${day.key}`);
   }, [orderedForcedCells]);
+
+  // 候補が0件のセル＝もうどの値も入れられない（詰み）。確定提案と同じく、再計算中は
+  // 前回の（古いかもしれない）判定で赤くしない。
+  const deadCells = useMemo(
+    () => (computing ? [] : candidates.deadCells()),
+    [candidates, computing]
+  );
+
+  const isDeadCell = useMemo(() => {
+    const keys = new Set(deadCells.map((cell) => `${cell.staffId}:${cell.day.key}`));
+    return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
+  }, [deadCells]);
 
   useEffect(() => {
     if (!schedule || cellSelection) return;
@@ -478,6 +499,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
     advanceFocusAfterEdit(nextSchedule);
+  };
+
+  // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
+  // EditLog に残す（どういう理由でその日を動かしたかは、詰みの記録として世界線に残る）。
+  const handleApplyRepair = (repair: ScheduleRepair) => {
+    handleChangeCell(repair.staffId, repair.day, repair.to);
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
@@ -710,9 +737,57 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           onSelectionChange={setCellSelection}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}
         />
       </div>
+
+      {/* 詰みの通知。セル1つの赤ハッチだけでは月末に埋もれるので、盤面の総数をここで出し、
+          最初の詰みセルへ飛べるようにする。 */}
+      {deadCells.length > 0 && (
+        <div className="e-dead-notice">
+          <span>
+            埋められないセルが {deadCells.length} 件あります（どの値を入れても制約に反します）
+          </span>
+          <button
+            type="button"
+            className="e-dead-jump"
+            onClick={() =>
+              setCellSelection({
+                staffId: deadCells[0].staffId,
+                day: deadCells[0].day,
+              })
+            }
+          >
+            最初のセルへ
+          </button>
+          <button
+            type="button"
+            className="e-dead-jump"
+            disabled={diagnosing}
+            title="どこを書き換えればこのセルが埋まるかを、盤面を総当たりして探します（少し時間がかかります）"
+            onClick={() =>
+              diagnoseDeadCell({
+                staffId: deadCells[0].staffId,
+                dayKey: deadCells[0].day.key,
+              })
+            }
+          >
+            {diagnosing ? "探しています…" : "解消案を探す"}
+          </button>
+        </div>
+      )}
+
+      {diagnosis && (
+        <div className="e-dead-diagnosis">
+          <DeadCellDiagnosisView
+            diagnosis={diagnosis}
+            nameOf={nameOf}
+            labelOf={cellLabelOf}
+            onApply={handleApplyRepair}
+          />
+        </div>
+      )}
 
       {/* 自動シフト操作バー。対象＝選択スタッフ（選択が無ければ全員）。 */}
       <div className="e-auto-bar">
@@ -938,6 +1013,51 @@ const StyledContainer = styled.div`
         border-color: #66bb6a;
       }
     }
+  }
+
+  .e-dead-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #fdecea;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+    color: #b71c1c;
+    font-size: 0.82em;
+
+    .e-dead-jump {
+      border: 1px solid #ef9a9a;
+      border-radius: 4px;
+      background: #fff;
+      color: #b71c1c;
+      font-size: 0.95em;
+      line-height: 1.6;
+      cursor: pointer;
+      padding: 0 8px;
+
+      &:hover {
+        background: #ffebee;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      &:first-of-type {
+        margin-left: auto;
+      }
+    }
+  }
+
+  .e-dead-diagnosis {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+    background: #fffaf9;
   }
 
   .e-auto-message {

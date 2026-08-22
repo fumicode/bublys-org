@@ -15,6 +15,7 @@ export * from "./LeaderRuleDiagram.js";
 export * from "./LeaderBadges.js";
 export * from "./AvailabilityGridView.js";
 export * from "./ConstraintViolationView.js";
+export * from "./DeadCellDiagnosisView.js";
 export * from "./ShiftWishGridView.js";
 export * from "./shiftWishOptions.js";
 export * from "./ClimberWorldLineCanvasView.js";

@@ -52,3 +52,4 @@ export * from './schedule/cellCandidates.js';
 export * from './schedule/affectedCells.js';
 export * from './schedule/ScheduleCandidates.js';
 export * from './schedule/computeCandidates.js';
+export * from './schedule/repairDeadCell.js';
