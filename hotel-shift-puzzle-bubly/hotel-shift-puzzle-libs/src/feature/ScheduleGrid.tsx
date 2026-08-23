@@ -642,7 +642,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
   // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
   // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
-  const handleConfirm = () => {
+  // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
+  // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
+  const handleConfirm = async () => {
     if (!scheduleId || !apex) return;
 
     const existing = allReports.find(
@@ -653,11 +655,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
 
-    const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
-      apex.id,
-      SCHEDULE_TYPE,
-      scheduleId
-    );
+    const resolved = await scope.resolveObjectsAt(apex.id);
+    const apexSchedule = resolved.find(
+      (r) => r.type === SCHEDULE_TYPE && r.id === scheduleId
+    )?.obj as MonthlyStaffSchedule | undefined;
     if (!apexSchedule) return;
 
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -718,7 +719,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     <button
       type="button"
       className="e-confirm"
-      onClick={handleConfirm}
+      onClick={() => void handleConfirm()}
       title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
     >
       🏁 完成レポートを作成

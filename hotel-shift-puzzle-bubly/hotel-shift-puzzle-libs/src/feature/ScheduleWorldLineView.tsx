@@ -40,14 +40,14 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
       const siblings = scope.graph.getChildrenMap()[apex.parentId] ?? [];
       const idx = siblings.indexOf(apex.id);
       const next = siblings[idx + delta];
-      if (next) restore(next);
+      if (next) void restore(next);
     };
     return [
       {
         key: "ArrowLeft",
         run: () => {
           const apex = scope.graph.getApex();
-          if (apex?.parentId) restore(apex.parentId);
+          if (apex?.parentId) void restore(apex.parentId);
         },
       },
       {
@@ -55,7 +55,7 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
         run: () => {
           const apex = scope.graph.getApex();
           const child = apex && scope.graph.getChildrenMap()[apex.id]?.[0];
-          if (child) restore(child);
+          if (child) void restore(child);
         },
       },
       { key: "ArrowUp", run: () => restoreSibling(-1) },
@@ -79,7 +79,7 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
       <WorldLineScopeView
         scope={scope}
         keyBindings={keyBindings}
-        onSelectNode={restore}
+        onSelectNode={(nodeId) => void restore(nodeId)}
         renderCanvas={(props) => <ClimberWorldLineCanvasView {...props} />}
         nameable
       />
