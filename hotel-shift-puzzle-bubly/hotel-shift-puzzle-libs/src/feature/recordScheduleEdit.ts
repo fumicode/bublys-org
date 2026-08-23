@@ -23,7 +23,6 @@ import {
   localScopeId,
   readFromScope,
   saveLocalBundle,
-  commitToScope,
   APP_SCOPE_ID,
   type BundleItem,
 } from "../objects/commit.js";
@@ -54,28 +53,14 @@ export type RecordEditMeta = {
 };
 
 /**
- * ローカル世界線に EditLog がまだ無ければ、空（または APP の現在値）を起点として先に載せる。
- * これがないと「初回編集の親ノード」に EditLog が無く、時間移動で APP のログが古いまま残る。
+ * 直前の操作ログを読む（読むだけ。世界線には触らない）。
+ *
+ * 以前はここで EditLog の起点をローカル世界線へ書き込んでいたが、それをやめた。
+ * 起点を作る場所が複数あると、どれが先に走るかで起点ノードの中身が変わってしまう
+ * （EditLog だけの起点ができ、そこへ時間移動しても勤務表が戻らない＝#110）。
+ * 起点は saveLocalBundle が「集約一式まとめて1ノード」で作る、の一本にする。
  */
-export function ensureEditLogBaseline(store: StoreLike, scheduleId: string): void {
-  const scopeId = localScopeId(SCHEDULE_TYPE, scheduleId);
-  if (
-    readFromScope(store, scopeId, SCHEDULE_EDIT_LOG_TYPE, scheduleId) !== undefined
-  ) {
-    return;
-  }
-  const prev =
-    readFromScope<ScheduleEditLog>(
-      store,
-      APP_SCOPE_ID,
-      SCHEDULE_EDIT_LOG_TYPE,
-      scheduleId
-    ) ?? ScheduleEditLog.empty(scheduleId);
-  commitToScope(store, scopeId, SCHEDULE_EDIT_LOG_TYPE, prev);
-}
-
 function loadEditLog(store: StoreLike, scheduleId: string): ScheduleEditLog {
-  ensureEditLogBaseline(store, scheduleId);
   return (
     readFromScope<ScheduleEditLog>(
       store,
@@ -107,6 +92,25 @@ function appendConcessionHint(
   return `${summary}（譲歩${concessionCount}）`;
 }
 
+/**
+ * ローカル世界線の起点に置く「編集前」の一式。
+ *
+ * このスコープは勤務表のものなので、**何を記録する操作であっても**勤務表は起点に載せる。
+ * 制約変更のように勤務表を含まない記録が最初に来ると、起点に勤務表が無い世界線ができ、
+ * そこへ時間移動しても勤務表が戻らない（#110）。
+ */
+function baselineOf(
+  schedule: MonthlyStaffSchedule | undefined,
+  prevLog: ScheduleEditLog
+): BundleItem[] {
+  const items: BundleItem[] = [
+    { type: SCHEDULE_EDIT_LOG_TYPE, obj: prevLog },
+  ];
+  // 勤務表が手元に無い経路（制約バブル単独で開いた場合など）は APP の現在の参照に任せる
+  if (schedule) items.unshift({ type: SCHEDULE_TYPE, obj: schedule });
+  return items;
+}
+
 /** 勤務表を変換し、違反差分付きの操作ログを同一ノードに記録する。 */
 export function recordScheduleMutation(
   store: StoreLike,
@@ -126,7 +130,8 @@ export function recordScheduleMutation(
     args.meta.summary,
     delta.concessions.length
   );
-  const log = loadEditLog(store, scheduleId).append({
+  const prevLog = loadEditLog(store, scheduleId);
+  const log = prevLog.append({
     actor: args.meta.actor,
     kind: args.meta.kind,
     summary,
@@ -137,10 +142,15 @@ export function recordScheduleMutation(
     rejectedSuggestionId: args.meta.rejectedSuggestionId,
   });
 
-  saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
-    { type: SCHEDULE_TYPE, obj: transformed },
-    { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
-  ]);
+  saveLocalBundle(
+    store,
+    localScopeId(SCHEDULE_TYPE, scheduleId),
+    [
+      { type: SCHEDULE_TYPE, obj: transformed },
+      { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
+    ],
+    baselineOf(args.schedule, prevLog)
+  );
   return transformed;
 }
 
@@ -230,7 +240,8 @@ export function recordAutoStep(
     `${args.stepLabel}: ${args.message}`,
     delta.concessions.length
   );
-  const log = loadEditLog(store, scheduleId).append({
+  const prevLog = loadEditLog(store, scheduleId);
+  const log = prevLog.append({
     actor: "auto",
     kind: "autoStep",
     summary,
@@ -238,10 +249,15 @@ export function recordAutoStep(
     constraintDelta: delta,
     source: "autoStep",
   });
-  saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), [
-    { type: SCHEDULE_TYPE, obj: args.next },
-    { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
-  ]);
+  saveLocalBundle(
+    store,
+    localScopeId(SCHEDULE_TYPE, scheduleId),
+    [
+      { type: SCHEDULE_TYPE, obj: args.next },
+      { type: SCHEDULE_EDIT_LOG_TYPE, obj: log },
+    ],
+    baselineOf(args.schedule, prevLog)
+  );
 }
 
 /**
@@ -271,7 +287,8 @@ export function recordConstraintEdit(
     args.summary,
     delta.concessions.length
   );
-  const log = loadEditLog(store, scheduleId).append({
+  const prevLog = loadEditLog(store, scheduleId);
+  const log = prevLog.append({
     actor: "human",
     kind: "constraintEdit",
     summary,
@@ -284,7 +301,12 @@ export function recordConstraintEdit(
   ];
 
   items.push({ type: SCHEDULE_EDIT_LOG_TYPE, obj: log });
-  saveLocalBundle(store, localScopeId(SCHEDULE_TYPE, scheduleId), items);
+  saveLocalBundle(
+    store,
+    localScopeId(SCHEDULE_TYPE, scheduleId),
+    items,
+    baselineOf(args.schedule, prevLog)
+  );
 }
 
 /**
