@@ -20,7 +20,12 @@ import {
   registerObjectIdentity,
   getObjectUrl,
 } from "@bublys-org/bubbles-ui";
-import { DomainRegistryProvider, defineDomainObjects } from "@bublys-org/domain-registry";
+import {
+  DomainRegistryProvider,
+  defineDomainObjects,
+  registerSchema,
+  type SchemaShape,
+} from "@bublys-org/domain-registry";
 
 /** plain ↔ インスタンス変換 codec（保存・世界線記録に使う） */
 export type ObjectSerialize<T> = {
@@ -55,6 +60,11 @@ export type ObjectDescriptor<T = unknown> = {
    * save 時、アプリ全体に加えてこのスコープにも記録され、まとめて巻き戻せる。
    */
   localScope?: (obj: T) => string | undefined;
+  /**
+   * ドメインスキーマ（プロパティ定義）。バブリ横断で「型の中身」を伝えるための共通言語。
+   * object-transformer などがドロップされた型を解釈してターゲット構造を再現できる。
+   */
+  shape?: SchemaShape;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,6 +93,7 @@ export function registerObjects(registry: ObjectRegistry): void {
     registerObjectType(type, d.icon);
     registerObjectIdentity(type, { class: d.class, getId: (obj) => d.getId(obj) });
     if (d.url) registerObjectUrl(type, d.url);
+    if (d.shape) registerSchema(type, d.shape);
   }
 }
 

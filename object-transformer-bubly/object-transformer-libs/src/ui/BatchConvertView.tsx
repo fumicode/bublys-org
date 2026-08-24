@@ -2,7 +2,11 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import type { MappingRuleState } from "@bublys-org/object-transformer-model";
+import {
+  getAtPath,
+  stringToPath,
+  type MappingRuleState,
+} from "@bublys-org/object-transformer-model";
 
 type BatchConvertViewProps = {
   rule: MappingRuleState;
@@ -53,7 +57,7 @@ export const BatchConvertView: FC<BatchConvertViewProps> = ({
                 <tr>
                   <th>#</th>
                   {rule.mappings.map((m) => (
-                    <th key={m.targetProperty}>{m.targetProperty}</th>
+                    <th key={m.targetPath}>{m.targetPath}</th>
                   ))}
                 </tr>
               </thead>
@@ -62,8 +66,8 @@ export const BatchConvertView: FC<BatchConvertViewProps> = ({
                   <tr key={i}>
                     <td>{i + 1}</td>
                     {rule.mappings.map((m) => (
-                      <td key={m.targetProperty}>
-                        {String(row[m.targetProperty] ?? "")}
+                      <td key={m.targetPath}>
+                        {String(getAtPath(row, stringToPath(m.targetPath)) ?? "")}
                       </td>
                     ))}
                   </tr>

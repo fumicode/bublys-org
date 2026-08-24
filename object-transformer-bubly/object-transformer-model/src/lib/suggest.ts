@@ -1,12 +1,15 @@
 /**
  * マッピング自動推定ロジック
- * ソースキーとスキーマプロパティの名前・エイリアス・値パターンからマッピングを提案する
+ *
+ * ソース側のリーフ path と、ターゲットスキーマのリーフ path を突き合わせて、
+ * 名前・エイリアス・値パターンから最尤のマッピングを提案する。
  */
 
-import type { DomainSchema, SchemaProperty } from "./DomainSchema.js";
+import { pathToString, type SchemaField } from "@bublys-org/domain-registry/schema";
+import type { DomainSchema } from "./DomainSchema.js";
 import type { FieldMapping, ValueTransform } from "./MappingRule.js";
 
-/** 組み込みエイリアス辞書 */
+/** 組み込みエイリアス辞書（プロパティ名の基底名でマッチ） */
 const ALIAS_DICTIONARY: Record<string, string[]> = {
   name: ["名前", "氏名", "Name", "お名前"],
   furigana: ["フリガナ", "ふりがな", "カナ", "読み"],
@@ -19,137 +22,124 @@ const ALIAS_DICTIONARY: Record<string, string[]> = {
   address: ["住所", "Address", "所在地"],
   age: ["年齢", "Age"],
   department: ["部署", "Department", "学部"],
+  city: ["市区町村", "市", "City"],
+  zip: ["郵便番号", "Zip", "Postal"],
 };
 
-/** メールアドレスパターン */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** 電話番号パターン */
 const PHONE_PATTERN = /^[\d\-+() ]{7,}$/;
 
+/** ソース側リーフの表現 */
+export type SourceLeaf = {
+  /** dot-notation の path */
+  readonly path: string;
+  /** 見出しラベル（あれば） */
+  readonly label?: string;
+  /** サンプル値（パターンマッチ用） */
+  readonly sampleValue?: unknown;
+};
+
 type ScoredMapping = {
-  sourceKey: string;
-  targetProperty: string;
+  sourcePath: string;
+  targetPath: string;
   score: number;
   transform: ValueTransform;
 };
 
-/**
- * ソースキーとターゲットプロパティのスコアを計算する
- */
+/** 基底名（path の末尾セグメント） */
+const leafName = (p: string): string => {
+  const parts = p.split(".");
+  return parts[parts.length - 1] ?? p;
+};
+
+/** ソース leaf とターゲットフィールドの相性を採点 */
 function scoreMatch(
-  sourceKey: string,
-  prop: SchemaProperty,
-  sampleValue?: string
+  source: SourceLeaf,
+  target: { path: string; field: SchemaField }
 ): ScoredMapping | null {
   let score = 0;
   let transform: ValueTransform = { type: "identity" };
 
-  const srcLower = sourceKey.toLowerCase();
-  const propLower = prop.name.toLowerCase();
+  const srcName = leafName(source.path).toLowerCase();
+  const srcLabel = source.label;
+  const tgtName = leafName(target.path);
+  const tgtLower = tgtName.toLowerCase();
 
-  // 完全一致（大文字小文字無視）
-  if (srcLower === propLower) {
-    score += 10;
-  }
+  // 完全一致
+  if (srcName === tgtLower) score += 10;
 
-  // ラベルとの完全一致
-  if (prop.label && sourceKey === prop.label) {
-    score += 10;
-  }
+  // ラベル一致（ソースキーがターゲットのラベルと同じ）
+  if (target.field.label && source.path === target.field.label) score += 10;
+  if (target.field.label && srcLabel === target.field.label) score += 10;
 
-  // エイリアス辞書マッチ
-  const aliases = ALIAS_DICTIONARY[prop.name];
+  // エイリアス辞書
+  const aliases = ALIAS_DICTIONARY[tgtName];
   if (aliases) {
-    const aliasMatch = aliases.some(
-      (alias) => alias.toLowerCase() === srcLower
-    );
-    if (aliasMatch) {
-      score += 8;
-    }
+    const hit = aliases.some((a) => a.toLowerCase() === srcName);
+    if (hit) score += 8;
+    if (srcLabel && aliases.some((a) => a === srcLabel)) score += 8;
   }
 
-  // 値パターンマッチ
-  if (sampleValue) {
-    if (prop.name === "email" || prop.type === "string") {
-      if (EMAIL_PATTERN.test(sampleValue) && prop.name === "email") {
-        score += 5;
-      }
-    }
-    if (prop.name === "phone") {
-      if (PHONE_PATTERN.test(sampleValue)) {
-        score += 5;
-      }
-    }
+  // 値パターン
+  const sample =
+    typeof source.sampleValue === "string" ? source.sampleValue : undefined;
+  if (sample) {
+    if (tgtName === "email" && EMAIL_PATTERN.test(sample)) score += 5;
+    if (tgtName === "phone" && PHONE_PATTERN.test(sample)) score += 5;
   }
 
-  // 型に応じたtransform推定
-  if (prop.type === "number") {
-    transform = { type: "toNumber" };
-  } else if (prop.type === "boolean") {
-    transform = {
-      type: "toBoolean",
-      trueValues: ["true", "はい", "yes", "1", "○"],
-    };
+  // 型に応じた transform 推定
+  if (target.field.shape.kind === "primitive") {
+    if (target.field.shape.primitive === "number") {
+      transform = { type: "toNumber" };
+    } else if (target.field.shape.primitive === "boolean") {
+      transform = {
+        type: "toBoolean",
+        trueValues: ["true", "はい", "yes", "1", "○"],
+      };
+    }
   }
 
   if (score === 0) return null;
-
   return {
-    sourceKey,
-    targetProperty: prop.name,
+    sourcePath: source.path,
+    targetPath: target.path,
     score,
     transform,
   };
 }
 
-/**
- * ソースキーとスキーマからマッピング候補を提案する
- *
- * @param sourceKeys PlaneObjectのキー一覧
- * @param schema 変換先スキーマ
- * @param sampleValues サンプル値（推定精度向上用）
- * @returns 提案されたFieldMappingの配列
- */
+/** ソース leaves とターゲットスキーマから提案を生成する */
 export function suggestMappings(
-  sourceKeys: string[],
-  schema: DomainSchema,
-  sampleValues?: Record<string, string>
+  sources: SourceLeaf[],
+  schema: DomainSchema
 ): FieldMapping[] {
-  const candidates: ScoredMapping[] = [];
+  const targets = schema.leafFields.map(({ path, field }) => ({
+    path: pathToString(path),
+    field,
+  }));
 
-  for (const sourceKey of sourceKeys) {
-    for (const prop of schema.properties) {
-      const match = scoreMatch(
-        sourceKey,
-        prop,
-        sampleValues?.[sourceKey]
-      );
-      if (match) {
-        candidates.push(match);
-      }
+  const candidates: ScoredMapping[] = [];
+  for (const src of sources) {
+    for (const tgt of targets) {
+      const m = scoreMatch(src, tgt);
+      if (m) candidates.push(m);
     }
   }
-
-  // スコア降順でソート
   candidates.sort((a, b) => b.score - a.score);
 
-  // 貪欲法: 各ソースキーとターゲットプロパティは1つずつ
   const usedSources = new Set<string>();
   const usedTargets = new Set<string>();
   const result: FieldMapping[] = [];
-
   for (const c of candidates) {
-    if (usedSources.has(c.sourceKey) || usedTargets.has(c.targetProperty)) {
-      continue;
-    }
-    usedSources.add(c.sourceKey);
-    usedTargets.add(c.targetProperty);
+    if (usedSources.has(c.sourcePath) || usedTargets.has(c.targetPath)) continue;
+    usedSources.add(c.sourcePath);
+    usedTargets.add(c.targetPath);
     result.push({
-      sourceKey: c.sourceKey,
-      targetProperty: c.targetProperty,
+      sourcePath: c.sourcePath,
+      targetPath: c.targetPath,
       transform: c.transform,
     });
   }
-
   return result;
 }

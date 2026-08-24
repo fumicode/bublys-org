@@ -3,72 +3,61 @@
 import { FC, useState } from "react";
 import styled from "styled-components";
 import type {
-  PlaneObjectLike,
-  SchemaProperty,
+  DomainSchema,
   FieldMapping,
+  SourceLeaf,
 } from "@bublys-org/object-transformer-model";
 import { SourcePanel } from "./SourcePanel.js";
 import { TargetPanel } from "./TargetPanel.js";
 
 export type MappingEditorViewProps = {
-  // ソース
-  sourceObject: PlaneObjectLike | null;
-  onDropSource: (e: React.DragEvent) => void;
-  onDragOverSource: (e: React.DragEvent) => void;
-  // ターゲット
-  schemaName: string | null;
-  targetProperties: SchemaProperty[];
-  targetSampleValues: Record<string, string>;
-  onDropTarget: (e: React.DragEvent) => void;
-  onDragOverTarget: (e: React.DragEvent) => void;
-  // マッピング
+  sourceLabel: string | null;
+  sourceLeaves: SourceLeaf[];
+  targetLabel: string | null;
+  targetSchema: DomainSchema | null;
   mappings: FieldMapping[];
   suggestions: FieldMapping[];
-  onMapField: (sourceKey: string, targetProperty: string) => void;
-  onUnmapField: (targetProperty: string) => void;
-  onAcceptSuggestion: (targetProperty: string) => void;
-  // ルール保存
+  onDropSource: (e: React.DragEvent) => void;
+  onDropTarget: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onMapField: (sourcePath: string, targetPath: string) => void;
+  onUnmapField: (targetPath: string) => void;
+  onAcceptSuggestion: (targetPath: string) => void;
+  onAcceptAllSuggestions: () => void;
   onSaveRule: (name: string) => void;
-  // 全提案を適用
-  onAcceptAllSuggestions?: () => void;
 };
 
 const FIELD_DND_TYPE = "application/x-object-transformer-field";
 
 export const MappingEditorView: FC<MappingEditorViewProps> = ({
-  sourceObject,
-  onDropSource,
-  onDragOverSource,
-  schemaName,
-  targetProperties,
-  targetSampleValues,
-  onDropTarget,
-  onDragOverTarget,
+  sourceLabel,
+  sourceLeaves,
+  targetLabel,
+  targetSchema,
   mappings,
   suggestions,
+  onDropSource,
+  onDropTarget,
+  onDragOver,
   onMapField,
   onUnmapField,
   onAcceptSuggestion,
-  onSaveRule,
   onAcceptAllSuggestions,
+  onSaveRule,
 }) => {
   const [ruleName, setRuleName] = useState("");
-  const mappedSourceKeys = mappings.map((m) => m.sourceKey);
+  const mappedSourcePaths = mappings.map((m) => m.sourcePath);
 
-  // ソースフィールドのドラッグ開始
-  const handleDragStartField = (sourceKey: string, e: React.DragEvent) => {
-    e.dataTransfer.setData(FIELD_DND_TYPE, sourceKey);
+  const handleDragStartField = (sourcePath: string, e: React.DragEvent) => {
+    e.dataTransfer.setData(FIELD_DND_TYPE, sourcePath);
     e.dataTransfer.effectAllowed = "link";
   };
 
-  // ターゲットスロットへのドロップ
-  const handleDropOnSlot = (targetProperty: string, e: React.DragEvent) => {
+  const handleDropOnSlot = (targetPath: string, e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const sourceKey = e.dataTransfer.getData(FIELD_DND_TYPE);
-    if (sourceKey) {
-      onMapField(sourceKey, targetProperty);
-    }
+    const sourcePath = e.dataTransfer.getData(FIELD_DND_TYPE);
+    if (sourcePath) onMapField(sourcePath, targetPath);
   };
 
   const handleDragOverSlot = (e: React.DragEvent) => {
@@ -76,36 +65,35 @@ export const MappingEditorView: FC<MappingEditorViewProps> = ({
     e.dataTransfer.dropEffect = "link";
   };
 
-  // 未マッピングの提案を抽出（既にマッピング済みのターゲットは除く）
   const activeSuggestions = suggestions.filter(
-    (s) => !mappings.some((m) => m.targetProperty === s.targetProperty)
+    (s) => !mappings.some((m) => m.targetPath === s.targetPath)
   );
 
-  const canSave = sourceObject && schemaName && mappings.length > 0;
+  const canSave = sourceLabel && targetSchema && mappings.length > 0;
 
   return (
     <StyledMappingEditor>
       <div className="e-panels">
         <div className="e-panel-left">
-          <h3 className="e-panel-title">ソース（PlaneObject）</h3>
+          <h3 className="e-panel-title">ソース</h3>
           <SourcePanel
-            sourceObject={sourceObject}
-            mappedSourceKeys={mappedSourceKeys}
+            sourceLabel={sourceLabel}
+            sourceLeaves={sourceLeaves}
+            mappedSourcePaths={mappedSourcePaths}
             onDropSource={onDropSource}
-            onDragOverSource={onDragOverSource}
+            onDragOverSource={onDragOver}
             onDragStartField={handleDragStartField}
           />
         </div>
         <div className="e-panel-right">
-          <h3 className="e-panel-title">ターゲット（ドメインオブジェクト）</h3>
+          <h3 className="e-panel-title">ターゲット</h3>
           <TargetPanel
-            schemaName={schemaName}
-            properties={targetProperties}
+            targetLabel={targetLabel}
+            targetShape={targetSchema?.root ?? null}
             mappings={mappings}
             suggestions={activeSuggestions}
-            targetSampleValues={targetSampleValues}
             onDropTarget={onDropTarget}
-            onDragOverTarget={onDragOverTarget}
+            onDragOverTarget={onDragOver}
             onDropOnSlot={handleDropOnSlot}
             onDragOverSlot={handleDragOverSlot}
             onUnmapField={onUnmapField}
@@ -114,15 +102,12 @@ export const MappingEditorView: FC<MappingEditorViewProps> = ({
         </div>
       </div>
 
-      {activeSuggestions.length > 0 && onAcceptAllSuggestions && (
+      {activeSuggestions.length > 0 && (
         <div className="e-suggestions-bar">
           <span className="e-suggestions-count">
             {activeSuggestions.length}件の提案があります
           </span>
-          <button
-            className="e-accept-all-btn"
-            onClick={onAcceptAllSuggestions}
-          >
+          <button className="e-accept-all-btn" onClick={onAcceptAllSuggestions}>
             すべて適用
           </button>
         </div>

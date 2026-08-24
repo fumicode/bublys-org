@@ -24,6 +24,7 @@ import {
   ScheduleReport,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
 import { localScopeId } from "./commit.js";
 
@@ -49,6 +50,12 @@ export const HOTEL_OBJECTS = defineObjects({
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     // url は app 層（registration/bubbleUrls.ts）で登録する
     // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
+    // ドメインスキーマ（object-transformer など横断で使う）
+    shape: objectShape([
+      { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
+      { name: "name", shape: primitiveShape("string"), required: true, label: "名前" },
+      { name: "department", shape: primitiveShape("string"), required: false, label: "所属部署" },
+    ]),
   },
   WorkShiftSet: {
     class: WorkShiftSet,

@@ -4,7 +4,7 @@ import { FC } from "react";
 import styled from "styled-components";
 import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type TaskListViewProps = {
   taskList: Task_タスク[];
@@ -31,25 +31,27 @@ export const TaskListView: FC<TaskListViewProps> = ({
               key={task.id}
               className={`e-item ${selectedTaskId === task.id ? "is-selected" : ""}`}
             >
-              <UrledPlace url={detailUrl}>
-                <button
-                  style={{ all: "unset", cursor: "pointer", width: "100%" }}
-                  onClick={() => onTaskClick?.(task.id)}
-                >
-                  <div className="e-content">
-                    <AssignmentIcon fontSize="small" className="e-icon" />
-                    <div className="e-text">
-                      <div className="e-title">{task.title}</div>
-                      {task.description && (
-                        <div className="e-description">{task.description}</div>
-                      )}
-                    </div>
-                    <div className="e-status">
-                      <StatusBadge status={task.status} />
-                    </div>
+              <ObjectView
+                type="Task"
+                url={detailUrl}
+                label={task.title}
+                draggable
+                fullWidth
+                onClick={() => onTaskClick?.(task.id)}
+              >
+                <div className="e-content">
+                  <AssignmentIcon fontSize="small" className="e-icon" />
+                  <div className="e-text">
+                    <div className="e-title">{task.title}</div>
+                    {task.description && (
+                      <div className="e-description">{task.description}</div>
+                    )}
                   </div>
-                </button>
-              </UrledPlace>
+                  <div className="e-status">
+                    <StatusBadge status={task.status} />
+                  </div>
+                </div>
+              </ObjectView>
             </li>
           );
         })

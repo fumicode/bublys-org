@@ -1,10 +1,10 @@
-export {
-  type DomainObjectConfig,
-  type DomainRegistry,
-  defineDomainObjects,
-  toCasRegistry,
-} from './lib/DomainRegistry.js';
-export { DomainRegistryProvider } from './lib/DomainRegistryProvider.js';
+/**
+ * ドメインスキーマの純粋層。
+ *
+ * DomainRegistryProvider を含む index.ts と分離し、React 依存のない
+ * schema 型・レジストリ・推論だけを提供する。テストや model 層はこちらを使うと
+ * DOM/React まで型解決の面倒を見なくて良い。
+ */
 
 export {
   type PrimitiveKind,

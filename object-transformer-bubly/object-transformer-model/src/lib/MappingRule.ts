@@ -1,5 +1,8 @@
 /**
- * PlaneObject → ドメインオブジェクト変換のマッピングルール
+ * ソースオブジェクト → ドメインオブジェクト変換のマッピングルール
+ *
+ * ソース・ターゲットとも「path（dot-notation）」で指定する。
+ * これにより、ネストしたオブジェクト同士のマッピングも表現できる。
  */
 
 export type ValueTransform =
@@ -9,8 +12,10 @@ export type ValueTransform =
   | { type: "dictionary"; map: Record<string, string> };
 
 export type FieldMapping = {
-  readonly sourceKey: string;
-  readonly targetProperty: string;
+  /** ソース側の path（dot-notation）。例: "name" / "address.city" */
+  readonly sourcePath: string;
+  /** ターゲット側の path（dot-notation） */
+  readonly targetPath: string;
   readonly transform: ValueTransform;
 };
 
@@ -43,9 +48,8 @@ export class MappingRule {
   }
 
   addMapping(mapping: FieldMapping): MappingRule {
-    // 同じtargetPropertyが既にあれば上書き
     const filtered = this.state.mappings.filter(
-      (m) => m.targetProperty !== mapping.targetProperty
+      (m) => m.targetPath !== mapping.targetPath
     );
     return new MappingRule({
       ...this.state,
@@ -54,34 +58,28 @@ export class MappingRule {
     });
   }
 
-  removeMapping(targetProperty: string): MappingRule {
+  removeMapping(targetPath: string): MappingRule {
     return new MappingRule({
       ...this.state,
-      mappings: this.state.mappings.filter(
-        (m) => m.targetProperty !== targetProperty
-      ),
+      mappings: this.state.mappings.filter((m) => m.targetPath !== targetPath),
       updatedAt: new Date().toISOString(),
     });
   }
 
-  getMappingForTarget(targetProperty: string): FieldMapping | undefined {
-    return this.state.mappings.find(
-      (m) => m.targetProperty === targetProperty
-    );
+  getMappingForTarget(targetPath: string): FieldMapping | undefined {
+    return this.state.mappings.find((m) => m.targetPath === targetPath);
   }
 
-  getMappingForSource(sourceKey: string): FieldMapping | undefined {
-    return this.state.mappings.find((m) => m.sourceKey === sourceKey);
+  getMappingForSource(sourcePath: string): FieldMapping | undefined {
+    return this.state.mappings.find((m) => m.sourcePath === sourcePath);
   }
 
-  /** マッピング済みのソースキー一覧 */
-  get mappedSourceKeys(): string[] {
-    return this.state.mappings.map((m) => m.sourceKey);
+  get mappedSourcePaths(): string[] {
+    return this.state.mappings.map((m) => m.sourcePath);
   }
 
-  /** マッピング済みのターゲットプロパティ一覧 */
-  get mappedTargetProperties(): string[] {
-    return this.state.mappings.map((m) => m.targetProperty);
+  get mappedTargetPaths(): string[] {
+    return this.state.mappings.map((m) => m.targetPath);
   }
 
   toJSON(): MappingRuleState {
@@ -99,7 +97,7 @@ export class MappingRule {
   ): MappingRule {
     const now = new Date().toISOString();
     return new MappingRule({
-      id: crypto.randomUUID(),
+      id: globalThis.crypto?.randomUUID?.() ?? `rule-${Date.now()}`,
       name,
       targetSchemaId,
       mappings,
