@@ -17,6 +17,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./candidates": {
+      "@bublys-org/source": "./src/candidates.ts",
+      "types": "./dist/candidates.d.ts",
+      "import": "./dist/candidates.js",
+      "default": "./dist/candidates.js"
     }
   },
   "dependencies": {

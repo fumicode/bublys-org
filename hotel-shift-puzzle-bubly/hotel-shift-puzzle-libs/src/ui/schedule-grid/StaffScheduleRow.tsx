@@ -8,6 +8,7 @@ import type {
   WorkingDay,
   ConstraintViolation,
   ShiftLeaderRule,
+  ShiftCell,
 } from "../../domain/index.js";
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
@@ -48,6 +49,15 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
+  candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /**
+   * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
+   * 渡された値は薄く描かれ、Tab で承認できる。
+   */
+  forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */
+  isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
 };
 
 /**
@@ -74,6 +84,9 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  candidateHintOf,
+  forcedCellOf,
+  isDeadCell,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
@@ -118,6 +131,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
       {days.map((day) => {
         const cell = schedule.statusOf(staff.id, day);
         const shift = cell.kind === "work" ? shiftMap.get(cell.shiftId) : undefined;
+        const forced =
+          cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
+        const dead =
+          cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
         const isSelected =
           selection?.staffId === staff.id && selection.day.equals(day);
@@ -134,6 +151,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             inputBuffer={isSelected ? inputBuffer : null}
             onSelect={() => onSelectCell(staff.id, day)}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
+            candidateHint={candidateHintOf?.(staff.id, day)}
+            forcedCandidate={forced}
+            dead={dead}
+            forcedShift={
+              forced?.kind === "work" ? shiftMap.get(forced.shiftId) : undefined
+            }
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}
           />

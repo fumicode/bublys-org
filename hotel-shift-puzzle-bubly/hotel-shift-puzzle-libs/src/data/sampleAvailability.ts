@@ -11,7 +11,7 @@ import { ScheduleAvailability } from "@bublys-org/hotel-shift-puzzle-model";
  *   - 土屋・中村 : 夜番責任者（夜責）。遅番に入れる（中村は全帯OK）
  *   - 山本・小林 : 早番責任者（早責）。早番に入れる（早番を担えるよう早番可）
  */
-const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
+export const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-tsuchiya": ["middle", "late"], // 夜責: 中番・遅番（夜＝遅番を担う）
   "staff-1": ["early", "middle", "late"],
   "staff-2": ["early", "middle", "late"],

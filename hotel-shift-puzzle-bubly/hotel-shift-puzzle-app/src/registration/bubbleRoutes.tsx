@@ -20,6 +20,7 @@ import {
   LeaderRuleView,
   ScheduleReportPanel,
   ScheduleReportList,
+  ScheduleEditLogPanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
@@ -33,6 +34,7 @@ import {
   scheduleReportUrl,
   scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
+  scheduleEditLogUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -88,6 +90,16 @@ const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
+/**
+ * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
+ * bundler 依存なので、バブル URL と同じく app 層の関心事として ここ に置き、
+ * ScheduleGrid へは関数として注入する。
+ */
+const createCandidatesWorker = () =>
+  new Worker(new URL("../workers/candidates.worker.ts", import.meta.url), {
+    type: "module",
+  });
+
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
 // キセキの木と完成レポートは、それぞれ独立したボタンから勤務表バブルを opener にして
 // 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
@@ -100,6 +112,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
   const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
+  const editLogUrl = scheduleEditLogUrl(scheduleId);
   // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
   const openSide = (url: string, position: OpeningPosition) =>
     openBubble(url, bubble.id, position);
@@ -112,10 +125,12 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
+      onOpenEditLog={() => openSide(editLogUrl, "bubble-side-right")}
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
+      editLogUrl={editLogUrl}
       ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
       reportBubbleUrl={scheduleReportUrl}
       onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
@@ -124,6 +139,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         scheduleViolationUrl(scheduleId, violationKey)
       }
       reservationInfoUrl={scheduleReservationInfoUrl(scheduleId)}
+      createCandidatesWorker={createCandidatesWorker}
     />
   );
 };
@@ -188,6 +204,10 @@ const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
 
+// --- 操作履歴（ノウハウ）バブル ---
+const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleEditLogPanel scheduleId={bubble.params.scheduleId} />);
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -202,6 +222,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // キセキの木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
   // 木の全体像をゆったり眺められるよう、世界線ビューより大きめの窓（fillsContainer）で開く。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 700, height: 500 } } },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/edit-log", type: "schedule-edit-log", Component: ScheduleEditLogBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）

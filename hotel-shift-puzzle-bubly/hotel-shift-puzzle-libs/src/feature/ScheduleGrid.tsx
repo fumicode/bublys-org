@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
@@ -14,10 +14,13 @@ import {
   ScheduleReport,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
+  makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
+  WorkingDay,
+  shiftCellKey,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
-  type WorkingDay,
+  type ScheduleRepair,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
@@ -28,14 +31,28 @@ import {
 } from "../ui/ScheduleConstraintsBar.js";
 import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
-import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
+import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
+import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
 import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
+import { suggestNextUndecided } from "./shiftSuggestion/index.js";
+import {
+  useScheduleCandidates,
+  orderForcedCells,
+  nextForcedCellAfter,
+} from "./candidates/index.js";
 import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import {
+  recordSetCell,
+  recordAutoStep,
+  recordRequiredEdit,
+  recordConstraintEdit,
+  buildCandidateEditLog,
+} from "./recordScheduleEdit.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -44,6 +61,7 @@ import {
   SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
+  SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -65,6 +83,10 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   availabilityUrl?: string;
+  /** 操作履歴（ノウハウ）バブルの URL */
+  editLogUrl?: string;
+  /** 操作履歴バブルを開くハンドラ */
+  onOpenEditLog?: () => void;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -91,6 +113,11 @@ type ScheduleGridProps = {
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
    */
   onOpenRule?: (ruleKey: string) => void;
+  /**
+   * 候補集合を計算する worker を作る。worker の作り方は bundler 依存なので app 層から
+   * 注入する（URL スキームと同じ流儀）。渡さなければ main thread で同期計算する。
+   */
+  createCandidatesWorker?: () => Worker;
 };
 
 /** 新しい責任者ルールの一意キーを生成する。 */
@@ -98,31 +125,40 @@ const newLeaderRuleKey = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `leader-${Date.now()}`;
 
 /**
- * 勤務表グリッド。編集はシェル経由：update(s => s.setCell(...)) を呼ぶだけで、
- * その勤務表を監視している世界線すべて（アプリ全体＋ローカル）へ自動保存される。
+ * 勤務表グリッド。セル編集・自動ステップ等は recordScheduleEdit 経由で
+ * Schedule + EditLog を同一世界線ノードに記録する。
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenTree,
   onOpenAvailability,
+  onOpenEditLog,
   onConfirm,
   worldLineUrl,
   treeUrl,
   availabilityUrl,
+  editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
+  createCandidatesWorker,
 }) => {
   useSeedHotelData();
   const store = useAppStore();
   const { scope } = useScheduleHistory(scheduleId ?? "");
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  const [cellSelection, setCellSelection] = useState<{
+    staffId: string;
+    day: WorkingDay;
+  } | null>(null);
   const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
+  const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
@@ -136,10 +172,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     scheduleId
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const { object: schedule, update } = useObjectShell<MonthlyStaffSchedule>(
-    SCHEDULE_TYPE,
-    scheduleId
-  );
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
@@ -180,7 +213,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
   );
-  const constraintsRepo = useObjectRepo<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
 
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
@@ -191,18 +223,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const ids = constraints?.linkedReportIds ?? [];
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
-
-  const handleDropReportUrl = (url: string) => {
-    const reportId = extractIdFromUrl(url);
-    if (!reportId || !scheduleId) return;
-    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
-    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
-    constraintsRepo.save(base.linkReport(reportId));
-  };
-  const handleUnlinkReport = (reportId: string) => {
-    if (!constraints) return;
-    constraintsRepo.save(constraints.unlinkReport(reportId));
-  };
 
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
   const minDayOff = constraints?.minMonthlyDayOff ?? 8;
@@ -243,25 +263,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return names.length > 0 ? `「${names.join("・")}」解決案生成` : "解決案生成";
   }, [relevantRules]);
 
-  // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
-  // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
-  const handleAddRule = () => {
-    if (!scheduleId) return;
-    const key = newLeaderRuleKey();
-    const base =
-      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
-    constraintsRepo.save(
-      base.addRule({
-        key,
-        label: "新責任者",
-        shiftName: workShifts[0]?.name ?? "",
-        leaderStaffIds: [],
-        minCount: 1,
-      })
-    );
-    onOpenRule?.(key);
-  };
-
   // 責任者ルールを人が読める形で描く用。名前は絞り込み前の全スタッフから引く
   // （部署フィルタで責任者が消えても名前を解決できるように）。
   const nameOf = useMemo(() => {
@@ -287,6 +288,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // パイプラインで拾う。責任者違反は「日単位（staffId なし）」で、列の警告として表に出る。
   // この勤務表に効く「すべての制約」を宣言的オブジェクトとして1本に組み立てる。
   // 表示（上部ルール）も違反も、この同じ制約リストから導出する（手書き文字列なし）。
+  // ※ handleDropReportUrl / handleAddRule より前に定義する（use-before-define 回避）。
   const allConstraints = useMemo(() => {
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     const shiftIdsOf = (shiftName: string) =>
@@ -297,9 +299,167 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     });
   }, [workShifts, constraints, wishByStaff]);
 
+  const handleDropReportUrl = (url: string) => {
+    const reportId = extractIdFromUrl(url);
+    if (!reportId || !scheduleId) return;
+    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
+    const next = base.linkReport(reportId);
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `レポートを紐づけ: ${reportId}`,
+    });
+  };
+  const handleUnlinkReport = (reportId: string) => {
+    if (!constraints) return;
+    const next = constraints.unlinkReport(reportId);
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `レポートの紐づけを解除: ${reportId}`,
+    });
+  };
+
+  // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
+  // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
+  const handleAddRule = () => {
+    if (!scheduleId) return;
+    const key = newLeaderRuleKey();
+    const base =
+      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const next = base.addRule({
+      key,
+      label: "新責任者",
+      shiftName: workShifts[0]?.name ?? "",
+      leaderStaffIds: [],
+      minCount: 1,
+    });
+    const shiftIdsOf = (shiftName: string) =>
+      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
+    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
+    recordConstraintEdit(store, {
+      schedule,
+      beforeConstraints: allConstraints,
+      afterConstraints: buildScheduleConstraints({
+        modelConstraints: next.modelConstraints(shiftIdsOf),
+        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      }),
+      nextConstraints: next,
+      summary: `責任者ルールを追加: ${key}`,
+    });
+    onOpenRule?.(key);
+  };
+
   const violations = useMemo(
     () => (schedule ? schedule.checkConstraints(allConstraints) : []),
     [schedule, allConstraints]
+  );
+
+  // まだ決まっていないセルに入れられる値（候補集合）。確定のたびに影響範囲だけ計算し直す。
+  const { candidates, computing, diagnoseDeadCell, diagnosis, diagnosing } =
+    useScheduleCandidates({
+    schedule,
+    constraints,
+    checkShiftWish: constraints?.checkShiftWish ?? true,
+    wishByStaff,
+    workShifts,
+    staffIds,
+    createWorker: createCandidatesWorker,
+  });
+
+  /** セルの値 → 人が読むラベル（"早番" / "休み"） */
+  const cellLabelOf = useCallback(
+    (cell: ShiftCell) =>
+      cell.kind === "work"
+        ? (workShifts.find((w) => w.id === cell.shiftId)?.name ?? cell.shiftId)
+        : cell.kind === "day-off"
+          ? "休み"
+          : "未定",
+    [workShifts]
+  );
+
+  const candidateHintOf = useCallback(
+    (staffId: string, day: WorkingDay): string | undefined => {
+      const options = candidates.candidatesOf(staffId, day);
+      if (!options) return undefined; // 確定済み（候補集合は未定セルの分だけ持つ）
+      if (options.length === 0) return "候補なし（このままではこのセルを埋められません）";
+      const labelOf = cellLabelOf;
+      const values = options.map(labelOf).join(" / ");
+      return options.length === 1
+        ? `候補は${values}だけ（ここは一意に決まります）`
+        : `候補${options.length}件: ${values}`;
+    },
+    [candidates, cellLabelOf]
+  );
+
+  // 候補が1つに絞られたセル＝制約から一意に決まる手。承認するまで勤務表には入れない。
+  // 再計算中は前回の（古いかもしれない）提案を出さない。承認直後に古い値を書かないため。
+  const orderedForcedCells = useMemo(
+    () => (computing ? [] : orderForcedCells(candidates.forcedCells(), staffIds)),
+    [candidates, computing, staffIds]
+  );
+
+  const forcedCellOf = useMemo(() => {
+    const byCell = new Map(
+      orderedForcedCells.map((forced) => [
+        `${forced.staffId}:${forced.day.key}`,
+        forced.cell,
+      ])
+    );
+    return (staffId: string, day: WorkingDay) => byCell.get(`${staffId}:${day.key}`);
+  }, [orderedForcedCells]);
+
+  // 候補が0件のセル＝もうどの値も入れられない（詰み）。確定提案と同じく、再計算中は
+  // 前回の（古いかもしれない）判定で赤くしない。
+  const deadCells = useMemo(
+    () => (computing ? [] : candidates.deadCells()),
+    [candidates, computing]
+  );
+
+  const isDeadCell = useMemo(() => {
+    const keys = new Set(deadCells.map((cell) => `${cell.staffId}:${cell.day.key}`));
+    return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
+  }, [deadCells]);
+
+  useEffect(() => {
+    if (!schedule || cellSelection) return;
+    const next = suggestNextUndecided(
+      schedule,
+      staffList.map((s) => s.id)
+    );
+    if (next) {
+      setCellSelection({ staffId: next.staffId, day: next.day });
+    }
+  }, [schedule, cellSelection, staffList]);
+
+  const advanceFocusAfterEdit = useCallback(
+    (nextSchedule: MonthlyStaffSchedule) => {
+      const next = suggestNextUndecided(
+        nextSchedule,
+        staffList.map((s) => s.id)
+      );
+      setCellSelection(
+        next ? { staffId: next.staffId, day: next.day } : null
+      );
+    },
+    [staffList]
   );
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
@@ -313,9 +473,51 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: シェルにメソッドを実行するだけ → 監視している世界線すべてへ自動保存
+  // セル編集: EditLog 付きで同一世界線ノードに記録
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    update((s) => s.setCell(staffId, day, to));
+    const next = recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId,
+      staffName: nameOf(staffId),
+      day,
+      to,
+    });
+    setCellSelection({ staffId, day });
+    advanceFocusAfterEdit(next);
+  };
+
+  // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
+  // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  const handleApproveForced = (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell
+  ) => {
+    const next = nextForcedCellAfter(orderedForcedCells, {
+      staffId,
+      dayKey: day.key,
+    });
+    const nextSchedule = recordSetCell(store, {
+      schedule,
+      constraints: allConstraints,
+      staffId,
+      staffName: nameOf(staffId),
+      day,
+      to: cell,
+      suggestionId: `forced:${staffId}:${day.key}:${shiftCellKey(cell)}`,
+    });
+    if (next) {
+      setCellSelection({ staffId: next.staffId, day: next.day });
+      return;
+    }
+    advanceFocusAfterEdit(nextSchedule);
+  };
+
+  // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
+  // EditLog に残す（どういう理由でその日を動かしたかは、詰みの記録として世界線に残る）。
+  const handleApplyRepair = (repair: ScheduleRepair) => {
+    handleChangeCell(repair.staffId, repair.day, repair.to);
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
@@ -332,13 +534,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       maxDayOffPerDay: maxPerDay,
       maxConsecutive: constraints?.maxConsecutiveWorkdays,
     });
-    update(() => result.schedule);
+    recordAutoStep(store, {
+      schedule,
+      next: result.schedule,
+      constraints: allConstraints,
+      stepId: step.key,
+      stepLabel: step.label,
+      message: result.message,
+    });
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 
-  // 完成案の複数生成：対象スタッフについて「毎日 担当勤務帯に責任者が最低1人いる」かつ
-  // 「全員が月◯日休む（1日◯人まで）」を満たす完成案を phase 違いで N 案つくり、
-  // それぞれ独立した世界線（兄弟ブランチ）に書く。
+  // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
     // 紐づけたレポートで譲歩が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
@@ -358,14 +565,40 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
       s = runOn(s, fulfillWishesStep);
-      s = runOn(s, makeSatisfyLeaderRulesStep(relevantRules, { phase }));
+
+      // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
+      const leaderFill = runAutoShiftStep(
+        makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+      );
+      s = leaderFill.schedule;
+
+      s = runOn(
+        s,
+        makeResolveAmbiguousLeaderSlotsStep(leaderFill.ambiguousLeaderSlots ?? [], { phase })
+      );
       s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
       return s;
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
-      obj: buildCandidate(i),
-      label: `案${i + 1}`,
-    }));
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
+      const obj = buildCandidate(i);
+      const label = `案${i + 1}`;
+      return {
+        obj,
+        label,
+        extras: [
+          {
+            type: SCHEDULE_EDIT_LOG_TYPE,
+            obj: buildCandidateEditLog(store, {
+              baseSchedule: schedule,
+              candidate: obj,
+              constraints: allConstraints,
+              label,
+            }),
+          },
+        ],
+      };
+    });
     commitCandidates(
       store,
       localScopeId(SCHEDULE_TYPE, scheduleId),
@@ -374,16 +607,30 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       candidates
     );
     setAutoMessage(
-      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
+      `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
     );
+    onOpenHistory?.();
   };
 
-  // 必要スタッフ数の編集（その日・全日）。同じくシェル経由で保存される
+  // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
   const handleChangeRequired = (day: WorkingDay, shiftName: string, count: number) => {
-    update((s) => s.setRequired(day, shiftName, count));
+    recordRequiredEdit(store, {
+      schedule,
+      constraints: allConstraints,
+      transform: (s) => s.setRequired(day, shiftName, count),
+      summary: `${day.day}日 ${shiftName} の必要人数 → ${count}`,
+      dayKey: day.key,
+      shiftName,
+    });
   };
   const handleChangeRequiredAllDays = (shiftName: string, count: number) => {
-    update((s) => s.setRequiredForAllDays(shiftName, count));
+    recordRequiredEdit(store, {
+      schedule,
+      constraints: allConstraints,
+      transform: (s) => s.setRequiredForAllDays(shiftName, count),
+      summary: `全日 ${shiftName} の必要人数 → ${count}`,
+      shiftName,
+    });
   };
 
   // 「完成レポートを作成」: apex の勤務表状態からレポートを計算して保存し、
@@ -592,23 +839,89 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           violationUrl={
             violationBubbleUrl ? (v) => violationBubbleUrl(v.key) : undefined
           }
+          selection={cellSelection}
+          onSelectionChange={setCellSelection}
+          candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
+          onApproveForced={handleApproveForced}
         />
       </div>
 
+      {/* 詰みの通知。セル1つの赤ハッチだけでは月末に埋もれるので、盤面の総数をここで出し、
+          最初の詰みセルへ飛べるようにする。 */}
+      {deadCells.length > 0 && (
+        <div className="e-dead-notice">
+          <span>
+            埋められないセルが {deadCells.length} 件あります（どの値を入れても制約に反します）
+          </span>
+          <button
+            type="button"
+            className="e-dead-jump"
+            onClick={() =>
+              setCellSelection({
+                staffId: deadCells[0].staffId,
+                day: deadCells[0].day,
+              })
+            }
+          >
+            最初のセルへ
+          </button>
+          <button
+            type="button"
+            className="e-dead-jump"
+            disabled={diagnosing}
+            title="どこを書き換えればこのセルが埋まるかを、盤面を総当たりして探します（少し時間がかかります）"
+            onClick={() =>
+              diagnoseDeadCell({
+                staffId: deadCells[0].staffId,
+                dayKey: deadCells[0].day.key,
+              })
+            }
+          >
+            {diagnosing ? "探しています…" : "解消案を探す"}
+          </button>
+        </div>
+      )}
+
+      {diagnosis && (
+        <div className="e-dead-diagnosis">
+          <DeadCellDiagnosisView
+            diagnosis={diagnosis}
+            nameOf={nameOf}
+            labelOf={cellLabelOf}
+            onApply={handleApplyRepair}
+          />
+        </div>
+      )}
+
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {onOpenHistory && (
+      {(onOpenHistory || onOpenEditLog) && (
         <div className="e-footer">
-          {withUrl(
-            worldLineUrl,
-            <button
-              type="button"
-              className="e-link e-worldline"
-              onClick={onOpenHistory}
-              title="この勤務表の世界線ビューを開く"
-            >
-              🌐 世界線ビュー
-            </button>
-          )}
+          {onOpenHistory &&
+            withUrl(
+              worldLineUrl,
+              <button
+                type="button"
+                className="e-link e-worldline"
+                onClick={onOpenHistory}
+                title="この勤務表の世界線ビューを開く"
+              >
+                🌐 世界線ビュー
+              </button>
+            )}
+          {onOpenEditLog &&
+            withUrl(
+              editLogUrl,
+              <button
+                type="button"
+                className="e-link"
+                onClick={onOpenEditLog}
+                title="操作履歴（ノウハウ）を開く"
+              >
+                📝 操作履歴
+              </button>
+            )}
           {onOpenTree &&
             withUrl(
               treeUrl,
@@ -745,6 +1058,51 @@ const StyledContainer = styled.div`
         border-color: #66bb6a;
       }
     }
+  }
+
+  .e-dead-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: #fdecea;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+    color: #b71c1c;
+    font-size: 0.82em;
+
+    .e-dead-jump {
+      border: 1px solid #ef9a9a;
+      border-radius: 4px;
+      background: #fff;
+      color: #b71c1c;
+      font-size: 0.95em;
+      line-height: 1.6;
+      cursor: pointer;
+      padding: 0 8px;
+
+      &:hover {
+        background: #ffebee;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      &:first-of-type {
+        margin-left: auto;
+      }
+    }
+  }
+
+  .e-dead-diagnosis {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+    background: #fffaf9;
   }
 
 

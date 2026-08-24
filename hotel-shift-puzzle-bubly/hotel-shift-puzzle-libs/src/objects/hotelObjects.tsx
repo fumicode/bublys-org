@@ -22,6 +22,7 @@ import {
   StaffMonthlyShiftWish,
   ScheduleConstraints,
   ScheduleReport,
+  ScheduleEditLog,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -39,6 +40,8 @@ export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
 export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
+/** 勤務表の操作履歴（ノウハウ可視化）。Schedule ローカル世界線に相乗り。 */
+export const SCHEDULE_EDIT_LOG_TYPE = "ScheduleEditLog";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
@@ -109,6 +112,14 @@ export const HOTEL_OBJECTS = defineObjects({
     // 確定時点のスナップショット。勤務表のローカル世界線には相乗りさせない
     // （相乗りさせると時間移動のたびに現れたり消えたりして確定記録の意味が壊れるため）。
     // state が完全 plain → serialize 不要。localScope も指定しない＝アプリ全体ログのみ。
+  },
+  ScheduleEditLog: {
+    class: ScheduleEditLog,
+    getId: (log: ScheduleEditLog) => log.id,
+    // 勤務表の操作履歴。親 Schedule のローカル世界線に相乗り（case B）。
+    // Schedule と同じノードに bundle で載せることで、時間移動と履歴がずれない。
+    // state が完全 plain なので serialize 不要。
+    localScope: (log: ScheduleEditLog) => localScopeId(SCHEDULE_TYPE, log.id),
   },
 });
 

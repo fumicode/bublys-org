@@ -15,7 +15,12 @@ import {
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
 } from "../domain/index.js";
-import { STAFF_COL_WIDTH, DAY_COL_WIDTH, OFF_COL_WIDTH } from "./schedule-grid/constants.js";
+import {
+  STAFF_COL_WIDTH,
+  DAY_COL_WIDTH,
+  OFF_COL_WIDTH,
+  DEMAND_CELL_KEY_PREFIX,
+} from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
@@ -29,7 +34,7 @@ import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
-import type { EditingRequired } from "./schedule-grid/types.js";
+import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -81,6 +86,26 @@ type ScheduleGridViewProps = {
   minDayOff?: number;
   /** 1日の休み人数の上限。footer の休み行でこれを超えた日を赤くする */
   maxDayOffPerDay?: number;
+  /** feature 層と共有する現在セル。キーボード選択と同じ状態にする。 */
+  selection?: CellSelection | null;
+  onSelectionChange?: (selection: CellSelection | null) => void;
+  /**
+   * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
+   * 確定済みセルには何も返さない。
+   */
+  candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /**
+   * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
+   * セルに薄く描かれ、Tab で承認できる。
+   */
+  forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /**
+   * そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。
+   * 埋められないセルを抱えたまま作業が進むのを防ぐため、セル自身に描く。
+   */
+  isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
+  /** 選択セルの確定提案を承認する（Tab）。承認後のフォーカス移動は feature 層が決める。 */
+  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
 };
 
 /**
@@ -137,6 +162,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onSelectRule,
   minDayOff,
   maxDayOffPerDay,
+  selection,
+  onSelectionChange,
+  candidateHintOf,
+  forcedCellOf,
+  isDeadCell,
+  onApproveForced,
 }) => {
   const days = schedule.workingDays();
 
@@ -176,7 +207,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // ホバー中セルの人が属する責任者ルールごとに、担当勤務帯（早番など）から全メンバーへ
   // ブレースを描くための情報を導く。制約がその日に満たされているかも添える。
   const hoverInfo = useMemo(() => {
-    if (!hoveredCell) return null;
+    if (!hoveredCell || hoveredCell.startsWith(DEMAND_CELL_KEY_PREFIX)) return null;
     const sep = hoveredCell.indexOf(":");
     if (sep < 0) return null;
     const staffId = hoveredCell.slice(0, sep);
@@ -190,20 +221,23 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       // 起点は「勤務帯」なので、本人も含めた表示中の全メンバーへ等しく線を伸ばす。
       const memberIds = rule.leaderStaffIds.filter((id) => visible.has(id));
       if (memberIds.length === 0) continue;
-      // 各メンバーが「その日に担当勤務帯へ入っているか（充足に寄与しているか）」を添える。
+      // 各メンバーについて「その日に担当勤務帯へ入っているか（充足に寄与しているか）」と
+      // 「これから入れるか（まだ未定か）」を添える。後者が点滅の対象を決める：休みや別の
+      // 勤務帯で確定している人に「誰か入って」と点滅で促しても仕方がない。
       const members = memberIds.map((id) => {
         const st = day ? schedule.statusOf(id, day) : { kind: "undecided" as const };
         const covering =
           st.kind === "work" && shiftNameByIdLocal.get(st.shiftId) === rule.shiftName;
-        return { staffId: id, covering };
+        return { staffId: id, covering, available: st.kind === "undecided" };
       });
       // その日に責任者ルールが未充足なら違反が立つ（列警告と同じ導出）。無ければ充足。
       const vtype = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
       const satisfied = day
         ? !violations.some((v) => v.constraintType === vtype && v.coversDay(day))
         : true;
-      // メンバー全員がその日に休み＝誰も入れず絶対に満たせない（黄色・同時点滅で警告）。
-      const allDayOff = !!day && memberIds.every((id) => schedule.isDayOff(id, day));
+      // 入れる人が誰も残っていない＝この日は絶対に満たせない（黄色・同時点滅で警告）。
+      // 全員が休みの日だけでなく、全員が別の勤務帯で確定している日もここに入る。
+      const unfillable = !satisfied && !members.some((m) => m.available);
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
@@ -211,7 +245,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         minCount: rule.minCount,
         members,
         satisfied,
-        allDayOff,
+        unfillable,
       });
     }
     if (groups.length === 0) return null;
@@ -279,6 +313,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     shiftOptions,
     availability,
     onChangeCell,
+    selection,
+    onSelectionChange,
+    forcedCellOf,
+    onApproveForced,
   });
 
   // ----- 必要人数の編集メニュー -----
@@ -322,6 +360,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
         />
       ));
     }
@@ -360,6 +401,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          candidateHintOf={candidateHintOf}
+          forcedCellOf={forcedCellOf}
+          isDeadCell={isDeadCell}
         />
       )),
     ]);
@@ -501,6 +545,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             groups={hoverInfo.groups}
           />
         )}
+
       </div>
 
       <RequiredEditMenu

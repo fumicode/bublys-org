@@ -1,4 +1,13 @@
 import { ScheduleConstraints } from './ScheduleConstraints.js';
+import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
+
+describe('ScheduleConstraints.modelConstraints', () => {
+  test('RequiredStaffingConstraint を含む', () => {
+    const constraints = new ScheduleConstraints({ scheduleId: 'schedule-A', leaderRules: [] });
+    const model = constraints.modelConstraints(() => []);
+    expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(true);
+  });
+});
 
 describe('ScheduleConstraints の参考レポート紐づけ（linkReport/unlinkReport）', () => {
   const create = () =>
