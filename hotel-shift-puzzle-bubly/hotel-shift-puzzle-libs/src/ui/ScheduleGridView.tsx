@@ -221,20 +221,23 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       // 起点は「勤務帯」なので、本人も含めた表示中の全メンバーへ等しく線を伸ばす。
       const memberIds = rule.leaderStaffIds.filter((id) => visible.has(id));
       if (memberIds.length === 0) continue;
-      // 各メンバーが「その日に担当勤務帯へ入っているか（充足に寄与しているか）」を添える。
+      // 各メンバーについて「その日に担当勤務帯へ入っているか（充足に寄与しているか）」と
+      // 「これから入れるか（まだ未定か）」を添える。後者が点滅の対象を決める：休みや別の
+      // 勤務帯で確定している人に「誰か入って」と点滅で促しても仕方がない。
       const members = memberIds.map((id) => {
         const st = day ? schedule.statusOf(id, day) : { kind: "undecided" as const };
         const covering =
           st.kind === "work" && shiftNameByIdLocal.get(st.shiftId) === rule.shiftName;
-        return { staffId: id, covering };
+        return { staffId: id, covering, available: st.kind === "undecided" };
       });
       // その日に責任者ルールが未充足なら違反が立つ（列警告と同じ導出）。無ければ充足。
       const vtype = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
       const satisfied = day
         ? !violations.some((v) => v.constraintType === vtype && v.coversDay(day))
         : true;
-      // メンバー全員がその日に休み＝誰も入れず絶対に満たせない（黄色・同時点滅で警告）。
-      const allDayOff = !!day && memberIds.every((id) => schedule.isDayOff(id, day));
+      // 入れる人が誰も残っていない＝この日は絶対に満たせない（黄色・同時点滅で警告）。
+      // 全員が休みの日だけでなく、全員が別の勤務帯で確定している日もここに入る。
+      const unfillable = !satisfied && !members.some((m) => m.available);
       groups.push({
         shiftId: shiftIdByName.get(rule.shiftName),
         shiftName: rule.shiftName,
@@ -242,7 +245,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         minCount: rule.minCount,
         members,
         satisfied,
-        allDayOff,
+        unfillable,
       });
     }
     if (groups.length === 0) return null;
