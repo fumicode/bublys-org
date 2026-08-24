@@ -141,6 +141,13 @@ export function useScopeNodeSummaries(
   objectId: string,
   format: (obj: unknown) => string,
 ): (nodeId: string) => string {
+  // 他ノードの中身を覗くので、evict 済みのぶんを先に埋めておくよう頼む。
+  // 届くと cas が変わり、下の useMemo が回り直して要約が出る。
+  const { requestNodes, graph } = scope;
+  useEffect(() => {
+    requestNodes(Object.keys(graph.state.nodes));
+  }, [requestNodes, graph]);
+
   const map = useMemo(() => {
     const m = new Map<string, string>();
     for (const id of Object.keys(scope.graph.state.nodes)) {

@@ -24,3 +24,8 @@ export { useScopeManager } from './useScopeManager';
 export { type ForkPreview, type WlNavProps } from './WorldLineNav';
 export { CasProvider, useCas, type CasTypeConfig, type CasRegistry } from './CasProvider';
 export { useCasScope, type CasScopeOptions, type CasScopeValue } from './useCasScope';
+export {
+  resolveStateRefs,
+  type ResolvedObject,
+  type ResolveStatesResult,
+} from './resolveStates';

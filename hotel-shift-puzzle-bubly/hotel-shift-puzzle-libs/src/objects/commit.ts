@@ -16,6 +16,7 @@ import {
   createStateRef,
   setGraph,
   setCasEntries,
+  type StateRef,
 } from "@bublys-org/world-line-graph";
 import { getDescriptor, type ObjectDescriptor } from "./framework.js";
 
@@ -95,6 +96,56 @@ export function commitBundle(
   store.dispatch(setCasEntries({ entries: casEntries }));
 }
 
+/**
+ * スコープの apex にある、その型・IDの参照（StateRef）を返す。
+ *
+ * 「そのスコープにそのオブジェクトが載っているか」は**参照の有無**で決まる。
+ * 実データはメモリ上の CAS から追い出されていることがあるので、
+ * 値が読めるかどうかで判断してはいけない（世界線の記録が欠ける）。
+ */
+export function refInScope(
+  store: StoreLike,
+  scopeId: string,
+  type: string,
+  id: string
+): StateRef | undefined {
+  const graph = graphOf(store, scopeId);
+  const apex = graph.state.apexNodeId;
+  if (!apex) return undefined;
+  return graph.getStateRefsAt(apex).find((r) => r.type === type && r.id === id);
+}
+
+/**
+ * その型・IDが、このスコープの履歴の**どこか**に載っているか。
+ *
+ * 「初登場か」の判定に apex を使ってはいけない。時間移動で過去のノードへ戻ると、
+ * まだその型が登場していない時点が apex になり、編集のたびに起点ノードが差し込まれる
+ * （分岐するたびに余計なノードが1つ増える）。登場したことがあるかは履歴全体で決まる。
+ */
+function everInScope(
+  store: StoreLike,
+  scopeId: string,
+  type: string,
+  id: string
+): boolean {
+  const nodes = graphOf(store, scopeId).state.nodes;
+  return Object.values(nodes).some((node) =>
+    node.changedRefs.some((r) => r.type === type && r.id === id)
+  );
+}
+
+/**
+ * 既存の参照をそのままスコープへ記録する（grow）。
+ *
+ * 参照が指す実データは既に CAS／永続ストアにあるので、値を読み直す必要はない。
+ * 「他のスコープにある現在値を、こちらのスコープの起点として置く」用途。
+ */
+function growWithRefs(store: StoreLike, scopeId: string, refs: StateRef[]): void {
+  if (refs.length === 0) return;
+  const updated = graphOf(store, scopeId).grow(refs);
+  store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
+}
+
 /** スコープの apex から型・IDのオブジェクトを読む */
 export function readFromScope<T>(
   store: StoreLike,
@@ -108,9 +159,19 @@ export function readFromScope<T>(
   const apex = graph.state.apexNodeId;
   if (!apex) return undefined;
   const ref = graph.getStateRefsAt(apex).find((r) => r.type === type && r.id === id);
-  if (!ref) return undefined;
+  if (!ref) return undefined; // そのオブジェクトはこのスコープに無い
   const data = store.getState().worldLineGraph?.cas?.[ref.hash];
-  if (data === undefined || data === null) return undefined;
+  if (data === null) return undefined; // 削除済み（tombstone）
+  if (data === undefined) {
+    // 参照はあるのに実データがメモリに無い＝CAS から追い出されただけ。
+    // ここで undefined を返すと「オブジェクトが無い」と区別がつかず、呼び出し側が
+    // 記録を飛ばして世界線が欠ける。同期では取りに行けないので、せめて黙らない。
+    console.warn(
+      `世界線: ${scopeId} の ${type}:${id} は参照だけあって実データが手元にありません` +
+        `（メモリ上の CAS から追い出された可能性）。値を必要としない経路を使ってください。`
+    );
+    return undefined;
+  }
   return codecOf(d).fromJSON(data) as T;
 }
 
@@ -133,18 +194,73 @@ export function saveObject(store: StoreLike, type: string, obj: unknown): void {
   commitToScope(store, APP_SCOPE_ID, type, obj);
 }
 
+/** 値から参照を作り、実データを CAS へ載せる（記録はまだしない） */
+function refForItem(store: StoreLike, { type, obj }: BundleItem): StateRef {
+  const d = getDescriptor(type);
+  if (!d) throw new Error(`save: type "${type}" が未登録です`);
+  const data = codecOf(d).toJSON(obj);
+  const hash = computeStateHash(data);
+  store.dispatch(setCasEntries({ entries: [{ hash, data }] }));
+  return createStateRef(type, d.getId(obj), hash);
+}
+
 /**
  * 複数オブジェクトをローカル世界線の同一ノードに載せ、それぞれ APP スコープにも反映する。
  * Schedule + ScheduleEditLog（＋必要なら Constraints）を1操作で記録するときに使う。
  * ローカルは1 grow、APP はオブジェクトごとに1 grow（平坦な変更ログ）。
+ *
+ * @param baseline その型がこのスコープに初登場のときに、起点として置く「編集前」の値。
+ *   呼び出し側は編集前の値を手に持っているので、それを渡すのが確実
+ *   （ストアから引き直すと、実データが手元に無いときに起点が欠ける＝#110）。
+ *   渡されなかった型は APP の現在の参照で代替する。
  */
 export function saveLocalBundle(
   store: StoreLike,
   localScopeIdValue: string,
-  items: BundleItem[]
+  items: BundleItem[],
+  baseline?: BundleItem[]
 ): void {
-  for (const { type, obj } of items) {
-    ensureLocalBaseline(store, localScopeIdValue, type, obj);
+  // 起点は**1ノードにまとめて**置く。1件ずつ記録すると先頭のノードに一部の型しか載らず、
+  // そこへ時間移動したときに残りが戻らない（doc の「まとめて巻き戻したとき元に戻れる」）。
+  // 起点に置く候補は「今回記録するもの」と「呼び出し側が起点として渡したもの」の和集合。
+  // items に無い型も起点に置けるようにしてある（例: 制約変更だけを記録するときも、
+  // このスコープの持ち主である勤務表は起点に載っていないといけない）。
+  const idOf = (item: BundleItem) => {
+    const d = getDescriptor(item.type);
+    if (!d) throw new Error(`save: type "${item.type}" が未登録です`);
+    return d.getId(item.obj);
+  };
+  const wanted = new Map<string, { type: string; id: string }>();
+  for (const item of [...items, ...(baseline ?? [])]) {
+    const id = idOf(item);
+    wanted.set(`${item.type}:${id}`, { type: item.type, id });
+  }
+
+  const baselines = [...wanted.values()]
+    .map(({ type, id }) => {
+      if (everInScope(store, localScopeIdValue, type, id)) return undefined;
+      const given = baseline?.find((b) => b.type === type && idOf(b) === id);
+      // 渡されていればそれを使う（確実）。無ければ APP の現在の参照で代替する
+      return given
+        ? refForItem(store, given)
+        : refInScope(store, APP_SCOPE_ID, type, id);
+    })
+    .filter((ref): ref is StateRef => ref !== undefined);
+  const creatingRoot = isScopeEmpty(store, localScopeIdValue);
+  growWithRefs(store, localScopeIdValue, baselines);
+  if (creatingRoot && baselines.length > 0) {
+    // 起点は人の操作に対応しないノードなので、そう読めるよう名前を付ける
+    // （付けないと「同じ状態が2つ並んでいる」ように見える）。
+    const graph = graphOf(store, localScopeIdValue);
+    const rootId = graph.state.rootNodeId;
+    if (rootId) {
+      store.dispatch(
+        setGraph({
+          scopeId: localScopeIdValue,
+          graph: graph.setNodeLabel(rootId, "編集前").toJSON(),
+        })
+      );
+    }
   }
   commitBundle(store, localScopeIdValue, items);
   for (const { type, obj } of items) {
@@ -152,20 +268,35 @@ export function saveLocalBundle(
   }
 }
 
-/** ローカルスコープに初登場なら、APP の現在値を起点として先に記録する */
+/**
+ * ローカルスコープに初登場なら、APP の現在値を起点として先に記録する。
+ *
+ * 判断も記録も**参照（StateRef）で行う**のが要点。以前は値を読んで判断していたため、
+ * その値がメモリ上の CAS から追い出されていると「APP にも無い」と誤判定し、起点の記録を
+ * 黙って飛ばしていた。結果、ローカル世界線の root にその型が載らず、そこへ時間移動しても
+ * 状態が戻らない（#110）。参照はグラフに載っているので、追い出しの影響を受けない。
+ */
+function baselineRefFor(
+  store: StoreLike,
+  localId: string,
+  type: string,
+  obj: unknown
+): StateRef | undefined {
+  const d = getDescriptor(type);
+  if (!d) throw new Error(`save: type "${type}" が未登録です`);
+  const id = d.getId(obj);
+  if (everInScope(store, localId, type, id)) return undefined; // 登場済み
+  return refInScope(store, APP_SCOPE_ID, type, id);
+}
+
 function ensureLocalBaseline(
   store: StoreLike,
   localId: string,
   type: string,
   obj: unknown
 ): void {
-  const d = getDescriptor(type);
-  if (!d) throw new Error(`save: type "${type}" が未登録です`);
-  const id = d.getId(obj);
-  const alreadyInScope = readFromScope(store, localId, type, id) !== undefined;
-  if (alreadyInScope) return;
-  const prev = readFromScope(store, APP_SCOPE_ID, type, id);
-  if (prev !== undefined) commitToScope(store, localId, type, prev);
+  const ref = baselineRefFor(store, localId, type, obj);
+  if (ref) growWithRefs(store, localId, [ref]);
 }
 
 /**
