@@ -4,7 +4,10 @@
  * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
  * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、囲碁などと同じ共通ビュー
- * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。
+ * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。時間が左から右へ流れ、分岐は
+ * 下へ伸びるので、長い世界線を辿りやすい。
+ * （勤務表専用の「木登り」ビュー ClimberWorldLineCanvasView も ui に置いてあるが、
+ *   いまは使っていない。renderCanvas に渡せば差し替えられる）
  *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
  *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
@@ -21,7 +24,6 @@ import {
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
 import { useScheduleHistory } from "./useScheduleHistory.js";
-import { ClimberWorldLineCanvasView } from "../ui/ClimberWorldLineCanvasView.js";
 
 type Props = {
   scheduleId: string;
@@ -80,7 +82,6 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
         scope={scope}
         keyBindings={keyBindings}
         onSelectNode={restore}
-        renderCanvas={(props) => <ClimberWorldLineCanvasView {...props} />}
         nameable
       />
     </StyledWrap>
