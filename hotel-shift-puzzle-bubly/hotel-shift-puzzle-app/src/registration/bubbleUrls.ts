@@ -22,6 +22,16 @@ import {
 export const staffUrl = (staffId: string): string =>
   `hotel-shift-puzzle/staffs/${staffId}`;
 
+/** スタッフ本人のシフト希望の入口（自分の月別一覧） */
+export const shiftWishListUrl = (): string => `hotel-shift-puzzle/shift-wishes`;
+
+/** スタッフ月別シフト希望の入力表バブル */
+export const staffShiftWishUrl = (
+  staffId: string,
+  year: number,
+  month: number
+): string => `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`;
+
 /** 月間勤務表バブル */
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;

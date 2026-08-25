@@ -2,6 +2,8 @@
 
 import { FC } from "react";
 import styled from "styled-components";
+import { Button } from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   Staff,
   WorkShiftSet,
@@ -9,7 +11,7 @@ import {
   type WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishGridView } from "../ui/ShiftWishGridView.js";
-import { buildWishOptions } from "../ui/shiftWishOptions.js";
+import { buildWishOptions, toggleWishInput } from "../ui/shiftWishOptions.js";
 import { useObject, useObjectRepo } from "../objects/repository.js";
 import {
   STAFF_TYPE,
@@ -41,9 +43,13 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
   const wish = stored ?? StaffMonthlyShiftWish.create({ staffId, year, month });
   const options = buildWishOptions(workShifts.map((w) => w.name));
 
-  const handleCycle = (day: WorkingDay, optionKey: string) => {
-    repo.save(wish.cyclePreference(day, optionKey));
+  const handleToggle = (day: WorkingDay, optionKey: string) => {
+    repo.save(toggleWishInput(wish, day, optionKey, options.map((o) => o.key)));
   };
+
+  // 提出は「いつ出したか」を残す。現在時刻はドメインではなくこの層が渡す。
+  const handleSubmit = () => repo.save(wish.submit(new Date().toISOString()));
+  const handleWithdraw = () => repo.save(wish.withdraw());
 
   return (
     <StyledContainer>
@@ -54,11 +60,46 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
             {staff?.name ?? staffId} / {year}年{month}月
           </span>
         </h3>
-        <p className="e-note">
-          各日・各希望をクリックで「○ したい → × 避けたい → 空欄（どうでもいい）」を切り替え。
-        </p>
+        {wish.isSubmitted ? (
+          <p className="e-note">
+            提出済みです。直すには「取り下げて編集」を押してください。
+          </p>
+        ) : (
+          <p className="e-note">
+            <b>休</b>＝その日は休みたい／<b>×</b>＝この勤務帯には入れない。クリックで入／切。
+            1日に出せるのはどちらか一方で、休みの日の勤務帯は斜線になります（斜線を押すと休みが外れます）。
+            すべての勤務帯に × を付けると、自動で休み希望になります。
+          </p>
+        )}
       </div>
-      <ShiftWishGridView wish={wish} options={options} onCycle={handleCycle} />
+
+      <ShiftWishGridView
+        wish={wish}
+        options={options}
+        onToggle={handleToggle}
+        readOnly={wish.isSubmitted}
+      />
+
+      <div className="e-actions">
+        {wish.isSubmitted ? (
+          <>
+            <span className="e-submitted">
+              <CheckCircleIcon fontSize="small" />
+              提出済み
+            </span>
+            <Button size="small" onClick={handleWithdraw}>
+              取り下げて編集
+            </Button>
+          </>
+        ) : (
+          <>
+            <span className="e-draft">下書き（まだ提出されていません）</span>
+            <Button size="small" variant="contained" onClick={handleSubmit}>
+              提出する
+            </Button>
+          </>
+        )}
+      </div>
     </StyledContainer>
   );
 };
@@ -81,5 +122,23 @@ const StyledContainer = styled.div`
       font-size: 0.78em;
       color: #888;
     }
+  }
+
+  .e-actions {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8em;
+  }
+  .e-draft {
+    color: #888;
+  }
+  .e-submitted {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: #558b2f;
+    font-weight: bold;
   }
 `;

@@ -17,6 +17,8 @@ export * from "./ScheduleViolationView.js";
 export * from "./scheduleConstraints.js";
 export * from "./ShiftWishConstraint.js";
 export * from "./ShiftWishEditor.js";
+export * from "./ShiftWishCollection.js";
+export * from "./currentStaff.js";
 export * from "./autoShift.js";
 export * from "./buildScheduleReport.js";
 export * from "./ScheduleReportPanel.js";
