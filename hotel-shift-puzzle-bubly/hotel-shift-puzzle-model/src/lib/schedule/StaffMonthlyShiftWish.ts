@@ -15,6 +15,9 @@
  *   - どうでもいい(空欄)  : 何も持たない
  * を1つの仕組みで表せる。neutral は「キーを持たない」で表現する。
  *
+ * ここで表せる形のうち、実際にどれを入力させるかは上位層（shiftWishOptions）が決める。
+ * 現在の入力仕様は「休みは want / 勤務帯は avoid のみ、1日にどちらか一方」。
+ *
  * state は完全に plain（入れ子の Record まで素の値）なので、state がそのまま plain を兼ねる。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
@@ -30,6 +33,11 @@ export type StaffMonthlyShiftWishState = {
   month: number;
   /** 稼働日キー("2026-06-01") → オプションキー → 希望 */
   byDay: Record<string, Record<string, ShiftWishPreference>>;
+  /**
+   * 本人が「提出」した時刻（ISO文字列）。未提出は null。
+   * 提出済みは下書きではなく確定した希望なので、取り下げるまで書き換えられない。
+   */
+  submittedAt: string | null;
 };
 
 /** シリアライズ用（state がそのまま plain） */
@@ -62,6 +70,7 @@ export class StaffMonthlyShiftWish {
       year: params.year,
       month: params.month,
       byDay: {},
+      submittedAt: null,
     });
   }
 
@@ -105,6 +114,41 @@ export class StaffMonthlyShiftWish {
     return Object.keys(this.wishesOn(day)).length === 0;
   }
 
+  /** 何日ぶん希望を入れたか（希望のある稼働日の数） */
+  get filledDayCount(): number {
+    return Object.keys(this.state.byDay).length;
+  }
+
+  /** 1日も希望を入れていない（まだ手を付けていない）か */
+  get isEmpty(): boolean {
+    return this.filledDayCount === 0;
+  }
+
+  /** 本人が提出済みか（提出済みは取り下げるまで書き換えられない） */
+  get isSubmitted(): boolean {
+    return this.state.submittedAt !== null;
+  }
+
+  /** 提出した時刻（ISO文字列）。未提出は null */
+  get submittedAt(): string | null {
+    return this.state.submittedAt;
+  }
+
+  /**
+   * 提出した新インスタンスを返す。時刻は上位層から渡す（ドメインは now を知らない）。
+   * 既に提出済みなら何も変わらない。
+   */
+  submit(at: string): StaffMonthlyShiftWish {
+    if (this.isSubmitted) return this;
+    return new StaffMonthlyShiftWish({ ...this.state, submittedAt: at });
+  }
+
+  /** 提出を取り下げて下書きに戻した新インスタンスを返す */
+  withdraw(): StaffMonthlyShiftWish {
+    if (!this.isSubmitted) return this;
+    return new StaffMonthlyShiftWish({ ...this.state, submittedAt: null });
+  }
+
   /**
    * その稼働日・そのオプションの希望を設定した新インスタンスを返す。不変。
    * pref=null で neutral（どうでもいい）に戻す。
@@ -114,6 +158,11 @@ export class StaffMonthlyShiftWish {
     optionKey: string,
     pref: ShiftWishPreference | null
   ): StaffMonthlyShiftWish {
+    if (this.isSubmitted) {
+      throw new Error(
+        "提出済みのシフト希望は編集できません（withdraw() で取り下げてから編集する）"
+      );
+    }
     const byDay = cloneByDay(this.state.byDay);
     const dayMap = { ...(byDay[day.key] ?? {}) };
     if (pref) dayMap[optionKey] = pref;
@@ -123,23 +172,13 @@ export class StaffMonthlyShiftWish {
     return new StaffMonthlyShiftWish({ ...this.state, byDay });
   }
 
-  /**
-   * 希望をトグルで一巡させた新インスタンスを返す。
-   * neutral → want(○) → avoid(×) → neutral。入力UIのクリック1発に使う。
-   */
-  cyclePreference(day: WorkingDay, optionKey: string): StaffMonthlyShiftWish {
-    const cur = this.preferenceFor(day, optionKey);
-    const next: ShiftWishPreference | null =
-      cur === undefined ? "want" : cur === "want" ? "avoid" : null;
-    return this.setPreference(day, optionKey, next);
-  }
-
   toPlain(): StaffMonthlyShiftWishPlain {
     return {
       staffId: this.state.staffId,
       year: this.state.year,
       month: this.state.month,
       byDay: cloneByDay(this.state.byDay),
+      submittedAt: this.state.submittedAt,
     };
   }
 
@@ -149,6 +188,8 @@ export class StaffMonthlyShiftWish {
       year: plain.year,
       month: plain.month,
       byDay: cloneByDay(plain.byDay ?? {}),
+      // 提出のしくみより前に保存されたデータは未提出として読む
+      submittedAt: plain.submittedAt ?? null,
     });
   }
 }

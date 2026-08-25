@@ -21,17 +21,30 @@ import {
   type DecodedWish,
   type WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { DAY_OFF_WISH, isWorkWish, workWishName } from "../ui/shiftWishOptions.js";
+import {
+  DAY_OFF_WISH,
+  isWorkWish,
+  workWishKey,
+  workWishName,
+} from "../ui/shiftWishOptions.js";
 
 export { AUTO_SHIFT_STEPS };
 export type { AutoShiftStep, AutoShiftStepResult };
 
 /**
  * その日のその人の希望を、自動シフトが扱える形にデコードする。
- *   - 休みたい(want) だけ            → day-off
- *   - 特定の勤務帯を1つだけ希望(want) → work（その帯）
- *   - 希望なし                        → neutral
- *   - それ以外（複数希望・休み×勤務帯の同時希望・避けたい等）→ ambiguous
+ *
+ * 入力仕様（#74）は「休」か「勤務帯×の集合」のどちらか一方なので、× は**その日に入れる帯を
+ * 絞り込むもの**として読む:
+ *   - 休みたい                     → day-off
+ *   - × を除いた残りが1帯だけ       → work（その帯に決まる）
+ *   - × を除いた残りが2帯以上       → neutral（需要充足ステップが残りから選ぶ）
+ *   - × で全帯が消えた             → day-off（入れる帯が無い＝休みたい。入力表と同じ扱い）
+ *   - 希望なし                     → neutral
+ *
+ * 旧データに残る「勤務帯○（want）」は、その帯を希望していると読み、○以外を×と同じ扱いにする
+ * （＝「早番○」と「中番×・遅番×」が同じ結論になる）。ただし○の帯がこの勤務表に無い場合は
+ * 休みたいという意味ではないので ambiguous（人間へ）。
  */
 /** その日のその人の希望をデコードする（シフト提案ポリシー等からも利用） */
 export const decodeWishForStaff = (
@@ -44,17 +57,46 @@ export const decodeWishForStaff = (
   const keys = Object.keys(wishes);
   if (keys.length === 0) return { kind: "neutral" };
 
-  const wantDayOff = wishes[DAY_OFF_WISH] === "want";
+  if (wishes[DAY_OFF_WISH] === "want") return { kind: "day-off" };
+
   const wantShiftNames = keys
     .filter((k) => isWorkWish(k) && wishes[k] === "want")
     .map(workWishName);
+  const avoidShiftNames = keys
+    .filter((k) => isWorkWish(k) && wishes[k] === "avoid")
+    .map(workWishName);
 
-  if (wantDayOff && wantShiftNames.length === 0) return { kind: "day-off" };
-  if (!wantDayOff && wantShiftNames.length === 1) {
-    const shiftId = shiftIdByName.get(wantShiftNames[0]);
+  // ○が付いていればそれだけが候補、無ければ × を除いた残りが候補。
+  const wantedOnly = wantShiftNames.length > 0;
+  const allowedNames = (
+    wantedOnly ? wantShiftNames : [...shiftIdByName.keys()]
+  ).filter((name) => !avoidShiftNames.includes(name));
+
+  // ×で全帯が消えたのなら「入れる帯が無い＝休みたい」（入力表が自動でそう畳むのと同じ）。
+  // ○の帯がこの勤務表に無いだけのときは休みたいという意味ではないので人間へ。
+  if (allowedNames.length === 0) {
+    return wantedOnly ? { kind: "ambiguous" } : { kind: "day-off" };
+  }
+  if (allowedNames.length === 1) {
+    const shiftId = shiftIdByName.get(allowedNames[0]);
     return shiftId ? { kind: "work", shiftId } : { kind: "ambiguous" };
   }
-  return { kind: "ambiguous" };
+  // 候補は絞れたが1つには決まらない。どの帯にするかは需要充足ステップに委ねる
+  // （×の帯を選ばせないのは AutoShiftContext.isAvailable が担う）。
+  return { kind: "neutral" };
+};
+
+/**
+ * その日その人が、その勤務帯に入れるか（希望の×を見る）。
+ * 可能勤務帯（ScheduleAvailability）と AND して AutoShiftContext.isAvailable にする。
+ */
+const isNotAvoided = (
+  wish: StaffMonthlyShiftWish | undefined,
+  day: WorkingDay,
+  shiftName: string | undefined
+): boolean => {
+  if (!wish || !shiftName) return true;
+  return wish.preferenceFor(day, workWishKey(shiftName)) !== "avoid";
 };
 
 export type AutoShiftParams = {
@@ -101,9 +143,10 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     shiftNameById,
     preferenceOf: (staffId, day) =>
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    isAvailable: availability
-      ? (staffId, shiftId) => availability.isAllowed(staffId, shiftId)
-      : undefined,
+    // 「入れるか」は 可能勤務帯（人ごと・月通し） AND その日の希望×（日ごと） で決まる。
+    isAvailable: (staffId, shiftId, day) =>
+      (!availability || availability.isAllowed(staffId, shiftId)) &&
+      isNotAvoided(wishByStaff.get(staffId), day, shiftNameById.get(shiftId)),
     maxConsecutive,
     minDayOff,
     maxDayOffPerDay,
