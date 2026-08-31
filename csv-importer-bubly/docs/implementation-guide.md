@@ -492,8 +492,15 @@ Google スプレッドシートとの双方向手動同期機能。ブラウザ�
 
 - GISスクリプト（`accounts.google.com/gsi/client`）を動的にロード（1回のみ）
 - スコープ: `https://www.googleapis.com/auth/spreadsheets`
-- クライアントID: `import.meta.env.VITE_GOOGLE_CLIENT_ID`（`.env.example`参照）
+- クライアントID: `bubbleRoutes.tsx` の `GOOGLE_CLIENT_ID`（= `import.meta.env.VITE_GOOGLE_CLIENT_ID`）を
+  `CsvSheetProvider` の `googleClientId` 経由で受け取る（`.env.example`参照）
 - トークンはメモリ内に保持（セッション単位、永続化しない）
+- `requestAccess()` の失敗理由は3つに区別される:
+  クライアントID未設定 / GISロード失敗 / GIS 側のエラー。
+  いずれも `SheetEditorFeature` が受けて `GoogleSheetsPanel` に表示する
+- `requestAccessToken()` に `prompt` は渡さない。
+  `prompt: ""` は「同意済みなら黙って通す」指定で、初回同意がまだのときに
+  何も起きずに失敗するため使わない
 
 ### `src/feature/googleSheetsApi.ts`
 
@@ -515,6 +522,9 @@ Google スプレッドシートとの双方向手動同期機能。ブラウザ�
 ### `src/ui/GoogleSheetsPanel.tsx`
 
 **役割**: Google Sheets連携のUIパネル。propsベースの純粋コンポーネント。
+
+`error?: string | null` を受け取り、値があれば赤いバナー（`.gs-error`）で表示する。
+接続・Push・Pull の失敗はすべてここに出る。
 
 #### 2つの表示状態
 
@@ -563,10 +573,27 @@ interface CsvSheetMeta {
 ### 前提条件（使用するために必要な設定）
 
 1. Google Cloud Consoleでプロジェクトを作成
-2. Google Sheets APIを有効化
+2. **Google Sheets API** を有効化
+   （**Drive API とは別物**。このバブリが叩くのは `sheets.googleapis.com` のみ）
 3. OAuth 2.0クライアントID（Webアプリケーション）を作成
-4. 承認済みJavaScriptオリジン: `http://localhost:4200`（開発用）
-5. `.env`に`VITE_GOOGLE_CLIENT_ID`を設定
+4. 承認済みJavaScriptオリジンに、**使う入口すべて**を登録する
+   - スタンドアロン: `http://localhost:4200`
+   - bublys-os 上のバブリとして使う場合: **bublys-os のオリジン**も必要
+5. OAuth同意画面が「テスト」状態なら、自分自身をテストユーザーに追加する
+6. `.env`に`VITE_GOOGLE_CLIENT_ID`を設定
+7. **バブリとして配信するバンドルを焼き直す**（クライアントIDはビルド時に埋め込まれるため）
+
+   ```
+   npx tsc -p csv-importer-libs/tsconfig.lib.json
+   cd csv-importer-app && npx vite build -c vite.config.bubly.ts
+   ```
+
+### 共有設定と操作の対応
+
+| スプレッドシートの共有 | Pull（読み込み） | Push（書き込み） |
+|---|---|---|
+| リンクを知っている全員：**閲覧者** | ○ | **×（403）** |
+| リンクを知っている全員：**編集者** | ○ | ○ |
 
 ---
 
@@ -583,6 +610,22 @@ interface CsvSheetMeta {
 | `csv-importer/sheets/:sheetId/world-line` | WorldLineFeature（世界線ビュー） | `sheetId` |
 | `csv-importer/sheets/:sheetId/objects` | CsvObjectListFeature（オブジェクト一覧） | `sheetId` |
 | `csv-importer/sheets/:sheetId/objects/:rowId` | CsvObjectDetailFeature（オブジェクト詳細） | `sheetId`, `rowId` |
+
+各バブルは `CsvSheetProvider` を直接書かず、同ファイル内の **`CsvBubbleProvider`** 経由でラップする。
+これは `googleClientId` の指定漏れを防ぐためのラッパーで、`GOOGLE_CLIENT_ID`
+（`import.meta.env.VITE_GOOGLE_CLIENT_ID`）を必ず渡す。
+
+```tsx
+const GOOGLE_CLIENT_ID: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+const CsvBubbleProvider: FC<{ children: ReactNode }> = ({ children }) => (
+  <CsvSheetProvider googleClientId={GOOGLE_CLIENT_ID}>{children}</CsvSheetProvider>
+);
+```
+
+**注意**: ここが素の `<CsvSheetProvider>` だと、内側の Context が `app.tsx` の外側の指定を
+上書きして `googleClientId` が `undefined` になり、スタンドアロン・バブリの両方で
+Google Sheets連携が無言で死ぬ。
 
 ---
 

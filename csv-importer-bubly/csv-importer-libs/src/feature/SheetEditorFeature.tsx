@@ -19,6 +19,11 @@ type SheetEditorFeatureProps = {
   bubbleId?: string;
 };
 
+/** 例外を画面に出せる文言にする */
+function toMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 /** sheetId に一致する初期CsvSheetを取得（pending → fallback） */
 function getInitialSheet(sheetId: string): CsvSheet {
   const pending = popPendingSheet(sheetId);
@@ -49,6 +54,8 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   const googleClientId = useGoogleClientId();
   const auth = useGoogleSheetsAuth(googleClientId);
   const [isSyncing, setIsSyncing] = useState(false);
+  // 連携の失敗は console だけだと気づけないので画面にも出す
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // 初期オブジェクトはマウント時に1回だけ生成
   const initialSheet = useMemo(() => getInitialSheet(sheetId), [sheetId]);
@@ -137,30 +144,35 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
 
   const handleLink = useCallback(
     async (url: string) => {
+      setSyncError(null);
       try {
         const spreadsheetId = parseSpreadsheetUrl(url);
         await auth.requestAccess();
         linkGoogleSheets(sheetId, spreadsheetId);
       } catch (e) {
         console.error("Google Sheets link failed:", e);
+        setSyncError(toMessage(e));
       }
     },
     [auth, sheetId, linkGoogleSheets]
   );
 
   const handleUnlink = useCallback(() => {
+    setSyncError(null);
     unlinkGoogleSheets(sheetId);
   }, [sheetId, unlinkGoogleSheets]);
 
   const handlePush = useCallback(async () => {
     if (!sheet || !gsLink || isSyncing) return;
     setIsSyncing(true);
+    setSyncError(null);
     try {
       const token = await auth.requestAccess();
       await pushToGoogleSheets(token, gsLink.spreadsheetId, sheet, gsLink.sheetName);
       updateLastSyncedAt(sheetId);
     } catch (e) {
       console.error("Push failed:", e);
+      setSyncError(toMessage(e));
     } finally {
       setIsSyncing(false);
     }
@@ -169,6 +181,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   const handlePull = useCallback(async () => {
     if (!sheet || !gsLink || !sheetShell || isSyncing) return;
     setIsSyncing(true);
+    setSyncError(null);
     try {
       const token = await auth.requestAccess();
       const updated = await pullFromGoogleSheets(token, gsLink.spreadsheetId, sheet, gsLink.sheetName);
@@ -176,6 +189,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       updateLastSyncedAt(sheetId);
     } catch (e) {
       console.error("Pull failed:", e);
+      setSyncError(toMessage(e));
     } finally {
       setIsSyncing(false);
     }
@@ -210,6 +224,7 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
           onUnlink={handleUnlink}
           onPush={handlePush}
           onPull={handlePull}
+          error={syncError}
         />
       }
     />

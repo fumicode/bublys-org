@@ -93,15 +93,27 @@ export function useGoogleSheetsAuth(clientId?: string): GoogleSheetsAuth {
     if (accessToken) return Promise.resolve(accessToken);
 
     return new Promise<string>((resolve, reject) => {
+      // クライアントID 未設定と GIS ロード失敗は原因が全く違うので区別して伝える
+      if (!clientId) {
+        reject(
+          new Error(
+            "Google クライアントIDが未設定です（.env の VITE_GOOGLE_CLIENT_ID を設定してビルドし直してください）"
+          )
+        );
+        return;
+      }
       if (!tokenClientRef.current) {
-        reject(new Error("Google Identity Services not loaded"));
+        reject(new Error("Google Identity Services を読み込めませんでした"));
         return;
       }
       resolveRef.current = resolve;
       rejectRef.current = reject;
-      tokenClientRef.current.requestAccessToken({ prompt: "" });
+      // prompt は指定しない（既定の挙動に任せる）。
+      // prompt: "" は「同意済みなら黙って通す」指定で、初回同意がまだのときに
+      // 何も起きずに失敗するため使わない。
+      tokenClientRef.current.requestAccessToken();
     });
-  }, [accessToken]);
+  }, [accessToken, clientId]);
 
   const signOut = useCallback(() => {
     if (accessToken && window.google) {

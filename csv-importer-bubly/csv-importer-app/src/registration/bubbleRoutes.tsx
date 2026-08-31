@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext } from "react";
+import { FC, ReactNode, useContext } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import {
   SheetListFeature,
@@ -11,6 +11,23 @@ import {
   CsvSheetProvider,
 } from "@bublys-org/csv-importer-libs";
 
+/**
+ * Google OAuth クライアントID。
+ * スタンドアロン（vite.config.mts）・バブリ（vite.config.bubly.ts）どちらのビルドでも
+ * Vite が build 時に .env の値へ置換する。未設定なら undefined のまま
+ * （= Google Sheets 連携だけが無効になり、他の機能は動く）。
+ */
+const GOOGLE_CLIENT_ID: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+/**
+ * 各バブルは CsvSheetProvider でラップする必要がある。
+ * 直接 CsvSheetProvider を書くと googleClientId の指定を忘れて Google Sheets 連携が
+ * 無言で死ぬので、必ずこのラッパー経由にする。
+ */
+const CsvBubbleProvider: FC<{ children: ReactNode }> = ({ children }) => (
+  <CsvSheetProvider googleClientId={GOOGLE_CLIENT_ID}>{children}</CsvSheetProvider>
+);
+
 // シート一覧バブル
 const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
@@ -18,45 +35,45 @@ const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
     openBubble(`csv-importer/sheets/${sheetId}`, bubble.id);
   };
   return (
-    <CsvSheetProvider>
+    <CsvBubbleProvider>
       <SheetListFeature onSheetSelect={handleSheetSelect} />
-    </CsvSheetProvider>
+    </CsvBubbleProvider>
   );
 };
 
 // シート編集バブル
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
-    <CsvSheetProvider>
+    <CsvBubbleProvider>
       <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
-    </CsvSheetProvider>
+    </CsvBubbleProvider>
   );
 };
 
 // オブジェクト一覧バブル
 const ObjectListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
-    <CsvSheetProvider>
+    <CsvBubbleProvider>
       <CsvObjectListFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
-    </CsvSheetProvider>
+    </CsvBubbleProvider>
   );
 };
 
 // オブジェクト詳細バブル
 const ObjectDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
-    <CsvSheetProvider>
+    <CsvBubbleProvider>
       <CsvObjectDetailFeature sheetId={bubble.params.sheetId} rowId={bubble.params.rowId} />
-    </CsvSheetProvider>
+    </CsvBubbleProvider>
   );
 };
 
 // 世界線ビューバブル
 const WorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
-    <CsvSheetProvider>
+    <CsvBubbleProvider>
       <WorldLineFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
-    </CsvSheetProvider>
+    </CsvBubbleProvider>
   );
 };
 
