@@ -13,7 +13,7 @@ type ScheduleReportListViewProps = {
 
 /**
  * シフト完成レポートの一覧（プレゼンテーショナル）。次回シフト作成前に、過去の
- * 妥協・繁忙日対応・貢献度スコアを参照する入口になる。開くだけで、内容の自動反映は行わない。
+ * 譲歩・繁忙日対応・貢献度スコアを参照する入口になる。開くだけで、内容の自動反映は行わない。
  */
 export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({ reports }) => {
   return (
@@ -21,7 +21,7 @@ export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({ report
       <div className="e-header">
         <h3>シフト完成レポート一覧 ({reports.length})</h3>
         <p className="e-hint">
-          過去のレポートを開いて、妥協してくれた人・繁忙日対応・配慮メモを参照できます。
+          過去のレポートを開いて、譲歩してくれた人・繁忙日対応・配慮メモを参照できます。
         </p>
       </div>
       <ul className="e-list">
@@ -44,7 +44,7 @@ export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({ report
                       {report.year}年{report.month}月
                     </div>
                     <div className="e-meta">
-                      {report.storeId} ・ 妥協{report.compromises.length}件 ・ 繁忙日
+                      {report.storeId} ・ 譲歩{report.compromises.length}件 ・ 繁忙日
                       {report.busyDayContributions.length}日
                     </div>
                   </div>

@@ -12,7 +12,7 @@ import type {
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
-import { wishText, type WishEntry } from "./wishSummary.js";
+import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
 
 type StaffScheduleRowProps = {
@@ -24,13 +24,10 @@ type StaffScheduleRowProps = {
   violations: ConstraintViolation[];
   /** スタッフ×日 → 希望エントリ */
   getWishEntries: (staffId: string, day: WorkingDay) => WishEntry[];
-  /** 希望行を開いているか */
-  expanded: boolean;
   /** キーボード操作でフォーカス中のセル（無ければ null） */
   selection: CellSelection | null;
   /** 選択セルで入力中のバッファ（Enter 確定前の文字列。null は非入力） */
   inputBuffer: string | null;
-  onToggleExpand: (staffId: string) => void;
   /** セルをシングルクリックで選択 */
   onSelectCell: (staffId: string, day: WorkingDay) => void;
   /** セルをダブルクリックで候補ドロップダウンを開く */
@@ -55,8 +52,8 @@ type StaffScheduleRowProps = {
 
 /**
  * スタッフ 1 人ぶんの行。
- * 左ヘッダ（名前・希望行トグル）＋各日のセル＋右端の休み合計。展開時は希望行を真下に並べる。
- * grid の直接の子になるよう Fragment で並べる。
+ * 左ヘッダ（名前）＋各日のセル＋右端の休み合計。grid の直接の子になるよう Fragment で並べる。
+ * 希望は各セルの円で読めるので、行を展開して希望行を出す機能は持たない。
  */
 export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   staff,
@@ -65,10 +62,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   shiftMap,
   violations,
   getWishEntries,
-  expanded,
   selection,
   inputBuffer,
-  onToggleExpand,
   onSelectCell,
   onOpenEditor,
   violationUrl,
@@ -85,8 +80,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
   return (
     <>
-      {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
-          名前クリックで希望行の開閉。左に抽出用チェックボックス（任意）。 */}
+      {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
+          左に抽出用チェックボックス（任意）。 */}
       <div className={`e-staff-cell${rowMod}`}>
         {onToggleSelected && (
           <input
@@ -105,13 +100,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           openingPosition="bubble-side-left"
           fullWidth={true}
         >
-          <div
-            className="e-staff"
-            role="button"
-            title="クリックで希望を表示/非表示"
-            onClick={() => onToggleExpand(staff.id)}
-          >
-            <span className="e-caret">{expanded ? "▾" : "▸"}</span>
+          <div className="e-staff" title="ダブルクリックでスタッフ詳細を開く">
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
@@ -192,30 +181,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })()}
 
-      {/* 展開時: 希望行（割当行の真下に並べて比較できる） */}
-      {expanded && (
-        <>
-          <div className="e-wish-row-head">（希望）</div>
-          {days.map((day) => {
-            const entries = getWishEntries(staff.id, day);
-            return (
-              <div key={`wish:${staff.id}:${day.key}`} className="e-wish-row-cell">
-                {entries.length > 0 ? (
-                  entries.map((e, i) => (
-                    <span key={i} className={e.pref === "want" ? "is-want" : "is-avoid"}>
-                      {wishText(e)}
-                    </span>
-                  ))
-                ) : (
-                  <span className="e-empty">・</span>
-                )}
-              </div>
-            );
-          })}
-          {/* 休合計列ぶんの空セル（グリッド整列用） */}
-          <div className="e-off-total e-off-filler" />
-        </>
-      )}
     </>
   );
 };

@@ -12,7 +12,6 @@ import {
   ScheduleReport,
   MaxConsecutiveWorkdaysConstraint,
   fulfillWishesStep,
-  makePartnerCoverStep,
   makeSatisfyLeaderRulesStep,
   makeMinDayOffStep,
   type AutoShiftStep,
@@ -53,7 +52,7 @@ type ExtractedScheduleProps = {
  *
  * 「その選択スタッフだけ」を対象に自動シフトのコマンドを実行できる:
  *   - 希望を叶える（既存ステップ。対象スタッフだけに限定）
- *   - 相方裏（早責ペアの一方が休みの日にもう一方を早番に入れる）
+ *   - 解決案生成（責任者ルールを満たす完成案を複数、世界線に書く）
  * 対象スタッフ＝抽出した subset を staffList として渡すことで、各ステップが自然に subset 限定になる。
  */
 export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
@@ -120,16 +119,8 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     return map;
   }, [allWishes, schedule]);
 
-  // 自動シフトコマンド。相方裏は「この選択に関係する責任者ルール」ごとに作る。
-  // 早番固定ではなく各ルール（早責→早番 / 夜責→遅番）から導出し、関係するルールが
-  // 無ければ相方裏ボタンは出ない（選択が責任者ペアとは限らないため）。
-  const steps = useMemo<AutoShiftStep[]>(
-    () => [
-      fulfillWishesStep,
-      ...relevantRules.map((rule) => makePartnerCoverStep(rule)),
-    ],
-    [relevantRules]
-  );
+  // 自動シフトコマンド（抽出ビュー）。相方裏コマンドは廃止したので「希望を叶える」のみ。
+  const steps = useMemo<AutoShiftStep[]>(() => [fulfillWishesStep], []);
 
   // 抽出ビューは subset に絞った勤務表なので、責任者違反（全体視点）は出さない
   // （footer は relevantRules のみ）。連勤・希望は集約の設定に従う。

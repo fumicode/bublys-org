@@ -44,7 +44,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
     staffId: 'staff-A',
     year: 2026,
     month: 6,
-  }).setPreference(day1, 'day-off', 'want'); // 6/1 は休みたいが早番に入った＝妥協
+  }).setPreference(day1, 'day-off', 'want'); // 6/1 は休みたいが早番に入った＝譲歩
 
   const staffIds = ['staff-A', 'staff-B', 'staff-C', 'staff-D'];
 
@@ -54,7 +54,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
       wish: { wishByStaff: new Map([['staff-A', wishA]]), shiftNameById },
     });
 
-  test('#87 スタッフに紐づくルール違反（連勤・希望など）を妥協として検出する', () => {
+  test('#87 スタッフに紐づくルール違反（連勤・希望など）を譲歩として検出する', () => {
     const report = buildScheduleReport({
       schedule: buildSchedule(),
       staffIds,
@@ -77,7 +77,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
     ]);
   });
 
-  test('責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は妥協に含めない', () => {
+  test('責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は譲歩に含めない', () => {
     // maxPerDay=0 にすると staff-D の6/2の休みが必ず「休み上限超過」を発生させる（日単位・staffIdなし）
     const report = buildScheduleReport({
       schedule: buildSchedule(),
@@ -103,14 +103,14 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
     ]);
   });
 
-  test('#89 妥協回数×2 + 繁忙日出勤回数×1 のスコアをスタッフ全員分、降順で返す', () => {
+  test('#89 譲歩回数×2 + 繁忙日出勤回数×1 のスコアをスタッフ全員分、降順で返す', () => {
     const report = buildScheduleReport({
       schedule: buildSchedule(),
       staffIds,
       constraints: buildConstraints(),
     });
 
-    // staff-A: 妥協2件(連勤+希望)・繁忙日1回(6/2出勤) → 2*2+1=5
+    // staff-A: 譲歩2件(連勤+希望)・繁忙日1回(6/2出勤) → 2*2+1=5
     expect(report.contributionScores).toEqual([
       { staffId: 'staff-A', compromiseCount: 2, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
