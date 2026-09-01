@@ -1,15 +1,10 @@
 {
   "name": "@bublys-org/sekaisen-igo-libs",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.lib.json",
-    "dev": "tsc -p tsconfig.lib.json --watch"
-  },
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -20,15 +15,9 @@
     }
   },
   "dependencies": {
-    "tslib": "^2.3.0",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/sekaisen-igo-model": "*",
     "@bublys-org/world-line-graph": "*"
-  },
-  "nx": {
-    "targets": {
-      "dev": { "continuous": true }
-    }
   }
 }
