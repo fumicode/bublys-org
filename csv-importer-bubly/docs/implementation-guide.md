@@ -1,0 +1,827 @@
+# CSV Importer 実装ガイド
+
+このドキュメントでは、CSV Importerバブリの実装内容を説明します。
+自動生成されたファイル（package.json、tsconfig.json、vite.config.mts など）は除き、
+**手書きで実装したファイル**のみを対象にしています。
+
+---
+
+## 全体像
+
+CSV Importerは3つのパッケージで構成されています:
+
+```
+csv-importer-model/   ← データの「形」と「操作」を定義（純粋なTypeScript）
+csv-importer-libs/    ← 画面の部品と、データの保存・読み出しロジック
+csv-importer-app/     ← 上記をまとめてアプリとして動かす設定
+```
+
+データの流れ（世界線グラフ統合後）:
+
+```
+ユーザーがセルをクリックして編集
+        ↓
+UI層（SheetEditorView）がコールバックを呼ぶ
+        ↓
+Feature層（SheetEditorFeature）が shell.update() を呼ぶ
+        ↓
+世界線グラフが新しいノードを作成（自動コミット）
+        ↓
+CASにハッシュベースで状態を保存（Redux + IndexedDB）
+        ↓
+画面が自動的に再描画される
+```
+
+**ポイント**: セルを1つ編集するたびに世界線に自動コミットされる。
+undo/redoはシートごとに独立して動作する。
+
+---
+
+## 1. ドメインモデル（csv-importer-model）
+
+### `src/lib/CsvSheet.ts`
+
+**役割**: CSVシートのデータ構造と操作ルールを定義する「設計図」。
+ReactやReduxには一切依存しない、純粋なTypeScriptコード。
+
+#### データの型
+
+```typescript
+// 1列の情報
+type CsvColumnState = {
+  id: string;      // 列の固有ID（例: "abc-123"）
+  name: string;    // ヘッダー名（例: "名前", "メール"）
+};
+
+// 1行の情報
+type CsvRowState = {
+  id: string;                       // 行の固有ID
+  cells: Record<string, string>;    // { 列ID: 値 } の辞書
+  // 例: { "abc-123": "田中", "def-456": "tanaka@example.com" }
+};
+
+// シート全体の情報
+type CsvSheetState = {
+  id: string;
+  name: string;                     // シート名
+  columns: CsvColumnState[];        // 列の配列（順序あり）
+  rows: CsvRowState[];              // 行の配列（順序あり）
+  createdAt: string;                // 作成日時
+  updatedAt: string;                // 更新日時
+};
+```
+
+// CSVの1行をラベル名ベースのプレーンオブジェクトに変換した型
+type PlaneObject = {
+  id: string;      // 行のUUID（CsvRowState.idと同一）
+  name: string;    // タイトル列の値、未指定時はインデックス番号
+  [key: string]: string;  // ラベル名 → セル値
+  // 例: { id: "a3f2-...", name: "田中", "名前": "田中", "メール": "tanaka@example.com" }
+};
+```
+
+**PlaneObjectとは？**
+
+CSVの内部データ（columnId → valueの辞書形式）を、**ラベル名をキーとした読みやすいプレーンオブジェクト**に変換した型。`id`は行のUUID（CsvRowState.idと同一）、`name`はタイトル列の値（未指定時はインデックス番号）。残りのプロパティはそのままラベル名がキー。
+
+`id`がrowのUUIDと同一なので、PlaneObject.idをそのままバブルルートのパラメータとして使える（index→UUIDのマッピングが不要）。
+
+```typescript
+// 変換例:
+// row.id = "a3f2-..."
+// columns = [{ id: "abc", name: "名前" }, { id: "def", name: "メール" }]
+// row.cells = { "abc": "田中", "def": "tanaka@ex.com" }
+// titleColumnId = "abc"
+// → { id: "a3f2-...", name: "田中", "名前": "田中", "メール": "tanaka@ex.com" }
+```
+
+**なぜcellsが配列ではなくRecord（辞書）なのか？**
+→ 列の追加・削除・並び替えに強いため。配列だと「3番目の値」のような位置依存になるが、辞書なら列IDで紐づくので列順が変わっても安全。
+
+#### CsvSheetクラスの主要メソッド
+
+| メソッド | 説明 | 戻り値 |
+|---------|------|--------|
+| `CsvSheet.create(name, columnNames)` | 空のシートを新規作成 | 新しいCsvSheet |
+| `CsvSheet.fromCsvText(name, csvText)` | CSVテキストをパースしてシートを作成 | 新しいCsvSheet |
+| `sheet.addColumn(name)` | 列を末尾に追加（既存行にも空セルが追加される） | 新しいCsvSheet |
+| `sheet.renameColumn(columnId, name)` | 列名を変更 | 新しいCsvSheet |
+| `sheet.deleteColumn(columnId)` | 列を削除（各行から該当セルも消える） | 新しいCsvSheet |
+| `sheet.addRow()` | 空行を末尾に追加 | 新しいCsvSheet |
+| `sheet.deleteRow(rowId)` | 行を削除 | 新しいCsvSheet |
+| `sheet.updateCell(rowId, columnId, value)` | セルの値を更新 | 新しいCsvSheet |
+| `sheet.rename(name)` | シート名を変更 | 新しいCsvSheet |
+| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換 | PlaneObject \| undefined |
+| `sheet.toPlaneObjects(titleColumnId?)` | 全行をPlaneObject配列に変換 | PlaneObject[] |
+| `sheet.toCsvText()` | CSV形式のテキストに変換（エクスポート用） | 文字列 |
+| `sheet.toJSON()` | 保存用のプレーンオブジェクトに変換 | CsvSheetState |
+| `CsvSheet.fromJSON(json)` | プレーンオブジェクトからCsvSheetを復元 | CsvSheet |
+
+**重要な設計原則: 不変性（イミュータビリティ）**
+
+すべてのメソッドは**元のシートを変更せず、新しいシートを返す**。
+
+```typescript
+const original = CsvSheet.create("テスト", ["名前"]);
+const updated = original.addColumn("メール");
+
+// originalは変わっていない！
+original.columns.length  // → 1
+updated.columns.length   // → 2
+```
+
+この不変性が世界線グラフとの相性が良い理由。`shell.update(s => s.addColumn("メール"))` のように、現在の状態を受け取って新しい状態を返す関数を渡すだけで自動コミットされる。
+
+#### CSVパーサー（内部ヘルパー関数）
+
+`parseCsvLines(text)` — CSVテキストを2次元配列に変換する内部関数。
+以下のCSV仕様に対応:
+- カンマ区切り
+- ダブルクオートで囲まれたフィールド（中にカンマや改行を含むケース）
+- `""` によるダブルクオートのエスケープ
+- CRLF（Windows）と LF（Mac/Linux）の両方の改行コード
+
+`escapeCsvField(field)` — フィールドにカンマ・改行・ダブルクオートが含まれる場合、ダブルクオートで囲む。
+
+---
+
+### `src/lib/CsvSheet.test.ts`
+
+**役割**: CsvSheetの動作を自動テストで検証する。16個のテストケース。
+
+| テストカテゴリ | テスト内容 |
+|--------------|----------|
+| create | 列名を指定して空シートを作成できる |
+| fromCsvText | CSVテキストから正しくパースできる / ダブルクオート対応 / 空CSV / CRLF対応 |
+| column ops | 列の追加・リネーム・削除が正しく動く |
+| row ops | 行の追加・削除・セル更新が正しく動く |
+| rename | シート名変更 |
+| toCsvText | CSVエクスポートが元のCSVと一致する / 特殊文字のエスケープ |
+| serialization | toJSON → fromJSON でデータが完全に復元される |
+| immutability | 操作後に元のインスタンスが変更されていないことを確認 |
+
+---
+
+## 2. 世界線グラフ統合（csv-importer-libs/feature）
+
+### `src/feature/CsvSheetProvider.tsx`
+
+**役割**: 世界線グラフシステムとCSVシートを接続するプロバイダー。sekaisen-igo-bublyのIgoGameProviderと同じパターン。
+
+#### 2つのスコープ構造
+
+```
+グローバルスコープ "csv-importer"
+  └─ CsvSheetMeta オブジェクト（id, name）× N枚
+      │
+      ├─ シートスコープ "csv-sheet-{sheetId1}"
+      │    └─ CsvSheet オブジェクト（シートの全データ）
+      │
+      └─ シートスコープ "csv-sheet-{sheetId2}"
+           └─ CsvSheet オブジェクト（シートの全データ）
+```
+
+- **グローバルスコープ**: 「どのシートが存在するか」を管理（メタデータのみ）
+- **シートスコープ**: 各シートの中身（列・行・セル）を管理。**undo/redoはシート単位で独立**
+
+#### ドメインオブジェクト登録
+
+```typescript
+const CSV_DOMAIN_OBJECTS = defineDomainObjects({
+  "csv-sheet": {
+    class: CsvSheet,
+    fromJSON: (json) => CsvSheet.fromJSON(json as CsvSheetState),
+    toJSON: (s: CsvSheet) => s.toJSON(),
+    getId: (s: CsvSheet) => s.id,
+  },
+  "csv-sheet-meta": {
+    class: Object,
+    fromJSON: (json) => json as CsvSheetMeta,
+    toJSON: (obj: CsvSheetMeta) => obj,
+    getId: (obj: CsvSheetMeta) => obj.id,
+  },
+});
+```
+
+世界線グラフが`CsvSheet`を保存/復元するための設定。`fromJSON`/`toJSON`で変換、`getId`でオブジェクトを特定。
+
+#### 一時保持マップ（pendingSheets）
+
+シート作成時（SheetListFeature）とエディタ表示時（SheetEditorFeature）は別コンポーネントのため、作成したCsvSheetをエディタに直接渡せない。これを解決するために、モジュールレベルの`pendingSheets` Mapを使用:
+
+```
+SheetListFeature: CsvSheet.create() → addSheet(sheet)
+    ↓ pendingSheets.set(sheet.id, sheet)
+SheetEditorFeature: popPendingSheet(sheetId) → initialObjectsとして使用
+```
+
+- `addSheet(sheet)` はメタ登録+スコープ作成に加え、`pendingSheets`にシートを保存
+- `popPendingSheet(sheetId)` は一時保持されたシートを取得して削除（1回限り）
+- エディタがマウントされた後、世界線グラフが永続化を担当するため一時保持は不要になる
+
+#### コンテキストで提供されるAPI（useCsvSheets フック）
+
+| API | 説明 |
+|-----|------|
+| `sheetMetas` | 全シートのメタデータ配列 `{ id, name }[]` |
+| `addSheet(sheet)` | 新しいシートを追加（メタ登録 + スコープ作成 + 一時保持） |
+| `deleteSheet(sheetId)` | シートを削除（メタ削除 + スコープ削除） |
+| `updateSheetMeta(sheetId, name)` | シート名の更新（一覧表示用） |
+
+#### プロバイダー階層
+
+```
+DomainRegistryProvider（ドメインオブジェクト定義を提供）
+  └─ CsvSheetInner（グローバルスコープ useCasScope("csv-importer") を使用）
+       └─ CsvSheetContext.Provider（子コンポーネントにAPIを提供）
+```
+
+---
+
+## 3. Redux Slice（csv-importer-libs/slice）
+
+### `src/slice/csv-importer-slice.ts`
+
+**役割**: 現在は世界線グラフに置き換えられたが、将来的な非バージョン管理データ用に残存。
+
+**注意**: シートデータの保存・取得は世界線グラフ（CAS + IndexedDB）が担当するようになったため、このスライスのアクション・セレクターはSheetEditorFeature/SheetListFeatureからは使用されなくなった。
+
+---
+
+## 4. UIコンポーネント（csv-importer-libs/ui）
+
+### `src/ui/WorldLineView.tsx`
+
+**役割**: 世界線グラフのDAGツリーを表示する汎用コンポーネント。sekaisen-igo-libsの同名コンポーネントと同じ設計。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `graph` | `WorldLineGraph` | 表示する世界線グラフ |
+| `onSelectNode` | `(nodeId) => void` | ノードクリック時（そのノードに移動） |
+| `onSelectNodeAndClose` | `(nodeId) => void` | ノードダブルクリック時（移動＋バブルを閉じる） |
+| `renderNodeSummary` | `(nodeId) => string` | ノードの要約テキスト（例: "3列 5行"） |
+
+#### キーボード操作
+
+| キー | 動作 |
+|------|------|
+| Ctrl/Cmd+Z | 親ノードに移動（undo） |
+| Ctrl/Cmd+Shift+Z | 子ノードに移動（redo、同じ世界線を優先） |
+| ArrowLeft | 親ノードに移動 |
+| ArrowRight | 子ノードに移動 |
+
+#### 表示
+
+- 各世界線（worldLineId）に異なる色を割り当て
+- 現在のノード（apex）はハイライト表示 + 「現在」バッジ
+- DAGのインデントで分岐を表現
+
+---
+
+### `src/ui/SheetListView.tsx`
+
+**役割**: シート一覧の見た目を担当する。データの取得方法は知らない（propsで受け取る）。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheets` | `SheetListItem[]` | 表示するシートの配列（`{ id, name }`） |
+| `buildSheetUrl` | `(sheetId) => string` | シートのバブルURLを生成する関数 |
+| `onSheetClick` | `(sheetId) => void` | シートクリック時のコールバック |
+| `onCreateSheet` | `() => void` | 「新規作成」ボタン押下時 |
+| `onImportCsv` | `(name, csvText) => void` | CSVインポート完了時 |
+| `onDeleteSheet` | `(sheetId) => void` | シート削除ボタン押下時（省略可能） |
+
+#### 画面構成
+
+```
+┌─────────────────────────────┐
+│ [+ 新規作成] [CSVインポート]  │  ← アクションボタン
+├─────────────────────────────┤
+│ 📊 スタッフ一覧           ×  │  ← シートカード（ObjectViewでラップ）+ 削除ボタン
+├─────────────────────────────┤     ドラッグ&ドロップ対応
+│ 📊 予算表                 ×  │
+└─────────────────────────────┘
+```
+
+「CSVインポート」ボタンの処理:
+1. `<input type="file">` を動的に生成してクリック
+2. ユーザーがCSVファイルを選択
+3. `FileReader` でテキストとして読み込み
+4. ファイル名（.csv除去）とテキスト内容を `onImportCsv` コールバックに渡す
+
+---
+
+### `src/ui/SheetEditorView.tsx`
+
+**役割**: スプレッドシート風のテーブルエディタ。セルのインライン編集を提供する。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheetName` | `string` | シート名（タイトル表示） |
+| `columns` | `CsvColumnState[]` | 列の定義 |
+| `rows` | `CsvRowState[]` | 行データ |
+| `onUpdateCell` | `(rowId, columnId, value) => void` | セル値変更時 |
+| `onRenameColumn` | `(columnId, name) => void` | 列名変更時 |
+| `onAddRow` | `() => void` | 行追加時 |
+| `onDeleteRow` | `(rowId) => void` | 行削除時 |
+| `onAddColumn` | `(name) => void` | 列追加時 |
+| `onDeleteColumn` | `(columnId) => void` | 列削除時 |
+| `onExportCsv` | `() => void` | 右上の「エクスポート」ボタン押下時（省略可能） |
+| `onOpenObjects` | `() => void` | 右上の「オブジェクト」ボタン押下時（省略可能） |
+| `onOpenWorldLine` | `() => void` | 右上の「世界線」ボタン押下時（省略可能） |
+
+#### 画面構成
+
+```
+┌─────────────────────────────────────────────┐
+│ スタッフ一覧  [オブジェクト] [エクスポート] [世界線] │  ← シート名 + 右上にオブジェクト/エクスポート/世界線ボタン
+├────┬──────────┬──────────────────┬─────┬─────┤
+│ #  │ 名前   × │ メール         × │ + ← │     │  ← ヘッダー行（クリックで編集、×で削除、+で追加）
+├────┼──────────┼──────────────────┼─────┼─────┤
+│ 1  │ 田中     │ tanaka@ex.com   │     │  ×  │  ← データ行（クリックで編集、×で削除）
+├────┼──────────┼──────────────────┼─────┼─────┤
+│ 2  │ 鈴木     │ suzuki@ex.com   │     │  ×  │
+└────┴──────────┴──────────────────┴─────┴─────┘
+│ [+ 行を追加]                                 │
+└─────────────────────────────────────────────┘
+```
+
+#### キーボード操作
+
+| キー | 動作 |
+|------|------|
+| クリック | そのセル/ヘッダーを編集モードにする |
+| Enter | 編集を確定して編集モードを終了 |
+| Escape | 編集を破棄して編集モードを終了 |
+| Tab | 編集を確定 → 右隣のセルへ移動（行末なら次の行の先頭へ） |
+| Ctrl+S / Cmd+S | 編集中のセルを確定（ブラウザのデフォルト保存を防止） |
+
+#### 編集の確定フロー（commitEditing関数）
+
+```
+セルクリック → editingCell に記録 + inputにフォーカス
+    ↓
+ユーザーが文字を入力 → editValue が更新
+    ↓
+Enter / Tab / 別のセルクリック / Blur
+    ↓
+commitEditing() が呼ばれる
+    ↓
+onUpdateCell(rowId, columnId, editValue) が呼ばれる
+    ↓
+Feature層 → shell.update() → 世界線に自動コミット → 画面再描画
+```
+
+---
+
+## 5. Feature層（csv-importer-libs/feature）
+
+### `src/feature/WorldLineFeature.tsx`
+
+**役割**: WorldLineView（見た目）と世界線グラフ（データ）を橋渡しする。囲碁の`WorldLineFeature`と同じパターン。
+
+#### やっていること
+
+1. `useCasScope(sheetScopeId(sheetId))` でシートの世界線スコープに接続
+2. `scope.moveTo(nodeId)` でノード選択時に世界線を移動
+3. ダブルクリック時はノード移動 + `removeBubble(bubbleId)` でバブルを閉じる
+4. `renderNodeSummary` でノードの要約を生成（`"3列 5行"` のような表示）
+
+---
+
+### `src/feature/SheetListFeature.tsx`
+
+**役割**: SheetListView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+#### やっていること
+
+1. `useCsvSheets()` でシートメタデータ一覧と操作関数を取得
+2. `useContext(BubblesContext)` でバブル操作関数を取得
+3. 各コールバックを実装:
+
+| コールバック | 処理内容 |
+|------------|---------|
+| `handleCreateSheet` | `CsvSheet.create(...)` で新シートを作成 → `addSheet(sheet)` でメタ登録+スコープ作成 → `openBubble(...)` でエディタバブルを開く |
+| `handleImportCsv` | `CsvSheet.fromCsvText(...)` でCSVをパース → `addSheet(sheet)` → エディタバブルを開く |
+| `handleDeleteSheet` | `deleteSheet(sheetId)` でメタ削除+スコープ削除 |
+| `handleSheetClick` | 親コンポーネントに通知するだけ |
+
+---
+
+### `src/feature/SheetEditorFeature.tsx`
+
+**役割**: SheetEditorView（見た目）と世界線グラフ（データ）を橋渡しする。**セル編集ごとに自動コミット**。
+
+#### Props
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheetId` | `string` | 表示・編集するシートのID |
+| `bubbleId` | `string?` | バブルID（世界線ビューをpopChildで開くために必要） |
+
+#### やっていること
+
+1. `getInitialSheet(sheetId)` で初期CsvSheetを取得（pendingがあればそれを使用、なければフォールバックでデフォルトシートを生成。**フォールバック時のidはsheetIdと一致させる**）
+2. `useCasScope(sheetScopeId(sheetId), { initialObjects })` でシート専用の世界線スコープを取得
+3. `scope.getShell<CsvSheet>("csv-sheet", sheetId)` でシートのシェルを取得
+4. 「世界線」ボタン押下時に `openBubble("csv-importer/sheets/{sheetId}/history", bubbleId)` で世界線ビューをpopChild
+5. 各操作を `shell.update()` で自動コミット:
+
+| UIからのコールバック | shell.update()の中身 |
+|-------------------|---------------------|
+| `handleUpdateCell(rowId, colId, value)` | `s.updateCell(rowId, colId, value)` |
+| `handleRenameColumn(colId, name)` | `s.renameColumn(colId, name)` |
+| `handleAddRow()` | `s.addRow()` |
+| `handleDeleteRow(rowId)` | `s.deleteRow(rowId)` |
+| `handleAddColumn(name)` | `s.addColumn(name)` |
+| `handleDeleteColumn(colId)` | `s.deleteColumn(colId)` |
+| `handleExportCsv()` | `sheet.toCsvText()` → Blob → `<a>` download でCSVファイルをダウンロード |
+
+**shell.update()の仕組み**:
+```typescript
+sheetShell.update((s) => s.updateCell(rowId, columnId, value));
+//                  ↑ 現在のCsvSheet    ↑ 新しいCsvSheetを返す
+// → 世界線グラフに新しいノードが自動追加される（コミット）
+// → CASにハッシュベースで保存される
+```
+
+---
+
+## 6. Google Sheets連携（csv-importer-libs/feature + ui）
+
+### 概要
+
+Google スプレッドシートとの双方向手動同期機能。ブラウザから直接Google Sheets APIを呼び出すサーバーレス（SPA）方式。
+
+#### アーキテクチャ
+
+```
+┌─ UI層 ──────────────────────────────────────┐
+│  SheetEditorView                             │
+│    └─ GoogleSheetsPanel（接続/Push/Pull UI） │
+├─ Feature層 ──────────────────────────────────┤
+│  SheetEditorFeature                          │
+│    ├─ useGoogleSheetsAuth（OAuth2トークン）   │
+│    └─ googleSheetsApi（API呼び出し）          │
+│  CsvSheetProvider                            │
+│    └─ CsvSheetMeta拡張（googleSheets link）  │
+├─ Domain層 ───────────────────────────────────┤
+│  CsvSheet（既存: toJSON/fromJSON）           │
+│  ※ 2D配列変換はgoogleSheetsApi内で実装      │
+└──────────────────────────────────────────────┘
+```
+
+### `src/feature/useGoogleSheetsAuth.ts`
+
+**役割**: Google Identity Services (GIS) を動的ロードしてOAuth2トークンを管理するフック。
+
+#### 提供するAPI
+
+| API | 型 | 説明 |
+|-----|---|------|
+| `accessToken` | `string \| null` | 現在のアクセストークン |
+| `isSignedIn` | `boolean` | 認証済みかどうか |
+| `requestAccess()` | `Promise<string>` | OAuth2ポップアップ→トークン返却 |
+| `signOut()` | `void` | トークン破棄 |
+
+- GISスクリプト（`accounts.google.com/gsi/client`）を動的にロード（1回のみ）
+- スコープ: `https://www.googleapis.com/auth/spreadsheets`
+- クライアントID: `bubbleRoutes.tsx` の `GOOGLE_CLIENT_ID`（= `import.meta.env.VITE_GOOGLE_CLIENT_ID`）を
+  `CsvSheetProvider` の `googleClientId` 経由で受け取る。
+  **これはビルド時に文字列へ置換される**ため、`.env` の変更はビルドし直すまで反映されない
+  → [セットアップ / 落とし穴 1](./google-sheets-setup.md#1-バブリとして動かすなら-env-変更後に再ビルドが必要-最重要)
+- トークンはメモリ内に保持（セッション単位、永続化しない）
+- `requestAccess()` の失敗理由は3つに区別される:
+  クライアントID未設定 / GISロード失敗 / GIS 側のエラー。
+  いずれも `SheetEditorFeature` が受けて `GoogleSheetsPanel` に表示する
+- `requestAccessToken()` に `prompt` は渡さない。
+  `prompt: ""` は「同意済みなら黙って通す」指定で、初回同意がまだのときに
+  何も起きずに失敗するため使わない
+
+### `src/feature/googleSheetsApi.ts`
+
+**役割**: Google Sheets REST APIの呼び出しとCsvSheet↔2D配列のデータ変換。
+
+#### 関数一覧
+
+| 関数 | 説明 |
+|------|------|
+| `csvSheetToValues(sheet)` | CsvSheet → 2D文字列配列（ヘッダー行 + データ行） |
+| `valuesToCsvSheet(values, existing)` | 2D配列 → CsvSheet（既存のカラムID/行IDを名前/位置で可能な限り再利用） |
+| `parseSpreadsheetUrl(url)` | スプレッドシートURLからIDを抽出（直接ID入力も対応） |
+| `pushToGoogleSheets(token, id, sheet, sheetName?)` | ローカル→Google Sheets（clear + PUT） |
+| `pullFromGoogleSheets(token, id, existing, sheetName?)` | Google Sheets→ローカル |
+
+**Push処理**: 書き込み前に`clear`で既存データをクリア（行数が減った場合のゴミ防止）→ `PUT values`でRAW書き込み。
+**Pull処理**: `GET values`で2D配列を取得 → `valuesToCsvSheet`で既存シートに変換。
+
+### `src/ui/GoogleSheetsPanel.tsx`
+
+**役割**: Google Sheets連携のUIパネル。propsベースの純粋コンポーネント。
+
+`error?: string | null` を受け取り、値があれば赤いバナー（`.gs-error`）で表示する。
+接続・Push・Pull の失敗はすべてここに出る。
+
+#### 2つの表示状態
+
+**未接続状態**: URLテキスト入力 + 「接続」ボタン
+**接続済み状態**: 接続ステータス + 最終同期日時 + Push/Pullボタン + 接続解除ボタン
+
+### CsvSheetMeta の拡張
+
+```typescript
+interface CsvSheetMeta {
+  id: string;
+  name: string;
+  googleSheets?: {       // ← 追加
+    spreadsheetId: string;
+    sheetName?: string;
+    lastSyncedAt?: string;
+  };
+}
+```
+
+追加されたコンテキストAPI:
+
+| API | 説明 |
+|-----|------|
+| `getSheetMeta(sheetId)` | 特定シートのメタを取得 |
+| `linkGoogleSheets(sheetId, spreadsheetId, sheetName?)` | メタにgoogleSheets情報を保存 |
+| `unlinkGoogleSheets(sheetId)` | googleSheets情報を削除 |
+| `updateLastSyncedAt(sheetId)` | 最終同期日時を現在時刻に更新 |
+
+### SheetEditorFeature の変更
+
+以下のSync処理を組み立て:
+- `useGoogleSheetsAuth()` でOAuth2トークンを管理
+- `getSheetMeta(sheetId)` でgoogleSheets情報を取得
+- `handleLink(url)` でURL解析→認証→リンク設定
+- `handlePush()` でローカルデータをGoogle Sheetsに書き込み
+- `handlePull()` でGoogle Sheetsからデータを読み込み→`shell.update()`で反映
+- `GoogleSheetsPanel`をSheetEditorViewの`googleSheetsPanel` propとして渡す
+
+### SheetEditorView の変更
+
+- `googleSheetsPanel?: ReactNode` propを追加
+- ヘッダーの`e-header-actions`内に「Sheets」トグルボタンを追加
+- クリックでGoogleSheetsPanelの表示/非表示を切り替え
+
+### 動かすための設定
+
+Google Cloud Console 側の設定手順、`.env`、および実際にハマった落とし穴は
+**[Google Sheets 連携のセットアップ](./google-sheets-setup.md)** にまとめてあります。
+
+要点だけ挙げると:
+
+- 必要なのは **OAuth クライアントIDだけ**（APIキー・シークレット・サービスアカウント・Drive API は不要）
+- 承認済みJavaScript生成元には、**使う入口すべて**を登録する（スタンドアロンと bublys-os は別オリジン）
+- `.env` を変えたら **バブリを再ビルドする**（クライアントIDはビルド時に `bubly.js` へ埋め込まれるため）
+
+---
+
+## 7. アプリ設定（csv-importer-app）
+
+### `src/registration/bubbleRoutes.tsx`
+
+**役割**: URLパターンと画面コンポーネントの対応を定義する。
+
+| URLパターン | 表示する画面 | パラメータ |
+|------------|------------|-----------|
+| `csv-importer/sheets` | SheetListFeature（シート一覧） | なし |
+| `csv-importer/sheets/:sheetId` | SheetEditorFeature（シート編集） | `sheetId` |
+| `csv-importer/sheets/:sheetId/world-line` | WorldLineFeature（世界線ビュー） | `sheetId` |
+| `csv-importer/sheets/:sheetId/objects` | CsvObjectListFeature（オブジェクト一覧） | `sheetId` |
+| `csv-importer/sheets/:sheetId/objects/:rowId` | CsvObjectDetailFeature（オブジェクト詳細） | `sheetId`, `rowId` |
+
+各バブルは `CsvSheetProvider` を直接書かず、同ファイル内の **`CsvBubbleProvider`** 経由でラップする。
+これは `googleClientId` の指定漏れを防ぐためのラッパーで、`GOOGLE_CLIENT_ID`
+（`import.meta.env.VITE_GOOGLE_CLIENT_ID`）を必ず渡す。
+
+```tsx
+const GOOGLE_CLIENT_ID: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+const CsvBubbleProvider: FC<{ children: ReactNode }> = ({ children }) => (
+  <CsvSheetProvider googleClientId={GOOGLE_CLIENT_ID}>{children}</CsvSheetProvider>
+);
+```
+
+**注意**: ここが素の `<CsvSheetProvider>` だと、内側の Context が `app.tsx` の外側の指定を
+上書きして `googleClientId` が `undefined` になり、スタンドアロン・バブリの両方で
+Google Sheets連携が無言で死ぬ。
+
+---
+
+### `src/app/app.tsx`
+
+**役割**: スタンドアロンモードでのアプリ全体の組み立て。
+
+処理の順序:
+1. `import TableChartIcon` — サイドバー用のMUIアイコンをインポート
+2. `initWorldLineGraph()` — 世界線グラフのReduxスライスとミドルウェアを注入
+3. `import '@bublys-org/csv-importer-libs'` — csvImporterスライス注入（副作用）
+4. `BubbleRouteRegistry.registerRoutes(...)` — バブルルートを登録
+5. `menuItems` — サイドバーに「シート一覧」メニューを定義（`TableChartIcon`アイコン付き）
+
+プロバイダー階層:
+```
+BublyStoreProvider（Reduxストア初期化 + redux-persist）
+  └─ CsvSheetProvider（世界線グラフ + ドメインオブジェクト登録）
+       └─ BublyApp（サイドバー + バブル表示エリア）
+```
+
+---
+
+### `src/bubly.ts`
+
+**役割**: bublys-os（メインアプリ）から動的にロードされるバブリとしての登録。
+
+**universe first 方式**: bublys-os では `registerBubly` した瞬間に `<name>-bubly` universe
+ルートが自動発行される。csv-importer はこの universe を主入口として使い、
+`initialBubbleUrls` で「シート一覧」を seed する。`menuItems` は universe と重複するので
+指定しない。
+
+```typescript
+const CsvImporterBubly: Bubly = {
+  name: "csv-importer",
+  version: "0.0.1",
+  label: "CSV インポーター",
+  icon: React.createElement(TableChartIcon, { color: "primary" }),
+  initialBubbleUrls: ["csv-importer/sheets"],
+  backdropColor: "hsl(180, 35%, 22%)",
+  register(context) {
+    context.registerBubbleRoutes(csvImporterBubbleRoutes);
+  },
+  unregister() {},
+};
+```
+
+サイドバーには `CSV インポーター`（universe エントリ）1 個だけが並ぶ。クリックで
+universe バブルが開き、その中に自動で `csv-importer/sheets` バブルが seed される。
+
+---
+
+## 8. オブジェクトビュー（csv-importer-libs/ui + feature）
+
+### 概要
+
+CSVシートの各行を`PlaneObject`型に変換して「オブジェクト」として表示する機能。CSVの内部データ（columnId → value）をラベル名ベースのプレーンオブジェクトに変換し、key-value形式で表示する。
+
+#### データフロー
+
+```
+CsvSheet.toPlaneObjects(titleColumnId)
+    ↓ PlaneObject[]
+CsvObjectListView（カードリスト表示）
+    ↓
+CsvSheet.toPlaneObject(rowId, titleColumnId)
+    ↓ PlaneObject
+CsvObjectDetailView（dl グリッド表示 + JSON表示トグル）
+```
+
+#### ナビゲーションフロー
+
+```
+SheetEditorView [「オブジェクト」ボタン]
+    ↓ openBubble("csv-importer/sheets/{sheetId}/objects", bubbleId)
+CsvObjectListFeature → CsvObjectListView
+    ↓ openBubble("csv-importer/sheets/{sheetId}/objects/{rowId}", bubbleId)
+CsvObjectDetailFeature → CsvObjectDetailView
+```
+
+### CsvSheetMeta の拡張
+
+```typescript
+interface CsvSheetMeta {
+  id: string;
+  name: string;
+  googleSheets?: GoogleSheetsLink;
+  titleColumnId?: string;  // オブジェクトのタイトルに使う列
+}
+```
+
+追加されたコンテキストAPI:
+
+| API | 説明 |
+|-----|------|
+| `setTitleColumn(sheetId, columnId)` | タイトル列を設定 |
+
+### `src/ui/CsvObjectDetailView.tsx`
+
+**役割**: PlaneObjectの全プロパティをkey-value形式で表示する。StaffDetailViewの`<dl>`グリッドパターンを参考にした設計。JSON表示トグル付き。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `object` | `PlaneObject` | 表示するオブジェクト |
+
+#### 表示モード
+
+- **プロパティ表示**（デフォルト）: `<dl>` グリッド (`grid-template-columns: auto 1fr`) で`id`/`name`以外のプロパティをkey-value表示
+- **JSON表示**: 右上の「JSON」ボタンをクリックすると `JSON.stringify(object, null, 2)` をダーク背景のpreで表示
+
+### `src/ui/CsvObjectListView.tsx`
+
+**役割**: PlaneObject配列をオブジェクトカードのリストとして表示する。タイトル列の選択ドロップダウン付き。
+
+#### 受け取るプロパティ
+
+| プロパティ | 型 | 説明 |
+|-----------|---|------|
+| `sheetName` | `string` | シート名（タイトル表示） |
+| `columns` | `CsvColumnState[]` | 列の定義（ドロップダウン用） |
+| `objects` | `PlaneObject[]` | 表示するオブジェクト配列 |
+| `titleColumnId` | `string?` | タイトルに使う列ID |
+| `onChangeTitleColumn` | `(columnId) => void` | タイトル列変更時 |
+| `onSelectObject` | `(objectId) => void` | オブジェクト選択時（PlaneObject.idを渡す） |
+| `buildObjectUrl` | `(objectId) => string` | オブジェクトのバブルURLを生成 |
+
+- タイトル未選択時はインデックス番号をnameに表示
+- 各カードにはname + 最初の3プロパティ（`id`/`name`除外）のプレビューを表示
+- ObjectViewでラップしてドラッグ&ドロップ対応
+
+### `src/feature/CsvObjectDetailFeature.tsx`
+
+**役割**: CsvObjectDetailView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+| Props | 型 | 説明 |
+|-------|---|------|
+| `sheetId` | `string` | シートID |
+| `rowId` | `string` | 行ID（UUID） |
+
+- `useCasScope(sheetScopeId(sheetId))` で同じ世界線スコープに接続
+- `sheet.toPlaneObject(rowId, titleColumnId)` でPlaneObjectに変換して渡す
+
+### `src/feature/CsvObjectListFeature.tsx`
+
+**役割**: CsvObjectListView（見た目）と世界線グラフ（データ）を橋渡しする。
+
+| Props | 型 | 説明 |
+|-------|---|------|
+| `sheetId` | `string` | シートID |
+| `bubbleId` | `string?` | バブルID（オブジェクト詳細をpopChildで開くために必要） |
+
+- `sheet.toPlaneObjects(titleColumnId)` でPlaneObject配列に変換して渡す
+- `onSelectObject(objectId)` で PlaneObject.id（= rowのUUID）をそのままバブルURLに使用
+- `getSheetMeta(sheetId)` で titleColumnId 取得
+- `setTitleColumn(sheetId, columnId)` でタイトル列変更
+
+### SheetEditorView / SheetEditorFeature の変更
+
+- SheetEditorViewに `onOpenObjects?: () => void` propを追加
+- ヘッダーの `e-header-actions` に紫系の「オブジェクト」ボタンを追加
+- SheetEditorFeatureに `handleOpenObjects` を追加（handleOpenWorldLineと同パターン）
+
+---
+
+## ファイル一覧（実装したもののみ）
+
+```
+csv-importer-model/
+  src/lib/
+    CsvSheet.ts           ← ドメインモデル（データ構造と操作）
+    CsvSheet.test.ts      ← テスト（16ケース）
+    index.ts              ← エクスポート定義
+  src/index.ts            ← パッケージエントリポイント
+  jest.config.ts          ← テスト設定
+  .spec.swcrc             ← テスト用コンパイル設定
+
+csv-importer-libs/
+  src/slice/
+    csv-importer-slice.ts ← Reduxスライス（将来的な非バージョン管理データ用に残存）
+    index.ts              ← エクスポート定義
+  src/ui/
+    SheetListView.tsx     ← シート一覧の見た目
+    SheetEditorView.tsx   ← シート編集の見た目（スプレッドシート風、右上にオブジェクト/世界線/Sheetsボタン）
+    WorldLineView.tsx     ← 世界線グラフのDAGツリー表示（汎用）
+    GoogleSheetsPanel.tsx ← Google Sheets連携パネルUI（接続/Push/Pull）
+    CsvObjectListView.tsx ← オブジェクト一覧の見た目（タイトル列選択 + カードリスト）
+    CsvObjectDetailView.tsx ← オブジェクト詳細の見た目（key-value dlグリッド）
+    index.ts              ← エクスポート定義
+  src/feature/
+    CsvSheetProvider.tsx  ← 世界線グラフ統合プロバイダー（ドメイン登録 + スコープ管理 + pendingSheets + Google Sheetsリンク管理 + タイトル列管理）
+    SheetListFeature.tsx  ← シート一覧の世界線グラフ接続
+    SheetEditorFeature.tsx← シート編集の世界線グラフ接続（セル編集ごとに自動コミット + 世界線/オブジェクトビュー起動 + Google Sheets同期）
+    WorldLineFeature.tsx  ← 世界線ビューの世界線グラフ接続（ノード移動・要約表示）
+    CsvObjectListFeature.tsx ← オブジェクト一覧の世界線グラフ接続
+    CsvObjectDetailFeature.tsx ← オブジェクト詳細の世界線グラフ接続
+    useGoogleSheetsAuth.ts← Google OAuth2認証フック（GIS動的ロード + トークン管理）
+    googleSheetsApi.ts    ← Google Sheets API呼び出し + CsvSheet↔2D配列変換
+    index.ts              ← エクスポート定義
+  src/index.ts            ← パッケージエントリポイント
+
+csv-importer-app/
+  .env.example            ← 環境変数テンプレート（VITE_GOOGLE_CLIENT_ID）
+  src/registration/
+    bubbleRoutes.tsx      ← URLと画面の対応定義
+  src/app/
+    app.tsx               ← スタンドアロンアプリの組み立て（initWorldLineGraph + CsvSheetProvider）
+  src/
+    bubly.ts              ← メインアプリ組み込み用の登録
+```
