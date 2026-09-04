@@ -493,7 +493,9 @@ Google スプレッドシートとの双方向手動同期機能。ブラウザ�
 - GISスクリプト（`accounts.google.com/gsi/client`）を動的にロード（1回のみ）
 - スコープ: `https://www.googleapis.com/auth/spreadsheets`
 - クライアントID: `bubbleRoutes.tsx` の `GOOGLE_CLIENT_ID`（= `import.meta.env.VITE_GOOGLE_CLIENT_ID`）を
-  `CsvSheetProvider` の `googleClientId` 経由で受け取る（`.env.example`参照）
+  `CsvSheetProvider` の `googleClientId` 経由で受け取る。
+  **これはビルド時に文字列へ置換される**ため、`.env` の変更はビルドし直すまで反映されない
+  → [セットアップ / 落とし穴 1](./google-sheets-setup.md#1-バブリとして動かすなら-env-変更後に再ビルドが必要-最重要)
 - トークンはメモリ内に保持（セッション単位、永続化しない）
 - `requestAccess()` の失敗理由は3つに区別される:
   クライアントID未設定 / GISロード失敗 / GIS 側のエラー。
@@ -570,30 +572,16 @@ interface CsvSheetMeta {
 - ヘッダーの`e-header-actions`内に「Sheets」トグルボタンを追加
 - クリックでGoogleSheetsPanelの表示/非表示を切り替え
 
-### 前提条件（使用するために必要な設定）
+### 動かすための設定
 
-1. Google Cloud Consoleでプロジェクトを作成
-2. **Google Sheets API** を有効化
-   （**Drive API とは別物**。このバブリが叩くのは `sheets.googleapis.com` のみ）
-3. OAuth 2.0クライアントID（Webアプリケーション）を作成
-4. 承認済みJavaScriptオリジンに、**使う入口すべて**を登録する
-   - スタンドアロン: `http://localhost:4200`
-   - bublys-os 上のバブリとして使う場合: **bublys-os のオリジン**も必要
-5. OAuth同意画面が「テスト」状態なら、自分自身をテストユーザーに追加する
-6. `.env`に`VITE_GOOGLE_CLIENT_ID`を設定
-7. **バブリとして配信するバンドルを焼き直す**（クライアントIDはビルド時に埋め込まれるため）
+Google Cloud Console 側の設定手順、`.env`、および実際にハマった落とし穴は
+**[Google Sheets 連携のセットアップ](./google-sheets-setup.md)** にまとめてあります。
 
-   ```
-   npx tsc -p csv-importer-libs/tsconfig.lib.json
-   cd csv-importer-app && npx vite build -c vite.config.bubly.ts
-   ```
+要点だけ挙げると:
 
-### 共有設定と操作の対応
-
-| スプレッドシートの共有 | Pull（読み込み） | Push（書き込み） |
-|---|---|---|
-| リンクを知っている全員：**閲覧者** | ○ | **×（403）** |
-| リンクを知っている全員：**編集者** | ○ | ○ |
+- 必要なのは **OAuth クライアントIDだけ**（APIキー・シークレット・サービスアカウント・Drive API は不要）
+- 承認済みJavaScript生成元には、**使う入口すべて**を登録する（スタンドアロンと bublys-os は別オリジン）
+- `.env` を変えたら **バブリを再ビルドする**（クライアントIDはビルド時に `bubly.js` へ埋め込まれるため）
 
 ---
 
