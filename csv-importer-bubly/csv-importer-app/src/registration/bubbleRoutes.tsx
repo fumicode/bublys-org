@@ -67,7 +67,13 @@ export const csvImporterBubbleRoutes: BubbleRoute[] = [
   {
     pattern: "csv-importer/sheets/:sheetId/world-line",
     type: "sheet-world-line",
-    bubbleOptions: { contentBackground: "transparent" },
+    // canvas は固有サイズを持たず容器いっぱいに広がるので窓型（fillsContainer）で開く。
+    // 世界線はセル編集のたびに右へ伸びるので、高さより幅を取る。
+    bubbleOptions: {
+      contentBackground: "rgba(15,18,28,0.3)",
+      fillsContainer: true,
+      defaultSize: { width: 520, height: 340 },
+    },
     Component: WorldLineBubble,
   },
   { pattern: "csv-importer/sheets/:sheetId", type: "sheet-editor", Component: SheetEditorBubble },

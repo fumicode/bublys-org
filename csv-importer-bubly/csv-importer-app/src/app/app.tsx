@@ -1,5 +1,5 @@
 import TableChartIcon from '@mui/icons-material/TableChart';
-import { BublyApp, BublyStoreProvider, BubbleRouteRegistry } from '@bublys-org/bubbles-ui';
+import { BublyApp, BublyStoreProvider, BubbleRouteRegistry, type BublyMenuItem } from '@bublys-org/bubbles-ui';
 import { initWorldLineGraph } from '@bublys-org/world-line-graph';
 
 // ライブラリインポート（Redux slice注入の副作用を含む）
@@ -15,7 +15,7 @@ initWorldLineGraph();
 BubbleRouteRegistry.registerRoutes(csvImporterBubbleRoutes);
 
 // サイドバーのメニュー項目
-const menuItems: { label: string; url: string; icon?: React.ReactNode }[] = [
+const menuItems: BublyMenuItem[] = [
   { label: 'シート一覧', url: 'csv-importer/sheets', icon: <TableChartIcon /> },
 ];
 
