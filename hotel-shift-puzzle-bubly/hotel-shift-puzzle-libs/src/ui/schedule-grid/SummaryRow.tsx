@@ -3,6 +3,7 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { WorkingDay } from "../../domain/index.js";
 import type { SummaryRow as SummaryRowModel } from "./summaryModel.js";
 import type { EditingRequired } from "./types.js";
+import { demandCellKey } from "./constants.js";
 
 type SummaryRowProps = {
   row: SummaryRowModel;
@@ -128,6 +129,9 @@ export const SummaryRow: FC<SummaryRowProps> = ({
                 met ? "達成" : "不足"
               }）${editable ? " — クリックで必要人数を変更" : ""}`}
               role={editable ? "button" : undefined}
+              data-cell-key={
+                !met && row.shiftId ? demandCellKey(row.shiftId, day.key) : undefined
+              }
               onClick={
                 editable
                   ? (e) =>

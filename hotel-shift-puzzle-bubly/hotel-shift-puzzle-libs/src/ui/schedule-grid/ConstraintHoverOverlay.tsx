@@ -3,9 +3,16 @@ import type { SVGProps } from "react";
 import styled, { css, keyframes } from "styled-components";
 import type { Keyframes } from "styled-components";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
+import { planRibbons, type RibbonMode } from "./constraintRibbon.js";
 
-/** ルールのメンバー1人分。covering＝その日に担当勤務帯へ実際に入っている（＝充足に寄与）か。 */
-export type ConstraintHoverMember = { staffId: string; covering: boolean };
+/** ルールのメンバー1人分。 */
+export type ConstraintHoverMember = {
+  staffId: string;
+  /** その日に担当勤務帯へ実際に入っている（＝充足に寄与）か。 */
+  covering: boolean;
+  /** その日まだ未定で、これから担当勤務帯に入れるか。休み・別の勤務帯で確定なら false。 */
+  available: boolean;
+};
 
 /** ホバー中セルの人が属する1責任者ルール分の関係（勤務帯→全メンバー）。 */
 export type ConstraintHoverGroup = {
@@ -21,8 +28,11 @@ export type ConstraintHoverGroup = {
   members: ConstraintHoverMember[];
   /** その日にルールが満たされているか（✅/⚠️ の切り替え）。 */
   satisfied: boolean;
-  /** メンバー全員がその日に休み（＝誰も入れず絶対に満たせない）。特別な黄色・同時点滅で警告する。 */
-  allDayOff: boolean;
+  /**
+   * 入れる人が誰も残っていない＝この日は絶対に満たせない。黄色・同時点滅で警告する。
+   * 全員が休みの日だけでなく、全員が別の勤務帯で確定している日もこれに当たる。
+   */
+  unfillable: boolean;
 };
 
 type Props = {
@@ -34,12 +44,6 @@ type Props = {
   groups: ConstraintHoverGroup[];
 };
 
-/**
- * リボン（面）の描画モード。
- *   solid=入っている人（濃く）/ faint=薄く / blink=巡回点灯（誰か入って）/
- *   sync=全員休みの警告（黄色・全体同時点滅）
- */
-type RibbonMode = "solid" | "faint" | "blink" | "sync";
 type Ribbon = {
   d: string;
   color: string;
@@ -63,7 +67,7 @@ type Node = {
   icon: string;
   /** ◯の中に入れる最低必要人数 */
   minCount: number;
-  /** 全員休みの警告ノード（黄色・同時点滅）か。 */
+  /** 誰も入れない日の警告ノード（黄色・同時点滅）か。 */
   sync?: boolean;
 };
 /** 制約全体（リボン＋ノード）を包む矩形。この下の表を backdrop blur でぼかす。 */
@@ -87,7 +91,7 @@ const nodeWidth = (ruleLabel: string, shiftName: string): number =>
 const OP_HIGH = 0.62; // 濃い（入っている／点灯中）
 const OP_LOW = 0.12; // 薄い（入っていない／消灯中）
 
-// 全員休み（絶対に満たせない）の警告色。黄色。
+// 誰も入れない（絶対に満たせない）ときの警告色。黄色。
 const WARN_FG = "#f9a825";
 const WARN_BG = "#fff8e1";
 const SYNC_MS = 800; // 同時点滅の周期
@@ -135,8 +139,10 @@ const blinkKeyframes = (count: number) => {
  * 担当勤務帯（早番など）のノードを列の右に置き、そこから各メンバーのセル右端へ面（リボン）を伸ばす。
  * さらに「中身」を描く:
  *   - 入っている人（担当勤務帯に割当済み＝充足に寄与）… 太く濃い面（solid）。
- *   - 充足済みで入っていない人 … 薄い面（faint）。
- *   - 未充足のとき入っていない候補 … 制約バブルと同じくパッパッと巡回点灯（blink）＝「誰か入って」。
+ *   - もう入れない人（休み・別の勤務帯で確定）… 薄い面（faint）。
+ *   - 未充足でまだ入れる候補が複数 … パッパッと巡回点灯（blink）＝「誰か入って」。
+ *   - 未充足で入れるのが1人だけ … 巡回せず静的に点灯（only）＝「この人しかいない」。
+ * どのリボンをどう描くかの判断は constraintRibbon.planRibbons に切り出してある。
  * 面の背後は backdrop blur でぼかし、関係を浮き立たせる（面の形に clip-path）。
  */
 export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) => {
@@ -177,9 +183,12 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
       const pts = g.members
         .map((m) => {
           const e = edgeOf(m.staffId);
-          return e ? { ...e, covering: m.covering } : null;
+          return e ? { ...e, covering: m.covering, available: m.available } : null;
         })
-        .filter((p): p is { rx: number; cy: number; covering: boolean } => !!p);
+        .filter(
+          (p): p is { rx: number; cy: number; covering: boolean; available: boolean } =>
+            !!p
+        );
       if (pts.length === 0) return;
 
       const fg = (g.shiftId && SHIFT_FG[g.shiftId]) || DEFAULT_FG;
@@ -206,33 +215,26 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
         minCount: g.minCount,
       };
 
-      if (g.allDayOff) {
-        // 全員休み＝誰も入れず絶対に満たせない。黄色の面を全体同時に点滅させる。
-        for (const p of pts) {
-          const d = ribbonPath(p.rx, p.cy, nx, ny, RIBBON_W);
-          ribbons.push({ d, color: WARN_FG, mode: "sync", index: 0, count: 0 });
-        }
-        nodes.push({ ...base, bg: WARN_BG, fg: WARN_FG, icon: "⚠️", sync: true });
-        return;
-      }
+      const plans = planRibbons(pts, {
+        satisfied: g.satisfied,
+        unfillable: g.unfillable,
+      });
 
-      // 未充足のときに巡回させる対象＝入っていない候補。
-      const blinkCount = g.satisfied ? 0 : pts.filter((p) => !p.covering).length;
-      let blinkIdx = 0;
-
-      for (const p of pts) {
+      pts.forEach((p, i) => {
         const width = p.covering ? RIBBON_W_STRONG : RIBBON_W;
         const d = ribbonPath(p.rx, p.cy, nx, ny, width);
-        if (p.covering) {
-          ribbons.push({ d, color: fg, mode: "solid", index: 0, count: 0 });
-        } else if (g.satisfied) {
-          ribbons.push({ d, color: fg, mode: "faint", index: 0, count: 0 });
-        } else {
-          ribbons.push({ d, color: fg, mode: "blink", index: blinkIdx++, count: blinkCount });
-        }
-      }
+        ribbons.push({
+          d,
+          color: g.unfillable ? WARN_FG : fg,
+          ...plans[i],
+        });
+      });
 
-      nodes.push({ ...base, bg, fg, icon: g.satisfied ? "✅" : "⚠️" });
+      nodes.push(
+        g.unfillable
+          ? { ...base, bg: WARN_BG, fg: WARN_FG, icon: "⚠️", sync: true }
+          : { ...base, bg, fg, icon: g.satisfied ? "✅" : "⚠️" }
+      );
     });
 
     if (ribbons.length === 0 || !Number.isFinite(minX)) {
@@ -324,7 +326,8 @@ export const ConstraintHoverOverlay: FC<Props> = ({ gridRef, dayKey, groups }) =
               key={`r${i}`}
               d={r.d}
               fill={r.color}
-              opacity={r.mode === "solid" ? OP_HIGH : OP_LOW}
+              // only は「入れるのはこの人だけ」。巡回させず静的に濃く出す。
+              opacity={r.mode === "solid" || r.mode === "only" ? OP_HIGH : OP_LOW}
             />
           );
         })}
@@ -392,13 +395,13 @@ const BlinkRibbon = styled.path<
   `}
 `;
 
-/** 全員休みの警告面。黄色で全体同時に点滅する（delay 無し＝一斉）。 */
+/** 誰も入れない日の警告面。黄色で全体同時に点滅する（delay 無し＝一斉）。 */
 const SyncRibbon = styled.path<SVGProps<SVGPathElement>>`
   opacity: ${OP_LOW};
   animation: ${syncBlink} ${SYNC_MS}ms ease-in-out infinite;
 `;
 
-/** 全員休みの警告ノード。面と同じ周期・タイミングで一斉に点滅する。 */
+/** 誰も入れない日の警告ノード。面と同じ周期・タイミングで一斉に点滅する。 */
 const SyncNodeGroup = styled.g`
   animation: ${syncBlink} ${SYNC_MS}ms ease-in-out infinite;
 `;

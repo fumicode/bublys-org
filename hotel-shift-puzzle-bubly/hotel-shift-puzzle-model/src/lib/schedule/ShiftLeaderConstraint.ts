@@ -32,6 +32,9 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
     this.label = rule.label;
   }
 
+  /** 対象日の責任者ロースターだけを見る（他日には影響しない） */
+  readonly scope = "day" as const;
+
   describe(): string {
     const who =
       this.rule.minCount <= 1 ? "誰か一人" : `最低${this.rule.minCount}人`;

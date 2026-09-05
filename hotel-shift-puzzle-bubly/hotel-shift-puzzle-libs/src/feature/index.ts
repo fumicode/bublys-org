@@ -23,3 +23,7 @@ export * from "./ScheduleReportPanel.js";
 export * from "./ScheduleReportList.js";
 export * from "./reportPriority.js";
 export * from "./staffLinkedReports.js";
+export * from "./ScheduleEditLogPanel.js";
+export * from "./recordScheduleEdit.js";
+export * from "./shiftSuggestion/index.js";
+export * from "./candidates/index.js";

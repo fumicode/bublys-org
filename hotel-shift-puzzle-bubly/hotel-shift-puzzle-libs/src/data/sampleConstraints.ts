@@ -28,8 +28,16 @@ const SAMPLE_LEADERS_BY_ROLE: Record<string, string[]> = {
   night: ["staff-tsuchiya", "staff-6"], // 土屋・中村
 };
 
-/** 指定した勤務表IDの制約（責任者ルール＋連勤上限＋希望チェック）を作る。 */
-export function createSampleConstraintsFor(scheduleId: string): ScheduleConstraints {
+/**
+ * 指定した勤務表IDの制約（責任者ルール＋連勤上限＋希望チェック）を作る。
+ *
+ * `maxDayOffPerDay` は勤務表ごとに変えられる。終盤シナリオ（9月）は「その日に休める枠が
+ * もう残っていない」状況を作りたいので、需要から決まる休み人数ちょうどまで絞る。
+ */
+export function createSampleConstraintsFor(
+  scheduleId: string,
+  options: { maxDayOffPerDay?: number } = {}
+): ScheduleConstraints {
   const leaderRules: ShiftLeaderRuleState[] = LEADER_ROLE_DEFS.map((def) => ({
     ...def,
     leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
@@ -40,6 +48,9 @@ export function createSampleConstraintsFor(scheduleId: string): ScheduleConstrai
     maxConsecutiveWorkdays: 5,
     checkShiftWish: true,
     minMonthlyDayOff: 8,
-    maxDayOffPerDay: 8,
+    maxDayOffPerDay: options.maxDayOffPerDay ?? 8,
   });
 }
+
+/** 責任者ロール → 候補者。シナリオ生成が責任者を満たすために参照する。 */
+export const SAMPLE_LEADER_STAFF_IDS = SAMPLE_LEADERS_BY_ROLE;

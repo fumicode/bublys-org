@@ -41,7 +41,6 @@ const MARGIN = 34; // ビューポート端の余白（魚眼の上下端がこ�
 const GEN_PX = 60;
 const MIN_SCALE = 0.34; // 最遠ノードのスケール
 const FALLOFF_POW = 1.4; // スケール減衰カーブ
-const LABEL_SCALE_THRESHOLD = 0.62; // これ未満のスケールでは状態要約を省略
 const LABEL_BUBBLE_SCALE_THRESHOLD = 0.4; // これ未満のスケールでは名前の吹き出しを省略
 
 // --- スクロール感度 ---
@@ -216,7 +215,6 @@ function draw(
   layout: Layout,
   project: ReturnType<typeof makeProjector>,
   apexNodeId: string | null,
-  getSummary: (id: string) => string,
   getLabel: (id: string) => string,
   vw: number,
   vh: number,
@@ -228,7 +226,10 @@ function draw(
     ctx.fillRect(0, 0, vw, vh);
   }
 
-  const screen = new Map<string, { sx: number; sy: number; scale: number; color: string }>();
+  const screen = new Map<
+    string,
+    { sx: number; sy: number; scale: number; color: string }
+  >();
   for (const [id, pos] of layout.nodes) {
     const p = project(pos.x, pos.y);
     screen.set(id, { ...p, color: pos.color });
@@ -296,16 +297,6 @@ function draw(
       ctx.stroke();
     }
     // apex はノードの代わりにクライマーを（他ノードの上に載るよう）後段でまとめて描く。
-
-    const summary = getSummary(id);
-    if (summary && s.scale >= LABEL_SCALE_THRESHOLD) {
-      ctx.fillStyle = "rgba(230,235,255,0.78)";
-      ctx.textAlign = "left";
-      ctx.font = `${Math.round(11 * s.scale)}px ui-sans-serif, -apple-system, sans-serif`;
-      // apex はクライマーが中央にいるので要約は少し右下へ寄せる
-      const dy = isApex ? r + 6 : 0;
-      ctx.fillText(summary, s.sx + r + 6, s.sy + dy);
-    }
   }
 
   // apex のクライマーを最後に描いて他ノードに隠れないようにする。
@@ -380,10 +371,11 @@ function draw(
   }
 }
 
-export const ClimberWorldLineCanvasView: FC<WorldLinesCanvasViewProps> = ({
+type ClimberWorldLineCanvasViewProps = WorldLinesCanvasViewProps;
+
+export const ClimberWorldLineCanvasView: FC<ClimberWorldLineCanvasViewProps> = ({
   graph,
   apexNodeId,
-  getNodeSummary,
   getNodeLabel,
   onSelectNode,
   onApexScreenPos,
@@ -395,7 +387,6 @@ export const ClimberWorldLineCanvasView: FC<WorldLinesCanvasViewProps> = ({
 
   // 同じ state なら layout を再利用
   const layout = useMemo(() => computeLayout(graph), [graph.state]);
-  const summarize = getNodeSummary ?? ((_: string) => "");
   const labelize = getNodeLabel ?? ((_: string) => "");
 
   // フォーカス（ビューポート中央に来る world 座標）。current を target へ追従させる。
@@ -411,8 +402,6 @@ export const ClimberWorldLineCanvasView: FC<WorldLinesCanvasViewProps> = ({
   viewportRef.current = viewport;
   const apexRef = useRef(apexNodeId);
   apexRef.current = apexNodeId;
-  const summarizeRef = useRef(summarize);
-  summarizeRef.current = summarize;
   const labelizeRef = useRef(labelize);
   labelizeRef.current = labelize;
   const backgroundRef = useRef(background);
@@ -427,7 +416,7 @@ export const ClimberWorldLineCanvasView: FC<WorldLinesCanvasViewProps> = ({
     if (!ctx) return;
     const { w, h } = viewportRef.current;
     const project = makeProjector(focusRef.current.x, focusRef.current.y, w, h);
-    draw(ctx, layoutRef.current, project, apexRef.current, summarizeRef.current, labelizeRef.current, w, h, backgroundRef.current);
+    draw(ctx, layoutRef.current, project, apexRef.current, labelizeRef.current, w, h, backgroundRef.current);
 
     // apex の画面座標を通知（ラベル入力欄をノード近くに置く用途）
     const cb = onApexScreenPosRef.current;
@@ -528,10 +517,10 @@ export const ClimberWorldLineCanvasView: FC<WorldLinesCanvasViewProps> = ({
     renderFrame();
   }, [layout, apexNodeId, setTarget, renderFrame]);
 
-  // summary / label だけの変化（フォーカスは動かさず描画だけ更新）
+  // label だけの変化（フォーカスは動かさず描画だけ更新）
   useEffect(() => {
     renderFrame();
-  }, [summarize, labelize, renderFrame]);
+  }, [labelize, renderFrame]);
 
   // 自前スクロール: wheel でフォーカスを動かす（縦＝時間軸／横＝分岐パン）
   useEffect(() => {

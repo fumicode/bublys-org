@@ -4,11 +4,14 @@
  * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
  * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、囲碁などと同じ共通ビュー
- * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。
+ * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。時間が左から右へ流れ、分岐は
+ * 下へ伸びるので、長い世界線を辿りやすい。
+ * （勤務表専用の「木登り」ビュー ClimberWorldLineCanvasView も ui に置いてあるが、
+ *   いまは使っていない。renderCanvas に渡せば差し替えられる）
  *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
  *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
- *   - 各ノードの要約は勤務表の割当件数。
+ *   - ノード要約は出さない（操作の詳細は操作履歴パネルで見る）。
  *   - Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ。
  *
  * 「完成レポートを作成」ボタンは勤務表（ScheduleGrid）側に移した。ここは純粋に
@@ -18,28 +21,16 @@ import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   WorldLineScopeView,
-  useScopeNodeSummaries,
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
-import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
 import { useScheduleHistory } from "./useScheduleHistory.js";
-import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 type Props = {
   scheduleId: string;
 };
 
-const formatAssignments = (s: unknown) =>
-  `${(s as MonthlyStaffSchedule).assignments.length}件`;
-
 export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
   const { scope, restore } = useScheduleHistory(scheduleId);
-  const getNodeSummary = useScopeNodeSummaries(
-    scope,
-    SCHEDULE_TYPE,
-    scheduleId,
-    formatAssignments
-  );
 
   // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。すべて restore 経由で
   // アプリ全体スコープへ反映する（共通の moveToSiblingBranch は scope.moveTo を使うので
@@ -89,7 +80,6 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
     <StyledWrap>
       <WorldLineScopeView
         scope={scope}
-        getNodeSummary={getNodeSummary}
         keyBindings={keyBindings}
         onSelectNode={restore}
         nameable

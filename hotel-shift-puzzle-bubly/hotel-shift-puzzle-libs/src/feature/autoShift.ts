@@ -33,7 +33,8 @@ export type { AutoShiftStep, AutoShiftStepResult };
  *   - 希望なし                        → neutral
  *   - それ以外（複数希望・休み×勤務帯の同時希望・避けたい等）→ ambiguous
  */
-const decodeWish = (
+/** その日のその人の希望をデコードする（シフト提案ポリシー等からも利用） */
+export const decodeWishForStaff = (
   wish: StaffMonthlyShiftWish | undefined,
   day: WorkingDay,
   shiftIdByName: Map<string, string>
@@ -98,7 +99,8 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     staffIds: staffList.map((s) => s.id),
     shiftIdByName,
     shiftNameById,
-    preferenceOf: (staffId, day) => decodeWish(wishByStaff.get(staffId), day, shiftIdByName),
+    preferenceOf: (staffId, day) =>
+      decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
     isAvailable: availability
       ? (staffId, shiftId) => availability.isAllowed(staffId, shiftId)
       : undefined,

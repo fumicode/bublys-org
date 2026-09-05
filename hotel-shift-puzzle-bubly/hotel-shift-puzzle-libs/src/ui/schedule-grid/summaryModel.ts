@@ -27,6 +27,8 @@ export type SummaryRow = {
   ruleKey?: string;
   /** この人数を超えた日は赤く警告する（休み行の「1日の休み上限」など） */
   warnOver?: number;
+  /** 勤務帯行の代表 shiftId（同名勤務帯の先頭）。人数不足セルのホバー起点に使う。 */
+  shiftId?: string;
 };
 
 /**
@@ -100,6 +102,7 @@ export function buildSummaryRows(
         count: (i: number) =>
           g.shiftIds.reduce((sum, id) => sum + (countsByDay[i].get(id) ?? 0), 0),
         required: (i: number) => schedule.requiredFor(days[i], g.name),
+        shiftId: colorId,
       };
     }),
     {

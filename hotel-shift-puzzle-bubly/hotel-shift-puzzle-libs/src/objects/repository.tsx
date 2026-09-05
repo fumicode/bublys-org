@@ -19,10 +19,22 @@ import { APP_SCOPE_ID, saveObject, removeObject } from "./commit.js";
 
 export { APP_SCOPE_ID };
 
-/** その型の全オブジェクトを取得（クエリ・購読） */
+/** 空の結果を毎回同じ配列で返すための定数（識別子を安定させる） */
+const EMPTY_OBJECTS: readonly never[] = [];
+
+/**
+ * その型の全オブジェクトを取得（クエリ・購読）
+ *
+ * useCasScope は毎レンダー新しい scope オブジェクトを返すので、scope を依存にすると
+ * 中身が変わっていなくても毎回新しい配列になる。中身が同じなら同じ配列を返すよう、
+ * shells（scope 内部で memo 済み）の識別子だけに依存させる。
+ * 呼び出し側がこの配列を useMemo/useEffect の依存に置けるようにするため。
+ */
 export function useObjects<T>(type: string): T[] {
   const scope = useCasScope(APP_SCOPE_ID);
-  return useMemo(() => scope.shells<T>(type).map((s) => s.object), [scope, type]);
+  const shells = scope.shells<T>(type);
+  const objects = useMemo(() => shells.map((s) => s.object), [shells]);
+  return objects.length === 0 ? (EMPTY_OBJECTS as unknown as T[]) : objects;
 }
 
 /** IDで単体取得（クエリ・購読、読み取り専用） */

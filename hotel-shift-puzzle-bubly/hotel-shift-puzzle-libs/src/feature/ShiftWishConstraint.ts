@@ -74,6 +74,8 @@ export function wishMismatchFor(
 export class ShiftWishConstraint implements ScheduleConstraint {
   readonly type = SHIFT_WISH_MISMATCH;
   readonly label = "希望";
+  /** 対象セル（そのスタッフ・その日）だけを見る（他のどのセルにも影響しない） */
+  readonly scope = "cell" as const;
 
   constructor(private readonly ctx: Context) {}
 

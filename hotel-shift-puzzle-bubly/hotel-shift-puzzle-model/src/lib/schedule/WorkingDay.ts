@@ -39,12 +39,20 @@ export class WorkingDay {
     return this.state.day;
   }
 
-  /** 一意キー・ISO日付 "2026-06-01"（辞書順でソート可能） */
+  /**
+   * 一意キー・ISO日付 "2026-06-01"（辞書順でソート可能）
+   * 索引や比較で多用されるので、不変であることを利用して初回だけ組み立てる。
+   */
+  private cachedKey?: string;
+
   get key(): string {
-    const yyyy = String(this.state.year).padStart(4, "0");
-    const mm = String(this.state.month).padStart(2, "0");
-    const dd = String(this.state.day).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    if (this.cachedKey === undefined) {
+      const yyyy = String(this.state.year).padStart(4, "0");
+      const mm = String(this.state.month).padStart(2, "0");
+      const dd = String(this.state.day).padStart(2, "0");
+      this.cachedKey = `${yyyy}-${mm}-${dd}`;
+    }
+    return this.cachedKey;
   }
 
   /** "6/1" のような短い表示 */
