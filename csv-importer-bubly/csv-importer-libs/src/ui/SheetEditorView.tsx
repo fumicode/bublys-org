@@ -185,22 +185,10 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
         <div className="e-subbar-left">
           {objectMode ? (
             <>
-              <span className="e-object-hint" title="⠿ を掴んで他のバブリへドラッグできます">⠿ で掴む</span>
               {onChangeTitleColumn && (
-                <label className="e-title-col">
-                  名前列
-                  <select
-                    value={titleColumnId ?? ""}
-                    onChange={(e) => onChangeTitleColumn(e.target.value)}
-                  >
-                    <option value="">（行番号）</option>
-                    {columns.map((col) => (
-                      <option key={col.id} value={col.id}>
-                        {col.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <span className="e-object-hint">
+                  見出しをクリックすると名前にする列を選べます
+                </span>
               )}
             </>
           ) : (
@@ -235,7 +223,17 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
         <table className="e-table">
           <thead>
             <tr>
-              <th className="e-row-num">
+              <th
+                className={`e-row-num ${
+                  objectMode && !titleColumnId ? "is-title" : ""
+                } ${objectMode && onChangeTitleColumn ? "is-pickable" : ""}`}
+                onClick={
+                  objectMode && onChangeTitleColumn
+                    ? () => onChangeTitleColumn("")
+                    : undefined
+                }
+                title={objectMode ? "行番号を名前にする" : undefined}
+              >
                 <span className="e-row-num-inner">
                   <span className="e-drag-handle" style={{ visibility: "hidden" }} aria-hidden>
                     ⠿
@@ -244,7 +242,28 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                 </span>
               </th>
               {columns.map((col) => (
-                <th key={col.id} className="e-header-cell">
+                <th
+                  key={col.id}
+                  className={`e-header-cell ${
+                    objectMode && titleColumnId === col.id ? "is-title" : ""
+                  } ${
+                    editingHeader?.columnId === col.id ? "" : "is-clickable"
+                  } ${objectMode && onChangeTitleColumn ? "is-pickable" : ""}`}
+                  /* 当たり判定は本文のセルと同じくセル全体。span に付けると
+                     文字の高さ分しか当たらない。 */
+                  onClick={
+                    editingHeader?.columnId === col.id
+                      ? undefined
+                      : objectMode
+                      ? () => onChangeTitleColumn?.(col.id)
+                      : () => handleHeaderClick(col.id, col.name)
+                  }
+                  title={
+                    objectMode
+                      ? `${col.name} を名前にする`
+                      : "クリックで列名を変更"
+                  }
+                >
                   {editingHeader?.columnId === col.id ? (
                     <input
                       ref={inputRef}
@@ -256,15 +275,16 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                     />
                   ) : (
                     <div className="e-header-content">
-                      <span
-                        className="e-header-name"
-                        onClick={() => handleHeaderClick(col.id, col.name)}
-                      >
-                        {col.name}
-                      </span>
+                      {/* Object 表示では本文と同じく「編集しない」で揃える。
+                          見出しのクリックは改名ではなく、この列を名前にする操作。
+                          クリックは th 側で受ける（当たり判定をセル全体にするため）。 */}
+                      <span className="e-header-name">{col.name}</span>
                       <button
                         className="e-delete-col"
-                        onClick={() => onDeleteColumn(col.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteColumn(col.id);
+                        }}
                         title="列を削除"
                         style={objectMode ? { visibility: "hidden" } : undefined}
                         tabIndex={objectMode ? -1 : undefined}
@@ -388,6 +408,10 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 };
 
 const StyledEditor = styled.div`
+  /* 「これが名前」を示す色。ラベル行とオブジェクト行で必ず同じにする。
+     冠の金（#c9962b）と同じ暖色系で、文字として読める濃さに寄せた朱橙。 */
+  --name-color: #b3540c;
+
   .e-header {
     display: flex;
     align-items: center;
@@ -523,26 +547,6 @@ const StyledEditor = styled.div`
     color: #999;
   }
 
-  .e-title-col {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    white-space: nowrap;
-    font-size: 0.8em;
-    color: #7b1fa2;
-
-    select {
-      flex: none;
-      min-width: 84px;
-      font-size: inherit;
-      padding: 2px 4px;
-      border: 1px solid #ce93d8;
-      border-radius: 3px;
-      background: #fff;
-      color: #7b1fa2;
-    }
-  }
 
   .e-export-btn {
     padding: 4px 12px;
@@ -681,9 +685,16 @@ const StyledEditor = styled.div`
         cursor: grab;
       }
 
+      /* Row 表示の「このセルは編集できる」ハイライト（.e-cell-value:hover）を打ち消す。
+         Object 表示では 1行がひとつのモノなので、セル単位で光ると帯が途切れて見える。
+         反応は行全体（&:hover td）で返す。 */
+      .e-cell-value:hover {
+        background: none;
+      }
+
       .e-cell.is-title .e-cell-value {
         font-weight: bold;
-        color: #6a1b9a;
+        color: var(--name-color);
       }
 
       &:hover td {
@@ -736,6 +747,71 @@ const StyledEditor = styled.div`
     background: #f0f0f0;
   }
 
+  /* Object 表示では見出し行が「名前にする列」の選択になる。
+     本文のセルが編集ではなく詳細を開くのと揃えて、見出しも改名しない。 */
+  /* 当たり判定は本文のセルと同じくセル全体。ホバーもセル全体で返す。 */
+  .e-table thead th.is-clickable {
+    cursor: pointer;
+
+    &:hover {
+      background: #e6e6e6;
+    }
+  }
+
+  .e-table thead th.is-pickable.is-clickable:hover {
+    background: #f5eef9;
+  }
+
+  /* 名前になっている列の見出しは、塗りつぶさず上の罫線に印を載せる。
+     罫線を印の地色で切って、そこに ★ が挟まっているように見せる。
+     絶対配置なのでレイアウトには影響しない（列位置は動かない）。 */
+  .e-table thead th.is-title {
+    /* 罫線の上下でそれぞれの地色。列によって見出しの地色が違うので変数にする。 */
+    --marker-outer-bg: hsla(0, 0%, 100%, 0.95);
+    --marker-cell-bg: #f0f0f0;
+
+    /* position は書かない。この th は既に sticky（＝配置済み要素）なので
+       ::before の絶対配置はこの th を基準に効く。relative を足すと
+       sticky を上書きしてラベル行が固定されなくなる。 */
+
+    .e-header-name,
+    .e-row-index {
+      color: var(--name-color);
+      font-weight: bold;
+    }
+
+    /* 冠。罫線と同じ高さ帯に収まる横長（44x12）のシルエットで、
+       台座が罫線にまたがって「この列が名前」を示す。 */
+    &::before {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      width: 46px;
+      height: 12px;
+      /* 印は罫線をまたぐので、地色も罫線で切り替える。
+         罫線より上（セルの外）は表の外側の地色、下（セルの中）は見出しの地色。
+         1色で塗ると、外にはみ出した分が見出し色の汚れとして残る。 */
+      background-color: transparent;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 12'%3E%3Cpath d='M4 10.4 L4 3.6 L10 7.6 L16 2.4 L22 7.2 L28 2.4 L34 7.6 L40 3.6 L40 10.4 Z' fill='%23c9962b'/%3E%3Ccircle cx='4' cy='2.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='16' cy='1.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='28' cy='1.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='40' cy='2.6' r='1.5' fill='%23c9962b'/%3E%3Crect x='4' y='8.4' width='36' height='2.6' rx='0.7' fill='%23a8781c'/%3E%3C/svg%3E"),
+        linear-gradient(
+          to bottom,
+          var(--marker-outer-bg) 0 10px,
+          var(--marker-cell-bg) 10px
+        );
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;
+    }
+  }
+
+  /* # の見出し（＝行番号を名前にする）はセルの地色が違う */
+  .e-table thead th.e-row-num.is-title {
+    --marker-cell-bg: #f8f8f8;
+  }
+
   .e-header-cell {
     background: #f0f0f0;
     min-width: 120px;
@@ -748,14 +824,12 @@ const StyledEditor = styled.div`
     }
 
     .e-header-name {
-      cursor: pointer;
       flex: 1;
       font-weight: bold;
-
-      &:hover {
-        background: #e0e0e0;
-        border-radius: 2px;
-      }
+      /* 本文の .e-cell-value と同じ高さ。文字だけだと当たり判定が薄くなる。 */
+      min-height: 24px;
+      display: flex;
+      align-items: center;
     }
 
     .e-delete-col {
@@ -800,6 +874,7 @@ const StyledEditor = styled.div`
       cursor: text;
       min-height: 24px;
 
+      /* 「このセルは編集できる」合図。Object 表示では tr.is-object 側で打ち消す。 */
       &:hover {
         background: #f9f9f9;
       }
