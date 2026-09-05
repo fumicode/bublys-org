@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useState, useRef, useEffect, useCallback } from "react";
+import { FC, ReactNode, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import styled from "styled-components";
 import { setDragPayload, getDragType } from "@bublys-org/bubbles-ui";
 import type { CsvColumnState, CsvRowState, PlaneObject } from "@bublys-org/csv-importer-model";
@@ -65,6 +65,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   // 行の「意味」（掴めるオブジェクトかどうか）だけが変わる。
   const [isObjectMode, setIsObjectMode] = useState(false);
   const canShowObjects = !!objects && !!buildObjectUrl;
+  // 空行は PlaneObject にならないので、行との対応は添字ではなく id で引く。
+  const objectByRowId = useMemo(
+    () => new Map((objects ?? []).map((o) => [String(o.id), o])),
+    [objects]
+  );
   const objectMode = isObjectMode && canShowObjects;
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -309,14 +314,16 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
           </thead>
           <tbody>
             {rows.map((row, rowIdx) => {
-              const obj = objects?.[rowIdx];
+              const obj = objectByRowId.get(row.id);
+              // 全列が空の行はまだオブジェクトではない。行は残すが掴めない。
+              const isObjectRow = objectMode && !!obj;
               return (
               <tr
                 key={row.id}
-                className={objectMode ? "is-object" : ""}
-                draggable={objectMode}
+                className={isObjectRow ? "is-object" : ""}
+                draggable={isObjectRow}
                 onDragStart={
-                  objectMode && obj && buildObjectUrl
+                  isObjectRow && obj && buildObjectUrl
                     ? (e) => {
                         // ObjectView と同じ規約: 型つきドラッグ + application/json で実データも運ぶ
                         setDragPayload(e, {
@@ -331,14 +338,14 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                 }
               >
                 <td className="e-row-num">
-                  {/* 行番号は位置の目印なので常に出す。つまみは表示のときも
+                  {/* 行番号は位置の目印なので常に出す。つまみは掴めないときも
                       visibility: hidden で場所だけ確保し、番号が動かないようにする。 */}
                   <span className="e-row-num-inner">
                     <span
                       className="e-drag-handle"
                       title="ドラッグして他のバブリへ渡す"
-                      style={objectMode ? undefined : { visibility: "hidden" }}
-                      aria-hidden={!objectMode}
+                      style={isObjectRow ? undefined : { visibility: "hidden" }}
+                      aria-hidden={!isObjectRow}
                     >
                       ⠿
                     </span>
@@ -350,7 +357,7 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                   const isEditing =
                     editingCell?.rowId === row.id &&
                     editingCell?.columnId === col.id;
-                  const isTitle = objectMode && titleColumnId === col.id;
+                  const isTitle = isObjectRow && titleColumnId === col.id;
                   return (
                     <td
                       key={col.id}
@@ -370,7 +377,7 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                           className="e-cell-value"
                           onClick={() =>
                             objectMode
-                              ? onSelectObject?.(row.id)
+                              ? isObjectRow && onSelectObject?.(row.id)
                               : handleCellClick(row.id, col.id, value)
                           }
                         >

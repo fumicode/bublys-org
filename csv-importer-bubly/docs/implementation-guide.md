@@ -111,11 +111,21 @@ CSVの内部データ（columnId → valueの辞書形式）を、**ラベル名
 | `sheet.deleteRow(rowId)` | 行を削除 | 新しいCsvSheet |
 | `sheet.updateCell(rowId, columnId, value)` | セルの値を更新 | 新しいCsvSheet |
 | `sheet.rename(name)` | シート名を変更 | 新しいCsvSheet |
-| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換 | PlaneObject \| undefined |
-| `sheet.toPlaneObjects(titleColumnId?)` | 全行をPlaneObject配列に変換 | PlaneObject[] |
+| `sheet.isEmptyRow(rowId)` | 全列が空（空白のみ含む）の行か | boolean |
+| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換。空行は undefined | PlaneObject \| undefined |
+| `sheet.toPlaneObjects(titleColumnId?)` | 中身のある行だけをPlaneObject配列に変換 | PlaneObject[] |
 | `sheet.toCsvText()` | CSV形式のテキストに変換（エクスポート用） | 文字列 |
 | `sheet.toJSON()` | 保存用のプレーンオブジェクトに変換 | CsvSheetState |
 | `CsvSheet.fromJSON(json)` | プレーンオブジェクトからCsvSheetを復元 | CsvSheet |
+
+**PlaneObject 変換のルール**
+
+- **全列が空の行はオブジェクトにしない**。表には行として残る（「+ 行を追加」直後の行など）が、
+  空文字だけのオブジェクトを他のバブリへ渡しても意味がないため変換対象から外す。
+  空白のみのセルも空とみなす
+- **名前は表示（# 列）と同じ 1 始まりの行番号**。タイトル列を指定していても、
+  そのセルが空なら行番号にフォールバックする
+- **空行を飛ばしても行番号は詰めない**。1行目と3行目だけ中身があれば名前は `"1"` と `"3"`
 
 **重要な設計原則: 不変性（イミュータビリティ）**
 

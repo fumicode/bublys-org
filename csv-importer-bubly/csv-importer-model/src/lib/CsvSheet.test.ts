@@ -155,6 +155,75 @@ describe("CsvSheet", () => {
     });
   });
 
+  describe("toPlaneObjects", () => {
+    const build = () =>
+      CsvSheet.fromCsvText("変換", "名前,部署\n山田,フロント\n,予約\n佐藤,宿泊");
+
+    it("タイトル列を指定しないと行番号が名前になる（表示と同じ 1 始まり）", () => {
+      const sheet = build();
+      const objects = sheet.toPlaneObjects();
+      expect(objects.map((o) => o.name)).toEqual(["1", "2", "3"]);
+    });
+
+    it("タイトル列の値が名前になる", () => {
+      const sheet = build();
+      const nameCol = sheet.columns[0];
+      const objects = sheet.toPlaneObjects(nameCol.id);
+      expect(objects.map((o) => o.name)).toEqual(["山田", "2", "佐藤"]);
+    });
+
+    it("列名をキーにした平坦なオブジェクトになる", () => {
+      const sheet = build();
+      const [first] = sheet.toPlaneObjects();
+      expect(first).toMatchObject({ 名前: "山田", 部署: "フロント" });
+      expect(first.id).toBe(sheet.rows[0].id);
+    });
+
+    /** fromCsvText は空行を読み飛ばすので、途中の空行はセルを消して作る */
+    const withEmptyMiddleRow = (blank: string) => {
+      const base = CsvSheet.fromCsvText(
+        "変換",
+        "名前,部署\n山田,フロント\n中村,予約\n佐藤,宿泊"
+      );
+      const midId = base.rows[1].id;
+      return base.columns.reduce((s, col) => s.updateCell(midId, col.id, blank), base);
+    };
+
+    it("全列が空の行はオブジェクトにしない", () => {
+      const sheet = withEmptyMiddleRow("");
+      expect(sheet.rows).toHaveLength(3); // 行自体は消さない
+      const objects = sheet.toPlaneObjects();
+      expect(objects).toHaveLength(2);
+      // 空行を飛ばしても行番号は詰めない（表の # と一致させる）
+      expect(objects.map((o) => o.name)).toEqual(["1", "3"]);
+    });
+
+    it("空白だけの行も空とみなす", () => {
+      const sheet = withEmptyMiddleRow("   ");
+      expect(sheet.toPlaneObjects()).toHaveLength(2);
+      expect(sheet.isEmptyRow(sheet.rows[1].id)).toBe(true);
+      expect(sheet.isEmptyRow(sheet.rows[0].id)).toBe(false);
+    });
+
+    it("空行を単体で変換すると undefined", () => {
+      const sheet = withEmptyMiddleRow("");
+      expect(sheet.toPlaneObject(sheet.rows[1].id)).toBeUndefined();
+      expect(sheet.toPlaneObject(sheet.rows[2].id)?.name).toBe("3");
+    });
+
+    it("追加した直後の空行はオブジェクトにならない", () => {
+      const sheet = CsvSheet.create("テスト", ["A", "B"]).addRow();
+      expect(sheet.rows).toHaveLength(1);
+      expect(sheet.toPlaneObjects()).toHaveLength(0);
+    });
+
+    it("toPlaneObject も同じ番号を返す", () => {
+      const sheet = build();
+      const second = sheet.toPlaneObject(sheet.rows[1].id);
+      expect(second?.name).toBe("2");
+    });
+  });
+
   describe("immutability", () => {
     it("操作は新しいインスタンスを返す", () => {
       const sheet = CsvSheet.create("テスト", ["A"]);

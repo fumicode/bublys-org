@@ -164,17 +164,38 @@ export class CsvSheet {
 
   // --- PlaneObject変換 ---
 
-  /** 指定行をPlaneObjectに変換する */
+  /**
+   * 全列が空の行は「まだ中身が無い」＝オブジェクトではないとみなす。
+   * 表には行として残るが、渡す相手にとっては空文字だけのオブジェクトに
+   * 意味がないので変換対象から外す。
+   */
+  isEmptyRow(rowId: string): boolean {
+    const row = this.state.rows.find((r) => r.id === rowId);
+    return row ? this.isEmpty(row) : true;
+  }
+
+  private isEmpty(row: CsvRowState): boolean {
+    return this.state.columns.every(
+      (col) => (row.cells[col.id] ?? "").trim() === ""
+    );
+  }
+
+  /** 指定行をPlaneObjectに変換する。空行は undefined */
   toPlaneObject(rowId: string, titleColumnId?: string): PlaneObject | undefined {
     const index = this.state.rows.findIndex((r) => r.id === rowId);
     if (index === -1) return undefined;
-    return this.buildPlaneObject(this.state.rows[index], index, titleColumnId);
+    const row = this.state.rows[index];
+    if (this.isEmpty(row)) return undefined;
+    return this.buildPlaneObject(row, index, titleColumnId);
   }
 
-  /** 全行をPlaneObject配列に変換する */
+  /**
+   * 中身のある行だけをPlaneObject配列に変換する。
+   * 行番号は元の並び順のまま（空行を飛ばしても番号は詰めない）。
+   */
   toPlaneObjects(titleColumnId?: string): PlaneObject[] {
-    return this.state.rows.map((row, index) =>
-      this.buildPlaneObject(row, index, titleColumnId)
+    return this.state.rows.flatMap((row, index) =>
+      this.isEmpty(row) ? [] : [this.buildPlaneObject(row, index, titleColumnId)]
     );
   }
 
@@ -183,9 +204,10 @@ export class CsvSheet {
     index: number,
     titleColumnId?: string,
   ): PlaneObject {
-    const name = titleColumnId
-      ? (row.cells[titleColumnId] || `${index}`)
-      : `${index}`;
+    // 行番号は表示（#列）と揃えて 1 始まり。0 始まりだと表の「1行目」が
+    // オブジェクト名 "0" になって食い違う。
+    const rowNumber = `${index + 1}`;
+    const name = titleColumnId ? row.cells[titleColumnId] || rowNumber : rowNumber;
     const obj: PlaneObject = { id: row.id, name };
     for (const col of this.state.columns) {
       obj[col.name] = row.cells[col.id] ?? "";
