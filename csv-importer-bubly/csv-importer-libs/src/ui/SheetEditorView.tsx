@@ -243,7 +243,7 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                   <span className="e-drag-handle" style={{ visibility: "hidden" }} aria-hidden>
                     ⠿
                   </span>
-                  <span className="e-row-index">#</span>
+                  <span className="e-row-index">行番号</span>
                 </span>
               </th>
               {columns.map((col) => (
@@ -628,7 +628,10 @@ const StyledEditor = styled.div`
     }
 
     .e-row-num {
-      width: 44px;
+      /* 見出しの「行番号」が入る幅。本文は数字だけだが、列幅は見出しで決まる。
+         Row / Object どちらでも同じ幅なので切り替えで列位置は動かない。 */
+      width: 64px;
+      white-space: nowrap;
       background: #f8f8f8;
       color: #999;
       font-size: 0.85em;
