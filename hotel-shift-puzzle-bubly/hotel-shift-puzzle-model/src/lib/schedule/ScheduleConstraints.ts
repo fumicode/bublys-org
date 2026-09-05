@@ -3,6 +3,7 @@ import { ShiftLeaderConstraint } from "./ShiftLeaderConstraint.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
+import { RequiredStaffingConstraint } from "./RequiredStaffingConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 
 /**
@@ -92,8 +93,8 @@ export class ScheduleConstraints {
 
   /**
    * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
-   * （責任者・連勤上限・月最低休日・1日の休み上限。希望違反は feature 層＋実行時データ依存
-   *  なので含まない——feature 側で足す。）
+   * （責任者・連勤上限・月最低休日・1日の休み上限・必要人数。希望違反は feature 層＋実行時
+   *  データ依存なので含まない——feature 側で足す。）
    * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
    */
   modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
@@ -102,6 +103,7 @@ export class ScheduleConstraints {
       ...this.leaderConstraints(shiftIdsOf),
       new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
       new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
+      new RequiredStaffingConstraint(shiftIdsOf),
     ];
   }
 

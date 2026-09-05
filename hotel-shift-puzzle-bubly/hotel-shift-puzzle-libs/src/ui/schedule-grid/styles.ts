@@ -672,6 +672,44 @@ export const StyledWrap = styled.div`
       height: 7px;
     }
   }
+
+  /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
+     クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
+     （ScheduleGridView 側のホバー検出を参照）。 */
+  .e-constraint-fix-hint {
+    position: absolute;
+    transform: translate(-50%, 6px);
+    z-index: 5;
+    max-width: 220px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 253, 245, 0.98);
+    border: 1px solid rgba(239, 108, 0, 0.4);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    font-size: 0.95em;
+    color: #5d4037;
+    line-height: 1.4;
+
+    p {
+      margin: 0 0 6px;
+    }
+
+    button {
+      border: 1px solid #ef6c00;
+      border-radius: 5px;
+      background: #fff3e0;
+      color: #e65100;
+      font-size: 0.95em;
+      font-weight: 600;
+      padding: 3px 8px;
+      cursor: pointer;
+
+      &:hover {
+        background: #ffe0b2;
+      }
+    }
+  }
+
   /* 部署グループヘッダー行（全カラムスパン） */
   .e-dept-label {
     position: sticky;
@@ -706,5 +744,50 @@ export const StyledWrap = styled.div`
   }
   .e-undecided {
     color: #d0d0d0;
+  }
+
+  /* 確定提案セル: 制約から一意に決まった値を「まだ入っていない」形で見せる。
+     確定済みセルと同じ勤務帯色・同じ数字を使いつつ、薄く・破線で囲うことで
+     「承認すればこうなる」と読ませる（Tab で承認）。 */
+  .e-forced {
+    .e-forced-value {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.6em;
+      padding: 0 3px;
+      border: 1px dashed rgba(0, 0, 0, 0.35);
+      border-radius: 4px;
+      opacity: 0.5;
+      font-weight: bold;
+      font-size: 1.05em;
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  /* 選択中は提案を少しはっきりさせる（今まさに Tab で承認できる場所） */
+  .e-forced.is-selected .e-forced-value {
+    opacity: 0.75;
+  }
+
+  /* 詰みセル: 候補が1つも無い＝この先どうやっても埋められない。
+     違反マーカー（右上の ⊿・下端の赤帯）は「今の割当が違反している」印なので、
+     こちらは地を斜線ハッチにして「入れる値が無い」ことを別の見た目で言い分ける。 */
+  .e-dead {
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(211, 47, 47, 0.06),
+      rgba(211, 47, 47, 0.06) 3px,
+      rgba(211, 47, 47, 0.16) 3px,
+      rgba(211, 47, 47, 0.16) 6px
+    );
+    .e-dead-mark {
+      color: #d32f2f;
+      opacity: 0.65;
+      font-weight: bold;
+      font-size: 1.05em;
+    }
+  }
+  .e-dead.is-selected .e-dead-mark {
+    opacity: 0.9;
   }
 `;

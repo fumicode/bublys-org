@@ -18,6 +18,8 @@ export * from './schedule/ScheduleAvailability.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
+// 操作履歴（ノウハウ可視化。勤務表ローカル世界線に相乗り）
+export * from './schedule/ScheduleEditLog.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
 export * from './schedule/ShiftLeaderRule.js';
@@ -32,6 +34,7 @@ export * from './schedule/fulfillWishesStep.js';
 export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';
 export * from './schedule/satisfyLeaderRulesStep.js';
+export * from './schedule/resolveAmbiguousLeaderSlotsStep.js';
 export * from './schedule/minDayOffStep.js';
 export * from './schedule/autoShiftSteps.js';
 
@@ -41,3 +44,11 @@ export * from './schedule/ScheduleConstraint.js';
 export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
+export * from './schedule/RequiredStaffingConstraint.js';
+
+// 候補集合（まだ決まっていないセルに入れられる値を、制約から絞り込んで持つ）
+export * from './schedule/cellCandidates.js';
+export * from './schedule/affectedCells.js';
+export * from './schedule/ScheduleCandidates.js';
+export * from './schedule/computeCandidates.js';
+export * from './schedule/repairDeadCell.js';
