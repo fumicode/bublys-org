@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ScheduleWorldLineTreeView — 勤務表の成果木ビュー（読み取り専用）
+ * ScheduleWorldLineTreeView — 勤務表のキセキの木ビュー（読み取り専用）
  *
  * ScheduleWorldLineView（世界線ビュー・canvas版、編集中の操作向け）とは別に、
  * 「作成後の評価」として世界線グラフを木のビジュアルに変換して見せるビュー。

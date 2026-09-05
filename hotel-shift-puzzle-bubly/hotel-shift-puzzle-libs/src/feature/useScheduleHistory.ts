@@ -12,8 +12,9 @@
  */
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { useAppStore } from "@bublys-org/state-management";
+import { ScheduleEditLog } from "@bublys-org/hotel-shift-puzzle-model";
 import { APP_SCOPE_ID, localScopeId, commitToScope } from "../objects/commit.js";
-import { SCHEDULE_TYPE } from "../objects/hotelObjects.js";
+import { SCHEDULE_TYPE, SCHEDULE_EDIT_LOG_TYPE } from "../objects/hotelObjects.js";
 
 export function useScheduleHistory(scheduleId: string) {
   const scope = useCasScope(localScopeId(SCHEDULE_TYPE, scheduleId));
@@ -23,11 +24,25 @@ export function useScheduleHistory(scheduleId: string) {
     scope.moveTo(nodeId);
     // このローカル世界線に属する「全オブジェクト」（Schedule + ScheduleAvailability 等）を
     // その時点の状態でアプリ全体スコープへ反映する（まとめて巻き戻し）。
-    for (const ref of scope.graph.getStateRefsAt(nodeId)) {
+    const refs = scope.graph.getStateRefsAt(nodeId);
+    for (const ref of refs) {
       const obj = scope.getObjectAt<unknown>(nodeId, ref.type, ref.id);
       if (obj !== null && obj !== undefined) {
         commitToScope(store, APP_SCOPE_ID, ref.type, obj);
       }
+    }
+    // EditLog がそのノードにまだ無い（初回記録より前）なら、空ログを APP へ戻す。
+    // そうしないと子ノードのログが APP に残り、操作履歴パネルが時間移動とずれる。
+    const hasEditLog = refs.some(
+      (r) => r.type === SCHEDULE_EDIT_LOG_TYPE && r.id === scheduleId
+    );
+    if (!hasEditLog) {
+      commitToScope(
+        store,
+        APP_SCOPE_ID,
+        SCHEDULE_EDIT_LOG_TYPE,
+        ScheduleEditLog.empty(scheduleId)
+      );
     }
   };
 

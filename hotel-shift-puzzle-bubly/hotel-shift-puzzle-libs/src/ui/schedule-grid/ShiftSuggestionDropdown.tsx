@@ -15,8 +15,8 @@ type ShiftSuggestionDropdownProps = {
 };
 
 /**
- * 勤務割当を選ぶドロップダウン（純粋表示）。
- * キーボード入力の候補とダブルクリックの選択肢を一本化したもの。
+ * 勤務割当の入力補助ドロップダウン（純粋表示）。
+ * キーボード入力・ダブルクリック用。AIの未来分岐提案とは別系統。
  * グリッドのキーボードフォーカスを奪わないよう、Menu ではなく Popper を使う。
  */
 export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({

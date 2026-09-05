@@ -28,7 +28,7 @@ describe('prioritizeStaffByLinkedReports（紐づけレポートによる自動�
     expect(prioritizeStaffByLinkedReports(staffList, [])).toEqual(staffList);
   });
 
-  test('貢献度スコア（妥協＋繁忙日対応の加重合計）が高いスタッフを先頭に安定ソートする', () => {
+  test('貢献度スコア（譲歩＋繁忙日対応の加重合計）が高いスタッフを先頭に安定ソートする', () => {
     const report = reportWithScores([
       { staffId: 'staff-A', score: 1 },
       { staffId: 'staff-C', score: 5 },
@@ -38,8 +38,8 @@ describe('prioritizeStaffByLinkedReports（紐づけレポートによる自動�
     expect(ordered.map((s) => s.id)).toEqual(['staff-C', 'staff-A', 'staff-B']);
   });
 
-  test('妥協が無くても繁忙日対応だけでスコアがあれば優先される（旧: 妥協件数のみでは反映されなかった）', () => {
-    // staff-B は妥協0件・繁忙日対応のみで score=3、staff-A は妥協由来の score=2
+  test('譲歩が無くても繁忙日対応だけでスコアがあれば優先される（旧: 譲歩件数のみでは反映されなかった）', () => {
+    // staff-B は譲歩0件・繁忙日対応のみで score=3、staff-A は譲歩由来の score=2
     const report = reportWithScores([
       { staffId: 'staff-A', score: 2 },
       { staffId: 'staff-B', score: 3 },

@@ -44,7 +44,7 @@ export type WishMismatch = {
  *   - 割当が「避けたい(×)」オプションに一致する          → 食い違い
  *   - 「したい(○)」が1つ以上あるのに、割当がそのどれでもない → 食い違い
  *   - その日に希望が無ければ判定しない
- * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの妥協検出
+ * グリッドの ⊿ 判定（{@link ShiftWishConstraint}）と、シフト完成レポートの譲歩検出
  * （buildScheduleReport）の両方から呼ばれる共通ロジック。
  */
 export function wishMismatchFor(
@@ -74,6 +74,8 @@ export function wishMismatchFor(
 export class ShiftWishConstraint implements ScheduleConstraint {
   readonly type = SHIFT_WISH_MISMATCH;
   readonly label = "希望";
+  /** 対象セル（そのスタッフ・その日）だけを見る（他のどのセルにも影響しない） */
+  readonly scope = "cell" as const;
 
   constructor(private readonly ctx: Context) {}
 

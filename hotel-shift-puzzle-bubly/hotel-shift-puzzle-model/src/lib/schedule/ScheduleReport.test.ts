@@ -76,7 +76,7 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
     expect(renamed.title).toBe('2026年6月');
   });
 
-  test('重みは既定で妥協×2・繁忙日×1', () => {
+  test('重みは既定で譲歩×2・繁忙日×1', () => {
     const base = create();
     expect(base.compromiseWeight).toBe(2);
     expect(base.busyDayWeight).toBe(1);
@@ -84,7 +84,7 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
 
   test('reweight で重みを変えると貢献度スコアが再計算される（不変）', () => {
     const base = create();
-    // staff-A: 妥協1・繁忙日1, staff-B: 妥協0・繁忙日1
+    // staff-A: 譲歩1・繁忙日1, staff-B: 譲歩0・繁忙日1
     const reweighted = base.reweight(1, 3);
 
     expect(reweighted.compromiseWeight).toBe(1);
@@ -93,7 +93,7 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
       { staffId: 'staff-A', compromiseCount: 1, busyDayCount: 1, score: 4 }, // 1*1+1*3
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 3 }, // 0*1+1*3
     ]);
-    // 生データ（妥協・繁忙日の事実）は変わらない
+    // 生データ（譲歩・繁忙日の事実）は変わらない
     expect(reweighted.compromises).toEqual(base.compromises);
     expect(reweighted.busyDayContributions).toEqual(base.busyDayContributions);
     // 元は不変

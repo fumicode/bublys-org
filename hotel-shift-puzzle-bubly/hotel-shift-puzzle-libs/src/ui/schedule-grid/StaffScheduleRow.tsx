@@ -8,11 +8,12 @@ import type {
   WorkingDay,
   ConstraintViolation,
   ShiftLeaderRule,
+  ShiftCell,
 } from "../../domain/index.js";
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
-import { wishText, type WishEntry } from "./wishSummary.js";
+import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
 
 type StaffScheduleRowProps = {
@@ -24,13 +25,10 @@ type StaffScheduleRowProps = {
   violations: ConstraintViolation[];
   /** スタッフ×日 → 希望エントリ */
   getWishEntries: (staffId: string, day: WorkingDay) => WishEntry[];
-  /** 希望行を開いているか */
-  expanded: boolean;
   /** キーボード操作でフォーカス中のセル（無ければ null） */
   selection: CellSelection | null;
   /** 選択セルで入力中のバッファ（Enter 確定前の文字列。null は非入力） */
   inputBuffer: string | null;
-  onToggleExpand: (staffId: string) => void;
   /** セルをシングルクリックで選択 */
   onSelectCell: (staffId: string, day: WorkingDay) => void;
   /** セルをダブルクリックで候補ドロップダウンを開く */
@@ -51,12 +49,21 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
+  candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /**
+   * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
+   * 渡された値は薄く描かれ、Tab で承認できる。
+   */
+  forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
+  /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */
+  isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
 };
 
 /**
  * スタッフ 1 人ぶんの行。
- * 左ヘッダ（名前・希望行トグル）＋各日のセル＋右端の休み合計。展開時は希望行を真下に並べる。
- * grid の直接の子になるよう Fragment で並べる。
+ * 左ヘッダ（名前）＋各日のセル＋右端の休み合計。grid の直接の子になるよう Fragment で並べる。
+ * 希望は各セルの円で読めるので、行を展開して希望行を出す機能は持たない。
  */
 export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   staff,
@@ -65,10 +72,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   shiftMap,
   violations,
   getWishEntries,
-  expanded,
   selection,
   inputBuffer,
-  onToggleExpand,
   onSelectCell,
   onOpenEditor,
   violationUrl,
@@ -79,14 +84,17 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  candidateHintOf,
+  forcedCellOf,
+  isDeadCell,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
   const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
   return (
     <>
-      {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開 / ドラッグ。
-          名前クリックで希望行の開閉。左に抽出用チェックボックス（任意）。 */}
+      {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
+          左に抽出用チェックボックス（任意）。 */}
       <div className={`e-staff-cell${rowMod}`}>
         {onToggleSelected && (
           <input
@@ -105,13 +113,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           openingPosition="bubble-side-left"
           fullWidth={true}
         >
-          <div
-            className="e-staff"
-            role="button"
-            title="クリックで希望を表示/非表示"
-            onClick={() => onToggleExpand(staff.id)}
-          >
-            <span className="e-caret">{expanded ? "▾" : "▸"}</span>
+          <div className="e-staff" title="ダブルクリックでスタッフ詳細を開く">
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
@@ -129,6 +131,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
       {days.map((day) => {
         const cell = schedule.statusOf(staff.id, day);
         const shift = cell.kind === "work" ? shiftMap.get(cell.shiftId) : undefined;
+        const forced =
+          cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
+        const dead =
+          cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
         const isSelected =
           selection?.staffId === staff.id && selection.day.equals(day);
@@ -145,6 +151,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             inputBuffer={isSelected ? inputBuffer : null}
             onSelect={() => onSelectCell(staff.id, day)}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
+            candidateHint={candidateHintOf?.(staff.id, day)}
+            forcedCandidate={forced}
+            dead={dead}
+            forcedShift={
+              forced?.kind === "work" ? shiftMap.get(forced.shiftId) : undefined
+            }
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}
           />
@@ -192,30 +204,6 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })()}
 
-      {/* 展開時: 希望行（割当行の真下に並べて比較できる） */}
-      {expanded && (
-        <>
-          <div className="e-wish-row-head">（希望）</div>
-          {days.map((day) => {
-            const entries = getWishEntries(staff.id, day);
-            return (
-              <div key={`wish:${staff.id}:${day.key}`} className="e-wish-row-cell">
-                {entries.length > 0 ? (
-                  entries.map((e, i) => (
-                    <span key={i} className={e.pref === "want" ? "is-want" : "is-avoid"}>
-                      {wishText(e)}
-                    </span>
-                  ))
-                ) : (
-                  <span className="e-empty">・</span>
-                )}
-              </div>
-            );
-          })}
-          {/* 休合計列ぶんの空セル（グリッド整列用） */}
-          <div className="e-off-total e-off-filler" />
-        </>
-      )}
     </>
   );
 };

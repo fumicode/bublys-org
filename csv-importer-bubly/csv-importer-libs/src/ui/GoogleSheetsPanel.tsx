@@ -13,6 +13,8 @@ export type GoogleSheetsPanelProps = {
   onUnlink: () => void;
   onPush: () => void;
   onPull: () => void;
+  /** 連携・同期の失敗理由。null なら何も出さない */
+  error?: string | null;
 };
 
 export const GoogleSheetsPanel: FC<GoogleSheetsPanelProps> = ({
@@ -25,6 +27,7 @@ export const GoogleSheetsPanel: FC<GoogleSheetsPanelProps> = ({
   onUnlink,
   onPush,
   onPull,
+  error,
 }) => {
   const [urlInput, setUrlInput] = useState("");
 
@@ -113,6 +116,8 @@ export const GoogleSheetsPanel: FC<GoogleSheetsPanelProps> = ({
           </div>
         </div>
       )}
+
+      {error && <div className="gs-error">{error}</div>}
     </StyledPanel>
   );
 };
@@ -129,6 +134,16 @@ const StyledPanel = styled.div`
     font-weight: bold;
     margin-bottom: 8px;
     color: #1a73e8;
+  }
+
+  .gs-error {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border: 1px solid #f5c2c0;
+    border-radius: 4px;
+    background: #fce8e6;
+    color: #c5221f;
+    word-break: break-word;
   }
 
   .gs-unlinked {

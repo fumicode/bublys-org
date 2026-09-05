@@ -41,13 +41,9 @@ export const scheduleReservationInfoUrl = (scheduleId: string): string =>
 export const scheduleWorldLineUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/world-line`;
 
-/** 完成木ビューバブル（SVG版・読み取り専用） */
+/** キセキの木ビューバブル（SVG版・読み取り専用） */
 export const scheduleWorldLineTreeUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/tree`;
-
-/** 自動シフト パネルバブル */
-export const scheduleAutoShiftUrl = (scheduleId: string): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/auto-shift`;
 
 /**
  * 抽出勤務表バブル（選択スタッフだけの勤務表）。
@@ -73,12 +69,16 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
-/** シフト完成レポートバブル（世界線ビューの「確定してレポート作成」から開く） */
+/** シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） */
 export const scheduleReportUrl = (reportId: string): string =>
   `hotel-shift-puzzle/schedule-reports/${reportId}`;
 
 /** シフト完成レポート一覧バブル（次回シフト作成前の参照用。勤務表一覧から開く） */
 export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-reports`;
+
+/** 操作履歴（ノウハウ可視化）バブル */
+export const scheduleEditLogUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;
 
 // オブジェクトの正規 URL を registry に登録（副作用）。libs の記述子からは url を外したので、
 // ObjectView(object=...) の url 解決はこの登録が担う。このモジュールは bubbleRoutes から

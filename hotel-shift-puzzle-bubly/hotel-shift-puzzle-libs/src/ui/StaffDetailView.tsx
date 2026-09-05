@@ -2,13 +2,25 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff } from "../domain/index.js";
+import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry } from "../domain/index.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import HandshakeIcon from "@mui/icons-material/Handshake";
+import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import { IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+
+/** 参照レポート（紐づけ済みの ScheduleReport）のうち、このスタッフに関する部分だけの読み取り専用サマリ */
+export type StaffLinkedReportSummary = {
+  report: ScheduleReport;
+  score: number;
+  compromises: CompromiseEntry[];
+  busyDays: BusyDayEntry[];
+  note: string;
+};
 
 type StaffDetailViewProps = {
   staff: Staff;
@@ -16,12 +28,15 @@ type StaffDetailViewProps = {
   onChangeDepartment?: (department: string) => void;
   /** 指定した年月のシフト希望エディタを開く */
   onOpenWish?: (year: number, month: number) => void;
+  /** このスタッフに関する参照レポートの評価（貢献度スコア・譲歩/繁忙日・配慮メモ）。読み取り専用 */
+  linkedReportSummaries?: StaffLinkedReportSummary[];
 };
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
   onChangeDepartment,
   onOpenWish,
+  linkedReportSummaries = [],
 }) => {
   const [year, setYear] = useState(2026);
   const [month, setMonth] = useState(6);
@@ -40,6 +55,15 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
 
   const cancelDept = () => {
     setEditingDept(false);
+  };
+
+  const dayLabel = (dayKey: string) => WorkingDay.fromKey(dayKey).label;
+  // 月単位の違反（休日不足など）は dayKeys が空。1日なら単日、複数日なら範囲で示す。
+  const dayRangeLabel = (dayKeys: string[]) => {
+    if (dayKeys.length === 0) return null;
+    const first = dayLabel(dayKeys[0]);
+    const last = dayLabel(dayKeys[dayKeys.length - 1]);
+    return dayKeys.length === 1 ? first : `${first}〜${last}`;
   };
 
   return (
@@ -136,6 +160,71 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               この月の希望を編集
             </button>
           </div>
+        </section>
+      )}
+
+      {linkedReportSummaries.length > 0 && (
+        <section className="e-section">
+          <h4>参照レポートでの評価</h4>
+          <ul className="e-linked-reports">
+            {linkedReportSummaries.map(({ report, score, compromises, busyDays, note }) => (
+              <li key={report.id} className="e-linked-report">
+                <div className="e-linked-report-head">
+                  <ObjectView
+                    object={report}
+                    label={report.title}
+                    draggable={false}
+                    openingPosition="bubble-side-right"
+                  >
+                    <span className="e-linked-report-title">
+                      <AssessmentIcon fontSize="inherit" className="e-icon-report" />
+                      {report.title}
+                    </span>
+                  </ObjectView>
+                  <span className="e-linked-report-score">スコア {score}</span>
+                </div>
+                {compromises.length > 0 && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">
+                      <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩
+                    </span>
+                    <ul className="e-compromise-days">
+                      {compromises.map((c, i) => {
+                        const range = dayRangeLabel(c.dayKeys);
+                        return (
+                          <li key={i}>
+                            <span className="e-compromise-tag">{c.label}</span>
+                            {range && <span className="e-compromise-range">{range}: </span>}
+                            {c.message}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                {busyDays.length > 0 && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">
+                      <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日対応
+                    </span>
+                    <ul className="e-busy-days">
+                      {busyDays.map((day) => (
+                        <li key={day.dayKey}>
+                          {dayLabel(day.dayKey)}（必要{day.requiredCount}人）
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {note && (
+                  <div className="e-detail-block">
+                    <span className="e-detail-label">配慮メモ</span>
+                    <p className="e-linked-report-note">{note}</p>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </StyledStaffDetail>
@@ -238,5 +327,103 @@ const StyledStaffDetail = styled.div`
         border-color: #90a4ae;
       }
     }
+  }
+
+  .e-linked-reports {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .e-linked-report {
+    padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .e-linked-report-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .e-linked-report-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #8d6e00;
+    cursor: pointer;
+  }
+
+  .e-icon-report {
+    color: #f9a825;
+  }
+
+  .e-linked-report-score {
+    margin-left: auto;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #555;
+    flex-shrink: 0;
+  }
+
+  .e-icon-compromise {
+    color: #6d4c41;
+  }
+
+  .e-icon-busy {
+    color: #e64a19;
+  }
+
+  .e-detail-block {
+    margin-top: 6px;
+  }
+
+  .e-detail-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78em;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 2px;
+  }
+
+  .e-compromise-days,
+  .e-busy-days {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8em;
+    color: #555;
+
+    li {
+      padding: 2px 0;
+    }
+  }
+
+  .e-compromise-tag {
+    display: inline-block;
+    border-radius: 4px;
+    background: #efebe9;
+    color: #6d4c41;
+    font-size: 0.85em;
+    padding: 0 5px;
+    margin-right: 4px;
+  }
+  .e-compromise-range {
+    color: #888;
+  }
+
+  .e-linked-report-note {
+    margin: 0;
+    font-size: 0.8em;
+    color: #555;
+    white-space: pre-wrap;
   }
 `;
