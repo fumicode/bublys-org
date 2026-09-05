@@ -148,18 +148,66 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 
   return (
     <StyledEditor>
+      {/* 1段目 = このシートは何か（名前）と、どう見るか（表示の切り替え）。 */}
       <div className="e-header">
         <h3 className="e-title">{sheetName}</h3>
-        <div className="e-header-actions">
-          {canShowObjects && (
+        {canShowObjects && (
+          <div
+            className="e-view-switch"
+            role="group"
+            aria-label="行の見方"
+            data-mode={objectMode ? "object" : "row"}
+          >
+            <span className="e-switch-knob" aria-hidden="true" />
             <button
-              className={`e-objects-btn ${objectMode ? "active" : ""}`}
-              onClick={() => setIsObjectMode((v) => !v)}
-              title={objectMode ? "表に戻す" : "行を掴めるオブジェクトとして表示する"}
+              className={!objectMode ? "is-on" : ""}
+              onClick={() => setIsObjectMode(false)}
+              aria-pressed={!objectMode}
+              title="表の行として編集する"
             >
-              オブジェクト
+              Row
             </button>
+            <button
+              className={objectMode ? "is-on" : ""}
+              onClick={() => setIsObjectMode(true)}
+              aria-pressed={objectMode}
+              title="掴んで渡せるオブジェクトとして扱う"
+            >
+              Object
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 2段目 = 左が表示ごとの操作、右がこのシート自体への操作（常に同じ位置）。
+          表示に関わらず必ず1行あるので、切り替えても表が上下に動かない。 */}
+      <div className="e-subbar">
+        <div className="e-subbar-left">
+          {objectMode ? (
+            <>
+              <span className="e-object-hint" title="⠿ を掴んで他のバブリへドラッグできます">⠿ で掴む</span>
+              {onChangeTitleColumn && (
+                <label className="e-title-col">
+                  名前列
+                  <select
+                    value={titleColumnId ?? ""}
+                    onChange={(e) => onChangeTitleColumn(e.target.value)}
+                  >
+                    <option value="">（行番号）</option>
+                    {columns.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </>
+          ) : (
+            <span className="e-table-hint">セルをクリックして編集</span>
           )}
+        </div>
+        <div className="e-subbar-right">
           {onExportCsv && (
             <button className="e-export-btn" onClick={onExportCsv}>
               エクスポート
@@ -334,27 +382,6 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
         <button className="e-btn" onClick={onAddRow}>
           + 行を追加
         </button>
-        {/* オブジェクト表示の操作は表の「下」に置く。上に置くと表がその分だけ
-            下へずれ、切り替えのたびに値の位置が動いてしまうため。 */}
-        {objectMode && onChangeTitleColumn && (
-          <div className="e-object-bar">
-            <span className="e-object-hint">⠿ を掴んでドラッグ</span>
-            <label className="e-title-col">
-              名前列
-              <select
-                value={titleColumnId ?? ""}
-                onChange={(e) => onChangeTitleColumn(e.target.value)}
-              >
-                <option value="">（行番号）</option>
-                {columns.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
       </div>
     </StyledEditor>
   );
@@ -377,58 +404,123 @@ const StyledEditor = styled.div`
     gap: 8px;
   }
 
-  .e-objects-btn {
-    padding: 4px 12px;
+  /* Row ⇄ Object のトグル。つまみが滑って「いまどちら側か」を示す。 */
+  .e-view-switch {
+    position: relative;
+    display: inline-flex;
+    padding: 2px;
     border: 1px solid #ce93d8;
-    border-radius: 4px;
-    background: #f3e5f5;
-    color: #7b1fa2;
-    cursor: pointer;
-    font-size: 0.8em;
-    white-space: nowrap;
+    border-radius: 999px;
+    background: #f7effa;
+    flex: none;
 
-    &:hover {
-      background: #e1bee7;
+    .e-switch-knob {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      left: 2px;
+      width: calc(50% - 2px);
+      border-radius: 999px;
+      background: #7b1fa2;
+      transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    &.active {
-      background: #7b1fa2;
-      border-color: #7b1fa2;
-      color: #fff;
+    &[data-mode="object"] .e-switch-knob {
+      transform: translateX(100%);
+    }
+
+    button {
+      position: relative;
+      z-index: 1;
+      flex: 1 1 0;
+      min-width: 62px;
+      padding: 3px 12px;
+      border: none;
+      background: none;
+      color: #7b1fa2;
+      cursor: pointer;
+      font-size: 0.8em;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      transition: color 0.18s ease;
+
+      &.is-on {
+        color: #fff;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #7b1fa2;
+        outline-offset: 2px;
+        border-radius: 999px;
+      }
     }
   }
 
-  .e-footer-actions {
+  @media (prefers-reduced-motion: reduce) {
+    .e-view-switch .e-switch-knob {
+      transition: none;
+    }
+  }
+
+  /* 2段目。左＝表示ごとの操作、右＝シート自体への操作。
+     表示に関わらず必ず1行あるので、切り替えで表が上下に動かない。 */
+  .e-subbar {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    flex-wrap: wrap;
-    /* フッターが表より広くならないように（bubble は fit-content なので、
-       ここが広いと表ごと横に伸びて列位置が動く）。 */
-    max-width: 100%;
-    min-width: 0;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    /* バブルは fit-content なので、この行の中身が表より広いと表ごと横に
+       伸びて列位置が動く。width: 0 + min-width: 100% にすると、親の
+       intrinsic width を決めるのは表だけになり、この行は幅いっぱいに広がる。
+       さらに高さを固定して、中身が折り返して表を下へ押すのも防ぐ。 */
+    width: 0;
+    min-width: 100%;
+    height: 28px;
+    overflow: hidden;
   }
 
-  .e-object-bar {
+  .e-subbar-left,
+  .e-subbar-right {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
-    max-width: 100%;
     min-width: 0;
-    padding: 4px 10px;
-    border: 1px solid #e1bee7;
-    border-radius: 4px;
-    background: #faf5fc;
+  }
+
+  /* 左は溢れたら切る。折り返させると行が高くなって表が下へずれる。 */
+  .e-subbar-left {
+    flex: 1 1 0;
+    overflow: hidden;
+    white-space: nowrap;
+
+    > * {
+      flex: none;
+    }
+  }
+
+  .e-subbar-right {
+    flex: none;
+  }
+
+  .e-subbar-right {
+    flex: none;
+  }
+
+  .e-object-hint {
+    min-width: 0;
+    white-space: nowrap;
     font-size: 0.8em;
     color: #7b1fa2;
   }
 
-  .e-object-hint {
-    /* nowrap にするとバーの最小幅が表より広くなり、bubble（fit-content）が
-       横に伸びて列位置がずれる。折り返しを許して幅を表側に決めさせる。 */
-    flex: 0 1 auto;
+  .e-table-hint {
     min-width: 0;
+    white-space: nowrap;
+    font-size: 0.8em;
+    color: #999;
   }
 
   .e-title-col {
@@ -436,8 +528,13 @@ const StyledEditor = styled.div`
     align-items: center;
     gap: 6px;
     min-width: 0;
+    white-space: nowrap;
+    font-size: 0.8em;
+    color: #7b1fa2;
 
     select {
+      flex: none;
+      min-width: 84px;
       font-size: inherit;
       padding: 2px 4px;
       border: 1px solid #ce93d8;
@@ -497,8 +594,12 @@ const StyledEditor = styled.div`
     }
   }
 
+  /* ここに overflow を置くと「中間のスクロールコンテナ」になり、ラベル行の
+     position: sticky がこのラッパに張り付いてしまう。ラッパには高さ制限が
+     ないので縦スクロールが起きず、sticky が何も効かなくなる。
+     縦横どちらのスクロールも .e-bubble-content（overflow: auto／max-height 90vh）
+     に任せるため、ここでは overflow を持たない。 */
   .e-table-wrapper {
-    overflow-x: auto;
     border: 1px solid #ddd;
     border-radius: 4px;
   }
@@ -616,6 +717,23 @@ const StyledEditor = styled.div`
       user-select: none;
       flex: none;
     }
+  }
+
+  /* ラベル行を固定して、その下の行だけがスクロールするようにする。
+     .e-bubble-content の padding: 16px の内側で止まるので、そのままだと
+     ラベルの上 16px に下の行が透けて流れる。表セルには margin が効かない
+     （負マージンで潰す手が使えない）ので、box-shadow で上 16px を塗る。
+     影はレイアウトに影響しないため位置は動かない。 */
+  .e-table thead th {
+    position: sticky;
+    /* .e-bubble-content の padding: 16px の内側で止まると、ラベルの上 16px に
+       下の行が透けて流れる。表セルには margin が効かないので負マージンでは
+       潰せないが、top は効くので 16px 上で止める＝コンテナの上端に密着させる。
+       上を通り過ぎた行はコンテナの overflow で切られるので隙間が生まれない。 */
+    top: -16px;
+    z-index: 2;
+    /* 行が透けないように不透明で塗る（列追加の th には背景が無いため） */
+    background: #f0f0f0;
   }
 
   .e-header-cell {
