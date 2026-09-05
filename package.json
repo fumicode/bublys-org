@@ -105,6 +105,8 @@
     "tailor-genie/*",
     "sekaisen-igo-bubly/*",
     "hotel-shift-puzzle-bubly/*",
-    "event-shift-puzzle/*"
+    "event-shift-puzzle/*",
+    "csv-importer-bubly/*",
+    "object-transformer-bubly/*"
   ]
 }
