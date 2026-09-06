@@ -42,12 +42,27 @@ export const registerBubly = (bubly: Bubly): void => {
 };
 
 /**
+ * バンドルの再ビルドが確実に反映されるよう、毎回異なるクエリを付ける。
+ * これがないとブラウザキャッシュの古い bubly.js を掴み、
+ * 「再ロードしたのに変更が反映されない」が起きる。
+ */
+const withCacheBust = (url: string): string => {
+  try {
+    const parsed = new URL(url, window.location.href);
+    parsed.searchParams.set("v", Date.now().toString());
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
+/**
  * スクリプトを動的にロード
  */
 const loadScript = (url: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = url;
+    script.src = withCacheBust(url);
     script.onload = () => resolve();
     script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
     document.head.appendChild(script);
@@ -163,19 +178,13 @@ export const getAllBublies = (): Record<string, Bubly> => {
 /**
  * ロード済みのすべてのバブリからメニュー項目を取得。
  *
- * 各バブリにつき:
- *  1. `<name>-bubly` の universe バブルを開く「窓」エントリ（bubly.icon / label / name から派生）
- *  2. レガシーの `bubly.menuItems`（任意）。inner bubble に直接行くショートカット
- * の順で並ぶ。
+ * バブリ 1 個 = メニュー 1 個。`<name>-bubly` の universe バブルを開く「窓」エントリ
+ * （bubly.icon / label / name から派生）だけを返す。
+ * バブリの中身（inner bubble）は universe の中からしか開けない。
  */
-export const getAllMenuItems = (): BublyMenuItem[] => {
-  const bublies = getAllBublies();
-  return Object.values(bublies).flatMap((bubly) => {
-    const universeEntry: BublyMenuItem = {
-      label: bubly.label ?? bubly.name,
-      url: toBublyRouteBase(bubly.name),
-      icon: bubly.icon ?? null,
-    };
-    return [universeEntry, ...(bubly.menuItems ?? [])];
-  });
-};
+export const getAllMenuItems = (): BublyMenuItem[] =>
+  Object.values(getAllBublies()).map((bubly) => ({
+    label: bubly.label ?? bubly.name,
+    url: toBublyRouteBase(bubly.name),
+    icon: bubly.icon ?? null,
+  }));

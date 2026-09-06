@@ -5,6 +5,7 @@ import { Provider } from 'react-redux'
 import * as ReactRedux from 'react-redux'
 import * as Redux from '@reduxjs/toolkit'
 import styled from 'styled-components'
+import * as StyledComponents from 'styled-components'
 import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist } from "@bublys-org/state-management";
 import * as StateManagement from "@bublys-org/state-management";
 import { PersistGate } from 'redux-persist/integration/react'
@@ -24,6 +25,17 @@ import { initWorldLineGraph } from '@bublys-org/world-line-graph';
 import * as WorldLineGraph from '@bublys-org/world-line-graph';
 import * as DomainRegistry from '@bublys-org/domain-registry';
 
+/**
+ * バブリ（IIFE バンドル）に渡す styled-components。
+ *
+ * バブリ側は `styled-components` モジュール全体を単一のグローバル `styled` として
+ * 参照するため、default export（styled 関数）だけを渡すと
+ * `keyframes` / `css` などの名前付きエクスポートが取れずロード時に落ちる。
+ * default に名前空間をマージして「関数でもあり名前空間でもある」形で共有する。
+ */
+const StyledShared = Object.assign(styled, StyledComponents) as typeof styled &
+  typeof StyledComponents;
+
 // プラグイン用共有ライブラリをセットアップ
 function setupSharedLibraries() {
   if (typeof window === 'undefined') return;
@@ -31,7 +43,7 @@ function setupSharedLibraries() {
   // グローバルReact（IIFE直接参照用）
   (window as { React?: typeof React }).React = React;
   (window as { ReactDOM?: typeof ReactDOM }).ReactDOM = ReactDOM;
-  (window as { styled?: typeof styled }).styled = styled;
+  (window as { styled?: typeof StyledShared }).styled = StyledShared;
 
   // 共有ライブラリオブジェクト（window.__BUBLYS_SHARED__経由）
   window.__BUBLYS_SHARED__ = {
@@ -39,7 +51,7 @@ function setupSharedLibraries() {
     ReactDOM,
     Redux,
     ReactRedux,
-    styled: styled as unknown as typeof import("styled-components"),
+    styled: StyledShared,
     StateManagement,
     BubblesUI,
     MuiMaterial,
