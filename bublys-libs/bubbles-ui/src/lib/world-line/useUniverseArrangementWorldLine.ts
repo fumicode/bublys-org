@@ -52,6 +52,29 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
     initialObjects: [{ type: BUBBLE_ARRANGEMENT_TYPE, object: new BubbleArrangement(view) }],
   });
 
+  /**
+   * この universe が世界線から復元されるか（= seed してはいけないか）を
+   * **マウント時に 1 回だけ**判定する。
+   *
+   * bubbles スライスは永続化されないので、リロード直後の universe は必ず空で始まる。
+   * そこで seed を撒くと「seed だけの状態」が commit されて apex が進み、
+   * 復元すべきノードを追い越して上書きしてしまう（中に開いていたバブルが消える）。
+   *
+   * ルール: **復元できる状態があるなら seed しない。seed は本当に空の universe だけ。**
+   */
+  const restoresFromWorldLineRef = useRef<boolean | null>(null);
+  if (restoresFromWorldLineRef.current === null) {
+    const urlNode = link ? link.snapshot.decode(link.bubbleUrl) : null;
+    const restorable =
+      (!!urlNode && !!scope.graph.state.nodes[urlNode]) ||
+      Object.keys(
+        scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID)?.object.toJSON()
+          .bubbles ?? {},
+      ).length > 0;
+    restoresFromWorldLineRef.current = restorable;
+  }
+  const restoresFromWorldLine = restoresFromWorldLineRef.current;
+
   const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
 
   // [commit] view 変化 → world-line に記録
@@ -130,5 +153,7 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
     // root 特化ラッパー（useRootArrangementWorldLine）が追加 URL バインドのために使う
     apexId,
     scope,
+    /** 世界線から復元される universe か。true のとき呼び出し側は seed してはいけない */
+    restoresFromWorldLine,
   };
 }
