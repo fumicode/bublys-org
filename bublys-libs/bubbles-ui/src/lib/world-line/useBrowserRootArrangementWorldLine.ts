@@ -1,7 +1,13 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
-import { ROOT_UNIVERSE_ID } from "../state/bubbles-slice.js";
+import { useAppDispatch } from "@bublys-org/state-management";
+import {
+  ROOT_UNIVERSE_ID,
+  buildSeedArrangement,
+  getInitialBubbleUrls,
+  replaceBubbleArrangement,
+} from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
 import {
   BUBBLE_ARRANGEMENT_TYPE,
@@ -53,7 +59,20 @@ const replaceHistoryState = (state: unknown, url: string): void => {
 };
 
 export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
-  const { apexId, scope } = useUniverseArrangementWorldLine(ROOT_UNIVERSE_ID);
+  const dispatch = useAppDispatch();
+  const { apexId, scope, restoresFromWorldLine } = useUniverseArrangementWorldLine(ROOT_UNIVERSE_ID);
+
+  // [seed] 復元するものが無いときだけ、設定済みの初期バブルを撒く。
+  // 初期配置をスライスの initialState に埋め込むと、reducer が undefined state で
+  // 呼ばれるたびに作り直されて復元済みの配置を上書きしてしまうため、ここで撒く。
+  useEffect(() => {
+    if (restoresFromWorldLine) return;
+    const urls = getInitialBubbleUrls();
+    if (!urls.length) return;
+    dispatch(replaceBubbleArrangement(buildSeedArrangement(urls), ROOT_UNIVERSE_ID));
+    // 初回だけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** 現 location から「いま居るノード」を取り出す。 */
   const parseNodeFromUrl = (): string | null => {

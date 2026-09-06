@@ -24,7 +24,7 @@ import {
   setGlobalCoordinateSystem,
   replaceBubbleArrangement,
   type OpeningPosition,
-  type BubbleArrangementState,
+  buildSeedArrangement,
 } from "../state/index.js";
 
 export type UniverseViewProps = {
@@ -61,14 +61,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   useEffect(() => {
     if (bubbleLayers.length > 0) return;
     if (!initialBubbleUrls?.length) return;
-    const bubbles: BubbleArrangementState["bubbles"] = {};
-    const layers: string[][] = [];
-    initialBubbleUrls.forEach((url, i) => {
-      const b = createBubble(url, { x: i * 400, y: 0 });
-      bubbles[b.id] = b.toJSON();
-      layers.push([b.id]);
-    });
-    dispatch(replaceBubbleArrangement({ bubbles, bubbleRelations: [], process: { layers } }, universeId));
+    dispatch(replaceBubbleArrangement(buildSeedArrangement(initialBubbleUrls), universeId));
     // 初回・空のときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

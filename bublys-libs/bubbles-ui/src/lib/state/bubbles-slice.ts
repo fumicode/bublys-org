@@ -86,34 +86,50 @@ const createEmptyUniverse = (): UniverseState => ({
   surfaceLeftTop: { x: 100, y: 100 },
 });
 
-// 初期状態を構築する関数（遅延評価）
+/** 設定済みの初期バブル url（seed する側が読む） */
+export const getInitialBubbleUrls = (): string[] => configuredInitialBubbleUrls;
+
+/** url 群から「横に並べただけ」の配置を作る。universe の seed 用 */
+export const buildSeedArrangement = (urls: string[]): BubbleArrangementState => {
+  const bubbles: Record<string, BubbleJson> = {};
+  const layers: string[][] = [];
+  urls.forEach((url, index) => {
+    const b = createBubble(url, { x: index * 400, y: 0 });
+    bubbles[b.id] = b.toJSON();
+    layers.push([b.id]);
+  });
+  return { bubbles, bubbleRelations: [], process: { layers } };
+};
+
+/**
+ * 初期状態は **空の root universe**。
+ *
+ * 初期バブルをここに埋め込むと、reducer が undefined state で呼ばれるたび
+ * （ストア作成・slice 注入・redux-persist の rehydrate など、実測で 1 ロードに 3 回）
+ * 初期配置が作り直され、世界線から復元した配置を上書きしてしまう。
+ * 初期バブルは「復元するものが無いときだけ撒く seed」として扱う
+ * （root は useBrowserRootArrangementWorldLine、nest は UniverseView が撒く）。
+ */
+const buildInitialState = (): BubbleStateSlice => ({
+  universes: { [ROOT_UNIVERSE_ID]: createEmptyUniverse() },
+  renderCount: 0,
+  animatingBubbleIds: [],
+});
+
+/**
+ * 初期状態は **1 ページロードにつき 1 個**に固定する。
+ *
+ * createSlice の initialState は「reducer が undefined な state で呼ばれるたび」に
+ * 評価されうる（ストア作成・slice の注入・redux-persist の rehydrate など、
+ * 実測で 1 ロードに 3 回）。毎回作り直すと **バブルの id が振り直され**、
+ * root の配置がすり替わる。その結果、世界線から復元した配置が上書きされ、
+ * すり替わった配置が commit されて apex が進み、URL の `universe@xxxx` が
+ * 何度も書き換わる（チラつき・履歴汚染）。
+ */
+let cachedInitialState: BubbleStateSlice | null = null;
 const getInitialState = (): BubbleStateSlice => {
-  const bubbleInstances = configuredInitialBubbleUrls.map((url, index) => {
-    return createBubble(url, { x: index * 400, y: 0 });
-  });
-
-  const entities: Record<string, BubbleJson> = {};
-  bubbleInstances.forEach((b) => {
-    entities[b.id] = b.toJSON();
-  });
-
-  const process: BubblesProcessState = {
-    layers: bubbleInstances.map((b) => [b.id]),
-  };
-
-  return {
-    universes: {
-      [ROOT_UNIVERSE_ID]: {
-        bubbles: entities,
-        process,
-        bubbleRelations: [],
-        globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
-        surfaceLeftTop: { x: 100, y: 100 },
-      },
-    },
-    renderCount: 0,
-    animatingBubbleIds: [],
-  };
+  if (!cachedInitialState) cachedInitialState = buildInitialState();
+  return cachedInitialState;
 };
 
 // draft state から universe を取得（無ければ作る）
