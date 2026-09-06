@@ -11,6 +11,7 @@ import {
   Button,
   Typography,
   CircularProgress,
+  IconButton,
 } from "@mui/material";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
@@ -22,7 +23,8 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import PublicIcon from "@mui/icons-material/Public";
-import { loadBublyFromOrigin, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
+import CloseIcon from "@mui/icons-material/Close";
+import { loadBublyFromOrigin, unloadBubly, getAllBublies, getAllMenuItems, BublyMenuItem } from "@bublys-org/bubbles-ui";
 
 type MenuItem = {
   label: string;
@@ -127,6 +129,12 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
     }
   };
 
+  const handleUnloadBubly = (name: string) => {
+    unloadBubly(name);
+    setLoadedBublies(Object.keys(getAllBublies()));
+    setDynamicMenuItems(getAllMenuItems());
+  };
+
   const width = isExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED;
 
   return (
@@ -214,9 +222,33 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
                 {isLoading ? <CircularProgress size={16} /> : "ロード"}
               </Button>
               {loadedBublies.length > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  ロード済: {loadedBublies.join(", ")}
-                </Typography>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    ロード済
+                  </Typography>
+                  {loadedBublies.map((name) => (
+                    <Box
+                      key={name}
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5 }}
+                    >
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
+                        {name}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleUnloadBubly(name)}
+                        title={`${name} を外す（次回の起動でも復元しない）`}
+                        sx={{ p: 0.25 }}
+                      >
+                        <CloseIcon sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Box>
               )}
             </Box>
           ) : (

@@ -1,8 +1,10 @@
 import { Bubly, BublyContext, BublyManifest, BublyMenuItem } from "./BublyTypes.js";
+import type { BubbleRoute } from "../bubble-routing/BubbleRouting.js";
 import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 import { makeBublyRoute } from "../bubble-routing/makeBublyRoute.js";
 import { BublyUniverseBubble } from "./BublyUniverseBubble.js";
 import {
+  forgetBublyOrigin,
   getSavedBublyOrigins,
   normalizeBublyOrigin,
   rememberBublyOrigin,
@@ -20,7 +22,7 @@ const DEFAULT_BUBLY_WINDOW_SIZE = { width: 480, height: 360 };
  * BublyContext.registerBubbleRoutes ではなく BublyLoader が直接登録するので、
  * bubly 側の register 関数で書き忘れても OS にロードした時点で自動的に窓が出る。
  */
-const registerBublyUniverseRoute = (bubly: Bubly): void => {
+const registerBublyUniverseRoute = (bubly: Bubly): BubbleRoute => {
   const base = toBublyRouteBase(bubly.name);
   const route = makeBublyRoute({
     base,
@@ -34,7 +36,21 @@ const registerBublyUniverseRoute = (bubly: Bubly): void => {
     },
   });
   BubbleRouteRegistry.registerRoutes([route]);
+  return route;
 };
+
+/**
+ * ロード済みバブリの素性。OS から外すときに必要になるものを持つ。
+ * ページをまたいでは残らない（復元時に作り直される）。
+ */
+type LoadedBublyRecord = {
+  /** 取得元。サイドバーから外したときに保存済みオリジンからも消すために持つ */
+  origin?: string;
+  /** このバブリがロード時に登録したルート。外すときはこれだけを剥がす */
+  routes: BubbleRoute[];
+};
+
+const loadedBublyRecords = new Map<string, LoadedBublyRecord>();
 
 /**
  * バブリを登録するAPI
@@ -77,9 +93,10 @@ const loadScript = (url: string): Promise<void> => {
 /**
  * バブリコンテキストを作成
  */
-const createBublyContext = (): BublyContext => ({
+const createBublyContext = (registeredRoutes: BubbleRoute[]): BublyContext => ({
   registerBubbleRoutes: (routes) => {
     BubbleRouteRegistry.registerRoutes(routes);
+    registeredRoutes.push(...routes);
   },
   injectSlice: (_slice) => {
     // sliceのinjectIntoパターンでは、インポート時に自動注入されるため、
@@ -111,12 +128,17 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
       return null;
     }
 
-    // バブリを登録
-    const context = createBublyContext();
-    bubly.register(context);
+    // バブリを登録。登録されたルートは「外す」ときのために控えておく
+    const registeredRoutes: BubbleRoute[] = [];
+    bubly.register(createBublyContext(registeredRoutes));
 
     // このバブリの `<name>-bubly` universe バブルルートを自動登録
-    registerBublyUniverseRoute(bubly);
+    registeredRoutes.push(registerBublyUniverseRoute(bubly));
+
+    loadedBublyRecords.set(bubly.name, {
+      origin: loadedBublyRecords.get(bubly.name)?.origin,
+      routes: registeredRoutes,
+    });
 
     return bubly;
   } catch (error) {
@@ -136,9 +158,36 @@ export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null>
   const bubly = await loadBublyFromUrl(`${normalizedOrigin}/bubly.js`);
 
   // ロードできたオリジンだけ覚える。次回の起動でここから復元する
-  if (bubly) rememberBublyOrigin(normalizedOrigin);
+  if (bubly) {
+    rememberBublyOrigin(normalizedOrigin);
+    const record = loadedBublyRecords.get(bubly.name);
+    if (record) record.origin = normalizedOrigin;
+  }
 
   return bubly;
+};
+
+/**
+ * バブリを OS から外す。
+ *
+ * そのバブリが登録したルートを剥がし、保存済みオリジンからも消すので、
+ * 次回の起動でも復元されない。
+ *
+ * すでに開いているそのバブリのバブルはその場では消えず、ルートが無くなった
+ * ぶん `Unknown bubble type` として残る（閉じれば消える）。
+ */
+export const unloadBubly = (name: string): void => {
+  const bubly = window.__BUBLYS_BUBLIES__?.[name];
+  const record = loadedBublyRecords.get(name);
+
+  if (record) {
+    BubbleRouteRegistry.unregisterRoutes(record.routes);
+    if (record.origin) forgetBublyOrigin(record.origin);
+    loadedBublyRecords.delete(name);
+  }
+
+  bubly?.unregister?.();
+  if (window.__BUBLYS_BUBLIES__) delete window.__BUBLYS_BUBLIES__[name];
 };
 
 /**
