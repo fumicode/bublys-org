@@ -46,11 +46,6 @@ const MyBubly: Bubly = {
   ],
   backdropColor: "hsl(200, 35%, 22%)",    // universe バブルの「夜空」色（半透明ガラス）
 
-  // 任意: inner bubble への直接ショートカット（root に直接 pop される）
-  menuItems: [
-    { label: "foo", url: "my-bubly/foo", icon: React.createElement(MyIcon) },
-  ],
-
   register(ctx) {
     ctx.registerBubbleRoutes(myBubbleRoutes);  // inner bubble ルート群を登録
   },
@@ -73,17 +68,18 @@ export default MyBubly;
    - `Component`: lib の `BublyUniverseBubble`（中で `useUniverseArrangementWorldLine` + `UniverseView` を起動）
    - `initialBubbleUrls`: `bubly.initialBubbleUrls`
    - `bubbleOptions.fillsContainer = true` / `defaultSize` / `backdropColor`
-3. `getAllMenuItems()` が各バブリにつき **2 種類**のエントリを返す:
-   - 先頭: 「universe バブルを開く」エントリ（url = `<name>-bubly`、icon = `bubly.icon`、label = `bubly.label`）
-   - 後ろ: `bubly.menuItems`（root に inner を直接出すレガシーショートカット）
+3. `getAllMenuItems()` が各バブリにつき **1 個**のエントリを返す:
+   - 「universe バブルを開く」エントリ（url = `<name>-bubly`、icon = `bubly.icon`、label = `bubly.label`）
 
-サイドバーはこのリストを並べるので、バブリ 1 個ロード = 最低 1 個アイコン追加（+ menuItems があればその分も）。
+サイドバーはこのリストを並べるので、**バブリ 1 個ロード = アイコン 1 個追加**。
+バブリの中身（inner bubble）は必ず universe の中に囲われた状態でしか開かない
+（root に inner を直接出すショートカットは廃止した）。
 
 ---
 
 ## ポート規約
 
-各バブリ app のスタンドアロン dev サーバーは固有ポートで立てる。`vite.config.mts` の `server.port` / `preview.port` に書く。
+各バブリ app のスタンドアロン dev サーバーは固有ポートで立てる。vite 製は `vite.config.mts` の `server.port` / `preview.port`、Next.js 製は `package.json` の nx ターゲット `dev`（`next dev --port NNNN`）に書く。
 
 現在の割り当て:
 
@@ -92,9 +88,14 @@ export default MyBubly;
 | 4000 | bublys-os |
 | 4001 | gakkai-shift |
 | 4002 | ekikyo |
-| 4003 | tailor-genie |
-| 4004 | sekaisen-igo |
-| 4005 | shift-puzzle |
+| 4003 | tailor-genie（Next.js。`next dev --port 4003`） |
+| 4004 | sekaisen-igo（Next.js。`next dev --port 4004`） |
+| 4005 | event-shift-puzzle |
+| 4006 | hotel-shift-puzzle |
+| 4200 | csv-importer |
+| 4201 | object-transformer |
+
+バブリ以外のアプリはバブリ帯とぶつからないポートを使う（`apps/calculator` = 4300、`apps/memo` = 4301）。
 
 新規バブリは未使用ポートを割り当て、`BublyApp` の `subtitle` にも書いておくと dev 中の自他識別がしやすい。
 
@@ -121,6 +122,13 @@ npx nx build:bubly @bublys-org/<my-bubly>-app
 ## 既知の落とし穴
 
 - **vite ポート衝突**: 別のバブリと同じポートを書くと dev サーバーが立たない or 誤配信になる。
-- **`initialBubbleUrls` が未指定**: universe を開いても中身が空。menuItems からショートカットは出るが、窓 = メインフローとしては機能しない。
+- **`initialBubbleUrls` が未指定**: universe を開いても中身が空。サイドバーのアイコンは出るが、窓 = メインフローとしては機能しない。
 - **State 永続化のせい古い `bubbleOptions`**: 既に開いている universe バブルは作成時の `bubbleOptions` 持ち。`backdropColor` / `defaultSize` を変えても反映されない → 一度閉じて開き直す。
 - **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly` しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。
+- **bubly.js のブラウザキャッシュ**: OS のローダーは毎回キャッシュバスター付きで取得するので、
+  `build:bubly` 後にサイドバーから再ロードすれば新しいバンドルが入る。手で `<script>` を
+  差し込むなど別経路で読むときは、自分でキャッシュを避けること。
+- **共有ライブラリの名前付きエクスポート**: バブリは `styled-components` などをモジュール
+  1 個 = グローバル 1 個として参照する。OS 側（`StoreProvider`）が default だけを共有すると
+  `keyframes` / `css` のような名前付きエクスポートが解決できず、`bubly.js` の評価中に落ちて
+  無言でロード失敗する（`<script onerror>` にも引っかからない）。共有するのは名前空間ごと。
