@@ -20,6 +20,12 @@
   },
   "nx": {
     "targets": {
+      "build": {
+        "dependsOn": [
+          "^build",
+          "build:bubly"
+        ]
+      },
       "build:bubly": {
         "dependsOn": [
           "^build"

@@ -109,6 +109,9 @@ npx nx dev @bublys-org/<my-bubly>-app    # スタンドアロンが port NNNN �
 
 # 2. バブリバンドルを作る（{origin}/bubly.js のため）
 npx nx build:bubly @bublys-org/<my-bubly>-app
+#    `nx build` は build:bubly に依存しているので、本番ビルド時は自動で作られる。
+#    dev サーバーは standalone を出しているだけなので、bubly.js を更新したいときは
+#    この build:bubly（か build）を明示的に叩く。
 
 # 3. OS（4000）のサイドバー → 「バブリ」セクションに `http://localhost:NNNN` を入力 → ロード
 #    → サイドバーに icon が追加されることを確認
@@ -124,7 +127,7 @@ npx nx build:bubly @bublys-org/<my-bubly>-app
 - **vite ポート衝突**: 別のバブリと同じポートを書くと dev サーバーが立たない or 誤配信になる。
 - **`initialBubbleUrls` が未指定**: universe を開いても中身が空。サイドバーのアイコンは出るが、窓 = メインフローとしては機能しない。
 - **State 永続化のせい古い `bubbleOptions`**: 既に開いている universe バブルは作成時の `bubbleOptions` 持ち。`backdropColor` / `defaultSize` を変えても反映されない → 一度閉じて開き直す。
-- **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly` しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。
+- **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly`（または `build`）しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。
 - **bubly.js のブラウザキャッシュ**: OS のローダーは毎回キャッシュバスター付きで取得するので、
   `build:bubly` 後にサイドバーから再ロードすれば新しいバンドルが入る。手で `<script>` を
   差し込むなど別経路で読むときは、自分でキャッシュを避けること。
