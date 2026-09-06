@@ -145,7 +145,8 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
       >
         <List dense sx={{ flex: 1, pt: 1 }}>
           {menuItems.map((item) => (
-            <Tooltip.Root key={item.label}>
+            // url はバブリ 1 個につき 1 個で一意。label は重複しうるのでキーにしない
+            <Tooltip.Root key={typeof item.url === "function" ? item.label : item.url}>
               <Tooltip.Trigger asChild>
                 <ListItemButton
                   onClick={() => handleItemClick(item)}
