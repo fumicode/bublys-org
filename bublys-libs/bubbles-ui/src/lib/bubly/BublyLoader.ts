@@ -2,6 +2,11 @@ import { Bubly, BublyContext, BublyManifest, BublyMenuItem } from "./BublyTypes.
 import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 import { makeBublyRoute } from "../bubble-routing/makeBublyRoute.js";
 import { BublyUniverseBubble } from "./BublyUniverseBubble.js";
+import {
+  getSavedBublyOrigins,
+  normalizeBublyOrigin,
+  rememberBublyOrigin,
+} from "./BublyOriginStore.js";
 
 /** `<name>-bubly` 形式に揃える。既に `-bubly` で終わっていればそのまま。 */
 const toBublyRouteBase = (name: string): string =>
@@ -127,11 +132,39 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
  * @param origin - オリジン (例: "http://localhost:4001")
  */
 export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null> => {
-  // 末尾のスラッシュを除去
-  const normalizedOrigin = origin.replace(/\/$/, "");
-  const bublyUrl = `${normalizedOrigin}/bubly.js`;
+  const normalizedOrigin = normalizeBublyOrigin(origin);
+  const bubly = await loadBublyFromUrl(`${normalizedOrigin}/bubly.js`);
 
-  return loadBublyFromUrl(bublyUrl);
+  // ロードできたオリジンだけ覚える。次回の起動でここから復元する
+  if (bubly) rememberBublyOrigin(normalizedOrigin);
+
+  return bubly;
+};
+
+/**
+ * 前回までにロードしたバブリを復元する。
+ *
+ * OS 起動時、**バブルを描画する前に**呼ぶこと。ルート登録が間に合わないと
+ * 永続化されたバブルが `Unknown bubble type` として描かれてしまう。
+ *
+ * 配信元が落ちているなどで失敗したオリジンは、保存から消さずに残す
+ * （次に立ち上がっていれば復元される）。
+ */
+export const restoreSavedBublies = async (): Promise<Bubly[]> => {
+  const origins = getSavedBublyOrigins();
+  if (origins.length === 0) return [];
+
+  const results = await Promise.all(
+    origins.map(async (origin) => {
+      const bubly = await loadBublyFromOrigin(origin);
+      if (!bubly) {
+        console.warn(`[BublyLoader] Failed to restore bubly from ${origin}`);
+      }
+      return bubly;
+    }),
+  );
+
+  return results.filter((bubly): bubly is Bubly => bubly !== null);
 };
 
 /**

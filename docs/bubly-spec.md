@@ -72,6 +72,21 @@ export default MyBubly;
    - 「universe バブルを開く」エントリ（url = `<name>-bubly`、icon = `bubly.icon`、label = `bubly.label`）
 
 サイドバーはこのリストを並べるので、**バブリ 1 個ロード = アイコン 1 個追加**。
+
+### ロード済みバブリの永続化
+
+`loadBublyFromOrigin()` が成功したオリジンは localStorage
+（`bublys.loaded-bubly-origins`）に覚えられ、次回の OS 起動時に
+`restoreSavedBublies()` が `{origin}/bubly.js` を取り直して再登録する。
+保存するのは**オリジンだけ**でバンドル本体は持たないので、配信側を更新すれば
+次の起動で新しいバンドルが入る。
+
+復元は **バブルを描画する前** に終わらせる（`StoreProvider` が復元完了まで
+children を描かない）。逆順だと、永続化されたバブルがルート未登録のまま
+`Unknown bubble type` として描かれてしまう。
+
+配信元が落ちていて復元に失敗したオリジンは、保存から消さずに残す
+（次に立ち上がっていれば復元される）。
 バブリの中身（inner bubble）は必ず universe の中に囲われた状態でしか開かない
 （root に inner を直接出すショートカットは廃止した）。
 
@@ -125,6 +140,7 @@ npx nx build:bubly @bublys-org/<my-bubly>-app
 ## 既知の落とし穴
 
 - **vite ポート衝突**: 別のバブリと同じポートを書くと dev サーバーが立たない or 誤配信になる。
+- **配信元が落ちたまま OS を起動**: 保存済みオリジンの復元に失敗し、そのバブリのバブルは `Unknown bubble type` になる。dev サーバーを立ててからリロードすれば戻る。
 - **`initialBubbleUrls` が未指定**: universe を開いても中身が空。サイドバーのアイコンは出るが、窓 = メインフローとしては機能しない。
 - **State 永続化のせい古い `bubbleOptions`**: 既に開いている universe バブルは作成時の `bubbleOptions` 持ち。`backdropColor` / `defaultSize` を変えても反映されない → 一度閉じて開き直す。
 - **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly`（または `build`）しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。

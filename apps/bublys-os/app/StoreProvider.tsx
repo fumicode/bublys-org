@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom'
 import { Provider } from 'react-redux'
 import * as ReactRedux from 'react-redux'
@@ -11,6 +11,7 @@ import * as StateManagement from "@bublys-org/state-management";
 import { PersistGate } from 'redux-persist/integration/react'
 import { Persistor } from 'redux-persist/lib/types';
 import {
+  restoreSavedBublies,
   bubblesSlice,
   bubblesListener,
   shellBubbleListener,
@@ -102,10 +103,28 @@ export default function StoreProvider({
 
   const { store, persistor } = storePersistorRef.current;
 
+  // 前回ロードしたバブリを復元してから中身を描く。
+  // 逆順だと、永続化されたバブルがルート未登録のまま描かれて
+  // `Unknown bubble type` になってしまう。
+  const [bubliesRestored, setBubliesRestored] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    restoreSavedBublies()
+      .catch((error) => {
+        console.error('[StoreProvider] Failed to restore bublies:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setBubliesRestored(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        {children}
+        {bubliesRestored ? children : null}
       </PersistGate>
     </Provider>
   );

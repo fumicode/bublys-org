@@ -94,8 +94,9 @@ export const Sidebar: FC<SidebarProps> = memo(({ onItemClick }) => {
     process.env.NEXT_PUBLIC_DEFAULT_BUBLY_ORIGIN ?? ""
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [loadedBublies, setLoadedBublies] = useState<string[]>([]);
-  const [dynamicMenuItems, setDynamicMenuItems] = useState<BublyMenuItem[]>([]);
+  // StoreProvider が復元を終えてから描画されるので、初期値はレジストリの現状でよい
+  const [loadedBublies, setLoadedBublies] = useState<string[]>(() => Object.keys(getAllBublies()));
+  const [dynamicMenuItems, setDynamicMenuItems] = useState<BublyMenuItem[]>(() => getAllMenuItems());
 
   // 静的 + 動的メニュー項目を結合
   const menuItems: MenuItem[] = [...staticMenuItems, ...dynamicMenuItems];
