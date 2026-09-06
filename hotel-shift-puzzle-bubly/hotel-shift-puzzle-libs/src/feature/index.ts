@@ -25,5 +25,7 @@ export * from "./reportPriority.js";
 export * from "./staffLinkedReports.js";
 export * from "./ScheduleEditLogPanel.js";
 export * from "./recordScheduleEdit.js";
+export * from "./useWorldFile.js";
+export * from "./WorldFilePanel.js";
 export * from "./shiftSuggestion/index.js";
 export * from "./candidates/index.js";

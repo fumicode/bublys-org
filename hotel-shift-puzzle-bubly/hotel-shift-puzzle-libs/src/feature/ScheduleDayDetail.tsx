@@ -15,7 +15,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleDayView } from "../ui/ScheduleDayView.js";
 import { useObjects, useObject } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
 import {
@@ -39,7 +38,6 @@ type ScheduleDayDetailProps = {
  * セル編集は recordSetCell 経由で Schedule + EditLog を同一世界線ノードに記録する。
  */
 export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
