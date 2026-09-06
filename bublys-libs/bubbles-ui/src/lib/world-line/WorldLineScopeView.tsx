@@ -71,8 +71,12 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   const apexLabel = (apexId ? scope.graph.state.nodes[apexId]?.label : undefined) ?? "";
 
   // 状態要約はそのまま、ラベル（名前）は別レイヤーで吹き出し表示する。
+  // ユーザーが付けた名前を優先し、無ければ意図の名前（open:… / close:… 等）を出す
   const getNodeLabel = useCallback(
-    (id: string) => scope.graph.state.nodes[id]?.label ?? "",
+    (id: string) => {
+      const node = scope.graph.state.nodes[id];
+      return node?.label ?? node?.intentLabel ?? "";
+    },
     [scope.graph],
   );
 

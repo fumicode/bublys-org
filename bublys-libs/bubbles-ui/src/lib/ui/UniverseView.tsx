@@ -2,6 +2,7 @@
 import { FC, ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { useAppDispatch, useAppSelector, selectWindowSize } from "@bublys-org/state-management";
 import { CoordinateSystem, Layer } from "@bublys-org/bubbles-ui-util";
+import { nameIntent } from "@bublys-org/world-line-graph";
 import { Bubble, createBubble } from "../Bubble.domain.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { BubbleRefsProvider } from "../context/BubbleRefsContext.js";
@@ -61,6 +62,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   useEffect(() => {
     if (bubbleLayers.length > 0) return;
     if (!initialBubbleUrls?.length) return;
+    nameIntent("seed");
     dispatch(replaceBubbleArrangement(buildSeedArrangement(initialBubbleUrls), universeId));
     // 初回・空のときだけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +70,8 @@ export const UniverseView: FC<UniverseViewProps> = ({
 
   const popChild = useCallback(
     (b: Bubble, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side-right"): string => {
+      // 動詞は「いま開いている意図に名前を付ける」だけ。区間を閉じはしない
+      nameIntent(`open:${b.url}`);
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
       dispatch(popChildInProcess({ bubbleId: b.id, openingPosition }, universeId));
@@ -78,6 +82,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
 
   const joinSibling = useCallback(
     (b: Bubble, openerBubbleId: string): string => {
+      nameIntent(`open:${b.url}`);
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
       dispatch(joinSiblingInProcess(b.id, universeId));
@@ -136,14 +141,27 @@ export const UniverseView: FC<UniverseViewProps> = ({
 
   const deleteBubble = useCallback(
     (b: Bubble) => {
+      nameIntent(`close:${b.type}`);
       dispatch(deleteProcessBubble(b.id, universeId));
       dispatch(removeBubble(b.id, universeId));
     },
     [dispatch, universeId],
   );
 
-  const layerDown = useCallback((b: Bubble) => dispatch(layerDownAction(b.id, universeId)), [dispatch, universeId]);
-  const layerUp = useCallback((b: Bubble) => dispatch(layerUpAction(b.id, universeId)), [dispatch, universeId]);
+  const layerDown = useCallback(
+    (b: Bubble) => {
+      nameIntent("layer:down");
+      dispatch(layerDownAction(b.id, universeId));
+    },
+    [dispatch, universeId],
+  );
+  const layerUp = useCallback(
+    (b: Bubble) => {
+      nameIntent("layer:up");
+      dispatch(layerUpAction(b.id, universeId));
+    },
+    [dispatch, universeId],
+  );
 
   const handleCoordinateSystemReady = useCallback(
     (cs: CoordinateSystem) => dispatch(setGlobalCoordinateSystem(cs.toData(), universeId)),
