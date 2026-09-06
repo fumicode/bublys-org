@@ -33,6 +33,25 @@ import { useUniverseArrangementWorldLine } from "./useUniverseArrangementWorldLi
  *   `makeSnapshotCodec("universe")` を渡せば `/universe@<node>` 形式になる。
  *   バブリ側で別の base を使いたければ自由に注入可能。
  */
+/**
+ * ブラウザ履歴を「Next.js のルーターを経由せずに」書き換える。
+ *
+ * Next.js の App Router は `window.history.pushState` / `replaceState` に
+ * パッチを当てて、外部からの URL 変更を自分のルート遷移として取り込む。
+ * ここで書く `/<base>@<node>` は**アプリが持つ世界線ノードの表現**であって
+ * Next のルートではないので、パッチではなくネイティブ実装を直接呼ぶ。
+ *
+ * パッチ経由のままだと、バブルを 1 個開くたびにルート遷移扱いになり、
+ * dev では `ChunkLoadError: Failed to load chunk ...` を踏むことがある。
+ */
+const pushHistoryState = (state: unknown, url: string): void => {
+  History.prototype.pushState.call(window.history, state, "", url);
+};
+
+const replaceHistoryState = (state: unknown, url: string): void => {
+  History.prototype.replaceState.call(window.history, state, "", url);
+};
+
 export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   const { apexId, scope } = useUniverseArrangementWorldLine(ROOT_UNIVERSE_ID);
 
@@ -96,7 +115,7 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
       }
       // 初回 or URL のノードが実在しない（stale url）: URL を現 apex に揃える
       // （履歴は置換してエントリを増やさない）
-      history.replaceState({ node: apexId }, "", target);
+      replaceHistoryState({ node: apexId }, target);
       trailRef.current = [apexId];
       indexRef.current = 0;
       refreshNav();
@@ -110,7 +129,7 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
     if (location.pathname === `/${codec.encode(apexId)}`) return;
 
     // 新規訪問: 前方を切り捨てて push（線形に見せる。枝は graph 側に残る）
-    history.pushState({ node: apexId }, "", target);
+    pushHistoryState({ node: apexId }, target);
     trailRef.current = trailRef.current.slice(0, indexRef.current + 1);
     trailRef.current.push(apexId);
     indexRef.current = trailRef.current.length - 1;
