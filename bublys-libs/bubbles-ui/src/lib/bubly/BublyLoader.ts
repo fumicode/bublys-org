@@ -153,8 +153,28 @@ export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
  *
  * @param origin - オリジン (例: "http://localhost:4001")
  */
+const loadingByOrigin = new Map<string, Promise<Bubly | null>>();
+
 export const loadBublyFromOrigin = async (origin: string): Promise<Bubly | null> => {
   const normalizedOrigin = normalizeBublyOrigin(origin);
+
+  // 同じオリジンへのロードが走っている間は、その 1 本に相乗りする。
+  // dev の StrictMode では復元の effect が 2 回走り、bubly.js が二重に読まれて
+  // ルートも二重登録されていた。
+  const inFlight = loadingByOrigin.get(normalizedOrigin);
+  if (inFlight) return inFlight;
+
+  const loading = loadBublyOnce(normalizedOrigin);
+  loadingByOrigin.set(normalizedOrigin, loading);
+  try {
+    return await loading;
+  } finally {
+    loadingByOrigin.delete(normalizedOrigin);
+  }
+};
+
+/** 実際の 1 回ぶんのロード。再ロード（ビルドし直した bubly を読み直す）は毎回走る */
+const loadBublyOnce = async (normalizedOrigin: string): Promise<Bubly | null> => {
   const bubly = await loadBublyFromUrl(`${normalizedOrigin}/bubly.js`);
 
   // ロードできたオリジンだけ覚える。次回の起動でここから復元する

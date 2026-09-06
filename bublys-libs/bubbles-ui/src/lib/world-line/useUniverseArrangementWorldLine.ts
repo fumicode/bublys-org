@@ -64,14 +64,9 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
    */
   const restoresFromWorldLineRef = useRef<boolean | null>(null);
   if (restoresFromWorldLineRef.current === null) {
-    const urlNode = link ? link.snapshot.decode(link.bubbleUrl) : null;
-    const restorable =
-      (!!urlNode && !!scope.graph.state.nodes[urlNode]) ||
-      Object.keys(
-        scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID)?.object.toJSON()
-          .bubbles ?? {},
-      ).length > 0;
-    restoresFromWorldLineRef.current = restorable;
+    // 判定は「世界線にノードがあるか」で見る。shell（apex の実体）はマウント時点では
+    // まだ引けないことがあり、それを頼りにすると root universe で判定を取りこぼす。
+    restoresFromWorldLineRef.current = Object.keys(scope.graph.state.nodes ?? {}).length > 0;
   }
   const restoresFromWorldLine = restoresFromWorldLineRef.current;
 
