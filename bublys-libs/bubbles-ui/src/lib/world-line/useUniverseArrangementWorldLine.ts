@@ -5,7 +5,9 @@ import { useCasScope } from "@bublys-org/world-line-graph";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import {
   makeSelectBubbleArrangementForUniverse,
-  replaceBubbleArrangement,
+  makeSelectProjectedNodeId,
+  projectUniverse,
+  markProjected,
   navigateBubble,
 } from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
@@ -96,26 +98,21 @@ export function useUniverseArrangementWorldLine(
   );
 
   /**
-   * この universe が世界線から復元されるか（= seed してはいけないか）を
-   * **マウント時に 1 回だけ**判定する。
-   *
-   * bubbles スライスは永続化されないので、リロード直後の universe は必ず空で始まる。
-   * そこで seed を撒くと「seed だけの状態」が commit されて apex が進み、
-   * 復元すべきノードを追い越して上書きしてしまう（中に開いていたバブルが消える）。
-   *
-   * ルール: **復元できる状態があるなら seed しない。seed は本当に空の universe だけ。**
+   * seed 判定専用: この universe は世界線から復元されるか。
+   * commit の可否はもう ref ではなく projectedNodeId が決めるので、この値は
+   * 「初期バブルを撒いてよいか」だけに使う（復元されるなら撒かない）。
    */
   const restoresFromWorldLineRef = useRef<boolean | null>(null);
   if (restoresFromWorldLineRef.current === null) {
-    // 判定材料は 2 つ。どちらかが立てば「復元される」:
-    //  - 親バブルの url がノードを指している（nest universe。マウント時に必ず読める）
-    //  - 世界線にノードがある（root universe など）
-    // shell（apex の実体）はマウント時点では引けないことがあるので使わない。
     const urlNode = link ? link.snapshot.decode(link.bubbleUrl) : null;
     restoresFromWorldLineRef.current =
       !!urlNode || Object.keys(scope.graph.state.nodes ?? {}).length > 0;
   }
   const restoresFromWorldLine = restoresFromWorldLineRef.current;
+
+  /** この配置が「どのノードの投影か」。null = まだ投影されていない = 読み取り専用 */
+  const projectedNodeId = useAppSelector(makeSelectProjectedNodeId(universeId));
+  const apexId = scope.graph.getApex()?.id ?? null;
 
   const onCommittedRef = useRef(onCommitted);
   onCommittedRef.current = onCommitted;
@@ -126,69 +123,61 @@ export function useUniverseArrangementWorldLine(
   /** 宣言順の都合で ref 越しに呼ぶ（実体は下の writeAddress） */
   const writeAddressRef = useRef<(nodeId: string) => void>(() => undefined);
 
-  const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
-
-  /**
-   * 復元が済んだか。**起動は「変更」ではない**ので、復元が流れ込むまでは commit しない。
-   *
-   * リロード直後の universe は空から始まり、そこへ復元が届くまでの間に
-   * 何段階か view が動く（seed・レイアウト調整など）。これをそのまま記録すると、
-   * 起動のたびに世界線ノードが増え、apex が進み、URL が何度も書き換わる
-   * （`universe@xxxx` のチラつき）。しかも push なのでブラウザ履歴まで汚れる。
-   *
-   * 復元するものが無い universe は最初から「済」でよい。
-   */
-  const restoredRef = useRef(!restoresFromWorldLine);
-
-  // [commit] view 変化 → world-line に記録
+  // ============================================================
+  // [投影] 世界線 → 配置。無条件・常時。
+  //
+  // 現在地（apex）が指すノードの中身を配置に流し込み、「どのノードの投影か」を
+  // 同じ 1 アクションで書く。CAS がまだ届いていない（shell が引けない）ときは
+  // 何もしない — 届いた瞬間に getShell の参照が変わって再実行される。
+  // ============================================================
   useEffect(() => {
     if (!isDriver()) return;
-    const signature = JSON.stringify(view);
-    if (signature === syncedSignatureRef.current) return;
-    // 復元前の途中経過は記録しない（syncedSignature も進めない。復元後の差分検知に使う）
-    if (!restoredRef.current) return;
-    syncedSignatureRef.current = signature;
+    if (!apexId || projectedNodeId === apexId) return;
     const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    const graphsBefore = store.getState().worldLineGraph?.graphs ?? {};
-    const nodesBefore = graphsBefore[universeId]?.nodes ?? {};
+    if (!shell) return;
+    dispatch(projectUniverse({ arrangement: shell.object.toJSON(), nodeId: apexId }, universeId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apexId, projectedNodeId, scope.getShell]);
+
+  // ============================================================
+  // [commit] 配置 → 世界線。**投影済みのときだけ**。
+  //
+  // 「起動は変更ではない」を時刻(ref)ではなく値(projectedNodeId)で表す。
+  // 投影が済んでいない universe は読み取り専用なので、起動途中の配置は記録されない。
+  // 投影直後は定義上 view == 世界線[apex] なので、復元をそのまま記録し返すことも起きない。
+  // 世界線をまだ持たない universe（apex なし）は、ここが最初のノードを作る（genesis）。
+  // ============================================================
+  useEffect(() => {
+    if (!isDriver()) return;
+    const projected = apexId === null ? true : projectedNodeId === apexId;
+    if (!projected) return;
+
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
+    // store の型は注入スライスを optional に持つため、セレクタ用に絞り込む
+    const latest = makeSelectBubbleArrangementForUniverse(universeId)(
+      store.getState() as Parameters<ReturnType<typeof makeSelectBubbleArrangementForUniverse>>[0],
+    );
+    if (shell && JSON.stringify(shell.object.toJSON()) === JSON.stringify(latest)) return;
+    if (!shell && Object.keys(latest.bubbles).length === 0) return; // 空 universe は焼かない
+
+    const nodesBefore = store.getState().worldLineGraph?.graphs?.[universeId]?.nodes ?? {};
     if (shell) {
-      shell.update(() => new BubbleArrangement(view));
+      shell.update(() => new BubbleArrangement(latest));
     } else {
-      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(view));
+      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(latest));
     }
-    // grow は同期 dispatch なので、直後の store が結果を持っている。
-    // 打ち消しスナップ（同じ内容の既存ノードへ吸収）では apex は動くがノードは増えない。
-    // 「ノードが新しく生まれた」ときだけ通知する ＝ 履歴を積んでよい唯一の瞬間。
-    const graphsAfter = store.getState().worldLineGraph?.graphs ?? {};
-    const after = graphsAfter[universeId]?.apexNodeId ?? null;
-    if (after && !nodesBefore[after]) {
+
+    // grow は同期 dispatch。直後の store が結果を持っている。
+    const after = store.getState().worldLineGraph?.graphs?.[universeId]?.apexNodeId ?? null;
+    if (!after) return;
+    dispatch(markProjected(after, universeId)); // 配置は今まさに焼いた中身 = このノードの投影
+    if (!nodesBefore[after]) {
+      // ノードが新しく生まれた = ユーザーの変更が記録された唯一の瞬間
       writeAddressRef.current(after);
       onCommittedRef.current?.(after);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-
-  // [rehydrate] apex 変化 → この universe に流し込む
-  const apexId = scope.graph.getApex()?.id ?? null;
-  useEffect(() => {
-    if (!isDriver()) return;
-    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    // 復元元が無い＝復元は起きない。commit の抑止を解いておく
-    if (!shell) {
-      restoredRef.current = true;
-      return;
-    }
-    const incoming = shell.object.toJSON();
-    const signature = JSON.stringify(incoming);
-    if (signature === syncedSignatureRef.current) {
-      restoredRef.current = true;
-      return;
-    }
-    syncedSignatureRef.current = signature;
-    dispatch(replaceBubbleArrangement(incoming, universeId));
-    restoredRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apexId]);
+  }, [view, projectedNodeId, apexId]);
 
   // ============================================================
   // [アドレス ⇄ 現在地]
