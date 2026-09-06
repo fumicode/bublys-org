@@ -77,10 +77,24 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
 
   const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
 
+  /**
+   * 復元が済んだか。**起動は「変更」ではない**ので、復元が流れ込むまでは commit しない。
+   *
+   * リロード直後の universe は空から始まり、そこへ復元が届くまでの間に
+   * 何段階か view が動く（seed・レイアウト調整など）。これをそのまま記録すると、
+   * 起動のたびに世界線ノードが増え、apex が進み、URL が何度も書き換わる
+   * （`universe@xxxx` のチラつき）。しかも push なのでブラウザ履歴まで汚れる。
+   *
+   * 復元するものが無い universe は最初から「済」でよい。
+   */
+  const restoredRef = useRef(!restoresFromWorldLine);
+
   // [commit] view 変化 → world-line に記録
   useEffect(() => {
     const signature = JSON.stringify(view);
     if (signature === syncedSignatureRef.current) return;
+    // 復元前の途中経過は記録しない（syncedSignature も進めない。復元後の差分検知に使う）
+    if (!restoredRef.current) return;
     syncedSignatureRef.current = signature;
     const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (shell) {
@@ -95,12 +109,20 @@ export function useUniverseArrangementWorldLine(universeId: string, link?: Unive
   const apexId = scope.graph.getApex()?.id ?? null;
   useEffect(() => {
     const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    if (!shell) return;
+    // 復元元が無い＝復元は起きない。commit の抑止を解いておく
+    if (!shell) {
+      restoredRef.current = true;
+      return;
+    }
     const incoming = shell.object.toJSON();
     const signature = JSON.stringify(incoming);
-    if (signature === syncedSignatureRef.current) return;
+    if (signature === syncedSignatureRef.current) {
+      restoredRef.current = true;
+      return;
+    }
     syncedSignatureRef.current = signature;
     dispatch(replaceBubbleArrangement(incoming, universeId));
+    restoredRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apexId]);
 
