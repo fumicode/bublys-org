@@ -50,12 +50,26 @@ import { useUniverseArrangementWorldLine } from "./useUniverseArrangementWorldLi
  * パッチ経由のままだと、バブルを 1 個開くたびにルート遷移扱いになり、
  * dev では `ChunkLoadError: Failed to load chunk ...` を踏むことがある。
  */
-const pushHistoryState = (state: unknown, url: string): void => {
-  History.prototype.pushState.call(window.history, state, "", url);
+/**
+ * いまの履歴エントリの state を土台に、自分の情報を乗せる。
+ *
+ * Next.js の App Router は popstate で `event.state.__NA`（＝自分が作ったエントリ）が
+ * 無いと `window.location.reload()` する。ルーターを経由せずに書くと、この印と
+ * 内部ツリーが落ちて**戻る/進むがフルリロードになる**。
+ * ここで作るのは Next のルート遷移ではなく世界線ノードの移動（同じページのまま）なので、
+ * 現在のエントリの state をそのまま引き継いで印を保つ。
+ */
+const withCurrentHistoryState = (state: Record<string, unknown>): Record<string, unknown> => ({
+  ...((window.history.state as Record<string, unknown> | null) ?? {}),
+  ...state,
+});
+
+const pushHistoryState = (state: Record<string, unknown>, url: string): void => {
+  History.prototype.pushState.call(window.history, withCurrentHistoryState(state), "", url);
 };
 
-const replaceHistoryState = (state: unknown, url: string): void => {
-  History.prototype.replaceState.call(window.history, state, "", url);
+const replaceHistoryState = (state: Record<string, unknown>, url: string): void => {
+  History.prototype.replaceState.call(window.history, withCurrentHistoryState(state), "", url);
 };
 
 export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
