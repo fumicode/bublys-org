@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { makeStore, AppStore, injectSlice, injectMiddleware, addToBlacklist } from '@bublys-org/state-management';
 import { PersistGate } from 'redux-persist/integration/react';
 import { Persistor } from 'redux-persist/lib/types';
-import { initWorldLineGraph } from '@bublys-org/world-line-graph';
+import { IntentBoundary, initWorldLineGraph } from '@bublys-org/world-line-graph';
 import { DomainRegistryProvider, type DomainRegistry } from '@bublys-org/domain-registry';
 import {
   bubblesSlice,
@@ -124,6 +124,8 @@ export function BublyStoreProvider({
 
   return (
     <Provider store={store}>
+      {/* ユーザー入力の瞬間に「1 意図」を開く（OS と同じルール） */}
+      <IntentBoundary />
       <PersistGate loading={null} persistor={persistor}>
         {inner}
       </PersistGate>

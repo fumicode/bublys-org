@@ -29,3 +29,12 @@ export {
   type ResolvedObject,
   type ResolveStatesResult,
 } from './resolveStates';
+export {
+  beginIntent,
+  startIntent,
+  currentIntentId,
+  currentIntentLabel,
+  nameIntent,
+  withIntent,
+} from './intent';
+export { IntentBoundary } from './IntentBoundary';

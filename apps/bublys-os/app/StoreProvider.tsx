@@ -22,7 +22,7 @@ import * as BubblesUI from "@bublys-org/bubbles-ui";
 import * as MuiMaterial from "@mui/material";
 import * as MuiIcons from "@mui/icons-material";
 import { registerAppObjectTypes } from "./object-type-registration";
-import { initWorldLineGraph } from '@bublys-org/world-line-graph';
+import { initWorldLineGraph, IntentBoundary } from '@bublys-org/world-line-graph';
 import * as WorldLineGraph from '@bublys-org/world-line-graph';
 import * as DomainRegistry from '@bublys-org/domain-registry';
 
@@ -123,6 +123,8 @@ export default function StoreProvider({
 
   return (
     <Provider store={store}>
+      {/* ユーザー入力の瞬間に「1 意図」を開く。世界線のノードはこの単位で 1 つになる */}
+      <IntentBoundary />
       <PersistGate loading={null} persistor={persistor}>
         {bubliesRestored ? children : null}
       </PersistGate>

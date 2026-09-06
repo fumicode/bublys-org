@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAppDispatch, useAppSelector, useAppStore } from "@bublys-org/state-management";
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { beginIntent } from "@bublys-org/world-line-graph";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import {
   makeSelectBubbleArrangementForUniverse,
@@ -214,6 +215,7 @@ export function useUniverseArrangementWorldLine(
   /** nav 動詞（←/→ / ジャンプ）: 移動したら、その現在地をアドレスに書く */
   const navigate = useCallback(
     (run: () => void) => {
+      beginIntent(); // nest の ←/→ もユーザーの 1 操作
       run();
       const apex = store.getState().worldLineGraph?.graphs?.[universeId]?.apexNodeId ?? null;
       if (apex) writeAddress(apex);

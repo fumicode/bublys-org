@@ -10,6 +10,7 @@ import {
   createStateRef,
   type StateRef,
 } from '../domain';
+import { currentIntentId, currentIntentLabel } from './intent';
 import { WorldLineGraph, type ForkChoice } from '../domain/WorldLineGraph';
 import {
   setGraph,
@@ -146,7 +147,9 @@ export function useCasScope(
 
   const grow = useCallback(
     (changedRefs: StateRef[], stateEntries: { hash: string; data: unknown }[]) => {
-      const updated = graph.grow(changedRefs);
+      // 世界線への記録は commit 1 本に通す。いま開いている意図が apex を生んだ意図と
+      // 同じなら（＝同じ 1 操作の続きなら）新しいノードを作らず apex を書き換える。
+      const updated = graph.commit(changedRefs, currentIntentId(), currentIntentLabel() ?? undefined);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
       if (stateEntries.length > 0) {
         // 直後に必要になる「現在の世界」が参照するハッシュは evict 対象から保護する

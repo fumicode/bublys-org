@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { beginIntent } from "@bublys-org/world-line-graph";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import { useAppDispatch } from "@bublys-org/state-management";
 import {
@@ -194,6 +195,7 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   // popstate（ブラウザ/ボタンの戻る・進む）→ URL のノードへ moveTo
   useEffect(() => {
     const onPopstate = () => {
+      beginIntent(); // 戻る/進むもユーザーの 1 操作
       const id = parseNodeFromUrl();
       if (!id || !hasNodeRef.current(id)) return; // 実在しないノードは無視（throw 回避）
       moveToRef.current(id);
@@ -214,6 +216,7 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   const jumpTo = useCallback(
     (nodeId: string) => {
       if (!hasNodeRef.current(nodeId)) return;
+      beginIntent(); // DAG のノードクリックもユーザーの 1 操作
       moveToRef.current(nodeId);
       pushCurrent(nodeId);
     },
