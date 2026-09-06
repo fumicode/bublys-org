@@ -38,7 +38,7 @@ export function App() {
     >
       <BublyApp
         title="Hotel Shift Puzzle"
-        subtitle="Standalone • Port 4004"
+        subtitle="Standalone • Port 4006"
         menuItems={menuItems}
         backdropColor="hsl(20, 40%, 22%)"
       />
