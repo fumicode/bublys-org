@@ -60,7 +60,13 @@ const replaceHistoryState = (state: unknown, url: string): void => {
 
 export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   const dispatch = useAppDispatch();
-  const { apexId, scope, restoresFromWorldLine } = useUniverseArrangementWorldLine(ROOT_UNIVERSE_ID);
+  // commit で新しいノードが生まれた瞬間だけ履歴を積む。宣言順の都合で ref 経由にする
+  const onCommittedRef = useRef<(nodeId: string) => void>(() => undefined);
+  const { apexId, scope, restoresFromWorldLine } = useUniverseArrangementWorldLine(
+    ROOT_UNIVERSE_ID,
+    undefined,
+    (nodeId) => onCommittedRef.current(nodeId),
+  );
 
   // [seed] 復元するものが無いときだけ、設定済みの初期バブルを撒く。
   // 初期配置をスライスの initialState に埋め込むと、reducer が undefined state で
@@ -93,8 +99,9 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   // throw するのを防ぐ）。最新グラフを掴むため毎レンダー更新。
   const hasNodeRef = useRef<(id: string) => boolean>(() => false);
   hasNodeRef.current = (id: string) => !!scope.graph.state.nodes[id];
-  // apex 変化が popstate（戻る/進む）由来かどうか。由来なら pushState しない。
-  const fromPopstateRef = useRef(false);
+  // 直前の現在地。apex の変化が「新ノードが生えた（commit）」のか
+  // 「既存ノードへ移動した（moveTo）」のかを見分けるために持つ。
+  const prevApexRef = useRef<string | null>(null);
 
   // 訪問トレイル（線形）: undo/redo ボタンの活性判定用。ブラウザ履歴スタックは
   // **中身を読めない**（length は取れるが現在位置は不明）ので、push/popstate を
@@ -115,17 +122,23 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
     });
   }, []);
 
-  // apex → URL（新規訪問なら push、popstate 由来なら何もしない）
+  // apex → URL。
+  //
+  // ルール: **URL は常に現 apex を指す（replace で自己修復）。履歴を積む(push)のは
+  // 「直前の現在地から新しいノードが生えた」ときだけ**＝ユーザーの変更が commit された瞬間。
+  // moveTo による移動（復元・打ち消しスナップ・popstate・遅れて届いた CAS）は
+  // 現在地が既存ノードへ動いただけなので履歴を増やさない。
+  // 起動中に URL が何度も書き換わり、履歴が起動途中の状態で埋まっていたのはここが原因だった。
   useEffect(() => {
     if (!apexId) return;
     const target = buildRootPath(apexId);
+    prevApexRef.current = apexId;
 
     if (!initializedRef.current) {
       initializedRef.current = true;
       const urlNode = parseNodeFromUrl();
       if (urlNode && urlNode !== apexId && hasNodeRef.current(urlNode)) {
-        // ディープリンク: URL のノードへ移動（apex がまた変わるので次回に任せる）
-        fromPopstateRef.current = true;
+        // アドレスが先に動いている（ディープリンク/リロード）→ そこへ移るだけ。逆流させない
         trailRef.current = [urlNode];
         indexRef.current = 0;
         moveToRef.current(urlNode);
@@ -133,7 +146,6 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
         return;
       }
       // 初回 or URL のノードが実在しない（stale url）: URL を現 apex に揃える
-      // （履歴は置換してエントリを増やさない）
       replaceHistoryState({ node: apexId }, target);
       trailRef.current = [apexId];
       indexRef.current = 0;
@@ -141,27 +153,35 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
       return;
     }
 
-    if (fromPopstateRef.current) {
-      fromPopstateRef.current = false;
-      return;
-    }
     if (location.pathname === `/${codec.encode(apexId)}`) return;
 
-    // 新規訪問: 前方を切り捨てて push（線形に見せる。枝は graph 側に残る）
-    pushHistoryState({ node: apexId }, target);
-    trailRef.current = trailRef.current.slice(0, indexRef.current + 1);
-    trailRef.current.push(apexId);
-    indexRef.current = trailRef.current.length - 1;
-    refreshNav();
+    // ここは「URL を現在地に合わせる」だけ。履歴を積むのは commit（onCommitted）と
+    // DAG ジャンプ（jumpTo）の 2 箇所に限る。
+    replaceHistoryState({ node: apexId }, target);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apexId, refreshNav]);
+
+  /** 履歴を 1 つ積んで現在地にする（commit / DAG ジャンプ共通） */
+  const pushCurrent = useCallback(
+    (nodeId: string) => {
+      pushHistoryState({ node: nodeId }, buildRootPath(nodeId));
+      trailRef.current = trailRef.current.slice(0, indexRef.current + 1);
+      trailRef.current.push(nodeId);
+      indexRef.current = trailRef.current.length - 1;
+      refreshNav();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [refreshNav],
+  );
+
+  // commit で新ノードが生まれた = ユーザーの変更が記録された。ここでだけ履歴が伸びる
+  onCommittedRef.current = pushCurrent;
 
   // popstate（ブラウザ/ボタンの戻る・進む）→ URL のノードへ moveTo
   useEffect(() => {
     const onPopstate = () => {
       const id = parseNodeFromUrl();
       if (!id || !hasNodeRef.current(id)) return; // 実在しないノードは無視（throw 回避）
-      fromPopstateRef.current = true;
       moveToRef.current(id);
       const i = trailRef.current.indexOf(id);
       if (i >= 0) indexRef.current = i;
@@ -171,6 +191,20 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
     return () => window.removeEventListener("popstate", onPopstate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshNav]);
+
+  /**
+   * DAG 上の任意ノードへジャンプする（世界線グラフのクリック等）。
+   * これは**ユーザーのナビゲーション**なので履歴を積む。
+   * apex→URL の effect は「生えた」以外を replace するので、push はここが担当する。
+   */
+  const jumpTo = useCallback(
+    (nodeId: string) => {
+      if (!hasNodeRef.current(nodeId)) return;
+      moveToRef.current(nodeId);
+      pushCurrent(nodeId);
+    },
+    [pushCurrent],
+  );
 
   // undo/redo はブラウザ履歴に委譲（ボタン = ブラウザの戻る/進む）
   const moveBack = useCallback(() => history.back(), []);
@@ -214,8 +248,8 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   return {
     moveBack,
     moveForward,
-    // DAG パネルからの枝ジャンプ用（pushState 経由で線形トレイルの先端に積まれる）
-    moveTo: scope.moveTo,
+    // DAG パネルからの枝ジャンプ用。これはユーザーのナビゲーションなので履歴を積む
+    moveTo: jumpTo,
     canUndo: nav.canUndo,
     canRedo: nav.canRedo,
     graph: scope.graph,

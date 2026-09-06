@@ -224,6 +224,8 @@ export function useCasScope(
   // StateRef から alive shells を導出 + apex 変更時の自動 sync
   // ============================================================
 
+  // 毎レンダー新しい配列を作ると shellsByType → getShell の参照が毎回変わり、
+  // 「getShell の参照が変わった＝CAS が遅れて届いた」という意味を持てなくなる
   const currentRefs = useMemo(() => graph.getCurrentStateRefs(), [graph]);
 
   // 型ごとにグループ化
@@ -323,7 +325,6 @@ export function useCasScope(
     if (graph.state.rootNodeId !== null) return;
     const initials = options?.initialObjects;
     if (!initials?.length) return;
-    initializedRef.current = true;
 
     const refs: StateRef[] = [];
     const entries: { hash: string; data: unknown }[] = [];
@@ -336,8 +337,14 @@ export function useCasScope(
       refs.push(createStateRef(type, id, hash));
       entries.push({ hash, data: shell.toJSON() });
     }
+    // registry に型が無いと refs が空のまま grow され、changedRefs が空の
+    // 「幽霊 root ノード」が焼かれる。addObjects 側には既にあるガード。
+    if (refs.length === 0) return;
+    // フラグはループ前ではなく grow の直後に立てる。前に立てると、
+    // 上のガードで抜けたときに「二度と初期化されない」に化ける。
+    initializedRef.current = true;
     growRef.current(refs, entries);
-  }, [graph.state.rootNodeId]);
+  }, [graph.state.rootNodeId, registry]);
 
   // ============================================================
   // 公開 API
