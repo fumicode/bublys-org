@@ -87,6 +87,11 @@ export type BubbleState = {
 
 
 // Domain Bubble class
+/**
+ * 掴んだ辺／隅。含まれる向きの辺だけが動き、**反対側は固定される**。
+ */
+export type ResizeEdge = "e" | "w" | "s" | "se" | "sw";
+
 export class Bubble {
   private state: BubbleState;
   constructor(props: BubbleProps) {
@@ -199,6 +204,36 @@ export class Bubble {
 
   resizeTo(size: Size2): Bubble {
     return new Bubble({ ...this.state, size });
+  }
+
+  /**
+   * 辺／隅を掴んだリサイズ。**掴んだ辺の反対側は固定される**。
+   *
+   * 左辺側（`w`）は幅と位置を同時に更新する。最小サイズで止まったときも
+   * 「実際に変わったぶん」だけ位置を動かすので右辺がずれない。
+   * 移動量は **layer-local**（{@link Layer.scaleScreenDelta} で変換済み）で受け取る。
+   * 画面座標のまま渡すと奥の面でズレるので、呼び出し側で必ず変換すること。
+   */
+  resizeByEdge(edge: ResizeEdge, localDelta: Point2, min: Size2): Bubble {
+    const current = this.size ?? this.defaultSize;
+
+    const rawWidth = edge.includes("e")
+      ? current.width + localDelta.x
+      : edge.includes("w")
+        ? current.width - localDelta.x
+        : current.width;
+    const rawHeight = edge.includes("s") ? current.height + localDelta.y : current.height;
+
+    const width = Math.max(min.width, rawWidth);
+    const height = Math.max(min.height, rawHeight);
+
+    // 左辺を掴んだときだけ、幅が変わったぶん左辺を動かす（右辺を固定するための対）
+    const shiftX = edge.includes("w") ? current.width - width : 0;
+
+    return this.resizeTo({ width, height }).moveTo({
+      x: this.position.x + shiftX,
+      y: this.position.y,
+    });
   }
 
   /** 最大化する（明示サイズ + maximized=true）。 */
