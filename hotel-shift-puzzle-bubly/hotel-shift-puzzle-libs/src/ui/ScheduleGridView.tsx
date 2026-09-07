@@ -2,6 +2,7 @@
 
 import { FC, Fragment, useMemo, useState } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+import { SCHEDULE_DAY_VIEW_TYPE } from "./viewObjectTypes.js";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -517,9 +518,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (
                 <ObjectView
+                  type={SCHEDULE_DAY_VIEW_TYPE}
                   url={dayBubbleUrl(day)}
+                  label={day.key}
                   openingPosition="origin-side"
-                  draggable={false}
                   fullWidth
                 >
                   {inner}
