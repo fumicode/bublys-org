@@ -146,11 +146,12 @@ export const BublyApp: FC<BublyAppProps> = ({
 
   const joinSibling = useCallback((
     b: Bubble,
-    openerBubbleId: string
+    openerBubbleId: string,
+    options?: OpenBubbleOptions
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
-    dispatch(joinSiblingAction(b.id));
+    dispatch(joinSiblingAction({ bubbleId: b.id, droppedAt: options?.droppedAt }));
     return b.id;
   }, [dispatch]);
 
@@ -162,10 +163,13 @@ export const BublyApp: FC<BublyAppProps> = ({
   ): string => {
     const newBubble = createBubble(name);
 
-    // 落とされた場所に開くときは、URL や兄弟の型による置き場所の読み替えをしない。
-    // 置き場所は人が指し示したのだから、それを他のルールで上書きしない。
+    // 落として開くときも、レイヤーの決まりは他と同じ。
+    // 同じ種類のバブルなら今のレイヤーに並べ、違う種類なら新しいレイヤーを作る。
+    // 落とした操作が変えるのは「どこに置くか」だけで、「どのレイヤーか」は変えない。
     if (openingPosition === 'dropped-place') {
-      return popChild(newBubble, openerBubbleId, openingPosition, options);
+      return surfaceBubbles?.[0]?.type === newBubble.type
+        ? joinSibling(newBubble, openerBubbleId, options)
+        : popChild(newBubble, openerBubbleId, openingPosition, options);
     }
 
     const isNameEndWithHistory = /\/history$/.test(name);

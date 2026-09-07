@@ -8,6 +8,7 @@ import {
   CoordinateSystem,
   Layer,
   BubblesContext,
+  type OpenBubbleOptions,
   BubbleRefsProvider,
   BubblesLayeredView,
   BubblesLayeredViewProps,
@@ -109,12 +110,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side-right"
+    openingPosition: OpeningPosition = "bubble-side-right",
+    options?: OpenBubbleOptions
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
-    dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
+    dispatch(popChildAction({ bubbleId: b.id, openingPosition, droppedAt: options?.droppedAt }));
 
     return b.id;
   }, [dispatch]);
@@ -157,12 +159,13 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   const joinSibling = useCallback((
     b: Bubble,
-    openerBubbleId: string
+    openerBubbleId: string,
+    options?: OpenBubbleOptions
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
-    dispatch(joinSiblingAction(b.id));
+    dispatch(joinSiblingAction({ bubbleId: b.id, droppedAt: options?.droppedAt }));
 
     return b.id;
   }, [dispatch]);
@@ -171,9 +174,19 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = "bubble-side-right"
+    openingPosition: OpeningPosition = "bubble-side-right",
+    options?: OpenBubbleOptions
   ): string => {
     const newBubble = createBubble(name);
+
+    // 落として開くときも、レイヤーの決まりは他と同じ。
+    // 同じ種類のバブルなら今のレイヤーに並べ、違う種類なら新しいレイヤーを作る。
+    // 落とした操作が変えるのは「どこに置くか」だけで、「どのレイヤーか」は変えない。
+    if (openingPosition === "dropped-place") {
+      return surfaceBubbles?.[0]?.type === newBubble.type
+        ? joinSibling(newBubble, openerBubbleId, options)
+        : popChild(newBubble, openerBubbleId, openingPosition, options);
+    }
 
     //nameの最後がhistoryであるかどうかをチェック
     const isNameEndWithHistory = /\/history$/.test(name);

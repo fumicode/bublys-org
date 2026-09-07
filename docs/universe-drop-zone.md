@@ -85,6 +85,29 @@ layer-local 座標                       ← bubble.position
 
 ---
 
+## どのレイヤーに置くか
+
+**落とした操作が決めるのは「どこに置くか」だけで、「どのレイヤーか」は決めない。**
+レイヤーの決まりは `openBubble` と同じ:
+
+| | |
+|---|---|
+| 今のレイヤーの先頭と同じ種類のバブル | そのレイヤーに並べる（`joinSibling`） |
+| 違う種類のバブル | 新しいレイヤーを作る（`popChild`） |
+
+「同じ種類のものは並べて見比べ、違う種類のものは奥行きで分ける」というレイヤーの意味は、
+どうやって開いたかとは関係がない。だからドロップだけ別扱いにしない。
+
+そのため `joinSibling` の action も `droppedAt` を運べるようにしてある
+（`JoinSiblingPayload`）。並べるときは普通は隣の兄弟に寄せて置くが、落として並べたときは
+落ちた点に置く。位置決めそのものは `popChild` と共通の1箇所（listener の
+`placeAtDroppedPoint`）にまとめてある。
+
+なお履歴（`/history` で終わる URL）の下部ストリップだけは**位置**の決まりなので、
+落として開いたときは落とした場所が勝つ。
+
+---
+
 ## 入れ子の宇宙
 
 入れ子の universe は普段 `pointer-events: none` で、空白領域は奥へ貫通する。
@@ -116,8 +139,9 @@ layer-local 座標                       ← bubble.position
 
 | 役割 | ファイル |
 |---|---|
-| 位置指定の値 | `bublys-libs/bubbles-ui/src/lib/state/bubbles-slice.ts`（`OpeningPosition` / `PopChildPayload.droppedAt`） |
-| 位置決め | `bublys-libs/bubbles-ui/src/lib/state/bubbles-listener.ts`（`popChildInProcess` の listener） |
+| 位置指定の値 | `bublys-libs/bubbles-ui/src/lib/state/bubbles-slice.ts`（`OpeningPosition` / `PopChildPayload.droppedAt` / `JoinSiblingPayload.droppedAt`） |
+| 位置決め | `bublys-libs/bubbles-ui/src/lib/state/bubbles-listener.ts`（`placeAtDroppedPoint` と2つの listener） |
+| レイヤーの決まり | `ui/UniverseView.tsx` / `bubly/BublyApp.tsx` の `openBubble` |
 | ドロップの受け口 | `bublys-libs/bubbles-ui/src/lib/hooks/useUniverseDropZone.ts` |
 | 座標変換 | `bublys-libs/bubbles-ui/src/lib/utils/drop-point.ts` |
 | 入れ子の一時解放 | `bublys-libs/bubbles-ui/src/lib/utils/drag-session.ts` |
