@@ -6,6 +6,12 @@ import { Bubble } from "../Bubble.domain.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { updateBubble } from "../state/bubbles-slice.js";
 
+/**
+ * どの辺／隅を掴んだか。`w` を含むときは**左辺を動かす**ので、
+ * サイズだけでなく位置も一緒に更新する（掴んだ辺の反対側が固定される）。
+ */
+export type ResizeDirection = "e" | "w" | "s" | "se" | "sw";
+
 type UseBubbleResizeArgs = {
   bubble: Bubble;
   ref: React.RefObject<HTMLElement | null>;
@@ -16,7 +22,7 @@ type UseBubbleResizeArgs = {
 const MIN_SIZE: Size2 = { width: 160, height: 100 };
 
 /**
- * バブル右下のリサイズハンドル用 hook。
+ * バブルの辺／隅のリサイズハンドル用 hook。左・右・下・左下・右下に対応する。
  *
  * 振る舞いは {@link useBubbleDrag} と対称的:
  *  - 開始時にバブルの実サイズ（getBoundingClientRect）を起点として記録
@@ -38,6 +44,12 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
   const startSizeRef = useRef<Size2 | null>(null);
   const startMouseRef = useRef<{ x: number; y: number } | null>(null);
   const currentSizeRef = useRef<Size2 | null>(null);
+  const directionRef = useRef<ResizeDirection>("se");
+  /** 左辺を掴んだときの起点。位置（ローカル）と style.left（画面）の両方を持つ */
+  const startPosRef = useRef<{ x: number; y: number } | null>(null);
+  const startLeftPxRef = useRef<number>(0);
+  /** 左辺を動かしたぶんのローカル移動量（確定時に位置へ反映する） */
+  const posShiftXRef = useRef(0);
 
   const handleResizing = (e: MouseEvent) => {
     if (!startSizeRef.current || !startMouseRef.current || !ref.current) return;
@@ -49,17 +61,41 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
     };
     const coordSystem = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);
     const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
-    const w = Math.max(MIN_SIZE.width, startSizeRef.current.width + localDelta.x);
-    const h = Math.max(MIN_SIZE.height, startSizeRef.current.height + localDelta.y);
-    currentSizeRef.current = { width: w, height: h };
-    ref.current.style.width = `${w}px`;
-    ref.current.style.height = `${h}px`;
+    const dir = directionRef.current;
+    const start = startSizeRef.current;
+
+    // 掴んだ辺だけを動かす。反対側の辺は動かない（= 左辺を掴んだら右辺が固定）
+    let w = start.width;
+    if (dir.includes("e")) w = start.width + localDelta.x;
+    if (dir.includes("w")) w = start.width - localDelta.x;
+    const h = dir.includes("s") ? start.height + localDelta.y : start.height;
+
+    const clampedW = Math.max(MIN_SIZE.width, w);
+    const clampedH = Math.max(MIN_SIZE.height, h);
+    currentSizeRef.current = { width: clampedW, height: clampedH };
+
+    ref.current.style.width = `${clampedW}px`;
+    ref.current.style.height = `${clampedH}px`;
     ref.current.style.transition = "none";
+
+    if (dir.includes("w")) {
+      // 実際に縮んだ/伸びたぶんだけ左辺を動かす。MIN で止まったときも右辺がずれない
+      const shift = start.width - clampedW;
+      posShiftXRef.current = shift;
+      ref.current.style.left = `${startLeftPxRef.current + shift * coordSystem.scale}px`;
+    }
   };
 
   const endResize = () => {
     if (currentSizeRef.current) {
-      const resized = bubbleRef.current.resizeTo(currentSizeRef.current);
+      let resized = bubbleRef.current.resizeTo(currentSizeRef.current);
+      // 左辺を掴んでいたら、縮んだぶん位置も動かす（右辺を固定するための対）
+      if (posShiftXRef.current !== 0 && startPosRef.current) {
+        resized = resized.moveTo({
+          x: startPosRef.current.x + posShiftXRef.current,
+          y: startPosRef.current.y,
+        });
+      }
       // 「ユーザーがサイズを決めた」状態 = maximized:false を明示的に立てる
       dispatch(updateBubble({ ...resized.toJSON(), maximized: false }, universeId));
     }
@@ -67,24 +103,34 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
       ref.current.style.transition = "";
       ref.current.style.width = "";
       ref.current.style.height = "";
+      ref.current.style.left = "";
     }
     startSizeRef.current = null;
     startMouseRef.current = null;
     currentSizeRef.current = null;
+    startPosRef.current = null;
+    posShiftXRef.current = 0;
     document.removeEventListener("mousemove", handleResizing);
     document.removeEventListener("mouseup", endResize);
   };
 
-  const onResizeStart = (e: {
-    clientX: number;
-    clientY: number;
-    stopPropagation: () => void;
-    preventDefault?: () => void;
-  }) => {
+  const onResizeStart = (
+    e: {
+      clientX: number;
+      clientY: number;
+      stopPropagation: () => void;
+      preventDefault?: () => void;
+    },
+    direction: ResizeDirection = "se",
+  ) => {
     e.stopPropagation();
     e.preventDefault?.();
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
+    directionRef.current = direction;
+    posShiftXRef.current = 0;
+    startPosRef.current = bubbleRef.current.position ?? { x: 0, y: 0 };
+    startLeftPxRef.current = parseFloat(ref.current?.style.left || "0") || 0;
     // getBoundingClientRect は画面座標（scale 後）。style.width/height はローカル座標なので、
     // scale で割ってローカルの起点サイズにそろえる（奥レイヤーで scale<1 のときズレないように）。
     const { scale } = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);

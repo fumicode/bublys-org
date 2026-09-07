@@ -89,13 +89,26 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
   const isHeaderVisible = isFocused || isMouseNearTop || isHeaderHovered;
 
+  /**
+   * ヘッダーを押し下げる基準の上端。
+   *
+   * バブルが universe の中にいるときは、その universe の窓（`main.e-window-content`）の
+   * 上端が「見えている範囲の上端」。ブラウザの viewport（0）を基準にすると、
+   * 入れ子の中で上端に張り付いたバブルのヘッダーが窓の外に出てクリップされ、掴めなくなる。
+   * root universe では該当する祖先が無いので 0（= viewport 上端）に落ちる。
+   */
+  const visibleTopBound = (): number => {
+    const clip = ref.current?.closest("main.e-window-content");
+    return clip ? clip.getBoundingClientRect().top : 0;
+  };
+
   const updateHeaderSafeZone = () => {
     const bubbleRect = ref.current?.getBoundingClientRect();
     if (!bubbleRect) return;
     const headerEl = ref.current?.querySelector('.e-window-header');
     const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
-    const headerTopInViewport = bubbleRect.top - headerHeight;
-    setHeaderOffset(Math.max(0, -headerTopInViewport));
+    const headerTop = bubbleRect.top - headerHeight;
+    setHeaderOffset(Math.max(0, visibleTopBound() - headerTop));
   };
 
   useLayoutEffect(() => {
@@ -232,12 +245,12 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
 
       <main className="e-window-content">{children}</main>
 
-      {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
-      <div
-        className="e-resize-handle"
-        onMouseDown={onResizeStart}
-        title="サイズ調整"
-      />
+      {/* リサイズハンドル。掴んだ辺の反対側が固定される（左辺を掴めば右辺は動かない） */}
+      <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
+      <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
+      <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
+      <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
+      <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
     </StyledWindow>
   );
 };
@@ -449,7 +462,52 @@ const StyledWindow = styled.div<StyledWindowProps>`
       linear-gradient(135deg, transparent 0%, transparent 65%, hsla(0, 0%, 100%, 0.4) 65%, hsla(0, 0%, 100%, 0.4) 75%, transparent 75%) no-repeat;
   }
 
-  &:hover > .e-resize-handle {
+  /* 辺のリサイズ帯。窓は pointer-events: none なので explicit auto。 */
+  > .e-resize-edge {
+    position: absolute;
+    z-index: 4;
+    pointer-events: auto;
+  }
+  > .e-resize-w {
+    left: -4px;
+    top: 8px;
+    bottom: 18px;
+    width: 10px;
+    cursor: ew-resize;
+  }
+  > .e-resize-e {
+    right: -4px;
+    top: 8px;
+    bottom: 18px;
+    width: 10px;
+    cursor: ew-resize;
+  }
+  > .e-resize-s {
+    left: 18px;
+    right: 18px;
+    bottom: -4px;
+    height: 10px;
+    cursor: ns-resize;
+  }
+  /* 左下の隅。右下（e-resize-handle）と対称 */
+  > .e-resize-corner {
+    position: absolute;
+    left: 2px;
+    bottom: 2px;
+    width: 18px;
+    height: 18px;
+    cursor: nesw-resize;
+    z-index: 5;
+    pointer-events: auto;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    background:
+      linear-gradient(45deg, transparent 0%, transparent 45%, hsla(0, 0%, 100%, 0.6) 45%, hsla(0, 0%, 100%, 0.6) 55%, transparent 55%) no-repeat,
+      linear-gradient(45deg, transparent 0%, transparent 65%, hsla(0, 0%, 100%, 0.4) 65%, hsla(0, 0%, 100%, 0.4) 75%, transparent 75%) no-repeat;
+  }
+
+  &:hover > .e-resize-handle,
+  &:hover > .e-resize-corner {
     opacity: 1;
   }
 `;
