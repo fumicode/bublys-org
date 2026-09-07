@@ -3,7 +3,7 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { useAppDispatch, useAppSelector, selectWindowSize } from "@bublys-org/state-management";
 import { CoordinateSystem, Layer } from "@bublys-org/bubbles-ui-util";
 import { Bubble, createBubble } from "../Bubble.domain.js";
-import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
+import { BubblesContext, type OpenBubbleOptions } from "../bubble-routing/BubbleRouting.js";
 import { BubbleRefsProvider } from "../context/BubbleRefsContext.js";
 import { BubblesLayeredView } from "./BubblesLayeredView.js";
 import { measureViewportForElement } from "../utils/measure-viewport.js";
@@ -74,10 +74,17 @@ export const UniverseView: FC<UniverseViewProps> = ({
   }, []);
 
   const popChild = useCallback(
-    (b: Bubble, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side-right"): string => {
+    (
+      b: Bubble,
+      openerBubbleId: string,
+      openingPosition: OpeningPosition = "bubble-side-right",
+      options?: OpenBubbleOptions,
+    ): string => {
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
-      dispatch(popChildInProcess({ bubbleId: b.id, openingPosition }, universeId));
+      dispatch(
+        popChildInProcess({ bubbleId: b.id, openingPosition, droppedAt: options?.droppedAt }, universeId),
+      );
       return b.id;
     },
     [dispatch, universeId],
@@ -127,8 +134,18 @@ export const UniverseView: FC<UniverseViewProps> = ({
   );
 
   const openBubble = useCallback(
-    (name: string, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side-right"): string => {
+    (
+      name: string,
+      openerBubbleId: string,
+      openingPosition: OpeningPosition = "bubble-side-right",
+      options?: OpenBubbleOptions,
+    ): string => {
       const newBubble = createBubble(name);
+      // 落とされた場所に開くときは、URL や兄弟の型による置き場所の読み替えをしない。
+      // 置き場所は人が指し示したのだから、それを他のルールで上書きしない。
+      if (openingPosition === "dropped-place") {
+        return popChild(newBubble, openerBubbleId, openingPosition, options);
+      }
       // 履歴は画面（この universe）下部の左右いっぱいストリップで開く
       if (/\/history$/.test(name)) {
         return popChildViewPortBelow(newBubble, openerBubbleId);

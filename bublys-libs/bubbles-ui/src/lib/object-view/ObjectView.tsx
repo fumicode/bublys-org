@@ -97,9 +97,11 @@ export const ObjectView: FC<ObjectViewProps> = ({
         type: getDragType(effectiveType) as DragDataType,
         url: resolvedUrl ?? '',
         label,
+        // 宇宙に落ちたときの opener。ダブルクリックで開くときと同じバブルを指す
+        sourceBubbleId: currentBubbleId,
       });
     },
-    [effectiveType, resolvedUrl, label]
+    [effectiveType, resolvedUrl, label, currentBubbleId]
   );
 
   const handleClick = useCallback(() => {

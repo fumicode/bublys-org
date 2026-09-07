@@ -31,11 +31,33 @@ export type BubbleArrangementState = {
   process: BubblesProcessState;
 }
 
-export type OpeningPosition = "bubble-side-right" | "bubble-side-left" | "bubble-side-top" | "bubble-side-bottom" | "origin-side";
+/**
+ * 新しいバブルをどこに開くか。
+ *
+ * 命名の約束:
+ *   - `*-side`  … 何かの「辺」に対する相対位置。基準となる矩形（opener バブル、
+ *                  あるいはクリック元の要素）があって、その隣に置く。
+ *   - `*-place` … 絶対的な「場所」。基準の矩形は無く、点そのものが位置になる。
+ * `dropped-place` が過去分詞なのは、これがルールではなく「落とされた」という
+ * 済んだ事実を運ぶ値だから（点は payload の `droppedAt` で一緒に来る）。
+ */
+export type OpeningPosition =
+  | "bubble-side-right"
+  | "bubble-side-left"
+  | "bubble-side-top"
+  | "bubble-side-bottom"
+  | "origin-side"
+  | "dropped-place";
 
 export type PopChildPayload = {
   bubbleId: string;
   openingPosition?: OpeningPosition;
+  /**
+   * 落とされた点（universe 座標）。`openingPosition: "dropped-place"` のときだけ意味を持つ。
+   * 他の位置指定は基準の矩形から計算できるが、ドロップ位置だけはどこからも再計算できない
+   * ので、起きた事実として action に載せて運ぶ。
+   */
+  droppedAt?: Point2;
 }
 
 /**

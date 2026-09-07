@@ -1,6 +1,6 @@
 import { FC, createContext } from "react";
 import { Bubble, BubbleOptions, BubbleParams } from "../Bubble.domain.js";
-import { Size2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+import { Size2, Point2, CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { OpeningPosition } from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "./SnapshotCodec.js";
 
@@ -100,12 +100,26 @@ export const matchesPattern = (url: string, pattern: string | RegExp): boolean =
   return patternToRegex(pattern).test(getPathPart(url));
 };
 
+/**
+ * openBubble の追加指定。位置指定の種類が増えても引数を増やさずに済むよう、
+ * 「その指定に必要な材料」はここにまとめる。
+ */
+export type OpenBubbleOptions = {
+  /** `openingPosition: "dropped-place"` のときの落下点（universe 座標） */
+  droppedAt?: Point2;
+};
+
 // BubblesContext型
 export type BubblesContextType = {
   pageSize?: Size2;
   surfaceLeftTop: { x: number; y: number };
   coordinateSystem: CoordinateSystem;
-  openBubble: (name: string, openerBubbleId: string, openingPosition?: OpeningPosition) => string;
+  openBubble: (
+    name: string,
+    openerBubbleId: string,
+    openingPosition?: OpeningPosition,
+    options?: OpenBubbleOptions,
+  ) => string;
 };
 
 export const BubblesContext = createContext<BubblesContextType>({

@@ -16,10 +16,13 @@ import {
   ROOT_UNIVERSE_ID,
 } from './bubbles-slice.js';
 import { Layer } from '@bublys-org/bubbles-ui-util';
+import { Bubble } from '../Bubble.domain.js';
 import { getOriginRect } from '../utils/get-origin-rect.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
-const toDirection = (pos: OpeningPosition): 'right' | 'left' | 'top' | 'bottom' => {
+// dropped-place は「方向」を持たない（点そのものが位置）ので、ここには来ない。
+// Exclude で型に書いておくと、分岐を足し忘れたときにコンパイルが止まる。
+const toDirection = (pos: Exclude<OpeningPosition, 'dropped-place'>): 'right' | 'left' | 'top' | 'bottom' => {
   if (pos === 'bubble-side-left')   return 'left';
   if (pos === 'bubble-side-top')    return 'top';
   if (pos === 'bubble-side-bottom') return 'bottom';
@@ -175,6 +178,33 @@ bubblesListener.startListening({
     const universeId = universeIdOf(popChildAction);
 
     const state = listenerApi.getState() as any;
+
+    // 落とされた場所に開く場合、位置は「落ちた点」そのもの。
+    // opener の矩形も relation も要らないので、relation の早期 return より前で片付ける
+    // （ポケットからのドロップなど opener が居ないドロップも同じ道を通る）。
+    if (openingPosition === "dropped-place") {
+      const droppedAt = payload.droppedAt;
+      if (!droppedAt) {
+        console.log("Pop: dropped-place without droppedAt");
+        return;
+      }
+      const droppedBubbleJson = state.bubbleState?.universes?.[universeId]?.bubbles?.[poppingBubbleId];
+      if (!droppedBubbleJson) {
+        console.log("Pop: dropped bubble not found");
+        return;
+      }
+      const droppedBubble = Bubble.fromJSON(droppedBubbleJson);
+
+      // droppedAt は universe 座標。バブルの position は surface レイヤーの
+      // layer-local 座標なので、他の位置指定と同じ変換を通す。
+      const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(state);
+      const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
+      const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+      const relativePoint = surfaceLayer.locate(droppedAt);
+
+      listenerApi.dispatch(updateBubble(droppedBubble.moveTo(relativePoint).toJSON(), universeId));
+      return;
+    }
 
     const relation = selectBubblesRelationByOpeneeId(state, { openeeId: poppingBubbleId, universeId });
     if(!relation) {
