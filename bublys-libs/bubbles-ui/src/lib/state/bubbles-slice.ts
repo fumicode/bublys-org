@@ -49,6 +49,17 @@ export type OpeningPosition =
   | "origin-side"
   | "dropped-place";
 
+/**
+ * 兄弟として同じレイヤーに並べるときの指定。
+ * `droppedAt` の意味は {@link PopChildPayload} と同じ（落とされた点）。
+ * レイヤーの決め方（同じ種類なら同じレイヤー／違えば新しいレイヤー）と、
+ * どこに置くかは別の話なので、どちらの action も落下点を運べるようにしてある。
+ */
+export type JoinSiblingPayload = {
+  bubbleId: string;
+  droppedAt?: Point2;
+}
+
 export type PopChildPayload = {
   bubbleId: string;
   openingPosition?: OpeningPosition;
@@ -189,6 +200,7 @@ const prepStr = (payload: string, universeId?: string) => withU(payload, univers
 const prepBubble = (payload: BubbleJson, universeId?: string) => withU(payload, universeId);
 const prepRelation = (payload: BubblesRelation, universeId?: string) => withU(payload, universeId);
 const prepPopChild = (payload: PopChildPayload, universeId?: string) => withU(payload, universeId);
+const prepJoinSibling = (payload: JoinSiblingPayload, universeId?: string) => withU(payload, universeId);
 const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(payload, universeId);
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
@@ -263,14 +275,14 @@ export const bubblesSlice = createSlice({
 
 
     joinSibling: {
-      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+      reducer: (state, action: PayloadAction<JoinSiblingPayload, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
         u.process = BubblesProcess.fromJSON(u.process)
-          .joinSibling(action.payload)
+          .joinSibling(action.payload.bubbleId)
           .toJSON();
         state.renderCount += 1;
       },
-      prepare: prepStr,
+      prepare: prepJoinSibling,
     },
 
     finishBubbleAnimation: (state, action: PayloadAction<string>) => {

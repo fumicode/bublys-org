@@ -88,11 +88,11 @@ export const UniverseView: FC<UniverseViewProps> = ({
   );
 
   const joinSibling = useCallback(
-    (b: Bubble, openerBubbleId: string): string => {
+    (b: Bubble, openerBubbleId: string, options?: OpenBubbleOptions): string => {
       nameIntent(`open:${b.url}`);
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
-      dispatch(joinSiblingInProcess(b.id, universeId));
+      dispatch(joinSiblingInProcess({ bubbleId: b.id, droppedAt: options?.droppedAt }, universeId));
       return b.id;
     },
     [dispatch, universeId],
@@ -139,10 +139,14 @@ export const UniverseView: FC<UniverseViewProps> = ({
       options?: OpenBubbleOptions,
     ): string => {
       const newBubble = createBubble(name);
-      // 落とされた場所に開くときは、URL や兄弟の型による置き場所の読み替えをしない。
-      // 置き場所は人が指し示したのだから、それを他のルールで上書きしない。
+      // 落として開くときも、レイヤーの決まりは他と同じ。
+      // 同じ種類のバブルなら今のレイヤーに並べ、違う種類なら新しいレイヤーを作る。
+      // 落とした操作が変えるのは「どこに置くか」だけで、「どのレイヤーか」は変えない。
+      // （履歴の下部ストリップだけは位置の決まりなので、落とした場所が勝つ）
       if (openingPosition === "dropped-place") {
-        return popChild(newBubble, openerBubbleId, openingPosition, options);
+        return surfaceBubbles?.[0]?.type === newBubble.type
+          ? joinSibling(newBubble, openerBubbleId, options)
+          : popChild(newBubble, openerBubbleId, openingPosition, options);
       }
       // 履歴は画面（この universe）下部の左右いっぱいストリップで開く
       if (/\/history$/.test(name)) {

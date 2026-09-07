@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import bubblesReducer, {
   addBubble,
   popChildInProcess,
+  joinSiblingInProcess,
   selectBubble,
   ROOT_UNIVERSE_ID,
   type BubbleStateSlice,
@@ -95,6 +96,32 @@ describe('dropped-place（落とされた場所に開く）', () => {
     await settle();
 
     expect(selectBubble(store.getState(), { id: bubble.id }).position).toEqual(before);
+  });
+
+  it('同じレイヤーに並べる場合も、隣に寄せずに落ちた点へ置く', async () => {
+    const store = makeStore();
+    const first = createBubble('users/first');
+    store.dispatch(addBubble(first.toJSON()));
+    store.dispatch(joinSiblingInProcess({ bubbleId: first.id }));
+    await settle();
+
+    const dropped = createBubble('users/dropped');
+    store.dispatch(addBubble(dropped.toJSON()));
+    store.dispatch(
+      joinSiblingInProcess({ bubbleId: dropped.id, droppedAt: { x: 700, y: 500 } })
+    );
+    await settle();
+
+    // 同じ（surface）レイヤーに2つ並んでいる
+    const layers = store.getState().bubbleState.universes[ROOT_UNIVERSE_ID].process.layers;
+    expect(layers.length).toBe(1);
+    expect([...layers[0]].sort()).toEqual([first.id, dropped.id].sort());
+
+    // 位置は兄弟の隣ではなく落ちた点
+    expect(selectBubble(store.getState(), { id: dropped.id }).position).toEqual({
+      x: 600,
+      y: 440,
+    });
   });
 
   it('他の位置指定は dropped-place の分岐に入らない（relation 無しでは何も起きない）', async () => {
