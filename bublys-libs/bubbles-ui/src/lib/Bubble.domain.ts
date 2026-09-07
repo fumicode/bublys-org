@@ -209,31 +209,38 @@ export class Bubble {
   /**
    * 辺／隅を掴んだリサイズ。**掴んだ辺の反対側は固定される**。
    *
-   * 左辺側（`w`）は幅と位置を同時に更新する。最小サイズで止まったときも
+   * 左辺側（`w`）は幅と位置を同時に更新する。最小サイズや universe の縁で止まったときも
    * 「実際に変わったぶん」だけ位置を動かすので右辺がずれない。
    * 移動量は **layer-local**（{@link Layer.scaleScreenDelta} で変換済み）で受け取る。
    * 画面座標のまま渡すと奥の面でズレるので、呼び出し側で必ず変換すること。
+   *
+   * @param limits.minX 左辺がこれより左へ出ない layer-local の x（universe の左端）。
+   *   ドラッグ側は universe の縁でクランプするので、リサイズだけが縁の外へ出られると
+   *   「リサイズでしか入れない・ドラッグでは戻れない領域」ができてしまう。
    */
-  resizeByEdge(edge: ResizeEdge, localDelta: Point2, min: Size2): Bubble {
+  resizeByEdge(
+    edge: ResizeEdge,
+    localDelta: Point2,
+    min: Size2,
+    limits?: { minX?: number },
+  ): Bubble {
     const current = this.size ?? this.defaultSize;
 
-    const rawWidth = edge.includes("e")
-      ? current.width + localDelta.x
-      : edge.includes("w")
-        ? current.width - localDelta.x
-        : current.width;
     const rawHeight = edge.includes("s") ? current.height + localDelta.y : current.height;
-
-    const width = Math.max(min.width, rawWidth);
     const height = Math.max(min.height, rawHeight);
 
-    // 左辺を掴んだときだけ、幅が変わったぶん左辺を動かす（右辺を固定するための対）
-    const shiftX = edge.includes("w") ? current.width - width : 0;
+    if (edge.includes("w")) {
+      // 左辺側は「右辺を固定して左辺を動かす」。右辺 = 位置 + 幅 は最後まで不変。
+      const right = this.position.x + current.width;
+      const wantedX = this.position.x + localDelta.x;
+      const x = limits?.minX !== undefined ? Math.max(wantedX, limits.minX) : wantedX;
+      const width = Math.max(min.width, right - x);
+      return this.resizeTo({ width, height }).moveTo({ x: right - width, y: this.position.y });
+    }
 
-    return this.resizeTo({ width, height }).moveTo({
-      x: this.position.x + shiftX,
-      y: this.position.y,
-    });
+    const rawWidth = edge.includes("e") ? current.width + localDelta.x : current.width;
+    const width = Math.max(min.width, rawWidth);
+    return this.resizeTo({ width, height }).moveTo(this.position);
   }
 
   /** 最大化する（明示サイズ + maximized=true）。 */

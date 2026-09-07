@@ -80,7 +80,12 @@ export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: Use
       y: e.clientY - startMouseRef.current.y,
     };
     const localDelta = depthLayerRef.current.scaleScreenDelta(screenDelta);
-    const next = startBubbleRef.current.resizeByEdge(edgeRef.current, localDelta, MIN_SIZE);
+    // universe の左端（universe 座標 x=0）を layer-local に直して渡す。
+    // ドラッグ側は縁でクランプするので、リサイズだけ外に出られると戻れなくなる。
+    const universeLeft = surfaceLayerRef.current.locate({ x: 0, y: 0 }).x;
+    const next = startBubbleRef.current.resizeByEdge(edgeRef.current, localDelta, MIN_SIZE, {
+      minX: universeLeft,
+    });
     currentBubbleRef.current = next;
     paint(next);
   };

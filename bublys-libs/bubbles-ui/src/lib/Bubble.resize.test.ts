@@ -65,3 +65,35 @@ describe("Bubble.resizeByEdge — 掴んだ辺の反対側が固定される", (
     expect(surface.place(b.position)).toEqual({ x: 300, y: 200 });
   });
 });
+
+describe("Bubble.resizeByEdge — universe の縁で止まる", () => {
+  const bubble = makeBubble({ x: 40, y: 0 }, { width: 400, height: 300 });
+  const rightEdge = (b: Bubble) => b.position.x + (b.size?.width ?? 0);
+
+  it("左辺は minX より左へ出ない（右辺は動かない）", () => {
+    const resized = bubble.resizeByEdge("w", { x: -500, y: 0 }, MIN, { minX: 0 });
+    expect(resized.position.x).toBe(0);
+    expect(rightEdge(resized)).toBe(rightEdge(bubble));
+    expect(resized.size?.width).toBe(440); // 縁で止まったぶんだけ広がる
+  });
+
+  it("縁の手前までは普通に広がる", () => {
+    const resized = bubble.resizeByEdge("w", { x: -30, y: 0 }, MIN, { minX: 0 });
+    expect(resized.position.x).toBe(10);
+    expect(resized.size?.width).toBe(430);
+    expect(rightEdge(resized)).toBe(rightEdge(bubble));
+  });
+
+  it("左下も同じく縁で止まり、高さは指示どおり変わる", () => {
+    const resized = bubble.resizeByEdge("sw", { x: -500, y: 60 }, MIN, { minX: 0 });
+    expect(resized.position.x).toBe(0);
+    expect(resized.size).toEqual({ width: 440, height: 360 });
+    expect(rightEdge(resized)).toBe(rightEdge(bubble));
+  });
+
+  it("minX を渡さなければ従来どおり制限しない", () => {
+    const resized = bubble.resizeByEdge("w", { x: -500, y: 0 }, MIN);
+    expect(resized.position.x).toBe(-460);
+    expect(rightEdge(resized)).toBe(rightEdge(bubble));
+  });
+});
