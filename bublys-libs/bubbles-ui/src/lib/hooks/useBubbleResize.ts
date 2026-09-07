@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { CoordinateSystem, type Size2 } from "@bublys-org/bubbles-ui-util";
+import { CoordinateSystem, type Point2, type Size2 } from "@bublys-org/bubbles-ui-util";
 import { Bubble } from "../Bubble.domain.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { updateBubble } from "../state/bubbles-slice.js";
@@ -17,6 +17,8 @@ type UseBubbleResizeArgs = {
   ref: React.RefObject<HTMLElement | null>;
   /** このバブルが属するレイヤー。奥レイヤーは scale で縮小表示されるため変換に必要。 */
   layerIndex?: number;
+  /** 奥行きの消失点。左辺を動かすとき transform-origin を追従させるのに要る。 */
+  vanishingPoint?: Point2;
 };
 
 const MIN_SIZE: Size2 = { width: 160, height: 100 };
@@ -31,7 +33,7 @@ const MIN_SIZE: Size2 = { width: 160, height: 100 };
  *    同時に maximized: false を立てて「ユーザーがサイズを決めた」状態に遷移する
  *    （最大化状態だった場合はそれが解除される）
  */
-export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs) {
+export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: UseBubbleResizeArgs) {
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
 
@@ -39,6 +41,8 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
   bubbleRef.current = bubble;
   const layerIndexRef = useRef(layerIndex);
   layerIndexRef.current = layerIndex;
+  const vanishingPointRef = useRef(vanishingPoint);
+  vanishingPointRef.current = vanishingPoint;
 
   // サイズはレイヤーローカル座標で扱う（style.width/height はローカル、bubble.size もローカル）。
   const startSizeRef = useRef<Size2 | null>(null);
@@ -79,10 +83,24 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
     ref.current.style.transition = "none";
 
     if (dir.includes("w")) {
-      // 実際に縮んだ/伸びたぶんだけ左辺を動かす。MIN で止まったときも右辺がずれない
+      // 実際に縮んだ/伸びたぶんだけ左辺を動かす。MIN で止まったときも右辺がずれない。
+      //
+      // style.left は **CSS transform で拡大縮小される前**の座標系（style.width と同じ）。
+      // 奥のレイヤーは scale で縮んで見えるだけなので、ここで scale を掛けてはいけない。
+      // 掛けると、ドラッグ中の見た目（scale 倍の移動）と確定後の位置（等倍）がずれ、
+      // 手を離した瞬間にバブルが横に飛ぶ。
       const shift = start.width - clampedW;
       posShiftXRef.current = shift;
-      ref.current.style.left = `${startLeftPxRef.current + shift * coordSystem.scale}px`;
+      const newLeft = startLeftPxRef.current + shift;
+      ref.current.style.left = `${newLeft}px`;
+
+      // 奥のレイヤーは消失点を原点に scale されている。left を動かしたら
+      // transform-origin も追従させないと、拡大縮小の基準がずれて見た目が横に流れ、
+      // 手を離した瞬間に確定位置へ「がくっ」と飛ぶ（ドラッグ側と同じ扱い）。
+      const origin = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0)
+        .withVanishingPoint(vanishingPointRef.current || { x: 0, y: 0 })
+        .calculateTransformOrigin({ x: newLeft, y: parseFloat(ref.current.style.top || "0") || 0 });
+      ref.current.style.transformOrigin = `${origin.x}px ${origin.y}px`;
     }
   };
 
@@ -104,6 +122,7 @@ export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs
       ref.current.style.width = "";
       ref.current.style.height = "";
       ref.current.style.left = "";
+      ref.current.style.transformOrigin = "";
     }
     startSizeRef.current = null;
     startMouseRef.current = null;

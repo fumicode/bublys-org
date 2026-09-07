@@ -80,7 +80,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
-  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
