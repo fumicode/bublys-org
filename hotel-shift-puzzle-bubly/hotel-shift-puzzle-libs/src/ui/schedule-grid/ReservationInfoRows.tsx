@@ -103,6 +103,7 @@ export const ReservationInfoRows: FC<ReservationInfoRowsProps> = ({
           })}
 
           <div className="e-res-filler" />
+          <div className="e-res-early-filler" />
         </Fragment>
       ))}
     </>

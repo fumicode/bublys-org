@@ -1,4 +1,5 @@
 import styled from "styled-components";
+import { EARLY_COL_WIDTH } from "./constants.js";
 
 /**
  * 勤務表グリッドのスタイル。
@@ -25,12 +26,13 @@ export const StyledWrap = styled.div`
   }
 
   /* 選択モード（責任者バッジ/チェックで対象を選択中）の行の見た目。
-     行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルへ同じクラスを付けて表現する。
+     行は grid の直接の子（名前セル＋各日セル＋休合計＋早番日数）なので、各セルへ同じクラスを付けて表現する。
      - is-dimmed: 対象外の行。blur でぼかし薄くして背景に退かせる（クリックは可能なまま）。
      - is-focused: 対象の行。うっすら黄色く強調して少し浮かせる（sticky セルを崩さないよう transform は使わない）。 */
   .e-staff-cell.is-dimmed,
   .e-cell.is-dimmed,
   .e-off-total.is-dimmed,
+  .e-early-total.is-dimmed,
   .e-sum-head.is-dimmed,
   .e-sum-cell.is-dimmed {
     filter: blur(1.4px);
@@ -41,7 +43,8 @@ export const StyledWrap = styled.div`
     box-shadow: inset 3px 0 0 #fbc02d;
   }
   .e-cell.is-focused,
-  .e-off-total.is-focused {
+  .e-off-total.is-focused,
+  .e-early-total.is-focused {
     background: #fffdf3;
   }
 
@@ -54,9 +57,12 @@ export const StyledWrap = styled.div`
   .e-sum-cell,
   .e-off-head,
   .e-off-total,
+  .e-early-head,
+  .e-early-total,
   .e-res-head,
   .e-res-cell,
   .e-res-filler,
+  .e-res-early-filler,
   .e-res-toggle,
   .e-res-toggle-bar {
     border-right: 1px solid #eee;
@@ -170,17 +176,25 @@ export const StyledWrap = styled.div`
   }
   .e-res-filler {
     position: sticky;
+    right: ${EARLY_COL_WIDTH}px;
+    z-index: 1;
+    background: #fff8f0;
+    border-left: 1px solid #e0e0e0;
+  }
+  .e-res-early-filler {
+    position: sticky;
     right: 0;
     z-index: 1;
     background: #fff8f0;
     border-left: 1px solid #e0e0e0;
   }
 
-  /* 右端「休（合計）」列。横スクロールしても右に固定して見えるようにする */
+  /* 右端付近の「休」「早」合計列。横スクロールしても右に固定して見えるようにする。
+     一番右が早番、その左が休み（right をずらして並べる）。 */
   .e-off-head {
     position: sticky;
     top: 0;
-    right: 0;
+    right: ${EARLY_COL_WIDTH}px;
     z-index: 3;
     background: #fafafa;
     display: flex;
@@ -192,7 +206,7 @@ export const StyledWrap = styled.div`
   }
   .e-off-total {
     position: sticky;
-    right: 0;
+    right: ${EARLY_COL_WIDTH}px;
     z-index: 1;
     background: #fbfbfb;
     display: flex;
@@ -202,12 +216,6 @@ export const StyledWrap = styled.div`
     color: #616161;
     font-variant-numeric: tabular-nums;
     border-left: 1px solid #e0e0e0;
-  }
-  .e-off-total.e-off-filler {
-    background: #fafafa;
-  }
-  .e-off-total.e-off-sum {
-    color: #455a64;
   }
   /* 月の最低休日数に満たないスタッフの休み合計（制約違反の可視化） */
   .e-off-total.is-under-min {
@@ -229,6 +237,50 @@ export const StyledWrap = styled.div`
   }
   .e-off-total.is-first {
     border-top: 2px solid #b0bec5;
+  }
+
+  .e-early-head {
+    position: sticky;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    background: #e3f2fd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #1565c0;
+    border-left: 1px solid #e0e0e0;
+  }
+  .e-early-total {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: #f5faff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #1565c0;
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid #e0e0e0;
+  }
+  .e-early-total.is-first {
+    border-top: 2px solid #b0bec5;
+  }
+
+  /* 集計行の右端（休・早列の下）。セルではなく「列が無い」余白として見せる */
+  .e-sum-rail-end {
+    background: transparent;
+    border: none;
+    pointer-events: none;
+  }
+  .e-sum-rail-end.is-first {
+    border-top: 2px solid transparent;
+  }
+  .e-sum-rail-end.is-dimmed {
+    filter: none;
+    opacity: 1;
   }
 
   /* 勤務帯ごと＋休みの人数集計行（背景・文字色は行ごとにインラインで色分け） */

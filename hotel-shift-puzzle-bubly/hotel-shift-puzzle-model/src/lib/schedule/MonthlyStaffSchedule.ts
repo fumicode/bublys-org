@@ -288,6 +288,21 @@ export class MonthlyStaffSchedule {
     return this.assignmentsForStaff(staffId).filter((a) => a.isDayOff).length;
   }
 
+  /**
+   * そのスタッフの月内で、指定勤務帯IDのいずれかに入った日数を数える（休み・未定は除く）。
+   * 「早番」など名前単位の合算は、呼び出し側で同名の ID 集合を渡して行う。
+   */
+  countWorkingForStaff(
+    staffId: string,
+    shiftIds: ReadonlySet<string>
+  ): number {
+    if (shiftIds.size === 0) return 0;
+    return this.assignmentsForStaff(staffId).filter((a) => {
+      const id = a.shiftId;
+      return id !== undefined && shiftIds.has(id);
+    }).length;
+  }
+
   // ========== 必要スタッフ数 ==========
 
   /** 必要スタッフ数（稼働日×勤務帯名） */
