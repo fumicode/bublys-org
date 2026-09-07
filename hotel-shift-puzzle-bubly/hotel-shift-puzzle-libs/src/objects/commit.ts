@@ -92,7 +92,11 @@ export function commitBundle(
   }
   const updated = graphOf(store, scopeId).grow(refs);
   store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
-  store.dispatch(setCasEntries({ entries: casEntries }));
+  // Redux の CAS は 300 件で頭打ちなので、「今の世界」が参照する分は間引きから守る
+  // （useCasScope の grow と同じ扱い）。守らないと、ファイル読み込み直後の 1 回の
+  // 保存で、読み込んだ履歴ぶんが一気に評価対象になって現在値まで落ちうる。
+  const protectHashes = updated.getCurrentStateRefs().map((ref) => ref.hash);
+  store.dispatch(setCasEntries({ entries: casEntries, protectHashes }));
 }
 
 /** スコープの apex から型・IDのオブジェクトを読む */
@@ -256,5 +260,6 @@ export function removeObject(store: StoreLike, type: string, id: string): void {
   const ref = createStateRef(type, id, hash);
   const updated = graphOf(store, APP_SCOPE_ID).grow([ref]);
   store.dispatch(setGraph({ scopeId: APP_SCOPE_ID, graph: updated.toJSON() }));
-  store.dispatch(setCasEntries({ entries: [{ hash, data: null }] }));
+  const protectHashes = updated.getCurrentStateRefs().map((r) => r.hash);
+  store.dispatch(setCasEntries({ entries: [{ hash, data: null }], protectHashes }));
 }

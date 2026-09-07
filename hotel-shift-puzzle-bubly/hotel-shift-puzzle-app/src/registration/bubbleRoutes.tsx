@@ -21,6 +21,7 @@ import {
   ScheduleReportPanel,
   ScheduleReportList,
   ScheduleEditLogPanel,
+  WorldFilePanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
@@ -204,6 +205,10 @@ const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
 
+// --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
+// 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
+const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePanel />);
+
 // --- 操作履歴（ノウハウ）バブル ---
 const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleEditLogPanel scheduleId={bubble.params.scheduleId} />);
@@ -214,6 +219,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
+  { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
   // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない

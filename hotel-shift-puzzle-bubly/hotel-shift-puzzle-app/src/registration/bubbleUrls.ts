@@ -76,6 +76,12 @@ export const scheduleReportUrl = (reportId: string): string =>
 /** シフト完成レポート一覧バブル（次回シフト作成前の参照用。勤務表一覧から開く） */
 export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-reports`;
 
+/**
+ * 勤務表ファイルバブル（ローカルファイルへの保存・読み込み）。
+ * 特定の勤務表ではなく世界全体を扱うので、勤務表の下ではなくトップレベルに置く。
+ */
+export const worldFileUrl = (): string => `hotel-shift-puzzle/file`;
+
 /** 操作履歴（ノウハウ可視化）バブル */
 export const scheduleEditLogUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;

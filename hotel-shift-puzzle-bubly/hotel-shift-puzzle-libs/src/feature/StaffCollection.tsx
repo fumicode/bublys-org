@@ -5,7 +5,6 @@ import styled from "styled-components";
 import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffListView } from "../ui/StaffListView.js";
 import { useObjects, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { STAFF_TYPE } from "../objects/hotelObjects.js";
 
 /** 新しいスタッフの ID を生成する */
@@ -13,7 +12,6 @@ const newStaffId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `staff-${Date.now()}`;
 
 export const StaffCollection: FC = () => {
-  useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
 

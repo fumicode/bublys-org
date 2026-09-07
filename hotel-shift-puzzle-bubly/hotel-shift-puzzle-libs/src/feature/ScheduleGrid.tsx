@@ -33,7 +33,6 @@ import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
@@ -147,7 +146,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   onOpenRule,
   createCandidatesWorker,
 }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const { scope } = useScheduleHistory(scheduleId ?? "");
   const apex = scope.graph.getApex();

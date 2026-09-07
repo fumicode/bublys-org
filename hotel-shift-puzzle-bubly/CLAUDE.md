@@ -104,6 +104,37 @@ hotel-shift-puzzle-app/src/
 
 ---
 
+## 勤務表ファイル（世界線ごとローカルファイルへ保存・読み込み）
+
+デバッグ用のデータパターンを `src/data/*.ts` に書き足す代わりに、アプリ上で作った状態を
+そのままファイルに保存し、開き直せるようにしたもの。実装は `libs/src/world-file/`。
+
+- **形式**: JSON（`.hsp.json`）。中身は `{ format, formatVersion, savedAt, note, graphs, cas }`。
+  `graphs` は スコープID → 世界線グラフ、`cas` は ハッシュ → 状態データ。
+  エディタで開いて 1 箇所だけ書き換えて読み直す・git で差分を見る、という使い方ができる。
+- **入れる範囲**: `hotel` スコープと `Schedule:<id>` スコープの**履歴・分岐すべて**。
+  `root`（バブル配置）と他バブリのスコープは入れない（`world-file/documentScopes.ts`）。
+- **読み込みは全置き換え**。ファイルに無いスコープは空グラフで上書きする。
+  `deleteScope` は使わない（キーごと消すと `useCasScope` の initialObjects 経路で
+  新しい世界が生えうるため）。
+- **CAS の本体は Redux ではない**。Redux の `cas` は 300 件で間引かれ、溢れた分は
+  IndexedDB にだけ残る。だから保存時は IndexedDB から取り直し（`collectWorldFile`）、
+  読み込み時は先に IndexedDB へ書いてから Redux に載せる（`applyWorldFile`）。
+- **dispatch 順は CAS → グラフ、かつ await をまたがない**。逆にすると
+  「全オブジェクトが消えた世界」が 1 フレーム観測される。
+- **例データは自動で入らない**。ファイルバブルの「例データ読み込み」ボタンで明示的に投入する
+  （`objects/seed.ts` の `buildSampleItems()`）。初回起動は空。
+  自動投入をやめたので「まだ無いものだけ足す」差分ロジックも不要になった
+  （読み込みは開くのと同じ全置き換え。足し込みだと今の状態しだいで結果が変わり、
+  「このパターンを再現する」用途に使えない）。
+- File System Access API（Chromium 系）を使い、「保存」は同じファイルへ上書きする。
+  ハンドルは IndexedDB に覚えてリロードをまたぐ。非対応ブラウザは
+  ダウンロード／`<input type=file>` に落ちる。
+
+UI は `hotel-shift-puzzle/file` バブル（`WorldFilePanel` / `WorldFileView`）。
+
+---
+
 ## 新機能の追加手順
 
 ### 1. ドメインモデル（hotel-shift-puzzle-model/src/lib/）

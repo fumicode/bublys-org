@@ -9,7 +9,6 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { WorkShiftListView } from "../ui/WorkShiftListView.js";
 import { useObjectShell, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import {
   WORKSHIFT_SET_TYPE,
   GLOBAL_WORKSHIFT_SET_ID,
@@ -25,7 +24,6 @@ const newWorkShiftId = (): string =>
  * 集約（WorkShiftSet）をシェル経由で編集する（ソートはセットが担保）。
  */
 export const WorkShiftCollection: FC = () => {
-  useSeedHotelData();
   const { object: set, update } = useObjectShell<WorkShiftSet>(
     WORKSHIFT_SET_TYPE,
     GLOBAL_WORKSHIFT_SET_ID
