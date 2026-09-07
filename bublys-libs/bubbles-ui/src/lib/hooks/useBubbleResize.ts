@@ -41,18 +41,15 @@ export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: Use
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
 
-  // 面が 2 つあることに注意（ここを取り違えると奥のレイヤーでズレる）:
-  //  - surface: 位置 ⇄ style.left/top の変換。**常に index 0**（平行移動だけ）。
-  //    奥行きの縮小は CSS transform: scale が担当するので、位置に scale を掛けてはいけない。
-  //  - depth:   スクリーン上の移動量・実寸 → layer-local への変換。**バブル自身の index**。
-  const surfaceLayerRef = useRef<Layer>(new Layer(0, { x: 0, y: 0 }, { x: 0, y: 0 }));
-  const depthLayerRef = useRef<Layer>(new Layer(0, { x: 0, y: 0 }, { x: 0, y: 0 }));
-  surfaceLayerRef.current = new Layer(
-    0,
-    surfaceLeftTop ?? { x: 0, y: 0 },
-    vanishingPoint ?? { x: 0, y: 0 },
-  );
-  depthLayerRef.current = surfaceLayerRef.current.atIndex(layerIndex ?? 0);
+  // バブルの位置は、どのレイヤーに居ても **universe（surface）座標の 1 つの空間**で持つ
+  // （BubblesLayeredView は全バブルを surface レイヤーで place する）。
+  // レイヤーが決めるのは**見た目の縮尺**だけなので、場合分けは要らない:
+  //   位置 ⇄ style.left/top … universe の面（下の frame）で変換する
+  //   画面の移動量 → モデル … その面の縮尺で割る（frame.atIndex(layerIndex)）
+  const frameRef = useRef<Layer>(new Layer(0, { x: 0, y: 0 }, { x: 0, y: 0 }));
+  frameRef.current = new Layer(0, surfaceLeftTop ?? { x: 0, y: 0 }, vanishingPoint ?? { x: 0, y: 0 });
+  /** このバブルの見た目の縮尺を持つ面（画面の移動量・実寸の変換に使う） */
+  const scaledFrame = () => frameRef.current.atIndex(layerIndex ?? 0);
 
   const edgeRef = useRef<ResizeEdge>("se");
   const startBubbleRef = useRef<Bubble | null>(null);
@@ -63,8 +60,8 @@ export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: Use
   const paint = (b: Bubble) => {
     const el = ref.current;
     if (!el || !b.size) return;
-    const topLeft = surfaceLayerRef.current.place(b.position);
-    const origin = depthLayerRef.current.transformOriginFor(topLeft);
+    const topLeft = frameRef.current.place(b.position);
+    const origin = scaledFrame().transformOriginFor(topLeft);
     el.style.left = `${topLeft.x}px`;
     el.style.top = `${topLeft.y}px`;
     el.style.width = `${b.size.width}px`;
@@ -79,10 +76,10 @@ export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: Use
       x: e.clientX - startMouseRef.current.x,
       y: e.clientY - startMouseRef.current.y,
     };
-    const localDelta = depthLayerRef.current.scaleScreenDelta(screenDelta);
+    const localDelta = scaledFrame().scaleScreenDelta(screenDelta);
     // universe の左端（universe 座標 x=0）を layer-local に直して渡す。
     // ドラッグ側は縁でクランプするので、リサイズだけ外に出られると戻れなくなる。
-    const universeLeft = surfaceLayerRef.current.locate({ x: 0, y: 0 }).x;
+    const universeLeft = frameRef.current.locate({ x: 0, y: 0 }).x;
     const next = startBubbleRef.current.resizeByEdge(edgeRef.current, localDelta, MIN_SIZE, {
       minX: universeLeft,
     });
@@ -129,11 +126,11 @@ export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: Use
     // getBoundingClientRect はスクリーン実寸なので、どちらも Layer で layer-local に直す。
     // bubble.position をそのまま起点にすると、未設定のとき {0,0} に化けて位置が飛ぶ。
     startBubbleRef.current = bubbleRef.current
-      .moveTo(surfaceLayerRef.current.locate({
+      .moveTo(frameRef.current.locate({
         x: parseFloat(el.style.left || "0") || 0,
         y: parseFloat(el.style.top || "0") || 0,
       }))
-      .resizeTo(depthLayerRef.current.scaleScreenSize({ width: rect.width, height: rect.height }));
+      .resizeTo(scaledFrame().scaleScreenSize({ width: rect.width, height: rect.height }));
     startMouseRef.current = { x: e.clientX, y: e.clientY };
     document.addEventListener("mousemove", handleResizing);
     document.addEventListener("mouseup", endResize);

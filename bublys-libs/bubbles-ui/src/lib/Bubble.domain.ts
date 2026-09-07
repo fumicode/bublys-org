@@ -134,6 +134,15 @@ export class Bubble {
     return new Bubble({ ...this.state, position: pos });
   }
 
+  /**
+   * layer-local の移動量ぶん動かす。
+   * 移動量は {@link Layer.scaleScreenDelta} で画面座標から変換済みのものを渡すこと
+   * （画面座標のまま渡すと奥の面でズレる）。
+   */
+  moveBy(localDelta: Point2): Bubble {
+    return this.moveTo({ x: this.position.x + localDelta.x, y: this.position.y + localDelta.y });
+  }
+
   get size(): Size2 | undefined {
     return this.state.size;
   }

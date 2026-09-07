@@ -72,7 +72,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
 
   if (!bubble) return null;
 
-  // bubble.position は layer-local 座標。surface レイヤーで universe 座標へ写す
+  // バブルの位置は、どのレイヤーに居ても universe（surface）座標の 1 つの空間で持つ。
+  // レイヤーが決めるのは見た目の縮尺（CSS transform: scale）だけなので、ここでは
+  // 常に surface レイヤーで写す（面ごとに座標系を分けない）
   const pos = surfaceLayer.place(bubble.position || { x: 0, y: 0 });
 
   // universe バブル（入れ子のバブルサーフェス）は専用シェルで描く。
