@@ -8,6 +8,8 @@ import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
+import { useUniverseDropZone } from "../hooks/useUniverseDropZone.js";
+import { DRAGGING_CLASS } from "../utils/drag-session.js";
 import {
   makeSelectValidBubbleRelationIds,
   makeSelectGlobalCoordinateSystem,
@@ -483,6 +485,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   );
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
+  const dropZone = useUniverseDropZone({ universeId, universeRef });
   const hudSurface = useMemo(() => ({ leftTop: surfaceLeftTop }), [surfaceLeftTop]);
 
   const isNested = universeId !== ROOT_UNIVERSE_ID;
@@ -502,7 +505,17 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   return (
     <UniverseContext.Provider value={universeContextValue}>
       <StyledFrame $nested={isNested}>
-        <StyledViewport ref={viewportRef} $nested={isNested}>
+        {/* 誰も受け止めなかったドロップは、宇宙が落ちた場所で受け止める。
+            ハンドラを StyledUniverse ではなく StyledViewport に付けるのは、
+            StyledUniverse には最小サイズ（UNIVERSE_MIN_SIZE）があり、可視領域の
+            うちそれをはみ出した帯が宇宙の外になってしまうため。見えている範囲は
+            全部「宇宙」として受け止めたい。座標は universeRef を基準に測る。 */}
+        <StyledViewport
+          ref={viewportRef}
+          $nested={isNested}
+          onDragOver={dropZone.onDragOver}
+          onDrop={dropZone.onDrop}
+        >
           <StyledUniverse
             ref={universeRef}
             $nested={isNested}
@@ -590,8 +603,17 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
      上でホイールを回すと、その wheel イベントが祖先の overflow:auto まで届いて
      ネイティブにスクロールが起きる。
      ※ スクロールバー自体は pointer-events: none のためつまめない（overlay として
-     表示はされる）。明示的に touchable にしたい場合は別の DOM 層が要る。 */
-  ${({ $nested }) => $nested && `pointer-events: none;`}
+     表示はされる）。明示的に touchable にしたい場合は別の DOM 層が要る。
+
+     ただしドラッグ中だけは触れるようにする。貫通したままだと、入れ子の宇宙の空白に
+     落としたのに親の宇宙が受け取ってしまい、落とした場所と違うところにバブルが出る。
+     （utils/drag-session.ts が body にクラスを付ける） */
+  ${({ $nested }) =>
+    $nested &&
+    `
+      pointer-events: none;
+      body.${DRAGGING_CLASS} & { pointer-events: auto; }
+    `}
 `;
 
 const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<

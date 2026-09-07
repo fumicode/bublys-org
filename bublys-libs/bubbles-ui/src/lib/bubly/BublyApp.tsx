@@ -13,7 +13,7 @@ import {
 } from '@bublys-org/state-management';
 import { CoordinateSystem, Layer } from '@bublys-org/bubbles-ui-util';
 import { Bubble, createBubble } from '../Bubble.domain.js';
-import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
+import { BubblesContext, type OpenBubbleOptions } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
 import { measureViewport } from '../utils/measure-viewport.js';
 import {
@@ -106,11 +106,12 @@ export const BublyApp: FC<BublyAppProps> = ({
   const popChild = useCallback((
     b: Bubble,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side-right'
+    openingPosition: OpeningPosition = 'bubble-side-right',
+    options?: OpenBubbleOptions
   ): string => {
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }));
-    dispatch(popChildAction({ bubbleId: b.id, openingPosition }));
+    dispatch(popChildAction({ bubbleId: b.id, openingPosition, droppedAt: options?.droppedAt }));
     return b.id;
   }, [dispatch]);
 
@@ -156,9 +157,16 @@ export const BublyApp: FC<BublyAppProps> = ({
   const popChildOrJoinSibling = useCallback((
     name: string,
     openerBubbleId: string,
-    openingPosition: OpeningPosition = 'bubble-side-right'
+    openingPosition: OpeningPosition = 'bubble-side-right',
+    options?: OpenBubbleOptions
   ): string => {
     const newBubble = createBubble(name);
+
+    // 落とされた場所に開くときは、URL や兄弟の型による置き場所の読み替えをしない。
+    // 置き場所は人が指し示したのだから、それを他のルールで上書きしない。
+    if (openingPosition === 'dropped-place') {
+      return popChild(newBubble, openerBubbleId, openingPosition, options);
+    }
 
     const isNameEndWithHistory = /\/history$/.test(name);
 
