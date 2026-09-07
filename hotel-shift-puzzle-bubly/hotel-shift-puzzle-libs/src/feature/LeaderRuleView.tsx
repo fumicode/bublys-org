@@ -93,10 +93,15 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
     [store, schedule, constraints, shiftIdsOf]
   );
 
-  const nameOf = useMemo(() => {
-    const byId = new Map(staffList.map((s) => [s.id, s.name]));
-    return (id: string) => byId.get(id) ?? id;
+  // 図には人そのものを渡す（候補者が ObjectView として振る舞えるように）
+  const staffOf = useMemo(() => {
+    const byId = new Map(staffList.map((s) => [s.id, s]));
+    return (id: string) => byId.get(id);
   }, [staffList]);
+  const nameOf = useCallback(
+    (id: string) => staffOf(id)?.name ?? id,
+    [staffOf]
+  );
 
   const handleChangeShift = useCallback(
     (shiftName: string) =>
@@ -155,7 +160,7 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
   return (
     <LeaderRuleDiagram
       rule={rule}
-      nameOf={nameOf}
+      staffOf={staffOf}
       shiftId={shiftId}
       onDropUrl={handleDropStaffUrl}
       dropAcceptTypes={[getDragType(STAFF_TYPE)]}

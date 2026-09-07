@@ -15,6 +15,7 @@
 import { FC, Fragment, ReactNode } from "react";
 import styled from "styled-components";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+import { SCHEDULE_LEADER_RULE_VIEW_TYPE } from "./viewObjectTypes.js";
 import { ShiftLeaderRule } from "../domain/index.js";
 import { leaderRoleColor } from "./LeaderBadges.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
@@ -132,9 +133,10 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
     return ruleBubbleUrl ? (
       <ObjectView
         key={rule.key}
+        type={SCHEDULE_LEADER_RULE_VIEW_TYPE}
         url={ruleBubbleUrl(rule.key)}
+        label={rule.label}
         openingPosition="origin-side"
-        draggable={false}
       >
         {frame}
       </ObjectView>
