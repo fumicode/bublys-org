@@ -28,7 +28,6 @@ type ShiftPlanTableViewProps = {
   onDropStaff?: (staffId: string, timeSlotId: string, roleId: string) => void;
   onRemoveAssignment?: (assignmentId: string) => void;
   onMoveAssignment?: (assignmentId: string, staffId: string, timeSlotId: string, roleId: string) => void;
-  onAssignmentClick?: (assignmentId: string) => void;
   onCellClick?: (timeSlotId: string, roleId: string) => void;
 };
 
@@ -43,7 +42,6 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
   onDropStaff,
   onRemoveAssignment,
   onMoveAssignment,
-  onAssignmentClick,
   onCellClick,
 }) => {
   const getStaffName = (staffId: string): string => {
@@ -242,13 +240,16 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                             type="ShiftAssignment"
                             url={assignmentUrl}
                             label={staffName}
+                            // 内側の .e-staff-chip が自前のドラッグ（text/staff-id 等）を
+                            // 持っているので、外側で HTML5 drag を二重に始めない
                             draggable={false}
-                            onClick={() => onAssignmentClick?.(assignment.id)}
+                            openingPosition="origin-side"
                           >
                             <div
                               className={`e-staff-chip ${isAvailable ? "is-available" : "is-unavailable"} ${hasViolation ? "has-violation" : ""}`}
                               draggable
                               onDragStart={(e) => handleChipDragStart(e, assignment.id, assignment.staffId, assignmentUrl, staffName)}
+                              title="ダブルクリックで配置の評価を開く"
                             >
                               {hasViolation && (
                                 <Tooltip title={violation.message} arrow>
@@ -266,6 +267,8 @@ export const ShiftPlanTableView: FC<ShiftPlanTableViewProps> = ({
                                   e.stopPropagation();
                                   onRemoveAssignment?.(assignment.id);
                                 }}
+                                // ✕ を素早く2回押しても、消えた配置のバブルが開かないように
+                                onDoubleClick={(e) => e.stopPropagation()}
                               >
                                 <CloseIcon fontSize="inherit" />
                               </IconButton>

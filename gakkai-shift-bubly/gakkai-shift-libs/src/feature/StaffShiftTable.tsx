@@ -17,14 +17,16 @@ import { createSampleStaffList } from "../data/sampleStaff.js";
 
 type StaffShiftTableProps = {
   shiftPlanId: string;
-  onStaffClick?: (staffId: string) => void;
-  onAssignmentClick?: (shiftPlanId: string, assignmentId: string) => void;
+  /** スタッフのURLを生成（ダブルクリックで開く先） */
+  buildStaffUrl: (staffId: string) => string;
+  /** 配置のURLを生成（ダブルクリックで開く先） */
+  buildAssignmentUrl: (shiftPlanId: string, assignmentId: string) => string;
 };
 
 export const StaffShiftTable: FC<StaffShiftTableProps> = ({
   shiftPlanId,
-  onStaffClick,
-  onAssignmentClick,
+  buildStaffUrl,
+  buildAssignmentUrl,
 }) => {
   const dispatch = useAppDispatch();
   const staffList = useAppSelector(selectGakkaiShiftStaffList);
@@ -62,8 +64,8 @@ export const StaffShiftTable: FC<StaffShiftTableProps> = ({
           roles={roles}
           assignments={shiftPlan.assignments}
           staffList={staffList}
-          onStaffClick={onStaffClick}
-          onAssignmentClick={(assignmentId) => onAssignmentClick?.(shiftPlanId, assignmentId)}
+          buildStaffUrl={buildStaffUrl}
+          buildAssignmentUrl={(assignmentId) => buildAssignmentUrl(shiftPlanId, assignmentId)}
         />
       </div>
     </StyledContainer>

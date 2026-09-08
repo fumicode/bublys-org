@@ -2,6 +2,7 @@
 
 import { FC } from "react";
 import styled from "styled-components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   TimeSlot_時間帯,
   Role_係,
@@ -15,8 +16,10 @@ type StaffShiftTableViewProps = {
   roles: readonly Role_係[];
   assignments: readonly ShiftAssignment_シフト配置[];
   staffList: readonly Staff_スタッフ[];
-  onStaffClick?: (staffId: string) => void;
-  onAssignmentClick?: (assignmentId: string) => void;
+  /** スタッフのURLを生成（ダブルクリックで開く先） */
+  buildStaffUrl: (staffId: string) => string;
+  /** 配置のURLを生成（ダブルクリックで開く先） */
+  buildAssignmentUrl: (assignmentId: string) => string;
 };
 
 export const StaffShiftTableView: FC<StaffShiftTableViewProps> = ({
@@ -24,8 +27,8 @@ export const StaffShiftTableView: FC<StaffShiftTableViewProps> = ({
   roles,
   assignments,
   staffList,
-  onStaffClick,
-  onAssignmentClick,
+  buildStaffUrl,
+  buildAssignmentUrl,
 }) => {
   // スタッフごとの配置を取得
   const getAssignmentsForStaff = (staffId: string) => {
@@ -84,12 +87,20 @@ export const StaffShiftTableView: FC<StaffShiftTableViewProps> = ({
           const staffAssignments = getAssignmentsForStaff(staff.id);
           return (
             <tr key={staff.id}>
-              <td
-                className="e-staff-cell"
-                onClick={() => onStaffClick?.(staff.id)}
-              >
-                <div className="e-staff-name">{staff.name}</div>
-                <div className="e-staff-school">{staff.state.school}</div>
+              {/* <td> 自体は包まない（table の中に span が入ると
+                  ブラウザの table fixup で表の外へ弾き出される）。中身だけ包む */}
+              <td className="e-staff-cell" title="ダブルクリックでスタッフを開く">
+                <ObjectView
+                  type="Staff"
+                  url={buildStaffUrl(staff.id)}
+                  label={staff.name}
+                  openingPosition="bubble-side-right"
+                  fullWidth
+                  className="e-staff-body"
+                >
+                  <div className="e-staff-name">{staff.name}</div>
+                  <div className="e-staff-school">{staff.state.school}</div>
+                </ObjectView>
               </td>
               {timeSlots.map((slot) => {
                 const assignment = getAssignmentForStaffAndTimeSlot(staff.id, slot.id);
@@ -104,9 +115,13 @@ export const StaffShiftTableView: FC<StaffShiftTableViewProps> = ({
                       <div className="e-unavailable-mark">×</div>
                     )}
                     {assignment && (
-                      <div
+                      <ObjectView
+                        type="ShiftAssignment"
+                        url={buildAssignmentUrl(assignment.id)}
+                        label={`${staff.name} / ${getRoleName(assignment.roleId)}`}
+                        openingPosition="origin-side"
+                        fullWidth
                         className={`e-assignment ${calculateScore(staff, assignment) >= 0 ? "is-positive" : "is-negative"}`}
-                        onClick={() => onAssignmentClick?.(assignment.id)}
                       >
                         <div className="e-role">
                           {getRoleName(assignment.roleId)}
@@ -115,7 +130,7 @@ export const StaffShiftTableView: FC<StaffShiftTableViewProps> = ({
                           {calculateScore(staff, assignment) >= 0 ? "+" : ""}
                           {calculateScore(staff, assignment)}
                         </div>
-                      </div>
+                      </ObjectView>
                     )}
                   </td>
                 );
@@ -173,6 +188,13 @@ const StyledTable = styled.table`
 
     &:hover {
       background-color: #e3f2fd;
+    }
+
+    /* ObjectView のラッパ span は display:flex（fullWidth）。
+       元の <td> 直下の block 積みと同じ見た目にするため、縦積みに戻す */
+    .e-staff-body {
+      flex-direction: column;
+      align-items: flex-start;
     }
 
     .e-staff-name {

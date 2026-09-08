@@ -28,7 +28,6 @@ import { UrledPlace } from "@bublys-org/bubbles-ui";
 
 type ShiftPlanEditorProps = {
   shiftPlanId: string;
-  onAssignmentClick?: (assignmentId: string) => void;
   onCellClick?: (timeSlotId: string, roleId: string) => void;
   onStaffViewClick?: () => void;
   /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
@@ -37,7 +36,6 @@ type ShiftPlanEditorProps = {
 
 export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
   shiftPlanId,
-  onAssignmentClick,
   onCellClick,
   onStaffViewClick,
   buildCellUrl,
@@ -214,7 +212,6 @@ export const ShiftPlanEditor: FC<ShiftPlanEditorProps> = ({
             onDropStaff={handleDropStaff}
             onRemoveAssignment={handleRemoveAssignment}
             onMoveAssignment={handleMoveAssignment}
-            onAssignmentClick={onAssignmentClick}
             onCellClick={onCellClick}
           />
         </div>

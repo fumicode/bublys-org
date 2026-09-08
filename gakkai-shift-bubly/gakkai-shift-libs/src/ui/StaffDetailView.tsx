@@ -10,13 +10,11 @@ import { Button } from "@mui/material";
 type StaffDetailViewProps = {
   staff: Staff_スタッフ;
   buildAvailabilityUrl?: (staffId: string) => string;
-  onOpenAvailability?: (staffId: string) => void;
 };
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
   buildAvailabilityUrl,
-  onOpenAvailability,
 }) => {
   const availabilityUrl = buildAvailabilityUrl?.(staff.id);
 
@@ -30,8 +28,9 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
             url={`gakkai-shift/staffs/${staff.id}`}
             label={staff.name}
             draggable={true}
+            openingPosition="bubble-side-right"
           >
-            <h3 className="e-name">{staff.name}</h3>
+            <h3 className="e-name" title="ダブルクリックでスタッフを開く">{staff.name}</h3>
           </ObjectView>
           <div className="e-furigana">{staff.state.furigana}</div>
         </div>
@@ -84,12 +83,13 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               url={availabilityUrl}
               label={`${staff.name}の参加可能時間帯`}
               draggable={true}
-              onClick={() => onOpenAvailability?.(staff.id)}
+              openingPosition="bubble-side-right"
             >
               <Button
                 variant="text"
                 size="small"
                 component="span"
+                title="ダブルクリックで参加可能時間帯を開く"
               >
                 {staff.availableTimeSlots.length}枠 (詳細を見る)
               </Button>
