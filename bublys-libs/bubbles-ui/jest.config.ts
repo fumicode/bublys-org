@@ -12,10 +12,10 @@ swcJestConfig.swcrc = false;
 export default {
   displayName: '@bublys-org/bubbles-ui',
   preset: '../../jest.preset.js',
-  testEnvironment: 'node',
+  testEnvironment: 'node',  // .tsx のテストはファイル先頭の @jest-environment jsdom で個別に切り替える
   transform: {
-    '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
+    '^.+\\.[tj]sx?$': ['@swc/jest', swcJestConfig],
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
 };
