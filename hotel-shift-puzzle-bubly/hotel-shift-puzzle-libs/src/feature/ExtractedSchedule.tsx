@@ -321,6 +321,8 @@ const StyledContainer = styled.div`
     .e-day-head,
     .e-off-head,
     .e-off-total,
+    .e-early-head,
+    .e-early-total,
     .e-staff-cell {
       background: hsla(0, 0%, 100%, 0.4);
     }
