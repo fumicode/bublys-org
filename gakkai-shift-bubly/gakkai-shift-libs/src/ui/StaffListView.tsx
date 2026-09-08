@@ -18,7 +18,8 @@ type StaffListViewProps = {
   staffList: Staff_スタッフ[];
   selectedStaffId?: string | null;
   buildDetailUrl: (staffId: string) => string;
-  onStaffClick?: (staffId: string) => void;
+  /** 単クリックの仕事は「選ぶ」だけ。開くのはダブルクリック（ObjectView の既定） */
+  onStaffSelect?: (staffId: string) => void;
   /** フィルターで絞り込まれたスキル（表示用） */
   filteredSkills?: FilteredSkills;
 };
@@ -27,7 +28,7 @@ export const StaffListView: FC<StaffListViewProps> = ({
   staffList,
   selectedStaffId,
   buildDetailUrl,
-  onStaffClick,
+  onStaffSelect,
   filteredSkills,
 }) => {
   /** フィルターに関連するスキルのバッジを生成 */
@@ -90,9 +91,10 @@ export const StaffListView: FC<StaffListViewProps> = ({
                 url={detailUrl}
                 label={staff.name}
                 draggable={true}
-                onClick={() => onStaffClick?.(staff.id)}
+                openingPosition="bubble-side-right"
+                onClick={() => onStaffSelect?.(staff.id)}
               >
-                <div className="e-content">
+                <div className="e-content" title="ダブルクリックでスタッフを開く">
                   <PersonIcon fontSize="small" className="e-avatar" />
                   <div className="e-text">
                     <div className="e-name">{staff.name}</div>

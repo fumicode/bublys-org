@@ -19,7 +19,6 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import { IconButton, Tooltip } from "@mui/material";
 
 type ShiftPlanManagerProps = {
-  onAssignmentClick?: (shiftPlanId: string, assignmentId: string) => void;
   onCellClick?: (timeSlotId: string, roleId: string) => void;
   /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
   buildCellUrl?: (timeSlotId: string, roleId: string) => string;
@@ -28,7 +27,6 @@ type ShiftPlanManagerProps = {
 };
 
 export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
-  onAssignmentClick,
   onCellClick,
   buildCellUrl,
   onStaffViewClick,
@@ -156,7 +154,6 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
           <ShiftPlanEditor
             key={selectedPlan.id}
             shiftPlanId={selectedPlan.id}
-            onAssignmentClick={(assignmentId) => onAssignmentClick?.(selectedPlan.id, assignmentId)}
             onCellClick={onCellClick}
             buildCellUrl={buildCellUrl}
             onStaffViewClick={() => onStaffViewClick?.(selectedPlan.id)}

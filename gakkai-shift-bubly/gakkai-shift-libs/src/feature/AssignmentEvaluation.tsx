@@ -19,8 +19,6 @@ import {
 type AssignmentEvaluationProps = {
   shiftPlanId: string;
   assignmentId: string;
-  onStaffClick?: (staffId: string) => void;
-  onTimeSlotClick?: (staffId: string) => void;
   buildStaffDetailUrl?: (staffId: string) => string;
   buildStaffAvailabilityUrl?: (staffId: string) => string;
 };
@@ -28,8 +26,6 @@ type AssignmentEvaluationProps = {
 export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
   shiftPlanId,
   assignmentId,
-  onStaffClick,
-  onTimeSlotClick,
   buildStaffDetailUrl,
   buildStaffAvailabilityUrl,
 }) => {
@@ -103,8 +99,6 @@ export const AssignmentEvaluation: FC<AssignmentEvaluationProps> = ({
       constraintViolations={constraintViolations}
       staffDetailUrl={buildStaffDetailUrl?.(staff.id)}
       staffAvailabilityUrl={buildStaffAvailabilityUrl?.(staff.id)}
-      onStaffClick={() => onStaffClick?.(staff.id)}
-      onTimeSlotClick={() => onTimeSlotClick?.(staff.id)}
     />
   );
 };

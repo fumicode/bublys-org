@@ -181,12 +181,11 @@ function describeFilter(filter: StaffFilterCriteria): { skills: string; timeSlot
 
 type StaffCollectionProps = {
   filter?: StaffFilterCriteria;
-  onStaffSelect?: (staffId: string) => void;
 };
 
 const buildDetailUrl = (staffId: string) => `gakkai-shift/staffs/${staffId}`;
 
-export const StaffCollection: FC<StaffCollectionProps> = ({ filter, onStaffSelect }) => {
+export const StaffCollection: FC<StaffCollectionProps> = ({ filter }) => {
   const dispatch = useAppDispatch();
   const staffList = useAppSelector(selectGakkaiShiftStaffList);
   const selectedStaffId = useAppSelector(selectGakkaiShiftSelectedStaffId);
@@ -208,9 +207,9 @@ export const StaffCollection: FC<StaffCollectionProps> = ({ filter, onStaffSelec
     return staffList.filter((staff) => matchesFilter(staff, filter));
   }, [staffList, filter]);
 
-  const handleStaffClick = (staffId: string) => {
+  // 単クリックの仕事は「選ぶ」だけ。開くのはダブルクリック（ObjectView の既定）
+  const handleStaffSelect = (staffId: string) => {
     dispatch(setSelectedStaffId(staffId));
-    onStaffSelect?.(staffId);
   };
 
   const hasFilter = filter && Object.keys(filter).length > 0;
@@ -266,7 +265,7 @@ export const StaffCollection: FC<StaffCollectionProps> = ({ filter, onStaffSelec
         staffList={filteredStaffList}
         selectedStaffId={selectedStaffId}
         buildDetailUrl={buildDetailUrl}
-        onStaffClick={handleStaffClick}
+        onStaffSelect={handleStaffSelect}
         filteredSkills={hasFilter ? {
           pc: filter.pc,
           zoom: filter.zoom,
