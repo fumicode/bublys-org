@@ -436,6 +436,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
   }, [deadCells]);
 
+  // 選択が無いときだけ、キーボード操作の起点として先頭の未定セルへ置く。
+  // セルを埋めたあとに勝手に飛ばさない（次へ進むのは Tab 承認と Enter 確定だけ）。
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -447,14 +449,19 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     }
   }, [schedule, cellSelection, staffList]);
 
+  /** Enter 確定後、今のセルより後ろの未定へ進む（先頭へは回り込まない）。 */
   const advanceFocusAfterEdit = useCallback(
-    (nextSchedule: MonthlyStaffSchedule) => {
+    (
+      nextSchedule: MonthlyStaffSchedule,
+      after: { staffId: string; day: WorkingDay }
+    ) => {
       const next = suggestNextUndecided(
         nextSchedule,
-        staffList.map((s) => s.id)
+        staffList.map((s) => s.id),
+        after
       );
       setCellSelection(
-        next ? { staffId: next.staffId, day: next.day } : null
+        next ? { staffId: next.staffId, day: next.day } : after
       );
     },
     [staffList]
@@ -471,8 +478,14 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: EditLog 付きで同一世界線ノードに記録
-  const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
+  // セル編集: EditLog 付きで同一世界線ノードに記録。
+  // Enter 確定だけ次の未定へ進む。マウス・Backspace などはそのセルに留まる。
+  const handleChangeCell = (
+    staffId: string,
+    day: WorkingDay,
+    to: ShiftCell,
+    opts?: { advance?: boolean }
+  ) => {
     const next = recordSetCell(store, {
       schedule,
       constraints: allConstraints,
@@ -481,12 +494,16 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       day,
       to,
     });
-    setCellSelection({ staffId, day });
-    advanceFocusAfterEdit(next);
+    if (opts?.advance) {
+      advanceFocusAfterEdit(next, { staffId, day });
+    } else {
+      setCellSelection({ staffId, day });
+    }
   };
 
   // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
   // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
   const handleApproveForced = (
     staffId: string,
     day: WorkingDay,
@@ -496,7 +513,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffId,
       dayKey: day.key,
     });
-    const nextSchedule = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -509,7 +526,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
       return;
     }
-    advanceFocusAfterEdit(nextSchedule);
+    setCellSelection({ staffId, day });
   };
 
   // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで

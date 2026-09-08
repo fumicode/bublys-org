@@ -14,7 +14,7 @@ import {
   type WorkShift,
   type WorkingDay,
 } from "../../domain/index.js";
-import type { CellSelection } from "./types.js";
+import type { CellSelection, ChangeCellOptions } from "./types.js";
 
 type UseCellKeyboardEditingParams = {
   /** 行の並び（上下移動の順序）。 */
@@ -25,8 +25,13 @@ type UseCellKeyboardEditingParams = {
   shiftOptions: WorkShift[];
   /** あれば「選択スタッフが入れる勤務帯」に候補を絞る。 */
   availability?: ScheduleAvailability;
-  /** セルの勤務割当を変更する（確定時に呼ぶ）。 */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /** セルの勤務割当を変更する（確定時に呼ぶ）。Enter 確定時は advance を付ける。 */
+  onChangeCell: (
+    staffId: string,
+    day: WorkingDay,
+    to: ShiftCell,
+    opts?: ChangeCellOptions
+  ) => void;
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
@@ -55,8 +60,8 @@ export type CellKeyboardEditing = {
   selectCell: (staffId: string, day: WorkingDay) => void;
   /** セルを選択して候補ドロップダウンを開く（全候補表示）。 */
   openEditor: (staffId: string, day: WorkingDay) => void;
-  /** 候補を確定（クリック / Enter）。 */
-  applySuggestion: (s: ShiftSuggestion) => void;
+  /** 候補を確定（クリック / Enter）。Enter のときは advance を付ける。 */
+  applySuggestion: (s: ShiftSuggestion, opts?: ChangeCellOptions) => void;
   /** グリッドの onKeyDown ハンドラ。 */
   handleKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
 };
@@ -73,9 +78,11 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
  * まとめたフック。状態と対話ロジックをここに閉じ込め、ScheduleGridView は描画に徹する。
  *
  * ルール:
- *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア
- *   - ドロップダウン開: ↑↓で候補移動 / Enter・クリックで確定 / ←→で閉じて隣セルへ /
- *                       Backspace で 1 文字削除（空ならクリアして閉じる）/ Esc で閉じる
+ *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア /
+ *                       Tab で確定提案を承認（移動は feature 層）
+ *   - ドロップダウン開: ↑↓で候補移動 / Enter で確定して次の未定へ / クリック確定は留まる /
+ *                       ←→で閉じて隣セルへ / Backspace で 1 文字削除（空ならクリアして閉じる） /
+ *                       Esc で閉じる
  */
 export function useCellKeyboardEditing({
   staffList,
@@ -148,8 +155,10 @@ export function useCellKeyboardEditing({
     gridRef.current?.focus();
   };
 
-  const applySuggestion = (s: ShiftSuggestion) => {
-    if (selection) onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
+  const applySuggestion = (s: ShiftSuggestion, opts?: ChangeCellOptions) => {
+    if (selection) {
+      onChangeCell(selection.staffId, selection.day, suggestionToCell(s), opts);
+    }
     setInputBuffer(null);
     gridRef.current?.focus();
   };
@@ -199,8 +208,9 @@ export function useCellKeyboardEditing({
           return;
         case "Enter":
           e.preventDefault();
-          if (suggestions.length > 0) applySuggestion(suggestions[activeClamped]);
-          else setInputBuffer(null);
+          if (suggestions.length > 0) {
+            applySuggestion(suggestions[activeClamped], { advance: true });
+          } else setInputBuffer(null);
           return;
         case "Escape":
           e.preventDefault();

@@ -10,6 +10,15 @@ export type CellSelection = {
   day: WorkingDay;
 };
 
+/**
+ * セル変更の付加情報。
+ * Enter で候補を確定したときだけ `advance` を付け、次の未定セルへ進む。
+ * マウスや Backspace などそれ以外の埋め方では付けない（選択はそのセルに残す）。
+ */
+export type ChangeCellOptions = {
+  advance?: boolean;
+};
+
 /** 必要人数編集メニューの対象。day=null は「全稼働日に一括」 */
 export type EditingRequired = {
   anchor: HTMLElement;

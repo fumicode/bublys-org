@@ -36,7 +36,11 @@ import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
-import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
+import type {
+  CellSelection,
+  ChangeCellOptions,
+  EditingRequired,
+} from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -65,8 +69,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
-  /** セルの勤務割当を変更する */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /** セルの勤務割当を変更する。Enter 確定時は opts.advance で次の未定へ進む。 */
+  onChangeCell: (
+    staffId: string,
+    day: WorkingDay,
+    to: ShiftCell,
+    opts?: ChangeCellOptions
+  ) => void;
   /** 必要スタッフ数を変更する（その日・その勤務帯名） */
   onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
