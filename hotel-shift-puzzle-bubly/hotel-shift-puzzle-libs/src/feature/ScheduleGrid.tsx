@@ -436,6 +436,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
   }, [deadCells]);
 
+  // 選択が無いときだけ、キーボード操作の起点として先頭の未定セルへ置く。
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -446,19 +447,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
     }
   }, [schedule, cellSelection, staffList]);
-
-  const advanceFocusAfterEdit = useCallback(
-    (nextSchedule: MonthlyStaffSchedule) => {
-      const next = suggestNextUndecided(
-        nextSchedule,
-        staffList.map((s) => s.id)
-      );
-      setCellSelection(
-        next ? { staffId: next.staffId, day: next.day } : null
-      );
-    },
-    [staffList]
-  );
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => {
@@ -471,9 +459,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: EditLog 付きで同一世界線ノードに記録
+  // セル編集: EditLog 付きで同一世界線ノードに記録。
+  // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    const next = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -481,12 +470,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       day,
       to,
     });
-    setCellSelection({ staffId, day });
-    advanceFocusAfterEdit(next);
   };
 
   // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
   // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
   const handleApproveForced = (
     staffId: string,
     day: WorkingDay,
@@ -496,7 +484,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffId,
       dayKey: day.key,
     });
-    const nextSchedule = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -509,7 +497,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
       return;
     }
-    advanceFocusAfterEdit(nextSchedule);
+    setCellSelection({ staffId, day });
   };
 
   // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
