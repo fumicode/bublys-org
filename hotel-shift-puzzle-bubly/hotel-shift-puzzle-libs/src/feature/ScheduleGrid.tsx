@@ -2,7 +2,7 @@
 
 import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
+import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   WorkShiftSet,
@@ -63,15 +63,19 @@ import {
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import {
+  SCHEDULE_WORLD_LINE_VIEW_TYPE,
+  SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+} from "../ui/viewObjectTypes.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビュー（左下）を開くハンドラ */
-  onOpenHistory?: () => void;
-  /** キセキの木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
-  onOpenTree?: () => void;
-  /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
-  onOpenAvailability?: () => void;
+  /**
+   * 候補集合を作ったあと、結果を見せるために世界線ビューを自動で開く。
+   * ユーザーが押して開くのではないので ObjectView ではなくハンドラのまま。
+   */
+  onOpenWorldLineAfterCandidates?: () => void;
   /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
   onConfirm?: (reportId: string) => void;
   /**
@@ -84,8 +88,6 @@ type ScheduleGridProps = {
   availabilityUrl?: string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
-  /** 操作履歴バブルを開くハンドラ */
-  onOpenEditLog?: () => void;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -129,10 +131,7 @@ const newLeaderRuleKey = (): string =>
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
-  onOpenHistory,
-  onOpenTree,
-  onOpenAvailability,
-  onOpenEditLog,
+  onOpenWorldLineAfterCandidates,
   onConfirm,
   worldLineUrl,
   treeUrl,
@@ -595,7 +594,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     setAutoMessage(
       `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
     );
-    onOpenHistory?.();
+    onOpenWorldLineAfterCandidates?.();
   };
 
   // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
@@ -749,13 +748,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             </select>
           )}
 
-          {onOpenAvailability &&
-            withUrl(
-              availabilityUrl,
-              <button type="button" className="e-link" onClick={onOpenAvailability}>
+          {availabilityUrl && (
+            <ObjectView
+              type={SCHEDULE_AVAILABILITY_TYPE}
+              url={availabilityUrl}
+              label="可能勤務帯"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックで可能勤務帯を開く">
                 可能勤務帯
-              </button>
-            )}
+              </span>
+            </ObjectView>
+          )}
 
           {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
               自動シフトの優先度に使う。詳しくは reportPriority.ts）。
@@ -883,39 +887,50 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(onOpenHistory || onOpenEditLog) && (
+      {(worldLineUrl || editLogUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
-          {onOpenHistory &&
-            withUrl(
-              worldLineUrl,
-              <button
-                type="button"
-                className="e-link e-worldline"
-                onClick={onOpenHistory}
-                title="この勤務表の世界線ビューを開く"
+          {worldLineUrl && (
+              <ObjectView
+                type={SCHEDULE_WORLD_LINE_VIEW_TYPE}
+                url={worldLineUrl}
+                label="世界線ビュー"
+                openingPosition="bubble-side-bottom"
               >
-                🌐 世界線ビュー
-              </button>
-            )}
-          {onOpenEditLog &&
-            withUrl(
-              editLogUrl,
-              <button
-                type="button"
-                className="e-link"
-                onClick={onOpenEditLog}
-                title="操作履歴（ノウハウ）を開く"
+                <span
+                  className="e-link e-worldline"
+                  title="ダブルクリックでこの勤務表の世界線ビューを開く"
+                >
+                  🌐 世界線ビュー
+                </span>
+              </ObjectView>
+          )}
+          {editLogUrl && (
+              <ObjectView
+                type={SCHEDULE_EDIT_LOG_TYPE}
+                url={editLogUrl}
+                label="操作履歴"
+                openingPosition="bubble-side-right"
               >
-                📝 操作履歴
-              </button>
-            )}
-          {onOpenTree &&
-            withUrl(
-              treeUrl,
-              <button type="button" className="e-link" onClick={onOpenTree}>
-                🌳 キセキの木で見る
-              </button>
-            )}
+                <span
+                  className="e-link"
+                  title="ダブルクリックで操作履歴（ノウハウ）を開く"
+                >
+                  📝 操作履歴
+                </span>
+              </ObjectView>
+          )}
+          {treeUrl && (
+              <ObjectView
+                type={SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE}
+                url={treeUrl}
+                label="キセキの木"
+                openingPosition="bubble-side-bottom"
+              >
+                <span className="e-link" title="ダブルクリックでキセキの木を開く">
+                  🌳 キセキの木で見る
+                </span>
+              </ObjectView>
+          )}
           {confirmButton}
         </div>
       )}
@@ -1121,6 +1136,10 @@ const StyledContainer = styled.div`
 
   /* ヘッダ・フッタ共通のリンク風ボタン */
   .e-link {
+    /* 「すでに在るものを開く」ボタンは ObjectView の中の <span> になった。
+       <button> と同じ見え方にするため、行揃えを明示する */
+    display: inline-flex;
+    align-items: center;
     border: 1px solid #cfd8dc;
     border-radius: 6px;
     background: #fff;

@@ -80,16 +80,8 @@ const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShi
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 // 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
-const ScheduleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  return withObjects(
-    <ScheduleCollection
-      onOpenReports={() =>
-        openBubble(scheduleReportListUrl(), bubble.id, "bubble-side-right")
-      }
-    />
-  );
-};
+const ScheduleListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ScheduleCollection reportListUrl={scheduleReportListUrl()} />);
 
 /**
  * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
@@ -123,10 +115,9 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
-      onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
-      onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
-      onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
-      onOpenEditLog={() => openSide(editLogUrl, "bubble-side-right")}
+      onOpenWorldLineAfterCandidates={() =>
+        openSide(worldLineUrl, "bubble-side-bottom")
+      }
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}

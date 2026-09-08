@@ -10,12 +10,18 @@
 import React from "react";
 import EventIcon from "@mui/icons-material/Event";
 import GppGoodIcon from "@mui/icons-material/GppGood";
+import PublicIcon from "@mui/icons-material/Public";
+import ParkIcon from "@mui/icons-material/Park";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import { registerObjectType } from "@bublys-org/bubbles-ui";
 import { registerObjects } from "./objects/framework.js";
 import { HOTEL_OBJECTS } from "./objects/hotelObjects.js";
 import {
   SCHEDULE_DAY_VIEW_TYPE,
   SCHEDULE_LEADER_RULE_VIEW_TYPE,
+  SCHEDULE_WORLD_LINE_VIEW_TYPE,
+  SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+  SCHEDULE_REPORT_LIST_VIEW_TYPE,
 } from "./ui/viewObjectTypes.js";
 
 registerObjects(HOTEL_OBJECTS);
@@ -27,4 +33,16 @@ registerObjectType(
 registerObjectType(
   SCHEDULE_LEADER_RULE_VIEW_TYPE,
   React.createElement(GppGoodIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SCHEDULE_WORLD_LINE_VIEW_TYPE,
+  React.createElement(PublicIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+  React.createElement(ParkIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SCHEDULE_REPORT_LIST_VIEW_TYPE,
+  React.createElement(ListAltIcon, { fontSize: "small" })
 );

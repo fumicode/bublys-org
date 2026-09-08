@@ -19,3 +19,12 @@ export const SCHEDULE_DAY_VIEW_TYPE = "ScheduleDay";
 
 /** 責任者ルール（早責・予責・夜責 …の制約アイコン） */
 export const SCHEDULE_LEADER_RULE_VIEW_TYPE = "ScheduleLeaderRule";
+
+/** 世界線ビュー（この勤務表のこれまでの分岐） */
+export const SCHEDULE_WORLD_LINE_VIEW_TYPE = "ScheduleWorldLine";
+
+/** キセキの木ビュー（世界線を木で描いた読み取り専用ビュー） */
+export const SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE = "ScheduleWorldLineTree";
+
+/** シフト完成レポート一覧 */
+export const SCHEDULE_REPORT_LIST_VIEW_TYPE = "ScheduleReportList";
