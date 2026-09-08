@@ -13,13 +13,9 @@ export const RuleListFeature: FC<RuleListFeatureProps> = ({ bubbleId }) => {
   const { rules, removeRule } = useTransformer();
   const { openBubble } = useContext(BubblesContext);
 
-  const handleSelectRule = useCallback(
-    (ruleId: string) => {
-      if (bubbleId) {
-        openBubble(`object-transformer/rules/${ruleId}/convert`, bubbleId);
-      }
-    },
-    [openBubble, bubbleId]
+  const buildRuleUrl = useCallback(
+    (ruleId: string) => `object-transformer/rules/${ruleId}/convert`,
+    []
   );
 
   const handleDeleteRule = useCallback(
@@ -38,7 +34,7 @@ export const RuleListFeature: FC<RuleListFeatureProps> = ({ bubbleId }) => {
   return (
     <RuleListView
       rules={rules}
-      onSelectRule={handleSelectRule}
+      buildRuleUrl={buildRuleUrl}
       onDeleteRule={handleDeleteRule}
       onNavigateToEditor={handleNavigateToEditor}
     />
