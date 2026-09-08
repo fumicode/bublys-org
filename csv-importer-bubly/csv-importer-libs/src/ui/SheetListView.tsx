@@ -14,7 +14,6 @@ export type SheetListItem = {
 type SheetListViewProps = {
   sheets: SheetListItem[];
   buildSheetUrl: (sheetId: string) => string;
-  onSheetClick?: (sheetId: string) => void;
   onCreateSheet?: () => void;
   onImportCsv?: (name: string, csvText: string) => void;
   onDeleteSheet?: (sheetId: string) => void;
@@ -23,7 +22,6 @@ type SheetListViewProps = {
 export const SheetListView: FC<SheetListViewProps> = ({
   sheets,
   buildSheetUrl,
-  onSheetClick,
   onCreateSheet,
   onImportCsv,
   onDeleteSheet,
@@ -69,9 +67,9 @@ export const SheetListView: FC<SheetListViewProps> = ({
                   url={buildSheetUrl(sheet.id)}
                   label={sheet.name}
                   draggable={true}
-                  onClick={() => onSheetClick?.(sheet.id)}
+                  openingPosition="bubble-side-right"
                 >
-                  <div className="e-content">
+                  <div className="e-content" title="ダブルクリックでシートを開く">
                     <TableChartIcon fontSize="small" className="e-icon" />
                     <div className="e-text">
                       <div className="e-name">{sheet.name}</div>
