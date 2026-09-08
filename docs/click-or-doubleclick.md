@@ -183,6 +183,18 @@ inline なので、`display: inline-flex; align-items: center;` を共有 CSS �
 
 ---
 
+## 設計の出典
+
+このルールと泡の膜は、下の設計スケッチから来ている。
+
+![ObjectView の操作と見た目](./images/object-view-interaction.png)
+
+図のうち **hover の膜**（左から2〜3コマ目）と **ダブルクリックで新しいバブルが開く**（下段）は
+実装済み。**シングルクリックでの選択状態**（4コマ目のピンクの輪郭）と
+**🖐手のひらパネル**（右下に選択が溜まる）はまだ無い。
+
+---
+
 ## 関連
 
 - [universe-drop-zone.md](./universe-drop-zone.md) — 誰も受け止めなかったドロップを宇宙が受け止める話
