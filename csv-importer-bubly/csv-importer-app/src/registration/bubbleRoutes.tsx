@@ -41,7 +41,7 @@ const SheetListBubble: BubbleRoute["Component"] = () => {
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <CsvBubbleProvider>
-      <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+      <SheetEditorFeature sheetId={bubble.params.sheetId} />
     </CsvBubbleProvider>
   );
 };

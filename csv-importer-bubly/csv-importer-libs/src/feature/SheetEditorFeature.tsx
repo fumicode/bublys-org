@@ -1,8 +1,7 @@
 'use client';
 
-import { FC, useCallback, useContext, useMemo, useState } from "react";
+import { FC, useCallback, useMemo, useState } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { SheetEditorView } from "../ui/SheetEditorView.js";
 import { GoogleSheetsPanel } from "../ui/GoogleSheetsPanel.js";
@@ -16,7 +15,6 @@ import {
 
 type SheetEditorFeatureProps = {
   sheetId: string;
-  bubbleId?: string;
 };
 
 /** 例外を画面に出せる文言にする */
@@ -47,9 +45,7 @@ function getInitialSheet(sheetId: string): CsvSheet {
 
 export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   sheetId,
-  bubbleId,
 }) => {
-  const { openBubble } = useContext(BubblesContext);
   const { getSheetMeta, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } = useCsvSheets();
   const googleClientId = useGoogleClientId();
   const auth = useGoogleSheetsAuth(googleClientId);
@@ -125,17 +121,8 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     URL.revokeObjectURL(url);
   }, [sheet]);
 
-  const handleOpenObjects = useCallback(() => {
-    if (bubbleId) {
-      openBubble(`csv-importer/sheets/${sheetId}/objects`, bubbleId);
-    }
-  }, [openBubble, sheetId, bubbleId]);
-
-  const handleOpenWorldLine = useCallback(() => {
-    if (bubbleId) {
-      openBubble(`csv-importer/sheets/${sheetId}/world-line`, bubbleId);
-    }
-  }, [openBubble, sheetId, bubbleId]);
+  const objectListUrl = `csv-importer/sheets/${sheetId}/objects`;
+  const worldLineUrl = `csv-importer/sheets/${sheetId}/world-line`;
 
   // --- Google Sheets Sync ---
 
@@ -211,8 +198,8 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
       onExportCsv={handleExportCsv}
-      onOpenObjects={bubbleId ? handleOpenObjects : undefined}
-      onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
+      objectListUrl={objectListUrl}
+      worldLineUrl={worldLineUrl}
       googleSheetsPanel={
         <GoogleSheetsPanel
           isLinked={!!gsLink}

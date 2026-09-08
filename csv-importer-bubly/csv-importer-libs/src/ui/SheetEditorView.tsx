@@ -2,6 +2,7 @@
 
 import { FC, ReactNode, useState, useRef, useEffect, useCallback } from "react";
 import styled from "styled-components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { CsvColumnState, CsvRowState } from "@bublys-org/csv-importer-model";
 
 type SheetEditorViewProps = {
@@ -14,8 +15,10 @@ type SheetEditorViewProps = {
   onDeleteRow: (rowId: string) => void;
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
-  onOpenObjects?: () => void;
-  onOpenWorldLine?: () => void;
+  /** オブジェクト一覧のURL（ダブルクリックで開く先） */
+  objectListUrl?: string;
+  /** 世界線ビューのURL（ダブルクリックで開く先） */
+  worldLineUrl?: string;
   onExportCsv?: () => void;
   googleSheetsPanel?: ReactNode;
 };
@@ -39,8 +42,8 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteRow,
   onAddColumn,
   onDeleteColumn,
-  onOpenObjects,
-  onOpenWorldLine,
+  objectListUrl,
+  worldLineUrl,
   onExportCsv,
   googleSheetsPanel,
 }) => {
@@ -133,10 +136,17 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
       <div className="e-header">
         <h3 className="e-title">{sheetName}</h3>
         <div className="e-header-actions">
-          {onOpenObjects && (
-            <button className="e-objects-btn" onClick={onOpenObjects}>
-              オブジェクト
-            </button>
+          {objectListUrl && (
+            <ObjectView
+              type="CsvObjectList"
+              url={objectListUrl}
+              label="オブジェクト一覧"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-objects-btn" title="ダブルクリックでオブジェクト一覧を開く">
+                オブジェクト
+              </span>
+            </ObjectView>
           )}
           {onExportCsv && (
             <button className="e-export-btn" onClick={onExportCsv}>
@@ -151,10 +161,17 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
               Sheets
             </button>
           )}
-          {onOpenWorldLine && (
-            <button className="e-worldline-btn" onClick={onOpenWorldLine}>
-              世界線
-            </button>
+          {worldLineUrl && (
+            <ObjectView
+              type="CsvSheetWorldLine"
+              url={worldLineUrl}
+              label="世界線ビュー"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-worldline-btn" title="ダブルクリックで世界線ビューを開く">
+                世界線
+              </span>
+            </ObjectView>
           )}
         </div>
       </div>
