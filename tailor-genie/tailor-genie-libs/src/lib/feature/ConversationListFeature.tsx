@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useContext } from "react";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
 import { useTailorGenie } from "./TailorGenieProvider.js";
 
 export const ConversationListFeature: FC = () => {
@@ -19,9 +19,10 @@ export const ConversationListFeature: FC = () => {
     openBubble(`tailor-genie/conversations/${id}`, "root");
   };
 
-  const handleOpenConversation = (convId: string) => {
+  // 単クリックの仕事は「今どの会話を見ているか」を切り替えることだけ。
+  // 開くのはダブルクリック（ObjectView の既定）
+  const handleSelectConversation = (convId: string) => {
     setActiveConversationId(convId);
-    openBubble(`tailor-genie/conversations/${convId}`, "root");
   };
 
   return (
@@ -50,19 +51,28 @@ export const ConversationListFeature: FC = () => {
           </div>
         ) : (
           conversationIds.map((id) => (
-            <div
+            <ObjectView
               key={id}
-              onClick={() => handleOpenConversation(id)}
-              style={{
-                padding: 12,
-                borderBottom: "1px solid #eee",
-                cursor: "pointer",
-              }}
+              type="Conversation"
+              url={`tailor-genie/conversations/${id}`}
+              label={`会話 #${id.slice(0, 8)}`}
+              openingPosition="bubble-side-right"
+              onClick={() => handleSelectConversation(id)}
+              fullWidth
             >
-              <div style={{ fontWeight: "bold" }}>
-                会話 #{id.slice(0, 8)}
+              <div
+                title="ダブルクリックで会話を開く"
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                <div style={{ fontWeight: "bold" }}>
+                  会話 #{id.slice(0, 8)}
+                </div>
               </div>
-            </div>
+            </ObjectView>
           ))
         )}
       </div>

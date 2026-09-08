@@ -1,3 +1,6 @@
+// Object type registration (副作用)
+import "./lib/object-type-registration.js";
+
 // Bubble Routes (このファイルをimportすると自動登録される)
 import "./lib/registration/bubbleRoutes.js";
 export { tailorGenieBubbleRoutes } from "./lib/registration/bubbleRoutes.js";
