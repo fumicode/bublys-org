@@ -33,7 +33,8 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const buildMemoUrl = (id: string) => `memos/${id}`;
   const buildMemoDeleteUrl = (id: string) => `memos/${id}/delete-confirm`;
-  const handleMemoClick = (_id: string, detailUrl: string) => {
+  // 「メモを追加」で作った新規メモを開く導線（一覧の行を開くのは ObjectView のダブルクリック）
+  const handleOpenMemo = (_id: string, detailUrl: string) => {
     openBubble(detailUrl, bubble.id);
   };
   const handleMemoDelete = (memoId: string) => {
@@ -43,7 +44,7 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
     <MemoCollection
       buildDetailUrl={buildMemoUrl}
       buildDeleteUrl={buildMemoDeleteUrl}
-      onMemoClick={handleMemoClick}
+      onOpenMemo={handleOpenMemo}
       onMemoDelete={handleMemoDelete}
     />
   );
@@ -52,16 +53,12 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
   const memoId = bubble.url.replace("memos/", "");
   const { openBubble } = useContext(BubblesContext);
-  const handleOpenAuthor = (_userId: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
   const handleOpenWorldLineView = () => {
     openBubble(`memos/${memoId}/history`, bubble.id);
   };
   return (
     <MemoWorldLineIntegration
       memoId={memoId}
-      onOpenAuthor={handleOpenAuthor}
       onOpenWorldLineView={handleOpenWorldLineView}
     />
   );

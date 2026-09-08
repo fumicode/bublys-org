@@ -10,10 +10,9 @@ import { UserGroupIcon } from "../ui/UserIcon.js";
 type UserGroupDetailProps = {
   groupId: string;
   onDeleted?: () => void;
-  onOpenUser?: (userId: string, detailUrl: string) => void;
 };
 
-export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, onOpenUser }) => {
+export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted }) => {
   const dispatch = useAppDispatch();
   const groupEntity = useAppSelector(selectUserGroupById(groupId));
   const users = useAppSelector(selectUsers);
@@ -134,7 +133,6 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted, 
         users={memberUsers}
         buildDetailUrl={(id) => `users/${id}`}
         buildDeleteUrl={(id) => `users/${id}/delete-confirm`}
-        onUserClick={(userId, url) => onOpenUser?.(userId, url)}
         onUserDelete={handleRemoveUser}
         showReorder={sortKey === "custom"}
         onReorder={sortKey === "custom" ? handleReorderById : undefined}
