@@ -75,6 +75,22 @@ describe('ObjectView が「開く」のはいつか', () => {
     expect(openBubble).not.toHaveBeenCalled();
   });
 
+  it('入れ子のときは内側が勝つ（外側は開かない）', () => {
+    const { openBubble } = renderWithContext(
+      <ObjectView url="schedules/1" openingPosition="bubble-side-right" draggable={false}>
+        <span>
+          外側
+          <ObjectView url="users/1" openingPosition="origin-side" draggable={false}>
+            <span>内側</span>
+          </ObjectView>
+        </span>
+      </ObjectView>
+    );
+    fireEvent.doubleClick(screen.getByText('内側'));
+    expect(openBubble).toHaveBeenCalledTimes(1);
+    expect(openBubble).toHaveBeenCalledWith('users/1', OPENER, 'origin-side');
+  });
+
   it('onClick は単クリックでだけ走り、開く動作とは独立している', () => {
     const onClick = jest.fn();
     const { openBubble } = renderWithContext(
