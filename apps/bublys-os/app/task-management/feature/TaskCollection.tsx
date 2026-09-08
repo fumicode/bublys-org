@@ -18,7 +18,6 @@ import { useState } from "react";
 import styled from "styled-components";
 
 type TaskCollectionProps = {
-  onTaskSelect?: (taskId: string) => void;
 };
 
 const buildDetailUrl = (taskId: string) => `task-management/tasks/${taskId}`;
@@ -54,7 +53,7 @@ const createSampleTasks = (): TaskJSON[] => {
   ];
 };
 
-export const TaskCollection: FC<TaskCollectionProps> = ({ onTaskSelect }) => {
+export const TaskCollection: FC<TaskCollectionProps> = () => {
   const dispatch = useAppDispatch();
   const taskList = useAppSelector(selectTaskList);
   const selectedTaskId = useAppSelector(selectSelectedTaskId);
@@ -67,9 +66,9 @@ export const TaskCollection: FC<TaskCollectionProps> = ({ onTaskSelect }) => {
     }
   }, [dispatch, taskList.length]);
 
+  // 単クリックは「選ぶ」だけ。開くのは ObjectView のダブルクリック
   const handleTaskClick = (taskId: string) => {
     dispatch(setSelectedTaskId(taskId));
-    onTaskSelect?.(taskId);
   };
 
   const handleAddTask = () => {

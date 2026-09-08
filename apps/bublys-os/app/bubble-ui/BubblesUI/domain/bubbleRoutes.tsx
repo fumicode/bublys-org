@@ -60,6 +60,7 @@ const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
     <MemoWorldLineIntegration
       memoId={memoId}
       onOpenWorldLineView={handleOpenWorldLineView}
+      worldLineUrl={`memos/${memoId}/history`}
     />
   );
 };

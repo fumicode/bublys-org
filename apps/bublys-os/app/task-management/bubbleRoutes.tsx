@@ -1,29 +1,19 @@
 "use client";
 
-import { useContext } from "react";
-import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubbleRoute } from "@bublys-org/bubbles-ui";
 import { TaskCollection } from "./feature/TaskCollection";
 import { TaskDetail } from "./feature/TaskDetail";
 
 // タスク管理 - タスク一覧バブル
-const TaskCollectionBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const handleTaskSelect = (taskId: string) => {
-    openBubble(`task-management/tasks/${taskId}`, bubble.id, "bubble-side-right");
-  };
-  return <TaskCollection onTaskSelect={handleTaskSelect} />;
+const TaskCollectionBubble: BubbleRoute["Component"] = () => {
+  return <TaskCollection />;
 };
 
 // タスク管理 - タスク詳細バブル
 const TaskDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
   const taskId = bubble.url.replace("task-management/tasks/", "");
 
-  const handleUserClick = (userId: string) => {
-    openBubble(`users/${userId}`, bubble.id, "bubble-side-right");
-  };
-
-  return <TaskDetail taskId={taskId} onUserClick={handleUserClick} />;
+  return <TaskDetail taskId={taskId} />;
 };
 
 /** タスク管理機能のバブルルート定義 */

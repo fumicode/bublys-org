@@ -7,11 +7,12 @@ import { dispatchCreateIgoGame } from '../feature/igoActions';
 
 type IgoGameCollectionProps = {
   buildDetailUrl: (gameId: string) => string;
-  onGameClick?: (gameId: string, detailUrl: string) => void;
+  /** 「新規対局」で作った対局を開く（一覧の行を開くのはダブルクリック） */
+  onOpenGame?: (gameId: string, detailUrl: string) => void;
 };
 
 /** 対局一覧 + 新規対局ボタン。 */
-export function IgoGameCollection({ buildDetailUrl, onGameClick }: IgoGameCollectionProps) {
+export function IgoGameCollection({ buildDetailUrl, onOpenGame }: IgoGameCollectionProps) {
   const dispatch = useAppDispatch();
 
   const handleNewGame = () => {
@@ -19,13 +20,13 @@ export function IgoGameCollection({ buildDetailUrl, onGameClick }: IgoGameCollec
     const game = IgoGame_囲碁ゲーム.create(gameId, 9);
     // world-line-graph に scope と初期ゲームを seed してから開く
     dispatchCreateIgoGame(dispatch, game);
-    onGameClick?.(gameId, buildDetailUrl(gameId));
+    onOpenGame?.(gameId, buildDetailUrl(gameId));
   };
 
   return (
     <div style={{ padding: 16, minWidth: 280 }}>
       <h3 style={{ margin: '0 0 12px', fontSize: 16 }}>囲碁 対局一覧</h3>
-      <IgoGameList buildDetailUrl={buildDetailUrl} onGameClick={onGameClick} />
+      <IgoGameList buildDetailUrl={buildDetailUrl} />
       <div style={{ marginTop: 16 }}>
         <Button variant="contained" onClick={handleNewGame}>
           新規対局
