@@ -12,10 +12,15 @@ swcJestConfig.swcrc = false;
 module.exports = {
   displayName: '@bublys-org/hotel-shift-puzzle-libs',
   preset: '../../jest.preset.js',
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom',
   transform: {
-    '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
+    '^.+\\.[tj]sx?$': ['@swc/jest', swcJestConfig],
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'html'],
+  moduleNameMapper: {
+    // redux-persist の es ビルドは ESM のまま配布されていて jest が解釈できない。
+    // 同内容の CJS ビルドへ差し替える（state-management 経由で読み込まれる）。
+    '^redux-persist/es/(.*)$': 'redux-persist/lib/$1',
+  },
   coverageDirectory: 'test-output/jest/coverage',
 };

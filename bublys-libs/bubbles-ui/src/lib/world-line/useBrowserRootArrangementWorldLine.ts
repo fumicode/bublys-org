@@ -149,6 +149,13 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
   // Map に詰めておき、renderNodeSummary は Map 引き O(1) で返す。これで頻繁な
   // 微小な再レンダー（例: finishBubbleAnimation dispatch）でも O(N²) 走査が
   // 起きなくなる。
+  // 他ノードの中身を覗くので、evict 済みのぶんを先に埋めておくよう頼む
+  // （オンデマンド取得はふだん「今いるノード」のぶんしか走らない）。
+  const { requestNodes } = scope;
+  useEffect(() => {
+    requestNodes(Object.keys(scope.graph.state.nodes));
+  }, [requestNodes, scope.graph]);
+
   const summaries = useMemo(() => {
     const map = new Map<string, string>();
     const nodes = scope.graph.state.nodes;
