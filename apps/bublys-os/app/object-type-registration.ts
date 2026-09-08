@@ -6,6 +6,7 @@ import { registerObjectType, registerObjectTypes } from "@bublys-org/bubbles-ui"
 import { UserIcon, UserGroupIcon } from "@bublys-org/users-libs";
 import PersonIcon from "@mui/icons-material/Person";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import { MemoIcon } from "./world-line/Memo/ui/MemoIcon";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
@@ -27,6 +28,7 @@ export const registerAppObjectTypes = (): void => {
   registerObjectType('UserGroup', React.createElement(UserGroupIcon, { fontSize: 'small' }));
   registerObjectType('Memo', React.createElement(MemoIcon));
   registerObjectType('IgoGame', React.createElement(SportsEsportsIcon, { fontSize: 'small', sx: { color: '#dcb35c' } }));
+  registerObjectType('Task', React.createElement(AssignmentIcon, { fontSize: 'small' }));
   registerObjectType('Staff', React.createElement(PersonIcon, { fontSize: 'small' }));
   registerObjectType('StaffAvailability', React.createElement(EventAvailableIcon, { fontSize: 'small' }));
   registerObjectType('ShiftAssignment', React.createElement(InsertDriveFileIcon, { fontSize: 'small' }));

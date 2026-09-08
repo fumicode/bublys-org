@@ -12,7 +12,6 @@ import { IgoGame_囲碁ゲーム } from '../domain';
 
 type IgoGameListProps = {
   buildDetailUrl: (gameId: string) => string;
-  onGameClick?: (gameId: string, detailUrl: string) => void;
 };
 
 function statusLabel(game: IgoGame_囲碁ゲーム): string {
@@ -23,7 +22,7 @@ function statusLabel(game: IgoGame_囲碁ゲーム): string {
   return `対局中・${game.currentTurnLabel}番`;
 }
 
-export function IgoGameList({ buildDetailUrl, onGameClick }: IgoGameListProps) {
+export function IgoGameList({ buildDetailUrl }: IgoGameListProps) {
   const dispatch = useAppDispatch();
   const gameIds = useAppSelector(selectIgoGameIds);
   const games = useAppSelector((state) =>
@@ -53,11 +52,12 @@ export function IgoGameList({ buildDetailUrl, onGameClick }: IgoGameListProps) {
               </div>
             </div>
             <div className="e-main">
+              {/* ダブルクリックで対局を開く / ドラッグでポケットや宇宙へ */}
               <ObjectView
                 type="IgoGame"
                 url={detailUrl}
                 label={label}
-                onClick={() => onGameClick?.(id, detailUrl)}
+                openingPosition="bubble-side-right"
               >
                 <SportsEsportsIcon sx={{ color: '#dcb35c', fontSize: 18 }} />
                 <span>{label}</span>
