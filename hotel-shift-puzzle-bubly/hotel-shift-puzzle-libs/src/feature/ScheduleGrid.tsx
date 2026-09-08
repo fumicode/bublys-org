@@ -100,6 +100,8 @@ type ScheduleGridProps = {
   reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /** 勤務間インターバルの図バブルの URL を作る（ルールキー）。同じく上部ルール行に渡す */
+  intervalRuleBubbleUrl?: (ruleKey: string) => string;
   /**
    * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
    * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
@@ -141,6 +143,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  intervalRuleBubbleUrl,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
@@ -784,6 +787,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           minDayOff={minDayOff}
           maxPerDay={maxPerDay}
           checkShiftWish={constraints?.checkShiftWish ?? true}
+          intervalRules={constraints?.shiftIntervalRules ?? []}
+          intervalRuleBubbleUrl={intervalRuleBubbleUrl}
         />
         <ShiftCommandsBar
           targetCount={subsetStaff.length}

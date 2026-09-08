@@ -25,6 +25,9 @@ export * from './schedule/ScheduleEditLog.js';
 export * from './schedule/ShiftLeaderRule.js';
 // 責任者ルールを違反を出す制約として扱うアダプタ（未充足日を日単位の違反に）
 export * from './schedule/ShiftLeaderConstraint.js';
+// 勤務間インターバルの宣言的ルール（「遅番の翌日は早番・中番に入れない」）とその制約アダプタ
+export * from './schedule/ShiftIntervalRule.js';
+export * from './schedule/ShiftIntervalConstraint.js';
 // 勤務表ごとの制約集約（責任者ルールを保持。将来は他の制約も同居可）
 export * from './schedule/ScheduleConstraints.js';
 

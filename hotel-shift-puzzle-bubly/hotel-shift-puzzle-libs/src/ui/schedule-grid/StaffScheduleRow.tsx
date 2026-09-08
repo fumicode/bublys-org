@@ -10,7 +10,10 @@ import type {
   ShiftLeaderRule,
   ShiftCell,
 } from "../../domain/index.js";
-import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
+import {
+  MIN_MONTHLY_DAY_OFF_CONSTRAINT,
+  isShiftIntervalConstraintType,
+} from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
@@ -140,6 +143,14 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
+        // 勤務間インターバル違反は「2日のつなぎ目」の違反なので、範囲（下端の赤帯）ではなく
+        // 境目の印として描く。どちら側の境目かは、違反範囲の初日／末日のどちらに当たるかで決まる。
+        const intervalCovering = covering.filter((v) =>
+          isShiftIntervalConstraintType(v.constraintType)
+        );
+        const otherCovering = covering.filter(
+          (v) => !isShiftIntervalConstraintType(v.constraintType)
+        );
         const isSelected =
           selection?.staffId === staff.id && selection.day.equals(day);
         return (
@@ -148,8 +159,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             cell={cell}
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
-            rangeViolation={covering.find((v) => v.days.length > 1)}
-            pointViolation={covering.find((v) => v.days.length === 1)}
+            rangeViolation={otherCovering.find((v) => v.days.length > 1)}
+            pointViolation={otherCovering.find((v) => v.days.length === 1)}
+            intervalAfter={intervalCovering.find((v) => v.days[0]?.equals(day))}
+            intervalBefore={intervalCovering.find((v) =>
+              v.days[v.days.length - 1]?.equals(day)
+            )}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}

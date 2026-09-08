@@ -725,6 +725,55 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を出す。
+     違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
+     希望の円（単日違反）とは別の形にしている。
+
+     前日側は右端に、翌日側は左端に同じ印を出す。丸は境界線の上に中心が来るよう半分だけ
+     はみ出させ（セルは overflow:hidden なのでそこで切られる）、2つの半円が合わさって
+     境界線上の1つの丸に見えるようにしている。 */
+  .e-interval-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #e53935;
+    cursor: pointer;
+    z-index: 1;
+    transition: width 0.1s;
+
+    &.is-before {
+      left: 0;
+    }
+    &.is-after {
+      right: 0;
+    }
+
+    &:hover {
+      width: 7px;
+    }
+
+    /* 境界線の上に乗る丸（半分はセルの外＝クリップされる） */
+    &::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 11px;
+      height: 11px;
+      margin-top: -5.5px;
+      border-radius: 50%;
+      background: #e53935;
+      border: 1.5px solid #fff;
+      box-sizing: border-box;
+    }
+    &.is-before::after {
+      left: -5.5px;
+    }
+    &.is-after::after {
+      right: -5.5px;
+    }
+  }
+
   /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
      クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
      （ScheduleGridView 側のホバー検出を参照）。 */
