@@ -85,10 +85,12 @@ const FloatingKyuseiSlot = styled.div<{
   margin-left: -${SIZE / 2}px;
 
   /* ObjectView のラッパ span。fullWidth で display:flex / width:100% は付くので、
-     高さだけ枠いっぱいに広げて丸全体を当たり判定にする */
+     高さだけ枠いっぱいに広げて丸全体を当たり判定にする。
+     hover で出る泡の膜も、四角ではなく丸で包まれてほしいので丸みを渡す */
   .e-kyusei-hit {
     height: 100%;
     border-radius: 50%;
+    --object-view-film-radius: 50%;
   }
 `;
 
