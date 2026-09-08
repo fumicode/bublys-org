@@ -130,6 +130,19 @@ export const ObjectView: FC<ObjectViewProps> = ({
     }
   }, [onDoubleClick, canOpenBubble, resolvedUrl, resolvedPosition, openBubble, currentBubbleId]);
 
+  /**
+   * ObjectView は入れ子になる（行の中のバッジ、セルの中のチップ、図のノード…）。
+   * そのとき開くべきなのは「指した本人」なので、内側で止めて外側へ渡さない。
+   * 各使用箇所で stopPropagation を書いて回ると必ず抜けが出るので、ここを規則にする。
+   */
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      openObject();
+    },
+    [openObject]
+  );
+
   const isInteractive = !!onClick || !!onDoubleClick || canOpenBubble;
   const hasDoubleClickAction = !!onDoubleClick || canOpenBubble;
 
@@ -165,7 +178,7 @@ export const ObjectView: FC<ObjectViewProps> = ({
         draggable={draggable}
         onDragStart={draggable ? handleDragStart : undefined}
         onClick={onClick ? handleClick : undefined}
-        onDoubleClick={hasDoubleClickAction ? openObject : undefined}
+        onDoubleClick={hasDoubleClickAction ? handleDoubleClick : undefined}
         onKeyDown={
           isInteractive
             ? (e) => {
