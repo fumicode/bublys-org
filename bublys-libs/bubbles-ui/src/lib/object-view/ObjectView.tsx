@@ -43,6 +43,12 @@ type ObjectViewProps = {
   draggable?: boolean;
   /** 幅を100%にするか（デフォルト: false） */
   fullWidth?: boolean;
+  /**
+   * ラッパ span に付けるクラス。
+   * 包む相手が flex/grid の子で `flex: 1` などを持っているとき、その指定はラッパ側に
+   * 移らないとレイアウトが崩れる。中身のクラスをラッパへ引き上げるための口。
+   */
+  className?: string;
 };
 
 /**
@@ -51,8 +57,12 @@ type ObjectViewProps = {
  * 以下の機能を提供:
  * - UrledPlace: LinkBubbleの対象となる
  * - draggable: ドラッグ可能（型情報を自動設定）
- * - ダブルクリック: registerObjectBubble で登録された設定に基づき自動でバブルを開く
- *   （onDoubleClick prop が渡された場合はそちらを優先）
+ * - ダブルクリック: バブルを開く（onDoubleClick prop が渡された場合はそちらを優先）
+ * - Enter / Space: ダブルクリックと同じ「開く」
+ *
+ * 開けるかどうかは `canOpenBubble` が決める。URL があるだけでは足りず、使用箇所で
+ * `openingPosition` を渡すか、型に `registerObjectBubble` を登録しておく必要がある。
+ * どちらも無いと、ダブルクリックのハンドラ自体が付かない（＝黙って開かない）。
  */
 export const ObjectView: FC<ObjectViewProps> = ({
   object,
@@ -66,6 +76,7 @@ export const ObjectView: FC<ObjectViewProps> = ({
   openingPosition,
   draggable = true,
   fullWidth = false,
+  className,
 }) => {
   const { openBubble } = useContext(BubblesContext);
   const currentBubbleId = useContext(CurrentBubbleContext);
@@ -108,10 +119,13 @@ export const ObjectView: FC<ObjectViewProps> = ({
     onClick?.();
   }, [onClick]);
 
-  const handleDoubleClick = useCallback(() => {
+  /** このオブジェクトを開く（ダブルクリックの動作）。onDoubleClick が渡っていればそちらが優先 */
+  const openObject = useCallback(() => {
     if (onDoubleClick) {
       onDoubleClick();
-    } else if (canOpenBubble && resolvedUrl) {
+      return;
+    }
+    if (canOpenBubble && resolvedUrl) {
       openBubble(resolvedUrl, currentBubbleId, resolvedPosition);
     }
   }, [onDoubleClick, canOpenBubble, resolvedUrl, resolvedPosition, openBubble, currentBubbleId]);
@@ -119,26 +133,45 @@ export const ObjectView: FC<ObjectViewProps> = ({
   const isInteractive = !!onClick || !!onDoubleClick || canOpenBubble;
   const hasDoubleClickAction = !!onDoubleClick || canOpenBubble;
 
+  /**
+   * キーボードの主アクション（Enter / Space）。
+   *
+   * キーボードには「ダブルクリック」に当たる打鍵が無いので、開けるなら Enter は「開く」に
+   * 割り当てる。マウスでは単クリックが何もしないのに Enter では開く、という非対称は意図的で、
+   * `role="button"` と `tabIndex=0` を名乗っている以上、キーボードで無反応なほうが不具合。
+   * 開けないときだけ onClick（選択など、開く以外の仕事）へ落とす。
+   */
+  const handlePrimaryKey = useCallback(() => {
+    if (hasDoubleClickAction) {
+      openObject();
+      return;
+    }
+    onClick?.();
+  }, [hasDoubleClickAction, openObject, onClick]);
+
   return (
     <UrledPlace url={resolvedUrl ?? ''}>
       <span
+        className={className}
         role={isInteractive ? 'button' : undefined}
         tabIndex={isInteractive ? 0 : undefined}
         style={{
           display: fullWidth ? 'flex' : 'inline-flex',
           width: fullWidth ? '100%' : undefined,
           cursor: isInteractive ? 'pointer' : undefined,
+          // ダブルクリックでラベルの文字が選択されてチラつくのを防ぐ
+          userSelect: hasDoubleClickAction ? 'none' : undefined,
         }}
         draggable={draggable}
         onDragStart={draggable ? handleDragStart : undefined}
         onClick={onClick ? handleClick : undefined}
-        onDoubleClick={hasDoubleClickAction ? handleDoubleClick : undefined}
+        onDoubleClick={hasDoubleClickAction ? openObject : undefined}
         onKeyDown={
           isInteractive
             ? (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  handleClick();
+                  handlePrimaryKey();
                 }
               }
             : undefined
