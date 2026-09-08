@@ -53,10 +53,6 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const shiftPlanId = bubble.params.shiftPlanId;
   const roles = Role_係.createDefaultRoles();
 
-  const handleStaffViewClick = () => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
-  };
-
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
   const buildFilterUrl = (timeSlotId: string, roleId: string): string => {
     const role = roles.find((r) => r.id === roleId);
@@ -94,7 +90,6 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <ShiftPlanEditor
       shiftPlanId={shiftPlanId}
       onCellClick={handleCellClick}
-      onStaffViewClick={handleStaffViewClick}
       buildCellUrl={buildFilterUrl}
     />
   );
@@ -104,10 +99,6 @@ const GakkaiShiftPlanEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const roles = Role_係.createDefaultRoles();
-
-  const handleStaffViewClick = (shiftPlanId: string) => {
-    openBubble(`gakkai-shift/shift-plans/${shiftPlanId}/staff-view`, bubble.id, "origin-side");
-  };
 
   /** 係と時間帯からフィルターURLを構築（originCell付きで一意にする） */
   const buildFilterUrl = (timeSlotId: string, roleId: string): string => {
@@ -146,7 +137,6 @@ const GakkaiShiftPlanManagerBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <ShiftPlanManager
       onCellClick={handleCellClick}
       buildCellUrl={buildFilterUrl}
-      onStaffViewClick={handleStaffViewClick}
     />
   );
 };

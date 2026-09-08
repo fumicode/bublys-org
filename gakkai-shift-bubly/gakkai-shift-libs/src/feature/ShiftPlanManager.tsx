@@ -23,13 +23,11 @@ type ShiftPlanManagerProps = {
   /** セルクリック時に開くバブルのURLを生成（origin-side配置用） */
   buildCellUrl?: (timeSlotId: string, roleId: string) => string;
   /** スタッフ別表示ボタンクリック時のコールバック */
-  onStaffViewClick?: (shiftPlanId: string) => void;
 };
 
 export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
   onCellClick,
   buildCellUrl,
-  onStaffViewClick,
 }) => {
   const dispatch = useAppDispatch();
   const shiftPlans = useAppSelector(selectGakkaiShiftPlans);
@@ -156,7 +154,6 @@ export const ShiftPlanManager: FC<ShiftPlanManagerProps> = ({
             shiftPlanId={selectedPlan.id}
             onCellClick={onCellClick}
             buildCellUrl={buildCellUrl}
-            onStaffViewClick={() => onStaffViewClick?.(selectedPlan.id)}
           />
         ) : (
           <div className="e-empty">シフト案を選択してください</div>
