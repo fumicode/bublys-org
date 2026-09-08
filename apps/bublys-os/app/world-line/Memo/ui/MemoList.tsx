@@ -12,11 +12,15 @@ import { ObjectView, UrledPlace } from '@bublys-org/bubbles-ui';
 type MemoListProps = {
   buildDetailUrl: (memoId: string) => string;
   buildDeleteUrl: (memoId: string) => string;
-  onMemoClick?: (memoId: string, detailUrl: string) => void;
+  /**
+   * 行を単クリックしたときの「選択」。開くのはダブルクリック（ObjectView）なので、
+   * ここは選択状態を持つ画面（world-line のデモページ）専用。
+   */
+  onSelectMemo?: (memoId: string) => void;
   onMemoDelete?: (memoId: string) => void;
 };
 
-export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoListProps) {
+export function MemoList({ buildDetailUrl, buildDeleteUrl, onSelectMemo, onMemoDelete }: MemoListProps) {
   // world-line-graph slice の scopeId 一覧（`memo:` プレフィックス）から ID を取り、
   // 各 ID の scope の apex に置かれている Memo を読む。
   const memoIds = useAppSelector(selectMemoIds);
@@ -38,11 +42,13 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDe
             key={memo.id}
             className="e-item"
           >
+            {/* ダブルクリックでメモを開く / ドラッグでポケットや宇宙へ */}
             <ObjectView
               type="Memo"
               url={detailUrl}
               label={label}
-              onClick={() => onMemoClick?.(memo.id, detailUrl)}
+              openingPosition="bubble-side-right"
+              onClick={onSelectMemo ? () => onSelectMemo(memo.id) : undefined}
             >
               <MemoIcon/>
               <span>「{label}...」</span>
@@ -53,7 +59,6 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDe
                 <UserBadge
                   label={users.find((u) => u.id === memo.authorId)?.name ?? "作者"}
                   linkTarget={`users/${memo.authorId}`}
-                  onClick={() => onMemoClick?.(memo.authorId!, `users/${memo.authorId}`)}
                 />
               </span>
             )}

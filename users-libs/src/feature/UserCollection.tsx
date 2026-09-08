@@ -42,7 +42,6 @@ type UserCollectionProps = {
   buildDetailUrl: (userId: string) => string;
   buildCreateUrl: () => string;
   buildDeleteUrl: (userId: string) => string;
-  onUserClick?: (userId: string, detailUrl: string) => void;
   onCreateClick?: (createUrl: string) => void;
   onUserDelete?: (userId: string) => void;
 };
@@ -51,7 +50,6 @@ export const UserCollection: FC<UserCollectionProps> = ({
   buildDetailUrl,
   buildCreateUrl,
   buildDeleteUrl,
-  onUserClick,
   onCreateClick,
   onUserDelete,
 }) => {
@@ -82,7 +80,6 @@ export const UserCollection: FC<UserCollectionProps> = ({
         users={users}
         buildDetailUrl={buildDetailUrl}
         buildDeleteUrl={buildDeleteUrl}
-        onUserClick={onUserClick}
         onUserDelete={handleDelete}
       />
       <div style={{ marginTop: "16px" }}>

@@ -10,11 +10,10 @@ import { getDragType, parseDragPayload, setDragPayload, extractIdFromUrl } from 
 interface MemoTitleProps {
   memo: Memo;
   onSetAuthor?: (userId: string) => void;
-  onOpenAuthor?: (userId: string, detailUrl: string) => void;
   onOpenWorldLineView?: () => void;
 }
 
-export function MemoTitle({ memo, onSetAuthor, onOpenAuthor, onOpenWorldLineView }: MemoTitleProps) {
+export function MemoTitle({ memo, onSetAuthor, onOpenWorldLineView }: MemoTitleProps) {
   const users = useAppSelector(selectUsers);
   const firstBlockId = memo.lines[0];
   const firstBlock = firstBlockId ? memo.blocks[firstBlockId] : null;
@@ -70,7 +69,6 @@ export function MemoTitle({ memo, onSetAuthor, onOpenAuthor, onOpenWorldLineView
           <UserBadge
             label={authorName}
             linkTarget={`users/${memo.authorId}`}
-            onClick={() => onOpenAuthor?.(memo.authorId!, `users/${memo.authorId}`)}
           />
         ) : (
           <span>未設定</span>

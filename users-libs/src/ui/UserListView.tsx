@@ -11,7 +11,6 @@ type UserListViewProps = {
   users: User[];
   buildDetailUrl: (userId: string) => string;
   buildDeleteUrl: (userId: string) => string;
-  onUserClick?: (userId: string, detailUrl: string) => void;
   onUserDelete?: (userId: string) => void;
   showReorder?: boolean;
   onReorder?: (sourceUserId: string, targetUserId: string) => void;
@@ -21,7 +20,6 @@ export const UserListView: FC<UserListViewProps> = ({
   users,
   buildDetailUrl,
   buildDeleteUrl,
-  onUserClick,
   onUserDelete,
   showReorder = false,
   onReorder,
@@ -70,11 +68,12 @@ export const UserListView: FC<UserListViewProps> = ({
                   <DragIndicatorIcon fontSize="small" />
                 </span>
               )}
+              {/* ダブルクリックで詳細バブルを開く / ドラッグでポケットや宇宙へ */}
               <ObjectView
                 type="User"
                 url={detailUrl}
                 label={user.name}
-                onClick={() => onUserClick?.(user.id, detailUrl)}
+                openingPosition="bubble-side-right"
               >
                 <div className="e-main">
                   <UserIcon fontSize="small" className="e-avatar" />

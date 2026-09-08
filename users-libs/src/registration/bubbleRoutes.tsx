@@ -28,9 +28,6 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
   const buildUserDeleteUrl = (id: string) => `users/${id}/delete-confirm`;
   const buildUserCreateUrl = () => "users/create";
 
-  const handleUserClick = (_id: string, detailUrl: string) => {
-    openBubble(detailUrl, bubble.id);
-  };
   const handleCreateClick = (createUrl: string) => {
     openBubble(createUrl, bubble.id);
   };
@@ -43,7 +40,6 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
       buildDetailUrl={buildUserUrl}
       buildCreateUrl={buildUserCreateUrl}
       buildDeleteUrl={buildUserDeleteUrl}
-      onUserClick={handleUserClick}
       onCreateClick={handleCreateClick}
       onUserDelete={handleUserDelete}
     />
@@ -52,13 +48,7 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
 
 const UserBubble: BubbleContentRenderer = ({ bubble }) => {
   const userId = bubble.url.replace("users/", "");
-  const { openBubble } = useContext(BubblesContext);
-
-  const handleOpenGroup = (_groupId: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
-
-  return <UserDetail userId={userId} onOpenGroup={handleOpenGroup} />;
+  return <UserDetail userId={userId} />;
 };
 
 const UserCreateBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -103,28 +93,16 @@ const UserDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 };
 
-const UserGroupsBubble: BubbleContentRenderer = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
+const UserGroupsBubble: BubbleContentRenderer = () => {
   const buildGroupUrl = (id: string) => `user-groups/${id}`;
 
-  const handleSelect = (_id: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
-
-  return (
-    <UserGroupList buildDetailUrl={buildGroupUrl} onSelect={handleSelect} />
-  );
+  return <UserGroupList buildDetailUrl={buildGroupUrl} />;
 };
 
 const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
   const groupId = bubble.url.replace("user-groups/", "");
-  const { openBubble } = useContext(BubblesContext);
 
-  const handleOpenUser = (_userId: string, url: string) => {
-    openBubble(url, bubble.id);
-  };
-
-  return <UserGroupDetail groupId={groupId} onOpenUser={handleOpenUser} />;
+  return <UserGroupDetail groupId={groupId} />;
 };
 
 // ルーティング定義
