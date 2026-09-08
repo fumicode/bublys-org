@@ -6,15 +6,9 @@ import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { useCsvSheets } from "./CsvSheetProvider.js";
 
-type SheetListFeatureProps = {
-  onSheetSelect?: (sheetId: string) => void;
-};
-
 const buildSheetUrl = (sheetId: string) => `csv-importer/sheets/${sheetId}`;
 
-export const SheetListFeature: FC<SheetListFeatureProps> = ({
-  onSheetSelect,
-}) => {
+export const SheetListFeature: FC = () => {
   const { sheetMetas, addSheet, deleteSheet } = useCsvSheets();
   const { openBubble } = useContext(BubblesContext);
 
@@ -34,15 +28,10 @@ export const SheetListFeature: FC<SheetListFeatureProps> = ({
     deleteSheet(sheetId);
   };
 
-  const handleSheetClick = (sheetId: string) => {
-    onSheetSelect?.(sheetId);
-  };
-
   return (
     <SheetListView
       sheets={sheetMetas}
       buildSheetUrl={buildSheetUrl}
-      onSheetClick={handleSheetClick}
       onCreateSheet={handleCreateSheet}
       onImportCsv={handleImportCsv}
       onDeleteSheet={handleDeleteSheet}

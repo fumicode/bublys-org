@@ -11,7 +11,6 @@ type CsvObjectListViewProps = {
   objects: PlaneObject[];
   titleColumnId?: string;
   onChangeTitleColumn: (columnId: string) => void;
-  onSelectObject: (objectId: string) => void;
   buildObjectUrl: (objectId: string) => string;
 };
 
@@ -21,7 +20,6 @@ export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
   objects,
   titleColumnId,
   onChangeTitleColumn,
-  onSelectObject,
   buildObjectUrl,
 }) => {
   const getPreviewProperties = (obj: PlaneObject): { key: string; value: string }[] => {
@@ -72,9 +70,9 @@ export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
                   url={buildObjectUrl(obj.id)}
                   label={obj.name}
                   draggable={true}
-                  onClick={() => onSelectObject(obj.id)}
+                  openingPosition="bubble-side-right"
                 >
-                  <div className="e-card">
+                  <div className="e-card" title="ダブルクリックでオブジェクトを開く">
                     <div className="e-card-title">{obj.name}</div>
                     {preview.length > 0 && (
                       <div className="e-card-preview">
