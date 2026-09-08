@@ -437,7 +437,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   }, [deadCells]);
 
   // 選択が無いときだけ、キーボード操作の起点として先頭の未定セルへ置く。
-  // セルを埋めたあとに勝手に飛ばさない（次へ進むのは Tab 承認と Enter 確定だけ）。
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -448,24 +447,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
     }
   }, [schedule, cellSelection, staffList]);
-
-  /** Enter 確定後、今のセルより後ろの未定へ進む（先頭へは回り込まない）。 */
-  const advanceFocusAfterEdit = useCallback(
-    (
-      nextSchedule: MonthlyStaffSchedule,
-      after: { staffId: string; day: WorkingDay }
-    ) => {
-      const next = suggestNextUndecided(
-        nextSchedule,
-        staffList.map((s) => s.id),
-        after
-      );
-      setCellSelection(
-        next ? { staffId: next.staffId, day: next.day } : after
-      );
-    },
-    [staffList]
-  );
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => {
@@ -479,14 +460,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   }
 
   // セル編集: EditLog 付きで同一世界線ノードに記録。
-  // Enter 確定だけ次の未定へ進む。マウス・Backspace などはそのセルに留まる。
-  const handleChangeCell = (
-    staffId: string,
-    day: WorkingDay,
-    to: ShiftCell,
-    opts?: { advance?: boolean }
-  ) => {
-    const next = recordSetCell(store, {
+  // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
+  const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -494,11 +470,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       day,
       to,
     });
-    if (opts?.advance) {
-      advanceFocusAfterEdit(next, { staffId, day });
-    } else {
-      setCellSelection({ staffId, day });
-    }
   };
 
   // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
