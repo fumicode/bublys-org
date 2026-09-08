@@ -2,18 +2,20 @@
 
 import { FC } from "react";
 import styled from "styled-components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { MappingRuleState } from "@bublys-org/object-transformer-model";
 
 type RuleListViewProps = {
   rules: MappingRuleState[];
-  onSelectRule: (ruleId: string) => void;
+  /** ルールのURLを生成（ダブルクリックで開く先） */
+  buildRuleUrl: (ruleId: string) => string;
   onDeleteRule: (ruleId: string) => void;
   onNavigateToEditor: () => void;
 };
 
 export const RuleListView: FC<RuleListViewProps> = ({
   rules,
-  onSelectRule,
+  buildRuleUrl,
   onDeleteRule,
   onNavigateToEditor,
 }) => {
@@ -32,20 +34,25 @@ export const RuleListView: FC<RuleListViewProps> = ({
         <ul className="e-list">
           {rules.map((rule) => (
             <li key={rule.id} className="e-item">
-              <div
-                className="e-rule-card"
-                onClick={() => onSelectRule(rule.id)}
+              <ObjectView
+                type="MappingRule"
+                url={buildRuleUrl(rule.id)}
+                label={rule.name}
+                openingPosition="bubble-side-right"
+                className="e-rule-card-slot"
               >
-                <div className="e-rule-name">{rule.name}</div>
-                <div className="e-rule-meta">
-                  <span className="e-rule-schema">
-                    → {rule.targetSchemaId}
-                  </span>
-                  <span className="e-rule-count">
-                    {rule.mappings.length}フィールド
-                  </span>
+                <div className="e-rule-card" title="ダブルクリックで変換を開く">
+                  <div className="e-rule-name">{rule.name}</div>
+                  <div className="e-rule-meta">
+                    <span className="e-rule-schema">
+                      → {rule.targetSchemaId}
+                    </span>
+                    <span className="e-rule-count">
+                      {rule.mappings.length}フィールド
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </ObjectView>
               <button
                 className="e-delete-btn"
                 onClick={(e) => {
@@ -113,6 +120,13 @@ const StyledRuleList = styled.div`
     &:hover {
       border-color: #b3d9ff;
     }
+  }
+
+  /* ObjectView のラッパ span。.e-item は display:flex なので、
+     元の .e-rule-card が持っていた flex:1 はラッパ側に載せる必要がある */
+  .e-rule-card-slot {
+    flex: 1;
+    min-width: 0;
   }
 
   .e-rule-card {
