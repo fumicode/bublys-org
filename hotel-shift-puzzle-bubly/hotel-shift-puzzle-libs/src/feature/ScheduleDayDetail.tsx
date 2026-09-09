@@ -25,6 +25,7 @@ import {
   SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
@@ -37,7 +38,7 @@ type ScheduleDayDetailProps = {
  * 勤務表グリッドの日付ヘッダをクリックして開く（その日だけを切り出したビュー）。
  * セル編集は recordSetCell 経由で Schedule + EditLog を同一世界線ノードに記録する。
  */
-export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
+const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
   const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -143,3 +144,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleDayDetailBody {...props} />
+  </ScheduleWorld>
+);

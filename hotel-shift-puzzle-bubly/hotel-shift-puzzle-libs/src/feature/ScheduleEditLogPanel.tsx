@@ -5,6 +5,7 @@ import { Staff, ScheduleEditLog } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleEditLogView } from "../ui/ScheduleEditLogView.js";
 import { useObject, useObjects } from "../objects/repository.js";
 import { STAFF_TYPE, SCHEDULE_EDIT_LOG_TYPE } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleEditLogPanelProps = {
   scheduleId: string;
@@ -14,7 +15,7 @@ type ScheduleEditLogPanelProps = {
  * 勤務表の操作履歴（ノウハウ）パネル。
  * ScheduleEditLog を世界線から読み、譲歩フィルタ付きで表示する。
  */
-export const ScheduleEditLogPanel: FC<ScheduleEditLogPanelProps> = ({
+const ScheduleEditLogPanelBody: FC<ScheduleEditLogPanelProps> = ({
   scheduleId,
 }) => {
   const log = useObject<ScheduleEditLog>(SCHEDULE_EDIT_LOG_TYPE, scheduleId);
@@ -37,3 +38,13 @@ export const ScheduleEditLogPanel: FC<ScheduleEditLogPanelProps> = ({
     />
   );
 };
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleEditLogPanel: FC<ScheduleEditLogPanelProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleEditLogPanelBody {...props} />
+  </ScheduleWorld>
+);

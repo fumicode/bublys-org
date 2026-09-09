@@ -27,6 +27,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
+import { AppWorld } from "./world.js";
 import { localScopeId } from "./commit.js";
 
 /** オブジェクト型名 */
@@ -52,7 +53,13 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     // url は app 層（registration/bubbleUrls.ts）で登録する
-    // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
+    // serialize 無し → state-object 規約で plain 化
+    //
+    // 固定メンバー。名簿はグローバルの資産だが、勤務表は「その時点のメンバーで組んだ記録」
+    // なので、あとの入退社・改名に揺さぶられてはいけない。勤務表の世界が生まれるときに
+    // そのときの参照が焼き付けられ、以後その世界の中では動かない
+    // （どの世界へ焼くかは Schedule 側の scope.pins が決める）。
+    membership: { kind: "pinned" },
     // ドメインスキーマ（object-transformer など横断で使う）
     shape: objectShape([
       { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
@@ -67,8 +74,11 @@ export const HOTEL_OBJECTS = defineObjects({
     //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
     //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）
     // state が完全 plain（id ＋ 勤務帯 state 配列）なので serialize 不要。
-    localScope: (s: WorkShiftSet) =>
-      s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id),
+    membership: {
+      kind: "live",
+      homeScope: (id: string) =>
+        id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   Schedule: {
     class: MonthlyStaffSchedule,
@@ -81,27 +91,35 @@ export const HOTEL_OBJECTS = defineObjects({
       fromJSON: (j) => MonthlyStaffSchedule.fromPlain(j as MonthlyStaffSchedulePlain),
     },
     // 勤務表ごとのローカル世界線（自分のスコープ）
-    localScope: (s: MonthlyStaffSchedule) => localScopeId(SCHEDULE_TYPE, s.state.id),
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
+    // この世界が生まれるとき、そのときのスタッフ名簿を焼き付ける
+    scope: { pins: [STAFF_TYPE] },
   },
   ScheduleAvailability: {
     class: ScheduleAvailability,
     getId: (a: ScheduleAvailability) => a.id,
-    // 親 Schedule のローカル世界線に束ねる（case B）
-    localScope: (a: ScheduleAvailability) => localScopeId(SCHEDULE_TYPE, a.scheduleId),
+    // 親 Schedule のローカル世界線に束ねる（case B）。id は scheduleId そのもの
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   ScheduleReservationInfo: {
     class: DailyReservationInfo,
     getId: (r: DailyReservationInfo) => r.id,
     // 稼働日ごとの予約状況（宿泊人数・部屋数）は「実際の予約」という外部の実データ。
-    // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、勤務表のローカル世界線には
-    // 相乗りさせない（localScope を指定しない）＝アプリ全体スコープのみ。時間移動しても
-    // 予約状況は変わらない（ScheduleReport と同じ考え方）。
+    // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、世界に属さない（external、既定）。
+    // 勤務表の世界の中から読んでも常にグローバルを見るので、時間移動しても予約状況は
+    // 変わらない（ScheduleReport と同じ考え方）。
     // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
   },
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,
     getId: (w: StaffMonthlyShiftWish) => w.id,
-    // スタッフ×月で1つ。店舗・勤務表には依存しないのでアプリ全体スコープのみ。
+    // スタッフ×月で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
     // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
   },
   ScheduleConstraints: {
@@ -110,15 +128,18 @@ export const HOTEL_OBJECTS = defineObjects({
     // 勤務表ごとの制約。親 Schedule のローカル世界線に束ねる（case B）。
     // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
     // state が plain（scheduleId ＋ ルール states 配列）なので serialize 不要。
-    localScope: (c: ScheduleConstraints) => localScopeId(SCHEDULE_TYPE, c.scheduleId),
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   ScheduleReport: {
     class: ScheduleReport,
     getId: (r: ScheduleReport) => r.state.id,
     icon: React.createElement(AssessmentIcon, { fontSize: "small" }),
-    // 確定時点のスナップショット。勤務表のローカル世界線には相乗りさせない
-    // （相乗りさせると時間移動のたびに現れたり消えたりして確定記録の意味が壊れるため）。
-    // state が完全 plain → serialize 不要。localScope も指定しない＝アプリ全体ログのみ。
+    // 確定時点のスナップショット。世界に属さない（external、既定）。
+    // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
+    // 意味が壊れる。state が完全 plain → serialize 不要。
   },
   ScheduleEditLog: {
     class: ScheduleEditLog,
@@ -126,9 +147,23 @@ export const HOTEL_OBJECTS = defineObjects({
     // 勤務表の操作履歴。親 Schedule のローカル世界線に相乗り（case B）。
     // Schedule と同じノードに bundle で載せることで、時間移動と履歴がずれない。
     // state が完全 plain なので serialize 不要。
-    localScope: (log: ScheduleEditLog) => localScopeId(SCHEDULE_TYPE, log.id),
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
   },
 });
 
-/** 世界線対象オブジェクトをまとめた Provider（バブリ全体で1つ） */
-export const HotelObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
+const ObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
+
+/**
+ * 世界線対象オブジェクトをまとめた Provider（バブリ全体で1つ）。
+ * 併せて根の World（グローバル台帳）を張る。バブルはここから世界に入る。
+ */
+export const HotelObjectsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <ObjectsProvider>
+    <AppWorld>{children}</AppWorld>
+  </ObjectsProvider>
+);

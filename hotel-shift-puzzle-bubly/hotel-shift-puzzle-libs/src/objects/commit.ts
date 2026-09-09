@@ -18,13 +18,26 @@ import {
   setCasEntries,
   type StateRef,
 } from "@bublys-org/world-line-graph";
-import { getDescriptor, type ObjectDescriptor } from "./framework.js";
+import {
+  getDescriptor,
+  homeScopeOf,
+  liveTypes,
+  pinnedTypesOf,
+  type ObjectDescriptor,
+} from "./framework.js";
 
 /** アプリ全体の世界線スコープID */
 export const APP_SCOPE_ID = "hotel";
 
 /** 型ごとのローカル世界線スコープID */
 export const localScopeId = (type: string, id: string): string => `${type}:${id}`;
+
+/**
+ * 削除マーカー（tombstone）のハッシュ。
+ * removeObject が置く `null` の内容ハッシュは定数なので、CAS を読まずに
+ * 「この参照は削除を表す」と判定できる。
+ */
+export const TOMBSTONE_HASH = computeStateHash(null);
 
 type StoreLike = {
   getState: () => {
@@ -68,6 +81,62 @@ export function commitToScope(
   commitBundle(store, scopeId, [{ type, obj }]);
 }
 
+/** 1回の grow でスコープに起こす変化。3種類を混ぜて1ノードにできる。 */
+export type ScopeChange = {
+  /** 値を記録する（新しい状態）。CAS に実データを載せ、参照を grow する */
+  save?: BundleItem[];
+  /**
+   * 既にある参照をそのまま載せる。**値は読まない**のが要点。
+   * 固定メンバーの焼き付け・起点の据え置きに使う。実データは CAS／永続ストアに
+   * 既にあるので、メモリから追い出されていても記録は欠けない（#110）。
+   */
+  pin?: StateRef[];
+  /** このスコープから外す（tombstone） */
+  remove?: { type: string; id: string }[];
+};
+
+/**
+ * 世界線に変化を記録する唯一の入口。**1回呼ぶ＝1ノード**。
+ *
+ * 更新後のグラフを返すのは、呼び出し側が続けてラベルを付けたりするため。
+ */
+export function growScope(
+  store: StoreLike,
+  scopeId: string,
+  change: ScopeChange
+): WorldLineGraph {
+  const refs: StateRef[] = [];
+  const casEntries: { hash: string; data: unknown }[] = [];
+
+  for (const { type, obj } of change.save ?? []) {
+    const d = getDescriptor(type);
+    if (!d) throw new Error(`commit: type "${type}" が未登録です`);
+    const id = d.getId(obj);
+    const data = codecOf(d).toJSON(obj);
+    const hash = computeStateHash(data);
+    refs.push(createStateRef(type, id, hash));
+    casEntries.push({ hash, data });
+  }
+  for (const ref of change.pin ?? []) refs.push(ref);
+  for (const { type, id } of change.remove ?? []) {
+    refs.push(createStateRef(type, id, TOMBSTONE_HASH));
+    casEntries.push({ hash: TOMBSTONE_HASH, data: null });
+  }
+
+  if (refs.length === 0) return graphOf(store, scopeId);
+
+  const updated = graphOf(store, scopeId).grow(refs);
+  store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
+  if (casEntries.length > 0) {
+    // Redux の CAS は 300 件で頭打ちなので、「今の世界」が参照する分は間引きから守る
+    // （useCasScope の grow と同じ扱い）。守らないと、ファイル読み込み直後の 1 回の
+    // 保存で、読み込んだ履歴ぶんが一気に評価対象になって現在値まで落ちうる。
+    const protectHashes = updated.getCurrentStateRefs().map((ref) => ref.hash);
+    store.dispatch(setCasEntries({ entries: casEntries, protectHashes }));
+  }
+  return updated;
+}
+
 /**
  * 複数オブジェクトを同一ノードの grow で記録する。
  * Schedule + ScheduleEditLog のように「操作と結果状態」を同じ世界線ノードに載せるときに使う。
@@ -78,26 +147,7 @@ export function commitBundle(
   scopeId: string,
   items: BundleItem[]
 ): void {
-  if (items.length === 0) return;
-  const refs = [];
-  const casEntries: { hash: string; data: unknown }[] = [];
-  for (const { type, obj } of items) {
-    const d = getDescriptor(type);
-    if (!d) throw new Error(`commit: type "${type}" が未登録です`);
-    const codec = codecOf(d);
-    const id = d.getId(obj);
-    const data = codec.toJSON(obj);
-    const hash = computeStateHash(data);
-    refs.push(createStateRef(type, id, hash));
-    casEntries.push({ hash, data });
-  }
-  const updated = graphOf(store, scopeId).grow(refs);
-  store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
-  // Redux の CAS は 300 件で頭打ちなので、「今の世界」が参照する分は間引きから守る
-  // （useCasScope の grow と同じ扱い）。守らないと、ファイル読み込み直後の 1 回の
-  // 保存で、読み込んだ履歴ぶんが一気に評価対象になって現在値まで落ちうる。
-  const protectHashes = updated.getCurrentStateRefs().map((ref) => ref.hash);
-  store.dispatch(setCasEntries({ entries: casEntries, protectHashes }));
+  growScope(store, scopeId, { save: items });
 }
 
 /**
@@ -117,6 +167,26 @@ export function refInScope(
   const apex = graph.state.apexNodeId;
   if (!apex) return undefined;
   return graph.getStateRefsAt(apex).find((r) => r.type === type && r.id === id);
+}
+
+/**
+ * そのオブジェクトがこのスコープに「無い」ことが確かか。
+ *
+ * 値が読めない理由は2つある: **本当に無い**／**メモリ上の CAS から追い出された**。
+ * 既定値を作って保存してよいのは前者だけで、後者でやると中身のあるオブジェクトを
+ * 空で上書きしてしまう（見ているだけでデータが壊れる）。
+ * 判定は参照（グラフ）で行う。参照は追い出されないので、この2つを正しく分けられる。
+ *
+ * 「無ければ作る」を書くときは、値の falsy 判定ではなく必ずこれを通すこと。
+ */
+export function isAbsentInScope(
+  store: StoreLike,
+  scopeId: string,
+  type: string,
+  id: string
+): boolean {
+  const ref = refInScope(store, scopeId, type, id);
+  return ref === undefined || ref.hash === TOMBSTONE_HASH;
 }
 
 /**
@@ -150,6 +220,142 @@ function growWithRefs(store: StoreLike, scopeId: string, refs: StateRef[]): void
   store.dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
 }
 
+/** スコープの apex にある、その型の参照すべて（削除済みは除く） */
+export function refsOfTypeInScope(
+  store: StoreLike,
+  scopeId: string,
+  type: string
+): StateRef[] {
+  const graph = graphOf(store, scopeId);
+  const apex = graph.state.apexNodeId;
+  if (!apex) return [];
+  return graph
+    .getStateRefsAt(apex)
+    .filter((r) => r.type === type && r.hash !== TOMBSTONE_HASH);
+}
+
+/**
+ * そのオーナー型のスコープが生まれるとき焼き付ける、固定メンバーの参照。
+ * グローバル（アプリ全体スコープ）の**現在の**参照をそのまま使う。値は読まない。
+ */
+export function pinnableRefs(store: StoreLike, ownerType: string): StateRef[] {
+  return pinnedTypesOf(ownerType).flatMap((type) =>
+    refsOfTypeInScope(store, APP_SCOPE_ID, type)
+  );
+}
+
+/**
+ * ローカル世界線スコープID（`Schedule:<id>`）を、持ち主の型とIDに分解する。
+ * 最初のコロンで切る（ID 側にコロンが含まれても持ち主は正しく取れる）。
+ */
+export function parseLocalScopeId(
+  scopeId: string
+): { ownerType: string; ownerId: string } | undefined {
+  const i = scopeId.indexOf(":");
+  if (i <= 0 || i === scopeId.length - 1) return undefined;
+  return { ownerType: scopeId.slice(0, i), ownerId: scopeId.slice(i + 1) };
+}
+
+/**
+ * 世界を誕生させる（冪等。すでにノードがあれば何もしない）。
+ *
+ * 起点ノード**1つ**に、次の2つをまとめて載せる:
+ *   - 持ち主一式 … この世界を本籍とする live な型（勤務表・勤務帯セット・可能勤務帯…）
+ *   - 固定メンバー … オーナー型の scope.pins が挙げる型の、グローバルの現在の参照すべて
+ *
+ * 誕生は**完全でなければならない**。一部の型しか載っていない起点を作ると、そこへ時間移動
+ * したときに残りが戻らない（#110）。だから型を1箇所（記述子）から導いてまとめて置く。
+ *
+ * 値ではなく**参照**をコピーするのが要点。メモリ上の CAS から追い出されていても
+ * 焼き付けが欠けない。呼び出し側が編集前の値を手に持っているときだけ seed で渡す
+ * （APP にまだ無い新規作成時など）。
+ */
+export function ensureWorldBorn(
+  store: StoreLike,
+  scopeId: string,
+  seed?: BundleItem[]
+): void {
+  if (!isScopeEmpty(store, scopeId)) return;
+  const owner = parseLocalScopeId(scopeId);
+  if (!owner) return;
+
+  const idOfItem = (item: BundleItem) => {
+    const d = getDescriptor(item.type);
+    if (!d) throw new Error(`born: type "${item.type}" が未登録です`);
+    return d.getId(item.obj);
+  };
+
+  // 固定メンバー（グローバルの現在の参照をそのまま）
+  const refs: StateRef[] = [...pinnableRefs(store, owner.ownerType)];
+
+  // 持ち主一式（この世界を本籍とする live な型を、持ち主IDで引く）
+  for (const type of liveTypes()) {
+    if (homeScopeOf(type, owner.ownerId) !== scopeId) continue;
+    const given = seed?.find(
+      (item) => item.type === type && idOfItem(item) === owner.ownerId
+    );
+    // 渡されていればその値から作る（確実）。無ければ APP の現在の参照で代替する
+    const ref = given
+      ? refForItem(store, given)
+      : refInScope(store, APP_SCOPE_ID, type, owner.ownerId);
+    if (ref && ref.hash !== TOMBSTONE_HASH) refs.push(ref);
+  }
+
+  if (refs.length === 0) return;
+
+  const graph = growScope(store, scopeId, { pin: refs });
+  const rootId = graph.state.rootNodeId;
+  if (rootId) {
+    // 起点は人の操作に対応しないノードなので、そう読めるよう名前を付ける
+    // （付けないと「同じ状態が2つ並んでいる」ように見える）。
+    store.dispatch(
+      setGraph({
+        scopeId,
+        graph: graph.setNodeLabel(rootId, "編集前").toJSON(),
+      })
+    );
+  }
+}
+
+/**
+ * 投入した一式のうち、自分の世界を持つものをその場で誕生させる。
+ * 例データ投入やファイル読み込みの直後に呼ぶ（それぞれの勤務表が固定メンバー入りで生まれる）。
+ */
+export function bornWorldsOf(store: StoreLike, items: BundleItem[]): void {
+  const scopeIds = new Set<string>();
+  for (const { type, obj } of items) {
+    const d = getDescriptor(type);
+    if (!d) continue;
+    const scopeId = homeScopeOf(type, d.getId(obj));
+    if (scopeId) scopeIds.add(scopeId);
+  }
+  for (const scopeId of scopeIds) ensureWorldBorn(store, scopeId);
+}
+
+/**
+ * ノードに名前を付ける。ただし**新しく生まれたノードにだけ**。
+ *
+ * grow は打ち消しスナップ（WorldLineGraph.grow）で、見込みの状態が既存のノード
+ * （祖先か直近の子）と一致すると、新しいノードを作らずそこへ moveTo する。
+ * そのため「grow したあと apex に setNodeLabel」と素直に書くと、既にある別のノードの
+ * 名前を黙って書き換えてしまう。grow の前に知っていたノードなら手を出さない。
+ * 既に名前が付いているノードにも付けない（人が付けた名前を奪わない）。
+ */
+function labelIfNew(
+  store: StoreLike,
+  scopeId: string,
+  nodeId: string,
+  knownNodeIds: ReadonlySet<string>,
+  label: string
+): void {
+  if (knownNodeIds.has(nodeId)) return; // スナップして既存ノードに乗った
+  const graph = graphOf(store, scopeId);
+  if (graph.state.nodes[nodeId]?.label) return;
+  store.dispatch(
+    setGraph({ scopeId, graph: graph.setNodeLabel(nodeId, label).toJSON() })
+  );
+}
+
 /** スコープの apex から型・IDのオブジェクトを読む */
 export function readFromScope<T>(
   store: StoreLike,
@@ -181,16 +387,23 @@ export function readFromScope<T>(
 
 /**
  * オブジェクトを「監視している世界線すべて」へ保存する。
- * 記述子の localScope が示すローカル世界線にも記録する（複数オブジェクトが同じスコープに
- * 相乗りする＝case B）。各オブジェクトがそのスコープに初登場するときは、編集前の状態を
- * 起点として先に記録する（まとめて巻き戻したとき元に戻れる）。
+ *
+ * live な型は、記述子が宣言する本籍（homeScope）のローカル世界線にも記録する
+ * （複数オブジェクトが同じスコープに相乗りする＝case B）。各オブジェクトがそのスコープに
+ * 初登場するときは、編集前の状態を起点として先に記録する（まとめて巻き戻したとき元に戻れる）。
+ *
+ * アプリ全体スコープには常に書く。ここは「全世界の最新値インデックス」で、
+ * 勤務表一覧やスタッフ詳細のような**世界をまたぐ問い合わせ**がこれを読む。
  */
 export function saveObject(store: StoreLike, type: string, obj: unknown): void {
   const d = getDescriptor(type);
   if (!d) throw new Error(`save: type "${type}" が未登録です`);
 
-  const localId = d.localScope?.(obj);
+  const localId = homeScopeOf(type, d.getId(obj));
   if (localId) {
+    // 世界がまだ無ければ、ここで生まれる（持ち主一式＋固定メンバーを1ノードで）
+    ensureWorldBorn(store, localId);
+    // 既に生まれている世界に**初登場**する型は、編集前を起点として先に置く
     ensureLocalBaseline(store, localId, type, obj);
     commitToScope(store, localId, type, obj);
   }
@@ -240,7 +453,13 @@ export function saveLocalBundle(
     wanted.set(`${item.type}:${id}`, { type: item.type, id });
   }
 
-  const baselines = [...wanted.values()]
+  // 世界がまだ無ければ、ここで生まれる（持ち主一式＋固定メンバーを1ノードで）。
+  // 起点に置く値は baseline（呼び出し側が持っている編集前）を優先する。
+  ensureWorldBorn(store, localScopeIdValue, baseline);
+
+  // 既に生まれている世界に**初登場**する型は、編集前の状態を起点として先に置く。
+  // 誕生のときにはまだ存在しなかった型（後から作られる制約など）がこれにあたる。
+  const lateBaselines = [...wanted.values()]
     .map(({ type, id }) => {
       if (everInScope(store, localScopeIdValue, type, id)) return undefined;
       const given = baseline?.find((b) => b.type === type && idOf(b) === id);
@@ -250,22 +469,8 @@ export function saveLocalBundle(
         : refInScope(store, APP_SCOPE_ID, type, id);
     })
     .filter((ref): ref is StateRef => ref !== undefined);
-  const creatingRoot = isScopeEmpty(store, localScopeIdValue);
-  growWithRefs(store, localScopeIdValue, baselines);
-  if (creatingRoot && baselines.length > 0) {
-    // 起点は人の操作に対応しないノードなので、そう読めるよう名前を付ける
-    // （付けないと「同じ状態が2つ並んでいる」ように見える）。
-    const graph = graphOf(store, localScopeIdValue);
-    const rootId = graph.state.rootNodeId;
-    if (rootId) {
-      store.dispatch(
-        setGraph({
-          scopeId: localScopeIdValue,
-          graph: graph.setNodeLabel(rootId, "編集前").toJSON(),
-        })
-      );
-    }
-  }
+  growWithRefs(store, localScopeIdValue, lateBaselines);
+
   commitBundle(store, localScopeIdValue, items);
   for (const { type, obj } of items) {
     commitToScope(store, APP_SCOPE_ID, type, obj);
@@ -308,10 +513,15 @@ function ensureLocalBaseline(
  *
  * 「グローバルにもテンプレートがあり、新しい世界線オリジンが作られるときにグローバルのものを
  *  スコープ内へコピーして独自版にする」という、よくあるパターンの標準 API。
- * 使い方: 取り込む型に localScope（origin スコープへ束ねる規約）を付けておき、origin 作成時に
+ * 使い方: 取り込む型を live にして homeScope（origin スコープへ束ねる規約）を宣言しておき、
+ * origin 作成時に
  *   adoptGlobalObject(store, WORKSHIFT_SET_TYPE, set => set.withId(scheduleId), GLOBAL_ID)
  * を呼ぶ。transform でグローバル値の id を origin 用へ差し替えると、saveObject が記述子の
- * localScope を見て origin スコープ＋APP_SCOPE の両方へ記録する（以後 origin の世界線に載る）。
+ * homeScope を見て origin スコープ＋APP_SCOPE の両方へ記録する（以後 origin の世界線に載る）。
+ *
+ * 固定メンバー（pinned）とは別物なので混同しないこと。こちらは **id を差し替えて別の
+ * オブジェクトにする**（勤務表ごとの独自セット）。pinned は同じオブジェクトの参照を
+ * そのまま焼き付ける（スタッフは勤務表ごとに別人にはならない）。
  *
  * グローバル値が未投入なら undefined を返す（呼び出し側で既定生成へフォールバック可能）。
  */
@@ -321,11 +531,27 @@ export function adoptGlobalObject<T>(
   transform: (global: T) => T,
   globalId: string
 ): T | undefined {
-  const global = readFromScope<T>(store, APP_SCOPE_ID, type, globalId);
-  if (global === undefined) return undefined;
-  const adopted = transform(global);
+  const adopted = adoptGlobalValue<T>(store, type, transform, globalId);
+  if (adopted === undefined) return undefined;
   saveObject(store, type, adopted);
   return adopted;
+}
+
+/**
+ * グローバルの現在値を読み、transform した値を返す（**保存はしない**）。
+ *
+ * 誕生を1ノードにまとめたいときに使う。ここで saveObject してしまうと、
+ * その1件だけで世界が生まれてしまい、固定メンバーの載らない起点ができる。
+ */
+export function adoptGlobalValue<T>(
+  store: StoreLike,
+  type: string,
+  transform: (global: T) => T,
+  globalId: string
+): T | undefined {
+  const global = readFromScope<T>(store, APP_SCOPE_ID, type, globalId);
+  if (global === undefined) return undefined;
+  return transform(global);
 }
 
 /**
@@ -335,8 +561,8 @@ export function adoptGlobalObject<T>(
  * - 各案は共通の親から grow する：apex に子ができると grow が自動でブランチを作る仕様なので、
  *   2案目以降は親へ moveTo してから grow すると兄弟になる。各ノードに label を付ける。
  * - extras があればその案の Schedule と同一ノードに載せる（例: ScheduleEditLog）。
- * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移し、その状態をアプリ全体
- *   スコープへも反映する（世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
+ * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移す
+ *   （世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
  * 返り値: 親ノードIDと、書き込んだ各案のノードID。
  */
 export function commitCandidates(
@@ -346,9 +572,9 @@ export function commitCandidates(
   baseObj: unknown,
   candidates: { obj: unknown; label?: string; extras?: BundleItem[] }[]
 ): { parentNodeId: string; nodeIds: string[] } {
-  if (isScopeEmpty(store, scopeId)) {
-    commitToScope(store, scopeId, type, baseObj); // root = 現状（共通の親）
-  }
+  // 共通の親（root）を作るのも誕生の一種。作る場所は ensureWorldBorn 一本にする
+  // （ここで commitToScope すると勤務表だけの起点ができ、固定メンバーが載らない）。
+  ensureWorldBorn(store, scopeId, [{ type, obj: baseObj }]);
   const parentNodeId = graphOf(store, scopeId).state.apexNodeId as string;
   const nodeIds: string[] = [];
 
@@ -359,27 +585,23 @@ export function commitCandidates(
       store.dispatch(setGraph({ scopeId, graph: moved.toJSON() }));
     }
     const items: BundleItem[] = [{ type, obj: c.obj }, ...(c.extras ?? [])];
+    // ラベルを付けてよいのは「この commit で生まれたノード」だけ。案が既存の状態と
+    // 一致すると grow はスナップして既存ノードへ移るので、その名前を奪わない。
+    const knownNodeIds = new Set(Object.keys(graphOf(store, scopeId).state.nodes));
     commitBundle(store, scopeId, items);
-    const g = graphOf(store, scopeId);
-    const apex = g.state.apexNodeId as string;
+    const apex = graphOf(store, scopeId).state.apexNodeId as string;
     nodeIds.push(apex);
-    if (c.label) {
-      store.dispatch(setGraph({ scopeId, graph: g.setNodeLabel(apex, c.label).toJSON() }));
-    }
+    if (c.label) labelIfNew(store, scopeId, apex, knownNodeIds, c.label);
   });
 
-  // 案1に着地：ローカル apex を案1へ移し、そのノードの全オブジェクトをアプリ全体へ反映する
+  // 案1に着地：ローカル apex を案1へ移す。
+  // 読みもこの世界からなので、移すだけで画面が案1になる（以前はここで案1の状態を
+  // アプリ全体スコープへ書き戻していた。restore と同じ橋渡しで、もう要らない）。
   const landing = nodeIds[0];
   if (landing) {
-    store.dispatch(setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landing).toJSON() }));
-    const g = graphOf(store, scopeId);
-    for (const ref of g.getStateRefsAt(landing)) {
-      const d = getDescriptor(ref.type);
-      if (!d) continue;
-      const data = store.getState().worldLineGraph?.cas?.[ref.hash];
-      if (data === undefined || data === null) continue;
-      commitToScope(store, APP_SCOPE_ID, ref.type, codecOf(d).fromJSON(data));
-    }
+    store.dispatch(
+      setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landing).toJSON() })
+    );
   }
 
   return { parentNodeId, nodeIds };

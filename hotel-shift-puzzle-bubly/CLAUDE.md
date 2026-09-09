@@ -85,17 +85,107 @@ hotel-shift-puzzle-app/src/
     routing 束縛なので app の関心事。`getId`/`serialize` 等の intrinsic な側面だけ libs に残す
   - UI 側は `ObjectView` に URL を渡すだけ。展開・data-url・openBubble・opener 解決は
     ObjectView に一任する（自前で UrledPlace＋openBubble を組まない）
+---
+
+## 世界線スコープ：所属・誕生・読み先
+
+このバブリのルールは3つだけ。分岐を増やさないこと。
+
+1. **オブジェクトの住所は1つ。** 所属は型の宣言（記述子の `membership`）だけで決まり、
+   読み・保存・削除が同じ解決式を共有する。
+2. **世界の誕生は1回・1ノード。** 持ち主と固定メンバーの**参照**を同じ grow に混ぜて起点に置く。
+   値は読まない（CAS から追い出されていても焼き付けが欠けないため）。
+3. **読みは世界線を進めない。** レンダー・effect の経路は絶対に grow しない。
+
+### メンバーの3分類（`objects/framework.tsx` の `Membership`）
+
+| 分類 | 意味 | 例 |
+|---|---|---|
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkShiftSet(勤務表用) / ScheduleAvailability / ScheduleConstraints / ScheduleEditLog |
+| `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
+| `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
+
+```typescript
+Staff:    { membership: { kind: "pinned" } }
+Schedule: {
+  membership: { kind: "live", homeScope: (id) => localScopeId(SCHEDULE_TYPE, id) },
+  scope: { pins: [STAFF_TYPE] },   // この世界が生まれるとき誰を連れてくるか
+}
+```
+
+- **宣言は両側に要る**。メンバー側の `membership` が「私はどう読まれるか」、
+  オーナー側の `scope.pins` が「誕生時に誰を連れるか」。pinned はメンバー側だけでは
+  「どのスコープへ焼くか」を言えない。
+- `homeScope` の引数は **obj ではなく id**。`removeObject(type, id)` はオブジェクトを
+  手に持たずに呼ばれるので、obj を要求すると削除だけ住所を解決できない。
+  全 live 型で id はスコープの持ち主 ID に等しい（`ScheduleAvailability.id` は `scheduleId`）。
+
+### 読み先（`objects/world.tsx` の `readScopeOf`）
+
+「どの世界にいるか」（`World` / `ScheduleWorld` の Context）と「その型はどう属すか」（`membership`）の
+積で決まる。だから `useObjects(type)` の呼び出し側は型しか書かない。
+
+```typescript
+if (membershipOf(type).kind === "external") return world.app;  // 常にグローバル
+if (!world.born) return world.app;   // 誕生していない世界は存在しない（安全網）
+return world.here;                   // メンバーはいま居る世界。参照が無ければ「無い」
+```
+
+**「その世界に無ければグローバルを見る」という ref 単位のフォールバックを入れてはいけない。**
+起点より前のノードへ戻ったときに、そこにグローバルの最新値が現れてしまう。
+`born` は**スコープ単位**なので安全（誕生前の世界には時間移動もできない）。
+
+バブルルートは全てトップレベルで個別に Provider に包まれる（親子にならない）ので、
+勤務表に属するバブルは自分で `<ScheduleWorld scheduleId={...}>` を張る（`feature/ScheduleWorld.tsx`）。
+
+### 誕生（`objects/commit.ts` の `ensureWorldBorn`）
+
+- 世界を作る場所は**この1関数だけ**。`saveObject` / `saveLocalBundle` / `commitCandidates` は
+  全部これを通る。誕生が部分的だと、起点に載っていない型が時間移動で戻らない（#110）。
+- 勤務表を作る＝その世界が生まれる。`feature/createSchedule.ts` が1 grow で
+  勤務表・勤務帯セット・可能勤務帯・固定メンバーをまとめて起点に置く。
+  `repo.save` を複数回呼ぶと1回目で世界が生まれてしまい、起点が欠ける。
+- 例データ投入・ファイル読み込みの直後は `bornWorldsOf(store, items)` で世界をまとめて誕生させる。
+
+### 「読めない」と「無い」を分ける（`isAbsentInScope`）
+
+メモリ上の CAS は 300 件で頭打ちなので、値が読めない理由は「本当に無い」と
+「追い出された」の2つある。**既定値を作って保存してよいのは前者だけ。**
+後者でやると中身のあるオブジェクトを空で上書きする（＝見ているだけでデータが壊れる）。
+判定は必ず参照（グラフ）で行う。参照は追い出されない。
+`useObjectsPending()` は「いま状態が揃っていない」を返すので、
+「無ければ作る」effect はこれで待つこと。
+
+### 時間移動
+
+読みもその世界からなので、**`scope.moveTo(nodeId)` だけで画面が変わる**。
+以前あった restore（ローカルの状態をアプリ全体スコープへ書き戻す橋渡し）は撤去した。
+世界線ビューは共通の `WorldLineScopeView`（既定 `onSelectNode` ＋ `moveToSiblingBranch`）を
+そのまま使う。囲碁など他のバブリと同じ形。
+
+### グローバル台帳（`APP_SCOPE_ID = "hotel"`）
+
+`saveObject` は本籍のローカル世界線に加えて**必ずここにも書く**。ここは
+「全世界の最新値インデックス」で、勤務表一覧やスタッフ詳細のような
+**世界をまたぐ問い合わせ**がこれを読む。時間移動はしない（常に最新）。
+
+---
+
 - **グローバル型を origin スコープへ取り込むパターン**（テンプレート → 世界線独自コピー）：
   「グローバルにもテンプレートがあり、新しい origin（勤務表など＝世界線の起点）が作られるとき、
   グローバルのものをその origin のスコープ内へコピーして独自版にする」よくある形。
-  - 取り込む型は、id が origin 用のときだけ origin のローカル世界線へ束ねるよう `localScope` を
+  **固定メンバー（pinned）とは別物**。こちらは **id を差し替えて別オブジェクトにする**
+  （勤務表ごとの独自セット）。pinned は同じオブジェクトの参照をそのまま焼き付ける
+  （スタッフは勤務表ごとに別人にはならない）。
+  - 取り込む型は、id が origin 用のときだけ origin のローカル世界線へ束ねるよう `homeScope` を
     宣言する（グローバル固定IDのときは `undefined`）。例（`objects/hotelObjects.tsx` の `WorkShiftSet`）:
-    `localScope: (s) => s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id)`
+    `homeScope: (id) => id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id)`
   - グローバルのテンプレートは固定ID（例 `"global"`）で1つ持ち、専用バブルで編集する。
   - origin 作成時に **`adoptGlobalObject(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
     （`objects/commit.ts`）を呼ぶ。これはグローバル現在値を読み、id を origin 用へ差し替えて
-    `saveObject` するだけ。`saveObject` が `localScope` を見て origin スコープ＋APP_SCOPE の両方へ
+    `saveObject` するだけ。`saveObject` が `homeScope` を見て origin スコープ＋APP_SCOPE の両方へ
     記録するので、以後その型の編集は origin の世界線に載る（時間移動で一緒に戻る）。
+    誕生を1ノードにまとめたいときは、保存しない `adoptGlobalValue` を使う。
   - 集約側には id を差し替えつつ中身（子の id 等）を保つコピー用メソッド（例 `WorkShiftSet.withId`）を
     生やす。ドメインは新規 id を採番しない（採番は feature 層）。
   - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と

@@ -44,6 +44,7 @@ import {
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ExtractedScheduleProps = {
   scheduleId?: string;
@@ -62,7 +63,7 @@ type ExtractedScheduleProps = {
  *   - 解決案生成（責任者ルールを満たす完成案を複数、世界線に書く）
  * 対象スタッフ＝抽出した subset を staffList として渡すことで、各ステップが自然に subset 限定になる。
  */
-export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
+const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   scheduleId,
   staffIds,
 }) => {
@@ -231,20 +232,19 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
       const obj = buildCandidate(i);
       const label = `案${i + 1}`;
+      // ログが読めないときは履歴を付けない（案そのものは記録する）
+      const editLog = buildCandidateEditLog(store, {
+        baseSchedule: schedule,
+        candidate: obj,
+        constraints: allConstraints,
+        label,
+      });
       return {
         obj,
         label,
-        extras: [
-          {
-            type: SCHEDULE_EDIT_LOG_TYPE,
-            obj: buildCandidateEditLog(store, {
-              baseSchedule: schedule,
-              candidate: obj,
-              constraints: allConstraints,
-              label,
-            }),
-          },
-        ],
+        extras: editLog
+          ? [{ type: SCHEDULE_EDIT_LOG_TYPE, obj: editLog }]
+          : [],
       };
     });
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
@@ -402,3 +402,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ExtractedSchedule: FC<ExtractedScheduleProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ExtractedScheduleBody {...props} />
+  </ScheduleWorld>
+);
