@@ -64,9 +64,21 @@ describe('decodeWishForStaff（×で候補を絞る）', () => {
     expect(decode(w)).toEqual({ kind: 'neutral' });
   });
 
-  test('旧データの「勤務帯○」は、その帯を希望していると読む', () => {
+  test('「勤務帯○」は、その帯を希望していると読む', () => {
     const w = empty().setPreference(d1, workWishKey('遅番'), 'want');
     expect(decode(w)).toEqual({ kind: 'work', shiftId: 'late' });
+  });
+
+  test('入力表で○を付けた日（2クリック）は、その帯に決まる', () => {
+    const w = click(click(empty(), workWishKey('遅番')), workWishKey('遅番'));
+    expect(decode(w)).toEqual({ kind: 'work', shiftId: 'late' });
+  });
+
+  test('○が2帯なら neutral（どちらかは需要充足に委ねる）', () => {
+    const twice = (acc: StaffMonthlyShiftWish, name: string) =>
+      click(click(acc, workWishKey(name)), workWishKey(name));
+    const w = twice(twice(empty(), '早番'), '中番');
+    expect(decode(w)).toEqual({ kind: 'neutral' });
   });
 
   test('この勤務表に無い帯の希望は決め手にならない（ambiguous）', () => {

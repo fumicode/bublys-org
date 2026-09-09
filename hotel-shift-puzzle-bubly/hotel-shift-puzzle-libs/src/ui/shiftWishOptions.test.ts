@@ -8,7 +8,7 @@ import {
   workWishKey,
 } from './shiftWishOptions.js';
 
-describe('シフト希望の入力ルール（休みと勤務帯×は排他・後勝ち）', () => {
+describe('シフト希望の入力ルール（休みと勤務帯の希望は排他・後勝ち）', () => {
   const d1 = WorkingDay.of(2026, 6, 1);
   const d2 = WorkingDay.of(2026, 6, 2);
   const early = workWishKey('早番');
@@ -26,9 +26,10 @@ describe('シフト希望の入力ルール（休みと勤務帯×は排他・�
     StaffMonthlyShiftWish.create({ staffId: 'staff-A', year: 2026, month: 6 });
 
   describe('wishMarkOf（表示する1文字）', () => {
-    test('休みは「休」・勤務帯は「×」', () => {
-      expect(wishMarkOf(DAY_OFF_WISH)).toBe('休');
-      expect(wishMarkOf(early)).toBe('×');
+    test('休みは「休」・勤務帯は ×（入れない）と ○（入りたい）', () => {
+      expect(wishMarkOf(DAY_OFF_WISH, 'want')).toBe('休');
+      expect(wishMarkOf(early, 'avoid')).toBe('×');
+      expect(wishMarkOf(early, 'want')).toBe('○');
     });
   });
 
@@ -42,12 +43,25 @@ describe('シフト希望の入力ルール（休みと勤務帯×は排他・�
       expect(cleared.isEmptyOn(d1)).toBe(true);
     });
 
-    test('勤務帯列は 空 → ×（avoid）→ 空 を往復する', () => {
+    test('勤務帯列は 空 → ×（avoid）→ ○（want）→ 空 と一巡する', () => {
       const avoided = click(empty(), d1, early);
       expect(avoided.preferenceFor(d1, early)).toBe('avoid');
 
-      const cleared = click(avoided, d1, early);
+      const wanted = click(avoided, d1, early);
+      expect(wanted.preferenceFor(d1, early)).toBe('want');
+
+      const cleared = click(wanted, d1, early);
       expect(cleared.preferenceFor(d1, early)).toBeUndefined();
+      expect(cleared.isEmptyOn(d1)).toBe(true);
+    });
+
+    test('勤務帯○は同じ日に複数入れられる（どの帯でもいい＝候補が複数）', () => {
+      const w = [early, early, middle, middle].reduce(
+        (acc, key) => click(acc, d1, key),
+        empty()
+      );
+      expect(w.preferenceFor(d1, early)).toBe('want');
+      expect(w.preferenceFor(d1, middle)).toBe('want');
     });
 
     test('勤務帯×は同じ日に複数入れられる（入れない帯が複数あるだけ）', () => {
@@ -56,11 +70,12 @@ describe('シフト希望の入力ルール（休みと勤務帯×は排他・�
       expect(w.preferenceFor(d1, late)).toBe('avoid');
     });
 
-    test('休みを入れると、その日の勤務帯×はすべて消える（後勝ち）', () => {
-      const avoided = click(click(empty(), d1, early), d1, late);
-      const w = click(avoided, d1, DAY_OFF_WISH);
+    test('休みを入れると、その日の勤務帯の希望（×も○も）はすべて消える（後勝ち）', () => {
+      const marked = click(click(click(empty(), d1, early), d1, early), d1, late);
+      expect(marked.preferenceFor(d1, early)).toBe('want');
+      expect(marked.preferenceFor(d1, late)).toBe('avoid');
 
-      expect(w.preferenceFor(d1, DAY_OFF_WISH)).toBe('want');
+      const w = click(marked, d1, DAY_OFF_WISH);
       expect(w.wishesOn(d1)).toEqual({ [DAY_OFF_WISH]: 'want' });
     });
 
@@ -78,10 +93,10 @@ describe('シフト希望の入力ルール（休みと勤務帯×は排他・�
       expect(w.preferenceFor(d1, DAY_OFF_WISH)).toBe('want');
     });
 
-    test('旧データの勤務帯○は、1クリックで×になる（新仕様へ寄せる）', () => {
-      const legacy = empty().setPreference(d1, early, 'want');
-      const w = click(legacy, d1, early);
-      expect(w.preferenceFor(d1, early)).toBe('avoid');
+    test('旧データの「休み×（出勤したい）」は、1クリックで休みになる（新仕様へ寄せる）', () => {
+      const legacy = empty().setPreference(d1, DAY_OFF_WISH, 'avoid');
+      const w = click(legacy, d1, DAY_OFF_WISH);
+      expect(w.preferenceFor(d1, DAY_OFF_WISH)).toBe('want');
     });
 
     test('すべての勤務帯に×を付けると、自動で休みになる（×は消える）', () => {
@@ -100,6 +115,19 @@ describe('シフト希望の入力ルール（休みと勤務帯×は排他・�
         empty()
       );
       expect(click(folded, d1, DAY_OFF_WISH).isEmptyOn(d1)).toBe(true);
+    });
+
+    test('○の帯があれば、残りが全部×でも休みには畳まない（入れる帯が残っている）', () => {
+      const w = [early, early, middle, late].reduce(
+        (acc, key) => click(acc, d1, key),
+        empty()
+      );
+      expect(w.wishesOn(d1)).toEqual({
+        [early]: 'want',
+        [middle]: 'avoid',
+        [late]: 'avoid',
+      });
+      expect(isDayOffChosen(w, d1)).toBe(false);
     });
 
     test('元のインスタンスは変わらない（不変）', () => {

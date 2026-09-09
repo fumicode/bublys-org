@@ -34,17 +34,17 @@ export type { AutoShiftStep, AutoShiftStepResult };
 /**
  * その日のその人の希望を、自動シフトが扱える形にデコードする。
  *
- * 入力仕様（#74）は「休」か「勤務帯×の集合」のどちらか一方なので、× は**その日に入れる帯を
+ * 入力仕様は「休」か「勤務帯ごとの×／○」のどちらか一方なので、×・○は**その日に入れる帯を
  * 絞り込むもの**として読む:
  *   - 休みたい                     → day-off
- *   - × を除いた残りが1帯だけ       → work（その帯に決まる）
- *   - × を除いた残りが2帯以上       → neutral（需要充足ステップが残りから選ぶ）
+ *   - 絞った候補が1帯だけ           → work（その帯に決まる）
+ *   - 絞った候補が2帯以上           → neutral（需要充足ステップが残りから選ぶ）
  *   - × で全帯が消えた             → day-off（入れる帯が無い＝休みたい。入力表と同じ扱い）
  *   - 希望なし                     → neutral
  *
- * 旧データに残る「勤務帯○（want）」は、その帯を希望していると読み、○以外を×と同じ扱いにする
- * （＝「早番○」と「中番×・遅番×」が同じ結論になる）。ただし○の帯がこの勤務表に無い場合は
- * 休みたいという意味ではないので ambiguous（人間へ）。
+ * 候補の絞り方は「○が付いていれば○の帯だけ、無ければ×を除いた残り」。つまり「早番○」と
+ * 「中番×・遅番×」は同じ結論になる。ただし○の帯がこの勤務表に無い場合は休みたいという
+ * 意味ではないので ambiguous（人間へ）。
  */
 /** その日のその人の希望をデコードする（シフト提案ポリシー等からも利用） */
 export const decodeWishForStaff = (
@@ -87,16 +87,25 @@ export const decodeWishForStaff = (
 };
 
 /**
- * その日その人が、その勤務帯に入れるか（希望の×を見る）。
+ * その日その人が、その勤務帯に入れるか（希望の×／○を見る）。
+ * 候補の絞り方は decodeWishForStaff と同じ：○があれば○の帯だけ、無ければ×を除いた残り。
+ * ただし○の帯がこの勤務表に無いときは絞り込まない（絞ると埋められるセルが無くなるため）。
  * 可能勤務帯（ScheduleAvailability）と AND して AutoShiftContext.isAvailable にする。
  */
-const isNotAvoided = (
+const isWishedShift = (
   wish: StaffMonthlyShiftWish | undefined,
   day: WorkingDay,
-  shiftName: string | undefined
+  shiftName: string | undefined,
+  shiftIdByName: Map<string, string>
 ): boolean => {
   if (!wish || !shiftName) return true;
-  return wish.preferenceFor(day, workWishKey(shiftName)) !== "avoid";
+  const wishes = wish.wishesOn(day);
+  const wantedNames = Object.keys(wishes)
+    .filter((k) => isWorkWish(k) && wishes[k] === "want")
+    .map(workWishName)
+    .filter((name) => shiftIdByName.has(name));
+  if (wantedNames.length > 0) return wantedNames.includes(shiftName);
+  return wishes[workWishKey(shiftName)] !== "avoid";
 };
 
 export type AutoShiftParams = {
@@ -143,10 +152,15 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     shiftNameById,
     preferenceOf: (staffId, day) =>
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    // 「入れるか」は 可能勤務帯（人ごと・月通し） AND その日の希望×（日ごと） で決まる。
+    // 「入れるか」は 可能勤務帯（人ごと・月通し） AND その日の希望×／○（日ごと） で決まる。
     isAvailable: (staffId, shiftId, day) =>
       (!availability || availability.isAllowed(staffId, shiftId)) &&
-      isNotAvoided(wishByStaff.get(staffId), day, shiftNameById.get(shiftId)),
+      isWishedShift(
+        wishByStaff.get(staffId),
+        day,
+        shiftNameById.get(shiftId),
+        shiftIdByName
+      ),
     maxConsecutive,
     minDayOff,
     maxDayOffPerDay,

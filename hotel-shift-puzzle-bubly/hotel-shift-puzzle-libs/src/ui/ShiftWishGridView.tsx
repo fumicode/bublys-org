@@ -5,10 +5,15 @@ import styled from "styled-components";
 import {
   DAY_OFF_WISH,
   isBlockedByDayOff,
+  nextWishPreference,
   wishMarkOf,
-  wishPreferenceOf,
+  wishMeaningOf,
 } from "./shiftWishOptions.js";
-import { StaffMonthlyShiftWish, WorkingDay } from "../domain/index.js";
+import {
+  StaffMonthlyShiftWish,
+  WorkingDay,
+  type ShiftWishPreference,
+} from "../domain/index.js";
 
 type WishOption = { key: string; label: string };
 
@@ -22,39 +27,42 @@ type ShiftWishGridViewProps = {
   readOnly?: boolean;
 };
 
-/**
- * 新仕様に無い極性（旧データの「勤務帯○」など）が残っていたときの表示。
- * 押せば新仕様のマーク（×）に寄る。
- */
-const LEGACY_MARK: Record<string, string> = { want: "○", avoid: "×" };
+/** そのセルの見た目（マークの色分け） */
+const cellClass = (
+  optionKey: string,
+  pref: ShiftWishPreference | undefined
+): string => {
+  if (!pref) return "";
+  if (optionKey === DAY_OFF_WISH) return pref === "want" ? "is-day-off" : "is-avoid";
+  return pref === "want" ? "is-want" : "is-avoid";
+};
 
 /** そのセルの今の意味と、押したらどうなるかを説明する */
 const cellTitle = (
   dayLabel: string,
   option: WishOption,
-  pref: string | undefined,
+  pref: ShiftWishPreference | undefined,
   blocked: boolean,
   readOnly: boolean
 ): string => {
-  const isDayOffOption = option.key === DAY_OFF_WISH;
-  const meaning = pref
-    ? isDayOffOption
-      ? "この日は休みたい"
-      : "この帯には入れない"
-    : "希望なし";
-  const head = `${dayLabel} ${option.label}: ${meaning}`;
+  const head = `${dayLabel} ${option.label}: ${wishMeaningOf(option.key, pref)}`;
   if (readOnly) return head;
-  if (blocked) return `${head}（休み希望の日。押すと休みが外れて「入れない」になります）`;
-  if (pref) return `${head}（押すと取り消します）`;
-  return `${head}（押すと「${isDayOffOption ? "休みたい" : "この帯には入れない"}」になります）`;
+
+  const next = nextWishPreference(option.key, pref);
+  const becomes = next
+    ? `「${wishMeaningOf(option.key, next)}」になります`
+    : "希望なしに戻ります";
+  if (blocked) return `${head}（休み希望の日。押すと休みが外れて${becomes}）`;
+  return `${head}（押すと${becomes}）`;
 };
 
 /**
  * 稼働日（行）× オプション（列）の希望表。
  *
- * 入力できるのは1日につき「休」か「勤務帯×の集合」のどちらか一方で、クリックすると
- * そのマークが入る／外れる。休み希望の日は勤務帯セルに斜線が入り、そこを押すと
- * 休みが外れて×が入る（後勝ち。ルールは shiftWishOptions が持つ）。
+ * 入力できるのは1日につき「休」か「勤務帯ごとの×／○」のどちらか一方。セルは押すたびに
+ * 一巡する（休み列は 空欄→休→空欄、勤務帯列は 空欄→×→○→空欄）。休み希望の日は勤務帯
+ * セルに斜線が入り、そこを押すと休みが外れて×が入る（後勝ち。ルールは shiftWishOptions
+ * が持つ）。
  */
 export const ShiftWishGridView: FC<ShiftWishGridViewProps> = ({
   wish,
@@ -90,17 +98,14 @@ export const ShiftWishGridView: FC<ShiftWishGridViewProps> = ({
               </td>
               {options.map((o) => {
                 const pref = wish.preferenceFor(day, o.key);
-                const marked = pref === wishPreferenceOf(o.key);
                 const blocked = isBlockedByDayOff(wish, day, o.key);
-                const isDayOffOption = o.key === DAY_OFF_WISH;
                 return (
                   <td
                     key={o.key}
                     role="button"
                     className={[
                       "e-cell",
-                      marked ? (isDayOffOption ? "is-day-off" : "is-avoid") : "",
-                      !marked && pref ? "is-legacy" : "",
+                      cellClass(o.key, pref),
                       blocked ? "is-blocked" : "",
                       readOnly ? "is-readonly" : "",
                     ]
@@ -109,7 +114,7 @@ export const ShiftWishGridView: FC<ShiftWishGridViewProps> = ({
                     title={cellTitle(day.label, o, pref, blocked, readOnly)}
                     onClick={readOnly ? undefined : () => onToggle(day, o.key)}
                   >
-                    {pref ? (marked ? wishMarkOf(o.key) : LEGACY_MARK[pref]) : ""}
+                    {pref ? wishMarkOf(o.key, pref) : ""}
                   </td>
                 );
               })}
@@ -184,10 +189,10 @@ const StyledTable = styled.table`
       background-color: #ffebee;
       color: #c62828;
     }
-    /* 旧データの ○ など、新仕様に無い極性 */
-    &.is-legacy {
-      background-color: #f5f5f5;
-      color: #9e9e9e;
+    /* ○（この帯に入りたい） */
+    &.is-want {
+      background-color: #e8f5e9;
+      color: #2e7d32;
     }
     /*
      * 休み希望の日の勤務帯セル。斜線で「今は選べない」ことを示す。
