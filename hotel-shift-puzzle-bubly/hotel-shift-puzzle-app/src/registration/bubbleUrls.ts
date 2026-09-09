@@ -82,6 +82,14 @@ export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-
  */
 export const worldFileUrl = (): string => `hotel-shift-puzzle/file`;
 
+/**
+ * 世界線インスペクタ（デバッグ用）。
+ * メモリ（Redux の CAS）と IndexedDB に何が入っているかを覗く。
+ * 特定の勤務表ではなく世界線の仕組みそのものを見るので、トップレベルに置く。
+ */
+export const worldLineInspectorUrl = (): string =>
+  `hotel-shift-puzzle/world-line-inspector`;
+
 /** 操作履歴（ノウハウ可視化）バブル */
 export const scheduleEditLogUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;

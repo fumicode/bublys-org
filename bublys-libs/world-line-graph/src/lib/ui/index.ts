@@ -17,3 +17,11 @@ export {
   type OrganicPetal,
   type OrganicTreeOptions,
 } from "./organicTree.js";
+export {
+  WorldLineInspectorView,
+  type WorldLineInspectorViewProps,
+  type InspectorNodeRow,
+  type InspectorRefRow,
+  type InspectorScopeRow,
+  type RefLocation,
+} from "./WorldLineInspectorView.js";

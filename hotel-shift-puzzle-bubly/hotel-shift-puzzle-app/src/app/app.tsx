@@ -2,6 +2,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import SaveIcon from '@mui/icons-material/Save';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -25,6 +26,11 @@ const menuItems: BublyMenuItem[] = [
   { label: '勤務帯', url: 'hotel-shift-puzzle/work-shifts', icon: <ScheduleIcon /> },
   { label: '勤務表', url: 'hotel-shift-puzzle/schedules', icon: <CalendarMonthIcon /> },
   { label: 'ファイル', url: 'hotel-shift-puzzle/file', icon: <SaveIcon /> },
+  {
+    label: '世界線インスペクタ',
+    url: 'hotel-shift-puzzle/world-line-inspector',
+    icon: <BugReportIcon />,
+  },
 ];
 
 export function App() {
