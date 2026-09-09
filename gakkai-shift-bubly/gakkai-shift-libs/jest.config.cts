@@ -18,4 +18,6 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
+  // まだテストを持たないライブラリ。0 件を失敗にしない
+  passWithNoTests: true,
 };
