@@ -1,94 +1,136 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { useAppDispatch } from "@bublys-org/state-management";
-import { CoordinateSystem, type Size2 } from "@bublys-org/bubbles-ui-util";
-import { Bubble } from "../Bubble.domain.js";
+import { Layer, type Point2, type Size2 } from "@bublys-org/bubbles-ui-util";
+import { Bubble, type ResizeEdge } from "../Bubble.domain.js";
+import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { updateBubble } from "../state/bubbles-slice.js";
+
+/** どの辺／隅を掴んだか（掴んだ辺の反対側が固定される） */
+export type ResizeDirection = ResizeEdge;
 
 type UseBubbleResizeArgs = {
   bubble: Bubble;
   ref: React.RefObject<HTMLElement | null>;
   /** このバブルが属するレイヤー。奥レイヤーは scale で縮小表示されるため変換に必要。 */
   layerIndex?: number;
+  /** 奥行きが収束する universe 座標。位置を動かすとき transform-origin の追従に要る。 */
+  vanishingPoint?: Point2;
 };
 
 const MIN_SIZE: Size2 = { width: 160, height: 100 };
 
 /**
- * バブル右下のリサイズハンドル用 hook。
+ * バブルの辺／隅のリサイズ hook（左・右・下・左下・右下）。
  *
- * 振る舞いは {@link useBubbleDrag} と対称的:
- *  - 開始時にバブルの実サイズ（getBoundingClientRect）を起点として記録
- *  - drag 中は DOM 直接操作で width/height を書き換え（transition off）
- *  - 終了時に 1 回だけ updateBubble を dispatch し、size を確定。
- *    同時に maximized: false を立てて「ユーザーがサイズを決めた」状態に遷移する
- *    （最大化状態だった場合はそれが解除される）
+ * ルール: **掴んだ辺の反対側が固定される**。
+ *
+ * 座標の扱いは {@link Layer}（空間の変換）と {@link Bubble.resizeByEdge}（位置とサイズの
+ * 更新規則）に任せ、この hook では scale やオフセットの掛け算・足し算を一切書かない。
+ * 手計算していたときは
+ *   - `style.left`（universe 座標）に scale を掛けた移動量を書いてしまう
+ *   - `bubble.position`（layer-local）が未定義のとき 0 で代用し、確定時に絶対位置へ飛ぶ
+ * という取り違えが起きた。起点は必ず「画面に出ている実物（DOM）」から作る。
  */
-export function useBubbleResize({ bubble, ref, layerIndex }: UseBubbleResizeArgs) {
+export function useBubbleResize({ bubble, ref, layerIndex, vanishingPoint }: UseBubbleResizeArgs) {
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
+  const { surfaceLeftTop } = useContext(BubblesContext);
 
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
-  const layerIndexRef = useRef(layerIndex);
-  layerIndexRef.current = layerIndex;
 
-  // サイズはレイヤーローカル座標で扱う（style.width/height はローカル、bubble.size もローカル）。
-  const startSizeRef = useRef<Size2 | null>(null);
-  const startMouseRef = useRef<{ x: number; y: number } | null>(null);
-  const currentSizeRef = useRef<Size2 | null>(null);
+  // バブルの位置は、どのレイヤーに居ても **universe（surface）座標の 1 つの空間**で持つ
+  // （BubblesLayeredView は全バブルを surface レイヤーで place する）。
+  // レイヤーが決めるのは**見た目の縮尺**だけなので、場合分けは要らない:
+  //   位置 ⇄ style.left/top … universe の面（下の frame）で変換する
+  //   画面の移動量 → モデル … その面の縮尺で割る（frame.atIndex(layerIndex)）
+  const frameRef = useRef<Layer>(new Layer(0, { x: 0, y: 0 }, { x: 0, y: 0 }));
+  frameRef.current = new Layer(0, surfaceLeftTop ?? { x: 0, y: 0 }, vanishingPoint ?? { x: 0, y: 0 });
+  /** このバブルの見た目の縮尺を持つ面（画面の移動量・実寸の変換に使う） */
+  const scaledFrame = () => frameRef.current.atIndex(layerIndex ?? 0);
+
+  const edgeRef = useRef<ResizeEdge>("se");
+  const startBubbleRef = useRef<Bubble | null>(null);
+  const startMouseRef = useRef<Point2 | null>(null);
+  const currentBubbleRef = useRef<Bubble | null>(null);
+
+  /** いまのバブルを DOM に反映する（位置・サイズ・transform-origin をまとめて） */
+  const paint = (b: Bubble) => {
+    const el = ref.current;
+    if (!el || !b.size) return;
+    const topLeft = frameRef.current.place(b.position);
+    const origin = scaledFrame().transformOriginFor(topLeft);
+    el.style.left = `${topLeft.x}px`;
+    el.style.top = `${topLeft.y}px`;
+    el.style.width = `${b.size.width}px`;
+    el.style.height = `${b.size.height}px`;
+    el.style.transformOrigin = `${origin.x}px ${origin.y}px`;
+    el.style.transition = "none";
+  };
 
   const handleResizing = (e: MouseEvent) => {
-    if (!startSizeRef.current || !startMouseRef.current || !ref.current) return;
-    // マウス移動は画面座標。奥レイヤーは scale で縮むので、ドラッグと同じ CoordinateSystem の核で
-    // 画面 delta → レイヤーローカル delta に変換してからローカルの起点サイズに足す。
+    if (!startBubbleRef.current || !startMouseRef.current) return;
     const screenDelta = {
       x: e.clientX - startMouseRef.current.x,
       y: e.clientY - startMouseRef.current.y,
     };
-    const coordSystem = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);
-    const localDelta = coordSystem.transformScreenDeltaToLocal(screenDelta);
-    const w = Math.max(MIN_SIZE.width, startSizeRef.current.width + localDelta.x);
-    const h = Math.max(MIN_SIZE.height, startSizeRef.current.height + localDelta.y);
-    currentSizeRef.current = { width: w, height: h };
-    ref.current.style.width = `${w}px`;
-    ref.current.style.height = `${h}px`;
-    ref.current.style.transition = "none";
+    const localDelta = scaledFrame().scaleScreenDelta(screenDelta);
+    // universe の左端（universe 座標 x=0）を layer-local に直して渡す。
+    // ドラッグ側は縁でクランプするので、リサイズだけ外に出られると戻れなくなる。
+    const universeLeft = frameRef.current.locate({ x: 0, y: 0 }).x;
+    const next = startBubbleRef.current.resizeByEdge(edgeRef.current, localDelta, MIN_SIZE, {
+      minX: universeLeft,
+    });
+    currentBubbleRef.current = next;
+    paint(next);
   };
 
   const endResize = () => {
-    if (currentSizeRef.current) {
-      const resized = bubbleRef.current.resizeTo(currentSizeRef.current);
+    const resized = currentBubbleRef.current;
+    if (resized) {
+      // サイズと位置は 1 回の更新でまとめて確定する（片方だけ先に反映されるとズレる）
       // 「ユーザーがサイズを決めた」状態 = maximized:false を明示的に立てる
       dispatch(updateBubble({ ...resized.toJSON(), maximized: false }, universeId));
     }
     if (ref.current) {
+      // transition だけ戻す。位置・サイズのインラインは残して React の再描画に上書きさせる
+      //（ここで消すと、React が新しい値を描くまでの 1 フレームだけ元の位置に戻って見える）
       ref.current.style.transition = "";
-      ref.current.style.width = "";
-      ref.current.style.height = "";
     }
-    startSizeRef.current = null;
+    startBubbleRef.current = null;
     startMouseRef.current = null;
-    currentSizeRef.current = null;
+    currentBubbleRef.current = null;
     document.removeEventListener("mousemove", handleResizing);
     document.removeEventListener("mouseup", endResize);
   };
 
-  const onResizeStart = (e: {
-    clientX: number;
-    clientY: number;
-    stopPropagation: () => void;
-    preventDefault?: () => void;
-  }) => {
+  const onResizeStart = (
+    e: {
+      clientX: number;
+      clientY: number;
+      stopPropagation: () => void;
+      preventDefault?: () => void;
+    },
+    edge: ResizeEdge = "se",
+  ) => {
     e.stopPropagation();
     e.preventDefault?.();
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    // getBoundingClientRect は画面座標（scale 後）。style.width/height はローカル座標なので、
-    // scale で割ってローカルの起点サイズにそろえる（奥レイヤーで scale<1 のときズレないように）。
-    const { scale } = CoordinateSystem.fromLayerIndex(layerIndexRef.current || 0);
-    startSizeRef.current = { width: rect.width / scale, height: rect.height / scale };
+    const el = ref.current;
+    const rect = el?.getBoundingClientRect();
+    if (!el || !rect) return;
+
+    edgeRef.current = edge;
+    // 起点は「画面に出ている実物」から作る。`style.left/top` は universe 座標、
+    // getBoundingClientRect はスクリーン実寸なので、どちらも Layer で layer-local に直す。
+    // bubble.position をそのまま起点にすると、未設定のとき {0,0} に化けて位置が飛ぶ。
+    startBubbleRef.current = bubbleRef.current
+      .moveTo(frameRef.current.locate({
+        x: parseFloat(el.style.left || "0") || 0,
+        y: parseFloat(el.style.top || "0") || 0,
+      }))
+      .resizeTo(scaledFrame().scaleScreenSize({ width: rect.width, height: rect.height }));
     startMouseRef.current = { x: e.clientX, y: e.clientY };
     document.addEventListener("mousemove", handleResizing);
     document.addEventListener("mouseup", endResize);

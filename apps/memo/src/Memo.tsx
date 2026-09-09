@@ -45,7 +45,7 @@ const handShakeMessage = () => {
     resources: [
       {
         containerName: 'MemoLine1',
-        containerUrl: 'http://localhost:4201/memo/text/block1',
+        containerUrl: 'http://localhost:4301/memo/text/block1',
         storableTypes: [StorableType.TEXT],
       },
     ],
@@ -54,7 +54,7 @@ const handShakeMessage = () => {
 
 const createMessage = (method: string, params: any) => {
   return {
-    protocol: 'http://localhost:4201/',
+    protocol: 'http://localhost:4301/',
     version: '0.0.1',
     method: method,
     params: params,
@@ -67,7 +67,7 @@ type slotRefState = 'None' | 'ReferTo' | 'ReferFrom';
 
 export const Memo = () => {
   //export可能なデータ
-  const blockURLs = ['http://localhost:4201/memo/text/block1'];
+  const blockURLs = ['http://localhost:4301/memo/text/block1'];
   const [exportableData, setExportableData] = useState<DTOParams[]>([
     ...blockURLs.map((url) => ({ containerURL: url, value: '' })),
   ]);

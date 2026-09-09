@@ -7,7 +7,6 @@
 
 import React from "react";
 import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
-import TaskIcon from '@mui/icons-material/Task';
 import GridOnIcon from '@mui/icons-material/GridOn';
 
 // Bubble Routes
@@ -16,26 +15,13 @@ import { shiftPuzzleBubbleRoutes } from "./registration/index.js";
 const ShiftPuzzleBubly: Bubly = {
   name: "shift-puzzle",
   version: "0.0.1",
-  label: "シフトパズル",
+  label: "イベントシフトパズル",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
   initialBubbleUrls: [
     "shift-puzzle/shift-plans",
     "shift-puzzle/tasks",
   ],
   backdropColor: "hsl(20, 40%, 22%)",
-
-  menuItems: [
-    {
-      label: "タスク一覧",
-      url: "shift-puzzle/tasks",
-      icon: React.createElement(TaskIcon, { color: "action" }),
-    },
-    {
-      label: "プリミティブガント",
-      url: "shift-puzzle/shift-plans/default-primitive/primitive-gantt",
-      icon: React.createElement(GridOnIcon, { color: "action" }),
-    },
-  ],
 
   register(context) {
     context.registerBubbleRoutes(shiftPuzzleBubbleRoutes);

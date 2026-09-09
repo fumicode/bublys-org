@@ -15,23 +15,10 @@ import { gakkaiShiftBubbleRoutes } from "./registration/index.js";
 const GakkaiShiftBubly: Bubly = {
   name: "gakkai-shift",
   version: "0.0.1",
-  label: "シフトパズル",
+  label: "学会シフトパズル",
   icon: React.createElement(EventNoteIcon, { color: "primary" }),
   initialBubbleUrls: ["gakkai-shift/staffs", "gakkai-shift/shift-plans"],
   backdropColor: "hsl(210, 35%, 22%)",
-
-  menuItems: [
-    {
-      label: "スタッフ一覧",
-      url: "gakkai-shift/staffs",
-      icon: React.createElement(EventNoteIcon, { color: "action" }),
-    },
-    {
-      label: "シフト配置表",
-      url: "gakkai-shift/shift-plans",
-      icon: React.createElement(EventNoteIcon, { color: "primary" }),
-    },
-  ],
 
   register(context) {
     context.registerBubbleRoutes(gakkaiShiftBubbleRoutes);

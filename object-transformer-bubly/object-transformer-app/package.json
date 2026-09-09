@@ -22,7 +22,7 @@
   },
   "nx": {
     "targets": {
-      "build": { "dependsOn": ["^build"] },
+      "build": { "dependsOn": ["^build", "build:bubly"] },
       "build:bubly": { "dependsOn": ["^build"] },
       "dev": { "dependsOn": ["^dev"], "continuous": true }
     }

@@ -32,7 +32,7 @@ export function App() {
       urlBinding={makeSnapshotCodec('universe')}
     >
       <BublyApp
-        title="シフトパズル"
+        title="学会シフトパズル"
         subtitle="Standalone • Port 4001"
         menuItems={menuItems}
         backdropColor="hsl(210, 35%, 22%)"

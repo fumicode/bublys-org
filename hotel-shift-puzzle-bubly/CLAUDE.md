@@ -156,8 +156,11 @@ Redux を使わず props で受ける純粋な表示 component。`ui/index.ts` �
 ### 5. バブルルート（hotel-shift-puzzle-app/src/registration/bubbleRoutes.tsx）
 `hotelShiftPuzzleBubbleRoutes` 配列にルートを追加。URL ビルダーは `registration/bubbleUrls.ts`
 に書き（pattern と隣り合わせる）、オブジェクトの URL なら同ファイルで `registerObjectUrl` 登録、
-サブビューの URL なら feature へ props で注入する。必要なら `app/app.tsx` の `menuItems` と
-`bubly.ts` の `menuItems` / `initialBubbleUrls` にもエントリーを足す。
+サブビューの URL なら feature へ props で注入する。必要なら `app/app.tsx` の `menuItems`
+（スタンドアロン起動時のサイドバー）と `bubly.ts` の `initialBubbleUrls` にもエントリーを足す。
+
+> `Bubly` の `menuItems` は廃止した。OS にロードしたバブリは universe のアイコン 1 個だけを
+> サイドバーに出し、中身は universe に囲われた中から開く。
 
 ### 6. ObjectView ダブルクリック展開（hotel-shift-puzzle-libs/src/object-type-registration.ts）
 ```typescript

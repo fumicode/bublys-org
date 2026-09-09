@@ -6,11 +6,11 @@ export default defineConfig(() => ({
   root: __dirname,
   cacheDir: '../node_modules/.vite/memo',
   server: {
-    port: 4201,
+    port: 4301,
     host: 'localhost',
   },
   preview: {
-    port: 4201,
+    port: 4301,
     host: 'localhost',
   },
   plugins: [react()],

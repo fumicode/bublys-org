@@ -1,11 +1,14 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { useCallback, useEffect, useRef } from "react";
+import { useAppDispatch, useAppSelector, useAppStore } from "@bublys-org/state-management";
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { beginIntent } from "@bublys-org/world-line-graph";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
 import {
   makeSelectBubbleArrangementForUniverse,
-  replaceBubbleArrangement,
+  makeSelectProjectedNodeId,
+  projectUniverse,
+  markProjected,
   navigateBubble,
 } from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
@@ -44,91 +47,202 @@ export type UniverseLink = {
  * 注: DomainRegistryProvider の内側で使うこと。1 universe につき 1 回だけ呼ぶこと
  *     （二重に呼ぶと commit/rehydrate が重複する）。
  */
-export function useUniverseArrangementWorldLine(universeId: string, link?: UniverseLink) {
+/**
+ * universe ごとの「世界線を駆動している hook インスタンス」。
+ *
+ * 同じ universe が複数箇所で描かれる（奥のレイヤーの縮小コピー等）と、この hook が
+ * 2 つ走って commit / rehydrate / url バインドが二重になる。実測では、同じ universe
+ * バブルの url を 2 インスタンスが交互に書き換え合い、そのたびに親の配置が変わって
+ * commit → URL push、という往復が起きていた。
+ *
+ * 先にマウントした 1 つだけを駆動役にし、他は描画専用にする。
+ */
+const universeDrivers = new Map<string, symbol>();
+
+export function useUniverseArrangementWorldLine(
+  universeId: string,
+  link?: UniverseLink,
+  /**
+   * commit で**新しいノードが生まれた**ときだけ呼ばれる。
+   * 「現在地が動いた」ではなく「変更が記録された」の合図なので、
+   * 履歴を積む（pushState）のはこれを受け取った側の責任。
+   */
+  onCommitted?: (nodeId: string) => void,
+) {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const view = useAppSelector(makeSelectBubbleArrangementForUniverse(universeId));
 
-  const scope = useCasScope(universeId, {
-    initialObjects: [{ type: BUBBLE_ARRANGEMENT_TYPE, object: new BubbleArrangement(view) }],
-  });
+  // initialObjects は渡さない。
+  // `view` はリロード直後は必ず空なので、世界線を持たない universe では
+  // 「空の配置」が root ノードとして焼かれてしまう（起動しただけで apex が立ち、
+  // 親バブルの url 書き換え → 親の配置変化 → commit → URL push の連鎖が始まる）。
+  // universe の最初のノードは、seed（＝復元するものが無いとき）の commit で作る。
+  const scope = useCasScope(universeId);
 
-  const syncedSignatureRef = useRef<string | null>(JSON.stringify(view));
-
-  // [commit] view 変化 → world-line に記録
-  useEffect(() => {
-    const signature = JSON.stringify(view);
-    if (signature === syncedSignatureRef.current) return;
-    syncedSignatureRef.current = signature;
-    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
-    if (shell) {
-      shell.update(() => new BubbleArrangement(view));
-    } else {
-      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(view));
+  // この universe の駆動役かどうか。空いていれば自分が取る
+  const driverTokenRef = useRef<symbol | null>(null);
+  if (driverTokenRef.current === null) driverTokenRef.current = Symbol(universeId);
+  const isDriver = (): boolean => {
+    const current = universeDrivers.get(universeId);
+    if (!current) {
+      universeDrivers.set(universeId, driverTokenRef.current as symbol);
+      return true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+    return current === driverTokenRef.current;
+  };
+  useEffect(
+    () => () => {
+      if (universeDrivers.get(universeId) === driverTokenRef.current) universeDrivers.delete(universeId);
+    },
+    [universeId],
+  );
 
-  // [rehydrate] apex 変化 → この universe に流し込む
+  /**
+   * seed 判定専用: この universe は世界線から復元されるか。
+   * commit の可否はもう ref ではなく projectedNodeId が決めるので、この値は
+   * 「初期バブルを撒いてよいか」だけに使う（復元されるなら撒かない）。
+   */
+  const restoresFromWorldLineRef = useRef<boolean | null>(null);
+  if (restoresFromWorldLineRef.current === null) {
+    const urlNode = link ? link.snapshot.decode(link.bubbleUrl) : null;
+    restoresFromWorldLineRef.current =
+      !!urlNode || Object.keys(scope.graph.state.nodes ?? {}).length > 0;
+  }
+  const restoresFromWorldLine = restoresFromWorldLineRef.current;
+
+  /** この配置が「どのノードの投影か」。null = まだ投影されていない = 読み取り専用 */
+  const projectedNodeId = useAppSelector(makeSelectProjectedNodeId(universeId));
   const apexId = scope.graph.getApex()?.id ?? null;
+
+  const onCommittedRef = useRef(onCommitted);
+  onCommittedRef.current = onCommitted;
+
+  const linkRef = useRef(link);
+  linkRef.current = link;
+
+  /** 宣言順の都合で ref 越しに呼ぶ（実体は下の writeAddress） */
+  const writeAddressRef = useRef<(nodeId: string) => void>(() => undefined);
+
+  // ============================================================
+  // [投影] 世界線 → 配置。無条件・常時。
+  //
+  // 現在地（apex）が指すノードの中身を配置に流し込み、「どのノードの投影か」を
+  // 同じ 1 アクションで書く。CAS がまだ届いていない（shell が引けない）ときは
+  // 何もしない — 届いた瞬間に getShell の参照が変わって再実行される。
+  // ============================================================
   useEffect(() => {
+    if (!isDriver()) return;
+    if (!apexId || projectedNodeId === apexId) return;
     const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
     if (!shell) return;
-    const incoming = shell.object.toJSON();
-    const signature = JSON.stringify(incoming);
-    if (signature === syncedSignatureRef.current) return;
-    syncedSignatureRef.current = signature;
-    dispatch(replaceBubbleArrangement(incoming, universeId));
+    dispatch(projectUniverse({ arrangement: shell.object.toJSON(), nodeId: apexId }, universeId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apexId]);
+  }, [apexId, projectedNodeId, scope.getShell]);
 
   // ============================================================
-  // [URL バインド] apex ⇄ 親バブルの url（universe@<node>）
+  // [commit] 配置 → 世界線。**投影済みのときだけ**。
   //
-  // apex と url が「最後に合意したノード(syncedNodeRef)」から
-  // どちらが離れたかで駆動方向を判定し、A/B が綱引きしないようにする：
-  //  - apex が syncedNode から離れた → 内部ナビ。url を apex に追従（navigate）。
-  //  - url が syncedNode から離れ、かつ apex とも違う → 外部ナビ（親の戻る等）。
-  //    その node へ moveTo（中身は rehydrate が反映）。
-  // これで seed/settle 中に apex が進んでも、遅れている url に引き戻されない。
+  // 「起動は変更ではない」を時刻(ref)ではなく値(projectedNodeId)で表す。
+  // 投影が済んでいない universe は読み取り専用なので、起動途中の配置は記録されない。
+  // 投影直後は定義上 view == 世界線[apex] なので、復元をそのまま記録し返すことも起きない。
+  // 世界線をまだ持たない universe（apex なし）は、ここが最初のノードを作る（genesis）。
+  // ============================================================
+  useEffect(() => {
+    if (!isDriver()) return;
+    const projected = apexId === null ? true : projectedNodeId === apexId;
+    if (!projected) return;
+
+    const shell = scope.getShell<BubbleArrangement>(BUBBLE_ARRANGEMENT_TYPE, BUBBLE_ARRANGEMENT_ID);
+    // store の型は注入スライスを optional に持つため、セレクタ用に絞り込む
+    const latest = makeSelectBubbleArrangementForUniverse(universeId)(
+      store.getState() as Parameters<ReturnType<typeof makeSelectBubbleArrangementForUniverse>>[0],
+    );
+    if (shell && JSON.stringify(shell.object.toJSON()) === JSON.stringify(latest)) return;
+    if (!shell && Object.keys(latest.bubbles).length === 0) return; // 空 universe は焼かない
+
+    const nodesBefore = store.getState().worldLineGraph?.graphs?.[universeId]?.nodes ?? {};
+    if (shell) {
+      shell.update(() => new BubbleArrangement(latest));
+    } else {
+      scope.addObject(BUBBLE_ARRANGEMENT_TYPE, new BubbleArrangement(latest));
+    }
+
+    // grow は同期 dispatch。直後の store が結果を持っている。
+    const after = store.getState().worldLineGraph?.graphs?.[universeId]?.apexNodeId ?? null;
+    if (!after) return;
+    dispatch(markProjected(after, universeId)); // 配置は今まさに焼いた中身 = このノードの投影
+    if (!nodesBefore[after]) {
+      // ノードが新しく生まれた = ユーザーの変更が記録された唯一の瞬間
+      writeAddressRef.current(after);
+      onCommittedRef.current?.(after);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, projectedNodeId, apexId]);
+
+  // ============================================================
+  // [アドレス ⇄ 現在地]
+  //
+  // ルール: **アドレス（親バブルの url）が先に動いたら、そこへ moveTo するだけ。逆流させない。**
+  // 逆向き（現在地 → アドレス）を書くのは 2 つの原因の場所だけ:
+  //   - commit で新しいノードが生まれたとき（下の commit effect から）
+  //   - nav 動詞（←/→ / DAG ジャンプ）を呼んだとき（下のラッパから）
+  // apex の変化を無条件に url へ追従させると、起動中の現在地の移動まで
+  // 親の配置変更として書き戻され、root まで波及して URL が何度も書き換わる。
   // ============================================================
   const bubbleUrl = link?.bubbleUrl;
-  const syncedNodeRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!link) return;
+    if (!link || !isDriver()) return;
     const urlNode = link.snapshot.decode(link.bubbleUrl);
-
-    if (apexId && apexId !== syncedNodeRef.current) {
-      // 内部ナビ: apex が進んだ → url を追従させる
-      syncedNodeRef.current = apexId;
-      if (urlNode !== apexId) {
-        dispatch(
-          navigateBubble({ id: link.bubbleId, url: link.snapshot.encode(apexId) }, link.parentUniverseId)
-        );
-      }
-      return;
-    }
-
-    if (urlNode && urlNode !== syncedNodeRef.current && urlNode !== apexId) {
-      // 外部ナビ: url が差し戻された → その node へ移動
-      if (!scope.graph.state.nodes[urlNode]) return; // 未所持ノードは無視
-      syncedNodeRef.current = urlNode;
-      scope.moveTo(urlNode);
-    }
+    if (!urlNode || urlNode === apexId) return;
+    if (!scope.graph.state.nodes[urlNode]) return; // 未所持ノードは無視
+    scope.moveTo(urlNode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apexId, bubbleUrl]);
+  }, [bubbleUrl, apexId]);
+
+  /** 現在地をアドレス（親バブルの url）に書き戻す。原因の場所からだけ呼ぶ */
+  const writeAddress = useCallback(
+    (nodeId: string) => {
+      if (!linkRef.current) return;
+      const l = linkRef.current;
+      if (l.snapshot.decode(l.bubbleUrl) === nodeId) return;
+      dispatch(navigateBubble({ id: l.bubbleId, url: l.snapshot.encode(nodeId) }, l.parentUniverseId));
+    },
+    [dispatch],
+  );
+
+  /** nav 動詞（←/→ / ジャンプ）: 移動したら、その現在地をアドレスに書く */
+  const navigate = useCallback(
+    (run: () => void) => {
+      beginIntent(); // nest の ←/→ もユーザーの 1 操作
+      run();
+      const apex = store.getState().worldLineGraph?.graphs?.[universeId]?.apexNodeId ?? null;
+      if (apex) writeAddress(apex);
+    },
+    [store, universeId, writeAddress],
+  );
+
+  writeAddressRef.current = writeAddress;
+
+  const moveBack = useCallback(() => navigate(() => scope.moveBack()), [navigate, scope]);
+  const moveForward = useCallback(() => navigate(() => scope.moveForward()), [navigate, scope]);
+  const moveTo = useCallback((nodeId: string) => navigate(() => scope.moveTo(nodeId)), [navigate, scope]);
 
   return {
     // nest 用 toolbar が直接使うショートカット（既存呼び出しと互換）。
     // canUndo/canRedo は DAG ベース（apex に parent/child が居るか）で、
     // moveBack/moveForward は DAG を辿る。root ラッパーはこれを使わずに
     // ブラウザ履歴ベースで自前計算する（意図的な非対称、docs の C 参照）。
-    moveBack: scope.moveBack,
-    moveForward: scope.moveForward,
+    moveBack,
+    moveForward,
+    moveTo,
     canUndo: scope.canUndo,
     canRedo: scope.canRedo,
     // root 特化ラッパー（useRootArrangementWorldLine）が追加 URL バインドのために使う
     apexId,
     scope,
+    /** 世界線から復元される universe か。true のとき呼び出し側は seed してはいけない */
+    restoresFromWorldLine,
   };
 }

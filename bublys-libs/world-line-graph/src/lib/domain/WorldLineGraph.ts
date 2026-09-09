@@ -93,7 +93,7 @@ export class WorldLineGraph {
     });
   }
 
-  grow(changedRefs: StateRef[]): WorldLineGraph {
+  grow(changedRefs: StateRef[], intentId?: string, intentLabel?: string): WorldLineGraph {
     const { nodes, rootNodeId } = this.state;
     const apex = this.getApex();
 
@@ -101,7 +101,7 @@ export class WorldLineGraph {
       const worldLineId = generateWorldLineId();
       // root の全体状態 = changedRefs そのもの
       const stateHash = combinedStateHash(refMapOf(changedRefs));
-      const newNode = createWorldNode(null, changedRefs, worldLineId, stateHash);
+      const newNode = createWorldNode(null, changedRefs, worldLineId, stateHash, intentId, intentLabel);
       return new WorldLineGraph({
         nodes: { ...nodes, [newNode.id]: newNode },
         apexNodeId: newNode.id,
@@ -136,11 +136,78 @@ export class WorldLineGraph {
       worldLineId = generateWorldLineId();
     }
 
-    const newNode = createWorldNode(apex.id, changedRefs, worldLineId, prospectHash);
+    const newNode = createWorldNode(apex.id, changedRefs, worldLineId, prospectHash, intentId, intentLabel);
     return new WorldLineGraph({
       nodes: { ...nodes, [newNode.id]: newNode },
       apexNodeId: newNode.id,
       rootNodeId,
+    });
+  }
+
+  /**
+   * **世界線に変化を記録する唯一の入口**。
+   *
+   * ルール: 世界線のノードは「ユーザーが手を下した 1 回（= 1 意図）」につき 1 つ。
+   * いま開いている意図が apex を生んだ意図と同じで、かつ apex が leaf なら、
+   * 新しいノードを作らずに **その apex を書き換える（amend）**。
+   * それ以外（意図が変わった / DAG ジャンプや popstate で apex が動いた / 枝が生えた）は
+   * 従来どおり grow する。呼び出し側は分岐を持たない。
+   */
+  commit(changedRefs: StateRef[], intentId: string | null, intentLabel?: string): WorldLineGraph {
+    const apex = this.getApex();
+    if (apex && intentId && apex.intentId === intentId && this.isLeaf(apex.id)) {
+      return this.amend(changedRefs, intentLabel);
+    }
+    return this.grow(changedRefs, intentId ?? undefined, intentLabel);
+  }
+
+  /** 子を持たない（＝この先に履歴が無い）ノードか */
+  private isLeaf(nodeId: string): boolean {
+    return (this.getChildrenMap()[nodeId] ?? []).length === 0;
+  }
+
+  /**
+   * apex のノードの**中身だけ**を差し替える。
+   *
+   * id / parentId / worldLineId / timestamp / label / intentId は据え置き
+   * （id が変わらないので、URL・親バブルの url・履歴・DAG の参照が一切壊れない）。
+   * leaf 限定なのは、子が前提にしている親の内容を黙って変えないため（履歴の改竄防止）と、
+   * 子孫に焼いた stateHash が腐って打ち消しスナップが誤爆するのを防ぐため。
+   * amend では打ち消しスナップを走らせない（同じ意図の途中経過なので移動してはいけない）。
+   */
+  private amend(changedRefs: StateRef[], intentLabel?: string): WorldLineGraph {
+    const apex = this.getApex();
+    if (!apex) throw new Error("amend: apex が無い");
+    if (!this.isLeaf(apex.id)) throw new Error("amend: 子を持つノードは書き換えない");
+
+    // このノードが「親から見て変えたもの」= 既存の changedRefs に今回ぶんを後勝ちで重ねる
+    const merged = refMapOf(apex.changedRefs);
+    for (const ref of changedRefs) {
+      merged.set(stateRefKey(ref), ref);
+    }
+
+    // 全体状態は「親の状態 + merged」。親と同じに戻った ref は changedRefs から刈る
+    const base = apex.parentId ? this.getStateRefMapAt(apex.parentId) : new Map<string, StateRef>();
+    const prospect = new Map(base);
+    for (const [key, ref] of merged) {
+      prospect.set(key, ref);
+    }
+    const pruned = [...merged.values()].filter((ref) => {
+      const baseRef = base.get(stateRefKey(ref));
+      return !baseRef || baseRef.hash !== ref.hash;
+    });
+
+    const amended: WorldNode = {
+      ...apex,
+      changedRefs: pruned,
+      stateHash: combinedStateHash(prospect),
+      // 名前はまだ無いときだけ埋める（既に付いている名前は上書きしない）
+      ...(apex.intentLabel || !intentLabel ? {} : { intentLabel }),
+    };
+
+    return new WorldLineGraph({
+      ...this.state,
+      nodes: { ...this.state.nodes, [amended.id]: amended },
     });
   }
 
