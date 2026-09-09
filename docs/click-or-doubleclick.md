@@ -193,9 +193,13 @@ inline なので、`display: inline-flex; align-items: center;` を共有 CSS �
 実装済み。**シングルクリックでの選択状態**（4コマ目のピンクの輪郭）と
 **🖐手のひらパネル**（右下に選択が溜まる）はまだ無い。
 
+単クリックが空いているのは、そこに「選ぶ」が入る予定だから。
+どういう選択にするかは [selection-and-scope.md](./selection-and-scope.md) で決めてある。
+
 ---
 
 ## 関連
 
+- [selection-and-scope.md](./selection-and-scope.md) — 単クリックに入る「選択」の設計
 - [universe-drop-zone.md](./universe-drop-zone.md) — 誰も受け止めなかったドロップを宇宙が受け止める話
 - [bubly-spec.md](./bubly-spec.md) — バブリの構成
