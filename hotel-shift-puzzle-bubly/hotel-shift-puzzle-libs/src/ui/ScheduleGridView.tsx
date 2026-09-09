@@ -478,7 +478,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
           const inner = (
-            <span className="e-day-inner" title={`${day.label} の詳細を開く（ダブルクリック）`}>
+            <span
+              className="e-day-inner"
+              // 違反マーク（⚠）は嵩張るのでヘッダ色だけで示し、理由は title で読めるようにする
+              title={[
+                ...(warns ? warns.map((v) => v.message) : []),
+                `${day.label} の詳細を開く（ダブルクリック）`,
+              ].join("\n")}
+            >
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
             </span>
@@ -490,29 +497,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""
               }${warns ? " is-warn" : ""}`}
             >
-              {warns &&
-                (() => {
-                  const mark = (
-                    <span
-                      className="e-day-warn"
-                      title={warns.map((v) => v.message).join("\n")}
-                    >
-                      ⚠
-                    </span>
-                  );
-                  // ダブルクリックでその日の（先頭の）違反バブルを開く
-                  return violationUrl ? (
-                    <ObjectView
-                      url={violationUrl(warns[0])}
-                      openingPosition="origin-side"
-                      draggable={false}
-                    >
-                      {mark}
-                    </ObjectView>
-                  ) : (
-                    mark
-                  );
-                })()}
               {/* ObjectView がダブルクリックでの展開・data-url（origin-side で近くに出す）を担う。
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (
