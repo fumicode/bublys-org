@@ -160,6 +160,7 @@ const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ScheduleDayDetail
       scheduleId={bubble.params.scheduleId}
       dayKey={bubble.params.dayKey}
+      createCandidatesWorker={createCandidatesWorker}
     />
   );
 
