@@ -90,6 +90,16 @@ export class ScheduleReport {
     return `${scheduleId}:${worldLineNodeId}`;
   }
 
+  /**
+   * レポートIDから勤務表IDを取り出す（{@link idOf} の逆）。
+   * レポート本体を読まなくても「どの勤務表の記録か」が分かるようにしておく
+   * （レポートのバブルはIDしか受け取らないため）。最初のコロンで切る。
+   */
+  static scheduleIdOf(reportId: string): string {
+    const i = reportId.indexOf(":");
+    return i < 0 ? reportId : reportId.slice(0, i);
+  }
+
   /** 既定のタイトル（未命名時・rename で空にしたときのフォールバック） */
   static defaultTitle(year: number, month: number): string {
     return `${year}年${month}月`;

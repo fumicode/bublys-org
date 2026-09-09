@@ -5,6 +5,7 @@ import { Staff, ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReportView } from "../ui/ScheduleReportView.js";
 import { useObjects, useObjectShell, useObjectRepo } from "../objects/repository.js";
 import { STAFF_TYPE, SCHEDULE_REPORT_TYPE } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleReportPanelProps = {
   reportId: string;
@@ -17,7 +18,7 @@ type ScheduleReportPanelProps = {
  * 削除後はこのバブル自体は自動で閉じない（bubbles-ui にその仕組みが無いため）ので、
  * 見つからない旨を表示するに留める。
  */
-export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = ({ reportId }) => {
+const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => {
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const { object: report, update } = useObjectShell<ScheduleReport>(
     SCHEDULE_REPORT_TYPE,
@@ -63,3 +64,14 @@ export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = ({ reportId }) 
     />
   );
 };
+
+/**
+ * 確定レポートは非メンバー（いつ見ても同じ）だが、譲歩・貢献度に出てくるスタッフ名は
+ * **確定した当時の名簿**で引きたい。レポートIDは `scheduleId:nodeId` なので、
+ * レポート本体を読まなくても、どの勤務表の世界に入ればよいかが分かる。
+ */
+export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = (props) => (
+  <ScheduleWorld scheduleId={ScheduleReport.scheduleIdOf(props.reportId)}>
+    <ScheduleReportPanelBody {...props} />
+  </ScheduleWorld>
+);

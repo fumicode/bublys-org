@@ -11,13 +11,20 @@ import {
   ScheduleAvailability,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { AvailabilityGridView } from "../ui/AvailabilityGridView.js";
-import { useObjects, useObject, useObjectShell, useObjectRepo } from "../objects/repository.js";
+import {
+  useObjects,
+  useObject,
+  useObjectShell,
+  useObjectRepo,
+  useObjectsPending,
+} from "../objects/repository.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type Props = {
   scheduleId: string;
@@ -32,7 +39,7 @@ const newWorkShiftId = (): string =>
  * あわせて、この勤務表の勤務帯セット（WorkShiftSet, id=scheduleId）も列として編集できる
  * （＋で追加・✏️で改名/時刻変更・削除）。どちらの編集も勤務表と同じローカル世界線に記録される（case B）。
  */
-export const AvailabilityEditor: FC<Props> = ({ scheduleId }) => {
+const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const { object: workShiftSet, update: updateSet } = useObjectShell<WorkShiftSet>(
@@ -46,15 +53,22 @@ export const AvailabilityEditor: FC<Props> = ({ scheduleId }) => {
   );
   const repo = useObjectRepo<ScheduleAvailability>(SCHEDULE_AVAILABILITY_TYPE);
 
+  // 「無ければ作る」は状態が揃うまで動かさない。メモリ上の CAS は 300 件で頭打ちなので、
+  // 追い出されただけの勤務帯セット／可能勤務帯を「無い」と読んで既定で上書きすると、
+  // 設定した中身が消える（＝見ているだけでデータが壊れる）。
+  const pending = useObjectsPending();
+
   // 勤務帯セットが無ければ既定（グローバルのコピー相当）を作成
   useEffect(() => {
+    if (pending) return;
     if (schedule && !workShiftSet) {
       setRepo.save(createDefaultWorkShiftSet(scheduleId));
     }
-  }, [schedule, workShiftSet, scheduleId, setRepo]);
+  }, [pending, schedule, workShiftSet, scheduleId, setRepo]);
 
   // 可能勤務帯が無ければ既定（全許可）を作成
   useEffect(() => {
+    if (pending) return;
     if (schedule && workShiftSet && !availability && staffList.length > 0) {
       repo.save(
         ScheduleAvailability.create(
@@ -64,7 +78,7 @@ export const AvailabilityEditor: FC<Props> = ({ scheduleId }) => {
         )
       );
     }
-  }, [availability, schedule, workShiftSet, staffList.length, scheduleId, repo]);
+  }, [pending, availability, schedule, workShiftSet, staffList.length, scheduleId, repo]);
 
   if (!schedule || !workShiftSet || !availability) {
     return <div style={{ padding: 16, color: "#666" }}>読み込み中…</div>;
@@ -130,3 +144,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const AvailabilityEditor: FC<Props> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <AvailabilityEditorBody {...props} />
+  </ScheduleWorld>
+);

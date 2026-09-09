@@ -3,19 +3,21 @@
 /**
  * オブジェクトリポジトリ（統一アクセス）
  *
- * 全ドメインオブジェクトはアプリ全体の世界線スコープ（CAS）に載る。取得は世界線を意識しない。
+ * 読みは「いま居る世界」から。どこから読むかは記述子の membership が決める
+ * （objects/world.tsx の readScopeOf）。呼び出し側は型だけ書けばよい。
  *   - useObjects(type)        … 一覧（クエリ・購読）
  *   - useObject(type, id)     … 単体（クエリ・購読、読み取り専用）
  *   - useObjectShell(type, id)… シェル。object（現在値）と update（メソッド実行→自動保存）
  *   - useObjectRepo(type)     … 新規作成・削除（save / remove）
  *
- * 編集はシェル経由：update(s => s.method()) を呼ぶだけで、その型を「監視している世界線
- * すべて」（アプリ全体＋ localHistory のローカル）へ自動保存される（commit.ts が fan-out）。
+ * 書きは commit.ts が記述子の homeScope を見て fan-out する（本籍のローカル世界線＋
+ * グローバル台帳）。グローバル台帳は「全世界の最新値インデックス」で、勤務表一覧や
+ * スタッフ詳細のような**世界をまたぐ問い合わせ**がここを読む。
  */
 import { useMemo, useCallback } from "react";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import { useAppStore } from "@bublys-org/state-management";
 import { APP_SCOPE_ID, saveObject, removeObject } from "./commit.js";
+import { readScopeOf, useWorld } from "./world.js";
 
 export { APP_SCOPE_ID };
 
@@ -31,19 +33,37 @@ const EMPTY_OBJECTS: readonly never[] = [];
  * 呼び出し側がこの配列を useMemo/useEffect の依存に置けるようにするため。
  */
 export function useObjects<T>(type: string): T[] {
-  const scope = useCasScope(APP_SCOPE_ID);
-  const shells = scope.shells<T>(type);
+  const world = useWorld();
+  const shells = readScopeOf(world, type).shells<T>(type);
   const objects = useMemo(() => shells.map((s) => s.object), [shells]);
   return objects.length === 0 ? (EMPTY_OBJECTS as unknown as T[]) : objects;
 }
 
-/** IDで単体取得（クエリ・購読、読み取り専用） */
+/**
+ * まだ状態が揃っていない（参照はあるのに実データが手元に無い）。
+ *
+ * メモリ上の CAS は 300 件で頭打ちなので、古い状態は追い出される。追い出されただけの
+ * ものを「無い」と読んで既定値を作り直して保存すると、中身のあるオブジェクトを空で
+ * 上書きしてしまう。「無ければ作る」を書くときは必ずこれで待つこと。
+ */
+export function useObjectsPending(): boolean {
+  const world = useWorld();
+  return world.here.pending || world.app.pending;
+}
+
+/**
+ * IDで単体取得（クエリ・購読、読み取り専用）
+ *
+ * 依存は getShell（scope 内部で shells に対して memo 済み）にする。scope そのものは
+ * 毎レンダー新しいオブジェクトなので、依存に置くと memo が常に無効になる。
+ */
 export function useObject<T>(type: string, id: string | undefined): T | undefined {
-  const scope = useCasScope(APP_SCOPE_ID);
+  const world = useWorld();
+  const getShell = readScopeOf(world, type).getShell;
   return useMemo(() => {
     if (id === undefined) return undefined;
-    return scope.getShell<T>(type, id)?.object;
-  }, [scope, type, id]);
+    return getShell<T>(type, id)?.object;
+  }, [getShell, type, id]);
 }
 
 /**

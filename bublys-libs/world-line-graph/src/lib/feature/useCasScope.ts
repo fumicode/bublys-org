@@ -43,6 +43,18 @@ export interface CasScopeValue {
   shells<T>(type: string): ObjectShell<T>[];
   /** 指定した型・IDのシェルを取得 */
   getShell<T>(type: string, id: string): ObjectShell<T> | null;
+  /**
+   * 現在の世界の状態がまだ揃っていない（参照はあるのに実データが手元に無い）。
+   *
+   * メモリ上の CAS は上限つきで古いものから追い出されるので、参照があっても値を
+   * 読めない瞬間がある。そこで「無い」と判断して既定値を作り直して保存すると、
+   * 追い出されただけの状態を空で上書きしてしまう（＝データが消える）。
+   * 値の不在で分岐する前にこれを見て、true のあいだは何もしないこと。
+   *
+   * false は「今この瞬間、現在の世界の参照はすべて手元にある」を意味するだけで、
+   * 「そのオブジェクトが存在する」ではない。存在の判定は参照の有無で行う。
+   */
+  pending: boolean;
   /** オブジェクトを追加して grow（型文字列省略時は instanceof で自動解決） */
   addObject(type: string, obj: unknown): void;
   addObject(obj: unknown): void;
@@ -248,6 +260,14 @@ export function useCasScope(
     }
     return map;
   }, [currentRefs, cas, registry]);
+
+  // 現在の世界が参照しているのに手元に無いものがあるか。
+  // tombstone は cas に null として載っているので undefined とは区別される
+  // （削除済み＝解決済み。未解決ではない）。
+  const pending = useMemo(
+    () => currentRefs.some((ref) => cas[ref.hash] === undefined),
+    [currentRefs, cas]
+  );
 
   const casRef = useRef(cas);
   casRef.current = cas;
@@ -500,6 +520,7 @@ export function useCasScope(
   return {
     shells,
     getShell,
+    pending,
     addObject,
     addObjects,
     removeObject,

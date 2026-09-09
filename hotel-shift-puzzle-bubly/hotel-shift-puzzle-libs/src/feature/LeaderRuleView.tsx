@@ -19,6 +19,7 @@ import {
   SCHEDULE_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type LeaderRuleViewProps = {
   /** どの勤務表の制約か */
@@ -33,7 +34,7 @@ type LeaderRuleViewProps = {
  * {@link LeaderRuleDiagram} に渡して「OR（このうち誰か一人はいなければならない）」の図を描く。
  * 人をドロップすると、その人を制約の候補に加えて保存する（＝勤務表の世界線にノードが増える）。
  */
-export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
+const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
   const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -168,3 +169,13 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
     />
   );
 };
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const LeaderRuleView: FC<LeaderRuleViewProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <LeaderRuleViewBody {...props} />
+  </ScheduleWorld>
+);

@@ -10,6 +10,8 @@ import "./slice/init.js";
 // オブジェクト記述子フレームワーク + リポジトリ + このバブリのオブジェクト定義
 export * from "./objects/framework.js";
 export * from "./objects/repository.js";
+export * from "./objects/world.js";
+export * from "./objects/migrateLegacyScopes.js";
 export * from "./objects/hotelObjects.js";
 
 // Domain models (re-exported from @bublys-org/hotel-shift-puzzle-model)

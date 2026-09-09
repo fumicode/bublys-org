@@ -25,6 +25,7 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type Props = {
   scheduleId: string;
@@ -32,7 +33,7 @@ type Props = {
   violationKey: string;
 };
 
-export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) => {
+const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -82,3 +83,13 @@ export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) =
 
   return <ConstraintViolationView violation={violation} staffName={staffName} />;
 };
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleViolationView: FC<Props> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleViolationViewBody {...props} />
+  </ScheduleWorld>
+);

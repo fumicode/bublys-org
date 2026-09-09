@@ -33,7 +33,12 @@ import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
-import { commitCandidates, localScopeId } from "../objects/commit.js";
+import {
+  commitCandidates,
+  localScopeId,
+  isAbsentInScope,
+  APP_SCOPE_ID,
+} from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import {
@@ -63,6 +68,7 @@ import {
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
@@ -127,7 +133,7 @@ const newLeaderRuleKey = (): string =>
  * 勤務表グリッド。セル編集・自動ステップ等は recordScheduleEdit 経由で
  * Schedule + EditLog を同一世界線ノードに記録する。
  */
-export const ScheduleGrid: FC<ScheduleGridProps> = ({
+const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenTree,
@@ -147,7 +153,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   createCandidatesWorker,
 }) => {
   const store = useAppStore();
-  const { scope } = useScheduleHistory(scheduleId ?? "");
+  const { scope } = useScheduleHistory();
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [cellSelection, setCellSelection] = useState<{
@@ -297,10 +303,29 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     });
   }, [workShifts, constraints, wishByStaff]);
 
+  /**
+   * 制約を編集するときの起点を返す。まだ作られていないときだけ空の制約から始める。
+   *
+   * `constraints ?? new ScheduleConstraints(...)` と書いてはいけない。値が読めないのには
+   * 「本当に無い」と「メモリ上の CAS から追い出された」の2つの理由があり、後者で空から
+   * 始めると責任者ルールと紐づけレポートを丸ごと消して保存してしまう。
+   * 存在の判定は参照で行い、読み込み待ちのあいだは編集させない。
+   */
+  const constraintsBase = (): ScheduleConstraints | undefined => {
+    if (constraints) return constraints;
+    if (!scheduleId) return undefined;
+    if (!isAbsentInScope(store, APP_SCOPE_ID, SCHEDULE_CONSTRAINTS_TYPE, scheduleId)) {
+      setAutoMessage("制約を読み込み中です。少し待ってからもう一度お試しください。");
+      return undefined;
+    }
+    return new ScheduleConstraints({ scheduleId, leaderRules: [] });
+  };
+
   const handleDropReportUrl = (url: string) => {
     const reportId = extractIdFromUrl(url);
     if (!reportId || !scheduleId) return;
-    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const base = constraintsBase();
+    if (!base) return;
     if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
     const next = base.linkReport(reportId);
     const shiftIdsOf = (shiftName: string) =>
@@ -340,8 +365,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const handleAddRule = () => {
     if (!scheduleId) return;
     const key = newLeaderRuleKey();
-    const base =
-      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const base = constraintsBase();
+    if (!base) return;
     const next = base.addRule({
       key,
       label: "新責任者",
@@ -569,20 +594,19 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
       const obj = buildCandidate(i);
       const label = `案${i + 1}`;
+      // ログが読めないときは履歴を付けない（案そのものは記録する）
+      const editLog = buildCandidateEditLog(store, {
+        baseSchedule: schedule,
+        candidate: obj,
+        constraints: allConstraints,
+        label,
+      });
       return {
         obj,
         label,
-        extras: [
-          {
-            type: SCHEDULE_EDIT_LOG_TYPE,
-            obj: buildCandidateEditLog(store, {
-              baseSchedule: schedule,
-              candidate: obj,
-              constraints: allConstraints,
-              label,
-            }),
-          },
-        ],
+        extras: editLog
+          ? [{ type: SCHEDULE_EDIT_LOG_TYPE, obj: editLog }]
+          : [],
       };
     });
     commitCandidates(
@@ -641,6 +665,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
 
+    // ここは useObject の同期読みで済ませない。確定はスナップショットを永続化する操作で、
+    // 値がメモリから追い出されていると「無い」と区別がつかず、間違ったレポートを焼いてしまう。
+    // 永続ストアからの取得を待てる resolveObjectsAt を使う（読み対称化とは別の理由で必要）。
+    // なお staffIds はこの世界の固定メンバー（＝確定時点の名簿）から取る。
     const resolved = await scope.resolveObjectsAt(apex.id);
     const apexSchedule = resolved.find(
       (r) => r.type === SCHEDULE_TYPE && r.id === scheduleId
@@ -1143,3 +1171,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleGrid: FC<ScheduleGridProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleGridBody {...props} />
+  </ScheduleWorld>
+);
