@@ -2,7 +2,9 @@
 
 import { useContext, type ReactNode } from "react";
 import { BubbleRoute, BubblesContext, type OpeningPosition } from "@bublys-org/bubbles-ui";
+import { WorldLineInspector } from "@bublys-org/world-line-graph";
 import {
+  APP_SCOPE_ID,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -218,6 +220,12 @@ const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePa
 const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleEditLogPanel scheduleId={bubble.params.scheduleId} />);
 
+// --- 世界線インスペクタ（デバッグ用） ---
+// 読み取り専用。Provider は要らない（Redux と IndexedDB を直接覗くだけ）が、
+// 他バブルと揃えて配下に置いておく。既定で「アプリ全体スコープ」を選んで開く。
+const WorldLineInspectorBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorldLineInspector defaultScopeId={APP_SCOPE_ID} />);
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -225,6 +233,8 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
+  // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
+  { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },
   // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
   // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
