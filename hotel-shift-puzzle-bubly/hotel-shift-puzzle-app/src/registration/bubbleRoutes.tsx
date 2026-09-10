@@ -17,7 +17,8 @@ import {
   AvailabilityEditor,
   ScheduleViolationView,
   ShiftWishEditor,
-  ShiftWishCollection,
+  ShiftWishMonthList,
+  ShiftWishStaffList,
   LeaderRuleView,
   ScheduleReportPanel,
   ScheduleReportList,
@@ -37,6 +38,7 @@ import {
   scheduleWorldLineTreeUrl,
   scheduleEditLogUrl,
   staffShiftWishUrl,
+  shiftWishMonthUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -62,14 +64,23 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-// --- シフト希望の入口バブル（本人が自分の月を選ぶ） ---
-const ShiftWishListBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
+// --- シフト希望の入口バブル（希望を集める月が並ぶ） ---
+const ShiftWishListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ShiftWishMonthList monthUrl={shiftWishMonthUrl} />);
+
+// --- その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
+// 対象の月は URL（:year/:month）で決まる。別の月・別の人は、それぞれ別のバブルとして開く。
+const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const year = Number(bubble.params.year);
+  const month = Number(bubble.params.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return <div style={{ padding: 16, color: "#666" }}>月の指定が正しくありません</div>;
+  }
   return withObjects(
-    <ShiftWishCollection
-      onOpenWish={(staffId, year, month) =>
-        openBubble(staffShiftWishUrl(staffId, year, month), bubble.id, "bubble-side-right")
-      }
+    <ShiftWishStaffList
+      year={year}
+      month={month}
+      wishUrl={(staffId) => staffShiftWishUrl(staffId, year, month)}
     />
   );
 };
@@ -221,6 +232,7 @@ const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
+  { pattern: "hotel-shift-puzzle/shift-wishes/:year/:month", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes", type: "shift-wish-list", Component: ShiftWishListBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
