@@ -16,13 +16,8 @@
  */
 import { useMemo, useCallback } from "react";
 import { useAppStore } from "@bublys-org/state-management";
-import {
-  APP_SCOPE_ID,
-  isAbsentInScope,
-  saveObject,
-  removeObject,
-} from "./commit.js";
-import { readScopeIdOf, readScopeOf, useWorld } from "./world.js";
+import { APP_SCOPE_ID, saveObject, removeObject } from "./commit.js";
+import { absentInReadScope, readScopeOf, useWorld } from "./world.js";
 
 export { APP_SCOPE_ID };
 
@@ -92,22 +87,13 @@ export function useObjectShell<T>(
 }
 
 /**
- * そのオブジェクトが「本当に無い」か。**「読めないだけ」と区別する。**
- *
- * 値が読めない理由は2つある。「まだ一度も作られていない」と「メモリ上の CAS から
- * 追い出された」。**既定値を作って保存してよいのは前者だけ。** 後者でやると、
- * 中身のあるオブジェクトを空で上書きする（＝見ているだけでデータが壊れる）。
- *
- * 判定は参照（グラフ）で行う。参照は追い出されない。
- * そして**読んだのと同じスコープ**を見る。読み先と判定先が違うと、
- * 過去のノードへ時間移動したときに「読み込み中」が永久に解けなくなる。
+ * そのオブジェクトが「本当に無い」か。判定の中身は {@link absentInReadScope}。
+ * 「読めないだけ」と区別するための番人なので、本体は純粋関数として別に置いてある。
  */
 export function useIsAbsent(type: string, id: string | undefined): boolean {
   const world = useWorld();
   const store = useAppStore();
-  const scopeId = readScopeIdOf(world, type, id);
-  if (id === undefined) return true;
-  return isAbsentInScope(store, scopeId, type, id);
+  return absentInReadScope(store, world, type, id);
 }
 
 /** 新規作成・削除（save は監視している世界線すべてへ保存） */

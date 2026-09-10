@@ -39,7 +39,7 @@ import { ACTION_COLOR, PALETTE_3D, ROLE_COLOR, cellStyle } from './palette3d.js'
 import { paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_FOV_DEG, orbitToPosition, type Orbit } from './camera.js';
 // ★ セルの位置は layout3d の1箇所から取る。式を書き写すとずれる（実際にずれていた）
-import { cellCenterWorld } from './layout3d.js';
+import { changedBoxTransform } from './geometry.js';
 
 /** いま選んでいる世界（板1枚）。線や箱はスコープ単位なので、文字列に潰さず組で持つ */
 export type Selection = { readonly scopeId: string; readonly nodeId: string };
@@ -342,12 +342,10 @@ export function createWorldLine3DScene(
         const style = cellStyle(cell, opts.locate?.(cell.hash) ?? 'memory', opts.changedThickness);
         // ★ 式を書き写さない。板の絵はラベル帯（上）と型名欄（左）のぶん内側に
         //   セルを置いているので、素の (row+0.5)/(col+0.5) だと箱だけが
-        //   型名欄の上に浮く（HEADER×cellPitch と GUTTER×cellPitch ぶんずれる）
-        const [, y, z] = cellCenterWorld(plate, cell.slot, opts.cellPitch);
-        // 板の面から過去側へ伸ばす（未来側へ出すと次の板とぶつかる）
-        const x = plate.origin[0] - opts.plateThickness / 2 - style.thickness / 2;
-        m.makeScale(style.thickness, opts.cell, opts.cell);
-        m.setPosition(x, y, z);
+        //   型名欄の上に浮く。姿勢は geometry.ts の純粋関数が持ち、テストが数値で固定する
+        const box = changedBoxTransform(plate, cell.slot, opts, style.thickness);
+        m.makeScale(box.scale[0], box.scale[1], box.scale[2]);
+        m.setPosition(box.position[0], box.position[1], box.position[2]);
         mesh.setMatrixAt(i, m);
         color.set(style.color);
         // 選択中は「その板の箱」だけ素の色。ほかは沈める（背景が暗いので暗く＝奥へ引く）。

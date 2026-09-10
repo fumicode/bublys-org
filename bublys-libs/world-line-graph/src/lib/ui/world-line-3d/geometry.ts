@@ -11,7 +11,7 @@
  * three にも React にも依存しない純粋関数だけを置く。
  */
 import { GUTTER_UNITS, HEADER_UNITS } from './types.js';
-import type { Plate3D, Vec3 } from './types.js';
+import type { Plate3D, Slot, Vec3 } from './types.js';
 
 /** ベクトルの足し算。板の origin にセルの相対位置を足すのに使う */
 export const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -77,5 +77,32 @@ export function slotFromOffset(
   return {
     row: Math.floor((extentY / 2 - dy) / cellPitch - HEADER_UNITS),
     col: Math.floor((extentZ / 2 - dz) / cellPitch - GUTTER_UNITS),
+  };
+}
+
+/**
+ * 「出来事のあったセル」に立てる箱の姿勢。
+ *
+ * three を通さずに数えられる純粋関数にしてある。**scene.ts はこれを呼ぶだけ**にして、
+ * 式を書き写さない。実際に写して、箱だけがラベル帯と型名欄のぶん浮いていた。
+ * 見張りの正規表現より、テストで数値を固定できる形のほうが強い。
+ *
+ * 箱は板の面から**過去側（-X）**へ伸ばす。未来側へ出すと次の板とぶつかる。
+ */
+export function changedBoxTransform(
+  plate: Plate3D,
+  slot: Slot,
+  o: {
+    readonly cellPitch: number;
+    readonly plateThickness: number;
+    /** セルの一辺（Y×Z の大きさ）。板の絵の ■ と一致する */
+    readonly cell: number;
+  },
+  thickness: number
+): { position: Vec3; scale: Vec3 } {
+  const [, y, z] = cellCenterWorld(plate, slot, o.cellPitch);
+  return {
+    position: [plate.origin[0] - o.plateThickness / 2 - thickness / 2, y, z],
+    scale: [thickness, o.cell, o.cell],
   };
 }
