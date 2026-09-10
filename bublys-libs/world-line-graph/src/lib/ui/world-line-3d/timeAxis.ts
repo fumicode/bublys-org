@@ -18,15 +18,18 @@ import type { TimeMode } from './types.js';
  * 各スコープのホップ数を X にすると、同時に起きたことが別の位置に並んでしまう。
  * 時刻でまとめれば「同時なら同じ X」になる。
  *
- * @returns nodeId → 時刻クラスタの番号（0 から連番）
+ * ★ `Slot`（席）とは別物。席は板の上の位置（YZ 平面）で、こちらは時間軸上の何列目か。
+ *   同じ40行の中に両方が出るので、名前で割っておかないと X の話か YZ の話か読めない。
+ *
+ * @returns nodeId → 時刻の列番号（0 から連番）
  */
-export function buildTimeSlots(
+export function buildTimeColumns(
   nodes: readonly { readonly id: string; readonly timestamp: number }[],
   toleranceMs: number
 ): Map<string, number> {
   const sorted = [...nodes].sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
-  const slots = new Map<string, number>();
-  let slot = -1;
+  const columns = new Map<string, number>();
+  let column = -1;
   // ★ 比べる相手は「直前のノード」ではなく**クラスタの先頭**。
   //   直前と比べると、許容時間より短い間隔が続く限りいくらでも数珠つなぎになる
   //   （200ms 間隔で10回編集すると、1.8 秒離れた両端まで「同時」に潰れる）。
@@ -34,12 +37,12 @@ export function buildTimeSlots(
   let clusterStart = Number.NEGATIVE_INFINITY;
   for (const n of sorted) {
     if (n.timestamp - clusterStart > toleranceMs) {
-      slot++;
+      column++;
       clusterStart = n.timestamp;
     }
-    slots.set(n.id, Math.max(slot, 0));
+    columns.set(n.id, Math.max(column, 0));
   }
-  return slots;
+  return columns;
 }
 
 /** 時間軸を組むのに要る、スコープ1つぶんの最小の情報 */
@@ -73,7 +76,7 @@ export function buildTimeAxis(
   o: TimeAxisOptions,
   timeMode: TimeMode = 'sync'
 ): (scopeId: string, nodeId: string, depth: number, scopeOriginX: number) => number {
-  const slotOf = buildTimeSlots(
+  const timeColumnOf = buildTimeColumns(
     scopes.flatMap((s) => s.nodes),
     o.syncToleranceMs
   );
@@ -87,7 +90,7 @@ export function buildTimeAxis(
   const top = new Map<string, number>();
   for (const s of scopes) {
     for (const n of s.nodes) {
-      const key = `${s.scopeId} ${slotOf.get(n.id) ?? 0}`;
+      const key = `${s.scopeId} ${timeColumnOf.get(n.id) ?? 0}`;
       const d = s.depths.get(n.id) ?? 0;
       const lo = base.get(key);
       if (lo === undefined || d < lo) base.set(key, d);
@@ -101,7 +104,7 @@ export function buildTimeAxis(
   const subStep = Math.min(o.subStep, 0.9 / widest);
 
   return (scopeId, nodeId, depth) => {
-    const slot = slotOf.get(nodeId) ?? 0;
+    const slot = timeColumnOf.get(nodeId) ?? 0;
     const from = base.get(`${scopeId} ${slot}`) ?? 0;
     return o.xStep * (slot + (depth - from) * subStep);
   };

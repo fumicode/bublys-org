@@ -47,8 +47,8 @@ const EMPTY_GRAPH: WorldLineGraphJson = WorldLineGraph.empty().toJSON();
  * 判定は **CAS の値ではなくグラフの参照**で行う。値で見ると、まだ再水和されていない
  * だけのスコープを「固定メンバーが無い」と誤判定して履歴を捨ててしまう。
  *
- * 対象は「pins を宣言した型が持ち主のスコープ」だけ。他バブリのスコープ（`memo:xxx` 等）は
- * この registry に無いので pins が空になり、自然に対象外になる。
+ * 対象は「pinTypes を宣言した型が持ち主のスコープ」だけ。他バブリのスコープ（`memo:xxx` 等）は
+ * この registry に無いので pinTypes が空になり、自然に対象外になる。
  *
  * @returns 作り直したスコープIDの一覧
  */

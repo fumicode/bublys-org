@@ -9,7 +9,7 @@ import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
 import { changedBoxTransform } from './geometry.js';
-import { CELL_PX, GUTTER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
+import { CELL_PITCH_PX, GUTTER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
 import {
   ACTION_COLOR,
@@ -556,7 +556,7 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     //   だから paintPlate に描かせて、その座標を読む。
     const c = fakeCanvas();
     paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
-    const side = CELL_PX - 6; // pad 3 × 2
+    const side = CELL_PITCH_PX - 6; // pad 3 × 2
     const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
     expect(drawn).toHaveLength(plate.cells.length);
 
@@ -593,7 +593,7 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     // 描かれた矩形をそのまま使う（式を写さない）
     const c = fakeCanvas();
     paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
-    const side = CELL_PX - 6;
+    const side = CELL_PITCH_PX - 6;
     const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
     expect(drawn).toHaveLength(plate.cells.length);
 
@@ -627,11 +627,11 @@ describe('板の絵', () => {
     const sel = fakeCanvas();
     paintPlate(sel.canvas, plateOf(), { cols: 2, rows: 2, selected: true });
 
-    // セル本体は「一辺が CELL_PX - pad*2」の fillRect。
+    // セル本体は「一辺が CELL_PITCH_PX - pad*2」の fillRect。
     // 下地（全面）や行の帯（幅3）と大きさで見分ける。並び順に頼らない
     const cellAlpha = (o: typeof plain) =>
       o.ops
-        .filter((x) => x.op === 'fillRect' && x.rect?.[2] === CELL_PX - 6)
+        .filter((x) => x.op === 'fillRect' && x.rect?.[2] === CELL_PITCH_PX - 6)
         .map((x) => x.alpha);
     // ★ every は空配列で true。件数を固定しないと「1つも描かない」変異を見逃す
     expect(cellAlpha(plain).length).toBeGreaterThan(0);
@@ -743,7 +743,7 @@ describe('板の絵', () => {
       .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === c.canvas.width);
     const lastCell = c.ops
       .map((o, i) => ({ o, i }))
-      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === CELL_PX - 6)
+      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === CELL_PITCH_PX - 6)
       .at(-1);
     expect(full.length).toBeGreaterThan(0);
     expect(lastCell).toBeTruthy();
@@ -766,7 +766,7 @@ describe('板の絵', () => {
     expect(
       c.ops.some((o) => o.op === 'stroke' && o.stroke === ACTION_COLOR.deleted)
     ).toBe(true);
-    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === CELL_PX - 6)).toBe(false);
+    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === CELL_PITCH_PX - 6)).toBe(false);
   });
 
   it('墓標には外ズレの角印を出さない（消えたものに「外と違う」は言えない）', () => {

@@ -58,7 +58,7 @@ export const HOTEL_OBJECTS = defineObjects({
     // 固定メンバー。名簿はグローバルの資産だが、勤務表は「その時点のメンバーで組んだ記録」
     // なので、あとの入退社・改名に揺さぶられてはいけない。勤務表の世界が生まれるときに
     // そのときの参照が焼き付けられ、以後その世界の中では動かない
-    // （どの世界へ焼くかは Schedule 側の scope.pins が決める）。
+    // （どの世界へ焼くかは Schedule 側の scope.pinTypes が決める）。
     membership: { kind: "pinned" },
     // ドメインスキーマ（object-transformer など横断で使う）
     shape: objectShape([
@@ -96,7 +96,7 @@ export const HOTEL_OBJECTS = defineObjects({
       homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
     },
     // この世界が生まれるとき、そのときのスタッフ名簿を焼き付ける
-    scope: { pins: [STAFF_TYPE] },
+    scope: { pinTypes: [STAFF_TYPE] },
   },
   ScheduleAvailability: {
     class: ScheduleAvailability,

@@ -86,11 +86,15 @@ export type ScopeChange = {
   /** 値を記録する（新しい状態）。CAS に実データを載せ、参照を grow する */
   save?: BundleItem[];
   /**
-   * 既にある参照をそのまま載せる。**値は読まない**のが要点。
-   * 固定メンバーの焼き付け・起点の据え置きに使う。実データは CAS／永続ストアに
+   * 既にある参照をそのまま載せる。**値は読まない**のが要点。実データは CAS／永続ストアに
    * 既にあるので、メモリから追い出されていても記録は欠けない（#110）。
+   *
+   * ★ **固定メンバー専用ではない。** 固定メンバーの焼き付けにも、live な持ち主一式の
+   *   起点の据え置きにも使う（`ensureWorldBorn` は両方を同じ配列に混ぜる）。
+   *   `pin` という名前だと「固定メンバー用」と読めてしまい、live の起点を `save` 側へ
+   *   回す人が出る。そちらは値を読みに行くので、追い出されていると起点が欠ける（#110）。
    */
-  pin?: StateRef[];
+  carry?: StateRef[];
   /** このスコープから外す（tombstone） */
   remove?: { type: string; id: string }[];
 };
@@ -117,7 +121,7 @@ export function growScope(
     refs.push(createStateRef(type, id, hash));
     casEntries.push({ hash, data });
   }
-  for (const ref of change.pin ?? []) refs.push(ref);
+  for (const ref of change.carry ?? []) refs.push(ref);
   for (const { type, id } of change.remove ?? []) {
     refs.push(createStateRef(type, id, TOMBSTONE_HASH));
     casEntries.push({ hash: TOMBSTONE_HASH, data: null });
@@ -261,7 +265,7 @@ export function parseLocalScopeId(
  *
  * 起点ノード**1つ**に、次の2つをまとめて載せる:
  *   - 持ち主一式 … この世界を本籍とする live な型（勤務表・勤務帯セット・可能勤務帯…）
- *   - 固定メンバー … オーナー型の scope.pins が挙げる型の、グローバルの現在の参照すべて
+ *   - 固定メンバー … オーナー型の scope.pinTypes が挙げる型の、グローバルの現在の参照すべて
  *
  * 誕生は**完全でなければならない**。一部の型しか載っていない起点を作ると、そこへ時間移動
  * したときに残りが戻らない（#110）。だから型を1箇所（記述子）から導いてまとめて置く。
@@ -303,7 +307,7 @@ export function ensureWorldBorn(
 
   if (refs.length === 0) return;
 
-  const graph = growScope(store, scopeId, { pin: refs });
+  const graph = growScope(store, scopeId, { carry: refs });
   const rootId = graph.state.rootNodeId;
   if (rootId) {
     // 起点は人の操作に対応しないノードなので、そう読めるよう名前を付ける
