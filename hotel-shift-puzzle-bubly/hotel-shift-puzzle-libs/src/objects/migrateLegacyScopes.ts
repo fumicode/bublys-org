@@ -21,6 +21,7 @@ import {
 } from "@bublys-org/world-line-graph";
 import {
   APP_SCOPE_ID,
+  TOMBSTONE_HASH,
   ensureWorldBorn,
   parseLocalScopeId,
   refsOfTypeInScope,
@@ -51,6 +52,23 @@ const EMPTY_GRAPH: WorldLineGraphJson = WorldLineGraph.empty().toJSON();
  *
  * @returns 作り直したスコープIDの一覧
  */
+/**
+ * グローバル台帳に、その型のオブジェクトが**最初に現れた時刻**。
+ * 1つも無ければ Infinity（＝どの世界の誕生よりあとなので、旧形式とは判定されない）。
+ */
+function earliestPinnedAt(store: StoreLike, pinnedTypes: string[]): number {
+  const types = new Set(pinnedTypes);
+  const nodes = store.getState().worldLineGraph?.graphs?.[APP_SCOPE_ID]?.nodes ?? {};
+  let earliest = Infinity;
+  for (const node of Object.values(nodes)) {
+    if (!node.changedRefs.some((r) => types.has(r.type) && r.hash !== TOMBSTONE_HASH)) {
+      continue;
+    }
+    if (node.timestamp < earliest) earliest = node.timestamp;
+  }
+  return earliest;
+}
+
 export function migrateLegacyScopes(store: StoreLike): string[] {
   const graphs = store.getState().worldLineGraph?.graphs ?? {};
   const rebuilt: string[] = [];
@@ -76,6 +94,18 @@ export function migrateLegacyScopes(store: StoreLike): string[] {
     // グローバルに焼き付けるものが1つも無いなら、作り直しても結果は同じ。
     // ここで抜けないと「作り直す → やはり固定メンバーが無い」を毎回繰り返してしまう。
     if (countIn(APP_SCOPE_ID) === 0) continue;
+
+    // ★ 「固定メンバーが載っていない」だけでは旧形式の証拠にならない。
+    //   名簿が空のときに作った世界も、正しく生まれたうえで0件になる。
+    //   決め手は**生まれた時刻**: 焼き付けるべきものが世界の誕生より前から
+    //   グローバルにあったなら、いまの仕組みなら必ず載っていたはず＝旧形式。
+    //   誕生と同時か、あとから足された名簿なら、載っていなくて当たり前。
+    //   取り違えると試行錯誤の履歴が黙って消えるので、迷ったら触らない側に倒す。
+    const bornAt = graph.nodes[graph.rootNodeId]?.timestamp;
+    if (bornAt === undefined) continue;
+    // 同時刻（同じミリ秒）は旧形式側に倒す。いまの仕組みなら、誕生の時点で
+    // 台帳にあったものは必ず焼き付いている＝0件で同時刻なら焼き損ねている
+    if (!(earliestPinnedAt(store, pinnedTypes) <= bornAt)) continue;
 
     store.dispatch(setGraph({ scopeId, graph: EMPTY_GRAPH }));
     ensureWorldBorn(store, scopeId);

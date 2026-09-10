@@ -163,11 +163,45 @@ return world.here;                   // メンバーはいま居る世界。参�
 世界線ビューは共通の `WorldLineScopeView`（既定 `onSelectNode` ＋ `moveToSiblingBranch`）を
 そのまま使う。囲碁など他のバブリと同じ形。
 
+### 世界線ビューアに答える（`objects/worldLineViewQueries.ts`）
+
+世界線ビューア（`docs/world-line-viewer.md`）は汎用ライブラリなので、`Staff` も
+`Membership` も `APP_SCOPE_ID` も知らない。このバブリの規約は**純粋なクエリ2本**で答える。
+
+```typescript
+hotelNestedScope(ref, currentScopeId)  // この参照はどの世界に属すか（本籍がそのまま答え）
+hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: live / pinned / null
+```
+
+- **対になる2つは同じファイルに置く。** 片方だけ app 層にあると、規約を直すときに
+  片方を直し忘れる。app 層（`bubbleRoutes.tsx`）は名前を渡すだけ。
+- **どちらも読むだけ。** ストアにも CAS にも触らないので module トップレベルの `const` に
+  でき、ビューアの `useMemo` の依存が毎レンダー変わってレイアウトを作り直す事故が起きない。
+- **`null` は「分からない／該当しない」。** グローバル台帳は「世界」ではない（誕生も
+  焼き付けも無い）ので、そこでは全部 `null`。ここを `live` に倒すと、図が
+  「全部この世界のもの」と断言してしまう。
+- 立場の語彙は `Membership`（`live` / `pinned` / `external`）と**揃えてある**。
+  ライブラリ側の `CellRole` も同じ3語。
+
+### 古い形式の世界線の作り直し（`objects/migrateLegacyScopes.ts`）
+
+固定メンバーを入れる前に生まれた世界線を、空に戻して誕生し直す。
+**「固定メンバーが載っていない」だけでは旧形式の証拠にならない。** 名簿が空のときに
+作った世界も、正しく生まれたうえで0件になる。決め手は**生まれた時刻**で、焼き付ける
+べきものが世界の誕生より前から台帳にあったときだけ旧形式とみなす。
+取り違えると試行錯誤の履歴が黙って消えるので、迷ったら触らない側に倒す。
+
 ### グローバル台帳（`APP_SCOPE_ID = "hotel"`）
 
 `saveObject` は本籍のローカル世界線に加えて**必ずここにも書く**。ここは
 「全世界の最新値インデックス」で、勤務表一覧やスタッフ詳細のような
 **世界をまたぐ問い合わせ**がこれを読む。時間移動はしない（常に最新）。
+
+**`removeObject` も同じ住所へ届く。** 保存が両方へ書くなら削除も両方へ書く。台帳にだけ
+墓標を置くと、消したはずのオブジェクトが自分の世界では生き続け、そこで1回編集すると
+台帳へ書き戻されて**復活する**（実際に踏んだ。`objects/addressSymmetry.test.ts` が見張る）。
+固定メンバー（pinned）は本籍を持たないので台帳だけが動く。これは仕様どおりで、
+「グローバルの名簿から消しても、焼き付けた世界からは消えない」がまさに固定の意味。
 
 ---
 
@@ -181,11 +215,12 @@ return world.here;                   // メンバーはいま居る世界。参�
     宣言する（グローバル固定IDのときは `undefined`）。例（`objects/hotelObjects.tsx` の `WorkShiftSet`）:
     `homeScope: (id) => id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id)`
   - グローバルのテンプレートは固定ID（例 `"global"`）で1つ持ち、専用バブルで編集する。
-  - origin 作成時に **`adoptGlobalObject(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
-    （`objects/commit.ts`）を呼ぶ。これはグローバル現在値を読み、id を origin 用へ差し替えて
-    `saveObject` するだけ。`saveObject` が `homeScope` を見て origin スコープ＋APP_SCOPE の両方へ
-    記録するので、以後その型の編集は origin の世界線に載る（時間移動で一緒に戻る）。
-    誕生を1ノードにまとめたいときは、保存しない `adoptGlobalValue` を使う。
+  - origin 作成時に **`adoptGlobalValue(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
+    （`objects/commit.ts`）でグローバル現在値を読み、id を origin 用へ差し替えた値を得る。
+    **これは保存しない。** 得た値は `ensureWorldBorn` の seed に混ぜて、持ち主・固定メンバーと
+    一緒に**1ノードで**起点に置く（`feature/createSchedule.ts` がその形）。
+    ここで `saveObject` を先に呼ぶと1回目の保存で世界が生まれてしまい、起点が欠ける
+    （「世界の誕生は1回・1ノード」に反する）。
   - 集約側には id を差し替えつつ中身（子の id 等）を保つコピー用メソッド（例 `WorkShiftSet.withId`）を
     生やす。ドメインは新規 id を採番しない（採番は feature 層）。
   - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と

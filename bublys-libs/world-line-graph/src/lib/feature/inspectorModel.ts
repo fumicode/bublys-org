@@ -7,7 +7,7 @@
  * （デバッグ道具が嘘をつくと、無いより悪い）
  */
 import { WorldLineGraph, type WorldLineGraphJson } from '../domain/WorldLineGraph';
-import { computeStateHash } from '../domain/StateHash';
+import { TOMBSTONE_HASH } from '../domain/StateHash';
 import type { StateRef } from '../domain/StateRef';
 import type {
   InspectorNodeRow,
@@ -16,8 +16,7 @@ import type {
   RefLocation,
 } from '../ui/WorldLineInspectorView';
 
-/** 削除マーカーのハッシュ。定数なので CAS を読まずに tombstone を判定できる */
-export const TOMBSTONE_HASH = computeStateHash(null);
+export { TOMBSTONE_HASH };
 
 export type InspectorSources = {
   /** メモリ（Redux）の CAS */

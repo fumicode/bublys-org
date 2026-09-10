@@ -508,34 +508,6 @@ function ensureLocalBaseline(
   if (ref) growWithRefs(store, localId, [ref]);
 }
 
-/**
- * グローバル（APP_SCOPE）の型オブジェクトを、新しい origin（勤務表など）のスコープへ取り込む。
- *
- * 「グローバルにもテンプレートがあり、新しい世界線オリジンが作られるときにグローバルのものを
- *  スコープ内へコピーして独自版にする」という、よくあるパターンの標準 API。
- * 使い方: 取り込む型を live にして homeScope（origin スコープへ束ねる規約）を宣言しておき、
- * origin 作成時に
- *   adoptGlobalObject(store, WORKSHIFT_SET_TYPE, set => set.withId(scheduleId), GLOBAL_ID)
- * を呼ぶ。transform でグローバル値の id を origin 用へ差し替えると、saveObject が記述子の
- * homeScope を見て origin スコープ＋APP_SCOPE の両方へ記録する（以後 origin の世界線に載る）。
- *
- * 固定メンバー（pinned）とは別物なので混同しないこと。こちらは **id を差し替えて別の
- * オブジェクトにする**（勤務表ごとの独自セット）。pinned は同じオブジェクトの参照を
- * そのまま焼き付ける（スタッフは勤務表ごとに別人にはならない）。
- *
- * グローバル値が未投入なら undefined を返す（呼び出し側で既定生成へフォールバック可能）。
- */
-export function adoptGlobalObject<T>(
-  store: StoreLike,
-  type: string,
-  transform: (global: T) => T,
-  globalId: string
-): T | undefined {
-  const adopted = adoptGlobalValue<T>(store, type, transform, globalId);
-  if (adopted === undefined) return undefined;
-  saveObject(store, type, adopted);
-  return adopted;
-}
 
 /**
  * グローバルの現在値を読み、transform した値を返す（**保存はしない**）。
@@ -607,12 +579,22 @@ export function commitCandidates(
   return { parentNodeId, nodeIds };
 }
 
-/** アプリ全体スコープからオブジェクトを削除（tombstone） */
+/**
+ * オブジェクトを削除する（墓標を置く）。
+ *
+ * **{@link saveObject} と同じ解決式を使う。** 住所は1つなので、保存が本籍の世界線と
+ * グローバル台帳の両方へ書くなら、削除も両方へ書かなければならない。
+ * 台帳にだけ墓標を置くと、消したはずのオブジェクトが自分の世界では生き続け、
+ * そこで1回でも編集すると台帳へ書き戻されて**復活する**（実際にそうなっていた）。
+ *
+ * 固定メンバー（pinned）は本籍を持たないので台帳だけが動く。これは仕様どおりで、
+ * 「グローバルの名簿から消しても、焼き付けた世界からは消えない」がまさに固定の意味。
+ */
 export function removeObject(store: StoreLike, type: string, id: string): void {
-  const hash = computeStateHash(null);
-  const ref = createStateRef(type, id, hash);
-  const updated = graphOf(store, APP_SCOPE_ID).grow([ref]);
-  store.dispatch(setGraph({ scopeId: APP_SCOPE_ID, graph: updated.toJSON() }));
-  const protectHashes = updated.getCurrentStateRefs().map((r) => r.hash);
-  store.dispatch(setCasEntries({ entries: [{ hash, data: null }], protectHashes }));
+  const localId = homeScopeOf(type, id);
+  // まだ生まれていない世界に墓標だけ置くと、起点が墓標の世界ができてしまう
+  if (localId && !isScopeEmpty(store, localId)) {
+    growScope(store, localId, { remove: [{ type, id }] });
+  }
+  growScope(store, APP_SCOPE_ID, { remove: [{ type, id }] });
 }

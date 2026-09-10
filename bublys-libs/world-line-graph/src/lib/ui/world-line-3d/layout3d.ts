@@ -47,7 +47,7 @@ import {
  * 「スコープ規約から導く、ライブラリの知らない知識」で同じ種類のものなので、
  * 注入口の形を揃えて覚えることを1つにする。
  *
- * `null` は「分からない／該当しない」。**分からないときに 'member' を返さないこと。**
+ * `null` は「分からない／該当しない」。**分からないときに 'live' を返さないこと。**
  * 例（hotel）: スタッフは `Schedule:<id>` では 'pinned' だが、
  * グローバル台帳では立場を持たない（null）。同じ型でも世界によって意味が変わる。
  */
@@ -474,7 +474,7 @@ export function computeWorldLine3DLayout(
           const slot = c.slotMap.of(st.key);
           if (!slot) continue;
           const nested = nestedInTree(resolve(st.ref, c.scopeId));
-          // 注入されなければ null＝「分からない」。ここで 'member' に倒すと、
+          // 注入されなければ null＝「分からない」。ここで 'live' に倒すと、
           // 立場を知らないバブリの図が「全部この世界のもの」と断言してしまう
           const role = input.resolveCellRole?.(st.ref, c.scopeId) ?? null;
           const outside = role === 'pinned' ? judgeOutside(st.ref, c.scopeId) : null;
