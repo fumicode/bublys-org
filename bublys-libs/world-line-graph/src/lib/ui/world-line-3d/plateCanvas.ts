@@ -3,25 +3,26 @@
  *
  * 板の上に並ぶセルは数十〜数百ある。これを1つずつ 3D のメッシュにすると
  * すぐ数千インスタンスになるうえ、面と面が重なって前後関係が壊れる。
- * 「変わっていないもの」は面の中の絵にしてしまえば、厚みの衝突が原理的に起きない。
+ * 「何も起きていないもの」は面の中の絵にしてしまえば、厚みの衝突が原理的に起きない。
  * 日本語のラベルも fillText でそのまま出る（three のテキストは日本語が豆腐になりやすい）。
  *
- * 厚みを持つ（＝このノードで変わった）セルだけを、別に 3D の箱として立てる。
+ * 出来事（作られた・変わった）のあったセルだけを、別に 3D の箱として立てる。
  *
  * キャンバスの向き: 左上が「席 (col=0, row=0)」。板を正面から見たときの左上に対応する
  * （CanvasTexture は既定で flipY されるので、キャンバスの上が板の上になる）。
+ * 上に HEADER_UNITS のラベル帯、左に GUTTER_UNITS の型名欄がある。
+ * どちらも 3D の格子と**同じ値**から導く（別々に決めると絵と当たり判定がずれる）。
  */
-import { LOCATION_MARK, type RefLocation } from '../refLocation.js';
-import { PALETTE_3D, cellStyle } from './palette3d.js';
-import { HEADER_UNITS, type Plate3D } from './types.js';
+import type { RefLocation } from '../refLocation.js';
+import { PALETTE_3D, cellStyle, locationEdgeColor } from './palette3d.js';
+import { GUTTER_UNITS, HEADER_UNITS, type Plate3D } from './types.js';
 
 /** 1セルあたりのピクセル数（テクスチャの解像度） */
-export const CELL_PX = 22;
-/**
- * 上部のラベル帯の高さ（px）。
- * ★ 3D の格子（layout3d の HEADER_UNITS）から導く。別々に決めると絵と当たり判定がずれる。
- */
+export const CELL_PX = 26;
+/** 上部のラベル帯の高さ（px）。3D の格子から導く */
 export const HEADER_PX = CELL_PX * HEADER_UNITS;
+/** 左の型名欄の幅（px）。3D の格子から導く */
+export const GUTTER_PX = CELL_PX * GUTTER_UNITS;
 
 export type PaintOptions = {
   readonly cols: number;
@@ -33,14 +34,14 @@ export type PaintOptions = {
 
 export function plateCanvasSize(opts: { cols: number; rows: number }) {
   return {
-    width: Math.max(opts.cols, 1) * CELL_PX,
+    width: GUTTER_PX + Math.max(opts.cols, 1) * CELL_PX,
     height: HEADER_PX + Math.max(opts.rows, 1) * CELL_PX,
   };
 }
 
 /**
  * 板1枚を描く。呼び出し側でキャンバスを使い回せるよう、キャンバスを受け取る。
- * @returns 描いたセルの数（要約表示の申告に使う）
+ * @returns 描いたセルの数
  */
 export function paintPlate(
   canvas: HTMLCanvasElement,
@@ -55,9 +56,11 @@ export function paintPlate(
 
   ctx.clearRect(0, 0, width, height);
 
-  // 下地
+  // 下地。板そのものを半透明にして、奥のノードが透けて見えるようにする
+  ctx.globalAlpha = PALETTE_3D.plateOpacity;
   ctx.fillStyle = PALETTE_3D.plate;
   ctx.fillRect(0, 0, width, height);
+  ctx.globalAlpha = 1;
 
   // 枠。起点と現在地が一目で分かるように色を変える
   const edge = plate.isApex
@@ -66,49 +69,84 @@ export function paintPlate(
       ? PALETTE_3D.plateEdgeRoot
       : PALETTE_3D.plateEdge;
   ctx.strokeStyle = edge;
-  ctx.lineWidth = opts.selected ? 4 : plate.isApex || plate.isRoot ? 3 : 1.5;
-  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, width - ctx.lineWidth, height - ctx.lineWidth);
+  ctx.lineWidth = opts.selected ? 5 : plate.isApex || plate.isRoot ? 3 : 1.5;
+  ctx.strokeRect(
+    ctx.lineWidth / 2,
+    ctx.lineWidth / 2,
+    width - ctx.lineWidth,
+    height - ctx.lineWidth
+  );
 
   // ラベル帯（ユーザーが付けた名前 > 意図の名前 > ノードID の先頭）
-  const title =
-    plate.label ?? plate.intentLabel ?? `${plate.nodeId.slice(0, 8)}…`;
+  const title = plate.label ?? plate.intentLabel ?? `${plate.nodeId.slice(0, 8)}…`;
   ctx.fillStyle = plate.label ? '#d2a8ff' : PALETTE_3D.label;
-  ctx.font = `${plate.label ? 'bold ' : ''}14px system-ui, sans-serif`;
+  ctx.font = `${plate.label ? 'bold ' : ''}15px system-ui, sans-serif`;
   ctx.textBaseline = 'middle';
-  ctx.fillText(title, 6, HEADER_PX / 2, width - 12);
+  ctx.fillText(title, 8, HEADER_PX / 2, width - 16);
+
+  // 左の型名欄。席は型ごとに行が分かれるので、行の先頭に型名を出せば
+  // 全部のセルに文字を詰め込まなくても「これは何のオブジェクトか」が読める
+  const typeOfRow = new Map<number, string>();
+  for (const cell of plate.cells) {
+    if (!typeOfRow.has(cell.slot.row)) typeOfRow.set(cell.slot.row, cell.type);
+  }
+  ctx.font = '12px system-ui, sans-serif';
+  for (const [row, type] of typeOfRow) {
+    if (row >= opts.rows) continue;
+    ctx.fillStyle = PALETTE_3D.gutter;
+    ctx.fillText(
+      type,
+      6,
+      HEADER_PX + row * CELL_PX + CELL_PX / 2,
+      GUTTER_PX - 10
+    );
+  }
 
   // セル
   let drawn = 0;
-  const pad = 2;
+  const pad = 3;
+  const size = CELL_PX - pad * 2;
   for (const cell of plate.cells) {
     if (cell.slot.col >= opts.cols || cell.slot.row >= opts.rows) continue;
-    const x = cell.slot.col * CELL_PX;
+    const x = GUTTER_PX + cell.slot.col * CELL_PX;
     const y = HEADER_PX + cell.slot.row * CELL_PX;
-    const style = cellStyle(cell, opts.locate?.(cell.hash) ?? 'memory', 1);
+    const location = opts.locate?.(cell.hash) ?? 'memory';
+    const style = cellStyle(cell, location, 1);
 
+    ctx.globalAlpha = style.opacity;
     if (style.tombstone) {
-      // 墓標：潰れた帯。「ここで消えた」が図から落ちないように出す
-      ctx.fillStyle = LOCATION_MARK.tombstone.color;
-      ctx.globalAlpha = 0.6;
-      ctx.fillRect(x + pad, y + CELL_PX / 2 - 2, CELL_PX - pad * 2, 4);
-      ctx.globalAlpha = 1;
+      // 墓標：十字の墓。「ここで消えた」が図から落ちないように出す
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(x + CELL_PX / 2, y + pad);
+      ctx.lineTo(x + CELL_PX / 2, y + CELL_PX - pad);
+      ctx.moveTo(x + pad + 2, y + pad + 6);
+      ctx.lineTo(x + CELL_PX - pad - 2, y + pad + 6);
+      ctx.stroke();
     } else {
       ctx.fillStyle = style.color;
-      ctx.globalAlpha = style.ring ? 1 : 0.55;
-      ctx.fillRect(x + pad, y + pad, CELL_PX - pad * 2, CELL_PX - pad * 2);
-      ctx.globalAlpha = 1;
+      ctx.fillRect(x + pad, y + pad, size, size);
       if (style.ring) {
-        // このノードで変わったセル。3D 側では厚みも持つ
-        ctx.strokeStyle = '#ffffff';
+        // 出来事のあったセル。3D 側では厚みも持つ
+        ctx.strokeStyle = style.color;
         ctx.lineWidth = 1.5;
-        ctx.strokeRect(x + pad, y + pad, CELL_PX - pad * 2, CELL_PX - pad * 2);
+        ctx.strokeRect(x + pad - 1.5, y + pad - 1.5, size + 3, size + 3);
+      }
+      // 値の所在は縁の色で出す（色相は出来事に使っているため）
+      if (location !== 'memory') {
+        ctx.strokeStyle = locationEdgeColor(location);
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + pad, y + pad, size, size);
       }
     }
+    ctx.globalAlpha = 1;
+
     // 入れ子を持つオブジェクトには印を付ける（ここから奥へ世界線が伸びる）
     if (cell.nestedScopeId) {
-      ctx.fillStyle = PALETTE_3D.nestNominal;
+      ctx.fillStyle = PALETTE_3D.nestLinked;
       ctx.beginPath();
-      ctx.arc(x + CELL_PX - pad - 3, y + pad + 3, 2.5, 0, Math.PI * 2);
+      ctx.arc(x + CELL_PX - pad - 2, y + pad + 2, 3, 0, Math.PI * 2);
       ctx.fill();
     }
     drawn++;

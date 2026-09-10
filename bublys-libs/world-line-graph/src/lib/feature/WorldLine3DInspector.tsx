@@ -13,10 +13,10 @@ import { useCallback, useEffect, useMemo, useState, type FC } from 'react';
 import { useAppSelector } from '@bublys-org/state-management';
 import type { RootState } from '@bublys-org/state-management';
 import { WorldLineGraph } from '../domain/WorldLineGraph';
-import type { StateRef } from '../domain/StateRef';
 import { listGraphScopeIdsFromIDB, listStateHashesFromIDB } from './IndexedDBStore';
 import { locateRef, type InspectorSources } from './inspectorModel';
 import { LOCATION_MARK } from '../ui/refLocation';
+import { ACTION_COLOR, ACTION_LABEL } from '../ui/world-line-3d/index.js';
 import {
   WorldLine3DView,
   computeWorldLine3DLayout,
@@ -206,7 +206,7 @@ const Detail: FC<{
         .sort((a, b) => a.key.localeCompare(b.key))
         .map((c) => {
           const loc = locate(c.hash);
-          const mark = LOCATION_MARK[c.status === 'tombstone' ? 'tombstone' : loc];
+          const mark = LOCATION_MARK[c.action === 'deleted' ? 'tombstone' : loc];
           return (
             <div
               key={c.key}
@@ -217,8 +217,11 @@ const Detail: FC<{
               }}
             >
               <span style={{ color: mark.color, whiteSpace: 'nowrap' }}>{mark.mark}</span>
-              <span style={{ color: c.changed ? '#ffffff' : '#8b949e', whiteSpace: 'nowrap' }}>
-                {c.changed ? '●' : '○'}
+              <span
+                style={{ color: ACTION_COLOR[c.action], whiteSpace: 'nowrap' }}
+                title={ACTION_LABEL[c.action]}
+              >
+                {ACTION_LABEL[c.action]}
               </span>
               <span style={{ color: '#79c0ff', whiteSpace: 'nowrap' }}>{c.type}</span>
               <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>
@@ -232,7 +235,8 @@ const Detail: FC<{
           );
         })}
       <div style={{ marginTop: 8, color: '#8b949e' }}>
-        ● = このノードで値が変わった（参照が載っているだけのものは ○）
+        左の記号 = 値の所在、右の言葉 = このノードで起きたこと。
+        消されたものは、その瞬間のノードにだけ墓標として出て、以降は現れません。
       </div>
     </div>
   );

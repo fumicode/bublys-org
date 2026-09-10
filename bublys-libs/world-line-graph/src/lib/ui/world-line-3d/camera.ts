@@ -52,7 +52,36 @@ export function orbitToPosition(o: Orbit): Vec3 {
   ];
 }
 
-/** 全体が画面に収まる姿勢。既定は少し見下ろした front view */
+/** カメラの基底（右・上・前）。yaw/pitch から決まる */
+export function cameraBasis(yaw: number, pitch: number): {
+  right: Vec3;
+  up: Vec3;
+  forward: Vec3;
+} {
+  const sy = Math.sin(yaw),
+    cy = Math.cos(yaw),
+    sp = Math.sin(pitch),
+    cp = Math.cos(pitch);
+  return {
+    right: [cy, 0, -sy],
+    up: [-sy * sp, cp, -cy * sp],
+    forward: [-sy * cp, -sp, -cy * cp],
+  };
+}
+
+const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+/**
+ * 全体が画面に収まる姿勢。
+ *
+ * **外接球ではなく、その視点から見た「見かけの大きさ」で合わせる。**
+ * この図は時間軸(X)にとても長い（板12枚で 170 ほど）のに、分岐(Y)と入れ子(Z)は
+ * 10 前後しかない。外接球だと最長軸が距離を決めてしまい、板を正対で見る「板」の
+ * 向きでは図が画面の1割ほどに縮んで、セルが数ピクセルになって何も読めなくなる。
+ *
+ * 箱の8隅をカメラの右/上/前に射影して合わせるので、**どの向きでも必ず収まり、
+ * かつ余白が出ない**。向きを変えるたびに合わせ直せばよい（プリセットは合わせ直す）。
+ */
 export function fitOrbit(
   bounds: { min: Vec3; max: Vec3 },
   aspect: number,
@@ -65,19 +94,32 @@ export function fitOrbit(
     (bounds.min[1] + bounds.max[1]) / 2,
     (bounds.min[2] + bounds.max[2]) / 2,
   ];
-  const size: Vec3 = [
-    Math.max(bounds.max[0] - bounds.min[0], 1),
-    Math.max(bounds.max[1] - bounds.min[1], 1),
-    Math.max(bounds.max[2] - bounds.min[2], 1),
+  const half: Vec3 = [
+    Math.max((bounds.max[0] - bounds.min[0]) / 2, 0.5),
+    Math.max((bounds.max[1] - bounds.min[1]) / 2, 0.5),
+    Math.max((bounds.max[2] - bounds.min[2]) / 2, 0.5),
   ];
-  // 外接球で収める。どの向きから見ても収まるので、視点を切り替えても破綻しない
-  // （軸ごとに距離を出すと「画面の横＝X」を仮定することになり、yaw を変えた瞬間に外れる）
-  const radius = Math.hypot(size[0], size[1], size[2]) / 2;
+  const { right, up, forward } = cameraBasis(yaw, pitch);
+  // 軸並行の箱なので、隅を全部回さなくても |half·|axis|| で見かけの半径が出る
+  const extent = (axis: Vec3) =>
+    half[0] * Math.abs(axis[0]) + half[1] * Math.abs(axis[1]) + half[2] * Math.abs(axis[2]);
+
   const fov = (fovDeg * Math.PI) / 180;
   const fovH = 2 * Math.atan(Math.tan(fov / 2) * Math.max(aspect, 0.0001));
-  const distance = (radius / Math.sin(Math.min(fov, fovH) / 2)) * 1.02;
+  const distance =
+    Math.max(
+      extent(up) / Math.tan(fov / 2),
+      extent(right) / Math.tan(fovH / 2)
+    ) *
+      1.06 +
+    // 手前側は近づくぶん大きく写るので、奥行きのぶんだけ引く
+    extent(forward);
   return clampOrbit({ target: center, yaw, pitch, distance });
 }
+
+/** dot は射影に使う。テストから basis を確かめられるように外に出しておく */
+export const projectExtent = (half: Vec3, axis: Vec3) =>
+  Math.abs(dot(half, [Math.abs(axis[0]), Math.abs(axis[1]), Math.abs(axis[2])]));
 
 /**
  * 見込みの姿勢（プリセット）。

@@ -7,12 +7,10 @@
 import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
-import { LOCATION_MARK } from '../refLocation.js';
 import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
-import { CELL_PX, HEADER_PX, plateCanvasSize } from './plateCanvas.js';
-import { buildSlotMap } from './slots.js';
+import { CELL_PX, GUTTER_PX, HEADER_PX, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
-import { cellStyle, worldLineColor } from './palette3d.js';
+import { ACTION_COLOR, cellStyle, worldLineColor } from './palette3d.js';
 import {
   ORBIT_PRESETS,
   applyDrag,
@@ -24,6 +22,8 @@ import {
   PITCH_LIMIT,
   type Orbit,
 } from './camera.js';
+import { cameraBasis, projectExtent } from './camera.js';
+import type { Vec3 } from './types.js';
 import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
 
 const h = (v: unknown) => computeStateHash(v);
@@ -48,6 +48,66 @@ describe('camera', () => {
     const halfW = halfH * (16 / 9);
     expect(halfH * 2).toBeGreaterThanOrEqual(bounds.max[1] - bounds.min[1]);
     expect(halfW * 2).toBeGreaterThanOrEqual(bounds.max[0] - bounds.min[0]);
+  });
+
+  /**
+   * ★ 図は時間軸に極端に長い（板12枚で 170、分岐と入れ子は 10 前後）。
+   * 外接球で合わせると**最長軸が全部の向きの距離を決めてしまう**ので、
+   * 板を正対で見る向きでは図が画面の1割に縮み、セルが数ピクセルになって読めない。
+   * 見かけの大きさ（視線に垂直な断面）で合わせること。
+   */
+  it('細長い図でも、一番手前が画面いっぱいに写る（余白を作らない）', () => {
+    const long = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const half: Vec3 = [200, 10, 5];
+    const fov = (45 * Math.PI) / 180;
+
+    for (const [pitch, yaw] of [
+      [0, Math.PI / 2], // 板：長辺が視線方向に寝る
+      [0.3, 1.05], // 斜め
+      [0.15, 0], // 年表：長辺が画面の横
+    ]) {
+      const o = fitOrbit(long, 16 / 9, 45, pitch, yaw);
+      const { right, up, forward } = cameraBasis(yaw, pitch);
+      // 一番手前の隅の位置で、画面の高さ or 幅のどちらかが埋まっていること
+      const near = o.distance - projectExtent(half, forward);
+      const halfH = Math.tan(fov / 2) * near;
+      const fill = Math.max(
+        projectExtent(half, up) / halfH,
+        projectExtent(half, right) / (halfH * (16 / 9))
+      );
+      expect(fill).toBeGreaterThan(0.9);
+    }
+  });
+
+  it('外接球で合わせるより近づく（同じ図でも見かけが大きくなる）', () => {
+    const long = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const sphere = (Math.hypot(400, 20, 10) / 2 / Math.sin(((45 * Math.PI) / 180) / 2)) * 1.02;
+    for (const [pitch, yaw] of [
+      [0, Math.PI / 2],
+      [0.15, 0],
+    ]) {
+      expect(fitOrbit(long, 16 / 9, 45, pitch, yaw).distance).toBeLessThan(sphere);
+    }
+  });
+
+  it('どの向きから合わせても、箱は画面に収まる', () => {
+    const box = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const half: Vec3 = [200, 10, 5];
+    const center = [200, 10, 5];
+    for (const yaw of [0, 0.7, Math.PI / 2, 2.6, -1.3]) {
+      for (const pitch of [0, 0.35, 1.2]) {
+        const o = fitOrbit(box, 16 / 9, 45, pitch, yaw);
+        const { right, up, forward } = cameraBasis(yaw, pitch);
+        const fov = (45 * Math.PI) / 180;
+        // 一番手前の隅（＝一番大きく写る）で確かめる
+        const depth = o.distance - projectExtent(half, forward);
+        const halfH = Math.tan(fov / 2) * depth;
+        const halfW = halfH * (16 / 9);
+        expect(halfH).toBeGreaterThanOrEqual(projectExtent(half, up));
+        expect(halfW).toBeGreaterThanOrEqual(projectExtent(half, right));
+        expect(o.target).toEqual(center);
+      }
+    }
   });
 
   it('仰角と距離は必ずクランプされる（真上を越えて反転しない）', () => {
@@ -119,11 +179,9 @@ describe('picking', () => {
     const g = WorldLineGraph.empty().grow([ref('A', 'a', 1)]);
     const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
     const plate = layout.plates[0];
-    const slotMap = buildSlotMap([{ type: 'A', key: 'A:a' }], DEFAULT_LAYOUT_3D_OPTIONS.cols);
     const hit = pickPlate(
       { origin: [plate.origin[0] + 100, plate.origin[1], plate.origin[2]], dir: [-1, 0, 0] },
       layout.plates,
-      slotMap,
       DEFAULT_LAYOUT_3D_OPTIONS.cellPitch
     );
     expect(hit).toMatchObject({ scopeId: 'app', nodeId: plate.nodeId });
@@ -140,16 +198,6 @@ describe('picking', () => {
     ]);
     const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
     const plate = layout.plates[0];
-    const slotMap = buildSlotMap(
-      [
-        { type: 'Staff', key: 'Staff:s1' },
-        { type: 'Staff', key: 'Staff:s2' },
-        { type: 'Staff', key: 'Staff:s3' },
-        { type: 'Schedule', key: 'Schedule:x' },
-        { type: 'Log', key: 'Log:l1' },
-      ],
-      DEFAULT_LAYOUT_3D_OPTIONS.cols
-    );
     const o = DEFAULT_LAYOUT_3D_OPTIONS;
     for (const cell of plate.cells) {
       // 式を書き写さない。layout が使うのと同じ関数でセル中心を出す
@@ -157,7 +205,6 @@ describe('picking', () => {
       const hit = pickPlate(
         { origin: [plate.origin[0] + 50, cy, cz], dir: [-1, 0, 0] },
         layout.plates,
-        slotMap,
         o.cellPitch
       );
       expect(hit?.cellKey).toBe(cell.key);
@@ -171,7 +218,6 @@ describe('picking', () => {
     const hit = pickPlate(
       { origin: [plate.origin[0] + 100, plate.origin[1], plate.origin[2]], dir: [1, 0, 0] },
       layout.plates,
-      buildSlotMap([{ type: 'A', key: 'A:a' }], 8),
       1.3
     );
     expect(hit).toBeNull();
@@ -186,7 +232,6 @@ describe('picking', () => {
     const hit = pickPlate(
       { origin: [near.origin[0] + 100, near.origin[1], near.origin[2]], dir: [-1, 0, 0] },
       layout.plates,
-      buildSlotMap([{ type: 'A', key: 'A:a' }], 8),
       1.3
     );
     expect(hit?.nodeId).toBe(near.nodeId);
@@ -201,22 +246,33 @@ describe('picking', () => {
 });
 
 describe('palette3d', () => {
-  it('色は所在だけで決まる（2Dインスペクタと同じ表）', () => {
-    for (const loc of ['memory', 'idb', 'lost'] as const) {
-      const s = cellStyle({ changed: false, status: 'present' }, loc, 2.4);
-      expect(s.color).toBe(LOCATION_MARK[loc].color);
-      // 変わっても色は同じ。違うのは厚みだけ
-      const changed = cellStyle({ changed: true, status: 'present' }, loc, 2.4);
-      expect(changed.color).toBe(s.color);
-      expect(changed.thickness).toBeGreaterThan(s.thickness);
-    }
+  it('色は「何が起きたか」で決まる（作られた=白 / 変わった=黄 / 消された=赤）', () => {
+    expect(cellStyle({ action: 'created' }, 'memory', 2.4).color).toBe(ACTION_COLOR.created);
+    expect(cellStyle({ action: 'changed' }, 'memory', 2.4).color).toBe(ACTION_COLOR.changed);
+    expect(cellStyle({ action: 'deleted' }, 'memory', 2.4).color).toBe(ACTION_COLOR.deleted);
   });
 
-  it('墓標は所在によらず削除済みの色で、厚みを持たない', () => {
-    const s = cellStyle({ changed: true, status: 'tombstone' }, 'memory', 2.4);
-    expect(s.color).toBe(LOCATION_MARK.tombstone.color);
+  it('出来事のあったセルだけ厚みと縁を持ち、何も起きていないセルは薄い', () => {
+    const still = cellStyle({ action: 'unchanged' }, 'memory', 2.4);
+    const made = cellStyle({ action: 'created' }, 'memory', 2.4);
+    expect(still.thickness).toBe(0);
+    expect(still.ring).toBe(false);
+    expect(made.thickness).toBeGreaterThan(0);
+    expect(made.ring).toBe(true);
+    expect(still.opacity).toBeLessThan(made.opacity);
+  });
+
+  it('消されたセルは墓標。厚みは持たない（消えたものが手前に飛び出さない）', () => {
+    const s = cellStyle({ action: 'deleted' }, 'memory', 2.4);
     expect(s.thickness).toBe(0);
     expect(s.tombstone).toBe(true);
+  });
+
+  it('値の所在は色相ではなく明るさに効く（出来事の色を潰さない）', () => {
+    const inMemory = cellStyle({ action: 'changed' }, 'memory', 2.4);
+    const lost = cellStyle({ action: 'changed' }, 'lost', 2.4);
+    expect(lost.color).toBe(inMemory.color); // 色相は同じ
+    expect(lost.opacity).toBeLessThan(inMemory.opacity); // 薄くなる
   });
 
   it('世界線の色は決定的', () => {
@@ -253,8 +309,8 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     const o = DEFAULT_LAYOUT_3D_OPTIONS;
 
     for (const cell of plate.cells) {
-      // キャンバス側（paintPlate と同じ式）: 左上原点
-      const canvasX = (cell.slot.col + 0.5) * CELL_PX;
+      // キャンバス側（paintPlate と同じ式）: 左上原点。左に型名欄がある
+      const canvasX = GUTTER_PX + (cell.slot.col + 0.5) * CELL_PX;
       const canvasY = HEADER_PX + (cell.slot.row + 0.5) * CELL_PX;
       // 板側（layout と同じ関数）: 中心原点。左上からの比率に直す
       const [, wy, wz] = cellCenterWorld(plate, cell.slot, o.cellPitch);
@@ -281,24 +337,16 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     // レイアウトが配った席をそのまま逆引きに使う（View と同じやり方）
     const at = new Map<string, string>();
     for (const c of plate.cells) at.set(`${c.slot.col},${c.slot.row}`, c.key);
-    const slotMap = {
-      of: () => undefined,
-      at: (col: number, row: number) => at.get(`${col},${row}`),
-      cols: layout.grid.cols,
-      rows: layout.grid.rows,
-      keys: [],
-    };
 
     for (const cell of plate.cells) {
       // キャンバス上のマスの中心 → 板の上の位置に写す
-      const canvasX = (cell.slot.col + 0.5) * CELL_PX;
+      const canvasX = GUTTER_PX + (cell.slot.col + 0.5) * CELL_PX;
       const canvasY = HEADER_PX + (cell.slot.row + 0.5) * CELL_PX;
       const wz = plate.origin[2] + plate.extentZ / 2 - (canvasX / size.width) * plate.extentZ;
       const wy = plate.origin[1] + plate.extentY / 2 - (canvasY / size.height) * plate.extentY;
       const hit = pickPlate(
         { origin: [plate.origin[0] + 50, wy, wz], dir: [-1, 0, 0] },
         layout.plates,
-        slotMap,
         o.cellPitch
       );
       expect(hit?.cellKey).toBe(cell.key);

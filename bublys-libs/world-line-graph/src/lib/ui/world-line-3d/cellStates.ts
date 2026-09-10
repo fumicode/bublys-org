@@ -5,19 +5,29 @@
  * getPathToNode は壊れたグラフで throw する（実際に空グラフや孤児ノードは実在する）。
  * ここでは root から DFS で降りながら適用・巻き戻しをするので O(Σ|changedRefs|)。
  *
- * **changed の定義が要点**: `node.changedRefs` に入っているか、ではなく
- * **親ノードとハッシュが違うか**で決める。grow は渡された参照をそのまま焼くので、
+ * **判定が要点**: `node.changedRefs` に入っているか、ではなく **親ノードとハッシュが
+ * 違うか**で「何が起きたか」を決める。grow は渡された参照をそのまま焼くので、
  * 値が変わっていない参照も changedRefs に入りうる（既存テスト
  * 「編集で値が変わらない型は、起点と次のノードで同じ参照のまま」がその状況）。
- * ここを間違えると「変わったものを強調する」が嘘になる。
+ * ここを間違えると「何が起きたかを色で語る」が丸ごと嘘になる。
+ *
+ * 消されたオブジェクトは、**消された瞬間のノードにだけ墓標として現れ、それ以降は
+ * 出てこない**。もう存在しないものを描き続けるのは嘘なので。
  */
 import type { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import type { StateRef } from '../../domain/StateRef.js';
+import { computeStateHash } from '../../domain/StateHash.js';
+import type { CellAction } from './types.js';
+
+/** 削除マーカーのハッシュ。定数なので値を読まずに判定できる */
+export const TOMBSTONE_HASH = computeStateHash(null);
 
 export type CellState = {
   readonly key: string;
   readonly ref: StateRef;
-  readonly changed: boolean;
+  /** このノードで何が起きたか */
+  readonly action: CellAction;
+  /** 参照としては changedRefs に入っていたか（action とのズレを数えるため） */
   readonly inChangedRefs: boolean;
 };
 
@@ -101,24 +111,42 @@ export function foldCellStates(graph: WorldLineGraph): FoldResult {
       clockAnomalyNodeIds.push(node.id);
     }
 
-    const changedKeys = new Map<string, boolean>(); // key → 値が変わったか
+    /** key → このノードで起きたこと（changedRefs に載っていたものだけ） */
+    const actions = new Map<string, CellAction>();
     for (const ref of node.changedRefs) {
       const key = keyOf(ref);
       const prev = current.get(key);
-      const changed = prev?.hash !== ref.hash;
-      if (!changed) unprunedChangedCount++;
-      changedKeys.set(key, changed);
+      const gone = prev === undefined || prev.hash === TOMBSTONE_HASH;
+      let action: CellAction;
+      if (ref.hash === TOMBSTONE_HASH) {
+        action = 'deleted';
+      } else if (gone) {
+        // まだ無かった（または一度消えた）ものが現れた＝作られた
+        action = 'created';
+      } else if (prev.hash !== ref.hash) {
+        action = 'changed';
+      } else {
+        // 参照は載っているが値は同じ。grow は渡された参照をそのまま焼くので起きる
+        action = 'unchanged';
+        unprunedChangedCount++;
+      }
+      actions.set(key, action);
       frame.undo.push([key, prev]);
       current.set(key, ref);
     }
 
     const cells: CellState[] = [];
     for (const [key, ref] of current) {
+      const action = actions.get(key);
+      if (ref.hash === TOMBSTONE_HASH && action !== 'deleted') {
+        // もう消えたもの。消された瞬間のノードにだけ墓標を置き、それ以降は描かない
+        continue;
+      }
       cells.push({
         key,
         ref,
-        changed: changedKeys.get(key) ?? false,
-        inChangedRefs: changedKeys.has(key),
+        action: action ?? 'unchanged',
+        inChangedRefs: actions.has(key),
       });
     }
     statesByNode.set(frame.nodeId, cells);

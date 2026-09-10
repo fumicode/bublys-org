@@ -16,10 +16,22 @@ export {
 export {
   computeWorldLine3DLayout,
   findViolations,
+  buildTimeSlots,
   cellOffset,
+  cellCenterWorld,
+  slotFromOffset,
   type Layout3DInput,
 } from "./layout3d.js";
-export { PALETTE_3D, cellStyle, worldLineColor, type CellStyle } from "./palette3d.js";
+export {
+  ACTION_COLOR,
+  ACTION_LABEL,
+  ACTION_ORDER,
+  PALETTE_3D,
+  cellStyle,
+  locationEdgeColor,
+  worldLineColor,
+  type CellStyle,
+} from "./palette3d.js";
 export {
   ORBIT_PRESETS,
   applyDrag,
@@ -48,6 +60,7 @@ export {
   plateCanvasSize,
   CELL_PX,
   HEADER_PX,
+  GUTTER_PX,
   type PaintOptions,
 } from "./plateCanvas.js";
 export {

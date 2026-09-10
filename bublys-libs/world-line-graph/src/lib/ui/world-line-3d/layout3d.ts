@@ -17,16 +17,18 @@ import type { StateRef } from '../../domain/StateRef.js';
 import type { RefLocation } from '../refLocation.js';
 import {
   DEFAULT_LAYOUT_3D_OPTIONS,
+  GUTTER_UNITS,
   HEADER_UNITS,
   type Cell3D,
   type Edge3D,
+  type IdentityLink3D,
   type Layout3D,
   type Layout3DOptions,
   type Nest3D,
   type Plate3D,
+  type TimeMode,
   type Vec3,
 } from './types.js';
-import { computeStateHash } from '../../domain/StateHash.js';
 import { buildSlotMap, type SlotMap } from './slots.js';
 import { foldCellStates, type CellState } from './cellStates.js';
 import { assignLanes } from './lanes.js';
@@ -35,9 +37,6 @@ import {
   defaultNestedScopeResolver,
   type NestedScopeResolver,
 } from './scopeTree.js';
-
-/** 削除マーカーのハッシュ。定数なので値を読まずに判定できる */
-export const TOMBSTONE_HASH = computeStateHash(null);
 
 export type Layout3DInput = {
   readonly rootScopeId: string;
@@ -48,6 +47,8 @@ export type Layout3DInput = {
   readonly resolveNestedScopeId?: NestedScopeResolver;
   /** 親とアドレス連動しているか（universe だけ true になる想定） */
   readonly isLinked?: (childScopeId: string, parentScopeId: string) => boolean;
+  /** X 軸の意味。既定は 'sync'（同時に起きたことは同じ X） */
+  readonly timeMode?: TimeMode;
   /**
    * **畳んでいる**入れ子スコープ。省略・空なら全部展開。
    *
@@ -76,7 +77,7 @@ export function cellOffset(
   return [
     0,
     extentY / 2 - cellPitch * (HEADER_UNITS + slot.row + 0.5),
-    extentZ / 2 - cellPitch * (slot.col + 0.5),
+    extentZ / 2 - cellPitch * (GUTTER_UNITS + slot.col + 0.5),
   ];
 }
 
@@ -100,8 +101,35 @@ export function slotFromOffset(
 ): { col: number; row: number } {
   return {
     row: Math.floor((extentY / 2 - dy) / cellPitch - HEADER_UNITS),
-    col: Math.floor((extentZ / 2 - dz) / cellPitch),
+    col: Math.floor((extentZ / 2 - dz) / cellPitch - GUTTER_UNITS),
   };
+}
+
+/**
+ * 時刻でノードをまとめ、「同時に起きたこと」に同じ番号を振る。
+ *
+ * 1つの操作は複数のスコープへ同時に書く（セルを1つ塗ると、その勤務表の世界線と
+ * アプリ全体スコープの両方にノードが増える）。書き込む**回数**はスコープごとに違うので、
+ * 各スコープのホップ数を X にすると、同時に起きたことが別の位置に並んでしまう。
+ * 時刻でまとめれば「同時なら同じ X」になる。
+ *
+ * @returns nodeId → 時刻クラスタの番号（0 から連番）
+ */
+export function buildTimeSlots(
+  nodes: readonly { readonly id: string; readonly timestamp: number }[],
+  toleranceMs: number
+): Map<string, number> {
+  const sorted = [...nodes].sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
+  const slots = new Map<string, number>();
+  let slot = -1;
+  let prev = Number.NEGATIVE_INFINITY;
+  for (const n of sorted) {
+    // 前のノードから離れていれば新しい時刻。近ければ同じ時刻とみなす
+    if (n.timestamp - prev > toleranceMs) slot++;
+    slots.set(n.id, Math.max(slot, 0));
+    prev = n.timestamp;
+  }
+  return slots;
 }
 
 /** ノードを (timestamp, id) で決定的に並べる。挿入順に頼ると JSON 往復で崩れる */
@@ -178,20 +206,29 @@ export function computeWorldLine3DLayout(
     return true;
   });
 
-  // --- 席割り（全スコープ共通。親子でオブジェクトを見比べるため） -----------
-  const slotMap: SlotMap = buildSlotMap(
-    collectTypedKeys(
-      graphs,
-      shownScopes.map((s) => s.scopeId)
-    ),
-    o.cols
-  );
-  // 板の絵（キャンバス）と 1:1 にするため、列は常に cols ぶん確保し、
-  // 高さにはラベル帯を含める。席の数で幅を縮めると絵と格子がずれる。
-  const extentY = (Math.max(slotMap.rows, 1) + HEADER_UNITS) * o.cellPitch;
-  const extentZ = Math.max(o.cols, 1) * o.cellPitch;
-  const lanePitchY = o.lanePitchY > 0 ? o.lanePitchY : extentY * 1.5;
-  const nestPitchZ = o.nestPitchZ > 0 ? o.nestPitchZ : extentZ * 1.5;
+  // --- 席割り（スコープごと） ----------------------------------------------
+  // **世界1つにつき1枚の席表**。全スコープ共通にすると、勤務表の世界（5種類しか
+  // 居ない）がアプリ全体スコープ（希望・予約・レポート…）の席数を背負い、板の
+  // 9割が空白になってセルが数ピクセルに潰れる。
+  // 同一性の線も入れ子の線も**同じスコープの中／親スコープの席**しか参照しないので、
+  // 席を世界ごとに詰めても線は繋がったまま。
+  const slotMapOf = new Map<string, SlotMap>();
+  const extentsOf = new Map<string, { y: number; z: number }>();
+  for (const s of shownScopes) {
+    const map = buildSlotMap(collectTypedKeys(graphs, [s.scopeId]), o.cols);
+    slotMapOf.set(s.scopeId, map);
+    // 板の絵（キャンバス）と 1:1 にするため、実際に使う列数ぶんだけ確保し、
+    // 高さにはラベル帯、幅には型名欄を含める。ここがずれると絵と当たり判定がずれる。
+    extentsOf.set(s.scopeId, {
+      y: (Math.max(map.rows, 1) + HEADER_UNITS) * o.cellPitch,
+      z: (Math.max(map.cols, 1) + GUTTER_UNITS) * o.cellPitch,
+    });
+  }
+  const maxExtentY = Math.max(1, ...[...extentsOf.values()].map((e) => e.y));
+  const maxExtentZ = Math.max(1, ...[...extentsOf.values()].map((e) => e.z));
+  // 段と枝の間隔は**一番大きい板**で決める。世界ごとに変えると板同士が重なる
+  const lanePitchY = o.lanePitchY > 0 ? o.lanePitchY : maxExtentY * 1.5;
+  const nestPitchZ = o.nestPitchZ > 0 ? o.nestPitchZ : maxExtentZ * 1.5;
 
   // --- スコープごとの下ごしらえ --------------------------------------------
   type ScopeCalc = {
@@ -205,6 +242,10 @@ export function computeWorldLine3DLayout(
     laneCount: number;
     depths: Map<string, number>;
     states: ReadonlyMap<string, readonly CellState[]>;
+    /** この世界の席表と板の大きさ */
+    slotMap: SlotMap;
+    extentY: number;
+    extentZ: number;
     origin: Vec3;
   };
 
@@ -250,6 +291,9 @@ export function computeWorldLine3DLayout(
       laneCount,
       depths,
       states: fold.statesByNode,
+      slotMap: slotMapOf.get(s.scopeId) ?? buildSlotMap([], o.cols),
+      extentY: extentsOf.get(s.scopeId)?.y ?? o.cellPitch,
+      extentZ: extentsOf.get(s.scopeId)?.z ?? o.cellPitch,
       origin: [0, 0, 0],
     });
   }
@@ -260,7 +304,36 @@ export function computeWorldLine3DLayout(
   const nests: Nest3D[] = [];
 
   const yExtentOf = (c: ScopeCalc) =>
-    Math.max(c.laneCount - 1, 0) * lanePitchY + extentY;
+    Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY;
+
+  // --- X（時間軸）を決める --------------------------------------------------
+  // 'sync': 全スコープのノードを時刻でまとめ、同時なら同じ X に置く。
+  //         同じ時刻に同じスコープが複数ノード書いたときだけ、その中で少しずらす
+  //         （アプリ全体スコープは1操作でオブジェクトごとに1ノード書くため）。
+  const timeMode: TimeMode = input.timeMode ?? 'sync';
+  const allNodes = calcs.flatMap((c) =>
+    Object.values(c.graph.state.nodes).map((n) => ({ id: n.id, timestamp: n.timestamp }))
+  );
+  const slotOf = buildTimeSlots(allNodes, o.syncToleranceMs);
+  /** (スコープ, 時刻クラスタ) ごとの最小 depth。同時刻の中での並び順の起点にする */
+  const baseDepth = new Map<string, number>();
+  if (timeMode === 'sync') {
+    for (const c of calcs) {
+      for (const node of Object.values(c.graph.state.nodes)) {
+        const key = `${c.scopeId} ${slotOf.get(node.id) ?? 0}`;
+        const d = c.depths.get(node.id) ?? 0;
+        const cur = baseDepth.get(key);
+        if (cur === undefined || d < cur) baseDepth.set(key, d);
+      }
+    }
+  }
+  const xOf = (c: ScopeCalc, nodeId: string, depth: number): number => {
+    if (timeMode === 'hops') return c.origin[0] + o.xStep * depth;
+    const slot = slotOf.get(nodeId) ?? 0;
+    const base = baseDepth.get(`${c.scopeId} ${slot}`) ?? 0;
+    // 同じ時刻・同じスコープの中では depth 順に少しだけずらす（親より子が必ず先へ進む）
+    return o.xStep * (slot + (depth - base) * o.subStep);
+  };
 
   const levels = [...new Set(calcs.map((c) => c.level))].sort((a, b) => a - b);
   for (const level of levels) {
@@ -272,11 +345,11 @@ export function computeWorldLine3DLayout(
         return { c, wishY: 0, anchorPos: null as Vec3 | null };
       }
       const parentPlate = platesByScopeNode.get(`${c.parentScopeId} ${c.anchor.nodeId}`);
-      const slot = slotMap.of(c.anchor.key);
+      const slot = slotMapOf.get(c.parentScopeId)?.of(c.anchor.key);
       if (!parentPlate || !slot) return { c, wishY: 0, anchorPos: null as Vec3 | null };
       const anchorPos = add(
         parentPlate.origin,
-        cellOffset(slot, extentY, extentZ, o.cellPitch)
+        cellOffset(slot, parentPlate.extentY, parentPlate.extentZ, o.cellPitch)
       );
       return { c, wishY: anchorPos[1], anchorPos };
     });
@@ -287,7 +360,7 @@ export function computeWorldLine3DLayout(
     for (const w of wishes) {
       const half = yExtentOf(w.c) / 2;
       const y =
-        cursor === -Infinity ? w.wishY : Math.max(w.wishY, cursor + half + extentY * 0.5);
+        cursor === -Infinity ? w.wishY : Math.max(w.wishY, cursor + half + maxExtentY * 0.5);
       cursor = y + half;
       const x = w.anchorPos ? w.anchorPos[0] : 0;
       w.c.origin = [x, y, -nestPitchZ * level];
@@ -299,27 +372,24 @@ export function computeWorldLine3DLayout(
         const depth = c.depths.get(node.id) ?? 0;
         const lane = c.lanes.get(node.id) ?? 0;
         const origin: Vec3 = [
-          c.origin[0] + o.xStep * depth,
+          xOf(c, node.id, depth),
           c.origin[1] + lanePitchY * lane,
           c.origin[2],
         ];
         const states = c.states.get(node.id) ?? [];
         const cells: Cell3D[] = [];
         for (const st of states) {
-          const slot = slotMap.of(st.key);
+          const slot = c.slotMap.of(st.key);
           if (!slot) continue;
           // 削除マーカーはハッシュが定数なので、locate を渡されなくても判定できる。
           // locate 任せにすると、渡されなかったときに「消えた」が図から落ちる
-          const isTomb =
-            st.ref.hash === TOMBSTONE_HASH || input.locate?.(st.ref.hash) === 'tombstone';
           cells.push({
             key: st.key,
             type: st.ref.type,
             id: st.ref.id,
             hash: st.ref.hash,
             slot,
-            status: isTomb ? 'tombstone' : 'present',
-            changed: st.changed,
+            action: st.action,
             inChangedRefs: st.inChangedRefs,
             // 図に出ていないスコープを指す印は付けない（クリックしても何も起きない嘘になる）
             nestedScopeId: nestedIfShown(resolve(st.ref, c.scopeId)),
@@ -329,8 +399,10 @@ export function computeWorldLine3DLayout(
           scopeId: c.scopeId,
           nodeId: node.id,
           origin,
-          extentY,
-          extentZ,
+          extentY: c.extentY,
+          extentZ: c.extentZ,
+          cols: c.slotMap.cols,
+          rows: c.slotMap.rows,
           depth,
           isApex: node.id === c.graph.state.apexNodeId,
           isRoot: node.id === c.graph.state.rootNodeId,
@@ -378,6 +450,32 @@ export function computeWorldLine3DLayout(
     }
   }
 
+  // --- 同一性の線（同じオブジェクトを時間方向につなぐレール） ---------------
+  // 席は全ノードで固定なので、この線は時間軸に平行なまっすぐな線になる。
+  // 消えたオブジェクトはそこで途切れる（墓標より先へは伸びない）。
+  const identities: IdentityLink3D[] = [];
+  for (const c of calcs) {
+    for (const node of sortedNodes(c.graph)) {
+      if (!node.parentId) continue;
+      const from = platesByScopeNode.get(`${c.scopeId} ${node.parentId}`);
+      const to = platesByScopeNode.get(`${c.scopeId} ${node.id}`);
+      if (!from || !to) continue;
+      const parentKeys = new Map(from.cells.map((cell) => [cell.key, cell]));
+      for (const cell of to.cells) {
+        const prev = parentKeys.get(cell.key);
+        // 親に居なかった＝ここで生まれたもの。つなぐ相手がいない
+        if (!prev || prev.action === 'deleted') continue;
+        identities.push({
+          from: cellCenterWorld(from, prev.slot, o.cellPitch),
+          to: cellCenterWorld(to, cell.slot, o.cellPitch),
+          key: cell.key,
+          scopeId: c.scopeId,
+          action: cell.action,
+        });
+      }
+    }
+  }
+
   // --- 範囲 -----------------------------------------------------------------
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
@@ -397,18 +495,23 @@ export function computeWorldLine3DLayout(
     max[0] = max[1] = max[2] = 0;
   }
 
-  // 2Dインスペクタは「いまの世界」の件数を出しているので、差を語るなら apex だけ数える。
-  // 全ノードの延べで数えるとノード数ぶん水増しされて、申告そのものが嘘になる
-  const tombstoneCount = plates
-    .filter((p) => p.isApex)
-    .reduce((n, p) => n + p.cells.filter((c) => c.status === 'tombstone').length, 0);
+  // 墓標は「消された瞬間のノード」にしか出ないので、全ノードの延べで数えてよい。
+  // （もし全ノードに描き続けていたらノード数ぶん水増しされ、申告そのものが嘘になる）
+  const tombstoneCount = plates.reduce(
+    (n, p) => n + p.cells.filter((c) => c.action === 'deleted').length,
+    0
+  );
 
   const base: Layout3D = {
     plates,
     edges,
+    identities,
     nests,
     bounds: { min: min as Vec3, max: max as Vec3 },
-    grid: { cols: slotMap.cols, rows: slotMap.rows },
+    grid: {
+      cols: Math.max(1, ...[...slotMapOf.values()].map((m) => m.cols)),
+      rows: Math.max(1, ...[...slotMapOf.values()].map((m) => m.rows)),
+    },
     diagnostics: {
       orphanScopeIds: tree.orphanScopeIds,
       emptyScopeIds: tree.emptyScopeIds,

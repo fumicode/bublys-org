@@ -35,8 +35,8 @@ import {
 } from 'three';
 import type { Layout3D, Plate3D } from './types.js';
 import type { RefLocation } from '../refLocation.js';
-import { PALETTE_3D, cellStyle } from './palette3d.js';
-import { CELL_PX, HEADER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
+import { ACTION_COLOR, PALETTE_3D, cellStyle } from './palette3d.js';
+import { paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { orbitToPosition, type Orbit } from './camera.js';
 
 export type SceneOptions = {
@@ -112,6 +112,7 @@ export function createWorldLine3DScene(
   let cellMesh: InstancedMesh | null = null;
   let edgeLines: LineSegments | null = null;
   let nestLines: LineSegments | null = null;
+  let identityLines: LineSegments | null = null;
   let orbit = initialOrbit;
 
   const applyCamera = () => {
@@ -137,7 +138,7 @@ export function createWorldLine3DScene(
       (cellMesh.material as { dispose(): void }).dispose();
       // geometry（boxGeo）は使い回している共有物なので、ここでは解放しない
     }
-    for (const obj of [edgeLines, nestLines]) {
+    for (const obj of [edgeLines, nestLines, identityLines]) {
       if (!obj) continue;
       scene.remove(obj);
       obj.geometry.dispose();
@@ -146,6 +147,7 @@ export function createWorldLine3DScene(
     cellMesh = null;
     edgeLines = null;
     nestLines = null;
+    identityLines = null;
   };
 
   const plateGeometry = (extentZ: number, extentY: number): PlaneGeometry => {
@@ -163,7 +165,12 @@ export function createWorldLine3DScene(
   };
 
   function buildLines(
-    segments: { from: readonly number[]; to: readonly number[]; color: string }[]
+    segments: {
+      from: readonly number[];
+      to: readonly number[];
+      color: string;
+      opacity?: number;
+    }[]
   ): LineSegments | null {
     if (segments.length === 0) return null;
     const pos = new Float32Array(segments.length * 6);
@@ -172,7 +179,9 @@ export function createWorldLine3DScene(
     segments.forEach((s, i) => {
       pos.set([s.from[0], s.from[1], s.from[2], s.to[0], s.to[1], s.to[2]], i * 6);
       c.set(s.color);
-      col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
+      // 線ごとの濃さは頂点カラーの明るさで出す（マテリアルは1つしか持てないので）
+      const a = s.opacity ?? 1;
+      col.set([c.r * a, c.g * a, c.b * a, c.r * a, c.g * a, c.b * a], i * 6);
     });
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(pos, 3));
@@ -184,9 +193,6 @@ export function createWorldLine3DScene(
 
   function update(layout: Layout3D, opts: SceneOptions, selected: string | null): SceneStats {
     clearGroup();
-
-    const cols = layout.grid.cols;
-    const rows = layout.grid.rows;
 
     // --- 板 ---------------------------------------------------------------
     // 手前（＝カメラに近い）から順にテクスチャを配る。溢れた分は単色の要約表示
@@ -203,21 +209,30 @@ export function createWorldLine3DScene(
       const isSelected = selected === `${plate.scopeId} ${plate.nodeId}`;
       if (textured < opts.maxTexturedPlates) {
         const canvas = document.createElement('canvas');
-        const size = plateCanvasSize({ cols, rows });
+        const grid = { cols: plate.cols, rows: plate.rows };
+        const size = plateCanvasSize(grid);
         canvas.width = size.width;
         canvas.height = size.height;
-        paintPlate(canvas, plate, { cols, rows, locate: opts.locate, selected: isSelected });
+        paintPlate(canvas, plate, { ...grid, locate: opts.locate, selected: isSelected });
         const tex = new CanvasTexture(canvas);
         // 既定は NoColorSpace。設定しないと板の絵と 3D の箱で同じ色が違って出る
         tex.colorSpace = SRGBColorSpace;
-        material = new MeshBasicMaterial({ map: tex, side: DoubleSide, transparent: true });
+        material = new MeshBasicMaterial({
+          map: tex,
+          side: DoubleSide,
+          transparent: true,
+          // 半透明の板を何枚も重ねるので、深度を書かずに奥から順に混ぜる。
+          // 書くと手前の板が奥の板を隠して「積み重なり」が見えなくなる
+          depthWrite: false,
+        });
         textured++;
       } else {
         material = new MeshBasicMaterial({
           color: new Color(PALETTE_3D.plate),
           side: DoubleSide,
           transparent: true,
-          opacity: 0.7,
+          opacity: PALETTE_3D.plateOpacity,
+          depthWrite: false,
         });
       }
       const mesh = new Mesh(geo, material);
@@ -227,10 +242,14 @@ export function createWorldLine3DScene(
     }
 
     // --- 変わったセルだけを箱にして、板から -X（過去側）へ伸ばす -----------
+    // 出来事（作られた・変わった）のあったセルだけを箱にして立てる。
+    // 消されたもの（墓標）は伸ばさない。何も起きていないものは板の絵のまま
     const changed: { plate: Plate3D; cell: Plate3D['cells'][number] }[] = [];
     for (const plate of layout.plates) {
       for (const cell of plate.cells) {
-        if (cell.changed && cell.status !== 'tombstone') changed.push({ plate, cell });
+        if (cell.action === 'created' || cell.action === 'changed') {
+          changed.push({ plate, cell });
+        }
       }
     }
     if (changed.length > 0) {
@@ -272,6 +291,19 @@ export function createWorldLine3DScene(
       }))
     );
     if (edgeLines) scene.add(edgeLines);
+
+    // --- 同一性のレール（同じオブジェクトを時間方向につなぐ） ---------------
+    // 席が固定なので、この線は時間軸に平行なまっすぐな線になる。
+    // 出来事の無かった区間は淡く、出来事のあった先は出来事の色で出す
+    identityLines = buildLines(
+      layout.identities.map((l) => ({
+        from: l.from,
+        to: l.to,
+        color: ACTION_COLOR[l.action],
+        opacity: l.action === 'unchanged' ? 0.16 : 0.8,
+      }))
+    );
+    if (identityLines) scene.add(identityLines);
 
     // --- 入れ子の漏斗 ------------------------------------------------------
     // 連動するもの（アドレス連動）と、名前が揃っているだけのものを色で分ける。
@@ -336,5 +368,3 @@ export function createWorldLine3DScene(
     dispose,
   };
 }
-
-export { CELL_PX, HEADER_PX };
