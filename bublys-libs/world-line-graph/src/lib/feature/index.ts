@@ -53,3 +53,7 @@ export {
   TOMBSTONE_HASH,
   type InspectorSources,
 } from './inspectorModel';
+export {
+  WorldLine3DInspector,
+  type WorldLine3DInspectorProps,
+} from './WorldLine3DInspector';
