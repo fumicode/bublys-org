@@ -2,9 +2,13 @@
 
 import { useContext, type ReactNode } from "react";
 import { BubbleRoute, BubblesContext, type OpeningPosition } from "@bublys-org/bubbles-ui";
-import { WorldLineInspector } from "@bublys-org/world-line-graph";
+import {
+  WorldLineInspector,
+  WorldLine3DInspector,
+} from "@bublys-org/world-line-graph";
 import {
   APP_SCOPE_ID,
+  homeScopeOf,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -226,6 +230,27 @@ const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
 const WorldLineInspectorBubble: BubbleRoute["Component"] = () =>
   withObjects(<WorldLineInspector defaultScopeId={APP_SCOPE_ID} />);
 
+// --- 世界線 3D ビュー（デバッグ用） ---
+// 入れ子は記述子の本籍（homeScope）から導く。hotel は Schedule:<id> が本籍なので、
+// 勤務表・可能勤務帯・制約・操作履歴のどれもが同じ勤務表の世界線に解決される。
+// このバブリの入れ子はアドレス連動しない（名前の規約だけ）ので isLinked は渡さない。
+const resolveHotelNestedScope = (
+  ref: { type: string; id: string },
+  currentScopeId: string
+): string | null => {
+  const scopeId = homeScopeOf(ref.type, ref.id);
+  if (!scopeId || scopeId === currentScopeId) return null;
+  return scopeId;
+};
+
+const WorldLine3DBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <WorldLine3DInspector
+      rootScopeId={APP_SCOPE_ID}
+      resolveNestedScopeId={resolveHotelNestedScope}
+    />
+  );
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -235,6 +260,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },
+  { pattern: "hotel-shift-puzzle/world-line-3d", type: "world-line-3d", Component: WorldLine3DBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1100, height: 700 } } },
   // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
   // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない

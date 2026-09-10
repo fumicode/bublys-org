@@ -1,0 +1,146 @@
+/**
+ * カメラの姿勢（純粋関数）。OrbitControls は使わない。
+ *
+ * ★ 板の法線は **X（時間軸）** であることに注意。板は時間軸に直交する断面
+ *   （フィルムのコマ）なので、**板の面を見るには X 軸に沿って見る**（yaw = ±90°）。
+ *   yaw = 0（-Z を向く）だと板はエッジオンになり、時間の流れと分岐・入れ子の
+ *   構造だけが見える「年表」の絵になる。どちらも要るのでプリセットで切り替える。
+ *
+ * 使わない理由:
+ *  - カメラ挙動がテストできる（デバッグ道具なので「見えている絵が正しい」が担保できること自体が価値）
+ *  - wheel の所有権が完全にこちらに来る。バブルは親（BubblesLayeredView）が window の
+ *    wheel を握っているので、二重に動くのを確実に止められる
+ *  - three/addons の型解決に依存しない
+ *
+ * 代償として damping と実機ピンチの追従を失う。デバッグ道具なので許容する。
+ *
+ * 既定の向きは「front view」: X（時間）が画面右、Y（分岐）が画面上、Z（入れ子）が奥。
+ * 2Dの世界線ビューが左→右に時間を流しているので、それと同じ読み方になるようにしてある。
+ */
+import type { Vec3 } from './types.js';
+
+export type Orbit = {
+  /** 注視点 */
+  readonly target: Vec3;
+  /** 水平角（rad）。0 で +Z から見る＝front view */
+  readonly yaw: number;
+  /** 仰角（rad）。+ で上から見下ろす */
+  readonly pitch: number;
+  /** 注視点からの距離 */
+  readonly distance: number;
+};
+
+export const PITCH_LIMIT = Math.PI / 2 - 0.05;
+export const MIN_DISTANCE = 2;
+export const MAX_DISTANCE = 20000;
+
+export function clampOrbit(o: Orbit): Orbit {
+  return {
+    ...o,
+    pitch: Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, o.pitch)),
+    distance: Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, o.distance)),
+  };
+}
+
+/** カメラの位置。yaw=0, pitch=0 なら target + (0,0,d)（＝ -Z を向く front view） */
+export function orbitToPosition(o: Orbit): Vec3 {
+  const cp = Math.cos(o.pitch);
+  return [
+    o.target[0] + o.distance * Math.sin(o.yaw) * cp,
+    o.target[1] + o.distance * Math.sin(o.pitch),
+    o.target[2] + o.distance * Math.cos(o.yaw) * cp,
+  ];
+}
+
+/** 全体が画面に収まる姿勢。既定は少し見下ろした front view */
+export function fitOrbit(
+  bounds: { min: Vec3; max: Vec3 },
+  aspect: number,
+  fovDeg = 45,
+  pitch = 0.35,
+  yaw = 0
+): Orbit {
+  const center: Vec3 = [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    (bounds.min[1] + bounds.max[1]) / 2,
+    (bounds.min[2] + bounds.max[2]) / 2,
+  ];
+  const size: Vec3 = [
+    Math.max(bounds.max[0] - bounds.min[0], 1),
+    Math.max(bounds.max[1] - bounds.min[1], 1),
+    Math.max(bounds.max[2] - bounds.min[2], 1),
+  ];
+  // 外接球で収める。どの向きから見ても収まるので、視点を切り替えても破綻しない
+  // （軸ごとに距離を出すと「画面の横＝X」を仮定することになり、yaw を変えた瞬間に外れる）
+  const radius = Math.hypot(size[0], size[1], size[2]) / 2;
+  const fov = (fovDeg * Math.PI) / 180;
+  const fovH = 2 * Math.atan(Math.tan(fov / 2) * Math.max(aspect, 0.0001));
+  const distance = (radius / Math.sin(Math.min(fov, fovH) / 2)) * 1.02;
+  return clampOrbit({ target: center, yaw, pitch, distance });
+}
+
+/**
+ * 見込みの姿勢（プリセット）。
+ * 板の法線が X なので、yaw = ±90° で板の面が正対する。
+ */
+export const ORBIT_PRESETS = {
+  /** 斜め（既定）。板の面を見ながら、時間の奥行きも分かる */
+  iso: { yaw: 1.05, pitch: 0.3, label: '斜め' },
+  /** 板の面を正対で見る。中身（オブジェクトの並び）が一番読める */
+  plates: { yaw: Math.PI / 2, pitch: 0.08, label: '板' },
+  /** 年表。時間が右へ流れ、板はエッジオン。分岐と入れ子の構造が読める */
+  timeline: { yaw: 0, pitch: 0.15, label: '年表' },
+  /** 見下ろし。分岐（Y）と入れ子の段（Z）の配置が読める */
+  top: { yaw: 0, pitch: PITCH_LIMIT - 0.1, label: '俯瞰' },
+} as const;
+
+// ============================================================================
+// ホイール
+// ============================================================================
+
+export type WheelInput = {
+  readonly deltaX: number;
+  readonly deltaY: number;
+  /** トラックパッドのピンチは ctrl 付きで来る */
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly shiftKey: boolean;
+};
+
+export type WheelAction =
+  | { readonly kind: 'zoom'; readonly amount: number }
+  | { readonly kind: 'panTime'; readonly amount: number };
+
+/**
+ * ホイールの意味を決める。
+ * 素のホイール／ピンチ＝ズーム、shift+縦 と 横スクロール＝時間方向のパン。
+ */
+export function wheelAction(e: WheelInput): WheelAction {
+  if (e.shiftKey) return { kind: 'panTime', amount: e.deltaY };
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return { kind: 'panTime', amount: e.deltaX };
+  return { kind: 'zoom', amount: e.deltaY };
+}
+
+/** ホイールを姿勢に適用する。panTime は target.x しか動かさない（時間軸に沿って移動する） */
+export function applyWheel(orbit: Orbit, action: WheelAction): Orbit {
+  if (action.kind === 'zoom') {
+    return clampOrbit({
+      ...orbit,
+      distance: orbit.distance * Math.exp(action.amount * 0.0015),
+    });
+  }
+  const step = orbit.distance * 0.002 * action.amount;
+  return {
+    ...orbit,
+    target: [orbit.target[0] + step, orbit.target[1], orbit.target[2]],
+  };
+}
+
+/** ドラッグで回す */
+export function applyDrag(orbit: Orbit, dx: number, dy: number): Orbit {
+  return clampOrbit({
+    ...orbit,
+    yaw: orbit.yaw - dx * 0.005,
+    pitch: orbit.pitch + dy * 0.005,
+  });
+}

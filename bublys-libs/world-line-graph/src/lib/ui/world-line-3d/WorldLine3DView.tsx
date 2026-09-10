@@ -1,0 +1,437 @@
+'use client';
+
+/**
+ * WorldLine3DView — 3D の世界線ビュー（プレゼンテーショナル）。
+ *
+ * three は **useEffect の中で動的 import する**。ここで静的 import すると
+ * Next.js の SSR に届き、初期バンドルにもバブリの IIFE にも three が入ってしまう。
+ * React.lazy は使わない（このリポジトリには default export も Suspense 境界も無い）。
+ *
+ * 読み取り専用。世界線には一切書き込まない（覗くだけで世界が動いてはいけない）。
+ */
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FC,
+} from 'react';
+import type { RefLocation } from '../refLocation.js';
+import { LOCATION_MARK, LOCATION_ORDER } from '../refLocation.js';
+import type { Layout3D, Layout3DOptions } from './types.js';
+import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
+import {
+  ORBIT_PRESETS,
+  applyDrag,
+  applyWheel,
+  fitOrbit,
+  wheelAction,
+  type Orbit,
+} from './camera.js';
+import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
+import type { SlotMap } from './slots.js';
+import { PALETTE_3D } from './palette3d.js';
+// 型だけ。実体は動的 import する（ここで実体を import すると three が静的に見える）
+import type { SceneStats, WorldLine3DScene } from './scene.js';
+
+export type Selection3D = {
+  readonly scopeId: string;
+  readonly nodeId: string;
+  readonly cellKey: string | null;
+};
+
+export type WorldLine3DViewProps = {
+  readonly layout: Layout3D;
+  readonly options?: Partial<Layout3DOptions>;
+  readonly locate?: (hash: string) => RefLocation;
+  readonly selection: Selection3D | null;
+  readonly onSelect: (sel: Selection3D | null) => void;
+  /** セルの入れ子を開く／閉じる */
+  readonly onToggleNested?: (scopeId: string) => void;
+  /** 右側の詳細パネル（feature 層が中身を差し込む） */
+  readonly detail?: React.ReactNode;
+};
+
+const HUD: React.CSSProperties = {
+  position: 'absolute',
+  left: 8,
+  top: 8,
+  padding: '6px 10px',
+  borderRadius: 6,
+  background: 'rgba(13,17,23,0.82)',
+  border: '1px solid #30363d',
+  color: '#c9d1d9',
+  font: '11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace',
+  pointerEvents: 'none',
+  maxWidth: '60%',
+};
+
+const btn: React.CSSProperties = {
+  background: '#21262d',
+  color: '#c9d1d9',
+  border: '1px solid #30363d',
+  borderRadius: 4,
+  padding: '2px 8px',
+  cursor: 'pointer',
+  font: 'inherit',
+  pointerEvents: 'auto',
+};
+
+export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
+  layout,
+  options,
+  locate,
+  selection,
+  onSelect,
+  onToggleNested,
+  detail,
+}) => {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<WorldLine3DScene | null>(null);
+  const orbitRef = useRef<Orbit | null>(null);
+  const [stats, setStats] = useState<SceneStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const o: Layout3DOptions = useMemo(
+    () => ({ ...DEFAULT_LAYOUT_3D_OPTIONS, ...options }),
+    [options]
+  );
+  /**
+   * 席の逆引き（席 → key）。
+   *
+   * ★ buildSlotMap で作り直してはいけない。レイアウトは全ノードの changedRefs から
+   *   席を配るが、plates[].cells は root から辿れたノードぶんしか無い。収集元が違うので、
+   *   壊れたグラフ（孤児ノード・親より古い時刻）では席が1つずれ、クリックしたものと
+   *   違うオブジェクトが右パネルに出る。**レイアウトが実際に配った席をそのまま使う。**
+   */
+  const slotMap: SlotMap = useMemo(() => {
+    const at = new Map<string, string>();
+    const of = new Map<string, { col: number; row: number }>();
+    for (const p of layout.plates) {
+      for (const c of p.cells) {
+        at.set(`${c.slot.col},${c.slot.row}`, c.key);
+        of.set(c.key, c.slot);
+      }
+    }
+    return {
+      of: (key: string) => of.get(key),
+      at: (col: number, row: number) => at.get(`${col},${row}`),
+      cols: layout.grid.cols,
+      rows: layout.grid.rows,
+      keys: [...of.keys()],
+    };
+  }, [layout]);
+
+  // --- 生成と後始末 --------------------------------------------------------
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let disposed = false;
+    let scene: WorldLine3DScene | null = null;
+
+    (async () => {
+      let mod: typeof import('./scene.js');
+      try {
+        mod = await import('./scene.js');
+      } catch (e) {
+        // 握りつぶすと真っ黒な四角が出るだけになる。理由を画面に出す
+        setError(`3D の読み込みに失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+      if (disposed || !hostRef.current) return;
+      const rect = host.getBoundingClientRect();
+      const orbit = fitOrbit(
+        layout.bounds,
+        Math.max(rect.width, 1) / Math.max(rect.height, 1),
+        45,
+        ORBIT_PRESETS.iso.pitch,
+        ORBIT_PRESETS.iso.yaw
+      );
+      orbitRef.current = orbit;
+      try {
+        scene = mod.createWorldLine3DScene(host, orbit);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        return;
+      }
+      sceneRef.current = scene;
+      scene.resize(rect.width, rect.height);
+      setReady(true);
+    })();
+
+    return () => {
+      disposed = true;
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+      setReady(false);
+    };
+    // 生成は1回だけ。レイアウトの変化は下の effect が拾う
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- レイアウトが変わったら描き直す --------------------------------------
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !ready) return;
+    setStats(
+      scene.update(
+        layout,
+        {
+          plateThickness: o.plateThickness,
+          changedThickness: o.changedThickness,
+          cellPitch: o.cellPitch,
+          cell: o.cell,
+          locate,
+          maxTexturedPlates: 160,
+        },
+        selection ? `${selection.scopeId} ${selection.nodeId}` : null
+      )
+    );
+  }, [layout, o, locate, selection, ready]);
+
+  // --- リサイズ（バブルは自由にリサイズされる） ----------------------------
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    // contentRect はレイアウト px。奥レイヤーの CSS scale の影響を受けない
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) sceneRef.current?.resize(r.width, r.height);
+    });
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, []);
+
+  // --- ホイール（canvas に直付け。親のズームと二重に動かさない） ------------
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !ready) return;
+    const canvas = host.querySelector('canvas');
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      // BubblesLayeredView は window の wheel を defaultPrevented を見ずに拾うので、
+      // preventDefault だけでなく stopPropagation も要る
+      e.preventDefault();
+      e.stopPropagation();
+      const orbit = orbitRef.current;
+      if (!orbit) return;
+      const next = applyWheel(orbit, wheelAction(e));
+      orbitRef.current = next;
+      sceneRef.current?.setOrbit(next);
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, [ready]);
+
+  // --- ドラッグで回す / クリックで選ぶ --------------------------------------
+  const down = useRef<{ x: number; y: number; t: number } | null>(null);
+  const dragging = useRef(false);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // canvas の上で押したときだけ回転・選択の対象にする。
+    // HUD のボタンを押しただけで選択処理が走ってしまうため（実際に踏んだ）
+    if ((e.target as Element).tagName !== 'CANVAS') {
+      down.current = null;
+      dragging.current = false;
+      return;
+    }
+    down.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+    dragging.current = true;
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  }, []);
+
+  const endDrag = useCallback(() => {
+    dragging.current = false;
+    down.current = null;
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    // ボタンが離れているのに dragging が立っていたら、キャプチャを失っている
+    if (e.buttons === 0 && dragging.current) {
+      dragging.current = false;
+      down.current = null;
+      return;
+    }
+    if (!dragging.current || !down.current) return;
+    const orbit = orbitRef.current;
+    if (!orbit) return;
+    const next = applyDrag(orbit, e.movementX, e.movementY);
+    orbitRef.current = next;
+    sceneRef.current?.setOrbit(next);
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      dragging.current = false;
+      const start = down.current;
+      down.current = null;
+      const host = hostRef.current;
+      const scene = sceneRef.current;
+      const orbit = orbitRef.current;
+      if (!start || !host || !scene || !orbit) return;
+      // ドラッグの終わりで選択が飛ばないように、クリックのときだけ拾う
+      if (!isClick(start, { x: e.clientX, y: e.clientY, t: Date.now() })) return;
+
+      const rect = host.getBoundingClientRect();
+      const ndc = ndcFromPointer(e.clientX, e.clientY, rect);
+      const ray = screenToRay(
+        ndc,
+        scene.camera.position,
+        orbit.target,
+        scene.camera.fov,
+        Math.max(rect.width, 1) / Math.max(rect.height, 1)
+      );
+      const hit = pickPlate(ray, layout.plates, slotMap, o.cellPitch);
+      if (!hit) {
+        onSelect(null);
+        return;
+      }
+      onSelect({ scopeId: hit.scopeId, nodeId: hit.nodeId, cellKey: hit.cellKey });
+      // 入れ子を持つセルを選んだら、その世界線を開く／閉じる
+      if (hit.cellKey && onToggleNested) {
+        const plate = layout.plates.find(
+          (p) => p.scopeId === hit.scopeId && p.nodeId === hit.nodeId
+        );
+        const cell = plate?.cells.find((c) => c.key === hit.cellKey);
+        if (cell?.nestedScopeId) onToggleNested(cell.nestedScopeId);
+      }
+    },
+    [layout, slotMap, o.cellPitch, onSelect, onToggleNested]
+  );
+
+  const setPreset = useCallback(
+    (preset: keyof typeof ORBIT_PRESETS) => {
+      const host = hostRef.current;
+      if (!host) return;
+      const rect = host.getBoundingClientRect();
+      const orbit = fitOrbit(
+        layout.bounds,
+        Math.max(rect.width, 1) / Math.max(rect.height, 1),
+        45,
+        ORBIT_PRESETS[preset].pitch,
+        ORBIT_PRESETS[preset].yaw
+      );
+      orbitRef.current = orbit;
+      sceneRef.current?.setOrbit(orbit);
+    },
+    [layout.bounds]
+  );
+
+  const d = layout.diagnostics;
+  const warnings: string[] = [];
+  if (d.violations.length > 0) warnings.push(`⚠ ${d.violations[0]}`);
+  if (d.orphanScopeIds.length > 0)
+    warnings.push(`図に出ていないスコープ ${d.orphanScopeIds.length} 件`);
+  if (d.emptyScopeIds.length > 0)
+    warnings.push(`ノードが無いスコープ ${d.emptyScopeIds.length} 件`);
+  if (d.orphanNodeIds.length > 0)
+    warnings.push(`親を辿れないノード ${d.orphanNodeIds.length} 件`);
+  if (d.clockAnomalyNodeIds.length > 0)
+    warnings.push(`親より古い時刻のノード ${d.clockAnomalyNodeIds.length} 件`);
+  if (stats && stats.summarizedPlates > 0)
+    warnings.push(`要約表示 ${stats.summarizedPlates} 枚（中身は省略）`);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex' }}>
+      <div
+        ref={hostRef}
+        style={{
+          position: 'relative',
+          flex: 1,
+          minWidth: 0,
+          background: PALETTE_3D.background,
+          cursor: 'grab',
+          userSelect: 'none',
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
+      >
+        <div style={HUD}>
+          <div>
+            <strong style={{ color: '#58a6ff' }}>世界線 3D</strong>{' '}
+            <span style={{ color: '#8b949e' }}>
+              X = 編集ステップ / Y = 分岐 / Z = 入れ子の段
+            </span>
+          </div>
+          <div>
+            板 {layout.plates.length} / セル{' '}
+            {layout.plates.reduce((n, p) => n + p.cells.length, 0)} / 変化{' '}
+            {stats?.changedCells ?? '…'} / 入れ子 {layout.nests.length}
+          </div>
+          <div>
+            {LOCATION_ORDER.map((k) => (
+              <span key={k} style={{ color: LOCATION_MARK[k].color, marginRight: 8 }}>
+                {LOCATION_MARK[k].mark}
+                {LOCATION_MARK[k].label}
+              </span>
+            ))}
+            <span style={{ color: PALETTE_3D.nestNominal }}>― 名前規約の入れ子</span>{' '}
+            <span style={{ color: PALETTE_3D.nestLinked }}>― アドレス連動の入れ子</span>
+          </div>
+          {d.tombstoneCount > 0 && (
+            <div style={{ color: '#8b949e' }}>
+              削除済み {d.tombstoneCount} 件を墓標で表示（2Dインスペクタの件数とはこの分だけ差が出ます）
+            </div>
+          )}
+          {d.unprunedChangedCount > 0 && (
+            <div style={{ color: '#8b949e' }}>
+              参照だけ載って値は変わっていないもの {d.unprunedChangedCount} 件（強調していません）
+            </div>
+          )}
+          {warnings.map((w) => (
+            <div key={w} style={{ color: '#f85149' }}>
+              {w}
+            </div>
+          ))}
+          <div style={{ marginTop: 4 }}>
+            {(['iso', 'plates', 'timeline', 'top'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                style={{ ...btn, marginRight: 4 }}
+                onClick={() => setPreset(p)}
+              >
+                {ORBIT_PRESETS[p].label}
+              </button>
+            ))}
+            <span style={{ color: '#6e7681', marginLeft: 6 }}>
+              ドラッグ=回転 / ホイール=ズーム / shift+ホイール=時間送り
+            </span>
+          </div>
+        </div>
+        {error && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              color: '#f85149',
+              font: '13px system-ui',
+            }}
+          >
+            {error}
+          </div>
+        )}
+      </div>
+      {detail && (
+        <div
+          style={{
+            width: 340,
+            flexShrink: 0,
+            borderLeft: '1px solid #30363d',
+            overflow: 'auto',
+            background: PALETTE_3D.background,
+          }}
+        >
+          {detail}
+        </div>
+      )}
+    </div>
+  );
+};

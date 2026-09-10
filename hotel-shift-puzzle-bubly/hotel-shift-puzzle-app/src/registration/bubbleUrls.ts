@@ -100,6 +100,9 @@ export const worldFileUrl = (): string => `hotel-shift-puzzle/file`;
 export const worldLineInspectorUrl = (): string =>
   `hotel-shift-puzzle/world-line-inspector`;
 
+/** 世界線を3Dで覗くビュー（デバッグ用） */
+export const worldLine3DUrl = (): string => `hotel-shift-puzzle/world-line-3d`;
+
 /** 操作履歴（ノウハウ可視化）バブル */
 export const scheduleEditLogUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;

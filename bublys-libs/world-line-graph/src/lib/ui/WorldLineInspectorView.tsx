@@ -8,17 +8,9 @@
  * この2つのズレが不具合の温床なので、**参照ごとに値がどこにあるか**を必ず出す。
  */
 import { FC, useEffect, useRef } from 'react';
+import { LOCATION_MARK, LOCATION_ORDER, type RefLocation } from './refLocation.js';
 
-/** その参照が指す値がいまどこにあるか */
-export type RefLocation =
-  /** メモリ（Redux の CAS）にある。同期で読める */
-  | 'memory'
-  /** メモリからは追い出された。IndexedDB にはある（非同期なら読める） */
-  | 'idb'
-  /** どこにも無い。もう復元できない */
-  | 'lost'
-  /** 削除マーカー（tombstone） */
-  | 'tombstone';
+export type { RefLocation };
 
 export type InspectorRefRow = {
   type: string;
@@ -72,13 +64,6 @@ export type WorldLineInspectorViewProps = {
   /** その値を IndexedDB から引いてくる */
   onLoadValue: (hash: string) => void;
   loading: boolean;
-};
-
-const LOCATION_MARK: Record<RefLocation, { mark: string; label: string; color: string }> = {
-  memory: { mark: '◎', label: 'メモリ', color: '#7ee787' },
-  idb: { mark: '○', label: '永続のみ', color: '#d29922' },
-  lost: { mark: '×', label: '消失', color: '#f85149' },
-  tombstone: { mark: '␡', label: '削除済み', color: '#8b949e' },
 };
 
 const short = (s: string | null | undefined, n = 8) =>
@@ -150,8 +135,7 @@ const Locations: FC<{ rows: InspectorRefRow[] }> = ({ rows }) => {
   }, {});
   return (
     <>
-      {(Object.keys(LOCATION_MARK) as RefLocation[])
-        .filter((k) => counts[k])
+      {LOCATION_ORDER.filter((k) => counts[k])
         .map((k) => (
           <span key={k} style={{ color: LOCATION_MARK[k].color, marginRight: 8 }}>
             {LOCATION_MARK[k].mark}
@@ -228,9 +212,7 @@ export const WorldLineInspectorView: FC<WorldLineInspectorViewProps> = ({
         IndexedDB: グラフ {idbScopeCount ?? '…'} / 状態 {idbStateCount ?? '…'}
       </span>
       <span style={{ color: '#8b949e' }}>
-        {Object.values(LOCATION_MARK)
-          .map((l) => `${l.mark}${l.label}`)
-          .join('  ')}
+        {LOCATION_ORDER.map((k) => `${LOCATION_MARK[k].mark}${LOCATION_MARK[k].label}`).join('  ')}
       </span>
       <button type="button" style={S.btn} onClick={onReload} disabled={loading}>
         {loading ? '読み込み中…' : '再読込'}
