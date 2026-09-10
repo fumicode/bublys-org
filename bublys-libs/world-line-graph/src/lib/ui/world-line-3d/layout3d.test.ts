@@ -365,12 +365,13 @@ describe('computeWorldLine3DLayout', () => {
       const inSched = l.plates
         .filter((p) => p.scopeId === 'Schedule:x')
         .flatMap((p) => p.cells);
-      expect(inSched.filter((c) => c.type === 'Staff').every((c) => c.role === 'pinned')).toBe(
-        true
-      );
-      expect(inSched.filter((c) => c.type === 'Schedule').every((c) => c.role === null)).toBe(
-        true
-      );
+      // ★ every は空配列で true。数えてから確かめる
+      const staff = inSched.filter((c) => c.type === 'Staff');
+      const sched = inSched.filter((c) => c.type === 'Schedule');
+      expect(staff.length).toBeGreaterThan(0);
+      expect(sched.length).toBeGreaterThan(0);
+      expect(staff.every((c) => c.role === 'pinned')).toBe(true);
+      expect(sched.every((c) => c.role === null)).toBe(true);
       // 台帳（起点スコープ）は世界ではないので立場を持たない
       expect(
         l.plates
@@ -413,6 +414,7 @@ describe('computeWorldLine3DLayout', () => {
       const s1 = cells.filter((c) => c.id === 's1');
       const s2 = cells.filter((c) => c.id === 's2');
       expect(s1.length).toBeGreaterThan(0);
+      expect(s2.length).toBeGreaterThan(0);
       expect(s1.every((c) => c.outside === 'differs')).toBe(true); // 外では改名済み
       expect(s2.every((c) => c.outside === 'same')).toBe(true); // 外も同じまま
       // 数えるのは口数（世界×オブジェクト）。板の枚数ぶん水増ししない

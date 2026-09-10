@@ -28,7 +28,7 @@ import {
 } from "react";
 import { useCasScope, type CasScopeValue } from "@bublys-org/world-line-graph";
 import { useAppStore } from "@bublys-org/state-management";
-import { APP_SCOPE_ID } from "./commit.js";
+import { APP_SCOPE_ID, isAbsentInScope } from "./commit.js";
 import { membershipOf } from "./framework.js";
 import { migrateLegacyScopes } from "./migrateLegacyScopes.js";
 
@@ -90,6 +90,30 @@ export function readScopeIdOf(
     return APP_SCOPE_ID;
   }
   return world.scopeId;
+}
+
+/**
+ * そのオブジェクトが「本当に無い」か。**「読めないだけ」と区別する。**
+ *
+ * 値が読めない理由は2つある。「まだ一度も作られていない」と「メモリ上の CAS から
+ * 追い出された」。**既定値を作って保存してよいのは前者だけ。** 後者でやると、
+ * 中身のあるオブジェクトを空で上書きする（＝見ているだけでデータが壊れる）。
+ *
+ * 判定は参照（グラフ）で行う。参照は追い出されない。
+ * そして**読んだのと同じスコープ**を見る（{@link readScopeIdOf}）。読み先と判定先が
+ * 違うと、過去のノードへ時間移動したときに「読み込み中」が永久に解けなくなる。
+ *
+ * ★ hook ではなく純粋関数にしてあるのは、**ここをテストで固定するため**。
+ *   静かにデータが壊れる経路の番人なので、React を通さずに数えられる形にしておく。
+ */
+export function absentInReadScope(
+  store: Parameters<typeof isAbsentInScope>[0],
+  world: WorldValue,
+  type: string,
+  id: string | undefined
+): boolean {
+  if (id === undefined) return true;
+  return isAbsentInScope(store, readScopeIdOf(world, type, id), type, id);
 }
 
 /** 読み先のスコープ。分岐は {@link readScopeIdOf} の1箇所だけ */

@@ -8,7 +8,8 @@ import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
-import { CELL_PX, GUTTER_PX, HEADER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
+import { changedBoxTransform } from './geometry.js';
+import { CELL_PX, GUTTER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
 import {
   ACTION_COLOR,
@@ -30,13 +31,97 @@ import {
 } from './camera.js';
 import { applyPan, cameraBasis, projectExtent } from './camera.js';
 import type { Plate3D, Vec3 } from './types.js';
+import { LOCATION_MARK } from '../refLocation.js';
 import { buildSlotMap } from './slots.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
 
 const h = (v: unknown) => computeStateHash(v);
 const ref = (type: string, id: string, v: unknown) => createStateRef(type, id, h(v));
+
+// ---------------------------------------------------------------------------
+// 板の絵を、本物の canvas 抜きで確かめる道具
+// ---------------------------------------------------------------------------
+type Op = {
+  op: string;
+  alpha: number;
+  fill: string;
+  stroke: string;
+  /** fillRect の引数。下地（全面）・行の帯（幅3）・セル（幅20）を取り違えないため */
+  rect?: [number, number, number, number];
+  text?: string;
+};
+function fakeCanvas() {
+  const ops: Op[] = [];
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textBaseline: '',
+    clearRect: (x: number, y: number, w: number, h: number) =>
+      ops.push({ ...rec('clearRect'), rect: [x, y, w, h] }),
+    fillRect: (x: number, y: number, w: number, h: number) =>
+      ops.push({ ...rec('fillRect'), rect: [x, y, w, h] }),
+    strokeRect: () => ops.push(rec('strokeRect')),
+    fillText: (t: string, x: number, y: number) =>
+      ops.push({ ...rec('fillText'), text: t, rect: [x, y, 0, 0] }),
+    beginPath: () => undefined,
+    closePath: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    arc: () => undefined,
+    stroke: () => ops.push(rec('stroke')),
+    fill: () => ops.push(rec('fill')),
+  };
+  const rec = (op: string): Op => ({
+    op,
+    alpha: ctx.globalAlpha,
+    fill: String(ctx.fillStyle),
+    stroke: String(ctx.strokeStyle),
+  });
+  return {
+    ops,
+    canvas: { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement,
+  };
+}
+
+const plateOf = (over: Partial<Plate3D> = {}): Plate3D => ({
+  scopeId: 'app',
+  nodeId: 'n1',
+  origin: [0, 0, 0],
+  extentY: 4,
+  extentZ: 14,
+  cols: 2,
+  rows: 2,
+  depth: 0,
+  isApex: false,
+  isRoot: false,
+  timestamp: 0,
+  cells: [
+    {
+      key: 'Schedule:x',
+      type: 'Schedule',
+      id: 'x',
+      hash: 'h1',
+      slot: { col: 0, row: 0 },
+      action: 'unchanged',
+      inChangedRefs: false,
+      nestedScopeId: 'Schedule:x',
+      nestedShown: true,
+      role: null,
+      outside: null,
+    },
+  ],
+  ...over,
+});
+const cellOf = (over: Partial<Plate3D['cells'][number]> = {}) => ({
+  ...plateOf().cells[0],
+  ...over,
+});
+
 
 describe('camera', () => {
   const bounds = { min: [0, 0, 0] as const, max: [100, 20, 10] as const };
@@ -345,12 +430,60 @@ describe('applyPan — shift+ドラッグで視点を滑らせる', () => {
  * だから**書き写しそのもの**を禁じる。
  */
 describe('セルの座標の出所', () => {
-  it('scene.ts はセルの位置を自分で計算しない（cellCenterWorld を使う）', () => {
+  /**
+   * ★ 正規表現の見張りは「前回の綴り」しか禁じられない（変数名を変えて書き戻す変異は
+   *   素通りした）。**数値で固定できる純粋関数に切り出すほうが強い。**
+   *   scene.ts は姿勢を自分で計算せず、この関数を呼ぶだけにしてある。
+   */
+  it('出来事の箱は、板の絵の ■ と同じ場所に立つ', () => {
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Staff', 's2', 2),
+      ref('Schedule', 'x', 3),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const o = DEFAULT_LAYOUT_3D_OPTIONS;
+
+    for (const cell of plate.cells) {
+      const box = changedBoxTransform(plate, cell.slot, o, o.changedThickness);
+      const [, y, z] = cellCenterWorld(plate, cell.slot, o.cellPitch);
+      // Y と Z は板の上のセル中心そのもの
+      expect(box.position[1]).toBeCloseTo(y, 9);
+      expect(box.position[2]).toBeCloseTo(z, 9);
+      // X は板の面から**過去側**へ。未来側へ出すと次の板とぶつかる
+      expect(box.position[0]).toBeLessThan(plate.origin[0]);
+      expect(box.position[0]).toBeCloseTo(
+        plate.origin[0] - o.plateThickness / 2 - o.changedThickness / 2,
+        9
+      );
+      // 一辺は板の絵の ■ と同じ
+      expect(box.scale[1]).toBe(o.cell);
+      expect(box.scale[2]).toBe(o.cell);
+    }
+  });
+
+  it('scene.ts はセルの位置を自分で計算しない（共有の関数を呼ぶ）', () => {
     const src = readFileSync(join(__dirname, 'scene.ts'), 'utf-8');
-    expect(src).toContain('cellCenterWorld');
-    // `cellPitch * (... slot.row ...)` のような手書きの式が無いこと
-    expect(src).not.toMatch(/cellPitch\s*\*\s*\(\s*cell\.slot/);
-    expect(src).not.toMatch(/extentY\s*\/\s*2\s*-\s*opts\.cellPitch/);
+    expect(src).toMatch(/changedBoxTransform\s*\(/);
+    // 手書きの式が無いこと（綴りを変えた書き戻しは上の数値テストが捕まえる）
+    expect(src).not.toMatch(/cellPitch\s*\*\s*\(/);
+    expect(src).not.toMatch(/extent[YZ]\s*\/\s*2\s*-\s*opts\.cellPitch/);
+  });
+
+  /**
+   * three を静的に import したファイルは Jest（jsdom）から読み込めない。
+   * 1本でも漏れると、そのファイルに触るテストが全部落ちる＝**検査できる領域が静かに縮む**。
+   */
+  it("'three' を静的 import してよいのは scene.ts だけ", () => {
+    const offenders = readdirSync(__dirname)
+      .filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.test.ts') && !f.endsWith('.test.tsx'))
+      .filter((f) =>
+        /^\s*import\s+(?!type\b)[^;]*from\s+['"]three['"]/m.test(
+          readFileSync(join(__dirname, f), 'utf-8')
+        )
+      );
+    expect(offenders).toEqual(['scene.ts']);
   });
 });
 
@@ -417,10 +550,20 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     const size = plateCanvasSize(layout.grid);
     const o = DEFAULT_LAYOUT_3D_OPTIONS;
 
-    for (const cell of plate.cells) {
-      // キャンバス側（paintPlate と同じ式）: 左上原点。左に型名欄がある
-      const canvasX = GUTTER_PX + (cell.slot.col + 0.5) * CELL_PX;
-      const canvasY = HEADER_PX + (cell.slot.row + 0.5) * CELL_PX;
+    // ★ 式をここに書き写してはいけない。写すと「テストに写した式 ↔ layout」を
+    //   比べることになり、**paintPlate が実際に描いた場所は誰も見ていない**状態になる
+    //   （実際、描画側を 9px ずらす変異が全テストを素通りしていた）。
+    //   だから paintPlate に描かせて、その座標を読む。
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
+    const side = CELL_PX - 6; // pad 3 × 2
+    const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
+    expect(drawn).toHaveLength(plate.cells.length);
+
+    plate.cells.forEach((cell, i) => {
+      const [rx, ry] = drawn[i].rect as [number, number, number, number];
+      const canvasX = rx + side / 2;
+      const canvasY = ry + side / 2;
       // 板側（layout と同じ関数）: 中心原点。左上からの比率に直す
       const [, wy, wz] = cellCenterWorld(plate, cell.slot, o.cellPitch);
       const plateFromLeft = plate.origin[2] + plate.extentZ / 2 - wz;
@@ -428,7 +571,7 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
 
       expect(canvasX / size.width).toBeCloseTo(plateFromLeft / plate.extentZ, 9);
       expect(canvasY / size.height).toBeCloseTo(plateFromTop / plate.extentY, 9);
-    }
+    });
   });
 
   it('キャンバス上のセル中心を狙ったレイが、そのセルを返す（絵→世界→当たり判定の往復）', () => {
@@ -447,10 +590,17 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
     const at = new Map<string, string>();
     for (const c of plate.cells) at.set(`${c.slot.col},${c.slot.row}`, c.key);
 
-    for (const cell of plate.cells) {
-      // キャンバス上のマスの中心 → 板の上の位置に写す
-      const canvasX = GUTTER_PX + (cell.slot.col + 0.5) * CELL_PX;
-      const canvasY = HEADER_PX + (cell.slot.row + 0.5) * CELL_PX;
+    // 描かれた矩形をそのまま使う（式を写さない）
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
+    const side = CELL_PX - 6;
+    const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
+    expect(drawn).toHaveLength(plate.cells.length);
+
+    plate.cells.forEach((cell, i) => {
+      const [rx, ry] = drawn[i].rect as [number, number, number, number];
+      const canvasX = rx + side / 2;
+      const canvasY = ry + side / 2;
       const wz = plate.origin[2] + plate.extentZ / 2 - (canvasX / size.width) * plate.extentZ;
       const wy = plate.origin[1] + plate.extentY / 2 - (canvasY / size.height) * plate.extentY;
       const hit = pickPlate(
@@ -459,7 +609,7 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
         o.cellPitch
       );
       expect(hit?.cellKey).toBe(cell.key);
-    }
+    });
   });
 });
 
@@ -471,83 +621,6 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
  * 黙って戻っても誰も気づかない（scene.ts は three 込みで Jest から読めない）。
  */
 describe('板の絵', () => {
-  type Op = {
-    op: string;
-    alpha: number;
-    fill: string;
-    stroke: string;
-    /** fillRect の引数。下地（全面）・行の帯（幅3）・セル（幅20）を取り違えないため */
-    rect?: [number, number, number, number];
-    text?: string;
-  };
-  function fakeCanvas() {
-    const ops: Op[] = [];
-    const ctx = {
-      globalAlpha: 1,
-      fillStyle: '',
-      strokeStyle: '',
-      lineWidth: 1,
-      font: '',
-      textBaseline: '',
-      clearRect: () => undefined,
-      fillRect: (x: number, y: number, w: number, h: number) =>
-        ops.push({ ...rec('fillRect'), rect: [x, y, w, h] }),
-      strokeRect: () => ops.push(rec('strokeRect')),
-      fillText: (t: string) => ops.push({ ...rec('fillText'), text: t }),
-      beginPath: () => undefined,
-      closePath: () => undefined,
-      moveTo: () => undefined,
-      lineTo: () => undefined,
-      arc: () => undefined,
-      stroke: () => ops.push(rec('stroke')),
-      fill: () => ops.push(rec('fill')),
-    };
-    const rec = (op: string): Op => ({
-      op,
-      alpha: ctx.globalAlpha,
-      fill: String(ctx.fillStyle),
-      stroke: String(ctx.strokeStyle),
-    });
-    return {
-      ops,
-      canvas: { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement,
-    };
-  }
-
-  const plateOf = (over: Partial<Plate3D> = {}): Plate3D => ({
-    scopeId: 'app',
-    nodeId: 'n1',
-    origin: [0, 0, 0],
-    extentY: 4,
-    extentZ: 14,
-    cols: 2,
-    rows: 2,
-    depth: 0,
-    isApex: false,
-    isRoot: false,
-    timestamp: 0,
-    cells: [
-      {
-        key: 'Schedule:x',
-        type: 'Schedule',
-        id: 'x',
-        hash: 'h1',
-        slot: { col: 0, row: 0 },
-        action: 'unchanged',
-        inChangedRefs: false,
-        nestedScopeId: 'Schedule:x',
-        nestedShown: true,
-        role: null,
-        outside: null,
-      },
-    ],
-    ...over,
-  });
-  const cellOf = (over: Partial<Plate3D['cells'][number]> = {}) => ({
-    ...plateOf().cells[0],
-    ...over,
-  });
-
   it('★ 選択中の板はセルを不透明で描く（薄さで奥へ引っ込めない）', () => {
     const plain = fakeCanvas();
     paintPlate(plain.canvas, plateOf(), { cols: 2, rows: 2 });
@@ -560,7 +633,9 @@ describe('板の絵', () => {
       o.ops
         .filter((x) => x.op === 'fillRect' && x.rect?.[2] === CELL_PX - 6)
         .map((x) => x.alpha);
+    // ★ every は空配列で true。件数を固定しないと「1つも描かない」変異を見逃す
     expect(cellAlpha(plain).length).toBeGreaterThan(0);
+    expect(cellAlpha(sel).length).toBe(cellAlpha(plain).length);
     expect(cellAlpha(plain).every((a) => a < 1)).toBe(true);
     expect(cellAlpha(sel).every((a) => a === 1)).toBe(true);
   });
@@ -654,6 +729,90 @@ describe('板の絵', () => {
   it('型名は行の先頭に出す（■だけでは何のオブジェクトか読めない）', () => {
     const c = fakeCanvas();
     paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
-    expect(c.ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2);
+    // ★ 件数だけ見ると「別の字を別の場所に描く」変異を見逃す。中身と位置で見る
+    const label = c.ops.find((o) => o.op === 'fillText' && o.text === 'Schedule');
+    expect(label).toBeTruthy();
+    expect(label?.rect?.[0]).toBeLessThan(GUTTER_PX); // 型名欄の中に収まっている
+  });
+
+  it('★ 下地はセルより先に描く（あとから塗ると全部隠れる）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    const full = c.ops
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === c.canvas.width);
+    const lastCell = c.ops
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === CELL_PX - 6)
+      .at(-1);
+    expect(full.length).toBeGreaterThan(0);
+    expect(lastCell).toBeTruthy();
+    expect(full.every(({ i }) => i < (lastCell?.i as number))).toBe(true);
+  });
+
+  it('★ 描き始めに前の絵を消す（キャンバスを使い回すので、消さないと前の板が残る）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    expect(c.ops[0]?.op).toBe('clearRect');
+    expect(c.ops[0]?.rect?.[2]).toBe(c.canvas.width);
+  });
+
+  it('墓標のセルは十字で描く（■では描かない）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'deleted' })] }), {
+      cols: 2,
+      rows: 2,
+    });
+    expect(
+      c.ops.some((o) => o.op === 'stroke' && o.stroke === ACTION_COLOR.deleted)
+    ).toBe(true);
+    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === CELL_PX - 6)).toBe(false);
+  });
+
+  it('墓標には外ズレの角印を出さない（消えたものに「外と違う」は言えない）', () => {
+    const c = fakeCanvas();
+    paintPlate(
+      c.canvas,
+      plateOf({
+        cells: [cellOf({ action: 'deleted', role: 'pinned', outside: 'differs' })],
+      }),
+      { cols: 2, rows: 2 }
+    );
+    expect(c.ops.some((o) => o.op === 'fill' && o.fill === ACTION_COLOR.changed)).toBe(false);
+  });
+
+  it('出来事のあったセルには縁を描く（板から浮いて見えるように）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+      cols: 2,
+      rows: 2,
+    });
+    expect(
+      c.ops.some((o) => o.op === 'strokeRect' && o.stroke === ACTION_COLOR.changed)
+    ).toBe(true);
+  });
+
+  it('手元に無い値・永続だけの値は縁の色が変わる（色相は出来事のまま）', () => {
+    for (const loc of ['idb', 'lost'] as const) {
+      const c = fakeCanvas();
+      paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+        cols: 2,
+        rows: 2,
+        locate: () => loc,
+      });
+      expect(
+        c.ops.some((o) => o.op === 'strokeRect' && o.stroke === LOCATION_MARK[loc].color)
+      ).toBe(true);
+    }
+    // メモリにあるものには所在の縁を描かない（描くと全セルに縁が付いて意味が消える）
+    const mem = fakeCanvas();
+    paintPlate(mem.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+      cols: 2,
+      rows: 2,
+      locate: () => 'memory',
+    });
+    expect(
+      mem.ops.some((o) => o.op === 'strokeRect' && o.stroke === LOCATION_MARK.idb.color)
+    ).toBe(false);
   });
 });
