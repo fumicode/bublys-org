@@ -3,12 +3,19 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@bublys-org/bubbles-ui": "*",
-    "@bublys-org/state-management": "*",
-    "@bublys-org/object-shell": "*",
     "@bublys-org/akashic-record": "*",
+    "@bublys-org/bubble-space": "*",
+    "@bublys-org/bubbles-ui": "*",
     "@bublys-org/hash-world-line": "*",
+    "@bublys-org/hotel-shift-puzzle-libs": "*",
+    "@bublys-org/hotel-shift-puzzle-model": "*",
+    "@bublys-org/memo-feature": "*",
+    "@bublys-org/memo-model": "*",
+    "@bublys-org/memo-state": "*",
+    "@bublys-org/object-shell": "*",
+    "@bublys-org/state-management": "*",
     "@bublys-org/users-libs": "*",
+    "@bublys-org/world-line-graph": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.2",
@@ -19,7 +26,12 @@
   },
   "nx": {
     "targets": {
-      "dev": { "dependsOn": ["^dev"], "continuous": true }
+      "dev": {
+        "dependsOn": [
+          "^dev"
+        ],
+        "continuous": true
+      }
     }
   }
 }
