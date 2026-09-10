@@ -22,8 +22,6 @@ import {
   type Cell3D,
   type CellRole,
   type OutsideMatch,
-  type Edge3D,
-  type IdentityLink3D,
   type Layout3D,
   type Layout3DOptions,
   type Nest3D,
@@ -32,6 +30,10 @@ import {
   type Vec3,
 } from './types.js';
 import { buildSlotMap, type SlotMap } from './slots.js';
+import { add, cellOffset, rectCornersXY } from './geometry.js';
+import { collectTypedKeys, sortedNodes } from './graphWalk.js';
+import { buildEdges, buildIdentityRails } from './links.js';
+import { buildTimeAxis } from './timeAxis.js';
 import { TOMBSTONE_HASH, foldCellStates, type CellState } from './cellStates.js';
 import { assignLanes } from './lanes.js';
 import {
@@ -51,6 +53,16 @@ import {
  * 例（hotel）: スタッフは `Schedule:<id>` では 'pinned' だが、
  * グローバル台帳では立場を持たない（null）。同じ型でも世界によって意味が変わる。
  */
+// 座標の式と時間軸は別ファイルに置いてある。ここから引いても同じものが出る
+// （scene.ts / picking.ts / テストが layout3d 経由で import しているため）
+export {
+  cellOffset,
+  cellCenterWorld,
+  rectCornersXY,
+  slotFromOffset,
+} from './geometry.js';
+export { buildTimeSlots, buildTimeAxis } from './timeAxis.js';
+
 export type CellRoleResolver = (
   ref: StateRef,
   currentScopeId: string
@@ -81,133 +93,6 @@ export type Layout3DInput = {
    */
   readonly collapsedScopeIds?: ReadonlySet<string>;
 };
-
-const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-
-/**
- * 板の中のセルの中心（板の origin からの相対）。
- *
- * ラベル帯（HEADER_UNITS）のぶんだけ下から始まる。板の絵も同じ比率で描くので、
- * 絵のマス・厚みの箱・当たり判定の3つが必ず同じ位置になる。
- * **セルの位置を出す式はここ1箇所だけ**。他所で書き写すとずれる。
- */
-export function cellOffset(
-  slot: { col: number; row: number },
-  extentY: number,
-  extentZ: number,
-  cellPitch: number
-): Vec3 {
-  return [
-    0,
-    extentY / 2 - cellPitch * (HEADER_UNITS + slot.row + 0.5),
-    extentZ / 2 - cellPitch * (GUTTER_UNITS + slot.col + 0.5),
-  ];
-}
-
-/** 板の上のセルの中心（ワールド座標） */
-/**
- * Z（入れ子の段の方向）を法線に持つ軸並行の矩形の4隅。
- * 回り順は (+X,+Y) → (-X,+Y) → (-X,-Y) → (+X,-Y)。
- *
- * 口と奥で**同じ回り順**にしないと、i と i+1 を結んだ側面がねじれる（蝶ネクタイ）。
- */
-export function rectCornersXY(
-  center: Vec3,
-  halfX: number,
-  halfY: number
-): [Vec3, Vec3, Vec3, Vec3] {
-  const [x, y, z] = center;
-  return [
-    [x + halfX, y + halfY, z],
-    [x - halfX, y + halfY, z],
-    [x - halfX, y - halfY, z],
-    [x + halfX, y - halfY, z],
-  ];
-}
-
-export function cellCenterWorld(
-  plate: Pick<Plate3D, 'origin' | 'extentY' | 'extentZ'>,
-  slot: { col: number; row: number },
-  cellPitch: number
-): Vec3 {
-  const off = cellOffset(slot, plate.extentY, plate.extentZ, cellPitch);
-  return [plate.origin[0] + off[0], plate.origin[1] + off[1], plate.origin[2] + off[2]];
-}
-
-/** ワールド座標の板内オフセットから席を逆算する（cellOffset の逆） */
-export function slotFromOffset(
-  dy: number,
-  dz: number,
-  extentY: number,
-  extentZ: number,
-  cellPitch: number
-): { col: number; row: number } {
-  return {
-    row: Math.floor((extentY / 2 - dy) / cellPitch - HEADER_UNITS),
-    col: Math.floor((extentZ / 2 - dz) / cellPitch - GUTTER_UNITS),
-  };
-}
-
-/**
- * 時刻でノードをまとめ、「同時に起きたこと」に同じ番号を振る。
- *
- * 1つの操作は複数のスコープへ同時に書く（セルを1つ塗ると、その勤務表の世界線と
- * アプリ全体スコープの両方にノードが増える）。書き込む**回数**はスコープごとに違うので、
- * 各スコープのホップ数を X にすると、同時に起きたことが別の位置に並んでしまう。
- * 時刻でまとめれば「同時なら同じ X」になる。
- *
- * @returns nodeId → 時刻クラスタの番号（0 から連番）
- */
-export function buildTimeSlots(
-  nodes: readonly { readonly id: string; readonly timestamp: number }[],
-  toleranceMs: number
-): Map<string, number> {
-  const sorted = [...nodes].sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
-  const slots = new Map<string, number>();
-  let slot = -1;
-  // ★ 比べる相手は「直前のノード」ではなく**クラスタの先頭**。
-  //   直前と比べると、許容時間より短い間隔が続く限りいくらでも数珠つなぎになる
-  //   （200ms 間隔で10回編集すると、1.8 秒離れた両端まで「同時」に潰れる）。
-  //   先頭から測れば、1つのクラスタの実時間の幅は必ず許容時間以下に収まる。
-  let clusterStart = Number.NEGATIVE_INFINITY;
-  for (const n of sorted) {
-    if (n.timestamp - clusterStart > toleranceMs) {
-      slot++;
-      clusterStart = n.timestamp;
-    }
-    slots.set(n.id, Math.max(slot, 0));
-  }
-  return slots;
-}
-
-/** ノードを (timestamp, id) で決定的に並べる。挿入順に頼ると JSON 往復で崩れる */
-function sortedNodes(graph: WorldLineGraph) {
-  return Object.values(graph.state.nodes).sort(
-    (a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id)
-  );
-}
-
-/** 席の一覧を全スコープ・全ノードの changedRefs から決定的に集める */
-function collectTypedKeys(
-  graphs: Readonly<Record<string, WorldLineGraph>>,
-  scopeIds: readonly string[]
-): { type: string; key: string }[] {
-  const out: { type: string; key: string }[] = [];
-  const seen = new Set<string>();
-  for (const scopeId of scopeIds) {
-    const graph = graphs[scopeId];
-    if (!graph) continue;
-    for (const node of sortedNodes(graph)) {
-      for (const ref of node.changedRefs) {
-        const key = `${ref.type}:${ref.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({ type: ref.type, key });
-      }
-    }
-  }
-  return out;
-}
 
 export function computeWorldLine3DLayout(
   input: Layout3DInput,
@@ -413,53 +298,23 @@ export function computeWorldLine3DLayout(
     Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY / 2;
 
   // --- X（時間軸）を決める --------------------------------------------------
-  // 'sync': 全スコープのノードを時刻でまとめ、同時なら同じ X に置く。
-  //         同じ時刻に同じスコープが複数ノード書いたときだけ、その中で少しずらす
-  //         （アプリ全体スコープは1操作でオブジェクトごとに1ノード書くため）。
-  const timeMode: TimeMode = input.timeMode ?? 'sync';
-  const allNodes = calcs.flatMap((c) =>
-    Object.values(c.graph.state.nodes).map((n) => ({ id: n.id, timestamp: n.timestamp }))
+  // 「どこまでを同時とみなすか」「同時の中でどう並べるか」は timeAxis.ts が持つ。
+  // どちらも間違えると図が嘘をつく（時刻が潰れる／時間が逆流する）ので、
+  // 数値で固定できる純粋関数に切り出してある。
+  const xAt = buildTimeAxis(
+    calcs.map((c) => ({
+      scopeId: c.scopeId,
+      depths: c.depths,
+      nodes: Object.values(c.graph.state.nodes).map((n) => ({
+        id: n.id,
+        timestamp: n.timestamp,
+      })),
+    })),
+    o,
+    input.timeMode ?? 'sync'
   );
-  const slotOf = buildTimeSlots(allNodes, o.syncToleranceMs);
-  /** (スコープ, 時刻クラスタ) ごとの最小 depth。同時刻の中での並び順の起点にする */
-  const baseDepth = new Map<string, number>();
-  if (timeMode === 'sync') {
-    for (const c of calcs) {
-      for (const node of Object.values(c.graph.state.nodes)) {
-        const key = `${c.scopeId} ${slotOf.get(node.id) ?? 0}`;
-        const d = c.depths.get(node.id) ?? 0;
-        const cur = baseDepth.get(key);
-        if (cur === undefined || d < cur) baseDepth.set(key, d);
-      }
-    }
-  }
-  // ★ クラスタ内のずらしの**合計**が、次のクラスタまでの距離を超えてはいけない。
-  //   超えると時間が逆流し（親より子が手前に来る）、板も重なる。
-  //   1操作でアプリ全体スコープにオブジェクトごとのノードが書かれるので、
-  //   同じクラスタに深さ4以上が入るのは珍しくない。
-  let widest = 1;
-  if (timeMode === 'sync') {
-    const maxDepth = new Map<string, number>();
-    for (const c of calcs) {
-      for (const node of Object.values(c.graph.state.nodes)) {
-        const key = `${c.scopeId} ${slotOf.get(node.id) ?? 0}`;
-        const d = c.depths.get(node.id) ?? 0;
-        const cur = maxDepth.get(key);
-        if (cur === undefined || d > cur) maxDepth.set(key, d);
-      }
-    }
-    for (const [key, d] of maxDepth) widest = Math.max(widest, d - (baseDepth.get(key) ?? 0));
-  }
-  // 0.9 は「次のクラスタの手前で必ず止まる」ための余白
-  const subStep = Math.min(o.subStep, 0.9 / widest);
-
-  const xOf = (c: ScopeCalc, nodeId: string, depth: number): number => {
-    if (timeMode === 'hops') return c.origin[0] + o.xStep * depth;
-    const slot = slotOf.get(nodeId) ?? 0;
-    const base = baseDepth.get(`${c.scopeId} ${slot}`) ?? 0;
-    // 同じ時刻・同じスコープの中では depth 順に少しだけずらす（親より子が必ず先へ進む）
-    return o.xStep * (slot + (depth - base) * subStep);
-  };
+  const xOf = (c: ScopeCalc, nodeId: string, depth: number) =>
+    xAt(c.scopeId, nodeId, depth, c.origin[0]);
 
   const levels = [...new Set(calcs.map((c) => c.level))].sort((a, b) => a - b);
   for (const level of levels) {
@@ -598,49 +453,10 @@ export function computeWorldLine3DLayout(
     }
   }
 
-  // --- 世界線のエッジ -------------------------------------------------------
-  const edges: Edge3D[] = [];
-  for (const c of calcs) {
-    for (const node of sortedNodes(c.graph)) {
-      if (!node.parentId) continue;
-      const from = platesByScopeNode.get(`${c.scopeId} ${node.parentId}`);
-      const to = platesByScopeNode.get(`${c.scopeId} ${node.id}`);
-      if (!from || !to) continue;
-      edges.push({
-        from: from.origin,
-        to: to.origin,
-        scopeId: c.scopeId,
-        kind: from.origin[1] === to.origin[1] ? 'time' : 'branch',
-      });
-    }
-  }
-
-  // --- 同一性の線（同じオブジェクトを時間方向につなぐレール） ---------------
-  // 席は全ノードで固定なので、この線は時間軸に平行なまっすぐな線になる。
-  // 消えたオブジェクトはそこで途切れる（墓標より先へは伸びない）。
-  const identities: IdentityLink3D[] = [];
-  for (const c of calcs) {
-    for (const node of sortedNodes(c.graph)) {
-      if (!node.parentId) continue;
-      const from = platesByScopeNode.get(`${c.scopeId} ${node.parentId}`);
-      const to = platesByScopeNode.get(`${c.scopeId} ${node.id}`);
-      if (!from || !to) continue;
-      const parentKeys = new Map(from.cells.map((cell) => [cell.key, cell]));
-      for (const cell of to.cells) {
-        const prev = parentKeys.get(cell.key);
-        // 親に居なかった＝ここで生まれたもの。つなぐ相手がいない
-        if (!prev || prev.action === 'deleted') continue;
-        identities.push({
-          from: cellCenterWorld(from, prev.slot, o.cellPitch),
-          to: cellCenterWorld(to, cell.slot, o.cellPitch),
-          key: cell.key,
-          scopeId: c.scopeId,
-          action: cell.action,
-          role: cell.role,
-        });
-      }
-    }
-  }
+  // --- 板と板をつなぐ線 -----------------------------------------------------
+  const links = calcs.map((c) => ({ scopeId: c.scopeId, graph: c.graph }));
+  const edges = buildEdges(links, platesByScopeNode);
+  const identities = buildIdentityRails(links, platesByScopeNode, o.cellPitch);
 
   // --- 範囲 -----------------------------------------------------------------
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
