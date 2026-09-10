@@ -29,6 +29,10 @@ type Props = {
 /**
  * スタッフ月別シフト希望エディタ。(staffId, year, month) の希望をリポジトリで読み書きする。
  * 希望は店舗・勤務表に依存しないアプリ全体の集約（無ければ空から作って保存）。
+ *
+ * 入力するのはシフト作成者。本人から聞き取った希望をここに写し、聞き終わったら「回収済み」に
+ * する（＝その内容で確定。取り消すまで書き換えられない）。対象の人・月は URL で決まるので、
+ * この画面の中で対象が入れ替わることはない。
  */
 export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
@@ -47,7 +51,7 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
     repo.save(toggleWishInput(wish, day, optionKey, options.map((o) => o.key)));
   };
 
-  // 提出は「いつ出したか」を残す。現在時刻はドメインではなくこの層が渡す。
+  // 回収は「いつ回収したか」を残す。現在時刻はドメインではなくこの層が渡す。
   const handleSubmit = () => repo.save(wish.submit(new Date().toISOString()));
   const handleWithdraw = () => repo.save(wish.withdraw());
 
@@ -62,11 +66,11 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
         </h3>
         {wish.isSubmitted ? (
           <p className="e-note">
-            提出済みです。直すには「取り下げて編集」を押してください。
+            回収済みです。直すには「回収を取り消して編集」を押してください。
           </p>
         ) : (
           <p className="e-note">
-            <b>休</b>＝その日は休みたい／<b>×</b>＝この勤務帯には入れない／<b>○</b>
+            本人から聞き取った希望を入力します。<b>休</b>＝その日は休みたい／<b>×</b>＝この勤務帯には入れない／<b>○</b>
             ＝この勤務帯に入りたい。休み列は押すたびに 空欄→休→空欄、勤務帯列は 空欄→×→○→空欄
             と変わります。 1日に出せるのは休みか勤務帯の希望かどちらか一方で、休みの日の勤務帯は
             斜線になります（斜線を押すと休みが外れます）。 すべての勤務帯に × を付けると、自動で
@@ -85,19 +89,19 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
       <div className="e-actions">
         {wish.isSubmitted ? (
           <>
-            <span className="e-submitted">
+            <span className="e-collected">
               <CheckCircleIcon fontSize="small" />
-              提出済み
+              回収済み
             </span>
             <Button size="small" onClick={handleWithdraw}>
-              取り下げて編集
+              回収を取り消して編集
             </Button>
           </>
         ) : (
           <>
-            <span className="e-draft">下書き（まだ提出されていません）</span>
+            <span className="e-uncollected">まだ回収していません</span>
             <Button size="small" variant="contained" onClick={handleSubmit}>
-              提出する
+              回収済みにする
             </Button>
           </>
         )}
@@ -133,10 +137,10 @@ const StyledContainer = styled.div`
     gap: 8px;
     font-size: 0.8em;
   }
-  .e-draft {
+  .e-uncollected {
     color: #888;
   }
-  .e-submitted {
+  .e-collected {
     display: inline-flex;
     align-items: center;
     gap: 3px;

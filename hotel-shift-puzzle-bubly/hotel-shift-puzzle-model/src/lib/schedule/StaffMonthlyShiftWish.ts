@@ -34,8 +34,9 @@ export type StaffMonthlyShiftWishState = {
   /** 稼働日キー("2026-06-01") → オプションキー → 希望 */
   byDay: Record<string, Record<string, ShiftWishPreference>>;
   /**
-   * 本人が「提出」した時刻（ISO文字列）。未提出は null。
-   * 提出済みは下書きではなく確定した希望なので、取り下げるまで書き換えられない。
+   * この希望が確定した時刻（ISO文字列）。未確定は null。
+   * 上位層（hotel-shift-puzzle）ではシフト作成者が「回収済み」にした時刻として使う。
+   * 確定した希望は書きかけではないので、取り消す（withdraw）まで書き換えられない。
    */
   submittedAt: string | null;
 };
@@ -124,26 +125,26 @@ export class StaffMonthlyShiftWish {
     return this.filledDayCount === 0;
   }
 
-  /** 本人が提出済みか（提出済みは取り下げるまで書き換えられない） */
+  /** 確定済みか（確定した希望は取り消すまで書き換えられない） */
   get isSubmitted(): boolean {
     return this.state.submittedAt !== null;
   }
 
-  /** 提出した時刻（ISO文字列）。未提出は null */
+  /** 確定した時刻（ISO文字列）。未確定は null */
   get submittedAt(): string | null {
     return this.state.submittedAt;
   }
 
   /**
-   * 提出した新インスタンスを返す。時刻は上位層から渡す（ドメインは now を知らない）。
-   * 既に提出済みなら何も変わらない。
+   * 確定した新インスタンスを返す。時刻は上位層から渡す（ドメインは now を知らない）。
+   * 既に確定済みなら何も変わらない。
    */
   submit(at: string): StaffMonthlyShiftWish {
     if (this.isSubmitted) return this;
     return new StaffMonthlyShiftWish({ ...this.state, submittedAt: at });
   }
 
-  /** 提出を取り下げて下書きに戻した新インスタンスを返す */
+  /** 確定を取り消して、書き換えられる状態に戻した新インスタンスを返す */
   withdraw(): StaffMonthlyShiftWish {
     if (!this.isSubmitted) return this;
     return new StaffMonthlyShiftWish({ ...this.state, submittedAt: null });
@@ -160,7 +161,7 @@ export class StaffMonthlyShiftWish {
   ): StaffMonthlyShiftWish {
     if (this.isSubmitted) {
       throw new Error(
-        "提出済みのシフト希望は編集できません（withdraw() で取り下げてから編集する）"
+        "確定済みのシフト希望は編集できません（withdraw() で確定を取り消してから編集する）"
       );
     }
     const byDay = cloneByDay(this.state.byDay);
@@ -188,7 +189,7 @@ export class StaffMonthlyShiftWish {
       year: plain.year,
       month: plain.month,
       byDay: cloneByDay(plain.byDay ?? {}),
-      // 提出のしくみより前に保存されたデータは未提出として読む
+      // 確定のしくみより前に保存されたデータは未確定として読む
       submittedAt: plain.submittedAt ?? null,
     });
   }

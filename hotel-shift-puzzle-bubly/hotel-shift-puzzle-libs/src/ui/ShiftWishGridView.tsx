@@ -23,7 +23,7 @@ type ShiftWishGridViewProps = {
   options: WishOption[];
   /** セルをクリックしたとき（そのマークを入れる／外す） */
   onToggle: (day: WorkingDay, optionKey: string) => void;
-  /** 提出済みなど、編集できない状態で表示する */
+  /** 回収済みなど、編集できない状態で表示する */
   readOnly?: boolean;
 };
 
