@@ -16,10 +16,21 @@
  * 所属をソースから推すと当たらない。それぞれ知っている側に聞く。
  */
 import { useCallback, useMemo, useState, type FC } from "react";
-import { ClassDiagramView, type ModelGraph } from "@bublys-org/model-graph";
+import {
+  ClassDiagramView,
+  type ClassScope,
+  type ModelGraph,
+} from "@bublys-org/model-graph";
 import { MODEL_GRAPH } from "./modelGraph.generated.js";
 import { HOTEL_OBJECTS } from "../objects/hotelObjects.js";
-import { membershipOf } from "../objects/framework.js";
+import { membershipOf, pinnedTypesOf } from "../objects/framework.js";
+import { APP_SCOPE_ID } from "../objects/commit.js";
+
+/**
+ * スコープIDの**形**を取り出すための置き id。
+ * クラス図は型の図なので実体の id が無い。`homeScope` に渡すと `Schedule:<id>` が返る
+ */
+const SCOPE_ID_SENTINEL = "<id>";
 
 /** クラス名 → 世界線への登録名（記述子から作る。手で書かない） */
 const REGISTERED_NAME_OF: Record<string, string> = Object.fromEntries(
@@ -37,6 +48,45 @@ function worldLineMembershipOf(className: string): string | undefined {
   const registered = REGISTERED_NAME_OF[className];
   if (!registered) return undefined;
   return membershipOf(registered).kind;
+}
+
+/**
+ * そのクラスがどの世界線スコープに属するか。
+ *
+ * ★ `homeScope` に**sentinel の id を渡してスコープの形を取り出す**。
+ *   クラス図は型の図なので実体の id が無い。`homeScope("<id>")` を呼べば
+ *   `Schedule:<id>` が返る＝そのスコープの**形**がそのまま読める。
+ *   ここを手で `"Schedule:<id>"` と書くと、記述子の規約を変えたとき図が古くなる。
+ *
+ * 焼き付けメンバー（pinned）が**どの世界に焼かれるか**は、メンバー側の宣言には
+ * 書いていない（オーナー側の `scope.pinTypes` が決める）ので、記述子を走査して探す。
+ */
+function worldLineScopeOf(className: string): ClassScope | undefined {
+  const registered = REGISTERED_NAME_OF[className];
+  if (!registered) return undefined;
+  const membership = membershipOf(registered);
+
+  if (membership.kind === "live") {
+    const scopeId = membership.homeScope(SCOPE_ID_SENTINEL);
+    // グローバル固定IDのときだけ本籍を持たない型がある（勤務帯セット）。
+    // 形が取れないものは「世界に属さない」と同じ扱いにする
+    return scopeId ? { scopeId, role: "live" } : undefined;
+  }
+  if (membership.kind === "pinned") {
+    // 「誰が焼き付けるか」はオーナー側の宣言。記述子を直に覗かず、
+    // 宣言を読むための関数（pinnedTypesOf）を通す
+    const owner = Object.keys(HOTEL_OBJECTS).find((type) =>
+      pinnedTypesOf(type).includes(registered)
+    );
+    if (!owner) return undefined;
+    const ownerMembership = membershipOf(owner);
+    const scopeId =
+      ownerMembership.kind === "live"
+        ? ownerMembership.homeScope(SCOPE_ID_SENTINEL)
+        : undefined;
+    return scopeId ? { scopeId, role: "pinned" } : undefined;
+  }
+  return { scopeId: APP_SCOPE_ID, role: "external" };
 }
 
 const S = {
@@ -62,14 +112,36 @@ const S = {
   canvas: { flex: 1, minHeight: 0, overflow: "auto" } as React.CSSProperties,
 };
 
+const btn: React.CSSProperties = {
+  background: "#21262d",
+  color: "#c9d1d9",
+  border: "1px solid #30363d",
+  borderRadius: 4,
+  padding: "2px 8px",
+  marginRight: 4,
+  cursor: "pointer",
+};
+
 export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
   graph = MODEL_GRAPH,
 }) => {
   const [selected, setSelected] = useState<string | null>(null);
   // 図は横に長い（集約の数だけ列が並ぶ）ので、縮めて全体を見る手段が要る
   const [scale, setScale] = useState(1);
+  const [mode, setMode] = useState<"force" | "column">("force");
+  /**
+   * ユーザーが動かした箱の位置。**この窓を開いているあいだだけ覚える。**
+   * 図の見方の好みであってドメインのデータではないので、世界線には載せない
+   */
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const move = useCallback(
+    (name: string, at: { x: number; y: number }) =>
+      setPositions((prev) => ({ ...prev, [name]: at })),
+    []
+  );
   const d = graph.diagnostics;
   const membership = useCallback(worldLineMembershipOf, []);
+  const scope = useCallback(worldLineScopeOf, []);
 
   const counts = useMemo(() => {
     const byKind = { aggregate: 0, part: 0, value: 0 };
@@ -87,7 +159,33 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
           {counts.byKind.value} ・ 内包 {counts.contains} / 参照 {counts.references}
         </span>
         <span style={S.legend}>
-          縦＝同じ集約の内側（上が根） ・ 横＝別の集約
+          配置{" "}
+          {(
+            [
+              ["force", "力学（近いものを近くに）"],
+              ["column", "列（集約ごと）"],
+            ] as const
+          ).map(([m, label]) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              style={{ ...btn, background: mode === m ? "#1f6feb" : "#21262d" }}
+            >
+              {label}
+            </button>
+          ))}
+          {Object.keys(positions).length > 0 && (
+            <button type="button" onClick={() => setPositions({})} style={btn}>
+              並びを戻す（{Object.keys(positions).length} 個動かした）
+            </button>
+          )}
+        </span>
+        <span style={S.legend}>
+          箱はドラッグで動かせる ・{" "}
+          <span style={{ color: "#39c5cf" }}>シアンの枠＝世界線スコープ</span>
+          （一緒に保存され、一緒に巻き戻る範囲）・{" "}
+          <span style={{ color: "#39c5cf" }}>▌＝その世界に焼き付けられる</span>
         </span>
         <span style={S.legend}>
           <span style={{ color: "#8b949e" }}>◆実線＝内包（一緒に巻き戻る）</span>{" "}
@@ -117,15 +215,7 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
               key={z}
               type="button"
               onClick={() => setScale(z)}
-              style={{
-                background: scale === z ? "#1f6feb" : "#21262d",
-                color: "#c9d1d9",
-                border: "1px solid #30363d",
-                borderRadius: 4,
-                padding: "2px 8px",
-                marginRight: 4,
-                cursor: "pointer",
-              }}
+              style={{ ...btn, background: scale === z ? "#1f6feb" : "#21262d" }}
             >
               {z * 100}%
             </button>
@@ -135,14 +225,7 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
           <button
             type="button"
             onClick={() => setSelected(null)}
-            style={{
-              background: "#21262d",
-              color: "#c9d1d9",
-              border: "1px solid #30363d",
-              borderRadius: 4,
-              padding: "2px 8px",
-              cursor: "pointer",
-            }}
+            style={btn}
           >
             {selected} の選択を外す
           </button>
@@ -154,7 +237,11 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
           selected={selected}
           onSelect={setSelected}
           membershipOf={membership}
+          scopeOf={scope}
           scale={scale}
+          mode={mode}
+          positions={positions}
+          onMove={move}
         />
       </div>
     </div>

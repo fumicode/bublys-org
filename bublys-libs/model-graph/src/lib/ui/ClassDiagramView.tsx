@@ -13,10 +13,12 @@
  * 集約の境界が図の骨格なので、境界をまたぐ線だけ破線にしてある。
  * 「どこまでが1つのかたまりか」が線の種類で読める。
  */
-import { useMemo, useState, type FC } from 'react';
+import { useCallback, useMemo, useRef, useState, type FC } from 'react';
 import type { ModelClass, ModelGraph } from '../domain/ModelGraph.js';
+import { layoutClassDiagramByForce } from './forceLayout.js';
 import {
   DEFAULT_LAYOUT_OPTIONS,
+  finishLayout,
   layoutClassDiagram,
   type ClassBox,
   type LayoutOptions,
@@ -39,6 +41,8 @@ export const CLASS_DIAGRAM_PALETTE = {
   containsLine: '#8b949e',
   referencesLine: '#e3b341',
   aggregateBand: '#1f6feb',
+  /** 世界線スコープの枠。世界線ビューアの「固定」と同じシアン */
+  scopeFrame: '#39c5cf',
 } as const;
 
 const KIND_LABEL: Record<ModelClass['kind'], string> = {
@@ -67,6 +71,31 @@ export type ClassDiagramViewProps = {
   readonly membershipOf?: (className: string) => string | undefined;
   /** 表示倍率。1 で実寸 */
   readonly scale?: number;
+  /**
+   * そのクラスがどの世界線スコープに属するか。バブリ側から注入する。
+   * 渡されなければ枠を**描かない**（知らないことを描かない）
+   */
+  readonly scopeOf?: (className: string) => ClassScope | undefined;
+  /**
+   * ユーザーが動かした位置（クラス名 → 左上）。**自動配置より優先する。**
+   * 動かした箱だけ入っていればよい
+   */
+  readonly positions?: Readonly<Record<string, { x: number; y: number }>>;
+  readonly onMove?: (name: string, at: { x: number; y: number }) => void;
+  /**
+   * 自動配置の仕方。
+   *  - 'force'  … 力学で2次元に置く。近い概念が近くに来る（既定）
+   *  - 'column' … 集約ごとに列。境界がまっすぐ読める代わりに横に長い
+   */
+  readonly mode?: 'force' | 'column';
+};
+
+/** そのクラスが属する世界線スコープ */
+export type ClassScope = {
+  /** スコープID。`Schedule:<id>` のような形 */
+  readonly scopeId: string;
+  /** その世界での立場 */
+  readonly role: 'live' | 'pinned' | 'external';
 };
 
 export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
@@ -76,14 +105,113 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
   onSelect,
   membershipOf,
   scale = 1,
+  scopeOf,
+  positions,
+  onMove,
+  mode = 'force',
 }) => {
   const o: LayoutOptions = useMemo(
     () => ({ ...DEFAULT_LAYOUT_OPTIONS, ...options }),
     [options]
   );
-  const layout = useMemo(() => layoutClassDiagram(graph, o), [graph, o]);
+  const auto = useMemo(
+    () =>
+      mode === 'column'
+        ? layoutClassDiagram(graph, o)
+        : // 世界線スコープも「近づけるまとまり」として渡す。同じ世界に載るものは
+          // つながりが無くても寄るので、枠が細長くならない
+          layoutClassDiagramByForce(graph, o, {}, (name) => {
+            const s = scopeOf?.(name);
+            return s && s.role === 'live' ? s.scopeId : undefined;
+          }),
+    [graph, o, mode, scopeOf]
+  );
+  // ユーザーが動かした箱はその位置に置き、線と大きさを引き直す。
+  // 自動配置を捨てずに**上から重ねる**ので、動かしていない箱はそのまま
+  const layout = useMemo(
+    () =>
+      positions && Object.keys(positions).length > 0
+        ? finishLayout(
+            graph,
+            auto.boxes.map((b) => (positions[b.name] ? { ...b, ...positions[b.name] } : b))
+          )
+        : auto,
+    [auto, graph, positions]
+  );
   const [hover, setHover] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const grab = useRef<{ dx: number; dy: number } | null>(null);
   const focus = hover ?? selected;
+
+  /** 画面の座標を図の座標に直す（倍率と viewBox を通す） */
+  const toDiagram = useCallback((clientX: number, clientY: number) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: ((clientX - rect.left) / rect.width) * (svgRef.current?.viewBox.baseVal.width ?? 1),
+      y: ((clientY - rect.top) / rect.height) * (svgRef.current?.viewBox.baseVal.height ?? 1),
+    };
+  }, []);
+
+  const onPointerDownBox = useCallback(
+    (name: string, e: React.PointerEvent) => {
+      const box = layout.boxes.find((b) => b.name === name);
+      if (!box || !onMove) return;
+      const at = toDiagram(e.clientX, e.clientY);
+      grab.current = { dx: at.x - box.x, dy: at.y - box.y };
+      setDragging(name);
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+    },
+    [layout.boxes, onMove, toDiagram]
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragging || !grab.current || !onMove) return;
+      const at = toDiagram(e.clientX, e.clientY);
+      onMove(dragging, {
+        x: Math.max(0, Math.round(at.x - grab.current.dx)),
+        y: Math.max(0, Math.round(at.y - grab.current.dy)),
+      });
+    },
+    [dragging, onMove, toDiagram]
+  );
+
+  const endDrag = useCallback(() => {
+    setDragging(null);
+    grab.current = null;
+  }, []);
+
+  /**
+   * 世界線スコープの枠。**その世界に一緒に載って、一緒に巻き戻る範囲**を囲う。
+   * 集約の境界（◆実線）とは別の軸で、こちらは「保存と巻き戻しの単位」。
+   *
+   * 焼き付けメンバー（pinned）は外の台帳にも居るので、枠の中には入れない。
+   * 囲うと「この世界のもの」に見えて嘘になる（印と線で結ぶだけにする）。
+   */
+  const scopeFrames = useMemo(() => {
+    if (!scopeOf) return [];
+    const live = layout.boxes.filter((b) => scopeOf(b.name)?.role === 'live');
+    const ids = [...new Set(live.map((b) => scopeOf(b.name)?.scopeId as string))];
+    return ids
+      .map((scopeId) => {
+        const members = live.filter((b) => scopeOf(b.name)?.scopeId === scopeId);
+        if (members.length < 2) return null;
+        const pad = 22;
+        const x = Math.min(...members.map((m) => m.x)) - pad;
+        const y = Math.min(...members.map((m) => m.y)) - pad - 14;
+        return {
+          scopeId,
+          x,
+          y,
+          w: Math.max(...members.map((m) => m.x + m.width)) - x + pad,
+          h: Math.max(...members.map((m) => m.y + m.height)) - y + pad,
+          lit: focus === null || members.some((m) => m.name === focus),
+        };
+      })
+      .filter((f): f is NonNullable<typeof f> => f !== null);
+  }, [layout.boxes, scopeOf, focus]);
 
   /** その線が、いま見ている箱に関わるか */
   const isLit = (from: string, to: string) =>
@@ -93,12 +221,21 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     // ★ 実寸で描いて、容器にスクロールさせる。100% × 100% にすると、容器が図より
     //   縦に長いときに viewBox が引き伸ばされ、図が帯のように潰れる（実際に潰れた）
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${layout.width} ${layout.height}`}
       width={layout.width * scale}
       height={layout.height * scale}
       preserveAspectRatio="xMinYMin meet"
-      style={{ background: CLASS_DIAGRAM_PALETTE.background, display: 'block' }}
+      style={{
+        background: CLASS_DIAGRAM_PALETTE.background,
+        display: 'block',
+        touchAction: dragging ? 'none' : undefined,
+      }}
       onClick={() => onSelect?.(null)}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
     >
       <defs>
         <marker
@@ -124,6 +261,30 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
           <path d="M0,5 L5,2 L10,5 L5,8 z" fill={CLASS_DIAGRAM_PALETTE.containsLine} />
         </marker>
       </defs>
+
+      {/*
+        世界線スコープの枠。**その世界に一緒に載って、一緒に巻き戻る範囲**を囲う。
+        集約の境界（◆実線）とは別の軸で、こちらは「保存と巻き戻しの単位」。
+        焼き付けメンバー（pinned）は外の台帳にも居るので、枠の中には入れない
+        （囲うと「この世界のもの」に見えて嘘になる）。破線で結ぶだけにする。
+      */}
+      {/* 枠の面は一番後ろ。箱を覆わないように */}
+      {scopeFrames.map((f) => (
+        <rect
+          key={f.scopeId}
+          x={f.x}
+          y={f.y}
+          width={f.w}
+          height={f.h}
+          rx={14}
+          fill={CLASS_DIAGRAM_PALETTE.scopeFrame}
+          fillOpacity={f.lit ? 0.05 : 0.02}
+          stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
+          strokeWidth={1.4}
+          strokeDasharray="10 6"
+          opacity={f.lit ? 1 : 0.35}
+        />
+      ))}
 
       {/* 集約の帯。同じ列が1つのかたまりであることを、線より先に地の色で言う */}
       {[...new Set(layout.boxes.map((b) => b.aggregate))].map((agg) => {
@@ -183,9 +344,34 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
           o={o}
           dim={focus !== null && focus !== box.name}
           membership={membershipOf?.(box.name)}
+          scope={scopeOf?.(box.name)}
+          dragging={dragging === box.name}
           onSelect={onSelect}
           onHover={setHover}
+          onPointerDownBox={onMove ? onPointerDownBox : undefined}
         />
+      ))}
+
+      {/* 枠の名前は最前面。箱の下に潜ると、どの枠か読めなくなる */}
+      {scopeFrames.map((f) => (
+        <text
+          key={f.scopeId}
+          x={f.x + 12}
+          y={f.y + 15}
+          fill={CLASS_DIAGRAM_PALETTE.scopeFrame}
+          opacity={f.lit ? 1 : 0.4}
+          style={{
+            font: 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace',
+            paintOrder: 'stroke',
+            stroke: CLASS_DIAGRAM_PALETTE.background,
+            strokeWidth: 4,
+          }}
+        >
+          {f.scopeId} の世界
+          <title>
+            {`この枠の中は一緒に保存され、一緒に巻き戻る（世界線スコープ ${f.scopeId}）`}
+          </title>
+        </text>
       ))}
     </svg>
   );
@@ -196,9 +382,12 @@ const ClassBoxView: FC<{
   o: LayoutOptions;
   dim: boolean;
   membership?: string;
+  scope?: ClassScope;
+  dragging: boolean;
   onSelect?: (name: string | null) => void;
   onHover: (name: string | null) => void;
-}> = ({ box, o, dim, membership, onSelect, onHover }) => {
+  onPointerDownBox?: (name: string, e: React.PointerEvent) => void;
+}> = ({ box, o, dim, membership, scope, dragging, onSelect, onHover, onPointerDownBox }) => {
   const { cls } = box;
   const pad = o.boxPadding;
   let line = 0;
@@ -207,9 +396,13 @@ const ClassBoxView: FC<{
   return (
     <g
       opacity={dim ? 0.35 : 1}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: onPointerDownBox ? (dragging ? 'grabbing' : 'grab') : 'pointer' }}
       onMouseEnter={() => onHover(box.name)}
       onMouseLeave={() => onHover(null)}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onPointerDownBox?.(box.name, e);
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onSelect?.(box.name);
@@ -222,8 +415,8 @@ const ClassBoxView: FC<{
         height={box.height}
         rx={6}
         fill={CLASS_DIAGRAM_PALETTE.boxFill}
-        stroke={kindColor(cls.kind)}
-        strokeWidth={cls.kind === 'aggregate' ? 2 : 1}
+        stroke={dragging ? CLASS_DIAGRAM_PALETTE.scopeFrame : kindColor(cls.kind)}
+        strokeWidth={dragging ? 2.5 : cls.kind === 'aggregate' ? 2 : 1}
       />
       <text
         x={box.x + pad}
@@ -242,6 +435,16 @@ const ClassBoxView: FC<{
       >
         {KIND_LABEL[cls.kind]}
         {membership ? ` / ${membership}` : ''}
+        {scope?.role === 'pinned' && ' ▌'}
+        <title>
+          {scope
+            ? scope.role === 'pinned'
+              ? `${scope.scopeId} の世界に焼き付けられる（外の台帳にも居るので、枠の中には入れない）`
+              : scope.role === 'live'
+                ? `${scope.scopeId} の世界で変化する（枠の中）`
+                : '世界に属さない（常にグローバル）'
+            : ''}
+        </title>
       </text>
 
       {cls.doc && (
