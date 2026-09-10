@@ -29,3 +29,4 @@ export * from "./useWorldFile.js";
 export * from "./WorldFilePanel.js";
 export * from "./shiftSuggestion/index.js";
 export * from "./candidates/index.js";
+export * from "./ScheduleConstraintsPanel.js";

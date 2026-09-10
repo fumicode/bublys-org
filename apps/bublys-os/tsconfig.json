@@ -52,7 +52,7 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/domain-registry"
+      "path": "../../memo-libs/memo-model"
     },
     {
       "path": "../../bublys-libs/hash-world-line"
@@ -61,10 +61,28 @@
       "path": "../../bublys-libs/akashic-record"
     },
     {
+      "path": "../../users-libs"
+    },
+    {
+      "path": "../../hotel-shift-puzzle-bubly/hotel-shift-puzzle-model"
+    },
+    {
+      "path": "../../hotel-shift-puzzle-bubly/hotel-shift-puzzle-libs"
+    },
+    {
+      "path": "../../bublys-libs/bubble-space"
+    },
+    {
+      "path": "../../memo-libs/memo-feature"
+    },
+    {
+      "path": "../../memo-libs/memo-state"
+    },
+    {
       "path": "../../bublys-libs/object-shell"
     },
     {
-      "path": "../../users-libs"
+      "path": "../../bublys-libs/domain-registry"
     },
     {
       "path": "../../bublys-libs/world-line-graph"

@@ -11,6 +11,8 @@ import "./slice/init.js";
 export * from "./objects/framework.js";
 export * from "./objects/repository.js";
 export * from "./objects/hotelObjects.js";
+// 例データの組み立て（ファイルバブル以外からも使えるように公開）
+export { buildSampleItems } from "./objects/seed.js";
 
 // Domain models (re-exported from @bublys-org/hotel-shift-puzzle-model)
 export * from "./domain/index.js";
