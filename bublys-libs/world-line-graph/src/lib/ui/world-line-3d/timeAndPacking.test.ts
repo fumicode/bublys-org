@@ -9,7 +9,6 @@ import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { buildTimeSlots, computeWorldLine3DLayout } from './layout3d.js';
-import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
 
 const ref = (t: string, i: string, v: unknown) => createStateRef(t, i, computeStateHash(v));
 
