@@ -40,6 +40,19 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   maxMethods: 10,
 };
 
+/** 位置が決まる前の箱（採寸だけ） */
+export type MeasuredBox = {
+  readonly name: string;
+  readonly cls: ModelClass;
+  readonly width: number;
+  readonly height: number;
+  /** その箱が属する集約の根。根自身は自分の名前 */
+  readonly aggregate: string;
+  /** 実際に描く行数（省略ぶんを除く） */
+  readonly shownFields: number;
+  readonly shownMethods: number;
+};
+
 /** 図に置かれた箱1つ */
 export type ClassBox = {
   readonly name: string;
@@ -113,6 +126,32 @@ export function assignAggregates(graph: ModelGraph): Map<string, string> {
   return owner;
 }
 
+/**
+ * 箱の大きさと、どの集約に属するかを決める。**位置は決めない。**
+ *
+ * 位置の決め方（列に並べる／力学で置く）は差し替えたいが、大きさの決め方は
+ * どちらでも同じ。分けておかないと、片方だけ直して食い違う。
+ */
+export function measureBoxes(
+  graph: ModelGraph,
+  options: Partial<LayoutOptions> = {}
+): MeasuredBox[] {
+  const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
+  const owner = assignAggregates(graph);
+  return graph.classes.map((cls) => {
+    const { h, f, m } = boxHeight(cls, o);
+    return {
+      name: cls.name,
+      cls,
+      width: o.boxWidth,
+      height: h,
+      aggregate: owner.get(cls.name) as string,
+      shownFields: f,
+      shownMethods: m,
+    };
+  });
+}
+
 function boxHeight(cls: ModelClass, o: LayoutOptions): { h: number; f: number; m: number } {
   const f = Math.min(cls.fields.length, o.maxFields);
   const m = Math.min(cls.methods.length, o.maxMethods);
@@ -135,7 +174,6 @@ export function layoutClassDiagram(
 ): ClassDiagramLayout {
   const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   const owner = assignAggregates(graph);
-  const byName = new Map(graph.classes.map((c) => [c.name, c]));
 
   /** 集約ID → その集約に属するクラス（根が先頭、あとは名前順） */
   const columns = new Map<string, ModelClass[]>();
@@ -180,6 +218,20 @@ export function layoutClassDiagram(
     x += o.boxWidth + o.gapX;
   }
 
+  return finishLayout(graph, boxes, { width: x, height: maxY + o.gapY });
+}
+
+/**
+ * 置き終わった箱から、線・大きさ・申告を作る。**配置の仕方によらず共通**。
+ *
+ * 線は箱の縁の中点どうしを結ぶ。左右どちらの縁から出すかは位置関係で決めるので、
+ * 力学配置で箱が入れ替わっても線の出方は自然なまま。
+ */
+export function finishLayout(
+  graph: ModelGraph,
+  boxes: readonly ClassBox[],
+  size?: { width: number; height: number }
+): ClassDiagramLayout {
   const boxByName = new Map(boxes.map((b) => [b.name, b]));
   const edges: ClassEdge[] = [];
   const dangling: string[] = [];
@@ -190,14 +242,14 @@ export function layoutClassDiagram(
       dangling.push(`${r.from}.${r.via} → ${r.to}`);
       continue;
     }
+    const rightward = to.x + to.width / 2 >= from.x + from.width / 2;
     edges.push({
       relation: r,
-      // 箱の縁の中点どうしを結ぶ。左右どちらから出すかは位置関係で決める
       from: {
-        x: from.x + (to.x >= from.x ? from.width : 0),
+        x: from.x + (rightward ? from.width : 0),
         y: from.y + from.height / 2,
       },
-      to: { x: to.x + (to.x >= from.x ? 0 : to.width), y: to.y + to.height / 2 },
+      to: { x: to.x + (rightward ? 0 : to.width), y: to.y + to.height / 2 },
       withinAggregate: from.aggregate === to.aggregate,
     });
   }
@@ -206,17 +258,18 @@ export function layoutClassDiagram(
     graph.relations.filter((r) => r.kind === 'contains').map((r) => r.to)
   );
   const orphanClasses = graph.classes
-    .filter(
-      (c) => c.kind !== 'aggregate' && !containedSomewhere.has(c.name) && byName.has(c.name)
-    )
+    .filter((c) => c.kind !== 'aggregate' && !containedSomewhere.has(c.name))
     .map((c) => c.name)
     .sort();
+
+  const width = size?.width ?? Math.max(...boxes.map((b) => b.x + b.width), 0) + 40;
+  const height = size?.height ?? Math.max(...boxes.map((b) => b.y + b.height), 0) + 40;
 
   return {
     boxes,
     edges,
-    width: x,
-    height: maxY + o.gapY,
+    width,
+    height,
     diagnostics: { orphanClasses, danglingRelations: dangling.sort() },
   };
 }

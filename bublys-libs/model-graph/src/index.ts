@@ -15,14 +15,24 @@ export {
 export {
   DEFAULT_LAYOUT_OPTIONS,
   assignAggregates,
+  finishLayout,
   layoutClassDiagram,
+  measureBoxes,
+  type MeasuredBox,
   type ClassBox,
   type ClassDiagramLayout,
   type ClassEdge,
   type LayoutOptions,
 } from './lib/ui/classLayout.js';
 export {
+  DEFAULT_FORCE_OPTIONS,
+  layoutClassDiagramByForce,
+  type ForceOptions,
+  type GroupOf,
+} from './lib/ui/forceLayout.js';
+export {
   CLASS_DIAGRAM_PALETTE,
   ClassDiagramView,
   type ClassDiagramViewProps,
+  type ClassScope,
 } from './lib/ui/ClassDiagramView.js';
