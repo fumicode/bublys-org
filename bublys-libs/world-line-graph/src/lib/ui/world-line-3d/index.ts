@@ -16,7 +16,7 @@ export {
 export {
   computeWorldLine3DLayout,
   findViolations,
-  buildTimeSlots,
+  buildTimeColumns,
   cellOffset,
   cellCenterWorld,
   slotFromOffset,
@@ -63,7 +63,7 @@ export {
 export {
   paintPlate,
   plateCanvasSize,
-  CELL_PX,
+  CELL_PITCH_PX,
   HEADER_PX,
   GUTTER_PX,
   type PaintOptions,

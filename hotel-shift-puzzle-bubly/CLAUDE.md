@@ -126,10 +126,20 @@ Schedule: {
 積で決まる。だから `useObjects(type)` の呼び出し側は型しか書かない。
 
 ```typescript
-if (membershipOf(type).kind === "external") return world.app;  // 常にグローバル
-if (!world.born) return world.app;   // 誕生していない世界は存在しない（安全網）
-return world.here;                   // メンバーはいま居る世界。参照が無ければ「無い」
+if (membershipOf(type).kind === "external") return APP;   // 常にグローバル
+if (!world.born) return APP;              // 誕生していない世界は存在しない（安全網）
+if (live && homeScope(id) === undefined) return APP;  // その id は本籍を持たない
+return world.scopeId;                     // いま居る世界。参照が無ければ「無い」
 ```
+
+**書き（`homeScopeOf`）と同じ (type, id) で解く。** 型だけで解くと、勤務帯セットのように
+id で本籍が変わる型（グローバル固定IDのときは本籍なし）を世界の中から読んだときに
+「その世界には居ない」＝ undefined になる。相方に「無ければ既定を作って保存」があると、
+そのままグローバルのテンプレートを空で上書きする経路になる。
+
+**存在の判定も同じスコープで行う**（`absentInReadScope` / `useIsAbsent`）。
+読み先と判定先が違うと、過去のノードへ時間移動したときに「読み込み中です」が
+永久に解けず、そのノードからは二度と編集できない（実際に踏んだ）。
 
 **「その世界に無ければグローバルを見る」という ref 単位のフォールバックを入れてはいけない。**
 起点より前のノードへ戻ったときに、そこにグローバルの最新値が現れてしまう。
@@ -170,7 +180,7 @@ return world.here;                   // メンバーはいま居る世界。参�
 
 ```typescript
 hotelNestedScope(ref, currentScopeId)  // この参照はどの世界に属すか（本籍がそのまま答え）
-hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: live / pinned / null
+hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: live / pinned / external / null
 ```
 
 - **対になる2つは同じファイルに置く。** 片方だけ app 層にあると、規約を直すときに

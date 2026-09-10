@@ -161,8 +161,11 @@ export type Nest3D = {
    * **口と奥で回り順を揃えること**。ずらすと側面がねじれて蝶ネクタイになる。
    */
   readonly mouth: readonly [Vec3, Vec3, Vec3, Vec3];
-  /** 漏斗の奥＝子の世界の手前の面。mouth と同じ回り順・同じ法線 */
-  readonly opening: readonly [Vec3, Vec3, Vec3, Vec3];
+  /**
+   * 漏斗の**奥**＝子の世界の手前の面。mouth と同じ回り順・同じ法線。
+   * `opening` にすると mouth と英語では同義語になり、どちらが親側か名前から読めない。
+   */
+  readonly far: readonly [Vec3, Vec3, Vec3, Vec3];
   readonly parentScopeId: string;
   readonly childScopeId: string;
   readonly kind: 'linked' | 'nominal';
@@ -242,8 +245,8 @@ export const DEFAULT_LAYOUT_3D_OPTIONS = {
   cell: 1.0,
   /** セルの間隔 */
   cellPitch: 1.3,
-  /** 板の格子の列数（Z方向）。行数は席数から決まる */
-  cols: 8,
+  /** 席を折り返す列数の**上限**。実際の列数は板ごとに詰めて決まる（Plate3D.cols） */
+  wrapCols: 8,
   /** 分岐レーンの間隔（Y）。板の高さより必ず大きくする */
   lanePitchY: 0,
   /** 入れ子の段の間隔（Z）。板の奥行きより必ず大きくする */

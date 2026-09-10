@@ -45,9 +45,9 @@ describe("世界から見たオブジェクトの立場", () => {
     expect(role(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID, SCHED)).toBeNull();
   });
 
-  it("世界に属さない型（外のもの）は、どの世界でも立場を持たない", () => {
-    expect(role("ScheduleReport", "sc1:node", SCHED)).toBeNull();
-    expect(role("StaffMonthlyShiftWish", "s1:2026-06", SCHED)).toBeNull();
+  it("★ 世界に属さない型は「外のもの」と言い切る（「分からない」と同じ絵にしない）", () => {
+    expect(role("ScheduleReport", "sc1:node", SCHED)).toBe("external");
+    expect(role("StaffMonthlyShiftWish", "s1:2026-06", SCHED)).toBe("external");
   });
 
   it("バブル配置のような世界でないスコープでは何も言わない", () => {

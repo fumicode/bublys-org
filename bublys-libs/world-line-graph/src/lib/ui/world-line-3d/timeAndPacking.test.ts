@@ -8,7 +8,7 @@
 import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
-import { buildTimeSlots, computeWorldLine3DLayout } from './layout3d.js';
+import { buildTimeColumns, computeWorldLine3DLayout } from './layout3d.js';
 
 const ref = (t: string, i: string, v: unknown) => createStateRef(t, i, computeStateHash(v));
 
@@ -41,13 +41,13 @@ describe('時刻クラスタ', () => {
     // 200ms 間隔の10回。許容 250ms。「直前から近い」で繋ぐと全部1クラスタになり、
     // 1.8 秒離れた両端が「同時に起きたこと」として同じ X に置かれる
     const nodes = Array.from({ length: 10 }, (_, i) => ({ id: `n${i}`, timestamp: i * 200 }));
-    const slots = buildTimeSlots(nodes, 250);
+    const slots = buildTimeColumns(nodes, 250);
     expect(new Set(slots.values()).size).toBeGreaterThan(1);
   });
 
   it('1つのクラスタの実時間の幅は、許容時間を超えない', () => {
     const nodes = Array.from({ length: 20 }, (_, i) => ({ id: `n${i}`, timestamp: i * 100 }));
-    const slots = buildTimeSlots(nodes, 250);
+    const slots = buildTimeColumns(nodes, 250);
     const span = new Map<number, { min: number; max: number }>();
     for (const n of nodes) {
       const s = slots.get(n.id) as number;
@@ -61,7 +61,7 @@ describe('時刻クラスタ', () => {
   });
 
   it('本当に同時（許容内）なら同じ時刻にまとまる', () => {
-    const slots = buildTimeSlots(
+    const slots = buildTimeColumns(
       [
         { id: 'a', timestamp: 1000 },
         { id: 'b', timestamp: 1100 },

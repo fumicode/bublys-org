@@ -16,6 +16,7 @@ export type SlotMap = {
   readonly of: (key: string) => Slot | undefined;
   /** 席 → key（歯抜けは undefined） */
   readonly at: (col: number, row: number) => string | undefined;
+  /** **実際に埋まった**列数。折り返しの上限（buildSlotMap の maxCols）ではない */
   readonly cols: number;
   readonly rows: number;
   readonly keys: readonly string[];
@@ -26,13 +27,14 @@ export type SlotMap = {
  *
  * @param typedKeys 出現順に並んだ `{ type, key }`。呼び出し側が全スコープ・全ノードの
  *   changedRefs を走査して渡す（和集合。順序は決定的であること）
- * @param cols 1行あたりの席数
+ * @param maxCols 席を折り返す列数の**上限**。実際に埋まった列数は戻り値の `cols`。
+ *   ここを板の幅に使ってはいけない（1列しか使わない世界の板まで上限ぶん広がる）
  */
 export function buildSlotMap(
   typedKeys: readonly { readonly type: string; readonly key: string }[],
-  cols: number
+  maxCols: number
 ): SlotMap {
-  if (cols < 1) throw new Error(`buildSlotMap: cols は1以上（${cols}）`);
+  if (maxCols < 1) throw new Error(`buildSlotMap: maxCols は1以上（${maxCols}）`);
 
   // 型の初出順 → その型の中でのキーの初出順
   const byType = new Map<string, string[]>();
@@ -53,7 +55,7 @@ export function buildSlotMap(
     // 型が変わったら行を折り返す（型のかたまりが目で読めるように）
     let col = 0;
     for (const key of list) {
-      if (col >= cols) {
+      if (col >= maxCols) {
         col = 0;
         row++;
       }
@@ -66,9 +68,8 @@ export function buildSlotMap(
   }
 
   const rows = Math.max(row, 1);
-  // ★ 引数の cols（＝折り返す上限）ではなく**実際に埋まった列数**を返す。
-  //   上限をそのまま返すと、1列しか使わない世界の板まで上限ぶん横に広がり、
-  //   板の9割が空白になる（世界ごとに席を詰めた意味が消える）。
+  // 実際に埋まった列数を返す（引数の maxCols ではない）。上限をそのまま返すと、
+  // 1列しか使わない世界の板まで上限ぶん横に広がり、板の9割が空白になる。
   let used = 0;
   for (const key of keys) used = Math.max(used, (of.get(key)?.col ?? 0) + 1);
   return {

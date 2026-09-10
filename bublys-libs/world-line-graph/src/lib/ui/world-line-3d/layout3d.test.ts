@@ -159,8 +159,13 @@ describe('computeWorldLine3DLayout', () => {
     // 中身の少ない世界の板は、アプリ全体スコープの板より小さいか同じ
     expect(local?.rows).toBeLessThanOrEqual(app?.rows as number);
     expect(local?.extentY).toBeLessThanOrEqual(app?.extentY as number);
-    // 席の数ぶんしか確保しない（既定の cols=8 に無条件で広げない）
-    expect(app?.cols).toBeLessThanOrEqual(DEFAULT_LAYOUT_3D_OPTIONS.cols);
+    // ★ 席の数ぶんしか確保しない。折り返しの上限（wrapCols）に無条件で広げない。
+    //   「上限以下」だけを見ると恒真になるので、**実際に埋まった列数と一致する**ことを見る
+    for (const p of layout.plates) {
+      const used = Math.max(0, ...p.cells.map((c) => c.slot.col + 1));
+      expect(p.cols).toBe(Math.max(used, 1));
+      expect(p.cols).toBeLessThanOrEqual(DEFAULT_LAYOUT_3D_OPTIONS.wrapCols);
+    }
   });
 
   it('決定的（同じ入力なら同じ出力。Math.random / Date.now を使っていない）', () => {
@@ -272,7 +277,7 @@ describe('computeWorldLine3DLayout', () => {
       const { nests } = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
       expect(nests.length).toBe(1);
       const n = nests[0];
-      for (const rect of [n.mouth, n.opening]) {
+      for (const rect of [n.mouth, n.far]) {
         expect(rect).toHaveLength(4);
         expect(new Set(rect.map((c) => c[2])).size).toBe(1); // z が一定＝Z法線
         expect(new Set(rect.map((c) => c[0])).size).toBe(2); // X に広がる
@@ -294,15 +299,15 @@ describe('computeWorldLine3DLayout', () => {
       expect(mid(n.mouth, 1)).toBeCloseTo(n.from[1], 9);
       expect(n.mouth[0][2]).toBeCloseTo(n.from[2], 9);
       // 奥は口より深い（Z がより負）＝入れ子は奥へ伸びる
-      expect(n.opening[0][2]).toBeLessThan(n.mouth[0][2]);
+      expect(n.far[0][2]).toBeLessThan(n.mouth[0][2]);
       // 「広がる」＝奥のほうが大きい
-      expect(size(n.opening, 1)).toBeGreaterThan(size(n.mouth, 1));
+      expect(size(n.far, 1)).toBeGreaterThan(size(n.mouth, 1));
 
       // 奥はその世界の板を包んでいる（包含が図の意味なので、はみ出したら嘘）
       const child = plates.filter((p) => p.scopeId === 'Schedule:x');
       expect(child.length).toBeGreaterThan(0);
-      const y0 = Math.min(...n.opening.map((c) => c[1]));
-      const y1 = Math.max(...n.opening.map((c) => c[1]));
+      const y0 = Math.min(...n.far.map((c) => c[1]));
+      const y1 = Math.max(...n.far.map((c) => c[1]));
       for (const p of child) {
         expect(p.origin[1] - p.extentY / 2).toBeGreaterThanOrEqual(y0 - 1e-9);
         expect(p.origin[1] + p.extentY / 2).toBeLessThanOrEqual(y1 + 1e-9);
@@ -319,10 +324,10 @@ describe('computeWorldLine3DLayout', () => {
       // 同じ index の隅が、中心から見て同じ象限に居ること
       for (let i = 0; i < 4; i++) {
         expect(Math.sign(n.mouth[i][0] - cx(n.mouth))).toBe(
-          Math.sign(n.opening[i][0] - cx(n.opening))
+          Math.sign(n.far[i][0] - cx(n.far))
         );
         expect(Math.sign(n.mouth[i][1] - cy(n.mouth))).toBe(
-          Math.sign(n.opening[i][1] - cy(n.opening))
+          Math.sign(n.far[i][1] - cy(n.far))
         );
       }
     });

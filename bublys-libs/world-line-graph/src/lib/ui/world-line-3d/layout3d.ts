@@ -61,7 +61,7 @@ export {
   rectCornersXY,
   slotFromOffset,
 } from './geometry.js';
-export { buildTimeSlots, buildTimeAxis } from './timeAxis.js';
+export { buildTimeColumns, buildTimeAxis } from './timeAxis.js';
 
 export type CellRoleResolver = (
   ref: StateRef,
@@ -148,7 +148,7 @@ export function computeWorldLine3DLayout(
   const slotMapOf = new Map<string, SlotMap>();
   const extentsOf = new Map<string, { y: number; z: number }>();
   for (const s of shownScopes) {
-    const map = buildSlotMap(collectTypedKeys(graphs, [s.scopeId]), o.cols);
+    const map = buildSlotMap(collectTypedKeys(graphs, [s.scopeId]), o.wrapCols);
     slotMapOf.set(s.scopeId, map);
     // 板の絵（キャンバス）と 1:1 にするため、実際に使う列数ぶんだけ確保し、
     // 高さにはラベル帯、幅には型名欄を含める。ここがずれると絵と当たり判定がずれる。
@@ -240,7 +240,7 @@ export function computeWorldLine3DLayout(
       laneCount,
       depths,
       states: fold.statesByNode,
-      slotMap: slotMapOf.get(s.scopeId) ?? buildSlotMap([], o.cols),
+      slotMap: slotMapOf.get(s.scopeId) ?? buildSlotMap([], o.wrapCols),
       extentY: extentsOf.get(s.scopeId)?.y ?? o.cellPitch,
       extentZ: extentsOf.get(s.scopeId)?.z ?? o.cellPitch,
       origin: [0, 0, 0],
@@ -436,7 +436,7 @@ export function computeWorldLine3DLayout(
       // 口＝親セルの位置に置いた小さな矩形。一辺は板の絵の ■ と同じ o.cell
       const mouth = rectCornersXY(w.anchorPos, o.cell / 2, o.cell / 2);
       // 奥＝その世界の**親に一番近い面**（z が最大の側）。ここを口から広げる
-      const opening = rectCornersXY(
+      const far = rectCornersXY(
         [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, box.z],
         Math.max((box.x1 - box.x0) / 2, o.cell / 2),
         Math.max((box.y1 - box.y0) / 2, o.cell / 2)
@@ -445,7 +445,7 @@ export function computeWorldLine3DLayout(
         from: w.anchorPos,
         to: rootPlate.origin,
         mouth,
-        opening,
+        far,
         parentScopeId: w.c.parentScopeId,
         childScopeId: w.c.scopeId,
         kind: w.c.kind === 'linked' ? 'linked' : 'nominal',

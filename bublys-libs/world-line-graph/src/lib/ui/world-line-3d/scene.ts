@@ -234,8 +234,8 @@ export function createWorldLine3DScene(
         const quad: [readonly number[], number][] = [
           [n.mouth[i], 1],
           [n.mouth[j], 1],
-          [n.opening[j], aFar],
-          [n.opening[i], aFar],
+          [n.far[j], aFar],
+          [n.far[i], aFar],
         ];
         for (const k of [0, 1, 2, 0, 2, 3]) {
           const [pt, a] = quad[k];
@@ -409,7 +409,7 @@ export function createWorldLine3DScene(
       ...layout.nests.flatMap((n) =>
         [0, 1, 2, 3].map((i) => ({
           from: n.mouth[i],
-          to: n.opening[i],
+          to: n.far[i],
           color: n.kind === 'linked' ? PALETTE_3D.nestLinked : PALETTE_3D.nestNominal,
           // 膜を濃くするより、稜線のほうが形が読める。
           // nominal は稜線も薄く＝奥が親に握られていないことを線でも言う

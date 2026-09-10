@@ -40,7 +40,7 @@ export type ObjectSerialize<T> = {
  *   - pinned   … **その世界が生まれた瞬間に焼き付けられ、以後動かない**。
  *                グローバル側の変更・削除は自動では波及しない（Staff）。
  *                どのスコープへ焼くかはメンバー側では言えないので、
- *                オーナー型の {@link ObjectDescriptor.scope} の pins が決める。
+ *                オーナー型の {@link ObjectDescriptor.scope} の pinTypes が決める。
  *   - external … スコープに属さず、**世界の中から読んでも常にグローバル**。
  *                実データ（予約状況）や確定記録（レポート）のように、時間移動しても
  *                変わってはいけないもの。
@@ -64,7 +64,7 @@ export type ScopeSpec = {
    * この型のスコープが生まれるとき、グローバルから参照をコピーして焼き付ける型。
    * 「誰を連れて生まれるか」はスコープのオーナーだけが言える。
    */
-  pins?: string[];
+  pinTypes?: string[];
 };
 
 /**
@@ -128,9 +128,9 @@ export function homeScopeOf(type: string, id: string): string | undefined {
   return membership.kind === "live" ? membership.homeScope(id) : undefined;
 }
 
-/** その型のスコープが生まれるとき焼き付ける型（オーナー型の scope.pins） */
+/** その型のスコープが生まれるとき焼き付ける型（オーナー型の scope.pinTypes） */
 export function pinnedTypesOf(ownerType: string): string[] {
-  return descriptorRegistry[ownerType]?.scope?.pins ?? [];
+  return descriptorRegistry[ownerType]?.scope?.pinTypes ?? [];
 }
 
 /** live な型の一覧（誕生時に「持ち主一式」を集めるのに使う） */

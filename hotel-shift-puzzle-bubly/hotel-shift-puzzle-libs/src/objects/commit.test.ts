@@ -47,7 +47,7 @@ registerObjects({
     getId: (o: Note) => o.state.id,
     membership: { kind: "live", homeScope: (id: string) => `Note:${id}` },
     // この世界が生まれるとき、そのときの Person 全員を焼き付ける
-    scope: { pins: [PERSON] },
+    scope: { pinTypes: [PERSON] },
   },
   [LOG]: {
     class: Log,

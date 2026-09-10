@@ -31,7 +31,7 @@ registerObjects({
     class: Note,
     getId: (o: Note) => o.state.id,
     membership: { kind: "live", homeScope: (id: string) => `Note:${id}` },
-    scope: { pins: [PERSON] },
+    scope: { pinTypes: [PERSON] },
   },
   [PERSON]: {
     class: Person,

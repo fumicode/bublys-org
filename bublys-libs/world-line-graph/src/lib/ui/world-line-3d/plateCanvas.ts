@@ -23,12 +23,15 @@ import {
 } from './palette3d.js';
 import { GUTTER_UNITS, HEADER_UNITS, type Plate3D } from './types.js';
 
-/** 1セルあたりのピクセル数（テクスチャの解像度） */
-export const CELL_PX = 26;
+/**
+ * セルの**間隔**（px）。3D の `cellPitch` に対応する。■ の一辺ではない
+ * （一辺は `CELL_PITCH_PX - pad * 2`）。ここを取り違えると px ↔ 3D の換算が 1.3 倍ずれる。
+ */
+export const CELL_PITCH_PX = 26;
 /** 上部のラベル帯の高さ（px）。3D の格子から導く */
-export const HEADER_PX = CELL_PX * HEADER_UNITS;
+export const HEADER_PX = CELL_PITCH_PX * HEADER_UNITS;
 /** 左の型名欄の幅（px）。3D の格子から導く */
-export const GUTTER_PX = CELL_PX * GUTTER_UNITS;
+export const GUTTER_PX = CELL_PITCH_PX * GUTTER_UNITS;
 
 export type PaintOptions = {
   readonly cols: number;
@@ -43,8 +46,8 @@ export type PaintOptions = {
 
 export function plateCanvasSize(opts: { cols: number; rows: number }) {
   return {
-    width: GUTTER_PX + Math.max(opts.cols, 1) * CELL_PX,
-    height: HEADER_PX + Math.max(opts.rows, 1) * CELL_PX,
+    width: GUTTER_PX + Math.max(opts.cols, 1) * CELL_PITCH_PX,
+    height: HEADER_PX + Math.max(opts.rows, 1) * CELL_PITCH_PX,
   };
 }
 
@@ -106,20 +109,20 @@ export function paintPlate(
   ctx.font = '12px system-ui, sans-serif';
   for (const [row, type] of typeOfRow) {
     if (row >= opts.rows) continue;
-    const y = HEADER_PX + row * CELL_PX;
+    const y = HEADER_PX + row * CELL_PITCH_PX;
     const pinned = pinnedRow.get(row) === true;
     if (pinned) {
       // ★ 20px のセルに小さな記号を足しても、図全体を収めた既定のズームでは
       //   1〜2px にしかならず読めない。型名欄（88px）は空いているので、
       //   行の頭に帯と字を置く。ここなら引いた絵でも「この行は焼き付け」が読める
       ctx.fillStyle = ROLE_COLOR.pinned as string;
-      ctx.fillRect(0, y + 2, 3, CELL_PX - 4);
+      ctx.fillRect(0, y + 2, 3, CELL_PITCH_PX - 4);
     }
     ctx.fillStyle = pinned ? (ROLE_COLOR.pinned as string) : PALETTE_3D.gutter;
-    ctx.fillText(type, 6, y + CELL_PX / 2, GUTTER_PX - (pinned ? 34 : 10));
+    ctx.fillText(type, 6, y + CELL_PITCH_PX / 2, GUTTER_PX - (pinned ? 34 : 10));
     if (pinned) {
       ctx.font = 'bold 11px system-ui, sans-serif';
-      ctx.fillText('固定', GUTTER_PX - 28, y + CELL_PX / 2, 24);
+      ctx.fillText('固定', GUTTER_PX - 28, y + CELL_PITCH_PX / 2, 24);
       ctx.font = '12px system-ui, sans-serif';
     }
   }
@@ -127,11 +130,11 @@ export function paintPlate(
   // セル
   let drawn = 0;
   const pad = 3;
-  const size = CELL_PX - pad * 2;
+  const size = CELL_PITCH_PX - pad * 2;
   for (const cell of plate.cells) {
     if (cell.slot.col >= opts.cols || cell.slot.row >= opts.rows) continue;
-    const x = GUTTER_PX + cell.slot.col * CELL_PX;
-    const y = HEADER_PX + cell.slot.row * CELL_PX;
+    const x = GUTTER_PX + cell.slot.col * CELL_PITCH_PX;
+    const y = HEADER_PX + cell.slot.row * CELL_PITCH_PX;
     const location = opts.locate?.(cell.hash) ?? 'memory';
     const style = cellStyle(cell, location, 1);
 
@@ -144,10 +147,10 @@ export function paintPlate(
       ctx.strokeStyle = style.color;
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(x + CELL_PX / 2, y + pad);
-      ctx.lineTo(x + CELL_PX / 2, y + CELL_PX - pad);
+      ctx.moveTo(x + CELL_PITCH_PX / 2, y + pad);
+      ctx.lineTo(x + CELL_PITCH_PX / 2, y + CELL_PITCH_PX - pad);
       ctx.moveTo(x + pad + 2, y + pad + 6);
-      ctx.lineTo(x + CELL_PX - pad - 2, y + pad + 6);
+      ctx.lineTo(x + CELL_PITCH_PX - pad - 2, y + pad + 6);
       ctx.stroke();
     } else {
       ctx.fillStyle = style.color;
@@ -173,9 +176,9 @@ export function paintPlate(
     if (outsideColor && !style.tombstone) {
       ctx.fillStyle = outsideColor;
       ctx.beginPath();
-      ctx.moveTo(x + pad, y + CELL_PX - pad);
-      ctx.lineTo(x + pad + 7, y + CELL_PX - pad);
-      ctx.lineTo(x + pad, y + CELL_PX - pad - 7);
+      ctx.moveTo(x + pad, y + CELL_PITCH_PX - pad);
+      ctx.lineTo(x + pad + 7, y + CELL_PITCH_PX - pad);
+      ctx.lineTo(x + pad, y + CELL_PITCH_PX - pad - 7);
       ctx.closePath();
       ctx.fill();
     }
@@ -185,7 +188,7 @@ export function paintPlate(
     // **畳んでも印は消さない**。消すと開き直す手がかりが図から無くなる
     if (cell.nestedScopeId) {
       ctx.beginPath();
-      ctx.arc(x + CELL_PX - pad - 2, y + pad + 2, 3, 0, Math.PI * 2);
+      ctx.arc(x + CELL_PITCH_PX - pad - 2, y + pad + 2, 3, 0, Math.PI * 2);
       if (cell.nestedShown) {
         ctx.fillStyle = PALETTE_3D.nestLinked;
         ctx.fill();

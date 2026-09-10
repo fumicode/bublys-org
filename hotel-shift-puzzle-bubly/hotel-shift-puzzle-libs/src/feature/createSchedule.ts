@@ -67,10 +67,10 @@ export function createSchedule(
 
   // 固定メンバー。**参照**だけを見るので、値が CAS から追い出されていても取りこぼさない。
   // 可能勤務帯の対象スタッフもこの参照の id から作る（値を読まないのが要点）。
-  const pins = pinnableRefs(store, SCHEDULE_TYPE);
+  const pinnedRefs = pinnableRefs(store, SCHEDULE_TYPE);
   const availability = ScheduleAvailability.create(
     id,
-    pins.map((ref) => ref.id),
+    pinnedRefs.map((ref) => ref.id),
     workShiftSet.shiftIds()
   );
 
@@ -80,7 +80,7 @@ export function createSchedule(
     { type: SCHEDULE_AVAILABILITY_TYPE, obj: availability },
   ];
 
-  // 誕生（1ノード）。持ち主一式は seed の値から、固定メンバーは記述子の pins から載る。
+  // 誕生（1ノード）。持ち主一式は seed の値から、固定メンバーは記述子の pinTypes から載る。
   ensureWorldBorn(store, scopeId, seed);
 
   // アプリ全体スコープ（全世界の最新値インデックス）にも反映する。
