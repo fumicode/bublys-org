@@ -52,14 +52,11 @@ const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollec
 
 // --- スタッフ詳細バブル ---
 const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
   const staffId = bubble.params.staffId;
   return withObjects(
     <StaffDetail
       staffId={staffId}
-      onOpenWish={(year, month) =>
-        openBubble(staffShiftWishUrl(staffId, year, month), bubble.id, "bubble-side-right")
-      }
+      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
     />
   );
 };
@@ -149,6 +146,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       onOpenEditLog={() => openSide(editLogUrl, "bubble-side-right")}
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       availabilityUrl={availabilityUrl}
+      shiftWishesUrl={shiftWishMonthUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       editLogUrl={editLogUrl}
