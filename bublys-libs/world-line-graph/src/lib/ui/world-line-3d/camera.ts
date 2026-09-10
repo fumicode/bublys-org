@@ -30,6 +30,9 @@ export type Orbit = {
   readonly distance: number;
 };
 
+/** 縦画角。scene.ts のカメラ・fitOrbit・applyPan がこれを共有する（別々に書くと静かにずれる） */
+export const DEFAULT_FOV_DEG = 45;
+
 export const PITCH_LIMIT = Math.PI / 2 - 0.05;
 export const MIN_DISTANCE = 2;
 export const MAX_DISTANCE = 20000;
@@ -85,7 +88,7 @@ const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 export function fitOrbit(
   bounds: { min: Vec3; max: Vec3 },
   aspect: number,
-  fovDeg = 45,
+  fovDeg = DEFAULT_FOV_DEG,
   pitch = 0.35,
   yaw = 0
 ): Orbit {
@@ -175,6 +178,45 @@ export function applyWheel(orbit: Orbit, action: WheelAction): Orbit {
   return {
     ...orbit,
     target: [orbit.target[0] + step, orbit.target[1], orbit.target[2]],
+  };
+}
+
+/**
+ * shift+ドラッグで視点を平行移動する（注視点だけ動かす。回さないしズームもしない）。
+ *
+ * 動かす向きは**画面の右・上**（＝カメラの right / up）。ワールドの X/Y に沿わせると、
+ * 板を正対で見る向き（yaw=90°）で右ドラッグが画面の奥行き方向になり、
+ * 「横に動かない」という今の不便が別の形で戻ってくる。
+ * 既定の姿勢も斜め（yaw≈1.05）なので、ワールド軸に沿わせた時点で約60°ずれる。
+ *
+ * shift+ホイールの panTime（時間軸＝ワールドXに厳密に沿う移動）とは役割が割れる:
+ *   時間に沿って送りたい → shift+ホイール / 見ている面で自由に滑らせたい → shift+ドラッグ
+ *
+ * 1px あたりのワールド量は注視点を通る面で測る（距離と画角に比例）。
+ * 比例させないと、引いたときは動かず、寄ったときに図が吹っ飛ぶ。
+ *
+ * @param viewportHeightPx canvas の CSS 高さ。canvas は host に 100% で敷かれているので
+ *                         host の rect 高さでよい（中に余白を足すとこの前提が崩れる）
+ */
+export function applyPan(
+  orbit: Orbit,
+  dx: number,
+  dy: number,
+  viewportHeightPx: number,
+  fovDeg = DEFAULT_FOV_DEG
+): Orbit {
+  const { right, up } = cameraBasis(orbit.yaw, orbit.pitch);
+  const k =
+    (2 * orbit.distance * Math.tan(((fovDeg * Math.PI) / 180) / 2)) /
+    Math.max(viewportHeightPx, 1);
+  // 掴んだ景色が指についてくる＝注視点は指と逆へ動く
+  return {
+    ...orbit,
+    target: [
+      orbit.target[0] + (-right[0] * dx + up[0] * dy) * k,
+      orbit.target[1] + (-right[1] * dx + up[1] * dy) * k,
+      orbit.target[2] + (-right[2] * dx + up[2] * dy) * k,
+    ],
   };
 }
 

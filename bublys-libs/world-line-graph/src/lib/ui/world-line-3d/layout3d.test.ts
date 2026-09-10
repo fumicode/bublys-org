@@ -12,7 +12,7 @@ import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellOffset } from './layout3d.js';
 import { TOMBSTONE_HASH } from './cellStates.js';
-import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
+import { DEFAULT_LAYOUT_3D_OPTIONS, type Vec3 } from './types.js';
 
 const h = (v: unknown) => computeStateHash(v);
 const ref = (type: string, id: string, v: unknown) => createStateRef(type, id, h(v));
@@ -205,6 +205,137 @@ describe('computeWorldLine3DLayout', () => {
         .sort();
     expect(hotelOf(collapsed)).toEqual(hotelOf(all));
     expect(collapsed.plates.some((p) => p.scopeId === 'Schedule:x')).toBe(false);
+  });
+
+  /**
+   * ★ これが無かったせいで「畳んだら二度と開けない」を素通りさせた。
+   * 上のテストは「板が消える」しか見ておらず、開き直す手がかりが消えたことを見ていない。
+   */
+  it('★ 畳んでも入れ子の印は残る（○印として。消すと開き直せなくなる）', () => {
+    const { graphs } = hotelLike();
+    const open = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+    const shut = computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs,
+      collapsedScopeIds: new Set(['Schedule:x']),
+    });
+    const marks = (l: typeof open) =>
+      l.plates
+        .filter((p) => p.scopeId === 'hotel')
+        .flatMap((p) => p.cells)
+        .filter((c) => c.nestedScopeId === 'Schedule:x');
+
+    expect(marks(open).length).toBeGreaterThan(0);
+    expect(marks(open).every((c) => c.nestedShown)).toBe(true);
+    // 畳んでも印の数は同じ。ただし「出ていない」印になる
+    expect(marks(shut).length).toBe(marks(open).length);
+    expect(marks(shut).every((c) => c.nestedShown === false)).toBe(true);
+  });
+
+  it('★ 畳んだ世界は黙って消さず申告する（HUD から全部開けるように）', () => {
+    const { graphs } = hotelLike();
+    const shut = computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs,
+      collapsedScopeIds: new Set(['Schedule:x']),
+    });
+    expect(shut.diagnostics.hiddenScopeIds).toEqual(['Schedule:x']);
+    const open = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+    expect(open.diagnostics.hiddenScopeIds).toEqual([]);
+  });
+
+  it('開く→畳む→開く で元に戻る（片道にならない）', () => {
+    const { graphs } = hotelLike();
+    const a = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+    computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs,
+      collapsedScopeIds: new Set(['Schedule:x']),
+    });
+    const c = computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs,
+      collapsedScopeIds: new Set<string>(),
+    });
+    expect(JSON.stringify(c)).toBe(JSON.stringify(a));
+  });
+
+  /**
+   * 入れ子の漏斗を「面」で描くための頂点。
+   *
+   * ★ 口を板と同じ X 法線にすると、口も奥も同じ x 平面に乗って
+   *   4枚の側面が1枚に潰れる（＝面にならない）。断面は必ず Z 法線であること。
+   */
+  describe('入れ子の漏斗の面', () => {
+    it('口と奥はどちらも Z 法線の矩形（潰れない断面）', () => {
+      const { graphs } = hotelLike();
+      const { nests } = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+      expect(nests.length).toBe(1);
+      const n = nests[0];
+      for (const rect of [n.mouth, n.opening]) {
+        expect(rect).toHaveLength(4);
+        expect(new Set(rect.map((c) => c[2])).size).toBe(1); // z が一定＝Z法線
+        expect(new Set(rect.map((c) => c[0])).size).toBe(2); // X に広がる
+        expect(new Set(rect.map((c) => c[1])).size).toBe(2); // Y に広がる
+      }
+    });
+
+    it('口は親セルの上にあり、奥はそれより深いところで広がる', () => {
+      const { graphs } = hotelLike();
+      const { nests, plates } = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+      const n = nests[0];
+      const mid = (r: readonly Vec3[], i: number) =>
+        (Math.min(...r.map((c) => c[i])) + Math.max(...r.map((c) => c[i]))) / 2;
+      const size = (r: readonly Vec3[], i: number) =>
+        Math.max(...r.map((c) => c[i])) - Math.min(...r.map((c) => c[i]));
+
+      // 口は親セルの位置（＝背骨の始点）にある
+      expect(mid(n.mouth, 0)).toBeCloseTo(n.from[0], 9);
+      expect(mid(n.mouth, 1)).toBeCloseTo(n.from[1], 9);
+      expect(n.mouth[0][2]).toBeCloseTo(n.from[2], 9);
+      // 奥は口より深い（Z がより負）＝入れ子は奥へ伸びる
+      expect(n.opening[0][2]).toBeLessThan(n.mouth[0][2]);
+      // 「広がる」＝奥のほうが大きい
+      expect(size(n.opening, 1)).toBeGreaterThan(size(n.mouth, 1));
+
+      // 奥はその世界の板を包んでいる（包含が図の意味なので、はみ出したら嘘）
+      const child = plates.filter((p) => p.scopeId === 'Schedule:x');
+      expect(child.length).toBeGreaterThan(0);
+      const y0 = Math.min(...n.opening.map((c) => c[1]));
+      const y1 = Math.max(...n.opening.map((c) => c[1]));
+      for (const p of child) {
+        expect(p.origin[1] - p.extentY / 2).toBeGreaterThanOrEqual(y0 - 1e-9);
+        expect(p.origin[1] + p.extentY / 2).toBeLessThanOrEqual(y1 + 1e-9);
+      }
+    });
+
+    it('口と奥の回り順が揃っている（ずれると側面がねじれる）', () => {
+      const { graphs } = hotelLike();
+      const n = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs }).nests[0];
+      const cx = (r: readonly Vec3[]) =>
+        (Math.min(...r.map((c) => c[0])) + Math.max(...r.map((c) => c[0]))) / 2;
+      const cy = (r: readonly Vec3[]) =>
+        (Math.min(...r.map((c) => c[1])) + Math.max(...r.map((c) => c[1]))) / 2;
+      // 同じ index の隅が、中心から見て同じ象限に居ること
+      for (let i = 0; i < 4; i++) {
+        expect(Math.sign(n.mouth[i][0] - cx(n.mouth))).toBe(
+          Math.sign(n.opening[i][0] - cx(n.opening))
+        );
+        expect(Math.sign(n.mouth[i][1] - cy(n.mouth))).toBe(
+          Math.sign(n.opening[i][1] - cy(n.opening))
+        );
+      }
+    });
+
+    it('畳んだ入れ子には漏斗を作らない（見えない世界へ口を開けない）', () => {
+      const { graphs } = hotelLike();
+      const shut = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs,
+        collapsedScopeIds: new Set(['Schedule:x']),
+      });
+      expect(shut.nests).toEqual([]);
+    });
   });
 
   it('墓標（削除済み）は数えて申告する。2Dインスペクタとの件数差になる', () => {

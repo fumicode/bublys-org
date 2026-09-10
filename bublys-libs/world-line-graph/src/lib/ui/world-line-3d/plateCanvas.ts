@@ -28,7 +28,10 @@ export type PaintOptions = {
   readonly cols: number;
   readonly rows: number;
   readonly locate?: (hash: string) => RefLocation;
-  /** 選択中のノードなら枠を強調する */
+  /**
+   * 選択中のノードか。枠を太くし、**セルを不透明で描く**。
+   * いま読んでいる板を薄さで奥へ引っ込めないため。
+   */
   readonly selected?: boolean;
 };
 
@@ -113,7 +116,10 @@ export function paintPlate(
     const location = opts.locate?.(cell.hash) ?? 'memory';
     const style = cellStyle(cell, location, 1);
 
-    ctx.globalAlpha = style.opacity;
+    // 選択中の世界は「いま読んでいる板」。ここだけ薄さを捨てる。
+    // 何が起きたかは色（ACTION_COLOR）、値の所在は縁の色が持っているので、
+    // α を 1 にしても図が語る内容は変わらない
+    ctx.globalAlpha = opts.selected ? 1 : style.opacity;
     if (style.tombstone) {
       // 墓標：十字の墓。「ここで消えた」が図から落ちないように出す
       ctx.strokeStyle = style.color;
@@ -142,12 +148,20 @@ export function paintPlate(
     }
     ctx.globalAlpha = 1;
 
-    // 入れ子を持つオブジェクトには印を付ける（ここから奥へ世界線が伸びる）
+    // 入れ子を持つオブジェクトには印を付ける（ここから奥へ世界線が伸びる）。
+    // 塗りつぶし＝開いている / 中抜き＝畳んでいる。
+    // **畳んでも印は消さない**。消すと開き直す手がかりが図から無くなる
     if (cell.nestedScopeId) {
-      ctx.fillStyle = PALETTE_3D.nestLinked;
       ctx.beginPath();
       ctx.arc(x + CELL_PX - pad - 2, y + pad + 2, 3, 0, Math.PI * 2);
-      ctx.fill();
+      if (cell.nestedShown) {
+        ctx.fillStyle = PALETTE_3D.nestLinked;
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = PALETTE_3D.nestLinked;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
     drawn++;
   }

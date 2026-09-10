@@ -22,7 +22,9 @@ import { LOCATION_MARK, LOCATION_ORDER } from '../refLocation.js';
 import type { Layout3D, Layout3DOptions } from './types.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
 import {
+  DEFAULT_FOV_DEG,
   ORBIT_PRESETS,
+  applyPan,
   applyDrag,
   applyWheel,
   fitOrbit,
@@ -48,6 +50,8 @@ export type WorldLine3DViewProps = {
   readonly onSelect: (sel: Selection3D | null) => void;
   /** セルの入れ子を開く／閉じる */
   readonly onToggleNested?: (scopeId: string) => void;
+  /** 畳んだ入れ子を全部開く。板が多い図では印が要約表示に埋もれるので、HUD 側の逃げ道 */
+  readonly onExpandAll?: () => void;
   /** 右側の詳細パネル（feature 層が中身を差し込む） */
   readonly detail?: React.ReactNode;
 };
@@ -84,6 +88,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
   selection,
   onSelect,
   onToggleNested,
+  onExpandAll,
   detail,
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -119,7 +124,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
       const orbit = fitOrbit(
         layout.bounds,
         Math.max(rect.width, 1) / Math.max(rect.height, 1),
-        45,
+        DEFAULT_FOV_DEG,
         ORBIT_PRESETS.iso.pitch,
         ORBIT_PRESETS.iso.yaw
       );
@@ -160,7 +165,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
           locate,
           maxTexturedPlates: 160,
         },
-        selection ? `${selection.scopeId} ${selection.nodeId}` : null
+        selection ? { scopeId: selection.scopeId, nodeId: selection.nodeId } : null
       )
     );
   }, [layout, o, locate, selection, ready]);
@@ -202,23 +207,41 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
   // --- ドラッグで回す / クリックで選ぶ --------------------------------------
   const down = useRef<{ x: number; y: number; t: number } | null>(null);
   const dragging = useRef(false);
+  /**
+   * このドラッグは回すのか、滑らせるのか。**押した瞬間に決めて最後まで変えない**。
+   * move ごとに shift を見ると、1ストロークの途中で回転と平行移動が混ざる。
+   */
+  const gesture = useRef<'orbit' | 'pan'>('orbit');
+  /** 直前の位置。movementX は端末画素で来ることがあり、掴んだ点が指からずれる */
+  const last = useRef<{ x: number; y: number } | null>(null);
+  /** ドラッグ開始時の canvas の高さ。px → ワールドの換算に要る */
+  const viewH = useRef(1);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     // canvas の上で押したときだけ回転・選択の対象にする。
     // HUD のボタンを押しただけで選択処理が走ってしまうため（実際に踏んだ）
     if ((e.target as Element).tagName !== 'CANVAS') {
       down.current = null;
+      last.current = null;
       dragging.current = false;
+      gesture.current = 'orbit';
       return;
     }
     down.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+    last.current = { x: e.clientX, y: e.clientY };
     dragging.current = true;
+    gesture.current = e.shiftKey ? 'pan' : 'orbit';
+    viewH.current = Math.max(hostRef.current?.getBoundingClientRect().height ?? 1, 1);
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }, []);
 
   const endDrag = useCallback(() => {
     dragging.current = false;
     down.current = null;
+    last.current = null;
+    // ★ ここでも戻す。pointercancel で終わったときに 'pan' が残ると、
+    //   次の素のドラッグが回転ではなく平行移動になる
+    gesture.current = 'orbit';
   }, []);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -226,12 +249,20 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
     if (e.buttons === 0 && dragging.current) {
       dragging.current = false;
       down.current = null;
+      last.current = null;
+      gesture.current = 'orbit';
       return;
     }
-    if (!dragging.current || !down.current) return;
+    if (!dragging.current || !last.current) return;
     const orbit = orbitRef.current;
     if (!orbit) return;
-    const next = applyDrag(orbit, e.movementX, e.movementY);
+    const dx = e.clientX - last.current.x;
+    const dy = e.clientY - last.current.y;
+    last.current = { x: e.clientX, y: e.clientY };
+    const next =
+      gesture.current === 'pan'
+        ? applyPan(orbit, dx, dy, viewH.current)
+        : applyDrag(orbit, dx, dy);
     orbitRef.current = next;
     sceneRef.current?.setOrbit(next);
   }, []);
@@ -240,7 +271,12 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
     (e: React.PointerEvent) => {
       dragging.current = false;
       const start = down.current;
+      const wasPan = gesture.current === 'pan';
       down.current = null;
+      last.current = null;
+      gesture.current = 'orbit';
+      // 平行移動の終わりで選択が飛ばないように。4px 未満でも起こさない
+      if (wasPan) return;
       const host = hostRef.current;
       const scene = sceneRef.current;
       const orbit = orbitRef.current;
@@ -283,7 +319,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
       const orbit = fitOrbit(
         layout.bounds,
         Math.max(rect.width, 1) / Math.max(rect.height, 1),
-        45,
+        DEFAULT_FOV_DEG,
         ORBIT_PRESETS[preset].pitch,
         ORBIT_PRESETS[preset].yaw
       );
@@ -355,11 +391,26 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
               </span>
             ))}
             <span style={{ color: PALETTE_3D.nestNominal }}>― 名前規約の入れ子</span>{' '}
-            <span style={{ color: PALETTE_3D.nestLinked }}>― アドレス連動の入れ子</span>
+            <span style={{ color: PALETTE_3D.nestLinked }}>― アドレス連動の入れ子</span>{' '}
+            <span style={{ color: PALETTE_3D.nestLinked }}>●開いている ○畳んでいる</span>
           </div>
           {d.tombstoneCount > 0 && (
             <div style={{ color: '#8b949e' }}>
               削除済み {d.tombstoneCount} 件を墓標で表示（2Dインスペクタの件数とはこの分だけ差が出ます）
+            </div>
+          )}
+          {d.hiddenScopeIds.length > 0 && (
+            <div style={{ color: '#8b949e' }}>
+              畳んで隠れている世界 {d.hiddenScopeIds.length} 件（セルの○印を押すと開きます）
+              {onExpandAll && (
+                <button
+                  type="button"
+                  style={{ ...btn, marginLeft: 6 }}
+                  onClick={onExpandAll}
+                >
+                  全部開く
+                </button>
+              )}
             </div>
           )}
           {d.unprunedChangedCount > 0 && (
@@ -383,9 +434,10 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
                 {ORBIT_PRESETS[p].label}
               </button>
             ))}
-            <span style={{ color: '#6e7681', marginLeft: 6 }}>
-              ドラッグ=回転 / ホイール=ズーム / shift+ホイール=時間送り
-            </span>
+          </div>
+          <div style={{ color: '#6e7681' }}>
+            ドラッグ=回転 / shift+ドラッグ=平行移動 / ホイール=ズーム /
+            shift+ホイール=時間送り（X軸だけ）
           </div>
         </div>
         {error && (

@@ -33,11 +33,16 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import type { Layout3D, Plate3D } from './types.js';
+import type { Layout3D, Nest3D, Plate3D } from './types.js';
 import type { RefLocation } from '../refLocation.js';
 import { ACTION_COLOR, PALETTE_3D, cellStyle } from './palette3d.js';
 import { paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { orbitToPosition, type Orbit } from './camera.js';
+// ★ セルの位置は layout3d の1箇所から取る。式を書き写すとずれる（実際にずれていた）
+import { cellCenterWorld } from './layout3d.js';
+
+/** いま選んでいる世界（板1枚）。線や箱はスコープ単位なので、文字列に潰さず組で持つ */
+export type Selection = { readonly scopeId: string; readonly nodeId: string };
 
 export type SceneOptions = {
   readonly plateThickness: number;
@@ -58,7 +63,7 @@ export type SceneStats = {
 };
 
 export type WorldLine3DScene = {
-  update(layout: Layout3D, opts: SceneOptions, selected: string | null): SceneStats;
+  update(layout: Layout3D, opts: SceneOptions, selected: Selection | null): SceneStats;
   setOrbit(orbit: Orbit): void;
   resize(width: number, height: number): void;
   /** カメラ姿勢（ピッキングに使う） */
@@ -113,6 +118,7 @@ export function createWorldLine3DScene(
   let edgeLines: LineSegments | null = null;
   let nestLines: LineSegments | null = null;
   let identityLines: LineSegments | null = null;
+  let nestSurface: Mesh | null = null;
   let orbit = initialOrbit;
 
   const applyCamera = () => {
@@ -138,7 +144,11 @@ export function createWorldLine3DScene(
       (cellMesh.material as { dispose(): void }).dispose();
       // geometry（boxGeo）は使い回している共有物なので、ここでは解放しない
     }
-    for (const obj of [edgeLines, nestLines, identityLines]) {
+    // 漏斗の面（Mesh）も線と同じく update ごとに作り直す。
+    // ここで解放しないと GL バッファが1回ごとに漏れる。
+    // ★ disposables には入れないこと。あれは使い回す資源（boxGeo 等）だけの置き場で、
+    //   毎回作り直すものを入れると配列が update のたびに伸びる
+    for (const obj of [edgeLines, nestLines, identityLines, nestSurface]) {
       if (!obj) continue;
       scene.remove(obj);
       obj.geometry.dispose();
@@ -148,6 +158,7 @@ export function createWorldLine3DScene(
     edgeLines = null;
     nestLines = null;
     identityLines = null;
+    nestSurface = null;
   };
 
   const plateGeometry = (extentZ: number, extentY: number): PlaneGeometry => {
@@ -191,7 +202,68 @@ export function createWorldLine3DScene(
     return new LineSegments(geo, mat);
   }
 
-  function update(layout: Layout3D, opts: SceneOptions, selected: string | null): SceneStats {
+  /**
+   * 入れ子の漏斗の「面」。親セルの小さな口から、その世界の手前の面へ広がる四角錐台。
+   *
+   * 線1本だと「この ■ の中がこの世界です」という**包含**が読めない。
+   * 面にすると、口から奥へ広がって世界を包んでいるのが一目で出る。
+   *
+   * 口も奥も Z 法線（入れ子の段の方向）なので、i と i+1 を素直に結べばねじれない。
+   * ここを板と同じ X 法線にすると、口と奥が同じ x 平面に乗って4枚が1枚に潰れる。
+   *
+   * ★ kind の描き分けは色ではなく**奥側の頂点α**でやる:
+   *     linked  … 奥まで一様。親の状態に子の現在地が入っている＝最後まで親が握っている
+   *     nominal … 奥へ向かって消える。名前が揃っているだけで、奥は親に握られていない
+   *   ここを一様にすると「連動しないものを連動するように描く」＝types.ts の禁止事項。
+   */
+  function buildNestSurface(nests: readonly Nest3D[]): Mesh | null {
+    if (nests.length === 0) return null;
+    // 漏斗1本 = 側面4枚 = 三角形8枚 = 頂点24
+    const pos = new Float32Array(nests.length * 24 * 3);
+    // ★ itemSize は 4（RGBA）。3 にすると three は α を見ない
+    const col = new Float32Array(nests.length * 24 * 4);
+    const c = new Color();
+    let vi = 0;
+    for (const n of nests) {
+      c.set(n.kind === 'linked' ? PALETTE_3D.nestLinked : PALETTE_3D.nestNominal);
+      const aFar = n.kind === 'linked' ? 1 : 0.15;
+      for (let i = 0; i < 4; i++) {
+        const j = (i + 1) % 4;
+        const quad: [readonly number[], number][] = [
+          [n.mouth[i], 1],
+          [n.mouth[j], 1],
+          [n.opening[j], aFar],
+          [n.opening[i], aFar],
+        ];
+        for (const k of [0, 1, 2, 0, 2, 3]) {
+          const [pt, a] = quad[k];
+          pos.set([pt[0], pt[1], pt[2]], vi * 3);
+          col.set([c.r, c.g, c.b, a], vi * 4);
+          vi++;
+        }
+      }
+    }
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('color', new BufferAttribute(col, 4));
+    const mat = new MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      // 板（下地 0.42）を通して読めるだけの薄さ。DoubleSide なので見通すと
+      // 表と裏の2枚を通り、実効は 1-(1-a)^2 になる
+      opacity: 0.14,
+      side: DoubleSide,
+      // 板と同じ。深度を書くと奥の板を隠してしまう
+      depthWrite: false,
+    });
+    const mesh = new Mesh(geo, mat);
+    // 板より先に描く（three の透明パスは renderOrder 昇順）。
+    // 膜が板の絵の上に乗ると中身が読めなくなるので、必ず膜を先に置く
+    mesh.renderOrder = -1;
+    return mesh;
+  }
+
+  function update(layout: Layout3D, opts: SceneOptions, selected: Selection | null): SceneStats {
     clearGroup();
 
     // --- 板 ---------------------------------------------------------------
@@ -206,7 +278,10 @@ export function createWorldLine3DScene(
     for (const plate of ordered) {
       const geo = plateGeometry(plate.extentZ, plate.extentY);
       let material: MeshBasicMaterial;
-      const isSelected = selected === `${plate.scopeId} ${plate.nodeId}`;
+      const isSelected =
+        selected !== null &&
+        selected.scopeId === plate.scopeId &&
+        selected.nodeId === plate.nodeId;
       if (textured < opts.maxTexturedPlates) {
         const canvas = document.createElement('canvas');
         const grid = { cols: plate.cols, rows: plate.rows };
@@ -263,14 +338,21 @@ export function createWorldLine3DScene(
       const color = new Color();
       changed.forEach(({ plate, cell }, i) => {
         const style = cellStyle(cell, opts.locate?.(cell.hash) ?? 'memory', opts.changedThickness);
-        const y = plate.origin[1] + plate.extentY / 2 - opts.cellPitch * (cell.slot.row + 0.5);
-        const z = plate.origin[2] + plate.extentZ / 2 - opts.cellPitch * (cell.slot.col + 0.5);
+        // ★ 式を書き写さない。板の絵はラベル帯（上）と型名欄（左）のぶん内側に
+        //   セルを置いているので、素の (row+0.5)/(col+0.5) だと箱だけが
+        //   型名欄の上に浮く（HEADER×cellPitch と GUTTER×cellPitch ぶんずれる）
+        const [, y, z] = cellCenterWorld(plate, cell.slot, opts.cellPitch);
         // 板の面から過去側へ伸ばす（未来側へ出すと次の板とぶつかる）
         const x = plate.origin[0] - opts.plateThickness / 2 - style.thickness / 2;
         m.makeScale(style.thickness, opts.cell, opts.cell);
         m.setPosition(x, y, z);
         mesh.setMatrixAt(i, m);
         color.set(style.color);
+        // 選択中は「その板の箱」だけ素の色。ほかは沈める（背景が暗いので暗く＝奥へ引く）。
+        // 箱は不透明パスに出るため、薄くしても手前に居座る。明るさで引っ込めるしかない
+        if (selected && !(plate.scopeId === selected.scopeId && plate.nodeId === selected.nodeId)) {
+          color.multiplyScalar(0.4);
+        }
         mesh.setColorAt(i, color);
       });
       mesh.instanceMatrix.needsUpdate = true;
@@ -308,13 +390,27 @@ export function createWorldLine3DScene(
     // --- 入れ子の漏斗 ------------------------------------------------------
     // 連動するもの（アドレス連動）と、名前が揃っているだけのものを色で分ける。
     // 連動しないものを連動するように描いたら嘘になる。
-    nestLines = buildLines(
-      layout.nests.map((n) => ({
+    nestSurface = buildNestSurface(layout.nests);
+    if (nestSurface) scene.add(nestSurface);
+    // 背骨と稜線は残す。面がエッジオンになる向きでは膜が消えるので、
+    // 線が無いと入れ子そのものが図から落ちる
+    nestLines = buildLines([
+      ...layout.nests.map((n) => ({
         from: n.from,
         to: n.to,
         color: n.kind === 'linked' ? PALETTE_3D.nestLinked : PALETTE_3D.nestNominal,
-      }))
-    );
+      })),
+      ...layout.nests.flatMap((n) =>
+        [0, 1, 2, 3].map((i) => ({
+          from: n.mouth[i],
+          to: n.opening[i],
+          color: n.kind === 'linked' ? PALETTE_3D.nestLinked : PALETTE_3D.nestNominal,
+          // 膜を濃くするより、稜線のほうが形が読める。
+          // nominal は稜線も薄く＝奥が親に握られていないことを線でも言う
+          opacity: n.kind === 'linked' ? 0.55 : 0.22,
+        }))
+      ),
+    ]);
     if (nestLines) scene.add(nestLines);
 
     applyCamera();
