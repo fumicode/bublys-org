@@ -10,7 +10,15 @@ import {
 } from "@bublys-org/world-line-graph";
 import { MonthlyStaffSchedule, Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { registerObjects } from "./framework.js";
-import { HOTEL_OBJECTS, SCHEDULE_TYPE, STAFF_TYPE } from "./hotelObjects.js";
+import {
+  GLOBAL_WORKSHIFT_SET_ID,
+  HOTEL_OBJECTS,
+  SCHEDULE_TYPE,
+  STAFF_TYPE,
+  WORKSHIFT_SET_TYPE,
+} from "./hotelObjects.js";
+import { homeScopeOf } from "./framework.js";
+import { readScopeIdOf } from "./world.js";
 import { APP_SCOPE_ID, localScopeId, removeObject, saveObject } from "./commit.js";
 import { migrateLegacyScopes } from "./migrateLegacyScopes.js";
 import { createSchedule } from "../feature/createSchedule.js";
@@ -103,5 +111,43 @@ describe("古い形式の作り直しは、正しく生まれた世界を巻き�
 
     expect(migrateLegacyScopes(store)).toEqual([]);
     expect(store.nodeCount(scopeId)).toBe(grown);
+  });
+});
+
+describe("読みと書きが同じ (type, id) で住所を解く", () => {
+  const world = (born: boolean, scopeId: string) =>
+    ({ scopeId, born, here: null, app: null }) as unknown as Parameters<
+      typeof readScopeIdOf
+    >[0];
+
+  it("★ グローバル固定IDの型は、世界の中から読んでも台帳を見る", () => {
+    const sched = localScopeId(SCHEDULE_TYPE, "sc1");
+    // 勤務帯セットは id で本籍が変わる。id を渡さないと世界の中を探して「無い」になる
+    expect(readScopeIdOf(world(true, sched), WORKSHIFT_SET_TYPE, "sc1")).toBe(sched);
+    expect(
+      readScopeIdOf(world(true, sched), WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID)
+    ).toBe(APP_SCOPE_ID);
+  });
+
+  it("書き（homeScopeOf）と読み（readScopeIdOf）が同じ答えを出す", () => {
+    const sched = localScopeId(SCHEDULE_TYPE, "sc1");
+    for (const [type, id] of [
+      [SCHEDULE_TYPE, "sc1"],
+      [WORKSHIFT_SET_TYPE, "sc1"],
+      [WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID],
+    ] as const) {
+      const home = homeScopeOf(type, id) ?? APP_SCOPE_ID;
+      expect(readScopeIdOf(world(true, sched), type, id)).toBe(home);
+    }
+  });
+
+  it("固定メンバーはいま居る世界から読む（焼き付けたものを見る）", () => {
+    const sched = localScopeId(SCHEDULE_TYPE, "sc1");
+    expect(readScopeIdOf(world(true, sched), STAFF_TYPE, "s1")).toBe(sched);
+  });
+
+  it("誕生していない世界は存在しないので、台帳が現在の世界", () => {
+    const sched = localScopeId(SCHEDULE_TYPE, "sc1");
+    expect(readScopeIdOf(world(false, sched), SCHEDULE_TYPE, "sc1")).toBe(APP_SCOPE_ID);
   });
 });
