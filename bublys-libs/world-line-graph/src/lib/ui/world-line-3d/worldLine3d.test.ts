@@ -8,7 +8,7 @@ import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef, type StateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { buildSlotMap } from './slots.js';
-import { foldCellStates } from './cellStates.js';
+import { TOMBSTONE_HASH, foldCellStates } from './cellStates.js';
 import { assignLanes } from './lanes.js';
 import { deriveScopeTree, defaultNestedScopeResolver } from './scopeTree.js';
 
@@ -77,7 +77,7 @@ describe('foldCellStates — 全体状態と「変わった」の定義', () => 
     );
   });
 
-  it('★ changedRefs に入っていても、値が変わっていなければ changed にしない', () => {
+  it('★ changedRefs に入っていても、値が変わっていなければ「起きたこと」にしない', () => {
     // 「制約だけ変えた」等、勤務表は動かないのに参照だけ載る操作が実在する
     // （commit.test.ts「編集で値が変わらない型は、起点と次のノードで同じ参照のまま」）
     const g = WorldLineGraph.empty()
@@ -88,16 +88,16 @@ describe('foldCellStates — 全体状態と「変わった」の定義', () => 
     const cells = statesByNode.get(apex) ?? [];
     const sched = cells.find((c) => c.key === 'Schedule:x');
     expect(sched?.inChangedRefs).toBe(true); // 参照としては載っている
-    expect(sched?.changed).toBe(false); // でも値は変わっていない
-    expect(cells.find((c) => c.key === 'Log:l1')?.changed).toBe(true);
+    expect(sched?.action).toBe('unchanged'); // でも値は変わっていない
+    expect(cells.find((c) => c.key === 'Log:l1')?.action).toBe('created');
     expect(unprunedChangedCount).toBe(1);
   });
 
-  it('起点のセルはすべて changed（比べる前が無い）', () => {
+  it('起点のセルはすべて created（そこで初めて現れたから）', () => {
     const g = WorldLineGraph.empty().grow([staff, sched0]);
     const root = g.state.rootNodeId as string;
     const cells = foldCellStates(g).statesByNode.get(root) ?? [];
-    expect(cells.every((c) => c.changed)).toBe(true);
+    expect(cells.every((c) => c.action === 'created')).toBe(true);
   });
 
   it('分岐しても、枝ごとに正しい全体状態になる', () => {
@@ -263,5 +263,53 @@ describe('deriveScopeTree — 入れ子の導出', () => {
   it('アドレス連動しているものは kind: linked になる（描き分けのため）', () => {
     const t = deriveScopeTree(mkInput({ isLinked: () => true }));
     expect(t.scopes[1].kind).toBe('linked');
+  });
+});
+
+/**
+ * 「消えたものは、以降そこに居ない」
+ *
+ * 消したのに図に描き続けると、世界線を読む人は「まだ居る」と読む。
+ * 墓標は**消された瞬間の1ノードだけ**に出て、その先には出さない。
+ */
+describe('消えたオブジェクトの扱い', () => {
+  const TOMB = TOMBSTONE_HASH;
+  const staff = { type: 'Staff', id: 's1', hash: 'h-staff' };
+  const other = { type: 'Staff', id: 's2', hash: 'h-other' };
+
+  it('消された瞬間のノードにだけ墓標が出て、その先のノードには出てこない', () => {
+    const g = WorldLineGraph.empty()
+      .grow([staff, other])
+      .grow([{ type: 'Staff', id: 's1', hash: TOMB }])
+      .grow([{ type: 'Staff', id: 's2', hash: 'h-other2' }]);
+
+    const { statesByNode } = foldCellStates(g);
+    const byDepth = [...statesByNode.values()];
+    const at = (i: number) => byDepth[i].find((c) => c.key === 'Staff:s1');
+
+    expect(at(0)?.action).toBe('created');
+    expect(at(1)?.action).toBe('deleted'); // 墓標
+    expect(at(2)).toBeUndefined(); // 以降は居ない
+  });
+
+  it('消したあと同じIDで作り直したら、また「作られた」になる（変更ではない）', () => {
+    const g = WorldLineGraph.empty()
+      .grow([staff])
+      .grow([{ type: 'Staff', id: 's1', hash: TOMB }])
+      .grow([{ type: 'Staff', id: 's1', hash: 'h-staff-again' }]);
+
+    const cells = [...foldCellStates(g).statesByNode.values()][2];
+    expect(cells.find((c) => c.key === 'Staff:s1')?.action).toBe('created');
+  });
+
+  it('枝分かれの片方で消しても、もう片方の枝には居続ける（巻き戻しが効く）', () => {
+    let g = WorldLineGraph.empty().grow([staff]);
+    const forkId = g.state.apexNodeId as string;
+    g = g.grow([{ type: 'Staff', id: 's1', hash: TOMB }]);
+    g = g.moveTo(forkId).grow([{ type: 'Staff', id: 's1', hash: 'h-staff2' }]);
+
+    const { statesByNode } = foldCellStates(g);
+    const alive = statesByNode.get(g.state.apexNodeId as string) ?? [];
+    expect(alive.find((c) => c.key === 'Staff:s1')?.action).toBe('changed');
   });
 });

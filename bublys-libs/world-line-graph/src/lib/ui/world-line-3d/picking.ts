@@ -10,7 +10,6 @@
  */
 import type { Vec3 } from './types.js';
 import type { Plate3D } from './types.js';
-import type { SlotMap } from './slots.js';
 import { slotFromOffset } from './layout3d.js';
 
 export type Ray = { readonly origin: Vec3; readonly dir: Vec3 };
@@ -90,13 +89,13 @@ export type Pick = {
 /**
  * レイが最初に当たった板（とセル）を返す。
  *
- * セルの逆引きは SlotMap の `at` を使う。席は型ごとに行を折り返すので歯抜けがあり、
- * `order[row * cols + col]` のような式で引くと必ずずれる。
+ * セルの逆引きは**その板が持っているセル**から引く。席表は世界ごとに違ううえ、
+ * 席は型ごとに行を折り返すので歯抜けがある。`order[row * cols + col]` のような
+ * 式や共通の席表で引くと、別の世界の席番号を当ててしまう。
  */
 export function pickPlate(
   ray: Ray,
   plates: readonly Plate3D[],
-  slotMap: SlotMap,
   cellPitch: number
 ): Pick | null {
   let best: Pick | null = null;
@@ -114,9 +113,10 @@ export function pickPlate(
 
     // 板の中のどの席か。式は layout3d の1箇所に寄せる（書き写すとずれる）
     const { row, col } = slotFromOffset(dy, dz, p.extentY, p.extentZ, cellPitch);
-    const key = slotMap.at(col, row) ?? null;
-    // その席にこのノードでオブジェクトが居るときだけ当たりにする
-    const hit = key && p.cells.some((c) => c.key === key) ? key : null;
+    // 席表は板（＝世界）ごとに違うので、板の中身から直に引く。
+    // 共通の席表を引くと、別の世界の席番号で当たりを判定してしまう
+    const hit =
+      p.cells.find((c) => c.slot.col === col && c.slot.row === row)?.key ?? null;
     best = { scopeId: p.scopeId, nodeId: p.nodeId, cellKey: hit, distance: t };
   }
   return best;

@@ -15,12 +15,21 @@ export type Vec3 = readonly [x: number, y: number, z: number];
 /** 席（スロット）。全ノード・全スコープで同じ key は同じ席に居続ける */
 export type Slot = { readonly col: number; readonly row: number };
 
-/** そのノードでのセルの状態 */
-export type CellStatus =
-  /** その時点の世界に居る */
-  | 'present'
-  /** 削除マーカー（墓標として出す） */
-  | 'tombstone';
+/**
+ * そのノードで、そのオブジェクトに**何が起きたか**。
+ *
+ * 「いま何が居るか」ではなく「何が起きたか」を語るのが要点。
+ * 世界線を見る人が知りたいのは出来事なので、状態ではなく動詞で持つ。
+ */
+export type CellAction =
+  /** このノードで初めて現れた（作られた） */
+  | 'created'
+  /** 前からあって、このノードで値が変わった */
+  | 'changed'
+  /** このノードで消された。ここに墓標を置き、**これ以降は描かない** */
+  | 'deleted'
+  /** 前からあって、このノードでは何も起きていない */
+  | 'unchanged';
 
 export type Cell3D = {
   /** `${type}:${id}` */
@@ -29,15 +38,7 @@ export type Cell3D = {
   readonly id: string;
   readonly hash: string;
   readonly slot: Slot;
-  readonly status: CellStatus;
-  /**
-   * このノードで**値が変わった**か。
-   *
-   * `node.changedRefs` に入っているか、ではない。grow は渡された参照をそのまま焼くので、
-   * 値が変わっていない参照も changedRefs に入りうる（既存テスト「編集で値が変わらない型は、
-   * 起点と次のノードで同じ参照のまま」がその状況）。親ノードとハッシュを比べて決める。
-   */
-  readonly changed: boolean;
+  readonly action: CellAction;
   /** 参照としては changedRefs に入っていたか（上とのズレを数えるため） */
   readonly inChangedRefs: boolean;
   /** このオブジェクトが自分の世界線を持つなら、そのスコープID */
@@ -52,6 +53,9 @@ export type Plate3D = {
   /** Y方向の高さ / Z方向の奥行き */
   readonly extentY: number;
   readonly extentZ: number;
+  /** この板の席の数（世界ごとに違う）。絵と格子はこの値から導く */
+  readonly cols: number;
+  readonly rows: number;
   /** そのスコープ内での世代（＝X の目盛り） */
   readonly depth: number;
   readonly isApex: boolean;
@@ -68,6 +72,21 @@ export type Edge3D = {
   readonly scopeId: string;
   /** time = 同じ枝の親子 / branch = 枝分かれ */
   readonly kind: 'time' | 'branch';
+};
+
+/**
+ * 同じオブジェクト（同じ `type:id`）を時間方向につなぐ線。
+ *
+ * 席は全ノードで固定なので、この線は時間軸に平行なまっすぐな「レール」になる。
+ * どのオブジェクトがいつからいつまで居たのか、どこで変わったのかが目で追える。
+ */
+export type IdentityLink3D = {
+  readonly from: Vec3;
+  readonly to: Vec3;
+  readonly key: string;
+  readonly scopeId: string;
+  /** 線の先（子ノード側）で何が起きたか */
+  readonly action: CellAction;
 };
 
 /**
@@ -106,6 +125,8 @@ export type Layout3DDiagnostics = {
 export type Layout3D = {
   readonly plates: readonly Plate3D[];
   readonly edges: readonly Edge3D[];
+  /** 同じオブジェクトを時間方向につなぐ線（同一性のレール） */
+  readonly identities: readonly IdentityLink3D[];
   readonly nests: readonly Nest3D[];
   readonly bounds: { readonly min: Vec3; readonly max: Vec3 };
   /** 席の総数（板の格子の大きさ） */
@@ -121,6 +142,15 @@ export type Layout3D = {
  * ＝図が嘘をつく（実際に踏んだ）。
  */
 export const HEADER_UNITS = 1.2;
+
+/**
+ * 板の左側の「型名を出す余白」の幅（セル何個分か）。
+ *
+ * ■ だけ並んでいても何のオブジェクトか分からない。席は型ごとに行が分かれるので、
+ * 行の左に型名を書けば、全部のセルに文字を詰め込まずに済む。
+ * HEADER_UNITS と同じく、板の絵と 3D の格子が共有する唯一の出所。
+ */
+export const GUTTER_UNITS = 3.4;
 
 export const DEFAULT_LAYOUT_3D_OPTIONS = {
   /** 時間方向のノード間隔 */
@@ -141,7 +171,30 @@ export const DEFAULT_LAYOUT_3D_OPTIONS = {
   nestPitchZ: 0,
   /** 入れ子をどこまで潜るか（循環と爆発の保険） */
   maxNestDepth: 4,
+  /**
+   * 「同時」とみなす時間の幅（ミリ秒）。
+   *
+   * 1つの操作は複数のスコープへ同時に書く（勤務表を1セル編集すると、その勤務表の
+   * 世界線とアプリ全体スコープの両方にノードが増える）。それらは同じ X に並んでほしい。
+   * ノードの timestamp は Date.now() のミリ秒なので、同じ操作の書き込みは数ミリ秒以内に収まる。
+   */
+  syncToleranceMs: 250,
+  /**
+   * 同じ時刻クラスタの中で、同じスコープに複数ノードができたときのずらし幅
+   * （xStep に対する比）。アプリ全体スコープは1操作で複数ノード書くので必要。
+   */
+  subStep: 0.32,
 } as const;
+
+/**
+ * X 軸の意味。
+ *
+ * - 'sync' … **実際の時刻**。同時に起きたことは同じ X に並ぶ。
+ *   1操作でスコープごとに書き込む回数が違っても、世界線どうしがずれない。
+ * - 'hops' … スコープ内の世代（親からのホップ数）。等間隔で読みやすいが、
+ *   書き込み回数の多いスコープだけが右へ流れて、他の世界線と年表がずれる。
+ */
+export type TimeMode = 'sync' | 'hops';
 
 export type Layout3DOptions = {
   -readonly [K in keyof typeof DEFAULT_LAYOUT_3D_OPTIONS]: number;

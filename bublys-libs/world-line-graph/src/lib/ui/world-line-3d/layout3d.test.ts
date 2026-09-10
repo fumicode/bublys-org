@@ -11,6 +11,7 @@ import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellOffset } from './layout3d.js';
+import { TOMBSTONE_HASH } from './cellStates.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
 
 const h = (v: unknown) => computeStateHash(v);
@@ -128,19 +129,38 @@ describe('computeWorldLine3DLayout', () => {
     expect(depth1[0].origin[1]).not.toBe(depth1[1].origin[1]);
   });
 
-  it('同じオブジェクトは、どのノード・どのスコープでも同じ席', () => {
+  /**
+   * 席は**世界ごと**に配る。同一性の線は同じ世界の中でしか引かないので、
+   * 「同じ世界のどのノードでも同じ席」だけ守れば線はまっすぐなレールになる。
+   * 全世界で席を共通にすると、5種類しか居ない勤務表の板が、アプリ全体スコープの
+   * 席数（希望・予約・レポート…）を背負って9割空白になる。
+   */
+  it('同じ世界の中では、同じオブジェクトはどのノードでも同じ席', () => {
     const { graphs } = hotelLike();
     const layout = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
     const slots = new Map<string, string>();
     for (const p of layout.plates) {
       for (const c of p.cells) {
-        const s = `${c.slot.col},${c.slot.row}`;
-        const known = slots.get(c.key);
-        if (known) expect(s).toBe(known);
-        else slots.set(c.key, s);
+        const at = `${c.slot.col},${c.slot.row}`;
+        const known = slots.get(`${p.scopeId} ${c.key}`);
+        if (known) expect(at).toBe(known);
+        else slots.set(`${p.scopeId} ${c.key}`, at);
       }
     }
     expect(slots.size).toBeGreaterThan(0);
+  });
+
+  it('★ 世界ごとに席を詰める（中身の少ない世界の板が、大きい世界に合わせて膨らまない）', () => {
+    const { graphs } = hotelLike();
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+    const app = layout.plates.find((p) => p.scopeId === 'hotel');
+    const local = layout.plates.find((p) => p.scopeId !== 'hotel');
+    expect(app && local).toBeTruthy();
+    // 中身の少ない世界の板は、アプリ全体スコープの板より小さいか同じ
+    expect(local?.rows).toBeLessThanOrEqual(app?.rows as number);
+    expect(local?.extentY).toBeLessThanOrEqual(app?.extentY as number);
+    // 席の数ぶんしか確保しない（既定の cols=8 に無条件で広げない）
+    expect(app?.cols).toBeLessThanOrEqual(DEFAULT_LAYOUT_3D_OPTIONS.cols);
   });
 
   it('決定的（同じ入力なら同じ出力。Math.random / Date.now を使っていない）', () => {
@@ -197,8 +217,9 @@ describe('computeWorldLine3DLayout', () => {
       graphs: { app: g },
       locate: (hash) => (hash === tomb ? 'tombstone' : 'memory'),
     });
+    // 消された瞬間のノードにだけ墓標が出る
     const apex = layout.plates.find((p) => p.isApex);
-    expect(apex?.cells.find((c) => c.key === 'Staff:s1')?.status).toBe('tombstone');
+    expect(apex?.cells.find((c) => c.key === 'Staff:s1')?.action).toBe('deleted');
     expect(layout.diagnostics.tombstoneCount).toBe(1);
   });
 
@@ -227,5 +248,144 @@ describe('computeWorldLine3DLayout', () => {
       { xStep: 0.01 }
     );
     expect(layout.diagnostics.violations.length).toBeGreaterThan(0);
+  });
+});
+
+describe('X は「同時」を表す（書き込み回数ではなく時刻で並ぶ）', () => {
+  /**
+   * 1つの操作は複数のスコープへ同時に書く。書き込む回数はスコープごとに違う
+   * （アプリ全体スコープはオブジェクトごとに1ノード、勤務表の世界線は束ねて1ノード）。
+   * ホップ数を X にすると、同時に起きたことが別の位置に並んで「片方だけ伸びている」
+   * ように見えてしまう。時刻でそろえる。
+   */
+  const at = (ts: number, refs: ReturnType<typeof ref>[]) => ({ ts, refs });
+
+  /** timestamp を明示してグラフを組み立てる */
+  function graphWithTimes(steps: { ts: number; refs: ReturnType<typeof ref>[] }[]) {
+    let g = WorldLineGraph.empty();
+    for (const s of steps) g = g.grow(s.refs);
+    // grow は Date.now() を使うので、後から timestamp を差し替える
+    const json = g.toJSON();
+    const ids = Object.values(json.nodes)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((n) => n.id);
+    const nodes = { ...json.nodes };
+    ids.forEach((id, i) => {
+      nodes[id] = { ...nodes[id], timestamp: steps[i].ts };
+    });
+    return WorldLineGraph.fromJSON({ ...json, nodes });
+  }
+
+  it('同時に書かれたノードは、スコープが違っても同じ X に並ぶ', () => {
+    // 操作1（t=1000）と操作2（t=5000）。アプリ全体は毎回2ノード、勤務表は1ノード書く
+    const hotel = graphWithTimes([
+      at(1000, [ref('Schedule', 'x', 0)]),
+      at(1000, [ref('Log', 'l', 0)]), // 同じ操作の2つめの書き込み
+      at(5000, [ref('Schedule', 'x', 1)]),
+      at(5000, [ref('Log', 'l', 1)]),
+    ]);
+    const sched = graphWithTimes([
+      at(1000, [ref('Schedule', 'x', 0)]),
+      at(5000, [ref('Schedule', 'x', 1)]),
+    ]);
+    const layout = computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs: { hotel, 'Schedule:x': sched },
+    });
+
+    const xAt = (scopeId: string, ts: number) =>
+      layout.plates
+        .filter((p) => p.scopeId === scopeId && p.timestamp === ts)
+        .map((p) => p.origin[0])
+        .sort((a, b) => a - b);
+
+    // 操作1: 勤務表の1枚が、アプリ全体の1枚目と同じ X
+    expect(xAt('Schedule:x', 1000)[0]).toBeCloseTo(xAt('hotel', 1000)[0], 9);
+    // 操作2 も同じ
+    expect(xAt('Schedule:x', 5000)[0]).toBeCloseTo(xAt('hotel', 5000)[0], 9);
+    // 操作1 と 操作2 は別の位置
+    expect(xAt('Schedule:x', 5000)[0]).toBeGreaterThan(xAt('Schedule:x', 1000)[0]);
+  });
+
+  it('同じ時刻に同じスコープが複数書いたぶんは、その中で少しだけずれる（重ならない）', () => {
+    const hotel = graphWithTimes([
+      at(1000, [ref('A', 'a', 0)]),
+      at(1000, [ref('B', 'b', 0)]),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs: { hotel } });
+    const xs = layout.plates.map((p) => p.origin[0]).sort((a, b) => a - b);
+    expect(xs[1]).toBeGreaterThan(xs[0]); // 親より子が先へ進む
+    expect(xs[1] - xs[0]).toBeLessThan(DEFAULT_LAYOUT_3D_OPTIONS.xStep); // でも1操作ぶんより小さい
+    expect(layout.diagnostics.violations).toEqual([]);
+  });
+
+  it('時刻がそろっていても、親より子が必ず先へ進む', () => {
+    const hotel = graphWithTimes([
+      at(1000, [ref('A', 'a', 0)]),
+      at(1000, [ref('A', 'a', 1)]),
+      at(1000, [ref('A', 'a', 2)]),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs: { hotel } });
+    for (const e of layout.edges) expect(e.to[0]).toBeGreaterThan(e.from[0]);
+  });
+
+  it("timeMode: 'hops' にすると、従来どおりスコープ内の世代で並ぶ", () => {
+    const hotel = graphWithTimes([
+      at(1000, [ref('A', 'a', 0)]),
+      at(1000, [ref('A', 'a', 1)]),
+    ]);
+    const layout = computeWorldLine3DLayout({
+      rootScopeId: 'hotel',
+      graphs: { hotel },
+      timeMode: 'hops',
+    });
+    const xs = layout.plates.map((p) => p.origin[0]).sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBeCloseTo(DEFAULT_LAYOUT_3D_OPTIONS.xStep, 9);
+  });
+});
+
+/**
+ * 同一性の線 — 「同じ ■ は同じもの」を図で言う。
+ *
+ * 席は全ノードで固定なので、この線は時間軸に平行なレールになる。
+ * 線が途切れる＝そこでそのオブジェクトが居なくなった、と読める。
+ */
+describe('同一性の線', () => {
+  const staff = { type: 'Staff', id: 's1', hash: 'h1' };
+
+  it('同じIDのセルを親ノードと子ノードでつなぐ', () => {
+    const g = WorldLineGraph.empty()
+      .grow([staff])
+      .grow([{ type: 'Staff', id: 's1', hash: 'h2' }]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'a', graphs: { a: g } });
+
+    const links = layout.identities.filter((l) => l.key === 'Staff:s1');
+    expect(links).toHaveLength(1);
+    expect(links[0].action).toBe('changed');
+    // 席が同じなので、時間軸(X)以外の座標は動かない＝まっすぐなレールになる
+    expect(links[0].from[1]).toBeCloseTo(links[0].to[1]);
+    expect(links[0].from[2]).toBeCloseTo(links[0].to[2]);
+    expect(links[0].to[0]).toBeGreaterThan(links[0].from[0]);
+  });
+
+  it('生まれたばかりのセルからは線が出ない（つなぐ相手が親に居ない）', () => {
+    const g = WorldLineGraph.empty()
+      .grow([staff])
+      .grow([{ type: 'Staff', id: 's2', hash: 'h9' }]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'a', graphs: { a: g } });
+    expect(layout.identities.some((l) => l.key === 'Staff:s2')).toBe(false);
+  });
+
+  it('★ 墓標より先へは伸びない（消えたものが線でつながって見えない）', () => {
+    const g = WorldLineGraph.empty()
+      .grow([staff])
+      .grow([{ type: 'Staff', id: 's1', hash: TOMBSTONE_HASH }])
+      .grow([{ type: 'Staff', id: 's9', hash: 'h9' }]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'a', graphs: { a: g } });
+
+    const links = layout.identities.filter((l) => l.key === 'Staff:s1');
+    // 起点 → 墓標 の1本だけ。墓標 → その先 は無い
+    expect(links).toHaveLength(1);
+    expect(links[0].action).toBe('deleted');
   });
 });

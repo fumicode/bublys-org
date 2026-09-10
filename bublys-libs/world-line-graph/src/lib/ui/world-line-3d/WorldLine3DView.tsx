@@ -30,8 +30,7 @@ import {
   type Orbit,
 } from './camera.js';
 import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
-import type { SlotMap } from './slots.js';
-import { PALETTE_3D } from './palette3d.js';
+import { ACTION_COLOR, ACTION_LABEL, ACTION_ORDER, PALETTE_3D } from './palette3d.js';
 // 型だけ。実体は動的 import する（ここで実体を import すると three が静的に見える）
 import type { SceneStats, WorldLine3DScene } from './scene.js';
 
@@ -98,31 +97,6 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
     () => ({ ...DEFAULT_LAYOUT_3D_OPTIONS, ...options }),
     [options]
   );
-  /**
-   * 席の逆引き（席 → key）。
-   *
-   * ★ buildSlotMap で作り直してはいけない。レイアウトは全ノードの changedRefs から
-   *   席を配るが、plates[].cells は root から辿れたノードぶんしか無い。収集元が違うので、
-   *   壊れたグラフ（孤児ノード・親より古い時刻）では席が1つずれ、クリックしたものと
-   *   違うオブジェクトが右パネルに出る。**レイアウトが実際に配った席をそのまま使う。**
-   */
-  const slotMap: SlotMap = useMemo(() => {
-    const at = new Map<string, string>();
-    const of = new Map<string, { col: number; row: number }>();
-    for (const p of layout.plates) {
-      for (const c of p.cells) {
-        at.set(`${c.slot.col},${c.slot.row}`, c.key);
-        of.set(c.key, c.slot);
-      }
-    }
-    return {
-      of: (key: string) => of.get(key),
-      at: (col: number, row: number) => at.get(`${col},${row}`),
-      cols: layout.grid.cols,
-      rows: layout.grid.rows,
-      keys: [...of.keys()],
-    };
-  }, [layout]);
 
   // --- 生成と後始末 --------------------------------------------------------
   useEffect(() => {
@@ -283,7 +257,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
         scene.camera.fov,
         Math.max(rect.width, 1) / Math.max(rect.height, 1)
       );
-      const hit = pickPlate(ray, layout.plates, slotMap, o.cellPitch);
+      const hit = pickPlate(ray, layout.plates, o.cellPitch);
       if (!hit) {
         onSelect(null);
         return;
@@ -298,7 +272,7 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
         if (cell?.nestedScopeId) onToggleNested(cell.nestedScopeId);
       }
     },
-    [layout, slotMap, o.cellPitch, onSelect, onToggleNested]
+    [layout, o.cellPitch, onSelect, onToggleNested]
   );
 
   const setPreset = useCallback(
@@ -355,15 +329,25 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
           <div>
             <strong style={{ color: '#58a6ff' }}>世界線 3D</strong>{' '}
             <span style={{ color: '#8b949e' }}>
-              X = 編集ステップ / Y = 分岐 / Z = 入れ子の段
+              X = 時刻（同時に起きたことは同じ位置） / Y = 分岐 / Z = 入れ子の段
             </span>
           </div>
           <div>
             板 {layout.plates.length} / セル{' '}
-            {layout.plates.reduce((n, p) => n + p.cells.length, 0)} / 変化{' '}
-            {stats?.changedCells ?? '…'} / 入れ子 {layout.nests.length}
+            {layout.plates.reduce((n, p) => n + p.cells.length, 0)} / 出来事{' '}
+            {stats?.changedCells ?? '…'} / 同一性の線 {layout.identities.length} / 入れ子{' '}
+            {layout.nests.length}
           </div>
           <div>
+            起きたこと:{' '}
+            {ACTION_ORDER.map((a) => (
+              <span key={a} style={{ color: ACTION_COLOR[a], marginRight: 8 }}>
+                ■{ACTION_LABEL[a]}
+              </span>
+            ))}
+          </div>
+          <div>
+            値の所在（縁の色）:{' '}
             {LOCATION_ORDER.map((k) => (
               <span key={k} style={{ color: LOCATION_MARK[k].color, marginRight: 8 }}>
                 {LOCATION_MARK[k].mark}
