@@ -165,12 +165,17 @@ export function buildTimeSlots(
   const sorted = [...nodes].sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
   const slots = new Map<string, number>();
   let slot = -1;
-  let prev = Number.NEGATIVE_INFINITY;
+  // ★ 比べる相手は「直前のノード」ではなく**クラスタの先頭**。
+  //   直前と比べると、許容時間より短い間隔が続く限りいくらでも数珠つなぎになる
+  //   （200ms 間隔で10回編集すると、1.8 秒離れた両端まで「同時」に潰れる）。
+  //   先頭から測れば、1つのクラスタの実時間の幅は必ず許容時間以下に収まる。
+  let clusterStart = Number.NEGATIVE_INFINITY;
   for (const n of sorted) {
-    // 前のノードから離れていれば新しい時刻。近ければ同じ時刻とみなす
-    if (n.timestamp - prev > toleranceMs) slot++;
+    if (n.timestamp - clusterStart > toleranceMs) {
+      slot++;
+      clusterStart = n.timestamp;
+    }
     slots.set(n.id, Math.max(slot, 0));
-    prev = n.timestamp;
   }
   return slots;
 }
@@ -395,8 +400,17 @@ export function computeWorldLine3DLayout(
     return there.hash === ref.hash ? 'same' : 'differs';
   }
 
-  const yExtentOf = (c: ScopeCalc) =>
-    Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY;
+  /**
+   * その世界が origin[1] から**下**へ張り出す量。板の半分だけ。
+   *
+   * ★ レーン（枝）は `origin[1] + lanePitchY * lane` と **+Y にだけ**伸びる。
+   *   だから世界の Y 範囲は origin を中心にしていない。中心とみなして詰めると、
+   *   枝の多い兄弟が次の兄弟に丸ごと覆いかぶさる（実際に同じ座標へ乗った）。
+   */
+  const yBelowOf = (c: ScopeCalc) => c.extentY / 2;
+  /** その世界が origin[1] から**上**へ張り出す量。枝のぶんはこちらに全部載る */
+  const yAboveOf = (c: ScopeCalc) =>
+    Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY / 2;
 
   // --- X（時間軸）を決める --------------------------------------------------
   // 'sync': 全スコープのノードを時刻でまとめ、同時なら同じ X に置く。
@@ -419,12 +433,32 @@ export function computeWorldLine3DLayout(
       }
     }
   }
+  // ★ クラスタ内のずらしの**合計**が、次のクラスタまでの距離を超えてはいけない。
+  //   超えると時間が逆流し（親より子が手前に来る）、板も重なる。
+  //   1操作でアプリ全体スコープにオブジェクトごとのノードが書かれるので、
+  //   同じクラスタに深さ4以上が入るのは珍しくない。
+  let widest = 1;
+  if (timeMode === 'sync') {
+    const maxDepth = new Map<string, number>();
+    for (const c of calcs) {
+      for (const node of Object.values(c.graph.state.nodes)) {
+        const key = `${c.scopeId} ${slotOf.get(node.id) ?? 0}`;
+        const d = c.depths.get(node.id) ?? 0;
+        const cur = maxDepth.get(key);
+        if (cur === undefined || d > cur) maxDepth.set(key, d);
+      }
+    }
+    for (const [key, d] of maxDepth) widest = Math.max(widest, d - (baseDepth.get(key) ?? 0));
+  }
+  // 0.9 は「次のクラスタの手前で必ず止まる」ための余白
+  const subStep = Math.min(o.subStep, 0.9 / widest);
+
   const xOf = (c: ScopeCalc, nodeId: string, depth: number): number => {
     if (timeMode === 'hops') return c.origin[0] + o.xStep * depth;
     const slot = slotOf.get(nodeId) ?? 0;
     const base = baseDepth.get(`${c.scopeId} ${slot}`) ?? 0;
     // 同じ時刻・同じスコープの中では depth 順に少しだけずらす（親より子が必ず先へ進む）
-    return o.xStep * (slot + (depth - base) * o.subStep);
+    return o.xStep * (slot + (depth - base) * subStep);
   };
 
   const levels = [...new Set(calcs.map((c) => c.level))].sort((a, b) => a - b);
@@ -448,12 +482,13 @@ export function computeWorldLine3DLayout(
 
     // 同じ段の兄弟が重ならないよう +Y へだけ押し出す（Y 区間パッキング）
     wishes.sort((a, b) => a.wishY - b.wishY || a.c.scopeId.localeCompare(b.c.scopeId));
-    let cursor = -Infinity;
+    let cursor = -Infinity; // 直前に置いた世界の**上端**
     for (const w of wishes) {
-      const half = yExtentOf(w.c) / 2;
       const y =
-        cursor === -Infinity ? w.wishY : Math.max(w.wishY, cursor + half + maxExtentY * 0.5);
-      cursor = y + half;
+        cursor === -Infinity
+          ? w.wishY
+          : Math.max(w.wishY, cursor + yBelowOf(w.c) + maxExtentY * 0.5);
+      cursor = y + yAboveOf(w.c);
       const x = w.anchorPos ? w.anchorPos[0] : 0;
       w.c.origin = [x, y, -nestPitchZ * level];
     }
@@ -672,9 +707,14 @@ export function computeWorldLine3DLayout(
  */
 export function findViolations(layout: Layout3D, o: Layout3DOptions): string[] {
   const v: string[] = [];
-  if (o.xStep <= o.plateThickness + o.changedThickness) {
+  // ★ 実際に隣り合う板の間隔は xStep ではなく **xStep × subStep**。
+  //   同じ時刻クラスタの中はこの刻みで並ぶので、xStep だけ見ても意味が無い
+  //   （既定は xStep 14 に対して実効 4.48）。
+  const step = o.xStep * Math.min(o.subStep, 1);
+  if (step <= o.plateThickness + o.changedThickness) {
     v.push(
-      `時間方向の間隔が足りない: xStep=${o.xStep} <= 板の厚み ${o.plateThickness} + 変化の厚み ${o.changedThickness}`
+      `時間方向の間隔が足りない: 実効の間隔 ${step.toFixed(2)}` +
+        `（xStep=${o.xStep} × subStep=${o.subStep}） <= 板の厚み ${o.plateThickness} + 変化の厚み ${o.changedThickness}`
     );
   }
   const ps = layout.plates;

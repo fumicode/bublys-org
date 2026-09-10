@@ -329,11 +329,24 @@ export function useCasScope(
     if (missingHashes.length === 0) return;
     for (const hash of missingHashes) attemptedRef.current.add(hash);
     let cancelled = false;
-    loadStatesRef.current(missingHashes).then((loaded) => {
-      if (cancelled || loaded.size === 0) return;
-      const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
-      dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
-    });
+    loadStatesRef.current(missingHashes)
+      .then((loaded) => {
+        if (cancelled || loaded.size === 0) return;
+        const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
+        dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
+      })
+      .catch((e) => {
+        // ★ ここを握りつぶすと、永続ストアが使えない環境（IndexedDB が塞がれている等）で
+        //   pending が永久に true のままになる。pending を見て待っている
+        //   「無ければ作る」の経路が全部止まり、画面は「読み込み中」から動かない。
+        //   取りに行って戻ってこなかったことは attemptedRef が覚えているので再試行はしない。
+        //   直る見込みの無い状態と読み込み中を、せめてログでは区別する。
+        console.warn(
+          "世界線: 永続ストアから状態を取り出せませんでした。" +
+            "この参照の値はこのセッションでは読めません。",
+          e
+        );
+      });
     return () => {
       cancelled = true;
     };
