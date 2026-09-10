@@ -5,7 +5,7 @@
  *
  * 制約を向きで3グループに分けて表示する:
  *   - 稼働日ごと（縦↕）: 責任者ルール（早責/予責/夜責）＋ 休み上限（1日 N 人まで）
- *   - 人ごと（横↔）    : 休日（月 N 日以上）＋ 連勤（N 連勤まで）
+ *   - 人ごと（横↔）    : 休日（月 N 日以上）＋ 連勤（N 連勤まで）＋ 勤務間インターバル（遅番明け）
  *   - 全体             : 希望（できるだけ希望に沿う）
  *
  * 責任者アイコンは、スタッフ名右の責任者バッジ（LeaderBadges）と同じく、単クリックで
@@ -15,7 +15,7 @@
 import { FC, Fragment, ReactNode } from "react";
 import styled from "styled-components";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import { ShiftLeaderRule } from "../domain/index.js";
+import { ShiftIntervalRule, ShiftLeaderRule } from "../domain/index.js";
 import { leaderRoleColor } from "./LeaderBadges.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
 import { IconColor, IconFrame, IconCaption } from "./constraint-icons/common.js";
@@ -23,6 +23,7 @@ import { LeaderConstraintIcon } from "./constraint-icons/LeaderConstraintIcon.js
 import { MaxDayOffPerDayIcon } from "./constraint-icons/MaxDayOffPerDayIcon.js";
 import { MinMonthlyDayOffIcon } from "./constraint-icons/MinMonthlyDayOffIcon.js";
 import { MaxConsecutiveIcon } from "./constraint-icons/MaxConsecutiveIcon.js";
+import { ShiftIntervalIcon } from "./constraint-icons/ShiftIntervalIcon.js";
 import { WishIcon } from "./constraint-icons/WishIcon.js";
 
 type ScheduleConstraintsBarProps = {
@@ -48,6 +49,10 @@ type ScheduleConstraintsBarProps = {
   maxPerDay: number;
   /** シフト希望チェックが有効か */
   checkShiftWish: boolean;
+  /** 勤務間インターバルのルール（「遅番の翌日は早番・中番に入れない」など） */
+  intervalRules?: ShiftIntervalRule[];
+  /** 勤務間インターバルの図バブル URL（ダブルクリックで開く）。省略時は開かない。 */
+  intervalRuleBubbleUrl?: (ruleKey: string) => string;
 };
 
 const DEFAULT_SHIFT_COLOR: IconColor = { bg: "#eceff1", fg: "#455a64" };
@@ -70,6 +75,8 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
   minDayOff,
   maxPerDay,
   checkShiftWish,
+  intervalRules = [],
+  intervalRuleBubbleUrl,
 }) => {
   // 責任者アイコン1つ（単クリック=選択 / ダブルクリック=図バブル）
   const renderLeader = (rule: ShiftLeaderRule): ReactNode => {
@@ -143,6 +150,41 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
     );
   };
 
+  // 勤務間インターバルのアイコン1つ（ダブルクリック=図バブル）。
+  // ルール自身が describe() で自己記述するので、ツールチップも表示もそこから導く
+  // （同じ文をここで書き直さない）。
+  const renderInterval = (rule: ShiftIntervalRule): ReactNode => {
+    const frame = (
+      <IconFrame
+        className={intervalRuleBubbleUrl ? "is-clickable" : ""}
+        title={`${rule.describe()}${
+          intervalRuleBubbleUrl ? "（ダブルクリックで詳細）" : ""
+        }`}
+      >
+        <ShiftIntervalIcon
+          fromShiftName={rule.fromShiftName}
+          forbiddenShiftNames={rule.forbiddenNextShiftNames}
+          restHours={rule.minRestHours}
+          colorOf={(name) => shiftColorOf?.(name) ?? DEFAULT_SHIFT_COLOR}
+        />
+        <IconCaption>{rule.label}</IconCaption>
+      </IconFrame>
+    );
+
+    return intervalRuleBubbleUrl ? (
+      <ObjectView
+        key={rule.key}
+        url={intervalRuleBubbleUrl(rule.key)}
+        openingPosition="origin-side"
+        draggable={false}
+      >
+        {frame}
+      </ObjectView>
+    ) : (
+      <Fragment key={rule.key}>{frame}</Fragment>
+    );
+  };
+
   return (
     <StyledBar>
       {/* 稼働日ごと（縦） */}
@@ -179,6 +221,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
             <MaxConsecutiveIcon max={maxConsecutive} />
             <IconCaption>連勤</IconCaption>
           </IconFrame>
+          {intervalRules.map(renderInterval)}
         </div>
       </div>
 

@@ -22,6 +22,14 @@ type ScheduleDataCellProps = {
   /** 単日違反（希望の食い違い）。希望の円をオレンジにして表す（旧: 右上の ⊿） */
   pointViolation?: ConstraintViolation;
   /**
+   * 前日との「つなぎ目」の違反（勤務間インターバル）。セルの左端＝前日との境目に印を出す。
+   * 違反しているのはセルの中身ではなく2日の間隔なので、赤帯（範囲）でも円（単日）でもなく、
+   * 境目そのものに印を置いて言い分ける。
+   */
+  intervalBefore?: ConstraintViolation;
+  /** 翌日との「つなぎ目」の違反。セルの右端＝翌日との境目に印を出す（intervalBefore の対）。 */
+  intervalAfter?: ConstraintViolation;
+  /**
    * まだ決まっていないセルに入れられる値（候補集合）の説明文。ホバーで内容が見えるよう
    * title に添える。確定済みセル・候補集合が無いときは undefined。
    */
@@ -71,7 +79,8 @@ type ScheduleDataCellProps = {
  *                                 ＝叶ったシフトの色の円
  *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
- * 範囲違反（連勤など）は従来どおり下端の赤帯。
+ * 範囲違反（連勤など）は従来どおり下端の赤帯。勤務間インターバル違反（遅番の翌日に早番など）は
+ * セルの中身ではなく2日のつなぎ目の話なので、隣のセルとの境目に赤い縦線＋半円を出す。
  * シングルクリックで選択、ダブルクリックで候補ドロップダウン（キーボード操作と共通）。
  */
 export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
@@ -80,6 +89,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   wishEntries,
   rangeViolation,
   pointViolation,
+  intervalBefore,
+  intervalAfter,
   candidateHint,
   forcedCandidate,
   forcedShift,
@@ -153,7 +164,9 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   }
   if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
 
-  if (pointViolation || rangeViolation) className += " is-violation";
+  if (pointViolation || rangeViolation || intervalBefore || intervalAfter) {
+    className += " is-violation";
+  }
   if (selected) className += " is-selected";
 
   // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
@@ -275,6 +288,10 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       {wishMarks}
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
       {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
+      {/* 勤務間インターバル: 2日の境目に印。前日側と翌日側の半円が合わさって
+          境界線上の1つの丸に見える（＝違反しているのは「この2日の間」）。 */}
+      {intervalAfter && violationMarker(intervalAfter, "e-interval-bar is-after")}
+      {intervalBefore && violationMarker(intervalBefore, "e-interval-bar is-before")}
     </div>
   );
 };
