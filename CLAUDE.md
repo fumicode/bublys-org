@@ -101,9 +101,16 @@ Reduxストアは以下を統合しています:
 
 世界線システムは、アプリケーション状態のタイムトラベル・バージョン管理を可能にする実験的な機能です。
 
-**配置場所:** `apps/bublys-os/app/world-line/`
+**配置場所:**
+- `bublys-libs/world-line-graph` — 現行の汎用ライブラリ。DAG（`WorldLineGraph`）と
+  内容アドレスのストア（CAS）、スコープ、覗くためのインスペクタ（2D / 3D）が入っている
+- `apps/bublys-os/app/world-line/` — 初期の実装例（Counter / Memo / WorldLine）
 
-**注意:** この機能は現在開発中であり、仕様が変更される可能性があります。詳細な実装パターンはコードを参照してください。
+**ドキュメント:**
+- [docs/world-line-graph-design.md](docs/world-line-graph-design.md) — ドメインモデルとメモリ構成
+- [docs/world-line-viewer.md](docs/world-line-viewer.md) — インスペクタの読み方と、バブリからの拡張
+
+**注意:** この機能は現在開発中であり、仕様が変更される可能性があります。
 
 ### コンポーネント構成（ドメイン駆動設計）
 

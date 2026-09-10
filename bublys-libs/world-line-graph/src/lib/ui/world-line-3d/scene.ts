@@ -37,7 +37,7 @@ import type { Layout3D, Nest3D, Plate3D } from './types.js';
 import type { RefLocation } from '../refLocation.js';
 import { ACTION_COLOR, PALETTE_3D, ROLE_COLOR, cellStyle } from './palette3d.js';
 import { paintPlate, plateCanvasSize } from './plateCanvas.js';
-import { orbitToPosition, type Orbit } from './camera.js';
+import { DEFAULT_FOV_DEG, orbitToPosition, type Orbit } from './camera.js';
 // ★ セルの位置は layout3d の1箇所から取る。式を書き写すとずれる（実際にずれていた）
 import { cellCenterWorld } from './layout3d.js';
 
@@ -107,7 +107,9 @@ export function createWorldLine3DScene(
 
   const scene = new Scene();
   scene.background = new Color(PALETTE_3D.background);
-  const camera = new PerspectiveCamera(45, 1, 0.1, 100000);
+  // 画角は camera.ts の1箇所から取る。ここに数字を書き直すと、fitOrbit と applyPan の
+  // 換算だけが別の画角で計算されて、寸法合わせと平行移動の手応えが静かにずれる
+  const camera = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, 0.1, 100000);
 
   // 使い回す資源（update のたびに作り直さない）
   const plateGeoCache = new Map<string, PlaneGeometry>();

@@ -8,8 +8,8 @@ import {
 } from "@bublys-org/world-line-graph";
 import {
   APP_SCOPE_ID,
-  homeScopeOf,
   hotelCellRole,
+  hotelNestedScope,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -232,23 +232,14 @@ const WorldLineInspectorBubble: BubbleRoute["Component"] = () =>
   withObjects(<WorldLineInspector defaultScopeId={APP_SCOPE_ID} />);
 
 // --- 世界線 3D ビュー（デバッグ用） ---
-// 入れ子は記述子の本籍（homeScope）から導く。hotel は Schedule:<id> が本籍なので、
-// 勤務表・可能勤務帯・制約・操作履歴のどれもが同じ勤務表の世界線に解決される。
+// 入れ子も立場（固定メンバーか）も、このバブリの記述子だけから導く純粋なクエリで答える。
+// 中身は libs の objects/worldLineViewQueries.ts に対で置いてある。
 // このバブリの入れ子はアドレス連動しない（名前の規約だけ）ので isLinked は渡さない。
-const resolveHotelNestedScope = (
-  ref: { type: string; id: string },
-  currentScopeId: string
-): string | null => {
-  const scopeId = homeScopeOf(ref.type, ref.id);
-  if (!scopeId || scopeId === currentScopeId) return null;
-  return scopeId;
-};
-
 const WorldLine3DBubble: BubbleRoute["Component"] = () =>
   withObjects(
     <WorldLine3DInspector
       rootScopeId={APP_SCOPE_ID}
-      resolveNestedScopeId={resolveHotelNestedScope}
+      resolveNestedScopeId={hotelNestedScope}
       // 「勤務表から見たスタッフは焼き付いていて動かない」を図に語らせる。
       // 判定は記述子だけから導く純粋なクエリ（読むだけ）なので、
       // module トップレベルの参照のままで済む＝レイアウトを作り直させない

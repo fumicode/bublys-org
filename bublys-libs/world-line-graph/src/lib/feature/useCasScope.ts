@@ -6,6 +6,7 @@ import {
 } from '@bublys-org/state-management';
 import type { RootState } from '@bublys-org/state-management';
 import {
+  TOMBSTONE_HASH,
   computeStateHash,
   createStateRef,
   type StateRef,
@@ -448,7 +449,7 @@ export function useCasScope(
 
   const removeObject = useCallback(
     (type: string, id: string) => {
-      const hash = computeStateHash(null);
+      const hash = TOMBSTONE_HASH;
       const ref = createStateRef(type, id, hash);
       growRef.current([ref], [{ hash, data: null }]);
     },

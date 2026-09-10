@@ -14,7 +14,7 @@ import {
   WORKSHIFT_SET_TYPE,
 } from "./hotelObjects.js";
 import { APP_SCOPE_ID, localScopeId } from "./commit.js";
-import { hotelCellRole } from "./cellRole.js";
+import { hotelCellRole, hotelNestedScope } from "./worldLineViewQueries.js";
 
 registerObjects(HOTEL_OBJECTS);
 
@@ -32,8 +32,8 @@ describe("世界から見たオブジェクトの立場", () => {
     expect(role(STAFF_TYPE, "s1", APP_SCOPE_ID)).toBeNull();
   });
 
-  it("勤務表そのものは、その勤務表の世界のメンバー（変化する）", () => {
-    expect(role(SCHEDULE_TYPE, "sc1", SCHED)).toBe("member");
+  it("勤務表そのものは、その勤務表の世界で変化する（live）", () => {
+    expect(role(SCHEDULE_TYPE, "sc1", SCHED)).toBe("live");
   });
 
   it("他の勤務表の世界から見たら、立場を持たない（そこには居ない）", () => {
@@ -41,7 +41,7 @@ describe("世界から見たオブジェクトの立場", () => {
   });
 
   it("勤務帯セットは id で変わる。勤務表用はメンバー、グローバル版は立場なし", () => {
-    expect(role(WORKSHIFT_SET_TYPE, "sc1", SCHED)).toBe("member");
+    expect(role(WORKSHIFT_SET_TYPE, "sc1", SCHED)).toBe("live");
     expect(role(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID, SCHED)).toBeNull();
   });
 
@@ -52,5 +52,24 @@ describe("世界から見たオブジェクトの立場", () => {
 
   it("バブル配置のような世界でないスコープでは何も言わない", () => {
     expect(role(STAFF_TYPE, "s1", "root")).toBeNull();
+  });
+});
+
+describe("入れ子の世界線の導出", () => {
+  const nest = (type: string, id: string, cur: string) =>
+    hotelNestedScope({ type, id }, cur);
+
+  it("本籍がそのまま入れ子の答えになる", () => {
+    expect(nest(SCHEDULE_TYPE, "sc1", APP_SCOPE_ID)).toBe(SCHED);
+    expect(nest(WORKSHIFT_SET_TYPE, "sc1", APP_SCOPE_ID)).toBe(SCHED);
+  });
+
+  it("いま居る世界と同じなら入れ子ではない（自分の中に自分は居ない）", () => {
+    expect(nest(SCHEDULE_TYPE, "sc1", SCHED)).toBeNull();
+  });
+
+  it("本籍を持たない型は入れ子を持たない", () => {
+    expect(nest(STAFF_TYPE, "s1", APP_SCOPE_ID)).toBeNull();
+    expect(nest(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID, APP_SCOPE_ID)).toBeNull();
   });
 });

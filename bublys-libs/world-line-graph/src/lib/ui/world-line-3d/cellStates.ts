@@ -16,11 +16,10 @@
  */
 import type { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import type { StateRef } from '../../domain/StateRef.js';
-import { computeStateHash } from '../../domain/StateHash.js';
+import { TOMBSTONE_HASH } from '../../domain/StateHash.js';
 import type { CellAction } from './types.js';
 
-/** 削除マーカーのハッシュ。定数なので値を読まずに判定できる */
-export const TOMBSTONE_HASH = computeStateHash(null);
+export { TOMBSTONE_HASH };
 
 export type CellState = {
   readonly key: string;

@@ -53,18 +53,18 @@ export const ACTION_ORDER: readonly CellAction[] = [
  * 入れ子（青・灰）とも、分岐（紫）とも当たらない**唯一の残り色相**。
  * 暗い背景 (#0d1117) に対して十分明るい。
  *
- * 'member' と 'external' には色を割り当てない。図に出したいのは
+ * 'live' と 'external' には色を割り当てない。図に出したいのは
  * 「外の変更が届かない」ことであって、普通のメンバーを飾ることではない。
  */
 export const ROLE_COLOR: Record<CellRole, string | null> = {
   pinned: '#39c5cf',
-  member: null,
+  live: null,
   external: null,
 };
 
 export const ROLE_LABEL: Record<CellRole, string> = {
   pinned: '固定（生まれたときに焼き付け）',
-  member: 'この世界のもの',
+  live: 'この世界で変化する',
   external: '外のもの',
 };
 
