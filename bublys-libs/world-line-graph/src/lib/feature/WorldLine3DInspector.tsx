@@ -100,6 +100,8 @@ export const WorldLine3DInspector: FC<WorldLine3DInspectorProps> = ({
     [rootScopeId, graphs, locate, resolveNestedScopeId, isLinked, collapsed]
   );
 
+  const expandAll = useCallback(() => setCollapsed(new Set()), []);
+
   const toggleNested = useCallback((scopeId: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -114,6 +116,7 @@ export const WorldLine3DInspector: FC<WorldLine3DInspectorProps> = ({
       layout={layout}
       selection={selection}
       locate={locate}
+      onToggleNested={toggleNested}
       cas={cas}
       idbScopeCount={idbScopeIds?.length ?? null}
     />
@@ -126,6 +129,7 @@ export const WorldLine3DInspector: FC<WorldLine3DInspectorProps> = ({
       selection={selection}
       onSelect={setSelection}
       onToggleNested={toggleNested}
+      onExpandAll={expandAll}
       detail={detail}
     />
   );
@@ -154,9 +158,10 @@ const Detail: FC<{
   layout: ReturnType<typeof computeWorldLine3DLayout>;
   selection: Selection3D | null;
   locate: (hash: string) => ReturnType<typeof locateRef>;
+  onToggleNested?: (scopeId: string) => void;
   cas: Readonly<Record<string, unknown>>;
   idbScopeCount: number | null;
-}> = ({ layout, selection, locate, cas, idbScopeCount }) => {
+}> = ({ layout, selection, locate, onToggleNested, cas, idbScopeCount }) => {
   if (!selection) {
     return (
       <div style={S.wrap}>
@@ -164,6 +169,7 @@ const Detail: FC<{
         <div style={{ color: '#8b949e' }}>
           板をクリックするとそのノードの中身が出ます。入れ子を持つセル（右上に点が付いているもの）を
           クリックすると、その世界線を開いたり閉じたりできます。
+          点が ● なら開いていて、○ なら畳んでいます。
         </div>
         <div style={{ marginTop: 8, color: '#8b949e' }}>
           メモリ上の状態 {Object.keys(cas).length} 件 / 永続スコープ {idbScopeCount ?? '…'} 件
@@ -227,7 +233,22 @@ const Detail: FC<{
               <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>
                 {c.id}
                 {c.nestedScopeId && (
-                  <span style={{ color: '#6e7681' }}> ↘{c.nestedScopeId}</span>
+                  <button
+                    type="button"
+                    onClick={() => onToggleNested?.(c.nestedScopeId as string)}
+                    title={c.nestedShown ? 'この世界線を畳む' : 'この世界線を開く'}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '0 4px',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      color: c.nestedShown ? '#58a6ff' : '#6e7681',
+                    }}
+                  >
+                    {c.nestedShown ? '↘' : '▸'}
+                    {c.nestedScopeId}
+                  </button>
                 )}
                 <div style={{ color: '#6e7681' }}>{preview(c.hash)}</div>
               </span>
@@ -235,6 +256,7 @@ const Detail: FC<{
           );
         })}
       <div style={{ marginTop: 8, color: '#8b949e' }}>
+        ↘ を押すとその世界線を畳み、▸ を押すと開きます。
         左の記号 = 値の所在、右の言葉 = このノードで起きたこと。
         消されたものは、その瞬間のノードにだけ墓標として出て、以降は現れません。
       </div>

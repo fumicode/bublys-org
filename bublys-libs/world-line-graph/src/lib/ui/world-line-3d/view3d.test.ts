@@ -8,9 +8,9 @@ import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
 import { createStateRef } from '../../domain/StateRef.js';
 import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
-import { CELL_PX, GUTTER_PX, HEADER_PX, plateCanvasSize } from './plateCanvas.js';
+import { CELL_PX, GUTTER_PX, HEADER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
-import { ACTION_COLOR, cellStyle, worldLineColor } from './palette3d.js';
+import { ACTION_COLOR, PALETTE_3D, cellStyle, worldLineColor } from './palette3d.js';
 import {
   ORBIT_PRESETS,
   applyDrag,
@@ -22,8 +22,11 @@ import {
   PITCH_LIMIT,
   type Orbit,
 } from './camera.js';
-import { cameraBasis, projectExtent } from './camera.js';
-import type { Vec3 } from './types.js';
+import { applyPan, cameraBasis, projectExtent } from './camera.js';
+import type { Plate3D, Vec3 } from './types.js';
+import { buildSlotMap } from './slots.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
 
 const h = (v: unknown) => computeStateHash(v);
@@ -245,6 +248,106 @@ describe('picking', () => {
   });
 });
 
+describe('席割り', () => {
+  it('★ 実際に埋まった列数だけ確保する（折り返しの上限まで広げない）', () => {
+    // 上限8だが、型が3つで各1個なら列は1つしか使わない
+    const map = buildSlotMap(
+      [
+        { type: 'A', key: 'A:a' },
+        { type: 'B', key: 'B:b' },
+        { type: 'C', key: 'C:c' },
+      ],
+      8
+    );
+    expect(map.cols).toBe(1);
+    expect(map.rows).toBe(3);
+  });
+
+  it('折り返すときは上限まで使う', () => {
+    const keys = Array.from({ length: 10 }, (_, i) => ({ type: 'A', key: `A:${i}` }));
+    const map = buildSlotMap(keys, 4);
+    expect(map.cols).toBe(4);
+    expect(map.rows).toBe(3); // 4 + 4 + 2
+  });
+
+  it('空でも 1 列 1 行は確保する（0 で割らないため）', () => {
+    const map = buildSlotMap([], 8);
+    expect(map.cols).toBe(1);
+    expect(map.rows).toBe(1);
+  });
+});
+
+describe('applyPan — shift+ドラッグで視点を滑らせる', () => {
+  const base = { target: [10, 2, -3] as Vec3, yaw: 1.05, pitch: 0.3, distance: 40 };
+
+  it('回さないしズームもしない（注視点だけ動く）', () => {
+    const p = applyPan(base, 30, -20, 800);
+    expect(p.yaw).toBe(base.yaw);
+    expect(p.pitch).toBe(base.pitch);
+    expect(p.distance).toBe(base.distance);
+    expect(p.target).not.toEqual(base.target);
+  });
+
+  it('★ 視線方向には動かない（奥行きが変わったら「平行移動」ではない）', () => {
+    for (const [yaw, pitch] of [
+      [0, 0],
+      [1.05, 0.3],
+      [Math.PI / 2, 0.08],
+      [-2.2, -0.7],
+    ]) {
+      const o = { ...base, yaw, pitch };
+      const p = applyPan(o, 37, -13, 800);
+      const { forward } = cameraBasis(yaw, pitch);
+      const d: Vec3 = [
+        p.target[0] - o.target[0],
+        p.target[1] - o.target[1],
+        p.target[2] - o.target[2],
+      ];
+      expect(d[0] * forward[0] + d[1] * forward[1] + d[2] * forward[2]).toBeCloseTo(0, 9);
+    }
+  });
+
+  it('横だけドラッグしたら高さは変わらない（画面の右に沿って動く）', () => {
+    const p = applyPan(base, 50, 0, 800);
+    expect(p.target[1]).toBeCloseTo(base.target[1], 9);
+    // 板を正対で見る向きでも、横ドラッグはちゃんと横（Z）に効く。
+    // ワールドXに沿わせると、この向きで横に動かなくなる
+    const plates = applyPan({ ...base, yaw: Math.PI / 2, pitch: 0 }, 50, 0, 800);
+    expect(Math.abs(plates.target[2] - base.target[2])).toBeGreaterThan(1);
+  });
+
+  it('掴んだ景色が指についてくる（注視点は指と逆へ動く）', () => {
+    // yaw=0 なら画面の右＝ワールド +X。右へドラッグ＝景色が右へ＝注視点は -X
+    const p = applyPan({ ...base, yaw: 0, pitch: 0 }, 50, 0, 800);
+    expect(p.target[0]).toBeLessThan(base.target[0]);
+  });
+
+  it('引くほど1pxが大きく効く（距離に比例。しないと遠景で動かなくなる）', () => {
+    const near = applyPan({ ...base, distance: 10 }, 50, 0, 800);
+    const far = applyPan({ ...base, distance: 100 }, 50, 0, 800);
+    const move = (p: typeof near) => Math.abs(p.target[0] - base.target[0]);
+    expect(move(far)).toBeCloseTo(move(near) * 10, 6);
+  });
+});
+
+/**
+ * ★ セルの位置を出す式は layout3d の1箇所だけ、という規律の見張り。
+ *
+ * これが無かったせいで scene.ts が式を書き写し、ラベル帯と型名欄のぶんだけ
+ * 「変更の箱」だけが板の絵の ■ からずれていた。scene.ts は three を静的 import
+ * するので Jest から読み込めない＝振る舞いのテストが書けない。
+ * だから**書き写しそのもの**を禁じる。
+ */
+describe('セルの座標の出所', () => {
+  it('scene.ts はセルの位置を自分で計算しない（cellCenterWorld を使う）', () => {
+    const src = readFileSync(join(__dirname, 'scene.ts'), 'utf-8');
+    expect(src).toContain('cellCenterWorld');
+    // `cellPitch * (... slot.row ...)` のような手書きの式が無いこと
+    expect(src).not.toMatch(/cellPitch\s*\*\s*\(\s*cell\.slot/);
+    expect(src).not.toMatch(/extentY\s*\/\s*2\s*-\s*opts\.cellPitch/);
+  });
+});
+
 describe('palette3d', () => {
   it('色は「何が起きたか」で決まる（作られた=白 / 変わった=黄 / 消された=赤）', () => {
     expect(cellStyle({ action: 'created' }, 'memory', 2.4).color).toBe(ACTION_COLOR.created);
@@ -351,5 +454,112 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
       );
       expect(hit?.cellKey).toBe(cell.key);
     }
+  });
+});
+
+/**
+ * 板の絵（paintPlate）は jsdom に本物の 2D コンテキストが無いので、
+ * 記録するだけの偽 ctx を渡して「何をどの α で描いたか」を見る。
+ *
+ * ここが無いと、選択中の板を不透明にする分岐も、畳んだ入れ子の○印も、
+ * 黙って戻っても誰も気づかない（scene.ts は three 込みで Jest から読めない）。
+ */
+describe('板の絵', () => {
+  type Op = { op: string; alpha: number; fill: string; stroke: string };
+  function fakeCanvas() {
+    const ops: Op[] = [];
+    const ctx = {
+      globalAlpha: 1,
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 1,
+      font: '',
+      textBaseline: '',
+      clearRect: () => undefined,
+      fillRect: () => ops.push(rec('fillRect')),
+      strokeRect: () => ops.push(rec('strokeRect')),
+      fillText: () => ops.push(rec('fillText')),
+      beginPath: () => undefined,
+      moveTo: () => undefined,
+      lineTo: () => undefined,
+      arc: () => undefined,
+      stroke: () => ops.push(rec('stroke')),
+      fill: () => ops.push(rec('fill')),
+    };
+    const rec = (op: string): Op => ({
+      op,
+      alpha: ctx.globalAlpha,
+      fill: String(ctx.fillStyle),
+      stroke: String(ctx.strokeStyle),
+    });
+    return {
+      ops,
+      canvas: { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement,
+    };
+  }
+
+  const plateOf = (over: Partial<Plate3D> = {}): Plate3D => ({
+    scopeId: 'app',
+    nodeId: 'n1',
+    origin: [0, 0, 0],
+    extentY: 4,
+    extentZ: 14,
+    cols: 2,
+    rows: 2,
+    depth: 0,
+    isApex: false,
+    isRoot: false,
+    timestamp: 0,
+    cells: [
+      {
+        key: 'Schedule:x',
+        type: 'Schedule',
+        id: 'x',
+        hash: 'h1',
+        slot: { col: 0, row: 0 },
+        action: 'unchanged',
+        inChangedRefs: false,
+        nestedScopeId: 'Schedule:x',
+        nestedShown: true,
+      },
+    ],
+    ...over,
+  });
+
+  it('★ 選択中の板はセルを不透明で描く（薄さで奥へ引っ込めない）', () => {
+    const plain = fakeCanvas();
+    paintPlate(plain.canvas, plateOf(), { cols: 2, rows: 2 });
+    const sel = fakeCanvas();
+    paintPlate(sel.canvas, plateOf(), { cols: 2, rows: 2, selected: true });
+
+    // セル本体は fillRect。下地の fillRect（1枚目）は板の透け方なので除く
+    const cellAlpha = (o: typeof plain) =>
+      o.ops.filter((x) => x.op === 'fillRect').slice(1).map((x) => x.alpha);
+    expect(cellAlpha(plain).length).toBeGreaterThan(0);
+    expect(cellAlpha(plain).every((a) => a < 1)).toBe(true);
+    expect(cellAlpha(sel).every((a) => a === 1)).toBe(true);
+  });
+
+  it('★ 入れ子の印は、畳んでいても消えない（塗りつぶし→中抜きに変わるだけ）', () => {
+    const open = fakeCanvas();
+    paintPlate(open.canvas, plateOf(), { cols: 2, rows: 2 });
+    const shut = fakeCanvas();
+    paintPlate(
+      shut.canvas,
+      plateOf({
+        cells: [{ ...plateOf().cells[0], nestedShown: false }],
+      }),
+      { cols: 2, rows: 2 }
+    );
+    // 開いている＝丸を塗る / 畳んでいる＝丸を描く（stroke）。どちらでも印は出る
+    expect(open.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(true);
+    expect(shut.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(false);
+    expect(shut.ops.some((o) => o.op === 'stroke' && o.stroke === PALETTE_3D.nestLinked)).toBe(true);
+  });
+
+  it('型名は行の先頭に出す（■だけでは何のオブジェクトか読めない）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    expect(c.ops.filter((o) => o.op === 'fillText').length).toBeGreaterThanOrEqual(2);
   });
 });

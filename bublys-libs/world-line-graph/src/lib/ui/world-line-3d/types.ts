@@ -41,8 +41,14 @@ export type Cell3D = {
   readonly action: CellAction;
   /** 参照としては changedRefs に入っていたか（上とのズレを数えるため） */
   readonly inChangedRefs: boolean;
-  /** このオブジェクトが自分の世界線を持つなら、そのスコープID */
+  /**
+   * このオブジェクトが自分の世界線を持つなら、そのスコープID。
+   * **畳んでいても ID は保つ**。消すと開き直す手がかりが図から無くなり、
+   * 畳む操作が片道切符になる（実際にそうなっていた）。
+   */
   readonly nestedScopeId: string | null;
+  /** その入れ子がいま図に出ているか。false ＝ 畳んでいる（印は中抜きで描く） */
+  readonly nestedShown: boolean;
 };
 
 export type Plate3D = {
@@ -97,8 +103,22 @@ export type IdentityLink3D = {
  *   - 'nominal' … scopeId が `型:id` で揃っているだけ（hotel の Schedule:x）。親を戻しても子は動かない
  */
 export type Nest3D = {
+  /** 背骨の線。面がエッジオンで消える向きでも、これは残る */
   readonly from: Vec3;
   readonly to: Vec3;
+  /**
+   * 漏斗の口＝親セルの位置に置いた小さな矩形。**Z（入れ子の段の方向）を法線に持つ**。
+   *
+   * 板の面（X法線）のまま口にすると、口も奥も同じ x 平面に乗るので、
+   * 4枚の側面が1枚の平面に潰れて互いに重なる（＝面にならない）。
+   * 入れ子は Z 方向に伸びるので、断面は Z 法線でなければならない。
+   *
+   * 回り順は (+X,+Y) → (-X,+Y) → (-X,-Y) → (+X,-Y)。
+   * **口と奥で回り順を揃えること**。ずらすと側面がねじれて蝶ネクタイになる。
+   */
+  readonly mouth: readonly [Vec3, Vec3, Vec3, Vec3];
+  /** 漏斗の奥＝子の世界の手前の面。mouth と同じ回り順・同じ法線 */
+  readonly opening: readonly [Vec3, Vec3, Vec3, Vec3];
   readonly parentScopeId: string;
   readonly childScopeId: string;
   readonly kind: 'linked' | 'nominal';
@@ -118,6 +138,8 @@ export type Layout3DDiagnostics = {
   readonly unprunedChangedCount: number;
   /** 墓標として出している削除済みの数（2Dインスペクタの件数との差） */
   readonly tombstoneCount: number;
+  /** 畳んでいて図に出していない入れ子スコープ（＝ユーザーが閉じたもの、とその子孫） */
+  readonly hiddenScopeIds: readonly string[];
   /** 板が重なっている等、成立していない不変条件 */
   readonly violations: readonly string[];
 };

@@ -82,6 +82,26 @@ export function cellOffset(
 }
 
 /** 板の上のセルの中心（ワールド座標） */
+/**
+ * Z（入れ子の段の方向）を法線に持つ軸並行の矩形の4隅。
+ * 回り順は (+X,+Y) → (-X,+Y) → (-X,-Y) → (+X,-Y)。
+ *
+ * 口と奥で**同じ回り順**にしないと、i と i+1 を結んだ側面がねじれる（蝶ネクタイ）。
+ */
+export function rectCornersXY(
+  center: Vec3,
+  halfX: number,
+  halfY: number
+): [Vec3, Vec3, Vec3, Vec3] {
+  const [x, y, z] = center;
+  return [
+    [x + halfX, y + halfY, z],
+    [x - halfX, y + halfY, z],
+    [x - halfX, y - halfY, z],
+    [x + halfX, y - halfY, z],
+  ];
+}
+
 export function cellCenterWorld(
   plate: Pick<Plate3D, 'origin' | 'extentY' | 'extentZ'>,
   slot: { col: number; row: number },
@@ -250,8 +270,21 @@ export function computeWorldLine3DLayout(
   };
 
   const shownIds = new Set(shownScopes.map((s) => s.scopeId));
-  const nestedIfShown = (scopeId: string | null) =>
-    scopeId && shownIds.has(scopeId) ? scopeId : null;
+  /**
+   * 入れ子の印を付けてよいか。
+   *
+   * 述語は「図に出ている」ではなく **「この図の入れ子ツリーに居て、その親の板が出ている」**。
+   * 「出ている」で判定すると、畳んだ瞬間に親セルの印が消えて開き直せなくなる（片道切符）。
+   * かといって「グラフが存在する」まで緩めると、空スコープや段の上限で切ったスコープにも
+   * 印が付き、押しても何も起きない別の嘘になる。
+   */
+  const parentOfScope = new Map(tree.scopes.map((s) => [s.scopeId, s.parentScopeId]));
+  const nestedInTree = (scopeId: string | null) => {
+    if (!scopeId || !parentOfScope.has(scopeId)) return null;
+    const parent = parentOfScope.get(scopeId) ?? null;
+    // 親の板が出ていないなら、その印はどの板にも載らない（載ったら嘘）
+    return parent === null || shownIds.has(parent) ? scopeId : null;
+  };
 
   const calcs: ScopeCalc[] = [];
   const orphanNodeIds: string[] = [];
@@ -302,6 +335,11 @@ export function computeWorldLine3DLayout(
   const plates: Plate3D[] = [];
   const platesByScopeNode = new Map<string, Plate3D>();
   const nests: Nest3D[] = [];
+  /** スコープID → その世界の外形（漏斗の奥に使う） */
+  const scopeBox = new Map<
+    string,
+    { x0: number; x1: number; y0: number; y1: number; z: number }
+  >();
 
   const yExtentOf = (c: ScopeCalc) =>
     Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY;
@@ -381,6 +419,7 @@ export function computeWorldLine3DLayout(
         for (const st of states) {
           const slot = c.slotMap.of(st.key);
           if (!slot) continue;
+          const nested = nestedInTree(resolve(st.ref, c.scopeId));
           // 削除マーカーはハッシュが定数なので、locate を渡されなくても判定できる。
           // locate 任せにすると、渡されなかったときに「消えた」が図から落ちる
           cells.push({
@@ -391,8 +430,10 @@ export function computeWorldLine3DLayout(
             slot,
             action: st.action,
             inChangedRefs: st.inChangedRefs,
-            // 図に出ていないスコープを指す印は付けない（クリックしても何も起きない嘘になる）
-            nestedScopeId: nestedIfShown(resolve(st.ref, c.scopeId)),
+            // 畳んでいる入れ子にも印は付ける（消すと開き直せない）。
+            // 出ているかどうかは nestedShown で分けて、絵は中抜きの丸にする
+            nestedScopeId: nested,
+            nestedShown: nested !== null && shownIds.has(nested),
           });
         }
         const plate: Plate3D = {
@@ -413,6 +454,16 @@ export function computeWorldLine3DLayout(
         };
         plates.push(plate);
         platesByScopeNode.set(`${c.scopeId} ${node.id}`, plate);
+        // 漏斗の奥（＝その世界の手前の面）を張るのに、世界ごとの外形が要る
+        const b = scopeBox.get(c.scopeId) ?? {
+          x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z: origin[2],
+        };
+        b.x0 = Math.min(b.x0, origin[0] - o.plateThickness / 2);
+        b.x1 = Math.max(b.x1, origin[0] + o.plateThickness / 2);
+        b.y0 = Math.min(b.y0, origin[1] - plate.extentY / 2);
+        b.y1 = Math.max(b.y1, origin[1] + plate.extentY / 2);
+        b.z = Math.max(b.z, origin[2] + plate.extentZ / 2); // 親に一番近い面
+        scopeBox.set(c.scopeId, b);
       }
     }
 
@@ -423,9 +474,21 @@ export function computeWorldLine3DLayout(
         `${w.c.scopeId} ${w.c.graph.state.rootNodeId}`
       );
       if (!rootPlate) continue;
+      const box = scopeBox.get(w.c.scopeId);
+      if (!box) continue;
+      // 口＝親セルの位置に置いた小さな矩形。一辺は板の絵の ■ と同じ o.cell
+      const mouth = rectCornersXY(w.anchorPos, o.cell / 2, o.cell / 2);
+      // 奥＝その世界の**親に一番近い面**（z が最大の側）。ここを口から広げる
+      const opening = rectCornersXY(
+        [(box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, box.z],
+        Math.max((box.x1 - box.x0) / 2, o.cell / 2),
+        Math.max((box.y1 - box.y0) / 2, o.cell / 2)
+      );
       nests.push({
         from: w.anchorPos,
         to: rootPlate.origin,
+        mouth,
+        opening,
         parentScopeId: w.c.parentScopeId,
         childScopeId: w.c.scopeId,
         kind: w.c.kind === 'linked' ? 'linked' : 'nominal',
@@ -519,6 +582,9 @@ export function computeWorldLine3DLayout(
       clockAnomalyNodeIds,
       unprunedChangedCount,
       tombstoneCount,
+      hiddenScopeIds: tree.scopes
+        .filter((sc) => !shownIds.has(sc.scopeId))
+        .map((sc) => sc.scopeId),
       violations: [],
     },
   };

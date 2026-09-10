@@ -66,10 +66,15 @@ export function buildSlotMap(
   }
 
   const rows = Math.max(row, 1);
+  // ★ 引数の cols（＝折り返す上限）ではなく**実際に埋まった列数**を返す。
+  //   上限をそのまま返すと、1列しか使わない世界の板まで上限ぶん横に広がり、
+  //   板の9割が空白になる（世界ごとに席を詰めた意味が消える）。
+  let used = 0;
+  for (const key of keys) used = Math.max(used, (of.get(key)?.col ?? 0) + 1);
   return {
     of: (key) => of.get(key),
     at: (c, r) => at.get(`${c},${r}`),
-    cols,
+    cols: Math.max(used, 1),
     rows,
     keys,
   };
