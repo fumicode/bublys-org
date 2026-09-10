@@ -9,6 +9,7 @@ import {
 import {
   APP_SCOPE_ID,
   hotelCellRole,
+  ModelClassDiagram,
   hotelNestedScope,
   StaffCollection,
   StaffDetail,
@@ -247,6 +248,12 @@ const WorldLine3DBubble: BubbleRoute["Component"] = () =>
     />
   );
 
+// --- モデルのクラス図 ---
+// 構造は TypeScript のソースから生成したもの、世界線での所属は記述子から。
+// 別々の出どころを、それぞれ知っている側に聞いている（片方を推測で埋めない）。
+const ModelClassDiagramBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ModelClassDiagram />);
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -256,6 +263,8 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },
+  // クラス図は横に広いので、窓型で大きめに開く
+  { pattern: "hotel-shift-puzzle/model-class-diagram", type: "model-class-diagram", Component: ModelClassDiagramBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1200, height: 760 } } },
   { pattern: "hotel-shift-puzzle/world-line-3d", type: "world-line-3d", Component: WorldLine3DBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1100, height: 700 } } },
   // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
   // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。

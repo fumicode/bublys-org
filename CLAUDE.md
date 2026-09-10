@@ -70,7 +70,8 @@ npx nx g @nx/js:lib <name>        # 新しいTypeScriptライブラリを生成
 - **apps/bublys-os**: メインのNext.js 15アプリケーション
 - **apps/calculator**: 独立した電卓アプリ
 - **apps/memo**: 独立したメモアプリ
-- **bublys-libs/**: コアライブラリ (state-management, bubbles-ui, bubbles-ui-state)
+- **bublys-libs/**: コアライブラリ (state-management, bubbles-ui, bubbles-ui-state,
+  world-line-graph, model-graph)
 - **memo-libs/**: メモ専用ライブラリ (memo-state, memo-feature, memo-model)
 
 ### 状態管理 (Redux Toolkit)
@@ -109,6 +110,15 @@ Reduxストアは以下を統合しています:
 **ドキュメント:**
 - [docs/world-line-graph-design.md](docs/world-line-graph-design.md) — ドメインモデルとメモリ構成
 - [docs/world-line-viewer.md](docs/world-line-viewer.md) — インスペクタの読み方と、バブリからの拡張
+
+### モデルのクラス図（`bublys-libs/model-graph`）
+
+ドメインモデルの構造を、**TypeScript のソースそのものから**起こして図にする。
+手で書いた宣言だとモデルを直したときに図だけが古いまま残るので、ソースを唯一の出所にし、
+生成物が古くなったら落ちるテストで追従を保証している。
+世界線での所属（live / pinned / external）だけは記述子から実行時に重ねる。
+
+- [docs/model-class-diagram.md](docs/model-class-diagram.md) — 図の読み方・生成し直し方・拡張
 
 **注意:** この機能は現在開発中であり、仕様が変更される可能性があります。
 

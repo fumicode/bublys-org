@@ -2,6 +2,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import SaveIcon from '@mui/icons-material/Save';
+import SchemaIcon from '@mui/icons-material/Schema';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import {
@@ -31,6 +32,11 @@ const menuItems: BublyMenuItem[] = [
     label: '世界線インスペクタ',
     url: 'hotel-shift-puzzle/world-line-inspector',
     icon: <BugReportIcon />,
+  },
+  {
+    label: 'クラス図',
+    url: 'hotel-shift-puzzle/model-class-diagram',
+    icon: <SchemaIcon />,
   },
   {
     label: '世界線 3D',

@@ -12,3 +12,17 @@ export {
   referencedClassByNaming,
   relationsOfClass,
 } from './lib/domain/relations.js';
+export {
+  DEFAULT_LAYOUT_OPTIONS,
+  assignAggregates,
+  layoutClassDiagram,
+  type ClassBox,
+  type ClassDiagramLayout,
+  type ClassEdge,
+  type LayoutOptions,
+} from './lib/ui/classLayout.js';
+export {
+  CLASS_DIAGRAM_PALETTE,
+  ClassDiagramView,
+  type ClassDiagramViewProps,
+} from './lib/ui/ClassDiagramView.js';
