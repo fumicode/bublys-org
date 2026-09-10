@@ -20,13 +20,18 @@ export {
   cellOffset,
   cellCenterWorld,
   slotFromOffset,
+  type CellRoleResolver,
   type Layout3DInput,
 } from "./layout3d.js";
 export {
   ACTION_COLOR,
   ACTION_LABEL,
   ACTION_ORDER,
+  OUTSIDE_COLOR,
+  OUTSIDE_LABEL,
   PALETTE_3D,
+  ROLE_COLOR,
+  ROLE_LABEL,
   cellStyle,
   locationEdgeColor,
   worldLineColor,

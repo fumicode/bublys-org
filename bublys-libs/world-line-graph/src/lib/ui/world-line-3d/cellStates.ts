@@ -40,6 +40,17 @@ export type FoldResult = {
   readonly clockAnomalyNodeIds: readonly string[];
   /** changedRefs に入っていたのに値は変わっていなかった参照の数 */
   readonly unprunedChangedCount: number;
+  /**
+   * 現在地（apex）時点の**生の**参照表。key → ref。
+   *
+   * ★ statesByNode の cells ではなくこちらを使うこと。cells は「消された瞬間の
+   * ノードにだけ墓標を置き、それ以降は落とす」ので、削除の次のノードへ apex が
+   * 進むとキーごと消える。「外で消された」と「外に一度も無い」を分けたい側からは
+   * 区別が付かなくなる。ここは墓標をそのまま残す。
+   *
+   * apex が無い／到達できないときは null（＝比べ先が無い。'same' に倒してはいけない）
+   */
+  readonly refsAtApex: ReadonlyMap<string, StateRef> | null;
 };
 
 const keyOf = (ref: StateRef) => `${ref.type}:${ref.id}`;
@@ -60,7 +71,8 @@ function sortedChildren(
 }
 
 export function foldCellStates(graph: WorldLineGraph): FoldResult {
-  const { nodes, rootNodeId } = graph.state;
+  const { nodes, rootNodeId, apexNodeId } = graph.state;
+  let refsAtApex: Map<string, StateRef> | null = null;
   const statesByNode = new Map<string, readonly CellState[]>();
   const clockAnomalyNodeIds: string[] = [];
   let unprunedChangedCount = 0;
@@ -71,6 +83,7 @@ export function foldCellStates(graph: WorldLineGraph): FoldResult {
       orphanNodeIds: Object.keys(nodes),
       clockAnomalyNodeIds,
       unprunedChangedCount: 0,
+      refsAtApex: null,
     };
   }
 
@@ -150,6 +163,9 @@ export function foldCellStates(graph: WorldLineGraph): FoldResult {
       });
     }
     statesByNode.set(frame.nodeId, cells);
+    // 現在地に着いたところで、墓標込みの参照表を1回だけ複製して持ち帰る。
+    // DFS の副産物なので追加の走査は要らない（O(席数) を1回）
+    if (frame.nodeId === apexNodeId) refsAtApex = new Map(current);
 
     for (const childId of sortedChildren(graph, childrenMap, frame.nodeId)) {
       if (visited.has(childId)) continue; // 壊れたグラフの循環対策
@@ -158,5 +174,11 @@ export function foldCellStates(graph: WorldLineGraph): FoldResult {
   }
 
   const orphanNodeIds = Object.keys(nodes).filter((id) => !visited.has(id));
-  return { statesByNode, orphanNodeIds, clockAnomalyNodeIds, unprunedChangedCount };
+  return {
+    statesByNode,
+    orphanNodeIds,
+    clockAnomalyNodeIds,
+    unprunedChangedCount,
+    refsAtApex,
+  };
 }

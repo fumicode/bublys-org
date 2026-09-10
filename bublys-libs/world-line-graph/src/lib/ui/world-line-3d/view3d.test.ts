@@ -10,7 +10,13 @@ import { computeStateHash } from '../../domain/StateHash.js';
 import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
 import { CELL_PX, GUTTER_PX, HEADER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
-import { ACTION_COLOR, PALETTE_3D, cellStyle, worldLineColor } from './palette3d.js';
+import {
+  ACTION_COLOR,
+  PALETTE_3D,
+  ROLE_COLOR,
+  cellStyle,
+  worldLineColor,
+} from './palette3d.js';
 import {
   ORBIT_PRESETS,
   applyDrag,
@@ -465,7 +471,15 @@ describe('板の絵と 3D の格子が同じ位置にあること（レビュー
  * 黙って戻っても誰も気づかない（scene.ts は three 込みで Jest から読めない）。
  */
 describe('板の絵', () => {
-  type Op = { op: string; alpha: number; fill: string; stroke: string };
+  type Op = {
+    op: string;
+    alpha: number;
+    fill: string;
+    stroke: string;
+    /** fillRect の引数。下地（全面）・行の帯（幅3）・セル（幅20）を取り違えないため */
+    rect?: [number, number, number, number];
+    text?: string;
+  };
   function fakeCanvas() {
     const ops: Op[] = [];
     const ctx = {
@@ -476,10 +490,12 @@ describe('板の絵', () => {
       font: '',
       textBaseline: '',
       clearRect: () => undefined,
-      fillRect: () => ops.push(rec('fillRect')),
+      fillRect: (x: number, y: number, w: number, h: number) =>
+        ops.push({ ...rec('fillRect'), rect: [x, y, w, h] }),
       strokeRect: () => ops.push(rec('strokeRect')),
-      fillText: () => ops.push(rec('fillText')),
+      fillText: (t: string) => ops.push({ ...rec('fillText'), text: t }),
       beginPath: () => undefined,
+      closePath: () => undefined,
       moveTo: () => undefined,
       lineTo: () => undefined,
       arc: () => undefined,
@@ -521,8 +537,14 @@ describe('板の絵', () => {
         inChangedRefs: false,
         nestedScopeId: 'Schedule:x',
         nestedShown: true,
+        role: null,
+        outside: null,
       },
     ],
+    ...over,
+  });
+  const cellOf = (over: Partial<Plate3D['cells'][number]> = {}) => ({
+    ...plateOf().cells[0],
     ...over,
   });
 
@@ -532,9 +554,12 @@ describe('板の絵', () => {
     const sel = fakeCanvas();
     paintPlate(sel.canvas, plateOf(), { cols: 2, rows: 2, selected: true });
 
-    // セル本体は fillRect。下地の fillRect（1枚目）は板の透け方なので除く
+    // セル本体は「一辺が CELL_PX - pad*2」の fillRect。
+    // 下地（全面）や行の帯（幅3）と大きさで見分ける。並び順に頼らない
     const cellAlpha = (o: typeof plain) =>
-      o.ops.filter((x) => x.op === 'fillRect').slice(1).map((x) => x.alpha);
+      o.ops
+        .filter((x) => x.op === 'fillRect' && x.rect?.[2] === CELL_PX - 6)
+        .map((x) => x.alpha);
     expect(cellAlpha(plain).length).toBeGreaterThan(0);
     expect(cellAlpha(plain).every((a) => a < 1)).toBe(true);
     expect(cellAlpha(sel).every((a) => a === 1)).toBe(true);
@@ -555,6 +580,75 @@ describe('板の絵', () => {
     expect(open.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(true);
     expect(shut.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(false);
     expect(shut.ops.some((o) => o.op === 'stroke' && o.stroke === PALETTE_3D.nestLinked)).toBe(true);
+  });
+
+  /**
+   * 固定メンバー（世界が生まれたときに焼き付けられ、以後動かない参照）。
+   *
+   * ★ 印をセルの中に置いても、図全体を収めた既定のズームでは 1〜2px にしかならず
+   *   読めない。型名欄（88px）は空いているので、そちらに帯と字を置く。
+   */
+  it('★ 行が丸ごと固定なら、型名欄に帯と「固定」の字を出す', () => {
+    const c = fakeCanvas();
+    paintPlate(
+      c.canvas,
+      plateOf({ cells: [cellOf({ role: 'pinned', type: 'Staff', key: 'Staff:s1' })] }),
+      { cols: 2, rows: 2 }
+    );
+    const band = c.ops.find(
+      (o) => o.op === 'fillRect' && o.fill === ROLE_COLOR.pinned && o.rect?.[2] === 3
+    );
+    expect(band).toBeTruthy();
+    expect(c.ops.some((o) => o.op === 'fillText' && o.text === '固定')).toBe(true);
+  });
+
+  it('固定でない行には帯を出さない（印が無い＝「そうではない」ではなく「言っていない」）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === 3)).toBe(false);
+    expect(c.ops.some((o) => o.op === 'fillText' && o.text === '固定')).toBe(false);
+  });
+
+  it('固定＋そのままのセルは、淡灰ではなく固定の色で出す（一番見えないセルにしない）', () => {
+    const still = cellStyle({ action: 'unchanged', role: 'pinned' }, 'memory', 2.4);
+    const plain = cellStyle({ action: 'unchanged', role: null }, 'memory', 2.4);
+    expect(still.color).toBe(ROLE_COLOR.pinned);
+    expect(still.opacity).toBeGreaterThan(plain.opacity);
+    // 焼き付けた瞬間は「作られた」のまま。立場で出来事の色を塗り替えない
+    expect(cellStyle({ action: 'created', role: 'pinned' }, 'memory', 2.4).color).toBe(
+      ACTION_COLOR.created
+    );
+  });
+
+  it('外の現在地と食い違うセルには、出来事の色で角の印を出す', () => {
+    for (const [outside, color] of [
+      ['differs', ACTION_COLOR.changed],
+      ['absent', ACTION_COLOR.deleted],
+    ] as const) {
+      const c = fakeCanvas();
+      paintPlate(
+        c.canvas,
+        plateOf({ cells: [cellOf({ role: 'pinned', outside })] }),
+        { cols: 2, rows: 2 }
+      );
+      expect(c.ops.some((o) => o.op === 'fill' && o.fill === color)).toBe(true);
+    }
+    // 一致しているとき・比べていないときは角の印を出さない
+    for (const outside of ['same', 'unknown', null] as const) {
+      const c = fakeCanvas();
+      paintPlate(
+        c.canvas,
+        plateOf({ cells: [cellOf({ role: 'pinned', outside })] }),
+        { cols: 2, rows: 2 }
+      );
+      expect(
+        c.ops.some(
+          (o) =>
+            o.op === 'fill' &&
+            (o.fill === ACTION_COLOR.changed || o.fill === ACTION_COLOR.deleted)
+        )
+      ).toBe(false);
+    }
   });
 
   it('型名は行の先頭に出す（■だけでは何のオブジェクトか読めない）', () => {

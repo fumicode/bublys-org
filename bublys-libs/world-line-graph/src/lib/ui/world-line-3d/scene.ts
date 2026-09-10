@@ -35,7 +35,7 @@ import {
 } from 'three';
 import type { Layout3D, Nest3D, Plate3D } from './types.js';
 import type { RefLocation } from '../refLocation.js';
-import { ACTION_COLOR, PALETTE_3D, cellStyle } from './palette3d.js';
+import { ACTION_COLOR, PALETTE_3D, ROLE_COLOR, cellStyle } from './palette3d.js';
 import { paintPlate, plateCanvasSize } from './plateCanvas.js';
 import { orbitToPosition, type Orbit } from './camera.js';
 // ★ セルの位置は layout3d の1箇所から取る。式を書き写すとずれる（実際にずれていた）
@@ -378,12 +378,18 @@ export function createWorldLine3DScene(
     // 席が固定なので、この線は時間軸に平行なまっすぐな線になる。
     // 出来事の無かった区間は淡く、出来事のあった先は出来事の色で出す
     identityLines = buildLines(
-      layout.identities.map((l) => ({
-        from: l.from,
-        to: l.to,
-        color: ACTION_COLOR[l.action],
-        opacity: l.action === 'unchanged' ? 0.16 : 0.8,
-      }))
+      layout.identities.map((l) => {
+        // 固定メンバーは構造上ずっと「そのまま」なので、淡灰にすると図から消える。
+        // シアンで通して「打ち込まれた杭」として見せる（線幅は WebGL では常に 1px
+        // なので、太さでは描き分けられない。色と濃さで出すしかない）
+        const pinnedStill = l.role === 'pinned' && l.action === 'unchanged';
+        return {
+          from: l.from,
+          to: l.to,
+          color: pinnedStill ? (ROLE_COLOR.pinned as string) : ACTION_COLOR[l.action],
+          opacity: pinnedStill ? 0.5 : l.action === 'unchanged' ? 0.16 : 0.8,
+        };
+      })
     );
     if (identityLines) scene.add(identityLines);
 

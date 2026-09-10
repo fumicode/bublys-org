@@ -9,6 +9,7 @@ import {
 import {
   APP_SCOPE_ID,
   homeScopeOf,
+  hotelCellRole,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -243,6 +244,10 @@ const WorldLine3DBubble: BubbleRoute["Component"] = () =>
     <WorldLine3DInspector
       rootScopeId={APP_SCOPE_ID}
       resolveNestedScopeId={resolveHotelNestedScope}
+      // 「勤務表から見たスタッフは焼き付いていて動かない」を図に語らせる。
+      // 判定は記述子だけから導く純粋なクエリ（読むだけ）なので、
+      // module トップレベルの参照のままで済む＝レイアウトを作り直させない
+      resolveCellRole={hotelCellRole}
     />
   );
 

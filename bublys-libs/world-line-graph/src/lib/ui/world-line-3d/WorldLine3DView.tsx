@@ -32,7 +32,13 @@ import {
   type Orbit,
 } from './camera.js';
 import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
-import { ACTION_COLOR, ACTION_LABEL, ACTION_ORDER, PALETTE_3D } from './palette3d.js';
+import {
+  ACTION_COLOR,
+  ACTION_LABEL,
+  ACTION_ORDER,
+  PALETTE_3D,
+  ROLE_COLOR,
+} from './palette3d.js';
 // 型だけ。実体は動的 import する（ここで実体を import すると three が静的に見える）
 import type { SceneStats, WorldLine3DScene } from './scene.js';
 
@@ -394,6 +400,26 @@ export const WorldLine3DView: FC<WorldLine3DViewProps> = ({
             <span style={{ color: PALETTE_3D.nestLinked }}>― アドレス連動の入れ子</span>{' '}
             <span style={{ color: PALETTE_3D.nestLinked }}>●開いている ○畳んでいる</span>
           </div>
+          {d.pinnedCount > 0 && (
+            <div style={{ color: '#8b949e' }}>
+              <span style={{ color: ROLE_COLOR.pinned as string }}>▌固定メンバー</span>{' '}
+              {d.pinnedCount} 口（生まれたときに焼き付け。外の変更は届きません）
+              {d.pinnedDivergedCount > 0 && (
+                <>
+                  {' / '}
+                  <span style={{ color: ACTION_COLOR.changed }}>
+                    うち {d.pinnedDivergedCount} 口は外の現在地と食い違い
+                  </span>
+                  （＝固定が効いています。セル左下の三角）
+                </>
+              )}
+            </div>
+          )}
+          {d.pinnedButChangedCount > 0 && (
+            <div style={{ color: '#f85149' }}>
+              ⚠ 固定と申告されたのに動いたセル {d.pinnedButChangedCount} 件
+            </div>
+          )}
           {d.tombstoneCount > 0 && (
             <div style={{ color: '#8b949e' }}>
               削除済み {d.tombstoneCount} 件を墓標で表示（2Dインスペクタの件数とはこの分だけ差が出ます）

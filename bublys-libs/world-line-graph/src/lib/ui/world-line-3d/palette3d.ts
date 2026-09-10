@@ -10,7 +10,7 @@
  * 2つの軸を両方とも色相にすると、どちらも読めなくなる。
  */
 import { LOCATION_MARK, type RefLocation } from '../refLocation.js';
-import type { Cell3D, CellAction } from './types.js';
+import type { Cell3D, CellAction, CellRole, OutsideMatch } from './types.js';
 
 export type CellStyle = {
   readonly color: string;
@@ -46,6 +46,43 @@ export const ACTION_ORDER: readonly CellAction[] = [
   'unchanged',
 ];
 
+/**
+ * 世界での立場の色。
+ *
+ * シアンは、出来事（白・黄・赤・淡灰）とも、所在（緑・橙・赤・灰）とも、
+ * 入れ子（青・灰）とも、分岐（紫）とも当たらない**唯一の残り色相**。
+ * 暗い背景 (#0d1117) に対して十分明るい。
+ *
+ * 'member' と 'external' には色を割り当てない。図に出したいのは
+ * 「外の変更が届かない」ことであって、普通のメンバーを飾ることではない。
+ */
+export const ROLE_COLOR: Record<CellRole, string | null> = {
+  pinned: '#39c5cf',
+  member: null,
+  external: null,
+};
+
+export const ROLE_LABEL: Record<CellRole, string> = {
+  pinned: '固定（生まれたときに焼き付け）',
+  member: 'この世界のもの',
+  external: '外のもの',
+};
+
+/** 外の現在地との食い違い。**新しい色相を増やさず、出来事の色をそのまま外向きに使う** */
+export const OUTSIDE_COLOR: Record<OutsideMatch, string | null> = {
+  same: null,
+  differs: ACTION_COLOR.changed,
+  absent: ACTION_COLOR.deleted,
+  unknown: null,
+};
+
+export const OUTSIDE_LABEL: Record<OutsideMatch, string> = {
+  same: '外の現在地と同じ',
+  differs: '外では別の値になっている（固定が効いています）',
+  absent: '外の現在地には無い（固定が効いています）',
+  unknown: '外が読めない（比べていません）',
+};
+
 export const PALETTE_3D = {
   /** 背景。バブルの半透明ダークに馴染ませる */
   background: '#0d1117',
@@ -75,18 +112,22 @@ export const PALETTE_3D = {
  * @param changedThickness 出来事のあったセルが伸びる長さ（レイアウトの設定と揃える）
  */
 export function cellStyle(
-  cell: Pick<Cell3D, 'action'>,
+  cell: Pick<Cell3D, 'action'> & Partial<Pick<Cell3D, 'role'>>,
   location: RefLocation,
   changedThickness: number
 ): CellStyle {
   const happened = cell.action !== 'unchanged';
   // 手元に無い値は薄く出す（あるのに読めない、が分かるように）
   const dim = location === 'lost' ? 0.35 : location === 'idb' ? 0.7 : 1;
+  // 固定メンバーは構造上いつも「そのまま」なので、淡灰のまま置くと
+  // 図の中で一番見えないセルになる。**そのままの区間だけ**シアンで出して、
+  // 「ここは動かない」を色で言う。焼き付けた瞬間は 'created'（白）のまま残す
+  const pinnedStill = cell.role === 'pinned' && !happened;
   return {
-    color: ACTION_COLOR[cell.action],
+    color: pinnedStill ? (ROLE_COLOR.pinned as string) : ACTION_COLOR[cell.action],
     // 墓標は伸ばさない（消えたものが手前に飛び出すと目立ちすぎる）
     thickness: happened && cell.action !== 'deleted' ? changedThickness : 0,
-    opacity: (happened ? 0.95 : 0.3) * dim,
+    opacity: (happened ? 0.95 : pinnedStill ? 0.6 : 0.3) * dim,
     ring: happened,
     tombstone: cell.action === 'deleted',
   };
