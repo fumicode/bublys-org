@@ -381,11 +381,24 @@ export const StyledWrap = styled.div`
     z-index: 3;
     background: #fafafa;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     font-weight: bold;
     color: #555;
     padding: 4px;
+
+    /* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。年月の下に置く。
+       列幅（STAFF_COL_WIDTH）に収まらない分は折り返す。 */
+    .e-corner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: normal;
+    }
   }
 
   /* 日付ヘッダ（上に固定） */

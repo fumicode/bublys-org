@@ -109,21 +109,23 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
   // バブル URL のスキームは app 層（ここ）の関心事。
-  // 可能勤務帯・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
+  // 世界線・自動シフトは勤務表バブルを opener にして bubble-side で、可能勤務帯は
+  // ボタン（表の左上）の右へ origin-side で開く。
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
   const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const editLogUrl = scheduleEditLogUrl(scheduleId);
-  // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
+  // 各アクションの方向は元のバブル配置（下＝世界線、上＝違反）を踏襲する。
   const openSide = (url: string, position: OpeningPosition) =>
     openBubble(url, bubble.id, position);
-  // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
+  // クリックした要素の近く（その右）に出したいものは origin-side で開く。
+  // 抽出（バッジ／抽出ボタン）と、表の左上に移した可能勤務帯ボタンがこれ。
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
   return withObjects(
     <ScheduleGrid
       scheduleId={scheduleId}
-      onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
+      onOpenAvailability={() => openOrigin(availabilityUrl)}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
       onOpenEditLog={() => openSide(editLogUrl, "bubble-side-right")}
