@@ -71,6 +71,12 @@ import {
 
 type ScheduleGridProps = {
   scheduleId?: string;
+  /**
+   * 勤務表バブルが抱えている付属パーツを、この表の中に描くかどうか。
+   * bubble-space で「独立した泡」として組み直すときは false にして外へ出す。
+   * 既定は全部 true（従来どおり1つのバブルに全部入る）。
+   */
+  chrome?: { header?: boolean; rulesStrip?: boolean; footer?: boolean };
   /** 世界線ビュー（左下）を開くハンドラ */
   /**
    * 候補集合を作ったあと、結果を見せるために世界線ビューを自動で開く。
@@ -138,6 +144,7 @@ const newLeaderRuleKey = (): string =>
  * Schedule + EditLog を同一世界線ノードに記録する。
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
+  chrome,
   scheduleId,
   onOpenWorldLineAfterCandidates,
   onConfirm,
@@ -721,8 +728,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     </button>
   );
 
+  const showHeader = chrome?.header ?? true;
+  const showRulesStrip = chrome?.rulesStrip ?? true;
+  const showFooter = chrome?.footer ?? true;
+
   return (
     <StyledContainer>
+      {showHeader && (
       <div className="e-header">
         <h3>
           {schedule.year}年{schedule.month}月の勤務表{" "}
@@ -796,9 +808,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           />
         </div>
       </div>
+      )}
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
           右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
+      {showRulesStrip && (
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
           leaderRules={leaderRules}
@@ -830,6 +844,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           onCloseMessage={() => setAutoMessage(null)}
         />
       </div>
+      )}
 
       {/* グリッド領域 */}
       <div className="e-grid-area">
@@ -913,7 +928,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(worldLineUrl || editLogUrl || treeUrl || pendingReportUrl) && (
+      {showFooter && (worldLineUrl || editLogUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
