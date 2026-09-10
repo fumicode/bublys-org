@@ -16,13 +16,23 @@ import { WorldLineGraph } from '../domain/WorldLineGraph';
 import { listGraphScopeIdsFromIDB, listStateHashesFromIDB } from './IndexedDBStore';
 import { locateRef, type InspectorSources } from './inspectorModel';
 import { LOCATION_MARK } from '../ui/refLocation';
-import { ACTION_COLOR, ACTION_LABEL } from '../ui/world-line-3d/index.js';
+import {
+  ACTION_COLOR,
+  ACTION_LABEL,
+  OUTSIDE_COLOR,
+  OUTSIDE_LABEL,
+  ROLE_COLOR,
+  ROLE_LABEL,
+} from '../ui/world-line-3d/index.js';
 import {
   WorldLine3DView,
   computeWorldLine3DLayout,
   type Selection3D,
 } from '../ui/world-line-3d/index.js';
-import type { NestedScopeResolver } from '../ui/world-line-3d/index.js';
+import type {
+  CellRoleResolver,
+  NestedScopeResolver,
+} from '../ui/world-line-3d/index.js';
 
 export type WorldLine3DInspectorProps = {
   /** 図の起点になるスコープ（アプリ全体スコープを渡す） */
@@ -32,6 +42,12 @@ export type WorldLine3DInspectorProps = {
    * hotel のように独自の本籍規約があるバブリはここで注入する。
    */
   readonly resolveNestedScopeId?: NestedScopeResolver;
+  /**
+   * セルの立場（この世界のもの／焼き付けた固定メンバー／外のもの）の導出。
+   * 誰が固定メンバーかはバブリの規約なので、ライブラリは判定を持たない。
+   * 省略すると立場は「分からない」になり、図には何も出ない。
+   */
+  readonly resolveCellRole?: CellRoleResolver;
   /** そのスコープが親とアドレス連動しているか（universe だけ true になる想定） */
   readonly isLinked?: (childScopeId: string, parentScopeId: string) => boolean;
 };
@@ -39,6 +55,7 @@ export type WorldLine3DInspectorProps = {
 export const WorldLine3DInspector: FC<WorldLine3DInspectorProps> = ({
   rootScopeId,
   resolveNestedScopeId,
+  resolveCellRole,
   isLinked,
 }) => {
   const graphJsons = useAppSelector((s: RootState) => s.worldLineGraph?.graphs ?? {});
@@ -94,10 +111,11 @@ export const WorldLine3DInspector: FC<WorldLine3DInspectorProps> = ({
         graphs,
         locate,
         resolveNestedScopeId,
+        resolveCellRole,
         isLinked,
         collapsedScopeIds: collapsed,
       }),
-    [rootScopeId, graphs, locate, resolveNestedScopeId, isLinked, collapsed]
+    [rootScopeId, graphs, locate, resolveNestedScopeId, resolveCellRole, isLinked, collapsed]
   );
 
   const expandAll = useCallback(() => setCollapsed(new Set()), []);
@@ -229,9 +247,27 @@ const Detail: FC<{
               >
                 {ACTION_LABEL[c.action]}
               </span>
+              {c.role === 'pinned' && (
+                <span
+                  style={{ color: ROLE_COLOR.pinned as string, whiteSpace: 'nowrap' }}
+                  title={ROLE_LABEL.pinned}
+                >
+                  ▌固定
+                </span>
+              )}
               <span style={{ color: '#79c0ff', whiteSpace: 'nowrap' }}>{c.type}</span>
               <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-all' }}>
                 {c.id}
+                {c.outside && c.outside !== 'same' && (
+                  <div
+                    style={{
+                      color:
+                        (OUTSIDE_COLOR[c.outside] as string | null) ?? '#8b949e',
+                    }}
+                  >
+                    外: {OUTSIDE_LABEL[c.outside]}
+                  </div>
+                )}
                 {c.nestedScopeId && (
                   <button
                     type="button"
@@ -256,7 +292,11 @@ const Detail: FC<{
           );
         })}
       <div style={{ marginTop: 8, color: '#8b949e' }}>
-        ↘ を押すとその世界線を畳み、▸ を押すと開きます。
+        <span style={{ color: ROLE_COLOR.pinned as string }}>▌固定</span>{' '}
+        は、この世界が生まれたときに焼き付けられた参照です。外で改名・削除しても
+        この世界の中では動きません。「外:」の行はその証拠で、比べ先は
+        起点スコープの<b>現在地（▶）</b>です。
+        <br />↘ を押すとその世界線を畳み、▸ を押すと開きます。
         左の記号 = 値の所在、右の言葉 = このノードで起きたこと。
         消されたものは、その瞬間のノードにだけ墓標として出て、以降は現れません。
       </div>

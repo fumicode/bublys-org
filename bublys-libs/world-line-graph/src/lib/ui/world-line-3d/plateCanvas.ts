@@ -14,7 +14,13 @@
  * どちらも 3D の格子と**同じ値**から導く（別々に決めると絵と当たり判定がずれる）。
  */
 import type { RefLocation } from '../refLocation.js';
-import { PALETTE_3D, cellStyle, locationEdgeColor } from './palette3d.js';
+import {
+  OUTSIDE_COLOR,
+  PALETTE_3D,
+  ROLE_COLOR,
+  cellStyle,
+  locationEdgeColor,
+} from './palette3d.js';
 import { GUTTER_UNITS, HEADER_UNITS, type Plate3D } from './types.js';
 
 /** 1セルあたりのピクセル数（テクスチャの解像度） */
@@ -90,19 +96,32 @@ export function paintPlate(
   // 左の型名欄。席は型ごとに行が分かれるので、行の先頭に型名を出せば
   // 全部のセルに文字を詰め込まなくても「これは何のオブジェクトか」が読める
   const typeOfRow = new Map<number, string>();
+  /** その行が丸ごと固定メンバーか。席は型ごとに行が割れるので、行＝型で語れる */
+  const pinnedRow = new Map<number, boolean>();
   for (const cell of plate.cells) {
     if (!typeOfRow.has(cell.slot.row)) typeOfRow.set(cell.slot.row, cell.type);
+    const pinned = cell.role === 'pinned';
+    pinnedRow.set(cell.slot.row, (pinnedRow.get(cell.slot.row) ?? true) && pinned);
   }
   ctx.font = '12px system-ui, sans-serif';
   for (const [row, type] of typeOfRow) {
     if (row >= opts.rows) continue;
-    ctx.fillStyle = PALETTE_3D.gutter;
-    ctx.fillText(
-      type,
-      6,
-      HEADER_PX + row * CELL_PX + CELL_PX / 2,
-      GUTTER_PX - 10
-    );
+    const y = HEADER_PX + row * CELL_PX;
+    const pinned = pinnedRow.get(row) === true;
+    if (pinned) {
+      // ★ 20px のセルに小さな記号を足しても、図全体を収めた既定のズームでは
+      //   1〜2px にしかならず読めない。型名欄（88px）は空いているので、
+      //   行の頭に帯と字を置く。ここなら引いた絵でも「この行は焼き付け」が読める
+      ctx.fillStyle = ROLE_COLOR.pinned as string;
+      ctx.fillRect(0, y + 2, 3, CELL_PX - 4);
+    }
+    ctx.fillStyle = pinned ? (ROLE_COLOR.pinned as string) : PALETTE_3D.gutter;
+    ctx.fillText(type, 6, y + CELL_PX / 2, GUTTER_PX - (pinned ? 34 : 10));
+    if (pinned) {
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.fillText('固定', GUTTER_PX - 28, y + CELL_PX / 2, 24);
+      ctx.font = '12px system-ui, sans-serif';
+    }
   }
 
   // セル
@@ -147,6 +166,19 @@ export function paintPlate(
       }
     }
     ctx.globalAlpha = 1;
+
+    // 外の現在地との食い違い＝「固定が効いている」証拠。左下の角だけが空いている。
+    // 引いた絵では点にしかならないので、件数は HUD、理由は右の詳細パネルが持つ
+    const outsideColor = cell.outside ? OUTSIDE_COLOR[cell.outside] : null;
+    if (outsideColor && !style.tombstone) {
+      ctx.fillStyle = outsideColor;
+      ctx.beginPath();
+      ctx.moveTo(x + pad, y + CELL_PX - pad);
+      ctx.lineTo(x + pad + 7, y + CELL_PX - pad);
+      ctx.lineTo(x + pad, y + CELL_PX - pad - 7);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     // 入れ子を持つオブジェクトには印を付ける（ここから奥へ世界線が伸びる）。
     // 塗りつぶし＝開いている / 中抜き＝畳んでいる。

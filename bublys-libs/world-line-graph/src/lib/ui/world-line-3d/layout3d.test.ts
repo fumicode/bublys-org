@@ -338,6 +338,142 @@ describe('computeWorldLine3DLayout', () => {
     });
   });
 
+  /**
+   * 固定メンバー（世界が生まれたときに焼き付けられ、以後動かない参照）。
+   *
+   * 誰が固定かはバブリの規約なので、ライブラリは判定を持たない。注入されなければ
+   * 「分からない（null）」で、**「固定ではない」と断言してはいけない**。
+   */
+  describe('世界での立場（固定メンバー）', () => {
+    const pinStaff = (ref: { type: string }, scopeId: string) =>
+      scopeId !== 'hotel' && ref.type === 'Staff' ? ('pinned' as const) : null;
+
+    it('注入しなければ全セル null（知らないことを知っているように描かない）', () => {
+      const { graphs } = hotelLike();
+      const l = computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs });
+      expect(l.plates.flatMap((p) => p.cells).every((c) => c.role === null)).toBe(true);
+      expect(l.diagnostics.pinnedCount).toBe(0);
+    });
+
+    it('注入すると、その世界のスタッフだけが固定になる', () => {
+      const { graphs } = hotelLike();
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs,
+        resolveCellRole: pinStaff,
+      });
+      const inSched = l.plates
+        .filter((p) => p.scopeId === 'Schedule:x')
+        .flatMap((p) => p.cells);
+      expect(inSched.filter((c) => c.type === 'Staff').every((c) => c.role === 'pinned')).toBe(
+        true
+      );
+      expect(inSched.filter((c) => c.type === 'Schedule').every((c) => c.role === null)).toBe(
+        true
+      );
+      // 台帳（起点スコープ）は世界ではないので立場を持たない
+      expect(
+        l.plates
+          .filter((p) => p.scopeId === 'hotel')
+          .flatMap((p) => p.cells)
+          .every((c) => c.role === null)
+      ).toBe(true);
+      expect(l.diagnostics.pinnedCount).toBeGreaterThan(0);
+    });
+
+    it('同一性のレールにも立場が載る（3D で「打ち込まれた杭」として描くため）', () => {
+      const { graphs } = hotelLike();
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs,
+        resolveCellRole: pinStaff,
+      });
+      const rails = l.identities.filter(
+        (i) => i.scopeId === 'Schedule:x' && i.key.startsWith('Staff:')
+      );
+      expect(rails.length).toBeGreaterThan(0);
+      expect(rails.every((i) => i.role === 'pinned')).toBe(true);
+    });
+
+    /**
+     * ★ 「固定されている」の証拠。外の台帳を変えてもここは動かない、を図に出す。
+     * hotelLike() は hotel 側で Staff:s1 を改名し、Schedule:x 側は起点のまま。
+     */
+    it('★ 外の現在地と食い違っているものを数える（固定が効いている証拠）', () => {
+      const { graphs } = hotelLike();
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs,
+        resolveCellRole: pinStaff,
+      });
+      const cells = l.plates
+        .filter((p) => p.scopeId === 'Schedule:x')
+        .flatMap((p) => p.cells)
+        .filter((c) => c.type === 'Staff');
+      const s1 = cells.filter((c) => c.id === 's1');
+      const s2 = cells.filter((c) => c.id === 's2');
+      expect(s1.length).toBeGreaterThan(0);
+      expect(s1.every((c) => c.outside === 'differs')).toBe(true); // 外では改名済み
+      expect(s2.every((c) => c.outside === 'same')).toBe(true); // 外も同じまま
+      // 数えるのは口数（世界×オブジェクト）。板の枚数ぶん水増ししない
+      expect(l.diagnostics.pinnedDivergedCount).toBe(1);
+      expect(l.diagnostics.pinnedCount).toBe(3); // スタッフ3人ぶんの焼き付け
+    });
+
+    it('外で消されたものは absent（墓標になっても「外に無い」と言える）', () => {
+      const { graphs } = hotelLike();
+      const gone = graphs.hotel
+        .grow([createStateRef('Staff', 's2', computeStateHash(null))])
+        // 墓標の次のノードへ進めても分かること。ここが従来の折り畳みでは落ちていた
+        .grow([ref('Schedule', 'x', { n: 9 })]);
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs: { ...graphs, hotel: gone },
+        resolveCellRole: pinStaff,
+      });
+      const s2 = l.plates
+        .filter((p) => p.scopeId === 'Schedule:x')
+        .flatMap((p) => p.cells)
+        .filter((c) => c.id === 's2');
+      expect(s2.length).toBeGreaterThan(0);
+      expect(s2.every((c) => c.outside === 'absent')).toBe(true);
+    });
+
+    it('比べ先が読めないときは unknown（「同じ」に倒すと図が嘘をつく）', () => {
+      const { graphs } = hotelLike();
+      // 起点スコープの現在地が壊れている（どのノードも指していない）。
+      // 壊れたグラフは実在するので、そこで「外と同じ」と描いたら嘘になる
+      const json = graphs.hotel.toJSON();
+      const brokenApex = WorldLineGraph.fromJSON({ ...json, apexNodeId: 'nowhere' });
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs: { ...graphs, hotel: brokenApex },
+        resolveCellRole: pinStaff,
+      });
+      const pinned = l.plates.flatMap((p) => p.cells).filter((c) => c.role === 'pinned');
+      expect(pinned.length).toBeGreaterThan(0);
+      expect(pinned.every((c) => c.outside === 'unknown')).toBe(true);
+      expect(l.diagnostics.pinnedDivergedCount).toBe(0);
+    });
+
+    it('固定と言ったのに動いたセルを数える（申告か仕組みが壊れたときの見張り）', () => {
+      const { graphs } = hotelLike();
+      // Schedule:x の中でスタッフを書き換える＝固定の約束が破れている状態
+      const broken = graphs['Schedule:x'].grow([ref('Staff', 's1', { n: 99 })]);
+      const l = computeWorldLine3DLayout({
+        rootScopeId: 'hotel',
+        graphs: { ...graphs, 'Schedule:x': broken },
+        resolveCellRole: pinStaff,
+      });
+      expect(l.diagnostics.pinnedButChangedCount).toBeGreaterThan(0);
+      // 壊れていない図では 0
+      expect(
+        computeWorldLine3DLayout({ rootScopeId: 'hotel', graphs, resolveCellRole: pinStaff })
+          .diagnostics.pinnedButChangedCount
+      ).toBe(0);
+    });
+  });
+
   it('墓標（削除済み）は数えて申告する。2Dインスペクタとの件数差になる', () => {
     const tomb = computeStateHash(null);
     const g = WorldLineGraph.empty()

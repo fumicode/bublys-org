@@ -31,6 +31,40 @@ export type CellAction =
   /** 前からあって、このノードでは何も起きていない */
   | 'unchanged';
 
+/**
+ * そのオブジェクトが、**その世界に対してどう属しているか**。
+ *
+ * {@link CellAction} とは軸が違う。action は「このノードで起きたこと」で時間とともに
+ * 変わる。role は「この世界での立場」で、世界が生まれたときに決まって以後変わらない。
+ * 混ぜると「変わっていない」と「外の変更が届かない」が同じ色になり、どちらも読めなくなる。
+ *
+ *   - 'member'   … この世界で**変化する**。編集でこの世界線にノードが増え、時間移動で戻る
+ *   - 'pinned'   … 世界が生まれた瞬間に参照が焼き付けられ、以後動かない。
+ *                  外での改名・削除は**ここへ届かない**
+ *   - 'external' … この世界に属さず、中から読んでも常に外の最新を見る
+ *
+ * `null` は **「分からない」**。立場を注入していないバブリでは全部これになる。
+ * **既定を 'member' にしてはいけない。** 知らないことを知っているように描いたら図が嘘をつく。
+ * 絵の側も同じで、「印が無い＝member」と読ませてはならない（印が無いのは「不明」も含む）。
+ */
+export type CellRole = 'member' | 'pinned' | 'external';
+
+/**
+ * 焼き付けた参照が、**外の世界の現在地**と食い違っているか。
+ *
+ * 「固定されている」の値打ちは、外を変えてもここが動かないことにある。
+ * その証拠になるのがこの食い違いなので、図に出せるようにする。
+ * 比べるのは**参照（ハッシュ）だけ**。値は CAS から追い出されるが参照は追い出されない。
+ *
+ *   - 'same'    … 外の現在地も同じ参照
+ *   - 'differs' … 外では別の参照になっている（改名など）
+ *   - 'absent'  … 外の現在地はこれを持っていない（消された／そもそも登場していない）
+ *   - 'unknown' … 比べ先が図に無い・現在地が読めない。**'same' に倒してはいけない**
+ *
+ * `null` は「比べる話ではない」（固定メンバーでない、外そのものの板、など）。
+ */
+export type OutsideMatch = 'same' | 'differs' | 'absent' | 'unknown';
+
 export type Cell3D = {
   /** `${type}:${id}` */
   readonly key: string;
@@ -49,6 +83,14 @@ export type Cell3D = {
   readonly nestedScopeId: string | null;
   /** その入れ子がいま図に出ているか。false ＝ 畳んでいる（印は中抜きで描く） */
   readonly nestedShown: boolean;
+  /**
+   * この世界でのこのオブジェクトの立場（{@link CellRole}）。
+   * このライブラリは誰が固定メンバーかを知らない。導出はバブリ側から注入する。
+   * **注入されなければ null（分からない）**。
+   */
+  readonly role: CellRole | null;
+  /** 焼き付けた参照が外の現在地と食い違っているか（{@link OutsideMatch}）。固定メンバー以外は null */
+  readonly outside: OutsideMatch | null;
 };
 
 export type Plate3D = {
@@ -93,6 +135,8 @@ export type IdentityLink3D = {
   readonly scopeId: string;
   /** 線の先（子ノード側）で何が起きたか */
   readonly action: CellAction;
+  /** 線の先のセルの立場。固定メンバーのレールは「打ち込まれた杭」として描き分ける */
+  readonly role: CellRole | null;
 };
 
 /**
@@ -140,6 +184,19 @@ export type Layout3DDiagnostics = {
   readonly tombstoneCount: number;
   /** 畳んでいて図に出していない入れ子スコープ（＝ユーザーが閉じたもの、とその子孫） */
   readonly hiddenScopeIds: readonly string[];
+  /**
+   * 焼き付けの口数＝(世界, オブジェクト) の組の数。
+   * **板ごとの延べではない。** 延べだと同じスタッフが板の枚数ぶん数えられ、
+   * 「9人の固定メンバー」が「81件」になって人数と読み違える
+   */
+  readonly pinnedCount: number;
+  /** そのうち、外の現在地と食い違っているもの（＝固定が効いている証拠） */
+  readonly pinnedDivergedCount: number;
+  /**
+   * ★ 固定と申告されたのに、起点より後で値が動いたセル。
+   * 0 でなければ「固定」の申告か仕組みのどちらかが壊れている。図に嘘を検出させる
+   */
+  readonly pinnedButChangedCount: number;
   /** 板が重なっている等、成立していない不変条件 */
   readonly violations: readonly string[];
 };

@@ -13,6 +13,10 @@ export * from "./objects/repository.js";
 export * from "./objects/world.js";
 export * from "./objects/migrateLegacyScopes.js";
 export * from "./objects/hotelObjects.js";
+// 世界での立場（固定メンバーか）を答える純粋なクエリ。世界線ビューが使う。
+// commit.js（書き込み API）はバレルに出さない ——「世界を作る場所は
+// ensureWorldBorn 1本」という規約を app 側から破れなくするため
+export * from "./objects/cellRole.js";
 
 // Domain models (re-exported from @bublys-org/hotel-shift-puzzle-model)
 export * from "./domain/index.js";

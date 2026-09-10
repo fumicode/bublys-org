@@ -20,6 +20,8 @@ import {
   GUTTER_UNITS,
   HEADER_UNITS,
   type Cell3D,
+  type CellRole,
+  type OutsideMatch,
   type Edge3D,
   type IdentityLink3D,
   type Layout3D,
@@ -30,13 +32,29 @@ import {
   type Vec3,
 } from './types.js';
 import { buildSlotMap, type SlotMap } from './slots.js';
-import { foldCellStates, type CellState } from './cellStates.js';
+import { TOMBSTONE_HASH, foldCellStates, type CellState } from './cellStates.js';
 import { assignLanes } from './lanes.js';
 import {
   deriveScopeTree,
   defaultNestedScopeResolver,
   type NestedScopeResolver,
 } from './scopeTree.js';
+
+/**
+ * セルの立場（{@link CellRole}）の導出。**バブリ側から注入する**。
+ *
+ * 引数も `| null` の扱いも {@link NestedScopeResolver} と揃えてある。入れ子も立場も
+ * 「スコープ規約から導く、ライブラリの知らない知識」で同じ種類のものなので、
+ * 注入口の形を揃えて覚えることを1つにする。
+ *
+ * `null` は「分からない／該当しない」。**分からないときに 'member' を返さないこと。**
+ * 例（hotel）: スタッフは `Schedule:<id>` では 'pinned' だが、
+ * グローバル台帳では立場を持たない（null）。同じ型でも世界によって意味が変わる。
+ */
+export type CellRoleResolver = (
+  ref: StateRef,
+  currentScopeId: string
+) => CellRole | null;
 
 export type Layout3DInput = {
   readonly rootScopeId: string;
@@ -45,6 +63,11 @@ export type Layout3DInput = {
   readonly locate?: (hash: string) => RefLocation;
   /** 入れ子の導出。省略時は `${type}:${id}` 規約 */
   readonly resolveNestedScopeId?: NestedScopeResolver;
+  /**
+   * セルの立場の導出。省略時は**全セル null（分からない）**。
+   * 誰が固定メンバーかはバブリの規約なので、ライブラリは判定を持たない。
+   */
+  readonly resolveCellRole?: CellRoleResolver;
   /** 親とアドレス連動しているか（universe だけ true になる想定） */
   readonly isLinked?: (childScopeId: string, parentScopeId: string) => boolean;
   /** X 軸の意味。既定は 'sync'（同時に起きたことは同じ X） */
@@ -287,6 +310,8 @@ export function computeWorldLine3DLayout(
   };
 
   const calcs: ScopeCalc[] = [];
+  /** スコープID → 現在地の参照表（墓標込み）。固定メンバーの比べ先 */
+  const refsAtApexOf = new Map<string, ReadonlyMap<string, StateRef> | null>();
   const orphanNodeIds: string[] = [];
   const clockAnomalyNodeIds: string[] = [];
   let unprunedChangedCount = 0;
@@ -296,6 +321,7 @@ export function computeWorldLine3DLayout(
     if (!graph) continue;
     const { of: lanes, laneCount } = assignLanes(graph);
     const fold = foldCellStates(graph);
+    refsAtApexOf.set(s.scopeId, fold.refsAtApex);
     orphanNodeIds.push(...fold.orphanNodeIds);
     clockAnomalyNodeIds.push(...fold.clockAnomalyNodeIds);
     unprunedChangedCount += fold.unprunedChangedCount;
@@ -340,6 +366,34 @@ export function computeWorldLine3DLayout(
     string,
     { x0: number; x1: number; y0: number; y1: number; z: number }
   >();
+
+  // ★ 板ごとの延べで数えない。同じスタッフが1つの世界に9枚の板ぶん出るので、
+  //   延べだと「9人の固定メンバー」が「81件」になって人数と読み違える。
+  //   数えるのは (世界, オブジェクト) の組＝「焼き付けの口数」
+  const pinnedKeys = new Set<string>();
+  const pinnedDivergedKeys = new Set<string>();
+  const pinnedButChangedKeys = new Set<string>();
+
+  /**
+   * 焼き付けた参照が、外の世界の現在地と食い違っているか。
+   *
+   * 比べ先は**図の起点スコープ（rootScopeId）の現在地**。hotel では焼き付け元が
+   * グローバル台帳＝起点スコープなので一致する。起点そのものの板は比べない
+   * （自分と自分を比べても何も言えない）。
+   *
+   * ★ 値ではなく参照（ハッシュ）で比べる。値は CAS から追い出されるが参照は残る。
+   * ★ 比べ先が無いときは 'unknown'。'same' に倒すと「合っている」と
+   *   「そもそも見ていない」が同じ絵になり、図が嘘をつく。
+   */
+  function judgeOutside(ref: StateRef, scopeId: string): OutsideMatch {
+    if (scopeId === input.rootScopeId) return 'unknown';
+    const outsideRefs = refsAtApexOf.get(input.rootScopeId);
+    if (!outsideRefs) return 'unknown';
+    const there = outsideRefs.get(`${ref.type}:${ref.id}`);
+    // 外に居ない／外では墓標になっている。どちらも「外の現在地は持っていない」
+    if (!there || there.hash === TOMBSTONE_HASH) return 'absent';
+    return there.hash === ref.hash ? 'same' : 'differs';
+  }
 
   const yExtentOf = (c: ScopeCalc) =>
     Math.max(c.laneCount - 1, 0) * lanePitchY + c.extentY;
@@ -420,6 +474,17 @@ export function computeWorldLine3DLayout(
           const slot = c.slotMap.of(st.key);
           if (!slot) continue;
           const nested = nestedInTree(resolve(st.ref, c.scopeId));
+          // 注入されなければ null＝「分からない」。ここで 'member' に倒すと、
+          // 立場を知らないバブリの図が「全部この世界のもの」と断言してしまう
+          const role = input.resolveCellRole?.(st.ref, c.scopeId) ?? null;
+          const outside = role === 'pinned' ? judgeOutside(st.ref, c.scopeId) : null;
+          if (role === 'pinned') {
+            const pinKey = `${c.scopeId} ${st.key}`;
+            pinnedKeys.add(pinKey);
+            if (outside === 'differs' || outside === 'absent') pinnedDivergedKeys.add(pinKey);
+            // 固定と言ったのに起点より後で動いた＝申告か仕組みのどちらかが壊れている
+            if (st.action === 'changed') pinnedButChangedKeys.add(pinKey);
+          }
           // 削除マーカーはハッシュが定数なので、locate を渡されなくても判定できる。
           // locate 任せにすると、渡されなかったときに「消えた」が図から落ちる
           cells.push({
@@ -434,6 +499,8 @@ export function computeWorldLine3DLayout(
             // 出ているかどうかは nestedShown で分けて、絵は中抜きの丸にする
             nestedScopeId: nested,
             nestedShown: nested !== null && shownIds.has(nested),
+            role,
+            outside,
           });
         }
         const plate: Plate3D = {
@@ -534,6 +601,7 @@ export function computeWorldLine3DLayout(
           key: cell.key,
           scopeId: c.scopeId,
           action: cell.action,
+          role: cell.role,
         });
       }
     }
@@ -582,6 +650,9 @@ export function computeWorldLine3DLayout(
       clockAnomalyNodeIds,
       unprunedChangedCount,
       tombstoneCount,
+      pinnedCount: pinnedKeys.size,
+      pinnedDivergedCount: pinnedDivergedKeys.size,
+      pinnedButChangedCount: pinnedButChangedKeys.size,
       hiddenScopeIds: tree.scopes
         .filter((sc) => !shownIds.has(sc.scopeId))
         .map((sc) => sc.scopeId),
