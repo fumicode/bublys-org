@@ -57,7 +57,7 @@ export {
   ndcFromPointer,
   pickPlate,
   screenToRay,
-  type Pick,
+  type PlatePick,
   type Ray,
 } from "./picking.js";
 export {

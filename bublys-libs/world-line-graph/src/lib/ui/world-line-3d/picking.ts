@@ -78,7 +78,12 @@ export function screenToRay(
   return { origin: cameraPos, dir };
 }
 
-export type Pick = {
+/**
+ * 当たったもの。**`PlatePick` という名前にしてあるのは、`Pick` が
+ * TypeScript 組み込みの `Pick<T, K>` を潰すため。** バレルから出ているので、
+ * このパッケージを import しただけで組み込みの Pick が使えなくなる。
+ */
+export type PlatePick = {
   readonly scopeId: string;
   readonly nodeId: string;
   /** セルに当たっていれば `${type}:${id}`。板の余白なら null */
@@ -97,8 +102,8 @@ export function pickPlate(
   ray: Ray,
   plates: readonly Plate3D[],
   cellPitch: number
-): Pick | null {
-  let best: Pick | null = null;
+): PlatePick | null {
+  let best: PlatePick | null = null;
   for (const p of plates) {
     // 板は x = origin[0] の平面
     if (Math.abs(ray.dir[0]) < 1e-9) continue;
