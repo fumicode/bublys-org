@@ -109,12 +109,12 @@ hotel-shift-puzzle-app/src/
 Staff:    { membership: { kind: "pinned" } }
 Schedule: {
   membership: { kind: "live", homeScope: (id) => localScopeId(SCHEDULE_TYPE, id) },
-  scope: { pins: [STAFF_TYPE] },   // この世界が生まれるとき誰を連れてくるか
+  scope: { pinTypes: [STAFF_TYPE] },   // この世界が生まれるとき誰を連れてくるか
 }
 ```
 
 - **宣言は両側に要る**。メンバー側の `membership` が「私はどう読まれるか」、
-  オーナー側の `scope.pins` が「誕生時に誰を連れるか」。pinned はメンバー側だけでは
+  オーナー側の `scope.pinTypes` が「誕生時に誰を連れるか」。pinned はメンバー側だけでは
   「どのスコープへ焼くか」を言えない。
 - `homeScope` の引数は **obj ではなく id**。`removeObject(type, id)` はオブジェクトを
   手に持たずに呼ばれるので、obj を要求すると削除だけ住所を解決できない。
@@ -200,6 +200,19 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 作った世界も、正しく生まれたうえで0件になる。決め手は**生まれた時刻**で、焼き付ける
 べきものが世界の誕生より前から台帳にあったときだけ旧形式とみなす。
 取り違えると試行錯誤の履歴が黙って消えるので、迷ったら触らない側に倒す。
+
+### モデルのクラス図（`src/model-graph/`）
+
+このバブリのモデルの構造を図にするバブル（`hotel-shift-puzzle/model-class-diagram`）。
+読み方と生成し直し方は `docs/model-class-diagram.md`。
+
+- 構造（クラス・フィールド・メソッド・つながり）は **TypeScript のソースから生成**する。
+  `modelGraph.generated.ts` は**手で編集しない**。モデルか記述子を直したら生成し直す。
+  忘れると `modelGraph.staleness.test.ts` が落ちる
+- 世界線での所属（live / pinned / external）だけは**記述子から実行時に**重ねる。
+  型からは分からないので、知っている側（記述子）に聞く
+- 登録されていないクラス（集約の中の部品）には所属を描かない。
+  「所属が無い」のではなく「所属という概念の対象ではない」ので、`external` と読ませたら嘘になる
 
 ### グローバル台帳（`APP_SCOPE_ID = "hotel"`）
 

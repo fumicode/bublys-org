@@ -33,5 +33,8 @@ export * from "./slice/index.js";
 // 勤務表ファイル（世界線ごとローカルファイルへ保存・読み込み）
 export * from "./world-file/index.js";
 
+// モデルのクラス図（ソースから生成した構造 ＋ 記述子の所属）
+export * from "./model-graph/index.js";
+
 // Sample data
 export * from "./data/index.js";

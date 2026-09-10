@@ -93,6 +93,9 @@ export const worldLineInspectorUrl = (): string =>
 /** 世界線を3Dで覗くビュー（デバッグ用） */
 export const worldLine3DUrl = (): string => `hotel-shift-puzzle/world-line-3d`;
 
+/** モデルのクラス図 */
+export const modelClassDiagramUrl = (): string => `hotel-shift-puzzle/model-class-diagram`;
+
 /** 操作履歴（ノウハウ可視化）バブル */
 export const scheduleEditLogUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;
