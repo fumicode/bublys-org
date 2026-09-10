@@ -32,13 +32,13 @@ import {
 import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
-import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
 import {
-  commitCandidates,
-  localScopeId,
-  isAbsentInScope,
-  APP_SCOPE_ID,
-} from "../objects/commit.js";
+  useObjects,
+  useObject,
+  useObjectRepo,
+  useIsAbsent,
+} from "../objects/repository.js";
+import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import {
@@ -304,6 +304,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   }, [workShifts, constraints, wishByStaff]);
 
   /**
+   * 「制約が本当に無い」か。**読んだのと同じスコープ**を見る。
+   * ここで別のスコープ（グローバル台帳）を見ると、過去のノードへ時間移動したときに
+   * 「読み込み中です」が永久に解けず、そのノードからは二度と編集できなくなる。
+   */
+  const constraintsAbsent = useIsAbsent(SCHEDULE_CONSTRAINTS_TYPE, scheduleId);
+
+  /**
    * 制約を編集するときの起点を返す。まだ作られていないときだけ空の制約から始める。
    *
    * `constraints ?? new ScheduleConstraints(...)` と書いてはいけない。値が読めないのには
@@ -314,7 +321,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const constraintsBase = (): ScheduleConstraints | undefined => {
     if (constraints) return constraints;
     if (!scheduleId) return undefined;
-    if (!isAbsentInScope(store, APP_SCOPE_ID, SCHEDULE_CONSTRAINTS_TYPE, scheduleId)) {
+    if (!constraintsAbsent) {
       setAutoMessage("制約を読み込み中です。少し待ってからもう一度お試しください。");
       return undefined;
     }
