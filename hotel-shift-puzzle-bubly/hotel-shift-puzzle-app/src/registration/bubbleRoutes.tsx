@@ -265,7 +265,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
-  { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 460, height: 360 } } },
+  { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 760, height: 460 } } },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },

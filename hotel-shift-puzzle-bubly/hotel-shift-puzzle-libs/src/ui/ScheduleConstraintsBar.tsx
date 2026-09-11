@@ -30,8 +30,12 @@ import { WishIcon } from "./constraint-icons/WishIcon.js";
 type ScheduleConstraintsBarProps = {
   /** 責任者ルール（解決済み） */
   leaderRules: ShiftLeaderRule[];
-  /** スタッフID → 表示名（tooltip 用） */
-  nameOf: (staffId: string) => string;
+  /**
+   * スタッフID → 表示名（tooltip 用）。
+   * 担当者は勤務表ごとに決まる（名簿は勤務表が生まれるときに焼き付く）ので、
+   * グローバルの制約セットを描くときは渡さない。渡さなければ ID をそのまま出す。
+   */
+  nameOf?: (staffId: string) => string;
   /** 担当勤務帯名 → 色（アイコンの流れを勤務帯色で塗る）。未解決は既定グレー。 */
   shiftColorOf?: (shiftName: string) => IconColor;
   /** 責任者アイコンの単クリック: その関係者を選択（フォーカス/解決モード）。 */
@@ -64,6 +68,22 @@ export const shiftColorById = (shiftId: string | undefined): IconColor => ({
   fg: (shiftId && SHIFT_FG[shiftId]) || DEFAULT_SHIFT_COLOR.fg,
 });
 
+/**
+ * 勤務帯の並びから `shiftColorOf`（担当勤務帯名 → 色）を作る。
+ *
+ * 責任者ルールが持つのは勤務帯の**名前**だけなので、色を引くには名前→ID の解決が要る。
+ * 同じ名前の勤務帯が時刻違いで複数あるときは**先頭（開始時刻昇順の最初）を代表**にする。
+ * 色の真実（SHIFT_BG / SHIFT_FG）がこのファイルにあるので、解決もここに置く
+ * （呼び出し側で書き写すと、勤務表とグローバルで色が食い違いうる）。
+ */
+export const shiftColorOfNames = (
+  shifts: readonly { id: string; name: string }[]
+): ((shiftName: string) => IconColor) => {
+  const idByName = new Map<string, string>();
+  for (const w of shifts) if (!idByName.has(w.name)) idByName.set(w.name, w.id);
+  return (shiftName: string) => shiftColorById(idByName.get(shiftName));
+};
+
 export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
   leaderRules,
   nameOf,
@@ -85,7 +105,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
     const chip = leaderRoleColor(rule.key);
     const who =
       rule.leaderStaffIds.length > 0
-        ? rule.leaderStaffIds.map(nameOf).join("・")
+        ? rule.leaderStaffIds.map((id) => nameOf?.(id) ?? id).join("・")
         : "（該当者なし）";
     const quota =
       rule.minCount <= 1 ? "のうちいずれか1人" : `のうち最低${rule.minCount}人`;

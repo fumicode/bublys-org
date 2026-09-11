@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect } from "react";
+import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import {
   ConstraintSet,
@@ -8,6 +8,10 @@ import {
   WorkShiftSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ConstraintSetView } from "../ui/ConstraintSetView.js";
+import {
+  ScheduleConstraintsBar,
+  shiftColorOfNames,
+} from "../ui/ScheduleConstraintsBar.js";
 import {
   useObject,
   useObjectShell,
@@ -32,6 +36,11 @@ const newRuleKey = (): string =>
  *
  * 責任者の担当者はここでは決めない。担当者は名簿のスタッフを指すが、名簿は勤務表が
  * 生まれるときに焼き付けられる（固定メンバー）ので、誰が担うかは勤務表ごとの話になる。
+ *
+ * 上には勤務表と**同じ** ScheduleConstraintsBar を出す。同じ制約セットなのだから同じ絵で
+ * 読めるべきで、グローバル用の似たバーを別に作らない。勤務表固有の prop
+ * （担当者名・選択状態・ルールバブルURL・バーの＋）は渡さない＝ただの図として並ぶ。
+ * 直すのは下のフォームで、直した瞬間に上の絵が変わる。
  */
 export const ConstraintSetCollection: FC = () => {
   const { object: constraintSet, update } = useObjectShell<ConstraintSet>(
@@ -45,6 +54,11 @@ export const ConstraintSetCollection: FC = () => {
     GLOBAL_WORKSHIFT_SET_ID
   );
   const shiftNames = [...new Set((workShiftSet?.shifts ?? []).map((w) => w.name))];
+  // 責任者アイコンを担当勤務帯の色で塗る（勤務表と同じ解決を使う）
+  const shiftColorOf = useMemo(
+    () => shiftColorOfNames(workShiftSet?.shifts ?? []),
+    [workShiftSet]
+  );
 
   // 無ければ既定のグローバルセットをその場で用意する。
   // 状態が揃うまでは動かさない（追い出されただけのセットを既定で上書きしないため）。
@@ -74,7 +88,17 @@ export const ConstraintSetCollection: FC = () => {
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>制約セット（{constraintSet.leaderRules.length} ルール）</h3>
+        <h3>制約セット</h3>
+      </div>
+      <div className="e-bar">
+        <ScheduleConstraintsBar
+          leaderRules={constraintSet.leaderRules}
+          shiftColorOf={shiftColorOf}
+          maxConsecutive={constraintSet.maxConsecutiveWorkdays}
+          minDayOff={constraintSet.minMonthlyDayOff}
+          maxPerDay={constraintSet.maxDayOffPerDay}
+          checkShiftWish={constraintSet.checkShiftWish}
+        />
       </div>
       <ConstraintSetView
         constraintSet={constraintSet}
@@ -105,10 +129,15 @@ const StyledContainer = styled.div`
   padding: 8px;
 
   .e-header {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 
     h3 {
       margin: 0;
     }
+  }
+
+  /* 「いま何が効いているか」の図。下のフォームを直すとここが変わる */
+  .e-bar {
+    margin-bottom: 8px;
   }
 `;

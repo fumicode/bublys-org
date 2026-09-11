@@ -25,7 +25,7 @@ import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import {
   ScheduleConstraintsBar,
-  shiftColorById,
+  shiftColorOfNames,
 } from "../ui/ScheduleConstraintsBar.js";
 import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
@@ -479,11 +479,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   }, [schedule, cellSelection, staffList]);
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
-  const shiftColorOf = useMemo(() => {
-    const idByName = new Map<string, string>();
-    for (const w of workShifts) if (!idByName.has(w.name)) idByName.set(w.name, w.id);
-    return (shiftName: string) => shiftColorById(idByName.get(shiftName));
-  }, [workShifts]);
+  const shiftColorOf = useMemo(() => shiftColorOfNames(workShifts), [workShifts]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
