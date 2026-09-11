@@ -26,6 +26,10 @@ export const staffUrl = (staffId: string): string =>
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;
 
+/** 勤務スタッフ群バブル（この勤務表で働く人たちを足す・外す・並べ替える） */
+export const scheduleStaffUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/staff`;
+
 /** 可能勤務帯エディタバブル */
 export const scheduleAvailabilityUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/availability`;

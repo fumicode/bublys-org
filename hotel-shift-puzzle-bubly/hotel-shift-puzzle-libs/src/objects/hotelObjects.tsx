@@ -11,10 +11,12 @@
  */
 import React from "react";
 import PersonIcon from "@mui/icons-material/Person";
+import GroupsIcon from "@mui/icons-material/Groups";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
   Staff,
+  WorkingStaffGroup,
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
@@ -32,6 +34,8 @@ import { localScopeId } from "./commit.js";
 
 /** オブジェクト型名 */
 export const STAFF_TYPE = "Staff";
+/** 勤務表ごとの「働く人たち」。勤務表が workingStaffGroupId で指す（id=scheduleId） */
+export const WORKING_STAFF_GROUP_TYPE = "WorkingStaffGroup";
 export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
 /** グローバルの勤務帯セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
 export const GLOBAL_WORKSHIFT_SET_ID = "global";
@@ -66,6 +70,22 @@ export const HOTEL_OBJECTS = defineObjects({
       { name: "name", shape: primitiveShape("string"), required: true, label: "名前" },
       { name: "department", shape: primitiveShape("string"), required: false, label: "所属部署" },
     ]),
+  },
+  WorkingStaffGroup: {
+    class: WorkingStaffGroup,
+    getId: (g: WorkingStaffGroup) => g.id,
+    icon: React.createElement(GroupsIcon, { fontSize: "small" }),
+    // 勤務表とスタッフの間に噛む入れ物。「誰が働くか」を持つ。
+    //
+    // スタッフ本体（固定メンバー）とは属し方が違う。名簿は世界が生まれた瞬間に焼き付いて
+    // 動かないが、**誰が働くかはこの世界の中で変わる**（臨時の人を足す・外す・並べ替える）。
+    // だから群は live で、親 Schedule の世界線に相乗りする（case B）。
+    // 臨時の人の実体は群が抱えるので、名簿には出ずに時間移動で一緒に戻る。
+    // state が完全 plain（id ＋ メンバー state 配列）なので serialize 不要。
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   WorkShiftSet: {
     class: WorkShiftSet,

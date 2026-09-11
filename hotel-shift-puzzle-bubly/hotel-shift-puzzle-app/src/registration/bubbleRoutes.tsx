@@ -23,6 +23,7 @@ import {
   ScheduleWorldLineView,
   ScheduleWorldLineTreeView,
   AvailabilityEditor,
+  WorkingStaffPanel,
   ScheduleViolationView,
   ShiftWishEditor,
   LeaderRuleView,
@@ -37,6 +38,7 @@ import {
 import {
   scheduleDayUrl,
   scheduleViolationUrl,
+  scheduleStaffUrl,
   scheduleAvailabilityUrl,
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
@@ -113,6 +115,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // バブル URL のスキームは app 層（ここ）の関心事。
   // 可能勤務帯・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
+  const workingStaffUrl = scheduleStaffUrl(scheduleId);
   const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const editLogUrl = scheduleEditLogUrl(scheduleId);
@@ -129,6 +132,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         openSide(worldLineUrl, "bubble-side-bottom")
       }
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
+      workingStaffUrl={workingStaffUrl}
       availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
@@ -148,6 +152,10 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     />
   );
 };
+
+// --- 勤務スタッフ群バブル（勤務表の「勤務スタッフ」ボタンから開く） ---
+const WorkingStaffBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<WorkingStaffPanel scheduleId={bubble.params.scheduleId} />);
 
 // --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
 const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -277,6 +285,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/edit-log", type: "schedule-edit-log", Component: ScheduleEditLogBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/shift-interval-rules/:ruleKey", type: "schedule-shift-interval-rule", Component: ShiftIntervalRuleBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/staff", type: "schedule-staff", Component: WorkingStaffBubble, bubbleOptions: { defaultSize: { width: 340, height: 420 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },

@@ -4,6 +4,8 @@
 
 // Staff（スタッフ）
 export * from './staff/Staff.js';
+// 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
+export * from './staff/WorkingStaffGroup.js';
 
 // 月間スタッフ勤務表（シフト表）
 export * from './schedule/WorkingDay.js';

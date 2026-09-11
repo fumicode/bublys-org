@@ -4,7 +4,6 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import styled from "styled-components";
 import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
@@ -50,6 +49,7 @@ import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleCon
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
   recordAutoStep,
@@ -58,10 +58,10 @@ import {
   buildCandidateEditLog,
 } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
+  WORKING_STAFF_GROUP_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
@@ -91,6 +91,7 @@ type ScheduleGridProps = {
    */
   worldLineUrl?: string;
   treeUrl?: string;
+  workingStaffUrl?: string;
   availabilityUrl?: string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
@@ -143,6 +144,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   onConfirm,
   worldLineUrl,
   treeUrl,
+  workingStaffUrl,
   availabilityUrl,
   editLogUrl,
   dayBubbleUrl,
@@ -162,7 +164,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     staffId: string;
     day: WorkingDay;
   } | null>(null);
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
+  const { staffList } = useWorkingStaff(scheduleId);
   // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
   const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
@@ -784,6 +787,23 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 </option>
               ))}
             </select>
+          )}
+
+          {/* 行になる人たち（勤務スタッフ群）。ここで足す・外す・並べ替える */}
+          {workingStaffUrl && (
+            <ObjectView
+              type={WORKING_STAFF_GROUP_TYPE}
+              url={workingStaffUrl}
+              label="勤務スタッフ"
+              openingPosition="bubble-side-left"
+            >
+              <span
+                className="e-link"
+                title="ダブルクリックでこの勤務表の勤務スタッフを開く"
+              >
+                勤務スタッフ
+              </span>
+            </ObjectView>
           )}
 
           {availabilityUrl && (

@@ -54,3 +54,29 @@ describe('ScheduleConstraints の参考レポート紐づけ（linkReport/unlink
     expect(restored.linkedReportIds).toEqual(['report-1', 'report-2']);
   });
 });
+
+describe('ScheduleConstraints.removeStaff（勤務表から外れた人を責任者候補から消す）', () => {
+  const create = () =>
+    new ScheduleConstraints({
+      scheduleId: 'schedule-A',
+      leaderRules: [
+        { key: 'early', label: '早責', shiftName: '早番', leaderStaffIds: ['a', 'b'], minCount: 1 },
+        { key: 'night', label: '夜責', shiftName: '遅番', leaderStaffIds: ['b', 'c'], minCount: 1 },
+      ],
+    });
+
+  test('すべてのルールの候補者から外す（不変）', () => {
+    const base = create();
+    const without = base.removeStaff('b');
+
+    expect(without.leaderRule('early')?.leaderStaffIds).toEqual(['a']);
+    expect(without.leaderRule('night')?.leaderStaffIds).toEqual(['c']);
+    // 元は不変
+    expect(base.leaderRule('early')?.leaderStaffIds).toEqual(['a', 'b']);
+  });
+
+  test('どのルールにも居なければ自分自身を返す（無駄な世界線ノードを作らない）', () => {
+    const base = create();
+    expect(base.removeStaff('zzz')).toBe(base);
+  });
+});

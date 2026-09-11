@@ -301,6 +301,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
+          "name": "workingStaffGroupId",
+          "type": "string",
+          "optional": false
+        },
+        {
           "name": "assignments",
           "type": "ShiftAssignment[]",
           "optional": false
@@ -316,6 +321,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "storeId",
         "year",
         "month",
+        "workingStaffGroupId",
         "assignments",
         "index",
         "requiredStaffing"
@@ -383,6 +389,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "params": [
             "staffId",
             "day"
+          ],
+          "returns": "MonthlyStaffSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "clearStaff",
+          "params": [
+            "staffId"
           ],
           "returns": "MonthlyStaffSchedule",
           "isStatic": false,
@@ -738,6 +753,16 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "allowAllIfUnset",
+          "params": [
+            "staffId",
+            "shiftIds"
+          ],
+          "returns": "ScheduleAvailability",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
           "name": "toggle",
           "params": [
             "staffId",
@@ -988,6 +1013,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "removeLeader",
           "params": [
             "ruleKey",
+            "staffId"
+          ],
+          "returns": "ScheduleConstraints",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeStaff",
+          "params": [
             "staffId"
           ],
           "returns": "ScheduleConstraints",
@@ -1679,6 +1713,137 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "WorkingStaffGroup",
+      "file": "staff/WorkingStaffGroup.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "members",
+          "type": "WorkingStaffMemberState[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "members"
+      ],
+      "methods": [
+        {
+          "name": "ofRoster",
+          "params": [
+            "id",
+            "staffIds"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "staffIds",
+          "params": [],
+          "returns": "string[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "has",
+          "params": [
+            "staffId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isTemporary",
+          "params": [
+            "staffId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "temporaryStaff",
+          "params": [],
+          "returns": "Staff[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "roster"
+          ],
+          "returns": "Staff[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addRoster",
+          "params": [
+            "staffId"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "addTemporary",
+          "params": [
+            "staff"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "remove",
+          "params": [
+            "staffId"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "move",
+          "params": [
+            "staffId",
+            "toIndex"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "renameTemporary",
+          "params": [
+            "staffId",
+            "name"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "changeTemporaryDepartment",
+          "params": [
+            "staffId",
+            "department"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "WorkShift",
       "file": "schedule/WorkShift.ts",
       "kind": "part",
@@ -1893,6 +2058,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "MonthlyStaffSchedule",
+      "to": "WorkingStaffGroup",
+      "kind": "references",
+      "via": "workingStaffGroupId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
       "from": "ScheduleAvailability",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -1975,7 +2148,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 36,
+    "fileCount": 37,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",

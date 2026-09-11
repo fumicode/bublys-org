@@ -338,6 +338,46 @@ export function recordConstraintEdit(
 }
 
 /**
+ * 勤務スタッフ群の変更を記録する（誰がこの勤務表で働くか）。
+ *
+ * 1回の変更で複数の集約が動く。臨時スタッフを足せば可能勤務帯にも席を用意するし、
+ * 人を外せばその人の割当と責任者ルールの担当からも消す。これらは**同じ1ノード**に
+ * 載せないと、時間移動したときに「行は消えたのに割当だけ残っている」中途半端な世界へ
+ * 戻れてしまう。呼び出し側が変わったものだけ `changed` に入れる。
+ *
+ * 違反差分は取らない（emptyConstraintDelta）。セルの決め方についての判断ではないので、
+ * 「この操作で何を譲歩したか」という読み方が当てはまらない。
+ */
+export function recordMembershipEdit(
+  store: StoreLike,
+  args: {
+    scheduleId: string;
+    /** 変更前の勤務表。起点に置くために渡す（この世界の持ち主なので必ず起点に要る） */
+    schedule: MonthlyStaffSchedule | undefined;
+    /** 同じノードに載せる変更後の一式。勤務スタッフ群は必ず入る */
+    changed: BundleItem[];
+    summary: string;
+    staffId?: string;
+  }
+): void {
+  const prevLog = loadEditLog(store, args.scheduleId);
+  const log = prevLog?.append({
+    actor: "human",
+    kind: "membershipEdit",
+    summary: args.summary,
+    targets: { staffId: args.staffId },
+    constraintDelta: emptyConstraintDelta(),
+  });
+
+  saveLocalBundle(
+    store,
+    localScopeId(SCHEDULE_TYPE, args.scheduleId),
+    withEditLog(args.changed, log),
+    baselineOf(args.schedule, prevLog)
+  );
+}
+
+/**
  * 候補案1つ分の EditLog を作る（commitCandidates の extras 用）。
  * 親のログに「案N」エントリを足した新インスタンスを返す。
  * ログが読めないときは undefined（＝この案は履歴に残さない。案そのものは記録される）。

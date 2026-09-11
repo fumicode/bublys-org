@@ -23,6 +23,7 @@ const KIND_LABEL: Record<ScheduleEditKind, string> = {
   constraintEdit: "制約",
   requiredEdit: "必要人数",
   candidate: "比較案",
+  membershipEdit: "勤務スタッフ",
 };
 
 function formatShortTime(iso: string): string {

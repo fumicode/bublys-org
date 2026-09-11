@@ -192,6 +192,26 @@ export class ScheduleConstraints {
     }));
   }
 
+  /**
+   * その人を**すべての**責任者ルールの候補者から外す。変わらなければ自分自身を返す。不変。
+   *
+   * その人がこの勤務表で働かなくなったときに使う。候補者に残したままだと、
+   * 表に居ない人を数えるルールができあがり、どう埋めても満たせない日が出る
+   * （画面には ✕ だけが出て、理由がどこにも書かれていない状態になる）。
+   */
+  removeStaff(staffId: string): ScheduleConstraints {
+    if (!this.state.leaderRules.some((r) => r.leaderStaffIds.includes(staffId))) {
+      return this;
+    }
+    return new ScheduleConstraints({
+      ...this.state,
+      leaderRules: this.state.leaderRules.map((r) => ({
+        ...r,
+        leaderStaffIds: r.leaderStaffIds.filter((id) => id !== staffId),
+      })),
+    });
+  }
+
   /** 責任者ルールを新規追加する（同じ key が既にあれば無視）。新インスタンスを返す。 */
   addRule(rule: ShiftLeaderRuleState): ScheduleConstraints {
     if (this.state.leaderRules.some((r) => r.key === rule.key)) return this;
