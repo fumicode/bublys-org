@@ -22,7 +22,7 @@ import {
   deadCellDiagnosisFromPlain,
   MonthlyStaffSchedule,
   ScheduleCandidates,
-  ScheduleConstraints,
+  ConstraintSet,
   StaffMonthlyShiftWish,
   WorkShift,
   diffScheduleCells,
@@ -43,7 +43,7 @@ import type {
 export type UseScheduleCandidatesParams = {
   schedule?: MonthlyStaffSchedule;
   /** 勤務表ごとの制約集約（未作成なら希望チェックだけ） */
-  constraints?: ScheduleConstraints;
+  constraints?: ConstraintSet;
   /** 希望との食い違いも制約として見るか */
   checkShiftWish: boolean;
   wishByStaff: Map<string, StaffMonthlyShiftWish>;

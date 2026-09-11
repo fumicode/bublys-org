@@ -1,18 +1,18 @@
-import { ScheduleConstraints } from './ScheduleConstraints.js';
+import { ConstraintSet } from './ConstraintSet.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
 
-describe('ScheduleConstraints.modelConstraints', () => {
+describe('ConstraintSet.modelConstraints', () => {
   test('RequiredStaffingConstraint を含む', () => {
-    const constraints = new ScheduleConstraints({ scheduleId: 'schedule-A', leaderRules: [] });
+    const constraints = new ConstraintSet({ scheduleId: 'schedule-A', leaderRules: [] });
     const model = constraints.modelConstraints(() => []);
     expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(true);
   });
 });
 
-describe('ScheduleConstraints の参考レポート紐づけ（linkReport/unlinkReport）', () => {
+describe('ConstraintSet の参考レポート紐づけ（linkReport/unlinkReport）', () => {
   const create = () =>
-    new ScheduleConstraints({ scheduleId: 'schedule-A', leaderRules: [] });
+    new ConstraintSet({ scheduleId: 'schedule-A', leaderRules: [] });
 
   test('既定は紐づけ無し', () => {
     expect(create().linkedReportIds).toEqual([]);
@@ -51,14 +51,14 @@ describe('ScheduleConstraints の参考レポート紐づけ（linkReport/unlink
 
   test('toPlain / fromPlain でラウンドトリップできる', () => {
     const linked = create().linkReport('report-1').linkReport('report-2');
-    const restored = ScheduleConstraints.fromPlain(linked.toPlain());
+    const restored = ConstraintSet.fromPlain(linked.toPlain());
     expect(restored.linkedReportIds).toEqual(['report-1', 'report-2']);
   });
 });
 
-describe('ScheduleConstraints.removeStaff（勤務表から外れた人を責任者候補から消す）', () => {
+describe('ConstraintSet.removeStaff（勤務表から外れた人を責任者候補から消す）', () => {
   const create = () =>
-    new ScheduleConstraints({
+    new ConstraintSet({
       scheduleId: 'schedule-A',
       leaderRules: [
         new ShiftLeaderRule({ key: 'early', label: '早責', shiftName: '早番', leaderStaffIds: ['a', 'b'], minCount: 1 }),

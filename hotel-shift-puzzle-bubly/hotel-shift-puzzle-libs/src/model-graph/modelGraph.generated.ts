@@ -73,6 +73,251 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "ConstraintSet",
+      "file": "schedule/ConstraintSet.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "leaderRules",
+          "type": "ShiftLeaderRule[]",
+          "optional": false
+        },
+        {
+          "name": "maxConsecutiveWorkdays",
+          "type": "number",
+          "optional": true
+        },
+        {
+          "name": "checkShiftWish",
+          "type": "boolean",
+          "optional": true
+        },
+        {
+          "name": "minMonthlyDayOff",
+          "type": "number",
+          "optional": true
+        },
+        {
+          "name": "maxDayOffPerDay",
+          "type": "number",
+          "optional": true
+        },
+        {
+          "name": "linkedReportIds",
+          "type": "string[]",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "maxConsecutiveWorkdays",
+        "checkShiftWish",
+        "minMonthlyDayOff",
+        "maxDayOffPerDay",
+        "linkedReportIds",
+        "leaderRules"
+      ],
+      "methods": [
+        {
+          "name": "empty",
+          "params": [
+            "id"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "withId",
+          "params": [
+            "newId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withMaxConsecutiveWorkdays",
+          "params": [
+            "days"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withMinMonthlyDayOff",
+          "params": [
+            "days"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withMaxDayOffPerDay",
+          "params": [
+            "count"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withCheckShiftWish",
+          "params": [
+            "check"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "linkReport",
+          "params": [
+            "reportId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "unlinkReport",
+          "params": [
+            "reportId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "modelConstraints",
+          "params": [
+            "shiftIdsOf"
+          ],
+          "returns": "ScheduleConstraint[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "leaderRule",
+          "params": [
+            "key"
+          ],
+          "returns": "ShiftLeaderRule | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "leaderConstraints",
+          "params": [
+            "shiftIdsOf"
+          ],
+          "returns": "ShiftLeaderConstraint[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addLeader",
+          "params": [
+            "ruleKey",
+            "staffId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeLeader",
+          "params": [
+            "ruleKey",
+            "staffId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeStaff",
+          "params": [
+            "staffId"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "addRule",
+          "params": [
+            "rule"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeRule",
+          "params": [
+            "ruleKey"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "setRuleShift",
+          "params": [
+            "ruleKey",
+            "shiftName"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "setRuleLabel",
+          "params": [
+            "ruleKey",
+            "label"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "setRuleMinCount",
+          "params": [
+            "ruleKey",
+            "minCount"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ConstraintSetPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "ConstraintViolation",
       "file": "schedule/ConstraintViolation.ts",
       "kind": "value",
@@ -368,6 +613,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
+          "name": "constraintSetId",
+          "type": "string",
+          "optional": false
+        },
+        {
           "name": "assignments",
           "type": "ShiftAssignment[]",
           "optional": false
@@ -384,6 +634,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "year",
         "month",
         "workingStaffGroupId",
+        "constraintSetId",
         "assignments",
         "index",
         "requiredStaffing"
@@ -876,198 +1127,6 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "ScheduleCandidates",
-          "isStatic": true,
-          "returnsSelf": true
-        }
-      ]
-    },
-    {
-      "name": "ScheduleConstraints",
-      "file": "schedule/ScheduleConstraints.ts",
-      "kind": "aggregate",
-      "fields": [
-        {
-          "name": "scheduleId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "leaderRules",
-          "type": "ShiftLeaderRule[]",
-          "optional": false
-        },
-        {
-          "name": "maxConsecutiveWorkdays",
-          "type": "number",
-          "optional": true
-        },
-        {
-          "name": "checkShiftWish",
-          "type": "boolean",
-          "optional": true
-        },
-        {
-          "name": "minMonthlyDayOff",
-          "type": "number",
-          "optional": true
-        },
-        {
-          "name": "maxDayOffPerDay",
-          "type": "number",
-          "optional": true
-        },
-        {
-          "name": "linkedReportIds",
-          "type": "string[]",
-          "optional": true
-        }
-      ],
-      "getters": [
-        "id",
-        "scheduleId",
-        "maxConsecutiveWorkdays",
-        "checkShiftWish",
-        "minMonthlyDayOff",
-        "maxDayOffPerDay",
-        "linkedReportIds",
-        "leaderRules"
-      ],
-      "methods": [
-        {
-          "name": "linkReport",
-          "params": [
-            "reportId"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "unlinkReport",
-          "params": [
-            "reportId"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "modelConstraints",
-          "params": [
-            "shiftIdsOf"
-          ],
-          "returns": "ScheduleConstraint[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "leaderRule",
-          "params": [
-            "key"
-          ],
-          "returns": "ShiftLeaderRule | undefined",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "leaderConstraints",
-          "params": [
-            "shiftIdsOf"
-          ],
-          "returns": "ShiftLeaderConstraint[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "addLeader",
-          "params": [
-            "ruleKey",
-            "staffId"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "removeLeader",
-          "params": [
-            "ruleKey",
-            "staffId"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "removeStaff",
-          "params": [
-            "staffId"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "addRule",
-          "params": [
-            "rule"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "removeRule",
-          "params": [
-            "ruleKey"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "setRuleShift",
-          "params": [
-            "ruleKey",
-            "shiftName"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "setRuleLabel",
-          "params": [
-            "ruleKey",
-            "label"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "setRuleMinCount",
-          "params": [
-            "ruleKey",
-            "minCount"
-          ],
-          "returns": "ScheduleConstraints",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "toPlain",
-          "params": [],
-          "returns": "ScheduleConstraintsPlain",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "fromPlain",
-          "params": [
-            "plain"
-          ],
-          "returns": "ScheduleConstraints",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2359,6 +2418,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "ConstraintSet",
+      "to": "ShiftLeaderRule",
+      "kind": "contains",
+      "via": "leaderRules",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ConstraintViolation",
       "to": "WorkingDay",
       "kind": "contains",
@@ -2392,6 +2459,14 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "MonthlyStaffSchedule",
+      "to": "ConstraintSet",
+      "kind": "references",
+      "via": "constraintSetId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
       "to": "RequiredStaffing",
       "kind": "contains",
       "via": "requiredStaffing",
@@ -2408,22 +2483,6 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "ScheduleCandidates",
-      "to": "MonthlyStaffSchedule",
-      "kind": "references",
-      "via": "scheduleId",
-      "many": false,
-      "foundBy": "id-naming"
-    },
-    {
-      "from": "ScheduleConstraints",
-      "to": "ShiftLeaderRule",
-      "kind": "contains",
-      "via": "leaderRules",
-      "many": true,
-      "foundBy": "type"
-    },
-    {
-      "from": "ScheduleConstraints",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
       "via": "scheduleId",
@@ -2531,8 +2590,8 @@ export const MODEL_GRAPH: ModelGraph = {
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
+      "ConstraintSet.linkedReportIds",
       "MonthlyStaffSchedule.storeId",
-      "ScheduleConstraints.linkedReportIds",
       "ScheduleEditEntry.rejectedSuggestionId",
       "ScheduleEditEntry.suggestionId",
       "ScheduleReport.storeId",

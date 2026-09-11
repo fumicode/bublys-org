@@ -5,7 +5,7 @@ import styled from "styled-components";
 import {
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleConstraints,
+  ConstraintSet,
   StaffMonthlyShiftWish,
   WorkingDay,
   type ShiftCell,
@@ -18,7 +18,7 @@ import { recordSetCell } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
@@ -43,8 +43,8 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey 
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む。名前横のバッジに使う
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);

@@ -7,7 +7,7 @@
 import {
   WorkingStaffGroup,
   MonthlyStaffSchedule,
-  ScheduleConstraints,
+  ConstraintSet,
   ShiftLeaderRule,
   WorkingDay,
   Staff,
@@ -15,7 +15,7 @@ import {
 import { buildMembershipChange } from './membershipChange.js';
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   WORKING_STAFF_GROUP_TYPE,
 } from '../objects/hotelObjects.js';
 
@@ -31,7 +31,7 @@ const setUp = () => ({
   })
     .assignShift('a', june1, 'early')
     .assignShift('b', june1, 'late'),
-  constraints: new ScheduleConstraints({
+  constraints: new ConstraintSet({
     scheduleId: 'sched-1',
     leaderRules: [
       new ShiftLeaderRule({
@@ -82,7 +82,7 @@ describe('buildMembershipChange（顔ぶれが変わったとき同じノード�
     });
 
     expect(typesOf(items).sort()).toEqual(
-      [WORKING_STAFF_GROUP_TYPE, SCHEDULE_TYPE, SCHEDULE_CONSTRAINTS_TYPE].sort()
+      [WORKING_STAFF_GROUP_TYPE, SCHEDULE_TYPE, CONSTRAINT_SET_TYPE].sort()
     );
 
     const schedule = pick<MonthlyStaffSchedule>(items, SCHEDULE_TYPE);
@@ -92,7 +92,7 @@ describe('buildMembershipChange（顔ぶれが変わったとき同じノード�
     // 残った人は無傷
     expect(schedule.getShiftIdFor('a', june1)).toBe('early');
 
-    const constraints = pick<ScheduleConstraints>(items, SCHEDULE_CONSTRAINTS_TYPE);
+    const constraints = pick<ConstraintSet>(items, CONSTRAINT_SET_TYPE);
     expect(constraints.leaderRule('early')?.leaderStaffIds).toEqual(['a']);
   });
 

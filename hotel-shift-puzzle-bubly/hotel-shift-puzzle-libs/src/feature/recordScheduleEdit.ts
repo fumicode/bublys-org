@@ -7,7 +7,7 @@
  */
 import {
   MonthlyStaffSchedule,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleEditLog,
   computeConstraintDelta,
   emptyConstraintDelta,
@@ -29,7 +29,7 @@ import {
 } from "../objects/commit.js";
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -300,11 +300,12 @@ export function recordConstraintEdit(
     schedule: MonthlyStaffSchedule | undefined;
     beforeConstraints: ScheduleConstraint[];
     afterConstraints: ScheduleConstraint[];
-    nextConstraints: ScheduleConstraints;
+    nextConstraints: ConstraintSet;
     summary: string;
   }
 ): void {
-  const scheduleId = args.nextConstraints.scheduleId;
+  // 勤務表ごとの制約セットは id が scheduleId（グローバルのテンプレートはここへ来ない）
+  const scheduleId = args.nextConstraints.id;
   const before =
     args.schedule?.checkConstraints(args.beforeConstraints) ?? [];
   const after =
@@ -330,7 +331,7 @@ export function recordConstraintEdit(
     store,
     localScopeId(SCHEDULE_TYPE, scheduleId),
     withEditLog(
-      [{ type: SCHEDULE_CONSTRAINTS_TYPE, obj: args.nextConstraints }],
+      [{ type: CONSTRAINT_SET_TYPE, obj: args.nextConstraints }],
       log
     ),
     baselineOf(args.schedule, prevLog)

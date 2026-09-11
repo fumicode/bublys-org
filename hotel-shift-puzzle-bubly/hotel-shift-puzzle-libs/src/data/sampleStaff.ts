@@ -4,7 +4,7 @@ import { Staff } from "@bublys-org/hotel-shift-puzzle-model";
  * サンプルのスタッフ一覧を生成する。
  *
  * 誰が早責/予責/夜責かはスタッフの属性ではなく勤務表側の制約なので、ここには持たせない
- * （ScheduleConstraints / data/sampleConstraints.ts が持つ）。並び順だけは責任者が上に来る
+ * （ConstraintSet / data/sampleConstraints.ts が持つ）。並び順だけは責任者が上に来る
  * ようにしてある（土屋＝夜責 → 早責3人 → …）。
  */
 export function createSampleStaffList(): Staff[] {

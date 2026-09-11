@@ -29,8 +29,8 @@ export * from './schedule/ScheduleEditLog.js';
 export * from './schedule/ShiftLeaderRule.js';
 // 責任者ルールを違反を出す制約として扱うアダプタ（未充足日を日単位の違反に）
 export * from './schedule/ShiftLeaderConstraint.js';
-// 勤務表ごとの制約集約（責任者ルールを保持。将来は他の制約も同居可）
-export * from './schedule/ScheduleConstraints.js';
+// 制約セット（勤務表が満たすべき制約をひとまとめ。グローバルのテンプレートと勤務表ごとの独自セット）
+export * from './schedule/ConstraintSet.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';

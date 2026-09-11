@@ -4,6 +4,7 @@
 export * from "./StaffCollection.js";
 export * from "./StaffDetail.js";
 export * from "./WorkShiftCollection.js";
+export * from "./ConstraintSetCollection.js";
 export * from "./ScheduleWorld.js";
 export * from "./membershipChange.js";
 export * from "./workingStaff.js";

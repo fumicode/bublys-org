@@ -19,7 +19,7 @@ type ScheduleReservationInfoDetailProps = {
  * 勤務表グリッドの予約行（日付ヘッダの上）をダブルクリックして開く。
  *
  * 予約状況は勤務表に紐づく姉妹集約 DailyReservationInfo（id=scheduleId）。まだ無ければ
- * 最初の入力時に空から作って保存する（ScheduleConstraints と同じ遅延生成パターン）。
+ * 最初の入力時に空から作って保存する（ConstraintSet と同じ遅延生成パターン）。
  * 予約は外部の実データなので勤務表の世界線には載せない（アプリ全体スコープのみ）。
  */
 export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProps> = ({

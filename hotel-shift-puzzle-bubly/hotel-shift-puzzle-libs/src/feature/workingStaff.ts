@@ -25,7 +25,7 @@ import {
   MonthlyStaffSchedule,
   WorkShift,
   WorkShiftSet,
-  ScheduleConstraints,
+  ConstraintSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   useObject,
@@ -36,7 +36,7 @@ import {
   STAFF_TYPE,
   SCHEDULE_TYPE,
   WORKSHIFT_SET_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   WORKING_STAFF_GROUP_TYPE,
 } from "../objects/hotelObjects.js";
 import { recordMembershipEdit } from "./recordScheduleEdit.js";
@@ -103,8 +103,8 @@ export function useWorkingStaff(
   // 顔ぶれと一緒に動くもの
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
 
