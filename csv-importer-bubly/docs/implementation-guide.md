@@ -111,11 +111,21 @@ CSVの内部データ（columnId → valueの辞書形式）を、**ラベル名
 | `sheet.deleteRow(rowId)` | 行を削除 | 新しいCsvSheet |
 | `sheet.updateCell(rowId, columnId, value)` | セルの値を更新 | 新しいCsvSheet |
 | `sheet.rename(name)` | シート名を変更 | 新しいCsvSheet |
-| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換 | PlaneObject \| undefined |
-| `sheet.toPlaneObjects(titleColumnId?)` | 全行をPlaneObject配列に変換 | PlaneObject[] |
+| `sheet.isEmptyRow(rowId)` | 全列が空（空白のみ含む）の行か | boolean |
+| `sheet.toPlaneObject(rowId, titleColumnId?)` | 指定行をPlaneObjectに変換。空行は undefined | PlaneObject \| undefined |
+| `sheet.toPlaneObjects(titleColumnId?)` | 中身のある行だけをPlaneObject配列に変換 | PlaneObject[] |
 | `sheet.toCsvText()` | CSV形式のテキストに変換（エクスポート用） | 文字列 |
 | `sheet.toJSON()` | 保存用のプレーンオブジェクトに変換 | CsvSheetState |
 | `CsvSheet.fromJSON(json)` | プレーンオブジェクトからCsvSheetを復元 | CsvSheet |
+
+**PlaneObject 変換のルール**
+
+- **全列が空の行はオブジェクトにしない**。表には行として残る（「+ 行を追加」直後の行など）が、
+  空文字だけのオブジェクトを他のバブリへ渡しても意味がないため変換対象から外す。
+  空白のみのセルも空とみなす
+- **名前は表示（# 列）と同じ 1 始まりの行番号**。タイトル列を指定していても、
+  そのセルが空なら行番号にフォールバックする
+- **空行を飛ばしても行番号は詰めない**。1行目と3行目だけ中身があれば名前は `"1"` と `"3"`
 
 **重要な設計原則: 不変性（イミュータビリティ）**
 
@@ -520,6 +530,26 @@ Google スプレッドシートとの双方向手動同期機能。ブラウザ�
 
 **Push処理**: 書き込み前に`clear`で既存データをクリア（行数が減った場合のゴミ防止）→ `PUT values`でRAW書き込み。
 **Pull処理**: `GET values`で2D配列を取得 → `valuesToCsvSheet`で既存シートに変換。
+
+### `src/ui/SheetEditorView.tsx` — Row / Object の切り替えとクリック規約
+
+**1段目**: シート名と `[Row｜Object]` トグル。
+**2段目**: 左が表示ごとの操作、右がシート自体への操作（「オブジェクト一覧」「エクスポート」「Sheets」「世界線」）。
+
+「オブジェクト一覧」「世界線」は `ObjectView` のチップ。**単クリックでは開かず、ダブルクリックで開く**
+（`docs/click-or-doubleclick.md`: 既に在るものを開くのはダブルクリック）。
+`objectListUrl` / `worldLineUrl` を受け取るだけで、開く処理は `ObjectView` が持つ。
+
+**Object 表示の行**（`tr.is-object`）:
+
+| 操作 | 挙動 |
+|---|---|
+| 単クリック（セル） | **何も起きない**。将来「選ぶ」が入る席（`docs/selection-and-scope.md`） |
+| ダブルクリック（行） | 詳細バブルを開く（`onOpenObject`）。`<tr>` は `ObjectView` で包めないので手で付ける |
+| ⠿ を掴んでドラッグ | `ObjectView` と同じ荷物（`type/csv-object` + url + label + object-id）に `application/json` を上乗せ |
+| hover | **泡の膜**。`ObjectView` が export する `objectFilmLook` を `tr::after` に当てる。定義は1つ |
+
+「Object」トグル（この表の見方を変える）と「オブジェクト一覧」チップ（別バブルで一覧を見る）は別物なので両方ある。
 
 ### `src/ui/GoogleSheetsPanel.tsx`
 

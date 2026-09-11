@@ -151,7 +151,7 @@ inline なので、`display: inline-flex; align-items: center;` を共有 CSS �
 |---|---|
 | 親が flex/grid で、中身が `flex: 1` や `margin-left: auto` を持っている | その指定を `className` prop でラッパへ引き上げる。中に残しても効かない |
 | 中身が縦積みだった | ラッパは `display: inline-flex`（`fullWidth` なら `flex`）。`flex-direction: column` を与えて戻す |
-| `<td>` / `<tr>` を包みたい | **包まない。** `<table>` の中に `<span>` が入るとブラウザの table fixup で表の外へ叩き出される。`<td>` の**中身**を包む |
+| `<td>` / `<tr>` を包みたい | **包まない。** `<table>` の中に `<span>` が入るとブラウザの table fixup で表の外へ叩き出される。`<td>` の**中身**を包む。**行そのものがオブジェクト**（csv-importer の Object 表示）なら `<tr>` に `draggable` / `onDoubleClick` を手で付け、膜は `objectFilmLook`（`ObjectView.tsx` が export）を `tr::after` に当てて**同じ見た目**にする。`<tr>` に `position: relative` + `::after` の絶対配置は効く |
 | 中身が `position: absolute` | 外から包むとラッパが実質0サイズになり、クリックもドラッグも拾えない。「位置を持つ枠」と「見た目」に分け、見た目のほうを包む |
 | 中身が既に `draggable` で自前のドラッグを持っている | `ObjectView` に `draggable={false}` を渡す。両方付けると `dragstart` が二重に走る |
 

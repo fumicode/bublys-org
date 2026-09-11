@@ -1,7 +1,8 @@
 'use client';
 
-import { FC, useCallback, useMemo, useState } from "react";
+import { FC, useCallback, useContext, useMemo, useState } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubblesContext, CurrentBubbleContext } from "@bublys-org/bubbles-ui";
 import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { SheetEditorView } from "../ui/SheetEditorView.js";
 import { GoogleSheetsPanel } from "../ui/GoogleSheetsPanel.js";
@@ -46,7 +47,10 @@ function getInitialSheet(sheetId: string): CsvSheet {
 export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   sheetId,
 }) => {
-  const { getSheetMeta, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } = useCsvSheets();
+  const { openBubble } = useContext(BubblesContext);
+  const currentBubbleId = useContext(CurrentBubbleContext);
+  const { getSheetMeta, setTitleColumn, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } =
+    useCsvSheets();
   const googleClientId = useGoogleClientId();
   const auth = useGoogleSheetsAuth(googleClientId);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -121,12 +125,38 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     URL.revokeObjectURL(url);
   }, [sheet]);
 
+  // 「オブジェクト一覧」「世界線」は ObjectView のチップ（ダブルクリックで開く）に URL を渡すだけ
   const objectListUrl = `csv-importer/sheets/${sheetId}/objects`;
   const worldLineUrl = `csv-importer/sheets/${sheetId}/world-line`;
+
+  const buildObjectUrl = useCallback(
+    (objectId: string) => `csv-importer/sheets/${sheetId}/objects/${objectId}`,
+    [sheetId]
+  );
+
+  // 行（＝オブジェクト）のダブルクリックで詳細を開く。<tr> は ObjectView で包めないので、
+  // ObjectView が内部でやっているのと同じ開き方をここで行う。
+  const handleOpenObject = useCallback(
+    (objectId: string) => {
+      openBubble(buildObjectUrl(objectId), currentBubbleId, "bubble-side-right");
+    },
+    [openBubble, buildObjectUrl, currentBubbleId]
+  );
+
+  const handleChangeTitleColumn = useCallback(
+    (columnId: string) => setTitleColumn(sheetId, columnId),
+    [setTitleColumn, sheetId]
+  );
 
   // --- Google Sheets Sync ---
 
   const meta = getSheetMeta(sheetId);
+
+  // 表の行と同じ並びの PlaneObject。オブジェクト表示で行に紐づけて渡す。
+  const objects = useMemo(
+    () => sheet?.toPlaneObjects(meta?.titleColumnId) ?? [],
+    [sheet, meta?.titleColumnId]
+  );
   const gsLink = meta?.googleSheets;
 
   const handleLink = useCallback(
@@ -200,6 +230,11 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onExportCsv={handleExportCsv}
       objectListUrl={objectListUrl}
       worldLineUrl={worldLineUrl}
+      objects={objects}
+      titleColumnId={meta?.titleColumnId}
+      onChangeTitleColumn={handleChangeTitleColumn}
+      onOpenObject={handleOpenObject}
+      buildObjectUrl={buildObjectUrl}
       googleSheetsPanel={
         <GoogleSheetsPanel
           isLinked={!!gsLink}

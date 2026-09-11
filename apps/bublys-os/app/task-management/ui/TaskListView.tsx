@@ -38,6 +38,7 @@ export const TaskListView: FC<TaskListViewProps> = ({
                 url={detailUrl}
                 label={task.title}
                 openingPosition="bubble-side-right"
+                draggable
                 fullWidth
                 onClick={() => onTaskClick?.(task.id)}
               >

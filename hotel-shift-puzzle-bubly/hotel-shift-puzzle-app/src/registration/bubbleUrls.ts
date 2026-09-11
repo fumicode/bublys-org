@@ -63,6 +63,16 @@ export const scheduleLeaderRuleUrl = (
   ruleKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/leader-rules/${ruleKey}`;
 
+/**
+ * 勤務間インターバルのルール可視化バブル（上部ルール行の「遅番明け」アイコンから開く）。
+ * 責任者ルールと並ぶ「ルールの図」なので、URL も leader-rules と同じ形に揃える。
+ */
+export const scheduleShiftIntervalRuleUrl = (
+  scheduleId: string,
+  ruleKey: string
+): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/shift-interval-rules/${ruleKey}`;
+
 /** 制約違反バブル（赤帯・⊿マーカーから開く） */
 export const scheduleViolationUrl = (
   scheduleId: string,

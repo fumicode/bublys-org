@@ -1,5 +1,7 @@
 import {
   MAX_CONSECUTIVE_WORKDAYS,
+  SHIFT_INTERVAL_CONSTRAINT,
+  isShiftIntervalConstraintType,
   MonthlyStaffSchedule,
   ScheduleCandidates,
   WorkingDay,
@@ -110,6 +112,15 @@ describe("作成途中の勤務表（2026年8月）", () => {
     const violations = schedule.checkConstraints(constraints);
     expect(
       violations.filter((v) => v.constraintType === MAX_CONSECUTIVE_WORKDAYS)
+    ).toEqual([]);
+  });
+
+  it("勤務間インターバルを踏んでいない（遅番の翌日に早番・中番が無い）", () => {
+    // 法律由来の制約なので、作成途中の盤面でも最初から破っていてはいけない。
+    // 自動生成ぶん（〜15日）も手で詰めたぶん（16〜22日）もまとめて見る。
+    const violations = schedule.checkConstraints(constraints);
+    expect(
+      violations.filter((v) => isShiftIntervalConstraintType(v.constraintType))
     ).toEqual([]);
   });
 
@@ -242,10 +253,15 @@ describe("終盤・詰みありの勤務表（2026年9月）", () => {
         b.blockedBy.map((v) => v.constraintType),
       ])
     );
-    // 出勤はどの勤務帯も連勤上限、休みは休み上限で塞がっている
+    // 出勤はどの勤務帯も連勤上限、休みは休み上限で塞がっている。
+    // 遅番はそれに加えて、翌29日が中番なので勤務間インターバル（遅番の翌日は早番・中番に
+    // 入れない）にも引っかかる＝塞がれている理由が2つある。
     expect(reasonTypes.get("early")).toEqual(["max-consecutive-workdays"]);
     expect(reasonTypes.get("middle")).toEqual(["max-consecutive-workdays"]);
-    expect(reasonTypes.get("late")).toEqual(["max-consecutive-workdays"]);
+    expect(reasonTypes.get("late")).toEqual([
+      "max-consecutive-workdays",
+      `${SHIFT_INTERVAL_CONSTRAINT}:late`,
+    ]);
     expect(reasonTypes.get("day-off")).toEqual(["max-day-off-per-day"]);
   });
 

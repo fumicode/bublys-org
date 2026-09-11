@@ -2,28 +2,182 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import type { SchemaProperty, FieldMapping } from "@bublys-org/object-transformer-model";
+import {
+  pathToString,
+  shapeKindLabel,
+  type SchemaField,
+  type SchemaShape,
+} from "@bublys-org/object-transformer-model";
+import type { FieldMapping } from "@bublys-org/object-transformer-model";
 
 type TargetPanelProps = {
-  schemaName: string | null;
-  properties: SchemaProperty[];
+  targetLabel: string | null;
+  targetShape: SchemaShape | null;
   mappings: FieldMapping[];
   suggestions: FieldMapping[];
-  targetSampleValues: Record<string, string>;
   onDropTarget: (e: React.DragEvent) => void;
   onDragOverTarget: (e: React.DragEvent) => void;
-  onDropOnSlot: (targetProperty: string, e: React.DragEvent) => void;
+  onDropOnSlot: (targetPath: string, e: React.DragEvent) => void;
   onDragOverSlot: (e: React.DragEvent) => void;
-  onUnmapField: (targetProperty: string) => void;
-  onAcceptSuggestion: (targetProperty: string) => void;
+  onUnmapField: (targetPath: string) => void;
+  onAcceptSuggestion: (targetPath: string) => void;
+};
+
+/** リーフフィールド1つを描画（drop zone として機能） */
+const LeafFieldRow: FC<{
+  path: string;
+  field: SchemaField;
+  mapping: FieldMapping | undefined;
+  suggestion: FieldMapping | undefined;
+  onDropOnSlot: (targetPath: string, e: React.DragEvent) => void;
+  onDragOverSlot: (e: React.DragEvent) => void;
+  onUnmapField: (targetPath: string) => void;
+  onAcceptSuggestion: (targetPath: string) => void;
+}> = ({
+  path,
+  field,
+  mapping,
+  suggestion,
+  onDropOnSlot,
+  onDragOverSlot,
+  onUnmapField,
+  onAcceptSuggestion,
+}) => (
+  <div
+    className={`e-slot ${mapping ? "is-mapped" : ""}`}
+    onDrop={(e) => onDropOnSlot(path, e)}
+    onDragOver={onDragOverSlot}
+  >
+    <div className="e-slot-header">
+      <span className="e-slot-label">{field.label ?? field.name}</span>
+      <span className="e-slot-type">
+        {shapeKindLabel(field.shape)}
+        {field.required ? " *" : ""}
+      </span>
+    </div>
+    <div className="e-slot-content">
+      {mapping ? (
+        <div className="e-mapped-value">
+          <span className="e-mapped-source">{mapping.sourcePath}</span>
+          <button
+            className="e-unmap-btn"
+            onClick={() => onUnmapField(path)}
+            title="マッピングを解除"
+          >
+            ×
+          </button>
+        </div>
+      ) : suggestion ? (
+        <div className="e-suggestion">
+          <span className="e-suggestion-text">提案: {suggestion.sourcePath}</span>
+          <button
+            className="e-accept-btn"
+            onClick={() => onAcceptSuggestion(path)}
+          >
+            適用
+          </button>
+        </div>
+      ) : (
+        <div className="e-empty-slot">
+          <span className="e-drop-hint">ドロップ</span>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+/** shape を再帰的に描画する。オブジェクトは折れ込み表示、リーフは drop zone */
+const ShapeTree: FC<{
+  shape: SchemaShape;
+  prefix: readonly string[];
+  mappings: FieldMapping[];
+  suggestions: FieldMapping[];
+  onDropOnSlot: (targetPath: string, e: React.DragEvent) => void;
+  onDragOverSlot: (e: React.DragEvent) => void;
+  onUnmapField: (targetPath: string) => void;
+  onAcceptSuggestion: (targetPath: string) => void;
+}> = ({
+  shape,
+  prefix,
+  mappings,
+  suggestions,
+  onDropOnSlot,
+  onDragOverSlot,
+  onUnmapField,
+  onAcceptSuggestion,
+}) => {
+  if (shape.kind !== "object") {
+    // ルートがオブジェクトでない特殊ケース。単一のリーフとして表示
+    const path = pathToString(prefix);
+    const field: SchemaField = {
+      name: prefix[prefix.length - 1] ?? "value",
+      shape,
+      required: true,
+    };
+    return (
+      <LeafFieldRow
+        path={path}
+        field={field}
+        mapping={mappings.find((m) => m.targetPath === path)}
+        suggestion={suggestions.find((s) => s.targetPath === path)}
+        onDropOnSlot={onDropOnSlot}
+        onDragOverSlot={onDragOverSlot}
+        onUnmapField={onUnmapField}
+        onAcceptSuggestion={onAcceptSuggestion}
+      />
+    );
+  }
+
+  return (
+    <div className="e-tree">
+      {shape.fields.map((field) => {
+        const nextPrefix = [...prefix, field.name];
+        const path = pathToString(nextPrefix);
+        if (field.shape.kind === "object") {
+          return (
+            <div key={path} className="e-branch">
+              <div className="e-branch-header">
+                <span className="e-branch-label">{field.label ?? field.name}</span>
+                <span className="e-branch-type">object{field.required ? " *" : ""}</span>
+              </div>
+              <div className="e-branch-body">
+                <ShapeTree
+                  shape={field.shape}
+                  prefix={nextPrefix}
+                  mappings={mappings}
+                  suggestions={suggestions}
+                  onDropOnSlot={onDropOnSlot}
+                  onDragOverSlot={onDragOverSlot}
+                  onUnmapField={onUnmapField}
+                  onAcceptSuggestion={onAcceptSuggestion}
+                />
+              </div>
+            </div>
+          );
+        }
+        return (
+          <LeafFieldRow
+            key={path}
+            path={path}
+            field={field}
+            mapping={mappings.find((m) => m.targetPath === path)}
+            suggestion={suggestions.find((s) => s.targetPath === path)}
+            onDropOnSlot={onDropOnSlot}
+            onDragOverSlot={onDragOverSlot}
+            onUnmapField={onUnmapField}
+            onAcceptSuggestion={onAcceptSuggestion}
+          />
+        );
+      })}
+    </div>
+  );
 };
 
 export const TargetPanel: FC<TargetPanelProps> = ({
-  schemaName,
-  properties,
+  targetLabel,
+  targetShape,
   mappings,
   suggestions,
-  targetSampleValues,
   onDropTarget,
   onDragOverTarget,
   onDropOnSlot,
@@ -31,7 +185,7 @@ export const TargetPanel: FC<TargetPanelProps> = ({
   onUnmapField,
   onAcceptSuggestion,
 }) => {
-  if (!schemaName) {
+  if (!targetShape || targetLabel === null) {
     return (
       <StyledTargetPanel>
         <div
@@ -39,24 +193,16 @@ export const TargetPanel: FC<TargetPanelProps> = ({
           onDrop={onDropTarget}
           onDragOver={onDragOverTarget}
         >
-          <p className="e-dropzone-text">
-            ドメインオブジェクトをここにドロップ
-          </p>
+          <p className="e-dropzone-text">ドメインオブジェクトをここにドロップ</p>
         </div>
       </StyledTargetPanel>
     );
   }
 
-  const getMappingForTarget = (propName: string) =>
-    mappings.find((m) => m.targetProperty === propName);
-
-  const getSuggestionForTarget = (propName: string) =>
-    suggestions.find((s) => s.targetProperty === propName);
-
   return (
     <StyledTargetPanel>
       <div className="e-header">
-        <h4 className="e-title">{schemaName}</h4>
+        <h4 className="e-title">{targetLabel}</h4>
         <div
           className="e-dropzone-mini"
           onDrop={onDropTarget}
@@ -65,68 +211,16 @@ export const TargetPanel: FC<TargetPanelProps> = ({
           変更
         </div>
       </div>
-      <ul className="e-slots">
-        {properties.map((prop) => {
-          const mapping = getMappingForTarget(prop.name);
-          const suggestion = getSuggestionForTarget(prop.name);
-          const sampleValue = targetSampleValues[prop.name];
-
-          return (
-            <li
-              key={prop.name}
-              className={`e-slot ${mapping ? "is-mapped" : ""}`}
-              onDrop={(e) => onDropOnSlot(prop.name, e)}
-              onDragOver={onDragOverSlot}
-            >
-              <div className="e-slot-header">
-                <span className="e-slot-label">
-                  {prop.label ?? prop.name}
-                </span>
-                <span className="e-slot-type">
-                  {prop.type}
-                  {prop.required ? " *" : ""}
-                </span>
-              </div>
-
-              <div className="e-slot-content">
-                {mapping ? (
-                  <div className="e-mapped-value">
-                    <span className="e-mapped-source">
-                      {mapping.sourceKey}
-                    </span>
-                    <button
-                      className="e-unmap-btn"
-                      onClick={() => onUnmapField(prop.name)}
-                      title="マッピングを解除"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : suggestion ? (
-                  <div className="e-suggestion">
-                    <span className="e-suggestion-text">
-                      提案: {suggestion.sourceKey}
-                    </span>
-                    <button
-                      className="e-accept-btn"
-                      onClick={() => onAcceptSuggestion(prop.name)}
-                    >
-                      適用
-                    </button>
-                  </div>
-                ) : (
-                  <div className="e-empty-slot">
-                    {sampleValue && (
-                      <span className="e-sample-value">{sampleValue}</span>
-                    )}
-                    <span className="e-drop-hint">ドロップ</span>
-                  </div>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <ShapeTree
+        shape={targetShape}
+        prefix={[]}
+        mappings={mappings}
+        suggestions={suggestions}
+        onDropOnSlot={onDropOnSlot}
+        onDragOverSlot={onDragOverSlot}
+        onUnmapField={onUnmapField}
+        onAcceptSuggestion={onAcceptSuggestion}
+      />
     </StyledTargetPanel>
   );
 };
@@ -181,17 +275,44 @@ const StyledTargetPanel = styled.div`
     }
   }
 
-  .e-slots {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  .e-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .e-branch {
+    border-left: 2px solid #d0e3ff;
+    padding-left: 8px;
+    margin-bottom: 4px;
+  }
+
+  .e-branch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .e-branch-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9em;
+  }
+
+  .e-branch-type {
+    font-size: 0.75em;
+    color: #999;
+  }
+
+  .e-branch-body {
+    padding-left: 4px;
   }
 
   .e-slot {
     padding: 8px 10px;
     border: 1px solid #eee;
     border-radius: 6px;
-    margin-bottom: 4px;
     transition: border-color 0.2s, background-color 0.15s;
 
     &:hover {
@@ -288,12 +409,6 @@ const StyledTargetPanel = styled.div`
     align-items: center;
     gap: 8px;
     min-height: 24px;
-  }
-
-  .e-sample-value {
-    font-size: 0.8em;
-    color: #ccc;
-    font-style: italic;
   }
 
   .e-drop-hint {

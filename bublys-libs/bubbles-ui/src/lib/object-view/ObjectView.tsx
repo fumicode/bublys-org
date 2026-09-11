@@ -1,5 +1,5 @@
 import { ComponentPropsWithoutRef, FC, ReactNode, useCallback, useContext } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { UrledPlace } from '../components/UrledPlace.js';
 import { DragDataType, setDragPayload } from '../utils/drag-types.js';
 import {
@@ -236,6 +236,48 @@ export const ObjectView: FC<ObjectViewProps> = ({
  * - 丸みは `--object-view-film-radius` で使う側が変えられる（既定 12px）。
  *   ekikyo の円形タイルは 50% を指定している。
  */
+/**
+ * 泡の膜の「見た目」だけを切り出したもの。
+ *
+ * ObjectView の ::after が使うのと同じ定義を、ObjectView で包めない要素
+ * （例: 表の <tr>。span で包むと table fixup で表の外へ叩き出される）にも
+ * 当てられるように export している。「膜が出る ＝ 掴める・開ける」という合図を
+ * 1つの定義に保つため、色や影をコピーせずこれを使うこと。
+ *
+ * 使う側は ::after に `content: ''; position: absolute; inset; z-index;
+ * pointer-events: none;` と、出し入れの opacity / transform を自分で持つ。
+ */
+export const objectFilmLook = css`
+  border-radius: var(--object-view-film-radius, 12px);
+  background:
+    /* 左上の光沢。シャボン玉の反射 */
+    radial-gradient(
+      115% 85% at 22% 16%,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0) 58%
+    ),
+    /* 右下のほのかな色だまり */
+    radial-gradient(
+      90% 70% at 82% 88%,
+      rgba(255, 228, 246, 0.5) 0%,
+      rgba(255, 228, 246, 0) 60%
+    ),
+    /* 膜そのもの。桃 → 藤 → 水 → 若草 */
+    linear-gradient(
+      135deg,
+      rgba(255, 158, 214, 0.44) 0%,
+      rgba(190, 173, 255, 0.4) 34%,
+      rgba(138, 219, 255, 0.36) 66%,
+      rgba(178, 255, 231, 0.34) 100%
+    );
+  box-shadow:
+    /* 膜のふち */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1px 6px rgba(255, 255, 255, 0.5),
+    /* わずかに浮いて見せる */
+    0 2px 12px rgba(122, 138, 214, 0.18);
+`;
+
 const ObjectSurface = styled.span<ComponentPropsWithoutRef<'span'>>`
   position: relative;
   /* 膜を必ず中身より前に出す。子が z-index を持っていても勝てるよう文脈を作る */
@@ -246,42 +288,13 @@ const ObjectSurface = styled.span<ComponentPropsWithoutRef<'span'>>`
     position: absolute;
     /* 中身より一回り大きく張り出させる ＝「泡に包まれた」感じ */
     inset: -4px;
-    border-radius: var(--object-view-film-radius, 12px);
     z-index: 1;
     /* 膜は見えるだけ。クリックもドラッグも透かして中身に届かせる */
     pointer-events: none;
     opacity: 0;
     transform: scale(0.97);
     transition: opacity 160ms ease-out, transform 160ms ease-out;
-
-    background:
-      /* 左上の光沢。シャボン玉の反射 */
-      radial-gradient(
-        115% 85% at 22% 16%,
-        rgba(255, 255, 255, 0.6) 0%,
-        rgba(255, 255, 255, 0) 58%
-      ),
-      /* 右下のほのかな色だまり */
-      radial-gradient(
-        90% 70% at 82% 88%,
-        rgba(255, 228, 246, 0.5) 0%,
-        rgba(255, 228, 246, 0) 60%
-      ),
-      /* 膜そのもの。桃 → 藤 → 水 → 若草 */
-      linear-gradient(
-        135deg,
-        rgba(255, 158, 214, 0.44) 0%,
-        rgba(190, 173, 255, 0.4) 34%,
-        rgba(138, 219, 255, 0.36) 66%,
-        rgba(178, 255, 231, 0.34) 100%
-      );
-
-    box-shadow:
-      /* 膜のふち */
-      inset 0 0 0 1px rgba(255, 255, 255, 0.6),
-      inset 0 1px 6px rgba(255, 255, 255, 0.5),
-      /* わずかに浮いて見せる */
-      0 2px 12px rgba(122, 138, 214, 0.18);
+    ${objectFilmLook}
   }
 
   &[data-film='on']:hover::after,

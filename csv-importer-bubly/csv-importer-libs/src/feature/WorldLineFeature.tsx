@@ -1,60 +1,62 @@
 "use client";
 
-import { FC, useCallback } from "react";
+import { FC, useMemo } from "react";
 import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { removeBubble } from "@bublys-org/bubbles-ui";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { WorldLineView } from "../ui/WorldLineView.js";
+import {
+  WorldLineScopeView,
+  useScopeNodeSummaries,
+  moveToSiblingBranch,
+} from "@bublys-org/bubbles-ui";
 import { sheetScopeId } from "./CsvSheetProvider.js";
 
 export type WorldLineFeatureProps = {
   sheetId: string;
+  /** route から渡ってくる。共通ビューはバブルを閉じないので今は使わない。 */
   bubbleId?: string;
 };
 
+/** 各ノードの要約 = その時点の表の大きさ */
+const formatSize = (obj: unknown): string => {
+  const sheet = obj as CsvSheet;
+  return `${sheet.columns.length}列 ${sheet.rows.length}行`;
+};
+
 /**
- * 世界線ビュー — シートの世界線グラフを表示し、任意のノードに移動できる
- * 別バブルとしてpopChildで開かれることを想定
+ * 世界線ビュー — シートの世界線グラフを共通の {@link WorldLineScopeView}
+ * （canvas: 左→右・分岐は下・横魚眼・自前スクロール）で表示する。
+ *
+ * ノードクリックでその世界へ移動（既定の scope.moveTo）。
+ * ← 親 / → 子 / ↑↓ 兄弟。nameable で選択中の世界に名前をつけられる。
  */
-export const WorldLineFeature: FC<WorldLineFeatureProps> = ({ sheetId, bubbleId }) => {
-  const dispatch = useAppDispatch();
+export const WorldLineFeature: FC<WorldLineFeatureProps> = ({ sheetId }) => {
   const scope = useCasScope(sheetScopeId(sheetId));
+  const getNodeSummary = useScopeNodeSummaries(scope, "csv-sheet", sheetId, formatSize);
 
-  const handleSelectNode = useCallback(
-    (nodeId: string) => {
-      scope.moveTo(nodeId);
-    },
-    [scope]
+  const keyBindings = useMemo(
+    () => [
+      { key: "ArrowLeft", run: scope.moveBack },
+      { key: "ArrowRight", run: scope.moveForward },
+      { key: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
+      { key: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
+    ],
+    [scope],
   );
 
-  // ダブルクリック: ノード選択 + バブルを閉じる
-  const handleSelectNodeAndClose = useCallback(
-    (nodeId: string) => {
-      scope.moveTo(nodeId);
-      if (bubbleId) {
-        dispatch(removeBubble(bubbleId));
-      }
-    },
-    [scope, dispatch, bubbleId]
-  );
-
-  // 各ノードのサマリー
-  const renderNodeSummary = useCallback(
-    (nodeId: string): string => {
-      const sheet = scope.getObjectAt<CsvSheet>(nodeId, "csv-sheet", sheetId);
-      if (!sheet) return "";
-      return `${sheet.columns.length}列 ${sheet.rows.length}行`;
-    },
-    [scope, sheetId]
-  );
+  if (!scope.graph.state.rootNodeId) {
+    return (
+      <div style={{ padding: 24, color: "#888", fontSize: "0.85em" }}>
+        履歴がありません。シートを編集すると記録されます。
+      </div>
+    );
+  }
 
   return (
-    <WorldLineView
-      graph={scope.graph}
-      onSelectNode={handleSelectNode}
-      onSelectNodeAndClose={handleSelectNodeAndClose}
-      renderNodeSummary={renderNodeSummary}
+    <WorldLineScopeView
+      scope={scope}
+      getNodeSummary={getNodeSummary}
+      keyBindings={keyBindings}
+      nameable
     />
   );
 };

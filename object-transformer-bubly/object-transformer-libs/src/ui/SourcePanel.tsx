@@ -2,24 +2,32 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import type { PlaneObjectLike } from "@bublys-org/object-transformer-model";
+import type { SourceLeaf } from "@bublys-org/object-transformer-model";
 
 type SourcePanelProps = {
-  sourceObject: PlaneObjectLike | null;
-  mappedSourceKeys: string[];
+  sourceLabel: string | null;
+  sourceLeaves: SourceLeaf[];
+  mappedSourcePaths: string[];
   onDropSource: (e: React.DragEvent) => void;
   onDragOverSource: (e: React.DragEvent) => void;
-  onDragStartField: (sourceKey: string, e: React.DragEvent) => void;
+  onDragStartField: (sourcePath: string, e: React.DragEvent) => void;
+};
+
+const formatSample = (value: unknown): string => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value) || "—";
 };
 
 export const SourcePanel: FC<SourcePanelProps> = ({
-  sourceObject,
-  mappedSourceKeys,
+  sourceLabel,
+  sourceLeaves,
+  mappedSourcePaths,
   onDropSource,
   onDragOverSource,
   onDragStartField,
 }) => {
-  if (!sourceObject) {
+  if (sourceLabel === null) {
     return (
       <StyledSourcePanel>
         <div
@@ -27,22 +35,16 @@ export const SourcePanel: FC<SourcePanelProps> = ({
           onDrop={onDropSource}
           onDragOver={onDragOverSource}
         >
-          <p className="e-dropzone-text">
-            PlaneObjectをここにドロップ
-          </p>
+          <p className="e-dropzone-text">ソースオブジェクトをここにドロップ</p>
         </div>
       </StyledSourcePanel>
     );
   }
 
-  const entries = Object.entries(sourceObject).filter(
-    ([key]) => key !== "id" && key !== "name"
-  );
-
   return (
     <StyledSourcePanel>
       <div className="e-header">
-        <h4 className="e-title">{sourceObject.name}</h4>
+        <h4 className="e-title">{sourceLabel}</h4>
         <div
           className="e-dropzone-mini"
           onDrop={onDropSource}
@@ -52,17 +54,17 @@ export const SourcePanel: FC<SourcePanelProps> = ({
         </div>
       </div>
       <ul className="e-fields">
-        {entries.map(([key, value]) => {
-          const isMapped = mappedSourceKeys.includes(key);
+        {sourceLeaves.map(({ path, label, sampleValue }) => {
+          const isMapped = mappedSourcePaths.includes(path);
           return (
             <li
-              key={key}
+              key={path}
               className={`e-field ${isMapped ? "is-mapped" : ""}`}
               draggable={!isMapped}
-              onDragStart={(e) => onDragStartField(key, e)}
+              onDragStart={(e) => onDragStartField(path, e)}
             >
-              <span className="e-field-key">{key}</span>
-              <span className="e-field-value">{value || "—"}</span>
+              <span className="e-field-key">{label ?? path}</span>
+              <span className="e-field-value">{formatSample(sampleValue)}</span>
               {isMapped && <span className="e-mapped-badge">mapped</span>}
             </li>
           );
