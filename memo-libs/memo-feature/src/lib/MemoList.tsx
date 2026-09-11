@@ -6,6 +6,7 @@ import { Button, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
+import { ObjectView } from '@bublys-org/bubbles-ui';
 
 type MemoListProps = {
   onSelectMemo: (memoId: string) => void;
@@ -18,15 +19,21 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
   return (
     <div>
       <StyledMemoList>
-        {memos.map((memo) => (
+        {memos.map((memo) => {
+          const firstBlockContent = memo.blocks[memo.lines[0]]?.content ?? '';
+          const label = firstBlockContent.slice(0, 40) || 'メモ';
+          return (
           <li key={memo.id} className="e-item">
-            <button
-              style={{ all: 'unset', cursor: 'pointer' }}
+            <ObjectView
+              type="Memo"
+              url={`memos/${memo.id}`}
+              label={label}
+              draggable
               onClick={() => onSelectMemo(memo.id)}
             >
               <ArticleOutlinedIcon />
-              <span>「{memo.blocks[memo.lines[0]]?.content}...」</span>
-            </button>
+              <span>「{firstBlockContent}...」</span>
+            </ObjectView>
             <span className="e-button-group">
               <IconButton
                 size="small"
@@ -46,7 +53,8 @@ export function MemoList({ onSelectMemo }: MemoListProps) {
               </IconButton>
             </span>
           </li>
-        ))}
+          );
+        })}
       </StyledMemoList>
       <div>
         <Button

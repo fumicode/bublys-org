@@ -9,10 +9,13 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*.ts"],
-  "references": [],
+  "references": [
+    { "path": "../../bublys-libs/domain-registry/tsconfig.lib.json" }
+  ],
   "exclude": [
     "jest.config.ts",
     "jest.config.cts",

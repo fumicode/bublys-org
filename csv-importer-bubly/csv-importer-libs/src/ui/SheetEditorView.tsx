@@ -1,8 +1,9 @@
 'use client';
 
-import { FC, ReactNode, useState, useRef, useEffect, useCallback } from "react";
+import { FC, ReactNode, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import styled from "styled-components";
-import type { CsvColumnState, CsvRowState } from "@bublys-org/csv-importer-model";
+import { setDragPayload, getDragType } from "@bublys-org/bubbles-ui";
+import type { CsvColumnState, CsvRowState, PlaneObject } from "@bublys-org/csv-importer-model";
 
 type SheetEditorViewProps = {
   sheetName: string;
@@ -14,7 +15,15 @@ type SheetEditorViewProps = {
   onDeleteRow: (rowId: string) => void;
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
-  onOpenObjects?: () => void;
+  /** オブジェクト表示で使う。行 → PlaneObject（行と同じ並び）。 */
+  objects?: PlaneObject[];
+  /** どの列を「名前」にするか。オブジェクト表示でそのセルを強調する。 */
+  titleColumnId?: string;
+  onChangeTitleColumn?: (columnId: string) => void;
+  /** オブジェクト表示で行をクリックしたとき（詳細を開く）。 */
+  onSelectObject?: (objectId: string) => void;
+  /** 行 → ドラッグで渡す URL。 */
+  buildObjectUrl?: (objectId: string) => string;
   onOpenWorldLine?: () => void;
   onExportCsv?: () => void;
   googleSheetsPanel?: ReactNode;
@@ -39,7 +48,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteRow,
   onAddColumn,
   onDeleteColumn,
-  onOpenObjects,
+  objects,
+  titleColumnId,
+  onChangeTitleColumn,
+  onSelectObject,
+  buildObjectUrl,
   onOpenWorldLine,
   onExportCsv,
   googleSheetsPanel,
@@ -48,6 +61,16 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   const [editingHeader, setEditingHeader] = useState<EditingHeader | null>(null);
   const [editValue, setEditValue] = useState("");
   const [showSheetsPanel, setShowSheetsPanel] = useState(false);
+  // 表 ⇄ オブジェクト の表示切り替え。骨格（列・行・セル位置）は共通で、
+  // 行の「意味」（掴めるオブジェクトかどうか）だけが変わる。
+  const [isObjectMode, setIsObjectMode] = useState(false);
+  const canShowObjects = !!objects && !!buildObjectUrl;
+  // 空行は PlaneObject にならないので、行との対応は添字ではなく id で引く。
+  const objectByRowId = useMemo(
+    () => new Map((objects ?? []).map((o) => [String(o.id), o])),
+    [objects]
+  );
+  const objectMode = isObjectMode && canShowObjects;
   const inputRef = useRef<HTMLInputElement>(null);
 
   const commitEditing = useCallback(() => {
@@ -130,14 +153,54 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 
   return (
     <StyledEditor>
+      {/* 1段目 = このシートは何か（名前）と、どう見るか（表示の切り替え）。 */}
       <div className="e-header">
         <h3 className="e-title">{sheetName}</h3>
-        <div className="e-header-actions">
-          {onOpenObjects && (
-            <button className="e-objects-btn" onClick={onOpenObjects}>
-              オブジェクト
+        {canShowObjects && (
+          <div
+            className="e-view-switch"
+            role="group"
+            aria-label="行の見方"
+            data-mode={objectMode ? "object" : "row"}
+          >
+            <span className="e-switch-knob" aria-hidden="true" />
+            <button
+              className={!objectMode ? "is-on" : ""}
+              onClick={() => setIsObjectMode(false)}
+              aria-pressed={!objectMode}
+              title="表の行として編集する"
+            >
+              Row
             </button>
+            <button
+              className={objectMode ? "is-on" : ""}
+              onClick={() => setIsObjectMode(true)}
+              aria-pressed={objectMode}
+              title="掴んで渡せるオブジェクトとして扱う"
+            >
+              Object
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 2段目 = 左が表示ごとの操作、右がこのシート自体への操作（常に同じ位置）。
+          表示に関わらず必ず1行あるので、切り替えても表が上下に動かない。 */}
+      <div className="e-subbar">
+        <div className="e-subbar-left">
+          {objectMode ? (
+            <>
+              {onChangeTitleColumn && (
+                <span className="e-object-hint">
+                  見出しをクリックすると名前にする列を選べます
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="e-table-hint">セルをクリックして編集</span>
           )}
+        </div>
+        <div className="e-subbar-right">
           {onExportCsv && (
             <button className="e-export-btn" onClick={onExportCsv}>
               エクスポート
@@ -165,9 +228,47 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
         <table className="e-table">
           <thead>
             <tr>
-              <th className="e-row-num">#</th>
+              <th
+                className={`e-row-num ${
+                  objectMode && !titleColumnId ? "is-title" : ""
+                } ${objectMode && onChangeTitleColumn ? "is-pickable" : ""}`}
+                onClick={
+                  objectMode && onChangeTitleColumn
+                    ? () => onChangeTitleColumn("")
+                    : undefined
+                }
+                title={objectMode ? "行番号を名前にする" : undefined}
+              >
+                <span className="e-row-num-inner">
+                  <span className="e-drag-handle" style={{ visibility: "hidden" }} aria-hidden>
+                    ⠿
+                  </span>
+                  <span className="e-row-index">行番号</span>
+                </span>
+              </th>
               {columns.map((col) => (
-                <th key={col.id} className="e-header-cell">
+                <th
+                  key={col.id}
+                  className={`e-header-cell ${
+                    objectMode && titleColumnId === col.id ? "is-title" : ""
+                  } ${
+                    editingHeader?.columnId === col.id ? "" : "is-clickable"
+                  } ${objectMode && onChangeTitleColumn ? "is-pickable" : ""}`}
+                  /* 当たり判定は本文のセルと同じくセル全体。span に付けると
+                     文字の高さ分しか当たらない。 */
+                  onClick={
+                    editingHeader?.columnId === col.id
+                      ? undefined
+                      : objectMode
+                      ? () => onChangeTitleColumn?.(col.id)
+                      : () => handleHeaderClick(col.id, col.name)
+                  }
+                  title={
+                    objectMode
+                      ? `${col.name} を名前にする`
+                      : "クリックで列名を変更"
+                  }
+                >
                   {editingHeader?.columnId === col.id ? (
                     <input
                       ref={inputRef}
@@ -179,16 +280,19 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                     />
                   ) : (
                     <div className="e-header-content">
-                      <span
-                        className="e-header-name"
-                        onClick={() => handleHeaderClick(col.id, col.name)}
-                      >
-                        {col.name}
-                      </span>
+                      {/* Object 表示では本文と同じく「編集しない」で揃える。
+                          見出しのクリックは改名ではなく、この列を名前にする操作。
+                          クリックは th 側で受ける（当たり判定をセル全体にするため）。 */}
+                      <span className="e-header-name">{col.name}</span>
                       <button
                         className="e-delete-col"
-                        onClick={() => onDeleteColumn(col.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteColumn(col.id);
+                        }}
                         title="列を削除"
+                        style={objectMode ? { visibility: "hidden" } : undefined}
+                        tabIndex={objectMode ? -1 : undefined}
                       >
                         ×
                       </button>
@@ -197,21 +301,68 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                 </th>
               ))}
               <th className="e-add-col">
-                <button onClick={handleAddColumn} title="列を追加">+</button>
+                <button
+                  onClick={handleAddColumn}
+                  title="列を追加"
+                  style={objectMode ? { visibility: "hidden" } : undefined}
+                  tabIndex={objectMode ? -1 : undefined}
+                >
+                  +
+                </button>
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, rowIdx) => (
-              <tr key={row.id}>
-                <td className="e-row-num">{rowIdx + 1}</td>
+            {rows.map((row, rowIdx) => {
+              const obj = objectByRowId.get(row.id);
+              // 全列が空の行はまだオブジェクトではない。行は残すが掴めない。
+              const isObjectRow = objectMode && !!obj;
+              return (
+              <tr
+                key={row.id}
+                className={isObjectRow ? "is-object" : ""}
+                draggable={isObjectRow}
+                onDragStart={
+                  isObjectRow && obj && buildObjectUrl
+                    ? (e) => {
+                        // ObjectView と同じ規約: 型つきドラッグ + application/json で実データも運ぶ
+                        setDragPayload(e, {
+                          type: getDragType("CsvObject"),
+                          url: buildObjectUrl(row.id),
+                          label: String(obj.name),
+                          objectId: row.id,
+                        });
+                        e.dataTransfer.setData("application/json", JSON.stringify(obj));
+                      }
+                    : undefined
+                }
+              >
+                <td className="e-row-num">
+                  {/* 行番号は位置の目印なので常に出す。つまみは掴めないときも
+                      visibility: hidden で場所だけ確保し、番号が動かないようにする。 */}
+                  <span className="e-row-num-inner">
+                    <span
+                      className="e-drag-handle"
+                      title="ドラッグして他のバブリへ渡す"
+                      style={isObjectRow ? undefined : { visibility: "hidden" }}
+                      aria-hidden={!isObjectRow}
+                    >
+                      ⠿
+                    </span>
+                    <span className="e-row-index">{rowIdx + 1}</span>
+                  </span>
+                </td>
                 {columns.map((col) => {
                   const value = row.cells[col.id] ?? "";
                   const isEditing =
                     editingCell?.rowId === row.id &&
                     editingCell?.columnId === col.id;
+                  const isTitle = isObjectRow && titleColumnId === col.id;
                   return (
-                    <td key={col.id} className="e-cell">
+                    <td
+                      key={col.id}
+                      className={`e-cell ${isTitle ? "is-title" : ""}`}
+                    >
                       {isEditing ? (
                         <input
                           ref={inputRef}
@@ -224,7 +375,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                       ) : (
                         <div
                           className="e-cell-value"
-                          onClick={() => handleCellClick(row.id, col.id, value)}
+                          onClick={() =>
+                            objectMode
+                              ? isObjectRow && onSelectObject?.(row.id)
+                              : handleCellClick(row.id, col.id, value)
+                          }
                         >
                           {value || "\u00A0"}
                         </div>
@@ -237,12 +392,15 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                     className="e-delete-row"
                     onClick={() => onDeleteRow(row.id)}
                     title="行を削除"
+                    style={objectMode ? { visibility: "hidden" } : undefined}
+                    tabIndex={objectMode ? -1 : undefined}
                   >
                     ×
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -257,6 +415,10 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
 };
 
 const StyledEditor = styled.div`
+  /* 「これが名前」を示す色。ラベル行とオブジェクト行で必ず同じにする。
+     冠の金（#c9962b）と同じ暖色系で、文字として読める濃さに寄せた朱橙。 */
+  --name-color: #b3540c;
+
   .e-header {
     display: flex;
     align-items: center;
@@ -273,20 +435,125 @@ const StyledEditor = styled.div`
     gap: 8px;
   }
 
-  .e-objects-btn {
-    padding: 4px 12px;
+  /* Row ⇄ Object のトグル。つまみが滑って「いまどちら側か」を示す。 */
+  .e-view-switch {
+    position: relative;
+    display: inline-flex;
+    padding: 2px;
     border: 1px solid #ce93d8;
-    border-radius: 4px;
-    background: #f3e5f5;
-    color: #7b1fa2;
-    cursor: pointer;
-    font-size: 0.8em;
-    white-space: nowrap;
+    border-radius: 999px;
+    background: #f7effa;
+    flex: none;
 
-    &:hover {
-      background: #e1bee7;
+    .e-switch-knob {
+      position: absolute;
+      top: 2px;
+      bottom: 2px;
+      left: 2px;
+      width: calc(50% - 2px);
+      border-radius: 999px;
+      background: #7b1fa2;
+      transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    &[data-mode="object"] .e-switch-knob {
+      transform: translateX(100%);
+    }
+
+    button {
+      position: relative;
+      z-index: 1;
+      flex: 1 1 0;
+      min-width: 62px;
+      padding: 3px 12px;
+      border: none;
+      background: none;
+      color: #7b1fa2;
+      cursor: pointer;
+      font-size: 0.8em;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      transition: color 0.18s ease;
+
+      &.is-on {
+        color: #fff;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #7b1fa2;
+        outline-offset: 2px;
+        border-radius: 999px;
+      }
     }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .e-view-switch .e-switch-knob {
+      transition: none;
+    }
+  }
+
+  /* 2段目。左＝表示ごとの操作、右＝シート自体への操作。
+     表示に関わらず必ず1行あるので、切り替えで表が上下に動かない。 */
+  .e-subbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    /* バブルは fit-content なので、この行の中身が表より広いと表ごと横に
+       伸びて列位置が動く。width: 0 + min-width: 100% にすると、親の
+       intrinsic width を決めるのは表だけになり、この行は幅いっぱいに広がる。
+       さらに高さを固定して、中身が折り返して表を下へ押すのも防ぐ。 */
+    width: 0;
+    min-width: 100%;
+    height: 28px;
+    overflow: hidden;
+  }
+
+  .e-subbar-left,
+  .e-subbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  /* 左は溢れたら切る。折り返させると行が高くなって表が下へずれる。 */
+  .e-subbar-left {
+    flex: 1 1 0;
+    overflow: hidden;
+    white-space: nowrap;
+
+    > * {
+      flex: none;
+    }
+  }
+
+  .e-subbar-right {
+    flex: none;
+  }
+
+  .e-subbar-right {
+    flex: none;
+  }
+
+  .e-object-hint {
+    min-width: 0;
+    white-space: nowrap;
+    font-size: 0.8em;
+    color: #7b1fa2;
+  }
+
+  .e-table-hint {
+    min-width: 0;
+    white-space: nowrap;
+    font-size: 0.8em;
+    color: #999;
+  }
+
 
   .e-export-btn {
     padding: 4px 12px;
@@ -338,8 +605,12 @@ const StyledEditor = styled.div`
     }
   }
 
+  /* ここに overflow を置くと「中間のスクロールコンテナ」になり、ラベル行の
+     position: sticky がこのラッパに張り付いてしまう。ラッパには高さ制限が
+     ないので縦スクロールが起きず、sticky が何も効かなくなる。
+     縦横どちらのスクロールも .e-bubble-content（overflow: auto／max-height 90vh）
+     に任せるため、ここでは overflow を持たない。 */
   .e-table-wrapper {
-    overflow-x: auto;
     border: 1px solid #ddd;
     border-radius: 4px;
   }
@@ -357,13 +628,198 @@ const StyledEditor = styled.div`
     }
 
     .e-row-num {
-      width: 40px;
-      text-align: center;
+      /* 見出しの「行番号」が入る幅。本文は数字だけだが、列幅は見出しで決まる。
+         Row / Object どちらでも同じ幅なので切り替えで列位置は動かない。 */
+      width: 64px;
+      white-space: nowrap;
       background: #f8f8f8;
       color: #999;
       font-size: 0.85em;
-      padding: 4px;
+      padding: 4px 6px;
     }
+
+    .e-row-num-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2px;
+    }
+
+    .e-row-index {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* --- オブジェクト表示 --- */
+    /* 骨格は表と共通。行の質感とタイトル列の強調だけが変わる。 */
+    /* --- 1行＝ひとつのオブジェクト --- */
+    /* 「モノ」に見せているのは分離と囲い。ただし行間を実際に空けると値が縦に
+       ずれるので、行の高さは変えずに背景の上下 3px だけ透明にした
+       グラデーションで塗る。隙間があるように見えて、値は 1px も動かない。
+       角丸はこの「隙間」があって初めて効く（隙間なしだと升目の角が丸いだけ）。 */
+    tr.is-object {
+      cursor: grab;
+
+      td {
+        background: linear-gradient(
+          to bottom,
+          transparent 0 3px,
+          #f3e8fa 3px calc(100% - 3px),
+          transparent calc(100% - 3px)
+        );
+        border-color: transparent;
+        transition: background 0.12s ease;
+      }
+
+      td:first-child {
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+      }
+
+      td:last-child {
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+      }
+
+      /* つまみ側は一段濃く塗って、掴む場所であることを示す */
+      .e-row-num {
+        background: linear-gradient(
+          to bottom,
+          transparent 0 3px,
+          #e7d3f2 3px calc(100% - 3px),
+          transparent calc(100% - 3px)
+        );
+        color: #7b1fa2;
+      }
+
+      .e-cell-value {
+        cursor: grab;
+      }
+
+      /* Row 表示の「このセルは編集できる」ハイライト（.e-cell-value:hover）を打ち消す。
+         Object 表示では 1行がひとつのモノなので、セル単位で光ると帯が途切れて見える。
+         反応は行全体（&:hover td）で返す。 */
+      .e-cell-value:hover {
+        background: none;
+      }
+
+      .e-cell.is-title .e-cell-value {
+        font-weight: bold;
+        color: var(--name-color);
+      }
+
+      &:hover td {
+        background: linear-gradient(
+          to bottom,
+          transparent 0 3px,
+          #e9d5f5 3px calc(100% - 3px),
+          transparent calc(100% - 3px)
+        );
+      }
+
+      &:hover .e-row-num {
+        background: linear-gradient(
+          to bottom,
+          transparent 0 3px,
+          #d9b6ec 3px calc(100% - 3px),
+          transparent calc(100% - 3px)
+        );
+      }
+
+      &:active {
+        cursor: grabbing;
+      }
+    }
+
+    .e-drag-handle {
+      display: inline-block;
+      line-height: 1;
+      font-size: 1em;
+      letter-spacing: -0.15em;
+      user-select: none;
+      flex: none;
+    }
+  }
+
+  /* ラベル行を固定して、その下の行だけがスクロールするようにする。
+     .e-bubble-content の padding: 16px の内側で止まるので、そのままだと
+     ラベルの上 16px に下の行が透けて流れる。表セルには margin が効かない
+     （負マージンで潰す手が使えない）ので、box-shadow で上 16px を塗る。
+     影はレイアウトに影響しないため位置は動かない。 */
+  .e-table thead th {
+    position: sticky;
+    /* .e-bubble-content の padding: 16px の内側で止まると、ラベルの上 16px に
+       下の行が透けて流れる。表セルには margin が効かないので負マージンでは
+       潰せないが、top は効くので 16px 上で止める＝コンテナの上端に密着させる。
+       上を通り過ぎた行はコンテナの overflow で切られるので隙間が生まれない。 */
+    top: -16px;
+    z-index: 2;
+    /* 行が透けないように不透明で塗る（列追加の th には背景が無いため） */
+    background: #f0f0f0;
+  }
+
+  /* Object 表示では見出し行が「名前にする列」の選択になる。
+     本文のセルが編集ではなく詳細を開くのと揃えて、見出しも改名しない。 */
+  /* 当たり判定は本文のセルと同じくセル全体。ホバーもセル全体で返す。 */
+  .e-table thead th.is-clickable {
+    cursor: pointer;
+
+    &:hover {
+      background: #e6e6e6;
+    }
+  }
+
+  .e-table thead th.is-pickable.is-clickable:hover {
+    background: #f5eef9;
+  }
+
+  /* 名前になっている列の見出しは、塗りつぶさず上の罫線に印を載せる。
+     罫線を印の地色で切って、そこに ★ が挟まっているように見せる。
+     絶対配置なのでレイアウトには影響しない（列位置は動かない）。 */
+  .e-table thead th.is-title {
+    /* 罫線の上下でそれぞれの地色。列によって見出しの地色が違うので変数にする。 */
+    --marker-outer-bg: hsla(0, 0%, 100%, 0.95);
+    --marker-cell-bg: #f0f0f0;
+
+    /* position は書かない。この th は既に sticky（＝配置済み要素）なので
+       ::before の絶対配置はこの th を基準に効く。relative を足すと
+       sticky を上書きしてラベル行が固定されなくなる。 */
+
+    .e-header-name,
+    .e-row-index {
+      color: var(--name-color);
+      font-weight: bold;
+    }
+
+    /* 冠。罫線と同じ高さ帯に収まる横長（44x12）のシルエットで、
+       台座が罫線にまたがって「この列が名前」を示す。 */
+    &::before {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      width: 46px;
+      height: 12px;
+      /* 印は罫線をまたぐので、地色も罫線で切り替える。
+         罫線より上（セルの外）は表の外側の地色、下（セルの中）は見出しの地色。
+         1色で塗ると、外にはみ出した分が見出し色の汚れとして残る。 */
+      background-color: transparent;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 12'%3E%3Cpath d='M4 10.4 L4 3.6 L10 7.6 L16 2.4 L22 7.2 L28 2.4 L34 7.6 L40 3.6 L40 10.4 Z' fill='%23c9962b'/%3E%3Ccircle cx='4' cy='2.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='16' cy='1.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='28' cy='1.6' r='1.5' fill='%23c9962b'/%3E%3Ccircle cx='40' cy='2.6' r='1.5' fill='%23c9962b'/%3E%3Crect x='4' y='8.4' width='36' height='2.6' rx='0.7' fill='%23a8781c'/%3E%3C/svg%3E"),
+        linear-gradient(
+          to bottom,
+          var(--marker-outer-bg) 0 10px,
+          var(--marker-cell-bg) 10px
+        );
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;
+    }
+  }
+
+  /* # の見出し（＝行番号を名前にする）はセルの地色が違う */
+  .e-table thead th.e-row-num.is-title {
+    --marker-cell-bg: #f8f8f8;
   }
 
   .e-header-cell {
@@ -378,14 +834,12 @@ const StyledEditor = styled.div`
     }
 
     .e-header-name {
-      cursor: pointer;
       flex: 1;
       font-weight: bold;
-
-      &:hover {
-        background: #e0e0e0;
-        border-radius: 2px;
-      }
+      /* 本文の .e-cell-value と同じ高さ。文字だけだと当たり判定が薄くなる。 */
+      min-height: 24px;
+      display: flex;
+      align-items: center;
     }
 
     .e-delete-col {
@@ -430,6 +884,7 @@ const StyledEditor = styled.div`
       cursor: text;
       min-height: 24px;
 
+      /* 「このセルは編集できる」合図。Object 表示では tr.is-object 側で打ち消す。 */
       &:hover {
         background: #f9f9f9;
       }

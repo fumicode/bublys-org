@@ -50,7 +50,8 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   bubbleId,
 }) => {
   const { openBubble } = useContext(BubblesContext);
-  const { getSheetMeta, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } = useCsvSheets();
+  const { getSheetMeta, setTitleColumn, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } =
+    useCsvSheets();
   const googleClientId = useGoogleClientId();
   const auth = useGoogleSheetsAuth(googleClientId);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -125,11 +126,24 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     URL.revokeObjectURL(url);
   }, [sheet]);
 
-  const handleOpenObjects = useCallback(() => {
-    if (bubbleId) {
-      openBubble(`csv-importer/sheets/${sheetId}/objects`, bubbleId);
-    }
-  }, [openBubble, sheetId, bubbleId]);
+  const handleSelectObject = useCallback(
+    (objectId: string) => {
+      if (bubbleId) {
+        openBubble(`csv-importer/sheets/${sheetId}/objects/${objectId}`, bubbleId);
+      }
+    },
+    [openBubble, sheetId, bubbleId]
+  );
+
+  const buildObjectUrl = useCallback(
+    (objectId: string) => `csv-importer/sheets/${sheetId}/objects/${objectId}`,
+    [sheetId]
+  );
+
+  const handleChangeTitleColumn = useCallback(
+    (columnId: string) => setTitleColumn(sheetId, columnId),
+    [setTitleColumn, sheetId]
+  );
 
   const handleOpenWorldLine = useCallback(() => {
     if (bubbleId) {
@@ -140,6 +154,12 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   // --- Google Sheets Sync ---
 
   const meta = getSheetMeta(sheetId);
+
+  // 表の行と同じ並びの PlaneObject。オブジェクト表示で行に紐づけて渡す。
+  const objects = useMemo(
+    () => sheet?.toPlaneObjects(meta?.titleColumnId) ?? [],
+    [sheet, meta?.titleColumnId]
+  );
   const gsLink = meta?.googleSheets;
 
   const handleLink = useCallback(
@@ -211,7 +231,11 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
       onExportCsv={handleExportCsv}
-      onOpenObjects={bubbleId ? handleOpenObjects : undefined}
+      objects={objects}
+      titleColumnId={meta?.titleColumnId}
+      onChangeTitleColumn={handleChangeTitleColumn}
+      onSelectObject={bubbleId ? handleSelectObject : undefined}
+      buildObjectUrl={buildObjectUrl}
       onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
       googleSheetsPanel={
         <GoogleSheetsPanel

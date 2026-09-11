@@ -20,6 +20,7 @@
     }
   },
   "dependencies": {
+    "@bublys-org/domain-registry": "*",
     "tslib": "^2.3.0"
   },
   "nx": {
