@@ -15,7 +15,7 @@
  * 別の出どころを混ぜないのが要点。構造を記述子に手で書くと図が黙って古くなるし、
  * 所属をソースから推すと当たらない。それぞれ知っている側に聞く。
  */
-import { useCallback, useMemo, useState, type FC } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import {
   ClassDiagramView,
   type ClassScope,
@@ -100,12 +100,22 @@ const S = {
     font: "12px system-ui, sans-serif",
   } as React.CSSProperties,
   hud: {
-    padding: "8px 10px",
+    padding: "5px 8px",
     borderBottom: "1px solid #21262d",
     display: "flex",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 8,
     alignItems: "center",
+    flex: "0 0 auto",
+  } as React.CSSProperties,
+  details: {
+    padding: "6px 10px",
+    borderBottom: "1px solid #21262d",
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+    color: "#8b949e",
+    flex: "0 0 auto",
   } as React.CSSProperties,
   legend: { color: "#8b949e" } as React.CSSProperties,
   warn: { color: "#e3b341" } as React.CSSProperties,
@@ -134,12 +144,33 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
    * 図の見方の好みであってドメインのデータではないので、世界線には載せない
    */
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  /** 読み方と申告。既定は畳む（出しっぱなしだと窓の半分を説明が占める） */
+  const [open, setOpen] = useState(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+
+  /** いまの窓に図全体が収まる倍率にする */
+  const fit = useCallback(() => {
+    const el = canvasRef.current;
+    const svg = el?.querySelector("svg");
+    if (!el || !svg) return;
+    const w = Number(svg.getAttribute("viewBox")?.split(" ")[2] ?? 0);
+    const h = Number(svg.getAttribute("viewBox")?.split(" ")[3] ?? 0);
+    if (!w || !h) return;
+    setScale(Math.min(el.clientWidth / w, el.clientHeight / h, 1));
+  }, []);
   const move = useCallback(
     (name: string, at: { x: number; y: number }) =>
       setPositions((prev) => ({ ...prev, [name]: at })),
     []
   );
   const d = graph.diagnostics;
+  // 開いた直後から全体が見えているようにする。押さないと収まらないのでは、
+  // 「まず図が読めない」状態から始まってしまう
+  useEffect(() => {
+    const id = requestAnimationFrame(fit);
+    return () => cancelAnimationFrame(id);
+  }, [fit, mode, graph]);
+
   const membership = useCallback(worldLineMembershipOf, []);
   const scope = useCallback(worldLineScopeOf, []);
 
@@ -150,20 +181,27 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
     return { byKind, contains, references: graph.relations.length - contains };
   }, [graph]);
 
+  const warnings =
+    d.classesWithoutState.length + d.unresolvedIdFields.length;
+
   return (
     <div style={S.wrap}>
+      {/*
+        ★ 操作は1行に収める。説明を出しっぱなしにすると、ふつうの大きさのバブルでは
+          説明が窓の半分を占めて図がほとんど見えない（実際にそうなっていた）。
+          読み方と申告は畳んでおき、押したときだけ開く。
+      */}
       <div style={S.hud}>
-        <strong style={{ color: "#58a6ff" }}>モデルのクラス図</strong>
+        <strong style={{ color: "#58a6ff" }}>クラス図</strong>
         <span style={S.legend}>
           集約 {counts.byKind.aggregate} / 部品 {counts.byKind.part} / 値{" "}
           {counts.byKind.value} ・ 内包 {counts.contains} / 参照 {counts.references}
         </span>
-        <span style={S.legend}>
-          配置{" "}
+        <span>
           {(
             [
-              ["force", "力学（近いものを近くに）"],
-              ["column", "列（集約ごと）"],
+              ["force", "力学"],
+              ["column", "列"],
             ] as const
           ).map(([m, label]) => (
             <button
@@ -175,41 +213,11 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
               {label}
             </button>
           ))}
-          {Object.keys(positions).length > 0 && (
-            <button type="button" onClick={() => setPositions({})} style={btn}>
-              並びを戻す（{Object.keys(positions).length} 個動かした）
-            </button>
-          )}
         </span>
-        <span style={S.legend}>
-          箱はドラッグで動かせる ・{" "}
-          <span style={{ color: "#39c5cf" }}>シアンの枠＝世界線スコープ</span>
-          （一緒に保存され、一緒に巻き戻る範囲）・{" "}
-          <span style={{ color: "#39c5cf" }}>▌＝その世界に焼き付けられる</span>
-        </span>
-        <span style={S.legend}>
-          <span style={{ color: "#8b949e" }}>◆実線＝内包（一緒に巻き戻る）</span>{" "}
-          <span style={{ color: "#e3b341" }}>→破線＝id で参照（別々に巻き戻る）</span>{" "}
-          <span style={{ color: "#e3b341" }}>↻＝自分を返す更新メソッド</span>
-        </span>
-        <span style={S.legend}>
-          出どころ: {d.sourceRoot}（{d.fileCount} ファイル）を生成時に読んだもの。
-          所属（live/pinned/external）は記述子から
-        </span>
-        {d.classesWithoutState.length > 0 && (
-          <span style={S.warn}>
-            state を持たないクラス {d.classesWithoutState.length} 件はフィールドが空（
-            {d.classesWithoutState.join(", ")}）
-          </span>
-        )}
-        {d.unresolvedIdFields.length > 0 && (
-          <span style={S.warn}>
-            参照先を決められなかった id が {d.unresolvedIdFields.length} 件＝
-            <b>その分だけ線が足りていない</b>（{d.unresolvedIdFields.join(", ")}）
-          </span>
-        )}
-        <span style={S.legend}>
-          表示{" "}
+        <span>
+          <button type="button" onClick={fit} style={btn}>
+            全体
+          </button>
           {[0.5, 0.75, 1].map((z) => (
             <button
               key={z}
@@ -221,17 +229,53 @@ export const ModelClassDiagram: FC<{ graph?: ModelGraph }> = ({
             </button>
           ))}
         </span>
-        {selected && (
-          <button
-            type="button"
-            onClick={() => setSelected(null)}
-            style={btn}
-          >
-            {selected} の選択を外す
+        {Object.keys(positions).length > 0 && (
+          <button type="button" onClick={() => setPositions({})} style={btn}>
+            並びを戻す（{Object.keys(positions).length}）
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          style={{ ...btn, background: open ? "#1f6feb" : "#21262d" }}
+        >
+          読み方{warnings > 0 ? ` ・ ⚠ ${warnings}` : ""}
+        </button>
       </div>
-      <div style={S.canvas}>
+
+      {open && (
+        <div style={S.details}>
+          <div>
+            縦横の位置＝関係の近さ（力学）・{" "}
+            <span style={{ color: "#8b949e" }}>◆実線＝内包（一緒に巻き戻る）</span>{" "}
+            <span style={{ color: "#e3b341" }}>→破線＝id で参照（別々に巻き戻る）</span>{" "}
+            <span style={{ color: "#e3b341" }}>↻＝自分を返す更新メソッド</span>
+          </div>
+          <div>
+            <span style={{ color: "#39c5cf" }}>シアンの枠＝世界線スコープ</span>
+            （一緒に保存され、一緒に巻き戻る範囲）・{" "}
+            <span style={{ color: "#39c5cf" }}>▌＝その世界に焼き付けられる</span>
+            （外の台帳と世界の中の両方に置き、点線で結ぶ）・ 箱はドラッグで動かせる
+          </div>
+          <div>
+            出どころ: {d.sourceRoot}（{d.fileCount} ファイル）を生成時に読んだもの。
+            所属（live/pinned/external）は記述子から
+          </div>
+          {d.classesWithoutState.length > 0 && (
+            <div style={S.warn}>
+              ⚠ state を持たないクラス {d.classesWithoutState.length} 件はフィールドが空（
+              {d.classesWithoutState.join(", ")}）
+            </div>
+          )}
+          {d.unresolvedIdFields.length > 0 && (
+            <div style={S.warn}>
+              ⚠ 参照先を決められなかった id が {d.unresolvedIdFields.length} 件＝
+              <b>その分だけ線が足りていない</b>（{d.unresolvedIdFields.join(", ")}）
+            </div>
+          )}
+        </div>
+      )}
+      <div style={S.canvas} ref={canvasRef}>
         <ClassDiagramView
           graph={graph}
           selected={selected}
