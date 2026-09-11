@@ -1,4 +1,5 @@
 import { Staff } from './Staff.js';
+import { WorkingStaffMember } from './WorkingStaffMember.js';
 import { WorkingStaffGroup } from './WorkingStaffGroup.js';
 
 const roster = [
@@ -92,6 +93,18 @@ describe('WorkingStaffGroup（勤務スタッフ群）', () => {
     // 名簿の人は群からは触れない（実体が世界の名簿側にある）
     expect(group.renameTemporary('a', '別人')).toBe(group);
     expect(group.changeTemporaryDepartment('a', '客室')).toBe(group);
+  });
+
+  test('members は WorkingStaffMember で返る（出自は実体の有無で分かる）', () => {
+    const group = groupOfRoster().addTemporary(
+      new Staff({ id: 'tmp-1', name: '応援 太郎' })
+    );
+    const members = group.members;
+
+    expect(members.every((m) => m instanceof WorkingStaffMember)).toBe(true);
+    expect(members.map((m) => m.staffId)).toEqual(['a', 'b', 'c', 'tmp-1']);
+    expect(members.map((m) => m.isTemporary)).toEqual([false, false, false, true]);
+    expect(members[3].staff?.name).toBe('応援 太郎');
   });
 
   test('state は入れ子まで plain（世界線記録の codec が要らない）', () => {
