@@ -11,14 +11,23 @@
  * 同一性は常に `staffId`。臨時の人の実体にも id は入っているが、読むときは staffId を
  * 正として被せ直すので、この2つがずれた記録が入ってきても行が分裂しない。
  *
- * state は入れ子まで完全 plain（StaffState は plain）。不変。
+ * state は抱えるものを**インスタンスで**持つ（保存形は別に持つ）。
+ * シリアライズ用に入れ子まで plain な {@link WorkingStaffMemberPlain} を定義し、
+ * toPlain() / fromPlain() で橋渡しする。不変。
  */
 import { Staff, type StaffState } from "./Staff.js";
 
+/** state：抱えている実体はインスタンス */
 export type WorkingStaffMemberState = {
   /** この行が指す人。名簿の人も臨時の人も、同一性はこれ */
   staffId: string;
   /** 臨時の人の実体。名簿の人は名簿側に実体があるので持たない */
+  staff?: Staff;
+};
+
+/** シリアライズ用：入れ子まで全部 plain */
+export type WorkingStaffMemberPlain = {
+  staffId: string;
   staff?: StaffState;
 };
 
@@ -32,7 +41,7 @@ export class WorkingStaffMember {
 
   /** この勤務表の中だけの臨時の人をメンバーにする（実体を抱える） */
   static temporary(staff: Staff): WorkingStaffMember {
-    return new WorkingStaffMember({ staffId: staff.id, staff: staff.state });
+    return new WorkingStaffMember({ staffId: staff.id, staff });
   }
 
   get staffId(): string {
@@ -50,7 +59,9 @@ export class WorkingStaffMember {
    */
   get staff(): Staff | undefined {
     const staff = this.state.staff;
-    return staff ? new Staff({ ...staff, id: this.state.staffId }) : undefined;
+    return staff && staff.id !== this.state.staffId
+      ? new Staff({ ...staff.state, id: this.state.staffId })
+      : staff;
   }
 
   /**
@@ -69,5 +80,19 @@ export class WorkingStaffMember {
     const staff = this.staff;
     if (!staff) return this;
     return WorkingStaffMember.temporary(fn(staff));
+  }
+
+  toPlain(): WorkingStaffMemberPlain {
+    const staff = this.state.staff;
+    return staff
+      ? { staffId: this.state.staffId, staff: staff.state }
+      : { staffId: this.state.staffId };
+  }
+
+  static fromPlain(plain: WorkingStaffMemberPlain): WorkingStaffMember {
+    return new WorkingStaffMember({
+      staffId: plain.staffId,
+      staff: plain.staff ? new Staff(plain.staff) : undefined,
+    });
   }
 }

@@ -34,15 +34,17 @@ describe('WorkingStaffMember（勤務スタッフ群のメンバー1人）', () 
   test('★ 臨時かどうかは「実体を抱えているか」だけで決まる（別の印を持たない）', () => {
     expect(new WorkingStaffMember({ staffId: 'a' }).isTemporary).toBe(false);
     expect(
-      new WorkingStaffMember({ staffId: 'x', staff: { id: 'x', name: '応援' } })
-        .isTemporary
+      new WorkingStaffMember({
+        staffId: 'x',
+        staff: new Staff({ id: 'x', name: '応援' }),
+      }).isTemporary
     ).toBe(true);
   });
 
   test('★ 同一性は staffId が正。抱えた実体の id がずれていても行は分裂しない', () => {
     const member = new WorkingStaffMember({
       staffId: 'tmp-1',
-      staff: { id: 'ずれた-id', name: '応援 太郎' },
+      staff: new Staff({ id: 'ずれた-id', name: '応援 太郎' }),
     });
 
     expect(member.staffId).toBe('tmp-1');
@@ -67,13 +69,33 @@ describe('WorkingStaffMember（勤務スタッフ群のメンバー1人）', () 
     expect(roster.get('a')?.name).toBe('相田'); // 名簿そのものは無傷
   });
 
-  test('state は入れ子まで plain（世界線記録の codec が要らない）', () => {
+  test('state は実体をインスタンスで持つ（保存形は toPlain で別に作る）', () => {
     const member = WorkingStaffMember.temporary(
       new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' })
     );
-    const plain = JSON.parse(JSON.stringify(member.state));
 
-    expect(plain).toEqual(member.state);
-    expect(new WorkingStaffMember(plain).staff?.name).toBe('応援 太郎');
+    expect(member.state.staff).toBeInstanceOf(Staff);
+    expect(member.toPlain()).toEqual({
+      staffId: 'tmp-1',
+      staff: { id: 'tmp-1', name: '応援 太郎', department: '客室' },
+    });
+    expect(() => JSON.stringify(member.toPlain())).not.toThrow();
+  });
+
+  test('toPlain / fromPlain で往復できる', () => {
+    const temporary = WorkingStaffMember.temporary(
+      new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' })
+    );
+    const rosterMember = WorkingStaffMember.ofRoster('a');
+
+    for (const original of [temporary, rosterMember]) {
+      const restored = WorkingStaffMember.fromPlain(original.toPlain());
+      expect(restored.staffId).toBe(original.staffId);
+      expect(restored.isTemporary).toBe(original.isTemporary);
+      expect(restored.staff?.state).toEqual(original.staff?.state);
+      expect(restored.toPlain()).toEqual(original.toPlain());
+    }
+    // 名簿の人は staff キーを持たない（「実体を抱えていない」が保存形にも出る）
+    expect('staff' in rosterMember.toPlain()).toBe(false);
   });
 });

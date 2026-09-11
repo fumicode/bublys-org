@@ -150,6 +150,7 @@ feature (domain + ui + Reduxに依存)
 - **ドメイン層**: 純粋なTypeScript、不変データ構造（他の層に依存しない）
   - **重要**: ドメインオブジェクトの状態は`state`オブジェクトを介して管理する
   - 例: `constructor(readonly state: { field1: string; field2: number })`
+  - **`state`が持つ子はインスタンス**にする。plain（`〜State`）を直接持たない（後述）
   - ReactもReduxもインポートしない
 - **UI層**: プレゼンテーショナルReactコンポーネント（ドメイン層のみに依存）
   - コンテキストを消費してドメインモデルを表示
@@ -165,20 +166,37 @@ feature (domain + ui + Reduxに依存)
    - 状態は`state`オブジェクトを介して管理し、イミュータブルに扱う
    - 例: `new MyFeature({ ...this.state, field: newValue })`
 
-2. **ジェネリック型パラメータ:**
+2. **`state`はドメインの形であって、保存形ではない（重要）:**
+   - **集約が持つ子はインスタンスで持つ。** `state`に plain（`〜State`）を並べない
+     ```typescript
+     // NG: 子を plain で持つ（保存の都合がドメインの形を決めている）
+     type GroupState = { id: string; members: MemberState[] };
+
+     // OK: 子はインスタンス。保存形は別に定義する
+     type GroupState  = { id: string; members: Member[] };
+     type GroupPlain  = { id: string; members: MemberPlain[] };   // シリアライズ用
+     ```
+   - **plain 化は「記録する1箇所」でやる。** 集約に`toPlain()` / `static fromPlain()`を生やし、
+     世界線やスライスへ渡すところだけが呼ぶ
+   - 「`state`が完全 plain なら codec を書かなくて済む」は**ドメインの形を決める理由にならない**。
+     codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す
+   - 副産物としてクラス図も正しくなる（`members: Member[]`と出る。plain だと union の
+     型エイリアスが共通フィールドしか読めず、関連が図から消える）
+
+3. **ジェネリック型パラメータ:**
    - ドメインモデルはジェネリック型を活用して柔軟性を持たせる
    - serialize/deserialize関数がドメインモデルとRedux JSONを橋渡し
 
-3. **プロバイダーパターン:**
+4. **プロバイダーパターン:**
    - フィーチャー層がコンポーネントをラップし、Contextを提供
    - UIコンポーネントはフックを通じてドメインロジックにアクセス
    - Redux実装からコンポーネントを分離
 
-4. **リスナーミドルウェアによる副作用管理:**
+5. **リスナーミドルウェアによる副作用管理:**
    - `bubbles-ui-state`でクロススライスインタラクションに使用
    - 複数の状態スライスにまたがる非同期操作を処理
 
-5. **Reduxスライスは集約のリポジトリに徹する（重要）:**
+6. **Reduxスライスは集約のリポジトリに徹する（重要）:**
    - スライスの役割は集約（ドメインオブジェクト）の**保存・取得だけ**。
      reducerは `setList` / `add` / `update`（集約丸ごとをIDで置換）/ `remove(id)` のような
      永続化操作のみを持つ

@@ -107,18 +107,32 @@ describe('WorkingStaffGroup（勤務スタッフ群）', () => {
     expect(members[3].staff?.name).toBe('応援 太郎');
   });
 
-  test('state は入れ子まで plain（世界線記録の codec が要らない）', () => {
-    const group = groupOfRoster().addTemporary(
+  test('state はメンバーをインスタンスで持つ（保存形は toPlain で別に作る）', () => {
+    const group = groupOfRoster();
+
+    expect(group.state.members[0]).toBeInstanceOf(WorkingStaffMember);
+    expect(group.toPlain().members[0]).toEqual({ staffId: 'a' });
+  });
+
+  test('toPlain / fromPlain で入れ子まで plain ↔ インスタンスを往復できる', () => {
+    const original = groupOfRoster().addTemporary(
       new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' })
     );
-    const plain = JSON.parse(JSON.stringify(group.state));
 
-    expect(plain).toEqual(group.state);
-    expect(new WorkingStaffGroup(plain).resolve(roster).map((s) => s.name)).toEqual([
+    const plain = original.toPlain();
+    expect(() => JSON.stringify(plain)).not.toThrow();
+
+    const restored = WorkingStaffGroup.fromPlain(
+      JSON.parse(JSON.stringify(plain))
+    );
+    expect(restored.state.members[0]).toBeInstanceOf(WorkingStaffMember);
+    expect(restored.resolve(roster).map((s) => s.name)).toEqual([
       '相田',
       '井上',
       '上田',
       '応援 太郎',
     ]);
+    expect(restored.isTemporary('tmp-1')).toBe(true);
+    expect(restored.toPlain()).toEqual(plain);
   });
 });
