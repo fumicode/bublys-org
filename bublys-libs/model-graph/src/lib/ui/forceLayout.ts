@@ -46,6 +46,11 @@ export type ForceOptions = {
   readonly gravity: number;
   /** 箱と箱のあいだに最低限あける距離 */
   readonly padding: number;
+  /**
+   * 枠（世界線スコープ）が違うものどうしの反発の倍率。
+   * 1 にすると枠がメンバーでない箱を飲み込む
+   */
+  readonly frameSeparation: number;
 };
 
 export const DEFAULT_FORCE_OPTIONS: ForceOptions = {
@@ -56,6 +61,7 @@ export const DEFAULT_FORCE_OPTIONS: ForceOptions = {
   groupStrength: 0.055,
   gravity: 0.006,
   padding: 28,
+  frameSeparation: 2.6,
 };
 
 /**
@@ -128,6 +134,13 @@ export function layoutClassDiagramByForce(
       : [n.box.aggregate, groupOf?.(n.box.name)].filter(Boolean)
   );
 
+  /**
+   * その箱が**どの枠の中に描かれるか**（世界線スコープ）。枠を持たないものは null。
+   * 集約は枠にならないので、ここには入れない。
+   */
+  const frameOf = nodes.map((n) => n.box.echoScopeId ?? groupOf?.(n.box.name) ?? null);
+  const frameIds = [...new Set(frameOf.filter((f): f is string => f !== null))];
+
   for (let step = 0; step < f.iterations; step++) {
     // 進むにつれて動きを小さくする（焼きなまし）。最後まで同じ強さだと震え続ける
     const cool = 1 - step / f.iterations;
@@ -151,10 +164,14 @@ export function layoutClassDiagramByForce(
           dy = 0.3;
           dist = 1;
         }
-        // 箱の大きさを見て、触れ合う距離までは強く押す
+        // 箱の大きさを見て、触れ合う距離までは強く押す。
+        // ★ 枠が違うものどうしは強めに離す。近いままだと、枠（メンバーの外接矩形）が
+        //   メンバーでない箱を飲み込んで「世界の中に居る」という嘘になる
+        const apart = frameOf[i] !== frameOf[j] && (frameOf[i] !== null || frameOf[j] !== null);
         const touch = a.r + b.r + f.padding;
         const strength =
-          f.repulsion / (dist * dist) + (dist < touch ? (touch - dist) * 2.5 : 0);
+          (f.repulsion / (dist * dist)) * (apart ? f.frameSeparation : 1) +
+          (dist < touch ? (touch - dist) * 2.5 : 0);
         const ux = dx / dist;
         const uy = dy / dist;
         a.vx += ux * strength;
@@ -210,6 +227,66 @@ export function layoutClassDiagramByForce(
       const scale = v > maxMove ? maxMove / v : 1;
       n.x += n.vx * scale;
       n.y += n.vy * scale;
+    }
+  }
+
+  // --- 枠からはみ出させる -------------------------------------------------
+  // 反発だけでは入り込みを完全には防げない。**枠は嘘をついてはいけない**ので、
+  // 最後に必ず押し出す。押し出したあと箱が重なりうるので、重なりだけ解いて仕上げる
+  for (let pass = 0; pass < 6; pass++) {
+    let moved = false;
+    for (const id of frameIds) {
+      const members = nodes.filter((_, i) => frameOf[i] === id);
+      if (members.length === 0) continue;
+      const pad = f.padding;
+      const x0 = Math.min(...members.map((m) => m.x - m.box.width / 2)) - pad;
+      const x1 = Math.max(...members.map((m) => m.x + m.box.width / 2)) + pad;
+      const y0 = Math.min(...members.map((m) => m.y - m.box.height / 2)) - pad;
+      const y1 = Math.max(...members.map((m) => m.y + m.box.height / 2)) + pad;
+      nodes.forEach((n, i) => {
+        if (frameOf[i] === id) return;
+        const l = n.x - n.box.width / 2;
+        const r = n.x + n.box.width / 2;
+        const t = n.y - n.box.height / 2;
+        const b = n.y + n.box.height / 2;
+        if (r <= x0 || l >= x1 || b <= y0 || t >= y1) return;
+        // 一番近い辺へ出す
+        const out = [
+          { d: r - x0, dx: -(r - x0), dy: 0 },
+          { d: x1 - l, dx: x1 - l, dy: 0 },
+          { d: b - y0, dx: 0, dy: -(b - y0) },
+          { d: y1 - t, dx: 0, dy: y1 - t },
+        ].reduce((min, c) => (c.d < min.d ? c : min));
+        n.x += out.dx;
+        n.y += out.dy;
+        moved = true;
+      });
+    }
+    if (!moved) break;
+    // 押し出したせいで箱が重なることがある。重なりだけ解く
+    for (let k = 0; k < 30; k++) {
+      let hit = false;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i];
+          const b = nodes[j];
+          const ox = (a.box.width + b.box.width) / 2 + f.padding - Math.abs(a.x - b.x);
+          const oy = (a.box.height + b.box.height) / 2 + f.padding - Math.abs(a.y - b.y);
+          if (ox <= 0 || oy <= 0) continue;
+          hit = true;
+          // 同じ枠の中で解くほうが枠を壊さない。浅いほうの軸へずらす
+          const sx = a.x <= b.x ? -1 : 1;
+          const sy = a.y <= b.y ? -1 : 1;
+          if (ox < oy) {
+            a.x += (sx * ox) / 2;
+            b.x -= (sx * ox) / 2;
+          } else {
+            a.y += (sy * oy) / 2;
+            b.y -= (sy * oy) / 2;
+          }
+        }
+      }
+      if (!hit) break;
     }
   }
 
