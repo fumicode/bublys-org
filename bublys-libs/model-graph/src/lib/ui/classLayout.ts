@@ -190,9 +190,11 @@ export function measureBoxes(
 }
 
 /**
- * 写しの箱を採寸する。**題名だけの小さな箱**にする。
- * 中身をもう一度書いても読むものは増えないし、写しのほうが大きいと
- * 「別のクラスだ」と読めてしまう。
+ * 写しの箱を採寸する。
+ *
+ * 中身（フィールド・メソッド）は書かない。もう一度書いても読むものは増えない。
+ * ただし**幅は本物と同じにする**。小さくすると脚注のように見えて、
+ * 「世界の中からの矢印が向かう先」として読めない（実際に読めなかった）。
  */
 export function measureEchoes(
   echoes: readonly EchoSpec[],
@@ -208,8 +210,8 @@ export function measureEchoes(
       return {
         name: echoName(e),
         cls: origin.cls,
-        width: o.boxWidth * 0.62,
-        height: o.lineHeight + o.boxPadding * 2,
+        width: o.boxWidth,
+        height: o.lineHeight * 2 + o.boxPadding * 2,
         aggregate: origin.aggregate,
         shownFields: 0,
         shownMethods: 0,
