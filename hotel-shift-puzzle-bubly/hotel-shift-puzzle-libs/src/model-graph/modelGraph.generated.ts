@@ -1844,6 +1844,66 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "WorkingStaffMember",
+      "file": "staff/WorkingStaffMember.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "staffId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "staff",
+          "type": "StaffState",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "staffId",
+        "isTemporary",
+        "staff"
+      ],
+      "methods": [
+        {
+          "name": "ofRoster",
+          "params": [
+            "staffId"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "temporary",
+          "params": [
+            "staff"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "fromRoster"
+          ],
+          "returns": "Staff | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "mapStaff",
+          "params": [
+            "fn"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "WorkShift",
       "file": "schedule/WorkShift.ts",
       "kind": "part",
@@ -2138,6 +2198,30 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "WorkingStaffGroup",
+      "to": "WorkingStaffMember",
+      "kind": "contains",
+      "via": "members",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "WorkingStaffMember",
+      "to": "Staff",
+      "kind": "contains",
+      "via": "staff",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "WorkingStaffMember",
+      "to": "Staff",
+      "kind": "references",
+      "via": "staffId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
       "from": "WorkShiftSet",
       "to": "WorkShift",
       "kind": "contains",
@@ -2148,7 +2232,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 37,
+    "fileCount": 38,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
