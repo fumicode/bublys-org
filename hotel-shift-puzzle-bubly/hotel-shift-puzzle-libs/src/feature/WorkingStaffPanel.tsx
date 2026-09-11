@@ -99,12 +99,6 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
         <h3>
           {schedule.year}年{schedule.month}月勤務スタッフ({staffList.length}名)
         </h3>
-        <p className="e-note">
-          この勤務表の行になる人たち。左の名簿から ＋ で加え、⠿ をドラッグで並び替え、
-          チェックでその人が入れる勤務帯を決めます（列の ✏️・＋ で勤務帯そのものも編集）。
-          ここでの編集は
-          <strong>この勤務表の世界線にだけ</strong>記録され、スタッフ名簿は動きません。
-        </p>
       </div>
       <WorkingStaffListView
         members={staffList}
@@ -134,12 +128,6 @@ const StyledContainer = styled.div`
 
     h3 {
       margin: 0;
-    }
-
-    .e-note {
-      margin: 4px 0 0;
-      font-size: 0.78em;
-      color: #888;
     }
   }
 `;
