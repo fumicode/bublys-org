@@ -114,17 +114,46 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     () => ({ ...DEFAULT_LAYOUT_OPTIONS, ...options }),
     [options]
   );
+  /**
+   * 焼き付けの写し。**外の台帳と世界の中の両方に置く**ための指定。
+   *
+   * 片方にしか描かないとどちらかが嘘になる。枠の中だけなら外の台帳にも居ることが消え、
+   * 枠の外だけならその世界に載っていることが消える。
+   */
+  const echoes = useMemo(() => {
+    if (!scopeOf) return [];
+    const liveOf = new Map<string, string>();
+    for (const c of graph.classes) {
+      const s = scopeOf(c.name);
+      if (s?.role === 'live' && !liveOf.has(s.scopeId)) liveOf.set(s.scopeId, c.name);
+    }
+    return graph.classes
+      .map((c) => ({ c, s: scopeOf(c.name) }))
+      .filter((x) => x.s?.role === 'pinned' && liveOf.has(x.s.scopeId))
+      .map((x) => ({
+        of: x.c.name,
+        scopeId: (x.s as ClassScope).scopeId,
+        near: liveOf.get((x.s as ClassScope).scopeId) as string,
+      }));
+  }, [graph.classes, scopeOf]);
+
   const auto = useMemo(
     () =>
       mode === 'column'
-        ? layoutClassDiagram(graph, o)
+        ? layoutClassDiagram(graph, o, echoes)
         : // 世界線スコープも「近づけるまとまり」として渡す。同じ世界に載るものは
           // つながりが無くても寄るので、枠が細長くならない
-          layoutClassDiagramByForce(graph, o, {}, (name) => {
-            const s = scopeOf?.(name);
-            return s && s.role === 'live' ? s.scopeId : undefined;
-          }),
-    [graph, o, mode, scopeOf]
+          layoutClassDiagramByForce(
+            graph,
+            o,
+            {},
+            (name) => {
+              const s = scopeOf?.(name);
+              return s && s.role === 'live' ? s.scopeId : undefined;
+            },
+            echoes
+          ),
+    [graph, o, mode, scopeOf, echoes]
   );
   // ユーザーが動かした箱はその位置に置き、線と大きさを引き直す。
   // 自動配置を捨てずに**上から重ねる**ので、動かしていない箱はそのまま
@@ -192,11 +221,20 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
    */
   const scopeFrames = useMemo(() => {
     if (!scopeOf) return [];
-    const live = layout.boxes.filter((b) => scopeOf(b.name)?.role === 'live');
-    const ids = [...new Set(live.map((b) => scopeOf(b.name)?.scopeId as string))];
+    const inScope = (b: (typeof layout.boxes)[number], scopeId: string) =>
+      b.echoScopeId === scopeId ||
+      (!b.echoOf && scopeOf(b.name)?.role === 'live' && scopeOf(b.name)?.scopeId === scopeId);
+    const ids = [
+      ...new Set(
+        layout.boxes
+          .map((b) => b.echoScopeId ?? (scopeOf(b.name)?.role === 'live' ? scopeOf(b.name)?.scopeId : undefined))
+          .filter((id): id is string => !!id)
+      ),
+    ];
     return ids
       .map((scopeId) => {
-        const members = live.filter((b) => scopeOf(b.name)?.scopeId === scopeId);
+        // 写しも囲う。**焼き付けられたものは、その世界の中に居る**
+        const members = layout.boxes.filter((b) => inScope(b, scopeId));
         if (members.length < 2) return null;
         const pad = 22;
         const x = Math.min(...members.map((m) => m.x)) - pad;
@@ -259,6 +297,17 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
           orient="auto-start-reverse"
         >
           <path d="M0,5 L5,2 L10,5 L5,8 z" fill={CLASS_DIAGRAM_PALETTE.containsLine} />
+        </marker>
+        <marker
+          id="cd-pin"
+          viewBox="0 0 6 6"
+          refX="3"
+          refY="3"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto"
+        >
+          <rect x="1" y="1" width="4" height="4" fill={CLASS_DIAGRAM_PALETTE.scopeFrame} />
         </marker>
       </defs>
 
@@ -337,12 +386,52 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
         );
       })}
 
+      {/*
+        焼き付けの線。外の台帳の箱と、世界の中の写しを結ぶ。
+        内包（◆実線・灰）とも参照（→破線・黄）とも違う**第3の線**にしてある。
+        どちらでもないから: 値を持つのでも id で指すのでもなく、
+        「世界が生まれた瞬間に同じ参照が焼かれて、以後そちらは動かない」という関係
+      */}
+      {layout.boxes
+        .filter((b) => b.echoOf)
+        .map((echo) => {
+          const origin = layout.boxes.find((b) => b.name === echo.echoOf);
+          if (!origin) return null;
+          const lit = isLit(echo.echoOf as string, echo.name);
+          const rightward = echo.x >= origin.x;
+          const from = {
+            x: origin.x + (rightward ? origin.width : 0),
+            y: origin.y + origin.height / 2,
+          };
+          const to = { x: echo.x + (rightward ? 0 : echo.width), y: echo.y + echo.height / 2 };
+          const mx = (from.x + to.x) / 2;
+          return (
+            <path
+              key={`pin-${echo.name}`}
+              d={`M ${from.x} ${from.y} C ${mx} ${from.y}, ${mx} ${to.y}, ${to.x} ${to.y}`}
+              fill="none"
+              stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
+              strokeWidth={lit ? 2 : 1.2}
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+              opacity={lit ? 0.95 : 0.2}
+              markerStart="url(#cd-pin)"
+              markerEnd="url(#cd-pin)"
+            >
+              <title>
+                {`${echo.echoOf} は ${echo.echoScopeId} の世界に焼き付けられている。` +
+                  `\n同じオブジェクトが外の台帳と世界の中の両方に居て、中のほうは動かない`}
+              </title>
+            </path>
+          );
+        })}
+
       {layout.boxes.map((box) => (
         <ClassBoxView
           key={box.name}
           box={box}
           o={o}
-          dim={focus !== null && focus !== box.name}
+          dim={focus !== null && focus !== box.name && focus !== box.echoOf}
           membership={membershipOf?.(box.name)}
           scope={scopeOf?.(box.name)}
           dragging={dragging === box.name}
@@ -392,6 +481,52 @@ const ClassBoxView: FC<{
   const pad = o.boxPadding;
   let line = 0;
   const nextY = () => box.y + pad + o.lineHeight * ++line - 5;
+
+  // 写しは題名だけの小さな箱。中身をもう一度書いても読むものは増えないし、
+  // 同じ大きさにすると「別のクラスだ」と読めてしまう
+  if (box.echoOf) {
+    return (
+      <g
+        opacity={dim ? 0.35 : 1}
+        style={{ cursor: onPointerDownBox ? (dragging ? 'grabbing' : 'grab') : 'pointer' }}
+        onMouseEnter={() => onHover(box.echoOf as string)}
+        onMouseLeave={() => onHover(null)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onPointerDownBox?.(box.name, e);
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect?.(box.echoOf as string);
+        }}
+      >
+        <rect
+          x={box.x}
+          y={box.y}
+          width={box.width}
+          height={box.height}
+          rx={6}
+          fill={CLASS_DIAGRAM_PALETTE.boxFill}
+          fillOpacity={0.85}
+          stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
+          strokeWidth={dragging ? 2.5 : 1.2}
+          strokeDasharray="4 3"
+        />
+        <text
+          x={box.x + pad}
+          y={box.y + pad + o.lineHeight - 5}
+          fill={CLASS_DIAGRAM_PALETTE.scopeFrame}
+          style={{ font: '12px system-ui, sans-serif' }}
+        >
+          ▌{box.echoOf}
+          <title>
+            {`${box.echoOf} の焼き付け。外の台帳の ${box.echoOf} と同じもので、` +
+              `この世界（${box.echoScopeId}）の中では動かない`}
+          </title>
+        </text>
+      </g>
+    );
+  }
 
   return (
     <g
