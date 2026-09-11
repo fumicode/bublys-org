@@ -18,6 +18,7 @@ import type { ModelClass, ModelGraph } from '../domain/ModelGraph.js';
 import { layoutClassDiagramByForce } from './forceLayout.js';
 import {
   DEFAULT_LAYOUT_OPTIONS,
+  assignAggregates,
   finishLayout,
   layoutClassDiagram,
   type ClassBox,
@@ -115,6 +116,25 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     [options]
   );
   /**
+   * クラス名 → その**世界線スコープ**。
+   *
+   * ★ 記述子に登録されている型だけでは足りない。集約の部品（`ShiftAssignment` など）は
+   *   登録されていないが、根と一緒に保存され、一緒に巻き戻る。つまり**同じ世界の中に居る**。
+   *   だから「その集約の根が live な世界」をそのまま部品にも配る。
+   */
+  const scopeMembers = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!scopeOf) return out;
+    const owner = assignAggregates(graph);
+    for (const c of graph.classes) {
+      const root = owner.get(c.name);
+      const s = root ? scopeOf(root) : undefined;
+      if (s?.role === 'live') out.set(c.name, s.scopeId);
+    }
+    return out;
+  }, [graph, scopeOf]);
+
+  /**
    * 焼き付けの写し。**外の台帳と世界の中の両方に置く**ための指定。
    *
    * 片方にしか描かないとどちらかが嘘になる。枠の中だけなら外の台帳にも居ることが消え、
@@ -130,12 +150,17 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     return graph.classes
       .map((c) => ({ c, s: scopeOf(c.name) }))
       .filter((x) => x.s?.role === 'pinned' && liveOf.has(x.s.scopeId))
-      .map((x) => ({
-        of: x.c.name,
-        scopeId: (x.s as ClassScope).scopeId,
-        near: liveOf.get((x.s as ClassScope).scopeId) as string,
-      }));
-  }, [graph.classes, scopeOf]);
+      .map((x) => {
+        const scopeId = (x.s as ClassScope).scopeId;
+        return {
+          of: x.c.name,
+          scopeId,
+          near: liveOf.get(scopeId) as string,
+          // この世界の中に居るものから伸びる線は、外の箱ではなく写しにつなぐ
+          members: [...scopeMembers].filter(([, id]) => id === scopeId).map(([n]) => n),
+        };
+      });
+  }, [graph.classes, scopeOf, scopeMembers]);
 
   const auto = useMemo(
     () =>
@@ -147,13 +172,10 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
             graph,
             o,
             {},
-            (name) => {
-              const s = scopeOf?.(name);
-              return s && s.role === 'live' ? s.scopeId : undefined;
-            },
+            (name) => scopeMembers.get(name),
             echoes
           ),
-    [graph, o, mode, scopeOf, echoes]
+    [graph, o, mode, scopeMembers, echoes]
   );
   // ユーザーが動かした箱はその位置に置き、線と大きさを引き直す。
   // 自動配置を捨てずに**上から重ねる**ので、動かしていない箱はそのまま
@@ -222,12 +244,11 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
   const scopeFrames = useMemo(() => {
     if (!scopeOf) return [];
     const inScope = (b: (typeof layout.boxes)[number], scopeId: string) =>
-      b.echoScopeId === scopeId ||
-      (!b.echoOf && scopeOf(b.name)?.role === 'live' && scopeOf(b.name)?.scopeId === scopeId);
+      b.echoScopeId === scopeId || (!b.echoOf && scopeMembers.get(b.name) === scopeId);
     const ids = [
       ...new Set(
         layout.boxes
-          .map((b) => b.echoScopeId ?? (scopeOf(b.name)?.role === 'live' ? scopeOf(b.name)?.scopeId : undefined))
+          .map((b) => b.echoScopeId ?? scopeMembers.get(b.name))
           .filter((id): id is string => !!id)
       ),
     ];
@@ -249,7 +270,7 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
         };
       })
       .filter((f): f is NonNullable<typeof f> => f !== null);
-  }, [layout.boxes, scopeOf, focus]);
+  }, [layout.boxes, scopeMembers, focus]);
 
   /** その線が、いま見ている箱に関わるか */
   const isLit = (from: string, to: string) =>

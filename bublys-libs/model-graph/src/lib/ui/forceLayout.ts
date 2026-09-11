@@ -222,5 +222,5 @@ export function layoutClassDiagramByForce(
     y: Math.round(n.y - n.box.height / 2 - minY + o.gapY),
   }));
 
-  return finishLayout(graph, boxes);
+  return finishLayout(graph, boxes, undefined, echoes);
 }

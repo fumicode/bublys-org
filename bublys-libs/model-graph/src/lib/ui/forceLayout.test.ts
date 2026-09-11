@@ -162,7 +162,14 @@ describe('焼き付けの写し', () => {
     cls('Constraints', { kind: 'aggregate' }),
     cls('Outside', { kind: 'aggregate' }),
   ]);
-  const echoes = [{ of: 'Staff', scopeId: 'Schedule:<id>', near: 'Schedule' }];
+  const echoes = [
+    {
+      of: 'Staff',
+      scopeId: 'Schedule:<id>',
+      near: 'Schedule',
+      members: ['Schedule', 'Constraints'],
+    },
+  ];
   const inScope = (n: string) => (n === 'Schedule' || n === 'Constraints' ? 'Schedule:<id>' : undefined);
 
   it('写し元は消えず、写しが増える（両方に居る）', () => {
@@ -206,7 +213,7 @@ describe('焼き付けの写し', () => {
       {},
       {},
       inScope,
-      [{ of: 'NotThere', scopeId: 'Schedule:<id>', near: 'Schedule' }]
+      [{ of: 'NotThere', scopeId: 'Schedule:<id>', near: 'Schedule', members: ['Schedule'] }]
     );
     expect(boxes.some((b) => b.echoOf)).toBe(false);
   });
@@ -217,5 +224,70 @@ describe('焼き付けの写し', () => {
     const near = layout.boxes.find((b) => b.name === 'Schedule') as (typeof layout.boxes)[number];
     expect(echo.x).toBe(near.x);
     expect(echo.y).toBeGreaterThan(near.y);
+  });
+});
+
+/**
+ * ★ 世界の中から焼き付けメンバーへ伸びる線は、**写しのほうへ**つなぐ。
+ * 世界の中から見えているのは焼き付けたほうで、外の台帳のほうではない。
+ * 外につなぐと「この世界のものが外を見ている」という嘘になる。
+ */
+describe('世界の中からの線は、写しにつなぐ', () => {
+  const classes = [
+    cls('Staff', { kind: 'aggregate' }),
+    cls('Schedule', { kind: 'aggregate' }),
+    cls('Assignment'), // Schedule の部品。ここから Staff を参照する
+    cls('Wish', { kind: 'aggregate' }), // 世界の外から Staff を参照する
+  ];
+  const relations = [
+    rel('Schedule', 'Assignment'),
+    rel('Assignment', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+    rel('Wish', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+  ];
+  const g = graph(classes, relations);
+  const echoes = [
+    {
+      of: 'Staff',
+      scopeId: 'Schedule:<id>',
+      near: 'Schedule',
+      // 部品も世界の中（根と一緒に保存され、一緒に巻き戻る）
+      members: ['Schedule', 'Assignment'],
+    },
+  ];
+  const inScope = (n: string) =>
+    n === 'Schedule' || n === 'Assignment' ? 'Schedule:<id>' : undefined;
+
+  const endOf = (layout: ReturnType<typeof layoutClassDiagramByForce>, from: string) => {
+    const e = layout.edges.find((x) => x.relation.from === from && x.relation.to === 'Staff');
+    const box = layout.boxes.find(
+      (b) => Math.abs(b.y + b.height / 2 - (e?.to.y ?? -1)) < 0.5 &&
+        (Math.abs(b.x - (e?.to.x ?? -1)) < 0.5 || Math.abs(b.x + b.width - (e?.to.x ?? -1)) < 0.5)
+    );
+    return box?.name;
+  };
+
+  it('★ 世界の中の部品からの線は、写しに届く', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    expect(endOf(layout, 'Assignment')).toBe('Staff@Schedule:<id>');
+  });
+
+  it('★ 世界の外からの線は、外の箱に届く（付け替えない）', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    expect(endOf(layout, 'Wish')).toBe('Staff');
+  });
+
+  it('線の数は変わらない（付け替えであって、増やしてはいない）', () => {
+    const plain = layoutClassDiagramByForce(g);
+    const withEcho = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    expect(withEcho.edges).toHaveLength(plain.edges.length);
+  });
+
+  it('列の配置でも同じように付け替わる', () => {
+    const layout = layoutClassDiagram(g, {}, echoes);
+    const e = layout.edges.find(
+      (x) => x.relation.from === 'Assignment' && x.relation.to === 'Staff'
+    );
+    const echo = layout.boxes.find((b) => b.echoOf === 'Staff') as (typeof layout.boxes)[number];
+    expect(e?.to.y).toBeCloseTo(echo.y + echo.height / 2, 6);
   });
 });

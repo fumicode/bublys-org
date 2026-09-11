@@ -56,6 +56,14 @@ export type EchoSpec = {
   readonly scopeId: string;
   /** その世界の中で、どの箱の近くに置くか */
   readonly near: string;
+  /**
+   * その世界の中に居るクラス（集約の部品も含む）。
+   *
+   * **ここから焼き付けメンバーへ伸びる線は、外の箱ではなく写しにつなぐ。**
+   * 世界の中から見えているのは焼き付けたほうで、外の台帳のほうではないから。
+   * 外につなぐと「この世界のものが外を見ている」という嘘になる。
+   */
+  readonly members: readonly string[];
 };
 
 /** 位置が決まる前の箱（採寸だけ） */
@@ -299,7 +307,7 @@ export function layoutClassDiagram(
     x += o.boxWidth + o.gapX;
   }
 
-  return finishLayout(graph, boxes, { width: x, height: maxY + o.gapY });
+  return finishLayout(graph, boxes, { width: x, height: maxY + o.gapY }, echoes);
 }
 
 /**
@@ -311,14 +319,27 @@ export function layoutClassDiagram(
 export function finishLayout(
   graph: ModelGraph,
   boxes: readonly ClassBox[],
-  size?: { width: number; height: number }
+  size?: { width: number; height: number },
+  echoes: readonly EchoSpec[] = []
 ): ClassDiagramLayout {
   const boxByName = new Map(boxes.map((b) => [b.name, b]));
+
+  /**
+   * 世界の中から焼き付けメンバーへ伸びる線を、**写しのほうへ付け替える**。
+   * 世界の中から見えているのは焼き付けたほうなので、外の箱につなぐと
+   * 「この世界のものが外を見ている」という嘘になる。
+   */
+  const redirect = new Map<string, string>();
+  for (const e of echoes) {
+    const echo = boxByName.get(echoName(e));
+    if (!echo) continue;
+    for (const from of e.members) redirect.set(`${from}→${e.of}`, echo.name);
+  }
   const edges: ClassEdge[] = [];
   const dangling: string[] = [];
   for (const r of graph.relations) {
     const from = boxByName.get(r.from);
-    const to = boxByName.get(r.to);
+    const to = boxByName.get(redirect.get(`${r.from}→${r.to}`) ?? r.to);
     if (!from || !to) {
       dangling.push(`${r.from}.${r.via} → ${r.to}`);
       continue;
