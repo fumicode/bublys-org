@@ -17,6 +17,7 @@ import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
   Staff,
   WorkingStaffGroup,
+  type WorkingStaffGroupPlain,
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
@@ -81,7 +82,13 @@ export const HOTEL_OBJECTS = defineObjects({
     // 動かないが、**誰が働くかはこの世界の中で変わる**（臨時の人を足す・外す・並べ替える）。
     // だから群は live で、親 Schedule の世界線に相乗りする（case B）。
     // 臨時の人の実体は群が抱えるので、名簿には出ずに時間移動で一緒に戻る。
-    // state が完全 plain（id ＋ メンバー state 配列）なので serialize 不要。
+    //
+    // 入れ子にインスタンスを持つので codec を明示（Schedule と同じ）。
+    // state は保存形ではなくドメインの形なので、plain にするのは記録するこの1箇所でやる。
+    serialize: {
+      toJSON: (g: WorkingStaffGroup) => g.toPlain(),
+      fromJSON: (j) => WorkingStaffGroup.fromPlain(j as WorkingStaffGroupPlain),
+    },
     membership: {
       kind: "live",
       homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),

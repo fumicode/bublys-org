@@ -10,20 +10,28 @@
  * 群は勤務表と同じ世界線に載るので、臨時の人は時間移動で一緒に現れたり消えたりする。
  *
  * 並び順は members の順そのもの（＝勤務表の行順）。
- * state は入れ子まで完全に plain なので、世界線記録の codec は不要。
+ * state はメンバーを**インスタンスで**持つ。シリアライズ用に入れ子まで plain な
+ * {@link WorkingStaffGroupPlain} を別途定義し、toPlain() / fromPlain() で橋渡しする。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { Staff } from "./Staff.js";
 import {
   WorkingStaffMember,
-  type WorkingStaffMemberState,
+  type WorkingStaffMemberPlain,
 } from "./WorkingStaffMember.js";
 
+/** state：メンバーはインスタンスで保持する */
 export type WorkingStaffGroupState = {
   /** この集約のID。勤務表が workingStaffGroupId で指す（勤務表1つにつき群1つ） */
   id: string;
   /** 働く人たち。**この配列の順が勤務表の行順** */
-  members: WorkingStaffMemberState[];
+  members: WorkingStaffMember[];
+};
+
+/** シリアライズ用：入れ子まで全部 plain */
+export type WorkingStaffGroupPlain = {
+  id: string;
+  members: WorkingStaffMemberPlain[];
 };
 
 export class WorkingStaffGroup {
@@ -33,7 +41,7 @@ export class WorkingStaffGroup {
   static ofRoster(id: string, staffIds: readonly string[]): WorkingStaffGroup {
     return new WorkingStaffGroup({
       id,
-      members: staffIds.map((staffId) => WorkingStaffMember.ofRoster(staffId).state),
+      members: staffIds.map((staffId) => WorkingStaffMember.ofRoster(staffId)),
     });
   }
 
@@ -43,7 +51,7 @@ export class WorkingStaffGroup {
 
   /** 働く人たち（並び順のまま） */
   get members(): WorkingStaffMember[] {
-    return this.state.members.map((m) => new WorkingStaffMember(m));
+    return this.state.members;
   }
 
   /** 働く人のID一覧（並び順のまま） */
@@ -63,7 +71,7 @@ export class WorkingStaffGroup {
 
   /** 臨時の人たち（実体はメンバーが抱えている） */
   temporaryStaff(): Staff[] {
-    return this.members
+    return this.state.members
       .map((m) => m.staff)
       .filter((staff): staff is Staff => staff !== undefined);
   }
@@ -77,7 +85,7 @@ export class WorkingStaffGroup {
    */
   resolve(roster: readonly Staff[]): Staff[] {
     const byId = new Map(roster.map((s) => [s.id, s]));
-    return this.members
+    return this.state.members
       .map((m) => m.resolve((staffId) => byId.get(staffId)))
       .filter((staff): staff is Staff => staff !== undefined);
   }
@@ -130,8 +138,7 @@ export class WorkingStaffGroup {
   }
 
   private memberOf(staffId: string): WorkingStaffMember | undefined {
-    const state = this.state.members.find((m) => m.staffId === staffId);
-    return state ? new WorkingStaffMember(state) : undefined;
+    return this.state.members.find((m) => m.staffId === staffId);
   }
 
   private withMember(
@@ -141,7 +148,7 @@ export class WorkingStaffGroup {
     if (this.has(staffId)) return this;
     return new WorkingStaffGroup({
       ...this.state,
-      members: [...this.state.members, member.state],
+      members: [...this.state.members, member],
     });
   }
 
@@ -155,9 +162,23 @@ export class WorkingStaffGroup {
     if (next === current) return this;
     return new WorkingStaffGroup({
       ...this.state,
-      members: this.state.members.map((m) =>
-        m.staffId === staffId ? next.state : m
-      ),
+      members: this.state.members.map((m) => (m.staffId === staffId ? next : m)),
+    });
+  }
+
+  // ========== シリアライズ ==========
+
+  toPlain(): WorkingStaffGroupPlain {
+    return {
+      id: this.state.id,
+      members: this.state.members.map((m) => m.toPlain()),
+    };
+  }
+
+  static fromPlain(plain: WorkingStaffGroupPlain): WorkingStaffGroup {
+    return new WorkingStaffGroup({
+      id: plain.id,
+      members: plain.members.map((m) => WorkingStaffMember.fromPlain(m)),
     });
   }
 }

@@ -1724,7 +1724,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "members",
-          "type": "WorkingStaffMemberState[]",
+          "type": "WorkingStaffMember[]",
           "optional": false
         }
       ],
@@ -1840,6 +1840,22 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "WorkingStaffGroup",
           "isStatic": false,
           "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "WorkingStaffGroupPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": true,
+          "returnsSelf": true
         }
       ]
     },
@@ -1855,7 +1871,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "staff",
-          "type": "StaffState",
+          "type": "Staff",
           "optional": true
         }
       ],
@@ -1899,6 +1915,22 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "WorkingStaffMember",
           "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "WorkingStaffMemberPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": true,
           "returnsSelf": true
         }
       ]

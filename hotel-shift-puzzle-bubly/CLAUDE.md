@@ -67,6 +67,23 @@ hotel-shift-puzzle-app/src/
     }
   }
   ```
+- **`state` はドメインの形であって、保存形ではない**。集約が持つ子は**インスタンスで持つ**。
+  plain（`〜State`）を並べない
+  ```typescript
+  // NG: 子を plain で持つ（記述子の codec を書かずに済ませたい、という保存の都合）
+  type WorkingStaffGroupState = { id: string; members: WorkingStaffMemberState[] };
+
+  // OK: 子はインスタンス。保存形（`〜Plain`）を別に定義し、toPlain/fromPlain で橋渡し
+  type WorkingStaffGroupState = { id: string; members: WorkingStaffMember[] };
+  type WorkingStaffGroupPlain = { id: string; members: WorkingStaffMemberPlain[] };
+  ```
+  - plain 化は**記録する1箇所**でやる。記述子に `serialize` を書き、そこだけが `toPlain()` を呼ぶ
+    （`Schedule` / `WorkingStaffGroup` がその形）
+  - 既定の「state 規約」（`toJSON: o => o.state`）が使えるのは、子を持たない集約だけ。
+    **codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す**
+  - 副産物としてクラス図も正しくなる（`members: WorkingStaffMember[]` と出る）
+  - 未対応: `WorkShiftSet` / `ScheduleConstraints` / `ScheduleEditLog` はまだ子を plain で
+    持っている（この原則より前に書いたもの）
 - **層の依存方向を守る**：domain ← ui ← feature。ui は Redux を直接触らない
 - スライスは `slice.injectInto(rootReducer)` を副作用で実行し、bublys-os の store に自動注入される
 - **Reduxスライスは集約のリポジトリに徹する**：スライスは集約の保存・取得のみ
@@ -274,9 +291,10 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
   真実になり、いつか食い違う。
 - 同一性は常に `staffId`。抱えた実体の `id` はそれで被せ直すので、ずれた記録が入ってきても
   行が分裂しない。
-- メンバーを型（`WorkingStaffMember`）にしてあるのは、**クラス図に出すため**でもある。
-  union の型エイリアスのままだと共通のフィールドしか読めず、`staffId`／`staff` が図に
-  出ない（＝名簿の人は指す・臨時の人は抱える、という肝心の違いが図から消える）。
+- メンバーは型（`WorkingStaffMember`）にし、群は**そのインスタンスを**持つ。
+  union の型エイリアスや plain のままだと、クラス図の抽出器が共通のフィールドしか読めず、
+  `staffId`／`staff` が図に出ない（＝名簿の人は指す・臨時の人は抱える、という肝心の違いが
+  図から消える）。保存形は `toPlain()` / `fromPlain()` と記述子の `serialize` が担う。
 - 群を持たない勤務表（この集約より前に作られたもの）は、これまで通り
   「この世界に居るスタッフ全員」が行になる。**編集しようとした瞬間に**その顔ぶれから群ができる
   （読みの経路では作らない）。
