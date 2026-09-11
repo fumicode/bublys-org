@@ -21,3 +21,6 @@ export * from "./slice/index.js";
 
 // Sample data
 export * from "./data/index.js";
+
+// モデルのクラス図
+export * from "./model-graph/index.js";

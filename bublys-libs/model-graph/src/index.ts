@@ -35,8 +35,12 @@ export {
   type GroupOf,
 } from './lib/ui/forceLayout.js';
 export {
+  scopeMembersOf,
+  type ClassScope,
+  type ScopeOf,
+} from './lib/ui/scopeMembers.js';
+export {
   CLASS_DIAGRAM_PALETTE,
   ClassDiagramView,
   type ClassDiagramViewProps,
-  type ClassScope,
 } from './lib/ui/ClassDiagramView.js';

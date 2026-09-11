@@ -1,6 +1,7 @@
 import PeopleIcon from '@mui/icons-material/People';
 import TaskIcon from '@mui/icons-material/Task';
 import GridOnIcon from '@mui/icons-material/GridOn';
+import SchemaIcon from '@mui/icons-material/Schema';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -22,6 +23,7 @@ const menuItems = [
   { label: '局員一覧', url: 'shift-puzzle/members', icon: <PeopleIcon /> },
   { label: 'タスク一覧', url: 'shift-puzzle/tasks', icon: <TaskIcon /> },
   { label: 'シフト表リスト', url: 'shift-puzzle/shift-plans', icon: <GridOnIcon /> },
+  { label: 'クラス図', url: 'shift-puzzle/model-class-diagram', icon: <SchemaIcon /> },
 ];
 
 export function App() {

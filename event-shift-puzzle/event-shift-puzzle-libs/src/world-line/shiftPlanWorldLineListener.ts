@@ -27,12 +27,10 @@ import {
   updateShiftPlan,
   addShiftPlan,
 } from "../slice/shift-plan-slice.js";
+import { SHIFT_TYPE, shiftPlanScopeId } from "./shiftPlanTabs.js";
 
 // ========== 定数 ==========
-
-const SHIFT_TYPE = "Shift";
-
-const scopeIdFor = (planId: string) => `shift-plan:${planId}`;
+// 宣言は shiftPlanTabs.ts に1つだけ置く。2か所に書くと、片方だけ直して食い違う
 
 // ========== Helper ==========
 
@@ -94,7 +92,7 @@ shiftPlanWorldLineListener.startListening({
     );
     const entries = changed.map((c) => ({ hash: c.hash, data: c.shift }));
 
-    const scopeId = scopeIdFor(planId);
+    const scopeId = shiftPlanScopeId(planId);
     const graphJson = nextState.worldLineGraph?.graphs[scopeId];
     const graph = graphJson
       ? WorldLineGraph.fromJSON(graphJson)

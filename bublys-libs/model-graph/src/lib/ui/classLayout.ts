@@ -279,7 +279,15 @@ function boxHeight(cls: ModelClass, o: LayoutOptions): { h: number; f: number; m
 export function layoutClassDiagram(
   graph: ModelGraph,
   options: Partial<LayoutOptions> = {},
-  echoes: readonly EchoSpec[] = []
+  echoes: readonly EchoSpec[] = [],
+  /**
+   * クラス名 → そのクラスが載る世界（世界線スコープ）。渡すと**同じ世界の列を隣どうしに置く**。
+   *
+   * ★ 枠はメンバーの外接矩形なので、メンバーの列が離れていると**あいだの列を飲み込む**。
+   *   hotel の列の配置では、その世界のものでない箱が7つ枠の中に入っていた。
+   *   枠を歪めるのではなく、箱のほうを寄せて直す（力学の配置で押し出すのと同じ考え方）。
+   */
+  groupOf?: (className: string) => string | undefined
 ): ClassDiagramLayout {
   const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   const owner = assignAggregates(graph);
@@ -298,7 +306,12 @@ export function layoutClassDiagram(
     });
   }
 
+  // 世界のあるものを先に、世界ごとにまとめて並べる。世界が無いものは後ろ。
+  // 同じ世界の中では、中身の濃い集約を左に置くと参照の線が右へ流れて交差が減る
+  const worldOf = (root: string) => groupOf?.(root) ?? '\uffff';
   const order = [...columns.keys()].sort((a, b) => {
+    const world = worldOf(a).localeCompare(worldOf(b));
+    if (world !== 0) return world;
     const diff = (columns.get(b)?.length ?? 0) - (columns.get(a)?.length ?? 0);
     return diff !== 0 ? diff : a.localeCompare(b);
   });

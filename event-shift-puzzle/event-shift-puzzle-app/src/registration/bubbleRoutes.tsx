@@ -17,6 +17,7 @@ import {
   ShiftPlanWorldLineGraphView,
   ShiftPlanList,
   ShiftStatus,
+  ModelClassDiagram,
   parseTaskFilter,
   selectShiftPuzzlePlans,
 } from "@bublys-org/event-shift-puzzle-libs";
@@ -207,8 +208,17 @@ const ShiftPuzzleShiftPlanHistoryBubble: BubbleRoute["Component"] = ({ bubble })
   return <ShiftPlanWorldLineGraphView planId={bubble.params.shiftPlanId} />;
 };
 
+// --- モデルのクラス図 ---
+// 構造は TypeScript のソースから生成したもの、集約の根はスライスの宣言から、
+// 世界線での所属は world-line の宣言から。別々の出どころを、それぞれ知っている側に聞く。
+const ShiftPuzzleModelClassDiagramBubble: BubbleRoute["Component"] = () => (
+  <ModelClassDiagram />
+);
+
 /** シフトパズル機能のバブルルート定義 */
 export const shiftPuzzleBubbleRoutes: BubbleRoute[] = [
+  // クラス図は横に広いので、窓型（fillsContainer）で大きめに開く
+  { pattern: "shift-puzzle/model-class-diagram", type: "model-class-diagram", Component: ShiftPuzzleModelClassDiagramBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1200, height: 760 } } },
   { pattern: "shift-puzzle/members/filter", type: "member-filter", Component: ShiftPuzzleMemberFilterBubble },
   { pattern: "shift-puzzle/members/:memberId/availableShifts", type: "member-availability", Component: ShiftPuzzleMemberAvailabilityBubble },
   { pattern: "shift-puzzle/members/:memberId", type: "member", Component: ShiftPuzzleMemberBubble },

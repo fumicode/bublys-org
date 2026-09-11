@@ -155,6 +155,7 @@ dispatch(restoreShiftPlanFromWorldLine({ planId, shifts }))
 | `shift-puzzle/tasks` | タスク一覧（エントリー） |
 | `shift-puzzle/tasks/filter` | タスクフィルター検索 |
 | `shift-puzzle/tasks/:taskId` | タスク詳細 |
+| `shift-puzzle/model-class-diagram` | モデルのクラス図（サイドバーから開く） |
 
 ---
 
@@ -302,6 +303,32 @@ your-event-bubly/
 | ObjectView ダブルクリック展開 | どんなオブジェクトのドリルダウンにも使える |
 | 世界線グラフ | 状態履歴・バージョン管理が必要な任意のデータ |
 | フィルターバブルパターン（MemberFilter 等） | 任意のリストの絞り込み UI |
+
+---
+
+## モデルのクラス図
+
+`shift-puzzle/model-class-diagram` バブル。構造は **TypeScript のソースから生成**していて、
+`event-shift-puzzle-libs/src/model-graph/modelGraph.generated.ts` に入っている。
+モデルを直したら生成し直すこと（忘れると `modelGraph.staleness.test.ts` が落ちる）。
+
+```bash
+npm --workspace @bublys-org/model-graph run build
+node bublys-libs/model-graph/dist/lib/extract/cli.js \
+  --source event-shift-puzzle/event-shift-puzzle-model/src/lib \
+  --slices  event-shift-puzzle/event-shift-puzzle-libs/src/slice \
+  --out     event-shift-puzzle/event-shift-puzzle-libs/src/model-graph/modelGraph.generated.ts
+```
+
+- **集約の根はスライスから読む**（`--slices`）。このバブリには記述子が無く、
+  「何が集約か」を宣言しているのはスライスだから。引数に手で書くと、スライスを
+  1つ足したときに図が黙って古くなる
+- **世界線スコープは `SHIFT_TYPE` / `shiftPlanScopeId` から読む**（`world-line/shiftPlanTabs.ts`）。
+  このバブリで世界線に載るのは **`Shift` だけ**で、持ち主の `ShiftPlan` は載らない。
+  だから図の枠は `Shift` と `BlockList` を囲み、`ShiftPlan` は枠の外に出る——
+  **集約の単位と巻き戻りの単位がずれている**ことが、図でそのまま読める
+
+読み方の詳細は [docs/model-class-diagram.md](../docs/model-class-diagram.md)。
 
 ---
 
