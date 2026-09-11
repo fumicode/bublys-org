@@ -91,7 +91,6 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   workingStaffUrl?: string;
-  availabilityUrl?: string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
   /**
@@ -144,7 +143,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   worldLineUrl,
   treeUrl,
   workingStaffUrl,
-  availabilityUrl,
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
@@ -799,19 +797,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 </option>
               ))}
             </select>
-          )}
-
-          {availabilityUrl && (
-            <ObjectView
-              type={SCHEDULE_AVAILABILITY_TYPE}
-              url={availabilityUrl}
-              label="可能勤務帯"
-              openingPosition="bubble-side-right"
-            >
-              <span className="e-link" title="ダブルクリックで可能勤務帯を開く">
-                可能勤務帯
-              </span>
-            </ObjectView>
           )}
 
           {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
