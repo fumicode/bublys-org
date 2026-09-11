@@ -22,7 +22,6 @@ import {
   HotelObjectsProvider,
   ScheduleWorldLineView,
   ScheduleWorldLineTreeView,
-  AvailabilityEditor,
   WorkingStaffPanel,
   ScheduleViolationView,
   ShiftWishEditor,
@@ -38,7 +37,6 @@ import {
   scheduleDayUrl,
   scheduleViolationUrl,
   scheduleStaffUrl,
-  scheduleAvailabilityUrl,
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
   scheduleLeaderRuleUrl,
@@ -119,10 +117,9 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
   // バブル URL のスキームは app 層（ここ）の関心事。
-  // 可能勤務帯・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
+  // 勤務スタッフ・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
   const workingStaffUrl = scheduleStaffUrl(scheduleId);
-  const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const editLogUrl = scheduleEditLogUrl(scheduleId);
   // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
@@ -135,13 +132,11 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <ScheduleGrid
       scheduleId={scheduleId}
       onOpenWorkingStaff={() => openSide(workingStaffUrl, "bubble-side-left")}
-      onOpenAvailability={() => openSide(availabilityUrl, "bubble-side-right")}
       onOpenHistory={() => openSide(worldLineUrl, "bubble-side-bottom")}
       onOpenTree={() => openSide(treeUrl, "bubble-side-bottom")}
       onOpenEditLog={() => openSide(editLogUrl, "bubble-side-right")}
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       workingStaffUrl={workingStaffUrl}
-      availabilityUrl={availabilityUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       editLogUrl={editLogUrl}
@@ -218,10 +213,6 @@ const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
     />
   );
 
-// --- 可能勤務帯エディタバブル ---
-const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
-
 // --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
 // 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
 const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePanel />);
@@ -281,7 +272,6 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/edit-log", type: "schedule-edit-log", Component: ScheduleEditLogBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/staff", type: "schedule-staff", Component: WorkingStaffBubble, bubbleOptions: { defaultSize: { width: 620, height: 440 } } },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },

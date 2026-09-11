@@ -1,17 +1,24 @@
 'use client';
 
-import { FC, useMemo, useState } from "react";
+import { FC, useMemo, useState, type KeyboardEvent } from "react";
 import styled from "styled-components";
 import PersonIcon from "@mui/icons-material/Person";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckIcon from "@mui/icons-material/Check";
+import DoneIcon from "@mui/icons-material/Done";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import { Button, IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { Staff, WorkShift } from "../domain/index.js";
+
+/** 勤務帯の編集フォームのドラフト。id が null なら新規追加、そうでなければ既存の編集。 */
+type ShiftDraft = { id: string | null; name: string; hour: number };
+
+const clampHour = (hour: number): number => Math.max(0, Math.min(23, hour));
 
 type WorkingStaffListViewProps = {
   /** この勤務表で働く人たち（並び順のまま＝勤務表の行順） */
@@ -38,6 +45,13 @@ type WorkingStaffListViewProps = {
   onRenameTemporary: (staffId: string, name: string) => void;
   /** その人のその勤務帯の可否を反転する */
   onToggleShift: (staffId: string, shiftId: string) => void;
+  /**
+   * 勤務帯（列）そのものの追加／編集を確定する。id が null なら追加、そうでなければ更新。
+   * 入力中は保存せず、✅ 押下で1回だけ呼ばれる（＝世界線に記録しすぎない）。
+   */
+  onCommitShift?: (id: string | null, draft: { name: string; hour: number }) => void;
+  /** 勤務帯（列）を取り除く */
+  onRemoveShift?: (shiftId: string) => void;
 };
 
 /**
@@ -64,6 +78,8 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   onMove,
   onRenameTemporary,
   onToggleShift,
+  onCommitShift,
+  onRemoveShift,
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
@@ -73,6 +89,74 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   /** ドロップ先として光らせている行 */
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  /** 勤務帯（列）の編集フォーム。1つだけ開く */
+  const [shiftDraft, setShiftDraft] = useState<ShiftDraft | null>(null);
+
+  const shiftColumnsEditable = editable && !!onCommitShift;
+
+  const commitShift = () => {
+    if (shiftDraft) {
+      onCommitShift?.(shiftDraft.id, {
+        name: shiftDraft.name,
+        hour: shiftDraft.hour,
+      });
+    }
+    setShiftDraft(null);
+  };
+
+  // Enter で確定（日本語入力の変換確定 Enter＝isComposing は除外）
+  const handleShiftFormKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      commitShift();
+    }
+  };
+
+  const renderShiftForm = (d: ShiftDraft) => (
+    <div className="e-shift-edit" onKeyDown={handleShiftFormKeyDown}>
+      <TextField
+        variant="standard"
+        size="small"
+        autoFocus
+        value={d.name}
+        placeholder="勤務帯名"
+        onChange={(e) => setShiftDraft({ ...d, name: e.target.value })}
+      />
+      <TextField
+        className="e-shift-hour"
+        variant="standard"
+        size="small"
+        type="number"
+        label="時"
+        value={d.hour}
+        inputProps={{ min: 0, max: 23 }}
+        onChange={(e) => {
+          const hour = parseInt(e.target.value, 10);
+          if (!Number.isNaN(hour)) setShiftDraft({ ...d, hour: clampHour(hour) });
+        }}
+      />
+      <div className="e-shift-edit-actions">
+        {d.id !== null && onRemoveShift && (
+          <IconButton
+            size="small"
+            title="この勤務帯を削除"
+            onClick={() => {
+              onRemoveShift(d.id as string);
+              setShiftDraft(null);
+            }}
+          >
+            <DeleteOutlineIcon fontSize="inherit" />
+          </IconButton>
+        )}
+        <IconButton size="small" title="やめる" onClick={() => setShiftDraft(null)}>
+          <CloseIcon fontSize="inherit" />
+        </IconButton>
+        <IconButton size="small" title="確定" onClick={commitShift}>
+          <DoneIcon fontSize="inherit" />
+        </IconButton>
+      </div>
+    </div>
+  );
 
   const workingIds = useMemo(
     () => new Set(members.map((s) => s.id)),
@@ -177,10 +261,47 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                   <th className="e-th-name">名前</th>
                   {workShifts.map((shift) => (
                     <th key={shift.id} className="e-th-shift" title={shift.name}>
-                      <span className="e-shift-name">{shift.name}</span>
-                      <span className="e-shift-time">{shift.startTimeLabel}</span>
+                      {shiftColumnsEditable && shiftDraft?.id === shift.id ? (
+                        renderShiftForm(shiftDraft)
+                      ) : (
+                        <>
+                          <span className="e-shift-name">{shift.name}</span>
+                          <span className="e-shift-time">{shift.startTimeLabel}</span>
+                          {shiftColumnsEditable && (
+                            <IconButton
+                              size="small"
+                              className="e-shift-edit-btn"
+                              title="この勤務帯を編集"
+                              onClick={() =>
+                                setShiftDraft({
+                                  id: shift.id,
+                                  name: shift.name,
+                                  hour: shift.startHour,
+                                })
+                              }
+                            >
+                              <EditIcon fontSize="inherit" />
+                            </IconButton>
+                          )}
+                        </>
+                      )}
                     </th>
                   ))}
+                  {shiftColumnsEditable && (
+                    <th className="e-th-add-shift">
+                      {shiftDraft?.id === null ? (
+                        renderShiftForm(shiftDraft)
+                      ) : (
+                        <IconButton
+                          size="small"
+                          title="勤務帯を追加"
+                          onClick={() => setShiftDraft({ id: null, name: "", hour: 9 })}
+                        >
+                          <AddIcon fontSize="inherit" />
+                        </IconButton>
+                      )}
+                    </th>
+                  )}
                   <th className="e-th-remove" />
                 </tr>
               </thead>
@@ -302,6 +423,8 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                         />
                       </td>
                     ))}
+
+                    {shiftColumnsEditable && <td className="e-add-shift-cell" />}
 
                     <td className="e-remove-cell">
                       <IconButton
@@ -490,9 +613,36 @@ const StyledContainer = styled.div`
 
     .e-shift-cell,
     .e-handle-cell,
-    .e-remove-cell {
+    .e-remove-cell,
+    .e-add-shift-cell {
       text-align: center;
       width: 1%;
+    }
+
+    .e-th-shift .e-shift-edit-btn {
+      font-size: 0.9rem;
+      padding: 0;
+      color: #bbb;
+    }
+
+    .e-th-shift:hover .e-shift-edit-btn {
+      color: #789;
+    }
+  }
+
+  .e-shift-edit {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 2px;
+
+    .e-shift-hour {
+      width: 48px;
+    }
+
+    .e-shift-edit-actions {
+      display: flex;
+      font-size: 0.9rem;
     }
   }
 

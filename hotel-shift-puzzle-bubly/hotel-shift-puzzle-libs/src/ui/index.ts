@@ -15,7 +15,6 @@ export * from "./ScheduleConstraintsBar.js";
 export * from "./ShiftCommandsBar.js";
 export * from "./LeaderRuleDiagram.js";
 export * from "./LeaderBadges.js";
-export * from "./AvailabilityGridView.js";
 export * from "./ConstraintViolationView.js";
 export * from "./DeadCellDiagnosisView.js";
 export * from "./ShiftWishGridView.js";

@@ -26,13 +26,9 @@ export const staffUrl = (staffId: string): string =>
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;
 
-/** 勤務スタッフ群バブル（この勤務表で働く人たちを足す・外す・並べ替える） */
+/** 勤務スタッフ群バブル（誰が働くか・並び順・可能勤務帯・勤務帯の列をここで全部） */
 export const scheduleStaffUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/staff`;
-
-/** 可能勤務帯エディタバブル */
-export const scheduleAvailabilityUrl = (scheduleId: string): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/availability`;
 
 /** 予約状況（宿泊人数・部屋数）編集バブル（勤務表の予約行から開く） */
 export const scheduleReservationInfoUrl = (scheduleId: string): string =>

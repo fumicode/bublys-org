@@ -75,8 +75,6 @@ type ScheduleGridProps = {
   onOpenTree?: () => void;
   /** 勤務スタッフ群（この勤務表で働く人たち）を開くハンドラ */
   onOpenWorkingStaff?: () => void;
-  /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
-  onOpenAvailability?: () => void;
   /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
   onConfirm?: (reportId: string) => void;
   /**
@@ -87,7 +85,6 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   workingStaffUrl?: string;
-  availabilityUrl?: string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
   /** 操作履歴バブルを開くハンドラ */
@@ -138,13 +135,11 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   onOpenHistory,
   onOpenTree,
   onOpenWorkingStaff,
-  onOpenAvailability,
   onOpenEditLog,
   onConfirm,
   worldLineUrl,
   treeUrl,
   workingStaffUrl,
-  availabilityUrl,
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
@@ -797,14 +792,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               ))}
             </select>
           )}
-
-          {onOpenAvailability &&
-            withUrl(
-              availabilityUrl,
-              <button type="button" className="e-link" onClick={onOpenAvailability}>
-                可能勤務帯
-              </button>
-            )}
 
           {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
               自動シフトの優先度に使う。詳しくは reportPriority.ts）。
