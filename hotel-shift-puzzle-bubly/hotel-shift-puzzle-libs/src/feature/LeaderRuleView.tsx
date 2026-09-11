@@ -3,14 +3,13 @@
 import { FC, useCallback, useMemo } from "react";
 import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
-  Staff,
   WorkShiftSet,
   ScheduleConstraints,
   MonthlyStaffSchedule,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
-import { useObjects, useObject } from "../objects/repository.js";
+import { useObject } from "../objects/repository.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import {
@@ -20,6 +19,7 @@ import {
   SCHEDULE_CONSTRAINTS_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type LeaderRuleViewProps = {
   /** どの勤務表の制約か */
@@ -36,7 +36,7 @@ type LeaderRuleViewProps = {
  */
 const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
   const store = useAppStore();
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  const { staffList } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);

@@ -28,6 +28,20 @@ describe('ScheduleAvailability（勤務表ごとの可能勤務帯）の使い�
     expect(onAgain.isAllowed('staff-A', 'early')).toBe(true);
   });
 
+  test('allowAllIfUnset は新しく入った人に全勤務帯を許可する（不変）', () => {
+    const base = create();
+    const withHelper = base.allowAllIfUnset('tmp-1', ['early', 'late']);
+
+    expect(withHelper.allowedShiftIds('tmp-1').sort()).toEqual(['early', 'late']);
+    expect(base.allowedShiftIds('tmp-1')).toEqual([]); // 元は不変
+  });
+
+  test('allowAllIfUnset は既に設定のある人には触らない（外して戻した人の可否を消さない）', () => {
+    const tuned = create().toggle('staff-A', 'early'); // 早番を外してある
+    expect(tuned.allowAllIfUnset('staff-A', ['early', 'late'])).toBe(tuned);
+    expect(tuned.isAllowed('staff-A', 'early')).toBe(false);
+  });
+
   test('toggle は他スタッフ・他勤務帯に影響しない', () => {
     const a = create().toggle('staff-A', 'early');
     expect(a.isAllowed('staff-A', 'late')).toBe(true);

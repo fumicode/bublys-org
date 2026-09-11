@@ -18,7 +18,9 @@ export type ScheduleEditKind =
   | "autoStep"
   | "constraintEdit"
   | "requiredEdit"
-  | "candidate";
+  | "candidate"
+  /** 勤務スタッフ群の変更（臨時スタッフの追加・除外・並び替え） */
+  | "membershipEdit";
 
 export type ScheduleEditTargets = {
   staffId?: string;

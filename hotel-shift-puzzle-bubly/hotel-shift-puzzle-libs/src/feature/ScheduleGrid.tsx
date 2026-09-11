@@ -4,7 +4,6 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import styled from "styled-components";
 import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
@@ -50,6 +49,7 @@ import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleCon
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
   recordAutoStep,
@@ -58,7 +58,6 @@ import {
   buildCandidateEditLog,
 } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
@@ -76,6 +75,8 @@ type ScheduleGridProps = {
   onOpenHistory?: () => void;
   /** キセキの木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
   onOpenTree?: () => void;
+  /** 勤務スタッフ群（この勤務表で働く人たち）を開くハンドラ */
+  onOpenWorkingStaff?: () => void;
   /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
   onOpenAvailability?: () => void;
   /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
@@ -87,6 +88,7 @@ type ScheduleGridProps = {
    */
   worldLineUrl?: string;
   treeUrl?: string;
+  workingStaffUrl?: string;
   availabilityUrl?: string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
@@ -137,11 +139,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenHistory,
   onOpenTree,
+  onOpenWorkingStaff,
   onOpenAvailability,
   onOpenEditLog,
   onConfirm,
   worldLineUrl,
   treeUrl,
+  workingStaffUrl,
   availabilityUrl,
   editLogUrl,
   dayBubbleUrl,
@@ -160,7 +164,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     staffId: string;
     day: WorkingDay;
   } | null>(null);
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
+  const { staffList } = useWorkingStaff(scheduleId);
   // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
   const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
@@ -783,6 +788,20 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               ))}
             </select>
           )}
+
+          {/* 行になる人たち（勤務スタッフ群）。ここで足す・外す・並べ替える */}
+          {onOpenWorkingStaff &&
+            withUrl(
+              workingStaffUrl,
+              <button
+                type="button"
+                className="e-link"
+                onClick={onOpenWorkingStaff}
+                title="この勤務表で働く人たち（臨時スタッフの追加・除外・並び替え）"
+              >
+                勤務スタッフ
+              </button>
+            )}
 
           {onOpenAvailability &&
             withUrl(

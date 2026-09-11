@@ -3,7 +3,6 @@
 import { FC, useEffect } from "react";
 import styled from "styled-components";
 import {
-  Staff,
   WorkShift,
   WorkShiftSet,
   createDefaultWorkShiftSet,
@@ -12,19 +11,18 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { AvailabilityGridView } from "../ui/AvailabilityGridView.js";
 import {
-  useObjects,
   useObject,
   useObjectShell,
   useObjectRepo,
   useObjectsPending,
 } from "../objects/repository.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type Props = {
   scheduleId: string;
@@ -40,7 +38,8 @@ const newWorkShiftId = (): string =>
  * （＋で追加・✏️で改名/時刻変更・削除）。どちらの編集も勤務表と同じローカル世界線に記録される（case B）。
  */
 const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 可能勤務帯の行も勤務表の行と同じ顔ぶれ（臨時の人も入る）
+  const { staffList } = useWorkingStaff(scheduleId);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const { object: workShiftSet, update: updateSet } = useObjectShell<WorkShiftSet>(
     WORKSHIFT_SET_TYPE,

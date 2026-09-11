@@ -1,11 +1,12 @@
 'use client';
 
 import { FC } from "react";
-import { Staff, ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
+import { ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReportView } from "../ui/ScheduleReportView.js";
-import { useObjects, useObjectShell, useObjectRepo } from "../objects/repository.js";
-import { STAFF_TYPE, SCHEDULE_REPORT_TYPE } from "../objects/hotelObjects.js";
+import { useObjectShell, useObjectRepo } from "../objects/repository.js";
+import { SCHEDULE_REPORT_TYPE } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type ScheduleReportPanelProps = {
   reportId: string;
@@ -19,7 +20,8 @@ type ScheduleReportPanelProps = {
  * 見つからない旨を表示するに留める。
  */
 const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => {
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  // レポートは勤務表のスナップショット。名前はその勤務表で働いた人たちから引く
+  const { staffList } = useWorkingStaff(ScheduleReport.scheduleIdOf(reportId));
   const { object: report, update } = useObjectShell<ScheduleReport>(
     SCHEDULE_REPORT_TYPE,
     reportId

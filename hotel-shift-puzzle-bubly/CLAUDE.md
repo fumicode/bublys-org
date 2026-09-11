@@ -101,7 +101,7 @@ hotel-shift-puzzle-app/src/
 
 | 分類 | 意味 | 例 |
 |---|---|---|
-| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkShiftSet(勤務表用) / ScheduleAvailability / ScheduleConstraints / ScheduleEditLog |
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ScheduleAvailability / ScheduleConstraints / ScheduleEditLog |
 | `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
 | `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
 
@@ -251,6 +251,41 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
   - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と
     勤務表ごと（id=scheduleId）の2通りで存在する。勤務表は勤務帯を `workShiftIds` で持たず、
     自分の `WorkShiftSet` を唯一の真実とする。
+
+---
+
+## 勤務表の行は「勤務スタッフ群」が決める
+
+勤務表はスタッフを直接持たない。間に **勤務スタッフ群（`WorkingStaffGroup`）** が入る。
+
+```
+勤務表 ──workingStaffGroupId──▶ 勤務スタッフ群 ──▶ メンバー
+                                                  ├ roster    : 名簿の人（世界に焼き付いた Staff を id で指す）
+                                                  └ temporary : この勤務表の中だけの臨時の人（実体を群が抱える）
+```
+
+- **名簿（`Staff`）は pinned、群は live。** 名簿は世界の誕生で焼き付いて動かない。
+  「誰が働くか」はその世界の中で変わるので、群は親 Schedule の世界線に相乗りする（case B）。
+  id は `scheduleId`（＝`workingStaffGroupId` の既定値）。
+- **臨時の人の実体は群の中にしか居ない。** `Staff` を新しく作るとグローバルの名簿に載って
+  しまうので、臨時の人は群が値として抱える。だから時間移動で一緒に現れたり消えたりする。
+- 群を持たない勤務表（この集約より前に作られたもの）は、これまで通り
+  「この世界に居るスタッフ全員」が行になる。**編集しようとした瞬間に**その顔ぶれから群ができる
+  （読みの経路では作らない）。
+
+### 顔ぶれが変わると連れて動くもの（`feature/membershipChange.ts`）
+
+1回の変更で複数の集約が動く。**同じ1ノードに載せる**こと（別々だと、その間のノードへ
+時間移動したときに中途半端な世界が現れる＝#110 と同じ事故）。
+
+| 変化 | 連れて動くもの | 載せないとどうなるか |
+|---|---|---|
+| 人が入る | 可能勤務帯に席を用意（`allowAllIfUnset`） | その人のセルに何も入れられない |
+| 人が外れる | 勤務表からその人の割当を消す（`clearStaff`） | 表に居ない人をフッターの集計が数え続ける |
+| 人が外れる | 責任者候補から外す（`ScheduleConstraints.removeStaff`） | どう埋めても満たせない日ができる |
+
+組み立ては純粋関数 `buildMembershipChange`（React も store も通さない＝テストで固定できる）、
+記録は `recordMembershipEdit`（`saveLocalBundle` で1ノード＋操作履歴に `membershipEdit` を積む）。
 
 ---
 

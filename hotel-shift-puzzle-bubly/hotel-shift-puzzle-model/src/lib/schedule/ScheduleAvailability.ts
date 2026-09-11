@@ -56,6 +56,23 @@ export class ScheduleAvailability {
     return new ScheduleAvailability({ ...this.state, byStaff });
   }
 
+  /**
+   * まだ設定の無いスタッフに、指定の勤務帯すべてを許可した新しいインスタンスを返す。不変。
+   * 既に設定があれば自分自身を返す。
+   *
+   * 「この勤務表で新しく働くことになった人は、既定でどの勤務帯にも入れる」ための入口。
+   * 設定が無いと allowedShiftIds が空を返し、その人のセルには何も入れられない
+   * （臨時スタッフを足したのに一日も割り当てられない、という形で現れる）。
+   * 既存の設定を上書きしないので、一度外して戻した人の可否はそのまま戻る。
+   */
+  allowAllIfUnset(staffId: string, shiftIds: string[]): ScheduleAvailability {
+    if (this.state.byStaff[staffId] !== undefined) return this;
+    return new ScheduleAvailability({
+      ...this.state,
+      byStaff: { ...this.state.byStaff, [staffId]: [...shiftIds] },
+    });
+  }
+
   /** 1つの可否をトグルした新しいインスタンスを返す。不変。 */
   toggle(staffId: string, shiftId: string): ScheduleAvailability {
     const current = this.allowedShiftIds(staffId);

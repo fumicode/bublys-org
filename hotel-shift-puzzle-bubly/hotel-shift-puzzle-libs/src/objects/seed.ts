@@ -23,9 +23,11 @@ import {
   ENDGAME_SCHEDULE_ID,
   ALLOWED_SHIFT_IDS_BY_STAFF,
 } from "../data/index.js";
+import { WorkingStaffGroup } from "@bublys-org/hotel-shift-puzzle-model";
 import type { BundleItem } from "./commit.js";
 import {
   STAFF_TYPE,
+  WORKING_STAFF_GROUP_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
@@ -42,7 +44,7 @@ import {
  *       空の勤務表（6月・7月） … 自動シフトを一から動かす用
  *       作成途中（8月）       … 候補集合・確定提案を見る用（実際に人が触る状態）
  *       終盤・詰みあり（9月）  … 埋められないセルがある状態
- *   - 勤務表ごとの勤務帯セット・可能勤務帯・制約
+ *   - 勤務表ごとの勤務帯セット・勤務スタッフ群・可能勤務帯・制約
  */
 export function buildSampleItems(): BundleItem[] {
   const items: BundleItem[] = [];
@@ -72,6 +74,11 @@ export function buildSampleItems(): BundleItem[] {
     items.push({
       type: WORKSHIFT_SET_TYPE,
       obj: createSampleWorkShiftSet().withId(schedule.id),
+    });
+    // その勤務表で働く人たち。例データではどの勤務表も名簿の全員（臨時は入れていない）
+    items.push({
+      type: WORKING_STAFF_GROUP_TYPE,
+      obj: WorkingStaffGroup.ofRoster(schedule.workingStaffGroupId, scenarioParams.staffIds),
     });
     // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
     items.push({

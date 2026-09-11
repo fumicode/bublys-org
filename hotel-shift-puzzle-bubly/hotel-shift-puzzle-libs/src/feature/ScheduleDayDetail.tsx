@@ -3,7 +3,6 @@
 import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
   ScheduleAvailability,
@@ -18,7 +17,6 @@ import { useObjects, useObject } from "../objects/repository.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
   SCHEDULE_AVAILABILITY_TYPE,
@@ -26,6 +24,7 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
@@ -40,7 +39,7 @@ type ScheduleDayDetailProps = {
  */
 const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
   const store = useAppStore();
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  const { staffList } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const availability = useObject<ScheduleAvailability>(
