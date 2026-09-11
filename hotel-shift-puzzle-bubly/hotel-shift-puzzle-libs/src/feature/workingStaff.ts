@@ -68,10 +68,14 @@ export type WorkingStaffValue = {
   remove: (staffId: string) => void;
   /** 行の並びを変える */
   move: (staffId: string, toIndex: number) => void;
-  /** 臨時の人の名前を変える */
-  renameTemporary: (staffId: string, name: string) => void;
-  /** 臨時の人の部署を変える */
-  changeTemporaryDepartment: (staffId: string, department: string) => void;
+  /**
+   * 臨時の人の名前・部署を直す（名簿の人には効かない）。
+   * 名前と部署をまとめて1回で渡すのは、**1回の編集＝世界線1ノード**にするため。
+   */
+  editTemporary: (
+    staffId: string,
+    edit: { name: string; department: string }
+  ) => void;
   /** この勤務表の勤務帯（可能勤務帯のチェック欄の列） */
   workShifts: WorkShift[];
   /** その人がその勤務帯に入れるか */
@@ -225,21 +229,22 @@ export function useWorkingStaff(
         }),
       [updateGroup, nameOf]
     ),
-    renameTemporary: useCallback(
-      (staffId: string, name: string) =>
-        updateGroup((g) => g.renameTemporary(staffId, name), {
-          summary: () => `臨時スタッフの名前を ${name} に変えた`,
-          staffId,
-        }),
+    editTemporary: useCallback(
+      (staffId: string, edit: { name: string; department: string }) =>
+        updateGroup(
+          (g) =>
+            g
+              .renameTemporary(staffId, edit.name)
+              .changeTemporaryDepartment(staffId, edit.department),
+          {
+            summary: () =>
+              `臨時スタッフ ${edit.name}${
+                edit.department ? `（${edit.department}）` : ""
+              } を直した`,
+            staffId,
+          }
+        ),
       [updateGroup]
-    ),
-    changeTemporaryDepartment: useCallback(
-      (staffId: string, department: string) =>
-        updateGroup((g) => g.changeTemporaryDepartment(staffId, department), {
-          summary: () => `${nameOf(staffId)} の部署を ${department} に変えた`,
-          staffId,
-        }),
-      [updateGroup, nameOf]
     ),
     workShifts,
     isAllowed: useCallback(

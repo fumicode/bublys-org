@@ -46,7 +46,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     addTemporary,
     remove,
     move,
-    renameTemporary,
+    editTemporary,
     workShifts,
     isAllowed,
     toggleShift,
@@ -97,10 +97,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     <StyledContainer>
       <div className="e-header">
         <h3>
-          勤務スタッフ{" "}
-          <span className="e-sub">
-            {schedule.year}年{schedule.month}月（{staffList.length}名）
-          </span>
+          {schedule.year}年{schedule.month}月勤務スタッフ({staffList.length}名)
         </h3>
         <p className="e-note">
           この勤務表の行になる人たち。左の名簿から ＋ で加え、⠿ をドラッグで並び替え、
@@ -120,7 +117,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
         onAddFromRoster={addFromRoster}
         onRemove={remove}
         onMove={move}
-        onRenameTemporary={renameTemporary}
+        onEditTemporary={editTemporary}
         onToggleShift={toggleShift}
         onCommitShift={workShiftSet ? handleCommitShift : undefined}
         onRemoveShift={(id) => updateSet((s) => s.remove(id))}
@@ -137,12 +134,6 @@ const StyledContainer = styled.div`
 
     h3 {
       margin: 0;
-    }
-
-    .e-sub {
-      font-weight: normal;
-      font-size: 0.8em;
-      color: #777;
     }
 
     .e-note {

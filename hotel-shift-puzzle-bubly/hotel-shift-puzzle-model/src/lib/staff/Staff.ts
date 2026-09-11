@@ -28,13 +28,15 @@ export class Staff {
     return this.state.department ?? "";
   }
 
-  /** 名前を変更した新しい Staff を返す */
+  /** 名前を変更した新しい Staff を返す。変わらなければ自分自身。 */
   rename(name: string): Staff {
+    if (name === this.state.name) return this;
     return new Staff({ ...this.state, name });
   }
 
-  /** 部署を変更した新しい Staff を返す */
+  /** 部署を変更した新しい Staff を返す。変わらなければ自分自身。 */
   changeDepartment(department: string): Staff {
+    if (department === this.department) return this;
     return new Staff({ ...this.state, department });
   }
 }
