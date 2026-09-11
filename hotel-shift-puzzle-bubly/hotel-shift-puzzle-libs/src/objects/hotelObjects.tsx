@@ -12,6 +12,7 @@
 import React from "react";
 import PersonIcon from "@mui/icons-material/Person";
 import GroupsIcon from "@mui/icons-material/Groups";
+import RuleIcon from "@mui/icons-material/Rule";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
@@ -23,8 +24,8 @@ import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
-  type ScheduleConstraintsPlain,
+  ConstraintSet,
+  type ConstraintSetPlain,
   ScheduleReport,
   ScheduleEditLog,
   type ScheduleEditLogPlain,
@@ -46,7 +47,15 @@ export const SCHEDULE_TYPE = "Schedule";
 /** 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表ごとに1つ（id=scheduleId）。 */
 export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
-export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
+
+/**
+ * 制約セット。勤務帯セットと同じく2通り:
+ *   グローバルのテンプレート（id="global"）／勤務表ごとの独自セット（id=scheduleId）
+ */
+export const CONSTRAINT_SET_TYPE = "ConstraintSet";
+/** グローバルの制約セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
+export const GLOBAL_CONSTRAINT_SET_ID = "global";
+
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
 /** 勤務表の操作履歴（ノウハウ可視化）。Schedule ローカル世界線に相乗り。 */
 export const SCHEDULE_EDIT_LOG_TYPE = "ScheduleEditLog";
@@ -145,19 +154,23 @@ export const HOTEL_OBJECTS = defineObjects({
     // スタッフ×月で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
     // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
   },
-  ScheduleConstraints: {
-    class: ScheduleConstraints,
-    getId: (c: ScheduleConstraints) => c.id,
-    // 勤務表ごとの制約。親 Schedule のローカル世界線に束ねる（case B）。
-    // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
+  ConstraintSet: {
+    class: ConstraintSet,
+    getId: (c: ConstraintSet) => c.id,
+    icon: React.createElement(RuleIcon, { fontSize: "small" }),
+    // 勤務帯セットと同じく2通りの使われ方をする集約:
+    //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
+    //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）。
+    //     担当者をドロップで足すと世界線にノードが増え、時間移動で一緒に戻る
     // 入れ子にインスタンス（ShiftLeaderRule）を持つので codec を明示。
     serialize: {
-      toJSON: (c: ScheduleConstraints) => c.toPlain(),
-      fromJSON: (j) => ScheduleConstraints.fromPlain(j as ScheduleConstraintsPlain),
+      toJSON: (c: ConstraintSet) => c.toPlain(),
+      fromJSON: (j) => ConstraintSet.fromPlain(j as ConstraintSetPlain),
     },
     membership: {
       kind: "live",
-      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+      homeScope: (id: string) =>
+        id === GLOBAL_CONSTRAINT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
     },
   },
   ScheduleReport: {

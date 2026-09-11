@@ -12,14 +12,14 @@ import {
   WorkShiftSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ConstraintViolationView } from "../ui/ConstraintViolationView.js";
 import { useObject, useObjects } from "../objects/repository.js";
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
@@ -38,8 +38,8 @@ const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
 

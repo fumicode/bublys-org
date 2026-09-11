@@ -14,6 +14,7 @@ import {
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
+  ConstraintSetCollection,
   ScheduleCollection,
   ScheduleGrid,
   ScheduleDayDetail,
@@ -87,6 +88,10 @@ const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
 
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
+
+// --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
+const ConstraintSetBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ConstraintSetCollection />);
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 // 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
@@ -260,6 +265,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
+  { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 460, height: 360 } } },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
   // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
   { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },

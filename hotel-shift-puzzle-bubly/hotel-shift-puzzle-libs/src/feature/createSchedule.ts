@@ -3,7 +3,7 @@
  *
  * 「勤務表を作る」は、世界線スコープ `Schedule:<id>` の**誕生**そのもの。
  * 起点ノードには次の一式が1ノードで載る:
- *   - 持ち主一式 … 勤務表・勤務帯セット（グローバルのコピー）・勤務スタッフ群
+ *   - 持ち主一式 … 勤務表・勤務帯セット・制約セット（どちらもグローバルのコピー）・勤務スタッフ群
  *   - 固定メンバー … そのときのスタッフ名簿（参照のコピー。以後この世界では動かない）
  *
  * 名簿（固定メンバー）と勤務スタッフ群は役割が違う。名簿は「そのとき居た人たち」を
@@ -19,6 +19,7 @@ import {
   WorkShiftSet,
   createDefaultWorkShiftSet,
   WorkingStaffGroup,
+  ConstraintSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   APP_SCOPE_ID,
@@ -33,7 +34,9 @@ import {
   SCHEDULE_TYPE,
   WORKSHIFT_SET_TYPE,
   WORKING_STAFF_GROUP_TYPE,
+  CONSTRAINT_SET_TYPE,
   GLOBAL_WORKSHIFT_SET_ID,
+  GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
 
 type StoreLike = {
@@ -69,6 +72,16 @@ export function createSchedule(
       GLOBAL_WORKSHIFT_SET_ID
     ) ?? createDefaultWorkShiftSet(id);
 
+  // 制約セットも同じ形でコピーする。グローバルで整えた責任者ルール・上限が、
+  // 新しい勤務表の出発点になる。未投入なら既定値だけの空セット。
+  const constraintSet =
+    adoptGlobalValue<ConstraintSet>(
+      store,
+      CONSTRAINT_SET_TYPE,
+      (global) => global.withId(schedule.constraintSetId),
+      GLOBAL_CONSTRAINT_SET_ID
+    ) ?? ConstraintSet.empty(schedule.constraintSetId);
+
   // 固定メンバー。**参照**だけを見るので、値が CAS から追い出されていても取りこぼさない。
   // 勤務スタッフ群はこの参照の id から作る（値を読まないのが要点）。
   const pinnedRefs = pinnableRefs(store, SCHEDULE_TYPE);
@@ -81,6 +94,7 @@ export function createSchedule(
     { type: SCHEDULE_TYPE, obj: schedule },
     { type: WORKSHIFT_SET_TYPE, obj: workShiftSet },
     { type: WORKING_STAFF_GROUP_TYPE, obj: staffGroup },
+    { type: CONSTRAINT_SET_TYPE, obj: constraintSet },
   ];
 
   // 誕生（1ノード）。持ち主一式は seed の値から、固定メンバーは記述子の pinTypes から載る。

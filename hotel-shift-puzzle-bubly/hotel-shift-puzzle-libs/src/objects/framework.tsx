@@ -41,7 +41,7 @@ export type ObjectSerialize<T> = {
  *   - live     … **その世界で変化する**。編集するとその世界線にノードが増え、時間移動で戻る。
  *                自分のスコープを持つ集約も、親集約のスコープに相乗りするものもこれ。
  *                  Schedule:            (id) => `Schedule:${id}`
- *                  ScheduleConstraints: (id) => `Schedule:${id}`   … 親の世界線に相乗り
+ *                  ConstraintSet: (id) => `Schedule:${id}`   … 親の世界線に相乗り
  *   - pinned   … **その世界が生まれた瞬間に焼き付けられ、以後動かない**。
  *                グローバル側の変更・削除は自動では波及しない（Staff）。
  *                どのスコープへ焼くかはメンバー側では言えないので、
@@ -53,7 +53,7 @@ export type ObjectSerialize<T> = {
  * 引数が obj ではなく id なのが要点。削除は `removeObject(type, id)` のように
  * オブジェクトを手に持たずに呼ばれるので、obj を要求すると削除だけが住所を
  * 解決できずアプリ全体スコープに落ちる（保存と削除で行き先が食い違う）。
- * 全 live 型で id はスコープの持ち主 ID に等しい（ScheduleConstraints.id は scheduleId）。
+ * 全 live 型で id はスコープの持ち主 ID に等しい（ConstraintSet.id は scheduleId）。
  */
 export type Membership =
   | { kind: "live"; homeScope: (id: string) => string | undefined }

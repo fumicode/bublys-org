@@ -6,7 +6,7 @@ import {
   WorkShiftSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleReport,
   MaxConsecutiveWorkdaysConstraint,
   fulfillWishesStep,
@@ -35,7 +35,7 @@ import {
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -84,8 +84,8 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // 抽出ビューで「対象」とするのは、メンバー全員が抽出 subset に含まれるルールだけ。
   // （例: 早責3人を抽出 → 早責は対象。予責は山本が兼務でも田中が subset 外なので対象外
   //   ＝ subset 外の人を動かさない。予責は予責メンバーを抽出したとき別途満たす。）
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。

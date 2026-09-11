@@ -1,7 +1,7 @@
 import {
   MonthlyStaffSchedule,
   ScheduleCandidates,
-  ScheduleConstraints,
+  ConstraintSet,
   ShiftLeaderRule,
   WorkShift,
   WorkingDay,
@@ -18,7 +18,7 @@ describe("computeCandidatesFor", () => {
   const day1 = WorkingDay.of(2026, 6, 1);
   const staffIds = ["L1", "L2", "X"];
 
-  const constraints = new ScheduleConstraints({
+  const constraints = new ConstraintSet({
     scheduleId: "sched-1",
     leaderRules: [
       new ShiftLeaderRule({

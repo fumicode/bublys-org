@@ -83,7 +83,7 @@ hotel-shift-puzzle-app/src/
     **codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す**
   - 副産物としてクラス図も正しくなる（`members: WorkingStaffMember[]` と出る）
   - 子を持つ集約は全部この形になっている：`Schedule` / `WorkingStaffGroup` /
-    `WorkShiftSet` / `ScheduleConstraints` / `ScheduleEditLog`
+    `WorkShiftSet` / `ConstraintSet` / `ScheduleEditLog`
   - **例外は worker 境界を越える DTO**（`CellCandidateEvaluation` / `ScheduleRepair` /
     `CandidateRequest`）。structured clone で渡すので plain でなければならない。
     渡す直前に `toPlain()` する
@@ -121,7 +121,7 @@ hotel-shift-puzzle-app/src/
 
 | 分類 | 意味 | 例 |
 |---|---|---|
-| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ScheduleConstraints / ScheduleEditLog |
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ConstraintSet(勤務表用) / ScheduleEditLog |
 | `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
 | `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
 
@@ -138,7 +138,7 @@ Schedule: {
   「どのスコープへ焼くか」を言えない。
 - `homeScope` の引数は **obj ではなく id**。`removeObject(type, id)` はオブジェクトを
   手に持たずに呼ばれるので、obj を要求すると削除だけ住所を解決できない。
-  全 live 型で id はスコープの持ち主 ID に等しい（`ScheduleConstraints.id` は `scheduleId`）。
+  全 live 型で id はスコープの持ち主 ID に等しい（勤務表用の `ConstraintSet.id` は `scheduleId`）。
 
 ### 読み先（`objects/world.tsx` の `readScopeOf`）
 
@@ -173,7 +173,7 @@ id で本籍が変わる型（グローバル固定IDのときは本籍なし）
 - 世界を作る場所は**この1関数だけ**。`saveObject` / `saveLocalBundle` / `commitCandidates` は
   全部これを通る。誕生が部分的だと、起点に載っていない型が時間移動で戻らない（#110）。
 - 勤務表を作る＝その世界が生まれる。`feature/createSchedule.ts` が1 grow で
-  勤務表・勤務帯セット・勤務スタッフ群・固定メンバーをまとめて起点に置く。
+  勤務表・勤務帯セット・制約セット・勤務スタッフ群・固定メンバーをまとめて起点に置く。
   `repo.save` を複数回呼ぶと1回目で世界が生まれてしまい、起点が欠ける。
 - 例データ投入・ファイル読み込みの直後は `bornWorldsOf(store, items)` で世界をまとめて誕生させる。
 
@@ -271,6 +271,12 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
   - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と
     勤務表ごと（id=scheduleId）の2通りで存在する。勤務表は勤務帯を `workShiftIds` で持たず、
     自分の `WorkShiftSet` を唯一の真実とする。
+  - **制約セット（`ConstraintSet`）も同じ形**。責任者ルール＋連勤上限・月の最低休日・
+    1日の休み上限・希望チェックを1つにまとめ、グローバル（`hotel-shift-puzzle/constraints`
+    バブルで編集）と勤務表ごとの2通りで存在する。勤務表は `constraintSetId` で指す。
+    ただし**責任者の担当者はグローバルでは決めない** —— 担当者は名簿のスタッフを指し、
+    名簿は勤務表が生まれるときに焼き付く（固定メンバー）ので、誰が担うかは勤務表ごとの話。
+    グローバルで決めるのは「どんな役割があるか（名前・担当勤務帯・最低人数）」まで。
 
 ---
 
@@ -320,7 +326,7 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 |---|---|---|
 | 人が入る | 無し（可能勤務帯は群の中。絞っていない人はどこでも入れる） | — |
 | 人が外れる | 勤務表からその人の割当を消す（`clearStaff`） | 表に居ない人をフッターの集計が数え続ける |
-| 人が外れる | 責任者候補から外す（`ScheduleConstraints.removeStaff`） | どう埋めても満たせない日ができる |
+| 人が外れる | 責任者候補から外す（`ConstraintSet.removeStaff`） | どう埋めても満たせない日ができる |
 
 組み立ては純粋関数 `buildMembershipChange`（React も store も通さない＝テストで固定できる）、
 記録は `recordMembershipEdit`（`saveLocalBundle` で1ノード＋操作履歴に `membershipEdit` を積む）。

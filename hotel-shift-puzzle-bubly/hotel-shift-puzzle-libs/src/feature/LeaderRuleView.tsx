@@ -4,7 +4,7 @@ import { FC, useCallback, useMemo } from "react";
 import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   WorkShiftSet,
-  ScheduleConstraints,
+  ConstraintSet,
   MonthlyStaffSchedule,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
@@ -16,7 +16,7 @@ import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
@@ -30,7 +30,7 @@ type LeaderRuleViewProps = {
 
 /**
  * 責任者ルール1件をビジュアル化するバブルの中身。
- * 勤務表ごとの制約オブジェクト（ScheduleConstraints）から該当ロールのルールを取り出し、
+ * 勤務表ごとの制約オブジェクト（ConstraintSet）から該当ロールのルールを取り出し、
  * {@link LeaderRuleDiagram} に渡して「OR（このうち誰か一人はいなければならない）」の図を描く。
  * 人をドロップすると、その人を制約の候補に加えて保存する（＝勤務表の世界線にノードが増える）。
  */
@@ -40,8 +40,8 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
 
@@ -77,7 +77,7 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
 
   // 編集は EditLog 付きで Constraints を同一世界線ノードに記録する。
   const editRule = useCallback(
-    (next: ScheduleConstraints | undefined, summary: string) => {
+    (next: ConstraintSet | undefined, summary: string) => {
       if (!next) return;
       recordConstraintEdit(store, {
         schedule,

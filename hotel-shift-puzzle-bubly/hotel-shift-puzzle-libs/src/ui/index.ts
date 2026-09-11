@@ -12,6 +12,7 @@ export * from "./ScheduleGridView.js";
 export * from "./ScheduleDayView.js";
 export * from "./ScheduleReservationInfoView.js";
 export * from "./ScheduleConstraintsBar.js";
+export * from "./ConstraintSetView.js";
 export * from "./ShiftCommandsBar.js";
 export * from "./LeaderRuleDiagram.js";
 export * from "./ShiftIntervalRuleDiagram.js";

@@ -17,12 +17,12 @@
 import type {
   WorkingStaffGroup,
   MonthlyStaffSchedule,
-  ScheduleConstraints,
+  ConstraintSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import type { BundleItem } from "../objects/commit.js";
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   WORKING_STAFF_GROUP_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -33,7 +33,7 @@ export type MembershipChange = {
   leaving?: string;
   /** 連れて動く集約。読めていないものは省略してよい（そのぶんは記録しない） */
   schedule?: MonthlyStaffSchedule;
-  constraints?: ScheduleConstraints;
+  constraints?: ConstraintSet;
 };
 
 /**
@@ -55,7 +55,7 @@ export function buildMembershipChange(change: MembershipChange): BundleItem[] {
     if (change.constraints) {
       const next = change.constraints.removeStaff(change.leaving);
       if (next !== change.constraints) {
-        items.push({ type: SCHEDULE_CONSTRAINTS_TYPE, obj: next });
+        items.push({ type: CONSTRAINT_SET_TYPE, obj: next });
       }
     }
   }

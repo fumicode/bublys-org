@@ -14,7 +14,7 @@ import {
 import { createSampleStaffList } from "./sampleStaff.js";
 import { ALLOWED_SHIFT_IDS_BY_STAFF } from "./sampleWorkingStaff.js";
 import { createSampleShiftWishes } from "./sampleShiftWishes.js";
-import { createSampleConstraintsFor } from "./sampleConstraints.js";
+import { createSampleConstraintSetFor } from "./sampleConstraints.js";
 import { buildScheduleConstraints } from "../feature/scheduleConstraints.js";
 import {
   createMidMonthSchedule,
@@ -45,7 +45,7 @@ const schedule = createMidMonthSchedule({
   maxConsecutive: 5,
 });
 
-const aggregate = createSampleConstraintsFor(MID_MONTH_SCHEDULE_ID);
+const aggregate = createSampleConstraintSetFor(MID_MONTH_SCHEDULE_ID);
 const constraints = buildScheduleConstraints({
   modelConstraints: aggregate.modelConstraints((shiftName) =>
     workShifts.filter((w) => w.name === shiftName).map((w) => w.id)
@@ -163,7 +163,7 @@ describe("終盤・詰みありの勤務表（2026年9月）", () => {
     wishes,
     maxConsecutive: 5,
   });
-  const endgameAggregate = createSampleConstraintsFor(ENDGAME_SCHEDULE_ID, {
+  const endgameAggregate = createSampleConstraintSetFor(ENDGAME_SCHEDULE_ID, {
     maxDayOffPerDay: ENDGAME_MAX_DAY_OFF_PER_DAY,
   });
   const modelConstraints = endgameAggregate.modelConstraints((shiftName) =>

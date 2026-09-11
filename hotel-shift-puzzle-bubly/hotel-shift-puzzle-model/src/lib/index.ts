@@ -32,8 +32,8 @@ export * from './schedule/ShiftLeaderConstraint.js';
 // 勤務間インターバルの宣言的ルール（「遅番の翌日は早番・中番に入れない」）とその制約アダプタ
 export * from './schedule/ShiftIntervalRule.js';
 export * from './schedule/ShiftIntervalConstraint.js';
-// 勤務表ごとの制約集約（責任者ルールを保持。将来は他の制約も同居可）
-export * from './schedule/ScheduleConstraints.js';
+// 制約セット（勤務表が満たすべき制約をひとまとめ。グローバルのテンプレートと勤務表ごとの独自セット）
+export * from './schedule/ConstraintSet.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';

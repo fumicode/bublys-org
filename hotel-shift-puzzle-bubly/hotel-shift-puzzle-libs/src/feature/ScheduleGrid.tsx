@@ -8,7 +8,7 @@ import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleReport,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
@@ -62,7 +62,7 @@ import {
   SCHEDULE_AVAILABILITY_TYPE,
   WORKING_STAFF_GROUP_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -211,8 +211,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   }, [staffList, deptFilter]);
 
   // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む（世界線に載る）。
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
@@ -306,24 +306,24 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
    * ここで別のスコープ（グローバル台帳）を見ると、過去のノードへ時間移動したときに
    * 「読み込み中です」が永久に解けず、そのノードからは二度と編集できなくなる。
    */
-  const constraintsAbsent = useIsAbsent(SCHEDULE_CONSTRAINTS_TYPE, scheduleId);
+  const constraintsAbsent = useIsAbsent(CONSTRAINT_SET_TYPE, scheduleId);
 
   /**
    * 制約を編集するときの起点を返す。まだ作られていないときだけ空の制約から始める。
    *
-   * `constraints ?? new ScheduleConstraints(...)` と書いてはいけない。値が読めないのには
+   * `constraints ?? new ConstraintSet(...)` と書いてはいけない。値が読めないのには
    * 「本当に無い」と「メモリ上の CAS から追い出された」の2つの理由があり、後者で空から
    * 始めると責任者ルールと紐づけレポートを丸ごと消して保存してしまう。
    * 存在の判定は参照で行い、読み込み待ちのあいだは編集させない。
    */
-  const constraintsBase = (): ScheduleConstraints | undefined => {
+  const constraintsBase = (): ConstraintSet | undefined => {
     if (constraints) return constraints;
     if (!scheduleId) return undefined;
     if (!constraintsAbsent) {
       setAutoMessage("制約を読み込み中です。少し待ってからもう一度お試しください。");
       return undefined;
     }
-    return new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    return ConstraintSet.empty(scheduleId);
   };
 
   const handleDropReportUrl = (url: string) => {
