@@ -95,6 +95,23 @@ describe('WorkingStaffGroup（勤務スタッフ群）', () => {
     expect(group.changeTemporaryDepartment('a', '客室')).toBe(group);
   });
 
+  test('同じ値に直しても新しいインスタンスを作らない（無駄な世界線ノードを作らない）', () => {
+    const group = groupOfRoster().addTemporary(
+      new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' })
+    );
+
+    expect(group.renameTemporary('tmp-1', '応援 太郎')).toBe(group);
+    expect(group.changeTemporaryDepartment('tmp-1', '客室')).toBe(group);
+  });
+
+  test('臨時の人の部署は空にも戻せる（未設定）', () => {
+    const group = groupOfRoster()
+      .addTemporary(new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' }))
+      .changeTemporaryDepartment('tmp-1', '');
+
+    expect(group.temporaryStaff()[0].department).toBe('');
+  });
+
   test('★ 可能勤務帯も群が持つ。メンバーでない人はどこにも入れない', () => {
     const all = ['early', 'late'];
     const group = groupOfRoster().toggleShift('b', 'late', all);

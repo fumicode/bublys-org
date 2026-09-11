@@ -144,7 +144,9 @@ export class WorkingStaffMember {
   mapStaff(fn: (staff: Staff) => Staff): WorkingStaffMember {
     const staff = this.staff;
     if (!staff) return this;
-    return new WorkingStaffMember({ ...this.state, staff: fn(staff) });
+    const next = fn(staff);
+    if (next === staff) return this; // 何も変わらなかった
+    return new WorkingStaffMember({ ...this.state, staff: next });
   }
 
   toPlain(): WorkingStaffMemberPlain {

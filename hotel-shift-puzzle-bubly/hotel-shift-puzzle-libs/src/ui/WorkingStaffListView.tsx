@@ -41,8 +41,11 @@ type WorkingStaffListViewProps = {
   onRemove: (staffId: string) => void;
   /** 行の並びを変える */
   onMove: (staffId: string, toIndex: number) => void;
-  /** 臨時の人の名前を変える */
-  onRenameTemporary: (staffId: string, name: string) => void;
+  /** 臨時の人の名前・部署を直す（名前と部署はまとめて1回で確定する） */
+  onEditTemporary: (
+    staffId: string,
+    edit: { name: string; department: string }
+  ) => void;
   /** その人のその勤務帯の可否を反転する */
   onToggleShift: (staffId: string, shiftId: string) => void;
   /**
@@ -76,7 +79,7 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   onAddFromRoster,
   onRemove,
   onMove,
-  onRenameTemporary,
+  onEditTemporary,
   onToggleShift,
   onCommitShift,
   onRemoveShift,
@@ -85,6 +88,7 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   const [department, setDepartment] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editDepartment, setEditDepartment] = useState("");
   /** ドラッグ中のメンバー（並び替え） */
   const [draggingId, setDraggingId] = useState<string | null>(null);
   /** ドロップ先として光らせている行 */
@@ -174,16 +178,19 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   const startEdit = (staff: Staff) => {
     setEditingId(staff.id);
     setEditName(staff.name);
+    setEditDepartment(staff.department);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName("");
+    setEditDepartment("");
   };
 
   const commitEdit = (id: string) => {
-    const trimmed = editName.trim();
-    if (trimmed) onRenameTemporary(id, trimmed);
+    const name = editName.trim();
+    // 名前は空にできない（行の見出しが消えてしまう）。部署は空でよい（＝未設定）
+    if (name) onEditTemporary(id, { name, department: editDepartment.trim() });
     cancelEdit();
   };
 
@@ -349,11 +356,25 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                         editingId === staff.id ? (
                           <span className="e-name e-editing">
                             <TextField
+                              className="e-edit-name"
                               variant="standard"
                               size="small"
                               autoFocus
+                              label="名前"
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") commitEdit(staff.id);
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                            />
+                            <TextField
+                              className="e-edit-dept"
+                              variant="standard"
+                              size="small"
+                              label="部署"
+                              value={editDepartment}
+                              onChange={(e) => setEditDepartment(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") commitEdit(staff.id);
                                 if (e.key === "Escape") cancelEdit();
@@ -380,10 +401,13 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                             >
                               臨時
                             </span>
+                            {staff.department && (
+                              <span className="e-dept">{staff.department}</span>
+                            )}
                             <IconButton
                               size="small"
                               disabled={!editable}
-                              title="名前を変える"
+                              title="名前と部署を直す"
                               onClick={() => startEdit(staff)}
                             >
                               <EditIcon fontSize="inherit" />
@@ -508,6 +532,18 @@ const StyledContainer = styled.div`
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+
+  .e-editing {
+    align-items: flex-end;
+
+    .e-edit-name {
+      width: 100px;
+    }
+
+    .e-edit-dept {
+      width: 80px;
+    }
   }
 
   .e-icon {
