@@ -19,13 +19,16 @@ import {
   WorkingStaffGroup,
   type WorkingStaffGroupPlain,
   WorkShiftSet,
+  type WorkShiftSetPlain,
   MonthlyStaffSchedule,
   ScheduleAvailability,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
+  type ScheduleConstraintsPlain,
   ScheduleReport,
   ScheduleEditLog,
+  type ScheduleEditLogPlain,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
@@ -100,7 +103,11 @@ export const HOTEL_OBJECTS = defineObjects({
     // 2通りの使われ方をする集約:
     //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
     //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）
-    // state が完全 plain（id ＋ 勤務帯 state 配列）なので serialize 不要。
+    // 入れ子にインスタンス（WorkShift）を持つので codec を明示。
+    serialize: {
+      toJSON: (s: WorkShiftSet) => s.toPlain(),
+      fromJSON: (j) => WorkShiftSet.fromPlain(j as WorkShiftSetPlain),
+    },
     membership: {
       kind: "live",
       homeScope: (id: string) =>
@@ -154,7 +161,11 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (c: ScheduleConstraints) => c.id,
     // 勤務表ごとの制約。親 Schedule のローカル世界線に束ねる（case B）。
     // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
-    // state が plain（scheduleId ＋ ルール states 配列）なので serialize 不要。
+    // 入れ子にインスタンス（ShiftLeaderRule）を持つので codec を明示。
+    serialize: {
+      toJSON: (c: ScheduleConstraints) => c.toPlain(),
+      fromJSON: (j) => ScheduleConstraints.fromPlain(j as ScheduleConstraintsPlain),
+    },
     membership: {
       kind: "live",
       homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
@@ -173,7 +184,12 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (log: ScheduleEditLog) => log.id,
     // 勤務表の操作履歴。親 Schedule のローカル世界線に相乗り（case B）。
     // Schedule と同じノードに bundle で載せることで、時間移動と履歴がずれない。
-    // state が完全 plain なので serialize 不要。
+    // 入れ子にインスタンス（ScheduleEditEntry → ConstraintDelta → ConstraintViolation）を
+    // 持つので codec を明示。
+    serialize: {
+      toJSON: (log: ScheduleEditLog) => log.toPlain(),
+      fromJSON: (j) => ScheduleEditLog.fromPlain(j as ScheduleEditLogPlain),
+    },
     membership: {
       kind: "live",
       homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),

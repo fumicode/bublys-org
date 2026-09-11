@@ -1,6 +1,7 @@
 import {
   DEFAULT_SHIFT_INTERVAL_RULES,
   ScheduleConstraints,
+  ShiftLeaderRule,
   type ShiftLeaderRuleState,
 } from "@bublys-org/hotel-shift-puzzle-model";
 
@@ -42,10 +43,13 @@ export function createSampleConstraintsFor(
   scheduleId: string,
   options: { maxDayOffPerDay?: number } = {}
 ): ScheduleConstraints {
-  const leaderRules: ShiftLeaderRuleState[] = LEADER_ROLE_DEFS.map((def) => ({
-    ...def,
-    leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
-  }));
+  const leaderRules = LEADER_ROLE_DEFS.map(
+    (def) =>
+      new ShiftLeaderRule({
+        ...def,
+        leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
+      })
+  );
   return new ScheduleConstraints({
     scheduleId,
     leaderRules,

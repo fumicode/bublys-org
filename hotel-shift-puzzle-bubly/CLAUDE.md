@@ -82,8 +82,11 @@ hotel-shift-puzzle-app/src/
   - 既定の「state 規約」（`toJSON: o => o.state`）が使えるのは、子を持たない集約だけ。
     **codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す**
   - 副産物としてクラス図も正しくなる（`members: WorkingStaffMember[]` と出る）
-  - 未対応: `WorkShiftSet` / `ScheduleConstraints` / `ScheduleEditLog` はまだ子を plain で
-    持っている（この原則より前に書いたもの）
+  - 子を持つ集約は全部この形になっている：`Schedule` / `WorkingStaffGroup` /
+    `WorkShiftSet` / `ScheduleConstraints` / `ScheduleEditLog`
+  - **例外は worker 境界を越える DTO**（`CellCandidateEvaluation` / `ScheduleRepair` /
+    `CandidateRequest`）。structured clone で渡すので plain でなければならない。
+    渡す直前に `toPlain()` する
 - **層の依存方向を守る**：domain ← ui ← feature。ui は Redux を直接触らない
 - スライスは `slice.injectInto(rootReducer)` を副作用で実行し、bublys-os の store に自動注入される
 - **Reduxスライスは集約のリポジトリに徹する**：スライスは集約の保存・取得のみ

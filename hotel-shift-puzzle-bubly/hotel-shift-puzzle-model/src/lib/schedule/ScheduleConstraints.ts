@@ -18,10 +18,11 @@ import type { ScheduleConstraint } from "./ScheduleConstraint.js";
  * いまは責任者ルール（早責/予責/夜責…定義＋候補者を丸ごと）だけを持つが、将来は月の最低休日数や
  * 1日の休み上限など他の制約もここに同居できる（型名を汎用にしてある）。
  */
+/** state：責任者ルールはインスタンスで保持する */
 export type ScheduleConstraintsState = {
   scheduleId: string;
   /** 責任者ルール。定義（key/label/shiftName/minCount）＋候補者(leaderStaffIds)を丸ごと持つ。 */
-  leaderRules: ShiftLeaderRuleState[];
+  leaderRules: ShiftLeaderRule[];
   /** 連勤上限（日数）。省略時 5。 */
   maxConsecutiveWorkdays?: number;
   /** シフト希望との食い違いを違反として見るか。省略時 true。 */
@@ -37,6 +38,14 @@ export type ScheduleConstraintsState = {
   shiftIntervalRules?: ShiftIntervalRuleState[];
   /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。省略時 []。 */
   linkedReportIds?: string[];
+};
+
+/** シリアライズ用：入れ子まで全部 plain */
+export type ScheduleConstraintsPlain = Omit<
+  ScheduleConstraintsState,
+  "leaderRules"
+> & {
+  leaderRules: ShiftLeaderRuleState[];
 };
 
 /** 各制約設定の既定値。 */
@@ -153,15 +162,14 @@ export class ScheduleConstraints {
     ];
   }
 
-  /** 責任者ルールを ShiftLeaderRule インスタンスとして得る。 */
+  /** 責任者ルール（並び順のまま）。 */
   get leaderRules(): ShiftLeaderRule[] {
-    return this.state.leaderRules.map((s) => new ShiftLeaderRule(s));
+    return this.state.leaderRules;
   }
 
   /** ロールキーでルールを取得。 */
   leaderRule(key: string): ShiftLeaderRule | undefined {
-    const s = this.state.leaderRules.find((r) => r.key === key);
-    return s ? new ShiftLeaderRule(s) : undefined;
+    return this.state.leaderRules.find((r) => r.key === key);
   }
 
   /**
@@ -177,19 +185,12 @@ export class ScheduleConstraints {
 
   /** そのルールの候補者に staffId を加える（重複は無視）。新インスタンスを返す。 */
   addLeader(ruleKey: string, staffId: string): ScheduleConstraints {
-    return this.mapRule(ruleKey, (r) =>
-      r.leaderStaffIds.includes(staffId)
-        ? r
-        : { ...r, leaderStaffIds: [...r.leaderStaffIds, staffId] }
-    );
+    return this.mapRule(ruleKey, (r) => r.withLeader(staffId));
   }
 
   /** そのルールの候補者から staffId を外す。新インスタンスを返す。 */
   removeLeader(ruleKey: string, staffId: string): ScheduleConstraints {
-    return this.mapRule(ruleKey, (r) => ({
-      ...r,
-      leaderStaffIds: r.leaderStaffIds.filter((id) => id !== staffId),
-    }));
+    return this.mapRule(ruleKey, (r) => r.withoutLeader(staffId));
   }
 
   /**
@@ -205,19 +206,17 @@ export class ScheduleConstraints {
     }
     return new ScheduleConstraints({
       ...this.state,
-      leaderRules: this.state.leaderRules.map((r) => ({
-        ...r,
-        leaderStaffIds: r.leaderStaffIds.filter((id) => id !== staffId),
-      })),
+      leaderRules: this.state.leaderRules.map((r) => r.withoutLeader(staffId)),
     });
   }
 
   /** 責任者ルールを新規追加する（同じ key が既にあれば無視）。新インスタンスを返す。 */
-  addRule(rule: ShiftLeaderRuleState): ScheduleConstraints {
-    if (this.state.leaderRules.some((r) => r.key === rule.key)) return this;
+  addRule(rule: ShiftLeaderRule | ShiftLeaderRuleState): ScheduleConstraints {
+    const added = rule instanceof ShiftLeaderRule ? rule : new ShiftLeaderRule(rule);
+    if (this.state.leaderRules.some((r) => r.key === added.key)) return this;
     return new ScheduleConstraints({
       ...this.state,
-      leaderRules: [...this.state.leaderRules, rule],
+      leaderRules: [...this.state.leaderRules, added],
     });
   }
 
@@ -231,23 +230,22 @@ export class ScheduleConstraints {
 
   /** ルールの担当勤務帯（名前＝入るべき時間帯）を変える。新インスタンスを返す。 */
   setRuleShift(ruleKey: string, shiftName: string): ScheduleConstraints {
-    return this.mapRule(ruleKey, (r) => ({ ...r, shiftName }));
+    return this.mapRule(ruleKey, (r) => r.withShiftName(shiftName));
   }
 
   /** ルールの表示ラベルを変える。新インスタンスを返す。 */
   setRuleLabel(ruleKey: string, label: string): ScheduleConstraints {
-    return this.mapRule(ruleKey, (r) => ({ ...r, label }));
+    return this.mapRule(ruleKey, (r) => r.withLabel(label));
   }
 
   /** ルールの最低必要人数を変える（1 以上に丸める）。新インスタンスを返す。 */
   setRuleMinCount(ruleKey: string, minCount: number): ScheduleConstraints {
-    const n = Math.max(1, Math.floor(minCount));
-    return this.mapRule(ruleKey, (r) => ({ ...r, minCount: n }));
+    return this.mapRule(ruleKey, (r) => r.withMinCount(minCount));
   }
 
   private mapRule(
     ruleKey: string,
-    fn: (r: ShiftLeaderRuleState) => ShiftLeaderRuleState
+    fn: (r: ShiftLeaderRule) => ShiftLeaderRule
   ): ScheduleConstraints {
     return new ScheduleConstraints({
       ...this.state,
@@ -255,11 +253,19 @@ export class ScheduleConstraints {
     });
   }
 
-  toPlain(): ScheduleConstraintsState {
-    return this.state;
+  // ========== シリアライズ ==========
+
+  toPlain(): ScheduleConstraintsPlain {
+    return {
+      ...this.state,
+      leaderRules: this.state.leaderRules.map((r) => r.state),
+    };
   }
 
-  static fromPlain(s: ScheduleConstraintsState): ScheduleConstraints {
-    return new ScheduleConstraints(s);
+  static fromPlain(plain: ScheduleConstraintsPlain): ScheduleConstraints {
+    return new ScheduleConstraints({
+      ...plain,
+      leaderRules: plain.leaderRules.map((r) => new ShiftLeaderRule(r)),
+    });
   }
 }

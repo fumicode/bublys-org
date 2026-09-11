@@ -22,6 +22,8 @@ export * from './schedule/ScheduleAvailability.js';
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
 // 操作履歴（ノウハウ可視化。勤務表ローカル世界線に相乗り）
+export * from './schedule/ConstraintDelta.js';
+export * from './schedule/ScheduleEditEntry.js';
 export * from './schedule/ScheduleEditLog.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
