@@ -4,6 +4,9 @@ import "./object-type-registration.js";
 // World-line graph 初期化（副作用）
 import "./world-line/init.js";
 
+// このバブリのスライス注入（副作用）
+import "./slice/init.js";
+
 // オブジェクト記述子フレームワーク + リポジトリ + このバブリのオブジェクト定義
 export * from "./objects/framework.js";
 export * from "./objects/repository.js";
@@ -20,6 +23,9 @@ export * from "./feature/index.js";
 
 // Redux slices
 export * from "./slice/index.js";
+
+// 勤務表ファイル（世界線ごとローカルファイルへ保存・読み込み）
+export * from "./world-file/index.js";
 
 // Sample data
 export * from "./data/index.js";

@@ -1,6 +1,7 @@
 import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import SaveIcon from '@mui/icons-material/Save';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -23,6 +24,7 @@ const menuItems: BublyMenuItem[] = [
   { label: 'スタッフ一覧', url: 'hotel-shift-puzzle/staffs', icon: <PeopleIcon /> },
   { label: '勤務帯', url: 'hotel-shift-puzzle/work-shifts', icon: <ScheduleIcon /> },
   { label: '勤務表', url: 'hotel-shift-puzzle/schedules', icon: <CalendarMonthIcon /> },
+  { label: 'ファイル', url: 'hotel-shift-puzzle/file', icon: <SaveIcon /> },
 ];
 
 export function App() {
@@ -36,7 +38,7 @@ export function App() {
     >
       <BublyApp
         title="Hotel Shift Puzzle"
-        subtitle="Standalone • Port 4004"
+        subtitle="Standalone • Port 4006"
         menuItems={menuItems}
         backdropColor="hsl(20, 40%, 22%)"
       />

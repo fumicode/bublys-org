@@ -6,11 +6,11 @@ export default defineConfig(() => ({
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/calculator',
   server: {
-    port: 4200,
+    port: 4300,
     host: 'localhost',
   },
   preview: {
-    port: 4200,
+    port: 4300,
     host: 'localhost',
   },
   plugins: [react()],

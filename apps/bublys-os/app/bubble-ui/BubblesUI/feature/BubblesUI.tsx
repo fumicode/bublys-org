@@ -1,6 +1,7 @@
 import { FC, useEffect, useCallback, useState, useMemo } from "react";
 import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem, selectPocketItems, removePocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
+import { nameIntent } from "@bublys-org/world-line-graph";
 
 import {
   Bubble,
@@ -84,6 +85,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
 
   // Redux を使ったアクションハンドラ
   const deleteBubble = useCallback((b: Bubble) => {
+    nameIntent(`close:${b.type}`);
     dispatch(deleteBubbleAction(b.id));
     dispatch(removeBubble(b.id));
 
@@ -98,10 +100,12 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch, shellManager]);
 
   const layerDown = useCallback((b: Bubble) => {
+    nameIntent("layer:down");
     dispatch(layerDownAction(b.id));
   }, [dispatch]);
 
   const layerUp = useCallback((b: Bubble) => {
+    nameIntent("layer:up");
     dispatch(layerUpAction(b.id));
   }, [dispatch]);
 
@@ -111,6 +115,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     openerBubbleId: string,
     openingPosition: OpeningPosition = "bubble-side-right"
   ): string => {
+    nameIntent(`open:${b.url}`);
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 
@@ -125,6 +130,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   // maximizeTo（=最大化扱い）ではなく resizeTo（=明示サイズ）で開くので、
   // 窓の「最大化/フィット」トグルとも整合する。
   const popChildViewPortBelow = useCallback((b: Bubble, openerBubbleId: string): string => {
+    nameIntent(`open:${b.url}`);
     const viewport = measureViewport();
     const surfaceLayer = new Layer(0, surfaceLeftTop, globalCoordinateSystem.vanishingPoint);
     const visible = viewport?.visibleRegion() ?? {
@@ -159,6 +165,7 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     b: Bubble,
     openerBubbleId: string
   ): string => {
+    nameIntent(`open:${b.url}`);
     dispatch(addBubble(b.toJSON()));
     dispatch(relateBubbles({openerId: openerBubbleId, openeeId: b.id}));
 

@@ -22,7 +22,7 @@ import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
  * を使って毎レンダーのコストを抑える。
  */
 export const BubbleArrangementWorldLineControls: FC = () => {
-  const { moveBack, moveForward, canUndo, canRedo, graph, summarizeNode } =
+  const { moveBack, moveForward, moveTo: jumpTo, canUndo, canRedo, graph, summarizeNode } =
     useRootArrangementWorldLine();
   const apexId = graph.getApex()?.id ?? null;
 
@@ -108,7 +108,7 @@ export const BubbleArrangementWorldLineControls: FC = () => {
         const next = siblings[idx + (e.key === "ArrowUp" ? -1 : 1)];
         if (!next) return;
         e.preventDefault();
-        rootScope.moveTo(next);
+        jumpTo(next);
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
@@ -215,7 +215,7 @@ export const BubbleArrangementWorldLineControls: FC = () => {
               graph={graph}
               apexNodeId={apexId}
               getNodeSummary={getNodeSummary}
-              onSelectNode={rootScope.moveTo}
+              onSelectNode={jumpTo}
             />
           </Box>
         </Box>

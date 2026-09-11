@@ -12,7 +12,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
 import { useObjects, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { adoptGlobalObject, saveObject } from "../objects/commit.js";
 import {
   STAFF_TYPE,
@@ -32,7 +31,6 @@ type ScheduleCollectionProps = {
 };
 
 export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ onOpenReports }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const staffList = useObjects<Staff>(STAFF_TYPE);

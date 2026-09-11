@@ -25,7 +25,8 @@
     "targets": {
       "build": {
         "dependsOn": [
-          "^build"
+          "^build",
+          "build:bubly"
         ]
       },
       "build:bubly": {

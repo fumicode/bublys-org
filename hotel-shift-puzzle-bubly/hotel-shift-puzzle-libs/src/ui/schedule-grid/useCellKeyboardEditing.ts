@@ -55,7 +55,7 @@ export type CellKeyboardEditing = {
   selectCell: (staffId: string, day: WorkingDay) => void;
   /** セルを選択して候補ドロップダウンを開く（全候補表示）。 */
   openEditor: (staffId: string, day: WorkingDay) => void;
-  /** 候補を確定（クリック / Enter）。 */
+  /** 候補を確定（クリック / Enter）。確定後は右隣のセルへ進む。 */
   applySuggestion: (s: ShiftSuggestion) => void;
   /** グリッドの onKeyDown ハンドラ。 */
   handleKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
@@ -73,9 +73,11 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
  * まとめたフック。状態と対話ロジックをここに閉じ込め、ScheduleGridView は描画に徹する。
  *
  * ルール:
- *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア
- *   - ドロップダウン開: ↑↓で候補移動 / Enter・クリックで確定 / ←→で閉じて隣セルへ /
- *                       Backspace で 1 文字削除（空ならクリアして閉じる）/ Esc で閉じる
+ *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア /
+ *                       Tab で確定提案を承認（移動は feature 層）
+ *   - ドロップダウン開: ↑↓で候補移動 / Enter・クリックで確定して右隣へ /
+ *                       ←→で閉じて隣セルへ / Backspace で 1 文字削除（空ならクリアして閉じる） /
+ *                       Esc で閉じる
  */
 export function useCellKeyboardEditing({
   staffList,
@@ -148,12 +150,6 @@ export function useCellKeyboardEditing({
     gridRef.current?.focus();
   };
 
-  const applySuggestion = (s: ShiftSuggestion) => {
-    if (selection) onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
-    setInputBuffer(null);
-    gridRef.current?.focus();
-  };
-
   // 選択を dStaff 行・dDay 列ぶん動かす（端でクランプ）。入力中バッファは破棄
   const moveSelection = (dStaff: number, dDay: number) => {
     setInputBuffer(null);
@@ -167,6 +163,17 @@ export function useCellKeyboardEditing({
       const nd = Math.min(Math.max(di + dDay, 0), days.length - 1);
       return { staffId: staffList[ns].id, day: days[nd] };
     });
+  };
+
+  const applySuggestion = (s: ShiftSuggestion) => {
+    if (selection) {
+      onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
+      // Enter / マウス確定とも右隣へ。最終列ならそのセルに留まる。
+      moveSelection(0, 1);
+    } else {
+      setInputBuffer(null);
+    }
+    gridRef.current?.focus();
   };
 
   const editing = inputBuffer !== null;

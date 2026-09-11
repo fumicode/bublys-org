@@ -10,7 +10,10 @@ import type {
   ShiftLeaderRule,
   ShiftCell,
 } from "../../domain/index.js";
-import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
+import {
+  MIN_MONTHLY_DAY_OFF_CONSTRAINT,
+  isShiftIntervalConstraintType,
+} from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
@@ -49,6 +52,8 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 早番として数える勤務帯 ID 集合（名前「早番」に属する ID） */
+  earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /**
@@ -62,7 +67,7 @@ type StaffScheduleRowProps = {
 
 /**
  * スタッフ 1 人ぶんの行。
- * 左ヘッダ（名前）＋各日のセル＋右端の休み合計。grid の直接の子になるよう Fragment で並べる。
+ * 左ヘッダ（名前）＋各日のセル＋休み合計＋早番日数。grid の直接の子になるよう Fragment で並べる。
  * 希望は各セルの円で読めるので、行を展開して希望行を出す機能は持たない。
  */
 export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
@@ -84,13 +89,15 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  earlyShiftIds,
   candidateHintOf,
   forcedCellOf,
   isDeadCell,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
-  // 行は grid の直接の子（名前セル＋各日セル＋休合計）なので、各セルに同じクラスを付ける。
+  // 行は grid の直接の子（名前セル＋各日セル＋休合計＋早番日数）なので、各セルに同じクラスを付ける。
   const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
+  const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -136,6 +143,14 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
         const covering = violations.filter((v) => v.coversCell(staff.id, day));
+        // 勤務間インターバル違反は「2日のつなぎ目」の違反なので、範囲（下端の赤帯）ではなく
+        // 境目の印として描く。どちら側の境目かは、違反範囲の初日／末日のどちらに当たるかで決まる。
+        const intervalCovering = covering.filter((v) =>
+          isShiftIntervalConstraintType(v.constraintType)
+        );
+        const otherCovering = covering.filter(
+          (v) => !isShiftIntervalConstraintType(v.constraintType)
+        );
         const isSelected =
           selection?.staffId === staff.id && selection.day.equals(day);
         return (
@@ -144,8 +159,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             cell={cell}
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
-            rangeViolation={covering.find((v) => v.days.length > 1)}
-            pointViolation={covering.find((v) => v.days.length === 1)}
+            rangeViolation={otherCovering.find((v) => v.days.length > 1)}
+            pointViolation={otherCovering.find((v) => v.days.length === 1)}
+            intervalAfter={intervalCovering.find((v) => v.days[0]?.equals(day))}
+            intervalBefore={intervalCovering.find((v) =>
+              v.days[v.days.length - 1]?.equals(day)
+            )}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}
@@ -203,6 +222,14 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           </div>
         );
       })()}
+
+      {/* 一番右: そのスタッフの月内早番日数（偏りが一目で分かる） */}
+      <div
+        className={`e-early-total${rowMod}`}
+        title={`${staff.name} の早番 ${earlyCount}日`}
+      >
+        {earlyCount}
+      </div>
 
     </>
   );

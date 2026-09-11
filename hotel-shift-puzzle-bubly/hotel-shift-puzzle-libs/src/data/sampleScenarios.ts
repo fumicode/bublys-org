@@ -24,8 +24,10 @@
  *   - すると予責を早番で担えるのが山本だけになり → 23日 山本 → 早番
  */
 import {
+  DEFAULT_SHIFT_INTERVAL_RULES,
   MonthlyStaffSchedule,
   RequiredStaffing,
+  ShiftIntervalRule,
   StaffMonthlyShiftWish,
   WorkingDay,
   type ShiftCell,
@@ -47,6 +49,32 @@ const LATE = "late";
 
 const work = (shiftId: string): ShiftCell => ({ kind: "work", shiftId });
 const off: ShiftCell = { kind: "day-off" };
+
+/** この勤務表で使う勤務帯ID → 勤務帯名（インターバルのルールは名前で書かれている） */
+const SHIFT_NAME_BY_ID: Record<string, string> = {
+  [EARLY]: "早番",
+  [MIDDLE]: "中番",
+  [LATE]: "遅番",
+};
+
+/**
+ * 勤務間インターバルのルール（遅番の翌日は早番・中番に入れない）。
+ * シナリオ勤務表は「詰み以外は成立している」盤面でないと確認したい場面が埋もれるので、
+ * 生成側でもこのルールを踏まないようにする。ルールの中身はここに書き写さず、
+ * 制約の既定（DEFAULT_SHIFT_INTERVAL_RULES）から導く。
+ */
+const INTERVAL_RULES = DEFAULT_SHIFT_INTERVAL_RULES.map((r) => new ShiftIntervalRule(r));
+
+/**
+ * 前日が prevShiftId（未出勤なら undefined）のとき、翌日 shiftId に入れられるか。
+ * 判定はルール自身（allowsNextDay）に訊く。違反を出す側（ShiftIntervalConstraint）と
+ * 同じ述語を通るので、「生成器は通したのに制約が違反と言う」がありえない。
+ */
+function intervalAllows(prevShiftId: string | undefined, shiftId: string): boolean {
+  const prevName = prevShiftId === undefined ? undefined : SHIFT_NAME_BY_ID[prevShiftId];
+  const nextName = SHIFT_NAME_BY_ID[shiftId];
+  return INTERVAL_RULES.every((r) => r.allowsNextDay(prevName, nextName));
+}
 
 /** 希望に沿って自動で組む範囲（ここまでは前半の流し込み） */
 const AUTO_FILLED_THROUGH = 15;
@@ -164,22 +192,31 @@ function dayOffWishLookup(
 
 /**
  * 1日目から throughDay まで、希望と可能勤務帯を尊重して必要人数を満たす。
- * 連勤が上限に達した人・その日に休み希望を出している人は休みにする。
+ * 連勤が上限に達した人・その日に休み希望を出している人・前日の勤務帯との間隔が足りない人
+ * （勤務間インターバル）は休みにする。
+ *
+ * upcomingWorkRun は「この自動生成のすぐ後ろに、手で置いた出勤が何日続くか」（スタッフ別）。
+ * 最終日の判断でこれを足して数え、自動生成ぶんと手置きぶんが繋がって連勤上限を超えるのを防ぐ。
+ * 渡さなければ 0 として扱う。
  */
 function fillFollowingWishes(
   schedule: MonthlyStaffSchedule,
   params: FillParams,
   month: number,
-  throughDay: number
+  throughDay: number,
+  upcomingWorkRun: Map<string, number> = new Map()
 ): MonthlyStaffSchedule {
   let result = schedule;
   const wantsDayOff = dayOffWishLookup(params.wishes, month);
   const streak = new Map<string, number>(params.staffIds.map((id) => [id, 0]));
+  /** 前日に入った勤務帯（休み・未定なら未設定）。勤務間インターバルの判定に使う */
+  const yesterdayShift = new Map<string, string>();
   const shiftIdOf: Record<string, string> = { 早番: EARLY, 中番: MIDDLE, 遅番: LATE };
 
   for (let d = 1; d <= throughDay; d++) {
     const day = WorkingDay.of(YEAR, month, d);
     const assignedToday = new Set<string>();
+    const todayShift = new Map<string, string>();
 
     for (const [index, [name, count]] of Object.entries(
       sampleDemandFor(day.weekday)
@@ -188,8 +225,12 @@ function fillFollowingWishes(
       const pool = params.staffIds.filter(
         (staffId) =>
           !assignedToday.has(staffId) &&
-          (streak.get(staffId) ?? 0) < params.maxConsecutive &&
+          // 最終日だけは、この後ろに続く手置きの出勤ぶんも数えて上限を守る
+          (streak.get(staffId) ?? 0) +
+            (d === throughDay ? (upcomingWorkRun.get(staffId) ?? 0) : 0) <
+            params.maxConsecutive &&
           !wantsDayOff(staffId, day) &&
+          intervalAllows(yesterdayShift.get(staffId), shiftId) &&
           (params.allowedShiftIds[staffId] ?? []).includes(shiftId)
       );
       // 日と勤務帯で開始位置をずらし、同じ人にばかり同じ帯が回らないようにする
@@ -198,6 +239,7 @@ function fillFollowingWishes(
         const staffId = pool[(offset + i) % pool.length];
         result = result.setCell(staffId, day, work(shiftId));
         assignedToday.add(staffId);
+        todayShift.set(staffId, shiftId);
       }
     }
 
@@ -209,8 +251,32 @@ function fillFollowingWishes(
         streak.set(staffId, 0);
       }
     }
+
+    yesterdayShift.clear();
+    for (const [staffId, shiftId] of todayShift) yesterdayShift.set(staffId, shiftId);
   }
   return result;
+}
+
+/**
+ * 手で詰めた 16 日以降、各スタッフが何日続けて出勤するか（休み・未定で止める）。
+ * 自動生成（〜15日）が最終日に出勤させてよいかを判断するために使う。
+ */
+function handFilledWorkRun(): Map<string, number> {
+  const planByDay = new Map(HAND_FILLED_DAYS.map((p) => [p.day, p]));
+  const run = new Map<string, number>();
+  for (let d = AUTO_FILLED_THROUGH + 1; ; d++) {
+    const plan = planByDay.get(d);
+    if (!plan) break;
+    const working = new Set([...plan.early, ...plan.middle, ...plan.late]);
+    for (const staffId of working) {
+      // 途中で休み／未定が入った人は数えるのをやめる（連勤が切れている）
+      if ((run.get(staffId) ?? 0) === d - AUTO_FILLED_THROUGH - 1) {
+        run.set(staffId, (run.get(staffId) ?? 0) + 1);
+      }
+    }
+  }
+  return run;
 }
 
 /**
@@ -226,7 +292,13 @@ export function createMidMonthSchedule(params: ScenarioParams): MonthlyStaffSche
     requiredStaffing: requiredStaffing(AUGUST),
   });
 
-  let schedule = fillFollowingWishes(base, params, AUGUST, AUTO_FILLED_THROUGH);
+  let schedule = fillFollowingWishes(
+    base,
+    params,
+    AUGUST,
+    AUTO_FILLED_THROUGH,
+    handFilledWorkRun()
+  );
 
   for (const plan of HAND_FILLED_DAYS) {
     const day = WorkingDay.of(YEAR, AUGUST, plan.day);
@@ -358,12 +430,28 @@ function fillRespectingLeaders(
   let result = schedule;
   const wantsDayOff = dayOffWishLookup(params.wishes, SEPTEMBER);
   const streak = new Map<string, number>(params.staffIds.map((id) => [id, 0]));
+  /** 前日に入った勤務帯（休み・未定なら未設定）。勤務間インターバルの判定に使う */
+  const yesterdayShift = new Map<string, string>();
   const rank = new Map(params.staffIds.map((id, i) => [id, i]));
   const shiftIdOf: Record<string, string> = { 早番: EARLY, 中番: MIDDLE, 遅番: LATE };
   const lastDay = new Date(YEAR, SEPTEMBER, 0).getDate();
 
   const canTake = (staffId: string, shiftId: string) =>
     (params.allowedShiftIds[staffId] ?? []).includes(shiftId);
+
+  /**
+   * 勤務間インターバルを踏まないか。前日との間だけでなく「翌日のピン」とも見比べる。
+   * 生成はピンを後から動かせないので、翌日に早番・中番が確定している人を今日の遅番に
+   * 入れてしまうと、あとから直せない違反になる。
+   */
+  const intervalOk = (staffId: string, shiftId: string, dayIndex: number) => {
+    if (!intervalAllows(yesterdayShift.get(staffId), shiftId)) return false;
+    if (dayIndex >= lastDay) return true; // 月末は翌日が無い
+    const tomorrow = WorkingDay.of(YEAR, SEPTEMBER, dayIndex + 1);
+    const tomorrowPin = pins.get(`${staffId}:${tomorrow.key}`);
+    if (tomorrowPin?.kind !== "work") return true;
+    return intervalAllows(shiftId, tomorrowPin.shiftId);
+  };
 
   for (let d = 1; d <= lastDay; d++) {
     const day = WorkingDay.of(YEAR, SEPTEMBER, d);
@@ -395,6 +483,7 @@ function fillRespectingLeaders(
         .filter(
           (staffId) =>
             (streak.get(staffId) ?? 0) < params.maxConsecutive &&
+            intervalOk(staffId, shiftId, d) &&
             canTake(staffId, shiftId)
         )
         .sort(
@@ -448,6 +537,9 @@ function fillRespectingLeaders(
         streak.set(staffId, 0);
       }
     }
+
+    yesterdayShift.clear();
+    for (const [staffId, shiftId] of working) yesterdayShift.set(staffId, shiftId);
   }
   return result;
 }

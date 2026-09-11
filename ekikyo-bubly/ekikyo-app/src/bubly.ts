@@ -20,14 +20,6 @@ const EkikyoBubly: Bubly = {
   initialBubbleUrls: ["ekikyo/kyuseis/五黄"],
   backdropColor: "hsl(355, 50%, 22%)",
 
-  menuItems: [
-    {
-      label: "九星盤",
-      url: "ekikyo/kyuseis/五黄",
-      icon: React.createElement(AutoAwesomeIcon, { color: "action" }),
-    },
-  ],
-
   register(context) {
     context.registerBubbleRoutes(ekikyoBubbleRoutes);
   },

@@ -33,7 +33,6 @@ import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
@@ -101,6 +100,8 @@ type ScheduleGridProps = {
   reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /** 勤務間インターバルの図バブルの URL を作る（ルールキー）。同じく上部ルール行に渡す */
+  intervalRuleBubbleUrl?: (ruleKey: string) => string;
   /**
    * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
    * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
@@ -142,12 +143,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  intervalRuleBubbleUrl,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
 }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const { scope } = useScheduleHistory(scheduleId ?? "");
   const apex = scope.graph.getApex();
@@ -438,6 +439,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
   }, [deadCells]);
 
+  // 選択が無いときだけ、キーボード操作の起点として先頭の未定セルへ置く。
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -448,19 +450,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
     }
   }, [schedule, cellSelection, staffList]);
-
-  const advanceFocusAfterEdit = useCallback(
-    (nextSchedule: MonthlyStaffSchedule) => {
-      const next = suggestNextUndecided(
-        nextSchedule,
-        staffList.map((s) => s.id)
-      );
-      setCellSelection(
-        next ? { staffId: next.staffId, day: next.day } : null
-      );
-    },
-    [staffList]
-  );
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => {
@@ -473,9 +462,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: EditLog 付きで同一世界線ノードに記録
+  // セル編集: EditLog 付きで同一世界線ノードに記録。
+  // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    const next = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -483,12 +473,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       day,
       to,
     });
-    setCellSelection({ staffId, day });
-    advanceFocusAfterEdit(next);
   };
 
   // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
   // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
   const handleApproveForced = (
     staffId: string,
     day: WorkingDay,
@@ -498,7 +487,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffId,
       dayKey: day.key,
     });
-    const nextSchedule = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -511,7 +500,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
       return;
     }
-    advanceFocusAfterEdit(nextSchedule);
+    setCellSelection({ staffId, day });
   };
 
   // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
@@ -642,7 +631,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
   // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
   // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
-  const handleConfirm = () => {
+  // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
+  // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
+  const handleConfirm = async () => {
     if (!scheduleId || !apex) return;
 
     const existing = allReports.find(
@@ -653,11 +644,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
 
-    const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
-      apex.id,
-      SCHEDULE_TYPE,
-      scheduleId
-    );
+    const resolved = await scope.resolveObjectsAt(apex.id);
+    const apexSchedule = resolved.find(
+      (r) => r.type === SCHEDULE_TYPE && r.id === scheduleId
+    )?.obj as MonthlyStaffSchedule | undefined;
     if (!apexSchedule) return;
 
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -718,7 +708,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     <button
       type="button"
       className="e-confirm"
-      onClick={handleConfirm}
+      onClick={() => void handleConfirm()}
       title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
     >
       🏁 完成レポートを作成
@@ -797,6 +787,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           minDayOff={minDayOff}
           maxPerDay={maxPerDay}
           checkShiftWish={constraints?.checkShiftWish ?? true}
+          intervalRules={constraints?.shiftIntervalRules ?? []}
+          intervalRuleBubbleUrl={intervalRuleBubbleUrl}
         />
         <ShiftCommandsBar
           targetCount={subsetStaff.length}

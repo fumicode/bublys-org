@@ -30,7 +30,10 @@ type SummaryRowProps = {
 /**
  * 集計行 1 行（勤務帯ごと or 休み）。
  * 勤務帯行は「現在/必要」を分母付きで表示し、充足率を背景バーで描く（達成=緑/不足=赤）。
- * 必要数なしの行は人数のみ。休み行の右端には月内の総休み数（＝休列の合計）を出す。
+ * 必要数なしの行は人数のみ。
+ *
+ * 右端の「休」「早」はスタッフ行専用の月間負荷列なので、ここには置かない。
+ * CSS grid の自動配置が崩れないよう、右2列分は見た目のないプレースホルダで跨ぐ（案A）。
  */
 export const SummaryRow: FC<SummaryRowProps> = ({
   row,
@@ -43,9 +46,8 @@ export const SummaryRow: FC<SummaryRowProps> = ({
 }) => {
   const isFirst = rowIndex === 0;
   const firstCls = isFirst ? " is-first" : "";
-  // 行は grid の直接の子（見出し＋各日セル＋右端）なので、各セルへ同じクラスを付ける
+  // 行は grid の直接の子（見出し＋各日セル＋右レール跨ぎ）なので、各セルへ同じクラスを付ける
   const dimCls = dimmed ? " is-dimmed" : "";
-  const isDayOff = row.key === "day-off";
 
   return (
     <>
@@ -185,14 +187,12 @@ export const SummaryRow: FC<SummaryRowProps> = ({
         );
       })}
 
-      {/* 右端: 休み行だけ月内の総休み数（＝休列の合計）。他行は空 */}
-      {isDayOff ? (
-        <div className={`e-off-total e-off-sum${firstCls}${dimCls}`} title="全スタッフの休み合計">
-          {days.reduce((sum, _day, i) => sum + row.count(i), 0)}
-        </div>
-      ) : (
-        <div className={`e-off-total e-off-filler${firstCls}${dimCls}`} />
-      )}
+      {/* 休・早はスタッフ帯専用。集計行は日列で終わり、grid 配置だけ右2列を跨ぐ */}
+      <div
+        className={`e-sum-rail-end${firstCls}${dimCls}`}
+        style={{ gridColumn: "span 2" }}
+        aria-hidden
+      />
     </>
   );
 };

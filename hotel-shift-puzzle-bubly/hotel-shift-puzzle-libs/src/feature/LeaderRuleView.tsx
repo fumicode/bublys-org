@@ -11,7 +11,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
 import { useObjects, useObject } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import {
@@ -35,7 +34,6 @@ type LeaderRuleViewProps = {
  * 人をドロップすると、その人を制約の候補に加えて保存する（＝勤務表の世界線にノードが増える）。
  */
 export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);

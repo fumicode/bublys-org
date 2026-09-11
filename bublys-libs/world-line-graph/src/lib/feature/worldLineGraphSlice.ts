@@ -48,15 +48,31 @@ export const MAX_CAS_ENTRIES = 300;
  * hot なデータが evict→再取得を繰り返す可能性はある。将来 LRU 化するなら
  * 参照時にキーを入れ直す等が必要。
  *
- * `protectHashes` に含まれるハッシュ（＝現在表示中の世界が参照しているデータ）は
- * 削除対象から除外する。
+ * 保護するのは次の2つ:
+ *   - `protectHashes`（呼び出し側が「これから使う」と申告したもの）
+ *   - **全スコープの現在ノードが参照しているハッシュ**
+ *
+ * 後者が要るのは、CAS がアプリ全体で1つの共有 Record だから。あるスコープの書き込みが、
+ * 別スコープが今まさに見ている世界のデータを追い出してしまうと、そのスコープでは
+ * 状態が読めなくなる（永続ストアからの復元が間に合わず「古いまま」に見える）。
+ * 走査は溢れているときだけなので、通常の書き込みでは走らない。
  */
+function currentWorldHashes(state: WorldLineSliceState): Set<string> {
+  const hashes = new Set<string>();
+  for (const graphJson of Object.values(state.graphs)) {
+    const graph = WorldLineGraph.fromJSON(graphJson as WorldLineGraphJson);
+    for (const ref of graph.getCurrentStateRefs()) hashes.add(ref.hash);
+  }
+  return hashes;
+}
+
 function evictCas(state: WorldLineSliceState, protectHashes: readonly string[]) {
   const keys = Object.keys(state.cas);
   const overflow = keys.length - MAX_CAS_ENTRIES;
   if (overflow <= 0) return;
 
-  const protectedSet = new Set(protectHashes);
+  const protectedSet = currentWorldHashes(state);
+  for (const hash of protectHashes) protectedSet.add(hash);
   let removed = 0;
   for (const key of keys) {
     if (removed >= overflow) break;

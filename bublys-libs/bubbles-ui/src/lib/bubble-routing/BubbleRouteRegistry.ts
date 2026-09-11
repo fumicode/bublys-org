@@ -21,6 +21,24 @@ class BubbleRouteRegistryClass {
   }
 
   /**
+   * 登録済みのルートを取り消す。
+   *
+   * `registerRoutes` に渡したのと同じルートオブジェクトを渡すこと
+   * （同一性で消すので、同じ内容の別オブジェクトでは消えない）。
+   * バブリを OS から外すときに、そのバブリが登録したルートだけを剥がすために使う。
+   */
+  unregisterRoutes(routes: BubbleRoute[]): void {
+    if (routes.length === 0) return;
+    const removing = new Set(routes);
+    const before = this.routes.length;
+    this.routes = this.routes.filter((route) => !removing.has(route));
+    this.notifyListeners();
+    console.log(
+      `[BubbleRouteRegistry] Unregistered ${before - this.routes.length} routes. Total: ${this.routes.length}`,
+    );
+  }
+
+  /**
    * BubblePropsResolver を登録（一度だけ）
    */
   private ensureResolverRegistered(): void {
