@@ -18,10 +18,13 @@
 import type { ModelGraph } from '../domain/ModelGraph.js';
 import {
   DEFAULT_LAYOUT_OPTIONS,
+  echoName,
   finishLayout,
   measureBoxes,
+  measureEchoes,
   type ClassBox,
   type ClassDiagramLayout,
+  type EchoSpec,
   type LayoutOptions,
 } from './classLayout.js';
 
@@ -78,12 +81,16 @@ export function layoutClassDiagramByForce(
   options: Partial<LayoutOptions> = {},
   force: Partial<ForceOptions> = {},
   /** 集約に加えて束ねたいまとまり（世界線スコープなど）。省略すると集約だけ */
-  groupOf?: GroupOf
+  groupOf?: GroupOf,
+  /** 焼き付けの写し。世界の中に置き、写し元とばねで結ぶ */
+  echoes: readonly EchoSpec[] = []
 ): ClassDiagramLayout {
   const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   const f = { ...DEFAULT_FORCE_OPTIONS, ...force };
-  const measured = measureBoxes(graph, o);
-  if (measured.length === 0) return finishLayout(graph, []);
+  const real = measureBoxes(graph, o);
+  if (real.length === 0) return finishLayout(graph, []);
+  // 写しも同じ場に置く。世界のまとまりに引かれ、写し元ともばねで結ばれる
+  const measured = [...real, ...measureEchoes(echoes, real, o)];
 
   // --- 初期位置。名前のハッシュで円周に置く（乱数を使わない） ---------------
   const radius = Math.max(300, measured.length * 45);
@@ -101,12 +108,25 @@ export function layoutClassDiagramByForce(
   });
   const index = new Map(nodes.map((n, i) => [n.box.name, i]));
 
-  const springs = graph.relations
-    .map((r) => ({ a: index.get(r.from), b: index.get(r.to) }))
-    .filter((s): s is { a: number; b: number } => s.a !== undefined && s.b !== undefined);
+  const springs = [
+    ...graph.relations.map((r) => ({ a: index.get(r.from), b: index.get(r.to) })),
+    // 写しは、写し元と「その世界の相手」の両方に引かれる。
+    // 前者だけだと枠の外へ引きずり出され、後者だけだと写し元と遠く離れて線が長くなる
+    ...echoes.flatMap((e) => [
+      { a: index.get(echoName(e)), b: index.get(e.of) },
+      { a: index.get(echoName(e)), b: index.get(e.near) },
+    ]),
+  ].filter((s): s is { a: number; b: number } => s.a !== undefined && s.b !== undefined);
 
-  /** 束ねるまとまり。集約と、注入されたグループ（世界線スコープ）の両方 */
-  const groups = nodes.map((n) => [n.box.aggregate, groupOf?.(n.box.name)].filter(Boolean));
+  /**
+   * 束ねるまとまり。集約と、注入されたグループ（世界線スコープ）の両方。
+   * ★ 写しは**写し元の集約では束ねない**（外へ引き戻される）。焼き付け先の世界だけで束ねる
+   */
+  const groups = nodes.map((n) =>
+    n.box.echoScopeId
+      ? [n.box.echoScopeId]
+      : [n.box.aggregate, groupOf?.(n.box.name)].filter(Boolean)
+  );
 
   for (let step = 0; step < f.iterations; step++) {
     // 進むにつれて動きを小さくする（焼きなまし）。最後まで同じ強さだと震え続ける

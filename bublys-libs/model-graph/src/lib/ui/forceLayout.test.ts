@@ -3,6 +3,7 @@
  * 崩れていないことを固定する。
  */
 import type { ModelClass, ModelGraph, ModelRelation } from '../domain/ModelGraph.js';
+import { layoutClassDiagram } from './classLayout.js';
 import { layoutClassDiagramByForce } from './forceLayout.js';
 
 const cls = (name: string, over: Partial<ModelClass> = {}): ModelClass => ({
@@ -147,5 +148,74 @@ describe('束ねの強さ', () => {
       );
     };
     expect(spread(names)).toBeLessThan(spread([...names, ...others]) * 0.7);
+  });
+});
+
+/**
+ * 焼き付けの写し。**同じものが外の台帳と世界の中の両方に居る**ことを描くための箱。
+ * 片方にしか描かないとどちらかが嘘になる。
+ */
+describe('焼き付けの写し', () => {
+  const g = graph([
+    cls('Staff', { kind: 'aggregate' }),
+    cls('Schedule', { kind: 'aggregate' }),
+    cls('Constraints', { kind: 'aggregate' }),
+    cls('Outside', { kind: 'aggregate' }),
+  ]);
+  const echoes = [{ of: 'Staff', scopeId: 'Schedule:<id>', near: 'Schedule' }];
+  const inScope = (n: string) => (n === 'Schedule' || n === 'Constraints' ? 'Schedule:<id>' : undefined);
+
+  it('写し元は消えず、写しが増える（両方に居る）', () => {
+    const { boxes } = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    expect(boxes.filter((b) => b.name === 'Staff')).toHaveLength(1);
+    const echo = boxes.find((b) => b.echoOf === 'Staff');
+    expect(echo).toBeTruthy();
+    expect(echo?.echoScopeId).toBe('Schedule:<id>');
+  });
+
+  it('写しは題名だけの小さな箱（同じ大きさだと別のクラスに見える）', () => {
+    const { boxes } = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    const origin = boxes.find((b) => b.name === 'Staff') as (typeof boxes)[number];
+    const echo = boxes.find((b) => b.echoOf === 'Staff') as (typeof boxes)[number];
+    expect(echo.width).toBeLessThan(origin.width);
+    expect(echo.shownFields).toBe(0);
+    expect(echo.shownMethods).toBe(0);
+  });
+
+  it('★ 写しは焼き付け先の世界のほうに寄る（写し元に引き戻されない）', () => {
+    const { boxes } = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    const at = (n: string) => boxes.find((b) => b.name === n) as (typeof boxes)[number];
+    const echo = boxes.find((b) => b.echoOf === 'Staff') as (typeof boxes)[number];
+    // 写しは、その世界の相手（Schedule）に、世界の外のもの（Outside）より近い
+    expect(dist(echo, at('Schedule'))).toBeLessThan(dist(echo, at('Outside')));
+  });
+
+  it('写しは関係の線を増やさない（同じオブジェクトなので、つながりは写し元のもの）', () => {
+    const withRel = graph(
+      [cls('Staff', { kind: 'aggregate' }), cls('Schedule', { kind: 'aggregate' })],
+      [rel('Schedule', 'Staff', { kind: 'references', via: 'staffId' })]
+    );
+    const plain = layoutClassDiagramByForce(withRel);
+    const withEcho = layoutClassDiagramByForce(withRel, {}, {}, inScope, echoes);
+    expect(withEcho.edges).toHaveLength(plain.edges.length);
+  });
+
+  it('写し元が図に無ければ、写しも作らない', () => {
+    const { boxes } = layoutClassDiagramByForce(
+      g,
+      {},
+      {},
+      inScope,
+      [{ of: 'NotThere', scopeId: 'Schedule:<id>', near: 'Schedule' }]
+    );
+    expect(boxes.some((b) => b.echoOf)).toBe(false);
+  });
+
+  it('列の配置でも、写しはその世界の列に入る', () => {
+    const layout = layoutClassDiagram(g, {}, echoes);
+    const echo = layout.boxes.find((b) => b.echoOf === 'Staff') as (typeof layout.boxes)[number];
+    const near = layout.boxes.find((b) => b.name === 'Schedule') as (typeof layout.boxes)[number];
+    expect(echo.x).toBe(near.x);
+    expect(echo.y).toBeGreaterThan(near.y);
   });
 });

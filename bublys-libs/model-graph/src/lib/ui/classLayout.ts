@@ -40,6 +40,24 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   maxMethods: 10,
 };
 
+/**
+ * 焼き付けの**写し**。
+ *
+ * 焼き付けメンバー（pinned）は、外の台帳と世界の中の**両方に居る**。
+ * 片方にしか描かないとどちらかが嘘になる:
+ *   枠の中だけ → 外の台帳にも居ることが消える
+ *   枠の外だけ → その世界に載っていることが消える
+ * だから両方に置いて、**同じものだと分かる線**で結ぶ。
+ */
+export type EchoSpec = {
+  /** 写し元のクラス名 */
+  readonly of: string;
+  /** どの世界に焼き付けられるか */
+  readonly scopeId: string;
+  /** その世界の中で、どの箱の近くに置くか */
+  readonly near: string;
+};
+
 /** 位置が決まる前の箱（採寸だけ） */
 export type MeasuredBox = {
   readonly name: string;
@@ -51,6 +69,13 @@ export type MeasuredBox = {
   /** 実際に描く行数（省略ぶんを除く） */
   readonly shownFields: number;
   readonly shownMethods: number;
+  /**
+   * 焼き付けの写しなら、写し元のクラス名。
+   * 写しは中身を持たない（同じオブジェクトなので、2回書いても読むものが増えない）
+   */
+  readonly echoOf?: string;
+  /** 写しが属する世界 */
+  readonly echoScopeId?: string;
 };
 
 /** 図に置かれた箱1つ */
@@ -66,6 +91,10 @@ export type ClassBox = {
   /** 実際に描く行数（省略ぶんを除く） */
   readonly shownFields: number;
   readonly shownMethods: number;
+  /** 焼き付けの写しなら、写し元のクラス名 */
+  readonly echoOf?: string;
+  /** 写しが属する世界 */
+  readonly echoScopeId?: string;
 };
 
 /** 箱と箱を結ぶ線 */
@@ -152,6 +181,42 @@ export function measureBoxes(
   });
 }
 
+/**
+ * 写しの箱を採寸する。**題名だけの小さな箱**にする。
+ * 中身をもう一度書いても読むものは増えないし、写しのほうが大きいと
+ * 「別のクラスだ」と読めてしまう。
+ */
+export function measureEchoes(
+  echoes: readonly EchoSpec[],
+  measured: readonly MeasuredBox[],
+  options: Partial<LayoutOptions> = {}
+): MeasuredBox[] {
+  const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
+  const byName = new Map(measured.map((b) => [b.name, b]));
+  return echoes
+    .map((e): MeasuredBox | null => {
+      const origin = byName.get(e.of);
+      if (!origin) return null;
+      return {
+        name: echoName(e),
+        cls: origin.cls,
+        width: o.boxWidth * 0.62,
+        height: o.lineHeight + o.boxPadding * 2,
+        aggregate: origin.aggregate,
+        shownFields: 0,
+        shownMethods: 0,
+        echoOf: e.of,
+        echoScopeId: e.scopeId,
+      };
+    })
+    .filter((b): b is MeasuredBox => b !== null);
+}
+
+/** 写しの箱の名前。写し元とぶつからないように世界の名前を足す */
+export function echoName(e: EchoSpec): string {
+  return `${e.of}@${e.scopeId}`;
+}
+
 function boxHeight(cls: ModelClass, o: LayoutOptions): { h: number; f: number; m: number } {
   const f = Math.min(cls.fields.length, o.maxFields);
   const m = Math.min(cls.methods.length, o.maxMethods);
@@ -170,7 +235,8 @@ function boxHeight(cls: ModelClass, o: LayoutOptions): { h: number; f: number; m
  */
 export function layoutClassDiagram(
   graph: ModelGraph,
-  options: Partial<LayoutOptions> = {}
+  options: Partial<LayoutOptions> = {},
+  echoes: readonly EchoSpec[] = []
 ): ClassDiagramLayout {
   const o = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   const owner = assignAggregates(graph);
@@ -194,6 +260,17 @@ export function layoutClassDiagram(
     return diff !== 0 ? diff : a.localeCompare(b);
   });
 
+  // 写しは「近くに置く相手」の集約の列に入れる（その世界の中に見えるように）
+  const echoBoxes = measureEchoes(echoes, measureBoxes(graph, o), o);
+  const echoesInColumn = new Map<string, MeasuredBox[]>();
+  for (let i = 0; i < echoes.length; i++) {
+    const box = echoBoxes.find((b) => b.name === echoName(echoes[i]));
+    if (!box) continue;
+    const column = owner.get(echoes[i].near);
+    if (!column) continue;
+    echoesInColumn.set(column, [...(echoesInColumn.get(column) ?? []), box]);
+  }
+
   const boxes: ClassBox[] = [];
   let x = o.gapX;
   let maxY = 0;
@@ -213,6 +290,10 @@ export function layoutClassDiagram(
         shownMethods: m,
       });
       y += h + o.gapY / 2;
+    }
+    for (const echo of echoesInColumn.get(root) ?? []) {
+      boxes.push({ ...echo, x, y });
+      y += echo.height + o.gapY / 2;
     }
     maxY = Math.max(maxY, y);
     x += o.boxWidth + o.gapX;
