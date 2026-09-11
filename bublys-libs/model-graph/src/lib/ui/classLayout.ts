@@ -105,18 +105,51 @@ export type ClassBox = {
   readonly echoScopeId?: string;
 };
 
+export type Point = { readonly x: number; readonly y: number };
+
+/**
+ * 曲線の形。**配置が決める**（ビューは `M from C c1 c2 to` と書くだけ）。
+ *
+ * 制御点をビューで作ると、横の縁から出る線と上下の縁から出る線で式が変わるのに
+ * 片方だけ直して食い違う。どの縁から出すかを知っているのはここなので、形もここで決める。
+ */
+export type Curve = {
+  readonly from: Point;
+  readonly to: Point;
+  readonly c1: Point;
+  readonly c2: Point;
+};
+
 /** 箱と箱を結ぶ線 */
-export type ClassEdge = {
+export type ClassEdge = Curve & {
   readonly relation: ModelRelation;
-  readonly from: { x: number; y: number };
-  readonly to: { x: number; y: number };
   /** 同じ集約の内側で閉じているか。閉じていれば境界をまたがない */
   readonly withinAggregate: boolean;
+};
+
+/**
+ * 焼き付けの線。外の台帳の箱と、世界の中の写しを結ぶ**第3の線**。
+ *
+ * 内包（値を持つ）でも参照（id で指す）でもない。「世界が生まれた瞬間に同じ参照が
+ * 焼かれて、以後そちらは動かない」という関係なので、線の種類を分けてある。
+ *
+ * ★ 位置の計算をビューに置かず、ここで関係の線と**一緒に**決める。
+ *   別に計算すると同じ点に重なって、矢尻を隠してしまう（実際に隠した）。
+ */
+export type PinEdge = Curve & {
+  /** 写し元のクラス名 */
+  readonly of: string;
+  /** 写しの箱の名前 */
+  readonly echo: string;
+  /** どの世界に焼き付けられるか */
+  readonly scopeId?: string;
 };
 
 export type ClassDiagramLayout = {
   readonly boxes: readonly ClassBox[];
   readonly edges: readonly ClassEdge[];
+  /** 焼き付けの線（写しがあるときだけ） */
+  readonly pinEdges: readonly PinEdge[];
   readonly width: number;
   readonly height: number;
   /** 図に置けなかったもの。黙って落とさない */
@@ -312,11 +345,99 @@ export function layoutClassDiagram(
   return finishLayout(graph, boxes, { width: x, height: maxY + o.gapY }, echoes);
 }
 
+/** 箱のどの縁から線を出すか */
+type Side = 'left' | 'right' | 'top' | 'bottom';
+
+/** 線を箱のどの縁から出すかの**請求**。縁のどこに付くかは、あとでまとめて決める */
+type PortRequest = {
+  readonly box: ClassBox;
+  readonly side: Side;
+  /** 相手の箱の中心。縁の上での並び順に使う（相手が手前にある線ほど手前の口に付く＝交差が減る） */
+  readonly toward: Point;
+};
+
+/** 縁の端に残す余白。角丸の上に線の口が乗らないように */
+const PORT_INSET = 6;
+
+/**
+ * 2つの箱を、**どの縁とどの縁で**結ぶか。
+ *
+ * ★ 中心の左右だけで決めると、横に重なった箱どうしで線が**後ろ向きに走る**。
+ *   矢尻は進行方向を向くので、相手の箱の中に食い込んで、あとから描かれる箱に
+ *   塗りつぶされる——「矢印が1本もつながっていない」に見える。実際に見えなかった。
+ *
+ * だから「離れている向き」で決める。横に並んでいれば横の縁どうし、
+ * 横に重なっている（＝縦に積まれている）なら上下の縁どうし。
+ * こうすると線は必ず**互いの外側へ向かって**出る。
+ */
+function sidesBetween(from: ClassBox, to: ClassBox): { from: Side; to: Side } {
+  const right = to.x - (from.x + from.width); // from の右に to が居るときの隙間
+  const left = from.x - (to.x + to.width); // from の左に to が居るとき
+  if (right >= 0 || left >= 0) {
+    return right >= left ? { from: 'right', to: 'left' } : { from: 'left', to: 'right' };
+  }
+  // 横に重なっている＝縦に積まれている。上下の縁で結ぶ
+  const below = to.y - (from.y + from.height);
+  const above = from.y - (to.y + to.height);
+  return below >= above ? { from: 'bottom', to: 'top' } : { from: 'top', to: 'bottom' };
+}
+
+/**
+ * 同じ縁に届く線を、縁の上に**並べる**。
+ *
+ * ★ 全部を縁の中点に集めると、何本届いていても**1本にしか見えない**。しかも印
+ *   （矢尻・四角）が完全に重なるので、あとから描いた線が前の線の印を塗りつぶす。
+ *   実際「写しに矢印が1本もつながっていない」という絵になった——3本とも同じ点に
+ *   終わっていて、最後に描いた焼き付けの四角が矢尻2つを隠していた。
+ *
+ * 1本しか来ない縁は中点のまま（ほとんどの箱はこちら）。
+ */
+function allocatePorts(requests: readonly PortRequest[]): Point[] {
+  const groups = new Map<string, number[]>();
+  requests.forEach((r, i) => {
+    const key = `${r.side}:${r.box.name}`;
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+
+  const ports: Point[] = new Array(requests.length);
+  for (const indices of groups.values()) {
+    const vertical = requests[indices[0]].side === 'left' || requests[indices[0]].side === 'right';
+    // 相手が手前にいる線ほど手前の口に付ける。同じ位置なら請求順（決定的にするため）
+    const key = (i: number) => (vertical ? requests[i].toward.y : requests[i].toward.x);
+    const order = [...indices].sort((a, b) => key(a) - key(b) || a - b);
+    order.forEach((i, rank) => {
+      const { box, side } = requests[i];
+      const length = vertical ? box.height : box.width;
+      const inset = Math.min(PORT_INSET, length / 4);
+      const at = inset + ((length - inset * 2) * (rank + 1)) / (order.length + 1);
+      ports[i] = vertical
+        ? { x: box.x + (side === 'right' ? box.width : 0), y: box.y + at }
+        : { x: box.x + at, y: box.y + (side === 'bottom' ? box.height : 0) };
+    });
+  }
+  return ports;
+}
+
+/**
+ * 線の曲がり方。縁の向きにまっすぐ出て、相手の縁へまっすぐ入る。
+ * 横の縁なら制御点を横に、上下の縁なら縦に置く。
+ */
+function curve(from: Point, to: Point, side: Side): Curve {
+  if (side === 'left' || side === 'right') {
+    const mx = (from.x + to.x) / 2;
+    return { from, to, c1: { x: mx, y: from.y }, c2: { x: mx, y: to.y } };
+  }
+  const my = (from.y + to.y) / 2;
+  return { from, to, c1: { x: from.x, y: my }, c2: { x: to.x, y: my } };
+}
+
 /**
  * 置き終わった箱から、線・大きさ・申告を作る。**配置の仕方によらず共通**。
  *
- * 線は箱の縁の中点どうしを結ぶ。左右どちらの縁から出すかは位置関係で決めるので、
- * 力学配置で箱が入れ替わっても線の出方は自然なまま。
+ * 線は箱の左右どちらかの縁から出る。どちらの縁かは位置関係で決めるので、力学配置で
+ * 箱が入れ替わっても線の出方は自然なまま。縁のどこに付くかは、**その縁に何本来たか**
+ * で決める（`allocatePorts`）。焼き付けの線も同じ仕組みで口を取るので、関係の矢印と
+ * 重ならない。
  */
 export function finishLayout(
   graph: ModelGraph,
@@ -337,8 +458,23 @@ export function finishLayout(
     if (!echo) continue;
     for (const from of e.members) redirect.set(`${from}→${e.of}`, echo.name);
   }
-  const edges: ClassEdge[] = [];
+
+  const requests: PortRequest[] = [];
+  const center = (b: ClassBox): Point => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+  /** 2つの箱の口を請求して、[出口, 入口, 縁の向き] を返す */
+  const claim = (from: ClassBox, to: ClassBox): [number, number, Side] => {
+    const side = sidesBetween(from, to);
+    const out = requests.push({ box: from, side: side.from, toward: center(to) }) - 1;
+    const into = requests.push({ box: to, side: side.to, toward: center(from) }) - 1;
+    return [out, into, side.from];
+  };
+
   const dangling: string[] = [];
+  const relationPorts: {
+    relation: ModelRelation;
+    withinAggregate: boolean;
+    at: [number, number, Side];
+  }[] = [];
   for (const r of graph.relations) {
     const from = boxByName.get(r.from);
     const to = boxByName.get(redirect.get(`${r.from}→${r.to}`) ?? r.to);
@@ -346,17 +482,47 @@ export function finishLayout(
       dangling.push(`${r.from}.${r.via} → ${r.to}`);
       continue;
     }
-    const rightward = to.x + to.width / 2 >= from.x + from.width / 2;
-    edges.push({
+    relationPorts.push({
       relation: r,
-      from: {
-        x: from.x + (rightward ? from.width : 0),
-        y: from.y + from.height / 2,
-      },
-      to: { x: to.x + (rightward ? 0 : to.width), y: to.y + to.height / 2 },
       withinAggregate: from.aggregate === to.aggregate,
+      at: claim(from, to),
     });
   }
+
+  // 焼き付けの線は**箱から**導く（写しの箱があること自体が焼き付けの事実）。
+  // 関係の線と同じ請求の列に並べるので、同じ縁に来れば互いに譲り合う
+  const pinPorts: {
+    of: string;
+    echo: string;
+    scopeId?: string;
+    at: [number, number, Side];
+  }[] = [];
+  for (const echo of boxes) {
+    if (!echo.echoOf) continue;
+    const origin = boxByName.get(echo.echoOf);
+    if (!origin) continue;
+    pinPorts.push({
+      of: echo.echoOf,
+      echo: echo.name,
+      scopeId: echo.echoScopeId,
+      at: claim(origin, echo),
+    });
+  }
+
+  const ports = allocatePorts(requests);
+  const shapeOf = ([out, into, side]: [number, number, Side]) =>
+    curve(ports[out], ports[into], side);
+  const edges: ClassEdge[] = relationPorts.map((p) => ({
+    relation: p.relation,
+    withinAggregate: p.withinAggregate,
+    ...shapeOf(p.at),
+  }));
+  const pinEdges: PinEdge[] = pinPorts.map((p) => ({
+    of: p.of,
+    echo: p.echo,
+    scopeId: p.scopeId,
+    ...shapeOf(p.at),
+  }));
 
   const containedSomewhere = new Set(
     graph.relations.filter((r) => r.kind === 'contains').map((r) => r.to)
@@ -372,6 +538,7 @@ export function finishLayout(
   return {
     boxes,
     edges,
+    pinEdges,
     width,
     height,
     diagnostics: { orphanClasses, danglingRelations: dangling.sort() },

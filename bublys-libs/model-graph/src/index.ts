@@ -22,6 +22,10 @@ export {
   type ClassBox,
   type ClassDiagramLayout,
   type ClassEdge,
+  type Curve,
+  type Point,
+  type EchoSpec,
+  type PinEdge,
   type LayoutOptions,
 } from './lib/ui/classLayout.js';
 export {
