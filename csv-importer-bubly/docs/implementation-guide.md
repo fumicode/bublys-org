@@ -531,6 +531,26 @@ Google スプレッドシートとの双方向手動同期機能。ブラウザ�
 **Push処理**: 書き込み前に`clear`で既存データをクリア（行数が減った場合のゴミ防止）→ `PUT values`でRAW書き込み。
 **Pull処理**: `GET values`で2D配列を取得 → `valuesToCsvSheet`で既存シートに変換。
 
+### `src/ui/SheetEditorView.tsx` — Row / Object の切り替えとクリック規約
+
+**1段目**: シート名と `[Row｜Object]` トグル。
+**2段目**: 左が表示ごとの操作、右がシート自体への操作（「オブジェクト一覧」「エクスポート」「Sheets」「世界線」）。
+
+「オブジェクト一覧」「世界線」は `ObjectView` のチップ。**単クリックでは開かず、ダブルクリックで開く**
+（`docs/click-or-doubleclick.md`: 既に在るものを開くのはダブルクリック）。
+`objectListUrl` / `worldLineUrl` を受け取るだけで、開く処理は `ObjectView` が持つ。
+
+**Object 表示の行**（`tr.is-object`）:
+
+| 操作 | 挙動 |
+|---|---|
+| 単クリック（セル） | **何も起きない**。将来「選ぶ」が入る席（`docs/selection-and-scope.md`） |
+| ダブルクリック（行） | 詳細バブルを開く（`onOpenObject`）。`<tr>` は `ObjectView` で包めないので手で付ける |
+| ⠿ を掴んでドラッグ | `ObjectView` と同じ荷物（`type/csv-object` + url + label + object-id）に `application/json` を上乗せ |
+| hover | **泡の膜**。`ObjectView` が export する `objectFilmLook` を `tr::after` に当てる。定義は1つ |
+
+「Object」トグル（この表の見方を変える）と「オブジェクト一覧」チップ（別バブルで一覧を見る）は別物なので両方ある。
+
 ### `src/ui/GoogleSheetsPanel.tsx`
 
 **役割**: Google Sheets連携のUIパネル。propsベースの純粋コンポーネント。

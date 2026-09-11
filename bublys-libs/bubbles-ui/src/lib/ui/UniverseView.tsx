@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector, selectWindowSize } from "@bublys-org/st
 import { CoordinateSystem, Layer } from "@bublys-org/bubbles-ui-util";
 import { nameIntent } from "@bublys-org/world-line-graph";
 import { Bubble, createBubble } from "../Bubble.domain.js";
-import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
+import { BubblesContext, type OpenBubbleOptions } from "../bubble-routing/BubbleRouting.js";
 import { BubbleRefsProvider } from "../context/BubbleRefsContext.js";
 import { BubblesLayeredView } from "./BubblesLayeredView.js";
 import { measureViewportForElement } from "../utils/measure-viewport.js";
@@ -69,23 +69,30 @@ export const UniverseView: FC<UniverseViewProps> = ({
   }, []);
 
   const popChild = useCallback(
-    (b: Bubble, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side-right"): string => {
+    (
+      b: Bubble,
+      openerBubbleId: string,
+      openingPosition: OpeningPosition = "bubble-side-right",
+      options?: OpenBubbleOptions,
+    ): string => {
       // 動詞は「いま開いている意図に名前を付ける」だけ。区間を閉じはしない
       nameIntent(`open:${b.url}`);
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
-      dispatch(popChildInProcess({ bubbleId: b.id, openingPosition }, universeId));
+      dispatch(
+        popChildInProcess({ bubbleId: b.id, openingPosition, droppedAt: options?.droppedAt }, universeId),
+      );
       return b.id;
     },
     [dispatch, universeId],
   );
 
   const joinSibling = useCallback(
-    (b: Bubble, openerBubbleId: string): string => {
+    (b: Bubble, openerBubbleId: string, options?: OpenBubbleOptions): string => {
       nameIntent(`open:${b.url}`);
       dispatch(addBubble(b.toJSON(), universeId));
       dispatch(relateBubbles({ openerId: openerBubbleId, openeeId: b.id }, universeId));
-      dispatch(joinSiblingInProcess(b.id, universeId));
+      dispatch(joinSiblingInProcess({ bubbleId: b.id, droppedAt: options?.droppedAt }, universeId));
       return b.id;
     },
     [dispatch, universeId],
@@ -125,8 +132,22 @@ export const UniverseView: FC<UniverseViewProps> = ({
   );
 
   const openBubble = useCallback(
-    (name: string, openerBubbleId: string, openingPosition: OpeningPosition = "bubble-side-right"): string => {
+    (
+      name: string,
+      openerBubbleId: string,
+      openingPosition: OpeningPosition = "bubble-side-right",
+      options?: OpenBubbleOptions,
+    ): string => {
       const newBubble = createBubble(name);
+      // 落として開くときも、レイヤーの決まりは他と同じ。
+      // 同じ種類のバブルなら今のレイヤーに並べ、違う種類なら新しいレイヤーを作る。
+      // 落とした操作が変えるのは「どこに置くか」だけで、「どのレイヤーか」は変えない。
+      // （履歴の下部ストリップだけは位置の決まりなので、落とした場所が勝つ）
+      if (openingPosition === "dropped-place") {
+        return surfaceBubbles?.[0]?.type === newBubble.type
+          ? joinSibling(newBubble, openerBubbleId, options)
+          : popChild(newBubble, openerBubbleId, openingPosition, options);
+      }
       // 履歴は画面（この universe）下部の左右いっぱいストリップで開く
       if (/\/history$/.test(name)) {
         return popChildViewPortBelow(newBubble, openerBubbleId);

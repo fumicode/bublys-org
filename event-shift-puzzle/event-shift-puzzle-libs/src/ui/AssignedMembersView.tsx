@@ -3,6 +3,7 @@
 import React, { FC } from 'react';
 import styled from 'styled-components';
 import { ObjectView } from '@bublys-org/bubbles-ui';
+import { withExpandUrl } from './withExpandUrl.js';
 import PersonIcon from '@mui/icons-material/Person';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import {
@@ -19,6 +20,8 @@ export type AssignedMembersViewProps = {
   shiftViolations: readonly AssignmentViolation[];
   density?: 'compact' | 'full';
   onExpand?: () => void;
+  /** 単独バブルの URL（link bubble のリボンの起点になる） */
+  expandUrl?: string;
 
   /** 局員バブル展開用 */
   buildMemberUrl?: (memberId: string) => string;
@@ -54,6 +57,7 @@ export const AssignedMembersView: FC<AssignedMembersViewProps> = ({
   shiftViolations,
   density = 'compact',
   onExpand,
+  expandUrl,
   buildMemberUrl,
   buildAvailabilityUrl,
 }) => {
@@ -81,11 +85,21 @@ export const AssignedMembersView: FC<AssignedMembersViewProps> = ({
       <div className="am-header">
         <span className="am-title">配置メンバー</span>
         <span className="am-count">{memberSummaries.length}名</span>
-        {onExpand && (
-          <button className="am-expand" onClick={onExpand} aria-label="拡大">
-            ↗
-          </button>
-        )}
+        {onExpand &&
+          /* 14px の ↗ アイコン。ObjectView にすると当たり判定が小さすぎ、
+             ドラッグして持ち出す意味も薄いので <button> のまま。
+             リボンだけ UrledPlace で確保し、開くのはダブルクリックに揃える。 */
+          withExpandUrl(
+            expandUrl,
+            <button
+              className="am-expand"
+              onDoubleClick={onExpand}
+              aria-label="拡大"
+              title="ダブルクリックで単独バブルとして開く"
+            >
+              ↗
+            </button>
+          )}
       </div>
 
       {shiftViolations.length > 0 && (

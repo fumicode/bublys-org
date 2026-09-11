@@ -1,7 +1,7 @@
 "use client";
 
-import { FC, ReactNode, useContext } from "react";
-import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
+import { FC, ReactNode } from "react";
+import { BubbleRoute } from "@bublys-org/bubbles-ui";
 import {
   SheetListFeature,
   SheetEditorFeature,
@@ -29,14 +29,10 @@ const CsvBubbleProvider: FC<{ children: ReactNode }> = ({ children }) => (
 );
 
 // シート一覧バブル
-const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const handleSheetSelect = (sheetId: string) => {
-    openBubble(`csv-importer/sheets/${sheetId}`, bubble.id);
-  };
+const SheetListBubble: BubbleRoute["Component"] = () => {
   return (
     <CsvBubbleProvider>
-      <SheetListFeature onSheetSelect={handleSheetSelect} />
+      <SheetListFeature />
     </CsvBubbleProvider>
   );
 };
@@ -45,7 +41,7 @@ const SheetListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <CsvBubbleProvider>
-      <SheetEditorFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+      <SheetEditorFeature sheetId={bubble.params.sheetId} />
     </CsvBubbleProvider>
   );
 };
@@ -54,7 +50,7 @@ const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const ObjectListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <CsvBubbleProvider>
-      <CsvObjectListFeature sheetId={bubble.params.sheetId} bubbleId={bubble.id} />
+      <CsvObjectListFeature sheetId={bubble.params.sheetId} />
     </CsvBubbleProvider>
   );
 };

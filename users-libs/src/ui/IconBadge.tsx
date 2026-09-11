@@ -1,50 +1,52 @@
 import React from "react";
 import styled from "styled-components";
-import { UrledPlace, DragDataType, useDragPayload, ObjectType, getDragType } from "@bublys-org/bubbles-ui";
+import { ObjectView, ObjectType, OpeningPosition } from "@bublys-org/bubbles-ui";
 
 type IconBadgeProps = {
   icon: React.ReactNode;
   label: string;
-  onClick?: () => void;
+  /** このバッジが指すオブジェクトの URL。渡すとバッジが ObjectView になる */
   dataUrl?: string;
-  draggable?: boolean;
-  /** @deprecated dragType の代わりに objectType を使用してください */
-  dragType?: DragDataType;
+  /** オブジェクトの型（ドラッグ種別の解決に使う） */
   objectType?: ObjectType;
+  /** ダブルクリックで開くときの展開位置 */
+  openingPosition?: OpeningPosition;
 };
 
-export const IconBadge = ({ icon, label, onClick, dataUrl, draggable = true, dragType, objectType }: IconBadgeProps) => {
-  // objectType があれば getDragType で変換、なければ legacy の dragType を使用
-  const resolvedDragType = objectType ? getDragType(objectType) as DragDataType : dragType;
-  const dragPayload = resolvedDragType && dataUrl ? { type: resolvedDragType, url: dataUrl, label } : null;
-  const { draggable: canDrag, onDragStart } = useDragPayload(dragPayload);
-
+/**
+ * アイコン付きのバッジ。URL と型を渡すと「そのオブジェクトそのもの」になる
+ * ＝ ドラッグでき、ダブルクリックで開く（ObjectView の約束）。
+ *
+ * 以前は onClick を受けて単クリックで開いていたが、開くのはダブルクリックに統一した。
+ * role/tabIndex/キーボード/ドラッグ/UrledPlace は全て ObjectView が持っているので、
+ * ここは見た目だけを持つ。
+ */
+export const IconBadge = ({
+  icon,
+  label,
+  dataUrl,
+  objectType,
+  openingPosition = "bubble-side-right",
+}: IconBadgeProps) => {
   const badge = (
-    <StyledBadge
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : -1}
-      onClick={onClick}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (!onClick) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      $clickable={!!onClick}
-      draggable={draggable && !!dataUrl && canDrag}
-      onDragStart={onDragStart}
-    >
+    <StyledBadge $clickable={!!dataUrl}>
       <span className="e-icon">{icon}</span>
       <span className="e-label">{label}</span>
     </StyledBadge>
   );
 
-  if (dataUrl) {
-    return <UrledPlace url={dataUrl}>{badge}</UrledPlace>;
-  }
+  if (!dataUrl) return badge;
 
-  return badge;
+  return (
+    <ObjectView
+      type={objectType}
+      url={dataUrl}
+      label={label}
+      openingPosition={openingPosition}
+    >
+      {badge}
+    </ObjectView>
+  );
 };
 
 const StyledBadge = styled.span<{ $clickable: boolean } & React.HTMLAttributes<HTMLSpanElement>>`

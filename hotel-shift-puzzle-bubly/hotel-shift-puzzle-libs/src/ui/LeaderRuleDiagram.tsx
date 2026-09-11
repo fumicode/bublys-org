@@ -5,15 +5,20 @@ import type { CSSProperties, HTMLAttributes, LiHTMLAttributes, SVGProps } from "
 import styled, { css, keyframes } from "styled-components";
 import type { Keyframes } from "styled-components";
 import { parseDragPayload } from "@bublys-org/bubbles-ui";
-import { ShiftLeaderRule } from "../domain/index.js";
+import { ObjectView } from "@bublys-org/bubbles-ui";
+import { ShiftLeaderRule, Staff } from "../domain/index.js";
 import { leaderRoleStyle } from "./LeaderBadges.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
 
 type LeaderRuleDiagramProps = {
   /** 描画する宣言的ルール（解決済み。leaderStaffIds が候補者集合） */
   rule: ShiftLeaderRule;
-  /** スタッフID → 表示名 */
-  nameOf: (staffId: string) => string;
+  /**
+   * スタッフID → その人（ドメインオブジェクト）。
+   * 名前を出すだけなら文字列で足りるが、候補者ひとりひとりが ObjectView（＝ドラッグでき、
+   * ダブルクリックで本人のバブルが開く）として振る舞うために、人そのものを受け取る。
+   */
+  staffOf: (staffId: string) => Staff | undefined;
   /**
    * 担当勤務帯の id（例: "early"）。流れ（名前ハイライト・腕・合流点・ターゲット）は
    * 制約の色ではなく「入るべき勤務帯の色」で塗るため、勤務帯 id を受けて SHIFT_BG/FG で色付ける。
@@ -81,7 +86,7 @@ const nameBlink = (onPct: number) => keyframes`
  */
 export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
   rule,
-  nameOf,
+  staffOf,
   shiftId,
   onDropUrl,
   dropAcceptTypes,
@@ -208,31 +213,43 @@ export const LeaderRuleDiagram: FC<LeaderRuleDiagramProps> = ({
       <div className="e-body">
         <ul className="e-names" style={{ gap: ROW_GAP }}>
           {n === 0 && <li className="e-name-empty">（該当者なし）</li>}
-          {ids.map((id, i) => (
-            <NameItem
-              key={id}
-              $animated={animated}
-              $anim={nameKf}
-              $dur={durMs}
-              $delay={i * SLOT_MS}
-              $onBg={shiftBg}
-              $onFg={shiftFg}
-              $onBorder={shiftBorder}
-            >
-              <span className="e-name-text">{nameOf(id)}</span>
-              {onRemoveStaff && (
-                <button
-                  type="button"
-                  className="e-remove"
-                  onClick={() => onRemoveStaff(id)}
-                  title={`${nameOf(id)} を候補から外す`}
-                  aria-label={`${nameOf(id)} を候補から外す`}
-                >
-                  ×
-                </button>
-              )}
-            </NameItem>
-          ))}
+          {ids.map((id, i) => {
+            const staff = staffOf(id);
+            const name = staff?.name ?? id;
+            return (
+              <NameItem
+                key={id}
+                $animated={animated}
+                $anim={nameKf}
+                $dur={durMs}
+                $delay={i * SLOT_MS}
+                $onBg={shiftBg}
+                $onFg={shiftFg}
+                $onBorder={shiftBorder}
+              >
+                {/* 候補者は「その人」そのもの。ドラッグして持ち出せるし、
+                    ダブルクリックすれば本人のバブルが開く。 */}
+                {staff ? (
+                  <ObjectView object={staff} label={name} openingPosition="origin-side">
+                    <span className="e-name-text">{name}</span>
+                  </ObjectView>
+                ) : (
+                  <span className="e-name-text">{name}</span>
+                )}
+                {onRemoveStaff && (
+                  <button
+                    type="button"
+                    className="e-remove"
+                    onClick={() => onRemoveStaff(id)}
+                    title={`${name} を候補から外す`}
+                    aria-label={`${name} を候補から外す`}
+                  >
+                    ×
+                  </button>
+                )}
+              </NameItem>
+            );
+          })}
         </ul>
 
         <svg

@@ -15,15 +15,54 @@ import {
   clearAllAnimations,
   ROOT_UNIVERSE_ID,
 } from './bubbles-slice.js';
-import { Layer } from '@bublys-org/bubbles-ui-util';
+import { Layer, type Point2 } from '@bublys-org/bubbles-ui-util';
+import { Bubble } from '../Bubble.domain.js';
 import { getOriginRect } from '../utils/get-origin-rect.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
-const toDirection = (pos: OpeningPosition): 'right' | 'left' | 'top' | 'bottom' => {
+// dropped-place は「方向」を持たない（点そのものが位置）ので、ここには来ない。
+// Exclude で型に書いておくと、分岐を足し忘れたときにコンパイルが止まる。
+const toDirection = (pos: Exclude<OpeningPosition, 'dropped-place'>): 'right' | 'left' | 'top' | 'bottom' => {
   if (pos === 'bubble-side-left')   return 'left';
   if (pos === 'bubble-side-top')    return 'top';
   if (pos === 'bubble-side-bottom') return 'bottom';
   return 'right';
+};
+
+/**
+ * 落とされた点にバブルを置く。置けたら true。
+ *
+ * popChild（新しいレイヤー）でも joinSibling（同じレイヤー）でも、落とされた点に置く
+ * ところは同じ。レイヤーをどうするかと、どこに置くかは別の話なので、位置決めはここに1つ。
+ *
+ * droppedAt は universe 座標。バブルの position は surface レイヤーの layer-local 座標
+ * なので、他の位置指定と同じ変換を通す。
+ */
+const placeAtDroppedPoint = (
+  listenerApi: { getState: () => any; dispatch: (action: any) => void },
+  universeId: string,
+  bubbleId: string,
+  droppedAt: Point2 | undefined,
+): boolean => {
+  if (!droppedAt) {
+    console.log("Place: dropped-place without droppedAt");
+    return false;
+  }
+  const state = listenerApi.getState();
+  const bubbleJson = state.bubbleState?.universes?.[universeId]?.bubbles?.[bubbleId];
+  if (!bubbleJson) {
+    console.log("Place: dropped bubble not found");
+    return false;
+  }
+  const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(state);
+  const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
+  const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+  const relativePoint = surfaceLayer.locate(droppedAt);
+
+  listenerApi.dispatch(
+    updateBubble(Bubble.fromJSON(bubbleJson).moveTo(relativePoint).toJSON(), universeId),
+  );
+  return true;
 };
 
 // アクションの meta から universeId を取り出す（無ければ root）
@@ -51,8 +90,15 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
-    const id = action.payload;
+    const id = action.payload.bubbleId;
     const universeId = universeIdOf(action);
+
+    // 落として並べた場合は、隣に寄せずに落ちた点へ置く。
+    // 同じレイヤーに入れる（＝兄弟になる）ことと、どこに置くかは別の話。
+    if (action.payload.droppedAt) {
+      placeAtDroppedPoint(listenerApi, universeId, id, action.payload.droppedAt);
+      return;
+    }
 
     const state = listenerApi.getState() as any;
 
@@ -175,6 +221,14 @@ bubblesListener.startListening({
     const universeId = universeIdOf(popChildAction);
 
     const state = listenerApi.getState() as any;
+
+    // 落とされた場所に開く場合、位置は「落ちた点」そのもの。
+    // opener の矩形も relation も要らないので、relation の早期 return より前で片付ける
+    // （ポケットからのドロップなど opener が居ないドロップも同じ道を通る）。
+    if (openingPosition === "dropped-place") {
+      placeAtDroppedPoint(listenerApi, universeId, poppingBubbleId, payload.droppedAt);
+      return;
+    }
 
     const relation = selectBubblesRelationByOpeneeId(state, { openeeId: poppingBubbleId, universeId });
     if(!relation) {

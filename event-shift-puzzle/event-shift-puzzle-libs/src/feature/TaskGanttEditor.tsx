@@ -25,7 +25,7 @@ import {
 } from '../slice/shift-plan-slice.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { TaskGanttView } from '../ui/TaskGanttView.js';
-import { UrledPlace } from '@bublys-org/bubbles-ui';
+import { ObjectView } from '@bublys-org/bubbles-ui';
 import { type GanttConfig, type RowAvailability } from '../ui/ganttTypes.js';
 import { draggingMemberId, DRAG_TYPE_MEMBER_INDIVIDUAL } from '../ui/MemberListView.js';
 import { draggingTaskGroups } from './TaskCollection.js';
@@ -254,11 +254,16 @@ export const TaskGanttEditor: FC<TaskGanttEditorProps> = ({
 
         {/* 履歴ボタン */}
         {buildHistoryUrl ? (
-          <UrledPlace url={buildHistoryUrl()}>
-            <button type="button" className="e-history-btn" onClick={onHistoryOpen} title="世界線の履歴を表示">
+          <ObjectView
+            type="ShiftPlanHistory"
+            url={buildHistoryUrl()}
+            label="世界線の履歴"
+            openingPosition="bubble-side-right"
+          >
+            <span className="e-history-btn" title="ダブルクリックで世界線の履歴を開く">
               履歴
-            </button>
-          </UrledPlace>
+            </span>
+          </ObjectView>
         ) : (
           <button type="button" className="e-history-btn" onClick={onHistoryOpen} title="世界線の履歴を表示">
             履歴

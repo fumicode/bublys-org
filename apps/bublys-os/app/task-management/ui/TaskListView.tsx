@@ -31,10 +31,13 @@ export const TaskListView: FC<TaskListViewProps> = ({
               key={task.id}
               className={`e-item ${selectedTaskId === task.id ? "is-selected" : ""}`}
             >
+              {/* 行はタスクそのもの。ダブルクリックで詳細を開き、ドラッグで持ち出せる。
+                  単クリックは「選ぶ」だけ（is-selected と TaskDetail のフォールバックが使う）。 */}
               <ObjectView
                 type="Task"
                 url={detailUrl}
                 label={task.title}
+                openingPosition="bubble-side-right"
                 draggable
                 fullWidth
                 onClick={() => onTaskClick?.(task.id)}

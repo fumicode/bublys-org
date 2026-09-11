@@ -15,10 +15,9 @@ import { TaskDetailView } from "../ui/TaskDetailView";
 
 type TaskDetailProps = {
   taskId?: string;
-  onUserClick?: (userId: string) => void;
 };
 
-export const TaskDetail: FC<TaskDetailProps> = ({ taskId, onUserClick }) => {
+export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
   const dispatch = useAppDispatch();
   const users = useAppSelector(selectUsers);
 
@@ -81,7 +80,6 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId, onUserClick }) => {
       onDescriptionChange={handleDescriptionChange}
       onAssigneeChange={handleAssigneeChange}
       buildUserDetailUrl={buildUserDetailUrl}
-      onUserClick={onUserClick}
     />
   );
 };

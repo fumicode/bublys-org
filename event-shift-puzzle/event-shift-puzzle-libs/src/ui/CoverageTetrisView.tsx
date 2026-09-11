@@ -3,6 +3,7 @@
 import React, { FC } from 'react';
 import styled from 'styled-components';
 import { ObjectView } from '@bublys-org/bubbles-ui';
+import { withExpandUrl } from './withExpandUrl.js';
 import { type BlockCoverage } from '../domain/index.js';
 
 // ========== 型定義 ==========
@@ -17,6 +18,8 @@ export type CoverageTetrisViewProps = {
   density?: 'compact' | 'full';
   /** 右上の「拡大」コールバック（カード時のみ） */
   onExpand?: () => void;
+  /** 単独バブルの URL（link bubble のリボンの起点になる） */
+  expandUrl?: string;
   /** 配置セルを ObjectView bubbleLink として展開するための URL ビルダー */
   buildMemberUrl?: (memberId: string) => string;
   /** エラーメンバーID → 違反メッセージ一覧（非スタブのみ）。full 密度時にリスト表示 */
@@ -46,6 +49,7 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
   memberNameMap,
   density = 'compact',
   onExpand,
+  expandUrl,
   buildMemberUrl,
   memberViolations,
 }) => {
@@ -90,11 +94,19 @@ export const CoverageTetrisView: FC<CoverageTetrisViewProps> = ({
         {totalErrorCount > 0 && (
           <span className="tt-error-badge">⚠ {totalErrorCount}名エラー</span>
         )}
-        {onExpand && (
-          <button className="tt-expand" onClick={onExpand} aria-label="拡大">
-            ↗
-          </button>
-        )}
+        {onExpand &&
+          /* AssignedMembersView と同じ理由で <button> のまま（14px の ↗ アイコン） */
+          withExpandUrl(
+            expandUrl,
+            <button
+              className="tt-expand"
+              onDoubleClick={onExpand}
+              aria-label="拡大"
+              title="ダブルクリックで単独バブルとして開く"
+            >
+              ↗
+            </button>
+          )}
       </div>
 
       <div

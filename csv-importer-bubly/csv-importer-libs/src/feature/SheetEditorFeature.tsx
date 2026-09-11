@@ -2,7 +2,7 @@
 
 import { FC, useCallback, useContext, useMemo, useState } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubblesContext, CurrentBubbleContext } from "@bublys-org/bubbles-ui";
 import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { SheetEditorView } from "../ui/SheetEditorView.js";
 import { GoogleSheetsPanel } from "../ui/GoogleSheetsPanel.js";
@@ -16,7 +16,6 @@ import {
 
 type SheetEditorFeatureProps = {
   sheetId: string;
-  bubbleId?: string;
 };
 
 /** 例外を画面に出せる文言にする */
@@ -47,9 +46,9 @@ function getInitialSheet(sheetId: string): CsvSheet {
 
 export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
   sheetId,
-  bubbleId,
 }) => {
   const { openBubble } = useContext(BubblesContext);
+  const currentBubbleId = useContext(CurrentBubbleContext);
   const { getSheetMeta, setTitleColumn, linkGoogleSheets, unlinkGoogleSheets, updateLastSyncedAt } =
     useCsvSheets();
   const googleClientId = useGoogleClientId();
@@ -126,30 +125,28 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
     URL.revokeObjectURL(url);
   }, [sheet]);
 
-  const handleSelectObject = useCallback(
-    (objectId: string) => {
-      if (bubbleId) {
-        openBubble(`csv-importer/sheets/${sheetId}/objects/${objectId}`, bubbleId);
-      }
-    },
-    [openBubble, sheetId, bubbleId]
-  );
+  // 「オブジェクト一覧」「世界線」は ObjectView のチップ（ダブルクリックで開く）に URL を渡すだけ
+  const objectListUrl = `csv-importer/sheets/${sheetId}/objects`;
+  const worldLineUrl = `csv-importer/sheets/${sheetId}/world-line`;
 
   const buildObjectUrl = useCallback(
     (objectId: string) => `csv-importer/sheets/${sheetId}/objects/${objectId}`,
     [sheetId]
   );
 
+  // 行（＝オブジェクト）のダブルクリックで詳細を開く。<tr> は ObjectView で包めないので、
+  // ObjectView が内部でやっているのと同じ開き方をここで行う。
+  const handleOpenObject = useCallback(
+    (objectId: string) => {
+      openBubble(buildObjectUrl(objectId), currentBubbleId, "bubble-side-right");
+    },
+    [openBubble, buildObjectUrl, currentBubbleId]
+  );
+
   const handleChangeTitleColumn = useCallback(
     (columnId: string) => setTitleColumn(sheetId, columnId),
     [setTitleColumn, sheetId]
   );
-
-  const handleOpenWorldLine = useCallback(() => {
-    if (bubbleId) {
-      openBubble(`csv-importer/sheets/${sheetId}/world-line`, bubbleId);
-    }
-  }, [openBubble, sheetId, bubbleId]);
 
   // --- Google Sheets Sync ---
 
@@ -231,12 +228,13 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onAddColumn={handleAddColumn}
       onDeleteColumn={handleDeleteColumn}
       onExportCsv={handleExportCsv}
+      objectListUrl={objectListUrl}
+      worldLineUrl={worldLineUrl}
       objects={objects}
       titleColumnId={meta?.titleColumnId}
       onChangeTitleColumn={handleChangeTitleColumn}
-      onSelectObject={bubbleId ? handleSelectObject : undefined}
+      onOpenObject={handleOpenObject}
       buildObjectUrl={buildObjectUrl}
-      onOpenWorldLine={bubbleId ? handleOpenWorldLine : undefined}
       googleSheetsPanel={
         <GoogleSheetsPanel
           isLinked={!!gsLink}

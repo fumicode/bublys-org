@@ -113,7 +113,7 @@ export default function Index() {
             <MemoList
               buildDetailUrl={buildMemoUrl}
               buildDeleteUrl={buildMemoDeleteUrl}
-              onMemoClick={(id) => handleSelectMemo(id)}
+              onSelectMemo={handleSelectMemo}
               onMemoDelete={handleMemoDelete}
             />
           </div>

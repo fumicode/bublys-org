@@ -2,7 +2,7 @@
 
 import { FC, ReactNode, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import styled from "styled-components";
-import { setDragPayload, getDragType } from "@bublys-org/bubbles-ui";
+import { ObjectView, objectFilmLook, setDragPayload, getDragType } from "@bublys-org/bubbles-ui";
 import type { CsvColumnState, CsvRowState, PlaneObject } from "@bublys-org/csv-importer-model";
 
 type SheetEditorViewProps = {
@@ -15,16 +15,22 @@ type SheetEditorViewProps = {
   onDeleteRow: (rowId: string) => void;
   onAddColumn: (name: string) => void;
   onDeleteColumn: (columnId: string) => void;
-  /** オブジェクト表示で使う。行 → PlaneObject（行と同じ並び）。 */
+  /** オブジェクト一覧のURL（ObjectView のチップ。ダブルクリックで開く先） */
+  objectListUrl?: string;
+  /** 世界線ビューのURL（同上） */
+  worldLineUrl?: string;
+  /** Object 表示で使う。行 → PlaneObject。空行は含まれない（id で引く）。 */
   objects?: PlaneObject[];
-  /** どの列を「名前」にするか。オブジェクト表示でそのセルを強調する。 */
+  /** どの列を「名前」にするか。Object 表示でそのセルを強調する。 */
   titleColumnId?: string;
   onChangeTitleColumn?: (columnId: string) => void;
-  /** オブジェクト表示で行をクリックしたとき（詳細を開く）。 */
-  onSelectObject?: (objectId: string) => void;
+  /**
+   * Object 表示で行をダブルクリックしたとき（詳細を開く）。
+   * 単クリックは開かない（click-or-doubleclick.md：既に在るものを開くのはダブルクリック）。
+   */
+  onOpenObject?: (objectId: string) => void;
   /** 行 → ドラッグで渡す URL。 */
   buildObjectUrl?: (objectId: string) => string;
-  onOpenWorldLine?: () => void;
   onExportCsv?: () => void;
   googleSheetsPanel?: ReactNode;
 };
@@ -48,12 +54,13 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   onDeleteRow,
   onAddColumn,
   onDeleteColumn,
+  objectListUrl,
+  worldLineUrl,
   objects,
   titleColumnId,
   onChangeTitleColumn,
-  onSelectObject,
+  onOpenObject,
   buildObjectUrl,
-  onOpenWorldLine,
   onExportCsv,
   googleSheetsPanel,
 }) => {
@@ -201,6 +208,20 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
           )}
         </div>
         <div className="e-subbar-right">
+          {/* 「Object」トグル（この表の見方を変える）とは別物。一覧を別バブルで開く。
+              既に在るものを開くのでダブルクリック（click-or-doubleclick.md）。 */}
+          {objectListUrl && (
+            <ObjectView
+              type="CsvObjectList"
+              url={objectListUrl}
+              label="オブジェクト一覧"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-objects-btn" title="ダブルクリックでオブジェクト一覧を開く">
+                オブジェクト一覧
+              </span>
+            </ObjectView>
+          )}
           {onExportCsv && (
             <button className="e-export-btn" onClick={onExportCsv}>
               エクスポート
@@ -214,10 +235,17 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
               Sheets
             </button>
           )}
-          {onOpenWorldLine && (
-            <button className="e-worldline-btn" onClick={onOpenWorldLine}>
-              世界線
-            </button>
+          {worldLineUrl && (
+            <ObjectView
+              type="CsvSheetWorldLine"
+              url={worldLineUrl}
+              label="世界線ビュー"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-worldline-btn" title="ダブルクリックで世界線ビューを開く">
+                世界線
+              </span>
+            </ObjectView>
           )}
         </div>
       </div>
@@ -322,6 +350,13 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                 key={row.id}
                 className={isObjectRow ? "is-object" : ""}
                 draggable={isObjectRow}
+                /* 既に在るもの（この行＝オブジェクト）を開くのでダブルクリック。
+                   単クリックは空けておく（将来「選ぶ」が入る：selection-and-scope.md）。
+                   <tr> は ObjectView で包めない（table fixup で表の外へ叩き出される）ので手で付ける。 */
+                onDoubleClick={
+                  isObjectRow && onOpenObject ? () => onOpenObject(row.id) : undefined
+                }
+                title={isObjectRow ? "ダブルクリックで開く／⠿ を掴んで渡す" : undefined}
                 onDragStart={
                   isObjectRow && obj && buildObjectUrl
                     ? (e) => {
@@ -375,10 +410,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
                       ) : (
                         <div
                           className="e-cell-value"
-                          onClick={() =>
+                          /* Object 表示では単クリックで何も起きない（開くのは行のダブルクリック） */
+                          onClick={
                             objectMode
-                              ? isObjectRow && onSelectObject?.(row.id)
-                              : handleCellClick(row.id, col.id, value)
+                              ? undefined
+                              : () => handleCellClick(row.id, col.id, value)
                           }
                         >
                           {value || "\u00A0"}
@@ -428,11 +464,6 @@ const StyledEditor = styled.div`
 
   .e-title {
     margin: 0;
-  }
-
-  .e-header-actions {
-    display: flex;
-    gap: 8px;
   }
 
   /* Row ⇄ Object のトグル。つまみが滑って「いまどちら側か」を示す。 */
@@ -590,7 +621,28 @@ const StyledEditor = styled.div`
     }
   }
 
+  /* 「オブジェクト一覧」チップ。ObjectView の中の span なので、button と違い
+     inline になる。inline-flex で button と同じ箱にする（click-or-doubleclick.md）。 */
+  .e-objects-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border: 1px solid #ce93d8;
+    border-radius: 4px;
+    background: #f3e5f5;
+    color: #7b1fa2;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+
+    &:hover {
+      background: #e1bee7;
+    }
+  }
+
   .e-worldline-btn {
+    display: inline-flex;
+    align-items: center;
     padding: 4px 12px;
     border: 1px solid #90caf9;
     border-radius: 4px;
@@ -654,20 +706,20 @@ const StyledEditor = styled.div`
     /* --- 1行＝ひとつのオブジェクト --- */
     /* 「モノ」に見せているのは分離と囲い。ただし行間を実際に空けると値が縦に
        ずれるので、行の高さは変えずに背景の上下 3px だけ透明にした
-       グラデーションで塗る。隙間があるように見えて、値は 1px も動かない。
-       角丸はこの「隙間」があって初めて効く（隙間なしだと升目の角が丸いだけ）。 */
+       グラデーションで塗る。隙間があるように見えて、値は 1px も動かない。 */
     tr.is-object {
       cursor: grab;
+      /* ::after の膜を行全体に絶対配置する基準。<tr> でも効く（実機で確認済み） */
+      position: relative;
 
       td {
         background: linear-gradient(
           to bottom,
           transparent 0 3px,
-          #f3e8fa 3px calc(100% - 3px),
+          #f7f1fb 3px calc(100% - 3px),
           transparent calc(100% - 3px)
         );
         border-color: transparent;
-        transition: background 0.12s ease;
       }
 
       td:first-child {
@@ -685,7 +737,7 @@ const StyledEditor = styled.div`
         background: linear-gradient(
           to bottom,
           transparent 0 3px,
-          #e7d3f2 3px calc(100% - 3px),
+          #ede3f4 3px calc(100% - 3px),
           transparent calc(100% - 3px)
         );
         color: #7b1fa2;
@@ -695,9 +747,8 @@ const StyledEditor = styled.div`
         cursor: grab;
       }
 
-      /* Row 表示の「このセルは編集できる」ハイライト（.e-cell-value:hover）を打ち消す。
-         Object 表示では 1行がひとつのモノなので、セル単位で光ると帯が途切れて見える。
-         反応は行全体（&:hover td）で返す。 */
+      /* Row 表示の「このセルは編集できる」ハイライトを打ち消す。
+         Object 表示では 1行がひとつのモノなので、反応は行全体（膜）で返す。 */
       .e-cell-value:hover {
         background: none;
       }
@@ -707,26 +758,36 @@ const StyledEditor = styled.div`
         color: var(--name-color);
       }
 
-      &:hover td {
-        background: linear-gradient(
-          to bottom,
-          transparent 0 3px,
-          #e9d5f5 3px calc(100% - 3px),
-          transparent calc(100% - 3px)
-        );
+      /* 泡の膜。ObjectView と同じ定義（objectFilmLook）を使う。
+         「膜が出る ＝ 掴める・開ける」の合図を、表の行でも同じ見た目で返す。
+         <tr> は ObjectView で包めないので ::after を自前で持つが、見た目は共有する。 */
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 2px -2px;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0;
+        transform: scale(0.985);
+        transition: opacity 160ms ease-out, transform 160ms ease-out;
+        --object-view-film-radius: 8px;
+        ${objectFilmLook}
       }
 
-      &:hover .e-row-num {
-        background: linear-gradient(
-          to bottom,
-          transparent 0 3px,
-          #d9b6ec 3px calc(100% - 3px),
-          transparent calc(100% - 3px)
-        );
+      &:hover::after,
+      &:focus-within::after {
+        opacity: 1;
+        transform: scale(1);
       }
 
       &:active {
         cursor: grabbing;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      tr.is-object::after {
+        transition: none;
       }
     }
 

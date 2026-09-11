@@ -12,6 +12,7 @@ import {
 } from "@bublys-org/domain-registry";
 import { UserIcon, UserGroupIcon } from "@bublys-org/users-libs";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { MemoIcon } from "./world-line/Memo/ui/MemoIcon";
