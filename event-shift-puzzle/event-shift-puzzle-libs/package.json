@@ -24,7 +24,8 @@
     "@bublys-org/event-shift-puzzle-model": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
-    "@bublys-org/world-line-graph": "*"
+    "@bublys-org/world-line-graph": "*",
+    "@bublys-org/model-graph": "*"
   },
   "nx": {
     "targets": {

@@ -7,4 +7,5 @@
  */
 export { extractModelGraph, type ExtractOptions } from './extractModelGraph.js';
 export { extractRegistry, type RegistryInfo } from './extractRegistry.js';
+export { extractSliceRoots, type SliceRoots } from './extractSliceRoots.js';
 export { renderGeneratedModule } from './renderGenerated.js';

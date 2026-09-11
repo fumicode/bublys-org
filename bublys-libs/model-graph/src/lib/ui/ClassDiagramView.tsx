@@ -16,9 +16,9 @@
 import { useCallback, useMemo, useRef, useState, type FC } from 'react';
 import type { ModelClass, ModelGraph } from '../domain/ModelGraph.js';
 import { layoutClassDiagramByForce } from './forceLayout.js';
+import { scopeMembersOf, type ClassScope } from './scopeMembers.js';
 import {
   DEFAULT_LAYOUT_OPTIONS,
-  assignAggregates,
   finishLayout,
   layoutClassDiagram,
   type ClassBox,
@@ -100,13 +100,7 @@ export type ClassDiagramViewProps = {
   readonly mode?: 'force' | 'column';
 };
 
-/** そのクラスが属する世界線スコープ */
-export type ClassScope = {
-  /** スコープID。`Schedule:<id>` のような形 */
-  readonly scopeId: string;
-  /** その世界での立場 */
-  readonly role: 'live' | 'pinned' | 'external';
-};
+export type { ClassScope };
 
 export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
   graph,
@@ -124,24 +118,11 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     () => ({ ...DEFAULT_LAYOUT_OPTIONS, ...options }),
     [options]
   );
-  /**
-   * クラス名 → その**世界線スコープ**。
-   *
-   * ★ 記述子に登録されている型だけでは足りない。集約の部品（`ShiftAssignment` など）は
-   *   登録されていないが、根と一緒に保存され、一緒に巻き戻る。つまり**同じ世界の中に居る**。
-   *   だから「その集約の根が live な世界」をそのまま部品にも配る。
-   */
-  const scopeMembers = useMemo(() => {
-    const out = new Map<string, string>();
-    if (!scopeOf) return out;
-    const owner = assignAggregates(graph);
-    for (const c of graph.classes) {
-      const root = owner.get(c.name);
-      const s = root ? scopeOf(root) : undefined;
-      if (s?.role === 'live') out.set(c.name, s.scopeId);
-    }
-    return out;
-  }, [graph, scopeOf]);
+  /** クラス名 → その**世界線スコープ**（判断は `scopeMembers.ts` の純粋関数に置いてある） */
+  const scopeMembers = useMemo(
+    () => (scopeOf ? scopeMembersOf(graph, scopeOf) : new Map<string, string>()),
+    [graph, scopeOf]
+  );
 
   /**
    * 焼き付けの写し。**外の台帳と世界の中の両方に置く**ための指定。
@@ -174,7 +155,9 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
   const auto = useMemo(
     () =>
       mode === 'column'
-        ? layoutClassDiagram(graph, o, echoes)
+        ? // 世界線スコープを渡す。同じ世界の列を隣どうしに置かないと、枠が
+          // あいだの列（その世界のものでない箱）を飲み込む
+          layoutClassDiagram(graph, o, echoes, (name) => scopeMembers.get(name))
         : // 世界線スコープも「近づけるまとまり」として渡す。同じ世界に載るものは
           // つながりが無くても寄るので、枠が細長くならない
           layoutClassDiagramByForce(
@@ -269,7 +252,9 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
       .map((scopeId) => {
         // 写しも囲う。**焼き付けられたものは、その世界の中に居る**
         const members = layout.boxes.filter((b) => inScope(b, scopeId));
-        if (members.length < 2) return null;
+        // 1つでも囲う。「この世界に載っているのはこれだけ」は、それ自体が読みどころ
+        // （event-shift-puzzle では ShiftPlan ではなく Shift だけが世界線に載る）
+        if (members.length === 0) return null;
         const pad = 22;
         const x = Math.min(...members.map((m) => m.x)) - pad;
         const y = Math.min(...members.map((m) => m.y)) - pad - 14;
@@ -369,26 +354,34 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
         />
       ))}
 
-      {/* 集約の帯。同じ列が1つのかたまりであることを、線より先に地の色で言う */}
-      {[...new Set(layout.boxes.map((b) => b.aggregate))].map((agg) => {
-        const members = layout.boxes.filter((b) => b.aggregate === agg);
-        if (members.length < 2) return null;
-        const x = Math.min(...members.map((m) => m.x));
-        const y = Math.min(...members.map((m) => m.y));
-        const bottom = Math.max(...members.map((m) => m.y + m.height));
-        return (
-          <rect
-            key={agg}
-            x={x - 10}
-            y={y - 10}
-            width={o.boxWidth + 20}
-            height={bottom - y + 20}
-            rx={10}
-            fill={CLASS_DIAGRAM_PALETTE.aggregateBand}
-            opacity={focus === null || members.some((m) => m.name === focus) ? 0.1 : 0.04}
-          />
-        );
-      })}
+      {/*
+        集約の帯。**列の配置のときだけ描く。**
+
+        ★ これは「同じ列が1つのかたまり」を地の色で言うための帯で、幅が箱1つぶんに
+          固定されている。力学の配置では同じ集約の箱が散らばるので、帯は最も左の箱の
+          ところに細長く残り、**同じ集約の他の箱を含まない**。読むと「この箱だけが
+          その集約」に見えて嘘になる。力学のときは内包（◆実線）が同じことを言う。
+      */}
+      {mode === 'column' &&
+        [...new Set(layout.boxes.map((b) => b.aggregate))].map((agg) => {
+          const members = layout.boxes.filter((b) => b.aggregate === agg);
+          if (members.length < 2) return null;
+          const x = Math.min(...members.map((m) => m.x));
+          const y = Math.min(...members.map((m) => m.y));
+          const bottom = Math.max(...members.map((m) => m.y + m.height));
+          return (
+            <rect
+              key={agg}
+              x={x - 10}
+              y={y - 10}
+              width={o.boxWidth + 20}
+              height={bottom - y + 20}
+              rx={10}
+              fill={CLASS_DIAGRAM_PALETTE.aggregateBand}
+              opacity={focus === null || members.some((m) => m.name === focus) ? 0.1 : 0.04}
+            />
+          );
+        })}
 
       {layout.edges.map((e, i) => {
         const lit = isLit(e.relation.from, e.relation.to);

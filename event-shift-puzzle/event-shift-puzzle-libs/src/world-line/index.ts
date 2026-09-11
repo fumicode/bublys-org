@@ -1,5 +1,6 @@
 export { shiftPlanWorldLineListener } from "./shiftPlanWorldLineListener.js";
 export {
+  SHIFT_TYPE,
   shiftPlanScopeId,
   selectShiftPlanGraph,
   selectShiftPlanTabs,

@@ -25,7 +25,12 @@ type GetState = () => RootStateActual;
 
 // ========== スコープ ==========
 
-const SHIFT_TYPE = "Shift";
+/**
+ * 世界線に記録する型。**このバブリではこれ1つだけ。**
+ * ShiftPlan そのものは記録されない（変わった Shift だけが CAS に載る）。
+ */
+export const SHIFT_TYPE = "Shift";
+/** 1つの ShiftPlan ＝ 1つの世界 */
 export const shiftPlanScopeId = (planId: string) => `shift-plan:${planId}`;
 
 // ========== Selectors ==========

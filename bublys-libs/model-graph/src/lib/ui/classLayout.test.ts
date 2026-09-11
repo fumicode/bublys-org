@@ -292,3 +292,58 @@ describe('線は箱の外から入る', () => {
     }
   });
 });
+
+/**
+ * ★ 枠は**メンバーの外接矩形**。だからメンバーの列が離れていると、あいだの列
+ * （その世界のものでない箱）を黙って飲み込む。実際 hotel の列の配置で、
+ * その世界のものでない箱が7つ枠の中に入っていた。
+ *
+ * 枠を歪めるのではなく、**箱のほうを寄せて**直す（力学の配置で押し出すのと同じ考え方）。
+ */
+describe('列の配置で、同じ世界の列は隣どうし', () => {
+  // ★ 列の順は既定で「中身の濃い集約が左」。この大きさなら InA(3) → Outside(2) → InB(1)
+  //   となって、**その世界でない Outside がメンバー2つのあいだに挟まる**。
+  //   世界でまとめる規則が効いていなければ、この形のまま出てくる
+  const g = graph(
+    [
+      cls('InA', { kind: 'aggregate' }),
+      cls('A1'),
+      cls('A2'),
+      cls('Outside', { kind: 'aggregate' }),
+      cls('O1'),
+      cls('InB', { kind: 'aggregate' }),
+    ],
+    [rel('InA', 'A1'), rel('InA', 'A2'), rel('Outside', 'O1')]
+  );
+  const world = (n: string) => (n === 'InA' || n === 'InB' ? 'W:<id>' : undefined);
+
+  it('（前提）世界を渡さないと、その世界でない列がメンバーのあいだに挟まる', () => {
+    const { boxes } = layoutClassDiagram(g);
+    const x = (n: string) => boxes.find((b) => b.name === n)?.x as number;
+    expect(x('InA')).toBeLessThan(x('Outside'));
+    expect(x('Outside')).toBeLessThan(x('InB'));
+  });
+
+  it('★ 世界のメンバーのあいだに、その世界でない列が挟まらない', () => {
+    const { boxes } = layoutClassDiagram(g, {}, [], world);
+    const x = (n: string) => boxes.find((b) => b.name === n)?.x as number;
+    const [left, right] = [x('InA'), x('InB')].sort((a, b) => a - b);
+    // Outside は左端か右端。メンバーのあいだに入っていない
+    expect(x('Outside') < left || x('Outside') > right).toBe(true);
+  });
+
+  it('世界を渡さなければ、これまで通りの並び（中身の濃い集約が左）', () => {
+    const plain = graph(
+      [cls('Big', { kind: 'aggregate' }), cls('Part'), cls('Small', { kind: 'aggregate' })],
+      [rel('Big', 'Part')]
+    );
+    const { boxes } = layoutClassDiagram(plain);
+    const x = (n: string) => boxes.find((b) => b.name === n)?.x as number;
+    expect(x('Big')).toBeLessThan(x('Small'));
+  });
+
+  it('同じ入力なら同じ並び（決定的）', () => {
+    const a = JSON.stringify(layoutClassDiagram(g, {}, [], world).boxes);
+    expect(JSON.stringify(layoutClassDiagram(g, {}, [], world).boxes)).toBe(a);
+  });
+});
