@@ -157,7 +157,17 @@ describe('束ねの強さ', () => {
  */
 describe('焼き付けの写し', () => {
   const g = graph([
-    cls('Staff', { kind: 'aggregate' }),
+    // 中身のあるクラスにしておく。空のクラスだと「写しのほうが低い」が測れない
+    cls('Staff', {
+      kind: 'aggregate',
+      fields: [
+        { name: 'id', type: 'string', optional: false },
+        { name: 'name', type: 'string', optional: false },
+      ],
+      methods: [
+        { name: 'rename', params: ['name'], returns: 'Staff', isStatic: false, returnsSelf: true },
+      ],
+    }),
     cls('Schedule', { kind: 'aggregate' }),
     cls('Constraints', { kind: 'aggregate' }),
     cls('Outside', { kind: 'aggregate' }),
@@ -180,13 +190,16 @@ describe('焼き付けの写し', () => {
     expect(echo?.echoScopeId).toBe('Schedule:<id>');
   });
 
-  it('写しは題名だけの小さな箱（同じ大きさだと別のクラスに見える）', () => {
+  it('写しは中身を書かないが、幅は本物と同じ（脚注に見えると行き先として読めない）', () => {
     const { boxes } = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
     const origin = boxes.find((b) => b.name === 'Staff') as (typeof boxes)[number];
     const echo = boxes.find((b) => b.echoOf === 'Staff') as (typeof boxes)[number];
-    expect(echo.width).toBeLessThan(origin.width);
+    // 中身は書かない（もう一度書いても読むものは増えない）
     expect(echo.shownFields).toBe(0);
     expect(echo.shownMethods).toBe(0);
+    expect(echo.height).toBeLessThan(origin.height);
+    // ★ でも幅は同じ。小さくすると「世界の中からの矢印が向かう先」として読めない
+    expect(echo.width).toBe(origin.width);
   });
 
   it('★ 写しは焼き付け先の世界のほうに寄る（写し元に引き戻されない）', () => {

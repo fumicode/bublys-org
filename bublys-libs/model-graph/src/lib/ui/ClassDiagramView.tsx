@@ -432,10 +432,10 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
               d={`M ${from.x} ${from.y} C ${mx} ${from.y}, ${mx} ${to.y}, ${to.x} ${to.y}`}
               fill="none"
               stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
-              strokeWidth={lit ? 2 : 1.2}
-              strokeDasharray="2 4"
+              strokeWidth={lit ? 2.6 : 1.6}
+              strokeDasharray="2 5"
               strokeLinecap="round"
-              opacity={lit ? 0.95 : 0.2}
+              opacity={lit ? 1 : 0.25}
               markerStart="url(#cd-pin)"
               markerEnd="url(#cd-pin)"
             >
@@ -537,13 +537,22 @@ const ClassBoxView: FC<{
           x={box.x + pad}
           y={box.y + pad + o.lineHeight - 5}
           fill={CLASS_DIAGRAM_PALETTE.scopeFrame}
-          style={{ font: '12px system-ui, sans-serif' }}
+          style={{ font: 'bold 13px system-ui, sans-serif' }}
         >
           ▌{box.echoOf}
           <title>
             {`${box.echoOf} の焼き付け。外の台帳の ${box.echoOf} と同じもので、` +
-              `この世界（${box.echoScopeId}）の中では動かない`}
+              `この世界（${box.echoScopeId}）の中では動かない。` +
+              `\nこの世界の中からの参照は、外の箱ではなくこちらに届く`}
           </title>
+        </text>
+        <text
+          x={box.x + pad}
+          y={box.y + pad + o.lineHeight * 2 - 5}
+          fill={CLASS_DIAGRAM_PALETTE.doc}
+          style={{ font: '10px system-ui, sans-serif' }}
+        >
+          焼き付け（この世界の中からはこちらを見る）
         </text>
       </g>
     );
