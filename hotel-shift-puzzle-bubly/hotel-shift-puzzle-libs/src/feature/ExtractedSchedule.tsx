@@ -5,7 +5,6 @@ import styled from "styled-components";
 import {
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
   ScheduleReport,
@@ -36,7 +35,6 @@ import {
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
@@ -69,13 +67,9 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const store = useAppStore();
 
-  const { staffList: allStaff } = useWorkingStaff(scheduleId);
+  const { staffList: allStaff, group: staffGroup } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
@@ -177,7 +171,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
       workShifts,
       wishByStaff,
-      availability,
+      staffGroup,
     });
     recordAutoStep(store, {
       schedule,
@@ -203,7 +197,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        availability,
+        staffGroup,
       }).schedule;
     // 1案 = 希望を叶える → 責任者を満たす（他ルールとの兼務を考慮し、一意に決まる枠だけ確定）
     //     → 残った枠を phase 違いで決める → 月の休みを入れる（phase）
@@ -214,7 +208,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, allLeaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
       );
       s = leaderFill.schedule;
 
@@ -259,7 +253,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         schedule={schedule}
         staffList={subset}
         workShifts={workShifts}
-        availability={availability}
+        staffGroup={staffGroup}
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}

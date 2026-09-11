@@ -121,7 +121,7 @@ hotel-shift-puzzle-app/src/
 
 | 分類 | 意味 | 例 |
 |---|---|---|
-| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ScheduleAvailability / ScheduleConstraints / ScheduleEditLog |
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ScheduleConstraints / ScheduleEditLog |
 | `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
 | `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
 
@@ -138,7 +138,7 @@ Schedule: {
   「どのスコープへ焼くか」を言えない。
 - `homeScope` の引数は **obj ではなく id**。`removeObject(type, id)` はオブジェクトを
   手に持たずに呼ばれるので、obj を要求すると削除だけ住所を解決できない。
-  全 live 型で id はスコープの持ち主 ID に等しい（`ScheduleAvailability.id` は `scheduleId`）。
+  全 live 型で id はスコープの持ち主 ID に等しい（`ScheduleConstraints.id` は `scheduleId`）。
 
 ### 読み先（`objects/world.tsx` の `readScopeOf`）
 
@@ -173,7 +173,7 @@ id で本籍が変わる型（グローバル固定IDのときは本籍なし）
 - 世界を作る場所は**この1関数だけ**。`saveObject` / `saveLocalBundle` / `commitCandidates` は
   全部これを通る。誕生が部分的だと、起点に載っていない型が時間移動で戻らない（#110）。
 - 勤務表を作る＝その世界が生まれる。`feature/createSchedule.ts` が1 grow で
-  勤務表・勤務帯セット・可能勤務帯・固定メンバーをまとめて起点に置く。
+  勤務表・勤務帯セット・勤務スタッフ群・固定メンバーをまとめて起点に置く。
   `repo.save` を複数回呼ぶと1回目で世界が生まれてしまい、起点が欠ける。
 - 例データ投入・ファイル読み込みの直後は `bornWorldsOf(store, items)` で世界をまとめて誕生させる。
 
@@ -280,8 +280,9 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 
 ```
 勤務表 ──workingStaffGroupId──▶ 勤務スタッフ群 ──▶ 勤務スタッフメンバー（行1つ）
-                                                    ├ staffId : 誰か（名簿の人も臨時の人もこれで指す）
-                                                    └ staff?  : 臨時の人だけが抱える実体
+                                                    ├ staffId          : 誰か（名簿の人も臨時の人もこれで指す）
+                                                    ├ staff?           : 臨時の人だけが抱える実体
+                                                    └ allowedShiftIds? : 入れる勤務帯（省略＝どこでも入れる）
 ```
 
 - **名簿（`Staff`）は pinned、群は live。** 名簿は世界の誕生で焼き付いて動かない。
@@ -294,6 +295,14 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
   真実になり、いつか食い違う。
 - 同一性は常に `staffId`。抱えた実体の `id` はそれで被せ直すので、ずれた記録が入ってきても
   行が分裂しない。
+- **可能勤務帯（誰がどの勤務帯に入れるか）もメンバーが持つ。**「誰が働くか」と「その人が
+  どこに入れるか」は同じ1つの参加の話なので、別の集約に分けない（`ScheduleAvailability`
+  という別集約だったものを畳んだ）。
+  - **省略＝まだ絞っていない＝どの勤務帯にも入れる。** 空配列（どこにも入れない）とは違う。
+    入ったばかりの人に全勤務帯を書き込んで回らなくていいし、勤務帯が増えても既定で入れる
+  - 絞っている人にだけ勤務帯を足すのが `allowShiftForAll`（勤務帯を1つ増やしたとき）
+  - 編集口は2つあるが真実は1つ：勤務スタッフバブルのチェック欄と可能勤務帯バブルは、
+    どちらも同じメンバーを書き換える
 - メンバーは型（`WorkingStaffMember`）にし、群は**そのインスタンスを**持つ。
   union の型エイリアスや plain のままだと、クラス図の抽出器が共通のフィールドしか読めず、
   `staffId`／`staff` が図に出ない（＝名簿の人は指す・臨時の人は抱える、という肝心の違いが
@@ -309,7 +318,7 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 
 | 変化 | 連れて動くもの | 載せないとどうなるか |
 |---|---|---|
-| 人が入る | 可能勤務帯に席を用意（`allowAllIfUnset`） | その人のセルに何も入れられない |
+| 人が入る | 無し（可能勤務帯は群の中。絞っていない人はどこでも入れる） | — |
 | 人が外れる | 勤務表からその人の割当を消す（`clearStaff`） | 表に居ない人をフッターの集計が数え続ける |
 | 人が外れる | 責任者候補から外す（`ScheduleConstraints.removeStaff`） | どう埋めても満たせない日ができる |
 

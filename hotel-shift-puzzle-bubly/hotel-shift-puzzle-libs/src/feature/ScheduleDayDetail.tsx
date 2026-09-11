@@ -5,7 +5,6 @@ import styled from "styled-components";
 import {
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   ScheduleConstraints,
   StaffMonthlyShiftWish,
   WorkingDay,
@@ -19,7 +18,6 @@ import { recordSetCell } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
@@ -39,13 +37,9 @@ type ScheduleDayDetailProps = {
  */
 const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
   const store = useAppStore();
-  const { staffList } = useWorkingStaff(scheduleId);
+  const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む。名前横のバッジに使う
@@ -119,7 +113,7 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey 
         schedule={schedule}
         staffList={staffList}
         workShifts={shiftOptions}
-        availability={availability}
+        staffGroup={staffGroup}
         leaderRules={leaderRules}
         wishByStaff={wishByStaff}
         onChangeCell={handleChangeCell}

@@ -11,7 +11,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import {
   Staff,
   WorkShift,
-  ScheduleAvailability,
+  WorkingStaffGroup,
 } from "../domain/index.js";
 
 /** 編集中フォームのドラフト。id が null なら新規追加、そうでなければ既存勤務帯の編集。 */
@@ -23,7 +23,8 @@ type AvailabilityGridViewProps = {
   workShifts: WorkShift[];
   /** 連続する同名をまとめたグループ（ヘッダ上段の colspan 用） */
   shiftGroups: { name: string; shifts: WorkShift[] }[];
-  availability: ScheduleAvailability;
+  /** 可能勤務帯（誰がどの勤務帯に入れるか）は勤務スタッフ群が持つ */
+  staffGroup: WorkingStaffGroup;
   onToggle: (staffId: string, shiftId: string) => void;
   /** 編集可否。true なら勤務帯の追加・改名・時刻変更・削除ができる */
   editable?: boolean;
@@ -50,7 +51,7 @@ export const AvailabilityGridView: FC<AvailabilityGridViewProps> = ({
   staffList,
   workShifts,
   shiftGroups,
-  availability,
+  staffGroup,
   onToggle,
   editable = false,
   onCommitShift,
@@ -188,7 +189,7 @@ export const AvailabilityGridView: FC<AvailabilityGridViewProps> = ({
               <td key={w.id} className="e-cell">
                 <Checkbox
                   size="small"
-                  checked={availability.isAllowed(staff.id, w.id)}
+                  checked={staffGroup.isAllowed(staff.id, w.id)}
                   onChange={() => onToggle(staff.id, w.id)}
                 />
               </td>

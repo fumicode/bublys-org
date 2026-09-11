@@ -1,4 +1,7 @@
-import { ScheduleAvailability } from "@bublys-org/hotel-shift-puzzle-model";
+import {
+  WorkingStaffGroup,
+  WorkingStaffMember,
+} from "@bublys-org/hotel-shift-puzzle-model";
 
 /**
  * サンプルの可能勤務帯（スタッフが入れる勤務帯）。人によってばらけさせる。
@@ -23,11 +26,24 @@ export const ALLOWED_SHIFT_IDS_BY_STAFF: Record<string, string[]> = {
   "staff-8": ["early", "middle"], // 早責: 早番・中番（早番を担えるよう早番可）
 };
 
-/** 指定した勤務表IDに紐づく、人ごとにばらけた可能勤務帯を作る */
-export function createSampleAvailabilityFor(scheduleId: string): ScheduleAvailability {
-  const byStaff: Record<string, string[]> = {};
-  for (const [staffId, shiftIds] of Object.entries(ALLOWED_SHIFT_IDS_BY_STAFF)) {
-    byStaff[staffId] = [...shiftIds];
-  }
-  return new ScheduleAvailability({ scheduleId, byStaff });
+/**
+ * サンプルの勤務スタッフ群。名簿の全員が働き、可能勤務帯は人ごとにばらける。
+ * 臨時スタッフは入れない（アプリ上で足して試す用に空けておく）。
+ */
+export function createSampleWorkingStaffGroupFor(
+  staffGroupId: string,
+  staffIds: readonly string[]
+): WorkingStaffGroup {
+  return new WorkingStaffGroup({
+    id: staffGroupId,
+    members: staffIds.map(
+      (staffId) =>
+        new WorkingStaffMember({
+          staffId,
+          allowedShiftIds: ALLOWED_SHIFT_IDS_BY_STAFF[staffId]
+            ? [...ALLOWED_SHIFT_IDS_BY_STAFF[staffId]]
+            : undefined,
+        })
+    ),
+  });
 }

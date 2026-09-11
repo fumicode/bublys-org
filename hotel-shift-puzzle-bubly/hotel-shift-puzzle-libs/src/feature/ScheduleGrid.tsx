@@ -6,7 +6,6 @@ import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-u
 import {
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
@@ -60,7 +59,6 @@ import {
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   SCHEDULE_REPORT_TYPE,
@@ -165,16 +163,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     day: WorkingDay;
   } | null>(null);
   // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
-  const { staffList } = useWorkingStaff(scheduleId);
+  const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
   const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   // 稼働日ごとの予約状況（宿泊人数・部屋数）。未作成なら undefined（予約行は空表示）。
   const reservationInfo = useObject<DailyReservationInfo>(
     SCHEDULE_RESERVATION_INFO_TYPE,
@@ -551,7 +545,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
       workShifts,
       wishByStaff,
-      availability,
+      staffGroup,
       // 「必要人数を埋める」はこれを見て、先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
       minDayOff,
       maxDayOffPerDay: maxPerDay,
@@ -579,7 +573,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        availability,
+        staffGroup,
         // handleRunStep と同じく連勤上限を渡す。渡さないと ctx.maxConsecutive が undefined に
         // なってステップ側の既定値 5 で走り、連勤上限を 5 未満にしている勤務表では
         // 生成した案が全て連勤違反になってしまう。
@@ -592,7 +586,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
       );
       s = leaderFill.schedule;
 
@@ -740,6 +734,21 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       ? reportBubbleUrl(ScheduleReport.idOf(scheduleId, apex.id))
       : undefined;
 
+  // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
+  const workingStaffSlot = onOpenWorkingStaff
+    ? withUrl(
+        workingStaffUrl,
+        <button
+          type="button"
+          className="e-staff-foot-link"
+          onClick={onOpenWorkingStaff}
+          title="この勤務表で働く人たち（追加・除外・並び替え・可能勤務帯）"
+        >
+          ＋ 勤務スタッフ
+        </button>
+      )
+    : undefined;
+
   const confirmButton = withUrl(
     pendingReportUrl,
     <button
@@ -788,20 +797,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               ))}
             </select>
           )}
-
-          {/* 行になる人たち（勤務スタッフ群）。ここで足す・外す・並べ替える */}
-          {onOpenWorkingStaff &&
-            withUrl(
-              workingStaffUrl,
-              <button
-                type="button"
-                className="e-link"
-                onClick={onOpenWorkingStaff}
-                title="この勤務表で働く人たち（臨時スタッフの追加・除外・並び替え）"
-              >
-                勤務スタッフ
-              </button>
-            )}
 
           {onOpenAvailability &&
             withUrl(
@@ -861,12 +856,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           schedule={schedule}
           staffList={filteredStaffList}
           workShifts={workShifts}
-          availability={availability}
+          staffGroup={staffGroup}
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           wishByStaff={wishByStaff}
           violations={violations}
           groupByDepartment={groupByDept}
+          workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}

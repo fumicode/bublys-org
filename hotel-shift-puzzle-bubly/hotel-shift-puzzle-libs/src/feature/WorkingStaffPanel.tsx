@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from "react";
+import { FC } from "react";
 import styled from "styled-components";
 import { MonthlyStaffSchedule } from "@bublys-org/hotel-shift-puzzle-model";
 import { WorkingStaffListView } from "../ui/WorkingStaffListView.js";
@@ -14,7 +14,8 @@ type Props = {
 };
 
 /**
- * 勤務スタッフ群バブル。この勤務表で働く人たちを足す・外す・並べ替える。
+ * 勤務スタッフ群バブル。**この勤務表のスタッフに関することはここで全部できる。**
+ * 足す・外す・並べ替える・臨時の人を作る・誰がどの勤務帯に入れるかを決める。
  *
  * 編集はすべてこの勤務表の世界線に記録される。グローバルの名簿は動かないので、
  * 「この月だけ応援を1人入れる」「この月はこの人を外す」が勤務表の中で完結する。
@@ -31,13 +32,10 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     remove,
     move,
     renameTemporary,
+    workShifts,
+    isAllowed,
+    toggleShift,
   } = useWorkingStaff(scheduleId);
-
-  // 名簿に居るのにこの勤務表では働かない人＝戻せる候補
-  const absentRoster = useMemo(() => {
-    const working = new Set(staffList.map((s) => s.id));
-    return roster.filter((s) => !working.has(s.id));
-  }, [roster, staffList]);
 
   // 勤務表が読めないと群の住所（workingStaffGroupId）も分からない。空で描かずに待つ。
   if (!schedule) {
@@ -54,20 +52,24 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
           </span>
         </h3>
         <p className="e-note">
-          この勤務表の行になる人たち。ここでの追加・除外・並び替えは
+          この勤務表の行になる人たち。左の名簿から ＋ で加え、⠿ をドラッグで並び替え、
+          チェックでその人が入れる勤務帯を決めます。ここでの編集は
           <strong>この勤務表の世界線にだけ</strong>記録され、スタッフ名簿は動きません。
         </p>
       </div>
       <WorkingStaffListView
         members={staffList}
         isTemporary={isTemporary}
-        absentRoster={absentRoster}
+        roster={roster}
+        workShifts={workShifts}
+        isAllowed={isAllowed}
         editable={canEdit}
         onAddTemporary={addTemporary}
         onAddFromRoster={addFromRoster}
         onRemove={remove}
         onMove={move}
         onRenameTemporary={renameTemporary}
+        onToggleShift={toggleShift}
       />
     </StyledContainer>
   );

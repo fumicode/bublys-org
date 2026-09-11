@@ -1,13 +1,13 @@
 'use client';
 
-import { FC, Fragment, useMemo, useState } from "react";
+import { FC, Fragment, ReactNode, useMemo, useState } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
-  ScheduleAvailability,
+  WorkingStaffGroup,
   DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
@@ -44,7 +44,8 @@ type ScheduleGridViewProps = {
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
   /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
-  availability?: ScheduleAvailability;
+  /** 可能勤務帯（誰がどの勤務帯に入れるか）は勤務スタッフ群が持つ。セル編集メニューの絞りに使う */
+  staffGroup?: WorkingStaffGroup;
   /**
    * 稼働日ごとの予約状況（宿泊人数・部屋数）。あれば日付ヘッダの上に読み取り専用の行を出す。
    * 店ごとに付け替える想定の姉妹モジュール。未指定なら予約行を出さない。
@@ -61,6 +62,11 @@ type ScheduleGridViewProps = {
   violations?: ConstraintViolation[];
   /** true のとき部署別にグループ化して表示する */
   groupByDepartment?: boolean;
+  /**
+   * メンバー行の一番下に置く導線（勤務スタッフバブルを開くボタンなど）。
+   * 行＝勤務スタッフ群のメンバーなので、その並びの続きに置く。渡されたときだけ行が出る。
+   */
+  workingStaffSlot?: ReactNode;
   /** 責任者の宣言的ルール（解決済み）。footer 先頭に早責/夜責などの ◯/✕ 行を出す */
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
@@ -146,12 +152,13 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  availability,
+  staffGroup,
   reservationInfo,
   reservationInfoUrl,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
+  workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
   onChangeCell,
@@ -322,7 +329,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     staffList,
     days,
     shiftOptions,
-    availability,
+    staffGroup,
     onChangeCell,
     selection,
     onSelectionChange,
@@ -539,6 +546,17 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
         {/* スタッフ行（部署グルーピングあり/なし） */}
         {renderStaffRows()}
+
+        {/* メンバーの続き。行を足す・外す・並べ替えるのは勤務スタッフバブルの仕事 */}
+        {workingStaffSlot && (
+          <>
+            <div className="e-staff-foot">{workingStaffSlot}</div>
+            <div
+              className="e-staff-foot-bar"
+              style={{ gridColumn: daysThroughSummarySpan }}
+            />
+          </>
+        )}
 
         {/* 勤務帯ごと＋休みの人数集計（スタッフ行の後） */}
         {summaryRows.map((row, rowIndex) => (

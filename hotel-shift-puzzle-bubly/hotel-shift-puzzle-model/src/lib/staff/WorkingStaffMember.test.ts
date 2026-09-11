@@ -69,6 +69,41 @@ describe('WorkingStaffMember（勤務スタッフ群のメンバー1人）', () 
     expect(roster.get('a')?.name).toBe('相田'); // 名簿そのものは無傷
   });
 
+  test('★ 可能勤務帯は「絞っていない＝どの勤務帯にも入れる」から始まる', () => {
+    const member = WorkingStaffMember.ofRoster('a');
+
+    expect(member.hasShiftLimit).toBe(false);
+    expect(member.allowedShiftIds).toBeUndefined();
+    expect(member.isAllowed('early')).toBe(true);
+    // 勤務帯が増えても入れる（席を用意して回らなくていい）
+    expect(member.isAllowed('あとから足した帯')).toBe(true);
+  });
+
+  test('toggleShift は絞っていない人を「これ以外」へ書き下す', () => {
+    const all = ['early', 'middle', 'late'];
+    const limited = WorkingStaffMember.ofRoster('a').toggleShift('late', all);
+
+    expect(limited.allowedShiftIds).toEqual(['early', 'middle']);
+    expect(limited.isAllowed('late')).toBe(false);
+    expect(limited.isAllowed('early')).toBe(true);
+    // 戻すと足される
+    expect(limited.toggleShift('late', all).isAllowed('late')).toBe(true);
+  });
+
+  test('絞った人は勤務帯が増えても入れない。allowShift で足し、allowAllShifts で絞りを外す', () => {
+    const limited = WorkingStaffMember.ofRoster('a').toggleShift('late', [
+      'early',
+      'late',
+    ]);
+
+    expect(limited.isAllowed('新しい帯')).toBe(false);
+    expect(limited.allowShift('新しい帯').isAllowed('新しい帯')).toBe(true);
+    expect(limited.allowAllShifts().hasShiftLimit).toBe(false);
+    // 絞っていない人に allowShift しても何も起きない（元から入れる）
+    const open = WorkingStaffMember.ofRoster('b');
+    expect(open.allowShift('early')).toBe(open);
+  });
+
   test('state は実体をインスタンスで持つ（保存形は toPlain で別に作る）', () => {
     const member = WorkingStaffMember.temporary(
       new Staff({ id: 'tmp-1', name: '応援 太郎', department: '客室' })
