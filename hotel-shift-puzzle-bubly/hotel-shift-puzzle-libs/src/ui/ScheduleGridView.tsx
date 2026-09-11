@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, Fragment, useMemo, useState } from "react";
+import { FC, Fragment, ReactNode, useMemo, useState } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   Staff,
@@ -55,6 +55,12 @@ type ScheduleGridViewProps = {
    * URL スキームは app 層の関心事なので注入で受ける（dayBubbleUrl と同じ流儀）。
    */
   reservationInfoUrl?: string;
+  /**
+   * スタッフ列（左列）に関わる操作（部署別グルーピング・部署フィルタ・可能勤務帯）。
+   * 年月を出す左上のコーナーセル（＝スタッフ列の真上）に入れて、何に効く操作なのかを
+   * 位置で示す。表の外の見出し行には置かない。中身は app/feature 層が決める。
+   */
+  staffColumnActions?: ReactNode;
   /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
@@ -149,6 +155,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   availability,
   reservationInfo,
   reservationInfoUrl,
+  staffColumnActions,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
@@ -472,13 +479,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
 
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 休合計 + 早番日数 */}
         <div className="e-corner">
-          {schedule.year}年{schedule.month}月
+          <span className="e-corner-title">
+            {schedule.year}年{schedule.month}月
+          </span>
+          {/* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。スタッフ列の真上＝
+              このコーナーセルに入れて、何に効く操作なのかを位置で示す。 */}
+          {staffColumnActions && (
+            <span className="e-corner-actions">{staffColumnActions}</span>
+          )}
         </div>
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
           const inner = (
-            <span className="e-day-inner" title={`${day.label} の詳細を開く（ダブルクリック）`}>
+            <span
+              className="e-day-inner"
+              // 違反マーク（⚠）は嵩張るのでヘッダ色だけで示し、理由は title で読めるようにする
+              title={[
+                ...(warns ? warns.map((v) => v.message) : []),
+                `${day.label} の詳細を開く（ダブルクリック）`,
+              ].join("\n")}
+            >
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
             </span>
@@ -490,29 +511,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                 wd === 0 ? " is-sun" : wd === 6 ? " is-sat" : ""
               }${warns ? " is-warn" : ""}`}
             >
-              {warns &&
-                (() => {
-                  const mark = (
-                    <span
-                      className="e-day-warn"
-                      title={warns.map((v) => v.message).join("\n")}
-                    >
-                      ⚠
-                    </span>
-                  );
-                  // ダブルクリックでその日の（先頭の）違反バブルを開く
-                  return violationUrl ? (
-                    <ObjectView
-                      url={violationUrl(warns[0])}
-                      openingPosition="origin-side"
-                      draggable={false}
-                    >
-                      {mark}
-                    </ObjectView>
-                  ) : (
-                    mark
-                  );
-                })()}
               {/* ObjectView がダブルクリックでの展開・data-url（origin-side で近くに出す）を担う。
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (
