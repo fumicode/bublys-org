@@ -22,8 +22,17 @@ import {
   finishLayout,
   layoutClassDiagram,
   type ClassBox,
+  type Curve,
   type LayoutOptions,
 } from './classLayout.js';
+
+/**
+ * 線の形は**配置が決めたものをそのまま描く**。
+ * ここで制御点を作り直すと、横の縁から出る線と上下の縁から出る線で式が変わるのに
+ * 片方だけ直して食い違う（実際、矢尻が箱の中に潜り込んだ）。
+ */
+const curvePath = (c: Curve) =>
+  `M ${c.from.x} ${c.from.y} C ${c.c1.x} ${c.c1.y}, ${c.c2.x} ${c.c2.y}, ${c.to.x} ${c.to.y}`;
 
 export const CLASS_DIAGRAM_PALETTE = {
   background: '#0d1117',
@@ -178,16 +187,20 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
     [graph, o, mode, scopeMembers, echoes]
   );
   // ユーザーが動かした箱はその位置に置き、線と大きさを引き直す。
-  // 自動配置を捨てずに**上から重ねる**ので、動かしていない箱はそのまま
+  // 自動配置を捨てずに**上から重ねる**ので、動かしていない箱はそのまま。
+  // ★ echoes を渡し忘れると付け替えが消えて、箱を1つ動かしただけで世界の中からの矢印が
+  //   外の箱へ戻ってしまう（同じ入力から同じ線が出る、を壊す）
   const layout = useMemo(
     () =>
       positions && Object.keys(positions).length > 0
         ? finishLayout(
             graph,
-            auto.boxes.map((b) => (positions[b.name] ? { ...b, ...positions[b.name] } : b))
+            auto.boxes.map((b) => (positions[b.name] ? { ...b, ...positions[b.name] } : b)),
+            undefined,
+            echoes
           )
         : auto,
-    [auto, graph, positions]
+    [auto, graph, positions, echoes]
   );
   const [hover, setHover] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -380,11 +393,10 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
       {layout.edges.map((e, i) => {
         const lit = isLit(e.relation.from, e.relation.to);
         const contains = e.relation.kind === 'contains';
-        const mx = (e.from.x + e.to.x) / 2;
         return (
           <path
             key={`${e.relation.from}-${e.relation.via}-${e.relation.to}-${i}`}
-            d={`M ${e.from.x} ${e.from.y} C ${mx} ${e.from.y}, ${mx} ${e.to.y}, ${e.to.x} ${e.to.y}`}
+            d={curvePath(e)}
             fill="none"
             stroke={
               contains
@@ -413,39 +425,28 @@ export const ClassDiagramView: FC<ClassDiagramViewProps> = ({
         どちらでもないから: 値を持つのでも id で指すのでもなく、
         「世界が生まれた瞬間に同じ参照が焼かれて、以後そちらは動かない」という関係
       */}
-      {layout.boxes
-        .filter((b) => b.echoOf)
-        .map((echo) => {
-          const origin = layout.boxes.find((b) => b.name === echo.echoOf);
-          if (!origin) return null;
-          const lit = isLit(echo.echoOf as string, echo.name);
-          const rightward = echo.x >= origin.x;
-          const from = {
-            x: origin.x + (rightward ? origin.width : 0),
-            y: origin.y + origin.height / 2,
-          };
-          const to = { x: echo.x + (rightward ? 0 : echo.width), y: echo.y + echo.height / 2 };
-          const mx = (from.x + to.x) / 2;
-          return (
-            <path
-              key={`pin-${echo.name}`}
-              d={`M ${from.x} ${from.y} C ${mx} ${from.y}, ${mx} ${to.y}, ${to.x} ${to.y}`}
-              fill="none"
-              stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
-              strokeWidth={lit ? 2.6 : 1.6}
-              strokeDasharray="2 5"
-              strokeLinecap="round"
-              opacity={lit ? 1 : 0.25}
-              markerStart="url(#cd-pin)"
-              markerEnd="url(#cd-pin)"
-            >
-              <title>
-                {`${echo.echoOf} は ${echo.echoScopeId} の世界に焼き付けられている。` +
-                  `\n同じオブジェクトが外の台帳と世界の中の両方に居て、中のほうは動かない`}
-              </title>
-            </path>
-          );
-        })}
+      {layout.pinEdges.map((p) => {
+        const lit = isLit(p.of, p.echo);
+        return (
+          <path
+            key={`pin-${p.echo}`}
+            d={curvePath(p)}
+            fill="none"
+            stroke={CLASS_DIAGRAM_PALETTE.scopeFrame}
+            strokeWidth={lit ? 2.6 : 1.6}
+            strokeDasharray="2 5"
+            strokeLinecap="round"
+            opacity={lit ? 1 : 0.25}
+            markerStart="url(#cd-pin)"
+            markerEnd="url(#cd-pin)"
+          >
+            <title>
+              {`${p.of} は ${p.scopeId} の世界に焼き付けられている。` +
+                `\n同じオブジェクトが外の台帳と世界の中の両方に居て、中のほうは動かない`}
+            </title>
+          </path>
+        );
+      })}
 
       {layout.boxes.map((box) => (
         <ClassBoxView

@@ -3,7 +3,12 @@
  * その狙いが崩れていないかを数値で固定する。
  */
 import type { ModelClass, ModelGraph, ModelRelation } from '../domain/ModelGraph.js';
-import { assignAggregates, layoutClassDiagram } from './classLayout.js';
+import {
+  assignAggregates,
+  finishLayout,
+  layoutClassDiagram,
+  type ClassBox,
+} from './classLayout.js';
 
 const cls = (name: string, over: Partial<ModelClass> = {}): ModelClass => ({
   name,
@@ -154,5 +159,136 @@ describe('配置', () => {
 
   it('同じ入力なら同じ配置（決定的）', () => {
     expect(JSON.stringify(layoutClassDiagram(g))).toBe(JSON.stringify(layoutClassDiagram(g)));
+  });
+});
+
+/**
+ * ★ 線の口は箱の**縁の上に並べる**。同じ点に集めると、何本来ていても1本にしか
+ * 見えないうえ、矢尻どうしが完全に重なって「つながっていない」ようにすら見える。
+ */
+describe('同じ縁に届く線', () => {
+  const many = graph(
+    [
+      cls('Hub', { kind: 'aggregate' }),
+      cls('A', { kind: 'aggregate' }),
+      cls('B', { kind: 'aggregate' }),
+      cls('C', { kind: 'aggregate' }),
+    ],
+    [
+      rel('A', 'Hub', { kind: 'references', via: 'hubId' }),
+      rel('B', 'Hub', { kind: 'references', via: 'hubId' }),
+      rel('C', 'Hub', { kind: 'references', via: 'hubId' }),
+    ]
+  );
+
+  it('★ 同じ箱に届く線どうしが同じ点で終わらない', () => {
+    const { edges } = layoutClassDiagram(many);
+    expect(edges).toHaveLength(3);
+    for (const a of edges) {
+      for (const b of edges) {
+        if (a === b) continue;
+        expect(Math.hypot(a.to.x - b.to.x, a.to.y - b.to.y)).toBeGreaterThan(4);
+      }
+    }
+  });
+
+  it('口はその箱の縁の上にある（並べても箱から離れない）', () => {
+    const layout = layoutClassDiagram(many);
+    const hub = layout.boxes.find((b) => b.name === 'Hub') as (typeof layout.boxes)[number];
+    for (const e of layout.edges) {
+      expect(Math.min(Math.abs(e.to.x - hub.x), Math.abs(e.to.x - (hub.x + hub.width)))).toBeLessThan(0.5);
+      expect(e.to.y).toBeGreaterThanOrEqual(hub.y);
+      expect(e.to.y).toBeLessThanOrEqual(hub.y + hub.height);
+    }
+  });
+
+  it('1本しか来ない縁は、これまで通り縁の中点', () => {
+    const one = graph(
+      [cls('A', { kind: 'aggregate' }), cls('Hub', { kind: 'aggregate' })],
+      [rel('A', 'Hub', { kind: 'references', via: 'hubId' })]
+    );
+    const layout = layoutClassDiagram(one);
+    const hub = layout.boxes.find((b) => b.name === 'Hub') as (typeof layout.boxes)[number];
+    expect(layout.edges[0].to.y).toBeCloseTo(hub.y + hub.height / 2, 6);
+  });
+
+  it('相手が上にある線ほど上の口に付く（線が交差しない）', () => {
+    const layout = layoutClassDiagram(many);
+    const at = (n: string) => layout.boxes.find((b) => b.name === n) as (typeof layout.boxes)[number];
+    const endOf = (from: string) =>
+      layout.edges.find((e) => e.relation.from === from)?.to.y as number;
+    const byFrom = ['A', 'B', 'C'].sort((x, y) => at(x).y - at(y).y);
+    expect(endOf(byFrom[0])).toBeLessThan(endOf(byFrom[1]));
+    expect(endOf(byFrom[1])).toBeLessThan(endOf(byFrom[2]));
+  });
+});
+
+/**
+ * ★ 線は**相手の箱の外から**入る。
+ *
+ * 中心の左右だけで縁を選ぶと、横に重なった箱どうしで線が**後ろ向きに走る**。
+ * 矢尻は進行方向を向くので相手の箱の中に食い込み、あとから描かれる箱に
+ * 塗りつぶされる——「矢印が1本もつながっていない」に見える。実際に見えなかった。
+ */
+describe('線は箱の外から入る', () => {
+  const at = (name: string, x: number, y: number): ClassBox => ({
+    name,
+    cls: cls(name, { kind: 'aggregate' }),
+    x,
+    y,
+    width: 240,
+    height: 100,
+    aggregate: name,
+    shownFields: 0,
+    shownMethods: 0,
+  });
+
+  /** その口が乗っている縁から見て、制御点が箱の外にあるか */
+  const outward = (c: { x: number; y: number }, port: { x: number; y: number }, b: ClassBox) => {
+    if (Math.abs(port.x - b.x) < 0.5) return c.x <= port.x + 0.5; // 左の縁
+    if (Math.abs(port.x - (b.x + b.width)) < 0.5) return c.x >= port.x - 0.5; // 右の縁
+    if (Math.abs(port.y - b.y) < 0.5) return c.y <= port.y + 0.5; // 上の縁
+    return c.y >= port.y - 0.5; // 下の縁
+  };
+
+  const g = graph(
+    [
+      cls('Upper', { kind: 'aggregate' }),
+      cls('Lower', { kind: 'aggregate' }),
+      cls('Side', { kind: 'aggregate' }),
+    ],
+    [
+      // 横に重なって縦に積まれた相手（ここが壊れていた）
+      rel('Upper', 'Lower', { kind: 'references', via: 'lowerId' }),
+      // 横に並んだ相手（これまで通り横の縁で結ぶ）
+      rel('Upper', 'Side', { kind: 'references', via: 'sideId' }),
+    ]
+  );
+  // Upper と Lower は x が重なっている。Side は完全に右
+  const placed = [at('Upper', 100, 0), at('Lower', 40, 300), at('Side', 600, 0)];
+
+  it('★ 横に重なった箱どうしは、上下の縁で結ぶ', () => {
+    const layout = finishLayout(g, placed);
+    const e = layout.edges.find((x) => x.relation.to === 'Lower') as (typeof layout.edges)[number];
+    expect(e.from.y).toBeCloseTo(100, 6); // Upper の下の縁
+    expect(e.to.y).toBeCloseTo(300, 6); // Lower の上の縁
+  });
+
+  it('横に並んだ箱どうしは、これまで通り横の縁で結ぶ', () => {
+    const layout = finishLayout(g, placed);
+    const e = layout.edges.find((x) => x.relation.to === 'Side') as (typeof layout.edges)[number];
+    expect(e.from.x).toBeCloseTo(340, 6); // Upper の右の縁
+    expect(e.to.x).toBeCloseTo(600, 6); // Side の左の縁
+  });
+
+  it('★ どの線も、最後の制御点が相手の箱の外にある（矢尻が箱に潜らない）', () => {
+    const layout = finishLayout(g, placed);
+    expect(layout.edges).toHaveLength(2);
+    for (const e of layout.edges) {
+      const target = placed.find((b) => b.name === e.relation.to) as ClassBox;
+      const source = placed.find((b) => b.name === e.relation.from) as ClassBox;
+      expect(outward(e.c2, e.to, target)).toBe(true);
+      expect(outward(e.c1, e.from, source)).toBe(true);
+    }
   });
 });

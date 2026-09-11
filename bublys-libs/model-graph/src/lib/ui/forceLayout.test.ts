@@ -270,13 +270,26 @@ describe('世界の中からの線は、写しにつなぐ', () => {
   const inScope = (n: string) =>
     n === 'Schedule' || n === 'Assignment' ? 'Schedule:<id>' : undefined;
 
+  /**
+   * その点がどの箱の縁に乗っているか。
+   * 線の口は縁の**中点とは限らない**し、**4つの縁のどれか**なので（横に並ぶ箱は左右、
+   * 縦に積まれた箱は上下で結ぶ）、「縁の上にあるか」だけで判定する
+   */
+  const boxAt = (
+    layout: ReturnType<typeof layoutClassDiagramByForce>,
+    at: { x: number; y: number }
+  ) =>
+    layout.boxes.find((b) => {
+      const insideX = at.x >= b.x - 0.5 && at.x <= b.x + b.width + 0.5;
+      const insideY = at.y >= b.y - 0.5 && at.y <= b.y + b.height + 0.5;
+      const onVertical = Math.abs(b.x - at.x) < 0.5 || Math.abs(b.x + b.width - at.x) < 0.5;
+      const onHorizontal = Math.abs(b.y - at.y) < 0.5 || Math.abs(b.y + b.height - at.y) < 0.5;
+      return (onVertical && insideY) || (onHorizontal && insideX);
+    })?.name;
+
   const endOf = (layout: ReturnType<typeof layoutClassDiagramByForce>, from: string) => {
     const e = layout.edges.find((x) => x.relation.from === from && x.relation.to === 'Staff');
-    const box = layout.boxes.find(
-      (b) => Math.abs(b.y + b.height / 2 - (e?.to.y ?? -1)) < 0.5 &&
-        (Math.abs(b.x - (e?.to.x ?? -1)) < 0.5 || Math.abs(b.x + b.width - (e?.to.x ?? -1)) < 0.5)
-    );
-    return box?.name;
+    return e ? boxAt(layout, e.to) : undefined;
   };
 
   it('★ 世界の中の部品からの線は、写しに届く', () => {
@@ -300,8 +313,45 @@ describe('世界の中からの線は、写しにつなぐ', () => {
     const e = layout.edges.find(
       (x) => x.relation.from === 'Assignment' && x.relation.to === 'Staff'
     );
+    expect(boxAt(layout, e?.to as { x: number; y: number })).toBe('Staff@Schedule:<id>');
+  });
+
+  /**
+   * ★ 同じ縁に何本も届くとき、**同じ点で終わらせない**。
+   *
+   * 集めてしまうと、何本来ていても1本にしか見えないうえ、印（矢尻・四角）が
+   * 完全に重なって、あとから描いた線が前の線の印を塗りつぶす。
+   * 実際「写しに矢印が1本もつながっていない」という絵になった:
+   * 参照2本と焼き付け1本が**同じ1点**に終わっていて、最後に描いた焼き付けの
+   * 四角が矢尻2つを隠していた。
+   */
+  it('★ 写しに届く線どうしが同じ点で終わらない（重なると1本にも0本にも見える）', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
     const echo = layout.boxes.find((b) => b.echoOf === 'Staff') as (typeof layout.boxes)[number];
-    expect(e?.to.y).toBeCloseTo(echo.y + echo.height / 2, 6);
+    const onEcho = (p: { x: number; y: number }) => boxAt(layout, p) === echo.name;
+
+    const ends = [
+      ...layout.edges.map((e) => e.to),
+      ...layout.edges.map((e) => e.from),
+      ...layout.pinEdges.map((p) => p.to),
+    ].filter(onEcho);
+    // 参照1本（Assignment→写し）＋ 焼き付け1本。両方とも写しに届いている
+    expect(ends.length).toBeGreaterThanOrEqual(2);
+    for (const a of ends) {
+      for (const b of ends) {
+        if (a === b) continue;
+        expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(4);
+      }
+    }
+  });
+
+  it('焼き付けの線も写しの縁に届く（配置と一緒に決まる。ビューで計算し直さない）', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    expect(layout.pinEdges).toHaveLength(1);
+    const [pin] = layout.pinEdges;
+    expect(pin.of).toBe('Staff');
+    expect(boxAt(layout, pin.from)).toBe('Staff');
+    expect(boxAt(layout, pin.to)).toBe('Staff@Schedule:<id>');
   });
 });
 
