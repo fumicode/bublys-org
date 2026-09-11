@@ -11,6 +11,7 @@ import {
   WorkShift,
   ScheduleAvailability,
   ScheduleConstraints,
+  ShiftLeaderRule,
   WorkingDay,
   Staff,
 } from '@bublys-org/hotel-shift-puzzle-model';
@@ -45,7 +46,13 @@ const setUp = () => ({
   constraints: new ScheduleConstraints({
     scheduleId: 'sched-1',
     leaderRules: [
-      { key: 'early', label: '早責', shiftName: '早番', leaderStaffIds: ['a', 'b'], minCount: 1 },
+      new ShiftLeaderRule({
+        key: 'early',
+        label: '早責',
+        shiftName: '早番',
+        leaderStaffIds: ['a', 'b'],
+        minCount: 1,
+      }),
     ],
   }),
 });

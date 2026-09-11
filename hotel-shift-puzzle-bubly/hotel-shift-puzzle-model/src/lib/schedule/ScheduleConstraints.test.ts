@@ -1,4 +1,5 @@
 import { ScheduleConstraints } from './ScheduleConstraints.js';
+import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
 
 describe('ScheduleConstraints.modelConstraints', () => {
@@ -60,8 +61,8 @@ describe('ScheduleConstraints.removeStaff（勤務表から外れた人を責任
     new ScheduleConstraints({
       scheduleId: 'schedule-A',
       leaderRules: [
-        { key: 'early', label: '早責', shiftName: '早番', leaderStaffIds: ['a', 'b'], minCount: 1 },
-        { key: 'night', label: '夜責', shiftName: '遅番', leaderStaffIds: ['b', 'c'], minCount: 1 },
+        new ShiftLeaderRule({ key: 'early', label: '早責', shiftName: '早番', leaderStaffIds: ['a', 'b'], minCount: 1 }),
+        new ShiftLeaderRule({ key: 'night', label: '夜責', shiftName: '遅番', leaderStaffIds: ['b', 'c'], minCount: 1 }),
       ],
     });
 

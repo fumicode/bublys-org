@@ -181,8 +181,10 @@ StaffMonthlyShiftWish.staffId  → Staff（外の箱）    external
 2つめが要点。推測で近い名前に寄せるより、**決められなかったと言う**ほうが正しい。
 ここに出ているぶん、図には線が足りていない。
 
-hotel では4件出る。うち3件（`storeId` / `worldLineNodeId`）は**モデルの外**を指していて、
-正しく解けないもの。1件（`linkedReportIds`）は登録名と命名がずれているために解けていない。
+hotel では6件出る。5件（`storeId` ×2 / `worldLineNodeId` / `suggestionId` /
+`rejectedSuggestionId`）は**モデルの外**を指していて、正しく解けないもの
+（店舗・世界線ノード・提案はドメインモデルのクラスではない）。
+1件（`linkedReportIds`）は登録名と命名がずれているために解けていない。
 
 ---
 

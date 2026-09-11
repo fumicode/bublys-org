@@ -11,6 +11,68 @@ import type { ModelGraph } from '@bublys-org/model-graph';
 export const MODEL_GRAPH: ModelGraph = {
   "classes": [
     {
+      "name": "ConstraintDelta",
+      "file": "schedule/ConstraintDelta.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "newlyViolated",
+          "type": "ConstraintViolation[]",
+          "optional": false
+        },
+        {
+          "name": "newlyResolved",
+          "type": "ConstraintViolation[]",
+          "optional": false
+        },
+        {
+          "name": "concessions",
+          "type": "ConstraintViolation[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "newlyViolated",
+        "newlyResolved",
+        "concessions"
+      ],
+      "methods": [
+        {
+          "name": "empty",
+          "params": [],
+          "returns": "ConstraintDelta",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "between",
+          "params": [
+            "before",
+            "after"
+          ],
+          "returns": "ConstraintDelta",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ConstraintDeltaPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ConstraintDelta",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "ConstraintViolation",
       "file": "schedule/ConstraintViolation.ts",
       "kind": "value",
@@ -914,7 +976,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "leaderRules",
-          "type": "ShiftLeaderRuleState[]",
+          "type": "ShiftLeaderRule[]",
           "optional": false
         },
         {
@@ -1079,16 +1141,104 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "toPlain",
           "params": [],
-          "returns": "ScheduleConstraintsState",
+          "returns": "ScheduleConstraintsPlain",
           "isStatic": false,
           "returnsSelf": false
         },
         {
           "name": "fromPlain",
           "params": [
-            "s"
+            "plain"
           ],
           "returns": "ScheduleConstraints",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ScheduleEditEntry",
+      "file": "schedule/ScheduleEditEntry.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "at",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "actor",
+          "type": "ScheduleEditActor",
+          "optional": false
+        },
+        {
+          "name": "kind",
+          "type": "ScheduleEditKind",
+          "optional": false
+        },
+        {
+          "name": "summary",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "targets",
+          "type": "ScheduleEditTargets",
+          "optional": false
+        },
+        {
+          "name": "constraintDelta",
+          "type": "ConstraintDelta",
+          "optional": false
+        },
+        {
+          "name": "source",
+          "type": "ScheduleEditSource",
+          "optional": true
+        },
+        {
+          "name": "suggestionId",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "rejectedSuggestionId",
+          "type": "string",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "at",
+        "actor",
+        "kind",
+        "summary",
+        "targets",
+        "constraintDelta",
+        "source",
+        "suggestionId",
+        "rejectedSuggestionId",
+        "hasConcessions"
+      ],
+      "methods": [
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ScheduleEditEntryPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ScheduleEditEntry",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -1106,7 +1256,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "entries",
-          "type": "ScheduleEditEntryPlain[]",
+          "type": "ScheduleEditEntry[]",
           "optional": false
         }
       ],
@@ -1128,7 +1278,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "entriesWithConcessions",
           "params": [],
-          "returns": "ScheduleEditEntryPlain[]",
+          "returns": "ScheduleEditEntry[]",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -1139,6 +1289,22 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "ScheduleEditLog",
           "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ScheduleEditLogPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ScheduleEditLog",
+          "isStatic": true,
           "returnsSelf": true
         }
       ]
@@ -1458,6 +1624,51 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "boolean",
           "isStatic": false,
           "returnsSelf": false
+        },
+        {
+          "name": "withLabel",
+          "params": [
+            "label"
+          ],
+          "returns": "ShiftLeaderRule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withShiftName",
+          "params": [
+            "shiftName"
+          ],
+          "returns": "ShiftLeaderRule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withMinCount",
+          "params": [
+            "minCount"
+          ],
+          "returns": "ShiftLeaderRule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withLeader",
+          "params": [
+            "staffId"
+          ],
+          "returns": "ShiftLeaderRule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withoutLeader",
+          "params": [
+            "staffId"
+          ],
+          "returns": "ShiftLeaderRule",
+          "isStatic": false,
+          "returnsSelf": true
         }
       ]
     },
@@ -2016,7 +2227,7 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "shifts",
-          "type": "WorkShiftState[]",
+          "type": "WorkShift[]",
           "optional": false
         }
       ],
@@ -2104,11 +2315,51 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "WorkShiftSet",
           "isStatic": false,
           "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "WorkShiftSetPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "WorkShiftSet",
+          "isStatic": true,
+          "returnsSelf": true
         }
       ]
     }
   ],
   "relations": [
+    {
+      "from": "ConstraintDelta",
+      "to": "ConstraintViolation",
+      "kind": "contains",
+      "via": "concessions",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConstraintDelta",
+      "to": "ConstraintViolation",
+      "kind": "contains",
+      "via": "newlyResolved",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConstraintDelta",
+      "to": "ConstraintViolation",
+      "kind": "contains",
+      "via": "newlyViolated",
+      "many": true,
+      "foundBy": "type"
+    },
     {
       "from": "ConstraintViolation",
       "to": "WorkingDay",
@@ -2190,6 +2441,22 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "ScheduleEditEntry",
+      "to": "ConstraintDelta",
+      "kind": "contains",
+      "via": "constraintDelta",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "ScheduleEditLog",
+      "to": "ScheduleEditEntry",
+      "kind": "contains",
+      "via": "entries",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ScheduleReport",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -2264,7 +2531,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 38,
+    "fileCount": 40,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
@@ -2276,6 +2543,8 @@ export const MODEL_GRAPH: ModelGraph = {
     "unresolvedIdFields": [
       "MonthlyStaffSchedule.storeId",
       "ScheduleConstraints.linkedReportIds",
+      "ScheduleEditEntry.rejectedSuggestionId",
+      "ScheduleEditEntry.suggestionId",
       "ScheduleReport.storeId",
       "ScheduleReport.worldLineNodeId"
     ]
