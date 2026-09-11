@@ -7,7 +7,7 @@ import {
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
-  ScheduleAvailability,
+  WorkingStaffGroup,
   ShiftLeaderRule,
   StaffMonthlyShiftWish,
   type ShiftCell,
@@ -25,7 +25,7 @@ type ScheduleDayViewProps = {
   /** この勤務表で使える勤務帯（早番・中番・遅番）。横方向に並べる */
   workShifts: WorkShift[];
   /** 可能勤務帯。あれば入れない勤務帯セルを無効化する */
-  availability?: ScheduleAvailability;
+  staffGroup?: WorkingStaffGroup;
   /** 責任者ルール（解決済み）。名前横に早責/夜責バッジを出す */
   leaderRules?: ShiftLeaderRule[];
   /** この年月のシフト希望（staffId 別）。スタッフ名の下にその日の希望を出す */
@@ -47,7 +47,7 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  availability,
+  staffGroup,
   leaderRules = [],
   wishByStaff,
   onChangeCell,
@@ -113,7 +113,7 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
 
               {workShifts.map((w) => {
                 const selected = status.kind === "work" && status.shiftId === w.id;
-                const allowed = !availability || availability.isAllowed(staff.id, w.id);
+                const allowed = !staffGroup || staffGroup.isAllowed(staff.id, w.id);
                 // 入れない勤務帯は無効（ただし既に入っている場合は外せるよう操作可）
                 const disabled = !allowed && !selected;
                 return (

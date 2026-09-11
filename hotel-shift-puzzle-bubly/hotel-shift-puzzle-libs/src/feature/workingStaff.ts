@@ -7,10 +7,11 @@
  * 群は勤務表と同じ世界線に載るので、足す・外す・並べ替えるとその世界線にノードが増え、
  * 時間移動で一緒に戻る。名簿（固定メンバー）はそのままで、グローバルには何も起きない。
  *
- * 誰が働くかが変わると、連れて動くものが3つある。同じ1ノードに載せる（#110 と同じ理由）:
- *   - 可能勤務帯 … 新しく入った人に席が無いと、その人のセルには何も入れられない
- *   - 勤務表     … 外した人の割当が残ると、表に居ない人をフッターが数え続ける
- *   - 制約       … 外した人が責任者候補に残ると、満たしようのない日ができる
+ * 人を外すと連れて動くものが2つある。同じ1ノードに載せる（#110 と同じ理由）:
+ *   - 勤務表 … 外した人の割当が残ると、表に居ない人をフッターが数え続ける
+ *   - 制約   … 外した人が責任者候補に残ると、満たしようのない日ができる
+ *
+ * 可能勤務帯（誰がどの勤務帯に入れるか）もこの群が持つので、ここで一緒に編集できる。
  *
  * 群をまだ持たない勤務表（この集約より前に作られたもの）は、これまで通り
  * 「この世界に居るスタッフ全員」が行になる。編集しようとした瞬間に、その顔ぶれから
@@ -22,8 +23,8 @@ import {
   Staff,
   WorkingStaffGroup,
   MonthlyStaffSchedule,
+  WorkShift,
   WorkShiftSet,
-  ScheduleAvailability,
   ScheduleConstraints,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
@@ -35,7 +36,6 @@ import {
   STAFF_TYPE,
   SCHEDULE_TYPE,
   WORKSHIFT_SET_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   WORKING_STAFF_GROUP_TYPE,
 } from "../objects/hotelObjects.js";
@@ -72,6 +72,14 @@ export type WorkingStaffValue = {
   renameTemporary: (staffId: string, name: string) => void;
   /** 臨時の人の部署を変える */
   changeTemporaryDepartment: (staffId: string, department: string) => void;
+  /** この勤務表の勤務帯（可能勤務帯のチェック欄の列） */
+  workShifts: WorkShift[];
+  /** その人がその勤務帯に入れるか */
+  isAllowed: (staffId: string, shiftId: string) => boolean;
+  /** その人のその勤務帯の可否を反転する */
+  toggleShift: (staffId: string, shiftId: string) => void;
+  /** 全員がその勤務帯に入れるようにする（勤務帯を1つ増やしたとき） */
+  allowShiftForAll: (shiftId: string, shiftName?: string) => void;
 };
 
 export function useWorkingStaff(
@@ -90,10 +98,7 @@ export function useWorkingStaff(
   const absent = useIsAbsent(WORKING_STAFF_GROUP_TYPE, workingStaffGroupId);
   // 顔ぶれと一緒に動くもの
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const constraints = useObject<ScheduleConstraints>(
     SCHEDULE_CONSTRAINTS_TYPE,
     scheduleId
@@ -119,8 +124,7 @@ export function useWorkingStaff(
       meta: {
         summary: (group: WorkingStaffGroup) => string;
         staffId?: string;
-        /** その人がこの勤務表で働き始める／働かなくなる（連れて動くものがある） */
-        joining?: string;
+        /** その人がこの勤務表で働かなくなる（連れて動くものがある） */
         leaving?: string;
       }
     ) => {
@@ -138,11 +142,8 @@ export function useWorkingStaff(
       // 顔ぶれと一緒に動くもの（可能勤務帯・割当・責任者候補）を同じノードに載せる
       const changed = buildMembershipChange({
         group: next,
-        joining: meta.joining,
         leaving: meta.leaving,
         schedule,
-        workShiftSet,
-        availability,
         constraints,
       });
 
@@ -162,8 +163,6 @@ export function useWorkingStaff(
       absent,
       roster,
       schedule,
-      workShiftSet,
-      availability,
       constraints,
     ]
   );
@@ -190,7 +189,6 @@ export function useWorkingStaff(
         updateGroup((g) => g.addRoster(staffId), {
           summary: () => `${nameOf(staffId)} をこの勤務表に加えた`,
           staffId,
-          joining: staffId,
         }),
       [updateGroup, nameOf]
     ),
@@ -204,7 +202,6 @@ export function useWorkingStaff(
         updateGroup((g) => g.addTemporary(staff), {
           summary: () => `臨時スタッフ ${staff.name} を加えた`,
           staffId: staff.id,
-          joining: staff.id,
         });
       },
       [updateGroup]
@@ -243,6 +240,32 @@ export function useWorkingStaff(
           staffId,
         }),
       [updateGroup, nameOf]
+    ),
+    workShifts,
+    isAllowed: useCallback(
+      (staffId: string, shiftId: string) => group?.isAllowed(staffId, shiftId) ?? true,
+      [group]
+    ),
+    toggleShift: useCallback(
+      (staffId: string, shiftId: string) => {
+        const allShiftIds = workShifts.map((w) => w.id);
+        const shiftName = workShifts.find((w) => w.id === shiftId)?.name ?? shiftId;
+        updateGroup((g) => g.toggleShift(staffId, shiftId, allShiftIds), {
+          summary: (next) =>
+            `${nameOf(staffId)} の ${shiftName} を${
+              next.isAllowed(staffId, shiftId) ? "可" : "不可"
+            }にした`,
+          staffId,
+        });
+      },
+      [updateGroup, workShifts, nameOf]
+    ),
+    allowShiftForAll: useCallback(
+      (shiftId: string, shiftName?: string) =>
+        updateGroup((g) => g.allowShiftForAll(shiftId), {
+          summary: () => `全員が ${shiftName ?? shiftId} に入れるようにした`,
+        }),
+      [updateGroup]
     ),
   };
 }

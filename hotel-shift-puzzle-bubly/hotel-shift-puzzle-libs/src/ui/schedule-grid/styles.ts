@@ -812,6 +812,41 @@ export const StyledWrap = styled.div`
   }
 
   /* 部署グループヘッダー行（全カラムスパン） */
+  /* メンバー行の一番下（勤務スタッフバブルへの導線）。左固定でスタッフ名の列に乗る */
+  .e-staff-foot {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fafafa;
+    padding: 2px 6px;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+  }
+  .e-staff-foot-link {
+    border: 1px dashed #bbb;
+    border-radius: 4px;
+    background: transparent;
+    color: #666;
+    font-size: 0.8em;
+    padding: 1px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #789;
+      color: #345;
+      background: #fff;
+    }
+  }
+  .e-staff-foot-bar {
+    background: #fafafa;
+    border-bottom: 1px solid #ddd;
+    box-sizing: border-box;
+  }
+
   .e-dept-label {
     position: sticky;
     left: 0;

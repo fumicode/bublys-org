@@ -1,15 +1,12 @@
 /**
- * 顔ぶれの変更で「連れて動くもの」が漏れないことを固定する。
+ * 人を外したとき「連れて動くもの」が漏れないことを固定する。
  *
- * 行だけ消して割当を残す・席を用意せずに人を足す、はどちらも画面上は静かに壊れる
- * （表に居ない人が必要人数を満たす／足した人に一日も割り当てられない）。
+ * 行だけ消して割当を残すと画面上は静かに壊れる（表に居ない人が必要人数を満たす）。
+ * 責任者候補に残すと、どう埋めても満たせない日ができる。
  */
 import {
   WorkingStaffGroup,
   MonthlyStaffSchedule,
-  WorkShiftSet,
-  WorkShift,
-  ScheduleAvailability,
   ScheduleConstraints,
   ShiftLeaderRule,
   WorkingDay,
@@ -18,18 +15,11 @@ import {
 import { buildMembershipChange } from './membershipChange.js';
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   SCHEDULE_CONSTRAINTS_TYPE,
   WORKING_STAFF_GROUP_TYPE,
 } from '../objects/hotelObjects.js';
 
 const june1 = WorkingDay.of(2026, 6, 1);
-
-const workShiftSet = () =>
-  WorkShiftSet.of('sched-1', [
-    WorkShift.of('early', '早番', { hour: 7 }),
-    WorkShift.of('late', '遅番', { hour: 13 }),
-  ]);
 
 const setUp = () => ({
   group: WorkingStaffGroup.ofRoster('sched-1', ['a', 'b']),
@@ -41,8 +31,6 @@ const setUp = () => ({
   })
     .assignShift('a', june1, 'early')
     .assignShift('b', june1, 'late'),
-  workShiftSet: workShiftSet(),
-  availability: ScheduleAvailability.create('sched-1', ['a', 'b'], ['early', 'late']),
   constraints: new ScheduleConstraints({
     scheduleId: 'sched-1',
     leaderRules: [
@@ -71,32 +59,18 @@ describe('buildMembershipChange（顔ぶれが変わったとき同じノード�
     expect(typesOf(items)).toEqual([WORKING_STAFF_GROUP_TYPE]);
   });
 
-  it('★ 人を足すと、可能勤務帯にその人の席ができる（無いと一日も割り当てられない）', () => {
+  it('★ 人を足しても連れて動くものは無い（可能勤務帯は群の中で、既定でどこにでも入れる）', () => {
     const base = setUp();
     const helper = new Staff({ id: 'tmp-1', name: '応援 太郎' });
     const items = buildMembershipChange({
       ...base,
       group: base.group.addTemporary(helper),
-      joining: 'tmp-1',
     });
 
-    expect(typesOf(items)).toEqual([
-      WORKING_STAFF_GROUP_TYPE,
-      SCHEDULE_AVAILABILITY_TYPE,
-    ]);
-    const availability = pick<ScheduleAvailability>(items, SCHEDULE_AVAILABILITY_TYPE);
-    expect(availability.allowedShiftIds('tmp-1').sort()).toEqual(['early', 'late']);
-  });
-
-  it('戻ってきた人の可能勤務帯は上書きしない（外す前の可否がそのまま戻る）', () => {
-    const base = setUp();
-    const items = buildMembershipChange({
-      ...base,
-      availability: base.availability.toggle('b', 'early'), // 早番を外してある
-      group: base.group.remove('b').addRoster('b'),
-      joining: 'b',
-    });
     expect(typesOf(items)).toEqual([WORKING_STAFF_GROUP_TYPE]);
+    const group = pick<WorkingStaffGroup>(items, WORKING_STAFF_GROUP_TYPE);
+    expect(group.isAllowed('tmp-1', 'early')).toBe(true);
+    expect(group.isAllowed('tmp-1', 'late')).toBe(true);
   });
 
   it('★ 人を外すと、その人の割当と責任者候補も同じ一式で消える', () => {
@@ -127,7 +101,7 @@ describe('buildMembershipChange（顔ぶれが変わったとき同じノード�
     const items = buildMembershipChange({
       group: base.group.remove('b'),
       leaving: 'b',
-      // schedule / constraints / availability は手元に無い
+      // schedule / constraints は手元に無い
     });
     expect(typesOf(items)).toEqual([WORKING_STAFF_GROUP_TYPE]);
   });

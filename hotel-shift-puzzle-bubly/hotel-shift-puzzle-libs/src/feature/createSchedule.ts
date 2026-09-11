@@ -3,7 +3,7 @@
  *
  * 「勤務表を作る」は、世界線スコープ `Schedule:<id>` の**誕生**そのもの。
  * 起点ノードには次の一式が1ノードで載る:
- *   - 持ち主一式 … 勤務表・勤務帯セット（グローバルのコピー）・勤務スタッフ群・可能勤務帯
+ *   - 持ち主一式 … 勤務表・勤務帯セット（グローバルのコピー）・勤務スタッフ群
  *   - 固定メンバー … そのときのスタッフ名簿（参照のコピー。以後この世界では動かない）
  *
  * 名簿（固定メンバー）と勤務スタッフ群は役割が違う。名簿は「そのとき居た人たち」を
@@ -18,7 +18,6 @@ import {
   MonthlyStaffSchedule,
   WorkShiftSet,
   createDefaultWorkShiftSet,
-  ScheduleAvailability,
   WorkingStaffGroup,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
@@ -33,7 +32,6 @@ import {
 import {
   SCHEDULE_TYPE,
   WORKSHIFT_SET_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
   WORKING_STAFF_GROUP_TYPE,
   GLOBAL_WORKSHIFT_SET_ID,
 } from "../objects/hotelObjects.js";
@@ -72,22 +70,17 @@ export function createSchedule(
     ) ?? createDefaultWorkShiftSet(id);
 
   // 固定メンバー。**参照**だけを見るので、値が CAS から追い出されていても取りこぼさない。
-  // 勤務スタッフ群も可能勤務帯も、この参照の id から作る（値を読まないのが要点）。
+  // 勤務スタッフ群はこの参照の id から作る（値を読まないのが要点）。
   const pinnedRefs = pinnableRefs(store, SCHEDULE_TYPE);
   const staffIds = pinnedRefs.map((ref) => ref.id);
-  // 生まれたときは名簿の全員が働く。ここから先、誰が働くかはこの世界の中だけで変わる。
+  // 生まれたときは名簿の全員が働き、可能勤務帯は絞らない（＝どの勤務帯にも入れる）。
+  // ここから先、誰が働くかも誰がどこに入れるかも、この世界の中だけで変わる。
   const staffGroup = WorkingStaffGroup.ofRoster(schedule.workingStaffGroupId, staffIds);
-  const availability = ScheduleAvailability.create(
-    id,
-    staffIds,
-    workShiftSet.shiftIds()
-  );
 
   const seed: BundleItem[] = [
     { type: SCHEDULE_TYPE, obj: schedule },
     { type: WORKSHIFT_SET_TYPE, obj: workShiftSet },
     { type: WORKING_STAFF_GROUP_TYPE, obj: staffGroup },
-    { type: SCHEDULE_AVAILABILITY_TYPE, obj: availability },
   ];
 
   // 誕生（1ノード）。持ち主一式は seed の値から、固定メンバーは記述子の pinTypes から載る。

@@ -95,6 +95,37 @@ describe('WorkingStaffGroup（勤務スタッフ群）', () => {
     expect(group.changeTemporaryDepartment('a', '客室')).toBe(group);
   });
 
+  test('★ 可能勤務帯も群が持つ。メンバーでない人はどこにも入れない', () => {
+    const all = ['early', 'late'];
+    const group = groupOfRoster().toggleShift('b', 'late', all);
+
+    expect(group.isAllowed('a', 'late')).toBe(true); // 絞っていない
+    expect(group.isAllowed('b', 'late')).toBe(false); // 外した
+    expect(group.isAllowed('b', 'early')).toBe(true);
+    expect(group.allowedShiftIdsOf('b')).toEqual(['early']);
+    expect(group.allowedShiftIdsOf('a')).toBeUndefined();
+    // この勤務表で働かない人は入れない
+    expect(group.isAllowed('zzz', 'early')).toBe(false);
+  });
+
+  test('allowShiftForAll は絞っている人にだけ勤務帯を足す（勤務帯を増やしたとき）', () => {
+    const limited = groupOfRoster().toggleShift('b', 'late', ['early', 'late']);
+
+    const withNew = limited.allowShiftForAll('night');
+    expect(withNew.isAllowed('b', 'night')).toBe(true);
+    expect(withNew.allowedShiftIdsOf('a')).toBeUndefined(); // 絞っていない人はそのまま
+
+    // 誰も変わらなければ自分自身（無駄な世界線ノードを作らない）
+    const open = groupOfRoster();
+    expect(open.allowShiftForAll('night')).toBe(open);
+  });
+
+  test('外して戻すと可能勤務帯の絞りは消える（メンバーごと消えるので）', () => {
+    const limited = groupOfRoster().toggleShift('b', 'late', ['early', 'late']);
+    const rejoined = limited.remove('b').addRoster('b');
+    expect(rejoined.isAllowed('b', 'late')).toBe(true);
+  });
+
   test('members は WorkingStaffMember で返る（出自は実体の有無で分かる）', () => {
     const group = groupOfRoster().addTemporary(
       new Staff({ id: 'tmp-1', name: '応援 太郎' })

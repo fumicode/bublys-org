@@ -754,89 +754,6 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
-      "name": "ScheduleAvailability",
-      "file": "schedule/ScheduleAvailability.ts",
-      "kind": "aggregate",
-      "fields": [
-        {
-          "name": "scheduleId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "byStaff",
-          "type": "Record<string, string[]>",
-          "optional": false
-        }
-      ],
-      "getters": [
-        "id",
-        "scheduleId"
-      ],
-      "methods": [
-        {
-          "name": "create",
-          "params": [
-            "scheduleId",
-            "staffIds",
-            "shiftIds"
-          ],
-          "returns": "ScheduleAvailability",
-          "isStatic": true,
-          "returnsSelf": true
-        },
-        {
-          "name": "allowedShiftIds",
-          "params": [
-            "staffId"
-          ],
-          "returns": "string[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "isAllowed",
-          "params": [
-            "staffId",
-            "shiftId"
-          ],
-          "returns": "boolean",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "allowForAll",
-          "params": [
-            "staffIds",
-            "shiftId"
-          ],
-          "returns": "ScheduleAvailability",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "allowAllIfUnset",
-          "params": [
-            "staffId",
-            "shiftIds"
-          ],
-          "returns": "ScheduleAvailability",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "toggle",
-          "params": [
-            "staffId",
-            "shiftId"
-          ],
-          "returns": "ScheduleAvailability",
-          "isStatic": false,
-          "returnsSelf": true
-        }
-      ]
-    },
-    {
       "name": "ScheduleCandidates",
       "file": "schedule/ScheduleCandidates.ts",
       "kind": "value",
@@ -1980,6 +1897,45 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": false
         },
         {
+          "name": "allowedShiftIdsOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "string[] | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isAllowed",
+          "params": [
+            "staffId",
+            "shiftId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toggleShift",
+          "params": [
+            "staffId",
+            "shiftId",
+            "allShiftIds"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "allowShiftForAll",
+          "params": [
+            "shiftId"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
           "name": "temporaryStaff",
           "params": [],
           "returns": "Staff[]",
@@ -2084,9 +2040,16 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "staff",
           "type": "Staff",
           "optional": true
+        },
+        {
+          "name": "allowedShiftIds",
+          "type": "string[]",
+          "optional": true
         }
       ],
       "getters": [
+        "hasShiftLimit",
+        "allowedShiftIds",
         "staffId",
         "isTemporary",
         "staff"
@@ -2108,6 +2071,41 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "WorkingStaffMember",
           "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "isAllowed",
+          "params": [
+            "shiftId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toggleShift",
+          "params": [
+            "shiftId",
+            "allShiftIds"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "allowShift",
+          "params": [
+            "shiftId"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "allowAllShifts",
+          "params": [],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
           "returnsSelf": true
         },
         {
@@ -2409,14 +2407,6 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
-      "from": "ScheduleAvailability",
-      "to": "MonthlyStaffSchedule",
-      "kind": "references",
-      "via": "scheduleId",
-      "many": false,
-      "foundBy": "id-naming"
-    },
-    {
       "from": "ScheduleCandidates",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -2531,7 +2521,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 40,
+    "fileCount": 39,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
@@ -2546,7 +2536,8 @@ export const MODEL_GRAPH: ModelGraph = {
       "ScheduleEditEntry.rejectedSuggestionId",
       "ScheduleEditEntry.suggestionId",
       "ScheduleReport.storeId",
-      "ScheduleReport.worldLineNodeId"
+      "ScheduleReport.worldLineNodeId",
+      "WorkingStaffMember.allowedShiftIds"
     ]
   }
 };

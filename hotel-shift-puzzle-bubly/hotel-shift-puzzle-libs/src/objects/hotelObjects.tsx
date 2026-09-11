@@ -21,7 +21,6 @@ import {
   WorkShiftSet,
   type WorkShiftSetPlain,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
   ScheduleConstraints,
@@ -44,7 +43,6 @@ export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
 /** グローバルの勤務帯セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
 export const GLOBAL_WORKSHIFT_SET_ID = "global";
 export const SCHEDULE_TYPE = "Schedule";
-export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 /** 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表ごとに1つ（id=scheduleId）。 */
 export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
@@ -131,15 +129,6 @@ export const HOTEL_OBJECTS = defineObjects({
     },
     // この世界が生まれるとき、そのときのスタッフ名簿を焼き付ける
     scope: { pinTypes: [STAFF_TYPE] },
-  },
-  ScheduleAvailability: {
-    class: ScheduleAvailability,
-    getId: (a: ScheduleAvailability) => a.id,
-    // 親 Schedule のローカル世界線に束ねる（case B）。id は scheduleId そのもの
-    membership: {
-      kind: "live",
-      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
-    },
   },
   ScheduleReservationInfo: {
     class: DailyReservationInfo,

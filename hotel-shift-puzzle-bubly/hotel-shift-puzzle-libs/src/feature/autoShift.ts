@@ -2,7 +2,7 @@
  * 自動シフト（段階的ステップ）の feature 層アダプタ。
  *
  * ドメインの各ステップ（model 層の AutoShiftStep）は希望の「オプションキー」の意味を知らない。
- * ここで shiftWishOptions の規約に従って希望をデコードし、可能勤務帯（ScheduleAvailability）を
+ * ここで shiftWishOptions の規約に従って希望をデコードし、可能勤務帯（勤務スタッフ群が持つ）を
  * 述語に変換して AutoShiftContext を組み、ステップへ渡す。希望キーの解釈はこの層が持つ。
  *
  * UI へはステップ一覧（AUTO_SHIFT_STEPS）をそのまま見せ、選ばれたステップを runAutoShiftStep で
@@ -11,7 +11,7 @@
 import {
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
-  ScheduleAvailability,
+  WorkingStaffGroup,
   WorkShift,
   Staff,
   AUTO_SHIFT_STEPS,
@@ -64,7 +64,7 @@ export type AutoShiftParams = {
   /** staffId → その月のシフト希望 */
   wishByStaff: Map<string, StaffMonthlyShiftWish>;
   /** 可能勤務帯（無ければ全可） */
-  availability?: ScheduleAvailability;
+  staffGroup?: WorkingStaffGroup;
   /** 連勤上限（既定 5） */
   maxConsecutive?: number;
   /**
@@ -82,7 +82,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     staffList,
     workShifts,
     wishByStaff,
-    availability,
+    staffGroup,
     maxConsecutive,
     minDayOff,
     maxDayOffPerDay,
@@ -101,8 +101,8 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     shiftNameById,
     preferenceOf: (staffId, day) =>
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    isAvailable: availability
-      ? (staffId, shiftId) => availability.isAllowed(staffId, shiftId)
+    isAvailable: staffGroup
+      ? (staffId, shiftId) => staffGroup.isAllowed(staffId, shiftId)
       : undefined,
     maxConsecutive,
     minDayOff,

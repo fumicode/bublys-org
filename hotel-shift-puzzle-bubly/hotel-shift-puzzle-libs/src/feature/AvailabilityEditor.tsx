@@ -7,7 +7,6 @@ import {
   WorkShiftSet,
   createDefaultWorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { AvailabilityGridView } from "../ui/AvailabilityGridView.js";
 import {
@@ -16,11 +15,7 @@ import {
   useObjectRepo,
   useObjectsPending,
 } from "../objects/repository.js";
-import {
-  WORKSHIFT_SET_TYPE,
-  SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
-} from "../objects/hotelObjects.js";
+import { WORKSHIFT_SET_TYPE, SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
@@ -33,27 +28,29 @@ const newWorkShiftId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `shift-${Date.now()}`;
 
 /**
- * 可能勤務帯エディタ。勤務表に紐づく ScheduleAvailability をシェル経由で編集する。
+ * 可能勤務帯エディタ。誰がどの勤務帯に入れるかは**勤務スタッフ群のメンバー**が持つので、
+ * チェックの読み書きはそこへ向ける（同じチェック欄は勤務スタッフバブルにもある。
+ * どちらも同じ1つの真実を編集する）。
  * あわせて、この勤務表の勤務帯セット（WorkShiftSet, id=scheduleId）も列として編集できる
  * （＋で追加・✏️で改名/時刻変更・削除）。どちらの編集も勤務表と同じローカル世界線に記録される（case B）。
  */
 const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
-  // 可能勤務帯の行も勤務表の行と同じ顔ぶれ（臨時の人も入る）
-  const { staffList } = useWorkingStaff(scheduleId);
+  // 行も可能勤務帯も勤務スタッフ群から。行の顔ぶれは勤務表と同じ（臨時の人も入る）
+  const {
+    staffList,
+    group: staffGroup,
+    toggleShift,
+    allowShiftForAll,
+  } = useWorkingStaff(scheduleId);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const { object: workShiftSet, update: updateSet } = useObjectShell<WorkShiftSet>(
     WORKSHIFT_SET_TYPE,
     scheduleId
   );
   const setRepo = useObjectRepo<WorkShiftSet>(WORKSHIFT_SET_TYPE);
-  const { object: availability, update } = useObjectShell<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
-  const repo = useObjectRepo<ScheduleAvailability>(SCHEDULE_AVAILABILITY_TYPE);
 
   // 「無ければ作る」は状態が揃うまで動かさない。メモリ上の CAS は 300 件で頭打ちなので、
-  // 追い出されただけの勤務帯セット／可能勤務帯を「無い」と読んで既定で上書きすると、
+  // 追い出されただけの勤務帯セットを「無い」と読んで既定で上書きすると、
   // 設定した中身が消える（＝見ているだけでデータが壊れる）。
   const pending = useObjectsPending();
 
@@ -65,21 +62,7 @@ const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
     }
   }, [pending, schedule, workShiftSet, scheduleId, setRepo]);
 
-  // 可能勤務帯が無ければ既定（全許可）を作成
-  useEffect(() => {
-    if (pending) return;
-    if (schedule && workShiftSet && !availability && staffList.length > 0) {
-      repo.save(
-        ScheduleAvailability.create(
-          scheduleId,
-          staffList.map((s) => s.id),
-          workShiftSet.shiftIds()
-        )
-      );
-    }
-  }, [pending, availability, schedule, workShiftSet, staffList.length, scheduleId, repo]);
-
-  if (!schedule || !workShiftSet || !availability) {
+  if (!schedule || !workShiftSet || !staffGroup) {
     return <div style={{ padding: 16, color: "#666" }}>読み込み中…</div>;
   }
 
@@ -94,9 +77,10 @@ const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
     const name = draft.name.trim() || "新しい勤務帯";
     if (id === null) {
       // 追加：セットに足し、既定で全スタッフ許可にする
+      // （絞っていない人は元から入れるので、実際に足すのは絞っている人だけ）
       const newId = newWorkShiftId();
       updateSet((s) => s.addShift(WorkShift.of(newId, name, { hour: draft.hour })));
-      update((a) => a.allowForAll(staffList.map((s) => s.id), newId));
+      allowShiftForAll(newId, name);
     } else {
       // 更新：改名と時刻変更をまとめて1インスタンスにして保存（1コミット）
       updateSet((s) => s.rename(id, name).changeStart(id, { hour: draft.hour }));
@@ -113,8 +97,8 @@ const AvailabilityEditorBody: FC<Props> = ({ scheduleId }) => {
         staffList={staffList}
         workShifts={shifts}
         shiftGroups={shiftGroups}
-        availability={availability}
-        onToggle={(staffId, shiftId) => update((a) => a.toggle(staffId, shiftId))}
+        staffGroup={staffGroup}
+        onToggle={toggleShift}
         editable
         onCommitShift={handleCommitShift}
         onRemoveShift={(id) => updateSet((s) => s.remove(id))}

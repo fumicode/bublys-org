@@ -12,7 +12,7 @@ import {
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { createSampleStaffList } from "./sampleStaff.js";
-import { ALLOWED_SHIFT_IDS_BY_STAFF } from "./sampleAvailability.js";
+import { ALLOWED_SHIFT_IDS_BY_STAFF } from "./sampleWorkingStaff.js";
 import { createSampleShiftWishes } from "./sampleShiftWishes.js";
 import { createSampleConstraintsFor } from "./sampleConstraints.js";
 import { buildScheduleConstraints } from "../feature/scheduleConstraints.js";

@@ -7,6 +7,8 @@
  *
  * メンバー1人の形は {@link WorkingStaffMember}。名簿の人は staffId で指すだけ、
  * 臨時の人は実体をメンバーが抱える（名簿には載らないので）。
+ * **可能勤務帯（誰がどの勤務帯に入れるか）もメンバーが持つ**。「誰が働くか」と
+ * 「その人がどの勤務帯に入れるか」は同じ参加の話なので、別の集約に分けない。
  * 群は勤務表と同じ世界線に載るので、臨時の人は時間移動で一緒に現れたり消えたりする。
  *
  * 並び順は members の順そのもの（＝勤務表の行順）。
@@ -67,6 +69,44 @@ export class WorkingStaffGroup {
   /** その人がこの勤務表の中だけで足した臨時の人か */
   isTemporary(staffId: string): boolean {
     return this.memberOf(staffId)?.isTemporary ?? false;
+  }
+
+  // ========== 可能勤務帯 ==========
+
+  /**
+   * その人がこの勤務表で入れる勤務帯ID（絞っていなければ undefined＝全部入れる）。
+   * メンバーでない人も undefined を返すので、可否は {@link isAllowed} で聞くこと。
+   */
+  allowedShiftIdsOf(staffId: string): string[] | undefined {
+    return this.memberOf(staffId)?.allowedShiftIds;
+  }
+
+  /** その人がその勤務帯に入れるか。メンバーでなければ入れない */
+  isAllowed(staffId: string, shiftId: string): boolean {
+    return this.memberOf(staffId)?.isAllowed(shiftId) ?? false;
+  }
+
+  /**
+   * その人のその勤務帯の可否を反転した新しい群を返す。不変。
+   * 勤務帯の全体集合が要るのは、まだ絞っていない人から1つ外すとき
+   * （「全部入れる」を「これ以外」に書き下すため）。
+   */
+  toggleShift(
+    staffId: string,
+    shiftId: string,
+    allShiftIds: readonly string[]
+  ): WorkingStaffGroup {
+    return this.mapMember(staffId, (m) => m.toggleShift(shiftId, allShiftIds));
+  }
+
+  /**
+   * 全員がその勤務帯に入れるようにした新しい群を返す。不変。
+   * 勤務帯を1つ増やしたときに使う（絞っていない人は元から入れるので変わらない）。
+   */
+  allowShiftForAll(shiftId: string): WorkingStaffGroup {
+    const members = this.state.members.map((m) => m.allowShift(shiftId));
+    if (members.every((m, i) => m === this.state.members[i])) return this;
+    return new WorkingStaffGroup({ ...this.state, members });
   }
 
   /** 臨時の人たち（実体はメンバーが抱えている） */

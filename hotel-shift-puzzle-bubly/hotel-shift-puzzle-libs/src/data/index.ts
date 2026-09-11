@@ -2,9 +2,9 @@
  * サンプルデータ
  */
 export * from "./sampleStaff.js";
+export * from "./sampleWorkingStaff.js";
 export * from "./sampleWorkShifts.js";
 export * from "./sampleSchedule.js";
 export * from "./sampleShiftWishes.js";
-export * from "./sampleAvailability.js";
 export * from "./sampleConstraints.js";
 export * from "./sampleScenarios.js";
