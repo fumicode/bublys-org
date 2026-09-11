@@ -304,3 +304,84 @@ describe('世界の中からの線は、写しにつなぐ', () => {
     expect(e?.to.y).toBeCloseTo(echo.y + echo.height / 2, 6);
   });
 });
+
+/**
+ * ★ 枠は「その世界に居るもの」を囲う。**メンバーでない箱が枠の中に入ってはいけない。**
+ *
+ * 枠はメンバーの外接矩形なので、力学配置がメンバーでない箱をその範囲に置くと
+ * 黙って飲み込まれる。実際、焼き付け元の Staff（世界の外に居る）が枠の中に入り、
+ * 「外の Staff」と「中の写し」が両方とも枠の中、という絵になった。
+ */
+describe('枠の中に、その世界のものでない箱を入れない', () => {
+  const frameOf = (l: ReturnType<typeof layoutClassDiagramByForce>, scopeId: string) => {
+    const members = l.boxes.filter(
+      (b) => b.echoScopeId === scopeId || (!b.echoOf && inScopeNames.includes(b.name))
+    );
+    return {
+      x0: Math.min(...members.map((m) => m.x)),
+      y0: Math.min(...members.map((m) => m.y)),
+      x1: Math.max(...members.map((m) => m.x + m.width)),
+      y1: Math.max(...members.map((m) => m.y + m.height)),
+      members,
+    };
+  };
+  const inScopeNames = ['Schedule', 'Assignment', 'Constraints', 'Rule'];
+  const classes = [
+    cls('Staff', { kind: 'aggregate' }),
+    cls('Schedule', { kind: 'aggregate' }),
+    cls('Assignment'),
+    cls('Constraints', { kind: 'aggregate' }),
+    cls('Rule'),
+    cls('Wish', { kind: 'aggregate' }),
+    cls('Report', { kind: 'aggregate' }),
+    cls('Violation'),
+  ];
+  const relations = [
+    rel('Schedule', 'Assignment'),
+    rel('Constraints', 'Rule'),
+    rel('Assignment', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+    rel('Rule', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+    rel('Wish', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+    rel('Violation', 'Staff', { kind: 'references', via: 'staffId', foundBy: 'id-naming' }),
+    rel('Report', 'Schedule', { kind: 'references', via: 'scheduleId', foundBy: 'id-naming' }),
+  ];
+  const g = graph(classes, relations);
+  const inScope = (n: string) => (inScopeNames.includes(n) ? 'Schedule:<id>' : undefined);
+  const echoes = [
+    { of: 'Staff', scopeId: 'Schedule:<id>', near: 'Schedule', members: inScopeNames },
+  ];
+
+  it('★ 焼き付け元（世界の外）が枠の中に入らない', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    const f = frameOf(layout, 'Schedule:<id>');
+    const staff = layout.boxes.find((b) => b.name === 'Staff') as (typeof layout.boxes)[number];
+    const overlaps =
+      staff.x < f.x1 && f.x0 < staff.x + staff.width &&
+      staff.y < f.y1 && f.y0 < staff.y + staff.height;
+    expect(overlaps).toBe(false);
+  });
+
+  it('★ 世界の外のものが1つも枠の中に入らない', () => {
+    const layout = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    const f = frameOf(layout, 'Schedule:<id>');
+    const inside = layout.boxes
+      .filter((b) => !f.members.includes(b))
+      .filter(
+        (b) => b.x < f.x1 && f.x0 < b.x + b.width && b.y < f.y1 && f.y0 < b.y + b.height
+      )
+      .map((b) => b.name);
+    expect(inside).toEqual([]);
+  });
+
+  it('押し出したあとも、箱同士は重ならない', () => {
+    const { boxes } = layoutClassDiagramByForce(g, {}, {}, inScope, echoes);
+    for (const a of boxes) {
+      for (const b of boxes) {
+        if (a === b) continue;
+        const overlap =
+          a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+});
