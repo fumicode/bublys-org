@@ -108,6 +108,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
+          "name": "shiftIntervalRules",
+          "type": "ShiftIntervalRule[]",
+          "optional": true
+        },
+        {
           "name": "linkedReportIds",
           "type": "string[]",
           "optional": true
@@ -119,6 +124,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "checkShiftWish",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
+        "shiftIntervalRules",
         "linkedReportIds",
         "leaderRules"
       ],
@@ -140,6 +146,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "ConstraintSet",
           "isStatic": false,
           "returnsSelf": true
+        },
+        {
+          "name": "shiftIntervalRule",
+          "params": [
+            "key"
+          ],
+          "returns": "ShiftIntervalRule | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "intervalConstraints",
+          "params": [
+            "shiftIdsOf"
+          ],
+          "returns": "ShiftIntervalConstraint[]",
+          "isStatic": false,
+          "returnsSelf": false
         },
         {
           "name": "withMaxConsecutiveWorkdays",
@@ -1516,6 +1540,85 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "ShiftIntervalConstraint",
+      "file": "schedule/ShiftIntervalConstraint.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [],
+      "methods": [
+        {
+          "name": "describe",
+          "params": [],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "check",
+          "params": [
+            "schedule"
+          ],
+          "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
+      "name": "ShiftIntervalRule",
+      "file": "schedule/ShiftIntervalRule.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "key",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "fromShiftName",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "forbiddenNextShiftNames",
+          "type": "string[]",
+          "optional": false
+        },
+        {
+          "name": "minRestHours",
+          "type": "number",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "key",
+        "fromShiftName",
+        "forbiddenNextShiftNames",
+        "minRestHours",
+        "label",
+        "restReason"
+      ],
+      "methods": [
+        {
+          "name": "allowsNextDay",
+          "params": [
+            "prevShiftName",
+            "nextShiftName"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "describe",
+          "params": [],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
       "name": "ShiftLeaderConstraint",
       "file": "schedule/ShiftLeaderConstraint.ts",
       "kind": "value",
@@ -2426,6 +2529,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "ConstraintSet",
+      "to": "ShiftIntervalRule",
+      "kind": "contains",
+      "via": "shiftIntervalRules",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ConstraintViolation",
       "to": "WorkingDay",
       "kind": "contains",
@@ -2580,12 +2691,13 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 39,
+    "fileCount": 41,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
       "RequiredStaffingConstraint",
+      "ShiftIntervalConstraint",
       "ShiftLeaderConstraint"
     ],
     "unresolvedTypes": [],

@@ -1,5 +1,6 @@
 import { ConstraintSet } from './ConstraintSet.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
+import { ShiftIntervalRule } from './ShiftIntervalRule.js';
 import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
 
 describe('ConstraintSet.modelConstraints', () => {
@@ -79,5 +80,57 @@ describe('ConstraintSet.removeStaff（勤務表から外れた人を責任者候
   test('どのルールにも居なければ自分自身を返す（無駄な世界線ノードを作らない）', () => {
     const base = create();
     expect(base.removeStaff('zzz')).toBe(base);
+  });
+});
+
+describe('ConstraintSet の勤務間インターバル（main から合流した制約）', () => {
+  test('既定は「遅番明けは早番・中番に入れない」。インスタンスで返る', () => {
+    const set = ConstraintSet.empty('schedule-A');
+    const rules = set.shiftIntervalRules;
+
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toBeInstanceOf(ShiftIntervalRule);
+    expect(rules[0].key).toBe('late');
+    expect(set.shiftIntervalRule('late')?.fromShiftName).toBe('遅番');
+  });
+
+  test('グローバルのテンプレート（id="global"）でも同じ既定が効く', () => {
+    expect(ConstraintSet.empty('global').shiftIntervalRules).toHaveLength(1);
+  });
+
+  test('★ toPlain / fromPlain の往復でインスタンスに戻る（CAS に plain が混ざらない）', () => {
+    const original = new ConstraintSet({
+      id: 'schedule-A',
+      leaderRules: [],
+      shiftIntervalRules: [
+        new ShiftIntervalRule({
+          key: 'late',
+          fromShiftName: '遅番',
+          forbiddenNextShiftNames: ['早番'],
+          minRestHours: 8,
+        }),
+      ],
+    });
+
+    const plain = original.toPlain();
+    expect(() => JSON.stringify(plain)).not.toThrow();
+    // 保存形は plain（インスタンスがそのまま CAS へ行っていない）
+    expect(plain.shiftIntervalRules?.[0]).toEqual({
+      key: 'late',
+      fromShiftName: '遅番',
+      forbiddenNextShiftNames: ['早番'],
+      minRestHours: 8,
+    });
+
+    const restored = ConstraintSet.fromPlain(JSON.parse(JSON.stringify(plain)));
+    expect(restored.state.shiftIntervalRules?.[0]).toBeInstanceOf(ShiftIntervalRule);
+    expect(restored.shiftIntervalRule('late')?.forbiddenNextShiftNames).toEqual(['早番']);
+    expect(restored.toPlain()).toEqual(plain);
+  });
+
+  test('withId でコピーしても勤務間インターバルはついていく（グローバル→勤務表）', () => {
+    const copy = ConstraintSet.empty('global').withId('schedule-A');
+    expect(copy.id).toBe('schedule-A');
+    expect(copy.shiftIntervalRules).toHaveLength(1);
   });
 });

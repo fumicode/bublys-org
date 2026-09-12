@@ -826,6 +826,9 @@ export const StyledWrap = styled.div`
     align-items: center;
   }
   .e-staff-foot-link {
+    /* <button> から ObjectView の中の <span> に変わったので、行揃えを自分で作る */
+    display: inline-flex;
+    align-items: center;
     border: 1px dashed #bbb;
     border-radius: 4px;
     background: transparent;

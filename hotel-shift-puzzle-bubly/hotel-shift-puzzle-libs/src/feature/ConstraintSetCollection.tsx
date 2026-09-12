@@ -93,6 +93,7 @@ export const ConstraintSetCollection: FC = () => {
       <div className="e-bar">
         <ScheduleConstraintsBar
           leaderRules={constraintSet.leaderRules}
+          intervalRules={constraintSet.shiftIntervalRules}
           shiftColorOf={shiftColorOf}
           maxConsecutive={constraintSet.maxConsecutiveWorkdays}
           minDayOff={constraintSet.minMonthlyDayOff}
