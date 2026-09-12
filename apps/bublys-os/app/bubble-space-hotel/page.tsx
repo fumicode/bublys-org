@@ -146,15 +146,10 @@ function Inner() {
               onOpenRule={(ruleKey) =>
                 openPanel(`rule-${ruleKey}`, `責任者ルール ${ruleKey}`, "rule", { w: 420, h: 320 }, "e", { ruleKey })
               }
-              onOpenAvailability={() =>
-                openPanel("availability", "可能勤務帯", "availability", { w: 460, h: 360 }, "w")
-              }
-              onOpenHistory={() =>
-                openPanel("worldline", "世界線ビュー", "worldline", { w: 640, h: 240 }, "s")
-              }
-              onOpenEditLog={() =>
-                openPanel("editlog", "操作履歴", "editlog", { w: 420, h: 320 }, "e")
-              }
+              // 可能勤務帯 / 世界線 / 操作履歴 を開くハンドラは廃止された。
+              // いまは ObjectView（ダブルクリック）で開く形になっていて、その入口は
+              // chrome（header / rulesStrip / footer）の中にある。ここでは全部 false にして
+              // 外へ出しているので、この表からは開かない。上のツールバーから開く。
             />
           );
         case "constraints":
