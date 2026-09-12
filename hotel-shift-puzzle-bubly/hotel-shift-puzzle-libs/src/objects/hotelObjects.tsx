@@ -11,35 +11,51 @@
  */
 import React from "react";
 import PersonIcon from "@mui/icons-material/Person";
+import GroupsIcon from "@mui/icons-material/Groups";
+import RuleIcon from "@mui/icons-material/Rule";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
   Staff,
+  WorkingStaffGroup,
+  type WorkingStaffGroupPlain,
   WorkShiftSet,
+  type WorkShiftSetPlain,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
+  type ConstraintSetPlain,
   ScheduleReport,
   ScheduleEditLog,
+  type ScheduleEditLogPlain,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
+import { AppWorld } from "./world.js";
 import { localScopeId } from "./commit.js";
 
 /** オブジェクト型名 */
 export const STAFF_TYPE = "Staff";
+/** 勤務表ごとの「働く人たち」。勤務表が workingStaffGroupId で指す（id=scheduleId） */
+export const WORKING_STAFF_GROUP_TYPE = "WorkingStaffGroup";
 export const WORKSHIFT_SET_TYPE = "WorkShiftSet";
 /** グローバルの勤務帯セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
 export const GLOBAL_WORKSHIFT_SET_ID = "global";
 export const SCHEDULE_TYPE = "Schedule";
-export const SCHEDULE_AVAILABILITY_TYPE = "ScheduleAvailability";
 /** 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表ごとに1つ（id=scheduleId）。 */
 export const SCHEDULE_RESERVATION_INFO_TYPE = "ScheduleReservationInfo";
 export const STAFF_SHIFT_WISH_TYPE = "StaffMonthlyShiftWish";
-export const SCHEDULE_CONSTRAINTS_TYPE = "ScheduleConstraints";
+
+/**
+ * 制約セット。勤務帯セットと同じく2通り:
+ *   グローバルのテンプレート（id="global"）／勤務表ごとの独自セット（id=scheduleId）
+ */
+export const CONSTRAINT_SET_TYPE = "ConstraintSet";
+/** グローバルの制約セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
+export const GLOBAL_CONSTRAINT_SET_ID = "global";
+
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
 /** 勤務表の操作履歴（ノウハウ可視化）。Schedule ローカル世界線に相乗り。 */
 export const SCHEDULE_EDIT_LOG_TYPE = "ScheduleEditLog";
@@ -52,7 +68,13 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     // url は app 層（registration/bubbleUrls.ts）で登録する
-    // serialize 無し → state-object 規約で plain 化（ドラッグ/表示・世界線記録の対象外）
+    // serialize 無し → state-object 規約で plain 化
+    //
+    // 固定メンバー。名簿はグローバルの資産だが、勤務表は「その時点のメンバーで組んだ記録」
+    // なので、あとの入退社・改名に揺さぶられてはいけない。勤務表の世界が生まれるときに
+    // そのときの参照が焼き付けられ、以後その世界の中では動かない
+    // （どの世界へ焼くかは Schedule 側の scope.pinTypes が決める）。
+    membership: { kind: "pinned" },
     // ドメインスキーマ（object-transformer など横断で使う）
     shape: objectShape([
       { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
@@ -60,15 +82,44 @@ export const HOTEL_OBJECTS = defineObjects({
       { name: "department", shape: primitiveShape("string"), required: false, label: "所属部署" },
     ]),
   },
+  WorkingStaffGroup: {
+    class: WorkingStaffGroup,
+    getId: (g: WorkingStaffGroup) => g.id,
+    icon: React.createElement(GroupsIcon, { fontSize: "small" }),
+    // 勤務表とスタッフの間に噛む入れ物。「誰が働くか」を持つ。
+    //
+    // スタッフ本体（固定メンバー）とは属し方が違う。名簿は世界が生まれた瞬間に焼き付いて
+    // 動かないが、**誰が働くかはこの世界の中で変わる**（臨時の人を足す・外す・並べ替える）。
+    // だから群は live で、親 Schedule の世界線に相乗りする（case B）。
+    // 臨時の人の実体は群が抱えるので、名簿には出ずに時間移動で一緒に戻る。
+    //
+    // 入れ子にインスタンスを持つので codec を明示（Schedule と同じ）。
+    // state は保存形ではなくドメインの形なので、plain にするのは記録するこの1箇所でやる。
+    serialize: {
+      toJSON: (g: WorkingStaffGroup) => g.toPlain(),
+      fromJSON: (j) => WorkingStaffGroup.fromPlain(j as WorkingStaffGroupPlain),
+    },
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
+  },
   WorkShiftSet: {
     class: WorkShiftSet,
     getId: (s: WorkShiftSet) => s.id,
     // 2通りの使われ方をする集約:
     //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
     //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）
-    // state が完全 plain（id ＋ 勤務帯 state 配列）なので serialize 不要。
-    localScope: (s: WorkShiftSet) =>
-      s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id),
+    // 入れ子にインスタンス（WorkShift）を持つので codec を明示。
+    serialize: {
+      toJSON: (s: WorkShiftSet) => s.toPlain(),
+      fromJSON: (j) => WorkShiftSet.fromPlain(j as WorkShiftSetPlain),
+    },
+    membership: {
+      kind: "live",
+      homeScope: (id: string) =>
+        id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   Schedule: {
     class: MonthlyStaffSchedule,
@@ -81,54 +132,83 @@ export const HOTEL_OBJECTS = defineObjects({
       fromJSON: (j) => MonthlyStaffSchedule.fromPlain(j as MonthlyStaffSchedulePlain),
     },
     // 勤務表ごとのローカル世界線（自分のスコープ）
-    localScope: (s: MonthlyStaffSchedule) => localScopeId(SCHEDULE_TYPE, s.state.id),
-  },
-  ScheduleAvailability: {
-    class: ScheduleAvailability,
-    getId: (a: ScheduleAvailability) => a.id,
-    // 親 Schedule のローカル世界線に束ねる（case B）
-    localScope: (a: ScheduleAvailability) => localScopeId(SCHEDULE_TYPE, a.scheduleId),
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
+    // この世界が生まれるとき、そのときのスタッフ名簿を焼き付ける
+    scope: { pinTypes: [STAFF_TYPE] },
   },
   ScheduleReservationInfo: {
     class: DailyReservationInfo,
     getId: (r: DailyReservationInfo) => r.id,
     // 稼働日ごとの予約状況（宿泊人数・部屋数）は「実際の予約」という外部の実データ。
-    // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、勤務表のローカル世界線には
-    // 相乗りさせない（localScope を指定しない）＝アプリ全体スコープのみ。時間移動しても
-    // 予約状況は変わらない（ScheduleReport と同じ考え方）。
+    // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、世界に属さない（external、既定）。
+    // 勤務表の世界の中から読んでも常にグローバルを見るので、時間移動しても予約状況は
+    // 変わらない（ScheduleReport と同じ考え方）。
     // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
   },
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,
     getId: (w: StaffMonthlyShiftWish) => w.id,
-    // スタッフ×月で1つ。店舗・勤務表には依存しないのでアプリ全体スコープのみ。
+    // スタッフ×月で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
     // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
   },
-  ScheduleConstraints: {
-    class: ScheduleConstraints,
-    getId: (c: ScheduleConstraints) => c.id,
-    // 勤務表ごとの制約。親 Schedule のローカル世界線に束ねる（case B）。
-    // 担当者をドロップで足すと、勤務表の世界線にノードが増え、時間移動で一緒に戻る。
-    // state が plain（scheduleId ＋ ルール states 配列）なので serialize 不要。
-    localScope: (c: ScheduleConstraints) => localScopeId(SCHEDULE_TYPE, c.scheduleId),
+  ConstraintSet: {
+    class: ConstraintSet,
+    getId: (c: ConstraintSet) => c.id,
+    icon: React.createElement(RuleIcon, { fontSize: "small" }),
+    // 勤務帯セットと同じく2通りの使われ方をする集約:
+    //   - グローバルのテンプレート（id="global"）… ローカル世界線を持たない
+    //   - 勤務表ごとの独自セット（id=scheduleId）… 親 Schedule の世界線に束ねる（case B）。
+    //     担当者をドロップで足すと世界線にノードが増え、時間移動で一緒に戻る
+    // 入れ子にインスタンス（ShiftLeaderRule）を持つので codec を明示。
+    serialize: {
+      toJSON: (c: ConstraintSet) => c.toPlain(),
+      fromJSON: (j) => ConstraintSet.fromPlain(j as ConstraintSetPlain),
+    },
+    membership: {
+      kind: "live",
+      homeScope: (id: string) =>
+        id === GLOBAL_CONSTRAINT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
+    },
   },
   ScheduleReport: {
     class: ScheduleReport,
     getId: (r: ScheduleReport) => r.state.id,
     icon: React.createElement(AssessmentIcon, { fontSize: "small" }),
-    // 確定時点のスナップショット。勤務表のローカル世界線には相乗りさせない
-    // （相乗りさせると時間移動のたびに現れたり消えたりして確定記録の意味が壊れるため）。
-    // state が完全 plain → serialize 不要。localScope も指定しない＝アプリ全体ログのみ。
+    // 確定時点のスナップショット。世界に属さない（external、既定）。
+    // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
+    // 意味が壊れる。state が完全 plain → serialize 不要。
   },
   ScheduleEditLog: {
     class: ScheduleEditLog,
     getId: (log: ScheduleEditLog) => log.id,
     // 勤務表の操作履歴。親 Schedule のローカル世界線に相乗り（case B）。
     // Schedule と同じノードに bundle で載せることで、時間移動と履歴がずれない。
-    // state が完全 plain なので serialize 不要。
-    localScope: (log: ScheduleEditLog) => localScopeId(SCHEDULE_TYPE, log.id),
+    // 入れ子にインスタンス（ScheduleEditEntry → ConstraintDelta → ConstraintViolation）を
+    // 持つので codec を明示。
+    serialize: {
+      toJSON: (log: ScheduleEditLog) => log.toPlain(),
+      fromJSON: (j) => ScheduleEditLog.fromPlain(j as ScheduleEditLogPlain),
+    },
+    membership: {
+      kind: "live",
+      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
+    },
   },
 });
 
-/** 世界線対象オブジェクトをまとめた Provider（バブリ全体で1つ） */
-export const HotelObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
+const ObjectsProvider = makeObjectsProvider(HOTEL_OBJECTS);
+
+/**
+ * 世界線対象オブジェクトをまとめた Provider（バブリ全体で1つ）。
+ * 併せて根の World（グローバル台帳）を張る。バブルはここから世界に入る。
+ */
+export const HotelObjectsProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <ObjectsProvider>
+    <AppWorld>{children}</AppWorld>
+  </ObjectsProvider>
+);

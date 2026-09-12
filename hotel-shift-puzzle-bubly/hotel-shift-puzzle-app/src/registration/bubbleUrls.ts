@@ -40,9 +40,12 @@ export const staffShiftWishUrl = (
 export const scheduleUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}`;
 
-/** 可能勤務帯エディタバブル */
-export const scheduleAvailabilityUrl = (scheduleId: string): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/availability`;
+/** グローバルの制約セット（テンプレート）バブル。勤務表作成時にここからコピーされる */
+export const constraintSetUrl = (): string => `hotel-shift-puzzle/constraints`;
+
+/** 勤務スタッフ群バブル（誰が働くか・並び順・可能勤務帯・勤務帯の列をここで全部） */
+export const scheduleStaffUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/staff`;
 
 /** 予約状況（宿泊人数・部屋数）編集バブル（勤務表の予約行から開く） */
 export const scheduleReservationInfoUrl = (scheduleId: string): string =>
@@ -71,21 +74,26 @@ export const scheduleExtractUrl = (scheduleId: string, staffIds: string[]): stri
 export const scheduleDayUrl = (scheduleId: string, dayKey: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
 
-/** 責任者ルール可視化バブル（上部ルール行のクリックで開く。ロールキーを乗せる） */
-export const scheduleLeaderRuleUrl = (
-  scheduleId: string,
-  ruleKey: string
-): string => `hotel-shift-puzzle/schedules/${scheduleId}/leader-rules/${ruleKey}`;
-
 /**
- * 勤務間インターバルのルール可視化バブル（上部ルール行の「遅番明け」アイコンから開く）。
- * 責任者ルールと並ぶ「ルールの図」なので、URL も leader-rules と同じ形に揃える。
+ * 制約1つぶんのバブル URL。
+ *
+ * 主語は**制約セットID**（"global" か scheduleId）。開いているのは「勤務表の一部」ではなく
+ * 「制約セットの中の1制約」なので、住所も制約セットで言う。おかげでグローバルの
+ * テンプレートからも勤務表からも、同じ1本の pattern で開ける。
  */
-export const scheduleShiftIntervalRuleUrl = (
-  scheduleId: string,
-  ruleKey: string
-): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/shift-interval-rules/${ruleKey}`;
+export const constraintBubbleUrlOf = (
+  constraintSetId: string,
+  kind: "leaderRule" | "shiftInterval" | "limit",
+  key: string
+): string => {
+  const path =
+    kind === "leaderRule"
+      ? "leader-rules"
+      : kind === "shiftInterval"
+        ? "shift-interval-rules"
+        : "limits";
+  return `hotel-shift-puzzle/constraints/${constraintSetId}/${path}/${key}`;
+};
 
 /** 制約違反バブル（赤帯・⊿マーカーから開く） */
 export const scheduleViolationUrl = (
@@ -105,6 +113,20 @@ export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-
  * 特定の勤務表ではなく世界全体を扱うので、勤務表の下ではなくトップレベルに置く。
  */
 export const worldFileUrl = (): string => `hotel-shift-puzzle/file`;
+
+/**
+ * 世界線インスペクタ（デバッグ用）。
+ * メモリ（Redux の CAS）と IndexedDB に何が入っているかを覗く。
+ * 特定の勤務表ではなく世界線の仕組みそのものを見るので、トップレベルに置く。
+ */
+export const worldLineInspectorUrl = (): string =>
+  `hotel-shift-puzzle/world-line-inspector`;
+
+/** 世界線を3Dで覗くビュー（デバッグ用） */
+export const worldLine3DUrl = (): string => `hotel-shift-puzzle/world-line-3d`;
+
+/** モデルのクラス図 */
+export const modelClassDiagramUrl = (): string => `hotel-shift-puzzle/model-class-diagram`;
 
 /** 操作履歴（ノウハウ可視化）バブル */
 export const scheduleEditLogUrl = (scheduleId: string): string =>

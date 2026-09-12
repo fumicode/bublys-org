@@ -14,6 +14,8 @@ import GppGoodIcon from "@mui/icons-material/GppGood";
 import PublicIcon from "@mui/icons-material/Public";
 import ParkIcon from "@mui/icons-material/Park";
 import ListAltIcon from "@mui/icons-material/ListAlt";
+import TuneIcon from "@mui/icons-material/Tune";
+import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import { registerObjectType } from "@bublys-org/bubbles-ui";
@@ -25,6 +27,8 @@ import {
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
   SCHEDULE_REPORT_LIST_VIEW_TYPE,
+  CONSTRAINT_LIMIT_VIEW_TYPE,
+  SHIFT_INTERVAL_RULE_VIEW_TYPE,
   SHIFT_WISH_MONTH_VIEW_TYPE,
   STAFF_SHIFT_WISH_SHEET_VIEW_TYPE,
 } from "./ui/viewObjectTypes.js";
@@ -50,6 +54,14 @@ registerObjectType(
 registerObjectType(
   SCHEDULE_REPORT_LIST_VIEW_TYPE,
   React.createElement(ListAltIcon, { fontSize: "small" })
+);
+registerObjectType(
+  CONSTRAINT_LIMIT_VIEW_TYPE,
+  React.createElement(TuneIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SHIFT_INTERVAL_RULE_VIEW_TYPE,
+  React.createElement(HourglassBottomIcon, { fontSize: "small" })
 );
 registerObjectType(
   SHIFT_WISH_MONTH_VIEW_TYPE,

@@ -15,8 +15,8 @@ import {
   createSampleWorkShiftSet,
   createSampleSchedules,
   createSampleShiftWishes,
-  createSampleAvailabilityFor,
-  createSampleConstraintsFor,
+  createSampleWorkingStaffGroupFor,
+  createSampleConstraintSetFor,
   createEndgameSchedule,
   createMidMonthSchedule,
   ENDGAME_MAX_DAY_OFF_PER_DAY,
@@ -26,10 +26,11 @@ import {
 import type { BundleItem } from "./commit.js";
 import {
   STAFF_TYPE,
+  WORKING_STAFF_GROUP_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
+  GLOBAL_CONSTRAINT_SET_ID,
   STAFF_SHIFT_WISH_TYPE,
 } from "./hotelObjects.js";
 
@@ -37,12 +38,12 @@ import {
  * 例データ一式を「世界線へ書き込める形」で組み立てる。
  *
  * 中身:
- *   - スタッフ 9 人、グローバルの勤務帯セット（テンプレート）、全員の希望（6〜9月）
+ *   - スタッフ 9 人、グローバルの勤務帯セット・制約セット（テンプレート）、全員の希望（6〜9月）
  *   - 勤務表 4 つ
  *       空の勤務表（6月・7月） … 自動シフトを一から動かす用
  *       作成途中（8月）       … 候補集合・確定提案を見る用（実際に人が触る状態）
  *       終盤・詰みあり（9月）  … 埋められないセルがある状態
- *   - 勤務表ごとの勤務帯セット・可能勤務帯・制約
+ *   - 勤務表ごとの勤務帯セット・勤務スタッフ群（＝誰が働くか＋可能勤務帯）・制約
  */
 export function buildSampleItems(): BundleItem[] {
   const items: BundleItem[] = [];
@@ -53,6 +54,12 @@ export function buildSampleItems(): BundleItem[] {
 
   // グローバルの勤務帯セット（テンプレート）。勤務表作成時にこれをコピーする。
   items.push({ type: WORKSHIFT_SET_TYPE, obj: createSampleWorkShiftSet() });
+
+  // グローバルの制約セット（テンプレート）。これも勤務表作成時にコピーされる。
+  items.push({
+    type: CONSTRAINT_SET_TYPE,
+    obj: createSampleConstraintSetFor(GLOBAL_CONSTRAINT_SET_ID),
+  });
 
   const scenarioParams = {
     staffIds: createSampleStaffList().map((s) => s.id),
@@ -73,18 +80,22 @@ export function buildSampleItems(): BundleItem[] {
       type: WORKSHIFT_SET_TYPE,
       obj: createSampleWorkShiftSet().withId(schedule.id),
     });
-    // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
+    // その勤務表で働く人たち。例データではどの勤務表も名簿の全員（臨時は入れていない）。
+    // 可能勤務帯もこの群が持つ（人によってばらける。早番・中番のみ／早番不可 など）
     items.push({
-      type: SCHEDULE_AVAILABILITY_TYPE,
-      obj: createSampleAvailabilityFor(schedule.id),
+      type: WORKING_STAFF_GROUP_TYPE,
+      obj: createSampleWorkingStaffGroupFor(
+        schedule.workingStaffGroupId,
+        scenarioParams.staffIds
+      ),
     });
-    // 制約（責任者ルール）も勤務表に紐づく別集約として投入。
+    // 制約セット（責任者ルール＋上限）。グローバルのコピー相当を勤務表ごとに投入。
     // 終盤シナリオだけは「その日に休める枠がもう残っていない」状況を作るため、
     // 1日の休み上限を需要から決まる人数ちょうどまで絞る。
     items.push({
-      type: SCHEDULE_CONSTRAINTS_TYPE,
-      obj: createSampleConstraintsFor(
-        schedule.id,
+      type: CONSTRAINT_SET_TYPE,
+      obj: createSampleConstraintSetFor(
+        schedule.constraintSetId,
         schedule.id === ENDGAME_SCHEDULE_ID
           ? { maxDayOffPerDay: ENDGAME_MAX_DAY_OFF_PER_DAY }
           : {}

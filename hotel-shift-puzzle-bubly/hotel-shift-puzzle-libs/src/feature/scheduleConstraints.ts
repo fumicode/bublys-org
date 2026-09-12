@@ -26,7 +26,7 @@ export type ScheduleConstraintContext = {
  * 勤務表に適用する制約一覧を組み立てる（グリッド・違反バブルが共有）。
  *
  * 各制約は宣言的オブジェクト（ScheduleConstraint）で、その設定値は勤務表ごとの
- * ScheduleConstraints 集約（世界線に載る）が持つ。model 層で完結する制約（責任者・連勤・
+ * ConstraintSet 集約（世界線に載る）が持つ。model 層で完結する制約（責任者・連勤・
  * 月最低休日・1日の休み上限）は集約の modelConstraints() から渡し、ここでは希望違反
  * （ShiftWishConstraint。feature 層＋実行時データ依存）だけを足して組み立てる。
  */

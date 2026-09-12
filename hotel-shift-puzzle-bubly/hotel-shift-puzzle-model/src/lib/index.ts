@@ -4,6 +4,9 @@
 
 // Staff（スタッフ）
 export * from './staff/Staff.js';
+// 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
+export * from './staff/WorkingStaffMember.js';
+export * from './staff/WorkingStaffGroup.js';
 
 // 月間スタッフ勤務表（シフト表）
 export * from './schedule/WorkingDay.js';
@@ -14,11 +17,12 @@ export * from './schedule/resolveShiftInput.js';
 export * from './schedule/RequiredStaffing.js';
 export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
-export * from './schedule/ScheduleAvailability.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
 // 操作履歴（ノウハウ可視化。勤務表ローカル世界線に相乗り）
+export * from './schedule/ConstraintDelta.js';
+export * from './schedule/ScheduleEditEntry.js';
 export * from './schedule/ScheduleEditLog.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
@@ -28,8 +32,8 @@ export * from './schedule/ShiftLeaderConstraint.js';
 // 勤務間インターバルの宣言的ルール（「遅番の翌日は早番・中番に入れない」）とその制約アダプタ
 export * from './schedule/ShiftIntervalRule.js';
 export * from './schedule/ShiftIntervalConstraint.js';
-// 勤務表ごとの制約集約（責任者ルールを保持。将来は他の制約も同居可）
-export * from './schedule/ScheduleConstraints.js';
+// 制約セット（勤務表が満たすべき制約をひとまとめ。グローバルのテンプレートと勤務表ごとの独自セット）
+export * from './schedule/ConstraintSet.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';

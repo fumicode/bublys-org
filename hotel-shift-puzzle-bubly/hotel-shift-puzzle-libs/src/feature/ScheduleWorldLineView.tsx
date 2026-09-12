@@ -3,13 +3,14 @@
 /**
  * ScheduleWorldLineView — 勤務表ごとのローカル世界線（canvas版）
  *
- * 勤務表専用のローカル世界線スコープ（schedule:${id}）を、囲碁などと同じ共通ビュー
+ * 勤務表専用のローカル世界線スコープ（Schedule:${id}）を、囲碁などと同じ共通ビュー
  * {@link WorldLineScopeView}（既定の左→右 canvas）で描く。時間が左から右へ流れ、分岐は
  * 下へ伸びるので、長い世界線を辿りやすい。
  * （勤務表専用の「木登り」ビュー ClimberWorldLineCanvasView も ui に置いてあるが、
  *   いまは使っていない。renderCanvas に渡せば差し替えられる）
- *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動（restore でアプリ全体
- *     リポジトリへ反映するので、グリッドの表示も戻る）。onSelectNode に restore を渡す。
+ *   - ノードクリック / 矢印キーでその時点の勤務表状態へ時間移動。読みもこの世界から
+ *     なので、共通の既定（scope.moveTo）と moveToSiblingBranch がそのまま使える
+ *     （以前はアプリ全体スコープへ書き戻す restore 版を自前で持っていた）。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
  *   - ノード要約は出さない（操作の詳細は操作履歴パネルで見る）。
  *   - Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ。
@@ -21,35 +22,27 @@ import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
   WorldLineScopeView,
+  moveToSiblingBranch,
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type Props = {
   scheduleId: string;
 };
 
-export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
-  const { scope, restore } = useScheduleHistory(scheduleId);
+const ScheduleWorldLineViewBody: FC<Props> = () => {
+  const { scope } = useScheduleHistory();
 
-  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。すべて restore 経由で
-  // アプリ全体スコープへ反映する（共通の moveToSiblingBranch は scope.moveTo を使うので
-  // ここでは restore 版を自前で持つ）。
-  const keyBindings = useMemo<KeyBinding[]>(() => {
-    const restoreSibling = (delta: number) => {
-      const apex = scope.graph.getApex();
-      if (!apex || apex.parentId === null) return;
-      const siblings = scope.graph.getChildrenMap()[apex.parentId] ?? [];
-      const idx = siblings.indexOf(apex.id);
-      const next = siblings[idx + delta];
-      if (next) void restore(next);
-    };
-    return [
+  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。
+  const keyBindings = useMemo<KeyBinding[]>(
+    () => [
       {
         key: "ArrowLeft",
         run: () => {
           const apex = scope.graph.getApex();
-          if (apex?.parentId) void restore(apex.parentId);
+          if (apex?.parentId) scope.moveTo(apex.parentId);
         },
       },
       {
@@ -57,13 +50,14 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
         run: () => {
           const apex = scope.graph.getApex();
           const child = apex && scope.graph.getChildrenMap()[apex.id]?.[0];
-          if (child) void restore(child);
+          if (child) scope.moveTo(child);
         },
       },
-      { key: "ArrowUp", run: () => restoreSibling(-1) },
-      { key: "ArrowDown", run: () => restoreSibling(1) },
-    ];
-  }, [scope, restore]);
+      { key: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
+      { key: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
+    ],
+    [scope]
+  );
 
   if (!scope.graph.state.rootNodeId) {
     return (
@@ -78,15 +72,17 @@ export const ScheduleWorldLineView: FC<Props> = ({ scheduleId }) => {
   // nameable で選択中の世界に名前をつけられる。
   return (
     <StyledWrap>
-      <WorldLineScopeView
-        scope={scope}
-        keyBindings={keyBindings}
-        onSelectNode={(nodeId) => void restore(nodeId)}
-        nameable
-      />
+      <WorldLineScopeView scope={scope} keyBindings={keyBindings} nameable />
     </StyledWrap>
   );
 };
+
+/** この勤務表の世界に入ってから世界線を描く */
+export const ScheduleWorldLineView: FC<Props> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleWorldLineViewBody {...props} />
+  </ScheduleWorld>
+);
 
 const StyledWrap = styled.div`
   position: relative;

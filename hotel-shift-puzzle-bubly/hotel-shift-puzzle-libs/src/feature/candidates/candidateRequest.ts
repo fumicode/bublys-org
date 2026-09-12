@@ -11,7 +11,7 @@
 import {
   MonthlyStaffSchedule,
   ScheduleCandidates,
-  ScheduleConstraints,
+  ConstraintSet,
   StaffMonthlyShiftWish,
   WorkShift,
   WorkingDay,
@@ -23,7 +23,7 @@ import {
   type MonthlyStaffSchedulePlain,
   type DeadCellDiagnosisPlain,
   type ScheduleCandidatesPlain,
-  type ScheduleConstraintsState,
+  type ConstraintSetPlain,
   type StaffMonthlyShiftWishPlain,
   type WorkShiftState,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -41,7 +41,7 @@ export type CandidateRequest = {
   staffIds: string[];
   workShifts: WorkShiftState[];
   /** 勤務表ごとの制約集約。未作成なら null（希望チェックだけになる） */
-  constraints: ScheduleConstraintsState | null;
+  constraints: ConstraintSetPlain | null;
   /** 希望との食い違いも制約として見るか */
   checkShiftWish: boolean;
   wishes: StaffMonthlyShiftWishPlain[];
@@ -68,7 +68,7 @@ function rebuildInput(request: CandidateRequest): CandidateComputationInput {
   }
 
   const aggregate = request.constraints
-    ? ScheduleConstraints.fromPlain(request.constraints)
+    ? ConstraintSet.fromPlain(request.constraints)
     : undefined;
 
   return {

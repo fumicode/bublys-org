@@ -11,18 +11,28 @@
  *   - 勤務表ごとの独自セット（id = scheduleId）。勤務表作成時にグローバルをコピーして作る。
  *
  * 各勤務帯の id は編集（改名・時刻変更・並び替え）で不変。割当・可能勤務帯が id で参照するため。
+ *
+ * state は勤務帯をインスタンスで保持する。シリアライズ用に入れ子まで plain な
+ * {@link WorkShiftSetPlain} を別途定義し、toPlain() / fromPlain() で橋渡しする。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { WorkShift, type WorkShiftState } from "./WorkShift.js";
 
+/** state：勤務帯はインスタンスで保持する */
 export type WorkShiftSetState = {
   id: string;
   /** 勤務帯（順不同で保持。参照時に開始時刻昇順へ整列する） */
+  shifts: WorkShift[];
+};
+
+/** シリアライズ用：入れ子まで全部 plain */
+export type WorkShiftSetPlain = {
+  id: string;
   shifts: WorkShiftState[];
 };
 
 /** 開始時刻昇順（同時刻は名前→id で安定化） */
-function compareShift(a: WorkShiftState, b: WorkShiftState): number {
+function compareShift(a: WorkShift, b: WorkShift): number {
   if (a.startMinute !== b.startMinute) return a.startMinute - b.startMinute;
   if (a.name !== b.name) return a.name < b.name ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
@@ -33,7 +43,7 @@ export class WorkShiftSet {
 
   /** 勤務帯の配列からセットを作る */
   static of(id: string, shifts: WorkShift[]): WorkShiftSet {
-    return new WorkShiftSet({ id, shifts: shifts.map((s) => s.state) });
+    return new WorkShiftSet({ id, shifts: [...shifts] });
   }
 
   get id(): string {
@@ -42,7 +52,7 @@ export class WorkShiftSet {
 
   /** 開始時刻昇順に整列した勤務帯 */
   get shifts(): WorkShift[] {
-    return [...this.state.shifts].sort(compareShift).map((s) => new WorkShift(s));
+    return [...this.state.shifts].sort(compareShift);
   }
 
   /** 開始時刻昇順の勤務帯ID一覧 */
@@ -51,8 +61,7 @@ export class WorkShiftSet {
   }
 
   findById(id: string): WorkShift | undefined {
-    const s = this.state.shifts.find((w) => w.id === id);
-    return s ? new WorkShift(s) : undefined;
+    return this.state.shifts.find((w) => w.id === id);
   }
 
   /**
@@ -77,7 +86,7 @@ export class WorkShiftSet {
   addShift(shift: WorkShift): WorkShiftSet {
     return new WorkShiftSet({
       ...this.state,
-      shifts: [...this.state.shifts, shift.state],
+      shifts: [...this.state.shifts, shift],
     });
   }
 
@@ -101,15 +110,29 @@ export class WorkShiftSet {
 
   /** id を差し替えた新しいセットを返す（勤務帯の id は維持）。グローバル→勤務表コピー用。不変。 */
   withId(newId: string): WorkShiftSet {
-    return new WorkShiftSet({ id: newId, shifts: this.state.shifts.map((s) => ({ ...s })) });
+    return new WorkShiftSet({ id: newId, shifts: [...this.state.shifts] });
   }
 
   private mapShift(id: string, fn: (s: WorkShift) => WorkShift): WorkShiftSet {
     return new WorkShiftSet({
       ...this.state,
-      shifts: this.state.shifts.map((s) =>
-        s.id === id ? fn(new WorkShift(s)).state : s
-      ),
+      shifts: this.state.shifts.map((s) => (s.id === id ? fn(s) : s)),
+    });
+  }
+
+  // ========== シリアライズ ==========
+
+  toPlain(): WorkShiftSetPlain {
+    return {
+      id: this.state.id,
+      shifts: this.state.shifts.map((s) => s.state),
+    };
+  }
+
+  static fromPlain(plain: WorkShiftSetPlain): WorkShiftSet {
+    return new WorkShiftSet({
+      id: plain.id,
+      shifts: plain.shifts.map((s) => new WorkShift(s)),
     });
   }
 }

@@ -5,19 +5,24 @@
  * 横の“1人の1か月”ストリップに、最低必要な休み（緑）を N 個ぶん塗り、≥N を示す。
  */
 import { FC } from "react";
+import { ICON_SIZE } from "./common.js";
 
-type Props = { min: number };
+type Props = {
+  min: number;
+  /** 1辺のサイズ（px）。バーは既定の80、バブルの図は大きく描く */
+  size?: number;
+};
 
 const CELLS = 10;
 
-export const MinMonthlyDayOffIcon: FC<Props> = ({ min }) => {
+export const MinMonthlyDayOffIcon: FC<Props> = ({ min, size = ICON_SIZE }) => {
   const off = Math.min(Math.max(0, min), CELLS);
   const w = 6;
   const gap = 1;
   const totalW = CELLS * (w + gap) - gap;
   const x0 = (80 - totalW) / 2;
   return (
-    <svg className="e-icon-svg" width={80} height={80} viewBox="0 0 80 80" aria-hidden>
+    <svg className="e-icon-svg" width={size} height={size} viewBox="0 0 80 80" aria-hidden>
       {/* 1人の1か月ストリップ（横） */}
       {Array.from({ length: CELLS }).map((_, i) => {
         const isOff = i < off;

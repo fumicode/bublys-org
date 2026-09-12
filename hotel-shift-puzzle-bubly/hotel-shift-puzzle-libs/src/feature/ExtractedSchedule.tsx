@@ -3,12 +3,10 @@
 import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleReport,
   MaxConsecutiveWorkdaysConstraint,
   fulfillWishesStep,
@@ -35,15 +33,15 @@ import {
   buildCandidateEditLog,
 } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type ExtractedScheduleProps = {
   scheduleId?: string;
@@ -62,20 +60,16 @@ type ExtractedScheduleProps = {
  *   - 解決案生成（責任者ルールを満たす完成案を複数、世界線に書く）
  * 対象スタッフ＝抽出した subset を staffList として渡すことで、各ステップが自然に subset 限定になる。
  */
-export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
+const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   scheduleId,
   staffIds,
 }) => {
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const store = useAppStore();
 
-  const allStaff = useObjects<Staff>(STAFF_TYPE);
+  const { staffList: allStaff, group: staffGroup } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
@@ -90,8 +84,8 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   // 抽出ビューで「対象」とするのは、メンバー全員が抽出 subset に含まれるルールだけ。
   // （例: 早責3人を抽出 → 早責は対象。予責は山本が兼務でも田中が subset 外なので対象外
   //   ＝ subset 外の人を動かさない。予責は予責メンバーを抽出したとき別途満たす。）
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
@@ -177,7 +171,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
       staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
       workShifts,
       wishByStaff,
-      availability,
+      staffGroup,
     });
     recordAutoStep(store, {
       schedule,
@@ -203,7 +197,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        availability,
+        staffGroup,
       }).schedule;
     // 1案 = 希望を叶える → 責任者を満たす（他ルールとの兼務を考慮し、一意に決まる枠だけ確定）
     //     → 残った枠を phase 違いで決める → 月の休みを入れる（phase）
@@ -214,7 +208,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, allLeaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
       );
       s = leaderFill.schedule;
 
@@ -231,20 +225,19 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
     const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
       const obj = buildCandidate(i);
       const label = `案${i + 1}`;
+      // ログが読めないときは履歴を付けない（案そのものは記録する）
+      const editLog = buildCandidateEditLog(store, {
+        baseSchedule: schedule,
+        candidate: obj,
+        constraints: allConstraints,
+        label,
+      });
       return {
         obj,
         label,
-        extras: [
-          {
-            type: SCHEDULE_EDIT_LOG_TYPE,
-            obj: buildCandidateEditLog(store, {
-              baseSchedule: schedule,
-              candidate: obj,
-              constraints: allConstraints,
-              label,
-            }),
-          },
-        ],
+        extras: editLog
+          ? [{ type: SCHEDULE_EDIT_LOG_TYPE, obj: editLog }]
+          : [],
       };
     });
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
@@ -260,7 +253,7 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
         schedule={schedule}
         staffList={subset}
         workShifts={workShifts}
-        availability={availability}
+        staffGroup={staffGroup}
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}
@@ -402,3 +395,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ExtractedSchedule: FC<ExtractedScheduleProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ExtractedScheduleBody {...props} />
+  </ScheduleWorld>
+);

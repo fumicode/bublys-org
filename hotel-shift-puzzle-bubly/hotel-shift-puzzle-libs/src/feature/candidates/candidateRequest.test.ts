@@ -1,7 +1,8 @@
 import {
   MonthlyStaffSchedule,
   ScheduleCandidates,
-  ScheduleConstraints,
+  ConstraintSet,
+  ShiftLeaderRule,
   WorkShift,
   WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -17,16 +18,16 @@ describe("computeCandidatesFor", () => {
   const day1 = WorkingDay.of(2026, 6, 1);
   const staffIds = ["L1", "L2", "X"];
 
-  const constraints = new ScheduleConstraints({
+  const constraints = new ConstraintSet({
     scheduleId: "sched-1",
     leaderRules: [
-      {
+      new ShiftLeaderRule({
         key: "early",
         label: "早責",
         shiftName: "早番",
         leaderStaffIds: ["L1", "L2"],
         minCount: 1,
-      },
+      }),
     ],
   });
 

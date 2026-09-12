@@ -22,7 +22,7 @@ import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { WorkingDay } from "./WorkingDay.js";
 import type { ScheduleCellRef } from "./affectedCells.js";
 import { shiftCellsEqual } from "./MonthlyStaffSchedule.js";
-import { computeConstraintDelta } from "./ScheduleEditLog.js";
+import { computeConstraintDelta } from "./ConstraintDelta.js";
 import {
   enumerateCellCandidates,
   evaluateCellCandidates,
@@ -217,8 +217,9 @@ export function findRepairsForDeadCell(
         day: probe.day,
         to: value,
         unlocks,
-        resolves: delta.newlyResolved,
-        costs: delta.newlyViolated,
+        // 修復案は worker 境界を越える（structured clone）ので plain にして持つ
+        resolves: delta.newlyResolved.map((v) => v.toPlain()),
+        costs: delta.newlyViolated.map((v) => v.toPlain()),
       });
     }
   }

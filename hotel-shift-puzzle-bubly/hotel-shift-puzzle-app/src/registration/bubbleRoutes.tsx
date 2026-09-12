@@ -3,9 +3,20 @@
 import { useContext, type ReactNode } from "react";
 import { BubbleRoute, BubblesContext, type OpeningPosition } from "@bublys-org/bubbles-ui";
 import {
+  WorldLineInspector,
+  WorldLine3DInspector,
+} from "@bublys-org/world-line-graph";
+import {
+  APP_SCOPE_ID,
+  hotelCellRole,
+  ModelClassDiagram,
+  hotelNestedScope,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
+  ConstraintSetCollection,
+  ConstraintLimitBubbleView,
+  GLOBAL_CONSTRAINT_SET_ID,
   ScheduleCollection,
   ScheduleGrid,
   ScheduleDayDetail,
@@ -14,7 +25,7 @@ import {
   HotelObjectsProvider,
   ScheduleWorldLineView,
   ScheduleWorldLineTreeView,
-  AvailabilityEditor,
+  WorkingStaffPanel,
   ScheduleViolationView,
   ShiftWishEditor,
   ShiftWishMonthList,
@@ -31,11 +42,10 @@ import {
 import {
   scheduleDayUrl,
   scheduleViolationUrl,
-  scheduleAvailabilityUrl,
+  scheduleStaffUrl,
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
-  scheduleLeaderRuleUrl,
-  scheduleShiftIntervalRuleUrl,
+  constraintBubbleUrlOf,
   scheduleReportUrl,
   scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
@@ -98,6 +108,16 @@ const ShiftWishBubble: BubbleRoute["Component"] = ({ bubble }) =>
 // --- 勤務帯リストバブル（リスト内で追加・編集） ---
 const WorkShiftListBubble: BubbleRoute["Component"] = () => withObjects(<WorkShiftCollection />);
 
+// --- 制約セットバブル（グローバルのテンプレート。勤務表作成時にコピーされる） ---
+const ConstraintSetBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <ConstraintSetCollection
+      bubbleUrlOf={(kind, key) =>
+        constraintBubbleUrlOf(GLOBAL_CONSTRAINT_SET_ID, kind, key)
+      }
+    />
+  );
+
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 // 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
 const ScheduleListBubble: BubbleRoute["Component"] = () =>
@@ -121,9 +141,9 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
   // バブル URL のスキームは app 層（ここ）の関心事。
-  // 可能勤務帯・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
+  // 勤務スタッフ・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
   // 同じ URL をボタンの data-url（*Url props）にも渡すことで、ボタンから link bubble が伸びる。
-  const availabilityUrl = scheduleAvailabilityUrl(scheduleId);
+  const workingStaffUrl = scheduleStaffUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const editLogUrl = scheduleEditLogUrl(scheduleId);
   // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
@@ -139,17 +159,16 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
         openSide(worldLineUrl, "bubble-side-bottom")
       }
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
-      availabilityUrl={availabilityUrl}
+      workingStaffUrl={workingStaffUrl}
       shiftWishesUrl={shiftWishMonthUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       editLogUrl={editLogUrl}
-      ruleBubbleUrl={(ruleKey) => scheduleLeaderRuleUrl(scheduleId, ruleKey)}
-      intervalRuleBubbleUrl={(ruleKey) =>
-        scheduleShiftIntervalRuleUrl(scheduleId, ruleKey)
-      }
+      bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
       reportBubbleUrl={scheduleReportUrl}
-      onOpenRule={(ruleKey) => openOrigin(scheduleLeaderRuleUrl(scheduleId, ruleKey))}
+      onOpenRule={(ruleKey) =>
+        openOrigin(constraintBubbleUrlOf(scheduleId, "leaderRule", ruleKey))
+      }
       dayBubbleUrl={(dayKey) => scheduleDayUrl(scheduleId, dayKey)}
       violationBubbleUrl={(violationKey) =>
         scheduleViolationUrl(scheduleId, violationKey)
@@ -159,6 +178,10 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     />
   );
 };
+
+// --- 勤務スタッフ群バブル（勤務表の「勤務スタッフ」ボタンから開く） ---
+const WorkingStaffBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<WorkingStaffPanel scheduleId={bubble.params.scheduleId} />);
 
 // --- 抽出勤務表バブル（選択スタッフだけの勤務表。「抽出」ボタンから開く） ---
 const ExtractedScheduleBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -207,27 +230,52 @@ const ScheduleReportListBubble: BubbleRoute["Component"] = () =>
 const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineTreeView scheduleId={bubble.params.scheduleId} />);
 
-// --- 責任者ルール可視化バブル（上部ルール行のクリックで開く） ---
+// --- 制約1つぶんのバブル（上部ルール行のアイコンをダブルクリックで開く） ---
+// 主語は制約セットID（"global" か scheduleId）。グローバルのテンプレートからも
+// 勤務表からも、同じルートで開く。
 const LeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(
     <LeaderRuleView
-      scheduleId={bubble.params.scheduleId}
+      constraintSetId={bubble.params.constraintSetId}
       ruleKey={bubble.params.ruleKey}
     />
   );
 
-// --- 勤務間インターバルのルール可視化バブル（上部ルール行の「遅番明け」から開く） ---
 const ShiftIntervalRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(
     <ShiftIntervalRuleView
-      scheduleId={bubble.params.scheduleId}
+      constraintSetId={bubble.params.constraintSetId}
       ruleKey={bubble.params.ruleKey}
     />
   );
 
-// --- 可能勤務帯エディタバブル ---
-const AvailabilityBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<AvailabilityEditor scheduleId={bubble.params.scheduleId} />);
+const ConstraintLimitBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <ConstraintLimitBubbleView
+      constraintSetId={bubble.params.constraintSetId}
+      limitKey={bubble.params.limitKey}
+    />
+  );
+
+// 旧住所（勤務表を主語にしていた頃）。ポケットや開きっぱなしのバブルに残った URL を
+// 切らないためのエイリアス。新しく作られる URL はすべて新しい住所になる。
+const LegacyScheduleLeaderRuleBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(
+    <LeaderRuleView
+      constraintSetId={bubble.params.scheduleId}
+      ruleKey={bubble.params.ruleKey}
+    />
+  );
+
+const LegacyScheduleShiftIntervalRuleBubble: BubbleRoute["Component"] = ({
+  bubble,
+}) =>
+  withObjects(
+    <ShiftIntervalRuleView
+      constraintSetId={bubble.params.scheduleId}
+      ruleKey={bubble.params.ruleKey}
+    />
+  );
 
 // --- 勤務表ファイルバブル（世界線ごとローカルファイルへ保存・読み込み） ---
 // 世界全体を扱うので勤務表 ID は取らない。Provider 配下に置くのは他バブルと同じ。
@@ -237,6 +285,34 @@ const WorldFileBubble: BubbleRoute["Component"] = () => withObjects(<WorldFilePa
 const ScheduleEditLogBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleEditLogPanel scheduleId={bubble.params.scheduleId} />);
 
+// --- 世界線インスペクタ（デバッグ用） ---
+// 読み取り専用。Provider は要らない（Redux と IndexedDB を直接覗くだけ）が、
+// 他バブルと揃えて配下に置いておく。既定で「アプリ全体スコープ」を選んで開く。
+const WorldLineInspectorBubble: BubbleRoute["Component"] = () =>
+  withObjects(<WorldLineInspector defaultScopeId={APP_SCOPE_ID} />);
+
+// --- 世界線 3D ビュー（デバッグ用） ---
+// 入れ子も立場（固定メンバーか）も、このバブリの記述子だけから導く純粋なクエリで答える。
+// 中身は libs の objects/worldLineViewQueries.ts に対で置いてある。
+// このバブリの入れ子はアドレス連動しない（名前の規約だけ）ので isLinked は渡さない。
+const WorldLine3DBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <WorldLine3DInspector
+      rootScopeId={APP_SCOPE_ID}
+      resolveNestedScopeId={hotelNestedScope}
+      // 「勤務表から見たスタッフは焼き付いていて動かない」を図に語らせる。
+      // 判定は記述子だけから導く純粋なクエリ（読むだけ）なので、
+      // module トップレベルの参照のままで済む＝レイアウトを作り直させない
+      resolveCellRole={hotelCellRole}
+    />
+  );
+
+// --- モデルのクラス図 ---
+// 構造は TypeScript のソースから生成したもの、世界線での所属は記述子から。
+// 別々の出どころを、それぞれ知っている側に聞いている（片方を推測で埋めない）。
+const ModelClassDiagramBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ModelClassDiagram />);
+
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
@@ -245,7 +321,17 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
+  // 制約1つぶんのバブル。具体的な pattern を先に置く（constraints 単体より上）
+  { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/limits/:limitKey", type: "constraint-limit", Component: ConstraintLimitBubble, bubbleOptions: { defaultSize: { width: 300, height: 320 } } },
+  { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/leader-rules/:ruleKey", type: "constraint-leader-rule", Component: LeaderRuleBubble },
+  { pattern: "hotel-shift-puzzle/constraints/:constraintSetId/shift-interval-rules/:ruleKey", type: "constraint-shift-interval-rule", Component: ShiftIntervalRuleBubble },
+  { pattern: "hotel-shift-puzzle/constraints", type: "constraint-set", Component: ConstraintSetBubble, bubbleOptions: { defaultSize: { width: 760, height: 460 } } },
   { pattern: "hotel-shift-puzzle/file", type: "world-file", Component: WorldFileBubble },
+  // インスペクタは表が詰まっているので、窓型（fillsContainer）で大きめに開く
+  { pattern: "hotel-shift-puzzle/world-line-inspector", type: "world-line-inspector", Component: WorldLineInspectorBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 900, height: 600 } } },
+  // クラス図は横に広いので、窓型で大きめに開く
+  { pattern: "hotel-shift-puzzle/model-class-diagram", type: "model-class-diagram", Component: ModelClassDiagramBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1200, height: 760 } } },
+  { pattern: "hotel-shift-puzzle/world-line-3d", type: "world-line-3d", Component: WorldLine3DBubble, bubbleOptions: { fillsContainer: true, defaultSize: { width: 1100, height: 700 } } },
   // 世界線ビューは左下のボタンを opener に bubble-side で開く（canvas を透かす半透明ダーク背景）。
   // URL は /history だと bubbles-ui が下部ストリップ展開に特別扱いするため /world-line にしている。
   // canvas は容器いっぱいに広がるので fillsContainer（窓型レイアウト）で開く。universe ではない
@@ -255,9 +341,10 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // 木の全体像をゆったり眺められるよう、世界線ビューより大きめの窓（fillsContainer）で開く。
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 700, height: 500 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/edit-log", type: "schedule-edit-log", Component: ScheduleEditLogBubble },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LeaderRuleBubble },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/shift-interval-rules/:ruleKey", type: "schedule-shift-interval-rule", Component: ShiftIntervalRuleBubble },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/availability", type: "schedule-availability", Component: AvailabilityBubble },
+  // 旧住所（エイリアス）。新しい URL は constraints/:constraintSetId/... で作られる
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LegacyScheduleLeaderRuleBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/shift-interval-rules/:ruleKey", type: "schedule-shift-interval-rule", Component: LegacyScheduleShiftIntervalRuleBubble },
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/staff", type: "schedule-staff", Component: WorkingStaffBubble, bubbleOptions: { defaultSize: { width: 620, height: 440 } } },
   // 抽出バブルはフロストガラス調：背景を半透明にして裏がうっすら見えるようにする（ぼかしは中で付与）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/extract/:staffIds", type: "schedule-extract", Component: ExtractedScheduleBubble, bubbleOptions: { contentBackground: "hsla(0, 0%, 100%, 0.5)" } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },

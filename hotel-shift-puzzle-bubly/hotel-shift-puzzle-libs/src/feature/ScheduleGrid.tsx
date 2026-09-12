@@ -4,13 +4,11 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react"
 import styled from "styled-components";
 import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleReport,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
@@ -27,12 +25,17 @@ import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import {
   ScheduleConstraintsBar,
-  shiftColorById,
+  shiftColorOfNames,
 } from "../ui/ScheduleConstraintsBar.js";
 import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
-import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
+import {
+  useObjects,
+  useObject,
+  useObjectRepo,
+  useIsAbsent,
+} from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
@@ -45,6 +48,7 @@ import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleCon
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
   recordAutoStep,
@@ -53,12 +57,11 @@ import {
   buildCandidateEditLog,
 } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
+  WORKING_STAFF_GROUP_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -68,6 +71,7 @@ import {
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
 } from "../ui/viewObjectTypes.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
@@ -86,7 +90,7 @@ type ScheduleGridProps = {
    */
   worldLineUrl?: string;
   treeUrl?: string;
-  availabilityUrl?: string;
+  workingStaffUrl?: string;
   /**
    * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
    * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
@@ -106,10 +110,14 @@ type ScheduleGridProps = {
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
    */
   reservationInfoUrl?: string;
-  /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
-  ruleBubbleUrl?: (ruleKey: string) => string;
-  /** 勤務間インターバルの図バブルの URL を作る（ルールキー）。同じく上部ルール行に渡す */
-  intervalRuleBubbleUrl?: (ruleKey: string) => string;
+  /**
+   * 制約1つぶんのバブル URL を作る。上部ルール行の全アイコンがこれで開く。
+   * URL スキームは app 層の関心事なので、種類とキーだけ渡して作ってもらう。
+   */
+  bubbleUrlOf?: (
+    kind: "leaderRule" | "shiftInterval" | "limit",
+    key: string
+  ) => string;
   /**
    * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
    * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
@@ -137,42 +145,38 @@ const newLeaderRuleKey = (): string =>
  * 勤務表グリッド。セル編集・自動ステップ等は recordScheduleEdit 経由で
  * Schedule + EditLog を同一世界線ノードに記録する。
  */
-export const ScheduleGrid: FC<ScheduleGridProps> = ({
+const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenWorldLineAfterCandidates,
   onConfirm,
   worldLineUrl,
   treeUrl,
-  availabilityUrl,
+  workingStaffUrl,
   shiftWishesUrl,
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
-  ruleBubbleUrl,
-  intervalRuleBubbleUrl,
+  bubbleUrlOf,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
 }) => {
   const store = useAppStore();
-  const { scope } = useScheduleHistory(scheduleId ?? "");
+  const { scope } = useScheduleHistory();
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const [cellSelection, setCellSelection] = useState<{
     staffId: string;
     day: WorkingDay;
   } | null>(null);
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
+  const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
   const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
   // この勤務表の勤務帯セット（id=scheduleId）。開始時刻昇順の勤務帯を得る。
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   // 稼働日ごとの予約状況（宿泊人数・部屋数）。未作成なら undefined（予約行は空表示）。
   const reservationInfo = useObject<DailyReservationInfo>(
     SCHEDULE_RESERVATION_INFO_TYPE,
@@ -216,11 +220,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   }, [staffList, deptFilter]);
 
   // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む（世界線に載る）。
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+  /**
+   * 制約バーに渡す制約セット。まだ読めていない間は既定値だけの空セットを描く
+   * （**表示用に作るだけで保存はしない**。保存の起点は useConstraintSetEditor が
+   * 「本当に無い」と確かめてから作る）。
+   */
+  const barConstraintSet = useMemo(
+    () => constraints ?? ConstraintSet.empty(scheduleId ?? ""),
+    [constraints, scheduleId]
+  );
 
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
   // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
@@ -306,10 +319,36 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     });
   }, [workShifts, constraints, wishByStaff]);
 
+  /**
+   * 「制約が本当に無い」か。**読んだのと同じスコープ**を見る。
+   * ここで別のスコープ（グローバル台帳）を見ると、過去のノードへ時間移動したときに
+   * 「読み込み中です」が永久に解けず、そのノードからは二度と編集できなくなる。
+   */
+  const constraintsAbsent = useIsAbsent(CONSTRAINT_SET_TYPE, scheduleId);
+
+  /**
+   * 制約を編集するときの起点を返す。まだ作られていないときだけ空の制約から始める。
+   *
+   * `constraints ?? new ConstraintSet(...)` と書いてはいけない。値が読めないのには
+   * 「本当に無い」と「メモリ上の CAS から追い出された」の2つの理由があり、後者で空から
+   * 始めると責任者ルールと紐づけレポートを丸ごと消して保存してしまう。
+   * 存在の判定は参照で行い、読み込み待ちのあいだは編集させない。
+   */
+  const constraintsBase = (): ConstraintSet | undefined => {
+    if (constraints) return constraints;
+    if (!scheduleId) return undefined;
+    if (!constraintsAbsent) {
+      setAutoMessage("制約を読み込み中です。少し待ってからもう一度お試しください。");
+      return undefined;
+    }
+    return ConstraintSet.empty(scheduleId);
+  };
+
   const handleDropReportUrl = (url: string) => {
     const reportId = extractIdFromUrl(url);
     if (!reportId || !scheduleId) return;
-    const base = constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const base = constraintsBase();
+    if (!base) return;
     if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
     const next = base.linkReport(reportId);
     const shiftIdsOf = (shiftName: string) =>
@@ -349,8 +388,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   const handleAddRule = () => {
     if (!scheduleId) return;
     const key = newLeaderRuleKey();
-    const base =
-      constraints ?? new ScheduleConstraints({ scheduleId, leaderRules: [] });
+    const base = constraintsBase();
+    if (!base) return;
     const next = base.addRule({
       key,
       label: "新責任者",
@@ -458,11 +497,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   }, [schedule, cellSelection, staffList]);
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
-  const shiftColorOf = useMemo(() => {
-    const idByName = new Map<string, string>();
-    for (const w of workShifts) if (!idByName.has(w.name)) idByName.set(w.name, w.id);
-    return (shiftName: string) => shiftColorById(idByName.get(shiftName));
-  }, [workShifts]);
+  const shiftColorOf = useMemo(() => shiftColorOfNames(workShifts), [workShifts]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -523,7 +558,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
       workShifts,
       wishByStaff,
-      availability,
+      staffGroup,
       // 「必要人数を埋める」はこれを見て、先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
       minDayOff,
       maxDayOffPerDay: maxPerDay,
@@ -551,7 +586,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        availability,
+        staffGroup,
         // handleRunStep と同じく連勤上限を渡す。渡さないと ctx.maxConsecutive が undefined に
         // なってステップ側の既定値 5 で走り、連勤上限を 5 未満にしている勤務表では
         // 生成した案が全て連勤違反になってしまう。
@@ -564,7 +599,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, availability }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
       );
       s = leaderFill.schedule;
 
@@ -578,20 +613,19 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
       const obj = buildCandidate(i);
       const label = `案${i + 1}`;
+      // ログが読めないときは履歴を付けない（案そのものは記録する）
+      const editLog = buildCandidateEditLog(store, {
+        baseSchedule: schedule,
+        candidate: obj,
+        constraints: allConstraints,
+        label,
+      });
       return {
         obj,
         label,
-        extras: [
-          {
-            type: SCHEDULE_EDIT_LOG_TYPE,
-            obj: buildCandidateEditLog(store, {
-              baseSchedule: schedule,
-              candidate: obj,
-              constraints: allConstraints,
-              label,
-            }),
-          },
-        ],
+        extras: editLog
+          ? [{ type: SCHEDULE_EDIT_LOG_TYPE, obj: editLog }]
+          : [],
       };
     });
     commitCandidates(
@@ -650,6 +684,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
 
+    // ここは useObject の同期読みで済ませない。確定はスナップショットを永続化する操作で、
+    // 値がメモリから追い出されていると「無い」と区別がつかず、間違ったレポートを焼いてしまう。
+    // 永続ストアからの取得を待てる resolveObjectsAt を使う（読み対称化とは別の理由で必要）。
+    // なお staffIds はこの世界の固定メンバー（＝確定時点の名簿）から取る。
     const resolved = await scope.resolveObjectsAt(apex.id);
     const apexSchedule = resolved.find(
       (r) => r.type === SCHEDULE_TYPE && r.id === scheduleId
@@ -709,6 +747,23 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       ? reportBubbleUrl(ScheduleReport.idOf(scheduleId, apex.id))
       : undefined;
 
+  // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
+  const workingStaffSlot = workingStaffUrl ? (
+    <ObjectView
+      type={WORKING_STAFF_GROUP_TYPE}
+      url={workingStaffUrl}
+      label="勤務スタッフ"
+      openingPosition="bubble-side-left"
+    >
+      <span
+        className="e-staff-foot-link"
+        title="ダブルクリックでこの勤務表の勤務スタッフを開く（追加・除外・並び替え・可能勤務帯）"
+      >
+        勤務スタッフ
+      </span>
+    </ObjectView>
+  ) : undefined;
+
   const confirmButton = withUrl(
     pendingReportUrl,
     <button
@@ -758,19 +813,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             </select>
           )}
 
-          {availabilityUrl && (
-            <ObjectView
-              type={SCHEDULE_AVAILABILITY_TYPE}
-              url={availabilityUrl}
-              label="可能勤務帯"
-              openingPosition="bubble-side-right"
-            >
-              <span className="e-link" title="ダブルクリックで可能勤務帯を開く">
-                可能勤務帯
-              </span>
-            </ObjectView>
-          )}
-
           {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
           {shiftWishesUrl && (
             <ObjectView
@@ -801,19 +843,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
-          leaderRules={leaderRules}
+          constraintSet={barConstraintSet}
           nameOf={nameOf}
           shiftColorOf={shiftColorOf}
           onSelectRule={selectRuleStaff}
           selectedStaffIds={selectedStaffIds}
-          ruleBubbleUrl={ruleBubbleUrl}
+          bubbleUrlOf={bubbleUrlOf}
           onAddRule={scheduleId && onOpenRule ? handleAddRule : undefined}
-          maxConsecutive={constraints?.maxConsecutiveWorkdays ?? 5}
-          minDayOff={minDayOff}
-          maxPerDay={maxPerDay}
-          checkShiftWish={constraints?.checkShiftWish ?? true}
-          intervalRules={constraints?.shiftIntervalRules ?? []}
-          intervalRuleBubbleUrl={intervalRuleBubbleUrl}
         />
         <ShiftCommandsBar
           targetCount={subsetStaff.length}
@@ -837,12 +873,13 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           schedule={schedule}
           staffList={filteredStaffList}
           workShifts={workShifts}
-          availability={availability}
+          staffGroup={staffGroup}
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           wishByStaff={wishByStaff}
           violations={violations}
           groupByDepartment={groupByDept}
+          workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}
@@ -1188,3 +1225,13 @@ const StyledContainer = styled.div`
     }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleGrid: FC<ScheduleGridProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleGridBody {...props} />
+  </ScheduleWorld>
+);

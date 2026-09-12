@@ -7,7 +7,7 @@ import {
 } from "react";
 import {
   suggestShiftInputs,
-  type ScheduleAvailability,
+  type WorkingStaffGroup,
   type ShiftCell,
   type ShiftSuggestion,
   type Staff,
@@ -24,7 +24,7 @@ type UseCellKeyboardEditingParams = {
   /** この勤務表で選べる勤務帯。 */
   shiftOptions: WorkShift[];
   /** あれば「選択スタッフが入れる勤務帯」に候補を絞る。 */
-  availability?: ScheduleAvailability;
+  staffGroup?: WorkingStaffGroup;
   /** セルの勤務割当を変更する（確定時に呼ぶ）。 */
   onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
@@ -83,7 +83,7 @@ export function useCellKeyboardEditing({
   staffList,
   days,
   shiftOptions,
-  availability,
+  staffGroup,
   onChangeCell,
   selection: controlledSelection,
   onSelectionChange,
@@ -113,8 +113,8 @@ export function useCellKeyboardEditing({
 
   // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば）
   const selectableShiftOptions =
-    availability && selection
-      ? shiftOptions.filter((w) => availability.isAllowed(selection.staffId, w.id))
+    staffGroup && selection
+      ? shiftOptions.filter((w) => staffGroup.isAllowed(selection.staffId, w.id))
       : shiftOptions;
 
   // 入力候補（前方一致）。バッファが null（非入力）なら候補は出さない

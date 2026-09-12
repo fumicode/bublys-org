@@ -40,6 +40,10 @@ export type MonthlyStaffScheduleState = {
   year: number;
   /** 対象月 1-12 */
   month: number;
+  /** この勤務表で働く人たち（勤務スタッフ群）のID。勤務表1つにつき1つ */
+  workingStaffGroupId: string;
+  /** この勤務表が満たすべき制約セットのID。勤務表1つにつき1つ */
+  constraintSetId: string;
   /** スタッフ×稼働日 の勤務割当 */
   assignments: ShiftAssignment[];
   /** 稼働日×勤務帯名 の必要スタッフ数 */
@@ -52,6 +56,10 @@ export type MonthlyStaffSchedulePlain = {
   storeId: string;
   year: number;
   month: number;
+  /** 勤務スタッフ群のID。この集約より後から入れたので、古い記録には無い */
+  workingStaffGroupId?: string;
+  /** 制約セットのID。この集約より後から入れたので、古い記録には無い */
+  constraintSetId?: string;
   assignments: ShiftAssignmentPlain[];
   requiredStaffing: RequiredStaffingPlain;
 };
@@ -81,6 +89,10 @@ export class MonthlyStaffSchedule {
     storeId: string;
     year: number;
     month: number;
+    /** 省略時は勤務表と同じID（勤務表1つにつき群1つなので、別IDにする理由は普通は無い） */
+    workingStaffGroupId?: string;
+    /** 省略時は勤務表と同じID */
+    constraintSetId?: string;
     requiredStaffing?: RequiredStaffing;
   }): MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
@@ -88,6 +100,8 @@ export class MonthlyStaffSchedule {
       storeId: params.storeId,
       year: params.year,
       month: params.month,
+      workingStaffGroupId: params.workingStaffGroupId ?? params.id,
+      constraintSetId: params.constraintSetId ?? params.id,
       assignments: [],
       requiredStaffing: params.requiredStaffing ?? RequiredStaffing.empty(),
     });
@@ -108,6 +122,26 @@ export class MonthlyStaffSchedule {
   /** 対象月 1-12 */
   get month(): number {
     return this.state.month;
+  }
+
+  /**
+   * この勤務表で働く人たち（勤務スタッフ群）のID。
+   *
+   * 行が誰なのかは、世界に居るスタッフ全員ではなく**この群**が決める。
+   * 群の解決（ID → WorkingStaffGroup）は上位層の仕事。勤務帯を ID で参照するのと同じ形。
+   */
+  get workingStaffGroupId(): string {
+    return this.state.workingStaffGroupId;
+  }
+
+  /**
+   * この勤務表が満たすべき制約セットのID。
+   *
+   * 制約セットの解決（ID → ConstraintSet）は上位層の仕事。勤務帯・勤務スタッフ群と同じ形で、
+   * 勤務表は中身を持たずに ID で指す。
+   */
+  get constraintSetId(): string {
+    return this.state.constraintSetId;
   }
 
   // ========== 稼働日 ==========
@@ -185,6 +219,20 @@ export class MonthlyStaffSchedule {
     const assignments = this.state.assignments.filter(
       (a) => !(a.staffId === staffId && a.day.equals(day))
     );
+    return new MonthlyStaffSchedule({ ...this.state, assignments });
+  }
+
+  /**
+   * そのスタッフの割当を月内すべて取り除いた新しい勤務表を返す。不変。
+   * 変わらなければ自分自身を返す。
+   *
+   * その人がこの勤務表で働かなくなったときに使う。行が消えても割当が残っていると、
+   * フッターの人数集計（{@link countWorkingByShift} / {@link countDayOffOn}）だけが
+   * その人を数え続け、表に居ない人が必要人数を満たしているように見える。
+   */
+  clearStaff(staffId: string): MonthlyStaffSchedule {
+    const assignments = this.state.assignments.filter((a) => a.staffId !== staffId);
+    if (assignments.length === this.state.assignments.length) return this;
     return new MonthlyStaffSchedule({ ...this.state, assignments });
   }
 
@@ -360,6 +408,8 @@ export class MonthlyStaffSchedule {
       storeId: this.state.storeId,
       year: this.state.year,
       month: this.state.month,
+      workingStaffGroupId: this.state.workingStaffGroupId,
+      constraintSetId: this.state.constraintSetId,
       assignments: this.state.assignments.map((a) => a.toPlain()),
       requiredStaffing: this.state.requiredStaffing.toPlain(),
     };
@@ -371,6 +421,10 @@ export class MonthlyStaffSchedule {
       storeId: plain.storeId,
       year: plain.year,
       month: plain.month,
+      // 勤務スタッフ群／制約セットより前に保存された勤務表は、自分と同じIDのものを指す
+      // （作成時の既定と同じ）
+      workingStaffGroupId: plain.workingStaffGroupId ?? plain.id,
+      constraintSetId: plain.constraintSetId ?? plain.id,
       assignments: plain.assignments.map((a) => ShiftAssignment.fromPlain(a)),
       requiredStaffing: RequiredStaffing.fromPlain(plain.requiredStaffing),
     });

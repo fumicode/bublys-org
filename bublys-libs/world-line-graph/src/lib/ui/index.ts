@@ -1,3 +1,8 @@
+export {
+  LOCATION_MARK,
+  LOCATION_ORDER,
+  type RefLocation,
+} from "./refLocation.js";
 // UI layer — world line graph 可視化コンポーネント
 export { WorldLineView, type WorldLineViewProps } from "./WorldLineView.js";
 export { WorldLineTreeView, type WorldLineTreeViewProps } from "./WorldLineTreeView.js";
@@ -17,3 +22,11 @@ export {
   type OrganicPetal,
   type OrganicTreeOptions,
 } from "./organicTree.js";
+export {
+  WorldLineInspectorView,
+  type WorldLineInspectorViewProps,
+  type InspectorNodeRow,
+  type InspectorRefRow,
+  type InspectorScopeRow,
+} from "./WorldLineInspectorView.js";
+export * from "./world-line-3d/index.js";

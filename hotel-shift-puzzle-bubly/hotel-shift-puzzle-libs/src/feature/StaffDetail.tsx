@@ -3,7 +3,7 @@
 import { FC, useMemo } from "react";
 import {
   Staff,
-  ScheduleConstraints,
+  ConstraintSet,
   ScheduleReport,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
@@ -12,7 +12,7 @@ import { StaffDetailView } from "../ui/StaffDetailView.js";
 import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
 import {
   STAFF_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
   SCHEDULE_TYPE,
   STAFF_SHIFT_WISH_TYPE,
@@ -41,7 +41,7 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, shiftWishUrl }) => 
 
   // 参照レポート（どの勤務表かは問わず、紐づけ済みの ScheduleReport 全部）から
   // このスタッフに関係する分だけを取り出す（貢献度スコア・譲歩/繁忙日・配慮メモ）。
-  const allConstraints = useObjects<ScheduleConstraints>(SCHEDULE_CONSTRAINTS_TYPE);
+  const allConstraints = useObjects<ConstraintSet>(CONSTRAINT_SET_TYPE);
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const linkedReports = useMemo(() => {
     const linkedIds = new Set(allConstraints.flatMap((c) => c.linkedReportIds));

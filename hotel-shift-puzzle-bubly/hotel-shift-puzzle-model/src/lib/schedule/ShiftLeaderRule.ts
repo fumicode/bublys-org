@@ -82,4 +82,42 @@ export class ShiftLeaderRule {
   ): boolean {
     return this.countOnShift(schedule, day, shiftIds) >= this.minCount;
   }
+
+  // ========== 更新（ルールに属する変更はここに置く） ==========
+
+  /** 表示ラベルを変えた新しいルールを返す。不変。 */
+  withLabel(label: string): ShiftLeaderRule {
+    return new ShiftLeaderRule({ ...this.state, label });
+  }
+
+  /** 担当勤務帯（名前）を変えた新しいルールを返す。不変。 */
+  withShiftName(shiftName: string): ShiftLeaderRule {
+    return new ShiftLeaderRule({ ...this.state, shiftName });
+  }
+
+  /** 最低必要人数を変えた新しいルールを返す（1 以上に丸める）。不変。 */
+  withMinCount(minCount: number): ShiftLeaderRule {
+    return new ShiftLeaderRule({
+      ...this.state,
+      minCount: Math.max(1, Math.floor(minCount)),
+    });
+  }
+
+  /** 候補者を1人加えた新しいルールを返す。既に居れば自分自身。不変。 */
+  withLeader(staffId: string): ShiftLeaderRule {
+    if (this.state.leaderStaffIds.includes(staffId)) return this;
+    return new ShiftLeaderRule({
+      ...this.state,
+      leaderStaffIds: [...this.state.leaderStaffIds, staffId],
+    });
+  }
+
+  /** 候補者を1人外した新しいルールを返す。居なければ自分自身。不変。 */
+  withoutLeader(staffId: string): ShiftLeaderRule {
+    if (!this.state.leaderStaffIds.includes(staffId)) return this;
+    return new ShiftLeaderRule({
+      ...this.state,
+      leaderStaffIds: this.state.leaderStaffIds.filter((id) => id !== staffId),
+    });
+  }
 }
