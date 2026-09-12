@@ -11,7 +11,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
 import { useObjects, useObject } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import {
@@ -35,7 +34,6 @@ type LeaderRuleViewProps = {
  * 人をドロップすると、その人を制約の候補に加えて保存する（＝勤務表の世界線にノードが増える）。
  */
 export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
@@ -95,10 +93,15 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
     [store, schedule, constraints, shiftIdsOf]
   );
 
-  const nameOf = useMemo(() => {
-    const byId = new Map(staffList.map((s) => [s.id, s.name]));
-    return (id: string) => byId.get(id) ?? id;
+  // 図には人そのものを渡す（候補者が ObjectView として振る舞えるように）
+  const staffOf = useMemo(() => {
+    const byId = new Map(staffList.map((s) => [s.id, s]));
+    return (id: string) => byId.get(id);
   }, [staffList]);
+  const nameOf = useCallback(
+    (id: string) => staffOf(id)?.name ?? id,
+    [staffOf]
+  );
 
   const handleChangeShift = useCallback(
     (shiftName: string) =>
@@ -157,7 +160,7 @@ export const LeaderRuleView: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey })
   return (
     <LeaderRuleDiagram
       rule={rule}
-      nameOf={nameOf}
+      staffOf={staffOf}
       shiftId={shiftId}
       onDropUrl={handleDropStaffUrl}
       dropAcceptTypes={[getDragType(STAFF_TYPE)]}

@@ -1,5 +1,7 @@
 import { ShiftLeaderRule, type ShiftLeaderRuleState } from "./ShiftLeaderRule.js";
 import { ShiftLeaderConstraint } from "./ShiftLeaderConstraint.js";
+import { ShiftIntervalRule, type ShiftIntervalRuleState } from "./ShiftIntervalRule.js";
+import { ShiftIntervalConstraint } from "./ShiftIntervalConstraint.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
@@ -28,6 +30,11 @@ export type ScheduleConstraintsState = {
   minMonthlyDayOff?: number;
   /** 1日に休んでよい人数の上限。省略時 8。 */
   maxDayOffPerDay?: number;
+  /**
+   * 勤務間インターバルのルール（「遅番の翌日は早番・中番に入れない」など）。
+   * 省略時は DEFAULT_SHIFT_INTERVAL_RULES（遅番明けの早番・中番を禁止）。
+   */
+  shiftIntervalRules?: ShiftIntervalRuleState[];
   /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。省略時 []。 */
   linkedReportIds?: string[];
 };
@@ -36,6 +43,20 @@ export type ScheduleConstraintsState = {
 export const DEFAULT_MAX_CONSECUTIVE_WORKDAYS = 5;
 export const DEFAULT_MIN_MONTHLY_DAY_OFF = 8;
 export const DEFAULT_MAX_DAY_OFF_PER_DAY = 8;
+
+/**
+ * 勤務間インターバルの既定ルール。
+ * 遅番のあと家に帰って8時間あけると翌日の早番・中番には間に合わない、という法律の要請を
+ * 「禁止する勤務帯の組」として表したもの（詳しくは ShiftIntervalRule のコメント）。
+ */
+export const DEFAULT_SHIFT_INTERVAL_RULES: ShiftIntervalRuleState[] = [
+  {
+    key: "late",
+    fromShiftName: "遅番",
+    forbiddenNextShiftNames: ["早番", "中番"],
+    minRestHours: 8,
+  },
+];
 
 export class ScheduleConstraints {
   constructor(readonly state: ScheduleConstraintsState) {}
@@ -69,6 +90,30 @@ export class ScheduleConstraints {
     return this.state.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY;
   }
 
+  /** 勤務間インターバルのルール。既定は DEFAULT_SHIFT_INTERVAL_RULES。 */
+  get shiftIntervalRules(): ShiftIntervalRule[] {
+    return (this.state.shiftIntervalRules ?? DEFAULT_SHIFT_INTERVAL_RULES).map(
+      (s) => new ShiftIntervalRule(s)
+    );
+  }
+
+  /** ルールキーで勤務間インターバルのルールを取得（ルールバブルが URL のキーから引く）。 */
+  shiftIntervalRule(key: string): ShiftIntervalRule | undefined {
+    return this.shiftIntervalRules.find((r) => r.key === key);
+  }
+
+  /**
+   * 勤務間インターバルのルールを「違反を出す制約」に変換して返す。
+   * 勤務帯名 → 勤務帯ID集合の解決は勤務表側の事情なので shiftIdsOf で受ける。
+   */
+  intervalConstraints(
+    shiftIdsOf: (shiftName: string) => string[]
+  ): ShiftIntervalConstraint[] {
+    return this.shiftIntervalRules.map(
+      (rule) => new ShiftIntervalConstraint(rule, shiftIdsOf)
+    );
+  }
+
   /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。既定 []。 */
   get linkedReportIds(): string[] {
     return this.state.linkedReportIds ?? [];
@@ -93,14 +138,15 @@ export class ScheduleConstraints {
 
   /**
    * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
-   * （責任者・連勤上限・月最低休日・1日の休み上限・必要人数。希望違反は feature 層＋実行時
-   *  データ依存なので含まない——feature 側で足す。）
+   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限・必要人数。希望違反は
+   *  feature 層＋実行時データ依存なので含まない——feature 側で足す。）
    * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
    */
   modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
     return [
       new MaxConsecutiveWorkdaysConstraint(this.maxConsecutiveWorkdays),
       ...this.leaderConstraints(shiftIdsOf),
+      ...this.intervalConstraints(shiftIdsOf),
       new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
       new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
       new RequiredStaffingConstraint(shiftIdsOf),

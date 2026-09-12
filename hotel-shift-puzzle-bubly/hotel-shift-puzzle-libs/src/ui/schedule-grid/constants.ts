@@ -13,7 +13,11 @@ export const SHIFT_FG: Record<string, string> = {
 // グリッドの列幅
 export const STAFF_COL_WIDTH = 168;
 export const DAY_COL_WIDTH = 40;
-export const OFF_COL_WIDTH = 40; // 右端「休（合計）」列
+export const OFF_COL_WIDTH = 40; // 右端付近「休（合計）」列
+export const EARLY_COL_WIDTH = 40; // 一番右「早番日数」列
+
+/** 早番日数の集計対象にする勤務帯名（同名の複数 ID を合算する） */
+export const EARLY_SHIFT_NAME = "早番";
 
 /**
  * 人数不足セル（集計行の shiftId×day）の data-cell-key 接頭辞。

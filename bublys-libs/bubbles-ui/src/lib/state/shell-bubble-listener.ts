@@ -1,3 +1,4 @@
+import { startIntent } from "@bublys-org/world-line-graph";
 /**
  * shell-bubble-listener
  * ShellManagerからのBubble作成リクエストを処理するRedux Listener Middleware
@@ -17,6 +18,8 @@ export const shellBubbleListener = createListenerMiddleware();
 shellBubbleListener.startListening({
   predicate: (action) => action.type === 'bubbles/requestBubbleCreation',
   effect: async (action: any, listenerApi) => {
+      // 入力を伴わないカスケード。直前のジェスチャの意図に吸われないよう自分で開く
+      startIntent("shell:create");
     const { url, openerBubbleId } = action.payload;
 
     console.log('[ShellBubble Listener] Creating bubble:', { url, openerBubbleId });
@@ -34,7 +37,7 @@ shellBubbleListener.startListening({
     }));
 
     // プロセス層に追加（横並びとして）
-    listenerApi.dispatch(joinSiblingInProcess(newBubble.id));
+    listenerApi.dispatch(joinSiblingInProcess({ bubbleId: newBubble.id }));
 
     console.log('[ShellBubble Listener] Bubble created:', newBubble.id);
   }

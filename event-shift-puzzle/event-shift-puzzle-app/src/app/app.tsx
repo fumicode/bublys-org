@@ -34,7 +34,7 @@ export function App() {
       urlBinding={makeSnapshotCodec('universe')}
     >
       <BublyApp
-        title="シフトパズル"
+        title="イベントシフトパズル"
         subtitle="Standalone • Port 4005"
         menuItems={menuItems}
         backdropColor="hsl(20, 40%, 22%)"

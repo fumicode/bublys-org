@@ -1,3 +1,4 @@
+import { startIntent } from "@bublys-org/world-line-graph";
 /**
  * shell-deletion-listener
  * Shell削除イベントを監視し、対応するBubbleを削除するRedux Listener Middleware
@@ -16,6 +17,8 @@ export const shellDeletionListener = createListenerMiddleware();
 shellDeletionListener.startListening({
   predicate: (action) => action.type === 'shells/deleted',
   effect: async (action: any, listenerApi) => {
+      // 入力を伴わないカスケード。直前のジェスチャの意図に吸われないよう自分で開く
+      startIntent("shell:delete");
     const { shellId, shellType } = action.payload;
 
     console.log('[ShellDeletion Listener] Shell deleted:', { shellId, shellType });

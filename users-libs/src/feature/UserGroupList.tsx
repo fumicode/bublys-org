@@ -7,7 +7,6 @@ import { ObjectView } from "@bublys-org/bubbles-ui";
 
 type UserGroupListProps = {
   buildDetailUrl: (groupId: string) => string;
-  onSelect?: (groupId: string, url: string) => void;
 };
 
 const defaultGroups = [
@@ -15,7 +14,7 @@ const defaultGroups = [
   new UserGroup("group-editors", "Editors", []),
 ];
 
-export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect }) => {
+export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl }) => {
   const dispatch = useAppDispatch();
   const groups = useAppSelector(selectUserGroups);
 
@@ -38,11 +37,12 @@ export const UserGroupList: FC<UserGroupListProps> = ({ buildDetailUrl, onSelect
           const url = buildDetailUrl(group.id);
           return (
             <li key={group.id} style={{ marginBottom: 8 }}>
+              {/* ダブルクリックで詳細バブルを開く */}
               <ObjectView
                 type="UserGroup"
                 url={url}
                 label={group.name}
-                onClick={() => onSelect?.(group.id, url)}
+                openingPosition="bubble-side-right"
               >
                 <UserGroupIcon fontSize="small" style={{ marginRight: 6, verticalAlign: "middle" }} />
                 {group.name}

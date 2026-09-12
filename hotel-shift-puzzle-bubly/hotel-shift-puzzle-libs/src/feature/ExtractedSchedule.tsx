@@ -22,7 +22,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import { useObjects, useObject } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
   buildScheduleConstraints,
@@ -67,7 +66,6 @@ export const ExtractedSchedule: FC<ExtractedScheduleProps> = ({
   scheduleId,
   staffIds,
 }) => {
-  useSeedHotelData();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const store = useAppStore();
 
@@ -323,6 +321,8 @@ const StyledContainer = styled.div`
     .e-day-head,
     .e-off-head,
     .e-off-total,
+    .e-early-head,
+    .e-early-total,
     .e-staff-cell {
       background: hsla(0, 0%, 100%, 0.4);
     }

@@ -5,7 +5,6 @@ import { Staff, StaffMonthlyShiftWish } from "@bublys-org/hotel-shift-puzzle-mod
 import { ShiftWishStaffListView } from "../ui/ShiftWishStaffListView.js";
 import { staffWishRows } from "./shiftWishMonths.js";
 import { useObjects } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { STAFF_TYPE, STAFF_SHIFT_WISH_TYPE } from "../objects/hotelObjects.js";
 
 type ShiftWishStaffListProps = {
@@ -26,7 +25,6 @@ export const ShiftWishStaffList: FC<ShiftWishStaffListProps> = ({
   month,
   wishUrl,
 }) => {
-  useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const wishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
 

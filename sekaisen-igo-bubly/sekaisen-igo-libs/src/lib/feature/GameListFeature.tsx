@@ -1,7 +1,7 @@
 "use client";
 
 import { FC, useContext } from "react";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
 import { useIgoGame } from "./IgoGameProvider.js";
 
 export const GameListFeature: FC = () => {
@@ -12,10 +12,6 @@ export const GameListFeature: FC = () => {
     const id = crypto.randomUUID();
     addGame(id);
     openBubble(`sekaisen-igo/games/${id}`, "root");
-  };
-
-  const handleOpenGame = (gameId: string) => {
-    openBubble(`sekaisen-igo/games/${gameId}`, "root");
   };
 
   return (
@@ -45,19 +41,27 @@ export const GameListFeature: FC = () => {
           </div>
         ) : (
           gameIds.map((id) => (
-            <div
+            <ObjectView
               key={id}
-              onClick={() => handleOpenGame(id)}
-              style={{
-                padding: 12,
-                borderBottom: "1px solid #eee",
-                cursor: "pointer",
-              }}
+              type="SekaisenIgoGame"
+              url={`sekaisen-igo/games/${id}`}
+              label={`対局 #${id.slice(0, 8)}`}
+              openingPosition="bubble-side-right"
+              fullWidth
             >
-              <div style={{ fontWeight: "bold" }}>
-                対局 #{id.slice(0, 8)}
+              <div
+                title="ダブルクリックで対局を開く"
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  borderBottom: "1px solid #eee",
+                }}
+              >
+                <div style={{ fontWeight: "bold" }}>
+                  対局 #{id.slice(0, 8)}
+                </div>
               </div>
-            </div>
+            </ObjectView>
           ))
         )}
       </div>

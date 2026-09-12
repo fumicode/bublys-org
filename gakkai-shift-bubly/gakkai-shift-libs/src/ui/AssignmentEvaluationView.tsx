@@ -23,8 +23,6 @@ type AssignmentEvaluationViewProps = {
   constraintViolations?: ConstraintViolation[];
   staffDetailUrl?: string;
   staffAvailabilityUrl?: string;
-  onStaffClick?: () => void;
-  onTimeSlotClick?: () => void;
 };
 
 export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
@@ -35,8 +33,6 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
   constraintViolations = [],
   staffDetailUrl,
   staffAvailabilityUrl,
-  onStaffClick,
-  onTimeSlotClick,
 }) => {
   const status = evaluation.getOverallStatus();
 
@@ -53,9 +49,10 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
                   url={staffAvailabilityUrl}
                   label={`${staffName}の参加可能時間帯`}
                   draggable={true}
-                  onClick={onTimeSlotClick}
+                  openingPosition="bubble-side-right"
                 >
-                  <Button variant="text" size="small" component="span" className="e-link-button">
+                  <Button variant="text" size="small" component="span" className="e-link-button"
+                    title="ダブルクリックで参加可能時間帯を開く">
                     {timeSlotLabel}
                   </Button>
                 </ObjectView>
@@ -84,9 +81,10 @@ export const AssignmentEvaluationView: FC<AssignmentEvaluationViewProps> = ({
                   url={staffDetailUrl}
                   label={staffName}
                   draggable={true}
-                  onClick={onStaffClick}
+                  openingPosition="bubble-side-right"
                 >
-                  <Button variant="text" size="small" component="span" className="e-link-button">
+                  <Button variant="text" size="small" component="span" className="e-link-button"
+                    title="ダブルクリックでスタッフを開く">
                     {staffName}
                   </Button>
                 </ObjectView>

@@ -38,12 +38,6 @@ export type Bubly = {
   /** サイドバーに表示するアイコン（任意） */
   icon?: React.ReactNode;
   /**
-   * 旧式のサイドバーメニュー項目（任意）。指定すると OS の動的メニューに追加され、
-   * クリックで直接 inner bubble URL を開く。新しいバブリは原則 universe バブルだけ
-   * 提供するため、ここに inner shortcut を増やすケースは少ない。
-   */
-  menuItems?: BublyMenuItem[];
-  /**
    * OS が自動登録する `<name>-bubly` universe バブル内に最初に開かれるバブルの url 群。
    * 空のときは何も seed しない。
    */

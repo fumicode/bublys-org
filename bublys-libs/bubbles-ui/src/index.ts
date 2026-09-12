@@ -30,6 +30,7 @@ export * from './lib/bubly/index.js';
 export * from './lib/hooks/useWindowSize.js';
 export * from './lib/hooks/useMyRect.js';
 export * from './lib/hooks/useBubbleDrag.js';
+export * from './lib/hooks/useUniverseDropZone.js';
 export * from './lib/hooks/useBubbleResize.js';
 export * from './lib/hooks/useKeyBindings.js';
 
@@ -41,6 +42,8 @@ export * from './lib/context/CurrentBubbleContext.js';
 // Universe / Viewport glue
 export * from './lib/universe-config.js';
 export * from './lib/utils/measure-viewport.js';
+export * from './lib/utils/drop-point.js';
+export * from './lib/utils/drag-session.js';
 
 // UI Components
 export * from './lib/ui/BubbleView.js';

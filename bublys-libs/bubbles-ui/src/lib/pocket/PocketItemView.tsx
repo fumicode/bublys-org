@@ -20,7 +20,7 @@ export const PocketItemView: FC<PocketItemViewProps> = ({ item, onRemove, onClic
   const resolvedLabel = (objectType && item.objectId && resolveObjectTypeLabel(objectType, item.objectId)) || item.label || item.url;
 
   const content = (
-    <div className="e-content" title={item.url}>
+    <div className="e-content" title={`ダブルクリックで開く — ${item.url}`}>
       <span className="e-icon">{icon}</span>
       <span className="e-label">{resolvedLabel}</span>
     </div>
@@ -30,16 +30,23 @@ export const PocketItemView: FC<PocketItemViewProps> = ({ item, onRemove, onClic
     <StyledPocketItem>
       <div className="e-content-wrapper">
         {objectType ? (
+          // ポケットの中身もオブジェクトなので、開くのはダブルクリック。
+          // ただしここでは openingPosition を使えない: PocketView は BubblesContext.Provider の
+          // 外（画面右下の fixed 要素）に置かれていて、ObjectView が引く openBubble は
+          // 既定実装の no-op になってしまう。onDoubleClick で、Provider を持つ側から
+          // 渡された openBubble（opener は "root"）を呼ぶ。
           <ObjectView
             type={objectType}
             url={item.url}
             label={item.label}
-            onClick={() => onClick?.(item.url)}
+            onDoubleClick={() => onClick?.(item.url)}
             draggable={true}
           >
             {content}
           </ObjectView>
         ) : (
+          // 型が未登録でオブジェクトとして描けていないときの退避。
+          // ObjectView の約束の外なので単クリックのままにする。
           <button
             className="e-content-button"
             onClick={() => onClick?.(item.url)}

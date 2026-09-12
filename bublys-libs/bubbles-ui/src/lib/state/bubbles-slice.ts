@@ -31,11 +31,44 @@ export type BubbleArrangementState = {
   process: BubblesProcessState;
 }
 
-export type OpeningPosition = "bubble-side-right" | "bubble-side-left" | "bubble-side-top" | "bubble-side-bottom" | "origin-side";
+/**
+ * 新しいバブルをどこに開くか。
+ *
+ * 命名の約束:
+ *   - `*-side`  … 何かの「辺」に対する相対位置。基準となる矩形（opener バブル、
+ *                  あるいはクリック元の要素）があって、その隣に置く。
+ *   - `*-place` … 絶対的な「場所」。基準の矩形は無く、点そのものが位置になる。
+ * `dropped-place` が過去分詞なのは、これがルールではなく「落とされた」という
+ * 済んだ事実を運ぶ値だから（点は payload の `droppedAt` で一緒に来る）。
+ */
+export type OpeningPosition =
+  | "bubble-side-right"
+  | "bubble-side-left"
+  | "bubble-side-top"
+  | "bubble-side-bottom"
+  | "origin-side"
+  | "dropped-place";
+
+/**
+ * 兄弟として同じレイヤーに並べるときの指定。
+ * `droppedAt` の意味は {@link PopChildPayload} と同じ（落とされた点）。
+ * レイヤーの決め方（同じ種類なら同じレイヤー／違えば新しいレイヤー）と、
+ * どこに置くかは別の話なので、どちらの action も落下点を運べるようにしてある。
+ */
+export type JoinSiblingPayload = {
+  bubbleId: string;
+  droppedAt?: Point2;
+}
 
 export type PopChildPayload = {
   bubbleId: string;
   openingPosition?: OpeningPosition;
+  /**
+   * 落とされた点（universe 座標）。`openingPosition: "dropped-place"` のときだけ意味を持つ。
+   * 他の位置指定は基準の矩形から計算できるが、ドロップ位置だけはどこからも再計算できない
+   * ので、起きた事実として action に載せて運ぶ。
+   */
+  droppedAt?: Point2;
 }
 
 /**
@@ -48,6 +81,14 @@ export interface UniverseState {
   bubbleRelations: BubblesRelation[];
   globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
+  /**
+   * この配置が「世界線のどのノードの投影か」。まだ投影されていなければ null。
+   *
+   * 配置は世界線のあるノードの投影であって、それ自体が真実ではない。
+   * 投影が済んでいない universe は読み取り専用（世界線にもアドレスにも書かない）。
+   * 「起動が終わったか」を時刻や ref ではなく**値**で表すための一点。
+   */
+  projectedNodeId: string | null;
 }
 
 /** ルート universe の ID。ネストした universe は別 ID を持つ。 */
@@ -84,36 +125,53 @@ const createEmptyUniverse = (): UniverseState => ({
   bubbleRelations: [],
   globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
   surfaceLeftTop: { x: 100, y: 100 },
+  projectedNodeId: null,
 });
 
-// 初期状態を構築する関数（遅延評価）
+/** 設定済みの初期バブル url（seed する側が読む） */
+export const getInitialBubbleUrls = (): string[] => configuredInitialBubbleUrls;
+
+/** url 群から「横に並べただけ」の配置を作る。universe の seed 用 */
+export const buildSeedArrangement = (urls: string[]): BubbleArrangementState => {
+  const bubbles: Record<string, BubbleJson> = {};
+  const layers: string[][] = [];
+  urls.forEach((url, index) => {
+    const b = createBubble(url, { x: index * 400, y: 0 });
+    bubbles[b.id] = b.toJSON();
+    layers.push([b.id]);
+  });
+  return { bubbles, bubbleRelations: [], process: { layers } };
+};
+
+/**
+ * 初期状態は **空の root universe**。
+ *
+ * 初期バブルをここに埋め込むと、reducer が undefined state で呼ばれるたび
+ * （ストア作成・slice 注入・redux-persist の rehydrate など、実測で 1 ロードに 3 回）
+ * 初期配置が作り直され、世界線から復元した配置を上書きしてしまう。
+ * 初期バブルは「復元するものが無いときだけ撒く seed」として扱う
+ * （root は useBrowserRootArrangementWorldLine、nest は UniverseView が撒く）。
+ */
+const buildInitialState = (): BubbleStateSlice => ({
+  universes: { [ROOT_UNIVERSE_ID]: createEmptyUniverse() },
+  renderCount: 0,
+  animatingBubbleIds: [],
+});
+
+/**
+ * 初期状態は **1 ページロードにつき 1 個**に固定する。
+ *
+ * createSlice の initialState は「reducer が undefined な state で呼ばれるたび」に
+ * 評価されうる（ストア作成・slice の注入・redux-persist の rehydrate など、
+ * 実測で 1 ロードに 3 回）。毎回作り直すと **バブルの id が振り直され**、
+ * root の配置がすり替わる。その結果、世界線から復元した配置が上書きされ、
+ * すり替わった配置が commit されて apex が進み、URL の `universe@xxxx` が
+ * 何度も書き換わる（チラつき・履歴汚染）。
+ */
+let cachedInitialState: BubbleStateSlice | null = null;
 const getInitialState = (): BubbleStateSlice => {
-  const bubbleInstances = configuredInitialBubbleUrls.map((url, index) => {
-    return createBubble(url, { x: index * 400, y: 0 });
-  });
-
-  const entities: Record<string, BubbleJson> = {};
-  bubbleInstances.forEach((b) => {
-    entities[b.id] = b.toJSON();
-  });
-
-  const process: BubblesProcessState = {
-    layers: bubbleInstances.map((b) => [b.id]),
-  };
-
-  return {
-    universes: {
-      [ROOT_UNIVERSE_ID]: {
-        bubbles: entities,
-        process,
-        bubbleRelations: [],
-        globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
-        surfaceLeftTop: { x: 100, y: 100 },
-      },
-    },
-    renderCount: 0,
-    animatingBubbleIds: [],
-  };
+  if (!cachedInitialState) cachedInitialState = buildInitialState();
+  return cachedInitialState;
 };
 
 // draft state から universe を取得（無ければ作る）
@@ -142,6 +200,7 @@ const prepStr = (payload: string, universeId?: string) => withU(payload, univers
 const prepBubble = (payload: BubbleJson, universeId?: string) => withU(payload, universeId);
 const prepRelation = (payload: BubblesRelation, universeId?: string) => withU(payload, universeId);
 const prepPopChild = (payload: PopChildPayload, universeId?: string) => withU(payload, universeId);
+const prepJoinSibling = (payload: JoinSiblingPayload, universeId?: string) => withU(payload, universeId);
 const prepCoord = (payload: CoordinateSystemData, universeId?: string) => withU(payload, universeId);
 const prepPoint = (payload: Point2, universeId?: string) => withU(payload, universeId);
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
@@ -216,14 +275,14 @@ export const bubblesSlice = createSlice({
 
 
     joinSibling: {
-      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+      reducer: (state, action: PayloadAction<JoinSiblingPayload, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
         u.process = BubblesProcess.fromJSON(u.process)
-          .joinSibling(action.payload)
+          .joinSibling(action.payload.bubbleId)
           .toJSON();
         state.renderCount += 1;
       },
-      prepare: prepStr,
+      prepare: prepJoinSibling,
     },
 
     finishBubbleAnimation: (state, action: PayloadAction<string>) => {
@@ -345,6 +404,36 @@ export const bubblesSlice = createSlice({
       prepare: prepPoint,
     },
     // world-line から復元した arrangement を丸ごと差し戻す
+    /**
+     * 世界線のノード → 配置（投影）。配置と「どのノードの投影か」を**同じ 1 アクション**で書く。
+     * これにより投影直後は定義上 view === 世界線[projectedNodeId] が成立し、
+     * 「復元をそのまま記録し返す」が条件式レベルで起きなくなる。
+     */
+    projectUniverse: {
+      reducer: (
+        state,
+        action: PayloadAction<{ arrangement: BubbleArrangementState; nodeId: string }, string, UniverseMeta>,
+      ) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.bubbles = action.payload.arrangement.bubbles;
+        u.bubbleRelations = action.payload.arrangement.bubbleRelations;
+        u.process = action.payload.arrangement.process;
+        u.projectedNodeId = action.payload.nodeId;
+        state.renderCount += 1;
+      },
+      prepare: (payload: { arrangement: BubbleArrangementState; nodeId: string }, universeId?: string) =>
+        withU(payload, universeId),
+    },
+
+    /** commit 後、配置はそのままで「投影元のノード」だけ進める */
+    markProjected: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.projectedNodeId = action.payload;
+      },
+      prepare: prepStr,
+    },
+
     replaceBubbleArrangement: {
       reducer: (state, action: PayloadAction<BubbleArrangementState, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
@@ -374,6 +463,8 @@ export const {
   setGlobalCoordinateSystem,
   setSurfaceLeftTop,
   replaceBubbleArrangement,
+  projectUniverse,
+  markProjected,
   finishBubbleAnimation,
   clearAllAnimations,
   focusBubble,
@@ -800,6 +891,11 @@ export const makeSelectBubbleArrangementForUniverse = memoizeByUniverse((uid) =>
     [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid)],
     projectArrangement,
   ),
+);
+
+/** この universe がどのノードの投影か（null = まだ投影されていない） */
+export const makeSelectProjectedNodeId = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).projectedNodeId ?? null,
 );
 
 // --- universe スコープの個別バブルセレクタ（cache キー = universeId:bubbleId） ---

@@ -2,6 +2,8 @@
 
 import { FC } from "react";
 import styled from "styled-components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
+import { SCHEDULE_REPORT_LIST_VIEW_TYPE } from "../ui/viewObjectTypes.js";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -12,7 +14,6 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
 import { useObjects, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { adoptGlobalObject, saveObject } from "../objects/commit.js";
 import {
   STAFF_TYPE,
@@ -28,11 +29,11 @@ const newScheduleId = (): string =>
 
 type ScheduleCollectionProps = {
   /** シフト完成レポート一覧バブルを開くハンドラ（次回シフト作成前の参照用） */
-  onOpenReports?: () => void;
+  /** シフト完成レポート一覧のURL（ダブルクリックで開く先）。URL スキームは app 層の関心事 */
+  reportListUrl?: string;
 };
 
-export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ onOpenReports }) => {
-  useSeedHotelData();
+export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ reportListUrl }) => {
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const staffList = useObjects<Staff>(STAFF_TYPE);
@@ -76,10 +77,21 @@ export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ onOpenReports 
     <StyledContainer>
       <div className="e-header">
         <h3>勤務表一覧 ({schedules.length})</h3>
-        {onOpenReports && (
-          <button type="button" className="e-reports" onClick={onOpenReports}>
-            📋 シフト完成レポート一覧
-          </button>
+        {reportListUrl && (
+          <ObjectView
+            type={SCHEDULE_REPORT_LIST_VIEW_TYPE}
+            url={reportListUrl}
+            label="シフト完成レポート一覧"
+            openingPosition="bubble-side-right"
+            className="e-reports-slot"
+          >
+            <span
+              className="e-reports"
+              title="ダブルクリックでシフト完成レポート一覧を開く"
+            >
+              📋 シフト完成レポート一覧
+            </span>
+          </ObjectView>
         )}
       </div>
       <ScheduleListView
@@ -102,8 +114,15 @@ const StyledContainer = styled.div`
       margin: 0;
     }
 
-    .e-reports {
+    /* ObjectView のラッパ span。.e-header は flex なので、右寄せの指定は
+       中のチップではなくラッパ側に載せないと効かない */
+    .e-reports-slot {
       margin-left: auto;
+    }
+
+    .e-reports {
+      display: inline-flex;
+      align-items: center;
       border: 1px solid #cfd8dc;
       border-radius: 6px;
       background: #fff;

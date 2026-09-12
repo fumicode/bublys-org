@@ -10,6 +10,7 @@ export const DRAG_KEYS = {
   url: "url",
   label: "label",
   objectId: "object-id",
+  sourceBubbleId: "source-bubble-id",
 } as const;
 
 // 特殊な組み込みドラッグ型
@@ -18,7 +19,18 @@ export const BUILTIN_DRAG_TYPES = {
 } as const;
 
 export type DragDataType = string;
-export type DragPayload = { type: DragDataType; url: string; label?: string; objectId?: string };
+export type DragPayload = {
+  type: DragDataType;
+  url: string;
+  label?: string;
+  objectId?: string;
+  /**
+   * ドラッグ元のバブルID。宇宙に落ちたときに「どこから出てきたか」を繋ぐのに使う。
+   * この文書の中でしか意味を持たない値なので、使う側は必ず実在確認すること
+   * （別ウィンドウからのドラッグでは他文書のIDが届く）。
+   */
+  sourceBubbleId?: string;
+};
 
 /**
  * 登録済みの全ドラッグ型リストを取得（動的）
@@ -42,6 +54,27 @@ export const setDragPayload = (
   if (payload.objectId) {
     e.dataTransfer.setData(DRAG_KEYS.objectId, payload.objectId);
   }
+  if (payload.sourceBubbleId) {
+    e.dataTransfer.setData(DRAG_KEYS.sourceBubbleId, payload.sourceBubbleId);
+  }
+};
+
+/**
+ * この荷物を受け取れる型かどうかだけを見る（中身は読まない）。
+ *
+ * dragover の時点では、ブラウザは `dataTransfer.getData()` に空文字しか返さない
+ * （保護モード。中身が読めるのは drop のときだけ）。なので dragover の判定に
+ * `parseDragPayload` を使うと必ず null になり、`preventDefault()` されず、
+ * 結果として drop が一度も発火しない。dragover では types だけを見ること。
+ */
+export const hasDragPayload = (
+  e: React.DragEvent,
+  options?: { acceptTypes?: DragDataType[] }
+): boolean => {
+  const { acceptTypes } = options ?? {};
+  const types = Array.from(e.dataTransfer.types);
+  const targetTypes = acceptTypes && acceptTypes.length > 0 ? acceptTypes : getDragDataTypeList();
+  return targetTypes.some((t) => types.includes(t));
 };
 
 export const parseDragPayload = (
@@ -59,8 +92,9 @@ export const parseDragPayload = (
 
   const label = e.dataTransfer.getData(DRAG_KEYS.label) || undefined;
   const objectId = e.dataTransfer.getData(DRAG_KEYS.objectId) || undefined;
+  const sourceBubbleId = e.dataTransfer.getData(DRAG_KEYS.sourceBubbleId) || undefined;
 
-  return { type: hitType, url, label, objectId };
+  return { type: hitType, url, label, objectId, sourceBubbleId };
 };
 
 export const useDragPayload = (
@@ -86,8 +120,8 @@ export const useDropPayload = (
 
   const handleDragOver = React.useCallback(
     (e: React.DragEvent) => {
-      const payload = parseDragPayload(e, { acceptTypes });
-      if (!payload) return;
+      // dragover では中身が読めないので型だけ見る（hasDragPayload のコメント参照）
+      if (!hasDragPayload(e, { acceptTypes })) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = dropEffect;
     },

@@ -19,7 +19,7 @@ interface ReferSlotDTO {
 
 const createMessage = (method: string, params: any) => {
   return {
-    protocol: 'http://localhost:4200/',
+    protocol: 'http://localhost:4300/',
     version: '0.0.1',
     method: method,
     params: params,
@@ -54,12 +54,12 @@ const handShakeMessage = () => {
     resources: [
       {
         containerName: 'Slot1',
-        containerUrl: 'http://localhost:4200/calculator/slot1',
+        containerUrl: 'http://localhost:4300/calculator/slot1',
         storableTypes: [StorableType.NUMBER],
       },
       {
         containerName: 'Slot2',
-        containerUrl: 'http://localhost:4200/calculator/slot2',
+        containerUrl: 'http://localhost:4300/calculator/slot2',
         storableTypes: [StorableType.NUMBER],
       },
     ],
@@ -78,9 +78,9 @@ const sendMessageToIframeParent = (message: Message) => {
 
 export default function EmbeddedPage() {
   const slotURLs = [
-    'http://localhost:4200/calculator/slot1',
-    'http://localhost:4200/calculator/slot2',
-    'http://localhost:4200/calculator/result',
+    'http://localhost:4300/calculator/slot1',
+    'http://localhost:4300/calculator/slot2',
+    'http://localhost:4300/calculator/result',
   ];
 
   const [parentMethods, setParentMethods] = useState<OSMethod[] | null>(null);

@@ -12,7 +12,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import ReplayIcon from "@mui/icons-material/Replay";
 import { EditableText } from "@/lib/EditableText";
 import EditIcon from "@mui/icons-material/Edit";
-import { UrledPlace } from "../../bubble-ui/components";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import { getDragType, parseDragPayload, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 
 type TaskDetailViewProps = {
@@ -23,7 +23,6 @@ type TaskDetailViewProps = {
   onDescriptionChange?: (description: string) => void;
   onAssigneeChange?: (assigneeId: string | undefined) => void;
   buildUserDetailUrl?: (userId: string) => string;
-  onUserClick?: (userId: string) => void;
 };
 
 export const TaskDetailView: FC<TaskDetailViewProps> = ({
@@ -34,7 +33,6 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
   onDescriptionChange,
   onAssigneeChange,
   buildUserDetailUrl,
-  onUserClick,
 }) => {
   const assignee = users.find(u => u.id === task.assigneeId);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -86,17 +84,24 @@ export const TaskDetailView: FC<TaskDetailViewProps> = ({
         <h4>担当者 {isDragOver && <span className="e-drop-hint">ここにドロップ</span>}</h4>
         <div className="e-assignee">
           {assignee && buildUserDetailUrl ? (
-            <UrledPlace url={buildUserDetailUrl(assignee.id)}>
+            /* 担当者はユーザーそのもの。ダブルクリックで本人のバブルが開き、ドラッグで持ち出せる。
+               内側は component="span" にして、interactive な要素が入れ子にならないようにする。 */
+            <ObjectView
+              type="User"
+              url={buildUserDetailUrl(assignee.id)}
+              label={assignee.name}
+              openingPosition="bubble-side-right"
+            >
               <Button
+                component="span"
                 variant="text"
                 size="small"
                 startIcon={<PersonIcon />}
-                onClick={() => onUserClick?.(assignee.id)}
                 className="e-assignee-link"
               >
                 {assignee.name}
               </Button>
-            </UrledPlace>
+            </ObjectView>
           ) : assignee ? (
             <span className="e-assignee-name">
               <PersonIcon fontSize="small" /> {assignee.name}

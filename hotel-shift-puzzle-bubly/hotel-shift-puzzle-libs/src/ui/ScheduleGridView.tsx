@@ -2,6 +2,7 @@
 
 import { FC, Fragment, useMemo, useState } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
+import { SCHEDULE_DAY_VIEW_TYPE } from "./viewObjectTypes.js";
 import {
   Staff,
   MonthlyStaffSchedule,
@@ -19,6 +20,8 @@ import {
   STAFF_COL_WIDTH,
   DAY_COL_WIDTH,
   OFF_COL_WIDTH,
+  EARLY_COL_WIDTH,
+  EARLY_SHIFT_NAME,
   DEMAND_CELL_KEY_PREFIX,
 } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
@@ -195,6 +198,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   // 勤務帯ID → WorkShift の解決マップ（独立集約から渡される）
   const shiftMap = new Map(workShifts.map((w) => [w.id, w]));
 
+  // 早番日数列: 名前が「早番」の勤務帯 ID を合算する（同名複数 ID もまとめる）
+  const earlyShiftIds = useMemo(
+    () =>
+      new Set(
+        workShifts.filter((w) => w.name === EARLY_SHIFT_NAME).map((w) => w.id)
+      ),
+    [workShifts]
+  );
+
   // 勤務帯名 → id（責任者ルールの担当勤務帯の色を引くため）
   const shiftIdByName = useMemo(() => {
     const m = new Map<string, string>();
@@ -334,7 +346,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     setEditingRequired(null);
   };
 
-  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px`;
+  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  // スタッフ列の右から、日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
+  const daysThroughSummarySpan = `2 / ${days.length + 4}`;
 
   // 部署グルーピング時は department ヘッダー行を挿入してスタッフ行を並べる
   const renderStaffRows = () => {
@@ -360,6 +374,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
@@ -377,7 +392,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         </div>
         <div
           className="e-dept-sep"
-          style={{ gridColumn: `2 / ${days.length + 3}` }}
+          style={{ gridColumn: daysThroughSummarySpan }}
         />
       </Fragment>,
       ...members.map((staff) => (
@@ -401,6 +416,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
@@ -441,7 +457,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             </div>
             <div
               className="e-res-toggle-bar"
-              style={{ gridColumn: `2 / ${days.length + 3}` }}
+              style={{ gridColumn: daysThroughSummarySpan }}
               title="予約情報の表示/折りたたみ"
               onClick={() => setReservationCollapsed((v) => !v)}
             />
@@ -455,7 +471,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           </>
         )}
 
-        {/* ヘッダ行: 左上の角 + 日付ヘッダ + 右上の休合計ヘッダ */}
+        {/* ヘッダ行: 左上の角 + 日付ヘッダ + 休合計 + 早番日数 */}
         <div className="e-corner">
           {schedule.year}年{schedule.month}月
         </div>
@@ -502,9 +518,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
                   展開先 URL は app 層から注入される（dayBubbleUrl）。 */}
               {dayBubbleUrl ? (
                 <ObjectView
+                  type={SCHEDULE_DAY_VIEW_TYPE}
                   url={dayBubbleUrl(day)}
+                  label={day.key}
                   openingPosition="origin-side"
-                  draggable={false}
                   fullWidth
                 >
                   {inner}
@@ -515,7 +532,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             </div>
           );
         })}
-        <div className="e-off-head">休</div>
+        <div className="e-off-head" title="月間の休み日数">
+          休
+        </div>
+        <div className="e-early-head" title="月間の早番日数">
+          早
+        </div>
 
         {/* スタッフ行（部署グルーピングあり/なし） */}
         {renderStaffRows()}

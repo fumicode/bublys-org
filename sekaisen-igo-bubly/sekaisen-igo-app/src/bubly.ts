@@ -20,14 +20,6 @@ const SekaisenIgoBubly: Bubly = {
   initialBubbleUrls: ["sekaisen-igo/games"],
   backdropColor: "hsl(155, 30%, 18%)",
 
-  menuItems: [
-    {
-      label: "対局一覧",
-      url: "sekaisen-igo/games",
-      icon: React.createElement(SportsEsportsIcon, { color: "action" }),
-    },
-  ],
-
   register(context) {
     context.registerBubbleRoutes(sekaisenIgoBubbleRoutes);
   },

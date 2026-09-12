@@ -8,10 +8,9 @@ import { getDragType, setDragPayload } from "@bublys-org/bubbles-ui";
 
 type UserDetailProps = {
   userId: string;
-  onOpenGroup?: (groupId: string, detailUrl: string) => void;
 };
 
-export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
+export const UserDetail: FC<UserDetailProps> = ({ userId }) => {
   const userEntity = useAppSelector(selectUserById(userId));
   const userGroups = useAppSelector(selectUserGroups);
   const user = userEntity
@@ -46,7 +45,6 @@ export const UserDetail: FC<UserDetailProps> = ({ userId, onOpenGroup }) => {
                 <UserGroupBadgeView
                   key={g.id}
                   label={g.name}
-                  onClick={() => onOpenGroup?.(g.id, `user-groups/${g.id}`)}
                   linkTarget={`user-groups/${g.id}`}
                 />
               ))}

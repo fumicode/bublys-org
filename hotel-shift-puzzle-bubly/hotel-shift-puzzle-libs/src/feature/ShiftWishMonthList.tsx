@@ -9,7 +9,6 @@ import {
 import { ShiftWishMonthListView } from "../ui/ShiftWishMonthListView.js";
 import { monthProgressList } from "./shiftWishMonths.js";
 import { useObjects } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { STAFF_TYPE, SCHEDULE_TYPE, STAFF_SHIFT_WISH_TYPE } from "../objects/hotelObjects.js";
 
 type ShiftWishMonthListProps = {
@@ -24,7 +23,6 @@ type ShiftWishMonthListProps = {
  * 決める。月を別途「募集中」と登録する仕組みは作らない（勤務表を作ったことが合図になる）。
  */
 export const ShiftWishMonthList: FC<ShiftWishMonthListProps> = ({ monthUrl }) => {
-  useSeedHotelData();
   const staffList = useObjects<Staff>(STAFF_TYPE);
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const wishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);

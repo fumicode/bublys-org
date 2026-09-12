@@ -8,7 +8,6 @@
 import React from "react";
 import { registerBubly, Bubly } from "@bublys-org/bubbles-ui";
 import ChatIcon from "@mui/icons-material/Chat";
-import PersonIcon from "@mui/icons-material/Person";
 
 // Bubble Routes
 import { tailorGenieBubbleRoutes } from "@bublys-org/tailor-genie-libs";
@@ -20,19 +19,6 @@ const TailorGenieBubly: Bubly = {
   icon: React.createElement(ChatIcon, { color: "primary" }),
   initialBubbleUrls: ["tailor-genie/conversations", "tailor-genie/speakers"],
   backdropColor: "hsl(35, 50%, 22%)",
-
-  menuItems: [
-    {
-      label: "会話一覧",
-      url: "tailor-genie/conversations",
-      icon: React.createElement(ChatIcon, { color: "action" }),
-    },
-    {
-      label: "スピーカー一覧",
-      url: "tailor-genie/speakers",
-      icon: React.createElement(PersonIcon, { color: "action" }),
-    },
-  ],
 
   register(context) {
     context.registerBubbleRoutes(tailorGenieBubbleRoutes);

@@ -11,14 +11,9 @@ import { IgoGameCollection } from "./ui";
  */
 const IgoGameBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const gameId = bubble.url.replace("igo-game/", "");
-  const { openBubble } = useContext(BubblesContext);
-
-  const handleOpenWorldLineView = () => {
-    openBubble(`igo-game/${gameId}/history`, bubble.id);
-  };
 
   return (
-    <IgoWorldLineIntegration gameId={gameId} onOpenWorldLineView={handleOpenWorldLineView} />
+    <IgoWorldLineIntegration gameId={gameId} worldLineUrl={`igo-game/${gameId}/history`} />
   );
 };
 
@@ -38,7 +33,8 @@ const IgoGamesBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <IgoGameCollection
       buildDetailUrl={(gameId) => `igo-game/${gameId}`}
-      onGameClick={(_gameId, detailUrl) => openBubble(detailUrl, bubble.id)}
+      // 「新規対局」で作った対局を開く導線（一覧の行を開くのは ObjectView のダブルクリック）
+      onOpenGame={(_gameId, detailUrl) => openBubble(detailUrl, bubble.id)}
     />
   );
 };

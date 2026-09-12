@@ -100,7 +100,8 @@ export const BublyUniverseBubble: BubbleContentRenderer = ({ bubble }) => {
       <UniverseView
         universeId={childUniverseId}
         renderBubbleContent={(b) => <BubbleContent bubble={b} />}
-        initialBubbleUrls={route?.initialBubbleUrls ?? []}
+        // 復元される universe には seed を撒かない（撒くと復元前に commit されて上書きになる）
+        initialBubbleUrls={nav.restoresFromWorldLine ? [] : route?.initialBubbleUrls ?? []}
       />
       <UniverseWorldLineToolbar {...nav} />
     </div>

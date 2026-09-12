@@ -47,6 +47,22 @@ export class Layer {
     return this.cs.transformScreenDeltaToLocal(screenDelta);
   }
 
+  /**
+   * スクリーン上の実寸（getBoundingClientRect）→ layer-local のサイズ。
+   * 奥の面は CSS transform で縮んで見えるだけなので、scale を戻す。
+   */
+  scaleScreenSize(screenSize: { width: number; height: number }): { width: number; height: number } {
+    return { width: screenSize.width / this.scale, height: screenSize.height / this.scale };
+  }
+
+  /**
+   * この面のバブルを universe 座標 `universeTopLeft` に置くときの CSS transform-origin。
+   * 面は消失点を原点に縮小されるので、位置を動かしたら原点も追従させる必要がある。
+   */
+  transformOriginFor(universeTopLeft: Point2): Point2 {
+    return this.cs.calculateTransformOrigin(universeTopLeft);
+  }
+
   /** 同一原点・消失点で深さだけ違うレイヤー */
   atIndex(index: number): Layer {
     return new Layer(index, this.surfaceOrigin, this.vanishingPoint);

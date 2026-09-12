@@ -27,7 +27,7 @@ import {
 } from '../slice/shift-plan-slice.js';
 import { createSampleMemberList } from '../data/sampleMember.js';
 import { PrimitiveGanttView, type RowAvailability } from '../ui/PrimitiveGanttView.js';
-import { UrledPlace } from '@bublys-org/bubbles-ui';
+import { ObjectView } from '@bublys-org/bubbles-ui';
 import { type GanttConfig } from '../ui/ganttTypes.js';
 import { draggingTaskId, DRAG_TYPE_TASK_LIST } from '../ui/TaskListView.js';
 import { draggingMemberIds, DRAG_TYPE_MEMBER_LIST } from './MemberCollection.js';
@@ -289,16 +289,16 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
         {/* タスクガントボタン */}
         {buildTaskGanttUrl ? (
-          <UrledPlace url={buildTaskGanttUrl()}>
-            <button
-              type="button"
-              className="e-task-gantt-btn"
-              onClick={onTaskGanttOpen}
-              title="タスク軸ガントを開く"
-            >
+          <ObjectView
+            type="TaskGantt"
+            url={buildTaskGanttUrl()}
+            label="タスク軸ガント"
+            openingPosition="bubble-side-right"
+          >
+            <span className="e-task-gantt-btn" title="ダブルクリックでタスク軸ガントを開く">
               タスク軸
-            </button>
-          </UrledPlace>
+            </span>
+          </ObjectView>
         ) : onTaskGanttOpen ? (
           <button
             type="button"
@@ -312,16 +312,16 @@ export const PrimitiveGanttEditor: FC<PrimitiveGanttEditorProps> = ({
 
         {/* 履歴ボタン */}
         {buildHistoryUrl ? (
-          <UrledPlace url={buildHistoryUrl()}>
-            <button
-              type="button"
-              className="e-history-btn"
-              onClick={onHistoryOpen}
-              title="世界線の履歴を表示"
-            >
+          <ObjectView
+            type="ShiftPlanHistory"
+            url={buildHistoryUrl()}
+            label="世界線の履歴"
+            openingPosition="bubble-side-right"
+          >
+            <span className="e-history-btn" title="ダブルクリックで世界線の履歴を開く">
               履歴
-            </button>
-          </UrledPlace>
+            </span>
+          </ObjectView>
         ) : (
           <button
             type="button"

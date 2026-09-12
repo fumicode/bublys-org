@@ -33,7 +33,6 @@ import { ShiftCommandsBar } from "../ui/ShiftCommandsBar.js";
 import { LinkedReportsView } from "../ui/LinkedReportsView.js";
 import { DeadCellDiagnosisView } from "../ui/DeadCellDiagnosisView.js";
 import { useObjects, useObject, useObjectRepo } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import { runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
@@ -64,16 +63,20 @@ import {
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
-import { SHIFT_WISH_MONTH_VIEW_TYPE } from "../ui/viewObjectTypes.js";
+import {
+  SHIFT_WISH_MONTH_VIEW_TYPE,
+  SCHEDULE_WORLD_LINE_VIEW_TYPE,
+  SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
+} from "../ui/viewObjectTypes.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
   /** 世界線ビュー（左下）を開くハンドラ */
-  onOpenHistory?: () => void;
-  /** キセキの木ビュー（読み取り専用の木ビジュアル）を開くハンドラ */
-  onOpenTree?: () => void;
-  /** 可能勤務帯エディタ（左・スタッフ関連）を開くハンドラ */
-  onOpenAvailability?: () => void;
+  /**
+   * 候補集合を作ったあと、結果を見せるために世界線ビューを自動で開く。
+   * ユーザーが押して開くのではないので ObjectView ではなくハンドラのまま。
+   */
+  onOpenWorldLineAfterCandidates?: () => void;
   /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
   onConfirm?: (reportId: string) => void;
   /**
@@ -91,8 +94,6 @@ type ScheduleGridProps = {
   shiftWishesUrl?: (year: number, month: number) => string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
-  /** 操作履歴バブルを開くハンドラ */
-  onOpenEditLog?: () => void;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -107,6 +108,8 @@ type ScheduleGridProps = {
   reservationInfoUrl?: string;
   /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
   ruleBubbleUrl?: (ruleKey: string) => string;
+  /** 勤務間インターバルの図バブルの URL を作る（ルールキー）。同じく上部ルール行に渡す */
+  intervalRuleBubbleUrl?: (ruleKey: string) => string;
   /**
    * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
    * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
@@ -136,10 +139,7 @@ const newLeaderRuleKey = (): string =>
  */
 export const ScheduleGrid: FC<ScheduleGridProps> = ({
   scheduleId,
-  onOpenHistory,
-  onOpenTree,
-  onOpenAvailability,
-  onOpenEditLog,
+  onOpenWorldLineAfterCandidates,
   onConfirm,
   worldLineUrl,
   treeUrl,
@@ -149,12 +149,12 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   ruleBubbleUrl,
+  intervalRuleBubbleUrl,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
 }) => {
-  useSeedHotelData();
   const store = useAppStore();
   const { scope } = useScheduleHistory(scheduleId ?? "");
   const apex = scope.graph.getApex();
@@ -445,6 +445,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
   }, [deadCells]);
 
+  // 選択が無いときだけ、キーボード操作の起点として先頭の未定セルへ置く。
   useEffect(() => {
     if (!schedule || cellSelection) return;
     const next = suggestNextUndecided(
@@ -455,19 +456,6 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
     }
   }, [schedule, cellSelection, staffList]);
-
-  const advanceFocusAfterEdit = useCallback(
-    (nextSchedule: MonthlyStaffSchedule) => {
-      const next = suggestNextUndecided(
-        nextSchedule,
-        staffList.map((s) => s.id)
-      );
-      setCellSelection(
-        next ? { staffId: next.staffId, day: next.day } : null
-      );
-    },
-    [staffList]
-  );
 
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => {
@@ -480,9 +468,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: EditLog 付きで同一世界線ノードに記録
+  // セル編集: EditLog 付きで同一世界線ノードに記録。
+  // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    const next = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -490,12 +479,11 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       day,
       to,
     });
-    setCellSelection({ staffId, day });
-    advanceFocusAfterEdit(next);
   };
 
   // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
   // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
+  // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
   const handleApproveForced = (
     staffId: string,
     day: WorkingDay,
@@ -505,7 +493,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       staffId,
       dayKey: day.key,
     });
-    const nextSchedule = recordSetCell(store, {
+    recordSetCell(store, {
       schedule,
       constraints: allConstraints,
       staffId,
@@ -518,7 +506,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       setCellSelection({ staffId: next.staffId, day: next.day });
       return;
     }
-    advanceFocusAfterEdit(nextSchedule);
+    setCellSelection({ staffId, day });
   };
 
   // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
@@ -616,7 +604,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     setAutoMessage(
       `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
     );
-    onOpenHistory?.();
+    onOpenWorldLineAfterCandidates?.();
   };
 
   // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
@@ -649,7 +637,9 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   // 開く導線も兼ねており、勤務表を編集せずに2回押すと ID（scheduleId + apex.id）が同じまま
   // create() し直してしまう。そうすると確定後も編集できる項目（タイトル・配慮メモ・
   // 譲歩/繁忙日の重み）が既定値へ巻き戻って消える。
-  const handleConfirm = () => {
+  // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
+  // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
+  const handleConfirm = async () => {
     if (!scheduleId || !apex) return;
 
     const existing = allReports.find(
@@ -660,11 +650,10 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       return;
     }
 
-    const apexSchedule = scope.getObjectAt<MonthlyStaffSchedule>(
-      apex.id,
-      SCHEDULE_TYPE,
-      scheduleId
-    );
+    const resolved = await scope.resolveObjectsAt(apex.id);
+    const apexSchedule = resolved.find(
+      (r) => r.type === SCHEDULE_TYPE && r.id === scheduleId
+    )?.obj as MonthlyStaffSchedule | undefined;
     if (!apexSchedule) return;
 
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -725,7 +714,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
     <button
       type="button"
       className="e-confirm"
-      onClick={handleConfirm}
+      onClick={() => void handleConfirm()}
       title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
     >
       🏁 完成レポートを作成
@@ -769,13 +758,18 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             </select>
           )}
 
-          {onOpenAvailability &&
-            withUrl(
-              availabilityUrl,
-              <button type="button" className="e-link" onClick={onOpenAvailability}>
+          {availabilityUrl && (
+            <ObjectView
+              type={SCHEDULE_AVAILABILITY_TYPE}
+              url={availabilityUrl}
+              label="可能勤務帯"
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックで可能勤務帯を開く">
                 可能勤務帯
-              </button>
-            )}
+              </span>
+            </ObjectView>
+          )}
 
           {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
           {shiftWishesUrl && (
@@ -818,6 +812,8 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
           minDayOff={minDayOff}
           maxPerDay={maxPerDay}
           checkShiftWish={constraints?.checkShiftWish ?? true}
+          intervalRules={constraints?.shiftIntervalRules ?? []}
+          intervalRuleBubbleUrl={intervalRuleBubbleUrl}
         />
         <ShiftCommandsBar
           targetCount={subsetStaff.length}
@@ -917,39 +913,50 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(onOpenHistory || onOpenEditLog) && (
+      {(worldLineUrl || editLogUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
-          {onOpenHistory &&
-            withUrl(
-              worldLineUrl,
-              <button
-                type="button"
-                className="e-link e-worldline"
-                onClick={onOpenHistory}
-                title="この勤務表の世界線ビューを開く"
+          {worldLineUrl && (
+              <ObjectView
+                type={SCHEDULE_WORLD_LINE_VIEW_TYPE}
+                url={worldLineUrl}
+                label="世界線ビュー"
+                openingPosition="bubble-side-bottom"
               >
-                🌐 世界線ビュー
-              </button>
-            )}
-          {onOpenEditLog &&
-            withUrl(
-              editLogUrl,
-              <button
-                type="button"
-                className="e-link"
-                onClick={onOpenEditLog}
-                title="操作履歴（ノウハウ）を開く"
+                <span
+                  className="e-link e-worldline"
+                  title="ダブルクリックでこの勤務表の世界線ビューを開く"
+                >
+                  🌐 世界線ビュー
+                </span>
+              </ObjectView>
+          )}
+          {editLogUrl && (
+              <ObjectView
+                type={SCHEDULE_EDIT_LOG_TYPE}
+                url={editLogUrl}
+                label="操作履歴"
+                openingPosition="bubble-side-right"
               >
-                📝 操作履歴
-              </button>
-            )}
-          {onOpenTree &&
-            withUrl(
-              treeUrl,
-              <button type="button" className="e-link" onClick={onOpenTree}>
-                🌳 キセキの木で見る
-              </button>
-            )}
+                <span
+                  className="e-link"
+                  title="ダブルクリックで操作履歴（ノウハウ）を開く"
+                >
+                  📝 操作履歴
+                </span>
+              </ObjectView>
+          )}
+          {treeUrl && (
+              <ObjectView
+                type={SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE}
+                url={treeUrl}
+                label="キセキの木"
+                openingPosition="bubble-side-bottom"
+              >
+                <span className="e-link" title="ダブルクリックでキセキの木を開く">
+                  🌳 キセキの木で見る
+                </span>
+              </ObjectView>
+          )}
           {confirmButton}
         </div>
       )}

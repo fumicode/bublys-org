@@ -1,8 +1,8 @@
 "use client";
 
-import { FC, useContext, useState, FormEvent, ChangeEvent } from "react";
+import { FC, useState, FormEvent, ChangeEvent } from "react";
 import { Speaker, SpeakerRole } from "@bublys-org/tailor-genie-model";
-import { BubblesContext, ObjectView } from "@bublys-org/bubbles-ui";
+import { ObjectView } from "@bublys-org/bubbles-ui";
 import { useTailorGenie } from "./TailorGenieProvider.js";
 
 const ROLE_LABELS: Record<SpeakerRole, string> = {
@@ -16,15 +16,10 @@ const ROLE_COLORS: Record<SpeakerRole, string> = {
 };
 
 export const SpeakerListFeature: FC = () => {
-  const { openBubble } = useContext(BubblesContext);
   const { speakerShells, addSpeaker } = useTailorGenie();
   const speakers = speakerShells.map((s) => s.object);
   const [newSpeakerName, setNewSpeakerName] = useState("");
   const [newSpeakerRole, setNewSpeakerRole] = useState<SpeakerRole>("guest");
-
-  const handleOpenSpeaker = (speakerId: string) => {
-    openBubble(`tailor-genie/speakers/${speakerId}`, "root");
-  };
 
   const handleCreateSpeaker = (e: FormEvent) => {
     e.preventDefault();
@@ -127,10 +122,11 @@ export const SpeakerListFeature: FC = () => {
               type="Speaker"
               url={`tailor-genie/speakers/${speaker.id}`}
               label={speaker.name}
-              onClick={() => handleOpenSpeaker(speaker.id)}
+              openingPosition="bubble-side-right"
               fullWidth
             >
               <div
+                title="ダブルクリックでスピーカーを開く"
                 style={{
                   padding: 12,
                   borderBottom: "1px solid #eee",

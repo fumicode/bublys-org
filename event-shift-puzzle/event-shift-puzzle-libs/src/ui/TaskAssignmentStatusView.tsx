@@ -27,6 +27,9 @@ export type TaskAssignmentStatusViewProps = {
   /** AカードまたはBカードをバブルとして昇格するコールバック */
   onExpandMembers?: () => void;
   onExpandCoverage?: () => void;
+  /** 「単独バブルとして開く」先の URL（↗ から link bubble のリボンが伸びる） */
+  expandMembersUrl?: string;
+  expandCoverageUrl?: string;
   /** 配置メンバー → 局員/参加可能シフトバブル展開 */
   buildMemberUrl?: (memberId: string) => string;
   buildMemberAvailabilityUrl?: (memberId: string) => string;
@@ -42,6 +45,8 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
   memberNameMap,
   onExpandMembers,
   onExpandCoverage,
+  expandMembersUrl,
+  expandCoverageUrl,
   buildMemberUrl,
   buildMemberAvailabilityUrl,
   onTaskSelect,
@@ -101,6 +106,7 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
             shiftViolations={status.shiftViolations}
             density="compact"
             onExpand={onExpandMembers}
+            expandUrl={expandMembersUrl}
             buildMemberUrl={buildMemberUrl}
             buildAvailabilityUrl={buildMemberAvailabilityUrl}
           />
@@ -113,6 +119,7 @@ export const TaskAssignmentStatusView: FC<TaskAssignmentStatusViewProps> = ({
             memberNameMap={memberNameMap}
             density="compact"
             onExpand={onExpandCoverage}
+            expandUrl={expandCoverageUrl}
           />
         </section>
       </div>

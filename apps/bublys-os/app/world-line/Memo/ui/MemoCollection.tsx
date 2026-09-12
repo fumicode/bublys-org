@@ -7,11 +7,12 @@ import { dispatchCreateMemo } from '../feature/memoActions';
 type MemoCollectionProps = {
   buildDetailUrl: (memoId: string) => string;
   buildDeleteUrl: (memoId: string) => string;
-  onMemoClick?: (memoId: string, detailUrl: string) => void;
+  /** 「メモを追加」で作った新規メモを開く（一覧の行を開くのはダブルクリック） */
+  onOpenMemo?: (memoId: string, detailUrl: string) => void;
   onMemoDelete?: (memoId: string) => void;
 };
 
-export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, onMemoDelete }: MemoCollectionProps) {
+export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onOpenMemo, onMemoDelete }: MemoCollectionProps) {
   const dispatch = useAppDispatch();
 
   const handleAddMemo = () => {
@@ -19,7 +20,7 @@ export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, on
     // world-line-graph に scope と初期 memo を seed する
     dispatchCreateMemo(dispatch, newMemo);
     // 新しいメモのバブルを開く
-    onMemoClick?.(newMemo.id, buildDetailUrl(newMemo.id));
+    onOpenMemo?.(newMemo.id, buildDetailUrl(newMemo.id));
   };
 
   const handleDelete = (memoId: string) => {
@@ -31,7 +32,6 @@ export function MemoCollection({ buildDetailUrl, buildDeleteUrl, onMemoClick, on
       <MemoList
         buildDetailUrl={buildDetailUrl}
         buildDeleteUrl={buildDeleteUrl}
-        onMemoClick={onMemoClick}
         onMemoDelete={handleDelete}
       />
       <div style={{ marginTop: '16px' }}>

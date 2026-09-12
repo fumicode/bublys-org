@@ -6,12 +6,28 @@
  * ObjectView の約束（オブジェクトを表し、ドラッグでき、ダブルクリックでバブルが開く）を
  * 満たすには型名が要るので、ここで名前を付ける。
  *
- * 集約と違うのは、単独では保存されないこと。だから CAS の記述子は持たず、ドラッグ種別と
- * アイコンだけを登録する（`object-type-registration.ts`）。
+ * 集約と違うのは、単独では保存されないこと。勤務日は勤務表の中の1日だし、責任者ルールは
+ * 制約オブジェクトの中の1件で、どちらも親の集約に属している。だから CAS の記述子は持たず、
+ * ドラッグ種別とアイコンだけを登録する（`object-type-registration.ts`）。
  *
- * URL は app 層から注入される（型に固定の id が無く、どの月か・誰の分か、で決まるため
- * `registerObjectUrl` の id → url が使えない）。
+ * URL は app 層から注入される（型に固定の id が無く、どの勤務表の何日か・どの月か・
+ * 誰の分か、で決まるため `registerObjectUrl` の id → url が使えない）。
  */
+
+/** 勤務表の稼働日（グリッドの日付ヘッダ） */
+export const SCHEDULE_DAY_VIEW_TYPE = "ScheduleDay";
+
+/** 責任者ルール（早責・予責・夜責 …の制約アイコン） */
+export const SCHEDULE_LEADER_RULE_VIEW_TYPE = "ScheduleLeaderRule";
+
+/** 世界線ビュー（この勤務表のこれまでの分岐） */
+export const SCHEDULE_WORLD_LINE_VIEW_TYPE = "ScheduleWorldLine";
+
+/** キセキの木ビュー（世界線を木で描いた読み取り専用ビュー） */
+export const SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE = "ScheduleWorldLineTree";
+
+/** シフト完成レポート一覧 */
+export const SCHEDULE_REPORT_LIST_VIEW_TYPE = "ScheduleReportList";
 
 /** その月のシフト希望（スタッフ全員 × 回収状況の一覧） */
 export const SHIFT_WISH_MONTH_VIEW_TYPE = "ShiftWishMonth";

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { shallowEqual } from 'react-redux';
 import {
   useAppDispatch,
@@ -10,6 +10,7 @@ import {
   createStateRef,
   type StateRef,
 } from '../domain';
+import { currentIntentId, currentIntentLabel } from './intent';
 import { WorldLineGraph, type ForkChoice } from '../domain/WorldLineGraph';
 import {
   setGraph,
@@ -18,6 +19,7 @@ import {
 import { ObjectShell } from './ObjectShell';
 import { useCas } from './CasProvider';
 import { loadStatesFromIDB } from './IndexedDBStore';
+import { resolveStateRefs, type ResolvedObject } from './resolveStates';
 
 // ============================================================================
 // Options
@@ -25,6 +27,11 @@ import { loadStatesFromIDB } from './IndexedDBStore';
 
 export interface CasScopeOptions {
   initialObjects?: { type: string; object: unknown }[];
+  /**
+   * evict 済みの状態を取りに行く先。既定は IndexedDB。
+   * テストから差し替えられるように注入できるようにしてある。
+   */
+  loadStates?: (hashes: string[]) => Promise<Map<string, unknown>>;
 }
 
 // ============================================================================
@@ -43,8 +50,30 @@ export interface CasScopeValue {
   addObjects(items: { type?: string; object: unknown }[]): void;
   /** オブジェクトを削除（tombstone）して grow */
   removeObject(type: string, id: string): void;
-  /** 任意ノードのデシリアライズ済みオブジェクトを取得（fork preview 用） */
+  /**
+   * 任意ノードのデシリアライズ済みオブジェクトを同期で取得（fork preview 用）。
+   *
+   * メモリ上の CAS しか見ないので、evict 済みのデータでは null になる。null は
+   * 「削除済み」と「まだ読めていない」の両方を意味するので、確実に値が要る場面では
+   * {@link resolveObjectsAt} を使うこと。表示だけなら requestNodes で先に埋めておけば、
+   * 届いた時点で cas が変わり再レンダリングされて自然に解決する。
+   */
   getObjectAt<T>(nodeId: string, type: string, id: string): T | null;
+  /**
+   * そのノード時点の全オブジェクトを解決する。メモリ上の CAS に無いものは
+   * 永続ストア（IndexedDB）から取ってきてから返す。
+   *
+   * 「そのノードの状態を実際に取り出して使う」用途（時間移動での復元など）はこちら。
+   * 同期の getObjectAt だと evict 済みのデータが黙って落ちる。
+   */
+  resolveObjectsAt(nodeId: string): Promise<ResolvedObject[]>;
+  /**
+   * これらのノードが参照するデータを、メモリ上の CAS に載せておくよう要求する。
+   *
+   * オンデマンド取得はふだん「今いるノード」のぶんしか走らないので、他ノードの中身を
+   * 覗く表示（世界線ビューのノード要約など）はこれで先に頼んでおく。
+   */
+  requestNodes(nodeIds: string[]): void;
   /** undo */
   moveBack(): void;
   /** redo */
@@ -118,7 +147,9 @@ export function useCasScope(
 
   const grow = useCallback(
     (changedRefs: StateRef[], stateEntries: { hash: string; data: unknown }[]) => {
-      const updated = graph.grow(changedRefs);
+      // 世界線への記録は commit 1 本に通す。いま開いている意図が apex を生んだ意図と
+      // 同じなら（＝同じ 1 操作の続きなら）新しいノードを作らず apex を書き換える。
+      const updated = graph.commit(changedRefs, currentIntentId(), currentIntentLabel() ?? undefined);
       dispatch(setGraph({ scopeId, graph: updated.toJSON() }));
       if (stateEntries.length > 0) {
         // 直後に必要になる「現在の世界」が参照するハッシュは evict 対象から保護する
@@ -163,6 +194,10 @@ export function useCasScope(
   growRef.current = grow;
   const registryRef = useRef(registry);
   registryRef.current = registry;
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
+  const loadStatesRef = useRef(options?.loadStates ?? loadStatesFromIDB);
+  loadStatesRef.current = options?.loadStates ?? loadStatesFromIDB;
 
   // ============================================================
   // Shell 管理 — Map<"type:id", ObjectShell>
@@ -192,7 +227,9 @@ export function useCasScope(
   // StateRef から alive shells を導出 + apex 変更時の自動 sync
   // ============================================================
 
-  const currentRefs = graph.getCurrentStateRefs();
+  // 毎レンダー新しい配列を作ると shellsByType → getShell の参照が毎回変わり、
+  // 「getShell の参照が変わった＝CAS が遅れて届いた」という意味を持てなくなる
+  const currentRefs = useMemo(() => graph.getCurrentStateRefs(), [graph]);
 
   // 型ごとにグループ化
   const shellsByType = useMemo(() => {
@@ -212,6 +249,9 @@ export function useCasScope(
     return map;
   }, [currentRefs, cas, registry]);
 
+  const casRef = useRef(cas);
+  casRef.current = cas;
+
   // ============================================================
   // オンデマンド取得（アカシックレコード）
   //
@@ -220,18 +260,55 @@ export function useCasScope(
   // setCasEntries で Redux に再水和する。
   // ============================================================
 
+  /** 他ノードの中身を覗きたい側から頼まれたハッシュ（requestNodes） */
+  const [requestedHashes, setRequestedHashes] = useState<readonly string[]>([]);
+
+  const requestNodes = useCallback((nodeIds: string[]) => {
+    setRequestedHashes((prev) => {
+      const known = new Set(prev);
+      const next = [...prev];
+      for (const nodeId of nodeIds) {
+        if (!graphRef.current.state.nodes[nodeId]) continue;
+        for (const ref of graphRef.current.getStateRefsAt(nodeId)) {
+          if (known.has(ref.hash)) continue;
+          known.add(ref.hash);
+          next.push(ref.hash);
+        }
+      }
+      return next.length === prev.length ? prev : next;
+    });
+  }, []);
+
+  /**
+   * 一度取りに行ったハッシュ。永続ストアにも無かった（＝もう復元できない）ものを
+   * レンダリングのたびに引き直さないための歯止め。
+   * グラフが動いたら（編集・時間移動）諦めを解いて、もう一度だけ試す。
+   */
+  const attemptedRef = useRef(new Set<string>());
+  useEffect(() => {
+    attemptedRef.current.clear();
+  }, [graph]);
+
   const missingHashes = useMemo(() => {
     const missing: string[] = [];
-    for (const ref of currentRefs) {
-      if (cas[ref.hash] === undefined) missing.push(ref.hash);
-    }
+    const seen = new Set<string>();
+    const want = (hash: string) => {
+      if (seen.has(hash)) return;
+      seen.add(hash);
+      if (cas[hash] !== undefined) return;
+      if (attemptedRef.current.has(hash)) return;
+      missing.push(hash);
+    };
+    for (const ref of currentRefs) want(ref.hash);
+    for (const hash of requestedHashes) want(hash);
     return missing;
-  }, [currentRefs, cas]);
+  }, [currentRefs, requestedHashes, cas]);
 
   useEffect(() => {
     if (missingHashes.length === 0) return;
+    for (const hash of missingHashes) attemptedRef.current.add(hash);
     let cancelled = false;
-    loadStatesFromIDB(missingHashes).then((loaded) => {
+    loadStatesRef.current(missingHashes).then((loaded) => {
       if (cancelled || loaded.size === 0) return;
       const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
       dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
@@ -251,7 +328,6 @@ export function useCasScope(
     if (graph.state.rootNodeId !== null) return;
     const initials = options?.initialObjects;
     if (!initials?.length) return;
-    initializedRef.current = true;
 
     const refs: StateRef[] = [];
     const entries: { hash: string; data: unknown }[] = [];
@@ -264,8 +340,14 @@ export function useCasScope(
       refs.push(createStateRef(type, id, hash));
       entries.push({ hash, data: shell.toJSON() });
     }
+    // registry に型が無いと refs が空のまま grow され、changedRefs が空の
+    // 「幽霊 root ノード」が焼かれる。addObjects 側には既にあるガード。
+    if (refs.length === 0) return;
+    // フラグはループ前ではなく grow の直後に立てる。前に立てると、
+    // 上のガードで抜けたときに「二度と初期化されない」に化ける。
+    initializedRef.current = true;
     growRef.current(refs, entries);
-  }, [graph.state.rootNodeId]);
+  }, [graph.state.rootNodeId, registry]);
 
   // ============================================================
   // 公開 API
@@ -367,6 +449,42 @@ export function useCasScope(
     [graph, cas, registry]
   );
 
+  const resolveObjectsAt = useCallback(
+    async (nodeId: string): Promise<ResolvedObject[]> => {
+      const currentGraph = graphRef.current;
+      if (!currentGraph.state.nodes[nodeId]) return [];
+      const refs = currentGraph.getStateRefsAt(nodeId);
+
+      const { resolved, loaded, unresolved } = await resolveStateRefs(
+        refs,
+        casRef.current,
+        loadStatesRef.current,
+        registryRef.current
+      );
+
+      if (loaded.size > 0) {
+        dispatch(
+          setCasEntries({
+            entries: Array.from(loaded.entries()).map(([hash, data]) => ({
+              hash,
+              data,
+            })),
+            // このノードの状態はこれから使うので、まとめて evict から守る
+            protectHashes: refs.map((ref) => ref.hash),
+          })
+        );
+      }
+      if (unresolved.length > 0) {
+        // 永続ストアにも無い＝もう復元できない。黙って欠けると「古いまま」に見えるので出す。
+        console.warn(
+          `世界線: ノード ${nodeId} の状態を復元できませんでした: ${unresolved.join(', ')}`
+        );
+      }
+      return resolved;
+    },
+    [dispatch]
+  );
+
   const getForkChoices = useCallback(
     () => graph.getForkChoices(),
     [graph]
@@ -386,6 +504,8 @@ export function useCasScope(
     addObjects,
     removeObject,
     getObjectAt,
+    resolveObjectsAt,
+    requestNodes,
     moveBack,
     moveForward,
     moveTo,

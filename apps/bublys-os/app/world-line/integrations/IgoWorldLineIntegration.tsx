@@ -4,11 +4,12 @@ import { IgoBoardView, GameInfoView } from '../../igo-game/ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
 import { useIgoWorldLine } from '../../igo-game/feature/useIgoWorldLine';
 import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { ObjectView } from '@bublys-org/bubbles-ui';
 
 type IgoWorldLineIntegrationProps = {
   gameId: string;
-  /** 世界線ビュー（履歴バブル）を開く */
-  onOpenWorldLineView?: () => void;
+  /** この対局の世界線バブルの URL（ダブルクリックで開く） */
+  worldLineUrl?: string;
 };
 
 /**
@@ -18,7 +19,7 @@ type IgoWorldLineIntegrationProps = {
  * 着手・パス・投了は `update(transform)` 経由で graph を伸ばす。
  * Cmd/Ctrl+Z でデータ undo（moveBack）、Shift 付きで redo（moveForward）。
  */
-export function IgoWorldLineIntegration({ gameId, onOpenWorldLineView }: IgoWorldLineIntegrationProps) {
+export function IgoWorldLineIntegration({ gameId, worldLineUrl }: IgoWorldLineIntegrationProps) {
   const { focusedObjectId, setFocusedObjectId } = useFocusedObject();
   const { apexGame, update, moveBack, moveForward } = useIgoWorldLine(gameId);
 
@@ -59,20 +60,28 @@ export function IgoWorldLineIntegration({ gameId, onOpenWorldLineView }: IgoWorl
         <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#333' }}>
           囲碁バブリ
         </h2>
-        {onOpenWorldLineView && (
-          <button
-            onClick={onOpenWorldLineView}
-            style={{
-              padding: '4px 12px',
-              fontSize: '13px',
-              borderRadius: '6px',
-              border: '1px solid #ccc',
-              background: '#fff',
-              cursor: 'pointer',
-            }}
+        {worldLineUrl && (
+          /* すでに在るもの（この対局の世界線）を開くので、ボタンではなくオブジェクトとして扱う。
+             ダブルクリックで開き、data-url からリンクのリボンも伸びる。 */
+          <ObjectView
+            url={worldLineUrl}
+            openingPosition="bubble-side-bottom"
+            draggable={false}
           >
-            🌳 世界線
-          </button>
+            <span
+              title="ダブルクリックで世界線を開く"
+              style={{
+                padding: '4px 12px',
+                fontSize: '13px',
+                borderRadius: '6px',
+                border: '1px solid #ccc',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              🌳 世界線
+            </span>
+          </ObjectView>
         )}
       </div>
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>

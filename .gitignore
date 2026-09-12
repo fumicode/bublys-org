@@ -39,6 +39,7 @@ testem.log
 Thumbs.db
 
 # Environment files
+.env
 .env.local
 .env*.local
 
@@ -66,5 +67,9 @@ vitest.config.*.timestamp*
 dist-bubly
 **/public/bubly.js
 **/public/bubly.js.map
+# hotel-shift-puzzle の bubly バンドルが吐く worker チャンク（ビルド成果物）
+hotel-shift-puzzle-bubly/hotel-shift-puzzle-app/public/assets/candidates.worker-*.js
+hotel-shift-puzzle-bubly/hotel-shift-puzzle-app/public/assets/candidates.worker-*.js.map
 
 .claude/
+csv-importer-bubly/csv-importer-app/.env

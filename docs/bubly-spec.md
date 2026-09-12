@@ -46,11 +46,6 @@ const MyBubly: Bubly = {
   ],
   backdropColor: "hsl(200, 35%, 22%)",    // universe バブルの「夜空」色（半透明ガラス）
 
-  // 任意: inner bubble への直接ショートカット（root に直接 pop される）
-  menuItems: [
-    { label: "foo", url: "my-bubly/foo", icon: React.createElement(MyIcon) },
-  ],
-
   register(ctx) {
     ctx.registerBubbleRoutes(myBubbleRoutes);  // inner bubble ルート群を登録
   },
@@ -73,17 +68,38 @@ export default MyBubly;
    - `Component`: lib の `BublyUniverseBubble`（中で `useUniverseArrangementWorldLine` + `UniverseView` を起動）
    - `initialBubbleUrls`: `bubly.initialBubbleUrls`
    - `bubbleOptions.fillsContainer = true` / `defaultSize` / `backdropColor`
-3. `getAllMenuItems()` が各バブリにつき **2 種類**のエントリを返す:
-   - 先頭: 「universe バブルを開く」エントリ（url = `<name>-bubly`、icon = `bubly.icon`、label = `bubly.label`）
-   - 後ろ: `bubly.menuItems`（root に inner を直接出すレガシーショートカット）
+3. `getAllMenuItems()` が各バブリにつき **1 個**のエントリを返す:
+   - 「universe バブルを開く」エントリ（url = `<name>-bubly`、icon = `bubly.icon`、label = `bubly.label`）
 
-サイドバーはこのリストを並べるので、バブリ 1 個ロード = 最低 1 個アイコン追加（+ menuItems があればその分も）。
+サイドバーはこのリストを並べるので、**バブリ 1 個ロード = アイコン 1 個追加**。
+
+### ロード済みバブリの永続化
+
+`loadBublyFromOrigin()` が成功したオリジンは localStorage
+（`bublys.loaded-bubly-origins`）に覚えられ、次回の OS 起動時に
+`restoreSavedBublies()` が `{origin}/bubly.js` を取り直して再登録する。
+保存するのは**オリジンだけ**でバンドル本体は持たないので、配信側を更新すれば
+次の起動で新しいバンドルが入る。
+
+復元は **バブルを描画する前** に終わらせる（`StoreProvider` が復元完了まで
+children を描かない）。逆順だと、永続化されたバブルがルート未登録のまま
+`Unknown bubble type` として描かれてしまう。
+
+配信元が落ちていて復元に失敗したオリジンは、保存から消さずに残す
+（次に立ち上がっていれば復元される）。
+
+サイドバーの「ロード済」一覧の × で `unloadBubly(name)` を呼ぶと、そのバブリが
+登録したルートを剥がし、保存済みオリジンからも消す（次回の起動でも復元されない）。
+すでに開いているそのバブリのバブルはその場では消えず、ルートが無くなったぶん
+`Unknown bubble type` として残る（閉じれば消える）。
+バブリの中身（inner bubble）は必ず universe の中に囲われた状態でしか開かない
+（root に inner を直接出すショートカットは廃止した）。
 
 ---
 
 ## ポート規約
 
-各バブリ app のスタンドアロン dev サーバーは固有ポートで立てる。`vite.config.mts` の `server.port` / `preview.port` に書く。
+各バブリ app のスタンドアロン dev サーバーは固有ポートで立てる。vite 製は `vite.config.mts` の `server.port` / `preview.port`、Next.js 製は `package.json` の nx ターゲット `dev`（`next dev --port NNNN`）に書く。
 
 現在の割り当て:
 
@@ -92,9 +108,14 @@ export default MyBubly;
 | 4000 | bublys-os |
 | 4001 | gakkai-shift |
 | 4002 | ekikyo |
-| 4003 | tailor-genie |
-| 4004 | sekaisen-igo |
-| 4005 | shift-puzzle |
+| 4003 | tailor-genie（Next.js。`next dev --port 4003`） |
+| 4004 | sekaisen-igo（Next.js。`next dev --port 4004`） |
+| 4005 | event-shift-puzzle |
+| 4006 | hotel-shift-puzzle |
+| 4200 | csv-importer |
+| 4201 | object-transformer |
+
+バブリ以外のアプリはバブリ帯とぶつからないポートを使う（`apps/calculator` = 4300、`apps/memo` = 4301）。
 
 新規バブリは未使用ポートを割り当て、`BublyApp` の `subtitle` にも書いておくと dev 中の自他識別がしやすい。
 
@@ -108,6 +129,9 @@ npx nx dev @bublys-org/<my-bubly>-app    # スタンドアロンが port NNNN �
 
 # 2. バブリバンドルを作る（{origin}/bubly.js のため）
 npx nx build:bubly @bublys-org/<my-bubly>-app
+#    `nx build` は build:bubly に依存しているので、本番ビルド時は自動で作られる。
+#    dev サーバーは standalone を出しているだけなので、bubly.js を更新したいときは
+#    この build:bubly（か build）を明示的に叩く。
 
 # 3. OS（4000）のサイドバー → 「バブリ」セクションに `http://localhost:NNNN` を入力 → ロード
 #    → サイドバーに icon が追加されることを確認
@@ -121,6 +145,14 @@ npx nx build:bubly @bublys-org/<my-bubly>-app
 ## 既知の落とし穴
 
 - **vite ポート衝突**: 別のバブリと同じポートを書くと dev サーバーが立たない or 誤配信になる。
-- **`initialBubbleUrls` が未指定**: universe を開いても中身が空。menuItems からショートカットは出るが、窓 = メインフローとしては機能しない。
+- **配信元が落ちたまま OS を起動**: 保存済みオリジンの復元に失敗し、そのバブリのバブルは `Unknown bubble type` になる。dev サーバーを立ててからリロードすれば戻る。
+- **`initialBubbleUrls` が未指定**: universe を開いても中身が空。サイドバーのアイコンは出るが、窓 = メインフローとしては機能しない。
 - **State 永続化のせい古い `bubbleOptions`**: 既に開いている universe バブルは作成時の `bubbleOptions` 持ち。`backdropColor` / `defaultSize` を変えても反映されない → 一度閉じて開き直す。
-- **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly` しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。
+- **`bubly.js` の再ビルド忘れ**: `bubly.ts` のコード変更は `build:bubly`（または `build`）しないと反映されない。dev サーバーは standalone モード（`app/app.tsx`）を出してるだけで、`bubly.js` はビルド成果物。
+- **bubly.js のブラウザキャッシュ**: OS のローダーは毎回キャッシュバスター付きで取得するので、
+  `build:bubly` 後にサイドバーから再ロードすれば新しいバンドルが入る。手で `<script>` を
+  差し込むなど別経路で読むときは、自分でキャッシュを避けること。
+- **共有ライブラリの名前付きエクスポート**: バブリは `styled-components` などをモジュール
+  1 個 = グローバル 1 個として参照する。OS 側（`StoreProvider`）が default だけを共有すると
+  `keyframes` / `css` のような名前付きエクスポートが解決できず、`bubly.js` の評価中に落ちて
+  無言でロード失敗する（`<script onerror>` にも引っかからない）。共有するのは名前空間ごと。

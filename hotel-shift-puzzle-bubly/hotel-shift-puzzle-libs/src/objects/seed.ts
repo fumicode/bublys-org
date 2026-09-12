@@ -1,23 +1,29 @@
-'use client';
-
 /**
- * サンプルデータの初回投入。
+ * 例データ（デバッグ用のデータパターン）の組み立て。
  *
- * 全オブジェクトは共有のアプリ全体スコープに載るため:
- *   - 複数バブルが個別に seed すると二重投入になりうる → モジュールフラグで一度だけ
- *   - 複数の addObject を同期で呼ぶと各 grow が stale graph から派生して上書きし合う
- *     → addObjects で「1回の grow」にまとめて投入する
- * 永続データがあれば（length>0）その型は投入しない。
+ * 以前はバブルのマウント時に自動投入していたが、今は投入しない。
+ * ファイルバブルの「例データ読み込み」から明示的に呼ばれるだけ。
+ *
+ * 自動投入をやめたことで「まだ無いものだけ足す」という差分ロジックも要らなくなった。
+ * あれは毎回のマウントで走っても壊れないようにするためのもので、ボタン 1 回の操作なら
+ * 「この一式をそのまま入れる」で足りる（呼び出し側が先に世界を空にする）。
+ *
+ * ここは組み立てるだけで、どこにどう書き込むかは知らない（React も store も触らない）。
  */
-import { useEffect } from "react";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import {
-  Staff,
-  WorkShiftSet,
-  MonthlyStaffSchedule,
-  StaffMonthlyShiftWish,
-} from "@bublys-org/hotel-shift-puzzle-model";
-import { useObjects, APP_SCOPE_ID } from "./repository.js";
+  createSampleStaffList,
+  createSampleWorkShiftSet,
+  createSampleSchedules,
+  createSampleShiftWishes,
+  createSampleAvailabilityFor,
+  createSampleConstraintsFor,
+  createEndgameSchedule,
+  createMidMonthSchedule,
+  ENDGAME_MAX_DAY_OFF_PER_DAY,
+  ENDGAME_SCHEDULE_ID,
+  ALLOWED_SHIFT_IDS_BY_STAFF,
+} from "../data/index.js";
+import type { BundleItem } from "./commit.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -26,113 +32,69 @@ import {
   SCHEDULE_CONSTRAINTS_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "./hotelObjects.js";
-import { createSampleStaffList } from "../data/sampleStaff.js";
-import { createSampleWorkShiftSet } from "../data/sampleWorkShifts.js";
-import { createSampleSchedules } from "../data/sampleSchedule.js";
-import { createSampleShiftWishes } from "../data/sampleShiftWishes.js";
-import { createSampleAvailabilityFor } from "../data/sampleAvailability.js";
-import { createSampleConstraintsFor } from "../data/sampleConstraints.js";
-import {
-  createEndgameSchedule,
-  createMidMonthSchedule,
-  ENDGAME_MAX_DAY_OFF_PER_DAY,
-  ENDGAME_SCHEDULE_ID,
-} from "../data/sampleScenarios.js";
-import { ALLOWED_SHIFT_IDS_BY_STAFF } from "../data/sampleAvailability.js";
 
-let seeded = false;
+/**
+ * 例データ一式を「世界線へ書き込める形」で組み立てる。
+ *
+ * 中身:
+ *   - スタッフ 9 人、グローバルの勤務帯セット（テンプレート）、全員の希望（6〜9月）
+ *   - 勤務表 4 つ
+ *       空の勤務表（6月・7月） … 自動シフトを一から動かす用
+ *       作成途中（8月）       … 候補集合・確定提案を見る用（実際に人が触る状態）
+ *       終盤・詰みあり（9月）  … 埋められないセルがある状態
+ *   - 勤務表ごとの勤務帯セット・可能勤務帯・制約
+ */
+export function buildSampleItems(): BundleItem[] {
+  const items: BundleItem[] = [];
 
-export function useSeedHotelData(): void {
-  const scope = useCasScope(APP_SCOPE_ID);
-  const staff = useObjects<Staff>(STAFF_TYPE);
-  const workShiftSets = useObjects<WorkShiftSet>(WORKSHIFT_SET_TYPE);
-  const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
-  const wishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
+  for (const staff of createSampleStaffList()) {
+    items.push({ type: STAFF_TYPE, obj: staff });
+  }
 
-  useEffect(() => {
-    if (seeded) return;
-    seeded = true;
+  // グローバルの勤務帯セット（テンプレート）。勤務表作成時にこれをコピーする。
+  items.push({ type: WORKSHIFT_SET_TYPE, obj: createSampleWorkShiftSet() });
 
-    const items: { type: string; object: unknown }[] = [];
+  const scenarioParams = {
+    staffIds: createSampleStaffList().map((s) => s.id),
+    allowedShiftIds: ALLOWED_SHIFT_IDS_BY_STAFF,
+    wishes: createSampleShiftWishes(),
+    maxConsecutive: 5,
+  };
+  const sampleSchedules = [
+    ...createSampleSchedules(),
+    createMidMonthSchedule(scenarioParams),
+    createEndgameSchedule(scenarioParams),
+  ];
 
-    // スタッフは「まだ居ない人だけ」足す。既に触ったデータがある環境でも、
-    // サンプルを増やしたぶんが入るようにする（全部揃うまで何も入らない、を避ける）。
-    const knownStaffIds = new Set(staff.map((s) => s.id));
-    items.push(
-      ...createSampleStaffList()
-        .filter((s) => !knownStaffIds.has(s.id))
-        .map((o) => ({ type: STAFF_TYPE, object: o }))
-    );
+  for (const schedule of sampleSchedules) {
+    items.push({ type: SCHEDULE_TYPE, obj: schedule });
+    // 勤務表ごとの独自勤務帯セット（グローバルのコピー。id=scheduleId）
+    items.push({
+      type: WORKSHIFT_SET_TYPE,
+      obj: createSampleWorkShiftSet().withId(schedule.id),
+    });
+    // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
+    items.push({
+      type: SCHEDULE_AVAILABILITY_TYPE,
+      obj: createSampleAvailabilityFor(schedule.id),
+    });
+    // 制約（責任者ルール）も勤務表に紐づく別集約として投入。
+    // 終盤シナリオだけは「その日に休める枠がもう残っていない」状況を作るため、
+    // 1日の休み上限を需要から決まる人数ちょうどまで絞る。
+    items.push({
+      type: SCHEDULE_CONSTRAINTS_TYPE,
+      obj: createSampleConstraintsFor(
+        schedule.id,
+        schedule.id === ENDGAME_SCHEDULE_ID
+          ? { maxDayOffPerDay: ENDGAME_MAX_DAY_OFF_PER_DAY }
+          : {}
+      ),
+    });
+  }
 
-    if (workShiftSets.length === 0) {
-      // グローバルの勤務帯セット（テンプレート）。勤務表作成時にこれをコピーする。
-      items.push({ type: WORKSHIFT_SET_TYPE, object: createSampleWorkShiftSet() });
-    }
+  for (const wish of createSampleShiftWishes()) {
+    items.push({ type: STAFF_SHIFT_WISH_TYPE, obj: wish });
+  }
 
-    // 勤務表も ID 単位で「まだ無いものだけ」足す。
-    //   - 空の勤務表（6月・7月）: 自動シフトを一から動かす用
-    //   - 作成途中（8月）      : 候補集合・確定提案を見る用（実際に人が触る状態）
-    //   - 終盤・詰みあり（9月）: 埋められないセルがある状態
-    const scenarioParams = {
-      staffIds: createSampleStaffList().map((s) => s.id),
-      allowedShiftIds: ALLOWED_SHIFT_IDS_BY_STAFF,
-      wishes: createSampleShiftWishes(),
-      maxConsecutive: 5,
-    };
-    const sampleSchedules = [
-      ...createSampleSchedules(),
-      createMidMonthSchedule(scenarioParams),
-      createEndgameSchedule(scenarioParams),
-    ];
-    const knownScheduleIds = new Set(schedules.map((s) => s.id));
-    for (const schedule of sampleSchedules) {
-      if (knownScheduleIds.has(schedule.id)) continue;
-      items.push({ type: SCHEDULE_TYPE, object: schedule });
-      // 勤務表ごとの独自勤務帯セット（グローバルのコピー。id=scheduleId）
-      items.push({
-        type: WORKSHIFT_SET_TYPE,
-        object: createSampleWorkShiftSet().withId(schedule.id),
-      });
-      // 可能勤務帯は人によってばらける（早番・中番のみ／早番不可 など）。勤務表に紐づく別集約
-      items.push({
-        type: SCHEDULE_AVAILABILITY_TYPE,
-        object: createSampleAvailabilityFor(schedule.id),
-      });
-      // 制約（責任者ルール）も勤務表に紐づく別集約として投入。
-      // 終盤シナリオだけは「その日に休める枠がもう残っていない」状況を作るため、
-      // 1日の休み上限を需要から決まる人数ちょうどまで絞る。
-      items.push({
-        type: SCHEDULE_CONSTRAINTS_TYPE,
-        object: createSampleConstraintsFor(
-          schedule.id,
-          schedule.id === ENDGAME_SCHEDULE_ID
-            ? { maxDayOffPerDay: ENDGAME_MAX_DAY_OFF_PER_DAY }
-            : {}
-        ),
-      });
-    }
-
-    // 希望も「まだ無い月・人だけ」足す
-    const knownWishKeys = new Set(
-      wishes.map((w) => `${w.staffId}:${w.year}-${w.month}`)
-    );
-    items.push(
-      ...createSampleShiftWishes()
-        .filter((w) => !knownWishKeys.has(`${w.staffId}:${w.year}-${w.month}`))
-        .map((o) => ({ type: STAFF_SHIFT_WISH_TYPE, object: o }))
-    );
-    // 既に永続化された勤務表（旧データや別経路で作成）に独自勤務帯セットが無ければ補う。
-    // 旧モデルの勤務帯ID（early/middle/late）と既定セットの id が一致するので割当は有効なまま。
-    const setIds = new Set(workShiftSets.map((s) => s.id));
-    for (const schedule of schedules) {
-      if (!setIds.has(schedule.id)) {
-        items.push({
-          type: WORKSHIFT_SET_TYPE,
-          object: createSampleWorkShiftSet().withId(schedule.id),
-        });
-      }
-    }
-    if (items.length > 0) scope.addObjects(items); // 1回の grow でまとめて投入
-    // 初回マウント時に一度だけ
-  }, []);
+  return items;
 }

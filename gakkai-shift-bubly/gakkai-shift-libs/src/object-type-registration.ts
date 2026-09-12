@@ -14,6 +14,7 @@ import {
 import PersonIcon from "@mui/icons-material/Person";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import AssignmentIcon from "@mui/icons-material/Assignment";
+import TableChartIcon from "@mui/icons-material/TableChart";
 import React from "react";
 
 // マスターデータ（静的）
@@ -61,3 +62,7 @@ registerObjectType('ShiftAssignment', {
   icon: React.createElement(AssignmentIcon, { fontSize: 'small' }),
   labelResolver: resolveShiftAssignmentLabel,
 });
+
+// 世界線に保存される集約ではないが、画面の上ではひとつの「もの」として振る舞うビュー。
+// ObjectView の約束（ドラッグでき、ダブルクリックでバブルが開く）を満たすには型名が要る。
+registerObjectType('StaffShiftTable', React.createElement(TableChartIcon, { fontSize: 'small' }));

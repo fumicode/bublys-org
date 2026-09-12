@@ -164,6 +164,25 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(schedule.countDayOffOn(june1)).toBe(2);
   });
 
+  test('countWorkingForStaff でスタッフの指定勤務帯日数を数える（休み・未定は除く）', () => {
+    const june2 = WorkingDay.of(2026, 6, 2);
+    const june3 = WorkingDay.of(2026, 6, 3);
+    const schedule = createJuneSchedule()
+      .assignShift('staff-A', june1, 'early')
+      .assignShift('staff-A', june2, 'early')
+      .assignShift('staff-A', june3, 'late')
+      .assignDayOff('staff-A', WorkingDay.of(2026, 6, 4))
+      .markUndecided('staff-A', WorkingDay.of(2026, 6, 5));
+
+    expect(schedule.countWorkingForStaff('staff-A', new Set(['early']))).toBe(2);
+    // 同名複数 ID を合算できる
+    expect(
+      schedule.countWorkingForStaff('staff-A', new Set(['early', 'early-8']))
+    ).toBe(2);
+    expect(schedule.countWorkingForStaff('staff-A', new Set(['late']))).toBe(1);
+    expect(schedule.countWorkingForStaff('staff-A', new Set())).toBe(0);
+  });
+
   test('必要スタッフ数を稼働日×勤務帯名で持てる（requiredFor / setRequired）', () => {
     const base = createJuneSchedule();
     // 既定は未設定（0）

@@ -149,7 +149,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
-  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
@@ -157,13 +157,26 @@ const BubbleViewInner: FC<BubbleProps> = ({
 
   const isHeaderVisible = isFocused || isMouseNearTop;
 
+  /**
+   * ヘッダーを押し下げる基準の上端。
+   *
+   * バブルが universe の中にいるときは、その universe の窓（`main.e-window-content`）の
+   * 上端が「見えている範囲の上端」。ブラウザの viewport（0）を基準にすると、
+   * 入れ子の中で上端に張り付いたバブルのヘッダーが窓の外に出てクリップされ、掴めなくなる。
+   * root universe では該当する祖先が無いので 0（= viewport 上端）に落ちる。
+   */
+  const visibleTopBound = (): number => {
+    const clip = ref.current?.closest("main.e-window-content");
+    return clip ? clip.getBoundingClientRect().top : 0;
+  };
+
   const updateHeaderSafeZone = () => {
     const bubbleRect = ref.current?.getBoundingClientRect();
     if (!bubbleRect) return;
     const headerEl = ref.current?.querySelector('.e-bubble-header');
     const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
-    const headerTopInViewport = bubbleRect.top - headerHeight;
-    setHeaderOffset(Math.max(0, -headerTopInViewport));
+    const headerTop = bubbleRect.top - headerHeight;
+    setHeaderOffset(Math.max(0, visibleTopBound() - headerTop));
   };
 
   useLayoutEffect(() => {
@@ -348,12 +361,12 @@ const BubbleViewInner: FC<BubbleProps> = ({
         {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
-      {/* 右下リサイズハンドル — ユーザーがサイズを決められる状態への入り口 */}
-      <div
-        className="e-resize-handle"
-        onMouseDown={onResizeStart}
-        title="サイズ調整"
-      />
+      {/* リサイズハンドル。掴んだ辺の反対側が固定される（左辺を掴めば右辺は動かない） */}
+      <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
+      <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
+      <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
+      <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
+      <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
     </StyledBubble>
   );
 };
@@ -768,7 +781,52 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       linear-gradient(135deg, transparent 0%, transparent 65%, hsla(0, 0%, 30%, 0.30) 65%, hsla(0, 0%, 30%, 0.30) 75%, transparent 75%) no-repeat;
   }
 
-  &:hover > .e-resize-handle {
+  /* 辺のリサイズ帯。見た目は出さず、掴める幅だけ持つ */
+  > .e-resize-edge {
+    position: absolute;
+    z-index: 4;
+  }
+  > .e-resize-w {
+    left: -3px;
+    top: 8px;
+    bottom: 16px;
+    width: 8px;
+    cursor: ew-resize;
+  }
+  > .e-resize-e {
+    right: -3px;
+    top: 8px;
+    bottom: 16px;
+    width: 8px;
+    cursor: ew-resize;
+  }
+  > .e-resize-s {
+    left: 16px;
+    right: 16px;
+    bottom: -3px;
+    height: 8px;
+    cursor: ns-resize;
+  }
+  /* 左下の隅。右下（e-resize-handle）と対称 */
+  > .e-resize-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  > .e-resize-sw {
+    left: 2px;
+    bottom: 2px;
+    cursor: nesw-resize;
+    background:
+      linear-gradient(45deg, transparent 0%, transparent 45%, hsla(0, 0%, 30%, 0.45) 45%, hsla(0, 0%, 30%, 0.45) 55%, transparent 55%) no-repeat,
+      linear-gradient(45deg, transparent 0%, transparent 65%, hsla(0, 0%, 30%, 0.30) 65%, hsla(0, 0%, 30%, 0.30) 75%, transparent 75%) no-repeat;
+  }
+
+  &:hover > .e-resize-handle,
+  &:hover > .e-resize-corner {
     opacity: 1;
   }
 `;

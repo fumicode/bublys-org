@@ -10,7 +10,6 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReservationInfoView } from "../ui/ScheduleReservationInfoView.js";
 import { useObject, useObjectRepo, APP_SCOPE_ID } from "../objects/repository.js";
-import { useSeedHotelData } from "../objects/seed.js";
 import { SCHEDULE_TYPE, SCHEDULE_RESERVATION_INFO_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleReservationInfoDetailProps = {
@@ -28,7 +27,6 @@ type ScheduleReservationInfoDetailProps = {
 export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProps> = ({
   scheduleId,
 }) => {
-  useSeedHotelData();
   // 稼働日は勤務表（年月）から導出するので勤務表本体も読む
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const reservationInfo = useObject<DailyReservationInfo>(
