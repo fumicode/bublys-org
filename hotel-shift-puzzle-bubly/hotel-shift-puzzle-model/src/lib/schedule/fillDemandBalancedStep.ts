@@ -64,7 +64,7 @@ export const fillDemandBalancedStep: AutoShiftStep = {
 
       // その人がその帯に「いま」入れるか（可能勤務帯 & 連勤上限）
       const canTake = (staffId: string, shiftId: string): boolean =>
-        isAvailable(staffId, shiftId) && !wouldExceedConsecutive(result, staffId, day, max);
+        isAvailable(staffId, shiftId, day) && !wouldExceedConsecutive(result, staffId, day, max);
 
       // 1人ずつ、最も充足率の低い帯へ配る
       // eslint-disable-next-line no-constant-condition
@@ -115,7 +115,7 @@ export const fillDemandBalancedStep: AutoShiftStep = {
         const counts = countWorkingByName(result, day, ctx.shiftNameById);
         let best: { shiftId: string; n: number } | null = null;
         for (const [name, shiftId] of ctx.shiftIdByName) {
-          if (!isAvailable(s, shiftId)) continue;
+          if (!isAvailable(s, shiftId, day)) continue;
           const n = counts.get(name) ?? 0;
           if (!best || n < best.n) best = { shiftId, n };
         }

@@ -11,9 +11,10 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 
 // Bubble Routes
-import { hotelShiftPuzzleBubbleRoutes } from "./registration/index.js";
+import { hotelShiftPuzzleBubbleRoutes, shiftWishListUrl } from "./registration/index.js";
 
 const HotelShiftPuzzleBubly: Bubly = {
   name: "hotel-shift-puzzle",
@@ -33,6 +34,11 @@ const HotelShiftPuzzleBubly: Bubly = {
       label: "勤務帯",
       url: "hotel-shift-puzzle/work-shifts",
       icon: React.createElement(ScheduleIcon, { color: "action" }),
+    },
+    {
+      label: "シフト希望",
+      url: shiftWishListUrl(),
+      icon: React.createElement(EditCalendarIcon, { color: "action" }),
     },
     {
       label: "勤務表",

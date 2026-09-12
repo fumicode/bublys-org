@@ -2,7 +2,7 @@
 
 import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
+import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   Staff,
   WorkShiftSet,
@@ -64,6 +64,7 @@ import {
   SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { SHIFT_WISH_MONTH_VIEW_TYPE } from "../ui/viewObjectTypes.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
@@ -83,6 +84,11 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   availabilityUrl?: string;
+  /**
+   * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
+   * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
+   */
+  shiftWishesUrl?: (year: number, month: number) => string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
   /** 操作履歴バブルを開くハンドラ */
@@ -138,6 +144,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   worldLineUrl,
   treeUrl,
   availabilityUrl,
+  shiftWishesUrl,
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
@@ -770,6 +777,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
               </button>
             )}
 
+          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
+          {shiftWishesUrl && (
+            <ObjectView
+              type={SHIFT_WISH_MONTH_VIEW_TYPE}
+              url={shiftWishesUrl(schedule.year, schedule.month)}
+              label={`${schedule.year}年${schedule.month}月のシフト希望`}
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックでこの月のシフト希望を開く">
+                シフト希望
+              </span>
+            </ObjectView>
+          )}
+
           {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
               自動シフトの優先度に使う。詳しくは reportPriority.ts）。
               独立した行にすると縦を食うので、可能勤務帯の右に並べて高さを抑える。 */}
@@ -1134,6 +1155,10 @@ const StyledContainer = styled.div`
 
   /* ヘッダ・フッタ共通のリンク風ボタン */
   .e-link {
+    /* 「すでに在るものを開く」ボタンは ObjectView の中の <span> になった。
+       <button> と同じ見え方にするため、行揃えを明示する */
+    display: inline-flex;
+    align-items: center;
     border: 1px solid #cfd8dc;
     border-radius: 6px;
     background: #fff;

@@ -67,7 +67,7 @@ export function makeSatisfyLeaderRulesStep(
         rule.leaderStaffIds.filter(
           (id) =>
             result.isUndecided(id, day) &&
-            isAvailable(id, coverShiftId) &&
+            isAvailable(id, coverShiftId, day) &&
             ctx.preferenceOf(id, day).kind !== "day-off" &&
             !wouldExceedConsecutive(result, id, day, max)
         );

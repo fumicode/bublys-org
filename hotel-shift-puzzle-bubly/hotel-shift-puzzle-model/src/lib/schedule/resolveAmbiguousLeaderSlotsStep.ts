@@ -46,7 +46,7 @@ export function makeResolveAmbiguousLeaderSlotsStep(
         ids.filter(
           (id) =>
             result.isUndecided(id, slot.day) &&
-            isAvailable(id, slot.shiftId) &&
+            isAvailable(id, slot.shiftId, slot.day) &&
             ctx.preferenceOf(id, slot.day).kind !== "day-off" &&
             !wouldExceedConsecutive(result, id, slot.day, max)
         );
