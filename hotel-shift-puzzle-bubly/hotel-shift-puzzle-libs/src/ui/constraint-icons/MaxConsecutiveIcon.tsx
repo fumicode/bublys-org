@@ -5,18 +5,23 @@
  * 横に連続した出勤セル（青）を N 個ぶん並べ、末尾に停止バー（休みで区切る）を置き ≤N を示す。
  */
 import { FC } from "react";
+import { ICON_SIZE } from "./common.js";
 
-type Props = { max: number };
+type Props = {
+  max: number;
+  /** 1辺のサイズ（px）。バーは既定の80、バブルの図は大きく描く */
+  size?: number;
+};
 
 const MAX_CELLS = 6;
 
-export const MaxConsecutiveIcon: FC<Props> = ({ max }) => {
+export const MaxConsecutiveIcon: FC<Props> = ({ max, size = ICON_SIZE }) => {
   const run = Math.min(Math.max(0, max), MAX_CELLS);
   const w = 9;
   const gap = 1.5;
   const x0 = 10;
   return (
-    <svg className="e-icon-svg" width={80} height={80} viewBox="0 0 80 80" aria-hidden>
+    <svg className="e-icon-svg" width={size} height={size} viewBox="0 0 80 80" aria-hidden>
       {/* N 連続の出勤セル（早番色） */}
       {Array.from({ length: run }).map((_, i) => (
         <rect

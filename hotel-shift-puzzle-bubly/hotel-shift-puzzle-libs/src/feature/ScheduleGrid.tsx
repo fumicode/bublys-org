@@ -104,10 +104,14 @@ type ScheduleGridProps = {
    * ダブルクリックでこの URL のバブルを開く。URL スキームは app 層の関心事なので注入で受ける。
    */
   reservationInfoUrl?: string;
-  /** ルール可視化バブルの URL を作る（ロールキー）。上部ルール行の ObjectView に渡す */
-  ruleBubbleUrl?: (ruleKey: string) => string;
-  /** 勤務間インターバルの図バブルの URL を作る（ルールキー）。同じく上部ルール行に渡す */
-  intervalRuleBubbleUrl?: (ruleKey: string) => string;
+  /**
+   * 制約1つぶんのバブル URL を作る。上部ルール行の全アイコンがこれで開く。
+   * URL スキームは app 層の関心事なので、種類とキーだけ渡して作ってもらう。
+   */
+  bubbleUrlOf?: (
+    kind: "leaderRule" | "shiftInterval" | "limit",
+    key: string
+  ) => string;
   /**
    * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
    * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
@@ -145,8 +149,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
-  ruleBubbleUrl,
-  intervalRuleBubbleUrl,
+  bubbleUrlOf,
   reportBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
@@ -215,6 +218,15 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     scheduleId
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
+  /**
+   * 制約バーに渡す制約セット。まだ読めていない間は既定値だけの空セットを描く
+   * （**表示用に作るだけで保存はしない**。保存の起点は useConstraintSetEditor が
+   * 「本当に無い」と確かめてから作る）。
+   */
+  const barConstraintSet = useMemo(
+    () => constraints ?? ConstraintSet.empty(scheduleId ?? ""),
+    [constraints, scheduleId]
+  );
 
   // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
   // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
@@ -810,19 +822,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
-          leaderRules={leaderRules}
+          constraintSet={barConstraintSet}
           nameOf={nameOf}
           shiftColorOf={shiftColorOf}
           onSelectRule={selectRuleStaff}
           selectedStaffIds={selectedStaffIds}
-          ruleBubbleUrl={ruleBubbleUrl}
+          bubbleUrlOf={bubbleUrlOf}
           onAddRule={scheduleId && onOpenRule ? handleAddRule : undefined}
-          maxConsecutive={constraints?.maxConsecutiveWorkdays ?? 5}
-          minDayOff={minDayOff}
-          maxPerDay={maxPerDay}
-          checkShiftWish={constraints?.checkShiftWish ?? true}
-          intervalRules={constraints?.shiftIntervalRules ?? []}
-          intervalRuleBubbleUrl={intervalRuleBubbleUrl}
         />
         <ShiftCommandsBar
           targetCount={subsetStaff.length}

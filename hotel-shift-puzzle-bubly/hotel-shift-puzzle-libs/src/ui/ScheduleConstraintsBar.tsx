@@ -15,21 +15,31 @@
 import { FC, Fragment, ReactNode } from "react";
 import styled from "styled-components";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import { SCHEDULE_LEADER_RULE_VIEW_TYPE } from "./viewObjectTypes.js";
-import { ShiftIntervalRule, ShiftLeaderRule } from "../domain/index.js";
+import {
+  SCHEDULE_LEADER_RULE_VIEW_TYPE,
+  CONSTRAINT_LIMIT_VIEW_TYPE,
+  SHIFT_INTERVAL_RULE_VIEW_TYPE,
+} from "./viewObjectTypes.js";
+import { ShiftIntervalRule, ShiftLeaderRule, ConstraintSet } from "../domain/index.js";
 import { leaderRoleColor } from "./LeaderBadges.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
 import { IconColor, IconFrame, IconCaption } from "./constraint-icons/common.js";
 import { LeaderConstraintIcon } from "./constraint-icons/LeaderConstraintIcon.js";
-import { MaxDayOffPerDayIcon } from "./constraint-icons/MaxDayOffPerDayIcon.js";
-import { MinMonthlyDayOffIcon } from "./constraint-icons/MinMonthlyDayOffIcon.js";
-import { MaxConsecutiveIcon } from "./constraint-icons/MaxConsecutiveIcon.js";
+import {
+  limitSpecsIn,
+  type LimitGroup,
+  type LimitSpec,
+} from "./constraint-icons/limitSpecs.js";
 import { ShiftIntervalIcon } from "./constraint-icons/ShiftIntervalIcon.js";
-import { WishIcon } from "./constraint-icons/WishIcon.js";
 
 type ScheduleConstraintsBarProps = {
-  /** 責任者ルール（解決済み） */
-  leaderRules: ShiftLeaderRule[];
+  /**
+   * 描く対象の制約セット。**バーが出すものは全部ここから出る**
+   * （責任者ルール・勤務間インターバル・連勤・休日・休み上限・希望）。
+   * 値をばらして渡していた頃は、呼び出し側が `?? 5` のような既定を書き直していて、
+   * モデルの既定と二重になっていた。
+   */
+  constraintSet: ConstraintSet;
   /**
    * スタッフID → 表示名（tooltip 用）。
    * 担当者は勤務表ごとに決まる（名簿は勤務表が生まれるときに焼き付く）ので、
@@ -42,22 +52,19 @@ type ScheduleConstraintsBarProps = {
   onSelectRule?: (staffIds: string[]) => void;
   /** 現在フォーカス中（選択中）のスタッフID。ルールの関係者が全員含まれればそのアイコンを強調する。 */
   selectedStaffIds?: Set<string>;
-  /** 責任者ルールの図バブル URL（ダブルクリックで開く）。省略時は開かない。 */
-  ruleBubbleUrl?: (ruleKey: string) => string;
+  /**
+   * 制約1つぶんのバブル URL を作る。渡すとどのアイコンもダブルクリックで開く。
+   *
+   * URL の形は app 層の関心事なので、libs は「どの種類の何番か」だけを言う
+   * （"leader-rules" のような URL の断片もここには書かない）。
+   * 制約が増えても prop は増えない。
+   */
+  bubbleUrlOf?: (
+    kind: "leaderRule" | "shiftInterval" | "limit",
+    key: string
+  ) => string;
   /** 責任者ルールを新規追加する。渡すと「＋」が出る。 */
   onAddRule?: () => void;
-  /** 連勤上限（日数） */
-  maxConsecutive: number;
-  /** 月の最低休日数 */
-  minDayOff: number;
-  /** 1日に休める人数の上限 */
-  maxPerDay: number;
-  /** シフト希望チェックが有効か */
-  checkShiftWish: boolean;
-  /** 勤務間インターバルのルール（「遅番の翌日は早番・中番に入れない」など） */
-  intervalRules?: ShiftIntervalRule[];
-  /** 勤務間インターバルの図バブル URL（ダブルクリックで開く）。省略時は開かない。 */
-  intervalRuleBubbleUrl?: (ruleKey: string) => string;
 };
 
 const DEFAULT_SHIFT_COLOR: IconColor = { bg: "#eceff1", fg: "#455a64" };
@@ -85,20 +92,41 @@ export const shiftColorOfNames = (
 };
 
 export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
-  leaderRules,
+  constraintSet,
   nameOf,
   shiftColorOf,
   onSelectRule,
   selectedStaffIds,
-  ruleBubbleUrl,
+  bubbleUrlOf,
   onAddRule,
-  maxConsecutive,
-  minDayOff,
-  maxPerDay,
-  checkShiftWish,
-  intervalRules = [],
-  intervalRuleBubbleUrl,
 }) => {
+  /**
+   * アイコンを「開けるもの」にする。URL を作れないときは素の図のまま返す。
+   * 包み方を3種で分けないのが要点（開くものと開かないものの非対称を作らない）。
+   */
+  const openable = (
+    frame: ReactNode,
+    kind: "leaderRule" | "shiftInterval" | "limit",
+    key: string,
+    type: string,
+    label: string
+  ): ReactNode => {
+    const url = bubbleUrlOf?.(kind, key);
+    return url ? (
+      <ObjectView
+        key={key}
+        type={type}
+        url={url}
+        label={label}
+        openingPosition="origin-side"
+      >
+        {frame}
+      </ObjectView>
+    ) : (
+      <Fragment key={key}>{frame}</Fragment>
+    );
+  };
+
   // 責任者アイコン1つ（単クリック=選択 / ダブルクリック=図バブル）
   const renderLeader = (rule: ShiftLeaderRule): ReactNode => {
     const color = shiftColorOf?.(rule.shiftName) ?? DEFAULT_SHIFT_COLOR;
@@ -157,19 +185,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
     );
 
     // ダブルクリックで図バブルを開く（ObjectView）。単クリックの選択は内側で stopPropagation 済み。
-    return ruleBubbleUrl ? (
-      <ObjectView
-        key={rule.key}
-        type={SCHEDULE_LEADER_RULE_VIEW_TYPE}
-        url={ruleBubbleUrl(rule.key)}
-        label={rule.label}
-        openingPosition="origin-side"
-      >
-        {frame}
-      </ObjectView>
-    ) : (
-      <Fragment key={rule.key}>{frame}</Fragment>
-    );
+    return openable(frame, "leaderRule", rule.key, SCHEDULE_LEADER_RULE_VIEW_TYPE, rule.label);
   };
 
   // 勤務間インターバルのアイコン1つ（ダブルクリック=図バブル）。
@@ -178,10 +194,8 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
   const renderInterval = (rule: ShiftIntervalRule): ReactNode => {
     const frame = (
       <IconFrame
-        className={intervalRuleBubbleUrl ? "is-clickable" : ""}
-        title={`${rule.describe()}${
-          intervalRuleBubbleUrl ? "（ダブルクリックで詳細）" : ""
-        }`}
+        className={bubbleUrlOf ? "is-clickable" : ""}
+        title={`${rule.describe()}${bubbleUrlOf ? "（ダブルクリックで詳細）" : ""}`}
       >
         <ShiftIntervalIcon
           fromShiftName={rule.fromShiftName}
@@ -193,19 +207,36 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
       </IconFrame>
     );
 
-    return intervalRuleBubbleUrl ? (
-      <ObjectView
-        key={rule.key}
-        url={intervalRuleBubbleUrl(rule.key)}
-        openingPosition="origin-side"
-        draggable={false}
-      >
-        {frame}
-      </ObjectView>
-    ) : (
-      <Fragment key={rule.key}>{frame}</Fragment>
+    return openable(
+      frame,
+      "shiftInterval",
+      rule.key,
+      SHIFT_INTERVAL_RULE_VIEW_TYPE,
+      rule.label
     );
   };
+
+  // 数と真偽で言い切れる制約（連勤・休日・休み上限・希望）。
+  // 描き方も文言も limitSpecs の1行から出るので、ここには制約ごとの分岐が無い。
+  const renderLimit = (spec: LimitSpec): ReactNode => {
+    const value = spec.read(constraintSet);
+    const frame = (
+      <IconFrame
+        className={bubbleUrlOf ? "is-clickable" : ""}
+        title={`${spec.describe(value)}${bubbleUrlOf ? "（ダブルクリックで詳細）" : ""}`}
+      >
+        {spec.render(value)}
+        <IconCaption>{spec.caption}</IconCaption>
+      </IconFrame>
+    );
+    return openable(frame, "limit", spec.key, CONSTRAINT_LIMIT_VIEW_TYPE, spec.caption);
+  };
+
+  const leaderRules = constraintSet.leaderRules;
+  const intervalRules = constraintSet.shiftIntervalRules;
+
+  const renderLimits = (group: LimitGroup): ReactNode[] =>
+    limitSpecsIn(group).map(renderLimit);
 
   return (
     <StyledBar>
@@ -214,10 +245,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
         <span className="e-group-label">稼働日ごと<span className="e-axis">↕</span></span>
         <div className="e-icons">
           {leaderRules.map(renderLeader)}
-          <IconFrame title={`1日に休めるのは${maxPerDay}人まで`}>
-            <MaxDayOffPerDayIcon max={maxPerDay} />
-            <IconCaption>休み上限</IconCaption>
-          </IconFrame>
+          {renderLimits("per-day")}
           {onAddRule && (
             <button
               type="button"
@@ -235,14 +263,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
       <div className="e-group">
         <span className="e-group-label">人ごと<span className="e-axis">↔</span></span>
         <div className="e-icons">
-          <IconFrame title={`月に${minDayOff}日以上休む`}>
-            <MinMonthlyDayOffIcon min={minDayOff} />
-            <IconCaption>休日</IconCaption>
-          </IconFrame>
-          <IconFrame title={`連勤は最大${maxConsecutive}日まで`}>
-            <MaxConsecutiveIcon max={maxConsecutive} />
-            <IconCaption>連勤</IconCaption>
-          </IconFrame>
+          {renderLimits("per-person")}
           {intervalRules.map(renderInterval)}
         </div>
       </div>
@@ -251,10 +272,7 @@ export const ScheduleConstraintsBar: FC<ScheduleConstraintsBarProps> = ({
       <div className="e-group">
         <span className="e-group-label">全体</span>
         <div className="e-icons">
-          <IconFrame title="できるだけシフト希望に沿う">
-            <WishIcon on={checkShiftWish} />
-            <IconCaption>希望</IconCaption>
-          </IconFrame>
+          {renderLimits("whole")}
         </div>
       </div>
     </StyledBar>

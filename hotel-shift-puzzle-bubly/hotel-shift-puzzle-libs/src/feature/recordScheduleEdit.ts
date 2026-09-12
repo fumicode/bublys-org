@@ -30,6 +30,7 @@ import {
 import {
   SCHEDULE_TYPE,
   CONSTRAINT_SET_TYPE,
+  GLOBAL_CONSTRAINT_SET_ID,
   SCHEDULE_EDIT_LOG_TYPE,
 } from "../objects/hotelObjects.js";
 
@@ -304,7 +305,16 @@ export function recordConstraintEdit(
     summary: string;
   }
 ): void {
-  // 勤務表ごとの制約セットは id が scheduleId（グローバルのテンプレートはここへ来ない）
+  // 勤務表ごとの制約セットは id が scheduleId。
+  // グローバルのテンプレート（id="global"）を通すと `Schedule:global` という存在しない
+  // 勤務表の世界が（スタッフの焼き付き込みで）生まれる。コメントではなくコードで塞ぐ。
+  if (args.nextConstraints.id === GLOBAL_CONSTRAINT_SET_ID) {
+    console.warn(
+      "recordConstraintEdit: グローバルの制約セットは勤務表の世界線に記録しません" +
+        "（テンプレートはどの勤務表のものでもないため）。"
+    );
+    return;
+  }
   const scheduleId = args.nextConstraints.id;
   const before =
     args.schedule?.checkConstraints(args.beforeConstraints) ?? [];

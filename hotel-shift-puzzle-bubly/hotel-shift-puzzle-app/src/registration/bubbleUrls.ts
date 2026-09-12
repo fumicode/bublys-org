@@ -60,21 +60,26 @@ export const scheduleExtractUrl = (scheduleId: string, staffIds: string[]): stri
 export const scheduleDayUrl = (scheduleId: string, dayKey: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/days/${dayKey}`;
 
-/** 責任者ルール可視化バブル（上部ルール行のクリックで開く。ロールキーを乗せる） */
-export const scheduleLeaderRuleUrl = (
-  scheduleId: string,
-  ruleKey: string
-): string => `hotel-shift-puzzle/schedules/${scheduleId}/leader-rules/${ruleKey}`;
-
 /**
- * 勤務間インターバルのルール可視化バブル（上部ルール行の「遅番明け」アイコンから開く）。
- * 責任者ルールと並ぶ「ルールの図」なので、URL も leader-rules と同じ形に揃える。
+ * 制約1つぶんのバブル URL。
+ *
+ * 主語は**制約セットID**（"global" か scheduleId）。開いているのは「勤務表の一部」ではなく
+ * 「制約セットの中の1制約」なので、住所も制約セットで言う。おかげでグローバルの
+ * テンプレートからも勤務表からも、同じ1本の pattern で開ける。
  */
-export const scheduleShiftIntervalRuleUrl = (
-  scheduleId: string,
-  ruleKey: string
-): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/shift-interval-rules/${ruleKey}`;
+export const constraintBubbleUrlOf = (
+  constraintSetId: string,
+  kind: "leaderRule" | "shiftInterval" | "limit",
+  key: string
+): string => {
+  const path =
+    kind === "leaderRule"
+      ? "leader-rules"
+      : kind === "shiftInterval"
+        ? "shift-interval-rules"
+        : "limits";
+  return `hotel-shift-puzzle/constraints/${constraintSetId}/${path}/${key}`;
+};
 
 /** 制約違反バブル（赤帯・⊿マーカーから開く） */
 export const scheduleViolationUrl = (

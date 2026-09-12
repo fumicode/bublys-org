@@ -5,25 +5,20 @@ import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
 import {
   WorkShiftSet,
   ConstraintSet,
-  MonthlyStaffSchedule,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { useAppStore } from "@bublys-org/state-management";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
 import { useObject } from "../objects/repository.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
-import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import {
   STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
-  SCHEDULE_TYPE,
-  CONSTRAINT_SET_TYPE,
 } from "../objects/hotelObjects.js";
-import { ScheduleWorld } from "./ScheduleWorld.js";
+import { ConstraintSetWorld } from "./ConstraintSetWorld.js";
+import { useConstraintSetEditor } from "./useConstraintSetEditor.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type LeaderRuleViewProps = {
-  /** どの勤務表の制約か */
-  scheduleId?: string;
+  /** どの制約セットか（"global" か scheduleId） */
+  constraintSetId?: string;
   /** 表示する責任者ロールのキー（例: "early" / "reservation" / "night"） */
   ruleKey: string;
 };
@@ -34,16 +29,19 @@ type LeaderRuleViewProps = {
  * {@link LeaderRuleDiagram} に渡して「OR（このうち誰か一人はいなければならない）」の図を描く。
  * 人をドロップすると、その人を制約の候補に加えて保存する（＝勤務表の世界線にノードが増える）。
  */
-const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) => {
-  const store = useAppStore();
-  const { staffList } = useWorkingStaff(scheduleId);
-  const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
-  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
-  const constraints = useObject<ConstraintSet>(
-    CONSTRAINT_SET_TYPE,
-    scheduleId
+const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({
+  constraintSetId,
+  ruleKey,
+}) => {
+  const { constraintSet: constraints, isGlobal, commit } =
+    useConstraintSetEditor(constraintSetId);
+  // 担当者は名簿のスタッフ。グローバルのテンプレートには名簿が無いので空になる
+  const { staffList } = useWorkingStaff(isGlobal ? undefined : constraintSetId);
+  const workShiftSet = useObject<WorkShiftSet>(
+    WORKSHIFT_SET_TYPE,
+    constraintSetId
   );
+  const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
 
   const rule = useMemo(
     () => constraints?.leaderRule(ruleKey),
@@ -69,29 +67,17 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
     return names;
   }, [workShifts]);
 
-  const shiftIdsOf = useCallback(
-    (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id),
-    [workShifts]
-  );
 
-  // 編集は EditLog 付きで Constraints を同一世界線ノードに記録する。
+  /**
+   * 編集は制約セットの編集口（useConstraintSetEditor）に任せる。
+   * グローバルなら台帳へ1回、勤務表ごとなら操作履歴と同じ世界線ノードへ——という
+   * 分岐はあちらが持っているので、ここには無い。
+   */
   const editRule = useCallback(
-    (next: ConstraintSet | undefined, summary: string) => {
-      if (!next) return;
-      recordConstraintEdit(store, {
-        schedule,
-        beforeConstraints: buildScheduleConstraints({
-          modelConstraints: constraints?.modelConstraints(shiftIdsOf),
-        }),
-        afterConstraints: buildScheduleConstraints({
-          modelConstraints: next.modelConstraints(shiftIdsOf),
-        }),
-        nextConstraints: next,
-        summary,
-      });
+    (apply: (set: ConstraintSet) => ConstraintSet, summary: string) => {
+      commit(apply, summary);
     },
-    [store, schedule, constraints, shiftIdsOf]
+    [commit]
   );
 
   // 図には人そのものを渡す（候補者が ObjectView として振る舞えるように）
@@ -106,33 +92,33 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
 
   const handleChangeShift = useCallback(
     (shiftName: string) =>
-      editRule(constraints?.setRuleShift(ruleKey, shiftName), `担当勤務帯を変更: ${shiftName}`),
-    [constraints, ruleKey, editRule]
+      editRule((set) => set.setRuleShift(ruleKey, shiftName), `担当勤務帯を変更: ${shiftName}`),
+    [ruleKey, editRule]
   );
   const handleChangeLabel = useCallback(
     (label: string) =>
-      editRule(constraints?.setRuleLabel(ruleKey, label), `ラベルを変更: ${label}`),
-    [constraints, ruleKey, editRule]
+      editRule((set) => set.setRuleLabel(ruleKey, label), `ラベルを変更: ${label}`),
+    [ruleKey, editRule]
   );
   const handleChangeMinCount = useCallback(
     (minCount: number) =>
       editRule(
-        constraints?.setRuleMinCount(ruleKey, minCount),
+        (set) => set.setRuleMinCount(ruleKey, minCount),
         `最小人数を変更: ${minCount}`
       ),
-    [constraints, ruleKey, editRule]
+    [ruleKey, editRule]
   );
   const handleRemoveStaff = useCallback(
     (staffId: string) =>
       editRule(
-        constraints?.removeLeader(ruleKey, staffId),
+        (set) => set.removeLeader(ruleKey, staffId),
         `責任者候補を削除: ${nameOf(staffId)}`
       ),
-    [constraints, ruleKey, editRule, nameOf]
+    [ruleKey, editRule, nameOf]
   );
   const handleDeleteRule = useCallback(
-    () => editRule(constraints?.removeRule(ruleKey), "ルール削除"),
-    [constraints, ruleKey, editRule]
+    () => editRule((set) => set.removeRule(ruleKey), "ルール削除"),
+    [ruleKey, editRule]
   );
 
   // 人（Staff）をドロップしたら、その人をこのルールの候補に加える
@@ -140,14 +126,14 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
   const handleDropStaffUrl = useCallback(
     (url: string) => {
       const staffId = extractIdFromUrl(url);
-      if (!staffId || !constraints || !rule) return;
+      if (!staffId || !rule) return;
       if (rule.leaderStaffIds.includes(staffId)) return; // 既に候補なら何もしない
       editRule(
-        constraints.addLeader(ruleKey, staffId),
+        (set) => set.addLeader(ruleKey, staffId),
         `責任者候補を追加: ${nameOf(staffId)}`
       );
     },
-    [constraints, rule, ruleKey, editRule, nameOf]
+    [rule, ruleKey, editRule, nameOf]
   );
 
   if (!rule) {
@@ -180,7 +166,7 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({ scheduleId, ruleKey }) =>
  * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
  */
 export const LeaderRuleView: FC<LeaderRuleViewProps> = (props) => (
-  <ScheduleWorld scheduleId={props.scheduleId}>
+  <ConstraintSetWorld constraintSetId={props.constraintSetId}>
     <LeaderRuleViewBody {...props} />
-  </ScheduleWorld>
+  </ConstraintSetWorld>
 );

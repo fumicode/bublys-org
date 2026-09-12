@@ -28,3 +28,9 @@ export const SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE = "ScheduleWorldLineTree";
 
 /** シフト完成レポート一覧 */
 export const SCHEDULE_REPORT_LIST_VIEW_TYPE = "ScheduleReportList";
+
+/** 数と真偽で言い切れる制約1つ（連勤・休日・休み上限・希望）。バブルで開いて直す */
+export const CONSTRAINT_LIMIT_VIEW_TYPE = "ConstraintLimit";
+
+/** 勤務間インターバルのルール1つ。バブルで開いて図を見る */
+export const SHIFT_INTERVAL_RULE_VIEW_TYPE = "ShiftIntervalRule";
