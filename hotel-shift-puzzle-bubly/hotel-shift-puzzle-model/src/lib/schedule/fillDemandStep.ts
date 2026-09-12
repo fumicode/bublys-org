@@ -71,7 +71,7 @@ export const fillDemandStep: AutoShiftStep = {
         // 不足分だけ、入れられる候補を貪欲に割り当てる
         for (const s of [...pool]) {
           if (remaining <= 0) break;
-          if (!isAvailable(s, shiftId)) continue;
+          if (!isAvailable(s, shiftId, day)) continue;
           if (wouldExceedConsecutive(result, s, day, max)) continue;
           result = result.assignShift(s, day, shiftId);
           assigned++;
@@ -90,7 +90,7 @@ export const fillDemandStep: AutoShiftStep = {
         if (ctx.preferenceOf(s, day).kind !== "neutral") continue; // 希望のある人は触らない
         if (wouldExceedConsecutive(result, s, day, max)) continue; // 連勤上限は守る
         for (const [, shiftId] of ctx.shiftIdByName) {
-          if (!isAvailable(s, shiftId)) continue;
+          if (!isAvailable(s, shiftId, day)) continue;
           result = result.assignShift(s, day, shiftId);
           extra++;
           break;

@@ -1822,13 +1822,22 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "byDay",
           "type": "Record<string, Record<string, ShiftWishPreference>>",
           "optional": false
+        },
+        {
+          "name": "submittedAt",
+          "type": "string | null",
+          "optional": false
         }
       ],
       "getters": [
         "id",
         "staffId",
         "year",
-        "month"
+        "month",
+        "filledDayCount",
+        "isEmpty",
+        "isSubmitted",
+        "submittedAt"
       ],
       "methods": [
         {
@@ -1887,21 +1896,27 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": false
         },
         {
-          "name": "setPreference",
+          "name": "submit",
           "params": [
-            "day",
-            "optionKey",
-            "pref"
+            "at"
           ],
           "returns": "StaffMonthlyShiftWish",
           "isStatic": false,
           "returnsSelf": true
         },
         {
-          "name": "cyclePreference",
+          "name": "withdraw",
+          "params": [],
+          "returns": "StaffMonthlyShiftWish",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "setPreference",
           "params": [
             "day",
-            "optionKey"
+            "optionKey",
+            "pref"
           ],
           "returns": "StaffMonthlyShiftWish",
           "isStatic": false,

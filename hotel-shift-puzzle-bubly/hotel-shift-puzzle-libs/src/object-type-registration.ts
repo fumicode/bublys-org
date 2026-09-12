@@ -4,8 +4,9 @@
  * 型の定義は objects/hotelObjects.ts に1箇所集約。ここでは登録を実行するだけ。
  *
  * それに加えて、世界線には保存されないが画面の上ではひとつの「もの」として振る舞う型
- * （勤務日・責任者ルール）も登録する。ObjectView の約束（ドラッグでき、ダブルクリックで
- * バブルが開く）を満たすにはドラッグ種別が要るため。名前は ui/viewObjectTypes.ts。
+ * （勤務日・責任者ルール・シフト希望の月と入力表）も登録する。ObjectView の約束
+ * （ドラッグでき、ダブルクリックでバブルが開く）を満たすにはドラッグ種別が要るため。
+ * 名前は ui/viewObjectTypes.ts。
  */
 import React from "react";
 import EventIcon from "@mui/icons-material/Event";
@@ -15,6 +16,8 @@ import ParkIcon from "@mui/icons-material/Park";
 import ListAltIcon from "@mui/icons-material/ListAlt";
 import TuneIcon from "@mui/icons-material/Tune";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
+import EditCalendarIcon from "@mui/icons-material/EditCalendar";
+import EditNoteIcon from "@mui/icons-material/EditNote";
 import { registerObjectType } from "@bublys-org/bubbles-ui";
 import { registerObjects } from "./objects/framework.js";
 import { HOTEL_OBJECTS } from "./objects/hotelObjects.js";
@@ -26,6 +29,8 @@ import {
   SCHEDULE_REPORT_LIST_VIEW_TYPE,
   CONSTRAINT_LIMIT_VIEW_TYPE,
   SHIFT_INTERVAL_RULE_VIEW_TYPE,
+  SHIFT_WISH_MONTH_VIEW_TYPE,
+  STAFF_SHIFT_WISH_SHEET_VIEW_TYPE,
 } from "./ui/viewObjectTypes.js";
 
 registerObjects(HOTEL_OBJECTS);
@@ -57,4 +62,12 @@ registerObjectType(
 registerObjectType(
   SHIFT_INTERVAL_RULE_VIEW_TYPE,
   React.createElement(HourglassBottomIcon, { fontSize: "small" })
+);
+registerObjectType(
+  SHIFT_WISH_MONTH_VIEW_TYPE,
+  React.createElement(EditCalendarIcon, { fontSize: "small" })
+);
+registerObjectType(
+  STAFF_SHIFT_WISH_SHEET_VIEW_TYPE,
+  React.createElement(EditNoteIcon, { fontSize: "small" })
 );

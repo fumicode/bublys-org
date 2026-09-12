@@ -2,6 +2,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RuleIcon from '@mui/icons-material/Rule';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import EditCalendarIcon from '@mui/icons-material/EditCalendar';
 import SaveIcon from '@mui/icons-material/Save';
 import SchemaIcon from '@mui/icons-material/Schema';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -19,7 +20,7 @@ import {
 import '@bublys-org/hotel-shift-puzzle-libs';
 
 // ルート登録（app側で管理）
-import { hotelShiftPuzzleBubbleRoutes } from '../registration/index.js';
+import { hotelShiftPuzzleBubbleRoutes, shiftWishListUrl } from '../registration/index.js';
 
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
@@ -28,6 +29,7 @@ const menuItems: BublyMenuItem[] = [
   { label: 'スタッフ一覧', url: 'hotel-shift-puzzle/staffs', icon: <PeopleIcon /> },
   { label: '勤務帯', url: 'hotel-shift-puzzle/work-shifts', icon: <ScheduleIcon /> },
   { label: '制約', url: 'hotel-shift-puzzle/constraints', icon: <RuleIcon /> },
+  { label: 'シフト希望', url: shiftWishListUrl(), icon: <EditCalendarIcon /> },
   { label: '勤務表', url: 'hotel-shift-puzzle/schedules', icon: <CalendarMonthIcon /> },
   { label: 'ファイル', url: 'hotel-shift-puzzle/file', icon: <SaveIcon /> },
   {

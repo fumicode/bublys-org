@@ -32,18 +32,6 @@ describe('StaffMonthlyShiftWish（スタッフ月別シフト希望）の使い�
     expect(w.wishesOn(d2)).toEqual({ 'work:早番': 'want', 'day-off': 'avoid' });
   });
 
-  test('cyclePreference は neutral→want→avoid→neutral を巡回（不変）', () => {
-    const base = create();
-    const a = base.cyclePreference(d1, EARLY);
-    expect(a.preferenceFor(d1, EARLY)).toBe('want');
-    const b = a.cyclePreference(d1, EARLY);
-    expect(b.preferenceFor(d1, EARLY)).toBe('avoid');
-    const c = b.cyclePreference(d1, EARLY);
-    expect(c.preferenceFor(d1, EARLY)).toBeUndefined();
-    // 元は不変
-    expect(base.isEmptyOn(d1)).toBe(true);
-  });
-
   test('setPreference(null) で neutral に戻す。空日はキーごと消える', () => {
     const w = create().setPreference(d1, EARLY, 'want').setPreference(d1, EARLY, null);
     expect(w.isEmptyOn(d1)).toBe(true);
@@ -59,5 +47,46 @@ describe('StaffMonthlyShiftWish（スタッフ月別シフト希望）の使い�
 
   test('6月は30稼働日', () => {
     expect(create().workingDays()).toHaveLength(30);
+  });
+
+  describe('提出（submit / withdraw）', () => {
+    const AT = '2026-05-20T09:00:00.000Z';
+
+    test('作りたては未提出', () => {
+      expect(create().isSubmitted).toBe(false);
+      expect(create().submittedAt).toBeNull();
+    });
+
+    test('submit で提出済みになる（不変）', () => {
+      const draft = create().setPreference(d1, DAY_OFF, 'want');
+      const submitted = draft.submit(AT);
+      expect(submitted.isSubmitted).toBe(true);
+      expect(submitted.submittedAt).toBe(AT);
+      expect(draft.isSubmitted).toBe(false); // 元は変わらない
+    });
+
+    test('提出済みは編集できない（取り下げれば編集できる）', () => {
+      const submitted = create().submit(AT);
+      expect(() => submitted.setPreference(d1, DAY_OFF, 'want')).toThrow();
+      expect(() =>
+        submitted.withdraw().setPreference(d1, DAY_OFF, 'want')
+      ).not.toThrow();
+    });
+
+    test('提出状態も toPlain / fromPlain で保たれる', () => {
+      const submitted = create().setPreference(d1, DAY_OFF, 'want').submit(AT);
+      const restored = StaffMonthlyShiftWish.fromPlain(submitted.toPlain());
+      expect(restored.submittedAt).toBe(AT);
+    });
+
+    test('提出のしくみより前の plain（submittedAt 無し）は未提出として読む', () => {
+      const legacy = StaffMonthlyShiftWish.fromPlain({
+        staffId: 'staff-A',
+        year: 2026,
+        month: 6,
+        byDay: {},
+      } as never);
+      expect(legacy.isSubmitted).toBe(false);
+    });
   });
 });

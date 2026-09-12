@@ -28,6 +28,8 @@ import {
   WorkingStaffPanel,
   ScheduleViolationView,
   ShiftWishEditor,
+  ShiftWishMonthList,
+  ShiftWishStaffList,
   LeaderRuleView,
   ShiftIntervalRuleView,
   ScheduleReportPanel,
@@ -48,6 +50,8 @@ import {
   scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
   scheduleEditLogUrl,
+  staffShiftWishUrl,
+  shiftWishMonthUrl,
 } from "./bubbleUrls.js";
 
 // 全バブルは統一リポジトリ（アプリ全体の世界線スコープ）にアクセスするため、
@@ -61,18 +65,32 @@ const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollec
 
 // --- スタッフ詳細バブル ---
 const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
   const staffId = bubble.params.staffId;
   return withObjects(
     <StaffDetail
       staffId={staffId}
-      onOpenWish={(year, month) =>
-        openBubble(
-          `hotel-shift-puzzle/staffs/${staffId}/shift-wish/${year}/${month}`,
-          bubble.id,
-          "bubble-side-right"
-        )
-      }
+      shiftWishUrl={(year, month) => staffShiftWishUrl(staffId, year, month)}
+    />
+  );
+};
+
+// --- シフト希望の入口バブル（希望を集める月が並ぶ） ---
+const ShiftWishListBubble: BubbleRoute["Component"] = () =>
+  withObjects(<ShiftWishMonthList monthUrl={shiftWishMonthUrl} />);
+
+// --- その月のシフト希望一覧バブル（スタッフ全員 × 回収状況） ---
+// 対象の月は URL（:year/:month）で決まる。別の月・別の人は、それぞれ別のバブルとして開く。
+const ShiftWishMonthBubble: BubbleRoute["Component"] = ({ bubble }) => {
+  const year = Number(bubble.params.year);
+  const month = Number(bubble.params.month);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return <div style={{ padding: 16, color: "#666" }}>月の指定が正しくありません</div>;
+  }
+  return withObjects(
+    <ShiftWishStaffList
+      year={year}
+      month={month}
+      wishUrl={(staffId) => staffShiftWishUrl(staffId, year, month)}
     />
   );
 };
@@ -142,6 +160,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       }
       onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       workingStaffUrl={workingStaffUrl}
+      shiftWishesUrl={shiftWishMonthUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       editLogUrl={editLogUrl}
@@ -297,6 +316,8 @@ const ModelClassDiagramBubble: BubbleRoute["Component"] = () =>
 /** このバブリのバブルルート定義 */
 export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/staffs/:staffId/shift-wish/:year/:month", type: "staff-shift-wish", Component: ShiftWishBubble },
+  { pattern: "hotel-shift-puzzle/shift-wishes/:year/:month", type: "shift-wish-month", Component: ShiftWishMonthBubble },
+  { pattern: "hotel-shift-puzzle/shift-wishes", type: "shift-wish-list", Component: ShiftWishListBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
