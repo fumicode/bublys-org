@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bubble-lab</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;--accent:#6ee7ff}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  #bar{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:6px 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .grp{display:flex;gap:5px;align-items:center}
+  .grp>span{color:var(--dim);font-size:11px;letter-spacing:.04em}
+  select,button{background:#1d2334;color:var(--fg);border:1px solid var(--line);
+    border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}
+  select:hover,button:hover{border-color:var(--accent)}
+  button.on{background:var(--accent);color:#07202a;border-color:var(--accent);font-weight:600}
+  .sep{width:1px;height:20px;background:var(--line)}
+  .key{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim)}
+  .sw{width:16px;height:9px;border-radius:2px;display:inline-block}
+  #stage{flex:1 1 auto;position:relative;min-height:0}
+  canvas{display:block;width:100%;height:100%}
+  .box{position:absolute;background:rgba(10,12,20,.86);border:1px solid var(--line);
+    border-radius:8px;padding:8px 11px;color:var(--dim);font-size:11px;line-height:1.7;pointer-events:none}
+  #hud{left:12px;bottom:12px;white-space:pre}
+  #hud b{color:var(--accent);font-weight:600}
+  #help{right:12px;bottom:12px;text-align:right}
+  #help b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <div class="grp">
+      <span>プリセット</span>
+      <button data-preset="current">現行 bubble-ui</button>
+      <button data-preset="histz">履歴を奥行きに</button>
+      <button data-preset="worldline">世界線ビュー</button>
+      <button data-preset="flat">フラット</button>
+    </div>
+    <div class="sep"></div>
+    <div class="grp"><span>X</span><select id="ax-x"></select></div>
+    <div class="grp"><span>Y</span><select id="ax-y"></select></div>
+    <div class="grp"><span>Z</span><select id="ax-z"></select></div>
+    <div class="grp"><span>レンズ</span><select id="lens"></select></div>
+    <div class="sep"></div>
+    <div class="grp">
+      <button id="t-ribbons">帯</button>
+      <button id="t-grow">箱が伸びる</button>
+      <button id="t-settle">席が譲り合う</button>
+      <button id="t-magnet">近接で吸着</button>
+      <button id="t-anchors">アンカー</button>
+      <button id="t-quantize">Z量子化</button>
+      <button id="open">開く</button>
+    </div>
+    <div class="sep"></div>
+    <div class="grp" id="legend"></div>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="box" id="hud"></div>
+    <div class="box" id="help">
+      <b>他の泡に近づけてドロップ … 結合</b>（中へ=含む／辺の外=隣り合う）　引き剥がすと外れる<br>
+      <b>「開く」</b> … 選んだ泡にリンクを作り、手前に開く（帯でつながる）<br>
+      右下の角 … 大きさ　背景ドラッグ … 焦点　ホイール … 焦点のZ　ダブルクリック … 焦点を据える
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================================
+   bubble-lab —— bubble-ui 再設計プロトタイプ
+
+   語彙（この順に依存する）
+     Bubble    中身と ownSize（自前の大きさ）だけを持つ。位置は持たない。
+     Relation  泡と泡のつながり。kind=意味、bind=配置をどれだけ拘束するか。
+     Anchor    ホストの「中身座標系」における取り付け矩形。hole / seat / beside。
+     Dimension 泡 → 数値。軸に差し込む。free なら泡が動き、derived なら焦点が動く。
+     Lens      Vec3 → 画面。scale はその点の局所倍率。逆変換を必ず持つ。
+     View      軸への次元の割り当て ＋ レンズ ＋ 焦点。
+   ============================================================================ */
+
+/* ============================================================
+   0. Bubble
+   ============================================================ */
+const TITLES = ["勤務表","スタッフ一覧","稼働日 3/12","希望シフト","ルール設定","集計表",
+  "責任者ルール","世界線","メモ","CSV取込","原価表","駅表","囲碁盤","タスク","設定","ログ"];
+let _s = 20260910;
+const rnd = () => (_s = (_s*1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+
+const bubbles = TITLES.map((title, i) => ({
+  id: "b"+i, title, hue: (i*47)%360,
+  ownSize: { w: 210, h: 132 },      // 自分が持っている大きさ（手で変えられる）
+  boxSize: { w: 210, h: 132 },      // 実際に描かれる箱（席の要求で ownSize より大きくなる）
+  // 面（z）は自由座標の一部。「開く」がここに書き込む。
+  free: (() => { const a = i*2.39996 + 0.6, r = 470 + rnd()*230;
+                 return { x: Math.cos(a)*r*1.35, y: Math.sin(a)*r*0.78,
+                          z: i === 0 ? 0 : i <= 3 ? 1 : i <= 8 ? 2 : 3 }; })(),
+  hist: i <= 9 ? i : i-4,
+  branch: i >= 10 && i <= 13 ? 1 : i >= 14 ? 2 : 0,
+  sibling: i % 5,
+  cur: null,                        // 補間中の論理座標
+}));
+const MAX_HIST = Math.max(...bubbles.map(b => b.hist));
+const byId = Object.fromEntries(bubbles.map(b => [b.id, b]));
+byId.b0.free.x = -150; byId.b0.free.y = -60;
+byId.b5.free.x = 230;  byId.b5.free.y = 40;      // 開いた泡はリンクの近くに現れる
+byId.b9.free.x = 470;  byId.b9.free.y = 20;
+byId.b3.free.z = -1;   // 希望シフト＝勤務表の隣だが、手前で大きい（縮尺は継承しない）
+byId.b0.ownSize = { w: 320, h: 220 };
+byId.b2.ownSize = { w: 190, h: 120 };
+byId.b3.ownSize = { w: 190, h: 150 };
+byId.b4.ownSize = { w: 190, h: 110 };
+bubbles.forEach(b => (b.boxSize = { ...b.ownSize }));
+
+/* ============================================================
+   1. Relation（関係）
+   ------------------------------------------------------------
+   関係は「意味」、結合は「配置」。関係が配置を拘束するかどうかの2段階:
+
+     bind "placed" … アンカーが置き場所を決める（含む／隣り合う）
+     bind "none"   … 配置を拘束しない。帯だけが見える（開いた／参照／由来／注釈）
+
+   ★ placed の中でも、アンカーがホストの内側か外側かで「入る世界」が違う:
+       内側（hole / seat） … ゲストはホストの**座標系に入る**。縮尺はホスト由来。
+       外側（beside）      … ゲストは**自分の奥行きのまま**、画面上で辺が接するだけ。
+     だから「リストの隣に、リストより手前で大きくアイテムを出す」が書ける。
+
+   どちらでも anchor から相手へ帯が伸びる。現行のリンクバブルは bind:"none" の帯。
+
+   ★「開いた」は拘束しない。「開く」は "opener の1つ手前に固定する" ことではなく、
+     その瞬間に最前面へ置く**操作**だから（現行 popChild = layers.unshift）。
+     置いたあとは奥へ送っても構わない。関係は出来事として残り続ける。
+
+   不変条件: 1つの泡が持てる placed 拘束は高々1つ。拘束しない関係はいくつでも。
+             この不変条件は reindex() が担保する。
+   ============================================================ */
+const REL_KINDS = {
+  contains:   { label:"含む",     hue:190, ribbon:"filled", bind:"placed" },
+  adjacent:   { label:"隣り合う", hue:170, ribbon:"seam",   bind:"placed" },
+  opened:     { label:"開いた",   hue:210, ribbon:"filled", bind:"none" },
+  references: { label:"参照",     hue: 45, ribbon:"thread", bind:"none" },
+  derived:    { label:"由来",     hue:305, ribbon:"thread", bind:"none" },
+  annotates:  { label:"注釈",     hue:110, ribbon:"thread", bind:"none" },
+};
+const bindOf = r => REL_KINDS[r.kind].bind;
+/** hole アンカーを持つ拘束しない関係＝「中身の中のリンク」。帯はここから伸びる。 */
+const isLink = r => bindOf(r) === "none" && r.anchor && r.anchor.kind === "hole";
+
+/* ---- Anchor：ホストの「中身座標系」における取り付け矩形 -------------------
+   内側に出れば入れ子、外側に出れば隣接。どれも同じ計算経路を通る。
+   大きさを誰が決めるかが3種の違い:
+     hole   ホストが決める（自前サイズの比率）。ゲストは穴に合わせる。
+     seat   ゲストが決める（ゲストの見かけの大きさ）。位置はホスト中身座標の絶対値。
+     beside ゲストが決める。位置はホストの辺。同じ辺なら辺に沿って並ぶ。
+   ------------------------------------------------------------------------- */
+const ANCHOR = {
+  hole:   (rx, ry, rw, rh) => ({ kind:"hole", rx, ry, rw, rh }),
+  seat:   (x, y)           => ({ kind:"seat", x, y }),
+  beside: (side, gap = 14) => ({ kind:"beside", side, gap }),
+};
+/** そのアンカーはゲストの大きさを決めるか（＝ゲストは枠に従うか） */
+const anchorSizesGuest = a => a.kind === "hole";
+const PAD = 14;
+
+const relations = [
+  { kind:"contains", from:"b0", to:"b1", anchor:ANCHOR.hole(.06,.30,.40,.52), dz:-0.15 },
+  { kind:"contains", from:"b0", to:"b2", anchor:ANCHOR.seat(340, 34),         dz:-1.10 },
+  { kind:"adjacent", from:"b0", to:"b3", anchor:ANCHOR.beside("e"),           dz: 0 },
+  { kind:"adjacent", from:"b3", to:"b4", anchor:ANCHOR.beside("s"),           dz: 0 },
+  // 開いた：リンクは勤務表の中身にある。開かれた泡の位置は拘束しない（帯だけが残る）
+  { kind:"opened",   from:"b0", to:"b5", anchor:ANCHOR.hole(.06,.86,.34,.075) },
+  { kind:"opened",   from:"b5", to:"b9", anchor:ANCHOR.hole(.08,.78,.40,.09)  },
+  // 配置を拘束しない関係：帯だけが見える
+  { kind:"references", from:"b6",  to:"b8"  },
+  { kind:"derived",    from:"b7",  to:"b15" },
+  { kind:"annotates",  from:"b13", to:"b12" },
+];
+
+/** 泡 → その泡の配置を拘束している関係。不変条件をここで担保する。 */
+let bindingOf = {};
+function reindex() {
+  const seen = {};
+  // 後ろにあるものほど新しい。新しい拘束を優先し、古い拘束は外す。
+  for (let i = relations.length - 1; i >= 0; i--) {
+    const r = relations[i];
+    if (bindOf(r) === "none") continue;
+    if (seen[r.to]) relations.splice(i, 1);   // 二重の placed 拘束は許さない
+    else seen[r.to] = r;
+  }
+  bindingOf = seen;
+}
+reindex();
+
+/** g が h の先祖か（循環結合の禁止） */
+function isAncestor(g, h) {
+  let cur = h;
+  for (let n = 0; cur && n < 64; n++) {
+    const r = bindingOf[cur]; if (!r) return false;
+    if (r.from === g) return true;
+    cur = r.from;
+  }
+  return false;
+}
+
+/* ============================================================
+   2. アンカーの矩形と、席の譲り合い
+   ============================================================ */
+function anchorRect(rel, host, guest) {
+  const a = rel.anchor;
+  if (!a) return { x:0, y:0, w:host.boxSize.w, h:host.boxSize.h };   // 拘束しない関係は箱そのもの
+  // 穴はホストの「自前の中身」に開いている。伸びた分では広がらない。
+  if (a.kind === "hole")
+    return { x:a.rx*host.ownSize.w, y:a.ry*host.ownSize.h, w:a.rw*host.ownSize.w, h:a.rh*host.ownSize.h };
+  // 席の大きさ＝ゲストの見かけの大きさ（手前に浮くほど広い場所を取る）
+  if (a.kind === "seat") {
+    const m = depthMag(rel.dz);
+    return { x:a.x, y:a.y, w:guest.boxSize.w*m, h:guest.boxSize.h*m };
+  }
+  // 隣接：同じホストの同じ辺に先に付いている泡の分だけ、辺に沿ってずらす
+  let along = 0;
+  for (const o of relations) {
+    if (o === rel) break;
+    if (o.from !== rel.from || bindOf(o) === "none") continue;
+    if (!o.anchor || o.anchor.kind !== "beside" || o.anchor.side !== a.side) continue;
+    const og = byId[o.to]; if (!og) continue;
+    along += (a.side === "e" || a.side === "w" ? og.boxSize.h : og.boxSize.w) + a.gap;
+  }
+  const gw = guest.boxSize.w, gh = guest.boxSize.h;
+  if (a.side === "e") return { x:host.boxSize.w + a.gap, y:along, w:gw, h:gh };
+  if (a.side === "w") return { x:-a.gap - gw,            y:along, w:gw, h:gh };
+  if (a.side === "s") return { x:along, y:host.boxSize.h + a.gap, w:gw, h:gh };
+  return { x:along, y:-a.gap - gh, w:gw, h:gh };
+}
+
+/** ホストの中で場所を取る「席」の関係だけを拾う（拘束が外れたものは席を取らない） */
+const seatsOf = hostId => relations.filter(r =>
+  r.from === hostId && bindOf(r) !== "none" && r.anchor && r.anchor.kind === "seat");
+
+const overlaps = (a,b) => a.x < b.x+b.w && b.x < a.x+a.w && a.y < b.y+b.h && b.y < a.y+a.h;
+
+/** a を o から押し出す。左上より外へは出さない（負座標を作らない）。 */
+function pushApart(a, o, share) {
+  if (!overlaps(a, o)) return;
+  const cands = [
+    { d:(o.x+o.w) - a.x,     ax:"x" }, { d:-((a.x+a.w) - o.x), ax:"x" },
+    { d:(o.y+o.h) - a.y,     ax:"y" }, { d:-((a.y+a.h) - o.y), ax:"y" },
+  ].filter(c => (c.ax === "x" ? a.x + c.d*share : a.y + c.d*share) >= 0)
+   .sort((p,q) => Math.abs(p.d) - Math.abs(q.d));
+  const c = cands[0] || { d:(o.x+o.w)-a.x, ax:"x" };
+  if (c.ax === "x") a.x += c.d*share; else a.y += c.d*share;
+}
+
+/**
+ * 同じホストの中で、席・ホスト自身の中身・穴が場所を取り合う。
+ * ★ ホスト自身の中身も「場所を取るもの」の一つとして同列に扱う。
+ *   これがあるから、放り込まれた泡がホストの中身を隠さない。
+ */
+function settleSeats() {
+  if (!view.settle) return;
+  for (const host of bubbles) {
+    const mine = seatsOf(host.id);
+    if (!mine.length) continue;
+    const fixed = [{ x:0, y:0, w:host.ownSize.w, h:host.ownSize.h }];   // ホスト自身の中身
+    for (const r of relations) {                                        // 穴とリンク
+      if (r.from !== host.id || !r.anchor || r.anchor.kind !== "hole") continue;
+      const a = r.anchor;
+      fixed.push({ x:a.rx*host.ownSize.w, y:a.ry*host.ownSize.h,
+                   w:a.rw*host.ownSize.w, h:a.rh*host.ownSize.h });
+    }
+    const seats = mine.map(r => {
+      const gz = byId[r.to], m = depthMag(r.dz);
+      return { r, x:r.anchor.x, y:r.anchor.y, w:gz.boxSize.w*m + PAD, h:gz.boxSize.h*m + PAD };
+    });
+    for (let pass = 0; pass < 3; pass++)
+      for (let i = 0; i < seats.length; i++) {
+        for (const o of fixed) pushApart(seats[i], o, 1);
+        for (let j = 0; j < seats.length; j++) if (j !== i) pushApart(seats[i], seats[j], 0.5);
+      }
+    for (const st of seats) {                                           // 減衰して落ち着かせる
+      st.r.anchor.x += (Math.max(0, st.x) - st.r.anchor.x) * 0.35;
+      st.r.anchor.y += (Math.max(0, st.y) - st.r.anchor.y) * 0.35;
+    }
+  }
+}
+
+/**
+ * 箱の大きさを解く。席を全部収めるまでホストが伸びる。
+ *   必要な箱幅 = 席のx + ゲスト幅 × 奥行き倍率 + 余白
+ * ★ 押し広げるのは「席」だけ。穴（ゲストが枠に従う）と隣接（外側）は要求しない。
+ *   これを守らないと「成長 → 比率アンカー拡大 → 再衝突 → さらに成長」で発散する。
+ */
+function growBoxes() {
+  for (const b of bubbles) {
+    let w = b.ownSize.w, h = b.ownSize.h;
+    if (view.grow) for (const r of seatsOf(b.id)) {
+      const gz = byId[r.to]; if (!gz) continue;
+      const m = depthMag(r.dz);
+      w = Math.max(w, r.anchor.x + gz.boxSize.w*m + PAD);
+      h = Math.max(h, r.anchor.y + gz.boxSize.h*m + PAD);
+    }
+    b.boxSize.w += (w - b.boxSize.w)*0.18;
+    b.boxSize.h += (h - b.boxSize.h)*0.18;
+  }
+}
+
+/* ============================================================
+   3. Dimension（次元）と Lens（レンズ）
+   ============================================================ */
+/**
+ * 指定した種類の関係を遡った鎖の長さ。
+ * ★ どの kind を辿るかはパラメータ。拘束するかどうかとは無関係なので、
+ *   「開いた」のような拘束しない関係も軸に刺せる（現行 openDepth の一般化）。
+ */
+function chainDepth(b, kind) {
+  let d = 0, cur = b.id;
+  for (let n = 0; n < 64; n++) {
+    const r = relations.find(x => x.to === cur && x.kind === kind);
+    if (!r) break;
+    d++; cur = r.from;
+  }
+  return d;
+}
+const DIMS = {
+  "none":          { label:"（なし）",   kind:"derived", unit:0,   valueOf:()=>0 },
+  "free.x":        { label:"自由 X",     kind:"free",    unit:1,   valueOf:b=>b.free.x },
+  "free.y":        { label:"自由 Y",     kind:"free",    unit:1,   valueOf:b=>b.free.y },
+  "free.z":        { label:"面（自由Z）", kind:"free",   unit:1,   valueOf:b=>b.free.z },
+  "open.chain":    { label:"開いた連鎖", kind:"derived", unit:1,   valueOf:b=>-chainDepth(b,"opened") },
+  "contain.chain": { label:"含む連鎖",   kind:"derived", unit:1,   valueOf:b=> chainDepth(b,"contains") },
+  "history.index": { label:"履歴の世代", kind:"derived", unit:1,   valueOf:b=>b.hist },
+  "history.age":   { label:"履歴の古さ", kind:"derived", unit:1,   valueOf:b=>MAX_HIST-b.hist },
+  "history.branch":{ label:"履歴の枝",   kind:"derived", unit:1.5, valueOf:b=>b.branch },
+  "order.sibling": { label:"兄弟の順序", kind:"derived", unit:1,   valueOf:b=>b.sibling },
+};
+const STEP_PX = 300;    // データ次元を X/Y に刺したときの1ステップの世界幅
+const axisValue = (id,b,ax) => { const d = DIMS[id], raw = d.valueOf(b);
+  return d.kind === "free" ? raw : (ax === "z" ? raw*d.unit : raw*d.unit*STEP_PX); };
+const layout = (b,v) => ({ x:axisValue(v.axes.x,b,"x"), y:axisValue(v.axes.y,b,"y"), z:axisValue(v.axes.z,b,"z") });
+
+const K_PERSP = 0.26;          // 奥行き1あたりの縮み具合
+const MAG_MIN = 0.04, MAG_MAX = 1.9;
+const VP = { dx:-130, dy:-165 };   // ★ 消失点は焦点と別物。一致させると奥が完全に隠れる。
+const clamp = (v,a,z)=>Math.min(Math.max(v,a),z);
+const sech2 = u => { const c = Math.cosh(u); return 1/(c*c); };
+/** 奥行き差 → 倍率。1-0.1*i と違い負にならず、遠方で 0 に漸近する。 */
+const depthMag = dz => clamp(1/(1 + K_PERSP*dz), MAG_MIN, MAG_MAX);
+/** ★ 焦点より手前は倍率が発散する。大きくし続けず、透明にして消す。 */
+const frontAlpha = dz => (dz < 0 ? clamp(1 + dz*0.55, 0, 1) : 1);
+
+/* Lens に課す2つの制約
+     A. 矩形を矩形に写す（位置と一様スケールだけを曲げる）→ Canvas でも DOM でも動く
+     B. scale = その点の局所倍率（ヤコビアン）。逆変換 unproject を必ず持つ。
+        これが無いレンズは「見るだけ」になり、掴めない。                        */
+const LENSES = {
+  perspective: { label:"透視（消失点）",
+    project(p, ctx) {
+      let dz = p.z - ctx.focus.z; if (ctx.quantize) dz = Math.round(dz);
+      const m = depthMag(dz);
+      const p0x = ctx.cx + (p.x-ctx.focus.x), p0y = ctx.cy + (p.y-ctx.focus.y);
+      const vx = ctx.cx+VP.dx, vy = ctx.cy+VP.dy;
+      return { x: vx+(p0x-vx)*m, y: vy+(p0y-vy)*m, scale:m, alpha:frontAlpha(dz) };
+    },
+    unproject(sx, sy, z, ctx) {
+      let dz = z - ctx.focus.z; if (ctx.quantize) dz = Math.round(dz);
+      const m = depthMag(dz), vx = ctx.cx+VP.dx, vy = ctx.cy+VP.dy;
+      return { x: ctx.focus.x + (vx+(sx-vx)/m) - ctx.cx, y: ctx.focus.y + (vy+(sy-vy)/m) - ctx.cy };
+    } },
+  fisheyeX: { label:"魚眼（X軸）",
+    project(p, ctx) {
+      const halfW = Math.max(1, ctx.cx-70), mag0 = 132/STEP_PX, K = halfW/mag0;
+      const u = p.x - ctx.focus.x;
+      let dz = p.z - ctx.focus.z; if (ctx.quantize) dz = Math.round(dz);
+      const m = mag0*sech2(u/K)*depthMag(dz);        // tanh の微分＝局所倍率
+      return { x: ctx.cx + halfW*Math.tanh(u/K), y: ctx.cy + (p.y-ctx.focus.y)*Math.max(m,0.12),
+               scale: Math.max(m/mag0, 0.16), alpha: frontAlpha(dz) };
+    },
+    unproject(sx, sy, z, ctx) {
+      const halfW = Math.max(1, ctx.cx-70), mag0 = 132/STEP_PX, K = halfW/mag0;
+      const u = K*Math.atanh(clamp((sx-ctx.cx)/halfW, -0.999, 0.999));
+      const m = Math.max(mag0*sech2(u/K)*depthMag(z-ctx.focus.z), 0.12);
+      return { x: ctx.focus.x + u, y: ctx.focus.y + (sy-ctx.cy)/m };
+    } },
+  flat: { label:"平行（Z無視）",
+    project(p, ctx) { return { x: ctx.cx+(p.x-ctx.focus.x), y: ctx.cy+(p.y-ctx.focus.y), scale:1, alpha:1 }; },
+    unproject(sx, sy, z, ctx) { return { x: ctx.focus.x+sx-ctx.cx, y: ctx.focus.y+sy-ctx.cy }; } },
+};
+
+/* ============================================================
+   4. View
+   ============================================================ */
+const view = {
+  axes: { x:"free.x", y:"free.y", z:"free.z" },
+  lensId: "perspective",
+  focus: { x:0, y:0, z:0 },
+  quantize: true,     // Z を整数の面にスナップ
+  magnet: true,       // 近づけると結合が生まれる
+  grow: true,         // 席を収めるまで箱が伸びる
+  settle: true,       // 席が場所を譲り合う
+  ribbons: true,
+  showAnchors: true,
+};
+let selectedId = "b0";
+
+function stepAnim() {
+  for (const b of bubbles) {
+    const t = layout(b, view);
+    if (!b.cur) { b.cur = {...t}; continue; }
+    b.cur.x += (t.x-b.cur.x)*0.14; b.cur.y += (t.y-b.cur.y)*0.14; b.cur.z += (t.z-b.cur.z)*0.14;
+  }
+}
+
+/* ============================================================
+   5. 解決 —— 論理座標 → 画面
+   ============================================================ */
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+let VW = 0, VH = 0, frameItems = [], itemById = {};
+function resize() {
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  VW = r.width; VH = r.height;
+  cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr);
+  g.setTransform(dpr,0,0,dpr,0,0);
+}
+new ResizeObserver(resize).observe(cv);
+const lensCtx = () => ({ focus:view.focus, cx:VW/2, cy:VH/2, quantize:view.quantize });
+const rectOf = it => ({ x: it.x - it.w*it.scale/2, y: it.y - it.h*it.scale/2,
+                        w: it.w*it.scale, h: it.h*it.scale });
+
+function resolveAll() {
+  const lens = LENSES[view.lensId], ctx = lensCtx(), cache = new Map(), items = [];
+
+  function resolve(b, guard) {
+    if (cache.has(b.id)) return cache.get(b.id);
+    if (guard.has(b.id)) return null;                 // 循環への保険
+    guard.add(b.id);
+    const rel = bindingOf[b.id];
+    let it = null;
+    if (rel && byId[rel.from]) {
+      const host = byId[rel.from], hostIt = resolve(host, guard);
+      if (hostIt && bindOf(rel) === "placed" && rel.anchor.kind === "beside") {
+        // ★ 隣接は「画面上で辺が接する」だけの制約。ホストの座標系には入らないので、
+        //   ゲストの奥行き＝縮尺は自分のもの。リストより手前にアイテムを大きく出せる。
+        const a = rel.anchor, sp = lens.project(b.cur, ctx);
+        const H = { x: hostIt.x - hostIt.w*hostIt.scale/2, y: hostIt.y - hostIt.h*hostIt.scale/2,
+                    w: hostIt.w*hostIt.scale, h: hostIt.h*hostIt.scale };
+        const gw = b.boxSize.w*sp.scale, gh = b.boxSize.h*sp.scale, gap = a.gap*sp.scale;
+        let along = 0;                       // 同じ辺の先客ぶん、辺に沿ってずらす（画面px）
+        for (const o of relations) {
+          if (o === rel) break;
+          if (o.from !== rel.from || bindOf(o) === "none") continue;
+          if (!o.anchor || o.anchor.kind !== "beside" || o.anchor.side !== a.side) continue;
+          const og = byId[o.to]; if (!og) continue;
+          const oi = resolve(og, guard); if (!oi) continue;
+          along += (a.side === "e" || a.side === "w" ? oi.h*oi.scale : oi.w*oi.scale) + gap;
+        }
+        let cx, cy;
+        if (a.side === "e")      { cx = H.x + H.w + gap + gw/2; cy = H.y + along + gh/2; }
+        else if (a.side === "w") { cx = H.x - gap - gw/2;       cy = H.y + along + gh/2; }
+        else if (a.side === "s") { cx = H.x + along + gw/2;     cy = H.y + H.h + gap + gh/2; }
+        else                     { cx = H.x + along + gw/2;     cy = H.y - gap - gh/2; }
+        it = { ref:b, rel, hostIt, sized:false, x:cx, y:cy, scale:sp.scale, alpha:sp.alpha,
+               z: b.cur.z, w:b.boxSize.w, h:b.boxSize.h, hue:b.hue, title:b.title,
+               anchor: { x:cx-gw/2, y:cy-gh/2, w:gw, h:gh } };
+      } else if (hostIt && bindOf(rel) === "placed") {
+        // 含む：ホストの中身座標にあるアンカーを画面へ写す（ゲストはホストの世界に入る）
+        const r = anchorRect(rel, host, b);
+        const hx = hostIt.x - hostIt.w*hostIt.scale/2, hy = hostIt.y - hostIt.h*hostIt.scale/2;
+        const ax = hx + r.x*hostIt.scale, ay = hy + r.y*hostIt.scale;
+        const dm = depthMag(view.quantize ? Math.round(rel.dz*2)/2 : rel.dz);
+        const sized = anchorSizesGuest(rel.anchor);   // 穴ならゲストの大きさは枠が決める
+        it = { ref:b, rel, hostIt, sized,
+               w: sized ? r.w : b.boxSize.w, h: sized ? r.h : b.boxSize.h,
+               scale: hostIt.scale*dm,
+               x: ax + r.w*hostIt.scale/2, y: ay + r.h*hostIt.scale/2,
+               alpha: hostIt.alpha, z: hostIt.z + rel.dz, hue:b.hue, title:b.title,
+               anchor: { x:ax, y:ay, w:r.w*hostIt.scale, h:r.h*hostIt.scale } };
+      }
+    }
+    if (!it) {
+      const s = lens.project(b.cur, ctx);
+      it = { ref:b, sized:false, x:s.x, y:s.y, scale:s.scale, alpha:s.alpha, z:b.cur.z,
+             w:b.boxSize.w, h:b.boxSize.h, hue:b.hue, title:b.title };
+    }
+    guard.delete(b.id); cache.set(b.id, it); items.push(it);
+    return it;
+  }
+  for (const b of bubbles) resolve(b, new Set());
+  itemById = Object.fromEntries(items.map(i => [i.ref.id, i]));
+
+  // 帯（リンクバブル）を、つながる相手のすぐ後ろに差し込む
+  if (view.ribbons) for (const rel of relations) {
+    const K = REL_KINDS[rel.kind]; if (K.ribbon === "seam") continue;
+    const from = itemById[rel.from], to = itemById[rel.to];
+    if (!from || !to || to.scale < 0.12) continue;
+    // ★ 起点はその関係自身のアンカー。相手が今どこに結合していようと関係ない。
+    let src;
+    if (rel.anchor) {
+      const r = anchorRect(rel, byId[rel.from], byId[rel.to]);
+      src = { x: from.x - from.w*from.scale/2 + r.x*from.scale,
+              y: from.y - from.h*from.scale/2 + r.y*from.scale,
+              w: r.w*from.scale, h: r.h*from.scale };
+    } else src = rectOf(from);
+    items.push({ kind:"ribbon", rel, K, src, dst: rectOf(to), z: to.z + 0.004,
+                 hue: K.hue, alpha: Math.min(from.alpha ?? 1, to.alpha ?? 1),
+                 scale: Math.max(from.scale, to.scale) });
+  }
+  // ★ 唯一のソート。親子関係は描画順を拘束しない。
+  items.sort((a,b) => b.z - a.z);
+  return items;
+}
+
+/* ============================================================
+   6. 描画
+   ============================================================ */
+function roundRect(x,y,w,h,r) {
+  g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+/** 現行 LinkBubbleView と同じ考えの帯：向かい合う辺どうしをベジェで結んで塗る */
+function ribbonPath(a, b) {
+  const dx = (b.x+b.w/2)-(a.x+a.w/2), dy = (b.y+b.h/2)-(a.y+a.h/2);
+  const horiz = Math.abs(dx) >= Math.abs(dy);
+  let p1,p2,q1,q2;
+  if (horiz) {
+    const ax = dx >= 0 ? a.x+a.w : a.x, bx = dx >= 0 ? b.x : b.x+b.w;
+    p1=[ax,a.y]; p2=[ax,a.y+a.h]; q1=[bx,b.y]; q2=[bx,b.y+b.h];
+  } else {
+    const ay = dy >= 0 ? a.y+a.h : a.y, by = dy >= 0 ? b.y : b.y+b.h;
+    p1=[a.x,ay]; p2=[a.x+a.w,ay]; q1=[b.x,by]; q2=[b.x+b.w,by];
+  }
+  const c = (u,v) => horiz ? [(u[0]+v[0])/2, u[1]] : [u[0], (u[1]+v[1])/2];
+  const c1 = c(p1,q1), d1 = horiz ? [c1[0],q1[1]] : [q1[0],c1[1]];
+  const c2 = c(q2,p2), d2 = horiz ? [c2[0],p2[1]] : [p2[0],c2[1]];
+  const P = new Path2D();
+  P.moveTo(p1[0],p1[1]);
+  P.bezierCurveTo(c1[0],c1[1], d1[0],d1[1], q1[0],q1[1]);
+  P.lineTo(q2[0],q2[1]);
+  P.bezierCurveTo(c2[0],c2[1], d2[0],d2[1], p2[0],p2[1]);
+  P.closePath(); return P;
+}
+function threadPath(a,b) {
+  const acx=a.x+a.w/2, acy=a.y+a.h/2, bcx=b.x+b.w/2, bcy=b.y+b.h/2, mx=(acx+bcx)/2;
+  const P = new Path2D(); P.moveTo(acx,acy); P.bezierCurveTo(mx,acy, mx,bcy, bcx,bcy); return P;
+}
+function drawRibbon(it) {
+  const a = it.src, b = it.dst;
+  if (Math.abs(a.x-b.x) < 2 && Math.abs(a.y-b.y) < 2) return;   // 席に着いていて重なるときは描かない
+  g.save(); g.globalAlpha = clamp(it.alpha,0,1)*0.9;
+  if (it.K.ribbon === "filled") {
+    const P = ribbonPath(a,b);
+    g.fillStyle = `hsla(${it.hue},55%,52%,0.22)`; g.fill(P);
+    g.strokeStyle = `hsla(${it.hue},60%,65%,0.45)`; g.lineWidth = 1; g.stroke(P);
+  } else {
+    const P = threadPath(a,b);
+    g.setLineDash([6,5]); g.strokeStyle = `hsla(${it.hue},70%,62%,0.75)`;
+    g.lineWidth = Math.max(1, 1.8*Math.min(1,it.scale)); g.stroke(P); g.setLineDash([]);
+    g.fillStyle = `hsla(${it.hue},70%,62%,0.9)`;
+    g.beginPath(); g.arc(b.x+b.w/2, b.y+b.h/2, 3.2, 0, Math.PI*2); g.fill();
+  }
+  g.restore();
+}
+
+function drawBubble(it) {
+  const R = rectOf(it), {x,y,w,h} = R;
+  if (x > VW+90 || x+w < -90 || y > VH+90 || y+h < -90) return;
+  const op = clamp(0.22 + 0.78*clamp(it.scale,0,1), 0.12, 1) * (it.alpha ?? 1);
+  if (op < 0.02) return;
+  const sel = it.ref.id === selectedId;
+  g.globalAlpha = op;
+
+  // 隣り合う泡は接している辺を膜のように光らせる
+  if (it.rel && REL_KINDS[it.rel.kind].ribbon === "seam"
+      && it.rel.anchor && it.rel.anchor.kind === "beside" && it.hostIt) {
+    const H = rectOf(it.hostIt), sd = it.rel.anchor.side;
+    g.strokeStyle = `hsla(${REL_KINDS[it.rel.kind].hue},70%,65%,.65)`; g.lineWidth = 3; g.beginPath();
+    if (sd === "e")      { g.moveTo(H.x+H.w, Math.max(H.y,y)); g.lineTo(H.x+H.w, Math.min(H.y+H.h,y+h)); }
+    else if (sd === "w") { g.moveTo(H.x, Math.max(H.y,y));     g.lineTo(H.x, Math.min(H.y+H.h,y+h)); }
+    else if (sd === "s") { g.moveTo(Math.max(H.x,x), H.y+H.h); g.lineTo(Math.min(H.x+H.w,x+w), H.y+H.h); }
+    else                 { g.moveTo(Math.max(H.x,x), H.y);     g.lineTo(Math.min(H.x+H.w,x+w), H.y); }
+    g.stroke();
+  }
+
+  g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 22*it.scale; g.shadowOffsetY = 6*it.scale;
+  roundRect(x,y,w,h,Math.max(3,10*it.scale)); g.fillStyle = `hsl(${it.hue} 30% 13%)`; g.fill();
+  g.shadowColor = "transparent"; g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.lineWidth = (sel?2.4:1.2)*Math.max(0.6,it.scale);
+  g.strokeStyle = sel ? "#6ee7ff" : `hsl(${it.hue} 62% 58% / .8)`; g.stroke();
+
+  const bh = Math.max(2, 24*it.scale);
+  g.save(); roundRect(x,y,w,h,Math.max(3,10*it.scale)); g.clip();
+  g.fillStyle = `hsl(${it.hue} 55% 42% / .55)`; g.fillRect(x,y,w,bh); g.restore();
+
+  if (it.scale > 0.34) {
+    g.fillStyle = "#eaf1ff"; g.globalAlpha = op; g.textBaseline = "middle";
+    g.font = `600 ${Math.round(12*it.scale)}px -apple-system,"Hiragino Sans",sans-serif`;
+    g.fillText(it.title, x+9*it.scale, y+bh/2);
+    if (it.ref.boxSize.w > it.ref.ownSize.w+2 && !it.rel) {
+      g.globalAlpha = op*.8; g.fillStyle = "#9ad9ea";
+      g.font = `${Math.round(10*it.scale)}px -apple-system,sans-serif`;
+      g.fillText("伸びている", x+w-62*it.scale, y+bh/2);
+    }
+  }
+  // ★ ホスト自身の中身は「自前サイズ」の範囲にだけ描く（伸びた分に広げると席の意味が消える）
+  if (it.scale > 0.5) {
+    const sw = Math.min(w, it.ref.ownSize.w*it.scale), sh = Math.min(h, it.ref.ownSize.h*it.scale);
+    g.globalAlpha = op*0.5; g.fillStyle = "#9fb0cc";
+    const rows = Math.max(1, Math.floor((sh-bh-14*it.scale)/(11*it.scale)));
+    for (let i = 0; i < Math.min(rows,8); i++)
+      g.fillRect(x+11*it.scale, y+bh+(10+i*11)*it.scale,
+                 (sw-22*it.scale)*(i===Math.min(rows,8)-1?0.5:0.82), 3.5*it.scale);
+    if (sw < w-4 || sh < h-4) {
+      g.globalAlpha = op*0.30; g.setLineDash([3,5]); g.strokeStyle = "#9fb0cc"; g.lineWidth = 1;
+      roundRect(x,y,sw,sh,6); g.stroke(); g.setLineDash([]);
+    }
+  } else if (it.scale > 0.14) {
+    g.globalAlpha = op*0.28; g.fillStyle = "#9fb0cc";
+    g.fillRect(x+8*it.scale, y+bh+8*it.scale, w-16*it.scale, h-bh-18*it.scale);
+  }
+
+  // この泡の中にあるリンク（＝拘束しない関係の hole アンカー）を中身の一部として描く
+  if (it.scale > 0.35) for (const rel of relations) {
+    if (rel.from !== it.ref.id || !isLink(rel)) continue;
+    const a = rel.anchor, gz = byId[rel.to]; if (!gz) continue;
+    const lx = x + a.rx*it.ref.ownSize.w*it.scale, ly = y + a.ry*it.ref.ownSize.h*it.scale;
+    const lw = a.rw*it.ref.ownSize.w*it.scale,     lh = a.rh*it.ref.ownSize.h*it.scale;
+    g.globalAlpha = op; roundRect(lx,ly,lw,lh,3*it.scale);
+    g.fillStyle = `hsla(${gz.hue},60%,52%,.5)`; g.fill();
+    g.strokeStyle = `hsla(${gz.hue},70%,68%,.9)`; g.lineWidth = 1; g.stroke();
+    if (lh > 11) { g.fillStyle = "#eaf1ff"; g.textBaseline = "middle";
+      g.font = `${Math.round(Math.min(11, lh*0.72))}px -apple-system,sans-serif`;
+      g.fillText("↗ " + gz.title, lx+5*it.scale, ly+lh/2); }
+  }
+
+  if (view.showAnchors && it.anchor && it.scale > 0.25) {
+    g.globalAlpha = op*.8; g.setLineDash([4,4]);
+    g.strokeStyle = it.sized ? "#6ee7ff" : "rgba(110,231,255,.5)"; g.lineWidth = 1;
+    roundRect(it.anchor.x, it.anchor.y, it.anchor.w, it.anchor.h, 4); g.stroke(); g.setLineDash([]);
+  }
+  if (sel && !it.sized && it.scale > 0.3) {     // 穴に嵌まった泡は大きさを持たないのでハンドルなし
+    g.globalAlpha = 1; g.fillStyle = "#6ee7ff"; roundRect(x+w-11, y+h-11, 9, 9, 2); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+
+function drawMagnetHint() {
+  if (!magnetHint) return;
+  const r = magnetHint.rect;
+  g.save(); g.strokeStyle = "#6ee7ff"; g.lineWidth = 2.5; g.setLineDash([7,5]);
+  g.shadowColor = "rgba(110,231,255,.8)"; g.shadowBlur = 16;
+  roundRect(r.x,r.y,r.w,r.h,6); g.stroke(); g.restore();
+  g.fillStyle = "#6ee7ff"; g.font = '600 12px -apple-system,"Hiragino Sans",sans-serif';
+  g.textBaseline = "bottom"; g.fillText(magnetHint.label, r.x, r.y-6);
+}
+
+function draw() {
+  g.clearRect(0,0,VW,VH);
+  const grd = g.createRadialGradient(VW/2,VH/2,0,VW/2,VH/2,Math.max(VW,VH)*0.75);
+  grd.addColorStop(0,"#141a2b"); grd.addColorStop(1,"#080a11");
+  g.fillStyle = grd; g.fillRect(0,0,VW,VH);
+  g.strokeStyle = "rgba(110,231,255,.16)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(VW/2-14,VH/2); g.lineTo(VW/2+14,VH/2);
+  g.moveTo(VW/2,VH/2-14); g.lineTo(VW/2,VH/2+14); g.stroke();
+  frameItems = resolveAll();
+  for (const it of frameItems) (it.kind === "ribbon" ? drawRibbon : drawBubble)(it);
+  drawMagnetHint();
+}
+function frame() { stepAnim(); settleSeats(); growBoxes(); draw(); updateHud(); requestAnimationFrame(frame); }
+
+/* ============================================================
+   7. 近接で吸着 —— 近づけると関係が生まれる
+   ------------------------------------------------------------
+   相手の縁の帯に触れれば「隣り合う」、帯より内側まで入れば「含む」。
+   膜に触れれば隣り合い、中まで入れば包含。
+   ============================================================ */
+const MAGNET_PX = 62, EDGE_BAND = 62;
+let magnetHint = null;
+
+function findMagnet(dragged) {
+  const di = itemById[dragged.id]; if (!di) return null;
+  const D = rectOf(di), dcx = D.x+D.w/2, dcy = D.y+D.h/2;
+  let best = null; const better = c => { if (!best || c.score < best.score) best = c; };
+  for (const host of bubbles) {
+    if (host.id === dragged.id || isAncestor(dragged.id, host.id)) continue;
+    const hi = itemById[host.id]; if (!hi || hi.scale < 0.25) continue;
+    const H = rectOf(hi), band = Math.min(EDGE_BAND, H.w/2-4, H.h/2-4);
+    if (dcx > H.x+band && dcx < H.x+H.w-band && dcy > H.y+band && dcy < H.y+H.h-band) {
+      const m = depthMag(-0.15), gw = dragged.boxSize.w*m, gh = dragged.boxSize.h*m;
+      const lx = Math.max(0, (dcx-H.x)/hi.scale - gw/2), ly = Math.max(0, (dcy-H.y)/hi.scale - gh/2);
+      better({ hostId:host.id, kind:"contains", score:-100-hi.scale, anchor:ANCHOR.seat(lx,ly),
+               rect:{ x:H.x+lx*hi.scale, y:H.y+ly*hi.scale, w:gw*hi.scale, h:gh*hi.scale },
+               label:`含む → ${host.title}` });
+      continue;
+    }
+    const sides = [
+      { s:"e", d:dcx-(H.x+H.w), across:dcy, lo:H.y, hi:H.y+H.h },
+      { s:"w", d:H.x-dcx,       across:dcy, lo:H.y, hi:H.y+H.h },
+      { s:"s", d:dcy-(H.y+H.h), across:dcx, lo:H.x, hi:H.x+H.w },
+      { s:"n", d:H.y-dcy,       across:dcx, lo:H.x, hi:H.x+H.w },
+    ];
+    for (const sd of sides) {
+      if (sd.d < -band || sd.d > MAGNET_PX) continue;
+      if (sd.across < sd.lo-36 || sd.across > sd.hi+36) continue;
+      const gw = dragged.boxSize.w*hi.scale, gh = dragged.boxSize.h*hi.scale;
+      better({ hostId:host.id, kind:"adjacent", score:Math.abs(sd.d), anchor:ANCHOR.beside(sd.s),
+        rect: sd.s==="e" ? {x:H.x+H.w+14*hi.scale,y:H.y,w:gw,h:gh}
+            : sd.s==="w" ? {x:H.x-14*hi.scale-gw, y:H.y,w:gw,h:gh}
+            : sd.s==="s" ? {x:H.x,y:H.y+H.h+14*hi.scale,w:gw,h:gh}
+            :              {x:H.x,y:H.y-14*hi.scale-gh,w:gw,h:gh},
+        label:`隣り合う → ${host.title} の${{e:"右",w:"左",s:"下",n:"上"}[sd.s]}` });
+    }
+  }
+  return best;
+}
+
+/**
+ * 置き場所の拘束を解く。placed（含む／隣り合う）は配置そのものが意味なので、外せば関係も消える。
+ * 拘束しない関係（開いた／参照／…）はそもそも触らない ＝ リンクの帯は消えない。
+ */
+function release(guestId) {
+  for (let i = relations.length-1; i >= 0; i--) {
+    const r = relations[i];
+    if (r.to === guestId && bindOf(r) === "placed") relations.splice(i, 1);
+  }
+  reindex();
+}
+function attach(guestId, cand) {
+  release(guestId);
+  // 同じ相手・同じ意味の関係が既にあれば繋ぎ直す（重複した帯を作らない）
+  const found = relations.find(r => r.from === cand.hostId && r.to === guestId && r.kind === cand.kind);
+  const dz = cand.kind === "contains" ? -0.15 : 0;
+  if (found) { found.anchor = cand.anchor; found.dz = dz; }
+  else relations.push({ kind:cand.kind, from:cand.hostId, to:guestId, anchor:cand.anchor, dz });
+  reindex();
+}
+/** 引き剥がし：拘束を外し、いま見えている場所にそのまま置く */
+function detach(b) {
+  const it = itemById[b.id];
+  if (!it || !bindingOf[b.id]) return;                 // 解決済みでなければ何もしない
+  const z = it.z;
+  const p = LENSES[view.lensId].unproject(it.x, it.y, z, lensCtx());
+  release(b.id);
+  b.free.x = p.x; b.free.y = p.y; b.free.z = z;
+  b.cur = { x:p.x, y:p.y, z };
+}
+
+/* ============================================================
+   8. 操作
+   ------------------------------------------------------------
+   自由な次元に束ねた軸ではバブルが動き、データの次元に束ねた軸では焦点が動く。
+   ============================================================ */
+function hitTest(mx,my) {
+  for (let i = frameItems.length-1; i >= 0; i--) {
+    const it = frameItems[i]; if (it.kind === "ribbon") continue;
+    const R = rectOf(it);
+    if (mx>=R.x && mx<=R.x+R.w && my>=R.y && my<=R.y+R.h) return it;
+  }
+  return null;
+}
+function onHandle(it,mx,my) {
+  if (!it || it.sized) return false;
+  const R = rectOf(it);
+  return mx>=R.x+R.w-14 && mx<=R.x+R.w+3 && my>=R.y+R.h-14 && my<=R.y+R.h+3;
+}
+let drag = null;
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  const hit = hitTest(mx,my); cv.setPointerCapture(e.pointerId);
+  if (hit) selectedId = hit.ref.id;
+  const sel = itemById[selectedId];
+  const xFree = DIMS[view.axes.x].kind === "free", yFree = DIMS[view.axes.y].kind === "free";
+  if (sel && onHandle(sel,mx,my)) drag = { mode:"resize", b:sel.ref, mx,my, mag:Math.max(sel.scale,.05) };
+  else if (hit && (xFree||yFree)) {
+    const bd = bindingOf[hit.ref.id];
+    drag = { mode:"bubble", b:hit.ref, mx,my, mag:Math.max(hit.scale,.05), xFree, yFree, moved:0,
+             boxBound: !!(bd && bindOf(bd) === "placed") };
+  } else drag = { mode:"focus", mx,my, mag:Math.max(hit?hit.scale:1,.05) };
+});
+cv.addEventListener("pointermove", e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  if (!drag) { const s = itemById[selectedId];
+    cv.style.cursor = onHandle(s,mx,my) ? "nwse-resize" : (hitTest(mx,my) ? "grab" : "default"); return; }
+  const dx = mx-drag.mx, dy = my-drag.my; drag.mx = mx; drag.my = my;
+  const lx = dx/drag.mag, ly = dy/drag.mag;              // ★ unproject = 画面の移動量 ÷ 局所倍率
+  if (drag.mode === "resize") {
+    drag.b.ownSize.w = Math.max(90, drag.b.ownSize.w+lx);
+    drag.b.ownSize.h = Math.max(70, drag.b.ownSize.h+ly);
+  } else if (drag.mode === "bubble") {
+    drag.moved += Math.abs(dx)+Math.abs(dy);
+    if (drag.boxBound) { if (drag.moved < 8) return; detach(drag.b); drag.boxBound = false; }
+    if (drag.xFree) { drag.b.free.x += lx; drag.b.cur.x += lx; }
+    if (drag.yFree) { drag.b.free.y += ly; drag.b.cur.y += ly; }
+    magnetHint = view.magnet ? findMagnet(drag.b) : null;
+  } else { view.focus.x -= lx; view.focus.y -= ly; }
+});
+function endDrag() {
+  if (drag && drag.mode === "bubble" && magnetHint) attach(drag.b.id, magnetHint);
+  magnetHint = null; drag = null;
+}
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("lostpointercapture", endDrag);
+cv.addEventListener("wheel", e => { e.preventDefault(); view.focus.z += e.deltaY*0.004; }, {passive:false});
+cv.addEventListener("dblclick", () => focusOnSelected());
+
+function focusOnSelected() {
+  const b = byId[selectedId]; if (!b) return;
+  const it = itemById[selectedId], t = layout(b, view);
+  view.focus = { x:t.x, y:t.y, z: it ? it.z : t.z };
+}
+/** ★ 焦点の奥行きは既定で「一番手前の泡」に合わせる（現行 bubble-ui は常に最前面を見ている）。 */
+function focusOnFront() {
+  const zs = frameItems.filter(i => i.kind !== "ribbon").map(i => i.z);
+  if (zs.length) view.focus.z = Math.min(...zs);
+}
+
+/* ============================================================
+   9. UI
+   ============================================================ */
+function fillSel(el,cur) {
+  el.innerHTML = "";
+  for (const [id,d] of Object.entries(DIMS)) {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = d.label + (d.kind === "free" ? " ·自由" : " ·データ");
+    el.appendChild(o);
+  }
+  el.value = cur;
+}
+const selX = document.getElementById("ax-x"), selY = document.getElementById("ax-y"),
+      selZ = document.getElementById("ax-z"), selL = document.getElementById("lens");
+fillSel(selX,view.axes.x); fillSel(selY,view.axes.y); fillSel(selZ,view.axes.z);
+for (const [id,l] of Object.entries(LENSES)) {
+  const o = document.createElement("option"); o.value = id; o.textContent = l.label; selL.appendChild(o);
+}
+selL.value = view.lensId;
+selX.onchange = () => (view.axes.x = selX.value);
+selY.onchange = () => (view.axes.y = selY.value);
+selZ.onchange = () => (view.axes.z = selZ.value);
+selL.onchange = () => (view.lensId = selL.value);
+
+const legend = document.getElementById("legend");
+for (const K of Object.values(REL_KINDS)) {
+  const el = document.createElement("span"); el.className = "key";
+  el.innerHTML = `<i class="sw" style="background:hsla(${K.hue},60%,55%,${K.ribbon==="filled"?".55":".9"})"></i>${K.label}` +
+                 `<small style="opacity:.6">${{placed:"置かれる",none:"—"}[K.bind]}</small>`;
+  legend.appendChild(el);
+}
+
+/** トグルは view のフラグ名と1対1に対応させる */
+const TOGGLES = { "t-ribbons":"ribbons", "t-grow":"grow", "t-settle":"settle",
+                  "t-magnet":"magnet", "t-anchors":"showAnchors", "t-quantize":"quantize" };
+function syncToggles() {
+  for (const [elId, key] of Object.entries(TOGGLES))
+    document.getElementById(elId).classList.toggle("on", view[key]);
+}
+for (const [elId, key] of Object.entries(TOGGLES))
+  document.getElementById(elId).onclick = () => { view[key] = !view[key]; syncToggles(); };
+syncToggles();
+
+/** 「開く」＝ 開いた関係を1本足すだけ。リンクはホストの中身に、泡は手前の面に。 */
+let openSeq = 0;
+document.getElementById("open").onclick = () => {
+  const src = byId[selectedId] || bubbles[0];
+  // ★ 開くのは「最前面に置く」操作。opener の1つ手前に固定するのではない
+  //   （現行 popChild = layers.unshift と同じ）。置いたあと奥へ送っても構わない。
+  const front = Math.min(0, ...bubbles.map(b => b.free.z));
+  const z = front - 1;
+  const nb = { id:"n"+openSeq++, title: src.title+" の詳細", hue:(src.hue+40)%360,
+    ownSize:{w:210,h:132}, boxSize:{w:210,h:132},
+    free:{ x:src.free.x+150, y:src.free.y+110, z },
+    hist:src.hist, branch:src.branch, sibling:src.sibling, cur:null };
+  bubbles.push(nb); byId[nb.id] = nb;
+  const n = relations.filter(r => r.from === src.id && r.kind === "opened").length;
+  relations.push({ kind:"opened", from:src.id, to:nb.id,
+                   anchor: ANCHOR.hole(.06, Math.min(.86, .40 + n*0.13), .40, .075) });
+  reindex();
+  nb.cur = { x:nb.free.x, y:nb.free.y, z: z + 2 };      // 奥から手前へ飛んでくる
+  selectedId = nb.id;
+  view.focus.z = z;                                     // 開いたらその面を見る
+};
+
+const PRESETS = {
+  current:   { axes:{x:"free.x",y:"free.y",z:"free.z"},              lens:"perspective", quantize:true,  on:"b0" },
+  histz:     { axes:{x:"none",y:"history.branch",z:"history.age"},   lens:"perspective", quantize:false, on:"b9" },
+  worldline: { axes:{x:"history.index",y:"history.branch",z:"none"}, lens:"fisheyeX",    quantize:false, on:"b7" },
+  flat:      { axes:{x:"free.x",y:"free.y",z:"none"},                lens:"flat",        quantize:false, on:"b0" },
+};
+document.querySelectorAll("[data-preset]").forEach(btn => {
+  btn.onclick = () => {
+    const p = PRESETS[btn.dataset.preset];
+    view.axes = {...p.axes}; view.lensId = p.lens; view.quantize = p.quantize;
+    selX.value = p.axes.x; selY.value = p.axes.y; selZ.value = p.axes.z; selL.value = p.lens;
+    syncToggles();
+    document.querySelectorAll("[data-preset]").forEach(b => b.classList.toggle("on", b===btn));
+    selectedId = p.on; focusOnSelected(); focusOnFront();
+  };
+});
+
+const hud = document.getElementById("hud");
+function updateHud() {
+  const b = byId[selectedId], it = itemById[selectedId];
+  const dx = DIMS[view.axes.x], dy = DIMS[view.axes.y], dz = DIMS[view.axes.z];
+  const mine = relations.filter(r => r.from === selectedId || r.to === selectedId);
+  const desc = mine.slice(0,4).map(r => {
+    const out = r.from === selectedId;
+    return `${out?"→":"←"}${REL_KINDS[r.kind].label}[${bindOf(r)}]:${byId[out?r.to:r.from]?.title ?? "?"}`;
+  }).join("  ") || "なし";
+  hud.innerHTML =
+    `X ← <b>${dx.label}</b>  Y ← <b>${dy.label}</b>  Z ← <b>${dz.label}</b>  レンズ <b>${LENSES[view.lensId].label}</b>\n` +
+    `選択 <b>${b?b.title:"-"}</b>  自前 ${b?b.ownSize.w.toFixed(0)+"×"+b.ownSize.h.toFixed(0):"-"}` +
+    ` → 箱 ${it?it.w.toFixed(0)+"×"+it.h.toFixed(0):"-"}` +
+    `${b && b.boxSize.w > b.ownSize.w+2 ? "  <b>（席の要求で伸びている）</b>" : ""}\n` +
+    `関係 ${desc}${mine.length>4?`  ほか${mine.length-4}件`:""}\n` +
+    `${magnetHint ? `<b>吸着候補: ${magnetHint.label}</b>`
+                  : `泡 ${bubbles.length}   関係 ${relations.length}   焦点 z${view.focus.z.toFixed(2)}`}`;
+}
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

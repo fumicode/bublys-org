@@ -1,0 +1,770 @@
+<title>泡の空間モデル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700&family=IBM+Plex+Sans+JP:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --paper:#f4f6f8;
+    --surface:#ffffff;
+    --sunken:#eef1f5;
+    --ink:#141922;
+    --ink-soft:#3d4756;
+    --muted:#5f6a7a;
+    --rule:#dae0e8;
+    --rule-soft:#e7ebf1;
+    --accent:#0c6c7d;
+    --accent-soft:#e0f0f3;
+    --warn:#9a5518;
+
+    --k-contains:#0f7a8c;
+    --k-adjacent:#0e7a5e;
+    --k-opened:#1b5fa8;
+    --k-references:#8a6410;
+    --k-derived:#8b3d8f;
+    --k-annotates:#3f7a1e;
+
+    --shadow:0 1px 2px rgba(20,25,34,.05), 0 8px 24px -12px rgba(20,25,34,.18);
+    --measure:69ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0c1016;
+      --surface:#141a24;
+      --sunken:#10151d;
+      --ink:#e3e9f2;
+      --ink-soft:#c2ccdb;
+      --muted:#8d99ab;
+      --rule:#242c3a;
+      --rule-soft:#1c232e;
+      --accent:#63d2e4;
+      --accent-soft:#10333b;
+      --warn:#e2a35f;
+
+      --k-contains:#4fc4d8;
+      --k-adjacent:#4ecfa4;
+      --k-opened:#77aef0;
+      --k-references:#dcb452;
+      --k-derived:#d488d9;
+      --k-annotates:#8fce62;
+
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0c1016;
+    --surface:#141a24;
+    --sunken:#10151d;
+    --ink:#e3e9f2;
+    --ink-soft:#c2ccdb;
+    --muted:#8d99ab;
+    --rule:#242c3a;
+    --rule-soft:#1c232e;
+    --accent:#63d2e4;
+    --accent-soft:#10333b;
+    --warn:#e2a35f;
+
+    --k-contains:#4fc4d8;
+    --k-adjacent:#4ecfa4;
+    --k-opened:#77aef0;
+    --k-references:#dcb452;
+    --k-derived:#d488d9;
+    --k-annotates:#8fce62;
+
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans JP","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    font-size:15.5px; line-height:1.85;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px 120px}
+
+  /* ── 見出し ─────────────────────────────── */
+  h1,h2,h3{font-family:"Shippori Mincho B1","Hiragino Mincho ProN",serif;font-weight:700;text-wrap:balance;line-height:1.42}
+  h1{font-size:clamp(2.1rem,4.6vw,3.05rem);letter-spacing:.01em;margin:0}
+  h2{font-size:1.62rem;margin:0}
+  h3{font-size:1.14rem;font-weight:600;margin:0}
+  p{margin:0;max-width:var(--measure)}
+  ul,ol{margin:0;padding-left:1.35em;max-width:var(--measure)}
+  li{margin:.28em 0}
+  a{color:var(--accent);text-underline-offset:3px}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+
+  code,kbd{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;font-size:.87em}
+  code{background:var(--sunken);padding:.1em .38em;border-radius:4px;border:1px solid var(--rule-soft)}
+  pre{margin:0;background:var(--sunken);border:1px solid var(--rule);border-radius:10px;
+      padding:16px 18px;overflow-x:auto;line-height:1.7}
+  pre code{background:none;border:0;padding:0;font-size:.83rem}
+
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);font-weight:600}
+
+  /* ── ヘッダ ─────────────────────────────── */
+  header{padding:72px 0 46px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:20px}
+  .lede{font-size:1.09rem;color:var(--ink-soft);max-width:62ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 22px;font-family:"IBM Plex Mono",monospace;
+    font-size:.74rem;color:var(--muted);letter-spacing:.04em;padding-top:4px}
+
+  /* ── レイアウト ───────────────────────────── */
+  .cols{display:grid;grid-template-columns:1fr;gap:0}
+  @media(min-width:1080px){
+    .cols{grid-template-columns:190px minmax(0,1fr);gap:56px;align-items:start}
+    nav.toc{position:sticky;top:28px;padding-top:56px}
+  }
+  nav.toc{display:none}
+  @media(min-width:1080px){nav.toc{display:block}}
+  nav.toc ol{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px}
+  nav.toc a{display:block;padding:5px 0 5px 12px;border-left:2px solid var(--rule);
+    color:var(--muted);text-decoration:none;font-size:.83rem;line-height:1.45}
+  nav.toc a:hover{color:var(--accent);border-left-color:var(--accent)}
+
+  main{display:flex;flex-direction:column;gap:64px;padding-top:56px;min-width:0}
+  section{display:flex;flex-direction:column;gap:20px;scroll-margin-top:24px}
+  .sechead{display:flex;flex-direction:column;gap:7px;border-top:2px solid var(--ink);padding-top:14px}
+
+  /* ── 中心ルール ───────────────────────────── */
+  .axiom{background:var(--surface);border:1px solid var(--rule);border-radius:12px;
+    padding:26px 30px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+  .axiom p{font-family:"Shippori Mincho B1",serif;font-size:1.2rem;line-height:1.75;max-width:56ch}
+  .axiom .eyebrow{color:var(--accent)}
+
+  /* ── 表 ───────────────────────────────── */
+  .tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:520px}
+  th,td{text-align:left;padding:10px 15px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+  thead th{background:var(--sunken);font-weight:600;font-size:.75rem;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  td code{white-space:nowrap}
+  .num{font-variant-numeric:tabular-nums;font-family:"IBM Plex Mono",monospace}
+
+  /* ── 関係の色チップ ─────────────────────────── */
+  .chip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-weight:500}
+  .chip::before{content:"";width:11px;height:11px;border-radius:3px;background:var(--c);flex:none}
+
+  /* ── カード ─────────────────────────────── */
+  .cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(248px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:18px 20px;
+    display:flex;flex-direction:column;gap:8px}
+  .card h3{font-family:"IBM Plex Sans JP",sans-serif;font-size:.95rem;font-weight:600}
+  .card p{font-size:.87rem;color:var(--ink-soft)}
+  .card .tag{font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;
+    color:var(--muted);text-transform:uppercase}
+
+  /* ── 制約リスト ───────────────────────────── */
+  .rules{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:2px;max-width:none}
+  .rules li{display:grid;grid-template-columns:2.4rem minmax(0,1fr);gap:14px;
+    padding:15px 0;border-bottom:1px solid var(--rule-soft);margin:0;max-width:none}
+  .rules li:first-child{border-top:1px solid var(--rule-soft)}
+  .rules .n{font-family:"IBM Plex Mono",monospace;font-size:.82rem;color:var(--accent);
+    font-weight:600;padding-top:.22em;font-variant-numeric:tabular-nums}
+  .rules .body{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .rules strong{font-weight:600}
+  .rules .why{font-size:.86rem;color:var(--muted);max-width:64ch}
+
+  /* ── 図 ───────────────────────────────── */
+  figure{margin:0;display:flex;flex-direction:column;gap:11px}
+  figure .frame{background:var(--surface);border:1px solid var(--rule);border-radius:10px;
+    padding:22px 20px;overflow-x:auto}
+  figure svg{display:block;max-width:100%;height:auto;margin:0 auto;color:var(--ink)}
+  figcaption{font-size:.83rem;color:var(--muted);max-width:var(--measure)}
+
+  /* ── 注意ブロック ─────────────────────────── */
+  .note{border-left:3px solid var(--warn);background:var(--sunken);padding:14px 18px;
+    border-radius:0 8px 8px 0;font-size:.9rem;color:var(--ink-soft)}
+  .note strong{color:var(--ink)}
+
+  details{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:0 20px}
+  summary{cursor:pointer;padding:15px 0;font-weight:600;font-size:.95rem;list-style-position:inside}
+  details[open] summary{border-bottom:1px solid var(--rule-soft);margin-bottom:16px}
+  details .inner{padding-bottom:20px;display:flex;flex-direction:column;gap:12px}
+
+  footer{margin-top:24px;padding-top:26px;border-top:1px solid var(--rule);
+    font-size:.82rem;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">bubble-ui 再設計 / 設計ノート</span>
+  <h1>泡の空間モデル</h1>
+  <p class="lede">レイヤーの配列を捨て、<strong>軸に次元を差し込み、レンズで射影し、関係で結ぶ</strong>という3つの仕組みに組み直す。Canvas プロトタイプで一通り動かして確かめた設計と、その過程で踏んだ制約の記録。</p>
+  <div class="meta">
+    <span>2026-09-10</span>
+    <span>検証: bubble-lab.html / Canvas 単体</span>
+    <span>状態: 設計確定・実装未着手</span>
+  </div>
+</header>
+
+<div class="cols">
+
+<nav class="toc" aria-label="目次">
+  <ol>
+    <li><a href="#axiom">中心のルール</a></li>
+    <li><a href="#vocab">語彙</a></li>
+    <li><a href="#resolve">解決の経路</a></li>
+    <li><a href="#relation">関係と配置</a></li>
+    <li><a href="#anchor">アンカーの3種</a></li>
+    <li><a href="#forces">結合の力学</a></li>
+    <li><a href="#migration">現行からの対応</a></li>
+    <li><a href="#constraints">13の制約</a></li>
+    <li><a href="#review">残っている弱さ</a></li>
+    <li><a href="#next">次の一手</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════ -->
+<section id="axiom">
+  <div class="sechead">
+    <span class="eyebrow">01</span>
+    <h2>中心のルール</h2>
+  </div>
+  <div class="axiom">
+    <span class="eyebrow">公理</span>
+    <p>泡の画面上の見え方は、<strong>論理座標 (x, y, z)</strong> と <strong>レンズ</strong> の合成だけで決まる。それ以外の特別扱いを一切しない。</p>
+  </div>
+  <p>現行 bubble-ui では「レイヤー配列の何番目か」「フォーカスされているか」「universe かどうか」「最大化か」が、それぞれ別の経路で見た目に効いていた。この4本を1本にまとめる。個々のイベントハンドラで挙動を書くのではなく、この1文から挙動が導出される状態を目指す。</p>
+  <p>そこから2つの操作ルールが自動的に出てくる。</p>
+  <div class="cards">
+    <div class="card">
+      <span class="tag">操作</span>
+      <h3>自由な次元を束ねた軸では、泡が動く</h3>
+      <p>ドラッグ量を局所倍率で割った分だけ論理座標が動く。従来の移動。</p>
+    </div>
+    <div class="card">
+      <span class="tag">操作</span>
+      <h3>データの次元を束ねた軸では、焦点が動く</h3>
+      <p>同じ横ドラッグが、履歴軸に束ねれば履歴のスクラブになる。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="vocab">
+  <div class="sechead">
+    <span class="eyebrow">02</span>
+    <h2>語彙</h2>
+  </div>
+  <p>プロトタイプの試行錯誤で名前が衝突していたので整理した。以下が確定した語彙で、実装もこの名前で書く。</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>名前</th><th>役割</th><th>持つもの</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Bubble</code></td>
+          <td>中身の単位。<strong>座標を持たない</strong></td>
+          <td><code>ownSize</code>（自前の大きさ）／<code>boxSize</code>（席の要求で伸びた実際の箱）</td>
+        </tr>
+        <tr>
+          <td><code>Dimension</code></td>
+          <td>泡 → 数値。軸に差し込む</td>
+          <td><code>kind: "free" | "derived"</code>／<code>valueOf(bubble)</code></td>
+        </tr>
+        <tr>
+          <td><code>Lens</code></td>
+          <td>Vec3 → 画面</td>
+          <td><code>project</code>／<code>unproject</code>（逆変換は必須）</td>
+        </tr>
+        <tr>
+          <td><code>View</code></td>
+          <td>軸への次元の割り当て＋レンズ＋焦点</td>
+          <td><code>axes{x,y,z}</code>／<code>lens</code>／<code>focus</code></td>
+        </tr>
+        <tr>
+          <td><code>Relation</code></td>
+          <td>泡と泡のつながり</td>
+          <td><code>kind</code>（意味）／<code>bind: "placed" | "none"</code>（配置を拘束するか）／<code>anchor</code></td>
+        </tr>
+        <tr>
+          <td><code>Anchor</code></td>
+          <td>ホストの<strong>中身座標系</strong>における取り付け矩形</td>
+          <td><code>hole</code> ／ <code>seat</code> ／ <code>beside</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <strong>座標系の呼び分け。</strong> アンカーは常に「ホストの<em>中身座標系</em>」の矩形として書く。矩形がホストの箱の<strong>内側にあれば入れ子、外側にあれば隣接</strong>。両者に別の仕組みは要らない。
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="resolve">
+  <div class="sechead">
+    <span class="eyebrow">03</span>
+    <h2>解決の経路</h2>
+  </div>
+  <p>1つの泡が画面のどこに何倍で描かれるかは、2つの経路のどちらかで決まる。拘束する関係を持つ泡はホストのアンカーから、持たない泡は次元とレンズから。</p>
+
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 860 300" role="img" aria-label="泡の画面位置は、拘束する関係があればホストのアンカーから、なければ次元とレンズから決まり、最後に絶対zの1回のソートで描画順が決まる">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="currentColor"/>
+          </marker>
+          <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+
+        <g font-family="IBM Plex Mono, monospace" font-size="12">
+          <!-- 起点 -->
+          <rect x="10" y="122" width="76" height="46" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="48" y="150" text-anchor="middle" fill="currentColor">Bubble</text>
+
+          <!-- 分岐 -->
+          <path d="M86 138 L128 138 L128 70 L168 70" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+          <path d="M86 152 L128 152 L128 226 L168 226" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+          <text x="134" y="58" font-size="11" fill="var(--accent)">拘束する関係がある</text>
+          <text x="134" y="252" font-size="11" fill="currentColor" opacity=".65">ない</text>
+
+          <!-- 上の経路：関係 -->
+          <rect x="170" y="47" width="124" height="46" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="232" y="70" text-anchor="middle" fill="var(--accent)">ホストを解決</text>
+          <text x="232" y="84" text-anchor="middle" font-size="10" fill="var(--accent)" opacity=".8">（再帰）</text>
+
+          <path d="M294 70 L336 70" fill="none" stroke="var(--accent)" stroke-width="1.3" marker-end="url(#arA)"/>
+          <rect x="338" y="47" width="124" height="46" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="400" y="76" text-anchor="middle" fill="var(--accent)">アンカー矩形</text>
+
+          <path d="M462 70 L560 70 L560 122" fill="none" stroke="var(--accent)" stroke-width="1.3" marker-end="url(#arA)"/>
+
+          <!-- 下の経路：次元とレンズ -->
+          <rect x="170" y="203" width="124" height="46" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="232" y="226" text-anchor="middle" fill="currentColor">次元 → 軸</text>
+          <text x="232" y="240" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">x / y / z</text>
+
+          <path d="M294 226 L336 226" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+          <rect x="338" y="203" width="124" height="46" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="400" y="226" text-anchor="middle" fill="currentColor">Vec3</text>
+          <text x="400" y="240" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">論理座標</text>
+
+          <path d="M462 226 L504 226" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+          <rect x="506" y="203" width="108" height="46" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="560" y="226" text-anchor="middle" fill="currentColor">Lens</text>
+          <text x="560" y="240" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">局所倍率</text>
+
+          <path d="M614 226 L668 226 L668 172" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+
+          <!-- 合流 -->
+          <rect x="606" y="124" width="124" height="46" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="668" y="147" text-anchor="middle" fill="currentColor">画面矩形</text>
+          <text x="668" y="161" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">x, y, scale, z</text>
+          <path d="M560 122 L560 147 L604 147" fill="none" stroke="var(--accent)" stroke-width="1.3" marker-end="url(#arA)"/>
+
+          <path d="M730 147 L772 147" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)"/>
+          <rect x="774" y="112" width="76" height="70" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <text x="812" y="140" text-anchor="middle" fill="currentColor">絶対 z で</text>
+          <text x="812" y="156" text-anchor="middle" fill="currentColor">1回ソート</text>
+          <text x="812" y="196" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">親子は描画順を</text>
+          <text x="812" y="209" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">拘束しない</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>2つの経路が「画面矩形」で合流し、そこから先は共通。描画順は<strong>解決された絶対 z の1回のソートだけ</strong>で決まるため、孫が祖父より手前に出られる。DOM の stacking context では不可能な性質で、これが「自由な三次元」の実体。</figcaption>
+  </figure>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="relation">
+  <div class="sechead">
+    <span class="eyebrow">04</span>
+    <h2>関係と配置</h2>
+  </div>
+  <div class="axiom">
+    <span class="eyebrow">分離</span>
+    <p>関係は<strong>意味</strong>、結合は<strong>配置</strong>。関係が配置を拘束するかどうかは、<strong>2段階</strong>しかない。</p>
+  </div>
+
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 700 216" role="img" aria-label="bind は box と none の2段階。box はアンカーが箱を決め、none は配置を拘束せず帯だけが見える">
+        <g font-family="IBM Plex Sans JP, sans-serif" font-size="12">
+          <!-- box -->
+          <text x="20" y="20" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--k-contains)" font-weight="600">bind: "placed"</text>
+          <text x="20" y="38" font-size="11" fill="currentColor" opacity=".65">アンカーが置き場所を決める</text>
+          <rect x="20" y="56" width="210" height="120" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="30" y="74" font-size="10" fill="currentColor" opacity=".6">ホスト</text>
+          <rect x="118" y="90" width="98" height="70" rx="6" fill="var(--k-contains)" opacity=".14"/>
+          <rect x="118" y="90" width="98" height="70" rx="6" fill="none" stroke="var(--k-contains)" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <text x="167" y="129" text-anchor="middle" font-size="11" fill="var(--k-contains)">ゲスト</text>
+          <text x="20" y="200" font-size="11" fill="currentColor" opacity=".7">含む ／ 隣り合う</text>
+
+          <line x1="330" y1="30" x2="330" y2="200" stroke="currentColor" stroke-width="1" opacity=".18"/>
+
+          <!-- none -->
+          <text x="380" y="20" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--k-opened)" font-weight="600">bind: "none"</text>
+          <text x="380" y="38" font-size="11" fill="currentColor" opacity=".65">配置は拘束しない。帯だけが見える</text>
+          <rect x="380" y="86" width="128" height="82" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="390" y="104" font-size="10" fill="currentColor" opacity=".6">ホスト</text>
+          <rect x="390" y="138" width="72" height="16" rx="3" fill="var(--k-opened)" opacity=".45"/>
+          <text x="426" y="150" text-anchor="middle" font-size="9" fill="currentColor">↗ リンク</text>
+          <path d="M462 146 C 500 146 508 106 540 106" fill="none" stroke="var(--k-opened)" stroke-width="8" opacity=".22"/>
+          <rect x="540" y="66" width="112" height="80" rx="7" fill="none" stroke="var(--k-opened)" stroke-width="1.6"/>
+          <text x="596" y="111" text-anchor="middle" font-size="11" fill="var(--k-opened)">相手はどこでもよい</text>
+          <text x="380" y="200" font-size="11" fill="currentColor" opacity=".7">開いた ／ 参照 ／ 由来 ／ 注釈</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>どちらの段階でも <strong>anchor から相手へ帯が伸びる</strong>。現行のリンクバブル（<code>LinkBubbleView</code>）は、<code>bind:"none"</code> の帯にあたる。<code>origin rect</code> がそのままアンカーになる。</figcaption>
+  </figure>
+
+  <h3>「開いた」を拘束にしてはいけない</h3>
+  <p>いちど「開いた」を <em>奥行きだけ拘束する</em> 中間段階（<code>bind:"depth"</code>、ゲストの z を <code>host.z − 1</code> に固定）として設計したが、これは<strong>二重に間違っていた</strong>。</p>
+  <ul>
+    <li><strong>永続的な拘束ではない。</strong> 開いた泡はあとから奥へ送ってよい。参照しながら別の作業をするときに背後へ回す、というのはごく普通の操作で、拘束はそれを禁じてしまう。</li>
+    <li><strong>そもそも <code>host.z − 1</code> ではない。</strong> 現行の <code>popChild</code> は <code>layers.unshift([id])</code>、つまり opener がどこにいようと<strong>最前面</strong>に置く。opener との相対位置ではない。</li>
+  </ul>
+  <p>正しくは、<strong>「開く」は関係の性質ではなく操作</strong>。その瞬間に最前面へ置き、関係のほうは出来事として残るだけでよい。</p>
+
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 700 200" role="img" aria-label="開いた瞬間は最前面に置かれるが、そのあと奥へ送っても関係と帯は残る">
+        <g font-family="IBM Plex Sans JP, sans-serif" font-size="12">
+          <text x="20" y="20" font-size="11" fill="var(--accent)" font-weight="600">開いた瞬間</text>
+          <text x="20" y="37" font-size="10.5" fill="currentColor" opacity=".6">最前面に置く（z = 最前面 − 1）</text>
+          <rect x="20" y="92" width="112" height="66" rx="7" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".75"/>
+          <text x="30" y="108" font-size="10" fill="currentColor" opacity=".55">opener  z=0</text>
+          <rect x="29" y="128" width="66" height="14" rx="3" fill="var(--k-opened)" opacity=".45"/>
+          <path d="M95 135 C 132 135 140 100 172 100" fill="none" stroke="var(--k-opened)" stroke-width="8" opacity=".22"/>
+          <rect x="172" y="58" width="132" height="90" rx="7" fill="none" stroke="var(--k-opened)" stroke-width="1.8"/>
+          <text x="238" y="99" text-anchor="middle" font-size="11" fill="var(--k-opened)">z = −1</text>
+          <text x="238" y="168" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".55">大きく、手前</text>
+
+          <line x1="352" y1="26" x2="352" y2="180" stroke="currentColor" stroke-width="1" opacity=".18"/>
+          <text x="366" y="106" font-size="15" fill="currentColor" opacity=".45">→</text>
+
+          <text x="400" y="20" font-size="11" fill="var(--accent)" font-weight="600">そのあと</text>
+          <text x="400" y="37" font-size="10.5" fill="currentColor" opacity=".6">奥へ送ってよい。関係も帯も残る</text>
+          <rect x="400" y="92" width="112" height="66" rx="7" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".75"/>
+          <text x="410" y="108" font-size="10" fill="currentColor" opacity=".55">opener  z=0</text>
+          <rect x="409" y="128" width="66" height="14" rx="3" fill="var(--k-opened)" opacity=".45"/>
+          <path d="M475 135 C 528 135 540 118 578 118" fill="none" stroke="var(--k-opened)" stroke-width="6" opacity=".2"/>
+          <rect x="578" y="98" width="80" height="52" rx="6" fill="none" stroke="var(--k-opened)" stroke-width="1.4" opacity=".8"/>
+          <text x="618" y="128" text-anchor="middle" font-size="11" fill="var(--k-opened)" opacity=".85">z = +2</text>
+          <text x="618" y="170" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".55">小さく、奥</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>拘束と初期配置を分けると、開いた泡は自由に動かせて、リンクの帯だけが残る。<code>bind:"depth"</code> を消したことで、それを繕うために入れていた「拘束を外しても関係は残す」という仕組み（<code>survives</code> フラグと <code>bind</code> の上書き）も丸ごと不要になった。</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>kind</th><th>bind</th><th>帯</th><th>引き剥がしたとき</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="chip" style="--c:var(--k-contains)">含む</span></td><td><code>placed</code></td><td>塗り</td><td>関係も消える</td></tr>
+        <tr><td><span class="chip" style="--c:var(--k-adjacent)">隣り合う</span></td><td><code>placed</code></td><td>接する辺が光る</td><td>関係も消える</td></tr>
+        <tr><td><span class="chip" style="--c:var(--k-opened)">開いた</span></td><td><code>none</code></td><td>塗り</td><td>—（そもそも拘束していない）</td></tr>
+        <tr><td><span class="chip" style="--c:var(--k-references)">参照</span></td><td><code>none</code></td><td>糸</td><td>—</td></tr>
+        <tr><td><span class="chip" style="--c:var(--k-derived)">由来</span></td><td><code>none</code></td><td>糸</td><td>—</td></tr>
+        <tr><td><span class="chip" style="--c:var(--k-annotates)">注釈</span></td><td><code>none</code></td><td>糸</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>placed</code> の2つは<strong>配置そのものが意味</strong>なので、泡を引き剥がせば関係も消える。それ以外は配置に触れていないので、引き剥がすという概念がない。</p>
+
+  <div class="note">
+    <strong>不変条件。</strong> 1つの泡が持てる <code>placed</code> 拘束は高々1つ。拘束しない関係はいくつでも持てる。この不変条件は呼び出し側ではなく、索引を張り直す <code>reindex()</code> が担保する。
+  </div>
+
+  <h3>関係グラフは軸に刺さる</h3>
+  <p>次元は関係グラフを遡って深さを数えられる。<strong>どの <code>kind</code> を辿るかはパラメータ</strong>で、拘束するかどうかとは無関係。だから拘束しない「開いた」も軸に刺せる。</p>
+  <pre><code>chainDepth(bubble, kind)   // その種類の関係を遡った鎖の長さ
+
+open.chain     = −chainDepth(b, "opened")     // 開いた連鎖。深いほど手前
+contain.chain  =  chainDepth(b, "contains")   // 入れ子の深さ</code></pre>
+  <p>現行の <code>openDepth</code> は <code>open.chain</code> に一般化される。ここで軸の仕組みと関係の仕組みが噛み合う。</p>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="anchor">
+  <div class="sechead">
+    <span class="eyebrow">05</span>
+    <h2>アンカーの3種</h2>
+  </div>
+  <div class="axiom">
+    <span class="eyebrow">規則</span>
+    <p>アンカーがホストの<strong>内側</strong>にあれば、ゲストはホストの<strong>座標系に入る</strong>。<strong>外側</strong>にあれば、ゲストは<strong>自分の奥行きのまま</strong>、画面上で辺が接するだけ。</p>
+  </div>
+  <p>中に入るのと隣に並ぶのは、幾何的に別物だった。前者は座標系の入れ子、後者は画面上の接触。<strong>隣接がホストの縮尺を継承してはいけない</strong>のはこのためで、継承させると「リストの隣に、リストより手前でアイテムを大きく開く」が書けなくなる。</p>
+
+  <figure>
+    <div class="frame">
+      <svg viewBox="0 0 700 216" role="img" aria-label="含むではゲストがホストの縮尺を継承し、隣り合うではゲストが自分の奥行きのまま画面上で辺だけ接する">
+        <g font-family="IBM Plex Sans JP, sans-serif" font-size="12">
+          <!-- 含む -->
+          <text x="20" y="20" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--k-contains)" font-weight="600">hole / seat</text>
+          <text x="20" y="38" font-size="11" fill="currentColor" opacity=".65">ホストの座標系に入る</text>
+          <rect x="20" y="62" width="200" height="118" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <text x="30" y="80" font-size="10" fill="currentColor" opacity=".55">ホスト  scale 0.8</text>
+          <rect x="112" y="98" width="94" height="64" rx="6" fill="var(--k-contains)" opacity=".14"/>
+          <rect x="112" y="98" width="94" height="64" rx="6" fill="none" stroke="var(--k-contains)" stroke-width="1.6"/>
+          <text x="159" y="126" text-anchor="middle" font-size="11" fill="var(--k-contains)">ゲスト</text>
+          <text x="159" y="142" text-anchor="middle" font-size="10" fill="var(--k-contains)" opacity=".85">scale 0.8</text>
+          <text x="20" y="202" font-size="11" fill="currentColor" opacity=".7">縮尺は<tspan font-weight="600">継承する</tspan></text>
+
+          <line x1="330" y1="30" x2="330" y2="200" stroke="currentColor" stroke-width="1" opacity=".18"/>
+
+          <!-- 隣り合う -->
+          <text x="380" y="20" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--k-adjacent)" font-weight="600">beside</text>
+          <text x="380" y="38" font-size="11" fill="currentColor" opacity=".65">画面上で辺が接するだけ</text>
+          <rect x="380" y="102" width="106" height="66" rx="7" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".8"/>
+          <text x="389" y="120" font-size="10" fill="currentColor" opacity=".55">リスト</text>
+          <text x="389" y="134" font-size="10" fill="currentColor" opacity=".55">z=+1</text>
+          <text x="389" y="148" font-size="10" fill="currentColor" opacity=".55">scale 0.6</text>
+          <line x1="486" y1="102" x2="486" y2="168" stroke="var(--k-adjacent)" stroke-width="3"/>
+          <rect x="496" y="62" width="172" height="118" rx="8" fill="none" stroke="var(--k-adjacent)" stroke-width="1.8"/>
+          <text x="582" y="112" text-anchor="middle" font-size="12" fill="var(--k-adjacent)">アイテム</text>
+          <text x="582" y="132" text-anchor="middle" font-size="10.5" fill="var(--k-adjacent)" opacity=".85">z=−1  scale 1.0</text>
+          <text x="380" y="202" font-size="11" fill="currentColor" opacity=".7">縮尺は<tspan font-weight="600">独立</tspan>。奥行きは各自のもの</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>リストから開いたアイテムを、リストのすぐ右に、リストより手前で大きく出す。隣接がホストの座標系に入らないから書ける配置で、実測でも <code>勤務表 scale 0.79 / 希望シフト scale 1.00</code>、辺のすき間はちょうど 14px に保たれる。</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>アンカー</th><th>座標系</th><th>縮尺</th><th>大きさ</th><th>ホストを押し広げるか</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>hole(rx,ry,rw,rh)</code></td>
+          <td>ホストの中身座標系<br><span style="opacity:.65">自前サイズの比率</span></td>
+          <td>ホスト由来</td>
+          <td>枠が決める</td>
+          <td>しない</td>
+        </tr>
+        <tr>
+          <td><code>seat(x,y)</code></td>
+          <td>ホストの中身座標系<br><span style="opacity:.65">中身座標の絶対値</span></td>
+          <td>ホスト由来</td>
+          <td>ゲスト自身</td>
+          <td><strong>押し広げる</strong></td>
+        </tr>
+        <tr>
+          <td><code>beside(side,gap)</code></td>
+          <td><strong>画面上の接触</strong><br><span style="opacity:.65">辺どうしを合わせる</span></td>
+          <td><strong>ゲスト自身の z 由来</strong></td>
+          <td>ゲスト自身</td>
+          <td>しない</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>用途はそれぞれ、<code>hole</code> が表のセルやパネルの一角と中身の中のリンク、<code>seat</code> が後から放り込まれた泡、<code>beside</code> が隣り合う泡。</p>
+  <div class="note">
+    <strong>すき間の尺度。</strong> <code>beside</code> の <code>gap</code> は<strong>ゲストの縮尺</strong>で画面 px に落とす。ゲストが奥へ行くとすき間も縮む（14px → 8px）。「すき間はゲストの世界に属する」という解釈だが、ホスト側の尺度や固定 px のほうが自然な場面もありそうで、まだ決め切れていない。
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="forces">
+  <div class="sechead">
+    <span class="eyebrow">06</span>
+    <h2>結合の力学</h2>
+  </div>
+  <p>結合は静的な設定ではなく、4方向に働く力になった。すべて毎フレーム解かれる。</p>
+  <div class="cards">
+    <div class="card">
+      <span class="tag">ホスト → ゲスト</span>
+      <h3>アンカーが位置と大きさを決める</h3>
+      <p>ホストが縮尺を持てばゲストもその縮尺に乗る。穴ならゲストの大きさも枠が決める。</p>
+    </div>
+    <div class="card">
+      <span class="tag">ゲスト → ホスト</span>
+      <h3>席が場所を要求し、箱が伸びる</h3>
+      <p><code>必要な箱幅 = 席x + ゲスト幅 × depthMag(dz) + 余白</code>。手前に浮くほど広い場所が要る。</p>
+    </div>
+    <div class="card">
+      <span class="tag">兄弟 ⇄ 兄弟</span>
+      <h3>席が場所を譲り合う</h3>
+      <p>重なりが最小の軸へ押し出す。<strong>ホスト自身の中身も場所を取るもののひとつ</strong>として同列に扱う。</p>
+    </div>
+    <div class="card">
+      <span class="tag">近接 → 結合</span>
+      <h3>近づけると関係が生まれる</h3>
+      <p>縁の帯に触れれば隣り合う、帯より内側まで入れば含む。膜に触れれば隣接、中まで入れば包含。</p>
+    </div>
+  </div>
+  <p>3つ目の「ホスト自身の中身も場所を取る」が、<em>放り込まれた泡がホストの中身を隠さない</em>という要求を特別扱いなしに満たす。中身が場所を占めているので、後から来た泡は自然にそこを避ける。</p>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="migration">
+  <div class="sechead">
+    <span class="eyebrow">07</span>
+    <h2>現行からの対応</h2>
+  </div>
+  <p>現行 bubble-ui の要素は、すべて新しい概念の<strong>インスタンス</strong>に収まった。新概念が実際に一般化になっている傍証として見ている。</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>現行</th><th>新</th></tr></thead>
+      <tbody>
+        <tr><td><code>BubblesProcess.layers: string[][]</code></td><td><strong>廃止。</strong>z は次元から導出</td></tr>
+        <tr><td><code>popChild</code>（<code>layers.unshift</code>）</td><td><strong>操作。</strong>最前面に置き、<code>opened</code> 関係を1本張る</td></tr>
+        <tr><td><code>bubbleRelations</code>（opener⇄openee）</td><td><code>Relation{ kind:"opened", bind:"none" }</code></td></tr>
+        <tr><td><code>openDepth</code></td><td><code>open.chain</code>（開いた関係を遡った鎖の長さ）</td></tr>
+        <tr><td><code>CoordinateSystem</code> / <code>Layer</code></td><td><code>PerspectiveLens</code> の内部</td></tr>
+        <tr><td><code>Viewport</code></td><td>フレームの画面矩形解決</td></tr>
+        <tr><td><code>bubbleOptions.universe</code></td><td>穴を1枚（全面）持つ泡。<strong>種別ではなくなる</strong></td></tr>
+        <tr><td><code>LinkBubbleView</code> の origin rect</td><td><strong>アンカー</strong>。帯はその可視化</td></tr>
+        <tr><td><code>WorldLinesCanvasView.makeProjector</code></td><td><code>FisheyeLens</code></td></tr>
+        <tr><td><code>BubbleRefsContext</code> の rect 登録</td><td>アンカー登録機構の原型としてそのまま使える</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="constraints">
+  <div class="sechead">
+    <span class="eyebrow">08</span>
+    <h2>13の制約</h2>
+  </div>
+  <p>すべてプロトタイプで実際に踏んだもの。設計を書いた時点では見えていなかった。実装時に同じ穴を掘り直さないための記録なので、番号で参照する。</p>
+  <ol class="rules">
+    <li><span class="n">01</span><div class="body">
+      <strong>消失点は焦点と別に持つ。</strong>
+      <span class="why">一致させると奥の泡が手前に完全に隠れる。式は <code>screen = VP + ((center + (p − focus)) − VP) × mag</code>。現行 <code>CoordinateSystem.vanishingPoint</code> が効いていたのはこれが理由だった。</span>
+    </div></li>
+    <li><span class="n">02</span><div class="body">
+      <strong>焦点より手前は倍率が発散する。大きくし続けず、透明にして消す。</strong>
+      <span class="why"><code>1/(1+k·dz)</code> は <code>dz → −1/k</code> で無限大。<code>alpha = clamp(1 + dz×0.55, 0, 1)</code>。</span>
+    </div></li>
+    <li><span class="n">03</span><div class="body">
+      <strong>焦点の奥行きは既定で「一番手前の泡」に合わせる。</strong>
+      <span class="why">制約 02 と対になる。開いた泡が手前に来るのに焦点が奥のままだと、フェードが効いて開いた泡が半透明になる。現行 bubble-ui は常に最前面を見ている。</span>
+    </div></li>
+    <li><span class="n">04</span><div class="body">
+      <strong>次元には向きがある。</strong>
+      <span class="why">「履歴の世代（大きいほど新しい）」を奥行きに刺すと過去が手前に来る。奥行き用には「履歴の古さ」という<em>別の次元</em>が要る。</span>
+    </div></li>
+    <li><span class="n">05</span><div class="body">
+      <strong>穴は自前サイズの比率、席は絶対値。これが唯一安定する組み合わせ。</strong>
+      <span class="why">両方を比率にすると「成長 → 比率アンカー拡大 → 再衝突 → さらに成長」で発散する。逆に穴を伸びた後のサイズの比率にすると、伸びた分だけ穴が広がって中身が破綻する。</span>
+    </div></li>
+    <li><span class="n">06</span><div class="body">
+      <strong>ホストを押し広げるのは席だけ。</strong>
+      <span class="why">穴（ゲストが枠に従う）と隣接（外側）に要求させると、制約 05 の発散を引き起こす。</span>
+    </div></li>
+    <li><span class="n">07</span><div class="body">
+      <strong>ホスト自身の中身は「自前サイズ」の範囲にだけ描く。</strong>
+      <span class="why">伸びた分まで中身を広げると、せっかく席を外へ押し出しても中身が下に潜り込んで隠れる。</span>
+    </div></li>
+    <li><span class="n">08</span><div class="body">
+      <strong>押し出し方向は「左上より外へ出さない」制約付きで最小移動を選ぶ。</strong>
+      <span class="why">これがないと負座標が生まれ、ホストの原点が動いて全体がずれる。書き戻しは減衰 0.35 で滑らかに落ち着かせる。</span>
+    </div></li>
+    <li><span class="n">09</span><div class="body">
+      <strong>隣接には「辺に沿った並び順」が要る。</strong>
+      <span class="why">同じホストの同じ辺に2つ結合すると同じ場所に重なる。先行するゲストの寸法を積算して辺に沿ってずらす。</span>
+    </div></li>
+    <li><span class="n">10</span><div class="body">
+      <strong>吸着で「内側＝入れ子」を無条件に優先すると、隣に置きたいのに入れ子になる。</strong>
+      <span class="why">隣に置こうとすると、たいてい別の泡の上を通過するため。縁の帯（約62px）は隣接、その内側が入れ子と分ける。</span>
+    </div></li>
+    <li><span class="n">11</span><div class="body">
+      <strong>吸着半径が広すぎると自由配置ができなくなる。</strong>
+      <span class="why">110px では空きに置いたつもりが必ずどこかに吸着した。62px＋辺方向の許容36px。触った感触で調整すべき値。</span>
+    </div></li>
+    <li><span class="n">12</span><div class="body">
+      <strong>拘束の段階を増やす前に、それが「操作」で表せないか疑う。</strong>
+      <span class="why">「開いた」を奥行き拘束（<code>bind:"depth"</code>）にしたせいで、隣にスナップした瞬間に opener のリンクバブルが消えるバグを出し、それを繕うために「拘束を外しても関係は残す」という仕組みまで足した。実際には「開く」という操作が初期配置を決めるだけでよく、拘束は最初から要らなかった。<strong>拘束は不変な関係にだけ与える。一度きりの出来事は操作で表す。</strong></span>
+    </div></li>
+    <li><span class="n">13</span><div class="body">
+      <strong>隣接はホストの座標系に入れない。</strong>
+      <span class="why">中に入るのと隣に並ぶのは幾何的に別物。隣接でホストの縮尺を継承させると「リストの隣に、リストより手前でアイテムを大きく開く」が書けなくなる。隣接は<em>画面空間</em>で解き、ゲストの縮尺は自分の z から取る。</span>
+    </div></li>
+    <li><span class="n">14</span><div class="body">
+      <strong>帯の起点はその関係自身のアンカーから引く。</strong>
+      <span class="why">相手の現在の結合先アンカーを使うと、別の相手にスナップし直した瞬間に帯の根元が飛ぶ。</span>
+    </div></li>
+  </ol>
+
+  <details>
+    <summary>レンズに課す2つの制約</summary>
+    <div class="inner">
+      <p><strong>A. 矩形を矩形に写す。</strong> 位置と一様スケールだけを曲げ、中身は歪めない。回転・せん断・台形歪みは禁止。出力が <code>translate + scale + opacity</code> に収まるので、<em>同じレンズが Canvas でも DOM でもそのまま動く</em>。魚眼でも各泡は軸平行の矩形のまま。</p>
+      <p><strong>B. 逆変換を必ず持つ。</strong> <code>scale</code> は「その点における射影の局所倍率（ヤコビアンの対角）」と定義する。これで透視も魚眼も同じ式になり、<code>unproject = 画面の移動量 ÷ 局所倍率</code> がタダで出る。逆変換のないレンズは「見るだけ」になり、掴めない。</p>
+      <pre><code>// 透視：奥行き差 → 倍率
+depthMag = dz =&gt; 1 / (1 + K_PERSP * dz)
+
+// 魚眼：tanh の微分がそのまま局所倍率
+mag = mag0 * sech²(u / K) * depthMag(dz)</code></pre>
+      <p><code>1 − 0.1×layerIndex</code>（現行）は <code>layerIndex ≥ 10</code> で負になる。<code>1/(1+k·dz)</code> なら遠方で 0 に漸近するだけで、これが本来の透視の式。</p>
+    </div>
+  </details>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="review">
+  <div class="sechead">
+    <span class="eyebrow">09</span>
+    <h2>残っている弱さ</h2>
+  </div>
+  <p>プロトタイプを読み直して見つけた、まだ直していない／設計として決まっていない点。実装前に潰すべきものと、持ち越してよいものが混ざっている。</p>
+
+  <h3>実装で必ず問題になる</h3>
+  <ul>
+    <li><strong>毎フレーム全解決している。</strong> <code>O(泡数 × 関係数)</code> の走査が数か所ある。とくに <code>chainDepth()</code> は鎖を1本遡るごとに <code>relations.find()</code> で線形探索していて、軸に刺さると毎フレーム全泡ぶん走る。実装では <code>to</code> をキーにした関係索引とメモ化が要る。</li>
+    <li><strong>解決の順序に1フレームの遅れがある。</strong> 席の譲り合い → 箱の成長 → 隣接位置の算出、の順で走るため、隣接の位置は1フレーム古い箱サイズを見ている。目には見えないが、正しくは不動点まで回すか、依存順にトポロジカルに解くべき。</li>
+    <li><strong>帯の描画順が「相手の z のすぐ後ろ」に固定されている。</strong> ホストと相手のあいだに無関係な泡が挟まると、帯がその泡を横切る。現行 <code>LinkBubbleView</code> も同じ制約を持つが、新設計では関係が増えるぶん目立つ可能性がある。</li>
+  </ul>
+
+  <h3>設計として決まっていない</h3>
+  <ul>
+    <li><strong>アンカーの宣言者。</strong> 中身（React コンポーネント）が測って登録するか、宣言的に持つか。前者はレイアウトがコンテンツに依存して1フレーム遅れる。現行の <code>BubbleRefsContext</code> は前者。</li>
+    <li><strong>席の譲り合いは減衰付きの局所解法。</strong> 詰まった配置では収束が遅く、局所最適に落ちうる。実装で本当に必要な品質かは未検証。</li>
+    <li><strong>隣接の並び順が配列順に依存する。</strong> 引き剥がして付け直すと列の末尾へ回る。妥当な挙動だが暗黙。明示的な順序を持たせるべきか。</li>
+  </ul>
+
+  <div class="note">
+    <strong>設計そのものへの疑い。</strong> いちばん確信が持てていないのは<em>次元を軸に刺す</em>という操作の UI としての分かりやすさ。プロトタイプではドロップダウン3つで露出しているが、これは開発者向けの見せ方で、利用者にそのまま出すものではない。プリセット（現行 bubble-ui / 履歴を奥行きに / 世界線ビュー）のような<strong>名前のついた組み合わせ</strong>が主で、軸の直接操作は裏口、という構成が現実的だと考えている。
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════ -->
+<section id="next">
+  <div class="sechead">
+    <span class="eyebrow">10</span>
+    <h2>次の一手</h2>
+  </div>
+  <p>Canvas プロトタイプでの検証はここで一区切り。現行 bubble-ui の要素はすべて新しい概念に乗り、当初の「もっと自由な三次元」という要求も、軸の差し替えが1本の補間で繋がることで確かめられた。</p>
+  <p>実コードへ移すなら <code>bublys-libs/bubble-space</code> を <code>nx g @nx/js:lib</code> で生成し、3層 DDD に載せる。層の切り方はプロトタイプの構造がそのまま対応する。</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>層</th><th>置くもの</th></tr></thead>
+      <tbody>
+        <tr><td><code>domain/</code></td><td><code>Bubble</code> <code>Relation</code> <code>Anchor</code> <code>Dimension</code> <code>Lens</code> <code>View</code>。純粋な TypeScript、React も Redux もインポートしない</td></tr>
+        <tr><td><code>ui/</code></td><td>解決済みの画面矩形リストを受け取って描くだけの表示層。Canvas と DOM の両方を差し替えられる（レンズの制約 A がこれを可能にする）</td></tr>
+        <tr><td><code>feature/</code></td><td>Redux 連携、ドラッグと吸着、世界線との接続</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Redux スライスは集約のリポジトリに徹する。<code>Relation</code> の追加・削除・拘束の解除といったロジックは、スライスの reducer ではなく集約のメソッドとして持たせる。</p>
+</section>
+
+<footer>
+  <div>プロトタイプ: <code>bubble-lab.html</code>（Canvas 単体、ビルド不要）</div>
+  <div>この文書は設計の合意点と、実装前に潰すべき論点の記録。仕様が変われば更新する。</div>
+</footer>
+
+</main>
+</div>
+</div>
