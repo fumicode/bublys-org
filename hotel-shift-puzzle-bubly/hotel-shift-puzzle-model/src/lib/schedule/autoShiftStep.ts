@@ -40,8 +40,12 @@ export type AutoShiftContext = {
   shiftNameById: Map<string, string>;
   /** (staffId, day) のデコード済み希望を返す。省略時の人は neutral 扱い */
   preferenceOf: (staffId: string, day: WorkingDay) => DecodedWish;
-  /** staffId が shiftId に入れるか（可能勤務帯）。省略時は全可 */
-  isAvailable?: (staffId: string, shiftId: string) => boolean;
+  /**
+   * staffId がその日 shiftId に入れるか。省略時は全可。
+   * 「その人が入れる帯か（可能勤務帯）」に加えて「その日は入れないと言っていないか（希望の×）」
+   * まで含めた判定を上位層が組み立てて渡す。
+   */
+  isAvailable?: (staffId: string, shiftId: string, day: WorkingDay) => boolean;
   /** 連勤上限。これを超える出勤割当はしない（既定 5） */
   maxConsecutive?: number;
   /**

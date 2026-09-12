@@ -64,6 +64,7 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import {
+  SHIFT_WISH_MONTH_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_VIEW_TYPE,
   SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE,
 } from "../ui/viewObjectTypes.js";
@@ -86,6 +87,11 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   availabilityUrl?: string;
+  /**
+   * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
+   * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
+   */
+  shiftWishesUrl?: (year: number, month: number) => string;
   /** 操作履歴（ノウハウ）バブルの URL */
   editLogUrl?: string;
   /**
@@ -138,6 +144,7 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
   worldLineUrl,
   treeUrl,
   availabilityUrl,
+  shiftWishesUrl,
   editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
@@ -760,6 +767,20 @@ export const ScheduleGrid: FC<ScheduleGridProps> = ({
             >
               <span className="e-link" title="ダブルクリックで可能勤務帯を開く">
                 可能勤務帯
+              </span>
+            </ObjectView>
+          )}
+
+          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
+          {shiftWishesUrl && (
+            <ObjectView
+              type={SHIFT_WISH_MONTH_VIEW_TYPE}
+              url={shiftWishesUrl(schedule.year, schedule.month)}
+              label={`${schedule.year}年${schedule.month}月のシフト希望`}
+              openingPosition="bubble-side-right"
+            >
+              <span className="e-link" title="ダブルクリックでこの月のシフト希望を開く">
+                シフト希望
               </span>
             </ObjectView>
           )}
