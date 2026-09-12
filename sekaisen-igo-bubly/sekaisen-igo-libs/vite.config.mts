@@ -48,6 +48,8 @@ export default defineConfig(() => ({
   test: {
     name: '@bublys-org/sekaisen-igo-libs',
     watch: false,
+    // まだテストを持たないライブラリ。0 件を失敗にしない
+    passWithNoTests: true,
     globals: true,
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],

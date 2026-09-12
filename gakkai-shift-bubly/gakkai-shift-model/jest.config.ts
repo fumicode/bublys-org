@@ -11,11 +11,13 @@ swcJestConfig.swcrc = false;
 
 export default {
   displayName: '@bublys-org/gakkai-shift-model',
-  preset: '../jest.preset.js',
+  preset: '../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
+  // まだテストを持たないライブラリ。0 件を失敗にしない
+  passWithNoTests: true,
 };
