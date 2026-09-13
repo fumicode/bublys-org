@@ -145,6 +145,15 @@ export function useScheduleCandidates({
   );
   const lastContextRef = useRef<object | null>(null);
   const lastSignatureRef = useRef<string | null>(null);
+  /**
+   * 直近の依頼を投げた先（worker、同期計算なら null）。
+   *
+   * 「同じ依頼を投げ直さない」歯止め（lastSignatureRef）は、その依頼の応答がいずれ返ってくる
+   * ことを前提にしている。worker が作り直されると前の worker は terminate 済みで応答が返って
+   * こないので、投げ先が変わったかどうかも見ないと computing のまま止まる。
+   * StrictMode は effect を setup → cleanup → setup と流すので、これは初回マウントで必ず起きる。
+   */
+  const lastTargetRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     if (!schedule) {
@@ -189,8 +198,12 @@ export function useScheduleCandidates({
       request.checkShiftWish,
       request.wishes,
     ]);
-    if (signature === lastSignatureRef.current) return;
+    const target = workerRef.current;
+    if (signature === lastSignatureRef.current && target === lastTargetRef.current) {
+      return;
+    }
     lastSignatureRef.current = signature;
+    lastTargetRef.current = target;
 
     const requestId = ++requestIdRef.current;
     requestScheduleRef.current.set(requestId, schedule);
@@ -199,11 +212,10 @@ export function useScheduleCandidates({
     setDiagnosis(null);
     setDiagnosing(false);
 
-    const worker = workerRef.current;
-    if (worker) {
+    if (target) {
       setComputing(true);
       const message: CandidateWorkerRequest = { kind: "candidates", requestId, request };
-      worker.postMessage(message);
+      target.postMessage(message);
       return;
     }
 

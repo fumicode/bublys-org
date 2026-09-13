@@ -146,7 +146,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const workingStaffUrl = scheduleStaffUrl(scheduleId);
   const worldLineUrl = scheduleWorldLineUrl(scheduleId);
   const editLogUrl = scheduleEditLogUrl(scheduleId);
-  // 各アクションの方向は元のバブル配置（右＝可能勤務帯、下＝世界線、上＝違反）を踏襲する。
+  // 各アクションの方向は元のバブル配置（下＝世界線、上＝違反）を踏襲する。
   const openSide = (url: string, position: OpeningPosition) =>
     openBubble(url, bubble.id, position);
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
@@ -198,6 +198,7 @@ const ScheduleDayBubble: BubbleRoute["Component"] = ({ bubble }) =>
     <ScheduleDayDetail
       scheduleId={bubble.params.scheduleId}
       dayKey={bubble.params.dayKey}
+      createCandidatesWorker={createCandidatesWorker}
     />
   );
 

@@ -3,6 +3,8 @@
 import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
+import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import {
   WorkShiftSet,
   MonthlyStaffSchedule,
@@ -764,6 +766,45 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     </ObjectView>
   ) : undefined;
 
+  // スタッフ列（左列）の見え方を切り替える操作。年月を出す左上のコーナーセル＝スタッフ列の
+  // 真上に置いて、何に効くのかを位置で示す（ScheduleGridView の staffColumnActions スロット）。
+  const staffColumnActions = (
+    <>
+      {/* 部署別グルーピングトグル */}
+      <button
+        type="button"
+        className={`e-icon-btn${groupByDept ? " is-active" : ""}`}
+        onClick={() => setGroupByDept((v) => !v)}
+        title="部署別にグループ化して表示"
+        aria-label="部署別にグループ化して表示"
+        aria-pressed={groupByDept}
+      >
+        <GroupWorkOutlinedIcon fontSize="inherit" />
+      </button>
+
+      {/* 部署フィルタ（ドロップダウン）。選んでいる部署名は読めないと困るので、
+          アイコンは目印に添えるだけにして select 自体は残す。 */}
+      {departments.length > 0 && (
+        <label className="e-dept-filter" title="表示する部署を絞り込む">
+          <FilterAltOutlinedIcon fontSize="inherit" />
+          <select
+            className="e-dept-select"
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            aria-label="表示する部署を絞り込む"
+          >
+            <option value="">全部署</option>
+            {departments.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </>
+  );
+
   const confirmButton = withUrl(
     pendingReportUrl,
     <button
@@ -784,35 +825,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           <span className="e-sub">{schedule.storeId}</span>
         </h3>
 
-        {/* 左：スタッフ（左列）に関わる操作をまとめる */}
+        {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
         <div className="e-actions e-actions-left">
-          {/* 部署別グルーピングトグル */}
-          <button
-            type="button"
-            className={`e-link${groupByDept ? " is-active" : ""}`}
-            onClick={() => setGroupByDept((v) => !v)}
-            title="部署別にグループ化して表示"
-          >
-            部署別
-          </button>
-
-          {/* 部署フィルタ（ドロップダウン） */}
-          {departments.length > 0 && (
-            <select
-              className="e-dept-select"
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              title="表示する部署を絞り込む"
-            >
-              <option value="">全部署</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          )}
-
           {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
           {shiftWishesUrl && (
             <ObjectView
@@ -828,8 +842,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           )}
 
           {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
-              自動シフトの優先度に使う。詳しくは reportPriority.ts）。
-              独立した行にすると縦を食うので、可能勤務帯の右に並べて高さを抑える。 */}
+              自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
           <LinkedReportsView
             reports={linkedReports}
             onDropUrl={handleDropReportUrl}
@@ -876,6 +889,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           staffGroup={staffGroup}
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
+          staffColumnActions={staffColumnActions}
           wishByStaff={wishByStaff}
           violations={violations}
           groupByDepartment={groupByDept}
@@ -1017,7 +1031,7 @@ const StyledContainer = styled.div`
       font-size: 0.8em;
       color: #777;
     }
-    /* 可能勤務帯などの操作＋参照レポートのドロップ欄を1行に収めて縦を抑える */
+    /* 参照レポートのドロップ欄。見出しと1行に収めて縦を抑える */
     .e-actions {
       display: flex;
       align-items: center;
@@ -1025,22 +1039,67 @@ const StyledContainer = styled.div`
       gap: 6px;
       min-width: 0;
     }
-    .e-dept-select {
+  }
+
+  /* 左上コーナーセル（年月）に入れた操作。スタッフ列の幅（STAFF_COL_WIDTH）に収める必要が
+     あるので、意味はアイコンで示し、言葉は title（ホバー）に逃がす。 */
+  .e-corner-actions {
+    /* アイコンボタン（部署別グルーピング） */
+    .e-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
       border: 1px solid #cfd8dc;
-      border-radius: 6px;
+      border-radius: 5px;
       background: #fff;
-      color: #37474f;
-      font-size: 0.8em;
-      padding: 4px 8px;
+      color: #546e7a;
+      font-size: 16px; /* アイコンのサイズ（fontSize="inherit"）を直接決める */
+      line-height: 1;
       cursor: pointer;
-      outline: none;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+
+      &:hover {
+        background: #eceff1;
+        border-color: #90a4ae;
+      }
+      /* 押されている状態（部署別グルーピングが ON） */
+      &.is-active {
+        background: #e8eaf6;
+        border-color: #3949ab;
+        color: #3949ab;
+      }
+    }
+
+    /* 部署フィルタ。目印のアイコン＋部署名の select を1つの枠に見せる */
+    .e-dept-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 4px 1px 3px;
+      border: 1px solid #cfd8dc;
+      border-radius: 5px;
+      background: #fff;
+      color: #546e7a;
+      font-size: 16px; /* アイコンのサイズ */
+      cursor: pointer;
 
       &:hover {
         border-color: #90a4ae;
       }
-      &:focus {
+      &:focus-within {
         border-color: #3949ab;
       }
+    }
+    .e-dept-select {
+      border: none;
+      background: transparent;
+      color: #37474f;
+      font-size: 11px;
+      padding: 0;
+      cursor: pointer;
+      outline: none;
+      max-width: 72px;
     }
   }
 
