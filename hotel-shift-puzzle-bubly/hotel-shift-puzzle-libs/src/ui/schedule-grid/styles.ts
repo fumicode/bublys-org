@@ -778,6 +778,13 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 違反の印の当たり判定（ObjectView のラッパ span）。fullWidth で幅は枠いっぱいになるので、
+     高さも枠いっぱいに広げる。膜は細い帯に沿うよう角丸を小さくする */
+  .e-violation-hit {
+    height: 100%;
+    --object-view-film-radius: 2px;
+  }
+
   /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
      クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
      （ScheduleGridView 側のホバー検出を参照）。 */

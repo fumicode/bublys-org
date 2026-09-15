@@ -58,7 +58,7 @@ type ScheduleDataCellProps = {
   /** ダブルクリックで候補ドロップダウンを開く（マウス操作用） */
   onOpenEditor: () => void;
   /**
-   * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）を ObjectView で包んで渡し、
+   * 違反バブルの URL を作る。違反マーカー（赤帯・境目の印）の内側に ObjectView を置き、
    * ダブルクリックで違反バブルを開く。ObjectView が data-url も埋めるので、
    * origin-side で開いたバブルがそのマーカーの近くに出る。
    */
@@ -191,33 +191,34 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   const shownWishEntries: WishEntry[] =
     hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
 
-  // 違反マーカー（赤帯・⊿）。ObjectView がダブルクリックでの違反バブル展開と data-url
+  // 違反マーカー（赤帯・境目の印）。ObjectView がダブルクリックでの違反バブル展開と data-url
   // （origin-side でマーカーの近くに出す）を担う。セルは単クリック=選択 / ダブルクリック=候補なので、
-  // マーカー上の操作はセルへ伝播させない（ラッパで stopPropagation）。
-  const violationMarker = (violation: ConstraintViolation, markerClass: string) => {
-    const marker = (
-      <span
-        className={markerClass}
-        title={`${violation.message}（ダブルクリックで詳細）`}
-      />
-    );
-    if (!violationUrl) return marker;
-    return (
-      <span
-        style={{ display: "contents" }}
-        onClick={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-      >
+  // マーカー上の操作はセルへ伝播させない。
+  //
+  // ★ 位置を持つ枠（markerClass。position:absolute でセルの端に張り付く）と、ObjectView を分ける。
+  //   ObjectView は膜のために position:relative を持つので、枠を ObjectView で包むと枠の基準が
+  //   幅0の ObjectView になり、帯が潰れて見えなくなる（#158）。ObjectView は枠の内側に置き、
+  //   枠いっぱいに広げて当たり判定にする。
+  const violationMarker = (violation: ConstraintViolation, markerClass: string) => (
+    <span
+      className={markerClass}
+      title={`${violation.message}（ダブルクリックで詳細）`}
+      onClick={violationUrl ? (e) => e.stopPropagation() : undefined}
+      onDoubleClick={violationUrl ? (e) => e.stopPropagation() : undefined}
+    >
+      {violationUrl && (
         <ObjectView
           url={violationUrl(violation)}
           openingPosition="origin-side"
           draggable={false}
+          fullWidth
+          className="e-violation-hit"
         >
-          {marker}
+          {null}
         </ObjectView>
-      </span>
-    );
-  };
+      )}
+    </span>
+  );
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
