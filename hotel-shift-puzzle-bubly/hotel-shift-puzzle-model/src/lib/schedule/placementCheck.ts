@@ -18,12 +18,12 @@
  *   - global       … 盤面全体
  * の上で前後を比べる。絞った勤務表では他のスタッフ／他の日の違反も変わるが、
  * 前後どちらにも同じだけ現れるので、差分（新しい違反）には影響しない。
- * 置く前の結果は勤務表インスタンスごとにキャッシュする（勤務表は不変なので古くならない）。
+ * 判定は、絞った範囲の割当の中身ごとにキャッシュする（1人置いても、別の人の判定は使い回せる）。
  *
  * 既知の限界（候補集合と同じ）: すでにある違反と同じキーのまま**悪化**する手は、
  * 新しい違反とは見なさない（例：すでに休み上限を超えている日にさらに休みを置く）。
  */
-import { MonthlyStaffSchedule, type ShiftCell } from "./MonthlyStaffSchedule.js";
+import { MonthlyStaffSchedule, shiftCellKey, type ShiftCell } from "./MonthlyStaffSchedule.js";
 import { violationIdentityKey } from "./ConstraintDelta.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkingDay } from "./WorkingDay.js";
@@ -78,35 +78,47 @@ export const violationKeys = (
 ): Set<string> =>
   new Set(schedule.checkConstraints(constraints).map(violationIdentityKey));
 
-/** 置く前の違反キー。制約リスト × 勤務表インスタンス × 絞り方 で覚えておく */
-const beforeCache = new WeakMap<
-  ScheduleConstraint[],
-  WeakMap<MonthlyStaffSchedule, Map<string, Set<string>>>
->();
+/**
+ * 判定のキャッシュ。
+ *
+ * キーは「絞った範囲の割当の中身」。自動シフトは1人置くたびに新しい勤務表インスタンスになるが、
+ * 別のスタッフ（別の日）の割当は変わっていないので、中身で引けばそのまま使い回せる。
+ * 同じセルに同じ値を何度も試す（責任者ステップは候補を数え直すたびに試す）ので、答えも覚える。
+ *
+ * 違反の出方は制約リスト（中身に希望や責任者ルールを抱えている）と必要人数でも変わるので、
+ * どちらも不変のインスタンスごとに分ける。
+ */
+type Memo = {
+  /** 絞った割当の中身 → 置く前の違反キー */
+  before: Map<string, Set<string>>;
+  /** 絞った割当の中身＋置くセルと値 → 新しい違反が出るか */
+  answer: Map<string, boolean>;
+};
+const memoCache = new WeakMap<ScheduleConstraint[], WeakMap<object, Memo>>();
+/** 1つの制約リスト×必要人数あたりに覚えておく数の上限（溢れたら捨てて作り直す） */
+const MEMO_LIMIT = 50000;
 
-const beforeKeysOf = (
-  schedule: MonthlyStaffSchedule,
-  constraints: ScheduleConstraint[],
-  group: ScheduleConstraint[],
-  projected: MonthlyStaffSchedule,
-  cacheKey: string
-): Set<string> => {
-  let bySchedule = beforeCache.get(constraints);
-  if (!bySchedule) {
-    bySchedule = new WeakMap();
-    beforeCache.set(constraints, bySchedule);
+const memoOf = (constraints: ScheduleConstraint[], schedule: MonthlyStaffSchedule): Memo => {
+  let byRequired = memoCache.get(constraints);
+  if (!byRequired) {
+    byRequired = new WeakMap();
+    memoCache.set(constraints, byRequired);
   }
-  let byKey = bySchedule.get(schedule);
-  if (!byKey) {
-    byKey = new Map();
-    bySchedule.set(schedule, byKey);
+  const required = schedule.state.requiredStaffing;
+  let memo = byRequired.get(required);
+  if (!memo || memo.before.size + memo.answer.size > MEMO_LIMIT) {
+    memo = { before: new Map(), answer: new Map() };
+    byRequired.set(required, memo);
   }
-  let keys = byKey.get(cacheKey);
-  if (!keys) {
-    keys = violationKeys(projected, group);
-    byKey.set(cacheKey, keys);
+  return memo;
+};
+
+const signatureOf = (projected: MonthlyStaffSchedule, projectionKey: string): string => {
+  const parts = [projectionKey, `${projected.state.year}-${projected.state.month}`];
+  for (const a of projected.assignments) {
+    parts.push(`${a.staffId}@${a.day.key}=${a.shift}`);
   }
-  return keys;
+  return parts.join("|");
 };
 
 /** そのセル（staffId × day）に cell を置くと、制約リストに新しい違反が出るか */
@@ -117,19 +129,30 @@ export function introducesViolation(
   day: WorkingDay,
   cell: ShiftCell
 ): boolean {
+  const memo = memoOf(constraints, schedule);
   for (const [projection, group] of groupsOf(constraints)) {
-    const cacheKey =
+    const projectionKey =
       projection === "staff"
         ? `staff:${staffId}`
         : projection === "day"
           ? `day:${day.key}`
           : "board";
     const projected = project(schedule, projection, staffId, day);
-    const before = beforeKeysOf(schedule, constraints, group, projected, cacheKey);
-    const after = violationKeys(projected.setCell(staffId, day, cell), group);
-    for (const key of after) {
-      if (!before.has(key)) return true;
+    const signature = signatureOf(projected, projectionKey);
+    const answerKey = `${signature}#${staffId}@${day.key}=${shiftCellKey(cell)}`;
+
+    let introduces = memo.answer.get(answerKey);
+    if (introduces === undefined) {
+      let before = memo.before.get(signature);
+      if (!before) {
+        before = violationKeys(projected, group);
+        memo.before.set(signature, before);
+      }
+      const after = violationKeys(projected.setCell(staffId, day, cell), group);
+      introduces = [...after].some((key) => !before?.has(key));
+      memo.answer.set(answerKey, introduces);
     }
+    if (introduces) return true;
   }
   return false;
 }

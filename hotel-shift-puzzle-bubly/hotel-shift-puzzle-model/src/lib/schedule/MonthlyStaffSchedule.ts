@@ -80,6 +80,9 @@ export function shiftCellsEqual(a: ShiftCell, b: ShiftCell): boolean {
   return shiftCellKey(a) === shiftCellKey(b);
 }
 
+/** 年月（"2026-6"）→ その月の稼働日。WorkingDay は不変なので使い回す（workingDays を参照） */
+const WORKING_DAYS_BY_MONTH = new Map<string, WorkingDay[]>();
+
 export class MonthlyStaffSchedule {
   constructor(readonly state: MonthlyStaffScheduleState) {}
 
@@ -148,10 +151,19 @@ export class MonthlyStaffSchedule {
 
   /** その月の全稼働日（1日〜末日） */
   workingDays(): WorkingDay[] {
-    const lastDay = new Date(this.state.year, this.state.month, 0).getDate();
-    return Array.from({ length: lastDay }, (_, i) =>
-      WorkingDay.of(this.state.year, this.state.month, i + 1)
-    );
+    // 制約チェックは制約ごとにこれを呼ぶので、自動シフトや候補集合のように何千回も
+    // チェックすると、毎回30個の WorkingDay とそのキー文字列を作り直すのが効いてくる。
+    // WorkingDay は不変なので年月ごとに使い回す（配列は呼び出し側が触れるよう毎回複製する）。
+    const monthKey = `${this.state.year}-${this.state.month}`;
+    let days = WORKING_DAYS_BY_MONTH.get(monthKey);
+    if (!days) {
+      const lastDay = new Date(this.state.year, this.state.month, 0).getDate();
+      days = Array.from({ length: lastDay }, (_, i) =>
+        WorkingDay.of(this.state.year, this.state.month, i + 1)
+      );
+      WORKING_DAYS_BY_MONTH.set(monthKey, days);
+    }
+    return days.slice();
   }
 
   // ========== 割当 ==========
