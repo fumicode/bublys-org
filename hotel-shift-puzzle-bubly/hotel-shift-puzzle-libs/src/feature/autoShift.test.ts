@@ -91,14 +91,12 @@ describe('decodeWishForStaff（×で候補を絞る）', () => {
   });
 });
 
-describe('autoShiftLimitsOf（自動シフトが守る上限は制約セットから）', () => {
-  test('★ 勤務表の制約セットの値をそのまま渡す（既定の 5 / 8 / 8 に落とさない）', () => {
+describe('autoShiftLimitsOf（自動シフトが置く休みの目標は制約セットから）', () => {
+  test('★ 勤務表の制約セットの値をそのまま渡す（既定の 8 / 8 に落とさない）', () => {
     const set = ConstraintSet.empty('sched-1')
-      .withMaxConsecutiveWorkdays(3)
       .withMinMonthlyDayOff(9)
       .withMaxDayOffPerDay(2);
     expect(autoShiftLimitsOf(set)).toEqual({
-      maxConsecutive: 3,
       minDayOff: 9,
       maxDayOffPerDay: 2,
     });

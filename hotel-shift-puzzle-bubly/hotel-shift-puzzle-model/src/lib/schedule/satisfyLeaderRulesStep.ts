@@ -19,7 +19,7 @@
  * 既知の限界（安全側に倒れて確定を保留するだけで、誤った確定はしない）:
  *   - 同日内の2ルール間の兼務のみ考慮する。3ルール以上が絡む連鎖的な取り合いまでは解かない。
  *   - 「他ルールで必要」判定は同日限定。ある人が別日のもう一つのルールで一意に必要、
- *     というケースは見ない（wouldExceedConsecutive の日またぎ連鎖とは別の話）。
+ *     というケースは見ない（制約による日またぎの判定＝canPlace とは別の話）。
  */
 import type {
   AutoShiftStep,
@@ -27,7 +27,7 @@ import type {
   AutoShiftStepResult,
   AmbiguousLeaderSlot,
 } from "./autoShiftStep.js";
-import { wouldExceedConsecutive } from "./autoShiftStep.js";
+import { canPlace } from "./autoShiftStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ShiftLeaderRule } from "./ShiftLeaderRule.js";
 import type { WorkingDay } from "./WorkingDay.js";
@@ -47,8 +47,6 @@ export function makeSatisfyLeaderRulesStep(
       "責任者ルール（早責など）を、毎日その勤務帯に最低人数の責任者が入るよう満たします（他の責任者ルールと兼務している人は取り合いにならないよう考慮／未定セルだけ／人間入力・休み希望は尊重）。",
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
-      const isAvailable = ctx.isAvailable ?? (() => true);
-      const max = ctx.maxConsecutive ?? 5;
       let result = schedule;
       let assigned = 0;
       const ambiguousLeaderSlots: AmbiguousLeaderSlot[] = [];
@@ -67,9 +65,8 @@ export function makeSatisfyLeaderRulesStep(
         rule.leaderStaffIds.filter(
           (id) =>
             result.isUndecided(id, day) &&
-            isAvailable(id, coverShiftId, day) &&
             ctx.preferenceOf(id, day).kind !== "day-off" &&
-            !wouldExceedConsecutive(result, id, day, max)
+            canPlace(ctx, result, id, day, { kind: "work", shiftId: coverShiftId })
         );
 
       // candidateId が、currentRule 以外の宣言済みルールでも「一意に（or ほぼ一意に）必要」か。
@@ -111,6 +108,8 @@ export function makeSatisfyLeaderRulesStep(
             if (nonCritical.length > 0 && nonCritical.length <= remainingNeed) {
               // hidden set: 除外後の候補が必要人数以下＝全員が確定して良い
               for (const id of nonCritical) {
+                // 直前に置いた人のせいで置けなくなることがある（日単位の制約など）ので置く直前にも見る
+                if (!canPlace(ctx, result, id, day, { kind: "work", shiftId: coverShiftId })) continue;
                 result = result.assignShift(id, day, coverShiftId);
                 assigned++;
               }

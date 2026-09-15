@@ -25,6 +25,7 @@
  * 大原則は他ステップと同じ:
  *   - 人間が入力済みのセル（出勤・休み）は上書きしない（未定セルのみ触る）
  *   - 出勤したい希望（work 指定）の日は休みにしない
+ *   - 置いても勤務表の制約に新しい違反が出ない日にだけ休みを置く（canPlace）
  *
  * 純粋・不変。乱数は使わず、phase で決定的に解を変える。
  */
@@ -33,6 +34,7 @@ import type {
   AutoShiftContext,
   AutoShiftStepResult,
 } from "./autoShiftStep.js";
+import { canPlace } from "./autoShiftStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
 export type MinDayOffOptions = {
@@ -85,7 +87,8 @@ export function placeMinDayOffs(
     // 中央から ±1 の小さなズラしに留める（端まで飛ばすと区間が偏って長い連勤が残るため）。
     // ズラし量は (phase + 並び順) から {-1,0,+1} を作り、案の違い＋スタッフ間の分散に使う。
     // 中央が休めない日（出勤希望・確定・maxPerDay 上限）なら、中央の近い順に外へ探す（巻回しない）。
-    // 休みを入れられる = 未定 かつ 出勤希望でない かつ maxPerDay 未満。無ければ null。
+    // 休みを入れられる = 未定 かつ 出勤希望でない かつ maxPerDay 未満 かつ
+    // 勤務表の制約に新しい違反が出ない（休み×の希望など）。無ければ null。
     const splitDay = (s: number, e: number): number | null => {
       const len = e - s + 1;
       const mid = Math.floor((s + e) / 2);
@@ -98,7 +101,8 @@ export function placeMinDayOffs(
         return (
           result.isUndecided(staffId, d) &&
           ctx.preferenceOf(staffId, d).kind !== "work" &&
-          (maxPerDay === undefined || result.countDayOffOn(d) < maxPerDay)
+          (maxPerDay === undefined || result.countDayOffOn(d) < maxPerDay) &&
+          canPlace(ctx, result, staffId, d, { kind: "day-off" })
         );
       };
       for (let dist = 0; dist <= len; dist++) {

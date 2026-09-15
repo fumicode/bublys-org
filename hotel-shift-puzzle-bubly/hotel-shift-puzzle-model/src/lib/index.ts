@@ -35,6 +35,8 @@ export * from './schedule/ConstraintSet.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';
+// そのセルにその値を置くと、勤務表の制約に新しい違反が出るか（自動シフトの置き場所の判定）
+export * from './schedule/placementCheck.js';
 export * from './schedule/fulfillWishesStep.js';
 export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';

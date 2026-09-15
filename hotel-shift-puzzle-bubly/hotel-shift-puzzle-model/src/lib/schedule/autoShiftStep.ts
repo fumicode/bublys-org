@@ -16,8 +16,10 @@
  *
  * 純粋・不変。run は新しい勤務表と結果サマリを返す。
  */
-import { WorkingDay } from "./WorkingDay.js";
-import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
+import type { WorkingDay } from "./WorkingDay.js";
+import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
+import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { introducesViolation } from "./placementCheck.js";
 
 /** デコード済みの「その日のその人の希望」。希望キーの意味解釈は上位層が行う */
 export type DecodedWish =
@@ -46,8 +48,12 @@ export type AutoShiftContext = {
    * まで含めた判定を上位層が組み立てて渡す。
    */
   isAvailable?: (staffId: string, shiftId: string, day: WorkingDay) => boolean;
-  /** 連勤上限。これを超える出勤割当はしない（既定 5） */
-  maxConsecutive?: number;
+  /**
+   * 勤務表の制約リスト（違反表示・候補集合と同じもの）。**置くたびに、新しい違反が出ないかを見る**
+   * （連勤・遅番明け・休日・希望…）。制約の中身は見ないので、制約を足せばそれも守られる。
+   * 省略時は制約を見ない。
+   */
+  constraints?: ScheduleConstraint[];
   /**
    * 月の最低休日数。指定すると「必要人数を埋める」は先にこの日数の休みを確保してから埋める。
    * （先に需要で埋め切ってしまうと、空きセルが無くなって月◯日休めなくなるため）
@@ -110,26 +116,27 @@ export interface AutoShiftStep {
 
 // ===== ステップ実装で共有するヘルパ =====
 
-const lastDayOf = (d: WorkingDay): number => new Date(d.year, d.month, 0).getDate();
-const prevDay = (d: WorkingDay): WorkingDay | null =>
-  d.day > 1 ? WorkingDay.of(d.year, d.month, d.day - 1) : null;
-const nextDay = (d: WorkingDay): WorkingDay | null =>
-  d.day < lastDayOf(d) ? WorkingDay.of(d.year, d.month, d.day + 1) : null;
-
 /**
- * その日に出勤させたとき、day を含む連続出勤区間が上限を超えるか。
- * 連勤の定義は MaxConsecutiveWorkdaysConstraint と同じ（同月内・休み/未定でリセット）。
+ * そのセルにその値を置いてよいか。**自動シフトが値を置くときは、必ずこれを通す。**
+ *
+ * 置いてよい ＝ 候補集合に載る値:
+ *   - 出勤なら、その人がその日その帯に入れる（可能勤務帯・希望の×／○）
+ *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts）
+ *
+ * 「どの制約を守るか」をステップごとに書かない。書くと、書き忘れた制約（遅番明けなど）だけが
+ * 自動シフトから漏れる。
  */
-export const wouldExceedConsecutive = (
+export const canPlace = (
+  ctx: AutoShiftContext,
   schedule: MonthlyStaffSchedule,
   staffId: string,
   day: WorkingDay,
-  max: number
+  cell: ShiftCell
 ): boolean => {
-  let run = 1; // day 自身（出勤と仮定）
-  for (let cur = prevDay(day); cur && schedule.isWorking(staffId, cur); cur = prevDay(cur)) run++;
-  for (let cur = nextDay(day); cur && schedule.isWorking(staffId, cur); cur = nextDay(cur)) run++;
-  return run > max;
+  if (cell.kind === "work" && ctx.isAvailable && !ctx.isAvailable(staffId, cell.shiftId, day)) {
+    return false;
+  }
+  return !ctx.constraints || !introducesViolation(schedule, ctx.constraints, staffId, day, cell);
 };
 
 /** その日・勤務帯名ごとの現在の出勤人数（名前粒度。Pass A の確定なども含む） */

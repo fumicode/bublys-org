@@ -4,6 +4,7 @@ import { createDefaultWorkShifts } from './WorkShift.js';
 import { makeSatisfyLeaderRulesStep } from './satisfyLeaderRulesStep.js';
 import { makeResolveAmbiguousLeaderSlotsStep } from './resolveAmbiguousLeaderSlotsStep.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
+import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
 describe('makeSatisfyLeaderRulesStep（責任者制約を満たす）', () => {
@@ -40,9 +41,12 @@ describe('makeSatisfyLeaderRulesStep（責任者制約を満たす）', () => {
   const step = makeSatisfyLeaderRulesStep([soleCandidateRule], [soleCandidateRule]);
 
   test('候補が1人しかいなければ、他に選択肢が無いので即ただちに確定する（連勤上限に達するまで）', () => {
-    const result = step.run(emptySchedule(), ctxOf(['A']));
+    const result = step.run(emptySchedule(), {
+      ...ctxOf(['A']),
+      constraints: [new MaxConsecutiveWorkdaysConstraint(5)],
+    });
 
-    // 連勤上限（既定5）に達するまでの最初の5日は、他に選択肢が無い＝毎日ただちに確定する
+    // 連勤上限（5）に達するまでの最初の5日は、他に選択肢が無い＝毎日ただちに確定する
     const days = result.schedule.workingDays().slice(0, 5);
     for (const day of days) {
       expect(result.schedule.getShiftIdFor('A', day)).toBe('early');

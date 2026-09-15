@@ -178,7 +178,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     test('連勤上限を超える出勤は割り当てない', () => {
       let base = emptySchedule(RequiredStaffing.uniform([day(6)], { 早番: 1 }));
       for (let d = 1; d <= 5; d++) base = base.assignShift('s1', day(d), 'early'); // 5連勤
-      const ctx = ctxOf(['s1'], {}, { maxConsecutive: 5 });
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(5)] });
       const { schedule } = fillDemandStep.run(base, ctx);
       expect(schedule.isUndecided('s1', day(6))).toBe(true);
     });
@@ -337,7 +337,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     test('★ 前後の連勤をつなげてしまう日には入れない（上限3・5〜6日と8〜9日が出勤）', () => {
       let base = emptySchedule(RequiredStaffing.uniform([day(7)], { 早番: 1 }));
       for (const d of [5, 6, 8, 9]) base = base.assignShift('s1', day(d), 'early');
-      const ctx = ctxOf(['s1'], {}, { maxConsecutive: 3 });
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(3)] });
 
       const { schedule } = step.run(base, ctx);
 
@@ -347,7 +347,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
 
     test('★ 設定した上限（3）が効く：3連勤までは入れ、4連勤は作らない', () => {
       const base = emptySchedule(RequiredStaffing.uniform(emptySchedule().workingDays(), { 早番: 1 }));
-      const ctx = ctxOf(['s1'], {}, { maxConsecutive: 3 });
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(3)] });
 
       const { schedule } = step.run(base, ctx);
 
