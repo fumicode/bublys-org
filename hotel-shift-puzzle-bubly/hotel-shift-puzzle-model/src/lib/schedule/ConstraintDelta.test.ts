@@ -1,5 +1,4 @@
 import {
-  ConstraintDelta,
   computeConstraintDelta,
   violationIdentityKey,
 } from "./ConstraintDelta.js";
@@ -9,8 +8,7 @@ import { WorkingDay } from "./WorkingDay.js";
 describe("computeConstraintDelta", () => {
   const day = WorkingDay.fromKey("2026-06-01");
 
-  it("新規のスタッフ紐づき違反を concessions に入れる", () => {
-    const before: ConstraintViolation[] = [];
+  it("新しく出た違反を newlyViolated に入れる（スタッフ紐づきも日単位も）", () => {
     const after = [
       new ConstraintViolation({
         constraintType: "max-consecutive-workdays",
@@ -18,16 +16,6 @@ describe("computeConstraintDelta", () => {
         days: [day],
         message: "6連勤（上限5連勤）",
       }),
-    ];
-    const delta = computeConstraintDelta(before, after);
-    expect(delta.newlyViolated).toHaveLength(1);
-    expect(delta.newlyResolved).toHaveLength(0);
-    expect(delta.concessions).toHaveLength(1);
-    expect(delta.concessions[0].staffId).toBe("s1");
-  });
-
-  it("日単位違反は newlyViolated には入るが concessions には入れない", () => {
-    const after = [
       new ConstraintViolation({
         constraintType: "shift-leader",
         days: [day],
@@ -35,8 +23,8 @@ describe("computeConstraintDelta", () => {
       }),
     ];
     const delta = computeConstraintDelta([], after);
-    expect(delta.newlyViolated).toHaveLength(1);
-    expect(delta.concessions).toHaveLength(0);
+    expect(delta.newlyViolated).toHaveLength(2);
+    expect(delta.newlyResolved).toHaveLength(0);
   });
 
   it("解消された違反を newlyResolved に入れる", () => {
@@ -74,46 +62,5 @@ describe("computeConstraintDelta", () => {
       message: "m",
     });
     expect(violationIdentityKey(violation)).toBe("x:s:2026-06-01_2026-06-03");
-  });
-});
-
-describe("ConstraintDelta", () => {
-  const day = WorkingDay.fromKey("2026-06-01");
-  const violation = () =>
-    new ConstraintViolation({
-      constraintType: "max-consecutive-workdays",
-      staffId: "s1",
-      days: [day],
-      message: "6連勤",
-    });
-
-  it("state は違反をインスタンスで持つ（保存形は toPlain で別に作る）", () => {
-    const delta = ConstraintDelta.between([], [violation()]);
-
-    expect(delta.state.newlyViolated[0]).toBeInstanceOf(ConstraintViolation);
-    expect(delta.toPlain().newlyViolated[0]).toEqual({
-      constraintType: "max-consecutive-workdays",
-      staffId: "s1",
-      dayKeys: ["2026-06-01"],
-      message: "6連勤",
-    });
-  });
-
-  it("toPlain / fromPlain で往復できる", () => {
-    const original = ConstraintDelta.between([violation()], []);
-    const restored = ConstraintDelta.fromPlain(
-      JSON.parse(JSON.stringify(original.toPlain()))
-    );
-
-    expect(restored.newlyResolved[0]).toBeInstanceOf(ConstraintViolation);
-    expect(restored.newlyResolved[0].message).toBe("6連勤");
-    expect(restored.toPlain()).toEqual(original.toPlain());
-  });
-
-  it("empty は何も増減していない", () => {
-    const delta = ConstraintDelta.empty();
-    expect(delta.newlyViolated).toEqual([]);
-    expect(delta.newlyResolved).toEqual([]);
-    expect(delta.concessions).toEqual([]);
   });
 });

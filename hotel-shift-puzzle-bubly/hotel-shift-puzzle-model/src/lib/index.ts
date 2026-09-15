@@ -20,10 +20,8 @@ export * from './schedule/MonthlyStaffSchedule.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
-// 操作履歴（ノウハウ可視化。勤務表ローカル世界線に相乗り）
+// 1つの手で制約違反がどう増減したか（候補集合・詰みの解消案で使う）
 export * from './schedule/ConstraintDelta.js';
-export * from './schedule/ScheduleEditEntry.js';
-export * from './schedule/ScheduleEditLog.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
 export * from './schedule/ShiftLeaderRule.js';

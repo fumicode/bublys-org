@@ -128,10 +128,6 @@ export const worldLine3DUrl = (): string => `hotel-shift-puzzle/world-line-3d`;
 /** モデルのクラス図 */
 export const modelClassDiagramUrl = (): string => `hotel-shift-puzzle/model-class-diagram`;
 
-/** 操作履歴（ノウハウ可視化）バブル */
-export const scheduleEditLogUrl = (scheduleId: string): string =>
-  `hotel-shift-puzzle/schedules/${scheduleId}/edit-log`;
-
 // オブジェクトの正規 URL を registry に登録（副作用）。libs の記述子からは url を外したので、
 // ObjectView(object=...) の url 解決はこの登録が担う。このモジュールは bubbleRoutes から
 // import されるため、ルート登録と同じタイミングで一度だけ走る。

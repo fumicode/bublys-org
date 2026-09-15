@@ -27,8 +27,6 @@ import {
   ConstraintSet,
   type ConstraintSetPlain,
   ScheduleReport,
-  ScheduleEditLog,
-  type ScheduleEditLogPlain,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
@@ -57,8 +55,6 @@ export const CONSTRAINT_SET_TYPE = "ConstraintSet";
 export const GLOBAL_CONSTRAINT_SET_ID = "global";
 
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
-/** 勤務表の操作履歴（ノウハウ可視化）。Schedule ローカル世界線に相乗り。 */
-export const SCHEDULE_EDIT_LOG_TYPE = "ScheduleEditLog";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
@@ -180,22 +176,6 @@ export const HOTEL_OBJECTS = defineObjects({
     // 確定時点のスナップショット。世界に属さない（external、既定）。
     // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
     // 意味が壊れる。state が完全 plain → serialize 不要。
-  },
-  ScheduleEditLog: {
-    class: ScheduleEditLog,
-    getId: (log: ScheduleEditLog) => log.id,
-    // 勤務表の操作履歴。親 Schedule のローカル世界線に相乗り（case B）。
-    // Schedule と同じノードに bundle で載せることで、時間移動と履歴がずれない。
-    // 入れ子にインスタンス（ScheduleEditEntry → ConstraintDelta → ConstraintViolation）を
-    // 持つので codec を明示。
-    serialize: {
-      toJSON: (log: ScheduleEditLog) => log.toPlain(),
-      fromJSON: (j) => ScheduleEditLog.fromPlain(j as ScheduleEditLogPlain),
-    },
-    membership: {
-      kind: "live",
-      homeScope: (id: string) => localScopeId(SCHEDULE_TYPE, id),
-    },
   },
 });
 

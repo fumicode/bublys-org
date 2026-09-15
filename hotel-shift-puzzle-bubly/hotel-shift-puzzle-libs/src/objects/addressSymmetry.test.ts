@@ -110,9 +110,7 @@ describe("古い形式の作り直しは、正しく生まれた世界を巻き�
     for (let k = 0; k < 3; k++) {
       cur = recordSetCell(store, {
         schedule: cur,
-        constraints: [],
         staffId: "s1",
-        staffName: "x",
         day: schedule.workingDays()[k],
         to: { kind: "day-off" },
       });
@@ -181,7 +179,7 @@ describe("読みと書きが同じ (type, id) で住所を解く", () => {
 
 /**
  * 「読めない」と「無い」を取り違えると、**見ているだけでデータが壊れる**。
- * その番人（absentInReadScope / loadEditLog の諦め）を固定する。
+ * その番人（absentInReadScope）を固定する。
  */
 describe("「読めない」と「無い」を分ける", () => {
   const world = (born: boolean, scopeId: string) =>
@@ -226,47 +224,5 @@ describe("「読めない」と「無い」を分ける", () => {
   it("id が分からないときは「無い」に倒す（既定値を作る側ではなく、作らない側）", () => {
     const store = fakeStore();
     expect(absentInReadScope(store, world(false, APP_SCOPE_ID), STAFF_TYPE, undefined)).toBe(true);
-  });
-});
-
-describe("操作履歴が読めないときは、履歴を諦める", () => {
-  it("★ 空のログで上書きしない（積み上げた履歴が消える）", () => {
-    const store = fakeStore();
-    saveObject(store, STAFF_TYPE, new Staff({ id: "s1", name: "a" }));
-    const schedule = createSchedule(store, { storeId: "st", year: 2026, month: 6 });
-    const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
-    const days = schedule.workingDays();
-
-    let cur: MonthlyStaffSchedule = schedule;
-    for (let k = 0; k < 2; k++) {
-      cur = recordSetCell(store, {
-        schedule: cur,
-        constraints: [],
-        staffId: "s1",
-        staffName: "a",
-        day: days[k],
-        to: { kind: "day-off" },
-      });
-    }
-    const logBefore = store.lastRefOf(scopeId, "ScheduleEditLog");
-    expect(logBefore).toBeDefined();
-
-    // 履歴の値だけ追い出す。参照はグラフに残っている
-    store.evict(logBefore?.hash as string);
-    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-
-    recordSetCell(store, {
-      schedule: cur,
-      constraints: [],
-      staffId: "s1",
-      staffName: "a",
-      day: days[2],
-      to: { kind: "day-off" },
-    });
-
-    // 勤務表そのものは記録される。履歴だけ諦める（＝参照が動かない）
-    expect(store.lastRefOf(scopeId, "ScheduleEditLog")?.hash).toBe(logBefore?.hash);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
   });
 });

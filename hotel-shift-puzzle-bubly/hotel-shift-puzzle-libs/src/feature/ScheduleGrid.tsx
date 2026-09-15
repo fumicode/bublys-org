@@ -17,7 +17,6 @@ import {
   makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   WorkingDay,
-  shiftCellKey,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type ScheduleRepair,
@@ -53,10 +52,8 @@ import { useScheduleHistory } from "./useScheduleHistory.js";
 import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
-  recordAutoStep,
-  recordRequiredEdit,
+  recordScheduleMutation,
   recordConstraintEdit,
-  buildCandidateEditLog,
 } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -65,7 +62,6 @@ import {
   SCHEDULE_RESERVATION_INFO_TYPE,
   CONSTRAINT_SET_TYPE,
   SCHEDULE_REPORT_TYPE,
-  SCHEDULE_EDIT_LOG_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import {
@@ -98,8 +94,6 @@ type ScheduleGridProps = {
    * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
    */
   shiftWishesUrl?: (year: number, month: number) => string;
-  /** 操作履歴（ノウハウ）バブルの URL */
-  editLogUrl?: string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -145,7 +139,7 @@ const newLeaderRuleKey = (): string =>
 
 /**
  * 勤務表グリッド。セル編集・自動ステップ等は recordScheduleEdit 経由で
- * Schedule + EditLog を同一世界線ノードに記録する。
+ * この勤務表の世界線に記録する。
  */
 const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
@@ -155,7 +149,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   treeUrl,
   workingStaffUrl,
   shiftWishesUrl,
-  editLogUrl,
   dayBubbleUrl,
   violationBubbleUrl,
   bubbleUrlOf,
@@ -352,36 +345,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     const base = constraintsBase();
     if (!base) return;
     if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
-    const next = base.linkReport(reportId);
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    recordConstraintEdit(store, {
-      schedule,
-      beforeConstraints: allConstraints,
-      afterConstraints: buildScheduleConstraints({
-        modelConstraints: next.modelConstraints(shiftIdsOf),
-        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
-      }),
-      nextConstraints: next,
-      summary: `レポートを紐づけ: ${reportId}`,
-    });
+    recordConstraintEdit(store, { schedule, nextConstraints: base.linkReport(reportId) });
   };
   const handleUnlinkReport = (reportId: string) => {
     if (!constraints) return;
-    const next = constraints.unlinkReport(reportId);
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     recordConstraintEdit(store, {
       schedule,
-      beforeConstraints: allConstraints,
-      afterConstraints: buildScheduleConstraints({
-        modelConstraints: next.modelConstraints(shiftIdsOf),
-        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
-      }),
-      nextConstraints: next,
-      summary: `レポートの紐づけを解除: ${reportId}`,
+      nextConstraints: constraints.unlinkReport(reportId),
     });
   };
 
@@ -399,19 +369,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       leaderStaffIds: [],
       minCount: 1,
     });
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    recordConstraintEdit(store, {
-      schedule,
-      beforeConstraints: allConstraints,
-      afterConstraints: buildScheduleConstraints({
-        modelConstraints: next.modelConstraints(shiftIdsOf),
-        wish: next.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
-      }),
-      nextConstraints: next,
-      summary: `責任者ルールを追加: ${key}`,
-    });
+    recordConstraintEdit(store, { schedule, nextConstraints: next });
     onOpenRule?.(key);
   };
 
@@ -505,20 +463,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: EditLog 付きで同一世界線ノードに記録。
+  // セル編集: この勤務表の世界線に記録。
   // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    recordSetCell(store, {
-      schedule,
-      constraints: allConstraints,
-      staffId,
-      staffName: nameOf(staffId),
-      day,
-      to,
-    });
+    recordSetCell(store, { schedule, staffId, day, to });
   };
 
-  // 確定提案の承認（Tab）。人が承認した手として EditLog に残し（source: "suggestion"）、
+  // 確定提案の承認（Tab）。承認した値を書き込み、
   // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
   // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
   const handleApproveForced = (
@@ -530,15 +481,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffId,
       dayKey: day.key,
     });
-    recordSetCell(store, {
-      schedule,
-      constraints: allConstraints,
-      staffId,
-      staffName: nameOf(staffId),
-      day,
-      to: cell,
-      suggestionId: `forced:${staffId}:${day.key}:${shiftCellKey(cell)}`,
-    });
+    recordSetCell(store, { schedule, staffId, day, to: cell });
     if (next) {
       setCellSelection({ staffId: next.staffId, day: next.day });
       return;
@@ -546,8 +489,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     setCellSelection({ staffId, day });
   };
 
-  // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱いで
-  // EditLog に残す（どういう理由でその日を動かしたかは、詰みの記録として世界線に残る）。
+  // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱い。
   const handleApplyRepair = (repair: ScheduleRepair) => {
     handleChangeCell(repair.staffId, repair.day, repair.to);
   };
@@ -566,14 +508,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       maxDayOffPerDay: maxPerDay,
       maxConsecutive: constraints?.maxConsecutiveWorkdays,
     });
-    recordAutoStep(store, {
-      schedule,
-      next: result.schedule,
-      constraints: allConstraints,
-      stepId: step.key,
-      stepLabel: step.label,
-      message: result.message,
-    });
+    recordScheduleMutation(store, { schedule, transform: () => result.schedule });
     setAutoMessage(`${step.label}: ${result.message}`);
   };
 
@@ -612,24 +547,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
       return s;
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => {
-      const obj = buildCandidate(i);
-      const label = `案${i + 1}`;
-      // ログが読めないときは履歴を付けない（案そのものは記録する）
-      const editLog = buildCandidateEditLog(store, {
-        baseSchedule: schedule,
-        candidate: obj,
-        constraints: allConstraints,
-        label,
-      });
-      return {
-        obj,
-        label,
-        extras: editLog
-          ? [{ type: SCHEDULE_EDIT_LOG_TYPE, obj: editLog }]
-          : [],
-      };
-    });
+    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
+      obj: buildCandidate(i),
+      label: `案${i + 1}`,
+    }));
     commitCandidates(
       store,
       localScopeId(SCHEDULE_TYPE, scheduleId),
@@ -643,24 +564,17 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     onOpenWorldLineAfterCandidates?.();
   };
 
-  // 必要スタッフ数の編集（その日・全日）。EditLog 付きで記録
+  // 必要スタッフ数の編集（その日・全日）
   const handleChangeRequired = (day: WorkingDay, shiftName: string, count: number) => {
-    recordRequiredEdit(store, {
+    recordScheduleMutation(store, {
       schedule,
-      constraints: allConstraints,
       transform: (s) => s.setRequired(day, shiftName, count),
-      summary: `${day.day}日 ${shiftName} の必要人数 → ${count}`,
-      dayKey: day.key,
-      shiftName,
     });
   };
   const handleChangeRequiredAllDays = (shiftName: string, count: number) => {
-    recordRequiredEdit(store, {
+    recordScheduleMutation(store, {
       schedule,
-      constraints: allConstraints,
       transform: (s) => s.setRequiredForAllDays(shiftName, count),
-      summary: `全日 ${shiftName} の必要人数 → ${count}`,
-      shiftName,
     });
   };
 
@@ -964,7 +878,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(worldLineUrl || editLogUrl || treeUrl || pendingReportUrl) && (
+      {(worldLineUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
@@ -978,21 +892,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                   title="ダブルクリックでこの勤務表の世界線ビューを開く"
                 >
                   🌐 世界線ビュー
-                </span>
-              </ObjectView>
-          )}
-          {editLogUrl && (
-              <ObjectView
-                type={SCHEDULE_EDIT_LOG_TYPE}
-                url={editLogUrl}
-                label="操作履歴"
-                openingPosition="bubble-side-right"
-              >
-                <span
-                  className="e-link"
-                  title="ダブルクリックで操作履歴（ノウハウ）を開く"
-                >
-                  📝 操作履歴
                 </span>
               </ObjectView>
           )}

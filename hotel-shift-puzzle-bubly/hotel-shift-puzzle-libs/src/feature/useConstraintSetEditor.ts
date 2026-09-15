@@ -5,7 +5,7 @@
  *
  * 制約セットは2通りあり、読み先も書き先も違う:
  *   - グローバルのテンプレート（id="global"）… 世界を持たない。保存はグローバル台帳へ1回
- *   - 勤務表ごとの独自セット（id=scheduleId）… 勤務表の世界線へ、操作履歴と同じノードで
+ *   - 勤務表ごとの独自セット（id=scheduleId）… 勤務表の世界線へ
  *
  * **この分岐を持つのはここだけ。** 呼び出し側（バブル）は制約セットIDを渡して commit を
  * 呼ぶだけで、どちらに書かれるかを知らない。分岐が2箇所に増えた瞬間、片方だけ直す事故が起きる。
@@ -33,7 +33,6 @@ import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
 } from "../objects/hotelObjects.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordConstraintEdit } from "./recordScheduleEdit.js";
 import { shiftColorOfNames } from "../ui/ScheduleConstraintsBar.js";
 import type { IconColor } from "../ui/constraint-icons/common.js";
@@ -53,7 +52,7 @@ export type ConstraintSetEditor = {
    * 制約セットを1つ変換して保存する。**1回呼ぶ＝記録1回**。
    * 変わらなければ何も書かない（同じ内容のノードを世界線に積まない）。
    */
-  commit: (fn: (set: ConstraintSet) => ConstraintSet, summary: string) => void;
+  commit: (fn: (set: ConstraintSet) => ConstraintSet) => void;
 };
 
 export function useConstraintSetEditor(
@@ -79,7 +78,7 @@ export function useConstraintSetEditor(
   );
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
 
-  // 勤務表ごとのときだけ、違反差分の計算に勤務表が要る
+  // 勤務表ごとのときだけ、世界線の起点に置くために勤務表が要る
   const schedule = useObject<MonthlyStaffSchedule>(
     SCHEDULE_TYPE,
     isGlobal ? undefined : constraintSetId
@@ -102,19 +101,13 @@ export function useConstraintSetEditor(
     [workShifts]
   );
 
-  const shiftIdsOf = useCallback(
-    (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id),
-    [workShifts]
-  );
-
   // 「読めないだけ」と「本当に無い」を分ける。読めないだけのものを空で作り直すと、
   // 中身のある制約セットを上書きしてしまう（見ているだけでデータが壊れる）。
   const canEdit =
     constraintSetId !== undefined && !pending && (constraintSet !== undefined || absent);
 
   const commit = useCallback(
-    (fn: (set: ConstraintSet) => ConstraintSet, summary: string) => {
+    (fn: (set: ConstraintSet) => ConstraintSet) => {
       if (constraintSetId === undefined) return;
       if (constraintSet === undefined && !absent) return; // 読めないだけかもしれない
       const base = constraintSet ?? ConstraintSet.empty(constraintSetId);
@@ -127,29 +120,10 @@ export function useConstraintSetEditor(
         return;
       }
 
-      // 勤務表ごとは、操作履歴と同じ世界線ノードに載せる
-      recordConstraintEdit(store, {
-        schedule,
-        beforeConstraints: buildScheduleConstraints({
-          modelConstraints: base.modelConstraints(shiftIdsOf),
-        }),
-        afterConstraints: buildScheduleConstraints({
-          modelConstraints: next.modelConstraints(shiftIdsOf),
-        }),
-        nextConstraints: next,
-        summary,
-      });
+      // 勤務表ごとは、その勤務表の世界線に載せる
+      recordConstraintEdit(store, { schedule, nextConstraints: next });
     },
-    [
-      store,
-      constraintSetId,
-      constraintSet,
-      absent,
-      isGlobal,
-      repo,
-      schedule,
-      shiftIdsOf,
-    ]
+    [store, constraintSetId, constraintSet, absent, isGlobal, repo, schedule]
   );
 
   return { constraintSet, isGlobal, shiftNames, shiftColorOf, canEdit, commit };

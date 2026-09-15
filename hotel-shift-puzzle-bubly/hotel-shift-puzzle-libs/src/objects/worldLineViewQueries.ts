@@ -12,7 +12,12 @@
  * ★ 対になる2つの答えは同じ場所に置く。片方だけ app 層にあると、
  *   規約を直すときに片方を直し忘れる。
  */
-import { membershipOf, homeScopeOf, pinnedTypesOf } from "./framework.js";
+import {
+  getDescriptor,
+  membershipOf,
+  homeScopeOf,
+  pinnedTypesOf,
+} from "./framework.js";
 import { parseLocalScopeId } from "./commit.js";
 
 /** 3Dビューの `CellRole`。ライブラリ側の型に合わせてあるが、依存はしない */
@@ -21,7 +26,7 @@ export type CellRole = "live" | "pinned" | "external";
 /**
  * その参照が自分の世界線を持つなら、そのスコープID。
  *
- * 本籍（homeScope）がそのまま入れ子の答えになる。勤務表・可能勤務帯・制約・操作履歴は
+ * 本籍（homeScope）がそのまま入れ子の答えになる。勤務表・勤務スタッフ群・勤務帯セット・制約は
  * どれも `Schedule:<id>` を本籍に持つので、同じ勤務表の世界線に解決される。
  * いま居る世界と同じなら入れ子ではない（自分の中に自分は居ない）。
  */
@@ -58,6 +63,10 @@ export function hotelCellRole(
   const owner = parseLocalScopeId(scopeId);
   // 世界ではない（グローバル台帳・バブル配置）。立場という概念が無い
   if (!owner) return null;
+
+  // 登録されていない型（撤去した型の記録が古い世界線に残っている等）は立場を言えない。
+  // 既定の所属（external）に倒すと「外のもの」と断言してしまう
+  if (!getDescriptor(ref.type)) return null;
 
   // この世界を本籍に持つ＝ここで変化する
   if (homeScopeOf(ref.type, ref.id) === scopeId) return "live";

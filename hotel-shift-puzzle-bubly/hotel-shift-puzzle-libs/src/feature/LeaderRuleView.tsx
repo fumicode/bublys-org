@@ -2,10 +2,7 @@
 
 import { FC, useCallback, useMemo } from "react";
 import { getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
-import {
-  WorkShiftSet,
-  ConstraintSet,
-} from "@bublys-org/hotel-shift-puzzle-model";
+import { WorkShiftSet } from "@bublys-org/hotel-shift-puzzle-model";
 import { LeaderRuleDiagram } from "../ui/LeaderRuleDiagram.js";
 import { useObject } from "../objects/repository.js";
 import {
@@ -67,57 +64,41 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({
     return names;
   }, [workShifts]);
 
-
   /**
    * 編集は制約セットの編集口（useConstraintSetEditor）に任せる。
-   * グローバルなら台帳へ1回、勤務表ごとなら操作履歴と同じ世界線ノードへ——という
+   * グローバルなら台帳へ1回、勤務表ごとならその勤務表の世界線へ——という
    * 分岐はあちらが持っているので、ここには無い。
    */
-  const editRule = useCallback(
-    (apply: (set: ConstraintSet) => ConstraintSet, summary: string) => {
-      commit(apply, summary);
-    },
-    [commit]
-  );
+  const editRule = commit;
 
   // 図には人そのものを渡す（候補者が ObjectView として振る舞えるように）
   const staffOf = useMemo(() => {
     const byId = new Map(staffList.map((s) => [s.id, s]));
     return (id: string) => byId.get(id);
   }, [staffList]);
-  const nameOf = useCallback(
-    (id: string) => staffOf(id)?.name ?? id,
-    [staffOf]
-  );
 
   const handleChangeShift = useCallback(
     (shiftName: string) =>
-      editRule((set) => set.setRuleShift(ruleKey, shiftName), `担当勤務帯を変更: ${shiftName}`),
+      editRule((set) => set.setRuleShift(ruleKey, shiftName)),
     [ruleKey, editRule]
   );
   const handleChangeLabel = useCallback(
     (label: string) =>
-      editRule((set) => set.setRuleLabel(ruleKey, label), `ラベルを変更: ${label}`),
+      editRule((set) => set.setRuleLabel(ruleKey, label)),
     [ruleKey, editRule]
   );
   const handleChangeMinCount = useCallback(
     (minCount: number) =>
-      editRule(
-        (set) => set.setRuleMinCount(ruleKey, minCount),
-        `最小人数を変更: ${minCount}`
-      ),
+      editRule((set) => set.setRuleMinCount(ruleKey, minCount)),
     [ruleKey, editRule]
   );
   const handleRemoveStaff = useCallback(
     (staffId: string) =>
-      editRule(
-        (set) => set.removeLeader(ruleKey, staffId),
-        `責任者候補を削除: ${nameOf(staffId)}`
-      ),
-    [ruleKey, editRule, nameOf]
+      editRule((set) => set.removeLeader(ruleKey, staffId)),
+    [ruleKey, editRule]
   );
   const handleDeleteRule = useCallback(
-    () => editRule((set) => set.removeRule(ruleKey), "ルール削除"),
+    () => editRule((set) => set.removeRule(ruleKey)),
     [ruleKey, editRule]
   );
 
@@ -128,12 +109,9 @@ const LeaderRuleViewBody: FC<LeaderRuleViewProps> = ({
       const staffId = extractIdFromUrl(url);
       if (!staffId || !rule) return;
       if (rule.leaderStaffIds.includes(staffId)) return; // 既に候補なら何もしない
-      editRule(
-        (set) => set.addLeader(ruleKey, staffId),
-        `責任者候補を追加: ${nameOf(staffId)}`
-      );
+      editRule((set) => set.addLeader(ruleKey, staffId));
     },
-    [rule, ruleKey, editRule, nameOf]
+    [rule, ruleKey, editRule]
   );
 
   if (!rule) {

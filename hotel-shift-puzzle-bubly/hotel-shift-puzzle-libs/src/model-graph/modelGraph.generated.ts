@@ -24,47 +24,18 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "newlyResolved",
           "type": "ConstraintViolation[]",
           "optional": false
-        },
-        {
-          "name": "concessions",
-          "type": "ConstraintViolation[]",
-          "optional": false
         }
       ],
       "getters": [
         "newlyViolated",
-        "newlyResolved",
-        "concessions"
+        "newlyResolved"
       ],
       "methods": [
-        {
-          "name": "empty",
-          "params": [],
-          "returns": "ConstraintDelta",
-          "isStatic": true,
-          "returnsSelf": true
-        },
         {
           "name": "between",
           "params": [
             "before",
             "after"
-          ],
-          "returns": "ConstraintDelta",
-          "isStatic": true,
-          "returnsSelf": true
-        },
-        {
-          "name": "toPlain",
-          "params": [],
-          "returns": "ConstraintDeltaPlain",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "fromPlain",
-          "params": [
-            "plain"
           ],
           "returns": "ConstraintDelta",
           "isStatic": true,
@@ -1151,159 +1122,6 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "ScheduleCandidates",
-          "isStatic": true,
-          "returnsSelf": true
-        }
-      ]
-    },
-    {
-      "name": "ScheduleEditEntry",
-      "file": "schedule/ScheduleEditEntry.ts",
-      "kind": "part",
-      "fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "at",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "actor",
-          "type": "ScheduleEditActor",
-          "optional": false
-        },
-        {
-          "name": "kind",
-          "type": "ScheduleEditKind",
-          "optional": false
-        },
-        {
-          "name": "summary",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "targets",
-          "type": "ScheduleEditTargets",
-          "optional": false
-        },
-        {
-          "name": "constraintDelta",
-          "type": "ConstraintDelta",
-          "optional": false
-        },
-        {
-          "name": "source",
-          "type": "ScheduleEditSource",
-          "optional": true
-        },
-        {
-          "name": "suggestionId",
-          "type": "string",
-          "optional": true
-        },
-        {
-          "name": "rejectedSuggestionId",
-          "type": "string",
-          "optional": true
-        }
-      ],
-      "getters": [
-        "id",
-        "at",
-        "actor",
-        "kind",
-        "summary",
-        "targets",
-        "constraintDelta",
-        "source",
-        "suggestionId",
-        "rejectedSuggestionId",
-        "hasConcessions"
-      ],
-      "methods": [
-        {
-          "name": "toPlain",
-          "params": [],
-          "returns": "ScheduleEditEntryPlain",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "fromPlain",
-          "params": [
-            "plain"
-          ],
-          "returns": "ScheduleEditEntry",
-          "isStatic": true,
-          "returnsSelf": true
-        }
-      ]
-    },
-    {
-      "name": "ScheduleEditLog",
-      "file": "schedule/ScheduleEditLog.ts",
-      "kind": "aggregate",
-      "fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "entries",
-          "type": "ScheduleEditEntry[]",
-          "optional": false
-        }
-      ],
-      "getters": [
-        "id",
-        "entries",
-        "latest"
-      ],
-      "methods": [
-        {
-          "name": "empty",
-          "params": [
-            "scheduleId"
-          ],
-          "returns": "ScheduleEditLog",
-          "isStatic": true,
-          "returnsSelf": true
-        },
-        {
-          "name": "entriesWithConcessions",
-          "params": [],
-          "returns": "ScheduleEditEntry[]",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "append",
-          "params": [
-            "entry"
-          ],
-          "returns": "ScheduleEditLog",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "toPlain",
-          "params": [],
-          "returns": "ScheduleEditLogPlain",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "fromPlain",
-          "params": [
-            "plain"
-          ],
-          "returns": "ScheduleEditLog",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2515,14 +2333,6 @@ export const MODEL_GRAPH: ModelGraph = {
       "from": "ConstraintDelta",
       "to": "ConstraintViolation",
       "kind": "contains",
-      "via": "concessions",
-      "many": true,
-      "foundBy": "type"
-    },
-    {
-      "from": "ConstraintDelta",
-      "to": "ConstraintViolation",
-      "kind": "contains",
       "via": "newlyResolved",
       "many": true,
       "foundBy": "type"
@@ -2616,22 +2426,6 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
-      "from": "ScheduleEditEntry",
-      "to": "ConstraintDelta",
-      "kind": "contains",
-      "via": "constraintDelta",
-      "many": false,
-      "foundBy": "type"
-    },
-    {
-      "from": "ScheduleEditLog",
-      "to": "ScheduleEditEntry",
-      "kind": "contains",
-      "via": "entries",
-      "many": true,
-      "foundBy": "type"
-    },
-    {
       "from": "ScheduleReport",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -2706,7 +2500,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 41,
+    "fileCount": 39,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
@@ -2719,8 +2513,6 @@ export const MODEL_GRAPH: ModelGraph = {
     "unresolvedIdFields": [
       "ConstraintSet.linkedReportIds",
       "MonthlyStaffSchedule.storeId",
-      "ScheduleEditEntry.rejectedSuggestionId",
-      "ScheduleEditEntry.suggestionId",
       "ScheduleReport.storeId",
       "ScheduleReport.worldLineNodeId",
       "WorkingStaffMember.allowedShiftIds"

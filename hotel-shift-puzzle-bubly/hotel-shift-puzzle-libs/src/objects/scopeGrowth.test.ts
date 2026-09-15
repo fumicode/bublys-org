@@ -66,28 +66,24 @@ describe('どの操作でどのスコープが伸びるか', () => {
     for (let k = 0; k < 3; k++) {
       cur = recordSetCell(store, {
         schedule: cur,
-        constraints: [],
         staffId: 's1',
-        staffName: 'staff1',
         day: days[k],
         to: { kind: 'day-off' },
       });
     }
 
-    // 3回の編集で +4。1つ多いのは、操作履歴（ScheduleEditLog）がこの世界に
-    // 初登場するときに「編集前」の起点が1つ差し込まれるため（#110 の仕掛け）
-    expect(store.counts()[scopeId]).toBe(before + 4);
+    // 1操作＝1ノード。勤務表は誕生の起点に載っているので、起点が差し込まれることもない
+    expect(store.counts()[scopeId]).toBe(before + 3);
   });
 
   /**
-   * ★ アプリ全体スコープは勤務表の世界線より**速く**伸びる。
-   *
-   * 勤務表の世界線は「1操作＝1ノード」（勤務表と操作履歴を束ねて1つの grow）だが、
-   * アプリ全体スコープは平坦な変更ログなので**オブジェクトごとに1ノード**書く。
-   * そのため見た目には「アプリ全体だけがどんどん伸びて、勤務表は伸びていない」ように映る。
-   * 実際には両方伸びていて、速さが違うだけ。ここが変わると図の読み方が変わるので固定する。
+   * 伸び方の単位が違う: 勤務表の世界線は「1操作＝1ノード」、アプリ全体スコープは平坦な
+   * 変更ログなので「オブジェクトごとに1ノード」。
+   * セル編集は勤務表1つしか動かさないので、両方とも同じだけ伸びる。
+   * （勤務スタッフの除外のように複数の集約が動く操作では、アプリ全体のほうが速く伸びる）
+   * ここが変わると世界線ビューの読み方が変わるので固定する。
    */
-  it('アプリ全体スコープは勤務表の世界線より速く伸びる（1操作あたりのノード数が違う）', () => {
+  it('セル編集では、勤務表の世界線とアプリ全体スコープが同じだけ伸びる', () => {
     const { store, schedule, scopeId } = setUp();
     const localBefore = store.counts()[scopeId];
     const appBefore = store.counts()[APP_SCOPE_ID];
@@ -97,9 +93,7 @@ describe('どの操作でどのスコープが伸びるか', () => {
     for (let k = 0; k < 5; k++) {
       cur = recordSetCell(store, {
         schedule: cur,
-        constraints: [],
         staffId: 's1',
-        staffName: 'staff1',
         day: days[k],
         to: { kind: 'day-off' },
       });
@@ -107,8 +101,8 @@ describe('どの操作でどのスコープが伸びるか', () => {
 
     const localGrew = store.counts()[scopeId] - localBefore;
     const appGrew = store.counts()[APP_SCOPE_ID] - appBefore;
-    expect(localGrew).toBeGreaterThan(0); // 勤務表の世界線も必ず伸びる
-    expect(appGrew).toBeGreaterThan(localGrew); // ただしアプリ全体のほうが速い
+    expect(localGrew).toBe(5); // 勤務表の世界線も必ず伸びる
+    expect(appGrew).toBe(localGrew);
   });
 
   it('セル編集はアプリ全体スコープにも記録される（全世界の最新値インデックス）', () => {
@@ -116,9 +110,7 @@ describe('どの操作でどのスコープが伸びるか', () => {
     const before = store.counts()[APP_SCOPE_ID];
     recordSetCell(store, {
       schedule,
-      constraints: [],
       staffId: 's1',
-      staffName: 'staff1',
       day: schedule.workingDays()[0],
       to: { kind: 'day-off' },
     });
@@ -133,14 +125,45 @@ describe('どの操作でどのスコープが伸びるか', () => {
 
     recordSetCell(store, {
       schedule,
-      constraints: [],
       staffId: 's1',
-      staffName: 'staff1',
       day: schedule.workingDays()[0],
       to: { kind: 'day-off' },
     });
 
     expect(store.counts()[otherScope]).toBe(before);
+  });
+
+  /**
+   * ★ 同じ状態に戻したら、新しい世界を作らずに元の世界へ戻る（#137 / #155）。
+   *
+   * 世界の同一性は、そのノードに載っている全オブジェクトのハッシュで決まる。
+   * 編集のたびに必ず変わるもの（時刻入りの記録など）を同じノードに載せると、
+   * 中身を元に戻しても二度と一致せず、世界線が伸び続ける。
+   */
+  it('★ セルを A → B → A と戻すと、元のノードへ戻る（世界線が伸びない）', () => {
+    const { store, schedule, scopeId } = setUp();
+    const day = schedule.workingDays()[0];
+    const apexOf = () => store.getState().worldLineGraph.graphs[scopeId].apexNodeId;
+    const nodeA = apexOf();
+
+    const toB = recordSetCell(store, {
+      schedule,
+      staffId: 's1',
+      day,
+      to: { kind: 'day-off' },
+    });
+    expect(apexOf()).not.toBe(nodeA);
+    const countAfterB = store.counts()[scopeId];
+
+    recordSetCell(store, {
+      schedule: toB,
+      staffId: 's1',
+      day,
+      to: { kind: 'undecided' },
+    });
+
+    expect(store.counts()[scopeId]).toBe(countAfterB);
+    expect(apexOf()).toBe(nodeA);
   });
 
   it('スタッフの改名は、勤務表の世界線を伸ばさない（固定メンバーだから）', () => {

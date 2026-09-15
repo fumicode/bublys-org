@@ -32,6 +32,10 @@ describe("世界から見たオブジェクトの立場", () => {
     expect(role(STAFF_TYPE, "s1", APP_SCOPE_ID)).toBeNull();
   });
 
+  it("登録されていない型（撤去した操作履歴の古い記録など）は、立場を言い切らない", () => {
+    expect(role("ScheduleEditLog", "sc1", SCHED)).toBeNull();
+  });
+
   it("勤務表そのものは、その勤務表の世界で変化する（live）", () => {
     expect(role(SCHEDULE_TYPE, "sc1", SCHED)).toBe("live");
   });

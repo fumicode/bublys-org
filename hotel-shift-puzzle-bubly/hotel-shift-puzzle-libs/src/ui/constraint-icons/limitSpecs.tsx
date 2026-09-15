@@ -7,7 +7,7 @@
  * 「制約セットから1つ読んで、1つ書き戻す」だけの制約。個別のコンポーネントも
  * 個別のハンドラも要らないので、**違うのはこの表の1行だけ**にしてある。
  *
- * バーの小さいアイコンも、バブルの大きい図も、ツールチップの文も、操作履歴の文言も、
+ * バーの小さいアイコンも、バブルの大きい図も、ツールチップの文も、
  * 全部この1行から出る（同じものを2度書かない）。制約を1つ増やすときに触るのはここだけ。
  *
  * `key` は**バブルの住所に載る**。ドメインの属性名（maxConsecutiveWorkdays）をそのまま
@@ -42,8 +42,6 @@ export type LimitSpec = {
   apply: (set: ConstraintSet, value: number | boolean) => ConstraintSet;
   /** いまの値を1行の日本語にする（ツールチップと図の説明） */
   describe: (value: number | boolean) => string;
-  /** 操作履歴に残す文言 */
-  summary: (value: number | boolean) => string;
   /** その値の図を描く */
   render: (value: number | boolean, size?: number) => ReactNode;
 };
@@ -66,7 +64,6 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxDayOffPerDay,
     apply: (set, v) => set.withMaxDayOffPerDay(asNumber(v)),
     describe: (v) => `1日に休めるのは${asNumber(v)}人まで`,
-    summary: (v) => `1日の休み上限を ${asNumber(v)}人 にした`,
     render: (v, size) => <MaxDayOffPerDayIcon max={asNumber(v)} size={size} />,
   },
   {
@@ -79,7 +76,6 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.minMonthlyDayOff,
     apply: (set, v) => set.withMinMonthlyDayOff(asNumber(v)),
     describe: (v) => `月に${asNumber(v)}日以上休む`,
-    summary: (v) => `月の最低休日を ${asNumber(v)}日 にした`,
     render: (v, size) => <MinMonthlyDayOffIcon min={asNumber(v)} size={size} />,
   },
   {
@@ -92,7 +88,6 @@ export const LIMIT_SPECS: LimitSpec[] = [
     read: (set) => set.maxConsecutiveWorkdays,
     apply: (set, v) => set.withMaxConsecutiveWorkdays(asNumber(v)),
     describe: (v) => `連勤は最大${asNumber(v)}日まで`,
-    summary: (v) => `連勤上限を ${asNumber(v)}日 にした`,
     render: (v, size) => <MaxConsecutiveIcon max={asNumber(v)} size={size} />,
   },
   {
@@ -107,7 +102,6 @@ export const LIMIT_SPECS: LimitSpec[] = [
       asBoolean(v)
         ? "できるだけシフト希望に沿う（沿わない日は違反として出す）"
         : "シフト希望は見ない",
-    summary: (v) => `希望チェックを${asBoolean(v) ? "入" : "切"}にした`,
     render: (v, size) => <WishIcon on={asBoolean(v)} size={size} />,
   },
 ];

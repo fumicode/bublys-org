@@ -14,7 +14,6 @@ import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleDayView, dayHeadingLabel } from "../ui/ScheduleDayView.js";
 import { useScheduleCandidates } from "./candidates/index.js";
 import { useObjects, useObject } from "../objects/repository.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -39,7 +38,7 @@ type ScheduleDayDetailProps = {
 /**
  * 稼働日 1 日ぶんの詳細バブル。
  * 勤務表グリッドの日付ヘッダをクリックして開く（その日だけを切り出したビュー）。
- * セル編集は recordSetCell 経由で Schedule + EditLog を同一世界線ノードに記録する。
+ * セル編集は recordSetCell 経由で、この勤務表の世界線に記録する。
  */
 const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   scheduleId,
@@ -73,21 +72,6 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
     return map;
   }, [allWishes, schedule]);
 
-  const allConstraints = useMemo(() => {
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    return buildScheduleConstraints({
-      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
-      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-    });
-  }, [workShifts, constraints, wishByStaff]);
-
-  const nameOf = useMemo(() => {
-    const map = new Map(staffList.map((s) => [s.id, s.name]));
-    return (id: string) => map.get(id) ?? id;
-  }, [staffList]);
-
   // まだ決まっていないセルに入れられる値（候補集合）。勤務表グリッドと同じフックを通すので、
   // ここで見える候補はグリッドの候補と一致する（計算対象も盤面全体で揃える）。
   const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
@@ -111,14 +95,7 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
   const shiftOptions = workShifts;
 
   const handleChangeCell = (staffId: string, to: ShiftCell) => {
-    recordSetCell(store, {
-      schedule,
-      constraints: allConstraints,
-      staffId,
-      staffName: nameOf(staffId),
-      day,
-      to,
-    });
+    recordSetCell(store, { schedule, staffId, day, to });
   };
 
   return (
