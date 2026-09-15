@@ -38,7 +38,7 @@ import {
   useIsAbsent,
 } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
-import { runAutoShiftStep } from "./autoShift.js";
+import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import {
   useScheduleCandidates,
@@ -239,9 +239,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
 
-  // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
-  const minDayOff = constraints?.minMonthlyDayOff ?? 8;
-  const maxPerDay = constraints?.maxDayOffPerDay ?? 8;
+  // 自動シフトが守る上限（連勤・休日・1日の休み上限）。集約から（世界線に載る）。
+  // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
+  const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
+  const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
 
   // 責任者バッジのクリック: そのルールの担当者を選択に足す（全員入っていれば外す＝トグル）。
   const selectRuleStaff = (ids: string[]) =>
@@ -503,10 +504,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       workShifts,
       wishByStaff,
       staffGroup,
-      // 「必要人数を埋める」はこれを見て、先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
-      minDayOff,
-      maxDayOffPerDay: maxPerDay,
-      maxConsecutive: constraints?.maxConsecutiveWorkdays,
+      // 「必要人数を埋める」は休日の上限を見て先に各自の休みを確保し、連勤上限を超えないように埋める
+      ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
     setAutoMessage(`${step.label}: ${result.message}`);
@@ -524,10 +523,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         workShifts,
         wishByStaff,
         staffGroup,
-        // handleRunStep と同じく連勤上限を渡す。渡さないと ctx.maxConsecutive が undefined に
-        // なってステップ側の既定値 5 で走り、連勤上限を 5 未満にしている勤務表では
-        // 生成した案が全て連勤違反になってしまう。
-        maxConsecutive: constraints?.maxConsecutiveWorkdays,
+        // handleRunStep と同じく上限を丸ごと渡す。渡さないとステップ側の既定値（連勤5）で走り、
+        // 連勤上限を 5 未満にしている勤務表では生成した案が連勤違反になってしまう。
+        ...limits,
       }).schedule;
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
       let s = schedule;
@@ -536,7 +534,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup, ...limits }
       );
       s = leaderFill.schedule;
 

@@ -9,11 +9,15 @@
  * 実行する。新しいコマンドが増えても UI は変更不要（リスト駆動）。
  */
 import {
+  ConstraintSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   WorkingStaffGroup,
   WorkShift,
   Staff,
+  DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
+  DEFAULT_MIN_MONTHLY_DAY_OFF,
+  DEFAULT_MAX_DAY_OFF_PER_DAY,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type AutoShiftContext,
@@ -126,6 +130,30 @@ export type AutoShiftParams = {
   /** 1日に休んでよい人数の上限（休みを入れるときに超えない） */
   maxDayOffPerDay?: number;
 };
+
+/** 自動シフトが守る上限（制約セットから取り出したもの） */
+export type AutoShiftLimits = Required<
+  Pick<AutoShiftParams, "maxConsecutive" | "minDayOff" | "maxDayOffPerDay">
+>;
+
+/**
+ * 制約セットから、自動シフトが守る上限を取り出す。
+ *
+ * **自動シフトを呼ぶところは、必ずこれを `...limits` で渡す。** 呼び出しごとに
+ * `maxConsecutive: constraints?.maxConsecutiveWorkdays` と手で書いていたため、
+ * 書き忘れた呼び出し（完成案の責任者ステップ・抽出ビュー）だけが黙って既定値で走り、
+ * 連勤上限を下げた勤務表で違反する案を作っていた（#158）。
+ *
+ * 制約セットがまだ読めていないときは、制約セットの既定値と同じ値を返す
+ * （制約バーが既定値の空セットを描くのと揃える）。
+ */
+export const autoShiftLimitsOf = (
+  constraints: ConstraintSet | undefined
+): AutoShiftLimits => ({
+  maxConsecutive: constraints?.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
+  minDayOff: constraints?.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF,
+  maxDayOffPerDay: constraints?.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY,
+});
 
 /** params から各ステップ共通の文脈を組む（希望のデコード・可能勤務帯の述語化） */
 const buildContext = (params: AutoShiftParams): AutoShiftContext => {

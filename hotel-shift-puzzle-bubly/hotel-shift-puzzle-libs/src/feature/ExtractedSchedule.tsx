@@ -25,7 +25,7 @@ import {
   buildScheduleConstraints,
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
-import { runAutoShiftStep } from "./autoShift.js";
+import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { recordSetCell, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
@@ -88,8 +88,9 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
   // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
-  const minDayOff = constraints?.minMonthlyDayOff ?? 8;
-  const maxPerDay = constraints?.maxDayOffPerDay ?? 8;
+  // 自動シフトが守る上限（連勤・休日・1日の休み上限）。自動シフトを呼ぶところは必ず丸ごと渡す。
+  const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
+  const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
   const allLeaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
   const relevantRules = useMemo(
     () =>
@@ -146,6 +147,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       workShifts,
       wishByStaff,
       staffGroup,
+      ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
     setAutoMessage(`${step.label}: ${result.message}`);
@@ -165,6 +167,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         workShifts,
         wishByStaff,
         staffGroup,
+        ...limits,
       }).schedule;
     // 1案 = 希望を叶える → 責任者を満たす（他ルールとの兼務を考慮し、一意に決まる枠だけ確定）
     //     → 残った枠を phase 違いで決める → 月の休みを入れる（phase）
@@ -175,7 +178,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, allLeaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup }
+        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup, ...limits }
       );
       s = leaderFill.schedule;
 
