@@ -22,7 +22,7 @@ import {
   CONSTRAINT_SET_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
-import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { scheduleConstraintsOf } from "./scheduleConstraints.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
@@ -53,15 +53,9 @@ const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
         wishByStaff.set(w.staffId, w);
       }
     }
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
     return schedule
       .checkConstraints(
-        buildScheduleConstraints({
-          modelConstraints: constraints?.modelConstraints(shiftIdsOf),
-          wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-        })
+        scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff })
       )
       .find((v) => v.key === violationKey);
   }, [schedule, allWishes, workShifts, constraints, violationKey]);

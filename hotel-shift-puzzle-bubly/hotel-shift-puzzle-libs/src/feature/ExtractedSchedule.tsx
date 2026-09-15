@@ -23,6 +23,7 @@ import { useObjects, useObject } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
   buildScheduleConstraints,
+  scheduleConstraintsOf,
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
@@ -87,8 +88,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     const ids = constraints?.linkedReportIds ?? [];
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
-  // 休みの制約値は集約から（世界線に載る）。未投入時は既定にフォールバック。
-  // 自動シフトが守る上限（連勤・休日・1日の休み上限）。自動シフトを呼ぶところは必ず丸ごと渡す。
+  // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
   const allLeaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
@@ -111,6 +111,13 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     }
     return map;
   }, [allWishes, schedule]);
+
+  // 自動シフトが守る制約は、抽出ビューでも勤務表全体と同じリスト（同じ勤務表を編集しているので）。
+  // 表示用の violations（抽出ビュー向けに絞った一覧）とは別物。
+  const allConstraints = useMemo(
+    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
+    [constraints, workShifts, wishByStaff]
+  );
 
   // 自動シフトコマンド（抽出ビュー）。相方裏コマンドは廃止したので「希望を叶える」のみ。
   const steps = useMemo<AutoShiftStep[]>(() => [fulfillWishesStep], []);
@@ -147,6 +154,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       workShifts,
       wishByStaff,
       staffGroup,
+      constraints: allConstraints,
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
@@ -167,6 +175,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         workShifts,
         wishByStaff,
         staffGroup,
+        constraints: allConstraints,
         ...limits,
       }).schedule;
     // 1案 = 希望を叶える → 責任者を満たす（他ルールとの兼務を考慮し、一意に決まる枠だけ確定）
@@ -178,7 +187,15 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, allLeaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup, ...limits }
+        {
+          schedule: s,
+          staffList: prioritizedStaff,
+          workShifts,
+          wishByStaff,
+          staffGroup,
+          constraints: allConstraints,
+          ...limits,
+        }
       );
       s = leaderFill.schedule;
 

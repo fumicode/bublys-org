@@ -45,7 +45,7 @@ import {
   orderForcedCells,
   nextForcedCellAfter,
 } from "./candidates/index.js";
-import { buildScheduleConstraints, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
+import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
@@ -239,8 +239,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return allReports.filter((r) => ids.includes(r.id));
   }, [allReports, constraints]);
 
-  // 自動シフトが守る上限（連勤・休日・1日の休み上限）。集約から（世界線に載る）。
+  // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。集約から（世界線に載る）。
   // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
+  // 守る制約（連勤・遅番明け…）は allConstraints で渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
 
@@ -305,15 +306,11 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // この勤務表に効く「すべての制約」を宣言的オブジェクトとして1本に組み立てる。
   // 表示（上部ルール）も違反も、この同じ制約リストから導出する（手書き文字列なし）。
   // ※ handleDropReportUrl / handleAddRule より前に定義する（use-before-define 回避）。
-  const allConstraints = useMemo(() => {
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    return buildScheduleConstraints({
-      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
-      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-    });
-  }, [workShifts, constraints, wishByStaff]);
+  // 自動シフトも同じリストを使う（置くたびに、これに新しい違反が出ないかを見る）。
+  const allConstraints = useMemo(
+    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
+    [workShifts, constraints, wishByStaff]
+  );
 
   /**
    * 「制約が本当に無い」か。**読んだのと同じスコープ**を見る。
@@ -504,7 +501,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       workShifts,
       wishByStaff,
       staffGroup,
-      // 「必要人数を埋める」は休日の上限を見て先に各自の休みを確保し、連勤上限を超えないように埋める
+      // 置くたびに勤務表の制約（連勤・遅番明け・希望…）に新しい違反が出ないかを見る
+      constraints: allConstraints,
+      // 「必要人数を埋める」は先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
@@ -523,8 +522,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         workShifts,
         wishByStaff,
         staffGroup,
-        // handleRunStep と同じく上限を丸ごと渡す。渡さないとステップ側の既定値（連勤5）で走り、
-        // 連勤上限を 5 未満にしている勤務表では生成した案が連勤違反になってしまう。
+        // handleRunStep と同じく制約リストと休みの目標を丸ごと渡す。渡さないと、
+        // 完成案が勤務表の制約（連勤・遅番明け…）に違反する
+        constraints: allConstraints,
         ...limits,
       }).schedule;
     const buildCandidate = (phase: number): MonthlyStaffSchedule => {
@@ -534,7 +534,15 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
       const leaderFill = runAutoShiftStep(
         makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
-        { schedule: s, staffList: prioritizedStaff, workShifts, wishByStaff, staffGroup, ...limits }
+        {
+          schedule: s,
+          staffList: prioritizedStaff,
+          workShifts,
+          wishByStaff,
+          staffGroup,
+          constraints: allConstraints,
+          ...limits,
+        }
       );
       s = leaderFill.schedule;
 
@@ -608,20 +616,16 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     )?.obj as MonthlyStaffSchedule | undefined;
     if (!apexSchedule) return;
 
-    const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
     const wishByStaffForApex = new Map<string, StaffMonthlyShiftWish>();
     for (const w of allWishes) {
       if (w.year === apexSchedule.year && w.month === apexSchedule.month) {
         wishByStaffForApex.set(w.staffId, w);
       }
     }
-    const shiftIdsOf = (shiftName: string) =>
-      workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
-    const reportConstraints = buildScheduleConstraints({
-      modelConstraints: constraints?.modelConstraints(shiftIdsOf),
-      wish: (constraints?.checkShiftWish ?? true)
-        ? { wishByStaff: wishByStaffForApex, shiftNameById }
-        : undefined,
+    const reportConstraints = scheduleConstraintsOf({
+      constraintSet: constraints,
+      workShifts,
+      wishByStaff: wishByStaffForApex,
     });
 
     const draft = buildScheduleReport({
