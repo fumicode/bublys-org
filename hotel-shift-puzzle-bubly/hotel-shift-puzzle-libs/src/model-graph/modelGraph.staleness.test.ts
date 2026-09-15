@@ -47,7 +47,9 @@ function regenerate() {
 
 describe("モデル図の生成物", () => {
   it("★ ソースと食い違っていない（食い違ったら生成し直す）", () => {
-    expect(regenerate()).toBe(readFileSync(GENERATED, "utf-8"));
+    // Windows の checkout（core.autocrlf=true）では生成物が CRLF になるので、改行を揃えて比べる
+    const committed = readFileSync(GENERATED, "utf-8").replace(/\r\n/g, "\n");
+    expect(regenerate()).toBe(committed);
   });
 
   it("記述子の登録が、そのまま集約の根になっている", () => {

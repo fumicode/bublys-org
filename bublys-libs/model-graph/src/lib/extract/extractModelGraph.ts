@@ -177,8 +177,15 @@ export function extractModelGraph(options: ExtractOptions): ModelGraph {
   const aggregates = new Set(options.aggregateTypes ?? []);
 
   const raw: { node: ts.ClassDeclaration; sf: ts.SourceFile; name: string }[] = [];
+  // TypeScript は OS によらず fileName を "/" 区切りで返すが、path.resolve は Windows で "\" を返す。
+  // 突き合わせも生成物に書くパスも OS で変わらないよう、ここで区切りを揃える
+  const toPosix = (p: string) => p.split(path.sep).join('/');
+  const rootPosix = `${toPosix(root)}/`;
+
   for (const sf of program.getSourceFiles()) {
-    if (sf.isDeclarationFile || !sf.fileName.startsWith(root)) continue;
+    if (sf.isDeclarationFile || !toPosix(path.resolve(sf.fileName)).startsWith(rootPosix)) {
+      continue;
+    }
     ts.forEachChild(sf, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
         raw.push({ node, sf, name: node.name.text });
@@ -196,7 +203,7 @@ export function extractModelGraph(options: ExtractOptions): ModelGraph {
     const fields = stateType ? fieldsOf(stateType, node, checker) : [];
     classes.push({
       name,
-      file: path.relative(root, sf.fileName),
+      file: toPosix(path.relative(root, path.resolve(sf.fileName))),
       kind: kindOf(name, fields, aggregates),
       fields,
       getters: node.members
