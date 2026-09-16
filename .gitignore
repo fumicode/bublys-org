@@ -73,3 +73,6 @@ hotel-shift-puzzle-bubly/hotel-shift-puzzle-app/public/assets/candidates.worker-
 
 .claude/
 csv-importer-bubly/csv-importer-app/.env
+
+# bubble-space プロトタイプの検証で撮ったスクショ（走らせれば作り直せる。28MB あるので入れない）
+docs/bubble-space-prototype/*/_check/shots/

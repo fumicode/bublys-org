@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bubble-lab v3 · 06-layout-apart</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;--accent:#6ee7ff;
+    --move:#7ee2a8;--fix:#ff9db1;--own:#ffd479}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  #bar{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:6px 12px 3px;display:flex;flex-direction:column;gap:5px}
+  .row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .lbl{color:var(--dim);font-size:11px;letter-spacing:.04em;white-space:nowrap;margin-right:2px}
+  .axis{color:var(--fg);font-size:12px;font-weight:600;margin:0 2px 0 10px}
+  select,button{background:#1d2334;color:var(--fg);border:1px solid var(--line);
+    border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}
+  select:hover,button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default;border-color:var(--line)}
+  .sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+  #axis-scope{font-size:12px;font-weight:600;color:var(--fg)}
+  #hint{color:var(--dim);font-size:11px;min-height:19px;padding-top:2px;border-top:1px dashed var(--line)}
+  #hint b{color:var(--accent);font-weight:600}
+  #stage{flex:1 1 auto;position:relative;min-height:0}
+  canvas{display:block;width:100%;height:100%}
+  .box{position:absolute;background:rgba(10,12,20,.88);border:1px solid var(--line);
+    border-radius:8px;padding:7px 11px;color:var(--dim);font-size:11px;line-height:1.65;pointer-events:none}
+  #side{position:absolute;right:12px;top:12px;width:376px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #side .box{position:static}
+  .t{color:var(--fg);font-weight:600;letter-spacing:.04em}
+  .sp{margin-top:3px}
+  .nm{font-weight:600}
+  .axs{padding-left:14px}
+  .ax{display:inline-block;margin-right:10px;white-space:nowrap}
+  .ax i{font-style:normal;color:var(--fg);opacity:.75;margin-right:4px}
+  .own{color:var(--own)} .inh{color:var(--dim);font-style:italic}
+  .move{color:var(--move)} .fix{color:var(--fix)} .cur{color:var(--accent)}
+  .who{color:var(--fg);font-weight:600}
+  #selection .kv{display:flex} #selection .k{flex:0 0 66px}
+  #cursor-hint{left:0;top:0;white-space:pre;display:none;z-index:5;background:rgba(8,10,17,.95);border-color:#3a4560}
+  #help{left:12px;bottom:12px}
+  #help b{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <div class="row">
+      <span id="axis-scope" data-hint="レイアウトとカメラが効く空間。<b>選択中の泡がいる空間</b>">外の空間 の</span>
+      <span class="axis">レイアウト</span>
+      <select id="sel-layout" data-hint="子を空間のどこに置くか。<b>型を1つ選ぶ</b>（CSS の display のように）。ドラッグの意味も型が決める：自由＝動く／並べる・等間隔の列＝並べ替わる／格子＝マスを移る／世代×枝＝視点が動く／古さで奥へ積む＝何も起きない"></select>
+      <select id="sel-dir" data-hint="並べる向き（CSS の flex-direction のように）。<b>並べる・等間隔の列</b>だけが持つ。並べ替えもこの向き"></select>
+      <span class="axis">カメラ</span>
+      <select id="sel-camera" data-hint="並べた結果を画面にどう写すか。<b>平行</b>＝そのまま／<b>魚眼</b>＝焦点の近くほど大きく／<b>透視</b>＝奥ほど小さく。ホイールもカメラが決める：透視＝奥行き／魚眼＝曲がる向きに送る／平行＝何もしない"></select>
+      <select id="sel-bend" data-hint="魚眼の曲がる向き。<b>横</b>＝X魚眼／<b>縦</b>＝Y魚眼／<b>両方</b>＝2D魚眼（ホイールは縦スクロールで縦、横スクロールで横に送る）"></select>
+      <span class="sep"></span>
+      <button id="inherit" data-hint="選択中の泡がいる空間の自前のレイアウトとカメラを捨てて、<b>外の空間のものを継ぐ</b>（焦点は継がない）">外から継ぐ</button>
+      <button id="refocus" data-hint="選択中の泡がいる空間の焦点を 0 に戻す">焦点を戻す</button>
+      <span class="sep"></span>
+      <span class="lbl" data-hint="対照実験。<b>公理案 A（00-core）</b>は「レイアウト＝親の View、View は軸ごとに 次元・並べ方・レンズ」。この案 B はよくある分け方（display とカメラ）で同じ場面を作る">案B · レイアウトとカメラを分ける（A は 00-core）</span>
+    </div>
+    <div id="hint">セレクトやボタンにマウスを乗せると、ここに意味が出ます。</div>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="side">
+      <div class="box" id="spaces"></div>
+      <div class="box" id="selection"></div>
+    </div>
+    <div class="box" id="cursor-hint"></div>
+    <div class="box" id="help">
+      泡を掴んで引く … <b>レイアウトの型</b>で決まる（動く／並べ替わる／マスを移る／視点が動く）<br>
+      空間を持つ泡の中へ落とす … その子になる　外へ大きく引き出す … 外の空間へ<br>
+      ホイール … <b>カメラ</b>で決まる（透視＝奥行き／魚眼＝曲がる向きに送る／平行＝何もしない）　右下の角 … 大きさ
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================================
+   bubble-lab v3 · 06-layout-apart —— 対照実験：レイアウトとカメラを分ける（案 B）
+   仕様：docs/bubble-space-prototype/v3/SPEC.md（画面の約束・__lab はそこにそろえる。語彙だけ B のもの）
+
+   比べる相手（公理案 A ＝ 00-core.html）
+     レイアウトとは親の View のこと。View は軸（X・Y・Z）ごとに「次元」「並べ方」「レンズ」を持つ。
+
+   この案 B のモデル（よくある分け方。わら人形にしない）
+     空間を持つ泡は「レイアウト」を1つ持つ。名前のついた型から選ぶ（CSS の display のように）。
+       レイアウトは子の「空間の中の位置」を決める。どのデータを読むか・ドラッグで何が起きるかは型が知っている。
+       並べる・等間隔の列 は向き（横・縦）を引数に持つ（CSS の flex-direction のように）。
+     空間ごとに「カメラ」を1つ持つ：焦点 ＋ 写し方（平行 / 魚眼 / 透視）。魚眼は曲がる向き（横・縦・両方）を引数に持つ。
+       レイアウトの結果に掛かる。ホイールはカメラが決める。
+     並べる型（並べる・格子・等間隔の列・世代×枝）は Z を決めず、泡の自由Z をそのまま通す（flex が translateZ に触らないのと同じ）。
+     大きさの倍率・入れ子の合成・描く順・当たり判定・焦点の約束は A と同じ（比べるのはモデルの違いだけ）。
+
+   この案で確かめること
+     同じ6場面を B で作り、A と「場面を書く量／選ぶもの／型ごとの分岐／作れるもの／操作の説明」を数えて比べる。
+
+   ホイールの決め方（B で選んだもの）
+     透視＝奥行き。ここまでは A の「Z に次元が刺さっていれば奥行き」と同じ方針で、6場面でホイールが効く空間も同じ（外の空間・議事録）。
+     B はそこへ機能を1つ足した：魚眼＝曲がる向きに送る（通り過ぎる泡が大きくなる）。平行＝何もしない（焦点を動かしても全部が一様に
+     ずれるだけで、中身に合わせて伸びた箱ではほぼ動けない）。足した分、coverflow・X魚眼ビューで答えが分かれる（B は横に送る、A は何もしない）
+
+   A と B の比べ（2つのファイルを読んで数えた。数え方は下の注。第2回で「触ると手前へ」を両方に入れて数え直した）
+     項目                            | A（00-core）                                    | B（06-layout-apart）
+     --------------------------------+-------------------------------------------------+-------------------------------------------------
+     6場面の add                     | 25 行                                           | 25 行（同じ泡。配置も54個すべて差 0。実測 _check/06-verify.mjs）
+     場面が名前で呼ぶ型の定義         | PRESETS 12 行（中身だけなら 8）                  | LAYOUTS 24＋CAMERAS 12＋VERBS 9 ＝ 45 行（中身だけなら 18＋7＋5 ＝ 30）
+     型を組む部品                     | DIMS〜LENS 28＋fitArrange 7＋arrangeAxis 36      | レンズの式 7＋並べる部品 30
+     スクリプト全体（コード行）       | 883 行（触ると手前へ を足す前 858）              | 864 行（足す前 843）
+     ユーザーが選ぶセレクタ           | 9（次元・並べ方・レンズ × 3軸）＋プリセット 8     | 4（レイアウト・向き・カメラ・曲がる向き。向きの2つは持つ型のときだけ出る）
+     選べる組み合わせ                 | (10×3×2)³ ＝ 216,000                             | 8×5 ＝ 40（レイアウト 6型・うち2つに向き2／カメラ 3型・魚眼に向き3）
+     型を読む分岐（新しい数え方）     | 44 か所（足す前 42）                             | 25 か所（足す前 24）
+       内わけ                         | 並べる・写す 19／描画 4／操作 15／画面の言葉 6    | 並べる・写す 7／描画 1／操作 11／画面の言葉 6
+     1 勤務表                        | 作れる（格子・縦に並べる・格子）                  | 作れる（格子・縦に並べる・格子）
+     2 coverflow                     | 作れる（X 順序·等間隔·魚眼）                     | 作れる（横の等間隔の列＋X魚眼）
+     3 X魚眼ビュー                   | 作れる（X 世代·等間隔·魚眼／Y 枝·等間隔·平行）    | 作れる（世代×枝の格子＋X魚眼。専用の型）
+     4 履歴を奥行きに                | 作れる（Z 古さ·等間隔·透視）                     | 作れる（古さで奥へ積む＋透視）
+     5 この物だけ履歴を奥行きに      | 作れる。その泡を空間にして版を子にする            | 作れる。同じく空間にする（A も B も要る）
+     6a 縦に並べた coverflow         | 作れる。足すもの無し                             | 作れる。足すもの無し
+                                     |   セレクタ：coverflow から 4、縦に並べる から 2   |   セレクタ：coverflow から 2（向き・曲がる向き）、縦に並べる から 3
+     6b 2D魚眼の格子                 | 作れる。足すもの無し。格子から 2（X・Y のレンズ）  | 作れる。足すもの無し。格子から 2（カメラ 魚眼・曲がる向き 両方）
+     7 順序で並べて奥行きは自由      | 作れる（Z を 自由Z·そのまま·透視 に）             | 作れる（カメラを透視に）。並べる型が自由Z を通す、と土台で決めたから
+     8 触ると手前へ（機能を1つ足す）  | raise 13 行＋呼ぶ所 2。型を読む分岐 ＋2           | raise 9 行＋呼ぶ所 2。型を読む分岐 ＋1
+       重ねて置く（触ると最前面へ、    | プリセット 1 行（Z を 順序·等間隔·透視 に）。      | 6型のどれでもできない（実測：6型ぜんぶで、触っても
+       ずれない）                     |   実測：memo1 を触ると 奥→手前が                 |   奥→手前が memo1,memo2,memo3 のまま）。
+                                     |   memo3,memo2,memo1 に変わる                    |   型を1つ足すことになる（奥行きを順序で決める型が無い）
+       置いた順（stack）を捨てた後始末 | freeCellNear 11 行（同じマスに2つ入れない）      | 同じ 11 行＋reindex 1 行
+     ドラッグの意味の説明            | 次元ごとの表（10次元→5つの動き。DIMS の write）   | 型ごとの表（6型→5つの動き。LAYOUTS の verb）
+                                     |   ＋軸ごとに当てる：書けるなら書く／書けないなら   |   ＋並べ替わる向きは引数 dir、マスは 横＝列・縦＝行（cells）
+                                     |     視点が動く／なしなら何も起きない              |
+                                     |   違いは、表を引くキーが「軸に刺さった次元」か「型」か
+     ホイール（同じ方針：奥行きだけ） | 規則1つ：Z が なし なら何も、あれば奥行き         | 規則1つ：カメラが透視なら奥行き、それ以外は何も（効く空間は A と同じ）
+     ホイールで魚眼を送る（B が足した）| 無し（coverflow・X魚眼ビューでは何も起きない）    | 足した分、カメラごとの表になった：透視＝奥行き／魚眼＝曲がる向きに送る／平行＝何も。
+                                     |                                                 |   2D魚眼では向きが1つに決まらない（縦スクロール＝縦・横スクロール＝横にした）
+   注（第2回で数え方を機械にした。第1回の道具（/tmp の v3check/）は消えたので、A と B を同じ1つの道具で測り直した。
+   物差しが第1回と違うので、絶対の数は第1回の表と揃わない。比べられるのは「同じ道具で測った A と B」と「足す前と後の差」）：
+   行数 _check/06-count.mjs、型を読む分岐 _check/06-branches.mjs（-v で1つずつ出る）。
+   分岐は if / else if / case / 三項の ? / ?? のうち、型を読む式（A＝軸に刺さった 次元・並べ方・レンズ とそこから出る動詞、
+   B＝レイアウトの型・カメラの型・verb）。軸だけを見るもの（axis・dir・bend）は当たらない。継承・セレクタ・__lab は数えない。
+   以下は第1回の注：add は「場面 1」から勤務表の最後の add まで。行数は空行・コメントだけの行を除き、表を使える形にする包みの行も込み
+   （A の AX・viewFromPreset、B の zFree・byDir・across・lenOn・AXIS_WORD・WHEEL_WORD・camOf・specOf・nameOf）。
+   「中身だけ」は const 表 = { と }; の間の行（v3check/06-layout-apart.count.mjs）。
+   型ごとの分岐は if / else if / case / ?: / ?? と、型から作る真偽の述語（A の moves・lift・follow）のうち判定に型を読むもの。
+   1つずつ字面で挙げて数えた（v3check/06-layout-apart.branches.mjs）。軸だけを見るもの、スロットの中身を見るもの、継承、ツールバー、__lab は数えない。
+   B の dir・bend で軸を選ぶだけの所（byDir・across・魚眼の横と縦の式の選び分け）も軸と同じく数えない（4 か所）。
+   A の内訳：並べる計算 13・焦点 2・描画 7・操作 15・ヒント 7。B：並べる計算 3・焦点 2・描画 3・操作 12・ヒント 9。
+   セレクタの数は本物の UI で、値が変わるものだけ数えた（v3check/06-layout-apart.fix-r1-selectors.mjs）
+
+   踏んだこと（作って試して分かったこと。検証：v3check/06-layout-apart.build-check.mjs 33項目、.verify-r1.mjs 22項目、
+   .compare.mjs 10項目、.fix-r1-selectors.mjs 9項目）
+     - 型の中身を書くと、6つとも「横・縦・奥に 詰める／等間隔／揃え／自由 を1つずつ当てる」形になった（combine(kids, x, y, z)）。
+       部品は A の並べ方と同じで、違いは組み合わせを型の名前で閉じたこと。6場面の配置は A と54個すべて位置・大きさ・倍率の差 0
+     - カメラも、ドラッグの逆写しが横・縦で別々に要るので、中身は「横の式・縦の式・奥の式」の組になった（X魚眼＝魚眼・平行・平行）。
+       格子のマス移動も「横は col、縦は row に書く」を型が持つ（cells）。軸ごとの考えは消えず、型の中に隠れた
+     - 第1版は 横に並べる・縦に並べる・等間隔の列 を別々の型、魚眼を X魚眼 だけにしていたので、縦に並べた coverflow と 2D魚眼の格子のために
+       型「縦の等間隔の列」とカメラ「Y魚眼」「2D魚眼」を足していた。これは B の表現力ではなく、向きを引数にしなかった作り方のせい（第1回の検証）。
+       flex-direction のように 並べる・等間隔の列 に向き dir、魚眼に曲がる向き bend を持たせると、足すもの無しで作れた
+       （配置の差は焦点 0 でも、焦点 Y 60・焦点 (116, 40) でも 0）。その代わり、並べる型の中身は「並べる部品を dir の軸へ、揃える部品を
+       もう一方へ」振り分ける形（byDir）になり、並べ替わる向きも dir を読み、魚眼は bend で横・縦の式を選ぶ。セレクタは 2 → 4。
+       軸の考えが引数として戻ってきた
+     - 型を変えると引数を捨てる作りだと、縦に並べる（スタッフ）を 等間隔の列 にした途端に横向きになり（箱 341×109、人が横に5つ）、勤務表の隣に
+       はみ出した。「新しい型も持つ引数は持ち越す」にすると縦のまま（109×313）。display を変えても flex-direction が残るのと同じ
+     - セレクタの手数は、どこから始めるかで入れ替わる。coverflow から縦 coverflow は A 4（X の次元を なし、Y を 順序・等間隔・魚眼）・B 2、
+       縦に並べる から縦 coverflow は A 2（Y の並べ方・レンズ）・B 3（型・カメラ・曲がる向き）、格子から 2D魚眼 は A 2・B 2
+     - A の「なし」に当たる言葉が B に無い。揃えの向き（横に並べるの縦）を素直に「泡の位置の範囲」で焦点を縛ると、始端ぞろえで
+       位置が −14〜0 にばらつくので、背景を縦に引くと中身が 14px 下がり、カーソル脇に「視点が動く（縦）」と出た。
+       揃えの部品に「並んでいない向き（範囲 [0,0]）」と言わせて A と同じ 0 にした。型が軸ごとの性質を別に言う要がある
+     - ホイールをカメラに持たせると、coverflow と X魚眼ビューでホイールが横に送る（焦点 X 0 → 100）。A では何も起きない所。
+       透視だけを奥行きにするなら（A と同じ方針）効く空間は A と同じ 外の空間・議事録 で、規則は1つで済む。送る機能を足した分がカメラごとの表
+     - 2D魚眼はホイールの軸が2つになり「曲がる向きに送る」が1つに決まらない。縦スクロール＝縦、横スクロール＝横にした。
+       マウスのホイール（縦だけ）では横に送れない。第1版はカーソル脇が「縦に送る」だけで、横スクロールで横に送れることが画面のどこにも
+       出ていなかった。縦と横で送る軸が違うときは「縦に送る・横スクロールで横」と出す。その行が選択欄で折り返し、「2D魚眼）」がラベルの列へ
+       回り込んだので、値の列にそろえた。背景ドラッグ後の焦点 (116, 40) も像も A と同じ（配置の差 0）
+     - カメラとレイアウトは独立なので、B にも意味の無い組み合わせは残る。縦に並べる＋X魚眼 は、曲がる向きが並びと直交して何も変わらない
+       （平行 → X魚眼 で人の配置の差 0）。向きを引数にしても dir と bend は別々に選ぶので残る
+     - 「この物だけ履歴を奥行きに」は A も B も、その泡を空間にして版を子にするしかない（親の見え方は兄弟全員に効く）。
+       B は 古さで奥へ積む が中央ぞろえを範囲で言うので箱が伸び（104×64 → 108×78）、A（X・Y そのまま）は伸びず、版が印の字に重なった
+     - 「順序で並べて奥行きは自由」は、並べる型が自由Z を通すので カメラを透視にするだけで出た（倍率 奥 0.762・手前 1.000、A と同じ）。
+       詰めるは自前の大きさで帯を取るので、奥の泡の脇が空き、手前の泡を左端へ並べ替えると奥の泡に重なる（A も同じ。第1版 制約13）
+     - 持ち上げた泡（並べ替え・マス移動）は「カーソルについてくる」の1文で済んだ。A は「並べ替わる軸だけついてくる、なしの軸は止める」
+     - 選択欄の「横ドラッグ／縦ドラッグ」は B では「ドラッグ」1行になる（型が1つの意味を持つので）。ただし世代×枝では横と縦で
+       視点の動き方が違い（横は並びの端まで、縦は ±17 で止まる）、1行の中で結局 軸ごとに言うことになった
+     - 外から継ぐ は B でも A と同じ穴：スタッフが勤務表の 格子 を継ぐと、人の泡は列・行を持たないので1マスに重なる。格子は向きを持たないので、
+       向きのセレクタも消える
+     - 数え方（第1回の検証）：比べの表で B の型の行数だけ包みの行を抜いていた（B が小さく見える向き）。型ごとの分岐も A の verbOf・setAxis・follow、
+       B の bounded・span ??・sp ? などが漏れていた。そろえて字面で挙げ直すと、型の定義 A 11・B 45、分岐 A 44・B 29。大小の関係は変わらない
+
+   踏んだこと（第2回：機能を1つ（触ると手前へ）足して、A がどれだけ太るかを測った。検証：_check/06-verify.mjs 14項目、
+   _check/06-count.mjs、_check/06-branches.mjs）
+     - 第1回の「踏んだこと」を測り直した。6場面の配置は A と B で54個すべて差 0（焦点 0 でも、背景を (116,40) 引いた後でも）。
+       ホイールは B だけ coverflow・X魚眼ビューで横に送る（焦点 X 0 → 100。A は何も起きない）。どちらも書いてあったとおりだった
+       （画面 y は ツールバーの高さが案ごとに違うので、キャンバスの中心を原点にしてそろえた。そこを忘れると54個ぜんぶ 15px ずれて見える）
+     - B の書き方：奥行きは型のもの。ownZ（古さで奥へ積む）の型は書けない、ほかの5型は自由Z を通すのでそこへ書く。raise 9 行＋呼ぶ所 2、
+       型を読む分岐 ＋1。A は Z 軸に刺さった次元で分ける（順序／自由座標／履歴／なし）ので raise 13 行＋呼ぶ所 2、分岐 ＋2。
+       ここだけ見れば B のほうが小さい
+     - ★ できることが違った。A は「Z に 順序 を刺す」だけ（プリセット 重ねて置く、1 行）で、触った泡が最前面へ上がる
+       （実測：memo1 を触ると 奥→手前 が memo3,memo2,memo1 に変わる）。B は 6型ぜんぶで試したが、触っても順番は一度も変わらない。
+       奥行きを順序で決める型が無いからで、同じことをするには型を1つ足すことになる。
+       ＝ A の太り（＋1 行の型・＋2 分岐）は「もう持っている語彙で言えた」ぶん、B の太り（＋1 分岐）は「言えないまま」のぶん
+     - 自由座標の側は A も B も同じ穴だった。「一番手前の兄弟の手前へ」と書くと、透視が dz<0 を消すので触った泡が消える
+       （B：勤務表 free.z 0.4 → −0.15、透明度 0）。土台 00-core で直した形（焦点の面まで）を B にも移した（0.4 → 0、透明度 1）。
+       同じ面に並んだ兄弟（メモ3つ、z=0）は、A でも B でも触って上下が変わらない ＝ 座標では「最前面」を表せない
+     - 置いた順（stack）を捨てると、同じマスに2つ入ったときの上下が決まらなくなる。A と同じ freeCellNear（11 行）を B にも入れた。
+       そのとき A（00-core）は親を付け替えたあと reindex() を呼んでいないので、逃げ先が古い兄弟で決まる：
+       議事録を格子にして（4つとも 0,0）よそから1つ落とすと A は 5個が2マス（重なり 3）、reindex を入れた B は 5個5マス（重なり 0）
+   ============================================================================ */
+
+/* ============================================================
+   定数（A と同じ）
+   ============================================================ */
+const HEADER = 24;              // 泡のヘッダの高さ（中身の箱はこの下）
+const PAD = 14;                 // 空間を持つ泡の箱の余白
+const GAP = 14;                 // 並べる型の既定の隙間
+const K_PERSP = 0.26;           // 透視：奥行き1あたりの縮み
+const ROOT_VP = { x: -130, y: -165 };   // root の消失点（画面中心から）
+const VP_CHILD = { fx: 1, fy: 1 };      // 子の空間の消失点（余白の内側の半幅・半高に対する割合、左上へ）
+const PULL = 48;                // 空間の外へ「大きく」引き出したとみなす距離（画面 px）
+const FONT = '-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif';
+const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+
+/* ============================================================
+   レンズの式（カメラの部品。式は A と同じ）
+   ============================================================ */
+const TANH_EDGE = 1 - 1e-12;
+const PARALLEL = { project: (u, H) => ({ s: u, k: 1 }), unproject: (s, H) => s };
+const FISHEYE = {
+  project: (u, H) => { const t = u / H, c = Math.cosh(t); return { s: H * Math.tanh(t), k: 1 / (c * c) }; },
+  unproject: (s, H) => H * Math.atanh(clamp(s / H, -TANH_EDGE, TANH_EDGE)) };
+const PERSPECTIVE = { mag: dz => 1 / Math.max(0.05, 1 + K_PERSP * dz), alpha: dz => dz < -1e-9 ? 0 : 1 };
+const FLAT = { mag: () => 1, alpha: () => 1 };
+
+/* ============================================================
+   カメラ：焦点 ＋ 写し方。空間ごとに1つ。レイアウトの結果に掛かる
+   ------------------------------------------------------------
+   魚眼は曲がる向き bend（横・縦・両方）を引数に持つ（並べる型の dir と同じく、よくある作り方）。
+   ドラッグの逆写しが横・縦で別々に要るので、写し方の中身は横・縦・奥の式の組になる（lens）。
+   wheel：ホイールのどの量で、焦点のどの軸をどれだけ送るか
+     透視＝奥行き。ここまでは A の「Z に次元があれば奥行き」と同じ方針で、6場面でホイールが効く空間も同じ（外の空間・議事録）
+     ＋ B が足した機能：魚眼＝曲がる向きに送る。両方に曲がると向きが1つに決まらないので、縦スクロール＝縦・横スクロール＝横
+   ============================================================ */
+const AXIS_WORD = { x: "横", y: "縦", xy: "両方" };
+const CAMERAS = {
+  parallel:    { label: "平行", params: {},
+    lens: () => ({ x: PARALLEL, y: PARALLEL, z: FLAT }),        wheel: () => ({}) },
+  fisheye:     { label: "魚眼", params: { bend: "x" }, name: P => ({ x: "X魚眼", y: "Y魚眼", xy: "2D魚眼" })[P.bend],
+    lens: P => ({ x: P.bend === "y" ? PARALLEL : FISHEYE, y: P.bend === "x" ? PARALLEL : FISHEYE, z: FLAT }),
+    wheel: P => P.bend === "xy" ? { deltaY: ["y", 0.5], deltaX: ["x", 0.5] } : { deltaY: [P.bend, 0.5], deltaX: [P.bend, 0.5] } },
+  perspective: { label: "透視", params: {},
+    lens: () => ({ x: PARALLEL, y: PARALLEL, z: PERSPECTIVE }), wheel: () => ({ deltaY: ["z", 0.004] }) },
+};
+const WHEEL_WORD = { x: "横に送る", y: "縦に送る", z: "奥行きの視点" };
+/** カメラの設定 { type, bend } → 横・縦・奥の式と wheel */
+const camOf = spec => ({ ...CAMERAS[spec.type].lens(spec), wheel: CAMERAS[spec.type].wheel(spec) });
+
+/* ============================================================
+   並べる部品（レイアウトの型が使う）。どれも「泡 → 空間の中の位置（中心）」と、並べた範囲 span を返す
+   span が null の軸は自由座標のまま：箱は伸びず、焦点はどこへでも行ける
+   ============================================================ */
+const minmax = m => m.size ? [Math.min(...m.values()), Math.max(...m.values())] : null;
+/** 値ごとの帯。帯の幅はその値を持つ泡の中で一番大きいもの。値の順に隙間 gap で並べ、塊の中央を 0 に。帯の中は始端ぞろえ */
+function packBy(kids, val, len, gap) {
+  const values = [...new Set(kids.map(val))].sort((p, q) => p - q), bandLen = new Map();
+  let total = -gap;
+  for (const v of values) { const l = Math.max(...kids.filter(b => val(b) === v).map(len)); bandLen.set(v, l); total += l + gap; }
+  let at = -Math.max(0, total) / 2;
+  const bands = [];
+  for (const v of values) { bands.push({ value: v, start: at, end: at + bandLen.get(v) }); at += bandLen.get(v) + gap; }
+  const pos = new Map(kids.map(b => [b.id, bands.find(x => x.value === val(b)).start + len(b) / 2]));
+  return { pos, bands, span: minmax(pos) };
+}
+/** 値 × 間隔。塊（端の泡の端から端）の中央を 0 に */
+function equalBy(kids, val, len, step) {
+  let lo = Infinity, hi = -Infinity;
+  for (const b of kids) { const c = val(b) * step; lo = Math.min(lo, c - len(b) / 2); hi = Math.max(hi, c + len(b) / 2); }
+  const mid = kids.length ? (lo + hi) / 2 : 0;
+  const pos = new Map(kids.map(b => [b.id, val(b) * step - mid]));
+  return { pos, bands: [], span: minmax(pos) };
+}
+/** 並びと直交する向き：一番大きい泡の幅の帯に、始端か中央でそろえる。並んではいないので、見る所は中央だけ（span [0,0]） */
+function alignBy(kids, len, align) {
+  const l = kids.length ? Math.max(...kids.map(len)) : 0;
+  const pos = new Map(kids.map(b => [b.id, align === "center" ? 0 : -l / 2 + len(b) / 2]));
+  return { pos, bands: [], span: kids.length ? [0, 0] : null };
+}
+const byValue = (kids, fn) => { const pos = new Map(kids.map(b => [b.id, fn(b)])); return { pos, bands: [], span: minmax(pos) }; };
+const freeAxis = (kids, key, bounded) => { const pos = new Map(kids.map(b => [b.id, b.free[key]])); return { pos, bands: [], span: bounded ? minmax(pos) : null }; };
+const centered = kids => byValue(kids, () => 0);
+function combine(kids, x, y, z) {
+  const pos = new Map(kids.map(b => [b.id, { x: x.pos.get(b.id), y: y.pos.get(b.id), z: z.pos.get(b.id) }]));
+  return { pos, span: { x: x.span, y: y.span, z: z.span }, bands: { x: x.bands, y: y.bands } };
+}
+
+/* ============================================================
+   レイアウトの型。子の「空間の中の位置」を決める。読むデータもドラッグの意味（verb）も型が知っている
+     verb：move＝動く（write で書く）／reorder＝並べ替わる（引数 dir の向き）／cell＝マスを移る（cells の値）／
+           view＝動かない・視点が動く／none＝何も起きない
+     並べる・等間隔の列は向き dir（横・縦）を引数に持つ（CSS の flex-direction のように）
+     Z：奥行きを決める型（古さで奥へ積む）以外は、泡の自由Z をそのまま通す（CSS の flex が translateZ に触らないのと同じ）
+   ============================================================ */
+const zFree = kids => freeAxis(kids, "z", true);
+/** ★ 向きの引数：並べる部品（main）を dir の軸へ、揃える部品（cross）をもう一方の軸へ振り分ける。軸の考えが引数として戻ってくる所 */
+const byDir = (dir, main, cross) => dir === "x" ? [main, cross] : [cross, main];
+const across = dir => dir === "x" ? "y" : "x";
+const lenOn = (size, axis) => b => axis === "x" ? size(b).w : size(b).h;
+const LAYOUTS = {
+  free: { label: "自由", verb: "move", params: {},
+    place: kids => combine(kids, freeAxis(kids, "x", false), freeAxis(kids, "y", false), zFree(kids)),
+    write: (b, u) => { b.free.x = u.x; b.free.y = u.y; } },
+  stack: { label: "並べる", name: P => `${AXIS_WORD[P.dir]}に並べる`, verb: "reorder", params: { dir: "x", gap: GAP, align: "start" },
+    place: (kids, P, size) => combine(kids, ...byDir(P.dir,
+      packBy(kids, b => b.order, lenOn(size, P.dir), P.gap), alignBy(kids, lenOn(size, across(P.dir)), P.align)), zFree(kids)) },
+  grid: { label: "格子", verb: "cell", cells: { x: "col", y: "row" }, params: { gap: GAP },
+    place: (kids, P, size) => combine(kids,
+      packBy(kids, b => b.cell.col, b => size(b).w, P.gap), packBy(kids, b => b.cell.row, b => size(b).h, P.gap), zFree(kids)) },
+  line: { label: "等間隔の列", name: P => `${AXIS_WORD[P.dir]}の等間隔の列`, verb: "reorder", params: { dir: "x", step: 68, align: "start" },
+    place: (kids, P, size) => combine(kids, ...byDir(P.dir,
+      equalBy(kids, b => b.order, lenOn(size, P.dir), P.step), alignBy(kids, lenOn(size, across(P.dir)), P.align)), zFree(kids)) },
+  genBranch: { label: "世代×枝の格子", verb: "view", params: { stepX: 64, stepY: 44 },
+    place: (kids, P, size) => combine(kids,
+      equalBy(kids, b => b.hist, b => size(b).w, P.stepX), equalBy(kids, b => b.branch, b => size(b).h, P.stepY), zFree(kids)) },
+  ageStack: { label: "古さで奥へ積む", verb: "none", ownZ: true, params: { step: 1 },
+    place: (kids, P, size, spaceId) => combine(kids,
+      centered(kids), centered(kids), byValue(kids, b => (maxHistIn(spaceId) - b.hist) * P.step)) },
+};
+/** verb ごとの言葉と、掴んだ泡の扱い（moves：空間を移れる／lift：持ち上げてカーソルについてくる） */
+const VERBS = {
+  move:    { text: "動かせる",                 short: "動く",       cls: "move", moves: true },
+  reorder: { text: "並べ替えられる",           short: "並べ替え",   cls: "move", moves: true, lift: true },
+  cell:    { text: "マスを移れる",             short: "マス移動",   cls: "move", moves: true, lift: true },
+  view:    { text: "動かせない（視点が動く）", short: "視点が動く", cls: "fix" },
+  none:    { text: "動かせない",               short: "動かない",   cls: "fix" },
+};
+/**
+ * ★ 触った泡は最前面へ（A に入ったのと同じ機能を B で書いたもの）。
+ *   B では奥行きは型のもの：ownZ の型（古さで奥へ積む）は型が決めるので書けない。ほかの型は自由Z を通すので、そこへ書く。
+ *   A の「Z 軸に順序を刺して重ねる」にあたる型は B に無い（6型のどれも奥行きを順序では決めない）。
+ */
+function raise(b) {
+  const space = b.parent ?? "root";
+  const S = setupOf(space);
+  if (LAYOUTS[S.layout.type].ownZ) return;
+  // 自由Z では「最前面」を表せない。透視カメラは焦点より手前（dz<0）を消すので、焦点の面の兄弟の
+  // さらに手前へ書くと、触った泡そのものが消える（実測：alpha 0）。書けるのは焦点の面まで（A と同じ）
+  const sibs = kidsOf(space).filter(k => k !== b);
+  const front = Math.min(b.free.z, ...sibs.map(k => k.free.z));
+  const to = Math.max(S.focus.z, front - 0.15);
+  if (b.free.z > to) b.free.z = to;
+}
+
+/** 型の名前と引数 → 空間に持たせる設定 { type, ...引数 }。["stack", { dir: "y" }] とも書ける */
+const specOf = (table, v, over = {}) => { const [type, args] = [].concat(v); return { type, ...table[type].params, ...args, ...over }; };
+/** 画面に出す名前：引数で名前が変わる型（横に並べる・X魚眼 など）はそれを、ほかは型の名前 */
+const nameOf = (table, spec) => table[spec.type].name?.(spec) ?? table[spec.type].label;
+
+/* ============================================================
+   状態：泡と root。関係は無い。親子だけ
+   layout / camera を持たない空間は外から継ぐ。焦点は空間そのものに持たせ、継がない
+   ============================================================ */
+const ROOT = { id: "root", title: "外の空間", hue: null, layout: specOf(LAYOUTS, "free"), camera: specOf(CAMERAS, "perspective"), focus: { x: 0, y: 0, z: 0 } };
+const bubbles = [];
+const BYID = new Map();
+const byId = id => BYID.get(id);
+
+function add(p) {
+  const b = {
+    id: p.id, title: p.title, hue: p.hue,
+    size: { w: p.w, h: p.h },
+    parent: p.parent ?? null,
+    free: { x: 0, y: 0, z: 0, ...p.free },
+    order: p.order ?? 0,
+    cell: { col: 0, row: 0, ...p.cell },
+    hist: p.hist ?? 0, branch: p.branch ?? 0,
+    layout: p.layout ? specOf(LAYOUTS, p.layout) : null,
+    camera: p.layout ? specOf(CAMERAS, p.camera ?? "parallel") : null,
+    implicit: false,
+    focus: { x: 0, y: 0, z: 0 },
+  };
+  bubbles.push(b); BYID.set(b.id, b);
+  return b;
+}
+
+/* ── 場面 1. メモ：自由に置いた普通の泡 ── */
+add({ id: "memo1", title: "メモ",     hue: 35, w: 130, h: 80, free: { x: -625, y: -338 } });
+add({ id: "memo2", title: "買い物",   hue: 60, w: 130, h: 80, free: { x: -482, y: -290 } });
+add({ id: "memo3", title: "思いつき", hue: 15, w: 130, h: 80, free: { x: -615, y: -237 } });
+
+/* ── 場面 2. 横に並べる ── */
+add({ id: "row", title: "横に並べる", hue: 170, w: 368, h: 130, free: { x: -215, y: -315 }, layout: ["stack", { dir: "x" }], camera: "parallel" });
+[["小", 80, 50], ["中", 104, 64], ["大", 128, 78]].forEach(([t, w, h], i) =>
+  add({ id: "row" + i, title: t, hue: 158 + i * 20, w, h, parent: "row", order: i, free: { x: (i - 1) * 120, y: 0 } }));
+
+/* ── 場面 3. coverflow ＝ 横の等間隔の列 ＋ X魚眼 ── */
+add({ id: "cover", title: "coverflow", hue: 205, w: 340, h: 124, free: { x: 150, y: -318 }, layout: ["line", { dir: "x" }], camera: ["fisheye", { bend: "x" }] });
+for (let i = 0; i < 7; i++)
+  add({ id: "cf" + i, title: "写真" + (i + 1), hue: 188 + i * 12, w: 90, h: 64, parent: "cover", order: i, free: { x: (i - 3) * 40 } });
+
+/* ── 場面 4. X魚眼ビュー ＝ 世代×枝の格子 ＋ X魚眼 ── */
+add({ id: "fish", title: "X魚眼ビュー", hue: 285, w: 420, h: 180, free: { x: -490, y: -101 }, layout: "genBranch", camera: ["fisheye", { bend: "x" }] });
+[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [3, 1], [4, 1], [5, 1], [5, 2]].forEach(([hist, branch], i) =>
+  add({ id: "v" + i, title: "版" + (i + 1), hue: [290, 325, 350][branch], w: 58, h: 34, parent: "fish", hist, branch,
+        free: { x: (hist - 2.5) * 60, y: (branch - 1) * 44 } }));
+
+/* ── 場面 5. 議事録（版）＝ 古さで奥へ積む ＋ 透視 ── */
+add({ id: "giji", title: "議事録（版）", hue: 265, w: 300, h: 310, free: { x: -510, y: 154 }, layout: "ageStack", camera: "perspective" });
+["初稿", "加筆", "指摘反映", "確定"].forEach((t, i) =>
+  add({ id: "g" + i, title: t, hue: 252 + i * 8, w: 150, h: 60, parent: "giji", hist: i, order: i, free: { x: (i - 1.5) * 40 } }));
+
+/* ── 場面 6. 勤務表 ＝ 格子（中に 縦に並べる のスタッフ、格子 のカレンダー） ── */
+add({ id: "kinmu", title: "勤務表", hue: 355, w: 482, h: 340, free: { x: -11, y: 18, z: 0.4 }, layout: "grid", camera: "parallel" });
+add({ id: "seiyaku", title: "制約",       hue: 40,  w: 260, h: 56,  parent: "kinmu", cell: { col: 1, row: 0 }, free: { x: 60,  y: -110 } });
+add({ id: "staff",   title: "スタッフ",   hue: 130, w: 120, h: 120, parent: "kinmu", cell: { col: 0, row: 1 }, free: { x: -180, y: 40 }, layout: ["stack", { dir: "y" }], camera: "parallel" });
+add({ id: "cal",     title: "カレンダー", hue: 95,  w: 336, h: 114, parent: "kinmu", cell: { col: 1, row: 1 }, free: { x: 60,  y: 40 }, layout: "grid", camera: "parallel" });
+["佐藤", "鈴木", "高橋", "田中", "伊藤"].forEach((t, i) =>
+  add({ id: "p" + i, title: t, hue: 130, w: 76, h: 22, parent: "staff", order: i, free: { y: (i - 2) * 30 } }));
+for (let i = 0; i < 14; i++)
+  add({ id: "d" + i, title: String(i + 1), hue: 95, w: 32, h: 24, parent: "cal", cell: { col: i % 7, row: Math.floor(i / 7) },
+        free: { x: (i % 7 - 3) * 46, y: (Math.floor(i / 7) - 0.5) * 38 } });
+
+let selectedId = "memo1";
+
+/* ============================================================
+   木：親子だけ
+   ============================================================ */
+let KIDS = new Map();
+function reindex() {
+  KIDS = new Map([["root", []]]);
+  for (const b of bubbles) {
+    const p = b.parent ?? "root";
+    if (!KIDS.has(p)) KIDS.set(p, []);
+    KIDS.get(p).push(b);
+  }
+}
+const kidsOf = id => KIDS.get(id) ?? [];
+const spaceObj = id => id === "root" ? ROOT : byId(id);
+const parentOf = id => id === "root" ? null : (byId(id).parent ?? "root");
+const isHost = b => b.layout !== null || kidsOf(b.id).length > 0;
+const maxHistIn = spaceId => Math.max(0, ...kidsOf(spaceId).map(b => b.hist));
+function isAncestor(a, id) {
+  for (let cur = id; cur; cur = parentOf(cur)) if (cur === a) return true;
+  return false;
+}
+function subtreeOf(id) {
+  const s = new Set([id]);
+  const walk = x => kidsOf(x).forEach(k => { s.add(k.id); walk(k.id); });
+  walk(id);
+  return s;
+}
+const spaceName = id => id === "root" ? "外の空間" : `${byId(id).title}の中`;
+const spaceHsl = id => id === "root" ? "#e6ebf5" : `hsl(${byId(id).hue} 70% 66%)`;
+
+/* ============================================================
+   継承：レイアウトとカメラは外から継ぐ。焦点は継がない
+   ============================================================ */
+function setupOf(spaceId) {
+  const sp = spaceObj(spaceId);
+  const src = sp.layout ? sp : setupOf(parentOf(spaceId));
+  return { layout: { ...src.layout }, camera: { ...src.camera }, focus: sp.focus, own: !!sp.layout };
+}
+/** セレクタ：その空間に自前のレイアウトとカメラを持たせてから変える（継いでいたなら、いまのものを写し取る） */
+function ownSetup(spaceId) {
+  const sp = spaceObj(spaceId);
+  if (!sp.layout) { const s = setupOf(spaceId); sp.layout = s.layout; sp.camera = s.camera; }
+  return sp;
+}
+/** 型を変えても、新しい型も持つ引数（向き dir・曲がる向き bend など）は持ち越す（display を変えても flex-direction が残るのと同じ） */
+function setSpec(spaceId, part, table, type, over = {}) {
+  if (!table[type]) throw new Error(`${part} の型が無い: ${type}`);
+  const sp = ownSetup(spaceId), keep = Object.keys(table[type].params).filter(k => k in sp[part]);
+  sp[part] = specOf(table, type, { ...Object.fromEntries(keep.map(k => [k, sp[part][k]])), ...over });
+}
+const setLayout = (spaceId, type, over) => setSpec(spaceId, "layout", LAYOUTS, type, over);
+const setCamera = (spaceId, type, over) => setSpec(spaceId, "camera", CAMERAS, type, over);
+function inheritSetup(spaceId) { if (spaceId !== "root") Object.assign(spaceObj(spaceId), { layout: null, camera: null }); }
+
+/**
+ * 箱の大きさ。レイアウトが並べた軸（span がある軸）は、カメラを通した中身が収まるまで伸びる（＋余白）。
+ * 自由座標のままの軸は自前の大きさ。魚眼は箱の半幅で曲がるので、何度か当てて落ち着かせる（A と同じ）
+ */
+function measure(b, memo) {
+  if (memo.has(b.id)) return memo.get(b.id);
+  const box = { w: b.size.w, h: b.size.h };
+  const kids = kidsOf(b.id);
+  if (kids.length) {
+    const S = setupOf(b.id), cam = camOf(S.camera), sizeOf = k => measure(k, memo);
+    const { pos, span } = LAYOUTS[S.layout.type].place(kids, S.layout, sizeOf, b.id);
+    for (const axis of ["x", "y"]) {
+      if (!span[axis]) continue;
+      const lens = cam[axis];
+      const ownHalf = (axis === "x" ? b.size.w : b.size.h - HEADER) / 2;
+      const halfLen = k => (axis === "x" ? sizeOf(k).w : sizeOf(k).h) / 2;
+      let half = ownHalf;
+      for (let n = 0; n < 60; n++) {
+        const H = Math.max(1, half);
+        let need = 0;
+        for (const k of kids) { const p = lens.project(pos.get(k.id)[axis], H); need = Math.max(need, Math.abs(p.s) + halfLen(k) * p.k); }
+        const next = Math.max(ownHalf, need + PAD);
+        if (Math.abs(next - half) < 1e-6) { half = next; break; }
+        half = next;
+      }
+      if (axis === "x") box.w = half * 2; else box.h = half * 2 + HEADER;
+    }
+  }
+  memo.set(b.id, box);
+  return box;
+}
+
+const halfOf = host => ({ x: Math.max(1, host.w / 2), y: Math.max(1, host.h / 2) });
+
+/** カメラの ctx。★ 目の位置を足すならここ1か所（A と同じ） */
+function lensCtx(spaceId, host, focus) {
+  const H = halfOf(host);
+  return {
+    focus: { ...focus },
+    H,
+    vp: spaceId === "root" ? { ...ROOT_VP }
+      : { x: -Math.max(0, H.x - PAD) * VP_CHILD.fx, y: -Math.max(0, H.y - PAD) * VP_CHILD.fy },
+  };
+}
+
+/* ============================================================
+   解く順番（1フレーム）：レイアウト → カメラ → 合成
+   ============================================================ */
+let frameItems = [];
+let PLACE = new Map();
+let LAYOUT = new Map();         // spaceId → { host, ctx, lay, cam, pos, span, bands }
+const anim = new Map();
+const EASE = 0.2;
+let drag = null;
+
+function ease(id, target, mode) {
+  let a = anim.get(id);
+  if (!a || mode === "snap") { a = { ...target }; anim.set(id, a); return a; }
+  for (const k in target) a[k] += (target[k] - a[k]) * EASE;
+  return a;
+}
+
+/** ★ 合成はここ1回だけ（A と同じ） */
+function compose(host, a) {
+  const scale = host.scale * a.scale;
+  const w = a.w * scale, h = a.h * scale;
+  return { x: host.cx + a.x * host.scale - w / 2, y: host.cy + a.y * host.scale - h / 2, w, h, scale,
+           alpha: host.alpha * a.alpha };
+}
+const contentOf = p => ({
+  cx: p.x + p.w / 2, cy: p.y + (HEADER + (p.box.h - HEADER) / 2) * p.scale,
+  w: p.box.w, h: p.box.h - HEADER, scale: p.scale, alpha: p.alpha, vis: p.vis, depth: p.depth,
+});
+const contentRect = host => ({ x: host.cx - host.w / 2 * host.scale, y: host.cy - host.h / 2 * host.scale,
+                               w: host.w * host.scale, h: host.h * host.scale });
+
+function resolveSpace(spaceId, host, memo, sink, lifted, mode) {
+  const S = setupOf(spaceId), kids = kidsOf(spaceId);
+  const lay = LAYOUTS[S.layout.type], cam = camOf(S.camera);
+  const sizeOf = b => measure(b, memo);
+  const { pos, span, bands } = lay.place(kids, S.layout, sizeOf, spaceId);          // レイアウト：空間の中の位置
+  const own = spaceId === "root" ? host : (m => ({ w: m.w, h: m.h - HEADER }))(measure(byId(spaceId), memo));
+  const L = { id: spaceId, host, S, lay, cam, pos, span, bands, kids, sizeOf, H: halfOf(own) };
+  const sp = spaceObj(spaceId);
+  for (const axis of ["x", "y", "z"]) sp.focus[axis] = fitFocus(L, axis, sp.focus[axis], sp.focus[axis]);
+  L.focus = { ...sp.focus };
+  const ctx = L.ctx = lensCtx(spaceId, host, L.focus);
+  LAYOUT.set(spaceId, L);
+
+  const items = kids.map((b, i) => {
+    const p3 = pos.get(b.id);
+    const px = cam.x.project(p3.x - ctx.focus.x, ctx.H.x);                          // カメラ：位置 − 焦点 → 画面
+    const py = cam.y.project(p3.y - ctx.focus.y, ctx.H.y);
+    const dz = p3.z - ctx.focus.z, m = cam.z.mag(dz);
+    const box = sizeOf(b);
+    const target = { x: ctx.vp.x + (px.s - ctx.vp.x) * m, y: ctx.vp.y + (py.s - ctx.vp.y) * m,
+                     scale: m * Math.min(px.k, py.k), alpha: cam.z.alpha(dz), w: box.w, h: box.h };
+    return { b, i, dz, m, pos: p3, target };
+  });
+  items.sort((p, q) => q.dz - p.dz || p.target.scale - q.target.scale || p.i - q.i);
+
+  const snapAll = drag && drag.started && drag.snapSpace === spaceId;
+  for (const it of items) {
+    const b = it.b;
+    const grabbed = drag && drag.started && drag.id === b.id;
+    const a = ease(b.id, it.target, snapAll || grabbed ? "snap" : mode);
+    let place = compose(host, a);
+    if (grabbed && drag.lift) {
+      // 並べ替え・マス移動：持ち上げた泡はカーソルについてくる（大きさは掴んだときのまま）
+      const scale = drag.scale0, w = a.w * scale, h = a.h * scale;
+      place = { x: drag.mx - drag.fx * w, y: drag.my - drag.fy * h, w, h, scale, alpha: 1 };
+    }
+    place.vis = host.vis * it.target.alpha;
+    Object.assign(place, { id: b.id, b, space: spaceId, depth: host.depth + 1, local: a.scale, m: it.m,
+                           pos: it.pos, box: { w: a.w, h: a.h } });
+    const out = grabbed ? lifted : sink;
+    out.push(place);
+    if (isHost(b)) resolveSpace(b.id, contentOf(place), memo, out, lifted, mode);
+  }
+}
+
+let VW = 0, VH = 0;
+function resolveAll(mode) {
+  reindex();
+  LAYOUT = new Map();
+  const sink = [], lifted = [];
+  resolveSpace("root", { cx: VW / 2, cy: VH / 2, w: VW, h: VH, scale: 1, alpha: 1, vis: 1, depth: 0 },
+               new Map(), sink, lifted, mode);
+  frameItems = sink.concat(lifted);
+  PLACE = new Map(frameItems.map(p => [p.id, p]));
+}
+
+/* ── 1軸の写しと逆写し（カメラの横・縦の式を使う） ── */
+function unprojectLocal(L, axis, screen, m = 1) {
+  const local = (screen - (axis === "x" ? L.host.cx : L.host.cy)) / L.host.scale;
+  const s = L.ctx.vp[axis] + (local - L.ctx.vp[axis]) / m;
+  return L.cam[axis].unproject(s, L.ctx.H[axis]);
+}
+const screenToAxis = (L, axis, screen, m = 1) => unprojectLocal(L, axis, screen, m) + L.ctx.focus[axis];
+function axisToScreen(L, axis, pos, m = 1) {
+  const s = L.cam[axis].project(pos - L.ctx.focus[axis], L.ctx.H[axis]).s;
+  return (axis === "x" ? L.host.cx : L.host.cy) + (L.ctx.vp[axis] + (s - L.ctx.vp[axis]) * m) * L.host.scale;
+}
+/**
+ * 焦点の約束（A と同じ中身。「なしの軸は 0」の代わりに、レイアウトの span で言う）
+ *   X/Y：レイアウトが並べた軸（span あり）では、(1) 並べた範囲の外へ出ない (2) 中身が箱からはみ出さない。自由座標の軸はどこへでも
+ *   Z  ：手前へは 1 退ける。奥へは一番奥の泡まで
+ */
+function focusFits(L, axis, f) {
+  const lens = L.cam[axis], H = L.H[axis];
+  for (const k of L.kids) {
+    const sz = L.sizeOf(k), half = (axis === "x" ? sz.w : sz.h) / 2, p = lens.project(L.pos.get(k.id)[axis] - f, H);
+    if (Math.abs(p.s) + half * p.k > H + 1e-6) return false;
+  }
+  return true;
+}
+function fitFocus(L, axis, v, cur = L.focus[axis]) {
+  const span = L.span[axis];
+  if (axis === "z") { const [lo, hi] = span ?? [0, 0]; return clamp(v, Math.min(0, lo) - 1, Math.max(0, hi)); }
+  if (!span) return v;
+  v = clamp(v, span[0], span[1]);                                                     // (1)
+  if (!focusFits(L, axis, v)) {                                                       // (2)
+    const from = focusFits(L, axis, cur) ? cur : 0;
+    let lo = 0, hi = 1;
+    for (let n = 0; n < 40; n++) { const t = (lo + hi) / 2; if (focusFits(L, axis, from + (v - from) * t)) lo = t; else hi = t; }
+    v = from + (v - from) * lo;
+  }
+  return v;
+}
+function setFocusAxis(L, axis, v) { const f = spaceObj(L.id).focus; f[axis] = fitFocus(L, axis, v, f[axis]); }
+
+/* ============================================================
+   描画（A と同じ。切り抜きはしない）
+   ============================================================ */
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+function resize() {
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  VW = r.width; VH = r.height;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(cv);
+
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+const layoutIn = spaceId => LAYOUTS[setupOf(spaceId).layout.type];
+/** その空間の中の泡を掴んだら何が起きるか：レイアウトの型の verb で決まる */
+const spaceSummary = spaceId => VERBS[layoutIn(spaceId).verb];
+
+function drawBubble(p) {
+  const { x, y, w, h, scale: s, b } = p;
+  if (x > VW + 40 || y > VH + 40 || x + w < -40 || y + h < -40 || w < 2) return;
+  const op = clamp(p.alpha, 0, 1) * clamp(0.3 + 0.7 * Math.min(1, s), 0.15, 1);
+  if (op < 0.02) return;
+  const sel = b.id === selectedId, host = isHost(b), chip = p.box.h <= 34;
+  const r = Math.max(2, (chip ? 6 : 10) * s);
+  const bh = chip ? h : HEADER * s;
+  g.globalAlpha = op;
+
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 18 * s; g.shadowOffsetY = 5 * s;
+  roundRect(x, y, w, h, r); g.fillStyle = `hsl(${b.hue} 30% 13%)`; g.fill();
+  g.shadowColor = "transparent"; g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.save(); roundRect(x, y, w, h, r); g.clip();
+  g.fillStyle = `hsl(${b.hue} 55% 42% / ${chip ? 0.5 : 0.55})`; g.fillRect(x, y, w, bh);
+  g.restore();
+  g.lineWidth = (sel ? 2.4 : 1.1) * clamp(s, 0.6, 1);
+  g.strokeStyle = sel ? "#6ee7ff" : `hsl(${b.hue} 62% 58% / .8)`;
+  roundRect(x, y, w, h, r); g.stroke();
+
+  const fs = 12 * s;
+  let titleEnd = x + 8 * s;
+  g.textBaseline = "middle";
+  if (fs >= 6.5) {
+    g.font = `600 ${fs}px ${FONT}`; g.fillStyle = "#eaf1ff";
+    const maxW = Math.max(4, w - 14 * s);
+    g.fillText(b.title, x + 8 * s, y + bh / 2 + 0.5, maxW);
+    titleEnd += Math.min(g.measureText(b.title).width, maxW);
+  }
+
+  if (host) {
+    drawSpaceMark(p, titleEnd, bh);
+    const c = contentRect(contentOf(p));
+    g.globalAlpha = op * 0.5; g.setLineDash([3, 4]); g.lineWidth = 1;
+    g.strokeStyle = `hsl(${b.hue} 60% 62% / .45)`;
+    roundRect(c.x + 4 * s, c.y + 3 * s, c.w - 8 * s, c.h - 7 * s, 6 * s); g.stroke(); g.setLineDash([]);
+  } else if (!chip && s > 0.2) {
+    g.globalAlpha = op * 0.5; g.fillStyle = "#9fb0cc";
+    const rows = Math.min(6, Math.floor((h - bh - 12 * s) / (11 * s)));
+    for (let i = 0; i < rows; i++)
+      g.fillRect(x + 10 * s, y + bh + (9 + i * 11) * s, (w - 20 * s) * (i === rows - 1 ? 0.5 : 0.82), 3.5 * s);
+  }
+  if (sel) { g.globalAlpha = 1; g.fillStyle = "#6ee7ff"; roundRect(x + w - 10, y + h - 10, 8, 8, 2); g.fill(); }
+  g.globalAlpha = 1;
+}
+
+const MARK_MIN = 6.5;
+function drawSpaceMark(p, titleEnd, bh) {
+  const S = spaceSummary(p.id), s = p.scale, fs = 10 * s, text = `中は別の空間 · ${S.short}`;
+  if (fs < MARK_MIN) return;
+  const right = p.x + p.w - 9 * s;
+  g.font = `600 ${fs}px ${FONT}`;
+  let y = p.y + bh / 2 + 0.5;
+  if (g.measureText(text).width > right - titleEnd - 10 * s) {
+    const room = p.w - 18 * s, w1 = g.measureText(text).width;
+    const size = Math.min(fs * 0.9, fs * room / w1);
+    if (size < MARK_MIN) return;
+    g.font = `600 ${size}px ${FONT}`;
+    y = p.y + bh + PAD * s / 2 + 0.5;
+    const tw = g.measureText(text).width;
+    g.fillStyle = `hsl(${p.b.hue} 30% 13%)`;
+    g.fillRect(right - tw - 3 * s, y - size * 0.6, tw + 6 * s, size * 1.2);
+  }
+  g.textAlign = "right"; g.fillStyle = S.cls === "move" ? "#7ee2a8" : "#ff9db1";
+  g.fillText(text, right, y);
+  g.textAlign = "left";
+}
+
+function drawDragMarks() {
+  if (!drag || drag.kind !== "bubble" || !drag.started || !drag.slot) return;
+  const sl = drag.slot, L = LAYOUT.get(sl.space);
+  g.save();
+  g.strokeStyle = "#6ee7ff"; g.fillStyle = "#6ee7ff"; g.shadowColor = "rgba(110,231,255,.8)"; g.shadowBlur = 10;
+  if (sl.space !== drag.space) {
+    const c = contentRect(L.host);
+    g.lineWidth = 2; g.setLineDash([7, 5]); roundRect(c.x, c.y, c.w, c.h, 6); g.stroke(); g.setLineDash([]);
+    g.shadowBlur = 0; g.font = `600 12px ${FONT}`; g.textBaseline = "bottom";
+    const label = `離すと ${spaceName(sl.space)}へ`;
+    const top = c.y - HEADER * L.host.scale;
+    const ty = top - 6 >= 18 ? top - 6 : c.y + c.h + 20 <= VH - 4 ? c.y + c.h + 20 : Math.max(c.y, 0) + 22;
+    const lx = clamp(c.x, 0, VW - g.measureText(label).width - 12) + 2;
+    g.fillStyle = "rgba(8,10,17,.85)"; g.fillRect(lx - 4, ty - 16, g.measureText(label).width + 8, 18);
+    g.fillStyle = "#6ee7ff"; g.fillText(label, lx, ty);
+    g.shadowBlur = 10;
+  }
+  if (sl.markRect) {
+    const m = sl.markRect;
+    g.lineWidth = 2; g.setLineDash([5, 4]); roundRect(m.x, m.y, m.w, m.h, 5); g.stroke(); g.setLineDash([]);
+    g.globalAlpha = 0.12; g.fill(); g.globalAlpha = 1;
+    if (sl.occupants && sl.occupants.length) {
+      const swap = sl.space === drag.space;
+      g.shadowBlur = 0; g.strokeStyle = swap ? "#ffd479" : "#ff9db1"; g.lineWidth = 1.5; g.setLineDash([3, 3]);
+      for (const o of sl.occupants) { const q = PLACE.get(o.id); if (q) { roundRect(q.x - 3, q.y - 3, q.w + 6, q.h + 6, 7); g.stroke(); } }
+      g.setLineDash([]);
+      const label = `${sl.occupants.map(o => o.title).join("・")}${swap ? "と入れ替わる" : "に重なる"}`;
+      g.font = `600 12px ${FONT}`; g.textBaseline = "bottom";
+      const tw = g.measureText(label).width, lx = clamp(m.x, 4, VW - tw - 12), ty = m.y - 6 >= 18 ? m.y - 6 : m.y + m.h + 20;
+      g.fillStyle = "rgba(8,10,17,.9)"; g.fillRect(lx - 4, ty - 16, tw + 8, 18);
+      g.fillStyle = swap ? "#ffd479" : "#ff9db1"; g.fillText(label, lx, ty);
+      g.shadowBlur = 10;
+    }
+  }
+  if (sl.markLine) {
+    const { axis, at, from, to } = sl.markLine;
+    g.lineWidth = 3; g.beginPath();
+    if (axis === "x") { g.moveTo(at, from); g.lineTo(at, to); } else { g.moveTo(from, at); g.lineTo(to, at); }
+    g.stroke();
+  }
+  g.restore();
+}
+
+function draw() {
+  g.clearRect(0, 0, VW, VH);
+  const grd = g.createRadialGradient(VW / 2, VH / 2, 0, VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+  grd.addColorStop(0, "#141a2b"); grd.addColorStop(1, "#080a11");
+  g.fillStyle = grd; g.fillRect(0, 0, VW, VH);
+  g.strokeStyle = "rgba(110,231,255,.16)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(VW / 2 - 14, VH / 2); g.lineTo(VW / 2 + 14, VH / 2);
+  g.moveTo(VW / 2, VH / 2 - 14); g.lineTo(VW / 2, VH / 2 + 14); g.stroke();
+
+  for (const p of frameItems) drawBubble(p);
+
+  const sp = selectedId ? parentOf(selectedId) : "root";
+  if (sp !== "root" && LAYOUT.get(sp)) {
+    const c = contentRect(LAYOUT.get(sp).host);
+    g.globalAlpha = 0.45; g.strokeStyle = "#6ee7ff"; g.lineWidth = 1; g.setLineDash([2, 4]);
+    roundRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2, 6); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  drawDragMarks();
+}
+
+/* ============================================================
+   操作 ——「ドラッグはレイアウトの型、ホイールはカメラ」
+   ============================================================ */
+function hitTest(mx, my, skip) {
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (!(p.vis > 0) || (skip && skip.has(p.id))) continue;
+    if (mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h) return p;
+  }
+  return null;
+}
+const inContent = (p, my) => isHost(p.b) && my >= p.y + HEADER * p.scale;
+function spaceAt(mx, my, skip) {
+  const p = hitTest(mx, my, skip);
+  return !p ? "root" : inContent(p, my) ? p.id : p.space;
+}
+const onHandle = (p, mx, my) => p && mx >= p.x + p.w - 12 && mx <= p.x + p.w + 3 && my >= p.y + p.h - 12 && my <= p.y + p.h + 3;
+function handleAt(mx, my) {
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (!(p.vis > 0)) continue;
+    if (p.id === selectedId && onHandle(p, mx, my)) return p;
+    if (mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h) return null;
+  }
+  return null;
+}
+const center = (p, axis) => axis === "x" ? p.x + p.w / 2 : p.y + p.h / 2;
+const pt = e => { const r = cv.getBoundingClientRect(); return { mx: e.clientX - r.left, my: e.clientY - r.top }; };
+
+cv.addEventListener("pointerdown", e => {
+  const { mx, my } = pt(e);
+  cv.setPointerCapture(e.pointerId);
+  const sel = handleAt(mx, my);
+  if (sel) {
+    drag = { kind: "resize", id: sel.id, space: sel.space, started: true, mx0: mx, my0: my, size0: { ...measure(sel.b, new Map()) },
+             scale: sel.scale, x0: sel.x, y0: sel.y, m: sel.m };
+    return;
+  }
+  const p = hitTest(mx, my);
+  if (p && !inContent(p, my)) {
+    selectedId = p.id;
+    raise(p.b);                      // ★ 触った泡は最前面へ（奥行きを型が決めていなければ）
+    const verb = LAYOUT.get(p.space).lay.verb, V = VERBS[verb];
+    drag = {
+      kind: "bubble", id: p.id, space: p.space, verb,
+      moves: !!V.moves, lift: !!V.lift,
+      snapSpace: verb === "view" ? p.space : null,
+      started: false, mx0: mx, my0: my, mx, my,
+      fx: (mx - p.x) / p.w, fy: (my - p.y) / p.h, scale0: p.scale,
+      skip: subtreeOf(p.id), slot: null,
+    };
+  } else {
+    const space = p ? p.id : "root", L = LAYOUT.get(space);
+    drag = { kind: "focus", space, snapSpace: space, started: false, mx0: mx, my0: my,
+             f0: { ...L.focus }, u0: { x: unprojectLocal(L, "x", mx), y: unprojectLocal(L, "y", my) } };
+  }
+});
+
+cv.addEventListener("pointermove", e => {
+  const { mx, my } = pt(e);
+  if (!drag) { showCursorHint(mx, my); return; }
+  hideCursorHint();
+  if (!drag.started && Math.hypot(mx - drag.mx0, my - drag.my0) < 3) return;
+  drag.started = true;
+  if (drag.kind === "resize") {
+    const b = byId(drag.id), L = LAYOUT.get(drag.space);
+    b.size.w = Math.max(40, drag.size0.w + (mx - drag.mx0) / drag.scale);
+    b.size.h = Math.max(HEADER + 10, drag.size0.h + (my - drag.my0) / drag.scale);
+    // 位置が書ける型（自由）では左上を動かさない：新しい箱の中心がそこに来るように位置を書く
+    if (L.lay.write) {
+      const box = measure(b, new Map());
+      L.lay.write(b, { x: screenToAxis(L, "x", drag.x0 + box.w * drag.scale / 2, drag.m),
+                       y: screenToAxis(L, "y", drag.y0 + box.h * drag.scale / 2, drag.m) });
+    }
+    drag.snapSpace = drag.space;
+  } else if (drag.kind === "focus") {
+    const L = LAYOUT.get(drag.space);
+    for (const axis of ["x", "y"])
+      setFocusAxis(L, axis, drag.f0[axis] + drag.u0[axis] - unprojectLocal(L, axis, axis === "x" ? mx : my));
+  } else {
+    moveBubble(mx, my);
+  }
+});
+
+/** 泡のドラッグ：レイアウトの型の verb で決まる */
+function moveBubble(mx, my) {
+  drag.mx = mx; drag.my = my;
+  const p = PLACE.get(drag.id), b = p.b, L = LAYOUT.get(drag.space);
+  const want = { x: mx - (drag.fx - 0.5) * p.w, y: my - (drag.fy - 0.5) * p.h };
+  if (drag.verb === "move") {
+    L.lay.write(b, { x: screenToAxis(L, "x", want.x, p.m), y: screenToAxis(L, "y", want.y, p.m) });
+  } else if (drag.verb === "view") {
+    for (const axis of ["x", "y"])
+      setFocusAxis(L, axis, L.focus[axis] + (p.pos[axis] - L.ctx.focus[axis]) - unprojectLocal(L, axis, want[axis], p.m));
+  }
+  if (drag.moves) drag.slot = slotAt(mx, my);
+}
+
+/** 離したらどこへ入るか：カーソルの下の空間の、レイアウトの型に従う */
+function slotAt(mx, my) {
+  let space = spaceAt(mx, my, drag.skip);
+  if (space !== drag.space && drag.space !== "root" && !isAncestor(drag.space, space)) {
+    const c = contentRect(LAYOUT.get(drag.space).host);
+    if (mx > c.x - PULL && mx < c.x + c.w + PULL && my > c.y - PULL && my < c.y + c.h + PULL) space = drag.space;
+  }
+  const L = LAYOUT.get(space);
+  if (!L) return null;
+  const p = PLACE.get(drag.id), lay = L.lay;
+  const slot = { space, order: null, cell: {}, coord: null, markLine: null, markRect: null };
+  const sibs = kidsOf(space).filter(k => !drag.skip.has(k.id)).map(k => PLACE.get(k.id)).filter(Boolean);
+  const box = contentRect(L.host);
+
+  if (lay.verb === "reorder") {
+    const axis = L.S.layout.dir, cur = axis === "x" ? mx : my;          // 並べ替わる向きは引数 dir
+    const sorted = sibs.slice().sort((a, c) => center(a, axis) - center(c, axis));
+    const idx = sorted.filter(s => center(s, axis) < cur).length;
+    const near = s => axis === "x" ? s.x : s.y, far = s => axis === "x" ? s.x + s.w : s.y + s.h;
+    const half = GAP / 2 * L.host.scale;
+    const at = !sorted.length ? (axis === "x" ? L.host.cx : L.host.cy)
+             : idx === 0 ? near(sorted[0]) - half
+             : idx === sorted.length ? far(sorted[idx - 1]) + half
+             : (far(sorted[idx - 1]) + near(sorted[idx])) / 2;
+    slot.order = { idx, list: sorted.map(s => s.b) };
+    slot.markLine = { axis, at, from: axis === "x" ? box.y + 4 : box.x + 4, to: axis === "x" ? box.y + box.h - 4 : box.x + box.w - 4 };
+  } else if (lay.verb === "cell") {
+    const range = {};
+    for (const axis of ["x", "y"]) {
+      const { value, start, end } = cellFromBands(L.bands[axis], screenToAxis(L, axis, axis === "x" ? mx : my), axis === "x" ? p.box.w : p.box.h);
+      slot.cell[lay.cells[axis]] = value;
+      range[axis] = [axisToScreen(L, axis, start), axisToScreen(L, axis, end)];
+    }
+    slot.markRect = { x: range.x[0], y: range.y[0], w: range.x[1] - range.x[0], h: range.y[1] - range.y[0] };
+    const stay = space === drag.space && Object.keys(slot.cell).every(key => slot.cell[key] === p.b.cell[key]);
+    slot.occupants = stay ? [] : sibs.map(s => s.b).filter(k => Object.keys(slot.cell).every(key => k.cell[key] === slot.cell[key]));
+  } else if (lay.verb === "move") {
+    const want = { x: mx - (drag.fx - 0.5) * p.w, y: my - (drag.fy - 0.5) * p.h };
+    slot.coord = { x: screenToAxis(L, "x", want.x, 1), y: screenToAxis(L, "y", want.y, 1) };
+  }
+  return slot;
+}
+
+/**
+ * 同じ空間で、cell に一番近い空きマス（exclude は数えない）。
+ * 置いた順（stack）を捨てたので、同じマスに2つ入ると上下が決まらない。よそから来た泡の先客はここへ逃がす。
+ */
+function freeCellNear(spaceId, cell, exclude) {
+  const keys = Object.keys(cell);
+  const taken = new Set(kidsOf(spaceId).filter(k => k !== exclude)
+    .map(k => keys.map(key => k.cell[key]).join(",")));
+  for (let r = 1; r < 32; r++)
+    for (const d of keys.length === 1 ? [[r], [-r]] : [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, r], [r, -r], [-r, -r]]) {
+      const cand = Object.fromEntries(keys.map((key, i) => [key, Math.max(0, cell[key] + (d[i] ?? 0))]));
+      if (!taken.has(keys.map(key => cand[key]).join(","))) return cand;
+    }
+  return cell;
+}
+
+function cellFromBands(bands, pos, len) {
+  if (!bands.length) return { value: 0, start: -len / 2, end: len / 2 };
+  const first = bands[0], last = bands[bands.length - 1];
+  if (pos > last.end + GAP / 2) return { value: last.value + 1, start: last.end + GAP, end: last.end + GAP + len };
+  if (pos < first.start - GAP / 2 && first.value > 0)
+    return { value: first.value - 1, start: first.start - GAP - len, end: first.start - GAP };
+  const bd = bands.find(x => pos <= x.end + GAP / 2) ?? last;
+  return { value: bd.value, start: bd.start, end: bd.end };
+}
+
+function endDrag() {
+  if (!drag) return;
+  if (drag.kind === "bubble" && drag.started && drag.moves) commitDrop();
+  drag = null;
+}
+function commitDrop() {
+  const slot = slotAt(drag.mx, drag.my);
+  if (!slot) return;
+  const b = byId(drag.id), p = PLACE.get(drag.id), moved = slot.space !== drag.space;
+  const byOrder = (q, r) => q.order - r.order;
+  const renumber = list => list.forEach((k, i) => { k.order = i; });
+  if (moved) {
+    b.parent = slot.space === "root" ? null : slot.space;
+    renumber(kidsOf(drag.space).filter(k => k !== b).sort(byOrder));
+    reindex();                       // ここから先（raise・先客の逃げ先）は、付け替えたあとの兄弟で決める
+  }
+  if (slot.order) {
+    const list = slot.order.list.slice();
+    list.splice(slot.order.idx, 0, b);
+    renumber(list);
+  } else if (moved) {
+    renumber([...kidsOf(slot.space).filter(k => k !== b).sort(byOrder), b]);
+  }
+  raise(b);                          // ★ 置いた泡も最前面へ（置いた順は持たない）
+  // 同じマスに2つ入れない。同じ空間の中なら先客は空けたマスへ、よそから来たなら一番近い空きマスへ（1人ずつ）
+  if (slot.occupants && slot.occupants.length) {
+    let vacated = moved ? null : Object.fromEntries(Object.keys(slot.cell).map(key => [key, b.cell[key]]));
+    Object.assign(b.cell, slot.cell);
+    for (const k of slot.occupants) { Object.assign(k.cell, vacated ?? freeCellNear(slot.space, slot.cell, k)); vacated = null; }
+  }
+  Object.assign(b.cell, slot.cell);
+  if (moved) {
+    const Lt = LAYOUT.get(slot.space);
+    if (slot.coord) Lt.lay.write(b, slot.coord);
+    b.free.z = Lt.ctx.focus.z;          // 奥行きは見えている焦点の面へ（Z を読まない型では使われないだけ）
+  }
+  if (moved || drag.lift) {
+    const H = LAYOUT.get(slot.space).host;
+    anim.set(b.id, { x: (p.x + p.w / 2 - H.cx) / H.scale, y: (p.y + p.h / 2 - H.cy) / H.scale,
+                     scale: p.scale / H.scale, alpha: 1, w: p.box.w, h: p.box.h });
+  }
+}
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("lostpointercapture", endDrag);
+
+/** ホイール：カーソルの下の空間のカメラが決める（透視＝奥行き／魚眼＝曲がる向きに送る／平行＝何もしない。CAMERAS の wheel） */
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const { mx, my } = pt(e), space = spaceAt(mx, my), L = LAYOUT.get(space);
+  if (!L) return;
+  for (const [key, [axis, rate]] of Object.entries(L.cam.wheel))
+    if (e[key]) setFocusAxis(L, axis, spaceObj(space).focus[axis] + e[key] * rate);
+  hintAt = { mx, my };
+}, { passive: false });
+cv.addEventListener("pointerleave", () => { if (!drag) hideCursorHint(); });
+
+/* ============================================================
+   画面の約束：ヒント行・右上の一覧・選択中の泡・カーソル脇・セレクタ
+   ============================================================ */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const targetSpace = () => selectedId && byId(selectedId) ? parentOf(selectedId) : "root";
+const nameHtml = id => `<span class="nm" style="color:${spaceHsl(id)}">${esc(spaceName(id))}</span>`;
+
+/** 焦点を引いたら、その向きでどれだけ動けるか（setFocusAxis と同じ fitFocus の答えから言う） */
+function focusHtml(spaceId, axis) {
+  const L = LAYOUT.get(spaceId), label = AXIS_WORD[axis];
+  if (!L) return `視点が動く（${label}）`;
+  const room = fitFocus(L, axis, Infinity) - fitFocus(L, axis, -Infinity);
+  const sp = L.span[axis], span = sp ? sp[1] - sp[0] : Infinity;
+  if (room >= 0.5 && room >= span - 0.5) return `視点が動く（${label}）`;
+  const why = span < 0.5 ? "並んでいない向き" : span <= room + 0.5 ? "並びの端まで" : "中身が箱いっぱい";
+  return room < 0.5 ? `<span class="fix">動かない</span>（${label}・${why}）`
+                    : `<span class="fix">少しだけ</span>視点が動く（${label}・${why}）`;
+}
+/** 泡を掴んで引いたら何が起きるか（その空間のレイアウトの型で） */
+function dragHtml(spaceId) {
+  const S = setupOf(spaceId), lay = LAYOUTS[S.layout.type], name = nameOf(LAYOUTS, S.layout);
+  switch (lay.verb) {
+    case "move":    return `<span class="move">動く</span>（${name}）`;
+    case "reorder": return `<span class="move">並べ替わる</span>（${AXIS_WORD[S.layout.dir]}に・${name}）`;
+    case "cell":    return `<span class="move">マスを移る</span>（${name}）`;
+    case "view":    return `<span class="fix">動かない</span>　${focusHtml(spaceId, "x")}／${focusHtml(spaceId, "y")}`;
+    default:        return `<span class="fix">何も起きない</span>（${name}）`;
+  }
+}
+/** ホイールで何が起きるか。縦スクロールと横スクロールで送る向きが違う（2D魚眼）なら、横スクロールの分も言う */
+function wheelHtml(spaceId) {
+  const S = setupOf(spaceId), { deltaY: wy, deltaX: wx } = camOf(S.camera).wheel, cam = nameOf(CAMERAS, S.camera);
+  if (!wy) return `<span class="fix">何も起きない</span>（${esc(spaceName(spaceId))}のカメラが ${cam}）`;
+  const also = wx && wx[0] !== wy[0] ? `・横スクロールで${AXIS_WORD[wx[0]]}` : "";
+  return `<span class="move">${WHEEL_WORD[wy[0]]}${also}</span>（${esc(spaceName(spaceId))}・カメラ ${cam}）`;
+}
+function crossHtml(spaceId) {
+  if (!spaceSummary(spaceId).moves) return null;
+  return spaceId === "root" ? ["中へ落とす", `<span class="move">その空間へ移る</span>`]
+                            : ["外へ引く", `<span class="move">外の空間へ出る</span>（箱の外まで大きく引く）`];
+}
+
+const cursorHint = document.getElementById("cursor-hint");
+let hintAt = null;
+function hideCursorHint() { hintAt = null; cursorHint.style.display = "none"; }
+function showCursorHint(mx, my) {
+  const sel = handleAt(mx, my), p = hitTest(mx, my), lines = [];
+  if (sel) {
+    lines.push(`<span class="who">${esc(sel.b.title)}</span>`, `ドラッグ    大きさを変える`);
+    cv.style.cursor = "nwse-resize";
+  } else if (p && !inContent(p, my)) {
+    const cross = crossHtml(p.space);
+    lines.push(`<span class="who">${esc(p.b.title)}</span>  ${nameHtml(p.space)}`, `ドラッグ    ${dragHtml(p.space)}`);
+    if (cross) lines.push(`${cross[0].padEnd(6, "　")}${cross[1]}`);
+    cv.style.cursor = "grab";
+  } else {
+    const space = p ? p.id : "root";
+    lines.push(`<span class="who">背景</span>  ${nameHtml(space)}`, `横ドラッグ  ${focusHtml(space, "x")}`, `縦ドラッグ  ${focusHtml(space, "y")}`);
+    cv.style.cursor = "default";
+  }
+  lines.push(`ホイール    ${wheelHtml(spaceAt(mx, my))}`);
+  const html = lines.join("\n");
+  if (hintAt && hintAt.html === html && hintAt.mx === mx && hintAt.my === my && cursorHint.style.display === "block") return;
+  hintAt = { mx, my, html };
+  cursorHint.innerHTML = html;
+  cursorHint.style.display = "block";
+  const w = cursorHint.offsetWidth, h = cursorHint.offsetHeight;
+  cursorHint.style.left = (mx + 18 + w > VW ? mx - 18 - w : mx + 18) + "px";
+  cursorHint.style.top = (my + 16 + h > VH ? my - 12 - h : my + 16) + "px";
+}
+
+/* ── 右上：空間の一覧（入れ子のツリー） ── */
+function spacesHtml() {
+  const cur = targetSpace(), rows = [];
+  const walk = (id, depth) => {
+    const S = setupOf(id), V = spaceSummary(id);
+    rows.push(
+      `<div class="sp" style="padding-left:${depth * 12}px">${depth ? "└ " : "▸ "}${nameHtml(id)}` +
+      `  <span class="${S.own ? "own" : "inh"}">${S.own ? "自前" : "継承"}</span>` +
+      `  <span class="${V.cls}">${V.text}</span>${id === cur ? ' <span class="cur">← 選択中</span>' : ""}` +
+      `<div class="axs"><span class="ax"><i>レイアウト</i>${nameOf(LAYOUTS, S.layout)}</span>` +
+      `<span class="ax"><i>カメラ</i>${nameOf(CAMERAS, S.camera)}</span></div></div>`);
+    for (const k of kidsOf(id)) if (isHost(k)) walk(k.id, depth + 1);
+  };
+  walk("root", 0);
+  return `<span class="t">空間</span>` + rows.join("");
+}
+
+/* ── その下：選択中の泡 ── */
+function selectionHtml() {
+  const b = byId(selectedId), p = PLACE.get(selectedId);
+  if (!b || !p) return "泡をクリックすると、ここに説明が出ます。";
+  const space = parentOf(b.id), S = setupOf(space);
+  const chain = [];
+  for (let q = p; q; q = q.space === "root" ? null : PLACE.get(q.space)) chain.unshift(q.local);
+  const k = (label, html) => `<div class="kv"><span class="k">${label}</span><span>${html}</span></div>`;   // 折り返しても値の列にそろう
+  const cross = crossHtml(space);
+  return [
+    `<div><span class="t">選択</span>  <span class="nm" style="color:hsl(${b.hue} 70% 66%)">${esc(b.title)}</span></div>`,
+    k("いる空間", `${nameHtml(space)}  <span class="${S.own ? "own" : "inh"}">${S.own ? "自前" : "継承"}</span>`),
+    p.vis > 0 ? "" : k("見え方", `<span class="fix">見えない</span>（焦点 Z より手前。掴めない）`),
+    k("ドラッグ", dragHtml(space)),
+    cross ? k(cross[0], cross[1]) : "",
+    k("ホイール", wheelHtml(space)),
+    isHost(b) ? k("中", `${nameHtml(b.id)}  <span class="${spaceSummary(b.id).cls}">${spaceSummary(b.id).text}</span>`) : "",
+    k("倍率", `<b style="color:var(--accent)">${p.scale.toFixed(3)}</b>` +
+      (chain.length > 1 ? `  ＝ ${chain.map(v => v.toFixed(3)).join(" × ")}` : "")),
+  ].join("");
+}
+
+/* ── ツールバー：レイアウトとカメラのセレクタ・ヒント行 ── */
+const selLayout = document.getElementById("sel-layout"), selCamera = document.getElementById("sel-camera");
+const selDir = document.getElementById("sel-dir"), selBend = document.getElementById("sel-bend");
+const fill = (el, entries) => { for (const [value, label] of entries) { const o = document.createElement("option"); o.value = value; o.textContent = label; el.appendChild(o); } };
+fill(selLayout, Object.entries(LAYOUTS).map(([k, t]) => [k, t.label])); fill(selCamera, Object.entries(CAMERAS).map(([k, t]) => [k, t.label]));
+fill(selDir, [["x", "横"], ["y", "縦"]]); fill(selBend, [["x", "横"], ["y", "縦"], ["xy", "両方"]]);
+selLayout.onchange = () => { setLayout(targetSpace(), selLayout.value); lastSig = ""; };
+selCamera.onchange = () => { setCamera(targetSpace(), selCamera.value); lastSig = ""; };
+selDir.onchange = () => { const S = setupOf(targetSpace()); setLayout(targetSpace(), S.layout.type, { dir: selDir.value }); lastSig = ""; };
+selBend.onchange = () => { const S = setupOf(targetSpace()); setCamera(targetSpace(), S.camera.type, { bend: selBend.value }); lastSig = ""; };
+let lastSig = "";
+function syncToolbar() {
+  const id = targetSpace(), S = setupOf(id);
+  const sig = `${id}|${S.own}|${JSON.stringify(S.layout)}|${JSON.stringify(S.camera)}`;
+  if (sig === lastSig) return;
+  lastSig = sig;
+  selLayout.value = S.layout.type; selCamera.value = S.camera.type;
+  // 向きのセレクタは、その引数を持つ型のときだけ出す
+  selDir.hidden = !("dir" in S.layout); if (!selDir.hidden) selDir.value = S.layout.dir;
+  selBend.hidden = !("bend" in S.camera); if (!selBend.hidden) selBend.value = S.camera.bend;
+  const lab = document.getElementById("axis-scope");
+  lab.textContent = `${spaceName(id)}${S.own ? "" : "（継承）"} の`;
+  lab.style.color = spaceHsl(id);
+  document.getElementById("inherit").disabled = id === "root" || !S.own;
+}
+document.getElementById("inherit").onclick = () => { inheritSetup(targetSpace()); lastSig = ""; };
+document.getElementById("refocus").onclick = () => { Object.assign(spaceObj(targetSpace()).focus, { x: 0, y: 0, z: 0 }); };
+{
+  const hintEl = document.getElementById("hint"), DEFAULT = hintEl.innerHTML;
+  for (const el of document.querySelectorAll("[data-hint]")) {
+    el.addEventListener("mouseenter", () => { hintEl.innerHTML = el.dataset.hint; });
+    el.addEventListener("focus", () => { hintEl.innerHTML = el.dataset.hint; });
+    el.addEventListener("mouseleave", () => { hintEl.innerHTML = DEFAULT; });
+  }
+}
+
+const panelCache = {};
+function setHtml(id, html) { if (panelCache[id] !== html) { panelCache[id] = html; document.getElementById(id).innerHTML = html; } }
+function updatePanels() {
+  setHtml("spaces", spacesHtml()); setHtml("selection", selectionHtml()); syncToolbar();
+  if (hintAt && !drag) showCursorHint(hintAt.mx, hintAt.my);
+}
+
+/* ============================================================
+   ループ
+   ============================================================ */
+function frame() { resolveAll("step"); draw(); updatePanels(); }
+function settle() { resolveAll("snap"); resolveAll("snap"); draw(); updatePanels(); }
+function loop() { frame(); requestAnimationFrame(loop); }
+
+/* ============================================================
+   検証用の口（SPEC §6 と同じ名前。View の代わりにレイアウトとカメラを返す）
+   ============================================================ */
+/** A のプリセット名 → B の（レイアウト, カメラ）。検証スクリプトで A と同じ場面を作るため */
+const FROM_A_PRESET = { free: ["free", "perspective"], row: [["stack", { dir: "x" }], "parallel"], column: [["stack", { dir: "y" }], "parallel"],
+                        grid: ["grid", "parallel"], fisheyeX: ["genBranch", ["fisheye", { bend: "x" }]],
+                        coverflow: [["line", { dir: "x" }], ["fisheye", { bend: "x" }]], histZ: ["ageStack", "perspective"] };
+const offset = () => { const r = cv.getBoundingClientRect(); return { x: r.left, y: r.top }; };
+const outPlace = p => { const o = offset();
+  return { id: p.id, x: p.x + o.x, y: p.y + o.y, w: p.w, h: p.h, scale: p.scale, local: p.local, depth: p.depth, space: p.space, alpha: p.alpha }; };
+window.__lab = {
+  select(id) { selectedId = id; lastSig = ""; },
+  selectedId: () => selectedId,
+  bubbles: () => JSON.parse(JSON.stringify(bubbles)),
+  /** B：{ layout: { type, ...引数 }, camera: { type, ...引数 }, focus, own } */
+  viewOf: id => { const s = setupOf(id); return JSON.parse(JSON.stringify({ layout: s.layout, camera: s.camera, focus: s.focus, own: s.own })); },
+  /** B には軸ごとの設定が無いので、axis の代わりに "layout" / "camera" を受け取る。例 setAxis("staff", "layout", { type: "line", dir: "y" })。type を省くと引数だけ変える */
+  setAxis(spaceId, part, patch) {
+    const { type, ...over } = patch;
+    if (part !== "layout" && part !== "camera") throw new Error("案B には軸ごとの設定が無い（layout / camera を渡す）: " + part);
+    (part === "layout" ? setLayout : setCamera)(spaceId, type ?? setupOf(spaceId)[part].type, over);
+    lastSig = "";
+  },
+  setLayout(spaceId, type, over) { setLayout(spaceId, type, over); lastSig = ""; },
+  setCamera(spaceId, type, over) { setCamera(spaceId, type, over); lastSig = ""; },
+  /** レイアウトの型名・カメラ名、または A のプリセット名（レイアウトとカメラの組にして当て、焦点を 0 に） */
+  preset(name, spaceId) {
+    const id = spaceId ?? targetSpace();
+    if (LAYOUTS[name]) setLayout(id, name);
+    else if (CAMERAS[name]) setCamera(id, name);
+    else if (FROM_A_PRESET[name]) {
+      setLayout(id, ...[].concat(FROM_A_PRESET[name][0])); setCamera(id, ...[].concat(FROM_A_PRESET[name][1]));
+      Object.assign(spaceObj(id).focus, { x: 0, y: 0, z: 0 });
+    }
+    else throw new Error("プリセットが無い: " + name);
+    lastSig = "";
+  },
+  inherit(spaceId) { inheritSetup(spaceId); lastSig = ""; },
+  placements: () => frameItems.map(outPlace),
+  rectOf(id) { const p = PLACE.get(id); if (!p) return null; const o = outPlace(p); return { x: o.x, y: o.y, w: o.w, h: o.h }; },
+  headerPointOf(id) {
+    const p = PLACE.get(id); if (!p) return null;
+    const o = offset(), y = p.box.h <= 34 ? p.y + p.h / 2 : p.y + Math.min(12 * p.scale, p.h / 2);
+    for (const t of [0.35, 0.5, 0.2, 0.65, 0.8, 0.1, 0.9]) {
+      const x = p.x + p.w * t, hit = hitTest(x, y);
+      if (hit && hit.id === id && !inContent(hit, y)) return { x: x + o.x, y: y + o.y };
+    }
+    return { x: p.x + p.w * 0.35 + o.x, y: y + o.y };
+  },
+  focusOf: id => ({ ...spaceObj(id).focus }),
+  layoutOf(id) { const L = LAYOUT.get(id); return L && { host: L.host, H: L.ctx.H, vp: L.ctx.vp, span: L.span }; },
+  frame() { frame(); },
+  settle() { settle(); },
+};
+
+resize();
+settle();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
