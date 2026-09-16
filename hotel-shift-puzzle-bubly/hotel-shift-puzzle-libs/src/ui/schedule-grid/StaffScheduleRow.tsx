@@ -58,7 +58,7 @@ type StaffScheduleRowProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
-   * 渡された値は薄く描かれ、Tab で承認できる。
+   * 渡された値は薄く描かれ、Enter / Tab で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
   /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */

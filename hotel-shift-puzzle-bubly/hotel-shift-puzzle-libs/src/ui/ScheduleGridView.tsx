@@ -36,7 +36,10 @@ import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
-import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
+import {
+  useCellKeyboardEditing,
+  type ApproveDirection,
+} from "./schedule-grid/useCellKeyboardEditing.js";
 import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
@@ -111,7 +114,7 @@ type ScheduleGridViewProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
-   * セルに薄く描かれ、Tab で承認できる。
+   * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
   /**
@@ -119,8 +122,16 @@ type ScheduleGridViewProps = {
    * 埋められないセルを抱えたまま作業が進むのを防ぐため、セル自身に描く。
    */
   isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
-  /** 選択セルの確定提案を承認する（Tab）。承認後のフォーカス移動は feature 層が決める。 */
-  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
+  /**
+   * 選択セルの確定提案を承認する（Enter＝"down" / Tab＝"right"）。
+   * その向きの次の提案セルへ選択を移したら true。false なら、その向きへ1マス動く。
+   */
+  onApproveForced?: (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell,
+    direction: ApproveDirection
+  ) => boolean;
 };
 
 /**

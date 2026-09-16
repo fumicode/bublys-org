@@ -898,7 +898,7 @@ export const StyledWrap = styled.div`
 
   /* 確定提案セル: 制約から一意に決まった値を「まだ入っていない」形で見せる。
      確定済みセルと同じ勤務帯色・同じ数字を使いつつ、薄く・破線で囲うことで
-     「承認すればこうなる」と読ませる（Tab で承認）。 */
+     「承認すればこうなる」と読ませる（Enter / Tab で承認）。 */
   .e-forced {
     .e-forced-value {
       display: inline-flex;
@@ -914,7 +914,7 @@ export const StyledWrap = styled.div`
       font-variant-numeric: tabular-nums;
     }
   }
-  /* 選択中は提案を少しはっきりさせる（今まさに Tab で承認できる場所） */
+  /* 選択中は提案を少しはっきりさせる（今まさに Enter / Tab で承認できる場所） */
   .e-forced.is-selected .e-forced-value {
     opacity: 0.75;
   }

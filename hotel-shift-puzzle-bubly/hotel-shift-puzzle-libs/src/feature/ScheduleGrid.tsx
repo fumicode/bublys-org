@@ -462,29 +462,29 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   }
 
   // セル編集: この勤務表の世界線に記録。
-  // 選択の移動は UI 層（候補確定→右隣）と handleApproveForced（Tab）に任せる。
+  // 選択の移動は UI 層（打った値は押したキーの向きへ）と handleApproveForced（Enter / Tab）に任せる。
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
     recordSetCell(store, { schedule, staffId, day, to });
   };
 
-  // 確定提案の承認（Tab）。承認した値を書き込み、
-  // 次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していけるようにする。
-  // 次の確定提案が無ければ、今承認したセルに留まる（空きセルへ飛ばさない）。
+  // 確定提案の承認（何も打っていないときの Enter＝下 / Tab＝右）。承認した値を書き込み、
+  // 押したキーの向きの次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していける。
+  // 次の確定提案が無ければ false を返し、UI 層がその向きへ1マス動かす（Excel の Enter / Tab と同じ）。
   const handleApproveForced = (
     staffId: string,
     day: WorkingDay,
-    cell: ShiftCell
-  ) => {
-    const next = nextForcedCellAfter(orderedForcedCells, {
-      staffId,
-      dayKey: day.key,
-    });
+    cell: ShiftCell,
+    direction: "right" | "down"
+  ): boolean => {
+    const ordered =
+      direction === "down"
+        ? orderForcedCells(orderedForcedCells, staffIds, "column")
+        : orderedForcedCells;
+    const next = nextForcedCellAfter(ordered, { staffId, dayKey: day.key });
     recordSetCell(store, { schedule, staffId, day, to: cell });
-    if (next) {
-      setCellSelection({ staffId: next.staffId, day: next.day });
-      return;
-    }
-    setCellSelection({ staffId, day });
+    if (!next) return false;
+    setCellSelection({ staffId: next.staffId, day: next.day });
+    return true;
   };
 
   // 詰みの解消案を勤務表に書き込む。人が選んで押した手なので、通常のセル編集と同じ扱い。

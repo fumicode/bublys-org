@@ -32,9 +32,27 @@ type UseCellKeyboardEditingParams = {
   onSelectionChange?: (selection: CellSelection | null) => void;
   /** そのセルが制約から一意に決まるなら、その値（確定提案）。無ければ undefined。 */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
-  /** 確定提案を承認する（Tab）。承認後のフォーカス移動は呼び出し側が決める。 */
-  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
+  /**
+   * 確定提案を承認する（何も打っていないときの Enter＝"down" / Tab＝"right"）。
+   * その向きの次の提案セルへ選択を移したら true を返す。false なら、その向きへ1マス動く。
+   */
+  onApproveForced?: (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell,
+    direction: ApproveDirection
+  ) => boolean;
 };
+
+/** 確定提案を承認したあと、次の提案を探す向き（Enter＝下 / Tab＝右） */
+export type ApproveDirection = "right" | "down";
+
+/**
+ * 編集の状態。Excel と同じく「打って入力する」と「リストから選ぶ」を分ける。
+ *   - type : 文字を打っている。Enter / Tab / 矢印で確定し、その向きへ動く
+ *   - list : リストを開いて選んでいる（Alt+↓ / F2 / ダブルクリック）。↑↓で選び、確定しても動かない
+ */
+export type EditMode = "type" | "list";
 
 export type CellKeyboardEditing = {
   /** キー入力を受けるグリッド要素の ref（tabIndex + onKeyDown を付ける先）。 */
@@ -43,7 +61,9 @@ export type CellKeyboardEditing = {
   selection: CellSelection | null;
   /** 打ち込み中のバッファ。null は非入力（ドロップダウン閉）、"" 以上は入力中（開）。 */
   inputBuffer: string | null;
-  /** ドロップダウンを開いているか（inputBuffer !== null）。 */
+  /** 編集の状態（打つ入力／リスト選択）。閉じていれば null。 */
+  editMode: EditMode | null;
+  /** ドロップダウンを開いているか（editMode !== null）。 */
   editing: boolean;
   /** 現在の入力候補（前方一致）。 */
   suggestions: ShiftSuggestion[];
@@ -53,9 +73,9 @@ export type CellKeyboardEditing = {
   anchorEl: HTMLElement | null;
   /** セルを選択（ドロップダウンは閉じる）。 */
   selectCell: (staffId: string, day: WorkingDay) => void;
-  /** セルを選択して候補ドロップダウンを開く（全候補表示）。 */
+  /** セルを選択してリスト選択を開く（全候補表示。ダブルクリック）。 */
   openEditor: (staffId: string, day: WorkingDay) => void;
-  /** 候補を確定（クリック / Enter）。確定後は右隣のセルへ進む。 */
+  /** リストから選んだ候補で確定する（クリック）。**動かない。** */
   applySuggestion: (s: ShiftSuggestion) => void;
   /** グリッドの onKeyDown ハンドラ。 */
   handleKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
@@ -72,12 +92,20 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
  * 勤務表グリッドのキーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）を
  * まとめたフック。状態と対話ロジックをここに閉じ込め、ScheduleGridView は描画に徹する。
  *
- * ルール:
- *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア /
- *                       Tab で確定提案を承認（移動は feature 層）
- *   - ドロップダウン開: ↑↓で候補移動 / Enter・クリックで確定して右隣へ /
- *                       ←→で閉じて隣セルへ / Backspace で 1 文字削除（空ならクリアして閉じる） /
- *                       Esc で閉じる
+ * カーソル移動は Excel に準拠する（#152）。ルールは3つだけ:
+ *   1. **打って入力した値は、押したキーの向きへ動いて確定する**
+ *      （Enter↓ / Shift+Enter↑ / Tab→ / Shift+Tab← / 矢印はその向き）
+ *   2. **リストから選んだ値は、その場に留まって確定する**（リストでの Enter・候補のクリック）
+ *   3. **何も入力していないときの Enter / Tab は移動。** そのセルに確定提案（点線）があれば、
+ *      承認してその向きの次の提案セルへ飛ぶ（次の提案を探すのは feature 層）
+ *
+ * 状態ごとのキー:
+ *   - 選択だけ  : 矢印・Enter・Tab で移動 / Alt+↓・F2 でリストを開く / 英数字で打つ入力を開く /
+ *                 Backspace・Delete で未定に戻す / Esc で選択を外す
+ *   - 打つ入力  : 英数字・Backspace で打つ / Enter・Tab・矢印で先頭の候補で確定して動く /
+ *                 Esc で取り消す（動かない）
+ *   - リスト選択: ↑↓で候補を選ぶ / Enter で確定して留まる / 英数字・Backspace で絞る /
+ *                 ←→・Tab で確定せずに閉じて動く / Esc で閉じる
  */
 export function useCellKeyboardEditing({
   staffList,
@@ -109,6 +137,7 @@ export function useCellKeyboardEditing({
     onSelectionChange?.(resolved);
   };
   const [inputBuffer, setInputBuffer] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<EditMode | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば）
@@ -117,7 +146,7 @@ export function useCellKeyboardEditing({
       ? shiftOptions.filter((w) => staffGroup.isAllowed(selection.staffId, w.id))
       : shiftOptions;
 
-  // 入力候補（前方一致）。バッファが null（非入力）なら候補は出さない
+  // 入力候補（前方一致）。閉じていれば候補は出さない
   const suggestions: ShiftSuggestion[] =
     inputBuffer !== null ? suggestShiftInputs(inputBuffer, selectableShiftOptions) : [];
   // 候補が減ったときに範囲外を指さないようクランプ
@@ -137,22 +166,33 @@ export function useCellKeyboardEditing({
     );
   }, [selectionKey]);
 
+  const closeEditor = () => {
+    setInputBuffer(null);
+    setEditMode(null);
+  };
+
+  /** 編集を開く。type は打った1文字目から、list は全候補から始める */
+  const beginEdit = (mode: EditMode, buffer: string) => {
+    setEditMode(mode);
+    setInputBuffer(buffer);
+    setActiveIndex(0);
+  };
+
   const selectCell = (staffId: string, day: WorkingDay) => {
     setSelection({ staffId, day });
-    setInputBuffer(null);
+    closeEditor();
     gridRef.current?.focus();
   };
 
   const openEditor = (staffId: string, day: WorkingDay) => {
     setSelection({ staffId, day });
-    setInputBuffer("");
-    setActiveIndex(0);
+    beginEdit("list", "");
     gridRef.current?.focus();
   };
 
-  // 選択を dStaff 行・dDay 列ぶん動かす（端でクランプ）。入力中バッファは破棄
+  // 選択を dStaff 行・dDay 列ぶん動かす（端でクランプ）。編集中なら閉じる
   const moveSelection = (dStaff: number, dDay: number) => {
-    setInputBuffer(null);
+    closeEditor();
     setSelection((prev) => {
       if (staffList.length === 0 || days.length === 0) return prev;
       if (!prev) return { staffId: staffList[0].id, day: days[0] };
@@ -165,25 +205,102 @@ export function useCellKeyboardEditing({
     });
   };
 
+  /** 候補でセルを確定して閉じる（動かない） */
+  const commit = (s: ShiftSuggestion) => {
+    if (selection) onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
+    closeEditor();
+  };
+
+  // リストから選んだ（クリック）＝ルール2：確定して留まる
   const applySuggestion = (s: ShiftSuggestion) => {
-    if (selection) {
-      onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
-      // Enter / マウス確定とも右隣へ。最終列ならそのセルに留まる。
-      moveSelection(0, 1);
-    } else {
-      setInputBuffer(null);
-    }
+    commit(s);
     gridRef.current?.focus();
   };
 
-  const editing = inputBuffer !== null;
+  // 打った値＝ルール1：先頭の候補で確定して、その向きへ動く。候補が無ければ変えずに動く
+  const commitTypedAndMove = (dStaff: number, dDay: number) => {
+    if (suggestions.length > 0) commit(suggestions[activeClamped]);
+    moveSelection(dStaff, dDay);
+  };
+
+  const editing = editMode !== null;
+
+  /** 押したキーが指す向き（Enter↓ / Tab→ / 矢印。Shift で逆向き）。移動のキーでなければ null */
+  const directionOf = (e: KeyboardEvent<HTMLDivElement>): [number, number] | null => {
+    switch (e.key) {
+      case "ArrowUp":
+        return [-1, 0];
+      case "ArrowDown":
+        return [1, 0];
+      case "ArrowLeft":
+        return [0, -1];
+      case "ArrowRight":
+        return [0, 1];
+      case "Enter":
+        return e.shiftKey ? [-1, 0] : [1, 0];
+      case "Tab":
+        return e.shiftKey ? [0, -1] : [0, 1];
+      default:
+        return null;
+    }
+  };
+
+  const isTypedChar = (e: KeyboardEvent<HTMLDivElement>) =>
+    e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key);
+
+  /** 打つ入力・リスト選択とも、Backspace は1文字消す。空でさらに消したらセルを未定にして閉じる */
+  const backspaceInEditor = () => {
+    if (!selection) return;
+    if (inputBuffer && inputBuffer.length > 0) {
+      setInputBuffer(inputBuffer.slice(0, -1));
+      setActiveIndex(0);
+      return;
+    }
+    onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
+    closeEditor();
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    // 修飾キー付きはブラウザ/OS のショートカットに委ねる
+    // Alt+↓ はリストを開く（Excel と同じ）。修飾キーの早期 return より前で拾う
+    if (e.altKey && e.key === "ArrowDown") {
+      if (selection && !editing) {
+        e.preventDefault();
+        openEditor(selection.staffId, selection.day);
+      }
+      return;
+    }
+    // それ以外の修飾キー付き（Shift は除く）はブラウザ/OS のショートカットに委ねる
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-    // ----- ドロップダウンを開いている間: 矢印は候補移動、Enter で確定 -----
-    if (editing && selection) {
+    // ----- 打つ入力: 確定キーで確定して、その向きへ動く -----
+    if (editMode === "type" && selection) {
+      const direction = directionOf(e);
+      if (direction) {
+        e.preventDefault();
+        commitTypedAndMove(...direction);
+        return;
+      }
+      switch (e.key) {
+        case "Escape":
+          e.preventDefault();
+          closeEditor(); // 打ち込みを取り消す（動かない）
+          return;
+        case "Backspace":
+          e.preventDefault();
+          backspaceInEditor();
+          return;
+        default:
+          if (isTypedChar(e)) {
+            e.preventDefault();
+            setInputBuffer((prev) => (prev ?? "") + e.key);
+            setActiveIndex(0);
+          }
+          return;
+      }
+    }
+
+    // ----- リスト選択: ↑↓で選び、Enter で確定して留まる -----
+    if (editMode === "list" && selection) {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
@@ -196,85 +313,84 @@ export function useCellKeyboardEditing({
           setActiveIndex((i) => Math.max(i - 1, 0));
           return;
         case "ArrowLeft":
-          // 横移動はドロップダウンを閉じて隣のセルへ（表計算的に編集を抜ける）
-          e.preventDefault();
-          moveSelection(0, -1);
-          return;
         case "ArrowRight":
+        case "Tab": {
+          // 横へ抜けるときは確定せずに閉じて動く
           e.preventDefault();
-          moveSelection(0, 1);
+          const direction = directionOf(e);
+          if (direction) moveSelection(...direction);
           return;
+        }
         case "Enter":
           e.preventDefault();
           if (suggestions.length > 0) applySuggestion(suggestions[activeClamped]);
-          else setInputBuffer(null);
+          else closeEditor();
           return;
         case "Escape":
           e.preventDefault();
-          setInputBuffer(null); // 打ち込みを取り消してドロップダウンを閉じる（選択は残す）
+          closeEditor();
           return;
         case "Backspace":
           e.preventDefault();
-          if (inputBuffer && inputBuffer.length > 0) {
-            setInputBuffer(inputBuffer.slice(0, -1));
-            setActiveIndex(0);
-          } else {
-            // 空の状態でさらに消したらセルを未定（クリア）にして閉じる
-            onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
-            setInputBuffer(null);
-          }
+          backspaceInEditor();
           return;
         default:
-          if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
+          if (isTypedChar(e)) {
             e.preventDefault();
-            setInputBuffer((prev) => (prev ?? "") + e.key);
+            setInputBuffer((prev) => (prev ?? "") + e.key); // 候補を絞る（リスト選択のまま）
             setActiveIndex(0);
           }
           return;
       }
     }
 
-    // ----- ドロップダウンを閉じている間: 矢印はセル移動 -----
-    switch (e.key) {
-      case "ArrowUp":
+    // ----- 選択だけ -----
+    const direction = directionOf(e);
+    if (!selection) {
+      // 選択が無ければ矢印で先頭セルから始める。Enter / Tab はブラウザに任せる
+      if (direction && e.key.startsWith("Arrow")) {
         e.preventDefault();
-        moveSelection(-1, 0);
-        return;
-      case "ArrowDown":
-        e.preventDefault();
-        moveSelection(1, 0);
-        return;
-      case "ArrowLeft":
-        e.preventDefault();
-        moveSelection(0, -1);
-        return;
-      case "ArrowRight":
-        e.preventDefault();
-        moveSelection(0, 1);
-        return;
-    }
-
-    if (!selection) return;
-
-    // Tab: そのセルが制約から一意に決まるなら、その値を承認して書き込む。
-    // 提案が無いセルでは何もしない＝ブラウザ本来のフォーカス移動に任せる。
-    if (e.key === "Tab" && !e.shiftKey) {
-      const forced = forcedCellOf?.(selection.staffId, selection.day);
-      if (forced) {
-        e.preventDefault();
-        onApproveForced?.(selection.staffId, selection.day, forced);
+        moveSelection(...direction);
       }
       return;
     }
 
+    if (direction) {
+      e.preventDefault();
+      // ルール3：何も入力していない Enter / Tab は、確定提案があれば承認して次の提案へ
+      const approveDirection: ApproveDirection | null = e.shiftKey
+        ? null
+        : e.key === "Enter"
+          ? "down"
+          : e.key === "Tab"
+            ? "right"
+            : null;
+      const forced =
+        approveDirection && onApproveForced
+          ? forcedCellOf?.(selection.staffId, selection.day)
+          : undefined;
+      if (approveDirection && onApproveForced && forced) {
+        const jumped = onApproveForced(
+          selection.staffId,
+          selection.day,
+          forced,
+          approveDirection
+        );
+        if (!jumped) moveSelection(...direction);
+        return;
+      }
+      moveSelection(...direction);
+      return;
+    }
+
     switch (e.key) {
-      case "Enter":
-        // 選択セルでドロップダウンを開く（全候補を表示）
+      case "F2":
         e.preventDefault();
         openEditor(selection.staffId, selection.day);
         return;
       case "Backspace":
-        // 打ち込まずにセルを未定（クリア）に戻す
+      case "Delete":
+        // 打たずにセルを未定（クリア）に戻す
         e.preventDefault();
         onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
         return;
@@ -283,11 +399,10 @@ export function useCellKeyboardEditing({
         setSelection(null);
         return;
       default:
-        // 英数字を打ち始めたらドロップダウンを開き、その文字をバッファに入れる
-        if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
+        // 英数字を打ち始めたら打つ入力を開き、その文字をバッファに入れる
+        if (isTypedChar(e)) {
           e.preventDefault();
-          setInputBuffer(e.key);
-          setActiveIndex(0);
+          beginEdit("type", e.key);
         }
     }
   };
@@ -296,6 +411,7 @@ export function useCellKeyboardEditing({
     gridRef,
     selection,
     inputBuffer,
+    editMode,
     editing,
     suggestions,
     activeIndex: activeClamped,
