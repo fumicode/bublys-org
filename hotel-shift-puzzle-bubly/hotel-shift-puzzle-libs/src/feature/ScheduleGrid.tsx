@@ -24,6 +24,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import type { CellSelection } from "../ui/schedule-grid/types.js";
 import {
   ScheduleConstraintsBar,
   shiftColorOfNames,
@@ -161,10 +162,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const { scope } = useScheduleHistory();
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
-  const [cellSelection, setCellSelection] = useState<{
-    staffId: string;
-    day: WorkingDay;
-  } | null>(null);
+  // キーボードのカーソル（スタッフ行のセル or 必要人数のセル。カーソルは1つ）
+  const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
   // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
   const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   // 候補集合は勤務表の全行について計算する（表示のフィルタとは無関係）
@@ -450,7 +449,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffList.map((s) => s.id)
     );
     if (next) {
-      setCellSelection({ staffId: next.staffId, day: next.day });
+      setCellSelection({ kind: "staff", staffId: next.staffId, day: next.day });
     }
   }, [schedule, cellSelection, staffList]);
 
@@ -483,7 +482,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     const next = nextForcedCellAfter(ordered, { staffId, dayKey: day.key });
     recordSetCell(store, { schedule, staffId, day, to: cell });
     if (!next) return false;
-    setCellSelection({ staffId: next.staffId, day: next.day });
+    setCellSelection({ kind: "staff", staffId: next.staffId, day: next.day });
     return true;
   };
 
@@ -844,6 +843,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             className="e-dead-jump"
             onClick={() =>
               setCellSelection({
+                kind: "staff",
                 staffId: deadCells[0].staffId,
                 day: deadCells[0].day,
               })

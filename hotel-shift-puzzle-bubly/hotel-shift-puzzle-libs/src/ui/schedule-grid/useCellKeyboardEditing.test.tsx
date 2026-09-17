@@ -30,6 +30,10 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       cell: ShiftCell,
       direction: ApproveDirection
     ) => boolean;
+    requiredShiftNames?: string[];
+    maxRequired?: number;
+    onChangeRequiredCell?: (shiftName: string, day: WorkingDay | null, count: number) => void;
+    onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
   } = {}) => {
     const onChangeCell = jest.fn();
     const hook = renderHook(() =>
@@ -54,7 +58,9 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     };
     const at = () => {
       const selection = hook.result.current.selection;
-      return selection ? `${selection.staffId}:${selection.day.day}` : null;
+      if (!selection) return null;
+      if (selection.kind === "staff") return `${selection.staffId}:${selection.day.day}`;
+      return `${selection.shiftName}:${selection.day?.day ?? "全日"}`;
     };
     return { hook, onChangeCell, press, at };
   };
@@ -220,5 +226,134 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     press("Delete");
 
     expect(onChangeCell).toHaveBeenCalledWith("s2", days[1], { kind: "undecided" });
+  });
+
+  /**
+   * 必要人数のセル（#156）。カーソルは1つで、表はひと続き（スタッフ行の下に必要人数の行）。
+   * キー操作は #152 のルールをそのまま使う。
+   */
+  describe("必要人数のセル", () => {
+    const requiredSetUp = () => {
+      const onChangeRequiredCell = jest.fn();
+      const onOpenRequiredList = jest.fn();
+      const ctx = setUp({
+        requiredShiftNames: ["早番", "遅番"],
+        maxRequired: 3,
+        onChangeRequiredCell,
+        onOpenRequiredList,
+      });
+      return { ...ctx, onChangeRequiredCell, onOpenRequiredList };
+    };
+
+    it("★ 一番下のスタッフ行から ↓ で必要人数の行へ入り、↑ で戻る", () => {
+      const { hook, press, at } = requiredSetUp();
+      act(() => hook.result.current.selectCell("s3", days[1]));
+
+      press("ArrowDown");
+      expect(at()).toBe("早番:2");
+
+      press("ArrowUp");
+      expect(at()).toBe("s3:2");
+    });
+
+    it("★ 「3」→ Enter で必要人数を3にして、下の勤務帯行へ", () => {
+      const { hook, press, at, onChangeRequiredCell, onChangeCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[2]));
+
+      press("3");
+      expect(hook.result.current.editMode).toBe("type");
+      expect(hook.result.current.suggestions).toEqual([]); // 勤務帯の候補リストは出さない
+      press("Enter");
+
+      expect(onChangeRequiredCell).toHaveBeenCalledWith("早番", days[2], 3);
+      expect(onChangeCell).not.toHaveBeenCalled();
+      expect(at()).toBe("遅番:3");
+    });
+
+    it("★ 行の見出しで「2」→ Tab で全日まとめて2にして、1日目へ", () => {
+      const { hook, press, at, onChangeRequiredCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("遅番", null));
+
+      press("2");
+      press("Tab");
+
+      expect(onChangeRequiredCell).toHaveBeenCalledWith("遅番", null, 2);
+      expect(at()).toBe("遅番:1");
+    });
+
+    it("1日目から ← で行の見出しへ", () => {
+      const { hook, press, at } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[0]));
+
+      press("ArrowLeft");
+
+      expect(at()).toBe("早番:全日");
+    });
+
+    it("最大値を超える数は入れずに動く（打ち込み途中の数字も同じ扱い）", () => {
+      const { hook, press, at, onChangeRequiredCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[0]));
+
+      press("1");
+      press("2"); // 12 > 最大 3
+      press("ArrowRight");
+
+      expect(onChangeRequiredCell).not.toHaveBeenCalled();
+      expect(at()).toBe("早番:2");
+    });
+
+    it("何も打たずに Enter / Tab は移動だけ", () => {
+      const { hook, press, at, onChangeRequiredCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[0]));
+
+      press("Enter");
+      press("Tab");
+
+      expect(onChangeRequiredCell).not.toHaveBeenCalled();
+      expect(at()).toBe("遅番:2");
+    });
+
+    it.each([
+      ["Alt+↓", "ArrowDown", { altKey: true }],
+      ["F2", "F2", {}],
+    ])("%s でメニューを開く（選ぶのはビューのメニュー。カーソルは動かない）", (_label, key, mods) => {
+      const { hook, press, at, onOpenRequiredList } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[1]));
+
+      press(key, mods);
+
+      expect(onOpenRequiredList).toHaveBeenCalledWith("早番", days[1]);
+      expect(at()).toBe("早番:2");
+    });
+
+    it("Delete で 0（設定なし）にする", () => {
+      const { hook, press, onChangeRequiredCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("遅番", days[1]));
+
+      press("Delete");
+
+      expect(onChangeRequiredCell).toHaveBeenCalledWith("遅番", days[1], 0);
+    });
+
+    it("Esc は打ち込みを取り消して、動かない", () => {
+      const { hook, press, at, onChangeRequiredCell } = requiredSetUp();
+      act(() => hook.result.current.selectRequired("早番", days[1]));
+
+      press("2");
+      press("Escape");
+
+      expect(onChangeRequiredCell).not.toHaveBeenCalled();
+      expect(at()).toBe("早番:2");
+      expect(hook.result.current.editing).toBe(false);
+    });
+
+    it("必要人数の行を渡さなければ（抽出ビュー）、一番下のスタッフ行で ↓ しても留まる", () => {
+      const { hook, press, at } = setUp();
+      act(() => hook.result.current.selectCell("s3", days[1]));
+
+      press("ArrowDown");
+
+      expect(at()).toBe("s3:2");
+    });
   });
 });

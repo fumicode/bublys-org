@@ -30,5 +30,13 @@ export const DEMAND_CELL_KEY_PREFIX = "demand:";
 export const demandCellKey = (shiftId: string, dayKey: string): string =>
   `${DEMAND_CELL_KEY_PREFIX}${shiftId}:${dayKey}`;
 
+/**
+ * 必要人数のセル（と行の見出し）の data-required-key を組み立てる。
+ * キーボードのカーソルで選ばれたセルを DOM から引く（メニューのアンカー）のに使う。
+ * dayKey が null なら行の見出し（全日まとめて）。
+ */
+export const requiredCellKey = (shiftName: string, dayKey: string | null): string =>
+  `required:${shiftName}:${dayKey ?? "all"}`;
+
 /** 曜日の表示（0=日 … 6=土）。WorkingDay.weekday の添字で引く。 */
 export const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];

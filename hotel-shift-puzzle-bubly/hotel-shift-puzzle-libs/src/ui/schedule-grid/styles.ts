@@ -300,6 +300,31 @@ export const StyledWrap = styled.div`
   .e-sum-cell.is-editable {
     cursor: pointer;
   }
+  /* キーボードのカーソルがいる必要人数のセル / 見出し（スタッフ行のセルの選択枠と同じ見た目） */
+  .e-sum-head.is-selected,
+  .e-sum-cell.is-selected {
+    box-shadow: inset 0 0 0 2px #1976d2;
+  }
+  /* 打ち込み表示の基準。見出しは sticky で既に基準になっているので、日のセルにだけ付ける
+     （見出しに relative を付けると横スクロールの固定が外れる） */
+  .e-sum-cell.is-selected {
+    position: relative;
+    z-index: 1;
+  }
+  /* 打ち込み中の数字（スタッフ行のセルの .e-input と同じ見た目） */
+  .e-sum-head .e-input,
+  .e-sum-cell .e-input {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(227, 242, 253, 0.95);
+    color: #0d47a1;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+  }
   .e-sum-cell.is-editable:hover {
     box-shadow: inset 0 0 0 2px #90a4ae;
   }

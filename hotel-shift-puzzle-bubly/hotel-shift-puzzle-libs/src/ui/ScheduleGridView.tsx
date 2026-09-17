@@ -23,6 +23,7 @@ import {
   EARLY_COL_WIDTH,
   EARLY_SHIFT_NAME,
   DEMAND_CELL_KEY_PREFIX,
+  requiredCellKey,
 } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
@@ -343,7 +344,23 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name));
 
-  // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
+  // ----- 必要人数 -----
+  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
+  // 必要人数として選べる最大値（スタッフ総数まで）
+  const maxRequired = Math.max(staffList.length, 1);
+  const requiredEditable = !!(onChangeRequired || onChangeRequiredAllDays);
+  // キーボードのカーソルが入れる必要人数の行（勤務帯名）。責任者行・休み行は並べない＝飛ばす
+  const requiredShiftNames = requiredEditable
+    ? summaryRows.filter((r) => r.required).map((r) => r.label)
+    : [];
+
+  /** 必要人数を1セル（day が null なら全日まとめて）確定する */
+  const changeRequired = (shiftName: string, day: WorkingDay | null, count: number) => {
+    if (day) onChangeRequired?.(day, shiftName, count);
+    else onChangeRequiredAllDays?.(shiftName, count);
+  };
+
+  // キーボード操作（セル選択・矢印移動・打ち込みでの確定）はフックに委譲
   const kb = useCellKeyboardEditing({
     staffList,
     days,
@@ -354,21 +371,34 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     onSelectionChange,
     forcedCellOf,
     onApproveForced,
+    requiredShiftNames,
+    maxRequired,
+    onChangeRequiredCell: changeRequired,
+    onOpenRequiredList: (shiftName, day) => {
+      // カーソルのいるセルをアンカーに、今の値でメニューを開く（クリックと同じメニュー）
+      const anchor = kb.gridRef.current?.querySelector<HTMLElement>(
+        `[data-required-key="${requiredCellKey(shiftName, day?.key ?? null)}"]`
+      );
+      const row = summaryRows.find((r) => r.label === shiftName);
+      if (!anchor || !row?.required) return;
+      const dayIndex = day ? days.findIndex((d) => d.key === day.key) : 0;
+      setEditingRequired({
+        anchor,
+        shiftName,
+        day,
+        current: row.required(Math.max(dayIndex, 0)),
+      });
+    },
   });
 
-  // ----- 必要人数の編集メニュー -----
-  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
-  // 必要人数として選べる最大値（スタッフ総数まで）
-  const maxRequired = Math.max(staffList.length, 1);
+  // メニューで選んだ値で確定する（ルール2：留まる）。閉じたらキー操作へ戻れるようグリッドへフォーカス
   const applyRequired = (count: number) => {
-    if (editingRequired) {
-      if (editingRequired.day) {
-        onChangeRequired?.(editingRequired.day, editingRequired.shiftName, count);
-      } else {
-        onChangeRequiredAllDays?.(editingRequired.shiftName, count);
-      }
-    }
+    if (editingRequired) changeRequired(editingRequired.shiftName, editingRequired.day, count);
+    closeRequiredMenu();
+  };
+  const closeRequiredMenu = () => {
     setEditingRequired(null);
+    kb.gridRef.current?.focus();
   };
 
   const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
@@ -576,11 +606,17 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             row={row}
             days={days}
             rowIndex={rowIndex}
-            editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
+            editable={!!row.required && requiredEditable}
             // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。
             // 人数の行（必要人数・休み）はどのロールを見ているときも充足を読み取る土台なので減光しない。
             dimmed={focusActive && !!row.ruleKey && !focusedRuleKeys.has(row.ruleKey)}
-            onEditRequired={setEditingRequired}
+            onEditRequired={(params) => {
+              // クリックでもカーソルをそのセルに置いてからメニューを開く（居場所を揃える）
+              kb.selectRequired(params.shiftName, params.day);
+              setEditingRequired(params);
+            }}
+            selection={kb.selection}
+            inputBuffer={kb.selection?.kind === "required" ? kb.inputBuffer : null}
             leaderViolationUrl={leaderViolationUrl}
           />
         ))}
@@ -600,7 +636,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       <RequiredEditMenu
         editingRequired={editingRequired}
         maxRequired={maxRequired}
-        onClose={() => setEditingRequired(null)}
+        onClose={closeRequiredMenu}
         onApply={applyRequired}
       />
 

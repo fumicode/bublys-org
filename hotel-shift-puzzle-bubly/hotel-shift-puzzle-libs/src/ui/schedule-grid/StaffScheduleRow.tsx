@@ -152,7 +152,9 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           (v) => !isShiftIntervalConstraintType(v.constraintType)
         );
         const isSelected =
-          selection?.staffId === staff.id && selection.day.equals(day);
+          selection?.kind === "staff" &&
+          selection.staffId === staff.id &&
+          selection.day.equals(day);
         return (
           <ScheduleDataCell
             key={`${staff.id}:${day.key}`}
