@@ -5,6 +5,7 @@ import {
   cellsOf,
   extendArea,
   isInSelection,
+  removeArea,
   sameCell,
   singleArea,
 } from "./gridSelection.js";
@@ -98,6 +99,43 @@ describe("gridSelection（勤務表の範囲選択）", () => {
     ]);
     expect(isInSelection(areas, staff("s1", 4), layout)).toBe(true);
     expect(isInSelection(areas, staff("s1", 3), layout)).toBe(false);
+  });
+
+  it("★ removeArea：長方形の真ん中の1セルを外すと、残りが上下左右の長方形に分かれる", () => {
+    const area = areaTo(staff("s1", 1), staff("s3", 3), layout); // 3行×3列
+
+    const rest = removeArea([area], singleArea(staff("s2", 2)), layout);
+
+    expect(labels(cellsOf(rest, layout))).toEqual([
+      "s1:1", "s1:2", "s1:3",
+      "s2:1",         "s2:3",
+      "s3:1", "s3:2", "s3:3",
+    ]);
+    expect(isInSelection(rest, staff("s2", 2), layout)).toBe(false);
+  });
+
+  it("★ removeArea：複数セルの長方形を外す。はみ出した分は無視し、重ならない範囲はそのまま", () => {
+    const areas = [
+      areaTo(staff("s1", 1), staff("s3", 4), layout), // 3行×4列
+      singleArea(staff("s1", 4)),
+    ];
+
+    // s2〜s3 の 2〜3日を外す
+    const rest = removeArea(areas, areaTo(staff("s2", 2), staff("s3", 3), layout), layout);
+
+    expect(labels(cellsOf(rest, layout))).toEqual([
+      "s1:1", "s1:2", "s1:3", "s1:4",
+      "s2:1",                 "s2:4",
+      "s3:1",                 "s3:4",
+    ]);
+  });
+
+  it("removeArea：1セルだけの範囲を外すと消え、含まない範囲はそのまま", () => {
+    const areas = [singleArea(staff("s1", 1)), areaTo(staff("s2", 1), staff("s2", 2), layout)];
+
+    const rest = removeArea(areas, singleArea(staff("s1", 1)), layout);
+
+    expect(rest).toEqual([areas[1]]);
   });
 
   it("sameCell：種類・人（勤務帯）・日がそろえば同じセル", () => {

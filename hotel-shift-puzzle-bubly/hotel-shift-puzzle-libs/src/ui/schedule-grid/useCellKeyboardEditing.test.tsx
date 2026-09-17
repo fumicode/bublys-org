@@ -691,6 +691,77 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       expect(at()).toBe("s1:3");
     });
 
+    it("★ マウス：選んであるセルを Ctrl/Cmd＋押すと外れる（長方形は分かれる）", () => {
+      const { hook, at, inRange } = setUp();
+      const cell = (staffId: string, d: number): CellSelection => ({
+        kind: "staff",
+        staffId,
+        day: days[d - 1],
+      });
+      act(() => hook.result.current.pressCell(cell("s1", 1), { shiftKey: true, additive: false }));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s2:1", "s2:2"]); // 起点（カーソル）は s2:2
+
+      act(() => hook.result.current.pressCell(cell("s1", 2), { shiftKey: false, additive: true }));
+      expect(inRange()).toEqual(["s1:1", "s2:1", "s2:2"]);
+      expect(at()).toBe("s2:2"); // カーソルは残る
+
+      // カーソルのセルを外すと、残った選択の起点へカーソルが移る
+      act(() => hook.result.current.pressCell(cell("s2", 2), { shiftKey: false, additive: true }));
+      expect(inRange()).toEqual(["s1:1", "s2:1"]);
+      expect(at()).not.toBe("s2:2");
+    });
+
+    it("★ マウス：Ctrl/Cmd＋ドラッグで長方形を足す。修飾無しのドラッグとは違い、元の選択は残る", () => {
+      const { hook, at, inRange } = setUp();
+      const cell = (staffId: string, d: number): CellSelection => ({
+        kind: "staff",
+        staffId,
+        day: days[d - 1],
+      });
+      act(() => hook.result.current.pressCell(cell("s1", 1), { shiftKey: true, additive: false }));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s2:1", "s2:2"]);
+
+      act(() => hook.result.current.pressCell(cell("s2", 3), { shiftKey: false, additive: true }));
+      act(() => hook.result.current.dragToCell(cell("s3", 3)));
+
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s2:1", "s2:2", "s2:3", "s3:3"]);
+      expect(at()).toBe("s2:3"); // カーソルは足した範囲の起点
+    });
+
+    it("★ マウス：選んであるセルから Ctrl/Cmd＋ドラッグすると、その長方形を外す", () => {
+      const { hook, at, inRange } = setUp();
+      const cell = (staffId: string, d: number): CellSelection => ({
+        kind: "staff",
+        staffId,
+        day: days[d - 1],
+      });
+      act(() => hook.result.current.pressCell(cell("s1", 1), { shiftKey: false, additive: false }));
+      act(() => hook.result.current.dragToCell(cell("s3", 3))); // 3行×3列、カーソルは s1:1
+      act(() => {
+        window.dispatchEvent(new MouseEvent("mouseup"));
+      });
+
+      act(() => hook.result.current.pressCell(cell("s2", 2), { shiftKey: false, additive: true }));
+      act(() => hook.result.current.dragToCell(cell("s3", 3)));
+
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s1:3", "s2:1", "s3:1"]);
+      expect(at()).toBe("s1:1"); // カーソルは外していないので残る
+
+      // ドラッグで行き過ぎて戻れば、外す範囲も戻る（押したときの選択から作り直す）
+      act(() => hook.result.current.dragToCell(cell("s2", 2)));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s1:3", "s2:1", "s2:3", "s3:1", "s3:2", "s3:3"]);
+    });
+
+    it("マウス：最後の1セルは Ctrl/Cmd＋押しても外れない（カーソルとして残る）", () => {
+      const { hook, at, inRange } = setUp();
+      const here: CellSelection = { kind: "staff", staffId: "s2", day: days[1] };
+
+      act(() => hook.result.current.pressCell(here, { shiftKey: false, additive: true }));
+
+      expect(at()).toBe("s2:2");
+      expect(inRange()).toEqual([]);
+    });
+
     it("マウス：押したままドラッグで範囲を広げる。離したあとは広がらない", () => {
       const { hook, inRange } = setUp();
       const cell = (staffId: string, d: number): CellSelection => ({

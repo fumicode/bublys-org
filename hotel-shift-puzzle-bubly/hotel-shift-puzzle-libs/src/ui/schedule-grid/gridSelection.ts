@@ -90,6 +90,40 @@ const rectOf = (area: SelectionArea, layout: CursorLayout) => {
   };
 };
 
+/**
+ * 選択から長方形1つぶんを外す（Ctrl/Cmd＋押して、選んであるセルから始めたとき。Excel と同じ）。
+ * 外す長方形と重なる範囲は、重ならない残りを上・下・左・右の最大4つの長方形に分ける。
+ * 残りが無くなれば空配列（最後の1セルを外すかは呼び出し側が決める）。
+ */
+export function removeArea(
+  areas: SelectionArea[],
+  removed: SelectionArea,
+  layout: CursorLayout
+): SelectionArea[] {
+  const x = rectOf(removed, layout);
+  if (!x) return areas;
+  const rectArea = (top: number, left: number, bottom: number, right: number): SelectionArea => ({
+    anchor: cursorAt(top, left, layout),
+    extent: cursorAt(bottom, right, layout),
+  });
+  return areas.flatMap((area) => {
+    const r = rectOf(area, layout);
+    if (!r) return [area];
+    // 重なり
+    const top = Math.max(r.top, x.top);
+    const bottom = Math.min(r.bottom, x.bottom);
+    const left = Math.max(r.left, x.left);
+    const right = Math.min(r.right, x.right);
+    if (top > bottom || left > right) return [area];
+    const pieces: SelectionArea[] = [];
+    if (r.top < top) pieces.push(rectArea(r.top, r.left, top - 1, r.right));
+    if (r.left < left) pieces.push(rectArea(top, r.left, bottom, left - 1));
+    if (right < r.right) pieces.push(rectArea(top, right + 1, bottom, r.right));
+    if (bottom < r.bottom) pieces.push(rectArea(bottom + 1, r.left, r.bottom, r.right));
+    return pieces;
+  });
+}
+
 /** セルが選択のどれかの範囲に入っているか */
 export function isInSelection(
   areas: SelectionArea[],

@@ -30,6 +30,7 @@ import {
   cellsOf,
   extendArea,
   isInSelection,
+  removeArea,
   sameCell,
   singleArea,
 } from "./gridSelection.js";
@@ -117,10 +118,11 @@ export type CellKeyboardEditing = {
   applyRequiredCount: (count: number) => boolean;
   /**
    * セルを押した（マウス）。修飾無し＝そのセルだけ、Shift＝起点からそこまでの範囲、
-   * additive（Ctrl/Cmd）＝飛び地として足す。押したままのドラッグは dragToCell で範囲を広げる。
+   * additive（Ctrl/Cmd）＝飛び地として足す（選んであるセルから始めたら外す）。押したままのドラッグは dragToCell で、
+   * 押したときに決まった操作（選び直す・広げる・足す・外す）を長方形で続ける。
    */
   pressCell: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
-  /** 押したまま入ったセルまで、最後の範囲を広げる（ドラッグ）。押していなければ何もしない */
+  /** 押したまま入ったセルまで、押したときの操作（選び直す・広げる・足す・外す）を続ける。押していなければ何もしない */
   dragToCell: (cell: CellSelection) => void;
   /** セルが範囲選択に入っているか（2セル以上選んでいるときだけ true。1セルはカーソルの枠で足りる） */
   isInRange: (cell: CellSelection) => boolean;
@@ -182,7 +184,7 @@ const isDigit = (e: KeyboardEvent<HTMLDivElement>) => /^[0-9]$/.test(e.key);
  * 居場所の違いにすぎない（#156）。表はひと続きで、スタッフ行の下に必要人数の行が続く（gridCursor）。
  *
  * **選択は「カーソル＋範囲の集まり」**（#157）。範囲は Excel と同じ長方形（Shift＋矢印・Shift＋クリック・
- * ドラッグ）で、Ctrl/Cmd＋クリックで飛び地を足す。カーソルは最後の範囲の起点。
+ * ドラッグ）で、Ctrl/Cmd＋クリック（ドラッグ）で飛び地を足す（選んであるセルから始めたら外す）。カーソルは最後の範囲の起点。
  *   - **入れる操作は選択の全セルに効く。** 打った値・リストで選んだ値・Delete を全セルへ1回で入れ、
  *     範囲を残して留まる。可能勤務帯に無い勤務帯は、その人のセルだけ飛ばす
  *   - **範囲は、カーソルが Shift 無しで動くと解ける。** 外から（feature 層が）カーソルを動かしても、
@@ -381,37 +383,97 @@ export function useCellKeyboardEditing({
   };
 
   // ----- マウス -----
-  const draggingRef = useRef(false);
+  /**
+   * 押してから離すまでの1回の操作（Excel と同じく、押したときに何をするかが決まる）。
+   *   - replace : 修飾無し。押したセルからドラッグした長方形で選び直す
+   *   - extend  : Shift。最後の範囲の起点から、押した（ドラッグした）セルまで
+   *   - add     : Ctrl/Cmd で、選んでいないセルから。押したセルからドラッグした長方形を足す
+   *   - remove  : Ctrl/Cmd で、選んであるセルから。押したセルからドラッグした長方形を外す
+   * base は押したときの選択。ドラッグ中は毎回 base から作り直す（行き過ぎて戻っても元に戻る）
+   */
+  type Gesture = {
+    mode: "replace" | "extend" | "add" | "remove";
+    start: CellSelection;
+    base: SelectionArea[];
+    baseCursor: CellSelection | null;
+    last: CellSelection;
+  };
+  const gestureRef = useRef<Gesture | null>(null);
   useEffect(() => {
     const stop = () => {
-      draggingRef.current = false;
+      gestureRef.current = null;
     };
     window.addEventListener("mouseup", stop);
     return () => window.removeEventListener("mouseup", stop);
   }, []);
 
+  /** 操作を、いまマウスがあるセルまで当てはめる */
+  const applyGesture = (g: Gesture, cell: CellSelection) => {
+    switch (g.mode) {
+      case "replace":
+        setAreas([areaTo(g.start, cell, layout)]);
+        setCursor(g.start);
+        return;
+      case "extend": {
+        const last = g.base[g.base.length - 1];
+        if (last) setAreas([...g.base.slice(0, -1), areaTo(last.anchor, cell, layout)]);
+        return;
+      }
+      case "add":
+        setAreas([...g.base, areaTo(g.start, cell, layout)]);
+        setCursor(g.start);
+        return;
+      case "remove": {
+        const rest = removeArea(g.base, areaTo(g.start, cell, layout), layout);
+        const cursor = g.baseCursor;
+        if (cursor && isInSelection(rest, cursor, layout)) {
+          // カーソルは残る。範囲の最後の起点がカーソルになるよう、カーソルの1セルを最後に足す
+          setAreas([...rest, singleArea(cursor)]);
+          setCursor(cursor);
+        } else if (rest.length > 0) {
+          // カーソルを外したら、残った選択の最後の起点へ移す
+          setAreas(rest);
+          setCursor(rest[rest.length - 1].anchor);
+        } else if (cursor) {
+          // 全部外れるときは、カーソルの1セルだけ残す（勤務表には常にカーソルが1つある）
+          setAreas([]);
+          setCursor(cursor);
+        }
+        return;
+      }
+    }
+  };
+
   const pressCell = (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => {
     closeEditor();
-    const last = activeAreas[activeAreas.length - 1];
-    if (mods.shiftKey && last) {
-      replaceLastArea(() => areaTo(last.anchor, cell, layout));
-    } else if (mods.additive && selection && selection.kind === cell.kind) {
-      setAreas([...activeAreas, singleArea(cell)]);
-      setCursor(cell);
-    } else {
-      setSelection(cell);
-    }
-    draggingRef.current = true;
+    const sameKind = !!selection && selection.kind === cell.kind;
+    const mode: Gesture["mode"] =
+      mods.shiftKey && sameKind
+        ? "extend"
+        : mods.additive && sameKind
+          ? hasRange || !sameCell(cell, selection)
+            ? isInSelection(activeAreas, cell, layout)
+              ? "remove"
+              : "add"
+            : "replace" // 1セルだけ選んでいてそのセルを押した＝何も変わらない
+          : "replace";
+    const g: Gesture = {
+      mode,
+      start: cell,
+      base: activeAreas,
+      baseCursor: selection,
+      last: cell,
+    };
+    gestureRef.current = g;
+    applyGesture(g, cell);
     gridRef.current?.focus();
   };
 
   const dragToCell = (cell: CellSelection) => {
-    if (!draggingRef.current) return;
-    const last = activeAreas[activeAreas.length - 1];
-    if (!last) return;
-    const next = areaTo(last.anchor, cell, layout);
-    if (sameCell(next.extent, last.extent)) return;
-    replaceLastArea(() => next);
+    const g = gestureRef.current;
+    if (!g || sameCell(g.last, cell)) return;
+    g.last = cell;
+    applyGesture(g, cell);
   };
 
   const isInRange = (cell: CellSelection) => hasRange && isInSelection(activeAreas, cell, layout);
