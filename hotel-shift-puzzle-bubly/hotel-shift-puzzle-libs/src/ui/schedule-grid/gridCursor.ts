@@ -20,10 +20,10 @@ export type CursorLayout = {
 };
 
 /** 行の見出し（全日まとめて）の列番号 */
-const HEAD_COL = -1;
+export const HEAD_COL = -1;
 
 /** (行, 列) の位置にあるカーソル */
-const cursorAt = (row: number, col: number, layout: CursorLayout): CellSelection => {
+export const cursorAt = (row: number, col: number, layout: CursorLayout): CellSelection => {
   const { staffIds, requiredShiftNames, days } = layout;
   if (row < staffIds.length) {
     return { kind: "staff", staffId: staffIds[row], day: days[Math.max(col, 0)] };
@@ -36,7 +36,7 @@ const cursorAt = (row: number, col: number, layout: CursorLayout): CellSelection
 };
 
 /** カーソルの (行, 列)。表に無い居場所なら undefined */
-const positionOf = (
+export const positionOf = (
   cursor: CellSelection,
   layout: CursorLayout
 ): { row: number; col: number } | undefined => {

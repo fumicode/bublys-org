@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, type MouseEvent } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { WorkingDay } from "../../domain/index.js";
 import type { SummaryRow as SummaryRowModel } from "./summaryModel.js";
@@ -24,6 +24,10 @@ type SummaryRowProps = {
   selection?: CellSelection | null;
   /** カーソルのいる必要人数のセルで打ち込み中の数字（null は非入力） */
   inputBuffer?: string | null;
+  /** Shift／Ctrl/Cmd＋クリック：範囲・飛び地の操作だけをする（メニューは開かない） */
+  onPressCell?: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
+  /** セルが範囲選択に入っているか */
+  isInRange?: (cell: CellSelection) => boolean;
   /**
    * 責任者行の未充足 ✕ から違反バブルを開くための URL を作る（ロールキー×稼働日）。
    * 違反が無い日は undefined。ダブルクリックで違反バブルを開く（ObjectView）。
@@ -48,6 +52,8 @@ export const SummaryRow: FC<SummaryRowProps> = ({
   onEditRequired,
   selection,
   inputBuffer = null,
+  onPressCell,
+  isInRange,
   leaderViolationUrl,
 }) => {
   const isFirst = rowIndex === 0;
@@ -63,6 +69,19 @@ export const SummaryRow: FC<SummaryRowProps> = ({
       <span className="e-input">{inputBuffer}</span>
     ) : null;
   const selectedCls = (dayKey: string | null) => (isCursorAt(dayKey) ? " is-selected" : "");
+  const here = (day: WorkingDay): CellSelection => ({ kind: "required", shiftName: row.label, day });
+  const rangeCls = (day: WorkingDay) =>
+    editable && isInRange?.(here(day)) ? " is-in-range" : "";
+  /**
+   * 修飾キー付きのクリックは範囲・飛び地の操作だけにする（true を返す）。
+   * 修飾無しは false を返し、今までどおりメニューを開く
+   */
+  const pressOrEdit = (e: MouseEvent, day: WorkingDay): boolean => {
+    const additive = e.ctrlKey || e.metaKey;
+    if (!onPressCell || !(e.shiftKey || additive)) return false;
+    onPressCell(here(day), { shiftKey: e.shiftKey, additive });
+    return true;
+  };
   const firstCls = isFirst ? " is-first" : "";
   // 行は grid の直接の子（見出し＋各日セル＋右レール跨ぎ）なので、各セルへ同じクラスを付ける
   const dimCls = dimmed ? " is-dimmed" : "";
@@ -143,7 +162,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
               key={`sum:${row.key}:${day.key}`}
               className={`e-sum-cell is-ratio${firstCls}${dimCls}${met ? " is-met" : " is-under"}${
                 editable ? " is-editable" : ""
-              }${selectedCls(day.key)}`}
+              }${selectedCls(day.key)}${rangeCls(day)}`}
               style={{
                 background: `linear-gradient(to top, ${fill} ${pct}%, ${track} ${pct}%)`,
               }}
@@ -158,6 +177,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
               onClick={
                 editable
                   ? (e) =>
+                      pressOrEdit(e, day) ||
                       onEditRequired({
                         anchor: e.currentTarget,
                         shiftName: row.label,
@@ -183,7 +203,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             key={`sum:${row.key}:${day.key}`}
             className={`e-sum-cell${firstCls}${dimCls}${n === 0 ? " is-zero" : ""}${
               over ? " is-over" : ""
-            }${editable ? " is-editable" : ""}${selectedCls(day.key)}`}
+            }${editable ? " is-editable" : ""}${selectedCls(day.key)}${rangeCls(day)}`}
             role={editable ? "button" : undefined}
             data-required-key={editable ? requiredCellKey(row.label, day.key) : undefined}
             title={
@@ -196,6 +216,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             onClick={
               editable
                 ? (e) =>
+                    pressOrEdit(e, day) ||
                     onEditRequired({
                       anchor: e.currentTarget,
                       shiftName: row.label,

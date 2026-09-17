@@ -37,7 +37,7 @@ describe("ScheduleDataCell の違反の印", () => {
         intervalBefore={violation("shift-interval")}
         intervalAfter={violation("shift-interval")}
         cellKey="s1:2026-06-01"
-        onSelect={() => undefined}
+        onPress={() => undefined}
         onOpenEditor={() => undefined}
         violationUrl={withUrl ? (v) => `violations/${v.constraintType}` : undefined}
       />

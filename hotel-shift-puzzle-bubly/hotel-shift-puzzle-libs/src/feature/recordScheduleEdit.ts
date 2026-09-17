@@ -75,9 +75,27 @@ export function recordSetCell(
     to: ShiftCell;
   }
 ): MonthlyStaffSchedule {
+  return recordSetCells(store, {
+    schedule: args.schedule,
+    changes: [{ staffId: args.staffId, day: args.day, to: args.to }],
+  });
+}
+
+/**
+ * 複数セルの編集（範囲選択でまとめて入れる。#157）を記録。
+ * 1回の操作は**1ノード**にする（1セルずつ記録すると、世界線を1つ戻しても範囲の一部しか戻らない）。
+ */
+export function recordSetCells(
+  store: StoreLike,
+  args: {
+    schedule: MonthlyStaffSchedule;
+    changes: { staffId: string; day: WorkingDay; to: ShiftCell }[];
+  }
+): MonthlyStaffSchedule {
   return recordScheduleMutation(store, {
     schedule: args.schedule,
-    transform: (s) => s.setCell(args.staffId, args.day, args.to),
+    transform: (s) =>
+      args.changes.reduce((acc, c) => acc.setCell(c.staffId, c.day, c.to), s),
   });
 }
 

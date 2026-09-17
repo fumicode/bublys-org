@@ -311,6 +311,17 @@ export const StyledWrap = styled.div`
     position: relative;
     z-index: 1;
   }
+  /* 範囲選択に入っている必要人数のセル（スタッフ行のセルの is-in-range と同じ見た目） */
+  .e-sum-cell.is-in-range {
+    position: relative;
+  }
+  .e-sum-cell.is-in-range::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(25, 118, 210, 0.18);
+    pointer-events: none;
+  }
   /* 打ち込み中の数字（スタッフ行のセルの .e-input と同じ見た目） */
   .e-sum-head .e-input,
   .e-sum-cell .e-input {
@@ -573,6 +584,16 @@ export const StyledWrap = styled.div`
       box-shadow: inset 0 0 0 2px #1976d2;
       z-index: 1;
     }
+  }
+
+  /* 範囲選択に入っているセル（#157）。勤務帯の背景色は inline なので、上に薄い青を重ねる */
+  .e-cell.is-in-range::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(25, 118, 210, 0.18);
+    pointer-events: none;
+    z-index: 1;
   }
 
   /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */

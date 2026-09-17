@@ -14,11 +14,10 @@ import {
   makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   type AutoShiftStep,
-  type WorkingDay,
-  type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import type { CellChange } from "../ui/schedule-grid/types.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
@@ -28,7 +27,7 @@ import {
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
-import { recordSetCell, recordScheduleMutation } from "./recordScheduleEdit.js";
+import { recordSetCells, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
@@ -141,9 +140,9 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
 
-  // セル編集: ScheduleGrid と同じく、この勤務表の世界線に記録
-  const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
-    recordSetCell(store, { schedule, staffId, day, to });
+  // セル編集: ScheduleGrid と同じく、この勤務表の世界線に記録（範囲でまとめて入れた分も1ノード）
+  const handleChangeCells = (changes: CellChange[]) => {
+    recordSetCells(store, { schedule, changes });
   };
 
   // 自動シフト：対象スタッフ（subset）だけを staffList として渡す → ステップが subset 限定になる
@@ -232,7 +231,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         leaderRules={relevantRules}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}
-        onChangeCell={handleChangeCell}
+        onChangeCells={handleChangeCells}
       />
 
       <div className="e-auto-bar">

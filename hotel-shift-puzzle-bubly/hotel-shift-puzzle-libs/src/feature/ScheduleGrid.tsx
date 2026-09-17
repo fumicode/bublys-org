@@ -24,7 +24,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
-import type { CellSelection } from "../ui/schedule-grid/types.js";
+import type { CellChange, CellSelection } from "../ui/schedule-grid/types.js";
 import {
   ScheduleConstraintsBar,
   shiftColorOfNames,
@@ -53,6 +53,7 @@ import { useScheduleHistory } from "./useScheduleHistory.js";
 import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
+  recordSetCells,
   recordScheduleMutation,
   recordConstraintEdit,
 } from "./recordScheduleEdit.js";
@@ -465,6 +466,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const handleChangeCell = (staffId: string, day: WorkingDay, to: ShiftCell) => {
     recordSetCell(store, { schedule, staffId, day, to });
   };
+  // 範囲選択でまとめて入れた分も1ノードに（#157）
+  const handleChangeCells = (changes: CellChange[]) => {
+    recordSetCells(store, { schedule, changes });
+  };
 
   // 確定提案の承認（何も打っていないときの Enter＝下 / Tab＝右）。承認した値を書き込み、
   // 押したキーの向きの次の提案セルへフォーカスを送る。押し続けるだけで提案を順に潰していける。
@@ -569,11 +574,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     onOpenWorldLineAfterCandidates?.();
   };
 
-  // 必要スタッフ数の編集（その日・全日）
-  const handleChangeRequired = (day: WorkingDay, shiftName: string, count: number) => {
+  // 必要スタッフ数の編集（その日・全日）。範囲選択でまとめて入れた分も1ノードに（#157）
+  const handleChangeRequired = (
+    changes: { day: WorkingDay; shiftName: string; count: number }[]
+  ) => {
     recordScheduleMutation(store, {
       schedule,
-      transform: (s) => s.setRequired(day, shiftName, count),
+      transform: (s) =>
+        changes.reduce((acc, c) => acc.setRequired(c.day, c.shiftName, c.count), s),
     });
   };
   const handleChangeRequiredAllDays = (shiftName: string, count: number) => {
@@ -815,7 +823,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onSelectRule={selectRuleStaff}
           minDayOff={constraints?.minMonthlyDayOff}
           maxDayOffPerDay={constraints?.maxDayOffPerDay}
-          onChangeCell={handleChangeCell}
+          onChangeCells={handleChangeCells}
           onChangeRequired={handleChangeRequired}
           onChangeRequiredAllDays={handleChangeRequiredAllDays}
           dayBubbleUrl={dayBubbleUrl ? (day) => dayBubbleUrl(day.key) : undefined}

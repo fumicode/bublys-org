@@ -14,8 +14,16 @@ import {
   type WorkShift,
   type WorkingDay,
 } from "../../domain/index.js";
-import type { CellSelection } from "./types.js";
-import { moveCursor } from "./gridCursor.js";
+import type { CellChange, CellSelection, RequiredChange, SelectionArea } from "./types.js";
+import { moveCursor, type CursorLayout } from "./gridCursor.js";
+import {
+  areaTo,
+  cellsOf,
+  extendArea,
+  isInSelection,
+  sameCell,
+  singleArea,
+} from "./gridSelection.js";
 
 type UseCellKeyboardEditingParams = {
   /** 行の並び（上下移動の順序）。 */
@@ -26,8 +34,11 @@ type UseCellKeyboardEditingParams = {
   shiftOptions: WorkShift[];
   /** あれば「選択スタッフが入れる勤務帯」に候補を絞る。 */
   staffGroup?: WorkingStaffGroup;
-  /** セルの勤務割当を変更する（確定時に呼ぶ）。 */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /**
+   * スタッフ行のセルの勤務割当を変更する（確定時に呼ぶ）。選択の全セルぶんを1回で渡す
+   * （1回の操作＝世界線の1ノード）。入れられないセル（可能勤務帯に無い）は除いてある。
+   */
+  onChangeCells: (changes: CellChange[]) => void;
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
@@ -50,8 +61,8 @@ type UseCellKeyboardEditingParams = {
   requiredShiftNames?: string[];
   /** 必要人数として入れられる最大値（これを超えて打った数は入れない） */
   maxRequired?: number;
-  /** 必要人数を確定する。day が null なら全日まとめて（行の見出し） */
-  onChangeRequiredCell?: (shiftName: string, day: WorkingDay | null, count: number) => void;
+  /** 必要人数を確定する。選択の全セルぶんを1回で渡す。day が null なら全日まとめて（行の見出し） */
+  onChangeRequiredCells?: (changes: RequiredChange[]) => void;
   /** 必要人数のメニュー（0〜最大値から選ぶ）を開く。day が null なら全日まとめて */
   onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
 };
@@ -88,6 +99,20 @@ export type CellKeyboardEditing = {
   selectCell: (staffId: string, day: WorkingDay) => void;
   /** 必要人数のセル（day が null なら行の見出し）を選択する。 */
   selectRequired: (shiftName: string, day: WorkingDay | null) => void;
+  /**
+   * 必要人数のメニューで選んだ数を、選択中の必要人数のセルぜんぶに入れる（ルール2：留まる）。
+   * 入れたセルが無ければ false
+   */
+  applyRequiredCount: (count: number) => boolean;
+  /**
+   * セルを押した（マウス）。修飾無し＝そのセルだけ、Shift＝起点からそこまでの範囲、
+   * additive（Ctrl/Cmd）＝飛び地として足す。押したままのドラッグは dragToCell で範囲を広げる。
+   */
+  pressCell: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
+  /** 押したまま入ったセルまで、最後の範囲を広げる（ドラッグ）。押していなければ何もしない */
+  dragToCell: (cell: CellSelection) => void;
+  /** セルが範囲選択に入っているか（2セル以上選んでいるときだけ true。1セルはカーソルの枠で足りる） */
+  isInRange: (cell: CellSelection) => boolean;
   /** スタッフ行のセルを選択してリスト選択を開く（全候補表示。ダブルクリック）。 */
   openEditor: (staffId: string, day: WorkingDay) => void;
   /** リストから選んだ候補で確定する（クリック）。**動かない。** */
@@ -135,6 +160,13 @@ const isDigit = (e: KeyboardEvent<HTMLDivElement>) => /^[0-9]$/.test(e.key);
  * **カーソルは1つ。** スタッフ行のセルと必要人数のセル（行の見出しを含む）は、同じカーソルの
  * 居場所の違いにすぎない（#156）。表はひと続きで、スタッフ行の下に必要人数の行が続く（gridCursor）。
  *
+ * **選択は「カーソル＋範囲の集まり」**（#157）。範囲は Excel と同じ長方形（Shift＋矢印・Shift＋クリック・
+ * ドラッグ）で、Ctrl/Cmd＋クリックで飛び地を足す。カーソルは最後の範囲の起点。
+ *   - **入れる操作は選択の全セルに効く。** 打った値・リストで選んだ値・Delete を全セルへ1回で入れ、
+ *     範囲を残して留まる。可能勤務帯に無い勤務帯は、その人のセルだけ飛ばす
+ *   - **範囲は、カーソルが Shift 無しで動くと解ける。** 外から（feature 層が）カーソルを動かしても、
+ *     最後の範囲の起点とずれるので解けたものとして扱う
+ *
  * カーソル移動は Excel に準拠する（#152）。ルールは3つだけ:
  *   1. **打って入力した値は、押したキーの向きへ動いて確定する**
  *      （Enter↓ / Shift+Enter↑ / Tab→ / Shift+Tab← / 矢印はその向き）
@@ -160,14 +192,14 @@ export function useCellKeyboardEditing({
   days,
   shiftOptions,
   staffGroup,
-  onChangeCell,
+  onChangeCells,
   selection: controlledSelection,
   onSelectionChange,
   forcedCellOf,
   onApproveForced,
   requiredShiftNames = [],
   maxRequired,
-  onChangeRequiredCell,
+  onChangeRequiredCells,
   onOpenRequiredList,
 }: UseCellKeyboardEditingParams): CellKeyboardEditing {
   const gridRef = useRef<HTMLDivElement>(null);
@@ -177,9 +209,41 @@ export function useCellKeyboardEditing({
     controlledSelection === undefined
       ? internalSelection
       : controlledSelection;
-  const setSelection = (next: CellSelection | null) => {
+  /** カーソルだけを動かす（範囲はそのまま。飛び地を足すとき） */
+  const setCursor = (next: CellSelection | null) => {
     if (controlledSelection === undefined) setInternalSelection(next);
     onSelectionChange?.(next);
+  };
+  /** カーソルを置き直す。範囲は解ける */
+  const setSelection = (next: CellSelection | null) => {
+    setAreas([]);
+    setCursor(next);
+  };
+
+  // ----- 範囲選択（#157）-----
+  const layout: CursorLayout = {
+    staffIds: staffList.map((s) => s.id),
+    requiredShiftNames,
+    days,
+  };
+  const [areas, setAreas] = useState<SelectionArea[]>([]);
+  // 範囲はカーソルに重ねる。最後の範囲の起点がカーソルでなければ（外から動かされた）解けている
+  const lastArea = areas[areas.length - 1];
+  const activeAreas: SelectionArea[] = !selection
+    ? []
+    : lastArea && sameCell(lastArea.anchor, selection)
+      ? areas
+      : [singleArea(selection)];
+  useEffect(() => {
+    if (lastArea && !sameCell(lastArea.anchor, selection)) setAreas([]);
+  }, [lastArea, selection]);
+  /** 選択中の全セル（表の上から・左から順） */
+  const targets = cellsOf(activeAreas, layout);
+  const hasRange = targets.length > 1;
+  /** 最後の範囲を置き換える（Shift で広げる・ドラッグ） */
+  const replaceLastArea = (next: (last: SelectionArea) => SelectionArea) => {
+    const last = activeAreas[activeAreas.length - 1];
+    if (last) setAreas([...activeAreas.slice(0, -1), next(last)]);
   };
   const [inputBuffer, setInputBuffer] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<EditMode | null>(null);
@@ -189,8 +253,9 @@ export function useCellKeyboardEditing({
   const staffSelection = selection?.kind === "staff" ? selection : null;
 
   // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば）
+  // 範囲のときは勤務帯ぜんぶから出し、入れる段で人ごとに飛ばす（setStaffCells）
   const selectableShiftOptions =
-    staffGroup && staffSelection
+    staffGroup && staffSelection && !hasRange
       ? shiftOptions.filter((w) => staffGroup.isAllowed(staffSelection.staffId, w.id))
       : shiftOptions;
 
@@ -260,11 +325,22 @@ export function useCellKeyboardEditing({
     );
   };
 
-  /** 候補でスタッフ行のセルを確定して閉じる（動かない） */
-  const commit = (s: ShiftSuggestion) => {
-    if (staffSelection) {
-      onChangeCell(staffSelection.staffId, staffSelection.day, suggestionToCell(s));
+  /** 選択中のスタッフ行のセルぜんぶに入れる。その人が入れない勤務帯のセルは飛ばす */
+  const setStaffCells = (to: ShiftCell) => {
+    const changes: CellChange[] = [];
+    for (const cell of targets) {
+      if (cell.kind !== "staff") continue;
+      if (to.kind === "work" && staffGroup && !staffGroup.isAllowed(cell.staffId, to.shiftId)) {
+        continue;
+      }
+      changes.push({ staffId: cell.staffId, day: cell.day, to });
     }
+    if (changes.length > 0) onChangeCells(changes);
+  };
+
+  /** 候補でスタッフ行のセル（範囲なら全セル）を確定して閉じる（動かない） */
+  const commit = (s: ShiftSuggestion) => {
+    if (staffSelection) setStaffCells(suggestionToCell(s));
     closeEditor();
   };
 
@@ -274,11 +350,49 @@ export function useCellKeyboardEditing({
     gridRef.current?.focus();
   };
 
-  // 打った値＝ルール1：先頭の候補で確定して、その向きへ動く。候補が無ければ変えずに動く
+  // 打った値＝ルール1：先頭の候補で確定して、その向きへ動く。候補が無ければ変えずに動く。
+  // 範囲なら全セルに入れて留まる（続けて上書き・Delete できる）
   const commitTypedAndMove = (dRow: number, dCol: number) => {
     if (suggestions.length > 0) commit(suggestions[activeClamped]);
-    moveSelection(dRow, dCol);
+    if (hasRange) closeEditor();
+    else moveSelection(dRow, dCol);
   };
+
+  // ----- マウス -----
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    const stop = () => {
+      draggingRef.current = false;
+    };
+    window.addEventListener("mouseup", stop);
+    return () => window.removeEventListener("mouseup", stop);
+  }, []);
+
+  const pressCell = (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => {
+    closeEditor();
+    const last = activeAreas[activeAreas.length - 1];
+    if (mods.shiftKey && last) {
+      replaceLastArea(() => areaTo(last.anchor, cell, layout));
+    } else if (mods.additive && selection && selection.kind === cell.kind) {
+      setAreas([...activeAreas, singleArea(cell)]);
+      setCursor(cell);
+    } else {
+      setSelection(cell);
+    }
+    draggingRef.current = true;
+    gridRef.current?.focus();
+  };
+
+  const dragToCell = (cell: CellSelection) => {
+    if (!draggingRef.current) return;
+    const last = activeAreas[activeAreas.length - 1];
+    if (!last) return;
+    const next = areaTo(last.anchor, cell, layout);
+    if (sameCell(next.extent, last.extent)) return;
+    replaceLastArea(() => next);
+  };
+
+  const isInRange = (cell: CellSelection) => hasRange && isInSelection(activeAreas, cell, layout);
 
   const editing = editMode !== null;
 
@@ -294,12 +408,27 @@ export function useCellKeyboardEditing({
   };
 
   // ===== 必要人数のセル =====
+  /**
+   * 選択中の必要人数のセルぜんぶに入れる（カーソルが見出しなら、見出し＝全日まとめて）。
+   * 入れたセルが無ければ（カーソルがスタッフ行）false
+   */
+  const setRequiredCount = (count: number): boolean => {
+    const changes: RequiredChange[] = [];
+    for (const cell of targets) {
+      if (cell.kind === "required") {
+        changes.push({ shiftName: cell.shiftName, day: cell.day, count });
+      }
+    }
+    if (changes.length === 0) return false;
+    onChangeRequiredCells?.(changes);
+    return true;
+  };
+
   const handleRequiredKeyDown = (
     e: KeyboardEvent<HTMLDivElement>,
     cursor: Extract<CellSelection, { kind: "required" }>
   ) => {
-    const setCount = (count: number) =>
-      onChangeRequiredCell?.(cursor.shiftName, cursor.day, count);
+    const setCount = (count: number) => setRequiredCount(count);
 
     // 打つ入力: 打った数で確定して、その向きへ動く（ルール1）
     if (editMode === "type") {
@@ -314,7 +443,8 @@ export function useCellKeyboardEditing({
           count >= 0 &&
           (maxRequired === undefined || count <= maxRequired);
         if (inRange) setCount(count);
-        moveSelection(...direction);
+        if (hasRange) closeEditor(); // 範囲なら全セルに入れて留まる
+        else moveSelection(...direction);
         return;
       }
       switch (e.key) {
@@ -369,7 +499,7 @@ export function useCellKeyboardEditing({
     e: KeyboardEvent<HTMLDivElement>,
     cursor: Extract<CellSelection, { kind: "staff" }>
   ) => {
-    const clearCell = () => onChangeCell(cursor.staffId, cursor.day, { kind: "undecided" });
+    const clearCell = () => setStaffCells({ kind: "undecided" });
 
     // ----- 打つ入力: 確定キーで確定して、その向きへ動く -----
     if (editMode === "type") {
@@ -448,7 +578,9 @@ export function useCellKeyboardEditing({
     if (direction) {
       e.preventDefault();
       // ルール3：何も入力していない Enter / Tab は、確定提案があれば承認して次の提案へ
-      const approveDirection: ApproveDirection | null = e.shiftKey
+      // 範囲があるときは承認しない（Enter / Tab は範囲を解いて動く）
+      const approveDirection: ApproveDirection | null =
+        e.shiftKey || hasRange
         ? null
         : e.key === "Enter"
           ? "down"
@@ -471,7 +603,7 @@ export function useCellKeyboardEditing({
     switch (e.key) {
       case "F2":
         e.preventDefault();
-        openEditor(cursor.staffId, cursor.day);
+        beginEdit("list", ""); // カーソルはそのまま（範囲も解かない）
         return;
       case "Backspace":
       case "Delete":
@@ -497,7 +629,7 @@ export function useCellKeyboardEditing({
     if (e.altKey && e.key === "ArrowDown") {
       if (selection && !editing) {
         e.preventDefault();
-        if (selection.kind === "staff") openEditor(selection.staffId, selection.day);
+        if (selection.kind === "staff") beginEdit("list", ""); // 範囲は解かない
         else onOpenRequiredList?.(selection.shiftName, selection.day);
       }
       return;
@@ -511,6 +643,16 @@ export function useCellKeyboardEditing({
       if (direction && e.key.startsWith("Arrow")) {
         e.preventDefault();
         moveSelection(...direction);
+      }
+      return;
+    }
+
+    // Shift＋矢印は範囲を広げる／狭める（カーソルは起点のまま）。打っている途中は確定のキー
+    if (e.shiftKey && e.key.startsWith("Arrow") && !editing) {
+      const direction = directionOf(e);
+      if (direction) {
+        e.preventDefault();
+        replaceLastArea((last) => extendArea(last, direction[0], direction[1], layout));
       }
       return;
     }
@@ -530,6 +672,10 @@ export function useCellKeyboardEditing({
     anchorEl,
     selectCell,
     selectRequired,
+    applyRequiredCount: setRequiredCount,
+    pressCell,
+    dragToCell,
+    isInRange,
     openEditor,
     applySuggestion,
     handleKeyDown,

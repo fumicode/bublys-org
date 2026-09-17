@@ -41,7 +41,12 @@ import {
   useCellKeyboardEditing,
   type ApproveDirection,
 } from "./schedule-grid/useCellKeyboardEditing.js";
-import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
+import type {
+  CellChange,
+  CellSelection,
+  EditingRequired,
+  RequiredChange,
+} from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -82,10 +87,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
-  /** セルの勤務割当を変更する */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
-  /** 必要スタッフ数を変更する（その日・その勤務帯名） */
-  onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
+  /**
+   * セルの勤務割当を変更する。範囲選択でまとめて入れたときも1回で渡る（1回の操作＝世界線の1ノード）。
+   * 可能勤務帯に無い勤務帯のセルは除いてある。
+   */
+  onChangeCells: (changes: CellChange[]) => void;
+  /** 必要スタッフ数を変更する（その日・その勤務帯名）。範囲選択でまとめて入れたときも1回で渡る */
+  onChangeRequired?: (changes: { day: WorkingDay; shiftName: string; count: number }[]) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
   onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
   /**
@@ -181,7 +189,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
-  onChangeCell,
+  onChangeCells,
   onChangeRequired,
   onChangeRequiredAllDays,
   dayBubbleUrl,
@@ -354,10 +362,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     ? summaryRows.filter((r) => r.required).map((r) => r.label)
     : [];
 
-  /** 必要人数を1セル（day が null なら全日まとめて）確定する */
-  const changeRequired = (shiftName: string, day: WorkingDay | null, count: number) => {
-    if (day) onChangeRequired?.(day, shiftName, count);
-    else onChangeRequiredAllDays?.(shiftName, count);
+  /** 必要人数を確定する。見出し（day が null）は全日まとめて、日のセルは1回にまとめて渡す */
+  const changeRequired = (changes: RequiredChange[]) => {
+    const perDay: { day: WorkingDay; shiftName: string; count: number }[] = [];
+    for (const { shiftName, day, count } of changes) {
+      if (day) perDay.push({ day, shiftName, count });
+      else onChangeRequiredAllDays?.(shiftName, count);
+    }
+    if (perDay.length > 0) onChangeRequired?.(perDay);
   };
 
   // キーボード操作（セル選択・矢印移動・打ち込みでの確定）はフックに委譲
@@ -366,14 +378,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     days,
     shiftOptions,
     staffGroup,
-    onChangeCell,
+    onChangeCells,
     selection,
     onSelectionChange,
     forcedCellOf,
     onApproveForced,
     requiredShiftNames,
     maxRequired,
-    onChangeRequiredCell: changeRequired,
+    onChangeRequiredCells: changeRequired,
     onOpenRequiredList: (shiftName, day) => {
       // カーソルのいるセルをアンカーに、今の値でメニューを開く（クリックと同じメニュー）
       const anchor = kb.gridRef.current?.querySelector<HTMLElement>(
@@ -391,9 +403,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     },
   });
 
-  // メニューで選んだ値で確定する（ルール2：留まる）。閉じたらキー操作へ戻れるようグリッドへフォーカス
+  // メニューで選んだ値で確定する（ルール2：留まる）。範囲を選んでいれば範囲の全セルへ。
+  // 閉じたらキー操作へ戻れるようグリッドへフォーカス
   const applyRequired = (count: number) => {
-    if (editingRequired) changeRequired(editingRequired.shiftName, editingRequired.day, count);
+    if (editingRequired && !kb.applyRequiredCount(count)) {
+      changeRequired([{ shiftName: editingRequired.shiftName, day: editingRequired.day, count }]);
+    }
     closeRequiredMenu();
   };
   const closeRequiredMenu = () => {
@@ -419,7 +434,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
-          onSelectCell={kb.selectCell}
+          onPressCell={kb.pressCell}
+          onDragToCell={kb.dragToCell}
+          isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
@@ -461,7 +478,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
-          onSelectCell={kb.selectCell}
+          onPressCell={kb.pressCell}
+          onDragToCell={kb.dragToCell}
+          isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
@@ -610,6 +629,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。
             // 人数の行（必要人数・休み）はどのロールを見ているときも充足を読み取る土台なので減光しない。
             dimmed={focusActive && !!row.ruleKey && !focusedRuleKeys.has(row.ruleKey)}
+            onPressCell={kb.pressCell}
+            isInRange={kb.isInRange}
             onEditRequired={(params) => {
               // クリックでもカーソルをそのセルに置いてからメニューを開く（居場所を揃える）
               kb.selectRequired(params.shiftName, params.day);

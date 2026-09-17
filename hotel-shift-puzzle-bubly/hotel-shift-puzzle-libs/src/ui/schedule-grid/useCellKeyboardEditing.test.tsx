@@ -1,11 +1,14 @@
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { act, renderHook } from "@testing-library/react";
 import {
   Staff,
   WorkingDay,
+  WorkingStaffGroup,
+  WorkingStaffMember,
   createDefaultWorkShifts,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import type { CellSelection } from "./types.js";
 import {
   useCellKeyboardEditing,
   type ApproveDirection,
@@ -34,11 +37,34 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     maxRequired?: number;
     onChangeRequiredCell?: (shiftName: string, day: WorkingDay | null, count: number) => void;
     onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
+    staffGroup?: WorkingStaffGroup;
   } = {}) => {
+    const { onChangeRequiredCell, ...rest } = opts;
+    // 1回の操作で渡る変更（範囲なら全セルぶん）。1セルずつ見る既存のテストは onChangeCell で読む
+    const onChangeCells = jest.fn();
     const onChangeCell = jest.fn();
-    const hook = renderHook(() =>
-      useCellKeyboardEditing({ staffList, days, shiftOptions, onChangeCell, ...opts })
-    );
+    const onChangeRequiredCells = jest.fn();
+    // feature 層と同じく、カーソルは外側の state が持つ（制御値）。setOutside で外から動かせる
+    const hook = renderHook(() => {
+      const [selection, setOutside] = useState<CellSelection | null>(null);
+      const kb = useCellKeyboardEditing({
+        staffList,
+        days,
+        shiftOptions,
+        selection,
+        onSelectionChange: setOutside,
+        onChangeCells: (changes) => {
+          onChangeCells(changes);
+          for (const c of changes) onChangeCell(c.staffId, c.day, c.to);
+        },
+        onChangeRequiredCells: (changes) => {
+          onChangeRequiredCells(changes);
+          for (const c of changes) onChangeRequiredCell?.(c.shiftName, c.day, c.count);
+        },
+        ...rest,
+      });
+      return { ...kb, setOutside };
+    });
     // 真ん中のセル（s2 × 2日）から始める。上下左右どちらにも動ける
     act(() => hook.result.current.selectCell("s2", days[1]));
 
@@ -62,7 +88,16 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       if (selection.kind === "staff") return `${selection.staffId}:${selection.day.day}`;
       return `${selection.shiftName}:${selection.day?.day ?? "全日"}`;
     };
-    return { hook, onChangeCell, press, at };
+    /** 選択中の全セル（範囲なら範囲ぜんぶ）を「s1:2」の形で並べる */
+    const inRange = () =>
+      staffList.flatMap((staff) =>
+        days
+          .filter((day) =>
+            hook.result.current.isInRange({ kind: "staff", staffId: staff.id, day })
+          )
+          .map((day) => `${staff.id}:${day.day}`)
+      );
+    return { hook, onChangeCell, onChangeCells, onChangeRequiredCells, press, at, inRange };
   };
 
   const early: ShiftCell = { kind: "work", shiftId: "early" };
@@ -354,6 +389,196 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       press("ArrowDown");
 
       expect(at()).toBe("s3:2");
+    });
+  });
+
+  /**
+   * 範囲選択（#157）。選択は「カーソル＋範囲の集まり」。
+   * 入れる操作は選択の全セルへ1回で入り、範囲を残して留まる。範囲はカーソルが Shift 無しで動くと解ける。
+   */
+  describe("範囲選択", () => {
+    const labels = (changes: { staffId: string; day: WorkingDay }[]) =>
+      changes.map((c) => `${c.staffId}:${c.day.day}`);
+
+    it("★ Shift＋→↓ で範囲を作り、「7」→ Enter で全セルに1回で入れて、範囲を残して留まる", () => {
+      const { hook, press, at, inRange, onChangeCells } = setUp();
+      press("ArrowRight", { shiftKey: true });
+      press("ArrowDown", { shiftKey: true });
+      expect(at()).toBe("s2:2"); // カーソルは起点のまま
+      expect(inRange()).toEqual(["s2:2", "s2:3", "s3:2", "s3:3"]);
+
+      press("7");
+      press("Enter");
+
+      expect(onChangeCells).toHaveBeenCalledTimes(1); // 1回の操作＝世界線の1ノード
+      expect(labels(onChangeCells.mock.calls[0][0])).toEqual(["s2:2", "s2:3", "s3:2", "s3:3"]);
+      expect(onChangeCells.mock.calls[0][0][0].to).toEqual(early);
+      expect(at()).toBe("s2:2");
+      expect(inRange()).toEqual(["s2:2", "s2:3", "s3:2", "s3:3"]);
+      expect(hook.result.current.editing).toBe(false);
+    });
+
+    it("★ 早番に入れない人のセルだけ飛ばす（休みは誰にでも入る）", () => {
+      const staffGroup = new WorkingStaffGroup({
+        id: "g",
+        members: [
+          WorkingStaffMember.ofRoster("s1"),
+          new WorkingStaffMember({ staffId: "s2", allowedShiftIds: ["late"] }),
+          WorkingStaffMember.ofRoster("s3"),
+        ],
+      });
+      const { press, onChangeCells } = setUp({ staffGroup });
+      press("ArrowDown", { shiftKey: true }); // s2:2〜s3:2
+
+      press("7");
+      press("Enter");
+      expect(labels(onChangeCells.mock.calls[0][0])).toEqual(["s3:2"]);
+
+      press("Delete");
+      expect(labels(onChangeCells.mock.calls[1][0])).toEqual(["s2:2", "s3:2"]);
+    });
+
+    it("範囲で候補リストを開くと、1人の可能勤務帯に絞らず勤務帯ぜんぶを出す", () => {
+      const staffGroup = new WorkingStaffGroup({
+        id: "g",
+        members: ["s1", "s2", "s3"].map(
+          (staffId) => new WorkingStaffMember({ staffId, allowedShiftIds: ["late"] })
+        ),
+      });
+      const { hook, press } = setUp({ staffGroup });
+      press("F2");
+      const single = hook.result.current.suggestions.length;
+      press("Escape");
+
+      press("ArrowDown", { shiftKey: true });
+      press("F2");
+      expect(hook.result.current.suggestions.length).toBeGreaterThan(single);
+    });
+
+    it("Delete で範囲の全セルを未定に戻す", () => {
+      const { press, onChangeCells } = setUp();
+      press("ArrowLeft", { shiftKey: true });
+
+      press("Delete");
+
+      expect(onChangeCells).toHaveBeenCalledWith([
+        { staffId: "s2", day: days[0], to: { kind: "undecided" } },
+        { staffId: "s2", day: days[1], to: { kind: "undecided" } },
+      ]);
+    });
+
+    it("Shift 無しの矢印で範囲が解け、カーソルから動く", () => {
+      const { press, at, inRange } = setUp();
+      press("ArrowRight", { shiftKey: true });
+
+      press("ArrowDown");
+
+      expect(at()).toBe("s3:2");
+      expect(inRange()).toEqual([]);
+    });
+
+    it("範囲では確定提案を承認しない（Enter は範囲を解いて動く）", () => {
+      const onApproveForced = jest.fn(() => true);
+      const { press, at, inRange } = setUp({ forcedCellOf: () => early, onApproveForced });
+      press("ArrowRight", { shiftKey: true });
+
+      press("Enter");
+
+      expect(onApproveForced).not.toHaveBeenCalled();
+      expect(at()).toBe("s3:2");
+      expect(inRange()).toEqual([]);
+    });
+
+    it("外からカーソルが動かされたら範囲は解ける（feature 層は範囲を知らなくてよい）", () => {
+      const { hook, press, inRange } = setUp();
+      press("ArrowRight", { shiftKey: true });
+
+      act(() => hook.result.current.setOutside({ kind: "staff", staffId: "s1", day: days[0] }));
+
+      expect(inRange()).toEqual([]);
+    });
+
+    it("マウス：Shift＋押すで起点から長方形、Ctrl/Cmd＋押すで飛び地を足す", () => {
+      const { hook, at, inRange } = setUp();
+      const cell = (staffId: string, d: number): CellSelection => ({
+        kind: "staff",
+        staffId,
+        day: days[d - 1],
+      });
+
+      act(() => hook.result.current.pressCell(cell("s1", 1), { shiftKey: true, additive: false }));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s2:1", "s2:2"]);
+      expect(at()).toBe("s2:2");
+
+      act(() => hook.result.current.pressCell(cell("s3", 3), { shiftKey: false, additive: true }));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s2:1", "s2:2", "s3:3"]);
+      expect(at()).toBe("s3:3"); // カーソルは足した飛び地へ
+
+      act(() => hook.result.current.pressCell(cell("s1", 3), { shiftKey: false, additive: false }));
+      expect(inRange()).toEqual([]);
+      expect(at()).toBe("s1:3");
+    });
+
+    it("マウス：押したままドラッグで範囲を広げる。離したあとは広がらない", () => {
+      const { hook, inRange } = setUp();
+      const cell = (staffId: string, d: number): CellSelection => ({
+        kind: "staff",
+        staffId,
+        day: days[d - 1],
+      });
+
+      act(() => hook.result.current.pressCell(cell("s1", 1), { shiftKey: false, additive: false }));
+      act(() => hook.result.current.dragToCell(cell("s2", 3)));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s1:3", "s2:1", "s2:2", "s2:3"]);
+
+      act(() => {
+        window.dispatchEvent(new MouseEvent("mouseup"));
+      });
+      act(() => hook.result.current.dragToCell(cell("s3", 3)));
+      expect(inRange()).toEqual(["s1:1", "s1:2", "s1:3", "s2:1", "s2:2", "s2:3"]);
+    });
+
+    it("必要人数の範囲で「2」→ Enter で全セルに2を1回で入れる。スタッフ行へは広がらない", () => {
+      const { hook, press, onChangeRequiredCells } = setUp({
+        requiredShiftNames: ["早番", "遅番"],
+        maxRequired: 3,
+      });
+      act(() => hook.result.current.selectRequired("早番", days[0]));
+      press("ArrowUp", { shiftKey: true }); // スタッフ行へは出ない
+      press("ArrowDown", { shiftKey: true });
+      press("ArrowRight", { shiftKey: true });
+
+      press("2");
+      press("Enter");
+
+      expect(onChangeRequiredCells).toHaveBeenCalledTimes(1);
+      expect(
+        onChangeRequiredCells.mock.calls[0][0].map(
+          (c: { shiftName: string; day: WorkingDay; count: number }) =>
+            `${c.shiftName}:${c.day.day}=${c.count}`
+        )
+      ).toEqual(["早番:1=2", "早番:2=2", "遅番:1=2", "遅番:2=2"]);
+    });
+
+    it("必要人数のメニューで選んだ数も、範囲の全セルに入れて留まる", () => {
+      const { hook, press, at, onChangeRequiredCells } = setUp({
+        requiredShiftNames: ["早番", "遅番"],
+        maxRequired: 3,
+      });
+      act(() => hook.result.current.selectRequired("遅番", days[1]));
+      press("ArrowRight", { shiftKey: true });
+
+      let applied = false;
+      act(() => {
+        applied = hook.result.current.applyRequiredCount(1);
+      });
+
+      expect(applied).toBe(true);
+      expect(onChangeRequiredCells).toHaveBeenCalledWith([
+        { shiftName: "遅番", day: days[1], count: 1 },
+        { shiftName: "遅番", day: days[2], count: 1 },
+      ]);
+      expect(at()).toBe("遅番:2");
     });
   });
 });
