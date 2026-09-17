@@ -2500,7 +2500,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 40,
+    "fileCount": 41,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",

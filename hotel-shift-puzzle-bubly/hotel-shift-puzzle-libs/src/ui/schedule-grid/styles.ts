@@ -587,6 +587,15 @@ export const StyledWrap = styled.div`
   }
 
   /* 範囲選択に入っているセル（#157）。勤務帯の背景色は inline なので、上に薄い青を重ねる */
+  /* カット中の元のセル（#166）。Excel の点線と同じく、貼るまでは囲むだけ */
+  .e-cell.is-cut-source::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border: 2px dashed #1976d2;
+    pointer-events: none;
+    z-index: 3;
+  }
   .e-cell.is-in-range::before {
     content: "";
     position: absolute;

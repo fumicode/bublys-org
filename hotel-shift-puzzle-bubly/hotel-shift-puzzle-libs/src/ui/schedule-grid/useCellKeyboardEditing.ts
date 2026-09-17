@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
   type RefObject,
 } from "react";
@@ -14,7 +15,14 @@ import {
   type WorkShift,
   type WorkingDay,
 } from "../../domain/index.js";
-import type { CellChange, CellSelection, RequiredChange, SelectionArea } from "./types.js";
+import type {
+  CellChange,
+  CellClipboardHandlers,
+  CellRef,
+  CellSelection,
+  RequiredChange,
+  SelectionArea,
+} from "./types.js";
 import { moveCursor, type CursorLayout } from "./gridCursor.js";
 import { matchesShortcut, parseShortcut } from "@bublys-org/bubbles-ui";
 import {
@@ -66,6 +74,8 @@ type UseCellKeyboardEditingParams = {
   onChangeRequiredCells?: (changes: RequiredChange[]) => void;
   /** 必要人数のメニュー（0〜最大値から選ぶ）を開く。day が null なら全日まとめて */
   onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
+  /** セルのコピー・カット・貼り付け（#166）。渡さなければ扱わない */
+  clipboard?: CellClipboardHandlers;
 };
 
 /** 確定提案を承認したあと、次の提案を探す向き（Enter＝下 / Tab＝右） */
@@ -120,6 +130,10 @@ export type CellKeyboardEditing = {
   applySuggestion: (s: ShiftSuggestion) => void;
   /** グリッドの onKeyDown ハンドラ。 */
   handleKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  /** グリッドの onCopy / onCut / onPaste ハンドラ（#166） */
+  handleCopy: (e: ClipboardEvent<HTMLDivElement>) => void;
+  handleCut: (e: ClipboardEvent<HTMLDivElement>) => void;
+  handlePaste: (e: ClipboardEvent<HTMLDivElement>) => void;
 };
 
 /** 候補を勤務割当（ShiftCell）へ変換する。 */
@@ -131,6 +145,9 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
 
 /** 打ち込みの取り消し（打っている途中の Ctrl/Cmd+Z。Excel と同じ） */
 const CANCEL_TYPING = parseShortcut("mod+z");
+
+/** オブジェクトとして貼る（#166）。値のみの Ctrl/Cmd+V はネイティブの paste イベントで受ける */
+const PASTE_OBJECTS = parseShortcut("mod+shift+v");
 
 /** 押したキーが指す向き（Enter↓ / Tab→ / 矢印。Shift で逆向き）。移動のキーでなければ null */
 const directionOf = (e: KeyboardEvent<HTMLDivElement>): [number, number] | null => {
@@ -205,6 +222,7 @@ export function useCellKeyboardEditing({
   maxRequired,
   onChangeRequiredCells,
   onOpenRequiredList,
+  clipboard,
 }: UseCellKeyboardEditingParams): CellKeyboardEditing {
   const gridRef = useRef<HTMLDivElement>(null);
   const [internalSelection, setInternalSelection] =
@@ -617,7 +635,8 @@ export function useCellKeyboardEditing({
         return;
       case "Escape":
         e.preventDefault();
-        setSelection(null);
+        // カットの点線があれば、それだけを消す（Excel と同じ）。無ければ選択を外す
+        if (!clipboard?.onCancelCut()) setSelection(null);
         return;
       default:
         // 英数字を打ち始めたら打つ入力を開き、その文字をバッファに入れる
@@ -626,6 +645,35 @@ export function useCellKeyboardEditing({
           beginEdit("type", e.key);
         }
     }
+  };
+
+  // ===== コピー・カット・貼り付け（#166）=====
+  /** 表の並び（キーボードのカーソルと同じ） */
+  const order = () => ({ staffIds: layout.staffIds, days });
+  /** 選択中のスタッフ行のセル（表の上から・左から順） */
+  const staffTargets = (): CellRef[] =>
+    targets.flatMap((c) => (c.kind === "staff" ? [{ staffId: c.staffId, day: c.day }] : []));
+  /** 1つの長方形なら列数。飛び地を含む選択は null（位置が決まらないので文字にできない） */
+  const columnsOfSelection = (): number | null => {
+    if (activeAreas.length !== 1) return null;
+    return new Set(staffTargets().map((c) => c.day.key)).size;
+  };
+
+  const copyOrCut = (e: ClipboardEvent<HTMLDivElement>, cut: boolean) => {
+    // 打っている最中・必要人数のセルでは勤務表の操作にしない
+    if (!clipboard || editing || selection?.kind !== "staff") return;
+    e.preventDefault();
+    const text = clipboard.onCopyCells(staffTargets(), { cut, columns: columnsOfSelection() });
+    e.clipboardData.setData("text/plain", text ?? "");
+  };
+
+  const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (!clipboard || editing || selection?.kind !== "staff") return;
+    e.preventDefault();
+    clipboard.onPasteValues(e.clipboardData.getData("text/plain"), {
+      ...order(),
+      targets: staffTargets(),
+    });
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -645,7 +693,16 @@ export function useCellKeyboardEditing({
       closeEditor();
       return;
     }
+    // オブジェクトとして貼る（Ctrl/Cmd+Shift+V）。ネイティブの貼り付けは出さない（#166）
+    if (clipboard && !editing && matchesShortcut(e, PASTE_OBJECTS)) {
+      if (selection?.kind === "staff") {
+        e.preventDefault();
+        clipboard.onPasteObjects(order());
+      }
+      return;
+    }
     // それ以外の修飾キー付き（Shift は除く）はブラウザ/OS のショートカットに委ねる
+    // （Ctrl/Cmd+C・X・V はグリッドの copy / cut / paste イベントで受ける）
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
     if (!selection) {
@@ -690,5 +747,8 @@ export function useCellKeyboardEditing({
     openEditor,
     applySuggestion,
     handleKeyDown,
+    handleCopy: (e) => copyOrCut(e, false),
+    handleCut: (e) => copyOrCut(e, true),
+    handlePaste,
   };
 }

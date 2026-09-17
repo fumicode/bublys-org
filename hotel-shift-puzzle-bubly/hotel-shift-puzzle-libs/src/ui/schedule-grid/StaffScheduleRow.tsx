@@ -39,6 +39,8 @@ type StaffScheduleRowProps = {
   onDragToCell?: (cell: CellSelection) => void;
   /** セルが範囲選択に入っているか */
   isInRange?: (cell: CellSelection) => boolean;
+  /** カット中の元のセルか（#166） */
+  isCutSource?: (staffId: string, day: WorkingDay) => boolean;
   /** セルをダブルクリックで候補ドロップダウンを開く */
   onOpenEditor: (staffId: string, day: WorkingDay) => void;
   /** 違反バブルの URL を作る。ObjectView がこれで開く（origin-side でマーカーの近くに出す） */
@@ -87,6 +89,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onPressCell,
   onDragToCell,
   isInRange,
+  isCutSource,
   onOpenEditor,
   violationUrl,
   selected,
@@ -179,6 +182,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}
             inRange={isInRange?.(here) ?? false}
+            cutSource={isCutSource?.(staff.id, day) ?? false}
             onPress={(e) =>
               onPressCell(here, { shiftKey: e.shiftKey, additive: e.ctrlKey || e.metaKey })
             }

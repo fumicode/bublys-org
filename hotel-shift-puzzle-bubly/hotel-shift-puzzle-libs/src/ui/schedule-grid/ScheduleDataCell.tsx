@@ -55,6 +55,8 @@ type ScheduleDataCellProps = {
   inputBuffer?: string | null;
   /** 範囲選択に入っているか（2セル以上選んでいるとき。薄い青を重ねる） */
   inRange?: boolean;
+  /** カット中の元のセルか（点線で囲む。#166） */
+  cutSource?: boolean;
   /** 押した（左ボタン）。選択するのは受け取り側（修飾キーで範囲・飛び地） */
   onPress: (e: React.MouseEvent<HTMLDivElement>) => void;
   /** 押したまま入ってきた（ドラッグで範囲を広げる） */
@@ -104,6 +106,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   selected = false,
   inputBuffer = null,
   inRange = false,
+  cutSource = false,
   onPress,
   onDragEnter,
   onOpenEditor,
@@ -118,6 +121,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   let className = "e-cell";
   if (cellClassName) className += ` ${cellClassName}`;
   if (inRange) className += " is-in-range";
+  if (cutSource) className += " is-cut-source";
   let style: React.CSSProperties | undefined;
   let content: React.ReactNode;
   let title: string | undefined;

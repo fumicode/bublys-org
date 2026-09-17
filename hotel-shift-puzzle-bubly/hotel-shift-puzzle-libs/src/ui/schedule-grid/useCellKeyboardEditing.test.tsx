@@ -8,7 +8,7 @@ import {
   createDefaultWorkShifts,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import type { CellSelection } from "./types.js";
+import type { CellClipboardHandlers, CellSelection } from "./types.js";
 import {
   useCellKeyboardEditing,
   type ApproveDirection,
@@ -38,6 +38,7 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     onChangeRequiredCell?: (shiftName: string, day: WorkingDay | null, count: number) => void;
     onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
     staffGroup?: WorkingStaffGroup;
+    clipboard?: CellClipboardHandlers;
   } = {}) => {
     const { onChangeRequiredCell, ...rest } = opts;
     // 1回の操作で渡る変更（範囲なら全セルぶん）。1セルずつ見る既存のテストは onChangeCell で読む
@@ -399,6 +400,132 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
    * 打っている途中の Ctrl/Cmd+Z は打ち込みの取り消し（#165）。打っていなければ素通しして、
    * 勤務表の世界線を戻すショートカット（useKeyBindings）に任せる。
    */
+  /**
+   * コピー・カット・貼り付け（#166）。Ctrl/Cmd+C・X・V はグリッドの copy / cut / paste イベントで受け、
+   * Ctrl/Cmd+Shift+V（オブジェクトとして）はキーで受ける。組み立てと記録は feature 層。
+   */
+  describe("コピー・カット・貼り付け", () => {
+    const clipboardSetUp = (text = "7\t休") => {
+      const clipboard = {
+        onCopyCells: jest.fn(() => text),
+        onPasteValues: jest.fn(),
+        onPasteObjects: jest.fn(),
+        onCancelCut: jest.fn(() => false),
+        isCutSource: jest.fn(() => false),
+      };
+      return { ...setUp({ clipboard }), clipboard };
+    };
+    /** グリッドの copy / cut / paste イベント */
+    const clipboardEvent = (pasted = "") => {
+      const setData = jest.fn();
+      const preventDefault = jest.fn();
+      const event = {
+        preventDefault,
+        clipboardData: { setData, getData: () => pasted },
+      } as unknown as Parameters<CellClipboardHandlers["onCopyCells"]>[0] & {
+        preventDefault: () => void;
+      };
+      return { event: event as never, setData, preventDefault };
+    };
+    const refs = (cells: { staffId: string; day: WorkingDay }[]) =>
+      cells.map((c) => `${c.staffId}:${c.day.day}`);
+
+    it("★ Ctrl/Cmd+C：選択のセルを表の順に渡し、返ってきた文字をクリップボードに書く", () => {
+      const { hook, press, clipboard } = clipboardSetUp();
+      press("ArrowRight", { shiftKey: true }); // s2:2〜s2:3
+      const { event, setData, preventDefault } = clipboardEvent();
+
+      act(() => hook.result.current.handleCopy(event));
+
+      expect(clipboard.onCopyCells).toHaveBeenCalledTimes(1);
+      const [cells, opts] = clipboard.onCopyCells.mock.calls[0] as unknown as [
+        { staffId: string; day: WorkingDay }[],
+        { cut: boolean; columns: number | null },
+      ];
+      expect(refs(cells)).toEqual(["s2:2", "s2:3"]);
+      expect(opts).toEqual({ cut: false, columns: 2 });
+      expect(setData).toHaveBeenCalledWith("text/plain", "7\t休");
+      expect(preventDefault).toHaveBeenCalled();
+    });
+
+    it("Ctrl/Cmd+X はカットとして渡す。飛び地を含む選択は列数 null", () => {
+      const { hook, clipboard } = clipboardSetUp();
+      act(() =>
+        hook.result.current.pressCell(
+          { kind: "staff", staffId: "s1", day: days[0] },
+          { shiftKey: false, additive: true }
+        )
+      );
+
+      act(() => hook.result.current.handleCut(clipboardEvent().event));
+
+      const [cells, opts] = clipboard.onCopyCells.mock.calls[0] as unknown as [
+        { staffId: string; day: WorkingDay }[],
+        { cut: boolean; columns: number | null },
+      ];
+      expect(refs(cells)).toEqual(["s1:1", "s2:2"]);
+      expect(opts).toEqual({ cut: true, columns: null });
+    });
+
+    it("★ Ctrl/Cmd+V：クリップボードの文字を、選択のセルと表の並びと一緒に渡す", () => {
+      const { hook, press, clipboard } = clipboardSetUp();
+      press("ArrowDown", { shiftKey: true }); // s2:2〜s3:2
+      const { event, preventDefault } = clipboardEvent("休");
+
+      act(() => hook.result.current.handlePaste(event));
+
+      expect(clipboard.onPasteValues).toHaveBeenCalledTimes(1);
+      const [text, ctx] = clipboard.onPasteValues.mock.calls[0] as unknown as [
+        string,
+        { targets: { staffId: string; day: WorkingDay }[]; staffIds: string[]; days: WorkingDay[] },
+      ];
+      expect(text).toBe("休");
+      expect(refs(ctx.targets)).toEqual(["s2:2", "s3:2"]);
+      expect(ctx.staffIds).toEqual(["s1", "s2", "s3"]);
+      expect(ctx.days).toEqual(days);
+      expect(preventDefault).toHaveBeenCalled();
+    });
+
+    it("★ Ctrl/Cmd+Shift+V：オブジェクトとして貼る（ネイティブの貼り付けは出さない）", () => {
+      const { press, clipboard } = clipboardSetUp();
+
+      const preventDefault = press("V", { ctrlKey: true, shiftKey: true });
+
+      expect(clipboard.onPasteObjects).toHaveBeenCalledWith({
+        staffIds: ["s1", "s2", "s3"],
+        days,
+      });
+      expect(preventDefault).toHaveBeenCalled();
+    });
+
+    it("打っている途中・必要人数のセルでは、勤務表の操作にしない", () => {
+      const { hook, press, clipboard } = clipboardSetUp();
+      press("7");
+      act(() => hook.result.current.handleCopy(clipboardEvent().event));
+      act(() => hook.result.current.handlePaste(clipboardEvent("休").event));
+      press("V", { metaKey: true, shiftKey: true });
+      press("Escape");
+
+      act(() => hook.result.current.selectRequired("早番", days[0]));
+      act(() => hook.result.current.handleCopy(clipboardEvent().event));
+
+      expect(clipboard.onCopyCells).not.toHaveBeenCalled();
+      expect(clipboard.onPasteValues).not.toHaveBeenCalled();
+      expect(clipboard.onPasteObjects).not.toHaveBeenCalled();
+    });
+
+    it("Esc はカットの点線があればそれだけを消し、選択は外さない", () => {
+      const { hook, press, at, clipboard } = clipboardSetUp();
+      clipboard.onCancelCut.mockReturnValueOnce(true);
+
+      press("Escape");
+      expect(at()).toBe("s2:2");
+
+      press("Escape"); // 点線が無ければ選択を外す（今までどおり）
+      expect(hook.result.current.selection).toBeNull();
+    });
+  });
+
   describe("Ctrl/Cmd+Z", () => {
     it.each([
       ["Ctrl+Z", { ctrlKey: true }],

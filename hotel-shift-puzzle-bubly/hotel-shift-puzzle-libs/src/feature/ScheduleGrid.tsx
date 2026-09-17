@@ -57,6 +57,7 @@ import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
+import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
 import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
@@ -467,6 +468,15 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 責任者アイコンの流れを「担当勤務帯の色」で塗るための解決関数（勤務帯名 → id → 色）。
   const shiftColorOf = useMemo(() => shiftColorOfNames(workShifts), [workShifts]);
 
+  // セルのコピー・カット・貼り付け（#166）。貼れなかった分はメッセージ欄で知らせる
+  const clipboard = useCellClipboard({
+    store,
+    schedule,
+    workShifts,
+    staffGroup,
+    onMessage: setAutoMessage,
+  });
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -842,6 +852,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           }
           selection={cellSelection}
           onSelectionChange={setCellSelection}
+          clipboard={clipboard}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}

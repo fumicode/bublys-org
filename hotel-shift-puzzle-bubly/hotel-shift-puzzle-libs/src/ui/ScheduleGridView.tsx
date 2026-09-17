@@ -43,6 +43,7 @@ import {
 } from "./schedule-grid/useCellKeyboardEditing.js";
 import type {
   CellChange,
+  CellClipboardHandlers,
   CellSelection,
   EditingRequired,
   RequiredChange,
@@ -116,6 +117,8 @@ type ScheduleGridViewProps = {
   /** feature 層と共有する現在セル。キーボード選択と同じ状態にする。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
+  /** セルのコピー・カット・貼り付け（#166）。渡さなければ扱わない */
+  clipboard?: CellClipboardHandlers;
   /**
    * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
    * 確定済みセルには何も返さない。
@@ -201,6 +204,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   maxDayOffPerDay,
   selection,
   onSelectionChange,
+  clipboard,
   candidateHintOf,
   forcedCellOf,
   isDeadCell,
@@ -386,6 +390,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     requiredShiftNames,
     maxRequired,
     onChangeRequiredCells: changeRequired,
+    clipboard,
     onOpenRequiredList: (shiftName, day) => {
       // カーソルのいるセルをアンカーに、今の値でメニューを開く（クリックと同じメニュー）
       const anchor = kb.gridRef.current?.querySelector<HTMLElement>(
@@ -436,6 +441,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           inputBuffer={kb.inputBuffer}
           onPressCell={kb.pressCell}
           onDragToCell={kb.dragToCell}
+          isCutSource={clipboard?.isCutSource}
           isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
@@ -480,6 +486,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           inputBuffer={kb.inputBuffer}
           onPressCell={kb.pressCell}
           onDragToCell={kb.dragToCell}
+          isCutSource={clipboard?.isCutSource}
           isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
@@ -510,6 +517,9 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         // 打っている最中はショートカット（Ctrl/Cmd+Z の世界線移動など）にキーを奪わせない
         data-text-editing={kb.editing ? "" : undefined}
         onKeyDown={kb.handleKeyDown}
+        onCopy={kb.handleCopy}
+        onCut={kb.handleCut}
+        onPaste={kb.handlePaste}
         onMouseOver={(e) => {
           const el = (e.target as HTMLElement).closest("[data-cell-key]");
           const key = el?.getAttribute("data-cell-key") ?? null;

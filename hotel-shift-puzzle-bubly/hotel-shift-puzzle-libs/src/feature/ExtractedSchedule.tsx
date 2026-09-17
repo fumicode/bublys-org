@@ -18,6 +18,7 @@ import {
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import type { CellChange } from "../ui/schedule-grid/types.js";
+import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
 import {
@@ -136,6 +137,15 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     );
   }, [schedule, wishByStaff, workShifts, constraints]);
 
+  // セルのコピー・カット・貼り付け（#166）。貼れなかった分はメッセージ欄で知らせる
+  const clipboard = useCellClipboard({
+    store,
+    schedule,
+    workShifts,
+    staffGroup,
+    onMessage: setAutoMessage,
+  });
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -232,6 +242,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         leaderRulesOnlyFooter
         minDayOff={minDayOff}
         onChangeCells={handleChangeCells}
+        clipboard={clipboard}
       />
 
       <div className="e-auto-bar">
