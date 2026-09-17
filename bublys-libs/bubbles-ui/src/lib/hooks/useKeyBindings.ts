@@ -4,15 +4,15 @@ import { useAppSelector } from "@bublys-org/state-management";
 import { CurrentBubbleContext } from "../context/CurrentBubbleContext.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { makeSelectFocusedBubbleId } from "../state/bubbles-slice.js";
+import { isTextEditingTarget, matchesShortcut, parseShortcut } from "./shortcut.js";
 
 /** 「このキー → この動作」1 件ぶんの宣言。 */
 export type KeyBinding = {
-  /** e.key（大文字小文字は無視）。例: "ArrowLeft", "z" */
-  key: string;
-  /** Cmd または Ctrl が必要か（既定 false） */
-  meta?: boolean;
-  /** Shift が必要か（既定 false） */
-  shift?: boolean;
+  /**
+   * ショートカットの表記（Windows / Mac 共通）。例: `"ArrowLeft"` / `"mod+z"` / `"mod+shift+z"`。
+   * `mod` は Cmd または Ctrl。詳しくは {@link parseShortcut}
+   */
+  keys: string;
   /** 押されたときに実行する動作 */
   run: () => void;
 };
@@ -27,6 +27,9 @@ export type KeyBinding = {
  * フォーカス制御: 「キーボードはフォーカス中のバブルが受け取る」。バブルの中で使うと
  * （CurrentBubbleContext が自分のバブルIDを供給する）、そのバブルが focusedBubbleId で
  * ないあいだはキーを受け取らない。バブルの外（id="root"）では常に有効。
+ *
+ * テキストを打っている最中（input / textarea / contentEditable / `data-text-editing` の内側）は
+ * キー操作を奪わない（{@link isTextEditingTarget}）。
  */
 export function useKeyBindings(bindings: KeyBinding[]): void {
   const ref = useRef(bindings);
@@ -45,16 +48,9 @@ export function useKeyBindings(bindings: KeyBinding[]): void {
     const onKey = (e: KeyboardEvent) => {
       // 未フォーカスのバブル内では受け取らない（キーはフォーカス中のバブルへ渡す）。
       if (!activeRef.current) return;
-      // テキスト入力中（input / textarea / contentEditable）はキー操作を奪わない。
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) {
-        return;
-      }
-      const meta = e.ctrlKey || e.metaKey;
+      if (isTextEditingTarget(e.target)) return;
       for (const b of ref.current) {
-        if (e.key.toLowerCase() !== b.key.toLowerCase()) continue;
-        if (!!b.meta !== meta) continue;
-        if (!!b.shift !== e.shiftKey) continue;
+        if (!matchesShortcut(e, parseShortcut(b.keys))) continue;
         e.preventDefault();
         b.run();
         return;

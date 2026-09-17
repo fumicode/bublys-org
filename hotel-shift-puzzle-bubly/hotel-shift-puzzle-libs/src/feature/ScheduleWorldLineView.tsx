@@ -13,7 +13,8 @@
  *     （以前はアプリ全体スコープへ書き戻す restore 版を自前で持っていた）。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
  *   - ノード要約は出さない。
- *   - Cmd+Z はデータ undo 用に予約のため使わない。矢印キーのみ。
+ *   - Ctrl/Cmd+Z で1つ戻る、Ctrl/Cmd+Shift+Z で1つ進む。勤務表バブルと同じ割り当て
+ *     （scheduleUndoBindings。このアプリでは編集を元に戻す＝世界線を戻す）。
  *
  * 「完成レポートを作成」ボタンは勤務表（ScheduleGrid）側に移した。ここは純粋に
  * 世界線の可視化・時間移動だけを担う。
@@ -26,6 +27,7 @@ import {
   type KeyBinding,
 } from "@bublys-org/bubbles-ui";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type Props = {
@@ -35,26 +37,27 @@ type Props = {
 const ScheduleWorldLineViewBody: FC<Props> = () => {
   const { scope } = useScheduleHistory();
 
-  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。
+  // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。Ctrl/Cmd+Z・Shift+Z は勤務表バブルと共通
   const keyBindings = useMemo<KeyBinding[]>(
     () => [
+      ...scheduleUndoBindings(scope),
       {
-        key: "ArrowLeft",
+        keys: "ArrowLeft",
         run: () => {
           const apex = scope.graph.getApex();
           if (apex?.parentId) scope.moveTo(apex.parentId);
         },
       },
       {
-        key: "ArrowRight",
+        keys: "ArrowRight",
         run: () => {
           const apex = scope.graph.getApex();
           const child = apex && scope.graph.getChildrenMap()[apex.id]?.[0];
           if (child) scope.moveTo(child);
         },
       },
-      { key: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
-      { key: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
+      { keys: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
+      { keys: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
     ],
     [scope]
   );

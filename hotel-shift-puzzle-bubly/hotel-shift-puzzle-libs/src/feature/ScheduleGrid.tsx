@@ -2,7 +2,13 @@
 
 import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { ObjectView, UrledPlace, getDragType, extractIdFromUrl } from "@bublys-org/bubbles-ui";
+import {
+  ObjectView,
+  UrledPlace,
+  getDragType,
+  extractIdFromUrl,
+  useKeyBindings,
+} from "@bublys-org/bubbles-ui";
 import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import {
@@ -50,6 +56,7 @@ import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstr
 import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { useWorkingStaff } from "./workingStaff.js";
 import {
   recordSetCell,
@@ -161,6 +168,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 }) => {
   const store = useAppStore();
   const { scope } = useScheduleHistory();
+  // Ctrl/Cmd+Z で世界線を1つ戻す・Shift 付きで進む（世界線ビューと同じ割り当て。#165）。
+  // セルを打っている途中はグリッドが data-text-editing を付けるので奪わない（打ち込みの取り消しになる）
+  useKeyBindings(scheduleUndoBindings(scope));
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   // キーボードのカーソル（スタッフ行のセル or 必要人数のセル。カーソルは1つ）

@@ -68,7 +68,10 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     // 真ん中のセル（s2 × 2日）から始める。上下左右どちらにも動ける
     act(() => hook.result.current.selectCell("s2", days[1]));
 
-    const press = (key: string, mods: { shiftKey?: boolean; altKey?: boolean } = {}) => {
+    const press = (
+      key: string,
+      mods: { shiftKey?: boolean; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean } = {}
+    ) => {
       const preventDefault = jest.fn();
       const event = {
         key,
@@ -389,6 +392,48 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       press("ArrowDown");
 
       expect(at()).toBe("s3:2");
+    });
+  });
+
+  /**
+   * 打っている途中の Ctrl/Cmd+Z は打ち込みの取り消し（#165）。打っていなければ素通しして、
+   * 勤務表の世界線を戻すショートカット（useKeyBindings）に任せる。
+   */
+  describe("Ctrl/Cmd+Z", () => {
+    it.each([
+      ["Ctrl+Z", { ctrlKey: true }],
+      ["Cmd+Z", { metaKey: true }],
+    ])("★ 「7」を打っている途中の %s は、打ち込みを取り消して動かない", (_label, mods) => {
+      const { hook, press, at, onChangeCells } = setUp();
+      press("7");
+
+      const preventDefault = press("z", mods);
+
+      expect(onChangeCells).not.toHaveBeenCalled();
+      expect(at()).toBe("s2:2");
+      expect(hook.result.current.editing).toBe(false);
+      expect(preventDefault).toHaveBeenCalled();
+    });
+
+    it("リストを開いている途中の Ctrl+Z も、閉じるだけ", () => {
+      const { hook, press, onChangeCells } = setUp();
+      press("F2");
+
+      press("z", { ctrlKey: true });
+
+      expect(onChangeCells).not.toHaveBeenCalled();
+      expect(hook.result.current.editing).toBe(false);
+    });
+
+    it("打っていないときの Ctrl+Z は何もしない（世界線を戻すショートカットに任せる）", () => {
+      const { hook, press, at, onChangeCells } = setUp();
+
+      const preventDefault = press("z", { ctrlKey: true });
+
+      expect(onChangeCells).not.toHaveBeenCalled();
+      expect(at()).toBe("s2:2");
+      expect(hook.result.current.editing).toBe(false);
+      expect(preventDefault).not.toHaveBeenCalled();
     });
   });
 

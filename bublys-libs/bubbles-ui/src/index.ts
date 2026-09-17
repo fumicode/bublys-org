@@ -33,6 +33,7 @@ export * from './lib/hooks/useBubbleDrag.js';
 export * from './lib/hooks/useUniverseDropZone.js';
 export * from './lib/hooks/useBubbleResize.js';
 export * from './lib/hooks/useKeyBindings.js';
+export * from './lib/hooks/shortcut.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';

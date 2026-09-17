@@ -16,6 +16,7 @@ import {
 } from "../../domain/index.js";
 import type { CellChange, CellSelection, RequiredChange, SelectionArea } from "./types.js";
 import { moveCursor, type CursorLayout } from "./gridCursor.js";
+import { matchesShortcut, parseShortcut } from "@bublys-org/bubbles-ui";
 import {
   areaTo,
   cellsOf,
@@ -127,6 +128,9 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
   if (s.kind === "day-off") return { kind: "day-off" };
   return { kind: "undecided" };
 };
+
+/** 打ち込みの取り消し（打っている途中の Ctrl/Cmd+Z。Excel と同じ） */
+const CANCEL_TYPING = parseShortcut("mod+z");
 
 /** 押したキーが指す向き（Enter↓ / Tab→ / 矢印。Shift で逆向き）。移動のキーでなければ null */
 const directionOf = (e: KeyboardEvent<HTMLDivElement>): [number, number] | null => {
@@ -632,6 +636,13 @@ export function useCellKeyboardEditing({
         if (selection.kind === "staff") beginEdit("list", ""); // 範囲は解かない
         else onOpenRequiredList?.(selection.shiftName, selection.day);
       }
+      return;
+    }
+    // 打っている途中の Ctrl/Cmd+Z は打ち込みの取り消し（Esc と同じ。動かない）。
+    // 打っていなければ素通しして、勤務表の世界線を戻すショートカットに任せる
+    if (editing && matchesShortcut(e, CANCEL_TYPING)) {
+      e.preventDefault();
+      closeEditor();
       return;
     }
     // それ以外の修飾キー付き（Shift は除く）はブラウザ/OS のショートカットに委ねる

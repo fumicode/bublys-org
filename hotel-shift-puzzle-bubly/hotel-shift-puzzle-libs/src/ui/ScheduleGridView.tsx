@@ -507,6 +507,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         ref={kb.gridRef}
         tabIndex={0}
         role="grid"
+        // 打っている最中はショートカット（Ctrl/Cmd+Z の世界線移動など）にキーを奪わせない
+        data-text-editing={kb.editing ? "" : undefined}
         onKeyDown={kb.handleKeyDown}
         onMouseOver={(e) => {
           const el = (e.target as HTMLElement).closest("[data-cell-key]");
