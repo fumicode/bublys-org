@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>v5-dom bench —— hybrid（組み合わせ）</title>
+<style>
+  /* ★ ここは全案で共通。変えない */
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0b0d14;color:#e6ebf5;overflow:hidden;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #stage{position:absolute;inset:0;overflow:hidden;touch-action:none}
+  /* 泡の要素は入力を受けない。当たり判定は placements から（driver.js が1つで受ける） */
+  #stage *{pointer-events:none}
+
+  /* 泡は全部 #stage の直下。left/top は 0 のまま動かさず、transform だけで動かす。
+     枠は border ではなく outline —— outline は場所を取らないので、太さを変えても layout が出ない
+     （border は箱の内側を食うので、太さを変えると中の題名の原点まで動いてしまう）。 */
+  .bub{position:absolute;left:0;top:0;transform-origin:0 0;border:0;outline-style:solid}
+  .bub.imp{outline-style:dashed}
+  .ttl{position:absolute;left:8px;white-space:nowrap;line-height:1}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+/* ============================================================================
+   hybrid —— 「平ら ＋ 簡略 ＋ 動かすあいだは画像」を組み合わせた案。
+   1つずつ入れて測った結果、**入れる価値があったのは ① と ③ だけ**だった。④ と ⑤ は効かない。
+
+   入れた（効いた）
+     ① 平ら    泡を全部 #stage の直下に置き、箱の大きさは「レンズを通す前」の bw×bh で固定する。
+               毎フレーム動かすのは transform（translate + scale）だけ。
+               → 倍率が変わっても layout が出ない。これがいちばん効いた（場面C の wheel で 14 倍）
+     ② 飛ばす  前のフレームから変わっていない値は書かない
+     ③ 簡略    ①のあと最後に残っていた layout の出どころは「字の大きさ」だった。
+               canvas は字を max(4, 12*倍率) px で描く。下限 4px があるので、小さい泡は倍率が変わるたび
+               font-size が変わる ＝ 毎フレーム layout。場面C の wheel で layout 1951ms（＝ 33ms/フレーム）。
+               そこで **下限を font-size ではなく、字自身の transform で作る**。
+               transform は layout を呼ばないので、毎フレーム書いても layout は 0 のまま（1951 → 0ms）。
+               ※ 題名を消してしまう（簡略の素直なやり方）でも同じ速さになるが、
+                  場面C では 202 個中 110 個の題名が消える。transform なら絵が canvas と合ったまま
+
+   入れなかった（測ったが効かなかった。数字は下）
+     ④ 画像    泡の見た目を SVG の data URL に焼いて background にする（＝ masa さんの案）。
+               wheel は変わらず（2.3→2.2ms）、resize は 1.6 倍おそくなり（2.4→3.9ms）、
+               メモリは 4 倍（10.6→40.8MB）。**箱が変わる泡は毎フレーム焼き直しになる**のが理由
+     ⑤ レイヤ  will-change:transform（ブラウザ組み込みの「絵を焼いて持っておく」）。
+               work は変わらず、落ちたフレームだけ増えた（場面B の resize で 0→16）
+
+   絵を合わせるために払ったもの
+     ・枠は画面でちょうど 1px にする（canvas は lineWidth 1 ＝ 画面 1px）。
+       transform で拡縮すると枠も一緒に拡縮してしまうので、outline-width を 1/倍率 にして打ち消す。
+       代金は wheel で +0.3〜0.8ms。払う価値はある（場面C の画素のずれ 平均 1.053 → 0.514）
+     ・線の中心を箱のふちに合わせる（outline-offset を -幅/2）。
+       canvas の stroke は線の中心がパスの上に来るので、内側いっぱいに引くと 0.5px ずれる
+
+   解く所（resolve.js）には触っていない。差し替えたのは render と update だけ。
+   ============================================================================ */
+import { start } from "./driver.js";
+
+const FONT = '-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif';
+
+/* ③ 字の下限の境目。canvas は字の大きさを max(4, 12*scale) にしているので、
+   12*scale が 4 に張り付く scale = 1/3 がその境目。
+   ★ font-size は箱の座標で 12px に固定したまま一度も書き換えない。
+     下限は下の k（字自身の transform）で作る。これが速さの正体 */
+const CUT = 1 / 3;
+
+/* line-height:1 の字の箱の、上から何割の所にベースラインが来るか。
+   canvas は fillText のベースラインを y+16*scale に置くので、それに合わせるために要る */
+let BASE_R = 0.92;
+(function () {
+  const g = document.createElement("canvas").getContext("2d");
+  g.font = `12px ${FONT}`;
+  const m = g.measureText("Hg"), A = m.fontBoundingBoxAscent, D = m.fontBoundingBoxDescent;
+  if (A > 0 && D >= 0) BASE_R = 0.5 + (A - D) / (2 * 12);
+})();
+
+const els = new Map();       // id → { el, t, st }
+
+function make(p) {
+  const el = document.createElement("div");
+  el.className = "bub" + (p.implicit ? " imp" : "");
+  el.setAttribute("data-id", p.id);                       // 絵の突き合わせ用。1回だけ書く
+  el.style.outlineColor = p.implicit ? "hsl(215 30% 62% / .45)" : `hsl(${p.hue} 70% 62% / .55)`;
+  if (!p.implicit) el.style.background = `hsl(${p.hue} 70% 62% / .16)`;
+  let t = null;
+  if (!p.implicit) {
+    t = document.createElement("span");
+    t.className = "ttl";
+    t.textContent = p.title;
+    t.style.color = `hsl(${p.hue} 70% 78%)`;
+    t.style.fontSize = "12px";                            // ★ 一度だけ。以後さわらない
+    t.style.top = (16 - BASE_R * 12) + "px";              // ★ 一度だけ
+    /* 下限をかけるときの伸縮の原点を、canvas の fillText の基準点（ベースラインの左端）に置く */
+    t.style.transformOrigin = "0 " + (BASE_R * 12) + "px";
+    el.appendChild(t);
+  }
+  const rec = { el, t, st: { on: null, bw: -1, bh: -1, x: NaN, y: NaN, s: NaN, a: NaN, z: -1, ow: -1, k: 1 } };
+  els.set(p.id, rec);
+  return rec;
+}
+
+function render(ps, api) {
+  const frag = document.createDocumentFragment();
+  for (const p of ps) frag.appendChild(make(p).el);
+  api.stage.appendChild(frag);
+  update(ps, api);
+}
+
+function update(ps, api) {
+  for (let n = 0; n < ps.length; n++) {
+    const p = ps[n];
+    const rec = els.get(p.id) || make(p);
+    const st = rec.st, s = rec.el.style;
+
+    /* 消えている泡・小さすぎる泡は出さない */
+    if (!(p.alpha > 0) || p.w < 0.5) { if (st.on !== false) { s.display = "none"; st.on = false; } continue; }
+    if (st.on !== true) { s.display = "block"; st.on = true; }
+
+    /* ① 箱は「レンズを通す前」の大きさ。倍率が変わっても書き換わらない ＝ layout が出ない */
+    if (st.bw !== p.bw || st.bh !== p.bh) {
+      st.bw = p.bw; st.bh = p.bh;
+      s.width = p.bw + "px"; s.height = p.bh + "px";
+      s.borderRadius = Math.min(8, p.bw / 2, p.bh / 2) + "px";   // 箱の座標の 8 ＝ 画面の 8*scale
+    }
+    /* ① 動かすのはこれだけ */
+    if (st.x !== p.x || st.y !== p.y || st.s !== p.scale) {
+      st.x = p.x; st.y = p.y; st.s = p.scale;
+      s.transform = "translate(" + p.x + "px," + p.y + "px) scale(" + p.scale + ")";
+    }
+    /* 枠を画面ちょうど 1px に。線の中心を箱のふちへ（canvas の stroke と同じ置き方） */
+    const ow = 1 / p.scale;
+    if (st.ow !== ow) { st.ow = ow; s.outlineWidth = ow + "px"; s.outlineOffset = -ow / 2 + "px"; }
+
+    if (st.a !== p.alpha) { st.a = p.alpha; s.opacity = p.alpha; }
+    if (st.z !== n) { st.z = n; s.zIndex = n; }
+
+    /* ③ 字の下限 4px。font-size ではなく字自身の transform で作る ＝ layout を呼ばない。
+       12 * k * 倍率 = 4 になるように k を決める。境目より大きい泡は k=1 なので何も書かない */
+    if (rec.t) {
+      const k = p.scale < CUT ? 1 / (3 * p.scale) : 1;
+      if (st.k !== k) { st.k = k; rec.t.style.transform = k === 1 ? "none" : "scale(" + k + ")"; }
+    }
+  }
+}
+
+start({ name: "hybrid", render, update });
+</script>
+</body>
+</html>
