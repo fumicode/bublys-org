@@ -23,6 +23,7 @@ const LIST = [
   ["drawmin","描く下限（小さすぎる泡は描かない・掴めない。★ 数とスタックは未決）"],
   ["screen","画面の約束（ヒント行・一覧・選択・カーソル脇・印・配色）"],
   ["react", "React 版（@bublys-org/bubble-layout-ui）とラボが px で同じものを描く"],
+  ["react-drag", "React 版とラボを本物のマウスで同じに触って、書かれた値を突き合わせる"],
 ];
 
 let ng = 0;

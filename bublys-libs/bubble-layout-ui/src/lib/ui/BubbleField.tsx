@@ -9,8 +9,8 @@
  *   ── 木が React と domain の2箇所にできて剥がせなくなる（DECISIONS.md）。
  */
 import { useMemo } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
-import type { BubbleId, BubbleWorld, Layout, Viewport } from '@bublys-org/bubble-layout';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
+import type { BubbleId, BubbleWorld, DropMarks, Layout, Viewport } from '@bublys-org/bubble-layout';
 import { drawField } from './draw.js';
 import type { BubbleDraw, MeasureText } from './draw.js';
 import { measureTextInDom } from './measure-text.js';
@@ -33,6 +33,10 @@ export interface BubbleFieldProps {
   readonly onPointerUp?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   readonly onWheel?: (e: React.WheelEvent<HTMLDivElement>) => void;
   readonly onDoubleClick?: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  /** 当たり判定が使う層の要素（`useBubbleInput` に渡したものと同じ ref） */
+  readonly layerRef?: RefObject<HTMLDivElement | null>;
+  /** いま離したらどうなるか（`useBubbleInput` の marks） */
+  readonly marks?: DropMarks | null;
   readonly className?: string;
   readonly style?: CSSProperties;
 }
@@ -40,7 +44,7 @@ export interface BubbleFieldProps {
 export function BubbleField(props: BubbleFieldProps) {
   const {
     world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab,
-    renderBubble, measureText, className, style, ...handlers
+    renderBubble, measureText, layerRef, marks, className, style, ...handlers
   } = props;
 
   const field = useMemo(
@@ -54,7 +58,7 @@ export function BubbleField(props: BubbleFieldProps) {
   );
 
   return (
-    <div className={'bl-layer' + (className ? ' ' + className : '')} style={style} {...handlers}>
+    <div ref={layerRef} className={'bl-layer' + (className ? ' ' + className : '')} style={style} {...handlers}>
       {field.items.map((it) => (
         <div
           key={it.id}
@@ -65,6 +69,7 @@ export function BubbleField(props: BubbleFieldProps) {
           {renderBubble ? renderBubble(it.id, it) : <BubbleShell draw={it} />}
         </div>
       ))}
+      <DropMarksView marks={marks ?? null} />
       {/* ★ 角は泡の中ではなく層の兄弟。中に置くと遠い泡の opacity に薄まる */}
       <div
         className="bl-hnd"
@@ -100,5 +105,28 @@ export function BubbleShell({ draw }: { readonly draw: BubbleDraw }) {
       <div className="inner" />
       <div className="mk">{draw.mark}</div>
     </>
+  );
+}
+
+/** いま離したらどうなるか（入るマス・差し込まれる位置）。lab.html 1098-1130 行 renderMarks の要る所だけ */
+export function DropMarksView({ marks }: { readonly marks: DropMarks | null }) {
+  if (!marks) return null;
+  const px = (v: number) => v.toFixed(1) + 'px';
+  return (
+    <div className="bl-marks">
+      {marks.rect && (
+        <div className="mk-cell" style={{ left: px(marks.rect.x), top: px(marks.rect.y), width: px(Math.max(0, marks.rect.w)), height: px(Math.max(0, marks.rect.h)) }} />
+      )}
+      {marks.line && (
+        <div
+          className="mk-line"
+          style={
+            marks.line.axis === 'x'
+              ? { left: px(marks.line.at - 1.5), top: px(marks.line.from), width: '3px', height: px(marks.line.to - marks.line.from) }
+              : { left: px(marks.line.from), top: px(marks.line.at - 1.5), width: px(marks.line.to - marks.line.from), height: '3px' }
+          }
+        />
+      )}
+    </div>
   );
 }

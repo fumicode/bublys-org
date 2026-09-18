@@ -58,5 +58,54 @@ headless Chromium で **ラボ（v5-dom/lab.html）と React 版を同時に開�
 
 ## まだ無いもの
 
-`feature`（Redux の配線・世界線・ObjectView・`openAt`）と、**入力**（掴む・落とす・ホイール・当たり判定）。
-いまの `BubbleField` は `onPointerDown` などを素通しするだけで、操作そのものはラボにしか無い。
+
+
+
+## 触れる
+
+```tsx
+const base = resolveWorld(world, viewport);          // 持ち上げる前
+const input = useBubbleInput({ world, setWorld, layout: base, viewport,
+                               selectedId, setSelectedId, layerRef });
+
+<BubbleField layout={input.layout} skipGrab={input.skipGrab} marks={input.marks}
+             layerRef={layerRef} {...input.handlers} ... />
+```
+
+掴む・引く・離す・ホイール・大きさの角・**②「引かずに離す＝触る」**まで入っている。
+値を書くのは domain の動詞（`dragBubble` `dragFocus` `wheelZ` `resizeBubble` `commitDrop` `focusOn`）で、
+ui がやるのは「何を掴んだか」を決めて**画面の量を模型の言葉に噛み砕く**ところまで。
+
+### 受け入れ条件 ── 同じ触り方なら同じ値
+
+`node docs/bubble-space-prototype/v5-dom/_check/react-drag.mjs`
+
+ラボと React を **本物のマウスで、同じ座標で、同じ順に触って**、58 個の泡の値
+（`size parent free order cell hist branch implicit focus`）と外の空間の焦点を突き合わせる。
+
+| 触り方 | 何が変わったか（両方で同じ） |
+|---|---|
+| 自由に置く空間で引く | `memo3.free` |
+| 並べ替え | `row0.order` `row1.order` |
+| マス移動 | `d3.cell` `d12.cell` |
+| 視点が動く空間で引く | `fish.focus` |
+| **なしの空間で引く** | **何も起きない** |
+| 背景を引く | `root.focus` |
+| **引かずに離す（＝触る）** | `cover.focus`（値は1つも書かない） |
+| ホイール | `root.focus` |
+| 大きさの角 | `memo1.size` `memo1.free`（⑤ pin） |
+
+**引いている途中の見え**（持ち上げ）も別に見ている ── 56 枚の矩形が **0.0px 差**、
+描く順の食い違い 0、一番手前の泡も同じ。
+
+### ★ ラボとの違いが1つある
+
+ラボは引いているあいだ「解き直す → DOM に写す → DOM で当てる」を1フレームでやるが、
+React は書き換えが次のフレームなので、**引いているあいだの落とし先は模型で当てる**（`hitModelAt`）。
+押した瞬間だけは DOM で当てる（`pickAt`）。
+上の突き合わせでは、これによる差は出ていない。
+
+## まだ無いもの
+
+`feature`（Redux の配線・世界線・ObjectView・`openAt`）。
+補間（CSS transition）も入れていない ── 決めてはある（DECISIONS.md）が、まだ書いていない。

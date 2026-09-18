@@ -90,3 +90,11 @@ export const FIELD_CSS = `
 .rl{left:calc(-13px * var(--k));top:0;width:calc(13px * var(--k));height:100%}
 .rr{right:calc(-13px * var(--k));top:0;width:calc(13px * var(--k));height:100%}
 `;
+
+/** 印（いま離したらどうなるか）。lab.html の #marks の所 */
+export const MARKS_CSS = `
+.bl-marks{position:absolute;inset:0;pointer-events:none;z-index:2}
+.bl-marks div{position:absolute;box-sizing:border-box}
+.bl-marks .mk-cell{border:2px dashed #6ee7ff;border-radius:5px;background:rgba(110,231,255,.12);box-shadow:0 0 10px rgba(110,231,255,.75)}
+.bl-marks .mk-line{background:#6ee7ff;box-shadow:0 0 10px rgba(110,231,255,.85)}
+`;
