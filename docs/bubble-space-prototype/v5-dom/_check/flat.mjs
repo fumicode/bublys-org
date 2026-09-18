@@ -36,21 +36,35 @@ console.log(`  重なった面積 ${hit.overlap}画素 ／ 重なった所 (${hi
 ok(hit.overlap > 100, "制約 と 議事録（版）が実際に重なっている");
 ok(hit.hit === "seiyaku", "重なった所を突くと、勤務表の中の「制約」が勝つ（入れ子の DOM では議事録が勝ってしまう）");
 
-// ② 触った泡は手前へ（Z が 順序 の空間では最前面まで上がる）
+// ★★ 2026-09-19：「触った泡は手前へ」は無くなった（raise を消した）。
+//    触っても値は1つも書かないので、重なりの上下（描く順＝z-index）は触っても変わらない。
+//    代わりに、触った泡へ視点が寄る。ここではその2つを一度に測る。
 await lab.preset("stackZ", "root");
 await lab.settle();
-const before = await lab.page.evaluate(() => +document.querySelector('.bub[data-id="memo3"]').style.zIndex);
+const zOf = () => lab.page.evaluate(() => Object.fromEntries(
+  [...document.querySelectorAll("#layer .bub")].map((e) => [e.dataset.id, +e.style.zIndex])));
+const valsOf = async () => (await lab.bubbles())
+  .map((b) => `${b.id}:${b.order}/${b.free.x},${b.free.y},${b.free.z}/${b.cell.col},${b.cell.row}`).join(" ");
+/** いま見えている泡だけの、描く順（z-index の小さい順）。カメラが消した泡は入れない */
+const seenOrder = async () => {
+  const z = await zOf(), vis = new Map((await lab.placements()).map((q) => [q.id, q.vis]));
+  return Object.keys(z).filter((id) => vis.get(id) > 0).sort((a, b) => z[a] - z[b]);
+};
+const v0 = await valsOf(), o0 = await seenOrder(), f0 = await lab.focusOf("root");
 const p = await lab.headerPointOf("memo3");
-await lab.page.mouse.click(p.x, p.y);
+await lab.page.mouse.click(p.x, p.y);          // ★ 引かずに離す＝触る
 await lab.settle();
-const after = await lab.page.evaluate(() => {
-  const els = [...document.querySelectorAll("#layer .bub")];
-  const me = +document.querySelector('.bub[data-id="memo3"]').style.zIndex;
-  const roots = els.filter((e) => ["memo1", "memo2", "memo3", "row", "cover", "fish", "giji", "kinmu"].includes(e.dataset.id));
-  return { me, max: Math.max(...roots.map((e) => +e.style.zIndex)) };
-});
-console.log(`  重ねて置く（Z が 順序）で「思いつき」を触る：z-index ${before} → ${after.me}（外の空間の泡の最大 ${after.max}）`);
-ok(after.me >= before, "触った泡は手前へ");
+const v1 = await valsOf(), o1 = await seenOrder(), f1 = await lab.focusOf("root");
+console.log(`  重ねて置く（Z が 順序）で「思いつき」を触る`);
+console.log(`  焦点 ${["x", "y", "z"].map((a) => `${a} ${f0[a].toFixed(2)}→${f1[a].toFixed(2)}`).join("　")}`);
+ok(v0 === v1, "触っても泡の値は1つも変わらない（order も free.z も。raise を消した）");
+ok(["x", "y", "z"].some((a) => Math.abs(f1[a] - f0[a]) > 1e-6), "代わりに、触った泡へ視点が寄る（焦点が動く）");
+// 描く順そのものは、焦点 Z をまたいだ泡が消えるぶん変わる。見えている泡どうしの上下は変わらない
+const keep = o0.filter((id) => o1.includes(id));
+console.log(`  見えている泡 ${o0.length} → ${o1.length} 個（焦点 Z をまたいだ ${o0.length - keep.length} 個が消えた）`);
+console.log(`  そのまま見えている ${keep.length} 個の上下：${keep.join(" ") === o1.filter((id) => keep.includes(id)).join(" ") ? "変わらない" : "変わった"}`);
+ok(keep.join(" ") === o1.filter((id) => keep.includes(id)).join(" "),
+   "見えている泡どうしの上下は、触っても変わらない（変わったのはカメラの位置だけ）");
 
 const errs = lab.errors();
 ok(errs.length === 0, `コンソールエラー 0（${errs.length}）`);

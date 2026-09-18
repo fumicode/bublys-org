@@ -1,0 +1,164 @@
+/**
+ * ② 触った泡へ、視点が寄る。
+ *
+ * > **触るのは「見る」ことであって、「動かす」ことではない。**
+ * > **だから触っても値は1つも書かない。その泡へ焦点が寄るだけ。**
+ *
+ * ★ このファイルは `raise.spec.ts`（触ったとき Z に書く動詞）の置き換え。
+ *   古い4本をどうしたかは、下のそれぞれの it に書いた。
+ *
+ * ★ 下の数は、ラボ（v5-dom/lab.html）を headless Chromium で開いて **本物のマウスでクリックして**
+ *   `__lab.focusOf(...)` / `__lab.placements()` から取った値と、8 通り（cf6・cf0・g0・勤務表・中・付箋A・版5・佐藤）
+ *   突き合わせてある ── **焦点は差 0、配置は最大 5.7e-14px**（ラボが stage の左上を足して返すぶんの桁落ち）。
+ *   ラボ側でも「触っても泡の値は1つも変わらない」（`__lab.bubbles()` が完全一致）を確かめた。
+ *
+ * ★ v4/RULES.md に焼いてある `0.31 … 0.98 … 0.31` → `0.03 … 0.98` は、下限 0.32 を取り消して
+ *   **また出るようになった**（2026-09-19。DECISIONS.md「端での下限 ── 入れたが、翌日に取り消した」）。
+ */
+import { focusOn } from './focus.js';
+import { resolveWorld } from './resolve.js';
+import { withPreset } from './view.js';
+import { DEFAULT_RULES } from './rules.js';
+import type { BubbleWorld } from './world.js';
+import { labScene, placeOf, VIEWPORT } from './lab-scene.fixture.js';
+
+const R = DEFAULT_RULES;
+const world = labScene();
+const layout = resolveWorld(world, VIEWPORT);
+
+/** 泡の「値」── 焦点（＝ その空間がどこを見ているか）だけを外したもの */
+const valueOf = (w: BubbleWorld, id: string) => {
+  const b = w.bubble(id);
+  if (!b) throw new Error('泡が無い: ' + id);
+  const rest: Record<string, unknown> = { ...b.state };
+  delete rest['focus'];
+  return rest;
+};
+const allValues = (w: BubbleWorld) => w.bubbles.map((b) => valueOf(w, b.id));
+/** coverflow 7枚の倍率 */
+const cover = (w: BubbleWorld) => {
+  const l = resolveWorld(w, VIEWPORT);
+  return [...Array(7)].map((_, i) => placeOf(l, 'cf' + i).scale);
+};
+/** RULES.md に焼いてある実測（小数2桁）と比べるため */
+const raw = (ks: readonly number[]) => ks.map((k) => Number(k.toFixed(2)));
+
+describe('② 触った泡へ、視点が寄る', () => {
+  it('★ 触っても、泡の値は1つも変わらない（変わるのはその空間の焦点だけ）', () => {
+    const next = focusOn(world, layout, 'cf0', R);
+    // 58 個ぜんぶ：親・順序・自由・マス・履歴・枝・大きさ・View が1つも動かない
+    expect(allValues(next)).toEqual(allValues(world));
+    // 動いたのは coverflow の焦点だけ（root も、ほかの空間も 0 のまま）
+    expect(next.bubble('cover')?.state.focus).toEqual({ x: -204, y: 0, z: 0 });
+    expect(next.state.root.focus).toEqual({ x: 0, y: 0, z: 0 });
+    const moved = next.bubbles.filter(
+      (b) => JSON.stringify(b.state.focus) !== JSON.stringify(world.bubble(b.id)?.state.focus),
+    );
+    expect(moved.map((b) => b.id)).toEqual(['cover']);
+  });
+
+  it('★ 触ると、その泡がその軸の焦点になる（coverflow ＝ 順序·等間隔·魚眼）', () => {
+    // cf6 の位置は 等間隔 68 × (6−3) ＝ 204。★ 下限を取り消したので、焦点はそこまで届く
+    //   （下限があったときは、端の泡が大きく描かれるぶん約束(2)「中身は箱に収まる」が 67.0721… で止めていた）
+    const touched = focusOn(world, layout, 'cf6', R);
+    expect(placeOf(layout, 'cf6').pos.x).toBe(204);
+    expect(touched.bubble('cover')?.state.focus.x).toBe(204);
+    // 倍率だけが入れ替わる（山が中央から右へ寄る）
+    expect(cover(world)).toEqual([
+      0.3126301311038828, 0.5629659042235501, 0.8443560262794297, 0.9772801709404171,
+      0.8443560262794297, 0.5629659042235501, 0.3126301311038828,
+    ]);
+    expect(cover(touched)).toEqual([
+      0.03383925738396272, 0.07362461508349882, 0.1559739262137659, 0.3126301311038828,
+      0.5629659042235501, 0.8443560262794297, 0.9772801709404171,
+    ]);
+    // ★ 触った端の泡は中央で原寸（0.98）、向こうの端は 0.03 まで潰れる ── それでよい
+    //   （「奥に行った泡は読めなくてよい。雰囲気だけでも残っていることに意味がある」）
+    expect(raw(cover(touched))[6]).toBe(0.98);
+    expect(Math.min(...cover(touched))).toBeLessThan(0.04);
+    // v4/RULES.md ② に焼いてある実測と、小数2桁で一致する
+    expect(raw(cover(world))).toEqual([0.31, 0.56, 0.84, 0.98, 0.84, 0.56, 0.31]);
+    expect(raw(cover(touched))).toEqual([0.03, 0.07, 0.16, 0.31, 0.56, 0.84, 0.98]);
+    // そして泡の値（順序・自由X）は1つも変わっていない
+    expect(allValues(touched)).toEqual(allValues(world));
+  });
+
+  it('送れない軸では何も起きない ── 次元が なし（議事録の X・Y）', () => {
+    // 旧 raise.spec「Z が 履歴：触っても上がらない」の後身。
+    // 守っていた性質（触っても値は動かない）はまだ生きているので、期待値だけ新しい規則へ直した。
+    const touched = focusOn(world, layout, 'g0', R);
+    expect(allValues(touched)).toEqual(allValues(world));
+    // X・Y は なし ＝ 何も起きない。Z（履歴の古さ）だけがその泡の面へ寄る（初稿は古さ 3）
+    expect(placeOf(layout, 'g0').pos.z).toBe(3);
+    expect(touched.bubble('giji')?.state.focus).toEqual({ x: 0, y: 0, z: 3 });
+    // 触った泡は焦点の面なので原寸。手前になった新しい版は透視が消す（RULES.md「消す。止めない」）
+    const after = resolveWorld(touched, VIEWPORT);
+    expect(placeOf(after, 'g0').scale).toBe(1);
+    expect(placeOf(after, 'g0').alpha).toBe(1);
+    expect(['g1', 'g2', 'g3'].map((id) => placeOf(after, id).alpha)).toEqual([0, 0, 0]);
+  });
+
+  it('送れない軸では何も起きない ── 箱にぴったり（見えない親の中）', () => {
+    // 旧 raise.spec「Z が なし：何も起きない」の後身。
+    // ③ 見えない親の箱はヘッダ 0・余白 0 で中身ぴったりなので、焦点の約束が 0 へ戻す
+    const touched = focusOn(world, layout, 'fA', R);
+    expect(allValues(touched)).toEqual(allValues(world));
+    // 残るのは約束の二分探索の粒（1e-6）だけ ＝ 画面はどこも動かない
+    expect(Math.abs(touched.bubble('snap1')?.state.focus.x ?? 1)).toBeLessThan(1e-5);
+    const after = resolveWorld(touched, VIEWPORT);
+    for (const id of ['fA', 'fB'])
+      expect(Math.abs(placeOf(after, id).x - placeOf(layout, id).x)).toBeLessThan(1e-5);
+  });
+
+  it('★ 焦点の約束はそのまま通る：詰めるの箱の余りぶんだけ寄って止まる（横に並べる）', () => {
+    // 横に並べる の箱は自前 368、中身は 80+14+104+14+128 ＝ 340。余りは 28 ＝ 片側 14。
+    // 中 の泡（位置 −24）を触っても、焦点は −24 までは行けず −14 で止まる（約束(2)：中身は箱に収まる）
+    const touched = focusOn(world, layout, 'row1', R);
+    expect(placeOf(layout, 'row1').pos.x).toBe(-24);
+    expect(touched.bubble('row')?.state.focus.x).toBeCloseTo(-14, 5);
+    expect(touched.bubble('row')?.state.focus.x).toBeGreaterThan(-14.001);
+    expect(allValues(touched)).toEqual(allValues(world));
+    // 3つとも同じだけ動く（平行なので像は曲がらない）
+    const after = resolveWorld(touched, VIEWPORT);
+    for (const id of ['row0', 'row1', 'row2'])
+      expect(placeOf(after, id).x - placeOf(layout, id).x).toBeCloseTo(14, 5);
+  });
+
+  it('★ Z：触った泡の面までカメラが寄る（勤務表 ＝ 自由Z 0.4）。値は書かない', () => {
+    // 旧 raise.spec「★ Z が 自由座標：焦点の面まで上がって、そこで止まる」の後身 ── 向きが逆になった。
+    // 旧：泡の 自由Z を焦点の面（0.2）へ**書いていた**。新：泡は動かず、焦点が泡の面（0.4）へ行く
+    const touched = focusOn(world, layout, 'kinmu', R);
+    expect(touched.bubble('kinmu')?.state.free.z).toBe(0.4);      // 値は書かれていない
+    expect(touched.state.root.focus).toEqual({ x: -11, y: 18, z: 0.4 });  // X・Y も寄る（自由＝送れる）
+    const after = resolveWorld(touched, VIEWPORT);
+    expect(placeOf(after, 'kinmu').scale).toBe(1);                // dz 0 ＝ 原寸
+    expect(placeOf(after, 'kinmu').alpha).toBe(1);
+    // ★ 奥の泡を触ると、手前にいた泡は消える（RULES.md：消す。止めない。縁に積むのは ui の仕事）
+    expect(after.order.filter((p) => p.space === 'root' && p.alpha === 0).map((p) => p.id))
+      .toEqual(['memo1', 'memo2', 'memo3', 'row', 'cover', 'fish', 'giji', 'fC']);
+  });
+
+  it('★ raise は消えた：Z が 順序 の空間でも、触って並べ替わらない（重ねて置く）', () => {
+    // 旧 raise.spec「Z が 順序：最前面（0）へ並べ替えて 0.. に詰め直す」の後身。
+    // 守っていた性質（触ると最前面へ並べ替わる）は **規則から消えた** ので、期待値を逆にした。
+    // 重なりの上下を変えたいなら掴んで引く（② 書けるなら書く）。触るのは見ることであって動かすことではない
+    const stacked = withPreset(labScene(), 'stackZ', 'root');
+    const line = (w: BubbleWorld) =>
+      w.kidsOf('root').slice().sort((a, b) => a.state.order - b.state.order)
+        .map((b) => `${b.id}:${b.state.order}`).join(' ');
+    const before = 'memo1:0 memo2:1 memo3:2 row:3 cover:4 fish:5 giji:6 kinmu:7 fC:8 snap1:9';
+    expect(line(stacked)).toBe(before);
+    let w = focusOn(stacked, resolveWorld(stacked, VIEWPORT), 'memo3', R);
+    expect(line(w)).toBe(before);                                  // 並べ替わらない
+    expect(w.state.root.focus.z).toBe(0.3);                        // 順序 2 × 間隔 0.15 の面へ寄る
+    // 何度触ってもずれない（値を書かないので、そもそも動かしようがない）
+    for (let i = 0; i < 5; i++) w = focusOn(w, resolveWorld(w, VIEWPORT), 'memo3', R);
+    expect(line(w)).toBe(before);
+    expect(w.state.root.focus).toEqual({ x: -615, y: -237, z: 0.3 });
+    expect(allValues(w)).toEqual(allValues(stacked));
+  });
+
+  it('無い泡を触っても何も起きない', () => {
+    expect(focusOn(world, layout, 'いない', R)).toBe(world);
+  });
+});

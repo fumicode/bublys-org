@@ -23,6 +23,10 @@
   button:disabled{opacity:.4;cursor:default;border-color:var(--line)}
   button.on{background:var(--accent);color:#07202a;border-color:var(--accent);font-weight:600}
   .sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+  /* ★ 描く下限のつまみ。行の高さ（25px）を変えないように、高さを決め打つ */
+  input[type=range]{width:104px;height:18px;margin:0;padding:0;vertical-align:middle;accent-color:var(--accent);cursor:pointer}
+  #drawmin-v{color:var(--fg);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:104px}
+  #drawmin-v .gone{color:#ff9db1;font-weight:600}
   #axis-scope{font-size:12px;font-weight:600;color:var(--fg)}
   #hint{color:var(--dim);font-size:11px;min-height:19px;padding-top:2px;border-top:1px dashed var(--line)}
   #hint b{color:var(--accent);font-weight:600}
@@ -34,7 +38,19 @@
     background:radial-gradient(circle var(--gr,1080px) at 50% 50%,#141a2b 0%,#080a11 100%)}
   .box{position:absolute;background:rgba(10,12,20,.88);border:1px solid var(--line);
     border-radius:8px;padding:7px 11px;color:var(--dim);font-size:11px;line-height:1.65;pointer-events:none}
-  #side{position:absolute;right:12px;top:12px;width:376px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #side{position:absolute;right:80px;top:12px;width:376px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  /* 手前の泡スタック：焦点より手前へ抜けて消えた泡を、画面の右端に積む（状態は持たない。毎フレーム作り直す） */
+  #stack{position:absolute;right:12px;top:12px;bottom:12px;width:56px;display:flex;flex-direction:column;gap:6px;
+    pointer-events:none;overflow:hidden;z-index:4}
+  #stack .stk-t{color:var(--dim);font-size:10px;line-height:1.4;text-align:center;letter-spacing:.04em;white-space:nowrap}
+  #stack .stk-t .r{margin-right:1px}
+  #stack .stk{pointer-events:auto;flex:0 0 auto;display:block;width:100%;height:30px;padding:0 4px;
+    border-radius:6px;border:1px solid hsl(var(--h) 62% 58% / .8);background:hsl(var(--h) 55% 42% / .55);
+    box-shadow:0 3px 10px rgba(0,0,0,.45);color:#eaf1ff;font:600 10px/1 var(--f);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  #stack .stk:hover{border-color:var(--accent)}
+  /* ★ 未決：小さすぎて描かなかった泡（点線）。手前へ抜けた泡（実線）と混ぜてよいかを目で見くらべるため */
+  #stack .stk.tiny{border-style:dashed;background:hsl(var(--h) 55% 42% / .28)}
   #side .box{position:static}
   .t{color:var(--fg);font-weight:600;letter-spacing:.04em}
   .sp{margin-top:3px}
@@ -156,10 +172,11 @@
       <button data-preset="fisheyeX" data-hint="選択中の泡がいる空間を <b>X魚眼ビュー</b> に。X は履歴の世代を魚眼で、Y は履歴の枝を平行で。掴むと視点が動く">X魚眼ビュー</button>
       <button data-preset="coverflow" data-hint="選択中の泡がいる空間を <b>coverflow</b> に。X は順序を等間隔に魚眼で。背景を横に引くとスライドする">coverflow</button>
       <button data-preset="histZ" data-hint="選択中の泡がいる空間を <b>履歴を奥行きに</b>。Z は履歴の古さを透視で。ホイールで時間を行き来する">履歴を奥行きに</button>
-      <button data-preset="stackZ" data-hint="選択中の泡がいる空間を <b>重ねて置く</b>。X・Y は自由、<b>Z は順序</b>。泡を触ると最前面へ並べ替わる（重ねた紙のように）">重ねて置く</button>
+      <button data-preset="stackZ" data-hint="選択中の泡がいる空間を <b>重ねて置く</b>。X・Y は自由、<b>Z は順序</b>。重なりの上下が View の中で決まる。<b>触っても変わらない</b>（触ると視点が寄る）">重ねて置く</button>
       <span class="sep"></span>
       <button id="inherit" data-hint="選択中の泡がいる空間の自前の View を捨てて、<b>外の空間の並べ方を継ぐ</b>（焦点は継がない）">外から継ぐ</button>
       <button id="refocus" data-hint="選択中の泡がいる空間の焦点を 0 に戻す">焦点を戻す</button>
+      <button id="stacktiny" data-hint="<b>小さくて描かなかった泡も、右端のスタックに積む</b>か。いまスタックが拾うのは「焦点より手前へ抜けた泡」だけ。どちらが素直かは未決 ── 押して見くらべる">小さいのも積む</button>
     </div>
     <div class="row">
       <span id="axis-scope" data-hint="軸セレクタが効く空間。<b>選択中の泡がいる空間</b>">外の空間 の</span>
@@ -175,6 +192,11 @@
       <select data-axis="z" data-part="dim" data-hint="奥行きに何を読むか。<b>なし</b>ならホイールは何もしない"></select>
       <select data-axis="z" data-part="arrange" data-hint="奥行きの値の決め方。そのまま／等間隔（値×1）／詰める（値の順位）"></select>
       <select data-axis="z" data-part="lens" data-hint="奥行きの写し方。<b>透視</b>＝消失点へ寄せて小さく／<b>平行</b>＝奥行きを見た目に使わない"></select>
+      <span class="sep"></span>
+      <span class="lbl">描く下限</span>
+      <input id="drawmin" type="range" min="0" max="20" step="0.5" value="5"
+             data-hint="<b>これより小さい泡は描かない</b>（画面での短辺）。題名を 6.5px で消すのと同じ話の、泡そのもの版。<b>描かない泡は掴めない</b>。いくつがよいかは未決 ── 動かして決める">
+      <span id="drawmin-v" data-hint="いまの下限と、<b>それで消えている泡の数</b>。0 にすると下限なし（ぜんぶ描く）"></span>
     </div>
     <div id="hint"><i class="r">①</i>親の View で決まる　<i class="r">②</i>操作は軸と掴んだもの　<i class="r">③</i>見えない親は体を持たない　<i class="r">④</i>並べる＝帯　<i class="r">⑤</i>触っていない泡は動かない</div>
   </div>
@@ -182,15 +204,16 @@
     <div id="bgfx"><i class="h"></i><i class="v"></i></div>
     <div id="layer"><div id="hnd"></div></div>
     <div id="marks"></div>
+    <div id="stack" data-hint="<b>手前の泡スタック</b>。焦点より手前（dz&lt;0）へ抜けて消えた泡が、その空間の中から積まれる。押すと<b>カメラが戻る</b>。状態は持たない（カメラを戻せば勝手に空になる）。<b>小さいのも積む</b>を押すと、描く下限で消えた泡（点線）も混ざる"></div>
     <div id="side">
       <div class="box" id="spaces"></div>
       <div class="box" id="selection"></div>
     </div>
     <div class="box" id="cursor-hint"></div>
     <div class="box" id="help">
+      泡を触る（引かずに離す）… <b>その泡へ視点が寄る</b>（値は1つも書かない）<br>
       泡を掴んで横・縦に引く … 軸ごとに <b>動く／並べ替わる／マスを移る／視点が動く</b><br>
-      中へ落とす … その子になる　縁へ寄せて離す … <b>くっつく</b>（見えない親の並び）　外へ大きく引く … 外へ<br>
-      ホイール … 奥行きの視点（Z が なしなら何もしない）　右下の角 … 大きさ
+      中へ落とす … その子になる　縁へ寄せて離す … <b>くっつく</b>　ホイール … 奥行きの視点　右下の角 … 大きさ
     </div>
   </div>
 </div>
@@ -213,7 +236,7 @@
 
    土台と、借りてきた部品
      土台   v3/00-core.html を複製（公理だけで組んであり、いちばん小さい。
-            直した形の raise・freeCellNear、min の大きさ、6場面をそのまま使う）
+            freeCellNear、min の大きさ、6場面をそのまま使う）
      泡の像 v3/03-pack-or-equal.html の projectIn()。泡の大きさを「中心1点の局所倍率」ではなく
             「泡の端をレンズに通した像の幅 ÷ 自前の幅」で決める（resolveSpace・measure・focusFits の3か所）
      見えない親 v3/01-snap-is-parent.html。くっつける／並びに加わる／並びは2つ以上／体を持たない
@@ -226,6 +249,23 @@
    画面で規則を指す
      ツールバーの下のヒント行（何も乗せていないとき）が①〜⑤の見出し。
      選択中の泡・カーソル脇のヒントの行頭に、その行がどの規則から出ているかの番号を出す
+
+   ★★ 2026-09-19：規則が1つ変わった（正は v4/RULES.md、経緯は ../DECISIONS.md）
+     ② 触った泡は「手前へ」ではなく「視点が寄る」── raise() を消した
+          触っても値は1つも書かない。その泡がその空間の焦点になるだけ（軸ごと。焦点の約束 fitFocus はそのまま通す）
+          「触った」と「掴んで引いた」は drag.started（pointerdown から 3px）で分ける。引いたときは今までどおり値を書く
+            （実測：coverflow の写真を触ると 倍率 0.31 0.56 0.84 0.98 0.84 0.56 0.31
+             → 0.03 0.07 0.16 0.31 0.56 0.84 0.98。泡の値は1つも変わらない）
+     ＋ 手前の泡スタック（ラボだけ。規則は増えない）
+          焦点より手前（dz<0）へ抜けて消えた泡を、画面の右端（#stack）に積む。押すとカメラが戻る
+          ★ 状態を持たない。毎フレーム「その空間の中の vis 0」から作り直す（実測：0 → 1 → 2、戻すと 0）
+
+     ＋ 描く下限（ラボだけ。規則は増えない → §2' DRAW_MIN）
+          端での下限 0.32 は入れた日に取り消した（「奥のは読めなくていい。雰囲気だけでも残ってることに意味がある」）。
+          代わりに「小さくなりすぎた泡は描かない」を置く。既にある「題名は 6.5px を切ったら描かない」の延長。
+          ★ いくつにするかは未決なので、ツールバーのつまみにした（既定 5.0px。__lab.setDrawMin）
+          ★ 描かない泡は掴めない（当たり判定からも外す）
+          ★ スタックに積むかどうかは未決なので、両方作ってボタンで切り替えられるようにした（__lab.setStackTiny）
 
    canvas 版 v4 から何を変えたか
      変えたのは描く所と当たり判定だけ。モデル（次元・並べ方・レンズ・解く順・操作・pin・くっつける）は
@@ -342,34 +382,34 @@ const DIMS = {
 const verbOf = dimId => dimId === "none" ? "none" : (DIMS[dimId].write ?? "focus");
 
 /**
- * ★ 触った泡は最前面へ ── その空間の Z 軸の次元が書けるなら、そこへ書く。
+ * ★ 触っても値は1つも書かない ── 触った泡へ、視点が寄る（v4/RULES.md ② 2026-09-19 改）
  *
- *   もとは stack（置いた順）という View の外の状態で上下を決めていた。
- *   これは公理の中に戻せる：「手前」は奥行きのことなので、Z 軸に書けばよい。
+ *   もとは raise()（触ったら Z 軸に書く）だった。それを消した。理由は DECISIONS.md：
+ *   「触るのは『見る』ことであって、『動かす』ことではない」。
+ *   ②はもともと「掴んでいないなら視点」と言っている。触るのも掴んでいないので、同じ枝に乗る。
+ *   　→ 実体は focusOn()（§3 操作）。ここには何も無い。
  *
- *     Z が 順序      … 最前面（0）へ並べ替えて詰め直す。値は 0.. に収まるので、何度触ってもずれていかない
- *     Z が 自由座標  … 一番手前の兄弟の手前へ。ただし同じ値で重なっている兄弟は、座標では上下が決まらない
- *                      （重なりの上下を View で決めたいなら、Z には順序を刺す）
- *     Z が 履歴・なし … 書けないので上がらない。履歴の並びは、触っても順番が変わらない
+ *   これで消えたもの：raise ／ order を X と Z で取り合う問題 ／ ⑤ との緊張（値を書かないので定義上守られる）
  */
-function raise(b) {
-  const space = b.parent ?? "root";
-  const A = viewOf(space).z, verb = verbOf(A.dim);
-  const sibs = kidsOf(space).filter(k => k !== b);
-  if (verb === "reorder") {
-    [b, ...sibs.sort((q, r) => q.order - r.order)].forEach((k, i) => { k.order = i; });
-  } else if (verb === "coord") {
-    // 自由座標の Z では「最前面」を表せない。透視は焦点より手前（dz<0）を消すので、
-    // 焦点の面にいる兄弟の「さらに手前」へ書くと、触った泡そのものが消える（実測：alpha 0）。
-    // だから書けるのは焦点の面まで。そこは兄弟と同じ面で、上下は決まらない（§3 の表）
-    const key = DIMS[A.dim].key, f = focusZ(space);         // ③ 見えない親の Z は外の窓のもの
-    const front = Math.min(b.free[key], ...sibs.map(k => k.free[key]));
-    const to = Math.max(f, front - (A.step ?? 1) * 0.15);
-    if (b.free[key] > to) b.free[key] = to;
-  }
-}
 
 const ARRANGES = { "as-is": "そのまま", equal: "等間隔", pack: "詰める" };
+
+/**
+ * ★ ① 端での下限は持たない（v4/RULES.md ①。2026-09-19 に一度入れたが、同じ日に取り消した）
+ *
+ *   倍率 = 親の倍率 × Z の倍率 × min(X の像の倍率, Y の像の倍率)     ── それだけ。下限は無い
+ *
+ *   いちど SIZE_FLOOR = 0.32（= 下限 + (1 − 下限) × min(kx, ky)）を入れた。取り消した理由は ../DECISIONS.md：
+ *     「奥に行ったバブルは読めなくてもいい。雰囲気だけでも残ってることに意味がある」（masa さん）
+ *   「潰れて読めないのは駄目」は masa さんの言葉ではなく、僕（Claude）の解釈だった。
+ *
+ *   下限を入れて起きていた不都合も、取り消すと消える（実測は _check/rule2.mjs・rule4.mjs）：
+ *     - 触った泡が中央まで来ない（焦点が 204 まで届かず 67.1 で止まった）→ 届く
+ *     - 「詰めるは重ならない」が崩れた（像より大きく描くので）→ 重ならなくなる
+ *
+ *   代わりに置くのは「描く下限」── 小さくなりすぎた泡は描かない（→ §2' DRAW_MIN）。
+ *   ★ あれは規則ではなく画面の話。倍率そのものは 0 まで素直に潰れる
+ */
 
 /** X/Y のレンズ：u（位置 − 焦点）→ 画面 s と局所倍率 k。1次元なので逆関数が必ずある。H は空間の半幅 */
 const TANH_EDGE = 1 - 1e-12;    // tanh が浮動小数で 1 に張り付く手前（|u| ≲ 14H まで往復が合う）
@@ -401,8 +441,9 @@ const PRESETS = {
   fisheyeX:  { label: "X魚眼ビュー",    x: AX("history.index", "equal", "fisheye", 64), y: AX("history.branch", "equal", "parallel", 44), z: AX("none", "as-is", "flat", 1) },
   coverflow: { label: "coverflow",      x: AX("order", "equal", "fisheye", 68),        y: AX("none", "pack", "parallel", 80),            z: AX("none", "as-is", "flat", 1) },
   histZ:     { label: "履歴を奥行きに", x: AX("none", "as-is", "parallel", 110),        y: AX("none", "as-is", "parallel", 80),           z: AX("history.age", "equal", "perspective", 1) },
-  // ★ 重なりの上下を View の中で決めたいなら、Z に「順序」を刺す。触った泡が最前面（順序 0）へ並べ替わる。
+  // ★ 重なりの上下を View の中で決めたいなら、Z に「順序」を刺す。上下が View の中で決まる。
   //   自由座標のままだと、同じ値で重なった兄弟の上下は決まらない（座標は同点を許すので）
+  //   ★ 触っても上下は変わらない（触っても値は1つも書かない）。変えたいなら掴んで引く
   stackZ:    { label: "重ねて置く",     x: AX("free.x", "as-is", "parallel", 110),      y: AX("free.y", "as-is", "parallel", 80),         z: AX("order", "equal", "perspective", 0.15) },
 };
 const viewFromPreset = id => { const p = PRESETS[id]; return { x: { ...p.x }, y: { ...p.y }, z: { ...p.z } }; };
@@ -747,7 +788,7 @@ function resolveSpace(spaceId, host, memo, sink, lifted, mode) {
     return { b, i, dz, m, pos, target };
   });
   // ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら大きく写るものを手前に（coverflow の中央が上に来る）。
-  //   それも同じ（格子の同じマスに重なる など）なら、決まらない ──「置いた順」という View の外の状態は持たない（raise）
+  //   それも同じ（格子の同じマスに重なる など）なら、決まらない ──「置いた順」という View の外の状態は持たない
   items.sort((p, q) => q.dz - p.dz || p.target.scale - q.target.scale || p.i - q.i);
 
   // 連続入力（焦点を引く・泡を引く・大きさ）は補間しない。大きさは pin が外の泡の座標へ書くので、その泡へ至る空間を全部
@@ -790,6 +831,33 @@ function resolveAll(mode) {
   for (let i = frameItems.length - 1; i >= 0; i--) {
     const p = frameItems[i];
     if (p.b.implicit) p.vis = kidsOf(p.id).some(k => PLACE.get(k.id)?.vis > 0) ? p.vis : 0;
+  }
+  markTiny();
+}
+
+/**
+ * ★ 描く下限：短辺が DRAW_MIN を切った泡に tiny を立てる（ui の話）。
+ *   ★ vis には触らない。vis はレンズの答え（domain）で、ライブラリ（bubble-layout）と 1 ビットまで同じ数。
+ *     描くか描かないかは、そこに ui が重ねる別の旗。
+ *   入れ物が tiny なら中身も tiny（箱ごと消える）。見えない親は、描く子が1つも無くなったら tiny
+ */
+function markTiny() {
+  const memo = new Map();
+  const shown = id => {
+    if (memo.has(id)) return memo.get(id);
+    const p = PLACE.get(id);
+    if (!p) return true;                                  // 外の空間（root）は入れ物ではない
+    memo.set(id, true);                                   // 念のため輪を切る（木なので回らない）
+    const v = Math.min(p.w, p.h) >= DRAW_MIN && shown(p.space);
+    memo.set(id, v);
+    return v;
+  };
+  for (const p of frameItems) p.tiny = !shown(p.id);
+  // ③ 中身が全部消えたら、並びの枠だけ残さない（子は親より後ろに並ぶので、後ろから）
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (p.b.implicit && !p.tiny)
+      p.tiny = !kidsOf(p.id).some(k => { const q = PLACE.get(k.id); return q && q.vis > 0 && !q.tiny; });
   }
 }
 
@@ -905,6 +973,22 @@ function spaceSummary(spaceId) {
 let hoverRing = null;           // カーソルが縁に乗っている見えない親
 const MARK_MIN = 6.5;           // 字の下限（画面 px）。これより小さくなる印・題名は描かない
 
+/* ── ★ 描く下限（ui の話。規則には無い。→ 冒頭の ★★ 2026-09-19） ─────────────────
+ * 「小さくなりすぎた泡は描かない」。上の MARK_MIN（題名は 12px × 倍率 が 6.5px を切ったら描かない）の延長で、
+ * 泡そのものにも下限を置く。測るのは **画面での短辺** min(w, h)。倍率ではなく px で測るのは、
+ * 同じ倍率でも小さい泡と大きい泡があるから（MARK_MIN も「12px × 倍率」という px の物差し）。
+ *
+ * ★ 既定 5.0px の理由：枠は倍率によらず画面で 1.1px（--rw × --k）。短辺 5.0px なら 1.1 + 2.8 + 1.1 で、
+ *   中身（色の面）が枠2本ぶんより広い。これを切ると泡は「色のついた面」ではなく「線の切れはし」になる。
+ *   ★ ただし、いくつがよいかは未決。ツールバーのつまみで 0〜20px を動かせる（__lab.setDrawMin）
+ *
+ * ★ 描かない泡は掴めない（当たり判定からも外す）。見えないものが掴めるのは、消えるより怖い
+ * ★ 入れ物が描かれないなら、その中身も描かれない（箱ごと消える。中身だけ宙に浮かせない）
+ * ★ ライブラリ（domain）には入れない。domain は placements を返すだけ
+ */
+let DRAW_MIN = 5.0;
+let STACK_TINY = false;         // ★ 未決：描かなかった泡を、手前の泡スタックに積むか（ツールバーのボタン）
+
 /* ── 泡ひとつぶんの DOM。作るのは1回だけ ── */
 const EL = new Map();           // id → { el, b, ... 前に書いた値 }
 function elOf(b) {
@@ -952,12 +1036,13 @@ function render() {
     if (!(Math.abs(s - r.k) <= r.k * 0.003)) { el.style.setProperty("--k", (1 / s).toFixed(4)); r.k = s; WROTE.k++; }  // 3 逆 scale
 
     const vis = p.vis > 0;                                            // ★ レンズの答え（補間しない）
-    const grab = vis && !(skip && skip.has(b.id));
+    const draw = vis && !p.tiny;                                      // ★ 描く下限を切った泡は描かない
+    const grab = draw && !(skip && skip.has(b.id));                   //   → 掴めない（pointer-events:none）
     const out = p.x > VW + 60 || p.y > VH + 60 || p.x + p.w < -60 || p.y + p.h < -60 || p.w < 2;
     let cls, op, dsp;
     if (b.implicit) {
       op = clamp(p.alpha, 0, 1);
-      dsp = (!vis || op <= 0.02 || out) ? "none" : "";
+      dsp = (!draw || op <= 0.02 || out) ? "none" : "";
       const V = viewOf(b.id);
       const word = verbOf(V.x.dim) === "reorder" ? "横に並べる" : verbOf(V.y.dim) === "reorder" ? "縦に並べる" : "並べる";
       const t = "見えない親 · " + word;
@@ -967,7 +1052,7 @@ function render() {
           + (p.y + p.h + 21 <= VH ? "" : " lbup");                     // 枠の下。入らなければ上
     } else {
       op = clamp(p.alpha, 0, 1) * clamp(0.3 + 0.7 * Math.min(1, s), 0.15, 1);
-      dsp = (out || (op < 0.02 && !vis)) ? "none" : "";
+      dsp = (out || p.tiny || (op < 0.02 && !vis)) ? "none" : "";
       const chip = p.box.h <= 34, host = isHost(b);
       let mcls = "";
       if (host) {
@@ -1068,7 +1153,7 @@ function pickAt(mx, my) {
     if (!el.classList) continue;
     if (el === hnd) {                                   // 大きさの角（泡の外に置いてある）
       const p = PLACE.get(selectedId);
-      if (!handle && p && p.vis > 0 && !p.b.implicit && onHandle(p, mx, my)) handle = p;
+      if (!handle && p && p.vis > 0 && !p.tiny && !p.b.implicit && onHandle(p, mx, my)) handle = p;
       continue;
     }
     const q = el.closest(".bub");
@@ -1092,7 +1177,7 @@ const onRing = (p, mx, my) => mx >= p.x - RING && mx <= p.x + p.w + RING && my >
 function hitModel(mx, my, skip) {
   for (let i = frameItems.length - 1; i >= 0; i--) {
     const p = frameItems[i];
-    if (!(p.vis > 0) || (skip && skip.has(p.id))) continue;
+    if (!(p.vis > 0) || p.tiny || (skip && skip.has(p.id))) continue;   // ★ 描かない泡は掴めない
     if (p.b.implicit) { if (onRing(p, mx, my)) return p; continue; }
     if (mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h) return p;
   }
@@ -1128,11 +1213,10 @@ stage.addEventListener("pointerdown", e => {
   const p0 = hitTest(mx, my);
   if (p0 && !inContent(p0, my)) {
     selectedId = p0.id;
-    raise(p0.b);                     // ★ 触った泡は最前面へ（Z 軸が書けるなら）
-    // ★ Z を書き替えたら、掴む前に配置を解き直す。奥行きの倍率 m は補間を通さないので raise で即変わり、
-    //   古い配置のまま逆写しすると 1/m のぶん外れる（押してすぐ動かすと泡が 95px 跳ぶ）
-    resolveAll("keep"); render();
-    const p = PLACE.get(p0.id) ?? p0;
+    // ★ 押した時点では何も書かない。焦点が寄るのは「引かずに離した」ときだけ（endDrag の focusOn）。
+    //   raise（触ったら Z に書く）を消したので、掴む前に解き直す必要も無くなった
+    //   （もとは「Z を書き替えたら 1/m のぶん逆写しが外れる」ための解き直しだった）
+    const p = p0;
     const V = viewOf(p.space), verbs = { x: verbOf(V.x.dim), y: verbOf(V.y.dim) };
     const vs = [verbs.x, verbs.y];
     drag = {
@@ -1344,6 +1428,26 @@ function endDrag() {
   drag = null;
   hoverRing = null;
   if (slot) commitDrop(d, slot);
+  // ★ ② 触った泡へ、視点が寄る。「触った」と「掴んで引いた」は drag.started で分ける
+  //   （started ＝ pointerdown から 3px 以上動いた。pointermove の Math.hypot(...) < 3 と同じ1つのしきい値）
+  //   引いたときは今までどおり値を書く。引かずに離したときだけ、値を1つも書かずに焦点だけ寄る
+  if (d.kind === "bubble" && !d.started) focusOn(d.id);
+}
+
+/**
+ * ★ ② 触った泡が、その空間の焦点になる。軸ごとに「その泡のその軸での位置」を焦点にする。
+ *   焦点の約束（fitFocus）はそのまま通すので、送れない軸（なし・箱にぴったり）では何も起きない。
+ *   値は1つも書かない ── 書くのは空間の focus だけ。
+ *   ③ 見えない親の Z は軸まるごと外の窓のものなので、Z だけ窓へ回す（並びの中の泡を触っても同じ）
+ */
+function focusOn(id) {
+  const p = PLACE.get(id);
+  if (!p) return;
+  for (const axis of ["x", "y", "z"]) {
+    const sp = axis === "z" ? windowOf(p.space) : p.space;
+    const L = LAYOUT.get(sp);
+    if (L) setFocusAxis(L, axis, p.pos[axis]);
+  }
 }
 
 const byOrder = (q, r) => q.order - r.order;
@@ -1378,7 +1482,7 @@ function commitDrop(d, slot) {
     } else if (moved) {
       renumber([...kidsOf(slot.space).filter(k => k !== b).sort(byOrder), b]);
     }
-    raise(b);                          // ② 置いた泡も手前へ（Z 軸が書けるなら。stack は持たない）
+    // ★ 置いた泡も「手前へ」書かない（raise を消した）。掴んで引いたときに書くのは、引いた軸の値だけ
     // ★ 同じマスに2つ入れない。マス移動は兄弟の値の入れ替え：
     //   同じ空間の中なら、先客は掴んだ泡が空けたマスへ移る（順序の差し込みが番号を振り直すのと同じ）。
     //   よその空間から来た泡には空けたマスが無いので、1人ずつ順に一番近い空きマスへ逃がす
@@ -1607,6 +1711,22 @@ function snapHtml(spaceId) {
                              : `<span class="move">並ぶ</span>（箱の外まで引き出してから）`];
 }
 
+/**
+ * ★ ② 触ったら何が起きるか。focusOn と同じ道（fitFocus）で「動く軸」を数えるだけ。書かない。
+ *   送れない軸（なし・箱にぴったり・もう焦点にいる）では何も起きない
+ */
+function touchHtml(id) {
+  const p = PLACE.get(id);
+  if (!p) return `<span class="fix">何も起きない</span>`;
+  const axes = [];
+  for (const axis of ["x", "y", "z"]) {
+    const L = LAYOUT.get(axis === "z" ? windowOf(p.space) : p.space);
+    if (L && Math.abs(fitFocus(L, axis, p.pos[axis], L.focus[axis]) - L.focus[axis]) > 1e-9) axes.push(axis.toUpperCase());
+  }
+  return axes.length ? `<span class="move">この泡へ視点が寄る</span>（${axes.join("・")}　値は書かない）`
+                     : `<span class="fix">何も起きない</span>（送れる軸が無い／もう焦点にいる）`;
+}
+
 /* ── カーソルの脇：その場所でドラッグ・ホイールしたら何が起きるか ── */
 const cursorHint = document.getElementById("cursor-hint");
 // 出ているヒントは、毎フレームいまの配置から作り直す（ホイールで焦点が動いた・補間で泡が動いた、でも古くならない）
@@ -1623,6 +1743,7 @@ function showCursorHint(mx, my) {
     const cross = crossHtml(p.space), snap = snapHtml(p.space);
     const who = p.b.implicit ? "並びの縁" : esc(p.b.title);
     lines.push(`<span class="who">${who}</span>  ${nameHtml(p.space)}`,
+               `${RM("②")}${"触る".padEnd(6, "　")}${touchHtml(p.id)}`,
                `${RM("②")}横ドラッグ  ${verbHtml(p.space, "x")}`, `${RM("②")}縦ドラッグ  ${verbHtml(p.space, "y")}`);
     if (cross) lines.push(`${RM("②")}${cross[0].padEnd(6, "　")}${cross[1]}`);
     if (snap) lines.push(`${RM("③")}${snap[0].padEnd(6, "　")}${snap[1]}`);
@@ -1677,7 +1798,9 @@ function selectionHtml() {
     `<div><span class="t">選択</span>  <span class="nm" style="color:hsl(${b.hue} 70% 66%)">${esc(b.title)}</span></div>`,
     k(imp ? "③" : "①", "いる空間", `${nameHtml(space)}  <span class="${imp ? "inh" : V.own ? "own" : "inh"}">` +
       `${imp ? "並べるだけ（View を選べない）" : V.own ? "自前" : "継承"}</span>`),
-    p.vis > 0 ? "" : k("①", "見え方", `<span class="fix">見えない</span>（焦点 Z より手前。掴めない）`),
+    p.vis > 0 ? "" : k("①", "見え方", `<span class="fix">見えない</span>（焦点 Z より手前。掴めない。<b>右端のスタック</b>から戻せる）`),
+    p.vis > 0 && p.tiny ? k("①", "見え方", `<span class="fix">描いていない</span>（短辺 ${p.w < p.h ? p.w.toFixed(1) : p.h.toFixed(1)}px ＜ 描く下限 ${DRAW_MIN.toFixed(1)}px。掴めない）`) : "",
+    k("②", "触る", touchHtml(b.id)),
     k("②", "横ドラッグ", verbHtml(space, "x")),
     k("②", "縦ドラッグ", verbHtml(space, "y")),
     crossHtml(space) ? k("②", crossHtml(space)[0], crossHtml(space)[1]) : "",
@@ -1728,12 +1851,93 @@ document.getElementById("refocus").onclick = () => { Object.assign(spaceObj(targ
     el.addEventListener("focus", () => { hintEl.innerHTML = el.dataset.hint; });
     el.addEventListener("mouseleave", () => { hintEl.innerHTML = DEFAULT; });
   }
+  // 手前の泡スタックの中身は毎フレーム作り直すので、ヒントは委譲で拾う（入れ物の mouseleave が既定に戻す）
+  // mouseenter（入れ物）より後に来る mousemove で当てる ── でないと入れ物のヒントに上書きされる
+  document.getElementById("stack").addEventListener("mousemove", e => {
+    const t = e.target.closest("[data-hint]");
+    if (t) hintEl.innerHTML = t.dataset.hint;
+  });
 }
+
+/* ── 右端：手前の泡スタック（ui の仕事。規則は増えない） ────────────────────────
+ * ① Z のレンズは、焦点より手前（dz<0）を消す。消えたものは画面の縁に積んで、拾えるようにする。
+ *
+ *   ★ 状態を持たない。毎フレーム「その空間の中で alpha が 0 の泡」から作り直す。
+ *     「積んだ」という配列を持ったら負け ── スタックは、カメラの位置の関数
+ *     （実測：ホイールで 0 → 1 → 2、戻すと勝手に 0 に戻る）
+ *   ★ 積むのは、その空間の中だけ（入れ子の奥までは拾わない）。
+ *     「その空間」＝ 軸セレクタ・焦点を戻す・空間の印 と同じ targetSpace（選択中の泡がいる空間）
+ *   ★ ポケット（クリップボード）とは別物。あちらは「置く」、これは「置かない」
+ *
+ * alpha は補間を通るので、途中の値は 0 ちょうどにならない。レンズの答えそのものは vis（補間しない）なので、
+ * ここは vis で見る。その空間が見えていないときは、中身が全部 vis 0 になるので積まない
+ */
+function stackRows() {
+  const sp = targetSpace(), h = PLACE.get(sp);
+  if (sp !== "root" && !(h && h.vis > 0 && !h.tiny)) return [];
+  const rows = [];
+  for (const p of frameItems) {
+    if (p.space !== sp || p.b.implicit) continue;
+    if (!(p.vis > 0)) rows.push({ id: p.id, why: "front" });                  // 焦点より手前へ抜けた
+    else if (STACK_TINY && p.tiny) rows.push({ id: p.id, why: "tiny" });      // ★ 未決：小さくて描かなかった
+  }
+  return rows;
+}
+const stackIds = () => stackRows().map(r => r.id);
+const stackEl = document.getElementById("stack");
+let stackSig = "";
+function renderStack() {
+  const rows = stackRows(), sig = rows.map(r => r.id + r.why).join(",");
+  if (sig === stackSig) return;
+  stackSig = sig;
+  const nf = rows.filter(r => r.why === "front").length, nt = rows.length - nf;
+  stackEl.innerHTML = !rows.length ? "" :
+    `<div class="stk-t">${RM("①")}手前 ${nf}${nt ? `<br>小 ${nt}` : ""}</div>` +
+    rows.map(r => { const b = byId(r.id), tiny = r.why === "tiny";
+      return `<button class="stk${tiny ? " tiny" : ""}" data-id="${esc(r.id)}" style="--h:${b.hue}" data-hint="<b>${esc(b.title)}</b>`
+           + (tiny ? ` は<b>小さすぎて描いていない</b>（短辺が描く下限を切った）。押すと<b>カメラが寄る</b>（その泡が焦点になって大きくなる）`
+                   : ` は焦点より手前へ抜けて消えている。押すと<b>カメラが戻る</b>（その泡が見える所まで焦点 Z が戻る）`)
+           + `">${esc(b.title)}</button>`; }).join("");
+}
+// ★ アイコンを押すと、カメラが戻る ── 触るのと同じ枝（focusOn）。新しい仕組みは足さない。
+//   #stage の pointerdown に届くと背景を掴んだことになるので、ここで止める
+stackEl.addEventListener("pointerdown", e => {
+  e.stopPropagation();
+  const el = e.target.closest(".stk");
+  if (!el) return;
+  e.preventDefault();
+  selectedId = el.dataset.id;
+  focusOn(selectedId);
+  lastSig = "";
+});
+stackEl.addEventListener("pointermove", e => { if (!drag) { e.stopPropagation(); hideCursorHint(); } });
+
+/* ── ★ 描く下限のつまみ（未決の数を、動かして決めるための口） ─────────────────────
+ * 「いくつにするか」は決まっていないので、ツールバーのつまみにした。
+ * 右の数は「いま、その下限で消えている泡の数」── ★ 減ったことに気づけるように、画面に出す
+ */
+const drawMinEl = document.getElementById("drawmin"), drawMinVal = document.getElementById("drawmin-v");
+const stackTinyEl = document.getElementById("stacktiny");
+let drawMinSig = "";
+function setDrawMin(v) { DRAW_MIN = Math.max(0, +v || 0); drawMinEl.value = String(DRAW_MIN); drawMinSig = ""; stackSig = ""; }
+function setStackTiny(on) { STACK_TINY = !!on; stackTinyEl.classList.toggle("on", STACK_TINY); stackSig = ""; }
+drawMinEl.oninput = () => setDrawMin(drawMinEl.value);
+stackTinyEl.onclick = () => setStackTiny(!STACK_TINY);
+function renderDrawMin() {
+  const n = frameItems.filter(p => p.tiny && !p.b.implicit).length;
+  const sig = DRAW_MIN + "/" + n;
+  if (sig === drawMinSig) return;
+  drawMinSig = sig;
+  drawMinVal.innerHTML = DRAW_MIN > 0
+    ? `${DRAW_MIN.toFixed(1)}px　描かない <span class="${n ? "gone" : ""}">${n}</span>`
+    : `なし（ぜんぶ描く）`;
+}
+setDrawMin(DRAW_MIN); setStackTiny(STACK_TINY);
 
 const panelCache = {};
 function setHtml(id, html) { if (panelCache[id] !== html) { panelCache[id] = html; document.getElementById(id).innerHTML = html; } }
 function updatePanels() {
-  setHtml("spaces", spacesHtml()); setHtml("selection", selectionHtml()); syncToolbar();
+  setHtml("spaces", spacesHtml()); setHtml("selection", selectionHtml()); syncToolbar(); renderStack(); renderDrawMin();
   if (hintAt && !drag) showCursorHint(hintAt.mx, hintAt.my);
 }
 
@@ -1750,7 +1954,7 @@ function loop() { frame(); requestAnimationFrame(loop); }
 const offset = () => { const r = stage.getBoundingClientRect(); return { x: r.left, y: r.top }; };
 const outPlace = p => { const o = offset();
   return { id: p.id, x: p.x + o.x, y: p.y + o.y, w: p.w, h: p.h, scale: p.scale, local: p.local, depth: p.depth, space: p.space,
-           alpha: p.alpha, vis: p.vis, implicit: p.b.implicit }; };
+           alpha: p.alpha, vis: p.vis, tiny: !!p.tiny, implicit: p.b.implicit }; };
 window.__lab = {
   select(id) { selectedId = id; lastSig = ""; },
   selectedId: () => selectedId,
@@ -1816,6 +2020,18 @@ window.__lab = {
   /** 数えたぶんを返して 0 に戻す。frames はフレーム数、あとは書いた回数の合計 */
   stats() { const o = { ...WROTE }; for (const k in WROTE) WROTE[k] = 0; return o; },
   dragState: () => drag && drag.slot ? { id: drag.id, space: drag.space, slot: { space: drag.slot.space, out: drag.slot.out, snap: drag.slot.snap ?? null } } : null,
+  /** いま積まれている「手前の泡」の id（その空間の中だけ。状態ではなく、カメラの位置の関数） */
+  stack: () => stackIds(),
+  /** 積まれているものを、なぜ積まれたかつきで（front ＝ 焦点より手前へ抜けた／tiny ＝ 小さくて描かなかった） */
+  stackRows: () => stackRows(),
+  /** ★ 描く下限（画面 px の短辺）。ツールバーのつまみと同じ口 */
+  setDrawMin(v) { setDrawMin(v); },
+  drawMinOf: () => DRAW_MIN,
+  /** いま描いていない泡の id（小さすぎるから描かなかったもの。見えない親も入る） */
+  tiny: () => frameItems.filter(p => p.tiny).map(p => p.id),
+  /** ★ 未決：描かなかった泡をスタックに積むか */
+  setStackTiny(on) { setStackTiny(!!on); },
+  stackTinyOn: () => STACK_TINY,
   /** ⑤ pin を切って比べるための口（画面のボタンにはしない。教えるためのトグルは v3/05 に残してある） */
   setPin(on) { PIN_ON = !!on; },
   pinOn: () => PIN_ON,

@@ -37,9 +37,9 @@ const local = (ps) => { const c = ps.find((p) => p.id === "cal");
   return ps.filter((p) => p.space === "cal").map((p) => ({ id: p.id,
     dx: (p.x + p.w / 2 - (c.x + c.w / 2)) / c.scale, dy: (p.y + p.h / 2 - (c.y + c.h / 2)) / c.scale, w: p.w / p.scale })); };
 const before = local(ps);
-await lab.dragBubble("kinmu", { dx: -40, dy: -25 });     // ② 触った泡は手前へ上がるので、勤務表の倍率は変わる
+await lab.dragBubble("kinmu", { dx: -40, dy: -25 });     // 掴んで引く＝値（自由X・自由Y）を書く。奥行きは書かない
 const ps2 = await lab.placements(), by2 = Object.fromEntries(ps2.map((p) => [p.id, p]));
-console.log(`  勤務表の倍率 ${byId.kinmu.scale.toFixed(4)} → ${by2.kinmu.scale.toFixed(4)}（触ったので焦点の面へ）`);
+console.log(`  勤務表の倍率 ${byId.kinmu.scale.toFixed(4)} → ${by2.kinmu.scale.toFixed(4)}（引いても奥行きは書かないので変わらない）`);
 const after = Object.fromEntries(local(ps2).map((p) => [p.id, p]));
 let worst = 0;
 for (const b of before) {
@@ -48,6 +48,36 @@ for (const b of before) {
 }
 console.log(`  外で動かしたあと、カレンダーの中の 14 個の局所配置のずれ 最大 ${worst.toFixed(4)}px`);
 ok(worst < 0.01, `中身は親の View だけで決まる（外で何が起きても局所配置は 0.00px）`);
+
+// ★★ 2026-09-19：「端での下限 0.32」は、入れた日に取り消した（../DECISIONS.md）。
+//    v4/RULES.md ①「端での下限は持たない。焦点を送れば端は 0 まで潰れる。それでよい」
+//    ここは「下限が無い」ことそのものを測る。読めるかどうかは測らない ── 読めなくてよい
+console.log(`\n■ ① 端での下限は持たない（倍率 = 親 × Z × min(X の像, Y の像)。それだけ）`);
+{
+  await lab.select("v0"); await lab.settle();
+  const local = () => lab.placements().then((ps) => ps.filter((p) => p.space === "fish")
+    .sort((a, b) => a.id.localeCompare(b.id)).map((p) => p.local));
+  const before = await local();
+  const q = await lab.call("headerPointOf", "v9");            // 端の版を触って、焦点を端まで送る
+  await lab.page.mouse.click(q.x, q.y); await lab.settle();
+  const after = await local();
+  console.log(`  X魚眼ビューの版10枚の倍率　焦点 0 ：${before.map((v) => v.toFixed(3)).join(" ")}`);
+  console.log(`  　　　　　　　　　　　　　　端を触る：${after.map((v) => v.toFixed(3)).join(" ")}`);
+  ok(Math.min(...after) < 0.32, `端は 0.32 より下まで潰れる（最小 ${Math.min(...after).toFixed(3)}）── 下限は無い`);
+  ok(Math.min(...after) < Math.min(...before), `焦点を送るほど端は小さくなる（${Math.min(...before).toFixed(3)} → ${Math.min(...after).toFixed(3)}）`);
+  ok(Math.max(...after) > 0.97, `代わりに、触った泡は原寸まで来る（最大 ${Math.max(...after).toFixed(3)}）`);
+  // ★ 「小さすぎる泡は描かない」は ui の話。倍率（＝ domain の答え）には手を出していない
+  const min0 = Math.min(...after);
+  await lab.call("setDrawMin", 20); await lab.settle();
+  const withMin = Math.min(...(await local()));
+  await lab.call("setDrawMin", 5); await lab.settle();
+  console.log(`  描く下限を 20px にしても、倍率は ${min0.toFixed(6)} → ${withMin.toFixed(6)}`);
+  ok(Math.abs(min0 - withMin) < 1e-12, `描く下限は倍率を変えない（描くか描かないかだけの話）`);
+  await lab.page.click("#refocus"); await lab.settle();
+  await lab.call("setAxis", "kinmu", "x", { lens: "parallel" });
+  await lab.call("setAxis", "cal", "x", { lens: "parallel" });
+  await lab.settle();
+}
 
 await lab.shot("rule1");
 const errs = lab.errors();

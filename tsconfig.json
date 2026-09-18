@@ -119,6 +119,9 @@
     },
     {
       "path": "./bublys-libs/bubble-space"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout"
     }
   ]
 }

@@ -65,45 +65,103 @@ for (const c of CASES) {
   await lab.page.click("#refocus"); await lab.settle();
 }
 
-// ★ free.z の空間で泡を触っても消えない（焦点の面で止まる）
-console.log(`\n■ 触る（② Z が自由座標なら、焦点の面まで上がって そこで止まる）`);
-await lab.call("preset", "free", "root");
-await lab.settle();
-// 1回目：焦点を 0.2 まで奥へ送ってから、そのさらに奥（自由Z 0.4）にいる 勤務表 を触る
-{ const r = await lab.rect("kinmu"); await lab.wheel(r.x + r.w / 2, r.y - 40, 50); }
-for (const round of ["焦点 0.2 の面へ", "焦点 0 の面へ"]) {
-  const focus = (await lab.focusOf("root")).z;
-  const b0 = (await lab.bubbles()).find((b) => b.id === "kinmu");
-  const p = await lab.call("headerPointOf", "kinmu");
-  await lab.page.mouse.click(p.x, p.y);
-  await lab.settle();
-  const b = (await lab.bubbles()).find((b) => b.id === "kinmu");
-  const q = (await lab.placements()).find((p) => p.id === "kinmu");
-  console.log(`  ${round}：焦点 Z ${focus.toFixed(3)}・勤務表の自由Z ${b0.free.z.toFixed(3)} で触る`
-            + ` → 自由Z ${b.free.z.toFixed(3)}  alpha ${q.alpha.toFixed(2)}  倍率 ${q.scale.toFixed(3)}`);
-  ok(Math.abs(b.free.z - focus) < 1e-6, `触った泡は焦点の面まで上がって、そこで止まる（それより手前へは出ない）`);
-  ok(q.alpha > 0.99, `触った泡は消えない（alpha ${q.alpha.toFixed(2)}）`);
-  await lab.select("kinmu"); await lab.settle();
-  await lab.page.click("#refocus"); await lab.settle();       // 焦点を 0 に戻して2回目へ
+// ★★ ② 触った泡へ、視点が寄る（2026-09-19 規則が変わった。raise を消した）
+//    もとはここで「触った泡は焦点の面まで上がる（Z に書く）」を見ていた。いまは値を1つも書かない。
+//    「触った」と「掴んで引いた」は、pointerdown から 3px 動いたか（drag.started）で分ける。
+const ids = (o) => o.map((b) => b.id).join(" ");
+const valsOf = async (space) => (await lab.bubbles()).filter((b) => (b.parent ?? "root") === space)
+  .map((b) => `${b.id}:${b.order}/${b.free.x.toFixed(1)},${b.free.y.toFixed(1)},${b.free.z.toFixed(2)}/${b.cell.col},${b.cell.row}`).join(" ");
+const scalesOf = async (space) => (await lab.placements()).filter((p) => p.space === space)
+  .sort((a, b) => a.id.localeCompare(b.id)).map((p) => p.scale);
+/** 引かずに離す＝触る（本物のマウスで、押した所と同じ所で離す） */
+const touch = async (id) => { const q = await lab.call("headerPointOf", id); await lab.page.mouse.click(q.x, q.y); await lab.settle(); };
+
+console.log(`\n■ 触る（coverflow・X＝順序·等間隔·魚眼）：焦点が寄る／値は1つも書かれない`);
+await lab.call("preset", "coverflow", "cover");
+await lab.select("cf3"); await lab.settle();
+{
+  const v0 = await valsOf("cover"), s0 = await scalesOf("cover"), f0 = (await lab.focusOf("cover")).x;
+  await touch("cf6");
+  const v1 = await valsOf("cover"), s1 = await scalesOf("cover"), f1 = (await lab.focusOf("cover")).x;
+  console.log(`  倍率  ${s0.map((v) => v.toFixed(2)).join(" ")}`);
+  console.log(`   →    ${s1.map((v) => v.toFixed(2)).join(" ")}`);
+  console.log(`  焦点 X ${f0.toFixed(2)} → ${f1.toFixed(2)}`);
+  ok(v0 === v1, `触っても泡の値は1つも変わらない（順序・自由・マス）`);
+  ok(Math.abs(f1 - f0) > 1e-6, `触ると、その泡がその軸の焦点になる（焦点 X が動く）`);
+  ok(s0.some((v, i) => Math.abs(v - s1[i]) > 0.01), `焦点が動いたので、倍率の山が動く（絵は変わる）`);
+  // ★ 掴んで引いたら、今までどおり値を書く（触ったのと同じ泡で比べる）
+  const b0 = await valsOf("cover");
+  await lab.dragBubble("cf6", { dx: -150 });
+  const b1 = await valsOf("cover");
+  console.log(`  掴んで 150px 引いたら  ${b0 === b1 ? "値は変わらない" : "値が変わった"}`);
+  ok(b0 !== b1, `掴んで引くのは今までどおり値を書く（触ると引くを分けている）`);
 }
-// Z が 順序 なら最前面へ。何度触ってもずれない
+
+console.log(`\n■ 「触った」と「掴んで引いた」の境目（pointerdown から 3px。drag.started と同じ1つのしきい値）`);
+await lab.call("preset", "coverflow", "cover");
+await lab.select("cf3"); await lab.settle();
+await lab.page.click("#refocus"); await lab.settle();
+for (const dx of [2, 8, -150]) {
+  const v0 = await valsOf("cover"), f0 = (await lab.focusOf("cover")).x;
+  await lab.dragBubble("cf5", { dx, steps: 4 });
+  const v1 = await valsOf("cover"), f1 = (await lab.focusOf("cover")).x;
+  const wrote = v0 !== v1, moved = Math.abs(f1 - f0) > 1e-6;
+  console.log(`  ${String(dx).padStart(4)}px 引いて離す  値を書いた ${wrote ? "はい" : "いいえ"}`
+            + `　焦点が寄った ${moved ? "はい" : "いいえ"}（${f0.toFixed(2)} → ${f1.toFixed(2)}）`);
+  if (dx === 2) ok(!wrote && moved, `2px（3px 未満）は「触った」── 値を書かず、焦点だけ寄る`);
+  if (dx === 8) ok(!moved, `8px は「掴んで引いた」── 焦点は寄らない（引きが足りず、並べ替えも起きない）`);
+  if (dx === -150) ok(wrote && !moved, `-150px は「掴んで引いた」── 今までどおり値を書く（焦点は寄らない）`);
+  await lab.page.click("#refocus"); await lab.settle();
+}
+
+console.log(`\n■ 触る（自由の空間）：Z にも書かない。代わりに焦点 Z がその泡の面へ`);
+await lab.call("preset", "free", "root");
+await lab.select("memo1"); await lab.settle();
+await lab.page.click("#refocus"); await lab.settle();
+{
+  const b0 = (await lab.bubbles()).find((b) => b.id === "kinmu");
+  const f0 = await lab.focusOf("root");
+  await touch("kinmu");
+  const b1 = (await lab.bubbles()).find((b) => b.id === "kinmu");
+  const f1 = await lab.focusOf("root");
+  const q = (await lab.placements()).find((p) => p.id === "kinmu");
+  console.log(`  勤務表（自由Z ${b0.free.z}）を触る → 自由Z ${b1.free.z}　焦点 Z ${f0.z.toFixed(2)} → ${f1.z.toFixed(2)}`
+            + `　焦点 X ${f0.x.toFixed(1)} → ${f1.x.toFixed(1)}　勤務表の alpha ${q.alpha.toFixed(2)} 倍率 ${q.scale.toFixed(3)}`);
+  ok(Math.abs(b1.free.z - b0.free.z) < 1e-9, `触っても自由Z は書かれない（raise が消えた）`);
+  ok(Math.abs(f1.z - b1.free.z) < 1e-6, `焦点 Z が、その泡の面へ寄る`);
+  ok(q.alpha > 0.99, `触った泡は消えない（alpha ${q.alpha.toFixed(2)}）`);
+  // 手前にいた兄弟は dz<0 で消える ── それでよい（消えたものは右端のスタックに積まれる。stack.mjs）
+  const gone = await lab.call("stack");
+  console.log(`  手前へ抜けて消えた兄弟 ${gone.length} 個  ${gone.join(" ")}`);
+  ok(gone.length > 0, `奥の泡を触ると、手前のものは消える（消えたものはスタックに積まれる）`);
+  await lab.select("memo1"); await lab.settle(); await lab.page.click("#refocus"); await lab.settle();
+}
+
+console.log(`\n■ 送れない軸では何も起きない（議事録（版）の X・Y は「なし」）`);
+{
+  const f0 = await lab.focusOf("giji");
+  await touch("g0");
+  const f1 = await lab.focusOf("giji");
+  console.log(`  版を触る → 議事録の焦点 X ${f0.x.toFixed(2)} → ${f1.x.toFixed(2)}　Y ${f0.y.toFixed(2)} → ${f1.y.toFixed(2)}`);
+  ok(Math.abs(f1.x) < 1e-9 && Math.abs(f1.y) < 1e-9, `なしの軸には焦点が無い（何も起きない）`);
+}
+
+// Z が 順序 でも、触って並べ替わることはもう無い（値を書かない）
+await lab.select("memo1"); await lab.settle(); await lab.page.click("#refocus"); await lab.settle();
 await lab.call("preset", "stackZ", "root");
 await lab.settle();
-const orders = [];
-for (let i = 0; i < 4; i++) {
-  const p = await lab.call("headerPointOf", "memo3");
-  await lab.page.mouse.click(p.x, p.y); await lab.settle();
-  const bs = await lab.bubbles();
-  orders.push(bs.find((b) => b.id === "memo3").order + "/" + Math.max(...bs.filter((b) => !b.parent).map((b) => b.order)));
+{
+  const o0 = (await lab.bubbles()).filter((b) => !b.parent).map((b) => b.id + ":" + b.order).join(" ");
+  for (let i = 0; i < 4; i++) await touch("memo3");
+  const o1 = (await lab.bubbles()).filter((b) => !b.parent).map((b) => b.id + ":" + b.order).join(" ");
+  console.log(`  Z が 順序：思いつき を4回触った  ${o0 === o1 ? "順序はどれも変わらない" : "順序が変わった"}`);
+  ok(o0 === o1, `Z が 順序 でも、触って並べ替わらない（重なりの上下は触っても変わらない）`);
 }
-console.log(`  Z が 順序：思いつき を4回触った（順序/兄弟の最大）  ${orders.join("  ")}`);
-ok(orders.every((o) => o.startsWith("0/")), `Z が 順序 なら最前面（0）へ。何度触ってもずれない`);
-// Z が 履歴 なら上がらない
+// Z が 履歴 なら、もともと書けない
 await lab.call("preset", "free", "root");
-await lab.settle();
+await lab.select("memo1"); await lab.settle(); await lab.page.click("#refocus"); await lab.settle();
 const h0 = (await lab.bubbles()).filter((b) => b.parent === "giji").map((b) => b.hist).join(",");
-const gp = await lab.call("headerPointOf", "g0");
-await lab.page.mouse.click(gp.x, gp.y); await lab.settle();
+await touch("g0");
 const h1 = (await lab.bubbles()).filter((b) => b.parent === "giji").map((b) => b.hist).join(",");
 console.log(`  Z が 履歴：版を触っても並びは変わらない  ${h0} → ${h1}`);
 ok(h0 === h1, `Z が 履歴 なら触っても上がらない`);

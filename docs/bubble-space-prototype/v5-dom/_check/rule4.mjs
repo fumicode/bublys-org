@@ -22,6 +22,8 @@ async function overlaps(space) {
   return { n, worst, gaps, ids: ps.map((p) => p.id) };
 }
 
+// ★★ 2026-09-19：一度入れた「端での下限 0.32」は、同じ日に取り消した（../DECISIONS.md）。
+//    下限は像より大きく描くので「詰めるは重ならない」を崩していた。取り消したので、また重ならない。
 console.log(`■ coverflow（写真7つ・X 魚眼）で 詰める と 等間隔 を比べる`);
 for (const arrange of ["pack", "equal"]) {
   for (const gap of [0, 14, 28]) {
@@ -35,7 +37,6 @@ for (const arrange of ["pack", "equal"]) {
     if (gap === 14) await lab.shot(`rule4-${arrange}-fisheye`);   // 目で見て確かめる
   }
 }
-
 console.log(`\n■ 勤務表（格子・詰める）の X も Y も魚眼にする`);
 await lab.call("setAxis", "kinmu", "x", { lens: "fisheye" });
 await lab.call("setAxis", "kinmu", "y", { lens: "fisheye" });
