@@ -2024,6 +2024,8 @@ window.__lab = {
   stack: () => stackIds(),
   /** 積まれているものを、なぜ積まれたかつきで（front ＝ 焦点より手前へ抜けた／tiny ＝ 小さくて描かなかった） */
   stackRows: () => stackRows(),
+  /** ② 触る（値は1つも書かない。視点だけ寄る）。React 版と同じ操作で突き合わせるための口 */
+  focusOn(id) { focusOn(id); lastSig = ""; },
   /** ★ 描く下限（画面 px の短辺）。ツールバーのつまみと同じ口 */
   setDrawMin(v) { setDrawMin(v); },
   drawMinOf: () => DRAW_MIN,

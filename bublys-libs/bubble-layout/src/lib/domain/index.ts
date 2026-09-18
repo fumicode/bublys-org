@@ -61,3 +61,8 @@ export type { DropQuery, DropTarget, DropSlot, DropMarks, OrderSlot, SnapTarget,
 export { reshape, commitDrop, applySnap, tidyRows, renumber, freeCellNear } from './reshape.js';
 export type { ReshapeChange } from './reshape.js';
 export { pin, keepSeen, anchorOf, withoutPin } from './pin.js';
+
+// ── ラボと同じ場面（テストと見本が使う材料。規則ではない）──
+// ★ もとは *.fixture.ts で、ライブラリの外に出していなかった。React 版とラボを突き合わせるとき、
+//   両方が「同じ場面」から始まらないと px で比べられないので、ここから出すことにした。
+export { labScene, VIEWPORT, LAB_ROOT_ORDER, LAB_SPACES } from './lab-scene.js';

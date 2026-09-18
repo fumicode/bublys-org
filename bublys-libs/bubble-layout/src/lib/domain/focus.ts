@@ -20,6 +20,7 @@
 import type { BubbleId } from './types.js';
 import type { BubbleWorld } from './world.js';
 import type { Layout } from './resolve.js';
+import { resolveRules } from './rules.js';
 import type { LayoutRules } from './rules.js';
 import { withFocusAxis } from './project.js';
 
@@ -36,8 +37,9 @@ export function focusOn(
   world: BubbleWorld,
   layout: Layout,
   id: BubbleId,
-  rules: LayoutRules,
+  rules?: Partial<LayoutRules>,
 ): BubbleWorld {
+  const R = resolveRules(rules);
   const p = layout.byId.get(id);
   if (!p) return world;
   let w = world;
@@ -48,7 +50,7 @@ export function focusOn(
     if (!L) continue;
     // 「その泡の、その軸での位置」を焦点にする。約束（fitFocus）は withFocusAxis がそのまま通す
     //   ── 次元が なし の軸は約束(0)が 0 を返すので、ここで分けなくても「何も起きない」になる
-    w = withFocusAxis(w, L, axis, p.pos[axis], rules);
+    w = withFocusAxis(w, L, axis, p.pos[axis], R);
   }
   return w;
 }

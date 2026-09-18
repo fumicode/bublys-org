@@ -20,7 +20,7 @@ import { resolveWorld } from './resolve.js';
 import { withPreset } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
 import type { BubbleWorld } from './world.js';
-import { labScene, placeOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
 const R = DEFAULT_RULES;
 const world = labScene();

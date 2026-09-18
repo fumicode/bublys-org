@@ -12,7 +12,7 @@ import { resolveWorld } from './resolve.js';
 import { measureAll } from './measure.js';
 import { viewOfSpace, withAxis } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
-import { labScene, placeOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
 const world = labScene();
 const layout = resolveWorld(world, VIEWPORT);

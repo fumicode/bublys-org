@@ -14,7 +14,7 @@ import { dragBubble, dragVerbsOf } from './drag.js';
 import { resolveWorld } from './resolve.js';
 import { withAxis } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
-import { labScene, placeOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
 describe('② 泡を引く', () => {
   it('★ 書き込む先は、その軸に刺さっている次元（free.x 決め打ちではない）', () => {

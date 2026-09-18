@@ -8,7 +8,7 @@ import { commitDrop, freeCellNear, renumber, tidyRows } from './reshape.js';
 import { actContext } from './act.js';
 import { resolveWorld } from './resolve.js';
 import { DEFAULT_RULES } from './rules.js';
-import { labScene, placeOf, seenOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, seenOf, VIEWPORT } from './lab-scene.js';
 
 const seat = (w: ReturnType<typeof labScene>, id: string) => {
   const b = w.bubble(id);

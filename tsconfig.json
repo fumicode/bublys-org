@@ -122,6 +122,9 @@
     },
     {
       "path": "./bublys-libs/bubble-layout"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout-ui"
     }
   ]
 }

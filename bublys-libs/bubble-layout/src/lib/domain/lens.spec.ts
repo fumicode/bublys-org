@@ -5,13 +5,13 @@
  *   ・大きさの倍率は数値1つ ＝ min(X の像の倍率, Y の像の倍率)（端での下限は持たない）
  *   ・X/Y のレンズは1次元の単調な関数なので、逆関数が必ず書ける（往復して戻る）
  *
- * 待っている数はラボ（v5-dom/lab.html）からの実測。手で作った数は無い（lab-scene.fixture.ts の断り）。
+ * 待っている数はラボ（v5-dom/lab.html）からの実測。手で作った数は無い（lab-scene.ts の断り）。
  */
 import { LENS_XY, LENS_Z, imageOf } from './lens.js';
 import { METRICS } from './types.js';
 import { resolveWorld } from './resolve.js';
 import { withAxis } from './view.js';
-import { labScene, placeOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
 const world = labScene();
 const layout = resolveWorld(world, VIEWPORT);

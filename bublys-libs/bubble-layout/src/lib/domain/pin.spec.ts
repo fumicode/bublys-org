@@ -19,7 +19,7 @@ import { actContext } from './act.js';
 import { resolveWorld } from './resolve.js';
 import type { Layout } from './resolve.js';
 import { DEFAULT_RULES } from './rules.js';
-import { labScene, placeOf, seenOf, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, placeOf, seenOf, VIEWPORT } from './lab-scene.js';
 
 /** 佐藤の右下の角を、画面で +60px 引く（ラボの widen と同じ） */
 function widen(world: ReturnType<typeof labScene>, run = resizeBubble) {

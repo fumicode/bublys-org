@@ -1,7 +1,7 @@
 /**
  * 解決（値 → 画面の配置）が、ラボと同じ数を出すか。
  *
- * 場面は `lab-scene.fixture.ts`（lab.html 446-482 行の7つ ＋ 起動時のくっつけ）。
+ * 場面は `lab-scene.ts`（lab.html 446-482 行の7つ ＋ 起動時のくっつけ）。
  * 待っている数は、ぜんぶ **ラボを headless Chromium で開いて `__lab.placements()` から実測した値**。
  * 画面は 1440 × 809.5（lab.html を 1440×900 で開いたときの #stage の大きさ）。
  *
@@ -15,7 +15,7 @@ import { presetView, viewOfSpace, withAxis } from './view.js';
 import { resolveWorld } from './resolve.js';
 import type { Layout } from './resolve.js';
 import { measureAll } from './measure.js';
-import { labScene, VIEWPORT } from './lab-scene.fixture.js';
+import { labScene, VIEWPORT } from './lab-scene.js';
 
 const world = labScene();
 const layout = resolveWorld(world, VIEWPORT);

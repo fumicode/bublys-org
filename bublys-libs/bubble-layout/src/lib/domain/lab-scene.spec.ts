@@ -2,7 +2,7 @@
  * 場面そのものが、ラボと同じ木になっているか。
  * （ここが狂うと、隣のテストに焼いてある実測値はぜんぶ別の場面の数になってしまう）
  */
-import { labScene, LAB_ROOT_ORDER, LAB_SPACES } from './lab-scene.fixture.js';
+import { labScene, LAB_ROOT_ORDER, LAB_SPACES } from './lab-scene.js';
 
 describe('場面 ── ラボと同じ木か', () => {
   it('58 個の泡が、ラボと同じ空間にいる', () => {
