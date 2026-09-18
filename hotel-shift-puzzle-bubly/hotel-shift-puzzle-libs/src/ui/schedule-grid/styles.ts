@@ -18,6 +18,14 @@ export const StyledWrap = styled.div`
     background: #fff;
     font-size: 0.8em;
 
+    /* セルはドラッグで範囲選択するので、ブラウザの文字選択は起こさない（#157 / #166）。
+       選択した文字ではなく、選択中のセルをコピーする。 */
+    user-select: none;
+    /* チェックボックスなどの入力は素の振る舞いに戻す */
+    input {
+      user-select: auto;
+    }
+
     /* キーボード操作のためグリッド自体を focusable にしている。
        選択はセルの枠線で示すので、コンテナ自身のフォーカス枠は消す。 */
     &:focus {
