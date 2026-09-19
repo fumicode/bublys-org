@@ -91,6 +91,11 @@ export interface BubbleInputOptions {
   readonly rules?: Partial<LayoutRules>;
   /** 泡を載せている層 */
   readonly layerRef: RefObject<HTMLDivElement | null>;
+  /**
+   * 本文を持つ泡（中身が本物の UI）。ここを突いても泡は掴めない ── ヘッダで掴む。
+   * 空間を持つ泡（world.isHost）は言わなくてもそう扱う。
+   */
+  readonly hasContent?: (id: BubbleId) => boolean;
 }
 
 export interface BubbleInput {
@@ -169,17 +174,28 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       handleEl: layer?.querySelector('.bl-hnd') ?? null,
     };
   }, [layerRef, lifted, tiny, selectedId]);
-  const isHost = useCallback((id: BubbleId) => world.isHost(id), [world]);
+  const hasContent = o.hasContent;
+  const hasBody = useCallback(
+    (id: BubbleId) => world.isHost(id) || (hasContent ? hasContent(id) : false),
+    [world, hasContent],
+  );
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!layerRef.current) return;
     const { mx, my } = pt(e);
-    layerRef.current.setPointerCapture(e.pointerId);
+    /**
+     * ★ 掴むと決まってから捕まえる。
+     *   押した時点で `setPointerCapture` すると、そのあとの **click / dblclick まで層に来る**
+     *   （捕まえると互換のマウスイベントも捕まえた要素へ配られる）。
+     *   泡の中身が本物の UI のとき、これだとボタンもダブルクリックも死ぬ。
+     */
+    const capture = () => layerRef.current?.setPointerCapture(e.pointerId);
     const pick = pickAt(pickInput(), mx, my);
 
     if (pick.handle) {
       // 引くのは見えている箱の角：中身で伸びた箱なら、伸びた大きさから始める
       const sel = pick.handle;
+      capture();
       drag.current = {
         kind: 'resize', id: sel.id, space: sel.space, started: true,
         mx0: mx, my0: my, mx, my,
@@ -191,7 +207,18 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     }
 
     const p0 = pick.bub;
-    if (p0 && !inContent(p0, my, isHost)) {
+    /**
+     * ★ 本文（空間ではない中身）を押したら、**何も始めない**。それは中身のもの。
+     *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点を引く」（ラボと同じ）。
+     */
+    if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody)) {
+      setSelectedId(p0.id);
+      drag.current = null;
+      show();
+      return;
+    }
+    if (p0 && !inContent(p0, my, hasBody)) {
+      capture();
       setSelectedId(p0.id);
       // ★ 押した時点では何も書かない。焦点が寄るのは「引かずに離した」ときだけ
       const verbs = dragVerbsOf(world, p0.space);
@@ -207,6 +234,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const space = p0 ? p0.id : 'root';
       const L = layout.spaces.get(space);
       if (!L) { drag.current = null; return; }
+      capture();
       drag.current = {
         kind: 'focus', id: space, space, started: false,
         mx0: mx, my0: my, mx, my,
@@ -215,7 +243,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       };
     }
     show();
-  }, [world, layout, rules, pt, pickInput, isHost, setSelectedId, layerRef]);
+  }, [world, layout, rules, pt, pickInput, hasBody, setSelectedId, layerRef]);
 
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
@@ -266,7 +294,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const shown = withLift(after, held);
       const rect = shown.byId.get(d.id);
       const screen: ScreenRects = new Map(shown.order.map((q) => [q.id, { x: q.x, y: q.y, w: q.w, h: q.h }]));
-      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id));
+      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false));
       const t = rect
         ? dropTargetAt(next, {
             layout: after, screen, pointer: { x: mx, y: my }, hitSpace,
@@ -277,7 +305,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       d.marks = t?.marks ?? null;
     }
     show();
-  }, [world, layout, lifted, viewport, rules, drawMin, setWorld, ctx, pt]);
+  }, [world, layout, lifted, viewport, rules, drawMin, setWorld, ctx, pt, hasContent]);
 
   const endDrag = useCallback(() => {
     const d = drag.current;
@@ -306,9 +334,9 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
 
   const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
     const { mx, my } = pt(e);
-    const space = world.windowOf(spaceModelAt(lifted, tiny, null, mx, my, isHost));
+    const space = world.windowOf(spaceModelAt(lifted, tiny, null, mx, my, hasBody));
     setWorld(wheelZ(world, layout, space, e.deltaY, rules));
-  }, [world, layout, lifted, tiny, rules, setWorld, pt, isHost]);
+  }, [world, layout, lifted, tiny, rules, setWorld, pt, hasBody]);
 
   return {
     handlers: {

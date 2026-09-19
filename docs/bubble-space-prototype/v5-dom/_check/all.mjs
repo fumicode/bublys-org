@@ -24,6 +24,7 @@ const LIST = [
   ["screen","画面の約束（ヒント行・一覧・選択・カーソル脇・印・配色）"],
   ["react", "React 版（@bublys-org/bubble-layout-ui）とラボが px で同じものを描く"],
   ["react-drag", "React 版とラボを本物のマウスで同じに触って、書かれた値を突き合わせる"],
+  ["bubly", "本物のバブリ（csv-importer）の画面が、新しいライブラリの上で動く（v6）"],
 ];
 
 let ng = 0;

@@ -27,11 +27,15 @@ export const onHandle = (p: Placement | null, mx: number, my: number): boolean =
   my >= p.y + p.h - HANDLE_IN && my <= p.y + p.h + HANDLE_OUT;
 
 /**
- * 空間を持つ泡の「中身の箱」に入っているか（ヘッダは外側の空間のもの）。
- * 見えない親は縁でしか当たらないので、いつも「掴む」
+ * 「中身の箱」に入っているか（ヘッダは外側の空間のもの）。中身の箱を突いたら、その泡は掴めない。
+ * 見えない親は縁でしか当たらないので、いつも「掴む」。
+ *
+ * ★ hasBody は「空間を持つ泡」だけでなく「**本文を持つ泡**」にも同じ扱いをするための口。
+ *   本文が本物の UI（ボタン・選択欄）のとき、そこを突いて泡が動いたら中身が触れない。
+ *   既存 bubbles-ui も「ヘッダで掴む」なので、規則を増やさずにそろう。
  */
-export const inContent = (p: Placement, my: number, isHost: (id: BubbleId) => boolean): boolean =>
-  !p.b.state.implicit && isHost(p.id) && my >= p.y + METRICS.HEADER * p.scale;
+export const inContent = (p: Placement, my: number, hasBody: (id: BubbleId) => boolean): boolean =>
+  !p.b.state.implicit && hasBody(p.id) && my >= p.y + METRICS.HEADER * p.scale;
 
 export interface PickInput {
   readonly layout: Layout;
@@ -92,10 +96,10 @@ export function spaceAt(
   input: PickInput,
   mx: number,
   my: number,
-  isHost: (id: BubbleId) => boolean,
+  hasBody: (id: BubbleId) => boolean,
 ): SpaceId {
   const p = pickAt(input, mx, my).bub;
-  return !p ? 'root' : inContent(p, my, isHost) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, my, hasBody) ? p.id : p.space;
 }
 
 /**
@@ -130,8 +134,8 @@ export function spaceModelAt(
   skip: ReadonlySet<BubbleId> | null,
   mx: number,
   my: number,
-  isHost: (id: BubbleId) => boolean,
+  hasBody: (id: BubbleId) => boolean,
 ): SpaceId {
   const p = hitModelAt(layout, tiny, skip, mx, my);
-  return !p ? 'root' : inContent(p, my, isHost) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, my, hasBody) ? p.id : p.space;
 }
