@@ -97,6 +97,44 @@ async function main() {
       [...document.querySelectorAll(".bl-layer .bub")].filter((e) => !e.className.includes("imp") && !e.className.includes("nt")).length);
     check(readable === 4, `一覧も詳細3つも、題名が読める大きさで残る（${readable} / 4）`);
   }
+  // ── ★ 囲っている親が見えて、まとめて動かせるか ──
+  const impBox = await page.evaluate(() => {
+    const el = document.querySelector(".bl-layer .bub.imp");
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2, y: r.top, w: r.width, h: r.height,
+      枠: !!el.querySelector(".fr"), 札: el.querySelector(".lb")?.textContent ?? null,
+      縁: el.querySelectorAll(".rg").length,
+    };
+  });
+  check(!!impBox?.枠, "★ 囲っている親に点線の枠が出る");
+  check(impBox?.札 === "見えない親 · 横に並べる", `札が出る（${impBox?.札}）`);
+  check(impBox?.縁 === 4, `掴める縁が4本ある（${impBox?.縁} 本）`);
+  if (impBox) {
+    const kids0 = (await bubs()).filter((b) => /\/objects\/r\d+$/.test(b.url)).map((b) => ({ url: b.url, x: b.x, y: b.y }));
+    const gy = impBox.y - 6;                        // 枠の外周（縁 12px の帯）を掴む
+    await page.mouse.move(impBox.x, gy);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) { await page.mouse.move(impBox.x + 12 * i, gy + 9 * i); await page.waitForTimeout(8); }
+    await page.mouse.up();
+    await page.waitForTimeout(160);
+    const kids1 = (await bubs()).filter((b) => /\/objects\/r\d+$/.test(b.url)).map((b) => ({ url: b.url, x: b.x, y: b.y }));
+    const moved = kids0.map((k, i) => ({ dx: kids1[i].x - k.x, dy: kids1[i].y - k.y }));
+    const allMoved = moved.every((m) => Math.abs(m.dy) > 40);
+    check(allMoved, `★ 親の縁を引くと、中の泡が全部ついてくる（${moved.map((m) => m.dy.toFixed(0)).join(" / ")}px）`);
+    // ★ Y には魚眼が無いので、縦は全員そろう
+    check(new Set(moved.map((m) => m.dy.toFixed(3))).size === 1,
+      `ばらけない ── 縦は全員そろう（${moved.map((m) => m.dy.toFixed(1)).join(" / ")}px）`);
+    // ★ 横は **そろわないのが正しい**：X に魚眼が点いているので、同じだけ動かしても
+    //   端にいる泡ほど画面での動きは縮む。値の上では1つの並びが動いただけ
+    check(moved.every((m) => m.dx > 0) && moved[0].dx > moved[moved.length - 1].dx,
+      `横は端ほど縮む（魚眼が効いている証拠：${moved.map((m) => m.dx.toFixed(0)).join(" / ")}px）`);
+    // 中の泡は「触っていない」ので、自分の値は1つも書かれていない
+    const kept = await page.evaluate(() => (window.__v6.stateOf ? "ある" : "なし"));
+    void kept;
+  }
+
   // 片づけて、以降の検査は2つの状態から。★ 1つずつ閉じる
   //   （同じ tick で2つ閉じると、2つ目が閉じる前の世界を見て取り消される）
   for (const r of ["r1", "r2"]) {

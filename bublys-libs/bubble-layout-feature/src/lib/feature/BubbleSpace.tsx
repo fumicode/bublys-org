@@ -13,7 +13,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
 import { actContext, emptyWorld, presetView, reshape, resolveWorld } from '@bublys-org/bubble-layout';
 import type { BubbleId, BubbleWorld, LayoutRules, PresetId, Viewport } from '@bublys-org/bubble-layout';
-import { BubbleField, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
+import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
+import type { BubbleDraw } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext } from './context.js';
 import type { BubbleSpaceApi } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
@@ -166,9 +167,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   });
 
   const renderBubble = useCallback(
-    (id: BubbleId) => {
+    (id: BubbleId, draw: BubbleDraw) => {
       const url = urls.get(id)?.url;
-      if (!url) return null;
+      /**
+       * ★ url を持たない泡＝**見えない親（並び）**。ここで `null` を返すと、
+       *   点線の枠も札も、掴むための縁（外周12px）も描かれず、
+       *   **兄弟たちをまとめて動かせなくなる**（v6 で踏んだ）。
+       *   ラボと同じ見本（`BubbleShell`）に任せる ── ③ 見えない親は外周でしか掴めない。
+       */
+      if (!url) return <BubbleShell draw={draw} />;
       const r = renderRoute(routes, id, url);
       return (
         <>
