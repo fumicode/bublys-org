@@ -72,6 +72,46 @@ async function main() {
   const shows = await page.evaluate(() => document.querySelector(".bl-layer")?.textContent ?? "");
   check(shows.includes("鈴木") && shows.includes("10/09"), "詳細にその行の中身が出ている（鈴木・10/09）");
 
+  // ── ★ 同じ一覧から続けて開いたら、重ならずに並ぶか（共通の見えない親に入る）──
+  for (const row of [0, 1]) {                       // さらに2つ、同じ一覧から開く
+    const list = await page.evaluate(() =>
+      [...document.querySelectorAll(".bl-layer .bub")].find((e) => e.dataset.id.endsWith("/objects"))?.dataset.id);
+    const items = await page.$$(".bl-layer [data-object-view]");
+    const rr = await items[row].boundingBox();
+    void list;
+    await page.mouse.dblclick(rr.x + rr.width / 2, rr.y + rr.height / 2);
+    await page.waitForTimeout(180);
+  }
+  const three = await bubs();
+  const imp = await page.evaluate(() =>
+    [...document.querySelectorAll(".bl-layer .bub.imp")].map((e) => e.dataset.id));
+  check(imp.length === 1, `★ 共通の見えない親（並び）が1つできる（${imp.length} 個）`);
+  const dets = three.filter((b) => /\/objects\/r\d+$/.test(b.url)).sort((a, b) => a.x - b.x);
+  check(dets.length === 3, `詳細が3つある（${dets.length} 個）`);
+  if (dets.length === 3) {
+    const xs = dets.map((d) => Math.round(d.x));
+    check(new Set(xs).size === 3, `★ 重ならない ── x が3つとも違う（${xs.join(" / ")}）`);
+    const ks = dets.map((d) => +d.k.toFixed(3));
+    check(new Set(ks).size === 1, `並びの中では同じ大きさ（${ks.join(" / ")}）`);
+    const readable = await page.evaluate(() =>
+      [...document.querySelectorAll(".bl-layer .bub")].filter((e) => !e.className.includes("imp") && !e.className.includes("nt")).length);
+    check(readable === 4, `一覧も詳細3つも、題名が読める大きさで残る（${readable} / 4）`);
+  }
+  // 片づけて、以降の検査は2つの状態から。★ 1つずつ閉じる
+  //   （同じ tick で2つ閉じると、2つ目が閉じる前の世界を見て取り消される）
+  for (const r of ["r1", "r2"]) {
+    await page.evaluate((id) => {
+      const el = [...document.querySelectorAll(".bl-layer .bub")].find((e) => e.dataset.id.endsWith("/objects/" + id));
+      el?.querySelector(".bl-close")?.click();
+    }, r);
+    await page.waitForTimeout(160);
+  }
+  const left = await bubs();
+  check(left.filter((b) => /\/objects\/r\d+$/.test(b.url)).length === 1,
+    `2つ閉じたら詳細は1つ（${left.filter((b) => /\/objects\/r\d+$/.test(b.url)).length} 個）`);
+  const impLeft = await page.evaluate(() => document.querySelectorAll(".bl-layer .bub.imp").length);
+  check(impLeft === 0, `★ ③ 並びは2つ以上 ── 1つになったら見えない親も消える（${impLeft} 個）`);
+
   // ── ③ 泡の中の本物の UI が触れるか ──
   const sel = await page.$(".bl-layer select");
   const hit = await page.evaluate(() => {

@@ -13,7 +13,9 @@
  *   次元は変えない（自由X のまま）。**レンズだけ**を魚眼にする ── これだけで
  *   「開いたほうが大きく、元のリストは小さく」が出る。
  */
-import { Bubble, METRICS, focusOn, renumber, resolveWorld, withAxis } from '@bublys-org/bubble-layout';
+import {
+  Bubble, METRICS, actContext, applySnap, focusOn, renumber, resolveWorld, withAxis,
+} from '@bublys-org/bubble-layout';
 import type { BubbleId, BubbleWorld, LayoutRules, Viewport } from '@bublys-org/bubble-layout';
 
 /** 開き方。いまは「隣に開く」だけ。ポップアップは未実装（DECISIONS.md の世界線スナップで戻る枝） */
@@ -30,6 +32,17 @@ export interface OpenAtInput {
   readonly hue?: number;
   readonly as?: OpenAs;
   readonly rules?: Partial<LayoutRules>;
+  /**
+   * ★ **同じ種類の泡（兄弟）を続けて開いたとき、その隣に並べる相手。**
+   *
+   * これが無いと、一覧の項目を2つダブルクリックしたとき、どちらも
+   * 「一覧の右隣」という**同じ場所に重なって**開く（元の泡が同じなので当たり前）。
+   * 旧 `bubbles-ui` は `join-sibling` でこれを避けていた。
+   *
+   * 渡すと、**共通の見えない親（並び）を作って、その中に並べる**（規則③ の「くっつける」そのもの）。
+   * 1枚目は見えない親が生まれ（`born`）、2枚目からはその並びに加わる（`join`）。
+   */
+  readonly joinWith?: BubbleId | null;
 }
 
 export interface OpenAtResult {
@@ -85,6 +98,36 @@ export function openAt(input: OpenAtInput): OpenAtResult {
     .sort((p, q) => (p.id === newId ? at + 0.5 : p.state.order) - (q.id === newId ? at + 0.5 : q.state.order))
     .map((b) => b.id);
   w = renumber(w, after);
+
+  /**
+   * ★ 同じ種類の兄弟が既にいるなら、**共通の見えない親（並び）を作って、その中に並べる**。
+   *
+   * これが無いと、一覧の項目を2つ開いたとき、どちらも「一覧の右隣」という
+   * 同じ場所に重なる（元の泡が同じなので、行き先も同じになる）。
+   * 使うのは規則③ の「くっつける」そのもの ── 新しい仕組みは要らない。
+   *   1枚目の相手には見えない親が生まれ（born）、2枚目からはその並びに加わる（join）。
+   */
+  const mate = input.joinWith ? w.bubble(input.joinWith) : null;
+  if (mate && mate.id !== newId) {
+    const row = w.rowOf(mate.id);
+    const ctx = actContext(
+      viewport,
+      new Map(
+        resolveWorld(world, viewport, input.rules).order.map((p) => [
+          p.id,
+          { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale },
+        ]),
+      ),
+      input.rules,
+    );
+    w = applySnap(w, ctx, newId, {
+      kind: row ? 'join' : 'born',
+      target: mate.id,
+      axis: 'x',
+      after: true,   // 続けて開いたものは、前に開いたものの右に
+      dist: 0,
+    }).world;
+  }
 
   // ★ 横に開いたら X の魚眼を点ける。次元は変えない（自由X のまま）
   //   ただし **元の泡があるときだけ** ── 最初の1つを置くのに、小さくする相手はいない
