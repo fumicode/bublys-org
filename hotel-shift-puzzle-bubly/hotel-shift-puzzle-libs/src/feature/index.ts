@@ -35,7 +35,6 @@ export * from "./ScheduleReportPanel.js";
 export * from "./ScheduleReportList.js";
 export * from "./reportPriority.js";
 export * from "./staffLinkedReports.js";
-export * from "./ScheduleEditLogPanel.js";
 export * from "./recordScheduleEdit.js";
 export * from "./useWorldFile.js";
 export * from "./WorldFilePanel.js";

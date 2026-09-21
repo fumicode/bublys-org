@@ -30,10 +30,10 @@ export function IgoWorldLineCanvas({ gameId }: { gameId: string }) {
     () =>
       focused
         ? [
-            { key: 'ArrowLeft', run: scope.moveBack },
-            { key: 'ArrowRight', run: scope.moveForward },
-            { key: 'ArrowUp', run: () => moveToSiblingBranch(scope, -1) },
-            { key: 'ArrowDown', run: () => moveToSiblingBranch(scope, 1) },
+            { keys: 'ArrowLeft', run: scope.moveBack },
+            { keys: 'ArrowRight', run: scope.moveForward },
+            { keys: 'ArrowUp', run: () => moveToSiblingBranch(scope, -1) },
+            { keys: 'ArrowDown', run: () => moveToSiblingBranch(scope, 1) },
           ]
         : [],
     [focused, scope],

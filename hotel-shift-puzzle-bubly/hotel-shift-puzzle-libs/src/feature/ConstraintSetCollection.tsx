@@ -64,7 +64,7 @@ export const ConstraintSetCollection: FC<ConstraintSetCollectionProps> = ({
       leaderStaffIds: [],
       minCount: 1,
     });
-    commit((set) => set.addRule(rule), `責任者ルール「${rule.label}」を追加`);
+    commit((set) => set.addRule(rule));
   };
 
   return (

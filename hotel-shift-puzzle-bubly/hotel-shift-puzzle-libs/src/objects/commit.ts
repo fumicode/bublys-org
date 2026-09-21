@@ -143,7 +143,7 @@ export function growScope(
 
 /**
  * 複数オブジェクトを同一ノードの grow で記録する。
- * Schedule + ScheduleEditLog のように「操作と結果状態」を同じ世界線ノードに載せるときに使う。
+ * 勤務表と勤務スタッフ群のように、1回の操作で動く複数の集約を同じ世界線ノードに載せるときに使う。
  * saveObject を連続呼びするとノードが分かれるため、編集記録時はこちらを使う。
  */
 export function commitBundle(
@@ -427,7 +427,7 @@ function refForItem(store: StoreLike, { type, obj }: BundleItem): StateRef {
 
 /**
  * 複数オブジェクトをローカル世界線の同一ノードに載せ、それぞれ APP スコープにも反映する。
- * Schedule + ScheduleEditLog（＋必要なら Constraints）を1操作で記録するときに使う。
+ * 勤務表・制約・勤務スタッフ群など、1操作で動く集約をまとめて記録するときに使う。
  * ローカルは1 grow、APP はオブジェクトごとに1 grow（平坦な変更ログ）。
  *
  * @param baseline その型がこのスコープに初登場のときに、起点として置く「編集前」の値。
@@ -536,7 +536,6 @@ export function adoptGlobalValue<T>(
  * - スコープが空なら baseObj を root として置き、それを共通の親にする。空でなければ現在の apex を親とする。
  * - 各案は共通の親から grow する：apex に子ができると grow が自動でブランチを作る仕様なので、
  *   2案目以降は親へ moveTo してから grow すると兄弟になる。各ノードに label を付ける。
- * - extras があればその案の Schedule と同一ノードに載せる（例: ScheduleEditLog）。
  * - 書き込み後は先頭の案（案1）に着地させる：ローカル apex を案1へ移す
  *   （世界線ビューの apex と、実際に表示される状態を案1で一致させる）。
  * 返り値: 親ノードIDと、書き込んだ各案のノードID。
@@ -546,7 +545,7 @@ export function commitCandidates(
   scopeId: string,
   type: string,
   baseObj: unknown,
-  candidates: { obj: unknown; label?: string; extras?: BundleItem[] }[]
+  candidates: { obj: unknown; label?: string }[]
 ): { parentNodeId: string; nodeIds: string[] } {
   // 共通の親（root）を作るのも誕生の一種。作る場所は ensureWorldBorn 一本にする
   // （ここで commitToScope すると勤務表だけの起点ができ、固定メンバーが載らない）。
@@ -560,7 +559,7 @@ export function commitCandidates(
       const moved = graphOf(store, scopeId).moveTo(parentNodeId);
       store.dispatch(setGraph({ scopeId, graph: moved.toJSON() }));
     }
-    const items: BundleItem[] = [{ type, obj: c.obj }, ...(c.extras ?? [])];
+    const items: BundleItem[] = [{ type, obj: c.obj }];
     // ラベルを付けてよいのは「この commit で生まれたノード」だけ。案が既存の状態と
     // 一致すると grow はスナップして既存ノードへ移るので、その名前を奪わない。
     const knownNodeIds = new Set(Object.keys(graphOf(store, scopeId).state.nodes));

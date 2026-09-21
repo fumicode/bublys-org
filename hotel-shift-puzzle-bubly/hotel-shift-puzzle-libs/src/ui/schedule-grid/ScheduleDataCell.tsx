@@ -53,12 +53,18 @@ type ScheduleDataCellProps = {
   selected?: boolean;
   /** 入力中バッファ（このセルで打ち込み中の文字列）。null なら非表示 */
   inputBuffer?: string | null;
-  /** シングルクリックでこのセルを選択する */
-  onSelect: () => void;
+  /** 範囲選択に入っているか（2セル以上選んでいるとき。薄い青を重ねる） */
+  inRange?: boolean;
+  /** カット中の元のセルか（点線で囲む。#166） */
+  cutSource?: boolean;
+  /** 押した（左ボタン）。選択するのは受け取り側（修飾キーで範囲・飛び地） */
+  onPress: (e: React.MouseEvent<HTMLDivElement>) => void;
+  /** 押したまま入ってきた（ドラッグで範囲を広げる） */
+  onDragEnter?: () => void;
   /** ダブルクリックで候補ドロップダウンを開く（マウス操作用） */
   onOpenEditor: () => void;
   /**
-   * 違反バブルの URL を作る。違反マーカー（赤帯・⊿）を ObjectView で包んで渡し、
+   * 違反バブルの URL を作る。違反マーカー（赤帯・境目の印）の内側に ObjectView を置き、
    * ダブルクリックで違反バブルを開く。ObjectView が data-url も埋めるので、
    * origin-side で開いたバブルがそのマーカーの近くに出る。
    */
@@ -81,7 +87,8 @@ type ScheduleDataCellProps = {
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
  * 範囲違反（連勤など）は従来どおり下端の赤帯。勤務間インターバル違反（遅番の翌日に早番など）は
  * セルの中身ではなく2日のつなぎ目の話なので、隣のセルとの境目に赤い縦線＋半円を出す。
- * シングルクリックで選択、ダブルクリックで候補ドロップダウン（キーボード操作と共通）。
+ * 押して選択（Shift で範囲・Ctrl/Cmd で飛び地・ドラッグで範囲）、ダブルクリックで候補ドロップダウン
+ * （キーボード操作と共通）。
  */
 export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   cell,
@@ -98,7 +105,10 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   cellKey,
   selected = false,
   inputBuffer = null,
-  onSelect,
+  inRange = false,
+  cutSource = false,
+  onPress,
+  onDragEnter,
   onOpenEditor,
   violationUrl,
   cellClassName,
@@ -110,6 +120,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
 
   let className = "e-cell";
   if (cellClassName) className += ` ${cellClassName}`;
+  if (inRange) className += " is-in-range";
+  if (cutSource) className += " is-cut-source";
   let style: React.CSSProperties | undefined;
   let content: React.ReactNode;
   let title: string | undefined;
@@ -191,33 +203,34 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   const shownWishEntries: WishEntry[] =
     hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
 
-  // 違反マーカー（赤帯・⊿）。ObjectView がダブルクリックでの違反バブル展開と data-url
+  // 違反マーカー（赤帯・境目の印）。ObjectView がダブルクリックでの違反バブル展開と data-url
   // （origin-side でマーカーの近くに出す）を担う。セルは単クリック=選択 / ダブルクリック=候補なので、
-  // マーカー上の操作はセルへ伝播させない（ラッパで stopPropagation）。
-  const violationMarker = (violation: ConstraintViolation, markerClass: string) => {
-    const marker = (
-      <span
-        className={markerClass}
-        title={`${violation.message}（ダブルクリックで詳細）`}
-      />
-    );
-    if (!violationUrl) return marker;
-    return (
-      <span
-        style={{ display: "contents" }}
-        onClick={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-      >
+  // マーカー上の操作はセルへ伝播させない。
+  //
+  // ★ 位置を持つ枠（markerClass。position:absolute でセルの端に張り付く）と、ObjectView を分ける。
+  //   ObjectView は膜のために position:relative を持つので、枠を ObjectView で包むと枠の基準が
+  //   幅0の ObjectView になり、帯が潰れて見えなくなる（#158）。ObjectView は枠の内側に置き、
+  //   枠いっぱいに広げて当たり判定にする。
+  const violationMarker = (violation: ConstraintViolation, markerClass: string) => (
+    <span
+      className={markerClass}
+      title={`${violation.message}（ダブルクリックで詳細）`}
+      onClick={violationUrl ? (e) => e.stopPropagation() : undefined}
+      onDoubleClick={violationUrl ? (e) => e.stopPropagation() : undefined}
+    >
+      {violationUrl && (
         <ObjectView
           url={violationUrl(violation)}
           openingPosition="origin-side"
           draggable={false}
+          fullWidth
+          className="e-violation-hit"
         >
-          {marker}
+          {null}
         </ObjectView>
-      </span>
-    );
-  };
+      )}
+    </span>
+  );
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
@@ -281,7 +294,13 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       role="button"
       title={title}
       data-cell-key={cellKey}
-      onClick={onSelect}
+      onMouseDown={(e) => {
+        if (e.button === 0) onPress(e);
+      }}
+      onMouseEnter={(e) => {
+        // 押したまま入ってきた＝ドラッグで範囲を広げる
+        if (e.buttons & 1) onDragEnter?.();
+      }}
       onDoubleClick={onOpenEditor}
     >
       {content}

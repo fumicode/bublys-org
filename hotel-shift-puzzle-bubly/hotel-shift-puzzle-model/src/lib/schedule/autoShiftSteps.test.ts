@@ -6,7 +6,8 @@ import { fulfillWishesStep } from './fulfillWishesStep.js';
 import { fillDemandStep } from './fillDemandStep.js';
 import { fillDemandBalancedStep } from './fillDemandBalancedStep.js';
 import { AUTO_SHIFT_STEPS } from './autoShiftSteps.js';
-import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
+import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
+import type { AutoShiftContext, AutoShiftStep, DecodedWish } from './autoShiftStep.js';
 
 describe('段階的な自動シフト（AutoShiftStep）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -177,7 +178,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     test('連勤上限を超える出勤は割り当てない', () => {
       let base = emptySchedule(RequiredStaffing.uniform([day(6)], { 早番: 1 }));
       for (let d = 1; d <= 5; d++) base = base.assignShift('s1', day(d), 'early'); // 5連勤
-      const ctx = ctxOf(['s1'], {}, { maxConsecutive: 5 });
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(5)] });
       const { schedule } = fillDemandStep.run(base, ctx);
       expect(schedule.isUndecided('s1', day(6))).toBe(true);
     });
@@ -218,7 +219,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       expect(schedule.getShiftIdFor('s1', day(1))).toBe('late');
     });
 
-    test('まんべんなく版も大原則は同じ（休み希望は入れない・連勤上限を守る）', () => {
+    test('まんべんなく版も大原則は同じ（休み希望は入れない）', () => {
       const required = RequiredStaffing.uniform([day(1)], { 早番: 1 });
       const ctx = ctxOf(['s1', 's2'], { [`s1|${day(1).key}`]: { kind: 'day-off' } });
       const { schedule } = fillDemandBalancedStep.run(emptySchedule(required), ctx);
@@ -310,6 +311,48 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       for (const s of staffIds) {
         expect(r.schedule.countDayOffForStaff(s)).toBe(0);
       }
+    });
+  });
+
+  /**
+   * 必要人数を埋める2戦略は、どちらも連勤上限を超える出勤を作らない（#158）。
+   * 判定は前後両方向に数える（入れる日が、後ろに続く連勤とつながる場合もある）。
+   * 上限は勤務表の制約セットの値が効く（既定の 5 ではない）。
+   */
+  describe.each<[string, AutoShiftStep]>([
+    ['早番から順に', fillDemandStep],
+    ['まんべんなく', fillDemandBalancedStep],
+  ])('必要人数を埋める（%s）は連勤上限を守る', (_label, step) => {
+    /** そのスタッフの最長の連勤日数 */
+    const longestRun = (schedule: MonthlyStaffSchedule, staffId: string) => {
+      let longest = 0;
+      let run = 0;
+      for (const d of schedule.workingDays()) {
+        run = schedule.isWorking(staffId, d) ? run + 1 : 0;
+        longest = Math.max(longest, run);
+      }
+      return longest;
+    };
+
+    test('★ 前後の連勤をつなげてしまう日には入れない（上限3・5〜6日と8〜9日が出勤）', () => {
+      let base = emptySchedule(RequiredStaffing.uniform([day(7)], { 早番: 1 }));
+      for (const d of [5, 6, 8, 9]) base = base.assignShift('s1', day(d), 'early');
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(3)] });
+
+      const { schedule } = step.run(base, ctx);
+
+      // 7日に入れると 5〜9日の5連勤になる。後ろ側（8〜9日）も数えないと見逃す
+      expect(schedule.isWorking('s1', day(7))).toBe(false);
+    });
+
+    test('★ 設定した上限（3）が効く：3連勤までは入れ、4連勤は作らない', () => {
+      const base = emptySchedule(RequiredStaffing.uniform(emptySchedule().workingDays(), { 早番: 1 }));
+      const ctx = ctxOf(['s1'], {}, { constraints: [new MaxConsecutiveWorkdaysConstraint(3)] });
+
+      const { schedule } = step.run(base, ctx);
+
+      expect(longestRun(schedule, 's1')).toBe(3);
+      expect(schedule.checkConstraints([new MaxConsecutiveWorkdaysConstraint(3)])).toEqual([]);
     });
   });
 });

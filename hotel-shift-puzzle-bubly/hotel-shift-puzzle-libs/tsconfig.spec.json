@@ -7,6 +7,7 @@
     "types": ["jest", "node"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "jsx": "react-jsx",
     "forceConsistentCasingInFileNames": true
   },
   "include": [
@@ -14,6 +15,8 @@
     "jest.config.cts",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.tsx",
     "src/**/*.d.ts"
   ],
   "references": [

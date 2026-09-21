@@ -1,5 +1,9 @@
-import { StaffMonthlyShiftWish, WorkingDay } from '@bublys-org/hotel-shift-puzzle-model';
-import { decodeWishForStaff } from './autoShift.js';
+import {
+  ConstraintSet,
+  StaffMonthlyShiftWish,
+  WorkingDay,
+} from '@bublys-org/hotel-shift-puzzle-model';
+import { autoShiftLimitsOf, decodeWishForStaff } from './autoShift.js';
 import { DAY_OFF_WISH, toggleWishInput, workWishKey } from '../ui/shiftWishOptions.js';
 
 describe('decodeWishForStaff（×で候補を絞る）', () => {
@@ -84,5 +88,23 @@ describe('decodeWishForStaff（×で候補を絞る）', () => {
   test('この勤務表に無い帯の希望は決め手にならない（ambiguous）', () => {
     const w = empty().setPreference(d1, workWishKey('夜勤'), 'want');
     expect(decode(w)).toEqual({ kind: 'ambiguous' });
+  });
+});
+
+describe('autoShiftLimitsOf（自動シフトが置く休みの目標は制約セットから）', () => {
+  test('★ 勤務表の制約セットの値をそのまま渡す（既定の 8 / 8 に落とさない）', () => {
+    const set = ConstraintSet.empty('sched-1')
+      .withMinMonthlyDayOff(9)
+      .withMaxDayOffPerDay(2);
+    expect(autoShiftLimitsOf(set)).toEqual({
+      minDayOff: 9,
+      maxDayOffPerDay: 2,
+    });
+  });
+
+  test('制約セットが読めていないときは、制約セットの既定値と同じ値', () => {
+    expect(autoShiftLimitsOf(undefined)).toEqual(
+      autoShiftLimitsOf(ConstraintSet.empty('sched-1'))
+    );
   });
 });

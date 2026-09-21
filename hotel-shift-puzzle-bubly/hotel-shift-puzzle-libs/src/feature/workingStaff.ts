@@ -83,7 +83,7 @@ export type WorkingStaffValue = {
   /** その人のその勤務帯の可否を反転する */
   toggleShift: (staffId: string, shiftId: string) => void;
   /** 全員がその勤務帯に入れるようにする（勤務帯を1つ増やしたとき） */
-  allowShiftForAll: (shiftId: string, shiftName?: string) => void;
+  allowShiftForAll: (shiftId: string) => void;
 };
 
 export function useWorkingStaff(
@@ -126,11 +126,9 @@ export function useWorkingStaff(
     (
       fn: (group: WorkingStaffGroup) => WorkingStaffGroup,
       meta: {
-        summary: (group: WorkingStaffGroup) => string;
-        staffId?: string;
         /** その人がこの勤務表で働かなくなる（連れて動くものがある） */
         leaving?: string;
-      }
+      } = {}
     ) => {
       if (scheduleId === undefined || workingStaffGroupId === undefined) return;
       if (group === undefined && !absent) return; // 読めないだけかもしれない
@@ -151,13 +149,7 @@ export function useWorkingStaff(
         constraints,
       });
 
-      recordMembershipEdit(store, {
-        scheduleId,
-        schedule,
-        changed,
-        summary: meta.summary(next),
-        staffId: meta.staffId,
-      });
+      recordMembershipEdit(store, { scheduleId, schedule, changed });
     },
     [
       store,
@@ -171,14 +163,6 @@ export function useWorkingStaff(
     ]
   );
 
-  const nameOf = useCallback(
-    (staffId: string) =>
-      staffList.find((s) => s.id === staffId)?.name ??
-      roster.find((s) => s.id === staffId)?.name ??
-      staffId,
-    [staffList, roster]
-  );
-
   return {
     staffList,
     roster,
@@ -189,12 +173,8 @@ export function useWorkingStaff(
     ),
     canEdit,
     addFromRoster: useCallback(
-      (staffId: string) =>
-        updateGroup((g) => g.addRoster(staffId), {
-          summary: () => `${nameOf(staffId)} をこの勤務表に加えた`,
-          staffId,
-        }),
-      [updateGroup, nameOf]
+      (staffId: string) => updateGroup((g) => g.addRoster(staffId)),
+      [updateGroup]
     ),
     addTemporary: useCallback(
       (name: string, department?: string) => {
@@ -203,46 +183,26 @@ export function useWorkingStaff(
           name,
           department: department || undefined,
         });
-        updateGroup((g) => g.addTemporary(staff), {
-          summary: () => `臨時スタッフ ${staff.name} を加えた`,
-          staffId: staff.id,
-        });
+        updateGroup((g) => g.addTemporary(staff));
       },
       [updateGroup]
     ),
     remove: useCallback(
-      (staffId: string) => {
-        const name = nameOf(staffId);
-        updateGroup((g) => g.remove(staffId), {
-          summary: () => `${name} をこの勤務表から外した`,
-          staffId,
-          leaving: staffId,
-        });
-      },
-      [updateGroup, nameOf]
+      (staffId: string) =>
+        updateGroup((g) => g.remove(staffId), { leaving: staffId }),
+      [updateGroup]
     ),
     move: useCallback(
       (staffId: string, toIndex: number) =>
-        updateGroup((g) => g.move(staffId, toIndex), {
-          summary: () => `${nameOf(staffId)} の行を ${toIndex + 1} 番目へ移した`,
-          staffId,
-        }),
-      [updateGroup, nameOf]
+        updateGroup((g) => g.move(staffId, toIndex)),
+      [updateGroup]
     ),
     editTemporary: useCallback(
       (staffId: string, edit: { name: string; department: string }) =>
-        updateGroup(
-          (g) =>
-            g
-              .renameTemporary(staffId, edit.name)
-              .changeTemporaryDepartment(staffId, edit.department),
-          {
-            summary: () =>
-              `臨時スタッフ ${edit.name}${
-                edit.department ? `（${edit.department}）` : ""
-              } を直した`,
-            staffId,
-          }
+        updateGroup((g) =>
+          g
+            .renameTemporary(staffId, edit.name)
+            .changeTemporaryDepartment(staffId, edit.department)
         ),
       [updateGroup]
     ),
@@ -254,22 +214,12 @@ export function useWorkingStaff(
     toggleShift: useCallback(
       (staffId: string, shiftId: string) => {
         const allShiftIds = workShifts.map((w) => w.id);
-        const shiftName = workShifts.find((w) => w.id === shiftId)?.name ?? shiftId;
-        updateGroup((g) => g.toggleShift(staffId, shiftId, allShiftIds), {
-          summary: (next) =>
-            `${nameOf(staffId)} の ${shiftName} を${
-              next.isAllowed(staffId, shiftId) ? "可" : "不可"
-            }にした`,
-          staffId,
-        });
+        updateGroup((g) => g.toggleShift(staffId, shiftId, allShiftIds));
       },
-      [updateGroup, workShifts, nameOf]
+      [updateGroup, workShifts]
     ),
     allowShiftForAll: useCallback(
-      (shiftId: string, shiftName?: string) =>
-        updateGroup((g) => g.allowShiftForAll(shiftId), {
-          summary: () => `全員が ${shiftName ?? shiftId} に入れるようにした`,
-        }),
+      (shiftId: string) => updateGroup((g) => g.allowShiftForAll(shiftId)),
       [updateGroup]
     ),
   };

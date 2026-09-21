@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent,
   type KeyboardEvent,
   type RefObject,
 } from "react";
@@ -14,7 +15,25 @@ import {
   type WorkShift,
   type WorkingDay,
 } from "../../domain/index.js";
-import type { CellSelection } from "./types.js";
+import type {
+  CellChange,
+  CellClipboardHandlers,
+  CellRef,
+  CellSelection,
+  RequiredChange,
+  SelectionArea,
+} from "./types.js";
+import { moveCursor, type CursorLayout } from "./gridCursor.js";
+import { matchesShortcut, parseShortcut } from "@bublys-org/bubbles-ui";
+import {
+  areaTo,
+  cellsOf,
+  extendArea,
+  isInSelection,
+  removeArea,
+  sameCell,
+  singleArea,
+} from "./gridSelection.js";
 
 type UseCellKeyboardEditingParams = {
   /** 行の並び（上下移動の順序）。 */
@@ -25,40 +44,98 @@ type UseCellKeyboardEditingParams = {
   shiftOptions: WorkShift[];
   /** あれば「選択スタッフが入れる勤務帯」に候補を絞る。 */
   staffGroup?: WorkingStaffGroup;
-  /** セルの勤務割当を変更する（確定時に呼ぶ）。 */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
+  /**
+   * スタッフ行のセルの勤務割当を変更する（確定時に呼ぶ）。選択の全セルぶんを1回で渡す
+   * （1回の操作＝世界線の1ノード）。入れられないセル（可能勤務帯に無い）は除いてある。
+   */
+  onChangeCells: (changes: CellChange[]) => void;
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
   /** そのセルが制約から一意に決まるなら、その値（確定提案）。無ければ undefined。 */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
-  /** 確定提案を承認する（Tab）。承認後のフォーカス移動は呼び出し側が決める。 */
-  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
+  /**
+   * 確定提案を承認する（何も打っていないときの Enter＝"down" / Tab＝"right"）。
+   * その向きの次の提案セルへ選択を移したら true を返す。false なら、その向きへ1マス動く。
+   */
+  onApproveForced?: (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell,
+    direction: ApproveDirection
+  ) => boolean;
+  /**
+   * 必要人数を入力できる勤務帯の行（勤務帯名。表示順）。スタッフ行の下に続けてカーソルが入る。
+   * 渡さなければ（抽出ビュー）、カーソルはスタッフ行だけを動く。
+   */
+  requiredShiftNames?: string[];
+  /** 必要人数として入れられる最大値（これを超えて打った数は入れない） */
+  maxRequired?: number;
+  /** 必要人数を確定する。選択の全セルぶんを1回で渡す。day が null なら全日まとめて（行の見出し） */
+  onChangeRequiredCells?: (changes: RequiredChange[]) => void;
+  /** 必要人数のメニュー（0〜最大値から選ぶ）を開く。day が null なら全日まとめて */
+  onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
+  /** セルのコピー・カット・貼り付け（#166）。渡さなければ扱わない */
+  clipboard?: CellClipboardHandlers;
 };
+
+/** 確定提案を承認したあと、次の提案を探す向き（Enter＝下 / Tab＝右） */
+export type ApproveDirection = "right" | "down";
+
+/**
+ * 編集の状態。Excel と同じく「打って入力する」と「リストから選ぶ」を分ける。
+ *   - type : 文字を打っている。Enter / Tab / 矢印で確定し、その向きへ動く
+ *   - list : リストを開いて選んでいる（Alt+↓ / F2 / ダブルクリック）。↑↓で選び、確定しても動かない
+ * 必要人数のセルのリスト（メニュー）はビューが持つので、ここでは type だけを使う。
+ */
+export type EditMode = "type" | "list";
 
 export type CellKeyboardEditing = {
   /** キー入力を受けるグリッド要素の ref（tabIndex + onKeyDown を付ける先）。 */
   gridRef: RefObject<HTMLDivElement | null>;
-  /** フォーカス中のセル（無ければ null）。 */
+  /** カーソル（無ければ null）。 */
   selection: CellSelection | null;
   /** 打ち込み中のバッファ。null は非入力（ドロップダウン閉）、"" 以上は入力中（開）。 */
   inputBuffer: string | null;
-  /** ドロップダウンを開いているか（inputBuffer !== null）。 */
+  /** 編集の状態（打つ入力／リスト選択）。閉じていれば null。 */
+  editMode: EditMode | null;
+  /** ドロップダウンを開いているか（editMode !== null）。 */
   editing: boolean;
-  /** 現在の入力候補（前方一致）。 */
+  /** 現在の入力候補（前方一致）。スタッフ行のセルを編集しているときだけ。 */
   suggestions: ShiftSuggestion[];
   /** ハイライト中の候補インデックス（範囲内にクランプ済み）。 */
   activeIndex: number;
-  /** 候補ドロップダウンのアンカー要素（選択セルの DOM）。 */
+  /** 候補ドロップダウンのアンカー要素（選択中のスタッフ行のセルの DOM）。 */
   anchorEl: HTMLElement | null;
-  /** セルを選択（ドロップダウンは閉じる）。 */
+  /** スタッフ行のセルを選択（ドロップダウンは閉じる）。 */
   selectCell: (staffId: string, day: WorkingDay) => void;
-  /** セルを選択して候補ドロップダウンを開く（全候補表示）。 */
+  /** 必要人数のセル（day が null なら行の見出し）を選択する。 */
+  selectRequired: (shiftName: string, day: WorkingDay | null) => void;
+  /**
+   * 必要人数のメニューで選んだ数を、選択中の必要人数のセルぜんぶに入れる（ルール2：留まる）。
+   * 入れたセルが無ければ false
+   */
+  applyRequiredCount: (count: number) => boolean;
+  /**
+   * セルを押した（マウス）。修飾無し＝そのセルだけ、Shift＝起点からそこまでの範囲、
+   * additive（Ctrl/Cmd）＝飛び地として足す（選んであるセルから始めたら外す）。押したままのドラッグは dragToCell で、
+   * 押したときに決まった操作（選び直す・広げる・足す・外す）を長方形で続ける。
+   */
+  pressCell: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
+  /** 押したまま入ったセルまで、押したときの操作（選び直す・広げる・足す・外す）を続ける。押していなければ何もしない */
+  dragToCell: (cell: CellSelection) => void;
+  /** セルが範囲選択に入っているか（2セル以上選んでいるときだけ true。1セルはカーソルの枠で足りる） */
+  isInRange: (cell: CellSelection) => boolean;
+  /** スタッフ行のセルを選択してリスト選択を開く（全候補表示。ダブルクリック）。 */
   openEditor: (staffId: string, day: WorkingDay) => void;
-  /** 候補を確定（クリック / Enter）。確定後は右隣のセルへ進む。 */
+  /** リストから選んだ候補で確定する（クリック）。**動かない。** */
   applySuggestion: (s: ShiftSuggestion) => void;
   /** グリッドの onKeyDown ハンドラ。 */
   handleKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  /** グリッドの onCopy / onCut / onPaste ハンドラ（#166） */
+  handleCopy: (e: ClipboardEvent<HTMLDivElement>) => void;
+  handleCut: (e: ClipboardEvent<HTMLDivElement>) => void;
+  handlePaste: (e: ClipboardEvent<HTMLDivElement>) => void;
 };
 
 /** 候補を勤務割当（ShiftCell）へ変換する。 */
@@ -68,27 +145,86 @@ const suggestionToCell = (s: ShiftSuggestion): ShiftCell => {
   return { kind: "undecided" };
 };
 
+/** 打ち込みの取り消し（打っている途中の Ctrl/Cmd+Z。Excel と同じ） */
+const CANCEL_TYPING = parseShortcut("mod+z");
+
+/** オブジェクトとして貼る（#166）。値のみの Ctrl/Cmd+V はネイティブの paste イベントで受ける */
+const PASTE_OBJECTS = parseShortcut("mod+shift+v");
+
+/** 押したキーが指す向き（Enter↓ / Tab→ / 矢印。Shift で逆向き）。移動のキーでなければ null */
+const directionOf = (e: KeyboardEvent<HTMLDivElement>): [number, number] | null => {
+  switch (e.key) {
+    case "ArrowUp":
+      return [-1, 0];
+    case "ArrowDown":
+      return [1, 0];
+    case "ArrowLeft":
+      return [0, -1];
+    case "ArrowRight":
+      return [0, 1];
+    case "Enter":
+      return e.shiftKey ? [-1, 0] : [1, 0];
+    case "Tab":
+      return e.shiftKey ? [0, -1] : [0, 1];
+    default:
+      return null;
+  }
+};
+
+const isTypedChar = (e: KeyboardEvent<HTMLDivElement>) =>
+  e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key);
+
+const isDigit = (e: KeyboardEvent<HTMLDivElement>) => /^[0-9]$/.test(e.key);
+
 /**
- * 勤務表グリッドのキーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）を
- * まとめたフック。状態と対話ロジックをここに閉じ込め、ScheduleGridView は描画に徹する。
+ * 勤務表グリッドのキーボード操作（セル選択・矢印移動・打ち込みでの確定）をまとめたフック。
+ * 状態と対話ロジックをここに閉じ込め、ScheduleGridView は描画に徹する。
  *
- * ルール:
- *   - ドロップダウン閉: 矢印でセル移動 / 英数字 or Enter で開く / Backspace で未定クリア /
- *                       Tab で確定提案を承認（移動は feature 層）
- *   - ドロップダウン開: ↑↓で候補移動 / Enter・クリックで確定して右隣へ /
- *                       ←→で閉じて隣セルへ / Backspace で 1 文字削除（空ならクリアして閉じる） /
- *                       Esc で閉じる
+ * **カーソルは1つ。** スタッフ行のセルと必要人数のセル（行の見出しを含む）は、同じカーソルの
+ * 居場所の違いにすぎない（#156）。表はひと続きで、スタッフ行の下に必要人数の行が続く（gridCursor）。
+ *
+ * **選択は「カーソル＋範囲の集まり」**（#157）。範囲は Excel と同じ長方形（Shift＋矢印・Shift＋クリック・
+ * ドラッグ）で、Ctrl/Cmd＋クリック（ドラッグ）で飛び地を足す（選んであるセルから始めたら外す）。カーソルは最後の範囲の起点。
+ *   - **入れる操作は選択の全セルに効く。** 打った値・リストで選んだ値・Delete を全セルへ1回で入れ、
+ *     範囲を残して留まる。可能勤務帯に無い勤務帯は、その人のセルだけ飛ばす
+ *   - **範囲は、カーソルが Shift 無しで動くと解ける。** 外から（feature 層が）カーソルを動かしても、
+ *     最後の範囲の起点とずれるので解けたものとして扱う
+ *
+ * カーソル移動は Excel に準拠する（#152）。ルールは3つだけ:
+ *   1. **打って入力した値は、押したキーの向きへ動いて確定する**
+ *      （Enter↓ / Shift+Enter↑ / Tab→ / Shift+Tab← / 矢印はその向き）
+ *   2. **リストから選んだ値は、その場に留まって確定する**（リストでの Enter・候補のクリック）
+ *   3. **何も入力していないときの Enter / Tab は移動。** そのセルに確定提案（点線）があれば、
+ *      承認してその向きの次の提案セルへ飛ぶ（次の提案を探すのは feature 層）
+ *
+ * スタッフ行のセル:
+ *   - 選択だけ  : 矢印・Enter・Tab で移動 / Alt+↓・F2 でリストを開く / 英数字で打つ入力を開く /
+ *                 Backspace・Delete で未定に戻す / Esc で選択を外す
+ *   - 打つ入力  : 英数字・Backspace で打つ / Enter・Tab・矢印で先頭の候補で確定して動く /
+ *                 Esc で取り消す（動かない）
+ *   - リスト選択: ↑↓で候補を選ぶ / Enter で確定して留まる / 英数字・Backspace で絞る /
+ *                 ←→・Tab で確定せずに閉じて動く / Esc で閉じる
+ * 必要人数のセル:
+ *   - 選択だけ  : 矢印・Enter・Tab で移動 / Alt+↓・F2 でメニューを開く / 数字で打つ入力を開く /
+ *                 Backspace・Delete で 0（設定なし）/ Esc で選択を外す
+ *   - 打つ入力  : 数字・Backspace で打つ / Enter・Tab・矢印で打った数で確定して動く
+ *                 （0〜最大値の外なら変えずに動く）/ Esc で取り消す（動かない）
  */
 export function useCellKeyboardEditing({
   staffList,
   days,
   shiftOptions,
   staffGroup,
-  onChangeCell,
+  onChangeCells,
   selection: controlledSelection,
   onSelectionChange,
   forcedCellOf,
   onApproveForced,
+  requiredShiftNames = [],
+  maxRequired,
+  onChangeRequiredCells,
+  onOpenRequiredList,
+  clipboard,
 }: UseCellKeyboardEditingParams): CellKeyboardEditing {
   const gridRef = useRef<HTMLDivElement>(null);
   const [internalSelection, setInternalSelection] =
@@ -97,35 +233,69 @@ export function useCellKeyboardEditing({
     controlledSelection === undefined
       ? internalSelection
       : controlledSelection;
-  const setSelection = (
-    next:
-      | CellSelection
-      | null
-      | ((previous: CellSelection | null) => CellSelection | null)
-  ) => {
-    const resolved =
-      typeof next === "function" ? next(selection) : next;
-    if (controlledSelection === undefined) setInternalSelection(resolved);
-    onSelectionChange?.(resolved);
+  /** カーソルだけを動かす（範囲はそのまま。飛び地を足すとき） */
+  const setCursor = (next: CellSelection | null) => {
+    if (controlledSelection === undefined) setInternalSelection(next);
+    onSelectionChange?.(next);
+  };
+  /** カーソルを置き直す。範囲は解ける */
+  const setSelection = (next: CellSelection | null) => {
+    setAreas([]);
+    setCursor(next);
+  };
+
+  // ----- 範囲選択（#157）-----
+  const layout: CursorLayout = {
+    staffIds: staffList.map((s) => s.id),
+    requiredShiftNames,
+    days,
+  };
+  const [areas, setAreas] = useState<SelectionArea[]>([]);
+  // 範囲はカーソルに重ねる。最後の範囲の起点がカーソルでなければ（外から動かされた）解けている
+  const lastArea = areas[areas.length - 1];
+  const activeAreas: SelectionArea[] = !selection
+    ? []
+    : lastArea && sameCell(lastArea.anchor, selection)
+      ? areas
+      : [singleArea(selection)];
+  useEffect(() => {
+    if (lastArea && !sameCell(lastArea.anchor, selection)) setAreas([]);
+  }, [lastArea, selection]);
+  /** 選択中の全セル（表の上から・左から順） */
+  const targets = cellsOf(activeAreas, layout);
+  const hasRange = targets.length > 1;
+  /** 最後の範囲を置き換える（Shift で広げる・ドラッグ） */
+  const replaceLastArea = (next: (last: SelectionArea) => SelectionArea) => {
+    const last = activeAreas[activeAreas.length - 1];
+    if (last) setAreas([...activeAreas.slice(0, -1), next(last)]);
   };
   const [inputBuffer, setInputBuffer] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<EditMode | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // スタッフ行のセルにいるときだけの値（候補・アンカー）
+  const staffSelection = selection?.kind === "staff" ? selection : null;
+
   // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば）
+  // 範囲のときは勤務帯ぜんぶから出し、入れる段で人ごとに飛ばす（setStaffCells）
   const selectableShiftOptions =
-    staffGroup && selection
-      ? shiftOptions.filter((w) => staffGroup.isAllowed(selection.staffId, w.id))
+    staffGroup && staffSelection && !hasRange
+      ? shiftOptions.filter((w) => staffGroup.isAllowed(staffSelection.staffId, w.id))
       : shiftOptions;
 
-  // 入力候補（前方一致）。バッファが null（非入力）なら候補は出さない
+  // 入力候補（前方一致）。スタッフ行のセルを編集しているときだけ出す
   const suggestions: ShiftSuggestion[] =
-    inputBuffer !== null ? suggestShiftInputs(inputBuffer, selectableShiftOptions) : [];
+    staffSelection && inputBuffer !== null
+      ? suggestShiftInputs(inputBuffer, selectableShiftOptions)
+      : [];
   // 候補が減ったときに範囲外を指さないようクランプ
   const activeClamped = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
 
   // ドロップダウンのアンカー要素を、選択セルの DOM から data 属性で引く
   // （クリック選択・矢印移動どちらでも同じ経路で取れる）
-  const selectionKey = selection ? `${selection.staffId}:${selection.day.key}` : null;
+  const selectionKey = staffSelection
+    ? `${staffSelection.staffId}:${staffSelection.day.key}`
+    : null;
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
     if (!selectionKey || !gridRef.current) {
@@ -137,53 +307,313 @@ export function useCellKeyboardEditing({
     );
   }, [selectionKey]);
 
-  const selectCell = (staffId: string, day: WorkingDay) => {
-    setSelection({ staffId, day });
+  const closeEditor = () => {
     setInputBuffer(null);
+    setEditMode(null);
+  };
+
+  /** 編集を開く。type は打った1文字目から、list は全候補から始める */
+  const beginEdit = (mode: EditMode, buffer: string) => {
+    setEditMode(mode);
+    setInputBuffer(buffer);
+    setActiveIndex(0);
+  };
+
+  const selectCell = (staffId: string, day: WorkingDay) => {
+    setSelection({ kind: "staff", staffId, day });
+    closeEditor();
+    gridRef.current?.focus();
+  };
+
+  const selectRequired = (shiftName: string, day: WorkingDay | null) => {
+    setSelection({ kind: "required", shiftName, day });
+    closeEditor();
     gridRef.current?.focus();
   };
 
   const openEditor = (staffId: string, day: WorkingDay) => {
-    setSelection({ staffId, day });
-    setInputBuffer("");
-    setActiveIndex(0);
+    setSelection({ kind: "staff", staffId, day });
+    beginEdit("list", "");
     gridRef.current?.focus();
   };
 
-  // 選択を dStaff 行・dDay 列ぶん動かす（端でクランプ）。入力中バッファは破棄
-  const moveSelection = (dStaff: number, dDay: number) => {
-    setInputBuffer(null);
-    setSelection((prev) => {
-      if (staffList.length === 0 || days.length === 0) return prev;
-      if (!prev) return { staffId: staffList[0].id, day: days[0] };
-      const si = staffList.findIndex((s) => s.id === prev.staffId);
-      const di = days.findIndex((d) => d.key === prev.day.key);
-      if (si < 0 || di < 0) return { staffId: staffList[0].id, day: days[0] };
-      const ns = Math.min(Math.max(si + dStaff, 0), staffList.length - 1);
-      const nd = Math.min(Math.max(di + dDay, 0), days.length - 1);
-      return { staffId: staffList[ns].id, day: days[nd] };
-    });
+  // カーソルを dRow 行・dCol 列ぶん動かす（表はひと続き。端でクランプ）。編集中なら閉じる
+  const moveSelection = (dRow: number, dCol: number) => {
+    closeEditor();
+    setSelection(
+      moveCursor(selection, dRow, dCol, {
+        staffIds: staffList.map((s) => s.id),
+        requiredShiftNames,
+        days,
+      })
+    );
   };
 
-  const applySuggestion = (s: ShiftSuggestion) => {
-    if (selection) {
-      onChangeCell(selection.staffId, selection.day, suggestionToCell(s));
-      // Enter / マウス確定とも右隣へ。最終列ならそのセルに留まる。
-      moveSelection(0, 1);
-    } else {
-      setInputBuffer(null);
+  /** 選択中のスタッフ行のセルぜんぶに入れる。その人が入れない勤務帯のセルは飛ばす */
+  const setStaffCells = (to: ShiftCell) => {
+    const changes: CellChange[] = [];
+    for (const cell of targets) {
+      if (cell.kind !== "staff") continue;
+      if (to.kind === "work" && staffGroup && !staffGroup.isAllowed(cell.staffId, to.shiftId)) {
+        continue;
+      }
+      changes.push({ staffId: cell.staffId, day: cell.day, to });
     }
+    if (changes.length > 0) onChangeCells(changes);
+  };
+
+  /** 候補でスタッフ行のセル（範囲なら全セル）を確定して閉じる（動かない） */
+  const commit = (s: ShiftSuggestion) => {
+    if (staffSelection) setStaffCells(suggestionToCell(s));
+    closeEditor();
+  };
+
+  // リストから選んだ（クリック）＝ルール2：確定して留まる
+  const applySuggestion = (s: ShiftSuggestion) => {
+    commit(s);
     gridRef.current?.focus();
   };
 
-  const editing = inputBuffer !== null;
+  // 打った値＝ルール1：先頭の候補で確定して、その向きへ動く。候補が無ければ変えずに動く。
+  // 範囲なら全セルに入れて留まる（続けて上書き・Delete できる）
+  const commitTypedAndMove = (dRow: number, dCol: number) => {
+    if (suggestions.length > 0) commit(suggestions[activeClamped]);
+    if (hasRange) closeEditor();
+    else moveSelection(dRow, dCol);
+  };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    // 修飾キー付きはブラウザ/OS のショートカットに委ねる
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+  // ----- マウス -----
+  /**
+   * 押してから離すまでの1回の操作（Excel と同じく、押したときに何をするかが決まる）。
+   *   - replace : 修飾無し。押したセルからドラッグした長方形で選び直す
+   *   - extend  : Shift。最後の範囲の起点から、押した（ドラッグした）セルまで
+   *   - add     : Ctrl/Cmd で、選んでいないセルから。押したセルからドラッグした長方形を足す
+   *   - remove  : Ctrl/Cmd で、選んであるセルから。押したセルからドラッグした長方形を外す
+   * base は押したときの選択。ドラッグ中は毎回 base から作り直す（行き過ぎて戻っても元に戻る）
+   */
+  type Gesture = {
+    mode: "replace" | "extend" | "add" | "remove";
+    start: CellSelection;
+    base: SelectionArea[];
+    baseCursor: CellSelection | null;
+    last: CellSelection;
+  };
+  const gestureRef = useRef<Gesture | null>(null);
+  useEffect(() => {
+    const stop = () => {
+      gestureRef.current = null;
+    };
+    window.addEventListener("mouseup", stop);
+    return () => window.removeEventListener("mouseup", stop);
+  }, []);
 
-    // ----- ドロップダウンを開いている間: 矢印は候補移動、Enter で確定 -----
-    if (editing && selection) {
+  /** 操作を、いまマウスがあるセルまで当てはめる */
+  const applyGesture = (g: Gesture, cell: CellSelection) => {
+    switch (g.mode) {
+      case "replace":
+        setAreas([areaTo(g.start, cell, layout)]);
+        setCursor(g.start);
+        return;
+      case "extend": {
+        const last = g.base[g.base.length - 1];
+        if (last) setAreas([...g.base.slice(0, -1), areaTo(last.anchor, cell, layout)]);
+        return;
+      }
+      case "add":
+        setAreas([...g.base, areaTo(g.start, cell, layout)]);
+        setCursor(g.start);
+        return;
+      case "remove": {
+        const rest = removeArea(g.base, areaTo(g.start, cell, layout), layout);
+        const cursor = g.baseCursor;
+        if (cursor && isInSelection(rest, cursor, layout)) {
+          // カーソルは残る。範囲の最後の起点がカーソルになるよう、カーソルの1セルを最後に足す
+          setAreas([...rest, singleArea(cursor)]);
+          setCursor(cursor);
+        } else if (rest.length > 0) {
+          // カーソルを外したら、残った選択の最後の起点へ移す
+          setAreas(rest);
+          setCursor(rest[rest.length - 1].anchor);
+        } else if (cursor) {
+          // 全部外れるときは、カーソルの1セルだけ残す（勤務表には常にカーソルが1つある）
+          setAreas([]);
+          setCursor(cursor);
+        }
+        return;
+      }
+    }
+  };
+
+  const pressCell = (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => {
+    closeEditor();
+    const sameKind = !!selection && selection.kind === cell.kind;
+    const mode: Gesture["mode"] =
+      mods.shiftKey && sameKind
+        ? "extend"
+        : mods.additive && sameKind
+          ? hasRange || !sameCell(cell, selection)
+            ? isInSelection(activeAreas, cell, layout)
+              ? "remove"
+              : "add"
+            : "replace" // 1セルだけ選んでいてそのセルを押した＝何も変わらない
+          : "replace";
+    const g: Gesture = {
+      mode,
+      start: cell,
+      base: activeAreas,
+      baseCursor: selection,
+      last: cell,
+    };
+    gestureRef.current = g;
+    applyGesture(g, cell);
+    gridRef.current?.focus();
+  };
+
+  const dragToCell = (cell: CellSelection) => {
+    const g = gestureRef.current;
+    if (!g || sameCell(g.last, cell)) return;
+    g.last = cell;
+    applyGesture(g, cell);
+  };
+
+  const isInRange = (cell: CellSelection) => hasRange && isInSelection(activeAreas, cell, layout);
+
+  const editing = editMode !== null;
+
+  /** 打つ入力・リスト選択とも、Backspace は1文字消す。空でさらに消したら clearCell して閉じる */
+  const backspaceInEditor = (clearCell: () => void) => {
+    if (inputBuffer && inputBuffer.length > 0) {
+      setInputBuffer(inputBuffer.slice(0, -1));
+      setActiveIndex(0);
+      return;
+    }
+    clearCell();
+    closeEditor();
+  };
+
+  // ===== 必要人数のセル =====
+  /**
+   * 選択中の必要人数のセルぜんぶに入れる（カーソルが見出しなら、見出し＝全日まとめて）。
+   * 入れたセルが無ければ（カーソルがスタッフ行）false
+   */
+  const setRequiredCount = (count: number): boolean => {
+    const changes: RequiredChange[] = [];
+    for (const cell of targets) {
+      if (cell.kind === "required") {
+        changes.push({ shiftName: cell.shiftName, day: cell.day, count });
+      }
+    }
+    if (changes.length === 0) return false;
+    onChangeRequiredCells?.(changes);
+    return true;
+  };
+
+  const handleRequiredKeyDown = (
+    e: KeyboardEvent<HTMLDivElement>,
+    cursor: Extract<CellSelection, { kind: "required" }>
+  ) => {
+    const setCount = (count: number) => setRequiredCount(count);
+
+    // 打つ入力: 打った数で確定して、その向きへ動く（ルール1）
+    if (editMode === "type") {
+      const direction = directionOf(e);
+      if (direction) {
+        e.preventDefault();
+        const count = Number(inputBuffer);
+        const inRange =
+          inputBuffer !== null &&
+          inputBuffer !== "" &&
+          Number.isInteger(count) &&
+          count >= 0 &&
+          (maxRequired === undefined || count <= maxRequired);
+        if (inRange) setCount(count);
+        if (hasRange) closeEditor(); // 範囲なら全セルに入れて留まる
+        else moveSelection(...direction);
+        return;
+      }
+      switch (e.key) {
+        case "Escape":
+          e.preventDefault();
+          closeEditor(); // 打ち込みを取り消す（動かない）
+          return;
+        case "Backspace":
+          e.preventDefault();
+          backspaceInEditor(() => setCount(0));
+          return;
+        default:
+          if (isDigit(e)) {
+            e.preventDefault();
+            setInputBuffer((prev) => (prev ?? "") + e.key);
+          }
+          return;
+      }
+    }
+
+    // 選択だけ
+    const direction = directionOf(e);
+    if (direction) {
+      e.preventDefault();
+      moveSelection(...direction); // 確定提案は無いので、Enter / Tab も移動だけ（ルール3）
+      return;
+    }
+    switch (e.key) {
+      case "F2":
+        e.preventDefault();
+        onOpenRequiredList?.(cursor.shiftName, cursor.day);
+        return;
+      case "Backspace":
+      case "Delete":
+        e.preventDefault();
+        setCount(0); // 設定なし
+        return;
+      case "Escape":
+        e.preventDefault();
+        setSelection(null);
+        return;
+      default:
+        if (isDigit(e)) {
+          e.preventDefault();
+          beginEdit("type", e.key);
+        }
+    }
+  };
+
+  // ===== スタッフ行のセル =====
+  const handleStaffKeyDown = (
+    e: KeyboardEvent<HTMLDivElement>,
+    cursor: Extract<CellSelection, { kind: "staff" }>
+  ) => {
+    const clearCell = () => setStaffCells({ kind: "undecided" });
+
+    // ----- 打つ入力: 確定キーで確定して、その向きへ動く -----
+    if (editMode === "type") {
+      const direction = directionOf(e);
+      if (direction) {
+        e.preventDefault();
+        commitTypedAndMove(...direction);
+        return;
+      }
+      switch (e.key) {
+        case "Escape":
+          e.preventDefault();
+          closeEditor(); // 打ち込みを取り消す（動かない）
+          return;
+        case "Backspace":
+          e.preventDefault();
+          backspaceInEditor(clearCell);
+          return;
+        default:
+          if (isTypedChar(e)) {
+            e.preventDefault();
+            setInputBuffer((prev) => (prev ?? "") + e.key);
+            setActiveIndex(0);
+          }
+          return;
+      }
+    }
+
+    // ----- リスト選択: ↑↓で選び、Enter で確定して留まる -----
+    if (editMode === "list") {
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
@@ -196,113 +626,191 @@ export function useCellKeyboardEditing({
           setActiveIndex((i) => Math.max(i - 1, 0));
           return;
         case "ArrowLeft":
-          // 横移動はドロップダウンを閉じて隣のセルへ（表計算的に編集を抜ける）
-          e.preventDefault();
-          moveSelection(0, -1);
-          return;
         case "ArrowRight":
+        case "Tab": {
+          // 横へ抜けるときは確定せずに閉じて動く
           e.preventDefault();
-          moveSelection(0, 1);
+          const direction = directionOf(e);
+          if (direction) moveSelection(...direction);
           return;
+        }
         case "Enter":
           e.preventDefault();
           if (suggestions.length > 0) applySuggestion(suggestions[activeClamped]);
-          else setInputBuffer(null);
+          else closeEditor();
           return;
         case "Escape":
           e.preventDefault();
-          setInputBuffer(null); // 打ち込みを取り消してドロップダウンを閉じる（選択は残す）
+          closeEditor();
           return;
         case "Backspace":
           e.preventDefault();
-          if (inputBuffer && inputBuffer.length > 0) {
-            setInputBuffer(inputBuffer.slice(0, -1));
-            setActiveIndex(0);
-          } else {
-            // 空の状態でさらに消したらセルを未定（クリア）にして閉じる
-            onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
-            setInputBuffer(null);
-          }
+          backspaceInEditor(clearCell);
           return;
         default:
-          if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
+          if (isTypedChar(e)) {
             e.preventDefault();
-            setInputBuffer((prev) => (prev ?? "") + e.key);
+            setInputBuffer((prev) => (prev ?? "") + e.key); // 候補を絞る（リスト選択のまま）
             setActiveIndex(0);
           }
           return;
       }
     }
 
-    // ----- ドロップダウンを閉じている間: 矢印はセル移動 -----
-    switch (e.key) {
-      case "ArrowUp":
-        e.preventDefault();
-        moveSelection(-1, 0);
+    // ----- 選択だけ -----
+    const direction = directionOf(e);
+    if (direction) {
+      e.preventDefault();
+      // ルール3：何も入力していない Enter / Tab は、確定提案があれば承認して次の提案へ
+      // 範囲があるときは承認しない（Enter / Tab は範囲を解いて動く）
+      const approveDirection: ApproveDirection | null =
+        e.shiftKey || hasRange
+        ? null
+        : e.key === "Enter"
+          ? "down"
+          : e.key === "Tab"
+            ? "right"
+            : null;
+      const forced =
+        approveDirection && onApproveForced
+          ? forcedCellOf?.(cursor.staffId, cursor.day)
+          : undefined;
+      if (approveDirection && onApproveForced && forced) {
+        const jumped = onApproveForced(cursor.staffId, cursor.day, forced, approveDirection);
+        if (!jumped) moveSelection(...direction);
         return;
-      case "ArrowDown":
-        e.preventDefault();
-        moveSelection(1, 0);
-        return;
-      case "ArrowLeft":
-        e.preventDefault();
-        moveSelection(0, -1);
-        return;
-      case "ArrowRight":
-        e.preventDefault();
-        moveSelection(0, 1);
-        return;
-    }
-
-    if (!selection) return;
-
-    // Tab: そのセルが制約から一意に決まるなら、その値を承認して書き込む。
-    // 提案が無いセルでは何もしない＝ブラウザ本来のフォーカス移動に任せる。
-    if (e.key === "Tab" && !e.shiftKey) {
-      const forced = forcedCellOf?.(selection.staffId, selection.day);
-      if (forced) {
-        e.preventDefault();
-        onApproveForced?.(selection.staffId, selection.day, forced);
       }
+      moveSelection(...direction);
       return;
     }
 
     switch (e.key) {
-      case "Enter":
-        // 選択セルでドロップダウンを開く（全候補を表示）
+      case "F2":
         e.preventDefault();
-        openEditor(selection.staffId, selection.day);
+        beginEdit("list", ""); // カーソルはそのまま（範囲も解かない）
         return;
       case "Backspace":
-        // 打ち込まずにセルを未定（クリア）に戻す
+      case "Delete":
+        // 打たずにセルを未定（クリア）に戻す
         e.preventDefault();
-        onChangeCell(selection.staffId, selection.day, { kind: "undecided" });
+        clearCell();
         return;
       case "Escape":
         e.preventDefault();
-        setSelection(null);
+        // カットの点線があれば、それだけを消す（Excel と同じ）。無ければ選択を外す
+        if (!clipboard?.onCancelCut()) setSelection(null);
         return;
       default:
-        // 英数字を打ち始めたらドロップダウンを開き、その文字をバッファに入れる
-        if (e.key.length === 1 && /^[0-9a-zA-Z]$/.test(e.key)) {
+        // 英数字を打ち始めたら打つ入力を開き、その文字をバッファに入れる
+        if (isTypedChar(e)) {
           e.preventDefault();
-          setInputBuffer(e.key);
-          setActiveIndex(0);
+          beginEdit("type", e.key);
         }
     }
+  };
+
+  // ===== コピー・カット・貼り付け（#166）=====
+  /** 表の並び（キーボードのカーソルと同じ） */
+  const order = () => ({ staffIds: layout.staffIds, days });
+  /** 選択中のスタッフ行のセル（表の上から・左から順） */
+  const staffTargets = (): CellRef[] =>
+    targets.flatMap((c) => (c.kind === "staff" ? [{ staffId: c.staffId, day: c.day }] : []));
+  /** 1つの長方形なら列数。飛び地を含む選択は null（位置が決まらないので文字にできない） */
+  const columnsOfSelection = (): number | null => {
+    if (activeAreas.length !== 1) return null;
+    return new Set(staffTargets().map((c) => c.day.key)).size;
+  };
+
+  const copyOrCut = (e: ClipboardEvent<HTMLDivElement>, cut: boolean) => {
+    // 打っている最中・必要人数のセルでは勤務表の操作にしない
+    if (!clipboard || editing || selection?.kind !== "staff") return;
+    e.preventDefault();
+    const text = clipboard.onCopyCells(staffTargets(), { cut, columns: columnsOfSelection() });
+    e.clipboardData.setData("text/plain", text ?? "");
+  };
+
+  const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (!clipboard || editing || selection?.kind !== "staff") return;
+    e.preventDefault();
+    clipboard.onPasteValues(e.clipboardData.getData("text/plain"), {
+      ...order(),
+      targets: staffTargets(),
+    });
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // Alt+↓ はリスト（メニュー）を開く（Excel と同じ）。修飾キーの早期 return より前で拾う
+    if (e.altKey && e.key === "ArrowDown") {
+      if (selection && !editing) {
+        e.preventDefault();
+        if (selection.kind === "staff") beginEdit("list", ""); // 範囲は解かない
+        else onOpenRequiredList?.(selection.shiftName, selection.day);
+      }
+      return;
+    }
+    // 打っている途中の Ctrl/Cmd+Z は打ち込みの取り消し（Esc と同じ。動かない）。
+    // 打っていなければ素通しして、勤務表の世界線を戻すショートカットに任せる
+    if (editing && matchesShortcut(e, CANCEL_TYPING)) {
+      e.preventDefault();
+      closeEditor();
+      return;
+    }
+    // オブジェクトとして貼る（Ctrl/Cmd+Shift+V）。ネイティブの貼り付けは出さない（#166）
+    if (clipboard && !editing && matchesShortcut(e, PASTE_OBJECTS)) {
+      if (selection?.kind === "staff") {
+        e.preventDefault();
+        clipboard.onPasteObjects(order());
+      }
+      return;
+    }
+    // それ以外の修飾キー付き（Shift は除く）はブラウザ/OS のショートカットに委ねる
+    // （Ctrl/Cmd+C・X・V はグリッドの copy / cut / paste イベントで受ける）
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (!selection) {
+      // 選択が無ければ矢印で左上のセルから始める。Enter / Tab はブラウザに任せる
+      const direction = directionOf(e);
+      if (direction && e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        moveSelection(...direction);
+      }
+      return;
+    }
+
+    // Shift＋矢印は範囲を広げる／狭める（カーソルは起点のまま）。打っている途中は確定のキー
+    if (e.shiftKey && e.key.startsWith("Arrow") && !editing) {
+      const direction = directionOf(e);
+      if (direction) {
+        e.preventDefault();
+        replaceLastArea((last) => extendArea(last, direction[0], direction[1], layout));
+      }
+      return;
+    }
+
+    if (selection.kind === "required") handleRequiredKeyDown(e, selection);
+    else handleStaffKeyDown(e, selection);
   };
 
   return {
     gridRef,
     selection,
     inputBuffer,
+    editMode,
     editing,
     suggestions,
     activeIndex: activeClamped,
     anchorEl,
     selectCell,
+    selectRequired,
+    applyRequiredCount: setRequiredCount,
+    pressCell,
+    dragToCell,
+    isInRange,
     openEditor,
     applySuggestion,
     handleKeyDown,
+    handleCopy: (e) => copyOrCut(e, false),
+    handleCut: (e) => copyOrCut(e, true),
+    handlePaste,
   };
 }

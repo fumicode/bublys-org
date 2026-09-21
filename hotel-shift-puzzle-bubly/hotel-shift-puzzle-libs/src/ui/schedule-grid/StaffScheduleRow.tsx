@@ -33,7 +33,14 @@ type StaffScheduleRowProps = {
   /** 選択セルで入力中のバッファ（Enter 確定前の文字列。null は非入力） */
   inputBuffer: string | null;
   /** セルをシングルクリックで選択 */
-  onSelectCell: (staffId: string, day: WorkingDay) => void;
+  /** セルを押した（選択。Shift で範囲・Ctrl/Cmd で飛び地） */
+  onPressCell: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
+  /** 押したままセルに入った（ドラッグで範囲を広げる） */
+  onDragToCell?: (cell: CellSelection) => void;
+  /** セルが範囲選択に入っているか */
+  isInRange?: (cell: CellSelection) => boolean;
+  /** カット中の元のセルか（#166） */
+  isCutSource?: (staffId: string, day: WorkingDay) => boolean;
   /** セルをダブルクリックで候補ドロップダウンを開く */
   onOpenEditor: (staffId: string, day: WorkingDay) => void;
   /** 違反バブルの URL を作る。ObjectView がこれで開く（origin-side でマーカーの近くに出す） */
@@ -58,7 +65,7 @@ type StaffScheduleRowProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
-   * 渡された値は薄く描かれ、Tab で承認できる。
+   * 渡された値は薄く描かれ、Enter / Tab で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
   /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */
@@ -79,7 +86,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   getWishEntries,
   selection,
   inputBuffer,
-  onSelectCell,
+  onPressCell,
+  onDragToCell,
+  isInRange,
+  isCutSource,
   onOpenEditor,
   violationUrl,
   selected,
@@ -152,7 +162,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           (v) => !isShiftIntervalConstraintType(v.constraintType)
         );
         const isSelected =
-          selection?.staffId === staff.id && selection.day.equals(day);
+          selection?.kind === "staff" &&
+          selection.staffId === staff.id &&
+          selection.day.equals(day);
+        const here: CellSelection = { kind: "staff", staffId: staff.id, day };
         return (
           <ScheduleDataCell
             key={`${staff.id}:${day.key}`}
@@ -168,7 +181,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}
-            onSelect={() => onSelectCell(staff.id, day)}
+            inRange={isInRange?.(here) ?? false}
+            cutSource={isCutSource?.(staff.id, day) ?? false}
+            onPress={(e) =>
+              onPressCell(here, { shiftKey: e.shiftKey, additive: e.ctrlKey || e.metaKey })
+            }
+            onDragEnter={onDragToCell ? () => onDragToCell(here) : undefined}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             candidateHint={candidateHintOf?.(staff.id, day)}
             forcedCandidate={forced}

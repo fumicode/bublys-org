@@ -17,7 +17,7 @@ import type {
   AutoShiftStepResult,
   AmbiguousLeaderSlot,
 } from "./autoShiftStep.js";
-import { wouldExceedConsecutive } from "./autoShiftStep.js";
+import { canPlace } from "./autoShiftStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
 export type ResolveAmbiguousLeaderSlotsOptions = {
@@ -37,8 +37,6 @@ export function makeResolveAmbiguousLeaderSlotsStep(
       "責任者制約を満たすステップで一意に決め切れなかった枠を、phase違いで確定します（複数案の生成に使う）。",
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
-      const isAvailable = ctx.isAvailable ?? (() => true);
-      const max = ctx.maxConsecutive ?? 5;
       let result = schedule;
       let assigned = 0;
 
@@ -46,9 +44,8 @@ export function makeResolveAmbiguousLeaderSlotsStep(
         ids.filter(
           (id) =>
             result.isUndecided(id, slot.day) &&
-            isAvailable(id, slot.shiftId, slot.day) &&
             ctx.preferenceOf(id, slot.day).kind !== "day-off" &&
-            !wouldExceedConsecutive(result, id, slot.day, max)
+            canPlace(ctx, result, id, slot.day, { kind: "work", shiftId: slot.shiftId })
         );
 
       slots.forEach((slot, slotIndex) => {
@@ -62,7 +59,8 @@ export function makeResolveAmbiguousLeaderSlotsStep(
         let need = slot.remainingNeed;
         for (const id of ordered) {
           if (need <= 0) break;
-          if (!result.isUndecided(id, slot.day)) continue; // 他の slot 解決で既に埋まった
+          // 他の slot 解決で既に埋まった／直前に置いた人のせいで置けなくなった（日単位の制約など）
+          if (refilter([id], slot).length === 0) continue;
           result = result.assignShift(id, slot.day, slot.shiftId);
           assigned++;
           need--;

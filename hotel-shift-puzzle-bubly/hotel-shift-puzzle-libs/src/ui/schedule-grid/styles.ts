@@ -18,6 +18,14 @@ export const StyledWrap = styled.div`
     background: #fff;
     font-size: 0.8em;
 
+    /* セルはドラッグで範囲選択するので、ブラウザの文字選択は起こさない（#157 / #166）。
+       選択した文字ではなく、選択中のセルをコピーする。 */
+    user-select: none;
+    /* チェックボックスなどの入力は素の振る舞いに戻す */
+    input {
+      user-select: auto;
+    }
+
     /* キーボード操作のためグリッド自体を focusable にしている。
        選択はセルの枠線で示すので、コンテナ自身のフォーカス枠は消す。 */
     &:focus {
@@ -300,6 +308,42 @@ export const StyledWrap = styled.div`
   .e-sum-cell.is-editable {
     cursor: pointer;
   }
+  /* キーボードのカーソルがいる必要人数のセル / 見出し（スタッフ行のセルの選択枠と同じ見た目） */
+  .e-sum-head.is-selected,
+  .e-sum-cell.is-selected {
+    box-shadow: inset 0 0 0 2px #1976d2;
+  }
+  /* 打ち込み表示の基準。見出しは sticky で既に基準になっているので、日のセルにだけ付ける
+     （見出しに relative を付けると横スクロールの固定が外れる） */
+  .e-sum-cell.is-selected {
+    position: relative;
+    z-index: 1;
+  }
+  /* 範囲選択に入っている必要人数のセル（スタッフ行のセルの is-in-range と同じ見た目） */
+  .e-sum-cell.is-in-range {
+    position: relative;
+  }
+  .e-sum-cell.is-in-range::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(25, 118, 210, 0.18);
+    pointer-events: none;
+  }
+  /* 打ち込み中の数字（スタッフ行のセルの .e-input と同じ見た目） */
+  .e-sum-head .e-input,
+  .e-sum-cell .e-input {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(227, 242, 253, 0.95);
+    color: #0d47a1;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    z-index: 2;
+  }
   .e-sum-cell.is-editable:hover {
     box-shadow: inset 0 0 0 2px #90a4ae;
   }
@@ -550,6 +594,25 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 範囲選択に入っているセル（#157）。勤務帯の背景色は inline なので、上に薄い青を重ねる */
+  /* カット中の元のセル（#166）。Excel の点線と同じく、貼るまでは囲むだけ */
+  .e-cell.is-cut-source::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border: 2px dashed #1976d2;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .e-cell.is-in-range::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(25, 118, 210, 0.18);
+    pointer-events: none;
+    z-index: 1;
+  }
+
   /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
   .e-cell .e-input {
     position: absolute;
@@ -778,6 +841,13 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 違反の印の当たり判定（ObjectView のラッパ span）。fullWidth で幅は枠いっぱいになるので、
+     高さも枠いっぱいに広げる。膜は細い帯に沿うよう角丸を小さくする */
+  .e-violation-hit {
+    height: 100%;
+    --object-view-film-radius: 2px;
+  }
+
   /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
      クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
      （ScheduleGridView 側のホバー検出を参照）。 */
@@ -891,7 +961,7 @@ export const StyledWrap = styled.div`
 
   /* 確定提案セル: 制約から一意に決まった値を「まだ入っていない」形で見せる。
      確定済みセルと同じ勤務帯色・同じ数字を使いつつ、薄く・破線で囲うことで
-     「承認すればこうなる」と読ませる（Tab で承認）。 */
+     「承認すればこうなる」と読ませる（Enter / Tab で承認）。 */
   .e-forced {
     .e-forced-value {
       display: inline-flex;
@@ -907,7 +977,7 @@ export const StyledWrap = styled.div`
       font-variant-numeric: tabular-nums;
     }
   }
-  /* 選択中は提案を少しはっきりさせる（今まさに Tab で承認できる場所） */
+  /* 選択中は提案を少しはっきりさせる（今まさに Enter / Tab で承認できる場所） */
   .e-forced.is-selected .e-forced-value {
     opacity: 0.75;
   }

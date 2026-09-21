@@ -14,16 +14,16 @@ export * from './schedule/WorkShift.js';
 export * from './schedule/WorkShiftSet.js';
 export * from './schedule/ShiftAssignment.js';
 export * from './schedule/resolveShiftInput.js';
+// セルのコピー・貼り付け（値のみ＝位置で / オブジェクトとして＝人と日で）
+export * from './schedule/cellClipboard.js';
 export * from './schedule/RequiredStaffing.js';
 export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
-// 操作履歴（ノウハウ可視化。勤務表ローカル世界線に相乗り）
+// 1つの手で制約違反がどう増減したか（候補集合・詰みの解消案で使う）
 export * from './schedule/ConstraintDelta.js';
-export * from './schedule/ScheduleEditEntry.js';
-export * from './schedule/ScheduleEditLog.js';
 
 // 責任者の宣言的ルール（集合のうち最低 minCount 人が勤務帯Xに入る ＝ ORルール）
 export * from './schedule/ShiftLeaderRule.js';
@@ -37,6 +37,8 @@ export * from './schedule/ConstraintSet.js';
 
 // 段階的な自動シフト（ステップ＝コマンド。共通型 AutoShiftStep に揃える）
 export * from './schedule/autoShiftStep.js';
+// そのセルにその値を置くと、勤務表の制約に新しい違反が出るか（自動シフトの置き場所の判定）
+export * from './schedule/placementCheck.js';
 export * from './schedule/fulfillWishesStep.js';
 export * from './schedule/fillDemandStep.js';
 export * from './schedule/fillDemandBalancedStep.js';

@@ -81,7 +81,7 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
       // （絞っていない人は元から入れるので、実際に足すのは絞っている人だけ）
       const newId = newWorkShiftId();
       updateSet((s) => s.addShift(WorkShift.of(newId, name, { hour: draft.hour })));
-      allowShiftForAll(newId, name);
+      allowShiftForAll(newId);
     } else {
       // 更新：改名と時刻変更をまとめて1インスタンスにして保存（1コミット）
       updateSet((s) => s.rename(id, name).changeStart(id, { hour: draft.hour }));

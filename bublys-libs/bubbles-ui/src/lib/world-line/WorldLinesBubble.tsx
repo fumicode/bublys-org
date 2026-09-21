@@ -44,12 +44,12 @@ export const WorldLinesBubble: FC = () => {
   // 操作: Cmd/Ctrl+Z / ← = 戻る, Cmd/Ctrl+Shift+Z / → = 進む, ↑↓ = 兄弟切替。
   const keyBindings = useMemo(
     () => [
-      { key: "z", meta: true, run: scope.moveBack },
-      { key: "z", meta: true, shift: true, run: scope.moveForward },
-      { key: "ArrowLeft", run: scope.moveBack },
-      { key: "ArrowRight", run: scope.moveForward },
-      { key: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
-      { key: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
+      { keys: "mod+z", run: scope.moveBack },
+      { keys: "mod+shift+z", run: scope.moveForward },
+      { keys: "ArrowLeft", run: scope.moveBack },
+      { keys: "ArrowRight", run: scope.moveForward },
+      { keys: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
+      { keys: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
     ],
     [scope],
   );

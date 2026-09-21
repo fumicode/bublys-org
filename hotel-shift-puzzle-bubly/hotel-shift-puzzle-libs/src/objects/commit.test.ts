@@ -276,7 +276,7 @@ describe("過去のノードから編集したとき（分岐）", () => {
     const graph = store.getState().worldLineGraph.graphs[LOCAL];
     const added = Object.keys(graph.nodes).filter((id) => !before.includes(id));
 
-    // 起点の子が1つだけ増える。EditLog の起点ノードが差し込まれて2つ増えてはいけない
+    // 起点の子が1つだけ増える。後から登場した型の起点ノードが差し込まれて2つ増えてはいけない
     expect(added).toHaveLength(1);
     expect(graph.nodes[added[0]].parentId).toBe(rootId);
     // 最初の編集の続きになっていない（＝ちゃんと分岐している）

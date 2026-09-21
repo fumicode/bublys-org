@@ -23,6 +23,7 @@ import {
   EARLY_COL_WIDTH,
   EARLY_SHIFT_NAME,
   DEMAND_CELL_KEY_PREFIX,
+  requiredCellKey,
 } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
@@ -36,8 +37,17 @@ import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
-import { useCellKeyboardEditing } from "./schedule-grid/useCellKeyboardEditing.js";
-import type { CellSelection, EditingRequired } from "./schedule-grid/types.js";
+import {
+  useCellKeyboardEditing,
+  type ApproveDirection,
+} from "./schedule-grid/useCellKeyboardEditing.js";
+import type {
+  CellChange,
+  CellClipboardHandlers,
+  CellSelection,
+  EditingRequired,
+  RequiredChange,
+} from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
   schedule: MonthlyStaffSchedule;
@@ -78,10 +88,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
-  /** セルの勤務割当を変更する */
-  onChangeCell: (staffId: string, day: WorkingDay, to: ShiftCell) => void;
-  /** 必要スタッフ数を変更する（その日・その勤務帯名） */
-  onChangeRequired?: (day: WorkingDay, shiftName: string, count: number) => void;
+  /**
+   * セルの勤務割当を変更する。範囲選択でまとめて入れたときも1回で渡る（1回の操作＝世界線の1ノード）。
+   * 可能勤務帯に無い勤務帯のセルは除いてある。
+   */
+  onChangeCells: (changes: CellChange[]) => void;
+  /** 必要スタッフ数を変更する（その日・その勤務帯名）。範囲選択でまとめて入れたときも1回で渡る */
+  onChangeRequired?: (changes: { day: WorkingDay; shiftName: string; count: number }[]) => void;
   /** 必要スタッフ数を全稼働日にまとめて変更する（その勤務帯名） */
   onChangeRequiredAllDays?: (shiftName: string, count: number) => void;
   /**
@@ -104,6 +117,8 @@ type ScheduleGridViewProps = {
   /** feature 層と共有する現在セル。キーボード選択と同じ状態にする。 */
   selection?: CellSelection | null;
   onSelectionChange?: (selection: CellSelection | null) => void;
+  /** セルのコピー・カット・貼り付け（#166）。渡さなければ扱わない */
+  clipboard?: CellClipboardHandlers;
   /**
    * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
    * 確定済みセルには何も返さない。
@@ -111,7 +126,7 @@ type ScheduleGridViewProps = {
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
-   * セルに薄く描かれ、Tab で承認できる。
+   * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
    */
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
   /**
@@ -119,8 +134,16 @@ type ScheduleGridViewProps = {
    * 埋められないセルを抱えたまま作業が進むのを防ぐため、セル自身に描く。
    */
   isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
-  /** 選択セルの確定提案を承認する（Tab）。承認後のフォーカス移動は feature 層が決める。 */
-  onApproveForced?: (staffId: string, day: WorkingDay, cell: ShiftCell) => void;
+  /**
+   * 選択セルの確定提案を承認する（Enter＝"down" / Tab＝"right"）。
+   * その向きの次の提案セルへ選択を移したら true。false なら、その向きへ1マス動く。
+   */
+  onApproveForced?: (
+    staffId: string,
+    day: WorkingDay,
+    cell: ShiftCell,
+    direction: ApproveDirection
+  ) => boolean;
 };
 
 /**
@@ -169,7 +192,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
-  onChangeCell,
+  onChangeCells,
   onChangeRequired,
   onChangeRequiredAllDays,
   dayBubbleUrl,
@@ -181,6 +204,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   maxDayOffPerDay,
   selection,
   onSelectionChange,
+  clipboard,
   candidateHintOf,
   forcedCellOf,
   isDeadCell,
@@ -332,32 +356,69 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const getWishEntries = (staffId: string, day: WorkingDay) =>
     wishEntriesFor(wishByStaff, staffId, day, (name) => shiftByName.get(name));
 
-  // キーボード操作（セル選択・矢印移動・打ち込みでの勤務帯確定）はフックに委譲
+  // ----- 必要人数 -----
+  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
+  // 必要人数として選べる最大値（スタッフ総数まで）
+  const maxRequired = Math.max(staffList.length, 1);
+  const requiredEditable = !!(onChangeRequired || onChangeRequiredAllDays);
+  // キーボードのカーソルが入れる必要人数の行（勤務帯名）。責任者行・休み行は並べない＝飛ばす
+  const requiredShiftNames = requiredEditable
+    ? summaryRows.filter((r) => r.required).map((r) => r.label)
+    : [];
+
+  /** 必要人数を確定する。見出し（day が null）は全日まとめて、日のセルは1回にまとめて渡す */
+  const changeRequired = (changes: RequiredChange[]) => {
+    const perDay: { day: WorkingDay; shiftName: string; count: number }[] = [];
+    for (const { shiftName, day, count } of changes) {
+      if (day) perDay.push({ day, shiftName, count });
+      else onChangeRequiredAllDays?.(shiftName, count);
+    }
+    if (perDay.length > 0) onChangeRequired?.(perDay);
+  };
+
+  // キーボード操作（セル選択・矢印移動・打ち込みでの確定）はフックに委譲
   const kb = useCellKeyboardEditing({
     staffList,
     days,
     shiftOptions,
     staffGroup,
-    onChangeCell,
+    onChangeCells,
     selection,
     onSelectionChange,
     forcedCellOf,
     onApproveForced,
+    requiredShiftNames,
+    maxRequired,
+    onChangeRequiredCells: changeRequired,
+    clipboard,
+    onOpenRequiredList: (shiftName, day) => {
+      // カーソルのいるセルをアンカーに、今の値でメニューを開く（クリックと同じメニュー）
+      const anchor = kb.gridRef.current?.querySelector<HTMLElement>(
+        `[data-required-key="${requiredCellKey(shiftName, day?.key ?? null)}"]`
+      );
+      const row = summaryRows.find((r) => r.label === shiftName);
+      if (!anchor || !row?.required) return;
+      const dayIndex = day ? days.findIndex((d) => d.key === day.key) : 0;
+      setEditingRequired({
+        anchor,
+        shiftName,
+        day,
+        current: row.required(Math.max(dayIndex, 0)),
+      });
+    },
   });
 
-  // ----- 必要人数の編集メニュー -----
-  const [editingRequired, setEditingRequired] = useState<EditingRequired | null>(null);
-  // 必要人数として選べる最大値（スタッフ総数まで）
-  const maxRequired = Math.max(staffList.length, 1);
+  // メニューで選んだ値で確定する（ルール2：留まる）。範囲を選んでいれば範囲の全セルへ。
+  // 閉じたらキー操作へ戻れるようグリッドへフォーカス
   const applyRequired = (count: number) => {
-    if (editingRequired) {
-      if (editingRequired.day) {
-        onChangeRequired?.(editingRequired.day, editingRequired.shiftName, count);
-      } else {
-        onChangeRequiredAllDays?.(editingRequired.shiftName, count);
-      }
+    if (editingRequired && !kb.applyRequiredCount(count)) {
+      changeRequired([{ shiftName: editingRequired.shiftName, day: editingRequired.day, count }]);
     }
+    closeRequiredMenu();
+  };
+  const closeRequiredMenu = () => {
     setEditingRequired(null);
+    kb.gridRef.current?.focus();
   };
 
   const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
@@ -378,7 +439,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
-          onSelectCell={kb.selectCell}
+          onPressCell={kb.pressCell}
+          onDragToCell={kb.dragToCell}
+          isCutSource={clipboard?.isCutSource}
+          isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
@@ -420,7 +484,10 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           getWishEntries={getWishEntries}
           selection={kb.selection}
           inputBuffer={kb.inputBuffer}
-          onSelectCell={kb.selectCell}
+          onPressCell={kb.pressCell}
+          onDragToCell={kb.dragToCell}
+          isCutSource={clipboard?.isCutSource}
+          isInRange={kb.isInRange}
           onOpenEditor={kb.openEditor}
           violationUrl={violationUrl}
           selected={selectedStaffIds?.has(staff.id)}
@@ -447,7 +514,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         ref={kb.gridRef}
         tabIndex={0}
         role="grid"
+        // 打っている最中はショートカット（Ctrl/Cmd+Z の世界線移動など）にキーを奪わせない
+        data-text-editing={kb.editing ? "" : undefined}
         onKeyDown={kb.handleKeyDown}
+        onCopy={kb.handleCopy}
+        onCut={kb.handleCut}
+        onPaste={kb.handlePaste}
         onMouseOver={(e) => {
           const el = (e.target as HTMLElement).closest("[data-cell-key]");
           const key = el?.getAttribute("data-cell-key") ?? null;
@@ -565,11 +637,19 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             row={row}
             days={days}
             rowIndex={rowIndex}
-            editable={!!row.required && !!(onChangeRequired || onChangeRequiredAllDays)}
+            editable={!!row.required && requiredEditable}
             // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。
             // 人数の行（必要人数・休み）はどのロールを見ているときも充足を読み取る土台なので減光しない。
             dimmed={focusActive && !!row.ruleKey && !focusedRuleKeys.has(row.ruleKey)}
-            onEditRequired={setEditingRequired}
+            onPressCell={kb.pressCell}
+            isInRange={kb.isInRange}
+            onEditRequired={(params) => {
+              // クリックでもカーソルをそのセルに置いてからメニューを開く（居場所を揃える）
+              kb.selectRequired(params.shiftName, params.day);
+              setEditingRequired(params);
+            }}
+            selection={kb.selection}
+            inputBuffer={kb.selection?.kind === "required" ? kb.inputBuffer : null}
             leaderViolationUrl={leaderViolationUrl}
           />
         ))}
@@ -589,7 +669,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       <RequiredEditMenu
         editingRequired={editingRequired}
         maxRequired={maxRequired}
-        onClose={() => setEditingRequired(null)}
+        onClose={closeRequiredMenu}
         onApply={applyRequired}
       />
 

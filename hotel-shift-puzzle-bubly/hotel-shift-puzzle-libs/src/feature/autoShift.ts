@@ -9,16 +9,20 @@
  * 実行する。新しいコマンドが増えても UI は変更不要（リスト駆動）。
  */
 import {
+  ConstraintSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   WorkingStaffGroup,
   WorkShift,
   Staff,
+  DEFAULT_MIN_MONTHLY_DAY_OFF,
+  DEFAULT_MAX_DAY_OFF_PER_DAY,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type AutoShiftContext,
   type AutoShiftStepResult,
   type DecodedWish,
+  type ScheduleConstraint,
   type WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
@@ -116,8 +120,11 @@ export type AutoShiftParams = {
   wishByStaff: Map<string, StaffMonthlyShiftWish>;
   /** 可能勤務帯（無ければ全可） */
   staffGroup?: WorkingStaffGroup;
-  /** 連勤上限（既定 5） */
-  maxConsecutive?: number;
+  /**
+   * 勤務表の制約リスト（違反表示・候補集合と同じもの。scheduleConstraintsOf で組む）。
+   * 自動シフトは置くたびに、これに新しい違反が出ないかを見る（連勤・遅番明け・希望…）。
+   */
+  constraints?: ScheduleConstraint[];
   /**
    * 月の最低休日数。渡すと「必要人数を埋める」は先にこの日数の休みを確保してから埋める
    * （先に需要で埋め切ると空きセルが無くなって月◯日休めなくなるため）。
@@ -127,6 +134,27 @@ export type AutoShiftParams = {
   maxDayOffPerDay?: number;
 };
 
+/** 自動シフトが目指す休みの置き方（制約セットから取り出したもの） */
+export type AutoShiftLimits = Required<Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay">>;
+
+/**
+ * 制約セットから、自動シフトが「何日休みを置くか・1日何人まで休ませるか」を取り出す。
+ *
+ * これは守る制約ではなく**置く目標**（休みの段が何日ぶん置きにいくか）。守る制約
+ * （連勤・遅番明け…）は制約リスト（constraints）で渡し、ここには含めない。
+ *
+ * **自動シフトを呼ぶところは、必ずこれを `...limits` で渡す。** 呼び出しごとに手で書くと、
+ * 書き忘れた呼び出しだけが黙って既定値で走る（#158）。
+ * 制約セットがまだ読めていないときは、制約セットの既定値と同じ値を返す
+ * （制約バーが既定値の空セットを描くのと揃える）。
+ */
+export const autoShiftLimitsOf = (
+  constraints: ConstraintSet | undefined
+): AutoShiftLimits => ({
+  minDayOff: constraints?.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF,
+  maxDayOffPerDay: constraints?.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY,
+});
+
 /** params から各ステップ共通の文脈を組む（希望のデコード・可能勤務帯の述語化） */
 const buildContext = (params: AutoShiftParams): AutoShiftContext => {
   const {
@@ -134,7 +162,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     workShifts,
     wishByStaff,
     staffGroup,
-    maxConsecutive,
+    constraints,
     minDayOff,
     maxDayOffPerDay,
   } = params;
@@ -162,7 +190,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
         shiftNameById.get(shiftId),
         shiftIdByName
       ),
-    maxConsecutive,
+    constraints,
     minDayOff,
     maxDayOffPerDay,
   };

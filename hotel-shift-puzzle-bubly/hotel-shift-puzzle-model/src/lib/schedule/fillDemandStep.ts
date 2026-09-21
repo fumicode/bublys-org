@@ -27,7 +27,7 @@ import type {
   AutoShiftContext,
   AutoShiftStepResult,
 } from "./autoShiftStep.js";
-import { wouldExceedConsecutive, countWorkingByName } from "./autoShiftStep.js";
+import { canPlace, countWorkingByName } from "./autoShiftStep.js";
 import { placeMinDayOffs } from "./minDayOffStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
@@ -41,8 +41,6 @@ export const fillDemandStep: AutoShiftStep = {
     "先に各スタッフの休み（月◯日）を確保し、必要人数に足りない勤務帯へ勤務帯の並び順（早番→中番→遅番）に前から詰めます。需要を満たしたあとに残る空きセルも、入れる勤務帯へ入れて埋め切ります（未定を残さない）。人数が足りないと後ろの帯（遅番）が枯れやすい。休み希望の人は入れず、人間入力済みのセルも触りません。",
 
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
-    const max = ctx.maxConsecutive ?? 5;
-    const isAvailable = ctx.isAvailable ?? (() => true);
     let result = schedule;
     let assigned = 0;
 
@@ -71,8 +69,8 @@ export const fillDemandStep: AutoShiftStep = {
         // 不足分だけ、入れられる候補を貪欲に割り当てる
         for (const s of [...pool]) {
           if (remaining <= 0) break;
-          if (!isAvailable(s, shiftId, day)) continue;
-          if (wouldExceedConsecutive(result, s, day, max)) continue;
+          // 入れる帯か・勤務表の制約に新しい違反が出ないか（連勤・遅番明け…）
+          if (!canPlace(ctx, result, s, day, { kind: "work", shiftId })) continue;
           result = result.assignShift(s, day, shiftId);
           assigned++;
           pool.splice(pool.indexOf(s), 1);
@@ -88,9 +86,9 @@ export const fillDemandStep: AutoShiftStep = {
       for (const s of ctx.staffIds) {
         if (!result.isUndecided(s, day)) continue;
         if (ctx.preferenceOf(s, day).kind !== "neutral") continue; // 希望のある人は触らない
-        if (wouldExceedConsecutive(result, s, day, max)) continue; // 連勤上限は守る
         for (const [, shiftId] of ctx.shiftIdByName) {
-          if (!isAvailable(s, shiftId, day)) continue;
+          // 制約は帯によって答えが変わる（遅番明けは早番だけ駄目、など）ので帯ごとに見る
+          if (!canPlace(ctx, result, s, day, { kind: "work", shiftId })) continue;
           result = result.assignShift(s, day, shiftId);
           extra++;
           break;

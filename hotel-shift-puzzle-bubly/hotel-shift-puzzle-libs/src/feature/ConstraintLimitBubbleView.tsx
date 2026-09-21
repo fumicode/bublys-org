@@ -49,7 +49,7 @@ const ConstraintLimitBubbleViewBody: FC<ConstraintLimitBubbleViewProps> = ({
       // 読めないだけのものを上書きしないよう、揃うまでは入力欄を出さない
       onCommit={
         canEdit
-          ? (value) => commit((set) => spec.apply(set, value), spec.summary(value))
+          ? (value) => commit((set) => spec.apply(set, value))
           : undefined
       }
     />

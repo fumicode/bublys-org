@@ -1,9 +1,9 @@
-import { FC } from "react";
+import { FC, type MouseEvent } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { WorkingDay } from "../../domain/index.js";
 import type { SummaryRow as SummaryRowModel } from "./summaryModel.js";
-import type { EditingRequired } from "./types.js";
-import { demandCellKey } from "./constants.js";
+import type { CellSelection, EditingRequired } from "./types.js";
+import { demandCellKey, requiredCellKey } from "./constants.js";
 
 type SummaryRowProps = {
   row: SummaryRowModel;
@@ -20,6 +20,14 @@ type SummaryRowProps = {
   dimmed?: boolean;
   /** 必要人数編集メニューを開く */
   onEditRequired: (params: EditingRequired) => void;
+  /** キーボードのカーソル。この行の必要人数のセル（または見出し）にいれば枠を出す */
+  selection?: CellSelection | null;
+  /** カーソルのいる必要人数のセルで打ち込み中の数字（null は非入力） */
+  inputBuffer?: string | null;
+  /** Shift／Ctrl/Cmd＋クリック：範囲・飛び地の操作だけをする（メニューは開かない） */
+  onPressCell?: (cell: CellSelection, mods: { shiftKey: boolean; additive: boolean }) => void;
+  /** セルが範囲選択に入っているか */
+  isInRange?: (cell: CellSelection) => boolean;
   /**
    * 責任者行の未充足 ✕ から違反バブルを開くための URL を作る（ロールキー×稼働日）。
    * 違反が無い日は undefined。ダブルクリックで違反バブルを開く（ObjectView）。
@@ -42,9 +50,38 @@ export const SummaryRow: FC<SummaryRowProps> = ({
   editable,
   dimmed,
   onEditRequired,
+  selection,
+  inputBuffer = null,
+  onPressCell,
+  isInRange,
   leaderViolationUrl,
 }) => {
   const isFirst = rowIndex === 0;
+  // この行の必要人数のセル（dayKey が null なら見出し）にカーソルがいるか
+  const isCursorAt = (dayKey: string | null) =>
+    editable &&
+    selection?.kind === "required" &&
+    selection.shiftName === row.label &&
+    (selection.day?.key ?? null) === dayKey;
+  /** カーソルのいるセルに重ねる、打ち込み中の数字 */
+  const typed = (dayKey: string | null) =>
+    isCursorAt(dayKey) && inputBuffer !== null ? (
+      <span className="e-input">{inputBuffer}</span>
+    ) : null;
+  const selectedCls = (dayKey: string | null) => (isCursorAt(dayKey) ? " is-selected" : "");
+  const here = (day: WorkingDay): CellSelection => ({ kind: "required", shiftName: row.label, day });
+  const rangeCls = (day: WorkingDay) =>
+    editable && isInRange?.(here(day)) ? " is-in-range" : "";
+  /**
+   * 修飾キー付きのクリックは範囲・飛び地の操作だけにする（true を返す）。
+   * 修飾無しは false を返し、今までどおりメニューを開く
+   */
+  const pressOrEdit = (e: MouseEvent, day: WorkingDay): boolean => {
+    const additive = e.ctrlKey || e.metaKey;
+    if (!onPressCell || !(e.shiftKey || additive)) return false;
+    onPressCell(here(day), { shiftKey: e.shiftKey, additive });
+    return true;
+  };
   const firstCls = isFirst ? " is-first" : "";
   // 行は grid の直接の子（見出し＋各日セル＋右レール跨ぎ）なので、各セルへ同じクラスを付ける
   const dimCls = dimmed ? " is-dimmed" : "";
@@ -52,9 +89,10 @@ export const SummaryRow: FC<SummaryRowProps> = ({
   return (
     <>
       <div
-        className={`e-sum-head${firstCls}${dimCls}${editable ? " is-editable" : ""}`}
+        className={`e-sum-head${firstCls}${dimCls}${editable ? " is-editable" : ""}${selectedCls(null)}`}
         style={{ background: row.bg, color: row.fg }}
         role={editable ? "button" : undefined}
+        data-required-key={editable ? requiredCellKey(row.label, null) : undefined}
         title={editable ? `${row.label}の必要人数を全日まとめて設定` : undefined}
         onClick={
           editable
@@ -69,6 +107,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
         }
       >
         {row.label}
+        {typed(null)}
       </div>
 
       {days.map((day, i) => {
@@ -123,7 +162,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
               key={`sum:${row.key}:${day.key}`}
               className={`e-sum-cell is-ratio${firstCls}${dimCls}${met ? " is-met" : " is-under"}${
                 editable ? " is-editable" : ""
-              }`}
+              }${selectedCls(day.key)}${rangeCls(day)}`}
               style={{
                 background: `linear-gradient(to top, ${fill} ${pct}%, ${track} ${pct}%)`,
               }}
@@ -134,9 +173,11 @@ export const SummaryRow: FC<SummaryRowProps> = ({
               data-cell-key={
                 !met && row.shiftId ? demandCellKey(row.shiftId, day.key) : undefined
               }
+              data-required-key={editable ? requiredCellKey(row.label, day.key) : undefined}
               onClick={
                 editable
                   ? (e) =>
+                      pressOrEdit(e, day) ||
                       onEditRequired({
                         anchor: e.currentTarget,
                         shiftName: row.label,
@@ -148,6 +189,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             >
               <span className="e-cur">{n}</span>
               <span className="e-den">/{req}</span>
+              {typed(day.key)}
             </div>
           );
         }
@@ -161,8 +203,9 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             key={`sum:${row.key}:${day.key}`}
             className={`e-sum-cell${firstCls}${dimCls}${n === 0 ? " is-zero" : ""}${
               over ? " is-over" : ""
-            }${editable ? " is-editable" : ""}`}
+            }${editable ? " is-editable" : ""}${selectedCls(day.key)}${rangeCls(day)}`}
             role={editable ? "button" : undefined}
+            data-required-key={editable ? requiredCellKey(row.label, day.key) : undefined}
             title={
               over
                 ? `${row.label} ${day.label}: ${n}人（上限${row.warnOver}人を超過）`
@@ -173,6 +216,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             onClick={
               editable
                 ? (e) =>
+                    pressOrEdit(e, day) ||
                     onEditRequired({
                       anchor: e.currentTarget,
                       shiftName: row.label,
@@ -183,6 +227,7 @@ export const SummaryRow: FC<SummaryRowProps> = ({
             }
           >
             {n}
+            {typed(day.key)}
           </div>
         );
       })}

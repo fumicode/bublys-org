@@ -22,6 +22,21 @@ describe("orderForcedCells", () => {
     ]);
   });
 
+  it("column（Enter＝下）は稼働日順 → スタッフ行順に並べる（列を下へ読み、次の列へ）", () => {
+    const ordered = orderForcedCells(
+      [forced("s2", 1), forced("s1", 5), forced("s1", 2), forced("s1", 1)],
+      ["s1", "s2"],
+      "column"
+    );
+
+    expect(ordered.map((c) => `${c.staffId}:${c.day.day}`)).toEqual([
+      "s1:1",
+      "s2:1",
+      "s1:2",
+      "s1:5",
+    ]);
+  });
+
   it("行順に無いスタッフは末尾に置く（消えない）", () => {
     const ordered = orderForcedCells([forced("unknown", 1), forced("s1", 9)], ["s1"]);
 

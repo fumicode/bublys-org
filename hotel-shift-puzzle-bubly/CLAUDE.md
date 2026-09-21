@@ -83,7 +83,7 @@ hotel-shift-puzzle-app/src/
     **codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す**
   - 副産物としてクラス図も正しくなる（`members: WorkingStaffMember[]` と出る）
   - 子を持つ集約は全部この形になっている：`Schedule` / `WorkingStaffGroup` /
-    `WorkShiftSet` / `ConstraintSet` / `ScheduleEditLog`
+    `WorkShiftSet` / `ConstraintSet`
   - **例外は worker 境界を越える DTO**（`CellCandidateEvaluation` / `ScheduleRepair` /
     `CandidateRequest`）。structured clone で渡すので plain でなければならない。
     渡す直前に `toPlain()` する
@@ -121,7 +121,7 @@ hotel-shift-puzzle-app/src/
 
 | 分類 | 意味 | 例 |
 |---|---|---|
-| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ConstraintSet(勤務表用) / ScheduleEditLog |
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ConstraintSet(勤務表用) |
 | `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
 | `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
 
@@ -192,6 +192,20 @@ id で本籍が変わる型（グローバル固定IDのときは本籍なし）
 以前あった restore（ローカルの状態をアプリ全体スコープへ書き戻す橋渡し）は撤去した。
 世界線ビューは共通の `WorldLineScopeView`（既定 `onSelectNode` ＋ `moveToSiblingBranch`）を
 そのまま使う。囲碁など他のバブリと同じ形。
+
+### 世界線に載せるのはドメインの状態だけ
+
+世界の同一性は、そのノードに載っている**全オブジェクトのハッシュ**で決まる。同じ状態に
+戻したら新しい世界を作らず既存の世界へ戻る（打ち消しスナップ）のは、これが一致するから。
+
+**編集のたびに必ず変わるもの（時刻入りの操作ログなど）を同じノードに載せてはいけない。**
+中身を元に戻しても世界全体のハッシュが二度と一致せず、世界線が伸び続ける。
+以前は操作履歴（`ScheduleEditLog`）を勤務表と同じノードに積んでいて、セルを A→B→A と
+戻しても元の世界へ戻れなかった（#137 / #155）。操作履歴は撤去した（#154）。
+`objects/scopeGrowth.test.ts` が「A→B→A で元のノードへ戻る」を見張る。
+
+撤去した型の参照は、古い世界線にそのまま残る（読まれないだけで害は無い）。
+世界線3Dビューはそれを「立場が分からない」（`null`）と描く。
 
 ### 世界線ビューアに答える（`objects/worldLineViewQueries.ts`）
 
@@ -329,7 +343,34 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 | 人が外れる | 責任者候補から外す（`ConstraintSet.removeStaff`） | どう埋めても満たせない日ができる |
 
 組み立ては純粋関数 `buildMembershipChange`（React も store も通さない＝テストで固定できる）、
-記録は `recordMembershipEdit`（`saveLocalBundle` で1ノード＋操作履歴に `membershipEdit` を積む）。
+記録は `recordMembershipEdit`（`saveLocalBundle` で1ノード）。
+
+---
+
+## 自動シフトが置けるのは、候補集合に載る値だけ
+
+「完成案を作る」「必要人数を埋める」「希望を叶える」の各ステップは、セルに値を置くたびに
+**「置いても、勤務表の制約に新しい違反が出ないか」**を見る（`schedule/autoShiftStep.ts` の `canPlace`
+→ `schedule/placementCheck.ts` の `introducesViolation`）。候補集合と同じ判定なので、
+「候補に出ない値を自動シフトが置く」「候補に出る値を自動シフトが避ける」が起きない。
+
+- **見る制約リストは違反表示と同じもの。** `feature/scheduleConstraints.ts` の `scheduleConstraintsOf`
+  で組み、赤線・違反バブル・自動シフトの全部に渡す。別々に組むと「画面は違反と言うのに自動シフトは
+  それを作る」がずれて起きる
+- **ステップに制約ごとの判定を書かない。** 連勤・遅番明け・休日・希望…を名指しすると、名指しし忘れた
+  制約だけが自動シフトから漏れる（実際に遅番明けが漏れていた＝#161）。制約を足したら、リストに
+  入るだけで自動シフトも守る
+- **希望より制約を優先する。** 違反になる希望は入れずに未定のまま残し、件数を結果メッセージで知らせる
+- 「まだ足りない」を表す制約（必要人数・責任者）は、空きを埋めても新しい違反にはならないので妨げない
+- `autoShiftLimitsOf` が渡すのは休みを**何日置くか**という目標（`minDayOff` / `maxDayOffPerDay`）で、
+  守る制約ではない
+
+### 重さ
+
+1手ごとに盤面全体をチェックすると遅すぎる（完成案3案で約2秒）。`introducesViolation` は制約の `scope`
+（`affectedCells` と同じ前提）でスタッフ／日に絞った勤務表の上で前後を比べ、判定を**絞った割当の中身**
+をキーに覚えておく。**scope の宣言が実態より狭いと答えが変わる**ので、新しい制約は `check()` が読む範囲を
+正しく宣言すること（`placementCheck.test.ts` が「絞った判定＝盤面全体の判定」を見張る）。
 
 ---
 
