@@ -1,0 +1,818 @@
+/**
+ * カメラ・ピッキング・配色を固定する。
+ *
+ * 「見えている絵が正しい」をテストで担保できることが、OrbitControls / Raycaster を
+ * 使わずに自前で持っている理由そのもの。ここが緩むと自前にした意味が無くなる。
+ */
+import { WorldLineGraph } from '../../domain/WorldLineGraph.js';
+import { createStateRef } from '../../domain/StateRef.js';
+import { computeStateHash } from '../../domain/StateHash.js';
+import { computeWorldLine3DLayout, cellCenterWorld } from './layout3d.js';
+import { changedBoxTransform } from './geometry.js';
+import { CELL_PITCH_PX, GUTTER_PX, paintPlate, plateCanvasSize } from './plateCanvas.js';
+import { DEFAULT_LAYOUT_3D_OPTIONS } from './types.js';
+import {
+  ACTION_COLOR,
+  PALETTE_3D,
+  ROLE_COLOR,
+  cellStyle,
+  worldLineColor,
+} from './palette3d.js';
+import {
+  ORBIT_PRESETS,
+  applyDrag,
+  applyWheel,
+  clampOrbit,
+  fitOrbit,
+  orbitToPosition,
+  wheelAction,
+  PITCH_LIMIT,
+  type Orbit,
+} from './camera.js';
+import { applyPan, cameraBasis, projectExtent } from './camera.js';
+import type { Plate3D, Vec3 } from './types.js';
+import { LOCATION_MARK } from '../refLocation.js';
+import { buildSlotMap } from './slots.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { isClick, ndcFromPointer, pickPlate, screenToRay } from './picking.js';
+
+const h = (v: unknown) => computeStateHash(v);
+const ref = (type: string, id: string, v: unknown) => createStateRef(type, id, h(v));
+
+// ---------------------------------------------------------------------------
+// 板の絵を、本物の canvas 抜きで確かめる道具
+// ---------------------------------------------------------------------------
+type Op = {
+  op: string;
+  alpha: number;
+  fill: string;
+  stroke: string;
+  /** fillRect の引数。下地（全面）・行の帯（幅3）・セル（幅20）を取り違えないため */
+  rect?: [number, number, number, number];
+  text?: string;
+};
+function fakeCanvas() {
+  const ops: Op[] = [];
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textBaseline: '',
+    clearRect: (x: number, y: number, w: number, h: number) =>
+      ops.push({ ...rec('clearRect'), rect: [x, y, w, h] }),
+    fillRect: (x: number, y: number, w: number, h: number) =>
+      ops.push({ ...rec('fillRect'), rect: [x, y, w, h] }),
+    strokeRect: () => ops.push(rec('strokeRect')),
+    fillText: (t: string, x: number, y: number) =>
+      ops.push({ ...rec('fillText'), text: t, rect: [x, y, 0, 0] }),
+    beginPath: () => undefined,
+    closePath: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    arc: () => undefined,
+    stroke: () => ops.push(rec('stroke')),
+    fill: () => ops.push(rec('fill')),
+  };
+  const rec = (op: string): Op => ({
+    op,
+    alpha: ctx.globalAlpha,
+    fill: String(ctx.fillStyle),
+    stroke: String(ctx.strokeStyle),
+  });
+  return {
+    ops,
+    canvas: { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement,
+  };
+}
+
+const plateOf = (over: Partial<Plate3D> = {}): Plate3D => ({
+  scopeId: 'app',
+  nodeId: 'n1',
+  origin: [0, 0, 0],
+  extentY: 4,
+  extentZ: 14,
+  cols: 2,
+  rows: 2,
+  depth: 0,
+  isApex: false,
+  isRoot: false,
+  timestamp: 0,
+  cells: [
+    {
+      key: 'Schedule:x',
+      type: 'Schedule',
+      id: 'x',
+      hash: 'h1',
+      slot: { col: 0, row: 0 },
+      action: 'unchanged',
+      inChangedRefs: false,
+      nestedScopeId: 'Schedule:x',
+      nestedShown: true,
+      role: null,
+      outside: null,
+    },
+  ],
+  ...over,
+});
+const cellOf = (over: Partial<Plate3D['cells'][number]> = {}) => ({
+  ...plateOf().cells[0],
+  ...over,
+});
+
+
+describe('camera', () => {
+  const bounds = { min: [0, 0, 0] as const, max: [100, 20, 10] as const };
+
+  it('既定（front view）は X が画面右、Y が画面上になる向き', () => {
+    const o = fitOrbit(bounds, 16 / 9, 45, 0, 0);
+    const pos = orbitToPosition(o);
+    // yaw=0, pitch=0 → target の +Z 側に立って -Z を向く
+    expect(pos[0]).toBeCloseTo(o.target[0], 9);
+    expect(pos[1]).toBeCloseTo(o.target[1], 9);
+    expect(pos[2]).toBeGreaterThan(o.target[2]);
+  });
+
+  it('全体が収まる距離になる（縦にも横にもはみ出さない）', () => {
+    const o = fitOrbit(bounds, 16 / 9, 45);
+    const fov = (45 * Math.PI) / 180;
+    const halfH = Math.tan(fov / 2) * o.distance;
+    const halfW = halfH * (16 / 9);
+    expect(halfH * 2).toBeGreaterThanOrEqual(bounds.max[1] - bounds.min[1]);
+    expect(halfW * 2).toBeGreaterThanOrEqual(bounds.max[0] - bounds.min[0]);
+  });
+
+  /**
+   * ★ 図は時間軸に極端に長い（板12枚で 170、分岐と入れ子は 10 前後）。
+   * 外接球で合わせると**最長軸が全部の向きの距離を決めてしまう**ので、
+   * 板を正対で見る向きでは図が画面の1割に縮み、セルが数ピクセルになって読めない。
+   * 見かけの大きさ（視線に垂直な断面）で合わせること。
+   */
+  it('細長い図でも、一番手前が画面いっぱいに写る（余白を作らない）', () => {
+    const long = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const half: Vec3 = [200, 10, 5];
+    const fov = (45 * Math.PI) / 180;
+
+    for (const [pitch, yaw] of [
+      [0, Math.PI / 2], // 板：長辺が視線方向に寝る
+      [0.3, 1.05], // 斜め
+      [0.15, 0], // 年表：長辺が画面の横
+    ]) {
+      const o = fitOrbit(long, 16 / 9, 45, pitch, yaw);
+      const { right, up, forward } = cameraBasis(yaw, pitch);
+      // 一番手前の隅の位置で、画面の高さ or 幅のどちらかが埋まっていること
+      const near = o.distance - projectExtent(half, forward);
+      const halfH = Math.tan(fov / 2) * near;
+      const fill = Math.max(
+        projectExtent(half, up) / halfH,
+        projectExtent(half, right) / (halfH * (16 / 9))
+      );
+      expect(fill).toBeGreaterThan(0.9);
+    }
+  });
+
+  it('外接球で合わせるより近づく（同じ図でも見かけが大きくなる）', () => {
+    const long = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const sphere = (Math.hypot(400, 20, 10) / 2 / Math.sin(((45 * Math.PI) / 180) / 2)) * 1.02;
+    for (const [pitch, yaw] of [
+      [0, Math.PI / 2],
+      [0.15, 0],
+    ]) {
+      expect(fitOrbit(long, 16 / 9, 45, pitch, yaw).distance).toBeLessThan(sphere);
+    }
+  });
+
+  it('どの向きから合わせても、箱は画面に収まる', () => {
+    const box = { min: [0, 0, 0] as const, max: [400, 20, 10] as const };
+    const half: Vec3 = [200, 10, 5];
+    const center = [200, 10, 5];
+    for (const yaw of [0, 0.7, Math.PI / 2, 2.6, -1.3]) {
+      for (const pitch of [0, 0.35, 1.2]) {
+        const o = fitOrbit(box, 16 / 9, 45, pitch, yaw);
+        const { right, up, forward } = cameraBasis(yaw, pitch);
+        const fov = (45 * Math.PI) / 180;
+        // 一番手前の隅（＝一番大きく写る）で確かめる
+        const depth = o.distance - projectExtent(half, forward);
+        const halfH = Math.tan(fov / 2) * depth;
+        const halfW = halfH * (16 / 9);
+        expect(halfH).toBeGreaterThanOrEqual(projectExtent(half, up));
+        expect(halfW).toBeGreaterThanOrEqual(projectExtent(half, right));
+        expect(o.target).toEqual(center);
+      }
+    }
+  });
+
+  it('仰角と距離は必ずクランプされる（真上を越えて反転しない）', () => {
+    const o = clampOrbit({ target: [0, 0, 0], yaw: 0, pitch: 99, distance: 1e9 });
+    expect(o.pitch).toBeCloseTo(PITCH_LIMIT, 9);
+    expect(o.distance).toBeLessThanOrEqual(20000);
+    expect(clampOrbit({ ...o, distance: 0 }).distance).toBeGreaterThan(0);
+  });
+
+  it('ホイールの意味: 素＝ズーム、shift＝時間パン、横スクロール＝時間パン', () => {
+    expect(wheelAction({ deltaX: 0, deltaY: 10, ctrlKey: false, metaKey: false, shiftKey: false }).kind).toBe('zoom');
+    expect(wheelAction({ deltaX: 0, deltaY: 10, ctrlKey: false, metaKey: false, shiftKey: true }).kind).toBe('panTime');
+    expect(wheelAction({ deltaX: 30, deltaY: 2, ctrlKey: false, metaKey: false, shiftKey: false }).kind).toBe('panTime');
+  });
+
+  it('時間パンは target.x しか動かさない（時間軸に沿って移動する）', () => {
+    const o: Orbit = { target: [10, 5, -3], yaw: 0.2, pitch: 0.3, distance: 50 };
+    const moved = applyWheel(o, { kind: 'panTime', amount: 100 });
+    expect(moved.target[1]).toBe(o.target[1]);
+    expect(moved.target[2]).toBe(o.target[2]);
+    expect(moved.target[0]).not.toBe(o.target[0]);
+    expect(moved.distance).toBe(o.distance);
+  });
+
+  it('ズームは距離だけを変え、注視点は動かさない', () => {
+    const o: Orbit = { target: [10, 5, -3], yaw: 0, pitch: 0, distance: 50 };
+    const zoomed = applyWheel(o, { kind: 'zoom', amount: -200 });
+    expect(zoomed.target).toEqual(o.target);
+    expect(zoomed.distance).toBeLessThan(o.distance);
+  });
+
+  it('ドラッグで回しても仰角は限界を超えない', () => {
+    let o: Orbit = { target: [0, 0, 0], yaw: 0, pitch: 0, distance: 10 };
+    for (let i = 0; i < 200; i++) o = applyDrag(o, 0, 50);
+    expect(Math.abs(o.pitch)).toBeLessThanOrEqual(PITCH_LIMIT);
+  });
+
+  it('プリセットはどれも仰角の限界内', () => {
+    for (const p of Object.values(ORBIT_PRESETS)) {
+      expect(Math.abs(p.pitch)).toBeLessThanOrEqual(PITCH_LIMIT);
+    }
+  });
+});
+
+describe('picking', () => {
+  it('NDC は rect の比だけで決まる（CSS scale が掛かっても同じ）', () => {
+    const a = ndcFromPointer(150, 100, { left: 100, top: 50, width: 200, height: 100 });
+    // 奥のレイヤーで 0.8 倍に縮んだ状態（rect も原点も縮む）
+    const b = ndcFromPointer(120, 80, { left: 80, top: 40, width: 160, height: 80 });
+    expect(a.x).toBeCloseTo(b.x, 9);
+    expect(a.y).toBeCloseTo(b.y, 9);
+  });
+
+  it('中心は (0,0)、左上は (-1,+1)', () => {
+    const rect = { left: 0, top: 0, width: 200, height: 100 };
+    const center = ndcFromPointer(100, 50, rect);
+    expect(center.x).toBeCloseTo(0, 9);
+    expect(center.y).toBeCloseTo(0, 9);
+    expect(ndcFromPointer(0, 0, rect)).toEqual({ x: -1, y: 1 });
+  });
+
+  it('クリックとドラッグを区別する', () => {
+    expect(isClick({ x: 0, y: 0, t: 0 }, { x: 2, y: 2, t: 100 })).toBe(true);
+    expect(isClick({ x: 0, y: 0, t: 0 }, { x: 50, y: 0, t: 100 })).toBe(false); // 動きすぎ
+    expect(isClick({ x: 0, y: 0, t: 0 }, { x: 0, y: 0, t: 900 })).toBe(false); // 長すぎ
+  });
+
+  it('板の中心を通るレイは、その板に当たる', () => {
+    const g = WorldLineGraph.empty().grow([ref('A', 'a', 1)]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const hit = pickPlate(
+      { origin: [plate.origin[0] + 100, plate.origin[1], plate.origin[2]], dir: [-1, 0, 0] },
+      layout.plates,
+      DEFAULT_LAYOUT_3D_OPTIONS.cellPitch
+    );
+    expect(hit).toMatchObject({ scopeId: 'app', nodeId: plate.nodeId });
+  });
+
+  it('★ どのセルも、その中心を通るレイで自分自身が返る（席の逆引きの往復）', () => {
+    // 型を跨いで席を配ると行が折り返して歯抜けになる。式で引くとここがずれる
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Staff', 's2', 2),
+      ref('Staff', 's3', 3),
+      ref('Schedule', 'x', 4),
+      ref('Log', 'l1', 5),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const o = DEFAULT_LAYOUT_3D_OPTIONS;
+    for (const cell of plate.cells) {
+      // 式を書き写さない。layout が使うのと同じ関数でセル中心を出す
+      const [, cy, cz] = cellCenterWorld(plate, cell.slot, o.cellPitch);
+      const hit = pickPlate(
+        { origin: [plate.origin[0] + 50, cy, cz], dir: [-1, 0, 0] },
+        layout.plates,
+        o.cellPitch
+      );
+      expect(hit?.cellKey).toBe(cell.key);
+    }
+  });
+
+  it('板の裏側（後ろ向きのレイ）は拾わない', () => {
+    const g = WorldLineGraph.empty().grow([ref('A', 'a', 1)]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const hit = pickPlate(
+      { origin: [plate.origin[0] + 100, plate.origin[1], plate.origin[2]], dir: [1, 0, 0] },
+      layout.plates,
+      1.3
+    );
+    expect(hit).toBeNull();
+  });
+
+  it('手前の板を優先する（奥のを貫通して拾わない）', () => {
+    const g = WorldLineGraph.empty().grow([ref('A', 'a', 1)]).grow([ref('A', 'a', 2)]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const sorted = [...layout.plates].sort((a, b) => a.origin[0] - b.origin[0]);
+    const far = sorted[0];
+    const near = sorted[1];
+    const hit = pickPlate(
+      { origin: [near.origin[0] + 100, near.origin[1], near.origin[2]], dir: [-1, 0, 0] },
+      layout.plates,
+      1.3
+    );
+    expect(hit?.nodeId).toBe(near.nodeId);
+    expect(hit?.nodeId).not.toBe(far.nodeId);
+  });
+
+  it('カメラ中心のレイは注視点の方を向く', () => {
+    const ray = screenToRay({ x: 0, y: 0 }, [0, 0, 100], [0, 0, 0], 45, 1.5);
+    expect(ray.dir[2]).toBeLessThan(0);
+    expect(Math.abs(ray.dir[0])).toBeLessThan(1e-9);
+  });
+});
+
+describe('席割り', () => {
+  it('★ 実際に埋まった列数だけ確保する（折り返しの上限まで広げない）', () => {
+    // 上限8だが、型が3つで各1個なら列は1つしか使わない
+    const map = buildSlotMap(
+      [
+        { type: 'A', key: 'A:a' },
+        { type: 'B', key: 'B:b' },
+        { type: 'C', key: 'C:c' },
+      ],
+      8
+    );
+    expect(map.cols).toBe(1);
+    expect(map.rows).toBe(3);
+  });
+
+  it('折り返すときは上限まで使う', () => {
+    const keys = Array.from({ length: 10 }, (_, i) => ({ type: 'A', key: `A:${i}` }));
+    const map = buildSlotMap(keys, 4);
+    expect(map.cols).toBe(4);
+    expect(map.rows).toBe(3); // 4 + 4 + 2
+  });
+
+  it('空でも 1 列 1 行は確保する（0 で割らないため）', () => {
+    const map = buildSlotMap([], 8);
+    expect(map.cols).toBe(1);
+    expect(map.rows).toBe(1);
+  });
+});
+
+describe('applyPan — shift+ドラッグで視点を滑らせる', () => {
+  const base = { target: [10, 2, -3] as Vec3, yaw: 1.05, pitch: 0.3, distance: 40 };
+
+  it('回さないしズームもしない（注視点だけ動く）', () => {
+    const p = applyPan(base, 30, -20, 800);
+    expect(p.yaw).toBe(base.yaw);
+    expect(p.pitch).toBe(base.pitch);
+    expect(p.distance).toBe(base.distance);
+    expect(p.target).not.toEqual(base.target);
+  });
+
+  it('★ 視線方向には動かない（奥行きが変わったら「平行移動」ではない）', () => {
+    for (const [yaw, pitch] of [
+      [0, 0],
+      [1.05, 0.3],
+      [Math.PI / 2, 0.08],
+      [-2.2, -0.7],
+    ]) {
+      const o = { ...base, yaw, pitch };
+      const p = applyPan(o, 37, -13, 800);
+      const { forward } = cameraBasis(yaw, pitch);
+      const d: Vec3 = [
+        p.target[0] - o.target[0],
+        p.target[1] - o.target[1],
+        p.target[2] - o.target[2],
+      ];
+      expect(d[0] * forward[0] + d[1] * forward[1] + d[2] * forward[2]).toBeCloseTo(0, 9);
+    }
+  });
+
+  it('横だけドラッグしたら高さは変わらない（画面の右に沿って動く）', () => {
+    const p = applyPan(base, 50, 0, 800);
+    expect(p.target[1]).toBeCloseTo(base.target[1], 9);
+    // 板を正対で見る向きでも、横ドラッグはちゃんと横（Z）に効く。
+    // ワールドXに沿わせると、この向きで横に動かなくなる
+    const plates = applyPan({ ...base, yaw: Math.PI / 2, pitch: 0 }, 50, 0, 800);
+    expect(Math.abs(plates.target[2] - base.target[2])).toBeGreaterThan(1);
+  });
+
+  it('掴んだ景色が指についてくる（注視点は指と逆へ動く）', () => {
+    // yaw=0 なら画面の右＝ワールド +X。右へドラッグ＝景色が右へ＝注視点は -X
+    const p = applyPan({ ...base, yaw: 0, pitch: 0 }, 50, 0, 800);
+    expect(p.target[0]).toBeLessThan(base.target[0]);
+  });
+
+  it('引くほど1pxが大きく効く（距離に比例。しないと遠景で動かなくなる）', () => {
+    const near = applyPan({ ...base, distance: 10 }, 50, 0, 800);
+    const far = applyPan({ ...base, distance: 100 }, 50, 0, 800);
+    const move = (p: typeof near) => Math.abs(p.target[0] - base.target[0]);
+    expect(move(far)).toBeCloseTo(move(near) * 10, 6);
+  });
+});
+
+/**
+ * ★ セルの位置を出す式は layout3d の1箇所だけ、という規律の見張り。
+ *
+ * これが無かったせいで scene.ts が式を書き写し、ラベル帯と型名欄のぶんだけ
+ * 「変更の箱」だけが板の絵の ■ からずれていた。scene.ts は three を静的 import
+ * するので Jest から読み込めない＝振る舞いのテストが書けない。
+ * だから**書き写しそのもの**を禁じる。
+ */
+describe('セルの座標の出所', () => {
+  /**
+   * ★ 正規表現の見張りは「前回の綴り」しか禁じられない（変数名を変えて書き戻す変異は
+   *   素通りした）。**数値で固定できる純粋関数に切り出すほうが強い。**
+   *   scene.ts は姿勢を自分で計算せず、この関数を呼ぶだけにしてある。
+   */
+  it('出来事の箱は、板の絵の ■ と同じ場所に立つ', () => {
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Staff', 's2', 2),
+      ref('Schedule', 'x', 3),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const o = DEFAULT_LAYOUT_3D_OPTIONS;
+
+    for (const cell of plate.cells) {
+      const box = changedBoxTransform(plate, cell.slot, o, o.changedThickness);
+      const [, y, z] = cellCenterWorld(plate, cell.slot, o.cellPitch);
+      // Y と Z は板の上のセル中心そのもの
+      expect(box.position[1]).toBeCloseTo(y, 9);
+      expect(box.position[2]).toBeCloseTo(z, 9);
+      // X は板の面から**過去側**へ。未来側へ出すと次の板とぶつかる
+      expect(box.position[0]).toBeLessThan(plate.origin[0]);
+      expect(box.position[0]).toBeCloseTo(
+        plate.origin[0] - o.plateThickness / 2 - o.changedThickness / 2,
+        9
+      );
+      // 一辺は板の絵の ■ と同じ
+      expect(box.scale[1]).toBe(o.cell);
+      expect(box.scale[2]).toBe(o.cell);
+    }
+  });
+
+  it('scene.ts はセルの位置を自分で計算しない（共有の関数を呼ぶ）', () => {
+    const src = readFileSync(join(__dirname, 'scene.ts'), 'utf-8');
+    expect(src).toMatch(/changedBoxTransform\s*\(/);
+    // 手書きの式が無いこと（綴りを変えた書き戻しは上の数値テストが捕まえる）
+    expect(src).not.toMatch(/cellPitch\s*\*\s*\(/);
+    expect(src).not.toMatch(/extent[YZ]\s*\/\s*2\s*-\s*opts\.cellPitch/);
+  });
+
+  /**
+   * three を静的に import したファイルは Jest（jsdom）から読み込めない。
+   * 1本でも漏れると、そのファイルに触るテストが全部落ちる＝**検査できる領域が静かに縮む**。
+   */
+  it("'three' を静的 import してよいのは scene.ts だけ", () => {
+    const offenders = readdirSync(__dirname)
+      .filter((f) => /\.tsx?$/.test(f) && !f.endsWith('.test.ts') && !f.endsWith('.test.tsx'))
+      .filter((f) =>
+        /^\s*import\s+(?!type\b)[^;]*from\s+['"]three['"]/m.test(
+          readFileSync(join(__dirname, f), 'utf-8')
+        )
+      );
+    expect(offenders).toEqual(['scene.ts']);
+  });
+});
+
+describe('palette3d', () => {
+  it('色は「何が起きたか」で決まる（作られた=白 / 変わった=黄 / 消された=赤）', () => {
+    expect(cellStyle({ action: 'created' }, 'memory', 2.4).color).toBe(ACTION_COLOR.created);
+    expect(cellStyle({ action: 'changed' }, 'memory', 2.4).color).toBe(ACTION_COLOR.changed);
+    expect(cellStyle({ action: 'deleted' }, 'memory', 2.4).color).toBe(ACTION_COLOR.deleted);
+  });
+
+  it('出来事のあったセルだけ厚みと縁を持ち、何も起きていないセルは薄い', () => {
+    const still = cellStyle({ action: 'unchanged' }, 'memory', 2.4);
+    const made = cellStyle({ action: 'created' }, 'memory', 2.4);
+    expect(still.thickness).toBe(0);
+    expect(still.ring).toBe(false);
+    expect(made.thickness).toBeGreaterThan(0);
+    expect(made.ring).toBe(true);
+    expect(still.opacity).toBeLessThan(made.opacity);
+  });
+
+  it('消されたセルは墓標。厚みは持たない（消えたものが手前に飛び出さない）', () => {
+    const s = cellStyle({ action: 'deleted' }, 'memory', 2.4);
+    expect(s.thickness).toBe(0);
+    expect(s.tombstone).toBe(true);
+  });
+
+  it('値の所在は色相ではなく明るさに効く（出来事の色を潰さない）', () => {
+    const inMemory = cellStyle({ action: 'changed' }, 'memory', 2.4);
+    const lost = cellStyle({ action: 'changed' }, 'lost', 2.4);
+    expect(lost.color).toBe(inMemory.color); // 色相は同じ
+    expect(lost.opacity).toBeLessThan(inMemory.opacity); // 薄くなる
+  });
+
+  it('世界線の色は決定的', () => {
+    expect(worldLineColor('abc')).toBe(worldLineColor('abc'));
+    expect(worldLineColor('abc')).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+});
+
+describe('板の絵と 3D の格子が同じ位置にあること（レビューで見つかった嘘の再発防止）', () => {
+  // 絵（キャンバス）と、厚みの箱・当たり判定が別々の格子に乗っていて、
+  // クリックしたセルと違うセルが右パネルに出ていた。両者が1つの値から導かれることを固定する。
+  it('キャンバスの縦横比が板の縦横比と一致する', () => {
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Schedule', 'x', 2),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const size = plateCanvasSize(layout.grid);
+    // 絵をそのまま板に貼るので、比が違うとセルの位置が必ずずれる
+    expect(size.width / size.height).toBeCloseTo(plate.extentZ / plate.extentY, 9);
+  });
+
+  it('キャンバス上のセル中心の比率が、板の上のセル中心の比率と一致する', () => {
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Staff', 's2', 2),
+      ref('Schedule', 'x', 3),
+      ref('Log', 'l1', 4),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const size = plateCanvasSize(layout.grid);
+    const o = DEFAULT_LAYOUT_3D_OPTIONS;
+
+    // ★ 式をここに書き写してはいけない。写すと「テストに写した式 ↔ layout」を
+    //   比べることになり、**paintPlate が実際に描いた場所は誰も見ていない**状態になる
+    //   （実際、描画側を 9px ずらす変異が全テストを素通りしていた）。
+    //   だから paintPlate に描かせて、その座標を読む。
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
+    const side = CELL_PITCH_PX - 6; // pad 3 × 2
+    const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
+    expect(drawn).toHaveLength(plate.cells.length);
+
+    plate.cells.forEach((cell, i) => {
+      const [rx, ry] = drawn[i].rect as [number, number, number, number];
+      const canvasX = rx + side / 2;
+      const canvasY = ry + side / 2;
+      // 板側（layout と同じ関数）: 中心原点。左上からの比率に直す
+      const [, wy, wz] = cellCenterWorld(plate, cell.slot, o.cellPitch);
+      const plateFromLeft = plate.origin[2] + plate.extentZ / 2 - wz;
+      const plateFromTop = plate.origin[1] + plate.extentY / 2 - wy;
+
+      expect(canvasX / size.width).toBeCloseTo(plateFromLeft / plate.extentZ, 9);
+      expect(canvasY / size.height).toBeCloseTo(plateFromTop / plate.extentY, 9);
+    });
+  });
+
+  it('キャンバス上のセル中心を狙ったレイが、そのセルを返す（絵→世界→当たり判定の往復）', () => {
+    const g = WorldLineGraph.empty().grow([
+      ref('Staff', 's1', 1),
+      ref('Staff', 's2', 2),
+      ref('Staff', 's3', 3),
+      ref('Schedule', 'x', 4),
+      ref('Log', 'l1', 5),
+    ]);
+    const layout = computeWorldLine3DLayout({ rootScopeId: 'app', graphs: { app: g } });
+    const plate = layout.plates[0];
+    const size = plateCanvasSize(layout.grid);
+    const o = DEFAULT_LAYOUT_3D_OPTIONS;
+    // レイアウトが配った席をそのまま逆引きに使う（View と同じやり方）
+    const at = new Map<string, string>();
+    for (const c of plate.cells) at.set(`${c.slot.col},${c.slot.row}`, c.key);
+
+    // 描かれた矩形をそのまま使う（式を写さない）
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plate, { cols: layout.grid.cols, rows: layout.grid.rows });
+    const side = CELL_PITCH_PX - 6;
+    const drawn = c.ops.filter((op) => op.op === 'fillRect' && op.rect?.[2] === side);
+    expect(drawn).toHaveLength(plate.cells.length);
+
+    plate.cells.forEach((cell, i) => {
+      const [rx, ry] = drawn[i].rect as [number, number, number, number];
+      const canvasX = rx + side / 2;
+      const canvasY = ry + side / 2;
+      const wz = plate.origin[2] + plate.extentZ / 2 - (canvasX / size.width) * plate.extentZ;
+      const wy = plate.origin[1] + plate.extentY / 2 - (canvasY / size.height) * plate.extentY;
+      const hit = pickPlate(
+        { origin: [plate.origin[0] + 50, wy, wz], dir: [-1, 0, 0] },
+        layout.plates,
+        o.cellPitch
+      );
+      expect(hit?.cellKey).toBe(cell.key);
+    });
+  });
+});
+
+/**
+ * 板の絵（paintPlate）は jsdom に本物の 2D コンテキストが無いので、
+ * 記録するだけの偽 ctx を渡して「何をどの α で描いたか」を見る。
+ *
+ * ここが無いと、選択中の板を不透明にする分岐も、畳んだ入れ子の○印も、
+ * 黙って戻っても誰も気づかない（scene.ts は three 込みで Jest から読めない）。
+ */
+describe('板の絵', () => {
+  it('★ 選択中の板はセルを不透明で描く（薄さで奥へ引っ込めない）', () => {
+    const plain = fakeCanvas();
+    paintPlate(plain.canvas, plateOf(), { cols: 2, rows: 2 });
+    const sel = fakeCanvas();
+    paintPlate(sel.canvas, plateOf(), { cols: 2, rows: 2, selected: true });
+
+    // セル本体は「一辺が CELL_PITCH_PX - pad*2」の fillRect。
+    // 下地（全面）や行の帯（幅3）と大きさで見分ける。並び順に頼らない
+    const cellAlpha = (o: typeof plain) =>
+      o.ops
+        .filter((x) => x.op === 'fillRect' && x.rect?.[2] === CELL_PITCH_PX - 6)
+        .map((x) => x.alpha);
+    // ★ every は空配列で true。件数を固定しないと「1つも描かない」変異を見逃す
+    expect(cellAlpha(plain).length).toBeGreaterThan(0);
+    expect(cellAlpha(sel).length).toBe(cellAlpha(plain).length);
+    expect(cellAlpha(plain).every((a) => a < 1)).toBe(true);
+    expect(cellAlpha(sel).every((a) => a === 1)).toBe(true);
+  });
+
+  it('★ 入れ子の印は、畳んでいても消えない（塗りつぶし→中抜きに変わるだけ）', () => {
+    const open = fakeCanvas();
+    paintPlate(open.canvas, plateOf(), { cols: 2, rows: 2 });
+    const shut = fakeCanvas();
+    paintPlate(
+      shut.canvas,
+      plateOf({
+        cells: [{ ...plateOf().cells[0], nestedShown: false }],
+      }),
+      { cols: 2, rows: 2 }
+    );
+    // 開いている＝丸を塗る / 畳んでいる＝丸を描く（stroke）。どちらでも印は出る
+    expect(open.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(true);
+    expect(shut.ops.some((o) => o.op === 'fill' && o.fill === PALETTE_3D.nestLinked)).toBe(false);
+    expect(shut.ops.some((o) => o.op === 'stroke' && o.stroke === PALETTE_3D.nestLinked)).toBe(true);
+  });
+
+  /**
+   * 固定メンバー（世界が生まれたときに焼き付けられ、以後動かない参照）。
+   *
+   * ★ 印をセルの中に置いても、図全体を収めた既定のズームでは 1〜2px にしかならず
+   *   読めない。型名欄（88px）は空いているので、そちらに帯と字を置く。
+   */
+  it('★ 行が丸ごと固定なら、型名欄に帯と「固定」の字を出す', () => {
+    const c = fakeCanvas();
+    paintPlate(
+      c.canvas,
+      plateOf({ cells: [cellOf({ role: 'pinned', type: 'Staff', key: 'Staff:s1' })] }),
+      { cols: 2, rows: 2 }
+    );
+    const band = c.ops.find(
+      (o) => o.op === 'fillRect' && o.fill === ROLE_COLOR.pinned && o.rect?.[2] === 3
+    );
+    expect(band).toBeTruthy();
+    expect(c.ops.some((o) => o.op === 'fillText' && o.text === '固定')).toBe(true);
+  });
+
+  it('固定でない行には帯を出さない（印が無い＝「そうではない」ではなく「言っていない」）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === 3)).toBe(false);
+    expect(c.ops.some((o) => o.op === 'fillText' && o.text === '固定')).toBe(false);
+  });
+
+  it('固定＋そのままのセルは、淡灰ではなく固定の色で出す（一番見えないセルにしない）', () => {
+    const still = cellStyle({ action: 'unchanged', role: 'pinned' }, 'memory', 2.4);
+    const plain = cellStyle({ action: 'unchanged', role: null }, 'memory', 2.4);
+    expect(still.color).toBe(ROLE_COLOR.pinned);
+    expect(still.opacity).toBeGreaterThan(plain.opacity);
+    // 焼き付けた瞬間は「作られた」のまま。立場で出来事の色を塗り替えない
+    expect(cellStyle({ action: 'created', role: 'pinned' }, 'memory', 2.4).color).toBe(
+      ACTION_COLOR.created
+    );
+  });
+
+  it('外の現在地と食い違うセルには、出来事の色で角の印を出す', () => {
+    for (const [outside, color] of [
+      ['differs', ACTION_COLOR.changed],
+      ['absent', ACTION_COLOR.deleted],
+    ] as const) {
+      const c = fakeCanvas();
+      paintPlate(
+        c.canvas,
+        plateOf({ cells: [cellOf({ role: 'pinned', outside })] }),
+        { cols: 2, rows: 2 }
+      );
+      expect(c.ops.some((o) => o.op === 'fill' && o.fill === color)).toBe(true);
+    }
+    // 一致しているとき・比べていないときは角の印を出さない
+    for (const outside of ['same', 'unknown', null] as const) {
+      const c = fakeCanvas();
+      paintPlate(
+        c.canvas,
+        plateOf({ cells: [cellOf({ role: 'pinned', outside })] }),
+        { cols: 2, rows: 2 }
+      );
+      expect(
+        c.ops.some(
+          (o) =>
+            o.op === 'fill' &&
+            (o.fill === ACTION_COLOR.changed || o.fill === ACTION_COLOR.deleted)
+        )
+      ).toBe(false);
+    }
+  });
+
+  it('型名は行の先頭に出す（■だけでは何のオブジェクトか読めない）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    // ★ 件数だけ見ると「別の字を別の場所に描く」変異を見逃す。中身と位置で見る
+    const label = c.ops.find((o) => o.op === 'fillText' && o.text === 'Schedule');
+    expect(label).toBeTruthy();
+    expect(label?.rect?.[0]).toBeLessThan(GUTTER_PX); // 型名欄の中に収まっている
+  });
+
+  it('★ 下地はセルより先に描く（あとから塗ると全部隠れる）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    const full = c.ops
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === c.canvas.width);
+    const lastCell = c.ops
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => o.op === 'fillRect' && o.rect?.[2] === CELL_PITCH_PX - 6)
+      .at(-1);
+    expect(full.length).toBeGreaterThan(0);
+    expect(lastCell).toBeTruthy();
+    expect(full.every(({ i }) => i < (lastCell?.i as number))).toBe(true);
+  });
+
+  it('★ 描き始めに前の絵を消す（キャンバスを使い回すので、消さないと前の板が残る）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf(), { cols: 2, rows: 2 });
+    expect(c.ops[0]?.op).toBe('clearRect');
+    expect(c.ops[0]?.rect?.[2]).toBe(c.canvas.width);
+  });
+
+  it('墓標のセルは十字で描く（■では描かない）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'deleted' })] }), {
+      cols: 2,
+      rows: 2,
+    });
+    expect(
+      c.ops.some((o) => o.op === 'stroke' && o.stroke === ACTION_COLOR.deleted)
+    ).toBe(true);
+    expect(c.ops.some((o) => o.op === 'fillRect' && o.rect?.[2] === CELL_PITCH_PX - 6)).toBe(false);
+  });
+
+  it('墓標には外ズレの角印を出さない（消えたものに「外と違う」は言えない）', () => {
+    const c = fakeCanvas();
+    paintPlate(
+      c.canvas,
+      plateOf({
+        cells: [cellOf({ action: 'deleted', role: 'pinned', outside: 'differs' })],
+      }),
+      { cols: 2, rows: 2 }
+    );
+    expect(c.ops.some((o) => o.op === 'fill' && o.fill === ACTION_COLOR.changed)).toBe(false);
+  });
+
+  it('出来事のあったセルには縁を描く（板から浮いて見えるように）', () => {
+    const c = fakeCanvas();
+    paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+      cols: 2,
+      rows: 2,
+    });
+    expect(
+      c.ops.some((o) => o.op === 'strokeRect' && o.stroke === ACTION_COLOR.changed)
+    ).toBe(true);
+  });
+
+  it('手元に無い値・永続だけの値は縁の色が変わる（色相は出来事のまま）', () => {
+    for (const loc of ['idb', 'lost'] as const) {
+      const c = fakeCanvas();
+      paintPlate(c.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+        cols: 2,
+        rows: 2,
+        locate: () => loc,
+      });
+      expect(
+        c.ops.some((o) => o.op === 'strokeRect' && o.stroke === LOCATION_MARK[loc].color)
+      ).toBe(true);
+    }
+    // メモリにあるものには所在の縁を描かない（描くと全セルに縁が付いて意味が消える）
+    const mem = fakeCanvas();
+    paintPlate(mem.canvas, plateOf({ cells: [cellOf({ action: 'changed' })] }), {
+      cols: 2,
+      rows: 2,
+      locate: () => 'memory',
+    });
+    expect(
+      mem.ops.some((o) => o.op === 'strokeRect' && o.stroke === LOCATION_MARK.idb.color)
+    ).toBe(false);
+  });
+});

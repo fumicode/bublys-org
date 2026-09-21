@@ -3,7 +3,7 @@
 import { FC } from "react";
 import styled from "styled-components";
 import type {
-  ScheduleEditEntryPlain,
+  ScheduleEditEntry,
   ScheduleEditKind,
 } from "../domain/index.js";
 
@@ -11,7 +11,7 @@ const CONCESSION_COLOR = "#6d4c41";
 const RESOLVED_COLOR = "#2e7d32";
 
 type ScheduleEditLogViewProps = {
-  entries: ScheduleEditEntryPlain[];
+  entries: ScheduleEditEntry[];
   concessionsOnly: boolean;
   onToggleConcessionsOnly: (v: boolean) => void;
   staffNameOf?: (staffId: string) => string;
@@ -23,6 +23,7 @@ const KIND_LABEL: Record<ScheduleEditKind, string> = {
   constraintEdit: "制約",
   requiredEdit: "必要人数",
   candidate: "比較案",
+  membershipEdit: "勤務スタッフ",
 };
 
 function formatShortTime(iso: string): string {

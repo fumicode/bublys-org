@@ -16,6 +16,8 @@ export {
   loadGraphFromIDB,
   saveStatesToIDB,
   loadStatesFromIDB,
+  listGraphScopeIdsFromIDB,
+  listStateHashesFromIDB,
 } from './IndexedDBStore';
 export { worldLineGraphListenerMiddleware } from './worldLineGraphListener';
 export { initWorldLineGraph } from './initWorldLineGraph';
@@ -38,3 +40,20 @@ export {
   withIntent,
 } from './intent';
 export { IntentBoundary } from './IntentBoundary';
+export {
+  WorldLineInspector,
+  type WorldLineInspectorProps,
+} from './WorldLineInspector';
+export {
+  locateRef,
+  toRefRow,
+  buildScopeRows,
+  buildNodeRows,
+  buildStateRows,
+  TOMBSTONE_HASH,
+  type InspectorSources,
+} from './inspectorModel';
+export {
+  WorldLine3DInspector,
+  type WorldLine3DInspectorProps,
+} from './WorldLine3DInspector';

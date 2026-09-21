@@ -67,6 +67,26 @@ hotel-shift-puzzle-app/src/
     }
   }
   ```
+- **`state` はドメインの形であって、保存形ではない**。集約が持つ子は**インスタンスで持つ**。
+  plain（`〜State`）を並べない
+  ```typescript
+  // NG: 子を plain で持つ（記述子の codec を書かずに済ませたい、という保存の都合）
+  type WorkingStaffGroupState = { id: string; members: WorkingStaffMemberState[] };
+
+  // OK: 子はインスタンス。保存形（`〜Plain`）を別に定義し、toPlain/fromPlain で橋渡し
+  type WorkingStaffGroupState = { id: string; members: WorkingStaffMember[] };
+  type WorkingStaffGroupPlain = { id: string; members: WorkingStaffMemberPlain[] };
+  ```
+  - plain 化は**記録する1箇所**でやる。記述子に `serialize` を書き、そこだけが `toPlain()` を呼ぶ
+    （`Schedule` / `WorkingStaffGroup` がその形）
+  - 既定の「state 規約」（`toJSON: o => o.state`）が使えるのは、子を持たない集約だけ。
+    **codec の一手間を惜しんで plain を持つと、保存形がドメインに染み出す**
+  - 副産物としてクラス図も正しくなる（`members: WorkingStaffMember[]` と出る）
+  - 子を持つ集約は全部この形になっている：`Schedule` / `WorkingStaffGroup` /
+    `WorkShiftSet` / `ConstraintSet` / `ScheduleEditLog`
+  - **例外は worker 境界を越える DTO**（`CellCandidateEvaluation` / `ScheduleRepair` /
+    `CandidateRequest`）。structured clone で渡すので plain でなければならない。
+    渡す直前に `toPlain()` する
 - **層の依存方向を守る**：domain ← ui ← feature。ui は Redux を直接触らない
 - スライスは `slice.injectInto(rootReducer)` を副作用で実行し、bublys-os の store に自動注入される
 - **Reduxスライスは集約のリポジトリに徹する**：スライスは集約の保存・取得のみ
@@ -85,22 +105,231 @@ hotel-shift-puzzle-app/src/
     routing 束縛なので app の関心事。`getId`/`serialize` 等の intrinsic な側面だけ libs に残す
   - UI 側は `ObjectView` に URL を渡すだけ。展開・data-url・openBubble・opener 解決は
     ObjectView に一任する（自前で UrledPlace＋openBubble を組まない）
+---
+
+## 世界線スコープ：所属・誕生・読み先
+
+このバブリのルールは3つだけ。分岐を増やさないこと。
+
+1. **オブジェクトの住所は1つ。** 所属は型の宣言（記述子の `membership`）だけで決まり、
+   読み・保存・削除が同じ解決式を共有する。
+2. **世界の誕生は1回・1ノード。** 持ち主と固定メンバーの**参照**を同じ grow に混ぜて起点に置く。
+   値は読まない（CAS から追い出されていても焼き付けが欠けないため）。
+3. **読みは世界線を進めない。** レンダー・effect の経路は絶対に grow しない。
+
+### メンバーの3分類（`objects/framework.tsx` の `Membership`）
+
+| 分類 | 意味 | 例 |
+|---|---|---|
+| `live` | その世界で**変化する**。編集でノードが増え、時間移動で戻る | Schedule / WorkingStaffGroup / WorkShiftSet(勤務表用) / ConstraintSet(勤務表用) / ScheduleEditLog |
+| `pinned` | 世界の**誕生時に焼き付けられ、以後動かない**。グローバル側の変更・削除は自動では波及しない | Staff |
+| `external`（既定） | 世界に属さず、**世界の中から読んでも常にグローバル** | ScheduleReservationInfo / ScheduleReport / StaffMonthlyShiftWish |
+
+```typescript
+Staff:    { membership: { kind: "pinned" } }
+Schedule: {
+  membership: { kind: "live", homeScope: (id) => localScopeId(SCHEDULE_TYPE, id) },
+  scope: { pinTypes: [STAFF_TYPE] },   // この世界が生まれるとき誰を連れてくるか
+}
+```
+
+- **宣言は両側に要る**。メンバー側の `membership` が「私はどう読まれるか」、
+  オーナー側の `scope.pinTypes` が「誕生時に誰を連れるか」。pinned はメンバー側だけでは
+  「どのスコープへ焼くか」を言えない。
+- `homeScope` の引数は **obj ではなく id**。`removeObject(type, id)` はオブジェクトを
+  手に持たずに呼ばれるので、obj を要求すると削除だけ住所を解決できない。
+  全 live 型で id はスコープの持ち主 ID に等しい（勤務表用の `ConstraintSet.id` は `scheduleId`）。
+
+### 読み先（`objects/world.tsx` の `readScopeOf`）
+
+「どの世界にいるか」（`World` / `ScheduleWorld` の Context）と「その型はどう属すか」（`membership`）の
+積で決まる。だから `useObjects(type)` の呼び出し側は型しか書かない。
+
+```typescript
+if (membershipOf(type).kind === "external") return APP;   // 常にグローバル
+if (!world.born) return APP;              // 誕生していない世界は存在しない（安全網）
+if (live && homeScope(id) === undefined) return APP;  // その id は本籍を持たない
+return world.scopeId;                     // いま居る世界。参照が無ければ「無い」
+```
+
+**書き（`homeScopeOf`）と同じ (type, id) で解く。** 型だけで解くと、勤務帯セットのように
+id で本籍が変わる型（グローバル固定IDのときは本籍なし）を世界の中から読んだときに
+「その世界には居ない」＝ undefined になる。相方に「無ければ既定を作って保存」があると、
+そのままグローバルのテンプレートを空で上書きする経路になる。
+
+**存在の判定も同じスコープで行う**（`absentInReadScope` / `useIsAbsent`）。
+読み先と判定先が違うと、過去のノードへ時間移動したときに「読み込み中です」が
+永久に解けず、そのノードからは二度と編集できない（実際に踏んだ）。
+
+**「その世界に無ければグローバルを見る」という ref 単位のフォールバックを入れてはいけない。**
+起点より前のノードへ戻ったときに、そこにグローバルの最新値が現れてしまう。
+`born` は**スコープ単位**なので安全（誕生前の世界には時間移動もできない）。
+
+バブルルートは全てトップレベルで個別に Provider に包まれる（親子にならない）ので、
+勤務表に属するバブルは自分で `<ScheduleWorld scheduleId={...}>` を張る（`feature/ScheduleWorld.tsx`）。
+
+### 誕生（`objects/commit.ts` の `ensureWorldBorn`）
+
+- 世界を作る場所は**この1関数だけ**。`saveObject` / `saveLocalBundle` / `commitCandidates` は
+  全部これを通る。誕生が部分的だと、起点に載っていない型が時間移動で戻らない（#110）。
+- 勤務表を作る＝その世界が生まれる。`feature/createSchedule.ts` が1 grow で
+  勤務表・勤務帯セット・制約セット・勤務スタッフ群・固定メンバーをまとめて起点に置く。
+  `repo.save` を複数回呼ぶと1回目で世界が生まれてしまい、起点が欠ける。
+- 例データ投入・ファイル読み込みの直後は `bornWorldsOf(store, items)` で世界をまとめて誕生させる。
+
+### 「読めない」と「無い」を分ける（`isAbsentInScope`）
+
+メモリ上の CAS は 300 件で頭打ちなので、値が読めない理由は「本当に無い」と
+「追い出された」の2つある。**既定値を作って保存してよいのは前者だけ。**
+後者でやると中身のあるオブジェクトを空で上書きする（＝見ているだけでデータが壊れる）。
+判定は必ず参照（グラフ）で行う。参照は追い出されない。
+`useObjectsPending()` は「いま状態が揃っていない」を返すので、
+「無ければ作る」effect はこれで待つこと。
+
+### 時間移動
+
+読みもその世界からなので、**`scope.moveTo(nodeId)` だけで画面が変わる**。
+以前あった restore（ローカルの状態をアプリ全体スコープへ書き戻す橋渡し）は撤去した。
+世界線ビューは共通の `WorldLineScopeView`（既定 `onSelectNode` ＋ `moveToSiblingBranch`）を
+そのまま使う。囲碁など他のバブリと同じ形。
+
+### 世界線ビューアに答える（`objects/worldLineViewQueries.ts`）
+
+世界線ビューア（`docs/world-line-viewer.md`）は汎用ライブラリなので、`Staff` も
+`Membership` も `APP_SCOPE_ID` も知らない。このバブリの規約は**純粋なクエリ2本**で答える。
+
+```typescript
+hotelNestedScope(ref, currentScopeId)  // この参照はどの世界に属すか（本籍がそのまま答え）
+hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: live / pinned / external / null
+```
+
+- **対になる2つは同じファイルに置く。** 片方だけ app 層にあると、規約を直すときに
+  片方を直し忘れる。app 層（`bubbleRoutes.tsx`）は名前を渡すだけ。
+- **どちらも読むだけ。** ストアにも CAS にも触らないので module トップレベルの `const` に
+  でき、ビューアの `useMemo` の依存が毎レンダー変わってレイアウトを作り直す事故が起きない。
+- **`null` は「分からない／該当しない」。** グローバル台帳は「世界」ではない（誕生も
+  焼き付けも無い）ので、そこでは全部 `null`。ここを `live` に倒すと、図が
+  「全部この世界のもの」と断言してしまう。
+- 立場の語彙は `Membership`（`live` / `pinned` / `external`）と**揃えてある**。
+  ライブラリ側の `CellRole` も同じ3語。
+
+### 古い形式の世界線の作り直し（`objects/migrateLegacyScopes.ts`）
+
+固定メンバーを入れる前に生まれた世界線を、空に戻して誕生し直す。
+**「固定メンバーが載っていない」だけでは旧形式の証拠にならない。** 名簿が空のときに
+作った世界も、正しく生まれたうえで0件になる。決め手は**生まれた時刻**で、焼き付ける
+べきものが世界の誕生より前から台帳にあったときだけ旧形式とみなす。
+取り違えると試行錯誤の履歴が黙って消えるので、迷ったら触らない側に倒す。
+
+### モデルのクラス図（`src/model-graph/`）
+
+このバブリのモデルの構造を図にするバブル（`hotel-shift-puzzle/model-class-diagram`）。
+読み方と生成し直し方は `docs/model-class-diagram.md`。
+
+- 構造（クラス・フィールド・メソッド・つながり）は **TypeScript のソースから生成**する。
+  `modelGraph.generated.ts` は**手で編集しない**。モデルか記述子を直したら生成し直す。
+  忘れると `modelGraph.staleness.test.ts` が落ちる
+- 世界線での所属（live / pinned / external）だけは**記述子から実行時に**重ねる。
+  型からは分からないので、知っている側（記述子）に聞く
+- 登録されていないクラス（集約の中の部品）には所属を描かない。
+  「所属が無い」のではなく「所属という概念の対象ではない」ので、`external` と読ませたら嘘になる
+- **焼き付けメンバー（Staff）は、枠の外と中の両方に描く。** 外の台帳にも居るので、
+  片方にしか描くとどちらかが嘘になる。同じものだと分かる点線で結ぶ
+
+### グローバル台帳（`APP_SCOPE_ID = "hotel"`）
+
+`saveObject` は本籍のローカル世界線に加えて**必ずここにも書く**。ここは
+「全世界の最新値インデックス」で、勤務表一覧やスタッフ詳細のような
+**世界をまたぐ問い合わせ**がこれを読む。時間移動はしない（常に最新）。
+
+**`removeObject` も同じ住所へ届く。** 保存が両方へ書くなら削除も両方へ書く。台帳にだけ
+墓標を置くと、消したはずのオブジェクトが自分の世界では生き続け、そこで1回編集すると
+台帳へ書き戻されて**復活する**（実際に踏んだ。`objects/addressSymmetry.test.ts` が見張る）。
+固定メンバー（pinned）は本籍を持たないので台帳だけが動く。これは仕様どおりで、
+「グローバルの名簿から消しても、焼き付けた世界からは消えない」がまさに固定の意味。
+
+---
+
 - **グローバル型を origin スコープへ取り込むパターン**（テンプレート → 世界線独自コピー）：
   「グローバルにもテンプレートがあり、新しい origin（勤務表など＝世界線の起点）が作られるとき、
   グローバルのものをその origin のスコープ内へコピーして独自版にする」よくある形。
-  - 取り込む型は、id が origin 用のときだけ origin のローカル世界線へ束ねるよう `localScope` を
+  **固定メンバー（pinned）とは別物**。こちらは **id を差し替えて別オブジェクトにする**
+  （勤務表ごとの独自セット）。pinned は同じオブジェクトの参照をそのまま焼き付ける
+  （スタッフは勤務表ごとに別人にはならない）。
+  - 取り込む型は、id が origin 用のときだけ origin のローカル世界線へ束ねるよう `homeScope` を
     宣言する（グローバル固定IDのときは `undefined`）。例（`objects/hotelObjects.tsx` の `WorkShiftSet`）:
-    `localScope: (s) => s.id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, s.id)`
+    `homeScope: (id) => id === GLOBAL_WORKSHIFT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id)`
   - グローバルのテンプレートは固定ID（例 `"global"`）で1つ持ち、専用バブルで編集する。
-  - origin 作成時に **`adoptGlobalObject(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
-    （`objects/commit.ts`）を呼ぶ。これはグローバル現在値を読み、id を origin 用へ差し替えて
-    `saveObject` するだけ。`saveObject` が `localScope` を見て origin スコープ＋APP_SCOPE の両方へ
-    記録するので、以後その型の編集は origin の世界線に載る（時間移動で一緒に戻る）。
+  - origin 作成時に **`adoptGlobalValue(store, TYPE, g => g.withId(originId), GLOBAL_ID)`**
+    （`objects/commit.ts`）でグローバル現在値を読み、id を origin 用へ差し替えた値を得る。
+    **これは保存しない。** 得た値は `ensureWorldBorn` の seed に混ぜて、持ち主・固定メンバーと
+    一緒に**1ノードで**起点に置く（`feature/createSchedule.ts` がその形）。
+    ここで `saveObject` を先に呼ぶと1回目の保存で世界が生まれてしまい、起点が欠ける
+    （「世界の誕生は1回・1ノード」に反する）。
   - 集約側には id を差し替えつつ中身（子の id 等）を保つコピー用メソッド（例 `WorkShiftSet.withId`）を
     生やす。ドメインは新規 id を採番しない（採番は feature 層）。
   - 例: 勤務帯は `WorkShiftSet`（勤務帯の集約）1つにまとめ、グローバル（id=`global`）と
     勤務表ごと（id=scheduleId）の2通りで存在する。勤務表は勤務帯を `workShiftIds` で持たず、
     自分の `WorkShiftSet` を唯一の真実とする。
+  - **制約セット（`ConstraintSet`）も同じ形**。責任者ルール＋連勤上限・月の最低休日・
+    1日の休み上限・希望チェックを1つにまとめ、グローバル（`hotel-shift-puzzle/constraints`
+    バブルで編集）と勤務表ごとの2通りで存在する。勤務表は `constraintSetId` で指す。
+    ただし**責任者の担当者はグローバルでは決めない** —— 担当者は名簿のスタッフを指し、
+    名簿は勤務表が生まれるときに焼き付く（固定メンバー）ので、誰が担うかは勤務表ごとの話。
+    グローバルで決めるのは「どんな役割があるか（名前・担当勤務帯・最低人数）」まで。
+
+---
+
+## 勤務表の行は「勤務スタッフ群」が決める
+
+勤務表はスタッフを直接持たない。間に **勤務スタッフ群（`WorkingStaffGroup`）** が入る。
+
+```
+勤務表 ──workingStaffGroupId──▶ 勤務スタッフ群 ──▶ 勤務スタッフメンバー（行1つ）
+                                                    ├ staffId          : 誰か（名簿の人も臨時の人もこれで指す）
+                                                    ├ staff?           : 臨時の人だけが抱える実体
+                                                    └ allowedShiftIds? : 入れる勤務帯（省略＝どこでも入れる）
+```
+
+- **名簿（`Staff`）は pinned、群は live。** 名簿は世界の誕生で焼き付いて動かない。
+  「誰が働くか」はその世界の中で変わるので、群は親 Schedule の世界線に相乗りする（case B）。
+  id は `scheduleId`（＝`workingStaffGroupId` の既定値）。
+- **臨時の人の実体はメンバーの中にしか居ない。** `Staff` を新しく作るとグローバルの名簿に
+  載ってしまうので、臨時の人はメンバーが値として抱える。だから時間移動で一緒に現れ／消える。
+- **見分けるルールは1つ：「実体を抱えていれば臨時の人」**（`WorkingStaffMember.isTemporary`）。
+  `origin: "roster" | "temporary"` のような別の印は持たない。持つと実体の有無と印の2箇所が
+  真実になり、いつか食い違う。
+- 同一性は常に `staffId`。抱えた実体の `id` はそれで被せ直すので、ずれた記録が入ってきても
+  行が分裂しない。
+- **可能勤務帯（誰がどの勤務帯に入れるか）もメンバーが持つ。**「誰が働くか」と「その人が
+  どこに入れるか」は同じ1つの参加の話なので、別の集約に分けない（`ScheduleAvailability`
+  という別集約だったものを畳んだ）。
+  - **省略＝まだ絞っていない＝どの勤務帯にも入れる。** 空配列（どこにも入れない）とは違う。
+    入ったばかりの人に全勤務帯を書き込んで回らなくていいし、勤務帯が増えても既定で入れる
+  - 絞っている人にだけ勤務帯を足すのが `allowShiftForAll`（勤務帯を1つ増やしたとき）
+  - 編集口は**勤務スタッフバブル1つ**。可能勤務帯バブルは畳んだ（チェック欄も、列＝勤務帯
+    セットの追加・改名・削除も、そちらへ移した）
+- メンバーは型（`WorkingStaffMember`）にし、群は**そのインスタンスを**持つ。
+  union の型エイリアスや plain のままだと、クラス図の抽出器が共通のフィールドしか読めず、
+  `staffId`／`staff` が図に出ない（＝名簿の人は指す・臨時の人は抱える、という肝心の違いが
+  図から消える）。保存形は `toPlain()` / `fromPlain()` と記述子の `serialize` が担う。
+- 群を持たない勤務表（この集約より前に作られたもの）は、これまで通り
+  「この世界に居るスタッフ全員」が行になる。**編集しようとした瞬間に**その顔ぶれから群ができる
+  （読みの経路では作らない）。
+
+### 顔ぶれが変わると連れて動くもの（`feature/membershipChange.ts`）
+
+1回の変更で複数の集約が動く。**同じ1ノードに載せる**こと（別々だと、その間のノードへ
+時間移動したときに中途半端な世界が現れる＝#110 と同じ事故）。
+
+| 変化 | 連れて動くもの | 載せないとどうなるか |
+|---|---|---|
+| 人が入る | 無し（可能勤務帯は群の中。絞っていない人はどこでも入れる） | — |
+| 人が外れる | 勤務表からその人の割当を消す（`clearStaff`） | 表に居ない人をフッターの集計が数え続ける |
+| 人が外れる | 責任者候補から外す（`ConstraintSet.removeStaff`） | どう埋めても満たせない日ができる |
+
+組み立ては純粋関数 `buildMembershipChange`（React も store も通さない＝テストで固定できる）、
+記録は `recordMembershipEdit`（`saveLocalBundle` で1ノード＋操作履歴に `membershipEdit` を積む）。
 
 ---
 

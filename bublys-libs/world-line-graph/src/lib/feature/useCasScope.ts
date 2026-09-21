@@ -6,6 +6,7 @@ import {
 } from '@bublys-org/state-management';
 import type { RootState } from '@bublys-org/state-management';
 import {
+  TOMBSTONE_HASH,
   computeStateHash,
   createStateRef,
   type StateRef,
@@ -43,6 +44,18 @@ export interface CasScopeValue {
   shells<T>(type: string): ObjectShell<T>[];
   /** 指定した型・IDのシェルを取得 */
   getShell<T>(type: string, id: string): ObjectShell<T> | null;
+  /**
+   * 現在の世界の状態がまだ揃っていない（参照はあるのに実データが手元に無い）。
+   *
+   * メモリ上の CAS は上限つきで古いものから追い出されるので、参照があっても値を
+   * 読めない瞬間がある。そこで「無い」と判断して既定値を作り直して保存すると、
+   * 追い出されただけの状態を空で上書きしてしまう（＝データが消える）。
+   * 値の不在で分岐する前にこれを見て、true のあいだは何もしないこと。
+   *
+   * false は「今この瞬間、現在の世界の参照はすべて手元にある」を意味するだけで、
+   * 「そのオブジェクトが存在する」ではない。存在の判定は参照の有無で行う。
+   */
+  pending: boolean;
   /** オブジェクトを追加して grow（型文字列省略時は instanceof で自動解決） */
   addObject(type: string, obj: unknown): void;
   addObject(obj: unknown): void;
@@ -249,6 +262,14 @@ export function useCasScope(
     return map;
   }, [currentRefs, cas, registry]);
 
+  // 現在の世界が参照しているのに手元に無いものがあるか。
+  // tombstone は cas に null として載っているので undefined とは区別される
+  // （削除済み＝解決済み。未解決ではない）。
+  const pending = useMemo(
+    () => currentRefs.some((ref) => cas[ref.hash] === undefined),
+    [currentRefs, cas]
+  );
+
   const casRef = useRef(cas);
   casRef.current = cas;
 
@@ -308,11 +329,24 @@ export function useCasScope(
     if (missingHashes.length === 0) return;
     for (const hash of missingHashes) attemptedRef.current.add(hash);
     let cancelled = false;
-    loadStatesRef.current(missingHashes).then((loaded) => {
-      if (cancelled || loaded.size === 0) return;
-      const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
-      dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
-    });
+    loadStatesRef.current(missingHashes)
+      .then((loaded) => {
+        if (cancelled || loaded.size === 0) return;
+        const entries = Array.from(loaded.entries()).map(([hash, data]) => ({ hash, data }));
+        dispatch(setCasEntries({ entries, protectHashes: missingHashes }));
+      })
+      .catch((e) => {
+        // ★ ここを握りつぶすと、永続ストアが使えない環境（IndexedDB が塞がれている等）で
+        //   pending が永久に true のままになる。pending を見て待っている
+        //   「無ければ作る」の経路が全部止まり、画面は「読み込み中」から動かない。
+        //   取りに行って戻ってこなかったことは attemptedRef が覚えているので再試行はしない。
+        //   直る見込みの無い状態と読み込み中を、せめてログでは区別する。
+        console.warn(
+          "世界線: 永続ストアから状態を取り出せませんでした。" +
+            "この参照の値はこのセッションでは読めません。",
+          e
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -428,7 +462,7 @@ export function useCasScope(
 
   const removeObject = useCallback(
     (type: string, id: string) => {
-      const hash = computeStateHash(null);
+      const hash = TOMBSTONE_HASH;
       const ref = createStateRef(type, id, hash);
       growRef.current([ref], [{ hash, data: null }]);
     },
@@ -500,6 +534,7 @@ export function useCasScope(
   return {
     shells,
     getShell,
+    pending,
     addObject,
     addObjects,
     removeObject,

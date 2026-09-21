@@ -381,11 +381,24 @@ export const StyledWrap = styled.div`
     z-index: 3;
     background: #fafafa;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     font-weight: bold;
     color: #555;
     padding: 4px;
+
+    /* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。年月の下に置く。
+       列幅（STAFF_COL_WIDTH）に収まらない分は折り返す。 */
+    .e-corner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-weight: normal;
+    }
   }
 
   /* 日付ヘッダ（上に固定） */
@@ -400,18 +413,9 @@ export const StyledWrap = styled.div`
     justify-content: center;
     padding: 4px 0;
 
-    /* 日単位の制約違反（責任者不在など）がある日は列ヘッダを警告色にし、⚠ を重ねる */
+    /* 日単位の制約違反（責任者不在など）がある日は列ヘッダを警告色にする */
     &.is-warn {
       background: #fff3e0;
-    }
-    .e-day-warn {
-      position: absolute;
-      top: 0;
-      right: 1px;
-      font-size: 0.7em;
-      line-height: 1;
-      color: #e65100;
-      pointer-events: none;
     }
 
     .e-day-num {
@@ -812,6 +816,44 @@ export const StyledWrap = styled.div`
   }
 
   /* 部署グループヘッダー行（全カラムスパン） */
+  /* メンバー行の一番下（勤務スタッフバブルへの導線）。左固定でスタッフ名の列に乗る */
+  .e-staff-foot {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fafafa;
+    padding: 2px 6px;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+  }
+  .e-staff-foot-link {
+    /* <button> から ObjectView の中の <span> に変わったので、行揃えを自分で作る */
+    display: inline-flex;
+    align-items: center;
+    border: 1px dashed #bbb;
+    border-radius: 4px;
+    background: transparent;
+    color: #666;
+    font-size: 0.8em;
+    padding: 1px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #789;
+      color: #345;
+      background: #fff;
+    }
+  }
+  .e-staff-foot-bar {
+    background: #fafafa;
+    border-bottom: 1px solid #ddd;
+    box-sizing: border-box;
+  }
+
   .e-dept-label {
     position: sticky;
     left: 0;

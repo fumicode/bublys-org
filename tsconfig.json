@@ -116,6 +116,9 @@
     },
     {
       "path": "./csv-importer-bubly/csv-importer-app"
+    },
+    {
+      "path": "./bublys-libs/model-graph"
     }
   ]
 }

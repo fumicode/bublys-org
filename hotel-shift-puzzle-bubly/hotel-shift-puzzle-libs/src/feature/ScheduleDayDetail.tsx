@@ -3,33 +3,37 @@
 import { FC, useMemo } from "react";
 import styled from "styled-components";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
-  ScheduleAvailability,
-  ScheduleConstraints,
+  ConstraintSet,
   StaffMonthlyShiftWish,
   WorkingDay,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
-import { ScheduleDayView } from "../ui/ScheduleDayView.js";
+import { ScheduleDayView, dayHeadingLabel } from "../ui/ScheduleDayView.js";
+import { useScheduleCandidates } from "./candidates/index.js";
 import { useObjects, useObject } from "../objects/repository.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
 import { recordSetCell } from "./recordScheduleEdit.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_AVAILABILITY_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type ScheduleDayDetailProps = {
   scheduleId?: string;
   /** 稼働日キー（"2026-06-01"） */
   dayKey: string;
+  /**
+   * 候補集合 worker を作る（app 層から注入）。省略すると main thread で同期計算する。
+   * 勤務表グリッドと同じ計算を通すので、ここで見える候補はグリッドの候補と一致する。
+   */
+  createCandidatesWorker?: () => Worker;
 };
 
 /**
@@ -37,20 +41,20 @@ type ScheduleDayDetailProps = {
  * 勤務表グリッドの日付ヘッダをクリックして開く（その日だけを切り出したビュー）。
  * セル編集は recordSetCell 経由で Schedule + EditLog を同一世界線ノードに記録する。
  */
-export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayKey }) => {
+const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
+  scheduleId,
+  dayKey,
+  createCandidatesWorker,
+}) => {
   const store = useAppStore();
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
-  const availability = useObject<ScheduleAvailability>(
-    SCHEDULE_AVAILABILITY_TYPE,
-    scheduleId
-  );
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // 責任者ルール（早責/夜責）は勤務表ごとの制約オブジェクトから読む。名前横のバッジに使う
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
   const leaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
@@ -84,6 +88,19 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
     return (id: string) => map.get(id) ?? id;
   }, [staffList]);
 
+  // まだ決まっていないセルに入れられる値（候補集合）。勤務表グリッドと同じフックを通すので、
+  // ここで見える候補はグリッドの候補と一致する（計算対象も盤面全体で揃える）。
+  const staffIds = useMemo(() => staffList.map((s) => s.id), [staffList]);
+  const { candidates, computing } = useScheduleCandidates({
+    schedule,
+    constraints,
+    checkShiftWish: constraints?.checkShiftWish ?? true,
+    wishByStaff,
+    workShifts,
+    staffIds,
+    createWorker: createCandidatesWorker,
+  });
+
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
   }
@@ -107,21 +124,18 @@ export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = ({ scheduleId, dayK
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>
-          稼働日{" "}
-          <span className="e-sub">
-            {schedule.year}年{day.label} / {schedule.storeId}
-          </span>
-        </h3>
+        <h3>{dayHeadingLabel(day)}</h3>
       </div>
       <ScheduleDayView
         day={day}
         schedule={schedule}
         staffList={staffList}
         workShifts={shiftOptions}
-        availability={availability}
+        staffGroup={staffGroup}
         leaderRules={leaderRules}
         wishByStaff={wishByStaff}
+        // 再計算中は前回の（古いかもしれない）候補を出さない（グリッドと同じ扱い）
+        candidates={computing ? undefined : candidates}
         onChangeCell={handleChangeCell}
       />
     </StyledContainer>
@@ -136,10 +150,15 @@ const StyledContainer = styled.div`
     h3 {
       margin: 0;
     }
-    .e-sub {
-      font-weight: normal;
-      font-size: 0.8em;
-      color: #777;
-    }
   }
 `;
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleDayDetail: FC<ScheduleDayDetailProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleDayDetailBody {...props} />
+  </ScheduleWorld>
+);

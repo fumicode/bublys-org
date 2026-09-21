@@ -211,3 +211,44 @@ export async function loadStatesFromIDB<T = unknown>(
     }
   });
 }
+
+// ============================================================================
+// 覗く用（デバッグ・インスペクタ）
+//
+// 通常の読み書きは hash / scopeId を指定して行うので一覧は要らないが、
+// 「いま永続ストアに何が入っているか」を人が確かめるには一覧が要る。
+// ============================================================================
+
+/** 永続化されているスコープIDの一覧（graphStore のキー） */
+export async function listGraphScopeIdsFromIDB(): Promise<string[]> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(GRAPH_STORE, 'readonly');
+    const request = tx.objectStore(GRAPH_STORE).getAllKeys();
+    request.onerror = () => {
+      db.close();
+      reject(new Error(`Failed to list graphs: ${request.error?.message}`));
+    };
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result.map(String));
+    };
+  });
+}
+
+/** 永続化されている状態のハッシュ一覧（stateStore のキー） */
+export async function listStateHashesFromIDB(): Promise<string[]> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STATE_STORE, 'readonly');
+    const request = tx.objectStore(STATE_STORE).getAllKeys();
+    request.onerror = () => {
+      db.close();
+      reject(new Error(`Failed to list states: ${request.error?.message}`));
+    };
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result.map(String));
+    };
+  });
+}

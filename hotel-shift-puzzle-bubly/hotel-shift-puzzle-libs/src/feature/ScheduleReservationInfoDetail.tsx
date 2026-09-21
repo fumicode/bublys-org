@@ -2,14 +2,12 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import { useKeyBindings } from "@bublys-org/bubbles-ui";
-import { useCasScope } from "@bublys-org/world-line-graph";
 import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReservationInfoView } from "../ui/ScheduleReservationInfoView.js";
-import { useObject, useObjectRepo, APP_SCOPE_ID } from "../objects/repository.js";
+import { useObject, useObjectRepo } from "../objects/repository.js";
 import { SCHEDULE_TYPE, SCHEDULE_RESERVATION_INFO_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleReservationInfoDetailProps = {
@@ -21,7 +19,7 @@ type ScheduleReservationInfoDetailProps = {
  * 勤務表グリッドの予約行（日付ヘッダの上）をダブルクリックして開く。
  *
  * 予約状況は勤務表に紐づく姉妹集約 DailyReservationInfo（id=scheduleId）。まだ無ければ
- * 最初の入力時に空から作って保存する（ScheduleConstraints と同じ遅延生成パターン）。
+ * 最初の入力時に空から作って保存する（ConstraintSet と同じ遅延生成パターン）。
  * 予約は外部の実データなので勤務表の世界線には載せない（アプリ全体スコープのみ）。
  */
 export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProps> = ({
@@ -35,15 +33,16 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
   );
   const repo = useObjectRepo<DailyReservationInfo>(SCHEDULE_RESERVATION_INFO_TYPE);
 
-  // 予約の編集はアプリ全体の世界線（APP_SCOPE）に積まれる。Cmd/Ctrl+Z で元に戻し、
-  // Cmd/Ctrl+Shift+Z（や Ctrl+Y）でやり直す。useKeyBindings はこのバブルにフォーカスが
-  // 当たっているときだけ効き、テキスト入力中はブラウザ標準のundoに任せる（横取りしない）。
-  const worldLine = useCasScope(APP_SCOPE_ID);
-  useKeyBindings([
-    { key: "z", meta: true, run: worldLine.moveBack },
-    { key: "z", meta: true, shift: true, run: worldLine.moveForward },
-    { key: "y", meta: true, run: worldLine.moveForward },
-  ]);
+  // ここには undo を置かない。
+  //
+  // 以前は ⌘Z を useCasScope(APP_SCOPE_ID).moveBack に割り当てていたが、APP スコープは
+  // 「アプリ全体の平坦な変更ログ」なので、直前にアプリのどこで起きた変更でも巻き戻る
+  // （予約を戻したつもりでスタッフの改名が戻る）。さらに勤務表の世界線は APP の現在値を
+  // 起点として生まれるので、APP を巻き戻した状態で勤務表を作ると「当時の名簿」が
+  // 焼き付いてしまう。グローバル台帳は常に最新、を規則にする。
+  //
+  // 予約単位の undo が要るなら、予約を自分の世界線スコープの持ち主にするのが筋
+  // （いまは「実際の予約」なので勤務表の世界線には載せない、という整理になっている）。
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;
@@ -67,8 +66,6 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
         </h3>
         <p className="e-note">
           稼働日ごとの中・夕・泊（人数・部屋数）・備考・婚礼を入力します。
-          <br />
-          ⌘/Ctrl+Z で元に戻す、⌘/Ctrl+Shift+Z でやり直し。
         </p>
       </div>
       <ScheduleReservationInfoView days={days} info={info} onSave={handleSave} />

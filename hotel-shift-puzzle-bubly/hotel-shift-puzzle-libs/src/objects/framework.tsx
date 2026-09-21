@@ -34,6 +34,45 @@ export type ObjectSerialize<T> = {
 };
 
 /**
+ * その型が世界線スコープに対してどう属するか。
+ *
+ * スコープのメンバーは3種類しかない。読み・保存・削除・誕生のすべてがこの1宣言で決まる:
+ *
+ *   - live     … **その世界で変化する**。編集するとその世界線にノードが増え、時間移動で戻る。
+ *                自分のスコープを持つ集約も、親集約のスコープに相乗りするものもこれ。
+ *                  Schedule:            (id) => `Schedule:${id}`
+ *                  ConstraintSet: (id) => `Schedule:${id}`   … 親の世界線に相乗り
+ *   - pinned   … **その世界が生まれた瞬間に焼き付けられ、以後動かない**。
+ *                グローバル側の変更・削除は自動では波及しない（Staff）。
+ *                どのスコープへ焼くかはメンバー側では言えないので、
+ *                オーナー型の {@link ObjectDescriptor.scope} の pinTypes が決める。
+ *   - external … スコープに属さず、**世界の中から読んでも常にグローバル**。
+ *                実データ（予約状況）や確定記録（レポート）のように、時間移動しても
+ *                変わってはいけないもの。
+ *
+ * 引数が obj ではなく id なのが要点。削除は `removeObject(type, id)` のように
+ * オブジェクトを手に持たずに呼ばれるので、obj を要求すると削除だけが住所を
+ * 解決できずアプリ全体スコープに落ちる（保存と削除で行き先が食い違う）。
+ * 全 live 型で id はスコープの持ち主 ID に等しい（ConstraintSet.id は scheduleId）。
+ */
+export type Membership =
+  | { kind: "live"; homeScope: (id: string) => string | undefined }
+  | { kind: "pinned" }
+  | { kind: "external" };
+
+/** 省略時の所属。世界に属さない＝常にグローバルから読む。 */
+const DEFAULT_MEMBERSHIP: Membership = { kind: "external" };
+
+/** そのスコープのオーナー型が宣言する、スコープ自身の性質 */
+export type ScopeSpec = {
+  /**
+   * この型のスコープが生まれるとき、グローバルから参照をコピーして焼き付ける型。
+   * 「誰を連れて生まれるか」はスコープのオーナーだけが言える。
+   */
+  pinTypes?: string[];
+};
+
+/**
  * オブジェクト型の記述子。型に「固有」の側面だけをここで表現する。
  * 展開位置（openingPosition）は型ではなく使う場所で決まるため、ここには持たせない。
  */
@@ -53,13 +92,15 @@ export type ObjectDescriptor<T = unknown> = {
    */
   serialize?: ObjectSerialize<T>;
   /**
-   * このオブジェクトが属するローカル世界線スコープID（無ければアプリ全体のみ）。
-   * 自分のスコープを持つ集約も、親集約のスコープに相乗りするオブジェクトもここで宣言する:
-   *   - Schedule:           (s) => `Schedule:${s.id}`     … 自分のローカル世界線
-   *   - ScheduleAvailability:(a) => `Schedule:${a.scheduleId}` … 親 Schedule の世界線に束ねる（case B）
-   * save 時、アプリ全体に加えてこのスコープにも記録され、まとめて巻き戻せる。
+   * この型が世界線スコープにどう属するか。省略時は external（世界に属さない）。
+   * 詳しくは {@link Membership}。
    */
-  localScope?: (obj: T) => string | undefined;
+  membership?: Membership;
+  /**
+   * この型が**オーナーである**スコープの宣言（`Schedule:<id>` の Schedule 側に書く）。
+   * メンバー側の membership が「私はどう読まれるか」、こちらが「誰を連れて生まれるか」。
+   */
+  scope?: ScopeSpec;
   /**
    * ドメインスキーマ（プロパティ定義）。バブリ横断で「型の中身」を伝えるための共通言語。
    * object-transformer などがドロップされた型を解釈してターゲット構造を再現できる。
@@ -81,6 +122,32 @@ let descriptorRegistry: ObjectRegistry = {};
 /** 登録済みの記述子を取得する */
 export function getDescriptor(type: string): ObjectDescriptor | undefined {
   return descriptorRegistry[type];
+}
+
+/** その型の所属（未登録・未宣言なら external） */
+export function membershipOf(type: string): Membership {
+  return descriptorRegistry[type]?.membership ?? DEFAULT_MEMBERSHIP;
+}
+
+/**
+ * そのオブジェクトが「変化する世界」のスコープID。live 型だけが持つ。
+ * pinned / external は undefined（＝自分から世界線に載りにいかない）。
+ */
+export function homeScopeOf(type: string, id: string): string | undefined {
+  const membership = membershipOf(type);
+  return membership.kind === "live" ? membership.homeScope(id) : undefined;
+}
+
+/** その型のスコープが生まれるとき焼き付ける型（オーナー型の scope.pinTypes） */
+export function pinnedTypesOf(ownerType: string): string[] {
+  return descriptorRegistry[ownerType]?.scope?.pinTypes ?? [];
+}
+
+/** live な型の一覧（誕生時に「持ち主一式」を集めるのに使う） */
+export function liveTypes(): string[] {
+  return Object.keys(descriptorRegistry).filter(
+    (type) => membershipOf(type).kind === "live"
+  );
 }
 
 /**

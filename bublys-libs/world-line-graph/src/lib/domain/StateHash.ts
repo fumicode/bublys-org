@@ -22,3 +22,14 @@ function normalizeJson(obj: unknown): string {
   );
   return '{' + pairs.join(',') + '}';
 }
+
+/**
+ * 削除マーカー（墓標）の内容ハッシュ。
+ *
+ * `null` の内容ハッシュは定数なので、**CAS から値を読まずに「消された」と判定できる**。
+ * 値はメモリから追い出されるが参照は追い出されないので、判定は必ずこちらで行う。
+ *
+ * ★ 各所で computeStateHash(null) を書き直さないこと。同じ値になるとはいえ、
+ *   「これは墓標の判定だ」という意図がコードから消える。
+ */
+export const TOMBSTONE_HASH = computeStateHash(null);

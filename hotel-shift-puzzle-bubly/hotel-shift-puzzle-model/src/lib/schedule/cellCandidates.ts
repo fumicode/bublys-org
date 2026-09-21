@@ -6,7 +6,7 @@
  */
 import type { ConstraintViolationPlain } from "./ConstraintViolation.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
-import { computeConstraintDelta } from "./ScheduleEditLog.js";
+import { computeConstraintDelta } from "./ConstraintDelta.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkShift } from "./WorkShift.js";
 import type { WorkingDay } from "./WorkingDay.js";
@@ -57,7 +57,13 @@ export function evaluateCellCandidates(
       const after = schedule
         .setCell(staffId, day, cell)
         .checkConstraints(constraints);
-      return { cell, blockedBy: computeConstraintDelta(before, after).newlyViolated };
+      // 候補評価は worker 境界を越える（structured clone）ので plain にして返す
+      return {
+        cell,
+        blockedBy: computeConstraintDelta(before, after).newlyViolated.map((v) =>
+          v.toPlain()
+        ),
+      };
     });
 }
 

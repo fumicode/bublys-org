@@ -31,7 +31,8 @@
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/world-line-graph": "*",
-    "@bublys-org/domain-registry": "*"
+    "@bublys-org/domain-registry": "*",
+    "@bublys-org/model-graph": "*"
   },
   "nx": {
     "targets": {

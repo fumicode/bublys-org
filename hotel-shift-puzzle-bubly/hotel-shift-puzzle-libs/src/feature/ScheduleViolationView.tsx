@@ -9,22 +9,22 @@
  */
 import { FC, useMemo } from "react";
 import {
-  Staff,
   WorkShiftSet,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
-  ScheduleConstraints,
+  ConstraintSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ConstraintViolationView } from "../ui/ConstraintViolationView.js";
 import { useObject, useObjects } from "../objects/repository.js";
 import {
-  STAFF_TYPE,
   WORKSHIFT_SET_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_CONSTRAINTS_TYPE,
+  CONSTRAINT_SET_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { buildScheduleConstraints } from "./scheduleConstraints.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useWorkingStaff } from "./workingStaff.js";
 
 type Props = {
   scheduleId: string;
@@ -32,14 +32,14 @@ type Props = {
   violationKey: string;
 };
 
-export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) => {
+const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
-  const staffList = useObjects<Staff>(STAFF_TYPE);
+  const { staffList } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const constraints = useObject<ScheduleConstraints>(
-    SCHEDULE_CONSTRAINTS_TYPE,
+  const constraints = useObject<ConstraintSet>(
+    CONSTRAINT_SET_TYPE,
     scheduleId
   );
 
@@ -82,3 +82,13 @@ export const ScheduleViolationView: FC<Props> = ({ scheduleId, violationKey }) =
 
   return <ConstraintViolationView violation={violation} staffName={staffName} />;
 };
+
+/**
+ * この勤務表の世界に入ってから中身を描く。
+ * 中の useObjects / useObject は、型の membership に従ってこの世界かグローバルかを選ぶ。
+ */
+export const ScheduleViolationView: FC<Props> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleViolationViewBody {...props} />
+  </ScheduleWorld>
+);

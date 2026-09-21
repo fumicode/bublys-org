@@ -29,3 +29,6 @@ export const DEMAND_CELL_KEY_PREFIX = "demand:";
 /** 人数不足セルの data-cell-key を組み立てる。 */
 export const demandCellKey = (shiftId: string, dayKey: string): string =>
   `${DEMAND_CELL_KEY_PREFIX}${shiftId}:${dayKey}`;
+
+/** 曜日の表示（0=日 … 6=土）。WorkingDay.weekday の添字で引く。 */
+export const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];

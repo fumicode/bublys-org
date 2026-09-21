@@ -10,6 +10,7 @@
     "@bublys-org/hotel-shift-puzzle-libs": "*",
     "@bublys-org/hotel-shift-puzzle-model": "*",
     "@bublys-org/state-management": "*",
+    "@bublys-org/world-line-graph": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.3.2",

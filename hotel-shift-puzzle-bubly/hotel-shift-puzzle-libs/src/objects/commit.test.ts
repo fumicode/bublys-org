@@ -14,8 +14,14 @@ import { registerObjects } from "./framework.js";
 import {
   APP_SCOPE_ID,
   commitToScope,
+  commitCandidates,
+  ensureWorldBorn,
+  isAbsentInScope,
   refInScope,
+  refsOfTypeInScope,
+  removeObject,
   saveLocalBundle,
+  saveObject,
   readFromScope,
 } from "./commit.js";
 
@@ -25,21 +31,33 @@ class Note {
 class Log {
   constructor(readonly state: { id: string; lines: string[] }) {}
 }
+/** 固定メンバー役。Note の世界が生まれるとき焼き付けられる */
+class Person {
+  constructor(readonly state: { id: string; name: string }) {}
+}
 
 const NOTE = "Note";
 const LOG = "Log";
+const PERSON = "Person";
 const LOCAL = "Note:n1";
 
 registerObjects({
   [NOTE]: {
     class: Note,
     getId: (o: Note) => o.state.id,
-    localScope: (o: Note) => `Note:${o.state.id}`,
+    membership: { kind: "live", homeScope: (id: string) => `Note:${id}` },
+    // この世界が生まれるとき、そのときの Person 全員を焼き付ける
+    scope: { pinTypes: [PERSON] },
   },
   [LOG]: {
     class: Log,
     getId: (o: Log) => o.state.id,
-    localScope: (o: Log) => `Note:${o.state.id}`,
+    membership: { kind: "live", homeScope: (id: string) => `Note:${id}` },
+  },
+  [PERSON]: {
+    class: Person,
+    getId: (o: Person) => o.state.id,
+    membership: { kind: "pinned" },
   },
 });
 
@@ -305,5 +323,168 @@ describe("起点ノードの見え方", () => {
     ]);
     const after = store.getState().worldLineGraph.graphs[LOCAL];
     expect(Object.keys(after.nodes)).toHaveLength(before + 1);
+  });
+});
+
+
+describe("isAbsentInScope — 「読めない」と「無い」を分ける", () => {
+  it("一度も記録されていなければ「無い」", () => {
+    const store = fakeStore();
+    expect(isAbsentInScope(store, APP_SCOPE_ID, NOTE, "n1")).toBe(true);
+  });
+
+  it("値が CAS から追い出されていても「無い」とは言わない", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    store.evict(NOTE, "n1");
+
+    // 値としては読めない（ここで「無い」と判断すると空で上書きしてしまう）
+    expect(readFromScope(store, APP_SCOPE_ID, NOTE, "n1")).toBeUndefined();
+    // 参照は残っているので「無い」ではない
+    expect(isAbsentInScope(store, APP_SCOPE_ID, NOTE, "n1")).toBe(false);
+  });
+
+  it("削除済み（tombstone）は「無い」", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    removeObject(store, NOTE, "n1");
+    expect(isAbsentInScope(store, APP_SCOPE_ID, NOTE, "n1")).toBe(true);
+  });
+});
+
+describe("commitCandidates — ラベルは新しいノードにだけ付ける", () => {
+  const labelsOf = (store: ReturnType<typeof fakeStore>, scopeId: string) => {
+    const graph = store.getState().worldLineGraph.graphs[scopeId];
+    return Object.values(graph.nodes).map((n) => (n as { label?: string }).label);
+  };
+
+  it("案が既存の状態と同じでも、既存ノードの名前を奪わない", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, LOCAL, NOTE, base);
+
+    // 起点に人が名前を付けている状態を作る
+    const graphJson = store.getState().worldLineGraph.graphs[LOCAL];
+    const rootId = graphJson.rootNodeId as string;
+    store.dispatch(
+      setGraph({
+        scopeId: LOCAL,
+        graph: WorldLineGraph.fromJSON(graphJson)
+          .setNodeLabel(rootId, "大事な世界")
+          .toJSON(),
+      })
+    );
+
+    // 案1が起点とまったく同じ状態＝ grow は新ノードを作らず起点へスナップする
+    commitCandidates(store, LOCAL, NOTE, base, [
+      { obj: new Note({ id: "n1", text: "元" }), label: "案1" },
+    ]);
+
+    const after = store.getState().worldLineGraph.graphs[LOCAL];
+    // 前提: スナップが起きて新しいノードは増えていない（増えていたらこのテストは無意味）
+    expect(Object.keys(after.nodes)).toHaveLength(1);
+    expect(after.nodes[rootId].label).toBe("大事な世界");
+    expect(labelsOf(store, LOCAL)).not.toContain("案1");
+  });
+
+  it("新しく生まれたノードには名前が付く", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, LOCAL, NOTE, base);
+
+    commitCandidates(store, LOCAL, NOTE, base, [
+      { obj: new Note({ id: "n1", text: "案1の内容" }), label: "案1" },
+    ]);
+
+    expect(labelsOf(store, LOCAL)).toContain("案1");
+  });
+});
+
+
+describe("ensureWorldBorn — 世界の誕生", () => {
+  const typesAtRoot = (store: ReturnType<typeof fakeStore>, scopeId: string) =>
+    rootRefsOf(store, scopeId);
+
+  it("持ち主一式と固定メンバーが、1ノードにまとまって載る", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p1", name: "田中" }));
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p2", name: "佐藤" }));
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    commitToScope(store, APP_SCOPE_ID, LOG, new Log({ id: "n1", lines: [] }));
+
+    ensureWorldBorn(store, LOCAL);
+
+    // 起点は1ノード。持ち主（Note/Log）と固定メンバー（Person 2人）が全部載る
+    const graph = store.getState().worldLineGraph.graphs[LOCAL];
+    expect(Object.keys(graph.nodes)).toHaveLength(1);
+    expect(typesAtRoot(store, LOCAL).sort()).toEqual([LOG, NOTE, PERSON, PERSON].sort());
+    expect(refsOfTypeInScope(store, LOCAL, PERSON).map((r) => r.id).sort()).toEqual([
+      "p1",
+      "p2",
+    ]);
+  });
+
+  it("固定メンバーの値が CAS から追い出されていても焼き付けられる（参照を写すだけ）", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p1", name: "田中" }));
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    store.evict(PERSON, "p1");
+
+    ensureWorldBorn(store, LOCAL);
+
+    expect(refsOfTypeInScope(store, LOCAL, PERSON).map((r) => r.id)).toEqual(["p1"]);
+  });
+
+  it("2回呼んでも増えない（冪等）", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    ensureWorldBorn(store, LOCAL);
+    const before = Object.keys(store.getState().worldLineGraph.graphs[LOCAL].nodes).length;
+    ensureWorldBorn(store, LOCAL);
+    expect(
+      Object.keys(store.getState().worldLineGraph.graphs[LOCAL].nodes)
+    ).toHaveLength(before);
+  });
+
+  it("グローバルで固定メンバーを消しても、既に焼き付いた世界からは消えない", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p1", name: "田中" }));
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    ensureWorldBorn(store, LOCAL);
+
+    removeObject(store, PERSON, "p1");
+
+    // グローバルからは消える。この世界の中には残る
+    expect(refsOfTypeInScope(store, APP_SCOPE_ID, PERSON)).toHaveLength(0);
+    expect(refsOfTypeInScope(store, LOCAL, PERSON).map((r) => r.id)).toEqual(["p1"]);
+  });
+
+  it("グローバルで固定メンバーを書き換えても、焼き付いた世界の値は動かない", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p1", name: "田中" }));
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+    ensureWorldBorn(store, LOCAL);
+    const pinnedHash = refsOfTypeInScope(store, LOCAL, PERSON)[0].hash;
+
+    saveObject(store, PERSON, new Person({ id: "p1", name: "田中(退職)" }));
+
+    expect(refsOfTypeInScope(store, LOCAL, PERSON)[0].hash).toBe(pinnedHash);
+    expect(store.getState().worldLineGraph.cas[pinnedHash]).toEqual({
+      id: "p1",
+      name: "田中",
+    });
+  });
+
+  it("最初の編集で世界が生まれるときも、固定メンバーは載る", () => {
+    const store = fakeStore();
+    commitToScope(store, APP_SCOPE_ID, PERSON, new Person({ id: "p1", name: "田中" }));
+    commitToScope(store, APP_SCOPE_ID, NOTE, new Note({ id: "n1", text: "元" }));
+
+    // 誕生を明示せず、いきなり編集を記録する経路
+    saveLocalBundle(store, LOCAL, [
+      { type: NOTE, obj: new Note({ id: "n1", text: "編集後" }) },
+    ]);
+
+    expect(typesAtRoot(store, LOCAL)).toContain(PERSON);
   });
 });

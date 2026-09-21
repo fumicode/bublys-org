@@ -1,14 +1,14 @@
 import {
-  DEFAULT_SHIFT_INTERVAL_RULES,
-  ScheduleConstraints,
+  ConstraintSet,
+  ShiftLeaderRule,
   type ShiftLeaderRuleState,
 } from "@bublys-org/hotel-shift-puzzle-model";
 
 /**
- * サンプルの制約（勤務表ごとの ScheduleConstraints）。
+ * サンプルの制約（勤務表ごとの ConstraintSet）。
  *
  * 以前は「責任者ロールの定義（config）」＋「どのスタッフが責任者か（Staff.leaderRoleKeys）」に
- * 分かれていたが、制約は勤務表側の要件なので ScheduleConstraints に一本化した。ここはその
+ * 分かれていたが、制約は勤務表側の要件なので ConstraintSet に一本化した。ここはその
  * サンプル（会社ごとに差し替える想定の入口）。
  *   - 早責: 早番に最低1人。会計の女性2人＋高橋。
  *   - 予責: 早番に最低1人（予約責任者）。山本（兼務）＋田中。
@@ -33,27 +33,33 @@ const SAMPLE_LEADERS_BY_ROLE: Record<string, string[]> = {
 };
 
 /**
- * 指定した勤務表IDの制約（責任者ルール＋連勤上限＋勤務間インターバル＋希望チェック）を作る。
+ * サンプルの制約セット（責任者ルール＋連勤上限＋希望チェック）を作る。
+ * id はグローバルのテンプレートなら "global"、勤務表ごとの独自セットなら scheduleId。
+ *
+ * 勤務間インターバル（遅番明け）は会社ごとに変わらない法律由来なので、ここでは持たせず
+ * ConstraintSet の既定（DEFAULT_SHIFT_INTERVAL_RULES）に任せる。
  *
  * `maxDayOffPerDay` は勤務表ごとに変えられる。終盤シナリオ（9月）は「その日に休める枠が
  * もう残っていない」状況を作りたいので、需要から決まる休み人数ちょうどまで絞る。
  */
-export function createSampleConstraintsFor(
-  scheduleId: string,
+export function createSampleConstraintSetFor(
+  id: string,
   options: { maxDayOffPerDay?: number } = {}
-): ScheduleConstraints {
-  const leaderRules: ShiftLeaderRuleState[] = LEADER_ROLE_DEFS.map((def) => ({
-    ...def,
-    leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
-  }));
-  return new ScheduleConstraints({
-    scheduleId,
+): ConstraintSet {
+  const leaderRules = LEADER_ROLE_DEFS.map(
+    (def) =>
+      new ShiftLeaderRule({
+        ...def,
+        leaderStaffIds: [...(SAMPLE_LEADERS_BY_ROLE[def.key] ?? [])],
+      })
+  );
+  return new ConstraintSet({
+    id,
     leaderRules,
     maxConsecutiveWorkdays: 5,
     checkShiftWish: true,
     minMonthlyDayOff: 8,
     maxDayOffPerDay: options.maxDayOffPerDay ?? 8,
-    shiftIntervalRules: DEFAULT_SHIFT_INTERVAL_RULES,
   });
 }
 

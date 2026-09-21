@@ -8,7 +8,11 @@ import {
   createDefaultWorkShiftSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { WorkShiftListView } from "../ui/WorkShiftListView.js";
-import { useObjectShell, useObjectRepo } from "../objects/repository.js";
+import {
+  useObjectShell,
+  useObjectRepo,
+  useObjectsPending,
+} from "../objects/repository.js";
 import {
   WORKSHIFT_SET_TYPE,
   GLOBAL_WORKSHIFT_SET_ID,
@@ -30,10 +34,13 @@ export const WorkShiftCollection: FC = () => {
   );
   const repo = useObjectRepo<WorkShiftSet>(WORKSHIFT_SET_TYPE);
 
-  // 無ければ既定のグローバルセットをその場で用意する
+  // 無ければ既定のグローバルセットをその場で用意する。
+  // 状態が揃うまでは動かさない（追い出されただけのセットを既定で上書きしないため）。
+  const pending = useObjectsPending();
   useEffect(() => {
+    if (pending) return;
     if (!set) repo.save(createDefaultWorkShiftSet(GLOBAL_WORKSHIFT_SET_ID));
-  }, [set, repo]);
+  }, [pending, set, repo]);
 
   const shifts = set?.shifts ?? [];
 

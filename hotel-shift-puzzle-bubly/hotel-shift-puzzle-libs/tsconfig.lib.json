@@ -14,10 +14,13 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
+      "path": "../../bublys-libs/model-graph/tsconfig.lib.json"
     },
     {
       "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/world-line-graph/tsconfig.lib.json"
     },
     {
       "path": "../hotel-shift-puzzle-model/tsconfig.lib.json"

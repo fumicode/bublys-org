@@ -24,7 +24,8 @@ import {
 } from "../world-file/collectWorldFile.js";
 import { applyWorldFile, clearDocumentScopes } from "../world-file/applyWorldFile.js";
 import { buildSampleItems } from "../objects/seed.js";
-import { commitBundle } from "../objects/commit.js";
+import { commitBundle, bornWorldsOf } from "../objects/commit.js";
+import { migrateLegacyScopes } from "../objects/migrateLegacyScopes.js";
 import { APP_SCOPE_ID } from "../objects/repository.js";
 import {
   validateWorldFile,
@@ -216,9 +217,16 @@ export function useWorldFile(): WorldFileController {
         }
         const { file, warnings } = validateWorldFile(parsed);
         const result = await applyWorldFile(store, file);
+        // 古い形式（固定メンバーの無い世界線）を含むファイルは、ここで作り直す。
+        // 勤務表の内容は残り、その試行錯誤の履歴だけが失われる。
+        const rebuilt = migrateLegacyScopes(store);
         dispatch(worldFileSynced({ fileName: name, note: file.note ?? "" }));
 
-        const summary = `${name} を読み込みました（世界線 ${result.loadedScopes} 件・状態 ${result.casCount} 件）`;
+        const legacyNote =
+          rebuilt.length > 0
+            ? `。古い形式の世界線 ${rebuilt.length} 件を作り直しました（勤務表は残り、履歴のみ失われます）`
+            : "";
+        const summary = `${name} を読み込みました（世界線 ${result.loadedScopes} 件・状態 ${result.casCount} 件）${legacyNote}`;
         if (warnings.length > 0) {
           return {
             kind: "warn" as const,
@@ -257,6 +265,9 @@ export function useWorldFile(): WorldFileController {
     const items = buildSampleItems();
     clearDocumentScopes(store);
     commitBundle(store, APP_SCOPE_ID, items);
+    // 例データの勤務表にもそれぞれの世界を持たせる。ここで誕生させておかないと、
+    // 最初の編集まで固定メンバーが載らず、それまでは名簿を消すと行が消えてしまう。
+    bornWorldsOf(store, items);
     detach();
     setMessage({
       kind: "info",

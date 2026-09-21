@@ -220,6 +220,44 @@ describe('MonthlyStaffSchedule（月間スタッフ勤務表）の使い方', ()
     expect(assignment.day).toBeInstanceOf(WorkingDay);
   });
 
+  test('clearStaff はその人の割当を月内すべて取り除く（他の人・元の勤務表は無傷）', () => {
+    const june2 = WorkingDay.of(2026, 6, 2);
+    const schedule = createJuneSchedule()
+      .assignShift('staff-A', june1, 'early')
+      .assignDayOff('staff-A', june2)
+      .assignShift('staff-B', june1, 'late');
+
+    const cleared = schedule.clearStaff('staff-A');
+
+    expect(cleared.assignmentsForStaff('staff-A')).toEqual([]);
+    // 行が消えても割当が残るとフッターが数え続けるので、集計から消えることまで見る
+    expect(cleared.countWorkingByShift(june1).get('early')).toBeUndefined();
+    expect(cleared.countDayOffOn(june2)).toBe(0);
+    // 他の人は無傷
+    expect(cleared.getShiftIdFor('staff-B', june1)).toBe('late');
+    // 元は不変
+    expect(schedule.getShiftIdFor('staff-A', june1)).toBe('early');
+  });
+
+  test('clearStaff は割当が無ければ自分自身を返す（無駄な世界線ノードを作らない）', () => {
+    const schedule = createJuneSchedule().assignShift('staff-A', june1, 'early');
+    expect(schedule.clearStaff('staff-Z')).toBe(schedule);
+  });
+
+  test('workingStaffGroupId は既定で勤務表と同じID。古い記録にも同じ値で補われる', () => {
+    const schedule = createJuneSchedule();
+    expect(schedule.workingStaffGroupId).toBe('sched-1');
+
+    // 勤務スタッフ群より前に保存された勤務表（workingStaffGroupId が無い）
+    const legacy = { ...schedule.toPlain() } as Record<string, unknown>;
+    delete legacy.workingStaffGroupId;
+    expect(
+      MonthlyStaffSchedule.fromPlain(
+        legacy as unknown as ReturnType<MonthlyStaffSchedule['toPlain']>
+      ).workingStaffGroupId
+    ).toBe('sched-1');
+  });
+
   test('toPlain / fromPlain で入れ子まで plain ↔ インスタンスを往復できる', () => {
     const original = createJuneSchedule()
       .assignShift('staff-A', june1, 'early')

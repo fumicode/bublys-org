@@ -5,16 +5,21 @@
  * ○（したい）と×（避けたい）のセルを描き、有効なら色付き、無効（off）なら淡色にする。
  */
 import { FC } from "react";
+import { ICON_SIZE } from "./common.js";
 
-type Props = { on: boolean };
+type Props = {
+  on: boolean;
+  /** 1辺のサイズ（px）。バーは既定の80、バブルの図は大きく描く */
+  size?: number;
+};
 
-export const WishIcon: FC<Props> = ({ on }) => {
+export const WishIcon: FC<Props> = ({ on, size = ICON_SIZE }) => {
   const wantBg = on ? "#e8f5e9" : "#f5f5f5";
   const wantFg = on ? "#2e7d32" : "#bdbdbd";
   const avoidBg = on ? "#ffebee" : "#f5f5f5";
   const avoidFg = on ? "#c62828" : "#bdbdbd";
   return (
-    <svg className="e-icon-svg" width={80} height={80} viewBox="0 0 80 80" aria-hidden>
+    <svg className="e-icon-svg" width={size} height={size} viewBox="0 0 80 80" aria-hidden>
       {/* ○ したい */}
       <rect x={16} y={20} width={22} height={22} rx={4} fill={wantBg} stroke={wantFg} strokeWidth={1.4} />
       <circle cx={27} cy={31} r={6} fill="none" stroke={wantFg} strokeWidth={2.2} />

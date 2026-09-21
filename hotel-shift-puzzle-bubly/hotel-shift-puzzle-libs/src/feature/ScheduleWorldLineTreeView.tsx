@@ -12,13 +12,14 @@ import { FC, useState } from "react";
 import styled from "styled-components";
 import { WorldLineTreeView } from "@bublys-org/world-line-graph";
 import { useScheduleHistory } from "./useScheduleHistory.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type Props = {
   scheduleId: string;
 };
 
-export const ScheduleWorldLineTreeView: FC<Props> = ({ scheduleId }) => {
-  const { scope } = useScheduleHistory(scheduleId);
+const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
+  const { scope } = useScheduleHistory();
   const getNodeLabel = (id: string) => scope.graph.state.nodes[id]?.label ?? "";
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -142,3 +143,10 @@ const StyledDetailPanel = styled.div`
     font-weight: 600;
   }
 `;
+
+/** この勤務表の世界に入ってから木を描く */
+export const ScheduleWorldLineTreeView: FC<Props> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <ScheduleWorldLineTreeViewBody {...props} />
+  </ScheduleWorld>
+);
