@@ -1,12 +1,19 @@
 /**
  * 岸（Showre = shore + show）。
  *
- * ルール: 「バブルは浮いているか、岸に着いているかのどちらか。岸に着いたバブルは帯になる。
- *          岸はユニバースごとに 4 つある。」
- *
- * 岸に着いたバブルは奥行き（process.layers）を持たない。かわりに、どの辺の何番目に
- * 居るかだけを持つ。岸の並びは配置（BubbleArrangement）の一部なので世界線に入る。
+ * ルール:
+ *   1. バブルを掴んで画面の縁に寄せて離すと、その辺に貼り付く。
+ *      **大きさはそのまま、辺と直交する向きの位置は落とした場所のまま**
+ *   2. 角の近くなら 2 辺に貼る
+ *   3. 海をスクロールしても、貼り付いたバブルは画面から動かない（位置は画面の座標）
+ *   4. **貼り付いたバブルどうしは重ならない。後から来た方が、落とした点の入る
+ *      空き区間に収まるまで縮む**
+ *   5. 並びも順序も無い。辺のどこに貼るかはユーザーが決める
+ *   6. **大きさはバブル自身が持つ**。岸は「どの辺に、どこで留まっているか」だけを覚える。
+ *      だからリサイズすれば貼った辺は動かず、掴んだ側だけが動く
  */
+
+import type { Point2, Size2 } from "@bublys-org/bubbles-ui-util";
 
 export type ShowreSide = "top" | "bottom" | "left" | "right";
 
@@ -15,136 +22,295 @@ export const SHOWRE_SIDES: readonly ShowreSide[] = ["top", "bottom", "left", "ri
 export const isShowreSide = (v: unknown): v is ShowreSide =>
   typeof v === "string" && (SHOWRE_SIDES as readonly string[]).includes(v);
 
-/** left / right は縦長の帯、top / bottom は横長の帯 */
-export const isVerticalShowre = (side: ShowreSide): boolean =>
-  side === "left" || side === "right";
+/** 画面の矩形（左上と大きさ） */
+export type ScreenRect = { x: number; y: number; width: number; height: number };
 
 /**
- * 各辺に着いているバブル ID の並び（配列の順 = 帯の並び順）と、
- * 岸が使われ始めた順（`order`）。
+ * 1 つのバブルの留め方。
+ * `at` は画面（ビューポート）の左上からの位置。貼った辺の成分は辺に合わせて上書きされるので、
+ * 覚えているのは「辺と直交する向きの位置」だけ、と思ってよい。
  *
- * `order` はルール「先に貼った岸が角を取る」のためのもの。先に使われ始めた岸ほど
- * 外側に置かれ、四隅を取る。誰も居なくなった岸は order から抜ける。
+ * ★ 大きさは持たない。岸に貼っても**バブルの大きさはバブル自身のもの**（ルール 6）。
+ *   ここにも持つと、リサイズしたときに二重管理がずれる（貼った辺が動く・反対側が縮む）。
  */
-export type ShowresState = Record<ShowreSide, string[]> & {
-  order: ShowreSide[];
+export type DockState = {
+  readonly edges: readonly ShowreSide[];
+  readonly at: Point2;
 };
 
-export const emptyShowresState = (): ShowresState => ({
-  top: [],
-  bottom: [],
-  left: [],
-  right: [],
-  order: [],
-});
+/** 岸に貼り付いているバブル（id → 留め方）。辺ごとの並びではない */
+export type DocksState = Record<string, DockState>;
+
+export const emptyDocksState = (): DocksState => ({});
+
+/** 貼り付けるか判定する、辺からの距離（px） */
+export const SHOWRE_DOCK_THRESHOLD = 24;
+
+/** 貼り付いたバブルどうしの、これ以上詰めない隙間（px） */
+export const SHOWRE_DOCK_GAP = 8;
+
+/** 縮められる下限（px）。これより狭い空きには貼れない */
+export const SHOWRE_MIN_SIZE: Size2 = { width: 120, height: 80 };
+
+const overlaps1 = (aLo: number, aHi: number, bLo: number, bHi: number): boolean =>
+  aLo < bHi && bLo < aHi;
+
+/** 2 つの矩形が重なるか（辺で接するだけは重なりではない） */
+export const rectsOverlap = (a: ScreenRect, b: ScreenRect): boolean =>
+  overlaps1(a.x, a.x + a.width, b.x, b.x + b.width) &&
+  overlaps1(a.y, a.y + a.height, b.y, b.y + b.height);
 
 /**
- * 点 (x, y) から見て一番近い辺。同距離なら左・右を優先する
- * （画面は横長が普通で、左右の方が縦の余白を奪わないため）。
+ * 点が画面のどの辺に近いか。近い辺をすべて返す（角なら 2 つ）。
+ * 遠ければ空（＝貼らない、海に浮く）。
  */
-export const nearestShowreSide = (
-  point: { x: number; y: number },
-  size: { width: number; height: number },
-): ShowreSide => {
-  const distances: Record<ShowreSide, number> = {
-    left: point.x,
-    right: size.width - point.x,
-    top: point.y,
-    bottom: size.height - point.y,
-  };
-  // 優先順に並べて reduce すれば、同距離のとき先に出た方（left / right）が残る
-  return (["left", "right", "top", "bottom"] as const).reduce((best, side) =>
-    distances[side] < distances[best] ? side : best,
-  );
-};
-
-export class Showres {
-  constructor(readonly state: ShowresState) {}
-
-  static empty(): Showres {
-    return new Showres(emptyShowresState());
-  }
-
-  static fromJSON(json: Partial<ShowresState> | undefined | null): Showres {
-    const empty = emptyShowresState();
-    if (!json) return new Showres(empty);
-    const sides = {
-      top: [...(json.top ?? empty.top)],
-      bottom: [...(json.bottom ?? empty.bottom)],
-      left: [...(json.left ?? empty.left)],
-      right: [...(json.right ?? empty.right)],
-    };
-    return new Showres({ ...sides, order: normalizeOrder(json.order, sides) });
-  }
-
-  toJSON(): ShowresState {
-    return this.state;
-  }
-
-  /** その辺に着いているバブル ID の並び */
-  on(side: ShowreSide): readonly string[] {
-    return this.state[side];
-  }
-
-  /** バブルがどの岸に居るか。浮いていれば undefined */
-  sideOf(bubbleId: string): ShowreSide | undefined {
-    return SHOWRE_SIDES.find((side) => this.state[side].includes(bubbleId));
-  }
-
-  /** 岸に居るすべてのバブル ID */
-  get allIds(): string[] {
-    return SHOWRE_SIDES.flatMap((side) => this.state[side]);
-  }
-
-  /**
-   * 岸が使われ始めた順（外側 → 内側）。誰かが居る岸だけ。
-   * 先に貼った岸ほど外側で、角を取る。
-   */
-  get order(): readonly ShowreSide[] {
-    return this.state.order;
-  }
-
-  /**
-   * 着岸。既にどこかの岸に居れば外してから着ける。
-   * index を省略すると末尾。範囲外は端に丸める。
-   */
-  dock(bubbleId: string, side: ShowreSide, index?: number): Showres {
-    const removed = this.undock(bubbleId);
-    const list = [...removed.state[side]];
-    const at = index === undefined ? list.length : Math.max(0, Math.min(index, list.length));
-    list.splice(at, 0, bubbleId);
-    const sides = { ...removed.state, [side]: list };
-    return new Showres({ ...sides, order: normalizeOrder(removed.state.order, sides) });
-  }
-
-  /** 引き剥がし。居なければそのまま */
-  undock(bubbleId: string): Showres {
-    if (this.sideOf(bubbleId) === undefined) return this;
-    const sides = emptyShowresState();
-    for (const side of SHOWRE_SIDES) {
-      sides[side] = this.state[side].filter((id) => id !== bubbleId);
-    }
-    return new Showres({ ...sides, order: normalizeOrder(this.state.order, sides) });
-  }
-
-  /** 辺の移動・辺内の並び替え。dock と同じ（岸に居なければ着岸になる） */
-  move(bubbleId: string, side: ShowreSide, index: number): Showres {
-    return this.dock(bubbleId, side, index);
-  }
-}
-
-/**
- * order を「誰かが居る岸だけ・重複なし・使われ始めた順」に整える。
- * 既存の order は残し、order に無いのに誰かが居る岸は末尾に足す
- * （古い保存形式に order が無い場合は、辺の既定順で補う）。
- */
-const normalizeOrder = (
-  order: readonly ShowreSide[] | undefined,
-  sides: Record<ShowreSide, string[]>,
+export const edgesNear = (
+  point: Point2,
+  viewport: Size2,
+  threshold: number = SHOWRE_DOCK_THRESHOLD,
 ): ShowreSide[] => {
-  const result: ShowreSide[] = [];
-  for (const side of [...(order ?? []), ...SHOWRE_SIDES]) {
-    if (sides[side].length > 0 && !result.includes(side)) result.push(side);
-  }
-  return result;
+  const edges: ShowreSide[] = [];
+  if (point.y <= threshold) edges.push("top");
+  else if (viewport.height - point.y <= threshold) edges.push("bottom");
+  if (point.x <= threshold) edges.push("left");
+  else if (viewport.width - point.x <= threshold) edges.push("right");
+  return edges;
 };
+
+/**
+ * 貼り付いたあとの矩形（重なりを見る前）。
+ * 貼った辺の成分は辺に合わせ、もう一方は `at` のまま（落とした場所）。
+ * 画面からははみ出させない。
+ */
+export const anchoredRect = (dock: DockState, size: Size2, viewport: Size2): ScreenRect => {
+  const { edges, at } = dock;
+  const width = Math.min(size.width, viewport.width);
+  const height = Math.min(size.height, viewport.height);
+  const x = edges.includes("left")
+    ? 0
+    : edges.includes("right")
+      ? viewport.width - width
+      : clamp(at.x, 0, Math.max(0, viewport.width - width));
+  const y = edges.includes("top")
+    ? 0
+    : edges.includes("bottom")
+      ? viewport.height - height
+      : clamp(at.y, 0, Math.max(0, viewport.height - height));
+  return { x, y, width, height };
+};
+
+const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), hi);
+
+/** 置き場所の留め方（CSS の left/right/top/bottom にそのまま渡せる形） */
+export type SlotStyle = {
+  left?: number;
+  right?: number;
+  top?: number;
+  bottom?: number;
+};
+
+/**
+ * 貼り付いたバブルの置き場所を、**辺で**留める形にする。
+ *
+ * 大きさを書かないのが肝。貼った辺は `0` で留め（左なら `left: 0`、下なら `bottom: 0`）、
+ * 箱の大きさはバブル自身が決めるので、貼ったままリサイズしても貼った辺は動かない。
+ * 貼っていない向きだけ、落とした場所（`at`）に置く。
+ */
+export const slotStyle = (dock: DockState, viewport: Size2, size?: Size2): SlotStyle => {
+  const rect = size ? anchoredRect(dock, size, viewport) : null;
+  const horizontal: SlotStyle = dock.edges.includes("left")
+    ? { left: 0 }
+    : dock.edges.includes("right")
+      ? { right: 0 }
+      : { left: rect ? rect.x : clamp(dock.at.x, 0, viewport.width) };
+  const vertical: SlotStyle = dock.edges.includes("top")
+    ? { top: 0 }
+    : dock.edges.includes("bottom")
+      ? { bottom: 0 }
+      : { top: rect ? rect.y : clamp(dock.at.y, 0, viewport.height) };
+  return { ...horizontal, ...vertical };
+};
+
+/**
+ * ルール 4。**後から来た方が縮む。**
+ *
+ * - **貼っていない向き**（左右の辺に貼ったときの縦）は、落とした場所をなるべく保ち、
+ *   先客に挟まれた空き区間に収まるまで縮む
+ * - **貼った向き**は辺に付いたまま、辺から先客までの空きに収まるまで縮む
+ * - 先客の上に落とそうとしたときと、空きが下限より狭いときは `null`（そこには貼れない）
+ *
+ * @param others 先に貼り付いているバブルの矩形（画面座標）
+ */
+export const fitAmongDocked = (
+  dock: DockState,
+  /** 貼ろうとしているバブルの大きさ（これが空きに入らなければ縮む） */
+  size: Size2,
+  viewport: Size2,
+  others: readonly ScreenRect[],
+  /** 落とした点（ビューポート座標）。空き区間はこの点が入っている所を探す */
+  pointer: Point2,
+  min: Size2 = SHOWRE_MIN_SIZE,
+  gap: number = SHOWRE_DOCK_GAP,
+): ScreenRect | null => {
+  const rect = anchoredRect(dock, size, viewport);
+  const anchorOf = (lo: ShowreSide, hi: ShowreSide): Anchor =>
+    dock.edges.includes(lo) ? "start" : dock.edges.includes(hi) ? "end" : null;
+  const anchorY = anchorOf("top", "bottom");
+  const anchorX = anchorOf("left", "right");
+
+  // 貼っていない向きから先に収める（貼った向きの空きは、その結果で変わるので）
+  const first: "x" | "y" = anchorY === null ? "y" : "x";
+  const second = first === "y" ? "x" : "y";
+  const anchors = { x: anchorX, y: anchorY } as const;
+  const limits = { x: viewport.width, y: viewport.height } as const;
+  const mins = { x: min.width, y: min.height } as const;
+  const pointers = { x: pointer.x, y: pointer.y } as const;
+
+  let out = rect;
+  for (const axis of [first, second] as const) {
+    const lo = axis === "x" ? out.x : out.y;
+    const len = axis === "x" ? out.width : out.height;
+    // その向きで重なりうるのは、もう一方の向きで重なっている先客だけ
+    const cross = axis === "x" ? "y" : "x";
+    const crossLo = cross === "x" ? out.x : out.y;
+    const crossLen = cross === "x" ? out.width : out.height;
+    const blockers = others
+      .filter((o) => {
+        const oLo = cross === "x" ? o.x : o.y;
+        const oLen = cross === "x" ? o.width : o.height;
+        return overlaps1(crossLo, crossLo + crossLen, oLo, oLo + oLen);
+      })
+      .map((o) => (axis === "x" ? ([o.x, o.x + o.width] as const) : ([o.y, o.y + o.height] as const)));
+    const fitted = fitAxis(lo, len, anchors[axis], pointers[axis], limits[axis], blockers, mins[axis], gap);
+    if (!fitted) return null;
+    out = axis === "x"
+      ? { ...out, x: fitted.lo, width: fitted.len }
+      : { ...out, y: fitted.lo, height: fitted.len };
+  }
+  return out;
+};
+
+/** 貼った向き（辺に付いている側）。null は貼っていない向き */
+type Anchor = "start" | "end" | null;
+
+/**
+ * 1 つの向きを空き区間に収める。
+ * 貼った向きは辺に付いたまま縮み、貼っていない向きは落とした場所をなるべく保って縮む。
+ */
+const fitAxis = (
+  lo: number,
+  len: number,
+  anchor: Anchor,
+  pointer: number,
+  limit: number,
+  blocked: readonly (readonly [number, number])[],
+  min: number,
+  gap: number,
+): { lo: number; len: number } | null => {
+  // 「ここに居たい」点。貼った向きは辺、貼っていない向きは**落とした点**
+  const probe = anchor === "start" ? 0 : anchor === "end" ? limit : pointer;
+  const span = freeSpan(probe, limit, blocked, gap);
+  if (!span) return null;
+  const room = span.hi - span.lo;
+  if (room < min) return null;
+  const next = Math.min(len, room);
+  const at =
+    anchor === "start" ? span.lo
+    : anchor === "end" ? span.hi - next
+    : clamp(lo, span.lo, span.hi - next);
+  return { lo: at, len: next };
+};
+
+/**
+ * `probe` を含む、先客に塞がれていない区間。probe が先客の上（隙間の中も含む）なら null。
+ */
+const freeSpan = (
+  probe: number,
+  limit: number,
+  blocked: readonly (readonly [number, number])[],
+  gap: number,
+): { lo: number; hi: number } | null => {
+  let lo = 0;
+  let hi = limit;
+  for (const [bLo, bHi] of blocked) {
+    if (probe > bLo - gap && probe < bHi + gap) return null;
+    if (bHi + gap <= probe) lo = Math.max(lo, bHi + gap);
+    else hi = Math.min(hi, bLo - gap);
+  }
+  return hi > lo ? { lo, hi } : null;
+};
+
+/**
+ * 岸に貼り付いているバブルたちの、画面上の矩形。
+ * 重なりの解決（ルール 4）は貼るときに済ませてあるので、ここは貼った値をそのまま写すだけ。
+ */
+export const dockedRects = (
+  docks: DocksState,
+  sizes: Record<string, Size2>,
+  viewport: Size2,
+): Record<string, ScreenRect> => {
+  const out: Record<string, ScreenRect> = {};
+  for (const [id, dock] of Object.entries(docks)) {
+    const size = sizes[id];
+    if (size) out[id] = anchoredRect(dock, size, viewport);
+  }
+  return out;
+};
+
+/** 縁に「着いている」とみなす許容（px）。これ以内なら接している */
+export const SHOWRE_TOUCH_TOLERANCE = 2;
+
+/** 縁に吸い寄せる距離（px）。これ以内なら、ぴたりと縁に合わせる */
+export const SHOWRE_SNAP = 6;
+
+/**
+ * その矩形が**いま**海の縁に接している辺。
+ *
+ * ★ 留め方（{@link DockState.edges}）とは別物。留め方は「落としたときにどの辺へ
+ *   寄せたか」＝位置の決まり方で、こちらは「いまどの辺に着いているか」＝見た目。
+ *   下辺に留めたバブルを左端まで伸ばせば、左辺にも**着く**。
+ *   管を引くかどうか（接ぎ目）は、こちらで決める。
+ */
+export const touchingEdges = (
+  rect: ScreenRect,
+  viewport: Size2,
+  tolerance: number = SHOWRE_TOUCH_TOLERANCE,
+): ShowreSide[] => {
+  const edges: ShowreSide[] = [];
+  if (rect.y <= tolerance) edges.push("top");
+  if (rect.x + rect.width >= viewport.width - tolerance) edges.push("right");
+  if (rect.y + rect.height >= viewport.height - tolerance) edges.push("bottom");
+  if (rect.x <= tolerance) edges.push("left");
+  return edges;
+};
+
+/**
+ * 縁の近くまで来た辺を、縁にぴたりと合わせる。
+ *
+ * 数 px だけ空いた状態は「着いていないが、着いているように見える」いちばん悪い形
+ * （管が 2 本並んで隙間が出る）。着くなら着く、離れるなら離れる、のどちらかにする。
+ */
+export const snapToViewport = (
+  rect: ScreenRect,
+  viewport: Size2,
+  snap: number = SHOWRE_SNAP,
+): ScreenRect => {
+  let { x, y, width, height } = rect;
+  if (x <= snap && x !== 0) {
+    width += x;
+    x = 0;
+  }
+  if (y <= snap && y !== 0) {
+    height += y;
+    y = 0;
+  }
+  const right = viewport.width - (x + width);
+  if (right <= snap && right !== 0) width += right;
+  const bottom = viewport.height - (y + height);
+  if (bottom <= snap && bottom !== 0) height += bottom;
+  return { x, y, width, height };
+};
+
+/** そのバブルが貼り付いている辺。貼っていなければ空 */
+export const edgesOf = (docks: DocksState, bubbleId: string): readonly ShowreSide[] =>
+  docks[bubbleId]?.edges ?? [];

@@ -31,8 +31,6 @@ import {
   measureViewport,
   OpeningPosition,
   DragDataType,
-  ShowreLayout,
-  ROOT_UNIVERSE_ID,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 import { BubbleContent } from "../ui/BubbleContent";
@@ -273,7 +271,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
       {/* <BubbleArrangementInspector /> */}
 
       <BubblesContext.Provider value={bubblesContextValue}>
-        <ShowreLayout universeId={ROOT_UNIVERSE_ID} renderBubbleContent={renderAppsBubbleContent}>
           {/* 表示状態を world-line に同期し undo/redo + 世界線グラフ起動を提供。
               openBubble を使うため BubblesContext.Provider の内側に配置する。 */}
           <BubbleArrangementWorldLineControls />
@@ -432,7 +429,6 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
             <TuneIcon />
           </IconButton>
         )}
-        </ShowreLayout>
       </BubblesContext.Provider>
     </Box>
   );

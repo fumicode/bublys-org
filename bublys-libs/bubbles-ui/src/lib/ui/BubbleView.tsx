@@ -15,6 +15,9 @@ import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
 import { BubbleSkeleton } from "./BubbleSkeleton.js";
 import { cornerRadiusFor, type BandSide } from "./link-band-path.js";
+import { useHeaderShift } from "../hooks/useHeaderShift.js";
+import { useShowreEdges } from "../showre/ShowreContext.js";
+import { TUBE_THICKNESS } from "../showre/tube.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -160,39 +163,26 @@ const BubbleViewInner: FC<BubbleProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked });
-  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint, docked });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
-  const [headerOffset, setHeaderOffset] = useState(0);
+  /** 貼り付いている辺。その辺は動かせないので、リサイズもレイヤーも出さない */
+  const gluedEdges = useShowreEdges();
 
   const isHeaderVisible = isFocused || isMouseNearTop;
 
   /**
-   * ヘッダーを押し下げる基準の上端。
-   *
-   * バブルが universe の中にいるときは、その universe の窓（`main.e-window-content`）の
-   * 上端が「見えている範囲の上端」。ブラウザの viewport（0）を基準にすると、
-   * 入れ子の中で上端に張り付いたバブルのヘッダーが窓の外に出てクリップされ、掴めなくなる。
-   * root universe では該当する祖先が無いので 0（= viewport 上端）に落ちる。
+   * ヘッダーは必ず箱の外（上）に出す。上に出しきれないとき（画面の上端・岸の上辺）は、
+   * ヘッダーを内側に押し込むのではなく、**出している間だけバブルが下へずれる**。
+   * 消えれば 0 に戻る ＝ そのぶん上に戻って辺にくっつく。
    */
-  const visibleTopBound = (): number => {
-    const clip = ref.current?.closest("main.e-window-content");
-    return clip ? clip.getBoundingClientRect().top : 0;
-  };
-
-  const updateHeaderSafeZone = () => {
-    const bubbleRect = ref.current?.getBoundingClientRect();
-    if (!bubbleRect) return;
-    const headerEl = ref.current?.querySelector('.e-bubble-header');
-    const headerHeight = headerEl?.getBoundingClientRect().height ?? 48;
-    const headerTop = bubbleRect.top - headerHeight;
-    setHeaderOffset(Math.max(0, visibleTopBound() - headerTop));
-  };
-
-  useLayoutEffect(() => {
-    if (isFocused) updateHeaderSafeZone();
-  }, [isFocused]);
+  const { shift, measure: updateHeaderSafeZone } = useHeaderShift({
+    ref,
+    headerSelector: ".e-bubble-header",
+    fallbackHeight: 48,
+    visible: !docked && isHeaderVisible,
+  });
 
   const isMaximized = bubble.isMaximized;
 
@@ -301,7 +291,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
       layerIndex={layerIndex}
       transformOrigin={vanishingPointRelative}
       headerVisible={isHeaderVisible}
-      headerOffset={headerOffset}
+      // 岸では箱の外に出られないので押し下げは要らない（ヘッダーは上端の内側）
+      $shift={shift}
       onClick={onClick}
       onFocus={handleFocus}
       onMouseDown={handleMouseDown}
@@ -319,6 +310,9 @@ const BubbleViewInner: FC<BubbleProps> = ({
       fillsContainer={bubble.fillsContainer}
       lightweightMode={lightweightMode}
     >
+      {/* 岸に着いたバブルは装飾を持たない（規則A）。ヘッダーも出さず、
+          かわりに**固定された辺そのもの**が取っ手になる（下の e-glued-edge） */}
+      {!docked && (
       <header className="e-bubble-header" ref={headerRef} onMouseDown={handleHeaderMouseDown}>
         <div
           className="e-address-bar"
@@ -347,7 +341,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
             >
               <ToggleSizeIcon size={20} isMaximized={isMaximized} />
             </button>
-            {onLayerDownClick && (
+            {/* 岸に貼り付いたバブルはレイヤー（奥行き）から外れているので、レイヤーボタンは出さない */}
+            {onLayerDownClick && gluedEdges.length === 0 && (
               <button
                 className="e-bubble-button e-layer-button"
                 onClick={(e) => {
@@ -359,7 +354,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
                 <LayerUpIcon size={20} />
               </button>
             )}
-            {onLayerUpClick && (
+            {onLayerUpClick && gluedEdges.length === 0 && (
               <button
                 className="e-bubble-button e-layer-button"
                 onClick={(e) => {
@@ -375,17 +370,44 @@ const BubbleViewInner: FC<BubbleProps> = ({
           <h1 className="e-bubble-name">{bubble.type}</h1>
         </div>
       </header>
+      )}
 
       <main className="e-bubble-content">
         {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
+      {/* 辺の役割は 2 つだけ ──
+          **固定された辺を掴めば動く。自由な辺を掴めば伸び縮みする。**
+          取っ手という装飾は無く、辺そのものが取っ手（岸に着いたバブルだけ） */}
+      {gluedEdges.map((edge) => (
+        <div
+          key={`glued-${edge}`}
+          className={`e-glued-edge e-glued-${edge}`}
+          onMouseDown={handleHeaderMouseDown}
+          title="岸の上で動かす"
+        />
+      ))}
+
       {/* リサイズハンドル。掴んだ辺の反対側が固定される（左辺を掴めば右辺は動かない） */}
-      <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
-      <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
-      <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
-      <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
-      <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
+      {/* 大きさを変える辺。**貼り付いている辺は動かせない**ので出さない */}
+      {!gluedEdges.includes("top") && (
+        <div className="e-resize-edge e-resize-n" onMouseDown={(e) => onResizeStart(e, "n")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("left") && (
+        <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("right") && (
+        <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && (
+        <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && !gluedEdges.includes("left") && (
+        <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && !gluedEdges.includes("right") && (
+        <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
+      )}
     </StyledBubble>
   );
 };
@@ -453,7 +475,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
   lightweightMode?: boolean; // 軽量モード
   headerVisible?: boolean;
-  headerOffset?: number; // バブル上端がビューポート外にかかる場合のヘッダー押し下げ量(px)
+  $shift?: number; // ヘッダーを箱の外に出しきるために、バブルを下へずらす量(px)
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -481,11 +503,15 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
   // ここで奥のレイヤーほどスケールを小さくしている。
   // CoordinateSystem.fromLayerIndex()を使用してscale計算を一箇所に凝集
-  transform: scale(
+  /* ヘッダーを箱の外に出しきるためのずらし（$shift）と、レイヤーの縮尺 */
+  transform: translateY(${({ $shift = 0 }) => $shift}px) scale(
     ${({ layerIndex }) => CoordinateSystem.fromLayerIndex(layerIndex ?? 0).scale}
   );
+  transition: transform 0.15s ease;
 
-  max-height: 90vh;//FIXME:突貫対応
+  /* 海に浮いているバブルの頭打ち。岸に貼ったバブルは画面（海）いっぱいまで伸ばせるので外す
+     ── 大きさの上限は「海より大きくならない」（useBubbleResize が海の大きさで抑える） */
+  max-height: ${({ $docked }) => ($docked ? "none" : "90vh")};//FIXME:突貫対応
 
   // 通常モードは泡っぽいグラデーション背景、軽量モードは単色（アルファ合成コスト削減）
   background: ${({ lightweightMode, colorHue }) => lightweightMode
@@ -534,7 +560,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   /* キーボードフォーカス時もヘッダーを表示（アクセシビリティ）。
      :focus-within ではなく :has(:focus-visible) を使うことで、
      マウスクリックによる一時的なフォーカスではトリガーされない。
-     transform は JS 管理（headerOffset 込み）なので上書きしない。 */
+     transform は JS 管理（$shift 込み）なので上書きしない。 */
   &:has(:focus-visible) >.e-bubble-header {
     opacity: 1;
     pointer-events: auto;
@@ -544,6 +570,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     cursor: move;
     user-select: none;
     position: absolute;
+    /* ヘッダーはいつも箱の外（上）。出しきれないときはバブルの側が下へずれる（$shift） */
     bottom: 100%;
     left: 0;
     right: 0;
@@ -557,8 +584,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
     opacity: ${({ headerVisible }) => headerVisible ? 1 : 0};
     pointer-events: ${({ headerVisible }) => headerVisible ? 'auto' : 'none'};
-    transform: ${({ headerVisible, headerOffset = 0 }) =>
-      headerVisible ? `translateY(${headerOffset}px)` : `translateY(${headerOffset + 6}px)`};
+    transform: ${({ headerVisible }) => (headerVisible ? "translateY(0)" : "translateY(6px)")};
     transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-header-content {
@@ -767,6 +793,36 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       0 1px 2px hsla(0, 0%, 100%, 0.5);
   }
 
+  /* 規則A: 岸に着いたバブルは装飾を持たない。
+     泡の地・影・縁・角丸・ガラスの照りを落とし、中身だけが縁に貼り付いた姿にする。
+     中身の地の色（アプリが持っている白など）はそのまま残す */
+  ${({ $docked }) => $docked && `
+    background: none;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+
+    &::before { content: none; }
+
+    /* 中身は管の内側に収まる（まわりを管が 1 周しているので、その厚みだけ空ける） */
+    > .e-bubble-content {
+      margin: ${TUBE_THICKNESS}px;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  `}
+
+  /* 固定された辺（＝動かす取っ手）。見た目は持たない ── 岸の管がその印になる */
+  > .e-glued-edge {
+    position: absolute;
+    z-index: 5;
+    cursor: move;
+  }
+  > .e-glued-top    { top: 0; left: 0; right: 0; height: 12px; }
+  > .e-glued-bottom { bottom: 0; left: 0; right: 0; height: 12px; }
+  > .e-glued-left   { left: 0; top: 0; bottom: 0; width: 12px; }
+  > .e-glued-right  { right: 0; top: 0; bottom: 0; width: 12px; }
+
   >.e-debug-rect {
     //下中央
     display: flex;
@@ -826,6 +882,13 @@ const StyledBubble = styled.div<StyledBubbleProp>`
     left: 16px;
     right: 16px;
     bottom: -3px;
+    height: 8px;
+    cursor: ns-resize;
+  }
+  > .e-resize-n {
+    left: 16px;
+    right: 16px;
+    top: -3px;
     height: 8px;
     cursor: ns-resize;
   }

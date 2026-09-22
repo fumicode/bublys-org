@@ -15,6 +15,8 @@ import { selectLauncherPlain, setLauncher } from "@bublys-org/launcher-libs";
 import { DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID } from "./launchTargets";
 
 const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
+/** 最初に貼るときの大きさ（あとはユーザーが辺を掴んで変えられる） */
+const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
 
 /**
  * ルール: 「root には必ずランチャーが 1 つは居る。無ければ main ランチャーを左の岸に着ける」。
@@ -44,6 +46,14 @@ export const useEnsureMainLauncher = () => {
     nameIntent("launcher:ensure");
     const bubble = createBubble(MAIN_LAUNCHER_URL);
     dispatch(addBubble(bubble.toJSON(), ROOT_UNIVERSE_ID));
-    dispatch(dockToShowre({ bubbleId: bubble.id, side: "left" }, ROOT_UNIVERSE_ID));
+    // 左辺の、画面の少し下がった所に貼る（大きさはランチャーの既定）
+    dispatch(dockToShowre(
+      {
+        bubbleId: bubble.id,
+        dock: { edges: ["left"], at: { x: 0, y: 24 } },
+        size: MAIN_LAUNCHER_SIZE,
+      },
+      ROOT_UNIVERSE_ID,
+    ));
   }, [dispatch, projectedNodeId, hasMainLauncherBubble]);
 };

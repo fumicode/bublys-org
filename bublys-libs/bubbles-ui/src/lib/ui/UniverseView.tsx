@@ -8,7 +8,6 @@ import { BubblesContext, type OpenBubbleOptions } from "../bubble-routing/Bubble
 import { BubbleRefsProvider } from "../context/BubbleRefsContext.js";
 import { BubblesLayeredView } from "./BubblesLayeredView.js";
 import { measureViewportForElement } from "../utils/measure-viewport.js";
-import { ShowreLayout } from "../showre/ShowreLayout.js";
 import {
   makeSelectBubbleLayers,
   makeSelectSurfaceBubbles,
@@ -205,20 +204,18 @@ export const UniverseView: FC<UniverseViewProps> = ({
     <BubblesContext.Provider value={bubblesContextValue}>
       <BubbleRefsProvider>
         <div ref={rootRef} style={{ width: "100%", height: "100%" }}>
-          {/* 岸 + 海。岸に着いたバブルは辺の帯として、浮いているバブルは海に描く */}
-          <ShowreLayout universeId={universeId} renderBubbleContent={renderBubbleContent}>
-            <BubblesLayeredView
-              universeId={universeId}
-              bubbleLayers={bubbleLayers}
-              vanishingPoint={globalCoordinateSystem.vanishingPoint}
-              renderBubbleContent={renderBubbleContent}
-              onBubbleClose={deleteBubble}
-              onBubbleLayerDown={layerDown}
-              onBubbleLayerUp={layerUp}
-              onCoordinateSystemReady={handleCoordinateSystemReady}
-            />
-            {children}
-          </ShowreLayout>
+          {/* 岸（貼り付いたバブル）は BubblesLayeredView の中に、海に重なる層として居る */}
+          <BubblesLayeredView
+            universeId={universeId}
+            bubbleLayers={bubbleLayers}
+            vanishingPoint={globalCoordinateSystem.vanishingPoint}
+            renderBubbleContent={renderBubbleContent}
+            onBubbleClose={deleteBubble}
+            onBubbleLayerDown={layerDown}
+            onBubbleLayerUp={layerUp}
+            onCoordinateSystemReady={handleCoordinateSystemReady}
+          />
+          {children}
         </div>
       </BubbleRefsProvider>
     </BubblesContext.Provider>

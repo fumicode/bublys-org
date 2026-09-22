@@ -1,6 +1,6 @@
 "use client";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, IconButton, Tooltip } from "@mui/material";
+import { Box, Divider, IconButton, Tooltip } from "@mui/material";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
@@ -10,6 +10,7 @@ import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { ROOT_UNIVERSE_ID } from "@bublys-org/bubbles-ui";
 import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
+import { FullscreenToggle } from "../components/FullscreenToggle";
 
 /**
  * bubble-ui の表示状態を world-line に同期し、undo/redo +（ドラッグで動かせる）
@@ -161,6 +162,9 @@ export const BubbleArrangementWorldLineControls: FC = () => {
             <AccountTreeIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        {/* 世界線とは別の話なので、区切りを挟んで隣に置く */}
+        <Divider orientation="vertical" flexItem sx={{ mx: 0.25, my: 0.5 }} />
+        <FullscreenToggle />
       </Box>
 
       {showGraph && (

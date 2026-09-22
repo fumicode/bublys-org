@@ -15,6 +15,8 @@ import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
 import { cornerRadiusFor, type BandSide } from "./link-band-path.js";
+import { useHeaderShift } from "../hooks/useHeaderShift.js";
+import { useShowreEdges } from "../showre/ShowreContext.js";
 
 const HEADER_PROXIMITY_THRESHOLD = 40;
 
@@ -90,7 +92,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   });
 
   const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked });
-  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
+  const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint, docked });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
@@ -117,35 +119,24 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     if (near) updateHeaderSafeZone();
   };
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
-  const [headerOffset, setHeaderOffset] = useState(0);
+  /** 貼り付いている辺。その辺は動かせないので、リサイズもレイヤーも出さない */
+  const gluedEdges = useShowreEdges();
 
   const isHeaderVisible = isFocused || isMouseNearTop || isHeaderHovered;
 
   /**
-   * ヘッダーを押し下げる基準の上端。
-   *
-   * バブルが universe の中にいるときは、その universe の窓（`main.e-window-content`）の
-   * 上端が「見えている範囲の上端」。ブラウザの viewport（0）を基準にすると、
-   * 入れ子の中で上端に張り付いたバブルのヘッダーが窓の外に出てクリップされ、掴めなくなる。
-   * root universe では該当する祖先が無いので 0（= viewport 上端）に落ちる。
+   * ヘッダーは必ず箱の外（上）に出す。出しきれないときは、内側に押し込むのではなく、
+   * **出している間だけバブルが下へずれる**。消えれば 0 に戻り、そのぶん上に戻る。
    */
-  const visibleTopBound = (): number => {
-    const clip = ref.current?.closest("main.e-window-content");
-    return clip ? clip.getBoundingClientRect().top : 0;
-  };
-
-  const updateHeaderSafeZone = () => {
-    const bubbleRect = ref.current?.getBoundingClientRect();
-    if (!bubbleRect) return;
-    const headerEl = ref.current?.querySelector('.e-window-header');
-    const headerHeight = headerEl?.getBoundingClientRect().height ?? 40;
-    const headerTop = bubbleRect.top - headerHeight;
-    setHeaderOffset(Math.max(0, visibleTopBound() - headerTop));
-  };
+  const { shift, measure: updateHeaderSafeZone } = useHeaderShift({
+    ref,
+    headerSelector: ".e-window-header",
+    fallbackHeight: 40,
+    visible: isHeaderVisible,
+  });
 
   useLayoutEffect(() => {
-    if (isFocused) updateHeaderSafeZone();
-    else setIsMouseNearTop(false);
+    if (!isFocused) setIsMouseNearTop(false);
   }, [isFocused, focusedBubbleId]);
 
   const isMaximized = bubble.isMaximized;
@@ -200,7 +191,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $layerIndex={layerIndex}
       $transformOrigin={vanishingPointRelative}
       $headerVisible={isHeaderVisible}
-      $headerOffset={headerOffset}
+      $shift={shift}
       onClick={onClick}
       onMouseMove={handleWindowMouseMove}
       onMouseEnter={() => onHoverChange?.(true)}
@@ -253,7 +244,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
         <div className="e-window-title">{bubble.type}</div>
         <div className="e-window-buttons-right">
           {headerExtras}
-          {onLayerDownClick && (
+          {/* 岸に貼り付いたバブルはレイヤー（奥行き）から外れているので、レイヤーボタンは出さない */}
+          {onLayerDownClick && gluedEdges.length === 0 && (
             <button
               className="e-window-button e-layer"
               onClick={(e) => {
@@ -265,7 +257,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
               <LayerUpIcon />
             </button>
           )}
-          {onLayerUpClick && (
+          {onLayerUpClick && gluedEdges.length === 0 && (
             <button
               className="e-window-button e-layer"
               onClick={(e) => {
@@ -283,11 +275,25 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       <main className="e-window-content">{children}</main>
 
       {/* リサイズハンドル。掴んだ辺の反対側が固定される（左辺を掴めば右辺は動かない） */}
-      <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
-      <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
-      <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
-      <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
-      <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
+      {/* 大きさを変える辺。**貼り付いている辺は動かせない**ので出さない */}
+      {!gluedEdges.includes("top") && (
+        <div className="e-resize-edge e-resize-n" onMouseDown={(e) => onResizeStart(e, "n")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("left") && (
+        <div className="e-resize-edge e-resize-w" onMouseDown={(e) => onResizeStart(e, "w")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("right") && (
+        <div className="e-resize-edge e-resize-e" onMouseDown={(e) => onResizeStart(e, "e")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && (
+        <div className="e-resize-edge e-resize-s" onMouseDown={(e) => onResizeStart(e, "s")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && !gluedEdges.includes("left") && (
+        <div className="e-resize-corner e-resize-sw" onMouseDown={(e) => onResizeStart(e, "sw")} title="サイズ調整" />
+      )}
+      {!gluedEdges.includes("bottom") && !gluedEdges.includes("right") && (
+        <div className="e-resize-handle" onMouseDown={(e) => onResizeStart(e, "se")} title="サイズ調整" />
+      )}
     </StyledWindow>
   );
 };
@@ -328,7 +334,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $backdropColor?: string;
   $lightweightMode?: boolean;
   $headerVisible?: boolean;
-  $headerOffset?: number;
+  $shift?: number; // ヘッダーを箱の外に出しきるために、バブルを下へずらす量(px)
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -350,9 +356,12 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
   transform-origin: ${({ $transformOrigin }) =>
     $transformOrigin ? `${$transformOrigin.x}px ${$transformOrigin.y}px` : "center center"};
-  transform: scale(${({ $layerIndex }) => CoordinateSystem.fromLayerIndex($layerIndex ?? 0).scale});
+  /* ヘッダーを箱の外に出しきるためのずらし（$shift）と、レイヤーの縮尺 */
+  transform: translateY(${({ $shift = 0 }) => $shift}px) scale(${({ $layerIndex }) => CoordinateSystem.fromLayerIndex($layerIndex ?? 0).scale});
+  transition: transform 0.15s ease;
 
-  max-height: 90vh;
+  /* 海に浮いている窓の頭打ち。岸に貼った窓は画面いっぱいまで伸ばせる（上限は海の大きさ） */
+  max-height: ${({ $docked }) => ($docked ? "none" : "90vh")};
 
   display: flex;
   flex-direction: column;
@@ -399,6 +408,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
   > .e-window-header {
     position: absolute;
+    /* ヘッダーはいつも箱の外（上）。出しきれないときはバブルの側が下へずれる（$shift） */
     bottom: 100%;
     left: 0;
     right: 0;
@@ -418,8 +428,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
     opacity: ${({ $headerVisible }) => $headerVisible ? 1 : 0};
     pointer-events: ${({ $headerVisible }) => $headerVisible ? 'auto' : 'none'};
-    transform: ${({ $headerVisible, $headerOffset = 0 }) =>
-      $headerVisible ? `translateY(${$headerOffset}px)` : `translateY(${$headerOffset + 6}px)`};
+    transform: ${({ $headerVisible }) => ($headerVisible ? "translateY(0)" : "translateY(6px)")};
     transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-window-buttons-left,
@@ -528,6 +537,13 @@ const StyledWindow = styled.div<StyledWindowProps>`
     left: 18px;
     right: 18px;
     bottom: -4px;
+    height: 10px;
+    cursor: ns-resize;
+  }
+  > .e-resize-n {
+    left: 18px;
+    right: 18px;
+    top: -4px;
     height: 10px;
     cursor: ns-resize;
   }

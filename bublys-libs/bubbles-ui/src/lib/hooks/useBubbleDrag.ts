@@ -7,8 +7,7 @@ import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { updateBubble, dockToShowre, undockFromShowre } from "../state/bubbles-slice.js";
 import { createUniverse } from "../universe-config.js";
-import { useShowreDrag } from "../showre/ShowreDragContext.js";
-import { dropPointToUniverse } from "../utils/drop-point.js";
+import { useShowreDock } from "../showre/ShowreDock.js";
 import { nameIntent } from "@bublys-org/world-line-graph";
 
 type UseBubbleDragArgs = {
@@ -53,9 +52,9 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked 
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
   const { surfaceLeftTop } = useContext(BubblesContext);
-  const showreDrag = useShowreDrag();
-  const showreDragRef = useRef(showreDrag);
-  showreDragRef.current = showreDrag;
+  const showreDock = useShowreDock();
+  const showreDockRef = useRef(showreDock);
+  showreDockRef.current = showreDock;
 
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
@@ -79,48 +78,66 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked 
   dockedRef.current = docked;
   const movedRef = useRef(false);
 
-  /** 浮いたときの大きさの見込み（引き剥がしの予告用） */
-  const floatSize = () => {
+  /** 掴んだときのバブルの矩形（画面座標）。岸では DOM が動かないので、これに移動量を足す */
+  const startRectRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  /**
+   * いまバブルが**見えている**矩形（画面座標）。
+   * ★ 掴んだ点との相対位置はここに入っている ── 貼り付く場所も予告もこれで決める。
+   *   カーソルの点を左上にすると、掴んだ場所のぶんだけバブルが飛ぶ（上に跳ねる・予告がずれる）。
+   */
+  const visualRect = (e: MouseEvent) => {
+    const start = startRectRef.current;
+    if (dockedRef.current && start && dragStartMouseRef.current) {
+      return {
+        x: start.x + (e.clientX - dragStartMouseRef.current.x),
+        y: start.y + (e.clientY - dragStartMouseRef.current.y),
+        width: start.width,
+        height: start.height,
+      };
+    }
+    const now = ref.current?.getBoundingClientRect();
+    if (now && now.width > 0) return { x: now.x, y: now.y, width: now.width, height: now.height };
     const b = bubbleRef.current;
-    return b.size ?? (b.isWindowed ? b.defaultSize : FALLBACK_FLOAT_SIZE);
+    const size = b.size ?? (b.isWindowed ? b.defaultSize : FALLBACK_FLOAT_SIZE);
+    return { x: e.clientX, y: e.clientY, width: size.width, height: size.height };
   };
 
-  // 岸に着いているとき: DOM は動かさず、予告だけ更新する
+  // 岸に貼り付いているとき: DOM は動かさず、予告だけ更新する
   const handleDockedDragging = (e: MouseEvent) => {
     const start = dragStartMouseRef.current;
-    const showre = showreDragRef.current;
+    const showre = showreDockRef.current;
     if (!start || !showre) return;
     if (!movedRef.current) {
       if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < CLICK_TOLERANCE) return;
       movedRef.current = true;
     }
-    const point = { x: e.clientX, y: e.clientY };
-    const side = showre.sideNear(point);
-    showre.setPreviewSide(side ?? null);
-    showre.setPreviewFloat(side ? null : { point, size: floatSize() });
+    showre.setPreview(showre.resolve(visualRect(e), { x: e.clientX, y: e.clientY }, bubbleRef.current.id));
   };
 
   const endDockedDrag = (e: MouseEvent) => {
-    const showre = showreDragRef.current;
+    const showre = showreDockRef.current;
     if (showre && movedRef.current) {
-      const point = { x: e.clientX, y: e.clientY };
-      const side = showre.sideNear(point);
-      if (side) {
-        nameIntent(`showre:dock:${side}`);
+      const rect = visualRect(e);
+      const hit = showre.resolve(rect, { x: e.clientX, y: e.clientY }, bubbleRef.current.id);
+      if (hit?.dock) {
+        // 貼り直す（別の辺へ・同じ辺の別の場所へ）
+        nameIntent(`showre:dock:${hit.dock.edges.join("+")}`);
         dispatch(dockToShowre(
-          { bubbleId: bubbleRef.current.id, side, index: showre.indexOnSide(side, point, bubbleRef.current.id) },
+          { bubbleId: bubbleRef.current.id, dock: hit.dock, size: { width: hit.rect.width, height: hit.rect.height } },
           showre.universeId,
         ));
       } else {
+        // 剥がして海に浮かせる
         nameIntent("showre:undock");
+        // 落とす点はバブルの左上（掴んだ点との相対位置を保つ）
         dispatch(undockFromShowre(
-          { bubbleId: bubbleRef.current.id, droppedAt: dropPointToUniverse(point, showre.seaElement()) },
+          { bubbleId: bubbleRef.current.id, droppedAt: showre.toUniverse({ x: rect.x, y: rect.y }) },
           showre.universeId,
         ));
       }
     }
-    showre?.setPreviewSide(null);
-    showre?.setPreviewFloat(null);
+    showre?.setPreview(null);
     dragStartMouseRef.current = null;
     movedRef.current = false;
     document.removeEventListener("mousemove", handleDockedDragging);
@@ -148,27 +165,27 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked 
     ref.current.style.transition = "none";
     ref.current.style.transformOrigin = `${origin.x}px ${origin.y}px`;
 
-    // 辺の近くなら「ここに着く」帯を見せる
-    const showre = showreDragRef.current;
-    if (showre) showre.setPreviewSide(showre.sideNear({ x: e.clientX, y: e.clientY }) ?? null);
+    // 「いま離したらどうなるか」の予告（岸でも海でも、離したあとの実寸そのまま）
+    const showre = showreDockRef.current;
+    if (showre) showre.setPreview(showre.resolve(visualRect(e), { x: e.clientX, y: e.clientY }, bubbleRef.current.id));
   };
 
   const endDrag = (e: MouseEvent) => {
-    const showre = showreDragRef.current;
-    const side = showre && currentBubbleRef.current
-      ? showre.sideNear({ x: e.clientX, y: e.clientY })
-      : undefined;
-    if (side && showre) {
-      // 着岸: 位置は更新せず（ドラッグ前の場所を覚えておく）、岸に着ける
-      nameIntent(`showre:dock:${side}`);
+    const showre = showreDockRef.current;
+    const hit = showre && currentBubbleRef.current
+      ? showre.resolve(visualRect(e), { x: e.clientX, y: e.clientY }, bubbleRef.current.id)
+      : null;
+    if (hit?.dock && showre) {
+      // 貼り付ける: 位置は画面の座標で覚えるので、universe の位置は書かない
+      nameIntent(`showre:dock:${hit.dock.edges.join("+")}`);
       dispatch(dockToShowre(
-        { bubbleId: bubbleRef.current.id, side, index: showre.indexOnSide(side, { x: e.clientX, y: e.clientY }) },
+        { bubbleId: bubbleRef.current.id, dock: hit.dock, size: { width: hit.rect.width, height: hit.rect.height } },
         showre.universeId,
       ));
     } else if (currentBubbleRef.current) {
       dispatch(updateBubble(currentBubbleRef.current.toJSON(), universeId));
     }
-    showre?.setPreviewSide(null);
+    showre?.setPreview(null);
     if (ref.current) {
       ref.current.style.transition = "";
       ref.current.style.transformOrigin = "";
@@ -183,6 +200,8 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked 
   const onDragStart = (e: { clientX: number; clientY: number; stopPropagation: () => void }) => {
     e.stopPropagation();
     if (dockedRef.current) {
+      const r = ref.current?.getBoundingClientRect();
+      startRectRef.current = r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null;
       dragStartMouseRef.current = { x: e.clientX, y: e.clientY };
       movedRef.current = false;
       document.addEventListener("mousemove", handleDockedDragging);

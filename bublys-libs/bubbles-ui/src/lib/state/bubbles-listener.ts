@@ -19,7 +19,7 @@ import {
 import { Layer, type Point2, type SmartRect } from '@bublys-org/bubbles-ui-util';
 import { Bubble } from '../Bubble.domain.js';
 import { getOriginRect, getDockedBubbleRect } from '../utils/get-origin-rect.js';
-import { Showres, type ShowreSide } from '../showre/Showre.domain.js';
+import type { ShowreSide } from '../showre/Showre.domain.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
 // dropped-place は「方向」を持たない（点そのものが位置）ので、ここには来ない。
@@ -243,8 +243,10 @@ const dockedOpenerBase = (
   openerId: string,
   openeeUrl: string,
 ): { rect: SmartRect; direction: 'right' | 'left' | 'top' | 'bottom' } | undefined => {
-  const showres = Showres.fromJSON(state.bubbleState?.universes?.[universeId]?.showres);
-  const side = showres.sideOf(openerId);
+  const edges: readonly ShowreSide[] =
+    state.bubbleState?.universes?.[universeId]?.docks?.[openerId]?.edges ?? [];
+  // 貼り付いている辺の反対（＝海の側）へ開く。角なら最初の辺で決める
+  const side = edges[0];
   if (!side) return undefined;
   const rect = getOriginRect(openerId, openeeUrl) ?? getDockedBubbleRect(openerId);
   if (!rect) return undefined;

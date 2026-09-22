@@ -23,13 +23,10 @@ export type LauncherViewEntry = {
 
 export type LauncherViewProps = {
   entries: LauncherViewEntry[];
-  /**
-   * 帯（岸に着いている）として描くか。
-   * compact ならアイコンだけ並べてラベルはツールチップ、そうでなければ一覧。
-   */
-  compact: boolean;
-  /** 帯の並ぶ向き。左右の岸なら縦、上下の岸なら横。浮いているときは縦 */
+  /** 並ぶ向き。決めるのは呼ぶ側（箱の大きさから {@link launcherLayout} が決める） */
   vertical: boolean;
+  /** ラベルを出すか。false ならアイコンだけ（名前はツールチップで出る） */
+  labels: boolean;
   onLaunch: (url: string) => void;
   /** 設定バブルの url（末尾の ⚙ から開く）。帯の起点にもなる */
   settingsUrl: string;
@@ -40,13 +37,12 @@ const ITEM_MIN = 44;
 
 /**
  * ランチャーの見た目。url の並びをボタンにする純粋な UI。
- * 岸に着いているか浮いているかは props（compact / vertical）で受けるだけで、
- * 自分では知らない。
+ * 並べ方（向き・ラベルの有無）は props で受けるだけで、自分では決めない。
  */
 export const LauncherView: FC<LauncherViewProps> = ({
   entries,
-  compact,
   vertical,
+  labels,
   onLaunch,
   settingsUrl,
   onOpenSettings,
@@ -57,8 +53,8 @@ export const LauncherView: FC<LauncherViewProps> = ({
     sx={{
       display: "flex",
       flexDirection: vertical ? "column" : "row",
-      alignItems: vertical ? "stretch" : "center",
-      minWidth: compact ? 56 : 180,
+      alignItems: vertical && labels ? "stretch" : "center",
+      minWidth: 0,
       py: vertical ? 0.5 : 0,
       px: vertical ? 0 : 0.5,
     }}
@@ -69,8 +65,8 @@ export const LauncherView: FC<LauncherViewProps> = ({
         url={entry.url}
         label={entry.label}
         icon={entry.icon ?? <LaunchIcon color="action" />}
-        compact={compact}
         vertical={vertical}
+        labels={labels}
         onClick={() => onLaunch(entry.url)}
       />
     ))}
@@ -79,8 +75,8 @@ export const LauncherView: FC<LauncherViewProps> = ({
       url={settingsUrl}
       label="設定"
       icon={<SettingsIcon color="action" />}
-      compact={compact}
       vertical={vertical}
+      labels={labels}
       onClick={onOpenSettings}
       sx={{
         [vertical ? "mt" : "ml"]: "auto",
@@ -94,32 +90,33 @@ type LauncherItemProps = {
   url: string;
   label: string;
   icon: ReactNode;
-  compact: boolean;
   vertical: boolean;
+  labels: boolean;
   onClick: () => void;
   sx?: SxProps<Theme>;
 };
 
-/** 1 項目。compact ならアイコンだけでラベルはツールチップ */
-const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, compact, vertical, onClick, sx }) => {
+/** 1 項目。ラベルを出さないときは、アイコンだけの正方形になる（名前はツールチップ） */
+const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, vertical, labels, onClick, sx }) => {
   const button = (
     <ListItemButton
       onClick={onClick}
       sx={{
         minHeight: ITEM_MIN,
-        px: 2,
+        minWidth: ITEM_MIN,
+        px: labels ? 2 : 0,
         flex: "0 0 auto",
-        justifyContent: compact ? "center" : "initial",
+        justifyContent: labels ? "initial" : "center",
         ...sx,
       }}
     >
       {/* UrledPlace: ここから開いたバブルへの帯（リンク）の起点。
           ボタンの中身（アイコン + ラベル）を囲むので、起点の矩形はその範囲になる */}
       <UrledPlace url={url}>
-        <ListItemIcon sx={{ minWidth: 0, mr: compact ? 0 : 2, justifyContent: "center" }}>
+        <ListItemIcon sx={{ minWidth: 0, mr: labels ? 2 : 0, justifyContent: "center" }}>
           {icon}
         </ListItemIcon>
-        {!compact && (
+        {labels && (
           <ListItemText
             primary={label}
             primaryTypographyProps={{ fontSize: "0.875rem", whiteSpace: "nowrap" }}
@@ -128,11 +125,9 @@ const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, compact, vertic
       </UrledPlace>
     </ListItemButton>
   );
-  return compact ? (
+  return (
     <Tooltip title={label} placement={vertical ? "right" : "bottom"} arrow>
       {button}
     </Tooltip>
-  ) : (
-    button
   );
 };

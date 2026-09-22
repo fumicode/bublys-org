@@ -32,6 +32,7 @@ export * from './lib/hooks/useMyRect.js';
 export * from './lib/hooks/useBubbleDrag.js';
 export * from './lib/hooks/useUniverseDropZone.js';
 export * from './lib/hooks/useBubbleResize.js';
+export * from './lib/hooks/useHeaderShift.js';
 export * from './lib/hooks/useKeyBindings.js';
 export * from './lib/hooks/shortcut.js';
 

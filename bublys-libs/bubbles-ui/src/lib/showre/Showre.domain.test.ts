@@ -1,131 +1,203 @@
-import { Showres, nearestShowreSide, isVerticalShowre, isShowreSide } from "./Showre.domain.js";
+import {
+  anchoredRect,
+  slotStyle,
+  edgesNear,
+  edgesOf,
+  fitAmongDocked,
+  isShowreSide,
+  rectsOverlap,
+  snapToViewport,
+  touchingEdges,
+  SHOWRE_DOCK_GAP,
+  type DockState,
+  type ScreenRect,
+} from "./Showre.domain.js";
 
-describe("Showres", () => {
-  it("empty() はどの岸にも誰も居ない", () => {
-    const s = Showres.empty();
-    expect(s.allIds).toEqual([]);
-    expect(s.sideOf("A")).toBeUndefined();
+const VIEWPORT = { width: 1000, height: 600 };
+const dock = (edges: DockState["edges"], at: { x: number; y: number }): DockState => ({ edges, at });
+const rectOf = (x: number, y: number, w: number, h: number): ScreenRect => ({ x, y, width: w, height: h });
+/** 既定の大きさ。岸は大きさを持たないので、呼ぶ側が渡す */
+const SIZE = { width: 200, height: 150 };
+
+describe("edgesNear（落とした点が、どの辺に貼り付くか）", () => {
+  it("辺の近くならその辺", () => {
+    expect(edgesNear({ x: 5, y: 300 }, VIEWPORT)).toEqual(["left"]);
+    expect(edgesNear({ x: 995, y: 300 }, VIEWPORT)).toEqual(["right"]);
+    expect(edgesNear({ x: 500, y: 5 }, VIEWPORT)).toEqual(["top"]);
+    expect(edgesNear({ x: 500, y: 595 }, VIEWPORT)).toEqual(["bottom"]);
   });
 
-  it("dock() で岸に着き、sideOf / on で引ける", () => {
-    const s = Showres.empty().dock("A", "left");
-    expect(s.sideOf("A")).toBe("left");
-    expect(s.on("left")).toEqual(["A"]);
+  it("角の近くなら 2 辺", () => {
+    expect(edgesNear({ x: 5, y: 5 }, VIEWPORT).sort()).toEqual(["left", "top"]);
+    expect(edgesNear({ x: 995, y: 595 }, VIEWPORT).sort()).toEqual(["bottom", "right"]);
   });
 
-  it("dock() は新しいインスタンスを返す（不変）", () => {
-    const s0 = Showres.empty();
-    const s1 = s0.dock("A", "left");
-    expect(s1).not.toBe(s0);
-    expect(s0.on("left")).toEqual([]);
-  });
-
-  it("index 省略は末尾、指定すればその位置、範囲外は端に丸める", () => {
-    const s = Showres.empty().dock("A", "left").dock("B", "left");
-    expect(s.on("left")).toEqual(["A", "B"]);
-    expect(s.dock("C", "left", 0).on("left")).toEqual(["C", "A", "B"]);
-    expect(s.dock("C", "left", 1).on("left")).toEqual(["A", "C", "B"]);
-    expect(s.dock("C", "left", 99).on("left")).toEqual(["A", "B", "C"]);
-    expect(s.dock("C", "left", -5).on("left")).toEqual(["C", "A", "B"]);
-  });
-
-  it("別の岸に dock() すると元の岸からは外れる（1 バブルは 1 岸にしか居ない）", () => {
-    const s = Showres.empty().dock("A", "left").dock("A", "bottom");
-    expect(s.on("left")).toEqual([]);
-    expect(s.on("bottom")).toEqual(["A"]);
-    expect(s.sideOf("A")).toBe("bottom");
-  });
-
-  it("同じ岸に dock() し直すと並び替えになる", () => {
-    const s = Showres.empty().dock("A", "top").dock("B", "top").dock("C", "top");
-    expect(s.move("C", "top", 0).on("top")).toEqual(["C", "A", "B"]);
-    expect(s.move("A", "top", 2).on("top")).toEqual(["B", "C", "A"]);
-  });
-
-  it("undock() で浮く。居なければ同じインスタンス", () => {
-    const s = Showres.empty().dock("A", "right").dock("B", "right");
-    const u = s.undock("A");
-    expect(u.on("right")).toEqual(["B"]);
-    expect(u.sideOf("A")).toBeUndefined();
-    expect(s.undock("Z")).toBe(s);
-  });
-
-  it("allIds は 4 辺のバブルをすべて返す", () => {
-    const s = Showres.empty().dock("A", "top").dock("B", "left").dock("C", "left");
-    expect(s.allIds.sort()).toEqual(["A", "B", "C"]);
-  });
-
-  it("fromJSON() は欠けている辺を空で補う（古い保存形式の互換）", () => {
-    const s = Showres.fromJSON({ left: ["A"] });
-    expect(s.on("left")).toEqual(["A"]);
-    expect(s.on("top")).toEqual([]);
-    expect(Showres.fromJSON(undefined).allIds).toEqual([]);
-  });
-
-  describe("order（先に貼った岸が角を取る）", () => {
-    it("岸が使われ始めた順に並ぶ", () => {
-      const s = Showres.empty().dock("A", "left").dock("B", "top").dock("C", "left");
-      expect(s.order).toEqual(["left", "top"]);
-    });
-
-    it("誰も居なくなった岸は order から抜け、次に使われたら末尾に付く", () => {
-      const s = Showres.empty().dock("A", "left").dock("B", "top");
-      const emptiedLeft = s.undock("A");
-      expect(emptiedLeft.order).toEqual(["top"]);
-      expect(emptiedLeft.dock("A", "left").order).toEqual(["top", "left"]);
-    });
-
-    it("同じ岸の中の並び替えや、別の岸への移動でも、残っている岸の順は変わらない", () => {
-      const s = Showres.empty().dock("A", "left").dock("B", "top").dock("C", "top");
-      expect(s.move("C", "top", 0).order).toEqual(["left", "top"]);
-      // A が left から bottom へ: left は空になって抜け、bottom が末尾に付く
-      expect(s.dock("A", "bottom").order).toEqual(["top", "bottom"]);
-    });
-
-    it("order の無い古い保存形式は、辺の既定順（top, bottom, left, right）で補う", () => {
-      const s = Showres.fromJSON({ left: ["A"], top: ["B"] });
-      expect(s.order).toEqual(["top", "left"]);
-    });
-
-    it("order に居るが誰も居ない岸は捨て、居るのに order に無い岸は末尾に足す", () => {
-      const s = Showres.fromJSON({ left: ["A"], right: ["B"], order: ["bottom", "right"] });
-      expect(s.order).toEqual(["right", "left"]);
-    });
-  });
-
-  it("toJSON() → fromJSON() で往復する", () => {
-    const s = Showres.empty().dock("A", "top").dock("B", "bottom", 0);
-    expect(Showres.fromJSON(s.toJSON()).toJSON()).toEqual(s.toJSON());
+  it("どの辺からも遠ければ空（海に浮く）", () => {
+    expect(edgesNear({ x: 500, y: 300 }, VIEWPORT)).toEqual([]);
   });
 });
 
-describe("nearestShowreSide", () => {
-  const size = { width: 1000, height: 600 };
-
-  it("各辺の近くではその辺", () => {
-    expect(nearestShowreSide({ x: 10, y: 300 }, size)).toBe("left");
-    expect(nearestShowreSide({ x: 990, y: 300 }, size)).toBe("right");
-    expect(nearestShowreSide({ x: 500, y: 10 }, size)).toBe("top");
-    expect(nearestShowreSide({ x: 500, y: 590 }, size)).toBe("bottom");
+describe("anchoredRect（貼った辺に合わせ、直交する向きは落とした場所のまま）", () => {
+  it("左辺: x は 0、y は落とした場所", () => {
+    expect(anchoredRect(dock(["left"], { x: 12, y: 220 }), SIZE, VIEWPORT)).toEqual({ x: 0, y: 220, width: 200, height: 150 });
   });
 
-  it("同距離なら左右を優先", () => {
-    expect(nearestShowreSide({ x: 0, y: 0 }, size)).toBe("left");
-    expect(nearestShowreSide({ x: 1000, y: 600 }, size)).toBe("right");
+  it("右辺: 右端に揃う", () => {
+    expect(anchoredRect(dock(["right"], { x: 980, y: 100 }), SIZE, VIEWPORT)).toEqual({ x: 800, y: 100, width: 200, height: 150 });
+  });
+
+  it("下辺: 下端に揃い、x は落とした場所", () => {
+    expect(anchoredRect(dock(["bottom"], { x: 300, y: 590 }), SIZE, VIEWPORT)).toEqual({ x: 300, y: 450, width: 200, height: 150 });
+  });
+
+  it("角: 2 辺とも合わせる", () => {
+    expect(anchoredRect(dock(["left", "top"], { x: 5, y: 5 }), SIZE, VIEWPORT)).toEqual({ x: 0, y: 0, width: 200, height: 150 });
+  });
+
+  it("画面からはみ出させない", () => {
+    expect(anchoredRect(dock(["left"], { x: 0, y: 590 }), SIZE, VIEWPORT).y).toBe(450);
+    expect(anchoredRect(dock(["top"], { x: 990, y: 0 }), SIZE, VIEWPORT).x).toBe(800);
+  });
+
+  it("大きさは持っているものそのまま（辺いっぱいには広げない）", () => {
+    const r = anchoredRect(dock(["left"], { x: 0, y: 100 }), { width: 240, height: 90 }, VIEWPORT);
+    expect([r.width, r.height]).toEqual([240, 90]);
   });
 });
 
-describe("isVerticalShowre / isShowreSide", () => {
-  it("left / right が縦、top / bottom が横", () => {
-    expect(isVerticalShowre("left")).toBe(true);
-    expect(isVerticalShowre("right")).toBe(true);
-    expect(isVerticalShowre("top")).toBe(false);
-    expect(isVerticalShowre("bottom")).toBe(false);
+describe("大きさを変えても、貼った辺は動かない（岸は大きさを持たない）", () => {
+  it("下辺に貼ったまま小さくすると、下辺はそのまま・上辺が下がる", () => {
+    const d = dock(["bottom"], { x: 300, y: 590 });
+    const before = anchoredRect(d, { width: 200, height: 150 }, VIEWPORT);
+    const after = anchoredRect(d, { width: 200, height: 100 }, VIEWPORT);
+    expect(before.y + before.height).toBe(600);
+    expect(after.y + after.height).toBe(600); // 下辺は動かない
+    expect(after.y).toBe(500); // 上辺だけが動く
   });
 
+  it("右辺に貼ったまま細くすると、右辺はそのまま・左辺が動く", () => {
+    const d = dock(["right"], { x: 980, y: 100 });
+    const after = anchoredRect(d, { width: 120, height: 150 }, VIEWPORT);
+    expect(after.x + after.width).toBe(1000);
+  });
+
+  it("置き場所は辺で留める。大きさは書かない（バブル自身が決める）", () => {
+    expect(slotStyle(dock(["bottom"], { x: 300, y: 590 }), VIEWPORT)).toEqual({ left: 300, bottom: 0 });
+    expect(slotStyle(dock(["left"], { x: 0, y: 220 }), VIEWPORT, { width: 200, height: 150 }))
+      .toEqual({ left: 0, top: 220 });
+    expect(slotStyle(dock(["right", "top"], { x: 980, y: 5 }), VIEWPORT)).toEqual({ right: 0, top: 0 });
+  });
+});
+
+describe("fitAmongDocked（後から来た方が縮む）", () => {
+  const at = (x: number, y: number, w: number, h: number): ScreenRect => ({ x, y, width: w, height: h });
+
+  it("先客が居なければ、そのままの大きさで貼る", () => {
+    expect(fitAmongDocked(dock(["left"], { x: 0, y: 100 }), SIZE, VIEWPORT, [], { x: 5, y: 160 })).toEqual(at(0, 100, 200, 150));
+  });
+
+  it("先客の下に落とせば、落とした場所のまま。縮まない", () => {
+    const others = [at(0, 0, 200, 300)];
+    const r = fitAmongDocked(dock(["left"], { x: 0, y: 320 }), SIZE, VIEWPORT, others, { x: 5, y: 380 })!;
+    expect(r.y).toBe(320); // 空き（308〜600）に収まるので、落とした場所のまま
+    expect(r.height).toBe(150);
+    expect(others.every((o) => !rectsOverlap(o, r))).toBe(true);
+  });
+
+  it("先客に食い込む場所に落としたら、空きの端まで押し戻される", () => {
+    const others = [at(0, 0, 200, 300)];
+    // 落とした場所は 305（先客の下端 300 + 隙間 8 より上）→ 308 へ
+    const r = fitAmongDocked(dock(["left"], { x: 0, y: 305 }), SIZE, VIEWPORT, others, { x: 5, y: 360 })!;
+    expect(r.y).toBe(300 + SHOWRE_DOCK_GAP);
+    expect(others.every((o) => !rectsOverlap(o, r))).toBe(true);
+  });
+
+  it("空きが足りなければ、その空きに収まるまで縮む", () => {
+    // 上に 300、下に 480 から先客。空きは 308〜472 の 164px
+    const others = [at(0, 0, 200, 300), at(0, 480, 200, 120)];
+    const r = fitAmongDocked(dock(["left"], { x: 0, y: 380 }), { width: 200, height: 400 }, VIEWPORT, others, { x: 5, y: 400 })!;
+    expect(r.y).toBe(308);
+    expect(r.height).toBe(164);
+    expect(others.every((o) => !rectsOverlap(o, r))).toBe(true);
+  });
+
+  it("先客の上に落とそうとしたら、そこには貼れない", () => {
+    const others = [at(0, 100, 200, 300)];
+    expect(fitAmongDocked(dock(["left"], { x: 0, y: 200 }), SIZE, VIEWPORT, others, { x: 5, y: 250 })).toBeNull();
+  });
+
+  it("空きが下限より狭ければ貼れない", () => {
+    const others = [at(0, 0, 200, 300), at(0, 340, 200, 260)];
+    expect(fitAmongDocked(dock(["left"], { x: 0, y: 320 }), SIZE, VIEWPORT, others, { x: 5, y: 330 })).toBeNull();
+  });
+
+  it("違う辺の先客は邪魔しない（右辺の先客は、左辺に貼るとき数えない）", () => {
+    const others = [at(800, 0, 200, 600)];
+    expect(fitAmongDocked(dock(["left"], { x: 0, y: 100 }), SIZE, VIEWPORT, others, { x: 5, y: 160 })).toEqual(at(0, 100, 200, 150));
+  });
+
+  it("背の高いバブルでも、落とした点が空きに入っていれば、その空きに縮んで入る", () => {
+    // 先客は 300〜531。落とした点は 150（その上の空き 0〜292）
+    const others = [at(0, 300, 183, 231)];
+    const r = fitAmongDocked(dock(["left"], { x: 0, y: 100 }), { width: 200, height: 360 }, VIEWPORT, others, { x: 5, y: 150 })!;
+    expect(r.y).toBe(0);
+    expect(r.height).toBe(292);
+    expect(rectsOverlap(others[0], r)).toBe(false);
+  });
+
+  it("上辺では横向きに縮む", () => {
+    const others = [at(0, 0, 300, 150)];
+    const r = fitAmongDocked(dock(["top"], { x: 400, y: 0 }), { width: 800, height: 150 }, VIEWPORT, others, { x: 500, y: 5 })!;
+    expect(r.x).toBe(308);
+    expect(r.width).toBe(692);
+    expect(rectsOverlap(others[0], r)).toBe(false);
+  });
+});
+
+describe("edgesOf / isShowreSide", () => {
+  it("貼っていなければ空", () => {
+    expect(edgesOf({}, "a")).toEqual([]);
+    expect(edgesOf({ a: dock(["left"], { x: 0, y: 0 }) }, "a")).toEqual(["left"]);
+  });
   it("4 辺の文字列だけを通す", () => {
     expect(isShowreSide("top")).toBe(true);
     expect(isShowreSide("center")).toBe(false);
-    expect(isShowreSide(null)).toBe(false);
+  });
+});
+
+describe("touchingEdges（いまどの辺に着いているか）", () => {
+  it("留め方ではなく、いまの位置で決まる（下辺に留めたまま左端まで伸ばせば左にも着く）", () => {
+    const rect = rectOf(0, 450, 700, 150); // 左端 + 下端まで届いている
+    expect(touchingEdges(rect, VIEWPORT).sort()).toEqual(["bottom", "left"]);
+  });
+
+  it("縁から離れていれば、その辺には着いていない", () => {
+    expect(touchingEdges(rectOf(20, 450, 200, 150), VIEWPORT)).toEqual(["bottom"]);
+  });
+
+  it("下辺いっぱいに伸ばせば 3 辺に着く（左・下・右）", () => {
+    const rect = rectOf(0, 450, VIEWPORT.width, 150);
+    expect(touchingEdges(rect, VIEWPORT).sort()).toEqual(["bottom", "left", "right"]);
+  });
+
+  it("四辺いっぱいなら 4 辺とも着いている", () => {
+    expect(touchingEdges(rectOf(0, 0, VIEWPORT.width, VIEWPORT.height), VIEWPORT).sort())
+      .toEqual(["bottom", "left", "right", "top"]);
+  });
+});
+
+describe("snapToViewport（縁の近くは、ぴたりと合わせる）", () => {
+  it("数 px だけ空いた辺は、縁まで伸ばす", () => {
+    expect(snapToViewport(rectOf(4, 100, 200, 150), VIEWPORT)).toEqual(rectOf(0, 100, 204, 150));
+  });
+
+  it("右辺・下辺も同じ", () => {
+    const r = snapToViewport(rectOf(700, 100, 297, 150), VIEWPORT);
+    expect(r.x + r.width).toBe(VIEWPORT.width);
+  });
+
+  it("離れている辺は動かさない", () => {
+    const r = rectOf(100, 100, 200, 150);
+    expect(snapToViewport(r, VIEWPORT)).toEqual(r);
   });
 });

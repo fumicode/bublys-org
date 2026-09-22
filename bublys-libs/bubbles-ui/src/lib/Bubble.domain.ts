@@ -96,7 +96,7 @@ export type BubbleState = {
 /**
  * 掴んだ辺／隅。含まれる向きの辺だけが動き、**反対側は固定される**。
  */
-export type ResizeEdge = "e" | "w" | "s" | "se" | "sw";
+export type ResizeEdge = "e" | "w" | "s" | "n" | "se" | "sw";
 
 export class Bubble {
   private state: BubbleState;
@@ -251,8 +251,18 @@ export class Bubble {
   ): Bubble {
     const current = this.size ?? this.defaultSize;
 
-    const rawHeight = edge.includes("s") ? current.height + localDelta.y : current.height;
-    const height = Math.max(min.height, rawHeight);
+    // 上辺側は「下辺を固定して上辺を動かす」。下辺 = 位置 + 高さ は最後まで不変。
+    // （岸の下に着いたバブルは上辺しか露出しないので、ここが無いと高さを変えられない）
+    let height: number;
+    let y = this.position.y;
+    if (edge.includes("n")) {
+      const bottom = this.position.y + current.height;
+      height = Math.max(min.height, bottom - (this.position.y + localDelta.y));
+      y = bottom - height;
+    } else {
+      const rawHeight = edge.includes("s") ? current.height + localDelta.y : current.height;
+      height = Math.max(min.height, rawHeight);
+    }
 
     if (edge.includes("w")) {
       // 左辺側は「右辺を固定して左辺を動かす」。右辺 = 位置 + 幅 は最後まで不変。
@@ -260,12 +270,12 @@ export class Bubble {
       const wantedX = this.position.x + localDelta.x;
       const x = limits?.minX !== undefined ? Math.max(wantedX, limits.minX) : wantedX;
       const width = Math.max(min.width, right - x);
-      return this.resizeTo({ width, height }).moveTo({ x: right - width, y: this.position.y });
+      return this.resizeTo({ width, height }).moveTo({ x: right - width, y });
     }
 
     const rawWidth = edge.includes("e") ? current.width + localDelta.x : current.width;
     const width = Math.max(min.width, rawWidth);
-    return this.resizeTo({ width, height }).moveTo(this.position);
+    return this.resizeTo({ width, height }).moveTo({ x: this.position.x, y });
   }
 
   /** 最大化する（明示サイズ + maximized=true）。 */

@@ -2,6 +2,12 @@ import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo
 import styled from "styled-components";
 import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode, selectLinkDisplay, toggleLinkDisplay } from "@bublys-org/state-management";
 import { useHoveredBubble, useHoveredBubbleState } from "../context/HoveredBubbleContext.js";
+import { TUBE_RADIUS } from "../showre/tube.js";
+import { ShowreOverlay } from "../showre/ShowreOverlay.js";
+import { ShowreDockContext, type DockResolution, type ShowreDockContextType } from "../showre/ShowreDock.js";
+import { anchoredRect as anchoredRectOf, edgesNear, fitAmongDocked, snapToViewport, type DockState, type ScreenRect } from "../showre/Showre.domain.js";
+import { dockToShowre, makeSelectBubbleSizes, makeSelectDocksJsonOf } from "../state/bubbles-slice.js";
+import { dropPointToUniverse } from "../utils/drop-point.js";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
@@ -549,6 +555,110 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   );
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
+
+  // ── 岸（Showre）──────────────────────────────────────────────
+  // 岸は海に重なる層で、海の大きさは削らない。貼り付く位置は「見えている範囲」＝
+  // スクロール容器（StyledViewport）の矩形で決める
+  const docksJson = useAppSelector(makeSelectDocksJsonOf(universeId));
+  const [dockPreview, setDockPreview] = useState<DockResolution | null>(null);
+  const [showreViewport, setShowreViewport] = useState({ width: 0, height: 0 });
+  const docksRef = useRef(docksJson);
+  docksRef.current = docksJson;
+  // 貼り付いた矩形は「留め方 × バブル自身の大きさ」で決まる（大きさは岸に持たない）
+  const bubbleSizes = useAppSelector(makeSelectBubbleSizes(universeId));
+  const bubbleSizesRef = useRef(bubbleSizes);
+  bubbleSizesRef.current = bubbleSizes;
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setShowreViewport((prev) =>
+        prev.width === r.width && prev.height === r.height ? prev : { width: r.width, height: r.height },
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /**
+   * 「いま離したらどうなるか」。
+   * どの辺に寄せたかは**カーソル**で決め、置く場所は**バブルが見えている矩形**で決める
+   * （掴んだ点との相対位置を保つ）。重なりの解決はドメイン（fitAmongDocked）。
+   */
+  const resolveDock = useCallback(
+    (rect: ScreenRect, cursor: Point2, bubbleId: string): DockResolution | null => {
+      const el = viewportRef.current;
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      const viewport = { width: box.width, height: box.height };
+      const local = { x: rect.x - box.left, y: rect.y - box.top };
+      const edges = edgesNear({ x: cursor.x - box.left, y: cursor.y - box.top }, viewport);
+      // 縁から遠ければ海に浮く。そのままの場所・大きさで予告する（岸 → 海 のときも出る）
+      if (edges.length === 0) {
+        return { rect: { x: local.x, y: local.y, width: rect.width, height: rect.height } };
+      }
+      const dock: DockState = { edges, at: local };
+      const size = { width: rect.width, height: rect.height };
+      const others = Object.entries(docksRef.current)
+        .filter(([id]) => id !== bubbleId)
+        .flatMap(([id, d]) => {
+          const other = bubbleSizesRef.current[id];
+          return other ? [anchoredRectOf(d, other, viewport)] : [];
+        });
+      const pointer = { x: cursor.x - box.left, y: cursor.y - box.top };
+      const fitted = fitAmongDocked(dock, size, viewport, others, pointer);
+      if (!fitted) return null;
+      // 縁まであと数 px なら、ぴたりと着ける（隙間が空くと管が 2 本並んで見える）
+      const snapped = snapToViewport(fitted, viewport);
+      return { rect: snapped, dock: { edges, at: { x: snapped.x, y: snapped.y } } };
+    },
+    [],
+  );
+
+  /**
+   * 貼ったまま大きさを変える（リサイズ）。画面座標の矩形で留め直すだけ。
+   * 留まっている辺は変わらない ── 変わるのは大きさと、貼っていない向きの位置。
+   */
+  const redock = useCallback(
+    (bubbleId: string, rect: ScreenRect) => {
+      const box = viewportRef.current?.getBoundingClientRect();
+      const edges = docksRef.current[bubbleId]?.edges;
+      if (!box || !edges) return;
+      // 縁まであと数 px なら、ぴたりと着ける（着くか離れるかのどちらかにする）
+      const local = snapToViewport(
+        { x: rect.x - box.left, y: rect.y - box.top, width: rect.width, height: rect.height },
+        { width: box.width, height: box.height },
+      );
+      dispatch(
+        dockToShowre(
+          {
+            bubbleId,
+            dock: { edges, at: { x: local.x, y: local.y } },
+            size: { width: local.width, height: local.height },
+          },
+          universeId,
+        ),
+      );
+    },
+    [dispatch, universeId],
+  );
+
+  const showreDock = useMemo<ShowreDockContextType>(
+    () => ({
+      universeId,
+      viewport: showreViewport,
+      resolve: resolveDock,
+      redock,
+      preview: dockPreview,
+      setPreview: setDockPreview,
+      toUniverse: (point: Point2) => dropPointToUniverse(point, universeRef.current),
+    }),
+    [universeId, showreViewport, resolveDock, redock, dockPreview],
+  );
   const dropZone = useUniverseDropZone({ universeId, universeRef });
   const hudSurface = useMemo(() => ({ leftTop: surfaceLeftTop }), [surfaceLeftTop]);
 
@@ -562,12 +672,30 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
     (e: React.MouseEvent) => {
       if (e.target !== e.currentTarget) return;
       dispatch(unfocusBubble(universeId));
+
+      // 背景のドラッグは視点を動かす（掴んでいないときは、いつも視点）。
+      // スクロールバーは出さないので、マウスで海を動かす手はこれ
+      const viewport = viewportRef.current;
+      if (!viewport || e.button !== 0) return;
+      const start = { x: e.clientX, y: e.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+      const onMove = (ev: MouseEvent) => {
+        viewport.scrollLeft = start.left - (ev.clientX - start.x);
+        viewport.scrollTop = start.top - (ev.clientY - start.y);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      e.preventDefault();
     },
     [dispatch, universeId]
   );
 
   return (
     <UniverseContext.Provider value={universeContextValue}>
+     <ShowreDockContext.Provider value={showreDock}>
       <StyledFrame $nested={isNested}>
         {/* 誰も受け止めなかったドロップは、宇宙が落ちた場所で受け止める。
             ハンドラを StyledUniverse ではなく StyledViewport に付けるのは、
@@ -617,6 +745,14 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
           </StyledUniverse>
         </StyledViewport>
 
+        {/* 岸 ── 海に重なる層。海は削らない（スクロールバーの位置も変わらない） */}
+        <ShowreOverlay
+          universeId={universeId}
+          viewport={showreViewport}
+          renderBubbleContent={renderBubbleContent}
+          preview={dockPreview}
+        />
+
         <StyledHeadsUpDisplay
           surface={hudSurface}
           surfaceZIndex={baseZIndex - 2}
@@ -647,6 +783,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
           </div>
         </StyledHeadsUpDisplay>
       </StyledFrame>
+     </ShowreDockContext.Provider>
     </UniverseContext.Provider>
   );
 };
@@ -664,6 +801,10 @@ const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
   overflow: hidden;
   z-index: 0;
 
+  /* 海の角は丸い。岸のネオン管（ShowreRim）と同じ丸みで切り抜く
+     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える */
+  border-radius: ${TUBE_RADIUS}px;
+
   /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
      全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */
   background: transparent;
@@ -678,23 +819,11 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   position: absolute;
   inset: 0;
   overflow: auto;
-  /* 海のスクロールバーは岸との境目に出る。白い溝に見えないよう、トラックを透明にして
-     つまみだけを夜空に溶かす（標準プロパティ。対応ブラウザではこちらが優先される） */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  /* 海にスクロールバーは出さない（新しい bubble-layout の見本と同じ）。
+     海を動かすのはホイールと、背景のドラッグ（掴んでいないときは視点が動く） */
+  scrollbar-width: none;
   &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.28);
-    border-radius: 4px;
-  }
-  &::-webkit-scrollbar-corner {
-    background: transparent;
+    display: none;
   }
   /* nested は pointer-events: none。空白領域は奥に貫通するが、内側のバブル（auto）
      上でホイールを回すと、その wheel イベントが祖先の overflow:auto まで届いて

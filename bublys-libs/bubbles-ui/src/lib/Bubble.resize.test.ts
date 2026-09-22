@@ -97,3 +97,28 @@ describe("Bubble.resizeByEdge — universe の縁で止まる", () => {
     expect(rightEdge(resized)).toBe(rightEdge(bubble));
   });
 });
+
+describe("resizeByEdge: 上辺（n）── 下辺を固定して上辺を動かす", () => {
+  const at = (x: number, y: number, w: number, h: number) =>
+    makeBubble({ x, y }, { width: w, height: h });
+
+  it("上へ引くと、下辺は動かずに高さが増える", () => {
+    const b = at(100, 200, 300, 240).resizeByEdge("n", { x: 0, y: -60 }, MIN);
+    expect(b.size).toEqual({ width: 300, height: 300 });
+    expect(b.position).toEqual({ x: 100, y: 140 });
+    // 下辺（位置 + 高さ）は不変
+    expect(b.position.y + b.size!.height).toBe(440);
+  });
+
+  it("下へ押すと高さが減る。最小より小さくはならず、下辺は固定のまま", () => {
+    const b = at(100, 200, 300, 240).resizeByEdge("n", { x: 0, y: 500 }, MIN);
+    expect(b.size!.height).toBe(MIN.height);
+    expect(b.position.y + b.size!.height).toBe(440);
+  });
+
+  it("幅は変わらない（n は縦だけ）", () => {
+    const b = at(100, 200, 300, 240).resizeByEdge("n", { x: 99, y: -10 }, MIN);
+    expect(b.size!.width).toBe(300);
+    expect(b.position.x).toBe(100);
+  });
+});
