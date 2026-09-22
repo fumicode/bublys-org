@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bubble-lab v3 · 05 勤務表を公理だけで組む</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;--accent:#6ee7ff;
+    --move:#7ee2a8;--fix:#ff9db1;--own:#ffd479}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+  #bar{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:6px 12px 3px;display:flex;flex-direction:column;gap:5px}
+  .row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+  .lbl{color:var(--dim);font-size:11px;letter-spacing:.04em;white-space:nowrap;margin-right:2px}
+  .axis{color:var(--fg);font-size:12px;font-weight:600;margin:0 2px 0 10px}
+  select,button{background:#1d2334;color:var(--fg);border:1px solid var(--line);
+    border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer}
+  select:hover,button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:default;border-color:var(--line)}
+  button.on{background:var(--accent);color:#07202a;border-color:var(--accent);font-weight:600}
+  .sep{width:1px;height:20px;background:var(--line);margin:0 6px}
+  #axis-scope{font-size:12px;font-weight:600;color:var(--fg)}
+  #hint{color:var(--dim);font-size:11px;min-height:19px;padding-top:2px;border-top:1px dashed var(--line)}
+  #hint b{color:var(--accent);font-weight:600}
+  #stage{flex:1 1 auto;position:relative;min-height:0}
+  canvas{display:block;width:100%;height:100%}
+  .box{position:absolute;background:rgba(10,12,20,.88);border:1px solid var(--line);
+    border-radius:8px;padding:7px 11px;color:var(--dim);font-size:11px;line-height:1.55;pointer-events:none}
+  #side{position:absolute;right:12px;top:12px;width:408px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #side .box{position:static}
+  .t{color:var(--fg);font-weight:600;letter-spacing:.04em}
+  .sp{margin-top:3px}
+  .nm{font-weight:600}
+  .axs{padding-left:13px;font-size:10.5px;line-height:1.5}
+  .ax{display:inline-block;margin-right:7px;white-space:nowrap}
+  .ax i{font-style:normal;color:var(--fg);opacity:.75;margin-right:3px}
+  .own{color:var(--own)} .inh{color:var(--dim);font-style:italic}
+  .move{color:var(--move)} .fix{color:var(--fix)} .cur{color:var(--accent)}
+  .who{color:var(--fg);font-weight:600}
+  #selection .k{display:inline-block;width:66px}
+  #cursor-hint{left:0;top:0;white-space:pre;display:none;z-index:5;background:rgba(8,10,17,.95);border-color:#3a4560}
+  #help{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);color:var(--dim);
+    font-size:11px;padding:4px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #help b{color:var(--accent);font-weight:600}
+  .case{color:var(--fg);font-size:13px;font-weight:700;letter-spacing:.03em;margin-right:6px;white-space:nowrap}
+  .grp{display:inline-flex;align-items:center;gap:3px;margin-right:6px}
+  .grp .lbl{color:var(--own);font-weight:600;font-size:11.5px}
+  #deep{border-top:1px dashed var(--line);padding-top:4px}
+  #deep .lbl{color:var(--dim)}
+  #more.on{background:var(--accent);color:#07202a;border-color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <div class="row">
+      <span class="case">案5 勤務表を、公理だけで組む</span>
+      <span class="sep"></span>
+      <span id="axis-scope" data-hint="セレクタが効く空間。<b>選択中の泡がいる空間</b>">外の空間 の</span>
+      <span class="grp"><span class="lbl">レイアウト</span>
+        <select id="type" data-hint="この空間の並べ方の <b>型</b>。中身は「軸ごとの 次元・並べ方・レンズ」（詳しく で見える）"></select></span>
+      <span class="grp" id="arg-align"><span class="lbl">揃え</span>
+        <select id="align" data-hint="帯の中で泡をどちらへ寄せるか。<b>始端</b>＝左・上ぞろえ（勤務表）／<b>中央</b>＝帯の中央（coverflow）。空間ごとの設定"></select></span>
+      <span class="grp" id="arg-stepx"><span class="lbl">間隔X</span>
+        <select id="stepx" data-hint="X の <b>等間隔</b> の間隔（px）。帯の幅でもある"></select></span>
+      <span class="grp" id="arg-stepy"><span class="lbl">間隔Y</span>
+        <select id="stepy" data-hint="Y の <b>等間隔</b> の間隔（px）"></select></span>
+      <span class="grp" id="arg-stepz"><span class="lbl">間隔Z</span><span class="z-scope lbl" data-hint="決まり2：見えない親に Z は無い（窓ではない）。Z のセレクタだけは <b>外の空間</b> に効く"></span>
+        <select id="stepz" data-hint="Z の <b>等間隔</b> の間隔（奥行き）。版と版の間の奥行き。大きいほど手前の版が大きく、奥の版の題は小さくなる"></select></span>
+      <span class="sep"></span>
+      <button id="refocus" data-hint="この空間の焦点を 0 に戻す（いま見ている所を真ん中へ）">焦点を戻す</button>
+      <span class="sep"></span>
+      <button id="nopin" data-hint="<b>留めるのをやめる</b>。泡の位置は箱の<b>中心</b>なので、箱が伸び縮みすると縁は半分ずつ動く。切ってから佐藤の右下の角を広げると、触っていない勤務表まで伸びの半分（−32px）だけ動く。ふだんはそれを書き戻して留めている">留めるのをやめる</button>
+      <button id="more" data-hint="軸ごとの <b>次元・並べ方・レンズ</b> の裏口を出す。型はこの9つの組み合わせでできている">詳しく</button>
+    </div>
+    <div class="row" id="deep" hidden>
+      <span class="lbl">裏口</span>
+      <span class="axis">X</span>
+      <select data-axis="x" data-part="dim" data-hint="横に何を読むか。<b>自由</b>＝動く／<b>順序</b>＝並べ替わる／<b>列・行</b>＝マスを移る／<b>履歴</b>＝視点が動く／なし＝何も起きない"></select>
+      <select data-axis="x" data-part="arrange" data-hint="値を位置にする決め方。<b>そのまま</b>＝px／<b>等間隔</b>＝帯の幅は間隔／<b>詰める</b>＝帯の幅は中身の最大"></select>
+      <select data-axis="x" data-part="lens" data-hint="横の位置を画面に写す式。<b>平行</b>＝そのまま／<b>魚眼</b>＝焦点の近くを大きく、端を詰める"></select>
+      <span class="axis">Y</span>
+      <select data-axis="y" data-part="dim" data-hint="縦に何を読むか。自由＝動く／順序＝並べ替わる／列・行＝マスを移る／履歴＝視点が動く"></select>
+      <select data-axis="y" data-part="arrange" data-hint="値を位置にする決め方。そのまま＝px／等間隔＝帯の幅は間隔／詰める＝帯の幅は中身の最大"></select>
+      <select data-axis="y" data-part="lens" data-hint="縦の位置を画面に写す式。平行／魚眼"></select>
+      <span class="axis">Z</span><span id="z-scope" class="z-scope lbl" data-hint="決まり2：見えない親に Z は無い（窓ではない）。Z のセレクタだけは <b>外の空間</b> に効く"></span>
+      <select data-axis="z" data-part="dim" data-hint="奥行きに何を読むか。<b>なし</b>ならホイールは何もしない"></select>
+      <select data-axis="z" data-part="arrange" data-hint="奥行きの値の決め方。そのまま／等間隔（値×間隔）／詰める（値の順位）"></select>
+      <select data-axis="z" data-part="lens" data-hint="奥行きの写し方。<b>透視</b>＝消失点へ寄せて小さく／<b>平行</b>＝奥行きを見た目に使わない"></select>
+      <span class="sep"></span>
+      <span class="lbl">大きさ</span>
+      <select id="sizerule" data-hint="X・Y の局所倍率から、泡の大きさの倍率をどう決めるか。既定は <b>小さい方</b>＝曲がっている軸に合わせる（本物の世界線ビューは 横だけ だが、軸を入れ替えると破れる）"></select>
+      <button id="inherit" data-hint="この空間の自前の View を捨てて、<b>外の空間の並べ方を継ぐ</b>（焦点は継がない）">外から継ぐ</button>
+    </div>
+    <div id="hint">ボタンやセレクトにマウスを乗せると、ここに意味が出ます。</div>
+  </div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="side">
+      <div class="box" id="spaces"></div>
+      <div class="box" id="selection"></div>
+    </div>
+    <div class="box" id="cursor-hint"></div>
+  </div>
+  <div id="help">
+    泡を掴んで引く … その空間の軸に従う（動く／並べ替わる／マスを移る／視点が動く）　ホイール … 奥行き　右下の角 … 大きさ　別の泡の縁へ寄せて離す … 並ぶ（見えない親が生まれる）
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================================
+   bubble-lab v3 · 05-kinmuhyo —— 勤務表を、公理だけで組む
+   仕様：docs/bubble-space-prototype/v3/SPEC.md（語彙・画面の約束はそこが正）
+   土台：01-snap-is-parent.html（＝00-core.html ＋ スナップ）を複製。案1〜4・6 で踏んで決めた決まりは最初から入れてある
+
+   公理（案）
+     泡の見え方は、その泡を入れている親の View で決まる。
+     View は軸（X・Y・Z）ごとに「次元」「並べ方」「レンズ」を持つ。
+     これが入れ子ごとに繰り返される。
+
+   この案で確かめること
+     masa さんが実際に「作れるようになりたい」と言った画面が、公理と決まり1〜8 だけで組めるか。特別扱いを足さずに済むか。
+       「勤務表の上の方に制約がまとまってて、その下にカレンダーがならび、左にスタッフが縦にならぶ」
+       「あるバブリの中でオブジェクトがいくつかあって、そのうち一つを履歴表示する」
+       「バブルAの左にバブルBがスナップしているとき、実はそれらを束ねるバブルXがあり…」
+     ＋ 案6 の問いへの答え：ふだんは「型＋引数」の少ないセレクタ、「詳しく」で軸ごとの裏口
+
+   組めたか（検証：scratchpad の v3check/05-kinmuhyo.build-check.mjs、本物のマウスで 75 項目）
+     組めた。特別扱い（この場面のためだけの if・例外）は 0。
+     場面の定義は 19 行（泡を足す 17 行 ＋ 起動時に並べる 2 行）。View を決めているのは add の view: "型名" が 6 か所だけで、
+     位置は1つも書いていない（free は「まだ並びに入っていない泡」を置く3つだけ。並んだあとは pin が書き直す）
+       - 上に制約・その下にカレンダー・カレンダーの左にスタッフ：格子（列・行を詰める）＋ 揃え 始端 だけで出る。
+         制約の左端＝カレンダーの左端（差 0.00px）、スタッフの上端＝カレンダーの上端（差 0.00px）、間は隙間 14px
+       - 勤務表の右に希望シフト・下に世界線：くっつける（決まり4）を起動時に2回。見えない親が入れ子になる
+         （外の空間 ⊃ 横の並び ⊃ [縦の並び ⊃ [勤務表, 世界線], 希望シフト]）。引き剥がすと親は消え、勤務表は 0.000px も跳ばない
+       - 佐藤だけ履歴を奥行きに：その泡に 履歴を奥行きに（Z 古さ·等間隔·透視）を持たせるだけ。佐藤の中でホイールすると
+         佐藤の焦点 Z だけが動き、ほかの4人・勤務表・カレンダー・世界線は 0.0000px 動かない
+       - 深さ6（外の空間 → 見えない親 → 見えない親 → 勤務表 → スタッフ → 佐藤 → 版）の倍率は各段の局所倍率の積
+
+   pin は「公理の穴」ではなかった（2026-09-16 に測って決めた）
+     いったんは「View だけでは『動かさなかった泡は動かない』が決まらない」＝公理の外、として数えていた。
+     測ってみると、pin を切ったときの移動量は**箱の伸び縮みのちょうど半分**だった：
+       佐藤の右下の角を +60px（箱は 150 → 214、＋64px）
+                          pin ON      pin OFF
+         佐藤の左上         0.0px     −32.0px   ← 伸びの半分
+         スタッフの左上      0.0px     −32.0px
+         勤務表の左上        0.0px     −32.0px
+         カレンダーの左上    64.0px      32.0px
+     半分になるのは、**泡の位置が箱の中心**だから。箱は中心を軸に両側へ伸びるので、左右の縁が半分ずつ動く。
+     つまり pin は穴を塞ぐ継ぎ足しではなく、**「位置＝中心」を選んだことから必然的に出てくる補正**だった。
+
+     「位置＝左上」にすれば pin は要らなくなるが、**中心を貫くことにした**（masa さんの判断）。
+     中心は、レンズ・消失点・魚眼の半幅・当たり判定まで一本で通っている考え方で、そこだけ崩したくない。
+
+     先に「塊を始端に留める」だけを試したが破綻した（記録として残す）：
+       塊＝中央 … 勤務表 528×572、画面の中に 53個
+       塊＝始端 … 勤務表 1888×1896、画面の中に 2個
+     箱が「中心からの最大距離 × 2」で測られているので、中身だけ端へ寄せると箱が倍になり、入れ子で増幅する。
+     中身の置き方だけ変えても駄目で、空間の原点と箱の測り方を一緒に変えないといけない。これも「位置＝中心」の現れ。
+
+     ツールバーの「留めるのをやめる」で、切ったときの動きを画面で見られる。
+
+   要った決まり（案1〜4・6 で決めたもの。この案では最初から入れた）
+     1 pin              要った。佐藤の角を 60px 広げると スタッフの帯が広がってカレンダー・制約が 60px 押されるが、勤務表の左上は 0.00px。
+                        希望シフトを引き剥がしても・くっつけ直しても 0.000px
+     2 見えない親は Z を通す  要った。並びの中の希望シフトの上でホイールすると外の空間の焦点 Z が動く。
+                        外の空間の Z を「なし」にすると並びの Z も なし（軸まるごと窓のもの。焦点だけ通すと並びの中だけ透視が残る）
+     3 見えない親は箱を持たない（出入りは窓で比べる）  要った。入れ子が深い（日は深さ5）ので、これが無いと日や人を少し引いただけで外の並びへ飛ぶ
+     4 くっつけるは落とし込みの1つ  要った。3 と同じ根。起動時の2つの並べも、ドラッグと同じ snapOp → reshape
+     5 帯の式は1つ・揃えは空間ごと  要った。勤務表は始端（制約とカレンダーの左端がそろう）、世界線は中央。
+                        勤務表を中央ぞろえにすると左端が 50px ずれるので、1つに決めると両方は満たせない
+     7 操作は軸と何を掴んだかで決まる  要った。日＝マスを移る（入れ替わる）／人＝並べ替わる／版＝視点が動く／希望シフト＝動く、が同じ1文で出る
+     8 大きさの倍率「小さい方（min）」  要った（既定として）。世界線の端の版が縮む。
+                        ※ 既定は「横だけ」だったが、案2 が min に決着したので合わせた（SPEC §1）。
+                        この場面ではどの決め方でも絵は変わらない（4通りとも差 0.0000px。_check/05-size-min.mjs）。
+                        魚眼の空間が既定で無く、X も Y も局所倍率 1 だから。切り替えは詳しくの中に残した
+   要らなかった決まり（この場面では踏まなかった）
+     6 箱の約束「小さい方が大きい方の中にいる」  中身より小さい箱の空間がこの場面に無い（どの空間も中身に合わせて伸びる）ので、出番が無かった
+     案1 の比べる②（詰める大きさ 自前／見かけ）  並びの泡が全部 z=0 なので同じ答えになる。トグルごと落とした
+     案1 の比べる③（並びの掴み方）  親の縁に決め打ちした
+
+   踏んだこと（作って試して分かったこと）
+     - 案1 の「差し込む所より前の泡を留める」をそのまま入れると、スタッフの中で伊藤を先頭へ並べ替えただけで勤務表が 34px 上へ動いた。
+       同じ空間での並べ替えは帯が入れ替わるだけで塊も箱も変わらないのに、前の泡（佐藤）を留めると pin が外へ遡って
+       並び（自由に置かれた泡）の座標を書くため。留めるのは「空間の中身が変わったとき（泡が入ってきた・出ていった）」だけにした。
+       入れ子が深いほど、pin の留める先を1つ間違えるとアプリごと動く
+     - 一つだけ履歴を奥行きにすると、その行が高くなる。佐藤（150×190）がスタッフの帯を決めるので、勤務表の行1 は 378px。
+       カレンダーは 146px で始端ぞろえなので、格子の右下に 232px の空きができる。masa さんの言葉どおりに並べると必ずこうなる
+     - 版の題が読めるかは「見える帯 ＝ 倍率の差 ×（消失点までの距離 − 版の高さ/2）」で決まる。佐藤 190px・版 22px・Z の間隔 1.2 で
+       13.8 / 8.5 / 5.7px。手前2枚は読め、3枚目は半分、4枚目は隠れる。4枚とも読ませるには泡が 300px 以上高く要り、スタッフの列に入らない。
+       ホイールで送れば読める（送ると手前の版は消える＝焦点より手前）ので、そのままにした
+     - 魚眼の端の版の題が読めるかは、大きさの下限で決まった。下限 0.25 だと世界線の端の版（版1・6・9・12）が 12px×0.516＝6.2px で
+       字の下限 6.5px に届かず、題が消えた。下限を 0.32（本物の世界線ビューの MIN_SCALE と同じ）にすると 6.8px で読める
+     - 格子の空きマス（列0・行0）は、スタッフの幅 × 制約の高さ の穴（178×110px）になる。masa さんのレイアウトでは
+       「スタッフの列の見出しの場所」に見えるが、公理からは何も置かなければ空くだけ
+     - くっつける順で入れ子の形が変わる。先に希望シフト（右）→ 次に世界線（下）だと、世界線は勤務表だけの下に付く。
+       逆の順だと世界線は 勤務表＋希望シフト の下に付く。どちらも公理どおりで、masa さんの言葉に近いのは前者
+     - ふだんの UI に出るセレクタは 1〜4 個：勤務表（格子）は 型＋揃え の 2、世界線（X魚眼ビュー）は ＋間隔X・間隔Y で 4、
+       佐藤（履歴を奥行きに）は 型＋間隔Z の 2。詳しくを開くと 11〜14 個。案6 の「選ぶものが少ない」は、型を主に出すだけで満たせる
+     - 型セレクタが「（合わせ）」になる場所がある。見えない親は X・Y が自分のもので Z は窓のものなので、どのプリセットとも一致しない。
+       型は View の要約でしかなく、View の方が広い（型に無い組み合わせが作れる）ことが画面に出る
+     - 「詳しく」を開くと canvas が 36px 低くなり、場面が 18px 上下する（場面は canvas の中心に置かれるので）。
+       検証で「元どおり」を px で測るときに引っかかった
+   ============================================================================ */
+
+/* ============================================================
+   §1 語彙：次元・並べ方・レンズ
+   ============================================================ */
+const HEADER = 24;              // 泡のヘッダの高さ（中身の箱はこの下）
+const PAD = 14;                 // 空間を持つ泡の箱の余白
+const GAP = 14;                 // 「詰める」の帯と帯の隙間
+const K_PERSP = 0.26;           // 透視：奥行き1あたりの縮み
+const ROOT_VP = { x: -130, y: -165 };   // root の消失点（画面中心から）
+const VP_CHILD = { fx: 1, fy: 1 };      // 子の空間の消失点（余白の内側の半幅・半高に対する割合、左上へ）。1 以下＝箱の中
+const PULL = 48;                // 空間の外へ「大きく」引き出したとみなす距離（画面 px）
+const FONT = '-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif';
+const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+
+/* ── 決まり4：くっつける（案1 の R1〜R6）。落とし込みの1つなので、離す先は土台の決まりで決めてから縁を見る ── */
+const SNAP_EDGE = 24;           // 縁どうしがこの距離（画面 px）以内なら「くっつける」
+const SNAP_OVERLAP = 0.4;       // 直交方向に、小さい方の長さのこの割合以上重なっていること
+const SNAP_GAP = 0;             // 見えない親の「詰める」の隙間（縁が接する）
+const RING = 12;                // 見えない親の縁（外周）の掴める幅
+/** 見えない親は枠を持たない（ヘッダも余白も無い）。箱は中身ぴったり */
+const headOf = b => b && b.implicit ? 0 : HEADER;
+const padOf = b => b && b.implicit ? 0 : PAD;
+
+/** 次元：泡 → 値。write はドラッグでその軸に何が起きるか（null＝書けない＝視点が動く） */
+const DIMS = {
+  "none":           { label: "なし",       write: null,      read: () => 0 },
+  "free.x":         { label: "自由X",      write: "coord",   key: "x",   read: b => b.free.x },
+  "free.y":         { label: "自由Y",      write: "coord",   key: "y",   read: b => b.free.y },
+  "free.z":         { label: "自由Z",      write: "coord",   key: "z",   read: b => b.free.z },
+  "order":          { label: "順序",       write: "reorder",             read: b => b.order },
+  "col":            { label: "列",         write: "cell",    key: "col", read: b => b.cell.col },
+  "row":            { label: "行",         write: "cell",    key: "row", read: b => b.cell.row },
+  "history.index":  { label: "履歴の世代", write: null,                  read: b => b.hist },
+  // ★ derived 次元は「どの空間の履歴か」を知っている（v2 で踏んだ）
+  "history.age":    { label: "履歴の古さ", write: null,                  read: (b, space) => maxHistIn(space) - b.hist },
+  "history.branch": { label: "履歴の枝",   write: null,                  read: b => b.branch },
+};
+/** 軸に刺さった次元で、ドラッグが何をするか："coord" | "reorder" | "cell" | "focus" | "none" */
+const verbOf = dimId => dimId === "none" ? "none" : (DIMS[dimId].write ?? "focus");
+
+const ARRANGES = { "as-is": "そのまま", equal: "等間隔", pack: "詰める" };
+/** 決まり5：帯の中での揃え。空間ごとの設定（1つに決めると勤務表と coverflow の両方は満たせない） */
+const ALIGNS = { start: "始端", center: "中央" };
+/**
+ * 決まり8：X・Y の局所倍率 → 泡の大きさの倍率（Z の倍率はこのあとに掛ける）。既定は「小さい方（min）」
+ *   ＝ 曲がっている軸に合わせる。平行のレンズは倍率がいつも 1 なので min から落ちる（SPEC §1。案2 で決着）
+ * （案2 の結果。本物の世界線ビュー WorldLinesCanvasView も X の端への近さだけで決めている）
+ */
+const SIZE_RULES = {
+  x:       { label: "横だけ",     raw: kx => kx },
+  min:     { label: "小さい方",   raw: (kx, ky) => Math.min(kx, ky) },
+  product: { label: "横×縦",      raw: (kx, ky) => kx * ky },
+  z:       { label: "奥行きだけ", raw: () => 1 },
+};
+const SIZE_FLOOR = 0.32;        // 端での倍率の下限（本物の世界線ビューの MIN_SCALE と同じ。魚眼の端の版の題が読める下限でもある）
+const sizeXY = (rule, kx, ky) => SIZE_FLOOR + (1 - SIZE_FLOOR) * SIZE_RULES[rule].raw(kx, ky);
+/** 1軸の局所倍率しか分からないとき（measure・focusFits）の上限：もう一方の軸を 1 とみなす */
+const sizeBound = (rule, axis, k) => sizeXY(rule, axis === "x" ? k : 1, axis === "y" ? k : 1);
+
+/** X/Y のレンズ：u（位置 − 焦点）→ 画面 s と局所倍率 k。1次元なので逆関数が必ずある。H は空間の半幅 */
+const TANH_EDGE = 1 - 1e-12;    // tanh が浮動小数で 1 に張り付く手前（|u| ≲ 14H まで往復が合う）
+const LENS_XY = {
+  parallel: { label: "平行", project: (u, H) => ({ s: u, k: 1 }), unproject: (s, H) => s },
+  fisheye:  { label: "魚眼",
+    project: (u, H) => { const t = u / H, c = Math.cosh(t); return { s: H * Math.tanh(t), k: 1 / (c * c) }; },
+    unproject: (s, H) => H * Math.atanh(clamp(s / H, -TANH_EDGE, TANH_EDGE)) },
+};
+/** Z のレンズ：dz（位置 − 焦点）→ 倍率 m と透明度。XY は消失点へ m で寄せる */
+const LENS_Z = {
+  perspective: { label: "透視",
+    // d → 0 は目の位置（dz = −1/0.26）。そこより手前は写らないので、式が発散しないように止めるだけ
+    mag: dz => 1 / Math.max(0.05, 1 + K_PERSP * dz),
+    alpha: dz => dz < -1e-9 ? 0 : 1 },    // 焦点より手前（dz<0）は消す（第1版 制約02）。薄れて見えるのは補間だけ
+  flat: { label: "平行", mag: () => 1, alpha: () => 1 },
+};
+const lensLabel = (axis, id) => (axis === "z" ? LENS_Z : LENS_XY)[id].label;
+
+/* ============================================================
+   プリセット＝View の型。どれも「軸ごとの 次元・並べ方・レンズ」だけ
+   ============================================================ */
+const AX = (dim, arrange, lens, step) => ({ dim, arrange, lens, step });
+/** 型＝軸ごとの 次元・並べ方・レンズ ＋ 空間ごとの 揃え・大きさ。UI に出るのはこの名前と引数だけ */
+const PRESETS = {
+  free:      { label: "自由に置く",     align: "start",  x: AX("free.x", "as-is", "parallel", 110),      y: AX("free.y", "as-is", "parallel", 80),         z: AX("free.z", "as-is", "perspective", 1) },
+  row:       { label: "横に並べる",     align: "start",  x: AX("order", "pack", "parallel", 110),        y: AX("none", "pack", "parallel", 80),            z: AX("none", "as-is", "flat", 1) },
+  column:    { label: "縦に並べる",     align: "start",  x: AX("none", "pack", "parallel", 110),         y: AX("order", "pack", "parallel", 80),           z: AX("none", "as-is", "flat", 1) },
+  grid:      { label: "格子",           align: "start",  x: AX("col", "pack", "parallel", 110),          y: AX("row", "pack", "parallel", 80),             z: AX("none", "as-is", "flat", 1) },
+  fisheyeX:  { label: "X魚眼ビュー",    align: "center", x: AX("history.index", "equal", "fisheye", 64), y: AX("history.branch", "equal", "parallel", 34), z: AX("none", "as-is", "flat", 1) },
+  coverflow: { label: "coverflow",      align: "center", x: AX("order", "equal", "fisheye", 68),         y: AX("none", "pack", "parallel", 80),            z: AX("none", "as-is", "flat", 1) },
+  histZ:     { label: "履歴を奥行きに", align: "center", x: AX("none", "as-is", "parallel", 110),        y: AX("none", "as-is", "parallel", 80),           z: AX("history.age", "equal", "perspective", 1.2) },
+};
+const viewFromPreset = id => { const p = PRESETS[id];
+  return { x: { ...p.x }, y: { ...p.y }, z: { ...p.z }, align: p.align, size: "min" }; };
+/** いまの View がどの型か（step は引数なので見ない）。どれでもなければ null＝「合わせ」 */
+function presetOf(spaceId) {
+  const V = viewOf(spaceId);
+  return Object.keys(PRESETS).find(id => ["x", "y", "z"].every(a =>
+    PRESETS[id][a].dim === V[a].dim && PRESETS[id][a].arrange === V[a].arrange && PRESETS[id][a].lens === V[a].lens)) ?? null;
+}
+/**
+ * 決まり4：見えない親の View。縁の軸は 順序・詰める・平行（隙間 0）、もう一方は なし・詰める、揃えは始端（左・上ぞろえ）、
+ * Z は自由Z・そのまま・透視（決まり2：子が自分の奥行きを保つ＝Z を通す）
+ */
+function snapView(axis) {
+  const along = { dim: "order", arrange: "pack", lens: "parallel", step: 110, gap: SNAP_GAP };
+  const cross = { dim: "none",  arrange: "pack", lens: "parallel", step: 80,  gap: SNAP_GAP };
+  // Z は書かない：見えない親は窓ではないので、Z は窓（外の空間）の軸がそのまま効く（決まり2・viewOf）
+  return { x: axis === "x" ? along : cross, y: axis === "y" ? along : cross, align: "start", size: "min" };
+}
+
+/* ============================================================
+   状態：泡と root。関係は無い。親子だけ
+   ------------------------------------------------------------
+   焦点は View の型に入れず、空間（泡）そのものに持たせる。
+   View は継げるが、焦点は継がない（§4）——その境目をデータの形に出すため。
+   ============================================================ */
+const ROOT = { id: "root", title: "外の空間", hue: null, view: viewFromPreset("free"), focus: { x: 0, y: 0, z: 0 } };
+const bubbles = [];
+const BYID = new Map();
+let STACK = 0;                  // 最後に置いた泡の stack
+const byId = id => BYID.get(id);
+
+function add(p) {
+  const b = {
+    id: p.id, title: p.title, hue: p.hue,
+    size: { w: p.w, h: p.h },
+    parent: p.parent ?? null,
+    free: { x: 0, y: 0, z: 0, ...p.free },
+    order: p.order ?? 0,
+    cell: { col: 0, row: 0, ...p.cell },
+    hist: p.hist ?? 0, branch: p.branch ?? 0,
+    view: p.view ? (typeof p.view === "string" ? viewFromPreset(p.view) : p.view) : null,
+    implicit: !!p.implicit,
+    focus: { x: 0, y: 0, z: 0 },          // この泡が空間を持つとき、その空間の「いまどこを見ているか」
+    stack: p.stack ?? 0,                  // 置いた順。Z も倍率も同じ兄弟が重なったとき、大きい方が手前（View の外の約束）
+    note: p.note ?? null,                 // 場面の注記（泡の上に小さく。配置には使わない）
+  };
+  bubbles.push(b); BYID.set(b.id, b);
+  return b;
+}
+function removeBubble(b) {
+  bubbles.splice(bubbles.indexOf(b), 1); BYID.delete(b.id); anim.delete(b.id);
+}
+
+/* ────────────────────────────────────────────────────────────
+   場面（1つだけ）：masa さんが「作れるようになりたい」と言った画面。
+   足すのは 泡 と、空間を持つ泡の View（型の名前）だけ。位置は View が決める
+   ──────────────────────────────────────────────────────────── */
+/* 勤務表：格子（列・行を詰める・始端ぞろえ）。上に制約、その下にカレンダー、カレンダーの左にスタッフ */
+add({ id: "kinmu", title: "勤務表", hue: 355, w: 300, h: 200, free: { x: -186, y: -69, z: 0 }, view: "grid" });
+add({ id: "seiyaku", title: "制約",       hue: 40,  w: 208, h: 110, parent: "kinmu", cell: { col: 1, row: 0 }, view: "column" });
+add({ id: "staff",   title: "スタッフ",   hue: 130, w: 168, h: 120, parent: "kinmu", cell: { col: 0, row: 1 }, view: "column" });
+add({ id: "cal",     title: "カレンダー", hue: 95,  w: 308, h: 122, parent: "kinmu", cell: { col: 1, row: 1 }, view: "grid" });
+["夜勤は続けて2回まで", "週の休みは2日以上", "日ごとに2人以上"].forEach((t, i) =>
+  add({ id: "c" + i, title: t, hue: 40, w: 180, h: 16, parent: "seiyaku", order: i }));
+/* スタッフ：5人。佐藤だけが空間を持ち、中はその人の変更履歴を奥行きに（Z 古さ・等間隔・透視） */
+add({ id: "p0", title: "佐藤", hue: 130, w: 150, h: 190, parent: "staff", order: 0, view: "histZ" });
+["鈴木", "高橋", "田中", "伊藤"].forEach((t, i) =>
+  add({ id: "p" + (i + 1), title: t, hue: 130, w: 70, h: 20, parent: "staff", order: i + 1 }));
+["いま", "3日前", "先週", "先月"].forEach((t, i) =>
+  add({ id: "h" + i, title: t, hue: 130, w: 96, h: 22, parent: "p0", hist: 3 - i }));
+/* カレンダー：格子（列＝日、行＝週）。日が 7×3 */
+for (let i = 0; i < 21; i++)
+  add({ id: "d" + i, title: String(i + 1), hue: 95, w: 28, h: 22, parent: "cal", cell: { col: i % 7, row: Math.floor(i / 7) } });
+/* 勤務表の右に希望シフト、勤務表の下に世界線（どちらも見えない親の並び。起動時に決まり4 で並べる） */
+add({ id: "kibou", title: "希望シフト", hue: 320, w: 170, h: 240, free: { x: 220, y: -69, z: 0 } });
+add({ id: "sekai", title: "世界線", hue: 265, w: 200, h: 120, free: { x: -186, y: 300, z: 0 }, view: "fisheyeX" });
+[[0, 1], [1, 1], [2, 1], [3, 0], [4, 0], [5, 0], [3, 1], [4, 1], [5, 1], [3, 2], [4, 2], [5, 2]].forEach(([gen, br], i) =>
+  add({ id: "v" + i, title: "版" + (i + 1), hue: 265, w: 56, h: 20, parent: "sekai", hist: gen, branch: br }));
+
+let selectedId = "seiyaku";
+let IMPLICIT_N = 0;             // 見えない親の番号
+
+/* ============================================================
+   木：親子だけ
+   ============================================================ */
+let KIDS = new Map();
+function reindex() {
+  KIDS = new Map([["root", []]]);
+  for (const b of bubbles) {
+    const p = b.parent ?? "root";
+    if (!KIDS.has(p)) KIDS.set(p, []);
+    KIDS.get(p).push(b);
+  }
+}
+const kidsOf = id => KIDS.get(id) ?? [];
+const spaceObj = id => id === "root" ? ROOT : byId(id);
+const parentOf = id => id === "root" ? null : (byId(id).parent ?? "root");
+/** 空間を持つ泡：自前の View を持つか、中に泡がいる */
+const isHost = b => b.view !== null || kidsOf(b.id).length > 0;
+const maxHistIn = spaceId => Math.max(0, ...kidsOf(spaceId).map(b => b.hist));
+function isAncestor(a, id) {             // a は id の先祖（id 自身も含む）か
+  for (let cur = id; cur; cur = parentOf(cur)) if (cur === a) return true;
+  return false;
+}
+function subtreeOf(id) {
+  const s = new Set([id]);
+  const walk = x => kidsOf(x).forEach(k => { s.add(k.id); walk(k.id); });
+  walk(id);
+  return s;
+}
+const spaceName = id => id === "root" ? "外の空間" : byId(id).implicit ? "並び（見えない親）" : `${byId(id).title}の中`;
+const spaceHsl = id => id === "root" ? "#e6ebf5" : byId(id).implicit ? "#cdd8ee" : `hsl(${byId(id).hue} 70% 66%)`;
+/**
+ * R6 見えない親は窓ではない。奥行きに置かれず（倍率 1）、焦点 Z も持たない。
+ * 中の泡の奥行きは、見えない親を外へたどった空間（窓）の焦点 Z から測る（ホイールもそこへ）。
+ * 空間の出入りも窓で数える：くっつけるは、相手の窓が「離す先の窓」（土台の決まり）と同じときだけ
+ */
+const windowOf = id => { let s = id; while (s !== "root" && byId(s) && byId(s).implicit) s = parentOf(s); return s; };
+const focusZ = id => spaceObj(windowOf(id)).focus.z;
+/** その泡を入れている見えない親（なければ null） */
+const rowOf = id => { const q = id === "root" ? null : byId(byId(id).parent); return q && q.implicit ? q : null; };
+
+/* ============================================================
+   §4 継承：並べ方は外から継ぐ。焦点は継がない
+   ============================================================ */
+function viewOf(spaceId) {
+  const sp = spaceObj(spaceId);
+  const src = sp.view ?? viewOf(parentOf(spaceId));
+  // 決まり2：見えない親は窓ではない。Z は軸まるごと窓（外の空間）のもの——焦点だけでなく次元・並べ方・レンズも。
+  // 焦点だけ通すと、外が「Z なし」でも並びの中だけ透視が残る（同じ泡が並びの中と外で別の大きさになる）
+  const z = spaceId !== "root" && sp.implicit ? viewOf(windowOf(spaceId)).z : src.z;
+  return { x: { ...src.x }, y: { ...src.y }, z: { ...z },
+           align: src.align ?? "start", size: src.size ?? "x", focus: sp.focus, own: !!sp.view };
+}
+
+/** 次元に合う並べ方。「そのまま」は px を持つ次元（自由）だけに意味がある */
+function fitArrange(dimId, arrange) {
+  const verb = verbOf(dimId);
+  if (verb === "coord") return "as-is";
+  if (verb === "none") return arrange;
+  if (arrange !== "as-is") return arrange;
+  return dimId.startsWith("history.") ? "equal" : "pack";
+}
+
+/** その空間に自前の View を持たせる（継いでいたなら、いまの見え方を写し取ってから） */
+function ownView(spaceId) {
+  const sp = spaceObj(spaceId);
+  if (!sp.view) { const v = viewOf(spaceId); sp.view = { x: v.x, y: v.y, z: v.z, align: v.align, size: v.size }; }
+  return sp.view;
+}
+/** 裏口：軸ごとの 次元・並べ方・レンズ */
+function setAxis(spaceId, axis, patch) {
+  if (axis === "z") spaceId = windowOf(spaceId);   // 決まり2：見えない親に Z は無い。Z を変えるのは窓（外の空間）
+  const A = ownView(spaceId)[axis];
+  Object.assign(A, patch);
+  if (patch.dim && !patch.arrange) A.arrange = fitArrange(A.dim, A.arrange);
+}
+/** 引数：空間ごとの 揃え・大きさ（軸ではないので View そのものに書く） */
+function setView(spaceId, patch) { Object.assign(ownView(spaceId), patch); }
+/** 型を当てる。案6 の「新しい型も持つ引数は持ち越す」に倣い、空間ごとの引数（揃え・大きさ）は引き継ぐ */
+function applyPreset(name, spaceId) {
+  const id = PRESETS[name] ? name : Object.keys(PRESETS).find(k => PRESETS[k].label === name);
+  if (!id) throw new Error("型が無い: " + name);
+  const sp = spaceObj(spaceId), was = sp.view;
+  sp.view = viewFromPreset(id);
+  if (was) { sp.view.align = was.align ?? sp.view.align; sp.view.size = was.size ?? sp.view.size; }
+  Object.assign(sp.focus, { x: 0, y: 0, z: 0 });
+}
+function inheritView(spaceId) { if (spaceId !== "root") spaceObj(spaceId).view = null; }
+
+/* ============================================================
+   §2 並べ方：値 → 空間の中での位置（泡の中心。原点は中身の箱の中心）
+   ============================================================ */
+function arrangeAxis(A, kids, axis, spaceId, sizeOf, align = "start") {
+  const dim = DIMS[A.dim];
+  const val = b => dim.read(b, spaceId);
+  const len = b => axis === "x" ? sizeOf(b).w : sizeOf(b).h;
+  const pos = new Map(), bands = [];
+  const values = [...new Set(kids.map(val))].sort((p, q) => p - q);
+  let mid = 0;
+
+  if (axis === "z") {                              // Z は中央ぞろえしない（焦点 0 ＝ 手前）
+    for (const b of kids) {
+      const v = val(b);
+      pos.set(b.id, A.arrange === "equal" ? v * A.step : A.arrange === "pack" ? values.indexOf(v) : v);
+    }
+  } else if (A.arrange === "as-is") {
+    for (const b of kids) pos.set(b.id, val(b));
+  } else {
+    // 決まり5：帯の式は1つ。値ごとに帯を作り、帯の中に揃えて置き、塊の中央を空間の中心に。
+    //   等間隔＝帯の幅は間隔・帯の中心は 値×間隔・無い値の所は空く
+    //   詰める＝帯の幅はその値を持つ泡の最大・隙間で続ける・無い値は場所を取らない
+    const gap = A.gap ?? GAP;                      // 帯の隙間は View の値（見えない親は 0。書いていなければ 14px）
+    if (A.arrange === "equal") {
+      for (const v of values) bands.push({ value: v, start: v * A.step - A.step / 2, end: v * A.step + A.step / 2 });
+    } else {
+      let at = 0;
+      for (const v of values) {
+        const l = Math.max(...kids.filter(b => val(b) === v).map(len));
+        bands.push({ value: v, start: at, end: at + l }); at += l + gap;
+      }
+    }
+    // 帯の中での揃え（空間ごとの設定）。始端＝左・上ぞろえ、中央＝帯の中央
+    const place = b => { const bd = bands.find(x => x.value === val(b));
+      return align === "center" ? (bd.start + bd.end) / 2 : bd.start + len(b) / 2; };
+    // 塊は泡の端から端（帯の端から端にすると、帯より大きい泡が端にいるとき箱が片寄る。案3 第1回）
+    let lo = Infinity, hi = -Infinity;
+    for (const b of kids) { const c = place(b); lo = Math.min(lo, c - len(b) / 2); hi = Math.max(hi, c + len(b) / 2); }
+    if (kids.length) mid = (lo + hi) / 2;
+    for (const b of kids) pos.set(b.id, place(b) - mid);
+    for (const bd of bands) { bd.start -= mid; bd.end -= mid; }
+  }
+  return { pos, bands, mid };
+}
+
+/**
+ * 箱の大きさ。「そのまま」の軸は自前の大きさ。
+ * 等間隔・詰めるの軸は、レンズを通した中身が収まるまで伸びる（＋余白）。
+ * 魚眼は箱の半幅で曲がるので、何度か当てて落ち着かせる。
+ * ただし見えない親は体を持たない（自前の大きさが無い・決まり3）ので、どの並べ方でも箱は中身ぴったり。
+ * 「そのままの軸は自前」は体のある泡の話で、見えない親でそこへ落ちると箱が 0×0 になり、
+ * 枠も縁（12px）も消えて並びが掴めなくなる
+ */
+function measure(b, memo) {
+  if (memo.has(b.id)) return memo.get(b.id);
+  const box = { w: b.size.w, h: b.size.h };
+  const kids = kidsOf(b.id), head = headOf(b), pad = padOf(b);
+  if (kids.length) {
+    const V = viewOf(b.id);
+    for (const axis of ["x", "y"]) {
+      const A = V[axis];
+      if (A.arrange === "as-is" && !b.implicit) continue;
+      const sizeOf = k => measure(k, memo);
+      const { pos } = arrangeAxis(A, kids, axis, b.id, sizeOf, V.align);
+      const lens = LENS_XY[A.lens];
+      const ownHalf = Math.max(0, (axis === "x" ? b.size.w : b.size.h - head) / 2);
+      const halfLen = k => (axis === "x" ? sizeOf(k).w : sizeOf(k).h) / 2;
+      let half = ownHalf;
+      for (let n = 0; n < 60; n++) {                 // H＝箱の半幅。魚眼では H と中身が互いに決まるので落ち着くまで
+        const H = Math.max(1, half);
+        let need = 0;
+        // 大きさは決め方（決まり8）の答え。この軸の倍率しか分からないので上限（sizeBound）で測る
+        for (const k of kids) { const p = lens.project(pos.get(k.id), H); need = Math.max(need, Math.abs(p.s) + halfLen(k) * sizeBound(V.size, axis, p.k)); }
+        const next = Math.max(ownHalf, need + pad);
+        if (Math.abs(next - half) < 1e-6) { half = next; break; }
+        half = next;
+      }
+      if (axis === "x") box.w = half * 2; else box.h = half * 2 + head;
+    }
+  }
+  memo.set(b.id, box);
+  return box;
+}
+
+/** 空間（中身の箱）の半幅。魚眼の像は箱いっぱい */
+const halfOf = host => ({ x: Math.max(1, host.w / 2), y: Math.max(1, host.h / 2) });
+
+/**
+ * レンズの ctx。★ 目の位置を足すならここ1か所（vp や focus をずらした写しを返す。状態には書き込まない）
+ * focus は写しで渡る。焦点を動かす操作はこの ctx に書かず、状態へ「u（位置 − 焦点）の変化の分」を書く（setFocusAxis の上）ので、
+ * ここで焦点をずらしても操作は壊れない
+ * 子の空間の消失点は箱の中（余白の内側の左上の角）に置く。透視は見える泡（dz ≥ 0）を m ≤ 1 で消失点へ寄せるだけなので、
+ * 寄せた像は「元の像と消失点を結ぶ範囲」にあり、X/Y で箱に収まった中身は Z をかけても箱に収まる（measure・focusFits は Z を見なくてよい）
+ */
+function lensCtx(spaceId, host, focus) {
+  const H = halfOf(host);
+  return {
+    focus: { ...focus },
+    H,
+    vp: spaceId === "root" ? { ...ROOT_VP }
+      : { x: -Math.max(0, H.x - padOf(byId(spaceId))) * VP_CHILD.fx, y: -Math.max(0, H.y - padOf(byId(spaceId))) * VP_CHILD.fy },
+  };
+}
+
+/* ============================================================
+   §2 解く順番（1フレーム）
+   ============================================================ */
+let frameItems = [];            // 描いた順の配置（画面座標）
+let PLACE = new Map();          // id → 配置
+let LAYOUT = new Map();         // spaceId → { host, ctx, V, arr }（ドラッグの逆変換に使う）
+const anim = new Map();         // id → 親の中身の座標での { x, y, scale, alpha, w, h }。補間はここだけ
+const EASE = 0.2;
+let drag = null;
+
+function ease(id, target, mode) {
+  let a = anim.get(id);
+  if (!a || mode === "snap") { a = { ...target }; anim.set(id, a); return a; }
+  if (mode === "keep") return a;                 // 補間を進めずに配置だけ解く（付け替えの前後で測るため）
+  for (const k in target) a[k] += (target[k] - a[k]) * EASE;
+  return a;
+}
+
+/** ★ 合成はここ1回だけ。深さ n でも scale は数値1つ */
+function compose(host, a) {
+  const scale = host.scale * a.scale;
+  const w = a.w * scale, h = a.h * scale;
+  return { x: host.cx + a.x * host.scale - w / 2, y: host.cy + a.y * host.scale - h / 2, w, h, scale,
+           alpha: host.alpha * a.alpha };
+}
+/** 空間を持つ泡の配置 → その中身の箱（子の空間の host）。vis は補間を通さないレンズの答え（見えるか） */
+const contentOf = p => { const hd = headOf(p.b); return {
+  cx: p.x + p.w / 2, cy: p.y + (hd + (p.box.h - hd) / 2) * p.scale,
+  w: p.box.w, h: p.box.h - hd, scale: p.scale, alpha: p.alpha, vis: p.vis, depth: p.depth,
+}; };
+const contentRect = host => ({ x: host.cx - host.w / 2 * host.scale, y: host.cy - host.h / 2 * host.scale,
+                               w: host.w * host.scale, h: host.h * host.scale });
+
+function resolveSpace(spaceId, host, memo, sink, lifted, mode) {
+  const V = viewOf(spaceId), kids = kidsOf(spaceId);
+  const sizeOf = b => measure(b, memo);
+  const arr = { x: arrangeAxis(V.x, kids, "x", spaceId, sizeOf, V.align),
+                y: arrangeAxis(V.y, kids, "y", spaceId, sizeOf, V.align),
+                z: arrangeAxis(V.z, kids, "z", spaceId, sizeOf) };
+  // 約束(2)の箱は補間を通さない答え（measure）で測る。補間中の箱で測ると、焦点が補間の進み方しだいで変わる
+  const own = spaceId === "root" ? host : (m => ({ w: m.w, h: m.h - headOf(byId(spaceId)) }))(measure(byId(spaceId), memo));
+  const L = { id: spaceId, host, V, arr, kids, sizeOf, H: halfOf(own) };
+  // ★ 焦点はいつも約束の中にいる（fitFocus）。約束は 焦点・View・中身 の三つで決まるので、焦点を書いたときだけ当てると
+  //   軸セレクタや「外から継ぐ」で View が変わったとき古い焦点が残る。写す前に、いまの View と中身で約束の中へ戻す
+  const sp = spaceObj(spaceId);
+  const passZ = windowOf(spaceId) !== spaceId;                      // R6：見えない親の Z は外の空間の焦点（約束も外が守る）
+  for (const axis of ["x", "y", "z"]) if (!(axis === "z" && passZ)) sp.focus[axis] = fitFocus(L, axis, sp.focus[axis], sp.focus[axis]);
+  L.focus = { ...sp.focus, z: focusZ(spaceId) };                    // このフレームの焦点（目を足す前）
+  const ctx = L.ctx = lensCtx(spaceId, host, L.focus);
+  LAYOUT.set(spaceId, L);
+  const lx = LENS_XY[V.x.lens], ly = LENS_XY[V.y.lens], lz = LENS_Z[V.z.lens];
+
+  const items = kids.map((b, i) => {
+    const pos = { x: arr.x.pos.get(b.id), y: arr.y.pos.get(b.id), z: arr.z.pos.get(b.id) };
+    const px = lx.project(pos.x - ctx.focus.x, ctx.H.x);          // 位置 − 焦点 → レンズ（軸ごと）
+    const py = ly.project(pos.y - ctx.focus.y, ctx.H.y);
+    const dz = b.implicit ? 0 : pos.z - ctx.focus.z, m = lz.mag(dz);   // そのあと Z で消失点へ寄せる（見えない親は奥行きに置かれない：決まり2）
+    const box = sizeOf(b);
+    const target = { x: ctx.vp.x + (px.s - ctx.vp.x) * m, y: ctx.vp.y + (py.s - ctx.vp.y) * m,
+                     scale: m * sizeXY(V.size, px.k, py.k), alpha: lz.alpha(dz), w: box.w, h: box.h };   // 決まり8
+    return { b, i, dz, m, pos, target };
+  });
+  // ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら大きく写るものを手前に（coverflow の中央が上に来る）。
+  //   それも同じ（格子の同じマスに重なる など）なら、後に置いた泡を手前に。上下は View から決まらないので、置いた順を泡に持たせる
+  items.sort((p, q) => q.dz - p.dz || p.target.scale - q.target.scale || p.b.stack - q.b.stack || p.i - q.i);
+
+  // 連続入力（焦点を引く・泡を引く・大きさ）は補間しない。大きさは R4 が外の泡の座標へ書くので、その泡へ至る空間を全部
+  const snapAll = drag && drag.started && (drag.snapSpace === spaceId || drag.kind === "resize" && isAncestor(spaceId, drag.id));
+  for (const it of items) {
+    const b = it.b;
+    const grabbed = drag && drag.started && drag.id === b.id;
+    // 掴んでいる泡は連続入力なので補間しない（並べ替えで持ち上げていても、自由の軸は掴んだ点にそろう）
+    const a = ease(b.id, it.target, snapAll || grabbed ? "snap" : mode);
+    let place = compose(host, a);
+    if (grabbed && drag.lift) {
+      // 並べ替え・マス移動：その軸ではカーソルについてくる。ほかの軸は View の答えのまま（なしなら動かない）。
+      // 空間の外へ引き出したら、もうこの空間の View には従わないので両方の軸でついてくる
+      const out = drag.slot && drag.slot.out;
+      const scale = drag.scale0, w = a.w * scale, h = a.h * scale;
+      const cx = place.x + place.w / 2, cy = place.y + place.h / 2;
+      const follow = ax => out || drag.verbs[ax] === "reorder" || drag.verbs[ax] === "cell";
+      place = { x: follow("x") ? drag.mx - drag.fx * w : cx - w / 2, y: follow("y") ? drag.my - drag.fy * h : cy - h / 2,
+                w, h, scale, alpha: 1 };
+    }
+    place.vis = host.vis * it.target.alpha;
+    Object.assign(place, { id: b.id, b, space: spaceId, depth: host.depth + 1, local: a.scale, m: it.m,
+                           pos: it.pos, box: { w: a.w, h: a.h } });
+    const out = grabbed ? lifted : sink;                            // 掴んでいる泡とその中身は一番上に描く
+    out.push(place);
+    if (isHost(b)) resolveSpace(b.id, contentOf(place), memo, out, lifted, mode);
+  }
+}
+
+let VW = 0, VH = 0;
+function resolveAll(mode) {
+  reindex();
+  LAYOUT = new Map();
+  const sink = [], lifted = [];
+  resolveSpace("root", { cx: VW / 2, cy: VH / 2, w: VW, h: VH, scale: 1, alpha: 1, vis: 1, depth: 0 },
+               new Map(), sink, lifted, mode);
+  frameItems = sink.concat(lifted);
+  PLACE = new Map(frameItems.map(p => [p.id, p]));
+  // 見えない親は体を持たないので、見えている子がいるときだけ見える（枠も縁も）。子は親より後ろに並ぶので、後ろから
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (p.b.implicit) p.vis = kidsOf(p.id).some(k => PLACE.get(k.id)?.vis > 0) ? p.vis : 0;
+  }
+}
+
+/* ── 1軸の写しと逆写し（ドラッグ・当たり判定・印で共通に使う） ── */
+/** 画面 → レンズを通す前の u（位置 − 焦点）。m は Z の倍率（その泡の奥行き） */
+function unprojectLocal(L, axis, screen, m = 1) {
+  const local = (screen - (axis === "x" ? L.host.cx : L.host.cy)) / L.host.scale;
+  const s = L.ctx.vp[axis] + (local - L.ctx.vp[axis]) / m;
+  return LENS_XY[L.V[axis].lens].unproject(s, L.ctx.H[axis]);
+}
+const screenToAxis = (L, axis, screen, m = 1) => unprojectLocal(L, axis, screen, m) + L.ctx.focus[axis];
+function axisToScreen(L, axis, pos, m = 1) {
+  const s = LENS_XY[L.V[axis].lens].project(pos - L.ctx.focus[axis], L.ctx.H[axis]).s;
+  return (axis === "x" ? L.host.cx : L.host.cy) + (L.ctx.vp[axis] + (s - L.ctx.vp[axis]) * m) * L.host.scale;
+}
+/**
+ * 焦点の約束。
+ *   (0) 次元が なし の軸は 0 ── なしの軸には焦点を動かす操作が無い（§3）ので、前の View の焦点が残ると戻せない
+ * X/Y の等間隔・詰めるの軸では、ほかに2つ：
+ *   (1) 見ている所には泡がある ── 並んだ泡の範囲の外へは出ない（魚眼の端で掴むと逆写しが急で飛ぶため）
+ *   (2) 中身は箱に収まる（§2）── 焦点をずらしても、中身が空間を持つ泡の箱からはみ出さない
+ * (2) はレンズを問わず「その焦点で写したら収まるか」で調べる。平行では余白のぶんしか動かず、
+ * 魚眼では端が飽和するので（泡の半幅 ≤ H/2 なら）いつでも収まる。
+ * Z の寄せは見なくてよい：消失点が箱の中にあり、見える泡は m ≤ 1 なので、寄せても箱から出ない（lensCtx）
+ * Z は「空にしない」：手前へは 1 退いて全体を見られる。奥へは一番奥の泡まで（その先は dz<0 で全部消える）
+ */
+function focusFits(L, axis, f) {
+  const lens = LENS_XY[L.V[axis].lens], H = L.H[axis], pos = L.arr[axis].pos;
+  for (const k of L.kids) {
+    const sz = L.sizeOf(k), half = (axis === "x" ? sz.w : sz.h) / 2, p = lens.project(pos.get(k.id) - f, H);
+    if (Math.abs(p.s) + half * sizeBound(L.V.size, axis, p.k) > H + 1e-6) return false;   // 大きさは measure と同じ上限で
+  }
+  return true;
+}
+/** Z の約束に入る奥行き。見えない親は奥行きを通す（R6）ので、その中の泡の奥行きも数える */
+function zReach(L) {
+  const out = [];
+  const walk = (spaceId, pos) => {
+    for (const k of kidsOf(spaceId)) {
+      if (k.implicit) walk(k.id, arrangeAxis(viewOf(k.id).z, kidsOf(k.id), "z", k.id, () => ({ w: 0, h: 0 })).pos);
+      else out.push(pos.get(k.id));
+    }
+  };
+  walk(L.id, L.arr.z.pos);
+  return out;
+}
+/** 焦点を v へ動かしたら、約束の中のどこに留まるか（書かない。ヒントも同じ答えを使う）。cur は今の焦点（(2) で戻る起点） */
+function fitFocus(L, axis, v, cur = L.focus[axis]) {
+  const ps = [...L.arr[axis].pos.values()];
+  if (L.V[axis].dim === "none") return 0;                                           // (0)
+  if (axis === "z") { const zs = zReach(L); return clamp(v, Math.min(0, ...zs) - 1, Math.max(0, ...zs)); }
+  if (L.V[axis].arrange === "as-is" || !ps.length) return v;
+  v = clamp(v, Math.min(...ps), Math.max(...ps));                                   // (1)
+  if (!focusFits(L, axis, v)) {                                                     // (2) 収まる所まで戻す
+    const from = focusFits(L, axis, cur) ? cur : 0;
+    let lo = 0, hi = 1;
+    for (let n = 0; n < 40; n++) { const t = (lo + hi) / 2; if (focusFits(L, axis, from + (v - from) * t)) lo = t; else hi = t; }
+    v = from + (v - from) * lo;
+  }
+  return v;
+}
+/**
+ * 焦点を書く先は状態（ctx は写し）。操作は「掴んだ点の u（位置 − 焦点）が画面でどれだけ変わったか」で焦点を動かす：
+ *   新しい焦点 ＝ このフレームの焦点 ＋（掴んだ点のいまの u − 行きたい u）
+ * u は ctx の焦点から測るので、ctx の焦点が目でずれていても差し引きで消え、状態に目のずれは入らない
+ */
+function setFocusAxis(L, axis, v) { const f = spaceObj(L.id).focus; f[axis] = fitFocus(L, axis, v, f[axis]); }
+/** 位置 → 次元の値（並べ方の逆）。書ける次元は「自由」だけなので as-is が主 */
+function valueFromPos(L, axis, pos) {
+  const A = L.V[axis];
+  return A.arrange === "equal" ? (pos + L.arr[axis].mid) / A.step : pos;
+}
+
+/* ============================================================
+   描画（切り抜きはしない）
+   ============================================================ */
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+function resize() {
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  VW = r.width; VH = r.height;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(cv);
+
+function roundRect(x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));    // 幅・高さが 0 以下でも角の半径は負にならない（負だと arcTo が例外）
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+/** その空間の中の泡を掴んだら何が起きるか（一覧・印に使う要約） */
+function spaceSummary(spaceId) {
+  const V = viewOf(spaceId), vs = [verbOf(V.x.dim), verbOf(V.y.dim)];
+  if (vs.includes("coord"))   return { text: "動かせる",       short: "動く",     cls: "move" };
+  if (vs.includes("reorder")) return { text: "並べ替えられる", short: "並べ替え", cls: "move" };
+  if (vs.includes("cell"))    return { text: "マスを移れる",   short: "マス移動", cls: "move" };
+  if (vs.includes("focus"))   return { text: "動かせない（視点が動く）", short: "視点が動く", cls: "fix" };
+  return { text: "動かせない", short: "動かない", cls: "fix" };
+}
+
+/** 並びの向き（見えない親の View から言う） */
+function rowWord(id) {
+  const V = viewOf(id);
+  return verbOf(V.x.dim) === "reorder" ? "横に並べる" : verbOf(V.y.dim) === "reorder" ? "縦に並べる" : spaceSummary(id).short;
+}
+let hoverRing = null;           // 縁を掴めるときに、カーソルが乗っている見えない親
+/**
+ * 見えない親は「うっすら枠」で出す：並びの外周に点線と小さな名前。選択中・縁にカーソルが乗っているときは濃く
+ * （掴めるのは縁だけなので、掴めるものが見えないと操作にならない）
+ */
+function drawRowFrame(p) {
+  const sel = p.id === selectedId, hov = hoverRing === p.id;
+  if (!(p.vis > 0) || !(p.alpha > 0.02) || p.w < 2) return;
+  const o = 5;
+  g.save();
+  g.globalAlpha = clamp(p.alpha, 0, 1) * (sel || hov ? 0.95 : 0.55);
+  g.strokeStyle = sel || hov ? "#6ee7ff" : "#cdd8ee"; g.lineWidth = sel ? 1.8 : 1.2; g.setLineDash([5, 4]);
+  roundRect(p.x - o, p.y - o, p.w + 2 * o, p.h + 2 * o, 12); g.stroke(); g.setLineDash([]);
+  g.restore();
+  // 名前は枠の外。まず枠の下（上は泡の注記やスナップの印が来る）。置き場所は placeLabels が決める
+  const fr = { x: p.x - o, y: p.y - o, w: p.w + 2 * o, h: p.h + 2 * o };
+  queueLabel({ text: `見えない親 · ${rowWord(p.id)}`, size: 10, color: sel || hov ? "#6ee7ff" : "#cdd8ee",
+               alpha: clamp(p.alpha, 0, 1) * (sel || hov ? 0.95 : 0.8),
+               at: (w, h) => [{ x: fr.x + 4, y: fr.y + fr.h + 3 }, { x: fr.x + 4, y: fr.y - 3 - h },
+                              { x: fr.x + fr.w - 4 - w, y: fr.y + fr.h + 3 }, { x: fr.x + fr.w - 4 - w, y: fr.y - 3 - h },
+                              { x: fr.x + 4, y: fr.y + fr.h + 5 + h }, { x: fr.x + 4, y: fr.y - 5 - 2 * h }] });
+}
+
+/* ── 画面の字（見えない親の名前・場面の注記）──
+   決まりは1つ：字は泡の後にまとめて置き、泡にもほかの字にも重ねない。候補の場所を順に試し、
+   どこも重なるなら重なりが一番少ない所（字どうし・画面の外は、泡に載るより重く数える。字は重なると両方読めないが、
+   泡に載った字は下地を敷けば読める）。重なるときだけ下地を敷く。
+   掴んでいる泡は仮の位置なので避けない（引くたびに字が跳ばないように） */
+let LABELS = [];
+const queueLabel = req => LABELS.push(req);
+const meet = (a, b) => { const x = Math.max(a.x, b.x), y = Math.max(a.y, b.y);
+  return { x, y, w: Math.max(0, Math.min(a.x + a.w, b.x + b.w) - x), h: Math.max(0, Math.min(a.y + a.h, b.y + b.h) - y) }; };
+const overlapArea = (a, b) => { const m = meet(a, b); return m.w * m.h; };
+const LABEL_CLASH = 10;         // 字どうし・画面の外の重さ（泡に載る 1 に対して）
+function placeLabels() {
+  const lifted = drag && drag.kind === "bubble" && drag.started ? drag.skip : new Set();
+  const walls = frameItems.filter(p => !p.b.implicit && p.vis > 0 && p.alpha > 0.02 && p.w >= 2 && !lifted.has(p.id));
+  const placed = [], screen = { x: 0, y: 0, w: VW, h: VH };
+  const out = [];
+  const order = new Map(frameItems.map((p, i) => [p.id, i]));
+  for (const L of LABELS) {
+    g.font = `600 ${L.size}px ${FONT}`;
+    const w = g.measureText(L.text).width, h = L.size + 3;
+    const own = L.owner ? PLACE.get(L.owner) : null;
+    let best = null;
+    for (const c of L.at(w, h)) {
+      const r = { x: c.x, y: c.y, w, h };
+      let onBubble = 0, clash = w * h - overlapArea(r, screen);                   // 画面の外
+      // 字が載るのはその場所で一番手前の泡：持ち主より奥の泡は、持ち主に隠れている所では数えない
+      for (const q of walls) if (q.id !== L.owner)
+        onBubble += overlapArea(r, q) - (own && order.get(q.id) < order.get(own.id) ? overlapArea(meet(r, q), own) : 0);
+      for (const q of [...placed, ...(L.keepOut ?? [])]) clash += overlapArea(r, q);
+      const cost = onBubble + LABEL_CLASH * clash;
+      if (!best || cost < best.cost - 1e-6) best = { r, cost, onBubble, clash };
+      if (cost < 1e-6) break;
+    }
+    const r = best.r;
+    placed.push(r);
+    out.push({ text: L.text, owner: L.owner ?? null, ...r, onBubble: best.onBubble, clash: best.clash });
+    g.save(); g.globalAlpha = L.alpha;
+    if (best.cost > 1e-6) { g.fillStyle = "rgba(8,10,17,.92)"; roundRect(r.x - 3, r.y - 1, r.w + 6, r.h + 2, 3); g.fill(); }
+    g.font = `600 ${L.size}px ${FONT}`; g.textBaseline = "top"; g.fillStyle = L.color;
+    g.fillText(L.text, r.x, r.y + 1.5);
+    g.restore();
+  }
+  LABELS = [];
+  return out;
+}
+let PLACED_LABELS = [];
+
+function drawBubble(p) {
+  const { x, y, w, h, scale: s, b } = p;
+  if (b.implicit) { drawRowFrame(p); return; }
+  if (x > VW + 40 || y > VH + 40 || x + w < -40 || y + h < -40 || w < 2) return;
+  const op = clamp(p.alpha, 0, 1) * clamp(0.3 + 0.7 * Math.min(1, s), 0.15, 1);
+  if (op < 0.02) return;
+  const sel = b.id === selectedId, host = isHost(b), chip = p.box.h <= 34;
+  const r = Math.max(2, (chip ? 6 : 10) * s);
+  const bh = chip ? h : HEADER * s;
+  g.globalAlpha = op;
+
+  g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 18 * s; g.shadowOffsetY = 5 * s;
+  roundRect(x, y, w, h, r); g.fillStyle = `hsl(${b.hue} 30% 13%)`; g.fill();
+  g.shadowColor = "transparent"; g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.save(); roundRect(x, y, w, h, r); g.clip();
+  g.fillStyle = `hsl(${b.hue} 55% 42% / ${chip ? 0.5 : 0.55})`; g.fillRect(x, y, w, bh);
+  g.restore();
+  g.lineWidth = (sel ? 2.4 : 1.1) * clamp(s, 0.6, 1);
+  g.strokeStyle = sel ? "#6ee7ff" : `hsl(${b.hue} 62% 58% / .8)`;
+  roundRect(x, y, w, h, r); g.stroke();
+
+  // タイトル
+  const fs = 12 * s;
+  let titleEnd = x + 8 * s;
+  g.textBaseline = "middle";
+  if (fs >= 6.5) {                              // 透視で4枚目（倍率 0.56）の見出しが 6.7px。それも読ませる
+    g.font = `600 ${fs}px ${FONT}`; g.fillStyle = "#eaf1ff";
+    const maxW = Math.max(4, w - 14 * s);
+    g.fillText(b.title, x + 8 * s, y + bh / 2 + 0.5, maxW);
+    titleEnd += Math.min(g.measureText(b.title).width, maxW);
+  }
+
+  if (host) {
+    drawSpaceMark(p, titleEnd, bh);
+    // 中身の箱（ここから下が別の空間）
+    const c = contentRect(contentOf(p));
+    g.globalAlpha = op * 0.5; g.setLineDash([3, 4]); g.lineWidth = 1;
+    g.strokeStyle = `hsl(${b.hue} 60% 62% / .45)`;
+    roundRect(c.x + 4 * s, c.y + 3 * s, c.w - 8 * s, c.h - 7 * s, 6 * s); g.stroke(); g.setLineDash([]);
+  } else if (!chip && s > 0.2) {
+    // 中身の仮の行
+    g.globalAlpha = op * 0.5; g.fillStyle = "#9fb0cc";
+    const rows = Math.min(6, Math.floor((h - bh - 12 * s) / (11 * s)));
+    for (let i = 0; i < rows; i++)
+      g.fillRect(x + 10 * s, y + bh + (9 + i * 11) * s, (w - 20 * s) * (i === rows - 1 ? 0.5 : 0.82), 3.5 * s);
+  }
+  if (sel) { g.globalAlpha = 1; g.fillStyle = "#6ee7ff"; roundRect(x + w - 10, y + h - 10, 8, 8, 2); g.fill(); }
+  g.globalAlpha = 1;
+  if (b.note && op > 0.3) {                     // 場面の注記（配置には使わない）。泡の上 → ヘッダの右 → 泡の下（placeLabels）
+    const titleBox = { x, y, w: titleEnd - x + 6 * s, h: bh };
+    queueLabel({ text: b.note, size: 10.5, color: "#ffd479", alpha: op * 0.9, owner: b.id, keepOut: [titleBox],
+                 at: (tw, th) => [{ x: x + 2, y: y - 3 - th }, { x: x + w - 2 - tw, y: y - 3 - th },
+                                  ...(!host && bh >= th ? [{ x: x + w - 8 * s - tw, y: y + (bh - th) / 2 }] : []),
+                                  { x: x + 2, y: y + h + 3 }] });
+  }
+}
+
+/**
+ * 空間を持つ泡の印：「中は別の空間」と、中の泡を掴んだら何が起きるか（§5.7）。文言は削らない（削ると印が何か分からない）。
+ * ヘッダのタイトルの右に入らなければ、ヘッダのすぐ下（中身の箱の上の余白）に置き、そこにも入らなければ字を縮める。
+ * 字の下限はタイトルと同じ 6.5px。それより小さくしないと入らない泡には描かない
+ */
+const MARK_MIN = 6.5;
+function drawSpaceMark(p, titleEnd, bh) {
+  const S = spaceSummary(p.id), s = p.scale, fs = 10 * s, text = `中は別の空間 · ${S.short}`;
+  if (fs < MARK_MIN) return;
+  const right = p.x + p.w - 9 * s;
+  g.font = `600 ${fs}px ${FONT}`;
+  let y = p.y + bh / 2 + 0.5;
+  if (g.measureText(text).width > right - titleEnd - 10 * s) {
+    const room = p.w - 18 * s, w1 = g.measureText(text).width;   // 字の幅は大きさに比例する
+    const size = Math.min(fs * 0.9, fs * room / w1);
+    if (size < MARK_MIN) return;
+    g.font = `600 ${size}px ${FONT}`;
+    y = p.y + bh + PAD * s / 2 + 0.5;
+    const tw = g.measureText(text).width;
+    g.fillStyle = `hsl(${p.b.hue} 30% 13%)`;                   // 中身の箱の破線の上に字を載せる
+    g.fillRect(right - tw - 3 * s, y - size * 0.6, tw + 6 * s, size * 1.2);
+  }
+  g.textAlign = "right"; g.fillStyle = S.cls === "move" ? "#7ee2a8" : "#ff9db1";
+  g.fillText(text, right, y);
+  g.textAlign = "left";
+}
+
+function drawDragMarks() {
+  if (!drag || drag.kind !== "bubble" || !drag.started || !drag.slot) return;
+  const sl = drag.slot, L = LAYOUT.get(sl.space);
+  g.save();
+  g.strokeStyle = "#6ee7ff"; g.fillStyle = "#6ee7ff"; g.shadowColor = "rgba(110,231,255,.8)"; g.shadowBlur = 10;
+  if (sl.snap) {                                 // 案1：縁へ寄せた。離すと並ぶ
+    const T = PLACE.get(sl.snap.target), { axis, at, from, to } = sl.markLine;
+    if (T) { g.lineWidth = 1.5; g.setLineDash([3, 3]); roundRect(T.x - 3, T.y - 3, T.w + 6, T.h + 6, 8); g.stroke(); g.setLineDash([]); }
+    g.lineWidth = 4; g.beginPath();
+    if (axis === "x") { g.moveTo(at, from); g.lineTo(at, to); } else { g.moveTo(from, at); g.lineTo(to, at); }
+    g.stroke();
+    g.shadowBlur = 0; g.font = `600 12px ${FONT}`; g.textBaseline = "bottom";
+    const label = sl.snap.kind === "join" ? "ここで離すと並びに加わる" : `ここで離すと${axis === "x" ? "横" : "縦"}に並ぶ（見えない親が生まれる）`;
+    const tw = g.measureText(label).width;
+    // 字は、横の縁なら相手の下（上は泡の注記が来る）、縦の縁なら縁の線のすぐ上（下には寄せた泡が来る）
+    const lx = clamp(axis === "x" ? at - tw / 2 : from, 4, VW - tw - 8);
+    const ly = axis === "x" ? (to + 24 <= VH - 4 ? to + 24 : from - 8) : at - 8;
+    g.fillStyle = "rgba(8,10,17,.9)"; g.fillRect(lx - 4, ly - 16, tw + 8, 18);
+    g.fillStyle = "#6ee7ff"; g.fillText(label, lx, ly);
+    g.restore();
+    return;
+  }
+  if (sl.space !== drag.space) {                 // 別の空間へ移る
+    const c = contentRect(L.host);
+    g.lineWidth = 2; g.setLineDash([7, 5]); roundRect(c.x, c.y, c.w, c.h, 6); g.stroke(); g.setLineDash([]);
+    g.shadowBlur = 0; g.font = `600 12px ${FONT}`; g.textBaseline = "bottom";
+    const label = `離すと ${spaceName(sl.space)}へ`;
+    // 置き場所：空間を持つ泡のヘッダの上（タイトルを隠さない）→ 箱の下 → どちらも画面の外なら箱の中の上端
+    const top = c.y - HEADER * L.host.scale;
+    const ty = top - 6 >= 18 ? top - 6 : c.y + c.h + 20 <= VH - 4 ? c.y + c.h + 20 : Math.max(c.y, 0) + 22;
+    const lx = clamp(c.x, 0, VW - g.measureText(label).width - 12) + 2;
+    g.fillStyle = "rgba(8,10,17,.85)"; g.fillRect(lx - 4, ty - 16, g.measureText(label).width + 8, 18);
+    g.fillStyle = "#6ee7ff"; g.fillText(label, lx, ty);
+    g.shadowBlur = 10;
+  }
+  if (sl.markRect) {                             // マス移動：入るマス
+    const m = sl.markRect;
+    g.lineWidth = 2; g.setLineDash([5, 4]); roundRect(m.x, m.y, m.w, m.h, 5); g.stroke(); g.setLineDash([]);
+    g.globalAlpha = 0.12; g.fill(); g.globalAlpha = 1;
+    if (sl.occupants && sl.occupants.length) {   // 先客がいる：離すと入れ替わる（よその空間からなら重なる）
+      const swap = sl.space === drag.space;
+      g.shadowBlur = 0; g.strokeStyle = swap ? "#ffd479" : "#ff9db1"; g.lineWidth = 1.5; g.setLineDash([3, 3]);
+      for (const o of sl.occupants) { const q = PLACE.get(o.id); if (q) { roundRect(q.x - 3, q.y - 3, q.w + 6, q.h + 6, 7); g.stroke(); } }
+      g.setLineDash([]);
+      const label = `${sl.occupants.map(o => o.title).join("・")}${swap ? "と入れ替わる" : "に重なる"}`;
+      g.font = `600 12px ${FONT}`; g.textBaseline = "bottom";
+      const tw = g.measureText(label).width, lx = clamp(m.x, 4, VW - tw - 12), ty = m.y - 6 >= 18 ? m.y - 6 : m.y + m.h + 20;
+      g.fillStyle = "rgba(8,10,17,.9)"; g.fillRect(lx - 4, ty - 16, tw + 8, 18);
+      g.fillStyle = swap ? "#ffd479" : "#ff9db1"; g.fillText(label, lx, ty);
+      g.shadowBlur = 10;
+    }
+  }
+  if (sl.markLine) {                             // 並べ替え：差し込まれる位置
+    const { axis, at, from, to } = sl.markLine;
+    g.lineWidth = 3; g.beginPath();
+    if (axis === "x") { g.moveTo(at, from); g.lineTo(at, to); } else { g.moveTo(from, at); g.lineTo(to, at); }
+    g.stroke();
+  }
+  g.restore();
+}
+
+function draw() {
+  g.clearRect(0, 0, VW, VH);
+  const grd = g.createRadialGradient(VW / 2, VH / 2, 0, VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+  grd.addColorStop(0, "#141a2b"); grd.addColorStop(1, "#080a11");
+  g.fillStyle = grd; g.fillRect(0, 0, VW, VH);
+  g.strokeStyle = "rgba(110,231,255,.16)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(VW / 2 - 14, VH / 2); g.lineTo(VW / 2 + 14, VH / 2);
+  g.moveTo(VW / 2, VH / 2 - 14); g.lineTo(VW / 2, VH / 2 + 14); g.stroke();
+
+  for (const p of frameItems) drawBubble(p);
+
+  // 選択中の泡がいる空間（軸セレクタが効く空間）の中身の箱を薄く示す
+  const sp = selectedId && byId(selectedId) ? parentOf(selectedId) : "root";
+  if (sp !== "root" && LAYOUT.get(sp)) {
+    const c = contentRect(LAYOUT.get(sp).host);
+    g.globalAlpha = 0.45; g.strokeStyle = "#6ee7ff"; g.lineWidth = 1; g.setLineDash([2, 4]);
+    roundRect(c.x + 1, c.y + 1, c.w - 2, c.h - 2, 6); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  PLACED_LABELS = placeLabels();
+  drawDragMarks();
+}
+
+
+/* ============================================================
+   §3 操作 ——「操作は軸に従う」
+   ============================================================ */
+/** 見えない親の縁（箱の外周 RING px）。並びを掴めるのはここだけ（体が無いので中は外の空間の背景） */
+const onRing = (p, mx, my) => mx >= p.x - RING && mx <= p.x + p.w + RING && my >= p.y - RING && my <= p.y + p.h + RING
+  && !(mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h);
+/**
+ * 当たり判定は描いた順の逆（内側・手前が勝つ）。レンズが消した泡（dz<0 など）は、薄れていく途中でも掴めない。
+ * 見えない親は箱を持たない：並びの中のすき間は外の空間の背景。当たるのは外周（縁 RING px）だけ
+ */
+function hitTest(mx, my, skip) {
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (!(p.vis > 0) || (skip && skip.has(p.id))) continue;
+    if (p.b.implicit) { if (onRing(p, mx, my)) return p; continue; }
+    if (mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h) return p;
+  }
+  return null;
+}
+/** 空間を持つ泡の「中身の箱」に入っているか（ヘッダは外側の空間のもの）。見えない親は縁でしか当たらないので、いつも「掴む」 */
+const inContent = (p, my) => !p.b.implicit && isHost(p.b) && my >= p.y + headOf(p.b) * p.scale;
+/** カーソルの下の空間：中身の箱の上ならその空間、泡の上ならその泡がいる空間 */
+function spaceAt(mx, my, skip) {
+  const p = hitTest(mx, my, skip);
+  return !p ? "root" : inContent(p, my) ? p.id : p.space;
+}
+const onHandle = (p, mx, my) => p && mx >= p.x + p.w - 12 && mx <= p.x + p.w + 3 && my >= p.y + p.h - 12 && my <= p.y + p.h + 3;
+/**
+ * 大きさの角。角は選択中の泡と一緒に描くので、当たり判定も同じ描いた順の逆で見る：
+ * 手前に別の泡（中身も含む）が重なっていればそちらが勝ち、レンズが消した泡（vis 0）の角は掴めない。見えない親に角は無い
+ */
+function handleAt(mx, my) {
+  for (let i = frameItems.length - 1; i >= 0; i--) {
+    const p = frameItems[i];
+    if (!(p.vis > 0) || p.b.implicit) continue;
+    if (p.id === selectedId && onHandle(p, mx, my)) return p;
+    if (mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h) return null;
+  }
+  return null;
+}
+const center = (p, axis) => axis === "x" ? p.x + p.w / 2 : p.y + p.h / 2;
+const pt = e => { const r = cv.getBoundingClientRect(); return { mx: e.clientX - r.left, my: e.clientY - r.top }; };
+
+// 並びごと掴むやり方は「親の縁」の1つだけ（案1 の比べる③は落とした）。
+// 縁に当たれば hitTest がもう見えない親を返しているので、掴んだものを選び直す関数は要らない
+
+cv.addEventListener("pointerdown", e => {
+  const { mx, my } = pt(e);
+  cv.setPointerCapture(e.pointerId);
+  const sel = handleAt(mx, my);
+  if (sel) {
+    // 引くのは見えている箱の角：中身で伸びた箱なら、自前の大きさではなく伸びた大きさから始める（引いた分だけ角が動く）
+    drag = { kind: "resize", id: sel.id, space: sel.space, started: true, mx0: mx, my0: my, size0: { ...measure(sel.b, new Map()) },
+             scale: sel.scale, x0: sel.x, y0: sel.y };
+    return;
+  }
+  const hit = hitTest(mx, my);
+  if (hit && !inContent(hit, my)) {
+    const p = hit;
+    selectedId = p.id;
+    const V = viewOf(p.space), verbs = { x: verbOf(V.x.dim), y: verbOf(V.y.dim) };
+    const vs = [verbs.x, verbs.y];
+    drag = {
+      kind: "bubble", id: p.id, space: p.space, verbs,
+      moves: vs.some(v => v === "coord" || v === "reorder" || v === "cell"),   // 泡が動くときだけ空間を移れる
+      lift: vs.some(v => v === "reorder" || v === "cell"),                     // 並べ替え・マス移動はカーソルについてくる
+      snapSpace: vs.includes("focus") ? p.space : null,
+      started: false, mx0: mx, my0: my, mx, my,
+      fx: (mx - p.x) / p.w, fy: (my - p.y) / p.h, scale0: p.scale,
+      skip: subtreeOf(p.id), slot: null,
+    };
+  } else {
+    // 背景：カーソルの下の空間の焦点を動かす（掴んだ点がカーソルについてくるように）
+    const space = hit ? hit.id : "root", L = LAYOUT.get(space);
+    drag = { kind: "focus", space, snapSpace: space, started: false, mx0: mx, my0: my,
+             f0: { ...L.focus }, u0: { x: unprojectLocal(L, "x", mx), y: unprojectLocal(L, "y", my) } };
+  }
+});
+
+cv.addEventListener("pointermove", e => {
+  const { mx, my } = pt(e);
+  if (!drag) { showCursorHint(mx, my); return; }
+  hideCursorHint();
+  if (!drag.started && Math.hypot(mx - drag.mx0, my - drag.my0) < 3) return;
+  drag.started = true;
+  if (drag.kind === "resize") {
+    const b = byId(drag.id);
+    b.size.w = Math.max(40, drag.size0.w + (mx - drag.mx0) / drag.scale);
+    b.size.h = Math.max(HEADER + 10, drag.size0.h + (my - drag.my0) / drag.scale);
+    // R4：大きさを変えた泡の左上は動かさない。どの空間にいても同じ1つの決まり（pin）：外へたどって最初に位置を書ける泡の座標へ、
+    // View の逆写しで書き戻す。自由の空間なら自分の座標、詰めるの中（勤務表の格子・並び）なら、それを入れている自由な泡の座標
+    pin(b.id, { x: drag.x0, y: drag.y0 });
+  } else if (drag.kind === "focus") {
+    const L = LAYOUT.get(drag.space);
+    for (const axis of ["x", "y"]) {
+      if (L.V[axis].dim === "none") continue;                 // なしの軸は何も起きない
+      // 掴んだ点の u が u0 → いま に変わった分だけ焦点を戻す（掴んだ点がカーソルについてくる）
+      setFocusAxis(L, axis, drag.f0[axis] + drag.u0[axis] - unprojectLocal(L, axis, axis === "x" ? mx : my));
+    }
+  } else {
+    moveBubble(mx, my);
+  }
+});
+
+/** 泡のドラッグ：軸ごとに、書けるなら書く／書けないなら焦点／なしなら何もしない */
+function moveBubble(mx, my) {
+  drag.mx = mx; drag.my = my;
+  const p = PLACE.get(drag.id), b = p.b, L = LAYOUT.get(drag.space);
+  for (const axis of ["x", "y"]) {
+    const verb = drag.verbs[axis];
+    // 泡の中心をどこへ持っていきたいか（掴んだ点と泡の相対位置を保つ）
+    const want = axis === "x" ? mx - (drag.fx - 0.5) * p.w : my - (drag.fy - 0.5) * p.h;
+    if (verb === "coord") {
+      // ★ 書き込む先はその軸に刺さっている次元（free.x 決め打ちにしない）
+      b.free[DIMS[L.V[axis].dim].key] = valueFromPos(L, axis, screenToAxis(L, axis, want, p.m));
+    } else if (verb === "focus") {
+      // 泡のいまの u（位置 − ctx の焦点）が、行きたい u になるまで焦点を動かす
+      setFocusAxis(L, axis, L.focus[axis] + (p.pos[axis] - L.ctx.focus[axis]) - unprojectLocal(L, axis, want, p.m));
+    }
+  }
+  if (drag.moves) { resolveAll("keep"); drag.slot = slotAt(mx, my); }
+}
+
+/**
+ * 離したらどこへ入るか。先に土台の決まりで離す先の空間を決め、その窓の中で縁（R1・R2）を見る：
+ *  - カーソルの下の空間（掴んだ泡とその中身は除く）
+ *  - ただし今いる空間の外へ出るのは、中身の箱から PULL 以上離れたときだけ
+ *  - くっつけるも空間への落とし込みの1つ：相手の窓（R6）が離す先の窓と同じときだけ効く
+ *  - その空間の View に従って、書く値（順序の差し込み位置・マス・自由座標）を決める
+ */
+function slotAt(mx, my) {
+  const slot = spaceSlotAt(mx, my);
+  if (!slot) return null;
+  slot.out = slot.space !== drag.space;          // 今いる空間の外へ引き出した（持ち上げた泡が両軸でついてくる）
+  const sn = snapAt(slot);
+  if (!sn) return slot;
+  const T = PLACE.get(sn.target), axis = sn.axis;
+  const at = sn.after ? (axis === "x" ? T.x + T.w : T.y + T.h) : (axis === "x" ? T.x : T.y);
+  const [from, to] = axis === "x" ? [T.y, T.y + T.h] : [T.x, T.x + T.w];
+  return { space: T.space, out: slot.out, snap: sn, order: null, cell: {}, coord: {}, markRect: null, markLine: { axis, at, from, to } };
+}
+
+/**
+ * R1・R2：掴んだ泡の縁が、ほかの泡の縁に寄っているか（画面で測る。第1版 制約13「隣接は画面空間で解く」）。
+ * 相手は「自由に置く空間の泡」か「見えない親の中の泡」で、窓が離す先（slot）の窓と同じもの。いちばん近い縁を返す。
+ * 並びの中で並びの軸に沿って引いているあいだは、土台の並べ替え（順序の書き込み）に任せる
+ */
+function snapAt(slot) {
+  const D = PLACE.get(drag.id), out = slot.out, win = windowOf(slot.space);
+  if (!D) return null;
+  const lo = (r, a) => a === "x" ? r.x : r.y, len = (r, a) => a === "x" ? r.w : r.h, hi = (r, a) => lo(r, a) + len(r, a);
+  let best = null;
+  for (const T of frameItems) {
+    if (!(T.vis > 0) || T.b.implicit || drag.skip.has(T.id) || windowOf(T.space) !== win) continue;
+    const V = viewOf(T.space), row = rowOf(T.id);
+    if (!row && !(verbOf(V.x.dim) === "coord" && verbOf(V.y.dim) === "coord")) continue;
+    for (const axis of ["x", "y"]) {
+      const o = axis === "x" ? "y" : "x";
+      const overlap = Math.min(hi(D, o), hi(T, o)) - Math.max(lo(D, o), lo(T, o));
+      if (overlap < SNAP_OVERLAP * Math.min(len(D, o), len(T, o))) continue;
+      const join = !!row && verbOf(V[axis].dim) === "reorder";
+      if (join && T.space === drag.space && !out) continue;
+      for (const after of [false, true]) {
+        const dist = Math.abs(after ? lo(D, axis) - hi(T, axis) : hi(D, axis) - lo(T, axis));
+        if (dist <= SNAP_EDGE && (!best || dist < best.dist)) best = { kind: join ? "join" : "born", target: T.id, axis, after, dist };
+      }
+    }
+  }
+  return best;
+}
+
+/** 土台の slotAt（縁を見ない） */
+function spaceSlotAt(mx, my) {
+  let space = spaceAt(mx, my, drag.skip);
+  if (space !== drag.space && drag.space !== "root" && !isAncestor(drag.space, space)) {
+    const c = contentRect(LAYOUT.get(drag.space).host);
+    if (mx > c.x - PULL && mx < c.x + c.w + PULL && my > c.y - PULL && my < c.y + c.h + PULL) space = drag.space;
+  }
+  const L = LAYOUT.get(space);
+  if (!L) return null;
+  const p = PLACE.get(drag.id);
+  const slot = { space, order: null, cell: {}, coord: {}, markLine: null, markRect: null };
+  const sibs = kidsOf(space).filter(k => !drag.skip.has(k.id)).map(k => PLACE.get(k.id)).filter(Boolean);
+  const box = contentRect(L.host);
+  const cellRange = {};
+
+  for (const axis of ["x", "y"]) {
+    const A = L.V[axis], verb = verbOf(A.dim), cur = axis === "x" ? mx : my;
+    if (verb === "reorder") {
+      const sorted = sibs.slice().sort((a, c) => center(a, axis) - center(c, axis));
+      const idx = sorted.filter(s => center(s, axis) < cur).length;
+      const near = s => axis === "x" ? s.x : s.y, far = s => axis === "x" ? s.x + s.w : s.y + s.h;
+      const half = (A.gap ?? GAP) / 2 * L.host.scale;
+      const at = !sorted.length ? (axis === "x" ? L.host.cx : L.host.cy)
+               : idx === 0 ? near(sorted[0]) - half
+               : idx === sorted.length ? far(sorted[idx - 1]) + half
+               : (far(sorted[idx - 1]) + near(sorted[idx])) / 2;
+      slot.order = { idx, list: sorted.map(s => s.b) };
+      slot.markLine = { axis, at, from: axis === "x" ? box.y + 4 : box.x + 4, to: axis === "x" ? box.y + box.h - 4 : box.x + box.w - 4 };
+    } else if (verb === "cell") {
+      const pos = screenToAxis(L, axis, cur);
+      const len = axis === "x" ? p.box.w : p.box.h;
+      const { value, start, end } = cellFromBands(L.arr[axis].bands, pos, len, A.gap ?? GAP);
+      slot.cell[DIMS[A.dim].key] = value;
+      cellRange[axis] = [axisToScreen(L, axis, start), axisToScreen(L, axis, end)];
+    }
+  }
+  if (cellRange.x || cellRange.y) {
+    const [x0, x1] = cellRange.x ?? [box.x, box.x + box.w], [y0, y1] = cellRange.y ?? [box.y, box.y + box.h];
+    slot.markRect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    // 先客：移った先で、X・Y どちらの次元で読んでも同じ値になる兄弟（＝同じ位置に置かれて重なる泡）
+    const probeB = { ...p.b, cell: { ...p.b.cell, ...slot.cell } };
+    const same = k => ["x", "y"].every(ax => DIMS[L.V[ax].dim].read(k, space) === DIMS[L.V[ax].dim].read(probeB, space));
+    const stay = space === drag.space && Object.keys(slot.cell).every(key => slot.cell[key] === p.b.cell[key]);
+    slot.occupants = stay ? [] : sibs.map(s => s.b).filter(same);    // 元のマスのままなら誰も動かない
+  }
+  return slot;
+}
+
+/** 位置 → マス。帯（と前後の隙間の半分）に入っていればその値、最後の帯より先なら新しい帯 */
+function cellFromBands(bands, pos, len, gap = GAP) {
+  if (!bands.length) return { value: 0, start: -len / 2, end: len / 2 };
+  const first = bands[0], last = bands[bands.length - 1];
+  if (pos > last.end + gap / 2) return { value: last.value + 1, start: last.end + gap, end: last.end + gap + len };
+  if (pos < first.start - gap / 2 && first.value > 0)
+    return { value: first.value - 1, start: first.start - gap - len, end: first.start - gap };
+  const bd = bands.find(x => pos <= x.end + gap / 2) ?? last;
+  return { value: bd.value, start: bd.start, end: bd.end };
+}
+
+function endDrag() {
+  if (!drag) return;
+  const d = drag;
+  let slot = null;
+  if (d.kind === "bubble" && d.started && d.moves) {
+    resolveAll("keep");                 // 最後のポインタ移動までを配置に入れる（補間は進めない）
+    slot = slotAt(d.mx, d.my);
+  }
+  drag = null;
+  hoverRing = null;
+  if (slot) commitDrop(d, slot);
+}
+
+const byOrder = (q, r) => q.order - r.order;
+const renumber = list => list.forEach((k, i) => { k.order = i; });
+/** 決まり1（pin）で留める泡：差し込む所より前の泡（並びは後ろへ伸びるので、前の泡を留めると動かない） */
+const anchorOf = (list, idx) => list[idx - 1] ?? list[idx] ?? null;
+
+/** 離したら確定：親を付け替えて、親の View に従って値を書く。位置は書かない（R4・R5 は reshape が当てる） */
+function commitDrop(d, slot) {
+  const b = byId(d.id);
+  reshape(() => {
+    if (slot.snap) return snapOp(b, slot.snap);
+    const moved = slot.space !== d.space;
+    // 順序は「兄弟の中での順番」：親を付け替えたら、出た空間と入った空間の兄弟を 0.. に振り直す
+    // （出た空間に欠番を残すと、等間隔では抜けた番号の所が穴になる）。入った先に差し込み位置が無ければ一番後ろ
+    if (moved) {
+      b.parent = slot.space === "root" ? null : slot.space;
+      renumber(kidsOf(d.space).filter(k => k !== b).sort(byOrder));   // KIDS は付け替える前のまま
+    }
+    let anchor = null;
+    if (slot.order) {
+      const list = slot.order.list.slice();
+      anchor = anchorOf(list, slot.order.idx);        // 差し込む所より前の泡を留める
+      list.splice(slot.order.idx, 0, b);
+      renumber(list);
+    } else if (moved) {
+      renumber([...kidsOf(slot.space).filter(k => k !== b).sort(byOrder), b]);
+    }
+    b.stack = ++STACK;                 // 置いた泡は、同じ奥行き・同じ大きさで重なる兄弟より手前（resolveSpace のソート）
+    // マス移動は兄弟の値の入れ替え：先客は、掴んだ泡が空けたマスへ移る。よその空間から入ってきた泡には空けたマスが無いので重なる
+    if (!moved && slot.occupants) {
+      const vacated = Object.fromEntries(Object.keys(slot.cell).map(key => [key, b.cell[key]]));
+      for (const k of slot.occupants) Object.assign(k.cell, vacated);
+    }
+    Object.assign(b.cell, slot.cell);
+    // 留めるのは空間の中身が変わったときだけ。同じ空間での並べ替えは、帯が入れ替わるだけで塊も箱も変わらないので留めない
+    // （留めると、スタッフの中で人を1つ並べ替えただけで、pin が外の自由な泡まで遡って勤務表ごと動く）
+    return moved ? [anchor ? anchor.id : b.id] : [];
+  }, d.lift ? [b.id] : []);
+}
+
+/**
+ * R1・R2 の付け替え。ドラッグでも、起動時の場面（勤務表＋希望シフト）でも、この関数だけ。
+ * 位置は書かない：留める泡（相手）を返し、reshape が R4 で留める
+ */
+function snapOp(b, sn) {
+  reindex();
+  const T = byId(sn.target), from = b.parent ?? "root";
+  let row;
+  if (sn.kind === "join") row = byId(T.parent);
+  else {
+    // R1：相手の席に見えない親が生まれる（親・順序・マス・置いた順を相手から写す）。奥行きには置かれない（R6）
+    row = add({ id: "row" + (++IMPLICIT_N), title: "並び（見えない親）", hue: 215, w: 0, h: 0, implicit: true, view: snapView(sn.axis),
+                parent: T.parent, order: T.order, cell: { ...T.cell }, free: { ...T.free }, stack: T.stack });
+    T.parent = row.id; T.order = 0;
+  }
+  b.parent = row.id;
+  reindex();
+  if (from !== row.id) renumber(kidsOf(from).sort(byOrder));
+  const list = kidsOf(row.id).filter(k => k !== b).sort(byOrder);
+  const idx = list.indexOf(T) + (sn.after ? 1 : 0);
+  const anchor = anchorOf(list, idx);               // 差し込む所より前の泡（生まれたばかりの並びでは相手 T）
+  list.splice(idx, 0, b);
+  renumber(list);
+  b.stack = ++STACK;
+  return [anchor ? anchor.id : T.id];
+}
+
+/**
+ * 形を変える（親の付け替え）。R3・R4・R5 はここで、どの操作にも同じに当たる：
+ *   1. change：付け替えるだけ（位置は書かない）。留める泡の id を返す
+ *   2. R3：子が1つになった見えない親は消え、残った泡が席を継ぐ（継いだ泡も留める）。子を失った並びは先頭を留める
+ *   3. R5：親が変わった泡は、見えていた倍率になる奥行きへ
+ *   4. R4：留める泡を、前のフレームで見えていた所へ（その泡を入れている自由に置く空間の座標に、View の逆写しで書き戻す）
+ *   5. 親が変わった泡の補間を、見えていた所から始める
+ */
+function reshape(change, animIds = []) {
+  const before = new Map(frameItems.map(p => [p.id, { x: p.x, y: p.y, cx: p.x + p.w / 2, cy: p.y + p.h / 2, scale: p.scale, w: p.box.w, h: p.box.h }]));
+  const parent0 = new Map(bubbles.map(b => [b.id, b.parent ?? "root"]));
+  const keep = change() || [];
+  const heirs = tidyRows();
+  reindex();
+  const moved = bubbles.filter(b => parent0.has(b.id) && parent0.get(b.id) !== (b.parent ?? "root")).map(b => b.id);
+  const shrunk = [...new Set(moved.map(id => parent0.get(id)))].filter(id => id !== "root" && byId(id) && byId(id).implicit)
+    .map(id => kidsOf(id).slice().sort(byOrder)[0]).filter(Boolean).map(k => k.id);
+  probe();
+  for (const id of moved) keepSeen(id, before.get(id));
+  for (const id of [...shrunk, ...heirs, ...keep]) pin(id, before.get(id));
+  // 補間は見えていた所から。親の箱（host）は次のフレームで使うもの（補間中の親）で測るので、外側から順に
+  const depth = id => { let n = 0; for (let c = id; c !== "root"; c = parentOf(c)) n++; return n; };
+  for (const id of [...new Set([...moved, ...animIds])].filter(byId).sort((a, c) => depth(a) - depth(c))) {
+    resolveAll("keep");
+    startFrom(id, before.get(id));
+  }
+  resolveAll("keep");
+  lastSig = "";
+}
+
+/** R3：並びは2つ以上。子が1つになった見えない親は消え、残った泡が親の席を継ぐ（0 なら消えるだけ）。継いだ泡の id を返す */
+function tidyRows() {
+  const heirs = [];
+  for (;;) {
+    reindex();
+    const X = bubbles.find(b => b.implicit && kidsOf(b.id).length < 2);
+    if (!X) return heirs;
+    const k = kidsOf(X.id)[0];
+    if (k) {
+      Object.assign(k, { parent: X.parent, order: X.order, cell: { ...X.cell }, stack: X.stack });
+      heirs.push(k.id);
+    }
+    if (selectedId === X.id) selectedId = k ? k.id : null;
+    removeBubble(X);
+  }
+}
+
+/** R5：空間を移っても見えている大きさを保つ。移った先の Z が 自由・そのまま・透視 なら、見えていた倍率になる奥行きを書く（手前へは出さない） */
+function keepSeen(id, bf) {
+  const b = byId(id), L = LAYOUT.get(parentOf(id));
+  if (!b || !bf || !L) return;
+  const A = L.V.z;
+  if (verbOf(A.dim) !== "coord" || A.arrange !== "as-is" || A.lens !== "perspective") return;
+  const m = bf.scale / L.host.scale;
+  b.free[DIMS[A.dim].key] = focusZ(L.id) + Math.max(0, (1 / m - 1) / K_PERSP);
+}
+
+/**
+ * R4：id の泡の左上を、画面上の bf の所へ。書くのは、その泡から外へたどって最初に「その軸が自由に置く空間」にいる泡の座標
+ * （土台のドラッグと同じ View の逆写し。並べ方が決める軸には書かない）。
+ * 左上なのは、大きさを変えた泡も留められるように（付け替えでは大きさが変わらないので中心と同じ）
+ */
+let PIN_ON = true;      // ★ 実験用：切ると「動かさなかった泡は動かない」の書き戻しをやめる
+function pin(id, bf) {
+  if (!PIN_ON) return;
+  if (!bf || !byId(id)) return;
+  for (let n = 0; n < 6; n++) {
+    probe();
+    const q = PLACE.get(id);
+    if (!q) return;
+    let wrote = false;
+    for (const axis of ["x", "y"]) {
+      const d = (axis === "x" ? bf.x - q.x : bf.y - q.y);
+      if (Math.abs(d) < 0.01) continue;
+      let A = null;
+      for (let cur = id; cur !== "root"; cur = parentOf(cur))
+        if (verbOf(viewOf(parentOf(cur))[axis].dim) === "coord") { A = byId(cur); break; }
+      if (!A) continue;
+      const pa = PLACE.get(A.id), L = LAYOUT.get(parentOf(A.id)), key = DIMS[L.V[axis].dim].key, c = center(pa, axis);
+      A.free[key] += valueFromPos(L, axis, screenToAxis(L, axis, c + d, pa.m)) - valueFromPos(L, axis, screenToAxis(L, axis, c, pa.m));
+      wrote = true;
+    }
+    if (!wrote) return;
+  }
+  probe();
+}
+
+/** 状態から配置を解き直す（補間は進めない）。付け替えのあと、書き戻す量を測るため */
+function probe() {
+  const saved = new Map([...anim].map(([k, v]) => [k, { ...v }]));
+  resolveAll("snap");
+  anim.clear();
+  for (const [k, v] of saved) anim.set(k, v);
+}
+
+/** 見えていた所から補間を始める（新しい親の中身の座標に直す） */
+function startFrom(id, bf) {
+  const H = LAYOUT.get(parentOf(id))?.host;
+  if (!bf || !H) return;
+  anim.set(id, { x: (bf.cx - H.cx) / H.scale, y: (bf.cy - H.cy) / H.scale, scale: bf.scale / H.scale, alpha: 1, w: bf.w, h: bf.h });
+}
+
+cv.addEventListener("pointerup", endDrag);
+cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("lostpointercapture", endDrag);
+
+/** ホイール：カーソルの下の空間の焦点 Z。Z が なし なら何もしない */
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const { mx, my } = pt(e), space = windowOf(spaceAt(mx, my)), L = LAYOUT.get(space);   // R6：見えない親はホイールを外へ通す
+  if (!L || L.V.z.dim === "none") return;
+  // 手前へは 1 退いて全体を見られる。奥へは一番奥の泡まで（Z の約束。fitFocus）
+  setFocusAxis(L, "z", spaceObj(space).focus.z + e.deltaY * 0.004);
+  hintAt = { mx, my };                  // ヒントは次のフレームで、動かした焦点の配置から作る
+}, { passive: false });
+cv.addEventListener("pointerleave", () => { if (!drag) hideCursorHint(); });
+
+/* ============================================================
+   §5 画面の約束：ヒント行・右上の一覧・選択中の泡・カーソル脇・軸セレクタ
+   ============================================================ */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const targetSpace = () => selectedId && byId(selectedId) ? parentOf(selectedId) : "root";
+const nameHtml = id => `<span class="nm" style="color:${spaceHsl(id)}">${esc(spaceName(id))}</span>`;
+
+/**
+ * 焦点を引いたら、その軸でどれだけ動けるか。setFocusAxis と同じ fitFocus の答えから言う。
+ * 言い分けは幅の閾値ではなく「どちらの約束で止まるか」：
+ *   並びの端まで送れる（約束(1)で止まる）            → 視点が動く
+ *   箱に収まる約束(2)で、並びの端より手前で止まる     → 少しだけ視点が動く（中身が箱いっぱい）
+ * （詰める・平行の軸は箱が中身ぴったりに伸びるので、余白の分しか動かない。X魚眼ビューの Y も ±17 で止まる）
+ */
+function focusHtml(spaceId, axis) {
+  const L = LAYOUT.get(spaceId), label = DIMS[viewOf(spaceId)[axis].dim].label;
+  if (!L) return `視点が動く（${label}）`;
+  const room = fitFocus(L, axis, Infinity) - fitFocus(L, axis, -Infinity);
+  const ps = [...L.arr[axis].pos.values()], span = ps.length ? Math.max(...ps) - Math.min(...ps) : 0;
+  if (room >= 0.5 && room >= span - 0.5) return `視点が動く（${label}）`;
+  const why = span <= room + 0.5 ? "並びの端まで" : "中身が箱いっぱい";
+  return room < 0.5 ? `<span class="fix">動かない</span>（${label}・${why}）`
+                    : `<span class="fix">少しだけ</span>視点が動く（${label}・${why}）`;
+}
+/** 1軸のドラッグで起きることを言葉に（その空間の View で） */
+function verbHtml(spaceId, axis) {
+  const dimId = viewOf(spaceId)[axis].dim, d = DIMS[dimId];
+  switch (verbOf(dimId)) {
+    case "coord":   return `<span class="move">動く</span>（${d.label}）`;
+    case "reorder": return `<span class="move">並べ替わる</span>`;
+    case "cell":    return `<span class="move">${d.label}を移る</span>`;
+    case "focus":   return `<span class="fix">動かない</span>　${focusHtml(spaceId, axis)}`;
+    default:        return `<span class="fix">何も起きない</span>（なし）`;
+  }
+}
+function wheelHtml(spaceId) {
+  spaceId = windowOf(spaceId);
+  const V = viewOf(spaceId);
+  return V.z.dim === "none"
+    ? `<span class="fix">何も起きない</span>（${esc(spaceName(spaceId))}の Z が なし）`
+    : `<span class="move">奥行きの視点</span>（${esc(spaceName(spaceId))}・${DIMS[V.z.dim].label}）`;
+}
+// 次元が なし でも並べ方とレンズは効いている（なし·詰める は上ぞろえで箱も伸びる）ので、3つとも出す
+const axisText = (V, axis) => `${DIMS[V[axis].dim].label}·${ARRANGES[V[axis].arrange]}·${lensLabel(axis, V[axis].lens)}`;
+/** 決まり2：見えない親の Z は窓（外の空間）のもの（自分の軸ではない）。一覧でもそう出す */
+const axisHtml = (V, axis, spaceId) => axisText(V, axis) +
+  (axis === "z" && spaceId !== "root" && byId(spaceId) && byId(spaceId).implicit
+    ? ` <span class="inh" style="color:${spaceHsl(windowOf(spaceId))}">←${esc(spaceName(windowOf(spaceId)))}</span>` : "");
+/** 決まり7：書ける軸を1つでも持つなら泡は動く。動かない泡は空間も移れない */
+const canMove = spaceId => { const V = viewOf(spaceId);
+  return [V.x.dim, V.y.dim].some(d => ["coord", "reorder", "cell"].includes(verbOf(d))); };
+/**
+ * 空間を移るのは「出る」と「入る」の2つ。軸の行（箱の中の話）とは別に出す（カーソルの点の話なので）。
+ *  出る＝箱の外まで大きく引く（root の泡には出る先が無い）
+ *  入る＝離した所が別の空間の中身の箱なら、そこへ移る。どの空間の泡でも同じ（root の泡だけの話ではない）
+ */
+function outHtml(spaceId) {
+  if (!canMove(spaceId) || spaceId === "root") return null;
+  return byId(spaceId).implicit ? ["外へ引く", `<span class="move">並びから抜ける</span>（大きく引き離す）`]
+                                : ["外へ引く", `<span class="move">外の空間へ出る</span>（箱の外まで大きく引く）`];
+}
+function dropHtml(spaceId) {
+  if (!canMove(spaceId)) return null;
+  return ["中へ落とす", `<span class="move">その空間へ移る</span>（別の泡の中身の箱で離す）`];
+}
+/**
+ * 縁へ寄せたら何が起きるか（泡が動く空間だけ）。くっつける相手は同じ窓（決まり2）の自由に置いた泡か並びの中の泡なので、
+ * 窓が自由でない空間（格子・縦並びの中）では、箱の外へ引き出してからになる（slotAt と同じ決まり）
+ */
+function snapHtml(spaceId) {
+  if (!canMove(spaceId)) return null;
+  const V = viewOf(windowOf(spaceId)), here = verbOf(V.x.dim) === "coord" && verbOf(V.y.dim) === "coord";
+  return ["縁へ寄せる", here ? `<span class="move">並ぶ</span>（見えない親が生まれる・並びなら加わる）`
+                             : `<span class="move">並ぶ</span>（箱の外まで引き出してから）`];
+}
+/** 並びごと動かすには（掴める所は縁だけ） */
+function rowGrabHtml(b) {
+  if (!rowOf(b.id)) return null;
+  return ["並びごと", `<span class="move">並びの外周（縁 12px）を掴む</span>`];
+}
+
+/* ── カーソルの脇：その場所でドラッグ・ホイールしたら何が起きるか ── */
+const cursorHint = document.getElementById("cursor-hint");
+// 出ているヒントは、毎フレームいまの配置から作り直す（ホイールで焦点が動いた・補間で泡が動いた、でも古くならない）
+let hintAt = null;
+function hideCursorHint() { hintAt = null; cursorHint.style.display = "none"; }
+function showCursorHint(mx, my) {
+  const sel = handleAt(mx, my), hit = hitTest(mx, my), lines = [];
+  hoverRing = hit && hit.b.implicit ? hit.id : null;
+  const line = kv => kv && lines.push(`${kv[0].padEnd(6, "　")}${kv[1]}`);
+  if (sel) {
+    lines.push(`<span class="who">${esc(sel.b.title)}</span>`, `ドラッグ    大きさを変える`);
+    cv.style.cursor = "nwse-resize";
+  } else if (hit && !inContent(hit, my)) {
+    const p = hit;                                 // 縁に当たれば hitTest がもう見えない親を返している
+    const who = p.b.implicit ? "並び（見えない親）の縁" : esc(p.b.title);
+    lines.push(`<span class="who">${who}</span>  ${nameHtml(p.space)}`,
+               `横ドラッグ  ${verbHtml(p.space, "x")}`, `縦ドラッグ  ${verbHtml(p.space, "y")}`);
+    line(outHtml(p.space)); line(dropHtml(p.space)); line(snapHtml(p.space));
+    line(rowGrabHtml(p.b));
+    cv.style.cursor = "grab";
+  } else {
+    const space = hit ? hit.id : "root", V = viewOf(space);
+    const bg = axis => V[axis].dim === "none" ? `<span class="fix">何も起きない</span>（なし）` : focusHtml(space, axis);
+    lines.push(`<span class="who">背景</span>  ${nameHtml(space)}`, `横ドラッグ  ${bg("x")}`, `縦ドラッグ  ${bg("y")}`);
+    cv.style.cursor = "default";
+  }
+  lines.push(`ホイール    ${wheelHtml(spaceAt(mx, my))}`);
+  const html = lines.join("\n");
+  if (hintAt && hintAt.html === html && hintAt.mx === mx && hintAt.my === my && cursorHint.style.display === "block") return;
+  hintAt = { mx, my, html };
+  cursorHint.innerHTML = html;
+  cursorHint.style.display = "block";
+  const w = cursorHint.offsetWidth, h = cursorHint.offsetHeight;
+  cursorHint.style.left = (mx + 18 + w > VW ? mx - 18 - w : mx + 18) + "px";
+  cursorHint.style.top = (my + 16 + h > VH ? my - 12 - h : my + 16) + "px";
+}
+
+/* ── 右上：空間の一覧（入れ子のツリー） ── */
+function spacesHtml() {
+  const cur = targetSpace(), rows = [];
+  const walk = (id, depth) => {
+    const V = viewOf(id), S = spaceSummary(id);
+    rows.push(
+      `<div class="sp" style="padding-left:${depth * 12}px">${depth ? "└ " : "▸ "}${nameHtml(id)}` +
+      `  <span class="${V.own ? "own" : "inh"}">${V.own ? "自前" : "継承"}</span>` +
+      `  <span class="${S.cls}">${S.text}</span>` +
+      `  <span class="own">${PRESETS[presetOf(id)]?.label ?? "合わせ"}・${ALIGNS[V.align]}ぞろえ</span>` +
+      `${id === cur ? ' <span class="cur">← 選択中</span>' : ""}` +
+      (id !== "root" && byId(id).implicit ? `<br><span class="inh" style="padding-left:14px">${kidsOf(id).slice().sort(byOrder).map(k => esc(k.title)).join(" ｜ ")}</span>` : "") +
+      `<div class="axs">${["x", "y", "z"].map(a => `<span class="ax"><i>${a.toUpperCase()}</i>${axisHtml(V, a, id)}</span>`).join("")}</div></div>`);
+    for (const k of kidsOf(id)) if (isHost(k)) walk(k.id, depth + 1);
+  };
+  walk("root", 0);
+  return `<span class="t">空間</span>` + rows.join("");
+}
+
+/* ── その下：選択中の泡 ── */
+function selectionHtml() {
+  const b = byId(selectedId), p = PLACE.get(selectedId);
+  if (!b || !p) return "泡をクリックすると、ここに説明が出ます。";
+  const space = parentOf(b.id), V = viewOf(space);
+  // 合成 scale の内訳：各段の局所倍率を並べる
+  const chain = [];
+  for (let q = p; q; q = q.space === "root" ? null : PLACE.get(q.space)) chain.unshift(q.local);
+  const k = (label, html) => `<div><span class="k">${label}</span>${html}</div>`;
+  return [
+    `<div><span class="t">選択</span>  <span class="nm" style="color:hsl(${b.hue} 70% 66%)">${esc(b.title)}</span></div>`,
+    k("いる空間", `${nameHtml(space)}  <span class="${V.own ? "own" : "inh"}">${V.own ? "自前" : "継承"}</span>`),
+    p.vis > 0 ? "" : k("見え方", `<span class="fix">見えない</span>（焦点 Z より手前。掴めない）`),
+    k("横ドラッグ", verbHtml(space, "x")),
+    k("縦ドラッグ", verbHtml(space, "y")),
+    outHtml(space) ? k(...outHtml(space)) : "",
+    dropHtml(space) ? k(...dropHtml(space)) : "",
+    snapHtml(space) && !b.implicit ? k(...snapHtml(space)) : "",
+    rowGrabHtml(b) ? k(...rowGrabHtml(b)) : "",
+    k("ホイール", wheelHtml(space)),
+    isHost(b) ? k("中", `${nameHtml(b.id)}  <span class="${spaceSummary(b.id).cls}">${spaceSummary(b.id).text}</span>`) : "",
+    k("倍率", `<b style="color:var(--accent)">${p.scale.toFixed(3)}</b>` +
+      (chain.length > 1 ? `  ＝ ${chain.map(v => v.toFixed(3)).join(" × ")}` : "")),
+  ].join("");
+}
+
+/* ──────────────────────────────────────────────────────────────
+   ツールバー（案6 の問いへの答え）：
+     ふだんは「型（レイアウトの名前）＋引数」だけ。引数は空間ごとの 揃え と、等間隔の軸の 間隔
+     「詳しく」で、軸ごとの 次元・並べ方・レンズ（型の中身）と 大きさの決め方 の裏口が出る
+   どちらも効く先は同じ：選択中の泡がいる空間
+   ────────────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const fill = (el, opts) => { for (const [value, label] of opts) {
+  const o = document.createElement("option"); o.value = value; o.textContent = label; el.appendChild(o); } };
+
+fill($("type"), Object.entries(PRESETS).map(([id, p]) => [id, p.label]).concat([["", "（合わせ）"]]));
+fill($("align"), Object.entries(ALIGNS));
+const STEPS = [24, 34, 44, 56, 64, 68, 80, 110];          // X・Y の間隔（px）
+const STEPS_Z = [0.4, 0.6, 0.8, 1, 1.2, 1.6, 2];         // Z の間隔（奥行き。px ではない）
+for (const ax of ["x", "y"]) fill($("step" + ax), STEPS.map(v => [String(v), String(v)]));
+fill($("stepz"), STEPS_Z.map(v => [String(v), String(v)]));
+fill($("sizerule"), Object.entries(SIZE_RULES).map(([id, r]) => [id, r.label]));
+
+$("type").onchange = () => { if ($("type").value) applyPreset($("type").value, targetSpace()); lastSig = ""; };
+$("align").onchange = () => { setView(targetSpace(), { align: $("align").value }); lastSig = ""; };
+$("sizerule").onchange = () => { setView(targetSpace(), { size: $("sizerule").value }); lastSig = ""; };
+for (const ax of ["x", "y", "z"]) $("step" + ax).onchange = () => { setAxis(targetSpace(), ax, { step: +$("step" + ax).value }); lastSig = ""; };
+
+const selects = [...document.querySelectorAll("select[data-axis]")];
+for (const el of selects) {
+  const { axis, part } = el.dataset;
+  fill(el, part === "dim" ? Object.entries(DIMS).map(([id, d]) => [id, d.label])
+         : part === "arrange" ? Object.entries(ARRANGES)
+         : Object.entries(axis === "z" ? LENS_Z : LENS_XY).map(([id, l]) => [id, l.label]));
+  el.onchange = () => { setAxis(targetSpace(), axis, { [part]: el.value }); lastSig = ""; };
+}
+let lastSig = "";
+function syncToolbar() {
+  const id = targetSpace(), V = viewOf(id);
+  const sig = `${id}|${V.own}|${V.align}|${V.size}|${["x", "y", "z"].map(a => `${V[a].dim},${V[a].arrange},${V[a].lens},${V[a].step}`).join("|")}`;
+  if (sig === lastSig) return;
+  lastSig = sig;
+  $("type").value = presetOf(id) ?? "";
+  $("align").value = V.align;
+  $("sizerule").value = V.size;
+  // 引数は、その型が持つときだけ出す（揃え＝帯がある／間隔＝等間隔の軸）
+  $("arg-align").hidden = !["x", "y"].some(a => V[a].arrange !== "as-is");
+  for (const ax of ["x", "y", "z"]) {
+    $("arg-step" + ax).hidden = V[ax].arrange !== "equal";
+    $("step" + ax).value = String(V[ax].step);
+  }
+  for (const el of selects) el.value = V[el.dataset.axis][el.dataset.part];
+  const lab = $("axis-scope");
+  lab.textContent = `${spaceName(id)}${V.own ? "" : "（継承）"} の`;
+  lab.style.color = spaceHsl(id);
+  // 決まり2：見えない親に Z は無い。Z のセレクタ（裏口の3つと 間隔Z）が効くのは窓（外の空間）なので、そう出す
+  const win = windowOf(id);
+  for (const zs of document.querySelectorAll(".z-scope")) {
+    zs.textContent = win === id ? "" : `（${spaceName(win)}）`;
+    zs.style.color = spaceHsl(win);
+  }
+  $("inherit").disabled = id === "root" || !V.own;
+}
+$("more").onclick = () => { const on = $("deep").hidden; $("deep").hidden = !on; $("more").classList.toggle("on", on); };
+$("inherit").onclick = () => { inheritView(targetSpace()); lastSig = ""; };
+$("refocus").onclick = () => { Object.assign(spaceObj(targetSpace()).focus, { x: 0, y: 0, z: 0 }); };
+// ★ 留める（pin）を切って見せるトグル。なぜ要るのかが画面で分かるように
+$("nopin").onclick = () => { PIN_ON = !PIN_ON; $("nopin").classList.toggle("on", !PIN_ON); lastSig = ""; };
+{
+  const hintEl = document.getElementById("hint"), DEFAULT = hintEl.innerHTML;
+  for (const el of document.querySelectorAll("[data-hint]")) {
+    el.addEventListener("mouseenter", () => { hintEl.innerHTML = el.dataset.hint; });
+    el.addEventListener("focus", () => { hintEl.innerHTML = el.dataset.hint; });
+    el.addEventListener("mouseleave", () => { hintEl.innerHTML = DEFAULT; });
+  }
+}
+
+const panelCache = {};
+function setHtml(id, html) { if (panelCache[id] !== html) { panelCache[id] = html; document.getElementById(id).innerHTML = html; } }
+function updatePanels() {
+  setHtml("spaces", spacesHtml()); setHtml("selection", selectionHtml()); syncToolbar();
+  if (hintAt && !drag) showCursorHint(hintAt.mx, hintAt.my);
+}
+
+/* ============================================================
+   ループ
+   ============================================================ */
+function frame() { resolveAll("step"); draw(); updatePanels(); }
+function settle() { resolveAll("snap"); resolveAll("snap"); draw(); updatePanels(); }
+function loop() { frame(); requestAnimationFrame(loop); }
+
+/* ============================================================
+   §6 検証用の口（座標はページのビューポート座標）
+   ============================================================ */
+const offset = () => { const r = cv.getBoundingClientRect(); return { x: r.left, y: r.top }; };
+const outPlace = p => { const o = offset();
+  return { id: p.id, x: p.x + o.x, y: p.y + o.y, w: p.w, h: p.h, scale: p.scale, local: p.local, depth: p.depth, space: p.space, alpha: p.alpha,
+           implicit: p.b.implicit }; };
+window.__lab = {
+  select(id) { selectedId = id; lastSig = ""; },
+  selectedId: () => selectedId,
+  bubbles: () => JSON.parse(JSON.stringify(bubbles)),
+  viewOf: id => { const v = viewOf(id); return JSON.parse(JSON.stringify({ x: v.x, y: v.y, z: v.z, align: v.align, size: v.size, focus: v.focus, own: v.own })); },
+  setAxis(spaceId, axis, patch) { setAxis(spaceId, axis, patch); lastSig = ""; },
+  setView(spaceId, patch) { setView(spaceId, patch); lastSig = ""; },
+  preset(name, spaceId) { applyPreset(name, spaceId ?? targetSpace()); lastSig = ""; },
+  presetOf: id => presetOf(id),
+  placements: () => frameItems.map(outPlace),
+  rectOf(id) { const p = PLACE.get(id); if (!p) return null; const o = outPlace(p); return { x: o.x, y: o.y, w: o.w, h: o.h }; },
+  /** ヘッダの中で、実際にその泡に当たる点（手前の泡に隠れていない点）を探す */
+  headerPointOf(id) {
+    const p = PLACE.get(id); if (!p) return null;
+    if (p.b.implicit) return this.edgePointOf(id);
+    const o = offset(), y = p.box.h <= 34 ? p.y + p.h / 2 : p.y + Math.min(12 * p.scale, p.h / 2);
+    for (const t of [0.35, 0.5, 0.2, 0.65, 0.8, 0.1, 0.9]) {
+      const x = p.x + p.w * t, hit = hitTest(x, y);
+      if (hit && hit.id === id && !inContent(hit, y)) return { x: x + o.x, y: y + o.y };
+    }
+    return { x: p.x + p.w * 0.35 + o.x, y: y + o.y };
+  },
+  focusOf: id => ({ ...spaceObj(id).focus }),
+  layoutOf(id) { const L = LAYOUT.get(id); return L && { host: L.host, H: L.ctx.H, vp: L.ctx.vp }; },
+  frame() { frame(); },
+  settle() { settle(); },
+  setPin(on) { PIN_ON = !!on; },
+  pinOn() { return PIN_ON; },
+  // ── 案1で足したもの ──
+  /** R1・R2 をドラッグなしで当てる。side は "left" | "right" | "top" | "bottom"（id を target のどちら側へ） */
+  snap(id, target, side) {
+    const axis = side === "left" || side === "right" ? "x" : "y", after = side === "right" || side === "bottom";
+    const row = rowOf(target), join = !!row && verbOf(viewOf(row.id)[axis].dim) === "reorder";
+    reshape(() => snapOp(byId(id), { kind: join ? "join" : "born", target, axis, after }));
+  },
+  /**
+   * 見えない親の縁（外周）で、実際にその並びに当たる点。
+   * 入れ子の並びは左上がそろうので、外の並びの縁は内の並びの縁に食われる（内側・手前が勝つ）。
+   * headerPointOf と同じく、当たる点を順に探す
+   */
+  edgePointOf(id) {
+    const p = PLACE.get(id); if (!p) return null;
+    const o = offset(), h = RING / 2;
+    for (const t of [0.5, 0.75, 0.25, 0.9, 0.1, 1, 0])
+      for (const c of [{ x: p.x + p.w * t, y: p.y - h }, { x: p.x + p.w + h, y: p.y + p.h * t },
+                       { x: p.x + p.w * t, y: p.y + p.h + h }, { x: p.x - h, y: p.y + p.h * t }]) {
+        const hit = hitTest(c.x, c.y);
+        if (hit && hit.id === id) return { x: c.x + o.x, y: c.y + o.y };
+      }
+    return { x: p.x + p.w * 0.5 + o.x, y: p.y - h + o.y };
+  },
+  rowOf: id => rowOf(id)?.id ?? null,
+  implicitParents: () => bubbles.filter(b => b.implicit).map(b => ({ id: b.id, parent: b.parent, kids: kidsOf(b.id).slice().sort(byOrder).map(k => k.id), view: JSON.parse(JSON.stringify(b.view)) })),
+  /** 補間を1フレーム進めずに、いまの状態で配置だけ解き直す */
+  keep() { resolveAll("keep"); },
+  dragState: () => drag && drag.slot ? { id: drag.id, space: drag.space, slot: { space: drag.slot.space, out: drag.slot.out, snap: drag.slot.snap ?? null } } : null,
+  hitAt(x, y) { const o = offset(), p = hitTest(x - o.x, y - o.y); return p ? p.id : null; },
+  /** いま描いた字（見えない親の名前・注記）の矩形と、泡・ほかの字との重なり（cost、px²） */
+  labels() { const o = offset(); return PLACED_LABELS.map(l => ({ ...l, x: l.x + o.x, y: l.y + o.y })); },
+};
+
+resize();
+settle();
+// 場面：希望シフトは勤務表の右、世界線は勤務表の下。どちらもドラッグと同じ決まり4（snapOp → reshape）で並べる。
+// 2回目は勤務表がもう並びの中にいるので、並びの中に並び（縦）が入れ子で生まれる
+reshape(() => snapOp(byId("kibou"), { kind: "born", target: "kinmu", axis: "x", after: true }));
+settle();
+reshape(() => snapOp(byId("sekai"), { kind: "born", target: "kinmu", axis: "y", after: true }));
+settle();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>v5-dom bench —— image-cache（動かすあいだは画像）</title>
+<style>
+  /* ★ ここは全案で共通。変えない */
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0b0d14;color:#e6ebf5;overflow:hidden;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #stage{position:absolute;inset:0;overflow:hidden;touch-action:none}
+  /* 泡の要素は入力を受けない。当たり判定は placements から（driver.js が1つで受ける） */
+  #stage *{pointer-events:none}
+
+  /* ── この案のぶん ── */
+  .bub{position:absolute;border:1px solid;transform-origin:0 0;background-repeat:no-repeat}
+  .bub.imp{border-style:dashed}
+  .ttl{position:absolute;white-space:nowrap;line-height:1}
+  /* 画像モード：枠も地も文字も DOM では描かない（全部 焼いた絵の中にある） */
+  .bub.im{border:0 none!important;background-color:transparent!important}
+  .bub.im>.ttl{display:none}
+</style>
+<style id="atlas-css"></style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { start } from "./driver.js";
+
+/* ============================================================================
+   image-cache —— 「動かすあいだは画像」
+
+   ・止まっているとき  … 素の DOM（absolute.html と同じ絵。left/top/width/height）
+   ・動かしているあいだ … 泡ぜんぶを1枚の絵（アトラス）に焼いておき、
+                          泡ごとの div は「その絵の一部を切り出した背景」だけを持ち、
+                          毎フレーム transform（translate + scale）と opacity だけを書く
+
+   焼き方（ネットワークを使わない）
+     DOM を SVG の <foreignObject> に入れて 1枚の SVG にし、<img> で読み、canvas へ drawImage、
+     PNG にして CSS の background-image に入れる。切り出しは background-position。
+     → 画像は **1枚だけ**。521 個の泡が同じ1枚を見る
+
+   焼き直す条件：泡の箱（bw,bh）が変わったとき。箱が変わった泡だけ DOM に戻す（＝ resize 中）
+   ============================================================================ */
+
+const qs = new URLSearchParams(location.search);
+const K        = +(qs.get("k") ?? 1);              // 焼く倍率（1 = 画面の等倍、2 = 倍の細かさ）
+const PREBAKE  = (qs.get("prebake") ?? "1") !== "0"; // 読み込み直後に焼いておくか
+const TAIL     = +(qs.get("tail") ?? 140);         // ホイールが止まったとみなすまでの ms
+const PNGMODE  = qs.get("png") ?? "blob";          // blob | data
+const OFF      = (qs.get("off") ?? "0") === "1";   // 画像を使わない（＝ DOM だけ。比較用）
+const FONT = `-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif`;
+const FONT_X = FONT.replace(/"/g, "'");            // SVG の style 属性の中に入れるので二重引用符は使えない
+const ATLAS_W = 2048, ATLAS_H = 8192;
+
+const els = new Map();        // id -> { el, t, base, mode, z, a, shown, bgp }
+let stage = null, apiRef = null;
+let atlas = null;             // { slots:Map(id->slot), w, h, url }
+let imageMode = false, baking = false, wheelTimer = 0;
+let lastPs = null;
+const bakes = [];             // 焼いた記録（実測）
+const meas = document.createElement("canvas").getContext("2d");
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ── 最初の1フレーム：要素を作る（absolute と同じ形） ── */
+function render(ps, api) {
+  stage = api.stage; apiRef = api;
+  const frag = document.createDocumentFragment();
+  for (const p of ps) {
+    const el = document.createElement("div");
+    el.className = "bub" + (p.implicit ? " imp" : "");
+    el.style.borderColor = p.implicit ? "hsl(215 30% 62% / .45)" : `hsl(${p.hue} 70% 62% / .55)`;
+    // ★ background（一括指定）だと background-image まで none を書いてしまい、
+    //   インライン指定が .bub.im のアトラス指定に勝つ。だから色だけを書く（絵は absolute と同じ）
+    if (!p.implicit) el.style.backgroundColor = `hsl(${p.hue} 70% 62% / .16)`;
+    const t = document.createElement("span");
+    t.className = "ttl";
+    t.textContent = p.implicit ? "" : p.title;
+    t.style.color = `hsl(${p.hue} 70% 78%)`;
+    el.appendChild(t);
+    els.set(p.id, { el, t, base: el.className, mode: 0, z: -1, a: -1, shown: true, bgp: "" });
+    frag.appendChild(el);
+  }
+  stage.appendChild(frag);
+  update(ps, api);
+  installGestures();
+  if (PREBAKE && !OFF) requestAnimationFrame(() => requestAnimationFrame(() => bake()));
+}
+
+/* ── 毎フレーム ── */
+function update(ps, api) {
+  lastPs = ps;
+  const useImg = imageMode && atlas && !OFF;
+  for (let n = 0; n < ps.length; n++) {
+    const p = ps[n], e = els.get(p.id), s = e.el.style;
+    if (!(p.alpha > 0) || p.w < 0.5) { if (e.shown) { s.display = "none"; e.shown = false; } continue; }
+    if (!e.shown) { s.display = "block"; e.shown = true; }
+
+    const slot = useImg ? atlas.slots.get(p.id) : null;
+    if (slot && Math.abs(slot.bw - p.bw) < 1e-6 && Math.abs(slot.bh - p.bh) < 1e-6) {
+      if (e.mode !== 1) toImage(e, slot);
+      const rx = p.w / slot.rw, ry = p.h / slot.rh;      // 焼いたときの矩形との比
+      s.transform = `translate(${p.x + slot.ox * rx}px,${p.y + slot.oy * ry}px) scale(${rx},${ry})`;
+    } else {
+      if (e.mode !== 0) toDom(e);
+      s.left = p.x + "px";
+      s.top = p.y + "px";
+      s.width = p.w + "px";
+      s.height = p.h + "px";
+      s.borderRadius = 8 * p.scale + "px";
+      const fs = Math.max(4, 12 * p.scale);
+      e.t.style.fontSize = fs + "px";
+      e.t.style.left = 8 * p.scale + "px";
+      e.t.style.top = 16 * p.scale - fs + "px";
+    }
+    if (e.z !== n) { s.zIndex = n; e.z = n; }
+    if (e.a !== p.alpha) { s.opacity = p.alpha; e.a = p.alpha; }
+  }
+}
+
+function toImage(e, slot) {
+  const s = e.el.style;
+  s.left = "0px"; s.top = "0px";
+  s.width = slot.ow + "px"; s.height = slot.oh + "px";
+  s.borderRadius = "0px";
+  if (e.bgp !== slot.bgp) { s.backgroundPosition = slot.bgp; e.bgp = slot.bgp; }
+  e.el.className = e.base + " im";
+  e.mode = 1;
+}
+function toDom(e) {
+  e.el.style.transform = "none";
+  e.el.className = e.base;
+  e.mode = 0;
+}
+
+/* ============================================================
+   焼く —— DOM → SVG(foreignObject) → img → canvas → PNG → CSS background
+   ============================================================ */
+function slotsOf(ps) {
+  const out = [];
+  for (const p of ps) {
+    if (!(p.alpha > 0) || p.w < 0.5) continue;
+    const s = p.scale, fs = Math.max(4, 12 * s);
+    let l = -1, t = -1, r = p.w + 1, b = p.h + 1;         // 枠のにじみのぶん 1px
+    if (!p.implicit) {                                     // 題名は箱からはみ出しうる（切り抜かないので）
+      meas.font = `${fs}px ${FONT}`;
+      const tw = meas.measureText(p.title).width;
+      t = Math.min(t, 16 * s - fs - 1);
+      r = Math.max(r, 8 * s + tw + 2);
+      b = Math.max(b, 16 * s + 0.3 * fs + 1);
+    }
+    out.push({ id: p.id, p, ox: l, oy: t, ow: r - l, oh: b - t, rw: p.w, rh: p.h, bw: p.bw, bh: p.bh, scale: s });
+  }
+  return out;
+}
+
+function pack(slots) {
+  const sorted = [...slots].sort((a, b) => (b.oh * K) - (a.oh * K));
+  let x = 0, y = 0, shelf = 0, W = 0;
+  const kept = [];
+  for (const s of sorted) {
+    const w = Math.ceil(s.ow * K), h = Math.ceil(s.oh * K);
+    if (w > ATLAS_W) { s.drop = true; continue; }
+    if (x + w > ATLAS_W) { x = 0; y += shelf; shelf = 0; }
+    if (y + h > ATLAS_H) { s.drop = true; continue; }
+    s.sx = x; s.sy = y; s.sw = w; s.sh = h;
+    x += w; shelf = Math.max(shelf, h); W = Math.max(W, x);
+    kept.push(s);
+  }
+  return { kept, w: Math.max(1, W), h: Math.max(1, y + shelf) };
+}
+
+function svgOf(kept, W, H) {
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`];
+  for (const s of kept) {
+    const p = s.p, sc = s.scale, fs = Math.max(4, 12 * sc);
+    const border = p.implicit
+      ? `${K}px dashed hsl(215 30% 62% / .45)`
+      : `${K}px solid hsl(${p.hue} 70% 62% / .55)`;
+    const bg = p.implicit ? "transparent" : `hsl(${p.hue} 70% 62% / .16)`;
+    const inner = p.implicit ? "" :
+      `<span style="position:absolute;left:${8 * sc * K}px;top:${(16 * sc - fs) * K}px;font-size:${fs * K}px;`
+      + `line-height:1;color:hsl(${p.hue} 70% 78%);white-space:nowrap">${esc(p.title)}</span>`;
+    parts.push(
+      `<foreignObject x="${s.sx}" y="${s.sy}" width="${s.sw}" height="${s.sh}">`
+      + `<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:${s.sw}px;height:${s.sh}px;font-family:${FONT_X}">`
+      + `<div style="box-sizing:border-box;position:absolute;left:${-s.ox * K}px;top:${-s.oy * K}px;`
+      + `width:${p.w * K}px;height:${p.h * K}px;border:${border};border-radius:${8 * sc * K}px;background:${bg}">`
+      + inner + `</div></div></foreignObject>`);
+  }
+  parts.push("</svg>");
+  return parts.join("");
+}
+
+let cv = null;
+async function bake() {
+  if (baking || OFF) return null;
+  baking = true;
+  try { return await bake_(); }
+  catch (e) { bakes.push({ error: String(e && e.message || e) }); return null; }
+  finally { baking = false; }
+}
+
+async function bake_() {
+  const T = {}, t0 = performance.now();
+  const ps = lastPs || [];
+  const slots = slotsOf(ps);
+  const { kept, w, h } = pack(slots);
+  T.pack = performance.now() - t0;
+
+  let t = performance.now();
+  const svg = svgOf(kept, w, h);
+  T.svg = performance.now() - t; T.svgLen = svg.length;
+
+  // ★ SVG は **data: でなければならない**。blob: で読ませると canvas が汚染されて toBlob / toDataURL が投げる
+  //    （実測："Tainted canvases may not be exported."）。ネットワークには出ない
+  t = performance.now();
+  const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("svg img")); img.src = url; });
+  await img.decode().catch(() => {});
+  T.load = performance.now() - t;
+
+  t = performance.now();
+  if (!cv) cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const g = cv.getContext("2d");
+  g.clearRect(0, 0, w, h);
+  g.drawImage(img, 0, 0);
+  T.draw = performance.now() - t;
+
+  t = performance.now();
+  let pngUrl, revoke = null;
+  if (PNGMODE === "data") {
+    pngUrl = cv.toDataURL("image/png");
+    T.pngLen = pngUrl.length;
+  } else {
+    const blob = await new Promise(r => cv.toBlob(r, "image/png"));
+    pngUrl = URL.createObjectURL(blob); revoke = pngUrl;
+    T.pngLen = blob.size;
+  }
+  T.png = performance.now() - t;
+
+  t = performance.now();
+  const probe = new Image();                       // 使う前に読み終えておく（最初のフレームで固まらないように）
+  await new Promise((res) => { probe.onload = res; probe.onerror = res; probe.src = pngUrl; });
+  await probe.decode().catch(() => {});
+  T.decode = performance.now() - t;
+
+  t = performance.now();
+  const map = new Map();
+  for (const s of kept) {
+    s.bgp = `${-s.sx / K}px ${-s.sy / K}px`;
+    map.set(s.id, s);
+  }
+  document.getElementById("atlas-css").textContent =
+    `.bub.im{background-image:url("${pngUrl}");background-size:${w / K}px ${h / K}px}`;
+  if (atlas && atlas.revoke) URL.revokeObjectURL(atlas.revoke);
+  atlas = { slots: map, w, h, revoke };
+  T.apply = performance.now() - t;
+
+  T.total = performance.now() - t0;
+  T.n = kept.length; T.dropped = slots.length - kept.length; T.atlas = `${w}x${h}`; T.k = K; T.png_mode = PNGMODE;
+  for (const k in T) if (typeof T[k] === "number") T[k] = +T[k].toFixed(2);
+  bakes.push(T);
+  return T;
+}
+
+/* ============================================================
+   いつ画像にするか —— 触っているあいだだけ
+   ============================================================ */
+function enter() { if (!OFF && atlas) imageMode = true; }
+function leave() { imageMode = false; }
+
+function installGestures() {
+  stage.addEventListener("pointerdown", () => {
+    if (needBake()) bake().then(enter); else enter();
+  });
+  const up = () => { leave(); if (needBake()) bake(); };
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+  stage.addEventListener("wheel", () => {
+    if (!imageMode) { if (needBake()) bake().then(enter); else enter(); }
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => { leave(); if (needBake()) bake(); }, TAIL);
+  }, { passive: true });
+}
+
+/** 焼き直しが要るか：箱が変わった泡があるか／倍率が離れすぎたか */
+function needBake() {
+  if (!atlas || !lastPs) return true;
+  let far = 0, miss = 0;
+  for (const p of lastPs) {
+    if (!(p.alpha > 0) || p.w < 0.5) continue;
+    const s = atlas.slots.get(p.id);
+    if (!s || Math.abs(s.bw - p.bw) > 1e-6 || Math.abs(s.bh - p.bh) > 1e-6) { miss++; continue; }
+    const r = p.scale / s.scale;
+    if (r > 2 || r < 0.5) far++;
+  }
+  return miss > 0 || far > 0;
+}
+
+/* ── 確かめの口（ベンチは見ない。probe だけが見る） ── */
+window.__ic = {
+  bakes: () => bakes.slice(),
+  last: () => bakes[bakes.length - 1] ?? null,
+  state: () => ({ imageMode, hasAtlas: !!atlas, k: K, prebake: PREBAKE, png: PNGMODE, off: OFF,
+                  slots: atlas ? atlas.slots.size : 0, atlas: atlas ? `${atlas.w}x${atlas.h}` : null }),
+  async forceBake() { const r = await bake(); return r; },
+  /** 焼いたときの倍率と、いまの倍率の比（＝画像をどれだけ引き伸ばしているか） */
+  ratios() { const out = [];
+    if (!atlas || !lastPs) return null;
+    for (const p of lastPs) { const s = atlas.slots.get(p.id); if (s && p.alpha > 0.01 && p.w > 0.5) out.push(p.scale / s.scale); }
+    out.sort((a, b) => a - b);
+    return { min: out[0], max: out[out.length - 1], mid: out[out.length >> 1], n: out.length }; },
+  /** 題名が箱からはみ出す泡（③ 切り抜かないので、焼く枠を広げてある） */
+  over() { if (!atlas) return null;
+    let n = 0, worst = null;
+    for (const s of atlas.slots.values()) {
+      const dx = s.ow - s.rw, dy = s.oh - s.rh;
+      if (dx > 2.01 || dy > 2.01) { n++; if (!worst || dx + dy > worst.dx + worst.dy) worst = { id: s.id, dx: +dx.toFixed(1), dy: +dy.toFixed(1), rw: +s.rw.toFixed(1), rh: +s.rh.toFixed(1) }; }
+    }
+    return { n, all: atlas.slots.size, worst }; },
+  /** いま何個が画像で、何個が DOM か */
+  modes() { let img = 0, dom = 0, off = 0;
+    for (const e of els.values()) { if (!e.shown) off++; else if (e.mode === 1) img++; else dom++; }
+    return { img, dom, hidden: off, imageMode }; },
+  setMode(m) { if (m === "image") enter(); else leave(); },
+  /** 要素の実際の矩形 と placements のずれ（px） */
+  diff() {
+    const r = stage.getBoundingClientRect(), out = [];
+    for (const p of window.__lab.placements()) {
+      if (!(p.alpha > 0.01) || p.w < 0.5) continue;
+      const e = els.get(p.id); if (!e || !e.shown) continue;
+      const q = e.el.getBoundingClientRect();
+      // 画像モードの要素は「はみ出しぶん」だけ大きい。焼いた比で戻して泡の矩形にする
+      let x = q.left, y = q.top, w = q.width, h = q.height;
+      if (e.mode === 1) {
+        const s = atlas.slots.get(p.id), rx = w / s.ow, ry = h / s.oh;
+        x -= s.ox * rx; y -= s.oy * ry; w = s.rw * rx; h = s.rh * ry;
+      }
+      out.push({ id: p.id, mode: e.mode,
+                 dx: x - p.x, dy: y - p.y, dw: w - p.w, dh: h - p.h });
+    }
+    const m = f => Math.max(...out.map(o => Math.abs(o[f])));
+    return { n: out.length, img: out.filter(o => o.mode === 1).length,
+             max: { dx: m("dx"), dy: m("dy"), dw: m("dw"), dh: m("dh") },
+             worst: out.slice().sort((a, b) => Math.max(Math.abs(b.dx), Math.abs(b.dy), Math.abs(b.dw), Math.abs(b.dh))
+                                              - Math.max(Math.abs(a.dx), Math.abs(a.dy), Math.abs(a.dw), Math.abs(a.dh))).slice(0, 4) };
+  },
+};
+
+start({ name: "image-cache", render, update });
+</script>
+</body>
+</html>

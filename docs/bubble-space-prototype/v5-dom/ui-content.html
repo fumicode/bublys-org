@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v5-dom · 中身から出る UI</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--panel2:#11141f;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;
+        --accent:#6ee7ff;--own:#ffd479;--off:#4a5268;--ok:#7ee2a8;--ng:#ff9db1}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;
+    font:13px/1.55 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #app{display:flex;flex-direction:column;height:100%}
+  header{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);padding:7px 14px}
+  header h1{margin:0;font-size:13px;font-weight:700;letter-spacing:.03em}
+  header p{margin:2px 0 0;color:var(--dim);font-size:11px}
+  header b{color:var(--accent);font-weight:600}
+  #main{flex:1 1 auto;display:flex;min-height:0}
+  .col{min-height:0;display:flex;flex-direction:column}
+  #left{flex:0 0 244px;border-right:1px solid var(--line);background:var(--panel2);overflow:auto}
+  #mid{flex:1 1 auto;min-width:0}
+  #right{flex:0 0 332px;border-left:1px solid var(--line);background:var(--panel2);overflow:auto}
+  .sec{padding:8px 12px;border-bottom:1px solid var(--line)}
+  .sec > .t{color:var(--dim);font-size:10.5px;letter-spacing:.08em;margin-bottom:6px}
+  /* 左：空間の一覧 */
+  .sp{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:7px;
+      color:var(--fg);font:inherit;padding:5px 8px;cursor:pointer;margin-bottom:3px}
+  .sp:hover{background:#1a2032}
+  .sp.on{background:#1d2436;border-color:var(--accent)}
+  .sp .nm{font-weight:600;font-size:12.5px}
+  .sp .inv{color:var(--dim);font-size:10.5px;font-variant-numeric:tabular-nums}
+  .sp .inv em{font-style:normal;color:var(--own)}
+  /* 中：札 */
+  #bar{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);padding:9px 14px 10px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;align-items:flex-start}
+  .chip{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:8px;
+        padding:6px 12px 7px;font:inherit;font-size:12.5px;cursor:pointer;text-align:left;line-height:1.35}
+  .chip:hover{border-color:var(--accent)}
+  .chip.on{background:#123240;border-color:var(--accent);color:#cdf6ff}
+  .chip[disabled]{opacity:.42;cursor:not-allowed;border-style:dashed;color:var(--off)}
+  .chip .why{display:block;font-size:10px;color:var(--dim);margin-top:1px}
+  .chip.on .why{color:#8fd4e6}
+  .chip[disabled] .why{color:var(--ng);opacity:.85}
+  .subbar{display:flex;gap:7px;align-items:center;margin-top:9px;flex-wrap:wrap}
+  .lbl{color:var(--dim);font-size:10.5px;letter-spacing:.06em}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{background:#1d2334;color:var(--dim);border:0;border-right:1px solid var(--line);
+    padding:4px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:#123240;color:#cdf6ff}
+  .seg[hidden]{display:none}
+  .ghost{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:7px;
+    padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+  .ghost:hover{border-color:var(--accent)}
+  .ghost.warn{border-color:var(--own);color:var(--own)}
+  /* 中：張りぼての舞台 */
+  #stage{flex:1 1 auto;position:relative;min-height:0;overflow:hidden}
+  #space{position:absolute;inset:14px;border:1px dashed #232a3d;border-radius:10px}
+  .bub{position:absolute;border-radius:7px;border:1px solid;display:flex;align-items:center;
+       justify-content:center;font-size:11px;overflow:hidden;white-space:nowrap;
+       transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease,opacity .22s ease}
+  .bub span{transform-origin:center;opacity:.95}
+  #empty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--dim);font-size:12px;text-align:center}
+  #stagefoot{position:absolute;left:16px;bottom:10px;color:var(--dim);font-size:10.5px}
+  #stagefoot b{color:var(--accent);font-weight:600}
+  /* 右：View の表 */
+  .map{font-size:11.5px}
+  .map .head{color:var(--dim);font-size:10.5px;margin-bottom:4px}
+  .map .pick{color:var(--accent);font-weight:700;font-size:13px}
+  .map .arrow{color:var(--dim);margin:0 5px}
+  .map .preset{color:var(--own);font-weight:700;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+  table{border-collapse:collapse;width:100%;margin-top:7px;font-variant-numeric:tabular-nums}
+  th,td{border:1px solid var(--line);padding:3px 6px;text-align:left;font-weight:400;font-size:11.5px}
+  th{color:var(--dim);font-size:10.5px;background:#161b2a;font-weight:600}
+  td.ax{color:var(--fg);font-weight:700;width:26px;background:#161b2a}
+  td.v{color:var(--own)}
+  td.n{color:var(--off)}
+  .note{color:var(--dim);font-size:10.5px;margin-top:7px;line-height:1.6}
+  .note b{color:var(--fg);font-weight:600}
+  .note .ng{color:var(--ng)}
+  /* 詳しく */
+  #more{display:none}
+  #more.open{display:block}
+  #more .row{display:flex;gap:4px;align-items:center;margin-bottom:4px}
+  #more .row > .ax{flex:0 0 18px;font-weight:700;font-size:12px}
+  select{flex:1 1 0;min-width:0;background:#1d2334;color:var(--fg);border:1px solid var(--line);
+    border-radius:6px;padding:2px 4px;font:inherit;font-size:11px;cursor:pointer}
+  select:hover{border-color:var(--accent)}
+  .free-badge{display:inline-block;background:#3a2f16;color:var(--own);border:1px solid #5a4a20;
+    border-radius:5px;padding:1px 6px;font-size:10.5px;margin-left:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>v5-dom · 中身から出る UI —— ユーザーは並べ方を選ばない</h1>
+    <p>札は<b>その空間の中身が持っている次元</b>からだけ出る。版が入っていれば「履歴で見る」が出る。列と行を持つものが入っていれば「表で見る」が出る。<b>右の表が、選んだ札 → v4 のどの View か</b>を出す。</p>
+  </header>
+  <div id="main">
+    <div class="col" id="left">
+      <div class="sec"><div class="t">空間（v4 の6場面 ＋ 新しく作った空っぽ）</div><div id="splist"></div></div>
+      <div class="sec">
+        <div class="t">この空間の中身が持っているもの</div>
+        <div id="invbox" class="note"></div>
+      </div>
+    </div>
+
+    <div class="col" id="mid">
+      <div id="bar">
+        <div class="lbl" style="margin-bottom:6px">見え方 —— <span id="chipcount"></span></div>
+        <div class="chips" id="chips"></div>
+        <div class="subbar">
+          <span class="lbl">むき</span>
+          <div class="seg" id="dirseg"><button data-dir="x">横</button><button data-dir="y">縦</button></div>
+          <span class="lbl" id="dirnone">（この見え方は むき を持たない）</span>
+          <span style="flex:1 1 auto"></span>
+          <button class="ghost" id="btn-more">詳しく ▾</button>
+          <button class="ghost warn" id="btn-back" hidden>札に戻す</button>
+        </div>
+      </div>
+      <div id="stage">
+        <div id="space"></div>
+        <div id="stagefoot"></div>
+      </div>
+    </div>
+
+    <div class="col" id="right">
+      <div class="sec">
+        <div class="map">
+          <div class="head">いま選んでいる札は、v4 のどの View か</div>
+          <div><span class="pick" id="pickname">—</span><span class="arrow">＝</span><span class="preset" id="presetname">—</span></div>
+          <table id="viewtbl">
+            <thead><tr><th></th><th>次元</th><th>並べ方</th><th>レンズ</th><th>間隔</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="note" id="viewnote"></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="t">汎用モデルへ降りる道</div>
+        <div class="note" style="margin-top:0">「詳しく」を開くと <b>v4 の軸セレクタ9つ</b>がそのまま出る。規則は1つも削っていない。触った時点で札から外れ、<span class="free-badge">自前の View</span> になる。</div>
+        <div id="more" style="margin-top:8px"></div>
+      </div>
+      <div class="sec">
+        <div class="t">この案の数</div>
+        <div class="note" id="counts"></div>
+      </div>
+      <div class="sec">
+        <div class="t">この案の弱点（隠さない）</div>
+        <div class="note">
+          <b>1. 空からは作れない。</b> 左の「新しい空間（空っぽ）」を見る。子2つが 列も行も版も持たないので札は <b>2枚</b>。
+          <span class="ng">表にする道が UI に無い</span>。中身に先に列・行を入れるか、「詳しく」へ降りるしかない。<br><br>
+          <b>2. 中身で増える札は 3枚だけ。</b> 自由に置く・並べる・送って見る は<span class="ng">どの空間でも出る</span>
+          （順序と自由座標は全部の泡が持つから）。勤務表の 制約・スタッフ・カレンダー を「送って見る」にもできてしまう。
+          中身が効くのは 表で見る・履歴で見る・版を奥へ の3枚。<br><br>
+          <b>3. 覚えられない。</b> 押せる札が空間ごとに 2〜5枚で変わる。だから<b>出ない札も灰色で残し、理由を書いた</b>
+          （「中身が 版 を持たない」）。消すと、できることが画面から消えて学べなくなる。<br><br>
+          <b>4. 「重ねて置く」が札にならなかった。</b> 中身から出る条件が書けない。
+          自由に置く に混ぜて Z＝順序 にすると、外の空間で 議事録の倍率が 1.000 → 0.810 に落ちた（v4 で実測）。
+          だから「詳しく」の中に置いた。<b>v4 の8プリセットのうち 1つが札から漏れている</b>。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================================
+   v5-dom · ui-content —— 「ユーザーは並べ方を選ばない」案の、触れる張りぼて
+
+   規則（v4/RULES.md）は1つも変えていない。View（軸ごとの 次元・並べ方・レンズ）の上に
+   薄い層を1枚載せただけ：
+
+     札が出る条件 ＝ その空間の子が、その次元に答えられるか
+       （「答えられる」＝ 子の間でその値が 2種類以上ある。1種類なら、並べても全員同じ場所）
+
+   根拠（v3/00-core の穴）：スタッフに「外から継ぐ」で勤務表の格子を当てると、人の泡は
+   列・行を持っていない（全員 0,0）ので1マスに重なる。実測：5人が 504.9,539.5 の1か所へ。
+   中身が持っていない次元は、そもそも選ばせてはいけない。
+   ============================================================================ */
+
+const GAP = 14, K_PERSP = 0.26;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+/* ── v4 の次元表（そのまま） ── */
+const DIMS = {
+  "none":           { label: "なし",       read: () => 0 },
+  "free.x":         { label: "自由X",      read: b => b.free.x },
+  "free.y":         { label: "自由Y",      read: b => b.free.y },
+  "free.z":         { label: "自由Z",      read: b => b.free.z },
+  "order":          { label: "順序",       read: b => b.order },
+  "col":            { label: "列",         read: b => b.cell.col },
+  "row":            { label: "行",         read: b => b.cell.row },
+  "history.index":  { label: "履歴の世代", read: b => b.hist },
+  "history.age":    { label: "履歴の古さ", read: (b, ks) => Math.max(...ks.map(k => k.hist)) - b.hist },
+  "history.branch": { label: "履歴の枝",   read: b => b.branch },
+};
+const ARR = { "as-is": "そのまま", equal: "等間隔", pack: "詰める" };
+const LENSL = { parallel: "平行", fisheye: "魚眼", perspective: "透視", flat: "平行" };
+
+/* ── v4 のプリセット（AX の値をそのまま写した） ── */
+const AX = (dim, arrange, lens, step) => ({ dim, arrange, lens, step });
+const PRESETS = {
+  free:      { x: AX("free.x","as-is","parallel",110),        y: AX("free.y","as-is","parallel",80),          z: AX("free.z","as-is","perspective",1) },
+  row:       { x: AX("order","pack","parallel",110),          y: AX("none","pack","parallel",80),             z: AX("none","as-is","flat",1) },
+  column:    { x: AX("none","pack","parallel",110),           y: AX("order","pack","parallel",80),            z: AX("none","as-is","flat",1) },
+  grid:      { x: AX("col","pack","parallel",110),            y: AX("row","pack","parallel",80),              z: AX("none","as-is","flat",1) },
+  fisheyeX:  { x: AX("history.index","equal","fisheye",64),   y: AX("history.branch","equal","parallel",44),  z: AX("none","as-is","flat",1) },
+  coverflow: { x: AX("order","equal","fisheye",68),           y: AX("none","pack","parallel",80),             z: AX("none","as-is","flat",1) },
+  // 縦の coverflow は v4 で「足すもの無し」で作れた組み合わせ（v3/06 の 6a）。プリセット名は無いので coverflow↕ と呼ぶ
+  coverflowY:{ x: AX("none","pack","parallel",110),           y: AX("order","equal","fisheye",68),            z: AX("none","as-is","flat",1) },
+  histZ:     { x: AX("none","as-is","parallel",110),          y: AX("none","as-is","parallel",80),            z: AX("history.age","equal","perspective",1) },
+  stackZ:    { x: AX("free.x","as-is","parallel",110),        y: AX("free.y","as-is","parallel",80),          z: AX("order","equal","perspective",0.15) },
+};
+const copyView = p => ({ x: { ...p.x }, y: { ...p.y }, z: { ...p.z } });
+
+/* ============================================================
+   ★ 薄い層はここだけ ── 札
+   need(inv) が「中身がその次元に答えられるか」。preset は v4 のどの View になるか
+   ============================================================ */
+const CHIPS = [
+  { id:"free",  label:"自由に置く", dir:false, preset:()=>"free",
+    need: inv => inv.n >= 1, why: "どこにでも置ける",   no: "中身が無い" },
+  { id:"line",  label:"並べる",     dir:true,  preset:d=>d==="x"?"row":"column",
+    need: inv => inv.n >= 2, why: "2つ以上入っている", no: "1つしか入っていない" },
+  { id:"flow",  label:"送って見る", dir:true,  preset:d=>d==="x"?"coverflow":"coverflowY",
+    need: inv => inv.n >= 3, why: "3つ以上入っている", no: "3つ未満" },
+  { id:"table", label:"表で見る",   dir:false, preset:()=>"grid",
+    need: inv => inv.col >= 2 || inv.row >= 2, why: "中身が 列・行 を持つ", no: "中身が 列・行 を持たない" },
+  { id:"hist",  label:"履歴で見る", dir:false, preset:()=>"fisheyeX",
+    need: inv => inv.hist >= 2, why: "中身が 版 を持つ", no: "中身が 版 を持たない" },
+  { id:"deep",  label:"版を奥へ",   dir:false, preset:()=>"histZ",
+    need: inv => inv.hist >= 2, why: "中身が 版 を持つ", no: "中身が 版 を持たない" },
+];
+const uniq = a => new Set(a).size;
+const inventoryOf = ks => ({
+  n: ks.length, order: uniq(ks.map(k=>k.order)), col: uniq(ks.map(k=>k.cell.col)),
+  row: uniq(ks.map(k=>k.cell.row)), hist: uniq(ks.map(k=>k.hist)), branch: uniq(ks.map(k=>k.branch)),
+});
+
+/* ============================================================
+   場面（v4/lab.html の add(...) から写した。張りぼてなので子だけ）
+   ============================================================ */
+const K = (id, title, hue, w, h, o = {}) => ({
+  id, title, hue, size: { w, h }, free: { x: 0, y: 0, z: 0, ...(o.free || {}) },
+  order: o.order ?? 0, cell: { col: 0, row: 0, ...(o.cell || {}) }, hist: o.hist ?? 0, branch: o.branch ?? 0,
+});
+const SPACES = [
+  { id:"memo",  name:"メモ（外の空間）", scene:"場面1", kids:[
+      K("memo1","メモ",35,130,80,{free:{x:-115,y:-50}}), K("memo2","買い物",60,130,80,{free:{x:28,y:-2}}),
+      K("memo3","思いつき",15,130,80,{free:{x:-105,y:51}}) ] },
+  { id:"row",   name:"横に並べる", scene:"場面2", kids:
+      [["小",80,50],["中",104,64],["大",128,78]].map(([t,w,h],i)=>K("r"+i,t,158+i*20,w,h,{order:i})) },
+  { id:"cover", name:"coverflow", scene:"場面3", kids:
+      Array.from({length:7},(_,i)=>K("cf"+i,"写真"+(i+1),188+i*12,90,64,{order:i})) },
+  { id:"fish",  name:"X魚眼ビュー", scene:"場面4", kids:
+      [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[3,1],[4,1],[5,1],[5,2]].map(([hist,branch],i)=>
+        K("v"+i,"版"+(i+1),[290,325,350][branch],58,34,{hist,branch})) },
+  { id:"giji",  name:"議事録（版）", scene:"場面5", kids:
+      ["初稿","加筆","指摘反映","確定"].map((t,i)=>K("g"+i,t,252+i*8,150,60,{hist:i,order:i})) },
+  { id:"kinmu", name:"勤務表", scene:"場面6", kids:[
+      K("seiyaku","制約",40,260,56,{cell:{col:1,row:0}}),
+      K("staff","スタッフ",130,120,120,{cell:{col:0,row:1}}),
+      K("cal","カレンダー",95,336,114,{cell:{col:1,row:1}}) ] },
+  { id:"staff", name:"└ スタッフ", scene:"場面6の中", kids:
+      ["佐藤","鈴木","高橋","田中","伊藤"].map((t,i)=>K("p"+i,t,130,76,22,{order:i})) },
+  { id:"cal",   name:"└ カレンダー", scene:"場面6の中", kids:
+      Array.from({length:14},(_,i)=>K("d"+i,String(i+1),95,32,24,{cell:{col:i%7,row:(i/7)|0}})) },
+  { id:"new",   name:"新しい空間（空っぽ）", scene:"★弱点", kids:[
+      K("n0","メモ",200,120,70,{free:{x:-70,y:-20},order:0}), K("n1","メモ",250,120,70,{free:{x:70,y:20},order:1}) ] },
+];
+SPACES.forEach(s => { s.inv = inventoryOf(s.kids); });
+
+/* ============================================================
+   ① 値 → 位置（並べ方） → 画面（レンズ）。張りぼてなので入れ子はしない
+   ============================================================ */
+function arrangeAxis(kids, ax, sizeOf) {
+  const vals = kids.map(k => DIMS[ax.dim].read(k, kids));
+  let pos;
+  if (ax.arrange === "as-is") pos = vals.slice();
+  else if (ax.arrange === "equal") pos = vals.map(v => v * (ax.step ?? 1));
+  else {
+    const us = [...new Set(vals)].sort((a, b) => a - b);
+    const wid = new Map(us.map(v => [v, Math.max(...kids.filter((k, i) => vals[i] === v).map(sizeOf))]));
+    let cur = 0; const mid = new Map();
+    for (const v of us) { mid.set(v, cur + wid.get(v) / 2); cur += wid.get(v) + GAP; }
+    pos = vals.map(v => mid.get(v));
+  }
+  if (ax.arrange === "as-is") return pos;                       // 帯を作らないので寄せない
+  const lo = Math.min(...pos.map((p, i) => p - sizeOf(kids[i]) / 2));
+  const hi = Math.max(...pos.map((p, i) => p + sizeOf(kids[i]) / 2));
+  const c = (lo + hi) / 2;
+  return pos.map(p => p - c);                                   // ④ 塊の中央を空間の中心へ
+}
+function projectXY(u, H, lens) {
+  if (lens === "fisheye") { const t = u / H, c = Math.cosh(t); return { s: H * Math.tanh(t), k: 1 / (c * c) }; }
+  return { s: u, k: 1 };
+}
+function resolve(kids, view, H, V) {
+  const px = arrangeAxis(kids, view.x, k => k.size.w);
+  const py = arrangeAxis(kids, view.y, k => k.size.h);
+  const pz = arrangeAxis(kids, view.z, () => 1);
+  return kids.map((k, i) => {
+    const a = projectXY(px[i], H, view.x.lens), b = projectXY(py[i], V, view.y.lens);
+    const persp = view.z.lens === "perspective";
+    const m = persp ? 1 / Math.max(0.05, 1 + K_PERSP * pz[i]) : 1;
+    const alpha = persp && pz[i] < -1e-9 ? 0 : 1;
+    const scale = m * Math.min(a.k, b.k);
+    return { k, sx: a.s * m, sy: b.s * m, scale, alpha, dz: pz[i] };
+  });
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+let cur = SPACES[0], chipId = null, dir = "x", own = null;   // own ＝ 詳しくで作った自前の View
+
+const $ = s => document.querySelector(s);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+
+function viewNow() {
+  if (own) return own;
+  const c = CHIPS.find(c => c.id === chipId);
+  return c ? copyView(PRESETS[c.preset(dir)]) : copyView(PRESETS.free);
+}
+function presetNameNow() {
+  if (own) return "自前の View";
+  const c = CHIPS.find(c => c.id === chipId);
+  return c ? c.preset(dir) : "free";
+}
+function defaultChipFor(sp) {
+  const map = { memo:"free", row:"line", cover:"flow", fish:"hist", giji:"deep", kinmu:"table", staff:"line", cal:"table", new:"free" };
+  const d = { memo:"x", row:"x", cover:"x", fish:"x", giji:"x", kinmu:"x", staff:"y", cal:"x", new:"x" };
+  dir = d[sp.id] || "x";
+  return map[sp.id] || "free";
+}
+
+/* 左：空間の一覧 */
+function drawList() {
+  const box = $("#splist"); box.textContent = "";
+  for (const s of SPACES) {
+    const b = el("button", "sp" + (s === cur ? " on" : ""));
+    const on = CHIPS.filter(c => c.need(s.inv)).length;
+    b.appendChild(el("div", "nm", s.name));
+    const inv = el("div", "inv");
+    inv.appendChild(document.createTextNode(s.scene + " · 子" + s.inv.n + " · 札 "));
+    inv.appendChild(el("em", null, String(on)));
+    inv.appendChild(document.createTextNode("枚"));
+    b.appendChild(inv);
+    b.onclick = () => { cur = s; own = null; chipId = defaultChipFor(s); drawAll(); };
+    box.appendChild(b);
+  }
+}
+
+/* 中：札 */
+function drawChips() {
+  const box = $("#chips"); box.textContent = "";
+  let on = 0;
+  for (const c of CHIPS) {
+    const ok = c.need(cur.inv);
+    if (ok) on++;
+    const b = el("button", "chip" + (ok && c.id === chipId && !own ? " on" : ""));
+    b.appendChild(document.createTextNode(c.label));
+    b.appendChild(el("span", "why", ok ? c.why : c.no));
+    if (!ok) b.disabled = true;
+    else b.onclick = () => { chipId = c.id; own = null; drawAll(); };
+    box.appendChild(b);
+  }
+  $("#chipcount").textContent = `この空間では ${on} 枚（灰色は、中身がその次元を持っていないので押せない）`;
+  const c = CHIPS.find(c => c.id === chipId);
+  const hasDir = !!(c && c.dir && !own);
+  $("#dirseg").hidden = !hasDir;
+  $("#dirnone").hidden = hasDir;
+  $("#dirnone").textContent = own ? "（自前の View を触っている）" : "（この見え方は むき を持たない）";
+  for (const b of $("#dirseg").children) b.classList.toggle("on", b.dataset.dir === dir);
+  $("#btn-back").hidden = !own;
+}
+
+/* 中：張りぼての泡 */
+function drawStage() {
+  const sp = $("#space"); sp.textContent = "";
+  const R = sp.getBoundingClientRect();
+  const W = R.width, Hh = R.height;
+  const view = viewNow();
+  const place = resolve(cur.kids, view, W / 2, Hh / 2);
+
+  // 全部が枠に入るよう、一様に縮める（張りぼて。v4 の合成とは別物）
+  let ext = 1;
+  for (const p of place) {
+    ext = Math.max(ext, Math.abs(p.sx) * 2 / (W - 40) + p.k.size.w * p.scale / (W - 40),
+                        Math.abs(p.sy) * 2 / (Hh - 40) + p.k.size.h * p.scale / (Hh - 40));
+  }
+  const f = 1 / ext;
+  const sorted = place.slice().sort((a, b) => b.dz - a.dz || a.scale - b.scale);
+  for (const p of sorted) {
+    const w = p.k.size.w * p.scale * f, h = p.k.size.h * p.scale * f;
+    const d = el("div", "bub");
+    d.style.width = w + "px"; d.style.height = h + "px";
+    d.style.left = (W / 2 + p.sx * f - w / 2) + "px";
+    d.style.top = (Hh / 2 + p.sy * f - h / 2) + "px";
+    d.style.background = `hsl(${p.k.hue} 55% 22%)`;
+    d.style.borderColor = `hsl(${p.k.hue} 60% 46%)`;
+    d.style.color = `hsl(${p.k.hue} 70% 84%)`;
+    d.style.opacity = String(p.alpha);
+    const s = el("span", null, p.k.title);
+    s.style.fontSize = Math.max(8, Math.min(12, h * 0.34)) + "px";
+    d.appendChild(s);
+    sp.appendChild(d);
+  }
+  const c = CHIPS.find(c => c.id === chipId);
+  // 中身が答えられない次元を当てると、泡が同じ場所に重なる。それを数えて出す
+  const spots = new Set(place.map(p => `${Math.round(p.sx)},${Math.round(p.sy)}`)).size;
+  const warn = spots < cur.kids.length
+    ? ` <span style="color:var(--ng)">— ${cur.kids.length}個が ${spots} か所に重なっている（中身が答えられない次元）</span>` : "";
+  $("#stagefoot").innerHTML = (own
+    ? "張りぼて。<b>自前の View</b>（詳しくで作った）で並べている"
+    : `張りぼて。札 <b>${c ? c.label : "自由に置く"}</b> ＝ v4 の <b>${presetNameNow()}</b> で並べている`) + warn;
+}
+
+/* 左下：在庫 */
+function drawInv() {
+  const i = cur.inv;
+  const line = (n, v, need) => `<b>${n}</b> ${v}種${v >= need ? ' <span style="color:var(--ok)">→ 答えられる</span>' : ' <span class="ng">→ 答えられない</span>'}`;
+  $("#invbox").innerHTML =
+    `子 <b>${i.n}</b>個<br>` + line("順序", i.order, 2) + "<br>" + line("列", i.col, 2) + "<br>" +
+    line("行", i.row, 2) + "<br>" + line("版", i.hist, 2) + "<br>" + line("枝", i.branch, 2) +
+    `<br><br>「答えられる」＝ 子の間でその値が <b>2種類以上</b>ある。1種類なら、その次元で並べても全員同じ場所に重なる。`;
+}
+
+/* 右：札 → View の表 */
+function drawMap() {
+  const view = viewNow();
+  const c = CHIPS.find(c => c.id === chipId);
+  $("#pickname").textContent = own ? "自前の View" : (c ? c.label + (c.dir ? "（" + (dir === "x" ? "横" : "縦") + "）" : "") : "自由に置く");
+  $("#presetname").textContent = own ? "—" : "v4 プリセット " + presetNameNow();
+  const tb = $("#viewtbl").querySelector("tbody"); tb.textContent = "";
+  for (const a of ["x", "y", "z"]) {
+    const ax = view[a], tr = el("tr");
+    tr.appendChild(el("td", "ax", a.toUpperCase()));
+    tr.appendChild(el("td", ax.dim === "none" ? "n" : "v", DIMS[ax.dim].label));
+    tr.appendChild(el("td", null, ARR[ax.arrange]));
+    tr.appendChild(el("td", null, LENSL[ax.lens]));
+    tr.appendChild(el("td", null, ax.arrange === "as-is" ? "—" : String(ax.step)));
+    tb.appendChild(tr);
+  }
+  $("#viewnote").innerHTML = own
+    ? '規則は同じまま、9つの軸セレクタを直に触っている。<span class="free-badge">自前の View</span>'
+    : `札を1枚押すと、この3行9マスが一度に決まる。<b>ユーザーはこの表を見ない</b>（ここに出しているのは、札と v4 の対応を示すため）。`;
+}
+
+/* 右：詳しく（v4 の軸セレクタ9つ） */
+function drawMore() {
+  const box = $("#more"); box.textContent = "";
+  const view = viewNow();
+  const opts = {
+    dim: Object.keys(DIMS), arrange: Object.keys(ARR),
+    lensXY: ["parallel", "fisheye"], lensZ: ["perspective", "flat"],
+  };
+  for (const a of ["x", "y", "z"]) {
+    const row = el("div", "row");
+    row.appendChild(el("span", "ax", a.toUpperCase()));
+    const mk = (part, list, labelOf) => {
+      const s = document.createElement("select");
+      for (const o of list) { const op = document.createElement("option"); op.value = o; op.textContent = labelOf(o); s.appendChild(op); }
+      s.value = view[a][part];
+      s.onchange = () => { const v = copyView(viewNow()); v[a][part] = s.value; own = v; drawAll(); };
+      row.appendChild(s);
+    };
+    mk("dim", opts.dim, o => DIMS[o].label);
+    mk("arrange", opts.arrange, o => ARR[o]);
+    mk("lens", a === "z" ? opts.lensZ : opts.lensXY, o => LENSL[o]);
+    box.appendChild(row);
+  }
+  const p = el("div", "note");
+  p.innerHTML = '軸 3 × （次元・並べ方・レンズ）＝ <b>9つ</b>。v4 のツールバーと同じもの。<br>' +
+    '選べる組み合わせは (10×3×2)³ ＝ <b>216,000</b>。<br>ここに <b>重ねて置く</b>（X・Y 自由 / Z 順序）も住んでいる —— 札にはしなかった。理由は下。';
+  box.appendChild(p);
+}
+
+function drawCounts() {
+  const perSpace = SPACES.map(s => CHIPS.filter(c => c.need(s.inv)).length);
+  $("#counts").innerHTML =
+    `<b>触るもの 3つ</b>：見え方の札 ／ むき ／ 詳しく<br>` +
+    `<b>作れる見え方 8通り</b>：札 6枚のうち 2枚が むき を持つ（4×1 ＋ 2×2）<br>` +
+    `札の枚数は空間ごとに <b>${Math.min(...perSpace)}〜${Math.max(...perSpace)}枚</b>（この9空間で実測）<br><br>` +
+    `<span style="color:var(--dim)">比べ：v4 のツールバーは <b>17</b>（プリセット8＋軸セレクタ9）、どの空間でも同じ。組み合わせ <b>216,000</b>。<br>` +
+    `v3/06 の案B は セレクタ 4・組み合わせ 40。</span>`;
+}
+
+function drawAll() { drawList(); drawChips(); drawInv(); drawMap(); drawMore(); drawCounts(); drawStage(); }
+
+$("#dirseg").onclick = e => { const b = e.target.closest("button"); if (!b) return; dir = b.dataset.dir; own = null; drawAll(); };
+$("#btn-more").onclick = () => { const m = $("#more"); m.classList.toggle("open"); $("#btn-more").textContent = m.classList.contains("open") ? "詳しく ▴" : "詳しく ▾"; };
+$("#btn-back").onclick = () => { own = null; drawAll(); };
+window.addEventListener("resize", drawStage);
+
+chipId = defaultChipFor(cur);
+drawAll();
+window.__v5 = {
+  spaces: () => SPACES.map(s => ({ id: s.id, name: s.name, inv: s.inv, chips: CHIPS.filter(c => c.need(s.inv)).map(c => c.label) })),
+  pick(spaceId, chip, d) { cur = SPACES.find(s => s.id === spaceId); chipId = chip; if (d) dir = d; own = null; drawAll(); },
+  state: () => ({ space: cur.id, chip: chipId, dir, preset: presetNameNow(), view: viewNow(), own: !!own }),
+  rects: () => [...document.querySelectorAll("#space .bub")].map(d => ({ x: +d.style.left.replace("px",""), y: +d.style.top.replace("px",""), w: +d.style.width.replace("px",""), h: +d.style.height.replace("px",""), t: d.textContent })),
+};
+</script>
+</body>
+</html>

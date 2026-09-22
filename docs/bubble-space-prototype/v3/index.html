@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bubble-lab v3 · 7つの案</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;--accent:#6ee7ff;
+    --move:#7ee2a8;--fix:#ff9db1;--own:#ffd479}
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:13px/1.65 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    padding:0 20px 56px;overflow-x:hidden}
+  .wrap{max-width:1400px;margin:0 auto}
+  a{color:inherit;text-decoration:none}
+
+  /* ── 見出し ───────────────────────────────── */
+  header{padding:26px 0 18px;border-bottom:1px solid var(--line);margin-bottom:26px}
+  h1{margin:0;font-size:21px;font-weight:700;letter-spacing:.02em}
+  h1 .v{color:var(--accent)}
+  .lead{margin:7px 0 0;color:var(--dim);font-size:12.5px}
+  .lead .spec{color:var(--accent);border-bottom:1px dotted var(--accent)}
+
+  h2{margin:0 0 4px;font-size:15px;font-weight:700;letter-spacing:.04em}
+  .sub{margin:0 0 14px;color:var(--dim);font-size:11.5px}
+  section{margin-bottom:34px}
+
+  /* ── 向きの図 ─────────────────────────────── */
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;margin-bottom:14px;overflow-x:auto}
+  .diagram svg{display:block;width:100%;min-width:560px;max-width:660px;height:auto;margin:0 auto}
+
+  /* ── ルール ───────────────────────────────── */
+  .rules{display:grid;gap:9px}
+  @media (min-width:1040px){
+    .rules{grid-template-columns:1fr 1fr}
+    .rule.back{grid-column:1 / -1}
+  }
+  .rule{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;
+    background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:9px;padding:11px 14px}
+  .rule.back{border-left-color:var(--own)}
+  .rule .no{font-size:19px;font-weight:700;color:var(--accent);line-height:1.2;text-align:center}
+  .rule.back .no{color:var(--own)}
+  .rule h3{margin:0 0 2px;font-size:13.5px;font-weight:700;display:flex;flex-wrap:wrap;
+    gap:8px;align-items:baseline}
+  .rule p{margin:0;color:var(--dim);font-size:12.5px}
+  .rule p b{color:var(--fg);font-weight:600}
+  .dirtag{font-size:10.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;
+    padding:1px 7px;border-radius:999px;border:1px solid var(--accent);color:var(--accent)}
+  .rule.back .dirtag{border-color:var(--own);color:var(--own)}
+  .seen{font-size:10.5px;color:var(--dim);border:1px solid var(--line);border-radius:999px;
+    padding:1px 7px;white-space:nowrap}
+  .seen:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ── 7案のカード ──────────────────────────── */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .card{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;overflow:hidden}
+  .card:hover{border-color:var(--accent)}
+  .shotwrap{position:relative;background:#070910;border-bottom:1px solid var(--line)}
+  .card img{display:block;width:100%;max-width:100%;aspect-ratio:8/5;object-fit:cover;
+    object-position:left top}
+  .card:hover img{opacity:.92}
+  .tag{position:absolute;left:8px;top:8px;background:rgba(7,9,16,.86);border:1px solid var(--line);
+    border-radius:6px;color:var(--accent);font-size:11px;font-weight:700;padding:1px 7px;
+    letter-spacing:.06em}
+  .body{padding:11px 13px 13px;display:flex;flex-direction:column;gap:7px;flex:1}
+  .card h3{margin:0;font-size:14px;font-weight:700;line-height:1.4}
+  .ask{margin:0;color:var(--dim);font-size:11.5px;line-height:1.55;
+    padding-left:11px;border-left:2px solid var(--line)}
+  .found{margin:0;padding:0;list-style:none;display:grid;gap:5px}
+  .found li{font-size:12px;line-height:1.6;padding-left:14px;position:relative;color:var(--fg)}
+  .found li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;
+    border-radius:50%;background:var(--move)}
+  .n{color:var(--accent);font-weight:700;font-feature-settings:"palt" 1}
+  .cant{margin:auto 0 0;font-size:11.5px;line-height:1.6;color:var(--fix);
+    background:rgba(255,157,177,.07);border:1px solid rgba(255,157,177,.28);
+    border-radius:7px;padding:7px 9px}
+  .cant b{color:var(--fix);font-weight:700}
+  .cant .h{display:block;font-size:10.5px;letter-spacing:.06em;opacity:.8;margin-bottom:1px}
+  .open{font-size:11px;color:var(--dim);letter-spacing:.02em}
+  .card:hover .open{color:var(--accent)}
+
+  /* ── まだ決まっていないこと ─────────────────── */
+  .opens{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .item{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--fix);
+    border-radius:9px;padding:11px 13px}
+  .item h3{margin:0 0 3px;font-size:13px;font-weight:700;color:var(--fix)}
+  .item p{margin:0 0 7px;color:var(--dim);font-size:12px;line-height:1.6}
+  .item p b{color:var(--fg);font-weight:600}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:1px 8px;border-radius:999px;
+    border:1px solid var(--line);color:var(--dim)}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+
+  footer{color:var(--dim);font-size:11px;border-top:1px solid var(--line);padding-top:14px}
+
+  @media (max-width:520px){
+    body{padding:0 12px 40px}
+    .rule{grid-template-columns:24px 1fr;gap:9px;padding:10px 11px}
+    .rule .no{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1><span class="v">bubble-lab v3</span> —— 泡の見え方は、親の View で決まる</h1>
+  <p class="lead">
+    7つの単体プロトタイプ。1案 = 1ファイル、カードをクリックすると開く。
+    語彙と約束は <a class="spec" href="SPEC.md">SPEC.md</a>。
+  </p>
+</header>
+
+<!-- ══════════ いまのルール ══════════ -->
+<section>
+  <h2>いまのルール — 5つ</h2>
+  <p class="sub">①〜④ は「値 → 見え」を決める。⑤ だけが逆で、「さっきの見え → 値」を書き直す。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 600 146" role="img" aria-label="①〜④は値から見えへ、⑤だけが見えから値へ">
+      <!-- 上の向き：値 → 見え -->
+      <text x="297" y="20" fill="#6ee7ff" font-size="11.5" font-weight="600" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">
+        ① 公理　　② 操作は軸に従う
+      </text>
+      <text x="297" y="36" fill="#6ee7ff" font-size="11.5" font-weight="600" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">
+        ③ 見えない親は体を持たない　　④ 並べる＝帯の式
+      </text>
+      <line x1="96" y1="58" x2="490" y2="58" stroke="#6ee7ff" stroke-width="2"/>
+      <path d="M490 52 L504 58 L490 64 Z" fill="#6ee7ff"/>
+
+      <!-- 箱：値 -->
+      <rect x="6" y="40" width="82" height="60" rx="10" fill="#141824" stroke="#2a3145"/>
+      <text x="47" y="66" fill="#e6ebf5" font-size="16" font-weight="700" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">値</text>
+      <text x="47" y="85" fill="#8b95ad" font-size="9.5" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">泡が持つ数</text>
+
+      <!-- 箱：見え -->
+      <rect x="512" y="40" width="82" height="60" rx="10" fill="#141824" stroke="#2a3145"/>
+      <text x="553" y="66" fill="#e6ebf5" font-size="16" font-weight="700" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">見え</text>
+      <text x="553" y="85" fill="#8b95ad" font-size="9.5" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">画面の場所</text>
+
+      <!-- 下の向き：見え → 値（逆） -->
+      <line x1="504" y1="86" x2="110" y2="86" stroke="#ffd479" stroke-width="2"/>
+      <path d="M110 80 L96 86 L110 92 Z" fill="#ffd479"/>
+      <text x="297" y="112" fill="#ffd479" font-size="11.5" font-weight="600" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">
+        ⑤ 触っていない泡は、画面の上で動かない
+      </text>
+      <text x="297" y="130" fill="#8b95ad" font-size="10.5" text-anchor="middle"
+            font-family="-apple-system,BlinkMacSystemFont,Hiragino Sans,Noto Sans JP,sans-serif">
+        （さっきの見えを保つように、値のほうを書き直す）
+      </text>
+    </svg>
+  </div>
+
+  <div class="rules">
+    <div class="rule">
+      <div class="no">①</div>
+      <div>
+        <h3>公理 <span class="dirtag">値 → 見え</span> <a class="seen" href="00-core.html">00 で見る</a></h3>
+        <p>泡の見え方は、その泡を<b>入れている親の View</b> で決まる。View は軸（X・Y・Z）ごとに
+          <b>次元・並べ方・レンズ</b> を持つ。これが入れ子ごとに繰り返される。</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <div class="no">②</div>
+      <div>
+        <h3>操作は軸に従う <span class="dirtag">値 → 見え</span> <a class="seen" href="04-ops-follow-axes.html">04 で見る</a></h3>
+        <p>泡を掴んで横・縦に引くと、その軸の次元が <b>書けるなら書く</b>（動く・並べ替わる・マスを移る）／
+          <b>書けないなら視点が動く</b>／<b>なしなら何も起きない</b>。ホイールは奥行きの視点。
+          <b>触った泡は手前へ</b>——Z 軸に書けるならそこへ書く（「最前面」になるのは Z が順序のときだけ。
+          自由座標では焦点の面まで）。</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <div class="no">③</div>
+      <div>
+        <h3>見えない親は体を持たない <span class="dirtag">値 → 見え</span> <a class="seen" href="01-snap-is-parent.html">01 で見る</a></h3>
+        <p>「A の左に B がスナップ」＝「<b>見えない親が中身を左右に並べている</b>」。隣り合う関係は持たない。
+          その見えない親は<b>箱も、奥行きも、View も、自分のものは何ひとつ持たない。持っているのは並べ方ひとつだけ</b>。
+          空間の出入りも、外へたどった窓で数える。</p>
+      </div>
+    </div>
+
+    <div class="rule">
+      <div class="no">④</div>
+      <div>
+        <h3>並べる＝帯の式 <span class="dirtag">値 → 見え</span> <a class="seen" href="03-pack-or-equal.html">03 で見る</a></h3>
+        <p><b>値ごとに帯</b>を作り、<b>帯の中に揃えて</b>置き、<b>塊の中央を空間の中心に</b>。
+          詰める＝帯の幅はその値の泡の最大、等間隔＝帯の幅は間隔。違うのは帯の決め方だけ。
+          <b>重ならないことを保証するのは詰めるだけ</b>。泡はその端をレンズに通した像の幅で縮むので、
+          重なりを作るのはレンズではなく並べ方。</p>
+      </div>
+    </div>
+
+    <div class="rule back">
+      <div class="no">⑤</div>
+      <div>
+        <h3>触っていない泡は、画面の上で動かない <span class="dirtag">見え → 値（逆）</span> <a class="seen" href="05-kinmuhyo.html">05 で見る</a></h3>
+        <p>泡の位置は<b>箱の中心</b>。だから中身が変わって箱が伸び縮みしたら、触っていない泡の
+          <b>見えている場所を保つように、位置を書き直す</b>。別の仕組みではなく、
+          「位置＝中心」を選んだことから必然的に出てくる補正（切ると、伸びの<b>ちょうど半分</b>だけ動く）。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 7案 ══════════ -->
+<section>
+  <h2>7つの案</h2>
+  <p class="sub">絵をクリックするとプロトタイプが開く。緑の点＝分かったこと、赤の枠＝直せなかったこと。</p>
+
+  <div class="cards">
+
+    <a class="card" href="00-core.html">
+      <div class="shotwrap"><img src="thumbs/00-core.jpg" alt="00-core の画面"><span class="tag">00</span></div>
+      <div class="body">
+        <h3>親の View だけで並べる（土台）</h3>
+        <p class="ask">6つの場面（メモ／横に並べる／coverflow／X魚眼ビュー／議事録／勤務表）が、親の View だけで出るか。</p>
+        <ul class="found">
+          <li>出た。アンカー・関係・席の譲り合いは無い。配置を決めるのは <span class="n">1か所</span>（resolveSpace）だけで、
+            深さ3の倍率は各段の局所倍率の積 <span class="n">0.905797</span></li>
+          <li>「手前へ」も Z 軸に書く。置いた順（stack）という <b>View の外の状態が消えた</b>。ただし自由座標で
+            「一番手前の手前へ」と素直に書くと <b>触った泡そのものが消える</b>（実測 透明度 <span class="n">0</span>）。
+            書けるのは焦点の面まで</li>
+          <li>親を付け替えたら <b>数え直す</b>（reindex）。呼ばないと先客の逃げ先が古い兄弟で決まった。
+            議事録を格子にして（4つとも 0,0）よそから1つ落とすと <span class="n">5個5マス</span>（前は 5個2マス）</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          root で奥へ1回ホイールすると、同じ面にいる泡が <b>8個のうち7個</b> まとめて消える（量を小さくしても1回で消える）。
+          「奥は一番奥の泡まで」は空にしないだけで、同じ面をまとめて越えるのは止めない。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="01-snap-is-parent.html">
+      <div class="shotwrap"><img src="thumbs/01-snap-is-parent.jpg" alt="01-snap-is-parent の画面"><span class="tag">01</span></div>
+      <div class="body">
+        <h3>スナップは、見えない親の並べ方</h3>
+        <p class="ask">隣り合う関係を持たずに、スナップの体験を親子と View だけで保てるか。</p>
+        <ul class="found">
+          <li>保てた。くっつける→並べ替え→加わる→入れ子→外す→親が消える まで通り、相手は <span class="n">0.0px</span> も跳ばない。
+            勤務表を並びの子にしても、中の10個は外にいるときと差 <span class="n">0.0000px</span></li>
+          <li>決まりは <span class="n">6つ → 4つ</span>。pin と 奥行き は<b>この案のものではなかった</b>ので土台へ返した</li>
+          <li>残りは1文に畳めた ——<b>見えない親は体を持たない。箱も、奥行きも、View も、自分のものは何ひとつ持たない。
+            持っているのは並べ方ひとつだけ</b>。それで穴が塞がった：並びに「自由に置く」を当てても勤務表 <span class="n">0.00px</span>
+            （前は −340px で画面の左外）。<span class="n">8つ</span>のプリセット全部 0.00px</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          詰める空間への差し込みでは、並びが必ず後ろへ伸びる。留まるのは差し込む所より前（0.00px）と並びの外の全部（0.00px）で、
+          後ろの泡だけが <b>差し込んだ泡の幅ちょうど 120.00px</b> 動く。詰めるの意味そのものなので、決まりでは塞がらない。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="02-lens-per-axis.html">
+      <div class="shotwrap"><img src="thumbs/02-lens-per-axis.jpg" alt="02-lens-per-axis の画面"><span class="tag">02</span></div>
+      <div class="body">
+        <h3>レンズは軸ごと。大きさはどう決めるか</h3>
+        <p class="ask">X・Y に別々のレンズを付けたとき、1つの数の倍率を、どの軸の倍率から決めるか。</p>
+        <ul class="found">
+          <li><b>min（小さい方）に決まった</b>。鏡（X 枝·平行／Y 世代·魚眼）では <b>横だけ</b> が <b>奥行きだけ</b> と
+            完全に同じ絵（差 <span class="n">0.00px</span>・端 <span class="n">1.00倍</span>・重なり <span class="n">9組</span>）＝
+            「何もしない」に落ちる。答えは「X から」ではなく <b>曲がっている軸から</b></li>
+          <li>理由は式で言える：<b>min は、泡が横の像にも縦の像にも収まる決め方のうち、いちばん大きいもの</b>。
+            泡の幅 − 像の幅は 奥行きだけ <span class="n">+36.0px</span>／横だけ <span class="n">+7.2px</span> に対し
+            min は <span class="n">0.0px</span>（下限 0 なら min の重なりは <span class="n">0組</span>）</li>
+          <li>「min は 1.0px ずれる」は<b>再現しなかった</b>。背景を掃いた掴んだ点のずれは、焦点に余裕があれば
+            小さい方・横だけ・横×縦 とも <span class="n">0.00px</span>。止まる向きでは3つとも同じ px（焦点が止まった分）</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった（min の値段）</span>
+          合わせなかった軸に隙間が空く（鏡で横に最大 <b>38.5px</b>・平均 17.8px。X が平行なのに泡は縦に合わせて縮むため）。
+          min の粗ではなく「倍率は1つの数・泡は矩形のまま」からの必然で、消すには矩形をやめるしかない。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="03-pack-or-equal.html">
+      <div class="shotwrap"><img src="thumbs/03-pack-or-equal.jpg" alt="03-pack-or-equal の画面"><span class="tag">03</span></div>
+      <div class="body">
+        <h3>並べ方：等間隔か、詰めるか</h3>
+        <p class="ask">等間隔と詰めるを1つの式で書けるか。どこで破綻するか。</p>
+        <ul class="found">
+          <li>書けた。違うのは <b>帯の決め方だけ</b>。揃えを全部の空間で1つにすると両方は満たせない
+            （中央にすると勤務表のスタッフとカレンダーが <span class="n">25px</span> 重なる）</li>
+          <li><b>詰める×魚眼 の重なりが 0 になった</b>。式を1つ変えただけ ——泡の大きさを「中心1点の局所倍率」ではなく
+            <b>「泡の端をレンズに通した像の幅 ÷ 自前の幅」</b>で決める。coverflow・詰める・魚眼で 隙間 0/14/28 とも重なり
+            <span class="n">0</span>（前は 3/1/0）。トグル総当たり <span class="n">24通り</span>で、中心の倍率は 20通り重なり、
+            新式は <span class="n">0通り</span>。平行のレンズの空間は1つも変わらない</li>
+          <li>1文：<b>重ならないことを保証するのは詰めるだけ。重なりを作るのはレンズではなく並べ方</b>。
+            「等間隔だと中の伸びが外に伝わらない」は<b>破綻ではなく定義どおり</b>——等間隔に中身を見させると
+            帯の幅が中身で決まり、詰めるそのものになる（重なり <span class="n">7 → 0</span>）</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          等間隔×魚眼 の重なりは <b>7 のまま</b>（間隔より広い泡が帯からはみ出す並べ方なので、レンズの写し方では消えない）。
+          等間隔の「塊」を <b>泡か帯か</b>も公理だけでは選べない（帯にすると箱が 511 → 634px 片寄る）。トグルのまま。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="04-ops-follow-axes.html">
+      <div class="shotwrap"><img src="thumbs/04-ops-follow-axes.jpg" alt="04-ops-follow-axes の画面"><span class="tag">04</span></div>
+      <div class="body">
+        <h3>操作は軸に従う</h3>
+        <p class="ask">「書けるなら書く／書けないなら視点／なしなら何も起きない」の1文だけで、触る・ドラッグ・ホイールの全部が説明できるか。</p>
+        <ul class="found">
+          <li>「触る」の行を足しても、<b>ルールは1文のまま</b>。表は <span class="n">4行 → 5行</span>。
+            5空間ぜんぶ、表の言葉と本物のクリックが一致した（順序＝最前面／自由座標＝焦点の面まで／履歴・なし＝上がらない）</li>
+          <li>操作を決めるのは軸だけでなく <b>何を掴んだか</b>。表は 泡／背景 の2列になった（ホイールは掴まないのでいつも視点）</li>
+          <li>空間を移るのは <b>カーソルの点</b> の決まりで、軸の決まりではない。軸を止めるならポインタの成分を止める
+            （左へ 330px 引いても泡は <span class="n">0px</span>・親も変わらない）</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          「dz&lt;0 は消える」と「Z の焦点は一番奥の泡まで行ける」が合わさると、同じ面に5つ並ぶ外の空間では
+          deltaY 4（焦点Z 0.016）でも <b>5個消え</b>、見える泡 31 → 1。比べのボタン「自由Zは手前の面で止める」を選ぶと
+          deltaY 100 でも <b>0個</b>だが、奥の面へ行けなくなる。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="05-kinmuhyo.html">
+      <div class="shotwrap"><img src="thumbs/05-kinmuhyo.jpg" alt="05-kinmuhyo の画面"><span class="tag">05</span></div>
+      <div class="body">
+        <h3>勤務表を、公理だけで組む</h3>
+        <p class="ask">masa さんが「作れるようになりたい」と言った画面が、特別扱いを足さずに組めるか。</p>
+        <ul class="found">
+          <li>組めた。特別扱い（この場面だけの if・例外）は <span class="n">0</span>。場面の定義は <span class="n">19行</span>、
+            View を決めるのは <span class="n">6か所</span>、位置は1つも書いていない</li>
+          <li>⑤ は公理の穴ではなかった。佐藤の箱を 150 → 214（＋64px）にして切ると、佐藤・スタッフ・勤務表がそろって
+            <span class="n">−32px ＝ 伸びのちょうど半分</span> 動く。「位置＝中心」から出る補正</li>
+          <li>深さ6（見えない親2つを含む）でも倍率は各段の積。佐藤の中でホイールすると佐藤の焦点 Z だけが動き、
+            ほかの4人・勤務表・カレンダー・世界線は <span class="n">0.0000px</span> 動かない</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          一つだけ履歴を奥行きにすると、その行が高くなる（佐藤 190px → 勤務表の行1 が 378px）。カレンダーは 146px の始端ぞろえなので、
+          格子の右下に <b>232px</b> の空きができる。版も <b>手前2枚</b>しか題が読めない（見える帯 13.8 / 8.5 / 5.7px。
+          4枚とも読ませるには泡が 300px 以上高く要る）。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+    <a class="card" href="06-layout-apart.html">
+      <div class="shotwrap"><img src="thumbs/06-layout-apart.jpg" alt="06-layout-apart の画面"><span class="tag">06</span></div>
+      <div class="body">
+        <h3>対照実験：レイアウトとカメラを分ける（案B）</h3>
+        <p class="ask">「型＋カメラ」に分けるよくある作り方（B）と、軸ごとの View（A＝公理）を、同じ道具で数えて比べる。</p>
+        <ul class="found">
+          <li>6場面の配置は A と <span class="n">54個すべて差 0</span>（焦点 0 でも、背景を (116,40) 引いた後でも）。
+            型の定義 A <span class="n">12行</span>／B <span class="n">45行</span>・選ぶセレクタ A <span class="n">9</span>／B <span class="n">4</span>・
+            組み合わせ A <span class="n">216,000</span>／B <span class="n">40</span></li>
+          <li>機能を1つ（触ると手前へ）足すと、型を読む分岐は <b>A ＋2 / B ＋1</b>（42→44 と 24→25）。<b>数だけなら B が小さい</b></li>
+          <li>ただし「重ねて置く」（触ると最前面へ・ずれない）は <b>A はプリセット1行</b>、<b>B は6型のどれでもできない</b>
+            （実測：6型ぜんぶで 奥→手前 が memo1,memo2,memo3 のまま）。
+            ＝ A の ＋2 は「もう持っている語彙で言えた」ぶん、B の ＋1 は「言えないまま」のぶん</li>
+        </ul>
+        <p class="cant"><span class="h">直せなかった</span>
+          <b>A と B のどちらを採るか</b>は決まっていない。分岐の数では B（44 対 25）、言える範囲では A。
+          両方そのまま載せてある。</p>
+        <span class="open">開く →</span>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<!-- ══════════ まだ決まっていないこと ══════════ -->
+<section>
+  <h2>まだ決まっていないこと</h2>
+  <p class="sub">8件。各案の「直せなかった」から。下の案の番号をクリックすると、その案が開く。</p>
+
+  <div class="opens">
+
+    <div class="item">
+      <h3>1 ── Z の焦点を、焦点の面で止めるか</h3>
+      <p>止めれば「ホイール1回で同じ面の7個が消える」も「触ると消える」も<b>いっぺんに塞がる</b>
+        （deltaY 100 でも消えた泡 0）。代わりに<b>奥の面へ行けなくなる</b>（奥へ4回ホイールしても焦点 0）。
+        案4 に比べのボタンがある。<b>masa さん判断待ち</b>。</p>
+      <div class="chips"><a class="chip" href="04-ops-follow-axes.html">04</a><a class="chip" href="00-core.html">00</a></div>
+    </div>
+
+    <div class="item">
+      <h3>2 ── 等間隔の「塊」は、泡か、帯か</h3>
+      <p>泡の端から端で測ると端の泡を広げて兄弟が一緒にずれ（−10/−20/−30px）、帯の端から端で測るとずれは 0 になる代わりに
+        箱が片寄る（勤務表 <b>511 → 634px</b>）。公理だけでは選べずトグルのまま。
+        <b>「塊を空間のどこに置くか」もまだ無い</b>（いまは必ず中央）。</p>
+      <div class="chips"><a class="chip" href="03-pack-or-equal.html">03</a></div>
+    </div>
+
+    <div class="item">
+      <h3>3 ── 等間隔 × 魚眼 の重なりは消せない</h3>
+      <p>詰める×魚眼 は「泡の端をレンズに通す」で 0 になったが、等間隔は <b>7 のまま</b>。
+        等間隔は<b>間隔より広い泡が帯からはみ出す並べ方</b>なので、レンズの写し方では消えない
+        （中身を見させると、それは等間隔ではなく詰めるになる）。</p>
+      <div class="chips"><a class="chip" href="03-pack-or-equal.html">03</a></div>
+    </div>
+
+    <div class="item">
+      <h3>4 ── 案 A と 案 B のどちらを採るか</h3>
+      <p>同じ絵は両方作れる（54個すべて差 0）。機能を1つ足したときの分岐は <b>A ＋2／B ＋1</b> で数なら B。
+        ただし「重ねて置く」は A ＝プリセット1行、B ＝<b>6型のどれでもできない</b>。
+        数と言える範囲が逆を向いている。</p>
+      <div class="chips"><a class="chip" href="06-layout-apart.html">06</a><a class="chip" href="00-core.html">00</a></div>
+    </div>
+
+    <div class="item">
+      <h3>5 ── 詰める空間への差し込みで、後ろが動く</h3>
+      <p>留まるのは差し込む所より前（0.00px）と並びの外の全部（0.00px）。後ろの泡だけが
+        <b>差し込んだ泡の幅ちょうど 120.00px</b> 動く。これは<b>詰めるの意味そのもの</b>で、穴ではない。
+        受け入れるかどうかだけが残っている。</p>
+      <div class="chips"><a class="chip" href="01-snap-is-parent.html">01</a></div>
+    </div>
+
+    <div class="item">
+      <h3>6 ── View そのものを変えたときは pin していない</h3>
+      <p>⑤ が効くのは <b>付け替えと大きさを変えたとき</b>だけ。見えない親のほうは「View を選べない」で塞がった
+        （8つのプリセット全部 <b>0.00px</b>）が、<b>体のある泡の View を変えたとき</b>の決まりはまだ無い。</p>
+      <div class="chips"><a class="chip" href="01-snap-is-parent.html">01</a></div>
+    </div>
+
+    <div class="item">
+      <h3>7 ── はみ出した中身の持ち主が見分けられない</h3>
+      <p>切り抜かないと決めたので、箱からはみ出した中身が <b>どちらの箱のものか読めない</b>
+        （左右が同じ題名・同じ色だと赤い破線が交差する）。いまは重なりの数（5／7）だけが頼り。
+        見分けるには「破れの見せ方」が要るが、それは<b>公理の外</b>。</p>
+      <div class="chips"><a class="chip" href="03-pack-or-equal.html">03</a></div>
+    </div>
+
+    <div class="item">
+      <h3>8 ── 自由座標の Z では、重なりの上下が決まらない</h3>
+      <p>「手前」は焦点の面までしか書けない（それより手前は透視が消す）ので、<b>自由座標では「最前面」を表せない</b>。
+        同じ面に来た泡の上下は View から決まらず、描く順の最後の項が決める。
+        決めたいなら <b>Z に「順序」を刺す</b>（プリセット「重ねて置く」）。</p>
+      <div class="chips"><a class="chip" href="04-ops-follow-axes.html">04</a><a class="chip" href="00-core.html">00</a></div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  絵は 1440×900 で撮ったもの（<code>_check/index-thumbs.mjs</code>）。
+  一覧そのものの確認は <code>_check/index-check.mjs</code>。ネットワークは使わない。
+</footer>
+
+</div>
+</body>
+</html>

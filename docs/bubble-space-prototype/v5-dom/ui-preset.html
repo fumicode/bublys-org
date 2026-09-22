@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v5-dom · 名前だけ見せる UI</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;--accent:#6ee7ff;
+        --warn:#ff9db1;--own:#ffd479;--ok:#7ee2a8}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;
+    font:13px/1.55 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #app{display:flex;flex-direction:column;height:100%}
+
+  /* ── 上：ユーザーに見せる UI はこの帯だけ ── */
+  #bar{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);padding:8px 14px 6px}
+  .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .lbl{color:var(--dim);font-size:11px;letter-spacing:.04em;white-space:nowrap;margin-right:4px}
+  .chip{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:7px;
+    padding:4px 10px 3px;font:inherit;font-size:12px;cursor:pointer;text-align:left;line-height:1.25}
+  .chip small{display:block;color:#6b768f;font-size:9.5px;letter-spacing:.02em;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .chip:hover{border-color:var(--accent)}
+  .chip.on{background:var(--accent);color:#07202a;border-color:var(--accent);font-weight:600}
+  .chip.on small{color:#0a3d4c}
+  .chip.mine{border-style:dashed;border-color:var(--own)}
+  #more{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;font-size:12px;padding:4px 6px}
+  .sep{width:1px;height:22px;background:var(--line);margin:0 6px}
+
+  /* ── 詳しく（汎用モデルへ降りる道） ── */
+  #deep{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
+  #deep .row{margin-bottom:3px}
+  #deep .ax{color:var(--fg);font-size:12px;font-weight:600;width:14px;text-align:center}
+  select{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:6px;
+    padding:2px 6px;font:inherit;font-size:11.5px;cursor:pointer}
+  select:hover{border-color:var(--accent)}
+  select.changed{border-color:var(--own);color:var(--own)}
+  #name-it{background:#2a2416;border:1px solid var(--own);color:var(--own);border-radius:6px;
+    padding:3px 9px;font:inherit;font-size:11.5px;cursor:pointer}
+  #name-it[hidden]{display:none}
+
+  /* ── 下：舞台と対応表 ── */
+  #main{flex:1 1 auto;display:flex;min-height:0}
+  #stage{flex:1 1 auto;position:relative;overflow:hidden;min-width:0}
+  #world{position:absolute;left:50%;top:50%;width:0;height:0}
+  .bub{position:absolute;left:0;top:0;border-radius:9px;will-change:transform;
+    border:1px solid rgba(255,255,255,.22);display:flex;align-items:flex-start;
+    transform-origin:0 0;padding:5px 7px;font-size:12px;font-weight:600;
+    color:#08111c;letter-spacing:.02em;white-space:nowrap;overflow:hidden}
+  #floor{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(60% 55% at 50% 48%,rgba(110,231,255,.055),transparent 70%)}
+  #ms{position:absolute;left:12px;bottom:10px;color:#5d6880;font-size:10.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  #stage-note{position:absolute;left:12px;top:10px;color:#5d6880;font-size:10.5px;max-width:420px}
+
+  /* ── 右：いま何を選んだか＝v4 のどれか ── */
+  #side{flex:0 0 392px;border-left:1px solid var(--line);background:#0e111a;
+    overflow-y:auto;padding:10px 12px 20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:8px 11px 9px;margin-bottom:9px}
+  .card h2{margin:0 0 5px;font-size:11px;letter-spacing:.07em;color:var(--dim);font-weight:600}
+  .now{font-size:17px;font-weight:700;color:var(--accent);line-height:1.3}
+  .now.mine{color:var(--own)}
+  .src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#6b768f;margin:1px 0 7px}
+  table{border-collapse:collapse;width:100%;font-size:11.5px}
+  td{padding:2px 0;vertical-align:top}
+  td.a{width:16px;color:var(--fg);font-weight:700}
+  td.j{color:var(--fg)}
+  td.e{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:#7d8aa6;text-align:right}
+  .hit{color:var(--ok);font-size:11.5px;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line)}
+  .hit.none{color:var(--own)}
+  ul{margin:3px 0 0;padding-left:15px;font-size:11.5px;color:var(--dim)}
+  li{margin-bottom:4px}
+  li b{color:var(--fg);font-weight:600}
+  .num{color:var(--warn);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+  .meas{color:#5d6880;font-size:10px;margin-top:6px}
+  .bad h2{color:var(--warn)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ ユーザーに見せるのは、この帯だけ ══ -->
+  <div id="bar">
+    <div class="row">
+      <span class="lbl">見え方</span>
+      <span id="chips" class="row" style="gap:6px"></span>
+      <span class="sep"></span>
+      <button id="more">詳しく ▸</button>
+    </div>
+    <div id="deep" hidden>
+      <div class="row">
+        <span class="lbl" style="width:88px">軸ごとに決める</span>
+        <span class="ax">X</span>
+        <select data-ax="x" data-part="dim"></select>
+        <select data-ax="x" data-part="arrange"></select>
+        <select data-ax="x" data-part="lens"></select>
+        <span class="ax" style="margin-left:10px">Y</span>
+        <select data-ax="y" data-part="dim"></select>
+        <select data-ax="y" data-part="arrange"></select>
+        <select data-ax="y" data-part="lens"></select>
+        <span class="ax" style="margin-left:10px">Z</span>
+        <select data-ax="z" data-part="dim"></select>
+        <select data-ax="z" data-part="arrange"></select>
+        <select data-ax="z" data-part="lens"></select>
+        <span class="sep"></span>
+        <button id="name-it" hidden>この見え方に名前をつける</button>
+      </div>
+      <div class="lbl" style="margin-top:2px;color:#5d6880">
+        ここが v4 の View そのもの（規則① 次元・並べ方・レンズ × 3軸）。1つでも触ると、上の名前が外れる
+      </div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="stage">
+      <div id="floor"></div>
+      <div id="world"></div>
+      <div id="stage-note">泡7つ。中身は張りぼて。並べ方だけ v4 の規則①④で本物（1段だけ・入れ子なし）</div>
+      <div id="ms"></div>
+    </div>
+
+    <!-- ══ どれを選ぶと v4 のどの View か ══ -->
+    <div id="side">
+      <div class="card">
+        <h2>いま選んでいる見え方</h2>
+        <div class="now" id="now-name">—</div>
+        <div class="src" id="now-src"></div>
+        <table id="now-axes"></table>
+        <div class="hit" id="now-hit"></div>
+      </div>
+
+      <div class="card">
+        <h2>名前 8つ ＝ v4 の6場面</h2>
+        <table id="map"></table>
+        <div class="meas">実測 v4/lab.html：6場面の空間 8つぜんぶ、名前1つと View が完全一致（8/8）。<br>
+          _check/preset-cover.mjs</div>
+      </div>
+
+      <div class="card bad">
+        <h2>この8つでは届かないもの</h2>
+        <ul id="gaps"></ul>
+        <div class="meas">実測：8つの View ぜんぶと突き合わせた最短距離（9セレクタのうち何個ずれているか）。<br>
+          名前だけ 8 通り ÷ 全部 216,000 通り ＝ <span class="num">0.0037%</span></div>
+      </div>
+
+      <div class="card bad">
+        <h2>名前を1つ押すだけ、の穴</h2>
+        <ul>
+          <li><b>名前が読むデータを、泡が持っていない。</b>
+            スタッフ（人5つ・列/行なし）に「格子」を押すと、箱 <span class="num">109×197 → 109×109</span>、
+            人の重なり <span class="num">0 → 10 組</span>（＝5C2）。全員が同じ1マスに積まれる</li>
+          <li><b>名前は「選んだ泡」ではなく「選んだ泡がいる空間」に効く。</b>
+            勤務表を選んで「横に並べる」を押すと、中の格子は <span class="num">col·pack のまま</span>で、
+            外の空間が横並びになり勤務表ごと <span class="num">770px</span> 飛ぶ</li>
+          <li><b>くっついた泡では、名前が別の空間へ回る（規則③）。</b>
+            付箋A を選んで「縦に並べる」を押しても、付箋A→B は <span class="num">120, 0</span> のまま横並び</li>
+        </ul>
+        <div class="meas">実測 v4/lab.html · _check/preset-traps.mjs（コンソールエラー 0）</div>
+      </div>
+
+      <div class="card">
+        <h2>汎用モデルへ降りる道</h2>
+        <ul>
+          <li><b>「詳しく」を開く</b>。9つのセレクタ＝ v4 の View そのもの。216,000 通りぜんぶに届く</li>
+          <li>1つでも触ると、名前が外れて <b>自分で決めた見え方</b> になる。変えた所は<span style="color:var(--own)">黄色</span></li>
+          <li><b>名前をつけると 9つ目の名前になる</b>。名前は閉じた表ではなく、しおり</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   v5-dom · 名前だけ見せる UI（プリセット案）
+   規則の正は ../v4/RULES.md。ここはその上に載せる薄い層の見本。
+   並べ方は v4 の規則①④を1段だけ本物で実装（入れ子・操作・⑤ は入れていない）。
+   ============================================================================ */
+
+/* ── 語彙（v4 と同じ id・同じ日本語） ── */
+const DIMS = {
+  "none":           { ja: "なし",       read: () => 0 },
+  "free.x":         { ja: "自由 X",     read: b => b.free.x },
+  "free.y":         { ja: "自由 Y",     read: b => b.free.y },
+  "free.z":         { ja: "自由 Z",     read: b => b.free.z },
+  "order":          { ja: "順序",       read: b => b.order },
+  "col":            { ja: "列",         read: b => b.cell.col },
+  "row":            { ja: "行",         read: b => b.cell.row },
+  "history.index":  { ja: "履歴の世代", read: b => b.hist },
+  "history.age":    { ja: "履歴の古さ", read: (b, all) => Math.max(...all.map(k => k.hist)) - b.hist },
+  "history.branch": { ja: "履歴の枝",   read: b => b.branch },
+};
+const ARRANGES = { "as-is": "そのまま", "equal": "等間隔", "pack": "詰める" };
+const LENS_XY  = { "parallel": "平行", "fisheye": "魚眼" };
+const LENS_Z   = { "perspective": "透視", "flat": "平行" };
+const lensTable = ax => ax === "z" ? LENS_Z : LENS_XY;
+
+/* ── 名前のついた見え方 ＝ v4/lab.html の PRESETS をそのまま ── */
+const AX = (dim, arrange, lens, step) => ({ dim, arrange, lens, step });
+const PRESETS = [
+  { id: "free",      ja: "自由に置く",     scene: "場面1 メモ",         node: "root",
+    x: AX("free.x","as-is","parallel",110),        y: AX("free.y","as-is","parallel",80),          z: AX("free.z","as-is","perspective",1) },
+  { id: "row",       ja: "横に並べる",     scene: "場面2 横に並べる",   node: "row",
+    x: AX("order","pack","parallel",110),          y: AX("none","pack","parallel",80),             z: AX("none","as-is","flat",1) },
+  { id: "column",    ja: "縦に並べる",     scene: "場面6 スタッフ",     node: "staff",
+    x: AX("none","pack","parallel",110),           y: AX("order","pack","parallel",80),            z: AX("none","as-is","flat",1) },
+  { id: "grid",      ja: "格子",           scene: "場面6 勤務表・カレンダー", node: "kinmu / cal",
+    x: AX("col","pack","parallel",110),            y: AX("row","pack","parallel",80),              z: AX("none","as-is","flat",1) },
+  { id: "fisheyeX",  ja: "X魚眼ビュー",    scene: "場面4 X魚眼ビュー",  node: "fish",
+    x: AX("history.index","equal","fisheye",64),   y: AX("history.branch","equal","parallel",44),  z: AX("none","as-is","flat",1) },
+  { id: "coverflow", ja: "coverflow",      scene: "場面3 coverflow",    node: "cover",
+    x: AX("order","equal","fisheye",68),           y: AX("none","pack","parallel",80),             z: AX("none","as-is","flat",1) },
+  { id: "histZ",     ja: "履歴を奥行きに", scene: "場面5 議事録（版）", node: "giji",
+    x: AX("none","as-is","parallel",110),          y: AX("none","as-is","parallel",80),            z: AX("history.age","equal","perspective",1) },
+  { id: "stackZ",    ja: "重ねて置く",     scene: "（6場面の外。規則②の「触ると手前へ」用）", node: "—",
+    x: AX("free.x","as-is","parallel",110),        y: AX("free.y","as-is","parallel",80),          z: AX("order","equal","perspective",0.15) },
+];
+
+/* ── この8つでは届かないもの（v4 で実測した最短距離） ── */
+const GAPS = [
+  { ja: "縦に並べた coverflow",     from: "縦に並べる", n: 2, how: "Y の 並べ方→等間隔・レンズ→魚眼" },
+  { ja: "2D魚眼の格子",             from: "格子",       n: 2, how: "X・Y のレンズ→魚眼" },
+  { ja: "順序で並べて奥行きは自由", from: "横に並べる", n: 2, how: "Z の 次元→自由 Z・レンズ→透視" },
+  { ja: "横に並べて手前へ上げる",   from: "横に並べる", n: 3, how: "Z の 次元→順序・並べ方→等間隔・レンズ→透視" },
+];
+
+/* ── 舞台の泡（張りぼて。どの名前でも何か出るように、全部の値を持たせてある） ── */
+const HUES = [35, 60, 15, 205, 188, 285, 130];
+const BUBBLES = [
+  { id:"b0", t:"メモ",     w:132, h:84, free:{x:-232,y:-112,z:0}, order:0, cell:{col:0,row:0}, hist:0, branch:0 },
+  { id:"b1", t:"買い物",   w:108, h:66, free:{x:  22,y:-142,z:0}, order:1, cell:{col:1,row:0}, hist:1, branch:0 },
+  { id:"b2", t:"思いつき", w:150, h:96, free:{x: 246,y: -64,z:0}, order:2, cell:{col:2,row:0}, hist:2, branch:0 },
+  { id:"b3", t:"写真",     w: 96, h:72, free:{x:-268,y:  62,z:0}, order:3, cell:{col:0,row:1}, hist:3, branch:1 },
+  { id:"b4", t:"議事録",   w:140, h:60, free:{x: -40,y:  46,z:0}, order:4, cell:{col:1,row:1}, hist:4, branch:1 },
+  { id:"b5", t:"勤務表",   w:118, h:90, free:{x: 210,y: 118,z:0}, order:5, cell:{col:2,row:1}, hist:5, branch:2 },
+  { id:"b6", t:"付箋",     w: 88, h:54, free:{x: -96,y: 168,z:0}, order:6, cell:{col:0,row:2}, hist:6, branch:2 },
+];
+
+/* ============================================================
+   規則①④：値 → 位置（帯の式） → 画面（レンズ）
+   ------------------------------------------------------------
+   帯 ── 値ごとに帯を作り、帯の中に揃えて置き、塊の中央を空間の中心に置く。
+          等間隔と詰めるの違いは、帯の幅の決め方だけ（RULES.md ④）
+   ============================================================ */
+const GAP = 14;
+function arrangeAxis(spec, axis, all) {
+  const val = b => DIMS[spec.dim].read(b, all);
+  const pos = new Map();
+  if (spec.arrange === "as-is") {                       // 値をそのまま px（奥行きなら そのまま dz）
+    all.forEach(b => pos.set(b.id, val(b)));
+    return pos;
+  }
+  // Z は「中央に寄せない」── 奥行きの 0 は焦点の面で、そこが動くと手前の泡が消える
+  //（実測 v4/lab.html の 議事録：古さ 0,1,2,3 の倍率が 1, .794, .658, .562 ＝ 1/(1+0.26·dz) そのまま）
+  if (axis === "z") {
+    if (spec.arrange === "equal") { all.forEach(b => pos.set(b.id, val(b) * spec.step)); return pos; }
+    const keys = [...new Set(all.map(val))].sort((a, b) => a - b);
+    all.forEach(b => pos.set(b.id, keys.indexOf(val(b)) * spec.step));
+    return pos;
+  }
+  const size = b => axis === "x" ? b.w : b.h;
+  if (spec.arrange === "equal") {                       // 帯の幅 ＝ 間隔。中身を見ない
+    const vs = all.map(val), mid = (Math.min(...vs) + Math.max(...vs)) / 2;
+    all.forEach(b => pos.set(b.id, (val(b) - mid) * spec.step));
+    return pos;
+  }
+  const keys = [...new Set(all.map(val))].sort((a, b) => a - b);   // 詰める：帯 ＝ その値の中で一番大きいもの
+  const band = new Map(keys.map(k => [k, Math.max(...all.filter(b => val(b) === k).map(size))]));
+  let run = 0; const mid = new Map();
+  keys.forEach((k, i) => { if (i) run += GAP; mid.set(k, run + band.get(k) / 2); run += band.get(k); });
+  all.forEach(b => pos.set(b.id, mid.get(val(b)) - run / 2));      // 塊の中央を空間の中心へ
+  return pos;
+}
+
+const K_PERSP = 0.26;                        // 透視：奥行き1あたりの縮み（v4 と同じ値）
+const VP = { x: -130, y: -165 };             // 消失点（空間の中心から）。v4/lab.html の ROOT_VP と同じ
+const projXY = (u, H, lens) => lens === "fisheye" ? H * Math.tanh(u / H) : u;
+
+/** 泡の像 ＝ 泡の端をレンズに通した間（RULES.md ①） */
+function resolve(view, all, H, V) {
+  const px = arrangeAxis(view.x, "x", all);
+  const py = arrangeAxis(view.y, "y", all);
+  const pz = arrangeAxis(view.z, "z", all);
+  return all.map(b => {
+    const dz = pz.get(b.id);
+    const m  = view.z.lens === "perspective" ? 1 / Math.max(0.05, 1 + K_PERSP * dz) : 1;
+    const alpha = (view.z.lens === "perspective" && dz < -1e-9) ? 0 : 1;   // 焦点より手前は消す
+    const ax = (p, half, span, lens) => {
+      const sL = projXY(p - half, span, lens), sR = projXY(p + half, span, lens);
+      return { c: (sL + sR) / 2, k: (sR - sL) / (half * 2) };
+    };
+    const X = ax(px.get(b.id), b.w / 2, H, view.x.lens);
+    const Y = ax(py.get(b.id), b.h / 2, V, view.y.lens);
+    const scale = m * Math.min(X.k, Y.k);                  // 倍率は1つの数。合わせられる軸は1つだけ
+    return { b, x: VP.x + (X.c - VP.x) * m, y: VP.y + (Y.c - VP.y) * m, scale, alpha, dz };
+  }).sort((p, q) => q.dz - p.dz || p.scale - q.scale);     // Z が同じなら、大きく写るものが手前
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+const world = document.getElementById("world");
+const nodes = new Map();
+BUBBLES.forEach((b, i) => {
+  const el = document.createElement("div");
+  el.className = "bub";
+  el.textContent = b.t;
+  el.style.width = b.w + "px";
+  el.style.height = b.h + "px";
+  el.style.background = `hsl(${HUES[i]} 62% 62%)`;
+  world.appendChild(el);
+  nodes.set(b.id, el);
+});
+
+let current = null;          // 選んでいるプリセット（null ＝ 自分で決めた見え方）
+let base = null;             // 最後に押した名前（変えた所を黄色にするため）
+let view = null;             // いまの View（9つの値）
+const custom = [];           // 名前をつけて増えたもの
+
+function draw() {
+  const st = document.getElementById("stage").getBoundingClientRect();
+  const t0 = performance.now();
+  const ps = resolve(view, BUBBLES, st.width / 2, st.height / 2);
+  ps.forEach((p, i) => {
+    const el = nodes.get(p.b.id);
+    el.style.transform = `translate(${(p.x - p.b.w * p.scale / 2).toFixed(2)}px,${(p.y - p.b.h * p.scale / 2).toFixed(2)}px) scale(${p.scale.toFixed(4)})`;
+    el.style.opacity = p.alpha;
+    el.style.zIndex = i;
+  });
+  document.getElementById("ms").textContent =
+    `並べ直し ${(performance.now() - t0).toFixed(2)}ms（泡 ${BUBBLES.length}・transform だけ）`;
+}
+
+/* ── 右の対応表 ── */
+function axisRow(ax, sp) {
+  const ja = `${DIMS[sp.dim].ja} · ${ARRANGES[sp.arrange]} · ${lensTable(ax)[sp.lens]}`;
+  const en = `${sp.dim}·${sp.arrange}·${sp.lens}`;
+  return `<tr><td class="a">${ax.toUpperCase()}</td><td class="j">${ja}</td><td class="e">${en}</td></tr>`;
+}
+function paintSide() {
+  const nm = document.getElementById("now-name");
+  nm.textContent = current ? current.ja : "自分で決めた見え方";
+  nm.className = "now" + (current ? "" : " mine");
+  document.getElementById("now-src").textContent =
+    current ? (current.made ? `名前をつけて増やしたもの（9つ目以降）` : `v4/lab.html · PRESETS.${current.id}`)
+            : "名前なし ── 9つのセレクタが直に値";
+  document.getElementById("now-axes").innerHTML = ["x","y","z"].map(a => axisRow(a, view[a])).join("");
+  const hit = document.getElementById("now-hit");
+  if (current && current.scene) { hit.className = "hit"; hit.textContent = `v4 の ${current.scene}（${current.node}）がこの View`; }
+  else { hit.className = "hit none"; hit.textContent = "v4 の6場面には、これと同じ View は無い"; }
+}
+
+/* ── 上のチップ ── */
+function paintChips() {
+  const box = document.getElementById("chips");
+  box.innerHTML = "";
+  [...PRESETS, ...custom].forEach(p => {
+    const b = document.createElement("button");
+    b.className = "chip" + (current === p ? " on" : "") + (p.made ? " mine" : "");
+    b.innerHTML = `${p.ja}<small>${p.x.dim.replace("history.","h.")} / ${p.y.dim.replace("history.","h.")} / ${p.z.dim.replace("history.","h.")}</small>`;
+    b.title = `X ${p.x.dim}·${p.x.arrange}·${p.x.lens}\nY ${p.y.dim}·${p.y.arrange}·${p.y.lens}\nZ ${p.z.dim}·${p.z.arrange}·${p.z.lens}`;
+    b.onclick = () => pick(p);
+    box.appendChild(b);
+  });
+}
+
+function pick(p) {
+  current = p; base = p;
+  view = { x: { ...p.x }, y: { ...p.y }, z: { ...p.z } };
+  paintChips(); paintSide(); syncSelects(); draw();
+}
+
+/* ── 詳しく：汎用モデルへ降りる道 ── */
+const selects = [...document.querySelectorAll("#deep select")];
+selects.forEach(s => {
+  const ax = s.dataset.ax, part = s.dataset.part;
+  const table = part === "dim" ? DIMS : part === "arrange" ? ARRANGES : lensTable(ax);
+  s.innerHTML = Object.entries(table)
+    .map(([k, v]) => `<option value="${k}">${part === "dim" ? v.ja : v}</option>`).join("");
+  s.onchange = () => {
+    view[ax][part] = s.value;
+    current = null;                       // 1つでも触ると名前が外れる
+    document.getElementById("name-it").hidden = false;
+    paintChips(); paintSide(); syncSelects(); draw();
+  };
+});
+function syncSelects() {
+  selects.forEach(s => {
+    const ax = s.dataset.ax, part = s.dataset.part;
+    s.value = view[ax][part];
+    s.classList.toggle("changed", !!base && base[ax][part] !== view[ax][part]);
+  });
+  document.getElementById("name-it").hidden = !!current;
+}
+document.getElementById("more").onclick = () => {
+  const d = document.getElementById("deep");
+  d.hidden = !d.hidden;
+  document.getElementById("more").textContent = d.hidden ? "詳しく ▸" : "詳しく ▾";
+};
+document.getElementById("name-it").onclick = () => {
+  const n = custom.length + 1;
+  const p = { id: "mine" + n, ja: "自分の見え方 " + n, made: true, scene: null, node: null,
+              x: { ...view.x }, y: { ...view.y }, z: { ...view.z } };
+  custom.push(p);
+  pick(p);
+};
+
+/* ── 名前 ＝ 場面 の表（右） ── */
+document.getElementById("map").innerHTML = PRESETS.map(p =>
+  `<tr><td class="j" style="width:116px">${p.ja}</td><td class="e" style="text-align:left;color:#8b95ad">${p.scene}</td></tr>`).join("");
+
+/* ── 届かないもの（右） ── */
+document.getElementById("gaps").innerHTML = GAPS.map(g =>
+  `<li><b>${g.ja}</b> … 名前に無い。いちばん近い「${g.from}」から、詳しくで <span class="num">${g.n}個</span>（${g.how}）</li>`).join("");
+
+/* ── 起動 ── */
+paintChips();
+pick(PRESETS[0]);
+addEventListener("resize", draw);
+
+window.__ui = {
+  pick: id => { const p = [...PRESETS, ...custom].find(q => q.id === id); if (p) pick(p); return !!p; },
+  current: () => current && current.id,
+  view: () => JSON.parse(JSON.stringify(view)),
+  rects: () => BUBBLES.map(b => { const r = nodes.get(b.id).getBoundingClientRect();
+    return { id: b.id, x: +r.x.toFixed(2), y: +r.y.toFixed(2), w: +r.width.toFixed(2), h: +r.height.toFixed(2),
+             o: +nodes.get(b.id).style.opacity }; }),
+  setAxis: (ax, part, v) => { const s = selects.find(s => s.dataset.ax === ax && s.dataset.part === part);
+    s.value = v; s.onchange(); },
+  nameIt: () => document.getElementById("name-it").click(),
+  chipCount: () => document.querySelectorAll("#chips .chip").length,
+  deepOpen: () => !document.getElementById("deep").hidden,
+  toggleDeep: () => document.getElementById("more").click(),
+};
+</script>
+</body>
+</html>
