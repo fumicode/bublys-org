@@ -1,0 +1,1257 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>泡のならべかた 引き継ぎノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f1f2f6;
+    --paper: #ffffff;
+    --ink: #191d28;
+    --muted: #5c6376;
+    --line: #d6d9e2;
+    --line-soft: #e8eaf0;
+    --code-bg: #ebedf3;
+    --stage: #f6f7fa;
+    --accent: #0d7f96;
+    --accent-soft: rgba(13, 127, 150, .12);
+    --old: #6f4aa8;
+    --old-soft: rgba(111, 74, 168, .13);
+    --fish: #ad6a18;
+    --fish-soft: rgba(173, 106, 24, .13);
+    --warn: #b23c27;
+    --warn-soft: rgba(178, 60, 39, .10);
+    --ok: #2e7d54;
+    --shadow: 0 1px 2px rgba(20, 24, 40, .05), 0 10px 26px -14px rgba(20, 24, 40, .22);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0f16; --paper: #151824; --ink: #e5e9f2; --muted: #98a1b6; --line: #2a2f40; --line-soft: #1e2230;
+      --code-bg: #0a0c12; --stage: #0a0c12;
+      --accent: #57d3e8; --accent-soft: rgba(87, 211, 232, .13);
+      --old: #b391e3; --old-soft: rgba(179, 145, 227, .15);
+      --fish: #e0a054; --fish-soft: rgba(224, 160, 84, .15);
+      --warn: #f08a76; --warn-soft: rgba(240, 138, 118, .12);
+      --ok: #6cc795;
+      --shadow: 0 1px 2px rgba(0,0,0,.45), 0 12px 30px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0f16; --paper: #151824; --ink: #e5e9f2; --muted: #98a1b6; --line: #2a2f40; --line-soft: #1e2230;
+    --code-bg: #0a0c12; --stage: #0a0c12;
+    --accent: #57d3e8; --accent-soft: rgba(87, 211, 232, .13);
+    --old: #b391e3; --old-soft: rgba(179, 145, 227, .15);
+    --fish: #e0a054; --fish-soft: rgba(224, 160, 84, .15);
+    --warn: #f08a76; --warn-soft: rgba(240, 138, 118, .12);
+    --ok: #6cc795;
+    --shadow: 0 1px 2px rgba(0,0,0,.45), 0 12px 30px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.9; -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif; font-weight: 700; text-wrap: balance; }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.3; margin: 0 0 14px; }
+  h2 { font-size: clamp(22px, 2.8vw, 27px); line-height: 1.4; margin: 0 0 6px; }
+  h3 { font-size: 18px; margin: 32px 0 8px; font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; }
+  h4 { font-size: 15px; margin: 22px 0 6px; font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; }
+  p { margin: 0 0 14px; }
+  ul, ol { padding-left: 1.4em; margin: 0 0 14px; }
+  li { margin-bottom: 5px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+  code { font-size: .9em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; word-break: break-word; }
+  pre { background: var(--code-bg); border: 1px solid var(--line-soft); border-radius: 8px; padding: 13px 17px; overflow-x: auto; font-size: 13px; line-height: 1.75; margin: 0 0 14px; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  blockquote { margin: 0 0 14px; padding: 2px 0 2px 18px; border-left: 3px solid var(--accent); color: var(--ink); }
+  blockquote p:last-child { margin-bottom: 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ── 骨組み ── */
+  .shell { display: grid; grid-template-columns: 244px minmax(0, 1fr); gap: 48px; max-width: 1240px; margin-inline: auto; padding-inline: 20px; padding-block: 0 120px; }
+  nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding-block: 40px 40px; font-size: 13.5px; }
+  nav.toc .brand { font-family: "Shippori Mincho B1", serif; font-weight: 700; font-size: 16px; margin-bottom: 4px; display: block; color: var(--ink); text-decoration: none; }
+  nav.toc .brand-sub { color: var(--muted); font-size: 12px; display: block; margin-bottom: 18px; line-height: 1.6; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+  nav.toc li { margin-bottom: 2px; }
+  nav.toc ol a { display: block; padding: 4px 10px 4px 30px; border-radius: 6px; color: var(--muted); text-decoration: none; position: relative; line-height: 1.5; }
+  nav.toc ol a::before { counter-increment: toc; content: counter(toc); position: absolute; left: 10px; font-family: "IBM Plex Mono", monospace; font-size: 11px; opacity: .65; }
+  nav.toc ol a:hover { background: var(--accent-soft); color: var(--accent); }
+  main { padding-block: 40px 0; min-width: 0; }
+  .prose { max-width: 700px; }
+  @media (max-width: 980px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding-inline: 16px; }
+    nav.toc { position: static; max-height: none; padding-block: 28px 8px; border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+    nav.toc ol { columns: 2; column-gap: 14px; }
+    main { padding-block: 0; }
+  }
+
+  /* ── 冒頭 ── */
+  .hero { padding-block: 8px 30px; border-bottom: 1px solid var(--line); margin-bottom: 44px; }
+  .kicker { font-size: 12px; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .hero .lede { font-size: 17px; max-width: 700px; }
+  .hero .facts { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12.5px; color: var(--muted); margin-top: 16px; }
+  .hero .facts span::before { content: "·"; margin-right: 7px; opacity: .5; }
+  .hero .facts span:first-child::before { content: none; }
+
+  section { margin-bottom: 68px; scroll-margin-top: 20px; }
+  section > .sec-head { margin-bottom: 20px; }
+  section > .sec-head .n { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); letter-spacing: .08em; display: block; margin-bottom: 4px; }
+  section > .sec-head .sub { color: var(--muted); font-size: 14px; max-width: 700px; }
+
+  /* ── 部品 ── */
+  .note { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 12px 18px; border-radius: 0 8px 8px 0; margin: 0 0 20px; max-width: 700px; font-size: 14px; }
+  .note b { color: var(--warn); }
+  .note p:last-child { margin-bottom: 0; }
+  .aside { border: 1px solid var(--line); background: var(--paper); border-radius: 10px; padding: 16px 20px; margin: 0 0 20px; max-width: 760px; font-size: 14px; box-shadow: var(--shadow); }
+  .aside p:last-child, .aside ul:last-child { margin-bottom: 0; }
+  .aside .t { font-weight: 700; margin-bottom: 6px; }
+
+  figure { margin: 24px 0 28px; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; line-height: 1.75; max-width: 760px; }
+  figcaption b { color: var(--ink); }
+  svg { max-width: 100%; height: auto; display: block; }
+  .drawing { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
+
+  .tbl { overflow-x: auto; margin: 18px 0 24px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 520px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); line-height: 1.7; }
+  th { font-weight: 700; font-size: 12.5px; color: var(--muted); background: var(--bg); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.k, .k { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  td.nw { white-space: nowrap; }
+  .warn-t { color: var(--warn); font-weight: 700; }
+  .ok-t { color: var(--ok); font-weight: 700; }
+  .old-t { color: var(--old); font-weight: 700; }
+  .fish-t { color: var(--fish); font-weight: 700; }
+
+  /* 規則カード */
+  .rules { display: grid; gap: 12px; margin: 20px 0 8px; max-width: 820px; }
+  .rule { display: grid; grid-template-columns: 42px 1fr; gap: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; box-shadow: var(--shadow); }
+  .rule .mark { font-family: "Shippori Mincho B1", serif; font-size: 26px; color: var(--accent); line-height: 1.2; }
+  .rule .body b { display: block; font-size: 15.5px; margin-bottom: 4px; }
+  .rule .body p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .rule .body p em { color: var(--ink); font-style: normal; }
+
+  /* 年表 */
+  .timeline { margin: 20px 0 8px; max-width: 820px; border-left: 2px solid var(--line); padding-left: 0; }
+  .tl { display: grid; grid-template-columns: 96px 1fr; gap: 18px; padding: 0 0 20px 20px; position: relative; }
+  .tl::before { content: ""; position: absolute; left: -7px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--line); }
+  .tl.done::before { background: var(--accent); border-color: var(--accent); }
+  .tl.now::before { background: var(--paper); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .tl .when { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); padding-top: 3px; }
+  .tl .what > b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .tl .what p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .tl .what .proof { font-size: 12.5px; color: var(--accent); font-family: "IBM Plex Mono", monospace; margin-top: 3px; }
+  @media (max-width: 620px) { .tl { grid-template-columns: 1fr; gap: 2px; } }
+
+  /* 残課題 */
+  .open { display: grid; gap: 10px; margin: 16px 0 24px; max-width: 860px; }
+  .item { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); }
+  .item .hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .item .hd b { font-size: 15px; }
+  .item .src { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--muted); }
+  .item p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .item p + p { margin-top: 6px; }
+  .item p b, .item p .lean { color: var(--ink); }
+  .badge { display: inline-block; font-size: 11px; letter-spacing: .04em; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .badge.hot { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+  .badge.dec { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .shots { grid-template-columns: 1fr; } }
+  .shot { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  .shot img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--line-soft); background: var(--stage); }
+  .shot .cap { padding: 10px 14px 13px; font-size: 12.5px; color: var(--muted); line-height: 1.65; }
+  .shot .cap b { display: block; font-size: 13.5px; color: var(--ink); margin-bottom: 2px; }
+  .shot.is-old .cap b { color: var(--old); }
+  .shot.is-fish .cap b { color: var(--fish); }
+  .shot.is-plane .cap b { color: var(--accent); }
+
+  .cmds { max-width: 820px; }
+  .cmd { border: 1px solid var(--line); border-radius: 10px; background: var(--paper); padding: 14px 18px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  .cmd b { font-size: 14.5px; }
+  .cmd p { margin: 2px 0 8px; font-size: 13px; color: var(--muted); }
+  .cmd pre { margin: 0; }
+
+  .map { max-width: 860px; }
+  .map pre { line-height: 1.85; }
+
+  footer.end { border-top: 1px solid var(--line); padding-top: 22px; color: var(--muted); font-size: 13px; max-width: 760px; }
+
+  /* SVG 共通 */
+  .s-text { fill: currentColor; font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; font-size: 13px; }
+  .s-bold { fill: currentColor; font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; font-size: 13px; font-weight: 700; }
+  .s-mono { fill: currentColor; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .s-dim { fill: var(--muted); font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif; font-size: 11.5px; }
+  .s-dim-m { fill: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  .s-line { stroke: currentColor; stroke-width: 1.4; fill: none; }
+  .s-soft { stroke: var(--line); stroke-width: 1.2; fill: none; }
+  .s-box { fill: var(--stage); stroke: var(--line); stroke-width: 1.2; }
+  .s-box-a { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .s-box-o { fill: var(--old-soft); stroke: var(--old); stroke-width: 1.4; }
+  .s-acc { fill: var(--accent); } .s-acc-s { stroke: var(--accent); }
+  .s-warn { fill: var(--warn); } .s-warn-s { stroke: var(--warn); }
+  .s-old { fill: var(--old); } .s-old-s { stroke: var(--old); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc">
+  <a class="brand" href="#top">泡のならべかた</a>
+  <span class="brand-sub">新しい bubble-ui の引き継ぎノート<br>2026-09-22</span>
+  <ol>
+    <li><a href="#what">これは何か</a></li>
+    <li><a href="#why">なぜ作り直すのか</a></li>
+    <li><a href="#rules">原則 ── 規則は5つ</a></li>
+    <li><a href="#solve">解く順番と平らな DOM</a></li>
+    <li><a href="#parts">部品の地図</a></li>
+    <li><a href="#progress">ここまでの道のり</a></li>
+    <li><a href="#run">動かし方</a></li>
+    <li><a href="#fight">いまの争点（v7）</a></li>
+    <li><a href="#open">残課題</a></li>
+    <li><a href="#manners">引き継ぐ人へ</a></li>
+    <li><a href="#docs">書類の地図</a></li>
+  </ol>
+</nav>
+
+<main id="top">
+
+<header class="hero">
+  <div class="kicker">handover note</div>
+  <h1>泡のならべかた ── 新しい bubble-ui</h1>
+  <p class="lede">旧 <code>bubbles-ui</code> を置き換えるために、泡の並べ方を<b>5つの規則</b>に絞り直して作り直しているライブラリ群です。規則・いまの進み具合・残っている課題を、この1枚にまとめました。</p>
+  <div class="facts">
+    <span>規則の正典 <a href="../bubble-space-prototype/v4/RULES.md">v4/RULES.md</a></span>
+    <span>ライブラリ <code>bublys-libs/bubble-layout{,-ui,-feature}</code></span>
+    <span>受け入れ検査 20 本 ＋ 単体 101 本</span>
+    <span>本番アプリへの配線は <b>まだ 0</b></span>
+  </div>
+</header>
+
+<!-- ─────────── 1 ─────────── -->
+<section id="what">
+  <div class="sec-head">
+    <span class="n">01</span>
+    <h2>これは何か</h2>
+  </div>
+  <div class="prose">
+    <p>バブリ（bubly）の画面は「泡」でできています。泡を開く・並べる・奥へ送る・掴んで動かす、という振る舞いを持つのが <code>bubbles-ui</code> です。それを<b>もっと汎用的で再帰的な模型に置き換え、同時に描画を速くする</b>ために作り直しているのが、この <code>bubble-layout</code> 系の3つのライブラリです。</p>
+
+    <div class="aside">
+      <div class="t">まず知っておくこと ── ノートが原典で、コードはその移植</div>
+      <p>この仕組みは <b>プロトタイプ → 設計ノート → 実装</b> の順で育ってきました。「なぜこうなっているのか分からない」実装を見つけたら、バグと呼ぶ前に <a href="../bubble-space-prototype/">docs/bubble-space-prototype/</a> のノートを探してください。番号つきで「踏んだ落とし穴」が書いてあります。</p>
+    </div>
+
+    <h3>読む順番</h3>
+    <ol>
+      <li><b>この頁</b>（全体像・15分）</li>
+      <li><a href="../bubble-space-prototype/v4/RULES.md">v4/RULES.md</a> ── 規則の正典。247行。<b>迷ったらここに戻る</b></li>
+      <li><a href="../bubble-space-prototype/v5-dom/lab.html">v5-dom/lab.html</a> を開いて触る（ビルド不要。ツールバーで軸とレンズを変えられる）</li>
+      <li><a href="../bubble-space-prototype/DECISIONS.md">DECISIONS.md</a> ── 規則の外で決めたことと、その経緯</li>
+    </ol>
+
+    <h3>いまの現在地（1文で）</h3>
+    <p>規則は固まり、domain・ui・feature の3層とも動いて検査も通っているが、<b>本番のアプリにはまだ1画面も載っていない</b>。載せる前に決めてほしいことが <a href="#fight">4つ</a>残っている。</p>
+  </div>
+</section>
+
+<!-- ─────────── 2 ─────────── -->
+<section id="why">
+  <div class="sec-head">
+    <span class="n">02</span>
+    <h2>なぜ作り直すのか</h2>
+  </div>
+  <div class="prose">
+    <blockquote>
+      <p>もっと汎用的で再帰的なモデルにし、記述できるシチュエーションを増やすということ、そして描画を高速化すること。（masa さん・2026-09-21）</p>
+    </blockquote>
+    <p>旧 <code>bubbles-ui</code> は「レイヤーの配列」で奥行きを、「測った矩形から次を決める」で位置を作っていました。これは <b>カレンダー・世界線・coverflow</b> のような並べ方を1つずつ作り込むことになり、しかも「測る → Redux → 再レンダ → また測る」のループを抱えていました。</p>
+    <p>新しい模型では、泡は<b>「位置になりうる値」を何種類も</b>持ち、親の View が<b>その値をどう読んで、どう並べて、どう写すか</b>を持ちます（→ <a href="#values">どういう意味か</a>）。並べ方は組み合わせで決まり、入れ子ごとに同じ規則が繰り返されます。</p>
+  </div>
+
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:26%"></th><th style="width:37%">旧 <code>bubbles-ui</code></th><th style="width:37%">新しい規則</th></tr></thead>
+      <tbody>
+        <tr><td>重なりの上下</td><td><code>process.layers: string[][]</code>＋置いた順。フォーカスで最後尾へ、<code>z-index:100</code> 直書きでレイヤーを飛び越える</td><td>描く順は <code>dz → scale → 並び順</code>。<b>View の外に状態を持たない</b></td></tr>
+        <tr><td>泡が持つ値</td><td><code>position</code> と <code>size</code> だけ。奥行きは「どの配列に居るか」でしか表せない</td><td>泡が <code>free / order / cell / hist</code> を持ち、View が読む</td></tr>
+        <tr><td>並べ方</td><td>測った矩形から次を決める（<code>SmartRect.calcPositionForSibling</code> が右→下→左→上に空きを探す）</td><td>帯の式。<b>値から純粋に計算する</b>（測らない）</td></tr>
+        <tr><td>倍率</td><td><code>scale = 1 − layerIndex × 0.1</code>。10 で 0、11 以上で負（クランプ無し）</td><td>透視 <code>m = 1/(1 + 0.26·dz)</code>。<code>dz&lt;0</code> は消す</td></tr>
+        <tr><td>入れ子</td><td>universe 泡だけ真の DOM 入れ子。scale の積を測って戻している</td><td>scale は数値1つ。<b>合成は1回だけ</b>、DOM は平ら</td></tr>
+        <tr><td>箱の伸び</td><td>全泡に <code>max-height: 90vh</code> 直書き（<code>//FIXME:突貫対応</code>）</td><td>④ 中身が収まるまで伸びる。切り抜きはしない</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note prose">
+    <p><b>「描く所だけ差し替え」は選べない。</b> 上の食い違い（とくに上3つ）は描画層の差し替えでは埋まらず、中途半端に両方残すと二重に動きます。残るのは <b>作り直し</b> か <b>共存</b> の二択 ── これは <a href="../bubble-space-prototype/v5-dom/FINDINGS.md">v5-dom/FINDINGS.md</a> 5章の実測に基づく結論です。</p>
+  </div>
+</section>
+
+<!-- ─────────── 3 ─────────── -->
+<section id="rules">
+  <div class="sec-head">
+    <span class="n">03</span>
+    <h2>原則 ── 規則は5つで全部</h2>
+    <p class="sub">これ以上でも以下でもありません。新しい振る舞いが欲しくなったとき、まず「5つのどれで書けるか」を考えます。規則を増やすのは最後の手段です。</p>
+  </div>
+
+  <div class="prose">
+    <p>規則②が「掴んでいる／掴んでいない」を分けているのは、<b>押してから離すまでに 3px 動いたかどうか</b>だけです。動かさずに離すのは「触る」で、これは別の操作です。</p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 880 172" role="img" aria-label="押してから離すまでの分かれ道。3px 動かずに離せば「触る」で視点が寄り、3px 以上動けばドラッグになって値が書かれ、離した所で確定する">
+        <rect class="s-box" x="10" y="58" width="128" height="46" rx="8"/>
+        <text class="s-bold" x="74" y="80" text-anchor="middle">押す</text>
+        <text class="s-dim-m" x="74" y="96" text-anchor="middle">pointerdown</text>
+
+        <path class="s-line" d="M144,70 L196,70 L196,34 L246,34" marker-end="url(#ar)"/>
+        <path class="s-line" d="M144,92 L196,92 L196,130 L246,130" marker-end="url(#ar)"/>
+        <text class="s-dim" x="246" y="26" text-anchor="end">3px 動かずに離した</text>
+        <text class="s-dim" x="246" y="152" text-anchor="end">3px 以上 動いた</text>
+
+        <!-- 触る -->
+        <rect class="s-box-a" x="252" y="14" width="150" height="40" rx="8"/>
+        <text class="s-bold" x="327" y="39" text-anchor="middle">触る</text>
+        <text class="s-text" x="416" y="30">値は1つも書かない。</text>
+        <text class="s-text" x="416" y="48">その泡へ<tspan font-weight="700">視点が寄る</tspan>だけ</text>
+
+        <!-- ドラッグする -->
+        <rect class="s-box" x="252" y="110" width="150" height="40" rx="8"/>
+        <text class="s-bold" x="327" y="135" text-anchor="middle">ドラッグしている</text>
+        <text class="s-dim-m" x="410" y="126">毎フレーム、行き先の印が出る</text>
+        <text class="s-dim-m" x="410" y="144">（掴んだ泡は持ち上がって指についてくる）</text>
+        <path class="s-line" d="M694,130 L734,130" marker-end="url(#ar)"/>
+        <text class="s-dim" x="714" y="118" text-anchor="middle">離す</text>
+        <rect class="s-box" x="740" y="110" width="130" height="40" rx="8"/>
+        <text class="s-bold" x="805" y="135" text-anchor="middle">確定</text>
+      </svg>
+    </div>
+    <figcaption>この 3px の分かれ道が、規則②の「掴んでいるか、掴んでいないか」の実体です。<b>触るのは掴んでいない</b>ので、背景をドラッグするのやホイールと同じ枝に乗り、視点だけが動きます。</figcaption>
+  </figure>
+
+  <div class="rules">
+    <div class="rule"><div class="mark">①</div><div class="body">
+      <b>泡の見え方は、その泡を入れている親の View で決まる</b>
+      <p>View は軸（X・Y・Z）ごとに <em>次元・並べ方・レンズ</em> を持つ。これが入れ子ごとに繰り返される。</p>
+    </div></div>
+    <div class="rule"><div class="mark">②</div><div class="body">
+      <b>操作は、軸と、何を掴んだかで決まる</b>
+      <p>ドラッグした量を、<em>その軸が読んでいる値に書き戻せるなら書く</em>。<em>書き戻せないなら、代わりに視点が動く</em>。掴んでいないとき（背景・ホイール・触る）は、いつも視点。</p>
+    </div></div>
+    <div class="rule"><div class="mark">③</div><div class="body">
+      <b>見えない親は、体を持たない</b>
+      <p>「A の左に B がくっついている」＝ <em>見えない親が中身を左右に並べている</em>。箱も奥行きも View も自分のものは何ひとつ持たず、持っているのは並べ方ひとつだけ。</p>
+    </div></div>
+    <div class="rule"><div class="mark">④</div><div class="body">
+      <b>並べるとは、値ごとに帯を作り、帯の中に揃えて置き、塊の中央を空間の中心に置くこと</b>
+      <p>等間隔と詰めるの違いは、<em>帯の幅の決め方だけ</em>。</p>
+    </div></div>
+    <div class="rule"><div class="mark">⑤</div><div class="body">
+      <b>触っていない泡は、画面の上で動かない</b>
+      <p>泡の位置は箱の中心なので、中身が増減して箱が伸び縮みしたら、<em>見えている場所を保つように位置を書き直す</em>。</p>
+    </div></div>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 880 250" role="img" aria-label="泡の持つ値が、次元・並べ方・レンズを通って画面の見えになる一方向の流れ。⑤だけが逆向きに、見えを保つように値を書き直す">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="ar-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--warn)"/></marker>
+        </defs>
+        <text class="s-dim" x="10" y="18">①②③④ ── 値から見えへ</text>
+        <line class="s-soft" x1="10" y1="26" x2="870" y2="26"/>
+
+        <rect class="s-box" x="10" y="52" width="176" height="70" rx="8"/>
+        <text class="s-bold" x="98" y="76" text-anchor="middle">泡が持つ値</text>
+        <text class="s-dim-m" x="98" y="96" text-anchor="middle">free / order / cell / hist</text>
+        <text class="s-dim-m" x="98" y="112" text-anchor="middle">size / parent</text>
+
+        <line class="s-line" x1="192" y1="87" x2="248" y2="87" marker-end="url(#ar)"/>
+        <text class="s-dim" x="220" y="76" text-anchor="middle">① 次元</text>
+        <text class="s-dim" x="220" y="108" text-anchor="middle">どれを読む</text>
+
+        <rect class="s-box" x="254" y="52" width="126" height="70" rx="8"/>
+        <text class="s-bold" x="317" y="84" text-anchor="middle">値</text>
+        <text class="s-dim-m" x="317" y="103" text-anchor="middle">軸ごとに1つの数</text>
+
+        <line class="s-line" x1="386" y1="87" x2="442" y2="87" marker-end="url(#ar)"/>
+        <text class="s-dim" x="414" y="76" text-anchor="middle">④ 並べ方</text>
+        <text class="s-dim" x="414" y="108" text-anchor="middle">帯を作る</text>
+
+        <rect class="s-box" x="448" y="52" width="150" height="70" rx="8"/>
+        <text class="s-bold" x="523" y="84" text-anchor="middle">空間の中の位置</text>
+        <text class="s-dim-m" x="523" y="103" text-anchor="middle">as-is / equal / pack</text>
+
+        <line class="s-line" x1="604" y1="87" x2="660" y2="87" marker-end="url(#ar)"/>
+        <text class="s-dim" x="632" y="76" text-anchor="middle">① レンズ</text>
+        <text class="s-dim" x="632" y="108" text-anchor="middle">軸ごとに1つ</text>
+
+        <rect class="s-box-a" x="666" y="52" width="204" height="70" rx="8"/>
+        <text class="s-bold" x="768" y="80" text-anchor="middle">画面</text>
+        <text class="s-dim-m" x="768" y="99" text-anchor="middle">x y w h scale alpha</text>
+        <text class="s-dim-m" x="768" y="115" text-anchor="middle">平行 / 魚眼 / 透視 / 平ら</text>
+
+        <!-- ⑤ 逆向き -->
+        <path class="s-line s-warn-s" d="M768,150 L768,182 L98,182 L98,150" marker-end="url(#ar-w)" stroke-dasharray="6 5"/>
+        <rect x="330" y="166" width="216" height="30" rx="6" fill="var(--warn-soft)" stroke="var(--warn)" stroke-width="1.2"/>
+        <text class="s-bold s-warn" x="438" y="186" text-anchor="middle">⑤ 見えを保つように値を書き直す</text>
+
+        <line class="s-soft" x1="10" y1="212" x2="870" y2="212"/>
+        <text class="s-dim" x="10" y="233">③ 見えない親 ＝ 「くっついている」を親子で表す（体を持たない）　／　② 触ったとき、その軸に書くか・視点を動かすか</text>
+      </svg>
+    </div>
+    <figcaption><b>①〜④が「値 → 見え」の一方向、⑤だけが逆向き。</b> ⑤は別の仕組みではなく、「泡の位置＝箱の中心」を選んだことから必然的に出てくる補正です。</figcaption>
+  </figure>
+
+  <h3 id="values">「泡は値を持つ」とはどういうことか</h3>
+  <div class="prose">
+    <p>泡は、順序もマスも自由座標も履歴も<b>ぜんぶ同時に</b>持っています。どれか1つを選んで入れるのではありません。<b>View が「この軸はどれを読むか」を選び、読まれなかった値はただ眠っています。</b></p>
+    <p>このうち<b>自由座標</b>（<code>free: {x, y, z}</code>）は、旧 <code>bubbles-ui</code> の <code>position: {x, y}</code> と見た目がそっくりです。ちがいは「持っているかどうか」ではなく、<b>それが必ず位置になるかどうか</b>：</p>
+    <ul>
+      <li>旧の <code>position</code> は<b>必ず位置</b>。ほかに置き場所が無いので、<b>並べ方を変えるには position を書き換えるしかない</b></li>
+      <li>新の <code>free</code> は<b>候補のひとつ</b>。親の View が X に「自由X」を刺しているときだけ位置になり、「順序」を刺していれば<b>1バイトも効かない</b>（眠る）</li>
+    </ul>
+  </div>
+
+  <div class="tbl" style="max-width:700px">
+    <table>
+      <thead><tr><th>泡</th><th><code>order</code> 順序</th><th><code>cell</code> マス</th><th><code>free</code> 自由座標</th><th><code>hist</code> 履歴</th><th><code>size</code></th></tr></thead>
+      <tbody>
+        <tr><td class="k">A</td><td class="k">0</td><td class="k">(0, 0)</td><td class="k">(−300, −100)</td><td class="k">0</td><td class="k">160×110</td></tr>
+        <tr><td class="k">B</td><td class="k">1</td><td class="k">(1, 0)</td><td class="k">(120, −40)</td><td class="k">1</td><td class="k">160×110</td></tr>
+        <tr><td class="k">C</td><td class="k">2</td><td class="k">(2, 0)</td><td class="k">(−80, 180)</td><td class="k">2</td><td class="k">160×110</td></tr>
+        <tr><td class="k">D</td><td class="k">3</td><td class="k">(0, 1)</td><td class="k">(260, 120)</td><td class="k">3</td><td class="k">160×110</td></tr>
+        <tr><td class="k">E</td><td class="k">4</td><td class="k">(1, 1)</td><td class="k">(40, −220)</td><td class="k">4</td><td class="k">160×110</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>この5つの泡に、<b>View だけ</b>を当て替えると、こうなります ── <b>泡の値は1バイトも変わっていません。</b></p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 900 262" role="img" aria-label="同じ5つの泡に3通りの View を当てた結果。横に並べる・格子・coverflow。泡の値はどれも同じまま">
+        <style>
+          .v-a { fill: hsl(4 48% 55% / .18); stroke: hsl(4 48% 55%); }
+          .v-b { fill: hsl(38 55% 45% / .18); stroke: hsl(38 55% 45%); }
+          .v-c { fill: hsl(140 35% 42% / .18); stroke: hsl(140 35% 42%); }
+          .v-d { fill: hsl(196 52% 44% / .18); stroke: hsl(196 52% 44%); }
+          .v-e { fill: hsl(258 42% 58% / .18); stroke: hsl(258 42% 58%); }
+          .v-t { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 500; }
+          .v-a-t { fill: hsl(4 48% 45%); } .v-b-t { fill: hsl(38 60% 36%); } .v-c-t { fill: hsl(140 38% 34%); }
+          .v-d-t { fill: hsl(196 55% 36%); } .v-e-t { fill: hsl(258 42% 50%); }
+        </style>
+        <!-- 横に並べる -->
+        <text class="s-bold" x="10" y="16">横に並べる</text>
+        <text class="s-dim" x="10" y="32">X＝順序 · 詰める · 平行</text>
+        <rect class="s-box" x="10" y="40" width="280" height="168" rx="6"/>
+        <rect class="v-a" x="30.2" y="108.6" width="44.8" height="30.8" rx="3"/><text class="v-t v-a-t" x="52.6" y="128" text-anchor="middle">A</text>
+        <rect class="v-b" x="78.9" y="108.6" width="44.8" height="30.8" rx="3"/><text class="v-t v-b-t" x="101.3" y="128" text-anchor="middle">B</text>
+        <rect class="v-c" x="127.6" y="108.6" width="44.8" height="30.8" rx="3"/><text class="v-t v-c-t" x="150" y="128" text-anchor="middle">C</text>
+        <rect class="v-d" x="176.3" y="108.6" width="44.8" height="30.8" rx="3"/><text class="v-t v-d-t" x="198.7" y="128" text-anchor="middle">D</text>
+        <rect class="v-e" x="225.0" y="108.6" width="44.8" height="30.8" rx="3"/><text class="v-t v-e-t" x="247.4" y="128" text-anchor="middle">E</text>
+        <text class="s-dim-m" x="10" y="226">order を読む → 0,1,2,3,4 の順に、隙間なく</text>
+
+        <!-- 格子 -->
+        <text class="s-bold" x="310" y="16">格子</text>
+        <text class="s-dim" x="310" y="32">X＝列 · Y＝行 · 詰める</text>
+        <rect class="s-box" x="310" y="40" width="280" height="168" rx="6"/>
+        <rect class="v-a" x="378.9" y="91.2" width="44.8" height="30.8" rx="3"/><text class="v-t v-a-t" x="401.3" y="110.6" text-anchor="middle">A</text>
+        <rect class="v-b" x="427.6" y="91.2" width="44.8" height="30.8" rx="3"/><text class="v-t v-b-t" x="450" y="110.6" text-anchor="middle">B</text>
+        <rect class="v-c" x="476.3" y="91.2" width="44.8" height="30.8" rx="3"/><text class="v-t v-c-t" x="498.7" y="110.6" text-anchor="middle">C</text>
+        <rect class="v-d" x="378.9" y="125.9" width="44.8" height="30.8" rx="3"/><text class="v-t v-d-t" x="401.3" y="145.3" text-anchor="middle">D</text>
+        <rect class="v-e" x="427.6" y="125.9" width="44.8" height="30.8" rx="3"/><text class="v-t v-e-t" x="450" y="145.3" text-anchor="middle">E</text>
+        <text class="s-dim-m" x="310" y="226">cell を読む → (0,0)(1,0)(2,0) / (0,1)(1,1)</text>
+
+        <!-- coverflow -->
+        <text class="s-bold" x="610" y="16">coverflow</text>
+        <text class="s-dim" x="610" y="32">X＝順序 · 等間隔68 · 魚眼</text>
+        <rect class="s-box" x="610" y="40" width="280" height="168" rx="6"/>
+        <rect class="v-a" x="693.0" y="109.8" width="41.4" height="28.4" rx="3"/>
+        <rect class="v-e" x="765.6" y="109.8" width="41.4" height="28.4" rx="3"/>
+        <rect class="v-b" x="709.7" y="109.0" width="43.6" height="30.0" rx="3"/>
+        <rect class="v-d" x="746.6" y="109.0" width="43.6" height="30.0" rx="3"/>
+        <rect class="v-c" x="727.8" y="108.7" width="44.4" height="30.5" rx="3"/>
+        <text class="v-t v-a-t" x="699" y="128" text-anchor="middle">A</text>
+        <text class="v-t v-b-t" x="716" y="128" text-anchor="middle">B</text>
+        <text class="v-t v-c-t" x="750" y="128" text-anchor="middle">C</text>
+        <text class="v-t v-d-t" x="784" y="128" text-anchor="middle">D</text>
+        <text class="v-t v-e-t" x="801" y="128" text-anchor="middle">E</text>
+        <text class="s-dim-m" x="610" y="226">同じ order を読むが、レンズが魚眼</text>
+        <text class="s-dim-m" x="610" y="242">倍率 0.92 / 0.97 / 0.99 / 0.97 / 0.92</text>
+
+      </svg>
+    </div>
+    <figcaption>1000×600 の窓での実測値をそのまま縮めた図。<b>並べ替えても、格子にしても、coverflow にしても、泡には1バイトも書いていません。</b>変えたのは親の空間の View だけです。（同じ5つに <code>histZ</code>（Z＝履歴の古さ）を当てれば、倍率 0.49 / 0.56 / 0.66 / 0.79 / 1.00 の奥行きに並びます）</figcaption>
+  </figure>
+
+  <div class="aside prose">
+    <div class="t">例えるなら</div>
+    <p>泡は<b>名簿の1行</b>です ── 出席番号・座席・身長が全部書いてある。View は<b>「どう並べるか」の指示</b> ──「出席番号順に」「座席表のとおりに」。<b>並べ方を変えても、名簿は書き換わりません。</b></p>
+    <p>名簿に「座席」が書いてあっても、<b>「出席番号順に並べ」と言われたら座席は効きません</b>。でも消えてはいないので、「座席表で」と言えばまた効く ── これが「自由座標を持っているのに、位置そのものではない」という意味です。</p>
+    <p>旧 <code>bubbles-ui</code> は名簿に「立ち位置」を書き込む方式でした。だから並べ方を変えるには全員の立ち位置を書き直す必要があり、そのために<b>実際に並ばせて measure する</b>（測る→Redux→再レンダ→また測る）ループを抱えていました。</p>
+  </div>
+
+  <div class="prose">
+    <h4>だから、並べ替えても元に戻れる</h4>
+    <p>旧は並べ替えると <code>position</code> を上書きしてしまうので、戻す先がありません。新は <code>order</code> を書くだけなので、<b>自由座標は無傷のまま残ります</b>。実測：</p>
+    <pre><code>① 自由に置く      画面 A(120,145) B(540,205) C(340,425) D(680,365) E(460,25)
+                  free A(-300,-100) B(120,-40) C(-80,180) D(260,120) E(40,-220)
+
+② X を「順序」に   画面 A(72,245) B(246,245) C(420,245) D(594,245) E(768,245)
+                  free 触っていない
+
+③ E を先頭へ並べ替え  order A:1 B:2 C:3 D:4 E:0   ← 変わった
+                  free ★ 1バイトも変わっていない
+
+④ X を「自由X」に戻す 画面 A(120,145) B(540,205) C(340,425) D(680,365) E(460,25)
+                  ★ ① と完全に同じ（散らばりが戻ってきた）。並べ替えた order も残っている</code></pre>
+
+    <h4>泡が持つもの、そのぜんぶ</h4>
+    <pre><code>{ id, title, hue,
+  size:   { w, h },              // 自前の大きさ
+  parent: "bubble-id" | null,    // null ＝ いちばん外の空間
+  free:   { x, y, z },           // 「自由」次元が読む
+  order:  0,                     // 「順序」次元が読む
+  cell:   { col, row },          // 「列」「行」次元が読む
+  hist: 0, branch: 0,            // 「履歴」次元が読む
+  view:   View | null,           // 中に泡を入れているなら、その並べ方
+  implicit: false,               // くっつけて生まれた見えない親か
+}</code></pre>
+    <p><b>持たないもの：</b>関係（含む・隣り合う）／アンカー／置いた順／レイヤー／url。<br>
+    含む＝親になる。隣り合う＝見えない親の並び。手前＝Z 軸の値に書く。</p>
+    <p class="small" style="color:var(--muted)">★ 値段：<code>order</code> は泡に1つしかないので、同じ空間の X と Z が<b>両方 order を読むと連動します</b>（「順序の取り合い」）。「横に並べる」と「触ると手前へ」を両方 order でやろうとして踏みました ── いまは後者を焦点（視点）に移して解決しています。</p>
+  </div>
+
+  <h3>① View の中身 ── 3軸 × 3つ ＝ 9マス</h3>
+  <div class="prose">
+    <p>この9マスの組み合わせが、並べ方のすべてです。「カレンダーの格子」も「coverflow」も「世界線の履歴ストリップ」も、9マスの値が違うだけ。プリセットは <code>free / row / column / grid / fisheyeX / coverflow / histZ / stackZ</code> の8つですが、これは<b>名前をつけた組み合わせ</b>にすぎません。</p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 800 278" role="img" aria-label="View は X・Y・Z の3軸それぞれに、次元・並べ方・レンズを持つ。coverflow の例では X が順序・等間隔68・魚眼、Y がなし・詰める・平行、Z がなし・そのまま・平ら">
+        <text class="s-dim" x="10" y="16">View（この空間の並べ方）　── 例：coverflow</text>
+        <line class="s-soft" x1="10" y1="42" x2="790" y2="42"/>
+        <text class="s-dim" x="52" y="36" text-anchor="middle">軸</text>
+        <text class="s-dim" x="215" y="36" text-anchor="middle">次元 ── 泡の何を読むか</text>
+        <text class="s-dim" x="430" y="36" text-anchor="middle">並べ方 ── 値 → 位置</text>
+        <text class="s-dim" x="650" y="36" text-anchor="middle">レンズ ── 位置 → 画面</text>
+
+        <!-- X -->
+        <text class="s-bold" x="52" y="76" text-anchor="middle">X</text>
+        <rect class="s-box-a" x="110" y="56" width="210" height="30" rx="6"/>
+        <text class="s-text" x="215" y="76" text-anchor="middle">順序（order）</text>
+        <rect class="s-box-a" x="330" y="56" width="200" height="30" rx="6"/>
+        <text class="s-text" x="430" y="76" text-anchor="middle">等間隔 step 68</text>
+        <rect class="s-box-a" x="540" y="56" width="220" height="30" rx="6"/>
+        <text class="s-text" x="650" y="76" text-anchor="middle">魚眼</text>
+        <!-- Y -->
+        <text class="s-bold" x="52" y="118" text-anchor="middle">Y</text>
+        <rect class="s-box" x="110" y="98" width="210" height="30" rx="6"/>
+        <text class="s-text" x="215" y="118" text-anchor="middle">なし</text>
+        <rect class="s-box" x="330" y="98" width="200" height="30" rx="6"/>
+        <text class="s-text" x="430" y="118" text-anchor="middle">詰める</text>
+        <rect class="s-box" x="540" y="98" width="220" height="30" rx="6"/>
+        <text class="s-text" x="650" y="118" text-anchor="middle">平行</text>
+        <!-- Z -->
+        <text class="s-bold" x="52" y="160" text-anchor="middle">Z</text>
+        <rect class="s-box" x="110" y="140" width="210" height="30" rx="6"/>
+        <text class="s-text" x="215" y="160" text-anchor="middle">なし</text>
+        <rect class="s-box" x="330" y="140" width="200" height="30" rx="6"/>
+        <text class="s-text" x="430" y="160" text-anchor="middle">そのまま</text>
+        <rect class="s-box" x="540" y="140" width="220" height="30" rx="6"/>
+        <text class="s-text" x="650" y="160" text-anchor="middle">平ら</text>
+
+        <line class="s-soft" x1="10" y1="188" x2="790" y2="188"/>
+        <text class="s-dim" x="10" y="208">選べるもの</text>
+        <text class="s-dim-m" x="110" y="208">なし ／ 自由X·Y·Z ／ 順序 ／ 列 ／ 行 ／ 履歴の世代·古さ·枝</text>
+        <text class="s-dim-m" x="110" y="228">そのまま（帯なし・値がそのまま px）</text>
+        <text class="s-dim-m" x="110" y="246">等間隔（帯の幅＝step。中身を見ない）</text>
+        <text class="s-dim-m" x="110" y="264">詰める（帯の幅＝その値の泡でいちばん大きいもの）</text>
+        <text class="s-dim-m" x="540" y="208">X·Y：平行 ／ 魚眼</text>
+        <text class="s-dim-m" x="540" y="228">Z：透視 ／ 平ら</text>
+        <text class="s-dim-m" x="540" y="252">★ 重ならないことを</text>
+        <text class="s-dim-m" x="540" y="268">保証するのは「詰める」だけ</text>
+      </svg>
+    </div>
+    <figcaption>次元は「泡の<b>どの値</b>を読むか」を選ぶだけ（<code>order</code> は泡に1つしかないので、同じ空間の X と Z が両方読むと連動します ── これが後述の「取り合い」）。空間が View を持たなければ、並べ方は外から継ぎます。<b>焦点（視点）は継ぎません。</b></figcaption>
+  </figure>
+
+  <h3 id="band">④ 「帯」とは ── 値1つにつき、1本のレーン</h3>
+  <div class="prose">
+    <p>次元が返すのは<b>数</b>だけです。そして<b>同じ数を持つ泡が複数ありうる</b>（順序が 1 の泡が2つ、など）。だから並べるには、先に「その数の泡が入る場所」を決める必要があります。それが<b>帯</b>です。</p>
+    <p>並べ方3つの違いは、<b>帯の幅の決め方だけ</b>：</p>
+    <ul>
+      <li><b>そのまま</b>（as-is）── 帯を作らない。値がそのまま px</li>
+      <li><b>等間隔</b>（equal）── 帯の幅は<b>いつも <code>step</code></b>。中身の大きさを見ない</li>
+      <li><b>詰める</b>（pack）── 帯の幅は<b>その値を持つ泡でいちばん大きいもの</b>。帯と帯は隙間（<code>gap</code>、既定 14px）で継ぐ</li>
+    </ul>
+    <p>下は実測です。泡は4つ、<b>B と C は同じ値（順序 1）</b>なので同じ帯に入ります。幅はわざとばらばら（A 160・B 100・C 240・D 120）。</p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 830 252" role="img" aria-label="詰めるでは帯の幅がその値の泡の最大幅になり、帯どうしは隙間で継がれるので別の帯の泡は重ならない。等間隔では帯の幅がいつも step なので、幅の広い泡は隣の帯へはみ出して重なる">
+        <text class="s-bold" x="10" y="16">詰める（pack）</text>
+        <text class="s-dim" x="108" y="16">帯の幅 ＝ その値の泡でいちばん大きいもの。帯と帯は隙間 14px で継ぐ</text>
+        <!-- 帯 -->
+        <rect x="59.8" y="32" width="208" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <rect x="286" y="32" width="312" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <rect x="616" y="32" width="156" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text class="s-dim-m" x="163" y="27" text-anchor="middle">帯 値0・幅160</text>
+        <text class="s-dim-m" x="442" y="27" text-anchor="middle">帯 値1・幅240（C の幅）</text>
+        <text class="s-dim-m" x="694" y="27" text-anchor="middle">帯 値2・幅120</text>
+        <!-- 泡 -->
+        <rect class="v-a" x="59.8" y="38" width="208" height="44" rx="3"/><text class="v-t v-a-t" x="163" y="65" text-anchor="middle">A 160</text>
+        <rect class="v-b" x="286" y="38" width="130" height="20" rx="3"/><text class="v-t v-b-t" x="351" y="52" text-anchor="middle">B 100</text>
+        <rect class="v-c" x="286" y="62" width="312" height="20" rx="3"/><text class="v-t v-c-t" x="442" y="76" text-anchor="middle">C 240</text>
+        <rect class="v-d" x="616" y="38" width="156" height="44" rx="3"/><text class="v-t v-d-t" x="694" y="65" text-anchor="middle">D 120</text>
+        <text class="s-dim" x="10" y="103">別の帯どうしは <tspan class="s-acc" font-weight="700">重ならない</tspan>（同じ帯の B と C だけが重なる）</text>
+
+        <text class="s-bold" x="10" y="146">等間隔（equal・step 180）</text>
+        <text class="s-dim" x="192" y="146">帯の幅はいつも 180。中身の大きさを見ない</text>
+        <rect x="78" y="162" width="234" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <rect x="312" y="162" width="234" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <rect x="546" y="162" width="234" height="56" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="4 3"/>
+        <text class="s-dim-m" x="195" y="157" text-anchor="middle">帯 値0・幅180</text>
+        <text class="s-dim-m" x="429" y="157" text-anchor="middle">帯 値1・幅180</text>
+        <text class="s-dim-m" x="663" y="157" text-anchor="middle">帯 値2・幅180</text>
+        <rect class="v-a" x="91" y="168" width="208" height="44" rx="3"/><text class="v-t v-a-t" x="195" y="195" text-anchor="middle">A 160</text>
+        <rect class="v-b" x="364" y="168" width="130" height="20" rx="3"/><text class="v-t v-b-t" x="429" y="182" text-anchor="middle">B 100</text>
+        <rect class="v-c" x="273" y="192" width="312" height="20" rx="3"/><text class="v-t v-c-t" x="429" y="206" text-anchor="middle">C 240</text>
+        <rect class="v-d" x="585" y="168" width="156" height="44" rx="3"/><text class="v-t v-d-t" x="663" y="195" text-anchor="middle">D 120</text>
+        <rect x="273" y="192" width="26" height="20" fill="var(--warn)" fill-opacity="0.35"/>
+        <path class="s-line s-warn-s" d="M286,236 L286,216" marker-end="url(#ar-w)"/>
+        <text class="s-bold s-warn" x="294" y="240">C が帯からはみ出して、別の帯の A に 20px 食い込む</text>
+      </svg>
+    </div>
+    <figcaption>色が泡、点線の枠が帯。<b>同じ値の泡（B と C）は同じ帯に入るので、必ず重なります。</b>ちがう値どうしが重なるかは、帯の幅の決め方しだい ── <b>重ならないことを保証するのは「詰める」だけ</b>です。「そのまま」は帯を作らないので、値がそのまま px（同じ値なら全部同じ場所）。</figcaption>
+  </figure>
+
+  <div class="aside prose">
+    <div class="t">ここから出てくるもの</div>
+    <ul>
+      <li><b>格子のマスは、X の帯と Y の帯の交差。</b>格子という専用のコードはありません ── X が「列」、Y が「行」を読んで、それぞれが帯を作るだけ。落とし先を決める <code>cellFromBands</code> も<b>軸ごとに1回ずつ呼ばれる</b>だけです（<code>drop.ts:228</code>）。ここから3つ出てきます（実測）：
+        <ul style="margin-top:6px">
+          <li><b>列の幅・行の高さは、そのマスでいちばん大きい泡で決まる</b>（詰めるなので）。表らしい振る舞いがタダで出る ── 実測で 列0 幅240／列2 幅120、行0 高さ60／行1 高さ100</li>
+          <li>★ <b>空の列は存在しない。</b>列1 に泡がいなければ帯は作られず、列0 と列2 は<b>ふつうの隙間 14px で隣り合う</b>（列1 のぶんは1px も空かない）。<b>マスの番号は座標ではなくラベル</b>です ── カレンダーで日付が飛ぶと、その列は詰まります。空けて見せたいなら、規則の外で手当てが要ります</li>
+          <li>いちばん右の帯より外に落とすと<b>列が1つ増える</b>（列2 の右 → 列3）。左の外では増えません（0 より小さくならない）</li>
+        </ul>
+      </li>
+      <li>★ <b>これは「泡を格子に並べる」ための道具で、泡の中身の表組みには使いません。</b>
+        細かい表は、<b>ふつうに CSS grid で組みます</b>（<code>&lt;table&gt;</code> ではなく ── <code>&lt;tr&gt;</code> は table fixup で <code>ObjectView</code> に包めず、実害が出ています）。
+        セルを全部泡にすると重すぎる、というのが 2026-09-19 の決定です（<a href="../bubble-space-prototype/DECISIONS.md">DECISIONS.md</a>「泡の中身と、子の泡は、別物にする」）。
+        泡にするのは<b>その表から開くオブジェクト</b>のほうです</li>
+      <li><b>塊</b>（規則④の「塊の中央を空間の中心に置く」）＝ 帯をぜんぶ合わせた範囲。だから泡が増えると、塊の中央がずれて<b>触っていない泡も動く</b> ── ⑤ が要る理由がこれ</li>
+      <li>等間隔に中身を見させると、帯の幅が中身で決まって「値×間隔」が消える ＝ <b>それは詰めるそのもの</b>。だから2つで足りる</li>
+    </ul>
+  </div>
+
+  <h3>② 操作 ── 何を掴んだか × どの軸</h3>
+  <div class="prose">
+    <p>泡をドラッグしたとき何が起きるかは、<b>「その軸が読んでいる値に、ドラッグした量を書き戻せるか」</b>だけで決まります。書き戻せる値なら泡が動き、書き戻せない値なら<b>代わりにカメラが動く</b>。5通りしかありません。</p>
+  </div>
+
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:21%">軸が読んでいる次元</th><th style="width:15%">書き戻せるか</th><th style="width:22%">泡に書かれるもの</th><th style="width:20%">見た目</th><th>実測（react-drag）</th></tr></thead>
+      <tbody>
+        <tr><td>自由X · 自由Y · 自由Z</td><td class="ok-t">書ける</td><td class="k">free.x / .y / .z</td><td>泡がついてくる</td><td class="k">memo3.free</td></tr>
+        <tr><td>順序</td><td class="ok-t">書ける</td><td class="k">order（兄弟と入れ替わる）</td><td>並べ替わる</td><td class="k">row0.order / row1.order</td></tr>
+        <tr><td>列 · 行</td><td class="ok-t">書ける</td><td class="k">cell.col / .row</td><td>別のマスへ移る</td><td class="k">d3.cell / d12.cell</td></tr>
+        <tr><td>履歴の世代 · 古さ · 枝</td><td class="warn-t">書けない</td><td>何も書かない</td><td><b>視点が動く</b>（時間を行き来する）</td><td class="k">fish.focus</td></tr>
+        <tr><td>なし</td><td>読む値が無い</td><td>何も書かない</td><td><b>何も起きない</b></td><td>何も変わらない</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="aside prose">
+    <div class="t">なぜ「履歴」は書けないのか</div>
+    <p>「その泡が<b>何世代目に生まれたか</b>」は済んだ事実で、ドラッグして変えられるものではありません。だから履歴の軸をドラッグしても泡は動かず、代わりに<b>カメラが時間の中を移動します</b> ── 世界線ビューを横にドラッグすると歴史をたどれるのは、これです。</p>
+    <p class="small" style="color:var(--muted)">この5通りは <code>dimension.ts</code> の <code>write</code> フィールドそのもの（<code>'coord' | 'reorder' | 'cell' | null</code>、それと <code>'none'</code>）。<b>新しい次元を足すときに決めるのは「この値は書き戻せるか」だけ</b>で、操作の側は1行も書きません。</p>
+  </div>
+
+  <div class="prose"><h4>掴んだものによる違い</h4></div>
+  <div class="tbl" style="max-width:760px">
+    <table>
+      <thead><tr><th>掴んだもの</th><th>軸</th><th>起きること</th></tr></thead>
+      <tbody>
+        <tr><td class="nw">泡を横・縦にドラッグする</td><td class="nw">X / Y</td><td>上の表のとおり（書き戻せるなら泡、書き戻せないなら視点）。<b>横と縦で別々に決まる</b> ── X は自由座標・Y は履歴、なら横にドラッグすると泡が動き、縦にドラッグすると時間を遡る</td></tr>
+        <tr><td class="nw">背景をドラッグする</td><td class="nw">X / Y</td><td>掴んでいないので、いつも視点</td></tr>
+        <tr><td class="nw">ホイール</td><td class="nw">Z</td><td>同上</td></tr>
+        <tr><td class="nw">泡を触る（3px も動かさずに離す）</td><td class="nw">—</td><td><b>その泡へ視点が寄る。値は1つも書かない</b></td></tr>
+        <tr><td class="nw">右下の角をドラッグする</td><td class="nw">—</td><td>大きさを変える（⑤で兄弟は動かない）</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="aside prose">
+    <div class="t">★ ここは 2026-09-19 に変わった ── 「触った泡は手前へ」を捨てた</div>
+    <blockquote><p>触った泡は手前へ、は多分、微妙だと思う。どちらかというと、<b>触った泡の方にカメラが寄っていく</b>感じがいいと思う。（masa さん）</p></blockquote>
+    <p>これで「横に並べる」と「触ると主役が変わる」が同時に成り立つようになりました（前者は X の次元、後者は焦点）。⑤との緊張も消えています ── 値を書かないので、触っていない泡は定義上動きません。</p>
+  </div>
+
+</section>
+
+<!-- ─────────── 4 ─────────── -->
+<section id="solve">
+  <div class="sec-head">
+    <span class="n">04</span>
+    <h2>解く順番と、平らな DOM</h2>
+    <p class="sub">速さの根っこはここです。「合成は1回だけ」と「DOM は平ら」の2つで、毎フレーム書くのが <code>transform</code> 1行になります。</p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 900 348" role="img" aria-label="domain は空間の木を再帰的に解き、合成を1回だけ行って平らな配置の一覧を返す。ui はそれを1枚の層の兄弟として並べ、毎フレーム transform だけを書く">
+        <text class="s-dim" x="10" y="16">domain が持つ ── 空間の木</text>
+        <rect class="s-box" x="10" y="32" width="250" height="196" rx="8"/>
+        <rect class="s-box-o" x="28" y="50" width="214" height="30" rx="6"/>
+        <text class="s-mono" x="135" y="70" text-anchor="middle">root（いちばん外の空間）</text>
+        <rect class="s-box-a" x="44" y="94" width="182" height="28" rx="6"/>
+        <text class="s-mono" x="135" y="113" text-anchor="middle">並び（空間を持つ泡）</text>
+        <rect class="s-box" x="62" y="136" width="70" height="26" rx="5"/>
+        <text class="s-mono" x="97" y="154" text-anchor="middle">詳細1</text>
+        <rect class="s-box" x="140" y="136" width="70" height="26" rx="5"/>
+        <text class="s-mono" x="175" y="154" text-anchor="middle">詳細2</text>
+        <rect class="s-box" x="44" y="176" width="182" height="28" rx="6"/>
+        <text class="s-mono" x="135" y="195" text-anchor="middle">一覧</text>
+        <path class="s-line s-acc-s" d="M34,108 L34,150 L58,150" marker-end="url(#ar)"/>
+        <text class="s-dim" x="10" y="248">再帰。深さ n でも</text>
+        <text class="s-dim" x="10" y="266">scale は数値1つ</text>
+
+        <line class="s-line" x1="272" y1="120" x2="316" y2="120" marker-end="url(#ar)"/>
+        <text class="s-dim" x="294" y="108" text-anchor="middle">解く</text>
+
+        <!-- 合成 -->
+        <rect x="324" y="46" width="252" height="148" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+        <text class="s-bold" x="450" y="70" text-anchor="middle">★ 合成はここ1回だけ</text>
+        <text class="s-mono" x="340" y="98">画面x = host.left</text>
+        <text class="s-mono" x="352" y="116">+ ローカルx × host.scale</text>
+        <text class="s-mono" x="340" y="142">scale = host.scale</text>
+        <text class="s-mono" x="352" y="160">× ローカルscale</text>
+        <text class="s-dim" x="450" y="184" text-anchor="middle">純関数。非同期も計測も 0 件</text>
+        <text class="s-dim" x="450" y="218" text-anchor="middle">→ placements（配置の一覧）</text>
+        <text class="s-dim-m" x="450" y="238" text-anchor="middle">id x y w h scale local alpha vis depth space</text>
+
+        <line class="s-line" x1="588" y1="120" x2="632" y2="120" marker-end="url(#ar)"/>
+        <text class="s-dim" x="610" y="108" text-anchor="middle">ui</text>
+
+        <!-- 平らな DOM -->
+        <text class="s-dim" x="640" y="16">ui が描く ── 平らな DOM</text>
+        <rect class="s-box" x="640" y="32" width="250" height="196" rx="8"/>
+        <text class="s-mono" x="656" y="54">#layer</text>
+        <rect class="s-box-o" x="656" y="64" width="218" height="26" rx="5"/>
+        <text class="s-mono" x="765" y="82" text-anchor="middle">.bub 並び　　z-index 0</text>
+        <rect class="s-box" x="656" y="96" width="218" height="26" rx="5"/>
+        <text class="s-mono" x="765" y="114" text-anchor="middle">.bub 詳細1　z-index 1</text>
+        <rect class="s-box" x="656" y="128" width="218" height="26" rx="5"/>
+        <text class="s-mono" x="765" y="146" text-anchor="middle">.bub 詳細2　z-index 2</text>
+        <rect class="s-box" x="656" y="160" width="218" height="26" rx="5"/>
+        <text class="s-mono" x="765" y="178" text-anchor="middle">.bub 一覧　　z-index 3</text>
+        <text class="s-dim" x="656" y="206">ぜんぶ兄弟（入れ子にしない）</text>
+        <text class="s-dim" x="640" y="248">毎フレーム書くのは</text>
+        <text class="s-mono s-acc" x="640" y="268">transform: translate() scale()</text>
+        <text class="s-dim" x="640" y="286">1行だけ → layout 0</text>
+
+        <line class="s-soft" x1="10" y1="304" x2="890" y2="304"/>
+        <text class="s-dim" x="10" y="326">★ 入れ子の DOM にしない理由：transform を持つ div は必ず重なりの文脈を作るので、</text>
+        <text class="s-dim" x="10" y="344"><tspan class="s-warn">中の泡が「親の兄弟」より手前に出られない</tspan> ＝ 規則②が破れる（実測 688画素の食い違い）</text>
+      </svg>
+    </div>
+    <figcaption><code>resolveWorld(world, viewport)</code> が木をたどって、平らな配置の一覧（placements）を返します。<b>木は domain だけが持ち、DOM は平ら。</b> だから <code>&lt;Bubble&gt;&lt;Bubble/&gt;&lt;/Bubble&gt;</code> と書けるようにはしません（木が React と domain の2箇所にできて剥がせなくなる）。泡の中身は <code>renderBubble(id, draw) =&gt; ReactNode</code> で外から渡します。</figcaption>
+  </figure>
+
+  <div class="aside prose">
+    <div class="t">速さについて、正しい言い方</div>
+    <p>「canvas の9〜12倍速い」は<b>主スレッドだけの話</b>です。実時間で本当に勝つのは魚眼の場面だけ（2.2倍）。DOM は仕事を減らしたのではなく、ラスタを別スレッドへ出しました。<b>正しい売り文句は「主スレッドが空く＝入力にも他の処理にもつっかからない」。</b></p>
+    <p>いちばん大きな落とし穴は <b>画面の px を毎フレーム書くこと</b>です。枠の太さや字の大きさを <code>border-width</code> / <code>font-size</code> で書くと layout が戻ってきます（実測：場面Cで layout 1951ms）。画面で固定したい量は<b>逆 scale を当てて戻す</b>（<code>--k</code>）。</p>
+  </div>
+</section>
+
+<!-- ─────────── 5 ─────────── -->
+<section id="parts">
+  <div class="sec-head">
+    <span class="n">05</span>
+    <h2>部品の地図 ── Nx のライブラリ3つ</h2>
+    <p class="sub">「部品」＝ Nx のライブラリ（プロジェクト）です。<code>bublys-libs/</code> の下に3つあり、CLAUDE.md の3層 DDD（domain / ui / feature）にそのまま1対1で乗っています。</p>
+  </div>
+
+  <div class="tbl" style="max-width:760px">
+    <table>
+      <thead><tr><th>Nx プロジェクト名（＝ import 名）</th><th>層</th><th>置き場所</th></tr></thead>
+      <tbody>
+        <tr><td class="k nw">@bublys-org/bubble-layout</td><td class="nw">domain</td><td class="k nw">bublys-libs/bubble-layout/</td></tr>
+        <tr><td class="k nw">@bublys-org/bubble-layout-ui</td><td class="nw">ui</td><td class="k nw">bublys-libs/bubble-layout-ui/</td></tr>
+        <tr><td class="k nw">@bublys-org/bubble-layout-feature</td><td class="nw">feature</td><td class="k nw">bublys-libs/bubble-layout-feature/</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>使う側は名前をそのまま書きます（<code>import { BubbleSpace } from '@bublys-org/bubble-layout-feature'</code>）。<code>npx nx</code> のコマンドでは短い名前でも通ります（<code>npx nx build bubble-layout</code>）。つなぎ方は <b>npm workspaces</b> で、<code>tsconfig</code> の <code>paths</code> ではありません ── <code>node_modules/@bublys-org/bubble-layout</code> が <code>bublys-libs/bubble-layout</code> へのシンボリックリンクになっています。</p>
+  </div>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 860 182" role="img" aria-label="矢印は依存する側から依存される側へ。feature は ui と domain に依存し、ui は domain に依存する。domain は何にも依存しない">
+        <rect class="s-box" x="10" y="42" width="220" height="62" rx="8"/>
+        <text class="s-bold" x="120" y="66" text-anchor="middle">bubble-layout</text>
+        <text class="s-dim" x="120" y="84" text-anchor="middle">domain ── 規則。純関数</text>
+        <text class="s-dim-m" x="120" y="30" text-anchor="middle">何にも依存しない</text>
+
+        <line class="s-line" x1="288" y1="66" x2="238" y2="66" marker-end="url(#ar)"/>
+        <text class="s-dim-m" x="263" y="88" text-anchor="middle">依存</text>
+
+        <rect class="s-box" x="296" y="42" width="220" height="62" rx="8"/>
+        <text class="s-bold" x="406" y="66" text-anchor="middle">bubble-layout-ui</text>
+        <text class="s-dim" x="406" y="84" text-anchor="middle">ui ── 描く・触る（React）</text>
+
+        <line class="s-line" x1="574" y1="66" x2="524" y2="66" marker-end="url(#ar)"/>
+        <text class="s-dim-m" x="549" y="88" text-anchor="middle">依存</text>
+
+        <rect class="s-box-a" x="582" y="42" width="268" height="62" rx="8"/>
+        <text class="s-bold" x="716" y="66" text-anchor="middle">bubble-layout-feature</text>
+        <text class="s-dim" x="716" y="84" text-anchor="middle">feature ── url・オブジェクト・開く</text>
+        <text class="s-dim-m" x="716" y="30" text-anchor="middle">アプリが触るのはここ</text>
+
+        <path class="s-line" d="M716,108 L716,134 L120,134 L120,110" marker-end="url(#ar)"/>
+        <text class="s-dim-m" x="418" y="150" text-anchor="middle">依存（feature は domain にも直接）</text>
+
+        <text class="s-dim" x="10" y="176">矢印は「A は B に依存する」の向き。逆向きは <tspan class="s-mono">@nx/enforce-module-boundaries</tspan>（<tspan class="s-mono">enforceBuildableLibDependency: true</tspan>）が止める</text>
+      </svg>
+    </div>
+    <figcaption>矢印は <code>package.json</code> の <code>dependencies</code> に書いてある本物の依存で、<b>依存する側から、依存される側へ</b>向いています。だから <b>domain にはどこからも矢印が入るだけで、出ていきません</b> ── React も Redux も DOM も知らない、が保たれます。</figcaption>
+  </figure>
+
+  <div class="note prose">
+    <p><b>★ これは「buildable library」です。</b> <code>package.json</code> の <code>main</code> / <code>exports</code> が <code>./dist/index.js</code> を指しているので、<b>ソースを直しただけでは使う側に届きません</b>。<code>npx nx build &lt;名前&gt;</code>（中身は <code>tsc -b tsconfig.lib.json</code>）が要ります。<br>
+    <code>nx test</code> は<b>依存だけ</b>をビルドするので、feature を直して feature のデモを焼くと<b>古いままの絵が出ます</b>（実際に踏みました）。<code>exports</code> に <code>"@bublys-org/source": "./src/index.ts"</code> という条件も置いてあり、それを指定するビルドツールだけは <code>src</code> を直接読みます。</p>
+  </div>
+
+  <div class="tbl" style="max-width:900px">
+    <table>
+      <thead><tr><th style="width:23%">ライブラリ</th><th style="width:9%">行数</th><th>何を持つか</th><th style="width:26%">受け入れ条件</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>bubble-layout</b><br><span class="src mono" style="font-size:11.5px;color:var(--muted)">domain</span></td>
+          <td class="k">2,813<br><span style="color:var(--muted)">+テスト 1,045</span></td>
+          <td>規則そのもの。<b>React も Redux も DOM も入っていない純関数</b>。<code>resolveWorld</code>（解く）と <code>reshape</code>（付け替える）の2本が入口。動詞は <code>dragBubble / dragFocus / wheelZ / resizeBubble / commitDrop / focusOn</code></td>
+          <td>ラボ（lab.html）と<b>差 0</b>（41場面・のべ2300個、浮動小数の最後の桁まで）</td>
+        </tr>
+        <tr>
+          <td><b>bubble-layout-ui</b><br><span class="src mono" style="font-size:11.5px;color:var(--muted)">ui</span></td>
+          <td class="k">1,116<br><span style="color:var(--muted)">+テスト 195</span></td>
+          <td>描く（<code>BubbleField</code>・<code>draw.ts</code>）と触る（<code>useBubbleInput</code>・<code>hit.ts</code>）。<b>描く下限（既定 5px）はここ</b> ── domain には入れない</td>
+          <td>ラボと <b>px で差 0</b>（12場面・6264個の数、DOM の矩形 0.00px）</td>
+        </tr>
+        <tr>
+          <td><b>bubble-layout-feature</b><br><span class="src mono" style="font-size:11.5px;color:var(--muted)">feature</span></td>
+          <td class="k">869<br><span style="color:var(--muted)">+テスト 225</span></td>
+          <td>url とオブジェクトにつなぐ。<code>BubbleSpace</code>（世界を持つ）・<code>ObjectView</code>・<code>openAt</code>（開く）・<code>routing</code></td>
+          <td>本物のバブリ（csv-importer）の画面を<b>1文字も編集せずに</b>載せて、本物のマウスで触る</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>旧 <code>bubbles-ui</code>（11,165行）との対応はこうです。置き換えに要る口は、バブリ6つを数えて<b>4つだけ</b>でした。</p>
+  </div>
+
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:34%">旧 bubbles-ui</th><th style="width:16%">使われ方</th><th>新しい側</th></tr></thead>
+      <tbody>
+        <tr><td><code>ObjectView</code></td><td class="k">223 箇所</td><td><code>feature/ObjectView</code>（<code>openingPosition</code> は受け取って無視する ＝ 編集せず載せ替えられる）</td></tr>
+        <tr><td><code>BubbleRoute</code></td><td class="k">65 箇所</td><td><code>feature/routing</code></td></tr>
+        <tr><td><code>openBubble</code></td><td class="k">37 箇所</td><td><code>feature/openAt</code></td></tr>
+        <tr><td><code>BublyApp</code> 系</td><td class="k">36 箇所</td><td><code>feature/BubbleSpace</code></td></tr>
+        <tr><td><code>bubbles-slice</code> ＋ <code>bubbles-listener</code><br><span style="color:var(--muted)">（測る→Redux→再レンダのループ）</span></td><td>—</td><td><b>要らなくなる。</b> 位置は値から純粋に出る</td></tr>
+        <tr><td><code>BubblesLayeredView</code> ＋ <code>BubbleView</code></td><td>—</td><td><code>ui/BubbleField</code>（ただし<b>見た目はまだ移していない</b> → <a href="#open">残課題</a>）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note prose">
+    <p><b>紛らわしい同名ライブラリ：</b> <code>bublys-libs/bubble-space</code>（1,574行）は<b>v1の模型で、別物</b>です（関係・アンカー・マグネット ＝ 規則が消したモデル）。使っているのは <code>apps/bublys-os/app/bubble-space-demo</code> と <code>bubble-space-hotel</code> の2ページだけ。比べる相手として残してあり、置き換えが済んだら2ページごと消す予定です。</p>
+  </div>
+</section>
+
+<!-- ─────────── 6 ─────────── -->
+<section id="progress">
+  <div class="sec-head">
+    <span class="n">06</span>
+    <h2>ここまでの道のり</h2>
+    <p class="sub">各段には「何を確かめたら次へ行ってよいか」が決まっていて、その検査が <code>_check/</code> に残っています。数字はすべて実測です。</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl done"><div class="when">09-10</div><div class="what">
+      <b>v1 <span style="font-weight:400;color:var(--muted)">bubble-lab.html</span></b>
+      <p>Canvas の単体プロトタイプ。「論理座標とレンズの合成だけで決まる」が第1版の公理だった。</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-13</div><div class="what">
+      <b>v2 <span style="font-weight:400;color:var(--muted)">bubble-lab-v2.html</span></b>
+      <p>目（カメラ）の位置で奥行きを覗く。</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-17</div><div class="what">
+      <b>v3 ── 公理を7つのプロトタイプで確かめる</b>
+      <p>v1 には配置の経路が2つあった（アンカーから決まる経路と、次元→レンズの経路）。<b>経路を1つにする</b>と決めた回。スナップも内包も coverflow も、すべて親の View。</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-17</div><div class="what">
+      <b>v4 ── 7案のいいとこどりを1つに（<a href="../bubble-space-prototype/v4/RULES.md">RULES.md</a>）</b>
+      <p>規則が5つに固まる。<b>ここが正典。</b></p>
+    </div></div>
+    <div class="tl done"><div class="when">09-18</div><div class="what">
+      <b>v5 ── canvas から DOM へ（<a href="../bubble-space-prototype/v5-dom/lab.html">lab.html</a>）</b>
+      <p>5通りの描き方を同じ台で測り、「平ら＋transform 1行」に決めた。旧 bubbles-ui との食い違い8つもここで洗い出した。</p>
+      <p class="proof">矩形 対 解いた答え 0.0000px ／ 落ちたフレーム 0</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-19</div><div class="what">
+      <b>ライブラリに切り出す（domain）</b>
+      <p>lab.html の純粋な部分だけを <code>bubble-layout</code> へ。同じ日に規則が2つ変わった（触ると視点が寄る／端での下限をやめる）。</p>
+      <p class="proof">ラボと差 0（41場面・2300個）／ テスト 63本</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-19</div><div class="what">
+      <b>React 版（ui）</b>
+      <p>描く・触るを React で。ラボと同時に開いて、同じ操作を同じ順に当てて突き合わせる検査を作った。</p>
+      <p class="proof">絵 0.00px（6264個）／ 触り方 9件で書かれた値が一致</p>
+    </div></div>
+    <div class="tl done"><div class="when">09-19</div><div class="what">
+      <b>v6 ── 本物のバブリを載せてみる（feature）</b>
+      <p>csv-importer の「一覧 → 詳細」を、画面ファイルを<b>1文字も編集せずに</b>新しいライブラリの上で動かした（esbuild の alias で差し替え）。</p>
+      <p class="proof">26件の検査。ObjectView・select が泡の中で生きる・ダブルクリックで開く</p>
+      <p style="margin-top:4px">09-21 に2つ直した ── 続けて開くと同じ場所に重なる／見えない親が掴めない。</p>
+    </div></div>
+    <div class="tl now"><div class="when">09-21<br>〜22</div><div class="what">
+      <b>v7 ── 旧の良さと収束させる　<span class="badge dec">いまここ</span></b>
+      <p>旧の実物と並べて測ったら、いまの開き方（X 魚眼）が<b>関心の順を逆転させていた</b>。旧の「層」を Z で書き直す案を、切り替えられる形で入れてある。</p>
+      <p class="proof">受け入れ検査 20本・単体 101本・lint 3つ、ぜんぶ通る</p>
+    </div></div>
+    <div class="tl"><div class="when">next</div><div class="what">
+      <b>本番のバブリに載せる</b>
+      <p>候補は <code>hotel-shift-puzzle-bubly</code>。その前に <a href="#fight">決めてほしいこと4つ</a>。</p>
+    </div></div>
+  </div>
+
+  <div class="aside prose" style="margin-top:28px">
+    <div class="t">「済んだ」の根拠 ── 検査 20 本</div>
+    <p><code>node docs/bubble-space-prototype/v5-dom/_check/all.mjs</code> で全部走ります。headless Chromium で <b>本物のマウス</b>で触り、数を突き合わせます。</p>
+    <p class="mono" style="font-size:12px;color:var(--muted);line-height:1.9">smoke ／ vs-v4 ／ hit ／ drag ／ flat ／ perf ／ ui ／ rule1〜rule5 ／ snap ／ stack ／ drawmin ／ screen ／ react ／ react-drag ／ bubly ／ plane</p>
+    <p>新しい振る舞いを足したら、<b>ここに1本足すのが作法</b>です。単体テスト（vitest 101本）は式の見張りで、受け入れ条件はこちら側にあります。</p>
+  </div>
+</section>
+
+<!-- ─────────── 7 ─────────── -->
+<section id="run">
+  <div class="sec-head">
+    <span class="n">07</span>
+    <h2>動かし方</h2>
+  </div>
+  <div class="cmds">
+    <div class="cmd">
+      <b>規則を触って確かめる（ビルド不要）</b>
+      <p>ツールバーで軸・並べ方・レンズを変えられる。プリセット8つ。<b>規則を疑ったらまずこれ。</b></p>
+      <pre><code>open docs/bubble-space-prototype/v5-dom/lab.html</code></pre>
+    </div>
+    <div class="cmd">
+      <b>本物のバブリの画面で触る（v6／v7）</b>
+      <p><code>#plane</code> を付けると旧の「層」の開き方で始まる。上のツールバーで切り替えられる。</p>
+      <pre><code>open docs/bubble-space-prototype/v6-bubly/dist/index.html
+open "docs/bubble-space-prototype/v6-bubly/dist/index.html#plane"</code></pre>
+    </div>
+    <div class="cmd">
+      <b>ライブラリを直したら、焼き直す</b>
+      <p>★ デモは feature の <code>dist</code> を掴むので、<code>nx test</code> だけでは反映されません（依存しかビルドされない）。</p>
+      <pre><code>npx nx build bubble-layout-feature
+node docs/bubble-space-prototype/v6-bubly/build.mjs</code></pre>
+    </div>
+    <div class="cmd">
+      <b>検査</b>
+      <pre><code>node docs/bubble-space-prototype/v5-dom/_check/all.mjs   # 受け入れ 20 本
+npx nx run-many -t lint test -p bubble-layout bubble-layout-ui bubble-layout-feature</code></pre>
+    </div>
+    <div class="cmd">
+      <b>React 版の見本だけ見る</b>
+      <pre><code>node bublys-libs/bubble-layout-ui/demo/build.mjs
+open bublys-libs/bubble-layout-ui/demo/dist/index.html</code></pre>
+    </div>
+    <div class="cmd">
+      <b>旧 bubbles-ui の実物と並べる</b>
+      <p>入口は <code>/</code>。<code>/bubble-ui</code> は Provider を持たない古い頁で落ちます（<code>useCas must be used within a CasProvider</code>）。<b>見終わったら止めること</b> ── dev サーバーはアプリのディレクトリ単位でロックを取るので、動かしたままだと次が起動できません。</p>
+      <pre><code>npx nx dev bublys-os     # → http://localhost:4000/</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── 8 ─────────── -->
+<section id="fight">
+  <div class="sec-head">
+    <span class="n">08</span>
+    <h2>いまの争点 ── 旧の良さをどう戻すか（v7）</h2>
+    <p class="sub">2026-09-21、旧の実物と新しい側を同じ順で触って測りました。詳細は <a href="../bubble-space-prototype/v7-convergence/FINDINGS.md">v7-convergence/FINDINGS.md</a>。</p>
+  </div>
+
+  <div class="prose">
+    <p>一覧から詳細を3つ続けて開く、という同じ流れです。</p>
+  </div>
+
+  <figure>
+    <div class="shots">
+      <div class="shot is-old">
+        <img src="shots/old-3.png" alt="旧 bubbles-ui で一覧から詳細を3つ開いた画面。詳細3つが同じ大きさで手前に並び、一覧は奥で小さい">
+        <div class="cap"><b>旧 bubbles-ui</b>詳細 1.00 ×3 ／ 一覧 0.80。同じ面に接して並び、閉じても兄弟は動かない。</div>
+      </div>
+      <div class="shot is-fish">
+        <img src="shots/new-fisheye-3.png" alt="新しい側の X 魚眼で詳細を3つ開いた画面。詳細3つが 0.755 まで縮み、一覧 0.773 より小さい">
+        <div class="cap"><b>新・X 魚眼（いまの既定）</b>詳細 0.755 ×3 ＜ 一覧 0.773。<span class="warn-t">関心の順が逆転</span>している。</div>
+      </div>
+      <div class="shot is-plane">
+        <img src="shots/new-plane-3.png" alt="新しい側の面モードで詳細を3つ開いた画面。詳細3つが 1.000 で縁を接して並び、一覧は 0.900">
+        <div class="cap"><b>新・面（v7 の提案）</b>詳細 1.000 ×3 ／ 一覧 0.900。旧と同じ形が、規則を足さずに出る。</div>
+      </div>
+    </div>
+    <figcaption>魚眼は<b>幅に罰を与えます</b>（規則①「泡の像は、端をレンズに通した間」）。続けて開いた同種は見えない親に入り、並びは1つの泡として像を作るので、2枚で 600px→0.912、3枚で 900px→0.755。<b>開けば開くほど、いちばん見たいものが小さくなる。</b></figcaption>
+  </figure>
+
+  <h3>芯 ── 旧の <code>layers</code> は「Z を詰める」だった</h3>
+
+  <figure>
+    <div class="drawing">
+      <svg viewBox="0 0 880 250" role="img" aria-label="旧の layers 配列の各要素が、新しい規則では同じ z 値を持つ泡の帯になり、帯の番号かける間隔が位置、透視が倍率になる">
+        <text class="s-dim" x="10" y="16">旧 bubbles-ui</text>
+        <text class="s-mono" x="10" y="42">process.layers = [</text>
+        <rect class="s-box-o" x="150" y="26" width="180" height="24" rx="5"/>
+        <text class="s-mono" x="160" y="43">[ d1, d2, d3 ]</text>
+        <text class="s-mono" x="336" y="42">,</text>
+        <rect class="s-box-o" x="350" y="26" width="170" height="24" rx="5"/>
+        <text class="s-mono" x="360" y="43">[ list, groups ]</text>
+        <text class="s-mono" x="526" y="42">]</text>
+        <text class="s-dim" x="560" y="43">何番目にいるか ＝ 奥行き</text>
+        <text class="s-dim" x="10" y="66">泡は奥行きの値を持たない。開くと unshift ＝ 全員が1段下がる</text>
+
+        <line class="s-line" x1="240" y1="76" x2="240" y2="104" marker-end="url(#ar)"/>
+        <line class="s-line" x1="435" y1="76" x2="435" y2="104" marker-end="url(#ar)"/>
+
+        <text class="s-dim" x="10" y="130">値（泡が持つ）</text>
+        <rect class="s-box" x="150" y="112" width="56" height="26" rx="5"/><text class="s-mono" x="178" y="130" text-anchor="middle">d1 −1</text>
+        <rect class="s-box" x="212" y="112" width="56" height="26" rx="5"/><text class="s-mono" x="240" y="130" text-anchor="middle">d2 −1</text>
+        <rect class="s-box" x="274" y="112" width="56" height="26" rx="5"/><text class="s-mono" x="302" y="130" text-anchor="middle">d3 −1</text>
+        <rect class="s-box" x="350" y="112" width="54" height="26" rx="5"/><text class="s-mono" x="377" y="130" text-anchor="middle">list 0</text>
+        <rect class="s-box" x="410" y="112" width="74" height="26" rx="5"/><text class="s-mono" x="447" y="130" text-anchor="middle">groups 0</text>
+        <text class="s-dim" x="560" y="130">Z ＝ 自由Z · 詰める · 透視</text>
+
+        <line class="s-line" x1="240" y1="142" x2="240" y2="166" marker-end="url(#ar)"/>
+        <line class="s-line" x1="435" y1="142" x2="435" y2="166" marker-end="url(#ar)"/>
+        <text class="s-dim" x="560" y="162">④ 値ごとに帯を作る</text>
+
+        <text class="s-dim" x="10" y="192">帯（View が作る）</text>
+        <rect class="s-box-a" x="150" y="174" width="180" height="26" rx="5"/>
+        <text class="s-mono" x="240" y="192" text-anchor="middle">帯0 ＝ { −1 }</text>
+        <rect class="s-box-a" x="350" y="174" width="134" height="26" rx="5"/>
+        <text class="s-mono" x="417" y="192" text-anchor="middle">帯1 ＝ { 0 }</text>
+        <text class="s-dim" x="560" y="192">空の帯は最初から無い</text>
+
+        <text class="s-dim" x="10" y="228">位置 → 倍率</text>
+        <text class="s-mono" x="150" y="228">dz 0 → m 1.00</text>
+        <text class="s-mono" x="350" y="228">dz 0.4274 → m 0.90</text>
+        <text class="s-dim" x="560" y="228">透視 m = 1 / (1 + 0.26·dz)</text>
+      </svg>
+    </div>
+    <figcaption>旧の配列の1要素が、新しい規則では「同じ <code>z</code> を持つ泡の帯」。開くときに<b>書くのは新しい泡の値1つだけ</b>で、他の泡は1バイトも変わりません。全員が1段下がって見えるのは、手前に帯が1つ増えて帯の番号がずれるからです。「空のレイヤーは詰まる」も、帯は値ごとに作るので何も書かずに出ます。</figcaption>
+  </figure>
+
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:30%"></th><th style="width:22%" class="old-t">旧</th><th style="width:24%" class="fish-t">新・X 魚眼</th><th style="width:24%;color:var(--accent)">新・面</th></tr></thead>
+      <tbody>
+        <tr><td>詳細を3つ</td><td class="k">1.00 ×3</td><td class="k warn-t">0.755 ×3</td><td class="k">1.000 ×3</td></tr>
+        <tr><td>そのときの一覧</td><td class="k">0.80</td><td class="k">0.773（詳細より大きい）</td><td class="k">0.900</td></tr>
+        <tr><td>一覧と詳細の隙間</td><td class="k">0px（測って寄せる）</td><td class="k">48px × 倍率</td><td class="k">0.00px（測らずに置く）</td></tr>
+        <tr><td>兄弟を1つ閉じる</td><td>他は動かない</td><td class="warn-t">残りが 150px 動いた</td><td class="k">0.00px</td></tr>
+        <tr><td>3段目</td><td class="k">1.0 / 0.9 / 0.8</td><td>—</td><td class="k">1.000 / 0.900 / 0.818</td></tr>
+        <tr><td>面が空になったら</td><td>後ろが1段ずつ上がる</td><td>—</td><td>上がる（一覧 1.000）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <p>この「面」の開き方は <code>&lt;BubbleSpace depth="plane"&gt;</code> で切り替えられる形で入っています（<b>既定はいまの魚眼のまま</b>、domain は1文字も触っていません）。決めてほしいことは <a href="#open">次の節</a>の先頭4つです。</p>
+  </div>
+</section>
+
+<!-- ─────────── 9 ─────────── -->
+<section id="open">
+  <div class="sec-head">
+    <span class="n">09</span>
+    <h2>残課題</h2>
+    <p class="sub">3種類に分かれます。<b>(a) 人が決めること</b>／<b>(b) 決まっているが作っていないこと</b>／<b>(c) 分かっている穴</b>。(a) を飛ばして (b) を作ると、あとで作り直しになります。</p>
+  </div>
+
+  <h3>(a) 決まっていない ── masa さん待ち</h3>
+  <div class="note prose">
+    <p><b>既定値を「決まったこと」として扱わないこと。</b> コードに入っている数（描く下限 5.0px、開く隙間、など）は、Claude が置いただけで masa さんが選んだものではないものが混ざっています。<b>masa さんの言葉と、こちらの解釈を混ぜない</b>のが、このプロジェクトでいちばん大事な作法です。</p>
+  </div>
+
+  <div class="open">
+    <div class="item">
+      <div class="hd"><b>1. 横に開いたときの奥行きは、魚眼か、面か</b><span class="badge hot">これが先</span><span class="src">v7 / FINDINGS 6章</span></div>
+      <p>魚眼は masa さん自身の提案で、狙いは「ただ兄弟にすると同じ大きさになって旧の良さが損なわれる」を避けること。<b>狙いは面でも満たせる</b>（上の実測）。魚眼を捨てる話ではなく、魚眼は View の1つとして残る（coverflow・世界線）。決めるのは「開く」の既定だけ。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>2. Z の「詰める」の帯の幅を <code>step</code> にするか</b><span class="src">v7 / arrange.ts:86</span></div>
+      <p>いま Z の詰めるは帯の幅が 1 に固定。<code>values.indexOf(v)</code> → <code>values.indexOf(v) * A.step</code> の<b>1語</b>で、開く・閉じるで<b>焦点を1回も書かずに</b>面が出る（実測 0回）。Z に詰めるを使う場面・検査は 0 件なので既存に響かない。ラボ（<code>lab.html:627</code>）にも同じ1語を入れて「差 0」を保つことになる。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>3. 接して開くと、少しドラッグしただけで「並び」になる</b><span class="badge hot">正面衝突</span><span class="src">v7 / snap-conflict.mjs</span></div>
+      <p>面で開いた直後の詳細を <b>(6,4)px</b> ドラッグして離すと、一覧と見えない親に入り 34px の穴があく。旧の良さ「縁が接する＝2つで1つに見える」と、新しい仕組み「くっつく」の衝突。</p>
+      <p><span class="lean">候補：</span>「くっつくのは同じ面の泡どうしだけ」（<code>snapCandidateAt</code> に1行。旧の「兄弟＝同じレイヤー」と同じ線引き）／ 接するのをやめて 48px あける ／ そのまま。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>4. 奥の泡を触ったとき、Z の焦点も寄せるか</b><span class="src">v7 / 規則②</span></div>
+      <p>旧は「描く順だけ上がる。何も消えない」。いまの②は X・Y・Z ぜんぶ寄せるので、奥の泡の<b>ヘッダ</b>を触ると手前の泡が消える（実測 <code>display:none</code>）。DECISIONS.md では「消えたものは画面の縁に積む」と決めてあるが、<b>そのスタックが feature にまだ無い</b>ので、いまはホイールでしか戻れない。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>5. 等間隔の「塊」を、泡の端と帯の端のどちらで測るか</b><span class="src">RULES.md 末尾</span></div>
+      <p>泡で測ると端の泡を広げたとき兄弟が一緒にずれる。帯で測るとずれは 0 だが箱が片寄る。両方できる形（<code>rules.equalExtent</code>）にしてあり、既定はラボと同じ <code>'bubble'</code>。<b>塊を空間のどこに置くか</b>（いまは必ず中央）も未定。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>6. 視点をどこで止めるか</b><span class="src">CARRYOVER 決めどころ4</span></div>
+      <p>いまは「中身が箱に収まるまで」。自由軸には止め方が無く、<b>背景を20回ドラッグすると画面に見えている泡が 0/58</b> になる（実測）。候補Bは「泡が置いてある所まで」に付け替える ── 規則を1つも増やさず、<b>旧 bubbles-ui は既にそちら</b>。関連して<b>「宇宙の縁で止める」が規則に無い</b>（カーソルを窓の外へ出すと泡が −227.0px へ行って二度と掴めない。旧にはガードがある）。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>7. ホスト自身の本文の席</b><span class="src">CARRYOVER 決めどころ5</span></div>
+      <p>「中身を持ちながら、子の泡も入れている泡」（表の行から泡が開いて、その泡が表の中に居座る、など）をまだ踏んでいない。ラボは本文を <code>display:none</code> にして避けてきた。④の帯に本文の席を1つ作るか、ホストになった泡は本文を捨てるか。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>8. 「開く」を規則②の表に入れるか／泡に url を持たせるか</b><span class="src">CARRYOVER 決めどころ6・8</span></div>
+      <p>①〜⑤に「泡を作る」も「消す」も無い ＝ <b>「開く＝物の泡を作って置く」は、いま既に規則の外</b>。いまは feature が <code>openAt</code> で持ち、url と id の対応も feature 側のメモ。</p>
+    </div>
+    <div class="item">
+      <div class="hd"><b>9. つまみ2つ（既定は置いただけ）</b><span class="src">DECISIONS.md</span></div>
+      <p><b>描く下限</b>（既定 5.0px・ツールバーの range 0〜20px）と<b>小さすぎた泡もスタックに積むか</b>（既定：積まない）。どちらも切り替えを残してあります。</p>
+    </div>
+  </div>
+
+  <h3>(b) 決まっているが、作っていない</h3>
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:28%">もの</th><th style="width:20%">決まっていること</th><th>いま</th></tr></thead>
+      <tbody>
+        <tr><td><b>補間</b></td><td>CSS transition に任せる。掴んでいる泡だけ切る</td><td>まだ書いていない。開くと泡がぱっと出る</td></tr>
+        <tr><td><b>手前の泡スタック</b></td><td>焦点より手前に出た泡は画面の縁に積む。押すとカメラが戻る。<b>状態は持たない</b>（カメラの位置の関数）</td><td>ラボにはある。feature に未配線（上の決めどころ4に直結）</td></tr>
+        <tr><td><b>カメラと世界線</b></td><td>カメラは<b>ハッシュに入れず、ノードに紐づける</b>（同一性には載せない）。ポップアップは打ち消しスナップで戻る</td><td>コードになっていない</td></tr>
+        <tr><td><b>Redux</b></td><td>載せるなら <code>WorldState</code> 丸ごと1つ（CLAUDE.md「スライスは集約のリポジトリに徹する」）</td><td><code>world</code> / <code>onChange</code> の口だけ開いている。開き直すと消える</td></tr>
+        <tr><td><b>泡の見た目</b></td><td>枠に出すのは<b>url（パンくず）</b>、題名ではない（中身が自分の題名を出すので二重になる）</td><td>ラボの暗い箱のまま。<span class="warn-t">バブリの中身（明るい地が前提）の字が読めない</span></td></tr>
+        <tr><td><b>出どころのリボン</b></td><td>足せる。ui 79行。毎フレーム <code>placements()</code> から引き直す</td><td>無い</td></tr>
+        <tr><td><b>ポップアップ／落とした点に開く</b></td><td>ダブルクリックとドロップは<b>もともと同じ道</b></td><td><code>OpenAs</code> は <code>'beside'</code> だけ</td></tr>
+        <tr><td><b>小さい泡は骨に</b></td><td>ui の仕事</td><td>描く下限（描かない）だけ。中間の「骨」が無い</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>(c) 分かっている穴</h3>
+  <div class="prose"><p>どれも実測で見つかっていて、直し方が分かっているものと、分かっていないものがあります。</p></div>
+  <div class="tbl" style="max-width:860px">
+    <table>
+      <thead><tr><th style="width:44%">穴</th><th style="width:18%">実測</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>消えた泡で縮んだ並びを⑤が留めない（<code>reshape</code> が「出ていった泡」しか数えない。ラボには泡を消す口が無かった）</td><td class="k">150px → 0.00px</td><td>feature で手当て済み。<b>本来の置き場は domain</b></td></tr>
+        <tr><td>魚眼で幅の広い泡を掴むとずれる（①「像は端を通した間」から出る残り）</td><td class="k">最大 21.78px</td><td>直し方が分かっていない</td></tr>
+        <tr><td>焦点の泡も原寸に戻らない（レンズは焦点の上でも曲がる）</td><td class="k">root で 0.962</td><td>同上（旧の最前面は 1.000）</td></tr>
+        <tr><td>ホイール1回で画面が1枚になる</td><td class="k">57個中 34個が vis 0</td><td>戻し方が画面のどこにも無い</td></tr>
+        <tr><td>View を組み替えると、触っていない泡が滑る</td><td class="k">平均 Δ321.9px</td><td>⑤の言葉の上では破れではない</td></tr>
+        <tr><td>角の当たり判定が 12px 決め打ち（小さい泡では幅の 41%）</td><td class="k">箱の外 +2px で効く</td><td>v3 は <code>min(12, w/2, h/2)</code> だった</td></tr>
+        <tr><td>世界線の箱が履歴の長さで膨らむ</td><td class="k">N=200 で 664→2341.9px</td><td>原因は <code>measure.ts:74</code> の <code>need + pad</code></td></tr>
+        <tr><td>泡が 1000 個を超える場面を誰も測っていない／画面外の泡を捨てる手が全部使えない（切り抜き禁止）</td><td class="k">58→521で反転</td><td>未検証</td></tr>
+        <tr><td>キーボード操作が無い</td><td class="k">tabindex 0 / keydown 0</td><td>ラボに口が無くて試せていない</td></tr>
+        <tr><td>複数人で同じ泡を見る／印刷・書き出し／検索</td><td class="k">178件中 0件</td><td>誰も考えていない</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────── 10 ─────────── -->
+<section id="manners">
+  <div class="sec-head">
+    <span class="n">10</span>
+    <h2>引き継ぐ人へ ── このプロジェクトの作法</h2>
+  </div>
+  <div class="prose">
+    <ol>
+      <li><b>ノートが原典、コードはその移植。</b> 意図が読めない実装を見つけたら、バグと呼ぶ前に <code>docs/</code> を探す。「穴を伸びた後のサイズの比率にすると破綻する」のように、かつて発散やクラッシュを起こして今の形に落ち着いた決定が番号つきで残っている。</li>
+      <li><b>実測で話す。</b> この一連のノートに出てくる数字は全部、実際に触って測ったものです。「たぶん速い」「たぶん同じ」は書かない。検査を1本足すほうが早い。</li>
+      <li><b>規則を増やす前に、5つのどれで書けるかを考える。</b> v7 の「面」も、規則を足さずに Z 軸で書けました。増やす提案をするときは、<b>増やすと分かる形で</b>出す。</li>
+      <li><b>domain に画面の話を入れない。</b> 描く下限も、当たり判定も、補間も ui。<code>resolveWorld</code> の答えは下限を動かしても1バイトも変わらない（検査が見張っています）。</li>
+      <li><b>masa さんの言葉と、自分の解釈を分ける。</b> 一度これを取り違えました ── 「覆われるのは構わない」を「潰れて読めないのは駄目」と読み替えて、要らない下限を入れてしまった。ノートに <b>★ 印</b>が付いているのは、その取り違えの記録です。</li>
+      <li><b>実装前に議論する。</b> CLAUDE.md の設計哲学：「イベントハンドラごとに個別の処理を書くのではなく、言語化しやすいシンプルなルールに基づいて動作が自然と行われるようにする」。</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ─────────── 11 ─────────── -->
+<section id="docs">
+  <div class="sec-head">
+    <span class="n">11</span>
+    <h2>書類の地図</h2>
+  </div>
+  <div class="map">
+    <pre><code>docs/bubble-layout/
+  index.html                        ← いま読んでいるもの
+
+docs/bubble-space-prototype/
+  <b>v4/RULES.md</b>                      ★ 規則の正典。迷ったらここ
+  <b>DECISIONS.md</b>                     ★ 規則の外で決めたことと、その経緯
+  v3/SPEC.md                        公理を7案で確かめた回の共通語彙
+  v5-dom/<b>FINDINGS.md</b>                DOM 5案の実測・旧との食い違い8つ・masa さんへの三択
+  v5-dom/lab.html                   ラボ（ビルド不要で触れる。規則の実物）
+  v5-dom/_check/all.mjs             受け入れ検査 20 本の入口
+  v6-bubly/<b>FINDINGS.md</b>              本物のバブリを載せた回。踏んだ3つ
+  v7-convergence/<b>FINDINGS.md</b>        旧との収束。決めどころ4つ（いまここ）
+  _carryover/<b>CARRYOVER.md</b>           ★ 旧の良さ 54件の棚卸し。書ける/足せる/ぶつかる/落とす
+
+bublys-libs/
+  bubble-layout/README.md           domain。何をどこへ移したか・テストの網
+  bubble-layout-ui/README.md        ui。なぜ平らな DOM か・描く下限
+  bubble-layout-feature/README.md   feature。置き換えに要る口4つ
+
+CLAUDE.md                           リポジトリ全体の規約（Nx・3層 DDD・スライスは集約のリポジトリ）</code></pre>
+  </div>
+  <div class="aside prose">
+    <div class="t">迷ったときの索引</div>
+    <ul>
+      <li>「この並べ方は書けるのか」→ <b>RULES.md</b> の①④、それでも分からなければラボで作ってみる</li>
+      <li>「旧にあったあの機能はどうなった」→ <b>CARRYOVER.md</b> の一覧（54件を4つに仕分けてある）</li>
+      <li>「なぜこの数字なのか」→ <b>DECISIONS.md</b>、それか各 FINDINGS の「ぶつかった」節</li>
+      <li>「なぜこの書き方なのか（性能）」→ <b>v5-dom/FINDINGS.md</b> 2〜3章</li>
+    </ul>
+  </div>
+</section>
+
+<footer class="end">
+  <p>2026-09-22 時点。ブランチ <code>feat/bubble-layout-convergence</code>。<br>
+  この頁は <code>docs/bubble-layout/index.html</code>。新しいことが決まったら、<b>まず FINDINGS を書き、この頁の「現在地」と「残課題」を直す</b>のがいちばん効きます。</p>
+</footer>
+
+</main>
+</div>
+</body>
+</html>

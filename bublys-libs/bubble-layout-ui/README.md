@@ -1,5 +1,7 @@
 # @bublys-org/bubble-layout-ui
 
+> **はじめて触る人へ：** 全体像・進み具合・残課題は [`docs/bubble-layout/index.html`](../../docs/bubble-layout/index.html)（ブラウザで開く1枚の引き継ぎノート）。
+
 泡のならべかたを **React で描く**。模型は [`@bublys-org/bubble-layout`](../bubble-layout)（domain）。
 
 正：[`docs/bubble-space-prototype/v4/RULES.md`](../../docs/bubble-space-prototype/v4/RULES.md)
@@ -72,7 +74,7 @@ const input = useBubbleInput({ world, setWorld, layout: base, viewport,
              layerRef={layerRef} {...input.handlers} ... />
 ```
 
-掴む・引く・離す・ホイール・大きさの角・**②「引かずに離す＝触る」**まで入っている。
+掴む・ドラッグする・離す・ホイール・大きさの角・**②「ドラッグせずに離す＝触る」**まで入っている。
 値を書くのは domain の動詞（`dragBubble` `dragFocus` `wheelZ` `resizeBubble` `commitDrop` `focusOn`）で、
 ui がやるのは「何を掴んだか」を決めて**画面の量を模型の言葉に噛み砕く**ところまで。
 
@@ -85,23 +87,23 @@ ui がやるのは「何を掴んだか」を決めて**画面の量を模型の
 
 | 触り方 | 何が変わったか（両方で同じ） |
 |---|---|
-| 自由に置く空間で引く | `memo3.free` |
+| 自由に置く空間でドラッグする | `memo3.free` |
 | 並べ替え | `row0.order` `row1.order` |
 | マス移動 | `d3.cell` `d12.cell` |
-| 視点が動く空間で引く | `fish.focus` |
-| **なしの空間で引く** | **何も起きない** |
-| 背景を引く | `root.focus` |
-| **引かずに離す（＝触る）** | `cover.focus`（値は1つも書かない） |
+| 視点が動く空間でドラッグする | `fish.focus` |
+| **なしの空間でドラッグする** | **何も起きない** |
+| 背景をドラッグする | `root.focus` |
+| **ドラッグせずに離す（＝触る）** | `cover.focus`（値は1つも書かない） |
 | ホイール | `root.focus` |
 | 大きさの角 | `memo1.size` `memo1.free`（⑤ pin） |
 
-**引いている途中の見え**（持ち上げ）も別に見ている ── 56 枚の矩形が **0.0px 差**、
+**ドラッグしている途中の見え**（持ち上げ）も別に見ている ── 56 枚の矩形が **0.0px 差**、
 描く順の食い違い 0、一番手前の泡も同じ。
 
 ### ★ ラボとの違いが1つある
 
-ラボは引いているあいだ「解き直す → DOM に写す → DOM で当てる」を1フレームでやるが、
-React は書き換えが次のフレームなので、**引いているあいだの落とし先は模型で当てる**（`hitModelAt`）。
+ラボはドラッグしているあいだ「解き直す → DOM に写す → DOM で当てる」を1フレームでやるが、
+React は書き換えが次のフレームなので、**ドラッグしているあいだの落とし先は模型で当てる**（`hitModelAt`）。
 押した瞬間だけは DOM で当てる（`pickAt`）。
 上の突き合わせでは、これによる差は出ていない。
 

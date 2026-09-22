@@ -1,5 +1,7 @@
 # @bublys-org/bubble-layout-feature
 
+> **はじめて触る人へ：** 全体像・進み具合・残課題は [`docs/bubble-layout/index.html`](../../docs/bubble-layout/index.html)（ブラウザで開く1枚の引き継ぎノート）。
+
 泡のならべかたを、**url とオブジェクトにつなぐ**層。
 模型は [`@bublys-org/bubble-layout`](../bubble-layout)、描く・触るは [`@bublys-org/bubble-layout-ui`](../bubble-layout-ui)。
 
@@ -46,7 +48,16 @@ BublyApp 系   36     外枠（Provider・メニュー）
 3. **そこへ視点が寄る**（泡の値は1つも書かない）
 
 隙間は `METRICS.SNAP_EDGE × 2`。**くっつく距離より広くないといけない** ──
-同じにしていたら、開いた直後の2つがひと引きで並びになった（v6 で踏んだ）。
+同じにしていたら、開いた直後の2つが少しドラッグしただけで並びになった（v6 で踏んだ）。
+
+## ★ 試している ── 奥行きを「面」で付ける（`depth="plane"`）
+
+既定は上の魚眼のまま。`<BubbleSpace depth="plane">` にすると、旧 `bubbles-ui` の `process.layers` を Z で書いた開き方になる：
+別の種類を開くと1段手前に新しい面（元の泡は 0.90 に下がる）、同じ種類は同じ面に並ぶ（全員 1.00）、
+面が空になると後ろが上がってくる。**規則は足していない**（外の空間は最初から `Z＝自由Z·そのまま·透視`）。
+
+なぜ試すか・実測・masa さんに決めてほしいこと：[`docs/bubble-space-prototype/v7-convergence/FINDINGS.md`](../../docs/bubble-space-prototype/v7-convergence/FINDINGS.md)。
+見張り：`node docs/bubble-space-prototype/v5-dom/_check/plane.mjs`（`all.mjs` の20本目）
 
 ## 受け入れ条件
 

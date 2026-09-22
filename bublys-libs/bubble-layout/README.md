@@ -1,5 +1,7 @@
 # @bublys-org/bubble-layout
 
+> **はじめて触る人へ：** 全体像・進み具合・残課題は [`docs/bubble-layout/index.html`](../../docs/bubble-layout/index.html)（ブラウザで開く1枚の引き継ぎノート）。
+
 `docs/bubble-space-prototype/v5-dom/lab.html`（1832 行）の**純粋な部分だけ**を切り出した domain ライブラリ。
 仕様の正は `docs/bubble-space-prototype/v4/RULES.md`。React も Redux も DOM も入っていない。
 
@@ -48,7 +50,7 @@ domain 本体 **2658 行 / 18 ファイル**、テスト **1017 行 / 9 ファ�
 | §2 解く順番（★合成はここ1回だけ） | 708-800 | `resolve.ts` |
 | 写しと逆写し・焦点の約束 | 802-854 | `project.ts` |
 | ② 触った泡へ視点が寄る（もと「手前へ」355-379 の raise） | 355-364, 1362-1378 | `focus.ts` |
-| ② 引いているあいだ値を書く所・ホイール・resize | 1135-1200, 1536-1541 | `drag.ts` |
+| ② ドラッグしているあいだ値を書く所・ホイール・resize | 1135-1200, 1536-1541 | `drag.ts` |
 | 離す先・くっつける候補・空間の見出し | 896-905, 1208-1301 | `drop.ts` |
 | 形を変える1本道（③ 並びは2つ以上） | 1304-1476 | `reshape.ts` |
 | ⑤ pin・keepSeen | 1478-1516 | `pin.ts` |
@@ -81,9 +83,9 @@ headless Chromium でラボを開き、`__lab.placements()` などを取って `
 | 泡の値 parent・order・free・focus・cell・hist・size | 同上 | **0** |
 | 空間 host・H・vp・焦点 xyz | 59 空間 | **0** |
 | View を変える（プリセット2・軸5・窓へ回る2・継承2＋実ボタン3） | 14 | **0** |
-| 操作を確定（本物のマウスで引いた `commitDrop`） | 10 本 | **0** |
+| 操作を確定（本物のマウスでドラッグした `commitDrop`） | 10 本 | **0** |
 | 触る（`focusOn`）/ resize（⑤ pin）/ ホイール / 背景ドラッグ / 泡ドラッグ | 16 本 | **0** |
-| 離す先 `slotAt`（引いている間の全部の答え） | 8 本・130 回 | **0**（後述の1点を除く） |
+| 離す先 `slotAt`（ドラッグしている間の全部の答え） | 8 本・130 回 | **0**（後述の1点を除く） |
 | 印 `markLine` / `markRect` | 3 本・51 回 | **0px** |
 
 **0 でなかったのは1つだけ。** `snap.dist` が 130 回中 **2 回だけ 1.14e-13** ちがった。
