@@ -10,7 +10,7 @@
  */
 export const FIELD_CSS = `
 .bl-layer{position:absolute;inset:0;z-index:1;--f:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
-/* 泡は DOM なので、引くと字が選択されてしまう。canvas には無かった代金。ここで止める */
+/* 泡は DOM なので、ドラッグすると字が選択されてしまう。canvas には無かった代金。ここで止める */
 .bl-layer{user-select:none;-webkit-user-select:none;touch-action:none}
 /* 泡。素の大きさは箱（bw×bh）のまま。毎フレーム書くのは transform だけ。
    画面で固定の量は逆 scale（--k）で戻す。border-width や font-size を毎フレーム書かない */

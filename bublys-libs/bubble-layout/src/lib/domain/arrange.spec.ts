@@ -25,7 +25,7 @@ describe('④ 並べる ＝ 帯の式', () => {
     expect(L.arr.x.pos.get('memo1')).toBe(-625);
     expect(L.arr.y.pos.get('memo1')).toBe(-338);
     expect(L.arr.x.bands).toEqual([]);                       // 帯を作らない
-    // 画面 1440 の中心 720 から −625、箱の半分 65 を引いて 30（ラボ実測）
+    // 画面 1440 の中心 720 から −625、箱の半分 65 をドラッグして 30（ラボ実測）
     expect(placeOf(layout, 'memo1').x).toBe(30);
     expect(placeOf(layout, 'memo1').y).toBe(26.75);
   });

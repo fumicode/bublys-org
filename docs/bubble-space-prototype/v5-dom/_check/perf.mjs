@@ -15,14 +15,14 @@ console.log(`    transform ${rest.tf} ／ 大きさ ${rest.wh} ／ 逆scale ${re
 ok(rest.frames > 20, `まわっている（${rest.frames} フレーム）`);
 ok(rest.tf + rest.wh + rest.k + rest.z + rest.cls + rest.op + rest.dsp === 0, "動いていないときは1つも書かない");
 
-// ── 2. 引いているとき：書くのは transform だけか ──
+// ── 2. ドラッグしているとき：書くのは transform だけか ──
 await lab.call("stats");
 const p = await lab.headerPointOf("memo1");
 await lab.page.mouse.move(p.x, p.y); await lab.page.mouse.down();
 for (let i = 1; i <= 30; i++) { await lab.page.mouse.move(p.x + i * 6, p.y + i * 3); await lab.page.waitForTimeout(10); }
 await lab.page.mouse.up();
 const dr = await lab.call("stats");
-console.log(`  メモを 180px 引くあいだ（${dr.frames} フレーム・のべ ${dr.els} 個）`);
+console.log(`  メモを 180px ドラッグするあいだ（${dr.frames} フレーム・のべ ${dr.els} 個）`);
 console.log(`    transform ${dr.tf} ／ 大きさ ${dr.wh} ／ 逆scale ${dr.k} ／ z-index ${dr.z}`
           + ` ／ class ${dr.cls} ／ opacity ${dr.op} ／ display ${dr.dsp}`);
 ok(dr.tf > 0, "transform は書いている");

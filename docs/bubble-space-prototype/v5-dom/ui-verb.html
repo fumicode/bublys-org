@@ -238,7 +238,7 @@ const VERBS = [
     view: "grid",  why: "列と行のマス。掴めば別のマスへ移る" },
   { id: "flip",  label: "めくる",     glyph: [[0,7,4,7],[5,4,6,13],[12,2,8,17],[21,6,4,9]],
     subLabel: "向き", subs: [{ id: "x", label: "横", view: "coverflow" }, { id: "y", label: "縦", view: "coverflowY" }],
-    why: "等間隔に並べて魚眼。真ん中が大きい。背景を引くと流れる" },
+    why: "等間隔に並べて魚眼。真ん中が大きい。背景をドラッグすると流れる" },
   { id: "pile",  label: "重ねる",     glyph: [[1,9,14,10],[5,5,14,10],[9,1,14,10]],
     view: "stackZ", why: "紙の束。触った泡が最前面へ（何度触ってもずれない）" },
   { id: "hist",  label: "履歴で見る", glyph: [[2,4,5,13],[8,6,5,9],[14,8,5,5],[20,9,4,3]],
@@ -571,12 +571,12 @@ function draw() {
     world.appendChild(d);
   }
   const sp = targetSpace(), F = focusOf(sp);
-  $("#stagehint").innerHTML = "泡を押す … その泡がいる空間に動詞が効く　背景を引く … <b>視点が動く</b>（②）　ホイール … <b>奥行きの視点</b>（②）"
+  $("#stagehint").innerHTML = "泡を押す … その泡がいる空間に動詞が効く　背景をドラッグする … <b>視点が動く</b>（②）　ホイール … <b>奥行きの視点</b>（②）"
     + "　｜　焦点 " + F.x.toFixed(0) + ", " + F.y.toFixed(0) + ", " + F.z.toFixed(2)
     + "　｜　④ 帯の式は本当に解いている。書き込む操作は入れていないので ⑤ は出ない";
 }
 
-/* ── ② 背景を引く＝視点／ホイール＝奥行きの視点 ── */
+/* ── ② 背景をドラッグする＝視点／ホイール＝奥行きの視点 ── */
 let drag = null;
 stage.addEventListener("mousedown", e => {
   drag = { x: e.clientX, y: e.clientY, sp: targetSpace() };

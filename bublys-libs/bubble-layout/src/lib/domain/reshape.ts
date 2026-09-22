@@ -154,7 +154,7 @@ export function commitDrop(
         w = renumber(w, [...sortedIds(w.kidsOf(slot.space).filter((k) => k.id !== id)), id]);
       }
       // ★ ここには raise（置いた泡も手前へ）があった。触っても値を書かなくなったので消した。
-      //   置くのは「掴んで引いた」あとなので、値（親・順序・マス）は上でもう書いてある。
+      //   置くのは「掴んでドラッグした」あとなので、値（親・順序・マス）は上でもう書いてある。
       //   視点の側は、掴む前の pointerdown が触りなので ui が focusOn を通っている（domain は足さない）
 
       // ★ 同じマスに2つ入れない。マス移動は兄弟の値の入れ替え：

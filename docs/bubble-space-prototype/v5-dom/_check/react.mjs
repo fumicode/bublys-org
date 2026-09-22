@@ -83,7 +83,7 @@ async function main() {
     await lab.call("keep");           // 補間を進めずに、いまの状態で解き直す（React は補間を持たない）
     await lab.settle(); await re.settle();
 
-    // ① 模型の答え。★ ラボの placements は窓の座標（舞台の左上を足してある）ので、引いてそろえる
+    // ① 模型の答え。★ ラボの placements は窓の座標（舞台の左上を足してある）ので、ドラッグしてそろえる
     const off = await lab.page.evaluate(() => { const r = document.querySelector("#stage").getBoundingClientRect(); return { x: r.left, y: r.top }; });
     const lp = (await lab.placements()).map((p) => ({ ...p, x: p.x - off.x, y: p.y - off.y }));
     const rp = await re.call("placements");

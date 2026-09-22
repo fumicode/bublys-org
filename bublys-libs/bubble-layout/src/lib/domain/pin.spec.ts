@@ -5,7 +5,7 @@
  * > 触っていない泡の見えている場所を保つように、位置を書き直す。
  *
  * ラボ実測（_check/rule5.mjs と同じ手順）：
- *   佐藤（スタッフの先頭）の右下の角を、本物のマウスで +60px 引く。
+ *   佐藤（スタッフの先頭）の右下の角を、本物のマウスで +60px ドラッグする。
  *   ・pin 入り … 勤務表・スタッフ・メモ・付箋A は 0.0px。カレンダーだけ帯の伸びちょうど（+60px）押される
  *   ・pin 切り … 勤務表・スタッフ が −30.0px（箱は中心を軸に両側へ伸びるので、左の縁は伸びの半分だけ動く）
  *
@@ -21,7 +21,7 @@ import type { Layout } from './resolve.js';
 import { DEFAULT_RULES } from './rules.js';
 import { labScene, placeOf, seenOf, VIEWPORT } from './lab-scene.js';
 
-/** 佐藤の右下の角を、画面で +60px 引く（ラボの widen と同じ） */
+/** 佐藤の右下の角を、画面で +60px ドラッグする（ラボの widen と同じ） */
 function widen(world: ReturnType<typeof labScene>, run = resizeBubble) {
   const layout = resolveWorld(world, VIEWPORT);
   const ctx = actContext(VIEWPORT, seenOf(layout), DEFAULT_RULES);
@@ -36,7 +36,7 @@ const ready = widen(labScene());
 const before = resolveWorld(ready, VIEWPORT);
 
 describe('⑤ 触っていない泡は、画面の上で動かない', () => {
-  it('★ 角を +60px 引いても、触っていない泡は 0.0px（勤務表・スタッフ・メモ・付箋A）', () => {
+  it('★ 角を +60px ドラッグしても、触っていない泡は 0.0px（勤務表・スタッフ・メモ・付箋A）', () => {
     const after = resolveWorld(widen(ready), VIEWPORT);
     // 箱はちゃんと 60px 伸びた（伸びていなければ「動かない」は当たり前になってしまう）
     expect(placeOf(after, 'staff').w - placeOf(before, 'staff').w).toBeCloseTo(60, 9);

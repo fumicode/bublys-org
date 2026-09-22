@@ -1,5 +1,5 @@
 // ③ くっつける ── 本物のマウスで。縁へ寄せる → 並ぶ／引き離す → 抜ける／入れ子／
-//   くっつけるは「落とし込みの1つ」（入れ子の中の泡が、少し引いただけで外の並びへ飛ばないか）
+//   くっつけるは「落とし込みの1つ」（入れ子の中の泡が、少しドラッグしただけで外の並びへ飛ばないか）
 //   node docs/bubble-space-prototype/v5-dom/_check/snap.mjs
 import { openLab } from "./lab.mjs";
 
@@ -11,7 +11,7 @@ const rows = () => lab.call("implicitParents");
 console.log(`■ 縁へ寄せて離す → くっつく（本物のマウス）`);
 {
   const before = await lab.rect("fA"), b2 = await lab.rect("fB"), c = await lab.rect("fC");
-  // 付箋C を 付箋B の右の縁から 20px 手前まで引く（SNAP_EDGE は 24px）
+  // 付箋C を 付箋B の右の縁から 20px 手前までドラッグする（SNAP_EDGE は 24px）
   const dx = (b2.x + b2.w + 20) - c.x, dy = (b2.y + 10) - c.y;
   await lab.dragBubble("fC", { dx, dy });
   const rs = await rows(), after = await lab.rect("fA");
@@ -49,7 +49,7 @@ console.log(`\n■ 引き離す → 抜ける。子が1つになった見えな�
   ok(!parent || !parent.startsWith("snap"), `引き離した泡は並びから抜ける（落ちた先は ${parent ?? "外の空間"}）`);
 }
 
-console.log(`\n■ くっつけるは「落とし込みの1つ」── 入れ子の中の泡を少し引いても、外の並びへ飛ばない`);
+console.log(`\n■ くっつけるは「落とし込みの1つ」── 入れ子の中の泡を少しドラッグしても、外の並びへ飛ばない`);
 for (const [id, dx] of [["d6", 22], ["seiyaku", 95], ["p4", 40]]) {
   const k0 = await lab.rect("kinmu");
   const b0 = (await lab.bubbles()).find((b) => b.id === id);

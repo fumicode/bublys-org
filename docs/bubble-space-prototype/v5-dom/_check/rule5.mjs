@@ -12,7 +12,7 @@ const ok = (c, msg) => { console.log(`${c ? "  OK " : "  NG "} ${msg}`); if (!c)
 const WATCH = ["kinmu", "staff", "cal", "seiyaku", "p1", "memo1", "fA"];
 const rects = async () => Object.fromEntries(await Promise.all(WATCH.map(async (id) => [id, await lab.rect(id)])));
 
-/** 佐藤（スタッフの中の先頭）の右下の角を、本物のマウスで dx だけ引く */
+/** 佐藤（スタッフの中の先頭）の右下の角を、本物のマウスで dx だけドラッグする */
 async function widen(dx) {
   await lab.select("p0");                 // 角は選択中の泡にだけ出る（handleAt）
   await lab.settle();

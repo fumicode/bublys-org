@@ -39,7 +39,7 @@ const css = (sel, prop) => lab.page.evaluate(([s, p]) => getComputedStyle(docume
   await lab.select("d3"); await lab.settle();
   const t = await lab.textOf("#selection");
   console.log("  選択中の泡（カレンダーの「4」）:\n" + t.split("\n").map((l) => "    " + l).join("\n"));
-  for (const k of ["いる空間", "横ドラッグ", "縦ドラッグ", "ホイール", "角を引く", "倍率"])
+  for (const k of ["いる空間", "横ドラッグ", "縦ドラッグ", "ホイール", "角をドラッグする", "倍率"])
     ok(t.includes(k), `選択中の泡に「${k}」が出る`);
   ok(/[①-⑤]/.test(t), `どの規則から出ている答えかが、行頭の番号で分かる`);
 }
@@ -52,7 +52,7 @@ const css = (sel, prop) => lab.page.evaluate(([s, p]) => getComputedStyle(docume
   const t = await lab.textOf("#cursor-hint");
   console.log(`  カーソル脇（カレンダーの「4」の上）: ${JSON.stringify(t)}`);
   ok(shown === "block", `カーソルの脇にヒントが出る`);
-  ok(t.includes("列を移る") && t.includes("行を移る"), `その場所で引いたら何が起きるかが出る`);
+  ok(t.includes("列を移る") && t.includes("行を移る"), `その場所でドラッグしたら何が起きるかが出る`);
   await lab.shot("screen-cursor");
 }
 

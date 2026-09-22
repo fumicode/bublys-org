@@ -13,7 +13,7 @@
  * ★ 中身は入っている（`declare` はもう無い。この barrel を import すれば動く）。
  *   解決（値 → 画面の配置。dimension / lens / arrange / view / bubble / world / measure / resolve / project）は、
  *   ラボを headless Chromium で開いて出した配置と **px で突き合わせて差 0** を確かめてある
- *   ── 15 場面（起動直後・焦点を引く・魚眼・プリセット・外から継ぐ・見えない親）× 58 個の泡、
+ *   ── 15 場面（起動直後・焦点をドラッグする・魚眼・プリセット・外から継ぐ・見えない親）× 58 個の泡、
  *   x・y・w・h・scale・local・alpha・vis・depth・描く順・空間ごとの H/vp/焦点 のぜんぶ。
  *   代表は `resolve.spec.ts`（`npx nx test bubble-layout`）。
  */

@@ -1,7 +1,7 @@
 /**
- * ② 操作は、軸と、何を掴んだかで決まる ── 泡を引いたとき、値のどこへ書くか。
+ * ② 操作は、軸と、何を掴んだかで決まる ── 泡をドラッグしたとき、値のどこへ書くか。
  *
- * | 軸の次元 | 泡を引くと |
+ * | 軸の次元 | 泡をドラッグすると |
  * | 書ける（自由・順序・列/行） | その次元へ書く |
  * | 書けない（履歴）            | 視点が動く     |
  * | なし                        | 何も起きない   |
@@ -16,10 +16,10 @@ import { withAxis } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
 import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
-describe('② 泡を引く', () => {
+describe('② 泡をドラッグする', () => {
   it('★ 書き込む先は、その軸に刺さっている次元（free.x 決め打ちではない）', () => {
-    // ラボ実測：外の空間の X に 自由Y・Y に 自由X を刺して、付箋C を (+90,+60) 引いた
-    //   → 自由X 268 → 328（＝ 縦に引いた 60）／自由Y 225 → 315（＝ 横に引いた 90）と入れ替わる
+    // ラボ実測：外の空間の X に 自由Y・Y に 自由X を刺して、付箋C を (+90,+60) ドラッグした
+    //   → 自由X 268 → 328（＝ 縦にドラッグした 60）／自由Y 225 → 315（＝ 横にドラッグした 90）と入れ替わる
     let w = withAxis(labScene(), 'root', 'x', { dim: 'free.y' });
     w = withAxis(w, 'root', 'y', { dim: 'free.x' });
     expect(dragVerbsOf(w, 'root')).toEqual({ x: 'coord', y: 'coord' });
@@ -31,7 +31,7 @@ describe('② 泡を引く', () => {
   });
 
   it('書けないなら視点が動く（X魚眼ビュー ＝ 履歴。泡ではなく空間の焦点に書く）', () => {
-    // ラボ実測：版5 を横に 70px 引いたら、X魚眼ビューの焦点 X が 0 → −110.48881297487148
+    // ラボ実測：版5 を横に 70px ドラッグしたら、X魚眼ビューの焦点 X が 0 → −110.48881297487148
     const w = labScene();
     const layout = resolveWorld(w, VIEWPORT);
     expect(dragVerbsOf(w, 'fish')).toEqual({ x: 'focus', y: 'focus' });
@@ -47,7 +47,7 @@ describe('② 泡を引く', () => {
   });
 
   it('なしなら何も起きない（議事録 ＝ X・Y とも なし）', () => {
-    // ラボ実測：確定 を (+70,+40) 引いても、値も焦点も動かない
+    // ラボ実測：確定 を (+70,+40) ドラッグしても、値も焦点も動かない
     const w = labScene();
     const layout = resolveWorld(w, VIEWPORT);
     expect(dragVerbsOf(w, 'giji')).toEqual({ x: 'none', y: 'none' });
@@ -59,7 +59,7 @@ describe('② 泡を引く', () => {
     expect(next.bubble('giji')?.state.focus).toEqual({ x: 0, y: 0, z: 0 });
   });
 
-  it('並べ替え・マス移動は引いているあいだ書かない（離したときに確定する）', () => {
+  it('並べ替え・マス移動はドラッグしているあいだ書かない（離したときに確定する）', () => {
     const w = labScene();
     const layout = resolveWorld(w, VIEWPORT);
     expect(dragVerbsOf(w, 'row')).toEqual({ x: 'reorder', y: 'none' });

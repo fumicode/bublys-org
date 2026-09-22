@@ -2,7 +2,7 @@
 //   node docs/bubble-space-prototype/v5-dom/_check/react-drag.mjs
 //
 // ★ 上の react.mjs は「同じ状態なら同じ絵になるか」。こちらは「同じ触り方なら同じ値が書かれるか」。
-//   引く点は **ラボが返した窓の座標をそのまま React にも当てる**（同じ場面なので同じ点が同じ泡を指す）。
+//   ドラッグする点は **ラボが返した窓の座標をそのまま React にも当てる**（同じ場面なので同じ点が同じ泡を指す）。
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -90,11 +90,11 @@ async function main() {
   const bad = [];
   let ng = 0;
 
-  // 引く点はラボから取る（同じ場面なので、同じ点が同じ泡を指す）
+  // ドラッグする点はラボから取る（同じ場面なので、同じ点が同じ泡を指す）
   const at = (id) => lab.call("headerPointOf", id);
 
   const CASES = [
-    ["自由に置く空間で 思いつき を引く", async () => {
+    ["自由に置く空間で 思いつき をドラッグする", async () => {
       const p = await at("memo3");
       return dragPath(p, { x: p.x + 140, y: p.y + 60 });
     }],
@@ -110,19 +110,19 @@ async function main() {
       const p = await at("v4");
       return dragPath(p, { x: p.x + 70, y: p.y });
     }],
-    ["なしの空間：議事録の 確定 を引く（何も起きない）", async () => {
+    ["なしの空間：議事録の 確定 をドラッグする（何も起きない）", async () => {
       const p = await at("g3");
       return dragPath(p, { x: p.x + 70, y: p.y + 40 });
     }],
-    ["背景を引く（外の空間の焦点）", async () => dragPath({ x: 240, y: 140 }, { x: 340, y: 200 })],
-    ["② 引かずに離す ＝ 触る（coverflow の写真7）", async () => {
+    ["背景をドラッグする（外の空間の焦点）", async () => dragPath({ x: 240, y: 140 }, { x: 340, y: 200 })],
+    ["② ドラッグせずに離す ＝ 触る（coverflow の写真7）", async () => {
       const p = await at("cf6");
       return async (page) => { await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.up(); };
     }],
     ["ホイール：背景で回す（外の空間の Z）", async () => async (page) => {
       await page.mouse.move(240, 140); await page.mouse.wheel(0, -300); await page.waitForTimeout(80);
     }],
-    ["大きさの角を引く（メモ）", async () => {
+    ["大きさの角をドラッグする（メモ）", async () => {
       await lab.call("select", "memo1"); await re.call("select", "memo1");
       await lab.settle(); await re.settle();
       const r = await lab.rect("memo1");
@@ -161,8 +161,8 @@ async function main() {
     if (n) ng++;
   }
 
-  // ── ★ 引いている「途中」の見え（持ち上げ）。値の突き合わせでは出ないので、ここで別に見る ──
-  console.log("\n── 引いている途中（持ち上げ）──");
+  // ── ★ ドラッグしている「途中」の見え（持ち上げ）。値の突き合わせでは出ないので、ここで別に見る ──
+  console.log("\n── ドラッグしている途中（持ち上げ）──");
   const midRects = async (page, sel) => page.evaluate((s) => {
     const layer = document.querySelector(s);
     const o = layer.getBoundingClientRect();
@@ -177,9 +177,9 @@ async function main() {
   }, sel);
 
   for (const [name, id, dx, dy] of [
-    ["並べ替え：小 を右へ引いた途中", "row0", 150, 10],
-    ["マス移動：カレンダーの 5 を引いた途中", "d4", 60, 34],
-    ["自由：思いつき を引いた途中", "memo3", 90, 50],
+    ["並べ替え：小 を右へドラッグした途中", "row0", 150, 10],
+    ["マス移動：カレンダーの 5 をドラッグした途中", "d4", 60, 34],
+    ["自由：思いつき をドラッグした途中", "memo3", 90, 50],
   ]) {
     const p = await at(id);
     const hold = async (page) => {
@@ -195,7 +195,7 @@ async function main() {
     const rr = await midRects(re.page, ".bl-layer");
     let worst = 0, n = 0, zbad = 0;
     for (const k of Object.keys(lr)) {
-      if (!rr[k]) { bad.push(`${name}：引いている途中、React に ${k} が無い`); ng++; continue; }
+      if (!rr[k]) { bad.push(`${name}：ドラッグしている途中、React に ${k} が無い`); ng++; continue; }
       n++;
       for (const f of ["x", "y", "w", "h"]) worst = Math.max(worst, Math.abs(lr[k][f] - rr[k][f]));
       if (lr[k].z !== rr[k].z) zbad++;

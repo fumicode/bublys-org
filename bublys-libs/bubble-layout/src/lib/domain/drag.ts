@@ -1,15 +1,15 @@
 /**
- * ② 操作は、軸と、何を掴んだかで決まる ── 引いているあいだ、値を書く所だけ。
+ * ② 操作は、軸と、何を掴んだかで決まる ── ドラッグしているあいだ、値を書く所だけ。
  *
- * 元：lab.html 1182-1200 行（moveBubble）、1163-1168 行（resize）、1171-1176 行（背景を引く）、
+ * 元：lab.html 1182-1200 行（moveBubble）、1163-1168 行（resize）、1171-1176 行（背景をドラッグする）、
  *     1536-1541 行（ホイール）、1137-1141 行（moves・lift）
  *
  * | 掴んだもの | 軸 | 起きること |
- * | 泡を横・縦に引く | X / Y | 書けるなら書く／書けないなら視点が動く／なしなら何も起きない |
- * | 背景を引く       | X / Y | 掴んでいないので、いつも視点（なし のときを除く） |
+ * | 泡を横・縦にドラッグする | X / Y | 書けるなら書く／書けないなら視点が動く／なしなら何も起きない |
+ * | 背景をドラッグする       | X / Y | 掴んでいないので、いつも視点（なし のときを除く） |
  * | ホイール         | Z     | 同上 |
  * | 泡を触る         | —     | 値は書かない。その泡が焦点になる（focus.ts の focusOn） |
- * | 右下の角を引く   | —     | 大きさを変える |
+ * | 右下の角をドラッグする   | —     | 大きさを変える |
  *
  * ★ 入力（pointerdown/move/up・当たり判定・掴んだ点との相対）は ui の仕事。
  *   ここへは「泡の中心を画面のどこへ持っていきたいか」まで噛み砕いて渡す
@@ -31,7 +31,7 @@ import { valueFromPos } from './arrange.js';
 import { screenToAxis, unprojectLocal, withFocusAxis } from './project.js';
 import { pin } from './pin.js';
 
-/** その空間で、X・Y を引いたら何が起きるか。lab.html 1135 行 verbs */
+/** その空間で、X・Y をドラッグしたら何が起きるか。lab.html 1135 行 verbs */
 export interface DragVerbs {
   readonly x: Verb;
   readonly y: Verb;
@@ -46,14 +46,14 @@ export interface DragBubbleQuery {
   readonly id: BubbleId;
   /** 掴んだときにいた空間（その View に従う） */
   readonly space: SpaceId;
-  /** 泡の**中心**を画面のどこへ持っていきたいか（掴んだ点と泡の相対位置は ui が引く） */
+  /** 泡の**中心**を画面のどこへ持っていきたいか（掴んだ点と泡の相対位置は ui がドラッグする） */
   readonly want: Point;
   /** その泡の Z の倍率（Placement.m）。逆写しに要る */
   readonly m: number;
 }
 
 /**
- * 泡を引く。lab.html 1182-1200 行 moveBubble の、値を書く所だけ。
+ * 泡をドラッグする。lab.html 1182-1200 行 moveBubble の、値を書く所だけ。
  * 軸ごとに：'coord' なら次元の key へ書く（free.x 決め打ちにしない）／'focus' なら焦点を動かす／
  * 'reorder'・'cell' はここでは書かない（離したときに確定する ＝ drop → reshape）。
  *
@@ -97,7 +97,7 @@ export interface DragFocusQuery {
 }
 
 /**
- * 背景を引く（視点）。lab.html 1171-1176 行。
+ * 背景をドラッグする（視点）。lab.html 1171-1176 行。
  * 掴んだ点の u が u0 → いま に変わった分だけ焦点を戻す（掴んだ点がカーソルについてくる）。
  * 次元が なし の軸は何も起きない。
  */
@@ -138,7 +138,7 @@ export interface ResizeQuery {
   readonly id: BubbleId;
   /** 掴んだときの箱の大きさ（measure の答え。自前の大きさではなく、伸びた大きさから始める） */
   readonly size0: Size;
-  /** 画面で引いた量 */
+  /** 画面でドラッグした量 */
   readonly by: Point;
   /** 掴んだときの合成倍率 */
   readonly scale: number;
@@ -147,7 +147,7 @@ export interface ResizeQuery {
 }
 
 /**
- * 右下の角を引く。lab.html 1163-1168 行。
+ * 右下の角をドラッグする。lab.html 1163-1168 行。
  * 大きさを書いてから ⑤ pin で左上を留める（どの空間にいても同じ1つの決まり）。
  * 付け替えは起きないので ReshapeResult ではなく世界だけを返す。
  */
@@ -163,11 +163,11 @@ export function resizeBubble(world: BubbleWorld, ctx: ActContext, q: ResizeQuery
   return pin(next, ctx, q.id, { x: q.at.x, y: q.at.y, w: q.size0.w, h: q.size0.h, scale: q.scale });
 }
 
-/** 引き始めに「この軸はついてくるか」（並べ替え・マス移動）。lab.html 1141 行 */
+/** ドラッグし始めに「この軸はついてくるか」（並べ替え・マス移動）。lab.html 1141 行 */
 export function liftsOf(verbs: DragVerbs): boolean {
   return [verbs.x, verbs.y].some((v) => v === 'reorder' || v === 'cell');
 }
-/** 引き始めに「この泡は空間を移れるか」（泡が動くときだけ）。lab.html 1140 行 moves */
+/** ドラッグし始めに「この泡は空間を移れるか」（泡が動くときだけ）。lab.html 1140 行 moves */
 export function movesOf(verbs: DragVerbs): boolean {
   return [verbs.x, verbs.y].some((v) => v === 'coord' || v === 'reorder' || v === 'cell');
 }

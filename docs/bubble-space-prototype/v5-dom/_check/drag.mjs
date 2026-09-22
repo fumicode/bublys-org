@@ -1,13 +1,13 @@
 // 掴んで動かせるか。── masa さんが困っていたのはここ。
 //   ★ 掴んだ点がカーソルからずれないこと（canvas 版は 0px。魚眼の中でも軸ごとに逆写しして合わせている）
-//   ★ 並べ替え・マス移動は、引いている間カーソルについてきて、差し込まれる位置に印が出る
+//   ★ 並べ替え・マス移動は、ドラッグしている間カーソルについてきて、差し込まれる位置に印が出る
 //   node docs/bubble-space-prototype/v5-dom/_check/drag.mjs
 import { openLab, ok, num } from "./lab.mjs";
 
 const lab = await openLab();
 await lab.settle();
 
-/** 泡を掴んで引き、引いている途中ずっと「掴んだ点」がカーソルからどれだけずれるか測る */
+/** 泡を掴んでドラッグし、そのあいだずっと「掴んだ点」がカーソルからどれだけずれるか測る */
 async function grabDrift(id, dx, dy, label) {
   await lab.settle();
   const p0 = await lab.headerPointOf(id);
@@ -29,7 +29,7 @@ async function grabDrift(id, dx, dy, label) {
   }
   await lab.page.mouse.up();
   await lab.settle();
-  console.log(`  ${label}：${dx},${dy}px 引くあいだ、掴んだ点とカーソルのずれ 最大 ${num(worst, 3)}px`);
+  console.log(`  ${label}：${dx},${dy}px ドラッグするあいだ、掴んだ点とカーソルのずれ 最大 ${num(worst, 3)}px`);
   return worst;
 }
 
@@ -51,7 +51,7 @@ console.log("\n■ 並べ替え（横に並べる）");
   } });
   const after = (await lab.bubbles()).filter((b) => b.parent === "row").sort((a, b) => a.order - b.order).map((b) => b.title);
   console.log(`  小 を右へ 230px：${before.join("→")}  ⇒  ${after.join("→")}`);
-  console.log(`  引いている間の「差し込まれる位置」の印：${JSON.stringify(mark)}`);
+  console.log(`  ドラッグしている間の「差し込まれる位置」の印：${JSON.stringify(mark)}`);
   ok(before.join() !== after.join(), "並べ替わった");
   ok(mark && mark.width <= 4 && mark.height > 40, "差し込まれる位置に縦の印が出ていた");
 }
@@ -64,19 +64,19 @@ console.log("\n■ マスを移る（カレンダー）");
     if (i === 10) rect = await lab.page.evaluate(() => !!document.querySelector("#marks .mk-cell"));
   } });
   const b1 = (await lab.bubbles()).find((b) => b.id === "d3");
-  console.log(`  「4」を右下へ：マス (${b0.cell.col},${b0.cell.row}) → (${b1.cell.col},${b1.cell.row})　引いている間のマスの印 ${rect}`);
+  console.log(`  「4」を右下へ：マス (${b0.cell.col},${b0.cell.row}) → (${b1.cell.col},${b1.cell.row})　ドラッグしている間のマスの印 ${rect}`);
   ok(b1.cell.col !== b0.cell.col || b1.cell.row !== b0.cell.row, "別のマスへ移った");
   ok(rect === true, "入るマスに印が出ていた");
 }
 
-console.log("\n■ 背景を引く／ホイール（視点）");
+console.log("\n■ 背景をドラッグする／ホイール（視点）");
 {
   const f0 = await lab.focusOf("cover");
   const r = await lab.rect("cover");
   await lab.dragPoint(r.x + r.w / 2, r.y + r.h - 12, r.x + r.w / 2 - 80, r.y + r.h - 12);
   const f1 = await lab.focusOf("cover");
   console.log(`  coverflow の背景を横に −80px：焦点 X ${num(f0.x, 3)} → ${num(f1.x, 3)}`);
-  ok(Math.abs(f1.x - f0.x) > 1e-6, "背景を引くと、カーソルの下の空間の焦点が動く");
+  ok(Math.abs(f1.x - f0.x) > 1e-6, "背景をドラッグすると、カーソルの下の空間の焦点が動く");
 
   const g = await lab.rect("giji");
   const z0 = (await lab.focusOf("giji")).z;
@@ -112,7 +112,7 @@ console.log("\n■ 右下の角で大きさを変える（選択中の泡だけ�
   console.log(`  付箋C の角を +70,+40：${num(r0.w)}x${num(r0.h)} → ${num(r1.w)}x${num(r1.h)}`
             + `　左上 (${num(pos0.x)},${num(pos0.y)}) → (${num(r1.x)},${num(r1.y)})　動いた他の泡 ${moved.length} 個`);
   if (moved.length) console.log(`    動いた：${moved.map(([id, v]) => `${id} (${num(others0[id][0])},${num(others0[id][1])})→(${num(v[0])},${num(v[1])})`).join(" / ")}`);
-  ok(r1.w > r0.w + 60 && r1.h > r0.h + 35, "角を引いた分だけ大きくなった");
+  ok(r1.w > r0.w + 60 && r1.h > r0.h + 35, "角をドラッグした分だけ大きくなった");
   ok(Math.abs(r1.x - pos0.x) < 0.5 && Math.abs(r1.y - pos0.y) < 0.5, "⑤ 大きさを変えた泡の左上は動かない");
   ok(moved.length === 0, "⑤ 触っていない泡は画面の上で動かない");
 }

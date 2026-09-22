@@ -2,7 +2,7 @@
  * ② 離したら確定するところ（マスの先客・順序の振り直し）と、
  * ③ 並びは2つ以上（子が1つになった見えない親は消え、残った泡が席を継ぐ）。
  *
- * ラボ実測：本物のマウスで引いて離したあとの `__lab.bubbles()` と `__lab.implicitParents()`。
+ * ラボ実測：本物のマウスでドラッグして離したあとの `__lab.bubbles()` と `__lab.implicitParents()`。
  */
 import { commitDrop, freeCellNear, renumber, tidyRows } from './reshape.js';
 import { actContext } from './act.js';
@@ -66,12 +66,12 @@ describe('② マスの先客は、いちばん近い空きマスへ逃げる', 
 
 describe('③ 並びは2つ以上', () => {
   it('★ 子が1つになった見えない親は消え、残った泡が席（親・順序・マス）を継ぐ', () => {
-    // ラボ実測：付箋A を並びの外の空いた所へ (+430,+150) 引いて離した
+    // ラボ実測：付箋A を並びの外の空いた所へ (+430,+150) ドラッグして離した
     //   → snap1 が消え、付箋B が 親 null・順序 9・自由座標 (125,245) を継ぐ（＝ 画面の上では動かない）
     const w = labScene();
     const layout = resolveWorld(w, VIEWPORT);
     expect(w.rowOf('fB')?.id).toBe('snap1');
-    // 並びの中は 順序・詰める なので、引いているあいだ値は書かれない。泡は「持ち上げ」でカーソルに
+    // 並びの中は 順序・詰める なので、ドラッグしているあいだ値は書かれない。泡は「持ち上げ」でカーソルに
     // ついてくるだけ（ui の持ちもの）。だから見えていた矩形だけを動かして渡す
     const seen = new Map(seenOf(layout));
     const fa = placeOf(layout, 'fA');

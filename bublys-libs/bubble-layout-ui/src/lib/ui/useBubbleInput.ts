@@ -1,15 +1,15 @@
 /**
- * 触る ── 掴む・引く・離す・ホイール・角。lab.html 1203-1650 行。
+ * 触る ── 掴む・ドラッグする・離す・ホイール・角。lab.html 1203-1650 行。
  *
  * ★ 値を書くのは domain の動詞（`dragBubble` `dragFocus` `wheelZ` `resizeBubble` `commitDrop` `focusOn`）。
  *   ここがやるのは「何を掴んだか」を決めて、**画面の量を模型の言葉に噛み砕く**ところまで。
  *
  * ★ ② 触るのは「見る」ことであって「動かす」ことではない ── 押した時点では何も書かない。
- *   焦点が寄るのは「引かずに離した」ときだけ。
+ *   焦点が寄るのは「ドラッグせずに離した」ときだけ。
  *
- * ★ ラボとの違いが1つある（正直に書く）：ラボは引いているあいだ
+ * ★ ラボとの違いが1つある（正直に書く）：ラボはドラッグしているあいだ
  *   「解き直す → DOM に写す → DOM で当てる」を1フレームでやるが、React は書き換えが次のフレームなので、
- *   引いているあいだの落とし先は**模型で当てる**（`hitModelAt`）。押した瞬間だけは DOM で当てる。
+ *   ドラッグしているあいだの落とし先は**模型で当てる**（`hitModelAt`）。押した瞬間だけは DOM で当てる。
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject, WheelEvent as ReactWheelEvent } from 'react';
@@ -41,7 +41,7 @@ import { hitModelAt, inContent, onHandle, pickAt, spaceModelAt } from './hit.js'
 import { withLift } from './lift.js';
 import type { LiftState } from './lift.js';
 
-/** 引き始めたとみなす距離（画面 px）。lab.html 1243 行 */
+/** ドラッグし始めたとみなす距離（画面 px）。lab.html 1243 行 */
 const DRAG_START = 3;
 
 type DragKind = 'bubble' | 'focus' | 'resize';
@@ -193,7 +193,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     const pick = pickAt(pickInput(), mx, my);
 
     if (pick.handle) {
-      // 引くのは見えている箱の角：中身で伸びた箱なら、伸びた大きさから始める
+      // ドラッグするのは見えている箱の角：中身で伸びた箱なら、伸びた大きさから始める
       const sel = pick.handle;
       capture();
       drag.current = {
@@ -209,7 +209,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     const p0 = pick.bub;
     /**
      * ★ 本文（空間ではない中身）を押したら、**何も始めない**。それは中身のもの。
-     *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点を引く」（ラボと同じ）。
+     *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点をドラッグする」（ラボと同じ）。
      */
     if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody)) {
       setSelectedId(p0.id);
@@ -220,7 +220,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     if (p0 && !inContent(p0, my, hasBody)) {
       capture();
       setSelectedId(p0.id);
-      // ★ 押した時点では何も書かない。焦点が寄るのは「引かずに離した」ときだけ
+      // ★ 押した時点では何も書かない。焦点が寄るのは「ドラッグせずに離した」ときだけ
       const verbs = dragVerbsOf(world, p0.space);
       drag.current = {
         kind: 'bubble', id: p0.id, space: p0.space, verbs,
@@ -272,7 +272,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       return;
     }
 
-    // 泡を引く：軸ごとに、書けるなら書く／書けないなら焦点／なしなら何もしない
+    // 泡をドラッグする：軸ごとに、書けるなら書く／書けないなら焦点／なしなら何もしない
     const p = lifted.byId.get(d.id);
     if (!p) return;
     const want = {
@@ -312,7 +312,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     drag.current = null;
     if (!d) return;
     if (!d.started) {
-      // ② 引かずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
+      // ② ドラッグせずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
       if (d.kind === 'bubble') setWorld(focusOn(world, layout, d.id, rules));
       show();
       return;

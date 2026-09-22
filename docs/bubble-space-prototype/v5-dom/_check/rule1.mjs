@@ -37,9 +37,9 @@ const local = (ps) => { const c = ps.find((p) => p.id === "cal");
   return ps.filter((p) => p.space === "cal").map((p) => ({ id: p.id,
     dx: (p.x + p.w / 2 - (c.x + c.w / 2)) / c.scale, dy: (p.y + p.h / 2 - (c.y + c.h / 2)) / c.scale, w: p.w / p.scale })); };
 const before = local(ps);
-await lab.dragBubble("kinmu", { dx: -40, dy: -25 });     // 掴んで引く＝値（自由X・自由Y）を書く。奥行きは書かない
+await lab.dragBubble("kinmu", { dx: -40, dy: -25 });     // 掴んでドラッグする＝値（自由X・自由Y）を書く。奥行きは書かない
 const ps2 = await lab.placements(), by2 = Object.fromEntries(ps2.map((p) => [p.id, p]));
-console.log(`  勤務表の倍率 ${byId.kinmu.scale.toFixed(4)} → ${by2.kinmu.scale.toFixed(4)}（引いても奥行きは書かないので変わらない）`);
+console.log(`  勤務表の倍率 ${byId.kinmu.scale.toFixed(4)} → ${by2.kinmu.scale.toFixed(4)}（ドラッグしても奥行きは書かないので変わらない）`);
 const after = Object.fromEntries(local(ps2).map((p) => [p.id, p]));
 let worst = 0;
 for (const b of before) {

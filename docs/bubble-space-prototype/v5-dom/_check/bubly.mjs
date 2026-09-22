@@ -122,7 +122,7 @@ async function main() {
     const kids1 = (await bubs()).filter((b) => /\/objects\/r\d+$/.test(b.url)).map((b) => ({ url: b.url, x: b.x, y: b.y }));
     const moved = kids0.map((k, i) => ({ dx: kids1[i].x - k.x, dy: kids1[i].y - k.y }));
     const allMoved = moved.every((m) => Math.abs(m.dy) > 40);
-    check(allMoved, `★ 親の縁を引くと、中の泡が全部ついてくる（${moved.map((m) => m.dy.toFixed(0)).join(" / ")}px）`);
+    check(allMoved, `★ 親の縁をドラッグすると、中の泡が全部ついてくる（${moved.map((m) => m.dy.toFixed(0)).join(" / ")}px）`);
     // ★ Y には魚眼が無いので、縦は全員そろう
     check(new Set(moved.map((m) => m.dy.toFixed(3))).size === 1,
       `ばらけない ── 縦は全員そろう（${moved.map((m) => m.dy.toFixed(1)).join(" / ")}px）`);
@@ -177,9 +177,9 @@ async function main() {
     return (await bubs()).find((b) => b.url === DETAIL);
   };
   const byBody = await drag(70, false);
-  check(Math.abs(byBody.y - before.y) < 0.5, `本文を引いても泡は動かない（${num(before.y)} → ${num(byBody.y)}）`);
+  check(Math.abs(byBody.y - before.y) < 0.5, `本文をドラッグしても泡は動かない（${num(before.y)} → ${num(byBody.y)}）`);
   const byHead = await drag(70, true);
-  check(byHead.y - before.y > 40, `ヘッダを引くと泡が動く（${num(before.y)} → ${num(byHead.y)}）`);
+  check(byHead.y - before.y > 40, `ヘッダをドラッグすると泡が動く（${num(before.y)} → ${num(byHead.y)}）`);
 
   // ── ⑤ 閉じる ──
   await page.evaluate((url) => {

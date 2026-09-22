@@ -125,7 +125,7 @@ export function dropTargetAt(world: BubbleWorld, q: DropQuery, rules: LayoutRule
 /**
  * lab.html 1225-1246 行 snapAt。掴んだ泡の縁が、ほかの泡の縁に寄っているか（画面で測る）。
  * 相手は「自由に置く空間の泡」か「見えない親の中の泡」で、窓が離す先と同じもの。いちばん近い縁を返す。
- * 並びの中で並びの軸に沿って引いているあいだは、土台の並べ替え（順序の書き込み）に任せる。
+ * 並びの中で並びの軸に沿ってドラッグしているあいだは、土台の並べ替え（順序の書き込み）に任せる。
  */
 export function snapCandidateAt(world: BubbleWorld, q: DropQuery, slot: DropSlot): SnapTarget | null {
   const D = q.grabbed.rect;

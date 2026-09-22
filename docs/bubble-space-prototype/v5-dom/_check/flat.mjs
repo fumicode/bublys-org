@@ -52,7 +52,7 @@ const seenOrder = async () => {
 };
 const v0 = await valsOf(), o0 = await seenOrder(), f0 = await lab.focusOf("root");
 const p = await lab.headerPointOf("memo3");
-await lab.page.mouse.click(p.x, p.y);          // ★ 引かずに離す＝触る
+await lab.page.mouse.click(p.x, p.y);          // ★ ドラッグせずに離す＝触る
 await lab.settle();
 const v1 = await valsOf(), o1 = await seenOrder(), f1 = await lab.focusOf("root");
 console.log(`  重ねて置く（Z が 順序）で「思いつき」を触る`);

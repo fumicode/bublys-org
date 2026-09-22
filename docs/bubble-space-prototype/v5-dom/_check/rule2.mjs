@@ -20,7 +20,7 @@ async function panel(id) {
 }
 const snap = async () => ({ b: Object.fromEntries((await lab.bubbles()).map((b) => [b.id, JSON.parse(JSON.stringify(b))])),
                             p: Object.fromEntries((await lab.placements()).map((p) => [p.id, p])) });
-/** 引いたあと、実際に何が起きたか */
+/** ドラッグしたあと、実際に何が起きたか */
 function what(a, z, id, space, axis) {
   const k = axis === "x" ? "x" : "y", cellKey = axis === "x" ? "col" : "row";
   const d = (v) => Math.abs(v) > 1e-6;
@@ -67,13 +67,13 @@ for (const c of CASES) {
 
 // ★★ ② 触った泡へ、視点が寄る（2026-09-19 規則が変わった。raise を消した）
 //    もとはここで「触った泡は焦点の面まで上がる（Z に書く）」を見ていた。いまは値を1つも書かない。
-//    「触った」と「掴んで引いた」は、pointerdown から 3px 動いたか（drag.started）で分ける。
+//    「触った」と「掴んでドラッグした」は、pointerdown から 3px 動いたか（drag.started）で分ける。
 const ids = (o) => o.map((b) => b.id).join(" ");
 const valsOf = async (space) => (await lab.bubbles()).filter((b) => (b.parent ?? "root") === space)
   .map((b) => `${b.id}:${b.order}/${b.free.x.toFixed(1)},${b.free.y.toFixed(1)},${b.free.z.toFixed(2)}/${b.cell.col},${b.cell.row}`).join(" ");
 const scalesOf = async (space) => (await lab.placements()).filter((p) => p.space === space)
   .sort((a, b) => a.id.localeCompare(b.id)).map((p) => p.scale);
-/** 引かずに離す＝触る（本物のマウスで、押した所と同じ所で離す） */
+/** ドラッグせずに離す＝触る（本物のマウスで、押した所と同じ所で離す） */
 const touch = async (id) => { const q = await lab.call("headerPointOf", id); await lab.page.mouse.click(q.x, q.y); await lab.settle(); };
 
 console.log(`\n■ 触る（coverflow・X＝順序·等間隔·魚眼）：焦点が寄る／値は1つも書かれない`);
@@ -89,15 +89,15 @@ await lab.select("cf3"); await lab.settle();
   ok(v0 === v1, `触っても泡の値は1つも変わらない（順序・自由・マス）`);
   ok(Math.abs(f1 - f0) > 1e-6, `触ると、その泡がその軸の焦点になる（焦点 X が動く）`);
   ok(s0.some((v, i) => Math.abs(v - s1[i]) > 0.01), `焦点が動いたので、倍率の山が動く（絵は変わる）`);
-  // ★ 掴んで引いたら、今までどおり値を書く（触ったのと同じ泡で比べる）
+  // ★ 掴んでドラッグしたら、今までどおり値を書く（触ったのと同じ泡で比べる）
   const b0 = await valsOf("cover");
   await lab.dragBubble("cf6", { dx: -150 });
   const b1 = await valsOf("cover");
-  console.log(`  掴んで 150px 引いたら  ${b0 === b1 ? "値は変わらない" : "値が変わった"}`);
-  ok(b0 !== b1, `掴んで引くのは今までどおり値を書く（触ると引くを分けている）`);
+  console.log(`  掴んで 150px ドラッグしたら  ${b0 === b1 ? "値は変わらない" : "値が変わった"}`);
+  ok(b0 !== b1, `掴んでドラッグするのは今までどおり値を書く（触るとドラッグするを分けている）`);
 }
 
-console.log(`\n■ 「触った」と「掴んで引いた」の境目（pointerdown から 3px。drag.started と同じ1つのしきい値）`);
+console.log(`\n■ 「触った」と「掴んでドラッグした」の境目（pointerdown から 3px。drag.started と同じ1つのしきい値）`);
 await lab.call("preset", "coverflow", "cover");
 await lab.select("cf3"); await lab.settle();
 await lab.page.click("#refocus"); await lab.settle();
@@ -106,11 +106,11 @@ for (const dx of [2, 8, -150]) {
   await lab.dragBubble("cf5", { dx, steps: 4 });
   const v1 = await valsOf("cover"), f1 = (await lab.focusOf("cover")).x;
   const wrote = v0 !== v1, moved = Math.abs(f1 - f0) > 1e-6;
-  console.log(`  ${String(dx).padStart(4)}px 引いて離す  値を書いた ${wrote ? "はい" : "いいえ"}`
+  console.log(`  ${String(dx).padStart(4)}px ドラッグして離す  値を書いた ${wrote ? "はい" : "いいえ"}`
             + `　焦点が寄った ${moved ? "はい" : "いいえ"}（${f0.toFixed(2)} → ${f1.toFixed(2)}）`);
   if (dx === 2) ok(!wrote && moved, `2px（3px 未満）は「触った」── 値を書かず、焦点だけ寄る`);
-  if (dx === 8) ok(!moved, `8px は「掴んで引いた」── 焦点は寄らない（引きが足りず、並べ替えも起きない）`);
-  if (dx === -150) ok(wrote && !moved, `-150px は「掴んで引いた」── 今までどおり値を書く（焦点は寄らない）`);
+  if (dx === 8) ok(!moved, `8px は「掴んでドラッグした」── 焦点は寄らない（ドラッグが足りず、並べ替えも起きない）`);
+  if (dx === -150) ok(wrote && !moved, `-150px は「掴んでドラッグした」── 今までどおり値を書く（焦点は寄らない）`);
   await lab.page.click("#refocus"); await lab.settle();
 }
 

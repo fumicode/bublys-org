@@ -32,7 +32,7 @@
   #hint b{color:var(--accent);font-weight:600}
   .r{color:#7d8aa6;font-style:normal;font-weight:600;margin-right:3px}
   #hint .r{color:var(--accent)}
-  /* 泡は DOM なので、引くと字が選択されてしまう。canvas には無かった代金。ここで止める */
+  /* 泡は DOM なので、ドラッグすると字が選択されてしまう。canvas には無かった代金。ここで止める */
   #stage{flex:1 1 auto;position:relative;min-height:0;overflow:hidden;touch-action:none;
     user-select:none;-webkit-user-select:none;
     background:radial-gradient(circle var(--gr,1080px) at 50% 50%,#141a2b 0%,#080a11 100%)}
@@ -170,7 +170,7 @@
       <button data-preset="column" data-hint="選択中の泡がいる空間を <b>縦に並べる</b> に。Y は順序を詰めて並べる。掴むと並べ替わる">縦に並べる</button>
       <button data-preset="grid" data-hint="選択中の泡がいる空間を <b>格子</b> に。X は列、Y は行を詰めて並べる。掴むと別のマスへ移る">格子</button>
       <button data-preset="fisheyeX" data-hint="選択中の泡がいる空間を <b>X魚眼ビュー</b> に。X は履歴の世代を魚眼で、Y は履歴の枝を平行で。掴むと視点が動く">X魚眼ビュー</button>
-      <button data-preset="coverflow" data-hint="選択中の泡がいる空間を <b>coverflow</b> に。X は順序を等間隔に魚眼で。背景を横に引くとスライドする">coverflow</button>
+      <button data-preset="coverflow" data-hint="選択中の泡がいる空間を <b>coverflow</b> に。X は順序を等間隔に魚眼で。背景を横にドラッグするとスライドする">coverflow</button>
       <button data-preset="histZ" data-hint="選択中の泡がいる空間を <b>履歴を奥行きに</b>。Z は履歴の古さを透視で。ホイールで時間を行き来する">履歴を奥行きに</button>
       <button data-preset="stackZ" data-hint="選択中の泡がいる空間を <b>重ねて置く</b>。X・Y は自由、<b>Z は順序</b>。重なりの上下が View の中で決まる。<b>触っても変わらない</b>（触ると視点が寄る）">重ねて置く</button>
       <span class="sep"></span>
@@ -211,8 +211,8 @@
     </div>
     <div class="box" id="cursor-hint"></div>
     <div class="box" id="help">
-      泡を触る（引かずに離す）… <b>その泡へ視点が寄る</b>（値は1つも書かない）<br>
-      泡を掴んで横・縦に引く … 軸ごとに <b>動く／並べ替わる／マスを移る／視点が動く</b><br>
+      泡を触る（ドラッグせずに離す）… <b>その泡へ視点が寄る</b>（値は1つも書かない）<br>
+      泡を掴んで横・縦にドラッグする … 軸ごとに <b>動く／並べ替わる／マスを移る／視点が動く</b><br>
       中へ落とす … その子になる　縁へ寄せて離す … <b>くっつく</b>　ホイール … 奥行きの視点　右下の角 … 大きさ
     </div>
   </div>
@@ -253,7 +253,7 @@
    ★★ 2026-09-19：規則が1つ変わった（正は v4/RULES.md、経緯は ../DECISIONS.md）
      ② 触った泡は「手前へ」ではなく「視点が寄る」── raise() を消した
           触っても値は1つも書かない。その泡がその空間の焦点になるだけ（軸ごと。焦点の約束 fitFocus はそのまま通す）
-          「触った」と「掴んで引いた」は drag.started（pointerdown から 3px）で分ける。引いたときは今までどおり値を書く
+          「触った」と「掴んでドラッグした」は drag.started（pointerdown から 3px）で分ける。ドラッグしたときは今までどおり値を書く
             （実測：coverflow の写真を触ると 倍率 0.31 0.56 0.84 0.98 0.84 0.56 0.31
              → 0.03 0.07 0.16 0.31 0.56 0.84 0.98。泡の値は1つも変わらない）
      ＋ 手前の泡スタック（ラボだけ。規則は増えない）
@@ -292,9 +292,9 @@
      - **DOM で当たり判定するなら、解き直したら DOM にも写してから突かないといけない。**
        v4 は「印は いま離したらどうなるか」を書いたばかりの座標で解き直してから見ている（moveBubble）。
        DOM だと、そこで render() を挟まないと1フレーム前の DOM を突くことになる。endDrag も同じ
-     - 泡は DOM なので、引くと字が選択される（canvas には無かった代金）。#stage に user-select:none
+     - 泡は DOM なので、ドラッグすると字が選択される（canvas には無かった代金）。#stage に user-select:none
      - 書いた回数の実測（__lab.stats）：落ち着いているとき 85 フレーム・のべ 4930 個で書き込み 0。
-       メモを 180px 引くあいだ 105 フレーム・のべ 5802 個で transform 33・大きさ 1・逆scale 1・z-index 57。
+       メモを 180px ドラッグするあいだ 105 フレーム・のべ 5802 個で transform 33・大きさ 1・逆scale 1・z-index 57。
        frame()（解く＋写す＋説明パネル）は中央 0.300ms／最大 0.500ms
      - ② を DOM で確かめた：勤務表を 議事録（版）に重ねると、勤務表の中の「制約」の z-index 37 >
        議事録 15。重なった 10752画素 の真ん中を突くと「制約」が勝つ。
@@ -311,7 +311,7 @@
        「横に並べる」の中身（row0・row1・row2）の row1 を上書きして、付箋A・付箋B が画面の2か所に描かれ、
        空間の一覧にも並びが2つ出た。id は "snap"+n にした。案1 の場面には "row" が無かったので、案1 では出なかった穴
      - pin を入れたら、土台が持っていた書き込みが2つ消せた（位置を書く所は 4 → 3 つ）：
-       ・角を引いたときの「位置が書ける軸なら自分の位置を書く」… 外へたどって書き戻す pin の一例だった
+       ・角をドラッグしたときの「位置が書ける軸なら自分の位置を書く」… 外へたどって書き戻す pin の一例だった
        ・落とし込みの slot.coord「離した先の自由座標を書く」… pin が「離した所に見えていた場所」へ書き戻すので要らない
        残ったのは 自由次元のドラッグ・pin・奥行き（keepSeen）の3つ
      - 泡の像に替えても、平行のレンズの空間は1つも変わらない（実測：00-core と同じ id の泡 54 のうち、
@@ -335,7 +335,7 @@
          以降の「横ドラッグ」が全部「何も起きない」になる。場面ごとに焦点を戻して測った
        ・角は選択中の泡にしか出ない（handleAt）。選ばずに角を掴むと、泡そのもののドラッグになる
      - くっつけるが「落とし込みの1つ」であることは、入れ子の中で効いた：カレンダーの「7」を 22px・制約を 95px・
-       伊藤を 40px 右へ引いても、3つとも中に留まり勤務表は 0.00px。勤務表の外まで引き出せば、伊藤は外の並びに加われる
+       伊藤を 40px 右へドラッグしても、3つとも中に留まり勤務表は 0.00px。勤務表の外まで引き出せば、伊藤は外の並びに加われる
      - 帯の中の揃えは RULES.md のとおり View の軸の値にした（UI のトグルにはしない）。効くのは詰めるだけで、
        等間隔の帯は「中心が 値×間隔・幅が 間隔」なので泡はいつも帯の中央に来る。勤務表の X を中央ぞろえにすると
        制約とカレンダーの左端が 34.4px ずれる ── 始端でないと「上に制約、その下にカレンダー」にならない
@@ -443,7 +443,7 @@ const PRESETS = {
   histZ:     { label: "履歴を奥行きに", x: AX("none", "as-is", "parallel", 110),        y: AX("none", "as-is", "parallel", 80),           z: AX("history.age", "equal", "perspective", 1) },
   // ★ 重なりの上下を View の中で決めたいなら、Z に「順序」を刺す。上下が View の中で決まる。
   //   自由座標のままだと、同じ値で重なった兄弟の上下は決まらない（座標は同点を許すので）
-  //   ★ 触っても上下は変わらない（触っても値は1つも書かない）。変えたいなら掴んで引く
+  //   ★ 触っても上下は変わらない（触っても値は1つも書かない）。変えたいなら掴んでドラッグする
   stackZ:    { label: "重ねて置く",     x: AX("free.x", "as-is", "parallel", 110),      y: AX("free.y", "as-is", "parallel", 80),         z: AX("order", "equal", "perspective", 0.15) },
 };
 const viewFromPreset = id => { const p = PRESETS[id]; return { x: { ...p.x }, y: { ...p.y }, z: { ...p.z } }; };
@@ -791,7 +791,7 @@ function resolveSpace(spaceId, host, memo, sink, lifted, mode) {
   //   それも同じ（格子の同じマスに重なる など）なら、決まらない ──「置いた順」という View の外の状態は持たない
   items.sort((p, q) => q.dz - p.dz || p.target.scale - q.target.scale || p.i - q.i);
 
-  // 連続入力（焦点を引く・泡を引く・大きさ）は補間しない。大きさは pin が外の泡の座標へ書くので、その泡へ至る空間を全部
+  // 連続入力（焦点をドラッグする・泡をドラッグする・大きさ）は補間しない。大きさは pin が外の泡の座標へ書くので、その泡へ至る空間を全部
   const snapAll = drag && drag.started && (drag.snapSpace === spaceId || drag.kind === "resize" && isAncestor(spaceId, drag.id));
   for (const it of items) {
     const b = it.b;
@@ -1205,7 +1205,7 @@ stage.addEventListener("pointerdown", e => {
   stage.setPointerCapture(e.pointerId);
   const sel = handleAt(mx, my);
   if (sel) {
-    // 引くのは見えている箱の角：中身で伸びた箱なら、自前の大きさではなく伸びた大きさから始める（引いた分だけ角が動く）
+    // ドラッグするのは見えている箱の角：中身で伸びた箱なら、自前の大きさではなく伸びた大きさから始める（ドラッグした分だけ角が動く）
     drag = { kind: "resize", id: sel.id, space: sel.space, started: true, mx0: mx, my0: my, size0: { ...measure(sel.b, new Map()) },
              scale: sel.scale, x0: sel.x, y0: sel.y };
     return;
@@ -1213,7 +1213,7 @@ stage.addEventListener("pointerdown", e => {
   const p0 = hitTest(mx, my);
   if (p0 && !inContent(p0, my)) {
     selectedId = p0.id;
-    // ★ 押した時点では何も書かない。焦点が寄るのは「引かずに離した」ときだけ（endDrag の focusOn）。
+    // ★ 押した時点では何も書かない。焦点が寄るのは「ドラッグせずに離した」ときだけ（endDrag の focusOn）。
     //   raise（触ったら Z に書く）を消したので、掴む前に解き直す必要も無くなった
     //   （もとは「Z を書き替えたら 1/m のぶん逆写しが外れる」ための解き直しだった）
     const p = p0;
@@ -1279,7 +1279,7 @@ function moveBubble(mx, my) {
     }
   }
   // 印は「いま離したらどうなるか」。書いたばかりの座標で配置を解き直してから見る（前のフレームの配置で見ると、
-  // 速く引いたとき縁の印が出ないまま離して、離した答えだけが並びになる＝印と答えが食い違う）
+  // 速くドラッグしたとき縁の印が出ないまま離して、離した答えだけが並びになる＝印と答えが食い違う）
   // ★ DOM で当たり判定するので、解き直したら DOM にも写してから見る（でないと1フレーム前の DOM を突くことになる）
   if (drag.moves) { resolveAll("keep"); render(); drag.slot = slotAt(mx, my); }
 }
@@ -1287,7 +1287,7 @@ function moveBubble(mx, my) {
 /**
  * 離したらどこへ入るか。先に土台の決まりで離す先の空間を決め、その窓の中でだけ縁（くっつける）を見る。
  * ③ くっつけるは空間への落とし込みの1つ ── 相手の窓が離す先の窓と同じときだけ効く
- * （そうしないと、カレンダーの「7」を 22px 引いただけで外の並びへ飛ぶ）
+ * （そうしないと、カレンダーの「7」を 22px ドラッグしただけで外の並びへ飛ぶ）
  */
 function slotAt(mx, my) {
   const slot = spaceSlotAt(mx, my);
@@ -1304,7 +1304,7 @@ function slotAt(mx, my) {
 /**
  * ③ くっつける・並びに加わる：掴んだ泡の縁が、ほかの泡の縁に寄っているか（画面で測る）。
  * 相手は「自由に置く空間の泡」か「見えない親の中の泡」で、窓が離す先と同じもの。いちばん近い縁を返す。
- * 並びの中で並びの軸に沿って引いているあいだは、土台の並べ替え（順序の書き込み）に任せる
+ * 並びの中で並びの軸に沿ってドラッグしているあいだは、土台の並べ替え（順序の書き込み）に任せる
  */
 function snapAt(slot) {
   const D = PLACE.get(drag.id), win = windowOf(slot.space);
@@ -1428,9 +1428,9 @@ function endDrag() {
   drag = null;
   hoverRing = null;
   if (slot) commitDrop(d, slot);
-  // ★ ② 触った泡へ、視点が寄る。「触った」と「掴んで引いた」は drag.started で分ける
+  // ★ ② 触った泡へ、視点が寄る。「触った」と「掴んでドラッグした」は drag.started で分ける
   //   （started ＝ pointerdown から 3px 以上動いた。pointermove の Math.hypot(...) < 3 と同じ1つのしきい値）
-  //   引いたときは今までどおり値を書く。引かずに離したときだけ、値を1つも書かずに焦点だけ寄る
+  //   ドラッグしたときは今までどおり値を書く。ドラッグせずに離したときだけ、値を1つも書かずに焦点だけ寄る
   if (d.kind === "bubble" && !d.started) focusOn(d.id);
 }
 
@@ -1482,7 +1482,7 @@ function commitDrop(d, slot) {
     } else if (moved) {
       renumber([...kidsOf(slot.space).filter(k => k !== b).sort(byOrder), b]);
     }
-    // ★ 置いた泡も「手前へ」書かない（raise を消した）。掴んで引いたときに書くのは、引いた軸の値だけ
+    // ★ 置いた泡も「手前へ」書かない（raise を消した）。掴んでドラッグしたときに書くのは、ドラッグした軸の値だけ
     // ★ 同じマスに2つ入れない。マス移動は兄弟の値の入れ替え：
     //   同じ空間の中なら、先客は掴んだ泡が空けたマスへ移る（順序の差し込みが番号を振り直すのと同じ）。
     //   よその空間から来た泡には空けたマスが無いので、1人ずつ順に一番近い空きマスへ逃がす
@@ -1655,7 +1655,7 @@ const targetSpace = () => windowOf(selectedId && byId(selectedId) ? parentOf(sel
 const nameHtml = id => `<span class="nm" style="color:${spaceHsl(id)}">${esc(spaceName(id))}</span>`;
 
 /**
- * 焦点を引いたら、その軸でどれだけ動けるか。setFocusAxis と同じ fitFocus の答えから言う。
+ * 焦点をドラッグしたら、その軸でどれだけ動けるか。setFocusAxis と同じ fitFocus の答えから言う。
  * 言い分けは幅の閾値ではなく「どちらの約束で止まるか」：
  *   並びの端まで送れる（約束(1)で止まる）            → 視点が動く
  *   箱に収まる約束(2)で、並びの端より手前で止まる     → 少しだけ視点が動く（中身が箱いっぱい）
@@ -1700,8 +1700,8 @@ function crossHtml(spaceId) {
   const V = viewOf(spaceId);
   if (![V.x.dim, V.y.dim].some(d => ["coord", "reorder", "cell"].includes(verbOf(d)))) return null;
   return spaceId === "root" ? ["中へ落とす", `<span class="move">その空間へ移る</span>`]
-       : byId(spaceId).implicit ? ["外へ引く", `<span class="move">並びから抜ける</span>（大きく引き離す）`]
-                                : ["外へ引く", `<span class="move">外の空間へ出る</span>（箱の外まで大きく引く）`];
+       : byId(spaceId).implicit ? ["外へドラッグする", `<span class="move">並びから抜ける</span>（大きく引き離す）`]
+                                : ["外へドラッグする", `<span class="move">外の空間へ出る</span>（箱の外まで大きくドラッグする）`];
 }
 /** ③ 縁へ寄せたら何が起きるか。相手は同じ窓の泡なので、窓が自由でない空間では箱の外へ引き出してから */
 function snapHtml(spaceId) {
@@ -1808,10 +1808,10 @@ function selectionHtml() {
     k("②", "ホイール", wheelHtml(space)),
     rowOf(b.id) ? k("③", "並びごと", `外周の縁（12px）を掴む`) : "",
     isHost(b) ? k("④", "中", `${nameHtml(b.id)}  <span class="${spaceSummary(b.id).cls}">${spaceSummary(b.id).text}</span>`) : "",
-    // ③ 見えない親は体を持たない ＝ 角も無い（実測：縁で並びを選んで右下を引いても箱は動かない）。
+    // ③ 見えない親は体を持たない ＝ 角も無い（実測：縁で並びを選んで右下をドラッグしても箱は動かない）。
     // v4 はここでも「大きさが変わる」と出すが、画面に角は描かれていないので言い分と起きることが食い違う
-    b.implicit ? k("③", "角を引く", `<span class="fix">できない</span>（見えない親は体を持たない）`)
-               : k("⑤", "角を引く", `大きさが変わる。<span class="move">触っていない泡は動かない</span>`),
+    b.implicit ? k("③", "角をドラッグする", `<span class="fix">できない</span>（見えない親は体を持たない）`)
+               : k("⑤", "角をドラッグする", `大きさが変わる。<span class="move">触っていない泡は動かない</span>`),
     k("①", "倍率", `<b style="color:var(--accent)">${p.scale.toFixed(3)}</b>` +
       (chain.length > 1 ? `  ＝ ${chain.map(v => v.toFixed(3)).join(" × ")}` : "")),
   ].join("");
