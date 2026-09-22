@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BubbleSpace, useBubbleSpace } from '@bublys-org/bubble-layout-feature';
+import type { OpenDepth } from '@bublys-org/bubble-layout-feature';
 import { routes } from './routes.js';
 
 const VIEWPORT = { w: 1440, h: 809.5 };
@@ -31,6 +32,8 @@ function Probe() {
 
 function App() {
   const [drawMin, setDrawMin] = useState(5);
+  // v7：奥行きの付け方を触って比べる。`#plane` で開くと最初から「面」
+  const [depth, setDepth] = useState<OpenDepth>(location.hash === '#plane' ? 'plane' : 'fisheye-x');
   return (
     <>
       <div id="bar">
@@ -41,9 +44,21 @@ function App() {
                onChange={(e) => setDrawMin(+e.target.value)} />
         <span className="read">{drawMin.toFixed(1)}px</span>
         <span className="sep" />
-        <span className="hint">項目をダブルクリック → 隣に開く　／　ヘッダで掴む　／　背景を引くと視点　／　ホイールで奥行き</span>
+        <label>奥行き</label>
+        {(['fisheye-x', 'plane'] as const).map((d) => (
+          <button key={d} data-depth={d} onClick={() => setDepth(d)}
+                  style={{ padding: '3px 10px', borderRadius: 6, cursor: 'pointer', font: 'inherit',
+                           border: '1px solid ' + (depth === d ? '#6ee7ff' : '#2a3145'),
+                           background: depth === d ? '#123' : 'transparent', color: depth === d ? '#6ee7ff' : '#8b95ad' }}>
+            {d === 'fisheye-x' ? '魚眼（いま）' : '面（旧の layers を Z で）'}
+          </button>
+        ))}
+        <span className="sep" />
+        <span className="hint">項目をダブルクリック → 隣に開く　／　ヘッダで掴む　／　背景をドラッグすると視点　／　ホイールで奥行き</span>
       </div>
       <BubbleSpace
+        key={depth}
+        depth={depth}
         routes={routes}
         initialUrls={['csv-importer/sheets/demo/objects']}
         viewport={VIEWPORT}

@@ -25,6 +25,7 @@ const LIST = [
   ["react", "React 版（@bublys-org/bubble-layout-ui）とラボが px で同じものを描く"],
   ["react-drag", "React 版とラボを本物のマウスで同じに触って、書かれた値を突き合わせる"],
   ["bubly", "本物のバブリ（csv-importer）の画面が、新しいライブラリの上で動く（v6）"],
+  ["plane", "旧 bubbles-ui の「面」を Z で書いた開き方が、本物のバブリの画面で出る（v7）"],
 ];
 
 let ng = 0;

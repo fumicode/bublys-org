@@ -14,12 +14,34 @@
  *   「開いたほうが大きく、元のリストは小さく」が出る。
  */
 import {
-  Bubble, METRICS, actContext, applySnap, focusOn, renumber, resolveWorld, withAxis,
+  Bubble, METRICS, actContext, applySnap, focusOn, renumber, resolveRules, resolveWorld,
+  screenToAxis, withAxis, withFocusAxis,
 } from '@bublys-org/bubble-layout';
 import type { BubbleId, BubbleWorld, LayoutRules, Viewport } from '@bublys-org/bubble-layout';
 
 /** 開き方。いまは「隣に開く」だけ。ポップアップは未実装（DECISIONS.md の世界線スナップで戻る枝） */
 export type OpenAs = 'beside';
+
+/**
+ * 奥行きの付け方。**試しに2つ並べてある**（v7 の検証。どちらにするかは masa さんが触って決める）。
+ *
+ * - `'fisheye-x'` … いまの既定。横に開いたら X の魚眼を点ける
+ * - `'plane'`     … 旧 `bubbles-ui` の「面」（`process.layers`）を Z で書いたもの：
+ *     **別の種類を開く**＝いちばん手前より1段手前の面に置き、Z の焦点をそこへ送る（他は全員1段下がる）
+ *     **同じ種類を開く**＝兄弟と同じ面に並べる（全員が手前のまま）
+ *   規則は1つも足していない ── 外の空間は最初から `Z＝自由Z·そのまま·透視` を持っている。
+ *
+ * ★ なぜ試すか（v7 の実測）：魚眼は**幅に罰を与える**（泡の像＝端をレンズに通した間）。
+ *   詳細を3つ開くと並びが 900px になり、詳細 0.755 ＜ 一覧 0.773 と**関心の順が逆転**した。
+ *   旧は同じ流れで 詳細 1.0 ×3 ／ 一覧 0.8。
+ */
+export type OpenDepth = 'fisheye-x' | 'plane';
+
+/**
+ * 面の1段。透視 `m = 1/(1 + 0.26·dz)` で **1段 0.90** になる dz（＝旧 `1 − 0.1 × layerIndex` の1段目）。
+ * 2段目からは透視が寝ていくので 0.818 / 0.75（旧は 0.8 / 0.7）。
+ */
+export const PLANE_STEP = (1 / 0.9 - 1) / METRICS.K_PERSP;
 
 export interface OpenAtInput {
   readonly world: BubbleWorld;
@@ -31,6 +53,8 @@ export interface OpenAtInput {
   readonly size?: { readonly w: number; readonly h: number };
   readonly hue?: number;
   readonly as?: OpenAs;
+  /** 奥行きの付け方。既定は `'fisheye-x'`（いまのまま） */
+  readonly depth?: OpenDepth;
   readonly rules?: Partial<LayoutRules>;
   /**
    * ★ **同じ種類の泡（兄弟）を続けて開いたとき、その隣に並べる相手。**
@@ -63,6 +87,7 @@ const DEFAULT_SIZE = { w: 320, h: 240 };
 const BESIDE_GAP = METRICS.SNAP_EDGE * 2;
 
 export function openAt(input: OpenAtInput): OpenAtResult {
+  if ((input.depth ?? 'fisheye-x') === 'plane') return openOnPlane(input);
   const { world, viewport, openerId, newId, title } = input;
   const size = input.size ?? DEFAULT_SIZE;
   const opener = openerId === null ? null : world.bubble(openerId);
@@ -139,6 +164,125 @@ export function openAt(input: OpenAtInput): OpenAtResult {
   // ② 開いたら、そこへ視点が寄る（泡の値は1つも書かない）
   w = focusOn(w, resolveWorld(w, viewport, input.rules), newId, input.rules);
   return { world: w, id: newId };
+}
+
+/**
+ * 面に開く（`depth: 'plane'`）── 旧 `bubbles-ui` の `popChild` / `joinSibling` を Z で書いたもの。
+ *
+ * ```
+ *   旧                          ここ
+ *   layers.unshift([id])        いちばん手前より1段手前の値を free.z に書き、Z の焦点をそこへ送る
+ *   layers[0].push(id)          兄弟と同じ free.z。並びに加わる（規則③）
+ *   測る→Redux→再レンダ→置く    置く所は**解いた答えから純関数で**出る（測らない）
+ * ```
+ *
+ * ★ **他の泡の値は1つも書かない。** 全員が1段下がって見えるのは、焦点が手前へ動いたから。
+ * ★ **X・Y の焦点は動かさない。** 平行のレンズで X・Y を送ると画面ごと滑る（CARRYOVER「開いた瞬間に画面ごと滑る」）。
+ *   旧も開いたときに画面は滑らない。奥行きだけが変わる。
+ * ★ 置く所は「元の泡が**1段下がった後**の右辺」。旧の `toLayerBelow().toGlobal().getNeighbor()` と同じ考えを、
+ *   焦点を送った世界を解いて読む ── 縁が接する（実測 0.0000px）。
+ */
+function openOnPlane(input: OpenAtInput): OpenAtResult {
+  const { world, viewport, openerId, newId, title } = input;
+  const R = resolveRules(input.rules);
+  const size = { w: Math.max(80, (input.size ?? DEFAULT_SIZE).w), h: Math.max(METRICS.HEADER + 10, (input.size ?? DEFAULT_SIZE).h) };
+  const opener = openerId === null ? null : world.bubble(openerId);
+  // ③ 見えない親（並び）は体を持たない。面を持つのは外へたどった窓
+  const space = opener ? world.windowOf(opener.space) : 'root';
+  const parent = space === 'root' ? null : space;
+  const make = (free: { x: number; y: number; z: number }) =>
+    Bubble.create({ id: newId, title, hue: input.hue ?? hueOf(newId), w: size.w, h: size.h, parent, order: world.kidsOf(space).length, free });
+
+  // 最初の1つ：真ん中、いまの面
+  if (!opener) {
+    return { world: world.add(make({ x: 0, y: 0, z: world.focusOf(space).z })), id: newId };
+  }
+
+  const mate = input.joinWith ? world.bubble(input.joinWith) : null;
+  if (mate && mate.id !== newId) {
+    // ── 同じ種類：兄弟と同じ面に並べる（旧 joinSibling）。面は増えない
+    const z = mate.state.free.z;
+    let w = world.add(make({ x: mate.state.free.x + mate.state.size.w / 2 + size.w / 2, y: mate.state.free.y, z }));
+    const row = w.rowOf(mate.id);
+    const ctx = actContext(viewport, seenOf(world, viewport, input.rules), input.rules);
+    w = applySnap(w, ctx, newId, { kind: row ? 'join' : 'born', target: mate.id, axis: 'x', after: true, dist: 0 }).world;
+    return { world: bringIntoView(sendZ(w, viewport, space, z, R), viewport, space, newId, R), id: newId };
+  }
+
+  // ── 別の種類：1段手前に新しい面（旧 popChild）
+  const kids = world.kidsOf(space);
+  const z = Math.min(...kids.map((b) => b.state.free.z)) - PLANE_STEP;
+  // 仮に置いて焦点を送り、元の泡が「1段下がった後」に画面のどこへ来るかを読む
+  const probe = sendZ(world.add(make({ x: 0, y: 0, z })), viewport, space, z, R);
+  const L = resolveWorld(probe, viewport, input.rules);
+  const S = L.spaces.get(space);
+  // 元の泡が並びの中にいるなら、基準は並びごと（並びの右辺に接して置く）
+  const base = L.byId.get(world.rowOf(opener.id)?.id ?? opener.id);
+  if (!S || !base) return { world: probe, id: newId };
+  const free = {
+    x: screenToAxis(S, 'x', base.x + base.w, 1) + size.w / 2,   // 右辺に接する。m=1 ＝ 焦点の面
+    y: screenToAxis(S, 'y', base.y, 1) + size.h / 2,            // 上をそろえる
+    z,
+  };
+  return { world: bringIntoView(sendZ(world.add(make(free)), viewport, space, z, R), viewport, space, newId, R), id: newId };
+}
+
+/**
+ * 開いた泡が窓からはみ出すなら、**はみ出したぶんだけ** X・Y の視点を送る。真ん中へは寄せない。
+ *
+ * ★ 面は幅を潰さない（魚眼とちがって）。だから同じ種類を続けて開くと、いつか窓の右へ溢れる
+ *   （実測：1440px の窓で、300px の詳細の3枚目が x1460…1760）。
+ *   ②の「視点が寄る」をそのまま当てると泡が真ん中へ来るまで画面ごと滑るので、要るぶんだけにする。
+ * ★ 平行のレンズの軸だけ。曲がったレンズでは「送る量」が画面の量と一致しないので、手を出さない。
+ */
+const VIEW_MARGIN = 24;
+function bringIntoView(world: BubbleWorld, viewport: Viewport, space: string, id: BubbleId, R: LayoutRules): BubbleWorld {
+  const L = resolveWorld(world, viewport, R);
+  const p = L.byId.get(id);
+  const S = L.spaces.get(space);
+  if (!p || !S) return world;
+  let w = world;
+  for (const axis of ['x', 'y'] as const) {
+    if (S.view[axis].lens !== 'parallel') continue;
+    const lo = axis === 'x' ? p.x : p.y;
+    const hi = lo + (axis === 'x' ? p.w : p.h);
+    const size = axis === 'x' ? viewport.w : viewport.h;
+    // 右（下）へ溢れたぶん。ただし左（上）が切れるほどは送らない ── 泡の頭が見えているほうが大事
+    const over = Math.max(0, hi - (size - VIEW_MARGIN));
+    const shift = Math.min(over, Math.max(0, lo - VIEW_MARGIN)) + Math.min(0, lo - VIEW_MARGIN);
+    if (shift === 0) continue;
+    w = withFocusAxis(w, S, axis, S.focus[axis] + shift / S.host.scale, R);
+  }
+  return w;
+}
+
+/** Z の焦点を送る。約束（`fitFocus`）は通す */
+function sendZ(world: BubbleWorld, viewport: Viewport, space: string, z: number, R: LayoutRules): BubbleWorld {
+  const L = resolveWorld(world, viewport, R).spaces.get(space);
+  return L ? withFocusAxis(world, L, 'z', z, R) : world;
+}
+
+function seenOf(world: BubbleWorld, viewport: Viewport, rules?: Partial<LayoutRules>) {
+  return new Map(
+    resolveWorld(world, viewport, rules).order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }]),
+  );
+}
+
+/**
+ * 面の上で閉じたあと ── **焦点の面が空になったら、焦点は残った中でいちばん手前の面へ下がる。**
+ *
+ * 旧の「空になったレイヤーは消え、後ろが1段ずつ上がる」に当たる。値は書かない。
+ * ★ これは A 案（いまの規則のまま）の手当て。Z の「詰める」の帯の幅を step にすれば（v7 の B 案）、
+ *   面はひとりでに詰まるので、この関数ごと要らなくなる。
+ */
+export function settlePlaneAfterClose(
+  world: BubbleWorld, viewport: Viewport, space: string, rules?: Partial<LayoutRules>,
+): BubbleWorld {
+  const kids = world.kidsOf(world.windowOf(space));
+  if (!kids.length) return world.withFocus(world.windowOf(space), { z: 0 });
+  const front = Math.min(...kids.map((b) => b.state.free.z));
+  if (world.focusOf(world.windowOf(space)).z >= front) return world;   // 焦点の面か、その奥にまだ泡がいる
+  return sendZ(world, viewport, world.windowOf(space), front, resolveRules(rules));
 }
 
 /** 色は id から作る（同じ url なら同じ色になるので、開き直しても色が変わらない） */

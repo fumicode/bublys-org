@@ -19,7 +19,8 @@ import { BubbleSpaceContext, CurrentBubbleContext } from './context.js';
 import type { BubbleSpaceApi } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
 import type { BubbleRoute } from './routing.js';
-import { openAt } from './openAt.js';
+import { openAt, settlePlaneAfterClose } from './openAt.js';
+import type { OpenDepth } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
 
 /** 開いた泡の覚え書き（domain には入れない） */
@@ -62,6 +63,8 @@ export interface BubbleSpaceProps {
   readonly viewport: Viewport;
   /** 外の空間の並べ方。既定は「自由に置く」（既存 bubbles-ui の宇宙と同じ） */
   readonly rootPreset?: PresetId;
+  /** 奥行きの付け方。既定は `'fisheye-x'`。`'plane'` は旧 bubbles-ui の「面」を Z で書いたもの（v7 で試している） */
+  readonly depth?: OpenDepth;
   readonly drawMin?: number;
   readonly rules?: Partial<LayoutRules>;
   /** 外で世界を持つなら渡す（Redux など）。渡さなければ自前で持つ */
@@ -75,6 +78,7 @@ export interface BubbleSpaceProps {
 
 export function BubbleSpace(props: BubbleSpaceProps) {
   const { routes, viewport, drawMin, rules, className, style, children } = props;
+  const depth: OpenDepth = props.depth ?? 'fisheye-x';
   const layerRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
 
@@ -103,7 +107,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const opener = openerId ?? null;
       const r = openAt({
         world, viewport, openerId: opener, newId: id,
-        title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules,
+        title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules, depth,
         joinWith: mateFor(world, urls, route.type, opener),
       });
       setWorld(r.world);
@@ -111,7 +115,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setSelectedId(id);
       return id;
     },
-    [routes, world, urls, viewport, rules, setWorld],
+    [routes, world, urls, viewport, rules, depth, setWorld],
   );
 
   const closeBubble = useCallback(
@@ -119,17 +123,32 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       /**
        * ★ 閉じるも **reshape を通す**。直に world.without(id) すると、
        *   ③「並びは2つ以上」が効かず、中身が1つになった見えない親が残る
-       *   ── そうなるとその泡は並びの中に閉じこめられて、ヘッダを引いても動かなくなる。
+       *   ── そうなるとその泡は並びの中に閉じこめられて、ヘッダをドラッグしても動かなくなる。
        *   （v6 で踏んだ。値を消すときも、規則の通り道を外れてはいけない）
        */
       const seen = new Map(
         base.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }]),
       );
-      setWorld(reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: [] })).world);
+      const space = world.bubble(id)?.space ?? 'root';
+      /**
+       * ★ ⑤ 並びの中の泡を閉じたら、**残った先頭の泡を留める**。
+       *   reshape は「泡が出ていって縮んだ並び」の先頭を自分で留めるが、見つけ方が
+       *   「親が変わった泡」からなので、**消えた泡は数に入らない**（ラボには泡を消す口が無かった）。
+       *   留めないと、並びは箱の中心が位置なので、縮んだ幅の半分だけ兄弟がずれる
+       *   （v7 で踏んだ：300px の詳細を1つ閉じると、触っていない兄弟が 150px 動いた。旧は動かない）。
+       */
+      const row = world.rowOf(id);
+      const heir = row
+        ? world.kidsOf(row.id).filter((b) => b.id !== id).sort((p, q) => p.state.order - q.state.order)[0]?.id
+        : undefined;
+      let next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
+      // 面で開いているなら：焦点の面が空になったら、後ろの面が上がってくる（旧の「空のレイヤーは詰まる」）
+      if (depth === 'plane') next = settlePlaneAfterClose(next, viewport, next.bubble(space) ? space : 'root', rules);
+      setWorld(next);
       setUrls((m) => { const n = new Map(m); n.delete(id); return n; });
       setSelectedId((s) => (s === id ? null : s));
     },
-    [world, setWorld, base, viewport, rules],
+    [world, setWorld, base, viewport, rules, depth],
   );
 
   const api: BubbleSpaceApi = useMemo(
@@ -150,7 +169,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       n += 1;
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
-                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules }).world;
+                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, depth }).world;
       m.set(id, { url, type: route.type, openerId: null, at: n });
     }
     seq.current = n;
