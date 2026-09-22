@@ -45,6 +45,8 @@ type ConnectedBubbleViewProps = {
   /** 帯（リンク）が着いている辺。その辺の角を角張らせる */
   linkedEdges?: BandSide[];
   onHoverChange?: (bubbleId: string, hovered: boolean) => void;
+  /** 岸に着いている（ShowreView から使う）。位置は使わず、帯の並びに収まる */
+  docked?: boolean;
   lightweightMode?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
@@ -56,7 +58,13 @@ type ConnectedBubbleViewProps = {
   onDebugRects?: (rects: SmartRect[]) => void;
 };
 
-const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
+export type { ConnectedBubbleViewProps };
+
+/**
+ * Redux から自分のバブルを引いて描く。海（BubblesLayeredView）でも岸（ShowreView）でも
+ * 同じものを使う — 岸に着いたからといって専用のビューは作らない。
+ */
+export const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
   universeId,
   bubbleId,
   layerIndex,
@@ -66,6 +74,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   surfaceLayer,
   linkedEdges,
   onHoverChange,
+  docked = false,
   lightweightMode,
   renderBubbleContent,
   onBubbleClick,
@@ -97,6 +106,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       <UniverseBubbleView
         linkedEdges={linkedEdges}
         onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
+        docked={docked}
         bubble={bubble}
         position={pos}
         layerIndex={layerIndex}
@@ -127,6 +137,7 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       contentBackground={bubble.contentBackground ?? "white"}
       linkedEdges={linkedEdges}
       onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
+      docked={docked}
       lightweightMode={lightweightMode}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
@@ -667,6 +678,24 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   position: absolute;
   inset: 0;
   overflow: auto;
+  /* 海のスクロールバーは岸との境目に出る。白い溝に見えないよう、トラックを透明にして
+     つまみだけを夜空に溶かす（標準プロパティ。対応ブラウザではこちらが優先される） */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
   /* nested は pointer-events: none。空白領域は奥に貫通するが、内側のバブル（auto）
      上でホイールを回すと、その wheel イベントが祖先の overflow:auto まで届いて
      ネイティブにスクロールが起きる。

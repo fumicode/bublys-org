@@ -35,6 +35,8 @@ type UniverseBubbleViewProps = {
   linkedEdges?: BandSide[];
   /** ホバーの出入り（帯をホバー時だけ出すのに使う） */
   onHoverChange?: (hovered: boolean) => void;
+  /** 岸に着いている。帯の並び（flex）の中に relative で収まり、ヘッダーのドラッグは辺の移動 / 引き剥がし */
+  docked?: boolean;
   isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
@@ -55,6 +57,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   zIndex,
   linkedEdges,
   onHoverChange,
+  docked = false,
   isFocused = false,
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
@@ -86,7 +89,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
     },
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked });
   const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
@@ -189,7 +192,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       ref={ref}
       data-bubble-id={bubble.id}
       data-window-style="universe"
-      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
+      style={docked ? undefined : { left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
+      $docked={docked}
       $colorHue={bubble.colorHue}
       $zIndex={isFocused ? 100 : zIndex}
       $linkedEdges={linkedEdges}
@@ -305,6 +309,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
   if ((prev.linkedEdges ?? []).join() !== (next.linkedEdges ?? []).join()) return false;
+  if (prev.docked !== next.docked) return false;
   if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
   if (prev.lightweightMode !== next.lightweightMode) return false;
@@ -315,6 +320,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $layerIndex?: number;
   $zIndex?: number;
   $linkedEdges?: BandSide[];
+  $docked?: boolean;
   $transformOrigin?: Vec2;
   $colorHue: number;
   $width?: string;
@@ -327,7 +333,8 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
 };
 
 const StyledWindow = styled.div<StyledWindowProps>`
-  position: absolute;
+  position: ${({ $docked }) => ($docked ? "relative" : "absolute")};
+  flex: 0 0 auto;
 
   /* universe バブル自身の「色付きガラス」は背後を透視可能にする ─ クリックは
      奥（親 universe のオブジェクト）にも届く。ヘッダーだけ explicit auto で

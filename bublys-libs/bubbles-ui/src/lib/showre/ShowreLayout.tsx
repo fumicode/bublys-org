@@ -23,6 +23,7 @@ export type ShowreLayoutProps = {
 
 /**
  * 「岸 + 海」のレイアウト。1 つの universe の 4 辺に岸を置き、中央に海を置く。
+ * 岸に着いたバブルは窓だったときの大きさのまま辺に沿って並ぶ（辺いっぱいは取らない）。
  *
  * ルール「先に貼った岸が角を取る」: 岸は使われ始めた順（Showres.order）に外側から
  * 包む。例えば left → top の順なら
@@ -130,7 +131,9 @@ export const ShowreLayout: FC<ShowreLayoutProps> = ({ universeId, renderBubbleCo
   const wrapWithShowres = (sides: readonly ShowreSide[], inner: ReactNode): ReactNode => {
     if (sides.length === 0) return inner;
     const [side, ...rest] = sides;
-    const bar = <ShowreView universeId={universeId} side={side} renderBubbleContent={renderBubbleContent} />;
+    const bar = (
+      <ShowreView universeId={universeId} side={side} renderBubbleContent={renderBubbleContent} seaRef={seaRef} />
+    );
     const content = wrapWithShowres(rest, inner);
     const before = side === "top" || side === "left";
     return (

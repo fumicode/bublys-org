@@ -97,6 +97,11 @@ type BubbleProps = {
   linkedEdges?: BandSide[];
   /** ホバーの出入り（帯をホバー時だけ出すのに使う） */
   onHoverChange?: (hovered: boolean) => void;
+  /**
+   * 岸に着いている。見た目は同じで、置き方だけ変わる: 海では absolute で position に置くが、
+   * 岸では帯の並び（flex）の中に relative で収まる。ヘッダーのドラッグは辺の移動 / 引き剥がし
+   */
+  docked?: boolean;
   lightweightMode?: boolean; // 軽量モード: box-shadow・transition・backdrop-filter を省略
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
@@ -120,6 +125,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   contentBackground = "white",
   linkedEdges,
   onHoverChange,
+  docked = false,
   lightweightMode = false,
   position,
   vanishingPoint,
@@ -153,7 +159,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
     }
   });
 
-  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint });
+  const { onDragStart } = useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint, docked });
   const { onResizeStart } = useBubbleResize({ bubble, ref, layerIndex, vanishingPoint });
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
@@ -288,7 +294,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
     <StyledBubble
       ref={ref}
       data-bubble-id={bubble.id}
-      style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
+      style={docked ? undefined : { left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
+      $docked={docked}
       colorHue={bubble.colorHue}
       zIndex={isFocused ? 100 : zIndex}
       layerIndex={layerIndex}
@@ -421,6 +428,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
       prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
       (prevProps.linkedEdges ?? []).join() !== (nextProps.linkedEdges ?? []).join() ||
+      prevProps.docked !== nextProps.docked ||
       prevProps.lightweightMode !== nextProps.lightweightMode) {
     return false;
   }
@@ -431,6 +439,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
 
 //div のpropsに合わせて
 type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
+  $docked?: boolean; // 岸に着いている（帯の並びに relative で収まる）
   layerIndex?: number; // レイヤーのインデックス = zIndex * -1
   zIndex?: number; // = - layerIndex
 
@@ -450,7 +459,8 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
 };
 
 const StyledBubble = styled.div<StyledBubbleProp>`
-  position: absolute;
+  position: ${({ $docked }) => ($docked ? "relative" : "absolute")};
+  flex: 0 0 auto;
 
   /* pointer-events は CSS で inherited なので、ネスト universe の none を
      継承しないようにバブル自身は常に auto を明示する。 */
