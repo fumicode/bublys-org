@@ -49,6 +49,8 @@ export type BubbleProps = {
   position?: Point2;
   size?: Size2;
   maximized?: boolean;
+  /** このバブルから開いたバブルへの帯（リンク）を隠す。関係は残るが描かない */
+  linksHidden?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
@@ -64,6 +66,8 @@ export type BubbleJson= {
   position?: Point2;
   size?: Size2;
   maximized?: boolean;
+  /** このバブルから開いたバブルへの帯（リンク）を隠す。関係は残るが描かない */
+  linksHidden?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: RectJson; //これはシリアライズ可能な型に保つ
@@ -79,6 +83,8 @@ export type BubbleState = {
   position?: Point2;
   size?: Size2;
   maximized?: boolean;
+  /** このバブルから開いたバブルへの帯（リンク）を隠す。関係は残るが描かない */
+  linksHidden?: boolean;
   bubbleOptions?: BubbleOptions;
 
   renderedRect?: SmartRect; //内部ではSmartRectを使う
@@ -182,6 +188,16 @@ export class Bubble {
    */
   get isMaximized(): boolean {
     return !!this.state.maximized;
+  }
+
+  /** このバブルから開いたバブルへの帯（リンク）を隠しているか */
+  get linksHidden(): boolean {
+    return !!this.state.linksHidden;
+  }
+
+  setLinksHidden(linksHidden: boolean): Bubble {
+    if (linksHidden === this.linksHidden) return this;
+    return new Bubble({ ...this.state, linksHidden });
   }
 
   get contentBackground(): string | undefined {

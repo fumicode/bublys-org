@@ -86,16 +86,22 @@ export const getOriginRect = (
 ): SmartRect | undefined => {
   if (typeof document === "undefined") return undefined;
 
-  const escapedUrl = CSS?.escape ? CSS.escape(targetUrl) : targetUrl;
-  const selector = `[data-url="${escapedUrl}"]`;
-
   const openerContainer = document.querySelector(
     `[data-bubble-id="${openerBubbleId}"]`
   ) as HTMLElement | null;
 
-  const originEl = openerContainer
-    ? (openerContainer.querySelector(selector) as HTMLElement | null)
-    : (document.querySelector(selector) as HTMLElement | null);
+  const find = (url: string): HTMLElement | null => {
+    const escapedUrl = CSS?.escape ? CSS.escape(url) : url;
+    const selector = `[data-url="${escapedUrl}"]`;
+    return openerContainer
+      ? (openerContainer.querySelector(selector) as HTMLElement | null)
+      : (document.querySelector(selector) as HTMLElement | null);
+  };
+
+  // 世界線つきの url（`<base>@<node>`）は node が進むたびに変わるが、クリック元は
+  // base で置かれている（ランチャーの「task-bubly」など）。見つからなければ base で探す
+  const at = targetUrl.indexOf("@");
+  const originEl = find(targetUrl) ?? (at > 0 ? find(targetUrl.slice(0, at)) : null);
 
   if (!originEl) return undefined;
 
@@ -107,5 +113,25 @@ export const getOriginRect = (
     ? viewport.size
     : { width: window.innerWidth, height: window.innerHeight };
 
+  return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());
+};
+
+/**
+ * 岸に着いているバブルの帯要素（data-docked-bubble-id）の矩形を、そのバブルが属する
+ * universe の座標で返す。浮いているバブルの renderedRect に相当するもの。
+ * 岸に着いている間は BubbleView が描かれず renderedRect が古いままなので、
+ * 開く位置や帯（リンク）の起点にはこちらを使う。
+ */
+export const getDockedBubbleRect = (bubbleId: string): SmartRect | undefined => {
+  if (typeof document === "undefined") return undefined;
+  const el = document.querySelector(
+    `[data-docked-bubble-id="${bubbleId}"]`,
+  ) as HTMLElement | null;
+  if (!el) return undefined;
+  const rect_vp = getElementRect(el);
+  const { rect: rect_uv, viewport } = toUniverseRect(rect_vp, el);
+  const parentSize = viewport
+    ? viewport.size
+    : { width: window.innerWidth, height: window.innerHeight };
   return new SmartRect(rect_uv, parentSize, CoordinateSystem.GLOBAL.toData());
 };

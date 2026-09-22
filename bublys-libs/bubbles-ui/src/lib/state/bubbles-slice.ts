@@ -572,6 +572,8 @@ export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
 const makeSelectBubblesJson = memoizeByUniverse(
   (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).bubbles,
 );
+/** universe の全バブル json（id → BubbleJson）。帯の辺の計算など、一括で矩形を見たいとき用 */
+export const makeSelectBubblesJsonOf = makeSelectBubblesJson;
 const makeSelectProcessJson = memoizeByUniverse(
   (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).process,
 );

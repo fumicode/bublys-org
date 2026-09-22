@@ -1,17 +1,21 @@
 import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useCallback, useState } from "react";
 import styled from "styled-components";
-import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode, selectLinkDisplay, toggleLinkDisplay } from "@bublys-org/state-management";
+import { useHoveredBubble, useHoveredBubbleState } from "../context/HoveredBubbleContext.js";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
+import { frustumBand, type BandSide } from "./link-band-path.js";
+import { getOriginRect, getDockedBubbleRect } from "../utils/get-origin-rect.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
 import { useUniverseDropZone } from "../hooks/useUniverseDropZone.js";
 import { DRAGGING_CLASS } from "../utils/drag-session.js";
 import {
   makeSelectValidBubbleRelationIds,
+  makeSelectBubblesJsonOf,
   makeSelectGlobalCoordinateSystem,
   makeSelectSurfaceLeftTop,
   makeSelectUniverseDimensions,
@@ -38,7 +42,9 @@ type ConnectedBubbleViewProps = {
   isFocused: boolean;
   vanishingPoint: Point2;
   surfaceLayer: Layer;
-  hasLeftLink?: boolean;
+  /** 帯（リンク）が着いている辺。その辺の角を角張らせる */
+  linkedEdges?: BandSide[];
+  onHoverChange?: (bubbleId: string, hovered: boolean) => void;
   lightweightMode?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
@@ -58,7 +64,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   isFocused,
   vanishingPoint,
   surfaceLayer,
-  hasLeftLink,
+  linkedEdges,
+  onHoverChange,
   lightweightMode,
   renderBubbleContent,
   onBubbleClick,
@@ -88,6 +95,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   if (bubble.isUniverse) {
     return (
       <UniverseBubbleView
+        linkedEdges={linkedEdges}
+        onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
         bubble={bubble}
         position={pos}
         layerIndex={layerIndex}
@@ -116,7 +125,8 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
-      hasLeftLink={hasLeftLink}
+      linkedEdges={linkedEdges}
+      onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
       lightweightMode={lightweightMode}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
@@ -141,6 +151,7 @@ type ConnectedLinkBubbleViewProps = {
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
   lightweightMode?: boolean;
+  visible: boolean;
 };
 
 const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
@@ -150,6 +161,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   coordinateSystem,
   linkZIndex,
   lightweightMode,
+  visible,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
   const selectOpenee = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openeeId), [universeId, openeeId]);
@@ -165,6 +177,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
       lightweightMode={lightweightMode}
+      visible={visible}
     />
   );
 });
@@ -368,6 +381,19 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
   const lightweightMode = useAppSelector(selectLightweightMode);
+  const linkDisplay = useAppSelector(selectLinkDisplay);
+
+  // ホバー中のバブル。Provider（ShowreLayout）があれば岸の帯とも共有、無ければここだけ
+  const hoveredContext = useHoveredBubble();
+  const localHovered = useHoveredBubbleState();
+  const { hoveredBubbleId, enterBubble, leaveBubble } = hoveredContext ?? localHovered;
+  const handleHoverChange = useCallback(
+    (bubbleId: string, hovered: boolean) => {
+      if (hovered) enterBubble(bubbleId);
+      else leaveBubble(bubbleId);
+    },
+    [enterBubble, leaveBubble],
+  );
 
   const undergroundVanishingPoint: Point2 = useMemo(
     () => vanishingPoint || { x: 20, y: 10 },
@@ -387,9 +413,34 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
     return result;
   }, [bubbleLayers]);
 
-  const openeeIds = useMemo(() => {
-    return new Set(relationIds.map(r => r.openeeId));
-  }, [relationIds]);
+  const bubblesJson = useAppSelector(makeSelectBubblesJsonOf(universeId));
+
+  // 帯（錐台）が着いている openee の辺。その辺の角を角張らせる。
+  // 起点側は帯に含まれる（錐台の奥の面）ので角は触らない。
+  // 矩形の出所は LinkBubbleView と同じ（クリック元 → 岸の帯 → renderedRect）。
+  const linkedEdges = useMemo(() => {
+    const result: Record<string, BandSide[]> = {};
+    const add = (id: string, side: BandSide) => {
+      const list = (result[id] ??= []);
+      if (!list.includes(side)) list.push(side);
+    };
+    for (const r of relationIds) {
+      const openerJson = bubblesJson[r.openerId];
+      const openeeJson = bubblesJson[r.openeeId];
+      if (!openerJson || !openeeJson) continue;
+      const opener = Bubble.fromJSON(openerJson);
+      const openee = Bubble.fromJSON(openeeJson);
+      // 帯を隠しているバブルからの帯は無いものとして扱う（角も丸いまま）
+      if (opener.linksHidden) continue;
+      const openerRect =
+        getOriginRect(opener.id, openee.url) ?? getDockedBubbleRect(opener.id) ?? opener.renderedRect;
+      const openeeRect = openee.renderedRect;
+      if (!openerRect || !openeeRect) continue;
+      const band = frustumBand(openerRect.toLocal(coordinateSystem), openeeRect.toLocal(coordinateSystem));
+      for (const edge of band?.openeeEdges ?? []) add(r.openeeId, edge);
+    }
+    return result;
+  }, [relationIds, bubblesJson, coordinateSystem]);
 
   // surface（最前面）レイヤー。bubble.position(layer-local) ⇄ universe 変換を担う
   const surfaceLayer = useMemo(
@@ -437,7 +488,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
               : layer;
           return orderedLayer.map((bubbleId) => {
             const zIndex = baseZIndex - layerIndex;
-            const hasLeftLink = openeeIds.has(bubbleId);
+            const edges = linkedEdges[bubbleId];
             const isFocused = focusedBubbleId === bubbleId;
 
             return (
@@ -450,7 +501,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                 isFocused={isFocused}
                 vanishingPoint={undergroundVanishingPoint}
                 surfaceLayer={surfaceLayer}
-                hasLeftLink={hasLeftLink}
+                linkedEdges={edges}
+                onHoverChange={handleHoverChange}
                 lightweightMode={lightweightMode}
                 renderBubbleContent={renderBubbleContent}
                 onBubbleClick={stableOnBubbleClick}
@@ -467,7 +519,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
         .flat(),
     [
       bubbleLayers,
-      openeeIds,
+      linkedEdges,
+      handleHoverChange,
       surfaceLayer,
       lightweightMode,
       universeId,
@@ -528,6 +581,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
             {!isLayerAnimating &&
               relationIds.map(({ openerId, openeeId }) => {
                 const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+                // opener が帯を隠していれば描かない（関係は残るので、戻せば復活する）
+                if (bubblesJson[openerId]?.linksHidden) return null;
 
                 return(
                   <ConnectedLinkBubbleView
@@ -538,6 +593,12 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
                     lightweightMode={lightweightMode}
+                    // 既定はホバー時だけ: どちらかの端のバブルにホバーしているとき見せる
+                    visible={
+                      linkDisplay === "always" ||
+                      hoveredBubbleId === openerId ||
+                      hoveredBubbleId === openeeId
+                    }
                   />
                 );
               })
@@ -564,6 +625,13 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
               title={lightweightMode ? '通常描画モードへ' : '軽量描画モードへ'}
             >
               {lightweightMode ? '精' : '速'}
+            </button>
+            <button
+              className="e-link-display-toggle"
+              onClick={() => dispatch(toggleLinkDisplay())}
+              title={linkDisplay === 'always' ? '帯をホバー時だけ表示する' : '帯を常に表示する'}
+            >
+              {linkDisplay === 'always' ? '常' : '帯'}
             </button>
           </div>
         </StyledHeadsUpDisplay>
@@ -699,7 +767,8 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
       }
     }
 
-    .e-lightweight-toggle {
+    .e-lightweight-toggle,
+    .e-link-display-toggle {
       position: absolute;
       bottom: 8px;
       left: ${({ surface }) => surface.leftTop.x + 40}px;
@@ -722,6 +791,10 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
         opacity: 1;
         background: rgba(255, 255, 255, 0.2);
       }
+    }
+
+    .e-link-display-toggle {
+      left: ${({ surface }) => surface.leftTop.x + 72}px;
     }
   }
 `;

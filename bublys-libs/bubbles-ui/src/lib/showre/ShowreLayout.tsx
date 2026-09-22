@@ -6,6 +6,7 @@ import type { Bubble } from "../Bubble.domain.js";
 import { makeSelectShowreOrder } from "../state/bubbles-slice.js";
 import { ShowreSide, isShowreSide, isVerticalShowre, nearestShowreSide } from "./Showre.domain.js";
 import { ShowreView } from "./ShowreView.js";
+import { HoveredBubbleProvider } from "../context/HoveredBubbleContext.js";
 import {
   SHOWRE_DOCK_THRESHOLD,
   ShowreDragContext,
@@ -182,6 +183,7 @@ export const ShowreLayout: FC<ShowreLayoutProps> = ({ universeId, renderBubbleCo
 
   return (
     <ShowreDragContext.Provider value={dragContext}>
+    <HoveredBubbleProvider>
       <div
         ref={layoutRef}
         data-showre-layout={universeId}
@@ -199,6 +201,7 @@ export const ShowreLayout: FC<ShowreLayoutProps> = ({ universeId, renderBubbleCo
         {/* ドラッグ中の「ここに着く」帯 */}
         {previewSide && <DockPreviewBand side={previewSide} rect={previewRect(previewSide)} />}
       </div>
+    </HoveredBubbleProvider>
     </ShowreDragContext.Provider>
   );
 };

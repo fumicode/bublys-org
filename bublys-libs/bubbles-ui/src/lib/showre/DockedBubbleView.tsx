@@ -1,10 +1,11 @@
 "use client";
-import { FC, ReactNode, memo } from "react";
+import { FC, ReactNode, memo, useEffect, useRef } from "react";
 import styled from "styled-components";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import type { Bubble } from "../Bubble.domain.js";
 import { ShowreSide, isVerticalShowre } from "./Showre.domain.js";
 import { useShowreGripDrag } from "./useShowreGripDrag.js";
+import { useHoveredBubble } from "../context/HoveredBubbleContext.js";
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 
@@ -37,8 +38,22 @@ export const DOCKED_EDGE_GAP = 4;
 export const DockedBubbleView: FC<DockedBubbleViewProps> = memo(({ bubble, side, children }) => {
   const vertical = isVerticalShowre(side);
   const { isDragging, gripProps } = useShowreGripDrag(bubble);
+  const hovered = useHoveredBubble();
+  // 要素が消える（引き剥がし・辺の移動で別の帯に移る等）と mouseleave が来ないので、ここで解く。
+  // context の値はホバーのたびに変わるので ref 経由にし、unmount のときだけ走らせる
+  const hoveredRef = useRef(hovered);
+  hoveredRef.current = hovered;
+  useEffect(() => () => hoveredRef.current?.leaveBubble(bubble.id), [bubble.id]);
   return (
-    <Docked data-docked-bubble-id={bubble.id} $vertical={vertical}>
+    // data-bubble-id: 浮いているバブルと同じく「この要素がバブル X」。
+    // 開いたバブルへの帯（LinkBubbleView）が、この中の UrledPlace を起点として探せる
+    <Docked
+      data-docked-bubble-id={bubble.id}
+      data-bubble-id={bubble.id}
+      $vertical={vertical}
+      onMouseEnter={() => hovered?.enterBubble(bubble.id)}
+      onMouseLeave={() => hovered?.leaveBubble(bubble.id)}
+    >
       <Grip $vertical={vertical} $dragging={isDragging} title="つまみ（ドラッグで辺の移動 / 海へ引き剥がし）" {...gripProps}>
         <DragIndicatorIcon sx={{ fontSize: 16, transform: vertical ? "rotate(90deg)" : "none" }} />
       </Grip>
@@ -53,7 +68,8 @@ const Docked = styled.div<DivProps & { $vertical: boolean }>`
   display: flex;
   flex-direction: ${(p) => (p.$vertical ? "column" : "row")};
   align-items: stretch;
-  flex: 0 0 auto;
+  /* 帯より長い中身は、帯からはみ出さずに中身の側でスクロールする（縮められる） */
+  flex: 0 1 auto;
   min-width: 0;
   min-height: 0;
   /* 同じ岸に並ぶ帯どうしの区切り */

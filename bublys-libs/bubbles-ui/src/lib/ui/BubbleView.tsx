@@ -1,4 +1,4 @@
-import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback } from "react";
+import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -14,6 +14,7 @@ import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
 import { BubbleSkeleton } from "./BubbleSkeleton.js";
+import { cornerRadiusFor, type BandSide } from "./link-band-path.js";
 
 /**
  * 長いslug（UUIDなど）を省略表示する
@@ -92,7 +93,10 @@ type BubbleProps = {
   zIndex?: number;
   isFocused?: boolean;
   contentBackground?: string; // コンテンツ背景色（デフォルト: white）
-  hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか（左角丸を無効化）
+  /** 帯（リンク）が着いている辺。その辺の角を角張らせる（帯の直線の縁が角丸からはみ出さないように） */
+  linkedEdges?: BandSide[];
+  /** ホバーの出入り（帯をホバー時だけ出すのに使う） */
+  onHoverChange?: (hovered: boolean) => void;
   lightweightMode?: boolean; // 軽量モード: box-shadow・transition・backdrop-filter を省略
 
   children?: React.ReactNode; // Bubbleか、Layoutか、Panelか。 Panelが最もベーシック
@@ -114,7 +118,8 @@ const BubbleViewInner: FC<BubbleProps> = ({
   zIndex,
   isFocused = false,
   contentBackground = "white",
-  hasLeftLink = false,
+  linkedEdges,
+  onHoverChange,
   lightweightMode = false,
   position,
   vanishingPoint,
@@ -237,8 +242,14 @@ const BubbleViewInner: FC<BubbleProps> = ({
     updateHeaderSafeZone();
   };
 
+  // 要素が消える（閉じる・岸に着く等）と mouseleave が来ないので、ここでホバーを解く
+  const onHoverChangeRef = useRef(onHoverChange);
+  onHoverChangeRef.current = onHoverChange;
+  useEffect(() => () => onHoverChangeRef.current?.(false), []);
+
   const handleMouseLeave = () => {
     setIsMouseNearTop(false);
+    onHoverChange?.(false);
   };
 
   const handleHeaderMouseDown = (e: React.MouseEvent<HTMLHeadingElement>) => {
@@ -287,6 +298,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       onClick={onClick}
       onFocus={handleFocus}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => onHoverChange?.(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onTransitionEnd={() => {
@@ -296,7 +308,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       width={bubble.size ? `${bubble.size.width}px` : undefined}
       height={bubble.size ? `${bubble.size.height}px` : undefined}
       contentBackground={contentBackground}
-      hasLeftLink={hasLeftLink}
+      $linkedEdges={linkedEdges}
       fillsContainer={bubble.fillsContainer}
       lightweightMode={lightweightMode}
     >
@@ -408,7 +420,7 @@ export const BubbleView = memo(BubbleViewInner, (prevProps, nextProps) => {
       prevProps.zIndex !== nextProps.zIndex ||
       prevProps.isFocused !== nextProps.isFocused ||
       prevProps.contentBackground !== nextProps.contentBackground ||
-      prevProps.hasLeftLink !== nextProps.hasLeftLink ||
+      (prevProps.linkedEdges ?? []).join() !== (nextProps.linkedEdges ?? []).join() ||
       prevProps.lightweightMode !== nextProps.lightweightMode) {
     return false;
   }
@@ -428,7 +440,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   width?: string; // 幅を指定するためのオプション
   height?: string; // 高さを指定するためのオプション
   contentBackground?: string; // コンテンツ背景色
-  hasLeftLink?: boolean; // 左側にリンクバブルが接続されているか
+  $linkedEdges?: BandSide[]; // 帯（リンク）が着いている辺
   fillsContainer?: boolean; // 中身が自前のviewportを持つ窓型コンテンツ（スクロール抑止）
   lightweightMode?: boolean; // 軽量モード
   headerVisible?: boolean;
@@ -486,7 +498,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
   };
 
   border: 1px solid hsla(0, 0%, 100%, 0.3);
-  border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 24px 0' : '24px'};
+  border-radius: ${({ $linkedEdges }) => cornerRadiusFor($linkedEdges, '24px')};
 
   display: flex;
   flex-direction: column;
@@ -505,7 +517,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       hsla(0, 0%, 100%, 0.05) 50%,
       transparent 100%
     );
-    border-radius: ${({ hasLeftLink }) => hasLeftLink ? '0 24px 50% 50%' : '24px 24px 50% 50%'};
+    border-radius: ${({ $linkedEdges }) => cornerRadiusFor($linkedEdges, '24px', '50%')};
     pointer-events: none;
   }
 

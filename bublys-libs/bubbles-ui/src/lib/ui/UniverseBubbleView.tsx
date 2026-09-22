@@ -1,5 +1,5 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useMemo, useState, memo, useRef } from "react";
+import { FC, useContext, useLayoutEffect, useMemo, useState, memo, useRef, useEffect } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -14,6 +14,7 @@ import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
+import { cornerRadiusFor, type BandSide } from "./link-band-path.js";
 
 const HEADER_PROXIMITY_THRESHOLD = 40;
 
@@ -30,6 +31,10 @@ type UniverseBubbleViewProps = {
   vanishingPoint?: Point2;
   layerIndex?: number;
   zIndex?: number;
+  /** 帯（リンク）が着いている辺。その辺の角を角張らせる */
+  linkedEdges?: BandSide[];
+  /** ホバーの出入り（帯をホバー時だけ出すのに使う） */
+  onHoverChange?: (hovered: boolean) => void;
   isFocused?: boolean;
   /** ヘッダー右側に追加で挟みたいコントロール（例: ←→ 世界線ナビ） */
   headerExtras?: React.ReactNode;
@@ -48,6 +53,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   children,
   layerIndex,
   zIndex,
+  linkedEdges,
+  onHoverChange,
   isFocused = false,
   position = { x: 0, y: 0 },
   vanishingPoint = new Vec2({ x: 0, y: 0 }),
@@ -93,6 +100,11 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
    * 届かなくなる。そこで、auto な子要素からバブルしてくる mousemove でも「上端に近いか」を
    * 見る。素地（pointer-events: none）の上はストリップが受け持つので、両方で漏れがない。
    */
+  // 要素が消える（閉じる・岸に着く等）と mouseleave が来ないので、ここでホバーを解く
+  const onHoverChangeRef = useRef(onHoverChange);
+  onHoverChangeRef.current = onHoverChange;
+  useEffect(() => () => onHoverChangeRef.current?.(false), []);
+
   const handleWindowMouseMove = (e: React.MouseEvent) => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
@@ -180,13 +192,15 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       style={{ left: position ? `${position.x}px` : 0, top: position ? `${position.y}px` : 0 }}
       $colorHue={bubble.colorHue}
       $zIndex={isFocused ? 100 : zIndex}
+      $linkedEdges={linkedEdges}
       $layerIndex={layerIndex}
       $transformOrigin={vanishingPointRelative}
       $headerVisible={isHeaderVisible}
       $headerOffset={headerOffset}
       onClick={onClick}
       onMouseMove={handleWindowMouseMove}
-      onMouseLeave={() => setIsMouseNearTop(false)}
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => { setIsMouseNearTop(false); onHoverChange?.(false); }}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));
@@ -290,6 +304,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
   }
   if (prev.position?.x !== next.position?.x || prev.position?.y !== next.position?.y) return false;
   if (prev.layerIndex !== next.layerIndex || prev.zIndex !== next.zIndex) return false;
+  if ((prev.linkedEdges ?? []).join() !== (next.linkedEdges ?? []).join()) return false;
   if (prev.isFocused !== next.isFocused) return false;
   if (prev.headerExtras !== next.headerExtras) return false;
   if (prev.lightweightMode !== next.lightweightMode) return false;
@@ -299,6 +314,7 @@ export const UniverseBubbleView = memo(UniverseBubbleViewInner, (prev, next) => 
 type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $layerIndex?: number;
   $zIndex?: number;
+  $linkedEdges?: BandSide[];
   $transformOrigin?: Vec2;
   $colorHue: number;
   $width?: string;
@@ -346,7 +362,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
       ? `color-mix(in srgb, ${$backdropColor} 55%, transparent)`
       : "transparent"};
   border: 1px solid hsla(${({ $colorHue }) => $colorHue}, 50%, 60%, 0.45);
-  border-radius: 14px;
+  border-radius: ${({ $linkedEdges }) => cornerRadiusFor($linkedEdges, '14px')};
   box-shadow: ${({ $lightweightMode }) => $lightweightMode
     ? 'none'
     : '0 16px 48px hsla(0, 0%, 0%, 0.5), 0 2px 8px hsla(0, 0%, 0%, 0.25)'};

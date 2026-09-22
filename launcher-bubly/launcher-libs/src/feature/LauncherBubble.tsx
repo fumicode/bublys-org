@@ -8,6 +8,7 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { LauncherView, type LauncherViewEntry } from "../ui/LauncherView.js";
 import { resolveLaunchTarget } from "../registration/launchTargets.js";
+import { launcherSettingsUrl } from "../registration/bubbleRoutes.js";
 import { useLauncher } from "./useLauncher.js";
 
 /**
@@ -17,8 +18,7 @@ import { useLauncher } from "./useLauncher.js";
  * コンポーネントで、見せ方だけ {@link useShowreSide} で分岐する。
  *
  * 呼び出しは、このバブルが居るユニバースの openBubble で開く。岸に着いた
- * バブルも ShowreView 経由でそのユニバースの BubblesContext の中に居るので、
- * サイドバーの popChildOrJoinSibling(url, "root") と同じ振る舞いになる。
+ * バブルも ShowreView 経由でそのユニバースの BubblesContext の中に居る。
  */
 export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   const launcherId = bubble.params.launcherId ?? bubble.url.replace(/^launchers\//, "");
@@ -44,9 +44,12 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
       entries={entries}
       compact={side !== undefined}
       vertical={side === undefined || isVerticalShowre(side)}
-      // 岸に着いたランチャーから開いたバブルは、岸ではなく海に属する（ランチャーとの
-      // 親子関係を持たない）。opener を "root" にすると relateBubbles が関係を作らない。
-      onLaunch={(url) => openBubble(url, side !== undefined ? "root" : bubble.id)}
+      // 開いたバブルはランチャーの子（帯がランチャーの項目から伸びる）。
+      // 帯を見せるかどうかはバブルの linksHidden（設定バブルから切り替え）で決まり、
+      // 関係自体は常に残るので、切り替えれば既に開いているものにも効く
+      onLaunch={(url) => openBubble(url, bubble.id)}
+      settingsUrl={launcherSettingsUrl(launcherId)}
+      onOpenSettings={() => openBubble(launcherSettingsUrl(launcherId), bubble.id)}
     />
   );
 };
