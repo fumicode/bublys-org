@@ -52,7 +52,7 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/domain-registry"
+      "path": "../../launcher-bubly/launcher-model"
     },
     {
       "path": "../../bublys-libs/hash-world-line"
@@ -61,10 +61,16 @@
       "path": "../../bublys-libs/akashic-record"
     },
     {
-      "path": "../../bublys-libs/object-shell"
+      "path": "../../launcher-bubly/launcher-libs"
     },
     {
       "path": "../../users-libs"
+    },
+    {
+      "path": "../../bublys-libs/object-shell"
+    },
+    {
+      "path": "../../bublys-libs/domain-registry"
     },
     {
       "path": "../../bublys-libs/world-line-graph"

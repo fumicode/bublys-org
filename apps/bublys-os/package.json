@@ -8,6 +8,8 @@
     "@bublys-org/state-management": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/akashic-record": "*",
+    "@bublys-org/launcher-libs": "*",
+    "@bublys-org/launcher-model": "*",
     "@bublys-org/hash-world-line": "*",
     "@bublys-org/users-libs": "*",
     "@emotion/react": "^11.14.0",

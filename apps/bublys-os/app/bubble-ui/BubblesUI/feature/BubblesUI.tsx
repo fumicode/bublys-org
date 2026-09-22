@@ -31,6 +31,8 @@ import {
   measureViewport,
   OpeningPosition,
   DragDataType,
+  ShowreLayout,
+  ROOT_UNIVERSE_ID,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 import { BubbleContent } from "../ui/BubbleContent";
@@ -38,7 +40,7 @@ import { Box, Slider, Typography, IconButton } from "@mui/material";
 import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
-import { Sidebar } from "../ui/Sidebar";
+import { useEnsureMainLauncher } from "@/app/launcher/useEnsureMainLauncher";
 import "../domain/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
@@ -252,30 +254,26 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     dispatch(removePocketItem(id));
   }, [dispatch]);
 
-  // Sidebarからのアイテムクリックハンドラー
-  const handleSidebarItemClick = useCallback((url: string) => {
-    popChildOrJoinSibling(url, "root");
-  }, [popChildOrJoinSibling]);
+  // 「root には必ずランチャーが 1 つは居る」— 無ければ main ランチャーを左の岸に着ける
+  useEnsureMainLauncher();
 
   return (
-    <Box sx={{ display: "flex", width: "100%", height: "100vh" }}>
+    // 画面全体 — universe（root も nested も）は透明にして、
+    // ここがすべての universe の「夜空」backdrop として 1 段大きく塗る。
+    // 岸に着いたバブルは帯として辺に、浮いているバブルは海（中央）に描く。
+    <Box
+      sx={{
+        width: "100%",
+        height: "100vh",
+        overflow: "hidden",
+        background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+      }}
+    >
       {/* 現在の view 状態の JSON を左下に表示（開発用） */}
       {/* <BubbleArrangementInspector /> */}
 
-      {/* Left Sidebar */}
-      <Sidebar onItemClick={handleSidebarItemClick} />
-
-      {/* Main Bubbles Area — universe（root も nested も）は透明にして、
-          ここがすべての universe の「夜空」backdrop として 1 段大きく塗る。 */}
-      <Box
-        sx={{
-          flex: 1,
-          position: "relative",
-          overflow: "hidden",
-          background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
-        }}
-      >
-        <BubblesContext.Provider value={bubblesContextValue}>
+      <BubblesContext.Provider value={bubblesContextValue}>
+        <ShowreLayout universeId={ROOT_UNIVERSE_ID} renderBubbleContent={renderAppsBubbleContent}>
           {/* 表示状態を world-line に同期し undo/redo + 世界線グラフ起動を提供。
               openBubble を使うため BubblesContext.Provider の内側に配置する。 */}
           <BubbleArrangementWorldLineControls />
@@ -296,146 +294,146 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
               </Box>
             </PositionDebuggerProvider>
           </BubbleRefsProvider>
-        </BubblesContext.Provider>
-      </Box>
 
-      {/* Pocket */}
-      {isPocketOpen ? (
-        <Box
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 80,
-            zIndex: 1000,
-          }}
-        >
-          <PocketView
-            items={pocketItems}
-            onRemove={handlePocketRemove}
-            onDrop={handlePocketDrop}
-            onItemClick={handlePocketItemClick}
-            onClose={() => setIsPocketOpen(false)}
-          />
-        </Box>
-      ) : (
-        <IconButton
-          sx={{
-            position: "fixed",
-            bottom: 20,
-            right: 80,
-            zIndex: 1000,
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.9)",
-            },
-          }}
-          onClick={() => setIsPocketOpen(true)}
-          onDragEnter={(e) => {
-            e.preventDefault();
-            setIsPocketOpen(true);
-          }}
-          onDragOver={(e) => e.preventDefault()}
-        >
-          <Inventory2Icon />
-        </IconButton>
-      )}
-
-      {/* Control Panel - 右上に配置 */}
-      {isControlPanelOpen ? (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            backgroundColor: "rgba(255, 255, 255, 0.9)",
-            padding: 2,
-            borderRadius: 1,
-            zIndex: 1000,
-            width: 300,
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">コントロール</Typography>
-            <IconButton size="small" onClick={() => setIsControlPanelOpen(false)}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
+        {/* Pocket — 海の中に absolute で置く。岸がどの辺にあっても被らない */}
+        {isPocketOpen ? (
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 20,
+              right: 80,
+              zIndex: 1000,
+            }}
+          >
+            <PocketView
+              items={pocketItems}
+              onRemove={handlePocketRemove}
+              onDrop={handlePocketDrop}
+              onItemClick={handlePocketItemClick}
+              onClose={() => setIsPocketOpen(false)}
+            />
           </Box>
-          <Typography gutterBottom>Vanishing Point X</Typography>
-          <Slider
-            value={globalCoordinateSystem.vanishingPoint.x}
-            min={-1000}
-            max={2000}
-            step={20}
-            onChange={(_, v) => {
-              dispatch(setGlobalCoordinateSystem({
-                ...globalCoordinateSystem,
-                vanishingPoint: { ...globalCoordinateSystem.vanishingPoint, x: v as number }
-              }));
+        ) : (
+          <IconButton
+            sx={{
+              position: "absolute",
+              bottom: 20,
+              right: 80,
+              zIndex: 1000,
+              backgroundColor: "rgba(255, 255, 255, 0.8)",
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+              },
             }}
-            valueLabelDisplay="auto"
-          />
-          <Typography gutterBottom>Vanishing Point Y</Typography>
-          <Slider
-            value={globalCoordinateSystem.vanishingPoint.y}
-            min={-1500}
-            max={1500}
-            step={20}
-            onChange={(_, v) => {
-              dispatch(setGlobalCoordinateSystem({
-                ...globalCoordinateSystem,
-                vanishingPoint: { ...globalCoordinateSystem.vanishingPoint, y: v as number }
-              }));
+            onClick={() => setIsPocketOpen(true)}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setIsPocketOpen(true);
             }}
-            valueLabelDisplay="auto"
-          />
-          <Typography gutterBottom>Surface Left Top X</Typography>
-          <Slider
-            value={surfaceLeftTop.x}
-            min={0}
-            max={500}
-            step={10}
-            onChange={(_, v) => {
-              dispatch(setSurfaceLeftTop({
-                ...surfaceLeftTop,
-                x: v as number
-              }));
-            }}
-            valueLabelDisplay="auto"
-          />
-          <Typography gutterBottom>Surface Left Top Y</Typography>
-          <Slider
-            value={surfaceLeftTop.y}
-            min={0}
-            max={500}
-            step={10}
-            onChange={(_, v) => {
-              dispatch(setSurfaceLeftTop({
-                ...surfaceLeftTop,
-                y: v as number
-              }));
-            }}
-            valueLabelDisplay="auto"
-          />
-          {additionalButton}
-        </Box>
-      ) : (
-        <IconButton
-          sx={{
-            position: "fixed",
-            top: 20,
-            right: 20,
-            zIndex: 1000,
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            "&:hover": {
+            onDragOver={(e) => e.preventDefault()}
+          >
+            <Inventory2Icon />
+          </IconButton>
+        )}
+
+        {/* Control Panel - ユニバース領域の右上 */}
+        {isControlPanelOpen ? (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 20,
+              right: 20,
               backgroundColor: "rgba(255, 255, 255, 0.9)",
-            },
-          }}
-          onClick={() => setIsControlPanelOpen(true)}
-        >
-          <TuneIcon />
-        </IconButton>
-      )}
+              padding: 2,
+              borderRadius: 1,
+              zIndex: 1000,
+              width: 300,
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
+            }}
+          >
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+              <Typography variant="subtitle1" fontWeight="bold">コントロール</Typography>
+              <IconButton size="small" onClick={() => setIsControlPanelOpen(false)}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+            <Typography gutterBottom>Vanishing Point X</Typography>
+            <Slider
+              value={globalCoordinateSystem.vanishingPoint.x}
+              min={-1000}
+              max={2000}
+              step={20}
+              onChange={(_, v) => {
+                dispatch(setGlobalCoordinateSystem({
+                  ...globalCoordinateSystem,
+                  vanishingPoint: { ...globalCoordinateSystem.vanishingPoint, x: v as number }
+                }));
+              }}
+              valueLabelDisplay="auto"
+            />
+            <Typography gutterBottom>Vanishing Point Y</Typography>
+            <Slider
+              value={globalCoordinateSystem.vanishingPoint.y}
+              min={-1500}
+              max={1500}
+              step={20}
+              onChange={(_, v) => {
+                dispatch(setGlobalCoordinateSystem({
+                  ...globalCoordinateSystem,
+                  vanishingPoint: { ...globalCoordinateSystem.vanishingPoint, y: v as number }
+                }));
+              }}
+              valueLabelDisplay="auto"
+            />
+            <Typography gutterBottom>Surface Left Top X</Typography>
+            <Slider
+              value={surfaceLeftTop.x}
+              min={0}
+              max={500}
+              step={10}
+              onChange={(_, v) => {
+                dispatch(setSurfaceLeftTop({
+                  ...surfaceLeftTop,
+                  x: v as number
+                }));
+              }}
+              valueLabelDisplay="auto"
+            />
+            <Typography gutterBottom>Surface Left Top Y</Typography>
+            <Slider
+              value={surfaceLeftTop.y}
+              min={0}
+              max={500}
+              step={10}
+              onChange={(_, v) => {
+                dispatch(setSurfaceLeftTop({
+                  ...surfaceLeftTop,
+                  y: v as number
+                }));
+              }}
+              valueLabelDisplay="auto"
+            />
+            {additionalButton}
+          </Box>
+        ) : (
+          <IconButton
+            sx={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              zIndex: 1000,
+              backgroundColor: "rgba(255, 255, 255, 0.8)",
+              "&:hover": {
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+              },
+            }}
+            onClick={() => setIsControlPanelOpen(true)}
+          >
+            <TuneIcon />
+          </IconButton>
+        )}
+        </ShowreLayout>
+      </BubblesContext.Provider>
     </Box>
   );
 };

@@ -1,0 +1,49 @@
+"use client";
+import { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import {
+  ROOT_UNIVERSE_ID,
+  addBubble,
+  createBubble,
+  dockToShowre,
+  makeSelectProjectedNodeId,
+  selectBubbleArrangement,
+} from "@bublys-org/bubbles-ui";
+import { nameIntent } from "@bublys-org/world-line-graph";
+import { Launcher } from "@bublys-org/launcher-model";
+import { selectLauncherPlain, setLauncher } from "@bublys-org/launcher-libs";
+import { DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID } from "./launchTargets";
+
+const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
+
+/**
+ * ルール: 「root には必ずランチャーが 1 つは居る。無ければ main ランチャーを左の岸に着ける」。
+ *
+ * - ランチャー集約 main が無ければ、OS 標準の呼び出しで作る
+ * - root の配置に `launchers/main` バブルが無ければ足して、左の岸に着ける
+ *
+ * 配置の方は世界線から復元し終わる（projectedNodeId が付く）まで待つ。
+ * 復元前に足すと、その commit が復元を上書きしてしまう。
+ */
+export const useEnsureMainLauncher = () => {
+  const dispatch = useAppDispatch();
+  const mainLauncher = useAppSelector(selectLauncherPlain(MAIN_LAUNCHER_ID));
+  const projectedNodeId = useAppSelector(makeSelectProjectedNodeId(ROOT_UNIVERSE_ID));
+  const arrangement = useAppSelector(selectBubbleArrangement);
+
+  useEffect(() => {
+    if (mainLauncher) return;
+    dispatch(setLauncher(Launcher.create(DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID).toPlain()));
+  }, [dispatch, mainLauncher]);
+
+  const hasMainLauncherBubble = Object.values(arrangement.bubbles).some((b) => b.url === MAIN_LAUNCHER_URL);
+
+  useEffect(() => {
+    if (projectedNodeId === null) return;
+    if (hasMainLauncherBubble) return;
+    nameIntent("launcher:ensure");
+    const bubble = createBubble(MAIN_LAUNCHER_URL);
+    dispatch(addBubble(bubble.toJSON(), ROOT_UNIVERSE_ID));
+    dispatch(dockToShowre({ bubbleId: bubble.id, side: "left" }, ROOT_UNIVERSE_ID));
+  }, [dispatch, projectedNodeId, hasMainLauncherBubble]);
+};

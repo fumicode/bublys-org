@@ -10,6 +10,7 @@ import {
 } from "../BubblesProcess.domain.js";
 import { BubblesProcessDPO } from "../BubblesProcessDPO.js";
 import { CoordinateSystemData, CoordinateSystem, Point2, Size2 } from "@bublys-org/bubbles-ui-util";
+import { Showres, ShowresState, ShowreSide, emptyShowresState } from "../showre/Showre.domain.js";
 
 
 export type BubblesRelation = {
@@ -29,6 +30,12 @@ export type BubbleArrangementState = {
   bubbles: Record<string, BubbleJson>;
   bubbleRelations: BubblesRelation[];
   process: BubblesProcessState;
+  /**
+   * 岸（Showre）に着いているバブル。辺ごとの ID の並び。
+   * 岸に着いたバブルは process.layers には居ない（奥行きを持たない）。
+   * 世界線に保存された古い配置には無いことがあるので、読む側は空で補う。
+   */
+  showres?: ShowresState;
 }
 
 /**
@@ -79,6 +86,8 @@ export interface UniverseState {
   bubbles: Record<string, BubbleJson>;
   process: BubblesProcessState;
   bubbleRelations: BubblesRelation[];
+  /** 岸に着いているバブル（{@link BubbleArrangementState.showres} と同じ） */
+  showres: ShowresState;
   globalCoordinateSystem: CoordinateSystemData;
   surfaceLeftTop: Point2; // surface領域の universe 上での起点（奥のレイヤーをどれだけ覗かせるか）
   /**
@@ -123,6 +132,7 @@ const createEmptyUniverse = (): UniverseState => ({
   bubbles: {},
   process: { layers: [] },
   bubbleRelations: [],
+  showres: emptyShowresState(),
   globalCoordinateSystem: CoordinateSystem.GLOBAL.toData(),
   surfaceLeftTop: { x: 100, y: 100 },
   projectedNodeId: null,
@@ -140,7 +150,7 @@ export const buildSeedArrangement = (urls: string[]): BubbleArrangementState => 
     bubbles[b.id] = b.toJSON();
     layers.push([b.id]);
   });
-  return { bubbles, bubbleRelations: [], process: { layers } };
+  return { bubbles, bubbleRelations: [], process: { layers }, showres: emptyShowresState() };
 };
 
 /**
@@ -190,6 +200,11 @@ const draftUniverse = (
 // 各 universe スコープのアクションは meta に universeId を載せる（省略時 root）。
 // これにより既存の dispatch(addBubble(json)) は root のまま、
 // ネストは dispatch(addBubble(json, universeId)) で対象 universe を指定できる。
+/** 着岸: どの辺の何番目か。index 省略で末尾 */
+export type DockToShowrePayload = { bubbleId: string; side: ShowreSide; index?: number };
+/** 引き剥がし: 落とされた点（universe 座標）があればそこに浮かせる */
+export type UndockFromShowrePayload = { bubbleId: string; droppedAt?: Point2 };
+
 type UniverseMeta = { universeId: string };
 const withU = <P>(payload: P, universeId: string = ROOT_UNIVERSE_ID) => ({
   payload,
@@ -206,6 +221,8 @@ const prepPoint = (payload: Point2, universeId?: string) => withU(payload, unive
 const prepView = (payload: BubbleArrangementState, universeId?: string) => withU(payload, universeId);
 const prepNavigate = (payload: { id: string; url: string }, universeId?: string) => withU(payload, universeId);
 const prepVoid = (universeId?: string) => withU(undefined, universeId);
+const prepDock = (payload: DockToShowrePayload, universeId?: string) => withU(payload, universeId);
+const prepUndock = (payload: UndockFromShowrePayload, universeId?: string) => withU(payload, universeId);
 export const bubblesSlice = createSlice({
   name: "bubbleState",
   initialState: getInitialState,
@@ -370,6 +387,9 @@ export const bubblesSlice = createSlice({
           layer => layer.filter(id => id !== removingId)
         ).filter(layer => layer.length > 0);  // Remove empty layers
 
+        // 岸に居たならそこからも外す
+        u.showres = Showres.fromJSON(u.showres).undock(removingId).toJSON();
+
         // レイヤー移動アニメーションが発生するので、ダミーIDを追加
         // （フォールバックタイマーでクリアされる）
         if (!state.animatingBubbleIds.includes('__removing__')) {
@@ -418,6 +438,7 @@ export const bubblesSlice = createSlice({
         u.bubbles = action.payload.arrangement.bubbles;
         u.bubbleRelations = action.payload.arrangement.bubbleRelations;
         u.process = action.payload.arrangement.process;
+        u.showres = Showres.fromJSON(action.payload.arrangement.showres).toJSON();
         u.projectedNodeId = action.payload.nodeId;
         state.renderCount += 1;
       },
@@ -440,9 +461,44 @@ export const bubblesSlice = createSlice({
         u.bubbles = action.payload.bubbles;
         u.bubbleRelations = action.payload.bubbleRelations;
         u.process = action.payload.process;
+        u.showres = Showres.fromJSON(action.payload.showres).toJSON();
         state.renderCount += 1;
       },
       prepare: prepView,
+    },
+
+    // ===== 岸（Showre） =====
+    // 「バブルは浮いているか、岸に着いているかのどちらか」。
+    // 着岸したバブルは奥行き（layers）から抜け、引き剥がすと海（layers）に戻る。
+
+    /** 着岸。layers から抜いて、指定の辺の並びに入れる */
+    dockToShowre: {
+      reducer: (state, action: PayloadAction<DockToShowrePayload, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const { bubbleId, side, index } = action.payload;
+        if (!u.bubbles[bubbleId]) return;
+        u.process = BubblesProcess.fromJSON(u.process).deleteBubble(bubbleId).toJSON();
+        u.showres = Showres.fromJSON(u.showres).dock(bubbleId, side, index).toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepDock,
+    },
+
+    /**
+     * 引き剥がし。岸から外して、海の一番手前のレイヤーに兄弟として戻す。
+     * `droppedAt`（universe 座標）があれば listener がそこに置く（joinSibling と同じ流儀）。
+     */
+    undockFromShowre: {
+      reducer: (state, action: PayloadAction<UndockFromShowrePayload, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        const { bubbleId } = action.payload;
+        const showres = Showres.fromJSON(u.showres);
+        if (showres.sideOf(bubbleId) === undefined) return;
+        u.showres = showres.undock(bubbleId).toJSON();
+        u.process = BubblesProcess.fromJSON(u.process).joinSibling(bubbleId).toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepUndock,
     },
   },
 });
@@ -465,6 +521,8 @@ export const {
   replaceBubbleArrangement,
   projectUniverse,
   markProjected,
+  dockToShowre,
+  undockFromShowre,
   finishBubbleAnimation,
   clearAllAnimations,
   focusBubble,
@@ -520,9 +578,13 @@ const makeSelectProcessJson = memoizeByUniverse(
 const makeSelectBubbleRelationsRaw = memoizeByUniverse(
   (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).bubbleRelations,
 );
+const makeSelectShowresJson = memoizeByUniverse(
+  (uid) => (state: { bubbleState: BubbleStateSlice }) => universeOf(state, uid).showres,
+);
 const selectBubblesJson = makeSelectBubblesJson(ROOT_UNIVERSE_ID);
 const selectProcessJson = makeSelectProcessJson(ROOT_UNIVERSE_ID);
 const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
+const selectShowresJson = makeSelectShowresJson(ROOT_UNIVERSE_ID);
 
 /**
  * 「いま universe に居る = process.layers に出現する」バブル ID の集合を計算する。
@@ -530,11 +592,13 @@ const selectBubbleRelationsRaw = makeSelectBubbleRelationsRaw(ROOT_UNIVERSE_ID);
  * これに含まれないバブルは「孤児」とみなして arrangement から落とす。世界線への
  * commit/rehydrate サイクルで「見えているものとデータが揃う」状態に収束する。
  */
-const collectLivingIds = (process: BubblesProcessState): Set<string> => {
+const collectLivingIds = (process: BubblesProcessState, showres: ShowresState): Set<string> => {
   const ids = new Set<string>();
   for (const layer of process.layers) {
     for (const id of layer) ids.add(id);
   }
+  // 岸に着いているバブルも「居る」
+  for (const id of Showres.fromJSON(showres).allIds) ids.add(id);
   return ids;
 };
 
@@ -554,8 +618,9 @@ const projectArrangement = (
   bubbles: Record<string, BubbleJson>,
   bubbleRelations: BubblesRelation[],
   process: BubblesProcessState,
+  showres: ShowresState,
 ): BubbleArrangementState => {
-  const living = collectLivingIds(process);
+  const living = collectLivingIds(process, showres);
   const arrangementBubbles: Record<string, BubbleJson> = {};
   for (const id of living) {
     const b = bubbles[id];
@@ -566,7 +631,7 @@ const projectArrangement = (
   const livingRelations = bubbleRelations.filter(
     (r) => living.has(r.openerId) && living.has(r.openeeId),
   );
-  return { bubbles: arrangementBubbles, bubbleRelations: livingRelations, process };
+  return { bubbles: arrangementBubbles, bubbleRelations: livingRelations, process, showres };
 };
 
 /**
@@ -581,7 +646,7 @@ const projectArrangement = (
  * 復元後はレンダリングで再計測されるので失われても問題ない。
  */
 export const selectBubbleArrangement = createSelector(
-  [selectBubblesJson, selectBubbleRelationsRaw, selectProcessJson],
+  [selectBubblesJson, selectBubbleRelationsRaw, selectProcessJson, selectShowresJson],
   projectArrangement,
 );
 
@@ -888,8 +953,44 @@ export const makeSelectLastSiblingRenderedRect = memoizeByUniverse((uid) =>
 
 export const makeSelectBubbleArrangementForUniverse = memoizeByUniverse((uid) =>
   createSelector(
-    [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid)],
+    [makeSelectBubblesJson(uid), makeSelectBubbleRelationsRaw(uid), makeSelectProcessJson(uid), makeSelectShowresJson(uid)],
     projectArrangement,
+  ),
+);
+
+/**
+ * 岸に着いているバブル（辺ごと、並び順どおり）。
+ * ID は居るが entity が消えているものは落とす。
+ */
+export const makeSelectShowreBubbles = memoizeByUniverse((uid) =>
+  createSelector(
+    [makeSelectShowresJson(uid), makeSelectBubblesJson(uid)],
+    (showresJson, bubblesJson): Record<ShowreSide, Bubble[]> => {
+      const showres = Showres.fromJSON(showresJson);
+      const pick = (side: ShowreSide) =>
+        showres.on(side)
+          .filter((id) => bubblesJson[id] !== undefined)
+          .map((id) => Bubble.fromJSON(bubblesJson[id]));
+      return { top: pick("top"), bottom: pick("bottom"), left: pick("left"), right: pick("right") };
+    },
+  ),
+);
+
+/** 岸が使われ始めた順（外側 → 内側）。先に貼った岸が角を取る */
+export const makeSelectShowreOrder = memoizeByUniverse((uid) =>
+  createSelector([makeSelectShowresJson(uid)], (showresJson): ShowreSide[] => [
+    ...Showres.fromJSON(showresJson).order,
+  ]),
+);
+
+/** バブルがどの岸に居るか。浮いていれば undefined */
+export const makeSelectShowreSideOf = memoizeByUniverse((uid) =>
+  createSelector(
+    [makeSelectShowresJson(uid)],
+    (showresJson) => {
+      const showres = Showres.fromJSON(showresJson);
+      return (bubbleId: string): ShowreSide | undefined => showres.sideOf(bubbleId);
+    },
   ),
 );
 

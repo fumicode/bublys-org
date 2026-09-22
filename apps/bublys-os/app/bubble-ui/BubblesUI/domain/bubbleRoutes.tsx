@@ -18,6 +18,9 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
+import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
+import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
+import "@/app/launcher/launchTargets";
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
@@ -198,6 +201,17 @@ const routes: BubbleRoute[] = [
     pattern: /^object-shells\/[^/]+\/[^/]+$/,
     type: "object-shell",
     Component: ShellBubble
+  },
+
+  // ランチャー（呼び出しを溜めるバブリ）。root では左の岸に着いている
+  ...launcherBubbleRoutes,
+
+  // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）
+  {
+    pattern: /^bubly-loader$/,
+    type: "bubly-loader",
+    Component: BublyLoaderBubble,
+    bubbleOptions: { defaultSize: { width: 300, height: 280 } },
   },
 ];
 

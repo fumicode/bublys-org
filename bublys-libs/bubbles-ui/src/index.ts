@@ -57,6 +57,9 @@ export * from './lib/ui/UniverseView.js';
 // Pocket
 export * from './lib/pocket/index.js';
 
+// 岸（Showre）: 辺に着いたバブル
+export * from './lib/showre/index.js';
+
 // State Management (Redux)
 export * from './lib/state/index.js';
 

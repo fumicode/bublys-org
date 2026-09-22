@@ -1,5 +1,5 @@
 "use client";
-import { FC, useContext, useLayoutEffect, useMemo, useState, memo } from "react";
+import { FC, useContext, useLayoutEffect, useMemo, useState, memo, useRef } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
@@ -84,6 +84,23 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const { headerRef } = useWheelLayerNavigation({ bubble, onLayerUpClick, onLayerDownClick });
 
   const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const isMouseNearTopRef = useRef(isMouseNearTop);
+  isMouseNearTopRef.current = isMouseNearTop;
+
+  /**
+   * ホットゾーン（上端の透明ストリップ）が中身に覆われていても、ヘッダーを出せるようにする。
+   * 上の岸に帯が着くと、帯（pointer-events: auto）がストリップの上に乗って mouseenter が
+   * 届かなくなる。そこで、auto な子要素からバブルしてくる mousemove でも「上端に近いか」を
+   * 見る。素地（pointer-events: none）の上はストリップが受け持つので、両方で漏れがない。
+   */
+  const handleWindowMouseMove = (e: React.MouseEvent) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const near = e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD;
+    if (near === isMouseNearTopRef.current) return;
+    setIsMouseNearTop(near);
+    if (near) updateHeaderSafeZone();
+  };
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const [headerOffset, setHeaderOffset] = useState(0);
 
@@ -168,6 +185,8 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $headerVisible={isHeaderVisible}
       $headerOffset={headerOffset}
       onClick={onClick}
+      onMouseMove={handleWindowMouseMove}
+      onMouseLeave={() => setIsMouseNearTop(false)}
       onTransitionEnd={() => {
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));

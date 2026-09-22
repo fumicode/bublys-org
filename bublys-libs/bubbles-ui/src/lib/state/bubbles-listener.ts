@@ -1,6 +1,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   joinSiblingInProcess,
+  undockFromShowre,
   popChildInProcess,
   popChildMaxInProcess,
   removeBubble,
@@ -87,6 +88,15 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
 };
 
 // joinSiblingInProcess 発火後、兄弟バブルの隣に配置
+// 岸から引き剥がして落とした点へ置く。レイヤーに戻すこと（reducer）と、どこに置くかは別の話。
+bubblesListener.startListening({
+  actionCreator: undockFromShowre,
+  effect: async (action, listenerApi) => {
+    if (!action.payload.droppedAt) return;
+    placeAtDroppedPoint(listenerApi, universeIdOf(action), action.payload.bubbleId, action.payload.droppedAt);
+  },
+});
+
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {

@@ -5,8 +5,10 @@ import { useAppDispatch } from "@bublys-org/state-management";
 import { Bubble } from "../Bubble.domain.js";
 import { BubblesContext } from "../bubble-routing/BubbleRouting.js";
 import { useUniverseId } from "../context/UniverseContext.js";
-import { updateBubble } from "../state/bubbles-slice.js";
+import { updateBubble, dockToShowre } from "../state/bubbles-slice.js";
 import { createUniverse } from "../universe-config.js";
+import { useShowreDrag } from "../showre/ShowreDragContext.js";
+import { nameIntent } from "@bublys-org/world-line-graph";
 
 type UseBubbleDragArgs = {
   bubble: Bubble;
@@ -29,11 +31,19 @@ type UseBubbleDragArgs = {
  *  - 起点は `bubble.position` ではなく**画面に出ている実物（DOM）**から作る
  *    （position は未設定のとき getter が {0,0} を返すので、掴んだ瞬間に原点へ飛ぶ）
  *  - 移動そのものの規則は集約（{@link Bubble.moveBy}）が持つ
+ *
+ * 岸（Showre）:
+ *  - 辺の近くで離すと、その岸に着く（{@link ShowreDragContext} が辺を判定する）。
+ *    ドラッグ中は「ここに着く」帯を見せ、離したときに位置更新のかわりに dockToShowre する。
+ *    位置はドラッグ前のまま残るので、引き剥がすと元の場所に戻れる。
  */
 export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBubbleDragArgs) {
   const dispatch = useAppDispatch();
   const universeId = useUniverseId();
   const { surfaceLeftTop } = useContext(BubblesContext);
+  const showreDrag = useShowreDrag();
+  const showreDragRef = useRef(showreDrag);
+  showreDragRef.current = showreDrag;
 
   const bubbleRef = useRef(bubble);
   bubbleRef.current = bubble;
@@ -74,12 +84,28 @@ export function useBubbleDrag({ bubble, ref, layerIndex, vanishingPoint }: UseBu
     ref.current.style.top = `${topLeft.y}px`;
     ref.current.style.transition = "none";
     ref.current.style.transformOrigin = `${origin.x}px ${origin.y}px`;
+
+    // 辺の近くなら「ここに着く」帯を見せる
+    const showre = showreDragRef.current;
+    if (showre) showre.setPreviewSide(showre.sideNear({ x: e.clientX, y: e.clientY }) ?? null);
   };
 
-  const endDrag = () => {
-    if (currentBubbleRef.current) {
+  const endDrag = (e: MouseEvent) => {
+    const showre = showreDragRef.current;
+    const side = showre && currentBubbleRef.current
+      ? showre.sideNear({ x: e.clientX, y: e.clientY })
+      : undefined;
+    if (side && showre) {
+      // 着岸: 位置は更新せず（ドラッグ前の場所を覚えておく）、岸に着ける
+      nameIntent(`showre:dock:${side}`);
+      dispatch(dockToShowre(
+        { bubbleId: bubbleRef.current.id, side, index: showre.indexOnSide(side, { x: e.clientX, y: e.clientY }) },
+        showre.universeId,
+      ));
+    } else if (currentBubbleRef.current) {
       dispatch(updateBubble(currentBubbleRef.current.toJSON(), universeId));
     }
+    showre?.setPreviewSide(null);
     if (ref.current) {
       ref.current.style.transition = "";
       ref.current.style.transformOrigin = "";

@@ -108,6 +108,7 @@
     "hotel-shift-puzzle-bubly/*",
     "event-shift-puzzle/*",
     "csv-importer-bubly/*",
-    "object-transformer-bubly/*"
+    "object-transformer-bubly/*",
+    "launcher-bubly/*"
   ]
 }

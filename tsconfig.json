@@ -119,6 +119,12 @@
     },
     {
       "path": "./bublys-libs/model-graph"
+    },
+    {
+      "path": "./launcher-bubly/launcher-model"
+    },
+    {
+      "path": "./launcher-bubly/launcher-libs"
     }
   ]
 }

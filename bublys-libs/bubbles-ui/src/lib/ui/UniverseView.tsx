@@ -8,6 +8,7 @@ import { BubblesContext, type OpenBubbleOptions } from "../bubble-routing/Bubble
 import { BubbleRefsProvider } from "../context/BubbleRefsContext.js";
 import { BubblesLayeredView } from "./BubblesLayeredView.js";
 import { measureViewportForElement } from "../utils/measure-viewport.js";
+import { ShowreLayout } from "../showre/ShowreLayout.js";
 import {
   makeSelectBubbleLayers,
   makeSelectSurfaceBubbles,
@@ -35,6 +36,11 @@ export type UniverseViewProps = {
   renderBubbleContent?: (bubble: Bubble) => ReactNode;
   /** universe が空のとき最初に置くバブルの URL 群（ネスト universe の種） */
   initialBubbleUrls?: string[];
+  /**
+   * 海（浮いているバブルのサーフェス）の上に重ねる overlay（世界線のツールバー等）。
+   * 岸の帯とは重ならない位置に来る（帯の外側ではなく、海の position: relative の中）。
+   */
+  children?: ReactNode;
 };
 
 /**
@@ -48,6 +54,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   universeId,
   renderBubbleContent,
   initialBubbleUrls,
+  children,
 }) => {
   const dispatch = useAppDispatch();
   // この universe の DOM 要素を引くためのラッパ ref（下部ストリップ計測用）
@@ -198,16 +205,20 @@ export const UniverseView: FC<UniverseViewProps> = ({
     <BubblesContext.Provider value={bubblesContextValue}>
       <BubbleRefsProvider>
         <div ref={rootRef} style={{ width: "100%", height: "100%" }}>
-          <BubblesLayeredView
-            universeId={universeId}
-            bubbleLayers={bubbleLayers}
-            vanishingPoint={globalCoordinateSystem.vanishingPoint}
-            renderBubbleContent={renderBubbleContent}
-            onBubbleClose={deleteBubble}
-            onBubbleLayerDown={layerDown}
-            onBubbleLayerUp={layerUp}
-            onCoordinateSystemReady={handleCoordinateSystemReady}
-          />
+          {/* 岸 + 海。岸に着いたバブルは辺の帯として、浮いているバブルは海に描く */}
+          <ShowreLayout universeId={universeId} renderBubbleContent={renderBubbleContent}>
+            <BubblesLayeredView
+              universeId={universeId}
+              bubbleLayers={bubbleLayers}
+              vanishingPoint={globalCoordinateSystem.vanishingPoint}
+              renderBubbleContent={renderBubbleContent}
+              onBubbleClose={deleteBubble}
+              onBubbleLayerDown={layerDown}
+              onBubbleLayerUp={layerUp}
+              onCoordinateSystemReady={handleCoordinateSystemReady}
+            />
+            {children}
+          </ShowreLayout>
         </div>
       </BubbleRefsProvider>
     </BubblesContext.Provider>

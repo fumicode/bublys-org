@@ -17,8 +17,8 @@ import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
  *
  * 世界線 view は **バブルにしない**。バブルにすると自分自身が
  * BubbleArrangement の一要素になり、過去ノードに戻ると view も消える、という
- * 矛盾が起きる。なのでこのチロムは bubble system の外側に position:fixed で
- * 浮かべる。view 中身は {@link WorldLinesCanvasView}（canvas 描画の pure 関数）
+ * 矛盾が起きる。なのでこのチロムは bubble system の外側に浮かべる
+ * （undo/redo はユニバース領域の左上に absolute、世界線 view は fixed）。view 中身は {@link WorldLinesCanvasView}（canvas 描画の pure 関数）
  * を使って毎レンダーのコストを抑える。
  */
 export const BubbleArrangementWorldLineControls: FC = () => {
@@ -124,9 +124,11 @@ export const BubbleArrangementWorldLineControls: FC = () => {
     <>
       <Box
         sx={{
-          position: "fixed",
+          // ユニバース領域（position: relative）の左上。サイドバーがどの辺に
+          // あっても、ユニバースの角から 20px の位置に来る
+          position: "absolute",
           top: 20,
-          left: 76,
+          left: 20,
           zIndex: 1000,
           display: "flex",
           gap: 0.5,
