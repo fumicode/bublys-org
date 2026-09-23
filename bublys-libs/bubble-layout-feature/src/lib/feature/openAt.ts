@@ -35,7 +35,10 @@ export type OpenAs = 'beside';
  *   詳細を3つ開くと並びが 900px になり、詳細 0.755 ＜ 一覧 0.773 と**関心の順が逆転**した。
  *   旧は同じ流れで 詳細 1.0 ×3 ／ 一覧 0.8。
  */
-export type OpenDepth = 'fisheye-x' | 'plane';
+export type OpenDepth = 'fisheye-x' | 'plane' | 'cascade';
+
+/** 「重ねて開く」で、元の泡からどれだけずらすか（px） */
+const CASCADE = { dx: 96, dy: 76 };
 
 /**
  * 面の1段。透視 `m = 1/(1 + 0.26·dz)` で **1段 0.90** になる dz（＝旧 `1 − 0.1 × layerIndex` の1段目）。
@@ -87,7 +90,9 @@ const DEFAULT_SIZE = { w: 320, h: 240 };
 const BESIDE_GAP = METRICS.SNAP_EDGE * 2;
 
 export function openAt(input: OpenAtInput): OpenAtResult {
-  if ((input.depth ?? 'fisheye-x') === 'plane') return openOnPlane(input);
+  const depth = input.depth ?? 'fisheye-x';
+  if (depth === 'plane') return openOnPlane(input);
+  const cascade = depth === 'cascade';
   const { world, viewport, openerId, newId, title } = input;
   const size = input.size ?? DEFAULT_SIZE;
   const opener = openerId === null ? null : world.bubble(openerId);
@@ -96,12 +101,22 @@ export function openAt(input: OpenAtInput): OpenAtResult {
   // 兄弟として、元の泡の右隣に
   const siblings = world.kidsOf(space);
   const at = opener ? siblings.findIndex((b) => b.id === opener.id) : siblings.length - 1;
+  /**
+   * ★ 置き場所は 2 通り:
+   *   beside  … 元の泡の右隣（既定）
+   *   cascade … 元の泡の右下へ少しずらして**重ねる**。Z を使わずに重なりを作る道
+   *             （重なりを作るのはレンズではなく並べ方 ── 同じあたりに置けば重なる）
+   */
+  /** 重ねて開くときの基準は「直前に開いた同じ種類のもの」。無ければ元の泡 */
+  const cascadeBase = (cascade && input.joinWith ? world.bubble(input.joinWith) : null) ?? opener;
   const free = opener
-    ? {
-        x: opener.state.free.x + opener.state.size.w / 2 + BESIDE_GAP + size.w / 2,
-        y: opener.state.free.y,
-        z: opener.state.free.z,
-      }
+    ? cascade && cascadeBase
+      ? { x: cascadeBase.state.free.x + CASCADE.dx, y: cascadeBase.state.free.y + CASCADE.dy, z: cascadeBase.state.free.z }
+      : {
+          x: opener.state.free.x + opener.state.size.w / 2 + BESIDE_GAP + size.w / 2,
+          y: opener.state.free.y,
+          z: opener.state.free.z,
+        }
     : { x: 0, y: 0, z: 0 };
 
   let w = world.add(
@@ -132,7 +147,9 @@ export function openAt(input: OpenAtInput): OpenAtResult {
    * 使うのは規則③ の「くっつける」そのもの ── 新しい仕組みは要らない。
    *   1枚目の相手には見えない親が生まれ（born）、2枚目からはその並びに加わる（join）。
    */
-  const mate = input.joinWith ? w.bubble(input.joinWith) : null;
+  // 重ねて開くときは、見えない親にまとめない ── まとめると並び全体が 1 つの像になり、
+  // 魚眼が幅に罰を与えて「開くほど、いちばん見たいものが小さくなる」（v7 の 0.755）
+  const mate = !cascade && input.joinWith ? w.bubble(input.joinWith) : null;
   if (mate && mate.id !== newId) {
     const row = w.rowOf(mate.id);
     const ctx = actContext(
@@ -159,6 +176,12 @@ export function openAt(input: OpenAtInput): OpenAtResult {
   if (opener && (input.as ?? 'beside') === 'beside') {
     const view = w.ownViewOf(space);
     if (!view || view.x.lens !== 'fisheye') w = withAxis(w, space, 'x', { lens: 'fisheye' });
+  }
+  // 重ねて開くときは Z を使わない。**前後は「焦点に近い＝大きいほうが手前」**で決まる
+  //（描く順の第2キー）。触れば焦点が寄り、前後が入れ替わる ── 泡の値は 1 つも書かない
+  if (cascade) {
+    const view = w.ownViewOf(space);
+    if (!view || view.z.dim !== 'none') w = withAxis(w, space, 'z', { dim: 'none', lens: 'flat' });
   }
 
   // ② 開いたら、そこへ視点が寄る（泡の値は1つも書かない）
