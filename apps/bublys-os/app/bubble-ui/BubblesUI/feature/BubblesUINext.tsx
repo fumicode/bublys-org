@@ -17,7 +17,7 @@ import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
-import { TUBE_RADIUS, anchoredRect } from "@bublys-org/bubbles-ui";
+import { TUBE_RADIUS, anchoredRect, type ScreenRect } from "@bublys-org/bubbles-ui";
 import { renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { bubbleRoutes } from "../domain/bubbleRoutes";
@@ -55,6 +55,8 @@ export const BubblesUINext = () => {
 
   /** 岸に着いているもの。海の泡ではないので、世界（WorldState）には居ない */
   const [docked, setDocked] = useState<readonly Docked[]>([]);
+  /** 「いま離したらここに着く」の予告 */
+  const [preview, setPreview] = useState<ScreenRect | null>(null);
   const vp = useMemo(() => ({ width: viewport.w, height: viewport.h }), [viewport]);
 
   /** 離したところが縁の近くなら、岸が横取りする */
@@ -70,6 +72,22 @@ export const BubblesUINext = () => {
       if (!hit) return false;
       setDocked((list) => [...list, { key: `${info.url}#${Date.now()}`, url: info.url, ...hit }]);
       return true;
+    },
+    [docked, vp],
+  );
+
+  /** ドラッグ中 ── 縁の近くなら、着いたあとの矩形を予告する */
+  const previewTakeOut = useCallback(
+    (info: { rect: { x: number; y: number; w: number; h: number }; pointer: { x: number; y: number } } | null) => {
+      if (!info) { setPreview(null); return; }
+      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
+      const hit = resolveDock(
+        { x: info.rect.x, y: info.rect.y, width: info.rect.w, height: info.rect.h },
+        info.pointer,
+        vp,
+        others,
+      );
+      setPreview(hit ? anchoredRect(hit.dock, hit.size, vp) : null);
     },
     [docked, vp],
   );
@@ -100,6 +118,7 @@ export const BubblesUINext = () => {
         viewport={viewport}
         depth={depth}
         onTakeOut={takeOut}
+        onTakeOutPreview={previewTakeOut}
         style={{ position: "absolute", inset: 0 }}
       >
         <SpaceHandle onReady={(api) => { spaceRef.current = api; }} />
@@ -111,6 +130,7 @@ export const BubblesUINext = () => {
         viewport={vp}
         docked={docked}
         renderContent={renderDockedContent}
+        preview={preview}
         onUndock={(key) => {
           const d = docked.find((x) => x.key === key);
           setDocked((list) => list.filter((x) => x.key !== key));

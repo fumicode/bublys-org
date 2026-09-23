@@ -103,6 +103,11 @@ export interface BubbleInputOptions {
    * 横取りした側の仕事。規則には無い話なので domain には入れない。
    */
   readonly claimDrop?: (info: ClaimDropInfo) => boolean;
+  /**
+   * ドラッグしている間ずっと、いまの居場所を知らせる（予告を出すため）。
+   * 掴んでいないとき・離したあとは `null` が来る。
+   */
+  readonly onDragInfo?: (info: ClaimDropInfo | null) => void;
 }
 
 /** 離した瞬間の、泡と指の居場所（どちらも層の座標） */
@@ -296,6 +301,9 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     const next = dragBubble(world, { layout, id: d.id, space: d.space, want, m: p.m }, rules);
     setWorld(next);
 
+    // 予告のために、いまの居場所を外へ知らせる（岸がここで「着くならここ」を描く）
+    o.onDragInfo?.({ id: d.id, pointer: { x: mx, y: my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h } });
+
     if (d.moves) {
       // 印は「いま離したらどうなるか」。書いたばかりの値で解き直してから見る
       const after = resolveWorld(next, viewport, rules);
@@ -324,6 +332,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
   const endDrag = useCallback((e?: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     drag.current = null;
+    o.onDragInfo?.(null);
     if (!d) return;
     if (!d.started) {
       // ② ドラッグせずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）

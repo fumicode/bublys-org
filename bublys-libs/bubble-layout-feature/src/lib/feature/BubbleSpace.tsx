@@ -56,6 +56,14 @@ function mateFor(
   return best ? best.id : null;
 }
 
+/** 離した／ドラッグしている泡の、いまの居場所（どちらも層の座標） */
+export interface TakeOutInfo {
+  readonly id: BubbleId;
+  readonly url: string;
+  readonly rect: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  readonly pointer: { readonly x: number; readonly y: number };
+}
+
 export interface BubbleSpaceProps {
   readonly routes: readonly BubbleRoute[];
   /** 空のときに最初に開く url */
@@ -78,7 +86,12 @@ export interface BubbleSpaceProps {
    * 離したところを、空間の外（岸など）が横取りする口。
    * `true` を返したら**その泡は海から出る** ── 以後どう見せるかは横取りした側の仕事。
    */
-  readonly onTakeOut?: (info: { readonly id: BubbleId; readonly url: string; readonly rect: { x: number; y: number; w: number; h: number }; readonly pointer: { x: number; y: number } }) => boolean;
+  readonly onTakeOut?: (info: TakeOutInfo) => boolean;
+  /**
+   * ドラッグしている間の居場所。横取りする側が「いま離したらこうなる」を描くために使う。
+   * 掴んでいないとき・離したあとは `null`。
+   */
+  readonly onTakeOutPreview?: (info: TakeOutInfo | null) => void;
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
@@ -209,9 +222,19 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   // 中身を持つ泡は、ヘッダでだけ掴める（本文は中身のもの。既存 bubbles-ui と同じ）
   const hasContent = useCallback((id: BubbleId) => urls.has(id), [urls]);
+  const onDragInfo = useCallback(
+    (info: { id: BubbleId; pointer: { x: number; y: number }; rect: { x: number; y: number; w: number; h: number } } | null) => {
+      if (!props.onTakeOutPreview) return;
+      if (!info) { props.onTakeOutPreview(null); return; }
+      const url = urls.get(info.id)?.url;
+      props.onTakeOutPreview(url ? { id: info.id, url, rect: info.rect, pointer: info.pointer } : null);
+    },
+    [props, urls],
+  );
+
   const input = useBubbleInput({
     world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules,
-    layerRef, hasContent, claimDrop,
+    layerRef, hasContent, claimDrop, onDragInfo,
   });
 
   const renderBubble = useCallback(

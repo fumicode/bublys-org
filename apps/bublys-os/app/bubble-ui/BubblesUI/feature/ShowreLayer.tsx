@@ -43,6 +43,8 @@ export type ShowreLayerProps = {
   readonly renderContent: (d: Docked) => ReactNode;
   /** 岸から剥がす（海へ戻す） */
   readonly onUndock: (key: string) => void;
+  /** 「いま離したらここに着く」の予告（画面の座標）。無ければ出さない */
+  readonly preview?: ScreenRect | null;
 };
 
 /**
@@ -68,7 +70,7 @@ export const resolveDock = (
   };
 };
 
-export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderContent, onUndock }) => {
+export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderContent, onUndock, preview }) => {
   const rects = useMemo(
     () => docked.map((d) => ({ key: d.key, rect: anchoredRect(d.dock, d.size, viewport) })),
     [docked, viewport],
@@ -141,6 +143,18 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderCont
           </div>
         ))}
       </div>
+      {/* 予告 ── 離したあとの実寸そのまま。岸でも海でも同じ規則で描く */}
+      {preview && (
+        <div
+          data-showre-preview=""
+          style={{
+            position: "absolute", pointerEvents: "none", boxSizing: "border-box", zIndex: 6,
+            left: preview.x, top: preview.y, width: preview.width, height: preview.height,
+            borderRadius: 16, border: "2px dashed rgba(255,255,255,.75)",
+            background: "rgba(255,255,255,.12)", boxShadow: "0 8px 24px rgba(0,0,0,.25)",
+          }}
+        />
+      )}
       <ShowreTubes viewport={viewport} outlines={outlines} />
     </>
   );
