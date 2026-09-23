@@ -154,6 +154,30 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /**
  * 1つの空間を解く。lab.html 719-785 行 resolveSpace（補間・持ち上げ・掴んでいる泡の抜き出しは ui なので無い）。
  */
+/**
+ * ③ **見えない親は体を持たない ＝ 自分の奥行きも持たない。中身と同じ面にいる。**
+ *
+ * ラボは並びを奥行き 0 に置きっぱなしにしていた（lab.html の `b.implicit ? 0 : …`）。
+ * だと中の泡だけがホイールで奥へ退き、**点線の枠だけが原寸のまま**残って、
+ * 中身のまわりに大きな空箱ができる（実測：窓の中でホイールを回すと、枠が縮まない）。
+ *
+ * 並びは中身の**まとまり**でしかないので、中身と同じ面に置く。
+ * 中身のいちばん手前の面を採る ── 中で奥行きが割れていても、並びは手前の面に立つ。
+ * @returns その並びが立つ面（窓の Z の値。空なら 0）
+ */
+function rowPlane(
+  world: BubbleWorld,
+  rowId: SpaceId,
+  sizeOf: (b: Bubble) => Size,
+  rules: LayoutRules,
+): number {
+  const kids = world.kidsOf(rowId);
+  if (!kids.length) return 0;
+  const A = viewOfSpace(world, rowId).z;       // ③ ＝ 窓の Z（viewOfSpace が差し替えている）
+  const ar = arrangeAxis({ axisView: A, axis: 'z', spaceId: rowId, kids, sizeOf, world, rules });
+  return Math.min(...kids.map((k) => ar.pos.get(k.id) ?? 0));
+}
+
 function resolveSpace(
   world: BubbleWorld,
   spaceId: SpaceId,
@@ -197,10 +221,14 @@ function resolveSpace(
   const focus: Focus = {
     x: fitFocus(L, 'x', at.x, at.x, rules),
     y: fitFocus(L, 'y', at.y, at.y, rules),
-    // ③ 見えない親の Z は窓のもの。窓は先に解かれているので、そこで約束に入れた値を使う
-    z: passZ
-      ? spaces.get(world.windowOf(spaceId))?.focus.z ?? at.z
-      : fitFocus(L, 'z', at.z, at.z, rules),
+    /**
+     * ③ 見えない親の Z は窓のもの（約束も外が守る）。
+     * ★ ただし焦点として置くのは**その並びが立つ面**。並びの置き場所で窓の奥行きを
+     *   もう掛けてあるので（上の dz）、中の泡はその面からの差だけを見る
+     *   ── こうしないと同じ奥行きが二重に掛かる。
+     *   面がそろった並び（ふつうはこれ）では、中の泡の差は 0 ＝ 枠と中身が同じ倍率で縮む。
+     */
+    z: passZ ? rowPlane(world, spaceId, sizeOf, rules) : fitFocus(L, 'z', at.z, at.z, rules),
   };
   L.focus = focus;
   const ctx = lensContext(world, spaceId, host, focus);   // このフレームの焦点（目を足す前）
@@ -220,8 +248,9 @@ function resolveSpace(
     const box = sizeOf(b);
     const px = imageOf(pos.x, box.w, lx, ctx.H.x, ctx.focus.x);   // ① 位置 − 焦点 → レンズ（軸ごと。泡の像）
     const py = imageOf(pos.y, box.h, ly, ctx.H.y, ctx.focus.y);
-    // ③ 見えない親は奥行きに置かれない（体が無い）。中の泡の奥行きは、窓の焦点から測る
-    const dz = b.state.implicit ? 0 : pos.z - ctx.focus.z;
+    // ③ 見えない親は**中身と同じ面**にいる（体が無いので自分の奥行きは持たない）。
+    //    奥行きはここで 1 回だけ掛かる ── 中の泡は、この面からの差だけを見る（下の focus.z）
+    const dz = (b.state.implicit ? rowPlane(world, b.id, sizeOf, rules) : pos.z) - ctx.focus.z;
     const m = lz.mag(dz);                                          // そのあと Z で消失点へ寄せる
     const target = {
       x: ctx.vp.x + (px.s - ctx.vp.x) * m,
