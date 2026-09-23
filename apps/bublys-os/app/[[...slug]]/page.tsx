@@ -8,7 +8,7 @@
 
 import { useEffect } from 'react';
 import { FocusedObjectProvider } from "../world-line/WorldLine/domain/FocusedObjectContext";
-import { BubblesUI } from "../bubble-ui/BubblesUI/feature/BubblesUI";
+import { BubblesUINext } from "../bubble-ui/BubblesUI/feature/BubblesUINext";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { registerShellTypes } from "../counter/registerShellTypes";
@@ -32,7 +32,7 @@ export default function Index() {
     <FocusedObjectProvider>
       <ShellManagerProvider>
         <DomainRegistryProvider registry={APP_DOMAIN_REGISTRY}>
-          <BubblesUI />
+          <BubblesUINext />
         </DomainRegistryProvider>
       </ShellManagerProvider>
     </FocusedObjectProvider>

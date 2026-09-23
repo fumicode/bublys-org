@@ -19,6 +19,21 @@ const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
 const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
 
 /**
+ * ランチャー集約 main が無ければ、OS 標準の呼び出しで作る。**泡は作らない。**
+ *
+ * 「どこに出すか」は海の側の仕事なので分けてある
+ * （新しい海は最初に開く url として `launchers/main` を渡すだけ）。
+ */
+export const useEnsureMainLauncherEntity = () => {
+  const dispatch = useAppDispatch();
+  const mainLauncher = useAppSelector(selectLauncherPlain(MAIN_LAUNCHER_ID));
+  useEffect(() => {
+    if (mainLauncher) return;
+    dispatch(setLauncher(Launcher.create(DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID).toPlain()));
+  }, [dispatch, mainLauncher]);
+};
+
+/**
  * ルール: 「root には必ずランチャーが 1 つは居る。無ければ main ランチャーを左の岸に着ける」。
  *
  * - ランチャー集約 main が無ければ、OS 標準の呼び出しで作る

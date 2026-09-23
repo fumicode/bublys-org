@@ -107,8 +107,21 @@ export function openAt(input: OpenAtInput): OpenAtResult {
    *   cascade … 元の泡の右下へ少しずらして**重ねる**。Z を使わずに重なりを作る道
    *             （重なりを作るのはレンズではなく並べ方 ── 同じあたりに置けば重なる）
    */
-  /** 重ねて開くときの基準は「直前に開いた同じ種類のもの」。無ければ元の泡 */
-  const cascadeBase = (cascade && input.joinWith ? world.bubble(input.joinWith) : null) ?? opener;
+  /**
+   * 重ねて開くときの基準は「**その空間で最後に置かれた泡**」。無ければ元の泡。
+   * 種類を問わないのは、種類が違うだけで同じ場所に落ちて完全に重なるから。
+   *
+   * ★ 新しい泡は元の泡の**直後**に挿さり、その後ろは 1 つずつ下がる（renumber）。
+   *   つまり **番号が小さいほうが新しい** ── 元の泡を除いた最小がそれ。
+   */
+  const cascadeBase = cascade
+    ? (input.joinWith ? world.bubble(input.joinWith) : null) ??
+      world
+        .kidsOf(space)
+        .filter((b) => b.id !== opener?.id)
+        .reduce<typeof opener>((best, b) => (!best || b.state.order < best.state.order ? b : best), null) ??
+      opener
+    : opener;
   const free = opener
     ? cascade && cascadeBase
       ? { x: cascadeBase.state.free.x + CASCADE.dx, y: cascadeBase.state.free.y + CASCADE.dy, z: cascadeBase.state.free.z }

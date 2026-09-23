@@ -13,57 +13,15 @@
  *   - 旧 `CurrentBubbleContext` → いま描いている泡の id
  * （旧 `ObjectView` はこの 2 つを見てダブルクリックで開くので、これで繋がる）
  */
-import { FC, useEffect, useMemo, useState } from "react";
-import { BubbleSpace, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, OpenDepth, RoutedBubble } from "@bublys-org/bubble-layout-feature";
-import { Bubble, BubblesContext, CurrentBubbleContext, createBubble } from "@bublys-org/bubbles-ui";
+import { useEffect, useMemo, useState } from "react";
+import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
+import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { bubbleRoutes } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
+import { bridgeRoutes } from "../bubble-ui/BubblesUI/feature/legacyRouteBridge";
 
 /** この画面で試すバブリ（全部載せると重いので、一覧 → 詳細のあるものから） */
 const TRY = ["users", "memos", "user-groups", "tasks", "igo-games"];
-
-/**
- * 旧のルートを、新しい空間のルートにする。
- * 形は同じ（pattern / type / Component）なので、包むのは**中身の橋渡しだけ**。
- */
-const bridgeRoute = (route: LegacyRoute): LayoutRoute => {
-  const Legacy = route.Component as FC<{ bubble: unknown }>;
-  const Bridged: FC<{ bubble: RoutedBubble }> = ({ bubble }) => {
-    // ★ 橋渡しは**画面ごと**に当てる。ルートの中身を描くのは BubbleSpace なので、
-    //   外側に Provider を置いても届かない（旧 ObjectView は context から openBubble を読む）
-    const space = useBubbleSpace();
-    const legacyContext = useMemo(
-      () => ({
-        openBubble: (url: string, openerBubbleId?: string) => {
-          space.openBubble(url, openerBubbleId ?? bubble.id);
-        },
-        surfaceLeftTop: { x: 0, y: 0 },
-      }),
-      [space, bubble.id],
-    );
-    // 旧の画面は bubbles-ui の Bubble（クラス）を期待するので、同じ url から作って渡す。
-    // id だけは新しい空間のものに揃える（ObjectView が「どの泡から開いたか」に使う）
-    const legacyBubble = useMemo(
-      () => Bubble.fromJSON({ ...createBubble(bubble.url).toJSON(), id: bubble.id }),
-      [bubble.id, bubble.url],
-    );
-    return (
-      <BubblesContext.Provider value={legacyContext as never}>
-        <CurrentBubbleContext.Provider value={bubble.id}>
-          <Legacy bubble={legacyBubble} />
-        </CurrentBubbleContext.Provider>
-      </BubblesContext.Provider>
-    );
-  };
-  const size = route.bubbleOptions?.defaultSize;
-  return {
-    pattern: route.pattern,
-    type: route.type,
-    Component: Bridged,
-    ...(size ? { size: { w: size.width, h: size.height } } : {}),
-  };
-};
 
 export default function BubbleLayoutPage() {
   const [depth, setDepth] = useState<OpenDepth>("cascade");
@@ -76,7 +34,7 @@ export default function BubbleLayoutPage() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  const routes = useMemo(() => bubbleRoutes.map(bridgeRoute), []);
+  const routes = useMemo(() => bridgeRoutes(bubbleRoutes), []);
   const initialUrls = useMemo(() => TRY.filter((u) => bubbleRoutes.some((r) => matches(r, u))).slice(0, 1), []);
 
   return (
