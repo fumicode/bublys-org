@@ -2,6 +2,7 @@
 //   node docs/bubble-space-prototype/v7-convergence/run.mjs
 //
 // A … いまの規則のまま（Z＝自由Z·そのまま·透視）。開く＝1段手前に置いて、Z の焦点を送る
+// C … 「Z を使わない」で同じ文型を書けるか（masa さんの問い）。焦点を追随させる
 // B … domain の**写し**を作り、arrange.ts の1語だけ変える（Z の詰めるの帯の幅を step に）。
 //     開く＝いちばん手前より小さい値を書くだけ。★ 焦点は1回も書かない
 //     リポジトリの bublys-libs/bubble-layout は1文字も触らない（写しは .tmp/ に作って捨てる）
@@ -23,7 +24,7 @@ const src = readFileSync(arrange, 'utf8');
 if (!src.includes(before)) throw new Error('arrange.ts の形が変わった。写しに当てる1語が見つからない');
 writeFileSync(arrange, src.replace(before, after));
 
-for (const name of ['exp-a-camera', 'exp-b-pack']) {
+for (const name of ['exp-a-camera', 'exp-b-pack', 'exp-c-noz']) {
   const out = path.join(TMP, name + '.mjs');
   await build({ entryPoints: [path.join(HERE, name + '.ts')], bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'warning' });
   console.log('\n══════════ ' + name + ' ══════════');
