@@ -105,6 +105,14 @@ export const SPACE_CSS = `
 .bub:not(.sel):has(> .bl-quiet)::after{content:none}
 .bub:not(.sel):has(> .bl-quiet) > .hd,
 .bub:not(.sel):has(> .bl-quiet) > .bl-close{display:none}
+/*
+ * ★ 装いを出さないあいだは、**その空けてあった所まで中身を広げる**。
+ *   ヘッダのぶん（上 27px）を空けたままだと、札と札のあいだが 48px も開いて
+ *   一覧がすかすかになる ── 広げれば上下とも 7px で、あいだは 28px に詰まる。
+ *   箱（泡の大きさ）は動かさないので、**隣の札は 1px も動かない**。
+ *   選んだ札だけが、ヘッダを出すぶん上から 20px ぶん譲る。
+ */
+.bub:not(.sel):has(> .bl-quiet) > .bl-body{top:7px}
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
 .bl-object{position:relative;isolation:isolate}
