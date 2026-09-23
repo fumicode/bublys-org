@@ -63,9 +63,15 @@ const FrameShore: FC<{ children: ReactNode }> = ({ children }) => {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // ★ 大きさは **レイアウトの px**（offsetWidth）で測る。
+    //   getBoundingClientRect は泡に掛かった transform:scale ごとの、**画面の px** を返す。
+    //   管を描く SVG は泡の中＝倍率が掛かる前の座標に居るので、画面の px で描くと
+    //   奴にある泡（scale<1）では枠がその倍率のぶん小さくなり、端まで届かない。
+    //   測る座標と描く座標は同じでなければならない。
     const measure = () => {
-      const r = el.getBoundingClientRect();
-      setSize((prev) => (prev.width === r.width && prev.height === r.height ? prev : { width: r.width, height: r.height }));
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
     };
     measure();
     const ro = new ResizeObserver(measure);
