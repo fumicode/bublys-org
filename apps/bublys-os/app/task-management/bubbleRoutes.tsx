@@ -15,8 +15,15 @@ import { TaskCard } from "./ui/TaskCard";
 import { TaskDetail } from "./feature/TaskDetail";
 import { useSeedTasks } from "./feature/useSeedTasks";
 
-/** 札 1 枚の大きさ（一覧が「縦に収まるか」を測るのに使う） */
-const CARD = { w: 280, h: 64 };
+/**
+ * 札 1 枚の大きさ。
+ *
+ * ★ 高さは**中身が全部映る**ように取る ── 泡の枠（ヘッダ 27 ＋ 下の余白 7 ＝ 34）を
+ *   足した値。64 にしていたら枠の中が 30px しかなく、**札 1 枚ずつに巻物の棒が出ていた**
+ *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
+ *   1 枚ずつ巻物になるのは本末転倒。
+ */
+const CARD = { w: 280, h: 88 };
 
 /**
  * タスク一覧 ── **並びの空間**。
