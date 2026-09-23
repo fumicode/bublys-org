@@ -29,6 +29,12 @@ export interface BubbleRoute {
   readonly hue?: number;
   /** 一覧に出す名前。無ければ url の末尾 */
   readonly title?: (params: BubbleParams) => string;
+  /**
+   * 中身の地。
+   *  - `'light'`（既定）… 明るい地を敷く。バブリの画面は明るい地を前提に書かれている
+   *  - `'clear'`        … 地を敷かない。中身が自分で背景を持つ窓（入れ子の宇宙・canvas）
+   */
+  readonly ground?: 'light' | 'clear';
 }
 
 const pathOf = (url: string): string => {

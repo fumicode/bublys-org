@@ -53,10 +53,14 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
 export const bridgeRoute = (route: LegacyRoute): LayoutRoute => {
   const Legacy = route.Component as FC<{ bubble: never }>;
   const size = route.bubbleOptions?.defaultSize;
+  // 旧は「窓（universe / fillsContainer）」と「普通の中身」を区別していた。同じ区別を渡す
+  // ── 窓は自分で背景を持つので、こちらで明るい地を敷くと中身が白く霞む
+  const isWindow = !!(route.bubbleOptions?.universe || route.bubbleOptions?.fillsContainer);
   return {
     pattern: route.pattern,
     type: route.type,
     Component: ({ bubble }) => <LegacyScreen bubble={bubble} Legacy={Legacy} />,
+    ground: isWindow ? ('clear' as const) : ('light' as const),
     ...(size ? { size: { w: size.width, h: size.height } } : {}),
   };
 };

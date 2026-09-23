@@ -3,13 +3,49 @@
  * 泡そのものの見た目は `bubble-layout-ui` の `FIELD_CSS`。
  */
 export const SPACE_CSS = `
+/**
+ * 器（泡の見た目）── ラボの暗い箱ではなく、バブリの画面が乗る器にする。
+ *
+ * ★ ここは **FIELD_CSS（ラボと px で突き合わせる側）を触らずに上書きする**。
+ *   変えるのは塗り・角丸・影・文字色だけで、箱の大きさと位置には手を出さない
+ *   （受け入れ検査はラボとの矩形一致を見張っている）。
+ * ★ 画面で固定したい量は逆 scale（--k）で戻す。border-width や font-size を
+ *   毎フレーム書くと layout が戻ってくる。
+ *
+ * 見分けは余白ではなく **塗り・角丸・縁・影**に依っている（CARRYOVER の実測）ので、
+ * 旧 bubbles-ui の泡と同じ作りを、この 3 つで置き直す。
+ */
+/* ★ 地は**不透明**。重なるのが前提の並べ方なので、半透明だと重なった所が霞んで読めない
+   （旧は重ならない前提だったので半透明でよかった） */
+.bub{--rr:16px;
+  background:linear-gradient(145deg,
+    hsl(var(--h) 34% 19%) 0%, hsl(var(--h) 32% 15%) 45%, hsl(var(--h) 30% 13%) 100%);
+  box-shadow:0 8px 32px hsl(var(--h) 50% 22% / .38), 0 2px 8px rgba(0,0,0,.18),
+    inset 0 2px 4px hsla(0,0%,100%,.35), inset 0 -1px 2px hsl(var(--h) 50% 30% / .2)}
+/* ③ 見えない親は体を持たない（FIELD_CSS の指定をここでも守る） */
+.bub.imp{background:none;box-shadow:none}
+
+/* ステータスバー ── 出すのは url。すりガラスの帯 */
+.bub > .hd{background:hsl(var(--h) 45% 18% / .5);backdrop-filter:blur(6px);
+  border-radius:calc(var(--rr)) calc(var(--rr)) 0 0}
+.bub > .ttl{color:#f4f7ff}
+
 /* ★ 中身は泡の中に素の px で置く。泡ごと transform で拡大縮小されるので、
-   中身の側では倍率を一切気にしなくてよい（逆 scale も要らない） */
-.bub > .bl-body{position:absolute;left:0;top:24px;right:0;bottom:0;overflow:auto;
-  pointer-events:auto;color:#e6ebf5;font:13px/1.6 var(--f)}
+   中身の側では倍率を一切気にしなくてよい（逆 scale も要らない）。
+   地は**明るい**── バブリの画面は明るい地を前提に書かれている（暗いままだと字が読めない） */
+.bub > .bl-body{position:absolute;left:7px;top:27px;right:7px;bottom:7px;overflow:auto;
+  pointer-events:auto;border-radius:11px;
+  background:linear-gradient(180deg,#ffffff 0%,#f7f8fb 100%);
+  color:#1b2029;font:13px/1.6 var(--f);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.05),0 1px 2px hsla(0,0%,100%,.5)}
+/* 窓（中身が自分で背景を持つ ── 入れ子の宇宙・canvas）。地を敷かず、箱いっぱいに広げる */
+.bub > .bl-body.bl-clear{left:0;top:24px;right:0;bottom:0;border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);
+  overflow:hidden;box-shadow:none;color:#e6ebf5;
+  /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
+  background:linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)}
 .bub.chip > .bl-body{display:none}
 .bub.nt > .bl-body{display:none}   /* 字が読めない大きさなら中身も描かない */
-.bl-noroute{padding:10px 12px;color:#ff9db1;font-size:11px;line-height:1.6}
+.bl-noroute{padding:10px 12px;color:#b23c27;font-size:11px;line-height:1.6}
 .bub > .bl-close{position:absolute;right:4px;top:3px;width:18px;height:18px;padding:0;
   border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
   font:600 14px/18px var(--f);cursor:pointer;pointer-events:auto}

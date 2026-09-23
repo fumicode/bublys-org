@@ -218,7 +218,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => closeBubble(id)}
           >×</button>
-          <div className="bl-body">
+          <div className={'bl-body' + (r?.route.ground === 'clear' ? ' bl-clear' : '')}>
             {r
               ? <CurrentBubbleContext.Provider value={id}><r.route.Component bubble={r.bubble} /></CurrentBubbleContext.Provider>
               : <div className="bl-noroute">route が無い<br />{url}</div>}
