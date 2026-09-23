@@ -20,6 +20,16 @@ import type { Host } from './resolve.js';
 /** 泡 id → 箱の大きさ。measure の答えを1フレーム分ためる入れ物（lab.html の memo） */
 export type BoxSizes = Map<BubbleId, Size>;
 
+/**
+ * **このフレームだけ背を伸ばす泡**（自前の px）。
+ *
+ * ★ 模型の値ではない ── 世界には書かない。1 フレームの measure にだけ効く。
+ *   使うのは「選んだ泡だけヘッダのぶん伸びて、並びの後ろがそのぶんずれる」のような、
+ *   **見る側の都合で箱が変わる**話。値を書かないので ②「触っても値は1つも書かない」を守れる。
+ *   並び（詰める）の帯も、箱も、焦点の約束も、伸びたあとの大きさで揃う。
+ */
+export type GrownHeights = ReadonlyMap<BubbleId, number>;
+
 /** ③ 見えない親は体を持たない。lab.html 326-327 行 headOf / padOf */
 export function headOf(world: BubbleWorld, id: SpaceId): number {
   const b = id === ROOT_SPACE ? null : world.bubble(id);
@@ -40,18 +50,20 @@ export function measureBox(
   id: BubbleId,
   memo: BoxSizes,
   rules: LayoutRules,
+  grown?: GrownHeights,
 ): Size {
   const done = memo.get(id);
   if (done) return done;
   const self = world.bubble(id);
   if (!self) return { w: 0, h: 0 };
-  const box = { w: self.state.size.w, h: self.state.size.h };
+  // ★ このフレームだけの伸び（見る側の都合）。中身を測る前に足す ── 帯も箱も揃う
+  const box = { w: self.state.size.w, h: self.state.size.h + (grown?.get(id) ?? 0) };
   const kids = world.kidsOf(id);
   const head = headOf(world, id);
   const pad = padOf(world, id);
   if (kids.length) {
     const V = viewOfSpace(world, id);
-    const sizeOf = (k: Bubble) => measureBox(world, k.id, memo, rules);
+    const sizeOf = (k: Bubble) => measureBox(world, k.id, memo, rules, grown);
     for (const axis of ['x', 'y'] as const) {
       const A = V[axis];
       // ③ 見えない親は自前の大きさを持たないので、どの並べ方でも箱は中身ぴったり
@@ -88,9 +100,9 @@ export function measureBox(
 }
 
 /** 泡ぜんぶを1回で measure する（1フレームの入口）。resolveWorld が最初に呼ぶ */
-export function measureAll(world: BubbleWorld, rules: LayoutRules): BoxSizes {
+export function measureAll(world: BubbleWorld, rules: LayoutRules, grown?: GrownHeights): BoxSizes {
   const memo: BoxSizes = new Map();
-  for (const b of world.bubbles) measureBox(world, b.id, memo, rules);
+  for (const b of world.bubbles) measureBox(world, b.id, memo, rules, grown);
   return memo;
 }
 

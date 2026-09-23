@@ -41,7 +41,7 @@ import type { Arranged } from './arrange.js';
 import { imageOf, LENS_XY, LENS_Z } from './lens.js';
 import type { LensXyId, LensZId } from './lens.js';
 import { halfOf, headOf, lensContext, measureAll, measureBox } from './measure.js';
-import type { BoxSizes, LensContext } from './measure.js';
+import type { BoxSizes, GrownHeights, LensContext } from './measure.js';
 import { fitFocus } from './project.js';
 
 /** 空間を持つ泡の「中身の箱」＝ その中の空間の土台。lab.html 745-752 行 contentOf */
@@ -123,9 +123,11 @@ export function resolveWorld(
   world: BubbleWorld,
   viewport: Viewport,
   rules?: Partial<LayoutRules>,
+  /** このフレームだけ背を伸ばす泡（模型の値ではない。measure.ts の GrownHeights） */
+  grown?: GrownHeights,
 ): Layout {
   const R = resolveRules(rules);
-  const boxes = measureAll(world, R);
+  const boxes = measureAll(world, R, grown);
   const spaces = new Map<SpaceId, SpaceLayout>();
   const sink: Mutable<Placement>[] = [];
   resolveSpace(

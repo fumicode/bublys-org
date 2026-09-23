@@ -55,6 +55,22 @@ function mateFor(
   return best ? best.id : null;
 }
 
+/**
+ * 選んだ札が伸びる高さ ＝ **中身の上端の差**。
+ *
+ * 静かな札は中身が上 7px の所から始まり、装いを出すと 27px の所から始まる（space-css の
+ * `.bl-body`）。その差 20px だけ札の背が伸びれば、**中身の高さは変わらない**
+ * ── 選び直すたびに札の中が伸び縮みするのを避けたいので、こうする。
+ * ★ CSS と同じ数。片方だけ変えると中身が伸び縮みする。
+ */
+const SELECTED_GROW = 27 - 7;
+
+/**
+ * 一覧の並びの隙間。札は自分で上下 7px の余白を持っているので、
+ * これに 14 を足した分が「白い箱と白い箱のあいだ」になる（4 なら 18px）。
+ */
+const LIST_GAP = 4;
+
 /** View が同じか（プリセットを当て直すかの判定。値はぜんぶ数か文字） */
 const sameAxis = (a: AxisView, b: AxisView) =>
   a.dim === b.dim && a.arrange === b.arrange && a.lens === b.lens && a.step === b.step;
@@ -140,8 +156,25 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [onChange],
   );
 
+  /**
+   * ★ **選んだ札だけ、ヘッダのぶん背が伸びる。**
+   *
+   * 一覧の札は、選んでいないあいだ装いを出さない（`bl-quiet`）ので、中身が
+   * ヘッダのぶんまで広がっている。選んだときに中身を縮めて場所を作ると、
+   * 選び直すたびに札の中が伸び縮みして落ち着かない ── **札のほうが伸びて、
+   * 並びの後ろがそのぶんずれる**ほうが素直。
+   *
+   * ★ 世界には書かない（② 触っても値は1つも書かない）。1 フレームの measure に
+   *   だけ効く `grown` で渡す ── 帯も箱も焦点の約束も、伸びたあとの大きさで揃う。
+   */
+  const grown = useMemo(() => {
+    const b = selectedId ? world.bubble(selectedId) : null;
+    if (!b || b.space === 'root' || !listHosts.current.has(b.space)) return undefined;
+    return new Map([[b.id, SELECTED_GROW]]);
+  }, [selectedId, world]);
+
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
-  const base = useMemo(() => resolveWorld(world, viewport, rules), [world, viewport, rules]);
+  const base = useMemo(() => resolveWorld(world, viewport, rules, grown), [world, viewport, rules, grown]);
 
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
   const takeOut = useCallback(
@@ -339,8 +372,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         w,
         w.kidsOf(hostId).slice().sort((a, b) => a.state.order - b.state.order).map((b) => b.id),
       );
-      // ★ 並べ方も**この同じ1回**で当てる（別の書き込みにすると片方が握り潰される）
-      if (preset && presetChanged) w = withPreset(w, preset, hostId);
+      /**
+       * ★ 並べ方も**この同じ1回**で当てる（別の書き込みにすると片方が握り潰される）。
+       *   隙間は既定（14）より詰める ── 札は自分で上下 7px の余白を持っているので、
+       *   既定のままだと札と札のあいだが 28px も開いて一覧がすかすかになる。
+       */
+      if (preset && presetChanged) {
+        w = withPreset(w, preset, hostId);
+        for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { gap: LIST_GAP });
+      }
       seq.current = n;
       setUrls(m);
       setWorld(w);
@@ -410,7 +450,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const input = useBubbleInput({
-    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules,
+    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, grown,
     layerRef, hasContent, claimDrop, onDragInfo,
   });
 

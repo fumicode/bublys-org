@@ -11,6 +11,7 @@
 import type { BubbleId, Rect, Size } from './types.js';
 import { resolveRules } from './rules.js';
 import type { LayoutRules } from './rules.js';
+import type { GrownHeights } from './measure.js';
 import type { BubbleWorld } from './world.js';
 
 /**
@@ -38,6 +39,12 @@ export interface ActContext {
   /** 直前のフレームで画面に見えていた矩形。⑤ の「触っていない泡は動かない」の起点 */
   readonly seen: SeenRects;
   readonly rules: LayoutRules;
+  /**
+   * このフレームだけ背を伸ばす泡（measure.ts の GrownHeights）。
+   * ⑤ pin は「書いて → 解き直して → 測る」を繰り返すので、解き直しにも同じ伸びが要る
+   * ── 渡さないと、伸びている泡のぶんだけ留め先がずれる。
+   */
+  readonly grown?: GrownHeights;
 }
 
 /** 形を変えたあと */
@@ -58,6 +65,7 @@ export function actContext(
   viewport: Size,
   seen: SeenRects,
   rules?: Partial<LayoutRules>,
+  grown?: GrownHeights,
 ): ActContext {
-  return { viewport, seen, rules: resolveRules(rules) };
+  return { viewport, seen, rules: resolveRules(rules), grown };
 }
