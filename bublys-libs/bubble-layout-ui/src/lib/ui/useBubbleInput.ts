@@ -284,7 +284,11 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点をドラッグする」（ラボと同じ）。
      */
     if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody)) {
-      setSelectedId(p0.id);
+      /**
+       * ★ **選ぶのもしない。** 中身に触ろうとしただけで泡が選ばれると、
+       *   一覧では触った札が装いを出して背まで伸び、**押したかった所が動く**。
+       *   選ぶのは泡の枠（ヘッダや縁）を触ったとき ── 中身は中身のもの。
+       */
       drag.current = null;
       show();
       return;
