@@ -15,24 +15,22 @@
  * ★ ラボの probe()（lab 1517-1523 行）＝ このライブラリの resolveWorld。
  *   ラボの probe は「補間を進めずに解き直す」ために anim を退避していたが、resolveWorld は補間を持たない。
  */
-import type { BubbleId, PlaneAxis, SpaceId } from './types.js';
+import type { BubbleId, SpaceId } from './types.js';
 import { METRICS } from './types.js';
 import type { Bubble } from './bubble.js';
 import type { BubbleWorld } from './world.js';
 import type { ActContext, SeenRect } from './act.js';
-import type { Layout, Placement } from './resolve.js';
+import type { Layout } from './resolve.js';
 import { resolveWorld } from './resolve.js';
 import { screenToAxis } from './project.js';
 import { valueFromPos } from './arrange.js';
 import { verbOf, writeKeyOf } from './dimension.js';
 import { viewOfSpace } from './view.js';
 
-/** lab.html 1115 行 center。画面の矩形の中点 */
-const center = (p: Placement, axis: PlaneAxis): number =>
-  axis === 'x' ? p.x + p.w / 2 : p.y + p.h / 2;
-
 /** lab.html 1470 行 PIN_ON。検証で切って比べるためだけの口（画面のボタンにはしない） */
 let PIN_ON = true;
+
+
 
 /**
  * id の泡の**左上**を、画面上の seen の所へ。lab.html 1493-1516 行 pin。
@@ -47,10 +45,30 @@ export function pin(
 ): BubbleWorld {
   if (!PIN_ON || !seen || !world.bubble(id)) return world;
   let w = world;
+  /**
+   * ★ **当ててみて悪くなったら、当てない。**
+   *
+   *   逆写しは1次の当て（当てて → 解き直して → もう一度）なので、当てる所の倍率が
+   *   場所で大きく変わるレンズでは外れることがある。とくに魚眼の端（tanh の寝た所）では
+   *   画面の 1px が世界の何十 px にも化けるうえ、像の幅まで一緒に潰れるので、
+   *   「見えていた左上」に合わせる式の解が定まらない ── 幅 0 のままどこまでも遠くへ行ける。
+   *   実測：並びから1つ引き出したら、残ったほうの倍率が 8e-12 になって画面から消えた。
+   *
+   *   ⑤ が守りたいのは「触っていない泡が画面の上で動かない」こと。当てた結果ズレが
+   *   **増える**なら、それは留めそこねているので、**留めなかったほうがまだ近い**。
+   *   いちばんズレの小さかった答えを返す ── 素直に効く場面（平行なレンズ・焦点の近く）では
+   *   毎回ズレが減るので、今までと同じ答えになる。
+   */
+  let best = world;
+  let bestErr = Infinity;
   for (let n = 0; n < 6; n++) {
     const layout = resolveWorld(w, ctx.viewport, ctx.rules);   // lab: probe()
     const q = layout.byId.get(id);
-    if (!q) return w;
+    if (!q) return best;
+    const err = Math.abs(seen.x - q.x) + Math.abs(seen.y - q.y);
+    if (!(err < bestErr)) return best;        // 縮まらなかった ＝ ここで止める
+    bestErr = err;
+    best = w;
     let wrote = false;
     for (const axis of ['x', 'y'] as const) {
       const d = axis === 'x' ? seen.x - q.x : seen.y - q.y;
@@ -70,17 +88,28 @@ export function pin(
       if (!pa || !L) continue;
       const key = writeKeyOf(L.view[axis].dim);
       if (key !== 'x' && key !== 'y' && key !== 'z') continue;
-      const c = center(pa, axis);
+      /**
+       * ★ 逆写しを当てる点は、**ズレを測った所そのもの**（留める泡の左上）。
+       *
+       *   ラボは土台（A）の**中心**で当てていた（lab 1508 行 center(pa)）。平行なレンズなら
+       *   どこで当てても答えは同じ（画面 1px ＝ 世界 1px）なので、差は出ない。
+       *   魚眼では場所ごとに倍率が違うので、**中心の倍率で左上のズレを直そうとすると当たらない**
+       *   ── しかも端（tanh の寝た所）では倍率が 1/60 ほどになるので、6 回まわしても収束せず、
+       *   並びが世界の中で数百 px 飛ぶ（実測：一覧の隣にいた並びが重なる所まで来た）。
+       *   測った所で当てれば、留める泡が土台そのものなら **1 回で厳密に**決まる。
+       */
+      const c = axis === 'x' ? q.x : q.y;
       // 土台のドラッグと同じ View の逆写し（並べ方が決める軸には書かない）。lab 1508-1509 行
-      const delta =
-        valueFromPos(L.view[axis], L.arr[axis], screenToAxis(L, axis, c + d, pa.m)) -
-        valueFromPos(L.view[axis], L.arr[axis], screenToAxis(L, axis, c, pa.m));
+      const at = (screen: number) =>
+        valueFromPos(L.view[axis], L.arr[axis], screenToAxis(L, axis, screen, pa.m));
+      const delta = at(c + d) - at(c);
+      if (!Number.isFinite(delta)) continue;
       w = w.withBubble(A.withFree(key, A.state.free[key] + delta));
       wrote = true;
     }
-    if (!wrote) return w;
+    if (!wrote) return best;
   }
-  return w;
+  return best;
 }
 
 /**

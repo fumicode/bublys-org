@@ -167,15 +167,24 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     });
   };
 
-  // ⑤ の起点：前のフレームで画面に見えていた矩形
-  const seen = useRef<SeenRects>(new Map());
   const tiny = useMemo(() => markTiny(world, layout, drawMin), [world, layout, drawMin]);
-  seen.current = useMemo(
-    () => new Map(layout.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }])),
-    [layout],
-  );
-
   const lifted = useMemo(() => withLift(layout, view.lift), [layout, view.lift]);
+
+  /**
+   * ⑤ の起点：前のフレームで**画面に見えていた**矩形。
+   *
+   * ★ **持ち上げを当てたあと**（`lifted`）で取る ── 掴んでいる泡は持ち上げでカーソルに
+   *   付いてきており、画面に見えているのはそちらだから。ラボも描いた配置そのもの
+   *   （`frameItems = sink.concat(lifted)`、lab.html 828 行）を ⑤ の起点にしている。
+   *   持ち上げる前の配置で取ると、掴んだ泡の「見えていた所」が**並びの中の元の席**になり、
+   *   並びから引き出して離した泡が**元の席へ引き戻される**（実測：引き出して下に置いたのに、
+   *   元の位置へ戻り、残ったほうは画面の外へ飛んだ）。
+   */
+  const seen = useRef<SeenRects>(new Map());
+  seen.current = useMemo(
+    () => new Map(lifted.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }])),
+    [lifted],
+  );
 
   const ctx = useCallback(
     () => actContext(viewport, seen.current, rules),

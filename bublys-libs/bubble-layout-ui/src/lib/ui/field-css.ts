@@ -18,6 +18,26 @@ export const FIELD_CSS = `
   box-sizing:border-box;transform-origin:0 0;border-radius:var(--rr);
   background:hsl(var(--h) 30% 13%);box-shadow:0 5px 18px rgba(0,0,0,.5)}
 .bub *{box-sizing:border-box}
+/**
+ * ★ **開いたら、空間が動いたことが分かるように滑らせる。**
+ *   書く値（domain の答え）は今までどおり補間しない ── 滑るのは描く側の仕事。
+ *   空間が 320ms かけて動き、そのあと 180ms で新しい泡が出る（2 拍）。
+ *   曲がり方はゆるい出入り ── 端が速いと「一瞬で終わった」に見える。
+ *   backwards ＝ 待っている間だけ透明。終わったら inline の opacity（遠さの薄さ）に戻る。
+ * ★ **掴んでいる間は切る。** 滑らせるとカーソルより遅れて付いてきて、掴んだ点がずれる。
+ *
+ * ★ ただし**切るのは滑らかさ（transition）だけ**。掴んでいる間に animation:none まで
+ *   掛けると、離した瞬間に animation が none から元の値へ戻り、ブラウザは
+ *   **生きている泡ぜんぶの出現アニメを鳴らし直す** ── backwards なので
+ *   260ms まるまる透明になってから 180ms で戻る ＝ 画面全体がちらつく。
+ *   大きさを変えて離すたびにこれが起きていた（実測：泡 7 つで animationstart が 14 回、
+ *   DOM の出し入れは 0 ＝ 作り直しではなく**鳴らし直し**）。
+ *   出現アニメは生まれて 440ms のあいだしか意味が無いので、掴んでいても触らなくてよい。
+ */
+.bub{transition:transform 320ms cubic-bezier(.32,.72,.32,1);animation:bl-in 180ms 260ms backwards}
+@keyframes bl-in{from{opacity:0}to{opacity:1}}
+.bl-layer.bl-live .bub{transition:none}
+@media (prefers-reduced-motion:reduce){ .bub{transition:none;animation:none} }
 .bub.chip{--rr:6px}
 .bub.sel{--rw:2.4px;--rc:#6ee7ff}
 /* ★ 枠は「子より上」に描く。inset の box-shadow は背景のレイヤなので、ヘッダ（.hd）が上から塗ってしまい、

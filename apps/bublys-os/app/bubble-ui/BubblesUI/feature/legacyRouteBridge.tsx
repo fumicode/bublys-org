@@ -2,18 +2,27 @@
 /**
  * 旧 `bubbles-ui` の画面を、新しい空間（泡のならべかた）の上でそのまま動かす橋。
  *
- * バブリの画面は**1文字も変えない**。渡すものは 2 つだけ:
+ * バブリの画面は**1文字も変えない**。渡すものは 3 つだけ:
  *   - 旧 `BubblesContext.openBubble` → 新しい空間の `openBubble`
  *   - 旧 `CurrentBubbleContext` → いま描いている泡の id
- * 旧 `ObjectView` はこの 2 つを見てダブルクリックで開くので、これで繋がる。
+ *   - 旧 `KeyboardFocusContext` → いま触られている泡の id
+ * 旧 `ObjectView` は前の 2 つを見てダブルクリックで開き、
+ * 旧 `useKeyBindings` は残りの 1 つで「キーボードは誰のものか」を決める。
  *
  * ルートの形（pattern / type / Component）は新旧で同じに作られているので、
  * 包むのは中身だけで済む。
  */
 import { FC, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { BubbleSpace, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
+import { BubbleSpace, useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, RoutedBubble } from "@bublys-org/bubble-layout-feature";
-import { Bubble, BubblesContext, CurrentBubbleContext, ShowreTubes, createBubble } from "@bublys-org/bubbles-ui";
+import {
+  Bubble,
+  BubblesContext,
+  CurrentBubbleContext,
+  KeyboardFocusContext,
+  ShowreTubes,
+  createBubble,
+} from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 
 /** 旧の画面 1 枚を、新しい空間の文脈に繋ぐ */
@@ -22,6 +31,14 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
   Legacy,
 }) => {
   const space = useBubbleSpace();
+  /**
+   * ★ 旧の「キーボードはフォーカス中のバブルが受け取る」を繋ぐ。
+   *   旧はこれを `bubbles` スライス（Redux）から読んでいたが、新しい海はそこへ書かない。
+   *   繋がないと**どのバブルも一致せず、キー操作が一切効かない**
+   *   （囲碁の世界線を ← → ↑ ↓ で辿れなくなっていたのがこれ）。
+   */
+  const selected = useSelectedBubble();
+  const keyboardFocus = useMemo(() => ({ focusedId: selected }), [selected]);
 
   // 旧の画面は bubbles-ui の Bubble（クラス）を期待する。同じ url から作り、
   // id だけ新しい空間のものに揃える（「どの泡から開いたか」に使われる）
@@ -42,9 +59,11 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
 
   return (
     <BubblesContext.Provider value={legacyContext as never}>
-      <CurrentBubbleContext.Provider value={bubble.id}>
-        <Legacy bubble={legacyBubble as never} />
-      </CurrentBubbleContext.Provider>
+      <KeyboardFocusContext.Provider value={keyboardFocus}>
+        <CurrentBubbleContext.Provider value={bubble.id}>
+          <Legacy bubble={legacyBubble as never} />
+        </CurrentBubbleContext.Provider>
+      </KeyboardFocusContext.Provider>
     </BubblesContext.Provider>
   );
 };
@@ -91,7 +110,6 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[] }>
             routes={routes()}
             initialUrls={seeds}
             viewport={{ w: size.width, h: size.height }}
-            depth="cascade"
             style={{ position: "absolute", left: 0, top: 0 }}
           />
           <div data-frame-shore="" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
@@ -126,10 +144,18 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),
-    // 中身が「地は自分で持つ」と言っていれば敷かない（空間がそのまま透ける）
+    /**
+     * 中身が「地は自分で持つ」と言っていれば敷かない（空間がそのまま透ける）。
+     *
+     * ★ 見るのは **`contentBackground` があるかどうか** ── 値が何かではない。
+     *   旧の世界では「その色で塗って」の意味だったが、新しい海では地を敷くかどうかしか
+     *   無い。`'transparent'` だけを見ていたので、世界線（`rgba(15,18,28,0.3)`）のように
+     *   **自分で色を決めていた泡が、いちばん明るい白地に落ちて**いた。
+     *   色を指しているのは「まわりに任せない」という意思表示なので、敷かないほうへ寄せる。
+     */
     ground: isWindow
       ? ('clear' as const)
-      : route.bubbleOptions?.contentBackground === 'transparent'
+      : route.bubbleOptions?.contentBackground
         ? ('none' as const)
         : ('light' as const),
     ...(size ? { size: { w: size.width, h: size.height } } : {}),

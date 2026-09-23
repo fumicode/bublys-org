@@ -16,7 +16,7 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
+import type { PresetId } from "@bublys-org/bubble-layout";
 import { TUBE_RADIUS, TUBE_THICKNESS, anchoredRect, type ScreenRect, type TubeJoin } from "@bublys-org/bubbles-ui";
 import { BubbleSpaceContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleSpaceApi, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
@@ -24,6 +24,7 @@ import { bubbleRoutes } from "../domain/bubbleRoutes";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
 import { bridgeRoutes } from "./legacyRouteBridge";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext";
+import { LayoutRoutesProvider } from "./ListSpace";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
 const LAUNCHER_URL = "launchers/main";
@@ -95,7 +96,8 @@ const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }
 };
 
 export const BubblesUINext = () => {
-  const [depth, setDepth] = useState<OpenDepth>("cascade");
+  /** 並べ方（View のプリセット）。開き方は 1 つしかないので、見え方が変わるのはここだけ */
+  const [preset, setPresetState] = useState<PresetId>("free");
   /** 岸に着いた泡の所で、ネオンをどう通すか（見た目だけ。挙動は同じ）。既定は迂回 */
   const [join, setJoin] = useState<TubeJoin>("detour");
   /**
@@ -187,6 +189,15 @@ export const BubblesUINext = () => {
       canOpen: (url) => spaceRef.current?.canOpen(url) ?? false,
       hasUrl: (url) => spaceRef.current?.hasUrl(url) ?? false,
       setLens: (axis, lens) => spaceRef.current?.setLens(axis, lens),
+      setPreset: (p) => spaceRef.current?.setPreset(p),
+      /**
+       * 岸には世界が無い ── 岸に貼られた泡は海から出ているので、
+       * 中身・親・自前の大きさを訊かれても答えられない。
+       * 一覧を岸に貼ったときは、一覧のほうが自分で小さな海を持つ（ListSpace）。
+       */
+      setChildren: () => undefined,
+      hostOf: () => null,
+      sizeOf: () => null,
       takeIn: (url, rect) => spaceRef.current?.takeIn(url, rect) ?? "",
     }),
     [],
@@ -240,13 +251,20 @@ export const BubblesUINext = () => {
   );
 
   /** 見え方の口に渡す値（泡は海の中で描かれるので、文脈で渡す） */
+  const setPreset = useCallback((next: PresetId) => {
+    setPresetState(next);
+    spaceRef.current?.setPreset(next);
+  }, []);
+
   const spaceView = useMemo<SpaceView>(
-    () => ({ depth, setDepth, join, setJoin, fisheye, toggleFisheye }),
-    [depth, join, fisheye, toggleFisheye],
+    () => ({ preset, setPreset, join, setJoin, fisheye, toggleFisheye }),
+    [preset, setPreset, join, fisheye, toggleFisheye],
   );
 
   return (
     <SpaceViewContext.Provider value={spaceView}>
+    {/* ルート一覧は、どの泡からでも引けるように配る（一覧の空間が中の海を作るのに要る） */}
+    <LayoutRoutesProvider routes={routes}>
     <Box
       sx={{
         width: "100%",
@@ -268,10 +286,8 @@ export const BubblesUINext = () => {
 [data-docked-url] .bl-body [data-frame-shore] [data-showre-tubes]{display:block}`}</style>
 
       <BubbleSpace
-        key={depth}
         routes={routes}
         viewport={viewport}
-        depth={depth}
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
         style={{ position: "absolute", inset: 0 }}
@@ -299,6 +315,7 @@ export const BubblesUINext = () => {
       />
 
     </Box>
+    </LayoutRoutesProvider>
     </SpaceViewContext.Provider>
   );
 };

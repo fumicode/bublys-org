@@ -7,10 +7,13 @@ export { BubbleSpace } from './BubbleSpace.js';
 export type { BubbleSpaceProps, TakeOutInfo } from './BubbleSpace.js';
 export { ObjectView } from './ObjectView.js';
 export type { ObjectViewProps } from './ObjectView.js';
-export { BubbleSpaceContext, CurrentBubbleContext, useBubbleSpace, useCurrentBubble } from './context.js';
+export {
+  BubbleSpaceContext, CurrentBubbleContext, SelectedBubbleContext,
+  useBubbleSpace, useCurrentBubble, useSelectedBubble,
+} from './context.js';
 export type { BubbleSpaceApi } from './context.js';
-export { openAt, hueOf, settlePlaneAfterClose, PLANE_STEP } from './openAt.js';
-export type { OpenAtInput, OpenAtResult, OpenAs, OpenDepth } from './openAt.js';
+export { openAt, hueOf } from './openAt.js';
+export type { OpenAtInput, OpenAtResult, OpenAs } from './openAt.js';
 export {
   patternToRegex, extractParamNames, extractParams, matchesPattern,
   matchBubbleRoute, renderRoute, titleOf,

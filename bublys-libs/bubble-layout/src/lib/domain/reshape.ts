@@ -87,7 +87,25 @@ export function reshape(
   // 3. 空間を移った泡は、見えていた大きさになる奥行きへ
   //    ★ ラボは probe() を1回だけ打って、その配置を moved 全員に使う（lab 1449-1450 行）
   const probe = resolveWorld(w, ctx.viewport, ctx.rules);
-  for (const id of moved) w = keepSeen(w, ctx, id, ctx.seen.get(id), probe);
+  /**
+   * ★ ただし**並び（見えない親）を出入りするときは、奥行きを書き換えない。**
+   *
+   *   ③ 見えない親は体を持たない ── 並びは「別の場所」ではなく、ただのまとまり。
+   *   出入りしても奥行きが変わったわけではないので、見えていた大きさを奥行きで
+   *   取り戻す必要がない。
+   *
+   *   書き換えると並びが壊れる。並びの中の泡の奥行きは**外の窓のもの**なので、
+   *   一人だけ別の面に置かれると、同じ帯にいるのに**一人だけ大きさが違い**、
+   *   自分の帯の中で縮んだぶんが**隙間**になる（実測：縦に並べた2つが 0.49 と 0.56 で、
+   *   間に 42px の空きができた）。
+   *   ラボでは起きない ── 平行なレンズだと並びの倍率が 1 なので、書いても 0 のままだった。
+   */
+  const isRow = (s: SpaceId | undefined) =>
+    !!s && s !== ROOT_SPACE && !!(world.bubble(s)?.state.implicit || w.bubble(s)?.state.implicit);
+  for (const id of moved) {
+    if (isRow(parent0.get(id)) || isRow(w.bubble(id)?.space)) continue;
+    w = keepSeen(w, ctx, id, ctx.seen.get(id), probe);
+  }
 
   // 4. ⑤ pin
   const pinned = [...shrunk, ...tidied.heirs, ...changed.keep];
@@ -239,7 +257,23 @@ function snapChange(world: BubbleWorld, id: BubbleId, sn: SnapTarget): ReshapeCh
   const anchor = anchorOf(list, idx);            // 差し込む所より前の泡（生まれたばかりの並びでは相手 T）
   list.splice(idx, 0, id);
   w = renumber(w, list);
-  return { world: w, keep: [anchor ?? sn.target] };
+  /**
+   * ★ **後ろへ差し込むなら、並びそのものの左上も留める。**
+   *
+   * ⑤ は「触っていない泡は画面の上で動かない」なので、留めるのは中の泡 1 つ（anchor）で足りる
+   * ── **平行なレンズなら**。並びの中は剛体なので、1 つ留めれば残りも動かない。
+   *
+   * 魚眼だとそうならない。並びの箱が伸びると**並びの像の倍率そのものが変わる**ので、
+   * 中の 1 つを画面に留めると、その辻褄合わせに並びが世界の中で右へ飛ぶ
+   * （実測：600 の泡を足すたびに並びが 200px ずつ右へ逃げ、隣にいたはずの一覧から離れていく）。
+   * 「並びは後ろへ伸びる」を言葉どおりにするなら、留めるのは**並びの左上**。
+   * `pin` はもともと左上を留める（大きさが変わる泡のため）ので、そのまま使える。
+   *
+   * 前へ差し込むとき（idx 0）は並びが前へ伸びるので、左上は動いて当たり前 ── 中の泡だけを留める。
+   * 生まれたばかりの並びは前のフレームに居ないので、`pin` は何もしない（seen が無い）。
+   */
+  const keep = anchor ?? sn.target;
+  return { world: w, keep: idx > 0 ? [keep, rowId] : [keep] };
 }
 
 /**

@@ -53,7 +53,7 @@ export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitFocus, withFo
 // ── 操作（値を書く。入力と当たり判定は ui）──
 export { actContext } from './act.js';
 export type { ActContext, ReshapeResult, SeenRect, SeenRects, ScreenRects } from './act.js';
-export { focusOn } from './focus.js';   // ② 触った泡へ視点が寄る（raise は消した）
+export { focusOn, bringToCenter } from './focus.js';   // ② 触った泡へ視点が寄る（raise は消した）
 export { dragVerbsOf, dragBubble, dragFocus, wheelZ, resizeBubble, liftsOf, movesOf } from './drag.js';
 export type { DragVerbs, DragBubbleQuery, DragFocusQuery, ResizeQuery } from './drag.js';
 export { dropTargetAt, spaceSlotAt, snapCandidateAt, spaceSummary } from './drop.js';

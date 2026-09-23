@@ -41,6 +41,7 @@ export * from './lib/context/BubbleRefsContext.js';
 export * from './lib/context/UniverseContext.js';
 export * from './lib/context/HoveredBubbleContext.js';
 export * from './lib/context/CurrentBubbleContext.js';
+export * from './lib/context/KeyboardFocusContext.js';
 
 // Universe / Viewport glue
 export * from './lib/universe-config.js';

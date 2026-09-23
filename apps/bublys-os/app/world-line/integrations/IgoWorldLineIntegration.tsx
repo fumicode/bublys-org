@@ -57,7 +57,9 @@ export function IgoWorldLineIntegration({ gameId, worldLineUrl }: IgoWorldLineIn
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#333' }}>
+        {/* ★ 地は空間がそのまま透ける（route の contentBackground: transparent）ので、
+            字は暗い空間で読める明るさにする。#333 のままだと闇に沈む */}
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#e6ebf5' }}>
           囲碁バブリ
         </h2>
         {worldLineUrl && (
@@ -76,6 +78,8 @@ export function IgoWorldLineIntegration({ gameId, worldLineUrl }: IgoWorldLineIn
                 borderRadius: '6px',
                 border: '1px solid #ccc',
                 background: '#fff',
+                // 明るい地を敷くので、字の色も自分で決める（継ぐと明るい字が白に乗る）
+                color: '#333',
                 cursor: 'pointer',
               }}
             >

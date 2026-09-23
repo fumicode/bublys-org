@@ -61,7 +61,14 @@ export const SPACE_CSS = `
   /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
   background:linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)}
 /* 地を敷かない ── 中身が自分で持つ。空間（夜空）がそのまま透ける */
-.bub > .bl-body.bl-none{background:none;box-shadow:none;color:#e6ebf5}
+.bub > .bl-body.bl-none{background:none;box-shadow:none;color:#e6ebf5;
+  /* ★ 巻物の棒も夜の側へ。明るい地を前提にした OS の棒が、
+     空間の上に**白い帯**として残る（世界線の下端がそう見えていた） */
+  scrollbar-width:thin;scrollbar-color:rgba(230,235,245,.28) transparent}
+.bub > .bl-body.bl-none::-webkit-scrollbar{width:8px;height:8px}
+.bub > .bl-body.bl-none::-webkit-scrollbar-track{background:transparent}
+.bub > .bl-body.bl-none::-webkit-scrollbar-thumb{background:rgba(230,235,245,.28);border-radius:4px}
+.bub > .bl-body.bl-none::-webkit-scrollbar-corner{background:transparent}
 .bub.chip > .bl-body{display:none}
 /* ★ 中身を消すのは題名より**奥**（倍率 0.3）。題名が読めなくなっても、
    中身の形は「何が入っているか」の手がかりになるので描き続ける（CONTENT_MIN） */
@@ -74,8 +81,17 @@ export const SPACE_CSS = `
 .bub.nt > .bl-close{display:none}
 
 /* 枠の題名は url。中身が自分の題名を出すので、枠は「どこにいるか」を出す（既存 bubbles-ui と同じ） */
-.bub > .bl-url{display:flex;align-items:center;gap:0;overflow:hidden;opacity:.85;
-  font:600 11px/1 var(--f);letter-spacing:.01em}
+/*
+ * ★ 長い url は**閉じるボタンに被る手前で … に切る**。
+ *   切り方を横並び（flex）から普通の行（block）に変えてあるのは、
+ *   text-overflow:ellipsis が効くのは**行**であって、並べ物の入れ物ではないから
+ *   ── flex のままだと、はみ出したぶんがただ切り落とされて … が出ない。
+ *   区切りの / は中の字のまま（inline）なので、見た目は今までどおり。
+ *   右の余地 34px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 隙間 4。
+ */
+.bub > .bl-url{display:block;max-width:calc(100% - 34px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;
+  font:600 11px/24px var(--f);letter-spacing:.01em}
 .bl-seg{white-space:nowrap}
 .bl-sep{opacity:.45;margin:0 3px}
 

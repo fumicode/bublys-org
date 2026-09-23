@@ -15,7 +15,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { bubbleRoutes } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
 import { bridgeRoutes } from "../bubble-ui/BubblesUI/feature/legacyRouteBridge";
@@ -24,7 +23,6 @@ import { bridgeRoutes } from "../bubble-ui/BubblesUI/feature/legacyRouteBridge";
 const TRY = ["users", "memos", "user-groups", "tasks", "igo-games"];
 
 export default function BubbleLayoutPage() {
-  const [depth, setDepth] = useState<OpenDepth>("cascade");
   const [viewport, setViewport] = useState({ w: 1280, h: 720 });
 
   useEffect(() => {
@@ -41,29 +39,14 @@ export default function BubbleLayoutPage() {
     <div style={{ height: "100vh", background: "radial-gradient(circle 1200px at 50% 40%,#141a2b 0%,#080a11 100%)", color: "#e6ebf5", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, height: 44, padding: "0 14px", borderBottom: "1px solid #222838", font: "13px/1.5 -apple-system, sans-serif" }}>
         <b>泡のならべかた ── 本物のバブリで</b>
-        <span style={{ color: "#8792ab" }}>項目をダブルクリック → 重ねて開く／触ると焦点が寄って前後が入れ替わる</span>
-        <span style={{ marginLeft: "auto" }} />
-        {(["cascade", "fisheye-x", "plane"] as const).map((d) => (
-          <button
-            key={d}
-            onClick={() => setDepth(d)}
-            style={{
-              font: "inherit", padding: "4px 12px", borderRadius: 7, cursor: "pointer",
-              border: `1px solid ${depth === d ? "#4d8dff" : "#2a3145"}`,
-              background: depth === d ? "#16233f" : "#141a2b",
-              color: depth === d ? "#dce8ff" : "#cfd8ea",
-            }}
-          >
-            {d === "cascade" ? "重ねて開く（Z なし）" : d === "fisheye-x" ? "隣に開く（魚眼）" : "面（Z あり）"}
-          </button>
-        ))}
+        <span style={{ color: "#8792ab" }}>
+          項目をダブルクリック → 隣に開く（空間が右へ動いて、あいた中央に出る）／触ると焦点が寄る
+        </span>
       </div>
       <BubbleSpace
-        key={depth}
         routes={routes}
         initialUrls={initialUrls}
         viewport={viewport}
-        depth={depth}
         style={{ position: "absolute", left: 0, top: 44, width: viewport.w, height: viewport.h }}
       />
     </div>

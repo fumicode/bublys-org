@@ -8,6 +8,8 @@
  */
 import { CSSProperties, FC } from "react";
 import { Box } from "@mui/material";
+import { PRESETS } from "@bublys-org/bubble-layout";
+import type { PresetId } from "@bublys-org/bubble-layout";
 import { FullscreenToggle } from "../../components/FullscreenToggle";
 import { useSpaceView } from "./SpaceViewContext";
 
@@ -24,15 +26,22 @@ const chip = (active: boolean): CSSProperties => ({
 });
 
 export const SpaceViewBubble: FC = () => {
-  const { depth, setDepth, join, setJoin, fisheye, toggleFisheye } = useSpaceView();
+  const { preset, setPreset, join, setJoin, fisheye, toggleFisheye } = useSpaceView();
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
-      {/* 開き方を見比べる口。決めた既定は「重ねて開く」 */}
-      {(["cascade", "fisheye-x", "plane"] as const).map((d) => (
-        <button key={d} onClick={() => setDepth(d)} style={chip(depth === d)}>
-          {d === "cascade" ? "重ねて開く" : d === "fisheye-x" ? "隣に開く" : "面"}
-        </button>
-      ))}
+      {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
+      <select
+        value={preset}
+        onChange={(e) => setPreset(e.target.value as PresetId)}
+        title="並べ方（軸ごとの 次元・並べ方・レンズ）"
+        style={{ ...chip(false), padding: "4px 8px" }}
+      >
+        {(Object.keys(PRESETS) as PresetId[]).map((id) => (
+          <option key={id} value={id} style={{ color: "#1b2029" }}>
+            {PRESETS[id].label}
+          </option>
+        ))}
+      </select>
 
       {/* ネオンの通し方。枝分かれ（T 字）か、泡の枠へ迂回するか */}
       <button

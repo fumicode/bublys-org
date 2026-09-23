@@ -228,7 +228,7 @@ function resolveSpace(
       y: ctx.vp.y + (py.s - ctx.vp.y) * m,
       // ① 大きさの倍率は数値1つ ＝ Z の倍率 × min(X の像の倍率, Y の像の倍率)。端での下限は持たない
       scale: m * Math.min(px.k, py.k),
-      alpha: lz.alpha(dz),
+      alpha: lz.alpha(dz, view.z.step),
       w: box.w,
       h: box.h,
     };

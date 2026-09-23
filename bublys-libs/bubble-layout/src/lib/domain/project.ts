@@ -71,9 +71,22 @@ export function fitFocus(
   const ps = [...L.arr[axis].pos.values()];
   if (L.view[axis].dim === 'none') return 0;                                        // (0)
   if (axis === 'z') {
-    // Z は「空にしない」：奥へは一番奥の泡まで。手前へどこまで退けるかが rules.zFocusStop
-    const front = Math.min(0, ...ps) - (rules.zFocusStop === 'behind' ? 1 : 0);
-    return clamp(v, front, Math.max(0, ...ps));
+    /**
+     * Z は「空にしない」：**奥へは一番奥の泡まで／手前へは一番手前の泡より 1 だけ**
+     * （どこまで退けるかが rules.zFocusStop）。
+     *
+     * ★ 端は**泡そのもの**から測る。ラボはここに 0 を混ぜていた（lab.html 900 行
+     *   `clamp(v, Math.min(0, ...ps) - 1, Math.max(0, ...ps))`）。ラボの Z の値は
+     *   いつも 0 から始まる（履歴の古さはいちばん新しいものが 0、順序も 0 から）ので
+     *   0 を混ぜても答えは同じだったが、こちらは一覧の札を消したり足したりするうちに
+     *   順序が 2,3,4… と 0 から離れる。0 を混ぜたままだと、いちばん手前まで繰っても
+     *   **札がその枚数ぶん奥に残る**（実測：先頭の札が 3 枚ぶん奥のまま前へ出てこない）。
+     *   決まりの言葉どおりに測れば、いちばん手前まで繰ったとき先頭の札は
+     *   「先頭が真ん中に来たときの 2 番目の位置」に立つ。
+     */
+    if (!ps.length) return clamp(v, -1, 0);
+    const front = Math.min(...ps) - (rules.zFocusStop === 'behind' ? 1 : 0);
+    return clamp(v, front, Math.max(...ps));
   }
   if (L.view[axis].arrange === 'as-is' || !ps.length) return v;
   const from0 = cur ?? L.focus[axis];

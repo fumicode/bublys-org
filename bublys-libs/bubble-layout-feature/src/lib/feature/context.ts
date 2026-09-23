@@ -3,7 +3,7 @@
  * ★ `openingPosition` は無い ── どこに置くかは親の View が決める（DECISIONS.md）。
  */
 import { createContext, useContext } from 'react';
-import type { BubbleId, LensId, PlaneAxis } from '@bublys-org/bubble-layout';
+import type { BubbleId, LensId, PlaneAxis, PresetId } from '@bublys-org/bubble-layout';
 
 export interface BubbleSpaceApi {
   /** その url の泡を、この泡の隣に開く。返るのは開いた泡の id */
@@ -19,6 +19,28 @@ export interface BubbleSpaceApi {
    * レンズは軸ごとに持つものなので、X と Y は別々に決まる（両方でも、どちらも平行でもよい）。
    */
   setLens: (axis: PlaneAxis, lens: LensId) => void;
+  /**
+   * 外の空間の**並べ方**を選ぶ（View のプリセット）。
+   * 「開き方」は 1 つしかないので、見え方が変わるのはここだけ。
+   */
+  setPreset: (preset: PresetId, spaceId?: BubbleId) => void;
+  /**
+   * その泡の**中身（子の泡）**を、この url たちに合わせる ── 一覧の空間。
+   * 議事録（版）と同じで、**同じ世界の中の子の空間**になる（入れ子の海ではない）。
+   *
+   * ★ 並べ方も**ここで一緒に**渡す。別々に呼ぶと、同じ描画のうちに後の書き込みが
+   *   前の書き込みを握り潰して、顔ぶれか並べ方のどちらかが消える（実測で踏んだ）。
+   *   **世界に書くのは1回**。顔ぶれも並べ方も変わらなければ、何も書かない。
+   */
+  setChildren: (hostId: BubbleId, urls: readonly string[], preset?: PresetId) => void;
+  /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
+  hostOf: (id: BubbleId) => BubbleId | null;
+  /**
+   * その泡が**自分で持っている大きさ**（中身で伸びる前・レンズを通す前）。
+   * 一覧が「縦に並べて収まるか」を測るのに使う ── 伸びたあとの箱で測ると、
+   * 伸びたぶん「収まる」がいつも真になって、並べ方が切り替わらない。
+   */
+  sizeOf: (id: BubbleId) => { readonly w: number; readonly h: number } | null;
   /**
    * 岸から海へ返す ── **画面のその矩形に見えるように**置く。
    *
@@ -36,6 +58,10 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   canOpen: () => false,
   hasUrl: () => false,
   setLens: () => undefined,
+  setPreset: () => undefined,
+  setChildren: () => undefined,
+  hostOf: () => null,
+  sizeOf: () => null,
   takeIn: () => '',
 });
 export const useBubbleSpace = (): BubbleSpaceApi => useContext(BubbleSpaceContext);
@@ -43,3 +69,13 @@ export const useBubbleSpace = (): BubbleSpaceApi => useContext(BubbleSpaceContex
 /** いま自分がどの泡の中にいるか（開くときの「元の泡」） */
 export const CurrentBubbleContext = createContext<BubbleId | null>(null);
 export const useCurrentBubble = (): BubbleId | null => useContext(CurrentBubbleContext);
+
+/**
+ * いま**触られている泡**（最後に押された泡）。
+ *
+ * ② 触るのは見ることなので、模型には書かない ── だから世界ではなくこの層が持つ。
+ * キーボードを受け取るのは誰か、を中身に伝えるのに要る（旧 `bubbles-ui` の
+ * 「キーボードはフォーカス中のバブルが受け取る」を、新しい海の上でも成り立たせる）。
+ */
+export const SelectedBubbleContext = createContext<BubbleId | null>(null);
+export const useSelectedBubble = (): BubbleId | null => useContext(SelectedBubbleContext);

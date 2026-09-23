@@ -19,7 +19,7 @@
  *   ラボは毎フレーム状態へ書き戻していた（lab 727 行）ので、状態の焦点と同じ値になる。
  */
 import type { BubbleId, Point, SpaceId, Size } from './types.js';
-import { METRICS } from './types.js';
+import { METRICS, ROOT_SPACE } from './types.js';
 import type { BubbleWorld } from './world.js';
 import type { Layout } from './resolve.js';
 import type { ActContext } from './act.js';
@@ -118,8 +118,9 @@ export function dragFocus(world: BubbleWorld, q: DragFocusQuery, rules: LayoutRu
  * ③ 見えない親はホイールを外へ通す（windowOf）。Z が なし なら何もしない。
  * 手前へどこまで退けるかは rules.zFocusStop（RULES.md まだ決めていない 1）。
  *
- * @param delta 焦点 Z に足す量。ラボは生の deltaY に 0.004 を掛けている（lab 1540 行）。
- *              その 0.004 は「ホイールの効き」＝入力の側の数なので ui に置いたまま、ここへは掛けた後を渡す。
+ * @param delta ホイールの生の量（deltaY）。**1 刻み ≒ 100** として、軸の刻みに直してから足す。
+ *              ラボは 0.004 を掛けていた（lab 1540 行）が、それだと刻みの細かい View で
+ *              1 回転が何百段にもなる。「**1 刻み ＝ 1 段**」のほうが、並びを 1 枚ずつ繰れる。
  */
 export function wheelZ(
   world: BubbleWorld,
@@ -128,10 +129,28 @@ export function wheelZ(
   delta: number,
   rules: LayoutRules,
 ): BubbleWorld {
-  const space = world.windowOf(spaceId);
+  /**
+   * ★ ホイールを受けるのは**空間**。泡の上で回したときは、その泡がいる空間へ**外へ通す**
+   *   ── ③ 見えない親を通すのと同じで、受け手が見つかるまで外へ。
+   *
+   *   ラボはここで止まっていた（`LAYOUT.get(space)` が無ければ何もしない）。
+   *   ラボの泡は中身を持たないので当たらなかったが、こちらは札が箱をほぼ埋めるので、
+   *   **札の上で回すと何も起きない**。「重なりを1枚ずつ繰る」が札の上でできないのは、
+   *   見る側の言葉と合わない。
+   */
+  let space: SpaceId = world.windowOf(spaceId);
+  while (space !== ROOT_SPACE && !layout.spaces.has(space)) {
+    space = world.windowOf(world.bubble(space)?.space ?? ROOT_SPACE);
+  }
   const L = layout.spaces.get(space);
   if (!L || L.view.z.dim === 'none') return world;
-  return withFocusAxis(world, L, 'z', L.focus.z + delta, rules);
+  /**
+   * ★ 動かすのは **軸の 1 刻みぶん**。ホイールの生の量（1 刻み ≒ 100px）を
+   *   そのまま奥行きに足すと、1 回転で何百段も飛んで**一瞬でいちばん奥**へ行く。
+   *   刻みは View が持っている（例: 奥行きに重ねる ＝ 0.15 ＝ 札 1 枚ぶん）。
+   */
+  const step = L.view.z.step || 1;
+  return withFocusAxis(world, L, 'z', L.focus.z + (delta / 100) * step, rules);
 }
 
 export interface ResizeQuery {

@@ -11,16 +11,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { actContext, dragBubble, emptyWorld, presetView, reshape, resolveRules, resolveWorld, withAxis } from '@bublys-org/bubble-layout';
-import type { BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, Viewport } from '@bublys-org/bubble-layout';
+import { Bubble, actContext, dragBubble, emptyWorld, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset } from '@bublys-org/bubble-layout';
+import type { AxisView, BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
-import { BubbleSpaceContext, CurrentBubbleContext } from './context.js';
+import { BubbleSpaceContext, CurrentBubbleContext, SelectedBubbleContext } from './context.js';
 import type { BubbleSpaceApi } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
 import type { BubbleRoute } from './routing.js';
-import { openAt, settlePlaneAfterClose } from './openAt.js';
-import type { OpenDepth } from './openAt.js';
+import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
 
 /** 開いた泡の覚え書き（domain には入れない） */
@@ -56,6 +55,12 @@ function mateFor(
   return best ? best.id : null;
 }
 
+/** View が同じか（プリセットを当て直すかの判定。値はぜんぶ数か文字） */
+const sameAxis = (a: AxisView, b: AxisView) =>
+  a.dim === b.dim && a.arrange === b.arrange && a.lens === b.lens && a.step === b.step;
+const sameView = (a: View | null, b: View) =>
+  !!a && sameAxis(a.x, b.x) && sameAxis(a.y, b.y) && sameAxis(a.z, b.z);
+
 /** 離した／ドラッグしている泡の、いまの居場所（どちらも層の座標） */
 export interface TakeOutInfo {
   readonly id: BubbleId;
@@ -75,11 +80,15 @@ export interface BubbleSpaceProps {
   readonly routes: readonly BubbleRoute[];
   /** 空のときに最初に開く url */
   readonly initialUrls?: readonly string[];
+  /**
+   * 開くのを**外へ渡す**。渡さなければ今までどおり自分の中に開く。
+   * 使うのは「海そのものが一覧になっている」とき（岸に貼った一覧）── 札から開いた詳細が
+   * その小さな海の中に生えても仕方がないので、外の海へ回す。
+   */
+  readonly openOutside?: (url: string, openerId: BubbleId | null) => BubbleId | void;
   readonly viewport: Viewport;
   /** 外の空間の並べ方。既定は「自由に置く」（既存 bubbles-ui の宇宙と同じ） */
   readonly rootPreset?: PresetId;
-  /** 奥行きの付け方。既定は `'fisheye-x'`。`'plane'` は旧 bubbles-ui の「面」を Z で書いたもの（v7 で試している） */
-  readonly depth?: OpenDepth;
   readonly drawMin?: number;
   readonly rules?: Partial<LayoutRules>;
   /** 外で世界を持つなら渡す（Redux など）。渡さなければ自前で持つ */
@@ -103,11 +112,15 @@ export interface BubbleSpaceProps {
 
 export function BubbleSpace(props: BubbleSpaceProps) {
   const { routes, viewport, drawMin, rules, className, style, children } = props;
-  const depth: OpenDepth = props.depth ?? 'fisheye-x';
   const layerRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
   /** レンズの向きが一度でも選ばれたか。選ばれたら `openAt` はレンズに触らない */
   const lensChosen = useRef(false);
+  /**
+   * ★ **一覧の空間**（`setChildren` で顔ぶれを決めている泡）。
+   *   一覧の中の泡から開いたら、**一覧の隣**に開く（中に生やさない）ために覚えておく。
+   */
+  const listHosts = useRef<Set<BubbleId>>(new Set());
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
   const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(new Map());
@@ -157,16 +170,25 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const canOpen = useCallback((url: string) => !!matchBubbleRoute(routes, url), [routes]);
   const hasUrl = useCallback((url: string) => [...urls.values()].some((o) => o.url === url), [urls]);
 
+  const openOutside = props.openOutside;
   const openBubble = useCallback(
     (url: string, openerId?: BubbleId | null, label?: string): BubbleId => {
+      if (openOutside) return openOutside(url, openerId ?? null) || '';
       const route = matchBubbleRoute(routes, url);
       if (!route) { console.warn('route が無い url:', url); return ''; }
       seq.current += 1;
       const id = `b${seq.current}:${url}`;
-      const opener = openerId ?? null;
+      /**
+       * ★ **一覧の中の札から開いたら、一覧の隣に開く。**
+       *   一覧は顔ぶれが外から決まる空間なので、その中に詳細が生えても次の合わせで消える。
+       *   元の泡を**一覧そのもの**に読み替えるだけでよい ── 開き方は1つのまま。
+       */
+      const from = openerId ?? null;
+      const fb = from ? world.bubble(from) : null;
+      const opener = fb && fb.space !== 'root' && listHosts.current.has(fb.space) ? fb.space : from;
       const r = openAt({
         world, viewport, openerId: opener, newId: id,
-        title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules, depth,
+        title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules,
         keepLens: lensChosen.current,
         joinWith: mateFor(world, urls, route.type, opener),
       });
@@ -175,7 +197,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setSelectedId(id);
       return id;
     },
-    [routes, world, urls, viewport, rules, depth, setWorld],
+    [routes, world, urls, viewport, rules, setWorld, openOutside],
   );
 
   const closeBubble = useCallback(
@@ -189,7 +211,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const seen = new Map(
         base.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }]),
       );
-      const space = world.bubble(id)?.space ?? 'root';
       /**
        * ★ ⑤ 並びの中の泡を閉じたら、**残った先頭の泡を留める**。
        *   reshape は「泡が出ていって縮んだ並び」の先頭を自分で留めるが、見つけ方が
@@ -203,12 +224,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         : undefined;
       let next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
       // 面で開いているなら：焦点の面が空になったら、後ろの面が上がってくる（旧の「空のレイヤーは詰まる」）
-      if (depth === 'plane') next = settlePlaneAfterClose(next, viewport, next.bubble(space) ? space : 'root', rules);
       setWorld(next);
       setUrls((m) => { const n = new Map(m); n.delete(id); return n; });
       setSelectedId((s) => (s === id ? null : s));
     },
-    [world, setWorld, base, viewport, rules, depth],
+    [world, setWorld, base, viewport, rules],
   );
 
   /**
@@ -236,7 +256,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const at = seq.current;
       const opened = openAt({
         world, viewport, openerId: null, newId: id, title: titleOf(routes, url),
-        size: { w: rect.w, h: rect.h }, hue: route.hue, rules, depth, keepLens: lensChosen.current,
+        size: { w: rect.w, h: rect.h }, hue: route.hue, rules, keepLens: lensChosen.current,
       });
       const L = resolveWorld(opened.world, viewport, rules);
       const p = L.byId.get(id);
@@ -252,12 +272,98 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, at }));
       return id;
     },
-    [routes, world, viewport, rules, depth, setWorld],
+    [routes, world, viewport, rules, setWorld],
   );
 
+  /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */
+  const setPreset = useCallback(
+    (preset: PresetId, spaceId: BubbleId = 'root') => {
+      // ★ レンズの選択を固定するのは**外の海**を選んだときだけ。
+      //   一覧が自分の中の並べ方を選んだだけで、外の魚眼まで止めてしまってはいけない
+      if (spaceId === 'root') lensChosen.current = true;
+      setWorld(withPreset(world, preset, spaceId));
+    },
+    [world, setWorld],
+  );
+
+  /**
+   * その泡の**子**を、この url たちに合わせる ── 一覧の空間。
+   *
+   * ★ 入れ子の海ではなく、**同じ世界の中の子の空間**にする（議事録（版）と同じ形）。
+   *   こうすると消失点も子の空間のものになり、奥へ行くほど左上へ退く。
+   *   掴んで外へ出す・ホイール・焦点も、ぜんぶ同じ道具がそのまま効く。
+   * ★ 顔ぶれが同じなら**何も書かない** ── 書くと次の走りの引き金になって止まらない。
+   */
+  const setChildren = useCallback(
+    (hostId: BubbleId, want: readonly string[], preset?: PresetId) => {
+      listHosts.current.add(hostId);
+      const kids = world.kidsOf(hostId);
+      const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
+      const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
+      const missing = want.filter((url) => !have.has(url));
+      const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
+      /**
+       * ★ 「もう当ててあるか」は**世界に訊く**。覚え書き（ref）で持つと、
+       *   同じ描画で2回走ったとき（React の二度がけ）1回目が覚え書きだけ書き換えて、
+       *   まだ state に落ちていない世界へ2回目が走り、**並べ方が当たらないまま**残る
+       *   ── 実測で踏んだ（札が5枚とも同じ所に原寸で重なった）。
+       */
+      const presetChanged = !!preset && !sameView(world.ownViewOf(hostId), presetView(preset));
+      if (missing.length === 0 && extra.length === 0 && !presetChanged) return;
+      let w = world;
+      let n = seq.current;
+      const m = new Map(urls);
+      for (const id of extra) { w = w.without(id); m.delete(id); }
+      for (const url of missing) {
+        const route = matchBubbleRoute(routes, url);
+        if (!route) continue;
+        n += 1;
+        const id = `b${n}:${url}`;
+        const size = route.size ?? { w: 280, h: 120 };
+        w = w.add(Bubble.create({
+          id, title: titleOf(routes, url), hue: route.hue ?? hueOf(id),
+          // 外の海そのものを一覧にすることもある（岸に貼った一覧）。root は親 null
+          w: size.w, h: size.h, parent: hostId === 'root' ? null : hostId,
+          order: w.kidsOf(hostId).length,
+        }));
+        m.set(id, { url, type: route.type, openerId: hostId, at: n });
+      }
+      /**
+       * ★ 順序を 0.. に詰め直す。足すときの順序は「いまの子の数」なので、
+       *   **途中の札を消すと穴が空いたまま**になる（0,1,2,3,4 から 0 を消すと 1..4）。
+       *   奥行きに重ねる並びは順序がそのまま奥行きなので、穴のぶんだけ
+       *   **並び全体が奥に沈んだまま**になり、いちばん手前まで繰っても前へ出てこない。
+       *   前後の関係は変えない（いまの順序で並べ直すだけ）。
+       */
+      w = renumber(
+        w,
+        w.kidsOf(hostId).slice().sort((a, b) => a.state.order - b.state.order).map((b) => b.id),
+      );
+      // ★ 並べ方も**この同じ1回**で当てる（別の書き込みにすると片方が握り潰される）
+      if (preset && presetChanged) w = withPreset(w, preset, hostId);
+      seq.current = n;
+      setUrls(m);
+      setWorld(w);
+    },
+    [world, urls, routes, setWorld],
+  );
+
+  /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
+  const hostOf = useCallback(
+    (id: BubbleId) => { const b = world.bubble(id); return b && b.space !== 'root' ? b.space : null; },
+    [world],
+  );
+
+  /** その泡が自分で持っている大きさ（中身で伸びる前の値） */
+  const sizeOf = useCallback(
+    (id: BubbleId) => world.bubble(id)?.state.size ?? null,
+    [world],
+  );
+
+
   const api: BubbleSpaceApi = useMemo(
-    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, takeIn }),
-    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, takeIn],
+    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, takeIn }),
+    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, takeIn],
   );
 
   /**
@@ -281,7 +387,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       n += 1;
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
-                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, depth, keepLens: lensChosen.current }).world;
+                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, keepLens: lensChosen.current }).world;
       m.set(id, { url, type: route.type, openerId: null, at: n });
     }
     seq.current = n;
@@ -366,6 +472,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   return (
     <BubbleSpaceContext.Provider value={api}>
+      <SelectedBubbleContext.Provider value={selectedId}>
       <style>{FIELD_CSS + MARKS_CSS + SPACE_CSS}</style>
       <div
         className={'bl-space' + (className ? ' ' + className : '')}
@@ -380,6 +487,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           drawMin={drawMin}
           selectedId={selectedId}
           skipGrab={input.skipGrab}
+          dragging={input.dragging}
           marks={input.marks}
           layerRef={layerRef}
           renderBubble={renderBubble}
@@ -387,6 +495,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         />
         {children}
       </div>
+      </SelectedBubbleContext.Provider>
     </BubbleSpaceContext.Provider>
   );
 }

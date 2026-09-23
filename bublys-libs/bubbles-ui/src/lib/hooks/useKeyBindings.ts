@@ -2,6 +2,7 @@
 import { useContext, useEffect, useRef } from "react";
 import { useAppSelector } from "@bublys-org/state-management";
 import { CurrentBubbleContext } from "../context/CurrentBubbleContext.js";
+import { KeyboardFocusContext } from "../context/KeyboardFocusContext.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { makeSelectFocusedBubbleId } from "../state/bubbles-slice.js";
 import { isTextEditingTarget, matchesShortcut, parseShortcut } from "./shortcut.js";
@@ -38,7 +39,14 @@ export function useKeyBindings(bindings: KeyBinding[]): void {
   // 自分がどのバブルにいるか（バブル外なら "root"）と、その universe でフォーカス中のバブル。
   const bubbleId = useContext(CurrentBubbleContext);
   const universeId = useUniverseId();
-  const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
+  const legacyFocused = useAppSelector(makeSelectFocusedBubbleId(universeId));
+  /**
+   * ★ フォーカスの持ち主は**土俵が決める**。差し込まれていればそれを見る
+   *   （新しい海。旧 `bubbles` スライスには書かないので、見比べても永久に一致しない）。
+   *   差し込まれていなければ今までどおり旧スライス ── 旧の宇宙はそのまま動く。
+   */
+  const injected = useContext(KeyboardFocusContext);
+  const focusedBubbleId = injected ? injected.focusedId : legacyFocused;
   // バブル内ならフォーカス中のときだけ有効。バブル外（root）は常に有効。
   const active = bubbleId === "root" || bubbleId === focusedBubbleId;
   const activeRef = useRef(active);

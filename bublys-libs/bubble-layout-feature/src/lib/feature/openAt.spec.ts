@@ -5,7 +5,7 @@
  *   `docs/bubble-space-prototype/v5-dom/_check/bubly.mjs`（16件）。ここは式の見張り。
  */
 import { METRICS, emptyWorld, presetView, resolveWorld, viewOfSpace } from '@bublys-org/bubble-layout';
-import { openAt, hueOf, settlePlaneAfterClose, PLANE_STEP } from './openAt.js';
+import { openAt, hueOf } from './openAt.js';
 
 const VIEWPORT = { w: 1440, h: 810 };
 const start = () => emptyWorld(presetView('free'));
@@ -87,81 +87,36 @@ describe('隣に開く', () => {
  * 数は旧の実物（2026-09-21・users 一覧 → user 詳細 ×3）と突き合わせてある：
  *   旧  詳細 1.00 ×3 ／ 元の泡は1段下がる ／ 縁が接する ／ 兄弟を閉じても他は動かない ／ 面が空くと後ろが上がる
  */
-describe('面に開く（旧の layers を Z で）', () => {
-  const P = { viewport: VIEWPORT, depth: 'plane' as const };
-  const list = () => openAt({ ...P, world: start(), openerId: null, newId: 'list', title: '一覧', size: { w: 340, h: 380 } }).world;
-  const scaleOf = (w: ReturnType<typeof start>, id: string) => resolveWorld(w, VIEWPORT).byId.get(id)?.scale ?? NaN;
 
-  it('★ 別の種類を開くと、元の泡は1段下がって 0.90、開いた泡は 1.00', () => {
-    const w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: '詳細', size: { w: 300, h: 260 } }).world;
-    expect(scaleOf(w, 'list')).toBeCloseTo(0.9, 10);
-    expect(scaleOf(w, 'd1')).toBeCloseTo(1, 10);
+/**
+ * ★ **開くことが書くのは「関係」。** 世代（hist）と枝（branch）。
+ *   どちらも掴んでも書けない次元なので、並べ方に刺せば関係が絵になる。
+ */
+describe('開くと関係が書かれる', () => {
+  it('最初の1つは 世代0・枝0', () => {
+    const w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: '一覧' }).world;
+    expect(w.bubble('a')?.state.hist).toBe(0);
+    expect(w.bubble('a')?.state.branch).toBe(0);
   });
 
-  it('★ 元の泡の値は1つも書かない。X の魚眼も点けない。X・Y の焦点も動かない（画面が滑らない）', () => {
-    const w0 = list();
-    const before = w0.bubble('list')?.state;
-    const w = openAt({ ...P, world: w0, openerId: 'list', newId: 'd1', title: '詳細' }).world;
-    expect(w.bubble('list')?.state).toEqual(before);
-    expect(viewOfSpace(w, 'root').x.lens).toBe('parallel');
-    expect(w.focusOf('root').x).toBe(0);
-    expect(w.focusOf('root').y).toBe(0);
-    expect(w.focusOf('root').z).toBeCloseTo(-PLANE_STEP, 10);
+  it('開いた元から1世代下がる（一覧 → 詳細 → さらに詳細）', () => {
+    let w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: '一覧' }).world;
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b', title: '詳細' }).world;
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'b', newId: 'c', title: 'さらに' }).world;
+    expect([w.bubble('a'), w.bubble('b'), w.bubble('c')].map((x) => x?.state.hist)).toEqual([0, 1, 2]);
   });
 
-  it('★ 縁が接する ── 元の泡が「下がった後」の右辺に、測らずに置く（隙間 0px）', () => {
-    const w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: '詳細', size: { w: 300, h: 260 } }).world;
-    const L = resolveWorld(w, VIEWPORT);
-    const a = L.byId.get('list'), b = L.byId.get('d1');
-    if (!a || !b) throw new Error('配置が無い');
-    expect(b.x - (a.x + a.w)).toBeCloseTo(0, 6);
-    expect(b.y).toBeCloseTo(a.y, 6);      // 上がそろう
+  it('同じ世代に来たものは、枝が 0,1,2… と増える', () => {
+    let w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: '一覧' }).world;
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b1', title: '詳細1' }).world;
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b2', title: '詳細2' }).world;
+    expect([w.bubble('b1'), w.bubble('b2')].map((x) => x?.state.hist)).toEqual([1, 1]);
+    expect([w.bubble('b1'), w.bubble('b2')].map((x) => x?.state.branch)).toEqual([0, 1]);
   });
 
-  it('★ 同じ種類を3つ開いても、全員 1.00 のまま（魚眼だと 0.755 まで落ちて一覧より小さくなった）', () => {
-    let w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: 'd1', size: { w: 300, h: 260 } }).world;
-    w = openAt({ ...P, world: w, openerId: 'list', newId: 'd2', title: 'd2', size: { w: 300, h: 260 }, joinWith: 'd1' }).world;
-    w = openAt({ ...P, world: w, openerId: 'list', newId: 'd3', title: 'd3', size: { w: 300, h: 260 }, joinWith: 'd2' }).world;
-    for (const id of ['d1', 'd2', 'd3']) expect(scaleOf(w, id)).toBeCloseTo(1, 10);
-    expect(scaleOf(w, 'list')).toBeCloseTo(0.9, 10);
-    // 並びの中で縁が接している
-    const L = resolveWorld(w, VIEWPORT);
-    const [p1, p2, p3] = ['d1', 'd2', 'd3'].map((id) => L.byId.get(id));
-    if (!p1 || !p2 || !p3) throw new Error('配置が無い');
-    expect(p2.x - (p1.x + p1.w)).toBeCloseTo(0, 6);
-    expect(p3.x - (p2.x + p2.w)).toBeCloseTo(0, 6);
-  });
-
-  it('★ 窓からはみ出したら、はみ出したぶんだけ視点を送る（真ん中へは寄せない）', () => {
-    let w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: 'd1', size: { w: 300, h: 260 } }).world;
-    w = openAt({ ...P, world: w, openerId: 'list', newId: 'd2', title: 'd2', size: { w: 300, h: 260 }, joinWith: 'd1' }).world;
-    expect(w.focusOf('root').x).not.toBe(0);                      // 2枚目で右へ溢れたので送った
-    const L = resolveWorld(w, VIEWPORT);
-    const d2 = L.byId.get('d2');
-    if (!d2) throw new Error('配置が無い');
-    expect(d2.x + d2.w).toBeCloseTo(VIEWPORT.w - 24, 6);          // 右の余白ちょうど。真ん中ではない
-    expect(L.byId.get('list')?.scale).toBeCloseTo(0.9, 10);       // 奥行きは変わらない
-  });
-
-  it('並びの中の泡からさらに開くと、3段になる（1.00 / 0.90 / 0.818）', () => {
-    let w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: 'd1' }).world;
-    w = openAt({ ...P, world: w, openerId: 'list', newId: 'd2', title: 'd2', joinWith: 'd1' }).world;
-    w = openAt({ ...P, world: w, openerId: 'd2', newId: 'e1', title: 'e1' }).world;
-    expect(w.bubble('e1')?.state.parent).toBe(null);          // 並びの中ではなく、窓に新しい面ができる
-    expect(scaleOf(w, 'e1')).toBeCloseTo(1, 10);
-    expect(scaleOf(w, 'd2')).toBeCloseTo(0.9, 10);
-    expect(scaleOf(w, 'list')).toBeCloseTo(1 / (1 + 0.26 * 2 * PLANE_STEP), 10);   // 0.818…
-  });
-
-  it('★ 面が空になったら、後ろの面が上がってくる。まだ兄弟がいるなら動かない', () => {
-    let w = openAt({ ...P, world: list(), openerId: 'list', newId: 'd1', title: 'd1' }).world;
-    const two = openAt({ ...P, world: w, openerId: 'list', newId: 'd2', title: 'd2', joinWith: 'd1' }).world;
-    // 兄弟が残る：焦点は動かない
-    const kept = settlePlaneAfterClose(w, VIEWPORT, 'root');
-    expect(kept.focusOf('root').z).toBe(w.focusOf('root').z);
-    void two;
-    // 面が空く：一覧が 1.00 に戻る
-    w = settlePlaneAfterClose(w.without('d1'), VIEWPORT, 'root');
-    expect(scaleOf(w, 'list')).toBeCloseTo(1, 10);
+  it('★ 関係は掴んでも壊れない ── 世代も枝も「書けない」次元', () => {
+    // 書けない次元は、掴むと視点が動くだけ（規則②）。値は泡に残る
+    const w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: '一覧' }).world;
+    expect(w.bubble('a')?.state.hist).toBe(0);
   });
 });

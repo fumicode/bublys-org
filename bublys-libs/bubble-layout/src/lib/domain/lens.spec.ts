@@ -69,14 +69,30 @@ describe('① レンズ（位置 → 画面）', () => {
     expect(Number.isFinite(LENS_XY.fisheye.unproject(H, H))).toBe(true);   // s ＝ H ちょうどでも数が返る
   });
 
-  it('透視は m ＝ 1/(1 + 0.26·dz)。焦点より手前（dz<0）は消す', () => {
+  it('透視は m ＝ 1/(1 + 0.26·dz)。焦点より手前は消す（刻みの 0.35 ぶんは同じ面のうち）', () => {
     expect(METRICS.K_PERSP).toBe(0.26);
     expect(LENS_Z.perspective.mag(0)).toBe(1);
     expect(LENS_Z.perspective.mag(0.4)).toBe(1 / 1.104);
     // ラボ実測：勤務表は 自由Z 0.4 で 0.9057971014492753（＝ 1/1.104）
     expect(placeOf(layout, 'kinmu').scale).toBe(LENS_Z.perspective.mag(0.4));
     expect(LENS_Z.perspective.alpha(0)).toBe(1);
-    expect(LENS_Z.perspective.alpha(-0.001)).toBe(0);
+    /**
+     * ★ ここは**ラボから変えた所**。ラボは `dz < 0` で即 0 ＝ 面を 1mm 越えたら消えるので、
+     *   手前へ繰ってきた泡が**原寸ちょうどでパッと消える**（「まだ普通の大きさなのに消えた」）。
+     *   刻みの 0.35 ぶんだけ行き過ぎても同じ面のうち、とした（METRICS.Z_FRONT_KEEP）。
+     */
+    expect(METRICS.Z_FRONT_KEEP).toBe(0.35);
+    expect(LENS_Z.perspective.alpha(-0.001)).toBe(1);   // 面をかすめただけ：まだ居る
+    expect(LENS_Z.perspective.alpha(-0.35)).toBe(1);    // ちょうど端：まだ居る
+    expect(LENS_Z.perspective.alpha(-0.36)).toBe(0);    // 越えた：消える
+    // 消える直前の大きさは 1.10 倍（1/(1 − 0.26×0.35)）── かすめてから消える
+    expect(Number(LENS_Z.perspective.mag(-0.35).toFixed(2))).toBe(1.1);
+    /**
+     * ★ 手前の余地は**刻みに対する割合**。生の dz で決めると、刻みの細かい並べ方
+     *   （重ねて置く ＝ 0.15）で何枚も手前に居残り、触った泡を覆ってしまう。
+     */
+    expect(LENS_Z.perspective.alpha(-0.05, 0.15)).toBe(1);   // 0.15 × 0.35 ＝ 0.0525 の内側
+    expect(LENS_Z.perspective.alpha(-0.1, 0.15)).toBe(0);    // その外
     expect(LENS_Z.flat.mag(9)).toBe(1);        // 平行は Z を見た目に使わない
   });
 

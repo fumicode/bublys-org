@@ -39,7 +39,8 @@ export interface ResolvedView extends View {
   readonly own: boolean;
 }
 
-export type PresetId = 'free' | 'row' | 'column' | 'grid' | 'fisheyeX' | 'coverflow' | 'histZ' | 'stackZ';
+export type PresetId =
+  | 'free' | 'row' | 'column' | 'grid' | 'fisheyeX' | 'coverflow' | 'histZ' | 'stackZ' | 'stackDepth';
 
 export interface Preset extends View {
   readonly label: string;
@@ -65,6 +66,21 @@ export const PRESETS: Readonly<Record<PresetId, Preset>> = {
   // ★ 重なりの上下を View の中で決めたいなら、Z に「順序」を刺す。触った泡が最前面（順序 0）へ並べ替わる。
   //   自由座標のままだと、同じ値で重なった兄弟の上下は決まらない（座標は同点を許すので）
   stackZ:    { label: '重ねて置く',     x: AX('free.x', 'as-is', 'parallel', 110),      y: AX('free.y', 'as-is', 'parallel', 80),         z: AX('order', 'equal', 'perspective', 0.15) },
+  /**
+   * ★ **奥行きに重ねる** ── 一覧が縦に収まらなくなったときの行き先。
+   *
+   * ★ **ずれは X・Y に刺さない。** 議事録（版）＝ `histZ` と同じで、X・Y は「なし·そのまま」。
+   *   奥へ行くほど左上へずれるのは、**消失点**（root は画面中心から −130, −165）に
+   *   寄っていくからで、次元で作るものではない。X・Y に順序を刺すと消失点と喧嘩して、
+   *   左右にも散る。**違うのは次元だけ** ── 履歴の古さではなく順序。
+   *   **刻みは議事録と同じ 1。** ここを細かくすると（0.15 / 0.3 で試した）1 段あたり
+   *   4〜8px しか退かず、手前の札が後ろを丸ごと隠す ── 実測で 2 度踏んだ。
+   *   1 段 1 なら透視が 0.79 → 0.66 → 0.56 … と効いて、後ろが順に覗く。
+   *   **何枚まで出すかは決めない** ── 奥へ行くほど小さくなり、描く下限を切ったところで
+   *   自然に消える（`markTiny`）。数で切るのではなく、読めなくなったら消える。
+   * 奥のものは読めなくてよい ── **在ることは諦めない**。
+   */
+  stackDepth:{ label: '奥行きに重ねる', x: AX('none', 'as-is', 'parallel', 110),        y: AX('none', 'as-is', 'parallel', 80),           z: AX('order', 'equal', 'perspective', 1) },
 };
 
 /** プリセット → View の写し。lab.html 407 行 viewFromPreset */

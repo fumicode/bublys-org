@@ -7,13 +7,13 @@
  * 泡は海の中で描かれるので、値はこの文脈で渡す。
  */
 import { createContext, useContext } from "react";
-import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
+import type { PresetId } from "@bublys-org/bubble-layout";
 import type { TubeJoin } from "@bublys-org/bubbles-ui";
 
 export type SpaceView = {
-  /** 開き方（重ねて開く／隣に開く／面） */
-  readonly depth: OpenDepth;
-  readonly setDepth: (depth: OpenDepth) => void;
+  /** 並べ方（View のプリセット）。**開き方は 1 つしかない**ので、見え方が変わるのはここ */
+  readonly preset: PresetId;
+  readonly setPreset: (preset: PresetId) => void;
   /** 岸に着いた泡の所で、ネオンをどう通すか */
   readonly join: TubeJoin;
   readonly setJoin: (join: TubeJoin) => void;
@@ -23,8 +23,8 @@ export type SpaceView = {
 };
 
 const NOOP: SpaceView = {
-  depth: "cascade",
-  setDepth: () => undefined,
+  preset: "free",
+  setPreset: () => undefined,
   join: "detour",
   setJoin: () => undefined,
   fisheye: { x: true, y: false },

@@ -33,8 +33,11 @@ export interface LensZ {
   readonly label: string;
   /** dz ＝ 位置 − 焦点 → 倍率 m。透視は 1/(1 + 0.26·dz) */
   mag(dz: number): number;
-  /** 透視は焦点より手前（dz<0）を消す。薄れて見えるのは補間だけ（lab.html 387 行） */
-  alpha(dz: number): number;
+  /**
+   * 透視は焦点より手前を消す。薄れて見えるのは補間だけ（lab.html 387 行）。
+   * @param step その軸の刻み。消し始めるのは焦点の面より `step × METRICS.Z_FRONT_KEEP` 手前から
+   */
+  alpha(dz: number, step?: number): number;
 }
 
 /** 魚眼の tanh が浮動小数で 1 に張り付く手前（|u| ≲ 14H まで往復が合う）。lab.html 379 行 */
@@ -67,8 +70,12 @@ export const LENS_Z: Readonly<Record<LensZId, LensZ>> = {
     label: '透視',
     // d → 0 は目の位置（dz = −1/0.26）。そこより手前は写らないので、式が発散しないように止めるだけ
     mag: (dz) => 1 / Math.max(0.05, 1 + METRICS.K_PERSP * dz),
-    // 焦点より手前（dz<0）は消す（第1版 制約02）。薄れて見えるのは補間だけ
-    alpha: (dz) => (dz < -1e-9 ? 0 : 1),
+    /**
+     * 焦点より手前は消す（第1版 制約02）。薄れて見えるのは補間だけ。
+     * ただし**刻みの 0.35 ぶんは同じ面のうち**として置いておく（METRICS.Z_FRONT_KEEP）
+     * ── 面をかすめた途端に原寸で消えると「まだ普通の大きさなのに消えた」と映る。
+     */
+    alpha: (dz, step = 1) => (dz < -Math.abs(step) * METRICS.Z_FRONT_KEEP - 1e-9 ? 0 : 1),
   },
   flat: { id: 'flat', label: '平行', mag: () => 1, alpha: () => 1 },
 };

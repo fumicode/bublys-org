@@ -35,6 +35,8 @@ export interface BubbleFieldProps {
   readonly onDoubleClick?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   /** 当たり判定が使う層の要素（`useBubbleInput` に渡したものと同じ ref） */
   readonly layerRef?: RefObject<HTMLDivElement | null>;
+  /** 掴んでいる間か（滑らかさを切る） */
+  readonly dragging?: boolean;
   /** いま離したらどうなるか（`useBubbleInput` の marks） */
   readonly marks?: DropMarks | null;
   readonly className?: string;
@@ -43,7 +45,7 @@ export interface BubbleFieldProps {
 
 export function BubbleField(props: BubbleFieldProps) {
   const {
-    world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab,
+    world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, dragging,
     renderBubble, measureText, layerRef, marks, className, style, ...handlers
   } = props;
 
@@ -58,7 +60,13 @@ export function BubbleField(props: BubbleFieldProps) {
   );
 
   return (
-    <div ref={layerRef} className={'bl-layer' + (className ? ' ' + className : '')} style={style} {...handlers}>
+    <div
+      ref={layerRef}
+      // 掴んでいる間は `bl-live` ── 滑らかさを切る（カーソルより遅れないように）
+      className={'bl-layer' + (dragging ? ' bl-live' : '') + (className ? ' ' + className : '')}
+      style={style}
+      {...handlers}
+    >
       {field.items.map((it) => (
         <div
           key={it.id}

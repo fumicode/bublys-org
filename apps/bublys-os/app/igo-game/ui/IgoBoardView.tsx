@@ -263,12 +263,19 @@ const LastMoveMarker = styled.div<{ $color: StoneColor_石の色 }>`
   opacity: 0.8;
 `;
 
+/**
+ * ★ 明るい地を敷く所は、字の色も自分で決める。
+ *   泡の中身は暗い空間の上に出るので、まわりは明るい字（#e6ebf5）を配っている。
+ *   ここだけ明るい地を敷くと、継いだ明るい字が明るい地に乗って読めなくなる
+ *   （「手番 黒番」「取られた: 0」が消えていた）。
+ */
 const GameInfoContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px;
   background-color: #f5f5f5;
+  color: #333;
   border-radius: 8px;
   min-width: 180px;
 `;
