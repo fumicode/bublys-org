@@ -302,7 +302,15 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
         skip: world.subtreeOf(p0.id), slot: null, marks: null,
       };
     } else {
-      // 背景：カーソルの下の空間の焦点を動かす（掴んだ点がカーソルについてくるように）
+      /**
+       * 背景：カーソルの下の空間の焦点を動かす（掴んだ点がカーソルについてくるように）。
+       *
+       * ★ **背景を押したら選ぶのをやめる。** 選ぶ手はあったのに、やめる手が無かった
+       *   （ラボも同じ ── 選んでいる印が輪だけだったので誰も困らなかった）。
+       *   いまは選んだ札が装いを出して背も伸びるので、やめられないと戻せない。
+       *   「触っていないなら選んでいない」が素直なので、背景を触ったら外す。
+       */
+      setSelectedId(null);
       const space = p0 ? p0.id : 'root';
       const L = layout.spaces.get(space);
       if (!L) { drag.current = null; return; }
