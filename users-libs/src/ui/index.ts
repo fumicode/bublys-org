@@ -5,3 +5,5 @@ export * from './UserGroupBadgeView.js';
 export * from './UserCreateFormView.js';
 export * from './UserListView.js';
 export * from './UserIcon.js';
+export * from './UserCard.js';
+export * from './UserGroupCard.js';

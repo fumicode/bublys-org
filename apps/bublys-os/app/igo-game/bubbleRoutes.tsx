@@ -4,7 +4,7 @@ import { useCallback, useContext, useMemo } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { Button, Tooltip } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { ListSpace } from "@/app/bubble-ui/BubblesUI/feature/ListSpace";
+import { ListSpace } from "@bublys-org/bubble-layout-feature";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
 import { IgoGameCard } from "./ui/IgoGameCard";

@@ -1,8 +1,10 @@
 "use client";
 
-import { useContext } from "react";
+import { useCallback, useContext, useMemo } from "react";
 import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLineScopeView } from "@bublys-org/bubbles-ui";
-import { useAppDispatch } from "@bublys-org/state-management";
+import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { ListSpace } from "@bublys-org/bubble-layout-feature";
+import { Button } from "@mui/material";
 import { useCasScope } from "@bublys-org/world-line-graph";
 
 // 外部バブリのルート
@@ -23,7 +25,10 @@ import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { SpaceViewBubble } from "@/app/bubble-ui/BubblesUI/feature/SpaceViewBubble";
 import "@/app/launcher/launchTargets";
-import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
+import { MemoCard } from "@/app/world-line/Memo/ui/MemoCard";
+import { Memo } from "@/app/world-line/Memo/domain/Memo";
+import { dispatchCreateMemo } from "@/app/world-line/Memo/feature/memoActions";
+import { selectMemoIds } from "@/app/world-line/Memo/feature/memoSelectors";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
 import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
 import { memoScopeId } from "@/app/world-line/Memo/domain/MemoDomain";
@@ -33,26 +38,50 @@ export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
   return BubbleRouteRegistry.matchRoute(url);
 };
 
-// Memoバブルコンポーネント
+/** 札 1 枚の大きさ（一覧が「縦に収まるか」を測るのに使う） */
+const MEMO_CARD = { w: 280, h: 64 };
+
+/**
+ * メモ一覧 ── **並びの空間**。
+ *
+ * 前は巻物（スクロールする行の一覧）だった。メモ 1 件を泡にして、
+ * 「少ないときは縦に並べる／多いときは奥行きに重ねる」を親の View に任せる。
+ */
 const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
+  const dispatch = useAppDispatch();
   const { openBubble } = useContext(BubblesContext);
-  const buildMemoUrl = (id: string) => `memos/${id}`;
-  const buildMemoDeleteUrl = (id: string) => `memos/${id}/delete-confirm`;
-  // 「メモを追加」で作った新規メモを開く導線（一覧の行を開くのは ObjectView のダブルクリック）
-  const handleOpenMemo = (_id: string, detailUrl: string) => {
-    openBubble(detailUrl, bubble.id);
-  };
-  const handleMemoDelete = (memoId: string) => {
-    openBubble(buildMemoDeleteUrl(memoId), bubble.id);
-  };
+  const memoIds = useAppSelector(selectMemoIds);
+  const members = useMemo(() => memoIds.map((id) => `memos/${id}/card`), [memoIds]);
+  // 「新しく作る」は並びの外（泡にはならない口）。**作ったらそのまま開く**
+  const newMemo = useCallback(() => {
+    const memo = Memo.create();
+    dispatchCreateMemo(dispatch, memo);
+    openBubble(`memos/${memo.id}`, bubble.id);
+  }, [dispatch, openBubble, bubble.id]);
   return (
-    <MemoCollection
-      buildDetailUrl={buildMemoUrl}
-      buildDeleteUrl={buildMemoDeleteUrl}
-      onOpenMemo={handleOpenMemo}
-      onMemoDelete={handleMemoDelete}
+    <ListSpace
+      members={members}
+      itemWidth={MEMO_CARD.w}
+      itemHeight={MEMO_CARD.h}
+      head={
+        <Button
+          size="small"
+          variant="contained"
+          onClick={newMemo}
+          sx={{ minWidth: 0, px: 0.9, py: 0.2, fontSize: 11, lineHeight: 1.5 }}
+        >
+          ＋新規
+        </Button>
+      }
     />
   );
+};
+
+/** メモ 1 件の札 ── 一覧の中の泡 */
+const MemoCardBubble: BubbleContentRenderer = ({ bubble }) => {
+  const { openBubble } = useContext(BubblesContext);
+  const memoId = bubble.url.replace("memos/", "").replace("/card", "");
+  return <MemoCard memoId={memoId} onDelete={(id) => openBubble(`memos/${id}/delete-confirm`, bubble.id)} />;
 };
 
 const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -139,7 +168,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["users"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 640 },
       backdropColor: "hsl(190, 50%, 22%)",
     },
   }),
@@ -150,7 +181,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["user-groups"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 640 },
       backdropColor: "hsl(270, 45%, 26%)",
     },
   }),
@@ -161,7 +194,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["memos"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 640 },
       backdropColor: "hsl(40, 55%, 26%)",
     },
   }),
@@ -172,7 +207,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["task-management/tasks"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 640 },
       backdropColor: "hsl(140, 45%, 22%)",
     },
   }),
@@ -181,7 +218,12 @@ const routes: BubbleRoute[] = [
   ...usersBubbleRoutes,
 
   // Memo
-  { pattern: /^memos$/, type: "memos", Component: MemosBubble },
+  { pattern: /^memos$/, type: "memos", Component: MemosBubble,
+    // 一覧は地を敷かない ── 並びの空間は海がそのまま透ける。箱は札 280 に対して広く取る
+    bubbleOptions: { defaultSize: { width: 420, height: 520 }, contentBackground: "transparent" } },
+  // ★ 札は詳細より**先に**置く（`memos/:id` が `.../card` も飲み込むので）
+  { pattern: /^memos\/[^/]+\/card$/, type: "memo-card", Component: MemoCardBubble,
+    bubbleOptions: { defaultSize: { width: MEMO_CARD.w, height: MEMO_CARD.h } } },
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
   { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },

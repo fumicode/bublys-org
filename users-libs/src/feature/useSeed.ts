@@ -1,9 +1,14 @@
-import { FC, useEffect } from "react";
+/**
+ * 最初の顔ぶれを撒く ── 一覧が空なら既定のユーザー／グループを入れる。
+ *
+ * 前は一覧の画面（`UserCollection` / `UserGroupList`）が自分で撒いていた。
+ * 一覧を**並びの空間**にしたので、画面は顔ぶれを読むだけになり、撒くのはここへ移した。
+ */
+import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { selectUsers, setUsers } from "../slice/index.js";
-import { UserListView } from "../ui/UserListView.js";
 import { User } from "../domain/User.domain.js";
-import { UrledPlace } from "@bublys-org/bubbles-ui";
+import { UserGroup } from "../domain/UserGroup.domain.js";
+import { selectUsers, setUsers, selectUserGroups, setUserGroups } from "../slice/index.js";
 
 const defaultUsers = [
   new User("2a5d5e9e-5d2b-4e9c-97e0-1d4f7f0db743", "田中 太郎", "2000-04-12"),
@@ -38,57 +43,23 @@ const defaultUsers = [
   new User("f7a8b9c0-1234-4345-789a-89abcdef0123", "村上 琴音", "2001-03-14"),
 ];
 
-type UserCollectionProps = {
-  buildDetailUrl: (userId: string) => string;
-  buildCreateUrl: () => string;
-  buildDeleteUrl: (userId: string) => string;
-  onCreateClick?: (createUrl: string) => void;
-  onUserDelete?: (userId: string) => void;
-};
+const defaultGroups = [
+  new UserGroup("group-admins", "Admins", []),
+  new UserGroup("group-editors", "Editors", []),
+];
 
-export const UserCollection: FC<UserCollectionProps> = ({
-  buildDetailUrl,
-  buildCreateUrl,
-  buildDeleteUrl,
-  onCreateClick,
-  onUserDelete,
-}) => {
+export function useSeedUsers(): void {
   const dispatch = useAppDispatch();
-  const userEntities = useAppSelector(selectUsers);
-
+  const users = useAppSelector(selectUsers);
   useEffect(() => {
-    if (userEntities.length === 0) {
-      dispatch(setUsers(defaultUsers.map((u) => u.toJSON())));
-    }
-  }, [dispatch, userEntities.length]);
+    if (users.length === 0) dispatch(setUsers(defaultUsers.map((u) => u.toJSON())));
+  }, [dispatch, users.length]);
+}
 
-  const users = userEntities.map((u) => new User(u.id, u.name, u.birthday));
-
-  const handleCreateClick = () => {
-    const createUrl = buildCreateUrl();
-    onCreateClick?.(createUrl);
-  };
-
-  const handleDelete = (userId: string) => {
-    onUserDelete?.(userId);
-  };
-
-  return (
-    <div>
-      <h3>ユーザー 一覧</h3>
-      <UserListView
-        users={users}
-        buildDetailUrl={buildDetailUrl}
-        buildDeleteUrl={buildDeleteUrl}
-        onUserDelete={handleDelete}
-      />
-      <div style={{ marginTop: "16px" }}>
-        <UrledPlace url={buildCreateUrl()}>
-          <button onClick={handleCreateClick}>
-            ユーザーを作成
-          </button>
-        </UrledPlace>
-      </div>
-    </div>
-  );
-};
+export function useSeedUserGroups(): void {
+  const dispatch = useAppDispatch();
+  const groups = useAppSelector(selectUserGroups);
+  useEffect(() => {
+    if (groups.length === 0) dispatch(setUserGroups(defaultGroups.map((g) => g.toJSON())));
+  }, [dispatch, groups.length]);
+}

@@ -20,3 +20,5 @@ export {
 } from './routing.js';
 export type { BubbleRoute, BubbleParams, RoutedBubble, BubbleContentRenderer } from './routing.js';
 export { SPACE_CSS } from './space-css.js';
+export { ListSpace, LayoutRoutesContext, LayoutRoutesProvider } from './ListSpace.js';
+export type { ListSpaceProps } from './ListSpace.js';

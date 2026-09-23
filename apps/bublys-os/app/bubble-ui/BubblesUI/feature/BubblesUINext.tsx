@@ -24,7 +24,7 @@ import { bubbleRoutes } from "../domain/bubbleRoutes";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
 import { bridgeRoutes } from "./legacyRouteBridge";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext";
-import { LayoutRoutesProvider } from "./ListSpace";
+import { LayoutRoutesProvider } from "@bublys-org/bubble-layout-feature";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
 const LAUNCHER_URL = "launchers/main";

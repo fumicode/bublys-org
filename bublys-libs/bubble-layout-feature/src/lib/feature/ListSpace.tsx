@@ -19,8 +19,10 @@
  * ★ ただし**岸に貼られたときだけは、自分で小さな海を持つ**（下の `ShoreSea`）。
  */
 import { FC, ReactNode, createContext, useContext, useEffect, useRef, useState } from "react";
-import { BubbleSpace, useBubbleSpace, useCurrentBubble } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
+import { BubbleSpace } from "./BubbleSpace.js";
+import { useBubbleSpace, useCurrentBubble } from "./context.js";
+import type { BubbleSpaceApi } from "./context.js";
+import type { BubbleRoute as LayoutRoute } from "./routing.js";
 import { METRICS } from "@bublys-org/bubble-layout";
 import type { PresetId } from "@bublys-org/bubble-layout";
 
