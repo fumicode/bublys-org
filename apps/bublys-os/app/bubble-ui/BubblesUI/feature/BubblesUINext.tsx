@@ -131,6 +131,9 @@ export const BubblesUINext = () => {
         docked={docked}
         renderContent={renderDockedContent}
         preview={preview}
+        onUpdate={(key, next) =>
+          setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)))
+        }
         onUndock={(key) => {
           const d = docked.find((x) => x.key === key);
           setDocked((list) => list.filter((x) => x.key !== key));

@@ -13,7 +13,7 @@
  * 新しい海との境目はここだけ ── **離したときに横取りする**（`claim`）。
  * 横取りしたら、その泡は海から出る（`BubbleSpace.onTakeOut`）。
  */
-import { FC, ReactNode, useMemo } from "react";
+import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useMemo, useRef } from "react";
 import {
   ShowreTubes,
   TUBE_THICKNESS,
@@ -25,6 +25,7 @@ import {
   touchingEdges,
   type DockState,
   type ScreenRect,
+  type ShowreSide,
   type ShowreTubeOutline,
 } from "@bublys-org/bubbles-ui";
 
@@ -43,6 +44,8 @@ export type ShowreLayerProps = {
   readonly renderContent: (d: Docked) => ReactNode;
   /** 岸から剥がす（海へ戻す） */
   readonly onUndock: (key: string) => void;
+  /** 岸の上で動かした／大きさを変えた */
+  readonly onUpdate: (key: string, next: { dock: DockState; size: { width: number; height: number } }) => void;
   /** 「いま離したらここに着く」の予告（画面の座標）。無ければ出さない */
   readonly preview?: ScreenRect | null;
 };
@@ -70,7 +73,77 @@ export const resolveDock = (
   };
 };
 
-export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderContent, onUndock, preview }) => {
+/** 辺の役割 ── 固定された辺を掴めば動く。自由な辺を掴めば伸び縮みする */
+const CURSOR: Record<ShowreSide, string> = { top: "ns-resize", bottom: "ns-resize", left: "ew-resize", right: "ew-resize" };
+const SIDES: readonly ShowreSide[] = ["top", "right", "bottom", "left"];
+/** 辺の帯の太さ（管と同じ） */
+const GRIP = TUBE_THICKNESS;
+
+export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderContent, onUndock, onUpdate, preview }) => {
+  /** 掴んでいるもの。動かす／伸び縮みのどちらも、画面の矩形の上で解く */
+  const grab = useRef<null | {
+    key: string; side: ShowreSide; move: boolean;
+    from: { x: number; y: number }; rect: ScreenRect; dock: DockState;
+  }>(null);
+
+  const onGripDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>, d: Docked, side: ShowreSide, move: boolean) => {
+      e.stopPropagation();
+      // ★ 先に掴んだことを覚える。捕捉（setPointerCapture）は失敗しうるので後
+      grab.current = {
+        key: d.key, side, move,
+        from: { x: e.clientX, y: e.clientY },
+        rect: anchoredRect(d.dock, d.size, viewport),
+        dock: d.dock,
+      };
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        // 捕捉できなくても掴めている（合成の入力など）
+      }
+    },
+    [viewport],
+  );
+
+  const onGripMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const g = grab.current;
+      if (!g) return;
+      const dx = e.clientX - g.from.x;
+      const dy = e.clientY - g.from.y;
+      if (g.move) {
+        // 固定された辺を掴んだ ── 岸の上を滑る（貼った辺は動かない）
+        onUpdate(g.key, {
+          dock: { edges: g.dock.edges, at: { x: g.rect.x + dx, y: g.rect.y + dy } },
+          size: { width: g.rect.width, height: g.rect.height },
+        });
+        return;
+      }
+      // 自由な辺を掴んだ ── 掴んだ辺の反対側が固定されるように、矩形を変える
+      const next = { ...g.rect };
+      if (g.side === "right") next.width = Math.max(120, g.rect.width + dx);
+      if (g.side === "bottom") next.height = Math.max(80, g.rect.height + dy);
+      if (g.side === "left") { next.width = Math.max(120, g.rect.width - dx); next.x = g.rect.x + (g.rect.width - next.width); }
+      if (g.side === "top") { next.height = Math.max(80, g.rect.height - dy); next.y = g.rect.y + (g.rect.height - next.height); }
+      onUpdate(g.key, {
+        dock: { edges: g.dock.edges, at: { x: next.x, y: next.y } },
+        size: { width: Math.min(next.width, viewport.width), height: Math.min(next.height, viewport.height) },
+      });
+    },
+    [onUpdate, viewport],
+  );
+
+  const onGripUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const g = grab.current;
+      grab.current = null;
+      if (!g || !g.move) return;
+      // 縁から遠くまで引いたら、岸から剥がして海へ返す
+      if (edgesNear({ x: e.clientX, y: e.clientY }, viewport).length === 0) onUndock(g.key);
+    },
+    [onUndock, viewport],
+  );
+
   const rects = useMemo(
     () => docked.map((d) => ({ key: d.key, rect: anchoredRect(d.dock, d.size, viewport) })),
     [docked, viewport],
@@ -128,18 +201,31 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({ viewport, docked, renderCont
                 {renderContent(d)}
               </div>
             </div>
-            {/* 剥がす口（当面はボタン。辺を掴んで剥がすのは次） */}
-            <button
-              onClick={() => onUndock(d.key)}
-              title="海へ戻す"
-              style={{
-                position: "absolute", right: 2, top: 2, width: 18, height: 18, padding: 0,
-                border: 0, borderRadius: 4, background: "rgba(0,0,0,.35)", color: "#eaf1ff",
-                font: "600 12px/18px sans-serif", cursor: "pointer",
-              }}
-            >
-              ↩
-            </button>
+            {/* 辺の役割は 2 つだけ ──
+                **固定された辺を掴めば動く（引き離せば剥がれる）。自由な辺を掴めば伸び縮みする。**
+                取っ手という装飾は無く、辺そのものが取っ手（＝管の上） */}
+            {SIDES.map((side) => {
+              const glued = d.dock.edges.includes(side);
+              const along = side === "top" || side === "bottom";
+              return (
+                <div
+                  key={side}
+                  data-showre-grip={side}
+                  title={glued ? "岸の上で動かす（引き離すと剥がれる）" : "大きさを変える"}
+                  onPointerDown={(e) => onGripDown(e, d, side, glued)}
+                  onPointerMove={onGripMove}
+                  onPointerUp={onGripUp}
+                  onPointerCancel={onGripUp}
+                  style={{
+                    position: "absolute",
+                    cursor: glued ? "move" : CURSOR[side],
+                    ...(along
+                      ? { left: 0, right: 0, height: GRIP, [side]: 0 }
+                      : { top: 0, bottom: 0, width: GRIP, [side]: 0 }),
+                  }}
+                />
+              );
+            })}
           </div>
         ))}
       </div>

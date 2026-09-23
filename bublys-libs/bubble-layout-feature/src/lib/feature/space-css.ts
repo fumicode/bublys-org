@@ -25,6 +25,17 @@ export const SPACE_CSS = `
 /* ③ 見えない親は体を持たない（FIELD_CSS の指定をここでも守る） */
 .bub.imp{background:none;box-shadow:none}
 
+/**
+ * カーソルは**できることを言う**。いままで全部 grab で嘘をついていた（CARRYOVER）。
+ *   ヘッダ（＝掴む所）… grab / 掴んでいる間 grabbing
+ *   中身              … 普通（中の UI が自分で決める）
+ *   右下の角          … nwse-resize（FIELD_CSS の .bl-hnd）
+ */
+.bub{cursor:grab}
+.bub:active{cursor:grabbing}
+.bub > .bl-body{cursor:auto}
+.bub > .bl-close{cursor:pointer}
+
 /* ステータスバー ── 出すのは url。すりガラスの帯 */
 .bub > .hd{background:hsl(var(--h) 45% 18% / .5);backdrop-filter:blur(6px);
   border-radius:calc(var(--rr)) calc(var(--rr)) 0 0}
