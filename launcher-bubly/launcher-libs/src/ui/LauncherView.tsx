@@ -67,7 +67,7 @@ export const LauncherView: FC<LauncherViewProps> = ({
         icon={entry.icon ?? <LaunchIcon color="action" />}
         vertical={vertical}
         labels={labels}
-        onClick={() => onLaunch(entry.url)}
+        onOpen={() => onLaunch(entry.url)}
       />
     ))}
     {/* 末尾: このランチャーの設定（設定バブルを開く） */}
@@ -77,7 +77,7 @@ export const LauncherView: FC<LauncherViewProps> = ({
       icon={<SettingsIcon color="action" />}
       vertical={vertical}
       labels={labels}
-      onClick={onOpenSettings}
+      onOpen={onOpenSettings}
       sx={{
         [vertical ? "mt" : "ml"]: "auto",
         [vertical ? "borderTop" : "borderLeft"]: "1px solid rgba(0, 0, 0, 0.08)",
@@ -92,16 +92,24 @@ type LauncherItemProps = {
   icon: ReactNode;
   vertical: boolean;
   labels: boolean;
-  onClick: () => void;
+  /** 開く ── **ダブルクリック**で呼ばれる */
+  onOpen: () => void;
   sx?: SxProps<Theme>;
 };
 
-/** 1 項目。ラベルを出さないときは、アイコンだけの正方形になる（名前はツールチップ） */
-const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, vertical, labels, onClick, sx }) => {
+/**
+ * 1 項目。ラベルを出さないときは、アイコンだけの正方形になる（名前はツールチップ）。
+ *
+ * **開くのはダブルクリック。** バブリでは「オブジェクトを開く」は一貫して
+ * ダブルクリック（`ObjectView`）なので、ランチャーの項目も同じにする
+ * ── 1 回のクリックは「選ぶ」であって「開く」ではない。
+ */
+const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, vertical, labels, onOpen, sx }) => {
   const button = (
     <ListItemButton
-      onClick={onClick}
+      onDoubleClick={onOpen}
       sx={{
+        userSelect: "none", // 2 回目のクリックで字が選ばれないように
         minHeight: ITEM_MIN,
         minWidth: ITEM_MIN,
         px: labels ? 2 : 0,

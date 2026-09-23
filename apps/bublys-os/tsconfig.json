@@ -67,6 +67,9 @@
       "path": "../../users-libs"
     },
     {
+      "path": "../../bublys-libs/bubble-layout-feature"
+    },
+    {
       "path": "../../bublys-libs/object-shell"
     },
     {

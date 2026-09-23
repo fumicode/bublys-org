@@ -4,7 +4,7 @@
  * 正：docs/bubble-space-prototype/v4/RULES.md ／ 経緯：docs/bubble-space-prototype/DECISIONS.md
  */
 export { BubbleSpace } from './BubbleSpace.js';
-export type { BubbleSpaceProps } from './BubbleSpace.js';
+export type { BubbleSpaceProps, TakeOutInfo } from './BubbleSpace.js';
 export { ObjectView } from './ObjectView.js';
 export type { ObjectViewProps } from './ObjectView.js';
 export { BubbleSpaceContext, CurrentBubbleContext, useBubbleSpace, useCurrentBubble } from './context.js';

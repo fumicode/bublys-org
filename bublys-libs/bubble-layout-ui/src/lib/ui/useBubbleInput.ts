@@ -114,7 +114,14 @@ export interface BubbleInputOptions {
 export interface ClaimDropInfo {
   readonly id: BubbleId;
   readonly pointer: { readonly x: number; readonly y: number };
+  /** いま画面に写っている矩形（レンズを通したあと） */
   readonly rect: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  /**
+   * 泡が**自分で持っている大きさ**（レンズを通す前）。
+   * 魚眼の掛かった向きでは、縁へ寄るほど写る幅が潰れる ── 写った大きさで渡すと、
+   * 横取りした側が「端に飲み込まれた薄い帯」を貼ることになる。
+   */
+  readonly size: { readonly w: number; readonly h: number };
 }
 
 export interface BubbleInput {
@@ -175,13 +182,40 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     [viewport, rules],
   );
 
-  /** 層の左上から測ったカーソル */
+  /**
+   * 泡が自分で持っている大きさ（レンズを通す前）。
+   * 写った大きさ（`p.w`/`p.h`）は魚眼で潰れるので、岸へ渡すのはこちら。
+   */
+  const ownSize = useCallback(
+    (id: BubbleId, p: { w: number; h: number }) => {
+      const b = world.bubble(id);
+      return b ? { w: b.state.size.w, h: b.state.size.h } : { w: p.w, h: p.h };
+    },
+    [world],
+  );
+
+  /**
+   * 層に掛かっている拡大率 ── **画面の px と層の px の比**。
+   *
+   * 層が拡大縮小された中に居ると（＝空間を持つ泡の中の海）、画面で測った距離は
+   * そのまま層の距離にならない。層の「画面での幅 ÷ レイアウトの幅」がその比で、
+   * 大元の画面では 1 になる。
+   */
+  const scaleOf = useCallback((layer: HTMLElement | null, r?: DOMRect): number => {
+    if (!layer || layer.offsetWidth <= 0) return 1;
+    const width = (r ?? layer.getBoundingClientRect()).width;
+    return width > 0 ? width / layer.offsetWidth : 1;
+  }, []);
+
+  /** 層の左上から測ったカーソル（**層の px**。画面の px ではない） */
   const pt = useCallback(
     (e: { clientX: number; clientY: number }) => {
-      const r = layerRef.current?.getBoundingClientRect();
-      return { mx: e.clientX - (r?.left ?? 0), my: e.clientY - (r?.top ?? 0) };
+      const layer = layerRef.current;
+      const r = layer?.getBoundingClientRect();
+      const k = scaleOf(layer ?? null, r);
+      return { mx: (e.clientX - (r?.left ?? 0)) / k, my: (e.clientY - (r?.top ?? 0)) / k };
     },
-    [layerRef],
+    [layerRef, scaleOf],
   );
   const pickInput = useCallback(() => {
     const layer = layerRef.current;
@@ -190,9 +224,13 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       layout: lifted, tiny, selectedId,
       layer: layer as Element,
       origin: { x: r?.left ?? 0, y: r?.top ?? 0 },
-      handleEl: layer?.querySelector('.bl-hnd') ?? null,
+      scale: scaleOf(layer ?? null, r),
+      // ★ **自分の層の角だけ**を拾う（`:scope >`）。空間を持つ泡の中には入れ子の層が居て、
+      //   そちらの角のほうが DOM の並びでは先に来る（角は層の最後の子）。
+      //   ただの `.bl-hnd` で引くと中の角を掴んでしまい、自分の泡の大きさが変えられなくなる
+      handleEl: layer?.querySelector(':scope > .bl-hnd') ?? null,
     };
-  }, [layerRef, lifted, tiny, selectedId]);
+  }, [layerRef, lifted, tiny, selectedId, scaleOf]);
   const hasContent = o.hasContent;
   const hasBody = useCallback(
     (id: BubbleId) => world.isHost(id) || (hasContent ? hasContent(id) : false),
@@ -302,7 +340,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     setWorld(next);
 
     // 予告のために、いまの居場所を外へ知らせる（岸がここで「着くならここ」を描く）
-    o.onDragInfo?.({ id: d.id, pointer: { x: mx, y: my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h } });
+    o.onDragInfo?.({ id: d.id, pointer: { x: mx, y: my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h }, size: ownSize(d.id, p) });
 
     if (d.moves) {
       // 印は「いま離したらどうなるか」。書いたばかりの値で解き直してから見る
@@ -344,7 +382,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     if (d.kind === 'bubble' && o.claimDrop) {
       const p = lifted.byId.get(d.id);
       const at = e ? pt(e) : null;
-      if (p && at && o.claimDrop({ id: d.id, pointer: { x: at.mx, y: at.my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h } })) {
+      if (p && at && o.claimDrop({ id: d.id, pointer: { x: at.mx, y: at.my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h }, size: ownSize(d.id, p) })) {
         show();
         return;
       }

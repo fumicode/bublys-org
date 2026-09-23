@@ -14,6 +14,7 @@
  */
 
 import type { Point2, Size2 } from "@bublys-org/bubbles-ui-util";
+import { TUBE_THICKNESS } from "./tube.js";
 
 export type ShowreSide = "top" | "bottom" | "left" | "right";
 
@@ -46,14 +47,42 @@ export const emptyDocksState = (): DocksState => ({});
 /** 貼り付けるか判定する、辺からの距離（px） */
 export const SHOWRE_DOCK_THRESHOLD = 24;
 
-/** 貼り付いたバブルどうしの、これ以上詰めない隙間（px） */
-export const SHOWRE_DOCK_GAP = 8;
+/**
+ * 貼り付いたバブルどうしの隙間（px）。**負 ＝ そのぶん重ねてよい。**
+ *
+ * 管は縁から**半分だけ内側**を走るので、縁どうしをただ接させると管が 2 本並んでしまう。
+ * **管の太さぶん重ねる**と 2 本の中心線がちょうど重なり、1 本の線に見える。
+ * 止まるのはそこ ── それ以上は食い込ませない。
+ */
+export const SHOWRE_DOCK_GAP = -TUBE_THICKNESS;
 
-/** 縮められる下限（px）。これより狭い空きには貼れない */
-export const SHOWRE_MIN_SIZE: Size2 = { width: 120, height: 80 };
+/**
+ * 中身がひとかけら残る大きさ（px）＝ アイコン 1 つ。
+ * 「どこまで小さくしてよいか」は中身が決めることなので、岸はこの 1 かけらしか見ない
+ */
+const SHOWRE_MIN_CONTENT = 24;
+
+/**
+ * 縮められる下限（px）。これより狭い空きには貼れない。
+ *
+ * 岸が守るのは「**取っ手が残るか**」だけ ── 向かい合う辺（＝取っ手。管と同じ太さ）2 本と、
+ * 中身がひとかけら。中身が入らなければ中身の側で切れるので、岸が止める理由はない。
+ */
+export const SHOWRE_MIN_SIZE: Size2 = {
+  width: TUBE_THICKNESS * 2 + SHOWRE_MIN_CONTENT,
+  height: TUBE_THICKNESS * 2 + SHOWRE_MIN_CONTENT,
+};
 
 const overlaps1 = (aLo: number, aHi: number, bLo: number, bHi: number): boolean =>
   aLo < bHi && bLo < aHi;
+
+/**
+ * もう一方の向きで「本当に」重なっているか。
+ * **管が 1 本になるぶんの重なり（-gap）は重なりと見ない** ── そこは隣と縁を共有している所で、
+ * その向きで邪魔をしているわけではない。
+ */
+const crossOverlaps = (lo: number, len: number, oLo: number, oLen: number, gap: number): boolean =>
+  overlaps1(lo - gap, lo + len + gap, oLo, oLo + oLen);
 
 /** 2 つの矩形が重なるか（辺で接するだけは重なりではない） */
 export const rectsOverlap = (a: ScreenRect, b: ScreenRect): boolean =>
@@ -178,7 +207,7 @@ export const fitAmongDocked = (
       .filter((o) => {
         const oLo = cross === "x" ? o.x : o.y;
         const oLen = cross === "x" ? o.width : o.height;
-        return overlaps1(crossLo, crossLo + crossLen, oLo, oLo + oLen);
+        return crossOverlaps(crossLo, crossLen, oLo, oLen, gap);
       })
       .map((o) => (axis === "x" ? ([o.x, o.x + o.width] as const) : ([o.y, o.y + o.height] as const)));
     const fitted = fitAxis(lo, len, anchors[axis], pointers[axis], limits[axis], blockers, mins[axis], gap);
@@ -188,6 +217,95 @@ export const fitAmongDocked = (
       : { ...out, y: fitted.lo, height: fitted.len };
   }
   return out;
+};
+
+/**
+ * 岸の上で**辺を掴んで伸ばした**ときの止まり所 ── 先客の縁で止める（接する所まで）。
+ *
+ * 規則4「貼り付いたバブルどうしは重ならない」は、貼るとき（{@link fitAmongDocked}）だけの
+ * 話ではない。**貼ったあと伸ばすとき**も同じ。ただしここは縮めない ──
+ * 掴んだ辺が先客にぶつかって止まるだけ。
+ *
+ * @param side 掴んだ辺。その辺だけが動き、向かいの辺は動かない
+ */
+export const clampResizeAmongDocked = (
+  rect: ScreenRect,
+  side: ShowreSide,
+  others: readonly ScreenRect[],
+  min: Size2 = SHOWRE_MIN_SIZE,
+  gap: number = SHOWRE_DOCK_GAP,
+): ScreenRect => {
+  const horizontal = side === "left" || side === "right";
+  // その向きでぶつかりうるのは、もう一方の向きで重なっている先客だけ
+  const blockers = others.filter((o) =>
+    horizontal
+      ? crossOverlaps(rect.y, rect.height, o.y, o.height, gap)
+      : crossOverlaps(rect.x, rect.width, o.x, o.width, gap),
+  );
+  const edges = (pick: (o: ScreenRect) => number, keep: (v: number) => boolean) =>
+    blockers.map(pick).filter(keep);
+
+  switch (side) {
+    case "right": {
+      const limit = Math.min(...edges((o) => o.x, (v) => v >= rect.x), Infinity) - gap;
+      return { ...rect, width: Math.max(min.width, Math.min(rect.width, limit - rect.x)) };
+    }
+    case "left": {
+      const right = rect.x + rect.width;
+      const limit = Math.max(...edges((o) => o.x + o.width, (v) => v <= right), -Infinity) + gap;
+      const x = Math.max(rect.x, limit);
+      return { ...rect, x, width: Math.max(min.width, right - x) };
+    }
+    case "bottom": {
+      const limit = Math.min(...edges((o) => o.y, (v) => v >= rect.y), Infinity) - gap;
+      return { ...rect, height: Math.max(min.height, Math.min(rect.height, limit - rect.y)) };
+    }
+    case "top": {
+      const bottom = rect.y + rect.height;
+      const limit = Math.max(...edges((o) => o.y + o.height, (v) => v <= bottom), -Infinity) + gap;
+      const y = Math.max(rect.y, limit);
+      return { ...rect, y, height: Math.max(min.height, bottom - y) };
+    }
+  }
+};
+
+/**
+ * 岸の上で**滑らせた**ときの止まり所 ── 先客にぶつかる所で止める（接する所まで）。
+ *
+ * @param axis 滑る向き（貼った辺と直交する向き）
+ * @param from 掴んだときの位置。ここから**どちらへ動いたか**で、どちらの縁で止めるかが決まる
+ */
+export const clampMoveAmongDocked = (
+  rect: ScreenRect,
+  axis: "x" | "y",
+  others: readonly ScreenRect[],
+  viewport: Size2,
+  from: number,
+  gap: number = SHOWRE_DOCK_GAP,
+): ScreenRect => {
+  const horizontal = axis === "x";
+  const lo = horizontal ? rect.x : rect.y;
+  const len = horizontal ? rect.width : rect.height;
+  const limit = horizontal ? viewport.width : viewport.height;
+  const blockers = others.filter((o) =>
+    horizontal
+      ? crossOverlaps(rect.y, rect.height, o.y, o.height, gap)
+      : crossOverlaps(rect.x, rect.width, o.x, o.width, gap),
+  );
+  const loOf = (o: ScreenRect) => (horizontal ? o.x : o.y);
+  const hiOf = (o: ScreenRect) => (horizontal ? o.x + o.width : o.y + o.height);
+
+  let next = lo;
+  if (lo > from) {
+    // 増える向きへ動いた ── 先手にいる先客の**手前**（管が 1 本になる所）で止まる
+    const stop = Math.min(...blockers.map(loOf).filter((v) => v >= from + len + gap), Infinity) - gap;
+    next = Math.min(lo, stop - len);
+  } else if (lo < from) {
+    const stop = Math.max(...blockers.map(hiOf).filter((v) => v <= from - gap), -Infinity) + gap;
+    next = Math.max(lo, stop);
+  }
+  next = Math.min(Math.max(next, 0), Math.max(0, limit - len));
+  return horizontal ? { ...rect, x: next } : { ...rect, y: next };
 };
 
 /** 貼った向き（辺に付いている側）。null は貼っていない向き */

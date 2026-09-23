@@ -5,7 +5,7 @@
  * 元：docs/bubble-space-prototype/v5-dom/lab.html の「描く所」と「触る所」
  */
 export { FIELD_CSS, MARKS_CSS } from './field-css.js';
-export { drawField, markTiny, rowsOf, HEADER, MARK_MIN, DRAW_MIN } from './draw.js';
+export { drawField, markTiny, rowsOf, HEADER, MARK_MIN, DRAW_MIN, CONTENT_MIN } from './draw.js';
 export type { BubbleDraw, HandleDraw, FieldDraw, DrawInput, MeasureText } from './draw.js';
 export { measureTextInDom, forgetTextWidths } from './measure-text.js';
 export { BubbleField, BubbleShell, DropMarksView } from './BubbleField.js';

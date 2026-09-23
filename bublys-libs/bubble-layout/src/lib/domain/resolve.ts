@@ -115,7 +115,7 @@ export interface Viewport {
 /**
  * 1フレーム解く。lab.html 786-800 行 resolveAll。
  *
- * 描く順は `q.dz − p.dz || p.scale − q.scale || 並び順`（Z が同じなら、大きく写るものが手前）。
+ * 描く順は `q.dz − p.dz || q.dist − p.dist || 並び順`（Z が同じなら、**焦点に近いものが手前**）。
  * View の外の状態は持たない。3つとも同じなら上下は View から決まらない（＝ Z に「順序」を刺す）。
  * ③ 見えない親は、見えている子がいるときだけ見える（lab.html 795-799 行）。
  */
@@ -232,11 +232,21 @@ function resolveSpace(
       w: box.w,
       h: box.h,
     };
-    return { b, i, dz, m, pos, target };
+    // 焦点からの隔たり（写ったあとの、泡の**中心**で測る）。前後を決める second key
+    const dist = Math.hypot(px.s, py.s);
+    return { b, i, dz, m, pos, target, dist };
   });
-  // ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら大きく写るものを手前に（coverflow の中央が上に来る）。
-  //   それも同じ（格子の同じマスに重なる など）なら、決まらない ──「置いた順」という View の外の状態は持たない
-  items.sort((p, q) => q.dz - p.dz || p.target.scale - q.target.scale || p.i - q.i);
+  /**
+   * ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら **焦点に近いものが手前**
+   *   （coverflow の中央が上に来る）。それも同じ（左右対称に置いた など）なら、決まらない
+   *   ──「置いた順」という View の外の状態は持たない。
+   *
+   * ★ 前は「**大きく写るもの**が手前」だった。これだと**幅の広い泡が損をする** ──
+   *   倍率は「像の幅 ÷ 実際の幅」なので、魚眼は幅に罰を与える（v7 の実測 0.755 ＜ 0.773）。
+   *   中央に来た広い泡が、端にいる細い泡より小さく写って**奥へ回ってしまう**。
+   *   見る側の言葉は「**真ん中に来たものが手前**」なので、隔たりで決める。
+   */
+  items.sort((p, q) => q.dz - p.dz || q.dist - p.dist || p.i - q.i);
 
   for (const it of items) {
     const a = it.target;                      // domain は補間しない（lab の mode="snap" と同じ）

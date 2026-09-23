@@ -125,6 +125,15 @@
     },
     {
       "path": "./launcher-bubly/launcher-libs"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout-feature"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout-ui"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout"
     }
   ]
 }

@@ -134,8 +134,9 @@ describe('② 触った泡へ、視点が寄る', () => {
     expect(placeOf(after, 'kinmu').scale).toBe(1);                // dz 0 ＝ 原寸
     expect(placeOf(after, 'kinmu').alpha).toBe(1);
     // ★ 奥の泡を触ると、手前にいた泡は消える（RULES.md：消す。止めない。縁に積むのは ui の仕事）
-    expect(after.order.filter((p) => p.space === 'root' && p.alpha === 0).map((p) => p.id))
-      .toEqual(['memo1', 'memo2', 'memo3', 'row', 'cover', 'fish', 'giji', 'fC']);
+    // 見ているのは「どれが消えたか」── 並びは描く順（焦点に近い順）なので、揃えてから比べる
+    expect(after.order.filter((p) => p.space === 'root' && p.alpha === 0).map((p) => p.id).sort())
+      .toEqual(['memo1', 'memo2', 'memo3', 'row', 'cover', 'fish', 'giji', 'fC'].sort());
   });
 
   it('★ raise は消えた：Z が 順序 の空間でも、触って並べ替わらない（重ねて置く）', () => {

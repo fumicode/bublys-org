@@ -17,6 +17,16 @@ export const HEADER = 24;
 export const MARK_MIN = 6.5;
 /** ★ 描く下限の既定（画面 px・短辺）。いくつがよいかは未決 ── DECISIONS.md */
 export const DRAW_MIN = 5.0;
+/**
+ * 中身を描く倍率の下限。
+ *
+ * ★ **「題名が読めない」と「中身を描かない」は別の話。**
+ *   題名は読めなくなったら出す意味が無い（{@link MARK_MIN}）が、中身は読めなくても
+ *   **形が「何が入っているか」の手がかり**になる。だから中身はもっと奥まで描く。
+ *   前はここが分かれておらず、本文 12px が 6.5px を切る倍率 0.542 で中身ごと消えていて、
+ *   泡そのものは短辺 5px まで残るので「枠だけの箱」が長く居座っていた。
+ */
+export const CONTENT_MIN = 0.25;
 /** 画面の外へどれだけ出たら消すか（lab.html 1041 行） */
 const OUT_PAD = 60;
 
@@ -230,7 +240,8 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       (b.id === c.selectedId ? ' sel' : '') +
       (chip ? ' chip' : '') +
       (host ? ' host' : '') +
-      (12 * s < MARK_MIN ? ' nt' : '') +
+      (12 * s < MARK_MIN ? ' nt' : '') +   // 題名：字の下限 6.5px を切ったら出さない
+      (s < CONTENT_MIN ? ' nc' : '') +     // 中身：題名より奥まで描く
       (s <= 0.2 ? ' nb' : '') +
       mcls;
   }

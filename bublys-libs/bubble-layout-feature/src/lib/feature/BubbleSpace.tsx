@@ -9,12 +9,12 @@
  *   Redux に載せるかは、この検証のあとで決める ── CLAUDE.md の
  *   「スライスは集約のリポジトリに徹する」に沿うなら、載せるのは `WorldState` 丸ごと1つ。
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { actContext, emptyWorld, presetView, reshape, resolveWorld } from '@bublys-org/bubble-layout';
-import type { BubbleId, BubbleWorld, LayoutRules, PresetId, Viewport } from '@bublys-org/bubble-layout';
+import { actContext, dragBubble, emptyWorld, presetView, reshape, resolveRules, resolveWorld, withAxis } from '@bublys-org/bubble-layout';
+import type { BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
-import type { BubbleDraw } from '@bublys-org/bubble-layout-ui';
+import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext } from './context.js';
 import type { BubbleSpaceApi } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
@@ -60,7 +60,14 @@ function mateFor(
 export interface TakeOutInfo {
   readonly id: BubbleId;
   readonly url: string;
+  /** いま画面に写っている矩形（レンズを通したあと）。どこに落ちたかを見るのに使う */
   readonly rect: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  /**
+   * 泡が**自分で持っている大きさ**（レンズを通す前）。
+   * 岸に貼るときの大きさはこちら ── 縁のほうはレンズで潰れているので、
+   * 写った大きさで貼ると端に飲み込まれて消える。
+   */
+  readonly size: { readonly w: number; readonly h: number };
   readonly pointer: { readonly x: number; readonly y: number };
 }
 
@@ -99,6 +106,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const depth: OpenDepth = props.depth ?? 'fisheye-x';
   const layerRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
+  /** レンズの向きが一度でも選ばれたか。選ばれたら `openAt` はレンズに触らない */
+  const lensChosen = useRef(false);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
   const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(new Map());
@@ -128,10 +137,10 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const claimDrop = useCallback(
-    (info: { id: BubbleId; pointer: { x: number; y: number }; rect: { x: number; y: number; w: number; h: number } }) => {
+    (info: ClaimDropInfo) => {
       const url = urls.get(info.id)?.url;
       if (!url || !props.onTakeOut) return false;
-      const taken = props.onTakeOut({ id: info.id, url, rect: info.rect, pointer: info.pointer });
+      const taken = props.onTakeOut({ id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer });
       if (taken) takeOut(info.id);
       return taken;
     },
@@ -150,6 +159,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const r = openAt({
         world, viewport, openerId: opener, newId: id,
         title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules, depth,
+        keepLens: lensChosen.current,
         joinWith: mateFor(world, urls, route.type, opener),
       });
       setWorld(r.world);
@@ -193,14 +203,66 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [world, setWorld, base, viewport, rules, depth],
   );
 
-  const api: BubbleSpaceApi = useMemo(
-    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen }),
-    [openBubble, closeBubble, urls, canOpen],
+  /**
+   * 外の空間のレンズを変える。書くのは View の 1 つの軸だけ（泡の値は 1 つも書かない）。
+   * 一度でも選ばれたら、以後 `openAt` はレンズに触らない（選んだ向きが残る）。
+   */
+  const setLens = useCallback(
+    (axis: PlaneAxis, lens: LensId) => {
+      lensChosen.current = true;
+      setWorld(withAxis(world, 'root', axis, { lens }));
+    },
+    [world, setWorld],
   );
 
-  // 空なら最初の url を開く（1回だけ）
+  /**
+   * 岸から海へ返す。置いたあと、**画面のその矩形に見えるように**動かす
+   * ── 動かし方は掴んで動かすのと同じ（`dragBubble`）なので、新しい規則は要らない。
+   */
+  const takeIn = useCallback(
+    (url: string, rect: { x: number; y: number; w: number; h: number }): BubbleId => {
+      const route = matchBubbleRoute(routes, url);
+      if (!route) { console.warn('route が無い url:', url); return ''; }
+      seq.current += 1;
+      const id = `b${seq.current}:${url}`;
+      const at = seq.current;
+      const opened = openAt({
+        world, viewport, openerId: null, newId: id, title: titleOf(routes, url),
+        size: { w: rect.w, h: rect.h }, hue: route.hue, rules, depth, keepLens: lensChosen.current,
+      });
+      const L = resolveWorld(opened.world, viewport, rules);
+      const p = L.byId.get(id);
+      setWorld(
+        p
+          ? dragBubble(
+              opened.world,
+              { layout: L, id, space: 'root', want: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, m: p.m },
+              resolveRules(rules),
+            )
+          : opened.world,
+      );
+      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, at }));
+      return id;
+    },
+    [routes, world, viewport, rules, depth, setWorld],
+  );
+
+  const api: BubbleSpaceApi = useMemo(
+    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, setLens, takeIn }),
+    [openBubble, closeBubble, urls, canOpen, setLens, takeIn],
+  );
+
+  /**
+   * 空なら最初の url を開く（1回だけ）。
+   *
+   * ★ **描いている最中に書かない。** 前はここを render の中でやっていて、
+   *   「別のコンポーネントを描いている最中にこのコンポーネントを更新した」と React に叱られていた
+   *   （入れ子の海だと、外の海を描いている最中に中の海が種を撒くので必ず起きる）。
+   *   置いたあとに 1 回だけ撒く ── 最初の一瞬だけ海が空になるが、値は同じところへ落ちる。
+   */
   const seeded = useRef(false);
-  if (!seeded.current && world.bubbles.length === 0 && props.initialUrls?.length) {
+  useEffect(() => {
+    if (seeded.current || world.bubbles.length > 0 || !props.initialUrls?.length) return;
     seeded.current = true;
     let w = world;
     let n = seq.current;
@@ -211,23 +273,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       n += 1;
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
-                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, depth }).world;
+                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, depth, keepLens: lensChosen.current }).world;
       m.set(id, { url, type: route.type, openerId: null, at: n });
     }
     seq.current = n;
-    // レンダリング中に setState するのは初回の種まきだけ（React は同じコミットで拾う）
     setUrls(m);
     setWorld(w);
-  }
+    // 撒くのは置いたあと 1 回だけ。以後は開く／閉じるが世界を進める
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 中身を持つ泡は、ヘッダでだけ掴める（本文は中身のもの。既存 bubbles-ui と同じ）
   const hasContent = useCallback((id: BubbleId) => urls.has(id), [urls]);
   const onDragInfo = useCallback(
-    (info: { id: BubbleId; pointer: { x: number; y: number }; rect: { x: number; y: number; w: number; h: number } } | null) => {
+    (info: ClaimDropInfo | null) => {
       if (!props.onTakeOutPreview) return;
       if (!info) { props.onTakeOutPreview(null); return; }
       const url = urls.get(info.id)?.url;
-      props.onTakeOutPreview(url ? { id: info.id, url, rect: info.rect, pointer: info.pointer } : null);
+      props.onTakeOutPreview(url ? { id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer } : null);
     },
     [props, urls],
   );

@@ -60,6 +60,12 @@ export interface OpenAtInput {
   readonly depth?: OpenDepth;
   readonly rules?: Partial<LayoutRules>;
   /**
+   * **レンズには触らない。** 既定では横に開くと X の魚眼を点けるが、
+   * 誰かが向きを選んでいる（魚眼を Y に向けた、どちらも平行にした）なら、
+   * 開くたびに X へ戻すとその選択が握り潰される。選ばれたあとはこれを立てる。
+   */
+  readonly keepLens?: boolean;
+  /**
    * ★ **同じ種類の泡（兄弟）を続けて開いたとき、その隣に並べる相手。**
    *
    * これが無いと、一覧の項目を2つダブルクリックしたとき、どちらも
@@ -186,7 +192,8 @@ export function openAt(input: OpenAtInput): OpenAtResult {
 
   // ★ 横に開いたら X の魚眼を点ける。次元は変えない（自由X のまま）
   //   ただし **元の泡があるときだけ** ── 最初の1つを置くのに、小さくする相手はいない
-  if (opener && (input.as ?? 'beside') === 'beside') {
+  //   `keepLens` が来ているときも触らない（誰かが向きを選んでいる）
+  if (opener && (input.as ?? 'beside') === 'beside' && !input.keepLens) {
     const view = w.ownViewOf(space);
     if (!view || view.x.lens !== 'fisheye') w = withAxis(w, space, 'x', { lens: 'fisheye' });
   }

@@ -61,7 +61,9 @@ export const SPACE_CSS = `
   /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
   background:linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)}
 .bub.chip > .bl-body{display:none}
-.bub.nt > .bl-body{display:none}   /* 字が読めない大きさなら中身も描かない */
+/* ★ 中身を消すのは題名より**奥**（倍率 0.3）。題名が読めなくなっても、
+   中身の形は「何が入っているか」の手がかりになるので描き続ける（CONTENT_MIN） */
+.bub.nc > .bl-body{display:none}
 .bl-noroute{padding:10px 12px;color:#b23c27;font-size:11px;line-height:1.6}
 .bub > .bl-close{position:absolute;right:4px;top:3px;width:18px;height:18px;padding:0;
   border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;

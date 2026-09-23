@@ -46,6 +46,11 @@ export interface PickInput {
   readonly layer: Element;
   /** 層の左上（画面座標）。掴んだ点はここからの相対で測る */
   readonly origin: { readonly x: number; readonly y: number };
+  /**
+   * 層に掛かっている拡大率（画面の px ÷ 層の px）。大元の画面では 1。
+   * 層の座標（mx, my）を画面に戻して当たりを取るのに使う
+   */
+  readonly scale?: number;
   /** 大きさの角の要素 */
   readonly handleEl: Element | null;
 }
@@ -58,7 +63,8 @@ export interface Picked {
 /** カーソルの下の泡と角。mx, my は層の左上から測った座標 */
 export function pickAt(input: PickInput, mx: number, my: number): Picked {
   const { layout, tiny, selectedId, layer, origin, handleEl } = input;
-  const list = document.elementsFromPoint(mx + origin.x, my + origin.y);
+  const k = input.scale ?? 1;
+  const list = document.elementsFromPoint(mx * k + origin.x, my * k + origin.y);
   let handle: Placement | null = null;
   let bub: Placement | null = null;
   for (const el of list) {
