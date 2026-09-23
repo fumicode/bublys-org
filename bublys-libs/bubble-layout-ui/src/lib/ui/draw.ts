@@ -214,7 +214,20 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       (b.id === c.selectedId || c.hoverRing === b.id ? ' on' : '') +
       (p.y + p.h + 21 <= c.viewport.h ? '' : ' lbup'); // 札は枠の下。入らなければ上
   } else {
-    op = clamp(p.alpha, 0, 1) * clamp(0.3 + 0.7 * Math.min(1, s), 0.15, 1);
+    /**
+     * 霞み ── **前後ではなく「写った大きさ」で薄くする**。手前かどうかは見ていない。
+     * ラボは `0.3 + 0.7 × 倍率`（lab.html 1054 行）だったが、これだと魚眼で縮んだ泡が
+     * 何にも隠れていないのに沈んで見える（実測：倍率 0.17 で opacity 0.42、
+     * 隣に居る原寸の泡が 1.0 なので「一番手前なのに暗い」と映る）。
+     * 霞ませ方を弱めて `0.5 + 0.5 × 倍率` にした。
+     *
+     * ★ **この薄め方そのものが良くない（2026-09-23 に申し送り）。**
+     *   「小さい＝薄い」を一本の式で決めているせいで、
+     *   「遠いから霞む」と「触っていないから沈む」が混ざっている。
+     *   どちらを見せたいのかを決め直してから、式ごと作り替えること。
+     *   いまの 0.5 は**繋ぎの値**であって、決まりではない。
+     */
+    op = clamp(p.alpha, 0, 1) * clamp(0.5 + 0.5 * Math.min(1, s), 0.15, 1);
     style['display'] = out || isTiny || (op < 0.02 && !vis) ? 'none' : '';
     const chip = p.box.h <= 34;
     const host = c.world.isHost(b.id);
