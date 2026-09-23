@@ -111,6 +111,11 @@ export const BubblesUINext = () => {
         borderRadius: `${TUBE_RADIUS}px`,
       }}
     >
+      {/* 窓の中の旧スタックは、自分の岸の管を描かない ── 枠が二重になるので。
+          岸は**窓の枠そのもの**（FrameShore）が引き受ける */}
+      <style>{`.bl-body [data-showre-tubes]{display:none}
+.bl-body [data-frame-shore] [data-showre-tubes]{display:block}`}</style>
+
       <BubbleSpace
         key={depth}
         routes={routes}

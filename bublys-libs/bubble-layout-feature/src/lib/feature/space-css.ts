@@ -49,6 +49,12 @@ export const SPACE_CSS = `
   background:linear-gradient(180deg,#ffffff 0%,#f7f8fb 100%);
   color:#1b2029;font:13px/1.6 var(--f);
   box-shadow:inset 0 2px 4px rgba(0,0,0,.05),0 1px 2px hsla(0,0%,100%,.5)}
+/**
+ * 窓（空間を持つ泡）は、**枠そのものが岸**。だから泡の輪（FIELD_CSS の ::after）は出さない
+ * ── 岸の管と二重になる。上端はステータスバーにぶつかる所まで。
+ */
+.bub:has(> .bl-body.bl-clear)::after{content:none}
+
 /* 窓（中身が自分で背景を持つ ── 入れ子の宇宙・canvas）。地を敷かず、箱いっぱいに広げる */
 .bub > .bl-body.bl-clear{left:0;top:24px;right:0;bottom:0;border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);
   overflow:hidden;box-shadow:none;color:#e6ebf5;

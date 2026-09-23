@@ -15,22 +15,22 @@
 
 import type { ShowreSide, ScreenRect } from "./Showre.domain.js";
 
-/** 管の太さ（px） */
-export const TUBE_THICKNESS = 12;
+/** 管の太さ（px）。細いほうが枠として邪魔にならない（前は 12 だった） */
+export const TUBE_THICKNESS = 4;
 
 /** 角の丸み（px）。海を切り抜くフレームと必ず合わせる */
-export const TUBE_RADIUS = 20;
+export const TUBE_RADIUS = 14;
 
 /** 管の色。奥行き（手前か奥か）を表す光なので、色は一色で変えない */
 export const TUBE_COLOR = "#1a5bff";
 
 /** 芯（白い線）の太さ（px） */
-export const TUBE_CORE_WIDTH = 3;
+export const TUBE_CORE_WIDTH = 1.2;
 
 /** 近い滲みのぼかし半径（px） */
-export const TUBE_GLOW_NEAR = 12;
+export const TUBE_GLOW_NEAR = 6;
 /** 遠い滲みのぼかし半径（px） */
-export const TUBE_GLOW_FAR = 34;
+export const TUBE_GLOW_FAR = 18;
 
 /** 管が囲む 1 つの矩形 */
 export type TubeOutline = {
