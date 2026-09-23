@@ -96,6 +96,20 @@ export interface BubbleInputOptions {
    * 空間を持つ泡（world.isHost）は言わなくてもそう扱う。
    */
   readonly hasContent?: (id: BubbleId) => boolean;
+  /**
+   * 離したところを、**空間の外に居る誰か**が横取りできる口（岸に貼る、など）。
+   *
+   * `true` を返したら、この落とし先は使わない ── 泡をどうするか（海から出すなど）は
+   * 横取りした側の仕事。規則には無い話なので domain には入れない。
+   */
+  readonly claimDrop?: (info: ClaimDropInfo) => boolean;
+}
+
+/** 離した瞬間の、泡と指の居場所（どちらも層の座標） */
+export interface ClaimDropInfo {
+  readonly id: BubbleId;
+  readonly pointer: { readonly x: number; readonly y: number };
+  readonly rect: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
 }
 
 export interface BubbleInput {
@@ -307,7 +321,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     show();
   }, [world, layout, lifted, viewport, rules, drawMin, setWorld, ctx, pt, hasContent]);
 
-  const endDrag = useCallback(() => {
+  const endDrag = useCallback((e?: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     drag.current = null;
     if (!d) return;
@@ -316,6 +330,15 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       if (d.kind === 'bubble') setWorld(focusOn(world, layout, d.id, rules));
       show();
       return;
+    }
+    // ★ 空間の外（岸など）が先に横取りできる。取られたら落とし先は使わない
+    if (d.kind === 'bubble' && o.claimDrop) {
+      const p = lifted.byId.get(d.id);
+      const at = e ? pt(e) : null;
+      if (p && at && o.claimDrop({ id: d.id, pointer: { x: at.mx, y: at.my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h } })) {
+        show();
+        return;
+      }
     }
     if (d.kind === 'bubble' && d.slot) {
       const grabbed = {
@@ -330,7 +353,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     }
     // ★ 大きさの角は `resizeBubble` の中で ⑤ pin まで済んでいるので、離すときにやることは無い
     show();
-  }, [world, layout, rules, setWorld, ctx]);
+  }, [world, layout, rules, setWorld, ctx, lifted, o, pt]);
 
   const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
     const { mx, my } = pt(e);

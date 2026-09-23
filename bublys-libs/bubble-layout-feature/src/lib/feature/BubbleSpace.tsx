@@ -74,6 +74,11 @@ export interface BubbleSpaceProps {
   readonly style?: CSSProperties;
   /** 泡の外に置くもの（ツールバーなど） */
   readonly children?: ReactNode;
+  /**
+   * 離したところを、空間の外（岸など）が横取りする口。
+   * `true` を返したら**その泡は海から出る** ── 以後どう見せるかは横取りした側の仕事。
+   */
+  readonly onTakeOut?: (info: { readonly id: BubbleId; readonly url: string; readonly rect: { x: number; y: number; w: number; h: number }; readonly pointer: { x: number; y: number } }) => boolean;
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
@@ -95,6 +100,30 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
   const base = useMemo(() => resolveWorld(world, viewport, rules), [world, viewport, rules]);
+
+  /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
+  const takeOut = useCallback(
+    (id: BubbleId) => {
+      setWorld(world.without(id));
+      setUrls((m) => {
+        const next = new Map(m);
+        next.delete(id);
+        return next;
+      });
+    },
+    [world, setWorld],
+  );
+
+  const claimDrop = useCallback(
+    (info: { id: BubbleId; pointer: { x: number; y: number }; rect: { x: number; y: number; w: number; h: number } }) => {
+      const url = urls.get(info.id)?.url;
+      if (!url || !props.onTakeOut) return false;
+      const taken = props.onTakeOut({ id: info.id, url, rect: info.rect, pointer: info.pointer });
+      if (taken) takeOut(info.id);
+      return taken;
+    },
+    [urls, props, takeOut],
+  );
 
   const canOpen = useCallback((url: string) => !!matchBubbleRoute(routes, url), [routes]);
 
@@ -182,7 +211,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const hasContent = useCallback((id: BubbleId) => urls.has(id), [urls]);
   const input = useBubbleInput({
     world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules,
-    layerRef, hasContent,
+    layerRef, hasContent, claimDrop,
   });
 
   const renderBubble = useCallback(

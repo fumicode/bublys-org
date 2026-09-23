@@ -17,4 +17,4 @@ export type { PickInput, Picked } from './hit.js';
 export { withLift } from './lift.js';
 export type { LiftState } from './lift.js';
 export { useBubbleInput } from './useBubbleInput.js';
-export type { BubbleInput, BubbleInputOptions } from './useBubbleInput.js';
+export type { BubbleInput, BubbleInputOptions, ClaimDropInfo } from './useBubbleInput.js';

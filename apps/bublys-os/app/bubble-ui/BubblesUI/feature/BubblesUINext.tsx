@@ -13,17 +13,28 @@
  *   1. 岸（Showre）とネオン … 旧 `BubblesLayeredView` の中にある
  *   2. 世界線 … このリポジトリ独自の作りがあるので、それを読んでから繋ぐ
  */
-import { useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { OpenDepth } from "@bublys-org/bubble-layout-feature";
+import { TUBE_RADIUS, anchoredRect } from "@bublys-org/bubbles-ui";
+import { renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
+import type { BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { bubbleRoutes } from "../domain/bubbleRoutes";
+import { ShowreLayer, resolveDock, type Docked } from "./ShowreLayer";
 import { bridgeRoutes } from "./legacyRouteBridge";
 import { FullscreenToggle } from "../../components/FullscreenToggle";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
 /** 最初に開くもの。root には必ずランチャーが 1 つ居る */
 const INITIAL_URLS = ["launchers/main"];
+
+/** 海の口を外から掴むための小物（`BubbleSpace` の中でしか使えないので、子として置く） */
+const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }) => {
+  const space = useBubbleSpace();
+  useEffect(() => onReady(space), [space, onReady]);
+  return null;
+};
 
 export const BubblesUINext = () => {
   const [depth, setDepth] = useState<OpenDepth>("cascade");
@@ -40,6 +51,36 @@ export const BubblesUINext = () => {
   useEnsureMainLauncherEntity();
 
   const routes = useMemo(() => bridgeRoutes(bubbleRoutes), []);
+  const spaceRef = useRef<BubbleSpaceApi | null>(null);
+
+  /** 岸に着いているもの。海の泡ではないので、世界（WorldState）には居ない */
+  const [docked, setDocked] = useState<readonly Docked[]>([]);
+  const vp = useMemo(() => ({ width: viewport.w, height: viewport.h }), [viewport]);
+
+  /** 離したところが縁の近くなら、岸が横取りする */
+  const takeOut = useCallback(
+    (info: { id: string; url: string; rect: { x: number; y: number; w: number; h: number }; pointer: { x: number; y: number } }) => {
+      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
+      const hit = resolveDock(
+        { x: info.rect.x, y: info.rect.y, width: info.rect.w, height: info.rect.h },
+        info.pointer,
+        vp,
+        others,
+      );
+      if (!hit) return false;
+      setDocked((list) => [...list, { key: `${info.url}#${Date.now()}`, url: info.url, ...hit }]);
+      return true;
+    },
+    [docked, vp],
+  );
+
+  const renderDockedContent = useCallback(
+    (d: Docked) => {
+      const r = renderRoute(routes, d.key, d.url);
+      return r ? <r.route.Component bubble={r.bubble} /> : null;
+    },
+    [routes],
+  );
 
   return (
     <Box
@@ -49,6 +90,7 @@ export const BubblesUINext = () => {
         overflow: "hidden",
         position: "relative",
         background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+        borderRadius: `${TUBE_RADIUS}px`,
       }}
     >
       <BubbleSpace
@@ -57,7 +99,23 @@ export const BubblesUINext = () => {
         initialUrls={INITIAL_URLS}
         viewport={viewport}
         depth={depth}
+        onTakeOut={takeOut}
         style={{ position: "absolute", inset: 0 }}
+      >
+        <SpaceHandle onReady={(api) => { spaceRef.current = api; }} />
+      </BubbleSpace>
+
+      {/* 岸 ── 海の縁。バブルが貼り付く先であり、「ここが端だ」の目印でもある。
+          海には重なるだけで、大きさは 1px も削らない */}
+      <ShowreLayer
+        viewport={vp}
+        docked={docked}
+        renderContent={renderDockedContent}
+        onUndock={(key) => {
+          const d = docked.find((x) => x.key === key);
+          setDocked((list) => list.filter((x) => x.key !== key));
+          if (d) spaceRef.current?.openBubble(d.url, null);
+        }}
       />
 
       {/* 開き方を見比べる口。決めた既定は「重ねて開く」 */}
