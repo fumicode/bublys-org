@@ -59,6 +59,20 @@ export function BubbleField(props: BubbleFieldProps) {
     [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, measureText],
   );
 
+  /**
+   * ★ **DOM の並びは動かさない。前後は z-index でつける。**
+   *
+   *   `field.items` は描く順（奥 → 手前）だが、焦点が動くたび・札を選ぶたびに
+   *   その順は入れ替わる。そのまま DOM の並びにすると React が要素を差し替え直し、
+   *   **CSS のアニメーションが鳴り直して画面がちらつく**
+   *   （実測：一覧で札を1枚選ぶだけで `bl-in` が 4 回鳴り、DOM の出し入れが 4 回）。
+   *   前後はもともと `zIndex` に入れてあるので、DOM の並びは id で固定してよい。
+   */
+  const dom = useMemo(
+    () => [...field.items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    [field.items],
+  );
+
   return (
     <div
       ref={layerRef}
@@ -67,7 +81,7 @@ export function BubbleField(props: BubbleFieldProps) {
       style={style}
       {...handlers}
     >
-      {field.items.map((it) => (
+      {dom.map((it) => (
         <div
           key={it.id}
           data-id={it.id}

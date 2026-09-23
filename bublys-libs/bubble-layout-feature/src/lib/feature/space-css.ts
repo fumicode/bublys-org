@@ -112,7 +112,18 @@ export const SPACE_CSS = `
  *   箱（泡の大きさ）は動かさないので、**隣の札は 1px も動かない**。
  *   選んだ札だけが、ヘッダを出すぶん上から 20px ぶん譲る。
  */
-.bub:not(.sel):has(> .bl-quiet) > .bl-body{top:7px}
+/* 一覧の札の中身は上 7px から。背が伸びた札だけヘッダのぶん譲る */
+.bub > .bl-body.bl-tight{top:7px}
+.bub > .bl-body.bl-tight.bl-grown{top:27px}
+/*
+ * 伸びない並べ方（奥行きに重ねる）で選んだときは、装いを**中身の上に重ねる**
+ * ── 位置は 1px も動かさない。中身は上 7px が余白なので、帯（24px）が重なるのは
+ * その余白と、その下の 17px だけ。字にはかからない。
+ * 重ねないと、あとから置かれる中身（不透明）に隠れて装いが見えない。
+ */
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .hd,
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .ttl,
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close{z-index:2}
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
 .bl-object{position:relative;isolation:isolate}

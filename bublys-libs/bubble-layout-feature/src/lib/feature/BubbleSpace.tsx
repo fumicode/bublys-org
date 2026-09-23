@@ -170,6 +170,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const grown = useMemo(() => {
     const b = selectedId ? world.bubble(selectedId) : null;
     if (!b || b.space === 'root' || !listHosts.current.has(b.space)) return undefined;
+    /**
+     * ★ 伸ばすのは、並びが**そのぶん詰め直す**並べ方のときだけ（縦に並べる）。
+     *   奥行きに重ねる並びは軸が「そのまま」なので、伸ばしても後ろは動かず、
+     *   **選んだ札だけが自分の箱の中心のぶん動く** ── 触っただけで札がずれて見える。
+     *   重ねる並びでは、位置はそのままで装いだけを付ける。
+     */
+    const v = world.ownViewOf(b.space);
+    if (!v || v.y.arrange === 'as-is') return undefined;
     return new Map([[b.id, SELECTED_GROW]]);
   }, [selectedId, world]);
 
@@ -496,7 +504,20 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => closeBubble(id)}
           >×</button>
-          <div className={'bl-body' + (r?.route.ground === 'clear' ? ' bl-clear' : r?.route.ground === 'none' ? ' bl-none' : '')}>
+          <div
+            className={
+              'bl-body' +
+              (r?.route.ground === 'clear' ? ' bl-clear' : r?.route.ground === 'none' ? ' bl-none' : '') +
+              /**
+               * ★ 一覧の札の中身は**いつも上 7px から**（`bl-tight`）。
+               *   背が伸びた札だけ、ヘッダのぶん 27px から始める（`bl-grown`）。
+               *   こうしておくと、伸びない並べ方（奥行きに重ねる）で選んでも
+               *   中身の大きさも場所も変わらない ── 装いが付くだけになる。
+               */
+              (inList ? ' bl-tight' : '') +
+              (grown?.has(id) ? ' bl-grown' : '')
+            }
+          >
             {r
               ? <CurrentBubbleContext.Provider value={id}><r.route.Component bubble={r.bubble} /></CurrentBubbleContext.Provider>
               : <div className="bl-noroute">route が無い<br />{url}</div>}
@@ -504,7 +525,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world],
+    [routes, urls, closeBubble, world, grown],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */
