@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { Bubble, actContext, dragBubble, emptyWorld, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset } from '@bublys-org/bubble-layout';
+import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset } from '@bublys-org/bubble-layout';
 import type { AxisView, BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
@@ -105,6 +105,14 @@ export interface BubbleSpaceProps {
   readonly viewport: Viewport;
   /** 外の空間の並べ方。既定は「自由に置く」（既存 bubbles-ui の宇宙と同じ） */
   readonly rootPreset?: PresetId;
+  /**
+   * **レンズをまかせる。** 軸ごとに「平行で置いたら中身が箱に収まるか」を見て、
+   * 収まらない軸だけ魚眼にする（収まったら平行へ戻す）。
+   * 泡を縦に足していって画面から溢れたら自分で魚眼Yを点ける、という手間を無くすための口。
+   */
+  readonly autoLens?: boolean;
+  /** まかせた結果どちらになったかを知らせる（口の見た目を合わせるのに使う） */
+  readonly onLens?: (axis: PlaneAxis, lens: LensId) => void;
   readonly drawMin?: number;
   readonly rules?: Partial<LayoutRules>;
   /** 外で世界を持つなら渡す（Redux など）。渡さなければ自前で持つ */
@@ -408,6 +416,28 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [world],
   );
 
+
+  /**
+   * ★ **レンズをまかせる。**
+   *
+   *   見るのは「**平行に置いたら**収まるか」（`fitsParallel`）── いまのレンズは見ない。
+   *   魚眼は必ず収めてしまうので、それで判ると点けた途端に「収まった」ことになり、
+   *   点けたり消したりが止まらない。平行のときの広がりはレンズを変えても動かないので、
+   *   書いた結果で判定が裏返ることがない ＝ ここで落ち着く。
+   */
+  const autoLens = props.autoLens;
+  const onLens = props.onLens;
+  useEffect(() => {
+    if (!autoLens) return;
+    const L = base.spaces.get('root');
+    if (!L) return;
+    for (const axis of ['x', 'y'] as const) {
+      const want: LensId = fitsParallel(L, axis) ? 'parallel' : 'fisheye';
+      // 口の見た目は**いつも**合わせる（変えたときだけだと、点けた瞬間の姿がずれる）
+      onLens?.(axis, want);
+      if (L.view[axis].lens !== want) setLens(axis, want);
+    }
+  }, [autoLens, base, setLens, onLens]);
 
   const api: BubbleSpaceApi = useMemo(
     () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, takeIn }),

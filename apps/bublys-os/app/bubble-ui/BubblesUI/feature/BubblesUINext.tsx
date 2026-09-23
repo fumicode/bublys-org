@@ -250,6 +250,15 @@ export const BubblesUINext = () => {
     [routes, shoreSpace],
   );
 
+  /**
+   * レンズをまかせるか。まかせているあいだ、軸ごとのレンズは海が自分で決める
+   * ── 口の見た目（魚眼X/Y が点いているか）は、決まった結果を受け取って合わせる。
+   */
+  const [autoLens, setAutoLens] = useState(false);
+  const onLens = useCallback((axis: "x" | "y", lens: string) => {
+    setFisheye((f) => (f[axis] === (lens === "fisheye") ? f : { ...f, [axis]: lens === "fisheye" }));
+  }, []);
+
   /** 見え方の口に渡す値（泡は海の中で描かれるので、文脈で渡す） */
   const setPreset = useCallback((next: PresetId) => {
     setPresetState(next);
@@ -257,8 +266,8 @@ export const BubblesUINext = () => {
   }, []);
 
   const spaceView = useMemo<SpaceView>(
-    () => ({ preset, setPreset, join, setJoin, fisheye, toggleFisheye }),
-    [preset, setPreset, join, fisheye, toggleFisheye],
+    () => ({ preset, setPreset, join, setJoin, fisheye, toggleFisheye, autoLens, setAutoLens }),
+    [preset, setPreset, join, fisheye, toggleFisheye, autoLens],
   );
 
   return (
@@ -288,6 +297,8 @@ export const BubblesUINext = () => {
       <BubbleSpace
         routes={routes}
         viewport={viewport}
+        autoLens={autoLens}
+        onLens={onLens}
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
         style={{ position: "absolute", inset: 0 }}

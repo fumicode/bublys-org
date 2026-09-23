@@ -53,6 +53,28 @@ export function focusFits(L: SpaceLayout, axis: PlaneAxis, f: number): boolean {
 }
 
 /**
+ * **平行に写したら、中身は箱に収まるか。**
+ *
+ * `focusFits` と違って**レンズを見ない**。魚眼は tanh で必ず箱に収めてしまうので、
+ * 「魚眼が要るか」を決めるのにそれを使うと、点けた途端に「収まった」ことになって
+ * すぐ消す ── 点けたり消したりが止まらない。
+ * 要るかどうかは**平行に置いたときの広がり**で決まる。これはレンズを変えても動かない。
+ */
+export function fitsParallel(L: SpaceLayout, axis: PlaneAxis): boolean {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const k of L.kids) {
+    const at = L.arr[axis].pos.get(k.id) ?? 0;
+    const sz = L.sizeOf(k);
+    const half = (axis === 'x' ? sz.w : sz.h) / 2;
+    lo = Math.min(lo, at - half);
+    hi = Math.max(hi, at + half);
+  }
+  if (!(hi > lo)) return true;                       // 泡がいない／1 点なら収まっている
+  return hi - lo <= L.H[axis] * 2 + 1e-6;
+}
+
+/**
  * 焦点を v へ動かしたら、約束の中のどこに留まるか（書かない）。lab.html 836-846 行 fitFocus。
  *   (0) 次元が なし の軸は 0
  *   (1) 見ている所には泡がある（並んだ泡の範囲の外へは出ない）

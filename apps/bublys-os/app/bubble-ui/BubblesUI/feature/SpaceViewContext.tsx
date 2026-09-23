@@ -20,6 +20,13 @@ export type SpaceView = {
   /** 魚眼をどちらの向きに掛けるか（軸ごと） */
   readonly fisheye: { readonly x: boolean; readonly y: boolean };
   readonly toggleFisheye: (axis: "x" | "y") => void;
+  /**
+   * **レンズをまかせる。** 軸ごとに「平行で置いたら中身が画面に収まるか」を見て、
+   * 収まらない軸だけ魚眼にする（収まったら平行へ戻す）。
+   * 泡を足していって溢れたら自分で魚眼を点け、減ったら消す、という手間が無くなる。
+   */
+  readonly autoLens: boolean;
+  readonly setAutoLens: (on: boolean) => void;
 };
 
 const NOOP: SpaceView = {
@@ -29,6 +36,8 @@ const NOOP: SpaceView = {
   setJoin: () => undefined,
   fisheye: { x: true, y: false },
   toggleFisheye: () => undefined,
+  autoLens: false,
+  setAutoLens: () => undefined,
 };
 
 export const SpaceViewContext = createContext<SpaceView>(NOOP);

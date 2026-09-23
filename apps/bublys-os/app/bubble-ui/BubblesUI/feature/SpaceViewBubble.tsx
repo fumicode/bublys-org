@@ -26,7 +26,7 @@ const chip = (active: boolean): CSSProperties => ({
 });
 
 export const SpaceViewBubble: FC = () => {
-  const { preset, setPreset, join, setJoin, fisheye, toggleFisheye } = useSpaceView();
+  const { preset, setPreset, join, setJoin, fisheye, toggleFisheye, autoLens, setAutoLens } = useSpaceView();
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
       {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
@@ -56,17 +56,36 @@ export const SpaceViewBubble: FC = () => {
         {join === "branch" ? "枝分かれ" : "迂回"}
       </button>
 
+      {/*
+        レンズをまかせる。溢れたら魚眼、収まったら平行 ── 軸ごとに勝手に切り替わる。
+        まかせているあいだは、手で選ぶ口は押せない（押しても次の瞬間に上書きされるので）
+      */}
+      <button
+        onClick={() => setAutoLens(!autoLens)}
+        title={
+          autoLens
+            ? "いまはまかせている ── 平行で収まらない向きだけ魚眼になる"
+            : "レンズをまかせる ── 泡が画面に収まらなくなった向きを、自分で魚眼にする"
+        }
+        style={chip(autoLens)}
+      >
+        まかせる
+      </button>
+
       {/* 魚眼の向き。軸ごとのレンズをそのまま口にしてある（両方／どちらも無し も選べる） */}
       {(["x", "y"] as const).map((axis) => (
         <button
           key={axis}
           onClick={() => toggleFisheye(axis)}
+          disabled={autoLens}
           title={
-            fisheye[axis]
-              ? `${axis.toUpperCase()} は魚眼 ── この向きに、焦点から離れるほど小さくなる`
-              : `${axis.toUpperCase()} は平行 ── この向きでは大きさが変わらない`
+            autoLens
+              ? `まかせているので、${axis.toUpperCase()} は自動で決まる`
+              : fisheye[axis]
+                ? `${axis.toUpperCase()} は魚眼 ── この向きに、焦点から離れるほど小さくなる`
+                : `${axis.toUpperCase()} は平行 ── この向きでは大きさが変わらない`
           }
-          style={chip(fisheye[axis])}
+          style={{ ...chip(fisheye[axis]), opacity: autoLens ? 0.5 : 1, cursor: autoLens ? "default" : "pointer" }}
         >
           魚眼{axis.toUpperCase()}
         </button>

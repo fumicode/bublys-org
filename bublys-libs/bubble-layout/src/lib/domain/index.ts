@@ -48,7 +48,7 @@ export { headOf, padOf, measureBox, measureAll, halfOf, lensContext } from './me
 export type { BoxSizes, GrownHeights, LensContext } from './measure.js';
 export { resolveWorld, compose, contentOf, contentRect, withFittedFocus } from './resolve.js';
 export type { Layout, SpaceLayout, Placement, Host, Viewport } from './resolve.js';
-export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitFocus, withFocusAxis, focusOf } from './project.js';
+export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitsParallel, fitFocus, withFocusAxis, focusOf } from './project.js';
 
 // ── 操作（値を書く。入力と当たり判定は ui）──
 export { actContext } from './act.js';
