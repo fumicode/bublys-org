@@ -425,6 +425,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        */
       if (!url) return <BubbleShell draw={draw} />;
       const r = renderRoute(routes, id, url);
+      /**
+       * ★ **一覧の中の札は、選んでいるものだけ url を出す。**
+       *   一覧は「どれを選ぶか」を見る画面なので、札ごとに uuid が並ぶと中身が読めない。
+       *   消すのではなく**選んだものにだけ出す**ので、どこの何かは要るときに分かる。
+       *   出し分けは CSS（`.bub.sel` が付いている）に任せる ── 選び直しのたびに
+       *   描き直さなくて済む。
+       */
+      const space = world.bubble(id)?.space;
+      const inList = !!space && listHosts.current.has(space);
       return (
         <>
           <div className="hd" />
@@ -433,7 +442,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               中身は自分の題名を自分で出すので、枠にも題名を出すと二重になる
               ── v6 の検証で最初に見つかったのがこれ。
           */}
-          <div className="ttl bl-url">
+          <div className={'ttl bl-url' + (inList ? ' bl-quiet' : '')}>
             {url.split("/").map((seg, i) => (
               <span key={i} className="bl-seg">
                 {i > 0 && <span className="bl-sep">/</span>}
@@ -455,7 +464,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble],
+    [routes, urls, closeBubble, world],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

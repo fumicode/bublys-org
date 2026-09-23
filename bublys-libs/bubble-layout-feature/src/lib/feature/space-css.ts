@@ -94,6 +94,8 @@ export const SPACE_CSS = `
   font:600 11px/24px var(--f);letter-spacing:.01em}
 .bl-seg{white-space:nowrap}
 .bl-sep{opacity:.45;margin:0 3px}
+/* 一覧の中の札 ── url は選んでいるものにだけ出す（並んだ uuid で中身が読めなくなるので） */
+.bub:not(.sel) > .bl-quiet{display:none}
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
 .bl-object{position:relative;isolation:isolate}
