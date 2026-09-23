@@ -12,6 +12,8 @@ export interface BubbleSpaceApi {
   urlOf: (id: BubbleId) => string | null;
   /** その url が開けるか（route が当たるか） */
   canOpen: (url: string) => boolean;
+  /** その url の泡が、いまこの空間に居るか（居なくなったことに気づくのに使う） */
+  hasUrl: (url: string) => boolean;
   /**
    * 外の空間の、その軸のレンズを変える ── **魚眼をどちらの向きに掛けるか**。
    * レンズは軸ごとに持つものなので、X と Y は別々に決まる（両方でも、どちらも平行でもよい）。
@@ -32,6 +34,7 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   closeBubble: () => undefined,
   urlOf: () => null,
   canOpen: () => false,
+  hasUrl: () => false,
   setLens: () => undefined,
   takeIn: () => '',
 });

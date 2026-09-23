@@ -20,6 +20,8 @@ import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
+import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
+import { SpaceViewBubble } from "@/app/bubble-ui/BubblesUI/feature/SpaceViewBubble";
 import "@/app/launcher/launchTargets";
 import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
 import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
@@ -205,6 +207,25 @@ const routes: BubbleRoute[] = [
 
   // ランチャー（呼び出しを溜めるバブリ）。root では左の岸に着いている
   ...launcherBubbleRoutes,
+
+  // 見え方（開き方・ネオンの通し方・レンズの向き）。前は画面の左上に固定した帯だった
+  {
+    pattern: /^space-view$/,
+    type: "space-view",
+    Component: SpaceViewBubble,
+    // 地は敷かない ── ボタンが空間の上に浮いて見える
+    bubbleOptions: { defaultSize: { width: 480, height: 44 }, contentBackground: "transparent" },
+  },
+
+  // ポケット（オブジェクトのクリップボード）。前は画面に居座る面だったが、1 つの泡にした
+  // ── いつも見えていてほしければ岸に貼る
+  {
+    pattern: /^pocket$/,
+    type: "pocket",
+    Component: PocketBubble,
+    // 地は中身が持つ ── 大きいときは自分で白い箱を描き、アイコンだけのときは空間を透かす
+    bubbleOptions: { defaultSize: { width: 260, height: 300 }, contentBackground: "transparent" },
+  },
 
   // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）
   {

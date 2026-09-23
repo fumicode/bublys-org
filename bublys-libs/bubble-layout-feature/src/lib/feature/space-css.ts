@@ -60,6 +60,8 @@ export const SPACE_CSS = `
   overflow:hidden;box-shadow:none;color:#e6ebf5;
   /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
   background:linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)}
+/* 地を敷かない ── 中身が自分で持つ。空間（夜空）がそのまま透ける */
+.bub > .bl-body.bl-none{background:none;box-shadow:none;color:#e6ebf5}
 .bub.chip > .bl-body{display:none}
 /* ★ 中身を消すのは題名より**奥**（倍率 0.3）。題名が読めなくなっても、
    中身の形は「何が入っているか」の手がかりになるので描き続ける（CONTENT_MIN） */

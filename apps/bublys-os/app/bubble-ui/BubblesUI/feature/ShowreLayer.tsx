@@ -46,7 +46,7 @@ export type Docked = {
    * 地の種類。海に浮いているときと同じものを敷く ──
    * **岸に着いても中身の見た目は変わらない**（変わるのは置き場所だけ）。
    */
-  readonly ground?: "light" | "clear";
+  readonly ground?: "light" | "clear" | "none";
 };
 
 /**
@@ -63,6 +63,12 @@ const GROUND = {
   // 窓（空間を持つ泡）── 自分の夜空を持っている。明るい地を敷くと中身が白く霞む
   clear: {
     background: "linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)",
+    color: "#e6ebf5",
+    overflow: "hidden" as const,
+  },
+  // 敷かない ── 中身が自分で地を持つ。**海がそのまま透ける**
+  none: {
+    background: "none",
     color: "#e6ebf5",
     overflow: "hidden" as const,
   },

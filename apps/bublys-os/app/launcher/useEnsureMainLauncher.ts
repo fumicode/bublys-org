@@ -19,17 +19,27 @@ const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
 const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
 
 /**
- * ランチャー集約 main が無ければ、OS 標準の呼び出しで作る。**泡は作らない。**
+ * ルール: **OS 標準の呼び出しは、main ランチャーに必ず 1 つずつ居る。**
  *
- * 「どこに出すか」は海の側の仕事なので分けてある
- * （新しい海は最初に開く url として `launchers/main` を渡すだけ）。
+ * - 集約が無ければ、OS 標準の呼び出しで作る
+ * - 有っても足りないものがあれば足す（あとから増えた呼び出しが出てこないので）
+ *
+ * OS 標準の呼び出しには外す口が無いので、足すだけで辻褄が合う
+ * （ロードしたバブリの `<name>-bubly` は標準ではないので、ここは触らない）。
+ * **泡は作らない** ── 「どこに出すか」は海の側の仕事（最初に開く url として渡すだけ）。
  */
 export const useEnsureMainLauncherEntity = () => {
   const dispatch = useAppDispatch();
   const mainLauncher = useAppSelector(selectLauncherPlain(MAIN_LAUNCHER_ID));
   useEffect(() => {
-    if (mainLauncher) return;
-    dispatch(setLauncher(Launcher.create(DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID).toPlain()));
+    if (!mainLauncher) {
+      dispatch(setLauncher(Launcher.create(DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID).toPlain()));
+      return;
+    }
+    const launcher = Launcher.fromPlain(mainLauncher);
+    const missing = DEFAULT_LAUNCHER_URLS.filter((url) => !launcher.urls.includes(url));
+    if (missing.length === 0) return;
+    dispatch(setLauncher(missing.reduce((l, url) => l.add(url), launcher).toPlain()));
   }, [dispatch, mainLauncher]);
 };
 

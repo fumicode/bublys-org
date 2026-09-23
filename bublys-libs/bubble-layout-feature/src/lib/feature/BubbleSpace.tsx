@@ -115,9 +115,16 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const [selectedId, setSelectedId] = useState<BubbleId | null>(null);
 
   const world = props.world ?? ownWorld;
+  /**
+   * ★ 頼るのは **`props.onChange` 1 つだけ**。`props` まるごとを頼りにすると、
+   *   描くたびに新しくなる（props は毎回新しい object）ので `setWorld` も新しくなり、
+   *   そこから作る開く口（`api`）まで毎回新しくなる。
+   *   口を state で持つ側（例: 岸）がそれを見ていると、更新が止まらなくなる。
+   */
+  const onChange = props.onChange;
   const setWorld = useCallback(
-    (next: BubbleWorld) => { if (props.onChange) props.onChange(next); else setOwnWorld(next); },
-    [props],
+    (next: BubbleWorld) => { if (onChange) onChange(next); else setOwnWorld(next); },
+    [onChange],
   );
 
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
@@ -148,6 +155,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const canOpen = useCallback((url: string) => !!matchBubbleRoute(routes, url), [routes]);
+  const hasUrl = useCallback((url: string) => [...urls.values()].some((o) => o.url === url), [urls]);
 
   const openBubble = useCallback(
     (url: string, openerId?: BubbleId | null, label?: string): BubbleId => {
@@ -248,8 +256,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, setLens, takeIn }),
-    [openBubble, closeBubble, urls, canOpen, setLens, takeIn],
+    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, takeIn }),
+    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, takeIn],
   );
 
   /**
@@ -333,7 +341,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => closeBubble(id)}
           >×</button>
-          <div className={'bl-body' + (r?.route.ground === 'clear' ? ' bl-clear' : '')}>
+          <div className={'bl-body' + (r?.route.ground === 'clear' ? ' bl-clear' : r?.route.ground === 'none' ? ' bl-none' : '')}>
             {r
               ? <CurrentBubbleContext.Provider value={id}><r.route.Component bubble={r.bubble} /></CurrentBubbleContext.Provider>
               : <div className="bl-noroute">route が無い<br />{url}</div>}

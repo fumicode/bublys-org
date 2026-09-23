@@ -126,7 +126,12 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),
-    ground: isWindow ? ('clear' as const) : ('light' as const),
+    // 中身が「地は自分で持つ」と言っていれば敷かない（空間がそのまま透ける）
+    ground: isWindow
+      ? ('clear' as const)
+      : route.bubbleOptions?.contentBackground === 'transparent'
+        ? ('none' as const)
+        : ('light' as const),
     ...(size ? { size: { w: size.width, h: size.height } } : {}),
   };
 };

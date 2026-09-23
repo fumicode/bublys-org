@@ -34,7 +34,13 @@ export interface BubbleRoute {
    *  - `'light'`（既定）… 明るい地を敷く。バブリの画面は明るい地を前提に書かれている
    *  - `'clear'`        … 地を敷かない。中身が自分で背景を持つ窓（入れ子の宇宙・canvas）
    */
-  readonly ground?: 'light' | 'clear';
+  /**
+   * 中身の下に敷く地。
+   *   `light` … 明るい地（既定。バブリの画面は明るい地を前提に書かれている）
+   *   `clear` … 窓（自分の夜空を持つ）
+   *   `none`  … **何も敷かない**。中身が自分で地を持つ（＝空間がそのまま透ける）
+   */
+  readonly ground?: 'light' | 'clear' | 'none';
 }
 
 const pathOf = (url: string): string => {

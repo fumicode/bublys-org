@@ -53,8 +53,15 @@ export const FullscreenToggle: FC = () => {
   }, []);
 
   return (
+    // ★ 色は**まわりから継ぐ**。この口は暗い空間の上に出ることもあるので、
+    //   既定の黒い字のままだと読めない（入っているときだけ青くする）。
+    //   ★ Tooltip の子は 1 つだけ ── ここに註釈を置くと子が 2 つになって壊れる
     <Tooltip title={isFullscreen ? "画面いっぱいを解除" : "画面いっぱいにする"} arrow>
-      <IconButton size="small" onClick={toggle} color={isFullscreen ? "primary" : "default"}>
+      <IconButton
+        size="small"
+        onClick={toggle}
+        sx={{ color: isFullscreen ? "#4d8dff" : "inherit" }}
+      >
         {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
       </IconButton>
     </Tooltip>

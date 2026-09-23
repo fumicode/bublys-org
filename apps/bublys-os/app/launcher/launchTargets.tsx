@@ -6,6 +6,7 @@ import NoteIcon from "@mui/icons-material/Note";
 import PersonIcon from "@mui/icons-material/Person";
 import PublicIcon from "@mui/icons-material/Public";
 import ExtensionIcon from "@mui/icons-material/Extension";
+import WorkspacesIcon from "@mui/icons-material/Workspaces";
 import { registerLaunchTargets, type LaunchTarget } from "@bublys-org/launcher-libs";
 
 /**
@@ -20,6 +21,7 @@ export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
   { url: "memo-bubly", label: "メモ", icon: <NoteIcon color="action" /> },
   { url: "users-bubly", label: "ユーザー", icon: <PersonIcon color="action" /> },
   { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
+  { url: "pocket", label: "ポケット", icon: <WorkspacesIcon sx={{ color: "#6ea8ff" }} /> },
   { url: "bubly-loader", label: "バブリを追加", icon: <ExtensionIcon color="action" /> },
 ];
 
