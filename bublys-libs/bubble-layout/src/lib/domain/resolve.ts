@@ -40,8 +40,8 @@ import { arrangeAxis } from './arrange.js';
 import type { Arranged } from './arrange.js';
 import { imageOf, LENS_XY, LENS_Z } from './lens.js';
 import type { LensXyId, LensZId } from './lens.js';
-import { halfOf, headOf, lensContext, measureAll, measureBox, padOf } from './measure.js';
-import type { BoxSizes, GrownHeights, LensContext } from './measure.js';
+import { chromeOf, halfOf, lensContext, measureAll, measureBox, padOf } from './measure.js';
+import type { BoxSizes, ChromeMap, LensContext } from './measure.js';
 import { fitFocus } from './project.js';
 
 /** 空間を持つ泡の「中身の箱」＝ その中の空間の土台。lab.html 745-752 行 contentOf */
@@ -134,8 +134,8 @@ export function resolveWorld(
   world: BubbleWorld,
   viewport: Viewport,
   rules?: Partial<LayoutRules>,
-  /** このフレームだけ背を伸ばす泡（模型の値ではない。measure.ts の GrownHeights） */
-  grown?: GrownHeights,
+  /** このフレームだけ、どの泡がどの装いを着ているか（模型の値ではない。measure.ts の ChromeMap） */
+  chrome?: ChromeMap,
   /**
    * このフレームだけ Z の焦点に足す量（空間ごと）。**約束（`fitFocus`）の外**に出る。
    *
@@ -146,7 +146,7 @@ export function resolveWorld(
   nudge?: ReadonlyMap<SpaceId, number>,
 ): Layout {
   const R = resolveRules(rules);
-  const boxes = measureAll(world, R, grown);
+  const boxes = measureAll(world, R, chrome);
   const spaces = new Map<SpaceId, SpaceLayout>();
   const sink: Mutable<Placement>[] = [];
   resolveSpace(
@@ -158,6 +158,7 @@ export function resolveWorld(
     spaces,
     sink,
     nudge,
+    chrome,
   );
   const byId = new Map<BubbleId, Placement>(sink.map((p) => [p.id, p]));
   // ③ 見えない親は体を持たないので、見えている子がいるときだけ見える（枠も縁も）。
@@ -210,10 +211,12 @@ function resolveSpace(
   sink: Mutable<Placement>[],
   /** そのフレームだけ Z の焦点に足す量（約束の外。resolveWorld の註） */
   nudge?: ReadonlyMap<SpaceId, number>,
+  /** このフレームだけの装い（箱＝中身＋装い） */
+  chrome?: ChromeMap,
 ): void {
   const view = viewOfSpace(world, spaceId);
   const kids = world.kidsOf(spaceId);
-  const sizeOf = (b: Bubble) => measureBox(world, b.id, boxes, rules);
+  const sizeOf = (b: Bubble) => measureBox(world, b.id, boxes, rules, chrome);
   const arr: { x: Arranged; y: Arranged; z: Arranged } = {
     x: arrangeAxis({ axisView: view.x, axis: 'x', spaceId, kids, sizeOf, world, rules }),
     y: arrangeAxis({ axisView: view.y, axis: 'y', spaceId, kids, sizeOf, world, rules }),
@@ -223,8 +226,14 @@ function resolveSpace(
   let own: { w: number; h: number };
   if (spaceId === ROOT_SPACE) own = { w: host.w, h: host.h };
   else {
-    const m = measureBox(world, spaceId, boxes, rules);
-    own = { w: m.w, h: m.h - headOf(world, spaceId) };
+    /**
+     * ★ 空間の中身は、箱から**装いのぶんを引いた**所。
+     *   前は縦だけ（ヘッダ 24）引いていて、横は箱いっぱいのつもりだった ──
+     *   CSS は左右も 7px 内側に置いているので、模型と絵が 14px ずれていた。
+     */
+    const m = measureBox(world, spaceId, boxes, rules, chrome);
+    const c = chromeOf(world, spaceId, chrome);
+    own = { w: m.w - (c.left + c.right), h: m.h - (c.top + c.bottom) };
   }
   /**
    * ④ 詰める並びは**箱の中央**に来る。その軸が「始端に空けておく量」（`reserve`）を持つなら、
@@ -378,7 +387,7 @@ function resolveSpace(
     };
     sink.push(place);
     if (world.isHost(it.b.id))
-      resolveSpace(world, it.b.id, contentOf(world, place), boxes, rules, spaces, sink, nudge);
+      resolveSpace(world, it.b.id, contentOf(world, place, chrome), boxes, rules, spaces, sink, nudge, chrome);
   }
 }
 
@@ -420,14 +429,21 @@ export function hostScale(host: Host): number {
   return host.scale * host.zoom;
 }
 
-/** 空間を持つ泡の配置 → その中身の箱（子の空間の host）。lab.html 745-752 行 */
-export function contentOf(world: BubbleWorld, p: Placement): Host {
-  const hd = headOf(world, p.id);
+/**
+ * 空間を持つ泡の配置 → その中身の箱（子の空間の host）。lab.html 745-752 行
+ *
+ * ★ 引くのは**装いのぶん全部**（上下左右）。前は上（ヘッダ）だけ引いていたので、
+ *   CSS が左右にも 7px 取っている泡では、模型の中身が絵より 14px 広かった。
+ */
+export function contentOf(world: BubbleWorld, p: Placement, chrome?: ChromeMap): Host {
+  const c = chromeOf(world, p.id, chrome);
+  const w = p.box.w - (c.left + c.right);
+  const h = p.box.h - (c.top + c.bottom);
   return {
-    cx: p.x + p.w / 2,
-    cy: p.y + (hd + (p.box.h - hd) / 2) * p.scale,
-    w: p.box.w,
-    h: p.box.h - hd,
+    cx: p.x + (c.left + w / 2) * p.scale,
+    cy: p.y + (c.top + h / 2) * p.scale,
+    w,
+    h,
     scale: p.scale,
     zoom: 1,                      // ★ 寄りは画面2（いちばん外側）だけのもの
     alpha: p.alpha,

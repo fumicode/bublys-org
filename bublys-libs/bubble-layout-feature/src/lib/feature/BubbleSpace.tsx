@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
 import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset } from '@bublys-org/bubble-layout';
-import type { AxisView, BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
+import type { AxisView, BubbleId, BubbleWorld, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, useScreenZoom } from './context.js';
@@ -55,18 +55,6 @@ function mateFor(
   return best ? best.id : null;
 }
 
-/**
- * 選んだ札が伸びる高さ ＝ **中身のまわりの余白の差**。
- *
- * 縦に詰める一覧の札は、静かなときは上下 1px（札と札のあいだを限界まで細くするため。
- * space-css の `.bl-packed`）。**選んで泡になったら**、上は装いのぶん 27px、
- * 下は**左右と同じ 7px**（`.bl-grown`）。
- *
- * ★ その差だけ札の背が伸びれば、**中身の高さは変わらない** ── 選び直すたびに札の中が
- *   伸び縮みするのを避けたいので、こうする。伸びたぶんは**並びの後ろがずれて**吸収する。
- * ★ CSS と同じ数。片方だけ変えると中身が伸び縮みする。
- */
-const SELECTED_GROW = (27 + 7) - (1 + 1);
 
 /**
  * 端で行き過ぎる量（軸の 1 刻みに対する割合）と、その山の長さ（ms）。
@@ -224,29 +212,36 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   /**
-   * ★ **選んだ札だけ、ヘッダのぶん背が伸びる。**
+   * **このフレームの装い** ── どの泡が、どの枠を着ているか。
    *
-   * 一覧の札は、選んでいないあいだ装いを出さない（`bl-quiet`）ので、中身が
-   * ヘッダのぶんまで広がっている。選んだときに中身を縮めて場所を作ると、
-   * 選び直すたびに札の中が伸び縮みして落ち着かない ── **札のほうが伸びて、
-   * 並びの後ろがそのぶんずれる**ほうが素直。
+   * > 箱 ＝ 中身 ＋ 装い（`chrome.ts`）。中身の大きさは泡が持ち、装いはここが決める。
    *
-   * ★ 世界には書かない（② 触っても値は1つも書かない）。1 フレームの measure に
-   *   だけ効く `grown` で渡す ── 帯も箱も焦点の約束も、伸びたあとの大きさで揃う。
+   * ★ 世界には書かない（② 触っても値は1つも書かない）。1 フレームの measure にだけ効く
+   *   ── 帯も箱も焦点の約束も、着たあとの大きさで揃う。
+   * ★ 前はここが「選んだ札だけ背を伸ばす px」（`SELECTED_GROW = (27+7)−(1+1)`）だった。
+   *   伸ばす量は**装いの差そのもの**だったので、装いを渡せば差はひとりでに出る。
+   *   一覧の札が装いを出す（選ばれる）と `packed` → `plain` になり、その差だけ箱が伸びる。
    */
-  const grown = useMemo(() => {
-    const b = selectedId ? world.bubble(selectedId) : null;
-    if (!b || b.space === 'root' || !listHosts.current.has(b.space)) return undefined;
-    /**
-     * ★ 伸ばすのは、並びが**そのぶん詰め直す**並べ方のときだけ（縦に並べる）。
-     *   奥行きに重ねる並びは軸が「そのまま」なので、伸ばしても後ろは動かず、
-     *   **選んだ札だけが自分の箱の中心のぶん動く** ── 触っただけで札がずれて見える。
-     *   重ねる並びでは、位置はそのままで装いだけを付ける。
-     */
-    const v = world.ownViewOf(b.space);
-    if (!v || v.y.arrange === 'as-is') return undefined;
-    return new Map([[b.id, SELECTED_GROW]]);
-  }, [selectedId, world]);
+  const chrome = useMemo(() => {
+    const m = new Map<BubbleId, ChromeId>();
+    for (const b of world.bubbles) {
+      if (b.state.implicit) continue;                 // ③ 見えない親は体を持たない（模型が bare を返す）
+      const url = urls.get(b.id)?.url;
+      const r = url ? matchBubbleRoute(routes, url) : null;
+      // 窓（中身が自分の宇宙を持つ）は帯だけ。余白は中の器が自分で取る
+      if (r?.ground === 'clear') { m.set(b.id, 'bar'); continue; }
+      const inList = b.space !== 'root' && listHosts.current.has(b.space);
+      // 一覧の中でも、装いを出している（選ばれている）札は普通の泡と同じ
+      if (!inList || b.id === selectedId) { m.set(b.id, 'plain'); continue; }
+      /**
+       * ★ 詰める並びのときだけ、札と札のあいだを限界まで細くする（`packed`）。
+       *   奥行きに重ねる並びは軸が「そのまま」なので、細くしても後ろは動かず、
+       *   触った札だけが自分の箱の中心のぶん動いて見える。
+       */
+      m.set(b.id, world.ownViewOf(b.space)?.y.arrange !== 'as-is' ? 'packed' : 'quiet');
+    }
+    return m;
+  }, [world, urls, routes, selectedId]);
 
   /**
    * **これ以上いけない**の跳ね返り（オーバースクロール）。
@@ -273,8 +268,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
   const base = useMemo(
-    () => resolveWorld(world, viewport, rules, grown, nudge),
-    [world, viewport, rules, grown, nudge],
+    () => resolveWorld(world, viewport, rules, chrome, nudge),
+    [world, viewport, rules, chrome, nudge],
   );
 
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
@@ -639,7 +634,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const input = useBubbleInput({
-    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, grown,
+    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, chrome,
     layerRef, hasContent, claimDrop, onDragInfo,
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
   });
@@ -705,7 +700,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
                */
               (inList ? ' bl-tight' : '') +
               (packed ? ' bl-packed' : '') +
-              (grown?.has(id) ? ' bl-grown' : '')
+              /* 装いを出している札（＝ 普通の泡と同じ枠）だけ、中身がヘッダのぶん下がる */
+              (inList && chrome.get(id) === 'plain' ? ' bl-grown' : '')
             }
           >
             {r
@@ -715,7 +711,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, grown, headerTools],
+    [routes, urls, closeBubble, world, chrome, headerTools],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

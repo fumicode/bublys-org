@@ -27,6 +27,7 @@ import type { LayoutRules } from './rules.js';
 import type { Verb } from './dimension.js';
 import { verbOf, writeKeyOf } from './dimension.js';
 import { viewOfSpace } from './view.js';
+import { chromeOf } from './measure.js';
 import { valueFromPos } from './arrange.js';
 import { screenToAxis, unprojectLocal, withFocusAxis } from './project.js';
 import { pin } from './pin.js';
@@ -203,6 +204,9 @@ export interface ResizeQuery {
   readonly at: { readonly x: number; readonly y: number };
 }
 
+/** 中身がこれより小さくはならない（px）。掴んだ角で潰しきらないための下限 */
+const MIN_CONTENT = 24;
+
 /**
  * 右下の角をドラッグする。lab.html 1163-1168 行。
  * 大きさを書いてから ⑤ pin で左上を留める（どの空間にいても同じ1つの決まり）。
@@ -211,10 +215,17 @@ export interface ResizeQuery {
 export function resizeBubble(world: BubbleWorld, ctx: ActContext, q: ResizeQuery): BubbleWorld {
   const b = world.bubble(q.id);
   if (!b) return world;
-  const size = {
-    w: Math.max(40, q.size0.w + q.by.x / q.scale),
-    h: Math.max(METRICS.HEADER + 10, q.size0.h + q.by.y / q.scale),
+  /**
+   * ★ 掴んでいるのは**箱の角**だが、泡が持つのは**中身の大きさ**なので、
+   *   書くときに装いのぶんを引く（`chrome.ts`）。下限も中身で見る
+   *   ── 装いの厚みは泡ごとに違うので、箱で下限を決めると泡によって中身が消える。
+   */
+  const c = chromeOf(world, q.id, ctx.chrome);
+  const box = {
+    w: Math.max(MIN_CONTENT + c.left + c.right, q.size0.w + q.by.x / q.scale),
+    h: Math.max(MIN_CONTENT + c.top + c.bottom, q.size0.h + q.by.y / q.scale),
   };
+  const size = { w: box.w - (c.left + c.right), h: box.h - (c.top + c.bottom) };
   const next = world.withBubble(b.withSize(size));
   // pin が見るのは左上（x・y）だけ。w/h/scale は掴んだときのものをそのまま渡す
   return pin(next, ctx, q.id, { x: q.at.x, y: q.at.y, w: q.size0.w, h: q.size0.h, scale: q.scale });

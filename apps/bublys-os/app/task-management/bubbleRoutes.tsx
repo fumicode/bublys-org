@@ -18,12 +18,11 @@ import { useSeedTasks } from "./feature/useSeedTasks";
 /**
  * 札 1 枚の大きさ。
  *
- * ★ 高さは**中身が全部映る**ように取る ── 泡の枠（ヘッダ 27 ＋ 下の余白 7 ＝ 34）を
- *   足した値。64 にしていたら枠の中が 30px しかなく、**札 1 枚ずつに巻物の棒が出ていた**
- *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
- *   1 枚ずつ巻物になるのは本末転倒。
+ * ★ **中身の数**（`chrome.ts`）。枠が取るぶんは枠が外へ足す。
+ *   高さは実測（中身は 46〜54px 要る）の上限 54 ── 一覧は「全部映る」ことが意味の画面なので、
+ *   1 枚ずつ巻物になるのは本末転倒。前は枠のぶん 34 を足した 88 を名乗っていた。
  */
-const CARD = { w: LIST_CARD_WIDTH, h: 88 };
+const CARD = { w: LIST_CARD_WIDTH, h: 54 };
 
 /**
  * タスク一覧 ── **並びの空間**。
@@ -110,6 +109,7 @@ export const taskManagementBubbleRoutes: BubbleRoute[] = [
     type: "task-management-task",
     Component: TaskDetailBubble,
     // ★ **全部映ることが意味の画面**。既定の 320×240 だと巻物になる（実測：中身 446px）
-    bubbleOptions: { defaultSize: { width: 420, height: 520 } },
+    //   中身の数（chrome.ts）── 前は枠込みの 420×520
+    bubbleOptions: { defaultSize: { width: 406, height: 486 } },
   },
 ];

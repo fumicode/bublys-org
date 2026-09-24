@@ -8,6 +8,8 @@
  */
 import { METRICS, ROOT_SPACE } from './types.js';
 import type { BubbleId, Focus, Size, SpaceId } from './types.js';
+import { CHROME, chromeH, chromeW } from './chrome.js';
+import type { Chrome, ChromeId } from './chrome.js';
 import type { Bubble } from './bubble.js';
 import type { BubbleWorld } from './world.js';
 import { viewOfSpace } from './view.js';
@@ -21,19 +23,32 @@ import type { Host } from './resolve.js';
 export type BoxSizes = Map<BubbleId, Size>;
 
 /**
- * **このフレームだけ背を伸ばす泡**（自前の px）。
+ * **このフレームだけ、その泡がどの装いを着ているか**。
  *
  * ★ 模型の値ではない ── 世界には書かない。1 フレームの measure にだけ効く。
- *   使うのは「選んだ泡だけヘッダのぶん伸びて、並びの後ろがそのぶんずれる」のような、
- *   **見る側の都合で箱が変わる**話。値を書かないので ②「触っても値は1つも書かない」を守れる。
- *   並び（詰める）の帯も、箱も、焦点の約束も、伸びたあとの大きさで揃う。
+ *   どの装いを着るか（窓か・一覧の札か・普通の泡か）は**描く側の都合**なので、
+ *   泡は持たない。値を書かないので ②「触っても値は1つも書かない」を守れる。
+ * ★ 前は「このフレームだけ背を伸ばす px」（`GrownHeights`）だった。
+ *   伸ばす量は装いの差そのものだったので、装いを渡せば差は**ひとりでに出る**。
  */
-export type GrownHeights = ReadonlyMap<BubbleId, number>;
+export type ChromeMap = ReadonlyMap<BubbleId, ChromeId>;
 
-/** ③ 見えない親は体を持たない。lab.html 326-327 行 headOf / padOf */
-export function headOf(world: BubbleWorld, id: SpaceId): number {
+/**
+ * その泡が着ている装い。
+ *
+ * - 器そのもの（root）… 装いは無い
+ * - ③ 見えない親 … **体を持たない**ので装いも無い
+ * - それ以外 … このフレームで渡された装い（既定は**帯だけ** ＝ ラボと同じ）
+ */
+export function chromeOf(world: BubbleWorld, id: SpaceId, chrome?: ChromeMap): Chrome {
   const b = id === ROOT_SPACE ? null : world.bubble(id);
-  return b && b.state.implicit ? 0 : METRICS.HEADER;
+  if (!b || b.state.implicit) return CHROME.bare;
+  return CHROME[chrome?.get(id) ?? 'bar'];
+}
+
+/** その空間の装いが、上に取るぶん（題名の帯）。lab.html 326 行 headOf */
+export function headOf(world: BubbleWorld, id: SpaceId, chrome?: ChromeMap): number {
+  return chromeOf(world, id, chrome).top;
 }
 export function padOf(world: BubbleWorld, id: SpaceId): number {
   const b = id === ROOT_SPACE ? null : world.bubble(id);
@@ -50,20 +65,25 @@ export function measureBox(
   id: BubbleId,
   memo: BoxSizes,
   rules: LayoutRules,
-  grown?: GrownHeights,
+  chrome?: ChromeMap,
 ): Size {
   const done = memo.get(id);
   if (done) return done;
   const self = world.bubble(id);
   if (!self) return { w: 0, h: 0 };
-  // ★ このフレームだけの伸び（見る側の都合）。中身を測る前に足す ── 帯も箱も揃う
-  const box = { w: self.state.size.w, h: self.state.size.h + (grown?.get(id) ?? 0) };
+  /**
+   * ★ **箱 ＝ 中身 ＋ 装い。**
+   *   泡が持っている `size` は**中身の大きさ**で、枠が取るぶんはここで外へ足す。
+   *   前は `size` が装い込みの箱だったので、同じ泡が置かれた場所（海・一覧）で
+   *   **中身の大きさまで変わって**いた（`chrome.ts` の註）。
+   */
+  const c = chromeOf(world, id, chrome);
+  const box = { w: self.state.size.w + chromeW(c), h: self.state.size.h + chromeH(c) };
   const kids = world.kidsOf(id);
-  const head = headOf(world, id);
   const pad = padOf(world, id);
   if (kids.length) {
     const V = viewOfSpace(world, id);
-    const sizeOf = (k: Bubble) => measureBox(world, k.id, memo, rules, grown);
+    const sizeOf = (k: Bubble) => measureBox(world, k.id, memo, rules, chrome);
     for (const axis of ['x', 'y'] as const) {
       const A = V[axis];
       // ③ 見えない親は自前の大きさを持たないので、どの並べ方でも箱は中身ぴったり
@@ -71,7 +91,8 @@ export function measureBox(
       if (A.arrange === 'as-is' && !self.state.implicit) continue;
       const ar = arrangeAxis({ axisView: A, axis, spaceId: id, kids, sizeOf, world, rules });
       const lens = LENS_XY[A.lens as LensXyId];
-      const ownHalf = Math.max(0, axis === 'x' ? self.state.size.w : self.state.size.h - head) / 2;
+      // 自前の下限は**中身**の半分（装いはこのあと外へ足す）
+      const ownHalf = Math.max(0, axis === 'x' ? self.state.size.w : self.state.size.h) / 2;
       const halfLen = (k: Bubble) => (axis === 'x' ? sizeOf(k).w : sizeOf(k).h) / 2;
       let half = ownHalf;
       for (let n = 0; n < 60; n++) {
@@ -91,8 +112,8 @@ export function measureBox(
         }
         half = next;
       }
-      if (axis === 'x') box.w = half * 2;
-      else box.h = half * 2 + head;
+      if (axis === 'x') box.w = half * 2 + chromeW(c);
+      else box.h = half * 2 + chromeH(c);
     }
   }
   memo.set(id, box);
@@ -100,9 +121,9 @@ export function measureBox(
 }
 
 /** 泡ぜんぶを1回で measure する（1フレームの入口）。resolveWorld が最初に呼ぶ */
-export function measureAll(world: BubbleWorld, rules: LayoutRules, grown?: GrownHeights): BoxSizes {
+export function measureAll(world: BubbleWorld, rules: LayoutRules, chrome?: ChromeMap): BoxSizes {
   const memo: BoxSizes = new Map();
-  for (const b of world.bubbles) measureBox(world, b.id, memo, rules, grown);
+  for (const b of world.bubbles) measureBox(world, b.id, memo, rules, chrome);
   return memo;
 }
 

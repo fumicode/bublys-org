@@ -35,11 +35,13 @@ describe('一覧の並べ方', () => {
   });
 
   it('折り返す列数は、箱に札が何枚とれるかで決まる', () => {
-    expect(colsFor('coverflowGrid', { w: 900, h: 400 })).toBe(2);   // (900−28) ÷ 392
-    expect(colsFor('coverflowGrid', { w: 1700, h: 400 })).toBe(4);
+    expect(colsFor('coverflowGrid', { w: 900, h: 400 }, LIST_CARD_WIDTH)).toBe(2);   // (900−28) ÷ 392
+    expect(colsFor('coverflowGrid', { w: 1700, h: 400 }, LIST_CARD_WIDTH)).toBe(4);
+    // 札が細ければ、同じ箱でも列は増える（列数は**札と箱の関係**）
+    expect(colsFor('coverflowGrid', { w: 900, h: 400 }, 240)).toBe(3);
     // 折り返さない並べ方は列数を持たない
-    expect(colsFor('coverflow', { w: 900, h: 400 })).toBeUndefined();
-    expect(colsFor('column', BOX)).toBeUndefined();
+    expect(colsFor('coverflow', { w: 900, h: 400 }, LIST_CARD_WIDTH)).toBeUndefined();
+    expect(colsFor('column', BOX, LIST_CARD_WIDTH)).toBeUndefined();
   });
 
   it('収まらなくなって、箱が横長なら coverflow', () => {
@@ -56,20 +58,16 @@ describe('一覧の並べ方', () => {
 });
 
 describe('並べ方ごとの札の形', () => {
-  it('詰める並びは箱の中身いっぱい、透視はそこから左右を細く', () => {
-    expect(itemWidthFor('column', LIST_BOX.width)).toBe(LIST_CARD_WIDTH);
-    expect(itemWidthFor('stackDepth', LIST_BOX.width)).toBe(LIST_CARD_WIDTH - LIST_DEPTH_INSET * 2);
+  it('札の幅は札のもの ── **箱は決めない**', () => {
+    // 箱をいくら広げても、札は自分の幅のまま（前は 箱−余白 だったので窓と一緒に太った）
+    for (const preset of ['column', 'coverflow', 'coverflowY', 'coverflowGrid'] as const) {
+      expect(itemWidthFor(preset, LIST_CARD_WIDTH)).toBe(LIST_CARD_WIDTH);
+      expect(itemWidthFor(preset, 240)).toBe(240);
+    }
   });
 
-  it('縦の coverflow は箱いっぱい ── 送るのは上下なので、横は細くしない', () => {
-    expect(itemWidthFor('coverflowY', LIST_BOX.width)).toBe(LIST_CARD_WIDTH);
-    expect(itemWidthFor('coverflowY', 826)).toBe(826 - 28);
-  });
-
-  it('coverflow は読める幅で頭打ち ── 広い箱でも札は太らない', () => {
-    expect(itemWidthFor('coverflow', WIDE.w)).toBe(LIST_CARD_WIDTH);
-    // 狭い箱では箱に合わせる（頭打ちなので、それ以上は広がらないだけ）
-    expect(itemWidthFor('coverflow', 200)).toBe(200 - 28);
+  it('透視だけは左右を細くする（後ろの札の肩を出すため）', () => {
+    expect(itemWidthFor('stackDepth', LIST_CARD_WIDTH)).toBe(LIST_CARD_WIDTH - LIST_DEPTH_INSET * 2);
   });
 
   it('送り幅は札より少し狭い ── 隣が肩を出す', () => {

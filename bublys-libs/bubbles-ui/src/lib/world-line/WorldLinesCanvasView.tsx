@@ -139,20 +139,44 @@ const clamp = (v: number, lo: number, hi: number) =>
  * 圧縮は遠方の端へ寄る。旧実装は focus→root 距離で正規化していたため、apex が右へ進む
  * ほど近傍が詰まっていた。
  */
+/**
+ * 横軸（魚眼）の目盛り。**投影と、その逆写し（掴んで動かす）で同じ数を使う**
+ * ── 別々に書くと、掴んだ点がカーソルからずれる。
+ */
+function xAxisOf(vw: number) {
+  const cx = vw / 2;
+  const halfW = Math.max(1, vw / 2 - MARGIN);
+  // 中心の拡大率: 1 世代(COL_DX) が GEN_PX になるよう固定（フォーカス位置に依存しない）
+  const k = halfW / (GEN_PX / COL_DX); // tanh の特性長（world unit）
+  return { cx, halfW, k };
+}
+
+/**
+ * 端は tanh で飽和しているので、逆写しはそのままでは無限へ飛ぶ。
+ * 少し内側（98%）で止める ── 端を掴んだときだけ、送りが速くなる。
+ */
+const SATURATE = 0.98;
+
+/** 画面の x に写っている世界の x（魚眼の逆写し） */
+function worldXAt(px: number, focusX: number, vw: number): number {
+  const { cx, halfW, k } = xAxisOf(vw);
+  return focusX + k * Math.atanh(clamp((px - cx) / halfW, -SATURATE, SATURATE));
+}
+
+/** その世界の点が画面の x に来るような焦点（＝掴んだ点がカーソルについてくる） */
+function focusXFor(worldX: number, px: number, vw: number): number {
+  const { cx, halfW, k } = xAxisOf(vw);
+  return worldX - k * Math.atanh(clamp((px - cx) / halfW, -SATURATE, SATURATE));
+}
+
 function makeProjector(
   focusX: number,
   focusY: number,
   vw: number,
   vh: number,
 ) {
-  const cx = vw / 2;
+  const { cx, halfW, k } = xAxisOf(vw);
   const cy = vh / 2;
-  const halfW = Math.max(1, vw / 2 - MARGIN);
-
-  // 中心の拡大率: 1 世代(COL_DX) が GEN_PX になるよう固定。
-  const mag0 = GEN_PX / COL_DX; // screen px / world unit（フォーカス位置に依存しない）
-  // tanh の特性長（world unit）。slope(0)=halfW/k=mag0 となるよう決める。
-  const k = halfW / mag0;
 
   return (worldX: number, worldY: number) => {
     const u = worldX - focusX; // apex(フォーカス)からの符号付き距離（world unit）
@@ -456,37 +480,112 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
     return () => canvas.removeEventListener("wheel", onWheel);
   }, [setTarget]);
 
-  // クリック当たり判定（魚眼後の screen 座標で最近傍ノードを拾う）
+  /**
+   * 画面の点 → この canvas のレイアウト座標。
+   *
+   * getBoundingClientRect は CSS transform（奥レイヤーの拡大縮小）後の実寸を返すが、
+   * 描画/当たり判定はレイアウト座標（viewport.w/h = clientWidth/Height）で行う。
+   * 表示スケール（rect 実寸 / レイアウト寸）で割り戻して座標系を合わせる。
+   */
+  const pointOf = useCallback((e: { clientX: number; clientY: number }) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const { w, h } = viewportRef.current;
+    const fx = rect.width / w || 1;
+    const fy = rect.height / h || 1;
+    return { px: (e.clientX - rect.left) / fx, py: (e.clientY - rect.top) / fy, w, h };
+  }, []);
+
+  /** その点にいるノード（魚眼後の screen 座標で最近傍を拾う） */
+  const nodeAt = useCallback((px: number, py: number, w: number, h: number) => {
+    const project = makeProjector(focusRef.current.x, focusRef.current.y, w, h);
+    let bestId: string | null = null;
+    let bestD2 = Infinity;
+    for (const [id, pos] of layoutRef.current.nodes) {
+      const { sx, sy, scale } = project(pos.x, pos.y);
+      const hitR = NODE_RADIUS * scale * 1.8;
+      const dx = px - sx;
+      const dy = py - sy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= hitR * hitR && d2 < bestD2) {
+        bestD2 = d2;
+        bestId = id;
+      }
+    }
+    return bestId;
+  }, []);
+
+  /**
+   * **背景を掴んで、見る場所を動かす。**
+   *
+   * > 掴んだ点が、カーソルについてくる。
+   *
+   * ★ 横は魚眼なので、画面のずれをそのまま焦点に足してはいけない（端ほど詰まっているので、
+   *   掴んだ点がカーソルから離れていく）。**投影の逆写し**（`focusXFor`）で焦点を出す。
+   *   ホイールの感度（`SENS_X`）は「1 目盛りいくつ送るか」の話で、こことは別物。
+   * ★ 縦は等倍なので、そのまま。
+   * ★ 動かしたら、離してもノードは選ばない（掴むのと選ぶのは別）。
+   */
+  const drag = useRef<null | { x: number; y: number; moved: boolean }>(null);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const p = pointOf(e);
+      if (!p) return;
+      const t = targetRef.current;
+      drag.current = {
+        x: worldXAt(p.px, t.x, p.w),
+        y: t.y + (p.py - p.h / 2),
+        moved: false,
+      };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // 捕捉できなくても掴めている（合成の入力など）
+      }
+    },
+    [pointOf],
+  );
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
+      const p = pointOf(e);
+      if (!p) return;
+      const d = drag.current;
+      if (!d) {
+        // 掴んでいないときは、カーソルで「何ができるか」を言う
+        const canvas = canvasRef.current;
+        if (canvas) canvas.style.cursor = nodeAt(p.px, p.py, p.w, p.h) ? 'pointer' : 'grab';
+        return;
+      }
+      // ★ ボタンが離れていたら黙って捨てる（離しの取りこぼしで、指を離しても付いてくるのを防ぐ）
+      if (e.buttons === 0) { drag.current = null; return; }
+      d.moved = true;
+      const canvas = canvasRef.current;
+      if (canvas) canvas.style.cursor = 'grabbing';
+      setTarget(focusXFor(d.x, p.px, p.w), d.y - (p.py - p.h / 2));
+    },
+    [pointOf, nodeAt, setTarget],
+  );
+
+  const onPointerUp = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (canvas) canvas.style.cursor = 'grab';
+  }, []);
+
+  // クリック（動かしていなければ、押した所のノードを選ぶ）
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const { w, h } = viewportRef.current;
-      // getBoundingClientRect は CSS transform（奥レイヤーの拡大縮小）後の実寸を返すが、
-      // 描画/当たり判定はレイアウト座標（viewport.w/h = clientWidth/Height）で行う。
-      // 表示スケール（rect 実寸 / レイアウト寸）でクリック位置を割り戻して座標系を合わせる。
-      const fx = rect.width / w || 1;
-      const fy = rect.height / h || 1;
-      const px = (e.clientX - rect.left) / fx;
-      const py = (e.clientY - rect.top) / fy;
-      const project = makeProjector(focusRef.current.x, focusRef.current.y, w, h);
-      let bestId: string | null = null;
-      let bestD2 = Infinity;
-      for (const [id, pos] of layoutRef.current.nodes) {
-        const { sx, sy, scale } = project(pos.x, pos.y);
-        const hitR = NODE_RADIUS * scale * 1.8;
-        const dx = px - sx;
-        const dy = py - sy;
-        const d2 = dx * dx + dy * dy;
-        if (d2 <= hitR * hitR && d2 < bestD2) {
-          bestD2 = d2;
-          bestId = id;
-        }
-      }
+      const d = drag.current;
+      drag.current = null;
+      if (d?.moved) return;   // 掴んで動かした手 ── 選ぶ手ではない
+      const p = pointOf(e);
+      if (!p) return;
+      const bestId = nodeAt(p.px, p.py, p.w, p.h);
       if (bestId) onSelectNode(bestId);
     },
-    [onSelectNode],
+    [pointOf, nodeAt, onSelectNode],
   );
 
   useEffect(() => () => {
@@ -498,7 +597,11 @@ export const WorldLinesCanvasView: FC<WorldLinesCanvasViewProps> = ({
       <canvas
         ref={canvasRef}
         onClick={handleClick}
-        style={{ display: "block", cursor: "pointer" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ display: "block", cursor: "grab" }}
       />
     </div>
   );

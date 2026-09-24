@@ -86,7 +86,7 @@ export function reshape(
 
   // 3. 空間を移った泡は、見えていた大きさになる奥行きへ
   //    ★ ラボは probe() を1回だけ打って、その配置を moved 全員に使う（lab 1449-1450 行）
-  const probe = resolveWorld(w, ctx.viewport, ctx.rules, ctx.grown);
+  const probe = resolveWorld(w, ctx.viewport, ctx.rules, ctx.chrome);
   /**
    * ★ ただし**並び（見えない親）を出入りするときは、奥行きを書き換えない。**
    *

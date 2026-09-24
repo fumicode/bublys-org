@@ -27,19 +27,20 @@ import type { PresetId } from '@bublys-org/bubble-layout';
 export const LIST_GAP = 0;
 
 /**
- * 一覧の箱の既定。バブリはどれも同じ大きさの一覧を出す。
+ * 一覧の**中身**の既定。バブリはどれも同じ大きさの一覧を出す。
  *
  * ★ 高さは「**縦に並べるか、そうでないか**」の境目でもある ── 箱は詰める軸で中身が入るまで
  *   伸びるので、伸びたあとで測ると「収まる」がいつも真になる。だから境目は**自前の大きさ**で見る。
- * ★ 520 → 540。口の下に隙間（{@link HEAD_GAP}）を空けたぶん、同じ枚数が入るように足した。
+ * ★ **中身の数**（`chrome.ts`）。前は装い込みの箱 420×540 だった
+ *   ── 普通の泡の装い（左右 7・上 27・下 7）を引いて 406×506。見た目は変わらない。
  */
-export const LIST_BOX = { width: 420, height: 540 } as const;
+export const LIST_BOX = { width: 406, height: 506 } as const;
 
 /**
  * 一覧の中の札の幅 ── **箱の中身いっぱい**。
  *
- * ★ 左右に残るのは枠の余白（`METRICS.PAD`）だけ。前は札を 280 にしていたので、
- *   420 の箱の中で **左右に 70px ずつ空いていた**（札の隙間は 4 なのに）。
+ * ★ 左右に残るのは並びの余白（`METRICS.PAD`）だけ。前は札を 280 にしていたので、
+ *   一覧の中で **左右に 70px ずつ空いていた**（札の隙間は 4 なのに）。
  *   広く取ってあったのは「右の余白に口（＋新規）を収める」ためだったが、
  *   口の幅（60 ＋ 隙間 8）に対して余白は 56 しかなく**そもそも収まっていない**
  *   ── 口は上の帯へ回っていた（`pickPreset` の `needsBand`）。つまり余白は誰の役にも立っていない。
@@ -100,9 +101,9 @@ const fitsAcross = (boxSide: number, cardSide: number): number =>
  *   View に持たせると「箱の大きさ」が見え方の一部になってしまい、
  *   同じ見え方を別の大きさの箱で使えない。
  */
-export const colsFor = (preset: PresetId, box: Box): number | undefined => {
+export const colsFor = (preset: PresetId, box: Box, itemWidth: number): number | undefined => {
   if (preset !== 'coverflowGrid') return undefined;
-  return Math.max(1, fitsAcross(box.w, itemWidthFor(preset, box.w)));
+  return Math.max(1, fitsAcross(box.w, itemWidthFor(preset, itemWidth)));
 };
 
 /** 箱の大きさから並べ方を決める（海でも岸でも同じ式） */
@@ -136,7 +137,7 @@ export const pickPreset = (
    * ★ **どちらの向きにも 2 枚以上とれるなら、折り返す。**
    *   1 列（1 行）に押し込むのは、押し込むしかないときだけ。
    */
-  const card = { w: itemWidthFor('coverflowGrid', box.w), h: itemHeight };
+  const card = { w: itemWidthFor('coverflowGrid', itemWidth), h: itemHeight };
   if (fitsAcross(box.w, card.w) >= 2 && fitsAcross(box.h, card.h) >= 2 && count > 1) return 'coverflowGrid';
   /**
    * ★ **入りきらないときの行き先は、箱の形で決まる。**
@@ -146,21 +147,23 @@ export const pickPreset = (
 };
 
 /**
- * その並べ方のときの札の幅。**箱から測る**ので、箱の大きさを変えてもついてくる。
+ * その並べ方のときの札の幅。
  *
- * - 詰める並び：箱の中身いっぱい（左右に残るのは枠の余白だけ）
- * - 透視：そこから左右 {@link LIST_DEPTH_INSET} ずつ細く ── **必ず階段になる**
- * - coverflow：**読める幅で頭打ち**。横へ送る並びなので、箱いっぱいにすると
- *   いつも 1 枚しか居られず、送っている感じが出ない
+ * > **札の大きさは、札の中身が決める。箱は決めない。**
  *
- * ★ 並べ方を決めるほう（{@link pickPreset}）には**いつも詰めるときの幅**を渡す ── 幅が並べ方を
- *   決め、並べ方が幅を決める、と回らないように。
+ * ★ 前は**箱から出していた**（`箱 − 余白`）。だから**窓を横に伸ばすと札まで太った**
+ *   ── 実測：箱 420→523 で札 392→495。囲碁の札の中身が要るのは約 240px なので、
+ *   ×の口が遠くに浮いていた。箱は札を**並べる場所**であって、札の形を決める場所ではない。
+ * ★ 箱より札が広いときは**見切れさせる**。縮めない ── 岸で決めたのと同じで、
+ *   「自分で狭めたのなら、小さく全部見せるより、前と同じ大きさで見切れるほうがいい」。
+ *
+ * 並べ方で変えるのは 1 つだけ:
+ * - 透視：左右 {@link LIST_DEPTH_INSET} ずつ細く ── **必ず階段になる**（後ろの札の肩を出す）
  */
-export const itemWidthFor = (preset: PresetId, boxWidth: number): number => {
-  const full = Math.max(1, boxWidth - METRICS.PAD * 2);
-  if (preset === 'stackDepth') return Math.max(1, full - LIST_DEPTH_INSET * 2);
-  if (preset === 'coverflow' || preset === 'coverflowGrid') return Math.min(full, LIST_CARD_WIDTH);
-  return full;
+export const itemWidthFor = (preset: PresetId, itemWidth: number): number => {
+  const w = Math.max(1, itemWidth);
+  if (preset === 'stackDepth') return Math.max(1, w - LIST_DEPTH_INSET * 2);
+  return w;
 };
 
 /**

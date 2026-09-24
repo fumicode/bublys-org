@@ -45,8 +45,14 @@ export type ListSpaceProps = {
   readonly members: readonly string[];
   /** 1 件のおおよその高さ。「縦に並べて収まるか」を測るのに使う */
   readonly itemHeight?: number;
-  /** 1 件の幅。口が横の余白に収まるかを測るのに使う */
-  readonly itemWidth?: number;
+  /**
+   * 1 件の幅。**数**なら決め打ち、**関数**なら「並びに使える幅」を受けて札が自分で答える。
+   *
+   * ★ 札の大きさを決めるのは札（`itemWidthFor` の註）。ただし箱と折り合いを付けたい札もある
+   *   ── 囲碁の札は「名前を理想 12 文字ぶん。箱が足りなければ 7 文字まで譲る」。
+   *   **譲る規則を持つのは札のほう**なので、ここは空きを教えるだけにする。
+   */
+  readonly itemWidth?: number | ((room: number) => number);
   /** 並びの上に置く口（「新しく作る」など）。並びの外なので、泡にはならない */
   readonly head?: ReactNode;
 };
@@ -126,16 +132,32 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   岸にいるときは伸びようがないので、そのまま自分の中身の箱で測る。
    */
   const own = me ? space.sizeOf(me) : null;
-  const box = own ? { w: own.w, h: own.h - METRICS.HEADER } : panel;
+  /**
+   * ★ 泡が持っているのは**中身の大きさ**（`chrome.ts`）なので、ここは引き算しない。
+   *   前は `own.h − ヘッダ24` と引いていた ── `size` が装い込みの箱だったころの名残。
+   */
+  const box = own ? { w: own.w, h: own.h } : panel;
   const headBox = head ? { w: headSize.w || 60, h: headSize.h || HEAD_HEIGHT } : null;
-  const preset = pickPreset(box, members.length, itemWidth, itemHeight, headBox);
+  /**
+   * 札に教える「並びに使える幅」＝ 中身の箱から、並びの左右の余白を引いたぶん。
+   * 札が数で答えるならそのまま使う。
+   */
+  const room = Math.max(0, box.w - METRICS.PAD * 2);
+  const itemW = typeof itemWidth === 'function' ? itemWidth(room) : itemWidth;
+  const preset = pickPreset(box, members.length, itemW, itemHeight, headBox);
   /** 口の場所は、並びの**始端に空けておく**（並びはそのすぐ下から積む） */
   const reserve = preset === 'column' ? reserveFor(headBox) : 0;
-  /** その並べ方のときの札の幅・送り幅・折り返す列数（どれも箱から決まる） */
-  const cardWidth = itemWidthFor(preset, box.w);
+  /**
+   * その並べ方のときの札の形と、送り幅・折り返す列数。
+   *
+   * ★ **札の幅は札のもの**（`itemWidth`）── 箱から出さない。
+   *   出していたころは、窓を横に伸ばすと札まで太った（`itemWidthFor` の註）。
+   *   箱から決まるのは「何列で折り返すか」だけ。
+   */
+  const cardWidth = itemWidthFor(preset, itemW);
   const stepX = stepFor(preset, { w: cardWidth, h: itemHeight })?.x;
   const stepY = stepFor(preset, { w: cardWidth, h: itemHeight })?.y;
-  const cols = colsFor(preset, box);
+  const cols = colsFor(preset, box, itemW);
 
   /**
    * ★ 世界に書くのは**この 1 箇所だけ**。顔ぶれと並べ方を一緒に渡す

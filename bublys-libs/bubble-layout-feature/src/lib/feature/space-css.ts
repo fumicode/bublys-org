@@ -1,7 +1,12 @@
 /**
  * 中身のある泡の見た目 ── 本文の席・閉じる・ObjectView の膜。
  * 泡そのものの見た目は `bubble-layout-ui` の `FIELD_CSS`。
+ *
+ * ★ **中身の席（`.bl-body` の inset）は、模型の装いの表（`CHROME`）から書き出す。**
+ *   ここに数を直に書くと、模型（箱の大きさ）と CSS（中身の席）が別々の数を持ち、
+ *   ずれが「一覧の口の隙間」のような所へ回り込んで埋められる。数は 1 か所。
  */
+import { CHROME, chromeInset } from '@bublys-org/bubble-layout';
 /**
  * **窓の夜空。** 空間を持つ泡は自分の宇宙を持っている。
  *
@@ -59,7 +64,7 @@ export const SPACE_CSS = `
 /* ★ 中身は泡の中に素の px で置く。泡ごと transform で拡大縮小されるので、
    中身の側では倍率を一切気にしなくてよい（逆 scale も要らない）。
    地は**明るい**── バブリの画面は明るい地を前提に書かれている（暗いままだと字が読めない） */
-.bub > .bl-body{position:absolute;left:7px;top:27px;right:7px;bottom:7px;overflow:auto;
+.bub > .bl-body{position:absolute;${chromeInset(CHROME.plain)};overflow:auto;
   pointer-events:auto;border-radius:11px;
   background:linear-gradient(180deg,#ffffff 0%,#f7f8fb 100%);
   color:#1b2029;font:13px/1.6 var(--f);
@@ -71,7 +76,7 @@ export const SPACE_CSS = `
 .bub:has(> .bl-body.bl-clear)::after{content:none}
 
 /* 窓（中身が自分で背景を持つ ── 入れ子の宇宙・canvas）。地を敷かず、箱いっぱいに広げる */
-.bub > .bl-body.bl-clear{left:0;top:24px;right:0;bottom:0;border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);
+.bub > .bl-body.bl-clear{${chromeInset(CHROME.bar)};border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);
   overflow:hidden;box-shadow:none;color:#e6ebf5;
   /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
   background:${WINDOW_SKY}}
@@ -143,8 +148,8 @@ export const SPACE_CSS = `
  *   選んだ札だけが、ヘッダを出すぶん上から 20px ぶん譲る。
  */
 /* 一覧の札の中身は上 7px から。背が伸びた札だけヘッダのぶん譲る */
-.bub > .bl-body.bl-tight{top:7px}
-.bub > .bl-body.bl-tight.bl-grown{top:27px}
+.bub > .bl-body.bl-tight{${chromeInset(CHROME.quiet)}}
+.bub > .bl-body.bl-tight.bl-grown{${chromeInset(CHROME.plain)}}
 /*
  * ★ **縦に詰める一覧では、札と札のあいだを限界まで細くする。**
  *   見えている隙間は「並びの隙間（LIST_GAP ＝ 0）＋ 札の上下の余白 × 2」なので、
@@ -154,7 +159,7 @@ export const SPACE_CSS = `
  *   そちらは札が重なって見えるので、余白を削ると後ろの札を余計に覆う。
  * ★ 選んで背が伸びた札だけは、ヘッダを出すぶん上を譲る（.bl-grown）。
  */
-.bub > .bl-body.bl-tight.bl-packed{top:1px;bottom:1px}
+.bub > .bl-body.bl-tight.bl-packed{${chromeInset(CHROME.packed)}}
 /*
  * ★ **泡になったら、下にも左右と同じだけ余白を置く。**
  *   静かなときの上下 1px は「札と札のあいだを細くする」ためのもので、
@@ -163,7 +168,7 @@ export const SPACE_CSS = `
  *   伸びる高さ（BubbleSpace の SELECTED_GROW）はこの差ぶん ＝ (27+7)−(1+1) ＝ 32。
  *   札の背が 32px 伸びるので、**並びの後ろの札もそのぶんずれる**（中身の高さは変わらない）。
  */
-.bub > .bl-body.bl-tight.bl-packed.bl-grown{top:27px;bottom:7px}
+.bub > .bl-body.bl-tight.bl-packed.bl-grown{${chromeInset(CHROME.plain)}}
 /*
  * 伸びない並べ方（奥行きに重ねる）で選んだときは、装いを**中身の上に重ねる**
  * ── 位置は 1px も動かさない。中身は上 7px が余白なので、帯（24px）が重なるのは

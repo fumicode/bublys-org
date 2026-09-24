@@ -62,7 +62,7 @@ export function pin(
   let best = world;
   let bestErr = Infinity;
   for (let n = 0; n < 6; n++) {
-    const layout = resolveWorld(w, ctx.viewport, ctx.rules, ctx.grown);   // lab: probe()
+    const layout = resolveWorld(w, ctx.viewport, ctx.rules, ctx.chrome);   // lab: probe()
     const q = layout.byId.get(id);
     if (!q) return best;
     const err = Math.abs(seen.x - q.x) + Math.abs(seen.y - q.y);
@@ -129,7 +129,7 @@ export function keepSeen(
   const b = world.bubble(id);
   const space = world.parentOf(id);
   if (!b || !seen || space === null) return world;
-  const L = (layout ?? resolveWorld(world, ctx.viewport, ctx.rules, ctx.grown)).spaces.get(space);
+  const L = (layout ?? resolveWorld(world, ctx.viewport, ctx.rules, ctx.chrome)).spaces.get(space);
   if (!L) return world;
   const A = L.view.z;
   if (verbOf(A.dim) !== 'coord' || A.arrange !== 'as-is' || A.lens !== 'perspective') return world;

@@ -22,6 +22,9 @@
 export { ROOT_SPACE, METRICS, clamp } from './types.js';
 export type { Axis, PlaneAxis, BubbleId, SpaceId, Size, Point, Rect, Vec3, Cell, Focus } from './types.js';
 
+export { CHROME, chromeW, chromeH, addChrome, stripChrome, chromeInset } from './chrome.js';
+export type { Chrome, ChromeId } from './chrome.js';
+
 export { DEFAULT_RULES, resolveRules } from './rules.js';
 export type { LayoutRules, EqualExtent, ZFocusStop } from './rules.js';
 
@@ -44,8 +47,8 @@ export { BubbleWorld, emptyWorld } from './world.js';
 export type { WorldState, RootState } from './world.js';
 
 // ── 解決（純関数。毎フレーム走る）──
-export { headOf, padOf, measureBox, measureAll, halfOf, lensContext } from './measure.js';
-export type { BoxSizes, GrownHeights, LensContext } from './measure.js';
+export { headOf, padOf, chromeOf, measureBox, measureAll, halfOf, lensContext } from './measure.js';
+export type { BoxSizes, ChromeMap, LensContext } from './measure.js';
 export { resolveWorld, compose, contentOf, contentRect, hostScale, withFittedFocus } from './resolve.js';
 export type { Layout, SpaceLayout, Placement, Host, Viewport } from './resolve.js';
 export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitsParallel, fitFocus, withFocusAxis, focusOf } from './project.js';

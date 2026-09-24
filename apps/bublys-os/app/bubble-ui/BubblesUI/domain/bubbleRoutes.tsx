@@ -39,14 +39,13 @@ export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
 };
 
 /**
- * 札 1 枚の大きさ。
+ * 札 1 枚の**中身**の大きさ（`chrome.ts`）。枠が取るぶんは枠が外へ足す。
  *
- * ★ 高さは**中身が全部映る**ように取る ── 泡の枠（ヘッダ 27 ＋ 下の余白 7 ＝ 34）を
- *   足した値。64 にしていたら枠の中が 30px しかなく、**札 1 枚ずつに巻物の棒が出ていた**
- *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
- *   1 枚ずつ巻物になるのは本末転倒。
+ * ★ 高さは実測（中身は 46〜54px 要る）の上限 54。64 にしていたら枠の中が 30px しかなく、
+ *   **札 1 枚ずつに巻物の棒が出ていた**。一覧は「全部映る」ことが意味の画面なので、
+ *   1 枚ずつ巻物になるのは本末転倒。前は枠のぶん 34 を足した 88 を名乗っていた。
  */
-const MEMO_CARD = { w: LIST_CARD_WIDTH, h: 88 };
+const MEMO_CARD = { w: LIST_CARD_WIDTH, h: 54 };
 
 /**
  * メモ一覧 ── **並びの空間**。
@@ -161,7 +160,8 @@ const routes: BubbleRoute[] = [
     base: "universe",
     type: "universe",
     Component: BublyUniverseBubble,
-    bubbleOptions: { universe: true, defaultSize: { width: 420, height: 320 } },
+    // 窓の**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+    bubbleOptions: { universe: true, defaultSize: { width: 420, height: 296 } },
   }),
 
   // ===== bubly = 1 universe バブル = 独立した世界線を持つ「アプリ境界」 =====
@@ -175,9 +175,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["users"],
     bubbleOptions: {
       universe: true,
-      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
       //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
-      defaultSize: { width: 560, height: 640 },
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(190, 50%, 22%)",
     },
   }),
@@ -188,9 +188,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["user-groups"],
     bubbleOptions: {
       universe: true,
-      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
       //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
-      defaultSize: { width: 560, height: 640 },
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(270, 45%, 26%)",
     },
   }),
@@ -201,9 +201,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["memos"],
     bubbleOptions: {
       universe: true,
-      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
       //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
-      defaultSize: { width: 560, height: 640 },
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(40, 55%, 26%)",
     },
   }),
@@ -214,9 +214,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["task-management/tasks"],
     bubbleOptions: {
       universe: true,
-      // ★ 中の一覧（並びの空間）が 420×520 なので、窓はそれが収まる大きさで開く
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
       //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
-      defaultSize: { width: 560, height: 640 },
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(140, 45%, 22%)",
     },
   }),
@@ -263,6 +263,7 @@ const routes: BubbleRoute[] = [
     type: "space-view",
     Component: SpaceViewBubble,
     // 地は敷かない ── ボタンが空間の上に浮いて見える
+    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
     bubbleOptions: { defaultSize: { width: 480, height: 44 }, contentBackground: "transparent" },
   },
 
@@ -273,7 +274,7 @@ const routes: BubbleRoute[] = [
     type: "pocket",
     Component: PocketBubble,
     // 地は中身が持つ ── 大きいときは自分で白い箱を描き、アイコンだけのときは空間を透かす
-    bubbleOptions: { defaultSize: { width: 260, height: 300 }, contentBackground: "transparent" },
+    bubbleOptions: { defaultSize: { width: 246, height: 266 }, contentBackground: "transparent" },
   },
 
   // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）
@@ -281,7 +282,7 @@ const routes: BubbleRoute[] = [
     pattern: /^bubly-loader$/,
     type: "bubly-loader",
     Component: BublyLoaderBubble,
-    bubbleOptions: { defaultSize: { width: 300, height: 280 } },
+    bubbleOptions: { defaultSize: { width: 286, height: 246 } },
   },
 ];
 

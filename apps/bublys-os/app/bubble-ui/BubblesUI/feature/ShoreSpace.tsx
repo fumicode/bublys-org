@@ -30,7 +30,6 @@ import {
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import { METRICS } from "@bublys-org/bubble-layout";
 import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
@@ -98,26 +97,22 @@ const toShore = (info: TakeOutInfo) => ({
 });
 
 /**
- * **岸と海では、同じ「大きさ」が違うものを指す。**
+ * **岸と海で、「大きさ」は同じものを指す ── どちらも中身の大きさ。**
  *
- * 海に浮いている泡には**バブルUI（ヘッダ）が付く**が、岸に貼ったものには付かない
- * （岸は管と中身だけ）。だから泡の大きさをそのまま渡すと、貼った瞬間に中身が
- * ヘッダのぶん広がり、剥がすと逆に**ヘッダに食われて縮む**。
+ * 海に浮いている泡には装い（題名の帯・余白）が付き、岸に貼ったものには付かない
+ * （岸は管と中身だけ）。けれど**泡が持っている大きさは中身の大きさ**なので（`chrome.ts`）、
+ * そのまま渡せば中身は 1px も変わらない。
  *
- * 揃えるのは**中身の大きさ**なので、渡すときに飾りのぶんを引き、返すときに足す。
- * 「剥がしたら同じ大きさ」は中の要素の話で、ヘッダを含んだ泡全体のことではない
- * ── バブルUIが付くぶん、泡そのものは大きくなる。
+ * ★ 前はここで引き算・足し算をしていた（`toDockSize` / `toBubbleSize` ＝ ヘッダ 24 の出し入れ）。
+ *   泡の `size` が装い込みの箱だったころの逃げで、装いを外へ出したので要らなくなった。
  */
-const CHROME_H = METRICS.HEADER;
-/** 泡の大きさ → 岸に貼る大きさ */
 const toDockSize = (size: { readonly w: number; readonly h: number }) => ({
   width: size.w,
-  height: Math.max(1, size.h - CHROME_H),
+  height: size.h,
 });
-/** 岸の大きさ → 海へ返す泡の大きさ */
 const toBubbleSize = (rect: { readonly width: number; readonly height: number }) => ({
   w: rect.width,
-  h: rect.height + CHROME_H,
+  h: rect.height,
 });
 
 /**

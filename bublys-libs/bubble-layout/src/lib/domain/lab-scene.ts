@@ -13,6 +13,7 @@
  * ★ ラボそのものは `node docs/bubble-space-prototype/v5-dom/_check/all.mjs` の 14 本で守られている
  *   （当たり判定・掴んで動かす・画面の約束はブラウザが要るので、そちらに残した）。
  */
+import { METRICS } from './types.js';
 import { Bubble } from './bubble.js';
 import { BubbleWorld } from './world.js';
 import { presetView, snapView } from './view.js';
@@ -26,8 +27,14 @@ export const VIEWPORT = { w: 1440, h: 809.5 };
 /** ラボの7つの場面（＋ 起動時のくっつけ） */
 export function labScene(): BubbleWorld {
   const bs: Bubble[] = [];
+  /**
+   * ★ **ラボの数は「箱」で書かれている。** 泡が持つのは**中身の大きさ**なので、
+   *   入口で装いのぶん（帯 24）を引く ── こうすると解いたあとの箱はラボと 1px も違わない。
+   *   ③ 見えない親は体を持たないので、装いも無い（引かない）。
+   */
   const add = (init: Parameters<typeof Bubble.create>[0]) => {
-    bs.push(Bubble.create(init));
+    const h = init.implicit ? init.h : (init.h ?? 0) - METRICS.HEADER;
+    bs.push(Bubble.create({ ...init, h }));
   };
 
   // 1. メモ

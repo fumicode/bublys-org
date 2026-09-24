@@ -121,8 +121,9 @@ export function openAt(input: OpenAtInput): OpenAtResult {
       id: newId,
       title,
       hue: input.hue ?? hueOf(newId),
+      // ★ 下限は**中身**で見る（泡が持つのは中身の大きさ ── chrome.ts）
       w: Math.max(80, size.w),
-      h: Math.max(METRICS.HEADER + 10, size.h),
+      h: Math.max(10, size.h),
       parent: space === 'root' ? null : space,
       order: at + 1,
       free,

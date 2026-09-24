@@ -35,7 +35,7 @@ import {
   zoomedBy,
 } from '@bublys-org/bubble-layout';
 import type {
-  BubbleId, BubbleWorld, DragVerbs, DropMarks, DropSlot, GrownHeights, Layout,
+  BubbleId, BubbleWorld, ChromeMap, DragVerbs, DropMarks, DropSlot, Layout,
   LayoutRules, ScreenRects, SeenRects, SpaceId, Viewport,
 } from '@bublys-org/bubble-layout';
 import { markTiny, DRAW_MIN } from './draw.js';
@@ -114,7 +114,7 @@ export interface BubbleInputOptions {
    * このフレームだけ背を伸ばす泡（`layout` を解くのに使ったのと**同じもの**を渡す）。
    * ⑤ pin は解き直しながら留めるので、渡さないと伸びているぶんだけ留め先がずれる。
    */
-  readonly grown?: GrownHeights;
+  readonly chrome?: ChromeMap;
   /** 泡を載せている層 */
   readonly layerRef: RefObject<HTMLDivElement | null>;
   /**
@@ -212,10 +212,10 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     [lifted],
   );
 
-  const grown = o.grown;
+  const chrome = o.chrome;
   const ctx = useCallback(
-    () => actContext(viewport, seen.current, rules, grown),
-    [viewport, rules, grown],
+    () => actContext(viewport, seen.current, rules, chrome),
+    [viewport, rules, chrome],
   );
 
   /**
@@ -409,7 +409,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
 
     if (d.moves) {
       // 印は「いま離したらどうなるか」。書いたばかりの値で解き直してから見る
-      const after = resolveWorld(next, viewport, rules, grown);
+      const after = resolveWorld(next, viewport, rules, chrome);
       const afterTiny = markTiny(next, after, drawMin);
       const held: LiftState = {
         id: d.id, skip: d.skip ?? new Set(), lift: !!d.lift, out: !!d.slot?.out,
