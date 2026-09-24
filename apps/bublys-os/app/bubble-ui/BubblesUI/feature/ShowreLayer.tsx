@@ -114,6 +114,16 @@ export type ShowreLayerProps = {
   readonly preview?: ScreenRect | null;
   /** 貼り付いた泡の所で管をどう通すか（見た目だけ。挙動は変わらない） */
   readonly join?: TubeJoin;
+  /**
+   * **自分の枠を描くか。** 既定は描く。この器が外の岸に貼られているときだけ false。
+   *
+   * ★ 枠はもう外の岸がその泡のまわりに引いている。ここで引くと二重になるうえ、
+   *   **窓の中の SVG は窓の外へ光を出せない**（器が切る）ので、外の海の側が暗くなる。
+   * ★ 前は CSS でまるごと消していたが、それだと中の岸の管まで一緒に消えた
+   *   （岸に貼ったものはバブルの装いを持たないので、戻す側の `.bl-body` が無い）。
+   *   消すのは枠 1 本だけなので、ここで分ける。
+   */
+  readonly frame?: boolean;
 };
 
 /**
@@ -165,7 +175,19 @@ const GRIP = TUBE_THICKNESS;
  * そこに余白を残すと中身が端から浮いた黒い帯になる。走らない辺は 0 にして、
  * 中身をそのぶん端へ寄せる。
  */
-const insetFor = (edges: readonly ShowreSide[], join: TubeJoin) => {
+/**
+ * 中身のまわりに空ける**管の帯**。光はアプリの中に入れない ── 帯の内側がアプリ。
+ *
+ * ★ **中身が自分の世界を持つ窓（`clear`）なら、帯を空けない。**
+ *   窓の中身は**それ自体が岸を持つ器**なので、その帯は窓の岸が自分で使う。
+ *   空けていたころは、窓の中の岸が引く線が外の輪の **6px（管の厚み）内側**に並び、
+ *   明るい芯が 2 本に見えてつながらなかった（実測：枠 266..826 に対し中の海が 272..826）。
+ */
+const insetFor = (edges: readonly ShowreSide[], join: TubeJoin, ground?: Docked["ground"]) => {
+  if (ground === "clear") return { top: 0, right: 0, bottom: 0, left: 0 };
+  return insetOf(edges, join);
+};
+const insetOf = (edges: readonly ShowreSide[], join: TubeJoin) => {
   const none = (side: ShowreSide) => join === "detour" && edges.includes(side);
   return {
     top: none("top") ? 0 : TUBE_THICKNESS,
@@ -234,6 +256,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   onUpdate,
   preview,
   join = "branch",
+  frame = true,
 }) => {
   /**
    * いま相手にしているもの。
@@ -574,7 +597,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
         const rect = anchoredRect(d.dock, d.size, viewport);
         // 管を引くかどうかは**いま接している辺**で決まる（留め方ではない）
         const edges = touchingEdges(rect, viewport);
-        return { d, rect, edges, inset: insetFor(edges, join) };
+        return { d, rect, edges, inset: insetFor(edges, join, d.ground) };
       }),
     [docked, viewport, join],
   );
@@ -582,14 +605,15 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   // 管は 1 枚にまとめて描く。海の縁と、貼り付いたバブルのまわりを、1 本の網として
   const outlines: ShowreTubeOutline[] = useMemo(
     () => [
-      {
+      // 自分の枠 ── 外の岸に貼られているときは、そちらが引くので描かない
+      ...(frame ? [{
         rect: { x: 0, y: 0, width: viewport.width, height: viewport.height },
         // 迂回のときだけ、岸の管から**泡が占めている範囲**を抜く。
         // そこは泡の枠が受け持つので、泡と画面の縁の間には管が通らない（T 字にならない）
         ...(join === "detour"
           ? { cuts: entries.flatMap(({ rect, edges }) => detourCuts(rect, edges)) }
           : {}),
-      },
+      }] : []),
       ...entries.map(({ rect, edges, inset }) => ({
         rect,
         joined: edges,
@@ -602,7 +626,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
         },
       })),
     ],
-    [entries, viewport, join],
+    [entries, viewport, join, frame],
   );
 
   return (

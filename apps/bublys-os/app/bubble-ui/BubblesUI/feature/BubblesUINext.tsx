@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box } from "@mui/material";
 import type { PresetId } from "@bublys-org/bubble-layout";
-import { TUBE_THICKNESS, type TubeJoin } from "@bublys-org/bubbles-ui";
+import { type TubeJoin } from "@bublys-org/bubbles-ui";
 import type { BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { bubbleRoutes } from "../domain/bubbleRoutes";
 import { SEA_GROUND, type Docked } from "./ShowreLayer";
@@ -65,14 +65,29 @@ const pocketDock = (): Docked => ({
 });
 const SPACE_VIEW_URL = "space-view";
 
+const SPACE_VIEW_SIZE = { width: 480, height: 44 };
+
 /**
- * 見え方の口の定位置 ── **左上の岸**。ランチャーのすぐ右どなりに、管が 1 本になるよう重ねて置く。
+ * 見え方の口の定位置 ── **上の縁の、横の中間**。
+ *
+ * ★ 中間は**サイドバーの幅を除いた残り**で測る。窓の真ん中で測ると、サイドバーのぶん
+ *   左に寄って見える（岸として塞がっている所は、空いている所ではない）。
+ * ★ 前はランチャーのすぐ右どなりに詰めて置いていたが、**上の縁の使いはじめを塞いで**いた。
+ *   真ん中なら左右どちらにも余地が残る。
+ * ★ 横の中心は**窓の幅から毎回出す**（定位置は viewport を受け取る）── 固定の数で持つと
+ *   窓の大きさが変わったときに中間からずれる。
  */
-const spaceViewDock = (): Docked => ({
+const spaceViewDock = (viewport: { width: number; height: number }): Docked => ({
   key: `${SPACE_VIEW_URL}#dock`,
   url: SPACE_VIEW_URL,
-  dock: { edges: ["top"], at: { x: LAUNCHER_WIDTH - TUBE_THICKNESS, y: 0 } },
-  size: { width: 480, height: 44 },
+  dock: {
+    edges: ["top"],
+    at: {
+      x: Math.round(LAUNCHER_WIDTH + (viewport.width - LAUNCHER_WIDTH - SPACE_VIEW_SIZE.width) / 2),
+      y: 0,
+    },
+  },
+  size: SPACE_VIEW_SIZE,
   // 地は敷かない ── ボタンが空間の上に浮いて見える
   ground: "none",
 });
@@ -163,14 +178,14 @@ export const BubblesUINext = () => {
     <LayoutRoutesProvider routes={routes}>
     {/* 地と角の丸みは器（ShoreSpace）が持つ ── 岸に貼り付いたものを見て決まるので */}
     <Box sx={{ width: "100%", height: "100vh", overflow: "hidden", position: "relative" }}>
-      {/* 管は**1 つの枠に 1 本**。二重になるところを 2 つ消してある:
-            ・窓の中にもう 1 本（その窓の枠は FrameShore が引き受ける）
-            ・岸に着いた窓の中にもう 1 本（そちらは岸の管が引き受ける）
-          どちらも「中に入れ子の窓が居るなら、その窓の枠は描く」を後の行で戻している */}
+      {/* 管は**1 つの枠に 1 本**。窓の中にもう 1 本引かれるところを消す
+          （その窓の枠は中の器＝ShoreSpace が引き受ける）。
+          ★ 「岸に着いた窓」の重なりは**ここでは消さない** ── CSS で消すと
+            その窓が持っている**中の岸の管まで一緒に消える**（岸に貼ったものは
+            バブルの装いを持たないので、戻す側の `.bl-body` が無い）。
+            消すのは枠 1 本だけなので、器の `frame` で分けている。 */}
       <style>{`.bl-body [data-showre-tubes]{display:none}
-.bl-body [data-frame-shore] [data-showre-tubes]{display:block}
-[data-docked-url] [data-frame-shore] [data-showre-tubes]{display:none}
-[data-docked-url] .bl-body [data-frame-shore] [data-showre-tubes]{display:block}`}</style>
+.bl-body [data-frame-shore] [data-showre-tubes]{display:block}`}</style>
 
       <ShoreSpace
         routes={routes}

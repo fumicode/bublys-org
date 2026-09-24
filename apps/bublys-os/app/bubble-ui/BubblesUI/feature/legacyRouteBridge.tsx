@@ -23,8 +23,9 @@ import {
   createBubble,
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
-import { ShoreSpace } from "./ShoreSpace";
+import { ShoreSpace, useOnShore } from "./ShoreSpace";
 import { WINDOW_GROUND } from "./ShowreLayer";
+import { useSpaceView } from "./SpaceViewContext";
 
 /** 旧の画面 1 枚を、新しい空間の文脈に繋ぐ */
 const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; children?: ReactNode }> = ({
@@ -80,9 +81,17 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
  * 無い ── あるのは「空間を持つ泡」だけなので、**その泡の枠そのものを岸として扱う**。
  * 中でもう 1 本ネオンを引くと枠が二重になるので、管はこの層だけが描く。
  */
-const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[] }> = ({ routes, seeds }) => {
+const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; url: string }> = ({ routes, seeds, url }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  /**
+   * ★ **ネオンの通し方（迂回／枝分かれ）は、窓の岸にも同じものが効く。**
+   *   見え方の口は 1 つしかないのに、窓の中だけ既定の「枝分かれ」に固定されていて、
+   *   外の海と中の窓で管の通り方が食い違っていた。見ているのは同じ場所（`SpaceViewContext`）。
+   */
+  const { join } = useSpaceView();
+  /** ★ この窓自身が岸に貼られているなら、枠は描かない ── 外の岸がもう引いている */
+  const onShore = useOnShore();
 
   useEffect(() => {
     const el = ref.current;
@@ -118,6 +127,10 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[] }>
           initialUrls={seeds}
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
+          join={join}
+          frame={!onShore}
+          // 岸に貼ると中身が描き直されるので、岸の中身は url で覚えておく
+          persistKey={url}
           style={{ position: "absolute", left: 0, top: 0 }}
         />
       )}
@@ -144,7 +157,7 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
     type: route.type,
     Component: ({ bubble }) =>
       isWindow ? (
-        <WindowSpace routes={all} seeds={seeds} />
+        <WindowSpace routes={all} seeds={seeds} url={bubble.url} />
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),

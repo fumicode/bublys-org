@@ -88,15 +88,22 @@ export function focusOn(
  * ★ 魚眼は一次では解けないので、`pin` と同じく**当てて解き直すを数回**。
  *   泡が窓の直接の子なら、② が済ませた時点で真ん中に居るので 1 周で抜ける。
  *
- * ★ 「真ん中」は**渡された窓の真ん中**。岸が食い込んでいるときは、器（`ShoreSpace`）が
- *   **口そのものを窓として渡す**ので、ここは何も知らなくてよい ── 一度ここに
- *   「真ん中と見なす点」を足したが、箱が口になれば同じことなので外した。
+ * @param center 「真ん中」と見なす点（画面の座標）。省いたら窓の真ん中。
+ *   **岸が食い込んでいるときに要る** ── 岸は海の上に重なって描かれるので、窓の真ん中が
+ *   岸の下に入っていることがある。そこへ開くと泡の半分が岸の地に隠れる（実測で踏んだ）。
+ *
+ *   ★ 一度は**海の箱ごと口にする**ことで済ませようとしたが、それだと岸のくっつき方が
+ *     変わるたびに箱が変わり、**触っていない泡が画面の上で動いて大きさまで変わった**
+ *     （実測：箱 1285→1915 で泡が 343→644、倍率 0.923→0.963）。⑤ に反するうえ、
+ *     「自分で狭めたのなら、前と同じ大きさで見切れる方がいい」にも反する。
+ *     **海は動かさず大きさも変えず、変えるのは開いたものの行き先だけ**にした。
  */
 export function bringToCenter(
   world: BubbleWorld,
   viewport: Viewport,
   id: BubbleId,
   rules?: Partial<LayoutRules>,
+  center?: { readonly x: number; readonly y: number },
 ): BubbleWorld {
   const R = resolveRules(rules);
   let w = world;
@@ -119,11 +126,23 @@ export function bringToCenter(
     const pa = layout.byId.get(anc) ?? p;
     let moved = false;
     for (const axis of ['x', 'y'] as const) {
-      const want = (axis === 'x' ? viewport.w : viewport.h) / 2;
+      /**
+       * 箱の真ん中 ── 焦点にした値が写る所。`screenToAxis(…, s)` を焦点にすると、
+       * **いま s にあるものがここへ来る**。
+       */
+      const mid = (axis === 'x' ? viewport.w : viewport.h) / 2;
+      const want = center ? (axis === 'x' ? center.x : center.y) : mid;
       const now = axis === 'x' ? pa.x + pa.w / 2 : pa.y + pa.h / 2;
       if (Math.abs(now - want) < 0.5) continue;
       const before = w.focusOf(space)[axis];
-      w = withFocusAxis(w, L, axis, screenToAxis(L, axis, now, pa.m), R);
+      /**
+       * ★ 行き先が箱の真ん中とは限らない（岸が食い込んでいれば、口の真ん中）。
+       *   像を `want − now` だけずらしたいので、焦点にするのは
+       *   **`now` から、ずらしたいぶんだけ戻した所**の値。
+       *   止める条件だけ変えても行き先は変わらない（一度これでしくじった）。
+       *   `want ＝ mid` なら `now` そのもので、今までとまったく同じ式になる。
+       */
+      w = withFocusAxis(w, L, axis, screenToAxis(L, axis, now - (want - mid), pa.m), R);
       if (Math.abs(w.focusOf(space)[axis] - before) > 1e-6) moved = true;
     }
     if (!moved) return w;

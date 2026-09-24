@@ -130,6 +130,14 @@ export interface BubbleSpaceProps {
   readonly autoLens?: boolean;
   /** まかせた結果どちらになったかを知らせる（口の見た目を合わせるのに使う） */
   readonly onLens?: (axis: PlaneAxis, lens: LensId) => void;
+  /**
+   * **いま見えている口**（画面の座標）。岸が海に食い込んでいるときに渡す。
+   *
+   * 岸は海の上に重なって描かれるので、渡さないと「窓の真ん中」が岸の下に入り、
+   * そこへ開いた泡の半分が岸の地に隠れる。使うのは**開いたものの行き先**だけで、
+   * **海の位置も大きさも変えない** ── 変えると触っていない泡まで動いて大きさも変わる。
+   */
+  readonly openArea?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
   readonly drawMin?: number;
   readonly rules?: Partial<LayoutRules>;
   /** 外で世界を持つなら渡す（Redux など）。渡さなければ自前で持つ */
@@ -153,6 +161,15 @@ export interface BubbleSpaceProps {
 
 export function BubbleSpace(props: BubbleSpaceProps) {
   const { routes, viewport, drawMin, rules, className, style, children } = props;
+  /**
+   * 開くものの行き先 ＝ **いま見えている口**の真ん中。
+   * 岸が食い込んでいなければ窓の真ん中で、今までと変わらない。
+   */
+  const openArea = props.openArea;
+  const openCenter = useMemo(
+    () => (openArea ? { x: openArea.x + openArea.w / 2, y: openArea.y + openArea.h / 2 } : undefined),
+    [openArea],
+  );
   const layerRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
   /** レンズの向きが一度でも選ばれたか。選ばれたら `openAt` はレンズに触らない */
@@ -282,6 +299,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         world, viewport, openerId: opener, newId: id,
         title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules,
         keepLens: lensChosen.current,
+        center: openCenter,
         joinWith: mateFor(world, urls, route.type, opener),
       });
       setWorld(r.world);
@@ -289,7 +307,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setSelectedId(id);
       return id;
     },
-    [routes, world, urls, viewport, rules, setWorld, openOutside],
+    [routes, world, urls, viewport, rules, setWorld, openOutside, openCenter],
   );
 
   const closeBubble = useCallback(
@@ -349,6 +367,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const opened = openAt({
         world, viewport, openerId: null, newId: id, title: titleOf(routes, url),
         size: { w: rect.w, h: rect.h }, hue: route.hue, rules, keepLens: lensChosen.current,
+        center: openCenter,
       });
       const L = resolveWorld(opened.world, viewport, rules);
       const p = L.byId.get(id);
@@ -364,7 +383,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, at }));
       return id;
     },
-    [routes, world, viewport, rules, setWorld],
+    [routes, world, viewport, rules, setWorld, openCenter],
   );
 
   /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */

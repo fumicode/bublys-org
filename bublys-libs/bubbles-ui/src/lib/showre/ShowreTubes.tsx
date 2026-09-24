@@ -86,11 +86,25 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
           <filter id={farId} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation={glowFar / 2} />
           </filter>
-          {/* アプリの中身には光を入れない */}
+          {/*
+            アプリの中身には光を入れない。
+
+            ★ **抜く形も角丸にする。** 中身の箱は角が丸いのに、抜く矩形が直角のままだと
+              **角の外側だけ光が抜けて暗い四角が残る**（実測で踏んだ：丸みの外に黒い角）。
+              丸みは管の内側の縁に合わせる（管の半径から厚みの半分を引いたもの）。
+          */}
           <mask id={maskId}>
             <rect x="0" y="0" width={viewport.width} height={viewport.height} fill="white" />
             {keepOuts.map((r, i) => (
-              <rect key={i} x={r.x} y={r.y} width={r.width} height={r.height} fill="black" />
+              <rect
+                key={i}
+                x={r.x}
+                y={r.y}
+                width={r.width}
+                height={r.height}
+                rx={Math.max(0, Math.min(radius, r.width / 2, r.height / 2))}
+                fill="black"
+              />
             ))}
           </mask>
         </defs>
@@ -112,6 +126,13 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
         {bands.map((d, i) => (
           <path key={`band-${i}`} d={d} stroke={color} strokeWidth={thickness} {...stroke} />
         ))}
+        {/*
+          ★ 芯の端だけ **square** にする。芯は相手の中心線まで伸びているが、そこで切ると
+            重なりが**半芯ぶんしかなく、角の 1 ピクセルが薄くなって切れて見える**
+            （実測：芯 1.5px で重なり 0.75px）。square は端を半芯ぶん延ばすので、
+            中心線を越えて角が埋まる。端は必ず継ぎ目（接している辺・通さない区間）なので、
+            延ばして困る所が無い。帯は太いので butt のままで隙間なく重なる。
+        */}
         {cores.map((d, i) => (
           <path
             key={`core-${i}`}
@@ -119,6 +140,7 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
             stroke="rgba(255,255,255,0.92)"
             strokeWidth={TUBE_CORE_WIDTH}
             {...stroke}
+            strokeLinecap="square"
           />
         ))}
       </svg>

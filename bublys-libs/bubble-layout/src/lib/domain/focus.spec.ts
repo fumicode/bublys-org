@@ -172,7 +172,7 @@ describe('② 触った泡へ、視点が寄る', () => {
     expect(allValues(w)).toEqual(allValues(stacked));
   });
 
-  it('★ 開いたものは、渡された窓の真ん中へ来る（岸が食い込むときは器が口そのものを渡す）', () => {
+  it('★ 開いたものの行き先は、渡した点（岸が食い込んでいるときの「口の真ん中」）', () => {
     const mid = { x: VIEWPORT.w / 2, y: VIEWPORT.h / 2 };
     const at = (w: BubbleWorld, id: string) => {
       const p = placeOf(resolveWorld(w, VIEWPORT), id);
@@ -182,14 +182,13 @@ describe('② 触った泡へ、視点が寄る', () => {
     const centered = at(bringToCenter(world, VIEWPORT, 'kinmu', R), 'kinmu');
     expect(Math.abs(centered.x - mid.x)).toBeLessThan(16);
     expect(Math.abs(centered.y - mid.y)).toBeLessThan(16);
-    // 狭い窓を渡せば、その窓の真ん中へ ── 岸が食い込んだときに器がこうする
-    const narrow = { w: VIEWPORT.w / 2, h: VIEWPORT.h };
-    const inNarrow = placeOf(
-      resolveWorld(bringToCenter(world, narrow, 'kinmu', R), narrow), 'kinmu',
-    );
-    expect(Math.abs(inNarrow.x + inNarrow.w / 2 - narrow.w / 2)).toBeLessThan(16);
-    // 値は1つも書かない ── 動くのは焦点だけ
-    expect(allValues(bringToCenter(world, VIEWPORT, 'kinmu', R))).toEqual(allValues(world));
+    // 渡せば、その点へ**同じだけ**ずれて来る。岸は海に重なるので、窓の真ん中が岸の下のことがある
+    const want = { x: mid.x + 260, y: mid.y - 90 };
+    const moved = at(bringToCenter(world, VIEWPORT, 'kinmu', R, want), 'kinmu');
+    expect(moved.x - centered.x).toBeCloseTo(want.x - mid.x, 0);
+    expect(moved.y - centered.y).toBeCloseTo(want.y - mid.y, 0);
+    // ★ 海そのものは動かない ── 窓も箱も変えないので、値も焦点の約束も同じまま
+    expect(allValues(bringToCenter(world, VIEWPORT, 'kinmu', R, want))).toEqual(allValues(world));
   });
 
   it('無い泡を触っても何も起きない', () => {

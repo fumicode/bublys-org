@@ -18,7 +18,9 @@ import {
   CSSProperties,
   FC,
   ReactNode,
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -26,6 +28,7 @@ import {
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
+import { METRICS } from "@bublys-org/bubble-layout";
 import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import { TUBE_RADIUS, anchoredRect, touchingEdges, type ScreenRect, type TubeJoin } from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
@@ -40,6 +43,19 @@ export type ShoreSpaceProps = {
   readonly ground: string;
   /** ネオンの通し方（枝分かれ／迂回） */
   readonly join?: TubeJoin;
+  /** 自分の枠を描くか（外の岸に貼られているなら、そちらが引くので描かない） */
+  readonly frame?: boolean;
+  /**
+   * **岸を覚えておく名前。** 渡すと、部品が作り直されても岸の中身が戻る。
+   *
+   * ★ 窓を岸に貼ると、中身は**別の場所で描き直される**（海の泡としてではなく、岸の中身として）
+   *   ので React は作り直す ── そのままだと**窓の中の岸が空になる**（実測で踏んだ）。
+   *   岸は「窓の中身の一部」なので、部品の一生より長く生きてよい。
+   * ★ 名前は url。海にいても岸にいても同じものが取れる（岸は `d.url` から同じ
+   *   `RoutedBubble` を作り直す）。**同じ url の窓が 2 つあると岸を分け合う**が、
+   *   いまは url ごとに 1 つしか開けない作りなので成り立つ。
+   */
+  readonly persistKey?: string;
   /** 空のときに最初に開く url */
   readonly initialUrls?: readonly string[];
   /** 定位置に居てほしいもの。窓の岸には渡さない（空の岸で始まる） */
@@ -57,17 +73,63 @@ export type ShoreSpaceProps = {
 };
 
 /**
- * ドラッグの知らせを、**海の座標から器の座標へ**直す。
+ * ドラッグの知らせを、岸が読む形にする。
  *
- * ★ 知らせ（`pointer` と `rect`）は**海の層の座標**で来る。海は口の左上に置いてあるので、
- *   岸（器の座標）で考えるにはそのぶん足す。これを通さないと、右の縁へ持っていっても
- *   手前だと思われて**反対側へ貼れない**（実測で踏んだ）。
+ * ★ 知らせ（`pointer` と `rect`）は**海の層の座標**で来る。岸は器の座標で考えるので、
+ *   本来はそのぶん直す必要がある。**いまは海を器の左上にそのまま置いている**ので
+ *   2 つは同じ ── 直す量は 0 だが、「別の座標だ」という境目はここに残しておく
+ *   （前に海を口へ寄せたとき、ここを通さなかったせいで**反対側の縁へ貼れなかった**）。
  */
-const toShore = (info: TakeOutInfo, open: { readonly x: number; readonly y: number }) => ({
-  x: info.rect.x + open.x,
-  y: info.rect.y + open.y,
-  pointer: { x: info.pointer.x + open.x, y: info.pointer.y + open.y },
+const toShore = (info: TakeOutInfo) => ({
+  x: info.rect.x,
+  y: info.rect.y,
+  pointer: info.pointer,
 });
+
+/**
+ * **岸と海では、同じ「大きさ」が違うものを指す。**
+ *
+ * 海に浮いている泡には**バブルUI（ヘッダ）が付く**が、岸に貼ったものには付かない
+ * （岸は管と中身だけ）。だから泡の大きさをそのまま渡すと、貼った瞬間に中身が
+ * ヘッダのぶん広がり、剥がすと逆に**ヘッダに食われて縮む**。
+ *
+ * 揃えるのは**中身の大きさ**なので、渡すときに飾りのぶんを引き、返すときに足す。
+ * 「剥がしたら同じ大きさ」は中の要素の話で、ヘッダを含んだ泡全体のことではない
+ * ── バブルUIが付くぶん、泡そのものは大きくなる。
+ */
+const CHROME_H = METRICS.HEADER;
+/** 泡の大きさ → 岸に貼る大きさ */
+const toDockSize = (size: { readonly w: number; readonly h: number }) => ({
+  width: size.w,
+  height: Math.max(1, size.h - CHROME_H),
+});
+/** 岸の大きさ → 海へ返す泡の大きさ */
+const toBubbleSize = (rect: { readonly width: number; readonly height: number }) => ({
+  w: rect.width,
+  h: rect.height + CHROME_H,
+});
+
+/**
+ * **この中身は岸の上にいる。** 岸に貼られた泡の中身にだけ true が届く。
+ *
+ * 読むのは「自分の枠を描くか」を決めるため（{@link ShowreLayer} の `frame` を見よ）。
+ */
+export const OnShoreContext = createContext(false);
+export const useOnShore = (): boolean => useContext(OnShoreContext);
+
+/** 名前を付けた岸の中身を、部品の一生より長く置いておく棚（上の `persistKey` を見よ） */
+const SHORE_MEMORY = new Map<string, readonly Docked[]>();
+/**
+ * **種をもうまいた名前。**
+ *
+ * ★ 窓を岸に貼ると中身は作り直される。そのとき `initialUrls` の種が**もう一度まかれて**、
+ *   同じ url の泡が 2 つ目として生える（実測で踏んだ：一覧が別にもう 1 つ出た）。
+ *   種は「空の窓を開いたとき 1 回」のものなので、名前ごとに 1 回だけにする。
+ * ★ **窓の海そのものはまだ覚えられていない。** 覚えているのは岸だけなので、
+ *   貼り直すと海に浮いていた泡は消える（岸に貼ってあったものは残る）。
+ *   海まで覚えるには `BubbleSpace` の世界と url の対応表を外へ出す必要がある ── 宿題。
+ */
+const SHORE_SEEDED = new Set<string>();
 
 /** 海の口を外から掴むための小物（`BubbleSpace` の中でしか使えないので、子として置く） */
 const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }) => {
@@ -86,6 +148,8 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homesReady = true,
   onSpaceReady,
   autoLens,
+  frame,
+  persistKey,
   onLens,
   className,
   style,
@@ -104,7 +168,20 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   );
 
   /** 岸に着いているもの。海の泡ではないので、世界（WorldState）には居ない */
-  const [docked, setDocked] = useState<readonly Docked[]>([]);
+  const [docked, setDocked] = useState<readonly Docked[]>(
+    () => (persistKey && SHORE_MEMORY.get(persistKey)) || [],
+  );
+  // 名前が付いているなら、変わるたび棚へ写す（作り直されたら、そこから始まる）
+  useEffect(() => {
+    if (persistKey) SHORE_MEMORY.set(persistKey, docked);
+  }, [persistKey, docked]);
+  /** 種は名前ごとに 1 回だけ。貼り直しでまき直さない（上の `SHORE_SEEDED` を見よ） */
+  const seeds = useMemo(() => {
+    if (!persistKey) return initialUrls;
+    if (SHORE_SEEDED.has(persistKey)) return undefined;
+    SHORE_SEEDED.add(persistKey);
+    return initialUrls;
+  }, [persistKey, initialUrls]);
   /** 「いま離したらここに着く」の予告 */
   const [preview, setPreview] = useState<ScreenRect | null>(null);
   /**
@@ -117,13 +194,8 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   /**
    * **海の「開いている口」。** 岸が食い込んでいるぶんを、辺ごとに引いた矩形。
    *
-   * **海はこの口そのもの**として置く ── 位置も大きさも、レンズの箱（`H`）もこれで決まる。
-   *
-   * ★ 一度「海は窓いっぱいのまま、中心だけ口へ寄せる」をやって取り消した。
-   *   海を平行移動すると**中身が丸ごとずれる**（実測：残った一覧が @-221 まで飛んだ）。
-   *   次に「開いたものの行き先だけ口の中心にする」もやったが、今度は**押しやられた側**が
-   *   窓の左端まで行って岸の下に潜った（実測：2 つ目で 1 つ目が @747、3 つ目で @631）。
-   *   端も中心も箱も口で決める、が結局いちばん短く言える。
+   * 使うのは**開いたものの行き先**だけ（下の `inner` の註を見よ）。海の位置も大きさも、
+   * これでは変えない。
    *
    * ★ 引くのは「その辺にいちばん深く食い込んでいるもの」のぶん。
    *   角の小物（ポケット 48×48）も辺ぜんぶを取るが、**規則が短く言える**ほうを採った。
@@ -147,15 +219,18 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
     return { x: l, y: t, w: Math.max(1, vp.width - l - r), h: Math.max(1, vp.height - t - b) };
   }, [docked, vp]);
   /**
-   * **海の箱は「口」そのもの。** 端も中心もレンズの箱（`H`）も、ぜんぶこれで決まる。
+   * **海の箱は窓いっぱい。岸が食い込んでも変えない。**
    *
-   * ★ 窓いっぱいのまま置いていたころは、**押しやられた泡の行き先が窓の左端**だった。
-   *   岸が左を覆っていると、そこは岸の下 ── 開くたびに前のものが岸に飲まれた
-   *   （実測：2 つ目を開くと 1 つ目が @747 ＝ 岸 0..745 の下、3 つ目で @631）。
-   * ★ 箱が狭まると魚眼が中身を潰すが、そこは
-   *   「**泡 1 つが原寸で入らない箱では魚眼を諦める**」が受け止める（`resolve` の註）。
+   * ★ 一度**箱そのものを口にした**が、取り消した。岸のくっつき方が変わるたびに箱が変わり、
+   *   **触っていない泡が画面の上で動いて、大きさまで変わる**（実測：箱 1285→1915 で
+   *   泡が 343→644、倍率 0.923→0.963）。動いた先が岸の下だと消えて見える
+   *   ── 岸の地は不透明なので。⑤「触っていない泡は画面の上で動かない」に反するうえ、
+   *   「**自分で狭めたのなら、残りに小さく全部見せるより、前と同じ大きさで見切れる方がいい**」
+   *   にも反していた（箱が縮めば中身も縮む ＝ 小さく全部見せに行く）。
+   * ★ だから口が効くのは**開いたものの行き先**だけ（`BubbleSpace` の `openArea`）。
+   *   岸の下に入ったものは**見切れているだけ** ── 海をドラッグすれば見に行ける。
    */
-  const inner = useMemo<Viewport>(() => ({ w: openArea.w, h: openArea.h }), [openArea]);
+  const inner = useMemo<Viewport>(() => ({ w: viewport.w, h: viewport.h }), [viewport.w, viewport.h]);
 
   /**
    * 離したところが縁の近くなら、岸が横取りする。
@@ -167,9 +242,10 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   const takeOut = useCallback(
     (info: TakeOutInfo) => {
       const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
-      const at = toShore(info, openArea);
+      const at = toShore(info);
+      const want = toDockSize(info.size);
       const hit = resolveDock(
-        { x: at.x, y: at.y, width: info.size.w, height: info.size.h },
+        { x: at.x, y: at.y, width: want.width, height: want.height },
         at.pointer,
         vp,
         others,
@@ -180,7 +256,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       setDocked((list) => [...list, { key: `${info.url}#${Date.now()}`, url: info.url, ground: g, ...hit }]);
       return true;
     },
-    [docked, vp, routes, openArea],
+    [docked, vp, routes],
   );
 
   /** ドラッグ中 ── 縁の近くなら、着いたあとの矩形を予告する（大きさは貼るときと同じ規則） */
@@ -188,16 +264,17 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
     (info: TakeOutInfo | null) => {
       if (!info) { setPreview(null); return; }
       const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
-      const at = toShore(info, openArea);
+      const at = toShore(info);
+      const want = toDockSize(info.size);
       const hit = resolveDock(
-        { x: at.x, y: at.y, width: info.size.w, height: info.size.h },
+        { x: at.x, y: at.y, width: want.width, height: want.height },
         at.pointer,
         vp,
         others,
       );
       setPreview(hit ? anchoredRect(hit.dock, hit.size, vp) : null);
     },
-    [docked, vp, openArea],
+    [docked, vp],
   );
 
   /**
@@ -262,9 +339,11 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          *   （実測で踏んだ）。ここで切れば、外の岸に貼ったときと同じになる。
          */
         <CurrentBubbleContext.Provider value={null}>
-          <BubbleSpaceContext.Provider value={shoreSpace}>
-            <r.route.Component bubble={r.bubble} />
-          </BubbleSpaceContext.Provider>
+          <OnShoreContext.Provider value={true}>
+            <BubbleSpaceContext.Provider value={shoreSpace}>
+              <r.route.Component bubble={r.bubble} />
+            </BubbleSpaceContext.Provider>
+          </OnShoreContext.Provider>
         </CurrentBubbleContext.Provider>
       );
     },
@@ -293,18 +372,20 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       <BubbleSpace
         routes={routes}
         viewport={inner}
-        initialUrls={initialUrls}
+        initialUrls={seeds}
         autoLens={autoLens}
+        openArea={openArea}
         onLens={onLens}
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
         /**
-         * ★ 海は**口の左上**に置く（大きさも口そのもの）。
+         * ★ 海は**器の左上にそのまま**置く（大きさも窓いっぱい）。岸で狭まるのは
+         *   見えている所だけで、海そのものではない。
          * ★ `overflow` は切らない ── 口で切ると、**岸が覆っていない所まで切れる**
          *   （見え方の帯は幅 480 で、その右は空いている）。はみ出したぶんは、
-         *   この器が窓の縁で切り、岸の地が上から隠す。
+         *   この器が窓の縁で切り、岸の地が上から隠す ＝ それが「見切れる」。
          */
-        style={{ position: "absolute", left: openArea.x, top: openArea.y, overflow: "visible" }}
+        style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}
       >
         <SpaceHandle onReady={onReady} />
         {children}
@@ -318,6 +399,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         renderContent={renderDockedContent}
         preview={preview}
         join={join}
+        frame={frame}
         onUpdate={(key, next) =>
           setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)))
         }
@@ -325,11 +407,8 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
           const d = docked.find((x) => x.key === key);
           setDocked((list) => list.filter((x) => x.key !== key));
           // 剥がした所にそのまま浮かべる（岸へ貼るときと同じで、見えている矩形が正）
-          // ★ 海は口の左上に置いてあるので、器の座標から海の座標へ戻して渡す
-          if (d)
-            spaceRef.current?.takeIn(d.url, {
-              x: rect.x - openArea.x, y: rect.y - openArea.y, w: rect.width, h: rect.height,
-            });
+          // ★ 大きさは**中身**を揃える ── バブルUI が付くぶん、泡そのものは大きくなる
+          if (d) spaceRef.current?.takeIn(d.url, { x: rect.x, y: rect.y, ...toBubbleSize(rect) });
         }}
       />
     </div>

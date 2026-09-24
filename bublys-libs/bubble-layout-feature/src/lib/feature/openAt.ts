@@ -33,6 +33,11 @@ export interface OpenAtInput {
   readonly as?: OpenAs;
   readonly rules?: Partial<LayoutRules>;
   /**
+   * 「真ん中」と見なす点（画面の座標）。省いたら窓の真ん中。
+   * 岸が食い込んでいるとき、**開いている口の真ん中**を渡す（`bringToCenter` を見よ）。
+   */
+  readonly center?: { readonly x: number; readonly y: number };
+  /**
    * **レンズには触らない。** 既定では横に開くと X の魚眼を点けるが、
    * 誰かが向きを選んでいる（魚眼を Y に向けた、どちらも平行にした）なら、
    * 開くたびに X へ戻すとその選択が握り潰される。選ばれたあとはこれを立てる。
@@ -186,7 +191,7 @@ export function openAt(input: OpenAtInput): OpenAtResult {
    *   開いたときだけは、外の窓の焦点も動かして新しい泡を真ん中へ持ってくる。
    *   窓の直接の子として開いたときは、② で既に真ん中なので何も起きない。
    */
-  w = bringToCenter(w, viewport, newId, input.rules);
+  w = bringToCenter(w, viewport, newId, input.rules, input.center);
   return { world: w, id: newId };
 }
 
