@@ -16,7 +16,7 @@ import type { AxisView, BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, P
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, useScreenZoom } from './context.js';
-import type { BubbleSpaceApi, ScreenZoom } from './context.js';
+import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
@@ -86,11 +86,29 @@ const OVERSCROLL_MS = 260;
  * ★ 透視（奥行きに重ねる）には掛からない ── そちらは X・Y が「なし・そのまま」なので、
  *   詰める隙間をどう変えても位置は1px も動かない。
  */
-export const LIST_GAP = 0;
+export { LIST_GAP } from './listArrange.js';
+import { LIST_GAP } from './listArrange.js';
+
+/**
+ * **順序 → 行と列。** 何列で折り返すかだけ決めれば、あとは順に詰めるだけ。
+ * 並べる側が測った列数を受け取り、泡が持つ `cell` に何を書くかを出す。
+ */
+const cellsOf = (kids: readonly Bubble[], cols: number) =>
+  kids
+    .slice()
+    .sort((a, b) => a.state.order - b.state.order)
+    .map((b, i) => ({ b, cell: { col: i % cols, row: Math.floor(i / cols) } }));
 
 /** View が同じか（プリセットを当て直すかの判定。値はぜんぶ数か文字） */
+/**
+ * ★ 見るのは**並べ方が決めるもの**（次元・並べ方・レンズ）だけ。
+ *   刻み（step）・隙間（gap）・取り分（reserve）は、当てたあとで外から合わせる値なので
+ *   ここでは見ない ── 見ると、合わせた途端に「プリセットと違う」になって**当て直しが
+ *   止まらなくなる**（実測で踏んだ：coverflow の刻みを札の幅から決めた瞬間に
+ *   Maximum update depth）。それぞれの変化は呼ぶ側が別に見ている。
+ */
 const sameAxis = (a: AxisView, b: AxisView) =>
-  a.dim === b.dim && a.arrange === b.arrange && a.lens === b.lens && a.step === b.step;
+  a.dim === b.dim && a.arrange === b.arrange && a.lens === b.lens;
 const sameView = (a: View | null, b: View) =>
   !!a && sameAxis(a.x, b.x) && sameAxis(a.y, b.y) && sameAxis(a.z, b.z);
 
@@ -413,7 +431,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    * ★ 顔ぶれが同じなら**何も書かない** ── 書くと次の走りの引き金になって止まらない。
    */
   const setChildren = useCallback(
-    (hostId: BubbleId, want: readonly string[], preset?: PresetId, itemWidth?: number, reserve?: number) => {
+    (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
+      const { preset, itemWidth, reserve, step, cols } = how;
       listHosts.current.add(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
@@ -431,7 +450,19 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const widthChanged = !!itemWidth && kids.some((k) => k.state.size.w !== itemWidth);
       /** ★ 取り分も見る ── 口の大きさは描いてから測るので、後から決まる */
       const shiftChanged = (world.ownViewOf(hostId)?.y.reserve ?? 0) !== (reserve ?? 0);
-      if (missing.length === 0 && extra.length === 0 && !presetChanged && !widthChanged && !shiftChanged) return;
+      /** ★ 送り幅も見る ── coverflow の刻みは**札の大きさから決まる**ので、箱が変われば後から変わる */
+      const own = world.ownViewOf(hostId);
+      const stepChanged = !!step && (['x', 'y'] as const).some(
+        (axis) => step[axis] !== undefined && own?.[axis].step !== step[axis],
+      );
+      /** ★ 折り返す列数も見る ── 箱が広がれば 1 行に入る枚数が変わる */
+      const cellsChanged = !!cols && cellsOf(kids, cols).some(({ b, cell }) =>
+        b.state.cell.col !== cell.col || b.state.cell.row !== cell.row,
+      );
+      if (
+        missing.length === 0 && extra.length === 0 &&
+        !presetChanged && !widthChanged && !shiftChanged && !stepChanged && !cellsChanged
+      ) return;
       let w = world;
       let n = seq.current;
       const m = new Map(urls);
@@ -474,6 +505,28 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       // 口の場所は並びの始端に空けておく（ListSpace の註）。口は描いてから測るので、
       // 並べ方が変わっていなくても後から決まることがある
       if (shiftChanged) w = withAxis(w, hostId, 'y', { reserve: reserve ?? 0 });
+      /**
+       * 「等間隔」の刻み ── coverflow の送り幅。**札の幅に対する割合**で決まる（`listArrange`）ので、
+       * プリセットが持っている値（ラボの写真の 68）では札に対して狭すぎる。ここで当て直す。
+       */
+      if (step) {
+        for (const axis of ['x', 'y'] as const) {
+          const v = step[axis];
+          if (v !== undefined) w = withAxis(w, hostId, axis, { step: v });
+        }
+      }
+      /**
+       * **折り返し** ── 順序から行と列を書く。
+       *
+       * ★ 折り返す幅（何列か）は**箱の話**なので、View ではなく渡す側が決める。
+       *   軸に刺さっているのは「列」と「行」で、そこに**どんな値が入っているか**は
+       *   泡が持つ（`cell`）── 並べ方は読むだけ、という形を崩さない。
+       */
+      if (cols) {
+        for (const { b, cell } of cellsOf(w.kidsOf(hostId), cols)) {
+          if (b.state.cell.col !== cell.col || b.state.cell.row !== cell.row) w = w.withBubble(b.withCell(cell));
+        }
+      }
       /**
        * ★ 札の幅も**この同じ1回**で当てる。並べ方で変わる ── 詰める並びは箱いっぱい、
        *   透視は細くして後ろの札の肩を出す（`ListSpace` の `LIST_DEPTH_INSET`）。

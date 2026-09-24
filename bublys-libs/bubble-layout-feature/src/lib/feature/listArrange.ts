@@ -1,0 +1,184 @@
+/**
+ * 一覧の**並べ方の決まり**だけを集めた所 ── React も世界も要らない、ただの寸法の話。
+ *
+ * 一覧がやることは 2 つしかない（`ListSpace` の註）。そのうちの
+ * 「**並べ方を選ぶ**」と「その並べ方のときの札の形」がここ。
+ *
+ *   1. 縦に並べて**収まる** … 縦に並べる（`column`）
+ *   2. 収まらない ＋ 箱が**縦にも横にも 2 枚以上とれる** … 折り返す coverflow
+ *   3. 収まらない ＋ 箱が**横長** … coverflow（横へ送る）
+ *   4. 収まらない ＋ 箱が**縦長** … 縦の coverflow（上下へ送る）
+ *
+ * ★ 3 と 4 の分かれ目は**箱の形**。入りきらないぶんをどちらへ送るかは、
+ *   「長いのはどちらの向きか」で決まる ── 送る道が長いほうへ送る。
+ * ★ 2 が先。**どちらの向きにも並べる場所があるなら、1 列に押し込めずに折り返す**。
+ *
+ * ★ **この条件は仮。** ラボの並べ方を**全部輸入してから、条件ごと整理し直す**
+ *   （2026-09-24 の申し送り）。いまは `stackDepth`（奥行きに重ねる）に出番が無い
+ *   ── 消してはいない。選び方を決め直すときに、もう一度机に乗せる。
+ */
+import { METRICS } from '@bublys-org/bubble-layout';
+import type { PresetId } from '@bublys-org/bubble-layout';
+
+/**
+ * 一覧の並びの隙間。**0**（札が自分で上下 7px の余白を持っている）。
+ * 既定（{@link METRICS.GAP} ＝ 14）のままだと札と札のあいだが 28px も開く。
+ */
+export const LIST_GAP = 0;
+
+/**
+ * 一覧の箱の既定。バブリはどれも同じ大きさの一覧を出す。
+ *
+ * ★ 高さは「**縦に並べるか、そうでないか**」の境目でもある ── 箱は詰める軸で中身が入るまで
+ *   伸びるので、伸びたあとで測ると「収まる」がいつも真になる。だから境目は**自前の大きさ**で見る。
+ * ★ 520 → 540。口の下に隙間（{@link HEAD_GAP}）を空けたぶん、同じ枚数が入るように足した。
+ */
+export const LIST_BOX = { width: 420, height: 540 } as const;
+
+/**
+ * 一覧の中の札の幅 ── **箱の中身いっぱい**。
+ *
+ * ★ 左右に残るのは枠の余白（`METRICS.PAD`）だけ。前は札を 280 にしていたので、
+ *   420 の箱の中で **左右に 70px ずつ空いていた**（札の隙間は 4 なのに）。
+ *   広く取ってあったのは「右の余白に口（＋新規）を収める」ためだったが、
+ *   口の幅（60 ＋ 隙間 8）に対して余白は 56 しかなく**そもそも収まっていない**
+ *   ── 口は上の帯へ回っていた（`pickPreset` の `needsBand`）。つまり余白は誰の役にも立っていない。
+ */
+export const LIST_CARD_WIDTH = LIST_BOX.width - METRICS.PAD * 2;
+
+/**
+ * 透視（奥行きに重ねる）のときだけ、札を左右にこれだけ細くする。
+ *
+ * ★ **後ろの札の肩を出すため。** 子の空間の消失点は「自分の中身の箱の左上の角」なので、
+ *   奥へ行った札の左端は `cx + vp.x·(1−m) − (幅/2)·m`。**幅がちょうど中身の箱いっぱい**だと
+ *   `幅/2 = |vp.x|` で `m` の項が消え、**奥も手前も左端がぴたりと揃う**（実測：どの札も 84.0）。
+ *   揃うと手前の札が後ろをまっすぐ覆ってしまうので、透視では細くして階段に戻す。
+ */
+export const LIST_DEPTH_INSET = 56;
+/** 透視のときの札の幅（既定の箱での値。実際は箱から測る ── {@link itemWidthFor}） */
+export const LIST_DEPTH_CARD_WIDTH = LIST_CARD_WIDTH - LIST_DEPTH_INSET * 2;
+
+/**
+ * **coverflow の送り幅は、札の幅に対する割合で決まる。**
+ *
+ * 札より少し狭くすると、隣が肩を出して「まだ後ろに居る」が見える。
+ * ラボ（v5-dom の場面 3）は写真 90 に対して刻み 68 ＝ **0.756**。同じ比を使う。
+ * 1 を超えると隙間が空いて、ただの横並びになる。
+ */
+export const COVERFLOW_STEP_RATIO = 68 / 90;
+
+/** 口（＋新規）の場所 ── 中身の箱の上からの位置と、その下に空ける隙間 */
+const HEAD_TOP = 2;
+/**
+ * 口の下に空ける隙間。**見えている隙間は 10px** ──
+ * 枠の CSS（.bl-body の上 27px）と模型のヘッダ（24px）の差 3px を込みにしてある。
+ */
+const HEAD_GAP = 13;
+/** 口を右の余白に置くときの、札とのあいだ */
+const HEAD_MARGIN = 8;
+
+export type Box = { readonly w: number; readonly h: number };
+
+/**
+ * 並びの上に空けておく量 ── **口の底＋隙間まで**（枠の余白のぶんは、並びの側でもう空いている）。
+ * 並びはこのすぐ下から積む（View の軸の reserve）。
+ */
+export const reserveFor = (headBox: { readonly h: number } | null): number =>
+  headBox ? Math.max(0, HEAD_TOP + headBox.h + HEAD_GAP - METRICS.PAD) : 0;
+
+/**
+ * その向きに、札が**何枚とれるか**（枠の余白を引いた中身の側で数える）。
+ * 折り返すかどうかも、何列で折り返すかも、この 1 つの数え方で決まる。
+ */
+const fitsAcross = (boxSide: number, cardSide: number): number =>
+  Math.max(0, Math.floor(Math.max(0, boxSide - METRICS.PAD * 2) / Math.max(1, cardSide)));
+
+/**
+ * **何列で折り返すか。** 折り返さない並べ方では `undefined`。
+ *
+ * ★ どこで折り返すかは**箱の話**なので、View（見え方）ではなく並べる側が持つ。
+ *   View に持たせると「箱の大きさ」が見え方の一部になってしまい、
+ *   同じ見え方を別の大きさの箱で使えない。
+ */
+export const colsFor = (preset: PresetId, box: Box): number | undefined => {
+  if (preset !== 'coverflowGrid') return undefined;
+  return Math.max(1, fitsAcross(box.w, itemWidthFor(preset, box.w)));
+};
+
+/** 箱の大きさから並べ方を決める（海でも岸でも同じ式） */
+export const pickPreset = (
+  box: Box,
+  count: number,
+  itemWidth: number,
+  itemHeight: number,
+  headBox: Box | null,
+): PresetId => {
+  /**
+   * ★ **口が居られるかも判定に入れる。**
+   *   口は右上の角に置く。札は横に中央ぞろえなので、箱が札より十分広ければ
+   *   右の余白に収まり、縦の場所取りは要らない（下までいっぱいに詰められる）。
+   *   細くして右の余白が消えたときだけ、口の段を縦に空ける。
+   */
+  const sideRoom = (box.w - itemWidth) / 2 - METRICS.PAD;
+  const needsBand = !!headBox && sideRoom < headBox.w + HEAD_MARGIN;
+  /**
+   * ★ 取り分は「**口の底まで**」ちょうど 1 回ぶん。
+   *
+   *   札は「空けた量のすぐ下」から積む（View の軸の reserve。resolve.ts が当てる）ので、
+   *   要るのは 口の底 − PAD だけ。前は中央ぞろえのまま空けようとして**口の高さの 2 倍**を
+   *   取っており、**最後の札と縁のあいだに余白が残っているのに奥行きへ切り替わって**いた。
+   */
+  const room = box.h - METRICS.PAD * 2 - reserveFor(needsBand ? headBox : null);
+  // 詰める並びの要り高 ＝ 札の高さ × 枚数 ＋ 隙間 ×（枚数 − 1）
+  const need = count * itemHeight + Math.max(0, count - 1) * LIST_GAP;
+  if (need <= room) return 'column';
+  /**
+   * ★ **どちらの向きにも 2 枚以上とれるなら、折り返す。**
+   *   1 列（1 行）に押し込むのは、押し込むしかないときだけ。
+   */
+  const card = { w: itemWidthFor('coverflowGrid', box.w), h: itemHeight };
+  if (fitsAcross(box.w, card.w) >= 2 && fitsAcross(box.h, card.h) >= 2 && count > 1) return 'coverflowGrid';
+  /**
+   * ★ **入りきらないときの行き先は、箱の形で決まる。**
+   *   長いほうの向きへ送る ── 横長なら coverflow、縦長ならその縦版。
+   */
+  return box.w > box.h ? 'coverflow' : 'coverflowY';
+};
+
+/**
+ * その並べ方のときの札の幅。**箱から測る**ので、箱の大きさを変えてもついてくる。
+ *
+ * - 詰める並び：箱の中身いっぱい（左右に残るのは枠の余白だけ）
+ * - 透視：そこから左右 {@link LIST_DEPTH_INSET} ずつ細く ── **必ず階段になる**
+ * - coverflow：**読める幅で頭打ち**。横へ送る並びなので、箱いっぱいにすると
+ *   いつも 1 枚しか居られず、送っている感じが出ない
+ *
+ * ★ 並べ方を決めるほう（{@link pickPreset}）には**いつも詰めるときの幅**を渡す ── 幅が並べ方を
+ *   決め、並べ方が幅を決める、と回らないように。
+ */
+export const itemWidthFor = (preset: PresetId, boxWidth: number): number => {
+  const full = Math.max(1, boxWidth - METRICS.PAD * 2);
+  if (preset === 'stackDepth') return Math.max(1, full - LIST_DEPTH_INSET * 2);
+  if (preset === 'coverflow' || preset === 'coverflowGrid') return Math.min(full, LIST_CARD_WIDTH);
+  return full;
+};
+
+/**
+ * その並べ方のときの「等間隔」の刻み。決めるのは coverflow とその縦版だけ
+ * （ほかは詰める並びなので、間隔は札の大きさと隙間から決まる）。
+ *
+ * ★ **送る向きの辺で測る。** 横へ送るなら札の幅、上下へ送るなら札の高さ
+ *   ── どちらも「札より少し狭い」が欲しいことなので、比は同じ。
+ *   折り返す並べ方は両方の向きへ送るので、両方を返す。
+ */
+export const stepFor = (
+  preset: PresetId,
+  card: { readonly w: number; readonly h: number },
+): { readonly x?: number; readonly y?: number } | undefined => {
+  const x = Math.round(card.w * COVERFLOW_STEP_RATIO);
+  const y = Math.round(card.h * COVERFLOW_STEP_RATIO);
+  if (preset === 'coverflow') return { x };
+  if (preset === 'coverflowY') return { y };
+  if (preset === 'coverflowGrid') return { x, y };
+  return undefined;
+};

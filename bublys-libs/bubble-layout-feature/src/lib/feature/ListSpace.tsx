@@ -19,7 +19,14 @@
  * ★ ただし**岸に貼られたときだけは、自分で小さな海を持つ**（下の `ShoreSea`）。
  */
 import { FC, ReactNode, createContext, useContext, useEffect, useRef, useState } from "react";
-import { BubbleSpace, LIST_GAP } from "./BubbleSpace.js";
+import { BubbleSpace } from "./BubbleSpace.js";
+import {
+  colsFor,
+  itemWidthFor,
+  pickPreset,
+  reserveFor,
+  stepFor,
+} from "./listArrange.js";
 import { useBubbleSpace, useCurrentBubble } from "./context.js";
 import type { BubbleSpaceApi } from "./context.js";
 import type { BubbleRoute as LayoutRoute } from "./routing.js";
@@ -44,9 +51,18 @@ export type ListSpaceProps = {
   readonly head?: ReactNode;
 };
 
-/** 口を置く帯の高さの既定（実際は測る）。右端からの隙間も込みで見る */
+/** 口を置く帯の高さの既定（実際は測る） */
 const HEAD_HEIGHT = 39;   // ★ 口は 1.5 倍（26 × 1.5）
-const HEAD_MARGIN = 8;
+/** 口を置く高さ（中身の箱の上から）。空ける量のほうは `listArrange` が持つ */
+const HEAD_TOP = 2;
+
+/**
+ * 枠が中身に取る余白（space-css の .bl-body の左右）。口の右の余白を札とそろえるのに要る。
+ */
+const BODY_INSET = 7;
+/** 口の右の余白 ── **札と同じ**（枠から `METRICS.PAD`）。中身の箱はもう `BODY_INSET` ぶん内側にいる */
+const HEAD_RIGHT = Math.max(0, METRICS.PAD - BODY_INSET);
+
 /**
  * 一覧の板。**白い札より少し沈んだ明るい面**。
  *
@@ -55,106 +71,16 @@ const HEAD_MARGIN = 8;
  */
 export const LIST_PANEL = 'linear-gradient(180deg,#c4cad9 0%,#b6bdce 100%)';
 
-/** 口を置く高さ（中身の箱の上から） */
-const HEAD_TOP = 2;
 /**
- * 枠が中身に取る余白（space-css の .bl-body の左右）。口の右の余白を札とそろえるのに要る。
+ * 並べ方・札の形・箱の寸法は `listArrange.ts`（寸法だけの世界）にある。
+ * ここから出しているのは、外（アプリ）が箱と札の大きさを揃えるため。
  */
-const BODY_INSET = 7;
-/** 口の右の余白 ── **札と同じ**（枠から `METRICS.PAD`）。中身の箱はもう `BODY_INSET` ぶん内側にいる */
-const HEAD_RIGHT = Math.max(0, METRICS.PAD - BODY_INSET);
-/**
- * 口の下に空ける隙間。**見えている隙間は 10px** ──
- * 枠の CSS（.bl-body の上 27px）と模型のヘッダ（24px）の差 3px を込みにしてある。
- */
-const HEAD_GAP = 13;
-
-/**
- * 並びの上に空けておく量 ── **口の底＋隙間まで**（枠の余白のぶんは、並びの側でもう空いている）。
- * 並びはこのすぐ下から積む（View の軸の reserve）。
- */
-const reserveFor = (headBox: { readonly h: number } | null): number =>
-  headBox ? Math.max(0, HEAD_TOP + headBox.h + HEAD_GAP - METRICS.PAD) : 0;
-
-/**
- * 一覧の箱の既定。バブリはどれも同じ大きさの一覧を出す。
- *
- * ★ 高さは「**縦に並べるか、奥行きに重ねるか**」の境目でもある ── 箱は詰める軸で中身が入るまで
- *   伸びるので、伸びたあとで測ると「収まる」がいつも真になる。だから境目は**自前の大きさ**で見る。
- * ★ 520 → 540。口の下に隙間（{@link HEAD_GAP}）を空けたぶん、同じ枚数が入るように足した。
- */
-export const LIST_BOX = { width: 420, height: 540 } as const;
-
-/**
- * 一覧の中の札の幅 ── **箱の中身いっぱい**。
- *
- * ★ 左右に残るのは枠の余白（`METRICS.PAD`）だけ。前は札を 280 にしていたので、
- *   420 の箱の中で **左右に 70px ずつ空いていた**（札の隙間は 4 なのに）。
- *   広く取ってあったのは「右の余白に口（＋新規）を収める」ためだったが、
- *   口の幅（60 ＋ 隙間 8）に対して余白は 56 しかなく**そもそも収まっていない**
- *   ── 口は上の帯へ回っていた（`pickPreset` の `needsBand`）。つまり余白は誰の役にも立っていない。
- */
-export const LIST_CARD_WIDTH = LIST_BOX.width - METRICS.PAD * 2;
-
-/**
- * 透視（奥行きに重ねる）のときだけ、札を左右にこれだけ細くする。
- *
- * ★ **後ろの札の肩を出すため。** 子の空間の消失点は「自分の中身の箱の左上の角」なので、
- *   奥へ行った札の左端は `cx + vp.x·(1−m) − (幅/2)·m`。**幅がちょうど中身の箱いっぱい**だと
- *   `幅/2 = |vp.x|` で `m` の項が消え、**奥も手前も左端がぴたりと揃う**（実測：どの札も 84.0）。
- *   揃うと手前の札が後ろをまっすぐ覆ってしまうので、透視では細くして階段に戻す。
- *   ずれの幅はそのままこの値（前と同じ 56px ＝ 札 280 のときの階段）。
- */
-export const LIST_DEPTH_INSET = 56;
-/** 透視のときの札の幅（既定の箱での値。実際は箱から測る ── {@link itemWidthFor}） */
-export const LIST_DEPTH_CARD_WIDTH = LIST_CARD_WIDTH - LIST_DEPTH_INSET * 2;
-
-/** 箱の大きさから並べ方を決める（海でも岸でも同じ式） */
-const pickPreset = (
-  box: { readonly w: number; readonly h: number },
-  count: number,
-  itemWidth: number,
-  itemHeight: number,
-  headBox: { readonly w: number; readonly h: number } | null,
-): PresetId => {
-  /**
-   * ★ **口が居られるかも判定に入れる。**
-   *   口は右上の角に置く。札は横に中央ぞろえなので、箱が札より十分広ければ
-   *   右の余白に収まり、縦の場所取りは要らない（下までいっぱいに詰められる）。
-   *   細くして右の余白が消えたときだけ、口の段を縦に空ける。
-   */
-  const sideRoom = (box.w - itemWidth) / 2 - METRICS.PAD;
-  const needsBand = !!headBox && sideRoom < headBox.w + HEAD_MARGIN;
-  /**
-   * ★ 取り分は「**口の底まで**」ちょうど 1 回ぶん。
-   *
-   *   札は「空けた量のすぐ下」から積む（View の軸の reserve。resolve.ts が当てる）ので、
-   *   要るのは 口の底 − PAD だけ。前は中央ぞろえのまま空けようとして**口の高さの 2 倍**を
-   *   取っており、**最後の札と縁のあいだに余白が残っているのに奥行きへ切り替わって**いた。
-   */
-  const room = box.h - METRICS.PAD * 2 - reserveFor(needsBand ? headBox : null);
-  // 詰める並びの要り高 ＝ 札の高さ × 枚数 ＋ 隙間 ×（枚数 − 1）
-  //   ★ 隙間は**一覧の隙間**（`LIST_GAP`）で測る。既定の GAP（14）で測っていたので、
-  //     実際より高く見積もって**早く奥行きへ切り替わって**いた
-  const need = count * itemHeight + Math.max(0, count - 1) * LIST_GAP;
-  return need <= room ? "column" : "stackDepth";
-};
-
-/**
- * その並べ方のときの札の幅。**箱から測る**ので、箱の大きさを変えてもついてくる。
- *
- * - 詰める並び：箱の中身いっぱい（左右に残るのは枠の余白だけ）
- * - 透視：そこから左右 {@link LIST_DEPTH_INSET} ずつ細く ── **必ず階段になる**。
- *   幅が中身の箱いっぱいだと `幅/2 = |消失点|` で奥行きの項が消えて**左端が揃い**、
- *   後ろの札が上からしか覗かない。細くしておけば、左からも覗く。
- *
- * ★ 並べ方を決めるほう（`pickPreset`）には**いつも詰めるときの幅**を渡す ── 幅が並べ方を
- *   決め、並べ方が幅を決める、と回らないように。
- */
-const itemWidthFor = (preset: PresetId, boxWidth: number): number => {
-  const full = Math.max(1, boxWidth - METRICS.PAD * 2);
-  return preset === 'stackDepth' ? Math.max(1, full - LIST_DEPTH_INSET * 2) : full;
-};
+export {
+  LIST_BOX,
+  LIST_CARD_WIDTH,
+  LIST_DEPTH_INSET,
+  LIST_DEPTH_CARD_WIDTH,
+} from "./listArrange.js";
 
 /** 要素の大きさを**レイアウトの px**（倍率の掛かる前の側）で見張る */
 const useBoxSize = (ref: React.RefObject<HTMLElement | null>) => {
@@ -205,6 +131,11 @@ export const ListSpace: FC<ListSpaceProps> = ({
   const preset = pickPreset(box, members.length, itemWidth, itemHeight, headBox);
   /** 口の場所は、並びの**始端に空けておく**（並びはそのすぐ下から積む） */
   const reserve = preset === 'column' ? reserveFor(headBox) : 0;
+  /** その並べ方のときの札の幅・送り幅・折り返す列数（どれも箱から決まる） */
+  const cardWidth = itemWidthFor(preset, box.w);
+  const stepX = stepFor(preset, { w: cardWidth, h: itemHeight })?.x;
+  const stepY = stepFor(preset, { w: cardWidth, h: itemHeight })?.y;
+  const cols = colsFor(preset, box);
 
   /**
    * ★ 世界に書くのは**この 1 箇所だけ**。顔ぶれと並べ方を一緒に渡す
@@ -213,8 +144,8 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   `space` が毎回新しくてもここで止まらなくなることはない。
    */
   useEffect(() => {
-    if (me) space.setChildren(me, members, preset, itemWidthFor(preset, box.w), reserve);
-  }, [me, members, preset, space, box.w, reserve]);
+    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols });
+  }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols]);
 
   /**
    * 中身は口だけ。並びは**外の層**が描く（DOM は平らなので、札はこの div の兄弟になる ──
@@ -242,7 +173,16 @@ export const ListSpace: FC<ListSpaceProps> = ({
     >
       {/* 岸に貼られたときだけ、自分で小さな海を持つ（下の註） */}
       {!me && panel.w > 0 && (
-        <ShoreSea members={members} preset={preset} viewport={panel} outer={space} />
+        <ShoreSea
+          members={members}
+          preset={preset}
+          cardWidth={cardWidth}
+          stepX={stepX}
+          stepY={stepY}
+          cols={cols}
+          viewport={panel}
+          outer={space}
+        />
       )}
       {head && (
         <div
@@ -279,9 +219,16 @@ export const ListSpace: FC<ListSpaceProps> = ({
 const ShoreSea: FC<{
   readonly members: readonly string[];
   readonly preset: PresetId;
+  /** その並べ方のときの札の幅と送り幅。**海に居るときと同じものを渡す** ── 岸でだけ
+   *  札が箱いっぱいのまま、送り幅もプリセットのまま、になっていた（実測で踏んだ：
+   *  coverflow の札が 3 枚ともほぼ同じ所に重なった） */
+  readonly cardWidth: number;
+  readonly stepX?: number;
+  readonly stepY?: number;
+  readonly cols?: number;
   readonly viewport: { readonly w: number; readonly h: number };
   readonly outer: BubbleSpaceApi;
-}> = ({ members, preset, viewport, outer }) => {
+}> = ({ members, preset, cardWidth, stepX, stepY, cols, viewport, outer }) => {
   const routes = useContext(LayoutRoutesContext);
   return (
     <BubbleSpace
@@ -290,19 +237,36 @@ const ShoreSea: FC<{
       openOutside={(url) => outer.openBubble(url, null)}
       style={{ position: "absolute", left: 0, top: 0 }}
     >
-      <ShoreMembers members={members} preset={preset} />
+      <ShoreMembers
+        members={members}
+        preset={preset}
+        cardWidth={cardWidth}
+        stepX={stepX}
+        stepY={stepY}
+        cols={cols}
+      />
     </BubbleSpace>
   );
 };
 
 /** 小さな海の中で、顔ぶれと並べ方を合わせる（書くのはここ 1 箇所） */
-const ShoreMembers: FC<{ readonly members: readonly string[]; readonly preset: PresetId }> = ({
-  members,
-  preset,
-}) => {
+const ShoreMembers: FC<{
+  readonly members: readonly string[];
+  readonly preset: PresetId;
+  readonly cardWidth: number;
+  readonly stepX?: number;
+  readonly stepY?: number;
+  readonly cols?: number;
+}> = ({ members, preset, cardWidth, stepX, stepY, cols }) => {
   const space = useBubbleSpace();
   useEffect(() => {
-    space.setChildren("root", members, preset);
-  }, [space, members, preset]);
+    space.setChildren("root", members, {
+      preset,
+      itemWidth: cardWidth,
+      reserve: 0,
+      step: { x: stepX, y: stepY },
+      cols,
+    });
+  }, [space, members, preset, cardWidth, stepX, stepY, cols]);
   return null;
 };

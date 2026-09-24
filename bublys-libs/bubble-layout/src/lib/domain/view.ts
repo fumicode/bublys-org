@@ -50,7 +50,9 @@ export interface ResolvedView extends View {
 }
 
 export type PresetId =
-  | 'free' | 'row' | 'column' | 'grid' | 'fisheyeX' | 'coverflow' | 'histZ' | 'stackZ' | 'stackDepth';
+  | 'free' | 'row' | 'column' | 'grid' | 'fisheyeX'
+  | 'coverflow' | 'coverflowY' | 'coverflowGrid'
+  | 'histZ' | 'stackZ' | 'stackDepth';
 
 export interface Preset extends View {
   readonly label: string;
@@ -72,6 +74,24 @@ export const PRESETS: Readonly<Record<PresetId, Preset>> = {
   grid:      { label: '格子',           x: AX('col', 'pack', 'parallel', 110),          y: AX('row', 'pack', 'parallel', 80),             z: AX('none', 'as-is', 'flat', 1) },
   fisheyeX:  { label: 'X魚眼ビュー',    x: AX('history.index', 'equal', 'fisheye', 64), y: AX('history.branch', 'equal', 'parallel', 44), z: AX('none', 'as-is', 'flat', 1) },
   coverflow: { label: 'coverflow',      x: AX('order', 'equal', 'fisheye', 68),         y: AX('none', 'pack', 'parallel', 80),            z: AX('none', 'as-is', 'flat', 1) },
+  /**
+   * ★ **縦の coverflow** ── coverflow の X と Y を入れ替えただけ。足した仕掛けは 1 つも無い。
+   *
+   *   順序を**縦に**等間隔で置き、Y に魚眼を掛ける。焦点の札が原寸で、上下へ離れるほど潰れる。
+   *   横は「なし・詰める・平行」＝ みんな同じ所（箱の横の中央）。
+   *   ラボ（v3 の 06-layout-apart）が「作れる。足すもの無し」と数えていたものが、これ。
+   */
+  coverflowY:{ label: '縦の coverflow', x: AX('none', 'pack', 'parallel', 110),         y: AX('order', 'equal', 'fisheye', 68),           z: AX('none', 'as-is', 'flat', 1) },
+  /**
+   * ★ **折り返した coverflow** ── coverflow を**2 行以上**に折った形。
+   *
+   *   軸に刺すのは順序ではなく**列と行**（`col` / `row`）。どこで折り返すかは
+   *   「順序 → 列・行」を書く側が決める ── 箱に何列入るかは箱の話なので、
+   *   View（見え方）ではなく、並べる側が持つ（一覧なら `listArrange` の `colsFor`）。
+   *   両方の軸を等間隔・魚眼にすると、**焦点の札だけが原寸で、離れるほど縦にも横にも潰れる**。
+   *   ラボ（v3 の 06-layout-apart）が「2D魚眼の格子」と呼んでいたのがこれ。
+   */
+  coverflowGrid:{ label: '折り返す coverflow', x: AX('col', 'equal', 'fisheye', 68),    y: AX('row', 'equal', 'fisheye', 68),             z: AX('none', 'as-is', 'flat', 1) },
   histZ:     { label: '履歴を奥行きに', x: AX('none', 'as-is', 'parallel', 110),        y: AX('none', 'as-is', 'parallel', 80),           z: AX('history.age', 'equal', 'perspective', 1) },
   // ★ 重なりの上下を View の中で決めたいなら、Z に「順序」を刺す。触った泡が最前面（順序 0）へ並べ替わる。
   //   自由座標のままだと、同じ値で重なった兄弟の上下は決まらない（座標は同点を許すので）

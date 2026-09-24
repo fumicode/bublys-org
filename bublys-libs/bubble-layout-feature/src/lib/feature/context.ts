@@ -5,6 +5,22 @@
 import { createContext, useContext } from 'react';
 import type { BubbleId, LensId, PlaneAxis, PresetId } from '@bublys-org/bubble-layout';
 
+/**
+ * 子をどう並べるか ── **顔ぶれと一緒に渡すもの**（`setChildren`）。
+ * どれも「見え方」ではなく**箱の大きさから決まる値**で、渡す側（一覧）が測って決める。
+ */
+export interface ChildrenLayout {
+  readonly preset?: PresetId;
+  /** 札の幅。並べ方で変わる（詰めるなら箱いっぱい、coverflow なら読める幅で頭打ち） */
+  readonly itemWidth?: number;
+  /** 並びの始端に空けておく量（一覧の口の場所） */
+  readonly reserve?: number;
+  /** 「等間隔」の刻み（送り幅）。軸ごとに、札の大きさから決まる */
+  readonly step?: { readonly x?: number; readonly y?: number };
+  /** **何列で折り返すか。** 渡すと、順序から行と列（`cell`）を書き直す */
+  readonly cols?: number;
+}
+
 export interface BubbleSpaceApi {
   /** その url の泡を、この泡の隣に開く。返るのは開いた泡の id */
   openBubble: (url: string, openerId?: BubbleId | null, title?: string) => BubbleId;
@@ -32,7 +48,7 @@ export interface BubbleSpaceApi {
    *   前の書き込みを握り潰して、顔ぶれか並べ方のどちらかが消える（実測で踏んだ）。
    *   **世界に書くのは1回**。顔ぶれも並べ方も変わらなければ、何も書かない。
    */
-  setChildren: (hostId: BubbleId, urls: readonly string[], preset?: PresetId, itemWidth?: number, reserve?: number) => void;
+  setChildren: (hostId: BubbleId, urls: readonly string[], how?: ChildrenLayout) => void;
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
   hostOf: (id: BubbleId) => BubbleId | null;
   /**
