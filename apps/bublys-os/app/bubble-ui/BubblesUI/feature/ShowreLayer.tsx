@@ -118,8 +118,12 @@ export type ShowreLayerProps = {
 
 /**
  * 「いま離したら岸に着くか」を解く。着くなら留め方を返す。
- * どの辺に寄せたかは**カーソル**、置く場所は**バブルが見えている矩形**で決める
+ * どの辺を**狙ったか**はカーソル、置く場所は**バブルが見えている矩形**で決める
  * （掴んだ点との相対位置を保つ）。重なりの解決はドメイン（fitAmongDocked）。
+ *
+ * ★ 狙った辺は `fitAmongDocked` の寄せ先として渡すだけで、**覚えるのは結果の矩形から
+ *   引き直した辺**（`touchingEdges`）。狙いと着いた所は一致しないことがある
+ *   ── 先客に押されて縁から離れることがあるので。
  */
 export const resolveDock = (
   rect: ScreenRect,
@@ -134,12 +138,12 @@ export const resolveDock = (
   if (!fitted) return null;
   const snapped = snapToViewport(fitted, viewport);
   return {
-    dock: { edges, at: { x: snapped.x, y: snapped.y } },
+    dock: { edges: touchingEdges(snapped, viewport), at: { x: snapped.x, y: snapped.y } },
     size: { width: snapped.width, height: snapped.height },
   };
 };
 
-/** 辺の役割 ── 固定された辺を掴めば動く。自由な辺を掴めば伸び縮みする */
+/** 辺を直交に引いたとき（＝その辺が動く）の形 */
 const CURSOR: Record<ShowreSide, string> = { top: "ns-resize", bottom: "ns-resize", left: "ew-resize", right: "ew-resize" };
 /** 境目（2 枚が分け合っている線）を動かすときの形。1 枚だけ動かすときとは見た目で分ける */
 const CURSOR_SPLIT: Record<ShowreSide, string> = { top: "row-resize", bottom: "row-resize", left: "col-resize", right: "col-resize" };
@@ -252,8 +256,13 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
 
   /** 掴んでいるもの。動かす／伸び縮みのどちらも、画面の矩形の上で解く */
   const grab = useRef<null | {
-    key: string; side: ShowreSide; move: boolean;
+    key: string; side: ShowreSide;
     from: { x: number; y: number }; rect: ScreenRect; dock: DockState;
+    /**
+     * 一続きの手で何をするか。**引いた向きで 1 回だけ決める**（決まるまでは `null`）。
+     * 辺と直交して引けば `resize`（その辺が動く）、辺に沿って引けば `slide`（体ごと動く）。
+     */
+    mode: 'resize' | 'slide' | null;
     /**
      * 境目を掴んでいる ── **2 枚が一緒に変わる**。
      * `lo` は小さい側（左・上）、`hi` は大きい側（右・下）。線が動くと lo が伸び hi が縮む。
@@ -392,7 +401,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   );
 
   const onGripDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>, d: Docked, side: ShowreSide, move: boolean) => {
+    (e: ReactPointerEvent<HTMLDivElement>, d: Docked, side: ShowreSide) => {
       e.stopPropagation();
       setActive(d.key);
       const rect = anchoredRect(d.dock, d.size, viewport);
@@ -401,7 +410,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
        * 線は両方の中に居るので、通ってきた側のものを動かす（右から来たなら、
        * 掴んだのが左の泡でも動くのは右の泡）。線の端から来たなら、線そのもの。
        */
-      const n = move ? null : neighbourOf(d.key, rect, side);
+      const n = neighbourOf(d.key, rect, side);
       const here = { d, rect };
       const there = n ? { d: n.d, rect: n.rect } : null;
       const dIsLo = side === "right" || side === "bottom";
@@ -420,10 +429,11 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
       }
       // ★ 先に掴んだことを覚える。捕捉（setPointerCapture）は失敗しうるので後
       grab.current = {
-        key: target.d.key, side: targetSide, move,
+        key: target.d.key, side: targetSide,
         from: { x: e.clientX, y: e.clientY },
         rect: target.rect,
         dock: target.d.dock,
+        mode: null,
         split,
       };
       try {
@@ -448,17 +458,36 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
       if (e.buttons === 0) { grab.current = null; return; }
       const dx = e.clientX - g.from.x;
       const dy = e.clientY - g.from.y;
-      if (g.move) {
+      /**
+       * ★ **辺の役割は、引いた向きで決まる。**
+       *
+       * 前は「貼っている辺＝剥がす／滑る、自由な辺＝伸縮」と辺ごとに役割を分けていた。
+       * それだと**くっついた辺が増えるほど伸縮できる向きが減る**（ランチャーは 3 辺が
+       * 貼っているので、右辺でしか伸縮できなかった）。役割を辺から外し、
+       * **直交して引けばその辺が動き、沿って引けば体ごと動く**ことにした。
+       * 何辺くっついていても、全部の辺で伸縮も滑りもできる。
+       *
+       * 決めるのは**一続きの手につき 1 回**。`GRIP` ぶん動くまで決めない（手の出だしは揺れる）。
+       */
+      if (!g.mode) {
+        const vertical = g.side === "left" || g.side === "right";
+        const across = Math.abs(vertical ? dx : dy);
+        const along = Math.abs(vertical ? dy : dx);
+        if (Math.max(across, along) < GRIP) return;
+        g.mode = along > across ? "slide" : "resize";
+      }
+      if (g.mode === "slide") {
         /**
-         * 固定された辺を掴んだ ── 岸の上を滑る。
+         * 辺に沿って引いた ── 体ごと動く。
          *
-         * ★ 貼っている辺は「**カーソルがいま触れている辺**」で決まる。縁から離せば辺が無くなり、
-         *   泡は岸から浮いてカーソルについてくる（＝剥がれていく途中が見える）。
-         *   縁へ戻せばまた貼り付くし、辺をまたげば別の辺へ移る。
+         * ★ くっついているかは**いつでも矩形から読む**（`touchingEdges`）。
+         *   縁から離せば辺が無くなり、泡は岸から浮いてカーソルについてくる
+         *   （＝剥がれていく途中が見える）。縁へ戻せばまた貼り付く。
          */
-        const edges = edgesNear({ x: e.clientX, y: e.clientY }, viewport);
         const size = { width: g.rect.width, height: g.rect.height };
-        const slid = anchoredRect({ edges, at: { x: g.rect.x + dx, y: g.rect.y + dy } }, size, viewport);
+        const moved = { x: g.rect.x + dx, y: g.rect.y + dy, width: size.width, height: size.height };
+        const edges = touchingEdges(moved, viewport);
+        const slid = anchoredRect({ edges, at: { x: moved.x, y: moved.y } }, size, viewport);
         // 岸の上では重ならない。滑る向き（貼った辺と直交する向き）で、先客の縁で止める。
         // 縁から離れているとき（edges が空）は岸を出ていく途中なので、止めない
         const axis = edges.includes("left") || edges.includes("right") ? "y" : "x";
@@ -484,7 +513,8 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
             ? { width: len, height: t.rect.height }
             : { width: t.rect.width, height: len };
           const at = axis === "x" ? { x: start, y: t.rect.y } : { x: t.rect.x, y: start };
-          onUpdate(t.d.key, { dock: { edges: t.d.dock.edges, at }, size });
+          const edges = touchingEdges({ x: at.x, y: at.y, width: size.width, height: size.height }, viewport);
+          onUpdate(t.d.key, { dock: { edges, at }, size });
         };
         const loStart = axis === "x" ? lo.rect.x : lo.rect.y;
         const hiStart = axis === "x" ? hi.rect.x : hi.rect.y;
@@ -502,10 +532,13 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
       if (g.side === "top") { next.height = Math.max(min.height, g.rect.height - dy); next.y = g.rect.y + (g.rect.height - next.height); }
       // 伸ばせるのは**先客にぴったり接する所まで**（重ならない）
       const fit = clampResizeAmongDocked(next, g.side, others(g.key), min);
-      onUpdate(g.key, {
-        dock: { edges: g.dock.edges, at: { x: fit.x, y: fit.y } },
-        size: { width: Math.min(fit.width, viewport.width), height: Math.min(fit.height, viewport.height) },
-      });
+      const size = {
+        width: Math.min(fit.width, viewport.width),
+        height: Math.min(fit.height, viewport.height),
+      };
+      // ★ くっついているかは**引き直す**。伸ばして 2 辺目に届けば、その場でそこにも着く
+      const edges = touchingEdges({ x: fit.x, y: fit.y, width: size.width, height: size.height }, viewport);
+      onUpdate(g.key, { dock: { edges, at: { x: fit.x, y: fit.y } }, size });
     },
     [onUpdate, viewport, others],
   );
@@ -514,15 +547,23 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   const onGripLost = useCallback(() => { grab.current = null; }, []);
 
   const onGripUp = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
+    () => {
       const g = grab.current;
       grab.current = null;
-      if (!g || !g.move) return;
-      // 縁から遠くまで引いたら、岸から剥がして海へ返す。
-      // 返す先は**いま見えている矩形**そのまま ── 剥がした所から飛ばない
-      if (edgesNear({ x: e.clientX, y: e.clientY }, viewport).length > 0) return;
+      if (!g) return;
       const d = docked.find((x) => x.key === g.key);
-      onUndock(g.key, d ? anchoredRect(d.dock, d.size, viewport) : g.rect);
+      if (!d) return;
+      const now = anchoredRect(d.dock, d.size, viewport);
+      // 岸に居るかどうかは、**いまの矩形が縁に触れているか**だけ
+      if (touchingEdges(now, viewport).length > 0) return;
+      /**
+       * 剥がして海へ返す。
+       *
+       * ★ 置く所は**剥がした所**そのまま（飛ばない）が、**大きさは掴んだときのもの**に戻す。
+       *   辺を内へ引いて縁から離すのが剥がす動きなので、その途中で縮むのは**手段**であって
+       *   結果ではない。縮んだまま返すと、剥がすたびに泡が痩せていく。
+       */
+      onUndock(g.key, { x: now.x, y: now.y, width: g.rect.width, height: g.rect.height });
     },
     [onUndock, viewport, docked],
   );
@@ -611,25 +652,23 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
                 {renderContent(d)}
               </div>
             </div>
-            {/* 辺の役割は 2 つだけ ──
-                **固定された辺を掴めば動く（引き離せば剥がれる）。自由な辺を掴めば伸び縮みする。**
+            {/* ★ **辺に役割は無い。どう引いたかで決まる。**
+                直交に引けばその辺が動き（伸縮）、沿って引けば体ごと動く（滑る／剥がれる）。
                 取っ手という装飾は無く、辺そのものが取っ手（＝管の上） */}
             {SIDES.map((side) => {
-              const glued = d.dock.edges.includes(side);
               const along = side === "top" || side === "bottom";
               return (
                 <div
                   key={side}
                   data-showre-grip={side}
                   title={
-                    glued ? "岸の上で動かす（引き離すと剥がれる）"
-                    : splitHover === `${d.key}:${side}` ? "境目を動かす（両方が変わる）"
-                    : "大きさを変える"
+                    splitHover === `${d.key}:${side}` ? "境目を動かす（両方が変わる）"
+                    : "直交に引けば大きさ、沿って引けば岸の上で動く（縁から離せば剥がれる）"
                   }
-                  onPointerDown={(e) => onGripDown(e, d, side, glued)}
+                  onPointerDown={(e) => onGripDown(e, d, side)}
                   onPointerMove={(e) => {
                     onGripMove(e);
-                    if (!grab.current && !glued) probeSplit(d, side);
+                    if (!grab.current) probeSplit(d, side);
                   }}
                   onPointerLeave={() => { if (!grab.current) setSplitHover(null); }}
                   onPointerUp={onGripUp}
@@ -638,9 +677,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
                   style={{
                     position: "absolute",
                     zIndex: 1,   // 中身より上。辺そのものが取っ手なので、埋もれてはいけない
-                    cursor: glued
-                      ? "move"
-                      : splitHover === `${d.key}:${side}` ? CURSOR_SPLIT[side] : CURSOR[side],
+                    cursor: splitHover === `${d.key}:${side}` ? CURSOR_SPLIT[side] : CURSOR[side],
                     ...(along
                       ? { left: 0, right: 0, height: GRIP, [side]: 0 }
                       : { top: 0, bottom: 0, width: GRIP, [side]: 0 }),
