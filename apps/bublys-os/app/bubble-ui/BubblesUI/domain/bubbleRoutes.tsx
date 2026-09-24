@@ -3,7 +3,7 @@
 import { useCallback, useContext, useMemo } from "react";
 import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLineScopeView } from "@bublys-org/bubbles-ui";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { ListSpace } from "@bublys-org/bubble-layout-feature";
+import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
 import { Button } from "@mui/material";
 import { useCasScope } from "@bublys-org/world-line-graph";
 
@@ -46,7 +46,7 @@ export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
  *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
  *   1 枚ずつ巻物になるのは本末転倒。
  */
-const MEMO_CARD = { w: 280, h: 88 };
+const MEMO_CARD = { w: LIST_CARD_WIDTH, h: 88 };
 
 /**
  * メモ一覧 ── **並びの空間**。
@@ -75,7 +75,7 @@ const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
           size="small"
           variant="contained"
           onClick={newMemo}
-          sx={{ minWidth: 0, px: 0.9, py: 0.2, fontSize: 11, lineHeight: 1.5 }}
+          sx={{ minWidth: 0, px: 1.35, py: 0.3, fontSize: 16.5, lineHeight: 1.5 }}
         >
           ＋新規
         </Button>
@@ -227,7 +227,7 @@ const routes: BubbleRoute[] = [
   // Memo
   { pattern: /^memos$/, type: "memos", Component: MemosBubble,
     // 一覧は地を敷かない ── 並びの空間は海がそのまま透ける。箱は札 280 に対して広く取る
-    bubbleOptions: { defaultSize: { width: 420, height: 520 }, contentBackground: "transparent" } },
+    bubbleOptions: { defaultSize: LIST_BOX, contentBackground: "transparent" } },
   // ★ 札は詳細より**先に**置く（`memos/:id` が `.../card` も飲み込むので）
   { pattern: /^memos\/[^/]+\/card$/, type: "memo-card", Component: MemoCardBubble,
     bubbleOptions: { defaultSize: { width: MEMO_CARD.w, height: MEMO_CARD.h } } },

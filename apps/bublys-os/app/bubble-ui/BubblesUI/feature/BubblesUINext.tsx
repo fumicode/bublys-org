@@ -21,7 +21,7 @@ import { TUBE_RADIUS, TUBE_THICKNESS, anchoredRect, type ScreenRect, type TubeJo
 import { BubbleSpaceContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleSpaceApi, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
 import { bubbleRoutes } from "../domain/bubbleRoutes";
-import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
+import { SEA_GROUND, ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
 import { bridgeRoutes } from "./legacyRouteBridge";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext";
 import { LayoutRoutesProvider } from "@bublys-org/bubble-layout-feature";
@@ -280,7 +280,8 @@ export const BubblesUINext = () => {
         height: "100vh",
         overflow: "hidden",
         position: "relative",
-        background: "linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)",
+        // 海の地。岸にも同じものを敷く（ShowreLayer の SEA_GROUND）ので、1 つの定義から引く
+        background: SEA_GROUND,
         // 角に貼り付いた泡が居る角だけ、丸みを外す（中身が角丸に削られないように）
         ...seaCornerRadius(docked, vp, join, TUBE_RADIUS),
       }}

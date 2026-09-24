@@ -40,7 +40,7 @@ import { arrangeAxis } from './arrange.js';
 import type { Arranged } from './arrange.js';
 import { imageOf, LENS_XY, LENS_Z } from './lens.js';
 import type { LensXyId, LensZId } from './lens.js';
-import { halfOf, headOf, lensContext, measureAll, measureBox } from './measure.js';
+import { halfOf, headOf, lensContext, measureAll, measureBox, padOf } from './measure.js';
 import type { BoxSizes, GrownHeights, LensContext } from './measure.js';
 import { fitFocus } from './project.js';
 
@@ -54,6 +54,17 @@ export interface Host {
   readonly h: number;
   /** 合成された倍率（深さ n でも数値1つ） */
   readonly scale: number;
+  /**
+   * **どれだけ寄って見ているか**（1 が等倍）。**いちばん外側の土台だけが 1 以外を持つ。**
+   *
+   * ★ **レンズの外側に掛かる。** レンズ（①）は「位置 → 箱の中の像」で、箱の半幅 `H` は
+   *   ここでは動かない ── だから寄っても魚眼の効き方は変わらず、**像ごと大きくなる**だけ。
+   *
+   * ★ 窓（空間を持つ泡）の中には掛けない（`contentOf` は 1 を渡す）。窓の中は画面1 で、
+   *   箱の大きさはその窓のもの。そこに寄りを足すと中身が窓の外へ溢れる。
+   *   外側が寄れば窓ごと大きくなるので、中身も一緒に大きく写る ── それで足りる。
+   */
+  readonly zoom: number;
   /** 補間を通した透明度 */
   readonly alpha: number;
   /** 補間を通さないレンズの答え（見えるか）。0 なら掴めない */
@@ -125,6 +136,14 @@ export function resolveWorld(
   rules?: Partial<LayoutRules>,
   /** このフレームだけ背を伸ばす泡（模型の値ではない。measure.ts の GrownHeights） */
   grown?: GrownHeights,
+  /**
+   * このフレームだけ Z の焦点に足す量（空間ごと）。**約束（`fitFocus`）の外**に出る。
+   *
+   * ★ 端で跳ね返る（オーバースクロール）ためのもの。端は模型の決まりなので動かせないが、
+   *   「これ以上いけない」は見せないと伝わらない ── 行き過ぎて戻る山を、ここで一瞬だけ足す。
+   *   **世界には1ミリも書かない**（`withFittedFocus` を呼ばなければ焼き付かない）。
+   */
+  nudge?: ReadonlyMap<SpaceId, number>,
 ): Layout {
   const R = resolveRules(rules);
   const boxes = measureAll(world, R, grown);
@@ -133,11 +152,12 @@ export function resolveWorld(
   resolveSpace(
     world,
     ROOT_SPACE,
-    { cx: viewport.w / 2, cy: viewport.h / 2, w: viewport.w, h: viewport.h, scale: 1, alpha: 1, vis: 1, depth: 0 },
+    { cx: viewport.w / 2, cy: viewport.h / 2, w: viewport.w, h: viewport.h, scale: 1, zoom: world.zoom, alpha: 1, vis: 1, depth: 0 },
     boxes,
     R,
     spaces,
     sink,
+    nudge,
   );
   const byId = new Map<BubbleId, Placement>(sink.map((p) => [p.id, p]));
   // ③ 見えない親は体を持たないので、見えている子がいるときだけ見える（枠も縁も）。
@@ -188,11 +208,13 @@ function resolveSpace(
   rules: LayoutRules,
   spaces: Map<SpaceId, SpaceLayout>,
   sink: Mutable<Placement>[],
+  /** そのフレームだけ Z の焦点に足す量（約束の外。resolveWorld の註） */
+  nudge?: ReadonlyMap<SpaceId, number>,
 ): void {
   const view = viewOfSpace(world, spaceId);
   const kids = world.kidsOf(spaceId);
   const sizeOf = (b: Bubble) => measureBox(world, b.id, boxes, rules);
-  const arr = {
+  const arr: { x: Arranged; y: Arranged; z: Arranged } = {
     x: arrangeAxis({ axisView: view.x, axis: 'x', spaceId, kids, sizeOf, world, rules }),
     y: arrangeAxis({ axisView: view.y, axis: 'y', spaceId, kids, sizeOf, world, rules }),
     z: arrangeAxis({ axisView: view.z, axis: 'z', spaceId, kids, sizeOf, world, rules }),
@@ -204,6 +226,25 @@ function resolveSpace(
     const m = measureBox(world, spaceId, boxes, rules);
     own = { w: m.w, h: m.h - headOf(world, spaceId) };
   }
+  /**
+   * ④ 詰める並びは**箱の中央**に来る。その軸が「始端に空けておく量」（`reserve`）を持つなら、
+   * 並びごと動かして**空けた量のすぐ下から積む**。
+   *
+   * ★ 動かす量は**箱と中身から毎フレーム決める** ── 固定の数で持つと、札が増えたり
+   *   選んで背が伸びたりしたときに狂う（中央ぞろえの余りは中身の高さで変わるので）。
+   * ★ 箱は動かさない。中身が箱に入らないときは何もしない（そこは並べ方の切り替えの仕事）。
+   */
+  for (const axis of ['x', 'y'] as const) {
+    const reserve = view[axis].reserve ?? 0;
+    if (reserve <= 0 || !arr[axis].bands.length) continue;
+    const pad = padOf(world, spaceId);
+    const half = (axis === 'x' ? own.w : own.h) / 2;
+    const lo = Math.min(...arr[axis].bands.map((b) => b.start));
+    const hi = Math.max(...arr[axis].bands.map((b) => b.end));
+    if (hi - lo + reserve > half * 2 - pad * 2) continue;   // 入らない ── 触らない
+    arr[axis] = shifted(arr[axis], -half + pad + reserve - lo);
+  }
+
   const L: Mutable<SpaceLayout> = {
     id: spaceId,
     host,
@@ -220,7 +261,7 @@ function resolveSpace(
   //   ★ lab は状態に書き戻していた（sp.focus[axis] = …）。ここは読むだけなので L.focus に持つ（resolve.withFittedFocus）
   const passZ = world.windowOf(spaceId) !== spaceId;   // ③ 見えない親の Z は外の窓のもの（約束も外が守る）
   const at = world.focusOf(spaceId);
-  const focus: Focus = {
+  const focus: Mutable<Focus> = {
     x: fitFocus(L, 'x', at.x, at.x, rules),
     y: fitFocus(L, 'y', at.y, at.y, rules),
     /**
@@ -232,6 +273,9 @@ function resolveSpace(
      */
     z: passZ ? rowPlane(world, spaceId, sizeOf, rules) : fitFocus(L, 'z', at.z, at.z, rules),
   };
+  // ★ 跳ね返りは**約束のあと**に足す。前に足すと約束が刈り取って、行き過ぎが出ない
+  const over = nudge?.get(spaceId);
+  if (over) focus.z += over;
   L.focus = focus;
   const ctx = lensContext(world, spaceId, host, focus);   // このフレームの焦点（目を足す前）
   L.ctx = ctx;
@@ -300,8 +344,20 @@ function resolveSpace(
       box: { w: a.w, h: a.h },
     };
     sink.push(place);
-    if (world.isHost(it.b.id)) resolveSpace(world, it.b.id, contentOf(world, place), boxes, rules, spaces, sink);
+    if (world.isHost(it.b.id))
+      resolveSpace(world, it.b.id, contentOf(world, place), boxes, rules, spaces, sink, nudge);
   }
+}
+
+/** 並び（位置と帯）をまとめてずらす。④ の「始端に空けておく量」を当てるのに使う */
+function shifted(a: Arranged, by: number): Arranged {
+  if (!by) return a;
+  return {
+    pos: new Map([...a.pos].map(([id, v]) => [id, v + by])),
+    bands: a.bands.map((b) => ({ ...b, start: b.start + by, end: b.end + by })),
+    mid: a.mid - by,
+    gap: a.gap,
+  };
 }
 
 const ZERO_FOCUS: Focus = { x: 0, y: 0, z: 0 };
@@ -312,17 +368,23 @@ export function compose(
   host: Host,
   local: { readonly x: number; readonly y: number; readonly scale: number; readonly alpha: number; readonly w: number; readonly h: number },
 ): Rect & { readonly scale: number; readonly alpha: number } {
-  const scale = host.scale * local.scale;
+  const hs = hostScale(host);                 // ★ 寄り（zoom）はレンズの外側 ＝ 合成のところで掛かる
+  const scale = hs * local.scale;
   const w = local.w * scale;
   const h = local.h * scale;
   return {
-    x: host.cx + local.x * host.scale - w / 2,
-    y: host.cy + local.y * host.scale - h / 2,
+    x: host.cx + local.x * hs - w / 2,
+    y: host.cy + local.y * hs - h / 2,
     w,
     h,
     scale,
     alpha: host.alpha * local.alpha,
   };
+}
+
+/** 画面へ写すときに効く倍率 ＝ 合成された倍率 × その空間の寄り */
+export function hostScale(host: Host): number {
+  return host.scale * host.zoom;
 }
 
 /** 空間を持つ泡の配置 → その中身の箱（子の空間の host）。lab.html 745-752 行 */
@@ -334,6 +396,7 @@ export function contentOf(world: BubbleWorld, p: Placement): Host {
     w: p.box.w,
     h: p.box.h - hd,
     scale: p.scale,
+    zoom: 1,                      // ★ 寄りは画面2（いちばん外側）だけのもの
     alpha: p.alpha,
     vis: p.vis,
     depth: p.depth,

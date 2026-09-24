@@ -15,8 +15,8 @@ import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, r
 import type { AxisView, BubbleId, BubbleWorld, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
-import { BubbleSpaceContext, CurrentBubbleContext, SelectedBubbleContext } from './context.js';
-import type { BubbleSpaceApi } from './context.js';
+import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, useScreenZoom } from './context.js';
+import type { BubbleSpaceApi, ScreenZoom } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
 import type { BubbleRoute } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
@@ -56,20 +56,37 @@ function mateFor(
 }
 
 /**
- * 選んだ札が伸びる高さ ＝ **中身の上端の差**。
+ * 選んだ札が伸びる高さ ＝ **中身のまわりの余白の差**。
  *
- * 静かな札は中身が上 7px の所から始まり、装いを出すと 27px の所から始まる（space-css の
- * `.bl-body`）。その差 20px だけ札の背が伸びれば、**中身の高さは変わらない**
- * ── 選び直すたびに札の中が伸び縮みするのを避けたいので、こうする。
+ * 縦に詰める一覧の札は、静かなときは上下 1px（札と札のあいだを限界まで細くするため。
+ * space-css の `.bl-packed`）。**選んで泡になったら**、上は装いのぶん 27px、
+ * 下は**左右と同じ 7px**（`.bl-grown`）。
+ *
+ * ★ その差だけ札の背が伸びれば、**中身の高さは変わらない** ── 選び直すたびに札の中が
+ *   伸び縮みするのを避けたいので、こうする。伸びたぶんは**並びの後ろがずれて**吸収する。
  * ★ CSS と同じ数。片方だけ変えると中身が伸び縮みする。
  */
-const SELECTED_GROW = 27 - 7;
+const SELECTED_GROW = (27 + 7) - (1 + 1);
 
 /**
- * 一覧の並びの隙間。札は自分で上下 7px の余白を持っているので、
- * これに 14 を足した分が「白い箱と白い箱のあいだ」になる（4 なら 18px）。
+ * 端で行き過ぎる量（軸の 1 刻みに対する割合）と、その山の長さ（ms）。
+ *
+ * ★ `METRICS.Z_FRONT_KEEP`（0.35）より**小さく**しておく ── 焦点より手前へ出た泡は
+ *   レンズが消すので、行き過ぎた瞬間に手前の札が消えてしまう。
  */
-const LIST_GAP = 4;
+const OVERSCROLL = 0.2;
+const OVERSCROLL_MS = 260;
+
+/**
+ * 一覧の並びの隙間。**0** ── 札と札のあいだは、札が自分で持つ上下の余白だけにする。
+ *
+ * ★ 見えている隙間は「並びの隙間 ＋ 札の上下の余白 × 2」。前は 4 ＋ 7×2 ＝ **18px** あった。
+ *   縦に詰める一覧では札の余白も 1px まで薄くする（`space-css` の `.bl-packed`）ので、
+ *   いまは **2px**。
+ * ★ 透視（奥行きに重ねる）には掛からない ── そちらは X・Y が「なし・そのまま」なので、
+ *   詰める隙間をどう変えても位置は1px も動かない。
+ */
+export const LIST_GAP = 0;
 
 /** View が同じか（プリセットを当て直すかの判定。値はぜんぶ数か文字） */
 const sameAxis = (a: AxisView, b: AxisView) =>
@@ -189,8 +206,34 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     return new Map([[b.id, SELECTED_GROW]]);
   }, [selectedId, world]);
 
+  /**
+   * **これ以上いけない**の跳ね返り（オーバースクロール）。
+   *
+   * 端は模型の決まり（`fitFocus`）なので動かせない。けれど端で回し続けても何も起きないと、
+   * 効かないのか端なのか分からない ── **一瞬だけ焦点を端の向こうへ出して戻す**。
+   * 山は **1 つだけ**（`sin`）。**世界には1ミリも書かない**ので、離れた所には何も残らない。
+   */
+  const [nudge, setNudge] = useState<ReadonlyMap<BubbleId, number> | undefined>(undefined);
+  const bouncing = useRef(false);
+  const overscroll = useCallback((space: BubbleId, dir: -1 | 1, step: number) => {
+    if (bouncing.current) return;                      // 鳴っている最中は重ねない
+    bouncing.current = true;
+    const amount = dir * step * OVERSCROLL;
+    const t0 = performance.now();
+    const tick = () => {
+      const t = (performance.now() - t0) / OVERSCROLL_MS;
+      if (t >= 1) { setNudge(undefined); bouncing.current = false; return; }
+      setNudge(new Map([[space, amount * Math.sin(Math.PI * t)]]));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, []);
+
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
-  const base = useMemo(() => resolveWorld(world, viewport, rules, grown), [world, viewport, rules, grown]);
+  const base = useMemo(
+    () => resolveWorld(world, viewport, rules, grown, nudge),
+    [world, viewport, rules, grown, nudge],
+  );
 
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
   const takeOut = useCallback(
@@ -344,7 +387,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    * ★ 顔ぶれが同じなら**何も書かない** ── 書くと次の走りの引き金になって止まらない。
    */
   const setChildren = useCallback(
-    (hostId: BubbleId, want: readonly string[], preset?: PresetId) => {
+    (hostId: BubbleId, want: readonly string[], preset?: PresetId, itemWidth?: number, reserve?: number) => {
       listHosts.current.add(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
@@ -358,7 +401,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   ── 実測で踏んだ（札が5枚とも同じ所に原寸で重なった）。
        */
       const presetChanged = !!preset && !sameView(world.ownViewOf(hostId), presetView(preset));
-      if (missing.length === 0 && extra.length === 0 && !presetChanged) return;
+      /** ★ 幅も見る ── 並べ方が同じでも、透視と詰めるで札の幅が変わることがある */
+      const widthChanged = !!itemWidth && kids.some((k) => k.state.size.w !== itemWidth);
+      /** ★ 取り分も見る ── 口の大きさは描いてから測るので、後から決まる */
+      const shiftChanged = (world.ownViewOf(hostId)?.y.reserve ?? 0) !== (reserve ?? 0);
+      if (missing.length === 0 && extra.length === 0 && !presetChanged && !widthChanged && !shiftChanged) return;
       let w = world;
       let n = seq.current;
       const m = new Map(urls);
@@ -369,10 +416,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         n += 1;
         const id = `b${n}:${url}`;
         const size = route.size ?? { w: 280, h: 120 };
+        const w0 = itemWidth ?? size.w;
         w = w.add(Bubble.create({
           id, title: titleOf(routes, url), hue: route.hue ?? hueOf(id),
           // 外の海そのものを一覧にすることもある（岸に貼った一覧）。root は親 null
-          w: size.w, h: size.h, parent: hostId === 'root' ? null : hostId,
+          w: w0, h: size.h, parent: hostId === 'root' ? null : hostId,
           order: w.kidsOf(hostId).length,
         }));
         m.set(id, { url, type: route.type, openerId: hostId, at: n });
@@ -396,6 +444,17 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       if (preset && presetChanged) {
         w = withPreset(w, preset, hostId);
         for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { gap: LIST_GAP });
+      }
+      // 口の場所は並びの始端に空けておく（ListSpace の註）。口は描いてから測るので、
+      // 並べ方が変わっていなくても後から決まることがある
+      if (shiftChanged) w = withAxis(w, hostId, 'y', { reserve: reserve ?? 0 });
+      /**
+       * ★ 札の幅も**この同じ1回**で当てる。並べ方で変わる ── 詰める並びは箱いっぱい、
+       *   透視は細くして後ろの札の肩を出す（`ListSpace` の `LIST_DEPTH_INSET`）。
+       */
+      if (itemWidth) {
+        for (const k of w.kidsOf(hostId))
+          if (k.state.size.w !== itemWidth) w = w.withBubble(k.withSize({ w: itemWidth, h: k.state.size.h }));
       }
       seq.current = n;
       setUrls(m);
@@ -487,9 +546,23 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [props, urls],
   );
 
+  /**
+   * **画面2はいちばん外のひとつきり。**
+   *
+   * 入れ子の海（窓の中・岸に貼った一覧）は、自分では寄りを持たず、外の画面へ渡す
+   * ── 海ごとに持つと掛け算になる（実測：窓の中で1回まわすと 2 倍 × 2 倍 ＝ 4 倍に写った）。
+   * 外に画面が無ければ、自分がいちばん外 ＝ 自分の世界が寄りを持つ。
+   */
+  const outerScreen = useScreenZoom();
+  const screen: ScreenZoom = useMemo(
+    () => outerScreen ?? { zoom: world.zoom, setZoom: (z: number) => setWorld(world.withZoom(z)) },
+    [outerScreen, world, setWorld],
+  );
+
   const input = useBubbleInput({
     world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, grown,
     layerRef, hasContent, claimDrop, onDragInfo,
+    zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
   });
 
   const renderBubble = useCallback(
@@ -512,6 +585,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        */
       const space = world.bubble(id)?.space;
       const inList = !!space && listHosts.current.has(space);
+      /**
+       * ★ その一覧が**縦に詰めている**か（奥行きに重ねるのではなく）。
+       *   詰める並びのときだけ札の上下の余白を薄くする ── 透視は 1px も動かさない。
+       */
+      const packed = inList && world.ownViewOf(space)?.y.arrange !== 'as-is';
       return (
         <>
           <div className="hd" />
@@ -545,6 +623,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
                *   中身の大きさも場所も変わらない ── 装いが付くだけになる。
                */
               (inList ? ' bl-tight' : '') +
+              (packed ? ' bl-packed' : '') +
               (grown?.has(id) ? ' bl-grown' : '')
             }
           >
@@ -572,6 +651,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   return (
     <BubbleSpaceContext.Provider value={api}>
+      <ScreenZoomContext.Provider value={screen}>
       <SelectedBubbleContext.Provider value={selectedId}>
       <style>{FIELD_CSS + MARKS_CSS + SPACE_CSS}</style>
       <div
@@ -596,6 +676,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         {children}
       </div>
       </SelectedBubbleContext.Provider>
+      </ScreenZoomContext.Provider>
     </BubbleSpaceContext.Provider>
   );
 }

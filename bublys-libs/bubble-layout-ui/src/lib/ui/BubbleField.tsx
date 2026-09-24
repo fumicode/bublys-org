@@ -31,6 +31,9 @@ export interface BubbleFieldProps {
   readonly onPointerDown?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   readonly onPointerMove?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   readonly onPointerUp?: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  readonly onPointerCancel?: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  /** 捕まえたポインタが外れた（離しを取りこぼしたときの受け皿。ラボと同じ） */
+  readonly onLostPointerCapture?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   readonly onWheel?: (e: React.WheelEvent<HTMLDivElement>) => void;
   readonly onDoubleClick?: (e: ReactPointerEvent<HTMLDivElement>) => void;
   /** 当たり判定が使う層の要素（`useBubbleInput` に渡したものと同じ ref） */

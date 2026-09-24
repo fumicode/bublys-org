@@ -9,7 +9,7 @@ import {
   deleteProcessBubble,
   removeBubble,
 } from "@bublys-org/bubbles-ui";
-import { ListSpace } from "@bublys-org/bubble-layout-feature";
+import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
 import { Button } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 
@@ -47,7 +47,7 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
           size="small"
           variant="contained"
           onClick={() => openBubble("users/create", bubble.id)}
-          sx={{ minWidth: 0, px: 0.9, py: 0.2, fontSize: 11, lineHeight: 1.5 }}
+          sx={{ minWidth: 0, px: 1.35, py: 0.3, fontSize: 16.5, lineHeight: 1.5 }}
         >
           ＋新規
         </Button>
@@ -64,7 +64,7 @@ const UsersBubble: BubbleContentRenderer = ({ bubble }) => {
  *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
  *   1 枚ずつ巻物になるのは本末転倒。
  */
-const CARD = { w: 280, h: 88 };
+const CARD = { w: LIST_CARD_WIDTH, h: 88 };
 
 /** ユーザー 1 人の札 ── 一覧の中の泡 */
 const UserCardBubble: BubbleContentRenderer = ({ bubble }) => {
@@ -138,7 +138,7 @@ const UserGroupsBubble: BubbleContentRenderer = () => {
           onClick={() =>
             dispatch(addUserGroup(new UserGroup(crypto.randomUUID(), `New Group ${groups.length + 1}`, []).toJSON()))
           }
-          sx={{ minWidth: 0, px: 0.9, py: 0.2, fontSize: 11, lineHeight: 1.5 }}
+          sx={{ minWidth: 0, px: 1.35, py: 0.3, fontSize: 16.5, lineHeight: 1.5 }}
         >
           ＋新規
         </Button>
@@ -160,7 +160,7 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
 
 // ルーティング定義
 /** 一覧（並びの空間）の箱 ── 札 280 に対して広く取る。右の余白に口（＋新規）が収まる */
-const LIST_SIZE = { width: 420, height: 520 };
+const LIST_SIZE = LIST_BOX;
 /** 一覧は地を敷かない ── 並びの空間は海がそのまま透ける */
 const LIST_OPTIONS = { defaultSize: LIST_SIZE, contentBackground: "transparent" };
 const CARD_OPTIONS = { defaultSize: { width: CARD.w, height: CARD.h } };

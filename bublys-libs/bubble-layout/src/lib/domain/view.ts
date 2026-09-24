@@ -20,6 +20,16 @@ export interface AxisView {
   readonly step: number;
   readonly gap?: number;
   readonly align?: Align;
+  /**
+   * 「詰める」並びの、**始端に空けておく量**（既定 0）。一覧の口（＋新規）の場所などに使う。
+   *
+   * ★ ④ 詰める並びは**箱の中央**に来る。中央のまま上に場所を空けるには、
+   *   上下に同じだけ余らせるしかなく、**欲しい高さの 2 倍**を取られる。
+   *   そのうえ札が少ないと、余ったぶんが上にも回って**口と1枚目のあいだが間延びする**。
+   *   これを持つ軸では、並びごと動かして「**空けた量のすぐ下から積む**」ようにする
+   *   （動かす量は箱と中身から毎フレーム決まる ── `resolve.anchorRun`）。
+   */
+  readonly reserve?: number;
 }
 
 /** X/Y は LensXyId、Z は LensZId しか意味を持たない（実体は同じ AxisView） */

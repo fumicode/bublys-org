@@ -19,7 +19,7 @@ import { METRICS, ROOT_SPACE } from './types.js';
 import type { Bubble } from './bubble.js';
 import type { BubbleWorld } from './world.js';
 import type { Layout } from './resolve.js';
-import { contentRect } from './resolve.js';
+import { contentRect, hostScale } from './resolve.js';
 import type { ScreenRects } from './act.js';
 import type { LayoutRules } from './rules.js';
 import { readDimension, verbOf, writeKeyOf } from './dimension.js';
@@ -211,7 +211,7 @@ export function spaceSlotAt(world: BubbleWorld, q: DropQuery, rules: LayoutRules
       const idx = sorted.filter((s) => center(s.r, axis) < cur).length;
       const near = (s: Sib) => lo(s.r, axis);
       const far = (s: Sib) => hi(s.r, axis);
-      const half = ((A.gap ?? METRICS.GAP) / 2) * L.host.scale;
+      const half = ((A.gap ?? METRICS.GAP) / 2) * hostScale(L.host);
       const at = !sorted.length ? (axis === 'x' ? L.host.cx : L.host.cy)
         : idx === 0 ? near(sorted[0]) - half
         : idx === sorted.length ? far(sorted[idx - 1]) + half

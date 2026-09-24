@@ -21,7 +21,7 @@ import type { Bubble } from './bubble.js';
 import type { BubbleWorld } from './world.js';
 import type { ActContext, SeenRect } from './act.js';
 import type { Layout } from './resolve.js';
-import { resolveWorld } from './resolve.js';
+import { hostScale, resolveWorld } from './resolve.js';
 import { screenToAxis } from './project.js';
 import { valueFromPos } from './arrange.js';
 import { verbOf, writeKeyOf } from './dimension.js';
@@ -135,7 +135,7 @@ export function keepSeen(
   if (verbOf(A.dim) !== 'coord' || A.arrange !== 'as-is' || A.lens !== 'perspective') return world;
   const key = writeKeyOf(A.dim);
   if (key !== 'x' && key !== 'y' && key !== 'z') return world;
-  const m = seen.scale / L.host.scale;
+  const m = seen.scale / hostScale(L.host);
   const f = world.focusOf(world.windowOf(L.id)).z;          // lab: focusZ(L.id)
   return world.withBubble(b.withFree(key, f + Math.max(0, (1 / m - 1) / METRICS.K_PERSP)));
 }

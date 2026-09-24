@@ -61,6 +61,9 @@
       "path": "../../bublys-libs/akashic-record"
     },
     {
+      "path": "../../bublys-libs/bubble-layout"
+    },
+    {
       "path": "../../launcher-bubly/launcher-libs"
     },
     {

@@ -32,7 +32,7 @@ export interface BubbleSpaceApi {
    *   前の書き込みを握り潰して、顔ぶれか並べ方のどちらかが消える（実測で踏んだ）。
    *   **世界に書くのは1回**。顔ぶれも並べ方も変わらなければ、何も書かない。
    */
-  setChildren: (hostId: BubbleId, urls: readonly string[], preset?: PresetId) => void;
+  setChildren: (hostId: BubbleId, urls: readonly string[], preset?: PresetId, itemWidth?: number, reserve?: number) => void;
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
   hostOf: (id: BubbleId) => BubbleId | null;
   /**
@@ -67,6 +67,23 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
 export const useBubbleSpace = (): BubbleSpaceApi => useContext(BubbleSpaceContext);
 
 /** いま自分がどの泡の中にいるか（開くときの「元の泡」） */
+/**
+ * **画面2** ── 海の像を、そっくりそのまま1枚の平面として見ているところ。
+ *
+ * ★ **1枚しか無い。** 入れ子の海（窓の中・岸に貼った一覧）は画面1 が深くなっただけで、
+ *   平面はいちばん外のひとつきり。海ごとに寄りを持たせると**掛け算になる**
+ *   （実測で踏んだ：窓の中で1回まわすと、窓の海と外の海が別々に 2 倍になって 4 倍に写った）。
+ *   だから内側の海は自分では持たず、これを通して外の画面へ渡す。
+ */
+export interface ScreenZoom {
+  readonly zoom: number;
+  readonly setZoom: (zoom: number) => void;
+}
+
+/** null ＝ 自分がいちばん外の画面（＝ 画面2 は自分の世界が持つ） */
+export const ScreenZoomContext = createContext<ScreenZoom | null>(null);
+export const useScreenZoom = (): ScreenZoom | null => useContext(ScreenZoomContext);
+
 export const CurrentBubbleContext = createContext<BubbleId | null>(null);
 export const useCurrentBubble = (): BubbleId | null => useContext(CurrentBubbleContext);
 

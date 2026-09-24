@@ -18,6 +18,7 @@
 import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import {
   ShowreTubes,
+  TUBE_RADIUS,
   TUBE_THICKNESS,
   SHOWRE_MIN_SIZE,
   anchoredRect,
@@ -50,6 +51,22 @@ export type Docked = {
 };
 
 /**
+ * **岸の地。** 岸に着いた泡 1 枚ずつの下に敷く、岸そのものの地。
+ *
+ * ★ 岸は**画面2（海の像を平面として見ている画面）に合成されている層**で、海の中には居ない。
+ *   だから岸の下を海の中身が通っても、岸は岸のまま読めていなければならない。
+ *
+ *   前は敷いていなかった（`ground: "none"` の泡は海がそのまま透けていた）。後ろがいつも
+ *   暗い海だったので成り立っていたが、**寄れる**ようになってからは白い泡が岸の下を通り、
+ *   見え方の帯の字が飛ぶ（実測：5 倍に寄せると、下を通った札が透けて読めない）。
+ *
+ * ★ 色は海と同じもの ── 敷いても見た目は1ピクセルも変わらない。変わるのは
+ *   「後ろに何が来ても変わらない」ということだけ。
+ */
+export const SEA_GROUND =
+  'linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)';
+
+/**
  * 地 2 つ。泡の中（`space-css` の `.bl-body` / `.bl-body.bl-clear`）と同じもの。
  * 岸に着いた泡は `.bub` の外に出るので、同じ地をこちらでも敷く。
  */
@@ -66,7 +83,7 @@ const GROUND = {
     color: "#e6ebf5",
     overflow: "hidden" as const,
   },
-  // 敷かない ── 中身が自分で地を持つ。**海がそのまま透ける**
+  // 敷かない ── 中身が自分で地を持つ。岸では下に岸の地（SEA_GROUND）が居る
   none: {
     background: "none",
     color: "#e6ebf5",
@@ -132,6 +149,26 @@ const insetFor = (edges: readonly ShowreSide[], join: TubeJoin) => {
     right: none("right") ? 0 : TUBE_THICKNESS,
     bottom: none("bottom") ? 0 : TUBE_THICKNESS,
     left: none("left") ? 0 : TUBE_THICKNESS,
+  };
+};
+
+/**
+ * **岸の地の、角の丸み。** 管が曲がる角だけ、地も同じだけ丸める。
+ *
+ * ★ 地を敷くまでは要らなかった ── 何も敷いていなければ角に何も無い。
+ *   敷いた途端、**四角い地の角が管の丸みの外へはみ出す**（門のように角が立つ）。
+ *   地は管の内側のものなので、管と同じ形に切り抜く。
+ *
+ * 丸めるのは**両隣の辺に管が走っている角**だけ。接している辺（`edges`）には管が走らず、
+ * そこは画面の縁までまっすぐ地が続くので、角は立てたまま。
+ */
+const shoreCornerRadius = (edges: readonly ShowreSide[], radius: number) => {
+  const drawn = (side: ShowreSide) => !edges.includes(side);
+  return {
+    borderTopLeftRadius: drawn("top") && drawn("left") ? radius : 0,
+    borderTopRightRadius: drawn("top") && drawn("right") ? radius : 0,
+    borderBottomRightRadius: drawn("bottom") && drawn("right") ? radius : 0,
+    borderBottomLeftRadius: drawn("bottom") && drawn("left") ? radius : 0,
   };
 };
 
@@ -319,7 +356,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   return (
     <>
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
-        {entries.map(({ d, inset }) => (
+        {entries.map(({ d, edges, inset }) => (
           <div
             key={d.key}
             data-docked-url={d.url}
@@ -328,6 +365,11 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
             style={{
               position: "absolute",
               pointerEvents: "auto",
+              // ★ 岸の地。岸は画面2に合成された層なので、下を海の中身が通っても透けない
+              background: SEA_GROUND,
+              // ★ 管と同じ形に切り抜く。四角いままだと、地の角が管の丸みの外へ出て門になる
+              ...shoreCornerRadius(edges, TUBE_RADIUS),
+              overflow: "hidden",
               // 相手にしているものを上に。共有している縁は、上に居るほうの取っ手が取る
               zIndex: active === d.key ? 1 : 0,
               ...slotStyle(d.dock, viewport, d.size),

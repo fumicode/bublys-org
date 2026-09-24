@@ -24,6 +24,8 @@ export interface RootState {
   /** root はいつも自前の View を持つ（継ぐ先が無い） */
   readonly view: View;
   readonly focus: Focus;
+  /** どれだけ寄って見ているか（1 が等倍）。**上限も下限も持たない**。省くと 1 */
+  readonly zoom?: number;
 }
 
 export interface WorldState {
@@ -142,6 +144,23 @@ export class BubbleWorld {
     return b ? b.state.focus : ZERO;
   }
 
+  /**
+   * **どれだけ寄って見ているか**（1 が等倍）。焦点と対の視点の値。
+   *
+   * ★ **持つのはいちばん外側だけ（画面2）。** 窓（空間を持つ泡）の中は画面1 ──
+   *   レンズが「位置 → 箱の中の像」を決めるところで、箱の大きさはその窓のもの。
+   *   そこに寄りを足すと**中身が窓の外へ溢れる**（実測：一覧の札が 280 → 2241px になって
+   *   海じゅうに散った）。寄るというのは画面2ごと大きくすることなので、窓ごと大きくなる。
+   *
+   * ★ **上限も下限も持たない。** 焦点（どこを見ているか）は「見ている所には泡がある」で
+   *   泡の範囲に閉じるが、倍率は「どれだけ大きく見たいか」でしかないので、閉じる理由が無い。
+   *   ── 画面の縁が何かの面に当たる、というのは模型の都合であって、見る側の話ではない。
+   */
+  get zoom(): number {
+    const z = this.state.root.zoom;
+    return z === undefined || !(z > 0) ? 1 : z;
+  }
+
   /** その空間の自前の View（継承をたどる前）。root は必ず持つ */
   ownViewOf(spaceId: SpaceId): View | null {
     if (spaceId === ROOT_SPACE) return this.state.root.view;
@@ -200,6 +219,11 @@ export class BubbleWorld {
     return b ? this.withBubble(b.withFocus(focus)) : this;
   }
 
+  /** 寄り（倍率）を書く。焦点と同じ視点の値なので、泡の値は1つも変わらない */
+  withZoom(zoom: number): BubbleWorld {
+    return new BubbleWorld({ ...this.state, root: { ...this.state.root, zoom: zoom > 0 ? zoom : 1 } });
+  }
+
   withView(spaceId: SpaceId, view: View | null): BubbleWorld {
     if (spaceId === ROOT_SPACE) {
       // root は継ぐ先が無いので、いつも自前の View を持つ（lab.html 558 行 inheritView も root を外す）
@@ -224,7 +248,7 @@ const ZERO: Focus = { x: 0, y: 0, z: 0 };
 export function emptyWorld(view: View): BubbleWorld {
   return new BubbleWorld({
     bubbles: [],
-    root: { title: '外の空間', view, focus: { x: 0, y: 0, z: 0 } },
+    root: { title: '外の空間', view, focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
     implicitSeq: 0,
   });
 }

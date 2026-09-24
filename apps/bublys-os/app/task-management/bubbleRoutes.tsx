@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useMemo } from "react";
 import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
-import { ListSpace } from "@bublys-org/bubble-layout-feature";
+import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
 import { Button } from "@mui/material";
 import {
   useAppDispatch,
@@ -23,7 +23,7 @@ import { useSeedTasks } from "./feature/useSeedTasks";
  *   （実測：中身は 46〜54px 要る）。一覧は「全部映る」ことが意味の画面なので、
  *   1 枚ずつ巻物になるのは本末転倒。
  */
-const CARD = { w: 280, h: 88 };
+const CARD = { w: LIST_CARD_WIDTH, h: 88 };
 
 /**
  * タスク一覧 ── **並びの空間**。
@@ -68,7 +68,7 @@ const TaskCollectionBubble: BubbleRoute["Component"] = ({ bubble }) => {
           size="small"
           variant="contained"
           onClick={newTask}
-          sx={{ minWidth: 0, px: 0.9, py: 0.2, fontSize: 11, lineHeight: 1.5 }}
+          sx={{ minWidth: 0, px: 1.35, py: 0.3, fontSize: 16.5, lineHeight: 1.5 }}
         >
           ＋新規
         </Button>
@@ -96,7 +96,7 @@ export const taskManagementBubbleRoutes: BubbleRoute[] = [
     type: "task-management-tasks",
     Component: TaskCollectionBubble,
     // 一覧は地を敷かない ── 並びの空間は海がそのまま透ける。箱は札 280 に対して広く取る
-    bubbleOptions: { defaultSize: { width: 420, height: 520 }, contentBackground: "transparent" },
+    bubbleOptions: { defaultSize: LIST_BOX, contentBackground: "transparent" },
   },
   // ★ 札は詳細より**先に**置く（`tasks/:id` が `.../card` も飲み込むので）
   {

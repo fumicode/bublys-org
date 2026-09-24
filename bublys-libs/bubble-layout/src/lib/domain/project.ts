@@ -12,6 +12,7 @@ import type { BubbleWorld } from './world.js';
 import { imageOf, LENS_XY } from './lens.js';
 import type { LensXyId } from './lens.js';
 import type { SpaceLayout } from './resolve.js';
+import { hostScale } from './resolve.js';
 import type { LayoutRules } from './rules.js';
 
 /**
@@ -19,7 +20,8 @@ import type { LayoutRules } from './rules.js';
  * @param m その泡の Z の倍率（Placement.m）。背景を掴んだときは 1
  */
 export function unprojectLocal(L: SpaceLayout, axis: PlaneAxis, screen: number, m = 1): number {
-  const local = (screen - (axis === 'x' ? L.host.cx : L.host.cy)) / L.host.scale;
+  // ★ 寄り（zoom）はレンズの外側で掛かっているので、逆写しでも外側で外す（hostScale）
+  const local = (screen - (axis === 'x' ? L.host.cx : L.host.cy)) / hostScale(L.host);
   const s = L.ctx.vp[axis] + (local - L.ctx.vp[axis]) / m;
   return LENS_XY[L.view[axis].lens as LensXyId].unproject(s, L.ctx.H[axis]);
 }
@@ -32,7 +34,7 @@ export function screenToAxis(L: SpaceLayout, axis: PlaneAxis, screen: number, m 
 /** 空間の中での位置 → 画面。lab.html 810-813 行 axisToScreen */
 export function axisToScreen(L: SpaceLayout, axis: PlaneAxis, pos: number, m = 1): number {
   const s = LENS_XY[L.view[axis].lens as LensXyId].project(pos - L.ctx.focus[axis], L.ctx.H[axis]).s;
-  return (axis === 'x' ? L.host.cx : L.host.cy) + (L.ctx.vp[axis] + (s - L.ctx.vp[axis]) * m) * L.host.scale;
+  return (axis === 'x' ? L.host.cx : L.host.cy) + (L.ctx.vp[axis] + (s - L.ctx.vp[axis]) * m) * hostScale(L.host);
 }
 
 /**
@@ -107,7 +109,17 @@ export function fitFocus(
      *   「先頭が真ん中に来たときの 2 番目の位置」に立つ。
      */
     if (!ps.length) return clamp(v, -1, 0);
-    const front = Math.min(...ps) - (rules.zFocusStop === 'behind' ? 1 : 0);
+    /**
+     * ★ **手前の端は「先頭の泡の面」**（`min(ps)`）。先頭を見たいなら、そこが行き先。
+     *
+     *   ラボは 1 段向こう（`min(ps) − 1`）まで退いていたが、それだと先頭を出そうとすると
+     *   **先頭が 2 番目の位置に来て**しまう（奥のぜんぶが見えるかわりに、見たいものが退く）。
+     *   「もう一度やったら向こうへ」も試したが、ホイールは一続きで何十回も来るので
+     *   素通りしてしまい、手の続き具合を見るしかなくなって具合が悪かった。
+     *   **端は 1 つにして、越えようとしたことは跳ね返り（bounce）で知らせる**（ui の仕事）。
+     *   どこまで退けるかは rules.zFocusStop（RULES.md まだ決めていない 1）。
+     */
+    const front = Math.min(...ps) - (rules.zFocusStop === 'behind' ? 0 : 1);
     return clamp(v, front, Math.max(...ps));
   }
   if (L.view[axis].arrange === 'as-is' || !ps.length) return v;

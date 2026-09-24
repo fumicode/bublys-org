@@ -114,14 +114,42 @@ export function dragFocus(world: BubbleWorld, q: DragFocusQuery, rules: LayoutRu
 }
 
 /**
- * ホイール ＝ Z の焦点。lab.html 1536-1541 行。
- * ③ 見えない親はホイールを外へ通す（windowOf）。Z が なし なら何もしない。
+ * ホイール ＝ **海の奥行き**（Z の焦点）。lab.html 1638-1646 行。
+ *
+ * ③ 見えない親はホイールを外へ通す（windowOf）。**Z が なし なら何も起きない。**
  * 手前へどこまで退けるかは rules.zFocusStop（RULES.md まだ決めていない 1）。
  *
+ * ★ **ここは画面1の中だけ。** 泡のいる範囲で止まるのが正しい（約束(1)「見ている所には泡がある」）
+ *   ── 泡のいない面を見ても仕方がない。
+ *   「もっと大きく／小さく見たい」は面を進む話ではないので、**画面2の寄り**（{@link zoomedBy}）が受け持つ。
+ *   一度ここに2段目（動けなかったぶんを寄りへ）を足したが、**スクロールとズームが混ざって**
+ *   奥行きを繰ろうとしただけで画面ごと寄ってしまった。操作は分ける。
+ *
  * @param delta ホイールの生の量（deltaY）。**1 刻み ≒ 100** として、軸の刻みに直してから足す。
- *              ラボは 0.004 を掛けていた（lab 1540 行）が、それだと刻みの細かい View で
+ *              ラボは 0.004 を掛けていた（lab 1644 行）が、それだと刻みの細かい View で
  *              1 回転が何百段にもなる。「**1 刻み ＝ 1 段**」のほうが、並びを 1 枚ずつ繰れる。
  */
+/**
+ * ホイールを受ける**空間**。泡の上で回したときは、その泡がいる空間へ**外へ通す**
+ * ── ③ 見えない親を通すのと同じで、受け手が見つかるまで外へ。
+ *
+ * ★ ラボはここで止まっていた（`LAYOUT.get(space)` が無ければ何もしない）。
+ *   ラボの泡は中身を持たないので当たらなかったが、こちらは札が箱をほぼ埋めるので、
+ *   **札の上で回すと何も起きない**。「重なりを1枚ずつ繰る」が札の上でできないのは、
+ *   見る側の言葉と合わない。
+ *
+ * ★ **外に出してある**のは、回したあとに「端だったか」を見る側（ui）が、
+ *   `wheelZ` と**同じ空間**を指せるようにするため。別々に出すと、札の id のまま
+ *   見てしまって話が噛み合わない（実測で踏んだ）。
+ */
+export function wheelSpace(world: BubbleWorld, layout: Layout, spaceId: SpaceId): SpaceId {
+  let space: SpaceId = world.windowOf(spaceId);
+  while (space !== ROOT_SPACE && !layout.spaces.has(space)) {
+    space = world.windowOf(world.bubble(space)?.space ?? ROOT_SPACE);
+  }
+  return space;
+}
+
 export function wheelZ(
   world: BubbleWorld,
   layout: Layout,
@@ -129,19 +157,7 @@ export function wheelZ(
   delta: number,
   rules: LayoutRules,
 ): BubbleWorld {
-  /**
-   * ★ ホイールを受けるのは**空間**。泡の上で回したときは、その泡がいる空間へ**外へ通す**
-   *   ── ③ 見えない親を通すのと同じで、受け手が見つかるまで外へ。
-   *
-   *   ラボはここで止まっていた（`LAYOUT.get(space)` が無ければ何もしない）。
-   *   ラボの泡は中身を持たないので当たらなかったが、こちらは札が箱をほぼ埋めるので、
-   *   **札の上で回すと何も起きない**。「重なりを1枚ずつ繰る」が札の上でできないのは、
-   *   見る側の言葉と合わない。
-   */
-  let space: SpaceId = world.windowOf(spaceId);
-  while (space !== ROOT_SPACE && !layout.spaces.has(space)) {
-    space = world.windowOf(world.bubble(space)?.space ?? ROOT_SPACE);
-  }
+  const space = wheelSpace(world, layout, spaceId);
   const L = layout.spaces.get(space);
   if (!L || L.view.z.dim === 'none') return world;
   /**
@@ -151,6 +167,28 @@ export function wheelZ(
    */
   const step = L.view.z.step || 1;
   return withFocusAxis(world, L, 'z', L.focus.z + (delta / 100) * step, rules);
+}
+
+/**
+ * ズーム ＝ **画面2の寄り**。海の像を1枚の平面として見ているところを、そのまま大きく／小さくする。
+ *
+ * ★ **上限も下限も持たない。** 焦点（どこを見ているか）は「見ている所には泡がある」で泡の範囲に
+ *   閉じるが、寄りは「どれだけ大きく見たいか」でしかないので、閉じる理由が無い。
+ *   ── 画面の縁が何かの面に当たる、というのは模型の都合であって、見る側の話ではない。
+ *
+ * ★ **レンズ（画面1）には触らない。** 箱の半幅 `H` は動かないので、魚眼の効き方は寄っても同じ。
+ *   像ごと大きくなるだけで、はみ出したぶんは画面の外へ出る。
+ *
+ * ★ 1 刻みの比は透視の 1 刻みと同じ（1 + K_PERSP ＝ 1.26）。奥行きを 1 段繰るのと
+ *   寄りを 1 段動かすのとが同じ効き方になるので、手の感じがそろう。
+ *
+ * @param delta ホイールの生の量（deltaY）。**1 刻み ≒ 100**。
+ *              **開く動作が拡大**（ピンチを開く・ホイールを上へ ＝ `deltaY` が負 → 大きくなる）
+ *              ── どこでもそうなっているので、ここだけ逆にしない。
+ */
+export function zoomedBy(zoom: number, delta: number): number {
+  const z = (zoom > 0 ? zoom : 1) * Math.pow(1 + METRICS.K_PERSP, -delta / 100);
+  return z > 0 && Number.isFinite(z) ? z : 1;
 }
 
 export interface ResizeQuery {

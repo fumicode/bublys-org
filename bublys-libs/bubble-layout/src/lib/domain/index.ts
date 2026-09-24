@@ -54,7 +54,7 @@ export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitsParallel, fi
 export { actContext } from './act.js';
 export type { ActContext, ReshapeResult, SeenRect, SeenRects, ScreenRects } from './act.js';
 export { focusOn, bringToCenter } from './focus.js';   // ② 触った泡へ視点が寄る（raise は消した）
-export { dragVerbsOf, dragBubble, dragFocus, wheelZ, resizeBubble, liftsOf, movesOf } from './drag.js';
+export { dragVerbsOf, dragBubble, dragFocus, wheelSpace, wheelZ, zoomedBy, resizeBubble, liftsOf, movesOf } from './drag.js';
 export type { DragVerbs, DragBubbleQuery, DragFocusQuery, ResizeQuery } from './drag.js';
 export { dropTargetAt, spaceSlotAt, snapCandidateAt, spaceSummary } from './drop.js';
 export type { DropQuery, DropTarget, DropSlot, DropMarks, OrderSlot, SnapTarget, Grabbed } from './drop.js';

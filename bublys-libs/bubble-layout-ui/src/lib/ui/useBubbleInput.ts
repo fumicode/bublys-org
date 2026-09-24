@@ -11,8 +11,8 @@
  *   「解き直す → DOM に写す → DOM で当てる」を1フレームでやるが、React は書き換えが次のフレームなので、
  *   ドラッグしているあいだの落とし先は**模型で当てる**（`hitModelAt`）。押した瞬間だけは DOM で当てる。
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, RefObject, WheelEvent as ReactWheelEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   actContext,
   applySnap,
@@ -30,7 +30,9 @@ import {
   resolveRules,
   resolveWorld,
   unprojectLocal,
+  wheelSpace,
   wheelZ,
+  zoomedBy,
 } from '@bublys-org/bubble-layout';
 import type {
   BubbleId, BubbleWorld, DragVerbs, DropMarks, DropSlot, GrownHeights, Layout,
@@ -43,6 +45,11 @@ import type { LiftState } from './lift.js';
 
 /** ドラッグし始めたとみなす距離（画面 px）。lab.html 1243 行 */
 const DRAG_START = 3;
+/**
+ * ホイールが「一続きの手」とみなされる間（ms）。
+ * 慣性つきのトラックパッドでも途切れない程度に取る ── 跳ね返りを**一続きにつき 1 回**にするのに使う。
+ */
+const WHEEL_GESTURE_GAP = 250;
 
 type DragKind = 'bubble' | 'focus' | 'resize';
 
@@ -82,6 +89,20 @@ interface DragState {
 export interface BubbleInputOptions {
   readonly world: BubbleWorld;
   readonly setWorld: (next: BubbleWorld) => void;
+  /**
+   * **画面2の寄り**と、その書き込み口。入れ子の海では**外の画面のもの**が渡ってくる
+   * ── 画面2は1枚しか無いので、海ごとに持つと掛け算になる。
+   * 省いたら自分の世界のもの（いちばん外の海）。
+   */
+  readonly zoom?: number;
+  readonly setZoom?: (zoom: number) => void;
+  /**
+   * **これ以上いけない**（奥行きの端で回し続けた）。行き過ぎて戻る山を描くのは呼ぶ側
+   * ── 焦点をそのフレームだけ動かす（`resolveWorld` の `nudge`）ので、世界には何も書かない。
+   * @param dir −1 ＝ 手前の端、+1 ＝ 奥の端
+   * @param step その軸の 1 刻み（行き過ぎる量をこれで測る）
+   */
+  readonly onOverscroll?: (space: SpaceId, dir: -1 | 1, step: number) => void;
   /** `resolveWorld` の答え（持ち上げる前） */
   readonly layout: Layout;
   readonly viewport: Viewport;
@@ -135,7 +156,7 @@ export interface BubbleInput {
     readonly onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
     readonly onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
     readonly onPointerCancel: (e: ReactPointerEvent<HTMLDivElement>) => void;
-    readonly onWheel: (e: ReactWheelEvent<HTMLDivElement>) => void;
+    readonly onLostPointerCapture: (e: ReactPointerEvent<HTMLDivElement>) => void;
   };
   /** 持ち上げを当てたあとの配置。`BubbleField` にはこれを渡す */
   readonly layout: Layout;
@@ -332,6 +353,23 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d) return;
+    /**
+     * ★ **ボタンが離れていたら、掴みを黙って捨てる。**
+     *
+     *   離した瞬間（`pointerup`）を取りこぼすことがある ── 捕まえたポインタが何かの拍子に
+     *   外れると、離しは層に来ない。そのまま掴みが残ると、**押していないただの移動で
+     *   海が動き続ける**（実測：海を1回クリックしたあと、指を離しても視点がついてくる）。
+     *   ここで捨てれば、取りこぼしても**次のひと動きで必ず止まる**。
+     *
+     *   ★ 「触った」（② 焦点が寄る）は起こさない ── 離しを取りこぼしている以上、
+     *     タップだったのか分からない。正しく離せたときは `onPointerUp` が拾う。
+     */
+    if (e.buttons === 0) {
+      drag.current = null;
+      o.onDragInfo?.(null);
+      show();
+      return;
+    }
     const { mx, my } = pt(e);
     if (!d.started && Math.hypot(mx - d.mx0, my - d.my0) < DRAG_START) return;
     d.started = true;
@@ -429,15 +467,89 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     show();
   }, [world, layout, rules, setWorld, ctx, lifted, o, pt]);
 
-  const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
+  /**
+   * **スクロールとズームは別の操作。**
+   *
+   * | 手 | 動くもの |
+   * |---|---|
+   * | 背景をドラッグ | 海の平行移動（X・Y の焦点） |
+   * | ホイール | **海の奥行き**（Z の焦点 ＝ 画面1）。泡のいる範囲で止まる |
+   * | ピンチ（⌘/Ctrl ＋ ホイール）／**左ボタンを押しながらホイール** | **画面2の寄り**。上限は無い |
+   *
+   * ★ 左ボタンを押しながら、でも寄れる ── ピンチの無いマウスのため。
+   *   そのとき**掴みかけは捨てる**（`drag.current = null`）。押していたのは寄るための合図で、
+   *   動かすつもりではないから ── 残すと、寄ったあとの1回目の move で掴んだ点の u が
+   *   食い違って**画面が飛ぶ**（掴んだときの u は寄る前の倍率で測ってある）。
+   *
+   * ★ ラボもホイールは奥行きだけだった（lab.html 1638-1646 行。ズームは無い）。
+   *   一度ホイールに「奥行きで動けなかったぶんは寄りへ」を足したが、
+   *   **奥行きを繰ろうとしただけで画面ごと寄ってしまう**。混ぜない。
+   * ★ 食うのはいちばん内側の海ひとつだけ（`stopPropagation`）── 入れ子の海は DOM も
+   *   入れ子なので、止めないと内側と外側が別々に動いて**掛け算になる**（実測で踏んだ）。
+   * ★ ネイティブの listener で受ける（`{ passive: false }`）。React の onWheel は passive なので
+   *   `preventDefault` が効かず、ピンチがブラウザの拡大に取られる。ラボも同じにしている。
+   */
+  /** 前のホイールが来た時刻と、跳ね返りの弾。端に着いたら 1 回だけ撃って、動いたら込め直す */
+  const lastWheelAt = useRef(0);
+  const bounceArmed = useRef(true);
+  const onWheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
+  onWheelRef.current = (e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const { mx, my } = pt(e);
-    const space = world.windowOf(spaceModelAt(lifted, tiny, null, mx, my, hasBody));
-    setWorld(wheelZ(world, layout, space, e.deltaY, rules));
-  }, [world, layout, lifted, tiny, rules, setWorld, pt, hasBody]);
+    // 左ボタンを押しながら（`buttons` の 1 ビット目）も、ピンチと同じ
+    if (e.ctrlKey || e.metaKey || (e.buttons & 1) !== 0) {
+      if (drag.current) {
+        drag.current = null;                 // 掴みかけは捨てる（押していたのは寄るための合図）
+        show();
+      }
+      // 画面2 ── 海は1ミリも動かない（値も焦点も書かない）
+      const now = o.zoom ?? world.zoom;
+      (o.setZoom ?? ((z: number) => setWorld(world.withZoom(z))))(zoomedBy(now, e.deltaY));
+      return;
+    }
+    // ★ 受け手は wheelZ と**同じ出し方**で出す（札の上で回したら、その札がいる空間まで外へ通す）
+    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody));
+    const next = wheelZ(world, layout, space, e.deltaY, rules);
+    const moved = next.focusOf(space).z !== world.focusOf(space).z;
+    /**
+     * ★ **跳ね返りは一続きの手につき 1 回。**
+     *   ホイールは慣性で何十回も来るので、来るたびに鳴らすと何度も跳ねる。
+     *   動いているあいだは弾を込め直し、端に着いたら 1 回だけ撃つ。
+     *   手が止まって（`WHEEL_GESTURE_GAP`）から回し直せば、また 1 回。
+     */
+    const now = e.timeStamp || Date.now();
+    if (now - lastWheelAt.current > WHEEL_GESTURE_GAP) bounceArmed.current = true;
+    lastWheelAt.current = now;
+    if (moved) { setWorld(next); bounceArmed.current = true; return; }
+    /**
+     * ★ **跳ね返りは、奥行きが本当にある並びの端だけ。**
+     *
+     *   Z に次元が無い空間（縦に並べる・横に並べる など）では、ホイールはもともと何もしない
+     *   ── そこで跳ねると「効かない」を「端だ」と言い違えることになる。
+     *   面が 1 つしかない空間（海の泡はふつう全部 z 0）も同じ。
+     *   跳ねるのは**面が 2 つ以上ある透視の並び**（奥行きに重ねる・履歴を奥行きに）だけ。
+     */
+    const L = layout.spaces.get(space);
+    if (!L || L.view.z.dim === 'none') return;
+    if (new Set(L.arr.z.pos.values()).size < 2) return;
+    if (!bounceArmed.current) return;
+    bounceArmed.current = false;
+    o.onOverscroll?.(space, e.deltaY < 0 ? -1 : 1, L.view.z.step || 1);
+  };
+  useEffect(() => {
+    const el = layerRef.current;
+    if (!el) return;
+    const on = (e: WheelEvent) => onWheelRef.current(e);
+    el.addEventListener('wheel', on, { passive: false });
+    return () => el.removeEventListener('wheel', on);
+  }, [layerRef]);
 
   return {
     handlers: {
-      onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag, onWheel,
+      onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag,
+      // ★ 捕まえたポインタが外れたら終わり（lab.html 1636 行 lostpointercapture）
+      onLostPointerCapture: endDrag,
     },
     layout: lifted,
     skipGrab: view.skip,
