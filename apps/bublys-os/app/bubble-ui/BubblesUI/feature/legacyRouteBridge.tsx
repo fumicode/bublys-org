@@ -23,7 +23,7 @@ import {
   createBubble,
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
-import { ShoreSpace, useOnShore } from "./ShoreSpace";
+import { ShoreSpace } from "./ShoreSpace";
 import { WINDOW_GROUND } from "./ShowreLayer";
 import { useSpaceView } from "./SpaceViewContext";
 
@@ -90,8 +90,6 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
    *   外の海と中の窓で管の通り方が食い違っていた。見ているのは同じ場所（`SpaceViewContext`）。
    */
   const { join } = useSpaceView();
-  /** ★ この窓自身が岸に貼られているなら、枠は描かない ── 外の岸がもう引いている */
-  const onShore = useOnShore();
 
   useEffect(() => {
     const el = ref.current;
@@ -128,7 +126,6 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
           join={join}
-          frame={!onShore}
           // 岸に貼ると中身が描き直されるので、岸の中身は url で覚えておく
           persistKey={url}
           style={{ position: "absolute", left: 0, top: 0 }}

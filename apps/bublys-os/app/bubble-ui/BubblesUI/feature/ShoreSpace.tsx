@@ -22,6 +22,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -30,7 +31,15 @@ import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
 import { METRICS } from "@bublys-org/bubble-layout";
 import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
-import { TUBE_RADIUS, anchoredRect, touchingEdges, type ScreenRect, type TubeJoin } from "@bublys-org/bubbles-ui";
+import {
+  TUBE_RADIUS,
+  anchoredRect,
+  touchingEdges,
+  type ScreenRect,
+  type ShowreSide,
+  type TubeSea,
+  type TubeJoin,
+} from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
@@ -43,8 +52,7 @@ export type ShoreSpaceProps = {
   readonly ground: string;
   /** ネオンの通し方（枝分かれ／迂回） */
   readonly join?: TubeJoin;
-  /** 自分の枠を描くか（外の岸に貼られているなら、そちらが引くので描かない） */
-  readonly frame?: boolean;
+
   /**
    * **岸を覚えておく名前。** 渡すと、部品が作り直されても岸の中身が戻る。
    *
@@ -110,12 +118,41 @@ const toBubbleSize = (rect: { readonly width: number; readonly height: number })
 });
 
 /**
- * **この中身は岸の上にいる。** 岸に貼られた泡の中身にだけ true が届く。
+ * **管の差し出し先。** 岸に貼られた泡の中身にだけ届く。
  *
- * 読むのは「自分の枠を描くか」を決めるため（{@link ShowreLayer} の `frame` を見よ）。
+ * > **管はいちばん外の岸が 1 枚で描く。中の岸は、自分の輪を親へ渡すだけ。**
+ *
+ * ★ 理由は 2 つあって、どちらも動かせない:
+ *   - 窓の中の SVG は**窓の外へ光を出せない**（器が切る）ので、海の側が暗くなる
+ *     → 描くのは外でなければならない
+ *   - 芯がつながるのは「帯を全部描いてから芯を全部描く」順序が効く**同じ 1 枚**の中だけ
+ *     → 継ぎ目の両側が同じ SVG にいなければならない
+ *   両方を満たす置き方はこれしかなかった（分けて描くのは両方向とも試して駄目だった）。
+ *
+ * `at` は親の座標での置き場所。届いた海は、そのぶんずらして親の海に並べる。
  */
-export const OnShoreContext = createContext(false);
-export const useOnShore = (): boolean => useContext(OnShoreContext);
+export type TubeSink = {
+  readonly at: { readonly x: number; readonly y: number };
+  /**
+   * 親の縁に乗っている辺。**そこには縁が無い**ことにする。
+   *
+   * ★ **大元の岸と、岸に着いた泡のあいだには線を作らない。** そこに水は無いので、
+   *   囲うものが無い。その辺は**引かない辺**として渡し、線はそこで終える
+   *   ── 終わり先は親の線とちょうど重なるので、合わせて閉じた形になる。
+   *   （外へ伸ばして追い出す手も試したが、必ず行き過ぎて**開いた端**ができた。）
+   */
+  readonly open: readonly ShowreSide[];
+  /**
+   * 引かない辺のうち、**線を縁まで走らせる**もの。
+   *
+   * ★ ふつうは親の線と重なる所で終えれば閉じるが、**その先が別の岸で塞がっている**と
+   *   止める相手がいない。閉じられないのは仕方がないので、最後までのばす。
+   */
+  readonly extend: Partial<Record<ShowreSide, { start?: boolean; end?: boolean }>>;
+  readonly publish: (key: string, seas: readonly TubeSea[] | null) => void;
+};
+
+export const TubeSinkContext = createContext<TubeSink | null>(null);
 
 /** 名前を付けた岸の中身を、部品の一生より長く置いておく棚（上の `persistKey` を見よ） */
 const SHORE_MEMORY = new Map<string, readonly Docked[]>();
@@ -148,7 +185,6 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homesReady = true,
   onSpaceReady,
   autoLens,
-  frame,
   persistKey,
   onLens,
   className,
@@ -184,6 +220,14 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   }, [persistKey, initialUrls]);
   /** 「いま離したらここに着く」の予告 */
   const [preview, setPreview] = useState<ScreenRect | null>(null);
+
+  /** 中の海から届いたもの（この海の座標）。貼り物ごとに溜める */
+  const [childSeas, setChildSeas] = useState<ReadonlyMap<string, readonly TubeSea[]>>(
+    () => new Map(),
+  );
+  const extraSeas = useMemo(() => [...childSeas.values()].flat(), [childSeas]);
+  /** 自分の差し出し先（あれば、自分では描かずここへ渡す） */
+  const sink = useContext(TubeSinkContext);
   /**
    * ★ 大きさは**数から作り直す**。親が `{ w, h }` をその場で作って渡してくると
    *   （窓がそうしている）、毎回新しい object になって下の海も作り直され、
@@ -325,6 +369,93 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
     });
   }, [docked, space, vp, homes, homesReady]);
 
+  /**
+   * 親へ差し出す ── 自分の座標の輪を、置かれている場所ぶんずらして渡す。
+   * 消えるときは `null` を出して引っ込める（残ると管だけが宙に浮く）。
+   */
+  const myId = useId();
+  const handOver = useCallback(
+    (seas: readonly TubeSea[]) => {
+      if (!sink) return;
+      const { x, y } = sink.at;
+      const shift = (r: ScreenRect) => ({ ...r, x: r.x + x, y: r.y + y });
+      sink.publish(
+        myId,
+        seas.map((s, i) => ({
+          rect: shift(s.rect),
+          holes: s.holes.map(shift),
+          // 引かない辺を持つのは**自分の海**だけ（中から届いたものは、もう自分の中の話）
+          ...(i === 0 && sink.open.length ? { open: sink.open } : {}),
+          ...(i === 0 && Object.keys(sink.extend).length ? { extend: sink.extend } : {}),
+          ...(s.keepOut ? { keepOut: s.keepOut.map(shift) } : {}),
+        })),
+      );
+    },
+    [sink, myId],
+  );
+  useEffect(() => () => sink?.publish(myId, null), [sink, myId]);
+
+  /** 貼り物 1 つぶんの差し出し口 ── 置き場所と、親の縁に乗っている辺を添えて渡す */
+  const publish = useCallback((key: string, seas: readonly TubeSea[] | null) => {
+    setChildSeas((prev) => {
+      const had = prev.has(key);
+      if (!seas) {
+        if (!had) return prev;
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      }
+      // ★ 同じ輪が届いたら溜め直さない ── 溜め直すと親が描き直し、子も描き直して、
+      //   ドラッグ中のように速い更新が続くと**積み上がって止まらなくなる**
+      //   （実測で踏んだ：Maximum update depth）。子は輪を memo で持つので、
+      //   中身が変わっていなければ同じものが届く。
+      if (prev.get(key) === seas) return prev;
+      const next = new Map(prev);
+      next.set(key, seas);
+      return next;
+    });
+  }, []);
+  /**
+   * 貼り物ごとの差し出し口 ── 置き場所と、親の縁に乗っている辺を添えて渡す。
+   *
+   * ★ **毎回作り直さない。** render のたびに作ると、中の岸から見て「差し出し先が変わった」
+   *   ことになり、輪を作り直す → 親が溜め直す → また render … と**止まらなくなる**
+   *   （実測で踏んだ：Maximum update depth）。貼り物と窓の大きさが変わったときだけ作る。
+   */
+  const sinks = useMemo(() => {
+    const m = new Map<string, TubeSink>();
+    const rects = docked.map((d) => ({ key: d.key, rect: anchoredRect(d.dock, d.size, vp) }));
+    /** その点が、ほかの貼り物に塞がれているか（塞がれていれば、親の線は来ない） */
+    const blocked = (key: string, x: number, y: number) =>
+      rects.some(
+        (o) =>
+          o.key !== key &&
+          x >= o.rect.x && x <= o.rect.x + o.rect.width &&
+          y >= o.rect.y && y <= o.rect.y + o.rect.height,
+      );
+    for (const { key, rect } of rects) {
+      const open = touchingEdges(rect, vp);
+      const R = rect.x + rect.width;
+      const B = rect.y + rect.height;
+      // 辺の両端のうち、ほかの岸に塞がれている所があるなら、その辺は縁までのばす
+      const ends: Record<ShowreSide, readonly [[number, number], [number, number]]> = {
+        top: [[rect.x, rect.y], [R, rect.y]],
+        right: [[R, rect.y], [R, B]],
+        bottom: [[rect.x, B], [R, B]],
+        left: [[rect.x, rect.y], [rect.x, B]],
+      };
+      const extend: Partial<Record<ShowreSide, { start?: boolean; end?: boolean }>> = {};
+      for (const side of open) {
+        const [a, b] = ends[side];
+        const start = blocked(key, a[0], a[1]);
+        const end = blocked(key, b[0], b[1]);
+        if (start || end) extend[side] = { start, end };
+      }
+      m.set(key, { at: { x: rect.x, y: rect.y }, open, extend, publish });
+    }
+    return m;
+  }, [docked, vp, publish]);
+
   const renderDockedContent = useCallback(
     (d: Docked) => {
       const r = renderRoute(routes, d.key, d.url);
@@ -339,15 +470,15 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          *   （実測で踏んだ）。ここで切れば、外の岸に貼ったときと同じになる。
          */
         <CurrentBubbleContext.Provider value={null}>
-          <OnShoreContext.Provider value={true}>
+          <TubeSinkContext.Provider value={sinks.get(d.key) ?? null}>
             <BubbleSpaceContext.Provider value={shoreSpace}>
               <r.route.Component bubble={r.bubble} />
             </BubbleSpaceContext.Provider>
-          </OnShoreContext.Provider>
+          </TubeSinkContext.Provider>
         </CurrentBubbleContext.Provider>
       );
     },
-    [routes, shoreSpace],
+    [routes, shoreSpace, sinks],
   );
 
   return (
@@ -399,7 +530,8 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         renderContent={renderDockedContent}
         preview={preview}
         join={join}
-        frame={frame}
+        extraSeas={extraSeas}
+        onSeas={sink ? handOver : undefined}
         onUpdate={(key, next) =>
           setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)))
         }

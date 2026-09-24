@@ -24,7 +24,6 @@ import {
   anchoredRect,
   clampMoveAmongDocked,
   clampResizeAmongDocked,
-  detourCuts,
   edgesNear,
   fitAmongDocked,
   slotStyle,
@@ -33,7 +32,7 @@ import {
   type DockState,
   type ScreenRect,
   type ShowreSide,
-  type ShowreTubeOutline,
+  type TubeSea,
   type TubeJoin,
 } from "@bublys-org/bubbles-ui";
 import { WINDOW_SKY } from "@bublys-org/bubble-layout-feature";
@@ -114,16 +113,17 @@ export type ShowreLayerProps = {
   readonly preview?: ScreenRect | null;
   /** 貼り付いた泡の所で管をどう通すか（見た目だけ。挙動は変わらない） */
   readonly join?: TubeJoin;
+  /** 中の海から届いたもの（この海の座標に直したもの） */
+  readonly extraSeas?: readonly TubeSea[];
   /**
-   * **自分の枠を描くか。** 既定は描く。この器が外の岸に貼られているときだけ false。
+   * **管を自分で描かず、海を差し出す口。** 渡されたらここは `ShowreTubes` を出さない。
    *
-   * ★ 枠はもう外の岸がその泡のまわりに引いている。ここで引くと二重になるうえ、
-   *   **窓の中の SVG は窓の外へ光を出せない**（器が切る）ので、外の海の側が暗くなる。
-   * ★ 前は CSS でまるごと消していたが、それだと中の岸の管まで一緒に消えた
-   *   （岸に貼ったものはバブルの装いを持たないので、戻す側の `.bl-body` が無い）。
-   *   消すのは枠 1 本だけなので、ここで分ける。
+   * ★ 管は**いちばん外の岸が 1 枚で**描く。理由は 2 つあって、どちらも動かせない:
+   *   - 窓の中の SVG は**窓の外へ光を出せない**（器が切る）ので、海の側が暗くなる
+   *   - **ネオンは海そのものの形をなぞる**ので、入れ子の海も同じ 1 枚に入っていないと、
+   *     形が別々の輪に割れて角がつながらない
    */
-  readonly frame?: boolean;
+  readonly onSeas?: (seas: readonly TubeSea[]) => void;
 };
 
 /**
@@ -256,7 +256,8 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   onUpdate,
   preview,
   join = "branch",
-  frame = true,
+  extraSeas,
+  onSeas,
 }) => {
   /**
    * いま相手にしているもの。
@@ -603,31 +604,34 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   );
 
   // 管は 1 枚にまとめて描く。海の縁と、貼り付いたバブルのまわりを、1 本の網として
-  const outlines: ShowreTubeOutline[] = useMemo(
-    () => [
-      // 自分の枠 ── 外の岸に貼られているときは、そちらが引くので描かない
-      ...(frame ? [{
-        rect: { x: 0, y: 0, width: viewport.width, height: viewport.height },
-        // 迂回のときだけ、岸の管から**泡が占めている範囲**を抜く。
-        // そこは泡の枠が受け持つので、泡と画面の縁の間には管が通らない（T 字にならない）
-        ...(join === "detour"
-          ? { cuts: entries.flatMap(({ rect, edges }) => detourCuts(rect, edges)) }
-          : {}),
-      }] : []),
-      ...entries.map(({ rect, edges, inset }) => ({
-        rect,
-        joined: edges,
-        // 光はアプリの中に入れない。中身がある所＝余白の内側がアプリ
-        keepOut: {
-          x: rect.x + inset.left,
-          y: rect.y + inset.top,
-          width: Math.max(0, rect.width - inset.left - inset.right),
-          height: Math.max(0, rect.height - inset.top - inset.bottom),
-        },
+  /**
+   * **この海。** 箱と、そこから切り抜かれているもの（岸に着いたもの）。
+   *
+   * ★ 管は海そのものの形をなぞるので、ここで渡すのは**形**だけ。どの辺を引くか・
+   *   角をどうつなぐかは、引き算した縁をたどれば**ひとりでに決まる**（`seaPath`）。
+   * ★ `keepOut` は光を入れない所（アプリの中身）。形とは別の話なので分けて持つ。
+   */
+  const sea: TubeSea = useMemo(
+    () => ({
+      rect: { x: 0, y: 0, width: viewport.width, height: viewport.height },
+      holes: entries.map((e) => e.rect),
+      keepOut: entries.map(({ rect, inset }) => ({
+        x: rect.x + inset.left,
+        y: rect.y + inset.top,
+        width: Math.max(0, rect.width - inset.left - inset.right),
+        height: Math.max(0, rect.height - inset.top - inset.bottom),
       })),
-    ],
-    [entries, viewport, join, frame],
+    }),
+    [entries, viewport],
   );
+
+  /** 自分の海 ＋ 中の海から届いたもの */
+  const allSeas = useMemo(
+    () => (extraSeas && extraSeas.length ? [sea, ...extraSeas] : [sea]),
+    [sea, extraSeas],
+  );
+  // 差し出す先があるなら、描かずに渡す（いちばん外だけが描く）
+  useEffect(() => { onSeas?.(allSeas); }, [allSeas, onSeas]);
 
   return (
     <>
@@ -724,7 +728,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
           }}
         />
       )}
-      <ShowreTubes viewport={viewport} outlines={outlines} />
+      {onSeas ? null : <ShowreTubes viewport={viewport} seas={allSeas} />}
     </>
   );
 };

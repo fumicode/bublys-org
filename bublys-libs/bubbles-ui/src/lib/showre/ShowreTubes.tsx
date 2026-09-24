@@ -1,7 +1,6 @@
 "use client";
 import { FC, memo, useId } from "react";
 import type { Size2 } from "@bublys-org/bubbles-ui-util";
-import type { ScreenRect } from "./Showre.domain.js";
 import {
   TUBE_COLOR,
   TUBE_CORE_WIDTH,
@@ -9,15 +8,20 @@ import {
   TUBE_GLOW_NEAR,
   TUBE_THICKNESS,
   TUBE_RADIUS,
-  tubePath,
-  type TubeOutline,
+  seaCapWidth,
+  seaCaps,
+  seaPath,
+  type TubeSea,
 } from "./tube.js";
 
 export type ShowreTubesProps = {
   /** 海（このユニバースの見えている範囲）の大きさ */
   viewport: Size2;
-  /** 管が囲む矩形たち。海の縁、岸に着いたバブル…… すべてまとめて 1 枚に描く */
-  outlines: readonly ShowreTubeOutline[];
+  /**
+   * 描く海たち。**管は海そのものの形をなぞる** ── 岸に着いたものは切り抜かれている。
+   * 入れ子の海（窓）も、この 1 枚にまとめて描く。
+   */
+  seas: readonly TubeSea[];
   thickness?: number;
   radius?: number;
   color?: string;
@@ -25,10 +29,6 @@ export type ShowreTubesProps = {
   glowFar?: number;
 };
 
-export type ShowreTubeOutline = TubeOutline & {
-  /** 光を入れたくない領域（アプリの中身）。無ければ内側も海 */
-  readonly keepOut?: ScreenRect;
-};
 
 /**
  * 岸の光（ネオン管）を**まとめて 1 枚に**描く層。
@@ -48,7 +48,7 @@ export type ShowreTubeOutline = TubeOutline & {
 export const ShowreTubes: FC<ShowreTubesProps> = memo(
   ({
     viewport,
-    outlines,
+    seas,
     thickness = TUBE_THICKNESS,
     radius = TUBE_RADIUS,
     color = TUBE_COLOR,
@@ -62,11 +62,22 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
 
     if (viewport.width <= 0 || viewport.height <= 0) return null;
 
-    // 帯は矩形の縁まで、芯は相手の中心線まで伸ばす。
-    // こうすると帯は隙間なく重なり、芯は T 字で出会って 1 本に見える
-    const bands = outlines.map((o) => tubePath(o, { thickness, radius, joinAt: "edge" })).filter(Boolean);
-    const cores = outlines.map((o) => tubePath(o, { thickness, radius, joinAt: "center" })).filter(Boolean);
-    const keepOuts = outlines.flatMap((o) => (o.keepOut ? [o.keepOut] : []));
+    /**
+     * ★ **ネオンは海そのものの形をなぞる。** 岸に着いたものは海から切り抜かれているので、
+     *   「箱の輪 ＋ 貼り物ごとの輪」を重ねるのではなく、**引き算した形の縁**を 1 本で描く。
+     *   帯も芯も**同じ 1 本**なので、継ぎ目も角の突き合わせも、そもそも存在しない。
+     */
+    const paths = seas
+      .map((s) => seaPath(s.rect, s.holes, { thickness, radius, open: s.open }))
+      .filter(Boolean);
+    /**
+     * ★ **蓋は帯だけ。** 止める相手がいない端に重ねる短い線で、**芯（白）は通さない**
+     *   ── 白い芯がその青に囲まれて、閉じて見える（`seaCaps`）。
+     */
+    const caps = seas
+      .map((s) => seaCaps(s.rect, { thickness, open: s.open, extend: s.extend }))
+      .filter(Boolean);
+    const keepOuts = seas.flatMap((s) => s.keepOut ?? []);
 
     const stroke = { fill: "none", strokeLinecap: "butt" as const, strokeLinejoin: "round" as const };
 
@@ -111,20 +122,29 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
 
         <g mask={`url(#${maskId})`}>
           <g filter={`url(#${farId})`} opacity={0.9}>
-            {bands.map((d, i) => (
+            {paths.map((d, i) => (
               <path key={i} d={d} stroke={color} strokeWidth={thickness} {...stroke} />
+            ))}
+            {caps.map((d, i) => (
+              <path key={`c${i}`} d={d} stroke={color} strokeWidth={seaCapWidth(thickness)} {...stroke} />
             ))}
           </g>
           <g filter={`url(#${nearId})`}>
-            {bands.map((d, i) => (
+            {paths.map((d, i) => (
               <path key={i} d={d} stroke={color} strokeWidth={thickness} {...stroke} />
+            ))}
+            {caps.map((d, i) => (
+              <path key={`c${i}`} d={d} stroke={color} strokeWidth={seaCapWidth(thickness)} {...stroke} />
             ))}
           </g>
         </g>
 
-        {/* 管そのもの（くっきり）。帯 → 芯の順に重ねる */}
-        {bands.map((d, i) => (
+        {/* 管そのもの（くっきり）。帯 → 芯の順に重ねる ── どちらも同じ 1 本 */}
+        {paths.map((d, i) => (
           <path key={`band-${i}`} d={d} stroke={color} strokeWidth={thickness} {...stroke} />
+        ))}
+        {caps.map((d, i) => (
+          <path key={`cap-${i}`} d={d} stroke={color} strokeWidth={seaCapWidth(thickness)} {...stroke} />
         ))}
         {/*
           ★ 芯の端だけ **square** にする。芯は相手の中心線まで伸びているが、そこで切ると
@@ -133,14 +153,13 @@ export const ShowreTubes: FC<ShowreTubesProps> = memo(
             中心線を越えて角が埋まる。端は必ず継ぎ目（接している辺・通さない区間）なので、
             延ばして困る所が無い。帯は太いので butt のままで隙間なく重なる。
         */}
-        {cores.map((d, i) => (
+        {paths.map((d, i) => (
           <path
             key={`core-${i}`}
             d={d}
             stroke="rgba(255,255,255,0.92)"
             strokeWidth={TUBE_CORE_WIDTH}
             {...stroke}
-            strokeLinecap="square"
           />
         ))}
       </svg>

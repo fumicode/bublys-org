@@ -1,4 +1,4 @@
-import { TUBE_RADIUS, TUBE_THICKNESS, detourCuts, tubePath } from "./tube.js";
+import { TUBE_CORE_WIDTH, TUBE_RADIUS, TUBE_THICKNESS, detourCuts, seaCapWidth, seaCaps, seaPath, tubePath } from "./tube.js";
 
 /**
  * 管は「中心線」で表す。接している辺には引かず、直交する走りは相手の管まで伸ばす
@@ -161,5 +161,125 @@ describe("tubePath（通さない区間 ＝ 迂回）", () => {
     const d = tubePath({ rect: VIEW, cuts });
     expect(stopsOn(d, "y", HALF)).toEqual([250, VIEW.width - HALF - CORNER]); // 上辺は泡の右端から
     expect(stopsOn(d, "x", HALF)).toEqual([300, VIEW.height - HALF - CORNER]); // 左辺は泡の下端から
+  });
+});
+
+describe("seaPath（海の輪郭を 1 本で）", () => {
+  const VP = { x: 0, y: 0, width: 800, height: 600 };
+  /** path のコマンド数（M が subpath の数） */
+  const subpaths = (d: string) => (d.match(/M/g) ?? []).length;
+  const corners = (d: string) => (d.match(/A/g) ?? []).length;
+
+  it("岸に何も無ければ、ただの角丸の箱（閉じた輪 1 本）", () => {
+    const d = seaPath(VP, []);
+    expect(subpaths(d)).toBe(1);
+    expect(corners(d)).toBe(4);
+    expect(d.endsWith("Z")).toBe(true);
+  });
+
+  it("縁に着いたものは切り抜かれ、**1 本のまま**まわりをなぞる", () => {
+    // 左の縁いっぱいに貼ったもの（ランチャーのような帯）
+    const d = seaPath(VP, [{ x: 0, y: 0, width: 60, height: 600 }]);
+    expect(subpaths(d)).toBe(1);          // 途切れない
+    // 丸いのは箱の 4 隅のうち、残っている右の 2 つだけ。
+    // 帯の脇で曲がる 2 つは**海が凸**なので、丸めると海が減る ── 直角のまま
+    expect(corners(d)).toBe(2);
+    expect(d.endsWith("Z")).toBe(true);
+  });
+
+  it("辺の途中に着いたものは、そこだけ凹んで曲がる（角が 4 つ増える）", () => {
+    const d = seaPath(VP, [{ x: 300, y: 0, width: 200, height: 44 }]);
+    expect(subpaths(d)).toBe(1);
+    // 箱の 4 隅 ＋ 凹みの**底の 2 つだけ**（そこは海が凹んでいるので、丸めると海が増える）。
+    // 凹みの入口 2 つは海が凸なので直角のまま
+    expect(corners(d)).toBe(6);
+    expect(d.endsWith("Z")).toBe(true);
+  });
+
+  it("角に着いたものは、角が 2 つだけ増える（辺を 2 つ食べるので）", () => {
+    const d = seaPath(VP, [{ x: 752, y: 552, width: 48, height: 48 }]);
+    expect(subpaths(d)).toBe(1);
+    // 箱の 4 隅のうち 1 つは食べられて 3 つ ＋ 食い込んだ角 1 つ
+    expect(corners(d)).toBe(4);
+    expect(d.endsWith("Z")).toBe(true);
+  });
+
+  it("隣り合って着いたものは、1 つの凹みにつながる", () => {
+    const apart = seaPath(VP, [
+      { x: 100, y: 0, width: 100, height: 44 },
+      { x: 400, y: 0, width: 100, height: 44 },
+    ]);
+    // 岸の上では、隣どうしは管の厚みぶん重なって着く（SHOWRE_DOCK_GAP ＝ −厚み）
+    const together = seaPath(VP, [
+      { x: 100, y: 0, width: 100, height: 44 },
+      { x: 200 - TUBE_THICKNESS, y: 0, width: 100, height: 44 },
+    ]);
+    expect(corners(apart)).toBe(8);       // 箱 4 ＋ 凹みの底 2×2
+    expect(corners(together)).toBe(6);    // 箱 4 ＋ つながった凹みの底 2
+    expect(subpaths(together)).toBe(1);
+  });
+
+  it("★ 角丸は海を削らない ── 海が凸になる角は直角のまま", () => {
+    // 辺の途中に貼ると、凹みの入口 2 つ（海が凸）と底 2 つ（海が凹）ができる。
+    // 丸いのは底だけなので、弧の向きは**すべて海の外へ膨らむ向き**（sweep 0）になる
+    const d = seaPath(VP, [{ x: 300, y: 0, width: 200, height: 44 }]);
+    const sweeps = [...d.matchAll(/A [\d.]+ [\d.]+ 0 0 (\d)/g)].map((m) => m[1]);
+    expect(sweeps.filter((v) => v === "1").length).toBe(4);   // 箱の 4 隅
+    expect(sweeps.filter((v) => v === "0").length).toBe(2);   // 凹みの底
+  });
+
+  it("海が無くなったら、線も無い", () => {
+    expect(seaPath(VP, [{ x: 0, y: 0, width: 800, height: 600 }])).toBe("");
+  });
+});
+
+describe("seaPath の「引かない辺」（大元の岸に乗っている辺）", () => {
+  const VP = { x: 0, y: 0, width: 800, height: 600 };
+
+  it("引かない辺の線は消え、上下の線は**その辺のちょうど上**で終わる", () => {
+    const d = seaPath(VP, [], { open: ["right"] });
+    // 閉じない（隣の海の線が続きを持つ）
+    expect(d.includes("Z")).toBe(false);
+    // 右端 = 箱の中心線 X1 に、線の端がちょうど乗る
+    const xs = [...d.matchAll(/[ML] ([\d.]+) ([\d.]+)/g)].map((m) => Number(m[1]));
+    expect(Math.max(...xs)).toBe(800 - TUBE_THICKNESS / 2);
+  });
+
+  it("引かない辺の隣の角は丸めない（そこで終わるので、丸める角が無い）", () => {
+    const open = seaPath(VP, [], { open: ["right"] });
+    const closed = seaPath(VP, []);
+    expect((open.match(/A/g) ?? []).length).toBe(2);   // 左の 2 隅だけ
+    expect((closed.match(/A/g) ?? []).length).toBe(4);
+  });
+});
+
+describe("seaPath の「止める相手がいない端」", () => {
+  const VP = { x: 0, y: 0, width: 800, height: 600 };
+
+  it("★ 本線は曲げない ── 蓋は別の短い線として重ねる", () => {
+    const line = seaPath(VP, [], { open: ["right"] });
+    const caps = seaCaps(VP, { open: ["right"], extend: { right: { end: true } } });
+    // 本線は蓋があっても変わらない（曲げない）
+    expect(seaPath(VP, [], { open: ["right"] })).toBe(line);
+    // 蓋は 1 本の直線。**本線の端のすぐ先**に、帯の太さぶんの長さで置く
+    const X = 800 - TUBE_THICKNESS / 2;
+    const Y = 600 - TUBE_THICKNESS / 2;
+    // path の数は小数 2 桁で丸めて書き出す
+    const at = Math.round((X + seaCapWidth(TUBE_THICKNESS) / 2) * 100) / 100;
+    expect(caps).toBe(`M ${at} ${Y - TUBE_THICKNESS / 2} L ${at} ${Y + TUBE_THICKNESS / 2}`);
+  });
+
+  it("★ 蓋の太さは、ハイライトを挟んでいる青の片側と同じ", () => {
+    // 帯 6px の真ん中を芯 1.5px が走るので、片側の青は (6 − 1.5) ÷ 2
+    expect(seaCapWidth(TUBE_THICKNESS)).toBe((TUBE_THICKNESS - TUBE_CORE_WIDTH) / 2);
+    expect(seaCapWidth(TUBE_THICKNESS)).toBeLessThan(TUBE_THICKNESS);
+  });
+
+  it("塞がっていない端には、蓋を足さない", () => {
+    // 下の端だけ塞がっている ＝ 蓋は 1 つ
+    const caps = seaCaps(VP, { open: ["right"], extend: { right: { end: true } } });
+    expect((caps.match(/M/g) ?? []).length).toBe(1);
+    // どちらも塞がっていなければ、蓋は無い
+    expect(seaCaps(VP, { open: ["right"] })).toBe("");
   });
 });

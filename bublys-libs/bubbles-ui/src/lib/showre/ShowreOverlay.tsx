@@ -12,9 +12,10 @@ import {
   removeBubble,
   updateBubble,
 } from "../state/bubbles-slice.js";
-import { anchoredRect, slotStyle, touchingEdges } from "./Showre.domain.js";
+import { anchoredRect, slotStyle } from "./Showre.domain.js";
 import { ShowreContext } from "./ShowreContext.js";
-import { ShowreTubes, type ShowreTubeOutline } from "./ShowreTubes.js";
+import { ShowreTubes } from "./ShowreTubes.js";
+import type { TubeSea } from "./tube.js";
 import { TUBE_THICKNESS } from "./tube.js";
 import { useHoveredBubble } from "../context/HoveredBubbleContext.js";
 import { ConnectedBubbleView } from "../ui/BubblesLayeredView.js";
@@ -76,27 +77,23 @@ export const ShowreOverlay: FC<ShowreOverlayProps> = memo(
       [dispatch, universeId],
     );
 
-    // 海の縁と、岸に着いたバブルたち。まとめて 1 本の網として描く
-    const tubeOutlines: ShowreTubeOutline[] = [
-      { rect: { x: 0, y: 0, width: viewport.width, height: viewport.height } },
-      ...docked.map(({ bubble, dock }) => {
-        const rect = anchoredRect(dock, bubble.size ?? bubble.defaultSize, viewport);
-        return {
-          rect,
-          // 管を引くかどうかは**いま接している辺**で決める。留め方（dock.edges）は
-          // 「落としたときにどの辺へ寄せたか」なので、伸ばして端に着いた辺は入らない。
-          // 下辺に留めたまま左端まで伸ばせば、左にも着く（最大 4 辺）
-          joined: touchingEdges(rect, viewport),
-          // 中身（アプリ）には光を入れない。中身は管の内側に収まっている
-          keepOut: {
-            x: rect.x + TUBE_THICKNESS,
-            y: rect.y + TUBE_THICKNESS,
-            width: Math.max(0, rect.width - TUBE_THICKNESS * 2),
-            height: Math.max(0, rect.height - TUBE_THICKNESS * 2),
-          },
-        };
-      }),
-    ];
+    /**
+     * この海 1 つ。**管は海そのものの形をなぞる** ── 岸に着いたものは切り抜かれている。
+     * 光は中身（アプリ）に入れない（`keepOut`）。
+     */
+    const rects = docked.map(({ bubble, dock }) =>
+      anchoredRect(dock, bubble.size ?? bubble.defaultSize, viewport),
+    );
+    const sea: TubeSea = {
+      rect: { x: 0, y: 0, width: viewport.width, height: viewport.height },
+      holes: rects,
+      keepOut: rects.map((rect) => ({
+        x: rect.x + TUBE_THICKNESS,
+        y: rect.y + TUBE_THICKNESS,
+        width: Math.max(0, rect.width - TUBE_THICKNESS * 2),
+        height: Math.max(0, rect.height - TUBE_THICKNESS * 2),
+      })),
+    };
 
     return (
       <Overlay data-showre-overlay={universeId}>
@@ -124,7 +121,7 @@ export const ShowreOverlay: FC<ShowreOverlayProps> = memo(
           );
         })}
         {/* 管は 1 枚にまとめて描く ── 海の縁も、岸に着いたバブルも、1 本の網 */}
-        <ShowreTubes viewport={viewport} outlines={tubeOutlines} />
+        <ShowreTubes viewport={viewport} seas={[sea]} />
 
         {preview && (
           <Preview
