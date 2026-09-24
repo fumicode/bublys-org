@@ -112,6 +112,28 @@ export const SPACE_CSS = `
 /* 効いている印は色で（形も変わるが、遠目には色のほうが速い） */
 .bub > .bl-tool[aria-pressed="true"]{opacity:1;color:#6ee7ff}
 .bub.nt > .bl-tool{display:none}
+/*
+ * **並べ方の口** ── 一覧の泡の、枠の**上**にくっつく横長の帯（仮の置き場所）。
+ *
+ * ★ ステータスバーの中はもう url・ロック・閉じるで埋まっていて、7 つ並べる場所が無い。
+ *   まずは外に出して形を見る ── 収まりが決まったら中へ移す。
+ * ★ 平行 3 → 魚眼 3 → 透視、の順。**同じ語彙のかたまりのあいだだけ隙間**を空ける。
+ */
+.bub > .bl-view{position:absolute;left:0;bottom:100%;margin-bottom:5px;
+  display:flex;align-items:center;gap:1px;padding:3px 5px;
+  border-radius:9px;background:hsl(var(--h) 45% 16% / .92);
+  box-shadow:0 2px 10px rgba(0,0,0,.35), inset 0 1px 0 hsla(0,0%,100%,.10);
+  pointer-events:auto}
+.bub > .bl-view .bl-view-pick{width:20px;height:20px;padding:0;
+  display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:5px;background:transparent;color:#eaf1ff;opacity:.5;
+  cursor:pointer;pointer-events:auto}
+.bub > .bl-view .bl-view-pick:hover{opacity:.9;background:rgba(255,255,255,.12)}
+/* いま効いているもの ── 色で言う（ロックと同じ） */
+.bub > .bl-view .bl-view-pick[aria-pressed="true"]{opacity:1;color:#6ee7ff;background:rgba(110,231,255,.14)}
+.bub > .bl-view .bl-view-gap{margin-left:6px}
+/* 一覧の札（静か）には出さない ── 並べ方を持っているのは一覧のほう */
+.bub.nt > .bl-view{display:none}
 
 /* 枠の題名は url。中身が自分の題名を出すので、枠は「どこにいるか」を出す（既存 bubbles-ui と同じ） */
 /*
@@ -133,6 +155,9 @@ export const SPACE_CSS = `
  * 枠（輪・地・影）もステータスバー（色の帯・url・閉じる）も出さない。
  * 一覧は「どれを選ぶか」を見る画面なので、札ごとに泡の装いが並ぶと中身が読めない。
  * 触れば泡として立ち上がる ── 消しているのではなく、静かにしているだけ。
+ *
+ * ★ **静かなのは「一覧の中に居て、選ばれていないとき」だけ**（BubbleSpace の装いの表）。
+ *   海に浮いていれば装い、岸に着けば装い無し ── 置かれた場所が決める。
  */
 .bub:not(.sel) > .bl-quiet{display:none}
 .bub:not(.sel):has(> .bl-quiet){background:none;box-shadow:none}
@@ -147,38 +172,34 @@ export const SPACE_CSS = `
  *   箱（泡の大きさ）は動かさないので、**隣の札は 1px も動かない**。
  *   選んだ札だけが、ヘッダを出すぶん上から 20px ぶん譲る。
  */
-/* 一覧の札の中身は上 7px から。背が伸びた札だけヘッダのぶん譲る */
+/* 一覧の札の中身は上 7px から。装いを出した札だけ帯のぶん譲る */
 .bub > .bl-body.bl-tight{${chromeInset(CHROME.quiet)}}
 .bub > .bl-body.bl-tight.bl-grown{${chromeInset(CHROME.plain)}}
 /*
- * ★ **縦に詰める一覧では、札と札のあいだを限界まで細くする。**
- *   見えている隙間は「並びの隙間（LIST_GAP ＝ 0）＋ 札の上下の余白 × 2」なので、
- *   ここを 1px にすると白い箱どうしのあいだは **2px** になる（前は 4 ＋ 7×2 ＝ 18px）。
- *   左右はそのまま ── 詰めたいのは札どうしのあいだで、枠との余白ではない。
+ * ★ **詰める一覧の札に装いは無い（箱＝中身）。**
+ *   見えている隙間は**並べ方が決める**（View の軸の gap ＝ LIST_GAP）。
+ *   装いを 1px でも持たせると、札どうしがその 2 倍ぶん勝手に開き、
+ *   一覧の幅も「中身＋装い＋余白」で数えることになる ── 中身だけを見て決められなくなる。
  * ★ **透視（奥行きに重ねる）には掛けない**（.bl-packed が付くのは詰める並びのときだけ）。
  *   そちらは札が重なって見えるので、余白を削ると後ろの札を余計に覆う。
- * ★ 選んで背が伸びた札だけは、ヘッダを出すぶん上を譲る（.bl-grown）。
  */
 .bub > .bl-body.bl-tight.bl-packed{${chromeInset(CHROME.packed)}}
 /*
- * ★ **泡になったら、下にも左右と同じだけ余白を置く。**
- *   静かなときの上下 1px は「札と札のあいだを細くする」ためのもので、
- *   装いが出て泡になったら話が別 ── 枠と中身が下だけぴたりと接していて、
- *   左右 7px と揃わない。上は装いのぶん 27px、下は左右と同じ 7px。
- *   伸びる高さ（BubbleSpace の SELECTED_GROW）はこの差ぶん ＝ (27+7)−(1+1) ＝ 32。
- *   札の背が 32px 伸びるので、**並びの後ろの札もそのぶんずれる**（中身の高さは変わらない）。
+ * ★ **装いを出したら、普通の泡と同じ枠**（上は帯のぶん 27、下と左右は 7）。
+ *   静かなときの上下 1px は「札と札のあいだを細くする」ためのもので、装いが出たら話が別。
+ *   差（(27+7)−(1+1) ＝ 32）だけ箱が伸びるので、**並びの後ろの札はそのぶん送られる**
+ *   ── 中身の高さは 1px も変わらない（箱＝中身＋装い）。
  */
 .bub > .bl-body.bl-tight.bl-packed.bl-grown{${chromeInset(CHROME.plain)}}
 /*
  * 伸びない並べ方（奥行きに重ねる）で選んだときは、装いを**中身の上に重ねる**
- * ── 位置は 1px も動かさない。中身は上 7px が余白なので、帯（24px）が重なるのは
- * その余白と、その下の 17px だけ。字にはかからない。
- * 重ねないと、あとから置かれる中身（不透明）に隠れて装いが見えない。
+ * ── 位置は 1px も動かさない。重ねないと、あとから置かれる中身（不透明）に隠れて見えない。
  */
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .hd,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .ttl,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool{z-index:2}
+
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
 .bl-object{position:relative;isolation:isolate}

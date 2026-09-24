@@ -5,6 +5,7 @@
  */
 import {
   COVERFLOW_STEP_RATIO,
+  GRID_MIN_SIDE,
   LIST_BOX,
   LIST_CARD_WIDTH,
   LIST_DEPTH_INSET,
@@ -39,9 +40,16 @@ describe('一覧の並べ方', () => {
     expect(colsFor('coverflowGrid', { w: 1700, h: 400 }, LIST_CARD_WIDTH)).toBe(4);
     // 札が細ければ、同じ箱でも列は増える（列数は**札と箱の関係**）
     expect(colsFor('coverflowGrid', { w: 900, h: 400 }, 240)).toBe(3);
+    // 格子（平行）も同じ式で折り返す
+    expect(colsFor('grid', { w: 900, h: 400 }, LIST_CARD_WIDTH)).toBe(2);
     // 折り返さない並べ方は列数を持たない
     expect(colsFor('coverflow', { w: 900, h: 400 }, LIST_CARD_WIDTH)).toBeUndefined();
     expect(colsFor('column', BOX, LIST_CARD_WIDTH)).toBeUndefined();
+  });
+
+  it('格子は 2×2 が最低 ── 1 列ぶんしか無い箱でも 2 列にする（はみ出しは見切れる）', () => {
+    expect(colsFor('grid', BOX, LIST_CARD_WIDTH)).toBe(GRID_MIN_SIDE);
+    expect(colsFor('coverflowGrid', { w: 100, h: 400 }, LIST_CARD_WIDTH)).toBe(GRID_MIN_SIDE);
   });
 
   it('収まらなくなって、箱が横長なら coverflow', () => {

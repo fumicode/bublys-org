@@ -10,9 +10,10 @@
  *   （want）まで噛み砕いて渡す。下の want は、ラボで本物のマウスを1歩だけ動かしたときの
  *   `mx − (fx − 0.5)·p.w`（lab.html 1186 行）をそのまま実測したもの。
  */
-import { dragBubble, dragVerbsOf, wheelZ, zoomedBy } from './drag.js';
+import { dragBubble, dragVerbsOf, wheelScroll, wheelZ, zoomedBy } from './drag.js';
 import { resolveWorld } from './resolve.js';
-import { presetView, withAxis, withPreset } from './view.js';
+import { presetView, viewOfSpace, withAxis, withPreset } from './view.js';
+import type { PresetId } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
 import { Bubble } from './bubble.js';
 import { BubbleWorld } from './world.js';
@@ -232,5 +233,127 @@ describe('ホイールは海の奥行き（画面1）、ズームは画面2', ()
       expect(inside(before)).toBe(true);
       expect(inside(after)).toBe(true);
     });
+  });
+});
+
+/**
+ * **魚眼は二本指で繰る。**
+ *
+ * 魚眼はレンズが tanh でぜんぶ箱に収めてしまうので、「収まらないから送る」は起きない。
+ * それでも二本指を受けるのは、動かしているのが**どの札が真ん中に来るか**だから。
+ * 送る量は px ではなく **1 刻み ＝ 札 1 枚**（奥行きを繰るのと同じ換算）。
+ */
+describe('魚眼をホイール（二本指）で繰る', () => {
+  const VP = { w: 1466, h: 974 };
+  /** 順序を刺した泡を n 枚。並べ方は preset に任せる */
+  const list = (n: number, preset: 'coverflow' | 'coverflowY'): BubbleWorld => {
+    const bs = [];
+    for (let i = 0; i < n; i++)
+      bs.push(Bubble.create({ id: 'b' + i, title: 'b' + i, w: 300, h: 84, order: i }));
+    return withPreset(
+      new BubbleWorld({
+        bubbles: bs.map((x) => x.state),
+        root: { title: '外', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+        implicitSeq: 0,
+      }),
+      preset,
+      'root',
+    );
+  };
+  const send = (w: BubbleWorld, d: { x: number; y: number }): BubbleWorld =>
+    wheelScroll(w, resolveWorld(w, VP), 'root', d, DEFAULT_RULES) ?? w;
+
+  it('縦の魚眼は、二本指の縦の量で繰る ── 1 刻み ＝ 札 1 枚', () => {
+    const w = list(8, 'coverflowY');
+    const step = viewOfSpace(w, 'root').y.step;
+    expect(send(w, { x: 0, y: 100 }).focusOf('root').y).toBeCloseTo(step);
+    // 半分だけ撫でたら半分だけ繰れる（トラックパッドは細かい量で何度も来る）
+    expect(send(w, { x: 0, y: 50 }).focusOf('root').y).toBeCloseTo(step / 2);
+    // 逆向きにも同じだけ繰れる（焦点 0 は真ん中の札。先頭はその手前にいる）
+    expect(send(w, { x: 0, y: -100 }).focusOf('root').y).toBeCloseTo(-step);
+    /**
+     * ★ どこまでも繰れはしない ── 約束(1)「見ている所には泡がある」で、
+     *   端は**先頭の札の場所**（8 枚・真ん中が 0 なら −3.5 枚ぶん）。
+     */
+    let back = w;
+    for (let i = 0; i < 20; i++) back = send(back, { x: 0, y: -100 });
+    expect(back.focusOf('root').y).toBeCloseTo(-3.5 * step);
+  });
+
+  it('横の魚眼は横の量で繰る。横の量が無ければ縦の量で代用する（ふつうのマウスのため）', () => {
+    const w = list(8, 'coverflow');
+    const step = viewOfSpace(w, 'root').x.step;
+    expect(send(w, { x: 100, y: 0 }).focusOf('root').x).toBeCloseTo(step);
+    expect(send(w, { x: 0, y: 100 }).focusOf('root').x).toBeCloseTo(step);
+    expect(send(w, { x: 0, y: 100 }).focusOf('root').y).toBe(0);     // 縦は なし なので動かない
+  });
+
+  it('魚眼でない並び（透視）は、ここでは受けない ── ホイールは奥行きを繰る', () => {
+    const w = withPreset(list(8, 'coverflowY'), 'stackDepth', 'root');
+    expect(wheelScroll(w, resolveWorld(w, VP), 'root', { x: 0, y: 100 }, DEFAULT_RULES)).toBeNull();
+  });
+});
+
+/**
+ * **見切れている向きへ送る。**
+ *
+ * 次元が刺さっていない軸（縦の一覧の横、横の一覧の縦）は、これまで焦点が 0 に釘付けだった。
+ * 「置き所が無い」は「見えなくていい」ではない ── 札のほうが箱より大きいときは、
+ * はみ出したぶんだけは見に行ける。その向きには並びの操作がもともと無いので、喧嘩もしない。
+ */
+describe('並べていない向きでも、見切れていれば送れる', () => {
+  const VP = { w: 1466, h: 974 };
+  const list = (n: number, card: { w: number; h: number }, preset: PresetId): BubbleWorld => {
+    const bs = [];
+    for (let i = 0; i < n; i++)
+      bs.push(Bubble.create({ id: 'b' + i, title: 'b' + i, w: card.w, h: card.h, order: i }));
+    return withPreset(
+      new BubbleWorld({
+        bubbles: bs.map((x) => x.state),
+        root: { title: '外', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+        implicitSeq: 0,
+      }),
+      preset,
+      'root',
+    );
+  };
+  const send = (w: BubbleWorld, d: { x: number; y: number }): BubbleWorld =>
+    wheelScroll(w, resolveWorld(w, VP), 'root', d, DEFAULT_RULES) ?? w;
+
+  it('縦の一覧で札が横にはみ出していたら、横へ送れる', () => {
+    const w = list(3, { w: 2000, h: 84 }, 'column');   // 箱（1466）より広い札
+    expect(send(w, { x: 120, y: 0 }).focusOf('root').x).toBeCloseTo(120);
+    expect(send(w, { x: -120, y: 0 }).focusOf('root').x).toBeCloseTo(-120);
+  });
+
+  it('入っているなら 0 のまま ── もとの約束どおり動かない', () => {
+    const w = list(3, { w: 300, h: 84 }, 'column');
+    expect(send(w, { x: 120, y: 0 }).focusOf('root').x).toBe(0);
+  });
+
+  it('横の一覧で札が縦にはみ出していたら、縦へ送れる', () => {
+    const w = list(3, { w: 300, h: 1200 }, 'row');     // 箱（974）より高い札
+    expect(send(w, { x: 0, y: 120 }).focusOf('root').y).toBeCloseTo(120);
+  });
+
+  it('縦の魚眼で横に見切れていたら、横へ送れる（魚眼は縦のまま）', () => {
+    const w = list(6, { w: 2000, h: 84 }, 'coverflowY');
+    const next = send(w, { x: 120, y: 0 });
+    expect(next.focusOf('root').x).toBeCloseTo(120);
+    expect(next.focusOf('root').y).toBe(0);            // 魚眼は動かない
+  });
+
+  it('透視（そのまま置く）は動かない ── 置き所が無い軸は送らない', () => {
+    const w = list(3, { w: 2000, h: 84 }, 'stackDepth');
+    expect(wheelScroll(w, resolveWorld(w, VP), 'root', { x: 120, y: 0 }, DEFAULT_RULES)).toBeNull();
+  });
+
+  it('横の魚眼で縦に見切れていたら、縦の量は**縦へ**行く（魚眼を繰るのに横取りしない）', () => {
+    const w = list(6, { w: 300, h: 1200 }, 'coverflow');
+    const next = send(w, { x: 0, y: 120 });
+    expect(next.focusOf('root').y).toBeCloseTo(120);
+    expect(next.focusOf('root').x).toBe(0);            // 魚眼は動かない
+    // 横の量なら、これまでどおり魚眼を繰る
+    expect(send(w, { x: 100, y: 0 }).focusOf('root').x).not.toBe(0);
   });
 });

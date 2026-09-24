@@ -16,6 +16,7 @@ import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   actContext,
   applySnap,
+  chromeOf,
   commitDrop,
   dragBubble,
   dragFocus,
@@ -30,6 +31,7 @@ import {
   resolveRules,
   resolveWorld,
   unprojectLocal,
+  wheelScroll,
   wheelSpace,
   wheelZ,
   zoomedBy,
@@ -175,6 +177,15 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
   // 手つきそのものは ref（書き換えても描き直さなくてよい帳面）。
   // 描くのに要る分だけを state に写す ── これが無いと、持ち上げた泡が画面で動かない
   const drag = useRef<DragState | null>(null);
+  /**
+   * **中身を触って選んだ泡**（掴みは始めていない）。
+   *
+   * ★ ②「触った泡へ視点が寄る」は、枠を触ったときだけのものではない。
+   *   中身を触って選んだときも、離したところで同じ道を通す ── でないと、
+   *   **全部が写っていないビュー**（奥行きに重ねる・魚眼）で選んだ泡が端に居たまま見えない。
+   *   平行な軸では `focusOn` が何もしないので、全部写っているビューでは今までどおり動かない。
+   */
+  const touched = useRef<{ id: BubbleId; mx: number; my: number } | null>(null);
   const [view, setView] = useState<DragView>(NO_DRAG);
   const show = () => {
     const d = drag.current;
@@ -272,6 +283,14 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     (id: BubbleId) => world.isHost(id) || (hasContent ? hasContent(id) : false),
     [world, hasContent],
   );
+  /**
+   * その泡の**枠が上に取るぶん**（装いの top）。当たり判定はここで中身と枠を分ける。
+   * 固定の 24 ではなく**着ている装い**から取る ── 装いを出していない札では 1px しか取らない。
+   */
+  const headOf = useCallback(
+    (id: BubbleId) => chromeOf(world, id, chrome).top,
+    [world, chrome],
+  );
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!layerRef.current) return;
@@ -283,6 +302,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      *   泡の中身が本物の UI のとき、これだとボタンもダブルクリックも死ぬ。
      */
     const capture = () => layerRef.current?.setPointerCapture(e.pointerId);
+    touched.current = null;
     const pick = pickAt(pickInput(), mx, my);
 
     if (pick.handle) {
@@ -304,17 +324,23 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      * ★ 本文（空間ではない中身）を押したら、**何も始めない**。それは中身のもの。
      *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点をドラッグする」（ラボと同じ）。
      */
-    if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody)) {
+    if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody, headOf)) {
       /**
-       * ★ **選ぶのもしない。** 中身に触ろうとしただけで泡が選ばれると、
-       *   一覧では触った札が装いを出して背まで伸び、**押したかった所が動く**。
-       *   選ぶのは泡の枠（ヘッダや縁）を触ったとき ── 中身は中身のもの。
+       * ★ **触ったら選ぶ。掴みはしない。**
+       *   選ぶのは「いま相手にしている泡」を決めることなので、中身を触っても起きてよい。
+       *   掴んで動かすのは枠だけ ── 中身のボタンを押したいだけなのに泡が動いては困る。
+       *
+       * ★ 前は選ぶのもしなかった。中身を触ると**一覧の札が装いを出して背が伸び、
+       *   押したかった所が動いた**から ── いまは札が装いを出さない（`space-css` の `.bl-quiet`）ので、
+       *   選んでも画面の上では 1px も動かない。
        */
+      setSelectedId(p0.id);
+      touched.current = { id: p0.id, mx, my };
       drag.current = null;
       show();
       return;
     }
-    if (p0 && !inContent(p0, my, hasBody)) {
+    if (p0 && !inContent(p0, my, hasBody, headOf)) {
       capture();
       setSelectedId(p0.id);
       // ★ 押した時点では何も書かない。焦点が寄るのは「ドラッグせずに離した」ときだけ
@@ -348,11 +374,19 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       };
     }
     show();
-  }, [world, layout, rules, pt, pickInput, hasBody, setSelectedId, layerRef]);
+  }, [world, layout, rules, pt, pickInput, hasBody, headOf, setSelectedId, layerRef]);
 
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (!d) return;
+    if (!d) {
+      // 中身を触ったまま動かした ── 触ったのではなく、中身を扱っている。寄せない
+      const t = touched.current;
+      if (t) {
+        const { mx, my } = pt(e);
+        if (Math.hypot(mx - t.mx, my - t.my) >= DRAG_START) touched.current = null;
+      }
+      return;
+    }
     /**
      * ★ **ボタンが離れていたら、掴みを黙って捨てる。**
      *
@@ -419,7 +453,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const shown = withLift(after, held);
       const rect = shown.byId.get(d.id);
       const screen: ScreenRects = new Map(shown.order.map((q) => [q.id, { x: q.x, y: q.y, w: q.w, h: q.h }]));
-      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false));
+      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => chromeOf(next, id, chrome).top);
       const t = rect
         ? dropTargetAt(next, {
             layout: after, screen, pointer: { x: mx, y: my }, hitSpace,
@@ -434,9 +468,15 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
 
   const endDrag = useCallback((e?: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
+    const t = touched.current;
     drag.current = null;
+    touched.current = null;
     o.onDragInfo?.(null);
-    if (!d) return;
+    if (!d) {
+      // ② 中身を触って、動かさずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
+      if (t) setWorld(focusOn(world, layout, t.id, rules));
+      return;
+    }
     if (!d.started) {
       // ② ドラッグせずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
       if (d.kind === 'bubble') setWorld(focusOn(world, layout, d.id, rules));
@@ -509,7 +549,15 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       return;
     }
     // ★ 受け手は wheelZ と**同じ出し方**で出す（札の上で回したら、その札がいる空間まで外へ通す）
-    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody));
+    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody, headOf));
+    /**
+     * ★ **収まらない並びは、まずスクロールに使う。**
+     *   縦に並べる・横に並べるで中身が箱に入りきらないとき、送る道がここしかない
+     *   （平行の軸なので、触っても寄らない）。収まっていれば `null` が返り、
+     *   今までどおり奥行きを繰る（`wheelZ`）。
+     */
+    const scrolled = wheelScroll(world, layout, space, { x: e.deltaX, y: e.deltaY }, rules);
+    if (scrolled) { setWorld(scrolled); bounceArmed.current = true; return; }
     const next = wheelZ(world, layout, space, e.deltaY, rules);
     const moved = next.focusOf(space).z !== world.focusOf(space).z;
     /**

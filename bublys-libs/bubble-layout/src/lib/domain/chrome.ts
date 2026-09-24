@@ -41,7 +41,10 @@ export type ChromeId = 'bare' | 'bar' | 'plain' | 'quiet' | 'packed';
  *   ── 窓（中身が自分の宇宙を持つ泡）と、**ラボの泡**がこれ。**既定**
  * - `plain` … 普通の泡。帯 24 ＋ 中身との隙間 3 ＝ 27、左右と下は 7
  * - `quiet` … 一覧の札（装いを出していない）。**上下も左右と同じ**
- * - `packed` … 一覧の札で、縦に詰める並びのとき。札と札のあいだを限界まで細くする
+ * - `packed` … 一覧の札で、詰める並びのとき。**装いは無い**（箱＝中身）。
+ *   ★ **隙間は並べ方が決める**（View の軸の `gap`）。装いは隙間ではない。
+ *     1px でも持たせると、札どうしのあいだがその 2 倍ぶんだけ勝手に開き、
+ *     一覧の幅も「中身＋装い＋余白」で数えることになる ── 中身だけを見て決められなくなる
  *
  * ★ 既定が `bar` なのは、**模型の素の振る舞いをラボと同じに保つ**ため。
  *   左右や下の余白は「バブリの画面を載せる器」の都合（`space-css` の `.bl-body`）で、
@@ -52,7 +55,7 @@ export const CHROME: Readonly<Record<ChromeId, Chrome>> = {
   bar: { left: 0, top: METRICS.HEADER, right: 0, bottom: 0 },
   plain: { left: 7, top: 27, right: 7, bottom: 7 },
   quiet: { left: 7, top: 7, right: 7, bottom: 7 },
-  packed: { left: 7, top: 1, right: 7, bottom: 1 },
+  packed: { left: 0, top: 0, right: 0, bottom: 0 },
 };
 
 /** 装いが横に取るぶん */

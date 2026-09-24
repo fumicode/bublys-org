@@ -63,6 +63,12 @@ export interface BubbleDraw {
   readonly title: string;
   readonly className: string;
   readonly style: Readonly<Record<string, string | number>>;
+  /**
+   * **留め** ── その泡を包む 1 枚（`bl-hold`）。箱に留める泡では箱そのもの
+   * （大きさ ＋ `overflow:hidden` ＋ 箱の位置）、留めない泡では大きさを持たない素通し。
+   * 切り取りを**箱の側**に置くための入れもの（{@link drawBubble} の註）。
+   */
+  readonly hold: Readonly<Record<string, string | number>>;
   /** 描く下限を切ったか（掴めない） */
   readonly tiny: boolean;
   /** 掴めるか */
@@ -207,12 +213,65 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
   const style: Record<string, string | number> = {
     width: bw.toFixed(2) + 'px',
     height: bh.toFixed(2) + 'px',
-    transform: `translate(${p.x.toFixed(2)}px,${p.y.toFixed(2)}px) scale(${s.toFixed(5)})`,
     zIndex: i, // 4 描く順 ＝ z-index
     '--k': (1 / s).toFixed(4), // 3 逆 scale
     '--h': st.hue == null ? 210 : st.hue,
     '--rows': rowsOf(bh),
   };
+
+  /**
+   * ★ **一覧の中身は、一覧の箱の中にだけ描く。**
+   *
+   *   札は一覧の泡の**外の層**に描かれている（DOM は平らなので兄弟）ので、
+   *   一覧の箱では切り取れない ── はみ出したぶんが海の上に出てしまう
+   *   （実測：箱 350 の一覧から札が左へ 749px、右へ 441px はみ出した）。
+   *
+   * ★ **切り取りは「箱の側」に置く。** 札に `clip-path` を掛けるやり方は捨てた。
+   *   切れ目は札の中の座標で書くので、札が動くたびに**書き直さなければならない**。
+   *   札の動き（transform）は合成の側で進むのに、切れ目の塗り直しは主たる流れの側なので、
+   *   手を速く左右に振ると塗りが追いつかず、その隙に箱の外へ出る（実測で残った）。
+   *   **箱と同じ大きさの入れもの（`bl-hold`）に入れて `overflow:hidden` で切る**と、
+   *   切り取りは箱に貼り付いたままになり、追いつく相手がそもそも居なくなる。
+   *   ふつうの web の入れもの（スクロールする箱）と同じ仕組み。
+   *
+   * ★ **留めるのは「1 つの泡に 1 枚」。** 空間ごとにまとめない ── DOM は平ら
+   *   （泡は層の兄弟）のままにしておかないと、中の泡が親の兄弟より手前に出られない。
+   *   留めが持つのは重なりの順（z-index）だけなので、並び順はこれまでどおり。
+   *
+   * ★ **空けてある所（`reserve`）より内側で切る。**
+   *   一覧の口（＋新規）のぶんを空けているのに箱の縁で切ると、送った札が
+   *   **口の並びまで出てきて被る**。隠れ始めるのは口の下。
+   *
+   * ★ **掴んでいる札は留めない。** 箱から外へ出すのがドラッグなので、
+   *   留めたままだと掴んだ札が箱の縁で切れて、どこへ運んでいるのか見えなくなる。
+   *
+   * ★ **奥行きに重ねる並びは切らない。** そちらは箱の外へ伸びていく絵で、
+   *   切ると「奥に続いている」が読めなくなる。
+   */
+  const home = c.layout.spaces.get(p.space);
+  const held =
+    !!home && home.id !== 'root' && home.view.z.dim === 'none' && !(c.skip ? c.skip.has(b.id) : false);
+  /** 留めの原点（画面の座標）。留めないときは画面そのもの（0,0） */
+  let ox = 0;
+  let oy = 0;
+  const hold: Record<string, string | number> = { zIndex: i };
+  if (held && home) {
+    const h = home.host;
+    const rLeft = (home.view.x.reserve ?? 0) * h.scale;
+    const rTop = (home.view.y.reserve ?? 0) * h.scale;
+    ox = h.cx - (h.w / 2) * h.scale + rLeft;
+    oy = h.cy - (h.h / 2) * h.scale + rTop;
+    hold['width'] = Math.max(0, h.w * h.scale - rLeft).toFixed(2) + 'px';
+    hold['height'] = Math.max(0, h.h * h.scale - rTop).toFixed(2) + 'px';
+    hold['transform'] = `translate(${ox.toFixed(2)}px,${oy.toFixed(2)}px)`;
+    hold['overflow'] = 'hidden';
+  }
+  /**
+   * ★ 泡の置き場所は**留めからの相対**。留めと泡はどちらも transform なので、
+   *   同じ曲線で動けば合成の側で足し合わされる ── 途中のどの絵でも辻褄が合う。
+   */
+  style['transform'] =
+    `translate(${(p.x - ox).toFixed(2)}px,${(p.y - oy).toFixed(2)}px) scale(${s.toFixed(5)})`;
 
   let className: string;
   let op: number;
@@ -283,6 +342,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
     title: st.title,
     className,
     style,
+    hold,
     tiny: isTiny,
     grab,
     label,

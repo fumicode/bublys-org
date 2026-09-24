@@ -27,15 +27,28 @@ export const onHandle = (p: Placement | null, mx: number, my: number): boolean =
   my >= p.y + p.h - HANDLE_IN && my <= p.y + p.h + HANDLE_OUT;
 
 /**
- * 「中身の箱」に入っているか（ヘッダは外側の空間のもの）。中身の箱を突いたら、その泡は掴めない。
+ * 「中身の箱」に入っているか（枠は外側の空間のもの）。中身の箱を突いたら、その泡は**掴めない**
+ * （触ったことにはなる ── 選ぶのは中身でもできる）。
  * 見えない親は縁でしか当たらないので、いつも「掴む」。
  *
  * ★ hasBody は「空間を持つ泡」だけでなく「**本文を持つ泡**」にも同じ扱いをするための口。
  *   本文が本物の UI（ボタン・選択欄）のとき、そこを突いて泡が動いたら中身が触れない。
- *   既存 bubbles-ui も「ヘッダで掴む」なので、規則を増やさずにそろう。
+ *
+ * ★ **枠の高さは、その泡が着ている装いから取る**（`headOf`）── 固定の 24 ではない。
+ *   固定にしていたころは、**装いを出していない一覧の札で枠が中身を食っていた**
+ *   （実測：箱 86 の札で上 24px が枠 ＝ 28%。名前の行 13〜33 の上半分と、盤の上 13px がそこ）。
+ *   逆に大きな泡では枠が 24px しかなく、そこを外すと掴めも選べもしなかった。
  */
-export const inContent = (p: Placement, my: number, hasBody: (id: BubbleId) => boolean): boolean =>
-  !p.b.state.implicit && hasBody(p.id) && my >= p.y + METRICS.HEADER * p.scale;
+export const inContent = (
+  p: Placement,
+  my: number,
+  hasBody: (id: BubbleId) => boolean,
+  /** その泡の枠が上に取るぶん（装いの top）。省けば模型の既定（帯 24） */
+  headOf?: (id: BubbleId) => number,
+): boolean =>
+  !p.b.state.implicit &&
+  hasBody(p.id) &&
+  my >= p.y + (headOf ? headOf(p.id) : METRICS.HEADER) * p.scale;
 
 export interface PickInput {
   readonly layout: Layout;
@@ -103,9 +116,10 @@ export function spaceAt(
   mx: number,
   my: number,
   hasBody: (id: BubbleId) => boolean,
+  headOf?: (id: BubbleId) => number,
 ): SpaceId {
   const p = pickAt(input, mx, my).bub;
-  return !p ? 'root' : inContent(p, my, hasBody) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, my, hasBody, headOf) ? p.id : p.space;
 }
 
 /**
@@ -141,7 +155,8 @@ export function spaceModelAt(
   mx: number,
   my: number,
   hasBody: (id: BubbleId) => boolean,
+  headOf?: (id: BubbleId) => number,
 ): SpaceId {
   const p = hitModelAt(layout, tiny, skip, mx, my);
-  return !p ? 'root' : inContent(p, my, hasBody) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, my, hasBody, headOf) ? p.id : p.space;
 }

@@ -18,7 +18,7 @@
  * ★ 焦点はどれも SpaceLayout.focus から読む（resolve.ts の断り）。
  *   ラボは毎フレーム状態へ書き戻していた（lab 727 行）ので、状態の焦点と同じ値になる。
  */
-import type { BubbleId, Point, SpaceId, Size } from './types.js';
+import type { BubbleId, PlaneAxis, Point, SpaceId, Size } from './types.js';
 import { METRICS, ROOT_SPACE } from './types.js';
 import type { BubbleWorld } from './world.js';
 import type { Layout } from './resolve.js';
@@ -149,6 +149,117 @@ export function wheelSpace(world: BubbleWorld, layout: Layout, spaceId: SpaceId)
     space = world.windowOf(world.bubble(space)?.space ?? ROOT_SPACE);
   }
   return space;
+}
+
+/**
+ * **並びを、ホイール（＝トラックパッドの二本指）で送る。**
+ *
+ * > 送れる軸は 2 つだけ ──
+ * >   ① **詰める並びで、中身が箱に収まっていない軸**（ふつうのスクロール。px そのまま）
+ * >   ② **魚眼の軸**（繰る。1 刻み ＝ 札 1 枚）
+ *
+ * ★ ① 収まっているなら何も起きない ── 見えているものを動かす理由が無い
+ *   （②「平行の軸では寄らない。触れたということは、もう見えている」と同じ考え）。
+ *   その前提が崩れるのは**入りきらないとき**だけなので、そこにだけ道を開ける。
+ * ★ ② 魚眼は「収まっているか」を訊かない ── レンズが tanh でぜんぶ箱に収めてしまうので、
+ *   「収まらない」がそもそも起きない。魚眼で二本指が動かすのは**どの札が真ん中に来るか**であって、
+ *   はみ出したぶんを見に行くことではない。だから**いつでも繰れる**。
+ *   （前はここに「魚眼には要らない」と書いてあった。はみ出しの話としては正しかったが、
+ *   繰る手だてがドラッグしか無く、二本指が死んでいた。）
+ * ★ 透視（奥行きに重ねる）はここではない ── そちらのホイールは奥行きを繰る（`wheelZ`）。
+ *
+ * @param delta ホイールの生の量。詰める並びは**画面の px そのまま**（平行な軸なので値と px は 1:1）、
+ *              魚眼は**1 回転 ≒ 100 ＝ 1 枚**に噛み砕いてから足す
+ * @returns 送れないときは `null`（呼ぶ側が次の受け手へ渡す）
+ */
+export function wheelScroll(
+  world: BubbleWorld,
+  layout: Layout,
+  spaceId: SpaceId,
+  delta: { readonly x: number; readonly y: number },
+  rules: LayoutRules,
+): BubbleWorld | null {
+  const space = wheelSpace(world, layout, spaceId);
+  const L = layout.spaces.get(space);
+  if (!L) return null;
+  const pad = METRICS.PAD;
+  /**
+   * その軸が「**魚眼で繰れる**」か ── レンズが魚眼で、次元が刺さっていて、泡がいること。
+   * 箱に収まっているかは見ない（上の註 ②）。
+   */
+  const turnable = (axis: PlaneAxis): boolean =>
+    L.view[axis].lens === 'fisheye' && L.view[axis].dim !== 'none' && L.arr[axis].pos.size > 0;
+  /**
+   * 魚眼を繰る量 ── **1 刻み ＝ 札 1 枚**（`wheelZ` と同じ換算。ホイール 1 回転 ≒ 100）。
+   * 刻みは View が持っている（coverflow なら札の幅の 0.756 倍）。px をそのまま足すと、
+   * トラックパッドの一撫でで何十枚も飛ぶ。
+   */
+  const turnBy = (axis: PlaneAxis, by: number): number => (by / 100) * (L.view[axis].step || 1);
+  /**
+   * その軸が「詰める並びで、収まっていない」か ── **次元が刺さっているかは訊かない。**
+   *
+   * ★ 縦に並べた一覧で札が横にはみ出しているなら、横にも送れないと見に行けない。
+   *   その向きには並びの操作がもともと無いので、送りと喧嘩しない
+   *   （魚眼も同じ ── 縦の魚眼の横、横の魚眼の縦）。焦点の側の約束は `fitFocus` の (0)。
+   * ★ 「そのまま置く」（透視の X・Y）は入らない ── 置き所が無い軸は動かさない。
+   */
+  const scrollable = (axis: PlaneAxis): boolean => {
+    const A = L.view[axis];
+    if (A.arrange !== 'pack' || A.lens !== 'parallel') return false;
+    const bands = L.arr[axis].bands;
+    if (!bands.length) return false;
+    const need = Math.max(...bands.map((b) => b.end)) - Math.min(...bands.map((b) => b.start));
+    // ★ 口のために空けてある所は、入る量から引く（`fitFocus` の `room2` と同じ数え方）
+    return need > L.H[axis] * 2 - pad * 2 - (A.reserve ?? 0);
+  };
+  if (turnable('x') || turnable('y')) {
+    let next = world;
+    let moved = false;
+    if (turnable('y') && delta.y !== 0) {
+      next = withFocusAxis(next, L, 'y', L.focus.y + turnBy('y', delta.y), rules);
+      moved = true;
+    }
+    if (turnable('x')) {
+      /**
+       * 横の魚眼は**横の量**で繰る。ただし横だけが魚眼なら（＝縦は繰らない）、
+       * 縦の量でも繰れるようにする ── ふつうのマウスのホイールには縦の量しか無い。
+       * 折り返す魚眼（縦も横も魚眼）では代用しない。縦は縦で繰るので、混ぜると二重に動く。
+       *
+       * ★ **縦に見切れているときも代用しない。** そのときの縦の量は「下を見に行く」
+       *   （`scrollable('y')`）ためのもので、そちらに譲る ── 見切れている向きの送りが先。
+       */
+      const by = delta.x !== 0 ? delta.x : turnable('y') || scrollable('y') ? 0 : delta.y;
+      if (by !== 0) {
+        next = withFocusAxis(next, L, 'x', L.focus.x + turnBy('x', by), rules);
+        moved = true;
+      }
+    }
+    if (moved) return next;
+  }
+  /**
+   * ★ **縦と横は別々に送る。** 二本指は斜めにも動くので、片方で打ち切らない
+   *   （縦に長くて横にも見切れている一覧では、両方が同時に要る）。
+   */
+  let next = world;
+  let moved = false;
+  if (scrollable('y') && delta.y !== 0) {
+    next = withFocusAxis(next, L, 'y', L.focus.y + delta.y, rules);
+    moved = true;
+  }
+  if (scrollable('x')) {
+    /**
+     * 横に並べた一覧は、横の量が無ければ縦の量で送る（ふつうのマウスでも送れるように）。
+     * ★ ただし**その向きに並べていない**（ただ見切れているだけの）ときは代用しない ──
+     *   縦の量は縦のためのもので、横がかすめ取ると縦へ動けなくなる。
+     */
+    const sub = L.view.x.dim !== 'none' && !turnable('y') && !scrollable('y');
+    const by = delta.x !== 0 ? delta.x : sub ? delta.y : 0;
+    if (by !== 0) {
+      next = withFocusAxis(next, L, 'x', L.focus.x + by, rules);
+      moved = true;
+    }
+  }
+  return moved ? next : null;
 }
 
 export function wheelZ(

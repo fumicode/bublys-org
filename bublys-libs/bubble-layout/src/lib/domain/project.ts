@@ -6,7 +6,7 @@
  * ② 逆変換は軸ごと（画面の移動量 → そのレンズの unproject → 空間の中の移動量）。
  * 書き込む先は、その軸に刺さっている次元。
  */
-import { clamp } from './types.js';
+import { METRICS, clamp } from './types.js';
 import type { PlaneAxis, Axis, SpaceId, Focus } from './types.js';
 import type { BubbleWorld } from './world.js';
 import { imageOf, LENS_XY } from './lens.js';
@@ -93,7 +93,22 @@ export function fitFocus(
   rules: LayoutRules,
 ): number {
   const ps = [...L.arr[axis].pos.values()];
-  if (L.view[axis].dim === 'none') return 0;                                        // (0)
+  /**
+   * (0) 次元が なし の軸は 0 ── **ただし「中身が入っているなら」**。
+   *
+   * ★ 次元が無いのは「並べる値が無い」という意味であって、「見えなくていい」ではない。
+   *   縦に並べた一覧で札のほうが箱より**横に**大きければ、横には並べていなくても
+   *   はみ出したぶんは見に行けないと困る（実測：札が右で切れたまま、横へ動かす道が無かった）。
+   *   その向きには並びの操作がもともと無いので、送りと喧嘩もしない。
+   * ★ 動けるのは**はみ出したぶんだけ**。入っているなら 0 のまま ＝ もとの約束どおり
+   *   （下の「収まらない並び」と同じ止まり方を、そのまま使う）。
+   * ★ 「そのまま置く」（自由・透視の X・Y）は別 ── 置き所が無いのだから動かない。
+   *   魚眼も別 ── レンズが箱に収めてしまうので、はみ出しという事が起きない。
+   */
+  const noDim = L.view[axis].dim === 'none';
+  if (noDim && (axis === 'z' || L.view[axis].arrange === 'as-is' || L.view[axis].lens !== 'parallel')) {
+    return 0;
+  }
   if (axis === 'z') {
     /**
      * Z は「空にしない」：**奥へは一番奥の泡まで／手前へは一番手前の泡より 1 だけ**
@@ -122,8 +137,42 @@ export function fitFocus(
     const front = Math.min(...ps) - (rules.zFocusStop === 'behind' ? 0 : 1);
     return clamp(v, front, Math.max(...ps));
   }
-  if (L.view[axis].arrange === 'as-is' || !ps.length) return v;
+  if (!ps.length) return noDim ? 0 : v;
+  if (L.view[axis].arrange === 'as-is') return v;
   const from0 = cur ?? L.focus[axis];
+  /**
+   * ★ **収まらない並びは、「全部が入る」では止められない。**
+   *
+   *   `focusFits`（(2)）は「どの泡も箱の中にある」なので、中身が入りきらない並びでは
+   *   **どの焦点でも偽**になる。そのまま通すと焦点が凍りつき、はみ出したぶんを
+   *   見に行く道が無くなる（実測：縦に並べた一覧でホイールが 1px も効かない）。
+   *
+   *   収まらないときは**端より外へは行かない**で止める ── ふつうのスクロールと同じ止まり方。
+   *   見るのは平行な軸だけ：魚眼は tanh で必ず箱に収めてしまうので、
+   *   「収まらない」はそもそも起きない（並びの広がりは箱と比べられない）。
+   */
+  if (L.view[axis].lens === 'parallel') {
+    const bands = L.arr[axis].bands;
+    if (bands.length) {
+      const lo = Math.min(...bands.map((b) => b.start));
+      const hi = Math.max(...bands.map((b) => b.end));
+      const room = Math.max(0, L.H[axis] - METRICS.PAD);
+      /**
+       * ★ **空けてある所（`reserve`）は、部屋の広さから引く。**
+       *   口のぶんを空けた並びは、箱に入る量がその 52px ぶん少ない。引かないと
+       *   「ぎりぎり収まっている」と数えてしまい、**はみ出した最後のひと切れに行けない**
+       *   （実測：札 6 枚の縦の一覧で、最後の 26px が切れたままホイールが効かなかった）。
+       */
+      const room2 = room * 2 - (L.view[axis].reserve ?? 0);
+      /**
+       * ★ 止まり所は**0 を含む**。0 は並びが置かれたそのままの所（口のぶんを空けた
+       *   「いちばん上」）なので、そこを端に含めないと、空けたはずの所まで送られてしまう
+       *   ── 実測：スクロールできるようにした途端、＋新規の口に札が戻ってきた。
+       */
+      if (hi - lo > room2) return clamp(v, Math.min(0, lo + room), Math.max(0, hi - room));
+    }
+  }
+  if (noDim) return 0;                        // (0) 入っているなら 0（はみ出していれば上で返った）
   v = clamp(v, Math.min(...ps), Math.max(...ps));                                   // (1)
   if (!focusFits(L, axis, v)) {                                                     // (2) 収まる所まで戻す
     const from = focusFits(L, axis, from0) ? from0 : 0;

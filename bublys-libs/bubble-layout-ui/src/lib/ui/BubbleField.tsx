@@ -84,14 +84,23 @@ export function BubbleField(props: BubbleFieldProps) {
       style={style}
       {...handlers}
     >
+      {/*
+        ★ **泡は1枚の「留め」に包む。** 箱に留める泡（一覧の札など）では、この留めが
+          箱そのもの（大きさ ＋ overflow:hidden）になって中身を切る ── 切り取りを
+          札ではなく**箱の側**に置くため（`draw.ts` の註）。留めない泡では
+          大きさを持たない素通しで、何も変わらない。
+        ★ **いつも包む。** 留める／留めないで入れ子の形を変えると、React が作り直して
+          出現アニメ（`bl-in`）が鳴り直す。形は変えず、中身（style）だけ変える。
+      */}
       {dom.map((it) => (
-        <div
-          key={it.id}
-          data-id={it.id}
-          className={it.className}
-          style={it.style as CSSProperties}
-        >
-          {renderBubble ? renderBubble(it.id, it) : <BubbleShell draw={it} />}
+        <div key={it.id} className="bl-hold" style={it.hold as CSSProperties}>
+          <div
+            data-id={it.id}
+            className={it.className}
+            style={it.style as CSSProperties}
+          >
+            {renderBubble ? renderBubble(it.id, it) : <BubbleShell draw={it} />}
+          </div>
         </div>
       ))}
       <DropMarksView marks={marks ?? null} />

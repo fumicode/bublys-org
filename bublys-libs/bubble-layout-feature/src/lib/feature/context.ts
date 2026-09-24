@@ -19,6 +19,8 @@ export interface ChildrenLayout {
   readonly step?: { readonly x?: number; readonly y?: number };
   /** **何列で折り返すか。** 渡すと、順序から行と列（`cell`）を書き直す */
   readonly cols?: number;
+  /** **箱が中身に合わせて伸びるか**（既定は伸びる）。`false` なら自前のままで見切れる */
+  readonly grow?: boolean;
 }
 
 export interface BubbleSpaceApi {
@@ -99,6 +101,34 @@ export interface ScreenZoom {
 /** null ＝ 自分がいちばん外の画面（＝ 画面2 は自分の世界が持つ） */
 export const ScreenZoomContext = createContext<ScreenZoom | null>(null);
 export const useScreenZoom = (): ScreenZoom | null => useContext(ScreenZoomContext);
+
+/**
+ * **人が選んだ並べ方。**
+ *
+ * ★ 並べ方を決めるのは**一覧**（箱と中身から自分で決める）。人が口から選んだら、
+ *   そちらが勝つ ── 決めたのは人のほうなので。
+ * ★ 選んだ答えは**一覧まで届かないといけない**。折り返す列数も札の幅も送り幅も、
+ *   並べ方から出るので、口の側だけで持っていると
+ *   「格子を選んでも列数が渡らず、札が全部 (0,0) に積まれる」（実測で踏んだ）。
+ */
+export interface ViewChoice {
+  readonly chosen: (hostId: BubbleId) => PresetId | undefined;
+  readonly choose: (hostId: BubbleId, preset: PresetId) => void;
+  /**
+   * **箱も中身に合わせて広がるか**（既定）。`false` なら箱はそのままで、
+   * 入らないぶんは見切れる（動かして見に行く）。
+   */
+  readonly grows: (hostId: BubbleId) => boolean;
+  readonly toggleGrows: (hostId: BubbleId) => void;
+}
+
+export const ViewChoiceContext = createContext<ViewChoice>({
+  chosen: () => undefined,
+  choose: () => undefined,
+  grows: () => true,
+  toggleGrows: () => undefined,
+});
+export const useViewChoice = (): ViewChoice => useContext(ViewChoiceContext);
 
 export const CurrentBubbleContext = createContext<BubbleId | null>(null);
 export const useCurrentBubble = (): BubbleId | null => useContext(CurrentBubbleContext);

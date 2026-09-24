@@ -9,9 +9,9 @@ export { ObjectView } from './ObjectView.js';
 export type { ObjectViewProps } from './ObjectView.js';
 export {
   BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext,
-  useBubbleSpace, useCurrentBubble, useScreenZoom, useSelectedBubble,
+  ViewChoiceContext, useBubbleSpace, useCurrentBubble, useScreenZoom, useSelectedBubble, useViewChoice,
 } from './context.js';
-export type { BubbleSpaceApi, ScreenZoom } from './context.js';
+export type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, ViewChoice } from './context.js';
 export { openAt, hueOf } from './openAt.js';
 export type { OpenAtInput, OpenAtResult, OpenAs } from './openAt.js';
 export {

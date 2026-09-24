@@ -89,6 +89,11 @@ export function measureBox(
       // ③ 見えない親は自前の大きさを持たないので、どの並べ方でも箱は中身ぴったり
       //   （「そのままの軸は自前」は体のある泡の話）
       if (A.arrange === 'as-is' && !self.state.implicit) continue;
+      /**
+       * ★ **伸びない軸**（`grow: false`）は自前のまま。入らないぶんは箱からはみ出す。
+       *   ③ 見えない親は体を持たないので、この指定は効かない（いつも中身ぴったり）。
+       */
+      if (A.grow === false && !self.state.implicit) continue;
       const ar = arrangeAxis({ axisView: A, axis, spaceId: id, kids, sizeOf, world, rules });
       const lens = LENS_XY[A.lens as LensXyId];
       // 自前の下限は**中身**の半分（装いはこのあと外へ足す）

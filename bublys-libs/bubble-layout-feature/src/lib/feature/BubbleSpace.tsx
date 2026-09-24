@@ -15,9 +15,10 @@ import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, r
 import type { AxisView, BubbleId, BubbleWorld, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
-import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, useScreenZoom } from './context.js';
-import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom } from './context.js';
+import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
+import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, ViewChoice } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
+import { FixedIcon, GrowIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
@@ -230,8 +231,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const r = url ? matchBubbleRoute(routes, url) : null;
       // 窓（中身が自分の宇宙を持つ）は帯だけ。余白は中の器が自分で取る
       if (r?.ground === 'clear') { m.set(b.id, 'bar'); continue; }
+      /**
+       * ★ **静かなのは「一覧の中に居て、選ばれていないとき」だけ。**
+       *   装いは泡が持つ性質ではなく、**置かれた場所と、いま相手にされているか**で決まる
+       *   ── 海に浮いていれば装い、岸に着けば装い無し（`bare`）、一覧の中なら静か。
+       * ★ 選ばれた札は普通の泡と同じ装いになる（＝ 触れば泡として立ち上がる）。
+       *   そのぶん箱は装いの差だけ伸びるので、**並びの後ろの札はそのぶん送られる**
+       *   ── 中身の大きさは 1px も変わらない（`chrome.ts`）。
+       */
       const inList = b.space !== 'root' && listHosts.current.has(b.space);
-      // 一覧の中でも、装いを出している（選ばれている）札は普通の泡と同じ
       if (!inList || b.id === selectedId) { m.set(b.id, 'plain'); continue; }
       /**
        * ★ 詰める並びのときだけ、札と札のあいだを限界まで細くする（`packed`）。
@@ -406,6 +414,54 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [routes, world, viewport, rules, setWorld, openCenter],
   );
 
+  /**
+   * **人が選んだ並べ方**（一覧の口から）。一覧は箱と中身から自分で並べ方を決めるが、
+   * 人が選んだらそちらが勝つ ── **決めたのは人のほう**なので。
+   *
+   * ★ いまは**選んだら戻らない**（仮）。自動に戻す道（箱を変えたら、など）はまだ決めていない。
+   */
+  const [chosenView, setChosenView] = useState<ReadonlyMap<BubbleId, PresetId>>(() => new Map());
+  /**
+   * ★ **覚えるだけ。世界には書かない。**
+   *   書くのは一覧の `setChildren` 1 か所 ── そこで並べ方と一緒に
+   *   **隙間・送り幅・折り返す列数・札の幅**がまとめて当たる。
+   *   ここで `withPreset` を直に書いていたころは、そのあと `setChildren` が
+   *   「もう当たっている」と判断して**隙間が既定の 14 に戻ったまま**だった（実測で踏んだ）。
+   */
+  const chooseView = useCallback((hostId: BubbleId, preset: PresetId) => {
+    setChosenView((prev) => {
+      const next = new Map(prev);
+      next.set(hostId, preset);
+      return next;
+    });
+  }, []);
+  /**
+   * ★ 選んだ答えは**一覧まで届ける**。折り返す列数も札の幅も送り幅も並べ方から出るので、
+   *   口の側だけで持っていると「格子を選んでも列数が渡らない」（実測で踏んだ）。
+   */
+  /**
+   * **箱も広げるか**（既定は広げる）。切ると箱はそのままで、入らないぶんは見切れる。
+   * ★ 並べ方を変えるたびに窓の大きさまで変わってほしい人と、窓は動かさず中を送りたい人がいる
+   *   ── どちらも正しいので、見る側が選ぶ。
+   */
+  const [fixedBox, setFixedBox] = useState<ReadonlySet<BubbleId>>(() => new Set());
+  const toggleGrows = useCallback((hostId: BubbleId) => {
+    setFixedBox((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(hostId)) next.add(hostId);
+      return next;
+    });
+  }, []);
+  const viewChoice = useMemo<ViewChoice>(
+    () => ({
+      chosen: (hostId) => chosenView.get(hostId),
+      choose: chooseView,
+      grows: (hostId) => !fixedBox.has(hostId),
+      toggleGrows,
+    }),
+    [chosenView, chooseView, fixedBox, toggleGrows],
+  );
+
   /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */
   const setPreset = useCallback(
     (preset: PresetId, spaceId: BubbleId = 'root') => {
@@ -427,7 +483,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
-      const { preset, itemWidth, reserve, step, cols } = how;
+      const { preset, itemWidth, reserve, step, cols, grow } = how;
       listHosts.current.add(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
@@ -450,13 +506,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const stepChanged = !!step && (['x', 'y'] as const).some(
         (axis) => step[axis] !== undefined && own?.[axis].step !== step[axis],
       );
+      /** ★ 箱が伸びるかも見る（見る側が切り替える） */
+      const growChanged = grow !== undefined && ((own?.x.grow ?? true) !== grow || (own?.y.grow ?? true) !== grow);
       /** ★ 折り返す列数も見る ── 箱が広がれば 1 行に入る枚数が変わる */
       const cellsChanged = !!cols && cellsOf(kids, cols).some(({ b, cell }) =>
         b.state.cell.col !== cell.col || b.state.cell.row !== cell.row,
       );
       if (
         missing.length === 0 && extra.length === 0 &&
-        !presetChanged && !widthChanged && !shiftChanged && !stepChanged && !cellsChanged
+        !presetChanged && !widthChanged && !shiftChanged && !stepChanged && !cellsChanged && !growChanged
       ) return;
       let w = world;
       let n = seq.current;
@@ -504,6 +562,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        * 「等間隔」の刻み ── coverflow の送り幅。**札の幅に対する割合**で決まる（`listArrange`）ので、
        * プリセットが持っている値（ラボの写真の 68）では札に対して狭すぎる。ここで当て直す。
        */
+      if (grow !== undefined && (presetChanged || growChanged)) {
+        for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { grow });
+      }
       if (step) {
         for (const axis of ['x', 'y'] as const) {
           const v = step[axis];
@@ -681,6 +742,48 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               </span>
             ))}
           </div>
+          {/*
+            ★ **一覧の泡には、並べ方の口を枠の上に出す**（仮の置き場所）。
+              一覧かどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
+              ステータスバーの中はもう url と閉じるとロックで埋まっているので、
+              7 つ並べる場所が無い ── まずは外に出して形を見る。
+          */}
+          {listHosts.current.has(id) && (
+            <div className="bl-view" onPointerDown={(e) => e.stopPropagation()}>
+              {VIEW_CHOICES.map((v) => (
+                <button
+                  key={v.id}
+                  className={'bl-view-pick' + (v.gapBefore ? ' bl-view-gap' : '')}
+                  title={v.label}
+                  aria-pressed={sameView(world.ownViewOf(id), presetView(v.id))}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onClick={() => chooseView(id, v.id)}
+                >
+                  <v.Icon />
+                </button>
+              ))}
+              {/*
+                ★ **箱も広げるか、箱はそのままで見切れさせるか。**
+                  並べ方を変えるたびに窓の大きさまで変わってほしい人と、
+                  窓は動かさず中を送って見たい人がいる ── どちらも正しいので選べるようにする。
+              */}
+              <button
+                className="bl-view-pick bl-view-gap"
+                title={
+                  fixedBox.has(id)
+                    ? '箱はそのまま ── 入らないぶんは見切れる（動かして見に行く）'
+                    : '中身に合わせて箱も広がる'
+                }
+                aria-pressed={fixedBox.has(id)}
+                onPointerDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onClick={() => toggleGrows(id)}
+              >
+                {fixedBox.has(id) ? <FixedIcon /> : <GrowIcon />}
+              </button>
+            </div>
+          )}
           {r && headerTools?.(r.bubble, r.route)}
           <button
             className="bl-close"
@@ -693,14 +796,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               'bl-body' +
               (r?.route.ground === 'clear' ? ' bl-clear' : r?.route.ground === 'none' ? ' bl-none' : '') +
               /**
-               * ★ 一覧の札の中身は**いつも上 7px から**（`bl-tight`）。
-               *   背が伸びた札だけ、ヘッダのぶん 27px から始める（`bl-grown`）。
-               *   こうしておくと、伸びない並べ方（奥行きに重ねる）で選んでも
-               *   中身の大きさも場所も変わらない ── 装いが付くだけになる。
+               * ★ 一覧の札の中身は、静かなあいだは上 7px から（`bl-tight`）、
+               *   縦に詰める並びなら 1px（`bl-packed`）。**装いを出した札**だけ、
+               *   帯のぶん 27px から始める（`bl-grown`）── 中身の大きさは変わらない。
                */
               (inList ? ' bl-tight' : '') +
               (packed ? ' bl-packed' : '') +
-              /* 装いを出している札（＝ 普通の泡と同じ枠）だけ、中身がヘッダのぶん下がる */
               (inList && chrome.get(id) === 'plain' ? ' bl-grown' : '')
             }
           >
@@ -711,7 +812,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools],
+    [routes, urls, closeBubble, world, chrome, headerTools, chooseView, fixedBox, toggleGrows],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */
@@ -728,6 +829,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   return (
     <BubbleSpaceContext.Provider value={api}>
+      <ViewChoiceContext.Provider value={viewChoice}>
       <ScreenZoomContext.Provider value={screen}>
       <SelectedBubbleContext.Provider value={selectedId}>
       <style>{FIELD_CSS + MARKS_CSS + SPACE_CSS}</style>
@@ -754,6 +856,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       </div>
       </SelectedBubbleContext.Provider>
       </ScreenZoomContext.Provider>
+      </ViewChoiceContext.Provider>
     </BubbleSpaceContext.Provider>
   );
 }

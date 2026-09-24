@@ -241,7 +241,11 @@ function resolveSpace(
    *
    * ★ 動かす量は**箱と中身から毎フレーム決める** ── 固定の数で持つと、札が増えたり
    *   選んで背が伸びたりしたときに狂う（中央ぞろえの余りは中身の高さで変わるので）。
-   * ★ 箱は動かさない。中身が箱に入らないときは何もしない（そこは並べ方の切り替えの仕事）。
+   * ★ 箱は動かさない。
+   * ★ **中身が箱に入らないときこそ動かす。** 前は「入らないなら触らない」としていたので、
+   *   入りきらない並びが中央ぞろえのまま上へはみ出し、**空けたはずの所（＋新規の口）に
+   *   札が被って**いた（実測）。空けるのは「そこに口がある」という話で、
+   *   中身が収まるかどうかとは関係がない。
    */
   for (const axis of ['x', 'y'] as const) {
     const reserve = view[axis].reserve ?? 0;
@@ -249,8 +253,6 @@ function resolveSpace(
     const pad = padOf(world, spaceId);
     const half = (axis === 'x' ? own.w : own.h) / 2;
     const lo = Math.min(...arr[axis].bands.map((b) => b.start));
-    const hi = Math.max(...arr[axis].bands.map((b) => b.end));
-    if (hi - lo + reserve > half * 2 - pad * 2) continue;   // 入らない ── 触らない
     arr[axis] = shifted(arr[axis], -half + pad + reserve - lo);
   }
 

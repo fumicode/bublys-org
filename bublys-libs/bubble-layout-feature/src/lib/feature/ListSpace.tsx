@@ -23,11 +23,12 @@ import { BubbleSpace } from "./BubbleSpace.js";
 import {
   colsFor,
   itemWidthFor,
+  needsBand,
   pickPreset,
   reserveFor,
   stepFor,
 } from "./listArrange.js";
-import { useBubbleSpace, useCurrentBubble } from "./context.js";
+import { useBubbleSpace, useCurrentBubble, useViewChoice } from "./context.js";
 import type { BubbleSpaceApi } from "./context.js";
 import type { BubbleRoute as LayoutRoute } from "./routing.js";
 import { METRICS } from "@bublys-org/bubble-layout";
@@ -144,9 +145,25 @@ export const ListSpace: FC<ListSpaceProps> = ({
    */
   const room = Math.max(0, box.w - METRICS.PAD * 2);
   const itemW = typeof itemWidth === 'function' ? itemWidth(room) : itemWidth;
-  const preset = pickPreset(box, members.length, itemW, itemHeight, headBox);
-  /** 口の場所は、並びの**始端に空けておく**（並びはそのすぐ下から積む） */
-  const reserve = preset === 'column' ? reserveFor(headBox) : 0;
+  /**
+   * ★ **人が選んでいたら、そちらが勝つ。** 一覧は箱と中身から自分で並べ方を決めるが、
+   *   決めたのが人ならその答えを使う ── **列数も札の幅も送り幅も、ここから出る**ので、
+   *   ここで受け取らないと「格子を選んでも列数が渡らない」（実測で踏んだ）。
+   */
+  const view = useViewChoice();
+  const chosen = view.chosen(me ?? '');
+  /** 箱も中身に合わせて広げるか（見る側が選ぶ）。切ると自前のままで見切れる */
+  const grow = view.grows(me ?? '');
+  const preset = chosen ?? pickPreset(box, members.length, itemW, itemHeight, headBox);
+  /**
+   * 口の場所は、並びの**始端に空けておく**（並びはそのすぐ下から積む）。
+   *
+   * ★ **どの並べ方でも空ける。** 前は「縦に並べる」のときだけだったので、
+   *   格子や魚眼に切り替えた途端、札が **＋新規の口の下に潜り込んで**いた（実測）。
+   *   空けないのは、並びが帯を作らない並べ方（奥行きに重ねる）だけ
+   *   ── そこは模型の側が「動かせない」と判断して、ひとりでに何もしない。
+   */
+  const reserve = needsBand(box, itemW, headBox) ? reserveFor(headBox) : 0;
   /**
    * その並べ方のときの札の形と、送り幅・折り返す列数。
    *
@@ -166,8 +183,8 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   `space` が毎回新しくてもここで止まらなくなることはない。
    */
   useEffect(() => {
-    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols });
-  }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols]);
+    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols, grow });
+  }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols, grow]);
 
   /**
    * 中身は口だけ。並びは**外の層**が描く（DOM は平らなので、札はこの div の兄弟になる ──

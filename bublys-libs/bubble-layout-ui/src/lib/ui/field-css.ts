@@ -33,8 +33,19 @@ export const FIELD_CSS = `
  *   大きさを変えて離すたびにこれが起きていた（実測：泡 7 つで animationstart が 14 回、
  *   DOM の出し入れは 0 ＝ 作り直しではなく**鳴らし直し**）。
  *   出現アニメは生まれて 440ms のあいだしか意味が無いので、掴んでいても触らなくてよい。
+ *
+ * ★ **留め（bl-hold）も、泡と同じ長さ・同じ曲線で動かす。**
+ *   一覧の札は箱の大きさの留めに入れて切る（draw.ts）。留めと札はどちらも transform なので、
+ *   同じ曲線なら合成の側で足し合わされて、途中のどの絵でも辻褄が合う。
+ *   ── 前は札に clip-path を掛けていた。切れ目は札の中の座標なので札が動くたびに
+ *   塗り直しが要り、手を速く振ると塗りが追いつかずに箱の外へ出た。
  */
-.bub{transition:transform 320ms cubic-bezier(.32,.72,.32,1);animation:bl-in 180ms 260ms backwards}
+.bub{transition:transform 320ms cubic-bezier(.32,.72,.32,1);animation:bl-in 180ms 260ms backwards;pointer-events:auto}
+/* 箱に留める入れもの。留めない泡では大きさを持たない（切らない）素通し */
+.bl-hold{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;pointer-events:none;
+  transition:transform 320ms cubic-bezier(.32,.72,.32,1)}
+.bl-layer.bl-live .bl-hold{transition:none}
+@media (prefers-reduced-motion:reduce){ .bl-hold{transition:none} }
 @keyframes bl-in{from{opacity:0}to{opacity:1}}
 .bl-layer.bl-live .bub{transition:none}
 @media (prefers-reduced-motion:reduce){ .bub{transition:none;animation:none} }

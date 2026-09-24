@@ -68,6 +68,9 @@ export const LIST_DEPTH_CARD_WIDTH = LIST_CARD_WIDTH - LIST_DEPTH_INSET * 2;
  */
 export const COVERFLOW_STEP_RATIO = 68 / 90;
 
+/** 格子のいちばん小さい形 ── **2×2**。これを下回るなら、それは格子ではない */
+export const GRID_MIN_SIDE = 2;
+
 /** 口（＋新規）の場所 ── 中身の箱の上からの位置と、その下に空ける隙間 */
 const HEAD_TOP = 2;
 /**
@@ -79,6 +82,16 @@ const HEAD_GAP = 13;
 const HEAD_MARGIN = 8;
 
 export type Box = { readonly w: number; readonly h: number };
+
+/**
+ * **口のために縦の場所を取るか。**
+ *
+ * 口は右上の角に置く。札は横に中央ぞろえなので、箱が札より十分広ければ右の余白に収まり、
+ * 縦の場所取りは要らない（下までいっぱいに詰められる）。
+ * 細くして右の余白が消えたときだけ、口の段を縦に空ける。
+ */
+export const needsBand = (box: Box, itemWidth: number, headBox: Box | null): boolean =>
+  !!headBox && (box.w - itemWidth) / 2 - METRICS.PAD < headBox.w + HEAD_MARGIN;
 
 /**
  * 並びの上に空けておく量 ── **口の底＋隙間まで**（枠の余白のぶんは、並びの側でもう空いている）。
@@ -97,13 +110,19 @@ const fitsAcross = (boxSide: number, cardSide: number): number =>
 /**
  * **何列で折り返すか。** 折り返さない並べ方では `undefined`。
  *
+ * > **格子は 2×2 を最低とし、空きと札の大きさから、入るだけ列を足す。**
+ *
+ * ★ **2 列を下回らない。** 1 列なら格子ではなく、ただの縦の並び
+ *   ── 「格子」を選んだのに縦一列になるのでは、選んだ意味がない。
+ *   箱に 1 列ぶんしか無くても 2 列にして、はみ出したぶんは見切れさせる
+ *   （札の大きさは箱が決めない、の続き）。
  * ★ どこで折り返すかは**箱の話**なので、View（見え方）ではなく並べる側が持つ。
  *   View に持たせると「箱の大きさ」が見え方の一部になってしまい、
  *   同じ見え方を別の大きさの箱で使えない。
  */
 export const colsFor = (preset: PresetId, box: Box, itemWidth: number): number | undefined => {
-  if (preset !== 'coverflowGrid') return undefined;
-  return Math.max(1, fitsAcross(box.w, itemWidthFor(preset, itemWidth)));
+  if (preset !== 'grid' && preset !== 'coverflowGrid') return undefined;
+  return Math.max(GRID_MIN_SIDE, fitsAcross(box.w, itemWidthFor(preset, itemWidth)));
 };
 
 /** 箱の大きさから並べ方を決める（海でも岸でも同じ式） */
@@ -114,14 +133,7 @@ export const pickPreset = (
   itemHeight: number,
   headBox: Box | null,
 ): PresetId => {
-  /**
-   * ★ **口が居られるかも判定に入れる。**
-   *   口は右上の角に置く。札は横に中央ぞろえなので、箱が札より十分広ければ
-   *   右の余白に収まり、縦の場所取りは要らない（下までいっぱいに詰められる）。
-   *   細くして右の余白が消えたときだけ、口の段を縦に空ける。
-   */
-  const sideRoom = (box.w - itemWidth) / 2 - METRICS.PAD;
-  const needsBand = !!headBox && sideRoom < headBox.w + HEAD_MARGIN;
+  const band = needsBand(box, itemWidth, headBox);
   /**
    * ★ 取り分は「**口の底まで**」ちょうど 1 回ぶん。
    *
@@ -129,7 +141,7 @@ export const pickPreset = (
    *   要るのは 口の底 − PAD だけ。前は中央ぞろえのまま空けようとして**口の高さの 2 倍**を
    *   取っており、**最後の札と縁のあいだに余白が残っているのに奥行きへ切り替わって**いた。
    */
-  const room = box.h - METRICS.PAD * 2 - reserveFor(needsBand ? headBox : null);
+  const room = box.h - METRICS.PAD * 2 - reserveFor(band ? headBox : null);
   // 詰める並びの要り高 ＝ 札の高さ × 枚数 ＋ 隙間 ×（枚数 − 1）
   const need = count * itemHeight + Math.max(0, count - 1) * LIST_GAP;
   if (need <= room) return 'column';
@@ -138,7 +150,11 @@ export const pickPreset = (
    *   1 列（1 行）に押し込むのは、押し込むしかないときだけ。
    */
   const card = { w: itemWidthFor('coverflowGrid', itemWidth), h: itemHeight };
-  if (fitsAcross(box.w, card.w) >= 2 && fitsAcross(box.h, card.h) >= 2 && count > 1) return 'coverflowGrid';
+  if (
+    fitsAcross(box.w, card.w) >= GRID_MIN_SIDE &&
+    fitsAcross(box.h, card.h) >= GRID_MIN_SIDE &&
+    count > 1
+  ) return 'coverflowGrid';
   /**
    * ★ **入りきらないときの行き先は、箱の形で決まる。**
    *   長いほうの向きへ送る ── 横長なら coverflow、縦長ならその縦版。

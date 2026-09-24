@@ -5,6 +5,7 @@ import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { Button, Tooltip } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
 import { LIST_BOX, ListSpace } from "@bublys-org/bubble-layout-feature";
+import { METRICS } from "@bublys-org/bubble-layout";
 import { IgoWorldLineIntegration } from "../world-line/integrations/IgoWorldLineIntegration";
 import { IgoWorldLineCanvas } from "../world-line/integrations/IgoWorldLineCanvas";
 import { IgoGameCard } from "./ui/IgoGameCard";
@@ -48,6 +49,24 @@ const IgoGameWorldLinesBubble: BubbleRoute["Component"] = ({ bubble }) => {
  *   一覧の中では上下に 34px 余っていた。
  */
 const IGO_CARD = { w: widthOfChars(IDEAL_CHARS), h: 84 } as const;
+
+/**
+ * **一覧の中身の大きさ ── 札から出す。**
+ *
+ * > 一覧の箱の幅は、札の幅から決まる（札の箱 ＋ 並びの左右の余白）。
+ *
+ * ```
+ * 札の中身 308 ＋ 並びの余白 14×2 ＝ 336
+ * ```
+ *
+ * ★ **装いは足さない。** 詰める並びの札は装いを持たない（`CHROME.packed` ＝ 0）ので、
+ *   札の箱はそのまま中身。隙間は並べ方が決める（`LIST_GAP`）。
+ *
+ * ★ 前は `LIST_BOX`（406）を使っていた。あれは**札 378（メモ・タスクの札）に合わせた既定**で、
+ *   囲碁の札を中身から 322 に決め直したあとも古い数のままだったので、
+ *   **縦に並べたとき左右に 42px ずつ空いていた**（上下は 0 で接しているのに）。
+ */
+const IGO_LIST = { w: IGO_CARD.w + METRICS.PAD * 2, h: LIST_BOX.height } as const;
 
 /**
  * 囲碁ゲーム - 対局一覧バブル ── **並びの空間**。
@@ -114,11 +133,8 @@ export const igoGameBubbleRoutes: BubbleRoute[] = [
     pattern: /^igo-games$/,
     type: "igo-games",
     Component: IgoGamesBubble,
-    // 地は中身が持つ（並びの空間は、海がそのまま透ける）
-    // ★ 箱は札よりだいぶ大きく取る。奥へ退く札は**箱の左上の角**（消失点）へ寄るので、
-    //   札が箱いっぱいだと退いても真上にしか出ず、左に覗かない ──
-    //   議事録（版）は 300 の箱に 150 の札。ここは 420 の箱に 280 の札
-    bubbleOptions: { defaultSize: LIST_BOX, contentBackground: "transparent" },
+    // 地は中身が持つ（並びの空間は、海がそのまま透ける）。幅は札から出す（IGO_LIST の註）
+    bubbleOptions: { defaultSize: { width: IGO_LIST.w, height: IGO_LIST.h }, contentBackground: "transparent" },
   },
   {
     pattern: /^igo-games\/[^/]+$/,
