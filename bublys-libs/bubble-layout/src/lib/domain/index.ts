@@ -46,7 +46,7 @@ export type { WorldState, RootState } from './world.js';
 // ── 解決（純関数。毎フレーム走る）──
 export { headOf, padOf, measureBox, measureAll, halfOf, lensContext } from './measure.js';
 export type { BoxSizes, GrownHeights, LensContext } from './measure.js';
-export { resolveWorld, compose, contentOf, contentRect, withFittedFocus } from './resolve.js';
+export { resolveWorld, compose, contentOf, contentRect, hostScale, withFittedFocus } from './resolve.js';
 export type { Layout, SpaceLayout, Placement, Host, Viewport } from './resolve.js';
 export { unprojectLocal, screenToAxis, axisToScreen, focusFits, fitsParallel, fitFocus, withFocusAxis, focusOf } from './project.js';
 

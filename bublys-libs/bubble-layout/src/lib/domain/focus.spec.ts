@@ -15,7 +15,8 @@
  * ★ v4/RULES.md に焼いてある `0.31 … 0.98 … 0.31` → `0.03 … 0.98` は、下限 0.32 を取り消して
  *   **また出るようになった**（2026-09-19。DECISIONS.md「端での下限 ── 入れたが、翌日に取り消した」）。
  */
-import { focusOn } from './focus.js';
+import { focusOn, bringToCenter } from './focus.js';
+import { fitFocus } from './project.js';
 import { resolveWorld } from './resolve.js';
 import { withPreset } from './view.js';
 import { DEFAULT_RULES } from './rules.js';
@@ -110,18 +111,22 @@ describe('② 触った泡へ、視点が寄る', () => {
       expect(Math.abs(placeOf(after, id).x - placeOf(layout, id).x)).toBeLessThan(1e-5);
   });
 
-  it('★ 焦点の約束はそのまま通る：詰めるの箱の余りぶんだけ寄って止まる（横に並べる）', () => {
+  it('★ 平行の軸では寄らない ── 触れた＝もう見えている（横に並べる）', () => {
     // 横に並べる の箱は自前 368、中身は 80+14+104+14+128 ＝ 340。余りは 28 ＝ 片側 14。
-    // 中 の泡（位置 −24）を触っても、焦点は −24 までは行けず −14 で止まる（約束(2)：中身は箱に収まる）
+    // 前は 中 の泡（位置 −24）を触ると焦点が −14 まで寄り、並びごと 14px ずれていた。
+    // 平行は倍率が一定なので、寄っても見え方は 1mm も変わらない ── 動くのは中身だけ。だから動かさない。
+    const before = world.bubble('row')?.state.focus.x;
     const touched = focusOn(world, layout, 'row1', R);
     expect(placeOf(layout, 'row1').pos.x).toBe(-24);
-    expect(touched.bubble('row')?.state.focus.x).toBeCloseTo(-14, 5);
-    expect(touched.bubble('row')?.state.focus.x).toBeGreaterThan(-14.001);
+    expect(touched.bubble('row')?.state.focus.x).toBe(before);
     expect(allValues(touched)).toEqual(allValues(world));
-    // 3つとも同じだけ動く（平行なので像は曲がらない）
+    // 画面の上でも 1px も動かない（⑤ 触っていない泡は画面の上で動かない、を触った泡ごと守る）
     const after = resolveWorld(touched, VIEWPORT);
     for (const id of ['row0', 'row1', 'row2'])
-      expect(placeOf(after, id).x - placeOf(layout, id).x).toBeCloseTo(14, 5);
+      expect(placeOf(after, id).x - placeOf(layout, id).x).toBeCloseTo(0, 5);
+    // ★ 焦点の約束そのものは変えていない ── 送れば今までどおり、箱の余りぶんで止まる
+    const L = layout.spaces.get('row');
+    expect(L && fitFocus(L, 'x', -24, 0, R)).toBeCloseTo(-14, 5);
   });
 
   it('★ Z：触った泡の面までカメラが寄る（勤務表 ＝ 自由Z 0.4）。値は書かない', () => {
@@ -129,7 +134,8 @@ describe('② 触った泡へ、視点が寄る', () => {
     // 旧：泡の 自由Z を焦点の面（0.2）へ**書いていた**。新：泡は動かず、焦点が泡の面（0.4）へ行く
     const touched = focusOn(world, layout, 'kinmu', R);
     expect(touched.bubble('kinmu')?.state.free.z).toBe(0.4);      // 値は書かれていない
-    expect(touched.state.root.focus).toEqual({ x: -11, y: 18, z: 0.4 });  // X・Y も寄る（自由＝送れる）
+    // X・Y は平行なので寄らない（触れた＝もう見えている）。動くのは透視の Z だけ
+    expect(touched.state.root.focus).toEqual({ x: 0, y: 0, z: 0.4 });
     const after = resolveWorld(touched, VIEWPORT);
     expect(placeOf(after, 'kinmu').scale).toBe(1);                // dz 0 ＝ 原寸
     expect(placeOf(after, 'kinmu').alpha).toBe(1);
@@ -162,8 +168,28 @@ describe('② 触った泡へ、視点が寄る', () => {
     // 何度触ってもずれない（値を書かないので、そもそも動かしようがない）
     for (let i = 0; i < 5; i++) w = focusOn(w, resolveWorld(w, VIEWPORT), 'memo3', R);
     expect(line(w)).toBe(before);
-    expect(w.state.root.focus).toEqual({ x: -615, y: -237, z: 0.3 });
+    expect(w.state.root.focus).toEqual({ x: 0, y: 0, z: 0.3 });   // X・Y は平行なので寄らない
     expect(allValues(w)).toEqual(allValues(stacked));
+  });
+
+  it('★ 開いたものは、渡された窓の真ん中へ来る（岸が食い込むときは器が口そのものを渡す）', () => {
+    const mid = { x: VIEWPORT.w / 2, y: VIEWPORT.h / 2 };
+    const at = (w: BubbleWorld, id: string) => {
+      const p = placeOf(resolveWorld(w, VIEWPORT), id);
+      return { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+    };
+    // 窓の真ん中のあたり（透視の Z が挟まるので、当てて解き直しても数 px 残る）
+    const centered = at(bringToCenter(world, VIEWPORT, 'kinmu', R), 'kinmu');
+    expect(Math.abs(centered.x - mid.x)).toBeLessThan(16);
+    expect(Math.abs(centered.y - mid.y)).toBeLessThan(16);
+    // 狭い窓を渡せば、その窓の真ん中へ ── 岸が食い込んだときに器がこうする
+    const narrow = { w: VIEWPORT.w / 2, h: VIEWPORT.h };
+    const inNarrow = placeOf(
+      resolveWorld(bringToCenter(world, narrow, 'kinmu', R), narrow), 'kinmu',
+    );
+    expect(Math.abs(inNarrow.x + inNarrow.w / 2 - narrow.w / 2)).toBeLessThan(16);
+    // 値は1つも書かない ── 動くのは焦点だけ
+    expect(allValues(bringToCenter(world, VIEWPORT, 'kinmu', R))).toEqual(allValues(world));
   });
 
   it('無い泡を触っても何も起きない', () => {

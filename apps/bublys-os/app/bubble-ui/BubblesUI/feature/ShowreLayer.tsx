@@ -439,6 +439,13 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       const g = grab.current;
       if (!g) return;
+      /**
+       * ★ **ボタンが離れていたら、黙って捨てる。**
+       *   離しを取りこぼすことがある（捕捉が外れる・窓の中で層をまたぐ）。そのままだと
+       *   **指を離しても辺がカーソルに付いてくる**。海のドラッグでは直していたが、
+       *   岸の取っ手は別の手なので入っていなかった。次のひと動きで必ず止まる。
+       */
+      if (e.buttons === 0) { grab.current = null; return; }
       const dx = e.clientX - g.from.x;
       const dy = e.clientY - g.from.y;
       if (g.move) {
@@ -502,6 +509,9 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
     },
     [onUpdate, viewport, others],
   );
+
+  /** 捕捉が外れた ── 掴みを捨てるだけ。剥がしはしない（離したわけではないので） */
+  const onGripLost = useCallback(() => { grab.current = null; }, []);
 
   const onGripUp = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -624,6 +634,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
                   onPointerLeave={() => { if (!grab.current) setSplitHover(null); }}
                   onPointerUp={onGripUp}
                   onPointerCancel={onGripUp}
+                  onLostPointerCapture={onGripLost}
                   style={{
                     position: "absolute",
                     zIndex: 1,   // 中身より上。辺そのものが取っ手なので、埋もれてはいけない

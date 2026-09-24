@@ -245,6 +245,39 @@ function resolveSpace(
     arr[axis] = shifted(arr[axis], -half + pad + reserve - lo);
   }
 
+  /**
+   * ★ **魚眼は、箱の 2 倍を超える泡は諦める。**
+   *
+   * 魚眼は「中身を箱に収める」ためのものだが、箱よりずっと大きい泡を収めにいくと、
+   * その 1 つが箱を埋めきって**ほかがぜんぶ潰れる**。収めた結果が読めないなら、
+   * 収めない方がまし ── 諦めた軸は平行になる。はみ出したぶんは器が切るが、
+   * 掴んで寄せれば見に行ける。
+   *
+   * 見るのは**いちばん大きい泡 1 つ**と箱の対比だけで、枚数は見ない
+   * ── coverflow のように何枚あっても、箱が泡なみに広ければ焦点のまわりは読める。
+   *
+   * 実測:
+   *   箱 151 に泡 420（2.8 倍）… 窓を岸に貼って海が 151 しか残らなかったとき。
+   *                              倍率 6e-05 ＝ 描く下限を切って消えた → 諦める
+   *   箱 815 に並び 840（1.03 倍）… 詳細を 2 つ開いて並びになったとき。
+   *                              魚眼なら収まって読める → 諦めない
+   *   ★ はじめ「泡が原寸で入らなければ諦める」（1 倍）にしたら後者を巻き込み、
+   *     並びが平行のまま岸の下へ散った。境目は 1 倍ではなく 2 倍。
+   */
+  const LENS_GIVE_UP = 2;
+  for (const axis of ['x', 'y'] as const) {
+    if (view[axis].lens !== 'fisheye') continue;
+    let biggest = 0;
+    for (const k of kids) {
+      const sz = sizeOf(k);
+      biggest = Math.max(biggest, axis === 'x' ? sz.w : sz.h);
+    }
+    const box = axis === 'x' ? own.w : own.h;
+    if (biggest > 0 && box * LENS_GIVE_UP < biggest) {
+      (view as Mutable<ResolvedView>)[axis] = { ...view[axis], lens: 'parallel' };
+    }
+  }
+
   const L: Mutable<SpaceLayout> = {
     id: spaceId,
     host,

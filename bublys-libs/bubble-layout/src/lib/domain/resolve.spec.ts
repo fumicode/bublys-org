@@ -10,7 +10,7 @@
  *   このファイルはそのうち、規則ごとに1つずつ代表を置いたもの。規則ごとの網は隣の *.spec.ts にある。
  */
 import { Bubble } from './bubble.js';
-import { BubbleWorld } from './world.js';
+import { BubbleWorld, emptyWorld } from './world.js';
 import { presetView, viewOfSpace, withAxis } from './view.js';
 import { resolveWorld } from './resolve.js';
 import type { Layout } from './resolve.js';
@@ -159,5 +159,38 @@ describe('泡のならべかた ── 解決（ラボと同じ数が出るか�
       expect(stop.spaces.get('root')?.focus.z).toBe(0);
       expect(from(stop, 'kinmu').x).toBe(at('kinmu').x);
     });
+  });
+});
+
+describe('魚眼は、箱の2倍を超える泡は諦める', () => {
+  /** 420 幅の泡が 2 つ。root は X 魚眼 */
+  const twoCards = () => {
+    let w = emptyWorld(presetView('fisheyeX'));
+    for (const [id, x] of [['a', -300], ['b', 300]] as const)
+      w = w.add(Bubble.create({ id, title: id, hue: 0, w: 420, h: 300, parent: null, order: 0, free: { x, y: 0, z: 0 } }));
+    return w;
+  };
+  const lensOf = (vw: number) =>
+    resolveWorld(twoCards(), { w: vw, h: 600 }).spaces.get('root')?.view.x.lens;
+
+  it('泡が箱の2倍までなら、魚眼のまま（収めれば読める）', () => {
+    expect(lensOf(900)).toBe('fisheye');
+    expect(lensOf(420)).toBe('fisheye');   // 1 倍
+    expect(lensOf(211)).toBe('fisheye');   // 1.99 倍
+    // ★ 詳細を2つ開いて並び（840）になった場面が、箱 815 で巻き込まれないこと
+    expect(lensOf(815 / 840 * 420 + 1)).toBe('fisheye');
+  });
+
+  it('泡が箱の2倍を超えたら、平行に落とす（収めてもほかが潰れる）', () => {
+    // 岸に窓を貼って海が 151 しか残らない、という実測の場面（2.8 倍）。
+    // 前はここで倍率 6e-05 になって消えた
+    expect(lensOf(151)).toBe('parallel');
+    expect(lensOf(209)).toBe('parallel');  // 2.01 倍
+  });
+
+  it('諦めるのは軸ごと ── Y は触らない', () => {
+    const L = resolveWorld(twoCards(), { w: 151, h: 600 }).spaces.get('root');
+    expect(L?.view.x.lens).toBe('parallel');
+    expect(L?.view.y.lens).toBe('parallel');   // fisheyeX は元から Y が平行
   });
 });

@@ -8,7 +8,7 @@
  * ★ 描く下限（tiny）は **ここ**（ui）にあって、domain には無い。
  *   `resolveWorld` の答え（placements）は下限を動かしても1バイトも変わらない ── DECISIONS.md。
  */
-import { clamp, spaceSummary, verbOf, viewOfSpace } from '@bublys-org/bubble-layout';
+import { clamp, hostScale, spaceSummary, verbOf, viewOfSpace } from '@bublys-org/bubble-layout';
 import type { BubbleId, BubbleWorld, Layout, Placement, SpaceId, Viewport } from '@bublys-org/bubble-layout';
 
 /** 泡のヘッダの高さ。domain の `METRICS.header` と同じ数（ここでは中身の行数を数えるのに要る） */
@@ -18,13 +18,21 @@ export const MARK_MIN = 6.5;
 /** ★ 描く下限の既定（画面 px・短辺）。いくつがよいかは未決 ── DECISIONS.md */
 export const DRAW_MIN = 5.0;
 /**
- * 中身を描く倍率の下限。
+ * 中身を描く倍率の下限。**その泡が自分の海の中でどれだけ縮んでいるか**で見る。
  *
  * ★ **「題名が読めない」と「中身を描かない」は別の話。**
  *   題名は読めなくなったら出す意味が無い（{@link MARK_MIN}）が、中身は読めなくても
  *   **形が「何が入っているか」の手がかり**になる。だから中身はもっと奥まで描く。
  *   前はここが分かれておらず、本文 12px が 6.5px を切る倍率 0.542 で中身ごと消えていて、
  *   泡そのものは短辺 5px まで残るので「枠だけの箱」が長く居座っていた。
+ *
+ * ★ **それぞれの海が、自分の物差しで決める。**
+ *   `Placement.scale` は入れ子を掛け合わせた**画面の**倍率（`compose`）なので、
+ *   そのまま比べると**窓の中の泡が、外の海と同じ画面の大きさで中身を失う**
+ *   ── 窓はそれ自体が縮んで写るので、中の泡は自分の海をいくら占めていても消えた。
+ *   見るのは自分の海の中での縮み（`scale ÷ その空間の倍率`）だけ。
+ *   絶対の下限は**窓が受け持つ** ── 窓が小さくなれば窓ごと中身を描かなくなるので、
+ *   中の海はそこで丸ごと消える。物差しが海ごとに閉じて、入れ子でも同じ言葉で通る。
  */
 export const CONTENT_MIN = 0.25;
 /** 画面の外へどれだけ出たら消すか（lab.html 1041 行） */
@@ -144,6 +152,7 @@ export function drawField(input: DrawInput): FieldDraw {
     if (isTiny) tinyIds.push(p.id);
     const item = drawBubble(p, i, isTiny, {
       world,
+      layout,
       viewport,
       selectedId,
       hoverRing,
@@ -164,6 +173,7 @@ export function drawField(input: DrawInput): FieldDraw {
 
 interface Ctx {
   readonly world: BubbleWorld;
+  readonly layout: Layout;
   readonly viewport: Viewport;
   readonly selectedId: BubbleId | null;
   readonly hoverRing: BubbleId | null;
@@ -175,6 +185,12 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
   const b = p.b;
   const st = b.state;
   const s = p.scale;
+  /**
+   * **自分の海の中での縮み。** `p.scale` は入れ子を掛け合わせた画面の倍率なので、
+   * その空間ぶんを割り戻す（{@link CONTENT_MIN} の註）。
+   */
+  const here = c.layout.spaces.get(p.space);
+  const sHere = here ? s / Math.max(1e-9, hostScale(here.host)) : s;
   const bw = Math.max(1, p.box.w);
   const bh = Math.max(1, p.box.h);
 
@@ -254,7 +270,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       (chip ? ' chip' : '') +
       (host ? ' host' : '') +
       (12 * s < MARK_MIN ? ' nt' : '') +   // 題名：字の下限 6.5px を切ったら出さない
-      (s < CONTENT_MIN ? ' nc' : '') +     // 中身：題名より奥まで描く
+      (sHere < CONTENT_MIN ? ' nc' : '') + // 中身：題名より奥まで描く（自分の海の中での縮みで見る）
       (s <= 0.2 ? ' nb' : '') +
       mcls;
   }
