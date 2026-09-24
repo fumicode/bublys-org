@@ -18,7 +18,7 @@ import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, useScreenZoom } from './context.js';
 import type { BubbleSpaceApi, ScreenZoom } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
-import type { BubbleRoute } from './routing.js';
+import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
 
@@ -157,6 +157,13 @@ export interface BubbleSpaceProps {
    * 掴んでいないとき・離したあとは `null`。
    */
   readonly onTakeOutPreview?: (info: TakeOutInfo | null) => void;
+  /**
+   * **ステータスバーに置くもの**（閉じる口の隣）。泡ごとに呼ばれる。
+   *
+   * 枠は空間のものなので、泡の**中身**からは触れない ── 中身は自分の箱の中しか描けない。
+   * 「その泡そのものをどう扱うか」の口（ロックなど）はここに差す。
+   */
+  readonly headerTools?: (bubble: RoutedBubble, route: BubbleRoute) => ReactNode;
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
@@ -584,6 +591,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
   });
 
+  const headerTools = props.headerTools;
   const renderBubble = useCallback(
     (id: BubbleId, draw: BubbleDraw) => {
       const url = urls.get(id)?.url;
@@ -625,6 +633,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               </span>
             ))}
           </div>
+          {r && headerTools?.(r.bubble, r.route)}
           <button
             className="bl-close"
             title="閉じる"
@@ -653,7 +662,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, grown],
+    [routes, urls, closeBubble, world, grown, headerTools],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

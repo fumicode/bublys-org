@@ -48,7 +48,8 @@ export const SPACE_CSS = `
 .bub{cursor:grab}
 .bub:active{cursor:grabbing}
 .bub > .bl-body{cursor:auto}
-.bub > .bl-close{cursor:pointer}
+.bub > .bl-close,
+.bub > .bl-tool{cursor:pointer}
 
 /* ステータスバー ── 出すのは url。すりガラスの帯 */
 .bub > .hd{background:hsl(var(--h) 45% 18% / .5);backdrop-filter:blur(6px);
@@ -93,6 +94,19 @@ export const SPACE_CSS = `
   font:600 14px/18px var(--f);cursor:pointer;pointer-events:auto}
 .bub > .bl-close:hover{opacity:1;background:rgba(255,255,255,.14)}
 .bub.nt > .bl-close{display:none}
+/*
+ * ステータスバーの口（閉じるの隣）。いまは岸のロックだけが使う。
+ * ★ 閉じる（右 4・幅 18）の左隣に 4px 空けて並べるので right は 26。
+ *   出るときは url の行き止まりもそのぶん手前へ（下の .bl-url を見よ）。
+ */
+.bub > .bl-tool{position:absolute;right:26px;top:3px;width:18px;height:18px;padding:0;
+  border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;pointer-events:auto}
+.bub > .bl-tool:hover{opacity:1;background:rgba(255,255,255,.14)}
+/* 効いている印は色で（形も変わるが、遠目には色のほうが速い） */
+.bub > .bl-tool[aria-pressed="true"]{opacity:1;color:#6ee7ff}
+.bub.nt > .bl-tool{display:none}
 
 /* 枠の題名は url。中身が自分の題名を出すので、枠は「どこにいるか」を出す（既存 bubbles-ui と同じ） */
 /*
@@ -103,6 +117,7 @@ export const SPACE_CSS = `
  *   区切りの / は中の字のまま（inline）なので、見た目は今までどおり。
  *   右の余地 34px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 隙間 4。
  */
+.bub:has(> .bl-tool) > .bl-url{max-width:calc(100% - 56px)}
 .bub > .bl-url{display:block;max-width:calc(100% - 34px);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;
   font:600 11px/24px var(--f);letter-spacing:.01em}
@@ -118,7 +133,8 @@ export const SPACE_CSS = `
 .bub:not(.sel):has(> .bl-quiet){background:none;box-shadow:none}
 .bub:not(.sel):has(> .bl-quiet)::after{content:none}
 .bub:not(.sel):has(> .bl-quiet) > .hd,
-.bub:not(.sel):has(> .bl-quiet) > .bl-close{display:none}
+.bub:not(.sel):has(> .bl-quiet) > .bl-close,
+.bub:not(.sel):has(> .bl-quiet) > .bl-tool{display:none}
 /*
  * ★ 装いを出さないあいだは、**その空けてあった所まで中身を広げる**。
  *   ヘッダのぶん（上 27px）を空けたままだと、札と札のあいだが 48px も開いて
@@ -156,7 +172,8 @@ export const SPACE_CSS = `
  */
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .hd,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .ttl,
-.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close{z-index:2}
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close,
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool{z-index:2}
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
 .bl-object{position:relative;isolation:isolate}

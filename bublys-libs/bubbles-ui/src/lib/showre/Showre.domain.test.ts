@@ -13,6 +13,7 @@ import {
   type ScreenRect,
   clampMoveAmongDocked,
   clampResizeAmongDocked,
+  retileToViewport,
 } from "./Showre.domain.js";
 import { TUBE_THICKNESS } from "./tube.js";
 
@@ -290,5 +291,54 @@ describe("clampResizeAmongDocked / clampMoveAmongDocked（岸の上では重な�
 
   it("先客が居なければ、そのまま", () => {
     expect(clampMoveAmongDocked(at(0, 300, 200, 150), "y", [], VIEWPORT, 100).y).toBe(300);
+  });
+});
+
+/**
+ * ロックした岸の引き直し ── 窓が変わっても、海の分け方は変わらない。
+ * 見るのは 2 つだけ：**継ぎ目の重なりが管 1 本のまま**か、**縁は縁のまま**か。
+ */
+describe("retileToViewport", () => {
+  const at = (x: number, y: number, w: number, h: number): ScreenRect => ({ x, y, width: w, height: h });
+  const SEAM = -SHOWRE_DOCK_GAP; // 継ぎ目の重なり ＝ 管 1 本
+  const from = { width: 560, height: 616 };
+
+  it("窓を広げても、分けている線の重なりは管 1 本のまま", () => {
+    const to = { width: 900, height: 700 };
+    const left = retileToViewport(at(0, 0, 344, 616), from, to);
+    const right = retileToViewport(at(338, 0, 222, 616), from, to);
+    expect(left.x + left.width - right.x).toBe(SEAM);
+    // 埋めていたものは埋めたまま（両端は縁）
+    expect(left.x).toBe(0);
+    expect(right.x + right.width).toBe(to.width);
+    expect(left.height).toBe(to.height);
+  });
+
+  it("窓を狭めても同じ（食い込まない）", () => {
+    const to = { width: 300, height: 400 };
+    const left = retileToViewport(at(0, 0, 344, 616), from, to);
+    const right = retileToViewport(at(338, 0, 222, 616), from, to);
+    expect(left.x + left.width - right.x).toBe(SEAM);
+    expect(right.x + right.width).toBe(to.width);
+  });
+
+  it("線は比で移る（半分だけ分け前が増える窓なら、線も半分の所）", () => {
+    const to = { width: 1120, height: 616 };   // 2 倍
+    const left = retileToViewport(at(0, 0, 344, 616), from, to);
+    expect(left.x + left.width).toBe(341 * 2 + TUBE_THICKNESS / 2);
+  });
+
+  it("縁に着いていない辺は比で動く", () => {
+    const to = { width: 560, height: 1232 };   // 縦だけ 2 倍
+    const bar = retileToViewport(at(0, 0, 560, 44), from, to);
+    expect(bar.y).toBe(0);
+    expect(bar.height).toBe(41 * 2 + TUBE_THICKNESS / 2);
+  });
+
+  it("小さくしても下限は割らない。縁に着いていた辺は縁のまま", () => {
+    const to = { width: 40, height: 40 };
+    const right = retileToViewport(at(338, 0, 222, 616), from, to);
+    expect(right.width).toBeGreaterThanOrEqual(TUBE_THICKNESS * 2 + 24);
+    expect(right.x + right.width).toBe(to.width);
   });
 });

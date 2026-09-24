@@ -23,17 +23,19 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
+import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
 import { METRICS } from "@bublys-org/bubble-layout";
 import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
   anchoredRect,
+  retileToViewport,
   touchingEdges,
   type ScreenRect,
   type ShowreSide,
@@ -41,6 +43,7 @@ import {
   type TubeJoin,
 } from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
+import { ShoreLockButton, useShoreLock } from "./ShoreLock";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
 export type Home = (viewport: { width: number; height: number }) => Docked;
@@ -234,6 +237,46 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    *   口が変わる → 描き直す → また新しい object … と**止まらなくなる**（実測で踏んだ）。
    */
   const vp = useMemo(() => ({ width: viewport.w, height: viewport.h }), [viewport.w, viewport.h]);
+
+  /**
+   * **ロック。** 掛かっているあいだ、窓の大きさが変わっても海の分け方を保つ。
+   *
+   * ★ 引き直すのは**辺ではなく、管の通っている線**（`retileToViewport`）。
+   *   継ぎ目を分け合う 2 枚は管 1 本ぶん重なっているので、辺を別々に比で動かすと
+   *   その重なりが崩れて、隙間が開いたり食い込んだりする。
+   * ★ 走るのは**大きさが変わったとき**だけ。ロックを掛けた瞬間は何も動かない
+   *   ── いまの形がそのまま「保つ形」になる。
+   * ★ `useLayoutEffect` で直す ── 描く前に直さないと、変わった大きさのまま 1 枚描かれて
+   *   海が一瞬だけ顔を出す。
+   */
+  const { isLocked } = useShoreLock();
+  const locked = !!persistKey && isLocked(persistKey);
+  const lastVp = useRef(vp);
+  useLayoutEffect(() => {
+    const from = lastVp.current;
+    lastVp.current = vp;
+    if (!locked || (from.width === vp.width && from.height === vp.height)) return;
+    setDocked((list) =>
+      list.map((d) => {
+        const next = retileToViewport(anchoredRect(d.dock, d.size, from), from, vp);
+        return {
+          ...d,
+          dock: { edges: touchingEdges(next, vp), at: { x: next.x, y: next.y } },
+          size: { width: next.width, height: next.height },
+        };
+      }),
+    );
+  }, [vp, locked]);
+
+  /**
+   * ステータスバーに出すロックの口 ── **窓（自分の中に岸を持てる泡）にだけ**。
+   * 名前は url。その窓の中の岸が、同じ名前で自分のロックを読む。
+   */
+  const headerTools = useCallback(
+    (bubble: RoutedBubble, route: LayoutRoute) =>
+      route.ground === "clear" ? <ShoreLockButton shoreKey={bubble.url} /> : null,
+    [],
+  );
 
   /**
    * **海の「開いている口」。** 岸が食い込んでいるぶんを、辺ごとに引いた矩形。
@@ -509,6 +552,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         onLens={onLens}
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
+        headerTools={headerTools}
         /**
          * ★ 海は**器の左上にそのまま**置く（大きさも窓いっぱい）。岸で狭まるのは
          *   見えている所だけで、海そのものではない。

@@ -450,3 +450,45 @@ export const snapToViewport = (
 /** そのバブルが貼り付いている辺。貼っていなければ空 */
 export const edgesOf = (docks: DocksState, bubbleId: string): readonly ShowreSide[] =>
   docks[bubbleId]?.edges ?? [];
+
+/**
+ * **ロックした岸の引き直し** ── 窓の大きさが変わっても、海の分け方を保つ。
+ *
+ * 岸の大きさは px で持っているので、窓が変われば**埋めていたはずの所に海が顔を出し**、
+ * 窄めれば向かい合った岸どうしが食い込む。ロック中はそれを起こさない。
+ *
+ * 引き直すのは辺ではなく、**管が通っている線**:
+ *
+ * - 縁に着いている辺 … 新しい縁のまま（比では動かさない。縁は縁だから）
+ * - それ以外の辺 … 辺を内側へ管の半分だけ寄せた所（＝線）を比で移し、半分だけ戻す
+ *
+ * ★ **辺そのものを比で動かしてはいけない。** 継ぎ目を分け合う 2 枚は
+ *   {@link SHOWRE_DOCK_GAP} ぶん（管 1 本）重なっているので、辺を別々に掛けて丸めると
+ *   その重なりが 6 から離れていく ── 隙間が開いたり食い違ったりする。
+ *   線は 2 枚で 1 本しかないので、そこを移せば両方が同じ答えになる。
+ */
+export const retileToViewport = (
+  rect: ScreenRect,
+  from: Size2,
+  to: Size2,
+  thickness: number = TUBE_THICKNESS,
+  min: Size2 = SHOWRE_MIN_SIZE,
+  tolerance: number = SHOWRE_TOUCH_TOLERANCE,
+): ScreenRect => {
+  const half = thickness / 2;
+  const axis = (lo: number, len: number, limitFrom: number, limitTo: number, minLen: number) => {
+    if (limitFrom <= 0) return { lo, len };
+    const s = limitTo / limitFrom;
+    const hi = lo + len;
+    const atLo = lo <= tolerance;
+    const atHi = hi >= limitFrom - tolerance;
+    const nextLo = atLo ? 0 : Math.round((lo + half) * s) - half;
+    const nextHi = atHi ? limitTo : Math.round((hi - half) * s) + half;
+    const nextLen = Math.max(minLen, nextHi - nextLo);
+    // 下限で伸びたぶんは、縁に着いていない側へ出す（着いている辺は動かさない）
+    return { lo: atHi && !atLo ? limitTo - nextLen : nextLo, len: nextLen };
+  };
+  const x = axis(rect.x, rect.width, from.width, to.width, min.width);
+  const y = axis(rect.y, rect.height, from.height, to.height, min.height);
+  return { x: x.lo, y: y.lo, width: x.len, height: y.len };
+};

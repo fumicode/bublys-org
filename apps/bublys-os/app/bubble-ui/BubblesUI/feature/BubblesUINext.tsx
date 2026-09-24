@@ -23,6 +23,7 @@ import { SEA_GROUND, type Docked } from "./ShowreLayer";
 import { ShoreSpace, type Home } from "./ShoreSpace";
 import { bridgeRoutes } from "./legacyRouteBridge";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext";
+import { ShoreLockProvider } from "./ShoreLock";
 import { LayoutRoutesProvider } from "@bublys-org/bubble-layout-feature";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
@@ -174,6 +175,9 @@ export const BubblesUINext = () => {
 
   return (
     <SpaceViewContext.Provider value={spaceView}>
+    {/* ロック（岸で海を埋めた形を、窓の大きさが変わっても保つ）。窓より上に置く
+        ── 窓は岸に貼ると描き直されるので、中に持つと貼り直すたびに外れる */}
+    <ShoreLockProvider>
     {/* ルート一覧は、どの泡からでも引けるように配る（一覧の空間が中の海を作るのに要る） */}
     <LayoutRoutesProvider routes={routes}>
     {/* 地と角の丸みは器（ShoreSpace）が持つ ── 岸に貼り付いたものを見て決まるので */}
@@ -202,6 +206,7 @@ export const BubblesUINext = () => {
 
     </Box>
     </LayoutRoutesProvider>
+    </ShoreLockProvider>
     </SpaceViewContext.Provider>
   );
 };
