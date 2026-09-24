@@ -15,7 +15,7 @@
  * 新しい海との境目はここだけ ── **離したときに横取りする**（`claim`）。
  * 横取りしたら、その泡は海から出る（`BubbleSpace.onTakeOut`）。
  */
-import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ShowreTubes,
   TUBE_RADIUS,
@@ -36,6 +36,7 @@ import {
   type ShowreTubeOutline,
   type TubeJoin,
 } from "@bublys-org/bubbles-ui";
+import { WINDOW_SKY } from "@bublys-org/bubble-layout-feature";
 
 /** 岸に着いているもの 1 つ。url と留め方だけ持つ（大きさは貼ったときのもの） */
 export type Docked = {
@@ -64,7 +65,16 @@ export type Docked = {
  *   「後ろに何が来ても変わらない」ということだけ。
  */
 export const SEA_GROUND =
-  'linear-gradient(145deg, hsl(220, 35%, 18%) 0%, hsl(225, 40%, 22%) 40%, hsl(230, 35%, 20%) 100%)';
+  'linear-gradient(145deg, hsl(220, 35%, 10%) 0%, hsl(225, 40%, 13%) 40%, hsl(230, 35%, 11%) 100%)';
+
+/**
+ * **窓の地（夜空）。** 空間を持つ泡は自分の夜空を持っている。
+ * 窓の中に岸を置くとき、岸の地もこれと同じにする（海の岸が `SEA_GROUND` なのと同じ理屈）。
+ *
+ * ★ 数は**泡の中の地と同じ所**（`space-css` の `WINDOW_SKY`）から引く。
+ *   前はここにも同じ数が書いてあり、片方だけ直すと岸と中身で色が食い違った。
+ */
+export const WINDOW_GROUND = WINDOW_SKY;
 
 /**
  * 地 2 つ。泡の中（`space-css` の `.bl-body` / `.bl-body.bl-clear`）と同じもの。
@@ -79,7 +89,7 @@ const GROUND = {
   },
   // 窓（空間を持つ泡）── 自分の夜空を持っている。明るい地を敷くと中身が白く霞む
   clear: {
-    background: "linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)",
+    background: WINDOW_GROUND,
     color: "#e6ebf5",
     overflow: "hidden" as const,
   },
@@ -131,6 +141,15 @@ export const resolveDock = (
 
 /** 辺の役割 ── 固定された辺を掴めば動く。自由な辺を掴めば伸び縮みする */
 const CURSOR: Record<ShowreSide, string> = { top: "ns-resize", bottom: "ns-resize", left: "ew-resize", right: "ew-resize" };
+/** 境目（2 枚が分け合っている線）を動かすときの形。1 枚だけ動かすときとは見た目で分ける */
+const CURSOR_SPLIT: Record<ShowreSide, string> = { top: "row-resize", bottom: "row-resize", left: "col-resize", right: "col-resize" };
+const OPPOSITE: Record<ShowreSide, ShowreSide> = { top: "bottom", bottom: "top", left: "right", right: "left" };
+
+/**
+ * 線をどちら側から来たか。`lo` は小さい側（左・上）、`hi` は大きい側（右・下）、
+ * `along` は線に沿って（線の端の外から）。
+ */
+type Approach = "lo" | "hi" | "along";
 const SIDES: readonly ShowreSide[] = ["top", "right", "bottom", "left"];
 /** 辺の帯の太さ（管と同じ） */
 const GRIP = TUBE_THICKNESS;
@@ -225,10 +244,21 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
    */
   const [active, setActive] = useState<string | null>(null);
 
+  /**
+   * いまカーソルが乗っている線が**境目か**（`"<key>:<side>"`）。
+   * 形を変えるためだけに持つ ── 掴む前に「1 枚だけか、両方か」が分かるように。
+   */
+  const [splitHover, setSplitHover] = useState<string | null>(null);
+
   /** 掴んでいるもの。動かす／伸び縮みのどちらも、画面の矩形の上で解く */
   const grab = useRef<null | {
     key: string; side: ShowreSide; move: boolean;
     from: { x: number; y: number }; rect: ScreenRect; dock: DockState;
+    /**
+     * 境目を掴んでいる ── **2 枚が一緒に変わる**。
+     * `lo` は小さい側（左・上）、`hi` は大きい側（右・下）。線が動くと lo が伸び hi が縮む。
+     */
+    split?: { axis: "x" | "y"; lo: { d: Docked; rect: ScreenRect }; hi: { d: Docked; rect: ScreenRect } };
   }>(null);
 
   /** 自分以外の、岸に着いているものの矩形 ── ぶつかる相手 */
@@ -238,16 +268,163 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
     [docked, viewport],
   );
 
+  /**
+   * カーソルが通ってきた跡。**どこを通って線に来たか**を、これで読む。
+   *
+   * 線そのものの上では「どちらの体の中か」が決まらないので、位置だけ見ても答えが出ない。
+   * 線から離れていた**最後の所**が、通ってきた側。
+   */
+  const trail = useRef<{ x: number; y: number }[]>([]);
+  useEffect(() => {
+    const on = (e: PointerEvent) => {
+      trail.current.push({ x: e.clientX, y: e.clientY });
+      if (trail.current.length > 24) trail.current.shift();
+    };
+    window.addEventListener("pointermove", on, { passive: true });
+    return () => window.removeEventListener("pointermove", on);
+  }, []);
+
+  /**
+   * 岸の層そのもの。跡は画面の座標で取れるが、線は**器の座標**にある ──
+   * いちばん外の海は器が 0,0 なので一致するが、**窓の中ではずれる**。ここで直す。
+   */
+  const layer = useRef<HTMLDivElement | null>(null);
+  const localTrail = useCallback(() => {
+    const o = layer.current?.getBoundingClientRect();
+    const dx = o ? o.left : 0;
+    const dy = o ? o.top : 0;
+    return trail.current.map((p) => ({ x: p.x - dx, y: p.y - dy }));
+  }, []);
+
+  /** 掴んだ辺にぴたりと着いている先客 ── 居れば、その線は 2 枚で分け合っている */
+  const neighbourOf = useCallback(
+    (key: string, rect: ScreenRect, side: ShowreSide): { d: Docked; rect: ScreenRect } | null => {
+      const near = (a: number, b: number) => Math.abs(a - b) <= GRIP;
+      for (const o of docked) {
+        if (o.key === key) continue;
+        const r = anchoredRect(o.dock, o.size, viewport);
+        const crosses =
+          side === "left" || side === "right"
+            ? r.y < rect.y + rect.height && rect.y < r.y + r.height
+            : r.x < rect.x + rect.width && rect.x < r.x + r.width;
+        if (!crosses) continue;
+        const touches =
+          side === "right" ? near(r.x, rect.x + rect.width)
+          : side === "left" ? near(r.x + r.width, rect.x)
+          : side === "bottom" ? near(r.y, rect.y + rect.height)
+          : near(r.y + r.height, rect.y);
+        if (touches) return { d: o, rect: r };
+      }
+      return null;
+    },
+    [docked, viewport],
+  );
+
+  /**
+   * **分け合っている線の上では、どこを通って来たかで何が動くかが決まる。**
+   *
+   * - 線を**横切って**来た → 通ってきた側の 1 枚だけが動く
+   * - 線に**沿って**来た（線の端の外から） → **両方**動く ＝ 境目そのものを動かす
+   */
+  const approachOf = useCallback(
+    (line: number, span: readonly [number, number], axis: "x" | "y"): Approach => {
+      const t = localTrail();
+      const across = (p: { x: number; y: number }) => (axis === "x" ? p.x : p.y) - line;
+      const alongPos = (p: { x: number; y: number }) => (axis === "x" ? p.y : p.x);
+
+      /**
+       * ★ **線をなぞって来たか。**
+       *   線の端が画面の縁に着いていると「端の外から回り込む」場所が無い
+       *   （ランチャーとバーの線は上端が y=0、窓を左右で分けた線は上下とも縁）。
+       *   そこで、線のそばを**線に沿って滑って来た**ときも「沿って来た」と読む。
+       *   測るのは**線のそばの跡だけ** ── 体の中を線と平行に動いてから一歩入る場合を
+       *   巻き込まないように。
+       */
+      let par = 0;
+      let perp = 0;
+      for (let i = t.length - 1; i > 0; i--) {
+        if (Math.abs(across(t[i])) > GRIP * 3) break; // 線のそばから離れた。ここまで
+        perp += Math.abs(across(t[i]) - across(t[i - 1]));
+        par += Math.abs(alongPos(t[i]) - alongPos(t[i - 1]));
+      }
+      if (par > perp && par > GRIP) return "along";
+
+      // 横切って来た ── 線から離れていた最後の所が、通ってきた側
+      for (let i = t.length - 1; i >= 0; i--) {
+        const p = t[i];
+        if (Math.abs(across(p)) <= GRIP) continue; // まだ線の上。もっと前を見る
+        if (alongPos(p) < span[0] || alongPos(p) > span[1]) return "along"; // 端の外から回り込んで来た
+        return across(p) < 0 ? "lo" : "hi";
+      }
+      return "along"; // 跡が無い（線の上から始まった）＝ 線そのものを掴んだとみなす
+    },
+    [localTrail],
+  );
+
+  /** 線の位置と、その線が伸びている範囲（2 枚が向かい合っている所だけ） */
+  const lineOf = (rect: ScreenRect, n: ScreenRect, side: ShowreSide) => {
+    const axis: "x" | "y" = side === "left" || side === "right" ? "x" : "y";
+    const line =
+      side === "right" ? rect.x + rect.width
+      : side === "left" ? rect.x
+      : side === "bottom" ? rect.y + rect.height
+      : rect.y;
+    const span: readonly [number, number] =
+      axis === "x"
+        ? [Math.max(rect.y, n.y), Math.min(rect.y + rect.height, n.y + n.height)]
+        : [Math.max(rect.x, n.x), Math.min(rect.x + rect.width, n.x + n.width)];
+    return { axis, line, span };
+  };
+
+  /** 掴む前に、その線が境目かどうかを見る（同じ規則で読む） */
+  const probeSplit = useCallback(
+    (d: Docked, side: ShowreSide) => {
+      const rect = anchoredRect(d.dock, d.size, viewport);
+      const n = neighbourOf(d.key, rect, side);
+      let key: string | null = null;
+      if (n) {
+        const { axis, line, span } = lineOf(rect, n.rect, side);
+        if (approachOf(line, span, axis) === "along") key = `${d.key}:${side}`;
+      }
+      setSplitHover((prev) => (prev === key ? prev : key));
+    },
+    [viewport, neighbourOf, approachOf],
+  );
+
   const onGripDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>, d: Docked, side: ShowreSide, move: boolean) => {
       e.stopPropagation();
       setActive(d.key);
+      const rect = anchoredRect(d.dock, d.size, viewport);
+      /**
+       * **分け合っている線なら、掴んだ辺＝掴んだ相手、とは限らない。**
+       * 線は両方の中に居るので、通ってきた側のものを動かす（右から来たなら、
+       * 掴んだのが左の泡でも動くのは右の泡）。線の端から来たなら、線そのもの。
+       */
+      const n = move ? null : neighbourOf(d.key, rect, side);
+      const here = { d, rect };
+      const there = n ? { d: n.d, rect: n.rect } : null;
+      const dIsLo = side === "right" || side === "bottom";
+      let target = here;
+      let targetSide = side;
+      let split: { axis: "x" | "y"; lo: { d: Docked; rect: ScreenRect }; hi: { d: Docked; rect: ScreenRect } } | undefined;
+      if (n && there) {
+        const { axis, line, span } = lineOf(rect, n.rect, side);
+        const app = approachOf(line, span, axis);
+        if (app === "along") {
+          split = { axis, lo: dIsLo ? here : there, hi: dIsLo ? there : here };
+        } else if ((app === "lo") !== dIsLo) {
+          target = there;
+          targetSide = OPPOSITE[side];
+        }
+      }
       // ★ 先に掴んだことを覚える。捕捉（setPointerCapture）は失敗しうるので後
       grab.current = {
-        key: d.key, side, move,
+        key: target.d.key, side: targetSide, move,
         from: { x: e.clientX, y: e.clientY },
-        rect: anchoredRect(d.dock, d.size, viewport),
-        dock: d.dock,
+        rect: target.rect,
+        dock: target.d.dock,
+        split,
       };
       try {
         (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -255,7 +432,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
         // 捕捉できなくても掴めている（合成の入力など）
       }
     },
-    [viewport],
+    [viewport, neighbourOf, approachOf],
   );
 
   const onGripMove = useCallback(
@@ -282,6 +459,30 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
           ? slid
           : clampMoveAmongDocked(slid, axis, others(g.key), viewport, axis === "x" ? g.rect.x : g.rect.y);
         onUpdate(g.key, { dock: { edges, at: { x: at.x, y: at.y } }, size });
+        return;
+      }
+      if (g.split) {
+        /**
+         * 境目を掴んだ ── **線が動き、2 枚が分け合う量だけが変わる**。
+         * 片方が伸びたぶん、もう片方が縮む。海は増えも減りもしない。
+         */
+        const { axis, lo, hi } = g.split;
+        const min = axis === "x" ? SHOWRE_MIN_SIZE.width : SHOWRE_MIN_SIZE.height;
+        const loLen = axis === "x" ? lo.rect.width : lo.rect.height;
+        const hiLen = axis === "x" ? hi.rect.width : hi.rect.height;
+        const raw = axis === "x" ? dx : dy;
+        const by = Math.min(Math.max(raw, min - loLen), hiLen - min);
+        const put = (t: { d: Docked; rect: ScreenRect }, start: number, len: number) => {
+          const size = axis === "x"
+            ? { width: len, height: t.rect.height }
+            : { width: t.rect.width, height: len };
+          const at = axis === "x" ? { x: start, y: t.rect.y } : { x: t.rect.x, y: start };
+          onUpdate(t.d.key, { dock: { edges: t.d.dock.edges, at }, size });
+        };
+        const loStart = axis === "x" ? lo.rect.x : lo.rect.y;
+        const hiStart = axis === "x" ? hi.rect.x : hi.rect.y;
+        put(lo, loStart, loLen + by);
+        put(hi, hiStart + by, hiLen - by);
         return;
       }
       // 自由な辺を掴んだ ── 掴んだ辺の反対側が固定されるように、矩形を変える
@@ -355,7 +556,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
 
   return (
     <>
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
+      <div ref={layer} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
         {entries.map(({ d, edges, inset }) => (
           <div
             key={d.key}
@@ -410,15 +611,25 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
                 <div
                   key={side}
                   data-showre-grip={side}
-                  title={glued ? "岸の上で動かす（引き離すと剥がれる）" : "大きさを変える"}
+                  title={
+                    glued ? "岸の上で動かす（引き離すと剥がれる）"
+                    : splitHover === `${d.key}:${side}` ? "境目を動かす（両方が変わる）"
+                    : "大きさを変える"
+                  }
                   onPointerDown={(e) => onGripDown(e, d, side, glued)}
-                  onPointerMove={onGripMove}
+                  onPointerMove={(e) => {
+                    onGripMove(e);
+                    if (!grab.current && !glued) probeSplit(d, side);
+                  }}
+                  onPointerLeave={() => { if (!grab.current) setSplitHover(null); }}
                   onPointerUp={onGripUp}
                   onPointerCancel={onGripUp}
                   style={{
                     position: "absolute",
                     zIndex: 1,   // 中身より上。辺そのものが取っ手なので、埋もれてはいけない
-                    cursor: glued ? "move" : CURSOR[side],
+                    cursor: glued
+                      ? "move"
+                      : splitHover === `${d.key}:${side}` ? CURSOR_SPLIT[side] : CURSOR[side],
                     ...(along
                       ? { left: 0, right: 0, height: GRIP, [side]: 0 }
                       : { top: 0, bottom: 0, width: GRIP, [side]: 0 }),

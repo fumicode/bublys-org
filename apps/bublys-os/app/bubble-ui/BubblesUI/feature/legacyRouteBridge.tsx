@@ -13,17 +13,18 @@
  * 包むのは中身だけで済む。
  */
 import { FC, ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { BubbleSpace, useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-feature";
+import { useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, RoutedBubble } from "@bublys-org/bubble-layout-feature";
 import {
   Bubble,
   BubblesContext,
   CurrentBubbleContext,
   KeyboardFocusContext,
-  ShowreTubes,
   createBubble,
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
+import { ShoreSpace } from "./ShoreSpace";
+import { WINDOW_GROUND } from "./ShowreLayer";
 
 /** 旧の画面 1 枚を、新しい空間の文脈に繋ぐ */
 const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; children?: ReactNode }> = ({
@@ -105,17 +106,20 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[] }>
   return (
     <div ref={ref} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
       {size.width > 0 && (
-        <>
-          <BubbleSpace
-            routes={routes()}
-            initialUrls={seeds}
-            viewport={{ w: size.width, h: size.height }}
-            style={{ position: "absolute", left: 0, top: 0 }}
-          />
-          <div data-frame-shore="" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <ShowreTubes viewport={size} outlines={[{ rect: { x: 0, y: 0, width: size.width, height: size.height } }]} />
-          </div>
-        </>
+        /**
+         * ★ **枠そのものが岸。** 前はここでネオンを 1 本描くだけで、貼る機能は無かった
+         *   ── 貼れる先が外の海にしか無かった。器（`ShoreSpace`）に差し替えて、
+         *   外の海と同じ岸を窓の中にも持たせる。管もその岸が引く（枠が二重にならない）。
+         * ★ 定位置（ランチャー・ポケット・見え方）は渡さない ── あれらは外の岸のもの。
+         *   窓の岸は**空で始まり**、中の海から引き出したものだけが貼り付く。
+         */
+        <ShoreSpace
+          routes={routes()}
+          initialUrls={seeds}
+          viewport={{ w: size.width, h: size.height }}
+          ground={WINDOW_GROUND}
+          style={{ position: "absolute", left: 0, top: 0 }}
+        />
       )}
     </div>
   );

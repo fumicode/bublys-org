@@ -19,6 +19,6 @@ export {
   matchBubbleRoute, renderRoute, titleOf,
 } from './routing.js';
 export type { BubbleRoute, BubbleParams, RoutedBubble, BubbleContentRenderer } from './routing.js';
-export { SPACE_CSS } from './space-css.js';
+export { SPACE_CSS, WINDOW_SKY } from './space-css.js';
 export { ListSpace, LIST_BOX, LIST_CARD_WIDTH, LIST_DEPTH_CARD_WIDTH, LayoutRoutesContext, LayoutRoutesProvider } from './ListSpace.js';
 export type { ListSpaceProps } from './ListSpace.js';

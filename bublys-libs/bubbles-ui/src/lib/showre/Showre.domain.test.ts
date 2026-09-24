@@ -166,6 +166,36 @@ describe("fitAmongDocked（後から来た方が縮む）", () => {
     expect(r.width).toBe(706);
     expect(merged(others[0], r)).toBe(true);
   });
+
+  // 縮む向きは決め打ちできない ── 滑る向きで空きが無ければ、貼った向きで縮んでから滑る
+  it("全高の先客がいても、反対の辺に貼れる（横向きに縮む）", () => {
+    const others = [at(0, 0, 400, VIEWPORT.height)];
+    const r = fitAmongDocked(
+      dock(["right"], { x: 400, y: 40 }),
+      { width: 600, height: 500 },
+      VIEWPORT,
+      others,
+      { x: VIEWPORT.width - 5, y: 300 },
+    );
+    expect(r).not.toBeNull();
+    expect(r!.x + r!.width).toBe(VIEWPORT.width);
+    // 先客の右に 606 空いているので、縮まず自分の大きさのまま入る
+    expect(r!.width).toBe(600);
+  });
+
+  it("岸だけで埋まってよい ── 海の取り分は残さない", () => {
+    const others = [at(0, 0, 400, VIEWPORT.height)];
+    const r = fitAmongDocked(
+      dock(["right"], { x: 400, y: 0 }),
+      { width: 2000, height: VIEWPORT.height },
+      VIEWPORT,
+      others,
+      { x: VIEWPORT.width - 5, y: 300 },
+    )!;
+    // 先客の右端から画面の右端まで、隙間なく埋まる（管のぶんだけ重なる）
+    expect(r.x).toBe(394);
+    expect(r.x + r.width).toBe(VIEWPORT.width);
+  });
 });
 
 describe("edgesOf / isShowreSide", () => {

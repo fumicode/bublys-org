@@ -168,6 +168,19 @@ export const slotStyle = (dock: DockState, viewport: Size2, size?: Size2): SlotS
  * - **貼った向き**は辺に付いたまま、辺から先客までの空きに収まるまで縮む
  * - 先客の上に落とそうとしたときと、空きが下限より狭いときは `null`（そこには貼れない）
  *
+ * ★ **どちらの向きから縮むかは、決め打ちできない。**
+ *   縮む前の矩形は先客と重なっているので、先に見たほうの向きでは「空きが無い」と出る。
+ *   どちらを先に見るかで通る落とし方が変わる:
+ *
+ *   - 上に全幅の先客 → **左**の縁へ落とす … 縦から縮めば入る（横から見ると空きゼロ）
+ *   - 左に全高の先客 → **右**の縁へ落とす … 横から縮めば入る（縦から見ると空きゼロ）
+ *
+ *   なので **滑る向きを先に見て、駄目ならもう一度、貼った向きを先に見る**。
+ *   規則で言うと「まず滑る向きで空きを探す。無ければ貼った向きで縮んでから滑る」。
+ *
+ * ★ **海が無くなってよい。** 縮み先は先客の縁までで、海の取り分は残さない
+ *   ── 岸だけで画面を埋める（昔ながらの分割レイアウトの）使い方をする人がいる。
+ *
  * @param others 先に貼り付いているバブルの矩形（画面座標）
  */
 export const fitAmongDocked = (
@@ -187,36 +200,41 @@ export const fitAmongDocked = (
   const anchorY = anchorOf("top", "bottom");
   const anchorX = anchorOf("left", "right");
 
-  // 貼っていない向きから先に収める（貼った向きの空きは、その結果で変わるので）
-  const first: "x" | "y" = anchorY === null ? "y" : "x";
-  const second = first === "y" ? "x" : "y";
+  // 滑る向き（貼っていない向き）
+  const slide: "x" | "y" = anchorY === null ? "y" : "x";
   const anchors = { x: anchorX, y: anchorY } as const;
   const limits = { x: viewport.width, y: viewport.height } as const;
   const mins = { x: min.width, y: min.height } as const;
   const pointers = { x: pointer.x, y: pointer.y } as const;
 
-  let out = rect;
-  for (const axis of [first, second] as const) {
-    const lo = axis === "x" ? out.x : out.y;
-    const len = axis === "x" ? out.width : out.height;
-    // その向きで重なりうるのは、もう一方の向きで重なっている先客だけ
-    const cross = axis === "x" ? "y" : "x";
-    const crossLo = cross === "x" ? out.x : out.y;
-    const crossLen = cross === "x" ? out.width : out.height;
-    const blockers = others
-      .filter((o) => {
-        const oLo = cross === "x" ? o.x : o.y;
-        const oLen = cross === "x" ? o.width : o.height;
-        return crossOverlaps(crossLo, crossLen, oLo, oLen, gap);
-      })
-      .map((o) => (axis === "x" ? ([o.x, o.x + o.width] as const) : ([o.y, o.y + o.height] as const)));
-    const fitted = fitAxis(lo, len, anchors[axis], pointers[axis], limits[axis], blockers, mins[axis], gap);
-    if (!fitted) return null;
-    out = axis === "x"
-      ? { ...out, x: fitted.lo, width: fitted.len }
-      : { ...out, y: fitted.lo, height: fitted.len };
-  }
-  return out;
+  /** その順で 2 つの向きを収めてみる。どちらかで空きが無ければ `null` */
+  const inOrder = (order: readonly ("x" | "y")[]): ScreenRect | null => {
+    let out = rect;
+    for (const axis of order) {
+      const lo = axis === "x" ? out.x : out.y;
+      const len = axis === "x" ? out.width : out.height;
+      // その向きで重なりうるのは、もう一方の向きで重なっている先客だけ
+      const cross = axis === "x" ? "y" : "x";
+      const crossLo = cross === "x" ? out.x : out.y;
+      const crossLen = cross === "x" ? out.width : out.height;
+      const blockers = others
+        .filter((o) => {
+          const oLo = cross === "x" ? o.x : o.y;
+          const oLen = cross === "x" ? o.width : o.height;
+          return crossOverlaps(crossLo, crossLen, oLo, oLen, gap);
+        })
+        .map((o) => (axis === "x" ? ([o.x, o.x + o.width] as const) : ([o.y, o.y + o.height] as const)));
+      const fitted = fitAxis(lo, len, anchors[axis], pointers[axis], limits[axis], blockers, mins[axis], gap);
+      if (!fitted) return null;
+      out = axis === "x"
+        ? { ...out, x: fitted.lo, width: fitted.len }
+        : { ...out, y: fitted.lo, height: fitted.len };
+    }
+    return out;
+  };
+
+  const other = slide === "y" ? "x" : "y";
+  return inOrder([slide, other]) ?? inOrder([other, slide]);
 };
 
 /**

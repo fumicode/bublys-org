@@ -47,6 +47,14 @@ export type ListSpaceProps = {
 /** 口を置く帯の高さの既定（実際は測る）。右端からの隙間も込みで見る */
 const HEAD_HEIGHT = 39;   // ★ 口は 1.5 倍（26 × 1.5）
 const HEAD_MARGIN = 8;
+/**
+ * 一覧の板。**白い札より少し沈んだ明るい面**。
+ *
+ * ★ 明るいものが重なる向きは 1 つ ── **海 → 窓 → この板 → 札**。
+ *   海がいちばん濃く、窓（`WINDOW_SKY`）がその上に浮き、この板がさらに上、札がいちばん明るい。
+ */
+export const LIST_PANEL = 'linear-gradient(180deg,#c4cad9 0%,#b6bdce 100%)';
+
 /** 口を置く高さ（中身の箱の上から） */
 const HEAD_TOP = 2;
 /**
@@ -213,7 +221,25 @@ export const ListSpace: FC<ListSpaceProps> = ({
    * つまり札のほうが手前で、重なったら口は押せなくなる）。だから口は**右上の角**に置く。
    */
   return (
-    <div ref={boxRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div
+      ref={boxRef}
+      /**
+       * ★ **一覧は自分で板を敷く。** 札はこの div の**兄弟**として層に描かれるので、
+       *   ここに地を敷けば札はその上に浮く ── 「明るい板の上に札が並ぶ」になる。
+       *   白い札より少し沈ませてある（真っ白にすると札との境目が消える）。
+       * ★ ルートの地の種類は増やしていない。一覧かどうかは一覧が知っていればよく、
+       *   窓でも岸でも同じように板が敷かれる。
+       */
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        borderRadius: "inherit",
+        background: LIST_PANEL,
+        color: "#1b2029",
+      }}
+    >
       {/* 岸に貼られたときだけ、自分で小さな海を持つ（下の註） */}
       {!me && panel.w > 0 && (
         <ShoreSea members={members} preset={preset} viewport={panel} outer={space} />

@@ -2,6 +2,20 @@
  * 中身のある泡の見た目 ── 本文の席・閉じる・ObjectView の膜。
  * 泡そのものの見た目は `bubble-layout-ui` の `FIELD_CSS`。
  */
+/**
+ * **窓の夜空。** 空間を持つ泡は自分の宇宙を持っている。
+ *
+ * ★ **いちばん外の海より明るい**（海は明度 10/13/11）。
+ *   窓は海の**手前に浮いている板**で、その上に一覧の板、さらに札が乗る
+ *   ── 明るいものが重なる向きを 1 つに決めておく（海 → 窓 → 板 → 札）。
+ * ★ 前は 16/19/17 で、海（18/22/20）との差が明度 2〜3 しか無く**窓の境目が読めなかった**。
+ *   濃さを 1 段はっきり離したうえで、海と窓の上下を入れ替えてある。
+ * ★ 同じ数が岸の側（ShowreLayer の WINDOW_GROUND）にもあり二重定義だった。
+ *   数はここだけに置いて、岸はここから引く。
+ */
+export const WINDOW_SKY =
+  'linear-gradient(145deg,hsl(220 35% 18%) 0%,hsl(225 40% 22%) 40%,hsl(230 35% 20%) 100%)';
+
 export const SPACE_CSS = `
 /**
  * 器（泡の見た目）── ラボの暗い箱ではなく、バブリの画面が乗る器にする。
@@ -59,7 +73,7 @@ export const SPACE_CSS = `
 .bub > .bl-body.bl-clear{left:0;top:24px;right:0;bottom:0;border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);
   overflow:hidden;box-shadow:none;color:#e6ebf5;
   /* 窓の中は自分の宇宙。夜空は**この窓が持つ**（外の海の夜空は透けさせない） */
-  background:linear-gradient(145deg,hsl(220 35% 16%) 0%,hsl(225 40% 19%) 40%,hsl(230 35% 17%) 100%)}
+  background:${WINDOW_SKY}}
 /* 地を敷かない ── 中身が自分で持つ。空間（夜空）がそのまま透ける */
 .bub > .bl-body.bl-none{background:none;box-shadow:none;color:#e6ebf5;
   /* ★ 巻物の棒も夜の側へ。明るい地を前提にした OS の棒が、
