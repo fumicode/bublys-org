@@ -322,7 +322,24 @@ function resolveSpace(
   const over = nudge?.get(spaceId);
   if (over) focus.z += over;
   L.focus = focus;
-  const ctx = lensContext(world, spaceId, host, focus);   // このフレームの焦点（目を足す前）
+  const ctx0 = lensContext(world, spaceId, host, focus);   // このフレームの焦点（目を足す前）
+  /**
+   * ★ **透視では、並びぜんぶを空間の中央にそろえる。**
+   *
+   *   奥へ逃げるぶんの余地は**消失点の側にしか要らない**。それなのに手前の面を空間の
+   *   真ん中に置いていたので、反対側に同じだけの余白が空いたまま残っていた
+   *   ── 一覧の透視では、いちばん手前の札の下に 28px（奥行きの取り分のちょうど半分）が
+   *   死んでいた。root の海では消失点が中心から 165px しか離れていないので、
+   *   **手前の泡より下の半分が丸ごと使われない**。
+   *
+   *   寄せるのは**像の側**（位置 − 焦点）であって、消失点ではない ── 消失点をずらすと
+   *   並びごと動いてしまって何も変わらない。手前の面だけを動かせば、
+   *   「消失点から手前の泡の遠い縁まで」がちょうど空間の中央に来る。
+   */
+  const lead = frontLead(view, ctx0, kids, arr, sizeOf);
+  const ctx = lead
+    ? { ...ctx0, focus: { ...ctx0.focus, x: ctx0.focus.x - lead.x, y: ctx0.focus.y - lead.y } }
+    : ctx0;
   L.ctx = ctx;
   spaces.set(spaceId, L);
 
@@ -425,6 +442,58 @@ function shifted(a: Arranged, by: number): Arranged {
 }
 
 const ZERO_FOCUS: Focus = { x: 0, y: 0, z: 0 };
+/**
+ * **透視の並びで、手前の面をどれだけ消失点の反対側へ寄せるか。**
+ *
+ * 並びが占めるのは「いちばん奥の泡の遠い縁」から「手前の泡の近い縁」まで。
+ * その真ん中が空間の中心に来るように寄せる。
+ *
+ * ★ **消失点までではなく、実際に逃げたぶんで測る。** 消失点は「無限に奥へ行ったら
+ *   そこへ集まる」点であって、並びの端ではない ── 泡が 1 つしか無いときに消失点まで
+ *   空けると、逃げてもいないのに手前の泡だけが下へずれる（実測で踏んだ）。
+ *   いちばん奥の倍率 `mf` が 0 に近づけば消失点までの距離に、1 に近づけば 0 に、
+ *   自然に繋がる（下の式）。
+ *
+ *   手前の中心を o、いちばん奥の倍率を mf、手前と奥の泡の丈を H0・Hf とすると、
+ *   奥の縁 ＝ `vp + (o − vp)·mf − Hf·mf/2`、手前の縁 ＝ `o + H0/2`。
+ *   この 2 つの真ん中を 0 に置くと
+ *
+ *   ```
+ *   o = ( −vp·(1 − mf) + Hf·mf/2 − H0/2 ) / (1 + mf)
+ *   ```
+ *
+ * 掛かるのは**平面に置き所が無い並び**だけ（奥行きに重ねる・履歴を奥行きに）。
+ * 自由に置く・重ねて置くは、人が置いた所に在るべきなので触らない。
+ */
+function frontLead(
+  view: SpaceLayout['view'],
+  ctx: LensContext,
+  kids: readonly Bubble[],
+  arr: SpaceLayout['arr'],
+  sizeOf: (b: Bubble) => Size,
+): { readonly x: number; readonly y: number } | null {
+  if (view.z.lens !== 'perspective') return null;
+  if (view.x.dim !== 'none' || view.y.dim !== 'none') return null;
+  let front: Bubble | null = null;
+  let back: Bubble | null = null;
+  let near = Infinity;
+  let far = -Infinity;
+  for (const b of kids) {
+    const dz = (arr.z.pos.get(b.id) ?? 0) - ctx.focus.z;
+    if (dz < near) { near = dz; front = b; }
+    if (dz > far) { far = dz; back = b; }
+  }
+  if (!front || !back) return null;
+  const mf = LENS_Z[view.z.lens as LensZId].mag(far - near);
+  const f = sizeOf(front);
+  const bk = sizeOf(back);
+  const lead = (vp: number, h0: number, hf: number) =>
+    Math.max(0, (-vp * (1 - mf) + (hf * mf) / 2 - h0 / 2) / (1 + mf));
+  const x = lead(ctx.vp.x, f.w, bk.w);
+  const y = lead(ctx.vp.y, f.h, bk.h);
+  return x === 0 && y === 0 ? null : { x, y };
+}
+
 const ZERO_CTX: LensContext = { focus: ZERO_FOCUS, H: { x: 1, y: 1 }, vp: { x: 0, y: 0 } };
 
 /** ★ 合成。lab.html 741-744 行 compose。深さ n でも scale は数値1つ */

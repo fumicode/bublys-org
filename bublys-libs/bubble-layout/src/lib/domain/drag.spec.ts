@@ -18,6 +18,7 @@ import { DEFAULT_RULES } from './rules.js';
 import { Bubble } from './bubble.js';
 import { BubbleWorld } from './world.js';
 import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
+import { METRICS } from './types.js';
 
 describe('② 泡をドラッグする', () => {
   it('★ 書き込む先は、その軸に刺さっている次元（free.x 決め打ちではない）', () => {
@@ -356,4 +357,46 @@ describe('並べていない向きでも、見切れていれば送れる', () =
     // 横の量なら、これまでどおり魚眼を繰る
     expect(send(w, { x: 100, y: 0 }).focusOf('root').x).not.toBe(0);
   });
+
+describe('★ 透視 ── 並びぜんぶを空間の中央にそろえる', () => {
+  const VP2 = { w: 1000, h: 800 };
+  /** 同じ大きさの泡を n 枚、奥行きに重ねた海 */
+  const stack = (n: number): BubbleWorld => {
+    const bs = [];
+    for (let i = 0; i < n; i++)
+      bs.push(Bubble.create({ id: 'b' + i, title: 'b' + i, w: 300, h: 100, order: i }));
+    return withPreset(
+      new BubbleWorld({
+        bubbles: bs.map((x) => x.state),
+        root: { title: '外', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+        implicitSeq: 0,
+      }),
+      'stackDepth',
+      'root',
+    );
+  };
+  /** 並びが占めている上端・下端（いちばん奥の遠い縁 〜 手前の近い縁） */
+  const span = (n: number) => {
+    const l = resolveWorld(stack(n), VP2);
+    const ps = [...l.byId.values()];
+    return { top: Math.min(...ps.map((p) => p.y)), bottom: Math.max(...ps.map((p) => p.y + p.h)) };
+  };
+
+  it('1 枚なら動かない ── 逃げていないのだから寄せる理由が無い', () => {
+    const s = span(1);
+    expect(Math.round((s.top + s.bottom) / 2)).toBe(VP2.h / 2);
+    // 丈は泡そのもの（中身 100 ＋ 帯 24）── 奥へ逃げたぶんは無い
+    expect(Math.round(s.bottom - s.top)).toBe(100 + METRICS.HEADER);
+  });
+
+  it('重なっていれば、手前の泡の下の余りが上の余りと同じになる', () => {
+    const s = span(8);
+    // 並びの真ん中が空間の中心（＝ 上の余りと下の余りが同じ）
+    expect(Math.abs((s.top + s.bottom) / 2 - VP2.h / 2)).toBeLessThan(1);
+    // 手前の泡は中心より下にいる（＝ 下の余りを削った）
+    const front = [...resolveWorld(stack(8), VP2).byId.values()].sort((a, b) => b.scale - a.scale)[0];
+    expect(front.y + front.h / 2).toBeGreaterThan(VP2.h / 2);
+  });
+});
+
 });
