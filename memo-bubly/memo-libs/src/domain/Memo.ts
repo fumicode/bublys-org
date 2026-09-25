@@ -109,7 +109,12 @@ export class Memo {
   }
 
   /**
-   * 新しいMemoインスタンスを作成
+   * 新しい Memo を作る。**中身は空**。
+   *
+   * ★ 前は「新しいメモの内容です。」を 1 行目に書き込んでいた。見出しは 1 行目から取るので
+   *   名前のつもりだったのだろうが、**データに入っている**ので書き始める前に消す手間が要る
+   *   ── 置き手紙ではなく、消さないと邪魔になるゴミになっていた。
+   *   名前は中身が決める。中身が無いうちは、見せる側が「無題」と言えばよい。
    */
   static create(): Memo {
     const memoId = crypto.randomUUID();
@@ -120,7 +125,7 @@ export class Memo {
         [firstLineId]: {
           id: firstLineId,
           type: "text",
-          content: "新しいメモの内容です。",
+          content: "",
         },
       },
       lines: [firstLineId],

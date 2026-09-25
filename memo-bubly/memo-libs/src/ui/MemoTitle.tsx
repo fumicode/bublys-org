@@ -19,7 +19,9 @@ export function MemoTitle({ memo, onSetAuthor, onOpenWorldLineView, worldLineUrl
   const users = useAppSelector(selectUsers);
   const firstBlockId = memo.lines[0];
   const firstBlock = firstBlockId ? memo.blocks[firstBlockId] : null;
-  const content = firstBlock?.content || '';
+  const content = firstBlock?.content?.trim() || '';
+  /** 名前は中身が決める。中身が無いうちは「無題」（データには書き込まない） */
+  const label = content || '無題';
   const authorName = memo.authorId ? users.find((u) => u.id === memo.authorId)?.name : undefined;
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -41,12 +43,13 @@ export function MemoTitle({ memo, onSetAuthor, onOpenWorldLineView, worldLineUrl
           setDragPayload(e, {
             type: getDragType('Memo'),
             url,
-            label: content || "メモ",
+            label,
           });
         }}
       >
         <MemoIcon fontSize="medium" />
-        <span>「{content}」</span>
+        {/* 書かれていないものに鉤括弧は付けない ── 薄く「無題」とだけ置く */}
+        <span style={content ? undefined : { opacity: 0.45 }}>{content ? `「${content}」` : label}</span>
         <IconButton onClick={() => navigator.clipboard.writeText(content)}>
           <LuClipboardCopy />
         </IconButton>

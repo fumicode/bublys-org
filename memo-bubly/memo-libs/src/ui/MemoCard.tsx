@@ -20,7 +20,9 @@ export function MemoCard({ memoId, onDelete }: { memoId: string; onDelete?: (id:
   const users = useAppSelector(selectUsers);
   if (!memo) return <StyledCard>このメモは見つかりませんでした。</StyledCard>;
 
-  const label = memo.blocks[memo.lines?.[0]]?.content ?? 'メモ';
+  /** 名前は中身（1 行目）が決める。まだ何も書かれていなければ「無題」 */
+  const content = memo.blocks[memo.lines?.[0]]?.content?.trim() ?? '';
+  const label = content || '無題';
   return (
     <StyledCard>
       <div className="e-main">
@@ -29,7 +31,8 @@ export function MemoCard({ memoId, onDelete }: { memoId: string; onDelete?: (id:
             どこに置くかは新しい模型では親の View が決めるので、値そのものは使われない */}
         <ObjectView type="Memo" url={`memos/${memoId}`} label={label} openingPosition="bubble-side-right">
           <MemoIcon />
-          <span className="e-label">「{label}…」</span>
+          {/* 書かれていないものに鉤括弧は付けない（「…」だけが並ぶと何も言っていない） */}
+          <span className="e-label">{content ? `「${content}…」` : label}</span>
         </ObjectView>
         {memo.authorId && (
           <span className="e-author">
