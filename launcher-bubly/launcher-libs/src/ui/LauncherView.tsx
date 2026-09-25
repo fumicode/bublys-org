@@ -10,6 +10,8 @@ import {
   type Theme,
 } from "@mui/material";
 import LaunchIcon from "@mui/icons-material/Launch";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
+import { Divider } from "@mui/material";
 import { UrledPlace } from "@bublys-org/bubbles-ui";
 
 /** 描くのに必要な分だけ解決済みの entry */
@@ -27,6 +29,13 @@ export type LauncherViewProps = {
   /** ラベルを出すか。false ならアイコンだけ（名前はツールチップで出る） */
   labels: boolean;
   onLaunch: (url: string) => void;
+  /**
+   * **この場を片付ける口**（渡さなければ出さない）。
+   *
+   * ★ 呼び出しの一覧とは**別もの**なので、仕切りを挟んで末尾に置く ──
+   *   ここに並んでいるものを 1 つ開く、という流れの中に「全部消す」を混ぜない。
+   */
+  onReset?: () => void;
 };
 
 const ITEM_MIN = 44;
@@ -40,6 +49,7 @@ export const LauncherView: FC<LauncherViewProps> = ({
   vertical,
   labels,
   onLaunch,
+  onReset,
 }) => (
   <List
     dense
@@ -69,6 +79,23 @@ export const LauncherView: FC<LauncherViewProps> = ({
         それは旧い海の値（`linksHidden`）── 新しい海は読んでいなかった。
         帯は**海ぜんぶの見え方**なので、口は見え方の帯（`SpaceViewBubble`）に移した。
     */}
+    {onReset && (
+      <>
+        <Divider
+          flexItem
+          orientation={vertical ? "horizontal" : "vertical"}
+          sx={{ my: vertical ? 0.5 : 0, mx: vertical ? 0 : 0.5, borderColor: "rgba(255,255,255,.14)" }}
+        />
+        <LauncherItem
+          url=""
+          label="この場を片付ける（保存を消す）"
+          icon={<DeleteSweepIcon sx={{ color: "#c0708a" }} />}
+          vertical={vertical}
+          labels={labels}
+          onOpen={onReset}
+        />
+      </>
+    )}
   </List>
 );
 
@@ -93,7 +120,12 @@ type LauncherItemProps = {
 const LauncherItem: FC<LauncherItemProps> = ({ url, label, icon, vertical, labels, onOpen, sx }) => {
   const button = (
     <ListItemButton
-      onDoubleClick={onOpen}
+      /**
+       * ★ 開くのはダブルクリック。ただし **url を持たない口（片付けなど）は 1 回で**
+       *   ── あれは「開く」ではなく「押す」ものなので、ふつうのボタンと同じ手ざわりにする。
+       */
+      onClick={url ? undefined : onOpen}
+      onDoubleClick={url ? onOpen : undefined}
       sx={{
         userSelect: "none", // 2 回目のクリックで字が選ばれないように
         minHeight: ITEM_MIN,

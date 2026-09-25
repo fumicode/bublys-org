@@ -1,10 +1,11 @@
 "use client";
-import { useContext, useMemo } from "react";
+import { useContext, useMemo, useState } from "react";
 import { BubbleContentRenderer, BubblesContext } from "@bublys-org/bubbles-ui";
 import { launcherLayout } from "@bublys-org/launcher-model";
 import { LauncherView, type LauncherViewEntry } from "../ui/LauncherView.js";
 import { resolveLaunchTarget } from "../registration/launchTargets.js";
 import { useLauncher } from "./useLauncher.js";
+import { ResetStorageConfirm } from "./ResetStorageConfirm.js";
 
 /** バブルの枠（余白 + 縁）。中身を描ける大きさは、バブルの大きさからこれを引いた分 */
 const CHROME = 26;
@@ -19,6 +20,8 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   const launcherId = bubble.params.launcherId ?? bubble.url.replace(/^launchers\//, "");
   const { launcher } = useLauncher(launcherId);
   const { openBubble } = useContext(BubblesContext);
+  /** 片付けるかどうかを訊いている最中か（`ResetStorageConfirm` の註） */
+  const [asking, setAsking] = useState(false);
   const entries = useMemo<LauncherViewEntry[]>(
     () =>
       (launcher?.entries ?? []).map((e) => {
@@ -29,7 +32,7 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 
   // 貼り付いている辺は知らなくてよい。並べ方は中身を描ける大きさと項目数で決まる。
-  // 末尾の設定 ⚙ も 1 項目として数える
+  // 末尾の「片付ける」も 1 項目として数える
   const outer = bubble.size ?? bubble.defaultSize;
   const drawable = {
     width: Math.max(0, outer.width - CHROME),
@@ -42,6 +45,7 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   }
 
   return (
+    <>
     <LauncherView
       entries={entries}
       vertical={layout.direction === "vertical"}
@@ -50,6 +54,9 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
       // 帯を見せるかどうかはバブルの linksHidden（設定バブルから切り替え）で決まり、
       // 関係自体は常に残るので、切り替えれば既に開いているものにも効く
       onLaunch={(url) => openBubble(url, bubble.id)}
+      onReset={() => setAsking(true)}
     />
+    <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
+    </>
   );
 };
