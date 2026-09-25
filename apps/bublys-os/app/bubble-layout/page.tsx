@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { bubbleRoutes } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
-import { bridgeRoutes } from "../bubble-ui/BubblesUI/feature/legacyRouteBridge";
+import { bridgeRoutes } from "@bublys-org/bubble-space-shell";
 
 /** この画面で試すバブリ（全部載せると重いので、一覧 → 詳細のあるものから） */
 const TRY = ["users", "memos", "user-groups", "tasks", "igo-games"];

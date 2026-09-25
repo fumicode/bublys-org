@@ -10,7 +10,7 @@ import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { ROOT_UNIVERSE_ID } from "@bublys-org/bubbles-ui";
 import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
-import { FullscreenToggle } from "../components/FullscreenToggle";
+import { FullscreenToggle } from "@bublys-org/bubble-space-shell";
 
 /**
  * bubble-ui の表示状態を world-line に同期し、undo/redo +（ドラッグで動かせる）

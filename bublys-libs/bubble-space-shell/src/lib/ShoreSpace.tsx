@@ -41,8 +41,8 @@ import {
   type TubeSea,
   type TubeJoin,
 } from "@bublys-org/bubbles-ui";
-import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer";
-import { ShoreLockButton, useShoreLock } from "./ShoreLock";
+import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer.js";
+import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
 export type Home = (viewport: { width: number; height: number }) => Docked;

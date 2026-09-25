@@ -24,7 +24,7 @@ import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
-import { SpaceViewBubble } from "@/app/bubble-ui/BubblesUI/feature/SpaceViewBubble";
+import { SpaceViewBubble } from "@bublys-org/bubble-space-shell";
 import "@/app/launcher/launchTargets";
 import { MemoCard } from "@/app/world-line/Memo/ui/MemoCard";
 import { Memo } from "@/app/world-line/Memo/domain/Memo";

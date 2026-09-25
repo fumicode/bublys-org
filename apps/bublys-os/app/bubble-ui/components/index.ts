@@ -1,3 +1,3 @@
 export { UrledPlace } from './UrledPlace';
 export { urlProps } from '../utils/url-props';
-export * from "./FullscreenToggle";
+export { FullscreenToggle } from "@bublys-org/bubble-space-shell";

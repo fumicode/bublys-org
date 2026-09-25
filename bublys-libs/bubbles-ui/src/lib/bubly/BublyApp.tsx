@@ -57,6 +57,20 @@ export type BublyAppProps = {
    * bublys-os にネストされたときも UniverseBubbleView 経由で同じ色が使われる想定。
    */
   backdropColor?: string;
+  /**
+   * **海を差し替える。** 渡すと、真ん中の置き場はこれになる（既定は旧い層の海）。
+   *
+   * ★ 新しい海（`@bublys-org/bubble-space-shell` の `BubbleSea`）は**この lib を使う側**なので、
+   *   ここから呼ぶと輪になる ── だから器の側では受け取るだけにして、何を敷くかは使う側が決める。
+   *   `ListSpace` のように「札を並べるのは外の海」という作りの泡は、新しい海でしか描けない。
+   */
+  sea?: React.ReactNode;
+  /**
+   * 口（サイドバーの項目・ポケットの札）を押したときの開き方を差し替える。
+   * 渡さなければ旧い層に開く。新しい海を敷いたときは、その海の `openBubble` を渡す
+   * ── でないと、押した泡が**見えない旧い海のほう**に開く。
+   */
+  onOpenUrl?: (url: string) => void;
 };
 
 /**
@@ -69,6 +83,8 @@ export const BublyApp: FC<BublyAppProps> = ({
   menuItems,
   sidebarFooter,
   backdropColor,
+  sea,
+  onOpenUrl,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -213,8 +229,9 @@ export const BublyApp: FC<BublyAppProps> = ({
   }, [dispatch]);
 
   const handlePocketItemClick = useCallback((url: string) => {
-    popChildOrJoinSibling(url, 'root');
-  }, [popChildOrJoinSibling]);
+    if (onOpenUrl) onOpenUrl(url);
+    else popChildOrJoinSibling(url, 'root');
+  }, [onOpenUrl, popChildOrJoinSibling]);
 
   const handlePocketRemove = useCallback((id: string) => {
     dispatch(removePocketItem(id));
@@ -222,7 +239,8 @@ export const BublyApp: FC<BublyAppProps> = ({
 
   const handleMenuItemClick = (item: BublyMenuItem) => {
     const url = typeof item.url === 'function' ? item.url() : item.url;
-    popChildOrJoinSibling(url, 'root');
+    if (onOpenUrl) onOpenUrl(url);
+    else popChildOrJoinSibling(url, 'root');
   };
 
   return (
@@ -296,20 +314,22 @@ export const BublyApp: FC<BublyAppProps> = ({
           background: backdropColor ?? 'transparent',
         }}
       >
-        <BubblesContext.Provider value={bubblesContextValue}>
-          <BubbleRefsProvider>
-            <Box sx={{ width: '100%', height: '100%' }}>
-              <BubblesLayeredView
-                bubbleLayers={bubbleLayers}
-                vanishingPoint={globalCoordinateSystem.vanishingPoint}
-                onBubbleClose={deleteBubble}
-                onBubbleLayerDown={layerDown}
-                onBubbleLayerUp={layerUp}
-                onCoordinateSystemReady={handleCoordinateSystemReady}
-              />
-            </Box>
-          </BubbleRefsProvider>
-        </BubblesContext.Provider>
+        {sea ?? (
+          <BubblesContext.Provider value={bubblesContextValue}>
+            <BubbleRefsProvider>
+              <Box sx={{ width: '100%', height: '100%' }}>
+                <BubblesLayeredView
+                  bubbleLayers={bubbleLayers}
+                  vanishingPoint={globalCoordinateSystem.vanishingPoint}
+                  onBubbleClose={deleteBubble}
+                  onBubbleLayerDown={layerDown}
+                  onBubbleLayerUp={layerUp}
+                  onCoordinateSystemReady={handleCoordinateSystemReady}
+                />
+              </Box>
+            </BubbleRefsProvider>
+          </BubblesContext.Provider>
+        )}
       </Box>
 
       {/* Pocket */}

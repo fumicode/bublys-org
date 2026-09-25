@@ -10,8 +10,8 @@ import { CSSProperties, FC } from "react";
 import { Box } from "@mui/material";
 import { PRESETS } from "@bublys-org/bubble-layout";
 import type { PresetId } from "@bublys-org/bubble-layout";
-import { FullscreenToggle } from "../../components/FullscreenToggle";
-import { useSpaceView } from "./SpaceViewContext";
+import { FullscreenToggle } from "./FullscreenToggle.js";
+import { useSpaceView } from "./SpaceViewContext.js";
 
 /** 口のボタン。押されているものだけ青く */
 const chip = (active: boolean): CSSProperties => ({

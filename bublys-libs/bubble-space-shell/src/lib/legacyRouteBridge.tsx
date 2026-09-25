@@ -23,9 +23,9 @@ import {
   createBubble,
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
-import { ShoreSpace } from "./ShoreSpace";
-import { WINDOW_GROUND } from "./ShowreLayer";
-import { useSpaceView } from "./SpaceViewContext";
+import { ShoreSpace } from "./ShoreSpace.js";
+import { WINDOW_GROUND } from "./ShowreLayer.js";
+import { useSpaceView } from "./SpaceViewContext.js";
 
 /** 旧の画面 1 枚を、新しい空間の文脈に繋ぐ */
 const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; children?: ReactNode }> = ({

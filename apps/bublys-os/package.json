@@ -3,14 +3,15 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@bublys-org/akashic-record": "*",
+    "@bublys-org/bubble-space-shell": "*",
     "@bublys-org/bubbles-ui": "*",
     "@bublys-org/domain-registry": "*",
-    "@bublys-org/state-management": "*",
-    "@bublys-org/object-shell": "*",
-    "@bublys-org/akashic-record": "*",
+    "@bublys-org/hash-world-line": "*",
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
-    "@bublys-org/hash-world-line": "*",
+    "@bublys-org/object-shell": "*",
+    "@bublys-org/state-management": "*",
     "@bublys-org/users-libs": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -22,7 +23,12 @@
   },
   "nx": {
     "targets": {
-      "dev": { "dependsOn": ["^dev"], "continuous": true }
+      "dev": {
+        "dependsOn": [
+          "^dev"
+        ],
+        "continuous": true
+      }
     }
   }
 }
