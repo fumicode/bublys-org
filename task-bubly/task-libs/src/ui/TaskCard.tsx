@@ -12,10 +12,9 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
   useAppSelector,
-  selectTaskList,
-  Task_タスク,
-  TaskStatus_ステータス,
 } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス } from "../domain/Task.domain.js";
+import { selectTaskList } from "../slice/task-slice.js";
 
 export const TaskCard: FC<{ taskId: string }> = ({ taskId }) => {
   const task = useAppSelector(selectTaskList).find((t) => t.id === taskId);

@@ -11,7 +11,7 @@ import { useCasScope } from "@bublys-org/world-line-graph";
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
 // gakkai-shiftは動的ロードに移行（プラグインテスト）
 // import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
-import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
+import { taskManagementBubbleRoutes } from "@bublys-org/task-libs";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";

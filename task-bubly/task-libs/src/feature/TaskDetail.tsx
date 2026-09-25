@@ -4,14 +4,11 @@ import { FC } from "react";
 import {
   useAppDispatch,
   useAppSelector,
-  selectSelectedTask,
-  selectTaskById,
-  updateTaskStatus,
-  updateTask,
-  TaskStatus_ステータス,
 } from "@bublys-org/state-management";
+import { TaskStatus_ステータス } from "../domain/Task.domain.js";
+import { selectSelectedTask, selectTaskById, updateTaskStatus, updateTask } from "../slice/task-slice.js";
 import { selectUsers } from "@bublys-org/users-libs";
-import { TaskDetailView } from "../ui/TaskDetailView";
+import { TaskDetailView } from "../ui/TaskDetailView.js";
 
 type TaskDetailProps = {
   taskId?: string;

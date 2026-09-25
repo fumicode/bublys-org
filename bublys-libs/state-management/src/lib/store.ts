@@ -16,7 +16,6 @@ import { counterSlice } from "./slices/counter-slice.js";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
-import { taskSlice } from "./slices/task-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -35,7 +34,6 @@ export const rootReducer = combineSlices(
   environmentSlice,
   memoSlice,
   pocketSlice,
-  taskSlice,
   // iframe-slices（単純なreducer）
   {
     app: appReducer,

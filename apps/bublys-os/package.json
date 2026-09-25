@@ -12,6 +12,7 @@
     "@bublys-org/launcher-model": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/state-management": "*",
+    "@bublys-org/task-libs": "*",
     "@bublys-org/users-libs": "*",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

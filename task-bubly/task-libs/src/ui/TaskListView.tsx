@@ -2,7 +2,7 @@
 
 import { FC } from "react";
 import styled from "styled-components";
-import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス } from "../domain/Task.domain.js";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 

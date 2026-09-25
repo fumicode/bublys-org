@@ -7,13 +7,12 @@ import { Button } from "@mui/material";
 import {
   useAppDispatch,
   useAppSelector,
-  selectTaskList,
-  addTask,
-  TaskJSON,
 } from "@bublys-org/state-management";
-import { TaskCard } from "./ui/TaskCard";
-import { TaskDetail } from "./feature/TaskDetail";
-import { useSeedTasks } from "./feature/useSeedTasks";
+import { TaskJSON } from "../domain/Task.domain.js";
+import { selectTaskList, addTask } from "../slice/task-slice.js";
+import { TaskCard } from "../ui/TaskCard.js";
+import { TaskDetail } from "../feature/TaskDetail.js";
+import { useSeedTasks } from "../feature/useSeedTasks.js";
 
 /**
  * 札 1 枚の大きさ。

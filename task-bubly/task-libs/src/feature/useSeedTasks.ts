@@ -9,10 +9,9 @@ import { useEffect } from "react";
 import {
   useAppDispatch,
   useAppSelector,
-  selectTaskList,
-  setTaskList,
-  TaskJSON,
 } from "@bublys-org/state-management";
+import { TaskJSON } from "../domain/Task.domain.js";
+import { selectTaskList, setTaskList } from "../slice/task-slice.js";
 
 const sampleTasks = (): TaskJSON[] => {
   const now = new Date().toISOString();

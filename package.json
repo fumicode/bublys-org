@@ -109,6 +109,7 @@
     "event-shift-puzzle/*",
     "csv-importer-bubly/*",
     "object-transformer-bubly/*",
-    "launcher-bubly/*"
+    "launcher-bubly/*",
+    "task-bubly/*"
   ]
 }

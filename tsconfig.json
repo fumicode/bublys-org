@@ -140,6 +140,12 @@
     },
     {
       "path": "./bublys-libs/bubble-space-shell"
+    },
+    {
+      "path": "./task-bubly/task-libs"
+    },
+    {
+      "path": "./task-bubly/task-app"
     }
   ]
 }

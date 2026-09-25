@@ -2,7 +2,7 @@
 
 import { FC, useState, useRef, useEffect } from "react";
 import styled from "styled-components";
-import { Task_タスク, TaskStatus_ステータス } from "@bublys-org/state-management";
+import { Task_タスク, TaskStatus_ステータス } from "../domain/Task.domain.js";
 import { UserState } from "@bublys-org/users-libs";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import PersonIcon from "@mui/icons-material/Person";
@@ -10,7 +10,7 @@ import { Button, Select, MenuItem, FormControl } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CheckIcon from "@mui/icons-material/Check";
 import ReplayIcon from "@mui/icons-material/Replay";
-import { EditableText } from "@/lib/EditableText";
+import { EditableText } from "@bublys-org/bubbles-ui";
 import EditIcon from "@mui/icons-material/Edit";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { getDragType, parseDragPayload, extractIdFromUrl } from "@bublys-org/bubbles-ui";
