@@ -60,6 +60,12 @@ export interface DrawInput {
    * 渡さなければ帯は描かない（ラボの素の海は関係を持たない）。
    */
   readonly openerOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /**
+   * **帯の出どころ。** 開いた泡の id → 押されたものの id。
+   * 一覧の札から開いたとき、`openerOf` は一覧（置き場所を決めた側）だが、
+   * 帯はこちら（札そのもの）から出す。無い／描かれていなければ `openerOf` に落ちる。
+   */
+  readonly originOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
   /** いま触れている泡。帯を見せるかどうかだけに使う */
   readonly hoveredId?: BubbleId | null;
 }
@@ -242,7 +248,12 @@ export function drawField(input: DrawInput): FieldDraw {
       };
     }
   }
-  return { items, bands: bandsOf(input.openerOf ?? null, input.hoveredId ?? null, layout, shown), handle, tinyIds };
+  return {
+    items,
+    bands: bandsOf(input.openerOf ?? null, input.originOf ?? null, input.hoveredId ?? null, layout, shown),
+    handle,
+    tinyIds,
+  };
 }
 
 /**
@@ -265,6 +276,7 @@ const zOf = (i: number): number => i * 2;
  */
 function bandsOf(
   openerOf: ReadonlyMap<BubbleId, BubbleId | null> | null,
+  originOf: ReadonlyMap<BubbleId, BubbleId | null> | null,
   hoveredId: BubbleId | null,
   layout: Layout,
   shown: ReadonlyMap<BubbleId, Placement>,
@@ -289,11 +301,18 @@ function bandsOf(
     const me = shown.get(p.id);
     if (!op || !me) continue;
     if (op.space !== me.space) continue; // 海をまたぐ帯は引かない（上の註）
-    const band = frustumBand(rectOf(op), rectOf(me));
+    /**
+     * ★ **出どころは押されたもの。** 一覧の札から開いたなら札から出す（札も泡なので矩形がある）。
+     *   海をまたぐかどうかは**開いた元**（一覧）で見る ── 札は一覧の中に居るので、
+     *   札で見ると必ずまたいでしまう。帯は層の兄弟として描くので切られない。
+     */
+    const originId = originOf?.get(p.id) ?? null;
+    const from = (originId ? shown.get(originId) : null) ?? op;
+    const band = frustumBand(rectOf(from), rectOf(me));
     if (!band) continue; // 一方が他方を含んでいる ── 帯は無い
     bands.push({
-      id: p.id, openerId, path: band.path, hue: op.b.state.hue ?? 0,
-      zIndex: zOf(i) - 1, on: hovered.has(p.id) || hovered.has(openerId),
+      id: p.id, openerId, path: band.path, hue: from.b.state.hue ?? 0,
+      zIndex: zOf(i) - 1, on: hovered.has(p.id) || hovered.has(openerId) || hovered.has(from.id),
     });
   }
   return bands;

@@ -47,6 +47,8 @@ export interface BubbleFieldProps {
    * 渡さなければ描かない ── 関係を持つのは海の側（`BubbleSpace`）の仕事。
    */
   readonly openerOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /** 帯の出どころ（押されたもの）。無ければ `openerOf` から出る */
+  readonly originOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
   /**
    * 帯の出し方。既定は `hover` ── **両端のどちらかに触れているときだけ**見せる
    * （旧い海と同じ。いつも出していると、開いた先が増えるほど海が塗り潰される）。
@@ -59,7 +61,7 @@ export interface BubbleFieldProps {
 export function BubbleField(props: BubbleFieldProps) {
   const {
     world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, dragging,
-    renderBubble, measureText, layerRef, marks, openerOf, bandDisplay = 'hover',
+    renderBubble, measureText, layerRef, marks, openerOf, originOf, bandDisplay = 'hover',
     className, style, ...handlers
   } = props;
 
@@ -77,10 +79,10 @@ export function BubbleField(props: BubbleFieldProps) {
     () =>
       drawField({
         world, layout, viewport, drawMin,
-        selectedId, hoverRing, skipGrab, openerOf, hoveredId,
+        selectedId, hoverRing, skipGrab, openerOf, originOf, hoveredId,
         measureText: measureText ?? measureTextInDom,
       }),
-    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, hoveredId, measureText],
+    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, originOf, hoveredId, measureText],
   );
 
   /**

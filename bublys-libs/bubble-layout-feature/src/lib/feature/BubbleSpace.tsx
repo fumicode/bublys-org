@@ -28,6 +28,12 @@ interface Opened {
   readonly url: string;
   readonly type: string;
   readonly openerId: BubbleId | null;
+  /**
+   * **押されたもの。** 一覧の札から開いたとき、`openerId` は一覧に読み替えられている
+   * （置き場所を決めるのは一覧なので）。こちらは読み替える前の**札そのもの**。
+   * 帯はここから出る ── 「一覧のどこから開いたか」が見えるように。
+   */
+  readonly originId: BubbleId | null;
   /** 開いた順（新しいほど大きい） */
   readonly at: number;
 }
@@ -376,6 +382,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [urls],
   );
 
+  /**
+   * **帯の出どころ。** 押されたものが泡なら（一覧の札はそれ自体が泡）、帯はその泡から出る。
+   * 一覧のどの札から開いたかが、そのまま形で見える。
+   */
+  const originOf = useMemo(
+    () => new Map([...urls].map(([id, u]) => [id, u.originId ?? null] as const)),
+    [urls],
+  );
+
   const openBubble = useCallback(
     (url: string, openerId?: BubbleId | null, label?: string): BubbleId => {
       if (openOutside) return openOutside(url, openerId ?? null) || '';
@@ -399,7 +414,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         joinWith: mateFor(world, urls, route.type, opener),
       });
       setWorld(r.world);
-      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: opener, at: seq.current }));
+      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: opener, originId: from, at: seq.current }));
       setSelectedId(id);
       return id;
     },
@@ -476,7 +491,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             )
           : opened.world,
       );
-      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, at }));
+      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, originId: null, at }));
       return id;
     },
     [routes, world, viewport, rules, setWorld, openCenter],
@@ -608,7 +623,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           w: w0, h: size.h, parent: hostId === 'root' ? null : hostId,
           order: w.kidsOf(hostId).length,
         }));
-        m.set(id, { url, type: route.type, openerId: hostId, at: n });
+        m.set(id, { url, type: route.type, openerId: hostId, originId: hostId, at: n });
       }
       /**
        * ★ 順序を 0.. に詰め直す。足すときの順序は「いまの子の数」なので、
@@ -763,7 +778,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
                    title: titleOf(routes, url), size: route.size, hue: route.hue, rules, keepLens: lensChosen.current }).world;
-      m.set(id, { url, type: route.type, openerId: null, at: n });
+      m.set(id, { url, type: route.type, openerId: null, originId: null, at: n });
     }
     seq.current = n;
     setUrls(m);
@@ -961,6 +976,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       >
         <BubbleField
           openerOf={openerOf}
+          originOf={originOf}
           world={world}
           layout={input.layout}
           viewport={viewport}

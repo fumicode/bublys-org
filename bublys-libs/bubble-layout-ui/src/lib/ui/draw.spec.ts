@@ -155,6 +155,24 @@ describe('描く ── 配置 → DOM の属性', () => {
       expect(draw.bands).toEqual([]);
     });
 
+    it('出どころが渡されたら、そこから出る（一覧の札から開いたとき）', () => {
+      const { world, layout } = field();
+      // 中に札を持つ泡（一覧の主）と、その札 1 枚
+      const card = layout.order.find((p) => p.space !== layout.order[0].space);
+      if (!card) throw new Error('入れ子の海がいない場面');
+      const host = card.space;
+      const openee = layout.order.find((p) => p.id !== host && p.space === layout.byId.get(host)?.space);
+      if (!openee) throw new Error('同じ海にもう 1 つ要る');
+      const draw = (originOf?: Map<string, string>) =>
+        drawField({
+          world, layout, viewport: VIEWPORT, measureText,
+          openerOf: new Map([[openee.id, host]]), originOf,
+        }).bands[0];
+      // 出どころが無ければ一覧の箱から、有れば札から
+      expect(draw()?.path).not.toBe(draw(new Map([[openee.id, card.id]]))?.path);
+      expect(draw(new Map([[openee.id, card.id]]))?.path).toContain(card.y.toFixed(0).slice(0, 2));
+    });
+
     it('見せるのは両端のどちらかに触れているとき', () => {
       const { world, layout, a, b } = pair();
       const bands = (hoveredId: string | null) =>
