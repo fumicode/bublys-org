@@ -56,6 +56,15 @@ export interface DrawInput {
   readonly skipGrab?: ReadonlySet<BubbleId> | null;
   /** 掴んでいる泡そのもの（箱の縁で切らないのはこれだけ） */
   readonly grabbedId?: BubbleId | null;
+  /**
+   * **補間しない泡。** 装いが出入りする泡がこれ。
+   *
+   * ★ 装いは箱の大きさ（その場で効く）と位置（320ms かけて補間）の**両方**を変える。
+   *   片方だけ補間すると、**中身が装いの高さぶん飛んでから戻ってくる**
+   *   ── 実測：選んだ札の中身が 27px 下がって、そこから元の位置へ 320ms かけて浮き上がった。
+   *   装いが出た泡は**そもそも動かない**（`resolve.ts` の `dressed`）ので、補間するものが無い。
+   */
+  readonly noTween?: ReadonlySet<BubbleId> | null;
   readonly measureText: MeasureText;
   /**
    * **どこから開いたか。** 開いた泡の id → 開いた元の id。
@@ -252,6 +261,7 @@ export function drawField(input: DrawInput): FieldDraw {
       hoverRing,
       skip,
       grabbed: input.grabbedId ?? null,
+      noTween: input.noTween ?? null,
       measureText,
     });
     items.push(item);
@@ -359,6 +369,7 @@ interface Ctx {
   readonly hoverRing: BubbleId | null;
   readonly skip: ReadonlySet<BubbleId> | null;
   readonly grabbed: BubbleId | null;
+  readonly noTween: ReadonlySet<BubbleId> | null;
   readonly measureText: MeasureText;
 }
 
@@ -393,6 +404,8 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
     '--h': st.hue == null ? 210 : st.hue,
     '--rows': rowsOf(bh),
   };
+  // ★ 装いが出入りする泡は補間しない（上の註）。動かないのだから、補間するものが無い
+  if (c.noTween?.has(b.id)) style['transition'] = 'none';
 
   /**
    * ★ **一覧の中身は、一覧の箱の中にだけ描く。**

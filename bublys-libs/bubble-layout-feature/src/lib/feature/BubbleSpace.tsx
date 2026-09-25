@@ -431,6 +431,22 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     return m;
   }, [selectedId, chrome]);
 
+  /**
+   * **補間しない泡** ── 装いが**出入りする**泡。いま着ている泡と、直前まで着ていた泡の 2 つ。
+   *
+   * ★ 脱ぐときも同じ（箱が縮むのはその場、位置の戻りは補間）ので、
+   *   直前の 1 つも覚えておかないと、選び直した瞬間に前の札が浮く。
+   */
+  const dressedBefore = useRef<BubbleId | null>(null);
+  const noTween = useMemo(() => {
+    const m = new Set<BubbleId>();
+    const now = [...dressed.keys()][0] ?? null;
+    if (now) m.add(now);
+    if (dressedBefore.current) m.add(dressedBefore.current);
+    dressedBefore.current = now;
+    return m;
+  }, [dressed]);
+
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
   const base = useMemo(
     () => resolveWorld(world, viewport, rules, chrome, nudge, dressed),
@@ -1092,6 +1108,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           selectedId={selectedId}
           skipGrab={input.skipGrab}
           grabbedId={input.grabbedId}
+          noTween={noTween}
           dragging={input.dragging}
           marks={input.marks}
           layerRef={layerRef}
