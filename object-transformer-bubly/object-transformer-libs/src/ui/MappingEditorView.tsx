@@ -25,6 +25,8 @@ export type MappingEditorViewProps = {
   onAcceptSuggestion: (targetPath: string) => void;
   onAcceptAllSuggestions: () => void;
   onSaveRule: (name: string) => void;
+  /** 保存したルールの一覧を開く */
+  onOpenRules: () => void;
 };
 
 const FIELD_DND_TYPE = "application/x-object-transformer-field";
@@ -44,6 +46,7 @@ export const MappingEditorView: FC<MappingEditorViewProps> = ({
   onAcceptSuggestion,
   onAcceptAllSuggestions,
   onSaveRule,
+  onOpenRules,
 }) => {
   const [ruleName, setRuleName] = useState("");
   const mappedSourcePaths = mappings.map((m) => m.sourcePath);
@@ -73,6 +76,17 @@ export const MappingEditorView: FC<MappingEditorViewProps> = ({
 
   return (
     <StyledMappingEditor>
+      {/*
+        ★ **保存したルールへ行ける道が無かった。** ルールを保存はできるのに、
+          その一覧（と、そこから開く一括変換）を開く口がどこにも無く、
+          保存したものが**二度と取り出せない**画面になっていた。
+      */}
+      <div className="e-bar">
+        <button className="e-rules-btn" onClick={onOpenRules}>
+          保存したルール
+        </button>
+      </div>
+
       <div className="e-panels">
         <div className="e-panel-left">
           <h3 className="e-panel-title">ソース</h3>
@@ -139,6 +153,26 @@ export const MappingEditorView: FC<MappingEditorViewProps> = ({
 };
 
 const StyledMappingEditor = styled.div`
+  .e-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+
+  .e-rules-btn {
+    padding: 4px 11px;
+    border: 1px solid rgba(27, 32, 41, 0.22);
+    border-radius: 6px;
+    background: #fff;
+    color: #1b2029;
+    font: 600 13px/1.5 -apple-system, sans-serif;
+    cursor: pointer;
+
+    &:hover {
+      background: #f5f5f5;
+    }
+  }
+
   .e-panels {
     display: grid;
     grid-template-columns: 1fr 1fr;

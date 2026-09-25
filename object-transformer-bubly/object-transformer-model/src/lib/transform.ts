@@ -37,6 +37,22 @@ export function getAtPath(obj: unknown, path: readonly string[]): unknown {
 const isIndexStep = (step: string): boolean => /^\d+$/.test(step);
 
 /**
+ * path の位置の値を**全部**取る。
+ *
+ * ★ 見本を出すだけなら最初の一つで足りる（{@link getAtPath}）が、
+ *   **出来たものを見せる**ときはそれでは嘘になる ── 並びに 100 積んだのに
+ *   1 つしか映らない。並びの中を指す段に出会ったら、そこから先は枝分かれして数える。
+ */
+export function collectAtPath(obj: unknown, path: readonly string[]): unknown[] {
+  if (path.length === 0) return obj === undefined ? [] : [obj];
+  if (obj === null || obj === undefined || typeof obj !== "object") return [];
+  const [head, ...rest] = path;
+  const next = (obj as Record<string, unknown>)[arrayNameOf(head)];
+  if (!isElementStep(head)) return collectAtPath(next, rest);
+  return Array.isArray(next) ? next.flatMap((item) => collectAtPath(item, rest)) : [];
+}
+
+/**
  * path の位置に値を置く。途中が無ければ作る。
  *
  * ★ **作るものは次の段が決める。** 次が「何番目」なら並び、そうでなければもの ──

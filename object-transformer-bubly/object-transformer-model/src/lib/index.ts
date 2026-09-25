@@ -9,6 +9,7 @@ export type {
 } from "./MappingRule.js";
 
 export {
+  collectAtPath,
   applyMappingRule,
   applyTransform,
   getAtPath,

@@ -3,25 +3,32 @@
 import { FC } from "react";
 import styled from "styled-components";
 import {
-  getAtPath,
+  collectAtPath,
   stringToPath,
   type MappingRuleState,
 } from "@bublys-org/object-transformer-model";
 
 type BatchConvertViewProps = {
   rule: MappingRuleState;
+  /** 落とされたものの名前（まだ何も落ちていなければ null） */
+  sourceLabel: string | null;
   sourceCount: number;
   results: Record<string, unknown>[] | null;
   onConvert: () => void;
   onBack: () => void;
+  onDropSource: (e: React.DragEvent) => void;
+  onDragOverSource: (e: React.DragEvent) => void;
 };
 
 export const BatchConvertView: FC<BatchConvertViewProps> = ({
   rule,
+  sourceLabel,
   sourceCount,
   results,
   onConvert,
   onBack,
+  onDropSource,
+  onDragOverSource,
 }) => {
   return (
     <StyledBatchConvert>
@@ -30,6 +37,24 @@ export const BatchConvertView: FC<BatchConvertViewProps> = ({
           ← 戻る
         </button>
         <h3 className="e-title">一括変換: {rule.name}</h3>
+      </div>
+
+      {/*
+        ★ **相手は落として渡す。** 前はここが置き石（いつも 0 件）で、変換を実行しても
+          何も起きなかった。表の一覧を掴んで落とせば、その行ぜんぶが相手になる。
+      */}
+      <div
+        className={`e-dropzone ${sourceLabel ? "filled" : ""}`}
+        onDrop={onDropSource}
+        onDragOver={onDragOverSource}
+      >
+        {sourceLabel ? (
+          <span className="e-dropzone-filled">
+            {sourceLabel}（{sourceCount} 件）
+          </span>
+        ) : (
+          <span className="e-dropzone-empty">変換する相手をここに落とす</span>
+        )}
       </div>
 
       <div className="e-info">
@@ -65,9 +90,16 @@ export const BatchConvertView: FC<BatchConvertViewProps> = ({
                 {results.map((row, i) => (
                   <tr key={i}>
                     <td>{i + 1}</td>
+                    {/*
+                      ★ **並びに入れたものは、全部見せる**（`collectAtPath`）。
+                        最初の一つだけ出していたころは、100 行を 1 つの並びに積んでも
+                        結果が 1 件 1 つにしか見えず、**流れたのかどうか判らなかった**。
+                    */}
                     {rule.mappings.map((m) => (
                       <td key={m.targetPath}>
-                        {String(getAtPath(row, stringToPath(m.targetPath)) ?? "")}
+                        {collectAtPath(row, stringToPath(m.targetPath))
+                          .map((v) => String(v ?? ""))
+                          .join(" / ")}
                       </td>
                     ))}
                   </tr>
@@ -82,6 +114,27 @@ export const BatchConvertView: FC<BatchConvertViewProps> = ({
 };
 
 const StyledBatchConvert = styled.div`
+  .e-dropzone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 2px dashed #bbb;
+    border-radius: 6px;
+    color: #888;
+    font-size: 0.9em;
+    text-align: center;
+
+    &.filled {
+      border-style: solid;
+      border-color: #4caf50;
+      color: #2e7d32;
+      font-weight: 600;
+    }
+  }
+
   .e-header {
     display: flex;
     align-items: center;

@@ -48,6 +48,7 @@ export const CsvObjectListFeature: FC<CsvObjectListFeatureProps> = ({
       titleColumnId={meta?.titleColumnId}
       onChangeTitleColumn={handleChangeTitleColumn}
       buildObjectUrl={buildObjectUrl}
+      listUrl={`csv-importer/sheets/${sheetId}/objects`}
     />
   );
 };

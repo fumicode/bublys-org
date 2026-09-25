@@ -1,7 +1,8 @@
 'use client';
 
-import { FC, useState, useCallback, useMemo } from "react";
+import { FC, useContext, useState, useCallback, useMemo } from "react";
 import {
+  BubblesContext,
   parseDragPayload,
   getObjectType,
 } from "@bublys-org/bubbles-ui";
@@ -74,6 +75,14 @@ function resolveDropped(e: React.DragEvent): DroppedSide | null {
     }
   }
 
+  /**
+   * ★ **並びで来たら、最初の 1 件を見本にする。**
+   *   繋ぎは「どの項目をどこへ」を決めるものなので、見るのは 1 件でよい ──
+   *   表の一覧をそのまま落としても、**繋ぎを作るときは先頭の行が相手**になる
+   *   （全部に流すのは一括変換の仕事）。読むときの `[]` が最初の一つなのと同じ決まり。
+   */
+  if (Array.isArray(raw)) raw = raw.length > 0 ? raw[0] : null;
+
   // 優先度2: 生データから推論
   if (raw !== null && typeof raw === "object") {
     const label =
@@ -129,8 +138,9 @@ const inferTransform = (schema: DomainSchema, targetPath: string): ValueTransfor
   return { type: "identity" };
 };
 
-export const MappingEditorFeature: FC<MappingEditorFeatureProps> = () => {
+export const MappingEditorFeature: FC<MappingEditorFeatureProps> = ({ bubbleId }) => {
   const { saveRule } = useTransformer();
+  const { openBubble } = useContext(BubblesContext);
 
   const [source, setSource] = useState<DroppedSide | null>(null);
   const [target, setTarget] = useState<DroppedSide | null>(null);
@@ -252,6 +262,10 @@ export const MappingEditorFeature: FC<MappingEditorFeatureProps> = () => {
     [target, mappings, saveRule]
   );
 
+  const handleOpenRules = useCallback(() => {
+    if (bubbleId) openBubble("object-transformer/rules", bubbleId);
+  }, [openBubble, bubbleId]);
+
   return (
     <MappingEditorView
       sourceLabel={source?.label ?? null}
@@ -268,6 +282,7 @@ export const MappingEditorFeature: FC<MappingEditorFeatureProps> = () => {
       onAcceptSuggestion={handleAcceptSuggestion}
       onAcceptAllSuggestions={handleAcceptAllSuggestions}
       onSaveRule={handleSaveRule}
+      onOpenRules={handleOpenRules}
     />
   );
 };

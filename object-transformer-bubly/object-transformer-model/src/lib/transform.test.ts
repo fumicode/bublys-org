@@ -1,6 +1,7 @@
 import {
   applyTransform,
   applyMappingRule,
+  collectAtPath,
   getAtPath,
   setAtPath,
 } from "./transform.js";
@@ -206,5 +207,29 @@ describe("並びの中へ繋ぐ", () => {
   it("読むときの [] は最初の一つ（見本のため）", () => {
     const memo = { blocks: [{ content: "題名" }, { content: "二行目" }] };
     expect(getAtPath(memo, ["blocks[]", "content"])).toBe("題名");
+  });
+});
+
+describe("出来たものを読む", () => {
+  const memo = {
+    id: "m1",
+    blocks: [{ content: "題名" }, { content: "こんにちは" }, { content: "また明日" }],
+  };
+
+  it("並びの中を指す道は、全部取れる", () => {
+    expect(collectAtPath(memo, ["blocks[]", "content"])).toEqual([
+      "題名",
+      "こんにちは",
+      "また明日",
+    ]);
+  });
+
+  it("並びの外は 1 つだけ", () => {
+    expect(collectAtPath(memo, ["id"])).toEqual(["m1"]);
+  });
+
+  it("無いものは空", () => {
+    expect(collectAtPath(memo, ["tags[]", "name"])).toEqual([]);
+    expect(collectAtPath(memo, ["authorId"])).toEqual([]);
   });
 });

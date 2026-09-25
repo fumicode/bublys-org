@@ -33,10 +33,13 @@ const RuleListBubble: BubbleRoute["Component"] = ({ bubble }) => {
 const BatchConvertBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <TransformerProvider>
+      {/* ★ 詳細の中身は枠から 12px 内側に置く（ほかの詳細と同じ） */}
+      <div style={{ padding: 12 }}>
       <BatchConvertFeature
         ruleId={bubble.params.ruleId}
         bubbleId={bubble.id}
       />
+      </div>
     </TransformerProvider>
   );
 };
@@ -47,6 +50,8 @@ export const objectTransformerBubbleRoutes: BubbleRoute[] = [
     pattern: "object-transformer/rules/:ruleId/convert",
     type: "batch-convert",
     Component: BatchConvertBubble,
+    /** 落とし口と結果の表が縦に並ぶので、エディタと同じくらいの箱が要る */
+    bubbleOptions: { defaultSize: { width: 560, height: 420 } },
   },
   {
     pattern: "object-transformer/rules",

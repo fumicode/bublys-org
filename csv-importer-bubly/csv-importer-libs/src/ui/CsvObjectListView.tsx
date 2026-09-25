@@ -12,6 +12,8 @@ type CsvObjectListViewProps = {
   titleColumnId?: string;
   onChangeTitleColumn: (columnId: string) => void;
   buildObjectUrl: (objectId: string) => string;
+  /** この一覧そのものの url。一覧まるごとを掴んで渡すのに要る */
+  listUrl: string;
 };
 
 export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
@@ -21,6 +23,7 @@ export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
   titleColumnId,
   onChangeTitleColumn,
   buildObjectUrl,
+  listUrl,
 }) => {
   const getPreviewProperties = (obj: PlaneObject): { key: string; value: string }[] => {
     return Object.entries(obj)
@@ -32,7 +35,30 @@ export const CsvObjectListView: FC<CsvObjectListViewProps> = ({
   return (
     <StyledObjectList>
       <div className="e-header">
-        <h3 className="e-title">{sheetName}</h3>
+        {/*
+          ★ **一覧まるごとも掴める。** 1 行ずつしか掴めなかったので、
+            「この表ぜんぶを変換する」が渡せなかった（変換の相手は 1 件ずつ拾うしかない）。
+            渡し方は 1 行のときと同じ規約 ── 型つきのドラッグに `application/json` で
+            実データを載せる。載せるのが**行の並び**になるだけ。
+        */}
+        <div
+          className="e-title-grab"
+          onDragStart={(e) => {
+            e.dataTransfer.setData("application/json", JSON.stringify(objects));
+          }}
+        >
+          <ObjectView
+            type="CsvObjectList"
+            url={listUrl}
+            label={sheetName}
+            draggable={true}
+            openingPosition="bubble-side-right"
+          >
+            <h3 className="e-title" title="掴んで渡すと、この表ぜんぶが相手になる">
+              {sheetName}
+            </h3>
+          </ObjectView>
+        </div>
         <div className="e-title-selector">
           <label className="e-label">タイトル列:</label>
           <select
