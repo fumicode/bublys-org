@@ -25,15 +25,22 @@ import { registerLaunchTargets, type LaunchTarget } from "@bublys-org/launcher-l
  *   すでに保存されている呼び出しは {@link RETIRED_LAUNCH_URLS} で差し替える。
  */
 export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
-  { url: "igo-games", label: "囲碁ゲーム", icon: <SportsEsportsIcon sx={{ color: "#dcb35c" }} /> },
-  { url: "task-management/tasks", label: "タスク管理", icon: <AssignmentIcon color="primary" /> },
-  { url: "user-groups", label: "グループ", icon: <GroupsIcon color="action" /> },
+  /**
+   * ★ **使いそうな順。** はじめて開いた人が手を伸ばす順に並べる ──
+   *   すぐ書けるもの（メモ・タスク）、次に人と表（ユーザー・グループ・CSV）、
+   *   そのうえで道具（変換）と遊び（囲碁）。
+   * ★ **下の 2 つは決まり**：いちばん下が「バブリを追加」、その上が「ユニバース」。
+   *   どちらも中身ではなく**器を足す/覗く**ものなので、並びの端に置く。
+   */
   { url: "memos", label: "メモ", icon: <NoteIcon color="action" /> },
+  { url: "task-management/tasks", label: "タスク管理", icon: <AssignmentIcon color="primary" /> },
   { url: "users", label: "ユーザー", icon: <PersonIcon color="action" /> },
+  { url: "user-groups", label: "グループ", icon: <GroupsIcon color="action" /> },
   { url: "csv-importer/sheets", label: "CSV インポーター", icon: <TableChartIcon color="primary" /> },
   { url: "object-transformer/editor", label: "変換エディタ", icon: <TransformIcon color="primary" /> },
-  { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
+  { url: "igo-games", label: "囲碁ゲーム", icon: <SportsEsportsIcon sx={{ color: "#dcb35c" }} /> },
   { url: "pocket", label: "ポケット", icon: <WorkspacesIcon sx={{ color: "#6ea8ff" }} /> },
+  { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
   { url: "bubly-loader", label: "バブリを追加", icon: <ExtensionIcon color="action" /> },
 ];
 

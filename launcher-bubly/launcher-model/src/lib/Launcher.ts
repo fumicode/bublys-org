@@ -91,6 +91,25 @@ export class Launcher {
     });
   }
 
+  /**
+   * **決まった並びへ揃える。** `urls` に有るものはその順に前へ、無いものは後ろにそのまま。
+   *
+   * ★ entry の id は引き継ぐ（消して足し直すのではなく、並べ替えるだけ）。
+   * ★ 標準の呼び出しの順番を後から変えたとき、**すでに使っている人の並びにも効かせる**
+   *   ために要る。足りないものを足すだけでは、古い並びのまま末尾に付くだけになる。
+   * ★ 標準に無いもの（読み込んだバブリなど）は触らない。人が足したものを、
+   *   こちらの都合で並べ替えない。
+   */
+  ordered(urls: readonly string[]): Launcher {
+    const rank = new Map(urls.map((url, i) => [url, i]));
+    const known = this.state.entries.filter((e) => rank.has(e.url));
+    const rest = this.state.entries.filter((e) => !rank.has(e.url));
+    const sorted = [...known].sort((a, b) => (rank.get(a.url) ?? 0) - (rank.get(b.url) ?? 0));
+    const same = sorted.every((e, i) => e === known[i]) && rest.every((e, i) => e === this.state.entries[known.length + i]);
+    if (same) return this;
+    return new Launcher({ ...this.state, entries: [...sorted, ...rest] });
+  }
+
   /** entry を toIndex の位置へ並び替える */
   move(entryId: string, toIndex: number): Launcher {
     const from = this.state.entries.findIndex((e) => e.id === entryId);

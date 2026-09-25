@@ -24,6 +24,9 @@ const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
  * - 集約が無ければ、OS 標準の呼び出しで作る
  * - 行き先が変わった呼び出しは差し替える（足す前に。でないと古いのと新しいのが並ぶ）
  * - 有っても足りないものがあれば足す（あとから増えた呼び出しが出てこないので）
+ * - **標準の並び順に揃える**（`ordered`）。足すだけだと、順番を変えても
+ *   すでに使っている人は古い並びのままで、新しいものが末尾に付くだけになる。
+ *   標準に無いもの（読み込んだバブリ）は触らない
  *
  * OS 標準の呼び出しには外す口が無いので、足すだけで辻褄が合う
  * （ロードしたバブリの `<name>-bubly` は標準ではないので、ここは触らない）。
@@ -40,8 +43,9 @@ export const useEnsureMainLauncherEntity = () => {
     const launcher = Launcher.fromPlain(mainLauncher);
     const moved = Object.entries(RETIRED_LAUNCH_URLS).reduce((l, [from, to]) => l.rename(from, to), launcher);
     const missing = DEFAULT_LAUNCHER_URLS.filter((url) => !moved.urls.includes(url));
-    if (moved === launcher && missing.length === 0) return;
-    dispatch(setLauncher(missing.reduce((l, url) => l.add(url), moved).toPlain()));
+    const next = missing.reduce((l, url) => l.add(url), moved).ordered(DEFAULT_LAUNCHER_URLS);
+    if (next === launcher) return;
+    dispatch(setLauncher(next.toPlain()));
   }, [dispatch, mainLauncher]);
 };
 
