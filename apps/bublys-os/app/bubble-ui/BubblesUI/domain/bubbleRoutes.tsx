@@ -55,8 +55,15 @@ const routes: BubbleRoute[] = [
     pattern: /^world-lines$/,
     type: "world-lines",
     Component: WorldLineHomeBubble,
-    // 木を描く canvas なので、開いた先はそれなりの広さが要る
-    bubbleOptions: { defaultSize: { width: 520, height: 340 } },
+    /**
+     * ★ 地は**暗いほうへ**（囲碁・メモの世界線と同じ値）。既定の明るい地のままだと
+     *   canvas が白い板になって、節も枝も**読めるのに読みにくい**（線は明るい色で描く）。
+     * ★ 木を描く canvas なので、開いた先はそれなりの広さが要る。
+     */
+    bubbleOptions: {
+      contentBackground: "rgba(15,18,28,0.3)",
+      defaultSize: { width: 520, height: 340 },
+    },
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用

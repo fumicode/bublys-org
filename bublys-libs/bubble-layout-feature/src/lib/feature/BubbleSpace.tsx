@@ -537,8 +537,10 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         next.delete(id);
         return next;
       });
+      // 岸へ出て行くのも**顔ぶれの変化**（受け取ったのが誰かは、海の関心ではない）
+      markSettled('members');
     },
-    [world, setWorld],
+    [world, setWorld, markSettled],
   );
 
   const claimDrop = useCallback(
@@ -662,13 +664,28 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    * 外の空間のレンズを変える。書くのは View の 1 つの軸だけ（泡の値は 1 つも書かない）。
    * 一度でも選ばれたら、以後 `openAt` はレンズに触らない（選んだ向きが残る）。
    */
-  const setLens = useCallback(
+  const applyLens = useCallback(
     (axis: PlaneAxis, lens: LensId) => {
       lensChosen.current = true;
       setWorld(withAxis(world, 'root', axis, { lens }));
+    },
+    [world, setWorld],
+  );
+  /**
+   * 人が向きを選んだ ── **これは節目**（`markSettled`）。
+   *
+   * ★ **まかせた結果の付け替えは節目にしない**（下の `autoLens` は `applyLens` を呼ぶ）。
+   *   あれは並びに合わせて機械が付け替えるだけで、人が決めたことではない ──
+   *   節目にしていたころは、世界線の節を押して戻るたびに
+   *   「まかせが働いて向きが変わった」が**もう 1 つの節として生まれて**いた
+   *   （戻った先で分岐が 1 つ増える）。
+   */
+  const setLens = useCallback(
+    (axis: PlaneAxis, lens: LensId) => {
+      applyLens(axis, lens);
       markSettled('view');
     },
-    [world, setWorld, markSettled],
+    [applyLens, markSettled],
   );
 
   /**
@@ -985,9 +1002,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const want: LensId = fitsParallel(L, axis) ? 'parallel' : 'fisheye';
       // 口の見た目は**いつも**合わせる（変えたときだけだと、点けた瞬間の姿がずれる）
       onLens?.(axis, want);
-      if (L.view[axis].lens !== want) setLens(axis, want);
+      if (L.view[axis].lens !== want) applyLens(axis, want);
     }
-  }, [autoLens, base, setLens, onLens]);
+  }, [autoLens, base, applyLens, onLens]);
 
   const api: BubbleSpaceApi = useMemo(
     () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),

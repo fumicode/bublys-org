@@ -44,6 +44,7 @@ import {
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer.js";
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
 import { putIntoWindow } from "./legacyRouteBridge.js";
+import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
 export type Home = (viewport: { width: number; height: number }) => Docked;
@@ -75,8 +76,11 @@ export type ShoreSpaceProps = {
   readonly homesReady?: boolean;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
-  /** 記録するに値することが起きた合図（`SettleWhy`）。世界線を記録する側が受ける */
-  readonly onSettled?: (why: SettleWhy) => void;
+  /**
+   * **この海の世界線を、どの scope に記録するか。** 渡さなければ記録しない。
+   * 記録するのは海の姿と**岸に貼ってあるもの**（`SeaWorldLine` の註）。
+   */
+  readonly worldLineScope?: string;
   readonly autoLens?: boolean;
   /** どこから開いたかの帯の出し方（海ぜんぶの見え方） */
   readonly bandDisplay?: 'hover' | 'always' | 'none';
@@ -187,7 +191,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homes,
   homesReady = true,
   onSpaceReady,
-  onSettled,
+  worldLineScope,
   autoLens,
   bandDisplay,
   persistKey,
@@ -216,6 +220,41 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   useEffect(() => {
     if (persistKey) SHORE_MEMORY.set(persistKey, docked);
   }, [persistKey, docked]);
+
+  /**
+   * **節目ごとに、海と岸の姿を世界線へ。** 渡されていなければ何もしない。
+   * 岸の貼り替えも節目なので、ここ（岸を持っている側）で記録する。
+   */
+  const setShore = useCallback((next: readonly Docked[]) => setDocked(next), []);
+  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore);
+
+  /**
+   * **岸で起きた節目を知らせる口。**
+   *
+   * ★ 岸の配列を**見張らない**。岸は機械の都合でも作り変わる（画面の大きさが変わった、
+   *   定位置を置き直した、戻した先で並べ直した）ので、見張ると機械の後始末まで
+   *   節になってしまう ── 知らせるのは**人が触った口から**だけ。
+   * ★ 知らせは 1 拍おいてから（`useEffect`）。貼った・動かしたの直後は、まだ
+   *   海も岸も state に落ちていないので、その場で姿を読むと**ひとつ前**を記録してしまう。
+   */
+  const [shoreBeat, setShoreBeat] = useState(0);
+  const shoreWhy = useRef<SettleWhy>('members');
+  const noteShore = useCallback((why: SettleWhy) => {
+    shoreWhy.current = why;
+    setShoreBeat((n) => n + 1);
+  }, []);
+  /**
+   * ★ 見るのは**拍だけ**。`record` を依存に入れると、世界線の中身が変わるたびに
+   *   作り直される（＝ 記録したその瞬間に）ので、**岸を触っていないのに知らせが走る**
+   *   ── 戻した先で 4 回走って、余計な節が生まれていた（実測）。
+   *   呼ぶ相手は覚え書きから取る。
+   */
+  const recordRef = useRef(record);
+  recordRef.current = record;
+  useEffect(() => {
+    if (shoreBeat === 0) return;
+    recordRef.current(shoreWhy.current);
+  }, [shoreBeat]);
   /** 種は名前ごとに 1 回だけ。貼り直しでまき直さない（上の `SHORE_SEEDED` を見よ） */
   const seeds = useMemo(() => {
     if (!persistKey) return initialUrls;
@@ -353,9 +392,11 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       // 地は海に浮いているときと同じもの（窓は自分の夜空を持っている）
       const g = matchBubbleRoute(routes, info.url)?.ground ?? "light";
       setDocked((list) => [...list, { key: `${info.url}#${Date.now()}`, url: info.url, ground: g, ...hit }]);
+      // 貼ったのは人。海の側は「泡が 1 つ減った」としか知らないので、ここから知らせる
+      noteShore('members');
       return true;
     },
-    [docked, vp, routes],
+    [docked, vp, routes, noteShore],
   );
 
   /** ドラッグ中 ── 縁の近くなら、着いたあとの矩形を予告する（大きさは貼るときと同じ規則） */
@@ -574,7 +615,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          *   註で「宿題」と書いてあったもの）。同じ名前で海も覚える。
          */
         memoryKey={persistKey}
-        onSettled={onSettled}
+        onSettled={record}
         autoLens={autoLens}
         bandDisplay={bandDisplay}
         openArea={openArea}
@@ -605,9 +646,11 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         join={join}
         extraSeas={extraSeas}
         onSeas={sink ? handOver : undefined}
-        onUpdate={(key, next) =>
-          setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)))
-        }
+        onUpdate={(key, next) => {
+          setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)));
+          // 岸の上で動かした・大きさを変えた（剥がすほうは海の `takeIn` が知らせる）
+          noteShore('moved');
+        }}
         onUndock={(key, rect) => {
           const d = docked.find((x) => x.key === key);
           setDocked((list) => list.filter((x) => x.key !== key));

@@ -28,7 +28,6 @@ import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
-import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
@@ -92,8 +91,6 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
     },
     [onSpaceReady],
   );
-  /** 節目ごとに、海の姿を世界線へ（渡されていなければ何もしない） */
-  const record = useSeaWorldLine(worldLineScope, spaceRef);
 
   /**
    * 定位置を置いてよいか ── **画面の大きさを測り終えてから**。
@@ -170,7 +167,8 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         homes={homes}
         homesReady={homesReady}
         onSpaceReady={handleSpaceReady}
-        onSettled={record}
+        /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
+        worldLineScope={worldLineScope}
         autoLens={autoLens}
         bandDisplay={bandsAlways ? 'always' : 'hover'}
         onLens={onLens}
