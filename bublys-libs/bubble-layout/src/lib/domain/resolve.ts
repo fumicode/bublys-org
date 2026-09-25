@@ -250,10 +250,29 @@ function resolveSpace(
    */
   for (const axis of ['x', 'y'] as const) {
     const reserve = view[axis].reserve ?? 0;
-    if (reserve <= 0 || !arr[axis].bands.length) continue;
+    if (!arr[axis].bands.length) continue;
     const pad = padOf(world, spaceId);
     const half = (axis === 'x' ? own.w : own.h) / 2;
     const lo = Math.min(...arr[axis].bands.map((b) => b.start));
+    const hi = Math.max(...arr[axis].bands.map((b) => b.end));
+    /**
+     * ★ **収まらない並びは始端ぞろえ。** 中央ぞろえは「収まるからこそ」意味がある
+     *   ── 収まらないものを中央に置くと、**始めと終わりが同じだけ箱の外へ出る**。
+     *   一覧はふつう頭から読むものなので、見えているのが真ん中からでは
+     *   「頭に戻る」から始めなければならない（実測：格子に切り替えると
+     *   いちばん上の行が箱の上へ出て、送らないと 1 行目が見えなかった）。
+     *   終わりのほうは送れば見に行ける（`fitFocus`）。
+     * ★ 見るのは**平行な軸だけ**。魚眼・透視はレンズが箱に収めてしまうので、
+     *   「はみ出す」という事がそもそも起きない（模型の値で測ると必ずはみ出して見える）。
+     * ★ **並べている向きだけ。** その軸に次元が刺さっていなければ、はみ出しているのは
+     *   「札 1 枚が箱より大きい」だけで、順序が無い ── 頭も終わりも無いのだから
+     *   真ん中のままでよく、見たい所へは送って行く（`fitFocus`）。
+     */
+    const over =
+      view[axis].lens === 'parallel' &&
+      view[axis].dim !== 'none' &&
+      hi - lo > half * 2 - pad * 2 - reserve;
+    if (reserve <= 0 && !over) continue;
     arr[axis] = shifted(arr[axis], -half + pad + reserve - lo);
   }
 

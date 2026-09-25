@@ -45,7 +45,14 @@ describe('② 泡をドラッグする', () => {
       w, { layout, id: 'v4', space: 'fish', want: { x: 388.4412856837971, y: 271.75 }, m: p.m }, DEFAULT_RULES,
     );
     expect(next.bubble('fish')?.state.focus.x).toBe(-110.48881297487148);
-    expect(next.bubble('fish')?.state.focus.y).toBe(0);
+    /**
+     * ★ **ラボとの違い（承知の上）。** ラボは 0。
+     *   この空間は枝（Y・平行・刻み 44）が 3 本で 132、箱の中身は 128 ── **4px はみ出している**。
+     *   「収まらない並びは始端ぞろえ」の規則（`resolve.ts`）で並びが 2px 上へ寄るので、
+     *   掴んだ点を指の下に保つぶん、焦点もその 2px ぶんだけ動く。
+     *   ラボにこの規則は無かった（はみ出しても中央ぞろえのままだった）。
+     */
+    expect(next.bubble('fish')?.state.focus.y).toBe(2);
     // 泡そのものの値は1つも変わらない
     expect(next.bubble('v4')?.state).toEqual(before);
   });
