@@ -13,6 +13,7 @@ export * from './lib/utils/url-parser.js';
 export * from './lib/utils/drag-types.js';
 export * from './lib/components/UrledPlace.js';
 export * from './lib/components/EditableText.js';
+export * from './lib/context/FocusedObjectContext.js';
 export * from './lib/object-view/ObjectTypeRegistry.js';
 export * from './lib/object-view/ObjectView.js';
 

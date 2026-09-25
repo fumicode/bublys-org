@@ -1,9 +1,9 @@
 'use client';
 import { useEffect } from 'react';
-import { MemoEditor } from '../Memo/ui/MemoEditor';
-import { MemoTitle } from '../Memo/ui/MemoTitle';
-import { useMemoWorldLine } from '../Memo/feature/useMemoWorldLine';
-import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { MemoEditor } from '../ui/MemoEditor.js';
+import { MemoTitle } from '../ui/MemoTitle.js';
+import { useMemoWorldLine } from './useMemoWorldLine.js';
+import { useFocusedObject } from '@bublys-org/bubbles-ui';
 
 type MemoWorldLineIntegrationProps = {
   memoId: string;

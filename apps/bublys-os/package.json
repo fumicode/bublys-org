@@ -10,6 +10,7 @@
     "@bublys-org/hash-world-line": "*",
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
+    "@bublys-org/memo-libs": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/task-libs": "*",

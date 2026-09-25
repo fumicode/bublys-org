@@ -1,5 +1,5 @@
 import { defineDomainObjects } from "@bublys-org/domain-registry";
-import { Memo, RawMemo } from "./Memo";
+import { Memo, RawMemo } from "./Memo.js";
 
 /**
  * メモを world-line-graph 上の CAS shell として扱うための domain-registry 定義。

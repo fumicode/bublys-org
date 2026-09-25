@@ -14,7 +14,7 @@ import { UserIcon, UserGroupIcon } from "@bublys-org/users-libs";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import AssignmentIcon from "@mui/icons-material/Assignment";
-import { MemoIcon } from "./world-line/Memo/ui/MemoIcon";
+import { MemoIcon } from "@bublys-org/memo-libs";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import React from "react";
 

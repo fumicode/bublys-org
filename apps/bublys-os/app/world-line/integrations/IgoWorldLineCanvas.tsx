@@ -4,7 +4,7 @@ import { useCasScope } from '@bublys-org/world-line-graph';
 import { WorldLineScopeView, useScopeNodeSummaries, moveToSiblingBranch } from '@bublys-org/bubbles-ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
 import { IGO_GAME_TYPE, igoScopeId } from '../../igo-game/domain/IgoGameDomain';
-import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from "@bublys-org/bubbles-ui";
 
 // 各ノードの要約 = その局面の手数。
 const formatMoves = (g: unknown) => {

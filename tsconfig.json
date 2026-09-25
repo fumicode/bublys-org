@@ -146,6 +146,12 @@
     },
     {
       "path": "./task-bubly/task-app"
+    },
+    {
+      "path": "./memo-bubly/memo-libs"
+    },
+    {
+      "path": "./memo-bubly/memo-app"
     }
   ]
 }

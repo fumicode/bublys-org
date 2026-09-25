@@ -1,9 +1,9 @@
-import { Memo, MemoBlock } from '../domain/Memo';
+import { Memo, MemoBlock } from '../domain/Memo.js';
 import { IconButton } from '@mui/material';
 import { useRef } from 'react';
 import { LuClipboardCopy } from 'react-icons/lu';
 import styled from 'styled-components';
-import { useFocusedObject } from '../../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from '@bublys-org/bubbles-ui';
 
 interface MemoEditorProps {
   memo: Memo;

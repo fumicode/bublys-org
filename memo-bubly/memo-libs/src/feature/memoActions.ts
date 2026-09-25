@@ -7,8 +7,8 @@ import {
   createStateRef,
 } from "@bublys-org/world-line-graph";
 import type { AppDispatch } from "@bublys-org/state-management";
-import { Memo } from "../domain/Memo";
-import { MEMO_TYPE, memoScopeId } from "../domain/MemoDomain";
+import { Memo } from "../domain/Memo.js";
+import { MEMO_TYPE, memoScopeId } from "../domain/MemoDomain.js";
 
 /**
  * 新規メモ用に world-line-graph に scope を作って、initial memo を seed する。

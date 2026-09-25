@@ -1,8 +1,8 @@
 import { FC } from "react";
 import { Button, Stack, Typography } from "@mui/material";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { selectMemoAtApex } from "./memoSelectors";
-import { dispatchDeleteMemo } from "./memoActions";
+import { selectMemoAtApex } from "./memoSelectors.js";
+import { dispatchDeleteMemo } from "./memoActions.js";
 
 type MemoDeleteConfirmProps = {
   memoId: string;

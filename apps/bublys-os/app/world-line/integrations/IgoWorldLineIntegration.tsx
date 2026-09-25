@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { IgoBoardView, GameInfoView, IgoGameName } from '../../igo-game/ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
 import { useIgoWorldLine } from '../../igo-game/feature/useIgoWorldLine';
-import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from "@bublys-org/bubbles-ui";
 import { ObjectView } from '@bublys-org/bubbles-ui';
 
 type IgoWorldLineIntegrationProps = {

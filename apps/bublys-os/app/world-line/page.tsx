@@ -5,7 +5,7 @@ import { CounterWorldLineManager } from './integrations/CounterWorldLineManager'
 import { MemoWorldLineIntegration } from './integrations/MemoWorldLineIntegration';
 import { Memo } from './Memo/domain/Memo';
 import { MemoList } from './Memo/ui/MemoList';
-import { FocusedObjectProvider } from './WorldLine/domain/FocusedObjectContext';
+import { FocusedObjectProvider } from '@bublys-org/bubbles-ui';
 
 export default function Index() {
   const [counterId, setCounterId] = useState<string | null>(null);

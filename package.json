@@ -110,6 +110,7 @@
     "csv-importer-bubly/*",
     "object-transformer-bubly/*",
     "launcher-bubly/*",
-    "task-bubly/*"
+    "task-bubly/*",
+    "memo-bubly/*"
   ]
 }

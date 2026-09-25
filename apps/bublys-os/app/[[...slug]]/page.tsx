@@ -7,13 +7,13 @@
 // 受けるため）。
 
 import { useEffect } from 'react';
-import { FocusedObjectProvider } from "../world-line/WorldLine/domain/FocusedObjectContext";
+import { FocusedObjectProvider } from "@bublys-org/bubbles-ui";
 import { BubblesUINext } from "../bubble-ui/BubblesUI/feature/BubblesUINext";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { registerShellTypes } from "../counter/registerShellTypes";
 import { BUBBLE_ARRANGEMENT_DOMAIN } from "@bublys-org/bubbles-ui";
-import { MEMO_DOMAIN } from "../world-line/Memo/domain/MemoDomain";
+import { MEMO_DOMAIN } from "@bublys-org/memo-libs";
 import { IGO_GAME_DOMAIN } from "../igo-game/domain/IgoGameDomain";
 
 const APP_DOMAIN_REGISTRY = {

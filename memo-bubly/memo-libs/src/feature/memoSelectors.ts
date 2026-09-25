@@ -1,11 +1,11 @@
 import type { RootState } from "@bublys-org/state-management";
 import { WorldLineGraph } from "@bublys-org/world-line-graph";
-import { Memo, RawMemo } from "../domain/Memo";
+import { Memo, RawMemo } from "../domain/Memo.js";
 import {
   MEMO_TYPE,
   MEMO_SCOPE_PREFIX,
   memoScopeId,
-} from "../domain/MemoDomain";
+} from "../domain/MemoDomain.js";
 
 /**
  * world-line-graph slice の graphs から `memo:` プレフィックス付きの scope ID を

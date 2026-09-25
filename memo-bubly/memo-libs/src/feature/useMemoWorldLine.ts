@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { Memo } from "../domain/Memo";
-import { MEMO_TYPE, memoScopeId } from "../domain/MemoDomain";
+import { Memo } from "../domain/Memo.js";
+import { MEMO_TYPE, memoScopeId } from "../domain/MemoDomain.js";
 
 /**
  * 1 memo につき 1 scope の world-line を提供するフック。
