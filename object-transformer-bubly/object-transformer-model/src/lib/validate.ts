@@ -57,6 +57,7 @@ export function validateMapping(
       break;
     case "object":
     case "array":
+    case "record":
       // 複合型はここでは検証しない
       break;
   }

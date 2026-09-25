@@ -1,3 +1,5 @@
+import { arrayShape, objectShape, primitiveShape, recordShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+
 // ========== State Types ==========
 
 export type CsvColumnState = {
@@ -309,3 +311,48 @@ function escapeCsvField(field: string): string {
   }
   return field;
 }
+
+/**
+ * **シートの形**（`SchemaShape`）── 他のバブリが「この型の中身は何か」を引くための申告。
+ * 形を state の隣に置く理由は `users-libs` の `USER_SHAPE` の註。
+ *
+ * ★ **セル（`cells`）は `record`。** キーは列の id なので、シートごとに違う ──
+ *   `object` では書けない。中の 1 つ 1 つに名前が無いぶん、繋ぎ先は辞書まるごとの 1 つ。
+ * ★ **表そのものを繋ぎ替えるのは、ふつう筋が悪い。** 変換の相手になるのは
+ *   「1 行 ＝ 1 オブジェクト」（`toPlaneObjects`）── そちらは列名がそのままキーになるので、
+ *   落とした値から形を起こす道（`inferShape`）で通る。ここで申告するのは、
+ *   シートを落としたときに**中身が空に見えない**ようにするため。
+ */
+export const CSV_SHEET_SHAPE: SchemaShape = objectShape([
+  { name: 'id', shape: primitiveShape('string'), required: true, label: 'ID' },
+  { name: 'name', shape: primitiveShape('string'), required: true, label: 'シート名' },
+  {
+    name: 'columns',
+    shape: arrayShape(
+      objectShape([
+        { name: 'id', shape: primitiveShape('string'), required: true, label: '列 ID' },
+        { name: 'name', shape: primitiveShape('string'), required: true, label: '列名' },
+      ]),
+    ),
+    required: true,
+    label: '列',
+  },
+  {
+    name: 'rows',
+    shape: arrayShape(
+      objectShape([
+        { name: 'id', shape: primitiveShape('string'), required: true, label: '行 ID' },
+        {
+          name: 'cells',
+          shape: recordShape(primitiveShape('string')),
+          required: true,
+          label: 'セル（列 ID → 値）',
+        },
+      ]),
+    ),
+    required: true,
+    label: '行',
+  },
+  { name: 'createdAt', shape: primitiveShape('string'), required: true, label: '作成日時' },
+  { name: 'updatedAt', shape: primitiveShape('string'), required: true, label: '更新日時' },
+]);

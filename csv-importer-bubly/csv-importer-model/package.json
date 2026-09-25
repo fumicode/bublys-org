@@ -20,11 +20,14 @@
     }
   },
   "dependencies": {
+    "@bublys-org/domain-registry": "0.0.1",
     "tslib": "^2.3.0"
   },
   "nx": {
     "targets": {
-      "dev": { "continuous": true }
+      "dev": {
+        "continuous": true
+      }
     }
   }
 }

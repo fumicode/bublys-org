@@ -2,7 +2,7 @@
  * Memo クラス
  * メモの内容を管理し、不変性を保つ
  */
-import { arrayShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+import { arrayShape, objectShape, primitiveShape, recordShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
 
 export type MemoBlock = {
   id: string;
@@ -142,10 +142,12 @@ export class Memo {
  *
  * ★ **書いた人（`authorId`）も申告する。** 申告を OS 側に手書きで置いていたころは
  *   `id` と `lines` の 2 つしか無く、モデルにある書いた人が**変換エディタから見えなかった**。
- * ★ **本文（`blocks`）はまだ書けない。** `Record<blockId, MemoBlock>` ── キーが動く辞書で、
- *   いまの `SchemaShape` には `record` の語彙が無い（object は項目名が決まっているもの、
- *   array は順番のあるもの）。**メモの中身そのものが繋げない**ということなので、
- *   語彙を足すまでは「メモは id と行の並びと書いた人」としか名乗れない。
+ * ★ **本文（`blocks`）は `record`。** `Record<blockId, MemoBlock>` ── キーが実行時にしか
+ *   無い辞書なので、`object`（項目名が決まっているもの）でも `array`（順番のあるもの）でもない。
+ *   中の 1 つ 1 つには名前が無く `blocks.<なにか>.content` という道が書けないので、
+ *   繋ぎ先は**辞書まるごと**の 1 つ（配列と同じ扱い ── `walkLeafFields` の註）。
+ * ★ **CSV からメモを作るには、これだけでは足りない。** ブロックは `lines` が id で
+ *   指してはじめて画面に出る ── その対応は**メモの決まり**であって、項目の繋ぎ替えでは作れない。
  */
 export const MEMO_SHAPE: SchemaShape = objectShape([
   { name: 'id', shape: primitiveShape('string'), required: true, label: 'ID' },
@@ -154,6 +156,18 @@ export const MEMO_SHAPE: SchemaShape = objectShape([
     shape: arrayShape(primitiveShape('string')),
     required: true,
     label: 'ブロック順序（ID 配列）',
+  },
+  {
+    name: 'blocks',
+    shape: recordShape(
+      objectShape([
+        { name: 'id', shape: primitiveShape('string'), required: true, label: 'ブロック ID' },
+        { name: 'type', shape: primitiveShape('string'), required: true, label: '種類' },
+        { name: 'content', shape: primitiveShape('string'), required: true, label: '中身' },
+      ]),
+    ),
+    required: true,
+    label: '本文（ブロック ID → ブロック）',
   },
   { name: 'authorId', shape: primitiveShape('string'), required: false, label: '書いた人の ID' },
 ]);

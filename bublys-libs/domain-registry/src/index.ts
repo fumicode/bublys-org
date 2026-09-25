@@ -14,6 +14,7 @@ export {
   enumShape,
   objectShape,
   arrayShape,
+  recordShape,
   shapeKindLabel,
   isLeafShape,
   walkLeafFields,

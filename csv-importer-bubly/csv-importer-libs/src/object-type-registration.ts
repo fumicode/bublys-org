@@ -6,6 +6,8 @@
  * ObjectView に type を書いたら、必ずここにも登録すること。
  */
 import { registerObjectType } from "@bublys-org/bubbles-ui";
+import { registerSchema } from "@bublys-org/domain-registry/schema";
+import { CSV_SHEET_SHAPE } from "@bublys-org/csv-importer-model";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import DataObjectIcon from "@mui/icons-material/DataObject";
 import ViewListIcon from "@mui/icons-material/ViewList";
@@ -26,3 +28,13 @@ registerObjectType("CsvObjectList", React.createElement(ViewListIcon, { fontSize
 
 /** シートの世界線ビュー */
 registerObjectType("CsvSheetWorldLine", React.createElement(PublicIcon, { fontSize: "small" }));
+
+/**
+ * シートの中身の形。
+ *
+ * ★ 申告するのは**シートだけ**。「1 行 ＝ 1 オブジェクト」（`CsvObject`）は
+ *   **シートごとに項目が違う**ので、決め打ちの申告では表せない ── そちらは落とした値から
+ *   形を起こす道（`inferShape`）に任せる。前からそれで通っているし、
+ *   そのほうが実際の列名がそのまま繋ぎ先に出る。
+ */
+registerSchema("CsvSheet", CSV_SHEET_SHAPE);
