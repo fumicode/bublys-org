@@ -48,8 +48,24 @@ export function MemoTitle({ memo, onSetAuthor, onOpenWorldLineView, worldLineUrl
         }}
       >
         <MemoIcon fontSize="medium" />
-        {/* 書かれていないものに鉤括弧は付けない ── 薄く「無題」とだけ置く */}
-        <span style={content ? undefined : { opacity: 0.45 }}>{content ? `「${content}」` : label}</span>
+        {/*
+          ★ **題は 1 行目そのまま。切るのは箱の仕事。**
+            1 行目は何文字でも書けるので、そのまま出すと見出しが何行にも伸びて中身を押し下げる。
+            2 行で頭打ちにして、溢れたら省略記号 ── どこで切るかはドメインではなく、ここが決める。
+          ★ 横に縮めるには `minWidth: 0` が要る（flex の子は既定で中身より小さくならない）。
+        */}
+        <span
+          style={{
+            minWidth: 0,
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 2,
+            overflow: "hidden",
+            ...(content ? null : { opacity: 0.45 }),
+          }}
+        >
+          {content ? `「${content}」` : label}
+        </span>
         <IconButton onClick={() => navigator.clipboard.writeText(content)}>
           <LuClipboardCopy />
         </IconButton>

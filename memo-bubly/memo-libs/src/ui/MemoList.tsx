@@ -36,7 +36,9 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onSelectMemo, onMemoD
       <StyledMemoList>
         {memos.map((memo) => {
           const detailUrl = buildDetailUrl(memo.id);
-          const label = memo.blocks[memo.lines?.[0]]?.content ?? "メモ";
+          /** 名前は中身（1 行目）が決める。まだ何も書かれていなければ「無題」 */
+          const content = memo.blocks[memo.lines?.[0]]?.content?.trim() ?? "";
+          const label = content || "無題";
           return (
           <li
             key={memo.id}
@@ -51,7 +53,8 @@ export function MemoList({ buildDetailUrl, buildDeleteUrl, onSelectMemo, onMemoD
               onClick={onSelectMemo ? () => onSelectMemo(memo.id) : undefined}
             >
               <MemoIcon/>
-              <span>「{label}...」</span>
+              {/* 題は 1 行目そのまま。切るのは箱の仕事（`MemoCard` の註） */}
+              <span>{content ? `「${content}」` : label}</span>
             </ObjectView>
 
             {memo.authorId && (

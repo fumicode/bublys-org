@@ -31,8 +31,14 @@ export function MemoCard({ memoId, onDelete }: { memoId: string; onDelete?: (id:
             どこに置くかは新しい模型では親の View が決めるので、値そのものは使われない */}
         <ObjectView type="Memo" url={`memos/${memoId}`} label={label} openingPosition="bubble-side-right">
           <MemoIcon />
-          {/* 書かれていないものに鉤括弧は付けない（「…」だけが並ぶと何も言っていない） */}
-          <span className="e-label">{content ? `「${content}…」` : label}</span>
+          {/*
+            ★ **題は 1 行目そのまま。切るのは箱の仕事。**
+              前は文字列に「…」を直に書いていたので、**切れていなくても必ず付いて**いた
+              （しかも長いときは CSS の省略記号と二重になる）。
+              収まらなければ `.e-label` が 1 行に切って省略記号を付ける ── それが本当の「切れた」。
+            ★ 書かれていないものに鉤括弧は付けない（空の「」だけが並んでも何も言っていない）。
+          */}
+          <span className="e-label">{content ? `「${content}」` : label}</span>
         </ObjectView>
         {memo.authorId && (
           <span className="e-author">
