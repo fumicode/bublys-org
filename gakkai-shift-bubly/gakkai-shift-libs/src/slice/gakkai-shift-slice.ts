@@ -1,6 +1,6 @@
 import { createSlice, createSelector, type WithSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 
 // ドメインモデルからインポート
 import {
@@ -91,8 +91,8 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof gakkaiShiftSlice> {}
 }
 
-// rootReducerに注入（副作用として実行）
-gakkaiShiftSlice.injectInto(rootReducer);
+// 注入（副作用として実行）。口は 1 つ ── `injectSlice` を通す
+injectSlice(gakkaiShiftSlice);
 
 // ========== Selectors ==========
 

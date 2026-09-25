@@ -1,6 +1,6 @@
 import { createSlice, createSelector, type WithSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 import { Task, type TaskState } from "@bublys-org/event-shift-puzzle-model";
 
 export { Task };
@@ -39,7 +39,7 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof taskSlice> {}
 }
 
-taskSlice.injectInto(rootReducer);
+injectSlice(taskSlice);
 
 // ========== Selectors ==========
 

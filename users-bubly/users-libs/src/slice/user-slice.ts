@@ -1,6 +1,6 @@
 import { createSlice, type WithSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 import type { UserState } from "../domain/User.domain.js";
 
 type UsersSliceState = {
@@ -32,8 +32,8 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof userSlice> {}
 }
 
-// rootReducerに注入（副作用として実行）
-userSlice.injectInto(rootReducer);
+// 注入（副作用として実行）。口は 1 つ ── `injectSlice` を通す
+injectSlice(userSlice);
 
 // アクションをエクスポート
 export const { setUsers, addUser, deleteUser } = userSlice.actions;

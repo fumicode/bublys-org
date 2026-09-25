@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction, type WithSlice } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 import type { LauncherPlain } from "@bublys-org/launcher-model";
 
 /**
@@ -33,7 +33,7 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof launcherSlice> {}
 }
 
-launcherSlice.injectInto(rootReducer);
+injectSlice(launcherSlice);
 
 export const { setLauncher, removeLauncher } = launcherSlice.actions;
 

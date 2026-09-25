@@ -1,6 +1,6 @@
 import { createSlice, type WithSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 
 // ドメインモデルからインポート
 import { ShiftPreference, type ShiftPreferenceState } from "@bublys-org/event-shift-puzzle-model";
@@ -49,8 +49,8 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof shiftPreferenceSlice> {}
 }
 
-// rootReducerに注入（副作用として実行）
-shiftPreferenceSlice.injectInto(rootReducer);
+// 注入（副作用として実行）。口は 1 つ ── `injectSlice` を通す
+injectSlice(shiftPreferenceSlice);
 
 // ========== Selectors ==========
 

@@ -7,7 +7,7 @@
  */
 import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction, WithSlice } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 import { Task_タスク, type TaskJSON, type TaskStatus_ステータス } from "../domain/Task.domain.js";
 
 // ========== State ==========
@@ -64,8 +64,8 @@ declare module "@bublys-org/state-management" {
   export interface LazyLoadedSlices extends WithSlice<typeof taskSlice> {}
 }
 
-// rootReducer に注入（副作用として実行）
-taskSlice.injectInto(rootReducer);
+// 注入（副作用として実行）。口は 1 つ ── `injectSlice` を通す
+injectSlice(taskSlice);
 
 /** この slice が注入された後の状態 */
 type StateWithTask = RootState & { task: TaskState };
