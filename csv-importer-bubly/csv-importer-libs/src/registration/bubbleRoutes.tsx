@@ -23,9 +23,19 @@ import {
  * ★ **OS に組み込まれたときは Vite が居ない。** `import.meta.env` そのものが無いので、
  *   直に読むと落ちる ── 無ければ undefined として扱う（連携だけが静かに無効になる）。
  */
-const GOOGLE_CLIENT_ID: string | undefined = (
-  import.meta as unknown as { env?: Record<string, string | undefined> }
-).env?.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID: string | undefined =
+  (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+    ?.VITE_GOOGLE_CLIENT_ID ??
+  /**
+   * ★ OS に組み込まれたときの置き場（Next）。Vite の `import.meta.env` が無いので、
+   *   こちらを見る ── Next はこの書き方をビルドのときに値そのものへ置き換える。
+   *   Vite のビルドには `process` が居ないことがあるので、`typeof` で確かめてから触る。
+   *   ★ 書き方は `process.env.NEXT_PUBLIC_…` のまま ── Next は**この綴りを見て**
+   *     値に置き換えるので、`?.` を挟むと置換が効かなくなる。
+   *   どちらにも無ければ undefined のまま ＝ Sheets の口は**出ない**
+   *   （`SheetEditorFeature` の註）。
+   */
+  (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID : undefined);
 
 /**
  * 各バブルは CsvSheetProvider でラップする必要がある。
