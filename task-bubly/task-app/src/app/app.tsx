@@ -51,7 +51,6 @@ export function App() {
       <BubblesContext.Provider value={bubbles as never}>
         <BublyApp
           title="タスク管理"
-          subtitle="いま何処まで来ているか"
           menuItems={menuItems}
           backdropColor={BACKDROP}
           sea={sea}

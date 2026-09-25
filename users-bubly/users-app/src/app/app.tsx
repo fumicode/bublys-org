@@ -53,7 +53,6 @@ export function App() {
       <BubblesContext.Provider value={bubbles as never}>
         <BublyApp
           title="ユーザー"
-          subtitle="顔ぶれと、その束"
           menuItems={menuItems}
           backdropColor={BACKDROP}
           sea={sea}
