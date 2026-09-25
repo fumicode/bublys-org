@@ -23,6 +23,22 @@ import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
 
+/**
+ * 並べ方の口を、箱の中のどこに置くか（左端からのずれ）。
+ *
+ * 箱の左端が見えている所より左なら、そのぶん右へずらす ── 箱の中の座標で返すので、
+ * 掛かっている倍率で割る（口は箱と一緒に縮む）。
+ */
+const viewToolLeft = (
+  at: { readonly x: number; readonly scale: number } | undefined,
+  area: { readonly x: number } | undefined,
+): number => {
+  if (!at) return 0;
+  /** 見えている所の左端。少しだけ内側に置く（縁にぴったりだと掴みにくい） */
+  const left = (area?.x ?? 0) + 8;
+  return Math.max(0, (left - at.x) / Math.max(0.05, at.scale));
+};
+
 /** 開いた泡の覚え書き（domain には入れない） */
 /** 泡の箱に対する割合（0〜1）で言う、中の一点 */
 export interface Spot {
@@ -1133,7 +1149,18 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               7 つ並べる場所が無い ── まずは外に出して形を見る。
           */}
           {listHosts.has(id) && (
-            <div className="bl-view" onPointerDown={(e) => e.stopPropagation()}>
+            /**
+             * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
+             *   箱が画面より広くなると（横に並べる・格子）**左端ごと画面の外へ出て、
+             *   二度と並べ方を変えられなくなる**（実測：横に並べたあと、口のつもりで
+             *   ランチャーを押していた）。見えている所より左には行かせない。
+             *   ずらす量は箱の中の座標なので、掛かっている倍率で割る。
+             */
+            <div
+              className="bl-view"
+              style={{ left: viewToolLeft(base.byId.get(id), openArea) }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               {VIEW_CHOICES.map((v) => (
                 <button
                   key={v.id}
