@@ -202,6 +202,13 @@ export interface TakeOutInfo {
    */
   readonly size: { readonly w: number; readonly h: number };
   readonly pointer: { readonly x: number; readonly y: number };
+  /**
+   * **落ちた先に居るもの。** 離した点の下にいちばん手前で写っている泡（自分と中身は除く）。
+   *
+   * ★ 海は「何が居るか」しか言わない ── それが何を意味するか（窓なら中へ入れる、
+   *   岸なら貼る）は**外の器が決める**。海に「窓」という概念を持たせない。
+   */
+  readonly over: { readonly id: BubbleId; readonly url: string } | null;
 }
 
 export interface BubbleSpaceProps {
@@ -470,11 +477,25 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     (info: ClaimDropInfo) => {
       const url = urls.get(info.id)?.url;
       if (!url || !props.onTakeOut) return false;
-      const taken = props.onTakeOut({ id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer });
+      /**
+       * 離した点の下に居るもの ── **手前から**探す（描く順の後ろほど手前）。
+       * 自分と、自分の中身は数えない（掴んだものの上に落ちたことにはならない）。
+       */
+      const mine = world.subtreeOf(info.id);
+      let over: { id: BubbleId; url: string } | null = null;
+      for (const p of base.order) {
+        if (mine.has(p.id) || p.b.state.implicit) continue;
+        const u = urls.get(p.id)?.url;
+        if (!u) continue;
+        if (info.pointer.x < p.x || info.pointer.x > p.x + p.w) continue;
+        if (info.pointer.y < p.y || info.pointer.y > p.y + p.h) continue;
+        over = { id: p.id, url: u };
+      }
+      const taken = props.onTakeOut({ id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer, over });
       if (taken) takeOut(info.id);
       return taken;
     },
-    [urls, props, takeOut],
+    [urls, props, takeOut, world, base],
   );
 
   const canOpen = useCallback((url: string) => !!matchBubbleRoute(routes, url), [routes]);
@@ -916,7 +937,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       if (!props.onTakeOutPreview) return;
       if (!info) { props.onTakeOutPreview(null); return; }
       const url = urls.get(info.id)?.url;
-      props.onTakeOutPreview(url ? { id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer } : null);
+      // 予告のときは「落ちた先」まで見ない（縁に着くかどうかしか描かないので要らない）
+      props.onTakeOutPreview(url ? { id: info.id, url, rect: info.rect, size: info.size, pointer: info.pointer, over: null } : null);
     },
     [props, urls],
   );
@@ -935,7 +957,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   const input = useBubbleInput({
-    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, chrome,
+    world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, chrome, dressed,
     layerRef, hasContent, claimDrop, onDragInfo,
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
   });

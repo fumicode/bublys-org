@@ -117,6 +117,14 @@ export interface BubbleInputOptions {
    * ⑤ pin は解き直しながら留めるので、渡さないと伸びているぶんだけ留め先がずれる。
    */
   readonly chrome?: ChromeMap;
+  /**
+   * 並べたあとに外へ足した装い（`resolveWorld` の `dressed`）。
+   *
+   * ★ **触る側もこれを見る。** 見ていないと、装いを出した札の帯を押しても
+   *   「中身を押した」ことになり、**掴めない**（選んだ札を持ち出せなくなっていた）。
+   *   描いてある帯と、掴める帯は同じでなければならない。
+   */
+  readonly dressed?: ReadonlyMap<BubbleId, { readonly top: number }>;
   /** 泡を載せている層 */
   readonly layerRef: RefObject<HTMLDivElement | null>;
   /**
@@ -294,8 +302,8 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    * 固定の 24 ではなく**着ている装い**から取る ── 装いを出していない札では 1px しか取らない。
    */
   const headOf = useCallback(
-    (id: BubbleId) => chromeOf(world, id, chrome).top,
-    [world, chrome],
+    (id: BubbleId) => chromeOf(world, id, chrome).top + (o.dressed?.get(id)?.top ?? 0),
+    [world, chrome, o.dressed],
   );
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -449,7 +457,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
 
     if (d.moves) {
       // 印は「いま離したらどうなるか」。書いたばかりの値で解き直してから見る
-      const after = resolveWorld(next, viewport, rules, chrome);
+      const after = resolveWorld(next, viewport, rules, chrome, undefined, o.dressed as never);
       const afterTiny = markTiny(next, after, drawMin);
       const held: LiftState = {
         id: d.id, skip: d.skip ?? new Set(), lift: !!d.lift, out: !!d.slot?.out,
@@ -459,7 +467,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const shown = withLift(after, held);
       const rect = shown.byId.get(d.id);
       const screen: ScreenRects = new Map(shown.order.map((q) => [q.id, { x: q.x, y: q.y, w: q.w, h: q.h }]));
-      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => chromeOf(next, id, chrome).top);
+      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => chromeOf(next, id, chrome).top + (o.dressed?.get(id)?.top ?? 0));
       const t = rect
         ? dropTargetAt(next, {
             layout: after, screen, pointer: { x: mx, y: my }, hitSpace,

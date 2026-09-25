@@ -14,13 +14,14 @@
  */
 import { FC, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, RoutedBubble } from "@bublys-org/bubble-layout-feature";
+import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble } from "@bublys-org/bubble-layout-feature";
 import {
   Bubble,
   BubblesContext,
   CurrentBubbleContext,
   KeyboardFocusContext,
   createBubble,
+  parseDragPayload,
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { ShoreSpace } from "./ShoreSpace.js";
@@ -81,6 +82,27 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
  * 無い ── あるのは「空間を持つ泡」だけなので、**その泡の枠そのものを岸として扱う**。
  * 中でもう 1 本ネオンを引くと枠が二重になるので、管はこの層だけが描く。
  */
+/**
+ * **窓の受け口** ── 外の海が「この窓に入れてくれ」と言うための、url ごとの入口。
+ *
+ * ★ 窓の中の海は別の世界（入れ子の `BubbleSpace` が自分の状態で持っている）なので、
+ *   外の海から直に書き込めない。窓の側が「入れる口」をここに出しておき、
+ *   外はその url を知っているだけで渡せる ── **繋ぐのは url 1 本**。
+ * ★ 部品の一生より長く置く（岸の記憶 `SHORE_MEMORY` と同じ考え）。
+ */
+const WINDOW_INBOX = new Map<string, (url: string) => void>();
+
+/** その url の窓へ入れる。窓が無ければ false（外の海は取り上げない） */
+export const putIntoWindow = (windowUrl: string, url: string): boolean => {
+  const put = WINDOW_INBOX.get(windowUrl);
+  if (!put) return false;
+  put(url);
+  return true;
+};
+
+/** その url が「中に入れられる窓」か */
+export const isWindowUrl = (windowUrl: string): boolean => WINDOW_INBOX.has(windowUrl);
+
 const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; url: string }> = ({ routes, seeds, url }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -90,6 +112,18 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
    *   外の海と中の窓で管の通り方が食い違っていた。見ているのは同じ場所（`SpaceViewContext`）。
    */
   const { join } = useSpaceView();
+  /**
+   * 中の海の口。**外から入れてもらう**のに要る（`WINDOW_INBOX`）。
+   * 海は作り直されることがあるので、口が変わるたび登録し直す。
+   */
+  const [inner, setInner] = useState<BubbleSpaceApi | null>(null);
+  useEffect(() => {
+    if (!inner) return;
+    WINDOW_INBOX.set(url, (u) => inner.openBubble(u, null));
+    return () => {
+      if (WINDOW_INBOX.get(url)) WINDOW_INBOX.delete(url);
+    };
+  }, [url, inner]);
 
   useEffect(() => {
     const el = ref.current;
@@ -123,7 +157,28 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
   }, []);
 
   return (
-    <div ref={ref} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div
+      ref={ref}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
+      /**
+       * ★ **ポケットや札からの引きずり落としも受ける。** あちらは HTML の drag
+       *   （海のポインタのドラッグとは別の道）なので、ここで別に受け口を出す。
+       *   運ばれてくるのは url 1 本 ── 受けたらこの窓で開く。
+       */
+      onDragOver={(e) => {
+        if (!inner) return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDrop={(e) => {
+        if (!inner) return;
+        const dropped = parseDragPayload(e)?.url ?? e.dataTransfer.getData("text/plain");
+        if (!dropped) return;
+        e.preventDefault();
+        e.stopPropagation();
+        inner.openBubble(dropped, null);
+      }}
+    >
       {size.width > 0 && (
         /**
          * ★ **枠そのものが岸。** 前はここでネオンを 1 本描くだけで、貼る機能は無かった
@@ -135,6 +190,7 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
         <ShoreSpace
           routes={routes()}
           initialUrls={seeds}
+          onSpaceReady={setInner}
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
           join={join}

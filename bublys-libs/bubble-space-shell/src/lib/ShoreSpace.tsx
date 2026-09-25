@@ -43,6 +43,7 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer.js";
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
+import { putIntoWindow } from "./legacyRouteBridge.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
 export type Home = (viewport: { width: number; height: number }) => Docked;
@@ -326,6 +327,16 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    */
   const takeOut = useCallback(
     (info: TakeOutInfo) => {
+      /**
+       * ★ **窓の上に落としたら、その窓の中へ引っ越す。**
+       *
+       *   泡は「どの海に居るか」を持つので、落とすのは引っ越し ── 元の海からは消える
+       *   （岸に貼るのと同じ読み）。窓の中の海は別の世界なので、繋ぐのは url 1 本
+       *   （`putIntoWindow`）。
+       *   一覧の札を落としたときは、一覧が顔ぶれを決めているので札は戻ってくる
+       *   ── 落としたのは「その url を窓で開け」という合図になる。
+       */
+      if (info.over && putIntoWindow(info.over.url, info.url)) return true;
       const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const at = toShore(info);
       const want = toDockSize(info.size);
