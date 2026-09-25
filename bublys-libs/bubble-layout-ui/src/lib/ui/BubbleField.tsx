@@ -24,6 +24,8 @@ export interface BubbleFieldProps {
   readonly selectedId?: BubbleId | null;
   readonly hoverRing?: BubbleId | null;
   readonly skipGrab?: ReadonlySet<BubbleId> | null;
+  /** 掴んでいる泡そのもの（箱の縁で切らないのはこれだけ） */
+  readonly grabbedId?: BubbleId | null;
   /** 泡の中身。渡さなければラボと同じ見本（ヘッダ・題名・行・印） */
   readonly renderBubble?: (id: BubbleId, draw: BubbleDraw) => ReactNode;
   /** 字幅の測り方を差し替える（テスト用） */
@@ -62,7 +64,7 @@ export interface BubbleFieldProps {
 
 export function BubbleField(props: BubbleFieldProps) {
   const {
-    world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, dragging,
+    world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, grabbedId, dragging,
     renderBubble, measureText, layerRef, marks, openerOf, originOf, originSpotOf, bandDisplay = 'hover',
     className, style, ...handlers
   } = props;
@@ -81,10 +83,10 @@ export function BubbleField(props: BubbleFieldProps) {
     () =>
       drawField({
         world, layout, viewport, drawMin,
-        selectedId, hoverRing, skipGrab, openerOf, originOf, originSpotOf, hoveredId,
+        selectedId, hoverRing, skipGrab, grabbedId, openerOf, originOf, originSpotOf, hoveredId,
         measureText: measureText ?? measureTextInDom,
       }),
-    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, originOf, originSpotOf, hoveredId, measureText],
+    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, grabbedId, openerOf, originOf, originSpotOf, hoveredId, measureText],
   );
 
   /**

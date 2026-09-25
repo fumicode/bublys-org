@@ -1071,6 +1071,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           drawMin={drawMin}
           selectedId={selectedId}
           skipGrab={input.skipGrab}
+          grabbedId={input.grabbedId}
           dragging={input.dragging}
           marks={input.marks}
           layerRef={layerRef}

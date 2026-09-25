@@ -164,6 +164,12 @@ export interface BubbleInput {
   readonly layout: Layout;
   /** 掴んでいる泡とその中身（掴めなくする） */
   readonly skipGrab: ReadonlySet<BubbleId> | null;
+  /**
+   * 掴んでいる泡**そのもの**（中身は含まない）。
+   * 箱の縁で切らないのはこれ 1 つだけ ── 中身まで切らずにいると、窓を掴んだ瞬間に
+   * 中の札の留めが外れて、送って隠してあったものが箱の外へ出てくる。
+   */
+  readonly grabbedId: BubbleId | null;
   /** いま離したらどうなるか */
   readonly marks: DropMarks | null;
   readonly dragging: boolean;
@@ -640,6 +646,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     },
     layout: lifted,
     skipGrab: view.skip,
+    grabbedId: view.lift?.id ?? null,
     marks: view.marks,
     // ★ 送っている間も「生きている」── 滑らかさを切るのは掴んでいる間と同じ
     dragging: view.dragging || panning,

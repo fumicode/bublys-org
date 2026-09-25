@@ -54,6 +54,8 @@ export interface DrawInput {
   readonly hoverRing?: BubbleId | null;
   /** 掴んでいる泡とその中身（掴めなくする） */
   readonly skipGrab?: ReadonlySet<BubbleId> | null;
+  /** 掴んでいる泡そのもの（箱の縁で切らないのはこれだけ） */
+  readonly grabbedId?: BubbleId | null;
   readonly measureText: MeasureText;
   /**
    * **どこから開いたか。** 開いた泡の id → 開いた元の id。
@@ -249,6 +251,7 @@ export function drawField(input: DrawInput): FieldDraw {
       selectedId,
       hoverRing,
       skip,
+      grabbed: input.grabbedId ?? null,
       measureText,
     });
     items.push(item);
@@ -355,6 +358,7 @@ interface Ctx {
   readonly selectedId: BubbleId | null;
   readonly hoverRing: BubbleId | null;
   readonly skip: ReadonlySet<BubbleId> | null;
+  readonly grabbed: BubbleId | null;
   readonly measureText: MeasureText;
 }
 
@@ -415,6 +419,9 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
    *
    * ★ **掴んでいる札は留めない。** 箱から外へ出すのがドラッグなので、
    *   留めたままだと掴んだ札が箱の縁で切れて、どこへ運んでいるのか見えなくなる。
+   *   ★ ただし**掴んだ泡そのものだけ**。前は「掴んだ泡とその中身」で見ていたので、
+   *     **窓を掴んだ瞬間に中の札の留めが外れて**いた ── 送って隠してあった札が
+   *     箱の外へ現れ、離すと戻る（実測）。中身は運ばれる側であって、掴まれていない。
    *
    * ★ **奥行きに重ねる並びは切らない。** そちらは箱の外へ伸びていく絵で、
    *   切ると「奥に続いている」が読めなくなる。
@@ -428,8 +435,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
     home && (home.view.x.lens === 'fisheye' || home.view.y.lens === 'fisheye')
       ? LENS_CONTENT_MIN
       : CONTENT_MIN;
-  const held =
-    !!home && home.id !== 'root' && home.view.z.dim === 'none' && !(c.skip ? c.skip.has(b.id) : false);
+  const held = !!home && home.id !== 'root' && home.view.z.dim === 'none' && b.id !== c.grabbed;
   /** 留めの原点（画面の座標）。留めないときは画面そのもの（0,0） */
   let ox = 0;
   let oy = 0;
