@@ -312,12 +312,20 @@ export const fitBoxFor = (
     });
   }
   if (preset === 'grid') {
-    const cols = Math.max(GRID_MIN_SIDE, Math.ceil(Math.sqrt(n)));
+    /**
+     * ★ **列数は箱に訊く**（並べるときと同じ式 ── {@link colsFor}）。
+     *
+     *   前は「四角に近い形」（√n）で列を決めていた。**部屋に入りきらず幅を切られると
+     *   列が減り、そのぶん行が増える**のに、高さは切る前の行数のままだったので、
+     *   増えた行が箱からはみ出した（実測：6 枚で「3 列 2 行」ぶんの高さの箱に
+     *   「2 列 3 行」が並び、いちばん下の行が 44px 切れた）。
+     *   欲しい幅を先に部屋で切り、**切れた幅で入る列数**を数えてから行を数える。
+     */
+    const want = Math.max(GRID_MIN_SIDE, Math.ceil(Math.sqrt(n)));
+    const w = cap({ w: spread(want, sx, card.w) + pad, h: card.h + pad }).w;
+    const cols = colsFor('grid', { w, h: card.h }, card.w) ?? want;
     const rows = Math.ceil(n / cols);
-    return cap({
-      w: spread(cols, sx, card.w) + pad,
-      h: spread(rows, sy, card.h) + reserve + pad,
-    });
+    return cap({ w, h: spread(rows, sy, card.h) + reserve + pad });
   }
   if (preset === 'stackDepth') {
     return cap({
