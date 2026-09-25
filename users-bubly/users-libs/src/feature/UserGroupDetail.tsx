@@ -88,7 +88,8 @@ export const UserGroupDetail: FC<UserGroupDetailProps> = ({ groupId, onDeleted }
   };
 
   return (
-    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+    // ★ 詳細の中身は枠から 12px 内側に置く
+    <div style={{ padding: 12 }} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
       <h3
         style={{ display: "flex", alignItems: "center", gap: 6 }}
         draggable={true}

@@ -47,6 +47,8 @@ export function MemoWorldLineIntegration({ memoId, onOpenWorldLineView, worldLin
 
   return (
     <div
+      /* ★ 詳細の中身は枠から 12px 内側に置く */
+      style={{ padding: 12 }}
       onFocus={() => setFocusedObjectId(memoId)}
       onMouseDown={() => setFocusedObjectId(memoId)}
       tabIndex={-1}

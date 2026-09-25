@@ -125,5 +125,10 @@ export const memoBubbleRoutes: BubbleRoute[] = [
     bubbleOptions: { defaultSize: { width: MEMO_CARD.w, height: MEMO_CARD.h } } },
   { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
   { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
-  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+  /**
+   * ★ 詳細の既定の大きさ（中身の数）。題は 2 行で頭打ち（`MemoTitle`）なので、
+   *   その 2 行 ＋ 作者の行 ＋ 本文が数行入る大きさ。
+   */
+  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble,
+    bubbleOptions: { defaultSize: { width: 440, height: 340 } } },
 ];

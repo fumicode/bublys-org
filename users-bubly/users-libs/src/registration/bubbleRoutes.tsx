@@ -163,16 +163,27 @@ const UserGroupBubble: BubbleContentRenderer = ({ bubble }) => {
 const LIST_SIZE = LIST_BOX;
 /** 一覧は地を敷かない ── 並びの空間は海がそのまま透ける */
 const LIST_OPTIONS = { defaultSize: LIST_SIZE, contentBackground: "transparent" };
+/**
+ * **詳細の既定の大きさ（中身の数 ── `chrome.ts`）。**
+ *
+ * 既定（320×240）のままだと、グループの詳細は「並び替え」の口が横に収まらず、
+ * 顔ぶれが縦に巻物になっていた。中身が素で要る大きさから決める:
+ *   ユーザー   題 ＋ 生年月日・年齢 ＋ 所属グループ            → 360×280
+ *   グループ   題 ＋ 並び替えの口（選択肢「カスタム（自由配置）」が
+ *              いちばん長い）＋ 顔ぶれ 3〜5 人                  → 420×380
+ */
+const USER_OPTIONS = { defaultSize: { width: 360, height: 280 } };
+const GROUP_OPTIONS = { defaultSize: { width: 420, height: 380 } };
 const CARD_OPTIONS = { defaultSize: { width: CARD.w, height: CARD.h } };
 
 export const usersBubbleRoutes: BubbleRoute[] = [
   { pattern: /^user-groups$/, type: "user-groups", Component: UserGroupsBubble, bubbleOptions: LIST_OPTIONS },
   // ★ 札は詳細より**先に**置く（`user-groups/:id` が `.../card` も飲み込むので）
   { pattern: /^user-groups\/[^/]+\/card$/, type: "user-group-card", Component: UserGroupCardBubble, bubbleOptions: CARD_OPTIONS },
-  { pattern: /^user-groups\/.+$/, type: "user-group", Component: UserGroupBubble },
+  { pattern: /^user-groups\/.+$/, type: "user-group", Component: UserGroupBubble, bubbleOptions: GROUP_OPTIONS },
   { pattern: /^users$/, type: "users", Component: UsersBubble, bubbleOptions: LIST_OPTIONS },
   { pattern: /^users\/create$/, type: "user-create", Component: UserCreateBubble },
   { pattern: /^users\/[^/]+\/card$/, type: "user-card", Component: UserCardBubble, bubbleOptions: CARD_OPTIONS },
   { pattern: /^users\/[^/]+\/delete-confirm$/, type: "user-delete-confirm", Component: UserDeleteConfirmBubble },
-  { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble },
+  { pattern: /^users\/[^/]+$/, type: "user", Component: UserBubble, bubbleOptions: USER_OPTIONS },
 ];

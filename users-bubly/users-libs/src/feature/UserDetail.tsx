@@ -27,7 +27,8 @@ export const UserDetail: FC<UserDetailProps> = ({ userId }) => {
   };
 
   return (
-    <div >
+    // ★ 詳細の中身は枠から 12px 内側に置く（枠のすぐ内側から字が始まっていた）
+    <div style={{ padding: 12 }}>
       <h3 draggable={true} onDragStart={handleDragStart} style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <UserIcon fontSize="small" /> {user.name}
       </h3>

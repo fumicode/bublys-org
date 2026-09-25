@@ -12,7 +12,10 @@ import {
 const MappingEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <TransformerProvider>
-      <MappingEditorFeature bubbleId={bubble.id} />
+      {/* ★ 詳細の中身は枠から 12px 内側に置く（「ソース」が枠のすぐ内側から始まっていた） */}
+      <div style={{ padding: 12 }}>
+        <MappingEditorFeature bubbleId={bubble.id} />
+      </div>
     </TransformerProvider>
   );
 };
@@ -54,5 +57,11 @@ export const objectTransformerBubbleRoutes: BubbleRoute[] = [
     pattern: "object-transformer/editor",
     type: "mapping-editor",
     Component: MappingEditorBubble,
+    /**
+     * ★ 既定の大きさ（中身の数）。落とし口が横に 2 つ並ぶので、
+     *   1 つ 240 ＋ すき間 ＝ 横 560 要る。狭いと「ソースオブ / ジェクトを」と
+     *   1 文字ずつ折り返して読めなくなる。
+     */
+    bubbleOptions: { defaultSize: { width: 560, height: 400 } },
   },
 ];

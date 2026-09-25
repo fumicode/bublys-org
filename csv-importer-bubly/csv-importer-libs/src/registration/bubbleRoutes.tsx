@@ -46,7 +46,10 @@ const SheetListBubble: BubbleRoute["Component"] = () => {
 const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <CsvBubbleProvider>
-      <SheetEditorFeature sheetId={bubble.params.sheetId} />
+      {/* ★ 詳細の中身は枠から 12px 内側に置く（題も口も枠のすぐ内側から始まっていた） */}
+      <div style={{ padding: 12 }}>
+        <SheetEditorFeature sheetId={bubble.params.sheetId} />
+      </div>
     </CsvBubbleProvider>
   );
 };
@@ -94,6 +97,11 @@ export const csvImporterBubbleRoutes: BubbleRoute[] = [
     },
     Component: WorldLineBubble,
   },
-  { pattern: "csv-importer/sheets/:sheetId", type: "sheet-editor", Component: SheetEditorBubble },
+  /**
+   * ★ 既定の大きさ（中身の数）。口が横に 4 つ（オブジェクト一覧・エクスポート・Sheets・世界線）
+   *   並ぶうえ、その右に Row/Object の切り替えが要る ── 横に 720 無いと口が折り返して切れる。
+   */
+  { pattern: "csv-importer/sheets/:sheetId", type: "sheet-editor", Component: SheetEditorBubble,
+    bubbleOptions: { defaultSize: { width: 720, height: 460 } } },
   { pattern: "csv-importer/sheets", type: "sheet-list", Component: SheetListBubble },
 ];
