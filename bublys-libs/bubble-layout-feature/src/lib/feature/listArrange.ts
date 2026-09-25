@@ -21,10 +21,21 @@ import { METRICS } from '@bublys-org/bubble-layout';
 import type { PresetId } from '@bublys-org/bubble-layout';
 
 /**
- * 一覧の並びの隙間。**0**（札が自分で上下 7px の余白を持っている）。
- * 既定（{@link METRICS.GAP} ＝ 14）のままだと札と札のあいだが 28px も開く。
+ * **平らな一覧（縦・横・格子）の隙間 ── 4px。**
+ *
+ * 既定（{@link METRICS.GAP} ＝ 14）のままだと、札が自分で持っている上下 7px の余白と
+ * 合わさって 28px も開く。かといって 0 だと札どうしが地続きに見えて、
+ * どこまでが 1 枚か読めない。**札の境目が見える最小**として 4px。
  */
-export const LIST_GAP = 0;
+export const LIST_GAP = 4;
+
+/**
+ * その並べ方の隙間。**隙間を持つのは平らな 3 つだけ。**
+ * 魚眼・透視は隣との間合いを**刻み**（`stepFor`）で取るので、隙間は 0
+ * ── 両方持たせると、レンズで詰まるはずの端が隙間のぶん開いたままになる。
+ */
+export const gapFor = (preset: PresetId): number =>
+  preset === 'row' || preset === 'column' || preset === 'grid' ? LIST_GAP : 0;
 
 /**
  * 一覧の**中身**の既定。バブリはどれも同じ大きさの一覧を出す。
@@ -158,9 +169,10 @@ export const usedFor = (
   const rows = Math.ceil(n / perRow);
   const lensX = preset === 'coverflow' || preset === 'coverflowGrid';
   const lensY = preset === 'coverflowY' || preset === 'coverflowGrid';
+  const gap = gapFor(preset);
   return {
-    w: lensX ? box.w : perRow * card.w,
-    h: lensY ? box.h : rows * card.h,
+    w: lensX ? box.w : perRow * card.w + Math.max(0, perRow - 1) * gap,
+    h: lensY ? box.h : rows * card.h + Math.max(0, rows - 1) * gap,
   };
 };
 
@@ -279,8 +291,10 @@ export const fitBoxFor = (
     preset === 'coverflow' || preset === 'coverflowY' || preset === 'coverflowGrid'
       ? COVERFLOW_STEP_RATIO
       : 1;
-  const sx = card.w * tight;
-  const sy = card.h * tight;
+  // ★ 箱にも隙間のぶんが要る（隙間を持つのは平らな 3 つだけ ── `gapFor`）
+  const gap = gapFor(preset);
+  const sx = card.w * tight + gap;
+  const sy = card.h * tight + gap;
   if (preset === 'column' || preset === 'coverflowY') {
     return cap({ w: card.w + pad, h: spread(n, sy, card.h) + reserve + pad });
   }
@@ -333,7 +347,7 @@ export const pickPreset = (
    */
   const room = box.h - METRICS.PAD * 2 - reserveFor(band ? headBox : null);
   // 詰める並びの要り高 ＝ 札の高さ × 枚数 ＋ 隙間 ×（枚数 − 1）
-  const need = count * itemHeight + Math.max(0, count - 1) * LIST_GAP;
+  const need = count * itemHeight + Math.max(0, count - 1) * gapFor('column');
   if (need <= room) return 'column';
   /**
    * ★ **どちらの向きにも 2 枚以上とれるなら、折り返す。**

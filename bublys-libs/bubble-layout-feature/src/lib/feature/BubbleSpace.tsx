@@ -149,7 +149,7 @@ const OVERSCROLL_MS = 260;
  *   詰める隙間をどう変えても位置は1px も動かない。
  */
 export { LIST_GAP } from './listArrange.js';
-import { LIST_GAP } from './listArrange.js';
+import { gapFor } from './listArrange.js';
 
 /**
  * **順序 → 行と列。** 何列で折り返すかだけ決めれば、あとは順に詰めるだけ。
@@ -758,7 +758,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        */
       if (preset && presetChanged) {
         w = withPreset(w, preset, hostId);
-        for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { gap: LIST_GAP });
+        for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { gap: gapFor(preset) });
       }
       /**
        * 口の場所は並びの始端に空けておく（`ListSpace` の註）。口は描いてから測るので、

@@ -17,6 +17,7 @@ import {
   itemWidthFor,
   pickPreset,
   stepFor,
+  LIST_GAP,
 } from './listArrange.js';
 import { METRICS } from '@bublys-org/bubble-layout';
 
@@ -157,20 +158,26 @@ describe('並べ方に合う箱の大きさ', () => {
   const CARD = { w: 308, h: 84 };
   const PAD2 = METRICS.PAD * 2;   // 並びの左右・上下の余白（28）
 
-  it('縦に並べる ── 幅は札 1 枚、高さは枚数ぶん（＋口の取り分）', () => {
-    expect(fitBoxFor('column', 6, CARD, 0)).toEqual({ w: 308 + PAD2, h: 6 * 84 + PAD2 });
-    expect(fitBoxFor('column', 6, CARD, 52)).toEqual({ w: 308 + PAD2, h: 6 * 84 + 52 + PAD2 });
+  /** 平らな 3 つは札と札のあいだに隙間を持つ（`LIST_GAP`）。箱にもそのぶんが要る */
+  const gaps = (k: number) => Math.max(0, k - 1) * LIST_GAP;
+
+  it('縦に並べる ── 幅は札 1 枚、高さは枚数ぶん（＋隙間・口の取り分）', () => {
+    expect(fitBoxFor('column', 6, CARD, 0)).toEqual({ w: 308 + PAD2, h: 6 * 84 + gaps(6) + PAD2 });
+    expect(fitBoxFor('column', 6, CARD, 52)).toEqual({ w: 308 + PAD2, h: 6 * 84 + gaps(6) + 52 + PAD2 });
   });
 
   it('横に並べる ── 縦と横が入れ替わるだけ', () => {
-    expect(fitBoxFor('row', 4, CARD, 0)).toEqual({ w: 4 * 308 + PAD2, h: 84 + PAD2 });
+    expect(fitBoxFor('row', 4, CARD, 0)).toEqual({ w: 4 * 308 + gaps(4) + PAD2, h: 84 + PAD2 });
   });
 
   it('格子は四角に近い形から出す（箱がまだ無いので、箱からは数えない）', () => {
     // 6 枚 → 3 列 2 行
-    expect(fitBoxFor('grid', 6, CARD, 0)).toEqual({ w: 3 * 308 + PAD2, h: 2 * 84 + PAD2 });
+    expect(fitBoxFor('grid', 6, CARD, 0)).toEqual({
+      w: 3 * 308 + gaps(3) + PAD2,
+      h: 2 * 84 + gaps(2) + PAD2,
+    });
     // 2 枚でも 2 列（格子の下限。`GRID_MIN_SIDE`）
-    expect(fitBoxFor('grid', 2, CARD, 0)).toEqual({ w: 2 * 308 + PAD2, h: 1 * 84 + PAD2 });
+    expect(fitBoxFor('grid', 2, CARD, 0)).toEqual({ w: 2 * 308 + gaps(2) + PAD2, h: 1 * 84 + PAD2 });
   });
 
   it('魚眼は**一回り小さい箱**になる ── そこではじめてレンズが働く', () => {
