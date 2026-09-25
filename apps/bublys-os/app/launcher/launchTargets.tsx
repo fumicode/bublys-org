@@ -7,6 +7,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import PublicIcon from "@mui/icons-material/Public";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import TableChartIcon from "@mui/icons-material/TableChart";
+import TransformIcon from "@mui/icons-material/Transform";
 import WorkspacesIcon from "@mui/icons-material/Workspaces";
 import { registerLaunchTargets, type LaunchTarget } from "@bublys-org/launcher-libs";
 
@@ -30,6 +31,7 @@ export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
   { url: "memos", label: "メモ", icon: <NoteIcon color="action" /> },
   { url: "users", label: "ユーザー", icon: <PersonIcon color="action" /> },
   { url: "csv-importer/sheets", label: "CSV インポーター", icon: <TableChartIcon color="primary" /> },
+  { url: "object-transformer/editor", label: "変換エディタ", icon: <TransformIcon color="primary" /> },
   { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
   { url: "pocket", label: "ポケット", icon: <WorkspacesIcon sx={{ color: "#6ea8ff" }} /> },
   { url: "bubly-loader", label: "バブリを追加", icon: <ExtensionIcon color="action" /> },

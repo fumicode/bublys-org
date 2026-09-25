@@ -6,7 +6,7 @@ import {
   MappingEditorFeature,
   RuleListFeature,
   BatchConvertFeature,
-} from "@bublys-org/object-transformer-libs";
+} from "../feature/index.js";
 
 // マッピングエディタバブル
 const MappingEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {

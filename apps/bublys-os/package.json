@@ -13,6 +13,7 @@
     "@bublys-org/launcher-model": "*",
     "@bublys-org/memo-libs": "*",
     "@bublys-org/object-shell": "*",
+    "@bublys-org/object-transformer-libs": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/task-libs": "*",
     "@bublys-org/users-libs": "*",
