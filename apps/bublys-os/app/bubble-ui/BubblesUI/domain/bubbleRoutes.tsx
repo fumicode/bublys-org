@@ -77,8 +77,17 @@ const routes: BubbleRoute[] = [
     pattern: /^guide$/,
     type: "guide",
     Component: GuideHomeBubble,
-    // 一覧は並びの空間。ほかの一覧と同じ大きさで開く（地は敷かない）
-    bubbleOptions: { defaultSize: { width: 406, height: 380 }, contentBackground: "transparent" },
+    /**
+     * ★ **ここは地を敷く。** ほかの一覧（ユーザー・メモ・シート）は地を敷かず空間が
+     *   そのまま透けるが、それはデータの一覧だから ── 説明は**読むもの**なので、
+     *   透かすと文字の下に空間が出て、どこまでがこの説明か分からなくなる。
+     */
+    /**
+     * ★ 高さは**説明の数から出す**（札 54 × 7 ＋ 隙間 4 × 6 ＋ 並びの余白 14×2 ＝ 430）。
+     *   足りないと「縦に並べて収まるか」の判定に落ちて、開いた瞬間**横の魚眼**になる
+     *   ── 読みものなのに 1 枚しか読めない（説明を 7 つに増やしたとき実測）。
+     */
+    bubbleOptions: { defaultSize: { width: 406, height: 440 } },
   },
   // ★ 札は詳細より**先に**置く（`guide/xxx` が `.../card` も飲み込むので）
   {
