@@ -3,7 +3,7 @@ import { Bubble } from "../Bubble.domain.js";
 import { CoordinateSystem } from "@bublys-org/bubbles-ui-util";
 import { getOriginRect, getDockedBubbleRect } from "../utils/get-origin-rect.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
-import { frustumBand } from "./link-band-path.js";
+import { frustumBand } from "@bublys-org/bubble-layout-ui";
 
 type LinkBubbleViewProps = {
   opener: Bubble;

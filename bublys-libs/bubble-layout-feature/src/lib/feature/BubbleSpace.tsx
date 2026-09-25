@@ -367,6 +367,15 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const hasUrl = useCallback((url: string) => [...urls.values()].some((o) => o.url === url), [urls]);
 
   const openOutside = props.openOutside;
+  /**
+   * **どこから開いたか。** `urls` が泡ごとに覚えている `openerId` を、帯を引く側へ渡す形にする。
+   * 世界（`world`）には書かない ── 関係は「どう置くか」ではないので、置き方の模型には要らない。
+   */
+  const openerOf = useMemo(
+    () => new Map([...urls].map(([id, u]) => [id, u.openerId ?? null] as const)),
+    [urls],
+  );
+
   const openBubble = useCallback(
     (url: string, openerId?: BubbleId | null, label?: string): BubbleId => {
       if (openOutside) return openOutside(url, openerId ?? null) || '';
@@ -951,6 +960,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         onDrop={onDrop}
       >
         <BubbleField
+          openerOf={openerOf}
           world={world}
           layout={input.layout}
           viewport={viewport}

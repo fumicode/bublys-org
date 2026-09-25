@@ -12,6 +12,8 @@ import { clamp, hostScale, spaceSummary, verbOf, viewOfSpace } from '@bublys-org
 import type { BubbleId, BubbleWorld, Layout, Placement, SpaceId, Viewport } from '@bublys-org/bubble-layout';
 
 /** 泡のヘッダの高さ。domain の `METRICS.header` と同じ数（ここでは中身の行数を数えるのに要る） */
+import { frustumBand } from './link-band-path.js';
+
 export const HEADER = 24;
 /** 字の下限（画面 px）。これより小さくなる題名・印は描かない（lab.html 974 行） */
 export const MARK_MIN = 6.5;
@@ -53,6 +55,13 @@ export interface DrawInput {
   /** 掴んでいる泡とその中身（掴めなくする） */
   readonly skipGrab?: ReadonlySet<BubbleId> | null;
   readonly measureText: MeasureText;
+  /**
+   * **どこから開いたか。** 開いた泡の id → 開いた元の id。
+   * 渡さなければ帯は描かない（ラボの素の海は関係を持たない）。
+   */
+  readonly openerOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /** いま触れている泡。帯を見せるかどうかだけに使う */
+  readonly hoveredId?: BubbleId | null;
 }
 
 /** 1つの泡を描くのに要るものぜんぶ */
@@ -85,8 +94,30 @@ export interface HandleDraw {
   readonly zIndex: number;
 }
 
+/**
+ * **帯** ── 「この泡は、あの泡から開いた」を示す錐台。
+ *
+ * 起点の 4 頂点と開いた先の 4 頂点を同名で対応づけた形（{@link frustumBand}）で、
+ * 旧い海（`BubblesLayeredView`）が描いていたものと同じ。**線ではなく面**なので、
+ * 魚眼で小さく写る泡へ伸びる帯は勝手に細くなる ── 太さを自分で持たなくてよい。
+ */
+export interface BandDraw {
+  /** 開いた先の泡（帯はこの泡に着く） */
+  readonly id: BubbleId;
+  /** 開いた元の泡。帯を見せるかどうかは**両端のどちらか**に触れているかで決まる */
+  readonly openerId: BubbleId;
+  readonly path: string;
+  /** 起点の色相。帯は起点の色で塗る */
+  readonly hue: number;
+  readonly zIndex: number;
+  /** いま見せる状態か（両端のどちらかに触れている） */
+  readonly on: boolean;
+}
+
 export interface FieldDraw {
   readonly items: readonly BubbleDraw[];
+  /** どこから開いたかの帯（`openerOf` を渡したときだけ） */
+  readonly bands: readonly BandDraw[];
   readonly handle: HandleDraw | null;
   /** 短辺が下限を切って描かなかった泡（ツールバーの読みに出す） */
   readonly tinyIds: readonly BubbleId[];
@@ -185,6 +216,8 @@ export function drawField(input: DrawInput): FieldDraw {
   const items: BubbleDraw[] = [];
   const tinyIds: BubbleId[] = [];
   let handle: HandleDraw | null = null;
+  /** 帯を引くのに要る「描かれた矩形」。描かなかった泡は入れない */
+  const shown = new Map<BubbleId, Placement>();
 
   for (let i = 0; i < layout.order.length; i++) {
     const p = layout.order[i];
@@ -200,16 +233,73 @@ export function drawField(input: DrawInput): FieldDraw {
       measureText,
     });
     items.push(item);
+    if (item.style['display'] === '') shown.set(p.id, p);
     // ③ 見えない親に角は無い。描いてある泡にだけ、その泡と同じ z（＝描く順）で角を出す
     if (p.id === selectedId && !p.b.state.implicit && item.style['display'] === '') {
       handle = {
         transform: `translate(${(p.x + p.w - 12).toFixed(2)}px,${(p.y + p.h - 12).toFixed(2)}px)`,
-        zIndex: i,
+        zIndex: zOf(i),
       };
     }
   }
-  return { items, handle, tinyIds };
+  return { items, bands: bandsOf(input.openerOf ?? null, input.hoveredId ?? null, layout, shown), handle, tinyIds };
 }
+
+/**
+ * **前後の数。** 泡は偶数、帯は 1 つ下の奇数に置く。
+ *
+ * 帯は「開いた先の泡のすぐ下」に居てほしい ── 泡と同じ数にすると、どちらが手前かは
+ * DOM の並びで決まってしまう。ところが DOM の並びは id で固定してあって
+ * 描く順とは関係がない（{@link BubbleField} の註）ので、同じ数にしてはいけない。
+ */
+const zOf = (i: number): number => i * 2;
+
+/**
+ * **どこから開いたかの帯を引く。**
+ *
+ * ★ 引くのは**同じ海にいるものどうし**だけ。窓や一覧の中と外は `bl-hold` で切られるので、
+ *   またいで引いた帯は縁で切れて途中で消える ── 窓そのものが持つ帯が、その続きを言う。
+ * ★ 太さは持たない。帯は 2 つの矩形から作る**面**なので、魚眼で小さく写る泡へ伸びれば
+ *   勝手に細くなる。
+ * ★ 位置は世界に書かない。毎回その時の矩形から引き直す（焦点が動けば帯も動く）。
+ */
+function bandsOf(
+  openerOf: ReadonlyMap<BubbleId, BubbleId | null> | null,
+  hoveredId: BubbleId | null,
+  layout: Layout,
+  shown: ReadonlyMap<BubbleId, Placement>,
+): BandDraw[] {
+  if (!openerOf || openerOf.size === 0) return [];
+  /**
+   * **触れているとみなすもの。** 触れている泡そのものと、**それが入っている空間**。
+   * 一覧の札に触れたら一覧に触れたことにする ── 開いたときに親を一覧へ読み替えたのと同じ読み。
+   */
+  const hovered = new Set<BubbleId>();
+  if (hoveredId) {
+    hovered.add(hoveredId);
+    const hp = shown.get(hoveredId);
+    if (hp) hovered.add(hp.space);
+  }
+  const bands: BandDraw[] = [];
+  for (let i = 0; i < layout.order.length; i++) {
+    const p = layout.order[i];
+    const openerId = openerOf.get(p.id) ?? null;
+    if (!openerId) continue;
+    const op = shown.get(openerId);
+    const me = shown.get(p.id);
+    if (!op || !me) continue;
+    if (op.space !== me.space) continue; // 海をまたぐ帯は引かない（上の註）
+    const band = frustumBand(rectOf(op), rectOf(me));
+    if (!band) continue; // 一方が他方を含んでいる ── 帯は無い
+    bands.push({
+      id: p.id, openerId, path: band.path, hue: op.b.state.hue ?? 0,
+      zIndex: zOf(i) - 1, on: hovered.has(p.id) || hovered.has(openerId),
+    });
+  }
+  return bands;
+}
+
+const rectOf = (p: Placement) => ({ left: p.x, top: p.y, right: p.x + p.w, bottom: p.y + p.h });
 
 interface Ctx {
   readonly world: BubbleWorld;
@@ -247,7 +337,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
   const style: Record<string, string | number> = {
     width: bw.toFixed(2) + 'px',
     height: bh.toFixed(2) + 'px',
-    zIndex: i, // 4 描く順 ＝ z-index
+    zIndex: zOf(i), // 4 描く順 ＝ z-index（帯が 1 つ下に入れるよう 2 つ刻み）
     '--k': (1 / s).toFixed(4), // 3 逆 scale
     '--h': st.hue == null ? 210 : st.hue,
     '--rows': rowsOf(bh),
@@ -296,7 +386,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
   /** 留めの原点（画面の座標）。留めないときは画面そのもの（0,0） */
   let ox = 0;
   let oy = 0;
-  const hold: Record<string, string | number> = { zIndex: i };
+  const hold: Record<string, string | number> = { zIndex: zOf(i) };
   if (held && home) {
     const h = home.host;
     const rLeft = (home.view.x.reserve ?? 0) * h.scale;

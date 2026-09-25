@@ -22,8 +22,13 @@ describe('描く ── 配置 → DOM の属性', () => {
     const { layout, draw } = field();
     expect(draw.items.length).toBe(58);
     expect(draw.items.map((i) => i.id)).toEqual(layout.order.map((p) => p.id));
-    // z-index ＝ 描く順の添字
-    expect(draw.items.map((i) => i.style['zIndex'])).toEqual(layout.order.map((_, i) => i));
+    /**
+     * z-index ＝ 描く順の添字 ×2。
+     * **帯（どこから開いたか）が泡の 1 つ下に入れるように、2 つ刻みで空けてある** ──
+     * 同じ数にすると、どちらが手前かが DOM の並びで決まってしまう（DOM の並びは id で
+     * 固定してあって描く順とは関係がない）。
+     */
+    expect(draw.items.map((i) => i.style['zIndex'])).toEqual(layout.order.map((_, i) => i * 2));
   });
 
   it('毎フレーム書くのは transform 1行 ── 桁もラボと同じ（x,y は 2桁・倍率は 5桁）', () => {
@@ -102,5 +107,79 @@ describe('描く ── 配置 → DOM の属性', () => {
     expect(imp.handle).toBeNull();
     const gone = drawField({ world, layout, viewport: VIEWPORT, selectedId: 'memo1', drawMin: 9999, measureText });
     expect(gone.handle).toBeNull();
+  });
+
+  describe('帯 ── どこから開いたか', () => {
+    /** ラボの場面から、同じ海にいる泡を 2 つ選ぶ */
+    const pair = () => {
+      const { world, layout } = field();
+      const same = layout.order.filter((p) => p.space === layout.order[0].space && !p.b.state.implicit);
+      return { world, layout, a: same[0].id, b: same[1].id };
+    };
+
+    it('渡さなければ引かない', () => {
+      expect(field().draw.bands).toEqual([]);
+    });
+
+    it('開いた元との間に 1 本引く。色は起点のもの', () => {
+      const { world, layout, a, b } = pair();
+      const draw = drawField({
+        world, layout, viewport: VIEWPORT, measureText,
+        openerOf: new Map([[b, a]]),
+      });
+      expect(draw.bands.length).toBe(1);
+      expect(draw.bands[0]).toMatchObject({ id: b, openerId: a });
+      expect(draw.bands[0].path.startsWith('M ')).toBe(true);
+      expect(draw.bands[0].hue).toBe(layout.byId.get(a)?.b.state.hue ?? 0);
+    });
+
+    it('泡の 1 つ下に入る', () => {
+      const { world, layout, a, b } = pair();
+      const draw = drawField({
+        world, layout, viewport: VIEWPORT, measureText,
+        openerOf: new Map([[b, a]]),
+      });
+      const openee = draw.items.find((i) => i.id === b);
+      expect(draw.bands[0].zIndex).toBe((openee?.style['zIndex'] as number) - 1);
+    });
+
+    it('海をまたぐ帯は引かない', () => {
+      const { world, layout } = field();
+      const outer = layout.order.find((p) => !p.b.state.implicit);
+      const inner = layout.order.find((p) => outer && p.space !== outer.space);
+      if (!outer || !inner) throw new Error('入れ子の海がいない場面');
+      const draw = drawField({
+        world, layout, viewport: VIEWPORT, measureText,
+        openerOf: new Map([[inner.id, outer.id]]),
+      });
+      expect(draw.bands).toEqual([]);
+    });
+
+    it('見せるのは両端のどちらかに触れているとき', () => {
+      const { world, layout, a, b } = pair();
+      const bands = (hoveredId: string | null) =>
+        drawField({
+          world, layout, viewport: VIEWPORT, measureText,
+          openerOf: new Map([[b, a]]), hoveredId,
+        }).bands;
+      expect(bands(null)[0].on).toBe(false);
+      expect(bands(a)[0].on).toBe(true);
+      expect(bands(b)[0].on).toBe(true);
+    });
+
+    it('一覧の札に触れたら、一覧に触れたことにする', () => {
+      const { world, layout } = field();
+      // 中に札を持つ泡（＝どれかの空間の主）を探す
+      const child = layout.order.find((p) => p.space !== layout.order[0].space);
+      if (!child) throw new Error('入れ子の海がいない場面');
+      const host = child.space;
+      const other = layout.order.find((p) => p.id !== host && p.space === layout.byId.get(host)?.space);
+      if (!other) throw new Error('同じ海にもう 1 つ要る');
+      const draw = drawField({
+        world, layout, viewport: VIEWPORT, measureText,
+        openerOf: new Map([[other.id, host]]), hoveredId: child.id,
+      });
+      expect(draw.bands[0]?.on).toBe(true);
+    });
   });
 });

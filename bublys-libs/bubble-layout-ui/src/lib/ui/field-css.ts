@@ -41,6 +41,8 @@ export const FIELD_CSS = `
  *   塗り直しが要り、手を速く振ると塗りが追いつかずに箱の外へ出た。
  */
 .bub{transition:transform 320ms cubic-bezier(.32,.72,.32,1);animation:bl-in 180ms 260ms backwards;pointer-events:auto}
+/* どこから開いたかの帯。泡の兄弟として敷く（触れない・切らない） */
+.bl-band{position:absolute;left:0;top:0;pointer-events:none;overflow:visible;transition:opacity 150ms ease}
 /* 箱に留める入れもの。留めない泡では大きさを持たない（切らない）素通し */
 .bl-hold{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;pointer-events:none;
   transition:transform 320ms cubic-bezier(.32,.72,.32,1)}

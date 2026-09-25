@@ -8,7 +8,7 @@
  * ★ 中身は外から渡す（`renderBubble`）。`<Bubble><Bubble/></Bubble>` と書けるようにはしない
  *   ── 木が React と domain の2箇所にできて剥がせなくなる（DECISIONS.md）。
  */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import type { BubbleId, BubbleWorld, DropMarks, Layout, Viewport } from '@bublys-org/bubble-layout';
 import { drawField } from './draw.js';
@@ -42,6 +42,16 @@ export interface BubbleFieldProps {
   readonly dragging?: boolean;
   /** いま離したらどうなるか（`useBubbleInput` の marks） */
   readonly marks?: DropMarks | null;
+  /**
+   * **どこから開いたか。** 渡すと、開いた元との間に帯（錐台）を描く。
+   * 渡さなければ描かない ── 関係を持つのは海の側（`BubbleSpace`）の仕事。
+   */
+  readonly openerOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /**
+   * 帯の出し方。既定は `hover` ── **両端のどちらかに触れているときだけ**見せる
+   * （旧い海と同じ。いつも出していると、開いた先が増えるほど海が塗り潰される）。
+   */
+  readonly bandDisplay?: 'hover' | 'always' | 'none';
   readonly className?: string;
   readonly style?: CSSProperties;
 }
@@ -49,17 +59,28 @@ export interface BubbleFieldProps {
 export function BubbleField(props: BubbleFieldProps) {
   const {
     world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, dragging,
-    renderBubble, measureText, layerRef, marks, className, style, ...handlers
+    renderBubble, measureText, layerRef, marks, openerOf, bandDisplay = 'hover',
+    className, style, ...handlers
   } = props;
+
+  /**
+   * いま触れている泡。**帯の見せ方にしか使わない**ので、ここで持つ（世界には書かない）。
+   * 出入りは層 1 枚で受けて、`data-id` を持つ先祖を辿る ── 泡ごとに handler は付けない。
+   */
+  const [hoveredId, setHoveredId] = useState<BubbleId | null>(null);
+  const noteHover = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const el = (e.target as HTMLElement | null)?.closest?.('[data-id]') as HTMLElement | null;
+    setHoveredId(el?.dataset.id ?? null);
+  }, []);
 
   const field = useMemo(
     () =>
       drawField({
         world, layout, viewport, drawMin,
-        selectedId, hoverRing, skipGrab,
+        selectedId, hoverRing, skipGrab, openerOf, hoveredId,
         measureText: measureText ?? measureTextInDom,
       }),
-    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, measureText],
+    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, hoveredId, measureText],
   );
 
   /**
@@ -82,6 +103,8 @@ export function BubbleField(props: BubbleFieldProps) {
       // 掴んでいる間は `bl-live` ── 滑らかさを切る（カーソルより遅れないように）
       className={'bl-layer' + (dragging ? ' bl-live' : '') + (className ? ' ' + className : '')}
       style={style}
+      onPointerOver={noteHover}
+      onPointerOut={noteHover}
       {...handlers}
     >
       {/*
@@ -92,6 +115,24 @@ export function BubbleField(props: BubbleFieldProps) {
         ★ **いつも包む。** 留める／留めないで入れ子の形を変えると、React が作り直して
           出現アニメ（`bl-in`）が鳴り直す。形は変えず、中身（style）だけ変える。
       */}
+      {/*
+        ★ **帯は泡の兄弟。** 泡の中に描くと、遠い泡の薄まり（opacity）に一緒に巻き込まれるし、
+          留め（`bl-hold`）の切り取りにも掛かる。開いた先のすぐ下（z は 1 つ下）に置く。
+      */}
+      {(bandDisplay === 'none' ? [] : field.bands).map((b) => (
+        <svg
+          key={b.id}
+          className="bl-band"
+          style={{
+            zIndex: b.zIndex,
+            opacity: bandDisplay === 'always' || b.on ? 1 : 0,
+          } as CSSProperties}
+          width={viewport.w}
+          height={viewport.h}
+        >
+          <path d={b.path} fill={`hsla(${b.hue}, 50%, 50%, 0.3)`} />
+        </svg>
+      ))}
       {dom.map((it) => (
         <div key={it.id} className="bl-hold" style={it.hold as CSSProperties}>
           <div

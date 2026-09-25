@@ -13,7 +13,7 @@ import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-
 import { BubbleView } from "./BubbleView.js";
 import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
-import { frustumBand, type BandSide } from "./link-band-path.js";
+import { frustumBand, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { getOriginRect, getDockedBubbleRect } from "../utils/get-origin-rect.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
