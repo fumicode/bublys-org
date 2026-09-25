@@ -18,7 +18,7 @@ import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
 import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, ViewChoice } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
-import { FixedIcon, GrowIcon, VIEW_CHOICES } from './ViewIcons.js';
+import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
@@ -428,10 +428,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   ここで `withPreset` を直に書いていたころは、そのあと `setChildren` が
    *   「もう当たっている」と判断して**隙間が既定の 14 に戻ったまま**だった（実測で踏んだ）。
    */
-  const chooseView = useCallback((hostId: BubbleId, preset: PresetId) => {
+  const chooseView = useCallback((hostId: BubbleId, preset: PresetId | null) => {
     setChosenView((prev) => {
+      if (preset === null ? !prev.has(hostId) : prev.get(hostId) === preset) return prev;
       const next = new Map(prev);
-      next.set(hostId, preset);
+      if (preset === null) next.delete(hostId);
+      else next.set(hostId, preset);
       return next;
     });
   }, []);
@@ -440,26 +442,36 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   口の側だけで持っていると「格子を選んでも列数が渡らない」（実測で踏んだ）。
    */
   /**
-   * **箱も広げるか**（既定は広げる）。切ると箱はそのままで、入らないぶんは見切れる。
-   * ★ 並べ方を変えるたびに窓の大きさまで変わってほしい人と、窓は動かさず中を送りたい人がいる
-   *   ── どちらも正しいので、見る側が選ぶ。
+   * **箱と並べ方が追いかけ合うか**（既定：追いかけ合う）。留めた一覧をここに入れる。
+   *
+   * ```
+   * 追いかけ合う  箱を変えたら → その箱に合う並べ方へ ／ 並べ方を選んだら → その大きさへ
+   * 留める        箱をどう変えても並べ方は変わらない
+   * ```
+   * ★ どちらでも**箱は人が自由に変えられる**（`ViewChoice` の註）。
    */
-  const [fixedBox, setFixedBox] = useState<ReadonlySet<BubbleId>>(() => new Set());
-  const toggleGrows = useCallback((hostId: BubbleId) => {
-    setFixedBox((prev) => {
+  const [pinned, setPinned] = useState<ReadonlySet<BubbleId>>(() => new Set());
+  const toggleFollows = useCallback((hostId: BubbleId) => {
+    setPinned((prev) => {
       const next = new Set(prev);
-      if (!next.delete(hostId)) next.add(hostId);
+      if (next.delete(hostId)) {
+        // ★ 追いかけ合うほうへ戻したら、留めていた並べ方は**解く** ── でないと
+        //   「箱を変えたら並べ方が付いてくる」が、次に箱を変えるまで効かない
+        chooseView(hostId, null);
+      } else {
+        next.add(hostId);
+      }
       return next;
     });
-  }, []);
+  }, [chooseView]);
   const viewChoice = useMemo<ViewChoice>(
     () => ({
       chosen: (hostId) => chosenView.get(hostId),
       choose: chooseView,
-      grows: (hostId) => !fixedBox.has(hostId),
-      toggleGrows,
+      follows: (hostId) => !pinned.has(hostId),
+      toggleFollows,
     }),
-    [chosenView, chooseView, fixedBox, toggleGrows],
+    [chosenView, chooseView, pinned, toggleFollows],
   );
 
   /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */
@@ -610,6 +622,34 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [world],
   );
 
+  /**
+   * その泡の自前の大きさを書く。**並べ方に合う大きさへ**（`follows`）だけが呼ぶ。
+   * 同じ値なら何も書かない ── 書くと次の走りの引き金になる。
+   */
+  const setSize = useCallback(
+    (id: BubbleId, size: { w: number; h: number }) => {
+      const b = world.bubble(id);
+      if (!b) return;
+      const now = b.state.size;
+      if (Math.abs(now.w - size.w) < 0.5 && Math.abs(now.h - size.h) < 0.5) return;
+      setWorld(world.withBubble(b.withSize({ w: Math.round(size.w), h: Math.round(size.h) })));
+    },
+    [world, setWorld],
+  );
+
+  /**
+   * その泡が置ける広さ ── 入っている空間の中身の大きさ。いちばん外なら画面そのもの。
+   * 「その並べ方に合う大きさ」の頭打ちに使う（海より大きい箱は置けない）。
+   */
+  const roomOf = useCallback(
+    (id: BubbleId) => {
+      const host = hostOf(id);
+      const own = host ? world.bubble(host)?.state.size : null;
+      return own ?? { w: viewport.w, h: viewport.h };
+    },
+    [world, hostOf, viewport],
+  );
+
 
   /**
    * ★ **レンズをまかせる。**
@@ -634,8 +674,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, setLens, onLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, takeIn }),
-    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, takeIn],
+    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
+    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
   );
 
   /**
@@ -726,6 +766,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   詰める並びのときだけ札の上下の余白を薄くする ── 透視は 1px も動かさない。
        */
       const packed = inList && world.ownViewOf(space)?.y.arrange !== 'as-is';
+      /**
+       * ★ **奥行きに重ねた札は、中を送らない。**
+       *   透視の札は後ろの肩を出すために**わざと細くしてある**（`LIST_DEPTH_INSET`）ので、
+       *   中身が枠に入らない ── そのままだと札 1 枚ずつに送り棒（スクロールバー）が出て、
+       *   字が縦に折り返す（実測の姿）。ここで送りたいのは**重なりの奥行き**であって
+       *   札の中身ではないので、入らないぶんは切る。
+       */
+      const deep = inList && !packed;
       return (
         <>
           <div className="hd" />
@@ -764,23 +812,31 @@ export function BubbleSpace(props: BubbleSpaceProps) {
                 </button>
               ))}
               {/*
-                ★ **箱も広げるか、箱はそのままで見切れさせるか。**
-                  並べ方を変えるたびに窓の大きさまで変わってほしい人と、
-                  窓は動かさず中を送って見たい人がいる ── どちらも正しいので選べるようにする。
+                ★ **箱と並べ方が追いかけ合うか。**
+
+                  点いている（追いかけ合う）  箱を変えたら → その箱に合う並べ方へ
+                                              並べ方を選んだら → その並べ方に合う大きさへ
+                  消えている（留める）        箱をどう変えても並べ方は変わらない
+
+                ★ **どちらでも箱は人のもの。** 追いかけ合う側も「箱を変えたら並べ方が付いてくる」
+                  であって、箱の大きさを人から取り上げるのではない。
+                  （前はここが「箱を中身に合わせて広げる」の切り替えになっていて、
+                  点けていると**中身より小さくできない箱**になっていた。）
+                ★ 並べ方の 7 つと同じで、**点いている＝それが効いている**。
               */}
               <button
-                className="bl-view-pick bl-view-gap"
+                className="bl-view-pick bl-view-apart"
                 title={
-                  fixedBox.has(id)
-                    ? '箱はそのまま ── 入らないぶんは見切れる（動かして見に行く）'
-                    : '中身に合わせて箱も広がる'
+                  pinned.has(id)
+                    ? '並べ方を留める ── 箱を変えても切り替わらない（押すと 追いかけ合う）'
+                    : '箱と並べ方が追いかけ合う ── 箱を変えたら並べ方が、並べ方を選んだら大きさが変わる（押すと 留める）'
                 }
-                aria-pressed={fixedBox.has(id)}
+                aria-pressed={!pinned.has(id)}
                 onPointerDown={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
-                onClick={() => toggleGrows(id)}
+                onClick={() => toggleFollows(id)}
               >
-                {fixedBox.has(id) ? <FixedIcon /> : <GrowIcon />}
+                {pinned.has(id) ? <PinIcon /> : <FollowIcon />}
               </button>
             </div>
           )}
@@ -802,6 +858,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
                */
               (inList ? ' bl-tight' : '') +
               (packed ? ' bl-packed' : '') +
+              (deep ? ' bl-cut' : '') +
               (inList && chrome.get(id) === 'plain' ? ' bl-grown' : '')
             }
           >
@@ -812,7 +869,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, chooseView, fixedBox, toggleGrows],
+    [routes, urls, closeBubble, world, chrome, headerTools, chooseView, pinned, toggleFollows],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

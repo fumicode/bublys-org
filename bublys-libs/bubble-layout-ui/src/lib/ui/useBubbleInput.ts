@@ -531,6 +531,14 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    */
   /** 前のホイールが来た時刻と、跳ね返りの弾。端に着いたら 1 回だけ撃って、動いたら込め直す */
   const lastWheelAt = useRef(0);
+  /**
+   * 送りの手が続いているあいだ立つ旗（滑らかさを切る）。
+   * 手が止まって `WHEEL_GESTURE_GAP` 経ったら下ろす ── そのとき泡はもう行き先に居るので、
+   * 滑らかさが戻っても何も動かない。
+   */
+  const [panning, setPanning] = useState(false);
+  const panTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (panTimer.current !== null) clearTimeout(panTimer.current); }, []);
   const bounceArmed = useRef(true);
   const onWheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
   onWheelRef.current = (e: WheelEvent) => {
@@ -557,7 +565,38 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      *   今までどおり奥行きを繰る（`wheelZ`）。
      */
     const scrolled = wheelScroll(world, layout, space, { x: e.deltaX, y: e.deltaY }, rules);
-    if (scrolled) { setWorld(scrolled); bounceArmed.current = true; return; }
+    if (scrolled) {
+      setWorld(scrolled);
+      bounceArmed.current = true;
+      /**
+       * ★ **送っている間は滑らせない**（掴んでいる間と同じ）。
+       *
+       *   滑らかさ（320ms）は「**置き場所が変わった**ことを見せる」ためのもので、
+       *   送り（スクロール）は置き場所が変わったのではなく**見ている所が動いた**だけ。
+       *   滑らせると手より 280ms 遅れて付いてくる（実測：1 刻み送って塗りが着くまで
+       *   18ms で −5px、144ms で −35px、277ms で −40px）。縦に長く送るぶんには
+       *   「滑らか」に見えるが、**自分の軸でない向き**は動ける幅が数十 px しかないので、
+       *   動き全部が滑りになって「遅れて効く」と映る。
+       * ★ **繰る（魚眼）は滑らせたまま。** あちらは 1 刻み ＝ 札 1 枚の**飛び**なので、
+       *   間を滑らせるほうが何が起きたか読める。見分けるのは軸のレンズ ──
+       *   平行な軸が動いたなら送り、魚眼の軸が動いたなら繰り。
+       */
+      const L0 = layout.spaces.get(space);
+      const panned =
+        !!L0 &&
+        (["x", "y"] as const).some(
+          (a) => L0.view[a].lens === "parallel" && scrolled.focusOf(space)[a] !== world.focusOf(space)[a],
+        );
+      if (panned) {
+        setPanning(true);
+        if (panTimer.current !== null) clearTimeout(panTimer.current);
+        panTimer.current = setTimeout(() => {
+          panTimer.current = null;
+          setPanning(false);
+        }, WHEEL_GESTURE_GAP);
+      }
+      return;
+    }
     const next = wheelZ(world, layout, space, e.deltaY, rules);
     const moved = next.focusOf(space).z !== world.focusOf(space).z;
     /**
@@ -602,7 +641,8 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     layout: lifted,
     skipGrab: view.skip,
     marks: view.marks,
-    dragging: view.dragging,
+    // ★ 送っている間も「生きている」── 滑らかさを切るのは掴んでいる間と同じ
+    dragging: view.dragging || panning,
   };
 }
 

@@ -10,10 +10,12 @@ import {
   LIST_CARD_WIDTH,
   LIST_DEPTH_INSET,
   colsFor,
+  fitBoxFor,
   itemWidthFor,
   pickPreset,
   stepFor,
 } from './listArrange.js';
+import { METRICS } from '@bublys-org/bubble-layout';
 
 /** 既定の一覧の箱（縦長） */
 const BOX = { w: LIST_BOX.width, h: LIST_BOX.height };
@@ -103,5 +105,46 @@ describe('並べ方ごとの札の形', () => {
   it('送り幅を決めるのは coverflow の 3 つだけ（ほかは詰める並びなので札が決める）', () => {
     expect(stepFor('column', { w: 300, h: 88 })).toBeUndefined();
     expect(stepFor('stackDepth', { w: 300, h: 88 })).toBeUndefined();
+  });
+});
+
+/**
+ * **その並べ方に合う箱の大きさ。**
+ *
+ * 箱と並べ方が追いかけ合うとき（`follows`）、並べ方を選んだらこの大きさへ移る。
+ * 出るのは詰める 3 つだけ ── 魚眼と透視はレンズが何でも箱に収めてしまうので、
+ * 中身から大きさが出ない（出ないものを決め打ちで与えない）。
+ */
+describe('並べ方に合う箱の大きさ', () => {
+  const CARD = { w: 308, h: 84 };
+  const PAD2 = METRICS.PAD * 2;   // 並びの左右・上下の余白（28）
+
+  it('縦に並べる ── 幅は札 1 枚、高さは枚数ぶん（＋口の取り分）', () => {
+    expect(fitBoxFor('column', 6, CARD, 0)).toEqual({ w: 308 + PAD2, h: 6 * 84 + PAD2 });
+    expect(fitBoxFor('column', 6, CARD, 52)).toEqual({ w: 308 + PAD2, h: 6 * 84 + 52 + PAD2 });
+  });
+
+  it('横に並べる ── 縦と横が入れ替わるだけ', () => {
+    expect(fitBoxFor('row', 4, CARD, 0)).toEqual({ w: 4 * 308 + PAD2, h: 84 + PAD2 });
+  });
+
+  it('格子は四角に近い形から出す（箱がまだ無いので、箱からは数えない）', () => {
+    // 6 枚 → 3 列 2 行
+    expect(fitBoxFor('grid', 6, CARD, 0)).toEqual({ w: 3 * 308 + PAD2, h: 2 * 84 + PAD2 });
+    // 2 枚でも 2 列（格子の下限。`GRID_MIN_SIDE`）
+    expect(fitBoxFor('grid', 2, CARD, 0)).toEqual({ w: 2 * 308 + PAD2, h: 1 * 84 + PAD2 });
+  });
+
+  it('魚眼と透視は大きさを返さない ── 箱に触らない', () => {
+    for (const preset of ['coverflow', 'coverflowY', 'coverflowGrid', 'stackDepth'] as const) {
+      expect(fitBoxFor(preset, 6, CARD, 0)).toBeUndefined();
+    }
+  });
+
+  it('置ける広さで頭打ちにする ── 海より大きい箱は置けない', () => {
+    const room = { w: 900, h: 800 };
+    expect(fitBoxFor('row', 6, CARD, 0, room)).toEqual({ w: 900, h: 84 + PAD2 });
+    // ただし札 1 枚は切らない（札より狭い箱を返しても仕方がない）
+    expect(fitBoxFor('row', 6, CARD, 0, { w: 100, h: 800 })?.w).toBe(308);
   });
 });

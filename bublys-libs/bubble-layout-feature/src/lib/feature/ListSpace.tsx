@@ -21,7 +21,9 @@
 import { FC, ReactNode, createContext, useContext, useEffect, useRef, useState } from "react";
 import { BubbleSpace } from "./BubbleSpace.js";
 import {
+  LIST_DEPTH_INSET,
   colsFor,
+  fitBoxFor,
   itemWidthFor,
   needsBand,
   pickPreset,
@@ -146,15 +148,17 @@ export const ListSpace: FC<ListSpaceProps> = ({
   const room = Math.max(0, box.w - METRICS.PAD * 2);
   const itemW = typeof itemWidth === 'function' ? itemWidth(room) : itemWidth;
   /**
-   * ★ **人が選んでいたら、そちらが勝つ。** 一覧は箱と中身から自分で並べ方を決めるが、
+   * ★ **留まっている並べ方があれば、そちらが勝つ。** 一覧は箱と中身から自分で決めるが、
    *   決めたのが人ならその答えを使う ── **列数も札の幅も送り幅も、ここから出る**ので、
    *   ここで受け取らないと「格子を選んでも列数が渡らない」（実測で踏んだ）。
    */
   const view = useViewChoice();
   const chosen = view.chosen(me ?? '');
-  /** 箱も中身に合わせて広げるか（見る側が選ぶ）。切ると自前のままで見切れる */
-  const grow = view.grows(me ?? '');
-  const preset = chosen ?? pickPreset(box, members.length, itemW, itemHeight, headBox);
+  /** 箱と並べ方が追いかけ合うか（見る側が選ぶ）。留めるなら、箱を変えても並べ方は変わらない */
+  const follows = view.follows(me ?? '');
+  /** いまの箱なら、どう並べるのが良いか（誰も留めていないときの答え） */
+  const auto = pickPreset(box, members.length, itemW, itemHeight, headBox);
+  const preset = chosen ?? auto;
   /**
    * 口の場所は、並びの**始端に空けておく**（並びはそのすぐ下から積む）。
    *
@@ -171,10 +175,67 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   出していたころは、窓を横に伸ばすと札まで太った（`itemWidthFor` の註）。
    *   箱から決まるのは「何列で折り返すか」だけ。
    */
-  const cardWidth = itemWidthFor(preset, itemW);
+  /**
+   * ★ **細くするのは「狭い所に置く」と札に伝えること。引き算ではない。**
+   *
+   *   透視は後ろの札の肩を出すために、札を左右 {@link LIST_DEPTH_INSET} ずつ狭い所に置く。
+   *   前はここで**幅から引いて**いたが、引き算は**札の下限を知らない** ──
+   *   囲碁の札は名前 7 文字（243）が下限なのに 196 まで削られて、字が縦に折り返していた。
+   *   狭さを渡して、どこまで譲れるかは札に決めさせる。
+   * ★ 譲れなくて入らないぶんは**はみ出す**。透視は枠からはみ出してよい並び
+   *   （切らない・送らない）なので、はみ出したまま階段になる。
+   */
+  const cardRoom = preset === 'stackDepth' ? Math.max(0, room - LIST_DEPTH_INSET * 2) : room;
+  const cardWidth =
+    typeof itemWidth === 'function' ? itemWidth(cardRoom) : itemWidthFor(preset, itemWidth);
   const stepX = stepFor(preset, { w: cardWidth, h: itemHeight })?.x;
   const stepY = stepFor(preset, { w: cardWidth, h: itemHeight })?.y;
   const cols = colsFor(preset, box, itemW);
+
+  /**
+   * **箱と並べ方の追いかけ合い。**
+   *
+   * ```
+   * 留める（follows が偽）  いま写っている並べ方を焼き付ける。箱を変えても選び直さない
+   * 追いかけ合う（真）      人が箱を変えたら、留めていた答えを解く ＝ また箱から決まる
+   * ```
+   *
+   * ★ 見分けるのは「**箱が変わったのは誰のせいか**」── 自分で書いた大きさ
+   *   （並べ方に合わせて `setSize` したぶん）は人の操作ではないので、解かない。
+   *   ここを見ないと、並べ方を選ぶ → 箱が変わる → その箱から選び直す、で**選んだ答えが
+   *   すぐ捨てられる**（横に並べるは `pickPreset` が返さない並べ方なので、選んだ瞬間に戻る）。
+   */
+  const wrote = useRef<{ w: number; h: number } | null>(null);
+  const lastBox = useRef<string>('');
+  const boxKey = `${Math.round(box.w)}x${Math.round(box.h)}`;
+  useEffect(() => {
+    if (!me) return;
+    const changed = lastBox.current !== '' && lastBox.current !== boxKey;
+    const mine =
+      !!wrote.current && `${Math.round(wrote.current.w)}x${Math.round(wrote.current.h)}` === boxKey;
+    lastBox.current = boxKey;
+    if (!follows) {
+      if (!chosen) view.choose(me, auto);
+      return;
+    }
+    if (changed && !mine && chosen) view.choose(me, null);
+  }, [me, follows, chosen, auto, boxKey, view]);
+
+  /**
+   * **並べ方を選んだら、その並べ方に合う大きさへ**（追いかけ合うときだけ）。
+   *
+   * ★ 大きさが出るのは**詰める 3 つだけ**（`fitBoxFor`）。魚眼と透視はレンズが何でも
+   *   箱に収めてしまうので中身から大きさが出ない ── 決め打ちで与えると、
+   *   「箱が小さくても全部見える」ための並べ方なのに、選んだ途端に合わせた箱を壊す。
+   * ★ 書くのは**大きさだけ**。場所は人のもの（角を掴んだときと同じ書き方）。
+   */
+  useEffect(() => {
+    if (!me || !follows || !chosen) return;
+    const want = fitBoxFor(chosen, members.length, { w: cardWidth, h: itemHeight }, reserve, space.roomOf(me));
+    if (!want) return;
+    wrote.current = want;
+    space.setSize(me, want);
+  }, [me, follows, chosen, members.length, cardWidth, itemHeight, reserve, space]);
 
   /**
    * ★ 世界に書くのは**この 1 箇所だけ**。顔ぶれと並べ方を一緒に渡す
@@ -183,8 +244,14 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   `space` が毎回新しくてもここで止まらなくなることはない。
    */
   useEffect(() => {
-    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols, grow });
-  }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols, grow]);
+    /**
+     * ★ **箱は伸ばさない**（`grow: false`）── 箱の大きさは人のもの。
+     *   「並べ方に合わせて箱を変える」は伸ばしっぱなしにすることではなく、
+     *   選んだ一度だけ大きさを書くこと（上の `setSize`）。伸ばしっぱなしにすると、
+     *   箱が**中身より小さくできない**ものになる（実測で踏んだ：横に縮まらない一覧）。
+     */
+    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols, grow: false });
+  }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols]);
 
   /**
    * 中身は口だけ。並びは**外の層**が描く（DOM は平らなので、札はこの div の兄弟になる ──

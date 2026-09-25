@@ -93,6 +93,8 @@ export const SPACE_CSS = `
 /* ★ 中身を消すのは題名より**奥**（倍率 0.3）。題名が読めなくなっても、
    中身の形は「何が入っているか」の手がかりになるので描き続ける（CONTENT_MIN） */
 .bub.nc > .bl-body{display:none}
+/* 奥行きに重ねた札 ── わざと細くしてあるので、入らないぶんは送らずに切る（BubbleSpace の註） */
+.bub > .bl-body.bl-cut{overflow:hidden}
 .bl-noroute{padding:10px 12px;color:#b23c27;font-size:11px;line-height:1.6}
 .bub > .bl-close{position:absolute;right:4px;top:3px;width:18px;height:18px;padding:0;
   border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
@@ -132,6 +134,10 @@ export const SPACE_CSS = `
 /* いま効いているもの ── 色で言う（ロックと同じ） */
 .bub > .bl-view .bl-view-pick[aria-pressed="true"]{opacity:1;color:#6ee7ff;background:rgba(110,231,255,.14)}
 .bub > .bl-view .bl-view-gap{margin-left:6px}
+/* 並べ方の 7 つとは**別の項目**（留めるかどうか）。間を広く取って、仕切りを 1 本引く */
+.bub > .bl-view .bl-view-apart{position:relative;margin-left:17px}
+.bub > .bl-view .bl-view-apart::before{content:"";position:absolute;left:-9px;top:2px;bottom:2px;
+  width:1px;background:rgba(234,241,255,.25)}
 /* 一覧の札（静か）には出さない ── 並べ方を持っているのは一覧のほう */
 .bub.nt > .bl-view{display:none}
 

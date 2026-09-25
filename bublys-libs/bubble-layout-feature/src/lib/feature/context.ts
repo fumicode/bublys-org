@@ -19,7 +19,13 @@ export interface ChildrenLayout {
   readonly step?: { readonly x?: number; readonly y?: number };
   /** **何列で折り返すか。** 渡すと、順序から行と列（`cell`）を書き直す */
   readonly cols?: number;
-  /** **箱が中身に合わせて伸びるか**（既定は伸びる）。`false` なら自前のままで見切れる */
+  /**
+   * **箱が中身に合わせて伸びるか**（既定は伸びる）。`false` なら自前のままで見切れる。
+   *
+   * ★ 一覧はいつも `false` を渡す ── **箱の大きさは人のもの**だから。
+   *   「並べ方に合わせて箱を変える」は、伸ばしっぱなしにすることではなく、
+   *   選んだ一度だけ大きさを書くこと（`setSize`）。
+   */
   readonly grow?: boolean;
 }
 
@@ -54,6 +60,18 @@ export interface BubbleSpaceApi {
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
   hostOf: (id: BubbleId) => BubbleId | null;
   /**
+   * その泡の**自前の大きさを書く**（中身の大きさ。装いは箱が外へ足す）。
+   *
+   * ★ 使うのは「並べ方を選んだら、その並べ方に合う大きさへ」だけ（`follows` のとき）。
+   *   ふだん箱の大きさを決めるのは**人**（角を掴む）なので、ここを軽々しく呼ばない。
+   */
+  setSize: (id: BubbleId, size: { readonly w: number; readonly h: number }) => void;
+  /**
+   * その泡が**置ける広さ** ── 入っている空間の中身の大きさ（いちばん外なら画面）。
+   * 「その並べ方に合う大きさ」をここで頭打ちにする（海より大きい箱は置けない）。
+   */
+  roomOf: (id: BubbleId) => { readonly w: number; readonly h: number };
+  /**
    * その泡が**自分で持っている大きさ**（中身で伸びる前・レンズを通す前）。
    * 一覧が「縦に並べて収まるか」を測るのに使う ── 伸びたあとの箱で測ると、
    * 伸びたぶん「収まる」がいつも真になって、並べ方が切り替わらない。
@@ -79,6 +97,8 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   setPreset: () => undefined,
   setChildren: () => undefined,
   hostOf: () => null,
+  setSize: () => undefined,
+  roomOf: () => ({ w: 0, h: 0 }),
   sizeOf: () => null,
   takeIn: () => '',
 });
@@ -112,21 +132,32 @@ export const useScreenZoom = (): ScreenZoom | null => useContext(ScreenZoomConte
  *   「格子を選んでも列数が渡らず、札が全部 (0,0) に積まれる」（実測で踏んだ）。
  */
 export interface ViewChoice {
+  /** いま留まっている並べ方（`undefined` なら、箱から決める） */
   readonly chosen: (hostId: BubbleId) => PresetId | undefined;
-  readonly choose: (hostId: BubbleId, preset: PresetId) => void;
+  /** 並べ方を留める。`null` で解く（また箱から決まるようになる） */
+  readonly choose: (hostId: BubbleId, preset: PresetId | null) => void;
   /**
-   * **箱も中身に合わせて広がるか**（既定）。`false` なら箱はそのままで、
-   * 入らないぶんは見切れる（動かして見に行く）。
+   * **箱と並べ方が追いかけ合うか**（既定：追いかけ合う）。
+   *
+   * ```
+   * 追いかけ合う（オン）  箱を変えたら → その箱に合う並べ方へ
+   *                       並べ方を選んだら → その並べ方に合う箱の大きさへ
+   * 留める（オフ）        箱をどう変えても並べ方は変わらない。箱は人のもの
+   * ```
+   *
+   * ★ どちらでも**箱は人が自由に変えられる**。オンは「変えたら並べ方が付いてくる」であって、
+   *   「箱の大きさを人から取り上げる」ではない（前はそこを取り違えて、
+   *   中身より小さくできない箱になっていた）。
    */
-  readonly grows: (hostId: BubbleId) => boolean;
-  readonly toggleGrows: (hostId: BubbleId) => void;
+  readonly follows: (hostId: BubbleId) => boolean;
+  readonly toggleFollows: (hostId: BubbleId) => void;
 }
 
 export const ViewChoiceContext = createContext<ViewChoice>({
   chosen: () => undefined,
   choose: () => undefined,
-  grows: () => true,
-  toggleGrows: () => undefined,
+  follows: () => true,
+  toggleFollows: () => undefined,
 });
 export const useViewChoice = (): ViewChoice => useContext(ViewChoiceContext);
 

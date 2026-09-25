@@ -384,9 +384,12 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       setChildren: () => undefined,
       hostOf: () => null,
       sizeOf: () => null,
+      setSize: () => undefined,
+      // 岸に貼った一覧が置ける広さは、岸の窓ぶん（それ以上は岸からはみ出す）
+      roomOf: () => ({ w: vp.width, h: vp.height }),
       takeIn: (url, rect) => spaceRef.current?.takeIn(url, rect) ?? "",
     }),
-    [],
+    [vp],
   );
 
   /** 定位置に居てほしいものが居なければ、そこへ戻す（最初に置くのも、これ 1 つで済む） */

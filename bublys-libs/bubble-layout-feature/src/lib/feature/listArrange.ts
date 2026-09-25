@@ -125,6 +125,43 @@ export const colsFor = (preset: PresetId, box: Box, itemWidth: number): number |
   return Math.max(GRID_MIN_SIDE, fitsAcross(box.w, itemWidthFor(preset, itemWidth)));
 };
 
+/**
+ * **その並べ方に合う箱の大きさ**（中身の側。装いは箱が外へ足す）。
+ *
+ * > 並べ方を選んだら、その並べ方に合う大きさへ ── **追いかけ合うとき**（`follows`）だけ。
+ *
+ * ★ **返すのは詰める 3 つだけ。** 魚眼と透視は**レンズが何でも箱に収めてしまう**ので、
+ *   中身から大きさが出ない ── 出ないものを決め打ちで与えると、
+ *   「箱が小さくても全部見える」ための並べ方なのに、選んだ途端に
+ *   せっかく合わせた箱を壊すことになる。だから `undefined`（箱に触らない）。
+ * ★ 格子の列数は**四角に近い形**から出す（箱から数える `colsFor` は、
+ *   ここでは箱がまだ決まっていないので使えない）。
+ * ★ 広さ（`room`）を渡すと、そこで頭打ちにする ── 海より大きい箱は置けない。
+ *   入りきらないぶんは見切れて、送って見に行く。
+ */
+export const fitBoxFor = (
+  preset: PresetId,
+  count: number,
+  card: Box,
+  reserve: number,
+  room?: Box | null,
+): Box | undefined => {
+  const n = Math.max(1, count);
+  const cap = (b: Box): Box => ({
+    w: room ? Math.min(b.w, Math.max(card.w, room.w)) : b.w,
+    h: room ? Math.min(b.h, Math.max(card.h, room.h)) : b.h,
+  });
+  const pad = METRICS.PAD * 2;
+  if (preset === 'column') return cap({ w: card.w + pad, h: n * card.h + reserve + pad });
+  if (preset === 'row') return cap({ w: n * card.w + pad, h: card.h + reserve + pad });
+  if (preset === 'grid') {
+    const cols = Math.max(GRID_MIN_SIDE, Math.ceil(Math.sqrt(n)));
+    const rows = Math.ceil(n / cols);
+    return cap({ w: cols * card.w + pad, h: rows * card.h + reserve + pad });
+  }
+  return undefined;
+};
+
 /** 箱の大きさから並べ方を決める（海でも岸でも同じ式） */
 export const pickPreset = (
   box: Box,
@@ -175,6 +212,10 @@ export const pickPreset = (
  *
  * 並べ方で変えるのは 1 つだけ:
  * - 透視：左右 {@link LIST_DEPTH_INSET} ずつ細く ── **必ず階段になる**（後ろの札の肩を出す）
+ *
+ * ★ ここで細くしてよいのは**幅を数で決めている札**だけ。札が自分で幅を決める（関数で答える）なら、
+ *   細さは**狭い所を渡して札に決めさせる**（`ListSpace` の `cardRoom`）── 引き算は札の下限を
+ *   知らないので、下限を割って字が折り返す（実測：囲碁の札が 7 文字 243 を割って 196 になった）。
  */
 export const itemWidthFor = (preset: PresetId, itemWidth: number): number => {
   const w = Math.max(1, itemWidth);
