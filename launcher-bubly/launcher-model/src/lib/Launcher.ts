@@ -68,6 +68,21 @@ export class Launcher {
     return new Launcher({ ...this.state, entries });
   }
 
+  /**
+   * 呼び出し先の差し替え。`from` を開いていた entry を `to` に向け直す。
+   *
+   * 同じ呼び出しの行き先が変わっただけなので、消して足し直すのではなく
+   * **その場で向きだけ変える** ── 並び順も entry の id も変わらない。
+   * 無ければ何もしない（自分をそのまま返す）。
+   */
+  rename(from: string, to: string): Launcher {
+    if (!this.state.entries.some((e) => e.url === from)) return this;
+    return new Launcher({
+      ...this.state,
+      entries: this.state.entries.map((e) => (e.url === from ? { ...e, url: to } : e)),
+    });
+  }
+
   remove(entryId: string): Launcher {
     if (!this.entryOf(entryId)) return this;
     return new Launcher({

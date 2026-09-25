@@ -68,4 +68,18 @@ describe("Launcher", () => {
     expect(Launcher.create([]).isEmpty).toBe(true);
     expect(Launcher.create(["a"]).isEmpty).toBe(false);
   });
+
+
+  it("呼び出し先を差し替えても、並び順と entry の id は変わらない", () => {
+    const l = Launcher.create(["memo-bubly", "users-bubly"], "main");
+    const ids = l.entries.map((e) => e.id);
+    const renamed = l.rename("memo-bubly", "memos");
+    expect(renamed.urls).toEqual(["memos", "users-bubly"]);
+    expect(renamed.entries.map((e) => e.id)).toEqual(ids);
+  });
+
+  it("無い呼び出し先を差し替えても何も起きない", () => {
+    const l = Launcher.create(["users"], "main");
+    expect(l.rename("memo-bubly", "memos")).toBe(l);
+  });
 });

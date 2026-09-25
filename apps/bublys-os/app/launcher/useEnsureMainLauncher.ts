@@ -12,7 +12,7 @@ import {
 import { nameIntent } from "@bublys-org/world-line-graph";
 import { Launcher } from "@bublys-org/launcher-model";
 import { selectLauncherPlain, setLauncher } from "@bublys-org/launcher-libs";
-import { DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID } from "./launchTargets";
+import { DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID, RETIRED_LAUNCH_URLS } from "./launchTargets";
 
 const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
 /** 最初に貼るときの大きさ（あとはユーザーが辺を掴んで変えられる） */
@@ -22,6 +22,7 @@ const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
  * ルール: **OS 標準の呼び出しは、main ランチャーに必ず 1 つずつ居る。**
  *
  * - 集約が無ければ、OS 標準の呼び出しで作る
+ * - 行き先が変わった呼び出しは差し替える（足す前に。でないと古いのと新しいのが並ぶ）
  * - 有っても足りないものがあれば足す（あとから増えた呼び出しが出てこないので）
  *
  * OS 標準の呼び出しには外す口が無いので、足すだけで辻褄が合う
@@ -37,9 +38,10 @@ export const useEnsureMainLauncherEntity = () => {
       return;
     }
     const launcher = Launcher.fromPlain(mainLauncher);
-    const missing = DEFAULT_LAUNCHER_URLS.filter((url) => !launcher.urls.includes(url));
-    if (missing.length === 0) return;
-    dispatch(setLauncher(missing.reduce((l, url) => l.add(url), launcher).toPlain()));
+    const moved = Object.entries(RETIRED_LAUNCH_URLS).reduce((l, [from, to]) => l.rename(from, to), launcher);
+    const missing = DEFAULT_LAUNCHER_URLS.filter((url) => !moved.urls.includes(url));
+    if (moved === launcher && missing.length === 0) return;
+    dispatch(setLauncher(missing.reduce((l, url) => l.add(url), moved).toPlain()));
   }, [dispatch, mainLauncher]);
 };
 
