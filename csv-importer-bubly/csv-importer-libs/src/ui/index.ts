@@ -1,4 +1,5 @@
 export { SheetListView, type SheetListItem } from "./SheetListView.js";
+export { SheetCard } from "./SheetCard.js";
 export { SheetEditorView } from "./SheetEditorView.js";
 export { GoogleSheetsPanel, type GoogleSheetsPanelProps } from "./GoogleSheetsPanel.js";
 export { CsvObjectListView } from "./CsvObjectListView.js";
