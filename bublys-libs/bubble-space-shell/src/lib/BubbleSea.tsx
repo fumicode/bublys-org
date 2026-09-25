@@ -28,6 +28,7 @@ import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
+import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
@@ -36,6 +37,11 @@ export type BubbleSeaProps = {
   readonly homes?: readonly Home[];
   /** 世界が空のときに最初に開く url */
   readonly initialUrls?: readonly string[];
+  /**
+   * **この海の世界線を、どの scope に記録するか。** 渡さなければ記録しない。
+   * 記録するのは 3 つの節目だけ（`SeaWorldLine` の註）。
+   */
+  readonly worldLineScope?: string;
   /** 最初のレンズの向き。既定は X だけ魚眼（隣に開いたときに点くのがこれ） */
   readonly initialFisheye?: { x: boolean; y: boolean };
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
@@ -52,6 +58,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   routes: legacyRoutes,
   homes,
   initialUrls,
+  worldLineScope,
   initialFisheye = { x: true, y: false },
   onSpaceReady,
   style,
@@ -85,6 +92,8 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
     },
     [onSpaceReady],
   );
+  /** 節目ごとに、海の姿を世界線へ（渡されていなければ何もしない） */
+  const record = useSeaWorldLine(worldLineScope, spaceRef);
 
   /**
    * 定位置を置いてよいか ── **画面の大きさを測り終えてから**。
@@ -161,6 +170,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         homes={homes}
         homesReady={homesReady}
         onSpaceReady={handleSpaceReady}
+        onSettled={record}
         autoLens={autoLens}
         bandDisplay={bandsAlways ? 'always' : 'hover'}
         onLens={onLens}

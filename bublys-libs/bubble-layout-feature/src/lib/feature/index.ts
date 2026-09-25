@@ -11,7 +11,7 @@ export {
   BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext,
   ViewChoiceContext, useBubbleSpace, useCurrentBubble, useScreenZoom, useSelectedBubble, useViewChoice,
 } from './context.js';
-export type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, ViewChoice } from './context.js';
+export type { BubbleSpaceApi, ChildrenLayout, OpenedPlain, ScreenZoom, SeaSnapshot, SettleWhy, ViewChoice } from './context.js';
 export { openAt, hueOf } from './openAt.js';
 export type { OpenAtInput, OpenAtResult, OpenAs } from './openAt.js';
 export {

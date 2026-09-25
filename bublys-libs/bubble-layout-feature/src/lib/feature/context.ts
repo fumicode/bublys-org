@@ -3,7 +3,7 @@
  * ★ `openingPosition` は無い ── どこに置くかは親の View が決める（DECISIONS.md）。
  */
 import { createContext, useContext } from 'react';
-import type { BubbleId, LensId, PlaneAxis, PresetId } from '@bublys-org/bubble-layout';
+import type { BubbleId, LensId, PlaneAxis, PresetId, WorldState } from '@bublys-org/bubble-layout';
 
 /**
  * 子をどう並べるか ── **顔ぶれと一緒に渡すもの**（`setChildren`）。
@@ -29,7 +29,44 @@ export interface ChildrenLayout {
   readonly grow?: boolean;
 }
 
+/**
+ * **海のいまの姿**（世界線に記録するときの 1 節ぶん）。
+ *
+ * 世界（泡の木と並べ方）だけでは足りない ── どの泡がどの url かは世界の外に居るので、
+ * 一緒に持たないと**戻したときに中身の無い泡が並ぶ**。
+ */
+export interface SeaSnapshot {
+  readonly world: WorldState;
+  readonly urls: readonly (readonly [BubbleId, OpenedPlain])[];
+  /** 開いた順の続き（戻したあとに開いた泡の id がぶつからないように） */
+  readonly seq: number;
+}
+
+/** `SeaSnapshot` が持つ、泡ひとつぶんの覚え書き（`BubbleSpace` の `Opened`） */
+export interface OpenedPlain {
+  readonly url: string;
+  readonly type: string;
+  readonly openerId: BubbleId | null;
+  readonly originId: BubbleId | null;
+  readonly originSpot: { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null;
+  readonly at: number;
+}
+
+/**
+ * **記録するに値する区切り**（`onSettled`）。3 つだけ。
+ *
+ * - `members` … 顔ぶれが変わった（開いた・閉じた・岸へ出した・岸から戻した）
+ * - `view`    … 並べ方／レンズを変えた
+ * - `moved`   … 動かした・大きさを変えた。**手を離したときに 1 つ**
+ *   （途中の 1px ごとに節目を作ると、戻りたい所が見つけられなくなる）
+ */
+export type SettleWhy = 'members' | 'view' | 'moved';
+
 export interface BubbleSpaceApi {
+  /** いまの姿を取り出す（世界線に記録するのに使う） */
+  snapshot: () => SeaSnapshot;
+  /** 記録してある姿に戻す（世界線の節へ移ったとき） */
+  restore: (snap: SeaSnapshot) => void;
   /** その url の泡を、この泡の隣に開く。返るのは開いた泡の id */
   openBubble: (url: string, openerId?: BubbleId | null, title?: string) => BubbleId;
   closeBubble: (id: BubbleId) => void;
@@ -87,7 +124,15 @@ export interface BubbleSpaceApi {
   takeIn: (url: string, rect: { x: number; y: number; w: number; h: number }) => BubbleId;
 }
 
+const EMPTY_SNAPSHOT: SeaSnapshot = {
+  world: { bubbles: [], root: { view: null as never, focus: { x: 0, y: 0, z: 0 } } } as unknown as WorldState,
+  urls: [],
+  seq: 0,
+};
+
 export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
+  snapshot: () => EMPTY_SNAPSHOT,
+  restore: () => undefined,
   openBubble: () => { console.warn('BubbleSpace の外で openBubble が呼ばれた'); return ''; },
   closeBubble: () => undefined,
   urlOf: () => null,

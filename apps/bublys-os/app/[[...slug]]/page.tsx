@@ -15,9 +15,12 @@ import { registerShellTypes } from "../counter/registerShellTypes";
 import { BUBBLE_ARRANGEMENT_DOMAIN } from "@bublys-org/bubbles-ui";
 import { MEMO_DOMAIN } from "@bublys-org/memo-libs";
 import { IGO_GAME_DOMAIN } from "../igo-game/domain/IgoGameDomain";
+import { SEA_ARRANGEMENT_DOMAIN } from "@bublys-org/bubble-space-shell";
 
 const APP_DOMAIN_REGISTRY = {
   ...BUBBLE_ARRANGEMENT_DOMAIN,
+  // 海の並びの移り変わり（`useSeaWorldLine` が記録する型）
+  ...SEA_ARRANGEMENT_DOMAIN,
   ...MEMO_DOMAIN,
   ...IGO_GAME_DOMAIN,
 };

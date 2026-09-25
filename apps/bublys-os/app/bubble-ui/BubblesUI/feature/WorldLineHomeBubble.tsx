@@ -11,14 +11,23 @@
  * ★ 開く先は**同じ url**（`world-lines`）── つまり出てくるのは自分の複製で、
  *   そちらは広いので世界線を映す。姿の違いは大きさだけで、別の作りは要らない。
  */
-import { FC, useContext, useEffect, useRef, useState } from "react";
+import { FC, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
-import { BubblesContext, WorldLinesBubble } from "@bublys-org/bubbles-ui";
+import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { WorldLineScopeView, useScopeNodeSummaries, moveToSiblingBranch } from "@bublys-org/bubbles-ui";
+import { useCasScope } from "@bublys-org/world-line-graph";
+import { SEA_ARRANGEMENT_ID, SEA_ARRANGEMENT_TYPE, type SeaArrangement } from "@bublys-org/bubble-space-shell";
 import { useCurrentBubble } from "@bublys-org/bubble-layout-feature";
 
 /** この泡の url。押して開く先も同じ（自分の複製） */
 export const WORLD_LINES_URL = "world-lines";
+
+/** 大元の海の世界線を置く名前（`BubblesUINext` が記録に使うのと同じ） */
+export const ROOT_SEA_SCOPE = "root";
+
+/** 節目の要約 ── その時点で海に浮かんでいた泡の数 */
+const countBubbles = (v: unknown) => `${(v as SeaArrangement).state.snapshot.urls.length}`;
 
 /**
  * アイコンだけにする大きさ。**「木が 2 段ぶん見えないなら、映す意味がない」**で決める。
@@ -70,10 +79,39 @@ export const WorldLineHomeBubble: FC = () => {
           </IconButton>
         </Tooltip>
       ) : (
-        <WorldLinesBubble />
+        <SeaWorldLineView />
       )}
     </div>
   );
+};
+
+/**
+ * 海の世界線そのもの。
+ *
+ * ★ `bubbles-ui` の `WorldLinesBubble` は**旧い海の並び**（`BubbleArrangement`）を読むので、
+ *   いまの海の節目は映らない。読む型が違うだけなので、同じ見本（`WorldLineScopeView`）に
+ *   こちらの型を渡す。
+ */
+const SeaWorldLineView: FC = () => {
+  const scope = useCasScope(ROOT_SEA_SCOPE);
+  const getNodeSummary = useScopeNodeSummaries(
+    scope,
+    SEA_ARRANGEMENT_TYPE,
+    SEA_ARRANGEMENT_ID,
+    countBubbles,
+  );
+  const keyBindings = useMemo(
+    () => [
+      { keys: "mod+z", run: scope.moveBack },
+      { keys: "mod+shift+z", run: scope.moveForward },
+      { keys: "ArrowLeft", run: scope.moveBack },
+      { keys: "ArrowRight", run: scope.moveForward },
+      { keys: "ArrowUp", run: () => moveToSiblingBranch(scope, -1) },
+      { keys: "ArrowDown", run: () => moveToSiblingBranch(scope, 1) },
+    ],
+    [scope],
+  );
+  return <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />;
 };
 
 export default WorldLineHomeBubble;

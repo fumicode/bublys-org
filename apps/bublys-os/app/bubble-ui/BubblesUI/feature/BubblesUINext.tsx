@@ -8,6 +8,7 @@
  *   ポケット・他のデモへ行く口の 4 つ。
  */
 import { BubbleSea, type Docked, type Home } from "@bublys-org/bubble-space-shell";
+import { ROOT_SEA_SCOPE } from "./WorldLineHomeBubble";
 import { bubbleRoutes } from "../domain/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
@@ -146,5 +147,16 @@ const HOMES: readonly Home[] = [
  */
 export const BubblesUINext = () => {
   useEnsureMainLauncherEntity();
-  return <BubbleSea routes={bubbleRoutes} homes={HOMES} style={{ height: "100vh" }} />;
+  /**
+   * ★ **この海の世界線は、root という名で記録する。** 世界線の泡（`WorldLineHomeBubble`）が
+   *   読むのと同じ名前にしておく ── 別の名前にすると、記録はされているのに何も映らない。
+   */
+  return (
+    <BubbleSea
+      routes={bubbleRoutes}
+      homes={HOMES}
+      worldLineScope={ROOT_SEA_SCOPE}
+      style={{ height: "100vh" }}
+    />
+  );
 };

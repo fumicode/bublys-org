@@ -12,3 +12,10 @@ export { bridgeRoutes } from './lib/legacyRouteBridge.js';
 export { SpaceViewContext, useSpaceView, type SpaceView } from './lib/SpaceViewContext.js';
 export { SpaceViewBubble } from './lib/SpaceViewBubble.js';
 export { FullscreenToggle } from './lib/FullscreenToggle.js';
+export {
+  SeaArrangement,
+  SEA_ARRANGEMENT_TYPE,
+  SEA_ARRANGEMENT_ID,
+  SEA_ARRANGEMENT_DOMAIN,
+  useSeaWorldLine,
+} from './lib/SeaWorldLine.js';

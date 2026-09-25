@@ -11,12 +11,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
-import type { AxisView, BubbleId, BubbleWorld, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
+import { Bubble, BubbleWorld, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
+import type { AxisView, BubbleId, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
-import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, ViewChoice } from './context.js';
+import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, SeaSnapshot, SettleWhy, ViewChoice } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
 import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
@@ -262,6 +262,11 @@ export interface BubbleSpaceProps {
    *   1 つしか開けない作りなので成り立つ（岸の `persistKey` と同じ前提）。
    */
   readonly memoryKey?: string;
+  /**
+   * **記録するに値することが起きた**という合図（`SettleWhy` の註）。
+   * 姿は渡さない ── 受けた側が `api.snapshot()` で読む（そのときには書き込みが済んでいる）。
+   */
+  readonly onSettled?: (why: SettleWhy) => void;
   readonly className?: string;
   readonly style?: CSSProperties;
   /** 泡の外に置くもの（ツールバーなど） */
@@ -342,6 +347,52 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const worldRef = useRef(world);
   worldRef.current = world;
+  /** 同じ理由で、url の覚えも覚え書きに写しておく（`snapshot` が古い姿を返さないように） */
+  const urlsRef = useRef(urls);
+  urlsRef.current = urls;
+
+  /**
+   * **いまの姿を取り出す／記録してある姿に戻す。**
+   *
+   * ★ どちらも**覚え書きから読む**ので、いつ呼ばれても古い姿を返さない
+   *   ── 記録する側は「区切りの合図」を受けてから呼ぶので、書き込みの直後になる。
+   * ★ 世界だけでは足りない。どの泡がどの url かは世界の外に居るので、一緒に持つ
+   *   （持たないと、戻したときに**中身の無い泡が並ぶ**）。
+   */
+  const snapshot = useCallback(
+    (): SeaSnapshot => ({
+      world: worldRef.current.toPlain(),
+      urls: [...urlsRef.current.entries()],
+      seq: seq.current,
+    }),
+    [],
+  );
+  const restore = useCallback((snap: SeaSnapshot) => {
+    seq.current = Math.max(seq.current, snap.seq);
+    setUrls(new Map(snap.urls));
+    setWorld(BubbleWorld.fromPlain(snap.world));
+  }, []);
+
+  /**
+   * **区切りの合図**（`onSettled`）── 記録するに値することが起きた。
+   *
+   * ★ 合図を出すだけで、姿は渡さない。世界が state に落ちるのは次の描画なので、
+   *   その場で渡すと**ひとつ前の姿**を記録してしまう。描き終えてから
+   *   `snapshot()` を読んでもらう（下の effect）。
+   */
+  const settleRef = useRef<SettleWhy | null>(null);
+  const [settleTick, setSettleTick] = useState(0);
+  const markSettled = useCallback((why: SettleWhy) => {
+    settleRef.current = why;
+    setSettleTick((n) => n + 1);
+  }, []);
+  const onSettled = props.onSettled;
+  useEffect(() => {
+    const why = settleRef.current;
+    if (!why) return;
+    settleRef.current = null;
+    onSettled?.(why);
+  }, [settleTick, onSettled]);
   /**
    * 世界を書く。**関数で書ける**（`setWorld(prev => …)`）。
    *
@@ -569,9 +620,10 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const originSpot = spotIn(layerRef.current, from, url);
       setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: opener, originId: from, originSpot, at: seq.current }));
       setSelectedId(id);
+      markSettled('members');
       return id;
     },
-    [routes, world, urls, viewport, rules, setWorld, openOutside, openCenter],
+    [routes, world, urls, viewport, rules, setWorld, openOutside, openCenter, markSettled],
   );
 
   const closeBubble = useCallback(
@@ -601,8 +653,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setWorld(next);
       setUrls((m) => { const n = new Map(m); n.delete(id); return n; });
       setSelectedId((s) => (s === id ? null : s));
+      markSettled('members');
     },
-    [world, setWorld, base, viewport, rules],
+    [world, setWorld, base, viewport, rules, markSettled],
   );
 
   /**
@@ -613,8 +666,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     (axis: PlaneAxis, lens: LensId) => {
       lensChosen.current = true;
       setWorld(withAxis(world, 'root', axis, { lens }));
+      markSettled('view');
     },
-    [world, setWorld],
+    [world, setWorld, markSettled],
   );
 
   /**
@@ -645,9 +699,10 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           : opened.world,
       );
       setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, originId: null, originSpot: null, at }));
+      markSettled('members');
       return id;
     },
-    [routes, world, viewport, rules, setWorld, openCenter],
+    [routes, world, viewport, rules, setWorld, openCenter, markSettled],
   );
 
   /**
@@ -712,8 +767,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       //   一覧が自分の中の並べ方を選んだだけで、外の魚眼まで止めてしまってはいけない
       if (spaceId === 'root') lensChosen.current = true;
       setWorld(withPreset(world, preset, spaceId));
+      markSettled('view');
     },
-    [world, setWorld],
+    [world, setWorld, markSettled],
   );
 
   /**
@@ -934,8 +990,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, setLens, onLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
-    [openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
   );
 
   /**
@@ -999,6 +1055,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     world, setWorld, layout: base, viewport, selectedId, setSelectedId, drawMin, rules, chrome, dressed,
     layerRef, hasContent, claimDrop, onDragInfo,
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
+    /** 動かし終え・広げ終えたときに 1 つ（途中の 1px ごとには出さない ── `SettleWhy` の註） */
+    onSettled: () => markSettled('moved'),
   });
 
   const headerTools = props.headerTools;

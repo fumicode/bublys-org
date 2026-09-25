@@ -144,6 +144,11 @@ export interface BubbleInputOptions {
    * 掴んでいないとき・離したあとは `null` が来る。
    */
   readonly onDragInfo?: (info: ClaimDropInfo | null) => void;
+  /**
+   * **手を離したときに 1 つ。** 動かした・大きさを変えた、が済んだ合図。
+   * 触っただけ（動かさずに離した）では出ない ── 焦点が寄るだけで、世界の値は 1 つも変わらないから。
+   */
+  readonly onSettled?: () => void;
 }
 
 /** 離した瞬間の、泡と指の居場所（どちらも層の座標） */
@@ -503,6 +508,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const at = e ? pt(e) : null;
       if (p && at && o.claimDrop({ id: d.id, pointer: { x: at.mx, y: at.my }, rect: { x: p.x, y: p.y, w: p.w, h: p.h }, size: ownSize(d.id, p) })) {
         show();
+        // 横取りされた＝この海から出て行った。顔ぶれが変わったことは横取りした側が知らせる
         return;
       }
     }
@@ -519,6 +525,8 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     }
     // ★ 大きさの角は `resizeBubble` の中で ⑤ pin まで済んでいるので、離すときにやることは無い
     show();
+    // 動かし終え・広げ終えた（`onSettled` の註）
+    o.onSettled?.();
   }, [world, layout, rules, setWorld, ctx, lifted, o, pt]);
 
   /**

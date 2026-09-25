@@ -19,7 +19,9 @@
     "@bublys-org/bubble-layout": "0.0.1",
     "@bublys-org/bubble-layout-feature": "0.0.1",
     "@bublys-org/bubble-layout-ui": "0.0.1",
-    "@bublys-org/bubbles-ui": "0.0.1"
+    "@bublys-org/bubbles-ui": "0.0.1",
+    "@bublys-org/domain-registry": "0.0.1",
+    "@bublys-org/world-line-graph": "0.0.1"
   },
   "scripts": {
     "build": "tsc -b tsconfig.lib.json",

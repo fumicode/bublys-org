@@ -29,7 +29,7 @@ import {
   useState,
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
+import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
 import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
@@ -75,6 +75,8 @@ export type ShoreSpaceProps = {
   readonly homesReady?: boolean;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
+  /** 記録するに値することが起きた合図（`SettleWhy`）。世界線を記録する側が受ける */
+  readonly onSettled?: (why: SettleWhy) => void;
   readonly autoLens?: boolean;
   /** どこから開いたかの帯の出し方（海ぜんぶの見え方） */
   readonly bandDisplay?: 'hover' | 'always' | 'none';
@@ -185,6 +187,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homes,
   homesReady = true,
   onSpaceReady,
+  onSettled,
   autoLens,
   bandDisplay,
   persistKey,
@@ -383,6 +386,12 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    */
   const shoreSpace = useMemo<BubbleSpaceApi>(
     () => ({
+      /**
+       * ★ 岸は**世界線に記録しない**。岸は「どこに貼ってあるか」であって並びではないし、
+       *   貼ってあるものは `SHORE_MEMORY` が覚えている ── 記録するのは海の側だけ。
+       */
+      snapshot: () => spaceRef.current?.snapshot() ?? { world: {} as never, urls: [], seq: 0 },
+      restore: (snap) => spaceRef.current?.restore(snap),
       openBubble: (url) => spaceRef.current?.openBubble(url, null) ?? "",
       closeBubble: (id) => spaceRef.current?.closeBubble(id),
       urlOf: (id) => spaceRef.current?.urlOf(id) ?? null,
@@ -565,6 +574,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          *   註で「宿題」と書いてあったもの）。同じ名前で海も覚える。
          */
         memoryKey={persistKey}
+        onSettled={onSettled}
         autoLens={autoLens}
         bandDisplay={bandDisplay}
         openArea={openArea}
