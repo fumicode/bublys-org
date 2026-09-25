@@ -1,11 +1,6 @@
 "use client";
 
-import { useCallback, useContext, useMemo } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLineScopeView } from "@bublys-org/bubbles-ui";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
-import { Button } from "@mui/material";
-import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubbleRoute, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble } from "@bublys-org/bubbles-ui";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -20,7 +15,6 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
 
 // ローカルコンポーネント
-import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
