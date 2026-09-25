@@ -447,10 +447,17 @@ function resolveSpace(
      *   軸ごとに別々に写すと線は真っ直ぐのままで、「格子を歪ませた」ようには見えない
      *   （実測で踏んだ：列の中心は揃うのに辺が揃わず、余白だけが残った）。
      *   隣どうしの間は「並べ方が持つ隙間」がレンズで縮んだぶん ── 端へ行くほど詰まる。
+     *
+     * ★ **曲がるのは、並べている軸だけ。** その軸に次元が刺さっていなければ、泡はみな
+     *   同じ一本の線の上にいる ── 曲げる軸がそもそも無い。それでも相手の倍率を掛けると、
+     *   **一定のはずの高さが端ほど中心線へ引き寄せられて、弓なりに垂れる**
+     *   （実測：横の魚眼で、1 列のはずの札が両端だけ下がった）。
      */
+    const bendX = view.x.dim !== 'none' ? ky : 1;
+    const bendY = view.y.dim !== 'none' ? kx : 1;
     const target = {
-      x: ctx.vp.x + (px.s * ky - ctx.vp.x) * m,
-      y: ctx.vp.y + (py.s * kx - ctx.vp.y) * m,
+      x: ctx.vp.x + (px.s * bendX - ctx.vp.x) * m,
+      y: ctx.vp.y + (py.s * bendY - ctx.vp.y) * m,
       scale: m * kx * ky,
       alpha: lz.alpha(dz, view.z.step),
       w: box.w,
