@@ -724,9 +724,16 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         w = withPreset(w, preset, hostId);
         for (const axis of ['x', 'y'] as const) w = withAxis(w, hostId, axis, { gap: LIST_GAP });
       }
-      // 口の場所は並びの始端に空けておく（ListSpace の註）。口は描いてから測るので、
-      // 並べ方が変わっていなくても後から決まることがある
-      if (shiftChanged) w = withAxis(w, hostId, 'y', { reserve: reserve ?? 0 });
+      /**
+       * 口の場所は並びの始端に空けておく（`ListSpace` の註）。口は描いてから測るので、
+       * 並べ方が変わっていなくても後から決まることがある。
+       *
+       * ★ **並べ方を変えたときも当て直す。** `withPreset` は View をプリセットから
+       *   作り直すので、そこで取り分が落ちる ── 取り分の数が変わっていなければ
+       *   書き直されず、**落ちたまま**になっていた。格子に切り替えると、収まらない並びが
+       *   中央ぞろえのまま上へはみ出して**＋新規の口に札が被った**（実測）。
+       */
+      if (shiftChanged || presetChanged) w = withAxis(w, hostId, 'y', { reserve: reserve ?? 0 });
       /**
        * 「等間隔」の刻み ── coverflow の送り幅。**札の幅に対する割合**で決まる（`listArrange`）ので、
        * プリセットが持っている値（ラボの写真の 68）では札に対して狭すぎる。ここで当て直す。

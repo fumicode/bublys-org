@@ -167,7 +167,15 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   空けないのは、並びが帯を作らない並べ方（奥行きに重ねる）だけ
    *   ── そこは模型の側が「動かせない」と判断して、ひとりでに何もしない。
    */
-  const reserve = needsBand(box, itemW, headBox) ? reserveFor(headBox) : 0;
+  /**
+   * ★ **見るのは「並びが実際に使う幅」。** 札 1 枚ぶんで見ていたので、格子のように
+   *   横へ列を足していく並べ方で**右の余白がとっくに埋まっているのに「余白がある」と
+   *   判断して**いた ── 口の段が空かず、いちばん上の行が ＋新規 の下に潜り込む（実測）。
+   *   折り返す数は取り分が決まらないと出せないので、まず取り分なしで数えて幅を見る。
+   */
+  const colsNoBand = colsFor(preset, box, itemWidthFor(preset, itemW), members.length, itemHeight);
+  const usedW = (colsNoBand ?? 1) * itemWidthFor(preset, itemW);
+  const reserve = needsBand(box, usedW, headBox) ? reserveFor(headBox) : 0;
   /**
    * その並べ方のときの札の形と、送り幅・折り返す列数。
    *
