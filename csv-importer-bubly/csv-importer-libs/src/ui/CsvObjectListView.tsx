@@ -1,4 +1,11 @@
 'use client';
+/**
+ * ★ **バブリの画面としては、もう使っていない。** 行の一覧は並びの空間
+ *   （`CsvObjectListFeature` ＋ `CsvObjectCard`）に移った ── 巻物のままだと
+ *   ほかの一覧と違って 7 つの並べ方が効かず、余白も箱も自分で抱えることになる。
+ *   残してあるのは `docs/bubble-space-prototype/v6-bubly` が
+ *   「バブリの本物の画面をそのまま動かす」検証に読んでいるから。
+ */
 
 import { FC } from "react";
 import styled from "styled-components";

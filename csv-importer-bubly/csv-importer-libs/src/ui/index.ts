@@ -3,4 +3,5 @@ export { SheetCard } from "./SheetCard.js";
 export { SheetEditorView } from "./SheetEditorView.js";
 export { GoogleSheetsPanel, type GoogleSheetsPanelProps } from "./GoogleSheetsPanel.js";
 export { CsvObjectListView } from "./CsvObjectListView.js";
+export { CsvObjectCard } from "./CsvObjectCard.js";
 export { CsvObjectDetailView } from "./CsvObjectDetailView.js";

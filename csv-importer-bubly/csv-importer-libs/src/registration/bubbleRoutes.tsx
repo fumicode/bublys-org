@@ -5,7 +5,9 @@ import { BubbleRoute, BubblesContext } from "@bublys-org/bubbles-ui";
 import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
 import { CsvSheet } from "@bublys-org/csv-importer-model";
 import { SheetCard } from "../ui/SheetCard.js";
-import { useCsvSheets } from "../feature/CsvSheetProvider.js";
+import { CsvObjectCard } from "../ui/CsvObjectCard.js";
+import { useCasScope } from "@bublys-org/world-line-graph";
+import { sheetScopeId, useCsvSheets } from "../feature/CsvSheetProvider.js";
 import {
   SheetEditorFeature,
   WorldLineFeature,
@@ -51,6 +53,9 @@ const CsvBubbleProvider: FC<{ children: ReactNode }> = ({ children }) => (
  * 中身は「表の絵 ＋ 名前 ＋ 消す口」の 1 行なので、ほかの一覧の札と同じ丈でよい。
  */
 const SHEET_CARD = { w: LIST_CARD_WIDTH, h: 54 } as const;
+
+/** 行 1 つの札の中身の大きさ。名前 ＋ 中身のさわりの 2 段なのでシートと同じ丈 */
+const OBJECT_CARD = { w: LIST_CARD_WIDTH, h: 54 } as const;
 
 /** 一覧の右上に出す口の見た目（ほかの一覧の「＋新規」に合わせた寸法） */
 const headBtn = (primary: boolean): React.CSSProperties => ({
@@ -165,12 +170,33 @@ const SheetEditorBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-// オブジェクト一覧バブル
+// オブジェクト一覧バブル ── 並びの空間（`CsvObjectListFeature`）
 const ObjectListBubble: BubbleRoute["Component"] = ({ bubble }) => {
   return (
     <CsvBubbleProvider>
       <CsvObjectListFeature sheetId={bubble.params.sheetId} />
     </CsvBubbleProvider>
+  );
+};
+
+/** 行 1 つの札 ── 一覧の中の泡 */
+const ObjectCardBubble: BubbleRoute["Component"] = ({ bubble }) => (
+  <CsvBubbleProvider>
+    <ObjectCardInner sheetId={bubble.params.sheetId} rowId={bubble.params.rowId} />
+  </CsvBubbleProvider>
+);
+
+const ObjectCardInner: FC<{ sheetId: string; rowId: string }> = ({ sheetId, rowId }) => {
+  const { getSheetMeta } = useCsvSheets();
+  const scope = useCasScope(sheetScopeId(sheetId));
+  const sheet = scope.getShell<CsvSheet>("csv-sheet", sheetId)?.object ?? null;
+  const object = sheet?.toPlaneObjects(getSheetMeta(sheetId)?.titleColumnId).find((o) => o.id === rowId);
+  if (!object) return null;
+  return (
+    <CsvObjectCard
+      object={object}
+      url={`csv-importer/sheets/${sheetId}/objects/${rowId}`}
+    />
   );
 };
 
@@ -194,8 +220,21 @@ const WorldLineBubble: BubbleRoute["Component"] = ({ bubble }) => {
 
 /** CSV Importer のバブルルート定義 */
 export const csvImporterBubbleRoutes: BubbleRoute[] = [
+  // ★ 札は詳細より**先に**置く（`:rowId` が `.../card` も飲み込むので）
+  {
+    pattern: "csv-importer/sheets/:sheetId/objects/:rowId/card",
+    type: "object-card",
+    Component: ObjectCardBubble,
+    bubbleOptions: { defaultSize: { width: OBJECT_CARD.w, height: OBJECT_CARD.h } },
+  },
   { pattern: "csv-importer/sheets/:sheetId/objects/:rowId", type: "object-detail", Component: ObjectDetailBubble },
-  { pattern: "csv-importer/sheets/:sheetId/objects", type: "object-list", Component: ObjectListBubble },
+  // 一覧は地を敷かない ── 並びの空間は海がそのまま透ける
+  {
+    pattern: "csv-importer/sheets/:sheetId/objects",
+    type: "object-list",
+    Component: ObjectListBubble,
+    bubbleOptions: { defaultSize: LIST_BOX, contentBackground: "transparent" },
+  },
   {
     pattern: "csv-importer/sheets/:sheetId/world-line",
     type: "sheet-world-line",
