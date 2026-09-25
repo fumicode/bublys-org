@@ -82,6 +82,7 @@ export interface Placement extends Rect {
   readonly depth: number;
   /** 合成された倍率（host.scale × ローカル） */
   readonly scale: number;
+
   /** ローカルの倍率だけ（合成する前） */
   readonly local: number;
   /** この泡の Z の倍率（逆写しに要る。lab.html 774 行 m） */
@@ -342,11 +343,30 @@ function resolveSpace(
     //    奥行きはここで 1 回だけ掛かる ── 中の泡は、この面からの差だけを見る（下の focus.z）
     const dz = (b.state.implicit ? rowPlane(world, b.id, sizeOf, rules) : pos.z) - ctx.focus.z;
     const m = lz.mag(dz);                                          // そのあと Z で消失点へ寄せる
+    /**
+     * ① 大きさの倍率は数値1つ。**両軸の倍率の積** ＝ Z の倍率 × X の像の倍率 × Y の像の倍率。
+     *
+     * ★ **比は変えない。** 歪むのは**並べ方の軸**であって、泡そのものではない
+     *   （泡を軸ごとに歪ませると中身まで伸び縮みする ── 一度やって捨てた）。
+     *   積にすると、遠さが縦横で重なる 4 隅がいちばん小さくなる
+     *   ── `min` では 4 隅と上下左右が**同じ大きさ**になってしまって、遠近が言えない。
+     * ★ 片方の軸が平行なら、その倍率は 1 なので積は今までの `min` と同じ値になる
+     *   ── 縦・横の coverflow も、ラボの X魚眼も、1px も変わらない。
+     */
+    const kx = px.k;
+    const ky = py.k;
+    /**
+     * ★ **位置は「相手の軸の倍率ぶん」内へ寄る** ＝ 並べ方の軸が曲がる。
+     *
+     *   魚眼の写真で格子の線が曲がるのと同じ ── 上の行は縦に遠いので、**横にも縮む**。
+     *   軸ごとに別々に写すと線は真っ直ぐのままで、「格子を歪ませた」ようには見えない
+     *   （実測で踏んだ：列の中心は揃うのに辺が揃わず、余白だけが残った）。
+     *   隣どうしの間は「並べ方が持つ隙間」がレンズで縮んだぶん ── 端へ行くほど詰まる。
+     */
     const target = {
-      x: ctx.vp.x + (px.s - ctx.vp.x) * m,
-      y: ctx.vp.y + (py.s - ctx.vp.y) * m,
-      // ① 大きさの倍率は数値1つ ＝ Z の倍率 × min(X の像の倍率, Y の像の倍率)。端での下限は持たない
-      scale: m * Math.min(px.k, py.k),
+      x: ctx.vp.x + (px.s * ky - ctx.vp.x) * m,
+      y: ctx.vp.y + (py.s * kx - ctx.vp.y) * m,
+      scale: m * kx * ky,
       alpha: lz.alpha(dz, view.z.step),
       w: box.w,
       h: box.h,

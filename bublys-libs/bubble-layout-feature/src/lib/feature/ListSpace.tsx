@@ -190,7 +190,17 @@ export const ListSpace: FC<ListSpaceProps> = ({
     typeof itemWidth === 'function' ? itemWidth(cardRoom) : itemWidthFor(preset, itemWidth);
   const stepX = stepFor(preset, { w: cardWidth, h: itemHeight })?.x;
   const stepY = stepFor(preset, { w: cardWidth, h: itemHeight })?.y;
-  const cols = colsFor(preset, box, itemW);
+  /**
+   * ★ 折り返す数を「箱の形」から出すときは、**口のぶん（`reserve`）を引いた形**で見る
+   *   ── 引かないと縦長に見えて、列が足りなくなる（実測：正方形の箱なのに 5 列が 3 列になった）。
+   */
+  const cols = colsFor(
+    preset,
+    { w: box.w, h: Math.max(1, box.h - reserve) },
+    cardWidth,
+    members.length,
+    itemHeight,
+  );
 
   /**
    * **箱と並べ方の追いかけ合い。**
@@ -224,14 +234,20 @@ export const ListSpace: FC<ListSpaceProps> = ({
   /**
    * **並べ方を選んだら、その並べ方に合う大きさへ**（追いかけ合うときだけ）。
    *
-   * ★ 大きさが出るのは**詰める 3 つだけ**（`fitBoxFor`）。魚眼と透視はレンズが何でも
-   *   箱に収めてしまうので中身から大きさが出ない ── 決め打ちで与えると、
-   *   「箱が小さくても全部見える」ための並べ方なのに、選んだ途端に合わせた箱を壊す。
+   * ★ 大きさは「**並びの広がりが、ちょうど入る**」から出る（`fitBoxFor`）。
+   *   広がりは刻みで測るので、魚眼は平行な兄弟より少し小さい箱になり、透視は
+   *   「手前の札＋奥へ逃げるぶん」になる ── **7 つとも大きさが出る**。
    * ★ 書くのは**大きさだけ**。場所は人のもの（角を掴んだときと同じ書き方）。
    */
   useEffect(() => {
     if (!me || !follows || !chosen) return;
-    const want = fitBoxFor(chosen, members.length, { w: cardWidth, h: itemHeight }, reserve, space.roomOf(me));
+    const want = fitBoxFor(
+      chosen,
+      members.length,
+      { w: cardWidth, h: itemHeight },
+      reserve,
+      space.roomOf(me),
+    );
     if (!want) return;
     wrote.current = want;
     space.setSize(me, want);

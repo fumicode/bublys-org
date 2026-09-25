@@ -93,9 +93,32 @@ export interface FieldDraw {
 }
 
 /**
+ * **魚眼の格子（両方の軸が魚眼）での、描く下限。**
+ *
+ * ★ 魚眼は「端は小さく写るが、**在ることは見える**」が値打ち。ふつうの下限（5px）のままだと
+ *   いちばん外がまるごと消えて、チラ見えのはずのものが「無い」になる
+ *   （実測：16 枚のうち 4 枚が 12×3px で消えていた）。だからここだけ下限を下げる。
+ * ★ 0 にはしない ── 割り切ってしまうと数だけ増えて画面には出ない。
+ *   0.4px なら、ブラウザは髪の毛 1 本の線として塗る（消えはしない）。
+ */
+export const LENS_DRAW_MIN = 0.4;
+
+/**
+ * **魚眼の格子での、中身を描く下限。**
+ *
+ * ★ 枠が残っても中身が消えると、端は**空の白い箱**になる ── 「小さいけれど同じ札がある」が
+ *   読めない。魚眼では端まで中身を描いて、潰れた札のままでいさせる。
+ *   ふつうの下限（{@link CONTENT_MIN} ＝ 0.25）は、遠い泡の中身を描かないための値で、
+ *   「端ほど潰れる」が売りの並べ方には強すぎる。
+ */
+export const LENS_CONTENT_MIN = 0.04;
+
+/**
  * ★ 描く下限：短辺が drawMin を切った泡に印を付ける（lab.html 838-860 行 markTiny）。
  *   入れ物が消えたら中身も消える。見えない親は、描く子が1つも無くなったら消える。
  *   `vis` には触らない ── vis はレンズの答え（domain）で、ここは ui が重ねる別の旗。
+ *
+ * ★ **下限は空間ごと。** 魚眼の格子だけ下げる（{@link LENS_DRAW_MIN}）。
  */
 export function markTiny(
   world: BubbleWorld,
@@ -107,6 +130,13 @@ export function markTiny(
     // 下限なしでも「並びの中身が全部消えたら枠も消す」は効かせない（消える泡が無いので同じ）
     return tiny;
   }
+  /** その泡がいる空間での下限 ── 魚眼の格子なら小さくても描く */
+  const minIn = (space: SpaceId): number => {
+    const V = viewOfSpace(world, space);
+    return V.x.lens === 'fisheye' && V.y.lens === 'fisheye'
+      ? Math.min(drawMin, LENS_DRAW_MIN)
+      : drawMin;
+  };
   const memo = new Map<SpaceId, boolean>();
   const shown = (id: SpaceId): boolean => {
     const known = memo.get(id);
@@ -114,7 +144,7 @@ export function markTiny(
     const p = layout.byId.get(id);
     if (!p) return true; // 外の空間（root）は入れ物ではない
     memo.set(id, true); // 念のため輪を切る（木なので回らない）
-    const v = Math.min(p.w, p.h) >= drawMin && shown(p.space);
+    const v = Math.min(p.w, p.h) >= minIn(p.space) && shown(p.space);
     memo.set(id, v);
     return v;
   };
@@ -249,6 +279,14 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
    *   切ると「奥に続いている」が読めなくなる。
    */
   const home = c.layout.spaces.get(p.space);
+  /**
+   * ★ **魚眼の格子（両方の軸が魚眼）では、中身も端まで描く**（{@link LENS_CONTENT_MIN}）。
+   *   端が空の白い箱になると「小さいけれど同じ札がある」が読めない。
+   */
+  const contentMin =
+    home && home.view.x.lens === 'fisheye' && home.view.y.lens === 'fisheye'
+      ? LENS_CONTENT_MIN
+      : CONTENT_MIN;
   const held =
     !!home && home.id !== 'root' && home.view.z.dim === 'none' && !(c.skip ? c.skip.has(b.id) : false);
   /** 留めの原点（画面の座標）。留めないときは画面そのもの（0,0） */
@@ -329,7 +367,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       (chip ? ' chip' : '') +
       (host ? ' host' : '') +
       (12 * s < MARK_MIN ? ' nt' : '') +   // 題名：字の下限 6.5px を切ったら出さない
-      (sHere < CONTENT_MIN ? ' nc' : '') + // 中身：題名より奥まで描く（自分の海の中での縮みで見る）
+      (sHere < contentMin ? ' nc' : '') + // 中身：題名より奥まで描く（自分の海の中での縮みで見る）
       (s <= 0.2 ? ' nb' : '') +
       mcls;
   }

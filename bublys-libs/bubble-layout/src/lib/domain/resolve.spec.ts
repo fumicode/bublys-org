@@ -16,6 +16,7 @@ import { resolveWorld } from './resolve.js';
 import type { Layout } from './resolve.js';
 import { measureAll } from './measure.js';
 import { labScene, VIEWPORT } from './lab-scene.js';
+import { METRICS } from './types.js';
 
 const world = labScene();
 const layout = resolveWorld(world, VIEWPORT);
@@ -192,5 +193,95 @@ describe('魚眼は、箱の2倍を超える泡は諦める', () => {
     const L = resolveWorld(twoCards(), { w: 151, h: 600 }).spaces.get('root');
     expect(L?.view.x.lens).toBe('parallel');
     expect(L?.view.y.lens).toBe('parallel');   // fisheyeX は元から Y が平行
+  });
+});
+
+/**
+ * **両方の軸が魚眼なら、大きさも軸ごとに歪む。**
+ *
+ * 倍率が数値 1 つなのは「遠いものは小さい」を言うため。両方の軸に魚眼が掛かると
+ * 言いたいことが 2 つになり、小さいほう（min）に揃えると**縦に潰れた札が横にも縮む**
+ * ── 列の中心は合っているのに辺が揃わず、そのぶんが隙間になる。4 隅も上下左右と同じ大きさになる。
+ */
+describe('軸ごとの歪み（両方の軸が魚眼のとき）', () => {
+  const VP = { w: 900, h: 600 };
+  /** cols × rows の格子。並べ方は渡した preset */
+  const grid = (cols: number, rows: number, preset: 'grid' | 'coverflowGrid'): BubbleWorld => {
+    const bs = [];
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        bs.push(
+          Bubble.create({
+            id: `b${r}${c}`, title: `b${r}${c}`, w: 200, h: 100,
+            order: r * cols + c, cell: { col: c, row: r },
+          }).state,
+        );
+    const v = presetView(preset);
+    const w0 = new BubbleWorld({
+      bubbles: bs,
+      root: { title: '外', view: v, focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+      implicitSeq: 0,
+    });
+    /**
+     * ★ **刻み ＝ 箱**（折り返す魚眼の決まり。`listArrange` の `stepFor`）。
+     *   画は連続なので、刻みが箱と同じなら像もぴたりと隣り合う ── 刻みを狭くすると
+     *   （coverflow のように）重なり、広げると隙間が空く。
+     *   測るのは**装い込みの箱**（`imageOf` に渡るのがそれ）。一覧の札は装いが 0 なので
+     *   「札の大きさ」がそのまま刻みになる。ここは既定の装い（帯 24）が付くぶんを足す。
+     */
+    return withAxis(withAxis(w0, 'root', 'x', { step: 200 }), 'root', 'y', {
+      step: 100 + METRICS.HEADER,
+    });
+  };
+  const at = (L: Layout, r: number, c: number) => L.byId.get(`b${r}${c}`)!;
+
+  it('同じ行の隣どうしは**ぴたり接する**（隙間も重なりも無い）', () => {
+    const L = resolveWorld(grid(5, 5, 'coverflowGrid'), VP);
+    for (let r = 0; r < 5; r++)
+      for (let c = 0; c < 4; c++) {
+        const a = at(L, r, c);
+        const b = at(L, r, c + 1);
+        expect(a.x + a.w).toBeCloseTo(b.x, 3);     // 右端 ＝ 隣の左端
+      }
+  });
+
+  it('同じ列の上下も**ぴたり接する**（間隔は刻みの隙間ぶん）', () => {
+    const L = resolveWorld(grid(5, 5, 'coverflowGrid'), VP);
+    for (let c = 0; c < 5; c++)
+      for (let r = 0; r < 4; r++) {
+        const a = at(L, r, c);
+        const b = at(L, r + 1, c);
+        expect(a.y + a.h).toBeCloseTo(b.y, 3);
+      }
+  });
+
+  /**
+   * ★ **並べ方の軸が歪む** ＝ 格子の線が曲がる。
+   *   上の行は縦に遠いので、横にも縮む ── 魚眼の写真で格子の線が曲がるのと同じ。
+   *   軸ごとに別々に写すと線は真っ直ぐのままで、「格子を歪ませた」ようには見えない。
+   */
+  it('外の行ほど**横に縮む** ── 列は真っ直ぐではなく、中心へ寄って曲がる', () => {
+    const L = resolveWorld(grid(5, 5, 'coverflowGrid'), VP);
+    const spanOf = (r: number) => at(L, r, 4).x + at(L, r, 4).w - at(L, r, 0).x;
+    expect(spanOf(1)).toBeLessThan(spanOf(2));       // 真ん中の行がいちばん広い
+    expect(spanOf(0)).toBeLessThan(spanOf(1));
+    expect(spanOf(4)).toBeCloseTo(spanOf(0), 6);     // 上下は対称
+    // 同じ列でも、外の行ほど中心へ寄る（左端が内側へ）
+    expect(at(L, 0, 0).x).toBeGreaterThan(at(L, 2, 0).x);
+  });
+
+  it('4 隅は上下左右より**さらに小さい**（min のままでは同じ大きさになっていた）', () => {
+    const L = resolveWorld(grid(5, 5, 'coverflowGrid'), VP);
+    const mid = at(L, 2, 2);
+    const edge = at(L, 2, 0);                      // 左の真ん中
+    const corner = at(L, 0, 0);                    // 左上
+    expect(corner.w * corner.h).toBeLessThan(edge.w * edge.h);
+    expect(edge.w * edge.h).toBeLessThan(mid.w * mid.h);
+  });
+
+  it('片方の軸だけ魚眼なら、今までどおり一様に縮む（歪みは持たない）', () => {
+    const w = withAxis(grid(5, 5, 'grid'), 'root', 'y', { lens: 'fisheye' });
+    const L = resolveWorld(w, VP);
+    for (const p of L.order) expect(p.stretch).toBeUndefined();
   });
 });

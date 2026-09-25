@@ -184,8 +184,20 @@ describe('① レンズ（位置 → 画面）', () => {
     expect(placeOf(layout, 'cf5').w).toBe(placeOf(layout, 'cf1').w);
   });
 
-  it('★ 大きさの倍率は数値1つ ＝ min(X の像の倍率, Y の像の倍率)', () => {
-    // 同じ場面を、X だけ魚眼／Y だけ魚眼／両方魚眼 で解いて、3つ目が前2つの min になっているか
+  /**
+   * ★ **ここはラボから意図して外した**（2026-09-25）。ラボは両軸が魚眼のとき `min` を採る。
+   *
+   *   `min` だと **4 隅が上下左右と同じ大きさ**になる（`min(k,k)` ＝ `min(k,1)`）ので、
+   *   縦にも横にも遠い隅が「さらに小さい」と言えない。格子を魚眼で見たときに
+   *   歪んで見えず、列の中心は揃うのに辺が揃わないまま余白だけが残る（実測で踏んだ）。
+   *   **積**にすると遠さが縦横で重なり、隅がいちばん小さくなる ── 泡の比は変えないまま。
+   *
+   * ★ **片方の軸が平行なら、積は min と同じ数**（平行の倍率は 1）。
+   *   だから縦・横の coverflow も、ラボの X魚眼ビューそのものも 1px も変わらない
+   *   ── 下の onlyX・onlyY がラボの実測値ちょうどであることで押さえている。
+   */
+  it('★ 大きさの倍率は数値1つ ＝ 両軸の像の倍率の**積**（片方が平行なら、ラボの min と同じ数）', () => {
+    // 同じ場面を、X だけ魚眼／Y だけ魚眼／両方魚眼 で解く
     const onlyX = resolveWorld(world, VIEWPORT);
     const onlyY = resolveWorld(
       withAxis(withAxis(world, 'fish', 'x', { lens: 'parallel' }), 'fish', 'y', { lens: 'fisheye' }),
@@ -193,14 +205,13 @@ describe('① レンズ（位置 → 画面）', () => {
     );
     const both = resolveWorld(withAxis(world, 'fish', 'y', { lens: 'fisheye' }), VIEWPORT);
     for (const [id, [kx, ky, kmin]] of Object.entries(LAB_FISH_SCALE)) {
-      expect(placeOf(onlyX, id).scale).toBe(kx);      // Y が平行なら倍率 1 なので min から落ちる
+      expect(placeOf(onlyX, id).scale).toBe(kx);      // Y が平行なら倍率 1 ── ラボと同じ数
       expect(placeOf(onlyY, id).scale).toBe(ky);      // X が平行なら同じく
-      expect(placeOf(both, id).scale).toBe(kmin);
-      expect(kmin).toBe(Math.min(kx, ky));
+      // 両方魚眼のときだけラボと違う ── 積は min より小さい（遠さが重なる）
+      expect(placeOf(both, id).scale).toBeCloseTo(kx * ky, 12);
+      expect(placeOf(both, id).scale).toBeLessThanOrEqual(kmin);
+      expect(kmin).toBe(Math.min(kx, ky));            // ラボが採っていた数（記録として残す）
     }
-    // 拾う軸は泡ごとに違う（v0 は X、v1 は Y）── どちらが曲がっているかを書かなくてよい
-    expect(LAB_FISH_SCALE['v0'][2]).toBe(LAB_FISH_SCALE['v0'][0]);
-    expect(LAB_FISH_SCALE['v1'][2]).toBe(LAB_FISH_SCALE['v1'][1]);
   });
 
   it('★ 合成は1回だけ。深さ3でも scale は数値1つ（勤務表 → カレンダー → 日）', () => {
