@@ -18,6 +18,7 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
+import { WorldLineOpenerBubble } from "../feature/WorldLineOpenerBubble";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
@@ -49,6 +50,15 @@ const routes: BubbleRoute[] = [
     pattern: /^world-lines$/,
     type: "world-lines",
     Component: WorldLinesBubble,
+    // 木を描く canvas なので、開いた先はそれなりの広さが要る
+    bubbleOptions: { defaultSize: { width: 520, height: 340 } },
+  },
+
+  // 世界線を開く口（岸の右上に貼ってある小さな泡 ── `BubblesUINext` の定位置）
+  {
+    pattern: /^world-line-opener$/,
+    type: "world-line-opener",
+    Component: WorldLineOpenerBubble,
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用

@@ -106,6 +106,27 @@ const demoSitesDock = (): Docked => ({
   ground: "none",
 });
 
+const WORLD_LINE_OPENER_URL = "world-line-opener";
+
+/**
+ * 世界線を開く口の定位置 ── **右上の角**。
+ *
+ * ★ 角にしたのは、ほかの縁がもう使われているから（左＝ランチャー、上の中央＝見え方の口、
+ *   下＝デモへ行く口、右下＝ポケット）。**いつも見えている所**に置きたいが、
+ *   海の使いはじめを塞ぎたくはない ── 角はどちらも満たす。
+ * ★ ポケットと同じ大きさにする。どちらも「押すと何かが出てくる小さな口」なので、
+ *   同じ見た目にしておけば、置き場所が違っても役割が同じだと判る。
+ */
+const worldLineOpenerDock = (viewport: { width: number; height: number }): Docked => ({
+  key: `${WORLD_LINE_OPENER_URL}#dock`,
+  url: WORLD_LINE_OPENER_URL,
+  // 2 辺に着いているので、置き場所（at）は使われない（角に吸い付く）
+  dock: { edges: ["top", "right"], at: { x: viewport.width, y: 0 } },
+  size: { width: 48, height: 48 },
+  // 地は中身が持つ ── アイコンだけのときは海がそのまま透ける
+  ground: "none",
+});
+
 /**
  * **定位置に居てほしいもの。** 居なくなったら、ここへ戻ってくる。
  * 岸に貼ってある間は閉じる口が無いので、消えるのは海へ出して閉じたときだけ。
@@ -115,6 +136,7 @@ const HOMES: readonly Home[] = [
   spaceViewDock,
   pocketDock,
   demoSitesDock,
+  worldLineOpenerDock,
 ];
 
 /**
