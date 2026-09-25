@@ -20,7 +20,7 @@ export const MemoDeleteConfirm: FC<MemoDeleteConfirmProps> = ({ memoId, onCancel
   };
 
   // メモの最初の行を取得
-  const memoTitle = memo?.blocks[memo.lines?.[0]]?.content ?? "メモ";
+  const memoTitle = memo?.title || "メモ";
 
   return (
     <Stack spacing={2}>

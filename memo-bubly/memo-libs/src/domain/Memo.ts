@@ -1,95 +1,134 @@
 /**
- * Memo クラス
- * メモの内容を管理し、不変性を保つ
+ * **メモ** ── 段落（ブロック）が順に並んだもの。
+ *
+ * > **持つのは並び。番号札の列と対応表に割るのは、しまうときだけ。**
+ *
+ * ★ 前は `state` が保存形そのものだった ── 並びを「番号札の列（`lines`）」と
+ *   「番号札 → 中身の対応表（`blocks`）」の**二つに割って**持っていた。
+ *   画面に出るのは二つが噛み合ったときだけなので、**片方だけ埋まったメモは
+ *   存在するのに何も映らない**。外から作るときに二箇所を同時に正しく埋める必要があり、
+ *   変換エディタからは「名前の決まっていない対応表」にしか見えなかった。
+ *   CLAUDE.md の「`state` はドメインの形であって、保存形ではない」がこれに当たる。
+ * ★ **保存形（{@link MemoPlain}）は変えていない。** すでに保存されているメモを
+ *   読めなくしないため ── 割るのも戻すのも {@link Memo.toPlain} / {@link Memo.fromPlain} の中だけ。
  */
-import { arrayShape, objectShape, primitiveShape, recordShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+import { arrayShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
 
+/** 段落 1 つ。`id` は画面が焦点を追いかけるのに要る（並び順は持たない） */
 export type MemoBlock = {
   id: string;
   type: string;
   content: string;
 };
 
-export type RawMemo = {
+/**
+ * **しまうときの形。** 番号札の列と対応表に割ってある。
+ * ここを読み書きしてよいのは {@link Memo.toPlain} / {@link Memo.fromPlain} だけ。
+ */
+export type MemoPlain = {
   id: string;
   blocks: {
-    [key: string]: MemoBlock;
+    [blockId: string]: MemoBlock;
   };
   lines: string[];
   authorId?: string | null;
 };
 
+/** メモの形（ドメインの形）。子は**並び**で持つ */
+export type MemoState = {
+  id: string;
+  blocks: MemoBlock[];
+  authorId: string | null;
+};
+
 export class Memo {
-  readonly state: RawMemo;
-  
-  constructor(state: RawMemo) {
-    this.state = { id: state.id, blocks: { ...state.blocks }, lines: [...state.lines], authorId: state.authorId ?? null };
+  readonly state: MemoState;
+
+  constructor(state: MemoState) {
+    this.state = {
+      id: state.id,
+      blocks: state.blocks.map((b) => ({ ...b })),
+      authorId: state.authorId ?? null,
+    };
   }
 
   get id(): string {
     return this.state.id;
   }
-  
-  get blocks(): Record<string, MemoBlock> {
+
+  /** 段落の並び。**この順番がそのまま画面の順番** */
+  get blocks(): readonly MemoBlock[] {
     return this.state.blocks;
   }
-  
-  get lines(): string[] {
-    return this.state.lines;
-  }
 
-  get authorId(): string | null | undefined {
+  get authorId(): string | null {
     return this.state.authorId;
   }
 
-  getNextBlockId(currentId: string): string | undefined {
-    const idx = this.state.lines.findIndex((id) => id === currentId);
-    return idx >= 0 && idx < this.state.lines.length - 1
-      ? this.state.lines[idx + 1]
-      : undefined;
+  /**
+   * **名前は中身が決める** ── 1 行目をそのまま返す（前後の空白は落とす）。
+   * まだ何も書かれていなければ空文字。「無題」と言うのは見せる側の仕事。
+   *
+   * ★ 前は「1 行目の番号札を引いて、対応表から中身を引く」を**四箇所が別々に**書いていた。
+   *   同じことを四回書けば、四回とも同じ形で壊れる（実測：番号札が消えたメモで軒並み落ちた）。
+   */
+  get title(): string {
+    return this.state.blocks[0]?.content.trim() ?? "";
   }
 
+  /** その段落の次（末尾なら undefined）。画面が焦点を動かすのに使う */
+  getNextBlockId(currentId: string): string | undefined {
+    const i = this.indexOf(currentId);
+    return i >= 0 ? this.state.blocks[i + 1]?.id : undefined;
+  }
+
+  /** その段落の前（先頭なら undefined） */
   getPrevBlockId(currentId: string): string | undefined {
-    const idx = this.state.lines.findIndex((id) => id === currentId);
-    return idx > 0 ? this.state.lines[idx - 1] : undefined;
+    const i = this.indexOf(currentId);
+    return i > 0 ? this.state.blocks[i - 1].id : undefined;
+  }
+
+  private indexOf(blockId: string): number {
+    return this.state.blocks.findIndex((b) => b.id === blockId);
+  }
+
+  private withBlocks(blocks: MemoBlock[]): Memo {
+    return new Memo({ ...this.state, blocks });
+  }
+
+  /** その段落のうしろに、新しい段落を差し込む */
+  insertTextBlockAfter(
+    afterId: string,
+    type: string,
+    content = "",
+  ): { memo: Memo; newBlockId: string } {
+    const newBlock: MemoBlock = { id: crypto.randomUUID(), type, content };
+    const blocks = [...this.state.blocks];
+    blocks.splice(this.indexOf(afterId) + 1, 0, newBlock);
+    return { memo: this.withBlocks(blocks), newBlockId: newBlock.id };
+  }
+
+  /** その段落の中身を書き換える。無い段落なら何もしない */
+  updateBlockContent(blockId: string, content: string): Memo {
+    const i = this.indexOf(blockId);
+    if (i < 0) return this;
+    const blocks = [...this.state.blocks];
+    blocks[i] = { ...blocks[i], content };
+    return this.withBlocks(blocks);
+  }
+
+  /** その段落を、ひとつ前の段落の末尾へ繋げる。先頭なら何もしない */
+  mergeBlock(blockId: string): Memo {
+    const i = this.indexOf(blockId);
+    if (i <= 0) return this;
+    const blocks = [...this.state.blocks];
+    blocks[i - 1] = { ...blocks[i - 1], content: blocks[i - 1].content + blocks[i].content };
+    blocks.splice(i, 1);
+    return this.withBlocks(blocks);
   }
 
   mergeWithPrevious(blockId: string): Memo {
     return this.mergeBlock(blockId);
-  }
-
-  insertTextBlockAfter(afterId: string, type: string, content = ""): { memo: Memo; newBlockId: string } {
-    const newBlockId = crypto.randomUUID();
-    const newBlock: MemoBlock = { id: newBlockId, type, content };
-    const { id, blocks, lines } = this.state;
-    const newBlocks = { ...blocks, [newBlockId]: newBlock };
-    const newLines = [...lines];
-    const idx = newLines.findIndex((bid) => bid === afterId);
-    newLines.splice(idx + 1, 0, newBlockId);
-    const newMemo = new Memo({ id, blocks: newBlocks, lines: newLines });
-    return { memo: newMemo, newBlockId };
-  }
-
-  updateBlockContent(blockId: string, content: string): Memo {
-    const { id, blocks, lines } = this.state;
-    const newBlocks = { ...blocks };
-    if (newBlocks[blockId]) {
-      newBlocks[blockId] = { ...newBlocks[blockId], content };
-    }
-    return new Memo({ id, blocks: newBlocks, lines: [...lines], authorId: this.state.authorId });
-  }
-
-  mergeBlock(blockId: string): Memo {
-    const { id, blocks, lines } = this.state;
-    const newBlocks = { ...blocks };
-    const newLines = [...lines];
-    const idx = newLines.findIndex((bid) => bid === blockId);
-    if (idx <= 0) return this;
-    const prevId = newLines[idx - 1];
-    newBlocks[prevId] = { ...newBlocks[prevId], content: newBlocks[prevId].content + newBlocks[blockId].content };
-    delete newBlocks[blockId];
-    newLines.splice(idx, 1);
-    return new Memo({ id, blocks: newBlocks, lines: newLines, authorId: this.state.authorId });
   }
 
   setAuthor(userId: string | null): Memo {
@@ -97,17 +136,39 @@ export class Memo {
   }
 
   /**
-   * JSON形式に変換
+   * しまう形にする ── ここで**はじめて**番号札の列と対応表に割る。
+   * 割るのはこの 1 箇所だけ（CLAUDE.md「plain 化は記録する 1 箇所でやる」）。
    */
-  toJson(): RawMemo {
-    return { ...this.state };
+  toPlain(): MemoPlain {
+    const blocks: MemoPlain["blocks"] = {};
+    for (const b of this.state.blocks) blocks[b.id] = { ...b };
+    return {
+      id: this.state.id,
+      blocks,
+      lines: this.state.blocks.map((b) => b.id),
+      authorId: this.state.authorId,
+    };
   }
 
   /**
-   * JSONからMemoインスタンスを作成
+   * しまってある形から戻す。番号札の列の順に段落を並べ直す。
+   *
+   * ★ **食い違っていても捨てない。** 番号札があるのに段落が無ければ飛ばし、
+   *   列に載っていない段落は末尾に足す ── 保存されているものは、
+   *   割れていた頃の食い違いを抱えていることがある（片方だけ書かれた更新が残り得た）。
+   *   ここで落とすと、書いた本人にはただ**文章が消えた**ようにしか見えない。
    */
-  static fromJson(json: any): Memo {
-    return new Memo(json);
+  static fromPlain(plain: MemoPlain): Memo {
+    const lines = plain.lines ?? [];
+    const table = plain.blocks ?? {};
+    const ordered = lines.map((id) => table[id]).filter((b): b is MemoBlock => !!b);
+    const seen = new Set(ordered.map((b) => b.id));
+    const orphans = Object.values(table).filter((b) => !seen.has(b.id));
+    return new Memo({
+      id: plain.id,
+      blocks: [...ordered, ...orphans].map((b) => ({ ...b })),
+      authorId: plain.authorId ?? null,
+    });
   }
 
   /**
@@ -119,55 +180,36 @@ export class Memo {
    *   名前は中身が決める。中身が無いうちは、見せる側が「無題」と言えばよい。
    */
   static create(): Memo {
-    const memoId = crypto.randomUUID();
-    const firstLineId = crypto.randomUUID();
-    const raw: RawMemo = {
-      id: memoId,
-      blocks: {
-        [firstLineId]: {
-          id: firstLineId,
-          type: "text",
-          content: "",
-        },
-      },
-      lines: [firstLineId],
+    return new Memo({
+      id: crypto.randomUUID(),
+      blocks: [{ id: crypto.randomUUID(), type: "text", content: "" }],
       authorId: null,
-    };
-    return Memo.fromJson(raw);
+    });
   }
 }
 
 /**
  * **メモの形**（`SchemaShape`）── 他のバブリが「この型の中身は何か」を引くための申告。
  *
- * ★ **書いた人（`authorId`）も申告する。** 申告を OS 側に手書きで置いていたころは
- *   `id` と `lines` の 2 つしか無く、モデルにある書いた人が**変換エディタから見えなかった**。
- * ★ **本文（`blocks`）は `record`。** `Record<blockId, MemoBlock>` ── キーが実行時にしか
- *   無い辞書なので、`object`（項目名が決まっているもの）でも `array`（順番のあるもの）でもない。
- *   中の 1 つ 1 つには名前が無く `blocks.<なにか>.content` という道が書けないので、
- *   繋ぎ先は**辞書まるごと**の 1 つ（配列と同じ扱い ── `walkLeafFields` の註）。
- * ★ **CSV からメモを作るには、これだけでは足りない。** ブロックは `lines` が id で
- *   指してはじめて画面に出る ── その対応は**メモの決まり**であって、項目の繋ぎ替えでは作れない。
+ * ★ 名乗るのは**ドメインの形**であって、しまう形（{@link MemoPlain}）ではない。
+ *   割ってあるのはメモの内輪の都合なので、外にはひとつの並びとして見せる。
+ * ★ 前は「番号札の列」と「名前の決まっていない対応表」を申告していたので、
+ *   本文は `record` としてまるごと 1 つの繋ぎ先にしかならなかった。
+ *   並びで持つようになったので、**中の項目に道が引ける**（`blocks` の中身）。
  */
 export const MEMO_SHAPE: SchemaShape = objectShape([
   { name: 'id', shape: primitiveShape('string'), required: true, label: 'ID' },
   {
-    name: 'lines',
-    shape: arrayShape(primitiveShape('string')),
-    required: true,
-    label: 'ブロック順序（ID 配列）',
-  },
-  {
     name: 'blocks',
-    shape: recordShape(
+    shape: arrayShape(
       objectShape([
-        { name: 'id', shape: primitiveShape('string'), required: true, label: 'ブロック ID' },
+        { name: 'id', shape: primitiveShape('string'), required: true, label: '段落 ID' },
         { name: 'type', shape: primitiveShape('string'), required: true, label: '種類' },
         { name: 'content', shape: primitiveShape('string'), required: true, label: '中身' },
       ]),
     ),
     required: true,
-    label: '本文（ブロック ID → ブロック）',
+    label: '段落の並び',
   },
   { name: 'authorId', shape: primitiveShape('string'), required: false, label: '書いた人の ID' },
 ]);

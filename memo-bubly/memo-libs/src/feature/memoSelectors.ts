@@ -1,6 +1,6 @@
 import type { RootState } from "@bublys-org/state-management";
 import { WorldLineGraph } from "@bublys-org/world-line-graph";
-import { Memo, RawMemo } from "../domain/Memo.js";
+import { Memo, MemoPlain } from "../domain/Memo.js";
 import {
   MEMO_TYPE,
   MEMO_SCOPE_PREFIX,
@@ -37,5 +37,5 @@ export const selectMemoAtApex = (memoId: string) => (state: RootState): Memo | n
   if (!memoRef) return null;
   const data = state.worldLineGraph?.cas[memoRef.hash];
   if (data === undefined || data === null) return null;
-  return Memo.fromJson(data as RawMemo);
+  return Memo.fromPlain(data as MemoPlain);
 };

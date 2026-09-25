@@ -78,8 +78,7 @@ export function MemoEditor({ memo, onMemoChange, memoId }: MemoEditorProps) {
 
   return (
     <StyledMemoDiv>
-      {memo.lines.map((lineId) => {
-        const block = memo.blocks[lineId];
+      {memo.blocks.map((block) => {
         if (block.type === 'text') {
           return (
             <div key={block.id} className="e-block">

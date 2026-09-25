@@ -4,14 +4,14 @@ import { Memo } from '../domain/Memo';
  * Memoのシリアライズ
  */
 export function serializeMemo(memo: Memo): any {
-  return memo.toJson();
+  return memo.toPlain();
 }
 
 /**
  * Memoのデシリアライズ
  */
 export function deserializeMemo(data: any): Memo {
-  return Memo.fromJson(data);
+  return Memo.fromPlain(data);
 }
 
 /**

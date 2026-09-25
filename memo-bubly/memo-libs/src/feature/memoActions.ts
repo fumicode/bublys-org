@@ -19,7 +19,7 @@ import { MEMO_TYPE, memoScopeId } from "../domain/MemoDomain.js";
 export function dispatchCreateMemo(dispatch: AppDispatch, memo: Memo): void {
   const memoId = memo.id;
   const scopeId = memoScopeId(memoId);
-  const data = memo.toJson();
+  const data = memo.toPlain();
   const hash = computeStateHash(data);
   const ref = createStateRef(MEMO_TYPE, memoId, hash);
 

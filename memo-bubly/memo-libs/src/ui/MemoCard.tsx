@@ -21,7 +21,7 @@ export function MemoCard({ memoId, onDelete }: { memoId: string; onDelete?: (id:
   if (!memo) return <StyledCard>このメモは見つかりませんでした。</StyledCard>;
 
   /** 名前は中身（1 行目）が決める。まだ何も書かれていなければ「無題」 */
-  const content = memo.blocks[memo.lines?.[0]]?.content?.trim() ?? '';
+  const content = memo.title;
   const label = content || '無題';
   return (
     <StyledCard>

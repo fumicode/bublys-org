@@ -17,10 +17,8 @@ interface MemoTitleProps {
 
 export function MemoTitle({ memo, onSetAuthor, onOpenWorldLineView, worldLineUrl }: MemoTitleProps) {
   const users = useAppSelector(selectUsers);
-  const firstBlockId = memo.lines[0];
-  const firstBlock = firstBlockId ? memo.blocks[firstBlockId] : null;
-  const content = firstBlock?.content?.trim() || '';
-  /** 名前は中身が決める。中身が無いうちは「無題」（データには書き込まない） */
+  /** 名前は中身が決める（`Memo.title`）。中身が無いうちは「無題」（データには書き込まない） */
+  const content = memo.title;
   const label = content || '無題';
   const authorName = memo.authorId ? users.find((u) => u.id === memo.authorId)?.name : undefined;
 

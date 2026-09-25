@@ -1,5 +1,5 @@
 import { defineDomainObjects } from "@bublys-org/domain-registry";
-import { Memo, RawMemo } from "./Memo.js";
+import { Memo, MemoPlain } from "./Memo.js";
 
 /**
  * メモを world-line-graph 上の CAS shell として扱うための domain-registry 定義。
@@ -14,8 +14,8 @@ export const MEMO_TYPE = "memo";
 export const MEMO_DOMAIN = defineDomainObjects({
   [MEMO_TYPE]: {
     class: Memo,
-    fromJSON: (json: unknown) => Memo.fromJson(json as RawMemo),
-    toJSON: (memo: Memo) => memo.toJson(),
+    fromJSON: (json: unknown) => Memo.fromPlain(json as MemoPlain),
+    toJSON: (memo: Memo) => memo.toPlain(),
     getId: (memo: Memo) => memo.id,
   },
 });
