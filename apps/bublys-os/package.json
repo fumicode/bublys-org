@@ -6,6 +6,7 @@
     "@bublys-org/akashic-record": "*",
     "@bublys-org/bubble-space-shell": "*",
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/csv-importer-libs": "*",
     "@bublys-org/domain-registry": "*",
     "@bublys-org/hash-world-line": "*",
     "@bublys-org/launcher-libs": "*",

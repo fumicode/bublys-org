@@ -9,15 +9,20 @@ import {
   CsvObjectListFeature,
   CsvObjectDetailFeature,
   CsvSheetProvider,
-} from "@bublys-org/csv-importer-libs";
+} from "../feature/index.js";
 
 /**
  * Google OAuth クライアントID。
  * スタンドアロン（vite.config.mts）・バブリ（vite.config.bubly.ts）どちらのビルドでも
  * Vite が build 時に .env の値へ置換する。未設定なら undefined のまま
  * （= Google Sheets 連携だけが無効になり、他の機能は動く）。
+ *
+ * ★ **OS に組み込まれたときは Vite が居ない。** `import.meta.env` そのものが無いので、
+ *   直に読むと落ちる ── 無ければ undefined として扱う（連携だけが静かに無効になる）。
  */
-const GOOGLE_CLIENT_ID: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID: string | undefined = (
+  import.meta as unknown as { env?: Record<string, string | undefined> }
+).env?.VITE_GOOGLE_CLIENT_ID;
 
 /**
  * 各バブルは CsvSheetProvider でラップする必要がある。

@@ -6,7 +6,11 @@
     "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -17,9 +21,14 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
-    "types": ["jest", "node"],
+    "types": [
+      "jest",
+      "node"
+    ],
     "outDir": "dist",
     "rootDir": "."
   },
@@ -67,7 +76,7 @@
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
-      "path": "../../memo-bubly/memo-libs"
+      "path": "../../csv-importer-bubly/csv-importer-libs"
     },
     {
       "path": "../../task-bubly/task-libs"
@@ -80,6 +89,9 @@
     },
     {
       "path": "../../bublys-libs/bubble-layout-feature"
+    },
+    {
+      "path": "../../memo-bubly/memo-libs"
     },
     {
       "path": "../../bublys-libs/object-shell"
