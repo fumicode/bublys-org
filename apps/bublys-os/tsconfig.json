@@ -6,11 +6,7 @@
     "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -21,14 +17,9 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
-    "types": [
-      "jest",
-      "node"
-    ],
+    "types": ["jest", "node"],
     "outDir": "dist",
     "rootDir": "."
   },
@@ -64,19 +55,22 @@
       "path": "../../launcher-bubly/launcher-model"
     },
     {
+      "path": "../../bublys-libs/bubble-layout"
+    },
+    {
       "path": "../../bublys-libs/hash-world-line"
     },
     {
       "path": "../../bublys-libs/akashic-record"
     },
     {
-      "path": "../../bublys-libs/bubble-layout"
-    },
-    {
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
-      "path": "../../users-libs"
+      "path": "../../users-bubly/users-libs"
+    },
+    {
+      "path": "../../bublys-libs/bubble-space-shell"
     },
     {
       "path": "../../bublys-libs/bubble-layout-feature"
@@ -95,9 +89,6 @@
     },
     {
       "path": "../../bublys-libs/state-management"
-    },
-    {
-      "path": "../../bublys-libs/bubble-space-shell"
     }
   ]
 }

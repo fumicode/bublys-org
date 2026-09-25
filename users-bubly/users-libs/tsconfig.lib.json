@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
     "rootDir": "src",
@@ -18,7 +18,7 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
-      "path": "../bublys-libs/bubble-layout-feature/tsconfig.lib.json"
+      "path": "../../bublys-libs/bubble-layout-feature/tsconfig.lib.json"
     }
   ],
   "exclude": [
