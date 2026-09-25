@@ -41,6 +41,7 @@ import type { Arranged } from './arrange.js';
 import { imageOf, LENS_XY, LENS_Z } from './lens.js';
 import type { LensXyId, LensZId } from './lens.js';
 import { chromeOf, halfOf, lensContext, measureAll, measureBox, padOf } from './measure.js';
+import type { Chrome } from './chrome.js';
 import type { BoxSizes, ChromeMap, LensContext } from './measure.js';
 import { fitFocus } from './project.js';
 
@@ -145,6 +146,17 @@ export function resolveWorld(
    *   **世界には1ミリも書かない**（`withFittedFocus` を呼ばなければ焼き付かない）。
    */
   nudge?: ReadonlyMap<SpaceId, number>,
+  /**
+   * **並べたあとに、その泡の外へ足す装い。**
+   *
+   * ★ 並べ方はこれを**見ない** ── 一覧の札を選んで装いが出ても、帯も刻みも中央ぞろえも
+   *   1px も変わらない。変わるのは「その泡の外側に装いが足された」ことだけで、
+   *   **出た泡の中身は動かない**。重なってしまう周りだけが、装いの取ったぶん逃げる
+   *   （`pushedAround`）。
+   * ★ 逃げるのは**平行に詰めている軸**だけ。魚眼・透視・「そのまま置く」では誰も動かない
+   *   ── そちらは並べ直す話ではなく、ただ装いが出るだけ。
+   */
+  dressed?: ReadonlyMap<BubbleId, Chrome>,
 ): Layout {
   const R = resolveRules(rules);
   const boxes = measureAll(world, R, chrome);
@@ -160,6 +172,7 @@ export function resolveWorld(
     sink,
     nudge,
     chrome,
+    dressed,
   );
   const byId = new Map<BubbleId, Placement>(sink.map((p) => [p.id, p]));
   // ③ 見えない親は体を持たないので、見えている子がいるときだけ見える（枠も縁も）。
@@ -214,6 +227,8 @@ function resolveSpace(
   nudge?: ReadonlyMap<SpaceId, number>,
   /** このフレームだけの装い（箱＝中身＋装い） */
   chrome?: ChromeMap,
+  /** 並べたあとに外へ足す装い（`resolveWorld` の註） */
+  dressed?: ReadonlyMap<BubbleId, Chrome>,
 ): void {
   const view = viewOfSpace(world, spaceId);
   const kids = world.kidsOf(spaceId);
@@ -275,6 +290,30 @@ function resolveSpace(
     if (reserve <= 0 && !over) continue;
     arr[axis] = shifted(arr[axis], -half + pad + reserve - lo);
   }
+
+  /**
+   * ★ **出た装いのぶんは、周りが逃げる。** 並べ方はここまで一切見ていない
+   *   （`arrangeAxis` に渡す `sizeOf` は装いを足していない箱）ので、
+   *   選んで装いが出ても**帯も刻みも中央ぞろえも変わらない**。変わるのは、
+   *   装いが出た泡の周りが押しのけられることだけ ── その泡自身は 1px も動かない。
+   * ★ **中央ぞろえ・始端ぞろえより後に置く。** 先に押しのけると、広がった並びを見て
+   *   もう一度そろえ直してしまい、押しのけたぶんが**打ち消される**
+   *   ── 実測：頭の札が戻ってきて、代わりに選んだ札が 27px 下がった。
+   */
+  if (dressed?.size) {
+    for (const b of kids) {
+      const d = dressed.get(b.id);
+      if (!d) continue;
+      for (const axis of ['x', 'y'] as const) {
+        // 逃げるのは平行に詰めている軸だけ（魚眼・透視・そのまま置く、では誰も動かない）
+        if (view[axis].lens !== 'parallel' || view[axis].arrange === 'as-is') continue;
+        const at = arr[axis].pos.get(b.id);
+        if (at === undefined) continue;
+        arr[axis] = pushedAround(arr[axis], at, axis === 'x' ? d.left : d.top, axis === 'x' ? d.right : d.bottom);
+      }
+    }
+  }
+
 
   /**
    * ★ **魚眼は、箱の 2 倍を超える泡は諦める。**
@@ -367,12 +406,22 @@ function resolveSpace(
   const lz = LENS_Z[view.z.lens as LensZId];
 
   const items = kids.map((b, i) => {
+    const dress = dressed?.get(b.id);
+    /**
+     * ★ **装いは外へ足す。中身は動かない。**
+     *   並べて決まった箱はそのまま中身の居場所。装いはその外側に付くので、
+     *   箱は `左+右` ぶん広がり、中心は**左右の差の半分**だけ動く
+     *   （上 27・下 7 なら、中心は 10 下がって、中身は 1px も動かない）。
+     */
+    const grown = sizeOf(b);
+    const box = dress
+      ? { w: grown.w + dress.left + dress.right, h: grown.h + dress.top + dress.bottom }
+      : grown;
     const pos: Vec3 = {
-      x: arr.x.pos.get(b.id) ?? 0,
-      y: arr.y.pos.get(b.id) ?? 0,
+      x: (arr.x.pos.get(b.id) ?? 0) + (dress ? (dress.right - dress.left) / 2 : 0),
+      y: (arr.y.pos.get(b.id) ?? 0) + (dress ? (dress.bottom - dress.top) / 2 : 0),
       z: arr.z.pos.get(b.id) ?? 0,
     };
-    const box = sizeOf(b);
     const px = imageOf(pos.x, box.w, lx, ctx.H.x, ctx.focus.x);   // ① 位置 − 焦点 → レンズ（軸ごと。泡の像）
     const py = imageOf(pos.y, box.h, ly, ctx.H.y, ctx.focus.y);
     // ③ 見えない親は**中身と同じ面**にいる（体が無いので自分の奥行きは持たない）。
@@ -445,11 +494,36 @@ function resolveSpace(
     };
     sink.push(place);
     if (world.isHost(it.b.id))
-      resolveSpace(world, it.b.id, contentOf(world, place, chrome), boxes, rules, spaces, sink, nudge, chrome);
+      resolveSpace(world, it.b.id, contentOf(world, place, chrome), boxes, rules, spaces, sink, nudge, chrome, dressed);
   }
 }
 
 /** 並び（位置と帯）をまとめてずらす。④ の「始端に空けておく量」を当てるのに使う */
+/**
+ * **出た装いのぶん、周りだけを押しのける。**
+ *
+ * 装いが出た泡は 1px も動かない（`at` はその泡の位置）。手前にいるものは `start` ぶん戻り、
+ * 向こうにいるものは `end` ぶん進む ── 重なりが解けるだけで、並べ方は何も変わらない。
+ * 帯も同じように動かす（送りの端がここから決まるので、置いてきぼりにすると
+ * 「はみ出したぶん」が数え違う）。
+ */
+function pushedAround(a: Arranged, at: number, start: number, end: number): Arranged {
+  if (!start && !end) return a;
+  const move = (v: number) => (v < at ? v - start : v > at ? v + end : v);
+  return {
+    pos: new Map([...a.pos].map(([id, v]) => [id, move(v)])),
+    bands: a.bands.map((b) => {
+      const c = (b.start + b.end) / 2;
+      // 装いが出た泡そのものの帯は、外へ広がる（動かない）
+      if (c === at) return { ...b, start: b.start - start, end: b.end + end };
+      return c < at ? { ...b, start: b.start - start, end: b.end - start }
+                    : { ...b, start: b.start + end, end: b.end + end };
+    }),
+    mid: a.mid,
+    gap: a.gap,
+  };
+}
+
 function shifted(a: Arranged, by: number): Arranged {
   if (!by) return a;
   return {

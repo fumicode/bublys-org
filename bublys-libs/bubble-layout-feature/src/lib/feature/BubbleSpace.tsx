@@ -11,8 +11,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset } from '@bublys-org/bubble-layout';
-import type { AxisView, BubbleId, BubbleWorld, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
+import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset, CHROME} from '@bublys-org/bubble-layout';
+import type { AxisView, BubbleId, BubbleWorld, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
@@ -377,7 +377,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   外の海の root は `setChildren` に渡らないので `listHosts` には入らない ── 見るのはこれ 1 つでよい。
        */
       const inList = listHosts.has(b.space);
-      if (!inList || b.id === selectedId) { m.set(b.id, 'plain'); continue; }
+      if (!inList) { m.set(b.id, 'plain'); continue; }
+      /**
+       * ★ **選ばれても、並べ方の装いは変えない。** 前はここで `plain` にしていたので、
+       *   箱が大きくなって**並べ直し**が起き、選んだ札の中身が 27px 下がり、
+       *   関係ない札まで横に 7px 動いていた（実測）。
+       *   選んだ札に出す装いは `dressed`（並べたあとに外へ足す）で渡す ── 並べ方は 1px も変わらない。
+       */
       /**
        * ★ 詰める並びのときだけ、札と札のあいだを限界まで細くする（`packed`）。
        *   奥行きに重ねる並びは軸が「そのまま」なので、細くしても後ろは動かず、
@@ -411,10 +417,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     requestAnimationFrame(tick);
   }, []);
 
+  /**
+   * **選んだ札に出す装い。** 並べたあとに、その泡の外側へ足す（`resolveWorld` の `dressed`）。
+   *
+   * ★ 出すのは**一覧の中の札**だけ。海に浮いている泡はもともと `plain` を着ているし、
+   *   岸に着いた泡は装いを持たない。
+   */
+  const dressed = useMemo(() => {
+    const m = new Map<BubbleId, Chrome>();
+    if (selectedId && chrome.get(selectedId) !== 'plain' && chrome.get(selectedId) !== 'bare') {
+      m.set(selectedId, CHROME.plain);
+    }
+    return m;
+  }, [selectedId, chrome]);
+
   // 持ち上げる前の配置。触る側（useBubbleInput）が持ち上げを当てて返す
   const base = useMemo(
-    () => resolveWorld(world, viewport, rules, chrome, nudge),
-    [world, viewport, rules, chrome, nudge],
+    () => resolveWorld(world, viewport, rules, chrome, nudge, dressed),
+    [world, viewport, rules, chrome, nudge, dressed],
   );
 
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
@@ -1023,7 +1043,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               (inList ? ' bl-tight' : '') +
               (packed ? ' bl-packed' : '') +
               (deep ? ' bl-cut' : '') +
-              (inList && chrome.get(id) === 'plain' ? ' bl-grown' : '')
+              (dressed.has(id) ? ' bl-grown' : '')
             }
           >
             {r
