@@ -24,6 +24,66 @@ import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
 
 /** 開いた泡の覚え書き（domain には入れない） */
+/** 泡の箱に対する割合（0〜1）で言う、中の一点 */
+export interface Spot {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * **押された所を、泡の箱に対する割合で測る。**
+ *
+ * 中の要素は行き先を名乗っている（`data-url`）ので、開こうとしている url と同じものを
+ * その泡の中から探す。見つからなければ null ── 帯は泡の箱ぜんぶから出る。
+ *
+ * ★ 箱も要素も同じ変換の下にあるので、割合は倍率に依らない（どちらも変換後の矩形で測る）。
+ */
+/**
+ * **要素の矩形。** `display:contents` の要素は自分では箱を持たない（`UrledPlace` がこれ）ので、
+ * 直接の子を合わせた矩形で代える ── 旧い海の `getElementRect` と同じ読み。
+ */
+const boxOf = (el: HTMLElement): DOMRect | null => {
+  if (getComputedStyle(el).display !== "contents") return el.getBoundingClientRect();
+  const kids = Array.from(el.children, (c) => c.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+  if (kids.length === 0) return null;
+  const left = Math.min(...kids.map((r) => r.left));
+  const top = Math.min(...kids.map((r) => r.top));
+  const right = Math.max(...kids.map((r) => r.right));
+  const bottom = Math.max(...kids.map((r) => r.bottom));
+  return new DOMRect(left, top, right - left, bottom - top);
+};
+
+/**
+ * **押された所を、泡の箱に対する割合で測る。**
+ *
+ * 中の要素は行き先を名乗っている（`data-url`）ので、開こうとしている url と同じものを
+ * その泡の中から探す。見つからなければ null ── 帯は泡の箱ぜんぶから出る。
+ *
+ * ★ 箱も要素も同じ変換の下にあるので、割合は倍率に依らない（どちらも変換後の矩形で測る）。
+ * ★ 世界線つきの url（`<base>@<node>`）は節が進むたびに変わるが、押される側は base で
+ *   置かれていることがある ── 見つからなければ base でもう一度探す。
+ */
+const spotIn = (layer: HTMLElement | null, ownerId: BubbleId | null, url: string): Spot | null => {
+  if (!layer || !ownerId || typeof document === "undefined") return null;
+  const owner = layer.querySelector<HTMLElement>(`[data-id="${CSS.escape(ownerId)}"]`);
+  if (!owner) return null;
+  const find = (u: string) => owner.querySelector<HTMLElement>(`[data-url="${CSS.escape(u)}"]`);
+  const at = url.indexOf("@");
+  const el = find(url) ?? (at > 0 ? find(url.slice(0, at)) : null);
+  if (!el) return null;
+  const ob = owner.getBoundingClientRect();
+  const eb = boxOf(el);
+  if (!eb || ob.width <= 0 || ob.height <= 0 || eb.width <= 0 || eb.height <= 0) return null;
+  return {
+    x: (eb.left - ob.left) / ob.width,
+    y: (eb.top - ob.top) / ob.height,
+    w: eb.width / ob.width,
+    h: eb.height / ob.height,
+  };
+};
+
 interface Opened {
   readonly url: string;
   readonly type: string;
@@ -34,6 +94,13 @@ interface Opened {
    * 帯はここから出る ── 「一覧のどこから開いたか」が見えるように。
    */
   readonly originId: BubbleId | null;
+  /**
+   * **押されたのが泡の中の一点だったとき**、その場所。泡の箱に対する割合（0〜1）で持つ。
+   *
+   * ★ 割合で持つのは、レンズが掛かっても追従させるため ── 画素で覚えると、焦点が動いて
+   *   泡の大きさが変わった瞬間にずれる。測るのは**開いた 1 回だけ**で、毎フレームは測らない。
+   */
+  readonly originSpot: Spot | null;
   /** 開いた順（新しいほど大きい） */
   readonly at: number;
 }
@@ -139,6 +206,11 @@ export interface TakeOutInfo {
 
 export interface BubbleSpaceProps {
   readonly routes: readonly BubbleRoute[];
+  /**
+   * どこから開いたかの帯の出し方。既定は `hover`（両端のどちらかに触れたときだけ）。
+   * 海ぜんぶの見え方なので、決めるのは海を立てる側。
+   */
+  readonly bandDisplay?: 'hover' | 'always' | 'none';
   /** 空のときに最初に開く url */
   readonly initialUrls?: readonly string[];
   /**
@@ -207,7 +279,7 @@ export interface BubbleSpaceProps {
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
-  const { routes, viewport, drawMin, rules, className, style, children } = props;
+  const { routes, viewport, drawMin, rules, bandDisplay, className, style, children } = props;
   /**
    * 開くものの行き先 ＝ **いま見えている口**の真ん中。
    * 岸が食い込んでいなければ窓の真ん中で、今までと変わらない。
@@ -391,6 +463,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [urls],
   );
 
+  /** 押されたのが泡の中の一点だったとき、その場所（箱に対する割合） */
+  const originSpotOf = useMemo(
+    () => new Map([...urls].flatMap(([id, u]) => (u.originSpot ? [[id, u.originSpot] as const] : []))),
+    [urls],
+  );
+
   const openBubble = useCallback(
     (url: string, openerId?: BubbleId | null, label?: string): BubbleId => {
       if (openOutside) return openOutside(url, openerId ?? null) || '';
@@ -414,7 +492,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         joinWith: mateFor(world, urls, route.type, opener),
       });
       setWorld(r.world);
-      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: opener, originId: from, at: seq.current }));
+      const originSpot = spotIn(layerRef.current, from, url);
+      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: opener, originId: from, originSpot, at: seq.current }));
       setSelectedId(id);
       return id;
     },
@@ -491,7 +570,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             )
           : opened.world,
       );
-      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, originId: null, at }));
+      setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, originId: null, originSpot: null, at }));
       return id;
     },
     [routes, world, viewport, rules, setWorld, openCenter],
@@ -623,7 +702,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           w: w0, h: size.h, parent: hostId === 'root' ? null : hostId,
           order: w.kidsOf(hostId).length,
         }));
-        m.set(id, { url, type: route.type, openerId: hostId, originId: hostId, at: n });
+        m.set(id, { url, type: route.type, openerId: hostId, originId: hostId, originSpot: null, at: n });
       }
       /**
        * ★ 順序を 0.. に詰め直す。足すときの順序は「いまの子の数」なので、
@@ -778,7 +857,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
                    title: titleOf(routes, url), size: route.size, hue: route.hue, rules, keepLens: lensChosen.current }).world;
-      m.set(id, { url, type: route.type, openerId: null, originId: null, at: n });
+      m.set(id, { url, type: route.type, openerId: null, originId: null, originSpot: null, at: n });
     }
     seq.current = n;
     setUrls(m);
@@ -975,8 +1054,10 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         onDrop={onDrop}
       >
         <BubbleField
+          bandDisplay={bandDisplay}
           openerOf={openerOf}
           originOf={originOf}
+          originSpotOf={originSpotOf}
           world={world}
           layout={input.layout}
           viewport={viewport}

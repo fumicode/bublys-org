@@ -6,7 +6,7 @@
  */
 export { FIELD_CSS, MARKS_CSS } from './field-css.js';
 export { drawField, markTiny, rowsOf, HEADER, MARK_MIN, DRAW_MIN, CONTENT_MIN } from './draw.js';
-export type { BubbleDraw, HandleDraw, FieldDraw, DrawInput, MeasureText } from './draw.js';
+export type { BandDraw, BandSpot, BubbleDraw, HandleDraw, FieldDraw, DrawInput, MeasureText } from './draw.js';
 export { measureTextInDom, forgetTextWidths } from './measure-text.js';
 // 帯（錐台）の形 ── 旧い海から持ってきた。どこから開いたかを描くのは新旧どちらも同じ形
 export { frustumBand, cornerRadiusFor } from './link-band-path.js';

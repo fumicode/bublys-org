@@ -12,7 +12,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import type { BubbleId, BubbleWorld, DropMarks, Layout, Viewport } from '@bublys-org/bubble-layout';
 import { drawField } from './draw.js';
-import type { BubbleDraw, MeasureText } from './draw.js';
+import type { BandSpot, BubbleDraw, MeasureText } from './draw.js';
 import { measureTextInDom } from './measure-text.js';
 
 export interface BubbleFieldProps {
@@ -49,6 +49,8 @@ export interface BubbleFieldProps {
   readonly openerOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
   /** 帯の出どころ（押されたもの）。無ければ `openerOf` から出る */
   readonly originOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /** 押されたのが泡の中の一点だったとき、その場所（箱に対する割合） */
+  readonly originSpotOf?: ReadonlyMap<BubbleId, BandSpot> | null;
   /**
    * 帯の出し方。既定は `hover` ── **両端のどちらかに触れているときだけ**見せる
    * （旧い海と同じ。いつも出していると、開いた先が増えるほど海が塗り潰される）。
@@ -61,7 +63,7 @@ export interface BubbleFieldProps {
 export function BubbleField(props: BubbleFieldProps) {
   const {
     world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, dragging,
-    renderBubble, measureText, layerRef, marks, openerOf, originOf, bandDisplay = 'hover',
+    renderBubble, measureText, layerRef, marks, openerOf, originOf, originSpotOf, bandDisplay = 'hover',
     className, style, ...handlers
   } = props;
 
@@ -79,10 +81,10 @@ export function BubbleField(props: BubbleFieldProps) {
     () =>
       drawField({
         world, layout, viewport, drawMin,
-        selectedId, hoverRing, skipGrab, openerOf, originOf, hoveredId,
+        selectedId, hoverRing, skipGrab, openerOf, originOf, originSpotOf, hoveredId,
         measureText: measureText ?? measureTextInDom,
       }),
-    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, originOf, hoveredId, measureText],
+    [world, layout, viewport, drawMin, selectedId, hoverRing, skipGrab, openerOf, originOf, originSpotOf, hoveredId, measureText],
   );
 
   /**

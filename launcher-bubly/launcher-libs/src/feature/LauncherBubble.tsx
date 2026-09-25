@@ -4,7 +4,6 @@ import { BubbleContentRenderer, BubblesContext } from "@bublys-org/bubbles-ui";
 import { launcherLayout } from "@bublys-org/launcher-model";
 import { LauncherView, type LauncherViewEntry } from "../ui/LauncherView.js";
 import { resolveLaunchTarget } from "../registration/launchTargets.js";
-import { launcherSettingsUrl } from "../registration/bubbleRoutes.js";
 import { useLauncher } from "./useLauncher.js";
 
 /** バブルの枠（余白 + 縁）。中身を描ける大きさは、バブルの大きさからこれを引いた分 */
@@ -51,8 +50,6 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
       // 帯を見せるかどうかはバブルの linksHidden（設定バブルから切り替え）で決まり、
       // 関係自体は常に残るので、切り替えれば既に開いているものにも効く
       onLaunch={(url) => openBubble(url, bubble.id)}
-      settingsUrl={launcherSettingsUrl(launcherId)}
-      onOpenSettings={() => openBubble(launcherSettingsUrl(launcherId), bubble.id)}
     />
   );
 };

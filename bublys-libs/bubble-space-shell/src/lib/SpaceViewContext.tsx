@@ -27,6 +27,12 @@ export type SpaceView = {
    */
   readonly autoLens: boolean;
   readonly setAutoLens: (on: boolean) => void;
+  /**
+   * **どこから開いたかの帯**を、いつも見せるか。
+   * 切っていても消えはしない ── 両端のどちらかに触れれば浮かぶ（既定）。
+   */
+  readonly bandsAlways: boolean;
+  readonly setBandsAlways: (on: boolean) => void;
 };
 
 const NOOP: SpaceView = {
@@ -38,6 +44,8 @@ const NOOP: SpaceView = {
   toggleFisheye: () => undefined,
   autoLens: false,
   setAutoLens: () => undefined,
+  bandsAlways: false,
+  setBandsAlways: () => undefined,
 };
 
 export const SpaceViewContext = createContext<SpaceView>(NOOP);

@@ -114,6 +114,8 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
    * ── 口の見た目（魚眼X/Y が点いているか）は、決まった結果を受け取って合わせる。
    */
   const [autoLens, setAutoLens] = useState(false);
+  /** 帯（どこから開いたか）をいつも見せるか。既定は触れたときだけ */
+  const [bandsAlways, setBandsAlways] = useState(false);
   const onLens = useCallback((axis: "x" | "y", lens: string) => {
     setFisheye((f) => (f[axis] === (lens === "fisheye") ? f : { ...f, [axis]: lens === "fisheye" }));
   }, []);
@@ -125,8 +127,11 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   }, []);
 
   const spaceView = useMemo<SpaceView>(
-    () => ({ preset, setPreset, join, setJoin, fisheye, toggleFisheye, autoLens, setAutoLens }),
-    [preset, setPreset, join, fisheye, toggleFisheye, autoLens],
+    () => ({
+      preset, setPreset, join, setJoin, fisheye, toggleFisheye,
+      autoLens, setAutoLens, bandsAlways, setBandsAlways,
+    }),
+    [preset, setPreset, join, fisheye, toggleFisheye, autoLens, bandsAlways],
   );
 
   return (
@@ -157,6 +162,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         homesReady={homesReady}
         onSpaceReady={handleSpaceReady}
         autoLens={autoLens}
+        bandDisplay={bandsAlways ? 'always' : 'hover'}
         onLens={onLens}
         style={{ position: "absolute", inset: 0 }}
       />

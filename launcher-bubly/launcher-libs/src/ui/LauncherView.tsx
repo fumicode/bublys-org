@@ -10,7 +10,6 @@ import {
   type Theme,
 } from "@mui/material";
 import LaunchIcon from "@mui/icons-material/Launch";
-import SettingsIcon from "@mui/icons-material/Settings";
 import { UrledPlace } from "@bublys-org/bubbles-ui";
 
 /** 描くのに必要な分だけ解決済みの entry */
@@ -28,9 +27,6 @@ export type LauncherViewProps = {
   /** ラベルを出すか。false ならアイコンだけ（名前はツールチップで出る） */
   labels: boolean;
   onLaunch: (url: string) => void;
-  /** 設定バブルの url（末尾の ⚙ から開く）。帯の起点にもなる */
-  settingsUrl: string;
-  onOpenSettings: () => void;
 };
 
 const ITEM_MIN = 44;
@@ -44,8 +40,6 @@ export const LauncherView: FC<LauncherViewProps> = ({
   vertical,
   labels,
   onLaunch,
-  settingsUrl,
-  onOpenSettings,
 }) => (
   <List
     dense
@@ -70,19 +64,11 @@ export const LauncherView: FC<LauncherViewProps> = ({
         onOpen={() => onLaunch(entry.url)}
       />
     ))}
-    {/* 末尾: このランチャーの設定（設定バブルを開く） */}
-    <LauncherItem
-      url={settingsUrl}
-      label="設定"
-      icon={<SettingsIcon color="action" />}
-      vertical={vertical}
-      labels={labels}
-      onOpen={onOpenSettings}
-      sx={{
-        [vertical ? "mt" : "ml"]: "auto",
-        [vertical ? "borderTop" : "borderLeft"]: "1px solid rgba(0, 0, 0, 0.08)",
-      }}
-    />
+    {/*
+      ★ **設定（⚙）は外した。** 持っていたつまみは「開いたものと帯で繋ぐ」1 つだけで、
+        それは旧い海の値（`linksHidden`）── 新しい海は読んでいなかった。
+        帯は**海ぜんぶの見え方**なので、口は見え方の帯（`SpaceViewBubble`）に移した。
+    */}
   </List>
 );
 

@@ -26,7 +26,8 @@ const chip = (active: boolean): CSSProperties => ({
 });
 
 export const SpaceViewBubble: FC = () => {
-  const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens } = useSpaceView();
+  const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens, bandsAlways, setBandsAlways } =
+    useSpaceView();
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
       {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
@@ -82,6 +83,22 @@ export const SpaceViewBubble: FC = () => {
           魚眼{axis.toUpperCase()}
         </button>
       ))}
+      {/*
+        ★ **どこから開いたか**を見せる口。前はランチャーの ⚙ の中にあった（`linksHidden`）が、
+          あれは旧い海だけの値で、新しい海では効かなかった。帯は**海ぜんぶの見え方**なので、
+          並べ方やレンズと同じ所に置く。
+      */}
+      <button
+        onClick={() => setBandsAlways(!bandsAlways)}
+        title={
+          bandsAlways
+            ? "帯をいつも見せている ── どの泡がどこから開いたか、一目で分かる"
+            : "帯は触れたときだけ ── 泡の両端のどちらかに触れると浮かぶ"
+        }
+        style={chip(bandsAlways)}
+      >
+        帯
+      </button>
       <FullscreenToggle />
     </Box>
   );

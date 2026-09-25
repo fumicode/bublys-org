@@ -75,6 +75,8 @@ export type ShoreSpaceProps = {
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
   readonly autoLens?: boolean;
+  /** どこから開いたかの帯の出し方（海ぜんぶの見え方） */
+  readonly bandDisplay?: 'hover' | 'always' | 'none';
   readonly onLens?: (axis: PlaneAxis, lens: LensId) => void;
   readonly className?: string;
   readonly style?: CSSProperties;
@@ -183,6 +185,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homesReady = true,
   onSpaceReady,
   autoLens,
+  bandDisplay,
   persistKey,
   onLens,
   className,
@@ -552,6 +555,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          */
         memoryKey={persistKey}
         autoLens={autoLens}
+        bandDisplay={bandDisplay}
         openArea={openArea}
         onLens={onLens}
         onTakeOut={takeOut}

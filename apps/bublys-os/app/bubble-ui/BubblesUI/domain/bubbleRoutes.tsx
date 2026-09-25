@@ -166,7 +166,7 @@ const routes: BubbleRoute[] = [
     Component: SpaceViewBubble,
     // 地は敷かない ── ボタンが空間の上に浮いて見える
     // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
-    bubbleOptions: { defaultSize: { width: 436, height: 44 }, contentBackground: "transparent" },
+    bubbleOptions: { defaultSize: { width: 482, height: 44 }, contentBackground: "transparent" },
   },
 
   // 他のデモへ行く口。これも 1 つの泡 ── いつも見えていてほしいので、既定では下の岸に貼る

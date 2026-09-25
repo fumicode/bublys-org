@@ -66,6 +66,11 @@ export interface DrawInput {
    * 帯はこちら（札そのもの）から出す。無い／描かれていなければ `openerOf` に落ちる。
    */
   readonly originOf?: ReadonlyMap<BubbleId, BubbleId | null> | null;
+  /**
+   * **押されたのが泡の中の一点だったとき**、その場所（出どころの箱に対する割合 0〜1）。
+   * 中の要素から開いたことが、帯の細い側の形でそのまま見える。
+   */
+  readonly originSpotOf?: ReadonlyMap<BubbleId, BandSpot> | null;
   /** いま触れている泡。帯を見せるかどうかだけに使う */
   readonly hoveredId?: BubbleId | null;
 }
@@ -107,6 +112,14 @@ export interface HandleDraw {
  * 旧い海（`BubblesLayeredView`）が描いていたものと同じ。**線ではなく面**なので、
  * 魚眼で小さく写る泡へ伸びる帯は勝手に細くなる ── 太さを自分で持たなくてよい。
  */
+/** 泡の箱に対する割合（0〜1）で言う、中の一点 */
+export interface BandSpot {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
 export interface BandDraw {
   /** 開いた先の泡（帯はこの泡に着く） */
   readonly id: BubbleId;
@@ -250,7 +263,10 @@ export function drawField(input: DrawInput): FieldDraw {
   }
   return {
     items,
-    bands: bandsOf(input.openerOf ?? null, input.originOf ?? null, input.hoveredId ?? null, layout, shown),
+    bands: bandsOf(
+      input.openerOf ?? null, input.originOf ?? null, input.originSpotOf ?? null,
+      input.hoveredId ?? null, layout, shown,
+    ),
     handle,
     tinyIds,
   };
@@ -277,6 +293,7 @@ const zOf = (i: number): number => i * 2;
 function bandsOf(
   openerOf: ReadonlyMap<BubbleId, BubbleId | null> | null,
   originOf: ReadonlyMap<BubbleId, BubbleId | null> | null,
+  originSpotOf: ReadonlyMap<BubbleId, BandSpot> | null,
   hoveredId: BubbleId | null,
   layout: Layout,
   shown: ReadonlyMap<BubbleId, Placement>,
@@ -308,7 +325,7 @@ function bandsOf(
      */
     const originId = originOf?.get(p.id) ?? null;
     const from = (originId ? shown.get(originId) : null) ?? op;
-    const band = frustumBand(rectOf(from), rectOf(me));
+    const band = frustumBand(spotRect(from, originSpotOf?.get(p.id) ?? null), rectOf(me));
     if (!band) continue; // 一方が他方を含んでいる ── 帯は無い
     bands.push({
       id: p.id, openerId, path: band.path, hue: from.b.state.hue ?? 0,
@@ -319,6 +336,17 @@ function bandsOf(
 }
 
 const rectOf = (p: Placement) => ({ left: p.x, top: p.y, right: p.x + p.w, bottom: p.y + p.h });
+
+/**
+ * 出どころの矩形。中の一点が分かっていれば、そのぶんだけ狭める。
+ * 割合で来るので、レンズで泡が大きくなろうと小さくなろうと同じ所を指す。
+ */
+const spotRect = (p: Placement, spot: BandSpot | null) => {
+  if (!spot) return rectOf(p);
+  const left = p.x + spot.x * p.w;
+  const top = p.y + spot.y * p.h;
+  return { left, top, right: left + spot.w * p.w, bottom: top + spot.h * p.h };
+};
 
 interface Ctx {
   readonly world: BubbleWorld;
