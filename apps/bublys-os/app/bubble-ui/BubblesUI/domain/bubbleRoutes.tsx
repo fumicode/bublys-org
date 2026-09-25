@@ -50,7 +50,7 @@ const routes: BubbleRoute[] = [
   // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
   // も消える挙動になる点だけ要注意。
   /**
-   * この海の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
+   * この空間の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
    * 岸に貼ってある 48×48 のときはアイコン、押すと同じ url の泡が開いて、
    * 広いそちらが世界線を映す。
    */
@@ -70,7 +70,7 @@ const routes: BubbleRoute[] = [
   },
 
   /**
-   * このデモの読み方。世界線と同じく**大きさで姿が変わる**（`GuideHomeBubble`）──
+   * 説明。世界線と同じく**大きさで姿が変わる**（`GuideHomeBubble`）──
    * 岸の 48×48 ではアイコン、押すと同じ url の泡が開いて一覧を映す。
    */
   {

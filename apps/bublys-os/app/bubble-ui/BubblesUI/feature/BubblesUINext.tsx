@@ -140,7 +140,7 @@ const worldLinesDock = (viewport: { width: number; height: number }): Docked => 
 const GUIDE_URL = "guide";
 
 /**
- * このデモの読み方の定位置 ── **右の縁、世界線のすぐ下**。
+ * 説明の定位置 ── **右の縁、世界線のすぐ下**。
  *
  * ★ 世界線と並べる。どちらも「押すと開く小さな口」で、広げれば自分が中身を映す泡なので、
  *   同じ大きさ・同じ縁に置いておけば役割が同じだと判る。
@@ -174,7 +174,7 @@ const HOMES: readonly Home[] = [
 export const BubblesUINext = () => {
   useEnsureMainLauncherEntity();
   /**
-   * ★ **この海の世界線は、root という名で記録する。** 世界線の泡（`WorldLineHomeBubble`）が
+   * ★ **この空間の世界線は、root という名で記録する。** 世界線の泡（`WorldLineHomeBubble`）が
    *   読むのと同じ名前にしておく ── 別の名前にすると、記録はされているのに何も映らない。
    */
   return (

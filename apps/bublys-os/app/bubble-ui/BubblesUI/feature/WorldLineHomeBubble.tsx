@@ -1,6 +1,6 @@
 "use client";
 /**
- * **この海の世界線** ── 1 つの泡として。ただし**大きさで姿が変わる**（ポケットと同じ決まり）。
+ * **この空間の世界線** ── 1 つの泡として。ただし**大きさで姿が変わる**（ポケットと同じ決まり）。
  *
  * > **大きければ自分が世界線を映し、小さければアイコンになる。**
  *
@@ -69,7 +69,7 @@ export const WorldLineHomeBubble: FC = () => {
   return (
     <div ref={ref} style={{ width: "100%", height: "100%" }}>
       {compact ? (
-        <Tooltip title="この海の世界線を開く" placement="left">
+        <Tooltip title="この空間の世界線" placement="left">
           <IconButton
             size="small"
             sx={{ width: "100%", height: "100%", color: "#9ec1ff" }}

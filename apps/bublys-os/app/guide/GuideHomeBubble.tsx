@@ -1,6 +1,6 @@
 "use client";
 /**
- * **このデモの読み方** ── 1 つのバブルとして。ただし**大きさで姿が変わる**
+ * **説明** ── 1 つのバブルとして。ただし**大きさで姿が変わる**
  * （ポケット・世界線と同じ決まり）。
  *
  * > **大きければ説明の一覧を映し、小さければアイコンになる。**
@@ -67,7 +67,7 @@ export const GuideHomeBubble: FC = () => {
   return (
     <div ref={ref} style={{ width: "100%", height: "100%" }}>
       {compact ? (
-        <Tooltip title="このデモの読み方" placement="left">
+        <Tooltip title="説明" placement="left">
           <IconButton
             size="small"
             sx={{ width: "100%", height: "100%", color: "#9ec1ff" }}
