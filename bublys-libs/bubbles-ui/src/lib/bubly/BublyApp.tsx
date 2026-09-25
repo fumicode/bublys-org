@@ -37,6 +37,7 @@ import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
 import { DragDataType } from '../utils/drag-types.js';
 import { BublyMenuItem } from './BublyTypes.js';
+import { DemoSwitcher } from './DemoSwitcher.js';
 
 /**
  * BublyApp のプロパティ
@@ -267,6 +268,15 @@ export const BublyApp: FC<BublyAppProps> = ({
             </Tooltip>
           ))}
         </List>
+
+        {/*
+          ★ **どのデモからでも、他のデモへ行ける。**
+            審査員が最初に踏む url は 1 つだけなので、そこが行き止まりだと残りは
+            無かったことになる。一覧は `demoSites.ts` の 1 か所から来る。
+        */}
+        <Box sx={{ mt: 'auto', p: 1, borderTop: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}>
+          <DemoSwitcher />
+        </Box>
 
         {/* フッター */}
         {sidebarFooter && (

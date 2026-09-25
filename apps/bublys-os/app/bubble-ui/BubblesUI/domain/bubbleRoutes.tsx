@@ -23,6 +23,7 @@ import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
+import { DemoSitesBubble } from "../feature/DemoSitesBubble";
 import { SpaceViewBubble } from "@/app/bubble-ui/BubblesUI/feature/SpaceViewBubble";
 import "@/app/launcher/launchTargets";
 import { MemoCard } from "@/app/world-line/Memo/ui/MemoCard";
@@ -264,7 +265,16 @@ const routes: BubbleRoute[] = [
     Component: SpaceViewBubble,
     // 地は敷かない ── ボタンが空間の上に浮いて見える
     // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
-    bubbleOptions: { defaultSize: { width: 480, height: 44 }, contentBackground: "transparent" },
+    bubbleOptions: { defaultSize: { width: 436, height: 44 }, contentBackground: "transparent" },
+  },
+
+  // 他のデモへ行く口。これも 1 つの泡 ── いつも見えていてほしいので、既定では下の岸に貼る
+  {
+    pattern: /^demo-sites$/,
+    type: "demo-sites",
+    Component: DemoSitesBubble,
+    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の DEMO_SITES_SIZE）と同じ
+    bubbleOptions: { defaultSize: { width: 430, height: 44 }, contentBackground: "transparent" },
   },
 
   // ポケット（オブジェクトのクリップボード）。前は画面に居座る面だったが、1 つの泡にした

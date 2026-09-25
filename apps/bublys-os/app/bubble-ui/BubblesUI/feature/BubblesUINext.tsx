@@ -66,7 +66,13 @@ const pocketDock = (): Docked => ({
 });
 const SPACE_VIEW_URL = "space-view";
 
-const SPACE_VIEW_SIZE = { width: 480, height: 44 };
+/**
+ * 見え方の口の大きさ。**中身の実測から決める**（箱が中身より広いと、右に空きが残る）。
+ *   選択 157 ＋ まかせる 78 ＋ 魚眼X 61 ＋ 魚眼Y 61 ＋ 全画面 30 ＝ 387
+ *   ＋ すき間 8×4 ＝ 32 ＋ 左右の余白 4×2 ＝ 8 → 427。少し余裕を見て 436。
+ * ★ 迂回（ネオンの通し方）の口を外したぶん、前の 480 から詰めた。
+ */
+const SPACE_VIEW_SIZE = { width: 436, height: 44 };
 
 /**
  * 見え方の口の定位置 ── **上の縁の、横の中間**。
@@ -93,6 +99,28 @@ const spaceViewDock = (viewport: { width: number; height: number }): Docked => (
   ground: "none",
 });
 
+const DEMO_SITES_URL = "demo-sites";
+
+const DEMO_SITES_SIZE = { width: 430, height: 44 };
+
+/**
+ * 他のデモへ行く口の定位置 ── **下の縁の、ランチャーのすぐ右**。
+ *
+ * ★ どのデモに着いても全部へ行けるようにするためのものなので、**いつも見えている所**に置く。
+ *   固定した面にはしない（新しい模型に固定の置き場所は無い）── 岸に貼った泡にしておけば、
+ *   引き剥がして海に浮かべることも、閉じることもできる。
+ * ★ 下の縁にしたのは、上は見え方の口、左はランチャー、右下はポケットが使っているから。
+ *   左端から置く（横の中間にすると、右下のポケットと目が競る）。
+ */
+const demoSitesDock = (): Docked => ({
+  key: `${DEMO_SITES_URL}#dock`,
+  url: DEMO_SITES_URL,
+  dock: { edges: ["bottom"], at: { x: LAUNCHER_WIDTH + 8, y: 0 } },
+  size: DEMO_SITES_SIZE,
+  // 地は敷かない ── ボタンが空間の上に浮いて見える（見え方の口と同じ）
+  ground: "none",
+});
+
 /**
  * **定位置に居てほしいもの。** 居なくなったら、ここへ戻ってくる。
  * 岸に貼ってある間は閉じる口が無いので、消えるのは海へ出して閉じたときだけ。
@@ -101,6 +129,7 @@ const HOMES: readonly Home[] = [
   launcherDock,
   spaceViewDock,
   pocketDock,
+  demoSitesDock,
 ];
 
 export const BubblesUINext = () => {

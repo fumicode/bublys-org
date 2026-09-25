@@ -22,6 +22,7 @@ import * as BubblesUI from "@bublys-org/bubbles-ui";
 import * as MuiMaterial from "@mui/material";
 import * as MuiIcons from "@mui/icons-material";
 import { registerAppObjectTypes } from "./object-type-registration";
+import { BootScreen } from './BootScreen';
 import { initWorldLineGraph, IntentBoundary } from '@bublys-org/world-line-graph';
 import * as WorldLineGraph from '@bublys-org/world-line-graph';
 import * as DomainRegistry from '@bublys-org/domain-registry';
@@ -121,12 +122,18 @@ export default function StoreProvider({
     };
   }, []);
 
+  /**
+   * ★ **待っているあいだは「最初の画面」を出す。**
+   *   前はどちらも `null` だったので、サーバが配る HTML に文字が 1 つも無く、
+   *   JS が走り終わるまで**完全な白画面**だった（`BootScreen` の註）。
+   *   出す所は 2 つ ── 保存の読み戻し（`PersistGate`）と、バブリの復元。
+   */
   return (
     <Provider store={store}>
       {/* ユーザー入力の瞬間に「1 意図」を開く。世界線のノードはこの単位で 1 つになる */}
       <IntentBoundary />
-      <PersistGate loading={null} persistor={persistor}>
-        {bubliesRestored ? children : null}
+      <PersistGate loading={<BootScreen />} persistor={persistor}>
+        {bubliesRestored ? children : <BootScreen />}
       </PersistGate>
     </Provider>
   );

@@ -1,15 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <title>HotelShiftPuzzleApp</title>
+    <title>シフトントン ── 旅館のシフトを、試しながら作る</title>
     <base href="/" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="旅館・ホテルのシフトを、世界線で分岐させて見比べながら作るアプリ。希望休や資格の組み合わせといった現場の制約を持ったまま、何通りも試して巻き戻せる。"
+    />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      ★ **最初の画面**（JS が届くまでのあいだ、ここが出ている）。
+        SPA は JS を落として走らせるまで何も無いので、素の HTML のままだと**完全な白画面**になる。
+        React は最初の描画でこの中身をそっくり置き換えるので、消す手当ては要らない。
+        素の要素とインラインの見た目だけで書く ── CSS も画像も待たずに出したいので。
+    -->
+    <div id="root">
+      <div
+        style="
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          background: radial-gradient(120% 120% at 50% 0%, hsl(20, 40%, 26%) 0%, hsl(20, 40%, 18%) 60%, hsl(20, 35%, 12%) 100%);
+          color: #f3ece6;
+          font: 400 16px/1.7 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+          letter-spacing: 0.02em;
+          text-align: center;
+          padding: 24px;
+        "
+      >
+        <div style="font-size: 26px; font-weight: 600; letter-spacing: 0.04em">シフトントン</div>
+        <div style="opacity: 0.8">旅館のシフトを、試しながら作る</div>
+        <div style="opacity: 0.45; font-size: 13px">読み込んでいます…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -26,7 +26,7 @@ const chip = (active: boolean): CSSProperties => ({
 });
 
 export const SpaceViewBubble: FC = () => {
-  const { preset, setPreset, join, setJoin, fisheye, toggleFisheye, autoLens, setAutoLens } = useSpaceView();
+  const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens } = useSpaceView();
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
       {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
@@ -43,19 +43,11 @@ export const SpaceViewBubble: FC = () => {
         ))}
       </select>
 
-      {/* ネオンの通し方。枝分かれ（T 字）か、泡の枠へ迂回するか */}
-      <button
-        onClick={() => setJoin(join === "branch" ? "detour" : "branch")}
-        title={
-          join === "branch"
-            ? "いまは枝分かれ ── 岸の管はまっすぐ走り、泡の枠が T 字に分かれる"
-            : "いまは迂回 ── 岸の管が泡の枠へ回り込み、泡と縁の間には通らない"
-        }
-        style={chip(false)}
-      >
-        {join === "branch" ? "枝分かれ" : "迂回"}
-      </button>
-
+      {/*
+        ★ ネオンの通し方（枝分かれ／迂回）の口は**外した**。
+          見た目の好みでしかなく、押しても何が変わったか分かりにくい ── 迂回のまま固定する。
+          値そのものは残してある（`useSpaceView` の `join`）ので、要るときはまたここに出せる。
+      */}
       {/*
         レンズをまかせる。溢れたら魚眼、収まったら平行 ── 軸ごとに勝手に切り替わる。
         まかせているあいだは、手で選ぶ口は押せない（押しても次の瞬間に上書きされるので）
