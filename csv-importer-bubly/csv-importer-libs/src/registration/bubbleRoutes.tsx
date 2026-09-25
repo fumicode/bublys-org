@@ -112,7 +112,7 @@ const SheetsSpace: FC<{ bubbleId: string }> = ({ bubbleId }) => {
             style={headBtn(false)}
             onClick={() => pickCsv((name, text) => open(CsvSheet.fromCsvText(name, text)))}
           >
-            CSV を読む
+            CSV を取り込む
           </button>
         </>
       }
