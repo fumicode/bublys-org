@@ -20,10 +20,14 @@
     }
   },
   "dependencies": {
+    "@bublys-org/bubbles-ui": "0.0.1",
+    "@bublys-org/domain-registry": "0.0.1"
   },
   "nx": {
     "targets": {
-      "dev": { "continuous": true }
+      "dev": {
+        "continuous": true
+      }
     }
   }
 }

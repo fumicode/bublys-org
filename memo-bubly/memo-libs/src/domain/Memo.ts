@@ -2,6 +2,8 @@
  * Memo クラス
  * メモの内容を管理し、不変性を保つ
  */
+import { arrayShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+
 export type MemoBlock = {
   id: string;
   type: string;
@@ -134,3 +136,24 @@ export class Memo {
     return Memo.fromJson(raw);
   }
 }
+
+/**
+ * **メモの形**（`SchemaShape`）── 他のバブリが「この型の中身は何か」を引くための申告。
+ *
+ * ★ **書いた人（`authorId`）も申告する。** 申告を OS 側に手書きで置いていたころは
+ *   `id` と `lines` の 2 つしか無く、モデルにある書いた人が**変換エディタから見えなかった**。
+ * ★ **本文（`blocks`）はまだ書けない。** `Record<blockId, MemoBlock>` ── キーが動く辞書で、
+ *   いまの `SchemaShape` には `record` の語彙が無い（object は項目名が決まっているもの、
+ *   array は順番のあるもの）。**メモの中身そのものが繋げない**ということなので、
+ *   語彙を足すまでは「メモは id と行の並びと書いた人」としか名乗れない。
+ */
+export const MEMO_SHAPE: SchemaShape = objectShape([
+  { name: 'id', shape: primitiveShape('string'), required: true, label: 'ID' },
+  {
+    name: 'lines',
+    shape: arrayShape(primitiveShape('string')),
+    required: true,
+    label: 'ブロック順序（ID 配列）',
+  },
+  { name: 'authorId', shape: primitiveShape('string'), required: false, label: '書いた人の ID' },
+]);

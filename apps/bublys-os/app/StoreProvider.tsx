@@ -21,7 +21,6 @@ import {
 import * as BubblesUI from "@bublys-org/bubbles-ui";
 import * as MuiMaterial from "@mui/material";
 import * as MuiIcons from "@mui/icons-material";
-import { registerAppObjectTypes } from "./object-type-registration";
 import { BootScreen } from './BootScreen';
 import { initWorldLineGraph, IntentBoundary } from '@bublys-org/world-line-graph';
 import * as WorldLineGraph from '@bublys-org/world-line-graph';
@@ -74,8 +73,12 @@ function initializeApp() {
   // プラグイン用共有ライブラリをセットアップ
   setupSharedLibraries();
 
-  // オブジェクト型を登録
-  registerAppObjectTypes();
+  /**
+   * ★ **オブジェクト型と形は、各バブリが自分で名乗る**（`*-libs/src/object-type-registration.ts`）。
+   *   ここに全バブリぶんを手書きで並べていたころは、モデルに項目を足しても申告だけが
+   *   古いまま残った（実測：タスクの担当者が変換エディタから繋げなかった）。
+   *   バブリの lib を import した時点で登録が走るので、OS からの呼び出しは要らない。
+   */
 
   // world-line-graph のsliceとmiddlewareを注入
   initWorldLineGraph();

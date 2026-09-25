@@ -13,6 +13,8 @@ import { IDEAL_CHARS, igoCardWidth, widthOfChars } from "./ui/igoCardWidth";
 import { selectIgoGameAtApex, selectIgoGameIds } from "./feature/igoSelectors";
 import { dispatchCreateIgoGame } from "./feature/igoActions";
 import { IgoGame_囲碁ゲーム } from "./domain";
+// 自分の型を名乗る（副作用。`object-type-registration.ts` の註）
+import "./object-type-registration";
 
 /**
  * 囲碁ゲーム - メインバブル（world-line-graph 統合版）

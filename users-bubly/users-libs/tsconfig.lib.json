@@ -19,6 +19,9 @@
   "references": [
     {
       "path": "../../bublys-libs/bubble-layout-feature/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
     }
   ],
   "exclude": [

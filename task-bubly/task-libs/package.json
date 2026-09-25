@@ -18,6 +18,7 @@
   "dependencies": {
     "@bublys-org/bubble-layout-feature": "0.0.1",
     "@bublys-org/bubbles-ui": "0.0.1",
+    "@bublys-org/domain-registry": "0.0.1",
     "@bublys-org/state-management": "0.0.1",
     "@bublys-org/users-libs": "0.0.1"
   },

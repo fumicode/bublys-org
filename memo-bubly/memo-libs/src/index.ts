@@ -1,3 +1,6 @@
+// 自分の型と形を名乗る（副作用。`object-type-registration.ts` の註）
+import "./object-type-registration.js";
+
 // Domain
 export * from './domain/Memo.js';
 export * from './domain/MemoDomain.js';
