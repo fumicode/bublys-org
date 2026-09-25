@@ -129,6 +129,23 @@ const worldLinesDock = (viewport: { width: number; height: number }): Docked => 
   ground: "none",
 });
 
+const GUIDE_URL = "guide";
+
+/**
+ * このデモの読み方の定位置 ── **右の縁、世界線のすぐ下**。
+ *
+ * ★ 世界線と並べる。どちらも「押すと開く小さな口」で、広げれば自分が中身を映す泡なので、
+ *   同じ大きさ・同じ縁に置いておけば役割が同じだと判る。
+ */
+const guideDock = (viewport: { width: number; height: number }): Docked => ({
+  key: `${GUIDE_URL}#dock`,
+  url: GUIDE_URL,
+  dock: { edges: ["right"], at: { x: viewport.width, y: 56 } },
+  size: { width: 48, height: 48 },
+  // 地は中身が持つ ── アイコンだけのときは海がそのまま透ける
+  ground: "none",
+});
+
 /**
  * **定位置に居てほしいもの。** 居なくなったら、ここへ戻ってくる。
  * 岸に貼ってある間は閉じる口が無いので、消えるのは海へ出して閉じたときだけ。
@@ -139,6 +156,7 @@ const HOMES: readonly Home[] = [
   pocketDock,
   demoSitesDock,
   worldLinesDock,
+  guideDock,
 ];
 
 /**

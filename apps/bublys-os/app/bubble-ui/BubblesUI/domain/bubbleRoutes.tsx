@@ -19,6 +19,9 @@ import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
 import { WorldLineHomeBubble } from "../feature/WorldLineHomeBubble";
+import { GuideHomeBubble, GUIDE_CARD } from "@/app/guide/GuideHomeBubble";
+import { GuideEntryBubble } from "@/app/guide/GuideEntryBubble";
+import { GuideCard } from "@/app/guide/GuideCard";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
@@ -64,6 +67,32 @@ const routes: BubbleRoute[] = [
       contentBackground: "rgba(15,18,28,0.3)",
       defaultSize: { width: 520, height: 340 },
     },
+  },
+
+  /**
+   * このデモの読み方。世界線と同じく**大きさで姿が変わる**（`GuideHomeBubble`）──
+   * 岸の 48×48 ではアイコン、押すと同じ url の泡が開いて一覧を映す。
+   */
+  {
+    pattern: /^guide$/,
+    type: "guide",
+    Component: GuideHomeBubble,
+    // 一覧は並びの空間。ほかの一覧と同じ大きさで開く（地は敷かない）
+    bubbleOptions: { defaultSize: { width: 406, height: 380 }, contentBackground: "transparent" },
+  },
+  // ★ 札は詳細より**先に**置く（`guide/xxx` が `.../card` も飲み込むので）
+  {
+    pattern: /^guide\/([^/]+)\/card$/,
+    type: "guide-card",
+    Component: ({ bubble }) => <GuideCard entryId={bubble.url.split("/")[1] ?? ""} />,
+    bubbleOptions: { defaultSize: { width: GUIDE_CARD.w, height: GUIDE_CARD.h } },
+  },
+  {
+    pattern: /^guide\/([^/]+)$/,
+    type: "guide-entry",
+    Component: ({ bubble }) => <GuideEntryBubble entryId={bubble.url.split("/")[1] ?? ""} />,
+    // 説明は読みもの。1 行が長くなりすぎない幅に切る
+    bubbleOptions: { defaultSize: { width: 380, height: 300 } },
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
