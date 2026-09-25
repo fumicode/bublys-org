@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, withAxis, withPreset, CHROME} from '@bublys-org/bubble-layout';
+import { Bubble, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
 import type { AxisView, BubbleId, BubbleWorld, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
@@ -336,8 +336,25 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   口を state で持つ側（例: 岸）がそれを見ていると、更新が止まらなくなる。
    */
   const onChange = props.onChange;
+  /**
+   * いまの世界を、書き込む側から読めるようにしておく（下の「関数で書く」ため）。
+   * 描くたびに合わせるだけなので、state ではなく覚え書きでよい。
+   */
+  const worldRef = useRef(world);
+  worldRef.current = world;
+  /**
+   * 世界を書く。**関数で書ける**（`setWorld(prev => …)`）。
+   *
+   * ★ 値で書くと、同じ拍で 2 つの書き込みが走ったとき**後から書いたほうが前のを
+   *   丸ごと巻き戻す** ── 一覧が「口の取り分」を書いた直後に箱の追従が走り、
+   *   取り分ごと消えていた（実測：口の段が空かず、札が口の下へ 7px 潜り込んだ）。
+   *   関数で書けば、いまの世界の上に積める。
+   */
   const setWorld = useCallback(
-    (next: BubbleWorld) => { if (onChange) onChange(next); else setOwnWorld(next); },
+    (next: BubbleWorld | ((prev: BubbleWorld) => BubbleWorld)) => {
+      if (onChange) onChange(typeof next === 'function' ? next(worldRef.current) : next);
+      else setOwnWorld(next as BubbleWorld);
+    },
     [onChange],
   );
 
@@ -846,14 +863,26 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   /**
    * その泡の自前の大きさを書く。**並べ方に合う大きさへ**（`follows`）だけが呼ぶ。
    * 同じ値なら何も書かない ── 書くと次の走りの引き金になる。
+   *
+   * ★ 書くときは**いまの世界から作る**（`setWorld(prev => …)`）。描画のときの世界から
+   *   作っていたころは、同じ拍で 2 つの書き込みが走ると**後から書いたほうが前のを
+   *   丸ごと巻き戻して**いた ── 一覧が「口の取り分」を書いた直後に箱の追従がここを通り、
+   *   取り分ごと消えていた（実測：口の段が空かず、札が口の下へ 7px 潜り込んだ）。
+   *   はじめの読みは「書かずに済ませる」ための下見なので、描画のときの世界でよい。
    */
   const setSize = useCallback(
     (id: BubbleId, size: { w: number; h: number }) => {
-      const b = world.bubble(id);
-      if (!b) return;
-      const now = b.state.size;
+      const b0 = world.bubble(id);
+      if (!b0) return;
+      const now = b0.state.size;
       if (Math.abs(now.w - size.w) < 0.5 && Math.abs(now.h - size.h) < 0.5) return;
-      setWorld(world.withBubble(b.withSize({ w: Math.round(size.w), h: Math.round(size.h) })));
+      setWorld((prev) => {
+        const b = prev.bubble(id);
+        if (!b) return prev;
+        const s = b.state.size;
+        if (Math.abs(s.w - size.w) < 0.5 && Math.abs(s.h - size.h) < 0.5) return prev;
+        return prev.withBubble(b.withSize({ w: Math.round(size.w), h: Math.round(size.h) }));
+      });
     },
     [world, setWorld],
   );
@@ -866,9 +895,19 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     (id: BubbleId) => {
       const host = hostOf(id);
       const own = host ? world.bubble(host)?.state.size : null;
-      return own ?? { w: viewport.w, h: viewport.h };
+      const room = own ?? { w: viewport.w, h: viewport.h };
+      /**
+       * ★ **置けるのは、その泡が装いを着たまま入る広さ**（`chrome.ts`）。
+       *   泡が持っているのは中身の大きさなので、装いのぶんを引かずに返していたころは、
+       *   海いっぱいに伸びた一覧が**装いの 34px ぶん海からはみ出して**いた
+       *   ── 帯も ＋新規 の口も画面の上へ出て、触れなくなる（実測：ユーザー一覧を縦に並べた）。
+       * ★ **縁にも触れない。** 並びが箱の中で余白（`METRICS.PAD`）を取るのと同じだけ、
+       *   箱も器の縁から離れる ── 引かないと帯が画面の縁に貼り付いて、口が半分切れて見えた。
+       */
+      const inner = stripChrome(room, CHROME[chrome.get(id) ?? 'plain']);
+      return { w: Math.max(0, inner.w - METRICS.PAD * 2), h: Math.max(0, inner.h - METRICS.PAD * 2) };
     },
-    [world, hostOf, viewport],
+    [world, hostOf, viewport, chrome],
   );
 
 

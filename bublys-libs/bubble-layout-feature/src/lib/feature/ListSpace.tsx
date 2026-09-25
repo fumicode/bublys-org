@@ -141,7 +141,13 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   前は `own.h − ヘッダ24` と引いていた ── `size` が装い込みの箱だったころの名残。
    */
   const box = own ? { w: own.w, h: own.h } : panel;
-  const headBox = head ? { w: headSize.w || 60, h: headSize.h || HEAD_HEIGHT } : null;
+  /**
+   * 口の大きさ。**高さは器が決めている**（下の `HEAD_HEIGHT`）ので測らない ──
+   * 測っていたころは、口の中身（ボタン）の背が器より低いと**段が足りず、
+   * いちばん上の札が口の下へ潜り込んで**いた（実測：CSV の一覧で 7px 重なった）。
+   * 変わり得るのは幅だけなので、そこだけ実寸を見る。
+   */
+  const headBox = head ? { w: headSize.w || 60, h: HEAD_HEIGHT } : null;
   /**
    * 札に教える「並びに使える幅」＝ 中身の箱から、並びの左右の余白を引いたぶん。
    * 札が数で答えるならそのまま使う。
@@ -178,7 +184,26 @@ export const ListSpace: FC<ListSpaceProps> = ({
   const cardW0 = itemWidthFor(preset, itemW);
   const colsNoBand = colsFor(preset, box, cardW0, members.length, itemHeight);
   const used = usedFor(preset, box, { w: cardW0, h: itemHeight }, members.length, colsNoBand);
-  const reserve = needsBand(box, used, headBox) ? reserveFor(headBox) : 0;
+  /**
+   * ★ **口の段が要るかは、いま写っている箱で見る。**
+   *   宣言した大きさ（`own`）で見ていたので、箱が並びに合わせて縮んだあとも
+   *   「上には余白がたっぷりある」と判断し、**段が空かずに口が札の上に乗って**いた
+   *   （実測：CSV の一覧で 7px 重なった）。写っている箱がまだ measure できていない
+   *   最初の一瞬だけ、宣言した大きさで代える。
+   */
+  const seen = panel.w > 0 && panel.h > 0 ? panel : box;
+  /**
+   * ★ **取り分を、取り分の入った箱で測らない。**
+   *   箱が並びに合わせて縮む状態（`fitBoxFor` が書いた大きさ）では、その箱の高さには
+   *   **もう取り分が入っている** ── それを「上に余白がある」と読むと段を外し、
+   *   外せば箱が縮んでまた段が要る、と**追いかけ合って止まらなくなる**
+   *   （実測：Maximum update depth exceeded）。
+   *   縮む箱のときは、上下は**並びが使うぶんちょうど**として見る（＝上の余白は無い）。
+   *   横の余白だけが答えを分ける ── 口が並びの右隣に収まるなら、段は要らない。
+   */
+  const fitted = !!me && follows && !!chosen;
+  const gauge = fitted ? { w: seen.w, h: used.h } : seen;
+  const reserve = needsBand(gauge, used, headBox) ? reserveFor(headBox) : 0;
   /**
    * その並べ方のときの札の形と、送り幅・折り返す列数。
    *
