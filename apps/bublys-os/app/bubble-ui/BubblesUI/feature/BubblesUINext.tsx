@@ -87,7 +87,15 @@ const spaceViewDock = (viewport: { width: number; height: number }): Docked => (
 
 const DEMO_SITES_URL = "demo-sites";
 
-const DEMO_SITES_SIZE = { width: 430, height: 44 };
+/**
+ * 他のデモへ行く口の大きさ。**中身の実測から決める**（箱が中身より広いと、右に空きが残る）。
+ *   見出し 52 ＋ シフトントン 100 ＋ 世界線囲碁 88 ＋ 学会シフト 88 ＝ 328
+ *   ＋ すき間 6×3 ＝ 18 ＋ 左右の余白 4×2 ＝ 8 → 354。少し余裕を見て 360。
+ *
+ * ★ この画面の中なので **bublys OS は出さない**（`DemoSitesBubble` の註）。
+ *   出していた頃は 430 だったので、外したぶん 70 詰めた。
+ */
+const DEMO_SITES_SIZE = { width: 360, height: 44 };
 
 /**
  * 他のデモへ行く口の定位置 ── **下の縁の、ランチャーのすぐ右**。

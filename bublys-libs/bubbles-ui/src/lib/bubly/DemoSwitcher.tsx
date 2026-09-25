@@ -23,6 +23,15 @@ export type DemoSwitcherProps = {
   readonly heading?: string;
   /** 住所を上書きする（試すとき用。ふだんは省く） */
   readonly href?: string;
+  /**
+   * **この中に出さないもの**（デモの id）。
+   *
+   * ★ デモの画面の**中**にこの口を置くときは、自分自身を出さない ── そこに居るのに
+   *   「ここへ行く」が並んでいても意味が無い（実測：OS の画面に「bublys OS」が並んでいた）。
+   * ★ 自分がどれかを**id で**言うのは、url を書かせるのとは別のこと。中身を別の url へ
+   *   置いても嘘にならない（住所で当てる仕組みはそのまま ── そちらは「いま居る印」に使う）。
+   */
+  readonly exclude?: string;
 };
 
 const tip = (site: DemoSite, isHere: boolean) =>
@@ -32,8 +41,10 @@ export const DemoSwitcher: FC<DemoSwitcherProps> = ({
   variant = 'rail',
   heading = '他のデモ',
   href,
+  exclude,
 }) => {
   const here = currentDemoId(href);
+  const sites = exclude ? DEMO_SITES.filter((s) => s.id !== exclude) : DEMO_SITES;
   const rail = variant === 'rail';
   const bar = variant === 'bar';
   return (
@@ -60,7 +71,7 @@ export const DemoSwitcher: FC<DemoSwitcherProps> = ({
           {heading}
         </Typography>
       )}
-      {DEMO_SITES.map((site) => {
+      {sites.map((site) => {
         const isHere = site.id === here;
         // ★ `title` は Tooltip が出す。両方に書くと MUI が叱る（素の tooltip と二重になる）
         const common = {

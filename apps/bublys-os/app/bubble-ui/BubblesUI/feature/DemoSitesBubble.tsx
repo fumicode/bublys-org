@@ -23,7 +23,8 @@ export const DemoSitesBubble: FC = () => (
       color: "#dce8ff",
     }}
   >
-    <DemoSwitcher variant="bar" />
+    {/* ★ ここは OS の画面の中なので、自分（bublys OS）は出さない（`exclude` の註） */}
+    <DemoSwitcher variant="bar" exclude="os" />
   </Box>
 );
 
