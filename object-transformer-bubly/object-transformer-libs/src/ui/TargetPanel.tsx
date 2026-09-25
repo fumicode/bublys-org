@@ -3,6 +3,7 @@
 import { FC } from "react";
 import styled from "styled-components";
 import {
+  elementStep,
   pathToString,
   shapeKindLabel,
   type SchemaField,
@@ -131,18 +132,33 @@ const ShapeTree: FC<{
   return (
     <div className="e-tree">
       {shape.fields.map((field) => {
-        const nextPrefix = [...prefix, field.name];
+        /**
+         * ★ **並びは枝として開く。** 中身が項目を持つ並び（`array<object>`）は、
+         *   中の項目それぞれが繋ぎ先になる ── そこへ繋ぐと、ソース 1 件が要素 1 つになる
+         *   （`applyMappingRule`）。開く段の名前は `blocks[]`（`ELEMENT_SUFFIX`）。
+         *   文字列の並びと辞書は中に道が無いので、これまでどおり 1 行で出す。
+         */
+        const opens =
+          field.shape.kind === "object" ||
+          (field.shape.kind === "array" && field.shape.item.kind === "object");
+        const nextPrefix = [
+          ...prefix,
+          field.shape.kind === "array" && opens ? elementStep(field.name) : field.name,
+        ];
         const path = pathToString(nextPrefix);
-        if (field.shape.kind === "object") {
+        if (opens) {
+          const inner = field.shape.kind === "array" ? field.shape.item : field.shape;
           return (
             <div key={path} className="e-branch">
               <div className="e-branch-header">
                 <span className="e-branch-label">{field.label ?? field.name}</span>
-                <span className="e-branch-type">object{field.required ? " *" : ""}</span>
+                <span className="e-branch-type">
+                  {shapeKindLabel(field.shape)}{field.required ? " *" : ""}
+                </span>
               </div>
               <div className="e-branch-body">
                 <ShapeTree
-                  shape={field.shape}
+                  shape={inner}
                   prefix={nextPrefix}
                   mappings={mappings}
                   suggestions={suggestions}

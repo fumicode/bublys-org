@@ -77,6 +77,36 @@ export const shapeKindLabel = (shape: SchemaShape): string => {
   }
 };
 
+/**
+ * **並びの中の一つ**を指す段。`blocks[]` のように並びの名前のうしろに付く。
+ *
+ * > **並びには番号がある。だから中へ道が引ける。**
+ *
+ * 辞書（`record`）との違いはここ ── 辞書の中の一つ一つには名前が無いので、
+ * 指しようがない（`walkLeafFields` の註）。並びは「何番目」で指せるから、
+ * 中の項目まで道が続く。何番目かは書かない：読むときは最初の一つ、
+ * 書くときは新しい一つ、と**する側が決める**（`transform.ts`）。
+ */
+export const ELEMENT_SUFFIX = "[]";
+
+/** 並びの中を指す段を作る（`blocks` → `blocks[]`） */
+export const elementStep = (name: string): string => `${name}${ELEMENT_SUFFIX}`;
+
+/** その段は並びの中を指しているか */
+export const isElementStep = (step: string): boolean => step.endsWith(ELEMENT_SUFFIX);
+
+/** 並びの中を指す段から、並びの名前を取り出す（`blocks[]` → `blocks`） */
+export const arrayNameOf = (step: string): string =>
+  isElementStep(step) ? step.slice(0, -ELEMENT_SUFFIX.length) : step;
+
+/**
+ * その並びの中へ道が引けるか。
+ * **中身が項目を持っているとき（`object`）だけ** ── 文字列の並びは中に項目が無いので、
+ * 引ける道は「並びそのもの」しかない。
+ */
+const opensInto = (shape: SchemaShape): boolean =>
+  shape.kind === "array" && shape.item.kind === "object";
+
 /** リーフ（プリミティブ or enum）かどうか */
 export const isLeafShape = (shape: SchemaShape): boolean =>
   shape.kind === "primitive" || shape.kind === "enum";
@@ -85,9 +115,11 @@ export const isLeafShape = (shape: SchemaShape): boolean =>
  * オブジェクト shape のリーフを path 付きで列挙する。
  * ネストしたオブジェクトは再帰的に平坦化。配列は要素まで潜らず配列自体をリーフ扱いにする。
  *
- * ★ **record も潜らない**（配列と同じ）。中の項目には**名前が無い**ので、
- *   `blocks.<なにか>.content` という道が書けない ── 道が書けないものは繋ぎ先にできないので、
- *   辞書まるごとで 1 つの繋ぎ先として出す。
+ * ★ **中身が項目を持つ並びは、中へ潜る**（`blocks[].content`）。並びには番号があるので
+ *   「その中の一つ」を指せる ── 指せるものは繋ぎ先にできる。
+ * ★ **文字列の並びと record は潜らない。** 前者は中に項目が無く、後者は中の一つ一つに
+ *   **名前が無い**（`blocks.<なにか>.content` が書けない）。道が引けないものは
+ *   まるごとで 1 つの繋ぎ先として出す。
  */
 export function walkLeafFields(
   shape: SchemaShape,
@@ -98,6 +130,9 @@ export function walkLeafFields(
   for (const field of shape.fields) {
     if (field.shape.kind === "object") {
       result.push(...walkLeafFields(field.shape, [...prefix, field.name]));
+    } else if (opensInto(field.shape) && field.shape.kind === "array") {
+      // 並びの中へ（`blocks[].content`）。何番目かは書かない（`ELEMENT_SUFFIX` の註）
+      result.push(...walkLeafFields(field.shape.item, [...prefix, elementStep(field.name)]));
     } else {
       result.push({ path: [...prefix, field.name], field });
     }
@@ -119,8 +154,14 @@ export function getFieldAtPath(
   if (path.length === 0) return undefined;
   if (shape.kind !== "object") return undefined;
   const [head, ...rest] = path;
-  const field = shape.fields.find((f) => f.name === head);
+  const field = shape.fields.find((f) => f.name === arrayNameOf(head));
   if (!field) return undefined;
   if (rest.length === 0) return field;
+  // ★ 並びの中を指す段（`blocks[]`）なら、並びの中身へ続ける
+  if (isElementStep(head)) {
+    return field.shape.kind === "array"
+      ? getFieldAtPath(field.shape.item, rest)
+      : undefined;
+  }
   return getFieldAtPath(field.shape, rest);
 }
