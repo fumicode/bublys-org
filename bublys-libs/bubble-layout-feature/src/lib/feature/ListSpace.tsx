@@ -26,6 +26,7 @@ import {
   fitBoxFor,
   itemWidthFor,
   needsBand,
+  usedFor,
   pickPreset,
   reserveFor,
   stepFor,
@@ -168,14 +169,16 @@ export const ListSpace: FC<ListSpaceProps> = ({
    *   ── そこは模型の側が「動かせない」と判断して、ひとりでに何もしない。
    */
   /**
-   * ★ **見るのは「並びが実際に使う幅」。** 札 1 枚ぶんで見ていたので、格子のように
-   *   横へ列を足していく並べ方で**右の余白がとっくに埋まっているのに「余白がある」と
-   *   判断して**いた ── 口の段が空かず、いちばん上の行が ＋新規 の下に潜り込む（実測）。
-   *   折り返す数は取り分が決まらないと出せないので、まず取り分なしで数えて幅を見る。
+   * ★ **見るのは「並びが実際に使う大きさ」**（`usedFor`）。札 1 枚ぶんで見ていたころは、
+   *   横へ並べる並べ方（格子・横に並べる）で**右上の角がとっくに埋まっているのに
+   *   「余白がある」と判断して**いた ── 口の段が空かず、札が ＋新規 の下に潜り込んだ。
+   *   折り返す数は取り分が決まらないと出せないので、まず取り分なしで数えて大きさを見る
+   *   （取り分は縦にしか効かないので、幅の答えは変わらない）。
    */
-  const colsNoBand = colsFor(preset, box, itemWidthFor(preset, itemW), members.length, itemHeight);
-  const usedW = (colsNoBand ?? 1) * itemWidthFor(preset, itemW);
-  const reserve = needsBand(box, usedW, headBox) ? reserveFor(headBox) : 0;
+  const cardW0 = itemWidthFor(preset, itemW);
+  const colsNoBand = colsFor(preset, box, cardW0, members.length, itemHeight);
+  const used = usedFor(preset, box, { w: cardW0, h: itemHeight }, members.length, colsNoBand);
+  const reserve = needsBand(box, used, headBox) ? reserveFor(headBox) : 0;
   /**
    * その並べ方のときの札の形と、送り幅・折り返す列数。
    *

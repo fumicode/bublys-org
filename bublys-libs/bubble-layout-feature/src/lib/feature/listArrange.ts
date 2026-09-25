@@ -123,12 +123,46 @@ export type Box = { readonly w: number; readonly h: number };
 /**
  * **口のために縦の場所を取るか。**
  *
- * 口は右上の角に置く。札は横に中央ぞろえなので、箱が札より十分広ければ右の余白に収まり、
- * 縦の場所取りは要らない（下までいっぱいに詰められる）。
- * 細くして右の余白が消えたときだけ、口の段を縦に空ける。
+ * > **口は右上の角に置く。並びがその角を使っていなければ、段は要らない。**
+ *
+ * 並びは箱の中央にそろうので、空いているのは右に `(箱 − 並び)/2`、上に `(箱 − 並び)/2`。
+ * **どちらかが口のぶん空いていれば足りる** ── 縦の一覧なら右の余白に、
+ * 横の一覧（背の低い箱）なら上の余白に、口が収まる。
+ *
+ * ★ 見るのは**並びが実際に使う大きさ**（{@link usedFor}）。札 1 枚で見ていたころは、
+ *   横へ列を足す並べ方（格子・横に並べる）で**右の余白がとっくに埋まっているのに
+ *   「余白がある」と判断して**いた ── 口の上に札が乗った（実測で 2 度踏んだ）。
  */
-export const needsBand = (box: Box, itemWidth: number, headBox: Box | null): boolean =>
-  !!headBox && (box.w - itemWidth) / 2 - METRICS.PAD < headBox.w + HEAD_MARGIN;
+export const needsBand = (box: Box, used: Box, headBox: Box | null): boolean => {
+  if (!headBox) return false;
+  const right = (box.w - used.w) / 2 - METRICS.PAD;
+  const top = (box.h - used.h) / 2 - METRICS.PAD;
+  return right < headBox.w + HEAD_MARGIN && top < headBox.h + HEAD_GAP;
+};
+
+/**
+ * **並びが実際に使う大きさ。** 口の段が要るかを決めるのに使う（{@link needsBand}）。
+ *
+ * ★ レンズの掛かった向きは**箱いっぱい**と見る ── 魚眼は端を小さくして全部を箱に収めるので、
+ *   その向きの余白はもう無い。平行な向きは「1 行に並ぶ数 × 札」で数える。
+ */
+export const usedFor = (
+  preset: PresetId,
+  box: Box,
+  card: Box,
+  count: number,
+  cols: number | undefined,
+): Box => {
+  const n = Math.max(1, count);
+  const perRow = cols ?? (preset === 'row' || preset === 'coverflow' ? n : 1);
+  const rows = Math.ceil(n / perRow);
+  const lensX = preset === 'coverflow' || preset === 'coverflowGrid';
+  const lensY = preset === 'coverflowY' || preset === 'coverflowGrid';
+  return {
+    w: lensX ? box.w : perRow * card.w,
+    h: lensY ? box.h : rows * card.h,
+  };
+};
 
 /**
  * 並びの上に空けておく量 ── **口の底＋隙間まで**（枠の余白のぶんは、並びの側でもう空いている）。
@@ -288,7 +322,8 @@ export const pickPreset = (
   itemHeight: number,
   headBox: Box | null,
 ): PresetId => {
-  const band = needsBand(box, itemWidth, headBox);
+  // ★ ここは**どの並べ方にするか**を決める前なので、札 1 枚で見る
+  const band = needsBand(box, { w: itemWidth, h: itemHeight }, headBox);
   /**
    * ★ 取り分は「**口の底まで**」ちょうど 1 回ぶん。
    *
