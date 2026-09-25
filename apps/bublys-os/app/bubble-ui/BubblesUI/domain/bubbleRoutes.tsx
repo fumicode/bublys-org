@@ -1,6 +1,6 @@
 "use client";
 
-import { BubbleRoute, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble } from "@bublys-org/bubbles-ui";
+import { BubbleRoute, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble } from "@bublys-org/bubbles-ui";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
@@ -18,7 +18,7 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
-import { WorldLineOpenerBubble } from "../feature/WorldLineOpenerBubble";
+import { WorldLineHomeBubble } from "../feature/WorldLineHomeBubble";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
@@ -46,19 +46,17 @@ const routes: BubbleRoute[] = [
   // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
   // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
   // も消える挙動になる点だけ要注意。
+  /**
+   * この海の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
+   * 岸に貼ってある 48×48 のときはアイコン、押すと同じ url の泡が開いて、
+   * 広いそちらが世界線を映す。
+   */
   {
     pattern: /^world-lines$/,
     type: "world-lines",
-    Component: WorldLinesBubble,
+    Component: WorldLineHomeBubble,
     // 木を描く canvas なので、開いた先はそれなりの広さが要る
     bubbleOptions: { defaultSize: { width: 520, height: 340 } },
-  },
-
-  // 世界線を開く口（岸の右上に貼ってある小さな泡 ── `BubblesUINext` の定位置）
-  {
-    pattern: /^world-line-opener$/,
-    type: "world-line-opener",
-    Component: WorldLineOpenerBubble,
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
