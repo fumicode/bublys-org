@@ -102,6 +102,18 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
     const measure = () => {
       const width = el.offsetWidth;
       const height = el.offsetHeight;
+      /**
+       * ★ **0 は「大きさが 0」ではなく「いま測れない」。** 覚えない。
+       *
+       *   窓が隠れると（魚眼の端で描く下限を切った・岸へ貼り替えている最中）
+       *   `offsetWidth` は 0 になる。それを覚えると下の `size.width > 0` が偽になり、
+       *   **中の海ごとアンマウントされる** ── 海の世界は入れ子の `BubbleSpace` が
+       *   React の状態で持っているので、そこに開いていたものが**丸ごと消える**。
+       *   戻ってきても種（`initialUrls`）だけの空の海になる（実測で踏んだ：
+       *   グループの窓を魚眼の端へ送って戻すと、中の一覧も札も消えていた）。
+       *   隠れているあいだは**最後に測れた大きさのまま**でいる ── どうせ写っていない。
+       */
+      if (width === 0 || height === 0) return;
       setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
     };
     measure();

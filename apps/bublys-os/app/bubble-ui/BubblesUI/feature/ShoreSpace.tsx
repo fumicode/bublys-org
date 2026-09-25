@@ -545,6 +545,12 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         routes={routes}
         viewport={inner}
         initialUrls={seeds}
+        /**
+         * ★ **海にも名前を付ける。** 岸（`SHORE_MEMORY`）だけ覚えていたので、
+         *   窓を貼り替えると**海に浮いていた泡が丸ごと消えて**いた（上の `SHORE_SEEDED` の
+         *   註で「宿題」と書いてあったもの）。同じ名前で海も覚える。
+         */
+        memoryKey={persistKey}
         autoLens={autoLens}
         openArea={openArea}
         onLens={onLens}

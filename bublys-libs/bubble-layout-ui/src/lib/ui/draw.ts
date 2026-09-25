@@ -93,18 +93,22 @@ export interface FieldDraw {
 }
 
 /**
- * **魚眼の格子（両方の軸が魚眼）での、描く下限。**
+ * **魚眼の掛かった空間での、描く下限。**
  *
  * ★ 魚眼は「端は小さく写るが、**在ることは見える**」が値打ち。ふつうの下限（5px）のままだと
  *   いちばん外がまるごと消えて、チラ見えのはずのものが「無い」になる
- *   （実測：16 枚のうち 4 枚が 12×3px で消えていた）。だからここだけ下限を下げる。
+ *   （実測：格子で 16 枚のうち 4 枚が 12×3px で消えた／岸に貼った一覧では 16 枚のうち
+ *   12 枚が消え、残ったのは 2 枚だけだった）。だからここだけ下限を下げる。
+ * ★ **片方の軸だけの魚眼にも効かせる。** 初めは格子（両方の軸が魚眼）だけにしていたが、
+ *   横・縦の coverflow でも、箱が小さいと端から順に消えて「中身が消えた」に見える。
+ *   消えるかどうかを決めているのはレンズなので、掛かっている軸が 1 つでも同じ扱いにする。
  * ★ 0 にはしない ── 割り切ってしまうと数だけ増えて画面には出ない。
  *   0.4px なら、ブラウザは髪の毛 1 本の線として塗る（消えはしない）。
  */
 export const LENS_DRAW_MIN = 0.4;
 
 /**
- * **魚眼の格子での、中身を描く下限。**
+ * **魚眼の掛かった空間での、中身を描く下限。**
  *
  * ★ 枠が残っても中身が消えると、端は**空の白い箱**になる ── 「小さいけれど同じ札がある」が
  *   読めない。魚眼では端まで中身を描いて、潰れた札のままでいさせる。
@@ -130,10 +134,10 @@ export function markTiny(
     // 下限なしでも「並びの中身が全部消えたら枠も消す」は効かせない（消える泡が無いので同じ）
     return tiny;
   }
-  /** その泡がいる空間での下限 ── 魚眼の格子なら小さくても描く */
+  /** その泡がいる空間での下限 ── 魚眼が掛かっていれば、小さくても描く */
   const minIn = (space: SpaceId): number => {
     const V = viewOfSpace(world, space);
-    return V.x.lens === 'fisheye' && V.y.lens === 'fisheye'
+    return V.x.lens === 'fisheye' || V.y.lens === 'fisheye'
       ? Math.min(drawMin, LENS_DRAW_MIN)
       : drawMin;
   };
@@ -280,11 +284,11 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
    */
   const home = c.layout.spaces.get(p.space);
   /**
-   * ★ **魚眼の格子（両方の軸が魚眼）では、中身も端まで描く**（{@link LENS_CONTENT_MIN}）。
+   * ★ **魚眼の掛かった空間では、中身も端まで描く**（{@link LENS_CONTENT_MIN}）。
    *   端が空の白い箱になると「小さいけれど同じ札がある」が読めない。
    */
   const contentMin =
-    home && home.view.x.lens === 'fisheye' && home.view.y.lens === 'fisheye'
+    home && (home.view.x.lens === 'fisheye' || home.view.y.lens === 'fisheye')
       ? LENS_CONTENT_MIN
       : CONTENT_MIN;
   const held =

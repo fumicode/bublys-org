@@ -96,6 +96,21 @@ const cellsOf = (kids: readonly Bubble[], cols: number) =>
  *   止まらなくなる**（実測で踏んだ：coverflow の刻みを札の幅から決めた瞬間に
  *   Maximum update depth）。それぞれの変化は呼ぶ側が別に見ている。
  */
+/**
+ * **人が決めた並べ方の棚。** url で覚える（泡の id は空間が変わると変わる ── `viewChoice` の註）。
+ * 部品が作り直されても、人が決めたことは残る。
+ */
+const VIEW_CHOICE_MEMORY = new Map<string, { readonly preset?: PresetId; readonly pinned: boolean }>();
+
+/**
+ * **名前を付けた海の棚。** 部品が作り直されても、ここから中身が戻る（`memoryKey` の註）。
+ * 岸の `SHORE_MEMORY`（ShoreSpace）と対になるもの ── あちらは貼ってあるもの、こちらは海。
+ */
+const SEA_MEMORY = new Map<
+  string,
+  { readonly world: BubbleWorld; readonly urls: ReadonlyMap<BubbleId, Opened>; readonly seq: number }
+>();
+
 const sameAxis = (a: AxisView, b: AxisView) =>
   a.dim === b.dim && a.arrange === b.arrange && a.lens === b.lens;
 const sameView = (a: View | null, b: View) =>
@@ -150,6 +165,18 @@ export interface BubbleSpaceProps {
   /** 外で世界を持つなら渡す（Redux など）。渡さなければ自前で持つ */
   readonly world?: BubbleWorld;
   readonly onChange?: (next: BubbleWorld) => void;
+  /**
+   * **この海に名前を付ける。** 付けると、部品が作り直されても**中身がそのまま戻る**。
+   *
+   * ★ 窓（空間を持つ泡）は、岸に貼り替えたり・魚眼の端で隠れたりするたびに
+   *   React の部品としては作り直される。世界（`ownWorld`）と url の対応を
+   *   部品の中だけで持っていると、そこで**海に浮いていた泡が丸ごと消える**
+   *   （実測：グループの窓を岸に貼ると、中の一覧も札も無くなった）。
+   *   岸が `SHORE_MEMORY` で貼ってあるものを覚えているのと同じことを、海にもする。
+   * ★ 名前は url。同じ url の窓が 2 つあると海を分け合うが、いまは url ごとに
+   *   1 つしか開けない作りなので成り立つ（岸の `persistKey` と同じ前提）。
+   */
+  readonly memoryKey?: string;
   readonly className?: string;
   readonly style?: CSSProperties;
   /** 泡の外に置くもの（ツールバーなど） */
@@ -185,18 +212,35 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [openArea],
   );
   const layerRef = useRef<HTMLDivElement | null>(null);
-  const seq = useRef(0);
+  /** 名前を付けた海の中身を、部品の一生より長く置いておく棚（`memoryKey` の註） */
+  const memoryKey = props.memoryKey;
+  const remembered = memoryKey ? SEA_MEMORY.get(memoryKey) : undefined;
+  /** 新しい泡の番号。**覚えていた続きから**（同じ番号を配ると、戻した泡と衝突する） */
+  const seq = useRef(remembered?.seq ?? 0);
   /** レンズの向きが一度でも選ばれたか。選ばれたら `openAt` はレンズに触らない */
   const lensChosen = useRef(false);
   /**
    * ★ **一覧の空間**（`setChildren` で顔ぶれを決めている泡）。
    *   一覧の中の泡から開いたら、**一覧の隣**に開く（中に生やさない）ために覚えておく。
+   *   装い（`chrome`）もここを見る ── 一覧の中の札は静かにしている。
+   *
+   * ★ **覚え書き（ref）ではなく状態で持つ。** ref だと足しても描き直しが起きないので、
+   *   装いの表（`chrome` は `world`・`urls` が変わったときだけ作り直す）が**古いまま**残る。
+   *   世界が最初から揃っているとき（海の記憶からの復元・岸への貼り替え）は世界が変わらないので、
+   *   札が「一覧の中」と見なされず `plain` を着たままになり、**札のあいだに装いのぶん
+   *   34px の隙間が空く**（実測で踏んだ）。
    */
-  const listHosts = useRef<Set<BubbleId>>(new Set());
+  const [listHosts, setListHosts] = useState<ReadonlySet<BubbleId>>(() => new Set());
+  /** 一覧の空間として覚える（もう覚えていれば何もしない ── 描き直しの引き金にしない） */
+  const noteListHost = useCallback((id: BubbleId) => {
+    setListHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
-  const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(new Map());
-  const [ownWorld, setOwnWorld] = useState<BubbleWorld>(() => emptyWorld(presetView(props.rootPreset ?? 'free')));
+  const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(() => remembered?.urls ?? new Map());
+  const [ownWorld, setOwnWorld] = useState<BubbleWorld>(
+    () => remembered?.world ?? emptyWorld(presetView(props.rootPreset ?? 'free')),
+  );
   const [selectedId, setSelectedId] = useState<BubbleId | null>(null);
 
   const world = props.world ?? ownWorld;
@@ -211,6 +255,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     (next: BubbleWorld) => { if (onChange) onChange(next); else setOwnWorld(next); },
     [onChange],
   );
+
+  /**
+   * 名前が付いているなら、変わるたび棚へ写す（作り直されたら、そこから始まる）。
+   * ★ 番号（`seq`）も一緒に置く ── 戻したあと同じ番号を配ると、泡の id が衝突する。
+   */
+  useEffect(() => {
+    if (memoryKey) SEA_MEMORY.set(memoryKey, { world: ownWorld, urls, seq: seq.current });
+  }, [memoryKey, ownWorld, urls]);
 
   /**
    * **このフレームの装い** ── どの泡が、どの枠を着ているか。
@@ -239,7 +291,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   そのぶん箱は装いの差だけ伸びるので、**並びの後ろの札はそのぶん送られる**
        *   ── 中身の大きさは 1px も変わらない（`chrome.ts`）。
        */
-      const inList = b.space !== 'root' && listHosts.current.has(b.space);
+      /**
+       * ★ **root を除外しない。** 岸に貼られた一覧は**自分の小さな海**を持ち、そこでは
+       *   札の親が `'root'` になる（`ListSpace` の `ShoreMembers` が `setChildren('root', …)`）。
+       *   除外していたので岸の札だけ「一覧の中」と見なされず、装いが `plain` になって
+       *   札のあいだに 34px（上 27 ＋ 下 7）の隙間が空いていた（実測で踏んだ）。
+       *   外の海の root は `setChildren` に渡らないので `listHosts` には入らない ── 見るのはこれ 1 つでよい。
+       */
+      const inList = listHosts.has(b.space);
       if (!inList || b.id === selectedId) { m.set(b.id, 'plain'); continue; }
       /**
        * ★ 詰める並びのときだけ、札と札のあいだを限界まで細くする（`packed`）。
@@ -249,7 +308,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       m.set(b.id, world.ownViewOf(b.space)?.y.arrange !== 'as-is' ? 'packed' : 'quiet');
     }
     return m;
-  }, [world, urls, routes, selectedId]);
+  }, [world, urls, routes, selectedId, listHosts]);
 
   /**
    * **これ以上いけない**の跳ね返り（オーバースクロール）。
@@ -322,7 +381,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        */
       const from = openerId ?? null;
       const fb = from ? world.bubble(from) : null;
-      const opener = fb && fb.space !== 'root' && listHosts.current.has(fb.space) ? fb.space : from;
+      const opener = fb && listHosts.has(fb.space) ? fb.space : from;
       const r = openAt({
         world, viewport, openerId: opener, newId: id,
         title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules,
@@ -415,63 +474,58 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   /**
-   * **人が選んだ並べ方**（一覧の口から）。一覧は箱と中身から自分で並べ方を決めるが、
-   * 人が選んだらそちらが勝つ ── **決めたのは人のほう**なので。
+   * **人が選んだ並べ方**（一覧の口から）と、**箱と並べ方が追いかけ合うか**。
    *
-   * ★ いまは**選んだら戻らない**（仮）。自動に戻す道（箱を変えたら、など）はまだ決めていない。
-   */
-  const [chosenView, setChosenView] = useState<ReadonlyMap<BubbleId, PresetId>>(() => new Map());
-  /**
-   * ★ **覚えるだけ。世界には書かない。**
-   *   書くのは一覧の `setChildren` 1 か所 ── そこで並べ方と一緒に
-   *   **隙間・送り幅・折り返す列数・札の幅**がまとめて当たる。
+   * ```
+   * 追いかけ合う（既定）  箱を変えたら → その箱に合う並べ方へ ／ 並べ方を選んだら → その大きさへ
+   * 留める                箱をどう変えても並べ方は変わらない
+   * ```
+   *
+   * ★ **覚えるのは url。泡の id ではない。** 同じ一覧でも、海から岸へ貼り替えれば
+   *   別の空間で作り直されて id が変わる ── id で覚えていると、**留めたはずの並べ方が
+   *   岸化した途端にほどける**（実測で踏んだ）。url なら、海でも岸でも窓の中でも
+   *   同じ答えが付いてくる。
+   * ★ 部品の一生より長く持つ（`VIEW_CHOICE_MEMORY`）── 作り直されるのは部品であって、
+   *   人が決めたことではない。
+   * ★ **覚えるだけ。世界には書かない。** 書くのは一覧の `setChildren` 1 か所
+   *   ── そこで並べ方と一緒に**隙間・送り幅・折り返す列数・札の幅**がまとめて当たる。
    *   ここで `withPreset` を直に書いていたころは、そのあと `setChildren` が
    *   「もう当たっている」と判断して**隙間が既定の 14 に戻ったまま**だった（実測で踏んだ）。
    */
-  const chooseView = useCallback((hostId: BubbleId, preset: PresetId | null) => {
-    setChosenView((prev) => {
-      if (preset === null ? !prev.has(hostId) : prev.get(hostId) === preset) return prev;
-      const next = new Map(prev);
-      if (preset === null) next.delete(hostId);
-      else next.set(hostId, preset);
-      return next;
-    });
-  }, []);
-  /**
-   * ★ 選んだ答えは**一覧まで届ける**。折り返す列数も札の幅も送り幅も並べ方から出るので、
-   *   口の側だけで持っていると「格子を選んでも列数が渡らない」（実測で踏んだ）。
-   */
-  /**
-   * **箱と並べ方が追いかけ合うか**（既定：追いかけ合う）。留めた一覧をここに入れる。
-   *
-   * ```
-   * 追いかけ合う  箱を変えたら → その箱に合う並べ方へ ／ 並べ方を選んだら → その大きさへ
-   * 留める        箱をどう変えても並べ方は変わらない
-   * ```
-   * ★ どちらでも**箱は人が自由に変えられる**（`ViewChoice` の註）。
-   */
-  const [pinned, setPinned] = useState<ReadonlySet<BubbleId>>(() => new Set());
-  const toggleFollows = useCallback((hostId: BubbleId) => {
-    setPinned((prev) => {
-      const next = new Set(prev);
-      if (next.delete(hostId)) {
-        // ★ 追いかけ合うほうへ戻したら、留めていた並べ方は**解く** ── でないと
-        //   「箱を変えたら並べ方が付いてくる」が、次に箱を変えるまで効かない
-        chooseView(hostId, null);
-      } else {
-        next.add(hostId);
-      }
-      return next;
-    });
-  }, [chooseView]);
+  const [viewTick, setViewTick] = useState(0);
+  /** 覚える名前 ＝ その泡の url（まだ url が分からなければ id で代用） */
+  const viewKey = useCallback((hostId: BubbleId) => urls.get(hostId)?.url ?? hostId, [urls]);
+  const chooseView = useCallback(
+    (hostId: BubbleId, preset: PresetId | null) => {
+      const key = viewKey(hostId);
+      const now = VIEW_CHOICE_MEMORY.get(key);
+      if ((now?.preset ?? null) === preset) return;
+      VIEW_CHOICE_MEMORY.set(key, { pinned: !!now?.pinned, preset: preset ?? undefined });
+      setViewTick((t) => t + 1);
+    },
+    [viewKey],
+  );
+  const toggleFollows = useCallback(
+    (hostId: BubbleId) => {
+      const key = viewKey(hostId);
+      const now = VIEW_CHOICE_MEMORY.get(key);
+      const pinned = !now?.pinned;
+      // ★ 追いかけ合うほうへ戻したら、留めていた並べ方は**解く** ── でないと
+      //   「箱を変えたら並べ方が付いてくる」が、次に箱を変えるまで効かない
+      VIEW_CHOICE_MEMORY.set(key, { pinned, preset: pinned ? now?.preset : undefined });
+      setViewTick((t) => t + 1);
+    },
+    [viewKey],
+  );
   const viewChoice = useMemo<ViewChoice>(
     () => ({
-      chosen: (hostId) => chosenView.get(hostId),
+      chosen: (hostId) => VIEW_CHOICE_MEMORY.get(viewKey(hostId))?.preset,
       choose: chooseView,
-      follows: (hostId) => !pinned.has(hostId),
+      follows: (hostId) => !VIEW_CHOICE_MEMORY.get(viewKey(hostId))?.pinned,
       toggleFollows,
     }),
-    [chosenView, chooseView, pinned, toggleFollows],
+    // viewTick ── 棚（モジュールの Map）を書き換えたことを、見ている側へ知らせる
+    [viewKey, chooseView, toggleFollows, viewTick],
   );
 
   /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */
@@ -496,7 +550,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
       const { preset, itemWidth, reserve, step, cols, grow } = how;
-      listHosts.current.add(hostId);
+      noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
@@ -607,7 +661,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls(m);
       setWorld(w);
     },
-    [world, urls, routes, setWorld],
+    [world, urls, routes, setWorld, noteListHost],
   );
 
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
@@ -760,7 +814,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   描き直さなくて済む。
        */
       const space = world.bubble(id)?.space;
-      const inList = !!space && listHosts.current.has(space);
+      const inList = !!space && listHosts.has(space);
       /**
        * ★ その一覧が**縦に詰めている**か（奥行きに重ねるのではなく）。
        *   詰める並びのときだけ札の上下の余白を薄くする ── 透視は 1px も動かさない。
@@ -796,7 +850,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
               7 つ並べる場所が無い ── まずは外に出して形を見る。
           */}
-          {listHosts.current.has(id) && (
+          {listHosts.has(id) && (
             <div className="bl-view" onPointerDown={(e) => e.stopPropagation()}>
               {VIEW_CHOICES.map((v) => (
                 <button
@@ -827,16 +881,16 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               <button
                 className="bl-view-pick bl-view-apart"
                 title={
-                  pinned.has(id)
+                  !viewChoice.follows(id)
                     ? '並べ方を留める ── 箱を変えても切り替わらない（押すと 追いかけ合う）'
                     : '箱と並べ方が追いかけ合う ── 箱を変えたら並べ方が、並べ方を選んだら大きさが変わる（押すと 留める）'
                 }
-                aria-pressed={!pinned.has(id)}
+                aria-pressed={viewChoice.follows(id)}
                 onPointerDown={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={() => toggleFollows(id)}
               >
-                {pinned.has(id) ? <PinIcon /> : <FollowIcon />}
+                {viewChoice.follows(id) ? <FollowIcon /> : <PinIcon />}
               </button>
             </div>
           )}
@@ -869,7 +923,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, chooseView, pinned, toggleFollows],
+    [routes, urls, closeBubble, world, chrome, headerTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

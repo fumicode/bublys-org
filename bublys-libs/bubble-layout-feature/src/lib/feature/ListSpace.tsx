@@ -188,8 +188,12 @@ export const ListSpace: FC<ListSpaceProps> = ({
   const cardRoom = preset === 'stackDepth' ? Math.max(0, room - LIST_DEPTH_INSET * 2) : room;
   const cardWidth =
     typeof itemWidth === 'function' ? itemWidth(cardRoom) : itemWidthFor(preset, itemWidth);
-  const stepX = stepFor(preset, { w: cardWidth, h: itemHeight })?.x;
-  const stepY = stepFor(preset, { w: cardWidth, h: itemHeight })?.y;
+  /**
+   * ★ 刻みは**箱と枚数も見る** ── 箱に対して刻みが大きいと、外側は数学的に 0 になって
+   *   下限をいくら下げても出てこない（`fitStep` の註）。
+   */
+  const stepX = stepFor(preset, { w: cardWidth, h: itemHeight }, box, members.length)?.x;
+  const stepY = stepFor(preset, { w: cardWidth, h: itemHeight }, box, members.length)?.y;
   /**
    * ★ 折り返す数を「箱の形」から出すときは、**口のぶん（`reserve`）を引いた形**で見る
    *   ── 引かないと縦長に見えて、列が足りなくなる（実測：正方形の箱なのに 5 列が 3 列になった）。

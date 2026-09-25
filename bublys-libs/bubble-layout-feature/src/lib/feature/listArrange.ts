@@ -94,12 +94,16 @@ export const LENS_GRID_SHARE = 0.8;
 /**
  * 折り返す魚眼の**素の隙間**（刻み ＝ 札 ＋ これ）。
  *
- * ★ **隙間も一緒に歪む。** 並べ方に直した魚眼は「大きさ ＋ 隙間」の 2 つで歪みを言うので、
- *   隙間を 0 にすると（＝刻みを札そのものにすると）札が地続きの 1 枚に見えて、
- *   どこまでが 1 枚か読めない。素の隙間を置いておけば、中心では素のまま、
- *   端へ行くほどレンズが詰めてくれる ── 小さく写っているもの同士ほどマージンが小さい。
- * ★ 詰める一覧の隙間（{@link LIST_GAP} ＝ 0）とは別 ── あちらは札が自分の余白で離れている。
- *   こちらは端で札の余白ごと潰れるので、並べ方の側が持つ。
+ * > **一覧の隙間は 0（{@link LIST_GAP}）。例外は折り返す魚眼だけ。**
+ *
+ * ★ 一覧を 0 にしたのは「**札が自分で余白を持っている**」から ── 並べ方の側がさらに
+ *   隙間を足すと、札と札のあいだが二重に開く。その判断はここでも生きている。
+ * ★ 折り返す魚眼だけ例外なのは、**端では札の余白ごと潰れる**から。
+ *   並べ方に直した魚眼は「大きさ ＋ 隙間」の 2 つで歪みを言うので、隙間を 0 にすると
+ *   （＝刻みを札そのものにすると）札が地続きの 1 枚に見えて、どこまでが 1 枚か読めない。
+ *   素の隙間を並べ方の側が持っておけば、中心では素のまま・端へ行くほどレンズが詰める
+ *   ── 小さく写っているもの同士ほどマージンが小さい、が出る。
+ * ★ 数は模型の既定（{@link METRICS.GAP} ＝ 14）と同じ。ここだけ既定に戻す、という意味。
  */
 export const LENS_GRID_GAP = METRICS.GAP;
 export const LENS_GRID_BOX = 3 / Math.atanh(LENS_GRID_SHARE);
@@ -357,11 +361,33 @@ export const itemWidthFor = (preset: PresetId, itemWidth: number): number => {
 export const stepFor = (
   preset: PresetId,
   card: { readonly w: number; readonly h: number },
+  box?: Box | null,
+  count = 0,
 ): { readonly x?: number; readonly y?: number } | undefined => {
-  const x = Math.round(card.w * COVERFLOW_STEP_RATIO);
-  const y = Math.round(card.h * COVERFLOW_STEP_RATIO);
+  const x = fitStep(Math.round(card.w * COVERFLOW_STEP_RATIO), box?.w, count);
+  const y = fitStep(Math.round(card.h * COVERFLOW_STEP_RATIO), box?.h, count);
   if (preset === 'coverflow') return { x };
   if (preset === 'coverflowY') return { y };
   if (preset === 'coverflowGrid') return { x: card.w + LENS_GRID_GAP, y: card.h + LENS_GRID_GAP };
   return undefined;
+};
+
+/**
+ * **端の札まで写る刻み**。画（tanh）は `|u| / H` で効くので、刻みが箱に対して大きいと
+ * 外側は**数学的に 0** になる ── 描く下限をいくら下げても出てこない。
+ *
+ *   実測：岸に貼った一覧（箱 279 ＝ H 140）で刻み 184 のまま 16 枚並べると、
+ *   端の札は中心から 8 刻み ＝ H の 10.5 倍。写る大きさは 0.0000001px で、16 枚中 6 枚しか出なかった。
+ *
+ * > **いちばん外の札が、箱の端（`LENS_EDGE`）に収まる刻みで頭打ちにする。**
+ *
+ * `LENS_EDGE = 2.5` は「端の札が札の 2.7%（札 243 なら 6.5px）で写る」所
+ * ── 小さいが、在ることは見える。箱が広ければ頭打ちは効かず、今までどおりの刻みになる。
+ */
+export const LENS_EDGE = 2.5;
+const fitStep = (want: number, boxSide: number | undefined, count: number): number => {
+  const n = Math.max(1, count);
+  if (!boxSide || n < 2) return want;
+  const half = Math.max(1, (boxSide - METRICS.PAD * 2) / 2);
+  return Math.max(1, Math.min(want, Math.round((half * LENS_EDGE) / ((n - 1) / 2))));
 };
