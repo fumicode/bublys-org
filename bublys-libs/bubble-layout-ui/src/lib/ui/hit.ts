@@ -44,28 +44,64 @@ export const onHandle = (
   my >= p.y + p.h - HANDLE_IN && my <= p.y + p.h + out;
 
 /**
- * 「中身の箱」に入っているか（枠は外側の空間のもの）。中身の箱を突いたら、その泡は**掴めない**
- * （触ったことにはなる ── 選ぶのは中身でもできる）。
+ * その泡の**装いが四辺に取るぶん**（`CHROME` ＋ 並べたあとに出た装い）。
+ * これが「中身の箱」の縁 ── 外側は枠、内側は中身。
+ */
+export interface Inset {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+/** 渡されなかったときの既定（模型の帯 24 だけ。ラボと同じ） */
+const BAR: Inset = { left: 0, top: METRICS.HEADER, right: 0, bottom: 0 };
+
+/**
+ * 「中身の箱」に入っているか（**その外側は枠** ＝ 掴める所）。中身の箱を突いたら
+ * その泡は**掴めない**（触ったことにはなる ── 選ぶのは中身でもできる）。
  * 見えない親は縁でしか当たらないので、いつも「掴む」。
  *
  * ★ hasBody は「空間を持つ泡」だけでなく「**本文を持つ泡**」にも同じ扱いをするための口。
  *   本文が本物の UI（ボタン・選択欄）のとき、そこを突いて泡が動いたら中身が触れない。
  *
- * ★ **枠の高さは、その泡が着ている装いから取る**（`headOf`）── 固定の 24 ではない。
+ * ★ **枠の広さは、その泡が着ている装いから取る**（`insetOf`）── 固定の数ではない。
  *   固定にしていたころは、**装いを出していない一覧の札で枠が中身を食っていた**
- *   （実測：箱 86 の札で上 24px が枠 ＝ 28%。名前の行 13〜33 の上半分と、盤の上 13px がそこ）。
- *   逆に大きな泡では枠が 24px しかなく、そこを外すと掴めも選べもしなかった。
+ *   （実測：箱 86 の札で上 24px が枠 ＝ 28%）。
+ *
+ * ★ **2026-09-26：四辺とも装いに従うようにした。**
+ *   それまでは上だけ装いで、左右と下は**自分で決めた 12px**を内側へ取っていた。
+ *   模型は装いの数（`CHROME`）を持っているのに、別の数を作っていたのが誤り:
+ *
+ *     普通の泡（`plain` 7/27/7/7）  7〜12px の帯が**中身の上に食い込み**、
+ *                                   しかもカーソルは中身のまま（掴めると見えない）
+ *     窓（`bar` 上 24 だけ）        帯より下はまるごと**中の海**なのに、四周 12px を
+ *                                   取り上げていた（実測：窓の縁から 6px を掴むと
+ *                                   中の海ではなく窓が動いた）
+ *
+ *   装いに従えば「**枠が見えている所 ＝ 掴める所**」になり、カーソルも合う
+ *   （そこに居るのは `.bub` 自身なので `cursor:grab` がそのまま出る）。
+ *   「中身が無くなるほど取らない」ための手当て（短辺の 1/4）も要らなくなった
+ *   ── 箱 ＝ 中身 ＋ 装い なので、中身は必ず残る。
  */
 export const inContent = (
   p: Placement,
+  mx: number,
   my: number,
   hasBody: (id: BubbleId) => boolean,
-  /** その泡の枠が上に取るぶん（装いの top）。省けば模型の既定（帯 24） */
-  headOf?: (id: BubbleId) => number,
-): boolean =>
-  !p.b.state.implicit &&
-  hasBody(p.id) &&
-  my >= p.y + (headOf ? headOf(p.id) : METRICS.HEADER) * p.scale;
+  /** その泡の装いが四辺に取るぶん。省けば模型の既定（帯 24 だけ） */
+  insetOf?: (id: BubbleId) => Inset,
+): boolean => {
+  if (p.b.state.implicit || !hasBody(p.id)) return false;
+  const c = insetOf ? insetOf(p.id) : BAR;
+  const s = p.scale;
+  return (
+    my >= p.y + c.top * s &&
+    my <= p.y + p.h - c.bottom * s &&
+    mx >= p.x + c.left * s &&
+    mx <= p.x + p.w - c.right * s
+  );
+};
 
 export interface PickInput {
   readonly layout: Layout;
@@ -135,10 +171,10 @@ export function spaceAt(
   mx: number,
   my: number,
   hasBody: (id: BubbleId) => boolean,
-  headOf?: (id: BubbleId) => number,
+  insetOf?: (id: BubbleId) => Inset,
 ): SpaceId {
   const p = pickAt(input, mx, my).bub;
-  return !p ? 'root' : inContent(p, my, hasBody, headOf) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, mx, my, hasBody, insetOf) ? p.id : p.space;
 }
 
 /**
@@ -174,8 +210,8 @@ export function spaceModelAt(
   mx: number,
   my: number,
   hasBody: (id: BubbleId) => boolean,
-  headOf?: (id: BubbleId) => number,
+  insetOf?: (id: BubbleId) => Inset,
 ): SpaceId {
   const p = hitModelAt(layout, tiny, skip, mx, my);
-  return !p ? 'root' : inContent(p, my, hasBody, headOf) ? p.id : p.space;
+  return !p ? 'root' : inContent(p, mx, my, hasBody, insetOf) ? p.id : p.space;
 }

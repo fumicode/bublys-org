@@ -351,11 +351,21 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     [world, hasContent],
   );
   /**
-   * その泡の**枠が上に取るぶん**（装いの top）。当たり判定はここで中身と枠を分ける。
-   * 固定の 24 ではなく**着ている装い**から取る ── 装いを出していない札では 1px しか取らない。
+   * その泡の**装いが四辺に取るぶん**。当たり判定はここで中身と枠を分ける
+   * ── **枠が見えている所が、掴める所**（`hit.ts` の `inContent`）。
+   * 固定の数ではなく**着ている装い**から取る（窓は帯だけ、一覧の札は四辺 7px、など）。
    */
-  const headOf = useCallback(
-    (id: BubbleId) => chromeOf(world, id, chrome).top + (o.dressed?.get(id)?.top ?? 0),
+  const insetOf = useCallback(
+    (id: BubbleId) => {
+      const c = chromeOf(world, id, chrome);
+      const d = o.dressed?.get(id);
+      return {
+        left: c.left,
+        top: c.top + (d?.top ?? 0),
+        right: c.right,
+        bottom: c.bottom,
+      };
+    },
     [world, chrome, o.dressed],
   );
 
@@ -422,7 +432,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      * ★ 本文（空間ではない中身）を押したら、**何も始めない**。それは中身のもの。
      *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点をドラッグする」（ラボと同じ）。
      */
-    if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody, headOf)) {
+    if (p0 && !world.isHost(p0.id) && inContent(p0, mx, my, hasBody, insetOf)) {
       /**
        * ★ **触ったら選ぶ。掴みはしない。**
        *   選ぶのは「いま相手にしている泡」を決めることなので、中身を触っても起きてよい。
@@ -438,7 +448,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       show();
       return;
     }
-    if (p0 && !inContent(p0, my, hasBody, headOf)) {
+    if (p0 && !inContent(p0, mx, my, hasBody, insetOf)) {
       capture();
       setSelectedId(p0.id);
       // ★ 押した時点では何も書かない。焦点が寄るのは「ドラッグせずに離した」ときだけ
@@ -472,7 +482,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       };
     }
     show();
-  }, [world, layout, rules, pt, pickInput, hasBody, headOf, setSelectedId, layerRef, startPinch]);
+  }, [world, layout, rules, pt, pickInput, hasBody, insetOf, setSelectedId, layerRef, startPinch]);
 
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (pointers.current.has(e.pointerId)) {
@@ -593,7 +603,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const shown = withLift(after, held);
       const rect = shown.byId.get(d.id);
       const screen: ScreenRects = new Map(shown.order.map((q) => [q.id, { x: q.x, y: q.y, w: q.w, h: q.h }]));
-      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => chromeOf(next, id, chrome).top + (o.dressed?.get(id)?.top ?? 0));
+      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => { const c = chromeOf(next, id, chrome); return { left: c.left, top: c.top + (o.dressed?.get(id)?.top ?? 0), right: c.right, bottom: c.bottom }; });
       const t = rect
         ? dropTargetAt(next, {
             layout: after, screen, pointer: { x: mx, y: my }, hitSpace,
@@ -709,7 +719,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
   wheelTurnRef.current = (g) => {
     const { mx, my } = g;
     // ★ 受け手は wheelZ と**同じ出し方**で出す（札の上で回したら、その札がいる空間まで外へ通す）
-    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody, headOf));
+    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody, insetOf));
     /**
      * ★ **収まらない並びは、まずスクロールに使う。**
      *   縦に並べる・横に並べるで中身が箱に入りきらないとき、送る道がここしかない

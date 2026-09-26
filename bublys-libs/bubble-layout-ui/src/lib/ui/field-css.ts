@@ -96,7 +96,7 @@ export const FIELD_CSS = `
    四角は 8px、当たりは 16px */
 .bl-hnd{position:absolute;left:0;top:0;width:16px;height:16px;display:none;cursor:nwse-resize;transform-origin:0 0}
 .bl-hnd::after{content:"";position:absolute;left:2px;top:2px;width:8px;height:8px;background:#6ee7ff;border-radius:2px}
-/* ★ 指で掴めるように、当たりだけ外へ広げる（12 ＋ 20 ＝ 32。hit.ts の HANDLE_COARSE_OUT と同じ数）。
+/* ★ 指で掴めるように、大きさの角の当たりだけ外へ広げる（12 ＋ 20 ＝ 32。hit.ts の HANDLE_COARSE_OUT と同じ数）。
    見える四角（::after の 8px）は 2,2 のままなので、**絵は 1px も動かない**。
    any-pointer なので、指もマウスも使える機械では広い箱が出るが、
    マウスのときは当たり判定（onHandle）が今までどおり +3px で切る ＝ DOM は候補を絞るだけ */
