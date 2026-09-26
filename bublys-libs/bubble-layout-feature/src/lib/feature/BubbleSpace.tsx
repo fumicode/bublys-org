@@ -18,6 +18,7 @@ import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
 import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, SeaSnapshot, SettleWhy, ViewChoice } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
+import { gapFor } from './listArrange.js';
 import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
@@ -165,7 +166,6 @@ const OVERSCROLL_MS = 260;
  *   詰める隙間をどう変えても位置は1px も動かない。
  */
 export { LIST_GAP } from './listArrange.js';
-import { gapFor } from './listArrange.js';
 
 /**
  * **順序 → 行と列。** 何列で折り返すかだけ決めれば、あとは順に詰めるだけ。
@@ -674,7 +674,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const heir = row
         ? world.kidsOf(row.id).filter((b) => b.id !== id).sort((p, q) => p.state.order - q.state.order)[0]?.id
         : undefined;
-      let next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
+      const next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
       // 面で開いているなら：焦点の面が空になったら、後ろの面が上がってくる（旧の「空のレイヤーは詰まる」）
       setWorld(next);
       setUrls((m) => { const n = new Map(m); n.delete(id); return n; });
