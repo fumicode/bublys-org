@@ -1,15 +1,25 @@
 "use client";
 
+/**
+ * レイヤー時代の海の画面。
+ *
+ * ★ **住所を `/bubble-ui/` の下に置く**ため、`page.tsx` ではなく optional catch-all
+ *   （`[[...slug]]`）にしてある。この海は記録のたびに現在地を住所へ書くが、
+ *   `/universe@<節>` はいまの海が受け持つ住所なので、**書いた先で再読み込みすると
+ *   いまの海が開いて**しまっていた。`/bubble-ui/layers@<節>` ならここに戻ってくる。
+ *   `[[...slug]]` は `/bubble-ui` そのものにも当たるので、入口の url は変わらない。
+ */
+
 import { useEffect } from 'react';
 import { FocusedObjectProvider } from "@bublys-org/bubbles-ui";
-import { BubblesUI } from "./BubblesUI/feature/BubblesUI";
+import { BubblesUI } from "../BubblesUI/feature/BubblesUI";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { LayoutRoutesProvider } from "@bublys-org/bubble-layout-feature";
 import { bridgeRoutes } from "@bublys-org/bubble-space-shell";
-import { bubbleRoutes } from "./BubblesUI/registration/bubbleRoutes";
-import { registerShellTypes } from "../counter/registerShellTypes";
-import { APP_DOMAIN_REGISTRY } from "../appDomainRegistry";
+import { bubbleRoutes } from "../BubblesUI/registration/bubbleRoutes";
+import { registerShellTypes } from "../../counter/registerShellTypes";
+import { APP_DOMAIN_REGISTRY } from "../../appDomainRegistry";
 
 /**
  * **いまの中身は、ルートの一覧を配られていないと止まらなくなる。**
