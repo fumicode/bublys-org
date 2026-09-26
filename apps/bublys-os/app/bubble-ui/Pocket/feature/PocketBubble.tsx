@@ -15,7 +15,7 @@
  */
 import { DragEvent as ReactDragEvent, FC, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BubblesContext, PocketView, hasDragPayload, parseDragPayload } from "@bublys-org/bubbles-ui";
+import { BubblesContext, PocketView, hasDragPayload, parseDragPayload, useBubbleBox } from "@bublys-org/bubbles-ui";
 import type { Bubble, DragDataType } from "@bublys-org/bubbles-ui";
 import {
   addPocketItem,
@@ -44,25 +44,14 @@ export const PocketBubble: FC<{ bubble: Bubble }> = ({ bubble }) => {
   const items = useAppSelector(selectPocketItems);
   const { openBubble } = useContext(BubblesContext);
 
+  /**
+   * 自分の面（受け皿であり、浮かぶ所の起点でもある）。**大きさを測るのには使わない**
+   * ── 描ける大きさは海が測って配る（`BubbleBoxContext`）。
+   */
   const ref = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // 大きさは**レイアウトの px**（泡に掛かる倍率の影響を受けない側）で見る
-    const measure = () => {
-      const width = el.offsetWidth;
-      const height = el.offsetHeight;
-      setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const compact = size.width > 0 && (size.width < COMPACT.width || size.height < COMPACT.height);
+  /** 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける */
+  const box = useBubbleBox();
+  const compact = !!box && (box.width < COMPACT.width || box.height < COMPACT.height);
 
   /** 仕舞う（受け入れるかどうかは型で決まる） */
   const take = useCallback(

@@ -11,10 +11,10 @@
  * ★ 開く先は**同じ url**（`world-lines`）── つまり出てくるのは自分の複製で、
  *   そちらは広いので世界線を映す。姿の違いは大きさだけで、別の作りは要らない。
  */
-import { FC, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useContext, useMemo } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubblesContext, useBubbleBox } from "@bublys-org/bubbles-ui";
 import { WorldLineScopeView, useScopeNodeSummaries, moveToSiblingBranch } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { SEA_ARRANGEMENT_ID, SEA_ARRANGEMENT_TYPE, type SeaArrangement } from "@bublys-org/bubble-space-shell";
@@ -44,30 +44,15 @@ export const WorldLineHomeBubble: FC = () => {
   /** 開いた先が「どこから出たか」を辿れるように、自分を親として渡す */
   const me = useCurrentBubble() ?? "root";
 
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // 大きさは**レイアウトの px**で見る（泡に掛かる倍率の影響を受けない側。ポケットと同じ）
-    const measure = () => {
-      const width = el.offsetWidth;
-      const height = el.offsetHeight;
-      setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  /** 測る前（0）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける */
-  const compact =
-    size.width > 0 && (size.width < COMPACT.width || size.height < COMPACT.height);
+  /**
+   * 描ける大きさは**海が測って配る**（`BubbleBoxContext`）── 自分では測らない。
+   * 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける。
+   */
+  const box = useBubbleBox();
+  const compact = !!box && (box.width < COMPACT.width || box.height < COMPACT.height);
 
   return (
-    <div ref={ref} style={{ width: "100%", height: "100%" }}>
+    <div style={{ width: "100%", height: "100%" }}>
       {compact ? (
         <Tooltip title="この空間の世界線" placement="left">
           <IconButton
