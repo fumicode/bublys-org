@@ -36,6 +36,11 @@ const countBubbles = (v: unknown) => `${(v as SeaArrangement).state.snapshot.url
  *   縦: 余白 28×2 ＋ 分岐 2 本ぶん 40（`ROW_DY`）  ＝ 96  → 余裕を見て 120
  *
  * （数は `WorldLinesCanvasView` の COL_DX / ROW_DY / MARGIN から）
+ *
+ * ★ **畳むのは、縦も横も足りないときだけ**（ランチャーと同じ「かつ」）。片方に余地が
+ *   あるなら中身を出して、はみ出すぶんは転がして見る ── 箱が短いことと、中身が多い
+ *   ことは別の話で、短い箱に合わせて姿を落としても中身の数は減らない。
+ *   （木は箱に合わせて描かれるので、細長ければ細長いなりに映る）
  */
 const COMPACT = { width: 170, height: 120 };
 
@@ -49,7 +54,7 @@ export const WorldLineHomeBubble: FC = () => {
    * 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける。
    */
   const box = useBubbleBox();
-  const compact = !!box && (box.width < COMPACT.width || box.height < COMPACT.height);
+  const compact = !!box && box.width < COMPACT.width && box.height < COMPACT.height;
 
   return (
     <div style={{ width: "100%", height: "100%" }}>

@@ -32,6 +32,11 @@ import {
  *   縦: 余白 24 ＋ 題名 28 ＋ 隙間 12 ＋ 1 行 44          ＝ おおよそ 110
  *
  * 前は 200 × 120 にしていて、**細長いポケットが読めるのにアイコンのまま**だった。
+ *
+ * ★ **畳むのは、縦も横も足りないときだけ**（ランチャーと同じ「かつ」）。片方に余地が
+ *   あるなら中身を出して、はみ出すぶんは転がして見る ── 箱が短いことと、中身が多い
+ *   ことは別の話で、短い箱に合わせて姿を落としても中身の数は減らない。
+ *   （受け皿は自分で転がる ── `PocketView` の `overflow: auto`）
  */
 const COMPACT = { width: 100, height: 110 };
 /** 外へ浮かび上がる受け皿の大きさ */
@@ -51,7 +56,7 @@ export const PocketBubble: FC<{ bubble: Bubble }> = ({ bubble }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   /** 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける */
   const box = useBubbleBox();
-  const compact = !!box && (box.width < COMPACT.width || box.height < COMPACT.height);
+  const compact = !!box && box.width < COMPACT.width && box.height < COMPACT.height;
 
   /** 仕舞う（受け入れるかどうかは型で決まる） */
   const take = useCallback(

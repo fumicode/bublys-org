@@ -35,6 +35,10 @@ export const GUIDE_CARD = { w: LIST_CARD_WIDTH, h: 54 } as const;
  *   **横に並べた瞬間アイコンに戻り、一覧そのものが居なくなるので二度と並べ方を
  *   変えられない**（札は世界に残るので、見た目は一覧のままなのに口が効かない）。
  *   実測で踏んだ。アイコンに戻すのは「もう何も映せない」ときだけでよい。
+ *
+ * ★ **畳むのは、縦も横も足りないときだけ**（ランチャーと同じ「かつ」）。片方に余地が
+ *   あるなら中身を出して、はみ出すぶんは転がして見る ── 箱が短いことと、中身が多い
+ *   ことは別の話で、短い箱に合わせて姿を落としても中身の数は減らない。
  */
 const COMPACT = { width: 120, height: 72 };
 
@@ -47,7 +51,7 @@ export const GuideHomeBubble: FC = () => {
    * 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける。
    */
   const box = useBubbleBox();
-  const compact = !!box && (box.width < COMPACT.width || box.height < COMPACT.height);
+  const compact = !!box && box.width < COMPACT.width && box.height < COMPACT.height;
 
   const members = useMemo(() => GUIDE_ENTRIES.map((e) => `guide/${e.id}/card`), []);
 
