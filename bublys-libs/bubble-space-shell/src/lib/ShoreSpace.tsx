@@ -82,6 +82,11 @@ export type ShoreSpaceProps = {
    * 記録するのは海の姿と**岸に貼ってあるもの**（`SeaWorldLine` の註）。
    */
   readonly worldLineScope?: string;
+  /**
+   * **世界線に入らないもの**（url）。渡したものは、海の姿からも岸からも抜いて記録し、
+   * 節へ移っても**いまのまま持ち越す**（`SeaWorldLine` の `WorldLineOutside`）。
+   */
+  readonly worldLineOutside?: readonly string[];
   /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
   readonly frameTools?: BubbleSpaceProps['frameTools'];
   readonly autoLens?: boolean;
@@ -227,6 +232,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   worldLineScope,
   autoLens,
   rules,
+  worldLineOutside,
   frameTools,
   bandDisplay,
   persistKey,
@@ -261,7 +267,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    * 岸の貼り替えも節目なので、ここ（岸を持っている側）で記録する。
    */
   const setShore = useCallback((next: readonly Docked[]) => setDocked(next), []);
-  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore);
+  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore, worldLineOutside);
 
   /**
    * **岸で起きた節目を知らせる口。**

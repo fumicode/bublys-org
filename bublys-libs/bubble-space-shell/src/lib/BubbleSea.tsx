@@ -46,6 +46,14 @@ export type BubbleSeaProps = {
    */
   readonly worldLineScope?: string;
   /**
+   * **世界線に入らないもの**（url）。
+   *
+   * > 世界線を映すものは、世界線に入らない。
+   *
+   * 渡したものは海の姿からも岸からも抜いて記録され、節へ移っても消えない
+   * （`SeaWorldLine` の `WorldLineOutside`）。渡さなければ、ぜんぶ入る。
+   */
+  readonly worldLineOutside?: readonly string[];
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
    *
@@ -69,6 +77,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   homes,
   initialUrls,
   worldLineScope,
+  worldLineOutside,
   rules,
   onSpaceReady,
   style,
@@ -145,6 +154,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         onSpaceReady={handleSpaceReady}
         /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
         worldLineScope={worldLineScope}
+        worldLineOutside={worldLineOutside}
         autoLens={autoLens}
         rules={rules}
         bandDisplay={bandDisplay}

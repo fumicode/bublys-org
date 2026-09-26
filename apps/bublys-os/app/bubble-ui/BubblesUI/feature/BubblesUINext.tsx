@@ -180,6 +180,18 @@ const HOMES: readonly Home[] = [
 const SEA_RULES = { sizeCombine: 'hypot' } as const;
 
 /**
+ * **世界線に入らないもの。**
+ *
+ * > 世界線を映すものは、世界線に入らない。
+ *
+ * 世界線の泡は「いまどの節に居るか」を映す窓であって、海の姿の一部ではない。
+ * 入れてしまうと、**古い節へ移った瞬間に窓ごと消える**（その節の姿には、あとから開いた
+ * 窓が無いので）。開く・動かす・広げるも顔ぶれの変化として節になり、
+ * 移った先で書けばそこが分岐になってしまう。
+ */
+const SEA_OUTSIDE = [WORLD_LINES_URL] as const;
+
+/**
  * ルール: **家具は OS が持ち、海は器が立てる。**
  * ランチャー集約（呼び出しの中身）は Redux にある ── 泡として出すのは海の仕事。
  */
@@ -195,6 +207,7 @@ export const BubblesUINext = () => {
       homes={HOMES}
       worldLineScope={ROOT_SEA_SCOPE}
       rules={SEA_RULES}
+      worldLineOutside={SEA_OUTSIDE}
       style={{ height: "100vh" }}
     />
   );
