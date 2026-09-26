@@ -15,20 +15,59 @@ import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLaunche
 const LAUNCHER_URL = "launchers/main";
 /** ランチャーの幅（アイコンだけ） */
 const LAUNCHER_WIDTH = 60;
+/** アイコンだけの泡の一辺（ポケット・世界線・説明と同じ） */
+const ICON = 48;
+/** 岸に貼ったものどうしのすき間 */
+const GAP = 8;
+
+/**
+ * **上の縁に見え方の口が入らない画面は、並べ方を変える。**
+ *
+ * > 端末の名前では決めない。**入るか入らないか**で決める。
+ *
+ * 上の縁の空きは「画面の幅 − 左のランチャー − 右上の世界線 − すき間」。ここに見え方の口の
+ * 中身（実測 470）が入らないなら、横に並べる余地が無いということなので、
+ * **上の縁はアイコン 1 列、下の縁は見え方の口を端から端まで**にする。
+ *
+ *   375 幅 → 空き 243 < 470 … 狭い並び（電話）
+ *   768 幅 → 空き 636 ≥ 470 … ふだんの並び
+ *
+ * ★ 決まるのは**最初に貼るとき**。貼ったあとに窓の大きさが変わっても貼り直さない
+ *   （岸は「居なければ置く」なので）。回して縦横が入れ替わったときは、いまの所そのまま。
+ */
+const SPACE_VIEW_NEED = 470;
+const isNarrow = (vp: { width: number }): boolean =>
+  vp.width - LAUNCHER_WIDTH - ICON - 3 * GAP < SPACE_VIEW_NEED;
+
+/**
+ * 狭い並びのときの、上の 1 列。左から順に詰める（ランチャー・他のデモ・説明・世界線・ポケット）。
+ * 端から始めて、あとはアイコン 1 つぶんずつ。
+ */
+const topRowAt = (index: number) => ({ x: index * (ICON + GAP), y: 0 });
 
 /**
  * ルール: **ランチャーは必ず居る。**
  * 最初は左の岸に、アイコンだけの幅で、端から端まで。
  * 海へ引き出して閉じてしまっても、**ここへ戻ってくる**（定位置）。
  */
-const launcherDock = (viewport: { width: number; height: number }): Docked => ({
-  key: `${LAUNCHER_URL}#dock`,
-  url: LAUNCHER_URL,
-  // 左と上に着いているので、置き場所（at）は使われない（角に吸い付く）
-  dock: { edges: ["left", "top"], at: { x: 0, y: 0 } },
-  size: { width: LAUNCHER_WIDTH, height: viewport.height },
-  ground: "light",
-});
+const launcherDock = (viewport: { width: number; height: number }): Docked =>
+  isNarrow(viewport)
+    ? {
+        // 狭い画面：上の 1 列の 1 番目。アイコンになって、押すと呼び出しが浮かぶ
+        key: `${LAUNCHER_URL}#dock`,
+        url: LAUNCHER_URL,
+        dock: { edges: ["top"], at: topRowAt(0) },
+        size: { width: ICON, height: ICON },
+        ground: "none",
+      }
+    : {
+        key: `${LAUNCHER_URL}#dock`,
+        url: LAUNCHER_URL,
+        // 左と上に着いているので、置き場所（at）は使われない（角に吸い付く）
+        dock: { edges: ["left", "top"], at: { x: 0, y: 0 } },
+        size: { width: LAUNCHER_WIDTH, height: viewport.height },
+        ground: "light",
+      };
 
 
 const POCKET_URL = "pocket";
@@ -40,12 +79,14 @@ const POCKET_URL = "pocket";
  * ── 専用の仕掛けは 1 つも要らない。広げたければ辺を掴んで引けばよいし、
  * 要らなければ引き剥がせば海へ返る。
  */
-const pocketDock = (): Docked => ({
+const pocketDock = (viewport: { width: number; height: number }): Docked => ({
   key: `${POCKET_URL}#dock`,
   url: POCKET_URL,
-  // 2 辺に着いているので、置き場所（at）は使われない（角に吸い付く）
-  dock: { edges: ["bottom", "right"], at: { x: 0, y: 0 } },
-  size: { width: 48, height: 48 },
+  // 狭い画面：上の 1 列の 5 番目。ふだんは右下の角（2 辺に着くので at は使われない）
+  dock: isNarrow(viewport)
+    ? { edges: ["top"], at: topRowAt(4) }
+    : { edges: ["bottom", "right"], at: { x: 0, y: 0 } },
+  size: { width: ICON, height: ICON },
   // 地は中身が持つ ── アイコンだけのときは海がそのまま透ける
   ground: "none",
 });
@@ -70,20 +111,34 @@ const SPACE_VIEW_SIZE = { width: 482, height: 44 };
  * ★ 横の中心は**窓の幅から毎回出す**（定位置は viewport を受け取る）── 固定の数で持つと
  *   窓の大きさが変わったときに中間からずれる。
  */
-const spaceViewDock = (viewport: { width: number; height: number }): Docked => ({
-  key: `${SPACE_VIEW_URL}#dock`,
-  url: SPACE_VIEW_URL,
-  dock: {
-    edges: ["top"],
-    at: {
-      x: Math.round(LAUNCHER_WIDTH + (viewport.width - LAUNCHER_WIDTH - SPACE_VIEW_SIZE.width) / 2),
-      y: 0,
-    },
-  },
-  size: SPACE_VIEW_SIZE,
-  // 地は敷かない ── ボタンが空間の上に浮いて見える
-  ground: "none",
-});
+const spaceViewDock = (viewport: { width: number; height: number }): Docked =>
+  isNarrow(viewport)
+    ? {
+        /**
+         * 狭い画面：**下の縁を端から端まで**。上は 1 列のアイコンで埋まっているし、
+         * これは中身がいちばん横に長いので、使える幅を全部やる。
+         * それでも入り切らないぶんは転がして見る（`SpaceViewTools`）。
+         */
+        key: `${SPACE_VIEW_URL}#dock`,
+        url: SPACE_VIEW_URL,
+        dock: { edges: ["bottom"], at: { x: 0, y: 0 } },
+        size: { width: viewport.width, height: SPACE_VIEW_SIZE.height },
+        ground: "none",
+      }
+    : {
+        key: `${SPACE_VIEW_URL}#dock`,
+        url: SPACE_VIEW_URL,
+        dock: {
+          edges: ["top"],
+          at: {
+            x: Math.round(LAUNCHER_WIDTH + (viewport.width - LAUNCHER_WIDTH - SPACE_VIEW_SIZE.width) / 2),
+            y: 0,
+          },
+        },
+        size: SPACE_VIEW_SIZE,
+        // 地は敷かない ── ボタンが空間の上に浮いて見える
+        ground: "none",
+      };
 
 const DEMO_SITES_URL = "demo-sites";
 
@@ -106,14 +161,24 @@ const DEMO_SITES_SIZE = { width: 360, height: 44 };
  * ★ 下の縁にしたのは、上は見え方の口、左はランチャー、右下はポケットが使っているから。
  *   左端から置く（横の中間にすると、右下のポケットと目が競る）。
  */
-const demoSitesDock = (): Docked => ({
-  key: `${DEMO_SITES_URL}#dock`,
-  url: DEMO_SITES_URL,
-  dock: { edges: ["bottom"], at: { x: LAUNCHER_WIDTH + 8, y: 0 } },
-  size: DEMO_SITES_SIZE,
-  // 地は敷かない ── ボタンが空間の上に浮いて見える（見え方の口と同じ）
-  ground: "none",
-});
+const demoSitesDock = (viewport: { width: number; height: number }): Docked =>
+  isNarrow(viewport)
+    ? {
+        // 狭い画面：上の 1 列の 2 番目。アイコンになって、押すと行き先が浮かぶ
+        key: `${DEMO_SITES_URL}#dock`,
+        url: DEMO_SITES_URL,
+        dock: { edges: ["top"], at: topRowAt(1) },
+        size: { width: ICON, height: ICON },
+        ground: "none",
+      }
+    : {
+        key: `${DEMO_SITES_URL}#dock`,
+        url: DEMO_SITES_URL,
+        dock: { edges: ["bottom"], at: { x: LAUNCHER_WIDTH + 8, y: 0 } },
+        size: DEMO_SITES_SIZE,
+        // 地は敷かない ── ボタンが空間の上に浮いて見える（見え方の口と同じ）
+        ground: "none",
+      };
 
 const WORLD_LINES_URL = "world-lines";
 
@@ -130,9 +195,11 @@ const WORLD_LINES_URL = "world-lines";
 const worldLinesDock = (viewport: { width: number; height: number }): Docked => ({
   key: `${WORLD_LINES_URL}#dock`,
   url: WORLD_LINES_URL,
-  // 2 辺に着いているので、置き場所（at）は使われない（角に吸い付く）
-  dock: { edges: ["top", "right"], at: { x: viewport.width, y: 0 } },
-  size: { width: 48, height: 48 },
+  // 狭い画面：上の 1 列の 4 番目。ふだんは右上の角（2 辺に着くので at は使われない）
+  dock: isNarrow(viewport)
+    ? { edges: ["top"], at: topRowAt(3) }
+    : { edges: ["top", "right"], at: { x: viewport.width, y: 0 } },
+  size: { width: ICON, height: ICON },
   // 地は中身が持つ ── アイコンだけのときは海がそのまま透ける
   ground: "none",
 });
@@ -148,8 +215,11 @@ const GUIDE_URL = "guide";
 const guideDock = (viewport: { width: number; height: number }): Docked => ({
   key: `${GUIDE_URL}#dock`,
   url: GUIDE_URL,
-  dock: { edges: ["right"], at: { x: viewport.width, y: 56 } },
-  size: { width: 48, height: 48 },
+  // 狭い画面：上の 1 列の 3 番目。ふだんは右の縁の、世界線のすぐ下
+  dock: isNarrow(viewport)
+    ? { edges: ["top"], at: topRowAt(2) }
+    : { edges: ["right"], at: { x: viewport.width, y: ICON + GAP } },
+  size: { width: ICON, height: ICON },
   // 地は中身が持つ ── アイコンだけのときは海がそのまま透ける
   ground: "none",
 });
@@ -158,7 +228,11 @@ const guideDock = (viewport: { width: number; height: number }): Docked => ({
  * **定位置に居てほしいもの。** 居なくなったら、ここへ戻ってくる。
  * 岸に貼ってある間は閉じる口が無いので、消えるのは海へ出して閉じたときだけ。
  */
-const HOMES: readonly Home[] = [
+/**
+ * ★ 外へ出しているのは、**本番の定位置をそのまま台（`app/shore-fit`）で見るため**。
+ *   台に同じ並びを書き写すと、片方だけ古くなる。
+ */
+export const HOMES: readonly Home[] = [
   launcherDock,
   spaceViewDock,
   pocketDock,

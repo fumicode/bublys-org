@@ -43,7 +43,24 @@ export const SpaceViewTools: FC<{
   const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens, bandsAlways, setBandsAlways } =
     view ?? here;
   return (
-    <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
+    <Box
+      sx={{
+        display: "flex",
+        gap: 1,
+        alignItems: "center",
+        height: "100%",
+        px: 0.5,
+        /**
+         * ★ **入り切らないぶんは転がして見る。** 狭い画面ではこの口は下の縁を端から端まで
+         *   使うが、それでも中身（実測 470）は入らない ── 黙って切ると、右側の口
+         *   （帯・全画面）に**手が届かなくなる**。姿は落とさず、横に転がす。
+         *   ランチャーと同じ決まり（`LauncherView` の註）。
+         */
+        maxWidth: "100%",
+        overflowX: "auto",
+        overflowY: "hidden",
+      }}
+    >
       {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
       <select
         value={preset}

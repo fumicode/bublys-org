@@ -21,6 +21,7 @@ import { BUBBLE_ARRANGEMENT_DOMAIN, FocusedObjectProvider } from "@bublys-org/bu
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { bubbleRoutes } from "../bubble-ui/BubblesUI/registration/bubbleRoutes";
+import { HOMES as REAL_HOMES } from "../bubble-ui/BubblesUI/feature/BubblesUINext";
 
 // ========== 岸に貼るものと、その中身が要る長さ ==========
 
@@ -105,6 +106,14 @@ const clampHomes = (vp: { width: number; height: number }): readonly Home[] => [
 ];
 
 const CANDIDATES: readonly Candidate[] = [
+  {
+    id: "real",
+    label: "★ いまの本番",
+    rule:
+      "本番の定位置そのもの（`BubblesUINext` の HOMES）。上の縁に見え方の口が入らない画面では、" +
+      "上に 1 列のアイコン（ランチャー・他のデモ・説明・世界線・ポケット）、下に見え方の口を端から端まで。",
+    homesFor: () => REAL_HOMES,
+  },
   {
     id: "as-is",
     label: "A いまのまま",
