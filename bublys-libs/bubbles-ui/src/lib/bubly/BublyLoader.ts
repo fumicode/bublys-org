@@ -10,8 +10,8 @@ import {
   rememberBublyOrigin,
 } from "./BublyOriginStore.js";
 
-/** `<name>-bubly` 形式に揃える。既に `-bubly` で終わっていればそのまま。 */
-const toBublyRouteBase = (name: string): string =>
+/** バブリ名 → OS が自動登録する universe バブルの url（`<name>-bubly`） */
+export const toBublyRouteBase = (name: string): string =>
   name.endsWith("-bubly") ? name : `${name}-bubly`;
 
 /** デフォルトの universe バブル既定サイズ */

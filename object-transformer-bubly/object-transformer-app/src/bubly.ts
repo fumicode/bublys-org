@@ -10,7 +10,7 @@ import TransformIcon from "@mui/icons-material/Transform";
 import "@bublys-org/object-transformer-libs";
 
 // Bubble Routes
-import { objectTransformerBubbleRoutes } from "./registration/index.js";
+import { objectTransformerBubbleRoutes } from "@bublys-org/object-transformer-libs";
 
 const ObjectTransformerBubly: Bubly = {
   name: "object-transformer",

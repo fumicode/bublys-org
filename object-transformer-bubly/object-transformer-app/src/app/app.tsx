@@ -6,7 +6,7 @@ import '@bublys-org/object-transformer-libs';
 import { TransformerProvider } from '@bublys-org/object-transformer-libs';
 
 // ルート登録（app側で管理）
-import { objectTransformerBubbleRoutes } from '../registration/index.js';
+import { objectTransformerBubbleRoutes } from '@bublys-org/object-transformer-libs';
 
 BubbleRouteRegistry.registerRoutes(objectTransformerBubbleRoutes);
 

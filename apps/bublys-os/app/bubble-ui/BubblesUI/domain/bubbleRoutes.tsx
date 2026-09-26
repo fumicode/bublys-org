@@ -1,94 +1,36 @@
 "use client";
 
-import { useContext } from "react";
-import { BubbleRoute, BubblesContext, deleteProcessBubble, removeBubble, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble, WorldLinesBubble, WorldLineScopeView } from "@bublys-org/bubbles-ui";
-import { useAppDispatch } from "@bublys-org/state-management";
-import { useCasScope } from "@bublys-org/world-line-graph";
+import { BubbleRoute, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble } from "@bublys-org/bubbles-ui";
 
 // 外部バブリのルート
 import { usersBubbleRoutes } from "@bublys-org/users-libs";
 // gakkai-shiftは動的ロードに移行（プラグインテスト）
 // import { gakkaiShiftBubbleRoutes } from "@bublys-org/gakkai-shift-libs";
-import { taskManagementBubbleRoutes } from "@/app/task-management/bubbleRoutes";
+import { taskManagementBubbleRoutes } from "@bublys-org/task-libs";
+import { memoBubbleRoutes } from "@bublys-org/memo-libs";
+import { csvImporterBubbleRoutes } from "@bublys-org/csv-importer-libs";
+import { objectTransformerBubbleRoutes } from "@bublys-org/object-transformer-libs";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
 
 // ローカルコンポーネント
-import { BubbleContentRenderer } from "../ui/BubbleContentRenderer";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
-import { MemoCollection } from "@/app/world-line/Memo/ui/MemoCollection";
-import { MemoDeleteConfirm } from "@/app/world-line/Memo/feature/MemoDeleteConfirm";
-import { MemoWorldLineIntegration } from "@/app/world-line/integrations/MemoWorldLineIntegration";
-import { memoScopeId } from "@/app/world-line/Memo/domain/MemoDomain";
+import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
+import { WorldLineHomeBubble } from "../feature/WorldLineHomeBubble";
+import { GuideHomeBubble, GUIDE_CARD } from "@/app/guide/GuideHomeBubble";
+import { GuideEntryBubble } from "@/app/guide/GuideEntryBubble";
+import { GuideCard } from "@/app/guide/GuideCard";
+import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
+import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
+import { DemoSitesBubble } from "../feature/DemoSitesBubble";
+import { SpaceViewBubble } from "@bublys-org/bubble-space-shell";
+import "@/app/launcher/launchTargets";
 
 /** BubbleRouteRegistry経由でルートを検索 */
 export const matchBubbleRoute = (url: string): BubbleRoute | undefined => {
   return BubbleRouteRegistry.matchRoute(url);
-};
-
-// Memoバブルコンポーネント
-const MemosBubble: BubbleContentRenderer = ({ bubble }) => {
-  const { openBubble } = useContext(BubblesContext);
-  const buildMemoUrl = (id: string) => `memos/${id}`;
-  const buildMemoDeleteUrl = (id: string) => `memos/${id}/delete-confirm`;
-  // 「メモを追加」で作った新規メモを開く導線（一覧の行を開くのは ObjectView のダブルクリック）
-  const handleOpenMemo = (_id: string, detailUrl: string) => {
-    openBubble(detailUrl, bubble.id);
-  };
-  const handleMemoDelete = (memoId: string) => {
-    openBubble(buildMemoDeleteUrl(memoId), bubble.id);
-  };
-  return (
-    <MemoCollection
-      buildDetailUrl={buildMemoUrl}
-      buildDeleteUrl={buildMemoDeleteUrl}
-      onOpenMemo={handleOpenMemo}
-      onMemoDelete={handleMemoDelete}
-    />
-  );
-};
-
-const MemoBubble: BubbleContentRenderer = ({ bubble }) => {
-  const memoId = bubble.url.replace("memos/", "");
-  const { openBubble } = useContext(BubblesContext);
-  const handleOpenWorldLineView = () => {
-    openBubble(`memos/${memoId}/history`, bubble.id);
-  };
-  return (
-    <MemoWorldLineIntegration
-      memoId={memoId}
-      onOpenWorldLineView={handleOpenWorldLineView}
-      worldLineUrl={`memos/${memoId}/history`}
-    />
-  );
-};
-
-const MemoDeleteConfirmBubble: BubbleContentRenderer = ({ bubble }) => {
-  const dispatch = useAppDispatch();
-  const memoId = bubble.url.replace("memos/", "").replace("/delete-confirm", "");
-
-  const closeSelf = () => {
-    dispatch(deleteProcessBubble(bubble.id));
-    dispatch(removeBubble(bubble.id));
-  };
-
-  return (
-    <MemoDeleteConfirm
-      memoId={memoId}
-      onDeleted={closeSelf}
-      onCancel={closeSelf}
-    />
-  );
-};
-
-// Memo の世界線を canvas で表示。click でそのノードに移動できる。
-// 履歴は /history なので popChildViewPortBelow で画面下部ストリップとして開く。
-const MemoWorldLinesBubble: BubbleContentRenderer = ({ bubble }) => {
-  const memoId = bubble.url.replace("memos/", "").replace("/history", "");
-  const scope = useCasScope(memoScopeId(memoId));
-  return <WorldLineScopeView scope={scope} nameable />;
 };
 
 // 再帰的 universe バブル（バブルの中の universe）は lib 提供の
@@ -107,10 +49,59 @@ const routes: BubbleRoute[] = [
   // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
   // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
   // も消える挙動になる点だけ要注意。
+  /**
+   * この空間の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
+   * 岸に貼ってある 48×48 のときはアイコン、押すと同じ url の泡が開いて、
+   * 広いそちらが世界線を映す。
+   */
   {
     pattern: /^world-lines$/,
     type: "world-lines",
-    Component: WorldLinesBubble,
+    Component: WorldLineHomeBubble,
+    /**
+     * ★ 地は**暗いほうへ**（囲碁・メモの世界線と同じ値）。既定の明るい地のままだと
+     *   canvas が白い板になって、節も枝も**読めるのに読みにくい**（線は明るい色で描く）。
+     * ★ 木を描く canvas なので、開いた先はそれなりの広さが要る。
+     */
+    bubbleOptions: {
+      contentBackground: "rgba(15,18,28,0.3)",
+      defaultSize: { width: 520, height: 340 },
+    },
+  },
+
+  /**
+   * 説明。世界線と同じく**大きさで姿が変わる**（`GuideHomeBubble`）──
+   * 岸の 48×48 ではアイコン、押すと同じ url の泡が開いて一覧を映す。
+   */
+  {
+    pattern: /^guide$/,
+    type: "guide",
+    Component: GuideHomeBubble,
+    /**
+     * ★ **ここは地を敷く。** ほかの一覧（ユーザー・メモ・シート）は地を敷かず空間が
+     *   そのまま透けるが、それはデータの一覧だから ── 説明は**読むもの**なので、
+     *   透かすと文字の下に空間が出て、どこまでがこの説明か分からなくなる。
+     */
+    /**
+     * ★ 高さは**説明の数から出す**（札 54 × 7 ＋ 隙間 4 × 6 ＋ 並びの余白 14×2 ＝ 430）。
+     *   足りないと「縦に並べて収まるか」の判定に落ちて、開いた瞬間**横の魚眼**になる
+     *   ── 読みものなのに 1 枚しか読めない（説明を 7 つに増やしたとき実測）。
+     */
+    bubbleOptions: { defaultSize: { width: 406, height: 440 } },
+  },
+  // ★ 札は詳細より**先に**置く（`guide/xxx` が `.../card` も飲み込むので）
+  {
+    pattern: /^guide\/([^/]+)\/card$/,
+    type: "guide-card",
+    Component: ({ bubble }) => <GuideCard entryId={bubble.url.split("/")[1] ?? ""} />,
+    bubbleOptions: { defaultSize: { width: GUIDE_CARD.w, height: GUIDE_CARD.h } },
+  },
+  {
+    pattern: /^guide\/([^/]+)$/,
+    type: "guide-entry",
+    Component: ({ bubble }) => <GuideEntryBubble entryId={bubble.url.split("/")[1] ?? ""} />,
+    // 説明は読みもの。1 行が長くなりすぎない幅に切る
+    bubbleOptions: { defaultSize: { width: 380, height: 300 } },
   },
 
   // 再帰的 universe（バブルの中の universe） — 素のデバッグ用
@@ -120,7 +111,8 @@ const routes: BubbleRoute[] = [
     base: "universe",
     type: "universe",
     Component: BublyUniverseBubble,
-    bubbleOptions: { universe: true, defaultSize: { width: 420, height: 320 } },
+    // 窓の**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+    bubbleOptions: { universe: true, defaultSize: { width: 420, height: 296 } },
   }),
 
   // ===== bubly = 1 universe バブル = 独立した世界線を持つ「アプリ境界」 =====
@@ -134,7 +126,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["users"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(190, 50%, 22%)",
     },
   }),
@@ -145,7 +139,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["user-groups"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(270, 45%, 26%)",
     },
   }),
@@ -156,7 +152,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["memos"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(40, 55%, 26%)",
     },
   }),
@@ -167,7 +165,9 @@ const routes: BubbleRoute[] = [
     initialBubbleUrls: ["task-management/tasks"],
     bubbleOptions: {
       universe: true,
-      defaultSize: { width: 480, height: 360 },
+      // ★ 中の一覧が収まる**中身**の大きさ（帯 24 のぶんは枠が外へ足す ── chrome.ts）
+      //   ── 小さいと一覧の上下がはみ出して、右上の口（＋新規）が窓の外に隠れる
+      defaultSize: { width: 560, height: 616 },
       backdropColor: "hsl(140, 45%, 22%)",
     },
   }),
@@ -175,11 +175,8 @@ const routes: BubbleRoute[] = [
   // Users（users-libsから）
   ...usersBubbleRoutes,
 
-  // Memo
-  { pattern: /^memos$/, type: "memos", Component: MemosBubble },
-  { pattern: /^memos\/[^/]+\/delete-confirm$/, type: "memo-delete-confirm", Component: MemoDeleteConfirmBubble },
-  { pattern: /^memos\/[^/]+\/history$/, type: "world-lines", Component: MemoWorldLinesBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)" } },
-  { pattern: /^memos\/[^/]+$/, type: "memo", Component: MemoBubble },
+  // メモ（memo-libs から）
+  ...memoBubbleRoutes,
 
   // 学会シフト（プラグインとして動的ロード）
   // ...gakkaiShiftBubbleRoutes,
@@ -190,6 +187,12 @@ const routes: BubbleRoute[] = [
   // 囲碁ゲーム
   ...igoGameBubbleRoutes,
 
+  // CSV インポーター（csv-importer-libs から）
+  ...csvImporterBubbleRoutes,
+
+  // 変換エディタ（object-transformer-libs から）
+  ...objectTransformerBubbleRoutes,
+
   // 易経（プラグインとして動的ロード）
   // ...ekikyoBubbleRoutes,
 
@@ -198,6 +201,46 @@ const routes: BubbleRoute[] = [
     pattern: /^object-shells\/[^/]+\/[^/]+$/,
     type: "object-shell",
     Component: ShellBubble
+  },
+
+  // ランチャー（呼び出しを溜めるバブリ）。root では左の岸に着いている
+  ...launcherBubbleRoutes,
+
+  // 見え方（開き方・ネオンの通し方・レンズの向き）。前は画面の左上に固定した帯だった
+  {
+    pattern: /^space-view$/,
+    type: "space-view",
+    Component: SpaceViewBubble,
+    // 地は敷かない ── ボタンが空間の上に浮いて見える
+    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
+    bubbleOptions: { defaultSize: { width: 482, height: 44 }, contentBackground: "transparent" },
+  },
+
+  // 他のデモへ行く口。これも 1 つの泡 ── いつも見えていてほしいので、既定では下の岸に貼る
+  {
+    pattern: /^demo-sites$/,
+    type: "demo-sites",
+    Component: DemoSitesBubble,
+    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の DEMO_SITES_SIZE）と同じ
+    bubbleOptions: { defaultSize: { width: 430, height: 44 }, contentBackground: "transparent" },
+  },
+
+  // ポケット（オブジェクトのクリップボード）。前は画面に居座る面だったが、1 つの泡にした
+  // ── いつも見えていてほしければ岸に貼る
+  {
+    pattern: /^pocket$/,
+    type: "pocket",
+    Component: PocketBubble,
+    // 地は中身が持つ ── 大きいときは自分で白い箱を描き、アイコンだけのときは空間を透かす
+    bubbleOptions: { defaultSize: { width: 246, height: 266 }, contentBackground: "transparent" },
+  },
+
+  // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）
+  {
+    pattern: /^bubly-loader$/,
+    type: "bubly-loader",
+    Component: BublyLoaderBubble,
+    bubbleOptions: { defaultSize: { width: 286, height: 246 } },
   },
 ];
 

@@ -1,6 +1,6 @@
 'use client';
 import { Counter } from '../../../counter/Counter';
-import { useFocusedObject } from '../../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from "@bublys-org/bubbles-ui";
 
 interface CounterViewProps {
   counter: Counter;

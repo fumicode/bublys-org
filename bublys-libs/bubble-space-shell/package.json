@@ -1,0 +1,40 @@
+{
+  "name": "@bublys-org/bubble-space-shell",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "@bublys-org/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@bublys-org/bubble-layout": "0.0.1",
+    "@bublys-org/bubble-layout-feature": "0.0.1",
+    "@bublys-org/bubble-layout-ui": "0.0.1",
+    "@bublys-org/bubbles-ui": "0.0.1",
+    "@bublys-org/domain-registry": "0.0.1",
+    "@bublys-org/world-line-graph": "0.0.1"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.lib.json",
+    "dev": "tsc -b tsconfig.lib.json --watch"
+  },
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": [
+          "^dev"
+        ],
+        "continuous": true
+      }
+    }
+  }
+}

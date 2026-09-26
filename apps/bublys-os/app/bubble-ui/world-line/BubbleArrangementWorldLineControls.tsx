@@ -1,6 +1,6 @@
 "use client";
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, IconButton, Tooltip } from "@mui/material";
+import { Box, Divider, IconButton, Tooltip } from "@mui/material";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
@@ -10,6 +10,7 @@ import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { ROOT_UNIVERSE_ID } from "@bublys-org/bubbles-ui";
 import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
+import { FullscreenToggle } from "@bublys-org/bubble-space-shell";
 
 /**
  * bubble-ui の表示状態を world-line に同期し、undo/redo +（ドラッグで動かせる）
@@ -17,8 +18,8 @@ import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
  *
  * 世界線 view は **バブルにしない**。バブルにすると自分自身が
  * BubbleArrangement の一要素になり、過去ノードに戻ると view も消える、という
- * 矛盾が起きる。なのでこのチロムは bubble system の外側に position:fixed で
- * 浮かべる。view 中身は {@link WorldLinesCanvasView}（canvas 描画の pure 関数）
+ * 矛盾が起きる。なのでこのチロムは bubble system の外側に浮かべる
+ * （undo/redo はユニバース領域の左上に absolute、世界線 view は fixed）。view 中身は {@link WorldLinesCanvasView}（canvas 描画の pure 関数）
  * を使って毎レンダーのコストを抑える。
  */
 export const BubbleArrangementWorldLineControls: FC = () => {
@@ -124,9 +125,11 @@ export const BubbleArrangementWorldLineControls: FC = () => {
     <>
       <Box
         sx={{
-          position: "fixed",
+          // ユニバース領域（position: relative）の左上。サイドバーがどの辺に
+          // あっても、ユニバースの角から 20px の位置に来る
+          position: "absolute",
           top: 20,
-          left: 76,
+          left: 20,
           zIndex: 1000,
           display: "flex",
           gap: 0.5,
@@ -159,6 +162,9 @@ export const BubbleArrangementWorldLineControls: FC = () => {
             <AccountTreeIcon fontSize="small" />
           </IconButton>
         </Tooltip>
+        {/* 世界線とは別の話なので、区切りを挟んで隣に置く */}
+        <Divider orientation="vertical" flexItem sx={{ mx: 0.25, my: 0.5 }} />
+        <FullscreenToggle />
       </Box>
 
       {showGraph && (

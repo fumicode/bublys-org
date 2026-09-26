@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>v5-dom bench —— lod（小さいものは簡略に）</title>
+<style>
+  /* ★ ここは全案で共通。変えない */
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0b0d14;color:#e6ebf5;overflow:hidden;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #stage{position:absolute;inset:0;overflow:hidden;touch-action:none}
+  /* 泡の要素は入力を受けない。当たり判定は placements から（driver.js が1つで受ける） */
+  #stage *{pointer-events:none}
+
+  /* ↓ ここから下がこの案のもの。土台は absolute.html と同じ（left/top/width/height） */
+  .bub{position:absolute;border:1px solid}
+  .bub.imp{border-style:dashed}
+  .ttl{position:absolute;white-space:nowrap;line-height:1}
+  /* 板：枠も角も持たない、地の色だけの1枚 */
+  .bub.plate{border-color:transparent;border-radius:0}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { start } from "./driver.js";
+
+/* ============================================================================
+   lod —— 「小さいものは簡略に」
+
+   土台は absolute.html とまったく同じ（left/top/width/height を毎フレーム書く）。
+   変えたのは **段階を付けたこと1つだけ**。だから差は LOD のぶんだけになる。
+
+   段階（字の大きさ fs = 12 × scale で決める）
+     ① 原寸   fs >= T1   角丸・枠・地・題名（＝ canvas.html と同じ絵）
+     ② 字なし  T2 <= fs < T1   角丸・枠・地。題名は描かない
+     ③ 板     T3 <= fs < T2   地の色だけの矩形。枠も角も題名も無い
+     ④ 描かない fs < T3（と、もともとの alpha<=0 / w<0.5）
+
+   段階に依るものは「段階が変わったフレーム」でしか書かない。
+   位置と大きさ（left/top/width/height/opacity/z-index）は absolute.html と同じく毎フレーム書く。
+
+   つまみ（?つき）
+     lod=6.5   T1   plate=0   T2   drop=0   T3
+     hide=remove|hidden|empty   字の消し方   platecol=mix|fill|edge  板の色
+     snap=1    字の大きさを 1px 刻みに丸める（字は消さない）
+     cv=1      全部の泡に content-visibility:auto
+     contain=paint|layout|strict|content   全部の泡に contain
+
+   ── 測ったこと（3回の中央値・1440×900・Chromium 145 headless。wheel の work p50 ms）──
+     この既定（字を消すだけ）A 3.4  B 5.7  C 4.8    LOD 無し（土台だけ）  A 4.3  B 5.7  C 11.1
+     canvas.html（物差し） A 4.4  B 2.8  C 13.3
+     ★ **板1枚にするのは効かなかった。** 字だけ消す（plate=0）と 板まで作る（plate=3）で
+       C の wheel はどちらも 4.8ms。速さは同じで、絵の差は 0.48% → 0.96% と倍になる。
+       だから既定は plate=0（板にしない）。板が要るのは「枠の色を塗り分けたい」ときだけ。
+     ★ 効くのは「字の大きさが泡ごとに毎フレーム変わる」場面だけ。
+       場面B は全部の泡が同じ倍率なので、LOD は1画素も1msも動かさない。
+     ★ 重いのは「字の数」ではなく「**1フレームに現れる別々の字の大きさの数**」。
+       診断（onefs=1：202 個ぜんぶ同じ大きさに）で C の wheel は 11.1 → 2.6ms。
+       だから字を消さずに **大きさを丸める**（snap=0.5）だけでも C は 1.6ms になる。
+       いいとこ取り（6.5/3 ＋ 0.5px 刻み ＋ contain:layout）は A 0.6 / B 3.9 / C 1.4 だった（つまみ違いの版は使い捨てなので消した。数は ../FINDINGS.md）。
+     ★ contain:paint と content-visibility:auto は **切り抜く**。v4 は切り抜かないので使えない
+       （はみ出した題名が切れて、絵が 0.33〜0.92% 変わる）。速くもならなかった。
+     つまみを1つずつ変えた版は使い捨てなので残していない。測った数は ../FINDINGS.md にある
+   ============================================================================ */
+const Q = new URLSearchParams(location.search);
+const num = (k, d) => (Q.has(k) ? +Q.get(k) : d);
+const T1 = num("lod", 6.5);      // これを切ったら 字を描かない
+const T2 = num("plate", 0);      // これを切ったら 板1枚（既定は 0 ＝ 板にしない。測ったら1ms も速くならなかった）
+const T3 = num("drop", 0);       // これを切ったら 何も描かない
+const HIDE = Q.get("hide") || "remove";
+const CV = Q.get("cv") === "1";
+const CONTAIN = Q.get("contain") || "";
+const PCOL = Q.get("platecol") || "mix";  // 板の色：fill 地(.16) / edge 枠(.55) / mix その中間(.33)
+const SNAP = num("snap", 0);              // 字の大きさを N px 刻みに丸める（0 ＝ 丸めない）
+const ONEFS = Q.get("onefs") === "1";     // 診断用：字の大きさを全部そろえる（絵は壊れる）
+
+const FULL = 0, PLAIN = 1, PLATE = 2, NONE = 3;
+const els = new Map();
+let stageCount = [0, 0, 0, 0];
+
+function stageOf(p) {
+  if (!(p.alpha > 0) || p.w < 0.5) return NONE;
+  const fs = 12 * p.scale;
+  if (fs < T3) return NONE;
+  if (fs < T2) return PLATE;
+  if (fs < T1) return PLAIN;
+  return FULL;
+}
+
+/** 段階が変わったときだけ呼ぶ。ここで「見た目の作り」を切り替える */
+function applyStage(e, p, st) {
+  const s = e.el.style;
+  e.st = st;
+  if (st === NONE) { s.display = "none"; return; }
+  s.display = "block";
+
+  // 見た目の作り：板か、ふつうか
+  const plate = st === PLATE ? "plate" : "normal";
+  if (plate !== e.look) {
+    e.look = plate;
+    e.el.classList.toggle("plate", plate === "plate");
+    if (plate === "plate") {
+      s.borderRadius = "0px";
+      s.borderColor = "transparent";        // 板は枠を持たない
+      // 小さい泡は画素の半分が枠なので、板の色は 地(.16) と 枠(.55) の中間にする
+      const a = PCOL === "fill" ? .16 : PCOL === "edge" ? .55 : .33;
+      s.background = p.implicit ? `hsl(215 30% 62% / ${a * .8})` : `hsl(${p.hue} 70% 62% / ${a})`;
+    } else {
+      s.borderColor = p.implicit ? "hsl(215 30% 62% / .45)" : `hsl(${p.hue} 70% 62% / .55)`;
+      s.background = p.implicit ? "none" : `hsl(${p.hue} 70% 62% / .16)`;
+    }
+  }
+
+  // 題名（見えない親はもともと持たない）
+  const wantText = st === FULL && !p.implicit;
+  if (wantText !== e.on) {
+    e.on = wantText;
+    if (HIDE === "remove") { if (wantText) e.el.appendChild(e.t); else e.t.remove(); }
+    else if (HIDE === "hidden") e.t.hidden = !wantText;
+    else e.t.textContent = wantText ? p.title : "";
+  }
+}
+
+function render(ps, api) {
+  const frag = document.createDocumentFragment();
+  for (const p of ps) {
+    const el = document.createElement("div");
+    el.className = "bub" + (p.implicit ? " imp" : "");
+    el.style.borderColor = p.implicit ? "hsl(215 30% 62% / .45)" : `hsl(${p.hue} 70% 62% / .55)`;
+    if (!p.implicit) el.style.background = `hsl(${p.hue} 70% 62% / .16)`;
+    if (CV) el.style.contentVisibility = "auto";
+    if (CONTAIN) el.style.contain = CONTAIN;
+    const t = document.createElement("span");
+    t.className = "ttl";
+    t.textContent = p.implicit ? "" : p.title;
+    t.style.color = `hsl(${p.hue} 70% 78%)`;
+    el.appendChild(t);
+    els.set(p.id, { el, t, st: -1, look: "normal", on: true });
+    frag.appendChild(el);
+  }
+  api.stage.appendChild(frag);
+  window.__lod = { T1, T2, T3, HIDE, CV, CONTAIN, PCOL, SNAP, stages: () => stageCount.slice() };
+  update(ps, api);
+}
+
+function update(ps, api) {
+  const cnt = [0, 0, 0, 0];
+  const one = ONEFS ? Math.max(4, 12 * ps[ps.length - 1].scale) : 0;
+  for (let n = 0; n < ps.length; n++) {
+    const p = ps[n], e = els.get(p.id);
+    const st = stageOf(p);
+    cnt[st]++;
+    if (st !== e.st) applyStage(e, p, st);
+    if (st === NONE) continue;
+    const s = e.el.style;
+    // ここは absolute.html と同じ（毎フレーム書く）
+    s.left = p.x + "px";
+    s.top = p.y + "px";
+    s.width = p.w + "px";
+    s.height = p.h + "px";
+    s.opacity = p.alpha;
+    s.zIndex = n;
+    if (st === PLATE) continue;             // 板は角も字も持たない → ここで終わり
+    s.borderRadius = 8 * p.scale + "px";
+    if (st !== FULL || p.implicit) continue; // 字なしはここで終わり
+    let fs = one || Math.max(4, 12 * p.scale);
+    if (SNAP) fs = Math.round(fs / SNAP) * SNAP;
+    e.t.style.fontSize = fs + "px";
+    e.t.style.left = 8 * p.scale + "px";
+    e.t.style.top = 16 * p.scale - fs + "px";
+  }
+  stageCount = cnt;
+}
+
+start({ name: "lod", render, update });
+</script>
+</body>
+</html>

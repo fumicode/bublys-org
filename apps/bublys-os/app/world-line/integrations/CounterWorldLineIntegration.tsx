@@ -2,7 +2,7 @@
 import { WorldLineView } from '../WorldLine/ui/WorldLineView';
 import { CounterView } from '../Counter/ui/CounterView';
 import { Counter } from '../../counter/Counter';
-import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from "@bublys-org/bubbles-ui";
 
 /**
  * CounterとWorldLineの統合層

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>v5-dom bench —— nested（入れ子の transform）</title>
+<style>
+  /* ★ ここは全案で共通。変えない */
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0b0d14;color:#e6ebf5;overflow:hidden;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #stage{position:absolute;inset:0;overflow:hidden;touch-action:none}
+  /* 泡の要素は入力を受けない。当たり判定は placements から（driver.js が1つで受ける） */
+  #stage *{pointer-events:none}
+
+  /* ── ここから案の分 ──
+     泡の div は親の div の中に入れる。位置と大きさは transform だけで出す。
+     ・left/top は 0 に固定。translate で動かす（layout を起こさない）
+     ・width/height は「レンズを通す前の箱」bw/bh をそのまま入れる。scale が画面の大きさにする
+     ・枠は border を使わない。border があると中の絶対配置の基点が padding box にずれるのと、
+       太さを書き直すと layout が出るため。inset の box-shadow なら paint だけで済む
+       （見えない親だけは点線なので border。数が1つなので border-width を書き直す） */
+  .bub{position:absolute;left:0;top:0;transform-origin:0 0;border-radius:8px}
+  .bub.imp{border:1px dashed;border-color:hsl(215 30% 62% / .45)}
+  .ttl{position:absolute;left:8px;white-space:nowrap;line-height:1;
+       font-size:12px;transform-origin:0 0}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { start } from "./driver.js";
+
+/* ============================================================================
+   入れ子の transform —— モデルの再帰をそのまま DOM の木にする
+
+   泡 X の div の中に、X の子の div を入れる。だから X に当てた transform は子にも効く。
+   子に書くのは「親からの相対」だけ。
+
+     親の画面での左上 (qx,qy)・合成倍率 qs、子の画面での左上 (px,py)・合成倍率 ps のとき
+       子の transform = translate((px-qx)/qs - b, (py-qy)/qs - b) scale(ps/qs)
+       b = 親の枠の太さ（絶対配置の基点は親の padding box なので、そのぶん戻す）
+     子の width/height は bw/bh（レンズを通す前の箱）。ps 倍されて画面の w/h になる。
+     だから **倍率が変わっても width/height は書かない** ＝ layout が出ない。
+
+   canvas と絵を合わせるために、scale で伸びてしまう2つを戻している（代金は下の報告に）
+     ・枠は画面で 1px → 局所で 1/scale px
+     ・題名は画面で max(4, 12*scale) → 12*scale が 4 を切るぶんだけ span を拡大する
+       （font-size を書くと layout が出るので transform でやる。上端は
+        「ベースラインが局所 16px に来る」ように 1回だけ測って決める）
+   ============================================================================ */
+
+const Q = 1024;                 // 座標を 1/1024px に丸めて、変わった泡だけ書き直す
+const els = new Map();
+let root = { f: -1, n: 0 };     // 兄弟の順番を数える入れ物（root 用）
+let frame = 0;
+let ASC = 12;                   // 12px の字のベースラインが、span の上から何 px 下か（1回だけ測る）
+
+/** canvas は「ベースラインを y+16*scale に置く」。DOM は上端しか指定できないので、上端の位置を1回測る */
+function measureAscent(stage) {
+  const s = document.createElement("span");
+  s.className = "ttl";
+  s.style.cssText = "position:absolute;left:-9999px;top:0";
+  s.textContent = "\u3042M";
+  const i = document.createElement("i");
+  i.style.cssText = "display:inline-block;width:0;height:0";
+  s.appendChild(i);
+  stage.appendChild(s);
+  const a = i.getBoundingClientRect().bottom - s.getBoundingClientRect().top;
+  stage.removeChild(s);
+  return a;
+}
+
+function render(ps, api) {
+  ASC = measureAscent(api.stage);
+  const top0 = Math.round((16 - ASC) * Q) / Q + "px";   // ベースラインが局所 16px に来る上端
+  for (const p of ps) {
+    const el = document.createElement("div");
+    el.className = "bub" + (p.implicit ? " imp" : "");
+    el.dataset.id = p.id;                       // 絵の確かめ用。最初の1回だけ書く
+    const t = document.createElement("span");
+    t.className = "ttl";
+    t.style.top = top0;
+    if (p.implicit) {
+      t.textContent = "";
+    } else {
+      el.style.background = `hsl(${p.hue} 70% 62% / .16)`;
+      t.textContent = p.title;
+      t.style.color = `hsl(${p.hue} 70% 78%)`;
+    }
+    el.appendChild(t);
+    const pr = p.space === "root" ? null : els.get(p.space);
+    (pr ? pr.el : api.stage).appendChild(el);
+    els.set(p.id, {
+      el, st: el.style, ts: t.style, p, pr,          // p は driver が使い回す同じ物（毎フレーム中身が変わる）
+      col: p.implicit ? null : `hsl(${p.hue} 70% 62% / .55)`,
+      imp: p.implicit,
+      tx: NaN, ty: NaN, k: NaN, w: -1, h: -1, sw: -1, c: -1, z: -1, on: null,
+      f: -1, n: 0,
+    });
+  }
+  update(ps, api);
+}
+
+function update(ps, api) {
+  frame++;
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i], e = els.get(p.id), st = e.st, pr = e.pr;
+
+    // ② 兄弟の中の順番。掴んだ泡は ps の最後に来るので、そのまま一番手前になる
+    const h = pr || root;
+    if (h.f !== frame) { h.f = frame; h.n = 0; }
+    const z = ++h.n;
+    if (z !== e.z) { e.z = z; st.zIndex = z; }
+
+    const on = p.alpha > 0 && p.w >= 0.5;
+    if (on !== e.on) { e.on = on; st.display = on ? "block" : "none"; }
+    if (!on) continue;
+
+    const q = pr ? pr.p : null;
+    const qs = q ? q.scale : 1;
+    const b = q && pr.imp ? 1 / q.scale : 0;          // 見えない親だけ枠を持つ
+    const tx = Math.round(((p.x - (q ? q.x : 0)) / qs - b) * Q) / Q;
+    const ty = Math.round(((p.y - (q ? q.y : 0)) / qs - b) * Q) / Q;
+    const k  = Math.round((p.scale / qs) * 1e6) / 1e6;
+    if (tx !== e.tx || ty !== e.ty || k !== e.k) {
+      e.tx = tx; e.ty = ty; e.k = k;
+      st.transform = `translate(${tx}px,${ty}px) scale(${k})`;
+    }
+
+    // 箱が変わったときだけ（＝ resize のときだけ）。ここだけが layout を起こす
+    if (p.bw !== e.w) { e.w = p.bw; st.width  = p.bw + "px"; }
+    if (p.bh !== e.h) { e.h = p.bh; st.height = p.bh + "px"; }
+
+    // 枠を画面で 1px に戻す
+    const sw = Math.round((1 / p.scale) * Q) / Q;
+    if (sw !== e.sw) {
+      e.sw = sw;
+      if (e.imp) st.borderWidth = sw + "px";
+      else st.boxShadow = `inset 0 0 0 ${sw}px ${e.col}`;
+    }
+
+    // 題名の下限 4px を戻す（12*scale < 4 のときだけ span を拡大）
+    if (!e.imp) {
+      const c = Math.round(Math.max(1, 1 / (3 * p.scale)) * 1e4) / 1e4;
+      if (c !== e.c) {
+        e.c = c;
+        e.ts.transform = c === 1 ? "none" : `translate(0,${Math.round(ASC * (1 - c) * Q) / Q}px) scale(${c})`;
+      }
+    }
+  }
+}
+
+start({ name: "nested", render, update });
+</script>
+</body>
+</html>

@@ -102,8 +102,10 @@ export const BublyUniverseBubble: BubbleContentRenderer = ({ bubble }) => {
         renderBubbleContent={(b) => <BubbleContent bubble={b} />}
         // 復元される universe には seed を撒かない（撒くと復元前に commit されて上書きになる）
         initialBubbleUrls={nav.restoresFromWorldLine ? [] : route?.initialBubbleUrls ?? []}
-      />
-      <UniverseWorldLineToolbar {...nav} />
+      >
+        {/* 海の左上に置く。岸の帯の上には被らない */}
+        <UniverseWorldLineToolbar {...nav} />
+      </UniverseView>
     </div>
   );
 };

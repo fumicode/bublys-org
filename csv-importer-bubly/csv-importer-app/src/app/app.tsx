@@ -7,7 +7,7 @@ import '@bublys-org/csv-importer-libs';
 import { CsvSheetProvider } from '@bublys-org/csv-importer-libs';
 
 // ルート登録（app側で管理）
-import { csvImporterBubbleRoutes } from '../registration/index.js';
+import { csvImporterBubbleRoutes } from '@bublys-org/csv-importer-libs';
 
 // worldLineGraph slice を注入
 initWorldLineGraph();

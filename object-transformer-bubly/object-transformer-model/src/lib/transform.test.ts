@@ -1,6 +1,7 @@
 import {
   applyTransform,
   applyMappingRule,
+  collectAtPath,
   getAtPath,
   setAtPath,
 } from "./transform.js";
@@ -142,5 +143,93 @@ describe("applyMappingRule", () => {
 
   it("handles empty source array", () => {
     expect(applyMappingRule([], rule)).toEqual([]);
+  });
+});
+
+describe("並びの中へ繋ぐ", () => {
+  /** CSV の 1 行 → メモの段落 1 つ */
+  const rule = MappingRule.create("行を段落に", "memo", [
+    { sourcePath: "本文", targetPath: "blocks[].content", transform: { type: "identity" } },
+    { sourcePath: "種類", targetPath: "blocks[].type", transform: { type: "identity" } },
+  ]);
+  const rows = [
+    { 本文: "題名", 種類: "text" },
+    { 本文: "こんにちは", 種類: "text" },
+    { 本文: "また明日", 種類: "text" },
+  ];
+
+  it("ソース 1 件ごとに要素が 1 つできて、ひとつのものに集まる", () => {
+    const out = applyMappingRule(rows, rule);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({
+      blocks: [
+        { content: "題名", type: "text" },
+        { content: "こんにちは", type: "text" },
+        { content: "また明日", type: "text" },
+      ],
+    });
+  });
+
+  it("並びとして作られる（番号を名前に持つ「もの」ではない）", () => {
+    expect(Array.isArray(applyMappingRule(rows, rule)[0].blocks)).toBe(true);
+  });
+
+  it("ソースの順番が、そのまま並びの順番", () => {
+    const out = applyMappingRule(rows, rule)[0].blocks as { content: string }[];
+    expect(out.map((b) => b.content)).toEqual(["題名", "こんにちは", "また明日"]);
+  });
+
+  it("並びの外へ繋いだ項目は、最初の 1 件から取る", () => {
+    const withOuter = rule.addMapping({
+      sourcePath: "書いた人",
+      targetPath: "authorId",
+      transform: { type: "identity" },
+    });
+    const out = applyMappingRule(
+      rows.map((r, i) => ({ ...r, 書いた人: i === 0 ? "u1" : "u2" })),
+      withOuter,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].authorId).toBe("u1");
+  });
+
+  it("ソースが無ければ、何も作らない", () => {
+    expect(applyMappingRule([], rule)).toEqual([]);
+  });
+
+  it("並びの外だけに繋いだときは、これまでどおり 1 件 → 1 つ", () => {
+    const flat = MappingRule.create("そのまま", "user", [
+      { sourcePath: "本文", targetPath: "name", transform: { type: "identity" } },
+    ]);
+    expect(applyMappingRule(rows, flat)).toHaveLength(3);
+  });
+
+  it("読むときの [] は最初の一つ（見本のため）", () => {
+    const memo = { blocks: [{ content: "題名" }, { content: "二行目" }] };
+    expect(getAtPath(memo, ["blocks[]", "content"])).toBe("題名");
+  });
+});
+
+describe("出来たものを読む", () => {
+  const memo = {
+    id: "m1",
+    blocks: [{ content: "題名" }, { content: "こんにちは" }, { content: "また明日" }],
+  };
+
+  it("並びの中を指す道は、全部取れる", () => {
+    expect(collectAtPath(memo, ["blocks[]", "content"])).toEqual([
+      "題名",
+      "こんにちは",
+      "また明日",
+    ]);
+  });
+
+  it("並びの外は 1 つだけ", () => {
+    expect(collectAtPath(memo, ["id"])).toEqual(["m1"]);
+  });
+
+  it("無いものは空", () => {
+    expect(collectAtPath(memo, ["tags[]", "name"])).toEqual([]);
+    expect(collectAtPath(memo, ["authorId"])).toEqual([]);
   });
 });

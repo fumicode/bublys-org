@@ -42,7 +42,8 @@ export function IgoGameList({ buildDetailUrl }: IgoGameListProps) {
     <StyledList>
       {games.map(({ id, game }) => {
         const detailUrl = buildDetailUrl(id);
-        const label = `${game.boardSize}路 対局`;
+        // 題名はその対局の名前（種類ではない）。札（IgoGameCard）と同じ
+        const label = game.displayName;
         return (
           <li key={id} className="e-item">
             <div aria-hidden className="e-thumb">
@@ -62,6 +63,8 @@ export function IgoGameList({ buildDetailUrl }: IgoGameListProps) {
                 <SportsEsportsIcon sx={{ color: '#dcb35c', fontSize: 18 }} />
                 <span>{label}</span>
               </ObjectView>
+              {/* 名前 / 正体 / 状態 の 3 行（札 IgoGameCard と同じ） */}
+              <span className="e-meta">{game.boardSize}路 対局</span>
               <span className="e-meta">
                 {game.state.moveHistory.length}手・{statusLabel(game)}
               </span>

@@ -1,9 +1,9 @@
 'use client';
 import { useEffect } from 'react';
-import { IgoBoardView, GameInfoView } from '../../igo-game/ui';
+import { IgoBoardView, GameInfoView, IgoGameName } from '../../igo-game/ui';
 import { IgoGame_囲碁ゲーム } from '../../igo-game/domain';
 import { useIgoWorldLine } from '../../igo-game/feature/useIgoWorldLine';
-import { useFocusedObject } from '../WorldLine/domain/FocusedObjectContext';
+import { useFocusedObject } from "@bublys-org/bubbles-ui";
 import { ObjectView } from '@bublys-org/bubbles-ui';
 
 type IgoWorldLineIntegrationProps = {
@@ -56,10 +56,16 @@ export function IgoWorldLineIntegration({ gameId, worldLineUrl }: IgoWorldLineIn
         outline: 'none',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#333' }}>
-          囲碁バブリ
-        </h2>
+      {/* ★ 隙間は**行が持つ**（`gap`）。名前の入力欄は空いたぶんまで伸びる（flex:1）ので、
+          行に隙間が無いと**ボタンにぶつかる**。数はこの画面のほかの隙間と同じ 16 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '16px' }}>
+        {/* ★ 見出しは**この対局の名前**。前はここに「囲碁バブリ」という固定の字が出ていた
+            ── アプリの名前が、対局の題名の場所にあった。名前はユーザーが付けるものなので、
+            押せば書ける（付くまでは「無題」と言う）。 */}
+        <IgoGameName
+          name={apexGame.state.name ?? ''}
+          onRename={(name) => update((current) => current.rename(name))}
+        />
         {worldLineUrl && (
           /* すでに在るもの（この対局の世界線）を開くので、ボタンではなくオブジェクトとして扱う。
              ダブルクリックで開き、data-url からリンクのリボンも伸びる。 */
@@ -76,6 +82,8 @@ export function IgoWorldLineIntegration({ gameId, worldLineUrl }: IgoWorldLineIn
                 borderRadius: '6px',
                 border: '1px solid #ccc',
                 background: '#fff',
+                // 明るい地を敷くので、字の色も自分で決める（継ぐと明るい字が白に乗る）
+                color: '#333',
                 cursor: 'pointer',
               }}
             >

@@ -9,6 +9,7 @@ export type {
 } from "./MappingRule.js";
 
 export {
+  collectAtPath,
   applyMappingRule,
   applyTransform,
   getAtPath,
@@ -33,6 +34,10 @@ export {
   enumShape,
   objectShape,
   arrayShape,
+  recordShape,
+  elementStep,
+  isElementStep,
+  arrayNameOf,
   walkLeafFields,
   pathToString,
   stringToPath,

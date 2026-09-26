@@ -7,17 +7,20 @@
 // 受けるため）。
 
 import { useEffect } from 'react';
-import { FocusedObjectProvider } from "../world-line/WorldLine/domain/FocusedObjectContext";
-import { BubblesUI } from "../bubble-ui/BubblesUI/feature/BubblesUI";
+import { FocusedObjectProvider } from "@bublys-org/bubbles-ui";
+import { BubblesUINext } from "../bubble-ui/BubblesUI/feature/BubblesUINext";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { registerShellTypes } from "../counter/registerShellTypes";
 import { BUBBLE_ARRANGEMENT_DOMAIN } from "@bublys-org/bubbles-ui";
-import { MEMO_DOMAIN } from "../world-line/Memo/domain/MemoDomain";
+import { MEMO_DOMAIN } from "@bublys-org/memo-libs";
 import { IGO_GAME_DOMAIN } from "../igo-game/domain/IgoGameDomain";
+import { SEA_ARRANGEMENT_DOMAIN } from "@bublys-org/bubble-space-shell";
 
 const APP_DOMAIN_REGISTRY = {
   ...BUBBLE_ARRANGEMENT_DOMAIN,
+  // 海の並びの移り変わり（`useSeaWorldLine` が記録する型）
+  ...SEA_ARRANGEMENT_DOMAIN,
   ...MEMO_DOMAIN,
   ...IGO_GAME_DOMAIN,
 };
@@ -32,7 +35,7 @@ export default function Index() {
     <FocusedObjectProvider>
       <ShellManagerProvider>
         <DomainRegistryProvider registry={APP_DOMAIN_REGISTRY}>
-          <BubblesUI />
+          <BubblesUINext />
         </DomainRegistryProvider>
       </ShellManagerProvider>
     </FocusedObjectProvider>

@@ -52,7 +52,10 @@
   ],
   "references": [
     {
-      "path": "../../bublys-libs/domain-registry"
+      "path": "../../launcher-bubly/launcher-model"
+    },
+    {
+      "path": "../../bublys-libs/bubble-layout"
     },
     {
       "path": "../../bublys-libs/hash-world-line"
@@ -61,10 +64,34 @@
       "path": "../../bublys-libs/akashic-record"
     },
     {
+      "path": "../../launcher-bubly/launcher-libs"
+    },
+    {
+      "path": "../../object-transformer-bubly/object-transformer-libs"
+    },
+    {
+      "path": "../../csv-importer-bubly/csv-importer-libs"
+    },
+    {
+      "path": "../../task-bubly/task-libs"
+    },
+    {
+      "path": "../../users-bubly/users-libs"
+    },
+    {
+      "path": "../../bublys-libs/bubble-space-shell"
+    },
+    {
+      "path": "../../bublys-libs/bubble-layout-feature"
+    },
+    {
+      "path": "../../memo-bubly/memo-libs"
+    },
+    {
       "path": "../../bublys-libs/object-shell"
     },
     {
-      "path": "../../users-libs"
+      "path": "../../bublys-libs/domain-registry"
     },
     {
       "path": "../../bublys-libs/world-line-graph"

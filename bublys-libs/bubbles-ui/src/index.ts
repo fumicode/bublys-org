@@ -13,6 +13,7 @@ export * from './lib/utils/url-parser.js';
 export * from './lib/utils/drag-types.js';
 export * from './lib/components/UrledPlace.js';
 export * from './lib/components/EditableText.js';
+export * from './lib/context/FocusedObjectContext.js';
 export * from './lib/object-view/ObjectTypeRegistry.js';
 export * from './lib/object-view/ObjectView.js';
 
@@ -32,13 +33,16 @@ export * from './lib/hooks/useMyRect.js';
 export * from './lib/hooks/useBubbleDrag.js';
 export * from './lib/hooks/useUniverseDropZone.js';
 export * from './lib/hooks/useBubbleResize.js';
+export * from './lib/hooks/useHeaderShift.js';
 export * from './lib/hooks/useKeyBindings.js';
 export * from './lib/hooks/shortcut.js';
 
 // Context
 export * from './lib/context/BubbleRefsContext.js';
 export * from './lib/context/UniverseContext.js';
+export * from './lib/context/HoveredBubbleContext.js';
 export * from './lib/context/CurrentBubbleContext.js';
+export * from './lib/context/KeyboardFocusContext.js';
 
 // Universe / Viewport glue
 export * from './lib/universe-config.js';
@@ -56,6 +60,9 @@ export * from './lib/ui/UniverseView.js';
 
 // Pocket
 export * from './lib/pocket/index.js';
+
+// 岸（Showre）: 辺に着いたバブル
+export * from './lib/showre/index.js';
 
 // State Management (Redux)
 export * from './lib/state/index.js';

@@ -28,6 +28,14 @@ export type Move_着手 = {
 /** 囲碁ゲームの状態 */
 export type IgoGameState_囲碁ゲーム状態 = {
   id: string;
+  /**
+   * 対局の名前 ── **ユーザーが付けるもの**。
+   *
+   * ★ 付いていないうちは無い（空でも既定の文字列でもなく、`undefined`）。
+   *   「9路 対局」のような**種類**を入れてはいけない ── それは名前の場所に種類を書くことで、
+   *   どの対局も同じ題名になる（実測：この海の対局は全部 9 路なので、札が全部同じ字だった）。
+   */
+  name?: string;
   boardSize: number;
   board: StoneColor_石の色[][];
   currentTurn: 'black' | 'white';
@@ -70,6 +78,37 @@ export class IgoGame_囲碁ゲーム {
   /** 盤面サイズを取得 */
   get boardSize(): number {
     return this.state.boardSize;
+  }
+
+  /**
+   * 画面に出す名前。付いていなければ**「無題」**。
+   *
+   * ★ 「無題」は種類ではなく**「名前が無い」と言っている**。
+   *   ここに「9路 対局」を入れると、名前の場所に種類が入り、名前が無いことが見えなくなる。
+   */
+  get displayName(): string {
+    const name = this.state.name?.trim();
+    return name ? name : '無題';
+  }
+
+  /** 名前が付いているか（＝ 人が決めた名前を持っているか） */
+  get hasName(): boolean {
+    return !!this.state.name?.trim();
+  }
+
+  /**
+   * 名前を付け替える。空にすれば名前は無くなる（「無題」に戻る）。
+   *
+   * ★ ほかの手（着手・パス・投了）と同じで**新しいインスタンスを返す**ので、
+   *   改名も世界線の 1 手になる ── Cmd+Z で戻る。名前だけ履歴の外に置くほうが不自然。
+   */
+  rename(name: string): IgoGame_囲碁ゲーム {
+    const next = name.trim();
+    if ((this.state.name ?? '') === next) return this;
+    const state = { ...this.state };
+    if (next) state.name = next;
+    else delete state.name;
+    return new IgoGame_囲碁ゲーム(state);
   }
 
   /** 現在の手番を取得 */

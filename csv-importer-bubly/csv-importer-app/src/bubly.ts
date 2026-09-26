@@ -13,7 +13,7 @@ import TableChartIcon from "@mui/icons-material/TableChart";
 import "@bublys-org/csv-importer-libs";
 
 // Bubble Routes
-import { csvImporterBubbleRoutes } from "./registration/index.js";
+import { csvImporterBubbleRoutes } from "@bublys-org/csv-importer-libs";
 
 const CsvImporterBubly: Bubly = {
   name: "csv-importer",

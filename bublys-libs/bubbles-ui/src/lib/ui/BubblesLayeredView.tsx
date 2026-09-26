@@ -1,17 +1,27 @@
 import React, { FC, ReactNode, useEffect, useRef, useLayoutEffect, memo, useMemo, useCallback, useState } from "react";
 import styled from "styled-components";
-import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, selectLightweightMode, toggleLightweightMode, selectLinkDisplay, toggleLinkDisplay } from "@bublys-org/state-management";
+import { useHoveredBubble, useHoveredBubbleState } from "../context/HoveredBubbleContext.js";
+import { TUBE_RADIUS } from "../showre/tube.js";
+import { ShowreOverlay } from "../showre/ShowreOverlay.js";
+import { ShowreDockContext, type DockResolution, type ShowreDockContextType } from "../showre/ShowreDock.js";
+import { anchoredRect as anchoredRectOf, edgesNear, fitAmongDocked, snapToViewport, type DockState, type ScreenRect } from "../showre/Showre.domain.js";
+import { dockToShowre, makeSelectBubbleSizes, makeSelectDocksJsonOf } from "../state/bubbles-slice.js";
+import { dropPointToUniverse } from "../utils/drop-point.js";
 import { Bubble } from "../Bubble.domain.js";
 import { Point2, Layer, CoordinateSystem, SmartRect } from "@bublys-org/bubbles-ui-util";
 import { BubbleView } from "./BubbleView.js";
 import { UniverseBubbleView } from "./UniverseBubbleView.js";
 import { LinkBubbleView } from "./LinkBubbleView.js";
+import { frustumBand, type BandSide } from "@bublys-org/bubble-layout-ui";
+import { getOriginRect, getDockedBubbleRect } from "../utils/get-origin-rect.js";
 import { BubbleContent } from "./BubbleContent.js";
 import { UniverseContext } from "../context/UniverseContext.js";
 import { useUniverseDropZone } from "../hooks/useUniverseDropZone.js";
 import { DRAGGING_CLASS } from "../utils/drag-session.js";
 import {
   makeSelectValidBubbleRelationIds,
+  makeSelectBubblesJsonOf,
   makeSelectGlobalCoordinateSystem,
   makeSelectSurfaceLeftTop,
   makeSelectUniverseDimensions,
@@ -38,7 +48,11 @@ type ConnectedBubbleViewProps = {
   isFocused: boolean;
   vanishingPoint: Point2;
   surfaceLayer: Layer;
-  hasLeftLink?: boolean;
+  /** 帯（リンク）が着いている辺。その辺の角を角張らせる */
+  linkedEdges?: BandSide[];
+  onHoverChange?: (bubbleId: string, hovered: boolean) => void;
+  /** 岸に着いている（ShowreView から使う）。位置は使わず、帯の並びに収まる */
+  docked?: boolean;
   lightweightMode?: boolean;
   renderBubbleContent: (bubble: Bubble) => ReactNode;
   onBubbleClick?: (name: string) => void;
@@ -50,7 +64,13 @@ type ConnectedBubbleViewProps = {
   onDebugRects?: (rects: SmartRect[]) => void;
 };
 
-const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
+export type { ConnectedBubbleViewProps };
+
+/**
+ * Redux から自分のバブルを引いて描く。海（BubblesLayeredView）でも岸（ShowreView）でも
+ * 同じものを使う — 岸に着いたからといって専用のビューは作らない。
+ */
+export const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function ConnectedBubbleView({
   universeId,
   bubbleId,
   layerIndex,
@@ -58,7 +78,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   isFocused,
   vanishingPoint,
   surfaceLayer,
-  hasLeftLink,
+  linkedEdges,
+  onHoverChange,
+  docked = false,
   lightweightMode,
   renderBubbleContent,
   onBubbleClick,
@@ -88,6 +110,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
   if (bubble.isUniverse) {
     return (
       <UniverseBubbleView
+        linkedEdges={linkedEdges}
+        onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
+        docked={docked}
         bubble={bubble}
         position={pos}
         layerIndex={layerIndex}
@@ -116,7 +141,9 @@ const ConnectedBubbleView: FC<ConnectedBubbleViewProps> = memo(function Connecte
       isFocused={isFocused}
       vanishingPoint={vanishingPoint}
       contentBackground={bubble.contentBackground ?? "white"}
-      hasLeftLink={hasLeftLink}
+      linkedEdges={linkedEdges}
+      onHoverChange={(h) => onHoverChange?.(bubbleId, h)}
+      docked={docked}
       lightweightMode={lightweightMode}
       onClick={() => onBubbleClick?.(bubble.url)}
       onCloseClick={() => onBubbleClose?.(bubble)}
@@ -141,6 +168,7 @@ type ConnectedLinkBubbleViewProps = {
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
   lightweightMode?: boolean;
+  visible: boolean;
 };
 
 const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function ConnectedLinkBubbleView({
@@ -150,6 +178,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   coordinateSystem,
   linkZIndex,
   lightweightMode,
+  visible,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
   const selectOpenee = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openeeId), [universeId, openeeId]);
@@ -165,6 +194,7 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
       lightweightMode={lightweightMode}
+      visible={visible}
     />
   );
 });
@@ -368,6 +398,19 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   const coordinateSystem = useAppSelector(makeSelectGlobalCoordinateSystem(universeId));
   const isLayerAnimating = useAppSelector(selectIsLayerAnimating);
   const lightweightMode = useAppSelector(selectLightweightMode);
+  const linkDisplay = useAppSelector(selectLinkDisplay);
+
+  // ホバー中のバブル。Provider（ShowreLayout）があれば岸の帯とも共有、無ければここだけ
+  const hoveredContext = useHoveredBubble();
+  const localHovered = useHoveredBubbleState();
+  const { hoveredBubbleId, enterBubble, leaveBubble } = hoveredContext ?? localHovered;
+  const handleHoverChange = useCallback(
+    (bubbleId: string, hovered: boolean) => {
+      if (hovered) enterBubble(bubbleId);
+      else leaveBubble(bubbleId);
+    },
+    [enterBubble, leaveBubble],
+  );
 
   const undergroundVanishingPoint: Point2 = useMemo(
     () => vanishingPoint || { x: 20, y: 10 },
@@ -387,9 +430,34 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
     return result;
   }, [bubbleLayers]);
 
-  const openeeIds = useMemo(() => {
-    return new Set(relationIds.map(r => r.openeeId));
-  }, [relationIds]);
+  const bubblesJson = useAppSelector(makeSelectBubblesJsonOf(universeId));
+
+  // 帯（錐台）が着いている openee の辺。その辺の角を角張らせる。
+  // 起点側は帯に含まれる（錐台の奥の面）ので角は触らない。
+  // 矩形の出所は LinkBubbleView と同じ（クリック元 → 岸の帯 → renderedRect）。
+  const linkedEdges = useMemo(() => {
+    const result: Record<string, BandSide[]> = {};
+    const add = (id: string, side: BandSide) => {
+      const list = (result[id] ??= []);
+      if (!list.includes(side)) list.push(side);
+    };
+    for (const r of relationIds) {
+      const openerJson = bubblesJson[r.openerId];
+      const openeeJson = bubblesJson[r.openeeId];
+      if (!openerJson || !openeeJson) continue;
+      const opener = Bubble.fromJSON(openerJson);
+      const openee = Bubble.fromJSON(openeeJson);
+      // 帯を隠しているバブルからの帯は無いものとして扱う（角も丸いまま）
+      if (opener.linksHidden) continue;
+      const openerRect =
+        getOriginRect(opener.id, openee.url) ?? getDockedBubbleRect(opener.id) ?? opener.renderedRect;
+      const openeeRect = openee.renderedRect;
+      if (!openerRect || !openeeRect) continue;
+      const band = frustumBand(openerRect.toLocal(coordinateSystem), openeeRect.toLocal(coordinateSystem));
+      for (const edge of band?.openeeEdges ?? []) add(r.openeeId, edge);
+    }
+    return result;
+  }, [relationIds, bubblesJson, coordinateSystem]);
 
   // surface（最前面）レイヤー。bubble.position(layer-local) ⇄ universe 変換を担う
   const surfaceLayer = useMemo(
@@ -437,7 +505,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
               : layer;
           return orderedLayer.map((bubbleId) => {
             const zIndex = baseZIndex - layerIndex;
-            const hasLeftLink = openeeIds.has(bubbleId);
+            const edges = linkedEdges[bubbleId];
             const isFocused = focusedBubbleId === bubbleId;
 
             return (
@@ -450,7 +518,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                 isFocused={isFocused}
                 vanishingPoint={undergroundVanishingPoint}
                 surfaceLayer={surfaceLayer}
-                hasLeftLink={hasLeftLink}
+                linkedEdges={edges}
+                onHoverChange={handleHoverChange}
                 lightweightMode={lightweightMode}
                 renderBubbleContent={renderBubbleContent}
                 onBubbleClick={stableOnBubbleClick}
@@ -467,7 +536,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
         .flat(),
     [
       bubbleLayers,
-      openeeIds,
+      linkedEdges,
+      handleHoverChange,
       surfaceLayer,
       lightweightMode,
       universeId,
@@ -485,6 +555,110 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   );
 
   const universeContextValue = useMemo(() => ({ universeId, universeRef }), [universeId]);
+
+  // ── 岸（Showre）──────────────────────────────────────────────
+  // 岸は海に重なる層で、海の大きさは削らない。貼り付く位置は「見えている範囲」＝
+  // スクロール容器（StyledViewport）の矩形で決める
+  const docksJson = useAppSelector(makeSelectDocksJsonOf(universeId));
+  const [dockPreview, setDockPreview] = useState<DockResolution | null>(null);
+  const [showreViewport, setShowreViewport] = useState({ width: 0, height: 0 });
+  const docksRef = useRef(docksJson);
+  docksRef.current = docksJson;
+  // 貼り付いた矩形は「留め方 × バブル自身の大きさ」で決まる（大きさは岸に持たない）
+  const bubbleSizes = useAppSelector(makeSelectBubbleSizes(universeId));
+  const bubbleSizesRef = useRef(bubbleSizes);
+  bubbleSizesRef.current = bubbleSizes;
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setShowreViewport((prev) =>
+        prev.width === r.width && prev.height === r.height ? prev : { width: r.width, height: r.height },
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /**
+   * 「いま離したらどうなるか」。
+   * どの辺に寄せたかは**カーソル**で決め、置く場所は**バブルが見えている矩形**で決める
+   * （掴んだ点との相対位置を保つ）。重なりの解決はドメイン（fitAmongDocked）。
+   */
+  const resolveDock = useCallback(
+    (rect: ScreenRect, cursor: Point2, bubbleId: string): DockResolution | null => {
+      const el = viewportRef.current;
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      const viewport = { width: box.width, height: box.height };
+      const local = { x: rect.x - box.left, y: rect.y - box.top };
+      const edges = edgesNear({ x: cursor.x - box.left, y: cursor.y - box.top }, viewport);
+      // 縁から遠ければ海に浮く。そのままの場所・大きさで予告する（岸 → 海 のときも出る）
+      if (edges.length === 0) {
+        return { rect: { x: local.x, y: local.y, width: rect.width, height: rect.height } };
+      }
+      const dock: DockState = { edges, at: local };
+      const size = { width: rect.width, height: rect.height };
+      const others = Object.entries(docksRef.current)
+        .filter(([id]) => id !== bubbleId)
+        .flatMap(([id, d]) => {
+          const other = bubbleSizesRef.current[id];
+          return other ? [anchoredRectOf(d, other, viewport)] : [];
+        });
+      const pointer = { x: cursor.x - box.left, y: cursor.y - box.top };
+      const fitted = fitAmongDocked(dock, size, viewport, others, pointer);
+      if (!fitted) return null;
+      // 縁まであと数 px なら、ぴたりと着ける（隙間が空くと管が 2 本並んで見える）
+      const snapped = snapToViewport(fitted, viewport);
+      return { rect: snapped, dock: { edges, at: { x: snapped.x, y: snapped.y } } };
+    },
+    [],
+  );
+
+  /**
+   * 貼ったまま大きさを変える（リサイズ）。画面座標の矩形で留め直すだけ。
+   * 留まっている辺は変わらない ── 変わるのは大きさと、貼っていない向きの位置。
+   */
+  const redock = useCallback(
+    (bubbleId: string, rect: ScreenRect) => {
+      const box = viewportRef.current?.getBoundingClientRect();
+      const edges = docksRef.current[bubbleId]?.edges;
+      if (!box || !edges) return;
+      // 縁まであと数 px なら、ぴたりと着ける（着くか離れるかのどちらかにする）
+      const local = snapToViewport(
+        { x: rect.x - box.left, y: rect.y - box.top, width: rect.width, height: rect.height },
+        { width: box.width, height: box.height },
+      );
+      dispatch(
+        dockToShowre(
+          {
+            bubbleId,
+            dock: { edges, at: { x: local.x, y: local.y } },
+            size: { width: local.width, height: local.height },
+          },
+          universeId,
+        ),
+      );
+    },
+    [dispatch, universeId],
+  );
+
+  const showreDock = useMemo<ShowreDockContextType>(
+    () => ({
+      universeId,
+      viewport: showreViewport,
+      resolve: resolveDock,
+      redock,
+      preview: dockPreview,
+      setPreview: setDockPreview,
+      toUniverse: (point: Point2) => dropPointToUniverse(point, universeRef.current),
+    }),
+    [universeId, showreViewport, resolveDock, redock, dockPreview],
+  );
   const dropZone = useUniverseDropZone({ universeId, universeRef });
   const hudSurface = useMemo(() => ({ leftTop: surfaceLeftTop }), [surfaceLeftTop]);
 
@@ -498,12 +672,30 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
     (e: React.MouseEvent) => {
       if (e.target !== e.currentTarget) return;
       dispatch(unfocusBubble(universeId));
+
+      // 背景のドラッグは視点を動かす（掴んでいないときは、いつも視点）。
+      // スクロールバーは出さないので、マウスで海を動かす手はこれ
+      const viewport = viewportRef.current;
+      if (!viewport || e.button !== 0) return;
+      const start = { x: e.clientX, y: e.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+      const onMove = (ev: MouseEvent) => {
+        viewport.scrollLeft = start.left - (ev.clientX - start.x);
+        viewport.scrollTop = start.top - (ev.clientY - start.y);
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      e.preventDefault();
     },
     [dispatch, universeId]
   );
 
   return (
     <UniverseContext.Provider value={universeContextValue}>
+     <ShowreDockContext.Provider value={showreDock}>
       <StyledFrame $nested={isNested}>
         {/* 誰も受け止めなかったドロップは、宇宙が落ちた場所で受け止める。
             ハンドラを StyledUniverse ではなく StyledViewport に付けるのは、
@@ -528,6 +720,8 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
             {!isLayerAnimating &&
               relationIds.map(({ openerId, openeeId }) => {
                 const linkZIndex = bubbleIdToZIndex[openeeId] - 1;
+                // opener が帯を隠していれば描かない（関係は残るので、戻せば復活する）
+                if (bubblesJson[openerId]?.linksHidden) return null;
 
                 return(
                   <ConnectedLinkBubbleView
@@ -538,12 +732,26 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
                     lightweightMode={lightweightMode}
+                    // 既定はホバー時だけ: どちらかの端のバブルにホバーしているとき見せる
+                    visible={
+                      linkDisplay === "always" ||
+                      hoveredBubbleId === openerId ||
+                      hoveredBubbleId === openeeId
+                    }
                   />
                 );
               })
             }
           </StyledUniverse>
         </StyledViewport>
+
+        {/* 岸 ── 海に重なる層。海は削らない（スクロールバーの位置も変わらない） */}
+        <ShowreOverlay
+          universeId={universeId}
+          viewport={showreViewport}
+          renderBubbleContent={renderBubbleContent}
+          preview={dockPreview}
+        />
 
         <StyledHeadsUpDisplay
           surface={hudSurface}
@@ -565,9 +773,17 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
             >
               {lightweightMode ? '精' : '速'}
             </button>
+            <button
+              className="e-link-display-toggle"
+              onClick={() => dispatch(toggleLinkDisplay())}
+              title={linkDisplay === 'always' ? '帯をホバー時だけ表示する' : '帯を常に表示する'}
+            >
+              {linkDisplay === 'always' ? '常' : '帯'}
+            </button>
           </div>
         </StyledHeadsUpDisplay>
       </StyledFrame>
+     </ShowreDockContext.Provider>
     </UniverseContext.Provider>
   );
 };
@@ -585,6 +801,10 @@ const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
   overflow: hidden;
   z-index: 0;
 
+  /* 海の角は丸い。岸のネオン管（ShowreRim）と同じ丸みで切り抜く
+     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える */
+  border-radius: ${TUBE_RADIUS}px;
+
   /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
      全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */
   background: transparent;
@@ -599,6 +819,12 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
   position: absolute;
   inset: 0;
   overflow: auto;
+  /* 海にスクロールバーは出さない（新しい bubble-layout の見本と同じ）。
+     海を動かすのはホイールと、背景のドラッグ（掴んでいないときは視点が動く） */
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
   /* nested は pointer-events: none。空白領域は奥に貫通するが、内側のバブル（auto）
      上でホイールを回すと、その wheel イベントが祖先の overflow:auto まで届いて
      ネイティブにスクロールが起きる。
@@ -699,7 +925,8 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
       }
     }
 
-    .e-lightweight-toggle {
+    .e-lightweight-toggle,
+    .e-link-display-toggle {
       position: absolute;
       bottom: 8px;
       left: ${({ surface }) => surface.leftTop.x + 40}px;
@@ -722,6 +949,10 @@ const StyledHeadsUpDisplay = styled.div<StyledHeadsUpDisplayProps>`
         opacity: 1;
         background: rgba(255, 255, 255, 0.2);
       }
+    }
+
+    .e-link-display-toggle {
+      left: ${({ surface }) => surface.leftTop.x + 72}px;
     }
   }
 `;

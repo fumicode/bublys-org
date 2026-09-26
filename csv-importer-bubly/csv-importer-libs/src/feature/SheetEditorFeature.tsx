@@ -235,19 +235,28 @@ export const SheetEditorFeature: FC<SheetEditorFeatureProps> = ({
       onChangeTitleColumn={handleChangeTitleColumn}
       onOpenObject={handleOpenObject}
       buildObjectUrl={buildObjectUrl}
+      /**
+       * ★ **鍵が無いなら、口も出さない。**
+       *   Google の鍵（`.env` の `VITE_GOOGLE_CLIENT_ID`）はビルドのときに焼き込まれる。
+       *   無いまま配ると Sheets の口は出るのに、押した先で必ず「未設定です」と断られる
+       *   ── 直せるのは配る人だけなので、使う人には**最初から無いもの**として見せる。
+       *   渡さなければ `SheetEditorView` が口ごと畳む。
+       */
       googleSheetsPanel={
-        <GoogleSheetsPanel
-          isLinked={!!gsLink}
-          spreadsheetId={gsLink?.spreadsheetId}
-          sheetName={gsLink?.sheetName}
-          lastSyncedAt={gsLink?.lastSyncedAt}
-          isSyncing={isSyncing}
-          onLink={handleLink}
-          onUnlink={handleUnlink}
-          onPush={handlePush}
-          onPull={handlePull}
-          error={syncError}
-        />
+        googleClientId ? (
+          <GoogleSheetsPanel
+            isLinked={!!gsLink}
+            spreadsheetId={gsLink?.spreadsheetId}
+            sheetName={gsLink?.sheetName}
+            lastSyncedAt={gsLink?.lastSyncedAt}
+            isSyncing={isSyncing}
+            onLink={handleLink}
+            onUnlink={handleUnlink}
+            onPush={handlePush}
+            onPull={handlePull}
+            error={syncError}
+          />
+        ) : undefined
       }
     />
   );

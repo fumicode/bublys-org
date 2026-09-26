@@ -35,6 +35,11 @@ export type UniverseViewProps = {
   renderBubbleContent?: (bubble: Bubble) => ReactNode;
   /** universe が空のとき最初に置くバブルの URL 群（ネスト universe の種） */
   initialBubbleUrls?: string[];
+  /**
+   * 海（浮いているバブルのサーフェス）の上に重ねる overlay（世界線のツールバー等）。
+   * 岸の帯とは重ならない位置に来る（帯の外側ではなく、海の position: relative の中）。
+   */
+  children?: ReactNode;
 };
 
 /**
@@ -48,6 +53,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   universeId,
   renderBubbleContent,
   initialBubbleUrls,
+  children,
 }) => {
   const dispatch = useAppDispatch();
   // この universe の DOM 要素を引くためのラッパ ref（下部ストリップ計測用）
@@ -198,6 +204,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
     <BubblesContext.Provider value={bubblesContextValue}>
       <BubbleRefsProvider>
         <div ref={rootRef} style={{ width: "100%", height: "100%" }}>
+          {/* 岸（貼り付いたバブル）は BubblesLayeredView の中に、海に重なる層として居る */}
           <BubblesLayeredView
             universeId={universeId}
             bubbleLayers={bubbleLayers}
@@ -208,6 +215,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
             onBubbleLayerUp={layerUp}
             onCoordinateSystemReady={handleCoordinateSystemReady}
           />
+          {children}
         </div>
       </BubbleRefsProvider>
     </BubblesContext.Provider>

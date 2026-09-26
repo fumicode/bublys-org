@@ -8,7 +8,7 @@ import {
   useShellManager,
   ShellListPanel,
 } from '@bublys-org/object-shell';
-import { FocusedObjectProvider } from '../world-line/WorldLine/domain/FocusedObjectContext';
+import { FocusedObjectProvider } from '@bublys-org/bubbles-ui';
 import { registerShellTypes } from '../counter/registerShellTypes';
 import { BubblesUI } from '../bubble-ui/BubblesUI/feature/BubblesUI';
 import {

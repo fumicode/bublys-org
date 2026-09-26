@@ -26,6 +26,7 @@
     }
   },
   "dependencies": {
+    "@bublys-org/bubble-layout-ui": "0.0.1",
     "@bublys-org/bubbles-ui-util": "*",
     "@bublys-org/domain-registry": "*",
     "@bublys-org/state-management": "*",
@@ -41,7 +42,9 @@
   },
   "nx": {
     "targets": {
-      "dev": { "continuous": true }
+      "dev": {
+        "continuous": true
+      }
     }
   }
 }

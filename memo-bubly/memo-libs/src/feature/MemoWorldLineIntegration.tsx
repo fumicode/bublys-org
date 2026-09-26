@@ -1,0 +1,69 @@
+'use client';
+import { useEffect } from 'react';
+import { MemoEditor } from '../ui/MemoEditor.js';
+import { MemoTitle } from '../ui/MemoTitle.js';
+import { useMemoWorldLine } from './useMemoWorldLine.js';
+import { useFocusedObject } from '@bublys-org/bubbles-ui';
+
+type MemoWorldLineIntegrationProps = {
+  memoId: string;
+  onOpenWorldLineView?: () => void;
+  /** このメモの世界線バブルの URL（リンクのリボン用） */
+  worldLineUrl?: string;
+};
+
+/**
+ * Memo の編集 UI と world-line-graph を接続するコンポーネント。
+ *
+ * `useMemoWorldLine(memoId)` で scope を確保し、apex memo を MemoEditor /
+ * MemoTitle に渡す。編集は `update(transform)` 経由で graph を伸ばす。
+ *
+ * scope（= world-line）が未初期化のとき（scope が空、apex 無し）は対象 memo が
+ * まだ存在しないことを示すプレースホルダを出す。
+ */
+export function MemoWorldLineIntegration({ memoId, onOpenWorldLineView, worldLineUrl }: MemoWorldLineIntegrationProps) {
+  const { focusedObjectId, setFocusedObjectId } = useFocusedObject();
+  const { apexMemo, update, moveBack, moveForward } = useMemoWorldLine(memoId);
+
+  // Cmd/Ctrl+Z でデータ undo（= 世界線の親ノードへ moveBack）、
+  // Cmd/Ctrl+Shift+Z で redo（moveForward）。フォーカス中の memo にだけ効かせる。
+  // これにより apex が動き、世界線ビューの塗り点も追従する。
+  useEffect(() => {
+    if (focusedObjectId !== memoId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.ctrlKey || e.metaKey;
+      if (!meta || e.key.toLowerCase() !== 'z') return;
+      e.preventDefault();
+      if (e.shiftKey) moveForward();
+      else moveBack();
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [focusedObjectId, memoId, moveBack, moveForward]);
+
+  if (!apexMemo) {
+    return <div style={{ opacity: 0.7 }}>このメモは見つからないか、まだ初期化されていません。</div>;
+  }
+
+  return (
+    <div
+      /* ★ 詳細の中身は枠から 12px 内側に置く */
+      style={{ padding: 12 }}
+      onFocus={() => setFocusedObjectId(memoId)}
+      onMouseDown={() => setFocusedObjectId(memoId)}
+      tabIndex={-1}
+    >
+      <MemoTitle
+        memo={apexMemo}
+        onSetAuthor={(userId) => update((current) => current.setAuthor(userId))}
+        onOpenWorldLineView={onOpenWorldLineView}
+        worldLineUrl={worldLineUrl}
+      />
+      <MemoEditor
+        memo={apexMemo}
+        memoId={memoId}
+        onMemoChange={(updated) => update(() => updated)}
+      />
+    </div>
+  );
+}

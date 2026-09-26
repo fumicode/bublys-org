@@ -40,7 +40,7 @@
       "path": "./gakkai-shift-bubly/gakkai-shift-model"
     },
     {
-      "path": "./users-libs"
+      "path": "./users-bubly/users-libs"
     },
     {
       "path": "./bublys-libs/bubbles-ui-util"
@@ -119,6 +119,39 @@
     },
     {
       "path": "./bublys-libs/model-graph"
+    },
+    {
+      "path": "./launcher-bubly/launcher-model"
+    },
+    {
+      "path": "./launcher-bubly/launcher-libs"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout-feature"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout-ui"
+    },
+    {
+      "path": "./bublys-libs/bubble-layout"
+    },
+    {
+      "path": "./users-bubly/users-app"
+    },
+    {
+      "path": "./bublys-libs/bubble-space-shell"
+    },
+    {
+      "path": "./task-bubly/task-libs"
+    },
+    {
+      "path": "./task-bubly/task-app"
+    },
+    {
+      "path": "./memo-bubly/memo-libs"
+    },
+    {
+      "path": "./memo-bubly/memo-app"
     }
   ]
 }

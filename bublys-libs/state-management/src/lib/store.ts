@@ -16,7 +16,6 @@ import { counterSlice } from "./slices/counter-slice.js";
 import { worldSlice } from "./slices/world-slice.js";
 import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
-import { taskSlice } from "./slices/task-slice.js";
 
 //iframe-slices
 import appReducer from './iframe-slices/apps.slice.js';
@@ -35,7 +34,6 @@ export const rootReducer = combineSlices(
   environmentSlice,
   memoSlice,
   pocketSlice,
-  taskSlice,
   // iframe-slices（単純なreducer）
   {
     app: appReducer,
@@ -57,15 +55,21 @@ const injectedMiddlewares: Middleware[] = [];
 const injectedBlacklist: string[] = [];
 
 /**
- * 外部ライブラリから slice を注入する。
- * 同じ slice を二重注入しても 1 回しか登録しない（複数のバブリ／ライブラリが
- * 同じ slice の初期化関数を呼ぶケースに耐えるため）。
+ * 外部ライブラリから slice を注入する。**注入はここ 1 か所を通す**
+ * （`slice.injectInto(rootReducer)` を直に呼ばない）。
+ *
+ * - 同じ slice を二重注入しても 1 回しか登録しない（複数のバブリ／ライブラリが
+ *   同じ初期化関数を呼ぶケースに耐えるため）
+ * - ★ **差し替えだと言っておく**（`overrideExisting`）。開発中は HMR で slice の模型が
+ *   作り直されるので、**同じ場所に別の reducer** が来る ── 黙っていると Redux Toolkit が
+ *   「上書きするなら言え」と警告を出し続ける。作り直されたのは同じ slice なので、
+ *   新しいほうで差し替えるのが正しい。
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const injectSlice = (slice: Slice) => {
   if (injectedSlices.includes(slice)) return;
   injectedSlices.push(slice);
-  slice.injectInto(rootReducer);
+  slice.injectInto(rootReducer, { overrideExisting: true });
 };
 
 /**

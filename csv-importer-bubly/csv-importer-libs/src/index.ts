@@ -9,3 +9,6 @@ export * from "./ui/index.js";
 
 // Feature components
 export * from "./feature/index.js";
+
+// Registration（バブルルート）
+export * from "./registration/index.js";

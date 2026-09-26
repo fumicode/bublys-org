@@ -15,7 +15,7 @@ import { hotelShiftPuzzleBubbleRoutes } from "./registration/index.js";
 const HotelShiftPuzzleBubly: Bubly = {
   name: "hotel-shift-puzzle",
   version: "0.0.1",
-  label: "Hotel Shift Puzzle",
+  label: "シフトントン",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
   initialBubbleUrls: ["hotel-shift-puzzle/schedules"],
   backdropColor: "hsl(20, 40%, 22%)",

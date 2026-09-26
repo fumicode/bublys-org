@@ -1,6 +1,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   joinSiblingInProcess,
+  undockFromShowre,
   popChildInProcess,
   popChildMaxInProcess,
   removeBubble,
@@ -15,9 +16,10 @@ import {
   clearAllAnimations,
   ROOT_UNIVERSE_ID,
 } from './bubbles-slice.js';
-import { Layer, type Point2 } from '@bublys-org/bubbles-ui-util';
+import { Layer, type Point2, type SmartRect } from '@bublys-org/bubbles-ui-util';
 import { Bubble } from '../Bubble.domain.js';
-import { getOriginRect } from '../utils/get-origin-rect.js';
+import { getOriginRect, getDockedBubbleRect } from '../utils/get-origin-rect.js';
+import type { ShowreSide } from '../showre/Showre.domain.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
 // dropped-place は「方向」を持たない（点そのものが位置）ので、ここには来ない。
@@ -87,6 +89,15 @@ const scheduleAnimationFallback = (dispatch: (action: ReturnType<typeof clearAll
 };
 
 // joinSiblingInProcess 発火後、兄弟バブルの隣に配置
+// 岸から引き剥がして落とした点へ置く。レイヤーに戻すこと（reducer）と、どこに置くかは別の話。
+bubblesListener.startListening({
+  actionCreator: undockFromShowre,
+  effect: async (action, listenerApi) => {
+    if (!action.payload.droppedAt) return;
+    placeAtDroppedPoint(listenerApi, universeIdOf(action), action.payload.bubbleId, action.payload.droppedAt);
+  },
+});
+
 bubblesListener.startListening({
   actionCreator: joinSiblingInProcess,
   effect: async (action, listenerApi) => {
@@ -210,6 +221,56 @@ bubblesListener.startListening({
 });
 
 
+/** 岸の辺 → その岸から海へ向かう向き */
+const towardSea: Record<ShowreSide, 'right' | 'left' | 'top' | 'bottom'> = {
+  left: 'right',
+  right: 'left',
+  top: 'bottom',
+  bottom: 'top',
+};
+
+/**
+ * opener が岸に着いているときの「基準の矩形」と「開く向き」。
+ *
+ * ルール: 岸に着いたバブルから開いたバブルは、岸から海の側へ開く。
+ * 基準は帯の中のクリック元（UrledPlace）、無ければ帯の要素そのもの。
+ * 岸に着いている間は BubbleView が描かれず renderedRect が古いままなので、
+ * DOM の帯を測る。浮いていれば undefined（通常の道）。
+ */
+const dockedOpenerBase = (
+  state: any,
+  universeId: string,
+  openerId: string,
+  openeeUrl: string,
+): { rect: SmartRect; direction: 'right' | 'left' | 'top' | 'bottom' } | undefined => {
+  const edges: readonly ShowreSide[] =
+    state.bubbleState?.universes?.[universeId]?.docks?.[openerId]?.edges ?? [];
+  // 貼り付いている辺の反対（＝海の側）へ開く。角なら最初の辺で決める
+  const side = edges[0];
+  if (!side) return undefined;
+  const rect = getOriginRect(openerId, openeeUrl) ?? getDockedBubbleRect(openerId);
+  if (!rect) return undefined;
+  return { rect, direction: towardSea[side] };
+};
+
+/**
+ * 岸の基準矩形の隣（海側）に置く位置（universe 座標）。
+ * 帯は奥のレイヤーに退かないので、浮いている opener 用の calcPositionToOpen
+ * （toLayerBelow を挟む）は使わない。開く側の大きさが分かっていれば
+ * 帯にぴったり接する位置、分からなければ隣の領域の左上（既存の getNeighbor の規約）。
+ */
+const positionBesideDocked = (
+  base: SmartRect,
+  direction: 'right' | 'left' | 'top' | 'bottom',
+  size: { width: number; height: number } | undefined,
+): Point2 => {
+  const g = base.toGlobal();
+  const known = size && size.width > 0 && size.height > 0;
+  if (known && direction === 'left') return { x: Math.max(0, g.x - size.width), y: g.y };
+  if (known && direction === 'top') return { x: g.x, y: Math.max(0, g.y - size.height) };
+  return g.getNeighbor(direction).position;
+};
+
 // popChildInProcess 発火後、moveTo → updateBubble を実行
 // openerのrenderedRectがすでにあれば、renderBubbleを待たずに即座に位置を計算
 bubblesListener.startListening({
@@ -238,6 +299,18 @@ bubblesListener.startListening({
 
     const openerBubble = selectBubble(state, { id: relation.openerId, universeId });
     const poppingBubble = selectBubble(state, { id: poppingBubbleId, universeId });
+
+    // opener が岸に着いていれば、帯を基準に海の側へ開く（renderedRect は使わない）
+    const docked = dockedOpenerBase(state, universeId, relation.openerId, poppingBubble.url);
+    if (docked) {
+      const coordinateConfig = makeSelectGlobalCoordinateSystem(universeId)(state);
+      const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
+      const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
+      const point = positionBesideDocked(docked.rect, docked.direction, poppingBubble.renderedRect?.size);
+      const moved = poppingBubble.moveTo(surfaceLayer.locate(point));
+      listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
+      return;
+    }
 
     // openerのrenderedRectがあれば、即座に位置を計算
     // calcPositionToOpenはtoLayerBelow().toGlobal()という純粋な数学的変換を使うので、

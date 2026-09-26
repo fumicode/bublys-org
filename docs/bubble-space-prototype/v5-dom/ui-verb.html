@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>v5-dom · ui-verb —— ユーザーに見せるのは動詞</title>
+<style>
+  :root{--bg:#0b0d14;--panel:#141824;--panel2:#10141f;--line:#2a3145;--fg:#e6ebf5;--dim:#8b95ad;
+        --accent:#6ee7ff;--on:#7ee2a8;--warn:#ffd479;--ng:#ff9db1}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;
+    font:13px/1.55 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+  #app{display:flex;flex-direction:column;height:100%}
+  .lbl{color:var(--dim);font-size:11px;letter-spacing:.04em;white-space:nowrap}
+  .ttl{color:var(--fg);font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:6px}
+  .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  .note{color:var(--dim);font-size:11px;line-height:1.7}
+  .note b{color:var(--accent);font-weight:600}
+  .note i{font-style:normal;color:var(--warn)}
+  code{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--warn)}
+
+  /* ── 上：場面 ── */
+  #top{flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+       padding:7px 12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .chip{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:14px;
+        padding:3px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .chip:hover{border-color:var(--accent)}
+  .chip.on{background:#26405a;border-color:var(--accent);color:#fff}
+  .chip .ok{color:var(--on);margin-right:4px}
+  #scope{color:var(--dim);font-size:11px}
+  #scope b{color:var(--accent);font-weight:600}
+
+  /* ── 本体 ── */
+  #main{flex:1 1 auto;display:flex;min-height:0}
+  #left{flex:0 0 206px;background:var(--panel);border-right:1px solid var(--line);
+        padding:10px 10px 8px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  #right{flex:0 0 358px;background:var(--panel);border-left:1px solid var(--line);
+         padding:10px 10px 8px;display:flex;flex-direction:column;gap:7px;overflow:auto}
+  #stage{flex:1 1 auto;position:relative;min-width:0;overflow:hidden;cursor:grab}
+  #stage.drag{cursor:grabbing}
+
+  /* ── 動詞 ── */
+  .verb{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+        background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:8px;
+        padding:7px 9px;font:inherit;font-size:13px;cursor:pointer;margin-bottom:5px}
+  .verb:hover{border-color:var(--accent)}
+  .verb.on{background:#26405a;border-color:var(--accent);color:#fff}
+  .verb .g{flex:0 0 26px;height:20px;position:relative;opacity:.9}
+  .verb .g i{position:absolute;background:currentColor;border-radius:1.5px;display:block}
+  #subs{display:flex;gap:5px;flex-wrap:wrap;align-items:center;min-height:26px}
+  #subs .sublbl{color:var(--dim);font-size:11px;margin-right:2px}
+  .sub{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:12px;
+       padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
+  .sub.on{background:#2e4a3a;border-color:var(--on);color:#eafff2}
+  #verbnote{border-top:1px dashed var(--line);padding-top:7px;margin-top:2px}
+
+  /* ── 対応表 ── */
+  #nowverb{color:var(--accent);font-weight:700;font-size:13px;letter-spacing:0}
+  #nowverb.edited{color:var(--warn)}
+  #mapv4{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+         font-size:11px;color:var(--dim);line-height:1.7}
+  #mapv4 b{color:var(--fg);font-weight:600}
+  table{border-collapse:collapse;width:100%;font-size:11px}
+  th{color:var(--dim);font-weight:600;text-align:left;padding:2px 4px;font-size:10px;letter-spacing:.06em}
+  td{padding:2px 4px;border-top:1px solid var(--line);white-space:nowrap}
+  td.ax{color:var(--fg);font-weight:700;width:18px}
+  td.v{color:var(--dim)}
+  td.v.live{color:var(--on)}
+  td.v.lensfish{color:var(--accent)}
+  select{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:5px;
+         padding:1px 4px;font:inherit;font-size:11px;cursor:pointer;width:100%}
+  select:hover{border-color:var(--accent)}
+  #more{background:#1d2334;color:var(--fg);border:1px solid var(--line);border-radius:7px;
+        padding:4px 10px;font:inherit;font-size:12px;cursor:pointer;align-self:flex-start}
+  #more:hover{border-color:var(--accent)}
+  #more.on{border-color:var(--warn);color:var(--warn)}
+  #back{background:#3a2f1c;color:var(--warn);border:1px solid var(--warn);border-radius:7px;
+        padding:3px 9px;font:inherit;font-size:11px;cursor:pointer;align-self:flex-start}
+
+  /* ── ステージ ── */
+  #frame{position:absolute;border:1px dashed #37405c;border-radius:10px;pointer-events:none}
+  #framelbl{position:absolute;color:var(--dim);font-size:11px;pointer-events:none}
+  #framelbl b{color:var(--fg);font-weight:600}
+  #world{position:absolute;inset:0}
+  .bub{position:absolute;left:0;top:0;transform-origin:0 0;border-radius:7px;
+       border:1px solid rgba(255,255,255,.22);overflow:hidden;cursor:pointer}
+  .bub .hd{height:22px;line-height:22px;padding:0 7px;font-size:11px;font-weight:600;
+           color:#0b0d14;white-space:nowrap;overflow:hidden}
+  .bub.sel{outline:2px solid var(--accent);outline-offset:1px}
+  #stagehint{position:absolute;left:12px;bottom:10px;right:12px;color:var(--dim);font-size:11px;
+             pointer-events:none;line-height:1.7}
+  #stagehint b{color:var(--accent)}
+
+  /* ── 下：作れないもの ── */
+  #bottom{flex:0 0 auto;background:var(--panel2);border-top:1px solid var(--line);
+          padding:6px 12px;display:flex;gap:18px;align-items:flex-start;font-size:11px;color:var(--dim)}
+  #bottom .h{color:var(--ng);font-weight:700;white-space:nowrap}
+  #bottom ul{margin:0;padding-left:15px}
+  #bottom li{line-height:1.7}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="top">
+    <span class="lbl">v4 の6場面</span>
+    <div id="scenes" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    <span class="sep"></span>
+    <span id="scope"></span>
+  </div>
+
+  <div id="main">
+    <div id="left">
+      <div class="ttl">動詞 ── ユーザーが見るのはこれだけ</div>
+      <div id="verbs"></div>
+      <div id="subs"></div>
+      <div class="note" id="verbnote"></div>
+    </div>
+
+    <div id="stage">
+      <div id="frame"></div>
+      <div id="framelbl"></div>
+      <div id="world"></div>
+      <div id="stagehint"></div>
+    </div>
+
+    <div id="right">
+      <div class="ttl">この動詞は v4 の どの View か</div>
+      <div><span id="nowverb"></span></div>
+      <div id="mapv4"></div>
+      <table id="axtbl"></table>
+      <button id="more">詳しく ▾（汎用モデルへ降りる）</button>
+      <div class="note" id="deep"></div>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <span class="h">動詞では出ない View<br>（＝詳しくへ降りるしかない）</span>
+    <ul>
+      <li>並べながら履歴を奥に … <code>X 順序·詰める·平行 ＋ Z 履歴の古さ·等間隔·透視</code>（詳しくで 3 手）</li>
+      <li>2D魚眼の格子 … <code>X も Y も 魚眼</code>（詳しくで 2 手）</li>
+    </ul>
+    <ul>
+      <li>順序で並べて奥行きは自由 … <code>Z 自由Z·そのまま·透視</code>（詳しくで 3 手）</li>
+      <li>間隔・隙間・揃え … 動詞が値を抱えている。<b style="color:var(--warn)">詳しくにも無い</b>（v4 も UI に無い）</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   v5-dom · ui-verb —— 「設定」ではなく「動詞」を見せる薄い層
+   正は ../v4/RULES.md。規則5つは 1つも変えない。ここで足すのは名前だけ。
+
+   この案の1文
+     動詞は View の別名にすぎない。動詞 → View は表の1行で、閉じた型ではない。
+     だから v3/06（案B）が「6型のどれでも作れない」と測った 重ねて置く が、この案では表の1行で出る。
+
+   ユーザーが触るもの（3つ）
+     1. 動詞      6個（自由に置く／並べる／表にする／めくる／重ねる／履歴で見る）
+     2. 副え      動詞が持つときだけ出る。多くて2択（横/縦・奥へ/広げて）
+     3. 詳しく    開くと v4 の軸セレクタ9個がそのまま出る（汎用モデルへ降りる道）
+     ＋ 効く空間は「選んでいる泡がいる空間」。v4 の規則そのままで、新しい操作子ではない
+     ＋ 同じ動詞をもう一度押す ＝ 焦点を戻す（v4 の「焦点を戻す」ボタンを動詞に畳んだ）
+
+   組み合わせ 9 通り（1+2+1+2+1+2）。v4 の軸セレクタは 216,000 通り、v3/06 の案B は 40 通り。
+
+   この絵について（張りぼてではない所／張りぼての所）
+     ・④ 帯の式・レンズ・min の大きさ・入れ子の合成 scale は本当に解いている（1枚に書いた小さい版）
+     ・入れていないもの：書き込む操作（泡のドラッグ）・見えない親・継承・⑤ の pin・当たり判定の細かい所
+       → ドラッグで値を書かないので、⑤（触っていない泡は動かない）はこの画面には出ない
+     ・背景ドラッグ＝視点（②）、ホイール＝奥行きの視点（②）だけ入れた。焦点が動くと動詞の意味が見える
+   ============================================================================ */
+
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+/* ============================================================
+   §1 v4 の語彙（../v4/lab.html §1 から写したもの。値は変えない）
+   ============================================================ */
+const HEADER = 22, PAD = 12, GAP = 14, K_PERSP = 0.26;
+
+const DIMS = {
+  "none":           { label: "なし",       read: () => 0,                   write: null },
+  "free.x":         { label: "自由X",      read: b => b.free.x,             write: "coord" },
+  "free.y":         { label: "自由Y",      read: b => b.free.y,             write: "coord" },
+  "free.z":         { label: "自由Z",      read: b => b.free.z,             write: "coord" },
+  "order":          { label: "順序",       read: b => b.order,              write: "reorder" },
+  "col":            { label: "列",         read: b => b.cell.col,           write: "cell" },
+  "row":            { label: "行",         read: b => b.cell.row,           write: "cell" },
+  "history.index":  { label: "履歴の世代", read: b => b.hist,               write: null },
+  "history.age":    { label: "履歴の古さ", read: (b, sp) => maxHist(sp) - b.hist, write: null },
+  "history.branch": { label: "履歴の枝",   read: b => b.branch,             write: null },
+};
+const verbOf = d => d === "none" ? "none" : (DIMS[d].write ?? "focus");
+const VERB_WORD = { coord: "動く", reorder: "並べ替わる", cell: "マスを移る", focus: "視点が動く", none: "何も起きない" };
+
+const ARRANGES = { "as-is": "そのまま", equal: "等間隔", pack: "詰める" };
+
+const TANH_EDGE = 1 - 1e-12;
+const LENS_XY = {
+  parallel: { label: "平行",  p: u => u,                           un: s => s },
+  fisheye:  { label: "魚眼",  p: (u, H) => H * Math.tanh(u / H),   un: (s, H) => H * Math.atanh(clamp(s / H, -TANH_EDGE, TANH_EDGE)) },
+};
+const LENS_Z = {
+  perspective: { label: "透視", mag: dz => 1 / Math.max(0.05, 1 + K_PERSP * dz), alpha: dz => dz < -1e-9 ? 0 : 1 },
+  flat:        { label: "平行", mag: () => 1, alpha: () => 1 },
+};
+const lensLabel = (axis, id) => (axis === "z" ? LENS_Z : LENS_XY)[id].label;
+
+/* ── v4 の PRESETS をそのまま（label と step まで同じ）。coverflowY だけ v4 に無い ── */
+const AX = (dim, arrange, lens, step) => ({ dim, arrange, lens, step });
+const PRESETS = {
+  free:      { label: "自由に置く",     x: AX("free.x", "as-is", "parallel", 110),      y: AX("free.y", "as-is", "parallel", 80),         z: AX("free.z", "as-is", "perspective", 1) },
+  row:       { label: "横に並べる",     x: AX("order", "pack", "parallel", 110),        y: AX("none", "pack", "parallel", 80),            z: AX("none", "as-is", "flat", 1) },
+  column:    { label: "縦に並べる",     x: AX("none", "pack", "parallel", 110),         y: AX("order", "pack", "parallel", 80),           z: AX("none", "as-is", "flat", 1) },
+  grid:      { label: "格子",           x: AX("col", "pack", "parallel", 110),          y: AX("row", "pack", "parallel", 80),             z: AX("none", "as-is", "flat", 1) },
+  fisheyeX:  { label: "X魚眼ビュー",    x: AX("history.index", "equal", "fisheye", 64), y: AX("history.branch", "equal", "parallel", 44), z: AX("none", "as-is", "flat", 1) },
+  coverflow: { label: "coverflow",      x: AX("order", "equal", "fisheye", 68),         y: AX("none", "pack", "parallel", 80),            z: AX("none", "as-is", "flat", 1) },
+  histZ:     { label: "履歴を奥行きに", x: AX("none", "as-is", "parallel", 110),        y: AX("none", "as-is", "parallel", 80),           z: AX("history.age", "equal", "perspective", 1) },
+  stackZ:    { label: "重ねて置く",     x: AX("free.x", "as-is", "parallel", 110),      y: AX("free.y", "as-is", "parallel", 80),         z: AX("order", "equal", "perspective", 0.15) },
+  // ★ v4 にボタンは無い。軸セレクタ4手で作れる（v3/06 の場面 6a「縦に並べた coverflow」）
+  coverflowY:{ label: "（縦の coverflow）", x: AX("none", "pack", "parallel", 110),     y: AX("order", "equal", "fisheye", 68),           z: AX("none", "as-is", "flat", 1) },
+};
+const viewFromPreset = id => { const p = PRESETS[id]; return { x: { ...p.x }, y: { ...p.y }, z: { ...p.z } }; };
+
+/* ============================================================
+   §2 動詞 ── これが足した層のすべて。表の1行＝1つの View
+   ============================================================ */
+const VERBS = [
+  { id: "free",  label: "自由に置く", glyph: [[2,2,9,7],[13,6,11,8],[4,12,10,6]],
+    view: "free",  why: "どこにでも置ける。掴めば動く" },
+  { id: "line",  label: "並べる",     glyph: [[1,6,7,9],[9,5,7,11],[17,4,8,13]],
+    subLabel: "向き", subs: [{ id: "x", label: "横", view: "row" }, { id: "y", label: "縦", view: "column" }],
+    why: "端をそろえて詰める。掴めば並べ替わる" },
+  { id: "table", label: "表にする",   glyph: [[1,3,11,7],[13,3,11,7],[1,11,11,7],[13,11,11,7]],
+    view: "grid",  why: "列と行のマス。掴めば別のマスへ移る" },
+  { id: "flip",  label: "めくる",     glyph: [[0,7,4,7],[5,4,6,13],[12,2,8,17],[21,6,4,9]],
+    subLabel: "向き", subs: [{ id: "x", label: "横", view: "coverflow" }, { id: "y", label: "縦", view: "coverflowY" }],
+    why: "等間隔に並べて魚眼。真ん中が大きい。背景をドラッグすると流れる" },
+  { id: "pile",  label: "重ねる",     glyph: [[1,9,14,10],[5,5,14,10],[9,1,14,10]],
+    view: "stackZ", why: "紙の束。触った泡が最前面へ（何度触ってもずれない）" },
+  { id: "hist",  label: "履歴で見る", glyph: [[2,4,5,13],[8,6,5,9],[14,8,5,5],[20,9,4,3]],
+    subLabel: "見せ方", subs: [{ id: "z", label: "奥へ", view: "histZ" }, { id: "x", label: "広げて", view: "fisheyeX" }],
+    why: "版を時間の順に。値は書けないので、掴むと視点が動く" },
+];
+const verbById = id => VERBS.find(v => v.id === id);
+/** 動詞（＋副え）→ v4 のプリセット id */
+function presetOfVerb(vid, sid) {
+  const v = verbById(vid); if (!v) return null;
+  return v.subs ? (v.subs.find(s => s.id === sid) ?? v.subs[0]).view : v.view;
+}
+/** 逆向き：いまの View が どの動詞と一致するか。一致しなければ null（＝手直し中） */
+const AXKEYS = ["dim", "arrange", "lens", "step"];
+const sameAx = (a, b) => AXKEYS.every(k => a[k] === b[k]);
+const sameView = (a, b) => sameAx(a.x, b.x) && sameAx(a.y, b.y) && sameAx(a.z, b.z);
+function verbOfView(view) {
+  for (const v of VERBS) {
+    const list = v.subs ?? [{ id: null, view: v.view }];
+    for (const s of list) if (sameView(view, PRESETS[s.view])) return { vid: v.id, sid: s.id, preset: s.view };
+  }
+  return null;
+}
+
+/* ============================================================
+   §3 場面 ── v4 lab.html の6場面。座標は空間の中心を 0 にして写した
+   ============================================================ */
+const SCENES = [
+  { id: "memo", name: "メモ", box: { w: 600, h: 330 }, verb: ["free", null], kids: [
+      { id: "m1", t: "メモ",     hue: 35, w: 130, h: 80, free: { x: -150, y: -60 } },
+      { id: "m2", t: "買い物",   hue: 60, w: 130, h: 80, free: { x: 0, y: -10 } },
+      { id: "m3", t: "思いつき", hue: 15, w: 130, h: 80, free: { x: -140, y: 50 } },
+  ] },
+  { id: "row", name: "横に並べる", box: { w: 368, h: 130 }, verb: ["line", "x"], kids: [
+      { id: "r0", t: "小", hue: 158, w: 80, h: 50, order: 0 },
+      { id: "r1", t: "中", hue: 178, w: 104, h: 64, order: 1 },
+      { id: "r2", t: "大", hue: 198, w: 128, h: 78, order: 2 },
+  ] },
+  { id: "cover", name: "coverflow", box: { w: 340, h: 124 }, verb: ["flip", "x"], kids:
+      [0,1,2,3,4,5,6].map(i => ({ id: "cf" + i, t: "写真" + (i + 1), hue: 188 + i * 12, w: 90, h: 64, order: i })) },
+  { id: "fish", name: "X魚眼ビュー", box: { w: 420, h: 180 }, verb: ["hist", "x"], kids:
+      [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[3,1],[4,1],[5,1],[5,2]].map(([hist, branch], i) =>
+        ({ id: "v" + i, t: "版" + (i + 1), hue: [290, 325, 350][branch], w: 58, h: 34, hist, branch })) },
+  { id: "giji", name: "議事録（版）", box: { w: 300, h: 310 }, verb: ["hist", "z"], kids:
+      ["初稿", "加筆", "指摘反映", "確定"].map((t, i) =>
+        ({ id: "g" + i, t, hue: 252 + i * 8, w: 150, h: 60, hist: i, order: i })) },
+  { id: "kinmu", name: "勤務表", box: { w: 482, h: 340 }, verb: ["table", null], kids: [
+      { id: "seiyaku", t: "制約",       hue: 40,  w: 260, h: 56,  cell: { col: 1, row: 0 } },
+      { id: "staff",   t: "スタッフ",   hue: 130, w: 120, h: 120, cell: { col: 0, row: 1 }, view: "column",
+        kids: ["佐藤","鈴木","高橋","田中","伊藤"].map((t, i) => ({ id: "p" + i, t, hue: 130, w: 76, h: 22, order: i })) },
+      { id: "cal",     t: "カレンダー", hue: 95,  w: 336, h: 114, cell: { col: 1, row: 1 }, view: "grid",
+        kids: Array.from({ length: 14 }, (_, i) => ({ id: "d" + i, t: String(i + 1), hue: 95, w: 32, h: 24,
+          cell: { col: i % 7, row: Math.floor(i / 7) } })) },
+  ] },
+];
+
+/* ── 場面 → 泡（平らな配列。親子だけ） ── */
+let bubbles = [], BYID = new Map(), KIDS = new Map(), ROOT = null, sceneId = "memo", selectedId = null;
+const byId = id => BYID.get(id);
+const kidsOf = id => KIDS.get(id) ?? [];
+const spaceObj = id => id === "__root" ? ROOT : byId(id);
+const viewOf = id => spaceObj(id).view;
+const focusOf = id => spaceObj(id).focus;
+const spaceName = id => id === "__root" ? SCENES.find(s => s.id === sceneId).name : byId(id).t + "の中";
+const maxHist = sp => Math.max(0, ...kidsOf(sp).map(b => b.hist));
+
+function loadScene(id) {
+  sceneId = id;
+  const sc = SCENES.find(s => s.id === id);
+  bubbles = []; BYID = new Map();
+  ROOT = { id: "__root", view: viewFromPreset(presetOfVerb(sc.verb[0], sc.verb[1])), focus: { x: 0, y: 0, z: 0 },
+           size: { ...sc.box }, noHeader: true };
+  const walk = (list, parent) => list.forEach(p => {
+    const b = { id: p.id, t: p.t, hue: p.hue, size: { w: p.w, h: p.h }, parent,
+      free: { x: 0, y: 0, z: 0, ...p.free }, order: p.order ?? 0, cell: { col: 0, row: 0, ...p.cell },
+      hist: p.hist ?? 0, branch: p.branch ?? 0,
+      view: p.view ? viewFromPreset(p.view) : null, focus: { x: 0, y: 0, z: 0 } };
+    bubbles.push(b); BYID.set(b.id, b);
+    if (p.kids) walk(p.kids, b.id);
+  });
+  walk(sc.kids, "__root");
+  reindex();
+  selectedId = sc.kids[0].id;
+  deep = false;
+  render();
+}
+function reindex() {
+  KIDS = new Map([["__root", []]]);
+  for (const b of bubbles) { const p = b.parent; if (!KIDS.has(p)) KIDS.set(p, []); KIDS.get(p).push(b); }
+}
+/** 効く空間＝選んでいる泡がいる空間（v4 の規則そのまま） */
+const targetSpace = () => selectedId ? byId(selectedId).parent : "__root";
+
+/* ============================================================
+   §4 ④ 帯の式・レンズ・min の大きさ（v4 の小さい版）
+   ============================================================ */
+let BOXC = new Map();
+function boxOf(b) {
+  if (BOXC.has(b.id)) return BOXC.get(b.id);
+  const kids = kidsOf(b.id);
+  const hd = b.noHeader ? 0 : HEADER;
+  let out = { w: b.size.w, h: b.size.h };
+  if (kids.length) {
+    const V = viewOf(b.id);
+    const ax = arrangeAxis(kids, V.x, k => boxOf(k).w, b.id, "x");
+    const ay = arrangeAxis(kids, V.y, k => boxOf(k).h, b.id, "y");
+    out = { w: Math.max(b.size.w, ax.span ? (ax.span[1] - ax.span[0]) + PAD * 2 : 0),
+            h: Math.max(b.size.h, ay.span ? (ay.span[1] - ay.span[0]) + PAD * 2 + hd : 0) };
+  }
+  BOXC.set(b.id, out);
+  return out;
+}
+/** その空間の中身の箱（余白の内側）。魚眼の半幅 H はここから */
+function contentOf(b) { const s = boxOf(b); return { w: s.w - PAD * 2, h: s.h - PAD * 2 - (b.noHeader ? 0 : HEADER) }; }
+/** ④ 値ごとに帯を作り、帯の中に揃えて置き、塊の中央を空間の中心に置く */
+function arrangeAxis(kids, A, lenOf, spaceId, axis) {
+  const val = b => DIMS[A.dim].read(b, spaceId);
+  const pos = new Map();
+  if (axis === "z") {                       // ④ Z は中央ぞろえしない（焦点 0 ＝ 手前。v4 と同じ）
+    const values = [...new Set(kids.map(val))].sort((p, q) => p - q);
+    kids.forEach(b => pos.set(b.id, A.arrange === "equal" ? val(b) * A.step
+                                  : A.arrange === "pack" ? values.indexOf(val(b)) : val(b)));
+    return { pos, span: null };
+  }
+  if (A.arrange === "as-is") { kids.forEach(b => pos.set(b.id, val(b))); return { pos, span: null }; }
+  if (A.arrange === "equal") {
+    kids.forEach(b => pos.set(b.id, val(b) * A.step));
+    let lo = Infinity, hi = -Infinity;
+    kids.forEach(b => { const c = pos.get(b.id), l = lenOf(b); lo = Math.min(lo, c - l / 2); hi = Math.max(hi, c + l / 2); });
+    const mid = (lo + hi) / 2;
+    kids.forEach(b => pos.set(b.id, pos.get(b.id) - mid));
+    return { pos, span: [lo - mid, hi - mid] };
+  }
+  const values = [...new Set(kids.map(val))].sort((p, q) => p - q), bandLen = new Map();
+  let total = -GAP;
+  for (const v of values) { const l = Math.max(...kids.filter(b => val(b) === v).map(lenOf)); bandLen.set(v, l); total += l + GAP; }
+  total = Math.max(0, total);
+  let at = -total / 2; const start = new Map();
+  for (const v of values) { start.set(v, at); at += bandLen.get(v) + GAP; }
+  kids.forEach(b => pos.set(b.id, start.get(val(b)) + lenOf(b) / 2));   // 帯の中は始端ぞろえ
+  return { pos, span: [-total / 2, total / 2] };
+}
+/** ① 値 → 位置 → 画面。合成は1回、scale は数値1つ */
+function resolve(spaceId, host, out) {
+  const kids = kidsOf(spaceId); if (!kids.length) return;
+  const V = viewOf(spaceId), F = focusOf(spaceId);
+  const ax = arrangeAxis(kids, V.x, k => boxOf(k).w, spaceId, "x");
+  const ay = arrangeAxis(kids, V.y, k => boxOf(k).h, spaceId, "y");
+  const az = arrangeAxis(kids, V.z, () => 0, spaceId, "z");
+  const Hx = Math.max(40, host.w / 2), Hy = Math.max(40, host.h / 2);
+  // ① 消失点は箱の中（余白の内側の左上）。v4 lensCtx の VP_CHILD と同じ ── 奥の泡が真後ろに隠れない
+  const vpx = -Math.max(0, Hx - PAD), vpy = -Math.max(0, Hy - PAD);
+  const LX = LENS_XY[V.x.lens], LY = LENS_XY[V.y.lens], LZ = LENS_Z[V.z.lens];
+  for (const k of kids) {
+    const s = boxOf(k);
+    const cx = ax.pos.get(k.id), cy = ay.pos.get(k.id), cz = az.pos.get(k.id);
+    const x1 = LX.p(cx - s.w / 2 - F.x, Hx), x2 = LX.p(cx + s.w / 2 - F.x, Hx);
+    const y1 = LY.p(cy - s.h / 2 - F.y, Hy), y2 = LY.p(cy + s.h / 2 - F.y, Hy);
+    const dz = cz - F.z, m = LZ.mag(dz);
+    // 大きさの倍率は1つの数。min ＝ 横の像にも縦の像にも収まる決め方のうち、いちばん大きいもの
+    const local = m * Math.min((x2 - x1) / s.w, (y2 - y1) / s.h);
+    const lx = vpx + ((x1 + x2) / 2 - vpx) * m, ly = vpy + ((y1 + y2) / 2 - vpy) * m;   // 消失点へ m で寄せる
+    const scale = host.scale * local;
+    const px = host.cx + lx * host.scale, py = host.cy + ly * host.scale;
+    out.push({ b: k, x: px - s.w * scale / 2, y: py - s.h * scale / 2, w: s.w, h: s.h,
+               scale, alpha: LZ.alpha(dz), dz, order: k.order });
+    if (kidsOf(k.id).length) {
+      const c = contentOf(k);
+      resolve(k.id, { cx: px, cy: py + HEADER * scale / 2, w: c.w, h: c.h, scale }, out);
+    }
+  }
+}
+
+/* ============================================================
+   §5 画面
+   ============================================================ */
+let deep = false;
+const world = $("#world"), stage = $("#stage");
+
+function render() { renderScenes(); renderVerbs(); renderMap(); draw(); }
+
+function renderScenes() {
+  const host = $("#scenes"); host.textContent = "";
+  for (const s of SCENES) {
+    const b = document.createElement("button");
+    b.className = "chip" + (s.id === sceneId ? " on" : "");
+    const v = verbById(s.verb[0]);
+    const sub = s.verb[1] && v.subs ? "（" + v.subs.find(x => x.id === s.verb[1]).label + "）" : "";
+    b.innerHTML = '<span class="ok">✓</span>' + s.name + '<span style="color:#8b95ad"> · ' + v.label + sub + '</span>';
+    b.onclick = () => loadScene(s.id);
+    host.appendChild(b);
+  }
+  const sp = targetSpace();
+  $("#scope").innerHTML = "動詞が効く空間 … <b>" + spaceName(sp) + "</b>（選んでいる泡がいる空間。v4 の規則そのまま）";
+}
+
+function renderVerbs() {
+  const cur = verbOfView(viewOf(targetSpace()));
+  const host = $("#verbs"); host.textContent = "";
+  for (const v of VERBS) {
+    const b = document.createElement("button");
+    b.className = "verb" + (cur && cur.vid === v.id ? " on" : "");
+    const g = v.glyph.map(([x, y, w, h]) => '<i style="left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px"></i>').join("");
+    b.innerHTML = '<span class="g">' + g + "</span><span>" + v.label + "</span>";
+    b.onclick = () => pickVerb(v.id);
+    host.appendChild(b);
+  }
+  const subHost = $("#subs"); subHost.textContent = "";
+  const v = cur ? verbById(cur.vid) : null;
+  if (v && v.subs) {
+    const l = document.createElement("span"); l.className = "sublbl"; l.textContent = v.subLabel;
+    subHost.appendChild(l);
+    for (const s of v.subs) {
+      const b = document.createElement("button");
+      b.className = "sub" + (cur.sid === s.id ? " on" : "");
+      b.textContent = s.label;
+      b.onclick = () => applyPreset(s.view);
+      subHost.appendChild(b);
+    }
+  }
+  $("#verbnote").innerHTML = cur
+    ? verbById(cur.vid).why + "<br>掴むと … 横 <i>" + VERB_WORD[verbOf(viewOf(targetSpace()).x.dim)]
+      + "</i>／縦 <i>" + VERB_WORD[verbOf(viewOf(targetSpace()).y.dim)] + "</i>（②）"
+      + "<br><b>同じ動詞をもう一度押す ＝ 焦点を戻す</b>"
+    : "いまの View は、どの動詞とも一致しない（＝<i>手直し中</i>）。動詞を押せば戻る。";
+}
+
+function pickVerb(vid) {
+  const cur = verbOfView(viewOf(targetSpace()));
+  if (cur && cur.vid === vid) { const f = focusOf(targetSpace()); f.x = f.y = f.z = 0; render(); return; }  // 2度押し＝焦点を戻す
+  applyPreset(presetOfVerb(vid, cur && verbById(vid).subs ? cur.sid : null));
+}
+function applyPreset(pid) {
+  const sp = targetSpace();
+  spaceObj(sp).view = viewFromPreset(pid);
+  const f = focusOf(sp); f.x = f.y = f.z = 0;      // 焦点は View に入っていないので、動詞を変えたら戻す
+  render();
+}
+
+function renderMap() {
+  const sp = targetSpace(), V = viewOf(sp), cur = verbOfView(V);
+  const nv = $("#nowverb");
+  if (cur) {
+    const v = verbById(cur.vid);
+    const sub = cur.sid ? "（" + v.subs.find(x => x.id === cur.sid).label + "）" : "";
+    nv.className = ""; nv.textContent = v.label + sub;
+    const p = PRESETS[cur.preset];
+    $("#mapv4").innerHTML = cur.preset === "coverflowY"
+      ? "＝ <b>v4 にボタンは無い</b>。軸セレクタ 4 手で同じもの（v3/06 の場面 6a「縦に並べた coverflow」）<br>"
+        + "<code>PRESETS.coverflow の X と Y を入れ替えたもの</code>"
+      : "＝ v4 lab.html の プリセット <b>「" + p.label + "」</b>　<code>PRESETS." + cur.preset + "</code>";
+  } else {
+    nv.className = "edited"; nv.textContent = "手直し中（どの動詞とも一致しない）";
+    $("#mapv4").innerHTML = "＝ v4 の <b>216,000 通り</b>のうちの1つ。動詞に名前は無い。<br>"
+      + "軸を動詞と同じ形に戻すと、<b>ひとりでに動詞へ戻る</b>（一致は9つの値で見ている）";
+  }
+  const t = $("#axtbl"); t.textContent = "";
+  t.innerHTML = "<tr><th></th><th>次元</th><th>並べ方</th><th>レンズ</th></tr>";
+  for (const axis of ["x", "y", "z"]) {
+    const A = V[axis], tr = document.createElement("tr");
+    const live = A.dim !== "none";
+    tr.innerHTML = '<td class="ax">' + axis.toUpperCase() + "</td>";
+    const cells = [
+      { part: "dim",     text: DIMS[A.dim].label,          opts: Object.keys(DIMS).map(k => [k, DIMS[k].label]) },
+      { part: "arrange", text: ARRANGES[A.arrange],        opts: Object.keys(ARRANGES).map(k => [k, ARRANGES[k]]) },
+      { part: "lens",    text: lensLabel(axis, A.lens),    opts: Object.keys(axis === "z" ? LENS_Z : LENS_XY).map(k => [k, lensLabel(axis, k)]) },
+    ];
+    for (const c of cells) {
+      const td = document.createElement("td");
+      td.className = "v" + (live ? " live" : "") + (c.part === "lens" && (A.lens === "fisheye" || A.lens === "perspective") ? " lensfish" : "");
+      if (deep) {
+        const sel = document.createElement("select");
+        for (const [val, label] of c.opts) { const o = document.createElement("option"); o.value = val; o.textContent = label; sel.appendChild(o); }
+        sel.value = A[c.part];
+        sel.onchange = () => { A[c.part] = sel.value; render(); };
+        td.appendChild(sel);
+      } else td.textContent = c.text;
+      tr.appendChild(td);
+    }
+    t.appendChild(tr);
+  }
+  $("#more").className = deep ? "on" : "";
+  $("#more").textContent = deep ? "詳しく ▴（閉じる）" : "詳しく ▾（汎用モデルへ降りる）";
+  $("#deep").innerHTML = deep
+    ? "ここは <b>v4 lab.html の軸セレクタ9個そのまま</b>。動詞は消えない ── 上の名前が「手直し中」に変わるだけ。<br>"
+      + "間隔（step）は動詞が抱えている値で、<i>ここにも出ていない</i>（v4 も同じ）。"
+    : "動詞で足りないときだけ開く。開くと <b>9個のセレクタ</b>＝ 216,000 通りへ降りる。";
+}
+
+/* ── ステージを描く ── */
+function stageBox() {
+  BOXC = new Map();
+  const sw = stage.clientWidth, sh = stage.clientHeight;
+  const b = boxOf(ROOT), c = contentOf(ROOT);
+  const fit = Math.min(1, (sw - 80) / b.w, (sh - 120) / b.h);
+  return { sw, sh, bw: b.w, bh: b.h, cw: c.w, ch: c.h, fit, cx: sw / 2, cy: (sh - 34) / 2 };
+}
+function draw() {
+  const S = stageBox();
+  const sw = S.sw, sh = S.sh, bw = S.bw * S.fit, bh = S.bh * S.fit, cx = S.cx, cy = S.cy;
+  const f = $("#frame");
+  f.style.left = (cx - bw / 2) + "px"; f.style.top = (cy - bh / 2) + "px";
+  f.style.width = bw + "px"; f.style.height = bh + "px";
+  const fl = $("#framelbl");
+  fl.style.left = (cx - bw / 2) + "px"; fl.style.top = (cy - bh / 2 - 19) + "px";
+  const V = viewOf("__root");
+  fl.innerHTML = "<b>" + spaceName("__root") + "</b> … X " + DIMS[V.x.dim].label + "·" + ARRANGES[V.x.arrange] + "·" + lensLabel("x", V.x.lens)
+    + "　Y " + DIMS[V.y.dim].label + "·" + ARRANGES[V.y.arrange] + "·" + lensLabel("y", V.y.lens)
+    + "　Z " + DIMS[V.z.dim].label + "·" + ARRANGES[V.z.arrange] + "·" + lensLabel("z", V.z.lens);
+
+  const out = [];
+  resolve("__root", { cx, cy, w: S.cw, h: S.ch, scale: S.fit }, out);
+  out.sort((p, q) => (q.dz - p.dz) || (p.scale - q.scale) || (p.order - q.order));
+
+  world.textContent = "";
+  for (const p of out) {
+    if (p.alpha <= 0) continue;
+    const d = document.createElement("div");
+    d.className = "bub" + (p.b.id === selectedId ? " sel" : "");
+    d.style.width = p.w + "px"; d.style.height = p.h + "px";
+    d.style.transform = "translate(" + p.x.toFixed(2) + "px," + p.y.toFixed(2) + "px) scale(" + p.scale.toFixed(4) + ")";
+    d.style.background = "hsl(" + p.b.hue + " 42% 22%)";
+    d.style.opacity = String(p.alpha);
+    const hd = document.createElement("div");
+    hd.className = "hd"; hd.textContent = p.b.t;
+    hd.style.background = "hsl(" + p.b.hue + " 62% 62%)";
+    if (p.h <= 30) { hd.style.height = p.h + "px"; hd.style.lineHeight = p.h + "px"; }
+    d.appendChild(hd);
+    d.onmousedown = e => { e.stopPropagation(); selectedId = p.b.id; render(); };
+    world.appendChild(d);
+  }
+  const sp = targetSpace(), F = focusOf(sp);
+  $("#stagehint").innerHTML = "泡を押す … その泡がいる空間に動詞が効く　背景をドラッグする … <b>視点が動く</b>（②）　ホイール … <b>奥行きの視点</b>（②）"
+    + "　｜　焦点 " + F.x.toFixed(0) + ", " + F.y.toFixed(0) + ", " + F.z.toFixed(2)
+    + "　｜　④ 帯の式は本当に解いている。書き込む操作は入れていないので ⑤ は出ない";
+}
+
+/* ── ② 背景をドラッグする＝視点／ホイール＝奥行きの視点 ── */
+let drag = null;
+stage.addEventListener("mousedown", e => {
+  drag = { x: e.clientX, y: e.clientY, sp: targetSpace() };
+  stage.classList.add("drag");
+});
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  const F = focusOf(drag.sp), V = viewOf(drag.sp);
+  const S = stageBox();
+  const Hx = Math.max(40, S.cw / 2), Hy = Math.max(40, S.ch / 2);
+  F.x -= LENS_XY[V.x.lens].un(clamp(e.clientX - drag.x, -Hx * 0.9, Hx * 0.9), Hx);
+  F.y -= LENS_XY[V.y.lens].un(clamp(e.clientY - drag.y, -Hy * 0.9, Hy * 0.9), Hy);
+  drag.x = e.clientX; drag.y = e.clientY;
+  draw();
+});
+window.addEventListener("mouseup", () => { drag = null; stage.classList.remove("drag"); });
+stage.addEventListener("wheel", e => {
+  e.preventDefault();
+  const sp = targetSpace(), V = viewOf(sp);
+  if (verbOf(V.z.dim) === "none") return;            // Z が なし ならホイールは何もしない
+  focusOf(sp).z += e.deltaY * 0.004;
+  draw();
+}, { passive: false });
+
+$("#more").onclick = () => { deep = !deep; renderMap(); };
+window.addEventListener("resize", draw);
+
+/* ── 検証用の口 ── */
+window.__ui = {
+  scenes: () => SCENES.map(s => s.id),
+  loadScene, pickVerb, applyPreset,
+  targetSpace, select: id => { selectedId = id; render(); },
+  viewOf: id => JSON.parse(JSON.stringify(viewOf(id))),
+  verbNow: () => verbOfView(viewOf(targetSpace())),
+  presetOfVerb,
+  /** 6場面ぜんぶ：動詞で作った View が v4 のプリセットと一致するか */
+  coverage: () => SCENES.map(s => {
+    const pid = presetOfVerb(s.verb[0], s.verb[1]);
+    return { scene: s.id, verb: s.verb[0], sub: s.verb[1], preset: pid,
+             match: !!verbOfView(viewFromPreset(pid)) };
+  }),
+  /** 動詞（＋副え）の総数 */
+  combos: () => VERBS.reduce((n, v) => n + (v.subs ? v.subs.length : 1), 0),
+  verbs: () => VERBS.map(v => v.id),
+  placements: () => { const out = [], S = stageBox();
+    resolve("__root", { cx: S.cx, cy: S.cy, w: S.cw, h: S.ch, scale: S.fit }, out);
+    return out.map(p => ({ id: p.b.id, x: +p.x.toFixed(2), y: +p.y.toFixed(2),
+                           w: +(p.w * p.scale).toFixed(2), h: +(p.h * p.scale).toFixed(2),
+                           scale: +p.scale.toFixed(4), alpha: p.alpha })); },
+  deep: on => { deep = !!on; renderMap(); },
+  isDeep: () => deep,
+  domCount: () => world.children.length,
+  stageBox,
+};
+
+loadScene("memo");
+</script>
+</body>
+</html>

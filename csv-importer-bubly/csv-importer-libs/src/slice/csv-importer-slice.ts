@@ -1,6 +1,6 @@
 import { createSlice, createSelector, type WithSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rootReducer, type RootState } from "@bublys-org/state-management";
+import { injectSlice, type RootState } from "@bublys-org/state-management";
 import { CsvSheet, type CsvSheetState } from "@bublys-org/csv-importer-model";
 
 // ========== State ==========
@@ -127,8 +127,8 @@ declare module "@bublys-org/state-management" {
     extends WithSlice<typeof csvImporterSlice> {}
 }
 
-// rootReducerに注入（副作用として実行）
-csvImporterSlice.injectInto(rootReducer);
+// 注入（副作用として実行）。口は 1 つ ── `injectSlice` を通す
+injectSlice(csvImporterSlice);
 
 // ========== Selectors ==========
 

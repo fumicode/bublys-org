@@ -1,8 +1,9 @@
 import { FC } from "react";
 import { Bubble } from "../Bubble.domain.js";
 import { CoordinateSystem } from "@bublys-org/bubbles-ui-util";
-import { getOriginRect } from "../utils/get-origin-rect.js";
+import { getOriginRect, getDockedBubbleRect } from "../utils/get-origin-rect.js";
 import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
+import { frustumBand } from "@bublys-org/bubble-layout-ui";
 
 type LinkBubbleViewProps = {
   opener: Bubble;
@@ -10,6 +11,8 @@ type LinkBubbleViewProps = {
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
   lightweightMode?: boolean;
+  /** 見せるか。既定はホバー時だけなので、普段は透明にしておく（DOM は残す） */
+  visible?: boolean;
 };
 
 export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
@@ -18,6 +21,7 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   coordinateSystem,
   linkZIndex,
   lightweightMode = false,
+  visible = true,
 }) => {
   const bubbleRefs = useBubbleRefsOptional();
 
@@ -27,7 +31,9 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
     // フォールバック: 従来のgetOriginRectを使う
     ?? getOriginRect(opener.id, openee.url);
 
-  const baseOpenerRect = originRect || opener.renderedRect;
+  // 岸に着いている opener は BubbleView が描かれず renderedRect が古いままなので、
+  // クリック元が見つからなければ帯の要素を測る（浮いていれば undefined で素通り）
+  const baseOpenerRect = originRect || getDockedBubbleRect(opener.id) || opener.renderedRect;
   const openerRect = baseOpenerRect
     ? baseOpenerRect.toLocal(coordinateSystem)
     : undefined;
@@ -40,24 +46,11 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
 
 
 
-  //A 〜 B
-  //|    |
-  //C 〜 D
-
-  const topControlX = (openerRect.x + openeeRect.x) / 2;
-  const bottomControlX = (openerRect.left + openeeRect.left) / 2;
-
-  const pathData = [
-    //A: 起点
-    `M ${openerRect.x} ${openerRect.y}`,
-    //B: ベジェ曲線で終点へ
-    `C ${topControlX} ${openerRect.y} ${topControlX} ${openeeRect.y} ${openeeRect.x} ${openeeRect.y}`,
-    //D: 直線で終点の下へ
-    `L ${openeeRect.left} ${openeeRect.bottom}`,
-    //C: ベジェ曲線で起点の下へ
-    `C ${bottomControlX} ${openeeRect.bottom} ${bottomControlX} ${openerRect.bottom} ${openerRect.left} ${openerRect.bottom}`,
-    "Z",
-  ].join(" ");
+  // 帯 = 起点（クリック元）が拡大されて openee になった錐台。
+  // 4 頂点の同名対応と凸包で形が決まる（link-band-path）。一方が他方を含めば無し
+  const band = frustumBand(openerRect, openeeRect);
+  if (!band) return null;
+  const pathData = band.path;
 
   return (
     <div
@@ -69,6 +62,8 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
         width: "100%",
         height: "100%",
         pointerEvents: "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.15s ease",
       }}
     >
       <svg width="100%" height="100%">

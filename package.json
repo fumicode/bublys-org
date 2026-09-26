@@ -99,7 +99,7 @@
     "memo-libs/*",
     "gakkai-shift-bubly/gakkai-shift-model",
     "gakkai-shift-bubly/gakkai-shift-libs",
-    "users-libs",
+    "users-bubly/*",
     "gakkai-shift-bubly/*",
     "ekikyo-bubly/ekikyo-libs",
     "ekikyo-bubly/ekikyo-app",
@@ -108,6 +108,9 @@
     "hotel-shift-puzzle-bubly/*",
     "event-shift-puzzle/*",
     "csv-importer-bubly/*",
-    "object-transformer-bubly/*"
+    "object-transformer-bubly/*",
+    "launcher-bubly/*",
+    "task-bubly/*",
+    "memo-bubly/*"
   ]
 }

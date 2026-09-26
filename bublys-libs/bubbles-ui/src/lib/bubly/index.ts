@@ -4,3 +4,5 @@ export * from "./BublyOriginStore.js";
 export * from "./BublyApp.js";
 export * from "./BublyStoreProvider.js";
 export * from "./BublyUniverseBubble.js";
+export * from "./demoSites.js";
+export * from "./DemoSwitcher.js";
