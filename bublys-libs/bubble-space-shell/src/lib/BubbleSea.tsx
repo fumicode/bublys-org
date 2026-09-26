@@ -20,6 +20,7 @@
  *   - 前後は「大きく写るものが手前」。触ると焦点が寄って入れ替わる（値は書かない）
  */
 import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PRESETS } from "@bublys-org/bubble-layout";
 import type { LayoutRules, PresetId } from "@bublys-org/bubble-layout";
 import { type TubeJoin, type BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { LayoutRoutesProvider, type BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
@@ -28,6 +29,15 @@ import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
 import { SpaceViewContext, type SpaceView } from "./SpaceViewContext.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
+
+/** 最初の並べ方。口の最初の見た目（どの軸が魚眼か）もここから出す */
+const INITIAL_PRESET: PresetId = "free";
+
+/** その並べ方で、どちらの軸が魚眼か */
+const lensesOf = (id: PresetId) => ({
+  x: PRESETS[id].x.lens === "fisheye",
+  y: PRESETS[id].y.lens === "fisheye",
+});
 
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
@@ -41,7 +51,13 @@ export type BubbleSeaProps = {
    * 記録するのは 3 つの節目だけ（`SeaWorldLine` の註）。
    */
   readonly worldLineScope?: string;
-  /** 最初のレンズの向き。既定は X だけ魚眼（隣に開いたときに点くのがこれ） */
+  /**
+   * 口の見た目の**最初の値**。渡さなければ、最初の並べ方（`INITIAL_PRESET`）のレンズ。
+   *
+   * ★ **効くのは一瞬だけ。** レンズの向きを持っているのは世界（View の軸）で、口は
+   *   その写し ── 海が立ち上がれば、口はいつも海の実物を映す（`BubbleSpace` の `onLens`）。
+   *   ここに実物と違う値を置くと、**立ち上がりの一瞬だけ嘘の見た目**が出る。
+   */
   readonly initialFisheye?: { x: boolean; y: boolean };
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
@@ -66,21 +82,28 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   homes,
   initialUrls,
   worldLineScope,
-  initialFisheye = { x: true, y: false },
+  initialFisheye,
   rules,
   onSpaceReady,
   style,
   children,
 }) => {
   /** 並べ方（View のプリセット）。開き方は 1 つしかないので、見え方が変わるのはここだけ */
-  const [preset, setPresetState] = useState<PresetId>("free");
+  const [preset, setPresetState] = useState<PresetId>(INITIAL_PRESET);
   /** 岸に着いた泡の所で、ネオンをどう通すか（見た目だけ。挙動は同じ）。既定は迂回 */
   const [join, setJoin] = useState<TubeJoin>("detour");
   /**
    * 魚眼をどちらの向きに掛けるか。**レンズは軸ごとに持つもの**なので、X と Y は別々に決まる
    * （両方掛けても、どちらも平行にしてもよい）。
+   *
+   * ★ **ここは口の見た目でしかない。** 本物は世界（View の軸）にあり、海が変わるたびに
+   *   `onLens` で送られてくる ── 押した回数で決まるものではないので、最初の値も
+   *   **最初の並べ方のレンズ**から出す（前は `{ x: true, y: false }` を焼いてあったので、
+   *   読み込み直すたびに口だけが「魚眼X 点灯」へ戻り、海と食い違っていた）。
    */
-  const [fisheye, setFisheye] = useState(initialFisheye);
+  const [fisheye, setFisheye] = useState(
+    () => initialFisheye ?? lensesOf(INITIAL_PRESET),
+  );
   const [viewport, setViewport] = useState({ w: 1280, h: 720 });
 
   useEffect(() => {
