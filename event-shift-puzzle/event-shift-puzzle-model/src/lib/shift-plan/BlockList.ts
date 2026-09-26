@@ -18,6 +18,10 @@ export interface BlockListState {
 
 // ========== BlockList クラス ==========
 
+/** startBlock 以上 endBlock 未満のブロック番号を並べる */
+const blocksIn = (start: number, end: number): number[] =>
+  Array.from({ length: Math.max(0, end - start) }, (_, i) => start + i);
+
 export class BlockList {
   constructor(readonly state: BlockListState) {}
 
@@ -63,22 +67,25 @@ export class BlockList {
     return result;
   }
 
-  /** 範囲内の全ブロックに局員を追加（startBlock 以上 endBlock 未満） */
+  /**
+   * 範囲内の全ブロックに局員を追加（startBlock 以上 endBlock 未満）。
+   *
+   * ★ **自分を変数に取り置かない。** `let result = this` と置くと、以降は「いまの自分」と
+   *   「積み上げた結果」が同じ名前で混ざる ── 畳み込みなら、始まりとして渡すだけで済む。
+   */
   addUserToRange(startBlock: number, endBlock: number, userId: string): BlockList {
-    let result: BlockList = this;
-    for (let b = startBlock; b < endBlock; b++) {
-      result = result.addUser(b, userId);
-    }
-    return result;
+    return blocksIn(startBlock, endBlock).reduce<BlockList>(
+      (list, b) => list.addUser(b, userId),
+      this,
+    );
   }
 
   /** 範囲内の全ブロックから局員を削除（startBlock 以上 endBlock 未満） */
   removeUserFromRange(startBlock: number, endBlock: number, userId: string): BlockList {
-    let result: BlockList = this;
-    for (let b = startBlock; b < endBlock; b++) {
-      result = result.removeUser(b, userId);
-    }
-    return result;
+    return blocksIn(startBlock, endBlock).reduce<BlockList>(
+      (list, b) => list.removeUser(b, userId),
+      this,
+    );
   }
 
   /** 全ブロックから指定局員を削除 */
