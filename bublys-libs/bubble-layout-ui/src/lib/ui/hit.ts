@@ -13,6 +13,17 @@ export const RING = 12;
 /** 大きさの角の当たり（右下 [−12, +3]）。lab.html 1198 行 */
 const HANDLE_IN = 12;
 const HANDLE_OUT = 3;
+/**
+ * **指で掴むときだけ、角の当たりを外へ広げる量。**
+ *
+ * 指は太いので、3px しか外へ出ていない角は狙えない（爪の先で 1px を突く動き）。
+ * 内側（12px）は広げない ── そこは中身の上なので、広げると**中身を触れなくなる**。
+ * 外側は箱の外の空白なので、広げても何も奪わない。
+ *
+ * ★ CSS の `@media (any-pointer:coarse)` で `.bl-hnd` を 16 → 32px にしてあるのと同じ数
+ *   （12 ＋ 20 ＝ 32）。DOM は候補を絞る道具で、当たったかどうかはここが決め直す。
+ */
+export const HANDLE_COARSE_OUT = 20;
 
 export const inBox = (p: Placement, mx: number, my: number): boolean =>
   mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h;
@@ -22,9 +33,15 @@ export const onRing = (p: Placement, mx: number, my: number): boolean =>
   mx >= p.x - RING && mx <= p.x + p.w + RING && my >= p.y - RING && my <= p.y + p.h + RING &&
   !(mx >= p.x && mx <= p.x + p.w && my >= p.y && my <= p.y + p.h);
 
-export const onHandle = (p: Placement | null, mx: number, my: number): boolean =>
-  !!p && mx >= p.x + p.w - HANDLE_IN && mx <= p.x + p.w + HANDLE_OUT &&
-  my >= p.y + p.h - HANDLE_IN && my <= p.y + p.h + HANDLE_OUT;
+export const onHandle = (
+  p: Placement | null,
+  mx: number,
+  my: number,
+  /** 外へ出る量（指のときだけ `HANDLE_COARSE_OUT`）。内側は広げない */
+  out: number = HANDLE_OUT,
+): boolean =>
+  !!p && mx >= p.x + p.w - HANDLE_IN && mx <= p.x + p.w + out &&
+  my >= p.y + p.h - HANDLE_IN && my <= p.y + p.h + out;
 
 /**
  * 「中身の箱」に入っているか（枠は外側の空間のもの）。中身の箱を突いたら、その泡は**掴めない**
@@ -66,6 +83,8 @@ export interface PickInput {
   readonly scale?: number;
   /** 大きさの角の要素 */
   readonly handleEl: Element | null;
+  /** 角が外へ出る量（指で掴むときは `HANDLE_COARSE_OUT`）。省けばマウスの 3px */
+  readonly handleOut?: number;
 }
 
 export interface Picked {
@@ -85,7 +104,7 @@ export function pickAt(input: PickInput, mx: number, my: number): Picked {
     if (handleEl && el === handleEl) {
       // 大きさの角（泡の外に置いてある）
       const p = selectedId ? layout.byId.get(selectedId) ?? null : null;
-      if (!handle && p && p.vis > 0 && !tiny.has(p.id) && !p.b.state.implicit && onHandle(p, mx, my)) handle = p;
+      if (!handle && p && p.vis > 0 && !tiny.has(p.id) && !p.b.state.implicit && onHandle(p, mx, my, input.handleOut)) handle = p;
       continue;
     }
     const q = el.closest('.bub') as HTMLElement | null;
