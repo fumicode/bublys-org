@@ -1,4 +1,17 @@
 "use client";
+/**
+ * **この OS で何が開けるか** ── url と、それを描く部品の対応表。
+ *
+ * ★ **ここは domain ではない**（2026-09-26 に `domain/` から移した）。中身は
+ *   「どの url を、どの React 部品で描くか」で、ドメインの要素は 1 つも無い
+ *   ── むしろ画面の部品を 20 個 import する。`domain` は何にも依存しない層なので、
+ *   そこに置くと**層の名前が嘘になる**（CLAUDE.md の依存の向き）。
+ * ★ 置き場所は `registration/` ── ほかのバブリ（`users-libs` / `launcher-libs` /
+ *   `task-libs` / `memo-libs`）が既にそう置いている。同じものは同じ所に。
+ * ★ まだ残っている宿題：登録が `BubbleRouteRegistry.registerRoutes()` 個別のまま。
+ *   domain-registry に寄せて「バブリの定義 1 か所で全部」にするのが次
+ *   （CLAUDE.md 残課題 2）── これは置き場所とは別の話。
+ */
 
 import { BubbleRoute, BubbleRouteRegistry, makeSnapshotRoute, makeBublyRoute, BublyUniverseBubble } from "@bublys-org/bubbles-ui";
 

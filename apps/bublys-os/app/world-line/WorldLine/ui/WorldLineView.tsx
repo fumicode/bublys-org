@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState, useRef, useEffect } from 'react';
-import { WorldLineContext } from '../domain/WorldLineContext';
+import { WorldLineContext } from './WorldLineContext';
 import { World } from '../domain/World';
 
 // InitializeButtonコンポーネントを直接定義

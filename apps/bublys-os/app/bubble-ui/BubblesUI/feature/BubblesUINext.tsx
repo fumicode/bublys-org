@@ -9,7 +9,7 @@
  */
 import { BubbleSea, type Docked, type Home } from "@bublys-org/bubble-space-shell";
 import { ROOT_SEA_SCOPE } from "./WorldLineHomeBubble";
-import { bubbleRoutes } from "../domain/bubbleRoutes";
+import { bubbleRoutes } from "../registration/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
 const LAUNCHER_URL = "launchers/main";

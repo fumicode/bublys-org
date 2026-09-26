@@ -39,7 +39,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
 import { useEnsureMainLauncher } from "@/app/launcher/useEnsureMainLauncher";
-import "../domain/bubbleRoutes";
+import "../registration/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
 // import { BubbleArrangementInspector } from "../../world-line/BubbleArrangementInspector";

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import { WorldLineContext, WorldLineContextType } from '../domain/WorldLineContext';
+import { WorldLineContext, WorldLineContextType } from '../ui/WorldLineContext';
 import { useFocusedObject } from "@bublys-org/bubbles-ui";
 import {
   initialize,

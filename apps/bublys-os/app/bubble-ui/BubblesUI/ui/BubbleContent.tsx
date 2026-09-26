@@ -1,7 +1,7 @@
 'use client';
 import { FC, memo } from "react";
 import { Bubble, CurrentBubbleContext } from "@bublys-org/bubbles-ui";
-import { matchBubbleRoute } from "../domain/bubbleRoutes";
+import { matchBubbleRoute } from "../registration/bubbleRoutes";
 
 /**
  * BubbleContentコンポーネント
