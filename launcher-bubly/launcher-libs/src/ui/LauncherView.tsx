@@ -28,6 +28,13 @@ export type LauncherViewProps = {
   vertical: boolean;
   /** ラベルを出すか。false ならアイコンだけ（名前はツールチップで出る） */
   labels: boolean;
+  /**
+   * 折り返して並べるか。既定は折り返さない（箱の中では、並ぶ向きは 1 本）。
+   *
+   * ★ 使うのは**箱の外に浮かぶ一覧**だけ ── あれは箱の大きさに縛られないので、
+   *   1 本に伸ばすより格子にしたほうが見える。
+   */
+  wrap?: boolean;
   onLaunch: (url: string) => void;
   /**
    * **この場を片付ける口**（渡さなければ出さない）。
@@ -48,6 +55,7 @@ export const LauncherView: FC<LauncherViewProps> = ({
   entries,
   vertical,
   labels,
+  wrap = false,
   onLaunch,
   onReset,
 }) => (
@@ -57,10 +65,21 @@ export const LauncherView: FC<LauncherViewProps> = ({
     sx={{
       display: "flex",
       flexDirection: vertical ? "column" : "row",
+      flexWrap: wrap ? "wrap" : "nowrap",
       alignItems: vertical && labels ? "stretch" : "center",
+      alignContent: "flex-start",
       minWidth: 0,
       py: vertical ? 0.5 : 0,
       px: vertical ? 0 : 0.5,
+      /**
+       * ★ **入り切らないぶんはスクロールで見る。** 箱が短いことと、行き先が多いことは
+       *   別の話 ── 短い箱に合わせて姿を落としても、行き先の数は減らない。
+       *   並ぶ向きにだけ転がす（直交する向きは、はみ出すものが無いので切る）。
+       */
+      maxWidth: "100%",
+      maxHeight: "100%",
+      overflowX: wrap || vertical ? "hidden" : "auto",
+      overflowY: wrap || vertical ? "auto" : "hidden",
     }}
   >
     {entries.map((entry) => (

@@ -346,7 +346,8 @@ const Num = ({ value, onChange }: { value: number; onChange: (n: number) => void
     value={value}
     onChange={(e) => {
       const n = Number(e.target.value);
-      if (Number.isFinite(n) && n >= 240 && n <= 4096) onChange(Math.round(n));
+      // 小さい方は思い切り小さくできる ── 岸に貼ったものが姿を落とす所を見るため
+      if (Number.isFinite(n) && n >= 60 && n <= 4096) onChange(Math.round(n));
     }}
     style={{ width: 72, ...chip(false), padding: "4px 6px", background: "rgba(255,255,255,.06)" }}
   />
