@@ -8,8 +8,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { WorldLinesCanvasView } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { ROOT_UNIVERSE_ID } from "@bublys-org/bubbles-ui";
-import { useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
+import { LAYERED_SEA_SCOPE, useRootArrangementWorldLine } from "./useRootArrangementWorldLine";
 import { FullscreenToggle } from "@bublys-org/bubble-space-shell";
 
 /**
@@ -28,7 +27,8 @@ export const BubbleArrangementWorldLineControls: FC = () => {
   const apexId = graph.getApex()?.id ?? null;
 
   // 世界線 view のクリック → moveTo / キーボードの兄弟移動用に scope を直接持つ
-  const rootScope = useCasScope(ROOT_UNIVERSE_ID);
+  // 世界線を置く場所は、いまの海とは分けてある（`useRootArrangementWorldLine` の註）
+  const rootScope = useCasScope(LAYERED_SEA_SCOPE);
 
   const [showGraph, setShowGraph] = useState(false);
 

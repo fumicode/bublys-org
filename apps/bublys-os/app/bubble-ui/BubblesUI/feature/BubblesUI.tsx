@@ -39,6 +39,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CloseIcon from "@mui/icons-material/Close";
 import { useEnsureMainLauncher } from "@/app/launcher/useEnsureMainLauncher";
+import { LAYERED_SEA_SCOPE } from "../../world-line/useRootArrangementWorldLine";
 import "../registration/bubbleRoutes";
 import { PocketView } from "../../Pocket/ui/PocketView";
 import { BubbleArrangementWorldLineControls } from "../../world-line/BubbleArrangementWorldLineControls";
@@ -253,7 +254,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   }, [dispatch]);
 
   // 「root には必ずランチャーが 1 つは居る」— 無ければ main ランチャーを左の岸に着ける
-  useEnsureMainLauncher();
+  // 世界線を置く場所は、いまの海とは分けてある（`useRootArrangementWorldLine` の註）
+  useEnsureMainLauncher(LAYERED_SEA_SCOPE);
 
   return (
     // 画面全体 — universe（root も nested も）は透明にして、

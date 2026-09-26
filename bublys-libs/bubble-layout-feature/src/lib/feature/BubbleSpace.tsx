@@ -830,7 +830,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
-      const missing = want.filter((url) => !have.has(url));
+      /**
+       * ★ **作れないものは「足りない」に数えない。** ルートの無い url は下の作る所で
+       *   飛ばされるので、数えたままだと「足りないまま」が永遠に続き、**同じ世界を
+       *   書き続けて止まらなくなる**（実測：ルートを配っていない海で一覧を出すと、
+       *   1.5 秒に 130 回 `Maximum update depth exceeded`）。
+       */
+      const missing = want.filter((url) => !have.has(url) && !!matchBubbleRoute(routes, url));
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
        * ★ 「もう当ててあるか」は**世界に訊く**。覚え書き（ref）で持つと、

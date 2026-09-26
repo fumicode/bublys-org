@@ -73,7 +73,11 @@ const replaceHistoryState = (state: Record<string, unknown>, url: string): void 
   History.prototype.replaceState.call(window.history, withCurrentHistoryState(state), "", url);
 };
 
-export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
+export function useBrowserRootArrangementWorldLine(
+  codec: SnapshotCodec,
+  /** 世界線を置く場所の名前（`useUniverseArrangementWorldLine` の註）。既定は root universe と同じ */
+  scopeId?: string,
+) {
   const dispatch = useAppDispatch();
   // commit で新しいノードが生まれた瞬間だけ履歴を積む。宣言順の都合で ref 経由にする
   const onCommittedRef = useRef<(nodeId: string) => void>(() => undefined);
@@ -81,6 +85,7 @@ export function useBrowserRootArrangementWorldLine(codec: SnapshotCodec) {
     ROOT_UNIVERSE_ID,
     undefined,
     (nodeId) => onCommittedRef.current(nodeId),
+    scopeId,
   );
 
   // [seed] 復元するものが無いときだけ、設定済みの初期バブルを撒く。
