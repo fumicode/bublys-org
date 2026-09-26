@@ -2,10 +2,11 @@
 /**
  * 旧 `bubbles-ui` の画面を、新しい空間（泡のならべかた）の上でそのまま動かす橋。
  *
- * バブリの画面は**1文字も変えない**。渡すものは 3 つだけ:
+ * バブリの画面は**1文字も変えない**。渡すものは 4 つだけ:
  *   - 旧 `BubblesContext.openBubble` → 新しい空間の `openBubble`
  *   - 旧 `CurrentBubbleContext` → いま描いている泡の id
  *   - 旧 `KeyboardFocusContext` → いま触られている泡の id
+ *   - `BubbleBoxContext` → **中身を描ける箱の大きさ**（ここで測る）
  * 旧 `ObjectView` は前の 2 つを見てダブルクリックで開き、
  * 旧 `useKeyBindings` は残りの 1 つで「キーボードは誰のものか」を決める。
  *
@@ -17,6 +18,7 @@ import { useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-fea
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble } from "@bublys-org/bubble-layout-feature";
 import {
   Bubble,
+  BubbleBoxContext,
   BubblesContext,
   CurrentBubbleContext,
   KeyboardFocusContext,
@@ -52,6 +54,36 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
     [bubble.id, bubble.url],
   );
 
+  /**
+   * **箱の大きさは、ここで 1 回だけ測る。**
+   *
+   * ★ 中身は自分の大きさを `bubble.size` からは知れない ── すぐ上で url から作り直して
+   *   いるので、入っているのは**ルートに書いた既定値**（岸に 60 幅で貼っても 60 とは
+   *   言ってくれない）。中身ごとに ResizeObserver を持つのも重複なので、通り道である
+   *   ここで測って `BubbleBoxContext` で配る。
+   * ★ 測るのは**レイアウトの px**（`offsetWidth`）── 泡に掛かる倍率の影響を受けない側。
+   *   画面に写る大きさではなく「中身が使える広さ」なので、こちらが正しい。
+   * ★ 測れるまでは配らない（`null`）。読む側は `bubble.size` に落ちればよい
+   *   ── 旧の海にはこの口がまだ無く、あちらの `size` は本当の大きさなので。
+   */
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      setBox((prev) =>
+        prev && prev.width === width && prev.height === height ? prev : { width, height },
+      );
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const legacyContext = useMemo(
     () => ({
       openBubble: (url: string, openerBubbleId?: string) => {
@@ -63,13 +95,18 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
   );
 
   return (
-    <BubblesContext.Provider value={legacyContext as never}>
-      <KeyboardFocusContext.Provider value={keyboardFocus}>
-        <CurrentBubbleContext.Provider value={bubble.id}>
-          <Legacy bubble={legacyBubble as never} />
-        </CurrentBubbleContext.Provider>
-      </KeyboardFocusContext.Provider>
-    </BubblesContext.Provider>
+    /* 測る箱。中身と同じ広さで、見た目には何も足さない */
+    <div ref={boxRef} style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0 }}>
+      <BubblesContext.Provider value={legacyContext as never}>
+        <KeyboardFocusContext.Provider value={keyboardFocus}>
+          <CurrentBubbleContext.Provider value={bubble.id}>
+            <BubbleBoxContext.Provider value={box && box.width > 0 && box.height > 0 ? box : null}>
+              <Legacy bubble={legacyBubble as never} />
+            </BubbleBoxContext.Provider>
+          </CurrentBubbleContext.Provider>
+        </KeyboardFocusContext.Provider>
+      </BubblesContext.Provider>
+    </div>
   );
 };
 

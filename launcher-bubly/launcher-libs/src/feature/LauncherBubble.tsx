@@ -1,15 +1,15 @@
 "use client";
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AppsIcon from "@mui/icons-material/Apps";
-import { BubbleContentRenderer, BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubbleContentRenderer, BubblesContext, useBubbleBox } from "@bublys-org/bubbles-ui";
 import { launcherLayout } from "@bublys-org/launcher-model";
 import { LauncherView, type LauncherViewEntry } from "../ui/LauncherView.js";
 import { resolveLaunchTarget } from "../registration/launchTargets.js";
 import { useLauncher } from "./useLauncher.js";
 import { ResetStorageConfirm } from "./ResetStorageConfirm.js";
 
-/** バブルの枠（余白 + 縁）。**測れるまで**の見積りにだけ使う（下の註） */
+/** バブルの枠（余白 + 縁）。**旧の海**で外側から内側を出すのにだけ使う（下の註） */
 const CHROME = 26;
 
 /**
@@ -49,39 +49,19 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   );
 
   /**
-   * **描ける大きさは自分で測る。**
+   * **描ける大きさは、海から配られたものを使う**（`BubbleBoxContext`）。
    *
-   * ★ `bubble.size` は当てにならない ── 新しい海では旧ルートの橋渡し
-   *   （`legacyRouteBridge` の `LegacyScreen`）が `createBubble(url)` で作り直すので、
-   *   **いつもルートの既定値**（220×360）が入っている。岸に 60 幅で貼っても
-   *   60 とは言ってくれない ── 縦アイコンに見えていたのは、220×360 を解いた答えが
-   *   たまたまそうなるからで、箱を見ていたわけではなかった（実測で踏んだ）。
-   * ★ 測るのは**レイアウトの px**（`offsetWidth`）── 泡に掛かる倍率の影響を受けない側。
-   *   ポケットが同じやり方をしている。
+   * ★ 自分では測らない。測るのは泡の通り道 1 か所（`legacyRouteBridge` の
+   *   `LegacyScreen`）── 中身ごとに ResizeObserver を持つと同じことを何度もやる。
+   * ★ 配られていなければ旧の海。あちらの `bubble.size` は**枠込みの外側**なので、
+   *   枠のぶんを引いてから使う（配られるほうは引いたあとの内側）。
    */
-  const boxRef = useRef<HTMLDivElement | null>(null);
-  const [measured, setMeasured] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const measure = () => {
-      const width = el.offsetWidth;
-      const height = el.offsetHeight;
-      setMeasured((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
+  const given = useBubbleBox();
   // 貼り付いている辺は知らなくてよい。並べ方は中身を描ける大きさと項目数で決まる。
   // 末尾の「片付ける」も 1 項目として数える
   const outer = bubble.size ?? bubble.defaultSize;
   const drawable =
-    measured.width > 0
-      ? measured
-      : { width: Math.max(0, outer.width - CHROME), height: Math.max(0, outer.height - CHROME) };
+    given ?? { width: Math.max(0, outer.width - CHROME), height: Math.max(0, outer.height - CHROME) };
   const layout = launcherLayout(drawable, entries.length + 1);
 
   /** まとまっているとき、外に浮かんでいる一覧の位置。null なら出ていない */
@@ -151,7 +131,7 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
     return (
       <>
         <div
-          ref={mergeRefs(boxRef, iconRef)}
+          ref={iconRef}
           title="押すと呼び出しの一覧が出る"
           style={{
             width: "100%",
@@ -211,7 +191,6 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
 
   return (
     <>
-    <div ref={boxRef} style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0 }}>
     <LauncherView
       entries={entries}
       vertical={layout.direction === "vertical"}
@@ -222,15 +201,7 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
       onLaunch={(url) => openBubble(url, bubble.id)}
       onReset={() => setAsking(true)}
     />
-    </div>
     <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
     </>
   );
 };
-
-/** 同じ要素を 2 つの ref で持つ（測る箱と、浮かべる元が同じ所なので） */
-const mergeRefs =
-  <T,>(...refs: readonly MutableRefObject<T | null>[]) =>
-  (el: T | null) => {
-    for (const r of refs) r.current = el;
-  };
