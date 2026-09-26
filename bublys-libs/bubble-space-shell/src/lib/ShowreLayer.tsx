@@ -636,7 +636,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   return (
     <>
       <div ref={layer} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
-        {entries.map(({ d, edges, inset }) => (
+        {entries.map(({ d, rect, edges, inset }) => (
           <div
             key={d.key}
             data-docked-url={d.url}
@@ -658,8 +658,16 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
             {/* 岸に着いたバブルは装飾を持たない。中身だけが管の内側に収まる */}
             <div
               style={{
-                width: d.size.width,
-                height: d.size.height,
+                /**
+                 * ★ **描くのは窓に収めた大きさ**（`rect`）── 持っている大きさ（`d.size`）
+                 *   ではない。置き場所のほうは前から窓の中へ寄せていたのに、大きさだけ
+                 *   生の値を渡していたので、**窓を狭めると岸が画面からはみ出して**いた
+                 *   （実測：幅 578 に広げた口が、375 の画面で 578 のまま 203 はみ出す）。
+                 * ★ 持っている値は変えない。広げ直せば元の大きさで出る
+                 *   （実測：1200 に戻すと 578 に戻る）。
+                 */
+                width: rect.width,
+                height: rect.height,
                 padding: `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`,
                 boxSizing: "border-box",
                 overflow: "hidden",
