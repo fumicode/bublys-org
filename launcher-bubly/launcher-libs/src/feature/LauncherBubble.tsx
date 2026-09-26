@@ -158,9 +158,15 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
                 width: POPUP_WIDTH,
                 padding: POPUP.pad,
                 boxSizing: "border-box",
-                borderRadius: 12,
-                background: "rgba(22,27,38,.96)",
-                border: "1px solid rgba(255,255,255,.14)",
+                /**
+                 * ★ **地はポケットの受け皿と同じ明るい箱**（`rgba(255,255,255,.9)`）。
+                 *   同じ「アイコンを押すと外へ浮かぶ中身」なのに、こちらだけ暗いと
+                 *   別の仕掛けに見える。岸に貼ったランチャーの地（`light`）とも揃う。
+                 */
+                borderRadius: 8,
+                background: "rgba(255,255,255,.9)",
+                color: "#1b2029",
+                boxShadow: "0 2px 8px rgba(0,0,0,.1)",
                 zIndex: 2000,
                 filter: "drop-shadow(0 8px 24px rgba(0,0,0,.35))",
               }}
