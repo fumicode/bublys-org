@@ -34,7 +34,14 @@ export const BubbleArrangementWorldLineControls: FC = () => {
 
   // パネル位置（ドラッグで動かせる）
   const panelRef = useRef<HTMLDivElement>(null);
-  const posRef = useRef({ x: 76, y: 64 });
+  /**
+   * 置き場所。**掴んでいるあいだは style を直に書き**、離した所で state に落とす。
+   *
+   * ★ 前は覚え書き（ref）に置いて、描くときに読んでいた ── 描いている最中に覚え書きを
+   *   読むのは React の決まりに反する（`react-hooks/refs`）。離すときだけ動く値なので、
+   *   state で持てば描画と辻褄が合う。
+   */
+  const [pos, setPos] = useState({ x: 76, y: 64 });
   const dragRef = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
 
   const onMove = useCallback((e: MouseEvent) => {
@@ -45,34 +52,38 @@ export const BubbleArrangementWorldLineControls: FC = () => {
     panelRef.current.style.top = `${y}px`;
   }, []);
 
-  const onUp = useCallback(
-    (e: MouseEvent) => {
-      if (dragRef.current) {
-        posRef.current = {
-          x: dragRef.current.px + (e.clientX - dragRef.current.mx),
-          y: dragRef.current.py + (e.clientY - dragRef.current.my),
-        };
-      }
-      dragRef.current = null;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    },
-    [onMove],
-  );
+  /**
+   * 掴んでいるあいだだけ窓ぜんぶで拾う。**外すのは 1 本の紐で**（`AbortController`）。
+   *
+   * ★ 前は `onUp` の中で `removeEventListener("mouseup", onUp)` と**自分を名指し**して
+   *   いた ── まだ出来ていない自分を指すので、React の決まりに引っかかる
+   *   （`react-hooks/immutability`）。紐を切る形にすれば、名指しが要らない。
+   */
+  const dragLeashRef = useRef<AbortController | null>(null);
+
+  const onUp = useCallback((e: MouseEvent) => {
+    if (dragRef.current) {
+      setPos({
+        x: dragRef.current.px + (e.clientX - dragRef.current.mx),
+        y: dragRef.current.py + (e.clientY - dragRef.current.my),
+      });
+    }
+    dragRef.current = null;
+    dragLeashRef.current?.abort();
+    dragLeashRef.current = null;
+  }, []);
 
   const onHeaderMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
-      dragRef.current = {
-        mx: e.clientX,
-        my: e.clientY,
-        px: posRef.current.x,
-        py: posRef.current.y,
-      };
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
+      dragRef.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+      dragLeashRef.current?.abort();
+      const leash = new AbortController();
+      dragLeashRef.current = leash;
+      document.addEventListener("mousemove", onMove, { signal: leash.signal });
+      document.addEventListener("mouseup", onUp, { signal: leash.signal });
     },
-    [onMove, onUp],
+    [onMove, onUp, pos],
   );
 
   // キーボード: パネルが open のときだけ window 全体で拾う。
@@ -172,8 +183,8 @@ export const BubbleArrangementWorldLineControls: FC = () => {
           ref={panelRef}
           sx={{
             position: "fixed",
-            left: `${posRef.current.x}px`,
-            top: `${posRef.current.y}px`,
+            left: `${pos.x}px`,
+            top: `${pos.y}px`,
             zIndex: 1000,
             width: 480,
             height: 360,

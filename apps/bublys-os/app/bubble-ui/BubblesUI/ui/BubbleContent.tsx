@@ -48,7 +48,7 @@ const MeasuredBox: FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-export const BubbleContent: FC<{ bubble: Bubble }> = memo(({ bubble }) => {
+export const BubbleContent: FC<{ bubble: Bubble }> = memo(function BubbleContent({ bubble }) {
   const route = matchBubbleRoute(bubble.url);
   const Renderer = route?.Component;
 

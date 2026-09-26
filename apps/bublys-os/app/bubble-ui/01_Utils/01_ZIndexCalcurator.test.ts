@@ -1,7 +1,7 @@
 import ZIndexCalcurator from "./01_ZIndexCalcurator";
 
 describe("ZIndexCalcurator", () => {
-  let zIndexCalcurator: ZIndexCalcurator = new ZIndexCalcurator([
+  const zIndexCalcurator: ZIndexCalcurator = new ZIndexCalcurator([
     "id1",
     "id2",
     "id3",

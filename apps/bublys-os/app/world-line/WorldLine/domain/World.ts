@@ -12,7 +12,7 @@ export class World<TWorldState> {
     worldId: string,
     parentWorldId: string | null,
     worldState: TWorldState,
-    apexWorldLineId: string = ''
+    apexWorldLineId = ''
   ) {
     this.worldId = worldId;
     this.parentWorldId = parentWorldId;

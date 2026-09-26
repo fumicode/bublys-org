@@ -55,7 +55,7 @@ export class IgoGame_囲碁ゲーム {
   constructor(readonly state: IgoGameState_囲碁ゲーム状態) {}
 
   /** 新しいゲームを作成 */
-  static create(id: string, boardSize: number = 9): IgoGame_囲碁ゲーム {
+  static create(id: string, boardSize = 9): IgoGame_囲碁ゲーム {
     const board: StoneColor_石の色[][] = Array(boardSize)
       .fill(null)
       .map(() => Array(boardSize).fill(null));

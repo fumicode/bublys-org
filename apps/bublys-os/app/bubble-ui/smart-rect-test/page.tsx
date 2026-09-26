@@ -51,33 +51,34 @@ export default function SmartRectTestPage() {
     return () => window.removeEventListener('resize', updateCanvasSize);
   }, []);
 
-  // 初期矩形を作成
-  useEffect(() => {
-    if (canvasSize.width === 0 || canvasSize.height === 0) return;
-
-    setRects(prevRects => {
-      if (prevRects.length === 0) {
-        const rect = new SmartRect(
-          new DOMRect(
-            initialRectDefault.x,
-            initialRectDefault.y,
-            initialRectDefault.width,
-            initialRectDefault.height
-          ),
-          { width: canvasSize.width, height: canvasSize.height }
-        );
-        setSelectedRectId('0');
-        return [{
-          id: '0',
-          rect,
-          label: '初期矩形',
-          color: '#ffaa00',
-          showGrid: true, // デフォルトでグリッド表示
-        }];
-      }
-      return prevRects;
-    });
-  }, [canvasSize, initialRectDefault.x, initialRectDefault.y, initialRectDefault.width, initialRectDefault.height]);
+  /**
+   * 初期矩形を作る ── **画面の大きさが分かった最初の 1 回だけ**。
+   *
+   * ★ 効果の中で書いていたが、効果の中で state を書くと「描く → 書く → また描く」を
+   *   繰り返す形になる（`react-hooks/set-state-in-effect`）。しかも state を作る式の
+   *   なかで別の state（選んだ矩形）まで書いていた。
+   *   「描いている途中で気づいて直す」は React が認めている形なので、そちらにする。
+   */
+  const [seeded, setSeeded] = useState(false);
+  if (!seeded && canvasSize.width > 0 && canvasSize.height > 0) {
+    setSeeded(true);
+    setRects([{
+      id: '0',
+      rect: new SmartRect(
+        new DOMRect(
+          initialRectDefault.x,
+          initialRectDefault.y,
+          initialRectDefault.width,
+          initialRectDefault.height
+        ),
+        { width: canvasSize.width, height: canvasSize.height }
+      ),
+      label: '初期矩形',
+      color: '#ffaa00',
+      showGrid: true, // デフォルトでグリッド表示
+    }]);
+    setSelectedRectId('0');
+  }
 
 
   // 選択中の矩形を取得
