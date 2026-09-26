@@ -693,6 +693,28 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         join={join}
         extraSeas={extraSeas}
         onSeas={sink ? handOver : undefined}
+        /**
+         * **中身が要る大きさが分かった** ── その 1 回だけ大きさを直し、印（`fit`）を外す。
+         *
+         * ★ 人が数えた幅をコードに書く代わりが、これ。中身が変わればこの答えも変わるので、
+         *   **書き写しが古くなる**ことがなくなる（ボタンを 1 足すたびに足し算をやり直す、
+         *   をやめられる）。
+         * ★ 印を外すので、以降は測り直さない ── 広げた幅が中身に合わせて勝手に戻るようでは、
+         *   岸が持ち主のものでなくなる。
+         * ★ 記録（世界線）には落とさない。姿が変わったわけではなく、**最初から中身が
+         *   要っていた大きさ**に落ち着いただけなので、ここで節を作ると起動しただけで
+         *   分岐が生まれる。
+         */
+        onFit={(key, size) =>
+          setDocked((list) =>
+            list.map((d) => {
+              if (d.key !== key || !d.fit) return d;
+              const width = d.fit === "height" ? d.size.width : Math.round(size.width);
+              const height = d.fit === "width" ? d.size.height : Math.round(size.height);
+              return { ...d, fit: undefined, size: { width, height } };
+            }),
+          )
+        }
         onUpdate={(key, next) => {
           setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)));
           // 岸の上で動かした・大きさを変えた（剥がすほうは海の `takeIn` が知らせる）

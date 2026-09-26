@@ -19,6 +19,11 @@ const LAUNCHER_WIDTH = 60;
 const ICON = 48;
 /** 岸に貼ったものどうしのすき間 */
 const GAP = 8;
+/**
+ * 横に寝た口の高さ。**これは測らずに決める** ── 中身なりの高さ（36）より少し高くして、
+ * 指で押せる的にするため。幅のほうは中身に訊く（`fit`）。
+ */
+const BAR_HEIGHT = 44;
 
 /**
  * **上の縁に見え方の口が入らない画面は、並べ方を変える。**
@@ -93,13 +98,17 @@ const pocketDock = (viewport: { width: number; height: number }): Docked => ({
 const SPACE_VIEW_URL = "space-view";
 
 /**
- * 見え方の口の大きさ。**中身の実測から決める**（箱が中身より広いと、右に空きが残る）。
- *   選択 157 ＋ まかせる 78 ＋ 魚眼X 61 ＋ 魚眼Y 61 ＋ 帯 39 ＋ 全画面 30 ＝ 426
- *   ＋ すき間 8×5 ＝ 40 ＋ 左右の余白 4×2 ＝ 8 → 474。少し余裕を見て 482。
- * ★ 帯（どこから開いたか）の口を足したぶん、436 から広げた。狭いままだと
- *   **全画面の口が箱から押し出されて消える**（実測で踏んだ）。
+ * 見え方の口の大きさ ── **中身に訊く**（`fit`）。
+ *
+ * ★ 前はここに人が数えた幅（482）が書いてあった:
+ *     選択 157 ＋ まかせる 78 ＋ 魚眼X 61 ＋ 魚眼Y 61 ＋ 帯 39 ＋ 全画面 30 ＝ 426
+ *     ＋ すき間とと余白 48 → 474 → 余裕を見て 482
+ *   本当の幅を決めているのは CSS なので、これは**その写し**。ボタンを 1 つ足したときに
+ *   足し算をやり直し忘れて、**全画面の口が箱から押し出されて消えた**（実測で踏んだ）。
+ * ★ いまは貼ったあとに中身を測って、その 1 回だけ大きさが決まる。下の数は
+ *   **測り終えるまでの仮の姿**（高さは帯 1 本ぶん）。
  */
-const SPACE_VIEW_SIZE = { width: 482, height: 44 };
+const SPACE_VIEW_SIZE = { width: 320, height: BAR_HEIGHT };
 
 /**
  * 見え方の口の定位置 ── **上の縁の、横の中間**。
@@ -122,7 +131,7 @@ const spaceViewDock = (viewport: { width: number; height: number }): Docked =>
         key: `${SPACE_VIEW_URL}#dock`,
         url: SPACE_VIEW_URL,
         dock: { edges: ["bottom"], at: { x: 0, y: 0 } },
-        size: { width: viewport.width, height: SPACE_VIEW_SIZE.height },
+        size: { width: viewport.width, height: BAR_HEIGHT },
         ground: "none",
       }
     : {
@@ -136,6 +145,8 @@ const spaceViewDock = (viewport: { width: number; height: number }): Docked =>
           },
         },
         size: SPACE_VIEW_SIZE,
+        // 幅は中身に訊く（最初の 1 回だけ）。高さは上の `BAR_HEIGHT` の決め事
+        fit: "width",
         // 地は敷かない ── ボタンが空間の上に浮いて見える
         ground: "none",
       };
@@ -143,14 +154,13 @@ const spaceViewDock = (viewport: { width: number; height: number }): Docked =>
 const DEMO_SITES_URL = "demo-sites";
 
 /**
- * 他のデモへ行く口の大きさ。**中身の実測から決める**（箱が中身より広いと、右に空きが残る）。
- *   見出し 52 ＋ シフトントン 100 ＋ 世界線囲碁 88 ＋ 学会シフト 88 ＝ 328
- *   ＋ すき間 6×3 ＝ 18 ＋ 左右の余白 4×2 ＝ 8 → 354。少し余裕を見て 360。
+ * 他のデモへ行く口の大きさ ── **中身に訊く**（`fit`）。
  *
- * ★ この画面の中なので **bublys OS は出さない**（`DemoSitesBubble` の註）。
- *   出していた頃は 430 だったので、外したぶん 70 詰めた。
+ * ★ 前はここにも人が数えた幅（360）が書いてあった。デモが 1 つ増えるたびに足し算を
+ *   やり直す約束だったが、**誰もそれを知らない**。
+ * ★ 下の数は測り終えるまでの仮の姿。
  */
-const DEMO_SITES_SIZE = { width: 360, height: 44 };
+const DEMO_SITES_SIZE = { width: 320, height: BAR_HEIGHT };
 
 /**
  * 他のデモへ行く口の定位置 ── **下の縁の、ランチャーのすぐ右**。
@@ -176,6 +186,8 @@ const demoSitesDock = (viewport: { width: number; height: number }): Docked =>
         url: DEMO_SITES_URL,
         dock: { edges: ["bottom"], at: { x: LAUNCHER_WIDTH + 8, y: 0 } },
         size: DEMO_SITES_SIZE,
+        // 幅は中身に訊く（最初の 1 回だけ）。高さは上の `BAR_HEIGHT` の決め事
+        fit: "width",
         // 地は敷かない ── ボタンが空間の上に浮いて見える（見え方の口と同じ）
         ground: "none",
       };
