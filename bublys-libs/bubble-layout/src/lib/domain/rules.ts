@@ -24,15 +24,35 @@ export type EqualExtent = 'bubble' | 'band';
  */
 export type ZFocusStop = 'behind' | 'focus-plane';
 
+/**
+ * 3. **自由に置く空間**で両軸に魚眼が掛かったとき、大きさの倍率をどう1つにまとめるか
+ *    （`lens.ts` の `sizeFit`）
+ *   - 'product' … 両軸の像の積（**既定** ＝ 何も渡さなければ今までと同じ答え）
+ *   - 'hypot'   … 軸の遠さを斜辺で1つにする。隅は上下左右より小さく、減衰は斜辺1本ぶん
+ *   - 'min'     … ラボと `RULES.md` の元の答え。隅と上下左右が同じ大きさになる
+ *
+ *  ★ **既定は変えない。** 「隅の減衰が早すぎる」と言われたのは**大元の海**ひとつなので、
+ *    斜辺を選ぶのはその海だけ（`BubblesUINext` が `BubbleSea` に渡す）。渡さなかった空間
+ *    ── 一覧・窓の中の海・ラボ由来のビュー ── は 1px も変わらない。
+ *  ★ **効くのは両軸が `as-is`（自由に置く）の空間だけ。** 刻みで並ぶ軸（`equal` / `pack`）が
+ *    あれば積で決まり、ここは見られない ── 刻みが箱と同じ格子で隣どうしがぴたり接するのは
+ *    `大きさ ∝ kx·ky` のときだけなので、そこは選べることではない（`resolve.ts` の `combine`）。
+ *  ★ **片方の軸が平行なら 3 つは同じ答え**（平行の倍率は 1 ＝ 遠さ 0）なので、ラボと
+ *    突き合わせた検証（`_check/all.mjs`）はどれを渡しても通る。数は `lens.spec.ts` に全部ある。
+ */
+export type SizeCombine = 'hypot' | 'product' | 'min';
+
 export interface LayoutRules {
   readonly equalExtent: EqualExtent;
   readonly zFocusStop: ZFocusStop;
+  readonly sizeCombine: SizeCombine;
 }
 
-/** ラボと同じ既定 */
+/** ラボと同じ既定（`sizeCombine` は renewal-demo までと同じ答えになる側） */
 export const DEFAULT_RULES: LayoutRules = {
   equalExtent: 'bubble',
   zFocusStop: 'behind',
+  sizeCombine: 'product',
 };
 
 /**

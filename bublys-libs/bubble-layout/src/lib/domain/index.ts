@@ -26,7 +26,7 @@ export { CHROME, chromeW, chromeH, addChrome, stripChrome, chromeInset } from '.
 export type { Chrome, ChromeId } from './chrome.js';
 
 export { DEFAULT_RULES, resolveRules } from './rules.js';
-export type { LayoutRules, EqualExtent, ZFocusStop } from './rules.js';
+export type { LayoutRules, EqualExtent, ZFocusStop, SizeCombine } from './rules.js';
 
 export { DIMENSIONS, verbOf, readDimension, maxHistIn, writeKeyOf } from './dimension.js';
 export type { Dimension, DimensionId, Verb, WriteKey } from './dimension.js';
@@ -34,8 +34,8 @@ export type { Dimension, DimensionId, Verb, WriteKey } from './dimension.js';
 export { ARRANGES, arrangeAxis, valueFromPos, cellFromBands } from './arrange.js';
 export type { ArrangeId, Align, Band, Arranged, ArrangeInput } from './arrange.js';
 
-export { LENS_XY, LENS_Z, lensLabel, imageOf } from './lens.js';
-export type { LensId, LensXyId, LensZId, LensXy, LensZ, Projected } from './lens.js';
+export { LENS_XY, LENS_Z, lensLabel, imageOf, sizeFit } from './lens.js';
+export type { LensId, LensXyId, LensZId, LensXy, LensZ, Projected, SizeFit } from './lens.js';
 
 export { PRESETS, presetView, snapView, viewOfSpace, fitArrange, withAxis, withPreset, withInheritedView } from './view.js';
 export type { AxisView, View, ResolvedView, Preset, PresetId } from './view.js';

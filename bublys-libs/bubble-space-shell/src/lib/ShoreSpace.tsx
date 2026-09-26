@@ -30,7 +30,7 @@ import {
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
+import type { LayoutRules, LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
   anchoredRect,
@@ -82,6 +82,11 @@ export type ShoreSpaceProps = {
    */
   readonly worldLineScope?: string;
   readonly autoLens?: boolean;
+  /**
+   * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
+   * 渡した海だけに効く ── 窓の中の海や一覧は、別の `BubbleSpace` なので影響を受けない。
+   */
+  readonly rules?: Partial<LayoutRules>;
   /** どこから開いたかの帯の出し方（海ぜんぶの見え方） */
   readonly bandDisplay?: 'hover' | 'always' | 'none';
   readonly onLens?: (axis: PlaneAxis, lens: LensId) => void;
@@ -193,6 +198,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   onSpaceReady,
   worldLineScope,
   autoLens,
+  rules,
   bandDisplay,
   persistKey,
   onLens,
@@ -617,6 +623,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         memoryKey={persistKey}
         onSettled={record}
         autoLens={autoLens}
+        rules={rules}
         bandDisplay={bandDisplay}
         openArea={openArea}
         onLens={onLens}

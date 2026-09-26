@@ -168,6 +168,18 @@ const HOMES: readonly Home[] = [
 ];
 
 /**
+ * **大元の海だけの決め事。**
+ *
+ * ★ 両軸に魚眼を掛けたとき、大きさのまとめ方を**斜辺**にする（既定は積）。
+ *   積だと遠さが縦横で 2 回掛かるので、**4 隅へ泡を動かしたときの減衰が早すぎた**
+ *   （u ＝ H の隅で 0.1764。上下左右は 0.4200）。斜辺なら 0.2932 ── 隅は上下左右より
+ *   小さいまま、減衰は斜辺 1 本ぶんで済む（`bubble-layout` の `lens.ts` の `sizeFit`）。
+ * ★ **渡すのはここだけ。** 一覧・折り返す魚眼・窓の中の海は別の空間なので、1px も変わらない
+ *   （刻みで並ぶ軸は、この口に何を渡しても積のまま ── 隣どうしがぴたり接するのを守るため）。
+ */
+const SEA_RULES = { sizeCombine: 'hypot' } as const;
+
+/**
  * ルール: **家具は OS が持ち、海は器が立てる。**
  * ランチャー集約（呼び出しの中身）は Redux にある ── 泡として出すのは海の仕事。
  */
@@ -182,6 +194,7 @@ export const BubblesUINext = () => {
       routes={bubbleRoutes}
       homes={HOMES}
       worldLineScope={ROOT_SEA_SCOPE}
+      rules={SEA_RULES}
       style={{ height: "100vh" }}
     />
   );

@@ -8,6 +8,7 @@
  */
 import { METRICS, clamp } from './types.js';
 import type { Axis } from './types.js';
+import type { SizeCombine } from './rules.js';
 
 export type LensXyId = 'parallel' | 'fisheye';
 export type LensZId = 'perspective' | 'flat';
@@ -82,10 +83,83 @@ export const LENS_Z: Readonly<Record<LensZId, LensZ>> = {
 
 /*
  * ★ 2026-09-19：ここにあった `sizeXY` / `sizeBound`（端での下限 0.32）は取り消した。
- *   倍率は `min(X の像の倍率, Y の像の倍率)` そのもの ── `resolve.ts` が直接 Math.min で出す。
  *   「奥に行った泡は読めなくてよい。雰囲気だけでも残っていることに意味がある」（DECISIONS.md）。
  *   小さくなりすぎた泡を**描かない**のは ui の仕事で、domain には入らない。
  */
+
+/**
+ * ① **像に泡を収める** ── 両軸の像から「大きさの倍率ひとつ」と「位置の曲がり」を出す。
+ *
+ * > **大きさは斜辺で決める。曲がりはその大きさに従う ── 泡はいつも自分の像を埋める。**
+ *
+ * 泡は矩形のまま拡大縮小するので、合わせられる軸は1つだけ（RULES.md「大きさの倍率」）。
+ * X の像と Y の像から**1つの数**を作る、その作り方がここ。
+ *
+ * ★ **大きさ（k）** ── 軸の遠さを `a = −ln k`（k ＝ その軸の像の倍率。遠いほど a が大きい）と
+ *   置くと、3 つのまとめ方は同じ式のものさし（p ノルム）違いになる:
+ *
+ * | | 式 | u ＝ H の隅 | 何が言えるか |
+ * |---|---|---|---|
+ * | `min` | `exp(−max(ax, ay))` | 0.4200 | ラボと RULES.md の元の答え。**隅と上下左右が同じ大きさ**になる |
+ * | `hypot` | `exp(−√(ax² + ay²))` | 0.2932 | **既定。** 隅はいちばん小さく、減衰は斜辺 1 本ぶん |
+ * | `product` | `exp(−(ax + ay))` ＝ `kx·ky` | 0.1764 | 遠さが 2 回掛かる（`1/cosh⁴t`）── 隅が早く消える |
+ *
+ * ★ **曲がり（bx・by）** ── 位置は「その軸の像」を `b` 倍した所に置く。
+ *   `b = k ÷ その軸の像の倍率` と決める ＝ **泡は自分の像をちょうど埋める**。
+ *   どのまとめ方でも `k ≤ min(kx, ky)` なので `b ≤ 1`、つまり位置は必ず像の内側 ＝ 箱の中。
+ *
+ *   `product` ではこれが `bx = ky`・`by = kx` そのもの（`kx·ky ÷ kx`）── **前からの式は、
+ *   この一般形の特別な場合だった**。「上の行は縦に遠いので横にも縮む」も同じまま。
+ *
+ *   ★ **なぜ曲がりを大きさに合わせるのか**（数で踏んだ）── 刻みが箱と同じ格子（`coverflowGrid`）で
+ *     隣どうしがぴたり接するのは「泡の幅 ＝ 像の幅 × 曲がり」のときだけ。`bx` を `ky` に
+ *     固定したまま大きさだけ斜辺にすると、泡が自分の像より広くなって**隣と重なる**
+ *     （実測：200×100 の格子・隙間 14 で横 −16.1px・縦 −8.1px）。合わせておけば、
+ *     ずれは必ず**隙間**の側に出る（重なりは構造的に出ない）。
+ *
+ * @param kx X の像の倍率（`imageOf().k`）。レンズの像は必ず 1 以下
+ * @param ky Y の像の倍率
+ */
+export interface SizeFit {
+  /** 大きさの倍率（Z の m を掛ける前） */
+  readonly k: number;
+  /** X の位置に掛ける曲がり */
+  readonly bx: number;
+  /** Y の位置に掛ける曲がり */
+  readonly by: number;
+}
+
+/**
+ * 遠さの上限。**潰れきった像（k ＝ 0）で `−ln 0` が ∞ になるのを、ここで止める。**
+ *
+ * ★ 止めないと、隅の斜辺が `exp(∞ − ∞)` になって**曲がりが NaN** になり、
+ *   泡の置き場所と薄さが NaN のまま画面へ出る（実測：両軸魚眼の海で一覧を開いた瞬間に
+ *   「`NaN` is an invalid value for the `opacity` css style property」）。
+ * ★ `exp(−700)` ≒ 1e-304 なので、大きさとしては 0 と同じ。止めても絵は変わらない。
+ *   止めた側の曲がりは、極限どおり 1 に寄る（片方が潰れきっても、もう片方の位置は曲がらない）。
+ */
+const A_MAX = 700;
+
+export function sizeFit(kx: number, ky: number, how: SizeCombine = 'hypot'): SizeFit {
+  // 遠さ（0 以上）。像が原寸（平行のレンズ）なら 0、潰れきっていたら A_MAX で止める
+  const ax = kx >= 1 ? 0 : Math.min(A_MAX, -Math.log(kx));
+  const ay = ky >= 1 ? 0 : Math.min(A_MAX, -Math.log(ky));
+  /**
+   * ★ **片方の軸が曲がっていないときは、そこで丸めない。**
+   *   `exp(−(−ln k))` は k にビット単位で戻る保証が無いので、像をそのまま返す
+   *   ── 縦・横の coverflow もラボの X魚眼ビューも、3 つのまとめ方すべてで 1px も変わらない。
+   */
+  if (ay === 0) return { k: kx, bx: 1, by: kx };
+  if (ax === 0) return { k: ky, bx: ky, by: 1 };
+  if (how === 'product') return { k: kx * ky, bx: ky, by: kx };
+  if (how === 'min') {
+    const k = Math.min(kx, ky);
+    // 潰れきった軸（k ＝ 0）で 0 ÷ 0 にしない ── 曲がりの極限は 1（斜辺と同じ）
+    return { k, bx: kx > 0 ? k / kx : 1, by: ky > 0 ? k / ky : 1 };
+  }
+  const d = Math.hypot(ax, ay);
+  return { k: Math.exp(-d), bx: Math.exp(ax - d), by: Math.exp(ay - d) };
+}
 
 /** 軸とレンズ id から見出し（lab.html 390 行 lensLabel） */
 export function lensLabel(axis: Axis, id: LensId): string {

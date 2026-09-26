@@ -2,15 +2,19 @@
  * ① レンズ ── 位置 → 画面。軸ごとに1つ。
  *   ・平行／魚眼／透視の式
  *   ・泡の像（端をレンズに通した間）
- *   ・大きさの倍率は数値1つ ＝ min(X の像の倍率, Y の像の倍率)（端での下限は持たない）
+ *   ・大きさの倍率は数値1つ ＝ 両軸の像をまとめた1つ（`sizeK`。端での下限は持たない）
  *   ・X/Y のレンズは1次元の単調な関数なので、逆関数が必ず書ける（往復して戻る）
  *
  * 待っている数はラボ（v5-dom/lab.html）からの実測。手で作った数は無い（lab-scene.ts の断り）。
  */
-import { LENS_XY, LENS_Z, imageOf } from './lens.js';
+import { LENS_XY, LENS_Z, imageOf, sizeFit } from './lens.js';
 import { METRICS } from './types.js';
 import { resolveWorld } from './resolve.js';
-import { withAxis } from './view.js';
+import { Bubble } from './bubble.js';
+import { BubbleWorld } from './world.js';
+import { DEFAULT_RULES } from './rules.js';
+import type { LayoutRules, SizeCombine } from './rules.js';
+import { presetView, withAxis } from './view.js';
 import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
 const world = labScene();
@@ -21,6 +25,8 @@ const layout = resolveWorld(world, VIEWPORT);
  * `__lab.setAxis("fish", …, { lens })` を当てて `__lab.placements()` から取った値。
  * ★ 2026-09-19：端での下限 0.32 を取り消したので、3通りとも下限を入れる前の数に戻った
  *   （0.7201… → 0.5884… ＝ 像の倍率そのもの）。3つ目が前2つの min という性質は前から変わらない。
+ * ★ 3つ目は**ラボのまとめ方（`min`）の数**。いまの既定は斜辺（`hypot`）なので両軸が魚眼のときだけ
+ *   ここより小さくなる ── どれだけ小さくなるかは下の「まとめ方は3つ」で測る。
  */
 const LAB_FISH_SCALE: Readonly<Record<string, readonly [number, number, number]>> = {
   v0: [0.5884453468854983, 0.7362335972462608, 0.5884453468854983],
@@ -185,32 +191,176 @@ describe('① レンズ（位置 → 画面）', () => {
   });
 
   /**
-   * ★ **ここはラボから意図して外した**（2026-09-25）。ラボは両軸が魚眼のとき `min` を採る。
+   * ★ **ここはラボから意図して外した**（2026-09-25 に `product`、2026-09-26 に `hypot`）。
+   *   ラボは両軸が魚眼のとき `min` を採る。
    *
    *   `min` だと **4 隅が上下左右と同じ大きさ**になる（`min(k,k)` ＝ `min(k,1)`）ので、
    *   縦にも横にも遠い隅が「さらに小さい」と言えない。格子を魚眼で見たときに
    *   歪んで見えず、列の中心は揃うのに辺が揃わないまま余白だけが残る（実測で踏んだ）。
-   *   **積**にすると遠さが縦横で重なり、隅がいちばん小さくなる ── 泡の比は変えないまま。
+   *   `product`（積）は遠さが縦横で**2 回**掛かるので、隅が早く消えすぎた（`1/cosh⁴t`）。
+   *   いまは**斜辺**（`hypot`）── 遠さを足さず、直角三角形の斜辺として1つにまとめる。
    *
-   * ★ **片方の軸が平行なら、積は min と同じ数**（平行の倍率は 1）。
+   * ★ **片方の軸が平行なら、3 つのまとめ方はどれも同じ数**（平行の倍率は 1 ＝ 遠さ 0）。
    *   だから縦・横の coverflow も、ラボの X魚眼ビューそのものも 1px も変わらない
-   *   ── 下の onlyX・onlyY がラボの実測値ちょうどであることで押さえている。
+   *   ── 下の onlyX・onlyY がラボの実測値ちょうどであることで、3 通りとも押さえている。
    */
-  it('★ 大きさの倍率は数値1つ ＝ 両軸の像の倍率の**積**（片方が平行なら、ラボの min と同じ数）', () => {
-    // 同じ場面を、X だけ魚眼／Y だけ魚眼／両方魚眼 で解く
-    const onlyX = resolveWorld(world, VIEWPORT);
-    const onlyY = resolveWorld(
-      withAxis(withAxis(world, 'fish', 'x', { lens: 'parallel' }), 'fish', 'y', { lens: 'fisheye' }),
-      VIEWPORT,
-    );
-    const both = resolveWorld(withAxis(world, 'fish', 'y', { lens: 'fisheye' }), VIEWPORT);
-    for (const [id, [kx, ky, kmin]] of Object.entries(LAB_FISH_SCALE)) {
-      expect(placeOf(onlyX, id).scale).toBe(kx);      // Y が平行なら倍率 1 ── ラボと同じ数
-      expect(placeOf(onlyY, id).scale).toBe(ky);      // X が平行なら同じく
-      // 両方魚眼のときだけラボと違う ── 積は min より小さい（遠さが重なる）
-      expect(placeOf(both, id).scale).toBeCloseTo(kx * ky, 12);
-      expect(placeOf(both, id).scale).toBeLessThanOrEqual(kmin);
-      expect(kmin).toBe(Math.min(kx, ky));            // ラボが採っていた数（記録として残す）
+  it('★ 大きさの倍率は数値1つ。片方が平行ならどれも同じ数（ラボの実測値ちょうど）', () => {
+    for (const how of ['hypot', 'product', 'min'] as const) {
+      const rules: Partial<LayoutRules> = { sizeCombine: how };
+      const onlyX = resolveWorld(world, VIEWPORT, rules);
+      const onlyY = resolveWorld(
+        withAxis(withAxis(world, 'fish', 'x', { lens: 'parallel' }), 'fish', 'y', { lens: 'fisheye' }),
+        VIEWPORT,
+        rules,
+      );
+      for (const [id, [kx, ky, kmin]] of Object.entries(LAB_FISH_SCALE)) {
+        // 片方が平行 ── どのまとめ方でも**ラボの実測値ちょうど**（丸めも入らない）
+        expect(placeOf(onlyX, id).scale).toBe(kx);
+        expect(placeOf(onlyY, id).scale).toBe(ky);
+        expect(kmin).toBe(Math.min(kx, ky));          // ラボが採っていた数（記録として残す）
+      }
+    }
+  });
+
+  /**
+   * ★ **まとめ方はその空間の View から出る**（規則①）── 海と一覧は別の空間なので、
+   *   どちらかを選ぶ話ではない。
+   *
+   * > **接する相手がいるなら、接することを守る。自由に置いた泡には隣が無い。**
+   *
+   *   刻みで並ぶ軸（`equal` / `pack`）があるなら**積**。X魚眼ビューは `equal` × `equal` なので、
+   *   両軸を魚眼にしても口に何を渡しても積のまま ── 折り返す魚眼の「ぴたり接する」を守るため。
+   *   両軸が `as-is`（自由に置く ＝ 海）なら口に従う（既定は積 ＝ 渡さなければ今までと同じ）。
+   */
+  it('★ まとめ方は並べ方で決まる ── 刻みで並ぶ空間は積、自由に置く空間は口に従う', () => {
+    const fishBoth = withAxis(world, 'fish', 'y', { lens: 'fisheye' });
+    // X魚眼ビュー（equal × equal）── 口に何を渡しても積
+    for (const how of ['hypot', 'product', 'min'] as const) {
+      const L = resolveWorld(fishBoth, VIEWPORT, { sizeCombine: how });
+      for (const [id, [kx, ky]] of Object.entries(LAB_FISH_SCALE))
+        expect(placeOf(L, id).scale).toBeCloseTo(kx * ky, 12);
+    }
+    // 外の空間（自由に置く ＝ as-is × as-is）の泡を、両軸魚眼にして測る
+    const sea = withAxis(withAxis(world, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' });
+    const kOf = (L: ReturnType<typeof resolveWorld>, id: string) => {
+      const p = placeOf(L, id);
+      const S = L.spaces.get(p.space);
+      if (!S) throw new Error('空間が無い');
+      return {
+        kx: imageOf(p.pos.x, p.box.w, LENS_XY.fisheye, S.ctx.H.x, S.ctx.focus.x).k,
+        ky: imageOf(p.pos.y, p.box.h, LENS_XY.fisheye, S.ctx.H.y, S.ctx.focus.y).k,
+        local: p.local / p.m,
+      };
+    };
+    // 外の空間に居て、両軸とも曲がっている泡（＝ 隅の側に居るもの）だけを見る
+    const outer = resolveWorld(sea, VIEWPORT)
+      .order.filter((p) => p.space === 'root' && !p.b.state.implicit)
+      .map((p) => p.id);
+    let bent = 0;
+    for (const id of outer) {
+      const hyp = kOf(resolveWorld(sea, VIEWPORT), id);
+      if (!(hyp.kx < 1 && hyp.ky < 1)) continue;
+      bent++;
+      // 既定は積（何も渡さなければ今までと同じ答え）
+      expect(hyp.local).toBeCloseTo(hyp.kx * hyp.ky, 12);
+      // 斜辺を渡した空間だけが変わる
+      const hyp2 = kOf(resolveWorld(sea, VIEWPORT, { sizeCombine: 'hypot' }), id);
+      expect(hyp2.local).toBeCloseTo(Math.exp(-Math.hypot(Math.log(hyp.kx), Math.log(hyp.ky))), 12);
+      expect(kOf(resolveWorld(sea, VIEWPORT, { sizeCombine: 'min' }), id).local)
+        .toBeCloseTo(Math.min(hyp.kx, hyp.ky), 12);
+      // 斜辺は積より大きく、min より小さい（＝ 隅は上下左右より小さいまま、減衰は斜辺1本ぶん）
+      expect(hyp2.local).toBeGreaterThan(hyp.kx * hyp.ky);
+      expect(hyp2.local).toBeLessThan(Math.min(hyp.kx, hyp.ky));
+    }
+    expect(bent).toBeGreaterThan(0);                    // 見る相手が居たことを押さえる
+    expect(DEFAULT_RULES.sizeCombine).toBe('product');  // 既定は変えていない
+  });
+
+  /**
+   * ★ **3 つの並び ── 積 ≤ 斜辺 ≤ min。** どれも min 以下なので、泡は横の像にも縦の像にも収まる。
+   *   斜辺が min より**厳しく小さい**ことで「隅は上下左右より小さい」が言え、
+   *   積より**厳しく大きい**ことで「隅が 2 回ぶん減衰しない」が言える。
+   *
+   *   u ＝ H（上下左右が 0.4200）の隅で: 積 0.1764 ＜ 斜辺 0.2932 ＜ min 0.4200。
+   *   X魚眼ビューの v0（kx 0.5884・ky 0.7362）では: 積 0.4332 ＜ 斜辺 0.5421 ＜ min 0.5884。
+   */
+  it('★ まとめ方の並びは 積 ≤ 斜辺 ≤ min（両軸が曲がっていれば、どちらも厳しい不等号）', () => {
+    const k = 1 / Math.cosh(1) ** 2;                       // u ＝ H での像の倍率（片軸）
+    expect(k).toBeCloseTo(0.42, 4);
+    expect(sizeFit(k, k, 'min').k).toBeCloseTo(0.42, 4);
+    expect(sizeFit(k, k, 'hypot').k).toBeCloseTo(0.2932, 4);
+    expect(sizeFit(k, k, 'product').k).toBeCloseTo(0.1764, 4);
+    // 隅（両軸が曲がっている）では 3 つがはっきり分かれる
+    expect(sizeFit(k, k, 'product').k).toBeLessThan(sizeFit(k, k, 'hypot').k);
+    expect(sizeFit(k, k, 'hypot').k).toBeLessThan(sizeFit(k, k, 'min').k);
+    // 上下左右（片方が平行）では 3 つとも同じ数 ── しかも**ビット単位で**その軸の像そのもの
+    for (const how of ['hypot', 'product', 'min'] as const) {
+      expect(sizeFit(k, 1, how).k).toBe(k);
+      expect(sizeFit(1, k, how).k).toBe(k);
+      expect(sizeFit(1, 1, how).k).toBe(1);
+    }
+    // 隅は上下左右より小さい（＝ 遠近が言える）。ここが `min` では等しくなっていた
+    expect(sizeFit(k, k, 'hypot').k).toBeLessThan(sizeFit(k, 1, 'hypot').k);
+    expect(sizeFit(k, k, 'min').k).toBe(sizeFit(k, 1, 'min').k);
+    // v0（X魚眼ビューの端）の実際の数
+    const [kx, ky] = LAB_FISH_SCALE['v0'];
+    expect(sizeFit(kx, ky, 'product').k).toBeCloseTo(0.4332, 4);
+    expect(sizeFit(kx, ky, 'hypot').k).toBeCloseTo(0.5421, 4);
+    expect(sizeFit(kx, ky, 'min').k).toBeCloseTo(0.5884, 4);
+    /**
+     * ★ **潰れきった端（像が 0 に落ちた）でも、数で返る。**
+     *   `−ln 0` は ∞ なので、止めないと斜辺が `exp(∞ − ∞)` ＝ NaN になり、
+     *   置き場所も薄さも NaN のまま画面へ出る（実測：両軸魚眼の海で一覧を開いた瞬間に
+     *   「`NaN` is an invalid value for the `opacity` css style property」）。
+     */
+    for (const how of ['hypot', 'product', 'min'] as const)
+      for (const [a, b] of [[0, 0.5], [0.5, 0], [0, 0], [1e-320, 0.5]] as const) {
+        const fit = sizeFit(a, b, how);
+        expect(Number.isFinite(fit.k)).toBe(true);
+        expect(Number.isFinite(fit.bx)).toBe(true);
+        expect(Number.isFinite(fit.by)).toBe(true);
+        expect(fit.k).toBeLessThanOrEqual(Math.min(a, b) + 1e-300);   // 収まる（min 以下）
+        expect(fit.bx).toBeGreaterThanOrEqual(0);
+        expect(fit.by).toBeGreaterThanOrEqual(0);
+      }
+    // 大きさは 0 と同じ（1e-304 以下）／潰れきっていない側の曲がりは、極限どおり 1 に寄る
+    expect(sizeFit(0, 0.5, 'hypot').k).toBeLessThan(1e-300);
+    expect(sizeFit(0, 0.5, 'hypot').bx).toBeCloseTo(1, 3);
+    expect(sizeFit(0, 0.5, 'hypot').by).toBeLessThan(1e-300);
+    // 止める手前（1e-320）と、止めたあと（0）で答えが跳ばない
+    expect(Math.abs(sizeFit(0, 0.5, 'hypot').bx - sizeFit(1e-320, 0.5, 'hypot').bx)).toBeLessThan(1e-3);
+  });
+
+  /**
+   * ★ **遠くへ行った泡が居ても、答えに NaN を出さない。**
+   *
+   *   魚眼の像は `|u| ≳ 19H` で**ぴたり 0 に潰れる**（tanh が 1 に張り付く）。
+   *   そこで遠さ（`−ln k`）が ∞ になり、斜辺が `exp(∞ − ∞)` ＝ NaN になっていた
+   *   ── 置き場所も薄さも NaN のまま画面へ出て、React が
+   *   「`NaN` is an invalid value for the `opacity` css style property」で止まる（実測）。
+   */
+  it('★ ずっと遠くの泡が居ても、配置に NaN は出ない（3 つのまとめ方とも）', () => {
+    for (const how of ['hypot', 'product', 'min'] as const) {
+      const far = new BubbleWorld({
+        bubbles: [
+          Bubble.create({ id: 'near', title: '近い', w: 200, h: 120, free: { x: 0, y: 0 } }).state,
+          // 箱の半幅の 20 倍より外 ＝ 像が 0 に潰れる所（前に泡が飛ばされた先と同じくらい）
+          Bubble.create({ id: 'far', title: '遠い', w: 200, h: 120, free: { x: 20000, y: 9000 } }).state,
+        ],
+        root: { title: '海', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+        implicitSeq: 0,
+      });
+      const both = withAxis(withAxis(far, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' });
+      const L = resolveWorld(both, VIEWPORT, { sizeCombine: how });
+      for (const p of L.order)
+        for (const v of [p.x, p.y, p.w, p.h, p.scale, p.local, p.alpha, p.vis, p.bend.x, p.bend.y])
+          expect(Number.isFinite(v)).toBe(true);
+      // 遠い泡は潰れている（描く側が消す）／近い泡は原寸のまま
+      const q = L.byId.get('far');
+      const n = L.byId.get('near');
+      if (!q || !n) throw new Error('居ない');
+      expect(q.scale).toBeLessThan(1e-6);
+      expect(n.scale).toBeGreaterThan(0.9);
     }
   });
 

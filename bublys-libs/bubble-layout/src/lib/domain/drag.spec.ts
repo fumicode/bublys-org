@@ -14,7 +14,7 @@ import { dragBubble, dragVerbsOf, wheelScroll, wheelZ, zoomedBy } from './drag.j
 import { resolveWorld } from './resolve.js';
 import { presetView, viewOfSpace, withAxis, withPreset } from './view.js';
 import type { PresetId } from './view.js';
-import { DEFAULT_RULES } from './rules.js';
+import { DEFAULT_RULES, resolveRules } from './rules.js';
 import { Bubble } from './bubble.js';
 import { BubbleWorld } from './world.js';
 import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
@@ -55,6 +55,110 @@ describe('② 泡をドラッグする', () => {
     expect(next.bubble('fish')?.state.focus.y).toBe(2);
     // 泡そのものの値は1つも変わらない
     expect(next.bubble('v4')?.state).toEqual(before);
+  });
+
+  /**
+   * ★ **自由に置く空間では曲がらない ── だから震えない。**
+   *
+   *   曲がり（`bend`）は「隣とぴたり接する」ためのもので、相手の軸で決まる。自由に置く海では
+   *   接する相手が居ないのに掛かっていたので、掴んで斜めに動かすと x と y が互いを揺らし、
+   *   **指を 1px 動かすと泡の中心が ±12px 跳ねて**いた（実測）。
+   *   曲げなければ軸ごとに独立して写るので、**指と 1 : 1**。
+   */
+  it('★ 隅の近くでも震えない ── 指を 1px 動かしたら、泡も 1px', () => {
+    const rules = resolveRules({ sizeCombine: 'hypot' });
+    let w = new BubbleWorld({
+      bubbles: [Bubble.create({ id: 'a', title: 'a', w: 300, h: 200, free: { x: 0, y: 0 } }).state],
+      root: { title: '海', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+      implicitSeq: 0,
+    });
+    w = withAxis(withAxis(w, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' });
+    const VP = { w: 1440, h: 900 };
+    let L = resolveWorld(w, VP, rules);
+    let p = L.byId.get('a');
+    if (!p) throw new Error('no a');
+    // 隅へ向けて 360px 引く（4px 刻み）。ずっと指の下に居る
+    let mx = p.x + p.w / 2;
+    let my = p.y + p.h / 2;
+    for (let i = 0; i < 90; i++) {
+      mx += 4; my += 2.5;
+      w = dragBubble(w, { layout: L, id: 'a', space: 'root', want: { x: mx, y: my }, m: p.m }, rules);
+      L = resolveWorld(w, VP, rules);
+      p = L.byId.get('a');
+      if (!p) throw new Error('gone');
+      expect(p.x + p.w / 2).toBeCloseTo(mx, 6);      // 途中の 1 歩も外さない
+      expect(p.y + p.h / 2).toBeCloseTo(my, 6);
+    }
+    expect(p.scale).toBeGreaterThan(0.3);            // 隅でも潰れきっていない（飛んでいない）
+    // ここで指を ±1px 揺らす ── 泡も ±1px（跳ねない）
+    let last = p.x + p.w / 2;
+    for (const d of [1, -1, 1, -1, 1, -1]) {
+      w = dragBubble(w, { layout: L, id: 'a', space: 'root', want: { x: mx + d, y: my }, m: p.m }, rules);
+      L = resolveWorld(w, VP, rules);
+      p = L.byId.get('a');
+      if (!p) throw new Error('gone');
+      const now = p.x + p.w / 2;
+      expect(Math.abs(now - (mx + d))).toBeLessThan(1e-6);   // 指の下
+      expect(Math.abs(now - last)).toBeLessThanOrEqual(2.000001);  // 跳ねない（前は ±12px）
+      last = now;
+    }
+  });
+
+  /**
+   * ★ **曲がるのは「刻みで並ぶ空間」だけ。**
+   *   格子（`coverflowGrid` ＝ equal × equal）では隣どうしがぴたり接するために曲がりが要る。
+   *   自由に置く海（as-is × as-is）では、接する相手が居ないので曲げない。
+   */
+  it('★ 曲がるのは刻みで並ぶ空間だけ（自由に置く海は曲がらない）', () => {
+    const rules = resolveRules({ sizeCombine: 'hypot' });
+    const VP = { w: 1440, h: 900 };
+    const bubbles = [
+      Bubble.create({ id: 'a', title: 'a', w: 200, h: 120, free: { x: 400, y: 260 }, cell: { col: 1, row: 1 } }).state,
+      Bubble.create({ id: 'b', title: 'b', w: 200, h: 120, free: { x: 0, y: 0 }, cell: { col: 0, row: 0 } }).state,
+    ];
+    const make = (preset: 'free' | 'coverflowGrid') => {
+      const w0 = new BubbleWorld({
+        bubbles, root: { title: '外', view: presetView(preset), focus: { x: 0, y: 0, z: 0 }, zoom: 1 }, implicitSeq: 0,
+      });
+      return preset === 'free'
+        ? withAxis(withAxis(w0, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' })
+        : w0;
+    };
+    const freeA = resolveWorld(make('free'), VP, rules).byId.get('a');
+    const gridA = resolveWorld(make('coverflowGrid'), VP, rules).byId.get('a');
+    if (!freeA || !gridA) throw new Error('no a');
+    expect(freeA.bend).toEqual({ x: 1, y: 1 });          // 自由：曲がらない
+    expect(gridA.bend.x).toBeLessThan(1);                // 格子：曲がる
+    expect(gridA.bend.y).toBeLessThan(1);
+  });
+
+  /**
+   * ★ **届かない所へは動かさない。**
+   *   魚眼は無限を箱に畳むので、箱の端より外の像はどんな位置にも対応しない。
+   *   無理に解くと答えが挟んだ端（±14H）に張り付き、**泡が海の外へ飛んで二度と掴めなくなる**
+   *   （実測：両軸魚眼で右下へ動かすと、位置が 723 → 8960 に跳んで消失点へ潰れた）。
+   */
+  it('★ 届かない所へは動かさない（端で止まる。内へ戻せばまた付いてくる）', () => {
+    const rules = DEFAULT_RULES;
+    let w = new BubbleWorld({
+      bubbles: [Bubble.create({ id: 'a', title: 'a', w: 260, h: 180, free: { x: 0, y: 0 } }).state],
+      root: { title: '海', view: presetView('free'), focus: { x: 0, y: 0, z: 0 }, zoom: 1 },
+      implicitSeq: 0,
+    });
+    w = withAxis(withAxis(w, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' });
+    const L = resolveWorld(w, VIEWPORT, rules);
+    const p = L.byId.get('a');
+    if (!p) throw new Error('no a');
+    // 箱のはるか外（届かない）を狙う
+    const far = dragBubble(
+      w, { layout: L, id: 'a', space: 'root', want: { x: p.x + p.w / 2 + 5000, y: p.y + p.h / 2 }, m: p.m }, rules,
+    );
+    expect(far.bubble('a')?.state.free.x).toBe(0);            // 動かない（飛ばない）
+    // 届く所なら、ちゃんと動く
+    const near = dragBubble(
+      w, { layout: L, id: 'a', space: 'root', want: { x: p.x + p.w / 2 + 100, y: p.y + p.h / 2 }, m: p.m }, rules,
+    );
+    expect(near.bubble('a')?.state.free.x).toBeGreaterThan(90);
   });
 
   it('なしなら何も起きない（議事録 ＝ X・Y とも なし）', () => {

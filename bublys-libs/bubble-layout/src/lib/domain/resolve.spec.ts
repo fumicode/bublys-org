@@ -163,7 +163,7 @@ describe('泡のならべかた ── 解決（ラボと同じ数が出るか�
   });
 });
 
-describe('魚眼は、箱の2倍を超える泡は諦める', () => {
+describe('魚眼は諦めない ── どんな大きさでも、選んだレンズのまま', () => {
   /** 420 幅の泡が 2 つ。root は X 魚眼 */
   const twoCards = () => {
     let w = emptyWorld(presetView('fisheyeX'));
@@ -171,28 +171,48 @@ describe('魚眼は、箱の2倍を超える泡は諦める', () => {
       w = w.add(Bubble.create({ id, title: id, hue: 0, w: 420, h: 300, parent: null, order: 0, free: { x, y: 0, z: 0 } }));
     return w;
   };
-  const lensOf = (vw: number) =>
-    resolveWorld(twoCards(), { w: vw, h: 600 }).spaces.get('root')?.view.x.lens;
+  const at = (vw: number) => resolveWorld(twoCards(), { w: vw, h: 600 });
+  const lensOf = (vw: number) => at(vw).spaces.get('root')?.view.x.lens;
 
-  it('泡が箱の2倍までなら、魚眼のまま（収めれば読める）', () => {
+  /**
+   * ★ **2026-09-26 に「箱の 2 倍を超える泡は諦める」を消した。**
+   *
+   *   前は、いちばん大きい泡が箱の 2 倍を超えるとその軸を平行に落としていた
+   *   （箱 151 に泡 420 ＝ 2.8 倍で、倍率 6e-05 になって消えたのが理由）。消した理由:
+   *
+   *     1. **人が選んだレンズを黙って裏返していた**（口は魚眼、絵は平行）
+   *     2. **「まかせる」と二重**だった ── 見える口と見えない所が食い違って押し合い、
+   *        まかせるが止まらなくなっていた（実測：2 秒で 416 回）
+   *     3. 大きすぎると感じたら、**見る人が**窓を小さくする・寄りを引く・端へ動かす
+   */
+  it('どれだけ箱が小さくても、魚眼のまま（平行に落とさない）', () => {
     expect(lensOf(900)).toBe('fisheye');
     expect(lensOf(420)).toBe('fisheye');   // 1 倍
     expect(lensOf(211)).toBe('fisheye');   // 1.99 倍
-    // ★ 詳細を2つ開いて並び（840）になった場面が、箱 815 で巻き込まれないこと
-    expect(lensOf(815 / 840 * 420 + 1)).toBe('fisheye');
+    expect(lensOf(209)).toBe('fisheye');   // 2.01 倍（前はここから平行に落ちていた）
+    expect(lensOf(151)).toBe('fisheye');   // 2.8 倍 ── 岸に窓を貼って海が 151 になった場面
+    expect(lensOf(60)).toBe('fisheye');    // 7 倍
   });
 
-  it('泡が箱の2倍を超えたら、平行に落とす（収めてもほかが潰れる）', () => {
-    // 岸に窓を貼って海が 151 しか残らない、という実測の場面（2.8 倍）。
-    // 前はここで倍率 6e-05 になって消えた
-    expect(lensOf(151)).toBe('parallel');
-    expect(lensOf(209)).toBe('parallel');  // 2.01 倍
-  });
-
-  it('諦めるのは軸ごと ── Y は触らない', () => {
-    const L = resolveWorld(twoCards(), { w: 151, h: 600 }).spaces.get('root');
-    expect(L?.view.x.lens).toBe('parallel');
-    expect(L?.view.y.lens).toBe('parallel');   // fisheyeX は元から Y が平行
+  /**
+   * ★ **値段を測り直した。** 諦めていた頃の註は「箱を埋めきってほかがぜんぶ潰れる
+   *   （倍率 6e-05）」だったが、いまの式では**そうならない**。魚眼は大きい泡を
+   *   **箱いっぱいに収める**だけで、隣を 0 にはしない ── あの数は別の頃・別の場面のもの。
+   */
+  it('大きい泡は、箱いっぱいに収まる（隣が消えるわけではない）', () => {
+    for (const [box, wantW] of [[151, 149.8], [60, 60.0]] as const) {
+      const a = at(box).byId.get('a');
+      if (!a) throw new Error('泡がいない');
+      expect(a.w).toBeCloseTo(wantW, 1);          // 箱いっぱい（はみ出しも、余りもしない）
+      expect(a.w).toBeLessThanOrEqual(box);
+    }
+    // 大きい泡（420）の隣に、ふつうの泡（120）を別の席で置いても、どちらも残る
+    let w = emptyWorld(presetView('fisheyeX'));
+    w = w.add(Bubble.create({ id: 'big', title: 'big', hue: 0, w: 420, h: 300, hist: 0 }));
+    w = w.add(Bubble.create({ id: 'small', title: 'small', hue: 0, w: 120, h: 100, hist: 1 }));
+    const L = resolveWorld(w, { w: 60, h: 600 });     // 箱の 7 倍の泡
+    expect(L.byId.get('big')?.scale).toBeCloseTo(0.143, 3);
+    expect(L.byId.get('small')?.scale).toBeCloseTo(0.217, 3);
   });
 });
 

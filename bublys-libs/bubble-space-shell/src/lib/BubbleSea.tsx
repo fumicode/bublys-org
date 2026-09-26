@@ -20,7 +20,7 @@
  *   - 前後は「大きく写るものが手前」。触ると焦点が寄って入れ替わる（値は書かない）
  */
 import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PresetId } from "@bublys-org/bubble-layout";
+import type { LayoutRules, PresetId } from "@bublys-org/bubble-layout";
 import { type TubeJoin, type BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { LayoutRoutesProvider, type BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { SEA_GROUND } from "./ShowreLayer.js";
@@ -43,6 +43,14 @@ export type BubbleSeaProps = {
   readonly worldLineScope?: string;
   /** 最初のレンズの向き。既定は X だけ魚眼（隣に開いたときに点くのがこれ） */
   readonly initialFisheye?: { x: boolean; y: boolean };
+  /**
+   * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
+   *
+   * ★ 効くのは**この海だけ**。窓の中の海も一覧も別の `BubbleSpace` なので、ここで選んだことは
+   *   伝わらない ── 「大元の海だけ、両軸が魚眼のときの大きさを斜辺でまとめる」のように、
+   *   名指しした海にだけ渡す（`sizeCombine`。`rules.ts` の註）。
+   */
+  readonly rules?: Partial<LayoutRules>;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
   readonly style?: CSSProperties;
@@ -59,6 +67,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   initialUrls,
   worldLineScope,
   initialFisheye = { x: true, y: false },
+  rules,
   onSpaceReady,
   style,
   children,
@@ -170,6 +179,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
         worldLineScope={worldLineScope}
         autoLens={autoLens}
+        rules={rules}
         bandDisplay={bandsAlways ? 'always' : 'hover'}
         onLens={onLens}
         style={{ position: "absolute", inset: 0 }}
