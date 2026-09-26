@@ -450,11 +450,18 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     // 泡をドラッグする：軸ごとに、書けるなら書く／書けないなら焦点／なしなら何もしない
     const p = lifted.byId.get(d.id);
     if (!p) return;
-    const want = {
-      x: mx - ((d.fx ?? 0.5) - 0.5) * p.w,
-      y: my - ((d.fy ?? 0.5) - 0.5) * p.h,
-    };
-    const next = dragBubble(world, { layout, id: d.id, space: d.space, want, m: p.m }, rules);
+    /**
+     * ★ **掴んだ点は、泡の自前の座標で渡す**（箱の左上からの px）。
+     *   ここで「描かれた箱」から中心を引いて渡していたころは、**箱が縮むたびに
+     *   掴んだ点がずれて**いた（魚眼の中で指を 1px 動かすと 0.47px ── `dragBubble` の註）。
+     *   自前の大きさはドラッグ中 1px も変わらないので、ずれようがない。
+     */
+    const grab = { x: (d.fx ?? 0.5) * p.box.w, y: (d.fy ?? 0.5) * p.box.h };
+    const next = dragBubble(
+      world,
+      { layout, id: d.id, space: d.space, pointer: { x: mx, y: my }, grab, m: p.m },
+      rules,
+    );
     setWorld(next);
 
     // 予告のために、いまの居場所を外へ知らせる（岸がここで「着くならここ」を描く）

@@ -726,7 +726,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         p
           ? dragBubble(
               opened.world,
-              { layout: L, id, space: 'root', want: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, m: p.m },
+              {
+                layout: L, id, space: 'root', m: p.m,
+                pointer: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+                // 箱の真ん中を掴んで置く（＝ 中心をそこへ持っていく）
+                grab: { x: p.box.w / 2, y: p.box.h / 2 },
+              },
               resolveRules(rules),
             )
           : opened.world,

@@ -88,6 +88,14 @@ export interface Placement extends Rect {
   readonly local: number;
   /** この泡の Z の倍率（逆写しに要る。lab.html 774 行 m） */
   readonly m: number;
+  /**
+   * 位置に掛かった**曲がり**（`sizeFit` の `bx`・`by`。曲げていない軸は 1）。
+   *
+   * ★ **逆写しに要る。** 画面から位置へ戻すとき、これを外さないと戻らない
+   *   ── 掴んで動かした泡が、歪むほどカーソルから離れていく
+   *   （実測：海の魚眼X で、480px 動かすと縦に 134px ずれた）。
+   */
+  readonly bend: { readonly x: number; readonly y: number };
   readonly alpha: number;
   readonly vis: number;
   /** 空間の中での位置（軸ごと。並べ方の答え） */
@@ -408,8 +416,8 @@ function resolveSpace(
    *
    * ★ 海と一覧は**別の空間**なので、どちらかを選ぶ話ではない ── 空間ごとに、その並べ方から出る。
    */
-  const tiles = !(view.x.arrange === 'as-is' && view.y.arrange === 'as-is');
-  const combine: SizeCombine = tiles ? 'product' : rules.sizeCombine;
+  const tiles = tilesOf(view);
+  const combine: SizeCombine = combineOf(view, rules);
 
   const items = kids.map((b, i) => {
     const dress = dressed?.get(b.id);
@@ -486,7 +494,7 @@ function resolveSpace(
     };
     // 焦点からの隔たり（写ったあとの、泡の**中心**で測る）。前後を決める second key
     const dist = Math.hypot(px.s, py.s);
-    return { b, i, dz, m, pos, target, dist };
+    return { b, i, dz, m, pos, target, dist, bend: { x: bendX, y: bendY } };
   });
   /**
    * ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら **焦点に近いものが手前**
@@ -517,6 +525,7 @@ function resolveSpace(
       depth: host.depth + 1,
       local: a.scale,
       m: it.m,
+      bend: it.bend,
       pos: it.pos,
       box: { w: a.w, h: a.h },
     };
@@ -616,6 +625,20 @@ function frontLead(
 }
 
 const ZERO_CTX: LensContext = { focus: ZERO_FOCUS, H: { x: 1, y: 1 }, vp: { x: 0, y: 0 } };
+
+/**
+ * その空間に**接する相手がいるか**（刻みで並ぶ軸があるか）。
+ * 曲がりと、大きさのまとめ方が、これで決まる（`sizeFit` の註）。
+ */
+export const tilesOf = (view: ResolvedView): boolean =>
+  !(view.x.arrange === 'as-is' && view.y.arrange === 'as-is');
+
+/**
+ * その空間の「大きさのまとめ方」。**掴んで動かす側（`dragBubble`）も同じ口から出す**
+ * ── 描くときと動かすときで違うまとめ方を使うと、指の下から外れる。
+ */
+export const combineOf = (view: ResolvedView, rules: LayoutRules): SizeCombine =>
+  tilesOf(view) ? 'product' : rules.sizeCombine;
 
 /** ★ 合成。lab.html 741-744 行 compose。深さ n でも scale は数値1つ */
 export function compose(

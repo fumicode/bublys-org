@@ -22,6 +22,9 @@ import type { BubbleId, PlaneAxis, Point, SpaceId, Size } from './types.js';
 import { METRICS, ROOT_SPACE } from './types.js';
 import type { BubbleWorld } from './world.js';
 import type { Layout } from './resolve.js';
+import { combineOf, hostScale } from './resolve.js';
+import { imageOf, sizeFit, LENS_XY } from './lens.js';
+import type { LensXyId } from './lens.js';
 import type { ActContext } from './act.js';
 import type { LayoutRules } from './rules.js';
 import type { Verb } from './dimension.js';
@@ -29,7 +32,7 @@ import { verbOf, writeKeyOf } from './dimension.js';
 import { viewOfSpace } from './view.js';
 import { chromeOf } from './measure.js';
 import { valueFromPos } from './arrange.js';
-import { screenToAxis, unprojectLocal, withFocusAxis } from './project.js';
+import { unprojectBubble, unprojectLocal, withFocusAxis } from './project.js';
 import { pin } from './pin.js';
 
 /** その空間で、X・Y をドラッグしたら何が起きるか。lab.html 1135 行 verbs */
@@ -47,8 +50,18 @@ export interface DragBubbleQuery {
   readonly id: BubbleId;
   /** 掴んだときにいた空間（その View に従う） */
   readonly space: SpaceId;
-  /** 泡の**中心**を画面のどこへ持っていきたいか（掴んだ点と泡の相対位置は ui がドラッグする） */
-  readonly want: Point;
+  /** いまのカーソル（層の座標） */
+  readonly pointer: Point;
+  /**
+   * **掴んだ点** ── その泡の**自前の座標**（箱の左上から測った px。倍率を掛ける前）。
+   *
+   * ★ 前はここが「泡の中心を画面のどこへ持っていきたいか」（`want`）で、掴んだ点と
+   *   中心の差は ui が**描かれた箱**で測って引いていた。ところが魚眼では**描かれる箱が
+   *   動くたびに縮む**ので、「箱の 4% の所」は 1 フレーム前とは別の点を指す
+   *   ── 指を 1px 動かすたびに掴んだ点が 0.47px ずれた（箱の真ん中を掴んだときだけ 0）。
+   *   泡が自前で持つ大きさはドラッグ中 1px も変わらないので、そちらで受ける。
+   */
+  readonly grab: Point;
   /** その泡の Z の倍率（Placement.m）。逆写しに要る */
   readonly m: number;
 }
@@ -65,10 +78,48 @@ export function dragBubble(world: BubbleWorld, q: DragBubbleQuery, rules: Layout
   const p = q.layout.byId.get(q.id);
   if (!L || !p) return world;
   const verbs = dragVerbsOf(world, q.space);
+  const hs = hostScale(L.host);
+  const lens = { x: LENS_XY[L.view.x.lens as LensXyId], y: LENS_XY[L.view.y.lens as LensXyId] };
+  const combine = combineOf(L.view, rules);
+  const box = { x: p.box.w, y: p.box.h };
+  /** その u（位置 − 焦点）に置いたとき、この泡が写る倍率（合成。寄りも Z も込み） */
+  const scaleAt = (ux: number, uy: number): number =>
+    hs *
+    p.m *
+    sizeFit(
+      imageOf(ux, box.x, lens.x, L.ctx.H.x, 0).k,
+      imageOf(uy, box.y, lens.y, L.ctx.H.y, 0).k,
+      combine,
+    ).k;
+  /** 掴んだ点が指の下に来るような「泡の中心」。倍率で決まる */
+  const wantOf = (axis: PlaneAxis, scale: number): number =>
+    q.pointer[axis] - (q.grab[axis] - box[axis] / 2) * scale;
+
+  /**
+   * ★ **置く所と倍率は、互いに決まる。**
+   *
+   *   置いた先で泡は縮み、縮むと掴んだ点の居場所が動く ── だから 1 回で当てられない。
+   *   `measureBox` が「魚眼では H と中身が互いに決まるので、落ち着くまで何度か当てる」
+   *   のと同じことをする。1 回ぶんの代金は tanh 4 つで、解き直しは要らない。
+   *   （実測・箱の上の帯を掴んで隅へ 400px 引いたとき：1 回 0.469px → 2 回 0.071px →
+   *     3 回 0.014px。箱の真ん中を掴んだときは、何回でも 0）
+   */
+  let scale = p.scale;
+  let u = { x: p.pos.x - L.ctx.focus.x, y: p.pos.y - L.ctx.focus.y };
+  for (let n = 0; n < 4; n++) {
+    const next = {
+      x: verbs.x === 'coord' || verbs.x === 'focus' ? unprojectBubble(L, 'x', wantOf('x', scale), p) : u.x,
+      y: verbs.y === 'coord' || verbs.y === 'focus' ? unprojectBubble(L, 'y', wantOf('y', scale), p) : u.y,
+    };
+    u = next;
+    const s = scaleAt(next.x, next.y);
+    if (Math.abs(s - scale) < 1e-9) break;
+    scale = s;
+  }
+
   let w = world;
   for (const axis of ['x', 'y'] as const) {
     const verb = verbs[axis];
-    const want = axis === 'x' ? q.want.x : q.want.y;
     if (verb === 'coord') {
       // ★ 書き込む先はその軸に刺さっている次元（lab 1191 行）
       const key = writeKeyOf(L.view[axis].dim);
@@ -76,11 +127,11 @@ export function dragBubble(world: BubbleWorld, q: DragBubbleQuery, rules: Layout
       const b = w.bubble(q.id);
       if (!b) continue;
       w = w.withBubble(
-        b.withFree(key, valueFromPos(L.view[axis], L.arr[axis], screenToAxis(L, axis, want, p.m))),
+        b.withFree(key, valueFromPos(L.view[axis], L.arr[axis], u[axis] + L.ctx.focus[axis])),
       );
     } else if (verb === 'focus') {
       // 泡のいまの u（位置 − ctx の焦点）が、行きたい u になるまで焦点を動かす（lab 1194 行）
-      const v = L.focus[axis] + (p.pos[axis] - L.ctx.focus[axis]) - unprojectLocal(L, axis, want, p.m);
+      const v = L.focus[axis] + (p.pos[axis] - L.ctx.focus[axis]) - u[axis];
       w = withFocusAxis(w, L, axis, v, rules);
     }
   }
