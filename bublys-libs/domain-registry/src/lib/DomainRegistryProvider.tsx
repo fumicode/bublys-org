@@ -2,7 +2,12 @@
 
 import React, { useMemo } from 'react';
 import { CasProvider } from '@bublys-org/world-line-graph';
-import { registerObjectType } from '@bublys-org/bubbles-ui';
+/**
+ * ★ 取りに行く先は**型の登録簿そのもの**（`@bublys-org/object-types`）。
+ *   前は `bubbles-ui` から取っていたが、あちらはこちらを取り込んでいるので
+ *   `bubbles-ui → domain-registry → bubbles-ui` の輪になっていた。
+ */
+import { registerObjectType } from '@bublys-org/object-types';
 import { type DomainRegistry, toCasRegistry } from './DomainRegistry';
 
 export function DomainRegistryProvider({

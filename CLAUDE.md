@@ -71,7 +71,10 @@ npx nx g @nx/js:lib <name>        # 新しいTypeScriptライブラリを生成
 - **apps/calculator**: 独立した電卓アプリ
 - **apps/memo**: 独立したメモアプリ
 - **bublys-libs/**: コアライブラリ (state-management, bubbles-ui, bubbles-ui-state,
-  world-line-graph, model-graph)
+  world-line-graph, model-graph, object-types)
+  - **object-types**: 型ごとの名乗り（名前・アイコン・名前の解き方・掴んで運ぶときの型・
+    どこに開くか・同じものかの見分け方）を覚えておく所。いちばん下に置いてあるので、
+    `bubbles-ui` も `domain-registry` も一方通行で取りに来られる
 - **memo-libs/**: メモ専用ライブラリ (memo-state, memo-feature, memo-model)
 
 ### 状態管理 (Redux Toolkit)

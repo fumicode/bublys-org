@@ -9,9 +9,10 @@ interface FocusedObjectContextType {
   setFocusedObjectId: (objectId: string | null) => void;
 }
 
+/** 親が居ないときの既定 ── 覚える所が無いので、書こうとしても何も起きない */
 const FocusedObjectContext = createContext<FocusedObjectContextType>({
   focusedObjectId: null,
-  setFocusedObjectId: () => {},
+  setFocusedObjectId: (): void => undefined,
 });
 
 /**

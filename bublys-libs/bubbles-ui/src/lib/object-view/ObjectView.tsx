@@ -9,7 +9,7 @@ import {
   getObjectUrl,
   resolveObjectType,
   getObjectId,
-} from './ObjectTypeRegistry.js';
+} from '@bublys-org/object-types';
 import { BubblesContext } from '../bubble-routing/BubbleRouting.js';
 import { CurrentBubbleContext } from '../context/CurrentBubbleContext.js';
 import type { OpeningPosition } from '../state/bubbles-slice.js';

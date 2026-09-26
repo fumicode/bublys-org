@@ -152,6 +152,9 @@
     },
     {
       "path": "./memo-bubly/memo-app"
+    },
+    {
+      "path": "./bublys-libs/object-types"
     }
   ]
 }

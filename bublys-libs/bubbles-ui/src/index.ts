@@ -14,7 +14,11 @@ export * from './lib/utils/drag-types.js';
 export * from './lib/components/UrledPlace.js';
 export * from './lib/components/EditableText.js';
 export * from './lib/context/FocusedObjectContext.js';
-export * from './lib/object-view/ObjectTypeRegistry.js';
+/**
+ * ★ 型の登録簿は `@bublys-org/object-types` へ出した（`domain-registry` との輪を切るため）。
+ *   ここから今までどおり全部出すので、使う側の import は 1 か所も変わらない。
+ */
+export * from '@bublys-org/object-types';
 export * from './lib/object-view/ObjectView.js';
 
 // Bubble Routing

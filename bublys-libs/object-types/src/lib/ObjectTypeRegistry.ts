@@ -8,7 +8,21 @@
  */
 
 import type { ReactNode } from 'react';
-import type { OpeningPosition } from '../state/bubbles-slice.js';
+
+/**
+ * **その型のものは、どこに開くか。**
+ *
+ * ★ もとは泡のスライス（`bubbles-ui` の `bubbles-slice`）に居たが、これは
+ *   「型ごとに前もって名乗っておくこと」なので、この登録簿と同じ棚に置く。
+ *   （`bubbles-ui` は今までどおりここから受け取って再輸出する）
+ */
+export type OpeningPosition =
+  | "bubble-side-right"
+  | "bubble-side-left"
+  | "bubble-side-top"
+  | "bubble-side-bottom"
+  | "origin-side"
+  | "dropped-place";
 
 // 登録された型名のセット
 const registeredTypes: Set<string> = new Set();

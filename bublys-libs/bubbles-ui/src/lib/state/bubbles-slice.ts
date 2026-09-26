@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction, createSelector } from "@reduxjs/toolkit";
+import type { OpeningPosition } from '@bublys-org/object-types';
 import {
   Bubble,
   BubbleJson,
@@ -55,13 +56,12 @@ export type BubbleArrangementState = {
  * `dropped-place` が過去分詞なのは、これがルールではなく「落とされた」という
  * 済んだ事実を運ぶ値だから（点は payload の `droppedAt` で一緒に来る）。
  */
-export type OpeningPosition =
-  | "bubble-side-right"
-  | "bubble-side-left"
-  | "bubble-side-top"
-  | "bubble-side-bottom"
-  | "origin-side"
-  | "dropped-place";
+/**
+ * ★ 定義は型の登録簿（`@bublys-org/object-types`）へ移した ── 「その型のものはどこに
+ *   開くか」は型ごとの名乗りなので、名乗りを覚える棚と同じ所に置く。
+ *   名前はここからも今までどおり出す。
+ */
+export type { OpeningPosition };
 
 /**
  * 兄弟として同じレイヤーに並べるときの指定。

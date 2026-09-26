@@ -29,6 +29,7 @@
     "@bublys-org/bubble-layout-ui": "0.0.1",
     "@bublys-org/bubbles-ui-util": "*",
     "@bublys-org/domain-registry": "*",
+    "@bublys-org/object-types": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/world-line-graph": "*",
     "@mui/icons-material": "^7.0.0",
@@ -38,7 +39,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-redux": "^9.2.0",
-    "styled-components": "^5.3.6"
+    "styled-components": "^5.3.6",
+    "@mui/material": "7.3.5",
+    "redux-persist": "^6.0.0",
+    "@testing-library/react": "16.3.0"
   },
   "nx": {
     "targets": {

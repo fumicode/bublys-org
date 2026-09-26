@@ -4,7 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import { PocketItemState } from '@bublys-org/state-management';
 import styled from 'styled-components';
-import { getObjectType, getObjectTypeIcon, resolveObjectTypeLabel } from '../object-view/ObjectTypeRegistry.js';
+import { getObjectType, getObjectTypeIcon, resolveObjectTypeLabel } from '@bublys-org/object-types';
 import { ObjectView } from '../object-view/ObjectView.js';
 
 type PocketItemViewProps = {
