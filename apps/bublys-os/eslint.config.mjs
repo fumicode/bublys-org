@@ -14,9 +14,28 @@ import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
 
+/**
+ * ★ **`react-hooks` は重ねない。**
+ *   共通の設定（`eslint.config.mjs`）は lib のために自分の版を配っているが、
+ *   この画面では Next が**新しい版を同じ名前で**配る。両方置くと
+ *   `Cannot redefine plugin "react-hooks"` で**設定ごと死ぬ**（実測で踏んだ）。
+ *   配るのは Next の版に任せ、共通側からは**名前だけ**外す ── 決まり
+ *   （`rules-of-hooks` など）はそのまま効く。
+ */
+const baseWithoutReactHooks = baseConfig.map((c) =>
+  c.plugins?.['react-hooks']
+    ? {
+        ...c,
+        plugins: Object.fromEntries(
+          Object.entries(c.plugins).filter(([name]) => name !== 'react-hooks'),
+        ),
+      }
+    : c,
+);
+
 export default [
   ...nextCoreWebVitals,
-  ...baseConfig,
+  ...baseWithoutReactHooks,
   ...nx.configs['flat/react-typescript'],
   {
     ignores: ['.next/**/*', '**/out-tsc'],
