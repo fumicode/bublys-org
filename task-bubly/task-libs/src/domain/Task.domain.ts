@@ -36,19 +36,31 @@ export class Task_タスク {
   isDone(): boolean { return this.state.status === 'done'; }
   isInProgress(): boolean { return this.state.status === 'doing'; }
 
+  /**
+   * **いま何処まで来ているかを変える。**
+   *
+   * ★ ステータスを変えるのは**集約の仕事**。前はスライスの reducer が
+   *   `task.status = …` と直に書いていた（規則6違反）うえ、そこで時刻も読んでいたので
+   *   **同じ操作をやり直すと違う値になる** reducer になっていた ── 世界線（やり直し）が
+   *   土台のこの場所では、それがいちばん困る。
+   */
+  withStatus(status: TaskStatus_ステータス): Task_タスク {
+    return this.withUpdatedState({ status });
+  }
+
   /** 作業を開始する */
   start(): Task_タスク {
-    return this.withUpdatedState({ status: 'doing' });
+    return this.withStatus('doing');
   }
 
   /** 完了する */
   complete(): Task_タスク {
-    return this.withUpdatedState({ status: 'done' });
+    return this.withStatus('done');
   }
 
   /** 未完了に戻す */
   reopen(): Task_タスク {
-    return this.withUpdatedState({ status: 'todo' });
+    return this.withStatus('todo');
   }
 
   /** タイトルを更新 */

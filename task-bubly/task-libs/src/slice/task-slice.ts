@@ -34,6 +34,13 @@ export const taskSlice = createSlice({
     addTask: (state, action: PayloadAction<TaskJSON>) => {
       state.taskList.push(action.payload);
     },
+    /**
+     * ★ **集約を丸ごと置く（保存だけ）。**
+     *   前はここに `updateTaskStatus` があり、reducer の中で `task.status = …` と
+     *   集約のロジックを書き、さらに `new Date()` で時刻まで読んでいた
+     *   ── **同じ入力で違う結果になる reducer** は、やり直し（世界線）と正面から喧嘩する。
+     *   ステータスを変えるのは集約（`Task_タスク.withStatus`）、ここは置くだけ。
+     */
     updateTask: (state, action: PayloadAction<TaskJSON>) => {
       const index = state.taskList.findIndex((t) => t.id === action.payload.id);
       if (index !== -1) {
@@ -45,16 +52,6 @@ export const taskSlice = createSlice({
     },
     setSelectedTaskId: (state, action: PayloadAction<string | null>) => {
       state.selectedTaskId = action.payload;
-    },
-    updateTaskStatus: (
-      state,
-      action: PayloadAction<{ id: string; status: TaskStatus_ステータス }>
-    ) => {
-      const task = state.taskList.find((t) => t.id === action.payload.id);
-      if (task) {
-        task.status = action.payload.status;
-        task.updatedAt = new Date().toISOString();
-      }
     },
   },
 });
@@ -76,7 +73,6 @@ export const {
   updateTask,
   deleteTask,
   setSelectedTaskId,
-  updateTaskStatus,
 } = taskSlice.actions;
 
 // ========== Selectors ==========

@@ -5,8 +5,8 @@ import {
   useAppDispatch,
   useAppSelector,
 } from "@bublys-org/state-management";
-import { TaskStatus_ステータス } from "../domain/Task.domain.js";
-import { selectSelectedTask, selectTaskById, updateTaskStatus, updateTask } from "../slice/task-slice.js";
+import { Task_タスク, TaskStatus_ステータス } from "../domain/Task.domain.js";
+import { selectSelectedTask, selectTaskById, updateTask } from "../slice/task-slice.js";
 import { selectUsers } from "@bublys-org/users-libs";
 import { TaskDetailView } from "../ui/TaskDetailView.js";
 
@@ -26,36 +26,34 @@ export const TaskDetail: FC<TaskDetailProps> = ({ taskId }) => {
 
   const task = taskId ? specificTask : selectedTask;
 
+  /**
+   * ★ **取る → 集約のメソッド → toJSON → 保存**（CLAUDE.md 規則6の流れ）。
+   *
+   *   前はここで plain を広げて `updatedAt: new Date()` を手で書いていた（3 か所）。
+   *   時刻の付け方が集約とここで二重になるうえ、ステータスだけは
+   *   **reducer の中で**書き換えていた（同じ入力で違う結果になる reducer）。
+   *   集約に任せれば、どの変え方でも同じ道を通る。
+   */
+  const save = (next: Task_タスク) => dispatch(updateTask(next.toJSON()));
+
   const handleStatusChange = (status: TaskStatus_ステータス) => {
     if (!task) return;
-    dispatch(updateTaskStatus({ id: task.id, status }));
+    save(task.withStatus(status));
   };
 
   const handleTitleChange = (title: string) => {
     if (!task) return;
-    dispatch(updateTask({
-      ...task.toJSON(),
-      title,
-      updatedAt: new Date().toISOString(),
-    }));
+    save(task.withTitle(title));
   };
 
   const handleDescriptionChange = (description: string) => {
     if (!task) return;
-    dispatch(updateTask({
-      ...task.toJSON(),
-      description,
-      updatedAt: new Date().toISOString(),
-    }));
+    save(task.withDescription(description));
   };
 
   const handleAssigneeChange = (assigneeId: string | undefined) => {
     if (!task) return;
-    dispatch(updateTask({
-      ...task.toJSON(),
-      assigneeId,
-      updatedAt: new Date().toISOString(),
-    }));
+    save(task.withAssignee(assigneeId));
   };
 
   const buildUserDetailUrl = (userId: string) => `users/${userId}`;

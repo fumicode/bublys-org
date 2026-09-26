@@ -61,18 +61,14 @@ export const gakkaiShiftSlice = createSlice({
     deleteStaff: (state, action: PayloadAction<string>) => {
       state.staffList = state.staffList.filter((s) => s.id !== action.payload);
     },
+    /**
+     * ★ ここには `updateStaffStatus` があった。reducer の中で `staff.status = …` と
+     *   集約のロジックを書き、`new Date()` まで読んでいた（同じ入力で違う結果）。
+     *   誰も dispatch していなかったので消した ── ステータスを変える必要が出たら、
+     *   集約に生やして「取る → メソッド → toJSON → 置く」で通す（`task-libs` と同じ）。
+     */
     setSelectedStaffId: (state, action: PayloadAction<string | null>) => {
       state.selectedStaffId = action.payload;
-    },
-    updateStaffStatus: (
-      state,
-      action: PayloadAction<{ id: string; status: StaffStatus_ステータス }>
-    ) => {
-      const staff = state.staffList.find((s) => s.id === action.payload.id);
-      if (staff) {
-        staff.status = action.payload.status;
-        staff.updatedAt = new Date().toISOString();
-      }
     },
   },
 });
@@ -83,7 +79,6 @@ export const {
   updateStaff,
   deleteStaff,
   setSelectedStaffId,
-  updateStaffStatus,
 } = gakkaiShiftSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加
