@@ -146,7 +146,23 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
     {/* ルート一覧は、どの泡からでも引けるように配る（一覧の空間が中の海を作るのに要る） */}
     <LayoutRoutesProvider routes={routes}>
     {/* 地と角の丸みは器（ShoreSpace）が持つ ── 岸に貼り付いたものを見て決まるので */}
-    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", ...style }}>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        position: "relative",
+        ...style,
+        /**
+         * ★ **器の大きさと岸の座標は、同じ 1 つの数から出す。**
+         *   岸は `window.innerHeight` で置き場所を決めるので、器がそれと違う高さだと
+         *   下の縁に貼ったものが画面の外へずれる（スマホの `100vh` がまさにそれ）。
+         *   測り終えていれば、その数でそのまま留める ── 測る前は渡された CSS のまま
+         *   （`100dvh` など）なので、ちらつかない。
+         */
+        ...(given || !homesReady ? {} : { width: measured.w, height: measured.h }),
+      }}
+    >
       {/* 管は**1 つの枠に 1 本**。窓の中にもう 1 本引かれるところを消す
           （その窓の枠は中の器＝ShoreSpace が引き受ける）。
           ★ 「岸に着いた窓」の重なりは**ここでは消さない** ── CSS で消すと

@@ -294,7 +294,14 @@ export const BubblesUINext = () => {
       worldLineScope={ROOT_SEA_SCOPE}
       rules={SEA_RULES}
       worldLineOutside={SEA_OUTSIDE}
-      style={{ height: "100vh" }}
+      /**
+       * ★ **`100vh` ではなく `100dvh`。** `vh` は「ブラウザの UI を隠したときの高さ」なので、
+       *   スマホでは**いま見えている高さより 50〜100px 大きい**。器がそのぶん下へ伸びて、
+       *   下の縁に貼ったもの（狭い画面では見え方の口）が**ブラウザの UI の下に潜る**
+       *   ── 実測：器を 80px 高くすると、帯の下端が見えている高さより 80px 下へ行った。
+       *   `dvh` はいま見えている高さを指すので、岸の座標（`window.innerHeight`）と揃う。
+       */
+      style={{ height: "100dvh" }}
     />
   );
 };
