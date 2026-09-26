@@ -12,6 +12,7 @@ import { PRESETS } from "@bublys-org/bubble-layout";
 import type { PresetId } from "@bublys-org/bubble-layout";
 import { FullscreenToggle } from "./FullscreenToggle.js";
 import { useSpaceView } from "./SpaceViewContext.js";
+import type { SpaceView } from "./SpaceViewContext.js";
 
 /** 口のボタン。押されているものだけ青く */
 const chip = (active: boolean): CSSProperties => ({
@@ -25,9 +26,22 @@ const chip = (active: boolean): CSSProperties => ({
   color: "#dce8ff",
 });
 
-export const SpaceViewBubble: FC = () => {
+/**
+ * 見え方の口の**中身**（ボタンの並び）。岸に貼る泡も、窓の枠に付く口も、これを使う。
+ *
+ * > **同じことをする口は、同じ見本から出す。**
+ *
+ * ★ 触る相手（`view`）は外から渡す ── 大元の海と、ユニバース（窓）の中の海とでは
+ *   持ち主が違うため。渡さなければ、いま居る海（`SpaceViewContext`）。
+ * ★ `fullscreen` は岸の口だけ。窓の枠に付けても意味が無い（窓は画面いっぱいにならない）。
+ */
+export const SpaceViewTools: FC<{
+  readonly view?: SpaceView;
+  readonly fullscreen?: boolean;
+}> = ({ view, fullscreen = true }) => {
+  const here = useSpaceView();
   const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens, bandsAlways, setBandsAlways } =
-    useSpaceView();
+    view ?? here;
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", height: "100%", px: 0.5 }}>
       {/* ★ **並べ方**の口。開き方は 1 つしかないので、見え方が変わるのはここだけ */}
@@ -99,7 +113,13 @@ export const SpaceViewBubble: FC = () => {
       >
         帯
       </button>
-      <FullscreenToggle />
+      {fullscreen && <FullscreenToggle />}
     </Box>
   );
 };
+
+/**
+ * 見え方 ── 大元の海の口を、岸に貼る**1 つの泡**として出す。
+ * 触る相手は、いま居る海（`SpaceViewContext`）。
+ */
+export const SpaceViewBubble: FC = () => <SpaceViewTools />;

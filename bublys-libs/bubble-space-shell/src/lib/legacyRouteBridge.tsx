@@ -27,6 +27,8 @@ import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { ShoreSpace } from "./ShoreSpace.js";
 import { WINDOW_GROUND } from "./ShowreLayer.js";
 import { useSpaceView } from "./SpaceViewContext.js";
+import type { SpaceView } from "./SpaceViewContext.js";
+import { useSpaceViewState } from "./useSpaceViewState.js";
 
 /** 旧の画面 1 枚を、新しい空間の文脈に繋ぐ */
 const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; children?: ReactNode }> = ({
@@ -83,27 +85,58 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
  * 中でもう 1 本ネオンを引くと枠が二重になるので、管はこの層だけが描く。
  */
 /**
- * **窓の受け口** ── 外の海が「この窓に入れてくれ」と言うための、url ごとの入口。
+ * **窓の受け口** ── 外の海が「この窓に入れてくれ」と言うための、窓ごとの入口。
  *
  * ★ 窓の中の海は別の世界（入れ子の `BubbleSpace` が自分の状態で持っている）なので、
  *   外の海から直に書き込めない。窓の側が「入れる口」をここに出しておき、
- *   外はその url を知っているだけで渡せる ── **繋ぐのは url 1 本**。
+ *   外はその泡の id を知っているだけで渡せる ── **繋ぐのは id 1 本**。
+ * ★ **鍵は url ではなく泡の id。** 同じ url の窓を 2 つ開いたら、中の世界も見え方も
+ *   別々でなければならない（「ユニバースは開いただけそれぞれ別」）。
+ *   url で覚えていたころは、2 つ目の窓が 1 つ目と**同じ海・同じ岸・同じ口**を分け合い、
+ *   種（`initialUrls`）も 2 つ目には蒔かれなかった。
  * ★ 部品の一生より長く置く（岸の記憶 `SHORE_MEMORY` と同じ考え）。
  */
 const WINDOW_INBOX = new Map<string, (url: string) => void>();
 
-/** その url の窓へ入れる。窓が無ければ false（外の海は取り上げない） */
-export const putIntoWindow = (windowUrl: string, url: string): boolean => {
-  const put = WINDOW_INBOX.get(windowUrl);
+/**
+ * **窓の見え方の口** ── 外の海が「この窓の見え方を触りたい」ときの受け口。
+ *
+ * ★ 入れる口（`WINDOW_INBOX`）と同じ理屈。窓の中は別の世界なので、外から直に書けない
+ *   ── 窓の側が口をここに出し、外は url を知っているだけで触れる。
+ * ★ 触ると窓の中の状態が変わるので、**変わったことを知らせる**（口の見た目を合わせるため）。
+ */
+const WINDOW_VIEW = new Map<string, SpaceView>();
+const WINDOW_VIEW_WATCH = new Set<() => void>();
+const tellWindowViews = () => { for (const fn of WINDOW_VIEW_WATCH) fn(); };
+
+/** その泡（窓）の見え方（無ければ null）。窓が立ち上がるまでは何も出さない */
+export const useWindowView = (windowId: string): SpaceView | null => {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const fn = () => bump((n) => n + 1);
+    WINDOW_VIEW_WATCH.add(fn);
+    return () => { WINDOW_VIEW_WATCH.delete(fn); };
+  }, []);
+  return WINDOW_VIEW.get(windowId) ?? null;
+};
+
+/** その泡（窓）の中へ入れる。窓でなければ false（外の海は取り上げない） */
+export const putIntoWindow = (windowId: string, url: string): boolean => {
+  const put = WINDOW_INBOX.get(windowId);
   if (!put) return false;
   put(url);
   return true;
 };
 
-/** その url が「中に入れられる窓」か */
-export const isWindowUrl = (windowUrl: string): boolean => WINDOW_INBOX.has(windowUrl);
+/** その泡が「中に入れられる窓」か（`bridgeRoute` の中の `isWindow` は別物 ── あちらはルートの話） */
+export const isWindowBubble = (windowId: string): boolean => WINDOW_INBOX.has(windowId);
 
-const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; url: string }> = ({ routes, seeds, url }) => {
+const WindowSpace: FC<{
+  routes: () => LayoutRoute[];
+  seeds: readonly string[];
+  /** **その窓の泡の id。** 中の海・岸・見え方の鍵はこれ（url ではない ── 上の註） */
+  id: string;
+}> = ({ routes, seeds, id }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   /**
@@ -111,7 +144,14 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
    *   見え方の口は 1 つしかないのに、窓の中だけ既定の「枝分かれ」に固定されていて、
    *   外の海と中の窓で管の通り方が食い違っていた。見ているのは同じ場所（`SpaceViewContext`）。
    */
-  const { join } = useSpaceView();
+  const { join, setJoin } = useSpaceView();
+  /**
+   * ★ **窓の中の海も、自分の見え方を持つ。** 持ち方は大元の海と同じ見本（`useSpaceViewState`）
+   *   ── 外の口で中の海を変えることはできない（別の世界なので）。
+   *   ネオンの通し方（`join`）だけは画面ぜんぶで 1 つなので、外のものをそのまま使う。
+   */
+  const innerRef = useRef<BubbleSpaceApi | null>(null);
+  const { view, onLens, autoLens, bandDisplay } = useSpaceViewState(innerRef, join, setJoin);
   /**
    * 中の海の口。**外から入れてもらう**のに要る（`WINDOW_INBOX`）。
    * 海は作り直されることがあるので、口が変わるたび登録し直す。
@@ -119,11 +159,21 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
   const [inner, setInner] = useState<BubbleSpaceApi | null>(null);
   useEffect(() => {
     if (!inner) return;
-    WINDOW_INBOX.set(url, (u) => inner.openBubble(u, null));
+    innerRef.current = inner;
+    WINDOW_INBOX.set(id, (u) => inner.openBubble(u, null));
     return () => {
-      if (WINDOW_INBOX.get(url)) WINDOW_INBOX.delete(url);
+      if (WINDOW_INBOX.get(id)) WINDOW_INBOX.delete(id);
     };
-  }, [url, inner]);
+  }, [id, inner]);
+  /** 見え方が変わるたび、棚を置き換えて外へ知らせる（外の口がこれを映す） */
+  useEffect(() => {
+    WINDOW_VIEW.set(id, view);
+    tellWindowViews();
+    return () => {
+      if (WINDOW_VIEW.get(id) === view) WINDOW_VIEW.delete(id);
+      tellWindowViews();
+    };
+  }, [id, view]);
 
   useEffect(() => {
     const el = ref.current;
@@ -194,8 +244,11 @@ const WindowSpace: FC<{ routes: () => LayoutRoute[]; seeds: readonly string[]; u
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
           join={join}
-          // 岸に貼ると中身が描き直されるので、岸の中身は url で覚えておく
-          persistKey={url}
+          autoLens={autoLens}
+          bandDisplay={bandDisplay}
+          onLens={onLens}
+          // 岸に貼ると中身が描き直されるので、岸の中身は**その窓の id**で覚えておく
+          persistKey={id}
           style={{ position: "absolute", left: 0, top: 0 }}
         />
       )}
@@ -222,7 +275,7 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
     type: route.type,
     Component: ({ bubble }) =>
       isWindow ? (
-        <WindowSpace routes={all} seeds={seeds} url={bubble.url} />
+        <WindowSpace routes={all} seeds={seeds} id={bubble.id} />
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),

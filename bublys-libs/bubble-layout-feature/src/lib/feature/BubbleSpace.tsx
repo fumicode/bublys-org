@@ -304,6 +304,17 @@ export interface BubbleSpaceProps {
    * 「その泡そのものをどう扱うか」の口（ロックなど）はここに差す。
    */
   readonly headerTools?: (bubble: RoutedBubble, route: BubbleRoute) => ReactNode;
+  /**
+   * **枠の上に貼る口**（一覧の並べ方の口と同じ棚）。泡ごとに呼ばれる。
+   *
+   * ★ ステータスバー（`headerTools`）と違って、**箱の外**に出る ── 中身の席を取らない。
+   *   窓（空間を持つ泡）の見え方の口のように、「その泡の中の世界をどう見るか」を
+   *   出すための所。中身が何かを知っているのは使う側なので、描くものは外から渡す。
+   * ★ **台（`.bl-view`）も渡す側が描く。** ここで包むと、中身が「まだ出さない」と
+   *   決めたときに**空の台だけが残る** ── 出るか出ないかは、出す側にしか分からない
+   *   （窓の口は、窓が立ち上がって口を出すまで何も出せない）。
+   */
+  readonly frameTools?: (bubble: RoutedBubble, route: BubbleRoute) => ReactNode;
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
@@ -1016,7 +1027,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *
    *   レンズの向きを持っているのは**世界**（View の軸）で、口（ツールバー）の見た目は
    *   その写し。写す道が「まかせる」のときしか無かったので、**読み込み直すたびに口だけが
-   *   最初の値（`initialFisheye`）へ戻り、海は覚えたまま**で食い違っていた
+   *   最初の値へ戻り、海は覚えたまま**で食い違っていた
    *   （実測：口は「魚眼X 点灯・魚眼Y 消灯」、海は `x: parallel` / `y: fisheye` と逆）。
    *   押した回数で決まるものではないので、**いつでも世界から出す**。
    *
@@ -1126,6 +1137,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   });
 
   const headerTools = props.headerTools;
+  const frameTools = props.frameTools;
   const renderBubble = useCallback(
     (id: BubbleId, draw: BubbleDraw) => {
       const url = urls.get(id)?.url;
@@ -1181,6 +1193,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
               7 つ並べる場所が無い ── まずは外に出して形を見る。
           */}
+          {/*
+            ★ **窓の見え方の口も、同じ棚に出す**（`frameTools`）。一覧の口とは出る相手が違う
+              ── 一覧は「自分で子を並べている泡」、窓は「中に別の世界を持つ泡」。
+              どちらも箱の外の同じ場所に出るので、両方に当てはまる泡が出てきたら重なる
+              （いまは出てこない：窓は子を並べない）。
+          */}
+          {r && frameTools?.(r.bubble, r.route)}
           {listHosts.has(id) && (
             /**
              * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
@@ -1265,7 +1284,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, viewChoice, listHosts],
+    [routes, urls, closeBubble, world, chrome, headerTools, frameTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

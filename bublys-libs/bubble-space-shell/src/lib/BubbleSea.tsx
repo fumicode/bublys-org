@@ -20,24 +20,18 @@
  *   - 前後は「大きく写るものが手前」。触ると焦点が寄って入れ替わる（値は書かない）
  */
 import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PRESETS } from "@bublys-org/bubble-layout";
 import type { LayoutRules, PresetId } from "@bublys-org/bubble-layout";
 import { type TubeJoin, type BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { LayoutRoutesProvider, type BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { SEA_GROUND } from "./ShowreLayer.js";
 import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
-import { SpaceViewContext, type SpaceView } from "./SpaceViewContext.js";
+import { SpaceViewContext } from "./SpaceViewContext.js";
+import { useSpaceViewState } from "./useSpaceViewState.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
 
 /** 最初の並べ方。口の最初の見た目（どの軸が魚眼か）もここから出す */
 const INITIAL_PRESET: PresetId = "free";
-
-/** その並べ方で、どちらの軸が魚眼か */
-const lensesOf = (id: PresetId) => ({
-  x: PRESETS[id].x.lens === "fisheye",
-  y: PRESETS[id].y.lens === "fisheye",
-});
 
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
@@ -52,13 +46,6 @@ export type BubbleSeaProps = {
    */
   readonly worldLineScope?: string;
   /**
-   * 口の見た目の**最初の値**。渡さなければ、最初の並べ方（`INITIAL_PRESET`）のレンズ。
-   *
-   * ★ **効くのは一瞬だけ。** レンズの向きを持っているのは世界（View の軸）で、口は
-   *   その写し ── 海が立ち上がれば、口はいつも海の実物を映す（`BubbleSpace` の `onLens`）。
-   *   ここに実物と違う値を置くと、**立ち上がりの一瞬だけ嘘の見た目**が出る。
-   */
-  readonly initialFisheye?: { x: boolean; y: boolean };
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
    *
@@ -82,28 +69,13 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   homes,
   initialUrls,
   worldLineScope,
-  initialFisheye,
   rules,
   onSpaceReady,
   style,
   children,
 }) => {
-  /** 並べ方（View のプリセット）。開き方は 1 つしかないので、見え方が変わるのはここだけ */
-  const [preset, setPresetState] = useState<PresetId>(INITIAL_PRESET);
   /** 岸に着いた泡の所で、ネオンをどう通すか（見た目だけ。挙動は同じ）。既定は迂回 */
   const [join, setJoin] = useState<TubeJoin>("detour");
-  /**
-   * 魚眼をどちらの向きに掛けるか。**レンズは軸ごとに持つもの**なので、X と Y は別々に決まる
-   * （両方掛けても、どちらも平行にしてもよい）。
-   *
-   * ★ **ここは口の見た目でしかない。** 本物は世界（View の軸）にあり、海が変わるたびに
-   *   `onLens` で送られてくる ── 押した回数で決まるものではないので、最初の値も
-   *   **最初の並べ方のレンズ**から出す（前は `{ x: true, y: false }` を焼いてあったので、
-   *   読み込み直すたびに口だけが「魚眼X 点灯」へ戻り、海と食い違っていた）。
-   */
-  const [fisheye, setFisheye] = useState(
-    () => initialFisheye ?? lensesOf(INITIAL_PRESET),
-  );
   const [viewport, setViewport] = useState({ w: 1280, h: 720 });
 
   useEffect(() => {
@@ -119,9 +91,20 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   const handleSpaceReady = useCallback(
     (api: BubbleSpaceApi) => {
       spaceRef.current = api;
+      setReady(api);
       onSpaceReady?.(api);
     },
     [onSpaceReady],
+  );
+  /** 口が変わったことを描き直しに伝えるだけ（触るのは `spaceRef`） */
+  const [, setReady] = useState<BubbleSpaceApi | null>(null);
+
+  /**
+   * ★ **見え方の持ち方は、窓の中の海と同じ見本**（`useSpaceViewState`）。
+   *   口の最初の見た目も、海が報せてくるレンズも、そこで面倒を見る。
+   */
+  const { view: spaceView, onLens, autoLens, bandDisplay } = useSpaceViewState(
+    spaceRef, join, setJoin, INITIAL_PRESET,
   );
 
   /**
@@ -132,45 +115,6 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
     typeof window !== "undefined" &&
     viewport.w === window.innerWidth &&
     viewport.h === window.innerHeight;
-
-  /**
-   * 軸のレンズを切り替える。世界に書くのは View の 1 つの軸だけ。
-   * ★ `setFisheye` の更新関数の中で海に書いてはいけない ──
-   *   更新関数はレンダリング中に呼ばれるので、別のコンポーネントを更新することになる。
-   */
-  const toggleFisheye = useCallback(
-    (axis: "x" | "y") => {
-      const on = !fisheye[axis];
-      setFisheye((f) => ({ ...f, [axis]: on }));
-      spaceRef.current?.setLens(axis, on ? "fisheye" : "parallel");
-    },
-    [fisheye],
-  );
-
-  /**
-   * レンズをまかせるか。まかせているあいだ、軸ごとのレンズは海が自分で決める
-   * ── 口の見た目（魚眼X/Y が点いているか）は、決まった結果を受け取って合わせる。
-   */
-  const [autoLens, setAutoLens] = useState(false);
-  /** 帯（どこから開いたか）をいつも見せるか。既定は触れたときだけ */
-  const [bandsAlways, setBandsAlways] = useState(false);
-  const onLens = useCallback((axis: "x" | "y", lens: string) => {
-    setFisheye((f) => (f[axis] === (lens === "fisheye") ? f : { ...f, [axis]: lens === "fisheye" }));
-  }, []);
-
-  /** 見え方の口に渡す値（泡は海の中で描かれるので、文脈で渡す） */
-  const setPreset = useCallback((next: PresetId) => {
-    setPresetState(next);
-    spaceRef.current?.setPreset(next);
-  }, []);
-
-  const spaceView = useMemo<SpaceView>(
-    () => ({
-      preset, setPreset, join, setJoin, fisheye, toggleFisheye,
-      autoLens, setAutoLens, bandsAlways, setBandsAlways,
-    }),
-    [preset, setPreset, join, fisheye, toggleFisheye, autoLens, bandsAlways],
-  );
 
   return (
     <SpaceViewContext.Provider value={spaceView}>
@@ -203,7 +147,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         worldLineScope={worldLineScope}
         autoLens={autoLens}
         rules={rules}
-        bandDisplay={bandsAlways ? 'always' : 'hover'}
+        bandDisplay={bandDisplay}
         onLens={onLens}
         style={{ position: "absolute", inset: 0 }}
       />

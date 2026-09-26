@@ -29,7 +29,7 @@ import {
   useState,
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
+import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, BubbleSpaceProps, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
 import type { LayoutRules, LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
@@ -43,7 +43,8 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer.js";
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
-import { putIntoWindow } from "./legacyRouteBridge.js";
+import { putIntoWindow, useWindowView } from "./legacyRouteBridge.js";
+import { SpaceViewTools } from "./SpaceViewBubble.js";
 import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
@@ -81,6 +82,8 @@ export type ShoreSpaceProps = {
    * 記録するのは海の姿と**岸に貼ってあるもの**（`SeaWorldLine` の註）。
    */
   readonly worldLineScope?: string;
+  /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
+  readonly frameTools?: BubbleSpaceProps['frameTools'];
   readonly autoLens?: boolean;
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
@@ -187,6 +190,31 @@ const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }
   return null;
 };
 
+/**
+ * **窓（ユニバース）の見え方の口** ── その窓の中の海を、外の枠の上から触る。
+ *
+ * > 同じことをする口は、同じ見本から出す（`SpaceViewTools`）。
+ *
+ * ★ 触る相手は**窓が出している口**（`useWindowView`）。窓の中は別の世界なので、
+ *   ここから直に書くことはできない ── 繋がっているのは url 1 本だけ。
+ * ★ 窓が立ち上がる前（口がまだ無い）は何も出さない。
+ * ★ **全画面は出さない** ── あれは画面ぜんぶの話で、窓には無い。
+ */
+const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
+  const view = useWindowView(id);
+  // 窓でない泡・まだ立ち上がっていない窓には、台ごと何も出さない
+  if (!view) return null;
+  return (
+    <div
+      className="bl-view bl-view-text"
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <SpaceViewTools view={view} fullscreen={false} />
+    </div>
+  );
+};
+
 export const ShoreSpace: FC<ShoreSpaceProps> = ({
   routes,
   viewport,
@@ -199,6 +227,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   worldLineScope,
   autoLens,
   rules,
+  frameTools,
   bandDisplay,
   persistKey,
   onLens,
@@ -384,7 +413,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
        *   一覧の札を落としたときは、一覧が顔ぶれを決めているので札は戻ってくる
        *   ── 落としたのは「その url を窓で開け」という合図になる。
        */
-      if (info.over && putIntoWindow(info.over.url, info.url)) return true;
+      if (info.over && putIntoWindow(info.over.id, info.url)) return true;
       const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const at = toShore(info);
       const want = toDockSize(info.size);
@@ -630,6 +659,11 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
         headerTools={headerTools}
+        /**
+         * ★ **窓には見え方の口を出す。** 渡された口が先（外から差せる）で、
+         *   渡されていなければ「窓なら出す」が既定 ── 器の仕事として持っておく。
+         */
+        frameTools={frameTools ?? ((bubble) => <WindowViewTools key={bubble.id} id={bubble.id} />)}
         /**
          * ★ 海は**器の左上にそのまま**置く（大きさも窓いっぱい）。岸で狭まるのは
          *   見えている所だけで、海そのものではない。
