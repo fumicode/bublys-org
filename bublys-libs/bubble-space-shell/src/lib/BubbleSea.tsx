@@ -36,6 +36,14 @@ const INITIAL_PRESET: PresetId = "free";
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
   readonly routes: readonly LegacyRoute[];
+  /**
+   * **測る相手**（CSS px）。渡さなければ窓そのもの（`window.innerWidth/Height`）。
+   *
+   * ★ 端末ごとの収まりを見るための口（`app/shore-fit`）。海は窓を測って定位置を置くので、
+   *   小さい枠に入れただけでは「窓ぜんぶある」と思ってしまう。渡したときは**測り終えた**
+   *   とみなす ── 窓でないものの大きさを窓と比べても、永遠に一致しない。
+   */
+  readonly viewport?: { readonly w: number; readonly h: number };
   /** 定位置に居てほしいもの（岸に貼る泡）。家具は使う側が決める */
   readonly homes?: readonly Home[];
   /** 世界が空のときに最初に開く url */
@@ -74,6 +82,7 @@ export type BubbleSeaProps = {
 
 export const BubbleSea: FC<BubbleSeaProps> = ({
   routes: legacyRoutes,
+  viewport: given,
   homes,
   initialUrls,
   worldLineScope,
@@ -85,14 +94,17 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
 }) => {
   /** 岸に着いた泡の所で、ネオンをどう通すか（見た目だけ。挙動は同じ）。既定は迂回 */
   const [join, setJoin] = useState<TubeJoin>("detour");
-  const [viewport, setViewport] = useState({ w: 1280, h: 720 });
+  const [measured, setMeasured] = useState({ w: 1280, h: 720 });
+  /** 外から渡されていれば、そちらが正 ── 窓は測らない */
+  const viewport = given ?? measured;
 
   useEffect(() => {
-    const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    if (given) return;
+    const measure = () => setMeasured({ w: window.innerWidth, h: window.innerHeight });
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, []);
+  }, [given]);
 
   const routes = useMemo(() => bridgeRoutes([...legacyRoutes]), [legacyRoutes]);
   /** 海の口（見え方の口から並べ方・レンズを触るのに要る。居なくなったことに気づく役は岸が持つ） */
@@ -121,9 +133,10 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
    * 測る前の仮の値で置くと、端から端までのはずのものが中途半端な丈になる。
    */
   const homesReady =
-    typeof window !== "undefined" &&
-    viewport.w === window.innerWidth &&
-    viewport.h === window.innerHeight;
+    given != null ||
+    (typeof window !== "undefined" &&
+      measured.w === window.innerWidth &&
+      measured.h === window.innerHeight);
 
   return (
     <SpaceViewContext.Provider value={spaceView}>
