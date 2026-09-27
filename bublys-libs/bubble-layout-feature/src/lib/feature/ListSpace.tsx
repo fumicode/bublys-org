@@ -59,6 +59,16 @@ export type ListSpaceProps = {
   readonly itemWidth?: number | ((room: number) => number);
   /** 並びの上に置く口（「新しく作る」など）。並びの外なので、泡にはならない */
   readonly head?: ReactNode;
+  /**
+   * 口の段の高さ。渡さなければ器が決める（小さなボタン 1 つぶん ＝ {@link HEAD_HEIGHT}）。
+   *
+   * ★ **測らない。置く側が言う。** 器が口の中身を測っていたころは、箱と追いかけ合って
+   *   段が足りず、いちばん上の札が口の下へ潜り込んでいた（`headBox` の註）。
+   *   ボタン 1 つより大きい口（入力欄など）を置くときだけ、置く側が高さを渡す。
+   * ★ 渡すと口は**上の帯いっぱい**になる（右上の角ではなく、横に広がる）
+   *   ── そういう口は角に収まらないので、並びは必ずその下から始まる。
+   */
+  readonly headHeight?: number;
 };
 
 /** 口を置く帯の高さの既定（実際は測る） */
@@ -116,6 +126,7 @@ export const ListSpace: FC<ListSpaceProps> = ({
   itemHeight = 104,
   itemWidth = 280,
   head,
+  headHeight,
 }) => {
   const space = useBubbleSpace();
   const me = useCurrentBubble();
@@ -147,7 +158,8 @@ export const ListSpace: FC<ListSpaceProps> = ({
    * いちばん上の札が口の下へ潜り込んで**いた（実測：CSV の一覧で 7px 重なった）。
    * 変わり得るのは幅だけなので、そこだけ実寸を見る。
    */
-  const headBox = head ? { w: headSize.w || 60, h: HEAD_HEIGHT } : null;
+  const headSlot = headHeight ?? HEAD_HEIGHT;
+  const headBox = head ? { w: headSize.w || 60, h: headSlot } : null;
   /**
    * 札に教える「並びに使える幅」＝ 中身の箱から、並びの左右の余白を引いたぶん。
    * 札が数で答えるならそのまま使う。
@@ -358,8 +370,11 @@ export const ListSpace: FC<ListSpaceProps> = ({
           onPointerDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
           style={{
-            position: "absolute", right: HEAD_RIGHT, top: HEAD_TOP, height: HEAD_HEIGHT,
-            display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6,
+            position: "absolute", right: HEAD_RIGHT, top: HEAD_TOP, height: headSlot,
+            // 高さを言われた口は、角ではなく**上の帯いっぱい**に置く（`headHeight` の註）
+            ...(headHeight === undefined
+              ? { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }
+              : { left: HEAD_RIGHT, display: "flex", alignItems: "stretch" }),
             boxSizing: "border-box", pointerEvents: "auto", zIndex: 5,
           }}
         >

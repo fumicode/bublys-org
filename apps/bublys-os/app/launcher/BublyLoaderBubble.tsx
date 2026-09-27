@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, CircularProgress, FormControlLabel, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import { loadBublyFromOrigin, getLoadedBublies, toBublyRouteBase, bublyOriginCandidates, useBubbleRoutes, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
@@ -38,6 +38,29 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
   useEffect(() => setPicked(0), [bublyOrigin]);
   const origin = candidates[picked] ?? candidates[0] ?? "";
 
+  /**
+   * **入力欄がいま何段ぶん占めているか。**
+   *
+   * 札は自分の DOM の中には居ない ── 海がこの泡の枠いっぱいに置く。だから
+   * こちらで刈り込んでも被りは止まらず、**並びに「上をこれだけ空けて」と言う**
+   * しかない（`ListSpace` の `headHeight`）。行き先の候補が 2 つ出れば入力欄は
+   * その分高くなるので、実物を測って渡す。
+   */
+  const headRef = useRef<HTMLDivElement | null>(null);
+  const [headHeight, setHeadHeight] = useState(0);
+  useEffect(() => {
+    const el = headRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      setHeadHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const handleLoad = async () => {
     if (!origin) return;
     setIsLoading(true);
@@ -58,34 +81,21 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
     }
   };
 
-  return (
-    /*
-      ★ **上が入力、下が一覧。この上下は動かない。**
-        一覧の札は泡なので、掴めば一覧の外へも出ようとする。出させない
-        ── 入力欄の上に札が浮くと、打っている所が隠れて打てなくなる。
-        守り方は 2 つ重ねる:
-          1. 入力欄のほうが**必ず上**（`zIndex`。地も持たせて透けないように）
-          2. 一覧は自分の箱で**刈り込む**（`overflow: hidden`）── 上へはみ出した札は
-             そこで切れる。泡の側に「出るな」と言わなくて済む
-      ★ **入力欄が伸びたら、一覧は下へ送る。** 行き先の候補が 2 つ出れば入力欄は
-        その分だけ高くなる。一覧は残りを使う（`flex: 1`）が、札 2 枚ぶんは譲らない
-        ── それより短くなるなら、泡の中身ごと転がして見る（`overflowY: auto`）。
-        短い箱に合わせて一覧を潰しても、ロード済みの数は減らない。
-    */
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", overflowY: "auto", overflowX: "hidden" }}>
-      <Box
-        sx={{
-          flexShrink: 0,
-          position: "relative",
-          zIndex: 1,
-          background: "#fff",
-          p: 2,
-          pb: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: 1,
-        }}
-      >
+  const head = (
+    <Box
+      ref={headRef}
+      sx={{
+        width: "100%",
+        alignSelf: "flex-start",
+        background: "#fff",
+        borderRadius: 1,
+        p: 1.5,
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        boxSizing: "border-box",
+      }}
+    >
       <Typography variant="subtitle1" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         <ExtensionIcon sx={{ fontSize: 18 }} />
         バブリ
@@ -129,31 +139,25 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
           ))}
         </RadioGroup>
       )}
-      <Button
-        size="small"
-        variant="contained"
-        onClick={handleLoad}
-        disabled={isLoading || !origin}
-      >
+      <Button size="small" variant="contained" onClick={handleLoad} disabled={isLoading || !origin}>
         {isLoading ? <CircularProgress size={16} /> : "ロード"}
       </Button>
-      </Box>
+    </Box>
+  );
 
-      {members.length > 0 && (
-        /* 一覧は泡の端まで使う ── 内側に余白を重ねると、その分だけ札が細くなる */
-        <Box
-          sx={{
-            flex: "1 1 auto",
-            // 札 2 枚は譲らない。これより狭くなるぶんは、中身ごと転がして見る
-            minHeight: BUBLY_CARD_HEIGHT * 2,
-            position: "relative",
-            zIndex: 0,
-            overflow: "hidden",
-          }}
-        >
-          <ListSpace members={members} itemHeight={BUBLY_CARD_HEIGHT} />
-        </Box>
-      )}
+  return (
+    /*
+      ★ **入力欄は「並びの口」として渡す。** 札は自分の DOM の中には居ないので
+        （海がこの泡の枠いっぱいに置く）、上に別の面を重ねても被りは止まらない。
+        並びに段を空けてもらうのが唯一の止め方 ── 入力欄が伸びれば段も伸びる。
+    */
+    <Box sx={{ width: "100%", height: "100%" }}>
+      <ListSpace
+        members={members}
+        itemHeight={BUBLY_CARD_HEIGHT}
+        head={head}
+        headHeight={headHeight || undefined}
+      />
     </Box>
   );
 };
