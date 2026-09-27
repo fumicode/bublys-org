@@ -27,6 +27,7 @@ import {
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { ShoreSpace } from "./ShoreSpace.js";
+import type { Home } from "./ShoreSpace.js";
 import { WINDOW_GROUND } from "./ShowreLayer.js";
 import { useSpaceView } from "./SpaceViewContext.js";
 import type { SpaceView } from "./SpaceViewContext.js";
@@ -168,12 +169,32 @@ export const putIntoWindow = (windowId: string, url: string): boolean => {
 /** その泡が「中に入れられる窓」か（`bridgeRoute` の中の `isWindow` は別物 ── あちらはルートの話） */
 export const isWindowBubble = (windowId: string): boolean => WINDOW_INBOX.has(windowId);
 
+/**
+ * **窓の岸に、はじめから貼っておくもの**（`BubbleRoute.shoreUrls`）の置き方。
+ *
+ * ★ 置き方を決めるのは器。ルートが言うのは「何を貼るか」だけ ── バブリは
+ *   自分が OS の中でどの辺に着くかを知らなくてよい。
+ * ★ 左の辺に、アイコンだけの幅で、端から端まで ── **大元の海のランチャーと同じ形**。
+ *   同じ役のものは同じ所に、同じ姿で置く。
+ */
+const SHORE_WIDTH = 60;
+const shoreHomeFor = (url: string): Home => (viewport) => ({
+  key: `${url}#dock`,
+  url,
+  dock: { edges: ["left", "top"], at: { x: 0, y: 0 } },
+  size: { width: SHORE_WIDTH, height: viewport.height },
+  ground: "light",
+});
+
 const WindowSpace: FC<{
   routes: () => LayoutRoute[];
   seeds: readonly string[];
+  /** 岸にはじめから貼っておくものの url（`BubbleRoute.shoreUrls`） */
+  shoreUrls: readonly string[];
   /** **その窓の泡の id。** 中の海・岸・見え方の鍵はこれ（url ではない ── 上の註） */
   id: string;
-}> = ({ routes, seeds, id }) => {
+}> = ({ routes, seeds, shoreUrls, id }) => {
+  const homes = useMemo(() => shoreUrls.map(shoreHomeFor), [shoreUrls]);
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   /**
@@ -271,12 +292,16 @@ const WindowSpace: FC<{
          * ★ **枠そのものが岸。** 前はここでネオンを 1 本描くだけで、貼る機能は無かった
          *   ── 貼れる先が外の海にしか無かった。器（`ShoreSpace`）に差し替えて、
          *   外の海と同じ岸を窓の中にも持たせる。管もその岸が引く（枠が二重にならない）。
-         * ★ 定位置（ランチャー・ポケット・見え方）は渡さない ── あれらは外の岸のもの。
-         *   窓の岸は**空で始まり**、中の海から引き出したものだけが貼り付く。
+         * ★ 定位置は**そのルートが言ったものだけ**（`shoreUrls`）。OS の定位置
+         *   （ポケット・見え方・他のデモ）は渡さない ── あれらは外の岸のもの。
+         *   バブリの窓には、そのバブリ自身の呼び出しが 1 つ貼られる
+         *   （単体で開いたときに脇の帯に並んでいたもの）。
          */
         <ShoreSpace
           routes={routes()}
           initialUrls={seeds}
+          homes={homes}
+          homesReady={size.width > 0}
           onSpaceReady={setInner}
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
@@ -307,12 +332,14 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
   const isWindow = !!(route.bubbleOptions?.universe || route.bubbleOptions?.fillsContainer);
   // 窓が開いたときに最初から居る泡（旧 `UniverseView.initialBubbleUrls` と同じ種）
   const seeds = route.initialBubbleUrls ?? [];
+  // 岸にはじめから貼っておくもの（バブリの窓なら、そのバブリの呼び出し）
+  const shoreUrls = route.shoreUrls ?? [];
   return {
     pattern: route.pattern,
     type: route.type,
     Component: ({ bubble }) =>
       isWindow ? (
-        <WindowSpace routes={all} seeds={seeds} id={bubble.id} />
+        <WindowSpace routes={all} seeds={seeds} shoreUrls={shoreUrls} id={bubble.id} />
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),

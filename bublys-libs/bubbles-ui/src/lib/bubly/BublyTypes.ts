@@ -42,6 +42,16 @@ export type Bubly = {
    * 空のときは何も seed しない。
    */
   initialBubbleUrls?: string[];
+  /**
+   * **このバブリで開けるもの**（名前・url・アイコン）。
+   *
+   * ★ **名乗るのは持ち主。** 前は単体で開くときの画面（`app.tsx` / `page.tsx`）に
+   *   だけ書いてあったので、**OS にロードすると誰も知らなかった** ── 窓を開いても
+   *   種（`initialBubbleUrls`）しか出てこず、ほかの一覧へは辿り着けなかった。
+   * ★ 出る所は 2 つ。単体なら脇の帯（`BublyApp`）、OS の中なら**その窓の岸**に
+   *   貼った呼び出し（`launchers/<name>`）── どちらも同じこの 1 つを読む。
+   */
+  menuItems?: BublyMenuItem[];
   /** 自動登録される universe バブルの既定サイズ（任意） */
   defaultSize?: Size2;
   /**

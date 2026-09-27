@@ -14,13 +14,11 @@ import '@bublys-org/gakkai-shift-libs';
 // ルート登録（app側で管理）
 import { gakkaiShiftBubbleRoutes } from '../registration/index.js';
 
+/** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
+import { menuItems } from "../bubly.js";
+
 BubbleRouteRegistry.registerRoutes(gakkaiShiftBubbleRoutes);
 
-// サイドバーのメニュー項目
-const menuItems = [
-  { label: 'スタッフ一覧', url: 'gakkai-shift/staffs', icon: <PeopleIcon /> },
-  { label: 'シフト配置表', url: 'gakkai-shift/shift-plans', icon: <EventNoteIcon /> },
-];
 
 export function App() {
   return (

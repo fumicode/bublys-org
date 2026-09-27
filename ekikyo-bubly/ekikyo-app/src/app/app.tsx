@@ -10,14 +10,11 @@ import {
 // ルート登録（app側で管理）
 import { ekikyoBubbleRoutes } from '../registration/index.js';
 
+/** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
+import { menuItems } from "../bubly.js";
+
 BubbleRouteRegistry.registerRoutes(ekikyoBubbleRoutes);
 
-// サイドバーのメニュー項目
-const menuItems = [
-  { label: '九星盤（五黄中心）', url: 'ekikyo/kyuseis/五黄', icon: <AutoAwesomeIcon /> },
-  { label: '九星盤（一白中心）', url: 'ekikyo/kyuseis/一白', icon: <AutoAwesomeIcon /> },
-  { label: '九星盤（九紫中心）', url: 'ekikyo/kyuseis/九紫', icon: <AutoAwesomeIcon /> },
-];
 
 export function App() {
   return (

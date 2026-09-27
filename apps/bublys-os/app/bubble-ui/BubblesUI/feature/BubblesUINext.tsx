@@ -13,6 +13,7 @@ import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
 // 組み込みのルートをレジストリに登録するための副作用 import（一覧は下で hook から引く）
 import "../registration/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
+import { useEnsureBublyLaunchers } from "@/app/launcher/useEnsureBublyLaunchers";
 
 const LAUNCHER_URL = "launchers/main";
 /** ランチャーの幅（アイコンだけ） */
@@ -285,6 +286,11 @@ const SEA_OUTSIDE = [WORLD_LINES_URL] as const;
  */
 export const BubblesUINext = () => {
   useEnsureMainLauncherEntity();
+  /**
+   * ★ ロードしたバブリは、自分の呼び出しを 1 つ持つ ── 窓の岸に貼るのは器、
+   *   中身を用意するのはこちら（`useEnsureBublyLaunchers` の註）。
+   */
+  useEnsureBublyLaunchers();
   /**
    * ★ **開けるものの一覧は、レジストリから引く。** 組み込みのぶんも、あとから
    *   ロードしたバブリのぶんも同じ所に居る（`useBubbleRoutes` の註）。

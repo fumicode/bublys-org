@@ -15,14 +15,11 @@ import '@bublys-org/event-shift-puzzle-libs';
 // ルート登録（app側で管理）
 import { shiftPuzzleBubbleRoutes } from '../registration/index.js';
 
+/** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
+import { menuItems } from "../bubly.js";
+
 BubbleRouteRegistry.registerRoutes(shiftPuzzleBubbleRoutes);
 
-// サイドバーのメニュー項目
-const menuItems = [
-  { label: '局員一覧', url: 'shift-puzzle/members', icon: <PeopleIcon /> },
-  { label: 'タスク一覧', url: 'shift-puzzle/tasks', icon: <TaskIcon /> },
-  { label: 'シフト表リスト', url: 'shift-puzzle/shift-plans', icon: <GridOnIcon /> },
-];
 
 export function App() {
   return (

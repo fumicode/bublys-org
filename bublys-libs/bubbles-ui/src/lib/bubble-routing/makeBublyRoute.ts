@@ -23,6 +23,8 @@ export const makeBublyRoute = (config: {
   type: string;
   Component: BubbleContentRenderer;
   initialBubbleUrls: string[];
+  /** その窓の岸に、はじめから貼っておくもの（`BubbleRoute.shoreUrls`） */
+  shoreUrls?: string[];
   bubbleOptions?: BubbleOptions;
 }): BubbleRoute => {
   return {
@@ -33,5 +35,6 @@ export const makeBublyRoute = (config: {
       bubbleOptions: config.bubbleOptions,
     }),
     initialBubbleUrls: config.initialBubbleUrls,
+    ...(config.shoreUrls ? { shoreUrls: config.shoreUrls } : {}),
   };
 };

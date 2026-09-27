@@ -22,18 +22,9 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { TailorGenieProvider } from "@bublys-org/tailor-genie-libs";
 
-const menuItems: BublyMenuItem[] = [
-  {
-    label: "会話一覧",
-    url: "tailor-genie/conversations",
-    icon: <ChatIcon />,
-  },
-  {
-    label: "スピーカー一覧",
-    url: "tailor-genie/speakers",
-    icon: <PersonIcon />,
-  },
-];
+/** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
+import { menuItems } from "../../bubly.js";
+
 
 /**
  * 保存を消して、入口からやり直す。

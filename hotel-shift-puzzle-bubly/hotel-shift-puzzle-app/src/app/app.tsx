@@ -23,32 +23,12 @@ import { useSampleWhenEmpty } from '@bublys-org/hotel-shift-puzzle-libs';
 import { hotelShiftPuzzleBubbleRoutes, scheduleUrl, shiftWishListUrl } from '../registration/index.js';
 import { MID_MONTH_SCHEDULE_ID } from '@bublys-org/hotel-shift-puzzle-libs';
 
+/** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
+import { menuItems } from "../bubly.js";
+
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
 // サイドバーのメニュー項目（ルートを追加したらここに対応エントリーを足す）
-const menuItems: BublyMenuItem[] = [
-  { label: 'スタッフ一覧', url: 'hotel-shift-puzzle/staffs', icon: <PeopleIcon /> },
-  { label: '勤務帯', url: 'hotel-shift-puzzle/work-shifts', icon: <ScheduleIcon /> },
-  { label: '制約', url: 'hotel-shift-puzzle/constraints', icon: <RuleIcon /> },
-  { label: 'シフト希望', url: shiftWishListUrl(), icon: <EditCalendarIcon /> },
-  { label: '勤務表', url: 'hotel-shift-puzzle/schedules', icon: <CalendarMonthIcon /> },
-  { label: 'ファイル', url: 'hotel-shift-puzzle/file', icon: <SaveIcon /> },
-  {
-    label: '世界線インスペクタ',
-    url: 'hotel-shift-puzzle/world-line-inspector',
-    icon: <BugReportIcon />,
-  },
-  {
-    label: 'クラス図',
-    url: 'hotel-shift-puzzle/model-class-diagram',
-    icon: <SchemaIcon />,
-  },
-  {
-    label: '世界線 3D',
-    url: 'hotel-shift-puzzle/world-line-3d',
-    icon: <ViewInArIcon />,
-  },
-];
 
 /**
  * ★ **空で開かない。** 世界に何も無いときだけ、例データを入れてから見せる

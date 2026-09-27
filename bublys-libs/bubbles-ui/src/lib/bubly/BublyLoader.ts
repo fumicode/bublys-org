@@ -10,6 +10,9 @@ import {
   rememberBublyOrigin,
 } from "./BublyOriginStore.js";
 
+/** バブリ名 → そのバブリの呼び出しを溜めるランチャーの url */
+export const toBublyLauncherUrl = (name: string): string => `launchers/${name}`;
+
 /** バブリ名 → OS が自動登録する universe バブルの url（`<name>-bubly`） */
 export const toBublyRouteBase = (name: string): string =>
   name.endsWith("-bubly") ? name : `${name}-bubly`;
@@ -29,6 +32,12 @@ const registerBublyUniverseRoute = (bubly: Bubly): BubbleRoute => {
     type: base,
     Component: BublyUniverseBubble,
     initialBubbleUrls: bubly.initialBubbleUrls ?? [],
+    /**
+     * ★ **窓の岸には、そのバブリの呼び出しを貼っておく。** 単体で開いたときに
+     *   脇の帯に並んでいたものが、OS の中では岸の呼び出しになる（OS の左の岸と同じ形）。
+     *   名乗りが無いバブリには貼らない ── 空の呼び出しを置いても場所を取るだけ。
+     */
+    ...(bubly.menuItems?.length ? { shoreUrls: [toBublyLauncherUrl(bubly.name)] } : {}),
     bubbleOptions: {
       universe: true,
       defaultSize: bubly.defaultSize ?? DEFAULT_BUBLY_WINDOW_SIZE,
