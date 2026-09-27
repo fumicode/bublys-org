@@ -206,7 +206,9 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
             open={asking}
             onClose={() => setAsking(false)}
             label={mine.label}
+            name={mine.name}
             slicePaths={mine.slicePaths}
+            worldLineScopePrefixes={mine.worldLineScopePrefixes}
           />
         ) : (
           <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
@@ -232,7 +234,9 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
         open={asking}
         onClose={() => setAsking(false)}
         label={mine.label}
+        name={mine.name}
         slicePaths={mine.slicePaths}
+        worldLineScopePrefixes={mine.worldLineScopePrefixes}
       />
     ) : (
       <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />

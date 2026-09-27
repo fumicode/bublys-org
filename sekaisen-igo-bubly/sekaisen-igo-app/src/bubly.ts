@@ -30,6 +30,12 @@ const SekaisenIgoBubly: Bubly = {
   label: "世界線囲碁",
   icon: React.createElement(SportsEsportsIcon, { color: "primary" }),
   menuItems,
+  /**
+   * 世界線に使う名前の頭 ── 対局 1 つにつき 1 本（`igo-game-<対局id>`）。
+   * 自分の名前と同じ世界線は名乗らなくても自分のものとして数えられる。
+   */
+  worldLineScopePrefixes: ["igo-game-"],
+
   initialBubbleUrls: ["sekaisen-igo/games"],
   backdropColor: "hsl(155, 30%, 18%)",
 

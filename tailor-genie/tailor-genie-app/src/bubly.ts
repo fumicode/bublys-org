@@ -32,6 +32,12 @@ const TailorGenieBubly: Bubly = {
   label: "Tailor Genie",
   icon: React.createElement(ChatIcon, { color: "primary" }),
   menuItems,
+  /**
+   * 世界線に使う名前の頭 ── 会話 1 つにつき 1 本（`conversation-<会話id>`）。
+   * 自分の名前と同じ世界線は名乗らなくても自分のものとして数えられる。
+   */
+  worldLineScopePrefixes: ["conversation-"],
+
   initialBubbleUrls: ["tailor-genie/conversations", "tailor-genie/speakers"],
   backdropColor: "hsl(35, 50%, 22%)",
 

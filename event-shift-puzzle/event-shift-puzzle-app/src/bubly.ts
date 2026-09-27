@@ -34,6 +34,12 @@ const ShiftPuzzleBubly: Bubly = {
   label: "イベントシフトパズル",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
   menuItems,
+  /**
+   * 世界線に使う名前の頭 ── シフト案 1 つにつき 1 本（`shift-plan:<案id>`）。
+   * 自分の名前と同じ世界線は名乗らなくても自分のものとして数えられる。
+   */
+  worldLineScopePrefixes: ["shift-plan:"],
+
   initialBubbleUrls: [
     "shift-puzzle/shift-plans",
     "shift-puzzle/tasks",

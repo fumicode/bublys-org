@@ -11,6 +11,19 @@ import {
   rememberBublyOrigin,
 } from "./BublyOriginStore.js";
 
+/**
+ * **その世界線は、このバブリのものか。**
+ *
+ * 自分の名前と同じものと、名乗った頭ではじまるもの（`igo-game-…`）。
+ * 名乗りが無ければ、自分の名前と同じものだけ。
+ */
+export const isBublyScope = (
+  scopeId: string,
+  bubly: { name: string; worldLineScopePrefixes?: readonly string[] },
+): boolean =>
+  scopeId === bubly.name ||
+  (bubly.worldLineScopePrefixes ?? []).some((prefix) => scopeId.startsWith(prefix));
+
 /** バブリ名 → そのバブリの呼び出しを溜めるランチャーの url */
 export const toBublyLauncherUrl = (name: string): string => `launchers/${name}`;
 
@@ -352,6 +365,8 @@ export type LoadedBubly = {
   origin?: string;
   /** このバブリが持ち込んだ置き場の名前（中身を片付けるときに要る） */
   slicePaths: readonly string[];
+  /** このバブリが世界線に使う名前の頭（自分の名前は別に数える） */
+  worldLineScopePrefixes: readonly string[];
 };
 
 /** ロード済みのバブリを、取ってきた先と一緒に並べる */
@@ -362,6 +377,7 @@ export const getLoadedBublies = (): LoadedBubly[] =>
     version: bubly.version,
     origin: loadedBublyRecords.get(bubly.name)?.origin,
     slicePaths: loadedBublyRecords.get(bubly.name)?.slicePaths ?? [],
+    worldLineScopePrefixes: bubly.worldLineScopePrefixes ?? [],
   }));
 
 /**

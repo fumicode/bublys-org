@@ -47,6 +47,12 @@ const HotelShiftPuzzleBubly: Bubly = {
   label: "シフトントン",
   icon: React.createElement(GridOnIcon, { color: "primary" }),
   menuItems,
+  /**
+   * 世界線に使う名前の頭 ── アプリ全体（`hotel`）と、勤務表 1 つにつき 1 本（`Schedule:<id>`）。
+   * 自分の名前と同じ世界線は名乗らなくても自分のものとして数えられる。
+   */
+  worldLineScopePrefixes: ["hotel", "Schedule:"],
+
   initialBubbleUrls: ["hotel-shift-puzzle/schedules"],
   backdropColor: "hsl(20, 40%, 22%)",
 
