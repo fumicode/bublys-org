@@ -278,6 +278,31 @@ export const getAllBublies = (): Record<string, Bubly> => {
 };
 
 /**
+ * ロード済みのバブリ 1 つの素性 ── **どこから来たか付き**。
+ *
+ * `Bubly` は自分がどのオリジンから来たかを知らない（知らなくてよい）。
+ * それを知っているのはロードした側（{@link loadedBublyRecords}）なので、
+ * 外して直すときに要る一式は、ここで 1 つにして渡す。
+ */
+export type LoadedBubly = {
+  name: string;
+  /** 人に見せる名前（無ければ name） */
+  label: string;
+  version: string;
+  /** 取ってきた先。復元されたものも、いまロードしたものも入る */
+  origin?: string;
+};
+
+/** ロード済みのバブリを、取ってきた先と一緒に並べる */
+export const getLoadedBublies = (): LoadedBubly[] =>
+  Object.values(getAllBublies()).map((bubly) => ({
+    name: bubly.name,
+    label: bubly.label ?? bubly.name,
+    version: bubly.version,
+    origin: loadedBublyRecords.get(bubly.name)?.origin,
+  }));
+
+/**
  * ロード済みのすべてのバブリからメニュー項目を取得。
  *
  * バブリ 1 個 = メニュー 1 個。`<name>-bubly` の universe バブルを開く「窓」エントリ
