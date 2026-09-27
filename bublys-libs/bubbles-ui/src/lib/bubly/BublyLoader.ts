@@ -3,6 +3,7 @@ import type { BubbleRoute } from "../bubble-routing/BubbleRouting.js";
 import { BubbleRouteRegistry } from "../bubble-routing/BubbleRouteRegistry.js";
 import { makeBublyRoute } from "../bubble-routing/makeBublyRoute.js";
 import { BublyUniverseBubble } from "./BublyUniverseBubble.js";
+import { injectedSlicePaths } from "@bublys-org/state-management";
 import {
   forgetBublyOrigin,
   getSavedBublyOrigins,
@@ -57,6 +58,14 @@ type LoadedBublyRecord = {
   origin?: string;
   /** このバブリがロード時に登録したルート。外すときはこれだけを剥がす */
   routes: BubbleRoute[];
+  /**
+   * このバブリが持ち込んだ置き場の名前（Redux の `reducerPath`）。
+   *
+   * 注入は**バンドルを読む最中の副作用**なので、誰が注いだかはどこにも書かれていない。
+   * 読む前と後で見比べて、増えたぶんをここに控える ── 「このバブリの中身だけ
+   * 片付ける」は、この一覧が無いと言えない。
+   */
+  slicePaths: string[];
 };
 
 const loadedBublyRecords = new Map<string, LoadedBublyRecord>();
@@ -149,6 +158,8 @@ const loadBublyFromUrlOnce = async (url: string): Promise<Bubly | null> => {
      *   バンドルを入れ直す）は名前が変わらないので、名前だけでは増減が分からない。
      */
     const before = new Map(Object.entries(window.__BUBLYS_BUBLIES__ ?? {}));
+    // 置き場も同じやり方で見比べる（`LoadedBublyRecord.slicePaths` の註）
+    const slicesBefore = new Set(injectedSlicePaths());
 
     await loadScript(url);
 
@@ -176,9 +187,16 @@ const loadBublyFromUrlOnce = async (url: string): Promise<Bubly | null> => {
     // このバブリの `<name>-bubly` universe バブルルートを自動登録
     registeredRoutes.push(registerBublyUniverseRoute(bubly));
 
+    const previous = loadedBublyRecords.get(bubly.name);
+    const added = [...new Set(injectedSlicePaths().filter((path) => !slicesBefore.has(path)))];
     loadedBublyRecords.set(bubly.name, {
-      origin: loadedBublyRecords.get(bubly.name)?.origin,
+      origin: previous?.origin,
       routes: registeredRoutes,
+      /**
+       * 読み直し（同じバンドルを入れ直す）では置き場は増えない ── 注入は 1 度きりなので。
+       * そのときは前に控えたものをそのまま持ち越す。
+       */
+      slicePaths: added.length > 0 ? added : previous?.slicePaths ?? [],
     });
 
     return bubly;
@@ -332,6 +350,8 @@ export type LoadedBubly = {
   version: string;
   /** 取ってきた先。復元されたものも、いまロードしたものも入る */
   origin?: string;
+  /** このバブリが持ち込んだ置き場の名前（中身を片付けるときに要る） */
+  slicePaths: readonly string[];
 };
 
 /** ロード済みのバブリを、取ってきた先と一緒に並べる */
@@ -341,6 +361,7 @@ export const getLoadedBublies = (): LoadedBubly[] =>
     label: bubly.label ?? bubly.name,
     version: bubly.version,
     origin: loadedBublyRecords.get(bubly.name)?.origin,
+    slicePaths: loadedBublyRecords.get(bubly.name)?.slicePaths ?? [],
   }));
 
 /**

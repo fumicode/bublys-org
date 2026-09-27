@@ -77,6 +77,26 @@ export const injectSlice = (slice: Slice) => {
 };
 
 /**
+ * **いま注ぎ込まれている置き場の名前**（`reducerPath`）。
+ *
+ * 読む前と後で見比べると「この読み込みで増えた置き場」が分かる ── バブリが
+ * どの置き場を持ち込んだかは、それでしか知れない（注入は読み込みの最中に
+ * 副作用として起きるので、誰が注いだかはどこにも書かれていない）。
+ */
+export const injectedSlicePaths = (): string[] => injectedSlices.map((s) => s.reducerPath);
+
+/**
+ * **名指しした置き場だけ、初期値へ戻す。**
+ *
+ * ★ 消すのではなく**忘れる**。その名前を状態から外すと、次にその reducer が
+ *   呼ばれたとき `undefined` を受け取るので、自分で初期値を作り直す
+ *   ── 置き場ごとに「消す」動作を書かせなくて済む（バブリ側に何も要らない）。
+ * ★ `localStorage` は触らない。保存は状態についてくるので、戻した状態がそのまま書かれる。
+ */
+export const CLEAR_SLICES = "store/clearSlices" as const;
+export const clearSlices = (paths: readonly string[]) => ({ type: CLEAR_SLICES, payload: paths });
+
+/**
  * 外部ライブラリから middleware を注入する。
  * 同じ middleware を二重注入しても 1 回しか登録しない。
  */
@@ -107,7 +127,21 @@ export const makeStore = (options?: { persistKey?: string }) => {
     blacklist: ['memo', environmentSlice.reducerPath, ...injectedBlacklist],
   };
 
-  const persistedReducer = persistReducer(persistConfig, rootReducer);
+  /**
+   * 名指しされた置き場を落としてから本体へ渡す（{@link clearSlices}）。
+   * 落とした所は、その reducer が初期値を作り直す。
+   */
+  const clearable: typeof rootReducer = ((state, action) => {
+    if (state && (action as { type?: string }).type === CLEAR_SLICES) {
+      const paths = (action as { payload?: readonly string[] }).payload ?? [];
+      const next = { ...(state as Record<string, unknown>) };
+      for (const path of paths) delete next[path];
+      return rootReducer(next as never, action);
+    }
+    return rootReducer(state, action);
+  }) as typeof rootReducer;
+
+  const persistedReducer = persistReducer(persistConfig, clearable);
 
   const store = configureStore({
     reducer: persistedReducer,
