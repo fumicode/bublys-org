@@ -334,10 +334,41 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
   };
 };
 
+/**
+ * **一度架けた橋は、架け直さない。**
+ *
+ * ★ `bridgeRoute` は呼ぶたびに新しい `Component` を作る。バブリを 1 つロードして
+ *   一覧が作り直されると、React には**ぜんぶが別の部品**に見えて、開いていた泡が
+ *   まるごと描き直される（中身の状態が消える）。旧ルートを鍵に控えておき、
+ *   増えたぶんだけ新しく架ける。
+ * ★ 鍵は旧ルートそのもの（弱い鍵）── ルートが捨てられれば控えも一緒に消える。
+ */
+const bridged = new WeakMap<LegacyRoute, LayoutRoute>();
+
+/**
+ * **窓の中の海に渡す一覧は、いつも最新のもの。**
+ *
+ * ★ 架け直さないので、控えてある橋が覚えている「一覧を読む口」は**架けたときのもの**。
+ *   そのときの一覧を直に覚えていると、あとからバブリをロードしても
+ *   **窓の中だけ古い一覧のまま**になる（外では開けるのに、窓の中では開けない）。
+ *   読む先を 1 つに寄せて、架け直しのたびにここを差し替える。
+ */
+let latest: LayoutRoute[] = [];
+const all = () => latest;
+
 /** 旧のルート一覧をまとめて。窓の中の海にも、同じ一覧をそのまま渡す */
 export const bridgeRoutes = (routes: readonly LegacyRoute[]): LayoutRoute[] => {
-  const bridged: LayoutRoute[] = [];
-  const all = () => bridged;
-  for (const route of routes) bridged.push(bridgeRoute(route, all));
-  return bridged;
+  const list: LayoutRoute[] = [];
+  for (const route of routes) {
+    const already = bridged.get(route);
+    if (already) {
+      list.push(already);
+      continue;
+    }
+    const made = bridgeRoute(route, all);
+    bridged.set(route, made);
+    list.push(made);
+  }
+  latest = list;
+  return list;
 };

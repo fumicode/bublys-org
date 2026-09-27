@@ -9,7 +9,9 @@
  */
 import { BubbleSea, type Docked, type Home } from "@bublys-org/bubble-space-shell";
 import { ROOT_SEA_SCOPE } from "./WorldLineHomeBubble";
-import { bubbleRoutes } from "../registration/bubbleRoutes";
+import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
+// 組み込みのルートをレジストリに登録するための副作用 import（一覧は下で hook から引く）
+import "../registration/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 
 const LAUNCHER_URL = "launchers/main";
@@ -284,12 +286,17 @@ const SEA_OUTSIDE = [WORLD_LINES_URL] as const;
 export const BubblesUINext = () => {
   useEnsureMainLauncherEntity();
   /**
+   * ★ **開けるものの一覧は、レジストリから引く。** 組み込みのぶんも、あとから
+   *   ロードしたバブリのぶんも同じ所に居る（`useBubbleRoutes` の註）。
+   */
+  const routes = useBubbleRoutes();
+  /**
    * ★ **この空間の世界線は、root という名で記録する。** 世界線の泡（`WorldLineHomeBubble`）が
    *   読むのと同じ名前にしておく ── 別の名前にすると、記録はされているのに何も映らない。
    */
   return (
     <BubbleSea
-      routes={bubbleRoutes}
+      routes={routes}
       homes={HOMES}
       worldLineScope={ROOT_SEA_SCOPE}
       rules={SEA_RULES}
