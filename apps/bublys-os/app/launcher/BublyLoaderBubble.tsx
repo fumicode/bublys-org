@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Box, Button, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExtensionIcon from "@mui/icons-material/Extension";
-import { loadBublyFromOrigin, unloadBubly, getAllBublies, toBublyRouteBase, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
+import { loadBublyFromOrigin, unloadBubly, getAllBublies, toBublyRouteBase, normalizeBublyOrigin, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
 import { Launcher } from "@bublys-org/launcher-model";
 import { useLauncher } from "@bublys-org/launcher-libs";
 import { MAIN_LAUNCHER_ID } from "./launchTargets";
@@ -19,12 +19,17 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
   // StoreProvider が復元を終えてから描画されるので、初期値はレジストリの現状でよい
   const [loadedBublies, setLoadedBublies] = useState<string[]>(() => Object.keys(getAllBublies()));
   const { launcher, update } = useLauncher(MAIN_LAUNCHER_ID);
+  /**
+   * **取りに行く先** ── 打たれたものを畳んだ結果（`normalizeBublyOrigin`）。
+   * 畳めなければ空。道もクエリも落ちるので、配信先のページをそのまま貼ってよい。
+   */
+  const origin = useMemo(() => normalizeBublyOrigin(bublyOrigin), [bublyOrigin]);
 
   const handleLoad = async () => {
-    if (!bublyOrigin.trim()) return;
+    if (!origin) return;
     setIsLoading(true);
     try {
-      const bubly = await loadBublyFromOrigin(bublyOrigin.trim());
+      const bubly = await loadBublyFromOrigin(origin);
       if (bubly) {
         setLoadedBublies(Object.keys(getAllBublies()));
         const url = toBublyRouteBase(bubly.name);
@@ -55,18 +60,40 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
         <ExtensionIcon sx={{ fontSize: 18 }} />
         バブリ
       </Typography>
+      {/*
+        ★ **打った所と、取りに行く先を並べて見せる。** 前は打ったものをそのまま
+          `{打ったもの}/bubly.js` にしていたので、コロンが 1 つ抜けただけで
+          **OS 自身を**取りに行き、404 の HTML を JavaScript として読んでいた。
+          いまは畳んだ結果を下に出すので、押す前に行き先が見える。
+        ★ **Enter でも決まる。** 打ち終わったらそのまま決められる所に、
+          わざわざボタンまで手を移さない。
+      */}
       <TextField
         size="small"
-        placeholder="オリジン (例: http://localhost:4001)"
+        placeholder="オリジン (例: localhost:4001)"
         value={bublyOrigin}
         onChange={(e) => setBublyOrigin(e.target.value)}
-        sx={{ "& input": { fontSize: "0.8rem", py: 0.75 } }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !isLoading && origin) handleLoad();
+        }}
+        error={!!bublyOrigin.trim() && !origin}
+        helperText={
+          !bublyOrigin.trim()
+            ? " "
+            : origin
+              ? `${origin}/bubly.js を取りに行く`
+              : "オリジンの形になっていない"
+        }
+        sx={{
+          "& input": { fontSize: "0.8rem", py: 0.75 },
+          "& .MuiFormHelperText-root": { fontSize: "0.7rem", mx: 0.5, mt: 0.25 },
+        }}
       />
       <Button
         size="small"
         variant="contained"
         onClick={handleLoad}
-        disabled={isLoading || !bublyOrigin.trim()}
+        disabled={isLoading || !origin}
       >
         {isLoading ? <CircularProgress size={16} /> : "ロード"}
       </Button>
