@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * **住所は `/universe@<節>` になる。** 世界線は現在地をブラウザの url に書くので
+ * （`makeSnapshotCodec("universe")`）、`page.tsx` のままだと**そこで読み直した
+ * 瞬間に 404** ── その道を受ける所が無い。保存を消したあとの読み直しで踏んだ。
+ *
+ * OS のレイヤー時代の海と同じ形にする（`apps/bublys-os/app/bubble-ui/[[...slug]]`）。
+ * `[[...slug]]` は `/` そのものにも当たるので、入口の url は変わらない。
+ */
+
 import ChatIcon from "@mui/icons-material/Chat";
 import PersonIcon from "@mui/icons-material/Person";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -26,10 +35,17 @@ const menuItems: BublyMenuItem[] = [
   },
 ];
 
+/**
+ * 保存を消して、入口からやり直す。
+ *
+ * ★ **読み直しではなく、入口へ戻す。** 住所は `/universe@<節>` ── 世界線の
+ *   現在地なので、保存を消した時点で**その節はもう無い**。同じ住所を読み直すのは
+ *   「消したはずの所へ戻れ」と言うことで、意味がない。
+ */
 const handleClearLocalStorage = () => {
-  if (window.confirm("ローカルストレージをクリアしますか？")) {
+  if (window.confirm("保存を消して、最初からやり直しますか？")) {
     localStorage.clear();
-    window.location.reload();
+    window.location.href = "/";
   }
 };
 
