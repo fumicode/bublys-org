@@ -32,7 +32,7 @@ const resolveShiftAssignmentLabel = (assignmentId: string): string | undefined =
   const state = store.getState() as any;
 
   // シフト案からドメインオブジェクトを構築して配置を検索
-  const shiftPlanStates: ShiftPlanState[] = state.shiftPlan?.shiftPlans ?? [];
+  const shiftPlanStates: ShiftPlanState[] = state.gakkaiShiftPlan?.shiftPlans ?? [];
   const plans = shiftPlanStates.map(s => new ShiftPlan_シフト案(s));
 
   const assignment = plans

@@ -134,7 +134,7 @@ const buildRestoredShifts = (
   state: RootState,
   planId: string
 ): ShiftState[] | null => {
-  const plan = state.shiftPlan?.shiftPlans?.find((p) => p.id === planId);
+  const plan = state.eventShiftPlan?.shiftPlans?.find((p) => p.id === planId);
   if (!plan?.shifts) return null;
 
   const refs = graph.getStateRefsAt(nodeId);
