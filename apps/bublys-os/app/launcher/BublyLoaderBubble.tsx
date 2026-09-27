@@ -60,12 +60,32 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
 
   return (
     /*
-      ★ **上が入力、下が一覧。** 一覧は並びの空間（`ListSpace`）なので、札 1 枚ずつが
-        バブルになり、ほかの一覧と同じ 7 つの並べ方がそのまま効く。
-      ★ 高さは箱いっぱいに伸ばす ── 一覧は「残りぜんぶ」を使う（`flex: 1`）。
-        伸ばさないと並びの空間が丈を持てず、札が 1 枚も置けない。
+      ★ **上が入力、下が一覧。この上下は動かない。**
+        一覧の札は泡なので、掴めば一覧の外へも出ようとする。出させない
+        ── 入力欄の上に札が浮くと、打っている所が隠れて打てなくなる。
+        守り方は 2 つ重ねる:
+          1. 入力欄のほうが**必ず上**（`zIndex`。地も持たせて透けないように）
+          2. 一覧は自分の箱で**刈り込む**（`overflow: hidden`）── 上へはみ出した札は
+             そこで切れる。泡の側に「出るな」と言わなくて済む
+      ★ **入力欄が伸びたら、一覧は下へ送る。** 行き先の候補が 2 つ出れば入力欄は
+        その分だけ高くなる。一覧は残りを使う（`flex: 1`）が、札 2 枚ぶんは譲らない
+        ── それより短くなるなら、泡の中身ごと転がして見る（`overflowY: auto`）。
+        短い箱に合わせて一覧を潰しても、ロード済みの数は減らない。
     */
-    <Box sx={{ height: "100%", p: 2, pb: 1, display: "flex", flexDirection: "column", gap: 1, boxSizing: "border-box" }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", overflowY: "auto", overflowX: "hidden" }}>
+      <Box
+        sx={{
+          flexShrink: 0,
+          position: "relative",
+          zIndex: 1,
+          background: "#fff",
+          p: 2,
+          pb: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+        }}
+      >
       <Typography variant="subtitle1" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         <ExtensionIcon sx={{ fontSize: 18 }} />
         バブリ
@@ -117,10 +137,20 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
       >
         {isLoading ? <CircularProgress size={16} /> : "ロード"}
       </Button>
+      </Box>
+
       {members.length > 0 && (
-        /* 一覧は**端まで**使う ── 自分の余白（p: 2）を打ち消す。
-           内側に余白を重ねると、その分だけ札が細くなって字が詰まる */
-        <Box sx={{ flex: 1, minHeight: 0, mx: -2, mb: -1 }}>
+        /* 一覧は泡の端まで使う ── 内側に余白を重ねると、その分だけ札が細くなる */
+        <Box
+          sx={{
+            flex: "1 1 auto",
+            // 札 2 枚は譲らない。これより狭くなるぶんは、中身ごと転がして見る
+            minHeight: BUBLY_CARD_HEIGHT * 2,
+            position: "relative",
+            zIndex: 0,
+            overflow: "hidden",
+          }}
+        >
           <ListSpace members={members} itemHeight={BUBLY_CARD_HEIGHT} />
         </Box>
       )}
