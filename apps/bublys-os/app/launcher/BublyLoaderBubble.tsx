@@ -1,9 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
+import { Box, Button, CircularProgress, FormControlLabel, IconButton, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExtensionIcon from "@mui/icons-material/Extension";
-import { loadBublyFromOrigin, unloadBubly, getAllBublies, toBublyRouteBase, normalizeBublyOrigin, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
+import { loadBublyFromOrigin, unloadBubly, getAllBublies, toBublyRouteBase, bublyOriginCandidates, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
 import { Launcher } from "@bublys-org/launcher-model";
 import { useLauncher } from "@bublys-org/launcher-libs";
 import { MAIN_LAUNCHER_ID } from "./launchTargets";
@@ -20,10 +20,14 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
   const [loadedBublies, setLoadedBublies] = useState<string[]>(() => Object.keys(getAllBublies()));
   const { launcher, update } = useLauncher(MAIN_LAUNCHER_ID);
   /**
-   * **取りに行く先** ── 打たれたものを畳んだ結果（`normalizeBublyOrigin`）。
-   * 畳めなければ空。道もクエリも落ちるので、配信先のページをそのまま貼ってよい。
+   * **取りに行けそうな先**（`bublyOriginCandidates`）。畳めたものが先、打ったそのままが後。
+   * 打った字は捨てないので、ここが空になるのは**何も打っていないとき**だけ。
    */
-  const origin = useMemo(() => normalizeBublyOrigin(bublyOrigin), [bublyOrigin]);
+  const candidates = useMemo(() => bublyOriginCandidates(bublyOrigin), [bublyOrigin]);
+  /** そのうち、どれで取りに行くか。打ち直したら先頭（畳めたほう）に戻る */
+  const [picked, setPicked] = useState(0);
+  useEffect(() => setPicked(0), [bublyOrigin]);
+  const origin = candidates[picked] ?? candidates[0] ?? "";
 
   const handleLoad = async () => {
     if (!origin) return;
@@ -61,12 +65,10 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
         バブリ
       </Typography>
       {/*
-        ★ **打った所と、取りに行く先を並べて見せる。** 前は打ったものをそのまま
-          `{打ったもの}/bubly.js` にしていたので、コロンが 1 つ抜けただけで
-          **OS 自身を**取りに行き、404 の HTML を JavaScript として読んでいた。
-          いまは畳んだ結果を下に出すので、押す前に行き先が見える。
-        ★ **Enter でも決まる。** 打ち終わったらそのまま決められる所に、
-          わざわざボタンまで手を移さない。
+        ★ **打った字は弾かない。** こちらが読めなかっただけで打ち間違いとは限らない。
+          畳めたものを先に出しつつ、打ったそのままも候補に残して**選べる**ようにする
+          ── 「形になっていない」と止めるのは、打った人にはただ開けないのと同じ。
+        ★ **Enter でも決まる。** 打ち終わった所から、わざわざボタンまで手を移さない。
       */}
       <TextField
         size="small"
@@ -76,19 +78,31 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
         onKeyDown={(e) => {
           if (e.key === "Enter" && !isLoading && origin) handleLoad();
         }}
-        error={!!bublyOrigin.trim() && !origin}
-        helperText={
-          !bublyOrigin.trim()
-            ? " "
-            : origin
-              ? `${origin}/bubly.js を取りに行く`
-              : "オリジンの形になっていない"
-        }
-        sx={{
-          "& input": { fontSize: "0.8rem", py: 0.75 },
-          "& .MuiFormHelperText-root": { fontSize: "0.7rem", mx: 0.5, mt: 0.25 },
-        }}
+        sx={{ "& input": { fontSize: "0.8rem", py: 0.75 } }}
       />
+      {/*
+        取りに行く先。候補が 1 つなら選ぶ所は出さず、行き先だけ見せる
+        ── 選べないものを選ばせる形にしない。
+      */}
+      {candidates.length === 1 && (
+        <Typography variant="caption" color="text.secondary" sx={{ mx: 0.5 }}>
+          {candidates[0]}/bubly.js を取りに行く
+        </Typography>
+      )}
+      {candidates.length > 1 && (
+        <RadioGroup value={picked} onChange={(e) => setPicked(Number(e.target.value))} sx={{ mx: 0.5 }}>
+          {candidates.map((c, i) => (
+            <FormControlLabel
+              key={c}
+              value={i}
+              control={<Radio size="small" sx={{ p: 0.25, mr: 0.5 }} />}
+              label={`${c}/bubly.js`}
+              slotProps={{ typography: { fontSize: "0.7rem", sx: { wordBreak: "break-all" } } }}
+              sx={{ m: 0, alignItems: "flex-start" }}
+            />
+          ))}
+        </RadioGroup>
+      )}
       <Button
         size="small"
         variant="contained"

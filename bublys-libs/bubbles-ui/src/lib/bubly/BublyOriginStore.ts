@@ -9,35 +9,40 @@
 
 const STORAGE_KEY = "bublys.loaded-bubly-origins";
 
-/**
- * **打たれたものを、オリジン 1 つに畳む。**
- *
- * 取りに行くのは `{origin}/bubly.js` だけなので、その手前は何であってもよい
- * ── 配信先のページをそのまま貼れるし、`http://` を省いてもよい。
- * 畳めなければ空文字を返す（呼ぶ側はそれを「押せない」の合図に使う）。
- *
- * ★ **比較と保存もここを通る。** `localhost:4001` と `http://localhost:4001/`
- *   を別のものとして 2 回覚えないため、畳むのはこの 1 か所に集める。
- * ★ `http/localhost:4001` のような**コロンの打ち損ない**も直す。直さないと
- *   `http://` を足した相対パスとして OS 自身を取りに行き、404 の HTML を
- *   JavaScript として読んで `Unexpected token '<'` になる（実測）。
- */
-export const normalizeBublyOrigin = (origin: string): string => {
-  const typed = origin.trim();
-  if (!typed) return "";
+/** 保存の形を 1 つに揃える（前後の空きと末尾スラッシュだけ） */
+export const normalizeBublyOrigin = (origin: string): string =>
+  origin.trim().replace(/\/$/, "");
 
-  // 先頭が http / https なら、その後ろの区切りが崩れていても組み直す。
-  // そうでなければ `http://` を補う（`localhost:4001` や `bublys.ooo`）
+/**
+ * 打たれたものを、URL として読める形に組み直してオリジンだけ取り出す。
+ * 読めなければ空。**捨てるためではなく、候補を 1 つ増やすために使う**。
+ */
+const foldToOrigin = (typed: string): string => {
+  // 先頭が http / https なら、その後ろの区切りが崩れていても組み直す
+  // （`http/localhost:4001` のような打ち損ない）。無ければ `http://` を補う
   const scheme = /^(https?)\b[:/]*(.*)$/i.exec(typed);
   const absolute = scheme ? `${scheme[1].toLowerCase()}://${scheme[2]}` : `http://${typed}`;
-
   try {
-    // origin は「scheme + ホスト + ポート」だけ。道もクエリも印も落ちる
-    const { origin: only } = new URL(absolute);
-    return only === "null" ? "" : only;
+    const { origin } = new URL(absolute);
+    return origin === "null" ? "" : origin;
   } catch {
     return "";
   }
+};
+
+/**
+ * **打たれたもので取りに行けそうな先**を、確からしい順に並べて返す。
+ *
+ * ★ **打った字は捨てない。** こちらが読めなかっただけで打ち間違いとは限らないし、
+ *   「形になっていない」と言って止めるのは、打った人にはただ開けないのと同じ。
+ *   畳んだものを**先に**出して、打ったそのままも残す ── どちらで取りに行くかは
+ *   打った人が選ぶ。
+ * ★ 畳んだ結果が打ったものと同じなら 1 つだけ返る（選ぶ所は出さなくてよい）。
+ */
+export const bublyOriginCandidates = (typed: string): string[] => {
+  const raw = typed.trim();
+  if (!raw) return [];
+  return [...new Set([foldToOrigin(raw), raw].filter(Boolean))];
 };
 
 const readRaw = (): string[] => {
