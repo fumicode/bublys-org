@@ -27,6 +27,7 @@ import {
 } from "@bublys-org/bubbles-ui";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { ShoreSpace } from "./ShoreSpace.js";
+import type { Home } from "./ShoreSpace.js";
 import { WINDOW_GROUND } from "./ShowreLayer.js";
 import { useSpaceView } from "./SpaceViewContext.js";
 import type { SpaceView } from "./SpaceViewContext.js";
@@ -168,12 +169,32 @@ export const putIntoWindow = (windowId: string, url: string): boolean => {
 /** その泡が「中に入れられる窓」か（`bridgeRoute` の中の `isWindow` は別物 ── あちらはルートの話） */
 export const isWindowBubble = (windowId: string): boolean => WINDOW_INBOX.has(windowId);
 
+/**
+ * **窓の岸に、はじめから貼っておくもの**（`BubbleRoute.shoreUrls`）の置き方。
+ *
+ * ★ 置き方を決めるのは器。ルートが言うのは「何を貼るか」だけ ── バブリは
+ *   自分が OS の中でどの辺に着くかを知らなくてよい。
+ * ★ 左の辺に、アイコンだけの幅で、端から端まで ── **大元の海のランチャーと同じ形**。
+ *   同じ役のものは同じ所に、同じ姿で置く。
+ */
+const SHORE_WIDTH = 60;
+const shoreHomeFor = (url: string): Home => (viewport) => ({
+  key: `${url}#dock`,
+  url,
+  dock: { edges: ["left", "top"], at: { x: 0, y: 0 } },
+  size: { width: SHORE_WIDTH, height: viewport.height },
+  ground: "light",
+});
+
 const WindowSpace: FC<{
   routes: () => LayoutRoute[];
   seeds: readonly string[];
+  /** 岸にはじめから貼っておくものの url（`BubbleRoute.shoreUrls`） */
+  shoreUrls: readonly string[];
   /** **その窓の泡の id。** 中の海・岸・見え方の鍵はこれ（url ではない ── 上の註） */
   id: string;
-}> = ({ routes, seeds, id }) => {
+}> = ({ routes, seeds, shoreUrls, id }) => {
+  const homes = useMemo(() => shoreUrls.map(shoreHomeFor), [shoreUrls]);
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   /**
@@ -271,12 +292,16 @@ const WindowSpace: FC<{
          * ★ **枠そのものが岸。** 前はここでネオンを 1 本描くだけで、貼る機能は無かった
          *   ── 貼れる先が外の海にしか無かった。器（`ShoreSpace`）に差し替えて、
          *   外の海と同じ岸を窓の中にも持たせる。管もその岸が引く（枠が二重にならない）。
-         * ★ 定位置（ランチャー・ポケット・見え方）は渡さない ── あれらは外の岸のもの。
-         *   窓の岸は**空で始まり**、中の海から引き出したものだけが貼り付く。
+         * ★ 定位置は**そのルートが言ったものだけ**（`shoreUrls`）。OS の定位置
+         *   （ポケット・見え方・他のデモ）は渡さない ── あれらは外の岸のもの。
+         *   バブリの窓には、そのバブリ自身の呼び出しが 1 つ貼られる
+         *   （単体で開いたときに脇の帯に並んでいたもの）。
          */
         <ShoreSpace
           routes={routes()}
           initialUrls={seeds}
+          homes={homes}
+          homesReady={size.width > 0}
           onSpaceReady={setInner}
           viewport={{ w: size.width, h: size.height }}
           ground={WINDOW_GROUND}
@@ -307,12 +332,14 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
   const isWindow = !!(route.bubbleOptions?.universe || route.bubbleOptions?.fillsContainer);
   // 窓が開いたときに最初から居る泡（旧 `UniverseView.initialBubbleUrls` と同じ種）
   const seeds = route.initialBubbleUrls ?? [];
+  // 岸にはじめから貼っておくもの（バブリの窓なら、そのバブリの呼び出し）
+  const shoreUrls = route.shoreUrls ?? [];
   return {
     pattern: route.pattern,
     type: route.type,
     Component: ({ bubble }) =>
       isWindow ? (
-        <WindowSpace routes={all} seeds={seeds} id={bubble.id} />
+        <WindowSpace routes={all} seeds={seeds} shoreUrls={shoreUrls} id={bubble.id} />
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),
@@ -334,10 +361,41 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
   };
 };
 
+/**
+ * **一度架けた橋は、架け直さない。**
+ *
+ * ★ `bridgeRoute` は呼ぶたびに新しい `Component` を作る。バブリを 1 つロードして
+ *   一覧が作り直されると、React には**ぜんぶが別の部品**に見えて、開いていた泡が
+ *   まるごと描き直される（中身の状態が消える）。旧ルートを鍵に控えておき、
+ *   増えたぶんだけ新しく架ける。
+ * ★ 鍵は旧ルートそのもの（弱い鍵）── ルートが捨てられれば控えも一緒に消える。
+ */
+const bridged = new WeakMap<LegacyRoute, LayoutRoute>();
+
+/**
+ * **窓の中の海に渡す一覧は、いつも最新のもの。**
+ *
+ * ★ 架け直さないので、控えてある橋が覚えている「一覧を読む口」は**架けたときのもの**。
+ *   そのときの一覧を直に覚えていると、あとからバブリをロードしても
+ *   **窓の中だけ古い一覧のまま**になる（外では開けるのに、窓の中では開けない）。
+ *   読む先を 1 つに寄せて、架け直しのたびにここを差し替える。
+ */
+let latest: LayoutRoute[] = [];
+const all = () => latest;
+
 /** 旧のルート一覧をまとめて。窓の中の海にも、同じ一覧をそのまま渡す */
 export const bridgeRoutes = (routes: readonly LegacyRoute[]): LayoutRoute[] => {
-  const bridged: LayoutRoute[] = [];
-  const all = () => bridged;
-  for (const route of routes) bridged.push(bridgeRoute(route, all));
-  return bridged;
+  const list: LayoutRoute[] = [];
+  for (const route of routes) {
+    const already = bridged.get(route);
+    if (already) {
+      list.push(already);
+      continue;
+    }
+    const made = bridgeRoute(route, all);
+    bridged.set(route, made);
+    list.push(made);
+  }
+  latest = list;
+  return list;
 };

@@ -77,6 +77,66 @@ export const injectSlice = (slice: Slice) => {
 };
 
 /**
+ * **いま注ぎ込まれている置き場の名前**（`reducerPath`）。
+ *
+ * 読む前と後で見比べると「この読み込みで増えた置き場」が分かる ── バブリが
+ * どの置き場を持ち込んだかは、それでしか知れない（注入は読み込みの最中に
+ * 副作用として起きるので、誰が注いだかはどこにも書かれていない）。
+ */
+export const injectedSlicePaths = (): string[] => injectedSlices.map((s) => s.reducerPath);
+
+/**
+ * **名指しした置き場だけ、初期値へ戻す。**
+ *
+ * ★ 消すのではなく**忘れる**。その名前を状態から外すと、次にその reducer が
+ *   呼ばれたとき `undefined` を受け取るので、自分で初期値を作り直す
+ *   ── 置き場ごとに「消す」動作を書かせなくて済む（バブリ側に何も要らない）。
+ * ★ `localStorage` は触らない。保存は状態についてくるので、戻した状態がそのまま書かれる。
+ */
+export const CLEAR_SLICES = "store/clearSlices" as const;
+export const clearSlices = (paths: readonly string[]) => ({ type: CLEAR_SLICES, payload: paths });
+
+/** いまの保存係と、書いている所の名前（下の {@link clearFromStorage} のために持つ） */
+let currentPersistor: { flush: () => Promise<unknown>; pause: () => void } | null = null;
+let currentPersistKey = "root";
+
+/**
+ * **憶えているものから、名指しした所だけ落として書き直す。**
+ *
+ * ★ なぜ状態ではなく保存を直に触るか ── 状態から消しても、**開いている画面が
+ *   作り直す**。世界線の口は無い世界線を見つけると作り直すので、消したそばから
+ *   同じ名前が戻る（実測：消しても消えなかった）。保存を書き直してから読み込み直せば、
+ *   誰も書き戻せない。OS ぜんぶの片付けが `localStorage.clear()` してから
+ *   読み込み直すのと同じ考えで、**消す範囲だけが違う**。
+ * ★ 書いたあと読み込み直すのは呼ぶ側。ここは保存を書き直して、書き戻しを止めるだけ。
+ *
+ * @param slicePaths 落とす置き場の名前
+ * @param worldLineScopes 落とす世界線の名前
+ */
+export const clearFromStorage = (
+  slicePaths: readonly string[],
+  worldLineScopes: readonly string[],
+): void => {
+  // これ以上書かせない（溜まっていたぶんが、書き直した上に乗るのを防ぐ）
+  currentPersistor?.pause();
+  const storageKey = `persist:${currentPersistKey}`;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return;
+    const saved: Record<string, string> = JSON.parse(raw);
+    for (const path of slicePaths) delete saved[path];
+    if (worldLineScopes.length > 0 && saved["worldLineGraph"]) {
+      const wl = JSON.parse(saved["worldLineGraph"]);
+      for (const scope of worldLineScopes) delete wl.graphs?.[scope];
+      saved["worldLineGraph"] = JSON.stringify(wl);
+    }
+    window.localStorage.setItem(storageKey, JSON.stringify(saved));
+  } catch {
+    // 読み書きを止められている所では何もしない（呼ぶ側は読み込み直すだけになる）
+  }
+};
+
+/**
  * 外部ライブラリから middleware を注入する。
  * 同じ middleware を二重注入しても 1 回しか登録しない。
  */
@@ -107,7 +167,21 @@ export const makeStore = (options?: { persistKey?: string }) => {
     blacklist: ['memo', environmentSlice.reducerPath, ...injectedBlacklist],
   };
 
-  const persistedReducer = persistReducer(persistConfig, rootReducer);
+  /**
+   * 名指しされた置き場を落としてから本体へ渡す（{@link clearSlices}）。
+   * 落とした所は、その reducer が初期値を作り直す。
+   */
+  const clearable: typeof rootReducer = ((state, action) => {
+    if (state && (action as { type?: string }).type === CLEAR_SLICES) {
+      const paths = (action as { payload?: readonly string[] }).payload ?? [];
+      const next = { ...(state as Record<string, unknown>) };
+      for (const path of paths) delete next[path];
+      return rootReducer(next as never, action);
+    }
+    return rootReducer(state, action);
+  }) as typeof rootReducer;
+
+  const persistedReducer = persistReducer(persistConfig, clearable);
 
   const store = configureStore({
     reducer: persistedReducer,
@@ -124,6 +198,8 @@ export const makeStore = (options?: { persistKey?: string }) => {
 
   // React外のコード（labelResolver等）からstoreにアクセスできるよう参照を保持
   currentStore = store;
+  currentPersistor = persistor;
+  currentPersistKey = options?.persistKey ?? "root";
 
   return {
     store,

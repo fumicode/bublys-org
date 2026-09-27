@@ -26,7 +26,8 @@
     "@bublys-org/state-management": "*",
     "@mui/material": "^7.3.2",
     "@mui/icons-material": "^7.3.2",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "@bublys-org/world-line-graph": "*"
   },
   "nx": {
     "targets": {

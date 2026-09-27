@@ -2,12 +2,13 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AppsIcon from "@mui/icons-material/Apps";
-import { BubbleContentRenderer, BubblesContext, useBubbleBox } from "@bublys-org/bubbles-ui";
+import { BubbleContentRenderer, BubblesContext, getLoadedBublies, useBubbleBox } from "@bublys-org/bubbles-ui";
 import { launcherLayout } from "@bublys-org/launcher-model";
 import { LauncherView, type LauncherViewEntry } from "../ui/LauncherView.js";
 import { resolveLaunchTarget } from "../registration/launchTargets.js";
 import { useLauncher } from "./useLauncher.js";
 import { ResetStorageConfirm } from "./ResetStorageConfirm.js";
+import { ClearBublyConfirm } from "./ClearBublyConfirm.js";
 
 /** バブルの枠（余白 + 縁）。**旧の海**で外側から内側を出すのにだけ使う（下の註） */
 const CHROME = 26;
@@ -39,6 +40,16 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
   const { openBubble } = useContext(BubblesContext);
   /** 片付けるかどうかを訊いている最中か（`ResetStorageConfirm` の註） */
   const [asking, setAsking] = useState(false);
+  /**
+   * ★ **「この場」がどこかは、この呼び出しが誰のものかで決まる。**
+   *   大元の呼び出しなら OS ぜんぶ、バブリの窓に貼った呼び出し（`launchers/<name>`）
+   *   なら**そのバブリの中身だけ**。同じごみ箱が、居る場所によって指すものを変える
+   *   ── 窓の中で押して OS ぜんぶが消えるのは、字と起きることが食い違っている。
+   */
+  const mine = useMemo(
+    () => getLoadedBublies().find((b) => b.name === launcherId),
+    [launcherId],
+  );
   const entries = useMemo<LauncherViewEntry[]>(
     () =>
       (launcher?.entries ?? []).map((e) => {
@@ -190,7 +201,18 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
             </div>,
             document.body,
           )}
-        <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
+        {mine ? (
+          <ClearBublyConfirm
+            open={asking}
+            onClose={() => setAsking(false)}
+            label={mine.label}
+            name={mine.name}
+            slicePaths={mine.slicePaths}
+            worldLineScopePrefixes={mine.worldLineScopePrefixes}
+          />
+        ) : (
+          <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
+        )}
       </>
     );
   }
@@ -207,7 +229,18 @@ export const LauncherBubble: BubbleContentRenderer = ({ bubble }) => {
       onLaunch={(url) => openBubble(url, bubble.id)}
       onReset={() => setAsking(true)}
     />
-    <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
+    {mine ? (
+      <ClearBublyConfirm
+        open={asking}
+        onClose={() => setAsking(false)}
+        label={mine.label}
+        name={mine.name}
+        slicePaths={mine.slicePaths}
+        worldLineScopePrefixes={mine.worldLineScopePrefixes}
+      />
+    ) : (
+      <ResetStorageConfirm open={asking} onClose={() => setAsking(false)} />
+    )}
     </>
   );
 };

@@ -276,6 +276,10 @@ export const seaCornerRadius = (
  * ★ なので**いったん縛りを外して**測る ── 浮かせて（`position: absolute`）、
  *   中身なりの大きさ（`max-content`）にして、測って、すぐ戻す。
  *   描く前（`useLayoutEffect`）に済ませるので、画面には出ない。
+ * ★ **端数は切り上げる。** `offsetWidth` は整数に丸めるので、**切り捨てた側に
+ *   落ちると箱が中身より狭くなる** ── 見え方の口は本当は 473.45px 要るのに
+ *   473 と答えていて、0.45px 足りないぶんが**最初から転がる帯**になっていた。
+ *   小数のまま測って（`getBoundingClientRect`）、上へ丸める。
  */
 const naturalSize = (el: HTMLElement): { width: number; height: number } => {
   const s = el.style;
@@ -284,7 +288,8 @@ const naturalSize = (el: HTMLElement): { width: number; height: number } => {
   s.width = "max-content";
   s.height = "max-content";
   s.visibility = "hidden";
-  const want = { width: el.offsetWidth, height: el.offsetHeight };
+  const rect = el.getBoundingClientRect();
+  const want = { width: Math.ceil(rect.width), height: Math.ceil(rect.height) };
   s.position = keep.position;
   s.width = keep.width;
   s.height = keep.height;

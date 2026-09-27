@@ -709,8 +709,9 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
           setDocked((list) =>
             list.map((d) => {
               if (d.key !== key || !d.fit) return d;
-              const width = d.fit === "height" ? d.size.width : Math.round(size.width);
-              const height = d.fit === "width" ? d.size.height : Math.round(size.height);
+              // 端数は切り上げ ── 1px でも足りないと、中身は転がるしかなくなる
+              const width = d.fit === "height" ? d.size.width : Math.ceil(size.width);
+              const height = d.fit === "width" ? d.size.height : Math.ceil(size.height);
               return { ...d, fit: undefined, size: { width, height } };
             }),
           )

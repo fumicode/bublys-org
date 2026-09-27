@@ -40,7 +40,7 @@ const findPlan = (
   state: RootState,
   planId: string
 ): ShiftPlanState | undefined =>
-  state.shiftPlan?.shiftPlans?.find((p) => p.id === planId);
+  state.eventShiftPlan?.shiftPlans?.find((p) => p.id === planId);
 
 const resolvePlanId = (payload: unknown): string | undefined => {
   if (!payload || typeof payload !== "object") return undefined;

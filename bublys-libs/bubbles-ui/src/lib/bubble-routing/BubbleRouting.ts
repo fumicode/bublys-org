@@ -34,6 +34,14 @@ export type BubbleRoute = {
    * 通常は `makeBublyRoute` 経由で snapshot codec と一緒に付与される。
    */
   initialBubbleUrls?: string[];
+  /**
+   * 空間を持つルート用：**その窓の岸に、はじめから貼っておくもの**の url。
+   *
+   * 置き方（どの辺に・どれだけの大きさで）は器が決める ── ここは
+   * 「何を貼るか」だけ言う。バブリの窓なら、そのバブリの呼び出し
+   * （`launchers/<name>`）が 1 つ入る。
+   */
+  shoreUrls?: string[];
 };
 
 /**

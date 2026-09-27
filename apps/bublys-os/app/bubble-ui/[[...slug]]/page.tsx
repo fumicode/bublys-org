@@ -11,13 +11,14 @@
  */
 
 import { useEffect } from 'react';
-import { FocusedObjectProvider } from "@bublys-org/bubbles-ui";
+import { FocusedObjectProvider, useBubbleRoutes } from "@bublys-org/bubbles-ui";
 import { BubblesUI } from "../BubblesUI/feature/BubblesUI";
 import { ShellManagerProvider } from "@bublys-org/object-shell";
 import { DomainRegistryProvider } from "@bublys-org/domain-registry";
 import { LayoutRoutesProvider } from "@bublys-org/bubble-layout-feature";
 import { bridgeRoutes } from "@bublys-org/bubble-space-shell";
-import { bubbleRoutes } from "../BubblesUI/registration/bubbleRoutes";
+// 組み込みのルートをレジストリに登録するための副作用 import（一覧は hook から引く）
+import "../BubblesUI/registration/bubbleRoutes";
 import { registerShellTypes } from "../../counter/registerShellTypes";
 import { APP_DOMAIN_REGISTRY } from "../../appDomainRegistry";
 
@@ -32,13 +33,17 @@ import { APP_DOMAIN_REGISTRY } from "../../appDomainRegistry";
  * いまの海は器（`BubbleSea`）がこれを配っている。レイヤー時代の海には配る所が無いので、
  * ここで同じものを配る（旧のルート定義に橋を架けた一覧）。
  */
-const LEGACY_LAYOUT_ROUTES = bridgeRoutes(bubbleRoutes);
-
 export default function Index() {
   // 型レジストリの初期化
   useEffect(() => {
     registerShellTypes();
   }, []);
+
+  /**
+   * ★ 一覧は**レジストリから引く**（モジュールの定数にしない）。あとからロードした
+   *   バブリのぶんも配らないと、一覧の泡はその url から札を作れない。
+   */
+  const legacyLayoutRoutes = bridgeRoutes(useBubbleRoutes());
 
   return (
     <FocusedObjectProvider>
@@ -51,7 +56,7 @@ export default function Index() {
             渡す一覧は**同じもの**（`appDomainRegistry`）── 画面ごとに書き写さない。
         */}
         <DomainRegistryProvider registry={APP_DOMAIN_REGISTRY}>
-          <LayoutRoutesProvider routes={LEGACY_LAYOUT_ROUTES}>
+          <LayoutRoutesProvider routes={legacyLayoutRoutes}>
             <BubblesUI />
           </LayoutRoutesProvider>
         </DomainRegistryProvider>

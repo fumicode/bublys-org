@@ -44,7 +44,17 @@ const toMutableShiftPlanState = (plan: ShiftPlanState) => ({
 // ========== Slice ==========
 
 export const shiftPlanSlice = createSlice({
-  name: "shiftPlan",
+  /**
+   * **置き場の名前は、バブリごとに分ける。**
+   *
+   * ★ 学会シフトと同じ `shiftPlan` を名乗っていたので、OS に両方ロードすると
+   *   **2 つのバブリが 1 つの引き出しを分け合って**いた（片方のシフト案が
+   *   もう片方を上書きする）。置き場は保存の住所そのものなので、
+   *   同じ名前は同じ場所を意味する。
+   * ★ 前の名前（`shiftPlan`）で保存されていたものは読めなくなる。
+   *   分け合っていた時点でどちらのものか言えないので、持ち越さない。
+   */
+  name: "eventShiftPlan",
   initialState,
   reducers: {
     addShiftPlan: (state, action: PayloadAction<ShiftPlanState>) => {
@@ -240,10 +250,10 @@ injectSlice(shiftPlanSlice);
 // ========== Selectors ==========
 
 // セレクター用の型
-type StateWithShiftPlan = RootState & { shiftPlan: ShiftPlanSliceState };
+type StateWithShiftPlan = RootState & { eventShiftPlan: ShiftPlanSliceState };
 
 // 基本セレクター
-const selectShiftPlansRaw = (state: StateWithShiftPlan) => state.shiftPlan?.shiftPlans ?? [];
+const selectShiftPlansRaw = (state: StateWithShiftPlan) => state.eventShiftPlan?.shiftPlans ?? [];
 
 /** シフト案一覧を取得（ドメインオブジェクト） */
 export const selectShiftPlans = createSelector(
@@ -253,12 +263,12 @@ export const selectShiftPlans = createSelector(
 
 /** 現在のシフト案IDを取得 */
 export const selectCurrentShiftPlanId = (state: StateWithShiftPlan): string | null =>
-  state.shiftPlan?.currentShiftPlanId ?? null;
+  state.eventShiftPlan?.currentShiftPlanId ?? null;
 
 /** IDでシフト案を取得（ドメインオブジェクト） */
 export const selectShiftPlanById = (id: string) =>
   createSelector(
-    [(state: StateWithShiftPlan) => (state.shiftPlan?.shiftPlans ?? []).find((p) => p.id === id)],
+    [(state: StateWithShiftPlan) => (state.eventShiftPlan?.shiftPlans ?? []).find((p) => p.id === id)],
     (plan): ShiftPlan | undefined => {
       return plan ? new ShiftPlan(plan) : undefined;
     }
@@ -267,9 +277,9 @@ export const selectShiftPlanById = (id: string) =>
 /** 現在のシフト案を取得（ドメインオブジェクト） */
 export const selectCurrentShiftPlan = createSelector(
   [(state: StateWithShiftPlan) => {
-    const id = state.shiftPlan?.currentShiftPlanId;
+    const id = state.eventShiftPlan?.currentShiftPlanId;
     if (!id) return undefined;
-    return (state.shiftPlan?.shiftPlans ?? []).find((p) => p.id === id);
+    return (state.eventShiftPlan?.shiftPlans ?? []).find((p) => p.id === id);
   }],
   (plan): ShiftPlan | undefined => {
     return plan ? new ShiftPlan(plan) : undefined;
