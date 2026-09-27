@@ -1,6 +1,9 @@
 import { useContext, useMemo, useState, useRef, useEffect } from 'react';
-import { WorldLineContext } from '../domain/WorldLineContext';
+import { WorldLineContext } from './WorldLineContext';
 import { World } from '../domain/World';
+
+/** 読むだけの表示に渡す手 ── 触られても何もしない */
+const doNothing = (): void => undefined;
 
 // InitializeButtonコンポーネントを直接定義
 function InitializeButton({ onInitialize, disabled = false }: { onInitialize: () => void; disabled?: boolean }) {
@@ -386,7 +389,7 @@ function WorldView3D<TWorldState>({
                     zIndex: isHovered ? 3000 : (isFocused ? 1000 : baseZIndex + 50),
                   }}
                 >
-                  {renderWorldState(world.worldState as TWorldState, () => {}, true)}
+                  {renderWorldState(world.worldState as TWorldState, doNothing, true)}
                 </div>
               );
             } else {
@@ -470,7 +473,7 @@ function WorldView3D<TWorldState>({
                       animation: 'fadeIn 0.2s ease-out',
                     }}
                   >
-                    {renderWorldState(world.worldState as TWorldState, () => {}, true)}
+                    {renderWorldState(world.worldState as TWorldState, doNothing, true)}
                   </div>
                 )}
               </div>

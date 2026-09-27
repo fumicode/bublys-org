@@ -11,10 +11,10 @@
  *   7 つの並べ方がそのまま効く ── 説明の画面だけ並べ替えられないのは、
  *   ここで説明していることと食い違う。
  */
-import { FC, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useContext, useMemo } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import { BubblesContext } from "@bublys-org/bubbles-ui";
+import { BubblesContext, useBubbleBox } from "@bublys-org/bubbles-ui";
 import { LIST_CARD_WIDTH, ListSpace, useCurrentBubble } from "@bublys-org/bubble-layout-feature";
 import { GUIDE_ENTRIES } from "./guideEntries";
 
@@ -35,6 +35,10 @@ export const GUIDE_CARD = { w: LIST_CARD_WIDTH, h: 54 } as const;
  *   **横に並べた瞬間アイコンに戻り、一覧そのものが居なくなるので二度と並べ方を
  *   変えられない**（札は世界に残るので、見た目は一覧のままなのに口が効かない）。
  *   実測で踏んだ。アイコンに戻すのは「もう何も映せない」ときだけでよい。
+ *
+ * ★ **畳むのは、縦も横も足りないときだけ**（ランチャーと同じ「かつ」）。片方に余地が
+ *   あるなら中身を出して、はみ出すぶんは転がして見る ── 箱が短いことと、中身が多い
+ *   ことは別の話で、短い箱に合わせて姿を落としても中身の数は減らない。
  */
 const COMPACT = { width: 120, height: 72 };
 
@@ -42,30 +46,17 @@ export const GuideHomeBubble: FC = () => {
   const { openBubble } = useContext(BubblesContext);
   const me = useCurrentBubble() ?? "root";
 
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // 大きさは**レイアウトの px**で見る（バブルに掛かる倍率の影響を受けない側。ポケットと同じ）
-    const measure = () => {
-      const width = el.offsetWidth;
-      const height = el.offsetHeight;
-      setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  /** 測る前（0）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける */
-  const compact = size.width > 0 && (size.width < COMPACT.width || size.height < COMPACT.height);
+  /**
+   * 描ける大きさは**海が測って配る**（`BubbleBoxContext`）── 自分では測らない。
+   * 配られる前（`null`）は広いものとして扱う ── 一瞬アイコンが見えて消える、を避ける。
+   */
+  const box = useBubbleBox();
+  const compact = !!box && box.width < COMPACT.width && box.height < COMPACT.height;
 
   const members = useMemo(() => GUIDE_ENTRIES.map((e) => `guide/${e.id}/card`), []);
 
   return (
-    <div ref={ref} style={{ width: "100%", height: "100%" }}>
+    <div style={{ width: "100%", height: "100%" }}>
       {compact ? (
         <Tooltip title="説明" placement="left">
           <IconButton

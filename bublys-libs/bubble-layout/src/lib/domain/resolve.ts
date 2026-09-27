@@ -33,12 +33,12 @@ import type { BubbleId, Rect, Size, SpaceId, Vec3, Focus } from './types.js';
 import type { Bubble } from './bubble.js';
 import type { BubbleWorld } from './world.js';
 import { resolveRules } from './rules.js';
-import type { LayoutRules } from './rules.js';
+import type { LayoutRules, SizeCombine } from './rules.js';
 import { viewOfSpace } from './view.js';
 import type { ResolvedView } from './view.js';
 import { arrangeAxis } from './arrange.js';
 import type { Arranged } from './arrange.js';
-import { imageOf, LENS_XY, LENS_Z } from './lens.js';
+import { imageOf, sizeFit, LENS_XY, LENS_Z } from './lens.js';
 import type { LensXyId, LensZId } from './lens.js';
 import { chromeOf, halfOf, lensContext, measureAll, measureBox, padOf } from './measure.js';
 import type { Chrome } from './chrome.js';
@@ -88,6 +88,14 @@ export interface Placement extends Rect {
   readonly local: number;
   /** この泡の Z の倍率（逆写しに要る。lab.html 774 行 m） */
   readonly m: number;
+  /**
+   * 位置に掛かった**曲がり**（`sizeFit` の `bx`・`by`。曲げていない軸は 1）。
+   *
+   * ★ **逆写しに要る。** 画面から位置へ戻すとき、これを外さないと戻らない
+   *   ── 掴んで動かした泡が、歪むほどカーソルから離れていく
+   *   （実測：海の魚眼X で、480px 動かすと縦に 134px ずれた）。
+   */
+  readonly bend: { readonly x: number; readonly y: number };
   readonly alpha: number;
   readonly vis: number;
   /** 空間の中での位置（軸ごと。並べ方の答え） */
@@ -316,37 +324,28 @@ function resolveSpace(
 
 
   /**
-   * ★ **魚眼は、箱の 2 倍を超える泡は諦める。**
+   * ★ **諦めない**（2026-09-26 に消した）。
    *
-   * 魚眼は「中身を箱に収める」ためのものだが、箱よりずっと大きい泡を収めにいくと、
-   * その 1 つが箱を埋めきって**ほかがぜんぶ潰れる**。収めた結果が読めないなら、
-   * 収めない方がまし ── 諦めた軸は平行になる。はみ出したぶんは器が切るが、
-   * 掴んで寄せれば見に行ける。
+   * > **どんな大きさのものでも、そのまま出す。大きすぎると思うかどうかは、見る人が決める。**
    *
-   * 見るのは**いちばん大きい泡 1 つ**と箱の対比だけで、枚数は見ない
-   * ── coverflow のように何枚あっても、箱が泡なみに広ければ焦点のまわりは読める。
+   * ここには「魚眼は箱の 2 倍を超える泡は諦める（その軸を平行に落とす）」があった。
+   * 箱よりずっと大きい泡を収めにいくと、その 1 つが箱を埋めてほかが潰れるから、という理由
+   * （実測：箱 151 に泡 420 で倍率 6e-05）。**消した理由は 3 つ:**
    *
-   * 実測:
-   *   箱 151 に泡 420（2.8 倍）… 窓を岸に貼って海が 151 しか残らなかったとき。
-   *                              倍率 6e-05 ＝ 描く下限を切って消えた → 諦める
-   *   箱 815 に並び 840（1.03 倍）… 詳細を 2 つ開いて並びになったとき。
-   *                              魚眼なら収まって読める → 諦めない
-   *   ★ はじめ「泡が原寸で入らなければ諦める」（1 倍）にしたら後者を巻き込み、
-   *     並びが平行のまま岸の下へ散った。境目は 1 倍ではなく 2 倍。
+   *   1. **人が選んだレンズを、黙って裏返していた。** 口は「魚眼」と言っているのに
+   *      平行で描かれる ── 見えているものが本当ではなくなる
+   *   2. **「まかせる」と二重だった。** 同じ「この軸を魚眼にするか」を、片方は見える口で、
+   *      片方は誰にも見えない所で決めていた。**食い違ったまま押し合って**、
+   *      まかせるが止まらなくなっていた（実測：2 秒で 416 回）
+   *   3. **直す手は見る人が持っている。** 大きすぎると感じたら、窓を小さくする・
+   *      寄りを引く・魚眼なら端へ動かす ── どれも既にある
+   *
+   * ★ **値段を測り直した。** 消したときの註は「箱を埋めきってほかがぜんぶ潰れる」だったが、
+   *   いまの式では**そうならない**（実測：箱 151 に泡 420 で、大きい泡は箱いっぱいの
+   *   幅 149.8・倍率 0.357、隣の泡は 0.550。箱 60 でも 0.143 と 0.217）。
+   *   魚眼は大きい泡を**箱いっぱいに収める**だけで、ほかを 0 にはしない
+   *   ── 6e-05 は別の頃・別の場面の数だった。
    */
-  const LENS_GIVE_UP = 2;
-  for (const axis of ['x', 'y'] as const) {
-    if (view[axis].lens !== 'fisheye') continue;
-    let biggest = 0;
-    for (const k of kids) {
-      const sz = sizeOf(k);
-      biggest = Math.max(biggest, axis === 'x' ? sz.w : sz.h);
-    }
-    const box = axis === 'x' ? own.w : own.h;
-    if (biggest > 0 && box * LENS_GIVE_UP < biggest) {
-      (view as Mutable<ResolvedView>)[axis] = { ...view[axis], lens: 'parallel' };
-    }
-  }
 
   const L: Mutable<SpaceLayout> = {
     id: spaceId,
@@ -404,6 +403,21 @@ function resolveSpace(
   const lx = LENS_XY[view.x.lens as LensXyId];
   const ly = LENS_XY[view.y.lens as LensXyId];
   const lz = LENS_Z[view.z.lens as LensZId];
+  /**
+   * ★ **両軸が魚眼のときの「大きさのまとめ方」は、その空間の View から出す**（規則①）。
+   *
+   * > **接する相手がいるなら、接することを守る。自由に置いた泡には隣が無い。**
+   *
+   *   刻みで並ぶ軸（`equal` / `pack`）があるなら**積** ── 刻みが箱と同じ格子
+   *   （折り返す魚眼・両軸が魚眼になった一覧）で隣どうしがぴたり接するのは、
+   *   `大きさ ∝ kx·ky` のときだけ（`lens.ts` の `sizeFit` の註。実測でも数式でも）。
+   *   両軸が「そのまま」（`as-is` ＝ 自由に置く。海がこれ）なら接する相手が居ないので、
+   *   遠さを素直に測る ＝ `rules.sizeCombine`（既定は斜辺）。
+   *
+   * ★ 海と一覧は**別の空間**なので、どちらかを選ぶ話ではない ── 空間ごとに、その並べ方から出る。
+   */
+  const tiles = tilesOf(view);
+  const combine: SizeCombine = combineOf(view, rules);
 
   const items = kids.map((b, i) => {
     const dress = dressed?.get(b.id);
@@ -429,20 +443,24 @@ function resolveSpace(
     const dz = (b.state.implicit ? rowPlane(world, b.id, sizeOf, rules) : pos.z) - ctx.focus.z;
     const m = lz.mag(dz);                                          // そのあと Z で消失点へ寄せる
     /**
-     * ① 大きさの倍率は数値1つ。**両軸の倍率の積** ＝ Z の倍率 × X の像の倍率 × Y の像の倍率。
+     * ① 大きさの倍率は数値1つ ＝ Z の倍率 × **両軸の像をまとめた1つの倍率**（`sizeK`）。
      *
      * ★ **比は変えない。** 歪むのは**並べ方の軸**であって、泡そのものではない
      *   （泡を軸ごとに歪ませると中身まで伸び縮みする ── 一度やって捨てた）。
-     *   積にすると、遠さが縦横で重なる 4 隅がいちばん小さくなる
-     *   ── `min` では 4 隅と上下左右が**同じ大きさ**になってしまって、遠近が言えない。
-     * ★ 片方の軸が平行なら、その倍率は 1 なので積は今までの `min` と同じ値になる
+     * ★ まとめ方は `rules.sizeCombine`。既定は**斜辺**（遠さを軸ごとに足さず、直角三角形の
+     *   斜辺として1つにする）── 4 隅は上下左右より小さいまま、減衰は 1 回ぶんで済む。
+     *   `min` では 4 隅と上下左右が**同じ大きさ**になって遠近が言えず、`product`（積）では
+     *   遠さが 2 回掛かって**隅が早く消える**。数と理由は `lens.ts` の `sizeK`。
+     * ★ 片方の軸が平行なら、3 つのまとめ方はどれも同じ数を返す（平行の倍率は 1）
      *   ── 縦・横の coverflow も、ラボの X魚眼も、1px も変わらない。
      */
     const kx = px.k;
     const ky = py.k;
     /**
-     * ★ **位置は「相手の軸の倍率ぶん」内へ寄る** ＝ 並べ方の軸が曲がる。
+     * ★ **位置は「大きさに合わせたぶん」内へ寄る** ＝ 並べ方の軸が曲がる（`sizeFit` の `bx`・`by`）。
      *
+     *   曲がり ＝ 大きさ ÷ その軸の像の倍率 ＝ **泡が自分の像をちょうど埋める**ようにする。
+     *   まとめ方が積のときは、これが相手の軸の倍率そのもの（`kx·ky ÷ kx` ＝ `ky`）。
      *   魚眼の写真で格子の線が曲がるのと同じ ── 上の行は縦に遠いので、**横にも縮む**。
      *   軸ごとに別々に写すと線は真っ直ぐのままで、「格子を歪ませた」ようには見えない
      *   （実測で踏んだ：列の中心は揃うのに辺が揃わず、余白だけが残った）。
@@ -452,20 +470,31 @@ function resolveSpace(
      *   同じ一本の線の上にいる ── 曲げる軸がそもそも無い。それでも相手の倍率を掛けると、
      *   **一定のはずの高さが端ほど中心線へ引き寄せられて、弓なりに垂れる**
      *   （実測：横の魚眼で、1 列のはずの札が両端だけ下がった）。
+     *
+     * ★ **自由に置く空間では曲げない**（`tiles` が偽）。曲がりは「隣とぴたり接する」ための
+     *   もので、接する相手が居ない所では値打ちが無いばかりか、**害になる**:
+     *
+     *   - 曲がりは**相手の軸**で決まるので、掴んで斜めに動かすと x と y が互いを揺らす
+     *     ── 指を 1px 動かすと泡の中心が **±12px 跳ねる**（実測。隅の近くで震えて止まらない）
+     *   - 曲がったぶん像が縮むので、**海の中を指しているのに「届かない」**ことになる
+     *     （実測：1440 の海で、隅へ 300px 動かした所で泡が飛んで固まった）
+     *
+     *   曲げなければ軸ごとに独立して写る ＝ 指の下から離れず、海の中ならどこへでも置ける。
      */
-    const bendX = view.x.dim !== 'none' ? ky : 1;
-    const bendY = view.y.dim !== 'none' ? kx : 1;
+    const fit = sizeFit(kx, ky, combine);
+    const bendX = tiles && view.x.dim !== 'none' ? fit.bx : 1;
+    const bendY = tiles && view.y.dim !== 'none' ? fit.by : 1;
     const target = {
       x: ctx.vp.x + (px.s * bendX - ctx.vp.x) * m,
       y: ctx.vp.y + (py.s * bendY - ctx.vp.y) * m,
-      scale: m * kx * ky,
+      scale: m * fit.k,
       alpha: lz.alpha(dz, view.z.step),
       w: box.w,
       h: box.h,
     };
     // 焦点からの隔たり（写ったあとの、泡の**中心**で測る）。前後を決める second key
     const dist = Math.hypot(px.s, py.s);
-    return { b, i, dz, m, pos, target, dist };
+    return { b, i, dz, m, pos, target, dist, bend: { x: bendX, y: bendY } };
   });
   /**
    * ★ 空間ごとに Z で1回だけ（奥 → 手前）。Z が同じなら **焦点に近いものが手前**
@@ -496,6 +525,7 @@ function resolveSpace(
       depth: host.depth + 1,
       local: a.scale,
       m: it.m,
+      bend: it.bend,
       pos: it.pos,
       box: { w: a.w, h: a.h },
     };
@@ -595,6 +625,20 @@ function frontLead(
 }
 
 const ZERO_CTX: LensContext = { focus: ZERO_FOCUS, H: { x: 1, y: 1 }, vp: { x: 0, y: 0 } };
+
+/**
+ * その空間に**接する相手がいるか**（刻みで並ぶ軸があるか）。
+ * 曲がりと、大きさのまとめ方が、これで決まる（`sizeFit` の註）。
+ */
+export const tilesOf = (view: ResolvedView): boolean =>
+  !(view.x.arrange === 'as-is' && view.y.arrange === 'as-is');
+
+/**
+ * その空間の「大きさのまとめ方」。**掴んで動かす側（`dragBubble`）も同じ口から出す**
+ * ── 描くときと動かすときで違うまとめ方を使うと、指の下から外れる。
+ */
+export const combineOf = (view: ResolvedView, rules: LayoutRules): SizeCombine =>
+  tilesOf(view) ? 'product' : rules.sizeCombine;
 
 /** ★ 合成。lab.html 741-744 行 compose。深さ n でも scale は数値1つ */
 export function compose(

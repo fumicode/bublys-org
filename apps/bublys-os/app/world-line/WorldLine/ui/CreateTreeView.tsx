@@ -13,7 +13,7 @@ export function CreateTreeView<TWorldState>({
   onCreateSelect, 
   createTree 
 }: CreateTreeViewProps<TWorldState>) {
-  const renderCreateNode = (create: World<TWorldState>, level: number = 0) => {
+  const renderCreateNode = (create: World<TWorldState>, level = 0) => {
     const isCurrent = create.worldId === currentCreateId;
     const children = createTree[create.worldId] || [];
     

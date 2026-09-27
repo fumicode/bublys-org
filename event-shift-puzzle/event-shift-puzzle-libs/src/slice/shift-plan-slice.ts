@@ -147,11 +147,12 @@ export const shiftPlanSlice = createSlice({
       const planIndex = state.shiftPlans.findIndex((p) => p.id === planId);
       if (planIndex === -1) return;
       const current = state.shiftPlans[planIndex];
-      state.shiftPlans[planIndex] = toMutableShiftPlanState({
-        ...current,
-        shifts,
-        updatedAt: new Date().toISOString(),
-      });
+      /**
+       * ★ **戻すのは編集ではない。** ここで `updatedAt` を「いま」にしていたので、
+       *   同じ節へ戻すたびに**記録と違う姿**になっていた（同じ入力で違う結果になる reducer）。
+       *   世界線は「その時の姿を再現する」ためのものなので、時刻も記録のまま置く。
+       */
+      state.shiftPlans[planIndex] = toMutableShiftPlanState({ ...current, shifts });
     },
 
     /**

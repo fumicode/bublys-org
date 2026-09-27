@@ -14,7 +14,7 @@
  *   「開いたほうが大きく、元のリストは小さく」が出る。
  */
 import {
-  Bubble, METRICS, actContext, applySnap, bringToCenter, focusOn, renumber, resolveWorld, withAxis,
+  Bubble, METRICS, actContext, applySnap, bringToCenter, focusOn, renumber, resolveWorld,
 } from '@bublys-org/bubble-layout';
 import type { BubbleId, BubbleWorld, LayoutRules, Viewport } from '@bublys-org/bubble-layout';
 
@@ -37,12 +37,6 @@ export interface OpenAtInput {
    * 岸が食い込んでいるとき、**開いている口の真ん中**を渡す（`bringToCenter` を見よ）。
    */
   readonly center?: { readonly x: number; readonly y: number };
-  /**
-   * **レンズには触らない。** 既定では横に開くと X の魚眼を点けるが、
-   * 誰かが向きを選んでいる（魚眼を Y に向けた、どちらも平行にした）なら、
-   * 開くたびに X へ戻すとその選択が握り潰される。選ばれたあとはこれを立てる。
-   */
-  readonly keepLens?: boolean;
   /**
    * ★ **同じ種類の泡（兄弟）を続けて開いたとき、その隣に並べる相手。**
    *
@@ -170,17 +164,21 @@ export function openAt(input: OpenAtInput): OpenAtResult {
   }
 
   /**
-   * ★ 横に開いたら X の魚眼を点ける。次元は変えない（自由X のまま）。
+   * ★ **開くときにレンズは触らない**（2026-09-26 に消した）。
    *
-   * 点けるのは **押しのける相手がいるとき**だけ ── 最初の1つを置くのに、小さくする相手はいない。
-   * ここが「元の泡がいるとき」だと、岸のランチャーから開いたとき（元の泡が無い）に点かず、
-   * 押しのけられた泡が**平行に滑って画面の外へ出ていく**（実測 cx −62）。
-   * `keepLens` が来ているときは触らない（誰かが向きを選んでいる）。
+   * > **口が言っていることが、そのまま海の振る舞い。**
+   *
+   * ここには「横に開いたら X の魚眼を点ける」があった。押しのけられた泡が平行に滑って
+   * 画面の外へ出ていくのを防ぐためだが、**見え方の口が「平行」と言っているのに海が勝手に
+   * 魚眼になる**。口を触ったことがある人だけ（`keepLens`）は守られて、
+   * まだ触っていない人は裏切られる ── 断りなく変える相手を選ぶ決まりだった。
+   *
+   * ★ **同じ役目の口はもうある。**「レンズをまかせる」（`autoLens`）が
+   *   「収まらない軸だけ魚眼にする／収まったら平行へ戻す」をやる。自動が要るならそちら
+   *   ── 点いている理由が画面の上にあるので、見る側が説明できる。
+   * ★ 値段：平行のまま並べていくと、古い泡は画面の外へ出る。**それが「平行に置く」の意味**。
+   *   見に行くには背景をドラッグする（焦点が動く）か、魚眼を点ける。
    */
-  if (base && !input.keepLens) {
-    const view = w.ownViewOf(space);
-    if (!view || view.x.lens !== 'fisheye') w = withAxis(w, space, 'x', { lens: 'fisheye' });
-  }
 
   // ② 開いたら、そこへ視点が寄る（泡の値は1つも書かない）
   //    ＝ **空間が右へ動いて、あいた中央に新しい泡が出る**

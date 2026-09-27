@@ -68,6 +68,15 @@ export function useUniverseArrangementWorldLine(
    * 履歴を積む（pushState）のはこれを受け取った側の責任。
    */
   onCommitted?: (nodeId: string) => void,
+  /**
+   * 世界線を置く場所の名前。渡さなければ universe の名前と同じ。
+   *
+   * ★ **別の模型の海と同じ名前にしない。** いまの海（`BubbleSea`）はこの名前の
+   *   いちばん上（`root`）に `sea-arrangement` を記録している。レイヤー時代の海が
+   *   同じ名前を見ると、そこに `bubble-arrangement` は 1 つも無いので
+   *   **復元が永遠に終わらず、泡が 1 つも出てこない**（実測で踏んだ）。
+   */
+  scopeId?: string,
 ) {
   const dispatch = useAppDispatch();
   const store = useAppStore();
@@ -78,7 +87,7 @@ export function useUniverseArrangementWorldLine(
   // 「空の配置」が root ノードとして焼かれてしまう（起動しただけで apex が立ち、
   // 親バブルの url 書き換え → 親の配置変化 → commit → URL push の連鎖が始まる）。
   // universe の最初のノードは、seed（＝復元するものが無いとき）の commit で作る。
-  const scope = useCasScope(universeId);
+  const scope = useCasScope(scopeId ?? universeId);
 
   // この universe の駆動役かどうか。空いていれば自分が取る
   const driverTokenRef = useRef<symbol | null>(null);

@@ -37,6 +37,9 @@
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../object-types/tsconfig.lib.json"
+    },
+    {
       "path": "../world-line-graph/tsconfig.lib.json"
     }
   ]

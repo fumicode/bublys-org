@@ -176,8 +176,8 @@ export class ShellHistory {
    */
   static compress<T>(
     node: ShellHistoryNode<T> | null,
-    keepRecent: number = 10,
-    keepEveryN: number = 10
+    keepRecent = 10,
+    keepEveryN = 10
   ): ShellHistoryNode<T> | null {
     if (!node) return null;
 

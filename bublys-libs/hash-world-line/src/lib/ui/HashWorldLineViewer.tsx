@@ -202,7 +202,7 @@ export function HashWorldLineViewer() {
   const handleDeleteWorldLine = useCallback(
     async (id: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      if (confirm('この世界線を削除しますか？')) {
+      if (window.confirm('この世界線を削除しますか？')) {
         await deleteWorldLine(id);
       }
     },
@@ -211,7 +211,7 @@ export function HashWorldLineViewer() {
 
   const handleRewind = useCallback(
     async (targetNodeId: string) => {
-      if (confirm('この状態に巻き戻しますか？')) {
+      if (window.confirm('この状態に巻き戻しますか？')) {
         await rewindWorldLine(targetNodeId);
       }
     },

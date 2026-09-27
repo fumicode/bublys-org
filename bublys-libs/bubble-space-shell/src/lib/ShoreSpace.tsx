@@ -29,8 +29,8 @@ import {
   useState,
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
-import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import type { LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
+import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, BubbleSpaceProps, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
+import type { LayoutRules, LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
   anchoredRect,
@@ -43,7 +43,8 @@ import {
 } from "@bublys-org/bubbles-ui";
 import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./ShowreLayer.js";
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
-import { putIntoWindow } from "./legacyRouteBridge.js";
+import { putIntoWindow, useWindowView } from "./legacyRouteBridge.js";
+import { SpaceViewTools } from "./SpaceViewBubble.js";
 import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
@@ -81,7 +82,19 @@ export type ShoreSpaceProps = {
    * 記録するのは海の姿と**岸に貼ってあるもの**（`SeaWorldLine` の註）。
    */
   readonly worldLineScope?: string;
+  /**
+   * **世界線に入らないもの**（url）。渡したものは、海の姿からも岸からも抜いて記録し、
+   * 節へ移っても**いまのまま持ち越す**（`SeaWorldLine` の `WorldLineOutside`）。
+   */
+  readonly worldLineOutside?: readonly string[];
+  /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
+  readonly frameTools?: BubbleSpaceProps['frameTools'];
   readonly autoLens?: boolean;
+  /**
+   * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
+   * 渡した海だけに効く ── 窓の中の海や一覧は、別の `BubbleSpace` なので影響を受けない。
+   */
+  readonly rules?: Partial<LayoutRules>;
   /** どこから開いたかの帯の出し方（海ぜんぶの見え方） */
   readonly bandDisplay?: 'hover' | 'always' | 'none';
   readonly onLens?: (axis: PlaneAxis, lens: LensId) => void;
@@ -182,6 +195,31 @@ const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }
   return null;
 };
 
+/**
+ * **窓（ユニバース）の見え方の口** ── その窓の中の海を、外の枠の上から触る。
+ *
+ * > 同じことをする口は、同じ見本から出す（`SpaceViewTools`）。
+ *
+ * ★ 触る相手は**窓が出している口**（`useWindowView`）。窓の中は別の世界なので、
+ *   ここから直に書くことはできない ── 繋がっているのは url 1 本だけ。
+ * ★ 窓が立ち上がる前（口がまだ無い）は何も出さない。
+ * ★ **全画面は出さない** ── あれは画面ぜんぶの話で、窓には無い。
+ */
+const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
+  const view = useWindowView(id);
+  // 窓でない泡・まだ立ち上がっていない窓には、台ごと何も出さない
+  if (!view) return null;
+  return (
+    <div
+      className="bl-view bl-view-text"
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
+      <SpaceViewTools view={view} fullscreen={false} />
+    </div>
+  );
+};
+
 export const ShoreSpace: FC<ShoreSpaceProps> = ({
   routes,
   viewport,
@@ -193,6 +231,9 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   onSpaceReady,
   worldLineScope,
   autoLens,
+  rules,
+  worldLineOutside,
+  frameTools,
   bandDisplay,
   persistKey,
   onLens,
@@ -226,7 +267,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    * 岸の貼り替えも節目なので、ここ（岸を持っている側）で記録する。
    */
   const setShore = useCallback((next: readonly Docked[]) => setDocked(next), []);
-  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore);
+  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore, worldLineOutside);
 
   /**
    * **岸で起きた節目を知らせる口。**
@@ -378,7 +419,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
        *   一覧の札を落としたときは、一覧が顔ぶれを決めているので札は戻ってくる
        *   ── 落としたのは「その url を窓で開け」という合図になる。
        */
-      if (info.over && putIntoWindow(info.over.url, info.url)) return true;
+      if (info.over && putIntoWindow(info.over.id, info.url)) return true;
       const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const at = toShore(info);
       const want = toDockSize(info.size);
@@ -617,12 +658,18 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         memoryKey={persistKey}
         onSettled={record}
         autoLens={autoLens}
+        rules={rules}
         bandDisplay={bandDisplay}
         openArea={openArea}
         onLens={onLens}
         onTakeOut={takeOut}
         onTakeOutPreview={previewTakeOut}
         headerTools={headerTools}
+        /**
+         * ★ **窓には見え方の口を出す。** 渡された口が先（外から差せる）で、
+         *   渡されていなければ「窓なら出す」が既定 ── 器の仕事として持っておく。
+         */
+        frameTools={frameTools ?? ((bubble) => <WindowViewTools key={bubble.id} id={bubble.id} />)}
         /**
          * ★ 海は**器の左上にそのまま**置く（大きさも窓いっぱい）。岸で狭まるのは
          *   見えている所だけで、海そのものではない。
@@ -646,6 +693,28 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
         join={join}
         extraSeas={extraSeas}
         onSeas={sink ? handOver : undefined}
+        /**
+         * **中身が要る大きさが分かった** ── その 1 回だけ大きさを直し、印（`fit`）を外す。
+         *
+         * ★ 人が数えた幅をコードに書く代わりが、これ。中身が変わればこの答えも変わるので、
+         *   **書き写しが古くなる**ことがなくなる（ボタンを 1 足すたびに足し算をやり直す、
+         *   をやめられる）。
+         * ★ 印を外すので、以降は測り直さない ── 広げた幅が中身に合わせて勝手に戻るようでは、
+         *   岸が持ち主のものでなくなる。
+         * ★ 記録（世界線）には落とさない。姿が変わったわけではなく、**最初から中身が
+         *   要っていた大きさ**に落ち着いただけなので、ここで節を作ると起動しただけで
+         *   分岐が生まれる。
+         */
+        onFit={(key, size) =>
+          setDocked((list) =>
+            list.map((d) => {
+              if (d.key !== key || !d.fit) return d;
+              const width = d.fit === "height" ? d.size.width : Math.round(size.width);
+              const height = d.fit === "width" ? d.size.height : Math.round(size.height);
+              return { ...d, fit: undefined, size: { width, height } };
+            }),
+          )
+        }
         onUpdate={(key, next) => {
           setDocked((list) => list.map((d) => (d.key === key ? { ...d, ...next } : d)));
           // 岸の上で動かした・大きさを変えた（剥がすほうは海の `takeIn` が知らせる）

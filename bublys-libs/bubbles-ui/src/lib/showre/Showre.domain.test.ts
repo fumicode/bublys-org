@@ -77,6 +77,24 @@ describe("anchoredRect（貼った辺に合わせ、直交する向きは落と�
     const r = anchoredRect(dock(["left"], { x: 0, y: 100 }), { width: 240, height: 90 }, VIEWPORT);
     expect([r.width, r.height]).toEqual([240, 90]);
   });
+
+  /**
+   * ★ **窓より大きいものは、窓に収めて返す。** 描くときはこの答えを使う
+   *   （`ShowreLayer`）── 持っている大きさをそのまま描いていたころは、窓を狭めると
+   *   **岸が画面からはみ出して**いた（実測：幅 578 に広げた口が、375 の画面で 578 のまま）。
+   *   持っている値は変えないので、広げ直せば元の大きさで出る。
+   */
+  it("窓より大きいものは、窓に収めた大きさを返す（持っている値は変えない）", () => {
+    const 大きい = { width: 1400, height: 900 };
+    const r = anchoredRect(dock(["top"], { x: 0, y: 0 }), 大きい, VIEWPORT);
+    expect([r.width, r.height]).toEqual([1000, 600]);
+    expect(大きい).toEqual({ width: 1400, height: 900 });
+  });
+
+  it("右下に貼ったまま窓より大きくなっても、辺から離れない", () => {
+    const r = anchoredRect(dock(["right", "bottom"], { x: 0, y: 0 }), { width: 1400, height: 900 }, VIEWPORT);
+    expect(r).toEqual({ x: 0, y: 0, width: 1000, height: 600 });
+  });
 });
 
 describe("大きさを変えても、貼った辺は動かない（岸は大きさを持たない）", () => {

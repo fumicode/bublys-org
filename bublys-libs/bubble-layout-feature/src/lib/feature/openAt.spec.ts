@@ -4,7 +4,7 @@
  * ★ 本当の受け入れ条件は、本物のバブリの画面で動かす
  *   `docs/bubble-space-prototype/v5-dom/_check/bubly.mjs`（16件）。ここは式の見張り。
  */
-import { METRICS, emptyWorld, presetView, resolveWorld, viewOfSpace } from '@bublys-org/bubble-layout';
+import { METRICS, emptyWorld, presetView, resolveWorld, viewOfSpace, withAxis } from '@bublys-org/bubble-layout';
 import { openAt, hueOf } from './openAt.js';
 
 const VIEWPORT = { w: 1440, h: 810 };
@@ -44,16 +44,37 @@ describe('隣に開く', () => {
     expect(gap).toBeGreaterThan(METRICS.SNAP_EDGE);
   });
 
-  it('★ 横に開くと X のレンズが魚眼になる。次元は変えない', () => {
+  /**
+   * ★ **開くときにレンズは触らない**（2026-09-26。前は「横に開いたら X の魚眼を点ける」だった）。
+   *
+   * > 口が言っていることが、そのまま海の振る舞い。
+   *
+   *   見え方の口が「平行」と言っているのに海が勝手に魚眼になると、**口を触ったことがある人だけ
+   *   守られて、まだ触っていない人は裏切られる**。自動が要るなら「まかせる」（`autoLens`）が
+   *   同じ役目をする ── そちらは点いている理由が画面の上にある。
+   */
+  it('★ 開いてもレンズは触らない（平行のまま）', () => {
     let w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: 'a' }).world;
     expect(viewOfSpace(w, 'root').x.lens).toBe('parallel');
     w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b', title: 'b' }).world;
+    expect(viewOfSpace(w, 'root').x.lens).toBe('parallel');   // 2 つ目を開いても平行のまま
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'b', newId: 'c', title: 'c' }).world;
+    expect(viewOfSpace(w, 'root').x.lens).toBe('parallel');   // 何枚開いても同じ
+    expect(viewOfSpace(w, 'root').x.dim).toBe('free.x');      // 次元もそのまま
+    expect(viewOfSpace(w, 'root').y.lens).toBe('parallel');
+  });
+
+  it('★ 魚眼にしてあれば、そのまま ── 開いても向きは変わらない', () => {
+    let w = withAxis(start(), 'root', 'x', { lens: 'fisheye' });
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: null, newId: 'a', title: 'a' }).world;
+    w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b', title: 'b' }).world;
     expect(viewOfSpace(w, 'root').x.lens).toBe('fisheye');
-    expect(viewOfSpace(w, 'root').x.dim).toBe('free.x');      // 次元はそのまま
   });
 
   it('★ 魚眼＋焦点で、opener が小さくなり、開いた泡が手前になる', () => {
-    let w = openAt({ world: start(), viewport: VIEWPORT, openerId: null, newId: 'a', title: 'a',
+    // ★ レンズは**こちらで点ける**（開く側はもう触らない）
+    let w = openAt({ world: withAxis(start(), 'root', 'x', { lens: 'fisheye' }), viewport: VIEWPORT,
+                     openerId: null, newId: 'a', title: 'a',
                      size: { w: 340, h: 380 } }).world;
     const alone = resolveWorld(w, VIEWPORT).byId.get('a');
     w = openAt({ world: w, viewport: VIEWPORT, openerId: 'a', newId: 'b', title: 'b',

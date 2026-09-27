@@ -58,11 +58,15 @@ export const useEnsureMainLauncherEntity = () => {
  * 配置の方は世界線から復元し終わる（projectedNodeId が付く）まで待つ。
  * 復元前に足すと、その commit が復元を上書きしてしまう。
  */
-export const useEnsureMainLauncher = () => {
+export const useEnsureMainLauncher = (worldLineScope: string = ROOT_UNIVERSE_ID) => {
   const dispatch = useAppDispatch();
   const mainLauncher = useAppSelector(selectLauncherPlain(MAIN_LAUNCHER_ID));
   const projectedNodeId = useAppSelector(makeSelectProjectedNodeId(ROOT_UNIVERSE_ID));
   const arrangement = useAppSelector(selectBubbleArrangement);
+  /** その世界線の現在地。無ければ「まだ何も記録されていない」 */
+  const apexId = useAppSelector(
+    (state) => state.worldLineGraph?.graphs?.[worldLineScope]?.apexNodeId ?? null,
+  );
 
   useEffect(() => {
     if (mainLauncher) return;
@@ -71,8 +75,17 @@ export const useEnsureMainLauncher = () => {
 
   const hasMainLauncherBubble = Object.values(arrangement.bubbles).some((b) => b.url === MAIN_LAUNCHER_URL);
 
+  /**
+   * **復元するものがあるなら、それが済むまで待つ。無ければ待たない。**
+   *
+   * ★ 前は「投影が済むまで待つ」だけだった。記録が 1 つも無い世界線では投影は永遠に
+   *   起きないので、**待ち続けて泡が 1 つも出てこない**（ランチャーが出ない → 泡が 0 →
+   *   「空の配置は焼かない」で記録も始まらない → 投影も起きない、の堂々巡り）。実測で踏んだ。
+   */
+  const restoring = apexId !== null && projectedNodeId === null;
+
   useEffect(() => {
-    if (projectedNodeId === null) return;
+    if (restoring) return;
     if (hasMainLauncherBubble) return;
     nameIntent("launcher:ensure");
     const bubble = createBubble(MAIN_LAUNCHER_URL);
@@ -86,5 +99,5 @@ export const useEnsureMainLauncher = () => {
       },
       ROOT_UNIVERSE_ID,
     ));
-  }, [dispatch, projectedNodeId, hasMainLauncherBubble]);
+  }, [dispatch, restoring, hasMainLauncherBubble]);
 };

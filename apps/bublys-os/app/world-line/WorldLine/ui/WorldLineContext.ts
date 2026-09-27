@@ -1,5 +1,15 @@
+/**
+ * 世界線の文脈（React Context）。
+ *
+ * ★ **ここは domain ではない**（2026-09-26 に `domain/` から移した）。
+ *   `createContext` は React のもので、domain は何にも依存しない層だから。
+ * ★ 置き場所が `feature/` ではなく `ui/` なのは、**依存の向き**のため
+ *   ── 消費するのは ui（`WorldLineView`）、値を配るのは feature（`WorldLineManager`）。
+ *   feature に置くと ui → feature の逆流になる。ui に置けば feature → ui → domain のまま
+ *   （CLAUDE.md：ui は「コンテキストを消費」、feature は「コンテキストプロバイダー」）。
+ */
 import { createContext } from "react";
-import { World } from "./World";
+import { World } from "../domain/World";
 
 /**
  * WorldLineContext の型定義(ジェネリック版)

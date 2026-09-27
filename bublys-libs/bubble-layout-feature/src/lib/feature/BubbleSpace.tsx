@@ -11,13 +11,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from 'react';
-import { Bubble, BubbleWorld, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
+import { Bubble, BubbleWorld, actContext, dragBubble, emptyWorld, fitsParallel, presetView, renumber, reshape, resolveRules, resolveWorld, stripChrome, viewOfSpace, withAxis, withPreset, CHROME, METRICS} from '@bublys-org/bubble-layout';
 import type { AxisView, BubbleId, Chrome, ChromeId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from '@bublys-org/bubble-layout';
 import { BubbleField, BubbleShell, FIELD_CSS, MARKS_CSS, useBubbleInput } from '@bublys-org/bubble-layout-ui';
 import type { BubbleDraw, ClaimDropInfo } from '@bublys-org/bubble-layout-ui';
 import { BubbleSpaceContext, CurrentBubbleContext, ScreenZoomContext, SelectedBubbleContext, ViewChoiceContext, useScreenZoom } from './context.js';
 import type { BubbleSpaceApi, ChildrenLayout, ScreenZoom, SeaSnapshot, SettleWhy, ViewChoice } from './context.js';
 import { matchBubbleRoute, renderRoute, titleOf } from './routing.js';
+import { gapFor } from './listArrange.js';
 import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
@@ -165,7 +166,6 @@ const OVERSCROLL_MS = 260;
  *   詰める隙間をどう変えても位置は1px も動かない。
  */
 export { LIST_GAP } from './listArrange.js';
-import { gapFor } from './listArrange.js';
 
 /**
  * **順序 → 行と列。** 何列で折り返すかだけ決めれば、あとは順に詰めるだけ。
@@ -304,6 +304,17 @@ export interface BubbleSpaceProps {
    * 「その泡そのものをどう扱うか」の口（ロックなど）はここに差す。
    */
   readonly headerTools?: (bubble: RoutedBubble, route: BubbleRoute) => ReactNode;
+  /**
+   * **枠の上に貼る口**（一覧の並べ方の口と同じ棚）。泡ごとに呼ばれる。
+   *
+   * ★ ステータスバー（`headerTools`）と違って、**箱の外**に出る ── 中身の席を取らない。
+   *   窓（空間を持つ泡）の見え方の口のように、「その泡の中の世界をどう見るか」を
+   *   出すための所。中身が何かを知っているのは使う側なので、描くものは外から渡す。
+   * ★ **台（`.bl-view`）も渡す側が描く。** ここで包むと、中身が「まだ出さない」と
+   *   決めたときに**空の台だけが残る** ── 出るか出ないかは、出す側にしか分からない
+   *   （窓の口は、窓が立ち上がって口を出すまで何も出せない）。
+   */
+  readonly frameTools?: (bubble: RoutedBubble, route: BubbleRoute) => ReactNode;
 }
 
 export function BubbleSpace(props: BubbleSpaceProps) {
@@ -323,8 +334,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const remembered = memoryKey ? SEA_MEMORY.get(memoryKey) : undefined;
   /** 新しい泡の番号。**覚えていた続きから**（同じ番号を配ると、戻した泡と衝突する） */
   const seq = useRef(remembered?.seq ?? 0);
-  /** レンズの向きが一度でも選ばれたか。選ばれたら `openAt` はレンズに触らない */
-  const lensChosen = useRef(false);
   /**
    * ★ **一覧の空間**（`setChildren` で顔ぶれを決めている泡）。
    *   一覧の中の泡から開いたら、**一覧の隣**に開く（中に生やさない）ために覚えておく。
@@ -630,7 +639,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const r = openAt({
         world, viewport, openerId: opener, newId: id,
         title: titleOf(routes, url, label), size: route.size, hue: route.hue, rules,
-        keepLens: lensChosen.current,
         center: openCenter,
         joinWith: mateFor(world, urls, route.type, opener),
       });
@@ -666,7 +674,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const heir = row
         ? world.kidsOf(row.id).filter((b) => b.id !== id).sort((p, q) => p.state.order - q.state.order)[0]?.id
         : undefined;
-      let next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
+      const next = reshape(world, actContext(viewport, seen, rules), (w) => ({ world: w.without(id), keep: heir ? [heir] : [] })).world;
       // 面で開いているなら：焦点の面が空になったら、後ろの面が上がってくる（旧の「空のレイヤーは詰まる」）
       setWorld(next);
       setUrls((m) => { const n = new Map(m); n.delete(id); return n; });
@@ -678,11 +686,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
 
   /**
    * 外の空間のレンズを変える。書くのは View の 1 つの軸だけ（泡の値は 1 つも書かない）。
-   * 一度でも選ばれたら、以後 `openAt` はレンズに触らない（選んだ向きが残る）。
+   * ★ ここが**レンズの向きを決める唯一の所**（人が口で選ぶか、「まかせる」が決めるか）。
+   *   開く側（`openAt`）はもう触らない ── 口が言っていることが、そのまま海の振る舞い。
    */
   const applyLens = useCallback(
     (axis: PlaneAxis, lens: LensId) => {
-      lensChosen.current = true;
       setWorld(withAxis(world, 'root', axis, { lens }));
     },
     [world, setWorld],
@@ -717,7 +725,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const at = seq.current;
       const opened = openAt({
         world, viewport, openerId: null, newId: id, title: titleOf(routes, url),
-        size: { w: rect.w, h: rect.h }, hue: route.hue, rules, keepLens: lensChosen.current,
+        size: { w: rect.w, h: rect.h }, hue: route.hue, rules,
         center: openCenter,
       });
       const L = resolveWorld(opened.world, viewport, rules);
@@ -726,7 +734,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         p
           ? dragBubble(
               opened.world,
-              { layout: L, id, space: 'root', want: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }, m: p.m },
+              {
+                layout: L, id, space: 'root', m: p.m,
+                pointer: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+                // 箱の真ん中を掴んで置く（＝ 中心をそこへ持っていく）
+                grab: { x: p.box.w / 2, y: p.box.h / 2 },
+              },
               resolveRules(rules),
             )
           : opened.world,
@@ -796,9 +809,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   /** その空間の並べ方を選ぶ。焦点は 0 に戻る（模型の `withPreset` の決まり） */
   const setPreset = useCallback(
     (preset: PresetId, spaceId: BubbleId = 'root') => {
-      // ★ レンズの選択を固定するのは**外の海**を選んだときだけ。
-      //   一覧が自分の中の並べ方を選んだだけで、外の魚眼まで止めてしまってはいけない
-      if (spaceId === 'root') lensChosen.current = true;
       setWorld(withPreset(world, preset, spaceId));
       markSettled('view');
     },
@@ -820,7 +830,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
-      const missing = want.filter((url) => !have.has(url));
+      /**
+       * ★ **作れないものは「足りない」に数えない。** ルートの無い url は下の作る所で
+       *   飛ばされるので、数えたままだと「足りないまま」が永遠に続き、**同じ世界を
+       *   書き続けて止まらなくなる**（実測：ルートを配っていない海で一覧を出すと、
+       *   1.5 秒に 130 回 `Maximum update depth exceeded`）。
+       */
+      const missing = want.filter((url) => !have.has(url) && !!matchBubbleRoute(routes, url));
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
        * ★ 「もう当ててあるか」は**世界に訊く**。覚え書き（ref）で持つと、
@@ -1010,17 +1026,51 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const autoLens = props.autoLens;
   const onLens = props.onLens;
+  /**
+   * ★ **口は海の実物を映す。**
+   *
+   * > **点いていると見えるなら、点いている。**
+   *
+   *   レンズの向きを持っているのは**世界**（View の軸）で、口（ツールバー）の見た目は
+   *   その写し。写す道が「まかせる」のときしか無かったので、**読み込み直すたびに口だけが
+   *   最初の値へ戻り、海は覚えたまま**で食い違っていた
+   *   （実測：口は「魚眼X 点灯・魚眼Y 消灯」、海は `x: parallel` / `y: fisheye` と逆）。
+   *   押した回数で決まるものではないので、**いつでも世界から出す**。
+   *
+   * ★ 映すのは**その空間の View**（＝ 口で選んだ向きそのもの）で、解いた結果ではない。
+   *   解く側には「魚眼は箱の 2 倍を超える泡は諦める」（`resolve.ts`）があり、諦めた軸は
+   *   その場だけ平行に落ちる ── あれは**描くときの判断**であって、選んだ向きではない。
+   *   そちらを映すと、押しても口が変わらない（もう魚眼なので書いても何も起きない）ことになる。
+   * ★ 受け手（`BubbleSea`）は同じ値なら何もしないので、往復にはならない。
+   */
+  useEffect(() => {
+    if (!onLens) return;
+    const V = viewOfSpace(world, 'root');
+    for (const axis of ['x', 'y'] as const) onLens(axis, V[axis].lens);
+  }, [world, onLens]);
   useEffect(() => {
     if (!autoLens) return;
     const L = base.spaces.get('root');
     if (!L) return;
+    /**
+     * ★ **見比べる相手は、書く相手と同じ所**（世界の View）。
+     *
+     *   ここは前まで**解いた答え**（`L.view`）と見比べていた。解く側には
+     *   「魚眼は箱の 2 倍を超える泡は諦める」（`resolve.ts`）があって、諦めた軸は
+     *   その場だけ平行に落ちる ── 世界に魚眼と書いても、解いた答えはいつまでも平行。
+     *   だから「違う」と言い続けて**書き続けた**（実測：諦めが効いている海で
+     *   まかせるを点けると **2 秒で 416 回**）。
+     *   書いた値がそのまま読める所（`viewOfSpace`）と見比べれば、1 回で落ち着く。
+     *
+     * ★ 口の見た目はここでは触らない ── 世界が変われば、上の「口は海の実物を映す」
+     *   が送ってくれる。二人で書くと、どちらが本当か分からなくなる。
+     */
+    const own = viewOfSpace(world, 'root');
     for (const axis of ['x', 'y'] as const) {
       const want: LensId = fitsParallel(L, axis) ? 'parallel' : 'fisheye';
-      // 口の見た目は**いつも**合わせる（変えたときだけだと、点けた瞬間の姿がずれる）
-      onLens?.(axis, want);
-      if (L.view[axis].lens !== want) applyLens(axis, want);
+      if (own[axis].lens !== want) applyLens(axis, want);
     }
-  }, [autoLens, base, applyLens, onLens]);
+  }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
     () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
@@ -1048,7 +1098,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       n += 1;
       const id = `b${n}:${url}`;
       w = openAt({ world: w, viewport, openerId: null, newId: id,
-                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules, keepLens: lensChosen.current }).world;
+                   title: titleOf(routes, url), size: route.size, hue: route.hue, rules }).world;
       m.set(id, { url, type: route.type, openerId: null, originId: null, originSpot: null, at: n });
     }
     seq.current = n;
@@ -1093,6 +1143,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   });
 
   const headerTools = props.headerTools;
+  const frameTools = props.frameTools;
   const renderBubble = useCallback(
     (id: BubbleId, draw: BubbleDraw) => {
       const url = urls.get(id)?.url;
@@ -1148,6 +1199,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
               7 つ並べる場所が無い ── まずは外に出して形を見る。
           */}
+          {/*
+            ★ **窓の見え方の口も、同じ棚に出す**（`frameTools`）。一覧の口とは出る相手が違う
+              ── 一覧は「自分で子を並べている泡」、窓は「中に別の世界を持つ泡」。
+              どちらも箱の外の同じ場所に出るので、両方に当てはまる泡が出てきたら重なる
+              （いまは出てこない：窓は子を並べない）。
+          */}
+          {r && frameTools?.(r.bubble, r.route)}
           {listHosts.has(id) && (
             /**
              * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
@@ -1232,7 +1290,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, viewChoice, listHosts],
+    [routes, urls, closeBubble, world, chrome, headerTools, frameTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

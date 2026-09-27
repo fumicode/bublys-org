@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useReducer } from 'react';
 import {
   useCasScope,
   ObjectShell,
@@ -49,20 +49,24 @@ function CounterPanel({
   shell: ObjectShell<Counter>;
   onRemove: () => void;
 }) {
-  const [obj, setObj] = useState(shell.object);
-
-  // apex 変更時に shell.object が差し替わるので同期
-  useEffect(() => {
-    setObj(shell.object);
-  }, [shell.object]);
+  /**
+   * 見せる値は**その場で殻に訊く**。写しを state に持たない。
+   *
+   * ★ 前は `useState(shell.object)` に写して、効果の中で写し直していた
+   *   ── 効果の中で書くと、描いてから書いてまた描く、を毎回やることになる
+   *   （`react-hooks/set-state-in-effect`）。しかも写しなので、殻が先に変わると古い。
+   *   state に要るのは「描き直せ」の合図だけなので、数を 1 つ増やすだけにする。
+   */
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+  const obj = shell.object;
 
   const handleCountUp = () => {
     shell.update((c) => c.countUp());
-    setObj(shell.object);
+    redraw();
   };
   const handleCountDown = () => {
     shell.update((c) => c.countDown());
-    setObj(shell.object);
+    redraw();
   };
 
   return (

@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom'
 import { Provider } from 'react-redux'
 import * as ReactRedux from 'react-redux'
@@ -97,15 +97,22 @@ export default function StoreProvider({
 }: {
   children: React.ReactNode
 }) {
-  const storePersistorRef = useRef<{ store: AppStore; persistor: Persistor }>(null);
-
-  if (!storePersistorRef.current) {
-    // アプリケーション初期化してからStore作成
+  /**
+   * **store は 1 回だけ作る。**
+   *
+   * ★ 覚え書き（`useRef`）で作って描くたびに読んでいたが、それは**描いている最中に
+   *   覚え書きを読む**ことなので React の決まりに反する（`react-hooks/refs`）。
+   *   1 回だけ作るための口は `useState` の初期化式のほうで、こちらは描画から切れている。
+   * ★ モジュールの変数にはしない ── この部品はサーバでも描かれるので、
+   *   置いたら**別の人の store が混ざる**。1 つの画面につき 1 つ。
+   * ★ 開発中の二度がけ（StrictMode）では初期化式が 2 回走り、store も 2 つ出来るが、
+   *   使われるのは 1 つで、捨てられたほうへは誰も書かない。`initializeApp` は
+   *   自分で 1 回に絞っている。
+   */
+  const [{ store, persistor }] = useState<{ store: AppStore; persistor: Persistor }>(() => {
     initializeApp();
-    storePersistorRef.current = makeStore();
-  }
-
-  const { store, persistor } = storePersistorRef.current;
+    return makeStore();
+  });
 
   // 前回ロードしたバブリを復元してから中身を描く。
   // 逆順だと、永続化されたバブルがルート未登録のまま描かれて

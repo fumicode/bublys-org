@@ -15,7 +15,7 @@
  * 新しい海との境目はここだけ ── **離したときに横取りする**（`claim`）。
  * 横取りしたら、その泡は海から出る（`BubbleSpace.onTakeOut`）。
  */
-import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ShowreTubes,
   TUBE_RADIUS,
@@ -43,6 +43,21 @@ export type Docked = {
   readonly url: string;
   readonly dock: DockState;
   readonly size: { readonly width: number; readonly height: number };
+  /**
+   * **大きさは中身に訊く**（最初の 1 回だけ）。
+   *
+   * 貼るときに人が数えた幅を書くと、中身が変わるたびに**書き写しが古くなる**
+   * ── ボタンを 1 つ足したら、足し算をやり直さないと箱から押し出される（実測で踏んだ）。
+   * この印が付いているものは、描いたあとに**中身が要る大きさ**を測って、その 1 回だけ
+   * 大きさを直す（印はそこで外れる）。
+   *
+   * ★ **訊くのは 1 回だけ。** そのあとは持ち主（ユーザー）のもの ── 広げた幅が
+   *   中身に合わせて勝手に戻るようでは、岸が自分のものでなくなる
+   *   （`DECISIONS.md`「岸の並びは、窓の大きさが変わっても置き直さない」と同じ筋）。
+   * ★ **どちらを訊くかは選べる。** 横に寝た帯は「幅は中身に訊くが、高さは指で押せる的
+   *   として決める」── measure と決め事を混ぜると、書いてあることが嘘になる。
+   */
+  readonly fit?: "width" | "height" | "both";
   /**
    * 地の種類。海に浮いているときと同じものを敷く ──
    * **岸に着いても中身の見た目は変わらない**（変わるのは置き場所だけ）。
@@ -109,6 +124,8 @@ export type ShowreLayerProps = {
   readonly onUndock: (key: string, rect: ScreenRect) => void;
   /** 岸の上で動かした／大きさを変えた */
   readonly onUpdate: (key: string, next: { dock: DockState; size: { width: number; height: number } }) => void;
+  /** 中身が要る大きさが分かったら知らせる（`fit` が付いているものだけ、1 回） */
+  readonly onFit?: (key: string, size: { width: number; height: number }) => void;
   /** 「いま離したらここに着く」の予告（画面の座標）。無ければ出さない */
   readonly preview?: ScreenRect | null;
   /** 貼り付いた泡の所で管をどう通すか（見た目だけ。挙動は変わらない） */
@@ -248,12 +265,71 @@ export const seaCornerRadius = (
   };
 };
 
+/**
+ * **中身が本当に要る大きさ。**
+ *
+ * > 箱の中で測っても、中身は**縛られた答え**しか返さない。
+ *
+ * ★ 押し込まれた中身は、縮んだり（`flex-shrink`）自分で転がしたり（`overflow: auto`）して
+ *   箱に収まってしまうので、外から `scrollWidth` を見ても箱と同じ数しか出ない
+ *   （実測：見え方の口も他のデモも、320 の箱の中では 308 としか言わなかった）。
+ * ★ なので**いったん縛りを外して**測る ── 浮かせて（`position: absolute`）、
+ *   中身なりの大きさ（`max-content`）にして、測って、すぐ戻す。
+ *   描く前（`useLayoutEffect`）に済ませるので、画面には出ない。
+ */
+const naturalSize = (el: HTMLElement): { width: number; height: number } => {
+  const s = el.style;
+  const keep = { position: s.position, width: s.width, height: s.height, visibility: s.visibility };
+  s.position = "absolute";
+  s.width = "max-content";
+  s.height = "max-content";
+  s.visibility = "hidden";
+  const want = { width: el.offsetWidth, height: el.offsetHeight };
+  s.position = keep.position;
+  s.width = keep.width;
+  s.height = keep.height;
+  s.visibility = keep.visibility;
+  return want;
+};
+
+/**
+ * **中身が要る大きさを測って知らせる**（`fit` が付いているものだけ）。
+ *
+ * ★ 測るのは `scrollWidth` / `scrollHeight` ── 箱に押し込まれた中身が、
+ *   **本当は何px 要るか**。箱の大きさ（`offsetWidth`）ではない。
+ * ★ 知らせるのは 1 回だけ。受けた側で `fit` が外れるので、そこで測るのも止まる。
+ * ★ 枠の余白（`inset`）は箱の側の話なので、測った中身に足して返す。
+ */
+const FitReporter: FC<{
+  readonly onFit: (size: { width: number; height: number }) => void;
+  readonly inset: { top: number; right: number; bottom: number; left: number };
+  readonly children: ReactNode;
+}> = ({ onFit, inset, children }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const want = naturalSize(el);
+    want.width += inset.left + inset.right;
+    want.height += inset.top + inset.bottom;
+    if (want.width > 0 && want.height > 0) onFit(want);
+    // 知らせるのは最初の 1 回だけ（受けた側で `fit` が外れる）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div ref={ref} style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0 }}>
+      {children}
+    </div>
+  );
+};
+
 export const ShowreLayer: FC<ShowreLayerProps> = ({
   viewport,
   docked,
   renderContent,
   onUndock,
   onUpdate,
+  onFit,
   preview,
   join = "branch",
   extraSeas,
@@ -636,7 +712,7 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
   return (
     <>
       <div ref={layer} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5 }}>
-        {entries.map(({ d, edges, inset }) => (
+        {entries.map(({ d, rect, edges, inset }) => (
           <div
             key={d.key}
             data-docked-url={d.url}
@@ -658,8 +734,16 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
             {/* 岸に着いたバブルは装飾を持たない。中身だけが管の内側に収まる */}
             <div
               style={{
-                width: d.size.width,
-                height: d.size.height,
+                /**
+                 * ★ **描くのは窓に収めた大きさ**（`rect`）── 持っている大きさ（`d.size`）
+                 *   ではない。置き場所のほうは前から窓の中へ寄せていたのに、大きさだけ
+                 *   生の値を渡していたので、**窓を狭めると岸が画面からはみ出して**いた
+                 *   （実測：幅 578 に広げた口が、375 の画面で 578 のまま 203 はみ出す）。
+                 * ★ 持っている値は変えない。広げ直せば元の大きさで出る
+                 *   （実測：1200 に戻すと 578 に戻る）。
+                 */
+                width: rect.width,
+                height: rect.height,
                 padding: `${inset.top}px ${inset.right}px ${inset.bottom}px ${inset.left}px`,
                 boxSizing: "border-box",
                 overflow: "hidden",
@@ -677,7 +761,13 @@ export const ShowreLayer: FC<ShowreLayerProps> = ({
                   ...GROUND[d.ground ?? "light"],
                 }}
               >
-                {renderContent(d)}
+                {d.fit && onFit ? (
+                  <FitReporter inset={inset} onFit={(size) => onFit(d.key, size)}>
+                    {renderContent(d)}
+                  </FitReporter>
+                ) : (
+                  renderContent(d)
+                )}
               </div>
             </div>
             {/* ★ **辺に役割は無い。どう引いたかで決まる。**

@@ -27,7 +27,7 @@ export class Viewport {
     /** 可視領域の universe 単位サイズ（screen pixel ではない） */
     readonly size: Size2,
     /** この universe DOM に効いている親 CSS scale（無いときは 1） */
-    readonly parentScale: number = 1,
+    readonly parentScale = 1,
   ) {}
 
   /**

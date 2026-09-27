@@ -26,6 +26,9 @@
   ],
   "references": [
     {
+      "path": "../object-types/tsconfig.lib.json"
+    },
+    {
       "path": "../world-line-graph/tsconfig.lib.json"
     },
     {

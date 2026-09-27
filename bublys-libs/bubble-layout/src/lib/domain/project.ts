@@ -11,7 +11,7 @@ import type { PlaneAxis, Axis, SpaceId, Focus } from './types.js';
 import type { BubbleWorld } from './world.js';
 import { imageOf, LENS_XY } from './lens.js';
 import type { LensXyId } from './lens.js';
-import type { SpaceLayout } from './resolve.js';
+import type { Placement, SpaceLayout } from './resolve.js';
 import { hostScale } from './resolve.js';
 import type { LayoutRules } from './rules.js';
 
@@ -29,6 +29,82 @@ export function unprojectLocal(L: SpaceLayout, axis: PlaneAxis, screen: number, 
 /** 画面 → 空間の中での位置。lab.html 809 行 screenToAxis（＝ unprojectLocal ＋ 焦点） */
 export function screenToAxis(L: SpaceLayout, axis: PlaneAxis, screen: number, m = 1): number {
   return unprojectLocal(L, axis, screen, m) + L.ctx.focus[axis];
+}
+
+/**
+ * **掴んだ泡の逆写し** ── 画面（泡の中心）→ その泡の u（位置 − 焦点）。
+ *
+ * > **写した道をそのまま逆にたどる。** 点の逆（`unprojectLocal`）では戻らない。
+ *
+ * 泡を写す道は 3 段（`resolve.ts`）:
+ *
+ *   ① 泡の像   s ＝ **両端をレンズに通した間の中点**（`imageOf`。中心1点の像ではない）
+ *   ② 曲がり   s × bend（相手の軸の遠さで内へ寄る）
+ *   ③ 奥行き   消失点へ m で寄せて、host で合成
+ *
+ * `unprojectLocal` は ③ と「点のレンズ」しか外さないので、① と ② のぶんだけ戻り切らない。
+ * 掴んで動かすとそれが**そのままカーソルとのずれ**になり、歪むほど開いていく
+ * （実測・海の魚眼X で右下へ 480px 動かしたとき：縦 −134.03px・横 −8.63px。
+ *   両軸を魚眼にすると 横 −215.98px・縦 −138.67px）。
+ *
+ * ★ **曲がりは泡が持っている**（`Placement.bend`）。相手の軸の遠さから決まるので、
+ *   ここで作り直さずに、写したときの値をそのまま外す。
+ * ★ ① の逆は閉じた式では書けない（tanh の和の逆）ので、**数で解く**。
+ *   出発点は点の逆、傾きは像の倍率 k ── どちらもその場にあるものだけで足りる。
+ *   平行のレンズでは像がそのまま（k ＝ 1）なので、1 回目で答えに着く ＝
+ *   **魚眼のいない空間では今までと 1px も変わらない**。
+ */
+export function unprojectBubble(
+  L: SpaceLayout,
+  axis: PlaneAxis,
+  screen: number,
+  p: Pick<Placement, 'm' | 'bend' | 'box' | 'pos'>,
+): number {
+  const lens = LENS_XY[L.view[axis].lens as LensXyId];
+  const H = L.ctx.H[axis];
+  const vp = L.ctx.vp[axis];
+  const local = (screen - (axis === 'x' ? L.host.cx : L.host.cy)) / hostScale(L.host);
+  // ③ 奥行きを外す → ② 曲がりを外す ＝ 泡の像の中点 s
+  const bend = axis === 'x' ? p.bend.x : p.bend.y;
+  const s = (vp + (local - vp) / p.m) / (bend || 1);
+  const len = axis === 'x' ? p.box.w : p.box.h;
+  // ① 泡の像の逆。幅を持たない泡と、平行のレンズ（像がそのまま）は、点の逆がそのまま答え
+  if (!(len > 1e-9) || lens.id === 'parallel') return lens.unproject(s, H);
+  /**
+   * 魚眼は「両端の tanh の和」なので閉じた式で戻せない。**挟んで詰める**。
+   *
+   * ★ 傾き（像の倍率 k）で寄せる手（Newton）は**端で発散する** ── 端では k が 0 に
+   *   近づくので、1 歩が跳ね上がって戻ってこない（実測：掴んだ泡が海の外へ飛んだ）。
+   *   挟む相手を決めてから半分ずつ詰めれば、像が単調に増えることだけで必ず収まる。
+   * ★ 挟む幅は **±14H** ── レンズ自身が往復できる限界と同じ（`lens.ts` の TANH_EDGE）。
+   *   そこより外は像が端に張り付いて見分けられないので、点の逆（`unproject`）の答えと揃う。
+   */
+  const F = L.ctx.focus[axis];
+  const far = 14 * H;
+  /**
+   * ★ **届かない所へは動かさない。**
+   *
+   *   魚眼は無限を箱に畳むので、箱の端より外の像は**どんな位置にも対応しない**。
+   *   曲がり（bend）で割ったぶん、狙いの像は箱より外へ出ることがある（相手の軸で
+   *   潰れているほど起きやすい）。そこを無理に解くと、答えは挟んだ端（±14H）に張り付き、
+   *   泡が海の外へ飛んで**二度と掴めなくなる**（実測：両軸魚眼で右下へ 280px ほど動かすと
+   *   位置が 723 → 8960 に跳ね、絵の上では消失点へ潰れて消えた）。
+   *   届かないと分かったら、その軸は**いまの所に置いたまま**にする ── 泡は端で止まり、
+   *   カーソルだけが先へ行く。内側へ戻せば、また届くので付いてくる。
+   *
+   * ★ 「宇宙の縁で止める」は規則がまだ持っていない（`DECISIONS.md` の持ち越し）。
+   *   ここでやるのは**外へ出さない**ことだけで、縁を決める話はしていない。
+   */
+  const reach = imageOf(far + F, len, lens, H, F).s;
+  if (Math.abs(s) > reach) return p.pos[axis] - F;
+  let lo = -far;
+  let hi = far;
+  for (let n = 0; n < 60; n++) {
+    const mid = (lo + hi) / 2;
+    if (imageOf(mid + F, len, lens, H, F).s < s) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 /** 空間の中での位置 → 画面。lab.html 810-813 行 axisToScreen */

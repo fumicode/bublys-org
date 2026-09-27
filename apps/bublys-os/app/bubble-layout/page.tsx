@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
-import { bubbleRoutes } from "../bubble-ui/BubblesUI/domain/bubbleRoutes";
+import { bubbleRoutes } from "../bubble-ui/BubblesUI/registration/bubbleRoutes";
 import { bridgeRoutes } from "@bublys-org/bubble-space-shell";
 
 /** この画面で試すバブリ（全部載せると重いので、一覧 → 詳細のあるものから） */

@@ -92,7 +92,7 @@ export const PostMessageManager = ({
   );
 
   //uuidでAppRefを探す。
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   // @ts-expect-error - 将来の実装のため保持
   const _findAppRefByUuid = useCallback(
     (uuid: string) => {
@@ -148,7 +148,9 @@ export const PostMessageManager = ({
       const url = getDomainWithProtocol(message.params.containerURL);
       if (!url) return;
       const iframes = findAppRefByUrl(url)?.map((e) => e.ref);
-      console.log('iframes', appRefs);
+      // ★ 印字するのは見つけた iframe ── ここで `appRefs` を覗いていたせいで、
+      //   この手が頼っているものと書いてある頼り先（deps）が食い違っていた
+      console.log('iframes', iframes?.length ?? 0);
       if (!iframes?.length) return;
 
       // exportDataメッセージで、fromContainerURLが指定されている場合、toDTOsを更新

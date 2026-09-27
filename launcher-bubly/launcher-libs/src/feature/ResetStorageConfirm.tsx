@@ -32,7 +32,7 @@ export const ResetStorageConfirm: FC<ResetStorageConfirmProps> = ({ open, onClos
     } catch {
       // 読み書きを止められている（プライベート窓など）。消せなくても読み込み直す
     }
-    location.reload();
+    window.location.reload();
   };
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="xs">

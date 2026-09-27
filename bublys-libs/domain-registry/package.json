@@ -25,10 +25,14 @@
       "default": "./dist/schema.js"
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "@bublys-org/object-types": "*"
+  },
   "nx": {
     "targets": {
-      "dev": { "continuous": true }
+      "dev": {
+        "continuous": true
+      }
     }
   }
 }

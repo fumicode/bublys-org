@@ -20,18 +20,30 @@
  *   - 前後は「大きく写るものが手前」。触ると焦点が寄って入れ替わる（値は書かない）
  */
 import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { PresetId } from "@bublys-org/bubble-layout";
+import type { LayoutRules, PresetId } from "@bublys-org/bubble-layout";
 import { type TubeJoin, type BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
 import { LayoutRoutesProvider, type BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
 import { SEA_GROUND } from "./ShowreLayer.js";
 import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
-import { SpaceViewContext, type SpaceView } from "./SpaceViewContext.js";
+import { SpaceViewContext } from "./SpaceViewContext.js";
+import { useSpaceViewState } from "./useSpaceViewState.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
+
+/** 最初の並べ方。口の最初の見た目（どの軸が魚眼か）もここから出す */
+const INITIAL_PRESET: PresetId = "free";
 
 export type BubbleSeaProps = {
   /** この海で開けるもの。レガシーのルート定義を渡すと、中で橋を架ける */
   readonly routes: readonly LegacyRoute[];
+  /**
+   * **測る相手**（CSS px）。渡さなければ窓そのもの（`window.innerWidth/Height`）。
+   *
+   * ★ 端末ごとの収まりを見るための口（`app/shore-fit`）。海は窓を測って定位置を置くので、
+   *   小さい枠に入れただけでは「窓ぜんぶある」と思ってしまう。渡したときは**測り終えた**
+   *   とみなす ── 窓でないものの大きさを窓と比べても、永遠に一致しない。
+   */
+  readonly viewport?: { readonly w: number; readonly h: number };
   /** 定位置に居てほしいもの（岸に貼る泡）。家具は使う側が決める */
   readonly homes?: readonly Home[];
   /** 世界が空のときに最初に開く url */
@@ -41,8 +53,23 @@ export type BubbleSeaProps = {
    * 記録するのは 3 つの節目だけ（`SeaWorldLine` の註）。
    */
   readonly worldLineScope?: string;
-  /** 最初のレンズの向き。既定は X だけ魚眼（隣に開いたときに点くのがこれ） */
-  readonly initialFisheye?: { x: boolean; y: boolean };
+  /**
+   * **世界線に入らないもの**（url）。
+   *
+   * > 世界線を映すものは、世界線に入らない。
+   *
+   * 渡したものは海の姿からも岸からも抜いて記録され、節へ移っても消えない
+   * （`SeaWorldLine` の `WorldLineOutside`）。渡さなければ、ぜんぶ入る。
+   */
+  readonly worldLineOutside?: readonly string[];
+  /**
+   * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
+   *
+   * ★ 効くのは**この海だけ**。窓の中の海も一覧も別の `BubbleSpace` なので、ここで選んだことは
+   *   伝わらない ── 「大元の海だけ、両軸が魚眼のときの大きさを斜辺でまとめる」のように、
+   *   名指しした海にだけ渡す（`sizeCombine`。`rules.ts` の註）。
+   */
+  readonly rules?: Partial<LayoutRules>;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
   readonly style?: CSSProperties;
@@ -55,31 +82,29 @@ export type BubbleSeaProps = {
 
 export const BubbleSea: FC<BubbleSeaProps> = ({
   routes: legacyRoutes,
+  viewport: given,
   homes,
   initialUrls,
   worldLineScope,
-  initialFisheye = { x: true, y: false },
+  worldLineOutside,
+  rules,
   onSpaceReady,
   style,
   children,
 }) => {
-  /** 並べ方（View のプリセット）。開き方は 1 つしかないので、見え方が変わるのはここだけ */
-  const [preset, setPresetState] = useState<PresetId>("free");
   /** 岸に着いた泡の所で、ネオンをどう通すか（見た目だけ。挙動は同じ）。既定は迂回 */
   const [join, setJoin] = useState<TubeJoin>("detour");
-  /**
-   * 魚眼をどちらの向きに掛けるか。**レンズは軸ごとに持つもの**なので、X と Y は別々に決まる
-   * （両方掛けても、どちらも平行にしてもよい）。
-   */
-  const [fisheye, setFisheye] = useState(initialFisheye);
-  const [viewport, setViewport] = useState({ w: 1280, h: 720 });
+  const [measured, setMeasured] = useState({ w: 1280, h: 720 });
+  /** 外から渡されていれば、そちらが正 ── 窓は測らない */
+  const viewport = given ?? measured;
 
   useEffect(() => {
-    const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    if (given) return;
+    const measure = () => setMeasured({ w: window.innerWidth, h: window.innerHeight });
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, []);
+  }, [given]);
 
   const routes = useMemo(() => bridgeRoutes([...legacyRoutes]), [legacyRoutes]);
   /** 海の口（見え方の口から並べ方・レンズを触るのに要る。居なくなったことに気づく役は岸が持つ） */
@@ -87,9 +112,20 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   const handleSpaceReady = useCallback(
     (api: BubbleSpaceApi) => {
       spaceRef.current = api;
+      setReady(api);
       onSpaceReady?.(api);
     },
     [onSpaceReady],
+  );
+  /** 口が変わったことを描き直しに伝えるだけ（触るのは `spaceRef`） */
+  const [, setReady] = useState<BubbleSpaceApi | null>(null);
+
+  /**
+   * ★ **見え方の持ち方は、窓の中の海と同じ見本**（`useSpaceViewState`）。
+   *   口の最初の見た目も、海が報せてくるレンズも、そこで面倒を見る。
+   */
+  const { view: spaceView, onLens, autoLens, bandDisplay } = useSpaceViewState(
+    spaceRef, join, setJoin, INITIAL_PRESET,
   );
 
   /**
@@ -97,48 +133,10 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
    * 測る前の仮の値で置くと、端から端までのはずのものが中途半端な丈になる。
    */
   const homesReady =
-    typeof window !== "undefined" &&
-    viewport.w === window.innerWidth &&
-    viewport.h === window.innerHeight;
-
-  /**
-   * 軸のレンズを切り替える。世界に書くのは View の 1 つの軸だけ。
-   * ★ `setFisheye` の更新関数の中で海に書いてはいけない ──
-   *   更新関数はレンダリング中に呼ばれるので、別のコンポーネントを更新することになる。
-   */
-  const toggleFisheye = useCallback(
-    (axis: "x" | "y") => {
-      const on = !fisheye[axis];
-      setFisheye((f) => ({ ...f, [axis]: on }));
-      spaceRef.current?.setLens(axis, on ? "fisheye" : "parallel");
-    },
-    [fisheye],
-  );
-
-  /**
-   * レンズをまかせるか。まかせているあいだ、軸ごとのレンズは海が自分で決める
-   * ── 口の見た目（魚眼X/Y が点いているか）は、決まった結果を受け取って合わせる。
-   */
-  const [autoLens, setAutoLens] = useState(false);
-  /** 帯（どこから開いたか）をいつも見せるか。既定は触れたときだけ */
-  const [bandsAlways, setBandsAlways] = useState(false);
-  const onLens = useCallback((axis: "x" | "y", lens: string) => {
-    setFisheye((f) => (f[axis] === (lens === "fisheye") ? f : { ...f, [axis]: lens === "fisheye" }));
-  }, []);
-
-  /** 見え方の口に渡す値（泡は海の中で描かれるので、文脈で渡す） */
-  const setPreset = useCallback((next: PresetId) => {
-    setPresetState(next);
-    spaceRef.current?.setPreset(next);
-  }, []);
-
-  const spaceView = useMemo<SpaceView>(
-    () => ({
-      preset, setPreset, join, setJoin, fisheye, toggleFisheye,
-      autoLens, setAutoLens, bandsAlways, setBandsAlways,
-    }),
-    [preset, setPreset, join, fisheye, toggleFisheye, autoLens, bandsAlways],
-  );
+    given != null ||
+    (typeof window !== "undefined" &&
+      measured.w === window.innerWidth &&
+      measured.h === window.innerHeight);
 
   return (
     <SpaceViewContext.Provider value={spaceView}>
@@ -148,7 +146,23 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
     {/* ルート一覧は、どの泡からでも引けるように配る（一覧の空間が中の海を作るのに要る） */}
     <LayoutRoutesProvider routes={routes}>
     {/* 地と角の丸みは器（ShoreSpace）が持つ ── 岸に貼り付いたものを見て決まるので */}
-    <div style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative", ...style }}>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        position: "relative",
+        ...style,
+        /**
+         * ★ **器の大きさと岸の座標は、同じ 1 つの数から出す。**
+         *   岸は `window.innerHeight` で置き場所を決めるので、器がそれと違う高さだと
+         *   下の縁に貼ったものが画面の外へずれる（スマホの `100vh` がまさにそれ）。
+         *   測り終えていれば、その数でそのまま留める ── 測る前は渡された CSS のまま
+         *   （`100dvh` など）なので、ちらつかない。
+         */
+        ...(given || !homesReady ? {} : { width: measured.w, height: measured.h }),
+      }}
+    >
       {/* 管は**1 つの枠に 1 本**。窓の中にもう 1 本引かれるところを消す
           （その窓の枠は中の器＝ShoreSpace が引き受ける）。
           ★ 「岸に着いた窓」の重なりは**ここでは消さない** ── CSS で消すと
@@ -169,8 +183,10 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         onSpaceReady={handleSpaceReady}
         /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
         worldLineScope={worldLineScope}
+        worldLineOutside={worldLineOutside}
         autoLens={autoLens}
-        bandDisplay={bandsAlways ? 'always' : 'hover'}
+        rules={rules}
+        bandDisplay={bandDisplay}
         onLens={onLens}
         style={{ position: "absolute", inset: 0 }}
       />

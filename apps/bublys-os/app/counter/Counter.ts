@@ -8,7 +8,7 @@ export class Counter implements Serializable<{ id: string; value: number }>, Dom
     public readonly id: string;
     public readonly value: number;
 
-    constructor(id: string, value: number = 0) {
+    constructor(id: string, value = 0) {
       this.id = id;
       this.value = value;
     }

@@ -18,6 +18,16 @@ const initialState: CsvImporterState = {
 export const csvImporterSlice = createSlice({
   name: "csvImporter",
   initialState,
+  /**
+   * ★ **入れ物に徹する**（CLAUDE.md 規則6）。置く・消すだけ。
+   *
+   *   前はここに `updateCell` / `addRow` / `deleteRow` / `addColumn` / `deleteColumn` /
+   *   `renameColumn` があった。**どれも集約（`CsvSheet`）に同じ名前で同じものがある**うえ、
+   *   reducer の中で `new Date()` と `crypto.randomUUID()` を読んでいた
+   *   ── **同じ入力で違う結果になる reducer** は、世界線（やり直し）と正面から喧嘩する。
+   *   しかも誰も dispatch していなかった（画面は `sheetShell.update((s) => s.updateCell(…))` と
+   *   集約を通している）。**複製を消しただけで、動きは 1 つも変わらない。**
+   */
   reducers: {
     setSheet: (state, action: PayloadAction<CsvSheetState>) => {
       state.sheets[action.payload.id] = action.payload;
@@ -25,101 +35,10 @@ export const csvImporterSlice = createSlice({
     deleteSheet: (state, action: PayloadAction<string>) => {
       delete state.sheets[action.payload];
     },
-    updateCell: (
-      state,
-      action: PayloadAction<{
-        sheetId: string;
-        rowId: string;
-        columnId: string;
-        value: string;
-      }>
-    ) => {
-      const { sheetId, rowId, columnId, value } = action.payload;
-      const sheet = state.sheets[sheetId];
-      if (!sheet) return;
-      const row = sheet.rows.find((r) => r.id === rowId);
-      if (row) {
-        row.cells[columnId] = value;
-        sheet.updatedAt = new Date().toISOString();
-      }
-    },
-    addRow: (state, action: PayloadAction<string>) => {
-      const sheet = state.sheets[action.payload];
-      if (!sheet) return;
-      const cells: Record<string, string> = {};
-      sheet.columns.forEach((col) => {
-        cells[col.id] = "";
-      });
-      sheet.rows.push({ id: crypto.randomUUID(), cells });
-      sheet.updatedAt = new Date().toISOString();
-    },
-    deleteRow: (
-      state,
-      action: PayloadAction<{ sheetId: string; rowId: string }>
-    ) => {
-      const sheet = state.sheets[action.payload.sheetId];
-      if (!sheet) return;
-      sheet.rows = sheet.rows.filter((r) => r.id !== action.payload.rowId);
-      sheet.updatedAt = new Date().toISOString();
-    },
-    addColumn: (
-      state,
-      action: PayloadAction<{ sheetId: string; columnName: string }>
-    ) => {
-      const sheet = state.sheets[action.payload.sheetId];
-      if (!sheet) return;
-      const newCol = { id: crypto.randomUUID(), name: action.payload.columnName };
-      sheet.columns.push(newCol);
-      sheet.rows.forEach((row) => {
-        row.cells[newCol.id] = "";
-      });
-      sheet.updatedAt = new Date().toISOString();
-    },
-    deleteColumn: (
-      state,
-      action: PayloadAction<{ sheetId: string; columnId: string }>
-    ) => {
-      const sheet = state.sheets[action.payload.sheetId];
-      if (!sheet) return;
-      sheet.columns = sheet.columns.filter(
-        (c) => c.id !== action.payload.columnId
-      );
-      sheet.rows.forEach((row) => {
-        delete row.cells[action.payload.columnId];
-      });
-      sheet.updatedAt = new Date().toISOString();
-    },
-    renameColumn: (
-      state,
-      action: PayloadAction<{
-        sheetId: string;
-        columnId: string;
-        name: string;
-      }>
-    ) => {
-      const sheet = state.sheets[action.payload.sheetId];
-      if (!sheet) return;
-      const col = sheet.columns.find(
-        (c) => c.id === action.payload.columnId
-      );
-      if (col) {
-        col.name = action.payload.name;
-        sheet.updatedAt = new Date().toISOString();
-      }
-    },
   },
 });
 
-export const {
-  setSheet,
-  deleteSheet,
-  updateCell,
-  addRow,
-  deleteRow,
-  addColumn,
-  deleteColumn,
-  renameColumn,
-} = csvImporterSlice.actions;
+export const { setSheet, deleteSheet } = csvImporterSlice.actions;
 
 // LazyLoadedSlicesを拡張して型を追加
 declare module "@bublys-org/state-management" {

@@ -1,5 +1,5 @@
 import React from "react";
-import { getAllDragTypes } from "../object-view/ObjectTypeRegistry.js";
+import { getAllDragTypes } from "@bublys-org/object-types";
 
 /**
  * ドラッグ＆ドロップ用のユーティリティ

@@ -107,7 +107,8 @@ export function measureBox(
         for (const k of kids) {
           const at = ar.pos.get(k.id) ?? 0;
           const p = imageOf(at, halfLen(k) * 2, lens, H, 0);
-          // 大きさは①の答え。この軸の像の倍率で測る（もう一方の軸は min から落ちるので見なくてよい）
+          // 大きさは①の答え。この軸の像の倍率で測る（合成した倍率は必ずこれ以下なので、
+          //   もう一方の軸は見なくてよい ── 中身は箱から出ない。`lens.ts` の `sizeK`）
           need = Math.max(need, Math.abs(p.s) + halfLen(k) * p.k);
         }
         const next = Math.max(ownHalf, need + pad);

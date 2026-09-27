@@ -41,7 +41,7 @@ import type {
   LayoutRules, ScreenRects, SeenRects, SpaceId, Viewport,
 } from '@bublys-org/bubble-layout';
 import { markTiny, DRAW_MIN } from './draw.js';
-import { hitModelAt, inContent, onHandle, pickAt, spaceModelAt } from './hit.js';
+import { HANDLE_COARSE_OUT, hitModelAt, inContent, onHandle, pickAt, spaceModelAt } from './hit.js';
 import { withLift } from './lift.js';
 import type { LiftState } from './lift.js';
 
@@ -52,8 +52,48 @@ const DRAG_START = 3;
  * 慣性つきのトラックパッドでも途切れない程度に取る ── 跳ね返りを**一続きにつき 1 回**にするのに使う。
  */
 const WHEEL_GESTURE_GAP = 250;
+/**
+ * 2 本指の手つきが「どちらなのか」決まる距離（層の px）。
+ * 間隔の変わりぶんと中点の動きぶんを比べて、**先にここを越えたほう**に決める。
+ */
+const PINCH_START = 8;
+/**
+ * **指がこれだけ動いたら 1 刻み**（層の px）。ホイールの生の量に直すと 100 ＝ 1 刻み
+ * （`wheelZ` / `wheelScroll` の換算）なので、`100 / この数` を掛けて渡す。
+ * 指 1 本ぶんの短い撫でで 1 枚繰れるくらい ── 小さくすると一撫でで何枚も飛ぶ。
+ */
+const TOUCH_TURN_PX = 64;
 
 type DragKind = 'bubble' | 'focus' | 'resize';
+
+/**
+ * **2 本指の手つき** ── 指 2 本は、ホイールとピンチの代わり。
+ *
+ * > **離すか近づけるかで「寄り」、そろえて動かすと「ホイール」。**
+ *
+ * スマホには車輪も修飾キーも無いので、**奥行きを繰る**（ホイール）と**画面2の寄り**（ピンチ）へ
+ * 行く道がそこだけ無かった。指 1 本ぶん（背景をドラッグ ＝ 平行移動、枠を掴む ＝ 動かす）は
+ * pointer で今までどおり動くので、足すのはこの 2 つだけ。
+ *
+ * ★ **一続きの手では、どちらか一方に決めて動かさない**（`kind`）。毎フレーム決め直すと、
+ *   寄せているあいだに中点が少し動いただけで奥行きが繰れて、2 つが混ざる
+ *   ── ホイールでも「スクロールとズームは別の操作」（下の表）を守っているのと同じ。
+ * ★ **3 本目以降は見ない**（先に着いた 2 本で測る）。
+ */
+interface PinchState {
+  /** まだ決まっていない間は null */
+  kind: 'zoom' | 'wheel' | null;
+  /** 始めの指の間隔（層の px） */
+  d0: number;
+  /** 始めの中点 */
+  cx0: number;
+  cy0: number;
+  /** 直前の中点（送りは差分で足す） */
+  cx: number;
+  cy: number;
+  /** 始めの寄り（画面2）。ピンチは**間隔の比をそのまま**掛ける */
+  zoom0: number;
+}
 
 /** 手つきのうち、**描くのに要る分**だけ（これだけが state。残りは ref の帳面） */
 interface DragView {
@@ -205,6 +245,12 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    *   平行な軸では `focusOn` が何もしないので、全部写っているビューでは今までどおり動かない。
    */
   const touched = useRef<{ id: BubbleId; mx: number; my: number } | null>(null);
+  /**
+   * いま着いている指（`pointerId` → 層の座標）。**2 本以上で「2 本指の手つき」**（`PinchState`）。
+   * マウスは同時に 2 つ来ないので、ここが 2 になるのは指（とペン）だけ。
+   */
+  const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinch = useRef<PinchState | null>(null);
   const [view, setView] = useState<DragView>(NO_DRAG);
   const show = () => {
     const d = drag.current;
@@ -283,11 +329,13 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     },
     [layerRef, scaleOf],
   );
-  const pickInput = useCallback(() => {
+  /** @param coarse 指（やペン）で触ったか ── 角の当たりを外へ広げる */
+  const pickInput = useCallback((coarse = false) => {
     const layer = layerRef.current;
     const r = layer?.getBoundingClientRect();
     return {
       layout: lifted, tiny, selectedId,
+      handleOut: coarse ? HANDLE_COARSE_OUT : undefined,
       layer: layer as Element,
       origin: { x: r?.left ?? 0, y: r?.top ?? 0 },
       scale: scaleOf(layer ?? null, r),
@@ -303,17 +351,58 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     [world, hasContent],
   );
   /**
-   * その泡の**枠が上に取るぶん**（装いの top）。当たり判定はここで中身と枠を分ける。
-   * 固定の 24 ではなく**着ている装い**から取る ── 装いを出していない札では 1px しか取らない。
+   * その泡の**装いが四辺に取るぶん**。当たり判定はここで中身と枠を分ける
+   * ── **枠が見えている所が、掴める所**（`hit.ts` の `inContent`）。
+   * 固定の数ではなく**着ている装い**から取る（窓は帯だけ、一覧の札は四辺 7px、など）。
    */
-  const headOf = useCallback(
-    (id: BubbleId) => chromeOf(world, id, chrome).top + (o.dressed?.get(id)?.top ?? 0),
+  const insetOf = useCallback(
+    (id: BubbleId) => {
+      const c = chromeOf(world, id, chrome);
+      const d = o.dressed?.get(id);
+      return {
+        left: c.left,
+        top: c.top + (d?.top ?? 0),
+        right: c.right,
+        bottom: c.bottom,
+      };
+    },
     [world, chrome, o.dressed],
   );
+
+  /** 画面2の寄りを書く（外で持っているなら外へ、持っていないなら世界へ）。ホイールもピンチもここ */
+  const setZoomTo = useCallback(
+    (z: number) => (o.setZoom ?? ((v: number) => setWorld(world.withZoom(v))))(z),
+    [o.setZoom, setWorld, world],
+  );
+
+  /**
+   * **2 本指の手つきを始める。** 掴みかけは捨てる ── 2 本目が着いた時点で、
+   * 押していたのは「動かすため」ではなくなっている（ホイール＋左ボタンと同じ扱い）。
+   */
+  const startPinch = useCallback(() => {
+    const two = [...pointers.current.values()].slice(0, 2);
+    if (two.length < 2) return;
+    const d0 = Math.hypot(two[0].x - two[1].x, two[0].y - two[1].y);
+    const cx0 = (two[0].x + two[1].x) / 2;
+    const cy0 = (two[0].y + two[1].y) / 2;
+    drag.current = null;
+    touched.current = null;
+    pinch.current = { kind: null, d0, cx0, cy0, cx: cx0, cy: cy0, zoom0: o.zoom ?? world.zoom };
+    o.onDragInfo?.(null);
+    show();
+  }, [o, world]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!layerRef.current) return;
     const { mx, my } = pt(e);
+    pointers.current.set(e.pointerId, { x: mx, y: my });
+    // ★ 2 本目が着いたら、そこから先は 2 本指の手つき（ホイールとピンチの代わり）
+    if (pointers.current.size >= 2) {
+      // 捕まえ損ねても手つきは始める（もう離れているポインタを捕まえようとすると投げる）
+      try { layerRef.current.setPointerCapture(e.pointerId); } catch { /* 捕まえられないだけ */ }
+      startPinch();
+      return;
+    }
     /**
      * ★ 掴むと決まってから捕まえる。
      *   押した時点で `setPointerCapture` すると、そのあとの **click / dblclick まで層に来る**
@@ -322,7 +411,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      */
     const capture = () => layerRef.current?.setPointerCapture(e.pointerId);
     touched.current = null;
-    const pick = pickAt(pickInput(), mx, my);
+    const pick = pickAt(pickInput(e.pointerType !== 'mouse'), mx, my);
 
     if (pick.handle) {
       // ドラッグするのは見えている箱の角：中身で伸びた箱なら、伸びた大きさから始める
@@ -343,7 +432,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      * ★ 本文（空間ではない中身）を押したら、**何も始めない**。それは中身のもの。
      *   空間を持つ泡の中身の箱は今までどおり「その空間の焦点をドラッグする」（ラボと同じ）。
      */
-    if (p0 && !world.isHost(p0.id) && inContent(p0, my, hasBody, headOf)) {
+    if (p0 && !world.isHost(p0.id) && inContent(p0, mx, my, hasBody, insetOf)) {
       /**
        * ★ **触ったら選ぶ。掴みはしない。**
        *   選ぶのは「いま相手にしている泡」を決めることなので、中身を触っても起きてよい。
@@ -359,7 +448,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       show();
       return;
     }
-    if (p0 && !inContent(p0, my, hasBody, headOf)) {
+    if (p0 && !inContent(p0, mx, my, hasBody, insetOf)) {
       capture();
       setSelectedId(p0.id);
       // ★ 押した時点では何も書かない。焦点が寄るのは「ドラッグせずに離した」ときだけ
@@ -393,9 +482,44 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       };
     }
     show();
-  }, [world, layout, rules, pt, pickInput, hasBody, headOf, setSelectedId, layerRef]);
+  }, [world, layout, rules, pt, pickInput, hasBody, insetOf, setSelectedId, layerRef, startPinch]);
 
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    if (pointers.current.has(e.pointerId)) {
+      const at = pt(e);
+      pointers.current.set(e.pointerId, { x: at.mx, y: at.my });
+    }
+    const pin = pinch.current;
+    if (pin) {
+      const two = [...pointers.current.values()].slice(0, 2);
+      if (two.length < 2) return;
+      const dist = Math.hypot(two[0].x - two[1].x, two[0].y - two[1].y);
+      const cx = (two[0].x + two[1].x) / 2;
+      const cy = (two[0].y + two[1].y) / 2;
+      if (!pin.kind) {
+        // 先に `PINCH_START` を越えたほうに決める（越えるまでは何も書かない）
+        const spread = Math.abs(dist - pin.d0);
+        const moved = Math.hypot(cx - pin.cx0, cy - pin.cy0);
+        if (spread < PINCH_START && moved < PINCH_START) return;
+        pin.kind = spread >= moved ? 'zoom' : 'wheel';
+      }
+      if (pin.kind === 'zoom') {
+        // ★ **間隔の比がそのまま寄りの比。** 海は1ミリも動かない（値も焦点も書かない）
+        if (pin.d0 > 0 && pin.zoom0 > 0) setZoomTo(pin.zoom0 * (dist / pin.d0));
+      } else {
+        // ★ ホイールと**同じ芯**へ渡す。指を上へ動かす ＝ 奥へ送る（ホイールを手前へ回すのと同じ向き）
+        const gain = 100 / TOUCH_TURN_PX;
+        wheelTurnRef.current({
+          mx: cx, my: cy,
+          dx: -(cx - pin.cx) * gain,
+          dy: -(cy - pin.cy) * gain,
+          at: e.timeStamp || Date.now(),
+        });
+      }
+      pin.cx = cx;
+      pin.cy = cy;
+      return;
+    }
     const d = drag.current;
     if (!d) {
       // 中身を触ったまま動かした ── 触ったのではなく、中身を扱っている。寄せない
@@ -450,11 +574,18 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     // 泡をドラッグする：軸ごとに、書けるなら書く／書けないなら焦点／なしなら何もしない
     const p = lifted.byId.get(d.id);
     if (!p) return;
-    const want = {
-      x: mx - ((d.fx ?? 0.5) - 0.5) * p.w,
-      y: my - ((d.fy ?? 0.5) - 0.5) * p.h,
-    };
-    const next = dragBubble(world, { layout, id: d.id, space: d.space, want, m: p.m }, rules);
+    /**
+     * ★ **掴んだ点は、泡の自前の座標で渡す**（箱の左上からの px）。
+     *   ここで「描かれた箱」から中心を引いて渡していたころは、**箱が縮むたびに
+     *   掴んだ点がずれて**いた（魚眼の中で指を 1px 動かすと 0.47px ── `dragBubble` の註）。
+     *   自前の大きさはドラッグ中 1px も変わらないので、ずれようがない。
+     */
+    const grab = { x: (d.fx ?? 0.5) * p.box.w, y: (d.fy ?? 0.5) * p.box.h };
+    const next = dragBubble(
+      world,
+      { layout, id: d.id, space: d.space, pointer: { x: mx, y: my }, grab, m: p.m },
+      rules,
+    );
     setWorld(next);
 
     // 予告のために、いまの居場所を外へ知らせる（岸がここで「着くならここ」を描く）
@@ -472,7 +603,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       const shown = withLift(after, held);
       const rect = shown.byId.get(d.id);
       const screen: ScreenRects = new Map(shown.order.map((q) => [q.id, { x: q.x, y: q.y, w: q.w, h: q.h }]));
-      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => chromeOf(next, id, chrome).top + (o.dressed?.get(id)?.top ?? 0));
+      const hitSpace = spaceModelAt(shown, afterTiny, d.skip ?? null, mx, my, (id) => next.isHost(id) || (hasContent ? hasContent(id) : false), (id) => { const c = chromeOf(next, id, chrome); return { left: c.left, top: c.top + (o.dressed?.get(id)?.top ?? 0), right: c.right, bottom: c.bottom }; });
       const t = rect
         ? dropTargetAt(next, {
             layout: after, screen, pointer: { x: mx, y: my }, hitSpace,
@@ -483,9 +614,21 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       d.marks = t?.marks ?? null;
     }
     show();
-  }, [world, layout, lifted, viewport, rules, drawMin, setWorld, ctx, pt, hasContent]);
+  }, [world, layout, lifted, viewport, rules, drawMin, setWorld, ctx, pt, hasContent, setZoomTo]);
 
   const endDrag = useCallback((e?: ReactPointerEvent<HTMLDivElement>) => {
+    if (e) pointers.current.delete(e.pointerId);
+    else pointers.current.clear();
+    if (pinch.current) {
+      /**
+       * ★ **2 本指の手つきは、指が 1 本になったところで終わり。**
+       *   残った 1 本では何も始めない（触ったことにもしない）── 次に着いた指から数え直す。
+       *   「2 本目が着いたら掴みを捨てる」の裏側で、これが無いと指を離した拍子に
+       *   **寄せていた海へ焦点が寄る**（タップと見分けがつかない）。
+       */
+      if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
     const d = drag.current;
     const t = touched.current;
     drag.current = null;
@@ -534,9 +677,11 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    *
    * | 手 | 動くもの |
    * |---|---|
-   * | 背景をドラッグ | 海の平行移動（X・Y の焦点） |
-   * | ホイール | **海の奥行き**（Z の焦点 ＝ 画面1）。泡のいる範囲で止まる |
-   * | ピンチ（⌘/Ctrl ＋ ホイール）／**左ボタンを押しながらホイール** | **画面2の寄り**。上限は無い |
+   * | 背景をドラッグ／**指 1 本で背景** | 海の平行移動（X・Y の焦点） |
+   * | ホイール／**指 2 本をそろえて動かす** | **海の奥行き**（Z の焦点 ＝ 画面1）。泡のいる範囲で止まる |
+   * | ピンチ（⌘/Ctrl ＋ ホイール）／左ボタンを押しながらホイール／**指 2 本を開く・閉じる** | **画面2の寄り**。上限は無い |
+   *
+   * ★ 指の 2 つは、この表の**同じ行**へ入る（新しい操作を足したのではない ── `PinchState`）。
    *
    * ★ 左ボタンを押しながら、でも寄れる ── ピンチの無いマウスのため。
    *   そのとき**掴みかけは捨てる**（`drag.current = null`）。押していたのは寄るための合図で、
@@ -562,31 +707,26 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
   const panTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (panTimer.current !== null) clearTimeout(panTimer.current); }, []);
   const bounceArmed = useRef(true);
-  const onWheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
-  onWheelRef.current = (e: WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const { mx, my } = pt(e);
-    // 左ボタンを押しながら（`buttons` の 1 ビット目）も、ピンチと同じ
-    if (e.ctrlKey || e.metaKey || (e.buttons & 1) !== 0) {
-      if (drag.current) {
-        drag.current = null;                 // 掴みかけは捨てる（押していたのは寄るための合図）
-        show();
-      }
-      // 画面2 ── 海は1ミリも動かない（値も焦点も書かない）
-      const now = o.zoom ?? world.zoom;
-      (o.setZoom ?? ((z: number) => setWorld(world.withZoom(z))))(zoomedBy(now, e.deltaY));
-      return;
-    }
+  /**
+   * **送り → 奥行き → 跳ね返り**の芯。ホイールと 2 本指の**どちらもここへ来る**。
+   *
+   * 受け取るのは「層のどこで・どれだけ」だけ（`dx`・`dy` はホイールの生の量 ＝ 100 が 1 刻み）。
+   * 寄り（画面2）はここに入れない ── 上の表の別の行なので、呼ぶ側で分ける。
+   */
+  const wheelTurnRef = useRef<
+    (g: { mx: number; my: number; dx: number; dy: number; at: number }) => void
+  >(() => undefined);
+  wheelTurnRef.current = (g) => {
+    const { mx, my } = g;
     // ★ 受け手は wheelZ と**同じ出し方**で出す（札の上で回したら、その札がいる空間まで外へ通す）
-    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody, headOf));
+    const space = wheelSpace(world, layout, spaceModelAt(lifted, tiny, null, mx, my, hasBody, insetOf));
     /**
      * ★ **収まらない並びは、まずスクロールに使う。**
      *   縦に並べる・横に並べるで中身が箱に入りきらないとき、送る道がここしかない
      *   （平行の軸なので、触っても寄らない）。収まっていれば `null` が返り、
      *   今までどおり奥行きを繰る（`wheelZ`）。
      */
-    const scrolled = wheelScroll(world, layout, space, { x: e.deltaX, y: e.deltaY }, rules);
+    const scrolled = wheelScroll(world, layout, space, { x: g.dx, y: g.dy }, rules);
     if (scrolled) {
       setWorld(scrolled);
       bounceArmed.current = true;
@@ -619,7 +759,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
       }
       return;
     }
-    const next = wheelZ(world, layout, space, e.deltaY, rules);
+    const next = wheelZ(world, layout, space, g.dy, rules);
     const moved = next.focusOf(space).z !== world.focusOf(space).z;
     /**
      * ★ **跳ね返りは一続きの手につき 1 回。**
@@ -627,7 +767,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      *   動いているあいだは弾を込め直し、端に着いたら 1 回だけ撃つ。
      *   手が止まって（`WHEEL_GESTURE_GAP`）から回し直せば、また 1 回。
      */
-    const now = e.timeStamp || Date.now();
+    const now = g.at;
     if (now - lastWheelAt.current > WHEEL_GESTURE_GAP) bounceArmed.current = true;
     lastWheelAt.current = now;
     if (moved) { setWorld(next); bounceArmed.current = true; return; }
@@ -644,7 +784,33 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     if (new Set(L.arr.z.pos.values()).size < 2) return;
     if (!bounceArmed.current) return;
     bounceArmed.current = false;
-    o.onOverscroll?.(space, e.deltaY < 0 ? -1 : 1, L.view.z.step || 1);
+    o.onOverscroll?.(space, g.dy < 0 ? -1 : 1, L.view.z.step || 1);
+  };
+
+  /**
+   * ホイールを受ける。**寄りはここで分け、送り・繰りは芯へ渡す**（`wheelTurnRef`）。
+   *
+   * ★ 左ボタンを押しながら、でも寄れる ── ピンチの無いマウスのため。
+   *   そのとき**掴みかけは捨てる**（`drag.current = null`）。押していたのは寄るための合図で、
+   *   動かすつもりではないから ── 残すと、寄ったあとの1回目の move で掴んだ点の u が
+   *   食い違って**画面が飛ぶ**（掴んだときの u は寄る前の倍率で測ってある）。
+   */
+  const onWheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
+  onWheelRef.current = (e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { mx, my } = pt(e);
+    // 左ボタンを押しながら（`buttons` の 1 ビット目）も、ピンチと同じ
+    if (e.ctrlKey || e.metaKey || (e.buttons & 1) !== 0) {
+      if (drag.current) {
+        drag.current = null;                 // 掴みかけは捨てる（押していたのは寄るための合図）
+        show();
+      }
+      // 画面2 ── 海は1ミリも動かない（値も焦点も書かない）
+      setZoomTo(zoomedBy(o.zoom ?? world.zoom, e.deltaY));
+      return;
+    }
+    wheelTurnRef.current({ mx, my, dx: e.deltaX, dy: e.deltaY, at: e.timeStamp || Date.now() });
   };
   useEffect(() => {
     const el = layerRef.current;

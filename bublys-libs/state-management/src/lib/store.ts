@@ -14,7 +14,6 @@ import storage from "redux-persist/es/storage"; // defaults to localStorage for 
 
 import { counterSlice } from "./slices/counter-slice.js";
 import { worldSlice } from "./slices/world-slice.js";
-import { memoSlice } from "./slices/memo-slice.js";
 import { pocketSlice } from "./slices/pocket-slice.js";
 
 //iframe-slices
@@ -32,7 +31,12 @@ export const rootReducer = combineSlices(
   counterSlice,
   worldSlice,
   environmentSlice,
-  memoSlice,
+  /**
+   * ★ **メモのスライスは外した。** 置いてはあったが、**誰も読み書きしていなかった**
+   *   ── OS のメモ（`memo-bubly`）は世界線の中（scope `memo:<id>`）に持っていて、
+   *   単体のメモアプリ（`apps/memo`）は自分の `memo-state` を持っている。
+   *   ここに残っていたのは、どちらにも繋がっていない 3 つ目の写しだった。
+   */
   pocketSlice,
   // iframe-slices（単純なreducer）
   {
@@ -94,7 +98,13 @@ export const makeStore = (options?: { persistKey?: string }) => {
   const persistConfig = {
     key: options?.persistKey ?? 'root',
     storage,
-    blacklist: [environmentSlice.reducerPath, ...injectedBlacklist],
+    /**
+     * ★ `memo` は**外したスライスの置き土産**。前に保存した人の localStorage には
+     *   まだ入っていて、読み戻すと「知らない鍵だ」と毎回言われる
+     *   （`Unexpected key "memo" found in previous state…`）。読みも書きもしないと
+     *   言っておけば、静かに置き去りになる。
+     */
+    blacklist: ['memo', environmentSlice.reducerPath, ...injectedBlacklist],
   };
 
   const persistedReducer = persistReducer(persistConfig, rootReducer);

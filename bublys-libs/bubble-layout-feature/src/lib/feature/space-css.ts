@@ -134,6 +134,9 @@ export const SPACE_CSS = `
 /* いま効いているもの ── 色で言う（ロックと同じ） */
 .bub > .bl-view .bl-view-pick[aria-pressed="true"]{opacity:1;color:#6ee7ff;background:rgba(110,231,255,.14)}
 .bub > .bl-view .bl-view-gap{margin-left:6px}
+/* ★ 字の口（窓の見え方）。絵の口（一覧の並べ方）と同じ棚に、同じ見た目の台で出す。
+   中身のボタンは自分で色を持っているので、台は高さと余白だけ合わせる */
+.bub > .bl-view.bl-view-text{padding:3px 4px;gap:0}
 /* 並べ方の 7 つとは**別の項目**（留めるかどうか）。間を広く取って、仕切りを 1 本引く */
 .bub > .bl-view .bl-view-apart{position:relative;margin-left:17px}
 .bub > .bl-view .bl-view-apart::before{content:"";position:absolute;left:-9px;top:2px;bottom:2px;

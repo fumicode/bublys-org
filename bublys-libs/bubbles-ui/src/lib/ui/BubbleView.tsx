@@ -303,8 +303,15 @@ const BubbleViewInner: FC<BubbleProps> = ({
         notifyRendered();
         dispatch(finishBubbleAnimation(bubble.id));
       }}
-      width={bubble.size ? `${bubble.size.width}px` : undefined}
-      height={bubble.size ? `${bubble.size.height}px` : undefined}
+      /**
+       * ★ **大きさが無ければ、そのルートの既定の大きさで出す。**
+       *   前は `fit-content`（中身なりの大きさ）だったが、いまの中身は**与えられた箱を
+       *   埋める**作りなので、箱が中身なりだと互いに縮め合って潰れる
+       *   （実測：memos の泡が 58×76、中身は 32×50 まで縮んでいた）。
+       *   箱は先に決まっていなければならない。
+       */
+      width={`${(bubble.size ?? bubble.defaultSize).width}px`}
+      height={`${(bubble.size ?? bubble.defaultSize).height}px`}
       contentBackground={contentBackground}
       $linkedEdges={linkedEdges}
       fillsContainer={bubble.fillsContainer}

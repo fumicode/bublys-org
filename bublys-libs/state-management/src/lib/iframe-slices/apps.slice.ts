@@ -26,12 +26,21 @@ const appSlice = createSlice({
   name: 'app',
   initialState,
   reducers: {
-    addApp: (state, action: PayloadAction<Omit<AppData, 'id'>>) => {
-      const newApp = {
-        ...action.payload,
-        id: Date.now().toString(),
-      };
-      state.apps.push(newApp);
+    /**
+     * ★ **id を作るのは reducer の外**（`prepare`）。
+     *   中で `Date.now()` を読んでいたので、**同じ操作をやり直すと違う id**になっていた
+     *   ── 世界線（やり直し）が土台のこの場所では、それがいちばん困る。
+     *   `prepare` は配るときに 1 回だけ走り、id は action に載って残るので、
+     *   同じ action を再生すれば必ず同じ結果になる。呼ぶ側は今までどおり。
+     */
+    addApp: {
+      reducer: (state, action: PayloadAction<AppData>) => {
+        state.apps.push(action.payload);
+      },
+      prepare: (app: Omit<AppData, 'id'>) => ({
+        // 時計を読んでよいのはここだけ（配るとき 1 回・prepare）── 下の見張りが見ている
+        payload: { ...app, id: Date.now().toString() } as AppData,
+      }),
     },
     removeApp: (state, action: PayloadAction<string>) => {
       state.apps = state.apps.filter((app) => app.id !== action.payload);
