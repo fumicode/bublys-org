@@ -1,16 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText,
-  DialogTitle, FormControlLabel, IconButton, Radio, RadioGroup, TextField, Tooltip, Typography,
-} from "@mui/material";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import CheckIcon from "@mui/icons-material/Check";
+import { Box, Button, CircularProgress, FormControlLabel, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import ExtensionIcon from "@mui/icons-material/Extension";
-import { loadBublyFromOrigin, unloadBubly, getLoadedBublies, toBublyRouteBase, bublyOriginCandidates, type LoadedBubly, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
+import { loadBublyFromOrigin, getLoadedBublies, toBublyRouteBase, bublyOriginCandidates, useBubbleRoutes, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
+import { ListSpace } from "@bublys-org/bubble-layout-feature";
 import { Launcher } from "@bublys-org/launcher-model";
 import { useLauncher } from "@bublys-org/launcher-libs";
 import { MAIN_LAUNCHER_ID } from "./launchTargets";
+import { BUBLY_CARD_HEIGHT } from "./BublyCard";
 
 /**
  * バブリをオリジンからロードするバブル（url: `bubly-loader`）。
@@ -20,14 +17,16 @@ import { MAIN_LAUNCHER_ID } from "./launchTargets";
 export const BublyLoaderBubble: BubbleContentRenderer = () => {
   const [bublyOrigin, setBublyOrigin] = useState(process.env.NEXT_PUBLIC_DEFAULT_BUBLY_ORIGIN ?? "");
   const [isLoading, setIsLoading] = useState(false);
-  // StoreProvider が復元を終えてから描画されるので、初期値はレジストリの現状でよい
-  const [loadedBublies, setLoadedBublies] = useState<LoadedBubly[]>(() => getLoadedBublies());
-  /** 外してよいか訊いている相手（null なら訊いていない） */
-  const [asking, setAsking] = useState<LoadedBubly | null>(null);
-  /** いまコピーしたばかりのオリジン（印を出すのに使う） */
-  const [copied, setCopied] = useState<string | null>(null);
-  /** 写せなかったオリジン。黙って失敗せず、そう言う */
-  const [copyFailed, setCopyFailed] = useState<string | null>(null);
+  /**
+   * **ロード済みの顔ぶれ** ── 札 1 枚ずつのバブルにして並べる（`ListSpace`）。
+   *
+   * ★ 足し引きに気づく合図はルートの一覧（`useBubbleRoutes`）。バブリをロードすれば
+   *   ルートが増え、外せば減るので、**そこが動いたら数え直せばよい**
+   *   ── ロード済みだけを見張る別の口を新しく作らない。
+   */
+  const routes = useBubbleRoutes();
+  const loadedBublies = useMemo(() => getLoadedBublies(), [routes]);
+  const members = useMemo(() => loadedBublies.map((b) => `bublies/${b.name}`), [loadedBublies]);
   const { launcher, update } = useLauncher(MAIN_LAUNCHER_ID);
   /**
    * **取りに行けそうな先**（`bublyOriginCandidates`）。畳めたものが先、打ったそのままが後。
@@ -45,7 +44,6 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
     try {
       const bubly = await loadBublyFromOrigin(origin);
       if (bubly) {
-        setLoadedBublies(getLoadedBublies());
         const url = toBublyRouteBase(bubly.name);
         if (launcher && !launcher.urls.includes(url)) update((l: Launcher) => l.add(url));
         alert(`バブリ "${bubly.name}" v${bubly.version} をロードしました`);
@@ -60,32 +58,14 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
     }
   };
 
-  const handleUnload = (name: string) => {
-    unloadBubly(name);
-    setLoadedBublies(getLoadedBublies());
-    const url = toBublyRouteBase(name);
-    const entry = launcher?.entries.find((e) => e.url === url);
-    if (entry) update((l: Launcher) => l.remove(entry.id));
-    setAsking(null);
-  };
-
-  /** オリジンを写す。写せたかどうかは印で返す（黙って失敗しない） */
-  const handleCopy = async (origin: string) => {
-    try {
-      await navigator.clipboard.writeText(origin);
-      setCopied(origin);
-      setTimeout(() => setCopied((c) => (c === origin ? null : c)), 1500);
-    } catch {
-      // クリップボードが使えない所（許しが無い・安全でない配信）もある。
-      // 黙って何も起きないと「押したのに写っていない」になるので、そう言う
-      // ── 字そのものは選んで写せる（`user-select: text`）
-      setCopyFailed(origin);
-      setTimeout(() => setCopyFailed((c) => (c === origin ? null : c)), 2500);
-    }
-  };
-
   return (
-    <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1, minWidth: 260 }}>
+    /*
+      ★ **上が入力、下が一覧。** 一覧は並びの空間（`ListSpace`）なので、札 1 枚ずつが
+        バブルになり、ほかの一覧と同じ 7 つの並べ方がそのまま効く。
+      ★ 高さは箱いっぱいに伸ばす ── 一覧は「残りぜんぶ」を使う（`flex: 1`）。
+        伸ばさないと並びの空間が丈を持てず、札が 1 枚も置けない。
+    */
+    <Box sx={{ height: "100%", p: 2, pb: 1, display: "flex", flexDirection: "column", gap: 1, boxSizing: "border-box" }}>
       <Typography variant="subtitle1" fontWeight="bold" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         <ExtensionIcon sx={{ fontSize: 18 }} />
         バブリ
@@ -137,100 +117,13 @@ export const BublyLoaderBubble: BubbleContentRenderer = () => {
       >
         {isLoading ? <CircularProgress size={16} /> : "ロード"}
       </Button>
-      {loadedBublies.length > 0 && (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-          <Typography variant="caption" color="text.secondary">ロード済</Typography>
-          {/*
-            ★ **ここは url を入れる所なので、url も出す。** 前は名前だけ並べていたが、
-              もう一度入れ直すにも、別の窓へ移すにも、要るのは取ってきた先のほう。
-              字は選べるようにし、写す口も付ける（クリップボードが無い所では選んで写す）。
-            ★ **外す口は「×」ではなく字で。** ×だけでは、アプリを消すのか記録を消すのか
-              分からない。何が起きるかは押したあとの問い（下の `Dialog`）で全部言う。
-          */}
-          {loadedBublies.map((bubly) => (
-            <Box
-              key={bubly.name}
-              sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 0.5 }}
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="body2" sx={{ lineHeight: 1.3 }}>
-                  {bubly.label}
-                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                    {bubly.name} v{bubly.version}
-                  </Typography>
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    display: "block",
-                    fontFamily: "monospace",
-                    fontSize: "0.7rem",
-                    userSelect: "text",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  {bubly.origin ?? "取ってきた先は分からない"}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, flexShrink: 0 }}>
-                {bubly.origin && (
-                  <Tooltip
-                    title={
-                      copied === bubly.origin
-                        ? "写した"
-                        : copyFailed === bubly.origin
-                          ? "写せなかった ── 字を選んで写して"
-                          : "オリジンを写す"
-                    }
-                  >
-                    <IconButton size="small" onClick={() => handleCopy(bubly.origin as string)} sx={{ p: 0.25 }}>
-                      {copied === bubly.origin
-                        ? <CheckIcon sx={{ fontSize: 14 }} />
-                        : <ContentCopyIcon sx={{ fontSize: 14 }} />}
-                    </IconButton>
-                  </Tooltip>
-                )}
-                <Button size="small" color="inherit" onClick={() => setAsking(bubly)} sx={{ minWidth: 0, px: 0.75, fontSize: "0.7rem" }}>
-                  外す
-                </Button>
-              </Box>
-            </Box>
-          ))}
+      {members.length > 0 && (
+        /* 一覧は**端まで**使う ── 自分の余白（p: 2）を打ち消す。
+           内側に余白を重ねると、その分だけ札が細くなって字が詰まる */
+        <Box sx={{ flex: 1, minHeight: 0, mx: -2, mb: -1 }}>
+          <ListSpace members={members} itemHeight={BUBLY_CARD_HEIGHT} />
         </Box>
       )}
-
-      {/*
-        ★ **外す前に、何が起きるかを全部言う。** 前は×を押した瞬間に外れていた。
-          消えるもの（呼び出し・次からの復元）と、消えないもの（このバブリが書いたもの）を
-          分けて言えば、押す前に取り返しがつくかどうかが分かる。
-      */}
-      <Dialog open={!!asking} onClose={() => setAsking(null)}>
-        <DialogTitle sx={{ fontSize: "1rem" }}>
-          「{asking?.label}」を OS から外す
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText component="div" sx={{ fontSize: "0.85rem" }}>
-            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
-              <li>ランチャーからこの呼び出しが消える</li>
-              <li>
-                次に立ち上げても復元しない（
-                <Box component="span" sx={{ fontFamily: "monospace" }}>{asking?.origin ?? "取ってきた先"}</Box>
-                を忘れる）
-              </li>
-              <li>開いたままの泡は残るが、中身は出なくなる（閉じれば消える）</li>
-              <li>
-                <strong>このバブリが書いたものは消えない</strong>
-                ── 同じオリジンを入れ直せば戻る
-              </li>
-            </Box>
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAsking(null)}>やめる</Button>
-          <Button color="error" onClick={() => asking && handleUnload(asking.name)}>外す</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
