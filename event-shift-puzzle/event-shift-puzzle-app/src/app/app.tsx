@@ -1,6 +1,3 @@
-import PeopleIcon from '@mui/icons-material/People';
-import TaskIcon from '@mui/icons-material/Task';
-import GridOnIcon from '@mui/icons-material/GridOn';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -16,7 +13,7 @@ import '@bublys-org/event-shift-puzzle-libs';
 import { shiftPuzzleBubbleRoutes } from '../registration/index.js';
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
-import { menuItems } from "../bubly.js";
+import { menuItems } from "../bubly";
 
 BubbleRouteRegistry.registerRoutes(shiftPuzzleBubbleRoutes);
 

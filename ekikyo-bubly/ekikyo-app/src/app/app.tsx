@@ -1,4 +1,3 @@
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import {
   BublyApp,
   BublyStoreProvider,
@@ -11,7 +10,7 @@ import {
 import { ekikyoBubbleRoutes } from '../registration/index.js';
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
-import { menuItems } from "../bubly.js";
+import { menuItems } from "../bubly";
 
 BubbleRouteRegistry.registerRoutes(ekikyoBubbleRoutes);
 

@@ -9,20 +9,13 @@
  * `[[...slug]]` は `/` そのものにも当たるので、入口の url は変わらない。
  */
 
-import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { IconButton, Tooltip } from "@mui/material";
-import {
-  BublyApp,
-  BublyStoreProvider,
-  BublyMenuItem,
-  BUBBLE_ARRANGEMENT_DOMAIN,
-  makeSnapshotCodec,
-} from "@bublys-org/bubbles-ui";
+import { BublyApp, BublyStoreProvider, BUBBLE_ARRANGEMENT_DOMAIN, makeSnapshotCodec } from "@bublys-org/bubbles-ui";
 import { IgoGameProvider } from "@bublys-org/sekaisen-igo-libs";
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
-import { menuItems } from "../../bubly.js";
+import { menuItems } from "../../bubly";
 
 
 /**

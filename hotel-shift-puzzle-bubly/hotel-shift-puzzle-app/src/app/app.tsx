@@ -1,30 +1,14 @@
-import PeopleIcon from '@mui/icons-material/People';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import RuleIcon from '@mui/icons-material/Rule';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import EditCalendarIcon from '@mui/icons-material/EditCalendar';
-import SaveIcon from '@mui/icons-material/Save';
-import SchemaIcon from '@mui/icons-material/Schema';
-import BugReportIcon from '@mui/icons-material/BugReport';
-import ViewInArIcon from '@mui/icons-material/ViewInAr';
-import {
-  BublyApp,
-  BublyStoreProvider,
-  BubbleRouteRegistry,
-  BUBBLE_ARRANGEMENT_DOMAIN,
-  makeSnapshotCodec,
-  type BublyMenuItem,
-} from '@bublys-org/bubbles-ui';
+import { BublyApp, BublyStoreProvider, BubbleRouteRegistry, BUBBLE_ARRANGEMENT_DOMAIN, makeSnapshotCodec } from '@bublys-org/bubbles-ui';
 
 // hotel-shift-puzzle-libs のslices等をimport（副作用で自動注入される）
 import { useSampleWhenEmpty } from '@bublys-org/hotel-shift-puzzle-libs';
 
 // ルート登録（app側で管理）
-import { hotelShiftPuzzleBubbleRoutes, scheduleUrl, shiftWishListUrl } from '../registration/index.js';
+import { hotelShiftPuzzleBubbleRoutes, scheduleUrl } from '../registration/index.js';
 import { MID_MONTH_SCHEDULE_ID } from '@bublys-org/hotel-shift-puzzle-libs';
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
-import { menuItems } from "../bubly.js";
+import { menuItems } from "../bubly";
 
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 
