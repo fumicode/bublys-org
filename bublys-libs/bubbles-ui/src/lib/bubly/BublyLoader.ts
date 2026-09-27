@@ -105,26 +105,58 @@ const createBublyContext = (registeredRoutes: BubbleRoute[]): BublyContext => ({
 });
 
 /**
+ * **読み込みは 1 本ずつ。**
+ *
+ * 「増えたものが、いま読んだバブリ」と言えるのは、その間に**ほかが増えない**とき
+ * だけ。復元は保存済みのオリジンを一斉に読むので（`restoreSavedBublies`）、
+ * 並べて走らせると控えと突き合わせる相手がずれ、**別のバブリを掴む**
+ * ── 実測：4 本を復元すると、取ってきた先が 3 本ぶん行方不明になった。
+ * 読むのは script 1 枚ぶんなので、順に読んでも待ち時間はほとんど変わらない。
+ */
+let loadingChain: Promise<unknown> = Promise.resolve();
+
+/**
  * バブリをURLからロード
  */
 export const loadBublyFromUrl = async (url: string): Promise<Bubly | null> => {
+  const mine = loadingChain.then(() => loadBublyFromUrlOnce(url), () => loadBublyFromUrlOnce(url));
+  loadingChain = mine;
+  return mine;
+};
+
+const loadBublyFromUrlOnce = async (url: string): Promise<Bubly | null> => {
   try {
+    /**
+     * ★ **読み込む前の顔ぶれを控える。**
+     *
+     *   読み込んだあと「最後に登録されたバブリ」を掴んでいたが、これは
+     *   **何も登録されなかったときに、もとから居たものを掴む**
+     *   ── 取りに行った先が JavaScript でなければ（相対パスとして OS 自身を叩いて
+     *   404 の HTML が返る、など）script は読めてしまい（`onload` は走り、中で
+     *   `Unexpected token '<'` になるだけ）、失敗が**別のバブリのロード成功**として
+     *   返っていた。そのバブリのルートが二重に登録され、間違ったオリジンが覚えられる。
+     *
+     *   控えるのは**名前ではなく実体**。同じ名前で読み直したとき（作り直した
+     *   バンドルを入れ直す）は名前が変わらないので、名前だけでは増減が分からない。
+     */
+    const before = new Map(Object.entries(window.__BUBLYS_BUBLIES__ ?? {}));
+
     await loadScript(url);
 
-    // バブリがwindow.__BUBLYS_BUBLIES__に登録されているか確認
     const bublies = window.__BUBLYS_BUBLIES__;
     if (!bublies) {
       console.error("[BublyLoader] No bublies found in window.__BUBLYS_BUBLIES__");
       return null;
     }
 
-    // 最後に登録されたバブリを取得
-    const bublyNames = Object.keys(bublies);
-    const latestBublyName = bublyNames[bublyNames.length - 1];
-    const bubly = bublies[latestBublyName];
+    // 増えた／入れ替わったものが、いま読んだバブリ
+    const bubly = Object.values(bublies).find((b) => before.get(b.name) !== b);
 
     if (!bubly) {
-      console.error("[BublyLoader] Bubly not found");
+      console.error(
+        `[BublyLoader] ${url} を読んでも、バブリは 1 つも名乗り出なかった` +
+          "（取りに行った先が bubly.js ではないかもしれない）",
+      );
       return null;
     }
 
