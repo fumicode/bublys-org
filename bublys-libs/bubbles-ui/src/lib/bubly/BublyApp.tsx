@@ -37,7 +37,6 @@ import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
 import { DragDataType } from '../utils/drag-types.js';
 import { BublyMenuItem } from './BublyTypes.js';
-import { DemoSwitcher } from './DemoSwitcher.js';
 
 /**
  * BublyApp のプロパティ
@@ -288,17 +287,24 @@ export const BublyApp: FC<BublyAppProps> = ({
         </List>
 
         {/*
-          ★ **どのデモからでも、他のデモへ行ける。**
-            審査員が最初に踏む url は 1 つだけなので、そこが行き止まりだと残りは
-            無かったことになる。一覧は `demoSites.ts` の 1 か所から来る。
+          ★ **ほかのデモへ行く口は、ここには置かない。**
+            この脇の帯はアイコン 1 列ぶんの幅しかないので、行き先を並べると
+            名前が切れて「OS / シフ / 碁 / 学」としか読めない。
+            行き先の一覧は OS の「他のデモ」の泡が持っている（`DemoSwitcher` は残す）。
+          ★ 下に付くのは、そのバブリが渡した口（`sidebarFooter`）だけ。
+            **上の並びと同じアイコン 1 つぶん**にする ── ここだけ字の入った箱にすると、
+            幅に収まらずに切れる（実測：「キャッシュクリア」が読めなかった）。
         */}
-        <Box sx={{ mt: 'auto', p: 1, borderTop: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)' }}>
-          <DemoSwitcher />
-        </Box>
-
-        {/* フッター */}
         {sidebarFooter && (
-          <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <Box
+            sx={{
+              mt: 'auto',
+              p: 0.5,
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
             {sidebarFooter}
           </Box>
         )}

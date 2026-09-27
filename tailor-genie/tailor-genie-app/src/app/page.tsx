@@ -3,7 +3,7 @@
 import ChatIcon from "@mui/icons-material/Chat";
 import PersonIcon from "@mui/icons-material/Person";
 import DeleteIcon from "@mui/icons-material/Delete";
-import { Button } from "@mui/material";
+import { IconButton, Tooltip } from "@mui/material";
 import {
   BublyApp,
   BublyStoreProvider,
@@ -33,25 +33,25 @@ const handleClearLocalStorage = () => {
   }
 };
 
+/**
+ * 保存を消してやり直す口 ── **アイコン 1 つ**。
+ *
+ * 脇の帯はアイコン 1 列ぶんの幅しかないので、字の入った箱を置くと切れる
+ * （実測：「キャッシュクリア」が読めなかった）。上の並びと同じ姿にする。
+ */
 const sidebarFooter = (
-  <Button
-    variant="outlined"
-    size="small"
-    startIcon={<DeleteIcon />}
-    onClick={handleClearLocalStorage}
-    sx={{
-      color: "rgba(255,255,255,0.6)",
-      borderColor: "rgba(255,255,255,0.3)",
-      fontSize: 12,
-      width: "100%",
-      "&:hover": {
-        borderColor: "rgba(255,255,255,0.5)",
-        backgroundColor: "rgba(255,255,255,0.1)",
-      },
-    }}
-  >
-    キャッシュクリア
-  </Button>
+  <Tooltip title="保存を消してやり直す" placement="right" arrow>
+    <IconButton
+      size="small"
+      onClick={handleClearLocalStorage}
+      sx={{
+        color: "rgba(255,255,255,0.6)",
+        "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" },
+      }}
+    >
+      <DeleteIcon fontSize="small" />
+    </IconButton>
+  </Tooltip>
 );
 
 function TailorGenieApp() {
