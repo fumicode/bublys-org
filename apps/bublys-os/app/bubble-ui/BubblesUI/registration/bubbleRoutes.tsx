@@ -31,15 +31,18 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
 import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
-import { WorldLineHomeBubble } from "../feature/WorldLineHomeBubble";
+/**
+ * ★ **家具の泡は lib から借りる**（世界線・見え方の口・ポケット）。どの空間にも
+ *   居てよいものなので、ここに書き下すと別の空間が同じものを持てない。
+ *   ここに残すのは**この OS だけで開けるもの**。
+ */
+import { furnitureBubbleRoutes } from "@bublys-org/space-furniture";
 import { GuideHomeBubble, GUIDE_CARD } from "@/app/guide/GuideHomeBubble";
 import { GuideEntryBubble } from "@/app/guide/GuideEntryBubble";
 import { GuideCard } from "@/app/guide/GuideCard";
 import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
 import { BublyCard, BUBLY_CARD_HEIGHT } from "@/app/launcher/BublyCard";
-import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
-import { SpaceViewBubble } from "@bublys-org/bubble-space-shell";
 import { LIST_BOX, LIST_CARD_WIDTH } from "@bublys-org/bubble-layout-feature";
 import "@/app/launcher/launchTargets";
 
@@ -58,30 +61,6 @@ const routes: BubbleRoute[] = [
     pattern: /^mob$/,
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
-  },
-
-  // 世界線 view の標準 UI は BubbleArrangementWorldLineControls 側の overlay。
-  // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
-  // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
-  // も消える挙動になる点だけ要注意。
-  /**
-   * この空間の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
-   * 岸に貼ってある 48×48 のときはアイコン、押すと同じ url の泡が開いて、
-   * 広いそちらが世界線を映す。
-   */
-  {
-    pattern: /^world-lines$/,
-    type: "world-lines",
-    Component: WorldLineHomeBubble,
-    /**
-     * ★ 地は**暗いほうへ**（囲碁・メモの世界線と同じ値）。既定の明るい地のままだと
-     *   canvas が白い板になって、節も枝も**読めるのに読みにくい**（線は明るい色で描く）。
-     * ★ 木を描く canvas なので、開いた先はそれなりの広さが要る。
-     */
-    bubbleOptions: {
-      contentBackground: "rgba(15,18,28,0.3)",
-      defaultSize: { width: 520, height: 340 },
-    },
   },
 
   /**
@@ -221,15 +200,8 @@ const routes: BubbleRoute[] = [
   // ランチャー（呼び出しを溜めるバブリ）。root では左の岸に着いている
   ...launcherBubbleRoutes,
 
-  // 見え方（開き方・ネオンの通し方・レンズの向き）。前は画面の左上に固定した帯だった
-  {
-    pattern: /^space-view$/,
-    type: "space-view",
-    Component: SpaceViewBubble,
-    // 地は敷かない ── ボタンが空間の上に浮いて見える
-    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
-    bubbleOptions: { defaultSize: { width: 482, height: 44 }, contentBackground: "transparent" },
-  },
+  // 岸に貼る家具（世界線・見え方の口・ポケット）。どの空間でも同じ 3 つ
+  ...furnitureBubbleRoutes,
 
   // 他のデモへ行く口。これも 1 つの泡 ── いつも見えていてほしいので、既定では下の岸に貼る
   {
@@ -238,16 +210,6 @@ const routes: BubbleRoute[] = [
     Component: DemoSitesBubble,
     // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の DEMO_SITES_SIZE）と同じ
     bubbleOptions: { defaultSize: { width: 430, height: 44 }, contentBackground: "transparent" },
-  },
-
-  // ポケット（オブジェクトのクリップボード）。前は画面に居座る面だったが、1 つの泡にした
-  // ── いつも見えていてほしければ岸に貼る
-  {
-    pattern: /^pocket$/,
-    type: "pocket",
-    Component: PocketBubble,
-    // 地は中身が持つ ── 大きいときは自分で白い箱を描き、アイコンだけのときは空間を透かす
-    bubbleOptions: { defaultSize: { width: 246, height: 266 }, contentBackground: "transparent" },
   },
 
   // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）

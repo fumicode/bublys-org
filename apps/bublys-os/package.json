@@ -14,6 +14,7 @@
     "@bublys-org/memo-libs": "*",
     "@bublys-org/object-shell": "*",
     "@bublys-org/object-transformer-libs": "*",
+    "@bublys-org/space-furniture": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/task-libs": "*",
     "@bublys-org/users-libs": "*",

@@ -155,6 +155,9 @@
     },
     {
       "path": "./bublys-libs/object-types"
+    },
+    {
+      "path": "./bublys-libs/space-furniture"
     }
   ]
 }

@@ -79,13 +79,16 @@
       "path": "../../users-bubly/users-libs"
     },
     {
-      "path": "../../bublys-libs/bubble-space-shell"
+      "path": "../../bublys-libs/space-furniture"
     },
     {
       "path": "../../bublys-libs/bubble-layout-feature"
     },
     {
       "path": "../../memo-bubly/memo-libs"
+    },
+    {
+      "path": "../../bublys-libs/bubble-space-shell"
     },
     {
       "path": "../../bublys-libs/object-shell"
