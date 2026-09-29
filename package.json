@@ -111,6 +111,9 @@
     "object-transformer-bubly/*",
     "launcher-bubly/*",
     "task-bubly/*",
-    "memo-bubly/*"
+    "memo-bubly/*",
+    "map-bubly/*",
+    "activity-bubly/*",
+    "itinerary-bubly/*"
   ]
 }

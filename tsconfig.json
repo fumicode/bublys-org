@@ -158,6 +158,18 @@
     },
     {
       "path": "./bublys-libs/space-furniture"
+    },
+    {
+      "path": "./itinerary-bubly/itinerary-libs"
+    },
+    {
+      "path": "./activity-bubly/activity-libs"
+    },
+    {
+      "path": "./map-bubly/map-libs"
+    },
+    {
+      "path": "./apps/travel-space"
     }
   ]
 }
