@@ -685,6 +685,42 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   /**
+   * **並びごと閉じる。**
+   *
+   * ★ くっつけて 1 つの塊にしたものは、**畳むときも塊で畳みたい**
+   *   ── 1 枚ずつ ✕ を押させると、くっつけた意味が畳むときだけ消える。
+   * ★ **一度の書き込みで全部消す。** 1 つずつ `closeBubble` を呼ぶと、
+   *   途中で「並びは 2 つ以上」の決まりが働いて見えない親が畳まれ、
+   *   残りが並びの外へこぼれる（そこから先はただの泡なので、閉じ方も変わる）。
+   * ★ 並びに入っていない泡に対しては、その泡だけを閉じる（同じ口でよい）。
+   */
+  const closeRow = useCallback(
+    (id: BubbleId) => {
+      const row = world.rowOf(id);
+      if (!row) return closeBubble(id);
+      const ids = world.kidsOf(row.id).map((b) => b.id);
+      const seen = new Map(
+        base.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }]),
+      );
+      const next = reshape(world, actContext(viewport, seen, rules), (w) => {
+        let x = w;
+        for (const k of ids) x = x.without(k);
+        return { world: x, keep: [] };
+      }).world;
+      setWorld(next);
+      setUrls((m) => {
+        const n = new Map(m);
+        for (const k of ids) n.delete(k);
+        return n;
+      });
+      setSelectedId((sel) => (sel !== null && ids.includes(sel) ? null : sel));
+      markSettled('members');
+    },
+    [world, base, viewport, rules, setWorld, closeBubble, markSettled],
+  );
+
+
+  /**
    * 外の空間のレンズを変える。書くのは View の 1 つの軸だけ（泡の値は 1 つも書かない）。
    * ★ ここが**レンズの向きを決める唯一の所**（人が口で選ぶか、「まかせる」が決めるか）。
    *   開く側（`openAt`）はもう触らない ── 口が言っていることが、そのまま海の振る舞い。
@@ -1171,8 +1207,27 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   点線の枠も札も、掴むための縁（外周12px）も描かれず、
        *   **兄弟たちをまとめて動かせなくなる**（v6 で踏んだ）。
        *   ラボと同じ見本（`BubbleShell`）に任せる ── ③ 見えない親は外周でしか掴めない。
+       * ★ **まとめて閉じる口は、ここに置く。** 並びを掴む所（外周）と同じ側に揃えるため
+       *   ── 泡の見出しに置くと「この泡の口」に見えるし、泡の数だけ同じ口が並ぶ。
+       * ★ 口と名札を**1 本の帯にまとめる**。別々に置くと、名札を口のぶんだけ右へ
+       *   寄せるのに口の幅を数えることになる ── 字や余白を変えたときに写しが古くなる。
+       *   名札の字は見本と同じものを使い、見本の札のほうは CSS で引っ込める。
        */
-      if (!url) return <BubbleShell draw={draw} />;
+      if (!url)
+        return (
+          <>
+            <div className="bl-rowtag">
+              <button
+                className="bl-close-row"
+                title="この並びをまとめて閉じる"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => closeRow(id)}
+              >× 閉じる</button>
+              <span className="bl-rowname">{draw.label}</span>
+            </div>
+            <BubbleShell draw={draw} />
+          </>
+        );
       const r = renderRoute(routes, id, url);
       /**
        * ★ **一覧の中の札は、選んでいるものだけ url を出す。**
@@ -1309,7 +1364,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, frameTools, viewChoice, listHosts],
+    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

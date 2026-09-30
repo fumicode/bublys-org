@@ -4,6 +4,7 @@ import { FC, ReactNode, useState, useRef, useEffect, useCallback, useMemo } from
 import styled from "styled-components";
 import { ObjectView, objectFilmLook, setDragPayload, getDragType } from "@bublys-org/bubbles-ui";
 import type { CsvColumnState, CsvRowState, PlaneObject } from "@bublys-org/csv-importer-model";
+import { isComposing } from "@bublys-org/bubbles-ui";
 
 type SheetEditorViewProps = {
   sheetName: string;
@@ -123,6 +124,11 @@ export const SheetEditorView: FC<SheetEditorViewProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    /**
+     * ★ **変換の最中の打鍵は、欄に対する合図ではない**（`ime.ts` の註）。
+     *   見ていなかったので、「はこね」を変換した Enter でセルから追い出されていた。
+     */
+    if (isComposing(e)) return;
     if (e.key === "Enter") {
       commitEditing();
     } else if (e.key === "Escape") {

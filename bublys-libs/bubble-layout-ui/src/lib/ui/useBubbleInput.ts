@@ -408,8 +408,14 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
      *   押した時点で `setPointerCapture` すると、そのあとの **click / dblclick まで層に来る**
      *   （捕まえると互換のマウスイベントも捕まえた要素へ配られる）。
      *   泡の中身が本物の UI のとき、これだとボタンもダブルクリックも死ぬ。
+     * ★ **捕まえ損ねても、掴むのはやめない。** もう離れている指を捕まえようとすると
+     *   ブラウザが投げる。そこで止まると、押した記録（pointers）だけが残って
+     *   **次から何も掴めなくなる**（ドロップダウンを開いた直後がこれ）。
+     *   2 本指のほうは先に同じことを学んでいたのに、こちらは素のままだった。
      */
-    const capture = () => layerRef.current?.setPointerCapture(e.pointerId);
+    const capture = () => {
+      try { layerRef.current?.setPointerCapture(e.pointerId); } catch { /* 捕まえられないだけ */ }
+    };
     touched.current = null;
     const pick = pickAt(pickInput(e.pointerType !== 'mouse'), mx, my);
 
@@ -797,11 +803,20 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    */
   const onWheelRef = useRef<(e: WheelEvent) => void>(() => undefined);
   onWheelRef.current = (e: WheelEvent) => {
+    /**
+     * ★ **中身が転がせるなら、中身が先。** 海はホイールを無条件に取り上げていたので、
+     *   泡の中の巻物（CSV の表、メモの行、ポケット）が**指でもトラックパッドでも
+     *   1px も動かなかった**（実測）。転がしきってから海の番にする。
+     * ★ 寄る（ctrl / ⌘ / 左ボタン）は例外 ── あれは中身の話ではなく画面の話なので、
+     *   どこで回しても海が受ける。
+     */
+    const zooming = e.ctrlKey || e.metaKey || (e.buttons & 1) !== 0;
+    if (!zooming && rollableUnder(e, layerRef.current)) return;
     e.preventDefault();
     e.stopPropagation();
     const { mx, my } = pt(e);
     // 左ボタンを押しながら（`buttons` の 1 ビット目）も、ピンチと同じ
-    if (e.ctrlKey || e.metaKey || (e.buttons & 1) !== 0) {
+    if (zooming) {
       if (drag.current) {
         drag.current = null;                 // 掴みかけは捨てる（押していたのは寄るための合図）
         show();
@@ -820,6 +835,43 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     return () => el.removeEventListener('wheel', on);
   }, [layerRef]);
 
+  /**
+   * **指が離れたことを、海の外でも受け取る。**
+   *
+   * ★ 海は自分の面に来た `pointerup` でしか指を数え直していなかった。ところが
+   *   **ドロップダウンを開くと、離した合図が海に返ってこない**（開いた一覧は
+   *   ブラウザの外側にあり、そこで離される）。すると指が 1 本押されたままとして残り、
+   *   次に触った瞬間に「2 本目が着いた」＝ 2 本指の手つきと見なされて、
+   *   **画面のどこも普通に触れなくなる**（実測で踏んだ）。
+   * ★ 窓そのものが焦点を失ったときも数え直す ── ドロップダウンやタブの切り替えでは
+   *   離した合図さえ来ないので、これが最後の砦。
+   * ★ ここでするのは**数え直しだけ**。触った・落としたの後始末は海の面が受け取った
+   *   ときの仕事なので、ここでは走らせない（走らせると、窓を離れただけで
+   *   焦点が動く）。
+   */
+  useEffect(() => {
+    const forget = (id?: number) => {
+      if (id === undefined) pointers.current.clear();
+      else pointers.current.delete(id);
+      if (pointers.current.size < 2) pinch.current = null;
+      // まだ動かしていない掴みかけは捨てる（掴んだつもりが残ると、次の一手が飛ぶ）
+      if (pointers.current.size === 0 && drag.current && !drag.current.started) {
+        drag.current = null;
+        touched.current = null;
+      }
+    };
+    const onUp = (e: PointerEvent) => forget(e.pointerId);
+    const onBlur = () => forget();
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+
   return {
     handlers: {
       onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag,
@@ -837,3 +889,31 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
 
 /** 角に当たっているか（カーソルの形を変えるときに使う） */
 export { onHandle, hitModelAt };
+
+/**
+ * **指の下に、まだ転がせる中身があるか。**
+ *
+ * > 中身が転がせるなら、中身が先。転がしきったら、外（海）の番。
+ *
+ * ★ 見るのは「転がせる箱か」だけでなく「**その向きにまだ余地があるか**」。
+ *   余地を見ないと、いちばん下まで行った表の上でいつまでも海が動かせなくなる。
+ * ★ 海の面（`stop`）まで遡ったら終わり。そこから先は海そのものなので、海が受ける。
+ */
+const rollableUnder = (e: WheelEvent, stop: HTMLElement | null): boolean => {
+  const sideways = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  let el = e.target instanceof HTMLElement ? e.target : null;
+  while (el && el !== stop) {
+    const style = getComputedStyle(el);
+    if (sideways) {
+      const can = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth - el.clientWidth > 1;
+      const room = e.deltaX < 0 ? el.scrollLeft > 0 : el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      if (can && room) return true;
+    } else {
+      const can = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight - el.clientHeight > 1;
+      const room = e.deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+      if (can && room) return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+};

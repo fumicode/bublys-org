@@ -2,6 +2,7 @@
 
 import { FC, useState, useRef, useEffect } from "react";
 import EditIcon from "@mui/icons-material/Edit";
+import { isCommitKey, isComposing } from "../utils/ime.js";
 
 type EditableTextProps = {
   value: string;
@@ -53,9 +54,10 @@ export const EditableText: FC<EditableTextProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    /** ★ 変換の最中の Enter / Escape は、欄に対する合図ではない（`ime.ts` の註） */
+    if (isCommitKey(e)) {
       handleSave();
-    } else if (e.key === "Escape") {
+    } else if (e.key === "Escape" && !isComposing(e)) {
       handleCancel();
     }
   };

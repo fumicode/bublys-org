@@ -56,7 +56,7 @@ export interface SnapTarget {
   readonly axis: PlaneAxis;
   /** 相手の後ろ側の縁か */
   readonly after: boolean;
-  /** 縁どうしの距離（画面 px） */
+  /** **指から相手の縁まで**の距離（画面 px） */
   readonly dist: number;
 }
 
@@ -123,14 +123,21 @@ export function dropTargetAt(world: BubbleWorld, q: DropQuery, rules: LayoutRule
 }
 
 /**
- * lab.html 1225-1246 行 snapAt。掴んだ泡の縁が、ほかの泡の縁に寄っているか（画面で測る）。
- * 相手は「自由に置く空間の泡」か「見えない親の中の泡」で、窓が離す先と同じもの。いちばん近い縁を返す。
- * 並びの中で並びの軸に沿ってドラッグしているあいだは、土台の並べ替え（順序の書き込み）に任せる。
+ * くっつく相手を探す。
+ *
+ * > **見るのは、掴んでいる指がどこに居るか。** 泡の縁どうしの近さではない。
+ *
+ * ★ 前は「掴んだ泡の縁」と「相手の縁」の距離で決めていた。だから**泡が大きいほど
+ *   縁が遠くまで届き、離れた所を触っているつもりでも近くの泡に吸い付いた**
+ *   ── 大きい泡を動かすと、通り道の泡に次々くっついてしまう。
+ *   指で測れば、泡の大きさは関係なくなる ── **触っている所が、くっつける所**。
+ * ★ 相手は「自由に置く空間の泡」か「見えない親の中の泡」で、窓が離す先と同じもの。
+ *   いちばん近い縁を返す。
+ * ★ 並びの中で並びの軸に沿ってドラッグしているあいだは、土台の並べ替えに任せる。
  */
 export function snapCandidateAt(world: BubbleWorld, q: DropQuery, slot: DropSlot): SnapTarget | null {
-  const D = q.grabbed.rect;
   const win = world.windowOf(slot.space);
-  if (!D) return null;
+  if (!q.grabbed.rect) return null;
   // 距離が同じなら先に見たほうが勝つ（dist < best.dist）。ラボは frameItems（描いた順）をそのまま回す
   let best: SnapTarget | null = null;
   for (const P of q.layout.order) {
@@ -141,13 +148,19 @@ export function snapCandidateAt(world: BubbleWorld, q: DropQuery, slot: DropSlot
     const T = q.screen.get(P.id) ?? P;
     for (const axis of ['x', 'y'] as const) {
       const o: PlaneAxis = axis === 'x' ? 'y' : 'x';
-      const overlap = Math.min(hi(D, o), hi(T, o)) - Math.max(lo(D, o), lo(T, o));
-      if (overlap < METRICS.SNAP_OVERLAP * Math.min(len(D, o), len(T, o))) continue;
+      /**
+       * ★ **その縁の前に指が居ること。** 直交する向きで相手の幅から外れていたら、
+       *   縁に近くても「その縁を狙っている」とは言えない
+       *   （相手の斜め上を通っただけでくっつく、を避ける）。
+       */
+      if (q.pointer[o] < lo(T, o) - METRICS.SNAP_EDGE) continue;
+      if (q.pointer[o] > hi(T, o) + METRICS.SNAP_EDGE) continue;
       // 並びに加わる（並びは2つ以上なので、親は増やさない）
       const join = !!row && verbOf(V[axis].dim) === 'reorder';
       if (join && P.space === q.grabbed.space && !slot.out) continue;
       for (const after of [false, true]) {
-        const dist = Math.abs(after ? lo(D, axis) - hi(T, axis) : hi(D, axis) - lo(T, axis));
+        /** ★ **指から相手の縁まで**の距離。掴んだ泡の大きさは関わらない */
+        const dist = Math.abs(q.pointer[axis] - (after ? hi(T, axis) : lo(T, axis)));
         if (dist <= METRICS.SNAP_EDGE && (!best || dist < best.dist)) {
           best = { kind: join ? 'join' : 'born', target: P.id, axis, after, dist };
         }
