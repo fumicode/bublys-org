@@ -8,7 +8,7 @@ import type { ItineraryPlain } from "../domain/Itinerary.domain.js";
 import { selectItineraries, setItineraryList } from "../slice/itinerary-slice.js";
 
 /** 見本の旅程の ID（ランチャーから直に開けるように固定にする） */
-export const SAMPLE_ITINERARY_ID = "hakone-1n2d";
+export const SAMPLE_ITINERARY_ID = "echigo-1n2d";
 
 /**
  * **空の旅程**を 1 つだけ置く。
@@ -23,7 +23,7 @@ export const SAMPLE_ITINERARY_ID = "hakone-1n2d";
  */
 const emptyItinerary = (): ItineraryPlain => ({
   id: SAMPLE_ITINERARY_ID,
-  title: "箱根 1泊2日",
+  title: "越後妻有 1泊2日",
   days: [],
 });
 
