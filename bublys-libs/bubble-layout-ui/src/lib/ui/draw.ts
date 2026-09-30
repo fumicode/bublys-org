@@ -459,7 +459,21 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
     home && (home.view.x.lens === 'fisheye' || home.view.y.lens === 'fisheye')
       ? LENS_CONTENT_MIN
       : CONTENT_MIN;
-  const held = !!home && home.id !== 'root' && home.view.z.dim === 'none' && b.id !== c.grabbed;
+  /**
+   * ★ **切るかどうかは「奥行きを使っているか」で決める。**
+   *
+   * > 前は `z.dim === 'none'` で見ていた。これは「奥行きを使っていない」の**写し**で、
+   * > 並べ方（縦・横・格子・魚眼）はどれも z が `none` なので、そのあいだは合っていた。
+   * > ところが**「自由に置く」だけは z を持っている**（`free.z`・透視）── 使っていないのに
+   * > 持っているだけで、**切られない側に落ちた**。自由に置く子の空間は
+   * > 本計画づくりの場が最初だったので、そこで初めて中身が箱の外へ出た（実測）。
+   *
+   * ★ 見るのは**z に何かを刺しているか**（`arrange`）。奥行きに重ねる・重ねて置く・
+   *   履歴を奥行きに、の 3 つだけが z に順序を刺していて、それらは箱の外へ伸びる絵なので
+   *   切ってはいけない。残りは全部切る ── 「自由に置く」もここに入る。
+   */
+  const usesDepth = home ? home.view.z.arrange !== 'as-is' : false;
+  const held = !!home && home.id !== 'root' && !usesDepth && b.id !== c.grabbed;
   /** 留めの原点（画面の座標）。留めないときは画面そのもの（0,0） */
   let ox = 0;
   let oy = 0;

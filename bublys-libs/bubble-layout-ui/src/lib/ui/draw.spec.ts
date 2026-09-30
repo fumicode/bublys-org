@@ -5,7 +5,7 @@
  *   `docs/bubble-space-prototype/v5-dom/_check/react.mjs`（12 場面・6264 個の数・**DOM の差 0px**）。
  *   ここはその手前の、目で読める形の見張り。
  */
-import { labScene, resolveWorld, VIEWPORT } from '@bublys-org/bubble-layout';
+import { labScene, resolveWorld, VIEWPORT, withPreset } from '@bublys-org/bubble-layout';
 import { DRAW_MIN, drawField, markTiny, rowsOf } from './draw.js';
 
 /** 画面が無いので、字幅は作り物（幅は「1文字 ≒ 0.62em」。ラボの実測に近い数） */
@@ -200,4 +200,42 @@ describe('描く ── 配置 → DOM の属性', () => {
       expect(draw.bands[0]?.on).toBe(true);
     });
   });
+});
+
+/**
+ * ★ **箱の中のものは、箱の外へ出ない。**
+ *
+ * 切るかどうかは「その空間が奥行きを使っているか」で決める。前は `z.dim === 'none'` で
+ * 見ていて、並べ方はどれも z が none なので合っていたが、**「自由に置く」だけは z を持つ**
+ * ので切られない側に落ちていた ── 自由に置く子の空間（本計画づくりの場）で、
+ * 中身が箱の外へ出た（実測）。
+ */
+describe('箱の中のものを、箱の外へ出さない', () => {
+  /** その空間の主でない子を 1 つ選び、留め（bl-hold）が切っているかを返す */
+  const clipsChildren = (preset: Parameters<typeof withPreset>[1]) => {
+    const base = labScene();
+    const layout0 = resolveWorld(base, VIEWPORT);
+    const child = layout0.order.find((p) => p.space !== 'root');
+    if (!child) throw new Error('入れ子の海がいない場面');
+    const world = withPreset(base, preset, child.space);
+    const layout = resolveWorld(world, VIEWPORT);
+    const draw = drawField({ world, layout, viewport: VIEWPORT, measureText });
+    const it = draw.items.find((i) => i.id === child.id);
+    if (!it) throw new Error('子が描かれていない');
+    return it.hold['overflow'] === 'hidden';
+  };
+
+  it.each(['free', 'column', 'row', 'grid', 'coverflow', 'coverflowY', 'coverflowGrid'] as const)(
+    '%s の空間は、中身を箱で切る',
+    (preset) => {
+      expect(clipsChildren(preset)).toBe(true);
+    },
+  );
+
+  it.each(['stackDepth', 'stackZ', 'histZ'] as const)(
+    '%s は奥行きに伸びる絵なので、切らない',
+    (preset) => {
+      expect(clipsChildren(preset)).toBe(false);
+    },
+  );
 });

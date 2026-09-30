@@ -40,6 +40,25 @@ const viewToolLeft = (
   return Math.max(0, (left - at.x) / Math.max(0.05, at.scale));
 };
 
+/**
+ * 見え方の口を、箱の上から下へ逃がす量（要らなければ `undefined`）。
+ *
+ * ★ 口は箱の**上**に出る（CSS の `bottom:100%`）ので、箱の上端が画面より上に居ると
+ *   口ごと画面の外に出る ── **本計画づくりの場が画面より高いときがこれ**で、
+ *   見え方を変える手が無くなる（実測で言われた）。横は `viewToolLeft` が同じことを
+ *   していたのに、縦は素のままだった。
+ * ★ 逃がすときは箱の**中**の上端すぐ下に置く。CSS の高さを写さずに済むので、
+ *   口のかたちを変えてもここは直さなくてよい。
+ */
+const viewToolTop = (
+  at: { readonly y: number; readonly scale: number } | undefined,
+  area: { readonly y: number } | undefined,
+): number | undefined => {
+  if (!at) return undefined;
+  const need = ((area?.y ?? 0) + 8 - at.y) / Math.max(0.05, at.scale);
+  return need > 0 ? need : undefined;
+};
+
 /** 開いた泡の覚え書き（domain には入れない） */
 /** 泡の箱に対する割合（0〜1）で言う、中の一点 */
 export interface Spot {
@@ -349,6 +368,18 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   /** 一覧の空間として覚える（もう覚えていれば何もしない ── 描き直しの引き金にしない） */
   const noteListHost = useCallback((id: BubbleId) => {
     setListHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  /**
+   * **中に空間を持っている泡**（`setChildren` を呼んだ泡ぜんぶ）。一覧かどうかは問わない。
+   *
+   * ★ 前は一覧の棚 1 つで、**見え方の口を出すこと**と**札を静かにすること**（＝帯を外して
+   *   掴めなくすること）の両方が決まっていた。だから座標を自分で書く空間が
+   *   「一覧ではない」と名乗ると、口まで消えて**見え方を変える手が無くなった**（実測で言われた）。
+   * ★ 2 つは別の話なので、棚も 2 つに分ける ── 口はここ、札の静かさは `listHosts`。
+   */
+  const [spaceHosts, setSpaceHosts] = useState<ReadonlySet<BubbleId>>(() => new Set());
+  const noteSpaceHost = useCallback((id: BubbleId) => {
+    setSpaceHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
@@ -862,7 +893,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
       const { preset, itemWidth, reserve, step, cols, grow, at, list } = how;
-      /** ★ 一覧ではない空間（座標を自分で書く盤）は、一覧として覚えない（`list` の註） */
+      /** ★ 中に空間を持つ泡として覚えるのは、一覧でもそうでなくても（見え方の口はどちらにも要る） */
+      noteSpaceHost(hostId);
+      /** ★ 一覧ではない空間（座標を自分で書く場）は、一覧として覚えない（`list` の註） */
       if (list !== false) noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
@@ -1005,7 +1038,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls(m);
       setWorld(w);
     },
-    [world, urls, routes, setWorld, noteListHost],
+    [world, urls, routes, setWorld, noteListHost, noteSpaceHost],
   );
 
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
@@ -1268,10 +1301,13 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             ))}
           </div>
           {/*
-            ★ **一覧の泡には、並べ方の口を枠の上に出す**（仮の置き場所）。
-              一覧かどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
+            ★ **中に空間を持つ泡には、見え方の口を枠の上に出す**（仮の置き場所）。
+              持っているかどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
-              7 つ並べる場所が無い ── まずは外に出して形を見る。
+              並べて置く場所が無い ── まずは外に出して形を見る。
+            ★ **一覧かどうかでは決めない。** 座標を自分で書く空間（本計画づくりの場）も
+              見え方は変えたいので、口は要る ── 一覧の棚（`listHosts`）が決めるのは
+              札を静かにするかどうかだけ。
           */}
           {/*
             ★ **窓の見え方の口も、同じ棚に出す**（`frameTools`）。一覧の口とは出る相手が違う
@@ -1280,7 +1316,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               （いまは出てこない：窓は子を並べない）。
           */}
           {r && frameTools?.(r.bubble, r.route)}
-          {listHosts.has(id) && (
+          {spaceHosts.has(id) && (
             /**
              * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
              *   箱が画面より広くなると（横に並べる・格子）**左端ごと画面の外へ出て、
@@ -1290,7 +1326,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
              */
             <div
               className="bl-view"
-              style={{ left: viewToolLeft(base.byId.get(id), openArea) }}
+              style={(() => {
+                /** 箱の上が画面より上に居るときだけ、口を箱の中へ逃がす（`viewToolTop` の註） */
+                const top = viewToolTop(base.byId.get(id), openArea);
+                return {
+                  left: viewToolLeft(base.byId.get(id), openArea),
+                  ...(top === undefined ? {} : { top, bottom: 'auto' as const }),
+                };
+              })()}
               onPointerDown={(e) => e.stopPropagation()}
             >
               {VIEW_CHOICES.map((v) => (
@@ -1364,7 +1407,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts],
+    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts, spaceHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

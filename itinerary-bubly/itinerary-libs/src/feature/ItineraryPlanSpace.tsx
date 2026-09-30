@@ -19,7 +19,15 @@
  * ★ **外の海へ持ち出すのは別の話。** そちらは今までどおり「外に 1 つ増えるだけで、
  *   ここからは減らない」── ほかの一覧と同じ振る舞い。
  */
-import { DragEvent as ReactDragEvent, FC, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  DragEvent as ReactDragEvent,
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useBubbleSpace, useCurrentBubble } from "@bublys-org/bubble-layout-feature";
 import {
   anyObjectDragType,
@@ -35,6 +43,32 @@ import { useHandedPieces } from "./useHandedPieces.js";
 /** 真ん中に置く旅程の url */
 const centerUrl = (itineraryId: string): string => `itineraries/${itineraryId}`;
 
+/**
+ * **場の実寸を見張る。**
+ *
+ * ★ 置き場所は場の大きさから出す（`planLayout`）ので、決め打ちにはできない
+ *   ── 人が辺を掴んで広げたら、そのぶん散らばりも広がってほしい。
+ * ★ 見るのは**倍率の掛かる前の px**（`offsetWidth`）。画面に写った大きさで測ると、
+ *   奥に退いた場では縮んだ数が返ってきて、散らばりが場ごとに変わってしまう。
+ */
+const useBoxSize = (ref: React.RefObject<HTMLElement | null>) => {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) setSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return size;
+};
+
 export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId }) => {
   const space = useBubbleSpace();
   const me = useCurrentBubble();
@@ -47,7 +81,11 @@ export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId })
 
   const center = centerUrl(itineraryId);
 
-  const spots = useMemo(() => planPositions(pieces), [pieces]);
+  /** 場の地。ここを測った大きさが、そのまま散らばりの入れものになる */
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
+  const box = useBoxSize(surfaceRef);
+
+  const spots = useMemo(() => planPositions(pieces, box), [pieces, box]);
   const urls = useMemo(() => [center, ...pieces.map((p) => p.url)], [center, pieces]);
 
   /** 真ん中は旅程。ほかは決まりどおりの所へ */
@@ -69,8 +107,13 @@ export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId })
      *   自分で書いた座標と喧嘩する。
      *   ついでに、子が帯（掴む所）を持ったままになるので**動かせる**。
      */
-    if (me) space.setChildren(me, urls, { preset: "free", at, grow: false, list: false });
-  }, [me, space, urls, at]);
+    /**
+     * ★ **測り終えるまで出さない。** 置き場所は場の実寸から出すので、
+     *   測る前に出すと全部が真ん中に生まれる ── `at` が効くのは**生まれるとき**だけなので、
+     *   あとから寸法が分かっても散らばらない。
+     */
+    if (me && box.w > 0) space.setChildren(me, urls, { preset: "free", at, grow: false, list: false });
+  }, [me, space, urls, at, box.w]);
 
   /**
    * **予定の札をここへ落としたら、旅程から剥がす。**
@@ -108,6 +151,7 @@ export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId })
   /** 盤の地。落とす先であり、案内を出す所でもある */
   const surface = (
     <div
+      ref={surfaceRef}
       data-plan-surface=""
       style={{
         position: "absolute",

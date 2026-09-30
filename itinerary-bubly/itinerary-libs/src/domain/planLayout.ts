@@ -13,6 +13,10 @@
  * ★ **埋まっているほど中心に近い。** 時刻・長さ・金額・場所・日付のうち
  *   いくつ言えているかで決まる。よく埋まっているものほど旅程に入れやすいので、
  *   手の届く所に居てほしい。
+ * ★ **寸法は場の実寸から出す。** 前はここに決め打ちの画素（内側 330・段 70…）が
+ *   書いてあり、場の大きさは別の所（`bubbleRoutes` の `defaultSize`）に書いてあった。
+ *   2 つは誰も揃えないので食い違い、**付箋が場の外へ 102px はみ出した**（実測）。
+ *   いまは場の大きさを受け取り、そこから内側と外側を出す ── 出所が 1 つになる。
  * ★ ここは純粋な計算。React も Redux も知らない。
  */
 
@@ -27,6 +31,9 @@ export type PlanPiece = {
 
 export type PlanSpot = { readonly x: number; readonly y: number };
 
+/** 場の中身の大きさ（枠の内側）。真ん中を原点とした座標を返すのに要る */
+export type PlanBox = { readonly w: number; readonly h: number };
+
 /** 8 方向。上から時計回り */
 const DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
   [0, -1],
@@ -40,51 +47,58 @@ const DIRECTIONS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * **円ではなく楕円**で散らす。
- *
- * ★ 真ん中の旅程が**縦長ではなく横長**（420×380）で、盤も横長だから。
- *   円にすると、斜めの所で旅程に重なるか、上下が盤からはみ出すかのどちらかになる
- *   （実測：円で置いたら付箋が盤の外に出た）。
+ * 真ん中の旅程の箱（`bubbleRoutes` の `itineraries/:id` と同じ）。
+ * 付箋はこれに被らない所に置く。
  */
-const INNER_X = 330;
-const INNER_Y = 250;
-/**
- * 埋まっていないものが 1 段ぶん遠ざかる量。
- *
- * ★ **付箋の丈より大きく**（帯を入れて 92）。小さいと段が違うだけで重なる
- *   ── 一覧をやめて帯が付いたぶん背が伸びたので、45 でも 62 でも足りなかった（実測）。
- *   そのぶん盤も縦に広げてある（`bubbleRoutes` の丈）。
- */
-const RING_X = 70;
-const RING_Y = 100;
+export const CENTER = { w: 420, h: 380 } as const;
+/** 付箋の箱（帯を入れた実寸） */
+export const PIECE = { w: 214, h: 102 } as const;
+/** 箱と箱のすき間（縁とのすき間でもある） */
+const GAP = 16;
 
+/** いちばん遠い段。これ以上は遠くしない */
+const MAX_RING = 2;
 /**
  * 斜めの向きだけ、少し遠くへ。
  *
- * ★ 斜めは縦横どちらの成分も 0.7 倍になるので、**そのままだと真ん中の旅程に被る**
- *   （横に 231 しか出ず、旅程の半幅 210 ＋ 付箋の半幅 100 に届かない）。
+ * ★ 斜めは縦横どちらの成分も 0.7 倍になるので、**そのままだと真ん中の旅程に被る**。
  */
 const DIAGONAL = 1.4;
-/** いちばん遠い段。これ以上は遠くしない（盤から出てしまう） */
-const MAX_RING = 2;
-/**
- * 同じ向き・同じ段にいくつも来たときに、横へずらす量。
- *
- * ★ **付箋の幅（200）より広く。** 狭いと隣どうしが重なって、
- *   何枚あるのかも読めなくなる（実測：88 にしていたら 4 枚が団子になった）。
- */
-const SPREAD = 220;
 
 /** 言える役の数の上限（時刻・長さ・金額・場所・日付） */
 export const MAX_KNOWN = 5;
 
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+
 /**
- * 置き場所を決める。
+ * その場での、内側（ここより近いと旅程に被る）と外側（ここより遠いと場から出る）。
+ *
+ * ★ 場が狭くて内側 > 外側になったら、**外側を取る** ── 旅程に多少被っても、
+ *   場の外に出すよりはよい（外に出たものは掴めない）。
+ */
+const room = (box: PlanBox) => {
+  const inner = { x: CENTER.w / 2 + PIECE.w / 2 + GAP, y: CENTER.h / 2 + PIECE.h / 2 + GAP };
+  const outer = { x: box.w / 2 - PIECE.w / 2 - GAP, y: box.h / 2 - PIECE.h / 2 - GAP };
+  return {
+    outer: { x: Math.max(0, outer.x), y: Math.max(0, outer.y) },
+    inner: { x: Math.min(inner.x, Math.max(0, outer.x)), y: Math.min(inner.y, Math.max(0, outer.y)) },
+  };
+};
+
+/**
+ * 置き場所を決める。真ん中（旅程）を原点とした画素で返す。
  *
  * 仲間は**出てきた順**に方向をもらう。9 つ目からは最初の方向に戻り、
  * そのぶん外側へ出る ── 方向を増やすより、遠くするほうが読み違えない。
  */
-export const planPositions = (pieces: readonly PlanPiece[]): Map<string, PlanSpot> => {
+export const planPositions = (
+  pieces: readonly PlanPiece[],
+  box: PlanBox,
+): Map<string, PlanSpot> => {
+  const { inner, outer } = room(box);
+  /** 隣どうしをずらす量。**付箋の幅より広く**、ただし場に収まる範囲で */
+  const spread = Math.min(PIECE.w + GAP, Math.max(0, outer.x));
+
   const dirOfGroup = new Map<string, number>();
   for (const p of pieces) {
     if (!dirOfGroup.has(p.group)) dirOfGroup.set(p.group, dirOfGroup.size);
@@ -107,10 +121,12 @@ export const planPositions = (pieces: readonly PlanPiece[]): Map<string, PlanSpo
      *   言えている割合で段を割り振れば、差がそのまま近さになる。
      */
     const short = Math.max(0, MAX_KNOWN - piece.known);
-    const ring = Math.round((short / MAX_KNOWN) * MAX_RING) + lap;
+    const ring = Math.min(MAX_RING, Math.round((short / MAX_KNOWN) * MAX_RING) + lap);
+    /** 段は内側から外側までを等分する ── 何段あっても場からは出ない */
+    const t = ring / MAX_RING;
     const diagonal = dir[0] !== 0 && dir[1] !== 0 ? DIAGONAL : 1;
-    const rx = (INNER_X + ring * RING_X) * diagonal;
-    const ry = (INNER_Y + ring * RING_Y) * diagonal;
+    const rx = (inner.x + (outer.x - inner.x) * t) * diagonal;
+    const ry = (inner.y + (outer.y - inner.y) * t) * diagonal;
 
     const key = `${order % DIRECTIONS.length}/${ring}`;
     const seat = seats.get(key) ?? 0;
@@ -120,9 +136,13 @@ export const planPositions = (pieces: readonly PlanPiece[]): Map<string, PlanSpo
     const side = seat === 0 ? 0 : Math.ceil(seat / 2) * (seat % 2 === 1 ? 1 : -1);
     const perp = { x: -dir[1], y: dir[0] };
 
+    /**
+     * ★ **最後に必ず場の中へ収める。** 斜めの伸ばし（1.4 倍）と席ずらしを足すと
+     *   縁を越えることがある ── 前はここが無くて、いちばん右の付箋が外へ出た。
+     */
     out.set(piece.url, {
-      x: Math.round(dir[0] * rx + perp.x * side * SPREAD),
-      y: Math.round(dir[1] * ry + perp.y * side * SPREAD * 0.6),
+      x: Math.round(clamp(dir[0] * rx + perp.x * side * spread, -outer.x, outer.x)),
+      y: Math.round(clamp(dir[1] * ry + perp.y * side * spread * 0.6, -outer.y, outer.y)),
     });
   }
 
