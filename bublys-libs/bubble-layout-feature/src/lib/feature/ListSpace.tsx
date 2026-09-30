@@ -76,7 +76,7 @@ export type ListSpaceProps = {
    *   `members` が決めているので「足りない」と数えられる）。
    *   出したいなら、持ち主がここで `members` から外す。
    */
-  readonly onLeave?: (url: string, at: { readonly space: string; readonly beside: boolean }) => void;
+  readonly onLeave?: (url: string, at: { readonly space: string | null; readonly beside: boolean }) => void;
 };
 
 /** 口を置く帯の高さの既定（実際は測る） */
