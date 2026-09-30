@@ -7,39 +7,72 @@
  * ★ 緯度経度から画面の位置への変換は {@link MapBounds_範囲.project} 1 本だけを通す。
  *   湖とピンで別々に計算すると、寄ったときにピンが湖から外れる。
  */
-import { ComponentPropsWithoutRef, FC, useCallback, useLayoutEffect, useRef, useState } from "react";
+import {
+  ComponentPropsWithoutRef,
+  DragEvent as ReactDragEvent,
+  FC,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import styled from "styled-components";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { MapBounds_範囲 } from "../domain/MapBounds.domain.js";
-import { Spot_地点 } from "../domain/Spot.domain.js";
 import { HAKONE_ROAD, LAKESIDE_ROAD, LAKE_ASHI, type LatLng } from "../domain/hakoneGeography.js";
+
+/**
+ * 地図に出る点 1 つ。
+ *
+ * ★ **地点（`Spot`）ではない。** 緯度経度さえ分かっていれば何でもここに来る
+ *   ── 描く側は、それが何の型だったかを知らなくてよい。
+ */
+export type MapPin = {
+  readonly id: string;
+  readonly name: string;
+  readonly lat: number;
+  readonly lng: number;
+  readonly color: string;
+  /** 開ける先。無ければ掴めるだけ */
+  readonly url?: string;
+  readonly type: string;
+};
 
 export type MapViewProps = {
   bounds: MapBounds_範囲;
-  spots: readonly Spot_地点[];
+  pins: readonly MapPin[];
   /** いま指されているもの。ピンが光る */
-  focusedSpotId?: string | null;
-  /** 道として繋ぐ地点の並び（旅程が渡す） */
-  routeSpotIds?: readonly string[];
+  focusedId?: string | null;
+  /** 道として繋ぐ点の並び（渡されたものの順） */
+  routeIds?: readonly string[];
   /** 掴んで動かした／輪を回した結果の「こうしたい」 */
   onBoundsChange?: (next: MapBounds_範囲) => void;
   /** ピンを指したとき */
-  onSpotFocus?: (spotId: string) => void;
+  onPinFocus?: (id: string) => void;
   /** 「この範囲で探す」を押したとき */
   onSearchHere?: () => void;
   /** 探す範囲が決まっているか（ボタンの見た目に出す） */
   searching?: boolean;
+  /** 受け取れる荷物か（`dragover` では型しか読めない） */
+  canAccept?: (e: ReactDragEvent) => boolean;
+  /** 落ちてきたもの。受けられたら true */
+  onDropPayload?: (e: ReactDragEvent) => boolean;
+  /** 渡されたものを返す口。何も渡されていなければ出さない */
+  onClearHanded?: () => void;
 };
 
 export const MapView: FC<MapViewProps> = ({
   bounds,
-  spots,
-  focusedSpotId,
-  routeSpotIds,
+  pins,
+  focusedId,
+  routeIds,
   onBoundsChange,
-  onSpotFocus,
+  onPinFocus,
   onSearchHere,
   searching = false,
+  canAccept,
+  onDropPayload,
+  onClearHanded,
 }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -101,10 +134,35 @@ export const MapView: FC<MapViewProps> = ({
 
   const zoom = (factor: number) => onBoundsChange?.(bounds.zoomed(factor));
 
+  /** 面ぜんぶが受け皿（ポケット・旅程と同じ決まり） */
+  const [dragOver, setDragOver] = useState(false);
+  const handleDragOver = (e: ReactDragEvent) => {
+    if (!onDropPayload || !canAccept?.(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setDragOver(true);
+  };
+  const handleDragLeave = (e: ReactDragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setDragOver(false);
+  };
+  const handleDrop = (e: ReactDragEvent) => {
+    setDragOver(false);
+    if (onDropPayload?.(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
     /* 測る箱 ── 中身と同じ広さで、見た目には何も足さない（器と同じ書き方） */
     <div ref={boxRef} style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0 }}>
-      <StyledMap>
+      <StyledMap
+        data-drag-over={dragOver ? "on" : "off"}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         {ready && (
           <svg
             className="e-canvas"
@@ -125,15 +183,15 @@ export const MapView: FC<MapViewProps> = ({
             <polyline className="e-road" points={toPoints(HAKONE_ROAD)} />
             <polyline className="e-road" points={toPoints(LAKESIDE_ROAD)} />
 
-            {/* 渡された道 ── 地点の並びをそのまま繋ぐ */}
-            {routeSpotIds && routeSpotIds.length >= 2 && (
+            {/* 渡されたものの道 ── 渡された順にそのまま繋ぐ（順の意味は知らない） */}
+            {routeIds && routeIds.length >= 2 && (
               <polyline
                 className="e-route"
                 points={toPoints(
-                  routeSpotIds
-                    .map((id) => spots.find((s) => s.id === id))
-                    .filter((s): s is Spot_地点 => s !== undefined)
-                    .map((s) => ({ lat: s.lat, lng: s.lng })),
+                  routeIds
+                    .map((id) => pins.find((p) => p.id === id))
+                    .filter((p): p is MapPin => p !== undefined)
+                    .map((p) => ({ lat: p.lat, lng: p.lng })),
                 )}
               />
             )}
@@ -143,30 +201,28 @@ export const MapView: FC<MapViewProps> = ({
         {/* ピンは SVG の外に置く ── 1 つ 1 つが掴める「もの」（ObjectView）になるので、
             HTML のまま重ねたほうが素直（SVG の中では ObjectView の span が置けない） */}
         {ready &&
-          spots.map((spot) => {
-            const { x, y } = bounds.project(spot.lat, spot.lng, width, height);
+          pins.map((pin) => {
+            const { x, y } = bounds.project(pin.lat, pin.lng, width, height);
             if (x < -40 || y < -40 || x > width + 40 || y > height + 40) return null;
-            const focused = spot.id === focusedSpotId;
+            const focused = pin.id === focusedId;
             return (
               <div
-                key={spot.id}
+                key={`${pin.type}/${pin.id}`}
                 className={`e-pin ${focused ? "is-focused" : ""}`}
                 style={{ left: x, top: y }}
               >
                 <ObjectView
-                  type="Spot"
-                  url={`spots/${spot.id}`}
-                  label={spot.name}
+                  type={pin.type}
+                  url={pin.url}
+                  id={pin.id}
+                  label={pin.name}
                   openingPosition="bubble-side-right"
                   draggable
-                  onClick={() => onSpotFocus?.(spot.id)}
+                  onClick={() => onPinFocus?.(pin.id)}
                 >
                   <span className="e-pin-body">
-                    <span
-                      className="e-pin-dot"
-                      style={{ background: Spot_地点.categoryColor(spot.category) }}
-                    />
-                    <span className="e-pin-name">{spot.name}</span>
+                    <span className="e-pin-dot" style={{ background: pin.color }} />
+                    <span className="e-pin-name">{pin.name}</span>
                   </span>
                 </ObjectView>
               </div>
@@ -178,15 +234,23 @@ export const MapView: FC<MapViewProps> = ({
           <button type="button" onClick={() => zoom(1.6)} title="引く">−</button>
         </div>
 
-        {onSearchHere && (
-          <button
-            type="button"
-            className={`e-search ${searching ? "is-on" : ""}`}
-            onClick={onSearchHere}
-          >
-            {searching ? "この範囲で探しています" : "この範囲で探す"}
-          </button>
-        )}
+        <div className="e-topleft">
+          {onSearchHere && (
+            <button
+              type="button"
+              className={`e-search ${searching ? "is-on" : ""}`}
+              onClick={onSearchHere}
+            >
+              {searching ? "この範囲で探しています" : "この範囲で探す"}
+            </button>
+          )}
+          {/* 渡されたものを返す。何も渡されていなければ出さない */}
+          {onClearHanded && (
+            <button type="button" className="e-search" onClick={onClearHanded}>
+              渡されたものを返す
+            </button>
+          )}
+        </div>
       </StyledMap>
     </div>
   );
@@ -291,10 +355,22 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
     cursor: pointer;
   }
 
-  .e-search {
+  /* 受け取れるものを掴んで来たら、面ぜんぶが受け皿だと判るようにする */
+  &[data-drag-over='on'] {
+    box-shadow: inset 0 0 0 3px #1f6fd0;
+  }
+
+  .e-topleft {
     position: absolute;
     left: 8px;
     top: 8px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    max-width: calc(100% - 50px);
+  }
+
+  .e-search {
     padding: 4px 10px;
     border: 1px solid rgba(0, 0, 0, 0.15);
     border-radius: 13px;

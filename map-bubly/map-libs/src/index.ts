@@ -10,7 +10,7 @@ export * from './domain/hakoneGeography.js';
 export * from './slice/map-slice.js';
 
 // UI
-export { MapView } from './ui/MapView.js';
+export { MapView, type MapPin } from './ui/MapView.js';
 export { SpotCard } from './ui/SpotCard.js';
 
 // Feature

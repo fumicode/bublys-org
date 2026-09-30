@@ -15,8 +15,8 @@ const base: ItineraryPlain = {
     {
       date: "2026-05-17",
       items: [
-        { id: "a", startMin: hm(9, 0), endMin: hm(10, 0), title: "朝の散歩", kind: "sightseeing", cost: 0, spotId: "s1" },
-        { id: "b", startMin: hm(12, 0), endMin: hm(13, 0), title: "昼食", kind: "meal", cost: 1500, spotId: "s2" },
+        { id: "a", startMin: hm(9, 0), endMin: hm(10, 0), title: "朝の散歩", kind: "sightseeing", cost: 0, ref: { type: "Spot", id: "s1" } },
+        { id: "b", startMin: hm(12, 0), endMin: hm(13, 0), title: "昼食", kind: "meal", cost: 1500, ref: { type: "Spot", id: "s2" } },
       ],
     },
     { date: "2026-05-18", items: [] },
@@ -33,14 +33,14 @@ describe("Itinerary_旅程", () => {
       durationMin: 60,
       kind: "sightseeing",
       cost: 1500,
-      spotId: "s3",
+      ref: { type: "Activity", id: "a3" },
       activityId: "act1",
     });
     const added = next.findItem("c");
     // 最後の終わり 13:00 ＋ すき間 15 分
     expect(added?.startMin).toBe(hm(13, 15));
     expect(added?.endMin).toBe(hm(14, 15));
-    expect(added?.activityId).toBe("act1");
+    expect(added?.ref).toEqual({ type: "Activity", id: "a3" });
   });
 
   it("その日が空なら 9:00 から始める", () => {
@@ -83,8 +83,11 @@ describe("Itinerary_旅程", () => {
     expect(itinerary.withoutItem("b").totalCost).toBe(0);
   });
 
-  it("その日に立ち寄る地点を、時刻の順で言える（地図に渡す道）", () => {
-    expect(itinerary.day("2026-05-17")!.spotIds).toEqual(["s1", "s2"]);
+  it("その日に立ち寄る先を、時刻の順で言える（地図へ渡す道）", () => {
+    expect(itinerary.day("2026-05-17")!.refs).toEqual([
+      { type: "Spot", id: "s1" },
+      { type: "Spot", id: "s2" },
+    ]);
   });
 
   it("保存形と行き来しても中身が変わらない", () => {

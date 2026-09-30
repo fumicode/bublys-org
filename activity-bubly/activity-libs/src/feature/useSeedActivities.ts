@@ -2,8 +2,8 @@
 /**
  * 最初のアクティビティを撒く。
  *
- * ★ `spotId` は地図バブリの撒く地点の ID と同じ文字列（`HAKONE_SPOTS`）。
- *   ここが食い違うと、地図に出ない・旅程から場所が引けないアクティビティになる。
+ * ★ `place` の id は地図バブリの撒く地点と同じ文字列（`HAKONE_SPOTS`）。
+ *   型も一緒に持つので、アクティビティは地図を import せずに名前を引ける。
  */
 import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
@@ -14,7 +14,7 @@ export const HAKONE_ACTIVITIES: ActivityPlain[] = [
   {
     id: "ashinoko-cruise",
     name: "芦ノ湖遊覧船",
-    spotId: "motohakone",
+    place: { type: "Spot", id: "motohakone" },
     durationMin: 60,
     price: 1500,
     rating: 4.4,
@@ -24,7 +24,7 @@ export const HAKONE_ACTIVITIES: ActivityPlain[] = [
   {
     id: "chokoku-museum",
     name: "彫刻の森美術館",
-    spotId: "chokoku-no-mori",
+    place: { type: "Spot", id: "chokoku-no-mori" },
     durationMin: 120,
     price: 1600,
     rating: 4.5,
@@ -34,7 +34,7 @@ export const HAKONE_ACTIVITIES: ActivityPlain[] = [
   {
     id: "owakudani-walk",
     name: "大涌谷 散策",
-    spotId: "owakudani",
+    place: { type: "Spot", id: "owakudani" },
     durationMin: 45,
     price: 0,
     rating: 4.2,
@@ -44,7 +44,7 @@ export const HAKONE_ACTIVITIES: ActivityPlain[] = [
   {
     id: "hakone-jinja-visit",
     name: "箱根神社 参拝",
-    spotId: "hakone-jinja",
+    place: { type: "Spot", id: "hakone-jinja" },
     durationMin: 60,
     price: 0,
     rating: 4.6,
@@ -54,7 +54,7 @@ export const HAKONE_ACTIVITIES: ActivityPlain[] = [
   {
     id: "yumoto-stroll",
     name: "箱根湯本 温泉街 散策",
-    spotId: "hakone-yumoto",
+    place: { type: "Spot", id: "hakone-yumoto" },
     durationMin: 60,
     price: 0,
     rating: 4.0,

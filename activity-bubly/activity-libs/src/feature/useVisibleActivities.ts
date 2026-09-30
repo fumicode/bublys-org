@@ -28,7 +28,7 @@ export function useVisibleActivities(): VisibleActivities {
   if (!bounds) return { activities, filtered: false, total: activities.length };
 
   const visible = activities.filter((a) => {
-    const spot = spots.find((s) => s.id === a.spotId);
+    const spot = a.place ? spots.find((s) => s.id === a.place?.id) : undefined;
     return spot ? bounds.contains(spot.lat, spot.lng) : false;
   });
   return { activities: visible, filtered: true, total: activities.length };

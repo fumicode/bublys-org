@@ -7,7 +7,14 @@
  *   足し算ができる形にしておく。読む形（`08:30`）は出すときに作る。
  * ★ 場所も中身も持たない ── 地点は `spotId`、アクティビティは `activityId` で指すだけ。
  */
-import { enumShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+import {
+  enumShape,
+  objectRefShape,
+  objectShape,
+  primitiveShape,
+  type SchemaShape,
+} from "@bublys-org/domain-registry/schema";
+import type { ObjectRef } from "@bublys-org/bubbles-ui";
 
 /** 予定の種類。行の左に出る印はこれで決まる */
 export type ItineraryKind_種類 = "move" | "meal" | "sightseeing" | "stay" | "other";
@@ -23,11 +30,19 @@ export type ItineraryItemPlain = {
   cost: number;
   /** 費用の但し書き（「宿泊費別」など）。無ければ金額をそのまま出す */
   costNote?: string;
-  /** 立ち寄る地点（地図の `Spot`） */
-  spotId?: string;
-  /** もとになったアクティビティ */
-  activityId?: string;
+  /**
+   * **立ち寄り先への指**（型と id）。
+   *
+   * ★ 前は `spotId: string` だった ── つまり「地図の地点である」と決め打ちしていた。
+   *   そのせいで旅程は地図を import しないと名前も出せず、**地図が無いと成り立たない
+   *   部品**になっていた。型も一緒に持てば、持ち主が誰であっても
+   *   `resolveObjectPlain(type, id, …)` で訊けるので、旅程は相手を知らなくてよい。
+   * ★ 指であって子ではない（`state` が持つ子はインスタンス、という決まりの対象外）。
+   */
+  ref?: ObjectRef;
 };
+
+export type { ObjectRef };
 
 export class ItineraryItem_予定 {
   constructor(readonly state: ItineraryItemPlain) {}
@@ -39,8 +54,7 @@ export class ItineraryItem_予定 {
   get kind(): ItineraryKind_種類 { return this.state.kind; }
   get cost(): number { return this.state.cost; }
   get costNote(): string | undefined { return this.state.costNote; }
-  get spotId(): string | undefined { return this.state.spotId; }
-  get activityId(): string | undefined { return this.state.activityId; }
+  get ref(): ObjectRef | undefined { return this.state.ref; }
 
   /** 「08:30 - 10:05」 */
   get timeLabel(): string {
@@ -112,15 +126,18 @@ export const ITINERARY_ITEM_SHAPE: SchemaShape = objectShape([
   { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
   { name: "startMin", shape: primitiveShape("number"), required: true, label: "開始（分）" },
   { name: "endMin", shape: primitiveShape("number"), required: true, label: "終了（分）" },
-  { name: "title", shape: primitiveShape("string"), required: true, label: "内容" },
+  { name: "title", shape: primitiveShape("string"), required: true, label: "内容", role: "title" },
   {
     name: "kind",
     shape: enumShape(["move", "meal", "sightseeing", "stay", "other"]),
     required: true,
     label: "種類",
   },
-  { name: "cost", shape: primitiveShape("number"), required: true, label: "費用" },
+  { name: "cost", shape: primitiveShape("number"), required: true, label: "費用", role: "money" },
   { name: "costNote", shape: primitiveShape("string"), required: false, label: "費用の但し書き" },
-  { name: "spotId", shape: primitiveShape("string"), required: false, label: "地点 ID" },
-  { name: "activityId", shape: primitiveShape("string"), required: false, label: "アクティビティ ID" },
+  /**
+   * ★ **役を名乗る**（`place`）。これで地図は、旅程を知らないまま
+   *   「この中に立ち寄り先が並んでいる」と読める（`collectPlaces`）。
+   */
+  { name: "ref", shape: objectRefShape(), required: false, label: "立ち寄り先", role: "place" },
 ]);

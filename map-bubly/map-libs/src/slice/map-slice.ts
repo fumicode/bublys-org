@@ -8,6 +8,7 @@
 import { createSlice, createSelector } from "@reduxjs/toolkit";
 import type { PayloadAction, WithSlice } from "@reduxjs/toolkit";
 import { injectSlice, type RootState } from "@bublys-org/state-management";
+import type { ObjectRef } from "@bublys-org/bubbles-ui";
 import { Spot_地点, type SpotPlain } from "../domain/Spot.domain.js";
 import { HAKONE_BOUNDS, MapBounds_範囲, type MapBoundsPlain } from "../domain/MapBounds.domain.js";
 
@@ -23,20 +24,24 @@ export type MapState = {
    */
   searchBounds: MapBoundsPlain | null;
   /**
-   * **いま示されている道**（地点 ID の並び）。地図はこれを繋いで点線を引く。
+   * **渡されたもの**（型と id の並び、渡された順）。
    *
-   * ★ **地図は道の意味を知らない。** 渡された並びを繋ぐだけ ── 旅程がその日の
-   *   行き先を渡すので結果として旅程の道になるが、地図から旅程を引きに行かない。
-   *   引きに行くと、地図が旅程に依存して一方通行が崩れる。
+   * > 地図は、場所を名乗っているものなら何でも描く。
+   *
+   * ★ 前は `routeSpotIds: string[]` で、しかも**旅程がここへ書き込んでいた**。
+   *   地図の引き出しを他人が開けていたので、地図は「渡されたもの」ではなく
+   *   「誰かが置いていったもの」を描いていた。いまは**落とされたときだけ**ここに入る。
+   * ★ 中身は指（型と id）だけ。何であるかは、描くときに持ち主へ訊く
+   *   ── だから地図は旅程もアクティビティも import しない。
    */
-  routeSpotIds: string[];
+  handed: ObjectRef[];
 };
 
 const initialState: MapState = {
   spotList: [],
   bounds: HAKONE_BOUNDS,
   searchBounds: null,
-  routeSpotIds: [],
+  handed: [],
 };
 
 export const mapSlice = createSlice({
@@ -65,9 +70,19 @@ export const mapSlice = createSlice({
     setSearchBounds: (state, action: PayloadAction<MapBoundsPlain | null>) => {
       state.searchBounds = action.payload;
     },
-    /** 道として繋ぐ地点の並びを置く（空なら道は消える） */
-    setRoute: (state, action: PayloadAction<string[]>) => {
-      state.routeSpotIds = action.payload;
+    /**
+     * 渡されたものを置く。
+     *
+     * ★ **同じものを渡し直したら、全部入れ替える。** 足し続けると、
+     *   旅程の日を渡すたびに前の日の道が残って、どれがいまの道か言えなくなる。
+     *   「いま渡されているもの」は 1 組だけ、という決まりにする。
+     */
+    setHanded: (state, action: PayloadAction<ObjectRef[]>) => {
+      state.handed = action.payload;
+    },
+    /** 渡されたものを返す（空にする） */
+    clearHanded: (state) => {
+      state.handed = [];
     },
   },
 });
@@ -87,14 +102,15 @@ export const {
   removeSpot,
   setBounds,
   setSearchBounds,
-  setRoute,
+  setHanded,
+  clearHanded,
 } = mapSlice.actions;
 
 const selectSpotListRaw = (state: StateWithMap): SpotPlain[] => state.map?.spotList ?? [];
 const selectBoundsRaw = (state: StateWithMap): MapBoundsPlain => state.map?.bounds ?? HAKONE_BOUNDS;
 const selectSearchBoundsRaw = (state: StateWithMap): MapBoundsPlain | null =>
   state.map?.searchBounds ?? null;
-const EMPTY_ROUTE: string[] = [];
+const EMPTY_HANDED: ObjectRef[] = [];
 
 /** 地点の一覧（ドメインオブジェクト） */
 export const selectSpots = createSelector(
@@ -127,9 +143,9 @@ export const selectSearchBounds = createSelector(
   (plain): MapBounds_範囲 | undefined => (plain ? MapBounds_範囲.fromPlain(plain) : undefined),
 );
 
-/** 道として繋ぐ地点の並び */
-export const selectRouteSpotIds = (state: StateWithMap): string[] =>
-  state.map?.routeSpotIds ?? EMPTY_ROUTE;
+/** いま渡されているもの（渡された順） */
+export const selectHanded = (state: StateWithMap): ObjectRef[] =>
+  state.map?.handed ?? EMPTY_HANDED;
 
 export { Spot_地点, MapBounds_範囲 };
 export type { SpotPlain, MapBoundsPlain };

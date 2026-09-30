@@ -1,18 +1,26 @@
 /**
  * **アクティビティ** ── 出かけた先でできること 1 つ。遊覧船、美術館、散策。
  *
- * ★ **場所は持たない。`spotId` で地図の地点を指すだけ**（地図バブリの `Spot_地点`）。
- *   名前と緯度経度をここにも持つと、地図で直しても片方だけ古いまま残る。
+ * ★ **場所は持たない。指すだけ**（`place`）。名前と緯度経度をここにも写して持つと、
+ *   相手で直しても片方だけ古いまま残る。
+ * ★ 指は**型と id の組**。id だけだと、使う側が「たぶん地点だろう」と決め打ちすることになる
+ *   ── それでは地点以外の場所（宿、駅、人が作った目印）に開かれない。
  * ★ 所要時間を持つのは、**旅程がこれを受け取ったときに終わりの時刻を出せる**ようにするため。
  *   旅程の側で「たぶん 1 時間」と決め打ちにすると、アクティビティを直しても旅程は変わらない。
  */
-import { objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+import {
+  objectRefShape,
+  objectShape,
+  primitiveShape,
+  type SchemaShape,
+} from "@bublys-org/domain-registry/schema";
+import type { ObjectRef } from "@bublys-org/bubbles-ui";
 
 export type ActivityPlain = {
   id: string;
   name: string;
-  /** 地図の地点の ID（`spots/<spotId>` で開ける） */
-  spotId: string;
+  /** 開催場所への指（型と id）。誰の場所でもよい */
+  place?: ObjectRef;
   /** 所要時間（分） */
   durationMin: number;
   /** 料金（円。0 なら無料） */
@@ -29,7 +37,7 @@ export class Activity_アクティビティ {
 
   get id(): string { return this.state.id; }
   get name(): string { return this.state.name; }
-  get spotId(): string { return this.state.spotId; }
+  get place(): ObjectRef | undefined { return this.state.place; }
   get durationMin(): number { return this.state.durationMin; }
   get price(): number { return this.state.price; }
   get rating(): number { return this.state.rating; }
@@ -64,13 +72,19 @@ export class Activity_アクティビティ {
   }
 }
 
-/** アクティビティの形 ── ほかのバブリが中身を引くための申告 */
+/**
+ * アクティビティの形 ── ほかのバブリが中身を引くための申告。
+ *
+ * ★ **役を名乗る**。これだけで旅程に落とせるようになる ── 旅程は
+ *   `Activity` という名前を知らないまま、「時間と金額と場所を名乗っているもの」
+ *   として予定にする。
+ */
 export const ACTIVITY_SHAPE: SchemaShape = objectShape([
   { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
-  { name: "name", shape: primitiveShape("string"), required: true, label: "名前" },
-  { name: "spotId", shape: primitiveShape("string"), required: true, label: "開催場所の地点 ID" },
-  { name: "durationMin", shape: primitiveShape("number"), required: true, label: "所要時間（分）" },
-  { name: "price", shape: primitiveShape("number"), required: true, label: "料金" },
+  { name: "name", shape: primitiveShape("string"), required: true, label: "名前", role: "title" },
+  { name: "place", shape: objectRefShape(), required: false, label: "開催場所", role: "place" },
+  { name: "durationMin", shape: primitiveShape("number"), required: true, label: "所要時間（分）", role: "duration" },
+  { name: "price", shape: primitiveShape("number"), required: true, label: "料金", role: "money" },
   { name: "rating", shape: primitiveShape("number"), required: true, label: "評価" },
   { name: "reviewCount", shape: primitiveShape("number"), required: true, label: "口コミ件数" },
   { name: "description", shape: primitiveShape("string"), required: true, label: "説明" },

@@ -9,20 +9,24 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "react", "react-dom"],
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["ES2021", "DOM"],
+    "lib": [
+      "ES2021",
+      "DOM"
+    ],
     "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
   "references": [
-    {
-      "path": "../../activity-bubly/activity-libs/tsconfig.lib.json"
-    },
-    {
-      "path": "../../map-bubly/map-libs/tsconfig.lib.json"
-    },
     {
       "path": "../../bublys-libs/domain-registry/tsconfig.lib.json"
     },

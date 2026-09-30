@@ -33,6 +33,19 @@ export type DragPayload = {
 };
 
 /**
+ * **この荷物が名乗っている型**（`type/...`）。知らない型でも返す。
+ *
+ * ★ `getDragDataTypeList()` は**登録済みの型しか並べない**ので、これを使って
+ *   受け取り判定をすると、まだ読み込んでいないバブリのものが黙って弾かれる。
+ *   「題名さえあれば受ける」と決めた受け皿（旅程・地図）は、型を知らないまま
+ *   受け取れなければならないので、荷物が名乗っている型をそのまま見る。
+ * ★ 知らない型では中身は引けない（形も持ち主も分からない）。引けるのは
+ *   荷物に載っている url とラベルだけ ── それで足りる所だけがこれを使う。
+ */
+export const anyObjectDragType = (e: React.DragEvent): DragDataType | undefined =>
+  Array.from(e.dataTransfer.types).find((t) => t.startsWith("type/"));
+
+/**
  * 登録済みの全ドラッグ型リストを取得（動的）
  */
 export const getDragDataTypeList = (): DragDataType[] => {

@@ -12,6 +12,7 @@ import {
   ItineraryItem_予定,
   type ItineraryItemPlain,
   type ItineraryKind_種類,
+  type ObjectRef,
 } from "./ItineraryItem.domain.js";
 
 // ========== 保存形（シリアライズ用。ドメインの形とは別） ==========
@@ -48,11 +49,11 @@ export class ItineraryDay_日 {
     return Math.max(...this.state.items.map((i) => i.endMin));
   }
 
-  /** その日に立ち寄る地点の並び（時刻の順）。地図に道として渡すのに使う */
-  get spotIds(): string[] {
+  /** その日に立ち寄る先の並び（時刻の順）。地図へ道として渡すのに使う */
+  get refs(): ObjectRef[] {
     return this.state.items
-      .map((i) => i.spotId)
-      .filter((id): id is string => !!id);
+      .map((i) => i.ref)
+      .filter((r): r is ObjectRef => r !== undefined);
   }
 
   withItem(item: ItineraryItem_予定): ItineraryDay_日 {
@@ -147,8 +148,7 @@ export class Itinerary_旅程 {
       durationMin: number;
       kind: ItineraryKind_種類;
       cost?: number;
-      spotId?: string;
-      activityId?: string;
+      ref?: ObjectRef;
       id?: string;
     },
   ): Itinerary_旅程 {
@@ -162,8 +162,7 @@ export class Itinerary_旅程 {
       title: spec.title,
       kind: spec.kind,
       cost: spec.cost ?? 0,
-      spotId: spec.spotId,
-      activityId: spec.activityId,
+      ref: spec.ref,
     });
     return this.withDay(day.withItem(item));
   }

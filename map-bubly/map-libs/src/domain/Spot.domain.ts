@@ -64,16 +64,23 @@ export class Spot_地点 {
   }
 }
 
-/** 地点の形 ── ほかのバブリが「この型の中身は何か」を引くための申告 */
+/**
+ * 地点の形 ── ほかのバブリが「この型の中身は何か」を引くための申告。
+ *
+ * ★ **役を名乗る**（`role`）。項目の綴り（`name` / `lat` / `lng`）に頼らせないため
+ *   ── 受け取る側が綴りを探しにいくと、別の型では黙って繋がらない。
+ *   ここを名乗っておけば、地図は「緯度と経度を名乗っているもの」としてこれを描けるし、
+ *   旅程は「題名を名乗っているもの」として名前を出せる。
+ */
 export const SPOT_SHAPE: SchemaShape = objectShape([
   { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
-  { name: "name", shape: primitiveShape("string"), required: true, label: "名前" },
+  { name: "name", shape: primitiveShape("string"), required: true, label: "名前", role: "title" },
   {
     name: "category",
     shape: enumShape(["sightseeing", "food", "lodging", "station", "port"]),
     required: true,
     label: "種類",
   },
-  { name: "lat", shape: primitiveShape("number"), required: true, label: "緯度" },
-  { name: "lng", shape: primitiveShape("number"), required: true, label: "経度" },
+  { name: "lat", shape: primitiveShape("number"), required: true, label: "緯度", role: "latitude" },
+  { name: "lng", shape: primitiveShape("number"), required: true, label: "経度", role: "longitude" },
 ]);

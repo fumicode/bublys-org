@@ -1,20 +1,29 @@
 'use client';
-/** アクティビティ 1 件 ── 入れ物と地図（開催場所）を、詳細の見た目に繋ぐ */
+/**
+ * アクティビティ 1 件 ── 入れ物と、開催場所を、詳細の見た目に繋ぐ。
+ *
+ * ★ **開催場所の持ち主を名指ししない。** 前は `selectSpotById` を地図から
+ *   import していたので、地図が無いとアクティビティが成り立たなかった。
+ *   いまは指（`place`）が型も持っているので、その持ち主に訊けばよい。
+ */
 import { FC } from "react";
-import { ObjectView, useFocusedObject } from "@bublys-org/bubbles-ui";
+import { ObjectView, resolveObjectPlain, useFocusedObject } from "@bublys-org/bubbles-ui";
+import { getSchema, readRoleText } from "@bublys-org/domain-registry/schema";
 import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
-import { selectSpotById } from "@bublys-org/map-libs";
 import { ActivityDetailView } from "../ui/ActivityDetailView.js";
 import { selectActivityById, updateActivity } from "../slice/activity-slice.js";
 
 export const ActivityDetail: FC<{ activityId: string }> = ({ activityId }) => {
   const dispatch = useAppDispatch();
   const activity = useAppSelector(selectActivityById(activityId));
-  /**
-   * ★ **場所は地図に聞く。** 名前をこちらに持たないので、地図で直せばここも直る。
-   *   `spotId` が空文字でもセレクタは動く（見つからないだけ）。
-   */
-  const spot = useAppSelector(selectSpotById(activity?.spotId ?? ""));
+  const place = activity?.place;
+
+  /** 場所の名前 ── **持ち主に訊く**。相手の側で直せばここも直る */
+  const placeName = useAppSelector((state) =>
+    place
+      ? readRoleText(getSchema(place.type), resolveObjectPlain(place.type, place.id, state), "title")
+      : undefined,
+  );
   const { setFocusedObjectId } = useFocusedObject();
 
   if (!activity) {
@@ -25,16 +34,23 @@ export const ActivityDetail: FC<{ activityId: string }> = ({ activityId }) => {
     <ActivityDetailView
       activity={activity}
       spot={
-        spot && (
-          /* 開催場所は地点そのもの。掴んで運べるし、ダブルクリックで地点の泡が開く */
-          <ObjectView object={spot} label={spot.name} onClick={() => setFocusedObjectId(spot.id)}>
-            <span>{spot.name}</span>
+        place &&
+        placeName && (
+          /* 開催場所は場所そのもの。掴んで運べるし、ダブルクリックでその泡が開く */
+          <ObjectView
+            type={place.type}
+            id={place.id}
+            label={placeName}
+            openingPosition="bubble-side-right"
+            onClick={() => setFocusedObjectId(place.id)}
+          >
+            <span>{placeName}</span>
           </ObjectView>
         )
       }
       onNameChange={(name) => dispatch(updateActivity(activity.withName(name).toPlain()))}
       onDescriptionChange={(d) => dispatch(updateActivity(activity.withDescription(d).toPlain()))}
-      onFocus={() => spot && setFocusedObjectId(spot.id)}
+      onFocus={() => place && setFocusedObjectId(place.id)}
     />
   );
 };

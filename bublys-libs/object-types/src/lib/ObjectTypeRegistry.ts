@@ -10,6 +10,20 @@
 import type { ReactNode } from 'react';
 
 /**
+ * **何かへの指** ── 型名と id の組。
+ *
+ * > id だけでは、誰に訊けばよいか分からない。
+ *
+ * バブリをまたいで「あれ」を指すには、これだけあればよい
+ * （{@link resolveObjectPlain} に渡せば中身が引ける）。
+ * id だけを持たせていたころは、持ち主の型を使う側が決め打ちするしかなかった。
+ */
+export type ObjectRef = {
+  readonly type: string;
+  readonly id: string;
+};
+
+/**
  * **その型のものは、どこに開くか。**
  *
  * ★ もとは泡のスライス（`bubbles-ui` の `bubbles-slice`）に居たが、これは
@@ -154,6 +168,48 @@ export const registerObjectUrl = (typeName: string, builder: (id: string) => str
 export const getObjectUrl = (typeName: string, id: string): string | undefined => {
   return registeredUrlBuilders.get(toKebabCase(typeName))?.(id);
 };
+
+/**
+ * **この型の、この id は何か** ── 持ち主に中身を訊く口。
+ *
+ * > バブリどうしの通り道は「ものを渡すこと」だけ。他のバブリの引き出しは覗かない。
+ *
+ * これが無かったころ、受け取った側が持てるのは url だけだったので、
+ * 値を読むには**持ち主を import するしかなかった**（旅程が地図とアクティビティを
+ * 名指ししていた理由）。名指しすると、その 2 つが無いと旅程が成り立たなくなる
+ * ── 部品として 1 つずつ選べない。
+ *
+ * ★ 返すのは**保存形（plain）**。形の申告（`registerSchema`）が説明しているのは
+ *   保存形なので、役から項目を引くには同じものでなければ噛み合わない。
+ * ★ **状態を引数で受け取る。** 登録は読み込んだ時点の副作用なので、その時にはまだ
+ *   store が無い。読むのは呼ぶ側（セレクタの中）なので、そちらから渡してもらう
+ *   ── こうすると `useAppSelector(s => resolveObjectPlain(型, id, s))` と書けて、
+ *   中身が変われば読んだ側も描き直る（渡した瞬間の写しにならない）。
+ * ★ この lib は state-management を知らない（いちばん下の棚なので）。
+ *   状態の形は `unknown` のまま受けて、名乗った持ち主が自分で読む。
+ */
+export type ObjectResolver = (id: string, state: unknown) => unknown | undefined;
+
+const registeredResolvers = new Map<string, ObjectResolver>();
+
+/** 「この型の中身は、こう引く」を名乗る（名乗るのは持ち主） */
+export const registerObjectResolver = (typeName: string, resolve: ObjectResolver): void => {
+  registeredResolvers.set(toKebabCase(typeName), resolve);
+};
+
+/** 型 + id から保存形を引く。名乗っていない型・見つからない id なら `undefined` */
+export const resolveObjectPlain = (
+  typeName: string,
+  id: string,
+  state: unknown,
+): unknown | undefined => registeredResolvers.get(toKebabCase(typeName))?.(id, state);
+
+/** 中身を訊ける型かどうか */
+export const canResolveObject = (typeName: string): boolean =>
+  registeredResolvers.has(toKebabCase(typeName));
+
+/** 中身を訊ける型の一覧（kebab-case）。地図が「場所を名乗る型」を探すのに使う */
+export const getResolvableObjectTypes = (): string[] => [...registeredResolvers.keys()];
 
 // オブジェクト型ごとの同一性解決（class による型判定・getId）
 type ObjectIdentity = {

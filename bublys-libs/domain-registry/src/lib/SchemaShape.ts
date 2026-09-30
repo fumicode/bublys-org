@@ -24,11 +24,55 @@ export type SchemaShape =
   | { readonly kind: "array"; readonly item: SchemaShape }
   | { readonly kind: "record"; readonly value: SchemaShape };
 
+/**
+ * **役** ── その項目が何にあたるかを、項目の名前とは別に名乗る。
+ *
+ * > 綴りには頼らない。
+ *
+ * 受け取る側が `durationMin` という名前を探しにいくと、相手が
+ * `estimateMinutes` だったときに**黙って繋がらない**（繋がらなかったことが
+ * 誰にも見えないのがいちばん悪い）。役を名乗ってもらえば、名前が何であっても引ける。
+ *
+ * ★ **足してよいのは、2 つ以上のバブリが独立にその役を要ったとき。**
+ *   1 つのバブリのためだけの役は、役ではなく**そのバブリの中の事情**。
+ *   これが無いと、バブリが増えるたびに共通語彙が膨らんで、誰も全体を言えなくなる。
+ * ★ 渡すデータの意味も、口（できることを差し出す穴）の契約も、**同じこの語彙で書く**
+ *   ── 仕組みを 2 つ作らない（`docs/bubly-composition.md`）。
+ */
+export type FieldRole =
+  /** そのものを一言で呼ぶ名前 */
+  | "title"
+  /** かかる長さ（分） */
+  | "duration"
+  /** 費用（円） */
+  | "money"
+  /** 場所。緯度・経度そのものか、場所を持つものの id */
+  | "place"
+  /** 緯度 */
+  | "latitude"
+  /** 経度 */
+  | "longitude";
+
+export const FIELD_ROLES: readonly FieldRole[] = [
+  "title",
+  "duration",
+  "money",
+  "place",
+  "latitude",
+  "longitude",
+];
+
 export type SchemaField = {
   readonly name: string;
   readonly shape: SchemaShape;
   readonly required: boolean;
   readonly label?: string;
+  /**
+   * この項目が何にあたるか（{@link FieldRole}）。名乗らなくてもよい ──
+   * **受け取る側が要求してよいのは題名だけ**で、あとは名乗っていれば
+   * そのぶんうまくやる、名乗っていなければ既定になる、という決まりにしてある。
+   */
+  readonly role?: FieldRole;
 };
 
 /** シンプルなビルダー（読みやすさのため） */

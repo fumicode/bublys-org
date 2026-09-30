@@ -11,7 +11,7 @@ import { ComponentPropsWithoutRef, DragEvent as ReactDragEvent, FC, ReactNode, u
 import styled from "styled-components";
 import { EditableText } from "@bublys-org/bubbles-ui";
 import { Itinerary_旅程 } from "../domain/Itinerary.domain.js";
-import { ItineraryItem_予定, formatMin, parseMin } from "../domain/ItineraryItem.domain.js";
+import { ItineraryItem_予定, formatMin, parseMin, type ObjectRef } from "../domain/ItineraryItem.domain.js";
 
 export type ItineraryViewProps = {
   itinerary: Itinerary_旅程;
@@ -19,10 +19,10 @@ export type ItineraryViewProps = {
   date: string;
   onSelectDate?: (date: string) => void;
   onTitleChange?: (title: string) => void;
-  /** 予定の行を押したとき（開催場所を「指したもの」にする） */
+  /** 予定の行を押したとき（立ち寄り先を「指したもの」にする） */
   onFocusItem?: (item: ItineraryItem_予定) => void;
-  /** いま指されている地点（行が光る） */
-  focusedSpotId?: string | null;
+  /** いま指されているものの id（行が光る） */
+  focusedObjectId?: string | null;
   onItemTitleChange?: (item: ItineraryItem_予定, title: string) => void;
   onItemTimeChange?: (item: ItineraryItem_予定, startMin: number, endMin: number) => void;
   onRemoveItem?: (item: ItineraryItem_予定) => void;
@@ -30,8 +30,11 @@ export type ItineraryViewProps = {
   onDropPayload?: (e: ReactDragEvent) => boolean;
   /** 受け取れる型かどうか（`dragover` では中身が読めないので型だけ見る） */
   canAccept?: (e: ReactDragEvent) => boolean;
-  /** 日ごとの場所の名前（地図から引いたもの） */
-  spotNameOf?: (spotId: string) => string | undefined;
+  /**
+   * 立ち寄り先の名前。**引くのは feature 層の仕事**（持ち主に訊く）。
+   * ここは受け取って出すだけで、相手が誰なのかは知らない。
+   */
+  nameOfRef?: (ref: ObjectRef) => string | undefined;
   /** 並びの上に出す口 */
   head?: ReactNode;
 };
@@ -42,13 +45,13 @@ export const ItineraryView: FC<ItineraryViewProps> = ({
   onSelectDate,
   onTitleChange,
   onFocusItem,
-  focusedSpotId,
+  focusedObjectId,
   onItemTitleChange,
   onItemTimeChange,
   onRemoveItem,
   onDropPayload,
   canAccept,
-  spotNameOf,
+  nameOfRef,
   head,
 }) => {
   const [dragOver, setDragOver] = useState(false);
@@ -103,7 +106,7 @@ export const ItineraryView: FC<ItineraryViewProps> = ({
 
       <ol className="e-items">
         {(day?.items ?? []).map((item) => {
-          const focused = !!item.spotId && item.spotId === focusedSpotId;
+          const focused = !!item.ref && item.ref.id === focusedObjectId;
           return (
             <li
               key={item.id}
@@ -130,8 +133,8 @@ export const ItineraryView: FC<ItineraryViewProps> = ({
                 <span className="e-item-title">
                   <EditableText value={item.title} onSave={(v) => onItemTitleChange?.(item, v)} />
                 </span>
-                {item.spotId && spotNameOf?.(item.spotId) && (
-                  <span className="e-spot">{spotNameOf(item.spotId)}</span>
+                {item.ref && nameOfRef?.(item.ref) && (
+                  <span className="e-spot">{nameOfRef(item.ref)}</span>
                 )}
               </span>
               <span className="e-cost">{item.costLabel}</span>

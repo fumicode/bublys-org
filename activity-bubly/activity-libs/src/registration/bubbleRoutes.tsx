@@ -2,10 +2,10 @@
 /** このアクティビティバブリで何が開けるか */
 import { useMemo } from "react";
 import type { BubbleRoute } from "@bublys-org/bubbles-ui";
-import { useFocusedObject } from "@bublys-org/bubbles-ui";
+import { resolveObjectPlain, useFocusedObject } from "@bublys-org/bubbles-ui";
+import { getSchema, readRoleText } from "@bublys-org/domain-registry/schema";
 import { LIST_BOX, LIST_CARD_WIDTH, ListSpace } from "@bublys-org/bubble-layout-feature";
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectSpots } from "@bublys-org/map-libs";
 import { ActivityCard } from "../ui/ActivityCard.js";
 import { ActivityDetail } from "../feature/ActivityDetail.js";
 import { selectActivities } from "../slice/activity-slice.js";
@@ -49,18 +49,23 @@ const ActivityCollectionBubble: BubbleRoute["Component"] = () => {
 const ActivityCardBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const id = bubble.url.replace(/^activities\//, "").replace(/\/card$/, "");
   const activity = useAppSelector(selectActivities).find((a) => a.id === id);
-  const spots = useAppSelector(selectSpots);
+  const place = activity?.place;
+  /** 場所の名前は持ち主に訊く ── 地図を import しない */
+  const placeName = useAppSelector((state) =>
+    place
+      ? readRoleText(getSchema(place.type), resolveObjectPlain(place.type, place.id, state), "title")
+      : undefined,
+  );
   const { focusedObjectId, setFocusedObjectId } = useFocusedObject();
   if (!activity) {
     return <div style={{ padding: 8, color: "#666" }}>このアクティビティは見つかりませんでした。</div>;
   }
-  const spot = spots.find((s) => s.id === activity.spotId);
   return (
     <ActivityCard
       activity={activity}
-      spotName={spot?.name}
-      focused={!!spot && spot.id === focusedObjectId}
-      onFocus={() => spot && setFocusedObjectId(spot.id)}
+      spotName={placeName}
+      focused={!!place && place.id === focusedObjectId}
+      onFocus={() => place && setFocusedObjectId(place.id)}
     />
   );
 };
