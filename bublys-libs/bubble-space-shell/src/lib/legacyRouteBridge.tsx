@@ -223,6 +223,13 @@ export const UniverseSpace: FC<{
    */
   const { join, setJoin } = useSpaceView();
   /**
+   * **外の海。** 窓の中から外へ持ち出されたものを受ける相手。
+   *
+   * ★ `WindowSpace` は外の海の中に描かれているので、ここで引ける口は**外のほう**。
+   *   中の海の口は `inner`（下）で、別物。
+   */
+  const outer = useBubbleSpace();
+  /**
    * ★ **窓の中の海も、自分の見え方を持つ。** 持ち方は大元の海と同じ見本（`useSpaceViewState`）
    *   ── 外の口で中の海を変えることはできない（別の世界なので）。
    *   ネオンの通し方（`join`）だけは画面ぜんぶで 1 つなので、外のものをそのまま使う。
@@ -331,6 +338,14 @@ export const UniverseSpace: FC<{
           onLens={onLens}
           // 岸に貼ると中身が描き直されるので、岸の中身は**その窓の id**で覚えておく
           persistKey={id}
+          /**
+           * ★ **中から外へ持ち出せる。** 窓は外の海の中に居るので、外の海を知っている
+           *   のはここだけ ── 中の海は「外まで運ばれた」としか言えない。
+           * ★ **引っ越しではない。** 外に 1 つ開くだけで、**中の泡はそのまま残る**
+           *   （ほかの一覧と同じ読み：外に増えるが、元からは減らない）。
+           *   開く元をこの窓にしておくので、窓の隣に出る。
+           */
+          onEscape={(info) => { outer.openBubble(info.url, id); }}
           style={{ position: "absolute", left: 0, top: 0 }}
         />
       )}

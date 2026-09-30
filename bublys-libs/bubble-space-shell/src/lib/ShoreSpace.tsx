@@ -91,6 +91,17 @@ export type ShoreSpaceProps = {
   readonly worldLineSeed?: SeaSeed;
   /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
   readonly frameTools?: BubbleSpaceProps['frameTools'];
+  /**
+   * **この海の外へ出そうとした。**
+   *
+   * > 岸にも着かず、**海の外まで運ばれた**ときに 1 度だけ呼ばれる。
+   *
+   * ★ 外に何があるか（もう 1 つ外の海があるのか、画面の端なのか）を、この海は知らない。
+   *   知っている外の器が受け取って決める ── 窓なら「外の海に 1 つ開く」。
+   * ★ **泡はこの海に残る。** 持ち出しは引っ越しではないので（外に 1 つ増えるだけ）、
+   *   ここが true を返して泡を消すことはしない。
+   */
+  readonly onEscape?: (info: TakeOutInfo) => void;
   readonly autoLens?: boolean;
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
@@ -190,6 +201,14 @@ const SHORE_MEMORY = new Map<string, readonly Docked[]>();
  */
 const SHORE_SEEDED = new Set<string>();
 
+/**
+ * 縁を**どれだけ越えたら**「外へ出したい」と読むか。
+ *
+ * ★ 0 にすると、岸に着けるつもりで少し行きすぎただけで外へ出てしまう。
+ *   逆に大きくすると、窓の外まで運んでも岸に貼り付く。指 1 本ぶんくらいにしてある。
+ */
+const ESCAPE_MARGIN = 40;
+
 /** 海の口を外から掴むための小物（`BubbleSpace` の中でしか使えないので、子として置く） */
 const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }) => {
   const space = useBubbleSpace();
@@ -237,6 +256,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   worldLineOutside,
   worldLineSeed,
   frameTools,
+  onEscape,
   bandDisplay,
   persistKey,
   onLens,
@@ -423,8 +443,25 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
        *   ── 落としたのは「その url を窓で開け」という合図になる。
        */
       if (info.over && putIntoWindow(info.over.id, info.url)) return true;
-      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const at = toShore(info);
+      /**
+       * ★ **縁を越えた先まで運んだら、外へ渡す。**
+       *
+       * > 縁に「着ける」のと、縁を「越える」のは別の身ぶり。
+       *
+       * ★ 岸に着けるのは、**海の中で縁へ寄せる**動き。少しはみ出すのは行きすぎただけなので、
+       *   そこまでは岸が受ける。それより先まで運んだら「この海の外へ出したい」と読む。
+       * ★ **先に見る。** あとに回すと岸がいつも先に当たって（縁の外でも近い岸が見つかる）、
+       *   外へ出る道に入れない（実測で踏んだ：下へ大きく引いても岸に貼り付いた）。
+       */
+      const beyond =
+        at.pointer.x < -ESCAPE_MARGIN || at.pointer.y < -ESCAPE_MARGIN ||
+        at.pointer.x > vp.width + ESCAPE_MARGIN || at.pointer.y > vp.height + ESCAPE_MARGIN;
+      if (beyond && onEscape) {
+        onEscape(info);
+        return false;
+      }
+      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const want = toDockSize(info.size);
       const hit = resolveDock(
         { x: at.x, y: at.y, width: want.width, height: want.height },
@@ -440,7 +477,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       noteShore('members');
       return true;
     },
-    [docked, vp, routes, noteShore],
+    [docked, vp, routes, noteShore, onEscape],
   );
 
   /** ドラッグ中 ── 縁の近くなら、着いたあとの矩形を予告する（大きさは貼るときと同じ規則） */
