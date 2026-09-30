@@ -369,18 +369,6 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const noteListHost = useCallback((id: BubbleId) => {
     setListHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
-  /**
-   * **中に空間を持っている泡**（`setChildren` を呼んだ泡ぜんぶ）。一覧かどうかは問わない。
-   *
-   * ★ 前は一覧の棚 1 つで、**見え方の口を出すこと**と**札を静かにすること**（＝帯を外して
-   *   掴めなくすること）の両方が決まっていた。だから座標を自分で書く空間が
-   *   「一覧ではない」と名乗ると、口まで消えて**見え方を変える手が無くなった**（実測で言われた）。
-   * ★ 2 つは別の話なので、棚も 2 つに分ける ── 口はここ、札の静かさは `listHosts`。
-   */
-  const [spaceHosts, setSpaceHosts] = useState<ReadonlySet<BubbleId>>(() => new Set());
-  const noteSpaceHost = useCallback((id: BubbleId) => {
-    setSpaceHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  }, []);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
   const [urls, setUrls] = useState<ReadonlyMap<BubbleId, Opened>>(() => remembered?.urls ?? new Map());
@@ -584,9 +572,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     [world, viewport, rules, chrome, nudge, dressed],
   );
 
+  /**
+   * **この海から出て行った札**（岸に貼った・外へ渡した）を、出した空間ごとに控える。
+   *
+   * ★ 出て行くと世界からも覚え書きからも消えるので、あとから「居ない」としか分からない
+   *   ── それだと顔ぶれを言い切っている空間が**毎回生やし直す**。
+   * ★ 戻ってくれば（同じ url が子として現れれば）控えは消す。
+   */
+  const gone = useRef<Map<BubbleId, Set<string>>>(new Map());
+
   /** 海から出す（岸へ渡す）。泡も url の覚えも落とす */
   const takeOut = useCallback(
     (id: BubbleId) => {
+      const opened = urls.get(id);
+      if (opened?.originId) {
+        const set = gone.current.get(opened.originId) ?? new Set<string>();
+        set.add(opened.url);
+        gone.current.set(opened.originId, set);
+      }
       setWorld(world.without(id));
       setUrls((m) => {
         const next = new Map(m);
@@ -596,7 +599,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       // 岸へ出て行くのも**顔ぶれの変化**（受け取ったのが誰かは、海の関心ではない）
       markSettled('members');
     },
-    [world, setWorld, markSettled],
+    [world, setWorld, markSettled, urls],
   );
 
   const claimDrop = useCallback(
@@ -772,23 +775,12 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   （戻った先で分岐が 1 つ増える）。
    */
   const setLens = useCallback(
-    (axis: PlaneAxis, lens: LensId, spaceId: BubbleId = 'root') => {
-      /** ★ 外の海なら今までどおり。**中の空間なら、その空間の軸だけ**を変える */
-      if (spaceId === 'root') applyLens(axis, lens);
-      else setWorld(withAxis(world, spaceId, axis, { lens }));
+    (axis: PlaneAxis, lens: LensId) => {
+      applyLens(axis, lens);
       markSettled('view');
     },
-    [applyLens, markSettled, world, setWorld],
+    [applyLens, markSettled],
   );
-
-  /**
-   * その空間の、いまの見え方（無ければ null）。
-   *
-   * ★ 見え方の口を**外の器が作る**のに要る ── 口の中身（`SpaceViewTools`）は
-   *   海の口と同じ見本から出したいが、あれは上の層に居るので、
-   *   ここからは「読む口」と「書く口」を渡すだけにする。
-   */
-  const viewOf = useCallback((spaceId: BubbleId) => world.ownViewOf(spaceId), [world]);
 
   /**
    * 岸から海へ返す。置いたあと、**画面のその矩形に見えるように**動かす
@@ -904,13 +896,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
       const { preset, itemWidth, reserve, step, cols, grow, at, list, onLeave } = how;
-      /** ★ 中に空間を持つ泡として覚えるのは、一覧でもそうでなくても（見え方の口はどちらにも要る） */
-      noteSpaceHost(hostId);
       /** ★ 一覧ではない空間（座標を自分で書く場）は、一覧として覚えない（`list` の註） */
       if (list !== false) noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
+      /** ★ 戻ってきた札の控えは消す（人が岸から海へ返したとき） */
+      const back = gone.current.get(hostId);
+      if (back) for (const url of have) back.delete(url);
       /**
        * ★ **作れないものは「足りない」に数えない。** ルートの無い url は下の作る所で
        *   飛ばされるので、数えたままだと「足りないまま」が永遠に続き、**同じ世界を
@@ -931,7 +924,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   （`onLeave` の註）。伝えたぶんは、この回は生やさない ── 生やしてから
        *   消すと、1 回ぶん画面がちらつく。
        */
-      const left = new Map<string, { space: BubbleId; beside: boolean }>();
+      const left = new Map<string, { space: BubbleId | null; beside: boolean }>();
       /** 一覧自身が居る空間。ここへ出されたのが「隣に剥がした」 */
       const mySpace = world.bubble(hostId)?.space ?? 'root';
       for (const [id, opened] of urls) {
@@ -941,10 +934,29 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         if (!want.includes(opened.url)) continue;
         left.set(opened.url, { space: here.space, beside: here.space === mySpace });
       }
+      /**
+       * ★ **海から出て行ったものも数える**（岸に貼った・外へ渡した）。
+       *   あちらは世界から消えるので上の見回りでは掴めない ── 出したときに控えておく。
+       *   これが無いと、**岸に貼った瞬間に海へ生え直して二重になる**。
+       */
+      const goneHere = gone.current.get(hostId);
+      if (goneHere) {
+        for (const url of goneHere) if (want.includes(url) && !have.has(url)) left.set(url, { space: null, beside: false });
+      }
       if (onLeave) for (const [url, at] of left) onLeave(url, at);
 
+      /**
+       * ★ **連れ戻すかどうかは、持ち主が決める。**
+       *
+       * 出て行ったことは伝える（`onLeave`）が、顔ぶれ（`want`）から外すかどうかは
+       * 持ち主の仕事。ここで勝手に外すと、**外の海へ持ち出しただけ**のときにも
+       * 一覧から減ってしまう ── ほかの一覧の決まり（「外に 1 つ増えるだけで、
+       * ここからは減らない」）が壊れる。
+       * ★ 海から出て行ったもの（岸）だけは、持ち主が外すまでのあいだ生やさない
+       *   ── 貼った先から毎回引き剥がすことになるので。
+       */
       const missing = want.filter(
-        (url) => !have.has(url) && !left.has(url) && !!matchBubbleRoute(routes, url),
+        (url) => !have.has(url) && !goneHere?.has(url) && !!matchBubbleRoute(routes, url),
       );
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
@@ -1077,7 +1089,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       setUrls(m);
       setWorld(w);
     },
-    [world, urls, routes, setWorld, noteListHost, noteSpaceHost],
+    [world, urls, routes, setWorld, noteListHost],
   );
 
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
@@ -1200,9 +1212,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn,
-      hasSpace: (id: BubbleId) => spaceHosts.has(id), isList: (id: BubbleId) => listHosts.has(id), viewOf }),
-    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, spaceHosts, listHosts, viewOf],
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
   );
 
   /**
@@ -1449,7 +1460,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts, spaceHosts],
+    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

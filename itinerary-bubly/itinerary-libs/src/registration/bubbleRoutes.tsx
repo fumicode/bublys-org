@@ -83,10 +83,13 @@ export const itineraryBubbleRoutes: BubbleRoute[] = [
      *   （そうしないと消失点が箱と関係ない所に置かれる ── `ListSpace` の註）。
      */
     /**
-     * ★ 大きさは**散らす寸法から出す**（`planLayout` のいちばん外の段 ＋ 付箋の半分）。
-     *   小さいと付箋が盤の外へ出て、「向きが関係を表す」が読めなくなる（実測で踏んだ）。
+     * ★ **画面に収まる大きさで開く。** 散らす寸法は場の実寸から出すので（`planLayout`）、
+     *   盤が小さければ散らばりもそのぶん縮む ── 大きさを先に決める必要はもう無い。
+     * ★ 前は 1240×1020 で開いていて、ふつうの画面に入らず**見出しごと画面の外**に出ていた
+     *   （見え方の口も一緒に外へ出て、触れなくなっていた）。広く使いたいときは
+     *   辺を掴んで広げるか、中の見え方の口で寄り引きする ── どちらも道具が持っている。
      */
-    bubbleOptions: { defaultSize: { width: 1240, height: 1020 }, contentBackground: "transparent" },
+    bubbleOptions: { defaultSize: { width: 900, height: 620 }, contentBackground: "transparent" },
   },
   {
     pattern: /^itineraries$/,

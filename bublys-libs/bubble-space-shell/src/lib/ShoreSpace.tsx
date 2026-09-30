@@ -30,8 +30,7 @@ import {
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, BubbleSpaceProps, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import type { LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from "@bublys-org/bubble-layout";
-import { PRESETS } from "@bublys-org/bubble-layout";
+import type { LayoutRules, LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
   anchoredRect,
@@ -46,7 +45,6 @@ import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./Showre
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
 import { putIntoWindow, useWindowView } from "./legacyRouteBridge.js";
 import { SpaceViewTools } from "./SpaceViewBubble.js";
-import type { SpaceView } from "./SpaceViewContext.js";
 import { useSeaWorldLine } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
@@ -208,39 +206,8 @@ const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }
  * ★ **全画面は出さない** ── あれは画面ぜんぶの話で、窓には無い。
  */
 const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
-  const win = useWindowView(id);
-  const space = useBubbleSpace();
-  /**
-   * **中に空間を持つ泡の見え方** ── 窓（別の世界）ではないが、自分の中に子を並べている泡。
-   *
-   * > 本計画づくりの場がこれ。**置いた所に意味がある**ので、
-   * > 一覧の「縦・横・格子…」ではなく、**どう見るか**の口を出す。
-   *
-   * ★ 触る相手は海の口と同じ形（`SpaceView`）にして、中身は同じ見本から出す。
-   *   ここが作るのは「その空間を読む・書く」の繋ぎだけ。
-   * ★ **まかせる・帯は出さない。** どちらも海ぜんぶの決まりで、
-   *   1 つの空間が自分で持てるものではない ── 出すと押せるのに何も起きない口になる。
-   */
-  const own = space.viewOf(id);
-  const mine = useMemo<SpaceView | null>(() => {
-    if (!own) return null;
-    const lensOf = (axis: "x" | "y") => own[axis].lens === "fisheye";
-    return {
-      preset: presetIdOf(own),
-      setPreset: (p) => space.setPreset(p, id),
-      join: "detour",
-      setJoin: () => undefined,
-      fisheye: { x: lensOf("x"), y: lensOf("y") },
-      toggleFisheye: (axis) => space.setLens(axis, lensOf(axis) ? "parallel" : "fisheye", id),
-      autoLens: false,
-      setAutoLens: () => undefined,
-      bandsAlways: false,
-      setBandsAlways: () => undefined,
-    };
-  }, [own, space, id]);
-
-  // 窓なら窓の口。そうでなければ、中に空間を持つ泡の口。どちらでもなければ何も出さない
-  const view = win ?? (space.hasSpace(id) && !space.isList(id) ? mine : null);
+  const view = useWindowView(id);
+  // 窓でない泡・まだ立ち上がっていない窓には、何も出さない
   if (!view) return null;
   return (
     <div
@@ -248,27 +215,9 @@ const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <SpaceViewTools view={view} fullscreen={false} autoLens={!!win} bands={!!win} />
+      <SpaceViewTools view={view} fullscreen={false} />
     </div>
   );
-};
-
-/**
- * いまの見え方が、どの並べ方にいちばん近いか。
- *
- * ★ 空間は並べ方を**名前では覚えていない**（軸ごとの値しか持たない）ので、
- *   選ぶ欄に出すために逆から当てる。当たらなければ「自由に置く」
- *   ── 座標で置いている空間はここに来る。
- */
-const presetIdOf = (view: View): PresetId => {
-  for (const id of Object.keys(PRESETS) as PresetId[]) {
-    const p = PRESETS[id];
-    const same = (["x", "y", "z"] as const).every(
-      (a) => p[a].dim === view[a].dim && p[a].arrange === view[a].arrange && p[a].lens === view[a].lens,
-    );
-    if (same) return id;
-  }
-  return "free";
 };
 
 export const ShoreSpace: FC<ShoreSpaceProps> = ({
@@ -544,10 +493,6 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       // 岸に貼った一覧が置ける広さは、岸の窓ぶん（それ以上は岸からはみ出す）
       roomOf: () => ({ w: vp.width, h: vp.height }),
       takeIn: (url, rect) => spaceRef.current?.takeIn(url, rect) ?? "",
-      /** ★ 岸に貼った泡は空間を持たない ── 中に子を並べるのは海の側の話 */
-      hasSpace: (id) => spaceRef.current?.hasSpace(id) ?? false,
-      isList: (id) => spaceRef.current?.isList(id) ?? false,
-      viewOf: (spaceId) => spaceRef.current?.viewOf(spaceId) ?? null,
     }),
     [vp],
   );
