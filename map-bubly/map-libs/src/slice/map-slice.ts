@@ -35,6 +35,15 @@ export type MapState = {
    *   ── だから地図は旅程もアクティビティも import しない。
    */
   handed: ObjectRef[];
+  /**
+   * **もう撒いた調べ物の名前。**
+   *
+   * ★ 「地点が 0 件なら撒く」だけでは、あとから増えた調べ物（越後の 793 件）が
+   *   すでに使っている人に永久に届かない。かといって「無ければ足す」にすると、
+   *   **人が消した地点が次に開いたとき戻ってくる**。撒いたことを覚えておけば、
+   *   どちらにもならない ── 撒くのは 1 度きり、消したものは消えたまま。
+   */
+  seeded: string[];
 };
 
 const initialState: MapState = {
@@ -42,6 +51,7 @@ const initialState: MapState = {
   bounds: HAKONE_BOUNDS,
   searchBounds: null,
   handed: [],
+  seeded: [],
 };
 
 export const mapSlice = createSlice({
@@ -61,6 +71,18 @@ export const mapSlice = createSlice({
     },
     removeSpot: (state, action: PayloadAction<string>) => {
       state.spotList = state.spotList.filter((s) => s.id !== action.payload);
+    },
+    /**
+     * 調べ物をひと組、足す（まだ撒いていなければ）。
+     *
+     * ★ 保存されたものは**前の形のまま戻ってくる**ことがあるので、無ければ作る。
+     */
+    seedSpots: (state, action: PayloadAction<{ name: string; spots: SpotPlain[] }>) => {
+      if (!state.seeded) state.seeded = [];
+      if (state.seeded.includes(action.payload.name)) return;
+      const have = new Set(state.spotList.map((s) => s.id));
+      for (const spot of action.payload.spots) if (!have.has(spot.id)) state.spotList.push(spot);
+      state.seeded.push(action.payload.name);
     },
     /** いま映している範囲を置く（計算は済んでいる） */
     setBounds: (state, action: PayloadAction<MapBoundsPlain>) => {
@@ -97,6 +119,7 @@ type StateWithMap = RootState & { map: MapState };
 
 export const {
   setSpotList,
+  seedSpots,
   addSpot,
   updateSpot,
   removeSpot,

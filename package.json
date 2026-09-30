@@ -116,6 +116,7 @@
     "map-bubly/*",
     "activity-bubly/*",
     "itinerary-bubly/*",
-    "note-bubly/*"
+    "note-bubly/*",
+    "lodging-bubly/*"
   ]
 }

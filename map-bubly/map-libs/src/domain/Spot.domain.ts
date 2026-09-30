@@ -19,6 +19,23 @@ export type SpotPlain = {
   lat: number;
   /** 経度 */
   lng: number;
+  /**
+   * **何をする所か。** 越後の一覧が持っている目印（温泉・入浴／スキー・スノーボード／酒蔵…）。
+   *
+   * ★ 種類（`category`）と分けてあるのは、**重なるから**。同じ所が温泉でもあり
+   *   宿泊もできることがあり、どれか 1 つを選ばせると必ず嘘になる。
+   *   種類はピンの色を決めるためだけの 5 つ、こちらは探すための目印。
+   */
+  tags?: string[];
+  address?: string;
+  /** どこの市町村か（探すときの絞り込み） */
+  city?: string;
+  /** 地方（越後では 下越・中越・上越） */
+  region?: string;
+  tel?: string;
+  url?: string;
+  /** 開いている時間など、出所に書いてあった一言 */
+  note?: string;
 };
 
 export class Spot_地点 {
@@ -29,6 +46,13 @@ export class Spot_地点 {
   get category(): SpotCategory_種類 { return this.state.category; }
   get lat(): number { return this.state.lat; }
   get lng(): number { return this.state.lng; }
+  get tags(): string[] { return this.state.tags ?? []; }
+  get address(): string | undefined { return this.state.address; }
+  get city(): string | undefined { return this.state.city; }
+  get region(): string | undefined { return this.state.region; }
+  get tel(): string | undefined { return this.state.tel; }
+  get url(): string | undefined { return this.state.url; }
+  get note(): string | undefined { return this.state.note; }
 
   withName(name: string): Spot_地点 {
     return new Spot_地点({ ...this.state, name });
@@ -83,4 +107,14 @@ export const SPOT_SHAPE: SchemaShape = objectShape([
   },
   { name: "lat", shape: primitiveShape("number"), required: true, label: "緯度", role: "latitude" },
   { name: "lng", shape: primitiveShape("number"), required: true, label: "経度", role: "longitude" },
+  /**
+   * ★ 住所も名乗る（役 `address`）── 受け取った側が地図を持っていなくても、
+   *   どこの話かを字で出せる。
+   */
+  { name: "address", required: false, shape: primitiveShape("string"), label: "住所", role: "address" },
+  { name: "city", required: false, shape: primitiveShape("string"), label: "市町村" },
+  { name: "region", required: false, shape: primitiveShape("string"), label: "地方" },
+  { name: "tel", required: false, shape: primitiveShape("string"), label: "電話" },
+  { name: "url", required: false, shape: primitiveShape("string"), label: "ウェブ" },
+  { name: "note", required: false, shape: primitiveShape("string"), label: "ひとこと" },
 ]);

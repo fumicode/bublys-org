@@ -1,14 +1,17 @@
 'use client';
 /**
- * 最初の地点を撒く ── 何も無ければ箱根のひと通りを入れる。
+ * 最初の地点を撒く。
  *
  * ★ **ID は固定の文字列**（`crypto.randomUUID()` ではない）。アクティビティも旅程も
  *   `spotId` でここを指すので、開くたびに ID が変わると指が外れる。
+ * ★ 撒くのは**ひと組ずつ、1 度きり**（`seedSpots`）。箱根の見本はデモが指しているので
+ *   残し、越後の調べ物はその上に足す ── 消した地点は戻ってこない。
  */
 import { useEffect } from "react";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+import { useAppDispatch } from "@bublys-org/state-management";
 import type { SpotPlain } from "../domain/Spot.domain.js";
-import { selectSpots, setSpotList } from "../slice/map-slice.js";
+import { ECHIGO } from "../data/echigo-spots.js";
+import { seedSpots } from "../slice/map-slice.js";
 
 export const HAKONE_SPOTS: SpotPlain[] = [
   { id: "hakone-yumoto", name: "箱根湯本駅", category: "station", lat: 35.2325, lng: 139.1063 },
@@ -27,8 +30,8 @@ export const HAKONE_SPOTS: SpotPlain[] = [
 
 export function useSeedSpots(): void {
   const dispatch = useAppDispatch();
-  const spots = useAppSelector(selectSpots);
   useEffect(() => {
-    if (spots.length === 0) dispatch(setSpotList(HAKONE_SPOTS));
-  }, [dispatch, spots.length]);
+    dispatch(seedSpots({ name: "hakone", spots: HAKONE_SPOTS }));
+    dispatch(seedSpots({ name: "echigo", spots: ECHIGO }));
+  }, [dispatch]);
 }
