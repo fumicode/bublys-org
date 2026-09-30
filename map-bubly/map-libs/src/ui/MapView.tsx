@@ -1,25 +1,38 @@
 'use client';
 /**
- * 地図の絵 ── 湖と道とピンを 1 枚の SVG に描く。
+ * 地図の絵 ── **本物の地図（OpenStreetMap）の上**に、この空間のピンと道を重ねる。
  *
- * ★ **ここは何も覚えない。** 映す範囲も、指されているものも、道も、全部もらう。
- *   掴んで動かした量も「こう動かしたい」と外へ言うだけ ── 覚えるのは入れ物（slice）の仕事。
- * ★ 緯度経度から画面の位置への変換は {@link MapBounds_範囲.project} 1 本だけを通す。
- *   湖とピンで別々に計算すると、寄ったときにピンが湖から外れる。
+ * ★ **地の絵は Leaflet に任せる。** 前は湖と道を緯度経度から SVG で描いていたので、
+ *   寄っても細かくならず、箱根の外へ出れば何も無かった。タイルなら
+ *   どこへ行っても地図があり、寄れば寄ったぶん出る。
+ * ★ **ピンは Leaflet のマーカーにしない。** ピンは「掴んで運べるもの」（`ObjectView`）で
+ *   なければならない ── それがバブリどうしの繋がり方そのものだから。
+ *   なので位置だけ Leaflet に訊いて（`latLngToContainerPoint`）、中身は自分で描く。
+ * ★ **映している範囲の持ち主は Leaflet。** 人が触って動くのはあちらなので、
+ *   動き終わったら「いまここです」と外へ言う。外から範囲を渡されたときだけ合わせる
+ *   ── 両方が持ち主になると、動かすたびに押し合って止まらなくなる。
  */
 import {
   ComponentPropsWithoutRef,
   DragEvent as ReactDragEvent,
   FC,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import styled from "styled-components";
+/**
+ * ★ **型だけを持ってくる**（`import type`）。Leaflet は読み込んだ時点で `window` を
+ *   触るので、ふつうに import するとサーバ側の下描きで落ちる
+ *   （実測：`next build` が `/_not-found` の書き出しで止まる）。
+ *   実体はブラウザに着いてから読む（下の `useEffect`）。
+ */
+import type * as LeafletNS from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { MapBounds_範囲 } from "../domain/MapBounds.domain.js";
-import { HAKONE_ROAD, LAKESIDE_ROAD, LAKE_ASHI, type LatLng } from "../domain/hakoneGeography.js";
 
 /**
  * 地図に出る点 1 つ。
@@ -45,7 +58,7 @@ export type MapViewProps = {
   focusedId?: string | null;
   /** 道として繋ぐ点の並び（渡されたものの順） */
   routeIds?: readonly string[];
-  /** 掴んで動かした／輪を回した結果の「こうしたい」 */
+  /** 人が動かし終わったときの「いまここです」 */
   onBoundsChange?: (next: MapBounds_範囲) => void;
   /** ピンを指したとき */
   onPinFocus?: (id: string) => void;
@@ -61,6 +74,35 @@ export type MapViewProps = {
   onClearHanded?: () => void;
 };
 
+/**
+ * **地の絵は地理院タイル（淡色地図）。**
+ *
+ * ★ **淡色にしたのは、この上に色を重ねるから。** ピンも道もこちらが色を持つので、
+ *   地が濃いと線がどれだけ地の道で、どれだけ旅程の道なのか読み分けられない。
+ *   標準地図（`std`）にしたければ URL の `pale` を `std` に替えるだけ。
+ * ★ **日本の外には出ない。** 地理院タイルは日本とその周りだけなので、
+ *   海外の旅程では地が白くなる（ピンと道はそのまま出る）。
+ *   世界を映したいなら、ここを別の出どころに替える（`README` を見よ）。
+ * ★ 出典は消さないこと。**承認なしで使える条件がこれ**（国土地理院コンテンツ利用規約）。
+ */
+const TILE_URL = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png";
+const TILE_ATTRIBUTION =
+  '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>（国土地理院）';
+/** タイルのある縮尺。これより引くと地が無くなる */
+const TILE_MIN_ZOOM = 5;
+const TILE_MAX_ZOOM = 18;
+
+/** 道の見た目。渡されたもののピンの色と揃える */
+const ROUTE_STYLE = { color: "#1f6fd0", weight: 3, dashArray: "6 5", opacity: 0.9 };
+
+/** 同じ範囲と見なす幅（度）。浮動小数の丸めで押し合いが起きない程度に */
+const EPS = 1e-7;
+
+const toLatLngBounds = (b: MapBounds_範囲): LeafletNS.LatLngBoundsExpression => [
+  [b.south, b.west],
+  [b.north, b.east],
+];
+
 export const MapView: FC<MapViewProps> = ({
   bounds,
   pins,
@@ -75,64 +117,142 @@ export const MapView: FC<MapViewProps> = ({
   onClearHanded,
 }) => {
   const boxRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  const mapRef = useRef<LeafletNS.Map | null>(null);
+  const routeRef = useRef<LeafletNS.Polyline | null>(null);
+  /** Leaflet の実体。ブラウザに着いてから入る */
+  const [L, setL] = useState<typeof LeafletNS | null>(null);
+  /**
+   * 描き直しの合図。地図が動くたびに増える。
+   * ピンの位置は Leaflet に訊かないと分からないので、動いたら描き直す必要がある。
+   */
+  const [beat, setBeat] = useState(0);
+  /** 外から渡された範囲を合わせている最中か（そのあいだは外へ言い返さない） */
+  const applyingRef = useRef(false);
+  /**
+   * いまの「外へ言う口」。覚え書きで持つ ── 依存に入れて地図を立て直すと、
+   * 触っている最中にタイルが消える。
+   */
+  const reportRef = useRef(onBoundsChange);
+  reportRef.current = onBoundsChange;
+  /** 最初に映す範囲。立てるときに 1 回だけ読む */
+  const initialBoundsRef = useRef(bounds);
+
+  /** Leaflet を読む（ブラウザでだけ。1 回だけ） */
+  useEffect(() => {
+    let alive = true;
+    import("leaflet").then((m) => {
+      if (alive) setL((m.default ?? m) as typeof LeafletNS);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** 地図を 1 つ立てる（Leaflet が着いてから、1 回だけ） */
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!L || !el || mapRef.current) return;
+
+    const map = L.map(el, {
+      // 口は自分で出す（岸に貼った小さな泡でも邪魔にならない大きさにしたい）
+      zoomControl: false,
+      attributionControl: true,
+      // タイルのある範囲の外へは出さない ── 出ると地が真っ白になる
+      minZoom: TILE_MIN_ZOOM,
+      maxZoom: TILE_MAX_ZOOM,
+    });
+    L.tileLayer(TILE_URL, {
+      minZoom: TILE_MIN_ZOOM,
+      maxZoom: TILE_MAX_ZOOM,
+      // 地理院タイルの決まり。出典と一覧への道は必ず出す
+      attribution: TILE_ATTRIBUTION,
+    }).addTo(map);
+
+    map.fitBounds(toLatLngBounds(initialBoundsRef.current));
+    mapRef.current = map;
+
+    const settled = () => {
+      setBeat((n) => n + 1);
+      if (applyingRef.current) return;
+      const b = map.getBounds();
+      reportRef.current?.(
+        MapBounds_範囲.fromPlain({
+          south: b.getSouth(),
+          north: b.getNorth(),
+          west: b.getWest(),
+          east: b.getEast(),
+        }),
+      );
+    };
+    map.on("moveend", settled);
+    map.on("zoomend", settled);
+    /** 動いている最中もピンを付いてこさせる ── 置いていかれると地図から浮く */
+    map.on("move", () => setBeat((n) => n + 1));
+
+    setBeat((n) => n + 1);
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+    // 立てるのは Leaflet が着いたとき 1 回だけ。範囲の追従は下の effect が受け持つ
+  }, [L]);
 
   /**
-   * 絵の大きさは箱に聞く。泡は大きさが変わるものなので、決め打ちにすると
-   * 広げたときに右下が空き、縮めたときに湖が切れる。
+   * **箱の大きさが変わったら、地図に教える。**
+   * 泡は大きさが変わるものなので、教えないとタイルが古い大きさのまま欠ける。
    */
   useLayoutEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setSize({ width, height });
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.invalidateSize();
+      setBeat((n) => n + 1);
     });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  const { width, height } = size;
-  const ready = width > 0 && height > 0;
-
-  const toPoints = useCallback(
-    (path: readonly LatLng[]): string =>
-      path
-        .map((p) => {
-          const { x, y } = bounds.project(p.lat, p.lng, width, height);
-          return `${x.toFixed(1)},${y.toFixed(1)}`;
-        })
-        .join(" "),
-    [bounds, width, height],
-  );
-
-  /** 掴んで動かす ── 動いた px を緯度経度に戻して「こう動かしたい」と言う */
-  const dragRef = useRef<{ x: number; y: number } | null>(null);
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (!onBoundsChange) return;
-    dragRef.current = { x: e.clientX, y: e.clientY };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const handlePointerMove = (e: React.PointerEvent) => {
-    const from = dragRef.current;
-    if (!from || !onBoundsChange || !ready) return;
-    const dx = e.clientX - from.x;
-    const dy = e.clientY - from.y;
-    if (dx === 0 && dy === 0) return;
-    dragRef.current = { x: e.clientX, y: e.clientY };
-    // 右へ引けば西へ動く（地図を掴んで引っぱる向き）
-    onBoundsChange(
-      bounds.panned((dy / height) * bounds.latSpan, (-dx / width) * bounds.lngSpan),
-    );
-  };
-  const handlePointerUp = (e: React.PointerEvent) => {
-    dragRef.current = null;
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+  /**
+   * 外から範囲を渡されたら合わせる。
+   *
+   * ★ **自分が動いて外へ言った結果が返ってきただけなら、動かさない。**
+   *   合わせ直すと、その動きがまた外へ出て、押し合いが止まらなくなる。
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const now = map.getBounds();
+    if (
+      Math.abs(now.getSouth() - bounds.south) < EPS &&
+      Math.abs(now.getNorth() - bounds.north) < EPS &&
+      Math.abs(now.getWest() - bounds.west) < EPS &&
+      Math.abs(now.getEast() - bounds.east) < EPS
+    ) {
+      return;
     }
-  };
+    applyingRef.current = true;
+    map.fitBounds(toLatLngBounds(bounds));
+    // 合わせ終わってから解く（`moveend` はこのあと来る）
+    window.setTimeout(() => {
+      applyingRef.current = false;
+    }, 0);
+  }, [bounds]);
 
-  const zoom = (factor: number) => onBoundsChange?.(bounds.zoomed(factor));
+  /** 道 ── 渡された順に繋ぐ。地の上に引くので Leaflet に描かせる */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!L || !map) return;
+    routeRef.current?.remove();
+    routeRef.current = null;
+    if (!routeIds || routeIds.length < 2) return;
+    const latLngs = routeIds
+      .map((id) => pins.find((p) => p.id === id))
+      .filter((p): p is MapPin => p !== undefined)
+      .map((p) => [p.lat, p.lng] as [number, number]);
+    if (latLngs.length < 2) return;
+    routeRef.current = L.polyline(latLngs, ROUTE_STYLE).addTo(map);
+  }, [L, routeIds, pins]);
 
   /** 面ぜんぶが受け皿（ポケット・旅程と同じ決まり） */
   const [dragOver, setDragOver] = useState(false);
@@ -154,126 +274,92 @@ export const MapView: FC<MapViewProps> = ({
     }
   };
 
+  /** 画面の中のどこに出すか。**Leaflet に訊く**（地の絵と同じ写し方でなければずれる） */
+  const pointOf = useCallback(
+    (pin: MapPin): { x: number; y: number } | null => {
+      const map = mapRef.current;
+      if (!map) return null;
+      const p = map.latLngToContainerPoint([pin.lat, pin.lng]);
+      const size = map.getSize();
+      if (p.x < -60 || p.y < -60 || p.x > size.x + 60 || p.y > size.y + 60) return null;
+      return { x: p.x, y: p.y };
+    },
+    // 地図が動くたびに引き直す
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [beat],
+  );
+
+  const zoom = (by: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setZoom(map.getZoom() + by);
+  };
+
   return (
-    /* 測る箱 ── 中身と同じ広さで、見た目には何も足さない（器と同じ書き方） */
-    <div ref={boxRef} style={{ width: "100%", height: "100%", minWidth: 0, minHeight: 0 }}>
-      <StyledMap
-        data-drag-over={dragOver ? "on" : "off"}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {ready && (
-          <svg
-            className="e-canvas"
-            width={width}
-            height={height}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
+    <StyledMap
+      data-drag-over={dragOver ? "on" : "off"}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* 地の絵（タイル）。Leaflet がこの中を全部描く */}
+      <div ref={boxRef} className="e-ground" />
+
+      {/* ピンは地の絵の上に重ねる ── 1 つ 1 つが掴める「もの」なので、自分で描く */}
+      {pins.map((pin) => {
+        const at = pointOf(pin);
+        if (!at) return null;
+        const focused = pin.id === focusedId;
+        return (
+          <div
+            key={`${pin.type}/${pin.id}`}
+            className={`e-pin ${focused ? "is-focused" : ""}`}
+            style={{ left: at.x, top: at.y }}
           >
-            <rect x={0} y={0} width={width} height={height} className="e-ground" />
-
-            {/* 山あい ── 地の起伏の代わりのごく淡い帯。読みの邪魔をしない濃さに留める */}
-            <polygon className="e-hill" points={toPoints(HILL_NORTH)} />
-            <polygon className="e-hill" points={toPoints(HILL_SOUTH)} />
-
-            <polygon className="e-lake" points={toPoints(LAKE_ASHI)} />
-            <polyline className="e-road" points={toPoints(HAKONE_ROAD)} />
-            <polyline className="e-road" points={toPoints(LAKESIDE_ROAD)} />
-
-            {/* 渡されたものの道 ── 渡された順にそのまま繋ぐ（順の意味は知らない） */}
-            {routeIds && routeIds.length >= 2 && (
-              <polyline
-                className="e-route"
-                points={toPoints(
-                  routeIds
-                    .map((id) => pins.find((p) => p.id === id))
-                    .filter((p): p is MapPin => p !== undefined)
-                    .map((p) => ({ lat: p.lat, lng: p.lng })),
-                )}
-              />
-            )}
-          </svg>
-        )}
-
-        {/* ピンは SVG の外に置く ── 1 つ 1 つが掴める「もの」（ObjectView）になるので、
-            HTML のまま重ねたほうが素直（SVG の中では ObjectView の span が置けない） */}
-        {ready &&
-          pins.map((pin) => {
-            const { x, y } = bounds.project(pin.lat, pin.lng, width, height);
-            if (x < -40 || y < -40 || x > width + 40 || y > height + 40) return null;
-            const focused = pin.id === focusedId;
-            return (
-              <div
-                key={`${pin.type}/${pin.id}`}
-                className={`e-pin ${focused ? "is-focused" : ""}`}
-                style={{ left: x, top: y }}
-              >
-                <ObjectView
-                  type={pin.type}
-                  url={pin.url}
-                  id={pin.id}
-                  label={pin.name}
-                  openingPosition="bubble-side-right"
-                  draggable
-                  onClick={() => onPinFocus?.(pin.id)}
-                >
-                  <span className="e-pin-body">
-                    <span className="e-pin-dot" style={{ background: pin.color }} />
-                    <span className="e-pin-name">{pin.name}</span>
-                  </span>
-                </ObjectView>
-              </div>
-            );
-          })}
-
-        <div className="e-controls">
-          <button type="button" onClick={() => zoom(1 / 1.6)} title="寄る">＋</button>
-          <button type="button" onClick={() => zoom(1.6)} title="引く">−</button>
-        </div>
-
-        <div className="e-topleft">
-          {onSearchHere && (
-            <button
-              type="button"
-              className={`e-search ${searching ? "is-on" : ""}`}
-              onClick={onSearchHere}
+            <ObjectView
+              type={pin.type}
+              url={pin.url}
+              id={pin.id}
+              label={pin.name}
+              openingPosition="bubble-side-right"
+              draggable
+              onClick={() => onPinFocus?.(pin.id)}
             >
-              {searching ? "この範囲で探しています" : "この範囲で探す"}
-            </button>
-          )}
-          {/* 渡されたものを返す。何も渡されていなければ出さない */}
-          {onClearHanded && (
-            <button type="button" className="e-search" onClick={onClearHanded}>
-              渡されたものを返す
-            </button>
-          )}
-        </div>
-      </StyledMap>
-    </div>
+              <span className="e-pin-body">
+                <span className="e-pin-dot" style={{ background: pin.color }} />
+                <span className="e-pin-name">{pin.name}</span>
+              </span>
+            </ObjectView>
+          </div>
+        );
+      })}
+
+      <div className="e-controls">
+        <button type="button" onClick={() => zoom(1)} title="寄る">＋</button>
+        <button type="button" onClick={() => zoom(-1)} title="引く">−</button>
+      </div>
+
+      <div className="e-topleft">
+        {onSearchHere && (
+          <button
+            type="button"
+            className={`e-search ${searching ? "is-on" : ""}`}
+            onClick={onSearchHere}
+          >
+            {searching ? "この範囲で探しています" : "この範囲で探す"}
+          </button>
+        )}
+        {/* 渡されたものを返す。何も渡されていなければ出さない */}
+        {onClearHanded && (
+          <button type="button" className="e-search" onClick={onClearHanded}>
+            渡されたものを返す
+          </button>
+        )}
+      </div>
+    </StyledMap>
   );
 };
 
-/** 地の起伏（北の外輪山・南の山あい）。形だけの飾りなので緯度経度もおおまかでよい */
-const HILL_NORTH: LatLng[] = [
-  { lat: 35.262, lng: 138.995 },
-  { lat: 35.258, lng: 139.06 },
-  { lat: 35.246, lng: 139.12 },
-  { lat: 35.262, lng: 139.12 },
-];
-const HILL_SOUTH: LatLng[] = [
-  { lat: 35.186, lng: 139.0 },
-  { lat: 35.196, lng: 139.05 },
-  { lat: 35.208, lng: 139.12 },
-  { lat: 35.186, lng: 139.12 },
-];
-
-/**
- * ★ 型を明示するのは**この版の styled-components の都合**（`ObjectView` と同じ書き方）。
- *   書かないと `styled.div` の props が空になり、`ref` も `onClick` も渡せない。
- */
 const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
   position: relative;
   width: 100%;
@@ -281,22 +367,23 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
   overflow: hidden;
   border-radius: 8px;
   font: 11px/1.4 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
-  touch-action: none;
 
-  .e-canvas { display: block; cursor: grab; }
-  .e-canvas:active { cursor: grabbing; }
+  /* 受け取れるものを掴んで来たら、面ぜんぶが受け皿だと判るようにする */
+  &[data-drag-over='on'] {
+    box-shadow: inset 0 0 0 3px #1f6fd0;
+  }
 
-  .e-ground { fill: #eaf3e6; }
-  .e-hill { fill: #dcead4; }
-  .e-lake { fill: #a8d4ee; stroke: #7fb9dd; stroke-width: 1; }
-  .e-road { fill: none; stroke: #ffffff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-  .e-route {
-    fill: none;
-    stroke: #1f6fd0;
-    stroke-width: 2.5;
-    stroke-dasharray: 6 5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+  .e-ground {
+    position: absolute;
+    inset: 0;
+    /* タイルが来るまでの地。真っ白より、地図らしい色のほうが欠けて見えない */
+    background: #dfe6e2;
+  }
+
+  /* 出典は小さく、でも必ず読める所に（OpenStreetMap の決まり） */
+  .leaflet-control-attribution {
+    font-size: 9px;
+    background: rgba(255, 255, 255, 0.75);
   }
 
   .e-pin {
@@ -304,6 +391,8 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
     /* 点が地点の真上に来るように、印のぶんだけ持ち上げる */
     transform: translate(-6px, -6px);
     white-space: nowrap;
+    /* タイルより前。Leaflet の面は 400 番台を使う */
+    z-index: 500;
   }
   .e-pin-body {
     display: inline-flex;
@@ -325,9 +414,9 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
   }
   .e-pin-name { max-width: 108px; overflow: hidden; text-overflow: ellipsis; }
 
-  /* 指されているものは光る ── 旅程でもアクティビティでも、同じ地点なら同時に光る */
+  /* 指されているものは光る ── 旅程でもアクティビティでも、同じものなら同時に光る */
   .e-pin.is-focused {
-    z-index: 2;
+    z-index: 600;
   }
   .e-pin.is-focused .e-pin-body {
     background: #fffbe6;
@@ -340,6 +429,7 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
     position: absolute;
     right: 8px;
     top: 8px;
+    z-index: 600;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -355,15 +445,11 @@ const StyledMap = styled.div<ComponentPropsWithoutRef<'div'>>`
     cursor: pointer;
   }
 
-  /* 受け取れるものを掴んで来たら、面ぜんぶが受け皿だと判るようにする */
-  &[data-drag-over='on'] {
-    box-shadow: inset 0 0 0 3px #1f6fd0;
-  }
-
   .e-topleft {
     position: absolute;
     left: 8px;
     top: 8px;
+    z-index: 600;
     display: flex;
     gap: 4px;
     flex-wrap: wrap;

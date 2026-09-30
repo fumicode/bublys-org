@@ -1,5 +1,8 @@
 /**
- * 範囲のテスト ── 「この地図で探す」が正しいことに、いちばんかかっている。
+ * 範囲のテスト ── **残っている仕事は「この中に入っているか」だけ**。
+ *
+ * ★ 寄る・動かす・画面の位置へ写す、のテストはもう無い。Leaflet の仕事になったので、
+ *   こちらに同じ計算を残すと**2 つの答え**ができてピンが地の絵からずれる。
  */
 import { describe, expect, it } from "vitest";
 import { HAKONE_BOUNDS, MapBounds_範囲 } from "./MapBounds.domain.js";
@@ -19,38 +22,10 @@ describe("MapBounds_範囲", () => {
     expect(bounds.contains(HAKONE_BOUNDS.north, HAKONE_BOUNDS.east)).toBe(true);
   });
 
-  it("北が上・東が右に写す", () => {
-    const nw = bounds.project(HAKONE_BOUNDS.north, HAKONE_BOUNDS.west, 100, 100);
-    const se = bounds.project(HAKONE_BOUNDS.south, HAKONE_BOUNDS.east, 100, 100);
-    expect(nw).toEqual({ x: 0, y: 0 });
-    expect(se.x).toBeCloseTo(100);
-    expect(se.y).toBeCloseTo(100);
-  });
-
-  it("寄っても中心は動かない", () => {
-    const zoomed = bounds.zoomed(0.5);
-    expect(zoomed.centerLat).toBeCloseTo(bounds.centerLat);
-    expect(zoomed.centerLng).toBeCloseTo(bounds.centerLng);
-    expect(zoomed.latSpan).toBeCloseTo(bounds.latSpan / 2);
-  });
-
-  it("寄りすぎでは潰れない（下限で止まる）", () => {
-    let b = bounds;
-    for (let i = 0; i < 20; i += 1) b = b.zoomed(0.5);
-    expect(b.latSpan).toBeGreaterThan(0);
-    expect(b.centerLat).toBeCloseTo(bounds.centerLat);
-  });
-
-  it("動かしても大きさは変わらない", () => {
-    const moved = bounds.panned(0.01, -0.02);
-    expect(moved.latSpan).toBeCloseTo(bounds.latSpan);
-    expect(moved.lngSpan).toBeCloseTo(bounds.lngSpan);
-    expect(moved.south).toBeCloseTo(bounds.south + 0.01);
-    expect(moved.west).toBeCloseTo(bounds.west - 0.02);
-  });
-
   it("同じ範囲かどうかを言える（探すのをやめる判定に使う）", () => {
     expect(bounds.equals(MapBounds_範囲.fromPlain(HAKONE_BOUNDS))).toBe(true);
-    expect(bounds.equals(bounds.panned(0.001, 0))).toBe(false);
+    expect(
+      bounds.equals(MapBounds_範囲.fromPlain({ ...HAKONE_BOUNDS, south: HAKONE_BOUNDS.south + 0.001 })),
+    ).toBe(false);
   });
 });

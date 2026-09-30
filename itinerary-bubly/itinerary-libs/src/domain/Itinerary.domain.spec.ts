@@ -113,3 +113,42 @@ describe("時刻の読み書き", () => {
     expect(parseMin("あさ")).toBeUndefined();
   });
 });
+
+describe("時刻と費用を直す", () => {
+  const item = itinerary.findItem("a")!; // 09:00 - 10:00
+
+  it("始まりを動かすと、予定ごと動く（長さはそのまま）", () => {
+    const moved = item.withStart(hm(8, 0));
+    expect(moved.startMin).toBe(hm(8, 0));
+    expect(moved.endMin).toBe(hm(9, 0));
+  });
+
+  it("終わりを動かすと、長さが変わる（始まりは動かない）", () => {
+    const longer = item.withEnd(hm(12, 0));
+    expect(longer.startMin).toBe(hm(9, 0));
+    expect(longer.endMin).toBe(hm(12, 0));
+  });
+
+  it("終わりは始まりより前にできない（時刻が逆さまにならない）", () => {
+    expect(item.withEnd(hm(7, 0)).endMin).toBe(hm(9, 0));
+  });
+
+  it("その日の外へは出さない", () => {
+    expect(item.withStart(-60).startMin).toBe(0);
+    expect(item.withEnd(hm(30, 0)).endMin).toBe(23 * 60 + 59);
+    // 始まりを終わり際へ動かしても、終わりはその日に収まる
+    expect(item.withStart(hm(23, 30)).endMin).toBe(23 * 60 + 59);
+  });
+
+  it("費用はマイナスにならない。小数は丸める", () => {
+    expect(item.withCost(-100).cost).toBe(0);
+    expect(item.withCost(1234.6).cost).toBe(1235);
+  });
+
+  it("直しても元のインスタンスは変わらない", () => {
+    item.withStart(hm(8, 0));
+    item.withCost(999);
+    expect(item.startMin).toBe(hm(9, 0));
+    expect(item.cost).toBe(0);
+  });
+});

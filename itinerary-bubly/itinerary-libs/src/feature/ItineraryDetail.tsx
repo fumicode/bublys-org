@@ -168,7 +168,10 @@ export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) =>
       /** 指したものを揃える ── 予定が指している先を「指したもの」にする */
       onFocusItem={(item: ItineraryItem_予定) => item.ref && setFocusedObjectId(item.ref.id)}
       onItemTitleChange={(item, title) => save(itinerary.withItem(item.withTitle(title)))}
-      onItemTimeChange={(item, start, end) => save(itinerary.withItem(item.withTime(start, end)))}
+      /** 始まりは予定ごと動き、終わりは長さを変える ── どちらの決まりも集約が持つ */
+      onItemStartChange={(item, start) => save(itinerary.withItem(item.withStart(start)))}
+      onItemEndChange={(item, end) => save(itinerary.withItem(item.withEnd(end)))}
+      onItemCostChange={(item, cost) => save(itinerary.withItem(item.withCost(cost)))}
       onRemoveItem={(item) => save(itinerary.withoutItem(item.id))}
       onDropPayload={onDropPayload}
       canAccept={canAccept}

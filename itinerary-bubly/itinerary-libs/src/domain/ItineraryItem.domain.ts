@@ -75,6 +75,40 @@ export class ItineraryItem_予定 {
     return new ItineraryItem_予定({ ...this.state, startMin, endMin });
   }
 
+  /**
+   * **始まりを動かす。長さはそのまま** ── 予定ごと前後に動く。
+   *
+   * ★ 始まりと終わりで振る舞いを分けたのは、動かしたい理由が違うから。
+   *   始まりを直すのは「もっと早く出る／遅く出る」で、そのとき中身の長さは変わらない。
+   *   終わりを直すのは「もっと長く居る」で、そのとき長さが変わる。
+   *   両方を同じ扱いにすると、出発を 30 分早めたいだけなのに滞在が 30 分延びる。
+   */
+  withStart(startMin: number): ItineraryItem_予定 {
+    const start = clampToDay(startMin);
+    const length = this.state.endMin - this.state.startMin;
+    return new ItineraryItem_予定({
+      ...this.state,
+      startMin: start,
+      endMin: clampToDay(start + length),
+    });
+  }
+
+  /**
+   * **終わりを動かす。長さが変わる。**
+   * 始まりより前にはできない ── 前に置けてしまうと、読んだときに時刻が逆さまになる。
+   */
+  withEnd(endMin: number): ItineraryItem_予定 {
+    return new ItineraryItem_予定({
+      ...this.state,
+      endMin: Math.max(this.state.startMin, clampToDay(endMin)),
+    });
+  }
+
+  /** 費用を変える。マイナスは受けない（返金は費用ではない） */
+  withCost(cost: number): ItineraryItem_予定 {
+    return new ItineraryItem_予定({ ...this.state, cost: Math.max(0, Math.round(cost)) });
+  }
+
   toPlain(): ItineraryItemPlain { return { ...this.state }; }
 
   static fromPlain(plain: ItineraryItemPlain): ItineraryItem_予定 {
@@ -103,6 +137,15 @@ export class ItineraryItem_予定 {
     return colors[kind];
   }
 }
+
+/**
+ * その日の中に収める。
+ *
+ * ★ **日をまたぐ予定はまだ表せない。** またぐなら翌日の予定として置き直す、という
+ *   決まりにしてある（`docs/bubly-composition.md` の 7 節）。
+ *   ここで黙って翌日へ回すと、どの日の予定なのか集約と画面で食い違う。
+ */
+const clampToDay = (min: number): number => Math.max(0, Math.min(Math.round(min), 24 * 60 - 1));
 
 /** 分を `HH:MM` にする */
 export const formatMin = (min: number): string => {

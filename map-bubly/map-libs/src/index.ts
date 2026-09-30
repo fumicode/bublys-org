@@ -4,7 +4,6 @@ import "./object-type-registration.js";
 // Domain
 export * from './domain/Spot.domain.js';
 export * from './domain/MapBounds.domain.js';
-export * from './domain/hakoneGeography.js';
 
 // Slice（入れ物）
 export * from './slice/map-slice.js';
