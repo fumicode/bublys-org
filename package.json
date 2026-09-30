@@ -115,6 +115,7 @@
     "memo-bubly/*",
     "map-bubly/*",
     "activity-bubly/*",
-    "itinerary-bubly/*"
+    "itinerary-bubly/*",
+    "note-bubly/*"
   ]
 }

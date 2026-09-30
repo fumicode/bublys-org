@@ -12,6 +12,7 @@
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
     "@bublys-org/map-libs": "*",
+    "@bublys-org/note-libs": "*",
     "@bublys-org/space-furniture": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/world-line-graph": "*",

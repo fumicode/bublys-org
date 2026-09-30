@@ -170,6 +170,9 @@
     },
     {
       "path": "./apps/travel-space"
+    },
+    {
+      "path": "./note-bubly/note-libs"
     }
   ]
 }

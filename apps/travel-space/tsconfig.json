@@ -55,6 +55,9 @@
       "path": "../../bublys-libs/bubble-layout-feature"
     },
     {
+      "path": "../../note-bubly/note-libs"
+    },
+    {
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
