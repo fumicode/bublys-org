@@ -60,10 +60,10 @@ export class MapBounds_範囲 {
 
 }
 
-/** 最初に映す範囲 ── 箱根がひと目に入るところ */
-export const HAKONE_BOUNDS: MapBoundsPlain = {
-  south: 35.19,
-  north: 35.256,
-  west: 139.0,
-  east: 139.116,
+/** 最初に映す範囲 ── 越後妻有（十日町・松代・松之山・津南）がひと目に入るところ */
+export const ECHIGO_TSUMARI_BOUNDS: MapBoundsPlain = {
+  south: 36.98,
+  north: 37.22,
+  west: 138.55,
+  east: 138.90,
 };

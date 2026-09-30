@@ -6,9 +6,10 @@
  *
  * ★ 装飾は**ボタン 1 つ**で付く。見出し・チェック・太字・取り消し・引用・字下げ。
  *   種類を選ばせる欄は作らない ── それだと「書く」と「分ける」で 2 手になる。
- *   装飾がそのまま意味になるので、押した時点で読み解きも変わる。
- * ★ **拾ったものは、拾った行に出す**（右端の淡い札）。外れていたら見えるので直せる。
- *   黙って賢く振る舞うより、見えていて直せるほうが信用される。
+ *   装飾は書き手が付けたものだから、メモの範囲内。
+ * ★ **意味づけはここではやらない**。「時刻」「金額」「場所」などを拾って札にするのは
+ *   「メモを解釈する」という別のバブリの仕事。書いた通りを出すだけにする
+ *   （バブリの単機能原則）。
  * ★ 指（ほかのバブリのもの）は札で出す。名前は持ち主に訊くので、**向こうで直せば
  *   ここも変わる** ── 名前を写して持たない。
  */
@@ -19,6 +20,7 @@ import {
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -26,15 +28,12 @@ import styled from "styled-components";
 import type { ObjectRef } from "@bublys-org/bubbles-ui";
 import { Note_メモ } from "../domain/Note.domain.js";
 import { NoteLine_行, type LineMark } from "../domain/NoteLine.domain.js";
-import type { NoteItem } from "../domain/read/readNote.js";
 
 /** 指の目印。描くときに札へ置き換える */
 const REF_PATTERN = /@\{([A-Za-z][A-Za-z0-9-]*):([^}]+)\}/g;
 
 export type NoteViewProps = {
   note: Note_メモ;
-  /** 読み解いた結果。行ごとに「何を拾ったか」を出すのに使う */
-  items: readonly NoteItem[];
   /** 指の名前を引く（引くのは feature 層の仕事） */
   nameOfRef?: (ref: ObjectRef) => string | undefined;
   /** 指を出すときの中身（掴める札にするため、feature 層が作る） */
@@ -53,7 +52,6 @@ export type NoteViewProps = {
 
 export const NoteView: FC<NoteViewProps> = ({
   note,
-  items,
   nameOfRef,
   renderRef,
   onTitleChange,
@@ -129,7 +127,6 @@ export const NoteView: FC<NoteViewProps> = ({
 
       <div className="e-lines">
         {note.lines.map((line) => {
-          const item = items.find((i) => i.lineId === line.id);
           const isEditing = line.id === editingId;
           return (
             <div
@@ -158,6 +155,7 @@ export const NoteView: FC<NoteViewProps> = ({
               {isEditing ? (
                 <LineInput
                   line={line}
+                  nameOfRef={nameOfRef}
                   onCommit={(text) => onLineChange?.(line.withText(text))}
                   onLeave={() => setEditingId(null)}
                   onEnter={(text) => {
@@ -184,15 +182,6 @@ export const NoteView: FC<NoteViewProps> = ({
                   <RenderedLine line={line} nameOfRef={nameOfRef} renderRef={renderRef} />
                 </span>
               )}
-
-              {/* 拾ったもの。外れていたら見える ── 見えれば直せる */}
-              {item && item.found.length > 0 && (
-                <span className="e-found">
-                  {item.found.slice(0, 4).map((f, i) => (
-                    <span key={`${f}-${i}`} className="e-found-chip">{f}</span>
-                  ))}
-                </span>
-              )}
             </div>
           );
         })}
@@ -203,31 +192,58 @@ export const NoteView: FC<NoteViewProps> = ({
 
 // ========== 1 行 ==========
 
-/** 書いている行。**書いたまま**（指の目印も見える）を出す */
+/**
+ * 書いている行。**書いていない時と同じ `<span>` のまま**、`contentEditable` で書ける
+ * ようにする（要素が `<input>` に切り替わらない ── 位置ずれも青枠も出ない）。
+ *
+ * ★ 指は `<span contentEditable="false">` の**札**として置き、書いている最中も**札のまま**。
+ *   キャレットは札の外だけを歩き、Backspace で札はまとめて 1 つとして消える。
+ * ★ 中身はマウント時に 1 度だけ DOM へ書き、以降は React に触らせない
+ *   （キーが変わるまで再マウントは起きない）。読むのは blur / Enter のときに DOM から。
+ */
 const LineInput: FC<{
   line: NoteLine_行;
+  nameOfRef?: (ref: ObjectRef) => string | undefined;
   onCommit: (text: string) => void;
   onLeave: () => void;
   onEnter: (text: string) => void;
   onBackspaceEmpty: () => void;
   onIndent: (by: number) => void;
-}> = ({ line, onCommit, onLeave, onEnter, onBackspaceEmpty, onIndent }) => {
-  const [text, setText] = useState(line.text);
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => setText(line.text), [line.text]);
-  useEffect(() => {
-    ref.current?.focus();
-    const at = ref.current?.value.length ?? 0;
-    ref.current?.setSelectionRange(at, at);
+}> = ({ line, nameOfRef, onCommit, onLeave, onEnter, onBackspaceEmpty, onIndent }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  const composingRef = useRef(false);
+  const escapingRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // ブラウザ側で書き出される focus 印を、インラインで潰す（CSS より強い優先度で）
+    Object.assign(el.style, {
+      outline: "none",
+      border: "0",
+      boxShadow: "none",
+      background: "transparent",
+      padding: "0",
+      margin: "0",
+    });
+    el.replaceChildren(...textToNodes(line.text, nameOfRef));
+    el.focus();
+    placeCaretAtEnd(el);
+    // 初回のマウント時のみ。以降 line.text が変わっても DOM へは書き戻さない
+    // （書いている最中に外から上書きすると、キャレットが飛ぶ・打ち込みが消える）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+  const readText = (): string => nodesToText(ref.current);
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLSpanElement>) => {
+    if (composingRef.current) return; // IME 変換中は素通し
     if (e.key === "Enter") {
       e.preventDefault();
-      onEnter(text);
+      onEnter(readText());
       return;
     }
-    if (e.key === "Backspace" && text === "") {
+    if (e.key === "Backspace" && readText() === "") {
       e.preventDefault();
       onBackspaceEmpty();
       return;
@@ -238,24 +254,99 @@ const LineInput: FC<{
       return;
     }
     if (e.key === "Escape") {
-      setText(line.text);
+      escapingRef.current = true;
+      // 元の中身に戻して離れる。blur で commit されないよう escapingRef を立てる
+      const el = ref.current;
+      if (el) el.replaceChildren(...textToNodes(line.text, nameOfRef));
       onLeave();
     }
   };
 
+  const onBlur = () => {
+    if (escapingRef.current) { escapingRef.current = false; return; }
+    const now = readText();
+    if (now !== line.text) onCommit(now);
+    onLeave();
+  };
+
   return (
-    <input
+    <span
       ref={ref}
       className={`e-input ${headingClass(line)}`}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => {
-        if (text !== line.text) onCommit(text);
-        onLeave();
-      }}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      role="textbox"
       onKeyDown={onKeyDown}
+      onBlur={onBlur}
+      onCompositionStart={() => { composingRef.current = true; }}
+      onCompositionEnd={() => { composingRef.current = false; }}
     />
   );
+};
+
+// ---- 生の文字列 ↔ DOM ノードの並び ----
+
+/**
+ * 生の文字列を DOM のノードに変える。`@{Type:id}` は**指の札**（contentEditable=false）に。
+ * 名前が引ければ名前を、引けなければ id を札に出す。
+ */
+const textToNodes = (
+  text: string,
+  nameOfRef?: (ref: ObjectRef) => string | undefined,
+): Node[] => {
+  const nodes: Node[] = [];
+  let at = 0;
+  for (const m of text.matchAll(REF_PATTERN)) {
+    const before = text.slice(at, m.index);
+    if (before) nodes.push(document.createTextNode(before));
+    const type = m[1];
+    const id = m[2];
+    const span = document.createElement("span");
+    span.className = "e-ref";
+    span.setAttribute("contenteditable", "false");
+    span.dataset.refType = type;
+    span.dataset.refId = id;
+    span.textContent = nameOfRef?.({ type, id }) ?? id;
+    nodes.push(span);
+    at = (m.index ?? 0) + m[0].length;
+  }
+  const tail = text.slice(at);
+  if (tail) nodes.push(document.createTextNode(tail));
+  return nodes;
+};
+
+/**
+ * contentEditable の中身を、`@{Type:id}` を含む生の文字列に戻す。
+ * 札は `dataset` から型と id を読み直して復元する ── 表示名は打ち直しの余地があるので使わない。
+ */
+const nodesToText = (root: HTMLElement | null): string => {
+  if (!root) return "";
+  let out = "";
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.textContent ?? "";
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    const type = el.dataset.refType;
+    const id = el.dataset.refId;
+    if (type && id) { out += `@{${type}:${id}}`; return; }
+    if (el.tagName === "BR") { out += "\n"; return; } // 念のため
+    for (const child of Array.from(el.childNodes)) walk(child);
+  };
+  for (const child of Array.from(root.childNodes)) walk(child);
+  return out;
+};
+
+const placeCaretAtEnd = (el: HTMLElement) => {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
 };
 
 /** 書いていない行。**出来上がった姿**（装飾が効いて、指は札になる） */
@@ -309,71 +400,90 @@ const StyledNote = styled.div<ComponentPropsWithoutRef<'div'>>`
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
-  font: 13px/1.7 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
-  color: #1b2029;
+  padding: 18px 22px 14px;
+  font: 14px/1.75 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  color: #1f2328;
   border-radius: 10px;
 
   &[data-drag-over='on'] { box-shadow: inset 0 0 0 2px #1f6fd0; background: rgba(31,111,208,0.05); }
 
-  .e-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  /* 題 ── 見出しの体裁で置く。フォームには見せない ── クリックで書ける、以上の飾りは要らない */
+  .e-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .e-title {
     flex: 1; min-width: 0;
-    font: inherit; font-size: 14px; font-weight: bold; color: inherit;
-    background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px;
+    font: inherit; font-size: 22px; line-height: 1.35; font-weight: 700; color: inherit;
+    background: transparent; border: 0; outline: 0; box-shadow: none;
+    padding: 2px 0; margin: 0;
+    -webkit-appearance: none; appearance: none;
+    border-radius: 3px;
   }
-  .e-title:hover { border-color: rgba(0,0,0,.18); }
-  .e-title:focus { outline: none; border-color: #1f6fd0; background: #fff; }
+  .e-title::placeholder { color: #b7bcc4; }
+  .e-title:hover { background: rgba(0,0,0,.03); }
+  .e-title:focus { background: transparent; }
 
-  .e-tools { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; flex-wrap: wrap; }
-  .e-tools-gap { width: 8px; }
-  .e-tool {
-    min-width: 24px; height: 22px; padding: 0 5px;
-    border: 1px solid rgba(0,0,0,.14); border-radius: 5px;
-    background: #fff; color: #444; font-size: 11px; line-height: 1; cursor: pointer;
+  /* 道具 ── 枠のない字だけの並び。押せるときは濃く、押せないときは薄く */
+  .e-tools {
+    display: flex; align-items: center; gap: 2px;
+    margin-bottom: 10px;
+    color: #6a717c;
   }
+  .e-tools-gap { width: 10px; }
+  .e-tool {
+    min-width: 24px; height: 24px; padding: 0 6px;
+    border: 0; background: transparent; color: inherit;
+    font: inherit; font-size: 12px; line-height: 1; cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .e-tool:hover:not(:disabled) { background: rgba(0,0,0,.06); color: #1f2328; }
   .e-tool:disabled { opacity: .35; cursor: default; }
-  .e-tool.is-on { background: #1f6fd0; border-color: #1f6fd0; color: #fff; }
+  .e-tool.is-on { color: #1f6fd0; background: rgba(31,111,208,.10); }
 
   .e-lines { flex: 1; min-height: 0; overflow: auto; }
 
+  /* 行 ── 通常時は完全に地の姿。書いている行だけ、ごく薄く印を付ける */
   .e-line {
-    display: flex; align-items: baseline; gap: 4px;
-    min-height: 22px; padding: 1px 4px 1px 0; border-radius: 4px;
+    display: flex; align-items: baseline; gap: 6px;
+    min-height: 26px; padding: 1px 2px 1px 0;
+    border-radius: 3px;
   }
-  .e-line:hover { background: rgba(0,0,0,.03); }
-  .e-line.is-editing { background: rgba(31,111,208,.06); }
+  .e-line.is-editing { background: rgba(31,111,208,.05); }
 
-  .e-check { border: none; background: none; cursor: pointer; padding: 0; color: #1f6fd0; font-size: 13px; }
+  .e-check {
+    border: 0; background: none; cursor: pointer; padding: 0;
+    color: #6a717c; font-size: 14px; line-height: 1;
+    align-self: center;
+  }
+  .e-check:hover { color: #1f6fd0; }
 
   .e-text, .e-input { flex: 1; min-width: 0; }
   .e-text { cursor: text; }
-  .e-input {
-    font: inherit; color: inherit; background: transparent;
-    border: none; outline: none; padding: 0;
+
+  /* 書いている行の入力欄 ── **書いていない行と同じ字面**にする。枠も背景も出さない */
+  .e-input,
+  .e-input:focus,
+  .e-input:focus-visible,
+  .e-input:hover {
+    font: inherit; color: inherit; background: transparent !important;
+    border: 0 !important; outline: none !important; box-shadow: none !important;
+    padding: 0 !important; margin: 0 !important;
+    -webkit-appearance: none; appearance: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* 見出しは大きく。押した瞬間に姿が変わるので、効いたことが判る */
-  .is-h1 { font-size: 15px; font-weight: bold; color: #0f2a52; }
-  .is-h2 { font-size: 14px; font-weight: bold; color: #24425f; }
-  .is-h3 { font-weight: bold; }
+  /* 見出し ── 書いた瞬間に大きさが変わることで、装飾が効いたと分かる */
+  .is-h1 { font-size: 20px; line-height: 1.4; font-weight: 700; color: #0f2a52; }
+  .is-h2 { font-size: 17px; line-height: 1.4; font-weight: 700; color: #24425f; }
+  .is-h3 { font-size: 15px; font-weight: 700; }
 
-  .is-strong { font-weight: bold; }
+  .is-strong { font-weight: 700; }
   /* 取り消しと引用は**拾わない**ので、薄くして「読まれていない」ことを見せる */
   .is-strike { text-decoration: line-through; color: #9aa1ab; }
-  .is-quote { color: #8a919b; border-left: 2px solid #ccd2da; padding-left: 6px; }
+  .is-quote { color: #6a717c; border-left: 3px solid #d0d7de; padding-left: 10px; }
   .is-done { color: #9aa1ab; text-decoration: line-through; }
 
   .e-blank::before { content: "\00a0"; }
 
   /* 指（ほかのバブリのもの）。名前は持ち主のものなので、向こうで直せばここも変わる */
   .e-ref { display: inline-flex; vertical-align: baseline; }
-
-  /* 拾ったもの。読みものの邪魔をしない濃さで、右端に寄せる */
-  .e-found { display: flex; gap: 3px; flex-shrink: 0; align-items: center; }
-  .e-found-chip {
-    font-size: 10px; line-height: 1.5;
-    padding: 0 5px; border-radius: 8px;
-    background: rgba(31,111,208,.09); color: #3d6ea8; white-space: nowrap;
-  }
 `;

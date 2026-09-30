@@ -84,7 +84,6 @@ export const NoteDetail: FC<{ noteId: string }> = ({ noteId }) => {
   return (
     <NoteView
       note={note}
-      items={items}
       /**
        * **このメモを掴む所。**
        *

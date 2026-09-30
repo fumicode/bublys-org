@@ -5,7 +5,7 @@
  *   指すだけにする。同じ「箱根神社」がバブリごとに別々に増えていくと、地図に出したとき
  *   ピンが二重になるうえ、名前を直しても片方しか直らない。
  */
-import { enumShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
+import { arrayShape, enumShape, objectShape, primitiveShape, type SchemaShape } from "@bublys-org/domain-registry/schema";
 
 /** 地点の種類。ピンの色と印はここで決まる */
 export type SpotCategory_種類 = "sightseeing" | "food" | "lodging" | "station" | "port";
@@ -36,6 +36,12 @@ export type SpotPlain = {
   url?: string;
   /** 開いている時間など、出所に書いてあった一言 */
   note?: string;
+  /**
+   * **写真の URL の並び。** 中身の絵はここには持たない ── 貼った先が消えたら映らなくなる。
+   *
+   * ★ 自分のストレージには入れない決まり。Wikimedia などの安定した出所を貼る運用にしてある。
+   */
+  photoUrls?: string[];
 };
 
 export class Spot_地点 {
@@ -53,9 +59,14 @@ export class Spot_地点 {
   get tel(): string | undefined { return this.state.tel; }
   get url(): string | undefined { return this.state.url; }
   get note(): string | undefined { return this.state.note; }
+  get photoUrls(): string[] { return this.state.photoUrls ?? []; }
 
   withName(name: string): Spot_地点 {
     return new Spot_地点({ ...this.state, name });
+  }
+
+  withPhotoUrls(photoUrls: string[]): Spot_地点 {
+    return new Spot_地点({ ...this.state, photoUrls });
   }
 
   toPlain(): SpotPlain { return { ...this.state }; }
@@ -117,4 +128,5 @@ export const SPOT_SHAPE: SchemaShape = objectShape([
   { name: "tel", required: false, shape: primitiveShape("string"), label: "電話" },
   { name: "url", required: false, shape: primitiveShape("string"), label: "ウェブ" },
   { name: "note", required: false, shape: primitiveShape("string"), label: "ひとこと" },
+  { name: "photoUrls", required: false, shape: arrayShape(primitiveShape("string")), label: "写真" },
 ]);

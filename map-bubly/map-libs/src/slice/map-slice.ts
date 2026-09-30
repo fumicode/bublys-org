@@ -10,7 +10,7 @@ import type { PayloadAction, WithSlice } from "@reduxjs/toolkit";
 import { injectSlice, type RootState } from "@bublys-org/state-management";
 import type { ObjectRef } from "@bublys-org/bubbles-ui";
 import { Spot_地点, type SpotPlain } from "../domain/Spot.domain.js";
-import { HAKONE_BOUNDS, MapBounds_範囲, type MapBoundsPlain } from "../domain/MapBounds.domain.js";
+import { ECHIGO_TSUMARI_BOUNDS, MapBounds_範囲, type MapBoundsPlain } from "../domain/MapBounds.domain.js";
 
 export type MapState = {
   spotList: SpotPlain[];
@@ -48,7 +48,7 @@ export type MapState = {
 
 const initialState: MapState = {
   spotList: [],
-  bounds: HAKONE_BOUNDS,
+  bounds: ECHIGO_TSUMARI_BOUNDS,
   searchBounds: null,
   handed: [],
   seeded: [],
@@ -130,7 +130,7 @@ export const {
 } = mapSlice.actions;
 
 const selectSpotListRaw = (state: StateWithMap): SpotPlain[] => state.map?.spotList ?? [];
-const selectBoundsRaw = (state: StateWithMap): MapBoundsPlain => state.map?.bounds ?? HAKONE_BOUNDS;
+const selectBoundsRaw = (state: StateWithMap): MapBoundsPlain => state.map?.bounds ?? ECHIGO_TSUMARI_BOUNDS;
 const selectSearchBoundsRaw = (state: StateWithMap): MapBoundsPlain | null =>
   state.map?.searchBounds ?? null;
 const EMPTY_HANDED: ObjectRef[] = [];
