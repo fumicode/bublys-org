@@ -112,7 +112,19 @@ export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId })
      *   測る前に出すと全部が真ん中に生まれる ── `at` が効くのは**生まれるとき**だけなので、
      *   あとから寸法が分かっても散らばらない。
      */
-    if (me && box.w > 0) space.setChildren(me, urls, { preset: "free", at, grow: false, list: false });
+    if (!me || box.w <= 0) return;
+    /**
+     * ★ **並べ方を書くのは、まだ決まっていないときだけ。**
+     *
+     * > 見え方は人のもの。器は最初の姿を置くだけ。
+     *
+     * 毎回「自由に置く」を渡していたころは、口で魚眼や縦並びを選んでも
+     * **次の走りで書き戻されて**いた ── 口が出ているのに押しても何も起きない
+     * （実測で踏んだ）。世界に訊けば「まだ誰も決めていない」が分かるので、
+     * そのときだけ書く。部品が作り直されても、人が決めたことは残る。
+     */
+    const first = space.viewOf(me) === null;
+    space.setChildren(me, urls, { preset: first ? "free" : undefined, at, grow: false, list: false });
   }, [me, space, urls, at, box.w]);
 
   /**

@@ -172,6 +172,8 @@ export const SPACE_CSS = `
   width:1px;background:rgba(234,241,255,.25)}
 /* 一覧の札（静か）には出さない ── 並べ方を持っているのは一覧のほう */
 .bub.nt > .bl-view{display:none}
+/* ★ 中身が差されなかった台は出さない（口を持たない泡にも台だけは置かれるので） */
+.bub > .bl-view:empty{display:none}
 
 /* 枠の題名は url。中身が自分の題名を出すので、枠は「どこにいるか」を出す（既存 bubbles-ui と同じ） */
 /*

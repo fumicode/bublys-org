@@ -772,12 +772,23 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   （戻った先で分岐が 1 つ増える）。
    */
   const setLens = useCallback(
-    (axis: PlaneAxis, lens: LensId) => {
-      applyLens(axis, lens);
+    (axis: PlaneAxis, lens: LensId, spaceId: BubbleId = 'root') => {
+      /** ★ 外の海なら今までどおり。**中の空間なら、その空間の軸だけ**を変える */
+      if (spaceId === 'root') applyLens(axis, lens);
+      else setWorld(withAxis(world, spaceId, axis, { lens }));
       markSettled('view');
     },
-    [applyLens, markSettled],
+    [applyLens, markSettled, world, setWorld],
   );
+
+  /**
+   * その空間の、いまの見え方（無ければ null）。
+   *
+   * ★ 見え方の口を**外の器が作る**のに要る ── 口の中身（`SpaceViewTools`）は
+   *   海の口と同じ見本から出したいが、あれは上の層に居るので、
+   *   ここからは「読む口」と「書く口」を渡すだけにする。
+   */
+  const viewOf = useCallback((spaceId: BubbleId) => world.ownViewOf(spaceId), [world]);
 
   /**
    * 岸から海へ返す。置いたあと、**画面のその矩形に見えるように**動かす
@@ -1189,8 +1200,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
-    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn,
+      hasSpace: (id: BubbleId) => spaceHosts.has(id), isList: (id: BubbleId) => listHosts.has(id), viewOf }),
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, spaceHosts, listHosts, viewOf],
   );
 
   /**
@@ -1333,37 +1345,38 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               持っているかどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
               並べて置く場所が無い ── まずは外に出して形を見る。
-            ★ **一覧かどうかでは決めない。** 座標を自分で書く空間（本計画づくりの場）も
-              見え方は変えたいので、口は要る ── 一覧の棚（`listHosts`）が決めるのは
-              札を静かにするかどうかだけ。
+            ★ **並べ方の口を出すのは一覧だけ**（`listHosts`）。一覧は中身が同じ型 1 つで、
+              順番で並ぶ場所だから、「縦・横・格子…」を選ぶのが意味を持つ。
+              置いた所に意味がある空間（本計画づくりの場）にこれを出すと、選んだ瞬間に
+              書いた座標が消える ── そちらへは**空間の見え方の口**を出す（下の `frameTools`）。
+            ★ **置き場所はどちらも同じ** ── 台（この `div`）は器が用意して、
+              中身だけを入れ替える。口ごとに置き場所を書くと、画角へ寄せる決まりが
+              片方だけ古くなる。
           */}
-          {/*
-            ★ **窓の見え方の口も、同じ棚に出す**（`frameTools`）。一覧の口とは出る相手が違う
-              ── 一覧は「自分で子を並べている泡」、窓は「中に別の世界を持つ泡」。
-              どちらも箱の外の同じ場所に出るので、両方に当てはまる泡が出てきたら重なる
-              （いまは出てこない：窓は子を並べない）。
-          */}
-          {r && frameTools?.(r.bubble, r.route)}
-          {spaceHosts.has(id) && (
-            /**
-             * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
-             *   箱が画面より広くなると（横に並べる・格子）**左端ごと画面の外へ出て、
-             *   二度と並べ方を変えられなくなる**（実測：横に並べたあと、口のつもりで
-             *   ランチャーを押していた）。見えている所より左には行かせない。
-             *   ずらす量は箱の中の座標なので、掛かっている倍率で割る。
-             */
-            <div
-              className="bl-view"
-              style={(() => {
-                /** 箱の上が画面より上に居るときだけ、口を箱の中へ逃がす（`viewToolTop` の註） */
-                const top = viewToolTop(base.byId.get(id), openArea);
-                return {
-                  left: viewToolLeft(base.byId.get(id), openArea),
-                  ...(top === undefined ? {} : { top, bottom: 'auto' as const }),
-                };
-              })()}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
+          <div
+            className="bl-view"
+            style={(() => {
+              /**
+               * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
+               *   箱が画面より広くなると**左端ごと画面の外へ出て、二度と変えられなくなる**
+               *   （実測：横に並べたあと、口のつもりでランチャーを押していた）。
+               *   箱の上が画面より上に居るときは、下へも逃がす（`viewToolTop` の註）。
+               */
+              const top = viewToolTop(base.byId.get(id), openArea);
+              return {
+                left: viewToolLeft(base.byId.get(id), openArea),
+                ...(top === undefined ? {} : { top, bottom: 'auto' as const }),
+              };
+            })()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {/*
+              ★ 空間の見え方の口（窓と、座標で置く空間）。器が中身を差す ──
+                海の口と**同じ見本**から出すために、ここでは作らない。
+            */}
+            {r && !listHosts.has(id) && frameTools?.(r.bubble, r.route)}
+            {listHosts.has(id) && (
+              <>
               {VIEW_CHOICES.map((v) => (
                 <button
                   key={v.id}
@@ -1404,8 +1417,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               >
                 {viewChoice.follows(id) ? <FollowIcon /> : <PinIcon />}
               </button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
           {r && headerTools?.(r.bubble, r.route)}
           <button
             className="bl-close"

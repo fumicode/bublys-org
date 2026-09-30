@@ -3,7 +3,7 @@
  * ★ `openingPosition` は無い ── どこに置くかは親の View が決める（DECISIONS.md）。
  */
 import { createContext, useContext } from 'react';
-import type { BubbleId, LensId, PlaneAxis, PresetId, WorldState } from '@bublys-org/bubble-layout';
+import type { BubbleId, LensId, PlaneAxis, PresetId, View, WorldState } from '@bublys-org/bubble-layout';
 
 /**
  * 子をどう並べるか ── **顔ぶれと一緒に渡すもの**（`setChildren`）。
@@ -120,7 +120,19 @@ export interface BubbleSpaceApi {
    * 外の空間の、その軸のレンズを変える ── **魚眼をどちらの向きに掛けるか**。
    * レンズは軸ごとに持つものなので、X と Y は別々に決まる（両方でも、どちらも平行でもよい）。
    */
-  setLens: (axis: PlaneAxis, lens: LensId) => void;
+  setLens: (axis: PlaneAxis, lens: LensId, spaceId?: BubbleId) => void;
+  /** その泡が中に空間を持っているか（`setChildren` を呼んだ泡） */
+  hasSpace: (id: BubbleId) => boolean;
+  /**
+   * その空間が**一覧か**（中身が同じ型 1 つで、順番で並ぶ所）。
+   *
+   * ★ 一覧とそうでない空間とでは、出す口が違う ── 一覧は「縦・横・格子…」を選ぶ口、
+   *   置いた所に意味がある空間は「どう見るか（寄り引き・魚眼）」の口。
+   *   同じ `View` を書き換えてはいるが、**選ばせてよいものが違う**。
+   */
+  isList: (id: BubbleId) => boolean;
+  /** その空間の、いまの見え方（無ければ null） */
+  viewOf: (spaceId: BubbleId) => View | null;
   /**
    * 外の空間の**並べ方**を選ぶ（View のプリセット）。
    * 「開き方」は 1 つしかないので、見え方が変わるのはここだけ。
@@ -175,6 +187,9 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   snapshot: () => EMPTY_SNAPSHOT,
   restore: () => undefined,
   openBubble: () => { console.warn('BubbleSpace の外で openBubble が呼ばれた'); return ''; },
+  hasSpace: () => false,
+  isList: () => false,
+  viewOf: () => null,
   closeBubble: () => undefined,
   urlOf: () => null,
   canOpen: () => false,

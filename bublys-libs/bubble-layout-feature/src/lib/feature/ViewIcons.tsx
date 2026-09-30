@@ -19,21 +19,6 @@ const Svg: FC<{ children: React.ReactNode }> = ({ children }) => (
   </svg>
 );
 
-/**
- * 自由に置く ── 揃っていない 3 つ。
- *
- * ★ **戻り道として要る。** ほかの 6 つは並べ方を上書きするので、これが無いと
- *   自分で置き場所を書いている空間（本計画づくりの場）で一度「縦に並べる」を押したら
- *   **二度と散らばりに戻せない**。
- */
-const FreeIcon: FC = () => (
-  <Svg>
-    <rect x="1" y="1.6" width="5" height="4" rx="1" />
-    <rect x="8" y="3.4" width="5" height="4" rx="1" />
-    <rect x="2.6" y="8.4" width="5" height="4" rx="1" />
-  </Svg>
-);
-
 /** 縦リスト ── 同じ横棒が縦に 3 本 */
 const ColumnIcon: FC = () => (
   <Svg>
@@ -156,8 +141,7 @@ export const VIEW_CHOICES: readonly {
   /** この前で少し隙間を空ける（語彙のかたまりが見えるように） */
   readonly gapBefore?: boolean;
 }[] = [
-  { id: 'free', label: '自由に置く', Icon: FreeIcon },
-  { id: 'column', label: '縦に並べる', Icon: ColumnIcon, gapBefore: true },
+  { id: 'column', label: '縦に並べる', Icon: ColumnIcon },
   { id: 'row', label: '横に並べる', Icon: RowIcon },
   { id: 'grid', label: '格子に並べる', Icon: GridIcon },
   { id: 'coverflowY', label: '縦の魚眼（真ん中が原寸）', Icon: CoverflowYIcon, gapBefore: true },
