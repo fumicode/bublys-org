@@ -152,3 +152,27 @@ describe("時刻と費用を直す", () => {
     expect(item.cost).toBe(0);
   });
 });
+
+describe("渡された「いつ」を、自分の日に合わせる", () => {
+  it("同じ月日の日が既にあれば、その日", () => {
+    expect(itinerary.resolveDate("05-17")).toBe("2026-05-17");
+  });
+
+  it("無い月日なら、その日を作る（年はこちらが持っている）", () => {
+    expect(itinerary.resolveDate("05-20")).toBe("2026-05-20");
+  });
+
+  it("何日目か、で合わせられる", () => {
+    expect(itinerary.resolveDate("#1")).toBe("2026-05-17");
+    expect(itinerary.resolveDate("#2")).toBe("2026-05-18");
+  });
+
+  it("**無い「何日目」は作らない**（いつ始まるか分からないので）", () => {
+    expect(itinerary.resolveDate("#5")).toBeUndefined();
+  });
+
+  it("読めない・空なら合わせられない", () => {
+    expect(itinerary.resolveDate("")).toBeUndefined();
+    expect(itinerary.resolveDate("いつか")).toBeUndefined();
+  });
+});

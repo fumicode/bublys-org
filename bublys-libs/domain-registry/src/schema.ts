@@ -42,7 +42,9 @@ export {
   objectRefShape,
   readPlaceRef,
   collectPlaces,
+  collectByRole,
   type FoundPlace,
+  type FoundObject,
 } from './lib/roles.js';
 
 export {

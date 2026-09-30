@@ -825,8 +825,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
-      const { preset, itemWidth, reserve, step, cols, grow } = how;
-      noteListHost(hostId);
+      const { preset, itemWidth, reserve, step, cols, grow, at, list } = how;
+      /** ★ 一覧ではない空間（座標を自分で書く盤）は、一覧として覚えない（`list` の註） */
+      if (list !== false) noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
@@ -868,11 +869,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       let n = seq.current;
       const m = new Map(urls);
       for (const id of extra) { w = w.without(id); m.delete(id); }
+      /** この 1 回で生まれたもの。置き場所を書くのはここだけ（生まれたとき 1 回） */
+      const born: Array<{ id: BubbleId; url: string }> = [];
       for (const url of missing) {
         const route = matchBubbleRoute(routes, url);
         if (!route) continue;
         n += 1;
         const id = `b${n}:${url}`;
+        born.push({ id, url });
         const size = route.size ?? { w: 280, h: 120 };
         const w0 = itemWidth ?? size.w;
         w = w.add(Bubble.create({
@@ -945,6 +949,21 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       if (itemWidth) {
         for (const k of w.kidsOf(hostId))
           if (k.state.size.w !== itemWidth) w = w.withBubble(k.withSize({ w: itemWidth, h: k.state.size.h }));
+      }
+      /**
+       * ★ **置き場所は、生まれたものにだけ書く。** すでに居るものに書き戻すと、
+       *   **人が掴んで動かした先から勝手に戻ってくる**（最初の姿を決めるのと、
+       *   ずっと決め続けるのは別の話）。
+       * ★ 書くのはこの同じ 1 回の中で ── 別の書き込みにすると、
+       *   同じ描画のうちに後のほうが前のほうを握り潰す（このファイルの決まり）。
+       */
+      if (at) {
+        for (const { id, url } of born) {
+          const want = at(url);
+          const k = w.bubble(id);
+          if (!want || !k) continue;
+          w = w.withBubble(k.withFree('x', want.x).withFree('y', want.y));
+        }
       }
       seq.current = n;
       setUrls(m);

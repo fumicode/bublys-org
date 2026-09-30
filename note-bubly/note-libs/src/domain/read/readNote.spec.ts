@@ -274,3 +274,24 @@ describe("似た形を取り違えない", () => {
     expect(items[0].startMin).toBeUndefined();
   });
 });
+
+describe("「約」と「要予約」を取り違えない", () => {
+  it("「要予約」の中の「約」は、曖昧の印ではない", () => {
+    const items = readNote(noteOf([line("そば屋 要予約 ¥1,500")]));
+    expect(items[0].title).toBe("そば屋");
+    expect(items[0].booking).toBe(true);
+    expect(items[0].money?.about).toBe(false);
+  });
+
+  it("数の直前の「約」は曖昧の印", () => {
+    const items = readNote(noteOf([line("移動 約30分")]));
+    expect(items[0].duration?.about).toBe(true);
+    expect(items[0].title).toBe("移動");
+  });
+
+  it("「くらい」は題名に残らない", () => {
+    const items = readNote(noteOf([line("切符を買う 1.5万くらい")]));
+    expect(items[0].title).toBe("切符を買う");
+    expect(items[0].money?.min).toBe(15000);
+  });
+});

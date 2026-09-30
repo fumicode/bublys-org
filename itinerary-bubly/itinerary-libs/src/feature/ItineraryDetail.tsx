@@ -13,27 +13,31 @@
  *   一覧が生まれて、また作者が組み合わせを決めることになる。
  *   （`docs/bubly-composition.md`）
  */
-import { FC, DragEvent as ReactDragEvent, useCallback } from "react";
+import { FC, DragEvent as ReactDragEvent, useCallback, useContext, useRef } from "react";
 import {
+  BubblesContext,
   anyObjectDragType,
   extractIdFromUrl,
   getObjectType,
   parseDragPayload,
   resolveObjectPlain,
-  useFocusedObject,
 } from "@bublys-org/bubbles-ui";
+import { useCurrentBubble } from "@bublys-org/bubble-layout-feature";
 import {
+  collectByRole,
   getSchema,
   readPlaceRef,
+  readRole,
   readRoleNumber,
   readRoleText,
+  type FoundObject,
 } from "@bublys-org/domain-registry/schema";
 import { useAppDispatch, useAppSelector, useAppStore } from "@bublys-org/state-management";
-import { shallowEqual } from "react-redux";
 import { ItineraryView } from "../ui/ItineraryView.js";
 import { Itinerary_旅程 } from "../domain/Itinerary.domain.js";
-import type { ItineraryItem_予定, ObjectRef } from "../domain/ItineraryItem.domain.js";
+import type { ObjectRef } from "../domain/ItineraryItem.domain.js";
 import {
+  rememberHanded,
   selectDate,
   selectItineraryById,
   selectSelectedDate,
@@ -48,44 +52,31 @@ import {
  */
 const DEFAULT_MIN = 60;
 
-/** 指しを表の鍵にする。型と id の 2 つでひとつ */
-const refKey = (ref: ObjectRef): string => `${ref.type}/${ref.id}`;
+/** 付箋を 1 枚ずつ散らす間隔（ミリ秒） */
+const SCATTER_GAP_MS = 90;
 
+/** 指しを表の鍵にする。型と id の 2 つでひとつ */
 export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) => {
   const dispatch = useAppDispatch();
   const store = useAppStore();
+  const { openBubble } = useContext(BubblesContext);
+  /** 自分の泡。入らなかったものを**自分の隣**に置くのに要る */
+  const myBubbleId = useCurrentBubble();
+  /**
+   * ★ **開く口は、呼ぶ直前に取り直す。**
+   *   海の `openBubble` は**そのときの海を抱えた関数**なので、掴んだまま続けて呼ぶと
+   *   どれも同じ「開く前の海」から新しい海を作り、**最後の 1 つしか残らない**
+   *   （実測：7 枚出るはずが 1 枚だった。間を空けても直らない ── 古いのは海ではなく関数）。
+   */
+  const openRef = useRef(openBubble);
+  openRef.current = openBubble;
   const itinerary = useAppSelector(selectItineraryById(itineraryId));
   const date = useAppSelector(selectSelectedDate(itineraryId));
-  const { focusedObjectId, setFocusedObjectId } = useFocusedObject();
 
   const save = useCallback(
     (next: Itinerary_旅程) => dispatch(updateItinerary(next.toPlain())),
     [dispatch],
   );
-
-  /**
-   * 指し先の名前 ── **持ち主に訊く。**
-   *
-   * ★ 名前をこちらに写して持たないので、相手の側で直せばここも直る。
-   *   （地図で地点の名前を直したら、旅程の行もその場で変わる）
-   * ★ **名前の表を作って返す**（関数を返さない）。セレクタが毎回新しい関数を返すと、
-   *   中身が同じでも「変わった」と見なされて描き直しが止まらなくなる。
-   *   表を浅く比べれば、名前が変わったときだけ描き直る。
-   */
-  const refNames = useAppSelector((state) => {
-    const out: Record<string, string> = {};
-    for (const day of itinerary?.days ?? []) {
-      for (const item of day.items) {
-        const ref = item.ref;
-        if (!ref) continue;
-        const key = refKey(ref);
-        if (out[key] !== undefined) continue;
-        const name = readRoleText(getSchema(ref.type), resolveObjectPlain(ref.type, ref.id, state), "title");
-        if (name) out[key] = name;
-      }
-    }
-    return out;
-  }, shallowEqual);
 
   /**
    * **何でも受ける。** 受けられるかどうかは、落ちてきてから中身を見て決める
@@ -94,20 +85,22 @@ export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) =>
   const canAccept = useCallback((e: ReactDragEvent) => anyObjectDragType(e) !== undefined, []);
 
   /**
-   * 落ちてきたものを、その日の最後の後ろに継ぐ。
+   * **落ちてきたものを、形にする。**
    *
-   * 読むのは役だけ ── 題名（これだけは要る）・時間・金額・場所。
-   * 場所は**そのものが場所そのものであるか**（緯度経度を名乗る）、
-   * **場所を指しているか**（`place` の役）のどちらかで決まる。
+   * > **日が決まっているものだけが、旅程に入る。決まっていないものは、隣に置いておく。**
+   *
+   * ★ 落ちてきたものの**中を歩いて、題名を名乗るものを全部拾う**（`collectByRole`）。
+   *   地点 1 つなら 1 件、メモなら中の全件 ── **数の違いを場合分けしない。**
+   *   地図が「場所を名乗るものを全部拾う」のと同じ歩き方で、問いだけが違う。
+   * ★ **入らなかったものは消さない。** 開ける先（役 `address`）を名乗っていれば、
+   *   自分の隣に泡として開く ── 画用紙の上に付箋を散らす、の形。
+   *   名乗っていなければ置けないので、そのときだけ黙って落ちる。
+   * ★ 相手が何であるかは最後まで知らない。メモも地点もアクティビティも、
+   *   「題名を名乗るもの」として同じ道を通る。
    */
   const onDropPayload = useCallback(
     (e: ReactDragEvent): boolean => {
-      if (!itinerary || !date) return false;
-      /**
-       * ★ **荷物が名乗っている型をそのまま見る**（登録済みの一覧で絞らない）。
-       *   絞ると、まだ読み込んでいないバブリのものが黙って弾かれて、
-       *   「題名さえあれば受ける」が嘘になる。
-       */
+      if (!itinerary) return false;
       const dragType = anyObjectDragType(e);
       if (!dragType) return false;
       const payload = parseDragPayload(e, { acceptTypes: [dragType] });
@@ -119,41 +112,114 @@ export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) =>
       const shape = getSchema(typeName);
       const plain = resolveObjectPlain(typeName, id, store.getState());
 
-      /**
-       * 題名。持ち主が答えられないとき（中身を訊く口を名乗っていない型）は、
-       * 掴んだときのラベルで代える ── **それも無ければ受けない**。
-       * 名前の無い予定は、あとから何だったか分からなくなる。
-       */
-      const title = readRoleText(shape, plain, "title") ?? payload.label;
-      if (!title) return false;
+      /** 中に居るもの。1 つも居なければ、落ちてきたもの自身を 1 件として見る */
+      const found: FoundObject[] = collectByRole(shape, plain, "title");
+      const pieces: FoundObject[] =
+        found.length > 0 ? found : shape ? [{ shape, value: plain }] : [];
+      if (pieces.length === 0) {
+        /**
+         * 中身を訊けない型（まだ読み込んでいないバブリのもの）。掴んだときのラベルで足す。
+         * ★ **日がまだ 1 つも無ければ、置く所が無い** ── その場合は受けない。
+         *   日を作れるのは「いつ」を言えるものだけ（メモの `5/17` など）。
+         */
+        if (!payload.label || !date) return false;
+        save(itinerary.appended(date, { title: payload.label, durationMin: DEFAULT_MIN, kind: "other" }));
+        return true;
+      }
 
-      const durationMin = readRoleNumber(shape, plain, "duration") ?? DEFAULT_MIN;
-      const cost = readRoleNumber(shape, plain, "money") ?? 0;
+      let next = itinerary;
+      const leftovers: string[] = [];
+      /** もとの 1 件を指す（外したときに、また浮かんでくるように） */
+      const fromOf = (piece: FoundObject): ObjectRef | undefined => {
+        const address = readRoleText(piece.shape, piece.value, "address");
+        const pid = (piece.value as { id?: unknown }).id;
+        return address && typeof pid === "string" ? { type: typeName, id: pid } : undefined;
+      };
 
-      /**
-       * 立ち寄り先。
-       * - 場所を**指している**もの（`place` の役）なら、その指をそのまま引き継ぐ
-       *   ── アクティビティを落とすと、予定が指すのは会場のほうになる
-       * - 指していなければ、**落ちてきたもの自身**を指す
-       *   （地点を落としたときはこちら。指すのはその地点）
-       */
-      const ref: ObjectRef = readPlaceRef(shape, plain) ?? { type: typeName, id };
+      for (const piece of pieces) {
+        const title = readRoleText(piece.shape, piece.value, "title") ?? payload.label;
+        if (!title) continue;
 
-      save(
-        itinerary.appended(date, {
+        /**
+         * いつの話か。**3 通りを分ける**:
+         *   - そもそも言わない型（地点・アクティビティ）→ **いま見ている日**。
+         *     1 件掴んで落としたときは「この日に入れたい」に決まっている
+         *   - 言うけれど空（メモの「いつか書いていない行」）→ **入らない**
+         *   - 言っている → その日に合わせる（無ければ作る）
+         *
+         * ★ `readRoleText` は空文字を `undefined` にするので、ここでは使えない。
+         *   **「言っていない」と「言ったが分からない」を混ぜると、日付の無い行が
+         *   黙って今日の予定になる**（実測で踏んだ）。
+         */
+        const dateRaw = readRole(piece.shape, piece.value, "date");
+        const placed =
+          dateRaw === undefined ? date : next.resolveDate(String(dateRaw));
+
+        if (!placed) {
+          // 日が決まっていない ── 旅程には入らない。隣に置く
+          const address = readRoleText(piece.shape, piece.value, "address");
+          if (address) leftovers.push(address);
+          continue;
+        }
+
+        /**
+         * 立ち寄り先。渡されたものが場所を指していればそれ、指していなくて
+         * **1 件だけ落ちてきたなら、落ちてきたもの自身**（地点を落としたときはこちら）。
+         */
+        const ref: ObjectRef | undefined =
+          readPlaceRef(piece.shape, piece.value) ??
+          (pieces.length === 1 ? { type: typeName, id } : undefined);
+
+        /** 何時からか。負の数は「書いていない」の印なので、そのときは継ぐ */
+        const startMin = readRoleNumber(piece.shape, piece.value, "time");
+
+        next = next.appended(placed, {
           title,
-          durationMin,
+          durationMin: readRoleNumber(piece.shape, piece.value, "duration") || DEFAULT_MIN,
           kind: "other",
-          cost,
+          cost: readRoleNumber(piece.shape, piece.value, "money") ?? 0,
           ref,
-        }),
-      );
-      return true;
+          from: fromOf(piece),
+          startMin: startMin !== undefined && startMin >= 0 ? startMin : undefined,
+        });
+      }
+
+      if (next !== itinerary) save(next);
+
+      /**
+       * **たくさん渡されたら、作業場を開く。**
+       *
+       * ★ 中に何件も入っていたということは、**これから並べ替える仕事**が始まるということ。
+       *   外の海に付箋を散らすと、ほかの泡と混ざって「どれがこの旅程の話か」が
+       *   言えなくなる ── 1 つの空間に囲って、そこを盤にする。
+       * ★ **1 件だけのときは開かない。** 地点を 1 つ落としただけで盤が出てくるのは、
+       *   手数が増えるだけ。
+       */
+      if (pieces.length > 1) {
+        dispatch(rememberHanded({ itineraryId, ref: { type: typeName, id } }));
+        openRef.current(`itineraries/${itineraryId}/plan`, myBubbleId ?? "");
+        return true;
+      }
+
+      /**
+       * ★ **入らなかったものを、自分の隣に開く。** 消さないことがこの手の要
+       *   ── 「読めなかったので捨てました」は、書いた人にとって一番困る。
+       */
+      leftovers.forEach((url, i) => {
+        window.setTimeout(() => openRef.current(url, myBubbleId ?? ""), i * SCATTER_GAP_MS);
+      });
+
+      return next !== itinerary || leftovers.length > 0;
     },
-    [itinerary, date, save, store],
+    [itinerary, date, save, store, myBubbleId, dispatch, itineraryId],
   );
 
-  if (!itinerary || !date) {
+  /**
+   * ★ **日が 1 つも無くても開く。** 日を作るのはメモの仕事なので、
+   *   渡される前の旅程は器だけ ── ここで「見つかりませんでした」と言うと、
+   *   **空であることと、無いことが同じに見える**。
+   */
+  if (!itinerary) {
     return <div style={{ padding: 12, color: "#666" }}>この旅程は見つかりませんでした。</div>;
   }
 
@@ -161,18 +227,8 @@ export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) =>
     <ItineraryView
       itinerary={itinerary}
       date={date}
-      focusedObjectId={focusedObjectId}
-      nameOfRef={(ref) => refNames[refKey(ref)]}
       onSelectDate={(d) => dispatch(selectDate({ itineraryId, date: d }))}
       onTitleChange={(title) => save(itinerary.withTitle(title))}
-      /** 指したものを揃える ── 予定が指している先を「指したもの」にする */
-      onFocusItem={(item: ItineraryItem_予定) => item.ref && setFocusedObjectId(item.ref.id)}
-      onItemTitleChange={(item, title) => save(itinerary.withItem(item.withTitle(title)))}
-      /** 始まりは予定ごと動き、終わりは長さを変える ── どちらの決まりも集約が持つ */
-      onItemStartChange={(item, start) => save(itinerary.withItem(item.withStart(start)))}
-      onItemEndChange={(item, end) => save(itinerary.withItem(item.withEnd(end)))}
-      onItemCostChange={(item, cost) => save(itinerary.withItem(item.withCost(cost)))}
-      onRemoveItem={(item) => save(itinerary.withoutItem(item.id))}
       onDropPayload={onDropPayload}
       canAccept={canAccept}
     />

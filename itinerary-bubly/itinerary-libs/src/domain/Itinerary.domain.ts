@@ -111,6 +111,45 @@ export class Itinerary_旅程 {
     return this.state.days.reduce((sum, d) => sum + d.totalCost, 0);
   }
 
+  /**
+   * **渡された「いつ」を、この旅程の日に合わせる。**
+   *
+   * 受け取る形は 2 つ（役 `date` の決まり）:
+   *   - `MM-DD` … 月と日。同じ月日の日が既にあればそれ、無ければ**その日を作る**
+   *   - `#N`    … 何日目か。N 日目が既にあればそれ、**無ければ合わせられない**
+   *
+   * ★ 年は**この旅程が持っている**。書く人は年を書かないので、渡ってくるのは月日まで
+   *   ── 年を埋めるのは、年を知っているこちらの仕事。日が 1 つも無ければ今年にする。
+   * ★ `#N` で日を**作らない**のは、「3 日目」だけ言われても**いつ始まるか分からない**から。
+   *   分からないものを作ると、誰も言っていない日が旅程に生える。
+   */
+  resolveDate(dateText: string): string | undefined {
+    if (!dateText) return undefined;
+
+    const nth = /^#(\d+)$/.exec(dateText);
+    if (nth) return this.dates[Number(nth[1]) - 1];
+
+    const md = /^(\d{2})-(\d{2})$/.exec(dateText);
+    if (!md) return undefined;
+    const monthDay = `${md[1]}-${md[2]}`;
+    const known = this.dates.find((d) => d.endsWith(monthDay));
+    if (known) return known;
+    const year = this.dates[0]?.slice(0, 4) ?? String(new Date().getFullYear());
+    return `${year}-${monthDay}`;
+  }
+
+  /**
+   * **いま旅程に入っているものの「もと」**（id の集まり）。
+   *
+   * 本計画づくりの場は、**これに入っていないものだけを浮かべる**
+   * ── 入れれば沈み、外せば浮かぶ。パズルの駒と同じ。
+   */
+  get placedFrom(): Set<string> {
+    const out = new Set<string>();
+    for (const d of this.state.days) for (const i of d.items) if (i.from) out.add(i.from.id);
+    return out;
+  }
+
   findItem(itemId: string): ItineraryItem_予定 | undefined {
     for (const d of this.state.days) {
       const hit = d.items.find((i) => i.id === itemId);
@@ -149,12 +188,25 @@ export class Itinerary_旅程 {
       kind: ItineraryKind_種類;
       cost?: number;
       ref?: ObjectRef;
+      /** もとになったもの（メモの 1 行など） */
+      from?: ObjectRef;
       id?: string;
+      /**
+       * **何時からか。** 渡されていればそこに置く（継がない）。
+       * ★ 渡されなかったときだけ「最後の後ろに継ぐ」── メモには時刻が書いてある
+       *   ことが多いので、継ぐほうを既定にすると**書いた時刻が捨てられる**。
+       */
+      startMin?: number;
     },
   ): Itinerary_旅程 {
     const day = this.day(date) ?? new ItineraryDay_日({ date, items: [] });
     const last = day.lastEndMin;
-    const startMin = last === undefined ? DEFAULT_START_MIN : last + GAP_MIN;
+    const startMin =
+      spec.startMin !== undefined && spec.startMin >= 0
+        ? spec.startMin
+        : last === undefined
+          ? DEFAULT_START_MIN
+          : last + GAP_MIN;
     const item = new ItineraryItem_予定({
       id: spec.id ?? crypto.randomUUID(),
       startMin,
@@ -163,6 +215,7 @@ export class Itinerary_旅程 {
       kind: spec.kind,
       cost: spec.cost ?? 0,
       ref: spec.ref,
+      from: spec.from,
     });
     return this.withDay(day.withItem(item));
   }

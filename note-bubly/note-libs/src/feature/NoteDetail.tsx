@@ -85,6 +85,29 @@ export const NoteDetail: FC<{ noteId: string }> = ({ noteId }) => {
     <NoteView
       note={note}
       items={items}
+      /**
+       * **このメモを掴む所。**
+       *
+       * ★ 無かったころ、開いているメモからは渡せなかった（掴めるのは一覧の札だけ）
+       *   ── 一覧を開いてから掴む、の 2 手が要った。
+       * ★ 「旅程へ」とは書かない。**渡す先を決めるのは掴んだ人**で、
+       *   地図にも落とせるし、ポケットにも入る。ここは「掴める」とだけ言う。
+       */
+      head={
+        <ObjectView type="Note" id={note.id} url={`notes/${note.id}`} label={note.title} draggable>
+          <span
+            title="掴んで、旅程や地図に落とす"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              padding: "2px 8px", borderRadius: 12,
+              background: "#fff6d6", border: "1px solid #e3d9b0",
+              fontSize: 11, color: "#6b5d2f", cursor: "grab", whiteSpace: "nowrap",
+            }}
+          >
+            ✥ このメモを掴む（{items.filter((i) => i.kind !== "note").length}件）
+          </span>
+        </ObjectView>
+      }
       nameOfRef={(ref) => names[refKey(ref)]}
       /** 札は掴める ── メモから地図へ、地図からメモへ、同じものが行き来する */
       renderRef={(ref) => (

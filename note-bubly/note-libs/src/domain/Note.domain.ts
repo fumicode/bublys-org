@@ -12,6 +12,7 @@ import {
   primitiveShape,
   type SchemaShape,
 } from "@bublys-org/domain-registry/schema";
+import { NOTE_ITEM_SHAPE } from "./read/NoteItemPlain.js";
 import {
   NOTE_LINE_SHAPE,
   NoteLine_行,
@@ -107,8 +108,18 @@ export class Note_メモ {
   }
 }
 
+/**
+ * メモの形。
+ *
+ * ★ **`items` が、ほかのバブリに渡るもの。** 行（`lines`）は書くためのもので、
+ *   受け取る側には読めない（役を名乗っていない）。読み解いた結果だけが役を名乗る。
+ *   だから旅程は「題名を名乗るものを全部拾う」だけで、メモを知らないまま形にできる。
+ * ★ `items` は**保存しない**。訊かれたときに `readNote` で毎回出す
+ *   （`object-type-registration.ts`）── 溜めると、書き換えたのに古い読みが残る。
+ */
 export const NOTE_SHAPE: SchemaShape = objectShape([
   { name: "id", shape: primitiveShape("string"), required: true, label: "ID" },
   { name: "title", shape: primitiveShape("string"), required: true, label: "題名", role: "title" },
   { name: "lines", shape: arrayShape(NOTE_LINE_SHAPE), required: true, label: "行" },
+  { name: "items", shape: arrayShape(NOTE_ITEM_SHAPE), required: false, label: "読み解いた結果" },
 ]);

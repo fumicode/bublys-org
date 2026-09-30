@@ -12,6 +12,7 @@ import { registerSchema } from "@bublys-org/domain-registry/schema";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import React from "react";
 import { ITINERARY_SHAPE, Itinerary_旅程 } from "./domain/Itinerary.domain.js";
+import { ITINERARY_ITEM_SHAPE } from "./domain/ItineraryItem.domain.js";
 import type { ItineraryState } from "./slice/itinerary-slice.js";
 
 registerObjectType("Itinerary", React.createElement(EventNoteIcon, { fontSize: "small" }));
@@ -33,3 +34,22 @@ registerObjectResolver("Itinerary", (id, state) =>
 );
 
 registerSchema("Itinerary", ITINERARY_SHAPE);
+
+/**
+ * **予定 1 件**も、それだけで 1 つのもの。
+ *
+ * ★ 一覧の中の札と、開いて直す詳細 ── どちらも泡なので、url と中身を訊く口が要る。
+ *   表の行のままだと、掴むことも、隣に開くことも、指すこともできなかった。
+ */
+registerObjectType("ItineraryItem", React.createElement(EventNoteIcon, { fontSize: "small" }));
+registerObjectUrl("ItineraryItem", (id) => `itinerary-items/${id}`);
+registerObjectBubble("ItineraryItem", { openingPosition: "bubble-side-right" });
+registerSchema("ItineraryItem", ITINERARY_ITEM_SHAPE);
+
+registerObjectResolver("ItineraryItem", (itemId, state) => {
+  for (const plain of (state as { itinerary?: ItineraryState }).itinerary?.itineraryList ?? []) {
+    const found = plain.days.flatMap((d) => d.items).find((i) => i.id === itemId);
+    if (found) return found;
+  }
+  return undefined;
+});

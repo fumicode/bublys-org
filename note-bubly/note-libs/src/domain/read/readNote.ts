@@ -22,6 +22,7 @@ import type { Note_メモ } from "../Note.domain.js";
 import type { NoteLine_行 } from "../NoteLine.domain.js";
 import { representative, type Approx } from "./Approx.js";
 import {
+  ABOUT_WORDS,
   findCommitment,
   findDate,
   findDuration,
@@ -238,6 +239,11 @@ const readLine = (line: NoteLine_行): LineRead => {
    * 「上の行の属性」の合図（近さの決まり）。
    */
   let title = text;
+  /**
+   * ★ **「くらい」を先に落とす。** 「約」は数の直前にあるときだけ曖昧の印なので、
+   *   数を先に取り除くと**その手がかりが消えて**、`移動 約` という題名が残る（実測）。
+   */
+  if (money?.about || duration?.about) title = title.replace(ABOUT_WORDS, " ");
   for (const raw of strip) title = title.split(raw).join(" ");
   title = title.replace(/[、,。・:：\-–—]/g, " ").replace(/\s+/g, " ").trim();
 

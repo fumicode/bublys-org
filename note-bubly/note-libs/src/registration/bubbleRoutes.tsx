@@ -9,6 +9,7 @@ import { NoteDetail } from "../feature/NoteDetail.js";
 import { selectNotes } from "../slice/note-slice.js";
 import { useSeedNote } from "../feature/useSeedNote.js";
 import { readNote } from "../domain/read/readNote.js";
+import { NoteItemBubble } from "../feature/NoteItemBubble.js";
 
 const CARD = { w: LIST_CARD_WIDTH, h: 46 };
 
@@ -50,7 +51,21 @@ const NoteDetailBubble = ({ url }: { url: string }) => {
   return <NoteDetail noteId={url.replace(/^notes\//, "")} />;
 };
 
+/** 付箋 1 枚の大きさ。**理由の 1 行まで読める**丈（中身の数） */
+const STICKY = { width: 200, height: 68 };
+
 export const noteBubbleRoutes: BubbleRoute[] = [
+  /**
+   * 付箋 ── 旅程に入らなかった 1 件。
+   * ★ 詳細より**先に**置く（`notes/:id` に食われないよう、url の頭から別にしてある）
+   */
+  {
+    pattern: /^note-items\/[^/]+$/,
+    type: "note-item",
+    Component: ({ bubble }) => <NoteItemBubble lineId={bubble.url.replace(/^note-items\//, "")} />,
+    // 地は中身が持つ（付箋の色）
+    bubbleOptions: { defaultSize: STICKY, contentBackground: "transparent" },
+  },
   {
     pattern: /^notes$/,
     type: "notes",

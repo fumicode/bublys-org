@@ -181,3 +181,69 @@ const walk = (shape: SchemaShape | undefined, value: unknown, out: FoundPlace[])
     }
   }
 };
+
+/** 歩いて見つけた「もの」1 つ。形と中身の組 ── 受け取った側が好きな役を読める */
+export type FoundObject = {
+  readonly shape: SchemaShape;
+  readonly value: unknown;
+};
+
+/**
+ * **渡されたものの中を歩いて、その役を名乗るものを順に拾う。**
+ *
+ * {@link collectPlaces} の一般形。地図は「場所を名乗るもの」を、旅程は
+ * 「題名を名乗るもの」を拾う ── **歩き方は 1 本、問いだけが違う。**
+ *
+ * ★ 拾うのは**その役を名乗る段そのもの**。段ごと返すので、受け取った側は
+ *   そこからほかの役（時間・金額・場所）も読める。
+ * ★ **自分の中に名乗るものが居れば、自分は数えない。** 入れものは入れものであって
+ *   中身ではない ── メモ自身も題名を名乗るので、これが無いと
+ *   「箱根 行きたいところメモ」という予定が 1 つ増える（実測で踏んだ）。
+ * ★ 入れ子は形に沿って歩く。形を持たない所へは入らない。
+ * ★ 順は**書いてある順**。並びを表す役を足さずに済むのは、書いてある順が
+ *   そのまま順だから（メモの行の順が、その日の予定の順になる）。
+ */
+export const collectByRole = (
+  shape: SchemaShape | undefined,
+  value: unknown,
+  role: FieldRole,
+): FoundObject[] => {
+  const out: FoundObject[] = [];
+  walkByRole(shape, value, role, out);
+  return out;
+};
+
+const walkByRole = (
+  shape: SchemaShape | undefined,
+  value: unknown,
+  role: FieldRole,
+  out: FoundObject[],
+): void => {
+  if (!shape) return;
+
+  if (shape.kind === "array") {
+    if (!Array.isArray(value)) return;
+    for (const v of value) walkByRole(shape.item, v, role, out);
+    return;
+  }
+
+  if (shape.kind !== "object") return;
+  if (value === null || typeof value !== "object") return;
+
+  // 先に中を見る。中に居れば、自分は入れものなので数えない
+  const inner: FoundObject[] = [];
+  const record = value as Record<string, unknown>;
+  for (const field of shape.fields) {
+    if (field.shape.kind === "object" || field.shape.kind === "array") {
+      // その役そのものの中へは入らない ── もう読んである
+      if (field.role === role) continue;
+      walkByRole(field.shape, record[field.name], role, inner);
+    }
+  }
+
+  if (inner.length > 0) {
+    out.push(...inner);
+    return;
+  }
+  if (hasRole(shape, role)) out.push({ shape, value });
+};

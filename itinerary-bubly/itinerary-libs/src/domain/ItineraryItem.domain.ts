@@ -40,6 +40,15 @@ export type ItineraryItemPlain = {
    * ★ 指であって子ではない（`state` が持つ子はインスタンス、という決まりの対象外）。
    */
   ref?: ObjectRef;
+  /**
+   * **この予定のもとになったもの**（メモの 1 行など）。
+   *
+   * ★ 外したときに「もとの 1 件が自由になった」と分かるようにするために要る
+   *   ── 本計画づくりの場では、旅程に入っていないものだけが浮かぶので、
+   *   これが無いと**外しても浮かんでこない**。
+   * ★ 立ち寄り先（`ref`）とは別。あちらは「どこへ行くか」、こちらは「どこから来たか」。
+   */
+  from?: ObjectRef;
 };
 
 export type { ObjectRef };
@@ -55,6 +64,7 @@ export class ItineraryItem_予定 {
   get cost(): number { return this.state.cost; }
   get costNote(): string | undefined { return this.state.costNote; }
   get ref(): ObjectRef | undefined { return this.state.ref; }
+  get from(): ObjectRef | undefined { return this.state.from; }
 
   /** 「08:30 - 10:05」 */
   get timeLabel(): string {
@@ -102,6 +112,11 @@ export class ItineraryItem_予定 {
       ...this.state,
       endMin: Math.max(this.state.startMin, clampToDay(endMin)),
     });
+  }
+
+  /** 種類を変える（行の左の色と、読み方が変わる） */
+  withKind(kind: ItineraryKind_種類): ItineraryItem_予定 {
+    return new ItineraryItem_予定({ ...this.state, kind });
   }
 
   /** 費用を変える。マイナスは受けない（返金は費用ではない） */
@@ -183,4 +198,5 @@ export const ITINERARY_ITEM_SHAPE: SchemaShape = objectShape([
    *   「この中に立ち寄り先が並んでいる」と読める（`collectPlaces`）。
    */
   { name: "ref", shape: objectRefShape(), required: false, label: "立ち寄り先", role: "place" },
+  { name: "from", shape: objectRefShape(), required: false, label: "もとになったもの" },
 ]);
