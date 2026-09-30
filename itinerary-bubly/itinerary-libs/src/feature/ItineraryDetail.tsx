@@ -231,6 +231,15 @@ export const ItineraryDetail: FC<{ itineraryId: string }> = ({ itineraryId }) =>
       onTitleChange={(title) => save(itinerary.withTitle(title))}
       onDropPayload={onDropPayload}
       canAccept={canAccept}
+      /**
+       * ★ **隣へ掴み出されたら、旅程から外す。**
+       *   外した先（本計画づくりの場）は「メモの別の見え方」なので、外しても何も失わない
+       *   ── もとの 1 件は付箋として浮き直る。ボタンの ↩ と同じことを、掴んで出すやり方で。
+       */
+      onItemLeave={(itemId) => {
+        if (!itinerary.findItem(itemId)) return;
+        save(itinerary.withoutItem(itemId));
+      }}
     />
   );
 };

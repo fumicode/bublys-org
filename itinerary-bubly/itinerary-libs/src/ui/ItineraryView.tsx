@@ -45,6 +45,13 @@ export type ItineraryViewProps = {
   canAccept?: (e: ReactDragEvent) => boolean;
   /** 見出しに置く口 */
   head?: ReactNode;
+  /**
+   * **予定の札が、掴まれて外の空間へ出て行った。**
+   *
+   * ★ 渡さないと、出した札は次の走りで一覧に生え直す（顔ぶれを決めているのは
+   *   旅程なので「足りない」と数えられる）── 掴んでも出せない、という形で出る。
+   */
+  onItemLeave?: (itemId: string) => void;
 };
 
 export const ItineraryView: FC<ItineraryViewProps> = ({
@@ -55,6 +62,7 @@ export const ItineraryView: FC<ItineraryViewProps> = ({
   onDropPayload,
   canAccept,
   head,
+  onItemLeave,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [title, setTitle] = useState(itinerary.title);
@@ -98,6 +106,16 @@ export const ItineraryView: FC<ItineraryViewProps> = ({
         members={members}
         itemHeight={ITEM_CARD_HEIGHT}
         headHeight={HEAD_HEIGHT}
+        /**
+         * ★ **すぐ隣に出されたときだけ伝える。**
+         *   隣（＝旅程が居るのと同じ空間＝本計画づくりの場）に出したのは「剥がした」。
+         *   もっと外の海へ持ち出したのは、ほかの一覧と同じで**増えるだけ** ──
+         *   一覧からは減らさない（そちらでは何も伝えない）。
+         */
+        onLeave={(url, at) => {
+          if (!at.beside) return;
+          onItemLeave?.(url.replace(/^itinerary-items\//, "").replace(/\/card$/, ""));
+        }}
         head={
           <div className="e-head">
             <div className="e-line">

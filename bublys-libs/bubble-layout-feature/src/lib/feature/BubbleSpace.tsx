@@ -892,7 +892,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
-      const { preset, itemWidth, reserve, step, cols, grow, at, list } = how;
+      const { preset, itemWidth, reserve, step, cols, grow, at, list, onLeave } = how;
       /** ★ 中に空間を持つ泡として覚えるのは、一覧でもそうでなくても（見え方の口はどちらにも要る） */
       noteSpaceHost(hostId);
       /** ★ 一覧ではない空間（座標を自分で書く場）は、一覧として覚えない（`list` の註） */
@@ -906,7 +906,35 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   書き続けて止まらなくなる**（実測：ルートを配っていない海で一覧を出すと、
        *   1.5 秒に 130 回 `Maximum update depth exceeded`）。
        */
-      const missing = want.filter((url) => !have.has(url) && !!matchBubbleRoute(routes, url));
+      /**
+       * ★ **出て行った札は、連れ戻さない。**
+       *
+       * 掴んで別の空間へ出した札は、もうこの一覧の子ではない。なのに顔ぶれには
+       * まだ載っているので、下の「足りない」に数えられて**元の場所に生え直す**
+       * ── 掴んで出しているのに出せない、という形で出る（実測で言われた）。
+       *
+       * ★ **自分が出した札かどうかは、覚え書きの `originId` で見分ける**（url では見ない）。
+       *   同じ url の泡は海に 2 つ以上あってよいので、url で見ると、外で開いただけの
+       *   同じものを「出て行った」と読み違える。
+       * ★ 出て行ったことは伝えるだけ。顔ぶれから外すかどうかは持ち主が決める
+       *   （`onLeave` の註）。伝えたぶんは、この回は生やさない ── 生やしてから
+       *   消すと、1 回ぶん画面がちらつく。
+       */
+      const left = new Map<string, { space: BubbleId; beside: boolean }>();
+      /** 一覧自身が居る空間。ここへ出されたのが「隣に剥がした」 */
+      const mySpace = world.bubble(hostId)?.space ?? 'root';
+      for (const [id, opened] of urls) {
+        if (opened.originId !== hostId) continue;
+        const here = world.bubble(id);
+        if (!here || here.space === hostId) continue;
+        if (!want.includes(opened.url)) continue;
+        left.set(opened.url, { space: here.space, beside: here.space === mySpace });
+      }
+      if (onLeave) for (const [url, at] of left) onLeave(url, at);
+
+      const missing = want.filter(
+        (url) => !have.has(url) && !left.has(url) && !!matchBubbleRoute(routes, url),
+      );
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
        * ★ 「もう当ててあるか」は**世界に訊く**。覚え書き（ref）で持つと、
