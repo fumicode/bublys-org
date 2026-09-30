@@ -113,13 +113,15 @@ export const FIELD_CSS = `
 .bub.imp.sel .fr{--fw:1.8px}
 .bub.imp.on .fr{border-color:#6ee7ff;opacity:.95}
 /* 札の字：canvas は座布団の上端から 2.5px 下に字の上を置く。flex の中央ぞろえだけだと 2px 下がる */
-.lb{position:absolute;left:calc(-4px * var(--k));top:calc(100% + 7px * var(--k));
+/* ★ 置き所は draw.ts が画素で出す（--lbx / --lby ＝ 箱の左上からの隔たり）。
+   画角の中へ寄せるのに窓の大きさが要るので、CSS だけでは決められない。
+   var の控えは、まだ数が来ていないときの昔の置き所（枠の左下） */
+.lb{position:absolute;left:calc(var(--lbx, -4) * 1px * var(--k));top:calc(var(--lby, 100) * 1px * var(--k));
   height:calc(15px * var(--k));display:flex;align-items:center;
   padding:0 calc(3px * var(--k)) calc(4px * var(--k));
   font-family:var(--f);font-weight:600;font-size:calc(10px * var(--k));line-height:1;white-space:nowrap;
   color:#cdd8ee;background:rgba(8,10,17,.92);border-radius:calc(3px * var(--k));opacity:.8}
 .bub.imp.on .lb{color:#6ee7ff;opacity:.95}
-.bub.imp.lbup .lb{top:auto;bottom:calc(100% + 7px * var(--k))}
 .rg{position:absolute}
 .bub.imp .rg{pointer-events:auto}
 /* 縁は 12px。DOM の画素まるめで外側 1px を取りこぼさないよう 13px 敷き、当たり判定が 12px に削る */

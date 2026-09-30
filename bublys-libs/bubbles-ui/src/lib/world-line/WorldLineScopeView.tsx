@@ -3,6 +3,7 @@ import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, 
 import type { CasScopeValue } from "@bublys-org/world-line-graph";
 import { useKeyBindings, type KeyBinding } from "../hooks/useKeyBindings.js";
 import { WorldLinesCanvasView, type WorldLinesCanvasViewProps } from "./WorldLinesCanvasView.js";
+import { isCommitKey } from "../utils/ime.js";
 
 const EMPTY_BINDINGS: KeyBinding[] = [];
 
@@ -116,7 +117,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
           onKeyDown={(e) => {
             // IME 変換確定の Enter で確定させない（二重入力の原因だった）。
             if (e.nativeEvent.isComposing) return;
-            if (e.key === "Enter") e.currentTarget.blur();
+            if (isCommitKey(e)) e.currentTarget.blur();
           }}
           placeholder="名前…"
           style={nameInputStyle}

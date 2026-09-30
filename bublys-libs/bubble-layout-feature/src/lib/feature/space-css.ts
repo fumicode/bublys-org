@@ -102,6 +102,35 @@ export const SPACE_CSS = `
 .bub > .bl-close:hover{opacity:1;background:rgba(255,255,255,.14)}
 .bub.nt > .bl-close{display:none}
 /*
+ * 並びごと閉じる口 ── **並びの名札の隣**。
+ *
+ * ★ 前は泡の見出しの、閉じるの左どなりに置いていた。押すと並び全部が消えるのに
+ *   「この泡の口」の顔をしていたし、並びの泡の数だけ同じ口が並んだ（実測で言われた）。
+ * ★ 並びは名札も点線の枠も掴む縁も自分で持っている。**掴む所と閉じる所を同じ側に揃える**と、
+ *   1 並び＝1 つになり、泡の閉じるとも離れる。
+ * ★ 見た目は名札に合わせる（同じ高さ・同じ座布団・同じ字）。名札の決まりは
+ *   bubble-layout-ui の field-css の .lb にある。
+ */
+/* 名札と口を並べた 1 本の帯。置き所は draw.ts が出した --lbx / --lby（画角の中に寄せてある） */
+.bub.imp > .bl-rowtag{position:absolute;display:flex;align-items:stretch;
+  left:calc(var(--lbx, -4) * 1px * var(--k));top:calc(var(--lby, 100) * 1px * var(--k));
+  height:calc(15px * var(--k));gap:calc(2px * var(--k));
+  font-family:var(--f);font-weight:600;font-size:calc(10px * var(--k));line-height:1;white-space:nowrap}
+/* ★ 幅は数えない。帯を flex にして、口と名札が並んだぶんだけ伸びるようにする
+   ── 数えると、字や余白を変えたときに写しのほうを直し忘れる */
+.bub.imp > .bl-rowtag > .bl-close-row{pointer-events:auto;
+  display:flex;align-items:center;gap:calc(3px * var(--k));
+  padding:0 calc(5px * var(--k));border:0;cursor:pointer;font:inherit;
+  color:#ffd9d2;background:rgba(120,30,22,.92);border-radius:calc(3px * var(--k));opacity:.85}
+.bub.imp > .bl-rowtag > .bl-close-row:hover{opacity:1;color:#fff;background:rgba(176,42,30,.98)}
+/* 名札の見た目は field-css の .lb に合わせる（同じ座布団・同じ字） */
+.bub.imp > .bl-rowtag > .bl-rowname{display:flex;align-items:center;
+  padding:0 calc(3px * var(--k));color:#cdd8ee;background:rgba(8,10,17,.92);
+  border-radius:calc(3px * var(--k));opacity:.8}
+.bub.imp.on > .bl-rowtag > .bl-rowname{color:#6ee7ff;opacity:.95}
+/* 帯を出したときは、見本の札は引っ込める（同じものが 2 つ出ないように） */
+.bub.imp:has(> .bl-rowtag) > .lb{display:none}
+/*
  * ステータスバーの口（閉じるの隣）。いまは岸のロックだけが使う。
  * ★ 閉じる（右 4・幅 18）の左隣に 4px 空けて並べるので right は 26。
  *   出るときは url の行き止まりもそのぶん手前へ（下の .bl-url を見よ）。

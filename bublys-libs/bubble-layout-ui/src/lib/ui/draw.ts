@@ -40,6 +40,17 @@ export const CONTENT_MIN = 0.25;
 /** 画面の外へどれだけ出たら消すか（lab.html 1041 行） */
 const OUT_PAD = 60;
 
+/**
+ * 見えない親の札まわりの寸法。**field-css の .lb と同じ数**でなければならない
+ * （ここは置き所を出すだけで、実際に描くのは CSS のほう）。
+ */
+/** 枠と札のすき間 */
+const TAG_GAP = 7;
+/** 札の高さ */
+const TAG_H = 15;
+/** 画角の縁からの余白 */
+const TAG_EDGE = 4;
+
 /** 題名・印の幅を測る人。画面が無い所（テスト）では作り物を渡す */
 export type MeasureText = (text: string, px: number) => number;
 
@@ -480,12 +491,37 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
     op = clamp(p.alpha, 0, 1);
     style['display'] = !draw || op <= 0.02 || out ? 'none' : '';
     label = '見えない親 · ' + implicitWord(c.world, b.id);
+    /**
+     * **札は、画角の中に出す。**
+     *
+     * > 並びは画面より大きくなる。札が並びに付いて回ると、**画面の外へ出て読めなくなる。**
+     *
+     * ★ 前は「枠の下。入らなければ上」の 2 択だった。並びが縦にも横にも画面をはみ出すと
+     *   どちらも画面の外で、札も、札に付いている口も見えなくなる（実測で言われた）。
+     * ★ いまは置き所を画素で出して、**画角の中へ寄せる**。寄せても並びから離れないよう、
+     *   並びの右端より先へは行かせない。
+     * ★ 画素で出すのはここだけ ── 画面の大きさ（viewport）と写った矩形（p）を
+     *   両方知っているのはこの場所だけなので、CSS では決められない。
+     */
+    const tx = Math.min(
+      Math.max(TAG_EDGE, p.x - TAG_EDGE),
+      // 並びの右端からはみ出さない（口の 1 つぶんは必ず並びの上に残る）
+      Math.max(TAG_EDGE, p.x + p.w - TAG_H),
+    );
+    const ty =
+      p.y + p.h + TAG_GAP + TAG_H <= c.viewport.h
+        ? p.y + p.h + TAG_GAP // 下に入る（ふだんはこれ）
+        : p.y - TAG_GAP - TAG_H >= 0
+          ? p.y - TAG_GAP - TAG_H // 下が無いので上へ
+          : c.viewport.h - TAG_H - TAG_EDGE; // どちらも無い（並びが画面より高い）→ 画角の下の縁
+    // 泡の箱の中に置くので、箱の左上からの隔たりで渡す。倍率は CSS 側が --k で戻す
+    style['--lbx'] = (tx - p.x).toFixed(2);
+    style['--lby'] = (ty - p.y).toFixed(2);
     className =
       'bub imp' +
       (grab ? '' : ' off') +
       (b.id === c.selectedId ? ' sel' : '') +
-      (b.id === c.selectedId || c.hoverRing === b.id ? ' on' : '') +
-      (p.y + p.h + 21 <= c.viewport.h ? '' : ' lbup'); // 札は枠の下。入らなければ上
+      (b.id === c.selectedId || c.hoverRing === b.id ? ' on' : '');
   } else {
     /**
      * 霞み ── **前後ではなく「写った大きさ」で薄くする**。手前かどうかは見ていない。
