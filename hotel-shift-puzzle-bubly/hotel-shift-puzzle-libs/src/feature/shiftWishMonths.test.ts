@@ -3,6 +3,7 @@ import {
   Staff,
   StaffMonthlyShiftWish,
   WorkingDay,
+  WorkingStaffGroup,
 } from '@bublys-org/hotel-shift-puzzle-model';
 import {
   monthProgressList,
@@ -10,6 +11,7 @@ import {
   monthsWithSchedule,
   staffWishRows,
   wishesOfMonth,
+  workingStaffOfMonth,
 } from './shiftWishMonths.js';
 import {
   collectedAtLabel,
@@ -32,6 +34,10 @@ const filledWish = (staffId: string, year: number, month: number) =>
   );
 
 const staff = (id: string, name: string) => new Staff({ id, name, department: '' });
+
+/** 勤務表 `id` の群（名簿の人だけ）。勤務表は既定で id と同じ群IDを指す */
+const group = (id: string, ...staffIds: string[]) =>
+  WorkingStaffGroup.ofRoster(id, staffIds);
 
 describe('monthsWithSchedule（希望を出す月＝勤務表がある月）', () => {
   test('勤務表が無ければ空', () => {
@@ -100,20 +106,126 @@ describe('wishesOfMonth（その月の希望だけを staffId で引く）', () 
   });
 });
 
+describe('workingStaffOfMonth（希望を集める相手＝その月に働く人）', () => {
+  const roster = [staff('s1', 'A'), staff('s2', 'B'), staff('s3', 'C')];
+
+  test('名簿ではなく群が顔ぶれを決める（勤務表から外した人は落ちる）', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-6')],
+      [group('sch-6', 's1', 's3')], // s2 は勤務表から外した
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => s.id)).toEqual(['s1', 's3']);
+  });
+
+  test('並び順は群の順（名簿順ではない。勤務表と見比べられるように）', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-6')],
+      [group('sch-6', 's3', 's1', 's2')],
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => s.id)).toEqual(['s3', 's1', 's2']);
+  });
+
+  test('勤務表で足した臨時の人も出る（実体は群のメンバーが抱えている）', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-6')],
+      [group('sch-6', 's1').addTemporary(staff('tmp-1', '応援'))],
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => [s.id, s.name])).toEqual([
+      ['s1', 'A'],
+      ['tmp-1', '応援'],
+    ]);
+  });
+
+  test('別の月の勤務表は混ざらない', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-6'), schedule(2026, 7, 'sch-7')],
+      [group('sch-6', 's1'), group('sch-7', 's2')],
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => s.id)).toEqual(['s1']);
+  });
+
+  test('同じ月に勤務表が2つあれば和集合。順は最初の勤務表の群から', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-a'), schedule(2026, 6, 'sch-b')],
+      [group('sch-a', 's3', 's1'), group('sch-b', 's1', 's2')], // s1 は両方に居る
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => s.id)).toEqual(['s3', 's1', 's2']);
+  });
+
+  test('群をまだ持たない勤務表は名簿全員（勤務表の行の振る舞いと揃える）', () => {
+    const staffList = workingStaffOfMonth(
+      [schedule(2026, 6, 'sch-6')],
+      [], // 群が無い
+      roster,
+      2026,
+      6
+    );
+    expect(staffList.map((s) => s.id)).toEqual(['s1', 's2', 's3']);
+  });
+
+  test('勤務表が無い月は空', () => {
+    expect(workingStaffOfMonth([], [], roster, 2026, 6)).toEqual([]);
+  });
+});
+
 describe('monthProgressList（月一覧の行）', () => {
+  const roster = [staff('s1', 'A'), staff('s2', 'B'), staff('s3', 'C')];
+
   test('月ごとに 回収済み／入力あり の人数を数える', () => {
-    const schedules = [schedule(2026, 6), schedule(2026, 7)];
+    const schedules = [schedule(2026, 6, 'sch-6'), schedule(2026, 7, 'sch-7')];
+    const groups = [group('sch-6', 's1', 's2', 's3'), group('sch-7', 's1', 's2', 's3')];
     const wishes = [
-      filledWish('staff-A', 2026, 6).submit('2026-05-20T09:03:00.000Z'),
-      filledWish('staff-B', 2026, 6),
-      emptyWish('staff-C', 2026, 6), // 作っただけ＝未入力扱い
-      filledWish('staff-A', 2026, 7),
+      filledWish('s1', 2026, 6).submit('2026-05-20T09:03:00.000Z'),
+      filledWish('s2', 2026, 6),
+      emptyWish('s3', 2026, 6), // 作っただけ＝未入力扱い
+      filledWish('s1', 2026, 7),
     ];
 
-    expect(monthProgressList(schedules, wishes, 3)).toEqual([
+    expect(monthProgressList(schedules, groups, roster, wishes)).toEqual([
       { year: 2026, month: 6, collectedCount: 1, startedCount: 2, staffCount: 3 },
       { year: 2026, month: 7, collectedCount: 0, startedCount: 1, staffCount: 3 },
     ]);
+  });
+
+  test('分母はその月に働く人の数（名簿の人数ではない）', () => {
+    const progress = monthProgressList(
+      [schedule(2026, 6, 'sch-6')],
+      [group('sch-6', 's1', 's2')], // 名簿は3人だが、働くのは2人
+      roster,
+      []
+    );
+    expect(progress[0].staffCount).toBe(2);
+  });
+
+  test('その月に働かない人の希望は数えない（外した人の回収済みで埋まらない）', () => {
+    const progress = monthProgressList(
+      [schedule(2026, 6, 'sch-6')],
+      [group('sch-6', 's1')], // s2 は外した
+      roster,
+      [filledWish('s2', 2026, 6).submit('2026-05-20T09:03:00.000Z')]
+    );
+    expect(progress[0]).toEqual({
+      year: 2026,
+      month: 6,
+      collectedCount: 0,
+      startedCount: 0,
+      staffCount: 1,
+    });
   });
 });
 
@@ -149,7 +261,7 @@ describe('monthSummariesOf（スタッフ詳細の行）', () => {
 });
 
 describe('staffWishRows（月別一覧の行）', () => {
-  test('希望がまだ無い人も「未入力」で並ぶ（スタッフ全員が対象）', () => {
+  test('希望がまだ無い人も「未入力」で並ぶ（渡した顔ぶれ全員が対象）', () => {
     const rows = staffWishRows(
       [staff('staff-A', '山田'), staff('staff-B', '鈴木')],
       [filledWish('staff-A', 2026, 6)],
@@ -163,13 +275,37 @@ describe('staffWishRows（月別一覧の行）', () => {
     ]);
   });
 
-  test('スタッフの並び順はそのまま（勤務表と見比べられるように）', () => {
+  test('渡した並び順はそのまま（勤務表と見比べられるように）', () => {
     const staffList = [staff('s3', 'C'), staff('s1', 'A'), staff('s2', 'B')];
     expect(staffWishRows(staffList, [], 2026, 6).map((r) => r.staff.id)).toEqual([
       's3',
       's1',
       's2',
     ]);
+  });
+
+  /**
+   * #159 の本題。勤務表から外した人は行から消え、勤務表で足した臨時の人は行に出る。
+   * 画面（ShiftWishStaffList）がこの2つを繋いでいるので、繋いだ形で1本固定する。
+   */
+  test('群が決めた顔ぶれで組むと、外した人は消え、臨時の人が出る', () => {
+    const roster = [staff('s1', 'A'), staff('s2', 'B')];
+    const schedules = [schedule(2026, 6, 'sch-6')];
+    const groups = [group('sch-6', 's1').addTemporary(staff('tmp-1', '応援'))];
+
+    const rows = staffWishRows(
+      workingStaffOfMonth(schedules, groups, roster, 2026, 6),
+      [filledWish('s2', 2026, 6), filledWish('tmp-1', 2026, 6)],
+      2026,
+      6
+    );
+
+    expect(rows.map((r) => [r.staff.id, r.status])).toEqual([
+      ['s1', 'empty'],   // 働く。まだ聞いていない
+      ['tmp-1', 'draft'], // 臨時の人。名簿に居なくても行になる
+    ]);
+    // s2 は勤務表から外したので、希望が残っていても行に出ない
+    expect(rows.some((r) => r.staff.id === 's2')).toBe(false);
   });
 });
 
