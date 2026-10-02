@@ -67,6 +67,15 @@
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
+      "path": "../../map-bubly/map-libs"
+    },
+    {
+      "path": "../../itinerary-bubly/itinerary-libs"
+    },
+    {
+      "path": "../../lodging-bubly/lodging-libs"
+    },
+    {
       "path": "../../object-transformer-bubly/object-transformer-libs"
     },
     {

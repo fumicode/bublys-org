@@ -23,6 +23,9 @@ import { taskManagementBubbleRoutes } from "@bublys-org/task-libs";
 import { memoBubbleRoutes } from "@bublys-org/memo-libs";
 import { csvImporterBubbleRoutes } from "@bublys-org/csv-importer-libs";
 import { objectTransformerBubbleRoutes } from "@bublys-org/object-transformer-libs";
+import { mapBubbleRoutes } from "@bublys-org/map-libs";
+import { itineraryBubbleRoutes } from "@bublys-org/itinerary-libs";
+import { lodgingBubbleRoutes } from "@bublys-org/lodging-libs";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
@@ -183,6 +186,18 @@ const routes: BubbleRoute[] = [
 
   // 変換エディタ（object-transformer-libs から）
   ...objectTransformerBubbleRoutes,
+
+  /**
+   * **旅の 4 つ**（地図・旅程・アクティビティ＝地点・宿泊施設）。
+   *
+   * ★ 旅の海（`apps/travel-space`）に載っているのと**同じものを同じ所から引く**。
+   *   写しを作らないので、片方だけ手ざわりが古くなることがない。
+   * ★ アクティビティの一覧は**地点の一覧**（`spots`）── 収集したアクティビティ 793 件は
+   *   地点として書き出されている（`tools/echigo/build.mjs`）。
+   */
+  ...mapBubbleRoutes,
+  ...itineraryBubbleRoutes,
+  ...lodgingBubbleRoutes,
 
   // 易経（プラグインとして動的ロード）
   // ...ekikyoBubbleRoutes,
