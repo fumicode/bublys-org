@@ -22,6 +22,8 @@ import * as BubblesUI from "@bublys-org/bubbles-ui";
 import * as MuiMaterial from "@mui/material";
 import * as MuiIcons from "@mui/icons-material";
 import { BootScreen } from './BootScreen';
+import { EditionPrompt } from './edition/EditionPrompt';
+import { EditionSnapshot, prepareEditionOnBoot, useEditionCheck } from './edition/useEditionCheck';
 import { initWorldLineGraph, IntentBoundary } from '@bublys-org/world-line-graph';
 import * as WorldLineGraph from '@bublys-org/world-line-graph';
 import * as DomainRegistry from '@bublys-org/domain-registry';
@@ -109,9 +111,15 @@ export default function StoreProvider({
    *   使われるのは 1 つで、捨てられたほうへは誰も書かない。`initializeApp` は
    *   自分で 1 回に絞っている。
    */
-  const [{ store, persistor }] = useState<{ store: AppStore; persistor: Persistor }>(() => {
+  const [{ store, persistor, editionSnapshot }] = useState<{
+    store: AppStore;
+    persistor: Persistor;
+    editionSnapshot: EditionSnapshot | null;
+  }>(() => {
+    // 保存係が動き出す前に、版を確かめる支度をする（`edition/useEditionCheck.ts`）
+    const editionSnapshot = prepareEditionOnBoot();
     initializeApp();
-    return makeStore();
+    return { ...makeStore(), editionSnapshot };
   });
 
   // 前回ロードしたバブリを復元してから中身を描く。
@@ -138,12 +146,21 @@ export default function StoreProvider({
    *   JS が走り終わるまで**完全な白画面**だった（`BootScreen` の註）。
    *   出す所は 2 つ ── 保存の読み戻し（`PersistGate`）と、バブリの復元。
    */
+  // 前の版で使っていた端末には、初期状態で見直すか訊く（`edition/edition.ts`）
+  const edition = useEditionCheck(persistor, editionSnapshot);
+
   return (
     <Provider store={store}>
       {/* ユーザー入力の瞬間に「1 意図」を開く。世界線のノードはこの単位で 1 つになる */}
       <IntentBoundary />
       <PersistGate loading={<BootScreen />} persistor={persistor}>
-        {bubliesRestored ? children : <BootScreen />}
+        {bubliesRestored && edition.ready ? children : <BootScreen />}
+        <EditionPrompt
+          open={edition.asking}
+          busy={edition.busy}
+          onReset={edition.reset}
+          onKeep={edition.keep}
+        />
       </PersistGate>
     </Provider>
   );
