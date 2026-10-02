@@ -3,7 +3,7 @@
  *   App Router では `metadata` を出せるのはサーバの部品だけ。client にすると
  *   `<title>` が空のまま配られる（OS で踏んだ）。
  */
-import 'modern-normalize';
+// modern-normalize は global.css が段（reset）に入れて読む
 import './global.css';
 import type { Metadata, Viewport } from 'next';
 import { StyledComponentsRegistry } from './registry';

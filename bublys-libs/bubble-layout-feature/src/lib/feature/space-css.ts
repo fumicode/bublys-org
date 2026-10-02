@@ -41,6 +41,8 @@ export const SPACE_CSS = `
     hsl(var(--h) 34% 19%) 0%, hsl(var(--h) 32% 15%) 45%, hsl(var(--h) 30% 13%) 100%);
   box-shadow:0 8px 32px hsl(var(--h) 50% 22% / .38), 0 2px 8px rgba(0,0,0,.18),
     inset 0 2px 4px hsla(0,0%,100%,.35), inset 0 -1px 2px hsl(var(--h) 50% 30% / .2)}
+/* 札は小さい角のまま（FIELD_CSS の .bub.chip）。段に入れると上の --rr:16px が勝つので言い直す */
+.bub.chip{--rr:6px}
 /* ③ 見えない親は体を持たない（FIELD_CSS の指定をここでも守る） */
 .bub.imp{background:none;box-shadow:none}
 
@@ -135,6 +137,26 @@ export const SPACE_CSS = `
  * ★ 閉じる（右 4・幅 18）の左隣に 4px 空けて並べるので right は 26。
  *   出るときは url の行き止まりもそのぶん手前へ（下の .bl-url を見よ）。
  */
+/*
+ * 鎖（url を見る・コピーする）── 閉じるの左隣（閉じる 右 4・幅 18 ＋ 隙間 4 ＝ 右 26）。
+ *   ロックが出る泡では、ロックが閉じるの隣に居るので、鎖はそのさらに左（右 48）。
+ * ★ 吹き出しは帯のすぐ下、右端に揃えて出す（泡の外へははみ出してよい）。
+ *   字は data-url を読むだけ ── 乗せるたびに描き直さない。
+ */
+.bub > .bl-link{position:absolute;right:26px;top:3px;width:18px;height:18px;padding:0;
+  border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;pointer-events:auto}
+.bub > .bl-link:hover,.bub > .bl-link:focus-visible{opacity:1;background:rgba(255,255,255,.14)}
+.bub > .bl-link::after{content:attr(data-url);position:absolute;right:0;top:calc(100% + 6px);z-index:3;
+  max-width:360px;padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font:500 11px/1.4 var(--f);letter-spacing:.01em;color:#eaf1ff;background:rgba(12,16,28,.92);
+  box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;opacity:0;transition:opacity 120ms ease}
+.bub > .bl-link:hover::after,.bub > .bl-link:focus-visible::after,
+.bub > .bl-link[data-copied]::after{opacity:1}
+.bub > .bl-link[data-copied]{opacity:1;color:#8ff0b8}
+.bub.nt > .bl-link{display:none}
+.bub:has(> .bl-tool) > .bl-link{right:48px}
 .bub > .bl-tool{position:absolute;right:26px;top:3px;width:18px;height:18px;padding:0;
   border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
   display:flex;align-items:center;justify-content:center;
@@ -182,13 +204,27 @@ export const SPACE_CSS = `
  *   text-overflow:ellipsis が効くのは**行**であって、並べ物の入れ物ではないから
  *   ── flex のままだと、はみ出したぶんがただ切り落とされて … が出ない。
  *   区切りの / は中の字のまま（inline）なので、見た目は今までどおり。
- *   右の余地 34px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 隙間 4。
+ *   右の余地 56px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 鎖（幅 18 ＋ 隙間 4）＋ 隙間 4。
+ *   ロックが出る泡は、さらにロック 1 つぶん（22px）手前で切る。
  */
-.bub:has(> .bl-tool) > .bl-url{max-width:calc(100% - 56px)}
-.bub > .bl-url{display:block;max-width:calc(100% - 34px);
+.bub:has(> .bl-tool) > .bl-url{max-width:calc(100% - 78px)}
+.bub > .bl-url{display:block;max-width:calc(100% - 56px);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;
   font:600 11px/24px var(--f);letter-spacing:.01em}
 .bl-seg{white-space:nowrap}
+/* 膜の板は皮（skin-css）が使う。皮が無い海では出さない */
+.bub > .bl-film{display:none}
+/*
+ * 型の名前とアイコン。アイコンは字の高さに合わせる（MUI の既定 20px では帯 24px に窮屈）。
+ * ★ **大きさは transform で縮める。** アイコンは型が名乗った MUI の部品で、MUI の CSS は
+ *   段に入っていない ── 器（@layer bl）が width を書いても MUI が必ず勝つ（中身が器に勝つ決まり）。
+ *   MUI が触らない性質で、20px を 14px の台に収める。
+ */
+.bl-kind{display:inline-flex;align-items:center;gap:5px;height:24px;vertical-align:top;white-space:nowrap}
+/* 台は flex にして、中の svg の display（MUI が決める）に行の高さを左右させない */
+.bl-kind-icon{display:flex;flex:none;width:14px;height:14px;line-height:0;overflow:visible}
+.bl-kind-icon > svg{flex:none;transform-origin:0 0;transform:scale(.7)}
+.bl-kind-list{opacity:.7;font-weight:500}
 .bl-sep{opacity:.45;margin:0 3px}
 /*
  * 一覧の中の札 ── **選んでいないあいだは「中身だけ」**。
@@ -204,7 +240,8 @@ export const SPACE_CSS = `
 .bub:not(.sel):has(> .bl-quiet)::after{content:none}
 .bub:not(.sel):has(> .bl-quiet) > .hd,
 .bub:not(.sel):has(> .bl-quiet) > .bl-close,
-.bub:not(.sel):has(> .bl-quiet) > .bl-tool{display:none}
+.bub:not(.sel):has(> .bl-quiet) > .bl-tool,
+.bub:not(.sel):has(> .bl-quiet) > .bl-link{display:none}
 /*
  * ★ 装いを出さないあいだは、**その空けてあった所まで中身を広げる**。
  *   ヘッダのぶん（上 27px）を空けたままだと、札と札のあいだが 48px も開いて
@@ -238,7 +275,8 @@ export const SPACE_CSS = `
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .hd,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .ttl,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close,
-.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool{z-index:2}
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool,
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-link{z-index:2}
 
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */

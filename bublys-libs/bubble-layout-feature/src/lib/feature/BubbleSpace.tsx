@@ -23,6 +23,29 @@ import { FollowIcon, PinIcon, VIEW_CHOICES } from './ViewIcons.js';
 import type { BubbleRoute, RoutedBubble } from './routing.js';
 import { hueOf, openAt } from './openAt.js';
 import { SPACE_CSS } from './space-css.js';
+import { BUBBLE_SKIN_CSS } from './skin-css.js';
+import { getObjectTypeIcon, objectTypeOfUrl } from '@bublys-org/object-types';
+import { UrlLink } from './UrlLink.js';
+
+/**
+ * **器の CSS は段（`@layer bl`）に入れる。**
+ *
+ * > 器は中身に勝てない。器の中では、ラボ → 印 → 器 → 皮 の順に上から塗る。
+ *
+ * ★ 段に入っていない CSS（中身の styled-components・MUI）は、詳細度に関係なく
+ *   必ず段に勝つ。器が中身の見た目を上書きしてしまうことが、これで起きなくなる。
+ * ★ 上書きの順を、文字列を足す順番ではなく**段の名前**で言う。
+ * ★ アプリ側の素の CSS（modern-normalize など）も段に入っていないと器に勝つので、
+ *   アプリは `@layer reset, bl;` を宣言して、それを `reset` に入れること
+ *   （apps/travel-space・apps/bublys-os の global.css）。
+ */
+const FRAME_CSS = `@layer bl{
+@layer field, marks, space, skin;
+@layer field{${FIELD_CSS}}
+@layer marks{${MARKS_CSS}}
+@layer space{${SPACE_CSS}}
+@layer skin{${BUBBLE_SKIN_CSS}}
+}`;
 
 /**
  * 並べ方の口を、箱の中のどこに置くか（左端からのずれ）。
@@ -1335,21 +1358,35 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   札の中身ではないので、入らないぶんは切る。
        */
       const deep = inList && !packed;
+      /** 何の型の泡か（無ければ url を出す） */
+      const kind = objectTypeOfUrl(url);
       return (
         <>
+          {/* 膜の板。皮（skin-css）が泡の地をここに描いて、出し入れする。皮が無ければ出ない */}
+          <div className="bl-film" />
           <div className="hd" />
           {/*
-            ★ 枠に出すのは **url**（題名ではない）。既存 bubbles-ui の泡と同じ。
+            ★ 枠に出すのは **何の型の泡か**（題名ではない）。
               中身は自分の題名を自分で出すので、枠にも題名を出すと二重になる
               ── v6 の検証で最初に見つかったのがこれ。
+            ★ 型は url から割り出す（`objectTypeOfUrl`：開く先を逆に読む）。
+              どの型の開く先でもない泡（地図・ランチャー）は、今までどおり url を出す。
           */}
           <div className={'ttl bl-url' + (inList ? ' bl-quiet' : '')}>
-            {url.split("/").map((seg, i) => (
-              <span key={i} className="bl-seg">
-                {i > 0 && <span className="bl-sep">/</span>}
-                {seg}
+            {kind ? (
+              <span className="bl-kind">
+                <span className="bl-kind-icon">{getObjectTypeIcon(kind.kind)}</span>
+                {kind.type}
+                {kind.list && <span className="bl-kind-list"> の一覧</span>}
               </span>
-            ))}
+            ) : (
+              url.split("/").map((seg, i) => (
+                <span key={i} className="bl-seg">
+                  {i > 0 && <span className="bl-sep">/</span>}
+                  {seg}
+                </span>
+              ))
+            )}
           </div>
           {/*
             ★ **中に空間を持つ泡には、見え方の口を枠の上に出す**（仮の置き場所）。
@@ -1432,6 +1469,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             )}
           </div>
           {r && headerTools?.(r.bubble, r.route)}
+          <UrlLink url={url} />
           <button
             className="bl-close"
             title="閉じる"
@@ -1480,7 +1518,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       <ViewChoiceContext.Provider value={viewChoice}>
       <ScreenZoomContext.Provider value={screen}>
       <SelectedBubbleContext.Provider value={selectedId}>
-      <style>{FIELD_CSS + MARKS_CSS + SPACE_CSS}</style>
+      <style>{FRAME_CSS}</style>
       <div
         className={'bl-space' + (className ? ' ' + className : '')}
         style={{ position: 'relative', width: viewport.w, height: viewport.h, overflow: 'hidden', ...style }}

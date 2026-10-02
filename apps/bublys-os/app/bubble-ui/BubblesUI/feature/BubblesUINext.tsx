@@ -31,6 +31,7 @@ import {
   makeWorldLinesDock,
 } from "@bublys-org/space-furniture";
 import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
+import { BUBBLE_SKIN } from "@bublys-org/bubble-layout-feature";
 // 組み込みのルートをレジストリに登録するための副作用 import（一覧は下で hook から引く）
 import "../registration/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
@@ -195,6 +196,11 @@ export const BubblesUINext = () => {
    *   読むのと同じ名前にしておく ── 別の名前にすると、記録はされているのに何も映らない。
    */
   return (
+    /**
+     * ★ **泡はシャボン玉の皮を着る**（`BUBBLE_SKIN`）── 旅の空間と同じ。器に口が無いので、
+     *   配置に影響しない入れもの（`display: contents`）に印を付ける ── 皮は祖先の印で効く。
+     */
+    <div className={BUBBLE_SKIN} style={{ display: "contents" }}>
     <BubbleSea
       routes={routes}
       homes={HOMES}
@@ -211,5 +217,6 @@ export const BubblesUINext = () => {
        */
       style={{ height: "100dvh" }}
     />
+    </div>
   );
 };

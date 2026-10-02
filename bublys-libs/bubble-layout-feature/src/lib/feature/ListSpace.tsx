@@ -364,7 +364,8 @@ export const ListSpace: FC<ListSpaceProps> = ({
         height: "100%",
         overflow: "hidden",
         borderRadius: "inherit",
-        background: LIST_PANEL,
+        /** 皮（`skin-css.ts`）が板の色を差し替えられるよう、変数を通す。無ければ今までの板 */
+        background: `var(--bl-list-panel, ${LIST_PANEL})`,
         color: "#1b2029",
       }}
     >
