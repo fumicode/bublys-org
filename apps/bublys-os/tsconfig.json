@@ -31,6 +31,7 @@
     "app/**/*.jsx",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "app/**/seed/*.json",
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "next-env.d.ts",

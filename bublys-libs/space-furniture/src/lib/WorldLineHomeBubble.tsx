@@ -14,10 +14,16 @@
 import { FC, useContext, useMemo } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { BubblesContext, useBubbleBox } from "@bublys-org/bubbles-ui";
 import { WorldLineScopeView, useScopeNodeSummaries, moveToSiblingBranch } from "@bublys-org/bubbles-ui";
 import { useCasScope } from "@bublys-org/world-line-graph";
-import { SEA_ARRANGEMENT_ID, SEA_ARRANGEMENT_TYPE, type SeaArrangement } from "@bublys-org/bubble-space-shell";
+import {
+  SEA_ARRANGEMENT_ID,
+  SEA_ARRANGEMENT_TYPE,
+  toSeaSeed,
+  type SeaArrangement,
+} from "@bublys-org/bubble-space-shell";
 import { useCurrentBubble } from "@bublys-org/bubble-layout-feature";
 
 /** この泡の url。押して開く先も同じ（自分の複製） */
@@ -101,7 +107,47 @@ const SeaWorldLineView: FC = () => {
     ],
     [scope],
   );
-  return <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />;
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />
+      <ExportSeedButton />
+    </div>
+  );
+};
+
+/**
+ * **いまの節の姿を、ファイルに書き出す口。**
+ *
+ * > **ブラウザの中にある姿を、外へ持ち出せるようにする。**
+ *
+ * ★ 書き出すのは**いま居る節**の姿（世界線で戻っていれば、戻った先）。
+ *   画面に見えているものと、書き出したものが同じになる。
+ * ★ ここに置くのは、世界線の泡が「いまどの節か」を映すものだから ── 何を書き出すかが
+ *   目の前に見えている。
+ */
+const ExportSeedButton: FC = () => {
+  const scope = useCasScope(ROOT_SEA_SCOPE);
+  const there = scope.getShell<SeaArrangement>(SEA_ARRANGEMENT_TYPE, SEA_ARRANGEMENT_ID)?.object ?? null;
+  const exportSeed = () => {
+    if (!there) return;
+    const seed = toSeaSeed(there, { w: window.innerWidth, h: window.innerHeight });
+    const blob = new Blob([JSON.stringify(seed, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "sea-seed.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <Tooltip title={there ? "いまの節の姿を書き出す（sea-seed.json）" : "まだ記録が無い"} placement="left">
+      {/* 押せないときも Tooltip が出るように span で包む */}
+      <span style={{ position: "absolute", top: 4, right: 4 }}>
+        <IconButton size="small" disabled={!there} onClick={exportSeed} sx={{ color: "#9ec1ff" }}>
+          <FileDownloadIcon fontSize="small" />
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
 };
 
 export default WorldLineHomeBubble;

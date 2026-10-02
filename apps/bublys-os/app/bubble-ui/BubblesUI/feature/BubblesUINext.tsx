@@ -7,7 +7,7 @@
  *   ここに残るのは「OS には何が定位置に居るか」だけ ── ランチャー・見え方の口・
  *   ポケット・他のデモへ行く口の 4 つ。
  */
-import { BubbleSea, type Docked, type Home } from "@bublys-org/bubble-space-shell";
+import { BubbleSea, type Docked, type Home, type SeaSeed } from "@bublys-org/bubble-space-shell";
 /**
  * ★ **家具は lib から借りる**（`@bublys-org/space-furniture`）。世界線・見え方の口・
  *   ポケット・ランチャーは「どの空間にも居てよいもの」なので、OS の中に置いておくと
@@ -35,6 +35,8 @@ import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
 import "../registration/bubbleRoutes";
 import { useEnsureMainLauncherEntity } from "@/app/launcher/useEnsureMainLauncher";
 import { useEnsureBublyLaunchers } from "@/app/launcher/useEnsureBublyLaunchers";
+import seaSeedJson from "../seed/sea-seed.json";
+import { useSeedOnFirstOpen } from "../seed/useSeedOnFirstOpen";
 
 const LAUNCHER_URL = "launchers/main";
 
@@ -159,6 +161,18 @@ const SEA_RULES = { sizeCombine: 'hypot' } as const;
 const SEA_OUTSIDE = [WORLD_LINES_URL] as const;
 
 /**
+ * **はじまりの海。** はじめて OS を開いた人（世界線に記録が 1 つも無い人）は、この並びから始まる。
+ *
+ * ★ 作り方：世界線の泡を広げて右上の ⬇ で書き出したもの（`sea-seed.json`）を、ここへ置く。
+ * ★ 入れてあるのは**海の並びだけ**。岸（ランチャーなどの定位置）は抜いてある ──
+ *   書き出した画面で測った座標なので、定位置の側に開いた画面に合わせて置いてもらう。
+ * ★ 泡が指す中身は、組み込みのもの（地点・宿・ユーザー）か、一緒に撒くもの
+ *   （`world-seed.json` の囲碁と旅程。`useSeedOnFirstOpen`）だけにする。
+ *   どちらでもないものを指すと、新しいブラウザでは中身の無い泡になる。
+ */
+const SEA_SEED = seaSeedJson as unknown as SeaSeed;
+
+/**
  * ルール: **家具は OS が持ち、海は器が立てる。**
  * ランチャー集約（呼び出しの中身）は Redux にある ── 泡として出すのは海の仕事。
  */
@@ -169,6 +183,8 @@ export const BubblesUINext = () => {
    *   中身を用意するのはこちら（`useEnsureBublyLaunchers` の註）。
    */
   useEnsureBublyLaunchers();
+  /** はじめて開いた人には、海の泡が指す中身（囲碁・旅程・地図）も撒く（海の種と同じ「はじめて」） */
+  useSeedOnFirstOpen(ROOT_SEA_SCOPE);
   /**
    * ★ **開けるものの一覧は、レジストリから引く。** 組み込みのぶんも、あとから
    *   ロードしたバブリのぶんも同じ所に居る（`useBubbleRoutes` の註）。
@@ -185,6 +201,7 @@ export const BubblesUINext = () => {
       worldLineScope={ROOT_SEA_SCOPE}
       rules={SEA_RULES}
       worldLineOutside={SEA_OUTSIDE}
+      worldLineSeed={SEA_SEED}
       /**
        * ★ **`100vh` ではなく `100dvh`。** `vh` は「ブラウザの UI を隠したときの高さ」なので、
        *   スマホでは**いま見えている高さより 50〜100px 大きい**。器がそのぶん下へ伸びて、

@@ -47,7 +47,7 @@ import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
 import { putIntoWindow, useWindowView } from "./legacyRouteBridge.js";
 import { SpaceViewTools } from "./SpaceViewBubble.js";
 import type { SpaceView } from "./SpaceViewContext.js";
-import { useSeaWorldLine } from "./SeaWorldLine.js";
+import { useSeaWorldLine, type SeaSeed } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
 export type Home = (viewport: { width: number; height: number }) => Docked;
@@ -89,6 +89,8 @@ export type ShoreSpaceProps = {
    * 節へ移っても**いまのまま持ち越す**（`SeaWorldLine` の `WorldLineOutside`）。
    */
   readonly worldLineOutside?: readonly string[];
+  /** 記録が 1 つも無いときの、はじまりの姿（`SeaWorldLine` の `SeaSeed`） */
+  readonly worldLineSeed?: SeaSeed;
   /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
   readonly frameTools?: BubbleSpaceProps['frameTools'];
   readonly autoLens?: boolean;
@@ -284,6 +286,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   autoLens,
   rules,
   worldLineOutside,
+  worldLineSeed,
   frameTools,
   bandDisplay,
   persistKey,
@@ -318,7 +321,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    * 岸の貼り替えも節目なので、ここ（岸を持っている側）で記録する。
    */
   const setShore = useCallback((next: readonly Docked[]) => setDocked(next), []);
-  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore, worldLineOutside);
+  const record = useSeaWorldLine(worldLineScope, spaceRef, docked, setShore, worldLineOutside, worldLineSeed);
 
   /**
    * **岸で起きた節目を知らせる口。**

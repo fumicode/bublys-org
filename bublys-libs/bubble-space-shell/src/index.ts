@@ -18,4 +18,6 @@ export {
   SEA_ARRANGEMENT_ID,
   SEA_ARRANGEMENT_DOMAIN,
   useSeaWorldLine,
+  toSeaSeed,
+  type SeaSeed,
 } from './lib/SeaWorldLine.js';
