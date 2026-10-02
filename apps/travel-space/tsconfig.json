@@ -55,7 +55,7 @@
       "path": "../../bublys-libs/bubble-layout-feature"
     },
     {
-      "path": "../../note-bubly/note-libs"
+      "path": "../../lodging-bubly/lodging-libs"
     },
     {
       "path": "../../launcher-bubly/launcher-libs"
@@ -71,9 +71,6 @@
     },
     {
       "path": "../../itinerary-bubly/itinerary-libs"
-    },
-    {
-      "path": "../../activity-bubly/activity-libs"
     },
     {
       "path": "../../map-bubly/map-libs"

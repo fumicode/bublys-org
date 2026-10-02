@@ -54,6 +54,43 @@ export class MapBounds_範囲 {
 
   toPlain(): MapBoundsPlain { return { ...this.state }; }
 
+  /**
+   * **渡された場所がぜんぶ映る範囲**を作る。
+   *
+   * > 渡されたものは、見えなければ渡されていないのと同じ。
+   *
+   * ★ 外から渡されたピンが画面の外にあると、地図は何も変わっていないように見える
+   *   ── 落とした人は「効かなかった」と読む。だから落ちた先に合わせて寄る。
+   * ★ **少し広げて囲む**（`margin`）。ぴったりに囲むと、端のピンが縁に貼り付いて
+   *   名前が切れる。1 点だけのときは広がりが 0 になるので、そこは決め打ちで広げる。
+   * ★ 1 つも渡されていなければ `undefined` ── 動かす理由が無いので動かさない。
+   */
+  static covering(
+    places: readonly { readonly lat: number; readonly lng: number }[],
+    /** 1 点だけのときに取る広さ（度）。約 2km */
+    spot = 0.02,
+    /** 周りに足す余白（広がりに対する割合） */
+    margin = 0.15,
+  ): MapBounds_範囲 | undefined {
+    if (places.length === 0) return undefined;
+    let south = places[0].lat, north = places[0].lat;
+    let west = places[0].lng, east = places[0].lng;
+    for (const p of places) {
+      if (p.lat < south) south = p.lat;
+      if (p.lat > north) north = p.lat;
+      if (p.lng < west) west = p.lng;
+      if (p.lng > east) east = p.lng;
+    }
+    const latPad = Math.max((north - south) * margin, spot / 2);
+    const lngPad = Math.max((east - west) * margin, spot / 2);
+    return new MapBounds_範囲({
+      south: south - latPad,
+      north: north + latPad,
+      west: west - lngPad,
+      east: east + lngPad,
+    });
+  }
+
   static fromPlain(plain: MapBoundsPlain): MapBounds_範囲 {
     return new MapBounds_範囲(plain);
   }

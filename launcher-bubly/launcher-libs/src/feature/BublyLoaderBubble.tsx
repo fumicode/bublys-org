@@ -5,9 +5,9 @@ import ExtensionIcon from "@mui/icons-material/Extension";
 import { loadBublyFromOrigin, getLoadedBublies, toBublyRouteBase, bublyOriginCandidates, useBubbleRoutes, type BubbleContentRenderer } from "@bublys-org/bubbles-ui";
 import { ListSpace } from "@bublys-org/bubble-layout-feature";
 import { Launcher } from "@bublys-org/launcher-model";
-import { useLauncher } from "@bublys-org/launcher-libs";
-import { MAIN_LAUNCHER_ID } from "./launchTargets";
-import { BUBLY_CARD_HEIGHT } from "./BublyCard";
+import { useLauncher } from "./useLauncher.js";
+import { MAIN_LAUNCHER_ID } from "../registration/launchTargets.js";
+import { BUBLY_CARD_HEIGHT } from "./BublyCard.js";
 
 /**
  * バブリをオリジンからロードするバブル（url: `bubly-loader`）。

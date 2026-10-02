@@ -57,20 +57,23 @@ export type MapViewProps = {
   /** いま指されているもの。ピンが光る */
   focusedId?: string | null;
   /** 道として繋ぐ点の並び（渡されたものの順） */
-  routeIds?: readonly string[];
+  /**
+   * **道**（ピンの id の並び）を、**渡したもの 1 つにつき 1 本**。
+   *
+   * ★ 前は 1 本だけだった。渡されたものを足せるようにすると、1 本では
+   *   **旅程の最後の立ち寄り先と、次に落とした宿が線で繋がる** ── 行ってもいない道ができる。
+   */
+  routes?: readonly (readonly string[])[];
   /** 人が動かし終わったときの「いまここです」 */
   onBoundsChange?: (next: MapBounds_範囲) => void;
   /** ピンを指したとき */
   onPinFocus?: (id: string) => void;
-  /** 「この範囲で探す」を押したとき */
-  onSearchHere?: () => void;
   /** 探す範囲が決まっているか（ボタンの見た目に出す） */
-  searching?: boolean;
   /** 受け取れる荷物か（`dragover` では型しか読めない） */
   canAccept?: (e: ReactDragEvent) => boolean;
   /** 落ちてきたもの。受けられたら true */
   onDropPayload?: (e: ReactDragEvent) => boolean;
-  /** 渡されたものを返す口。何も渡されていなければ出さない */
+  /** 出ているピンを消す口。何も渡されていなければ出さない */
   onClearHanded?: () => void;
 };
 
@@ -107,18 +110,16 @@ export const MapView: FC<MapViewProps> = ({
   bounds,
   pins,
   focusedId,
-  routeIds,
+  routes,
   onBoundsChange,
   onPinFocus,
-  onSearchHere,
-  searching = false,
   canAccept,
   onDropPayload,
   onClearHanded,
 }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletNS.Map | null>(null);
-  const routeRef = useRef<LeafletNS.Polyline | null>(null);
+  const routeRef = useRef<LeafletNS.Polyline[]>([]);
   /** Leaflet の実体。ブラウザに着いてから入る */
   const [L, setL] = useState<typeof LeafletNS | null>(null);
   /**
@@ -243,16 +244,18 @@ export const MapView: FC<MapViewProps> = ({
   useEffect(() => {
     const map = mapRef.current;
     if (!L || !map) return;
-    routeRef.current?.remove();
-    routeRef.current = null;
-    if (!routeIds || routeIds.length < 2) return;
-    const latLngs = routeIds
-      .map((id) => pins.find((p) => p.id === id))
-      .filter((p): p is MapPin => p !== undefined)
-      .map((p) => [p.lat, p.lng] as [number, number]);
-    if (latLngs.length < 2) return;
-    routeRef.current = L.polyline(latLngs, ROUTE_STYLE).addTo(map);
-  }, [L, routeIds, pins]);
+    for (const line of routeRef.current) line.remove();
+    routeRef.current = [];
+    for (const ids of routes ?? []) {
+      if (ids.length < 2) continue;
+      const latLngs = ids
+        .map((id) => pins.find((p) => p.id === id))
+        .filter((p): p is MapPin => p !== undefined)
+        .map((p) => [p.lat, p.lng] as [number, number]);
+      if (latLngs.length < 2) continue;
+      routeRef.current.push(L.polyline(latLngs, ROUTE_STYLE).addTo(map));
+    }
+  }, [L, routes, pins]);
 
   /** 面ぜんぶが受け皿（ポケット・旅程と同じ決まり） */
   const [dragOver, setDragOver] = useState(false);
@@ -340,19 +343,10 @@ export const MapView: FC<MapViewProps> = ({
       </div>
 
       <div className="e-topleft">
-        {onSearchHere && (
-          <button
-            type="button"
-            className={`e-search ${searching ? "is-on" : ""}`}
-            onClick={onSearchHere}
-          >
-            {searching ? "この範囲で探しています" : "この範囲で探す"}
-          </button>
-        )}
-        {/* 渡されたものを返す。何も渡されていなければ出さない */}
+        {/* 出ているピンを消す。何も渡されていなければ出さない */}
         {onClearHanded && (
           <button type="button" className="e-search" onClick={onClearHanded}>
-            渡されたものを返す
+            ピンを消す
           </button>
         )}
       </div>

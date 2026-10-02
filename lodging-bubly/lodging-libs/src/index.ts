@@ -4,6 +4,7 @@ import "./object-type-registration.js";
 // Domain
 export * from './domain/Lodging.domain.js';
 export * from './domain/lodgingSearch.js';
+export * from './domain/foundLodgings.js';
 
 // Slice（入れ物）
 export * from './slice/lodging-slice.js';
@@ -18,7 +19,6 @@ export { LodgingDetailView } from './ui/LodgingDetailView.js';
 
 // Feature
 export { LodgingDetail } from './feature/LodgingDetail.js';
-export { useSeedLodgings } from './feature/useSeedLodgings.js';
 
 // Registration（バブルルート）
 export { lodgingBubbleRoutes } from './registration/bubbleRoutes.js';

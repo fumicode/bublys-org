@@ -4,6 +4,8 @@ import "./object-type-registration.js";
 // Domain
 export * from './domain/Spot.domain.js';
 export * from './domain/MapBounds.domain.js';
+export * from './domain/spotSearch.js';
+export * from './domain/foundSpots.js';
 
 // Slice（入れ物）
 export * from './slice/map-slice.js';
@@ -15,7 +17,6 @@ export { SpotCard } from './ui/SpotCard.js';
 // Feature
 export { MapBubble } from './feature/MapBubble.js';
 export { SpotDetail } from './feature/SpotDetail.js';
-export { useSeedSpots, HAKONE_SPOTS } from './feature/useSeedSpots.js';
 
 // Registration（バブルルート）
 export { mapBubbleRoutes } from './registration/bubbleRoutes.js';

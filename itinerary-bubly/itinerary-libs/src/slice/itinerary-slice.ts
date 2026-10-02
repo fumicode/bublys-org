@@ -23,9 +23,22 @@ export type ItineraryState = {
    * ★ 旅程そのものの中身ではない（旅程は予定の集まり）ので、集約には入れない。
    */
   handed: Record<string, ObjectRef[]>;
+  /**
+   * **見本をもう撒いたか。**
+   *
+   * ★ 前は「0 件なら撒く」だった。それだと**最後の 1 件を消した瞬間に戻ってくる**
+   *   ── 消したのに消えない（実測）。撒いたことを覚えておけば、
+   *   撒くのは 1 度きりで、消したものは消えたままになる。
+   */
+  seeded: boolean;
 };
 
-const initialState: ItineraryState = { itineraryList: [], selectedDate: {}, handed: {} };
+const initialState: ItineraryState = {
+  itineraryList: [],
+  selectedDate: {},
+  handed: {},
+  seeded: false,
+};
 
 export const itinerarySlice = createSlice({
   name: "itinerary",
@@ -33,6 +46,17 @@ export const itinerarySlice = createSlice({
   reducers: {
     setItineraryList: (state, action: PayloadAction<ItineraryPlain[]>) => {
       state.itineraryList = action.payload;
+    },
+    /**
+     * 見本をひと組、撒く（まだ撒いていなければ）。
+     *
+     * ★ 保存されたものは**前の形のまま戻ってくる**ことがあるので、無ければ作る。
+     */
+    seedItineraries: (state, action: PayloadAction<ItineraryPlain[]>) => {
+      if (state.seeded) return;
+      state.seeded = true;
+      const have = new Set(state.itineraryList.map((t) => t.id));
+      for (const t of action.payload) if (!have.has(t.id)) state.itineraryList.push(t);
     },
     addItinerary: (state, action: PayloadAction<ItineraryPlain>) => {
       state.itineraryList.push(action.payload);
@@ -81,6 +105,7 @@ type StateWithItinerary = RootState & { itinerary: ItineraryState };
 
 export const {
   setItineraryList,
+  seedItineraries,
   addItinerary,
   updateItinerary,
   removeItinerary,

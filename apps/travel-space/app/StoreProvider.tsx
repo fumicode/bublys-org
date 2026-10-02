@@ -36,8 +36,8 @@ import { BootScreen } from './BootScreen';
  *   ここから名指しで登録して回る必要はない。
  */
 import '@bublys-org/map-libs';
-import '@bublys-org/activity-libs';
 import '@bublys-org/itinerary-libs';
+import '@bublys-org/lodging-libs';
 
 let appInitialized = false;
 function initializeApp() {

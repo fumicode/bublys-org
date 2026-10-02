@@ -3,7 +3,6 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@bublys-org/activity-libs": "*",
     "@bublys-org/bubble-layout-feature": "*",
     "@bublys-org/bubble-space-shell": "*",
     "@bublys-org/bubbles-ui": "*",
@@ -11,8 +10,8 @@
     "@bublys-org/itinerary-libs": "*",
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
+    "@bublys-org/lodging-libs": "*",
     "@bublys-org/map-libs": "*",
-    "@bublys-org/note-libs": "*",
     "@bublys-org/space-furniture": "*",
     "@bublys-org/state-management": "*",
     "@bublys-org/world-line-graph": "*",

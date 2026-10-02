@@ -123,6 +123,6 @@ describe("空でも落ちない", () => {
   });
 
   it("1 軒も無ければ、0 件", () => {
-    expect(searchLodgings([], { text: "湯沢" })).toEqual({ hits: [], matches: [], total: 0 });
+    expect(searchLodgings([], { text: "湯沢" })).toEqual({ hits: [], matches: [], total: 0, offset: 0 });
   });
 });

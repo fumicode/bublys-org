@@ -172,6 +172,30 @@ export class Itinerary_旅程 {
   }
 
   /**
+   * **日を 1 つ足す**（日付を指定して）。
+   *
+   * > 日は、予定より先に決まる。
+   *
+   * ★ 前は「予定を足すと、その日が無ければ生まれる」だけだった。それだと
+   *   **行く日が決まっているのに予定がまだ無い**という、いちばん普通の状態が作れない
+   *   ── 旅程は日を並べる所なので、日だけを置けないのは致命的。
+   * ★ すでにある日なら**何もしない**（同じ日を 2 つ作らない）。
+   * ★ 並びは日付の順に揃う（`withDay` が並べ直す）。飛び地の日を足しても間に入る。
+   */
+  withEmptyDay(date: string): Itinerary_旅程 {
+    if (this.day(date)) return this;
+    return this.withDay(new ItineraryDay_日({ date, items: [] }));
+  }
+
+  /** 日を 1 つ外す（その日の予定ごと消える） */
+  withoutDay(date: string): Itinerary_旅程 {
+    return new Itinerary_旅程({
+      ...this.state,
+      days: this.state.days.filter((d) => d.date !== date),
+    });
+  }
+
+  /**
    * **落としたものを、その日の最後に継ぐ。**
    *
    * > 何時からにするかは聞かない。**最後の予定の後ろに、すこし間を空けて置く。**

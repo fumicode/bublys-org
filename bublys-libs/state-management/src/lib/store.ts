@@ -159,12 +159,12 @@ export const makeStore = (options?: { persistKey?: string }) => {
     key: options?.persistKey ?? 'root',
     storage,
     /**
-     * ★ `memo` は**外したスライスの置き土産**。前に保存した人の localStorage には
-     *   まだ入っていて、読み戻すと「知らない鍵だ」と毎回言われる
+     * ★ `memo` / `note` / `activity` は**外したスライスの置き土産**。前に保存した人の
+     *   localStorage にはまだ入っていて、読み戻すと「知らない鍵だ」と毎回言われる
      *   （`Unexpected key "memo" found in previous state…`）。読みも書きもしないと
      *   言っておけば、静かに置き去りになる。
      */
-    blacklist: ['memo', environmentSlice.reducerPath, ...injectedBlacklist],
+    blacklist: ['memo', 'note', 'activity', environmentSlice.reducerPath, ...injectedBlacklist],
   };
 
   /**

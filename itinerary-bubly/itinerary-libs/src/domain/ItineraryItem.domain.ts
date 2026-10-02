@@ -124,6 +124,28 @@ export class ItineraryItem_予定 {
     return new ItineraryItem_予定({ ...this.state, cost: Math.max(0, Math.round(cost)) });
   }
 
+  /**
+   * 費用の但し書きを変える（「宿泊費別」など）。
+   *
+   * ★ 空にしたら**但し書きそのものを落とす**。空の字を持っていると、
+   *   「但し書きがある」と「無い」の区別が字の長さで決まってしまう。
+   */
+  withCostNote(costNote: string): ItineraryItem_予定 {
+    const next = costNote.trim();
+    const state = { ...this.state };
+    if (next) state.costNote = next;
+    else delete state.costNote;
+    return new ItineraryItem_予定(state);
+  }
+
+  /** 立ち寄り先を指す／外す（`undefined` で外れる） */
+  withRef(ref: ObjectRef | undefined): ItineraryItem_予定 {
+    const state = { ...this.state };
+    if (ref) state.ref = ref;
+    else delete state.ref;
+    return new ItineraryItem_予定(state);
+  }
+
   toPlain(): ItineraryItemPlain { return { ...this.state }; }
 
   static fromPlain(plain: ItineraryItemPlain): ItineraryItem_予定 {

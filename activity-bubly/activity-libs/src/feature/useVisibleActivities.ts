@@ -1,14 +1,15 @@
 'use client';
 /**
- * **この地図で探す** ── 地図が決めた範囲の中にあるアクティビティだけを返す。
+ * **出すアクティビティ** ── いまは絞らず、持っているものをそのまま返す。
  *
- * ★ ルールは 1 行：「開催場所が、探す範囲の中に入っているか」。
- *   範囲が決まっていなければ絞らない（全部返す）。
- * ★ 読むのは地図の**探す範囲**であって、映している範囲ではない
- *   ── 映している範囲を読むと、地図を少し動かしただけで一覧が入れ替わる。
+ * ★ もとは地図の「この範囲で探す」が決めた範囲で絞っていた。その口は消えた
+ *   （読み手がこのバブリ 1 つだけになり、旅の空間からも外れたため）ので、
+ *   **絞る理由が無くなった**。絞らないと決めた以上、範囲を読む所も残さない
+ *   ── 読まない値を読み続けると、どちらが本当か後から分からなくなる。
+ * ★ 形（`filtered` / `total`）はそのまま残す。呼ぶ側はこれを見て
+ *   「絞っている」と出し分けているので、いつも `false` と答えればよい。
  */
 import { useAppSelector } from "@bublys-org/state-management";
-import { selectSearchBounds, selectSpots } from "@bublys-org/map-libs";
 import { Activity_アクティビティ } from "../domain/Activity.domain.js";
 import { selectActivities } from "../slice/activity-slice.js";
 
@@ -22,14 +23,5 @@ export type VisibleActivities = {
 
 export function useVisibleActivities(): VisibleActivities {
   const activities = useAppSelector(selectActivities);
-  const spots = useAppSelector(selectSpots);
-  const bounds = useAppSelector(selectSearchBounds);
-
-  if (!bounds) return { activities, filtered: false, total: activities.length };
-
-  const visible = activities.filter((a) => {
-    const spot = a.place ? spots.find((s) => s.id === a.place?.id) : undefined;
-    return spot ? bounds.contains(spot.lat, spot.lng) : false;
-  });
-  return { activities: visible, filtered: true, total: activities.length };
+  return { activities, filtered: false, total: activities.length };
 }

@@ -35,6 +35,8 @@ export type SpotSearchResult = {
   readonly matches: readonly SpotPlain[];
   /** 見つかった数 */
   readonly total: number;
+  /** いま出している先頭が、当たったもの全体の何件目か（0 始まり） */
+  readonly offset: number;
 };
 
 /** 一度に出す数。これ以上は「まだある」とだけ言う */
@@ -71,9 +73,27 @@ export const searchSpots = (
   spots: readonly SpotPlain[],
   query: SpotQuery,
   limit: number = SPOT_SEARCH_LIMIT,
+  /**
+   * **何件目から出すか**（頁送り）。
+   *
+   * ★ 上限で切ったまま次が無いと、41 件目から先は**存在しないのと同じ**だった
+   *   （帯は「793 件のうち 40 件」と言うのに、残りへ行く口が無い）。
+   * ★ 足していく（もっと見る）のではなく**入れ替える**。一覧は 1 件につき泡を
+   *   1 つ作るので、足し続けると泡が数百になって重くなる ── 泡の数は一定に保つ。
+   * ★ 行き過ぎた所を渡されたら**最後の頁に丸める**。絞り込みを変えると件数が減るので、
+   *   そのままだと空の頁が出る。
+   */
+  offset = 0,
 ): SpotSearchResult => {
   const found = spots.filter((s) => matchesSpot(s, query));
-  return { hits: found.slice(0, limit), matches: found, total: found.length };
+  const from = found.length === 0 ? 0 : Math.min(Math.max(0, offset), Math.max(0, found.length - 1));
+  const start = Math.floor(from / limit) * limit;
+  return {
+    hits: found.slice(start, start + limit),
+    matches: found,
+    total: found.length,
+    offset: start,
+  };
 };
 
 /**

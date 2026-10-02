@@ -4,7 +4,7 @@
  *
  * OS（`BubblesUINext`）と同じ器・同じ家具を被る。違うのは 2 つだけ:
  *
- *   - **開けるもの**が旅の 3 つだけ（OS の標準バブリは 1 つも載らない）
+ *   - **開けるもの**が旅の 4 つだけ（OS の標準バブリは 1 つも載らない）
  *   - **岸に貼る家具が 4 つ**（ランチャー・見え方の口・ポケット・世界線）。
  *     OS にある「他のデモへ行く口」「説明」「バブリを追加」は、この空間のものではない
  */
@@ -24,11 +24,11 @@ import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
 // 開けるものをレジストリに登録するための副作用 import（一覧は下で hook から引く）
 import "./routes";
 import {
+  ACTIVITIES_URL,
   DEFAULT_LAUNCHER_URLS,
   ITINERARY_URL,
   MAIN_LAUNCHER_ID,
   MAP_URL,
-  NOTE_URL,
 } from "./launchTargets";
 
 const LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
@@ -51,15 +51,14 @@ const HOMES: readonly Home[] = [
 ];
 
 /**
- * **最初に開いておくもの** ── 地図・メモ・旅程。
+ * **最初に開いておくもの** ── 地図・アクティビティ・旅程の 3 つ。
  *
- * ★ この空間の話は「**書く → 形にする → 地図で確かめる**」なので、その 3 つを出す。
- *   アクティビティは呼び出しから 1 手で開く ── 4 つ出すと、どれも小さくなって
- *   何が主役なのか言えなくなる。
+ * ★ この空間は「3 つが繋がって動く」ことが中身なので、**最初から 3 つ出しておく**。
+ *   1 つずつ呼び出させると、繋がりが見えるまでに 3 手かかる。
  * ★ **並びは「最後に開いたものが真ん中に来る」**（`openAt` ＋ `bringToCenter`）。
- *   だから旅程を最後に置く ── 渡される側が真ん中。
+ *   だから旅程を最後に置く ── 主役は旅程で、地図とアクティビティはそこへ渡す側。
  */
-const INITIAL_URLS = [MAP_URL, NOTE_URL, ITINERARY_URL] as const;
+const INITIAL_URLS = [MAP_URL, ACTIVITIES_URL, ITINERARY_URL] as const;
 
 /**
  * **大元の海だけの決め事。**

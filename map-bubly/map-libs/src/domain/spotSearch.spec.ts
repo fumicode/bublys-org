@@ -124,3 +124,58 @@ describe("1 件ずつの見分け", () => {
     expect(SPOTS.every((x) => matchesSpot(x, {}))).toBe(true);
   });
 });
+
+/**
+ * **頁送り。** 上限で切ったまま次が無いと、41 件目から先は存在しないのと同じだった。
+ */
+describe("頁を送る", () => {
+  /** 上限 3 で試す（数が読めるほうが、どこで切れたか分かる） */
+  const many: SpotPlain[] = Array.from({ length: 7 }, (_, i) => ({
+    id: `s${i}`,
+    name: `地点${i}`,
+    category: "sightseeing",
+    lat: 37,
+    lng: 138,
+  }));
+
+  it("先頭からは最初のひと組", () => {
+    const r = searchSpots(many, {}, 3, 0);
+    expect(r.hits.map((x) => x.id)).toEqual(["s0", "s1", "s2"]);
+    expect(r.offset).toBe(0);
+    expect(r.total).toBe(7);
+  });
+
+  it("次を頼めば、次のひと組と入れ替わる（足されない）", () => {
+    const r = searchSpots(many, {}, 3, 3);
+    expect(r.hits.map((x) => x.id)).toEqual(["s3", "s4", "s5"]);
+    expect(r.offset).toBe(3);
+  });
+
+  it("最後の組は半端でもよい", () => {
+    const r = searchSpots(many, {}, 3, 6);
+    expect(r.hits.map((x) => x.id)).toEqual(["s6"]);
+  });
+
+  it("行き過ぎたら最後の組に丸める ── 絞り込みで件数が減っても空にならない", () => {
+    const r = searchSpots(many, {}, 3, 99);
+    expect(r.hits.map((x) => x.id)).toEqual(["s6"]);
+    expect(r.offset).toBe(6);
+  });
+
+  it("組の途中を渡されても、その組の頭から出す", () => {
+    const r = searchSpots(many, {}, 3, 4);
+    expect(r.offset).toBe(3);
+    expect(r.hits.map((x) => x.id)).toEqual(["s3", "s4", "s5"]);
+  });
+
+  it("1 件も無ければ 0 件目のまま", () => {
+    const r = searchSpots([], {}, 3, 99);
+    expect(r.hits).toEqual([]);
+    expect(r.offset).toBe(0);
+  });
+
+  it("絞り込んだ中で送る ── 当たったものぜんぶは切らない", () => {
+    const r = searchSpots(many, {}, 3, 3);
+    expect(r.matches).toHaveLength(7);
+  });
+});
