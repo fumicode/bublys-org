@@ -189,6 +189,25 @@ export interface BubbleInputOptions {
    * 触っただけ（動かさずに離した）では出ない ── 焦点が寄るだけで、世界の値は 1 つも変わらないから。
    */
   readonly onSettled?: () => void;
+  /**
+   * **泡を掴んで動かし始めた**（押しただけではなく、ドラッグになった瞬間に 1 つ）。
+   * 大きさを変える・海を見回すでは出ない ── 泡そのものを動かしたときだけ。
+   *
+   * ★ 何をするかは呼ぶ側が決める（海のモードを「風」にする、など）。ここはモードを知らない。
+   */
+  readonly onGrabStart?: (id: BubbleId) => void;
+  /**
+   * **泡を、動かさずに押して離した**（＝ 触った。焦点が寄るのと同じ手）。
+   * 中身を押した場合も、枠を押した場合も出る。背景では出ない。
+   */
+  readonly onTap?: (id: BubbleId) => void;
+  /**
+   * **泡の全面を枠にする**（中身を押しても掴む）。
+   *
+   * ★ 中身が本物の UI でも、空間を持つ泡でも、どこを押しても泡を掴む。
+   *   中身へ手を届かせないのは呼ぶ側の仕事（CSS の `pointer-events` など）── ここは当たり判定だけ。
+   */
+  readonly wholeGrab?: boolean;
 }
 
 /** 離した瞬間の、泡と指の居場所（どちらも層の座標） */
@@ -346,10 +365,18 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     };
   }, [layerRef, lifted, tiny, selectedId, scaleOf]);
   const hasContent = o.hasContent;
+  const wholeGrab = !!o.wholeGrab;
+  /** ★ 全面が枠なら、どの泡も「中身の箱」を持たない ── `inContent` がいつも外を返す */
   const hasBody = useCallback(
-    (id: BubbleId) => world.isHost(id) || (hasContent ? hasContent(id) : false),
-    [world, hasContent],
+    (id: BubbleId) => !wholeGrab && (world.isHost(id) || (hasContent ? hasContent(id) : false)),
+    [world, hasContent, wholeGrab],
   );
+  /**
+   * 掴み始め・触ったの知らせ先。**覚え書きから呼ぶ** ── 手つきの callback は `o` を依存に
+   * 入れていないので、そのまま閉じ込めると古い口を呼び続ける。
+   */
+  const hand = useRef({ onGrabStart: o.onGrabStart, onTap: o.onTap });
+  hand.current = { onGrabStart: o.onGrabStart, onTap: o.onTap };
   /**
    * その泡の**装いが四辺に取るぶん**。当たり判定はここで中身と枠を分ける
    * ── **枠が見えている所が、掴める所**（`hit.ts` の `inContent`）。
@@ -555,7 +582,9 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     }
     const { mx, my } = pt(e);
     if (!d.started && Math.hypot(mx - d.mx0, my - d.my0) < DRAG_START) return;
+    const first = !d.started;
     d.started = true;
+    if (first && d.kind === 'bubble') hand.current.onGrabStart?.(d.id);
     d.mx = mx; d.my = my;
 
     if (d.kind === 'resize') {
@@ -642,12 +671,18 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
     o.onDragInfo?.(null);
     if (!d) {
       // ② 中身を触って、動かさずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
-      if (t) setWorld(focusOn(world, layout, t.id, rules));
+      if (t) {
+        setWorld(focusOn(world, layout, t.id, rules));
+        hand.current.onTap?.(t.id);
+      }
       return;
     }
     if (!d.started) {
       // ② ドラッグせずに離した ＝ 触った。その泡へ視点が寄る（値は1つも書かない）
-      if (d.kind === 'bubble') setWorld(focusOn(world, layout, d.id, rules));
+      if (d.kind === 'bubble') {
+        setWorld(focusOn(world, layout, d.id, rules));
+        hand.current.onTap?.(d.id);
+      }
       show();
       return;
     }

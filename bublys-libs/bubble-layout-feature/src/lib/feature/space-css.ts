@@ -21,6 +21,14 @@ import { CHROME, chromeInset } from '@bublys-org/bubble-layout';
 export const WINDOW_SKY =
   'linear-gradient(145deg,hsl(220 35% 18%) 0%,hsl(225 40% 22%) 40%,hsl(230 35% 20%) 100%)';
 
+/**
+ * **羽のカーソル**（風のモード）── 矢印に羽を添えたもの。矢印の先（2, 2）が押す点。
+ *
+ * ★ 羽の縁の下に白を敷いてある。暗い海の上でも、明るい中身の上でも輪郭が沈まないように。
+ * ★ 32×32。ブラウザが受け付けるカーソルの大きさに収まり、高精細の画面でも SVG なので滲まない。
+ */
+const FEATHER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M1.5 1.5L1.5 17L5.3 13.4L8 19.4L10.4 18.4L7.8 12.4L13 12.4Z' fill='%23111' stroke='%23fff' stroke-width='1.3' stroke-linejoin='round'/%3E%3Cg transform='translate(14.2 30.6) rotate(-45)'%3E%3Cpath d='M3 0L5 -2.7L8 -4.3L10.6 -4.6L11.5 -2.9L12.4 -4.4L15.6 -3L19.8 -1L15.4 1.5L12.2 2.6L10.6 2.7L9.9 1.4L9.1 2.7L6 2.3Z' fill='none' stroke='%23fff' stroke-width='2.8' stroke-linejoin='round'/%3E%3Cpath d='M0 0.2L18.6 -0.6' stroke='%23fff' stroke-width='2.8' stroke-linecap='round'/%3E%3Cpath d='M3 0L5 -2.7L8 -4.3L10.6 -4.6L11.5 -2.9L12.4 -4.4L15.6 -3L19.8 -1L15.4 1.5L12.2 2.6L10.6 2.7L9.9 1.4L9.1 2.7L6 2.3Z' fill='%23f4f7ff' stroke='%232c3150' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M0 0.2L18.6 -0.6' stroke='%232c3150' stroke-width='1.1' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E") 2 2`;
+
 export const SPACE_CSS = `
 /**
  * 器（泡の見た目）── ラボの暗い箱ではなく、バブリの画面が乗る器にする。
@@ -296,4 +304,16 @@ export const SPACE_CSS = `
 /* 入れ子のときは内側が勝つ（開くときの stopPropagation と同じ決まりを見た目にも通す） */
 .bl-object[data-film=on]:has([data-object-view]:hover)::after{opacity:0}
 @media (prefers-reduced-motion:reduce){ .bl-object::after{transition:none} }
+
+/*
+ * 風（並べる）── 海のモード（BubbleSpace の SeaMode）。層に .bl-wind が付く。
+ * ★ 自分の層の泡だけに効かせる（子の結合子）。窓の中の海は、窓ごと手が届かなくなるので要らない。
+ * ★ 中身へは手を届かせない。押した所はどこでも泡の枠になる（当たり判定は wholeGrab）。
+ * ★ カーソルは海ぜんぶで羽 ── 背景の上でも、いまのモードが見えるように。
+ *   閉じる・道具の口はそのまま押せるので指のまま。角は大きさを変える矢印のまま。
+ */
+.bl-wind > .bl-hold > .bub > .bl-body{pointer-events:none}
+.bl-wind,.bl-wind .bub,.bl-wind .bub *{cursor:${FEATHER_CURSOR},grab}
+.bl-wind .bub > :is(.bl-close,.bl-tool,.bl-link){cursor:pointer}
+.bl-wind > .bl-hnd{cursor:nwse-resize}
 `;

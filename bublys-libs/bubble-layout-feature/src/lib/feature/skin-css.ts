@@ -47,12 +47,13 @@ ${S} .bub.sel:not(.imp){--rw:2.2px;--rc:hsl(200 92% 64%)}
 
 /* 膜の板。ObjectView の膜と同じく、少し縮んだ所から浮かんでくる */
 ${S} .bub > .bl-film{display:block;position:absolute;inset:0;border-radius:var(--rr);pointer-events:none;
+  /* 色の濃さは --bl-film-k で薄められる（板ごと opacity で薄めると、板の上に描く照りまで薄まるので） */
   background:
-    radial-gradient(115% 85% at 22% 16%,rgba(255,255,255,.6) 0%,rgba(255,255,255,0) 58%),
-    radial-gradient(90% 70% at 82% 88%,rgba(255,228,246,.5) 0%,rgba(255,228,246,0) 60%),
-    linear-gradient(135deg,rgba(255,158,214,.44) 0%,rgba(190,173,255,.4) 34%,
-      rgba(138,219,255,.36) 66%,rgba(178,255,231,.34) 100%),
-    hsl(232 45% 94% / .22);
+    radial-gradient(115% 85% at 22% 16%,rgba(255,255,255,calc(.6 * var(--bl-film-k,1))) 0%,rgba(255,255,255,0) 58%),
+    radial-gradient(90% 70% at 82% 88%,rgba(255,228,246,calc(.5 * var(--bl-film-k,1))) 0%,rgba(255,228,246,0) 60%),
+    linear-gradient(135deg,rgba(255,158,214,calc(.44 * var(--bl-film-k,1))) 0%,rgba(190,173,255,calc(.4 * var(--bl-film-k,1))) 34%,
+      rgba(138,219,255,calc(.36 * var(--bl-film-k,1))) 66%,rgba(178,255,231,calc(.34 * var(--bl-film-k,1))) 100%),
+    hsl(232 45% 94% / calc(.22 * var(--bl-film-k,1)));
   -webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.6),inset 0 1px 6px rgba(255,255,255,.5),
     0 10px 36px rgba(122,138,214,.32),0 2px 8px rgba(20,24,48,.18);
@@ -85,6 +86,41 @@ ${S} .bub:not(.imp)::after{transition:opacity 160ms ease-out,transform 160ms eas
   ${S} .bub > :is(.bl-film,.hd,.ttl,.bl-view,.bl-close,.bl-tool,.bl-link),
   ${S} .bub:not(.imp)::after{transition:none}
 }
+
+/*
+ * 風（並べる）── 膜が中身の**前**へ回る。どの泡も包まれ、装いを着る。
+ * ★ 前に回るのは裏の膜の板そのもの（新しい板は足さない）。並べ終えて使うモードに戻れば、また裏へ。
+ * ★ 前の膜はぼかしを弱く、少し薄くする ── 中身は透けて読めるが、膜の向こうにあると分かる程度。
+ * ★ 中身は 1 つの重なりに閉じ込める（isolation）。中身が自分で z-index を持っていると
+ *   （地図の板は 400、一覧の中の層は 1）、膜を追い越して前に出てしまうので。
+ * ★ 帯・題名・口は膜のさらに前（押せる口は押せるまま）。
+ */
+${S} .bl-wind > .bl-hold > .bub:not(.imp){--bl-dress:1}
+${S} .bl-wind > .bl-hold > .bub > .bl-body{isolation:isolate}
+${S} .bl-wind > .bl-hold > .bub > .bl-film{z-index:1;--bl-film-k:.7;
+  -webkit-backdrop-filter:blur(1px) saturate(1.15);backdrop-filter:blur(1px) saturate(1.15)}
+${S} .bl-wind > .bl-hold > .bub > :is(.hd,.ttl,.bl-view,.bl-close,.bl-tool,.bl-link){z-index:2}
+/*
+ * 光の照り返しを一筋 ── 膜が前に張っていることを、色ではなく形で言う。
+ * ★ 左上の角に沿った短い弧（円の上と左の縁だけを描き、両端は薄める）。シャボン玉の照りと同じ所。
+ * ★ 大きさは泡の**短辺**から出す（膜の板を寸法の入れ物にして cqmin で測る）。
+ *   縦横の比に引きずられると、縦長の一覧では細長い輪、大きな地図では縁を下りる「C」になる。
+ */
+${S} .bl-wind > .bl-hold > .bub > .bl-film{container-type:size}
+${S} .bl-wind > .bl-hold > .bub > .bl-film::before{content:"";position:absolute;left:5cqmin;top:5cqmin;
+  width:46cqmin;height:46cqmin;border-radius:50%;
+  border:solid #fff;border-width:clamp(4px,2cqmin,9px) 0 0 clamp(4px,2cqmin,9px);
+  filter:drop-shadow(0 0 4px rgba(255,255,255,.9));
+  -webkit-mask-image:radial-gradient(circle at 22% 22%,#000 0,#000 26%,transparent 50%);
+  mask-image:radial-gradient(circle at 22% 22%,#000 0,#000 26%,transparent 50%)}
+/*
+ * 一覧の中の札は、一覧の膜の**内側**のもの。
+ * ★ DOM では一覧の兄弟なので、一覧の膜を追い越して前に出てしまう ── 札にも同じ膜を張る。
+ *   照りと装いは付けない（照りは一覧に 1 筋だけ。札ごとに輪や帯が出ると騒がしい）。
+ */
+${S} .bl-wind > .bl-hold > .bub:has(> .bl-quiet){--bl-dress:0}
+${S} .bl-wind > .bl-hold > .bub:has(> .bl-quiet) > .bl-film{display:block;opacity:1}
+${S} .bl-wind > .bl-hold > .bub:has(> .bl-quiet) > .bl-film::before{content:none}
 
 /* 中身の板：角を泡の角に合わせる（外の角丸 22 − 左右の装い 7） */
 ${S} .bub > .bl-body{border-radius:15px;

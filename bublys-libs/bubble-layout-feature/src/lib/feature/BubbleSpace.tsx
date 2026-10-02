@@ -48,6 +48,16 @@ const FRAME_CSS = `@layer bl{
 }`;
 
 /**
+ * **海のモード。**
+ *
+ * - `use`  … 使う。中身を触れる。掴めるのは枠だけ（今まで）
+ * - `wind` … 風。泡を吹いて並べる。どの泡も全面で掴め、中身には触れない。カーソルに羽
+ *
+ * ★ 針（`needle`：泡を突いて割る。× を押したまま引くと入る）は、まだ無い。足すときはここに 1 つ。
+ */
+export type SeaMode = 'use' | 'wind';
+
+/**
  * 並べ方の口を、箱の中のどこに置くか（左端からのずれ）。
  *
  * 箱の左端が見えている所より左なら、そのぶん右へずらす ── 箱の中の座標で返すので、
@@ -399,6 +409,24 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     () => remembered?.world ?? emptyWorld(presetView(props.rootPreset ?? 'free')),
   );
   const [selectedId, setSelectedId] = useState<BubbleId | null>(null);
+  /**
+   * **海のモード** ── いま押す・掴む・離すが何を意味するか（{@link SeaMode}）。
+   *
+   * > 海はいつも 1 つのモードに居る。モードは手つきから読み取り、カーソルが教える。
+   *
+   * ★ ボタンは置かない。泡を掴んで動かしたら「風」に入り、泡を触ったら（動かさずに離したら）
+   *   「使う」に戻る。迷ったら Esc ── どのモードからでも「使う」に戻る。
+   * ★ 背景を押して離しても戻らない。並べている途中の見回しのたびに抜けてしまうので。
+   * ★ 海ごと（この `BubbleSpace` ごと）に 1 つ。窓の中の海は自分のモードを持つ。
+   * ★ 世界線には残さない。選んでいる泡と同じく「いま何をしているか」の話なので。
+   */
+  const [mode, setMode] = useState<SeaMode>('use');
+  useEffect(() => {
+    if (mode === 'use') return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMode('use'); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode]);
 
   const world = props.world ?? ownWorld;
   /**
@@ -1302,6 +1330,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
     zoom: screen.zoom, setZoom: screen.setZoom, onOverscroll: overscroll,
     /** 動かし終え・広げ終えたときに 1 つ（途中の 1px ごとには出さない ── `SettleWhy` の註） */
     onSettled: () => markSettled('moved'),
+    // 風の間は、どの泡も全面が枠（中身へは手が届かない ── 届かなくするのは CSS の `.bl-wind`）
+    wholeGrab: mode === 'wind',
+    // 泡を掴んで動かした ＝ 並べたい。触った ＝ 使いたい
+    onGrabStart: () => setMode('wind'),
+    onTap: () => setMode('use'),
   });
 
   const headerTools = props.headerTools;
@@ -1542,6 +1575,8 @@ export function BubbleSpace(props: BubbleSpaceProps) {
           marks={input.marks}
           layerRef={layerRef}
           renderBubble={renderBubble}
+          /** モードは層の印で言う ── 中身へ手を届かせない・カーソル・膜は CSS がこれを読む */
+          className={mode === 'use' ? undefined : `bl-${mode}`}
           {...input.handlers}
         />
         {children}
