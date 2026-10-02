@@ -1,0 +1,42 @@
+{
+  "name": "@bublys-org/travel-space",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@bublys-org/bubble-layout-feature": "*",
+    "@bublys-org/bubble-space-shell": "*",
+    "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/domain-registry": "*",
+    "@bublys-org/itinerary-libs": "*",
+    "@bublys-org/launcher-libs": "*",
+    "@bublys-org/launcher-model": "*",
+    "@bublys-org/lodging-libs": "*",
+    "@bublys-org/map-libs": "*",
+    "@bublys-org/space-furniture": "*",
+    "@bublys-org/state-management": "*",
+    "@bublys-org/world-line-graph": "*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
+    "modern-normalize": "^3.0.1",
+    "next": "~16.1.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "redux-persist": "^6.0.0",
+    "styled-components": "5.3.6"
+  },
+  "nx": {
+    "targets": {
+      "dev": {
+        "dependsOn": [
+          "^dev"
+        ],
+        "continuous": true,
+        "options": {
+          "port": 4007
+        }
+      }
+    }
+  }
+}

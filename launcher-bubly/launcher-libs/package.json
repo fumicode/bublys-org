@@ -20,14 +20,15 @@
     }
   },
   "dependencies": {
-    "tslib": "^2.3.0",
-    "@bublys-org/launcher-model": "*",
+    "@bublys-org/bubble-layout-feature": "*",
     "@bublys-org/bubbles-ui": "*",
+    "@bublys-org/launcher-model": "*",
     "@bublys-org/state-management": "*",
-    "@mui/material": "^7.3.2",
+    "@bublys-org/world-line-graph": "*",
     "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
     "react": "^19.0.0",
-    "@bublys-org/world-line-graph": "*"
+    "tslib": "^2.3.0"
   },
   "nx": {
     "targets": {

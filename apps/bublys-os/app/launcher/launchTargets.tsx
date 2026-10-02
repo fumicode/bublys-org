@@ -9,6 +9,10 @@ import ExtensionIcon from "@mui/icons-material/Extension";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import TransformIcon from "@mui/icons-material/Transform";
 import WorkspacesIcon from "@mui/icons-material/Workspaces";
+import MapIcon from "@mui/icons-material/Map";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+import HikingIcon from "@mui/icons-material/Hiking";
+import HotelIcon from "@mui/icons-material/Hotel";
 import { registerLaunchTargets, type LaunchTarget } from "@bublys-org/launcher-libs";
 
 /**
@@ -31,6 +35,8 @@ export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
    *   そのうえで道具（変換）と遊び（囲碁）。
    * ★ **下の 2 つは決まり**：いちばん下が「バブリを追加」、その上が「ユニバース」。
    *   どちらも中身ではなく**器を足す/覗く**ものなので、並びの端に置く。
+   * ★ **旅の 4 つ**（地図・旅程・アクティビティ・宿泊施設）は道具のあと、器の手前。
+   *   旅の海（`apps/travel-space`）と同じものを同じ所から引いている。
    */
   { url: "memos", label: "メモ", icon: <NoteIcon color="action" /> },
   { url: "task-management/tasks", label: "タスク管理", icon: <AssignmentIcon color="primary" /> },
@@ -39,6 +45,10 @@ export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
   { url: "csv-importer/sheets", label: "CSV インポーター", icon: <TableChartIcon color="primary" /> },
   { url: "object-transformer/editor", label: "変換エディタ", icon: <TransformIcon color="primary" /> },
   { url: "igo-games", label: "囲碁ゲーム", icon: <SportsEsportsIcon sx={{ color: "#dcb35c" }} /> },
+  { url: "map", label: "地図", icon: <MapIcon sx={{ color: "#0f8f86" }} /> },
+  { url: "itineraries", label: "旅程", icon: <EventNoteIcon color="primary" /> },
+  { url: "spots", label: "アクティビティ", icon: <HikingIcon sx={{ color: "#e06c2b" }} /> },
+  { url: "lodgings", label: "宿泊施設", icon: <HotelIcon sx={{ color: "#9a5bd6" }} /> },
   { url: "pocket", label: "ポケット", icon: <WorkspacesIcon sx={{ color: "#6ea8ff" }} /> },
   { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
   { url: "bubly-loader", label: "バブリを追加", icon: <ExtensionIcon color="action" /> },

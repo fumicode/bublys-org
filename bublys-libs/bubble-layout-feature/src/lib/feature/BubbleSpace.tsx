@@ -40,6 +40,25 @@ const viewToolLeft = (
   return Math.max(0, (left - at.x) / Math.max(0.05, at.scale));
 };
 
+/**
+ * 見え方の口を、箱の上から下へ逃がす量（要らなければ `undefined`）。
+ *
+ * ★ 口は箱の**上**に出る（CSS の `bottom:100%`）ので、箱の上端が画面より上に居ると
+ *   口ごと画面の外に出る ── **本計画づくりの場が画面より高いときがこれ**で、
+ *   見え方を変える手が無くなる（実測で言われた）。横は `viewToolLeft` が同じことを
+ *   していたのに、縦は素のままだった。
+ * ★ 逃がすときは箱の**中**の上端すぐ下に置く。CSS の高さを写さずに済むので、
+ *   口のかたちを変えてもここは直さなくてよい。
+ */
+const viewToolTop = (
+  at: { readonly y: number; readonly scale: number } | undefined,
+  area: { readonly y: number } | undefined,
+): number | undefined => {
+  if (!at) return undefined;
+  const need = ((area?.y ?? 0) + 8 - at.y) / Math.max(0.05, at.scale);
+  return need > 0 ? need : undefined;
+};
+
 /** 開いた泡の覚え書き（domain には入れない） */
 /** 泡の箱に対する割合（0〜1）で言う、中の一点 */
 export interface Spot {
@@ -349,6 +368,18 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   /** 一覧の空間として覚える（もう覚えていれば何もしない ── 描き直しの引き金にしない） */
   const noteListHost = useCallback((id: BubbleId) => {
     setListHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  /**
+   * **中に空間を持っている泡**（`setChildren` を呼んだ泡ぜんぶ）。一覧かどうかは問わない。
+   *
+   * ★ 前は一覧の棚 1 つで、**見え方の口を出すこと**と**札を静かにすること**（＝帯を外して
+   *   掴めなくすること）の両方が決まっていた。だから座標を自分で書く空間が
+   *   「一覧ではない」と名乗ると、口まで消えて**見え方を変える手が無くなった**（実測で言われた）。
+   * ★ 2 つは別の話なので、棚も 2 つに分ける ── 口はここ、札の静かさは `listHosts`。
+   */
+  const [spaceHosts, setSpaceHosts] = useState<ReadonlySet<BubbleId>>(() => new Set());
+  const noteSpaceHost = useCallback((id: BubbleId) => {
+    setSpaceHosts((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }, []);
 
   // url と種類は domain に入れない（「泡に url を持たせるか」は未決）。ここで id との対で持つ
@@ -685,6 +716,42 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   );
 
   /**
+   * **並びごと閉じる。**
+   *
+   * ★ くっつけて 1 つの塊にしたものは、**畳むときも塊で畳みたい**
+   *   ── 1 枚ずつ ✕ を押させると、くっつけた意味が畳むときだけ消える。
+   * ★ **一度の書き込みで全部消す。** 1 つずつ `closeBubble` を呼ぶと、
+   *   途中で「並びは 2 つ以上」の決まりが働いて見えない親が畳まれ、
+   *   残りが並びの外へこぼれる（そこから先はただの泡なので、閉じ方も変わる）。
+   * ★ 並びに入っていない泡に対しては、その泡だけを閉じる（同じ口でよい）。
+   */
+  const closeRow = useCallback(
+    (id: BubbleId) => {
+      const row = world.rowOf(id);
+      if (!row) return closeBubble(id);
+      const ids = world.kidsOf(row.id).map((b) => b.id);
+      const seen = new Map(
+        base.order.map((p) => [p.id, { x: p.x, y: p.y, w: p.box.w, h: p.box.h, scale: p.scale }]),
+      );
+      const next = reshape(world, actContext(viewport, seen, rules), (w) => {
+        let x = w;
+        for (const k of ids) x = x.without(k);
+        return { world: x, keep: [] };
+      }).world;
+      setWorld(next);
+      setUrls((m) => {
+        const n = new Map(m);
+        for (const k of ids) n.delete(k);
+        return n;
+      });
+      setSelectedId((sel) => (sel !== null && ids.includes(sel) ? null : sel));
+      markSettled('members');
+    },
+    [world, base, viewport, rules, setWorld, closeBubble, markSettled],
+  );
+
+
+  /**
    * 外の空間のレンズを変える。書くのは View の 1 つの軸だけ（泡の値は 1 つも書かない）。
    * ★ ここが**レンズの向きを決める唯一の所**（人が口で選ぶか、「まかせる」が決めるか）。
    *   開く側（`openAt`）はもう触らない ── 口が言っていることが、そのまま海の振る舞い。
@@ -705,12 +772,23 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    *   （戻った先で分岐が 1 つ増える）。
    */
   const setLens = useCallback(
-    (axis: PlaneAxis, lens: LensId) => {
-      applyLens(axis, lens);
+    (axis: PlaneAxis, lens: LensId, spaceId: BubbleId = 'root') => {
+      /** ★ 外の海なら今までどおり。**中の空間なら、その空間の軸だけ**を変える */
+      if (spaceId === 'root') applyLens(axis, lens);
+      else setWorld(withAxis(world, spaceId, axis, { lens }));
       markSettled('view');
     },
-    [applyLens, markSettled],
+    [applyLens, markSettled, world, setWorld],
   );
+
+  /**
+   * その空間の、いまの見え方（無ければ null）。
+   *
+   * ★ 見え方の口を**外の器が作る**のに要る ── 口の中身（`SpaceViewTools`）は
+   *   海の口と同じ見本から出したいが、あれは上の層に居るので、
+   *   ここからは「読む口」と「書く口」を渡すだけにする。
+   */
+  const viewOf = useCallback((spaceId: BubbleId) => world.ownViewOf(spaceId), [world]);
 
   /**
    * 岸から海へ返す。置いたあと、**画面のその矩形に見えるように**動かす
@@ -825,8 +903,11 @@ export function BubbleSpace(props: BubbleSpaceProps) {
    */
   const setChildren = useCallback(
     (hostId: BubbleId, want: readonly string[], how: ChildrenLayout = {}) => {
-      const { preset, itemWidth, reserve, step, cols, grow } = how;
-      noteListHost(hostId);
+      const { preset, itemWidth, reserve, step, cols, grow, at, list, onLeave } = how;
+      /** ★ 中に空間を持つ泡として覚えるのは、一覧でもそうでなくても（見え方の口はどちらにも要る） */
+      noteSpaceHost(hostId);
+      /** ★ 一覧ではない空間（座標を自分で書く場）は、一覧として覚えない（`list` の註） */
+      if (list !== false) noteListHost(hostId);
       const kids = world.kidsOf(hostId);
       const urlOfKid = (id: BubbleId) => urls.get(id)?.url;
       const have = new Set(kids.map((k) => urlOfKid(k.id)).filter(Boolean) as string[]);
@@ -836,7 +917,35 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   書き続けて止まらなくなる**（実測：ルートを配っていない海で一覧を出すと、
        *   1.5 秒に 130 回 `Maximum update depth exceeded`）。
        */
-      const missing = want.filter((url) => !have.has(url) && !!matchBubbleRoute(routes, url));
+      /**
+       * ★ **出て行った札は、連れ戻さない。**
+       *
+       * 掴んで別の空間へ出した札は、もうこの一覧の子ではない。なのに顔ぶれには
+       * まだ載っているので、下の「足りない」に数えられて**元の場所に生え直す**
+       * ── 掴んで出しているのに出せない、という形で出る（実測で言われた）。
+       *
+       * ★ **自分が出した札かどうかは、覚え書きの `originId` で見分ける**（url では見ない）。
+       *   同じ url の泡は海に 2 つ以上あってよいので、url で見ると、外で開いただけの
+       *   同じものを「出て行った」と読み違える。
+       * ★ 出て行ったことは伝えるだけ。顔ぶれから外すかどうかは持ち主が決める
+       *   （`onLeave` の註）。伝えたぶんは、この回は生やさない ── 生やしてから
+       *   消すと、1 回ぶん画面がちらつく。
+       */
+      const left = new Map<string, { space: BubbleId; beside: boolean }>();
+      /** 一覧自身が居る空間。ここへ出されたのが「隣に剥がした」 */
+      const mySpace = world.bubble(hostId)?.space ?? 'root';
+      for (const [id, opened] of urls) {
+        if (opened.originId !== hostId) continue;
+        const here = world.bubble(id);
+        if (!here || here.space === hostId) continue;
+        if (!want.includes(opened.url)) continue;
+        left.set(opened.url, { space: here.space, beside: here.space === mySpace });
+      }
+      if (onLeave) for (const [url, at] of left) onLeave(url, at);
+
+      const missing = want.filter(
+        (url) => !have.has(url) && !left.has(url) && !!matchBubbleRoute(routes, url),
+      );
       const extra = kids.filter((k) => { const u = urlOfKid(k.id); return !u || !want.includes(u); }).map((k) => k.id);
       /**
        * ★ 「もう当ててあるか」は**世界に訊く**。覚え書き（ref）で持つと、
@@ -868,11 +977,14 @@ export function BubbleSpace(props: BubbleSpaceProps) {
       let n = seq.current;
       const m = new Map(urls);
       for (const id of extra) { w = w.without(id); m.delete(id); }
+      /** この 1 回で生まれたもの。置き場所を書くのはここだけ（生まれたとき 1 回） */
+      const born: Array<{ id: BubbleId; url: string }> = [];
       for (const url of missing) {
         const route = matchBubbleRoute(routes, url);
         if (!route) continue;
         n += 1;
         const id = `b${n}:${url}`;
+        born.push({ id, url });
         const size = route.size ?? { w: 280, h: 120 };
         const w0 = itemWidth ?? size.w;
         w = w.add(Bubble.create({
@@ -946,11 +1058,26 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         for (const k of w.kidsOf(hostId))
           if (k.state.size.w !== itemWidth) w = w.withBubble(k.withSize({ w: itemWidth, h: k.state.size.h }));
       }
+      /**
+       * ★ **置き場所は、生まれたものにだけ書く。** すでに居るものに書き戻すと、
+       *   **人が掴んで動かした先から勝手に戻ってくる**（最初の姿を決めるのと、
+       *   ずっと決め続けるのは別の話）。
+       * ★ 書くのはこの同じ 1 回の中で ── 別の書き込みにすると、
+       *   同じ描画のうちに後のほうが前のほうを握り潰す（このファイルの決まり）。
+       */
+      if (at) {
+        for (const { id, url } of born) {
+          const want = at(url);
+          const k = w.bubble(id);
+          if (!want || !k) continue;
+          w = w.withBubble(k.withFree('x', want.x).withFree('y', want.y));
+        }
+      }
       seq.current = n;
       setUrls(m);
       setWorld(w);
     },
-    [world, urls, routes, setWorld, noteListHost],
+    [world, urls, routes, setWorld, noteListHost, noteSpaceHost],
   );
 
   /** その泡が入っている空間（＝ 親の泡）。子から「外へ開く」ときに要る */
@@ -1073,8 +1200,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn }),
-    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn],
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn,
+      hasSpace: (id: BubbleId) => spaceHosts.has(id), isList: (id: BubbleId) => listHosts.has(id), viewOf }),
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, spaceHosts, listHosts, viewOf],
   );
 
   /**
@@ -1152,8 +1280,27 @@ export function BubbleSpace(props: BubbleSpaceProps) {
        *   点線の枠も札も、掴むための縁（外周12px）も描かれず、
        *   **兄弟たちをまとめて動かせなくなる**（v6 で踏んだ）。
        *   ラボと同じ見本（`BubbleShell`）に任せる ── ③ 見えない親は外周でしか掴めない。
+       * ★ **まとめて閉じる口は、ここに置く。** 並びを掴む所（外周）と同じ側に揃えるため
+       *   ── 泡の見出しに置くと「この泡の口」に見えるし、泡の数だけ同じ口が並ぶ。
+       * ★ 口と名札を**1 本の帯にまとめる**。別々に置くと、名札を口のぶんだけ右へ
+       *   寄せるのに口の幅を数えることになる ── 字や余白を変えたときに写しが古くなる。
+       *   名札の字は見本と同じものを使い、見本の札のほうは CSS で引っ込める。
        */
-      if (!url) return <BubbleShell draw={draw} />;
+      if (!url)
+        return (
+          <>
+            <div className="bl-rowtag">
+              <button
+                className="bl-close-row"
+                title="この並びをまとめて閉じる"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => closeRow(id)}
+              >× 閉じる</button>
+              <span className="bl-rowname">{draw.label}</span>
+            </div>
+            <BubbleShell draw={draw} />
+          </>
+        );
       const r = renderRoute(routes, id, url);
       /**
        * ★ **一覧の中の札は、選んでいるものだけ url を出す。**
@@ -1194,31 +1341,42 @@ export function BubbleSpace(props: BubbleSpaceProps) {
             ))}
           </div>
           {/*
-            ★ **一覧の泡には、並べ方の口を枠の上に出す**（仮の置き場所）。
-              一覧かどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
+            ★ **中に空間を持つ泡には、見え方の口を枠の上に出す**（仮の置き場所）。
+              持っているかどうかは「自分で子を並べているか」で分かる（`setChildren` を呼んだ泡）。
               ステータスバーの中はもう url と閉じるとロックで埋まっているので、
-              7 つ並べる場所が無い ── まずは外に出して形を見る。
+              並べて置く場所が無い ── まずは外に出して形を見る。
+            ★ **並べ方の口を出すのは一覧だけ**（`listHosts`）。一覧は中身が同じ型 1 つで、
+              順番で並ぶ場所だから、「縦・横・格子…」を選ぶのが意味を持つ。
+              置いた所に意味がある空間（本計画づくりの場）にこれを出すと、選んだ瞬間に
+              書いた座標が消える ── そちらへは**空間の見え方の口**を出す（下の `frameTools`）。
+            ★ **置き場所はどちらも同じ** ── 台（この `div`）は器が用意して、
+              中身だけを入れ替える。口ごとに置き場所を書くと、画角へ寄せる決まりが
+              片方だけ古くなる。
           */}
-          {/*
-            ★ **窓の見え方の口も、同じ棚に出す**（`frameTools`）。一覧の口とは出る相手が違う
-              ── 一覧は「自分で子を並べている泡」、窓は「中に別の世界を持つ泡」。
-              どちらも箱の外の同じ場所に出るので、両方に当てはまる泡が出てきたら重なる
-              （いまは出てこない：窓は子を並べない）。
-          */}
-          {r && frameTools?.(r.bubble, r.route)}
-          {listHosts.has(id) && (
-            /**
-             * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
-             *   箱が画面より広くなると（横に並べる・格子）**左端ごと画面の外へ出て、
-             *   二度と並べ方を変えられなくなる**（実測：横に並べたあと、口のつもりで
-             *   ランチャーを押していた）。見えている所より左には行かせない。
-             *   ずらす量は箱の中の座標なので、掛かっている倍率で割る。
-             */
-            <div
-              className="bl-view"
-              style={{ left: viewToolLeft(base.byId.get(id), openArea) }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
+          <div
+            className="bl-view"
+            style={(() => {
+              /**
+               * ★ **口は、いつも掴める所に出す。** 口は箱の左上に付いているので、
+               *   箱が画面より広くなると**左端ごと画面の外へ出て、二度と変えられなくなる**
+               *   （実測：横に並べたあと、口のつもりでランチャーを押していた）。
+               *   箱の上が画面より上に居るときは、下へも逃がす（`viewToolTop` の註）。
+               */
+              const top = viewToolTop(base.byId.get(id), openArea);
+              return {
+                left: viewToolLeft(base.byId.get(id), openArea),
+                ...(top === undefined ? {} : { top, bottom: 'auto' as const }),
+              };
+            })()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {/*
+              ★ 空間の見え方の口（窓と、座標で置く空間）。器が中身を差す ──
+                海の口と**同じ見本**から出すために、ここでは作らない。
+            */}
+            {r && !listHosts.has(id) && frameTools?.(r.bubble, r.route)}
+            {listHosts.has(id) && (
+              <>
               {VIEW_CHOICES.map((v) => (
                 <button
                   key={v.id}
@@ -1259,8 +1417,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
               >
                 {viewChoice.follows(id) ? <FollowIcon /> : <PinIcon />}
               </button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
           {r && headerTools?.(r.bubble, r.route)}
           <button
             className="bl-close"
@@ -1290,7 +1449,7 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         </>
       );
     },
-    [routes, urls, closeBubble, world, chrome, headerTools, frameTools, viewChoice, listHosts],
+    [routes, urls, closeBubble, closeRow, world, chrome, headerTools, frameTools, viewChoice, listHosts, spaceHosts],
   );
 
   /** 宇宙に落とす ── ダブルクリックと同じ道（`openBubble` の元が違うだけ） */

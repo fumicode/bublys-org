@@ -2,6 +2,15 @@ import type { ReactNode } from "react";
 import { getBubly } from "@bublys-org/bubbles-ui";
 
 /**
+ * **最初のランチャーの ID。**
+ *
+ * ★ OS も旅の空間も同じ "main" を書いていた。同じ字を 2 か所に置くと、
+ *   片方を変えたときに**バブリを追加する口だけが別のランチャーを見る**ことになる。
+ *   ランチャーの持ちものなので、ここに 1 つ置く。
+ */
+export const MAIN_LAUNCHER_ID = "main";
+
+/**
  * url をどう見せるか（ラベル・アイコン）。
  * ランチャーの entry は url しか持たないので、描くときにここで解決する。
  */

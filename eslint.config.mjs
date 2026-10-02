@@ -66,7 +66,10 @@ export default [
        *   （`no-empty-object-type`）に引き継がれた同じ検査なので止める
        *   ── 同じ 1 行が 2 回数えられていた。
        */
-      '@typescript-eslint/no-empty-object-type': ['error', { allowInterfaces: 'with-single-extends' }],
+      '@typescript-eslint/no-empty-object-type': [
+        'error',
+        { allowInterfaces: 'with-single-extends' },
+      ],
       '@typescript-eslint/no-empty-interface': 'off',
     },
   },

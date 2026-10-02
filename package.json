@@ -54,6 +54,7 @@
     "@testing-library/dom": "10.4.0",
     "@testing-library/react": "16.3.0",
     "@types/jest": "^30.0.0",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "20.19.9",
     "@types/react": "19.0.0",
     "@types/react-dom": "19.0.0",
@@ -111,6 +112,11 @@
     "object-transformer-bubly/*",
     "launcher-bubly/*",
     "task-bubly/*",
-    "memo-bubly/*"
+    "memo-bubly/*",
+    "map-bubly/*",
+    "activity-bubly/*",
+    "itinerary-bubly/*",
+    "note-bubly/*",
+    "lodging-bubly/*"
   ]
 }

@@ -3,7 +3,7 @@
  * ★ `openingPosition` は無い ── どこに置くかは親の View が決める（DECISIONS.md）。
  */
 import { createContext, useContext } from 'react';
-import type { BubbleId, LensId, PlaneAxis, PresetId, WorldState } from '@bublys-org/bubble-layout';
+import type { BubbleId, LensId, PlaneAxis, PresetId, View, WorldState } from '@bublys-org/bubble-layout';
 
 /**
  * 子をどう並べるか ── **顔ぶれと一緒に渡すもの**（`setChildren`）。
@@ -27,6 +27,47 @@ export interface ChildrenLayout {
    *   選んだ一度だけ大きさを書くこと（`setSize`）。
    */
   readonly grow?: boolean;
+  /**
+   * **最初にどこへ置くか**（url ごと。空間の中の座標。原点は空間の真ん中）。
+   *
+   * ★ 効くのは**その泡が生まれるとき 1 回だけ**。あとは人のもの ──
+   *   掴んで動かしたものを書き戻すと、**動かした先から勝手に戻ってくる**。
+   *   「置き場所に意味がある」のは最初の姿の話で、そのあと意味を決めるのは人。
+   * ★ 使うのは、並べ方（`preset`）では表せないことを最初の姿に持たせたいとき
+   *   ── 例：旅程の本計画づくりで、「どの仲間か」を向きに、「どれくらい埋まっているか」を
+   *   中心からの近さにする。
+   * ★ 渡さなければ今までどおり（並べ方が決める）。
+   */
+  readonly at?: (url: string) => { readonly x: number; readonly y: number } | undefined;
+  /**
+   * **一覧として扱うか**（既定は扱う）。
+   *
+   * ★ `false` にするのは「子を持つが、**一覧ではない**空間」── 置き場所そのものに
+   *   意味がある盤（`at` で座標を書く所）。一覧として扱われると 3 つのことが起きて、
+   *   どれも盤には合わない:
+   *     1. **並べ方の口が出る**（縦に並べる・格子…）。座標を自分で決めている盤で
+   *        それを選ばせるのは嘘 ── 選んでも置き場所と喧嘩する
+   *     2. **子の装いが静かになり、帯（見出し）が消える**。帯はその泡を掴む所なので、
+   *        消えると**動かせない**（実測：盤の付箋が掴めなかった）
+   *     3. 子から開いたものが、一覧の隣＝**盤の外**に出る。作業場の中で開いてほしい
+   */
+  readonly list?: boolean;
+  /**
+   * **札が出て行ったときに知らせる先。**
+   *
+   * > 出て行った札を、黙って連れ戻さない。
+   *
+   * ★ 一覧の顔ぶれは持ち主（旅程・一覧のもと）が決めているので、札を掴んで
+   *   外の空間へ出しても、次の走りで「足りない」と数えられて**元の場所に生え直す**
+   *   ── 掴んで出しているのに出せない、という形で出る（実測で言われた）。
+   * ★ 出て行ったことをここで知らせれば、持ち主が「では顔ぶれから外す」と決められる。
+   *   **決めるのは持ち主**で、器は起きたことを伝えるだけ ── 器が勝手に外すと、
+   *   外へ持ち出しただけ（一覧には残したい）のときに消えてしまう。
+   * ★ `beside` は「**一覧のすぐ隣**（一覧自身と同じ空間）に出されたか」。
+   *   もっと外（外の海）へ持ち出されたのとは意味が違うので、そこは持ち主が分けられる
+   *   ── 隣に出したのは「一覧から剥がした」、外へ出したのは「持ち出した」。
+   */
+  readonly onLeave?: (url: string, at: { readonly space: BubbleId; readonly beside: boolean }) => void;
 }
 
 /**
@@ -79,7 +120,19 @@ export interface BubbleSpaceApi {
    * 外の空間の、その軸のレンズを変える ── **魚眼をどちらの向きに掛けるか**。
    * レンズは軸ごとに持つものなので、X と Y は別々に決まる（両方でも、どちらも平行でもよい）。
    */
-  setLens: (axis: PlaneAxis, lens: LensId) => void;
+  setLens: (axis: PlaneAxis, lens: LensId, spaceId?: BubbleId) => void;
+  /** その泡が中に空間を持っているか（`setChildren` を呼んだ泡） */
+  hasSpace: (id: BubbleId) => boolean;
+  /**
+   * その空間が**一覧か**（中身が同じ型 1 つで、順番で並ぶ所）。
+   *
+   * ★ 一覧とそうでない空間とでは、出す口が違う ── 一覧は「縦・横・格子…」を選ぶ口、
+   *   置いた所に意味がある空間は「どう見るか（寄り引き・魚眼）」の口。
+   *   同じ `View` を書き換えてはいるが、**選ばせてよいものが違う**。
+   */
+  isList: (id: BubbleId) => boolean;
+  /** その空間の、いまの見え方（無ければ null） */
+  viewOf: (spaceId: BubbleId) => View | null;
   /**
    * 外の空間の**並べ方**を選ぶ（View のプリセット）。
    * 「開き方」は 1 つしかないので、見え方が変わるのはここだけ。
@@ -134,6 +187,9 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   snapshot: () => EMPTY_SNAPSHOT,
   restore: () => undefined,
   openBubble: () => { console.warn('BubbleSpace の外で openBubble が呼ばれた'); return ''; },
+  hasSpace: () => false,
+  isList: () => false,
+  viewOf: () => null,
   closeBubble: () => undefined,
   urlOf: () => null,
   canOpen: () => false,

@@ -12,6 +12,7 @@ import {
 import { nameIntent } from "@bublys-org/world-line-graph";
 import { Launcher } from "@bublys-org/launcher-model";
 import { selectLauncherPlain, setLauncher } from "@bublys-org/launcher-libs";
+import { useEnsureLauncherEntity } from "@bublys-org/space-furniture";
 import { DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID, RETIRED_LAUNCH_URLS } from "./launchTargets";
 
 const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
@@ -19,35 +20,17 @@ const MAIN_LAUNCHER_URL = `launchers/${MAIN_LAUNCHER_ID}`;
 const MAIN_LAUNCHER_SIZE = { width: 200, height: 360 };
 
 /**
- * ルール: **OS 標準の呼び出しは、main ランチャーに必ず 1 つずつ居る。**
+ * OS 標準の呼び出しを main ランチャーに揃える。
  *
- * - 集約が無ければ、OS 標準の呼び出しで作る
- * - 行き先が変わった呼び出しは差し替える（足す前に。でないと古いのと新しいのが並ぶ）
- * - 有っても足りないものがあれば足す（あとから増えた呼び出しが出てこないので）
- * - **標準の並び順に揃える**（`ordered`）。足すだけだと、順番を変えても
- *   すでに使っている人は古い並びのままで、新しいものが末尾に付くだけになる。
- *   標準に無いもの（読み込んだバブリ）は触らない
- *
- * OS 標準の呼び出しには外す口が無いので、足すだけで辻褄が合う
- * （ロードしたバブリの `<name>-bubly` は標準ではないので、ここは触らない）。
- * **泡は作らない** ── 「どこに出すか」は海の側の仕事（最初に開く url として渡すだけ）。
+ * ★ **ルール自体は lib（`@bublys-org/space-furniture`）に置いた** ── どの空間でも
+ *   同じなので。ここに残るのは「この OS では何が標準か」だけ。
  */
-export const useEnsureMainLauncherEntity = () => {
-  const dispatch = useAppDispatch();
-  const mainLauncher = useAppSelector(selectLauncherPlain(MAIN_LAUNCHER_ID));
-  useEffect(() => {
-    if (!mainLauncher) {
-      dispatch(setLauncher(Launcher.create(DEFAULT_LAUNCHER_URLS, MAIN_LAUNCHER_ID).toPlain()));
-      return;
-    }
-    const launcher = Launcher.fromPlain(mainLauncher);
-    const moved = Object.entries(RETIRED_LAUNCH_URLS).reduce((l, [from, to]) => l.rename(from, to), launcher);
-    const missing = DEFAULT_LAUNCHER_URLS.filter((url) => !moved.urls.includes(url));
-    const next = missing.reduce((l, url) => l.add(url), moved).ordered(DEFAULT_LAUNCHER_URLS);
-    if (next === launcher) return;
-    dispatch(setLauncher(next.toPlain()));
-  }, [dispatch, mainLauncher]);
-};
+export const useEnsureMainLauncherEntity = () =>
+  useEnsureLauncherEntity({
+    launcherId: MAIN_LAUNCHER_ID,
+    urls: DEFAULT_LAUNCHER_URLS,
+    retired: RETIRED_LAUNCH_URLS,
+  });
 
 /**
  * ルール: 「root には必ずランチャーが 1 つは居る。無ければ main ランチャーを左の岸に着ける」。

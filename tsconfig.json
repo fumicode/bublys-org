@@ -155,6 +155,33 @@
     },
     {
       "path": "./bublys-libs/object-types"
+    },
+    {
+      "path": "./bublys-libs/space-furniture"
+    },
+    {
+      "path": "./itinerary-bubly/itinerary-libs"
+    },
+    {
+      "path": "./activity-bubly/activity-libs"
+    },
+    {
+      "path": "./map-bubly/map-libs"
+    },
+    {
+      "path": "./apps/travel-space"
+    },
+    {
+      "path": "./note-bubly/note-libs"
+    },
+    {
+      "path": "./lodging-bubly/lodging-libs"
+    },
+    {
+      "path": "./map-bubly/map-app"
+    },
+    {
+      "path": "./lodging-bubly/lodging-app"
     }
   ]
 }

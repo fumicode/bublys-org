@@ -15,8 +15,8 @@ import CheckIcon from "@mui/icons-material/Check";
 import { getLoadedBublies, toBublyRouteBase, unloadBubly } from "@bublys-org/bubbles-ui";
 import { ObjectView } from "@bublys-org/bubble-layout-feature";
 import { Launcher } from "@bublys-org/launcher-model";
-import { useLauncher } from "@bublys-org/launcher-libs";
-import { MAIN_LAUNCHER_ID } from "./launchTargets";
+import { useLauncher } from "./useLauncher.js";
+import { MAIN_LAUNCHER_ID } from "../registration/launchTargets.js";
 
 /** 札 1 枚の丈 ── 名前の行 ＋ オリジンの行 */
 export const BUBLY_CARD_HEIGHT = 56;

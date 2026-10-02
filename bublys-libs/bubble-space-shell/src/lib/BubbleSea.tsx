@@ -29,6 +29,7 @@ import { bridgeRoutes } from "./legacyRouteBridge.js";
 import { SpaceViewContext } from "./SpaceViewContext.js";
 import { useSpaceViewState } from "./useSpaceViewState.js";
 import { ShoreLockProvider } from "./ShoreLock.js";
+import type { SeaSeed } from "./SeaWorldLine.js";
 
 /** 最初の並べ方。口の最初の見た目（どの軸が魚眼か）もここから出す */
 const INITIAL_PRESET: PresetId = "free";
@@ -63,6 +64,11 @@ export type BubbleSeaProps = {
    */
   readonly worldLineOutside?: readonly string[];
   /**
+   * **はじまりの姿**（`SeaSeed`）。この scope に記録が 1 つも無いときだけ、最初の節になる。
+   * 記録があれば何もしない ── 一度でも触った人は、自分の海から始まる。
+   */
+  readonly worldLineSeed?: SeaSeed;
+  /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
    *
    * ★ 効くのは**この海だけ**。窓の中の海も一覧も別の `BubbleSpace` なので、ここで選んだことは
@@ -87,6 +93,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   initialUrls,
   worldLineScope,
   worldLineOutside,
+  worldLineSeed,
   rules,
   onSpaceReady,
   style,
@@ -184,6 +191,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
         worldLineScope={worldLineScope}
         worldLineOutside={worldLineOutside}
+        worldLineSeed={worldLineSeed}
         autoLens={autoLens}
         rules={rules}
         bandDisplay={bandDisplay}

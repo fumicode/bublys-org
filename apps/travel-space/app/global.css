@@ -1,0 +1,19 @@
+/* modern-normalize は layout.tsx で import 済み */
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /*
+   * 海は 100dvh の 1 枚の場。ページ自体が転がると、岸に貼ったものの座標
+   * （画面の座標）と中身がずれるので、ここでは転がさない。
+   */
+  overflow: hidden;
+  overscroll-behavior: none;
+}

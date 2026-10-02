@@ -31,6 +31,7 @@
     "app/**/*.jsx",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "app/**/seed/*.json",
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "next-env.d.ts",
@@ -67,6 +68,15 @@
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
+      "path": "../../map-bubly/map-libs"
+    },
+    {
+      "path": "../../itinerary-bubly/itinerary-libs"
+    },
+    {
+      "path": "../../lodging-bubly/lodging-libs"
+    },
+    {
       "path": "../../object-transformer-bubly/object-transformer-libs"
     },
     {
@@ -79,13 +89,16 @@
       "path": "../../users-bubly/users-libs"
     },
     {
-      "path": "../../bublys-libs/bubble-space-shell"
+      "path": "../../bublys-libs/space-furniture"
     },
     {
       "path": "../../bublys-libs/bubble-layout-feature"
     },
     {
       "path": "../../memo-bubly/memo-libs"
+    },
+    {
+      "path": "../../bublys-libs/bubble-space-shell"
     },
     {
       "path": "../../bublys-libs/object-shell"

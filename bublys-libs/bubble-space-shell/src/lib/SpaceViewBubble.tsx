@@ -38,7 +38,16 @@ const chip = (active: boolean): CSSProperties => ({
 export const SpaceViewTools: FC<{
   readonly view?: SpaceView;
   readonly fullscreen?: boolean;
-}> = ({ view, fullscreen = true }) => {
+  /**
+   * **まかせる**を出すか（既定は出す）。
+   *
+   * ★ 出さないのは「1 つの空間の見え方」を触る口。まかせるは**海ぜんぶ**の決まりで、
+   *   空間が自分で持てるものではない ── 出すと、押せるのに何も起きない口になる。
+   */
+  readonly autoLens?: boolean;
+  /** **帯**を出すか（既定は出す）。まかせると同じ理由 */
+  readonly bands?: boolean;
+}> = ({ view, fullscreen = true, autoLens: showAutoLens = true, bands: showBands = true }) => {
   const here = useSpaceView();
   const { preset, setPreset, fisheye, toggleFisheye, autoLens, setAutoLens, bandsAlways, setBandsAlways } =
     view ?? here;
@@ -84,6 +93,7 @@ export const SpaceViewTools: FC<{
         レンズをまかせる。溢れたら魚眼、収まったら平行 ── 軸ごとに勝手に切り替わる。
         まかせているあいだは、手で選ぶ口は押せない（押しても次の瞬間に上書きされるので）
       */}
+      {showAutoLens && (
       <button
         onClick={() => setAutoLens(!autoLens)}
         title={
@@ -95,6 +105,7 @@ export const SpaceViewTools: FC<{
       >
         まかせる
       </button>
+      )}
 
       {/* 魚眼の向き。軸ごとのレンズをそのまま口にしてある（両方／どちらも無し も選べる） */}
       {(["x", "y"] as const).map((axis) => (
@@ -119,6 +130,7 @@ export const SpaceViewTools: FC<{
           あれは旧い海だけの値で、新しい海では効かなかった。帯は**海ぜんぶの見え方**なので、
           並べ方やレンズと同じ所に置く。
       */}
+      {showBands && (
       <button
         onClick={() => setBandsAlways(!bandsAlways)}
         title={
@@ -130,6 +142,7 @@ export const SpaceViewTools: FC<{
       >
         帯
       </button>
+      )}
       {fullscreen && <FullscreenToggle />}
     </Box>
   );

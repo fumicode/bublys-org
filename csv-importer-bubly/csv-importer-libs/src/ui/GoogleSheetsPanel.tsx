@@ -2,6 +2,7 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
+import { isCommitKey } from "@bublys-org/bubbles-ui";
 
 export type GoogleSheetsPanelProps = {
   isLinked: boolean;
@@ -39,7 +40,7 @@ export const GoogleSheetsPanel: FC<GoogleSheetsPanelProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (isCommitKey(e)) {
       handleLink();
     }
   };

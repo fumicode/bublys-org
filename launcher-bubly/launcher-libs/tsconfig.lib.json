@@ -20,6 +20,9 @@
     },
     {
       "path": "../launcher-model/tsconfig.lib.json"
+    },
+    {
+      "path": "../../bublys-libs/bubble-layout-feature/tsconfig.lib.json"
     }
   ],
   "exclude": [

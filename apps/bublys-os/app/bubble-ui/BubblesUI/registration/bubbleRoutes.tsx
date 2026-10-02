@@ -23,6 +23,9 @@ import { taskManagementBubbleRoutes } from "@bublys-org/task-libs";
 import { memoBubbleRoutes } from "@bublys-org/memo-libs";
 import { csvImporterBubbleRoutes } from "@bublys-org/csv-importer-libs";
 import { objectTransformerBubbleRoutes } from "@bublys-org/object-transformer-libs";
+import { mapBubbleRoutes } from "@bublys-org/map-libs";
+import { itineraryBubbleRoutes } from "@bublys-org/itinerary-libs";
+import { lodgingBubbleRoutes } from "@bublys-org/lodging-libs";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
@@ -30,17 +33,17 @@ import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ローカルコンポーネント
 import { MobBubble } from "../ui/bubbles/MobBubble";
 import { ShellBubble } from '../ui/bubbles/ShellBubble';
-import { launcherBubbleRoutes } from "@bublys-org/launcher-libs";
-import { WorldLineHomeBubble } from "../feature/WorldLineHomeBubble";
+import { bublyLoaderBubbleRoutes, launcherBubbleRoutes } from "@bublys-org/launcher-libs";
+/**
+ * ★ **家具の泡は lib から借りる**（世界線・見え方の口・ポケット）。どの空間にも
+ *   居てよいものなので、ここに書き下すと別の空間が同じものを持てない。
+ *   ここに残すのは**この OS だけで開けるもの**。
+ */
+import { furnitureBubbleRoutes } from "@bublys-org/space-furniture";
 import { GuideHomeBubble, GUIDE_CARD } from "@/app/guide/GuideHomeBubble";
 import { GuideEntryBubble } from "@/app/guide/GuideEntryBubble";
 import { GuideCard } from "@/app/guide/GuideCard";
-import { BublyLoaderBubble } from "@/app/launcher/BublyLoaderBubble";
-import { BublyCard, BUBLY_CARD_HEIGHT } from "@/app/launcher/BublyCard";
-import { PocketBubble } from "@/app/bubble-ui/Pocket/feature/PocketBubble";
 import { DemoSitesBubble } from "../feature/DemoSitesBubble";
-import { SpaceViewBubble } from "@bublys-org/bubble-space-shell";
-import { LIST_BOX, LIST_CARD_WIDTH } from "@bublys-org/bubble-layout-feature";
 import "@/app/launcher/launchTargets";
 
 /** BubbleRouteRegistry経由でルートを検索 */
@@ -58,30 +61,6 @@ const routes: BubbleRoute[] = [
     pattern: /^mob$/,
     type: "mob",
     Component: ({ bubble }) => <MobBubble bubble={bubble} />
-  },
-
-  // 世界線 view の標準 UI は BubbleArrangementWorldLineControls 側の overlay。
-  // バブル版は opt-in（`world-lines` URL を直接 openBubble で開ける）。
-  // バブル化すると自分自身が arrangement の一部になり、過去ノードに戻ると view
-  // も消える挙動になる点だけ要注意。
-  /**
-   * この空間の世界線。**大きさで姿が変わる**（`WorldLineHomeBubble`）──
-   * 岸に貼ってある 48×48 のときはアイコン、押すと同じ url の泡が開いて、
-   * 広いそちらが世界線を映す。
-   */
-  {
-    pattern: /^world-lines$/,
-    type: "world-lines",
-    Component: WorldLineHomeBubble,
-    /**
-     * ★ 地は**暗いほうへ**（囲碁・メモの世界線と同じ値）。既定の明るい地のままだと
-     *   canvas が白い板になって、節も枝も**読めるのに読みにくい**（線は明るい色で描く）。
-     * ★ 木を描く canvas なので、開いた先はそれなりの広さが要る。
-     */
-    bubbleOptions: {
-      contentBackground: "rgba(15,18,28,0.3)",
-      defaultSize: { width: 520, height: 340 },
-    },
   },
 
   /**
@@ -208,6 +187,18 @@ const routes: BubbleRoute[] = [
   // 変換エディタ（object-transformer-libs から）
   ...objectTransformerBubbleRoutes,
 
+  /**
+   * **旅の 4 つ**（地図・旅程・アクティビティ＝地点・宿泊施設）。
+   *
+   * ★ 旅の海（`apps/travel-space`）に載っているのと**同じものを同じ所から引く**。
+   *   写しを作らないので、片方だけ手ざわりが古くなることがない。
+   * ★ アクティビティの一覧は**地点の一覧**（`spots`）── 収集したアクティビティ 793 件は
+   *   地点として書き出されている（`tools/echigo/build.mjs`）。
+   */
+  ...mapBubbleRoutes,
+  ...itineraryBubbleRoutes,
+  ...lodgingBubbleRoutes,
+
   // 易経（プラグインとして動的ロード）
   // ...ekikyoBubbleRoutes,
 
@@ -221,15 +212,8 @@ const routes: BubbleRoute[] = [
   // ランチャー（呼び出しを溜めるバブリ）。root では左の岸に着いている
   ...launcherBubbleRoutes,
 
-  // 見え方（開き方・ネオンの通し方・レンズの向き）。前は画面の左上に固定した帯だった
-  {
-    pattern: /^space-view$/,
-    type: "space-view",
-    Component: SpaceViewBubble,
-    // 地は敷かない ── ボタンが空間の上に浮いて見える
-    // 中身の数（chrome.ts）。岸に貼ったときの大きさ（BubblesUINext の SPACE_VIEW_SIZE）と同じ
-    bubbleOptions: { defaultSize: { width: 482, height: 44 }, contentBackground: "transparent" },
-  },
+  // 岸に貼る家具（世界線・見え方の口・ポケット）。どの空間でも同じ 3 つ
+  ...furnitureBubbleRoutes,
 
   // 他のデモへ行く口。これも 1 つの泡 ── いつも見えていてほしいので、既定では下の岸に貼る
   {
@@ -240,37 +224,12 @@ const routes: BubbleRoute[] = [
     bubbleOptions: { defaultSize: { width: 430, height: 44 }, contentBackground: "transparent" },
   },
 
-  // ポケット（オブジェクトのクリップボード）。前は画面に居座る面だったが、1 つの泡にした
-  // ── いつも見えていてほしければ岸に貼る
-  {
-    pattern: /^pocket$/,
-    type: "pocket",
-    Component: PocketBubble,
-    // 地は中身が持つ ── 大きいときは自分で白い箱を描き、アイコンだけのときは空間を透かす
-    bubbleOptions: { defaultSize: { width: 246, height: 266 }, contentBackground: "transparent" },
-  },
-
-  // バブリをオリジンからロードする（旧サイドバー下部の「バブリ」欄）
-  {
-    pattern: /^bubly-loader$/,
-    type: "bubly-loader",
-    Component: BublyLoaderBubble,
-    /**
-     * ★ **幅は一覧の箱に合わせる**（`LIST_BOX.width`）。中身は札 1 枚ずつのバブルなので、
-     *   ほかの一覧と同じ幅でなければ札が切れる ── 286 だったころは、オリジンも
-     *   「外す」も見切れていた。
-     * ★ 丈は一覧の箱より少し高く ── 上に入力欄と行き先の案内が載るぶん。
-     */
-    bubbleOptions: { defaultSize: { width: LIST_BOX.width, height: LIST_BOX.height } },
-  },
-
-  // ロード済みのバブリ 1 つ ── バブリの一覧の中の泡
-  {
-    pattern: /^bublies\/[^/]+$/,
-    type: "bubly-card",
-    Component: ({ bubble }) => <BublyCard name={bubble.url.replace("bublies/", "")} />,
-    bubbleOptions: { defaultSize: { width: LIST_CARD_WIDTH, height: BUBLY_CARD_HEIGHT } },
-  },
+  /**
+   * **バブリを追加する口**（と、その札）は `launcher-libs` から借りる。
+   * ★ もとはここ（OS の中）に部品ごと置いてあったので、**別の空間からは使えなかった**
+   *   ── 旅の空間に同じ口を置けるよう、ランチャーの持ちものとして外へ出した。
+   */
+  ...bublyLoaderBubbleRoutes,
 ];
 
 export const bubbleRoutes = routes;

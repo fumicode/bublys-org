@@ -21,7 +21,7 @@
  *   泡は増えも減りもするので、差分で持つと「どの時点の何に対する差か」を別に持つ羽目になる。
  *   姿は小さい（泡の箱と url だけ）ので、丸ごとで困らない。
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { defineDomainObjects } from "@bublys-org/domain-registry";
 import { BubbleWorld } from "@bublys-org/bubble-layout";
@@ -80,6 +80,36 @@ export const SEA_ARRANGEMENT_DOMAIN = defineDomainObjects({
     getId: (a: SeaArrangement) => a.id,
   },
 });
+
+/**
+ * **海の種** ── ある節の姿を、ブラウザの外へ持ち出すための形。
+ *
+ * > **持ち出すのは、世界線に記録したものそのもの。**
+ *
+ * ★ 姿は持ち主のブラウザ（CAS ＝ IndexedDB）の中にしか無いので、ほかの人が開いたときの
+ *   はじまりにするには、一度ファイルにして外へ出す必要がある。
+ * ★ 中身は記録と同じ `SeaState` ── 別の形を作ると、記録と種のどちらかだけが古くなる。
+ * ★ **岸は持ち出さない。** 岸に貼ってあるのは定位置のもの（ランチャーなど）で、座標は
+ *   書き出した画面で測った値 ── 持ち出すと、大きさの違う画面でも同じ座標に貼られてしまう。
+ *   岸の無い記録は「岸を触らない」と読まれるので（`SeaState` の註）、定位置の側が
+ *   開いた画面に合わせて置いてくれる。
+ * ★ 書き出したときの画面の大きさも添える。浮いている泡の座標はその画面で測ったものなので、
+ *   大きさの違う画面で開くときに、どれだけずれるかを判断する手がかりになる。
+ */
+export type SeaSeed = {
+  readonly kind: "sea-seed";
+  readonly version: 1;
+  readonly viewport: { readonly w: number; readonly h: number };
+  readonly state: SeaState;
+};
+
+export const toSeaSeed = (
+  arrangement: SeaArrangement,
+  viewport: { readonly w: number; readonly h: number },
+): SeaSeed => {
+  const { id, snapshot } = arrangement.toPlain();
+  return { kind: "sea-seed", version: 1, viewport, state: { id, snapshot } };
+};
 
 /**
  * **世界線に入らないもの。** url で名指す（`BubbleSea` の `worldLineOutside`）。
@@ -192,9 +222,25 @@ export function useSeaWorldLine(
   setShore: (next: readonly Docked[]) => void,
   /** **世界線に入らないもの**（url。`WorldLineOutside` の註）。渡さなければ、ぜんぶ入る */
   outside: WorldLineOutside = [],
+  /**
+   * **はじまりの姿**（`SeaSeed`）。
+   *
+   * > **記録が 1 つも無いときだけ、種を最初の節として書く。**
+   *
+   * ★ 書くだけで、戻すのは下の「いまの節の姿へ戻す」がやる ── 種を開く道を別に作らない。
+   *   リロードで記録から戻るのと、同じ 1 本の道を通る。
+   * ★ 「記録が無い」は世界線の根が無いこと（`useCasScope` の `initialObjects`）。
+   *   グラフは保存の読み戻し（`PersistGate`）が済んでから描かれるので、
+   *   読み込み中を「無い」と取り違えない。
+   */
+  seed?: SeaSeed,
 ): (why: SettleWhy) => void {
+  const initialObjects = useMemo(
+    () => (seed ? [{ type: SEA_ARRANGEMENT_TYPE, object: SeaArrangement.fromPlain(seed.state) }] : undefined),
+    [seed],
+  );
   // scope は名前が要る。使わないときも hook は呼ぶ（呼ぶ数は変えられない）
-  const scope = useCasScope(scopeId ?? "");
+  const scope = useCasScope(scopeId ?? "", { initialObjects: scopeId ? initialObjects : undefined });
   /** 最後に記録した／戻した姿の印。往復を止めるのはこれ 1 つ */
   const mark = useRef<string>("");
   /** 岸の**いまの姿**を覚え書きで持つ（記録は描き終えてから呼ばれるので、これで足りる） */

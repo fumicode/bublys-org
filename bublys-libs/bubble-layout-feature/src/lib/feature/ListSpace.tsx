@@ -69,6 +69,14 @@ export type ListSpaceProps = {
    *   ── そういう口は角に収まらないので、並びは必ずその下から始まる。
    */
   readonly headHeight?: number;
+  /**
+   * **札が掴まれて外の空間へ出て行ったときに知らせる先。**
+   *
+   * ★ 渡さないと、出て行った札は次の走りで**元の場所に生え直す**（顔ぶれは
+   *   `members` が決めているので「足りない」と数えられる）。
+   *   出したいなら、持ち主がここで `members` から外す。
+   */
+  readonly onLeave?: (url: string, at: { readonly space: string; readonly beside: boolean }) => void;
 };
 
 /** 口を置く帯の高さの既定（実際は測る） */
@@ -127,9 +135,13 @@ export const ListSpace: FC<ListSpaceProps> = ({
   itemWidth = 280,
   head,
   headHeight,
+  onLeave,
 }) => {
   const space = useBubbleSpace();
   const me = useCurrentBubble();
+  /** 知らせ先は、いつも最新のものを呼ぶ（下の `useEffect` の註） */
+  const leaveRef = useRef(onLeave);
+  leaveRef.current = onLeave;
 
   const boxRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
@@ -318,7 +330,18 @@ export const ListSpace: FC<ListSpaceProps> = ({
      *   選んだ一度だけ大きさを書くこと（上の `setSize`）。伸ばしっぱなしにすると、
      *   箱が**中身より小さくできない**ものになる（実測で踏んだ：横に縮まらない一覧）。
      */
-    if (me) space.setChildren(me, members, { preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols, grow: false });
+    /**
+     * ★ **知らせ先は ref 越しに呼ぶ。** そのまま閉じ込めると、持ち主が
+     *   毎回新しい関数を渡す作りのとき**古いほうを呼び続ける**（実測で踏んだ形：
+     *   閉じ込めた関数が古く、1 つしか開かなかった）。依存に足すと、
+     *   関数が変わるたびに走り直すことになる。
+     */
+    if (me) {
+      space.setChildren(me, members, {
+        preset, itemWidth: cardWidth, reserve, step: { x: stepX, y: stepY }, cols, grow: false,
+        onLeave: (url, at) => leaveRef.current?.(url, at),
+      });
+    }
   }, [me, members, preset, space, cardWidth, reserve, stepX, stepY, cols]);
 
   /**
