@@ -13,7 +13,7 @@ import { resolveWorld } from './resolve.js';
 import { Bubble } from './bubble.js';
 import { BubbleWorld } from './world.js';
 import { DEFAULT_RULES } from './rules.js';
-import type { LayoutRules, SizeCombine } from './rules.js';
+import type { LayoutRules } from './rules.js';
 import { presetView, withAxis } from './view.js';
 import { labScene, placeOf, VIEWPORT } from './lab-scene.js';
 
