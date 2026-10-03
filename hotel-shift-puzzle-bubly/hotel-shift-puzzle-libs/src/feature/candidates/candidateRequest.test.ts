@@ -19,7 +19,7 @@ describe("computeCandidatesFor", () => {
   const staffIds = ["L1", "L2", "X"];
 
   const constraints = new ConstraintSet({
-    scheduleId: "sched-1",
+    id: "sched-1",
     leaderRules: [
       new ShiftLeaderRule({
         key: "early",

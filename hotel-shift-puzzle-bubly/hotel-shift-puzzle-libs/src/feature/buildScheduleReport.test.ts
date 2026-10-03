@@ -24,7 +24,6 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: ['early', 'mid', 'late'],
     })
       .setRequired(day1, '早番', 1)
       .setRequired(day2, '中番', 2)
@@ -125,7 +124,6 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
       storeId: 'store-1',
       year: 2026,
       month: 6,
-      workShiftIds: ['early'],
     });
     const report = buildScheduleReport({
       schedule: empty,
