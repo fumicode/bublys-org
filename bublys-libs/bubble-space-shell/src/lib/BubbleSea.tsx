@@ -47,6 +47,13 @@ export type BubbleSeaProps = {
   readonly viewport?: { readonly w: number; readonly h: number };
   /** 定位置に居てほしいもの（岸に貼る泡）。家具は使う側が決める */
   readonly homes?: readonly Home[];
+  /**
+   * **海の地**（CSS の background）。渡さなければ夜空（`SEA_GROUND`）。
+   *
+   * ★ 効くのは海の地だけ。岸の地（岸に貼った泡の下）と窓の中の夜空はそのまま ──
+   *   海の縁と窓を、絵の上でも見分けられるように。
+   */
+  readonly ground?: string;
   /** 世界が空のときに最初に開く url */
   readonly initialUrls?: readonly string[];
   /**
@@ -90,6 +97,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   routes: legacyRoutes,
   viewport: given,
   homes,
+  ground = SEA_GROUND,
   initialUrls,
   worldLineScope,
   worldLineOutside,
@@ -182,7 +190,7 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
       <ShoreSpace
         routes={routes}
         viewport={viewport}
-        ground={SEA_GROUND}
+        ground={ground}
         join={join}
         initialUrls={initialUrls}
         homes={homes}

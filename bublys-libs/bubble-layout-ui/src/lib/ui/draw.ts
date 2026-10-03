@@ -581,7 +581,15 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       (s <= 0.2 ? ' nb' : '') +
       mcls;
   }
-  style['opacity'] = Math.round(op * 1000) / 1000;
+  /**
+   * ★ **ほぼ原寸の泡は薄めない**（0.95 以上 ＝ 原寸の 9 割以上に写る泡は 1 に揃える）。
+   *   目では区別がつかない薄さでも、
+   *   opacity が 1 未満の要素はブラウザにとって「後ろをぼかす範囲の境目」になる ──
+   *   中身のすりガラス（backdrop-filter）が泡の中しかぼかせず、後ろの海の絵まで届かない
+   *   （実測：原寸の泡が 0.994、95% に写った一覧が 0.978 で、板の向こうの山がくっきり見えていた）。
+   */
+  const opacity = Math.round(op * 1000) / 1000;
+  style['opacity'] = opacity >= 0.95 ? 1 : opacity;
 
   return {
     id: b.id,

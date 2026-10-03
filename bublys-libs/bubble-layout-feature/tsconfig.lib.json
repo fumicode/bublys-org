@@ -16,7 +16,8 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [
     { "path": "../bubble-layout/tsconfig.lib.json" },
-    { "path": "../bubble-layout-ui/tsconfig.lib.json" }
+    { "path": "../bubble-layout-ui/tsconfig.lib.json" },
+    { "path": "../object-types/tsconfig.lib.json" }
   ],
   "exclude": [
     "vite.config.ts", "vite.config.mts", "vitest.config.ts", "vitest.config.mts",
