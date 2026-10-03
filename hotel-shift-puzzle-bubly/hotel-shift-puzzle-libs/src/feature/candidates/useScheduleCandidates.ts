@@ -25,6 +25,7 @@ import {
   ConstraintSet,
   StaffMonthlyShiftWish,
   WorkShift,
+  WorkingStaffGroup,
   diffScheduleCells,
   type DeadCellDiagnosis,
   type ScheduleCandidatesPlain,
@@ -49,6 +50,8 @@ export type UseScheduleCandidatesParams = {
   wishByStaff: Map<string, StaffMonthlyShiftWish>;
   workShifts: WorkShift[];
   staffIds: string[];
+  /** 勤務スタッフ群（可能勤務帯で候補を絞る）。群がまだ無い勤務表なら省略 */
+  staffGroup?: WorkingStaffGroup;
   /** 候補集合 worker を作る（app 層から注入）。省略時は main thread で同期計算する */
   createWorker?: () => Worker;
 };
@@ -77,6 +80,7 @@ export function useScheduleCandidates({
   wishByStaff,
   workShifts,
   staffIds,
+  staffGroup,
   createWorker,
 }: UseScheduleCandidatesParams): ScheduleCandidatesResult {
   const [candidates, setCandidates] = useState(() => ScheduleCandidates.empty(""));
@@ -138,10 +142,11 @@ export function useScheduleCandidates({
     };
   }, [createWorker]);
 
-  // 制約・勤務帯・対象スタッフ・希望のいずれかが変わったら全計算に戻すための識別子。
+  // 制約・勤務帯・対象スタッフ・希望・可能勤務帯のいずれかが変わったら全計算に戻すための識別子。
+  // 可能勤務帯を変えても勤務表のセルは1つも変わらないので、セルの差分だけでは候補が更新されない。
   const contextVersion = useMemo(
     () => ({}),
-    [constraints, workShifts, staffIds, checkShiftWish, wishByStaff]
+    [constraints, workShifts, staffIds, checkShiftWish, wishByStaff, staffGroup]
   );
   const lastContextRef = useRef<object | null>(null);
   const lastSignatureRef = useRef<string | null>(null);
@@ -181,6 +186,7 @@ export function useScheduleCandidates({
       constraints: constraints?.toPlain() ?? null,
       checkShiftWish,
       wishes: [...wishByStaff.values()].map((w) => w.toPlain()),
+      staffGroup: staffGroup?.toPlain() ?? null,
       previous: reusable?.candidates.toPlain(),
       changed: changed?.map((cell) => ({
         staffId: cell.staffId,
@@ -197,6 +203,7 @@ export function useScheduleCandidates({
       request.constraints,
       request.checkShiftWish,
       request.wishes,
+      request.staffGroup,
     ]);
     const target = workerRef.current;
     if (signature === lastSignatureRef.current && target === lastTargetRef.current) {
@@ -229,6 +236,7 @@ export function useScheduleCandidates({
     constraints,
     checkShiftWish,
     wishByStaff,
+    staffGroup,
   ]);
 
   const diagnoseDeadCell = useCallback((cell: CandidateCellRefPlain) => {
