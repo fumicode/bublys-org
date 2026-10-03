@@ -202,6 +202,11 @@ export interface BubbleInputOptions {
    */
   readonly onTap?: (id: BubbleId) => void;
   /**
+   * **海の背景を、動かさずに押して離した。** 背景を引いて見回したときは出ない。
+   * 一覧の中の空間（泡の中の背景）では出ない ── この海そのものの背景だけ。
+   */
+  readonly onBackgroundTap?: () => void;
+  /**
    * **泡の全面を枠にする**（中身を押しても掴む）。
    *
    * ★ 中身が本物の UI でも、空間を持つ泡でも、どこを押しても泡を掴む。
@@ -375,8 +380,8 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
    * 掴み始め・触ったの知らせ先。**覚え書きから呼ぶ** ── 手つきの callback は `o` を依存に
    * 入れていないので、そのまま閉じ込めると古い口を呼び続ける。
    */
-  const hand = useRef({ onGrabStart: o.onGrabStart, onTap: o.onTap });
-  hand.current = { onGrabStart: o.onGrabStart, onTap: o.onTap };
+  const hand = useRef({ onGrabStart: o.onGrabStart, onTap: o.onTap, onBackgroundTap: o.onBackgroundTap });
+  hand.current = { onGrabStart: o.onGrabStart, onTap: o.onTap, onBackgroundTap: o.onBackgroundTap };
   /**
    * その泡の**装いが四辺に取るぶん**。当たり判定はここで中身と枠を分ける
    * ── **枠が見えている所が、掴める所**（`hit.ts` の `inContent`）。
@@ -683,6 +688,7 @@ export function useBubbleInput(o: BubbleInputOptions): BubbleInput {
         setWorld(focusOn(world, layout, d.id, rules));
         hand.current.onTap?.(d.id);
       }
+      if (d.kind === 'focus' && d.id === 'root') hand.current.onBackgroundTap?.();
       show();
       return;
     }

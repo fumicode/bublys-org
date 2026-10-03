@@ -22,12 +22,24 @@ export const WINDOW_SKY =
   'linear-gradient(145deg,hsl(220 35% 18%) 0%,hsl(225 40% 22%) 40%,hsl(230 35% 20%) 100%)';
 
 /**
- * **羽のカーソル**（風のモード）── 矢印に羽を添えたもの。矢印の先（2, 2）が押す点。
+ * **羽** ── 風と針のカーソルが、同じ 1 枚の羽を向きだけ変えて使う。
  *
- * ★ 羽の縁の下に白を敷いてある。暗い海の上でも、明るい中身の上でも輪郭が沈まないように。
- * ★ 32×32。ブラウザが受け付けるカーソルの大きさに収まり、高精細の画面でも SVG なので滲まない。
+ * ★ 優雅に ── なめらかな曲線だけで描き、切れ込みはやわらかく 1 つ。根元の毛のような
+ *   写実は入れない。白から淡い藤色・水色へ。矢印は出さない（羽だけ）。
+ * ★ 縁の下に白を敷いてある。暗い海の上でも、明るい中身の上でも輪郭が沈まないように。
+ * ★ 48×48（SVG なので高精細の画面でも滲まない）。大きすぎて使えない環境では控えに落ちる。
+ * ★ 押す点はどちらも**羽の軸の根元**（羽ペンのペン先と同じ所）。
  */
-const FEATHER_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M1.5 1.5L1.5 17L5.3 13.4L8 19.4L10.4 18.4L7.8 12.4L13 12.4Z' fill='%23111' stroke='%23fff' stroke-width='1.3' stroke-linejoin='round'/%3E%3Cg transform='translate(14.2 30.6) rotate(-45)'%3E%3Cpath d='M3 0L5 -2.7L8 -4.3L10.6 -4.6L11.5 -2.9L12.4 -4.4L15.6 -3L19.8 -1L15.4 1.5L12.2 2.6L10.6 2.7L9.9 1.4L9.1 2.7L6 2.3Z' fill='none' stroke='%23fff' stroke-width='2.8' stroke-linejoin='round'/%3E%3Cpath d='M0 0.2L18.6 -0.6' stroke='%23fff' stroke-width='2.8' stroke-linecap='round'/%3E%3Cpath d='M3 0L5 -2.7L8 -4.3L10.6 -4.6L11.5 -2.9L12.4 -4.4L15.6 -3L19.8 -1L15.4 1.5L12.2 2.6L10.6 2.7L9.9 1.4L9.1 2.7L6 2.3Z' fill='%23f4f7ff' stroke='%232c3150' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M0 0.2L18.6 -0.6' stroke='%232c3150' stroke-width='1.1' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E") 2 2`;
+const featherSvg = (transform: string) =>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#ffffff'/><stop offset='.5' stop-color='#f2edff'/><stop offset='1' stop-color='#dcefff'/></linearGradient></defs><g transform='${transform}'><path d='M7 0C13 -7 24 -12.6 36 -14.6Q34.6 -12.4 35.6 -11.6Q39.6 -15.4 46 -16C51.5 -16.4 55.5 -14.6 55 -12.6C50 -7 40 -2.6 28 -0.4C19 1.2 11.5 1.4 7 0Z' fill='none' stroke='#fff' stroke-width='2.4' stroke-linejoin='round'/><path d='M0 0C18 0.4 37 -4 54.6 -12.4' fill='none' stroke='#fff' stroke-width='2.2' stroke-linecap='round'/><path d='M7 0C13 -7 24 -12.6 36 -14.6Q34.6 -12.4 35.6 -11.6Q39.6 -15.4 46 -16C51.5 -16.4 55.5 -14.6 55 -12.6C50 -7 40 -2.6 28 -0.4C19 1.2 11.5 1.4 7 0Z' fill='url(#g)' stroke='#8a8dc0' stroke-width='.7' stroke-linejoin='round'/><path d='M17 -0.6Q22 -4.6 25 -9.4M27 -2Q33 -6.4 36.5 -11.6M38.5 -5Q44 -9.4 47.5 -14M19 0.4Q25 0.6 29 -0.6' fill='none' stroke='#d3cdf3' stroke-width='.55' stroke-linecap='round'/><path d='M0 0C18 0.4 37 -4 54.6 -12.4' fill='none' stroke='#8a8dc0' stroke-width='.8' stroke-linecap='round'/></g></svg>`;
+const svgCursor = (svg: string, x: number, y: number) =>
+  `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}`;
+
+/** 風 ── 根元が左下、羽先が右上（そっと吹いて運ぶ） */
+const FEATHER_CURSOR = svgCursor(featherSvg('translate(4 44) rotate(-55) scale(.9 -.9)'), 4, 44);
+
+/** 針 ── 同じ羽を上下に返して、根元が左上・羽先が右下。軸の根元で泡を突いて割る */
+const NEEDLE_CURSOR = svgCursor(featherSvg('translate(4 4) rotate(55) scale(.9 .9)'), 4, 4);
 
 export const SPACE_CSS = `
 /**
@@ -316,4 +328,50 @@ export const SPACE_CSS = `
 .bl-wind,.bl-wind .bub,.bl-wind .bub *{cursor:${FEATHER_CURSOR},grab}
 .bl-wind .bub > :is(.bl-close,.bl-tool,.bl-link){cursor:pointer}
 .bl-wind > .bl-hnd{cursor:nwse-resize}
+
+/*
+ * 針 ── × を押したまま引いている間だけ。層に .bl-needle が付く。
+ * ★ どの泡にも**急所**（.bl-spot）が出る。筆跡が急所を通った泡が割れる（BubbleSpace の armNeedle）。
+ *   急所は × の下、泡の右上の**内側**── 割るものと閉じるものが同じ所にある。
+ *   くっきりした玉ではなく、縁のぼやけた赤い光（膜の一部がぼんやり赤くなっている）。
+ *   大きめにして、おおざっぱに引いても当たるようにする（直径 64、赤が濃いのは真ん中）。
+ *   泡ごと縮んで描かれる（transform）ので、px で書けば遠い泡の急所は一緒に小さくなる。
+ * ★ 中身へは手を届かせない ── 筆跡の当たりは急所だけで取るので、中身が上にあると隠れる。
+ */
+.bub > .bl-spot{display:none}
+/* 中身は 1 つの重なりに閉じ込める ── 中身が自分で z-index を持つと（地図の板は 400）、急所を追い越して前に出る */
+.bl-needle > .bl-hold > .bub > .bl-body{pointer-events:none;isolation:isolate}
+.bl-needle > .bl-hold > .bub > .bl-spot{display:block;position:absolute;right:6px;top:28px;z-index:3;
+  width:64px;height:64px;border-radius:50%;pointer-events:auto;
+  background:radial-gradient(circle,rgba(236,34,62,.85) 0,rgba(236,34,62,.6) 28%,rgba(236,34,62,.22) 52%,rgba(236,34,62,0) 72%);
+  animation:bl-spot-beat 1.4s ease-in-out infinite}
+/*
+ * 当たりは、見える赤より画面の上でいつも少し広い（見えない縁）。
+ * ★ 遠い泡は急所も縮んで写るので、そのままだと遠いものほど当てにくい。縁の幅は --k
+ *   （写る倍率の逆数）を掛けて、泡がどれだけ縮んでも画面の上で同じにする。
+ */
+.bl-needle > .bl-hold > .bub > .bl-spot::before{content:"";position:absolute;inset:calc(-6px * var(--k,1));border-radius:50%}
+/* 呼吸 ── 大きさは変えず、赤の濃さだけが寄せては引く（膜が脈打つ） */
+@keyframes bl-spot-beat{0%,100%{opacity:.75}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){ .bl-needle > .bl-hold > .bub > .bl-spot{animation:none} }
+/*
+ * 急所を持たない泡（一覧の札）は、針を素通しにして薄める。
+ * ★ 札は DOM では一覧の兄弟で、一覧より前に描かれる ── そのままだと一覧の急所が札の下に隠れ、
+ *   筆跡も札に当たって届かない。薄めれば、下の急所が透けて見え、札が割る相手でないことも伝わる。
+ * ★ 薄めるのは filter ── 泡の opacity は遠さの薄まりとして style に直に入っているので、上書きできない。
+ */
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)),
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)) *{pointer-events:none}
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)){filter:opacity(.3)}
+.bl-needle,.bl-needle .bub,.bl-needle .bub *{cursor:${NEEDLE_CURSOR},crosshair}
+
+/* はじける泡（popEffect.ts）── 割った瞬間の写し。手は素通し（筆跡の当たりを邪魔しない） */
+/* ★ 写しは現れ直さない ── 泡の出現アニメ（bl-in）まで写ると、割れる泡がふわっと現れ直す */
+.bl-pop-ghost,.bl-pop-ghost *{pointer-events:none !important;transition:none !important;animation:none !important}
+.bl-pop-fx{position:absolute;left:0;top:0;transform-origin:0 0;overflow:visible}
+.bl-pop-ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.95);box-shadow:0 0 10px rgba(255,140,170,.75),inset 0 0 6px rgba(255,255,255,.8)}
+.bl-pop-drop{position:absolute;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff 0,rgba(255,182,224,.95) 45%,rgba(150,214,255,.85) 100%);
+  box-shadow:0 0 4px rgba(255,255,255,.7)}
 `;
