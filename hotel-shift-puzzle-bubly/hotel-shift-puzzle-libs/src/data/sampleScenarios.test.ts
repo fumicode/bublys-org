@@ -148,7 +148,9 @@ describe("作成途中の勤務表（2026年8月）", () => {
     // 田中が休むと、23日に予責を早番で担えるのは山本だけになる
     const afterTanaka = approve(afterKobayashi, "staff-4", aug(23), dayOff);
     expect(afterTanaka.candidates.candidatesOf("staff-7", aug(23))).toEqual([early]);
-  });
+    // 承認のたびに盤面全体の候補集合を計算し直すので重い（単独で約 4 秒）。
+    // 既定の 5 秒では、他のプロジェクトと並列で流したときに時間切れになる
+  }, 30_000);
 });
 
 

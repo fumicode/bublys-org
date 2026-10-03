@@ -32,7 +32,7 @@ const setUp = () => ({
     .assignShift('a', june1, 'early')
     .assignShift('b', june1, 'late'),
   constraints: new ConstraintSet({
-    scheduleId: 'sched-1',
+    id: 'sched-1',
     leaderRules: [
       new ShiftLeaderRule({
         key: 'early',
