@@ -366,6 +366,9 @@ export const ListSpace: FC<ListSpaceProps> = ({
         borderRadius: "inherit",
         /** 皮（`skin-css.ts`）が板の色を差し替えられるよう、変数を通す。無ければ今までの板 */
         background: `var(--bl-list-panel, ${LIST_PANEL})`,
+        /** 後ろのぼかしも皮が渡す（後ろに絵や泡が透けても、字が混ざらないように）。無ければぼかさない */
+        backdropFilter: "var(--bl-list-blur, none)",
+        WebkitBackdropFilter: "var(--bl-list-blur, none)",
         color: "#1b2029",
       }}
     >

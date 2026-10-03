@@ -36,7 +36,16 @@ const S = `.${BUBBLE_SKIN}`;
 export const BUBBLE_SKIN_CSS = `
 /* 一覧の板（ListSpace の LIST_PANEL）── 膜の上に乗るので、灰色ではなく白いすりガラスに */
 /* ★ 触っていないあいだは膜が無く、暗い海の上に直に乗るので、白は濃いめに */
-${S}{--bl-list-panel:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(248,249,253,.82) 100%)}
+/*
+ * 板の白とぼかしは変数にしてある ── 海の地によって、ちょうどよい白の濃さが違うので。
+ * ★ 既定は暗い海向け（白を濃く）。白を減らすと、暗い地が透けて灰色にくすむ。
+ *   明るい絵を敷いた海は、海の器（BubbleSea の style）で薄い白に差し替える
+ *   ── そうすると、ぼけた絵が板の向こうに透けて見える。
+ */
+${S}{--bl-list-panel:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(248,249,253,.82) 100%);
+  --bl-body-glass:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(248,249,253,.84) 100%);
+  /* 一覧の板も、中身の板と同じすりガラス（後ろが透けても字が混ざらない） */
+  --bl-list-blur:blur(14px) saturate(1.4)}
 /* 泡の本体は地を持たない。地は膜の板（.bl-film）が持つ */
 ${S} .bub:not(.imp){--rr:22px;--rw:1px;--rc:rgba(255,255,255,.72);--bl-dress:0;
   background:none;box-shadow:none}
@@ -131,8 +140,8 @@ ${S} .bub > .bl-body{border-radius:15px;
  *   灰色にくすむので。
  */
 ${S} .bub > .bl-body:not(.bl-clear):not(.bl-none){
-  background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(248,249,253,.84) 100%);
-  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4)}
+  background:var(--bl-body-glass);
+  -webkit-backdrop-filter:var(--bl-list-blur);backdrop-filter:var(--bl-list-blur)}
 ${S} .bub > .bl-body.bl-clear{border-radius:0 0 calc(var(--rr) - 2px) calc(var(--rr) - 2px);box-shadow:none}
 ${S} .bub > .bl-body.bl-none{box-shadow:none}
 `;

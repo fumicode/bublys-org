@@ -7,6 +7,7 @@
  *   ここに残るのは「OS には何が定位置に居るか」だけ ── ランチャー・見え方の口・
  *   ポケット・他のデモへ行く口の 4 つ。
  */
+import type { CSSProperties } from "react";
 import { BubbleSea, type Docked, type Home, type SeaSeed } from "@bublys-org/bubble-space-shell";
 /**
  * ★ **家具は lib から借りる**（`@bublys-org/space-furniture`）。世界線・見え方の口・
@@ -174,6 +175,27 @@ const SEA_OUTSIDE = [WORLD_LINES_URL] as const;
 const SEA_SEED = seaSeedJson as unknown as SeaSeed;
 
 /**
+ * **海の地の絵** ── テラスで旅を思い描く絵。泡はこの空の上に浮かぶ。
+ *
+ * ★ 窓いっぱいに敷き、はみ出すぶんは切る（cover）。真ん中を合わせる。
+ * ★ 絵の上に温かい白を薄く重ねる（明るい絵なので、明るい方へ薄める）。
+ *   そのままだと細かくて鮮やかすぎて、泡の中身の後ろで字と混ざる。
+ */
+const SEA_GROUND_IMAGE =
+  'linear-gradient(rgba(252,250,246,.45),rgba(252,250,246,.45)),' +
+  ' url("/backgrounds/terrace-dream.jpg") center / cover no-repeat, #f4f1ea';
+
+/**
+ * **板の白を薄くする**（皮の変数を差し替える）── 明るい絵の上では、白を減らしても灰色にくすまない。
+ * 板の向こうに、ぼけた絵が透けて見えるくらいにする（字が混ざらないのは、すりガラスのぼかしが受け持つ）。
+ */
+const LIGHT_GLASS = {
+  '--bl-list-panel': 'linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(250,250,252,.45) 100%)',
+  '--bl-body-glass': 'linear-gradient(180deg,rgba(255,255,255,.62) 0%,rgba(250,250,252,.52) 100%)',
+  '--bl-list-blur': 'blur(16px) saturate(1.3)',
+} as CSSProperties;
+
+/**
  * ルール: **家具は OS が持ち、海は器が立てる。**
  * ランチャー集約（呼び出しの中身）は Redux にある ── 泡として出すのは海の仕事。
  */
@@ -204,6 +226,7 @@ export const BubblesUINext = () => {
     <BubbleSea
       routes={routes}
       homes={HOMES}
+      ground={SEA_GROUND_IMAGE}
       worldLineScope={ROOT_SEA_SCOPE}
       rules={SEA_RULES}
       worldLineOutside={SEA_OUTSIDE}
@@ -215,7 +238,7 @@ export const BubblesUINext = () => {
        *   ── 実測：器を 80px 高くすると、帯の下端が見えている高さより 80px 下へ行った。
        *   `dvh` はいま見えている高さを指すので、岸の座標（`window.innerHeight`）と揃う。
        */
-      style={{ height: "100dvh" }}
+      style={{ height: "100dvh", ...LIGHT_GLASS }}
     />
     </div>
   );
