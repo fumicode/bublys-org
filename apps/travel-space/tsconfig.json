@@ -19,7 +19,7 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "types": ["jest", "node"],
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
     "outDir": "dist",
     "rootDir": "."
   },
@@ -36,8 +36,6 @@
     "out-tsc",
     "dist",
     "node_modules",
-    "jest.config.ts",
-    "jest.config.cts",
     "app/**/*.spec.ts",
     "app/**/*.test.ts",
     "src/**/*.spec.ts",
