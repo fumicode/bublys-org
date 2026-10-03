@@ -15,6 +15,7 @@ import {
   StaffMonthlyShiftWish,
   WorkShift,
   WorkingDay,
+  WorkingStaffGroup,
   computeAllCandidates,
   deadCellDiagnosisToPlain,
   findRepairsForDeadCell,
@@ -26,6 +27,7 @@ import {
   type ConstraintSetPlain,
   type StaffMonthlyShiftWishPlain,
   type WorkShiftState,
+  type WorkingStaffGroupPlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { buildScheduleConstraints } from "../scheduleConstraints.js";
 
@@ -45,6 +47,11 @@ export type CandidateRequest = {
   /** 希望との食い違いも制約として見るか */
   checkShiftWish: boolean;
   wishes: StaffMonthlyShiftWishPlain[];
+  /**
+   * 勤務スタッフ群。可能勤務帯（その人が入れる勤務帯）で候補の元を絞るのに使う。
+   * 群がまだ無い勤務表なら null（全員がどの勤務帯にも入れる）。
+   */
+  staffGroup: WorkingStaffGroupPlain | null;
   /**
    * 差分計算するときだけ渡す。previous（前回の候補集合）と changed（変わったセル）が
    * 揃っているときは影響範囲だけ計算し、揃っていなければ全計算する。
@@ -75,6 +82,9 @@ function rebuildInput(request: CandidateRequest): CandidateComputationInput {
     schedule,
     workShifts,
     staffIds: request.staffIds,
+    staffGroup: request.staffGroup
+      ? WorkingStaffGroup.fromPlain(request.staffGroup)
+      : undefined,
     constraints: buildScheduleConstraints({
       modelConstraints: aggregate?.modelConstraints(shiftIdsOf),
       wish: request.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,

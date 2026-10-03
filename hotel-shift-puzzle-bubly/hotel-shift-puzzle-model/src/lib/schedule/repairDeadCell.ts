@@ -29,7 +29,7 @@ import {
   legalCandidatesFor,
   type CellCandidateEvaluation,
 } from "./cellCandidates.js";
-import type { CandidateComputationInput } from "./computeCandidates.js";
+import { workShiftsFor, type CandidateComputationInput } from "./computeCandidates.js";
 
 /** 詰みセルを解消する1手の書き換え案 */
 export type ScheduleRepair = {
@@ -143,13 +143,15 @@ export function findRepairsForDeadCell(
   dead: ScheduleCellRef,
   limits: RepairSearchLimits = {}
 ): DeadCellDiagnosis {
-  const { schedule, constraints, workShifts } = input;
+  const { schedule, constraints } = input;
+  // 詰みセルに入れたいのは、その人が入れる勤務帯（可能勤務帯で絞った値）だけ
+  const deadShifts = workShiftsFor(input, dead.staffId);
   const blocked = evaluateCellCandidates(
     schedule,
     constraints,
     dead.staffId,
     dead.day,
-    workShifts
+    deadShifts
   );
 
   const diagnosis: DeadCellDiagnosis = {
@@ -188,13 +190,14 @@ export function findRepairsForDeadCell(
   }
 
   const beforeViolations = schedule.checkConstraints(constraints);
-  const values = enumerateCellCandidates(workShifts).filter(
-    (cell) => cell.kind !== "undecided"
-  );
 
   const repairs: ScheduleRepair[] = [];
   for (const probe of probes.values()) {
     const current = schedule.statusOf(probe.staffId, probe.day);
+    // 書き換え先も、そのセルの人が入れる勤務帯に限る（入れない勤務帯への書き換えは提案しない）
+    const values = enumerateCellCandidates(workShiftsFor(input, probe.staffId)).filter(
+      (cell) => cell.kind !== "undecided"
+    );
     for (const value of values) {
       if (shiftCellsEqual(current, value)) continue;
 
@@ -204,7 +207,7 @@ export function findRepairsForDeadCell(
         constraints,
         dead.staffId,
         dead.day,
-        workShifts
+        deadShifts
       );
       if (unlocks.length === 0) continue; // まだ詰んだまま
 
