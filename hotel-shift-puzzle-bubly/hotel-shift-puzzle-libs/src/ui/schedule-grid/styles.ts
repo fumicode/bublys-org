@@ -215,7 +215,7 @@ export const StyledWrap = styled.div`
   .e-off-total {
     position: sticky;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 1;
+    z-index: 2; /* 違反の印（z-index:1・DOM で後ろ）より上。横スクロールで印を隠す */
     background: #fbfbfb;
     display: flex;
     align-items: center;
@@ -263,7 +263,7 @@ export const StyledWrap = styled.div`
   .e-early-total {
     position: sticky;
     right: 0;
-    z-index: 1;
+    z-index: 2; /* 違反の印より上（.e-off-total と同じ） */
     background: #f5faff;
     display: flex;
     align-items: center;
@@ -498,7 +498,7 @@ export const StyledWrap = styled.div`
   .e-staff-cell {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: 2; /* 違反の印より上（.e-off-total と同じ） */
     background: #fff;
     display: flex;
     align-items: center;
@@ -572,8 +572,8 @@ export const StyledWrap = styled.div`
   /* データセル */
   .e-cell {
     position: relative;
-    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
-    overflow: hidden;
+    /* セル自体はクリップしない。違反の印（ViolationMarks）が末尾のセルから左の列へ伸びるため。
+       角へ退避した希望の円のクリップは .e-wish-marks が受け持つ。 */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -659,6 +659,8 @@ export const StyledWrap = styled.div`
   .e-wish-marks {
     position: absolute;
     inset: 0;
+    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
+    overflow: hidden;
     pointer-events: none; /* セルの選択を邪魔しない（叶わなかった円だけ下で戻す） */
   }
 
@@ -734,8 +736,11 @@ export const StyledWrap = styled.div`
        そのまま（角の弧という見た目を崩さない）。 */
   .e-cell.has-wish-hint:hover,
   .e-cell.has-wish-hint.is-selected {
-    overflow: visible;
     z-index: 5;
+  }
+  .e-cell.has-wish-hint:hover .e-wish-marks,
+  .e-cell.has-wish-hint.is-selected .e-wish-marks {
+    overflow: visible;
   }
   .e-cell:hover .e-wish-marks.is-corner .e-wish-badge .e-wish-char,
   .e-cell.is-selected .e-wish-marks.is-corner .e-wish-badge .e-wish-char {
@@ -775,12 +780,21 @@ export const StyledWrap = styled.div`
     font-weight: normal;
   }
 
-  /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */
+  /* 違反の印（ViolationMarks）。違反1件に印1つで、違反が覆う範囲の末尾のセルに置き、
+     そこから左へ伸ばす。セルの中の絶対配置なので、行・列の番号を数えずにセルへ追従する。
+
+     基準はセルの padding box（右と下の罫線 1px を除いた矩形）。重なり順は z-index:1 で
+     「帯がかかる左のセル（選択中の z-index:1 も DOM で前なので下）より上、固定列（名前・休・早。
+     z-index:2）・日付ヘッダ（2）・制約ホバーのオーバーレイ（3〜4）より下」。 */
+
+  /* 連勤など複数日の違反: 覆う日の下端に1本の赤帯。
+     --span 列ぶん左へ伸ばす。1列は「padding box の幅＋右の罫線 1px」なので、
+     末尾のセルの右端から span 列ぶん戻ると先頭のセルの左端（＝以前の1セルずつの帯と同じ位置）。 */
   .e-violation-bar {
     position: absolute;
-    left: 0;
     right: 0;
     bottom: 0;
+    width: calc(var(--span, 1) * (100% + 1px) - 1px);
     height: 4px;
     background: #e53935;
     cursor: pointer;
@@ -792,52 +806,38 @@ export const StyledWrap = styled.div`
     }
   }
 
-  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を出す。
+  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を1つ出す。
      違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
      希望の円（単日違反）とは別の形にしている。
-
-     前日側は右端に、翌日側は左端に同じ印を出す。丸は境界線の上に中心が来るよう半分だけ
-     はみ出させ（セルは overflow:hidden なのでそこで切られる）、2つの半円が合わさって
-     境界線上の1つの丸に見えるようにしている。 */
+     後の日のセルに置き、中心を前の日の右の罫線（セルの左端から -0.5px）に合わせる。 */
   .e-interval-bar {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 4px;
+    left: -0.5px;
+    width: 9px;
+    transform: translateX(-50%);
     background: #e53935;
     cursor: pointer;
     z-index: 1;
     transition: width 0.1s;
 
-    &.is-before {
-      left: 0;
-    }
-    &.is-after {
-      right: 0;
-    }
-
     &:hover {
-      width: 7px;
+      width: 15px;
     }
 
-    /* 境界線の上に乗る丸（半分はセルの外＝クリップされる） */
-    &::after {
-      content: "";
+    /* 境界線の上に乗る丸。帯の当たり判定（ObjectView）の子なので、丸の上でもバブルを開ける */
+    .e-interval-dot {
       position: absolute;
       top: 50%;
+      left: 50%;
       width: 11px;
       height: 11px;
-      margin-top: -5.5px;
+      transform: translate(-50%, -50%);
       border-radius: 50%;
       background: #e53935;
       border: 1.5px solid #fff;
       box-sizing: border-box;
-    }
-    &.is-before::after {
-      left: -5.5px;
-    }
-    &.is-after::after {
-      right: -5.5px;
     }
   }
 
