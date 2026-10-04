@@ -128,6 +128,11 @@ export type BubblesContextType = {
     openingPosition?: OpeningPosition,
     options?: OpenBubbleOptions,
   ) => string;
+  /**
+   * その url のバブルがすでに開いているか。
+   * 「1つあれば足りるバブル」を開く側が、開く前に確かめるための問い。答えない海もある（未定義）。
+   */
+  isOpen?: (url: string) => boolean;
 };
 
 export const BubblesContext = createContext<BubblesContextType>({

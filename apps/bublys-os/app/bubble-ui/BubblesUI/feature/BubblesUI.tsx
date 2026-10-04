@@ -1,5 +1,5 @@
 import { FC, useEffect, useCallback, useState, useMemo } from "react";
-import { useAppSelector, useAppDispatch, selectWindowSize, setWindowSize, addPocketItem, selectPocketItems, removePocketItem } from "@bublys-org/state-management";
+import { useAppSelector, useAppDispatch, useAppStore, selectWindowSize, setWindowSize, addPocketItem, selectPocketItems, removePocketItem } from "@bublys-org/state-management";
 import { useShellManager } from "@bublys-org/object-shell";
 import { nameIntent } from "@bublys-org/world-line-graph";
 
@@ -31,6 +31,7 @@ import {
   measureViewport,
   OpeningPosition,
   DragDataType,
+  selectHasBubbleOfUrl,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 import { BubbleContent } from "../ui/BubbleContent";
@@ -58,6 +59,7 @@ type BubblesUI = {
 
 export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   // レイヤー構造（IDの配列のみ）- 各バブルは自分でReduxから取得
   const bubbleLayers = useAppSelector(selectBubbleLayers);
   // surface判定用（popChild/joinSibling判定のみに使用）
@@ -222,7 +224,8 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     surfaceLeftTop,
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
+    isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url),
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store]);
 
   const handleBubbleClick = useCallback((name: string) => {
     console.log("Bubble clicked: " + name);

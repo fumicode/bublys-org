@@ -90,6 +90,7 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
       openBubble: (url: string, openerBubbleId?: string) => {
         space.openBubble(url, openerBubbleId ?? bubble.id);
       },
+      isOpen: (url: string) => space.hasUrl(url),
       surfaceLeftTop: { x: 0, y: 0 },
     }),
     [space, bubble.id],

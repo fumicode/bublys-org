@@ -5,6 +5,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
   useAppSelector,
   useAppDispatch,
+  useAppStore,
   selectWindowSize,
   setWindowSize,
   selectPocketItems,
@@ -32,6 +33,7 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   OpeningPosition,
+  selectHasBubbleOfUrl,
 } from '../state/index.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
@@ -86,6 +88,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   onOpenUrl,
 }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
   const surfaceBubbles = useAppSelector(selectSurfaceBubbles);
 
@@ -210,7 +213,8 @@ export const BublyApp: FC<BublyAppProps> = ({
     surfaceLeftTop,
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
+    isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url),
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store]);
 
   // Pocket
   const [isPocketOpen, setIsPocketOpen] = useState(false);

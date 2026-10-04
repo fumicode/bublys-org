@@ -1,6 +1,6 @@
 "use client";
 import { FC, ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
-import { useAppDispatch, useAppSelector, selectWindowSize } from "@bublys-org/state-management";
+import { useAppDispatch, useAppSelector, useAppStore, selectWindowSize } from "@bublys-org/state-management";
 import { CoordinateSystem, Layer } from "@bublys-org/bubbles-ui-util";
 import { nameIntent } from "@bublys-org/world-line-graph";
 import { Bubble, createBubble } from "../Bubble.domain.js";
@@ -26,6 +26,7 @@ import {
   replaceBubbleArrangement,
   type OpeningPosition,
   buildSeedArrangement,
+  selectHasBubbleOfUrl,
 } from "../state/index.js";
 
 export type UniverseViewProps = {
@@ -56,6 +57,7 @@ export const UniverseView: FC<UniverseViewProps> = ({
   children,
 }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   // この universe の DOM 要素を引くためのラッパ ref（下部ストリップ計測用）
   const rootRef = useRef<HTMLDivElement>(null);
   const bubbleLayers = useAppSelector(makeSelectBubbleLayers(universeId));
@@ -196,8 +198,14 @@ export const UniverseView: FC<UniverseViewProps> = ({
   );
 
   const bubblesContextValue = useMemo(
-    () => ({ pageSize, surfaceLeftTop, coordinateSystem: globalCoordinateSystem, openBubble }),
-    [pageSize, surfaceLeftTop, globalCoordinateSystem, openBubble],
+    () => ({
+      pageSize,
+      surfaceLeftTop,
+      coordinateSystem: globalCoordinateSystem,
+      openBubble,
+      isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url, universeId),
+    }),
+    [pageSize, surfaceLeftTop, globalCoordinateSystem, openBubble, store, universeId],
   );
 
   return (

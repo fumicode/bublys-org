@@ -575,6 +575,13 @@ export const selectBubble = (
   { id, universeId = ROOT_UNIVERSE_ID }: { id: string; universeId?: string },
 ) => Bubble.fromJSON(universeOf(state, universeId).bubbles[id]);
 
+/** その url のバブルが universe に開いているか */
+export const selectHasBubbleOfUrl = (
+  state: { bubbleState: BubbleStateSlice },
+  url: string,
+  universeId: string = ROOT_UNIVERSE_ID,
+): boolean => Object.values(universeOf(state, universeId).bubbles).some((b) => b.url === url);
+
 export const selectRenderCount = (state: { bubbleState: BubbleStateSlice }) =>
   state.bubbleState.renderCount;
 
