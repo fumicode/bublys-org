@@ -701,7 +701,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   return (
     <UniverseContext.Provider value={universeContextValue}>
      <ShowreDockContext.Provider value={showreDock}>
-      <StyledFrame $nested={isNested}>
+      <StyledFrame $nested={isNested} $showreEnabled={isShowreEnabled}>
         {/* 誰も受け止めなかったドロップは、宇宙が落ちた場所で受け止める。
             ハンドラを StyledUniverse ではなく StyledViewport に付けるのは、
             StyledUniverse には最小サイズ（UNIVERSE_MIN_SIZE）があり、可視領域の
@@ -755,6 +755,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
           viewport={showreViewport}
           renderBubbleContent={renderBubbleContent}
           preview={dockPreview}
+          isShowreEnabled={isShowreEnabled}
         />
 
         <StyledHeadsUpDisplay
@@ -798,7 +799,7 @@ export const BubblesLayeredView = memo(BubblesLayeredViewInner);
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
 
-const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
+const StyledFrame = styled.div<DivProps & { $nested?: boolean; $showreEnabled?: boolean }>`
   width: 100%;
   height: 100%;
   position: relative;
@@ -806,8 +807,9 @@ const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
   z-index: 0;
 
   /* 海の角は丸い。岸のネオン管（ShowreRim）と同じ丸みで切り抜く
-     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える */
-  border-radius: ${TUBE_RADIUS}px;
+     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える。
+     岸を切っていれば管が無いので、角も丸めない */
+  border-radius: ${({ $showreEnabled = true }) => ($showreEnabled ? `${TUBE_RADIUS}px` : "0")};
 
   /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
      全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */
