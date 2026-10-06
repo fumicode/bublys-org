@@ -2,11 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { beginIntent } from "@bublys-org/world-line-graph";
 import { BubbleArrangement } from "../BubbleArrangement.domain.js";
-import { useAppDispatch } from "@bublys-org/state-management";
+import { useAppDispatch, useAppStore } from "@bublys-org/state-management";
+import { measureOpenRegion } from "../utils/open-region.js";
 import {
   ROOT_UNIVERSE_ID,
   buildSeedArrangement,
   getInitialBubbleUrls,
+  makeSelectSurfaceLeftTop,
   replaceBubbleArrangement,
 } from "../state/bubbles-slice.js";
 import type { SnapshotCodec } from "../bubble-routing/SnapshotCodec.js";
@@ -79,6 +81,7 @@ export function useBrowserRootArrangementWorldLine(
   scopeId?: string,
 ) {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   // commit で新しいノードが生まれた瞬間だけ履歴を積む。宣言順の都合で ref 経由にする
   const onCommittedRef = useRef<(nodeId: string) => void>(() => undefined);
   const { apexId, scope, restoresFromWorldLine } = useUniverseArrangementWorldLine(
@@ -95,7 +98,10 @@ export function useBrowserRootArrangementWorldLine(
     if (restoresFromWorldLine) return;
     const urls = getInitialBubbleUrls();
     if (!urls.length) return;
-    dispatch(replaceBubbleArrangement(buildSeedArrangement(urls), ROOT_UNIVERSE_ID));
+    // 撒いたバブルも、開いたバブルと同じく見えている範囲からはみ出さない
+    const surfaceLeftTop = makeSelectSurfaceLeftTop(ROOT_UNIVERSE_ID)(store.getState() as any);
+    const region = measureOpenRegion(surfaceLeftTop);
+    dispatch(replaceBubbleArrangement(buildSeedArrangement(urls, region), ROOT_UNIVERSE_ID));
     // 初回だけ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
