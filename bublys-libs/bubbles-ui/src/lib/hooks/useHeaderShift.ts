@@ -3,11 +3,11 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 /**
  * ヘッダー（ステータス／アドレスバー）は**いつも箱の外（上）**に出す。
- * 上に出しきれないとき（画面や窓の上端に着いているとき）は、バブルの側を
+ * 上に出しきれないとき（universe の上端に着いているとき）は、バブルの側を
  * そのぶん下へずらす。ずらす量がこの hook の返す `shift`。
  *
  * 規則はふたつだけ ──
- *  1. ヘッダーの上端が、見えている範囲の上端より上に出ない（出ないように下へずらす）
+ *  1. ヘッダーの上端が、universe の上端より上に出ない（出ないように下へずらす）
  *  2. ずれているのは**バーを出している間だけ**。消えたら、そのぶん上に戻って辺にくっつく
  *
  * だから「ずらす量」は出した瞬間に測り直す。mousemove のような別のきっかけに頼ると、
@@ -33,16 +33,18 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
   shiftRef.current = shift;
 
   /**
-   * 「見えている範囲」の上端。
+   * ヘッダーが越えてはいけない上端 ＝ **このバブルが居る universe の上端**。
    *
-   * universe の中に居るときは、その窓（`main.e-window-content`）の上端。
-   * ブラウザの viewport（0）を基準にすると、入れ子の中で上端に着いたバブルの
-   * ヘッダーが窓の外に出てクリップされ、掴めなくなる。
-   * root universe では該当する祖先が無いので 0（= viewport 上端）。
+   * ★ 見えている範囲（viewport や窓）の上端ではない。バブルは universe の上端を
+   *   越えられないが、見えている範囲の外へ出るのは構わない ── 海をスクロールすれば
+   *   画面の上へ流れていくのが自然。見えている範囲を基準にしていたときは、
+   *   画面の上へ流れたバブルが、ヘッダーを見せようとして画面の中へ押し戻されていた。
+   * universe の矩形はスクロールと一緒に動くので、画面の座標のまま比べてよい。
+   * 入れ子の中でも、いちばん近い universe（その窓の海）が基準になる。
    */
-  const visibleTopBound = (): number => {
-    const clip = ref.current?.closest("main.e-window-content");
-    return clip ? clip.getBoundingClientRect().top : 0;
+  const topBound = (): number => {
+    const universe = ref.current?.closest("[data-bubble-universe]");
+    return universe ? universe.getBoundingClientRect().top : 0;
   };
 
   /**
@@ -70,7 +72,7 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
       ref.current?.querySelector(headerSelector)?.getBoundingClientRect().height ?? fallbackHeight;
     // いまずれているぶんを引いて、素の位置で測る
     const headerTop = bubbleRect.top - appliedShift() - headerHeight;
-    const next = Math.max(0, visibleTopBound() - headerTop);
+    const next = Math.max(0, topBound() - headerTop);
     if (!Number.isFinite(next)) return;
     // ★ サブピクセルの差では動かさない。
     //   実測は毎回わずかに違う値（48.3984375 と 48.39843814697266 など）を返すので、
