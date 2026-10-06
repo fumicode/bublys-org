@@ -2,7 +2,7 @@
 import { FC, useContext, useLayoutEffect, useMemo, useState, memo, useRef, useEffect } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
@@ -17,7 +17,6 @@ import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleI
 import { cornerRadiusFor, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { useHeaderShift } from "../hooks/useHeaderShift.js";
 import { useShowreEdges } from "../showre/ShowreContext.js";
-import { depthTransform } from "./depthTransform.js";
 
 const HEADER_PROXIMITY_THRESHOLD = 40;
 
@@ -358,7 +357,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
   transform-origin: ${({ $transformOrigin }) =>
     $transformOrigin ? `${$transformOrigin.x}px ${$transformOrigin.y}px` : "center center"};
   /* ヘッダーを箱の外に出しきるためのずらし（$shift）と、レイヤーの縮尺 */
-  transform: ${({ $layerIndex, $shift = 0 }) => depthTransform($layerIndex ?? 0, $shift)};
+  transform: translateY(${({ $shift = 0 }) => $shift}px) scale(${({ $layerIndex }) => CoordinateSystem.fromLayerIndex($layerIndex ?? 0).scale});
   transition: transform 0.15s ease;
 
   /* 海に浮いている窓の頭打ち。岸に貼った窓は画面いっぱいまで伸ばせる（上限は海の大きさ） */

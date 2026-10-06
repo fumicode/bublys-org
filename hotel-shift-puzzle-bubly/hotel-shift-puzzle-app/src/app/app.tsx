@@ -17,10 +17,9 @@ BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
 /**
  * ★ **奥へ行っても縮めない。** 勤務表は字が細かいので、縮むと読めなくなり、
  *   読めないから中身を省く（骨だけ）── が初めての人には「消えた」に見える。
- *   代わりに 1 段ごとに左上へ同じだけ寄せて、後ろのバブルの端が覗くようにする。
- *   縮めないので、骨だけにする処理もかからない（isTooSmallToRead）。
+ *   奥は重なり順だけで表す。縮めないので、骨だけにする処理もかからない（isTooSmallToRead）。
  */
-configureDepth({ scaleDecayRate: 0, shiftPerLayer: 24 });
+configureDepth({ scaleDecayRate: 0 });
 
 // サイドバーのメニュー項目（ルートを追加したらここに対応エントリーを足す）
 

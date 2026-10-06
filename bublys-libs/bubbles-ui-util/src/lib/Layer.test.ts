@@ -79,30 +79,18 @@ describe("Layer", () => {
   });
 });
 
-describe("縮めずに寄せる奥行き（configureDepth）", () => {
-  beforeEach(() => configureDepth({ scaleDecayRate: 0, shiftPerLayer: 24 }));
+describe("縮めない奥行き（configureDepth）", () => {
+  beforeEach(() => configureDepth({ scaleDecayRate: 0 }));
   afterEach(() => configureDepth({}));
 
-  it("どの深さでも scale は 1", () => {
-    expect(new Layer(3, { x: 0, y: 0 }, { x: 0, y: 0 }).scale).toBe(1);
-  });
-
-  it("1 段奥へ行くごとに左上へ shiftPerLayer ずつ寄る（位置によらない）", () => {
-    const at = (index: number) => new Layer(index, { x: 100, y: 100 }, { x: 0, y: 0 });
-    expect(at(0).place({ x: 50, y: 60 })).toEqual({ x: 150, y: 160 });
-    expect(at(2).place({ x: 50, y: 60 })).toEqual({ x: 102, y: 112 });
-    expect(at(2).place({ x: 500, y: 600 })).toEqual({ x: 552, y: 652 });
-  });
-
-  it("locate は place の逆", () => {
+  it("どの深さでも scale は 1 で、位置もずれない", () => {
     const layer = new Layer(3, { x: 100, y: 100 }, { x: 7, y: 9 });
-    expect(layer.locate(layer.place({ x: 50, y: 60 }))).toEqual({ x: 50, y: 60 });
+    expect(layer.scale).toBe(1);
+    expect(layer.place({ x: 50, y: 60 })).toEqual({ x: 150, y: 160 });
   });
 
-  it("既定に戻せば今まで通り縮み、寄せは無い", () => {
+  it("既定に戻せば今まで通り縮む", () => {
     configureDepth({});
-    const cs = CoordinateSystem.fromLayerIndex(3);
-    expect(cs.scale).toBeCloseTo(0.7);
-    expect(cs.depthShift).toEqual({ x: 0, y: 0 });
+    expect(CoordinateSystem.fromLayerIndex(3).scale).toBeCloseTo(0.7);
   });
 });
