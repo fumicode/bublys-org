@@ -6,9 +6,12 @@ import { useLayoutEffect, useRef, useState } from "react";
  * 上に出しきれないとき（universe の上端に着いているとき）は、バブルの側を
  * そのぶん下へずらす。ずらす量がこの hook の返す `shift`。
  *
- * 規則はふたつだけ ──
- *  1. ヘッダーの上端が、universe の上端より上に出ない（出ないように下へずらす）
+ * 規則は 3 つ ──
+ *  1. ヘッダーの上端が、universe の上端より上に出ない（出ないように**バブルごと**下へずらす）
  *  2. ずれているのは**バーを出している間だけ**。消えたら、そのぶん上に戻って辺にくっつく
+ *  3. ヘッダーが**見えている範囲**の上端より上に出るなら、**ヘッダーだけ**をバブルに重ねて
+ *     下ろす（`headerDrop`）。バブルは画面の外へ流れてよいが、掴む所は見えていてほしい。
+ *     下ろせるのはバブルの下端まで ── 下端まで画面の外へ出たら、ヘッダーも一緒に出ていく
  *
  * だから「ずらす量」は出した瞬間に測り直す。mousemove のような別のきっかけに頼ると、
  * バーだけ出て押し下げが 0 のまま（＝バーが画面の外）という食い違いが起きる。
@@ -31,6 +34,8 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
   const [shift, setShift] = useState(0);
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
+  /** ヘッダーだけを下ろす量（バブルの中の座標 px） */
+  const [headerDrop, setHeaderDrop] = useState(0);
 
   /**
    * ヘッダーが越えてはいけない上端 ＝ **このバブルが居る universe の上端**。
@@ -46,6 +51,16 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
     const universe = ref.current?.closest("[data-bubble-universe]");
     return universe ? universe.getBoundingClientRect().top : 0;
   };
+
+  /** スクロールする器（universe の親 = 海の見えている範囲） */
+  const scroller = (): HTMLElement | null =>
+    ref.current?.closest("[data-bubble-universe]")?.parentElement ?? null;
+
+  /** 見えている範囲の上端。ヘッダーはここより上に出たら、バブルに重ねて下ろす（規則 3） */
+  const visibleTop = (): number => scroller()?.getBoundingClientRect().top ?? 0;
+
+  const headerHeightNow = (): number =>
+    ref.current?.querySelector(headerSelector)?.getBoundingClientRect().height ?? fallbackHeight;
 
   /**
    * いま**実際に効いている**ずらし量（px）。
@@ -64,20 +79,43 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
     return Number.isFinite(m.m42) ? m.m42 : shiftRef.current;
   };
 
-  /** いまの位置から、必要なずらし量を測り直す */
+  /** いまの位置から、必要なずらし量（バブルごと・ヘッダーだけ）を測り直す */
   const measure = () => {
-    const bubbleRect = ref.current?.getBoundingClientRect();
-    if (!bubbleRect) return;
-    const headerHeight =
-      ref.current?.querySelector(headerSelector)?.getBoundingClientRect().height ?? fallbackHeight;
+    const el = ref.current;
+    const bubbleRect = el?.getBoundingClientRect();
+    if (!el || !bubbleRect) return;
+    const headerHeight = headerHeightNow();
     // いまずれているぶんを引いて、素の位置で測る
-    const headerTop = bubbleRect.top - appliedShift() - headerHeight;
-    const next = Math.max(0, topBound() - headerTop);
+    const rawTop = bubbleRect.top - appliedShift();
+    const next = Math.max(0, topBound() - (rawTop - headerHeight));
     if (!Number.isFinite(next)) return;
     // ★ サブピクセルの差では動かさない。
     //   実測は毎回わずかに違う値（48.3984375 と 48.39843814697266 など）を返すので、
     //   そのまま入れると「値が変わった → 描き直し → また測る」で止まらなくなる。
     setShift((prev) => (Math.abs(prev - next) < SHIFT_EPSILON ? prev : next));
+
+    // 規則 3: ずらし終えた位置で、ヘッダーが見えている範囲の上に出るぶんだけ下ろす。
+    // 下ろすのはバブルの下端まで（＝最大でバブルの高さ）。
+    // ヘッダーはバブルの中に居るので、画面の px をバブルの縮尺で割って中の px にする。
+    const headerTop = rawTop + next - headerHeight;
+    const dropOnScreen = Math.min(Math.max(0, visibleTop() - headerTop), bubbleRect.height);
+    const scale = el.offsetHeight > 0 ? bubbleRect.height / el.offsetHeight : 1;
+    const nextDrop = scale > 0 ? dropOnScreen / scale : 0;
+    setHeaderDrop((prev) => (Math.abs(prev - nextDrop) < SHIFT_EPSILON ? prev : nextDrop));
+  };
+
+  /**
+   * マウスが「バブルの見えている部分の上の辺」の近くにあるか（ヘッダーを出すきっかけ）。
+   * 上の辺が画面の外なら、見えている範囲の上端を辺とみなす。そのときヘッダーは
+   * 下ろされてバブルに重なるので、ヘッダーの上にいる間も「近く」に数える。
+   */
+  const isNearTop = (clientY: number, threshold: number): boolean => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return false;
+    const top = visibleTop();
+    const edge = Math.max(rect.top, top);
+    const covered = rect.top < top ? headerHeightNow() : 0;
+    return clientY - edge < threshold + covered;
   };
 
   /**
@@ -104,6 +142,15 @@ export function useHeaderShift({ ref, headerSelector, fallbackHeight, visible }:
     return () => el.removeEventListener("transitionend", onEnd);
   }, [shift, visible]);
 
+  /** 出している間は、海のスクロールでも測り直す（バブルは描き直されないので） */
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = scroller();
+    if (!el) return;
+    el.addEventListener("scroll", measure, { passive: true });
+    return () => el.removeEventListener("scroll", measure);
+  }, [visible]);
+
   // 出していない間は 0（＝辺にくっついたまま）
-  return { shift: visible ? shift : 0, measure };
+  return { shift: visible ? shift : 0, headerDrop: visible ? headerDrop : 0, measure, isNearTop };
 }
