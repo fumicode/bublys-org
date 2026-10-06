@@ -70,8 +70,8 @@ export type BublyAppProps = {
    * ── でないと、押した泡が**見えない旧い海のほう**に開く。
    */
   onOpenUrl?: (url: string) => void;
-  /** 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う（{@link BubblesLayeredViewProps.showre}） */
-  showre?: boolean;
+  /** 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う（{@link BubblesLayeredViewProps.isShowreEnabled}） */
+  isShowreEnabled?: boolean;
 };
 
 /**
@@ -86,7 +86,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   backdropColor,
   sea,
   onOpenUrl,
-  showre,
+  isShowreEnabled,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -339,7 +339,7 @@ export const BublyApp: FC<BublyAppProps> = ({
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}
-                  showre={showre}
+                  isShowreEnabled={isShowreEnabled}
                 />
               </Box>
             </BubbleRefsProvider>

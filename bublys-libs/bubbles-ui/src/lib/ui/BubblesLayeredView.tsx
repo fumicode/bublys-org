@@ -215,7 +215,7 @@ export type BubblesLayeredViewProps = {
    * 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う。
    * 切ると、どこで離しても海に浮く。もう貼り付いているバブルは、掴めば剥がせる。
    */
-  showre?: boolean;
+  isShowreEnabled?: boolean;
 };
 
 const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
@@ -235,7 +235,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerUp,
   onCoordinateSystemReady,
   onDebugRects,
-  showre = true,
+  isShowreEnabled = true,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const universeRef = useRef<HTMLDivElement>(null);
@@ -603,7 +603,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const edges = edgesNear({ x: cursor.x - box.left, y: cursor.y - box.top }, viewport);
       // 縁から遠ければ（岸を切っていればどこでも）海に浮く。
       // そのままの場所・大きさで予告する（岸 → 海 のときも出る）
-      if (!showre || edges.length === 0) {
+      if (!isShowreEnabled || edges.length === 0) {
         return { rect: { x: local.x, y: local.y, width: rect.width, height: rect.height } };
       }
       const dock: DockState = { edges, at: local };
@@ -621,7 +621,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const snapped = snapToViewport(fitted, viewport);
       return { rect: snapped, dock: { edges, at: { x: snapped.x, y: snapped.y } } };
     },
-    [showre],
+    [isShowreEnabled],
   );
 
   /**

@@ -68,7 +68,7 @@ export function App() {
         menuItems={menuItems}
         backdropColor="hsl(20, 40%, 22%)"
         // 岸はいったん切る。縁の近くで離すと思いがけず貼り付いて、初めての人が戸惑う
-        showre={false}
+        isShowreEnabled={false}
       />
     </BublyStoreProvider>
   );
