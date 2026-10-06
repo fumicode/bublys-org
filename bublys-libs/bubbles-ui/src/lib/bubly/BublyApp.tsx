@@ -264,10 +264,15 @@ export const BublyApp: FC<BublyAppProps> = ({
         </Tooltip>
 
         <List sx={{ flex: 1, py: 0.5 }}>
+          {/*
+            ★ **メニューはダブルクリックで開く。** 1 回のクリックで開くと、触ってみただけで
+              バブルが増えていき、初めての人には「何かが勝手に出てきた」に見える。
+              何が開くかはホバーの名前で分かるので、開くと決めたときだけ開く。
+          */}
           {menuItems.map((item) => (
-            <Tooltip key={item.label} title={item.label} placement="right" arrow>
+            <Tooltip key={item.label} title={`${item.label}（ダブルクリックで開く）`} placement="right" arrow>
               <ListItemButton
-                onClick={() => handleMenuItemClick(item)}
+                onDoubleClick={() => handleMenuItemClick(item)}
                 sx={{
                   color: 'rgba(255,255,255,0.8)',
                   justifyContent: 'center',
