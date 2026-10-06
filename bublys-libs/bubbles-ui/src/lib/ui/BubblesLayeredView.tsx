@@ -211,6 +211,11 @@ export type BubblesLayeredViewProps = {
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
   onDebugRects?: (rects: SmartRect[]) => void;
+  /**
+   * 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う。
+   * 切ると、どこで離しても海に浮く。もう貼り付いているバブルは、掴めば剥がせる。
+   */
+  showre?: boolean;
 };
 
 const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
@@ -230,6 +235,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerUp,
   onCoordinateSystemReady,
   onDebugRects,
+  showre = true,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const universeRef = useRef<HTMLDivElement>(null);
@@ -595,8 +601,9 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const viewport = { width: box.width, height: box.height };
       const local = { x: rect.x - box.left, y: rect.y - box.top };
       const edges = edgesNear({ x: cursor.x - box.left, y: cursor.y - box.top }, viewport);
-      // 縁から遠ければ海に浮く。そのままの場所・大きさで予告する（岸 → 海 のときも出る）
-      if (edges.length === 0) {
+      // 縁から遠ければ（岸を切っていればどこでも）海に浮く。
+      // そのままの場所・大きさで予告する（岸 → 海 のときも出る）
+      if (!showre || edges.length === 0) {
         return { rect: { x: local.x, y: local.y, width: rect.width, height: rect.height } };
       }
       const dock: DockState = { edges, at: local };
@@ -614,7 +621,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const snapped = snapToViewport(fitted, viewport);
       return { rect: snapped, dock: { edges, at: { x: snapped.x, y: snapped.y } } };
     },
-    [],
+    [showre],
   );
 
   /**

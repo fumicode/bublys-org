@@ -33,7 +33,7 @@ import {
   selectSurfaceLeftTop,
   OpeningPosition,
 } from '../state/index.js';
-import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
+import { BubblesLayeredView, type BubblesLayeredViewProps } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
 import { DragDataType } from '../utils/drag-types.js';
 import { BublyMenuItem } from './BublyTypes.js';
@@ -70,6 +70,8 @@ export type BublyAppProps = {
    * ── でないと、押した泡が**見えない旧い海のほう**に開く。
    */
   onOpenUrl?: (url: string) => void;
+  /** 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う（{@link BubblesLayeredViewProps.showre}） */
+  showre?: boolean;
 };
 
 /**
@@ -84,6 +86,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   backdropColor,
   sea,
   onOpenUrl,
+  showre,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -336,6 +339,7 @@ export const BublyApp: FC<BublyAppProps> = ({
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}
+                  showre={showre}
                 />
               </Box>
             </BubbleRefsProvider>
