@@ -11,30 +11,54 @@ export type CoordinateSystemData = {
 };
 
 /**
- * スケール計算の定数
- * レイヤーごとのスケール減少率
+ * 奥行きの見せ方。奥のレイヤーを「どれだけ縮めるか」と「どれだけずらすか」。
+ *
+ * - `scaleDecayRate`: 1 段奥へ行くごとに減る縮尺（0.1 なら 1.0 → 0.9 → 0.8 …）
+ * - `shiftPerLayer`: 1 段奥へ行くごとに、消失点の側（左上）へ寄せる距離（px）。
+ *   縮める場合は縮みそのものが消失点へ寄せるので、既定は 0
+ * - `scaleStartLayerIndex`: このインデックス未満の面は縮めも寄せもしない。
+ *   レイヤーが 1 枚増えた瞬間にクリック位置がずれないようにするため
+ *
+ * ページに 1 つの設定。アプリの入口で {@link configureDepth} を 1 度呼んで変える。
  */
-const SCALE_DECAY_RATE = 0.1;
+export type DepthStyle = {
+  scaleDecayRate: number;
+  shiftPerLayer: number;
+  scaleStartLayerIndex: number;
+};
 
-/**
- * スケール計算を開始するレイヤーインデックス
- * このインデックス未満のレイヤーはすべてscale=1.0
- * これにより、レイヤーが追加されてもクリック位置がずれない
- */
-const SCALE_START_LAYER_INDEX = 1;
+const DEFAULT_DEPTH_STYLE: DepthStyle = {
+  scaleDecayRate: 0.1,
+  shiftPerLayer: 0,
+  scaleStartLayerIndex: 1,
+};
+
+let depthStyle: DepthStyle = DEFAULT_DEPTH_STYLE;
+
+/** 奥行きの見せ方を変える。渡さなかった項目は既定のまま */
+export function configureDepth(style: Partial<DepthStyle>): void {
+  depthStyle = { ...DEFAULT_DEPTH_STYLE, ...style };
+}
+
+/** 今の奥行きの見せ方 */
+export function getDepthStyle(): DepthStyle {
+  return depthStyle;
+}
 
 /**
  * 座標系クラス（2D一次変換）
  * SmartRectがどの座標系で表現されているかを示す
  *
  * 数学的には以下の一次変換を表現：
- * global = vanishingPoint + (local - vanishingPoint) * scale + offset
+ * global = vanishingPoint + (local - vanishingPoint) * scale + offset + depthShift
  *
  * プロパティ:
  * - layerIndex: レイヤーのインデックス（0が最前面、数字が大きいほど奥）
  *   - scaleはlayerIndexから計算される
- *   - layerIndex < SCALE_START_LAYER_INDEX の場合: scale = 1.0
- *   - それ以外: scale = 1 - (layerIndex - SCALE_START_LAYER_INDEX + 1) * SCALE_DECAY_RATE
+ *   - layerIndex < scaleStartLayerIndex の場合: scale = 1.0
+ *   - それ以外: scale = 1 - (layerIndex - scaleStartLayerIndex + 1) * scaleDecayRate
+ *   - depthShift も同じ段数に shiftPerLayer を掛けて、左上へ寄せる
+ *   （{@link DepthStyle}）
  * - offset: 平行移動（translation）
  * - vanishingPoint: スケール変換の基準点（transform-origin）
  */
@@ -48,14 +72,27 @@ export class CoordinateSystem {
   /**
    * このレイヤーのスケール値
    * layerIndex=0 → scale=1.0
-   * layerIndex=1 → scale=1.0 (SCALE_START_LAYER_INDEX未満は1.0)
+   * layerIndex=1 → scale=1.0 (scaleStartLayerIndex未満は1.0)
    * layerIndex=2 → scale=0.9
    * layerIndex=3 → scale=0.8
-   * ...
+   * ...（既定の奥行き。{@link configureDepth} で変わる）
    */
   get scale(): number {
-    const effectiveIndex = Math.max(0, this.layerIndex - SCALE_START_LAYER_INDEX + 1);
-    return 1 - effectiveIndex * SCALE_DECAY_RATE;
+    return 1 - this.depthSteps * depthStyle.scaleDecayRate;
+  }
+
+  /**
+   * このレイヤーを左上へ寄せる量（px）。縮めずに奥を表すときに使う。
+   * CSS では scale より先に translate として当てる。
+   */
+  get depthShift(): Point2 {
+    const d = 0 - this.depthSteps * depthStyle.shiftPerLayer; // 寄せ無しで -0 にしない
+    return { x: d, y: d };
+  }
+
+  /** 縮めたり寄せたりする段数（手前の数枚は 0） */
+  private get depthSteps(): number {
+    return Math.max(0, this.layerIndex - depthStyle.scaleStartLayerIndex + 1);
   }
 
   /**
@@ -111,30 +148,32 @@ export class CoordinateSystem {
   /**
    * ローカル座標の点をグローバル座標系に変換
    *
-   * 変換式: global = vanishingPoint + (local - vanishingPoint) * scale + offset
+   * 変換式: global = vanishingPoint + (local - vanishingPoint) * scale + offset + depthShift
    *
    * @param localPoint ローカル座標系での点
    * @returns グローバル座標系での座標
    */
   transformLocalToGlobal(localPoint: Point2): Point2 {
+    const shift = this.depthShift;
     return {
-      x: this.vanishingPoint.x + (localPoint.x - this.vanishingPoint.x) * this.scale + this.offset.x,
-      y: this.vanishingPoint.y + (localPoint.y - this.vanishingPoint.y) * this.scale + this.offset.y,
+      x: this.vanishingPoint.x + (localPoint.x - this.vanishingPoint.x) * this.scale + this.offset.x + shift.x,
+      y: this.vanishingPoint.y + (localPoint.y - this.vanishingPoint.y) * this.scale + this.offset.y + shift.y,
     };
   }
 
   /**
    * グローバル座標の点をローカル座標系に変換
    *
-   * 変換式: local = vanishingPoint + (global - offset - vanishingPoint) / scale
+   * 変換式: local = vanishingPoint + (global - offset - depthShift - vanishingPoint) / scale
    *
    * @param globalPoint グローバル座標系での点
    * @returns ローカル座標系での座標
    */
   transformGlobalToLocal(globalPoint: Point2): Point2 {
+    const shift = this.depthShift;
     return {
-      x: this.vanishingPoint.x + (globalPoint.x - this.offset.x - this.vanishingPoint.x) / this.scale,
-      y: this.vanishingPoint.y + (globalPoint.y - this.offset.y - this.vanishingPoint.y) / this.scale,
+      x: this.vanishingPoint.x + (globalPoint.x - this.offset.x - shift.x - this.vanishingPoint.x) / this.scale,
+      y: this.vanishingPoint.y + (globalPoint.y - this.offset.y - shift.y - this.vanishingPoint.y) / this.scale,
     };
   }
 

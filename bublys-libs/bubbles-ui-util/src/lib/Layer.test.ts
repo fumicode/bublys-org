@@ -1,5 +1,5 @@
 import { Layer } from "./Layer.js";
-import { CoordinateSystem } from "./CoordinateSystem.js";
+import { CoordinateSystem, configureDepth } from "./CoordinateSystem.js";
 
 describe("Layer", () => {
   describe("最前面(index=0, scale=1)", () => {
@@ -76,5 +76,33 @@ describe("Layer", () => {
     expect(deeper.index).toBe(3);
     expect(deeper.surfaceOrigin).toEqual({ x: 100, y: 100 });
     expect(deeper.vanishingPoint).toEqual({ x: 5, y: 5 });
+  });
+});
+
+describe("縮めずに寄せる奥行き（configureDepth）", () => {
+  beforeEach(() => configureDepth({ scaleDecayRate: 0, shiftPerLayer: 24 }));
+  afterEach(() => configureDepth({}));
+
+  it("どの深さでも scale は 1", () => {
+    expect(new Layer(3, { x: 0, y: 0 }, { x: 0, y: 0 }).scale).toBe(1);
+  });
+
+  it("1 段奥へ行くごとに左上へ shiftPerLayer ずつ寄る（位置によらない）", () => {
+    const at = (index: number) => new Layer(index, { x: 100, y: 100 }, { x: 0, y: 0 });
+    expect(at(0).place({ x: 50, y: 60 })).toEqual({ x: 150, y: 160 });
+    expect(at(2).place({ x: 50, y: 60 })).toEqual({ x: 102, y: 112 });
+    expect(at(2).place({ x: 500, y: 600 })).toEqual({ x: 552, y: 652 });
+  });
+
+  it("locate は place の逆", () => {
+    const layer = new Layer(3, { x: 100, y: 100 }, { x: 7, y: 9 });
+    expect(layer.locate(layer.place({ x: 50, y: 60 }))).toEqual({ x: 50, y: 60 });
+  });
+
+  it("既定に戻せば今まで通り縮み、寄せは無い", () => {
+    configureDepth({});
+    const cs = CoordinateSystem.fromLayerIndex(3);
+    expect(cs.scale).toBeCloseTo(0.7);
+    expect(cs.depthShift).toEqual({ x: 0, y: 0 });
   });
 });

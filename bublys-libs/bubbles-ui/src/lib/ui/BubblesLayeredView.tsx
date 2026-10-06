@@ -36,7 +36,8 @@ import {
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
  * per-bubble selector のみを購読し、world-line 操作では再 render しない。
  *
- * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため BubbleSkeleton で表示する。
+ * 縮んで内容が読めないバブル（既定の奥行きでは layerIndex >= 3、scale 0.8 以下）は
+ * BubbleSkeleton で表示する（isTooSmallToRead）。縮めない奥行きでは骨にならない。
  * ただしフォーカス時（ヘッダークリック・キーボードフォーカス）はスケルトンを解除してフルコンテンツを表示する。
  * このスケルトン切り替えは BubbleView の内部状態（isFocused）で管理される。
  */

@@ -1,7 +1,7 @@
 import { FC, useMemo, useState, useContext, useLayoutEffect, memo, useCallback, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
-import { Point2, Vec2, CoordinateSystem, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
+import { Point2, Vec2, SmartRect, Layer } from "@bublys-org/bubbles-ui-util";
 import { useMyRectObserver } from "../hooks/useMyRect.js";
 import { useBubbleDrag } from "../hooks/useBubbleDrag.js";
 import { useBubbleResize } from "../hooks/useBubbleResize.js";
@@ -13,7 +13,8 @@ import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
-import { BubbleSkeleton } from "./BubbleSkeleton.js";
+import { BubbleSkeleton, isTooSmallToRead } from "./BubbleSkeleton.js";
+import { depthTransform } from "./depthTransform.js";
 import { cornerRadiusFor, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { useHeaderShift } from "../hooks/useHeaderShift.js";
 import { useShowreEdges } from "../showre/ShowreContext.js";
@@ -380,7 +381,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       )}
 
       <main className="e-bubble-content">
-        {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
+        {isTooSmallToRead(layerIndex ?? 0) && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
       {/* 辺の役割は 2 つだけ ──
@@ -508,12 +509,10 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       ? `${transformOrigin.x}px ${transformOrigin.y}px`
       : "center center"};
 
-  // ここで奥のレイヤーほどスケールを小さくしている。
-  // CoordinateSystem.fromLayerIndex()を使用してscale計算を一箇所に凝集
-  /* ヘッダーを箱の外に出しきるためのずらし（$shift）と、レイヤーの縮尺 */
-  transform: translateY(${({ $shift = 0 }) => $shift}px) scale(
-    ${({ layerIndex }) => CoordinateSystem.fromLayerIndex(layerIndex ?? 0).scale}
-  );
+  // ここで奥のレイヤーほど縮め・寄せている（どちらをどれだけやるかは DepthStyle）。
+  // CoordinateSystem.fromLayerIndex()を使用して奥行きの計算を一箇所に凝集
+  /* レイヤーの寄せ、ヘッダーを箱の外に出しきるためのずらし（$shift）、レイヤーの縮尺 */
+  transform: ${({ layerIndex, $shift = 0 }) => depthTransform(layerIndex ?? 0, $shift)};
   transition: transform 0.15s ease;
 
   /* 海に浮いているバブルの頭打ち。岸に貼ったバブルは画面（海）いっぱいまで伸ばせるので外す
