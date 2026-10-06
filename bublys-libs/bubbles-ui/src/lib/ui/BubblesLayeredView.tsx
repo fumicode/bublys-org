@@ -168,7 +168,6 @@ type ConnectedLinkBubbleViewProps = {
   openeeId: string;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
-  lightweightMode?: boolean;
   visible: boolean;
 };
 
@@ -178,7 +177,6 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   openeeId,
   coordinateSystem,
   linkZIndex,
-  lightweightMode,
   visible,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
@@ -194,7 +192,6 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       openee={openee}
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
-      lightweightMode={lightweightMode}
       visible={visible}
     />
   );
@@ -732,7 +729,6 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                     openeeId={openeeId}
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
-                    lightweightMode={lightweightMode}
                     // 既定はホバー時だけ: どちらかの端のバブルにホバーしているとき見せる
                     visible={
                       linkDisplay === "always" ||
