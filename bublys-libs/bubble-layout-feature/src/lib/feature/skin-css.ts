@@ -51,6 +51,8 @@ ${S} .bub:not(.imp){--rr:22px;--rw:1px;--rc:rgba(255,255,255,.72);--bl-dress:0;
   background:none;box-shadow:none}
 /* 触っているあいだだけ装いを着る */
 ${S} .bub:not(.imp):is(:hover,.sel,:focus-within){--bl-dress:1}
+/* 並べた仲間のどれかを選んでいれば、並び全体が装いを着る（並べたものは一緒に見るので。印は draw.ts） */
+${S} .bub.bl-row-on:not(.imp){--bl-dress:1}
 /* 選んだ泡 ── 膜の水色で輪を太く */
 ${S} .bub.sel:not(.imp){--rw:2.2px;--rc:hsl(200 92% 64%)}
 
@@ -86,7 +88,7 @@ ${S} .bub > .bl-link:hover{opacity:var(--bl-dress);background:rgba(44,49,80,.08)
 ${S} .bub > .bl-link[data-copied]{opacity:var(--bl-dress);color:hsl(150 60% 32%)}
 ${S} .bub > .bl-tool[aria-pressed="true"]{color:hsl(200 80% 42%)}
 /* 見えていない口は押せない */
-${S} .bub:not(:hover):not(.sel):not(:focus-within) > :is(.bl-close,.bl-tool,.bl-link){pointer-events:none}
+${S} .bub:not(:hover):not(.sel):not(.bl-row-on):not(:focus-within) > :is(.bl-close,.bl-tool,.bl-link){pointer-events:none}
 
 /* 出し入れは ObjectView の膜と同じ長さ・同じ曲線 */
 ${S} .bub > :is(.bl-film,.hd,.ttl,.bl-view,.bl-close,.bl-tool,.bl-link),

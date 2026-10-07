@@ -574,6 +574,7 @@ function drawBubble(p: Placement, i: number, isTiny: boolean, c: Ctx): BubbleDra
       'bub' +
       (grab ? '' : ' off') +
       (b.id === c.selectedId ? ' sel' : '') +
+      (rowMate(c, b.id) ? ' bl-row-on' : '') +
       (chip ? ' chip' : '') +
       (host ? ' host' : '') +
       (12 * s < MARK_MIN ? ' nt' : '') +   // 題名：字の下限 6.5px を切ったら出さない
@@ -612,4 +613,18 @@ function implicitWord(world: BubbleWorld, id: SpaceId): string {
   return verbOf(V.x.dim) === 'reorder' ? '横に並べる'
        : verbOf(V.y.dim) === 'reorder' ? '縦に並べる'
        : '並べる';
+}
+
+/**
+ * **選んでいる泡と同じ並びの仲間か**（自分が選ばれているときは含めない ── それは `sel`）。
+ *
+ * > 並べたものは一緒に見る。仲間のどれかを選んでいれば、並び全体が装いを着る。
+ *
+ * ★ 並びの仲間は DOM では兄弟（親子ではない）なので、CSS だけでは「仲間が選ばれている」を
+ *   知れない。ここで印（`bl-row-on`）を付け、見た目は皮の CSS が決める。
+ */
+function rowMate(c: { readonly world: BubbleWorld; readonly selectedId: BubbleId | null }, id: BubbleId): boolean {
+  if (!c.selectedId || c.selectedId === id) return false;
+  const row = c.world.rowOf(c.selectedId);
+  return !!row && c.world.rowOf(id)?.id === row.id;
 }
