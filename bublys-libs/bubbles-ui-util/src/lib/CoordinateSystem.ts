@@ -11,17 +11,36 @@ export type CoordinateSystemData = {
 };
 
 /**
- * スケール計算の定数
- * レイヤーごとのスケール減少率
+ * 奥行きの見せ方。奥のレイヤーをどれだけ縮めるか。
+ *
+ * - `scaleDecayRate`: 1 段奥へ行くごとに減る縮尺（0.1 なら 1.0 → 0.9 → 0.8 …）
+ *   0 にすると、どの深さでも等倍（重なり順だけで奥を表す）
+ * - `scaleStartLayerIndex`: このインデックス未満の面は縮めない。
+ *   レイヤーが 1 枚増えた瞬間にクリック位置がずれないようにするため
+ *
+ * ページに 1 つの設定。アプリの入口で {@link configureDepth} を 1 度呼んで変える。
  */
-const SCALE_DECAY_RATE = 0.1;
+export type DepthStyle = {
+  scaleDecayRate: number;
+  scaleStartLayerIndex: number;
+};
 
-/**
- * スケール計算を開始するレイヤーインデックス
- * このインデックス未満のレイヤーはすべてscale=1.0
- * これにより、レイヤーが追加されてもクリック位置がずれない
- */
-const SCALE_START_LAYER_INDEX = 1;
+const DEFAULT_DEPTH_STYLE: DepthStyle = {
+  scaleDecayRate: 0.1,
+  scaleStartLayerIndex: 1,
+};
+
+let depthStyle: DepthStyle = DEFAULT_DEPTH_STYLE;
+
+/** 奥行きの見せ方を変える。渡さなかった項目は既定のまま */
+export function configureDepth(style: Partial<DepthStyle>): void {
+  depthStyle = { ...DEFAULT_DEPTH_STYLE, ...style };
+}
+
+/** 今の奥行きの見せ方 */
+export function getDepthStyle(): DepthStyle {
+  return depthStyle;
+}
 
 /**
  * 座標系クラス（2D一次変換）
@@ -33,8 +52,9 @@ const SCALE_START_LAYER_INDEX = 1;
  * プロパティ:
  * - layerIndex: レイヤーのインデックス（0が最前面、数字が大きいほど奥）
  *   - scaleはlayerIndexから計算される
- *   - layerIndex < SCALE_START_LAYER_INDEX の場合: scale = 1.0
- *   - それ以外: scale = 1 - (layerIndex - SCALE_START_LAYER_INDEX + 1) * SCALE_DECAY_RATE
+ *   - layerIndex < scaleStartLayerIndex の場合: scale = 1.0
+ *   - それ以外: scale = 1 - (layerIndex - scaleStartLayerIndex + 1) * scaleDecayRate
+ *   （{@link DepthStyle}）
  * - offset: 平行移動（translation）
  * - vanishingPoint: スケール変換の基準点（transform-origin）
  */
@@ -48,14 +68,14 @@ export class CoordinateSystem {
   /**
    * このレイヤーのスケール値
    * layerIndex=0 → scale=1.0
-   * layerIndex=1 → scale=1.0 (SCALE_START_LAYER_INDEX未満は1.0)
+   * layerIndex=1 → scale=1.0 (scaleStartLayerIndex未満は1.0)
    * layerIndex=2 → scale=0.9
    * layerIndex=3 → scale=0.8
-   * ...
+   * ...（既定の奥行き。{@link configureDepth} で変わる）
    */
   get scale(): number {
-    const effectiveIndex = Math.max(0, this.layerIndex - SCALE_START_LAYER_INDEX + 1);
-    return 1 - effectiveIndex * SCALE_DECAY_RATE;
+    const effectiveIndex = Math.max(0, this.layerIndex - depthStyle.scaleStartLayerIndex + 1);
+    return 1 - effectiveIndex * depthStyle.scaleDecayRate;
   }
 
   /**

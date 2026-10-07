@@ -18,9 +18,6 @@ import RuleIcon from "@mui/icons-material/Rule";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import SaveIcon from "@mui/icons-material/Save";
-import BugReportIcon from "@mui/icons-material/BugReport";
-import SchemaIcon from "@mui/icons-material/Schema";
-import ViewInArIcon from "@mui/icons-material/ViewInAr";
 
 /**
  * **このバブリで開けるもの。** 名乗るのはここ 1 か所。
@@ -28,6 +25,9 @@ import ViewInArIcon from "@mui/icons-material/ViewInAr";
  * 単体で開いたときは脇の帯（`BublyApp`）に、OS にロードしたときは**その窓の岸**に
  * 貼った呼び出しとして出る ── 前は単体の画面にしか書いていなかったので、
  * OS の中では種しか出てこず、ほかの一覧へ辿り着けなかった。
+ *
+ * デバッグ用（世界線インスペクタ・クラス図・世界線 3D）は並べない。ルートは残してあるので、
+ * URL を直に開けば今も見られる。
  */
 export const menuItems: BublyMenuItem[] = [
   { label: "スタッフ一覧", url: 'hotel-shift-puzzle/staffs', icon: React.createElement(PeopleIcon) },
@@ -36,9 +36,6 @@ export const menuItems: BublyMenuItem[] = [
   { label: "シフト希望", url: shiftWishListUrl(), icon: React.createElement(EditCalendarIcon) },
   { label: "勤務表", url: 'hotel-shift-puzzle/schedules', icon: React.createElement(CalendarMonthIcon) },
   { label: "ファイル", url: 'hotel-shift-puzzle/file', icon: React.createElement(SaveIcon) },
-  { label: "世界線インスペクタ", url: 'hotel-shift-puzzle/world-line-inspector', icon: React.createElement(BugReportIcon) },
-  { label: "クラス図", url: 'hotel-shift-puzzle/model-class-diagram', icon: React.createElement(SchemaIcon) },
-  { label: "世界線 3D", url: 'hotel-shift-puzzle/world-line-3d', icon: React.createElement(ViewInArIcon) },
 ];
 
 const HotelShiftPuzzleBubly: Bubly = {

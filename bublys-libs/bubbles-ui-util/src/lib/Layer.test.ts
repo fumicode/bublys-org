@@ -1,5 +1,5 @@
 import { Layer } from "./Layer.js";
-import { CoordinateSystem } from "./CoordinateSystem.js";
+import { CoordinateSystem, configureDepth } from "./CoordinateSystem.js";
 
 describe("Layer", () => {
   describe("最前面(index=0, scale=1)", () => {
@@ -76,5 +76,21 @@ describe("Layer", () => {
     expect(deeper.index).toBe(3);
     expect(deeper.surfaceOrigin).toEqual({ x: 100, y: 100 });
     expect(deeper.vanishingPoint).toEqual({ x: 5, y: 5 });
+  });
+});
+
+describe("縮めない奥行き（configureDepth）", () => {
+  beforeEach(() => configureDepth({ scaleDecayRate: 0 }));
+  afterEach(() => configureDepth({}));
+
+  it("どの深さでも scale は 1 で、位置もずれない", () => {
+    const layer = new Layer(3, { x: 100, y: 100 }, { x: 7, y: 9 });
+    expect(layer.scale).toBe(1);
+    expect(layer.place({ x: 50, y: 60 })).toEqual({ x: 150, y: 160 });
+  });
+
+  it("既定に戻せば今まで通り縮む", () => {
+    configureDepth({});
+    expect(CoordinateSystem.fromLayerIndex(3).scale).toBeCloseTo(0.7);
   });
 });

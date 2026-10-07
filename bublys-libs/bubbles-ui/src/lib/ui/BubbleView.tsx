@@ -13,7 +13,7 @@ import { useBubbleRefsOptional } from "../context/BubbleRefsContext.js";
 import { measureViewport } from "../utils/measure-viewport.js";
 import { useUniverseId } from "../context/UniverseContext.js";
 import { CloseIcon, ToggleSizeIcon, LayerUpIcon, LayerDownIcon } from "./BubbleIcons.js";
-import { BubbleSkeleton } from "./BubbleSkeleton.js";
+import { BubbleSkeleton, isTooSmallToRead } from "./BubbleSkeleton.js";
 import { cornerRadiusFor, type BandSide } from "@bublys-org/bubble-layout-ui";
 import { useHeaderShift } from "../hooks/useHeaderShift.js";
 import { useShowreEdges } from "../showre/ShowreContext.js";
@@ -177,7 +177,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
    * ヘッダーを内側に押し込むのではなく、**出している間だけバブルが下へずれる**。
    * 消えれば 0 に戻る ＝ そのぶん上に戻って辺にくっつく。
    */
-  const { shift, measure: updateHeaderSafeZone } = useHeaderShift({
+  const { shift, headerDrop, measure: updateHeaderSafeZone, isNearTop } = useHeaderShift({
     ref,
     headerSelector: ".e-bubble-header",
     fallbackHeight: 48,
@@ -234,7 +234,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    setIsMouseNearTop(e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD);
+    setIsMouseNearTop(isNearTop(e.clientY, HEADER_PROXIMITY_THRESHOLD));
     updateHeaderSafeZone();
   };
 
@@ -293,6 +293,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       headerVisible={isHeaderVisible}
       // 岸では箱の外に出られないので押し下げは要らない（ヘッダーは上端の内側）
       $shift={shift}
+      $headerDrop={headerDrop}
       onClick={onClick}
       onFocus={handleFocus}
       onMouseDown={handleMouseDown}
@@ -380,7 +381,7 @@ const BubbleViewInner: FC<BubbleProps> = ({
       )}
 
       <main className="e-bubble-content">
-        {(layerIndex ?? 0) >= 3 && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
+        {isTooSmallToRead(layerIndex ?? 0) && !isFocused ? <BubbleSkeleton bubble={bubble} /> : children}<br />
       </main>
 
       {/* 辺の役割は 2 つだけ ──
@@ -483,6 +484,7 @@ type StyledBubbleProp = React.HTMLAttributes<HTMLDivElement> & {
   lightweightMode?: boolean; // 軽量モード
   headerVisible?: boolean;
   $shift?: number; // ヘッダーを箱の外に出しきるために、バブルを下へずらす量(px)
+  $headerDrop?: number; // 見えている範囲の上に出るぶん、ヘッダーだけをバブルに重ねて下ろす量(px)
 
   ref: React.RefObject<HTMLDivElement | null>;
 };
@@ -508,7 +510,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
       ? `${transformOrigin.x}px ${transformOrigin.y}px`
       : "center center"};
 
-  // ここで奥のレイヤーほどスケールを小さくしている。
+  // ここで奥のレイヤーほどスケールを小さくしている（どれだけ縮めるかは DepthStyle）。
   // CoordinateSystem.fromLayerIndex()を使用してscale計算を一箇所に凝集
   /* ヘッダーを箱の外に出しきるためのずらし（$shift）と、レイヤーの縮尺 */
   transform: translateY(${({ $shift = 0 }) => $shift}px) scale(
@@ -591,7 +593,7 @@ const StyledBubble = styled.div<StyledBubbleProp>`
 
     opacity: ${({ headerVisible }) => headerVisible ? 1 : 0};
     pointer-events: ${({ headerVisible }) => headerVisible ? 'auto' : 'none'};
-    transform: ${({ headerVisible }) => (headerVisible ? "translateY(0)" : "translateY(6px)")};
+    transform: ${({ headerVisible, $headerDrop = 0 }) => `translateY(${$headerDrop + (headerVisible ? 0 : 6)}px)`};
     transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-header-content {
