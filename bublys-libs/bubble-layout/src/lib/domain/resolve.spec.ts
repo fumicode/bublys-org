@@ -15,6 +15,7 @@ import { presetView, viewOfSpace, withAxis } from './view.js';
 import { resolveWorld } from './resolve.js';
 import type { Layout } from './resolve.js';
 import { measureAll } from './measure.js';
+import { resolveRules } from './rules.js';
 import { labScene, VIEWPORT } from './lab-scene.js';
 import { METRICS } from './types.js';
 
@@ -43,7 +44,7 @@ describe('泡のならべかた ── 解決（ラボと同じ数が出るか�
     });
 
     it('等間隔・詰めるの軸では、箱は中身が収まるまで伸びる（勤務表 482 → 498）', () => {
-      const boxes = measureAll(world, { equalExtent: 'bubble', zFocusStop: 'behind' });
+      const boxes = measureAll(world, resolveRules({ equalExtent: 'bubble', zFocusStop: 'behind' }));
       expect(boxes.get('kinmu')).toEqual({ w: 498, h: 340 });   // 自前は 482×340
       expect(boxes.get('cal')).toEqual({ w: 336, h: 114 });
       expect(boxes.get('staff')).toEqual({ w: 120, h: 218 });
@@ -70,7 +71,7 @@ describe('泡のならべかた ── 解決（ラボと同じ数が出るか�
       // 旧「★ 下限のぶん、魚眼の空間の箱は伸びる（coverflow 自前 340 → 368.70…）」の後身。
       // ④ 箱は中身が収まるまで伸びる。その「中身」を像の幅で測るので（＝ レンズが縮めたぶんだけ
       // 中身も縮む）、魚眼にしても中身は自前の幅に収まったまま ── 340 に戻った。
-      const boxes = measureAll(world, { equalExtent: 'bubble', zFocusStop: 'behind' });
+      const boxes = measureAll(world, resolveRules({ equalExtent: 'bubble', zFocusStop: 'behind' }));
       expect(boxes.get('cover')).toEqual({ w: 340, h: 124 });
       // 平行の空間も、前から伸びない（像の倍率が 1）
       expect(boxes.get('kinmu')).toEqual({ w: 498, h: 340 });
@@ -302,6 +303,7 @@ describe('軸ごとの歪み（両方の軸が魚眼のとき）', () => {
   it('片方の軸だけ魚眼なら、今までどおり一様に縮む（歪みは持たない）', () => {
     const w = withAxis(grid(5, 5, 'grid'), 'root', 'y', { lens: 'fisheye' });
     const L = resolveWorld(w, VP);
-    for (const p of L.order) expect(p.stretch).toBeUndefined();
+    // 一様に縮む ＝ 縦と横の縮み方が同じ（像の縦横比が自前の箱と変わらない）
+    for (const p of L.order) expect(p.w / p.box.w).toBeCloseTo(p.h / p.box.h, 6);
   });
 });

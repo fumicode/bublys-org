@@ -17,7 +17,7 @@ describe("scheduleUndoBindings（勤務表の世界線を Ctrl/Cmd+Z で動か�
     ["Ctrl+Shift+Z", { key: "Z", ctrlKey: true, shiftKey: true }, "forward"],
     ["Cmd+Shift+Z", { key: "Z", metaKey: true, shiftKey: true }, "forward"],
   ])("★ %s → 世界線を1つ %s", (_label, e, expected) => {
-    const scope = { moveBack: jest.fn(), moveForward: jest.fn() };
+    const scope = { moveBack: vi.fn(), moveForward: vi.fn() };
 
     pressOn(scheduleUndoBindings(scope), e);
 
@@ -26,7 +26,7 @@ describe("scheduleUndoBindings（勤務表の世界線を Ctrl/Cmd+Z で動か�
   });
 
   it("修飾キー無しの z では動かない", () => {
-    const scope = { moveBack: jest.fn(), moveForward: jest.fn() };
+    const scope = { moveBack: vi.fn(), moveForward: vi.fn() };
 
     pressOn(scheduleUndoBindings(scope), { key: "z" });
 
