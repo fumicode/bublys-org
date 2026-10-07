@@ -5,6 +5,8 @@ import {
   ShiftLeaderRule,
   WorkShift,
   WorkingDay,
+  WorkingStaffGroup,
+  WorkingStaffMember,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { computeCandidatesFor, type CandidateRequest } from "./candidateRequest.js";
 
@@ -48,6 +50,7 @@ describe("computeCandidatesFor", () => {
     constraints: constraints.toPlain(),
     checkShiftWish: false,
     wishes: [],
+    staffGroup: null,
     ...extra,
   });
 
@@ -89,5 +92,30 @@ describe("computeCandidatesFor", () => {
     );
 
     expect(result.candidatesOf("L2", day1)).toHaveLength(3);
+  });
+
+  it("#67 plain の勤務スタッフ群から、可能勤務帯で候補を絞れる", () => {
+    // L2 と X は遅番しか入れない。L1 が遅番 → 早責を埋められる人は居ない
+    const staffGroup = new WorkingStaffGroup({
+      id: "sched-1",
+      members: [
+        new WorkingStaffMember({ staffId: "L1" }),
+        new WorkingStaffMember({ staffId: "L2", allowedShiftIds: ["late"] }),
+        new WorkingStaffMember({ staffId: "X", allowedShiftIds: ["late"] }),
+      ],
+    });
+    const schedule = baseSchedule.setCell("L1", day1, {
+      kind: "work",
+      shiftId: "late",
+    });
+
+    const result = ScheduleCandidates.fromPlain(
+      computeCandidatesFor(requestFor(schedule, { staffGroup: staffGroup.toPlain() }))
+    );
+
+    const lateOrOff = [{ kind: "work", shiftId: "late" }, { kind: "day-off" }];
+    expect(result.candidatesOf("X", day1)).toEqual(lateOrOff);
+    // 以前は「早番だけ（一意に決まる）」と、入れない勤務帯を提案していた
+    expect(result.candidatesOf("L2", day1)).toEqual(lateOrOff);
   });
 });
