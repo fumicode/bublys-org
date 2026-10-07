@@ -2,6 +2,18 @@ import styled from "styled-components";
 import { EARLY_COL_WIDTH } from "./constants.js";
 
 /**
+ * グリッドの重なり順。ルールは「横・縦にスクロールする面（データセル・違反の印・
+ * 制約ホバーのオーバーレイなど）より、固定された列・行が必ず手前」。
+ *
+ * スクロールする面の中では z-index 1〜5 を使っている（選択中のセル=1、違反の印=1、
+ * 制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
+ * それらより上に置き、スクロールで下に入ったものが透けて前に出ないようにする。
+ */
+const Z_FIXED = 6; // 固定の列（スタッフ名・休・早・見出し列）と固定の行（日付ヘッダ）
+const Z_FIXED_CROSS = 7; // 固定の列と行が交わる角（左上・休/早の見出し・予約の開閉）
+const Z_POPUP = 8; // 固定の列より手前に出すふきだし（制約の解消案）
+
+/**
  * 勤務表グリッドのスタイル。
  * CSS は class 名ベースのため、StyledWrap の子孫であればどの子コンポーネントが
  * 描いた要素にも適用される（ScheduleDataCell / StaffScheduleRow / SummaryRow など）。
@@ -83,7 +95,7 @@ export const StyledWrap = styled.div`
   .e-res-toggle {
     position: sticky;
     left: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -118,7 +130,7 @@ export const StyledWrap = styled.div`
   .e-res-head {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -185,14 +197,14 @@ export const StyledWrap = styled.div`
   .e-res-filler {
     position: sticky;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fff8f0;
     border-left: 1px solid #e0e0e0;
   }
   .e-res-early-filler {
     position: sticky;
     right: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fff8f0;
     border-left: 1px solid #e0e0e0;
   }
@@ -203,7 +215,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #fafafa;
     display: flex;
     align-items: center;
@@ -215,7 +227,7 @@ export const StyledWrap = styled.div`
   .e-off-total {
     position: sticky;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 2; /* 違反の印（z-index:1・DOM で後ろ）より上。横スクロールで印を隠す */
+    z-index: ${Z_FIXED};
     background: #fbfbfb;
     display: flex;
     align-items: center;
@@ -251,7 +263,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     right: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #e3f2fd;
     display: flex;
     align-items: center;
@@ -263,7 +275,7 @@ export const StyledWrap = styled.div`
   .e-early-total {
     position: sticky;
     right: 0;
-    z-index: 2; /* 違反の印より上（.e-off-total と同じ） */
+    z-index: ${Z_FIXED};
     background: #f5faff;
     display: flex;
     align-items: center;
@@ -295,7 +307,7 @@ export const StyledWrap = styled.div`
   .e-sum-head {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -422,7 +434,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     left: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #fafafa;
     display: flex;
     flex-direction: column;
@@ -449,7 +461,7 @@ export const StyledWrap = styled.div`
   .e-day-head {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: ${Z_FIXED};
     background: #fafafa;
     display: flex;
     flex-direction: column;
@@ -498,7 +510,7 @@ export const StyledWrap = styled.div`
   .e-staff-cell {
     position: sticky;
     left: 0;
-    z-index: 2; /* 違反の印より上（.e-off-total と同じ） */
+    z-index: ${Z_FIXED};
     background: #fff;
     display: flex;
     align-items: center;
@@ -729,9 +741,10 @@ export const StyledWrap = styled.div`
 
      - 未割当で希望が複数あるセル … 円が横に並ぶとセル幅に収まらず端が切れて読めないので、
        クリップを外して（overflow: visible）隣の列の上へはみ出させる。円の背景は白なので
-       下のセルに重なっても読める。手前に出すため z-index はグリッド内で最も高くする
+       下のセルに重なっても読める。手前に出すため z-index はスクロールする面の中で最も高くする
        （制約ホバーの すりガラス=3 / リボン=4 より上。同じセルをホバーすると両方出るので、
-       これらの下だと右へはみ出した円が隠れてしまう）。
+       これらの下だと右へはみ出した円が隠れてしまう）。固定の列・行（Z_FIXED）よりは下に置く。
+       上にすると、選択したまま横スクロールしたときにこのセルの違反の印が名前の列に透けて出る。
      - 値が入ったセル … 角に残した円の文字（＝叶った希望）を戻す。円のクリップは
        そのまま（角の弧という見た目を崩さない）。 */
   .e-cell.has-wish-hint:hover,
@@ -784,8 +797,9 @@ export const StyledWrap = styled.div`
      そこから左へ伸ばす。セルの中の絶対配置なので、行・列の番号を数えずにセルへ追従する。
 
      基準はセルの padding box（右と下の罫線 1px を除いた矩形）。重なり順は z-index:1 で
-     「帯がかかる左のセル（選択中の z-index:1 も DOM で前なので下）より上、固定列（名前・休・早。
-     z-index:2）・日付ヘッダ（2）・制約ホバーのオーバーレイ（3〜4）より下」。 */
+     「帯がかかる左のセル（選択中の z-index:1 も DOM で前なので下）より上、制約ホバーの
+     オーバーレイ（3〜4）より下」。固定の列・行（Z_FIXED）はいつも印より手前なので、
+     横スクロールで印が名前の列の下へ入っても透けて出ない。 */
 
   /* 連勤など複数日の違反: 覆う日の下端に1本の赤帯。
      --span 列ぶん左へ伸ばす。1列は「padding box の幅＋右の罫線 1px」なので、
@@ -854,7 +868,7 @@ export const StyledWrap = styled.div`
   .e-constraint-fix-hint {
     position: absolute;
     transform: translate(-50%, 6px);
-    z-index: 5;
+    z-index: ${Z_POPUP};
     max-width: 220px;
     padding: 8px 10px;
     border-radius: 8px;
@@ -890,7 +904,7 @@ export const StyledWrap = styled.div`
   .e-staff-foot {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fafafa;
     padding: 2px 6px;
     border-right: 1px solid #ddd;
@@ -927,7 +941,7 @@ export const StyledWrap = styled.div`
   .e-dept-label {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #e8eaf6;
     color: #3949ab;
     font-weight: bold;
