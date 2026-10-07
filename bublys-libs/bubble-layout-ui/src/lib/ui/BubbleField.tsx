@@ -205,8 +205,8 @@ export function DropMarksView({ marks }: { readonly marks: DropMarks | null }) {
           className="mk-line"
           style={
             marks.line.axis === 'x'
-              ? { left: px(marks.line.at - 1.5), top: px(marks.line.from), width: '3px', height: px(marks.line.to - marks.line.from) }
-              : { left: px(marks.line.from), top: px(marks.line.at - 1.5), width: px(marks.line.to - marks.line.from), height: '3px' }
+              ? { left: px(marks.line.at - 2), top: px(marks.line.from), width: '4px', height: px(marks.line.to - marks.line.from) }
+              : { left: px(marks.line.from), top: px(marks.line.at - 2), width: px(marks.line.to - marks.line.from), height: '4px' }
           }
         />
       )}

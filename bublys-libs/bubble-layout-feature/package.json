@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "@bublys-org/bubble-layout": "0.0.1",
-    "@bublys-org/bubble-layout-ui": "0.0.1"
+    "@bublys-org/bubble-layout-ui": "0.0.1",
+    "@bublys-org/object-types": "0.0.1"
   },
   "scripts": {
     "build": "tsc -b tsconfig.lib.json",
