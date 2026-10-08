@@ -44,11 +44,21 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
     expect(r.scoreOf('staff-Z')).toBe(0);
   });
 
-  describe('isReferenceableFrom（参照レポートにできるのは同じ店舗の前の月だけ）', () => {
+  describe('isReferenceableFrom（参照レポートにできるのは同じ店舗の前月だけ）', () => {
     // レポートは store-1 の 2026年6月
-    test('同じ店舗の後の月からは参照できる（年をまたいでも）', () => {
+    test('同じ店舗の翌月からは参照できる', () => {
       expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 7 })).toBe(true);
-      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2027, month: 1 })).toBe(true);
+    });
+
+    test('2か月以上後の月からは参照できない（前月のレポートではない）', () => {
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 8 })).toBe(false);
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2027, month: 6 })).toBe(false);
+    });
+
+    test('12月のレポートは翌年1月から参照できる（年をまたぐ前月）', () => {
+      const december = ScheduleReport.fromPlain({ ...create().toPlain(), year: 2026, month: 12 });
+      expect(december.isReferenceableFrom({ storeId: 'store-1', year: 2027, month: 1 })).toBe(true);
+      expect(december.isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 1 })).toBe(false);
     });
 
     test('同じ月・前の月からは参照できない', () => {

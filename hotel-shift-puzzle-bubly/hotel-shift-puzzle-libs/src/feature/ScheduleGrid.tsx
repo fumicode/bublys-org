@@ -255,7 +255,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     () => allReports.find((r) => r.id === constraints?.linkedReportId),
     [allReports, constraints]
   );
-  // 紐づけられるのは同じ店舗の前の月のレポートだけ（ScheduleReport.isReferenceableFrom）。新しい順。
+  // 紐づけられるのは同じ店舗の前月のレポートだけ（ScheduleReport.isReferenceableFrom）。新しい順。
   const referenceableReports = useMemo(
     () =>
       schedule
@@ -365,14 +365,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 参照レポートを紐づける（プルダウンでもドロップでも同じ入口）。紐づけは1つなので置き換わる。
-  // 参照できないレポート（別の店舗・同じ月以降）は紐づけず、理由を伝える。
+  // 参照できないレポート（別の店舗・前月以外の月）は紐づけず、理由を伝える。
   const handleLinkReport = (reportId: string) => {
     if (!scheduleId || !schedule) return;
     const report = allReports.find((r) => r.id === reportId);
     if (!report) return;
     if (!report.isReferenceableFrom(schedule)) {
       setAutoMessage(
-        `「${report.title}」は参照レポートにできません（同じ店舗の、前の月のレポートだけ紐づけられます）。`
+        `「${report.title}」は参照レポートにできません（同じ店舗の、前月のレポートだけ紐づけられます）。`
       );
       return;
     }

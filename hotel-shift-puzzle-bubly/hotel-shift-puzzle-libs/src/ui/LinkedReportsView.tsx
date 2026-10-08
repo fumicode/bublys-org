@@ -11,7 +11,7 @@ type LinkedReportsViewProps = {
   /** この勤務表の参照レポート（紐づけは1つだけ）。無ければ undefined */
   report: ScheduleReport | undefined;
   /**
-   * 紐づけられるレポート（同じ店舗の前の月のもの。新しい順）。
+   * 紐づけられるレポート（同じ店舗の前月のもの。新しい順）。
    * 渡すと「選んで紐づける」プルダウンが出る。今の参照レポートは含めなくてよい（ここで除く）。
    */
   candidates?: ScheduleReport[];
@@ -35,7 +35,7 @@ const EFFECT_HINT =
 /**
  * 勤務表の参照レポートを表示・紐づけする（プレゼンテーショナル）。
  *
- * 紐づけ方は2通り。主にはプルダウンで選ぶ（候補は同じ店舗の前の月のレポート）。
+ * 紐づけ方は2通り。主にはプルダウンで選ぶ（候補は同じ店舗の前月のレポート）。
  * レポートをドラッグして落としてもよい（責任者ルールに Staff をドロップで追加する
  * {@link LeaderRuleDiagram} と同じ drop パターン: dragover で型だけ判定→drop で parseDragPayload）。
  * 紐づけは1つなので、どちらで紐づけても今のものと置き換わる。
@@ -114,7 +114,7 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
           onChange={(e) => {
             if (e.target.value) onLink(e.target.value);
           }}
-          title="同じ店舗の、前の月のレポートから選べます"
+          title="同じ店舗の、前月のレポートから選べます"
           aria-label={report ? "参照レポートを変える" : "参照レポートを選んで紐づける"}
         >
           <option value="">{report ? "変える…" : "＋ 選んで紐づける"}</option>
@@ -129,7 +129,7 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
       )}
       {!report && choices.length === 0 && (
         <span className="e-hint">
-          {droppable ? "紐づけられるレポートがありません（同じ店舗の前の月のもの）" : "なし"}
+          {droppable ? "紐づけられるレポートがありません（同じ店舗の前月のもの）" : "なし"}
         </span>
       )}
     </StyledWrap>
