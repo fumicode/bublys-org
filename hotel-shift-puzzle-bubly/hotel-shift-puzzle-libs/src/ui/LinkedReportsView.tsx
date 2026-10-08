@@ -8,8 +8,15 @@ import { ObjectView, parseDragPayload } from "@bublys-org/bubbles-ui";
 import { ScheduleReport } from "../domain/index.js";
 
 type LinkedReportsViewProps = {
-  /** この勤務表に紐づいたシフト完成レポート */
-  reports: ScheduleReport[];
+  /** この勤務表の参照レポート（紐づけは1つだけ）。無ければ undefined */
+  report: ScheduleReport | undefined;
+  /**
+   * 紐づけられるレポート（同じ店舗の前の月のもの。新しい順）。
+   * 渡すと「選んで紐づける」プルダウンが出る。今の参照レポートは含めなくてよい（ここで除く）。
+   */
+  candidates?: ScheduleReport[];
+  /** プルダウンでレポートを選んだとき呼ぶ（今の参照レポートと置き換わる） */
+  onLink?: (reportId: string) => void;
   /**
    * レポートの URL をドロップしたとき呼ぶ。渡すとエリアが drop を受け付け、
    * そのレポートを紐づけられる。dropAcceptTypes と併せて指定する。
@@ -17,24 +24,34 @@ type LinkedReportsViewProps = {
   onDropUrl?: (url: string) => void;
   /** 受け付けるドラッグ型（ScheduleReport の drag type）。 */
   dropAcceptTypes?: string[];
-  /** 紐づけを解除するとき呼ぶ。渡すと各バッジに × が付く。 */
+  /** 紐づけを外すとき呼ぶ。渡すとバッジに × が付く。 */
   onUnlink?: (reportId: string) => void;
 };
 
+/** 参照レポートが勤務表のどこに効くか（ラベルの説明に出す） */
+const EFFECT_HINT =
+  "参照レポートの貢献度スコアが高い人ほど、自動シフトで休みを優先して取れます（スコアは各スタッフ名の横に出ます）。";
+
 /**
- * 勤務表に紐づけたシフト完成レポートを表示する（プレゼンテーショナル）。
- * 責任者ルールに Staff をドロップで追加する {@link LeaderRuleDiagram} と同じ drop パターン
- * （dragover で型だけ判定→drop で parseDragPayload）で、ScheduleReport のドロップを受け付ける。
+ * 勤務表の参照レポートを表示・紐づけする（プレゼンテーショナル）。
+ *
+ * 紐づけ方は2通り。主にはプルダウンで選ぶ（候補は同じ店舗の前の月のレポート）。
+ * レポートをドラッグして落としてもよい（責任者ルールに Staff をドロップで追加する
+ * {@link LeaderRuleDiagram} と同じ drop パターン: dragover で型だけ判定→drop で parseDragPayload）。
+ * 紐づけは1つなので、どちらで紐づけても今のものと置き換わる。
  * バッジはダブルクリックでレポートバブルを開く（ObjectView の既定挙動）。
  */
 export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
-  reports,
+  report,
+  candidates = [],
+  onLink,
   onDropUrl,
   dropAcceptTypes,
   onUnlink,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const droppable = !!onDropUrl;
+  const choices = candidates.filter((c) => c.id !== report?.id);
 
   const handleDragOver = (e: DragEvent) => {
     if (!onDropUrl) return;
@@ -54,7 +71,7 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
     onDropUrl(payload.url);
   };
 
-  if (reports.length === 0 && !droppable) return null;
+  if (!report && !droppable && !onLink) return null;
 
   return (
     <StyledWrap
@@ -63,36 +80,57 @@ export const LinkedReportsView: FC<LinkedReportsViewProps> = ({
       onDragLeave={droppable ? handleDragLeave : undefined}
       onDrop={droppable ? handleDrop : undefined}
     >
-      <span className="e-label">
+      <span className="e-label" title={EFFECT_HINT}>
         <AssessmentIcon fontSize="inherit" className="e-icon" />
         参照レポート
       </span>
-      {reports.length === 0 ? (
-        <span className="e-hint">📎 レポートをドラッグして紐づけ</span>
-      ) : (
-        reports.map((report) => (
-          <span key={report.id} className="e-chip">
-            <ObjectView
-              object={report}
-              label={report.title}
-              draggable={false}
-              openingPosition="origin-side"
+      {report && (
+        <span className="e-chip" title={EFFECT_HINT}>
+          <ObjectView
+            object={report}
+            label={report.title}
+            draggable={false}
+            openingPosition="origin-side"
+          >
+            <span className="e-chip-text">{report.title}</span>
+          </ObjectView>
+          {onUnlink && (
+            <button
+              type="button"
+              className="e-unlink"
+              onClick={() => onUnlink(report.id)}
+              title={`「${report.title}」の紐づけを外す`}
+              aria-label={`「${report.title}」の紐づけを外す`}
             >
-              <span className="e-chip-text">{report.title}</span>
-            </ObjectView>
-            {onUnlink && (
-              <button
-                type="button"
-                className="e-unlink"
-                onClick={() => onUnlink(report.id)}
-                title={`「${report.title}」の紐づけを解除`}
-                aria-label={`「${report.title}」の紐づけを解除`}
-              >
-                ×
-              </button>
-            )}
-          </span>
-        ))
+              ×
+            </button>
+          )}
+        </span>
+      )}
+      {onLink && choices.length > 0 && (
+        <select
+          className="e-pick"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) onLink(e.target.value);
+          }}
+          title="同じ店舗の、前の月のレポートから選べます"
+          aria-label={report ? "参照レポートを変える" : "参照レポートを選んで紐づける"}
+        >
+          <option value="">{report ? "変える…" : "＋ 選んで紐づける"}</option>
+          {choices.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.title === ScheduleReport.defaultTitle(c.year, c.month)
+                ? c.title
+                : `${c.title}（${c.year}年${c.month}月）`}
+            </option>
+          ))}
+        </select>
+      )}
+      {!report && choices.length === 0 && (
+        <span className="e-hint">
+          {droppable ? "紐づけられるレポートがありません（同じ店舗の前の月のもの）" : "なし"}
+        </span>
       )}
     </StyledWrap>
   );
@@ -136,6 +174,21 @@ const StyledWrap = styled.div<HTMLAttributes<HTMLDivElement>>`
     color: #bbb;
   }
 
+  .e-pick {
+    font-size: 0.78em;
+    color: #8d6e00;
+    border: 1px dashed #f9a825;
+    border-radius: 999px;
+    background: #fff;
+    padding: 1px 6px;
+    cursor: pointer;
+    max-width: 14em;
+
+    &:hover {
+      background: #fffde7;
+    }
+  }
+
   .e-chip {
     display: inline-flex;
     align-items: center;
@@ -160,7 +213,7 @@ const StyledWrap = styled.div<HTMLAttributes<HTMLDivElement>>`
     border: none;
     background: transparent;
     color: currentColor;
-    opacity: 0.5;
+    opacity: 0.7;
     font-size: 1.05em;
     line-height: 1;
     padding: 0 4px;

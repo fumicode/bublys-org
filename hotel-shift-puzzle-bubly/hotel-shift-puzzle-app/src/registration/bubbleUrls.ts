@@ -22,6 +22,14 @@ import {
 export const staffUrl = (staffId: string): string =>
   `hotel-shift-puzzle/staffs/${staffId}`;
 
+/**
+ * 勤務表から開いたスタッフ詳細バブル。どの勤務表から開いたかを URL で持つので、
+ * 詳細にその勤務表の参照レポートでの評価が出る（スタッフ一覧から開く staffUrl には出ない）。
+ * 最後の区切りが staffId なので、ここからドラッグしてもスタッフとして落とせる。
+ */
+export const scheduleStaffDetailUrl = (scheduleId: string, staffId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/staffs/${staffId}`;
+
 /** シフト希望の入口。希望を集める月（＝勤務表がある月）が並ぶ月一覧 */
 export const shiftWishListUrl = (): string => `hotel-shift-puzzle/shift-wishes`;
 

@@ -547,6 +547,20 @@ export const StyledWrap = styled.div`
       align-items: flex-end;
       gap: 1px;
     }
+    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    .e-priority-badge {
+      flex-shrink: 0;
+      font-size: 0.55em;
+      font-weight: bold;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
+      white-space: nowrap;
+      color: #8d6e00;
+      background: #fffde7;
+      border: 1px solid #ffe082;
+      cursor: help;
+    }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
       flex-shrink: 0;

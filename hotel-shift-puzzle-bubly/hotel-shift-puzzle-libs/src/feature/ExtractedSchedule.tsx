@@ -27,7 +27,7 @@ import {
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
-import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { prioritizeStaffByReport } from "./reportPriority.js";
 import { recordSetCells, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -43,6 +43,8 @@ type ExtractedScheduleProps = {
   scheduleId?: string;
   /** 抽出対象のスタッフID（元の勤務表で選択した人たち） */
   staffIds: string[];
+  /** スタッフ名から開くスタッフ詳細バブルの URL（ScheduleGrid と同じ。app 層から注入） */
+  staffBubbleUrl?: (staffId: string) => string;
 };
 
 /**
@@ -59,6 +61,7 @@ type ExtractedScheduleProps = {
 const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   scheduleId,
   staffIds,
+  staffBubbleUrl,
 }) => {
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const store = useAppStore();
@@ -81,13 +84,13 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     CONSTRAINT_SET_TYPE,
     scheduleId
   );
-  // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
+  // 参照レポート（ScheduleGrid で紐づけたもの）。
   // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは reportPriority.ts）。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReports = useMemo(() => {
-    const ids = constraints?.linkedReportIds ?? [];
-    return allReports.filter((r) => ids.includes(r.id));
-  }, [allReports, constraints]);
+  const linkedReport = useMemo(
+    () => allReports.find((r) => r.id === constraints?.linkedReportId),
+    [allReports, constraints]
+  );
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
@@ -157,9 +160,13 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
 
   // 自動シフト：対象スタッフ（subset）だけを staffList として渡す → ステップが subset 限定になる
   const handleRunStep = (step: AutoShiftStep) => {
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subset,
+      linkedReport
+    );
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
+      staffList: prioritizedStaff,
       workShifts,
       wishByStaff,
       staffGroup,
@@ -167,7 +174,8 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
-    setAutoMessage(`${step.label}: ${result.message}`);
+    const note = step.grantsDayOffInStaffOrder ? priorityNote : null;
+    setAutoMessage([`${step.label}: ${result.message}`, note].filter(Boolean).join("\n"));
   };
 
   // 完成案の複数生成：抽出中の人について「毎日 担当勤務帯に責任者が最低1人いる（責任者ルール）」
@@ -176,7 +184,10 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // （たいてい既に開いているため）。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    const prioritizedStaff = prioritizeStaffByLinkedReports(subset, linkedReports);
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subset,
+      linkedReport
+    );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
@@ -224,7 +235,12 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     }));
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
     setAutoMessage(
-      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
+      [
+        `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`,
+        priorityNote,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
   };
 
@@ -239,6 +255,8 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}
+        referenceReport={linkedReport}
+        staffUrlOf={staffBubbleUrl}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}
         onChangeCells={handleChangeCells}

@@ -37,6 +37,30 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
     expect(r.contributionScores).toHaveLength(2);
   });
 
+  test('scoreOf はそのスタッフの貢献度スコアを返す（行が無ければ 0）', () => {
+    const r = create();
+    expect(r.scoreOf('staff-A')).toBe(3);
+    expect(r.scoreOf('staff-B')).toBe(1);
+    expect(r.scoreOf('staff-Z')).toBe(0);
+  });
+
+  describe('isReferenceableFrom（参照レポートにできるのは同じ店舗の前の月だけ）', () => {
+    // レポートは store-1 の 2026年6月
+    test('同じ店舗の後の月からは参照できる（年をまたいでも）', () => {
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 7 })).toBe(true);
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2027, month: 1 })).toBe(true);
+    });
+
+    test('同じ月・前の月からは参照できない', () => {
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 6 })).toBe(false);
+      expect(create().isReferenceableFrom({ storeId: 'store-1', year: 2026, month: 5 })).toBe(false);
+    });
+
+    test('別の店舗からは参照できない', () => {
+      expect(create().isReferenceableFrom({ storeId: 'store-2', year: 2026, month: 7 })).toBe(false);
+    });
+  });
+
   test('配慮メモは既定で空、setNote で設定できる（不変）', () => {
     const base = create();
     expect(base.noteFor('staff-A')).toBe('');

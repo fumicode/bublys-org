@@ -53,7 +53,7 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { prioritizeStaffByReport } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
@@ -132,6 +132,11 @@ type ScheduleGridProps = {
    */
   reportBubbleUrl?: (reportId: string) => string;
   /**
+   * スタッフ名から開くスタッフ詳細バブルの URL を作る（staffId を渡す）。この勤務表の文脈を
+   * 持った URL を渡すと、詳細にこの勤務表の参照レポートでの評価が出る。同上・app 層から注入。
+   */
+  staffBubbleUrl?: (staffId: string) => string;
+  /**
    * 責任者ルールを追加したあと、その編集バブルを開くハンドラ（ロールキーを渡す）。
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
    */
@@ -163,6 +168,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   violationBubbleUrl,
   bubbleUrlOf,
   reportBubbleUrl,
+  staffBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
@@ -241,14 +247,24 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     [constraints, scheduleId]
   );
 
-  // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
-  // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
+  // 参照レポート（過去のシフト完成レポートを1つ紐づける）。自動シフトの実行前に
+  // staffList をこれの貢献度スコアで並べ替え、休みを優先して取れる順にする（reportPriority.ts）。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReports = useMemo(() => {
-    const ids = constraints?.linkedReportIds ?? [];
-    return allReports.filter((r) => ids.includes(r.id));
-  }, [allReports, constraints]);
+  const linkedReport = useMemo(
+    () => allReports.find((r) => r.id === constraints?.linkedReportId),
+    [allReports, constraints]
+  );
+  // 紐づけられるのは同じ店舗の前の月のレポートだけ（ScheduleReport.isReferenceableFrom）。新しい順。
+  const referenceableReports = useMemo(
+    () =>
+      schedule
+        ? allReports
+            .filter((r) => r.isReferenceableFrom(schedule))
+            .sort((a, b) => b.year - a.year || b.month - a.month)
+        : [],
+    [allReports, schedule]
+  );
 
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。集約から（世界線に載る）。
   // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
@@ -348,13 +364,27 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return ConstraintSet.empty(scheduleId);
   };
 
-  const handleDropReportUrl = (url: string) => {
-    const reportId = extractIdFromUrl(url);
-    if (!reportId || !scheduleId) return;
+  // 参照レポートを紐づける（プルダウンでもドロップでも同じ入口）。紐づけは1つなので置き換わる。
+  // 参照できないレポート（別の店舗・同じ月以降）は紐づけず、理由を伝える。
+  const handleLinkReport = (reportId: string) => {
+    if (!scheduleId || !schedule) return;
+    const report = allReports.find((r) => r.id === reportId);
+    if (!report) return;
+    if (!report.isReferenceableFrom(schedule)) {
+      setAutoMessage(
+        `「${report.title}」は参照レポートにできません（同じ店舗の、前の月のレポートだけ紐づけられます）。`
+      );
+      return;
+    }
     const base = constraintsBase();
     if (!base) return;
-    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
-    recordConstraintEdit(store, { schedule, nextConstraints: base.linkReport(reportId) });
+    const next = base.linkReport(reportId);
+    if (next === base) return; // 既に紐づいている
+    recordConstraintEdit(store, { schedule, nextConstraints: next });
+  };
+  const handleDropReportUrl = (url: string) => {
+    const reportId = extractIdFromUrl(url);
+    if (reportId) handleLinkReport(reportId);
   };
   const handleUnlinkReport = (reportId: string) => {
     if (!constraints) return;
@@ -517,11 +547,16 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 紐づけたレポートで譲歩が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 参照レポートの貢献度スコアが高い人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subsetStaff,
+      linkedReport
+    );
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
+      staffList: prioritizedStaff,
       workShifts,
       wishByStaff,
       staffGroup,
@@ -531,14 +566,18 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
-    setAutoMessage(`${step.label}: ${result.message}`);
+    const note = step.grantsDayOffInStaffOrder ? priorityNote : null;
+    setAutoMessage([`${step.label}: ${result.message}`, note].filter(Boolean).join("\n"));
   };
 
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 紐づけたレポートで譲歩が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
+    // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subsetStaff,
+      linkedReport
+    );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
@@ -588,8 +627,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       schedule,
       candidates
     );
+    // 完成案は「月◯日休む」まで入れるので、並び順が休みの優先に効いている
     setAutoMessage(
-      `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
+      [
+        `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`,
+        priorityNote,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
     onOpenWorldLineAfterCandidates?.();
   };
@@ -784,10 +829,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             </ObjectView>
           )}
 
-          {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
-              自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
+          {/* 参照レポート（プルダウンで選ぶか、レポート一覧からドラッグで紐づける。
+              自動シフトで休みを優先する順に使う。詳しくは reportPriority.ts）。 */}
           <LinkedReportsView
-            reports={linkedReports}
+            report={linkedReport}
+            candidates={referenceableReports}
+            onLink={handleLinkReport}
             onDropUrl={handleDropReportUrl}
             dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
             onUnlink={handleUnlinkReport}
@@ -838,6 +885,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
+          referenceReport={linkedReport}
+          staffUrlOf={staffBubbleUrl}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}
           onSelectRule={selectRuleStaff}

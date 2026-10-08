@@ -186,6 +186,20 @@ export class ScheduleReport {
     return this.state.contributionScores;
   }
 
+  /** そのスタッフの貢献度スコア（スコアの行が無ければ 0） */
+  scoreOf(staffId: string): number {
+    return this.state.contributionScores.find((s) => s.staffId === staffId)?.score ?? 0;
+  }
+
+  /**
+   * この勤務表の参照レポートにできるか。**同じ店舗の、それより前の月**のレポートだけ。
+   * 別の店舗は働く人も事情も違い、同じ月や先の月は「振り返り」にならないため。
+   */
+  isReferenceableFrom(target: { storeId: string; year: number; month: number }): boolean {
+    if (target.storeId !== this.state.storeId) return false;
+    return this.state.year * 12 + this.state.month < target.year * 12 + target.month;
+  }
+
   get compromiseWeight(): number {
     return this.state.compromiseWeight;
   }
