@@ -87,11 +87,17 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "linkedReportId",
           "type": "string",
           "optional": true
+        },
+        {
+          "name": "useReportPriority",
+          "type": "boolean",
+          "optional": true
         }
       ],
       "getters": [
         "id",
         "maxConsecutiveWorkdays",
+        "useReportPriority",
         "checkShiftWish",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
@@ -167,6 +173,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "withCheckShiftWish",
           "params": [
             "check"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withUseReportPriority",
+          "params": [
+            "use"
           ],
           "returns": "ConstraintSet",
           "isStatic": false,
@@ -621,6 +636,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "requiredStaffing",
           "type": "RequiredStaffing",
           "optional": false
+        },
+        {
+          "name": "precedingTail",
+          "type": "PrecedingMonthTail",
+          "optional": true
         }
       ],
       "getters": [
@@ -630,6 +650,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "month",
         "workingStaffGroupId",
         "constraintSetId",
+        "precedingTail",
         "assignments",
         "index",
         "requiredStaffing"
@@ -642,6 +663,22 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "MonthlyStaffSchedule",
           "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previousYearMonth",
+          "params": [],
+          "returns": "{ year: number; month: number; }",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "withPrecedingTail",
+          "params": [
+            "tail"
+          ],
+          "returns": "MonthlyStaffSchedule",
+          "isStatic": false,
           "returnsSelf": true
         },
         {
@@ -880,6 +917,172 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "MonthlyStaffSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "PrecedingCell",
+      "file": "schedule/PrecedingMonthTail.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "staffId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "day",
+          "type": "WorkingDay",
+          "optional": false
+        },
+        {
+          "name": "value",
+          "type": "PrecedingCellValue",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "staffId",
+        "day",
+        "value",
+        "isWorking",
+        "shiftName"
+      ],
+      "methods": [
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PrecedingCellPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "PrecedingCell",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ],
+      "doc": "前月末尾の1セル（スタッフ×前月の日）"
+    },
+    {
+      "name": "PrecedingMonthTail",
+      "file": "schedule/PrecedingMonthTail.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "sourceReportId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "confirmedAt",
+          "type": "number",
+          "optional": true
+        },
+        {
+          "name": "days",
+          "type": "WorkingDay[]",
+          "optional": false
+        },
+        {
+          "name": "cells",
+          "type": "PrecedingCell[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "sourceReportId",
+        "confirmedAt",
+        "days",
+        "lastDay",
+        "yearMonth",
+        "signature"
+      ],
+      "methods": [
+        {
+          "name": "capture",
+          "params": [
+            "params"
+          ],
+          "returns": "PrecedingMonthTail",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "directlyPrecedes",
+          "params": [
+            "year",
+            "month"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "cellOf",
+          "params": [
+            "staffId",
+            "day"
+          ],
+          "returns": "PrecedingCell | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isWorking",
+          "params": [
+            "staffId",
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "shiftNameOn",
+          "params": [
+            "staffId",
+            "day"
+          ],
+          "returns": "string | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "trailingWorkdays",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "staffIds",
+          "params": [],
+          "returns": "string[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PrecedingMonthTailPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "PrecedingMonthTail",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -1196,6 +1399,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "busyDayWeight",
           "type": "number",
           "optional": false
+        },
+        {
+          "name": "confirmedAt",
+          "type": "number",
+          "optional": true
         }
       ],
       "getters": [
@@ -1206,6 +1414,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "month",
         "storeId",
         "title",
+        "confirmedAt",
         "compromises",
         "busyDayContributions",
         "contributionScores",
@@ -2421,6 +2630,14 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "MonthlyStaffSchedule",
+      "to": "PrecedingMonthTail",
+      "kind": "contains",
+      "via": "precedingTail",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
       "to": "RequiredStaffing",
       "kind": "contains",
       "via": "requiredStaffing",
@@ -2434,6 +2651,38 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "workingStaffGroupId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "PrecedingCell",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "day",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "PrecedingCell",
+      "to": "Staff",
+      "kind": "references",
+      "via": "staffId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
+      "from": "PrecedingMonthTail",
+      "to": "PrecedingCell",
+      "kind": "contains",
+      "via": "cells",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "PrecedingMonthTail",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "days",
+      "many": true,
+      "foundBy": "type"
     },
     {
       "from": "ScheduleCandidates",
@@ -2518,7 +2767,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 41,
+    "fileCount": 42,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
@@ -2531,6 +2780,7 @@ export const MODEL_GRAPH: ModelGraph = {
     "unresolvedIdFields": [
       "ConstraintSet.linkedReportId",
       "MonthlyStaffSchedule.storeId",
+      "PrecedingMonthTail.sourceReportId",
       "ScheduleReport.storeId",
       "ScheduleReport.worldLineNodeId",
       "WorkingStaffMember.allowedShiftIds"

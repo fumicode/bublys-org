@@ -10,12 +10,14 @@ import type {
   ShiftLeaderRule,
   ShiftCell,
   ScheduleReport,
+  PrecedingMonthTail,
 } from "../../domain/index.js";
 import {
   MIN_MONTHLY_DAY_OFF_CONSTRAINT,
   isShiftIntervalConstraintType,
 } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
+import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
@@ -23,6 +25,8 @@ import type { CellSelection } from "./types.js";
 type StaffScheduleRowProps = {
   staff: Staff;
   days: WorkingDay[];
+  /** 前月の確定版から写し取った末尾。あれば今月1日の左に読み取り専用で並べる */
+  precedingTail?: PrecedingMonthTail;
   schedule: MonthlyStaffSchedule;
   /** 勤務帯ID → WorkShift の解決マップ */
   shiftMap: Map<string, WorkShift>;
@@ -85,6 +89,7 @@ type StaffScheduleRowProps = {
 export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   staff,
   days,
+  precedingTail,
   schedule,
   shiftMap,
   violations,
@@ -160,6 +165,17 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           </div>
         </ObjectView>
       </div>
+
+      {/* 前月の末尾（読み取り専用）。同じ人の前月末が今月1日の左にそのまま続く */}
+      {precedingTail && (
+        <PrecedingStaffCells
+          tail={precedingTail}
+          staffId={staff.id}
+          staffName={staff.name}
+          shiftMap={shiftMap}
+          className={rowMod.trim() || undefined}
+        />
+      )}
 
       {/* 各稼働日のセル */}
       {days.map((day) => {

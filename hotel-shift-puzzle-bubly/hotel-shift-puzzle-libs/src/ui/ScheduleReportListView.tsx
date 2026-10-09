@@ -5,10 +5,13 @@ import styled from "styled-components";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import { ScheduleReport } from "../domain/index.js";
+import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
 type ScheduleReportListViewProps = {
   /** 年月降順（新しい順） */
   reports: ScheduleReport[];
+  /** 確定した時刻（epoch ms）。同じ月の確定が複数あるとき見分けられるよう小さく出す */
+  confirmedAtOf?: (report: ScheduleReport) => number | undefined;
 };
 
 /**
@@ -16,7 +19,10 @@ type ScheduleReportListViewProps = {
  * 譲歩・繁忙日対応・貢献度スコアを参照する入口になる。ここから勤務表の「参照レポート」へ
  * ドラッグして紐づけることもできる（勤務表側のプルダウンでも選べる）。
  */
-export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({ reports }) => {
+export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({
+  reports,
+  confirmedAtOf,
+}) => {
   return (
     <StyledContainer>
       <div className="e-header">
@@ -48,6 +54,11 @@ export const ScheduleReportListView: FC<ScheduleReportListViewProps> = ({ report
                         `${report.year}年${report.month}月 ・ `}
                       {report.storeId} ・ 譲歩{report.compromises.length}件 ・ 繁忙日
                       {report.busyDayContributions.length}日
+                      {confirmedAtOf?.(report) !== undefined && (
+                        <span className="e-confirmed-at">
+                          {" "}・ 確定 {formatConfirmedAt(confirmedAtOf(report))}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -114,6 +125,10 @@ const StyledContainer = styled.div`
     .e-meta {
       font-size: 0.8em;
       color: #777;
+    }
+    .e-confirmed-at {
+      font-size: 0.9em;
+      color: #999;
     }
   }
 `;
