@@ -110,6 +110,22 @@ export class BubblesProcess {
     });
   }
 
+  /**
+   * すでに開いているバブルを最前面へ出す（フォーカスも移す）。
+   * popChild と違い、元の層からは抜く（同じ id が2つの層に居てはいけない）。
+   * 居なければ何もしない。
+   */
+  bringToFront(id: string): BubblesProcess {
+    if (!this.state.layers.some((layer) => layer.includes(id))) return this;
+    return this.apply(draft => {
+      draft.layers = draft.layers
+        .map(layer => layer.filter(bId => bId !== id))
+        .filter(layer => layer.length > 0);
+      draft.layers.unshift([id]);
+      draft.focusedBubbleId = id;
+    });
+  }
+
   joinSibling(id: string): BubblesProcess {
     return this.apply(draft => {
       if (draft.layers.length === 0) {
