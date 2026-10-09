@@ -91,6 +91,8 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     () => allReports.find((r) => r.id === constraints?.linkedReportId),
     [allReports, constraints]
   );
+  // 貢献度スコアは、スイッチ（ConstraintSet.useReportPriority）がオンのときだけ優先度に使う
+  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
@@ -162,7 +164,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   const handleRunStep = (step: AutoShiftStep) => {
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subset,
-      linkedReport
+      priorityReport
     );
     const result = runAutoShiftStep(step, {
       schedule,
@@ -186,7 +188,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     if (!scheduleId) return;
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subset,
-      linkedReport
+      priorityReport
     );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -255,7 +257,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}
-        referenceReport={linkedReport}
+        referenceReport={priorityReport}
         staffUrlOf={staffBubbleUrl}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}

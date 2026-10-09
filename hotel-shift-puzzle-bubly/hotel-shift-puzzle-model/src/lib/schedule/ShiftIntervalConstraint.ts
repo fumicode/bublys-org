@@ -13,6 +13,10 @@
  * 違反範囲を [前日, 翌日] の2日にしているのは、違反しているのがどちらか一方のセルではなく
  * 「2日のつなぎ目（間隔）」だから。表もこの2日の境目に印を出す。
  *
+ * 前月とつないでいれば（{@link MonthlyStaffSchedule.precedingTail}）、前月末日と今月1日の
+ * つなぎ目も見る。前月側は写し取った勤務帯名をそのまま使う（前月の勤務帯IDは今月の勤務帯
+ * セットでは引けないため）。違反の範囲は [前月末日, 今月1日]。
+ *
  * 勤務帯の解決（shiftName → 勤務帯ID集合）は勤務表側の事情なので、責任者制約と同じく
  * 呼び出し側から shiftIdsOf を受け取る（同名で開始時刻違いの勤務帯が複数あってよいため）。
  */
@@ -70,8 +74,21 @@ export class ShiftIntervalConstraint implements ScheduleConstraint {
 
     const days = schedule.workingDays();
     const staffIds = [...new Set(schedule.assignments.map((a) => a.staffId))];
+    const tail = schedule.precedingTail;
+    const lastOfPrev = tail?.lastDay;
 
     for (const staffId of staffIds) {
+      if (tail && lastOfPrev && days.length > 0) {
+        const prevShiftName = tail.shiftNameOn(staffId, lastOfPrev);
+        const nextShiftName = this.shiftNameOn(schedule, staffId, days[0]);
+        if (
+          prevShiftName !== undefined &&
+          nextShiftName !== undefined &&
+          !this.rule.allowsNextDay(prevShiftName, nextShiftName)
+        ) {
+          violations.push(this.toViolation(staffId, lastOfPrev, days[0], prevShiftName, nextShiftName));
+        }
+      }
       for (let i = 0; i + 1 < days.length; i++) {
         const prevDay = days[i];
         const nextDay = days[i + 1];
@@ -84,18 +101,28 @@ export class ShiftIntervalConstraint implements ScheduleConstraint {
         if (this.rule.allowsNextDay(prevShiftName, nextShiftName)) continue;
 
         violations.push(
-          new ConstraintViolation({
-            constraintType: this.type,
-            staffId,
-            // 違反しているのは「この2日のつなぎ目」なので、範囲は前日と翌日の2日。
-            days: [prevDay, nextDay],
-            message: `${prevShiftName}の翌日に${nextShiftName}（${this.rule.restReason}）`,
-          })
+          this.toViolation(staffId, prevDay, nextDay, prevShiftName, nextShiftName)
         );
       }
     }
 
     return violations;
+  }
+
+  private toViolation(
+    staffId: string,
+    prevDay: WorkingDay,
+    nextDay: WorkingDay,
+    prevShiftName: string,
+    nextShiftName: string
+  ): ConstraintViolation {
+    return new ConstraintViolation({
+      constraintType: this.type,
+      staffId,
+      // 違反しているのは「この2日のつなぎ目」なので、範囲は前日と翌日の2日。
+      days: [prevDay, nextDay],
+      message: `${prevShiftName}の翌日に${nextShiftName}（${this.rule.restReason}）`,
+    });
   }
 
   /** そのセルの勤務帯名（休み・未定・ルールが名指ししていない勤務帯なら undefined） */

@@ -20,6 +20,7 @@ import {
 import {
   STAFF_COL_WIDTH,
   DAY_COL_WIDTH,
+  PREV_COL_WIDTH,
   OFF_COL_WIDTH,
   EARLY_COL_WIDTH,
   EARLY_SHIFT_NAME,
@@ -36,6 +37,7 @@ import {
 } from "./schedule-grid/ConstraintHoverOverlay.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
+import { PrecedingHeadCells } from "./schedule-grid/PrecedingCells.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import {
@@ -431,9 +433,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     kb.gridRef.current?.focus();
   };
 
-  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
-  // スタッフ列の右から、日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
-  const daysThroughSummarySpan = `2 / ${days.length + 4}`;
+  // 前月の確定版から写し取った末尾（月跨ぎのつなぎ）。スタッフ列と今月1日の間に並べる
+  const precedingTail = schedule.precedingTail;
+  const precedingDays = precedingTail?.days ?? [];
+  const precedingCols =
+    precedingDays.length > 0 ? `repeat(${precedingDays.length}, ${PREV_COL_WIDTH}px) ` : "";
+  const gridTemplateColumns = `${STAFF_COL_WIDTH}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  // スタッフ列の右から、前月の列＋日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
+  const daysThroughSummarySpan = `2 / ${precedingDays.length + days.length + 4}`;
 
   // 部署グルーピング時は department ヘッダー行を挿入してスタッフ行を並べる
   const renderStaffRows = () => {
@@ -443,6 +450,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           key={staff.id}
           staff={staff}
           days={days}
+          precedingTail={precedingTail}
           schedule={schedule}
           shiftMap={shiftMap}
           violations={violations}
@@ -490,6 +498,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           key={staff.id}
           staff={staff}
           days={days}
+          precedingTail={precedingTail}
           schedule={schedule}
           shiftMap={shiftMap}
           violations={violations}
@@ -564,6 +573,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             {!reservationCollapsed && (
               <ReservationInfoRows
                 days={days}
+                precedingCount={precedingDays.length}
                 reservationInfo={reservationInfo}
                 reservationInfoUrl={reservationInfoUrl}
               />
@@ -582,6 +592,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <span className="e-corner-actions">{staffColumnActions}</span>
           )}
         </div>
+        <PrecedingHeadCells days={precedingDays} />
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
@@ -650,6 +661,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             key={`sum:${row.key}`}
             row={row}
             days={days}
+            precedingCount={precedingDays.length}
             rowIndex={rowIndex}
             editable={!!row.required && requiredEditable}
             // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。

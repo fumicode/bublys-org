@@ -48,6 +48,12 @@ export type ConstraintSetState = {
    * （ScheduleReport）のID。紐づけられるのは1つだけ。省略時は紐づけ無し。
    */
   linkedReportId?: string;
+  /**
+   * 参照レポートの貢献度スコアを、自動シフトで休みを割り当てる順（優先度）に使うか。省略時 false。
+   * 参照レポートは勤務表を作るときに自動で紐づくので、スコアまで黙って効かないよう既定はオフ。
+   * これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は参照している限り常に効く。
+   */
+  useReportPriority?: boolean;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -107,6 +113,11 @@ export class ConstraintSet {
   /** 連勤上限（日数）。既定 5。 */
   get maxConsecutiveWorkdays(): number {
     return this.state.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS;
+  }
+
+  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うか。既定 false。 */
+  get useReportPriority(): boolean {
+    return this.state.useReportPriority ?? false;
   }
 
   /** シフト希望との食い違いを違反として見るか。既定 true。 */
@@ -175,6 +186,12 @@ export class ConstraintSet {
   withCheckShiftWish(check: boolean): ConstraintSet {
     if (check === this.checkShiftWish) return this;
     return new ConstraintSet({ ...this.state, checkShiftWish: check });
+  }
+
+  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
+  withUseReportPriority(use: boolean): ConstraintSet {
+    if (use === this.useReportPriority) return this;
+    return new ConstraintSet({ ...this.state, useReportPriority: use });
   }
 
   private withNumber(

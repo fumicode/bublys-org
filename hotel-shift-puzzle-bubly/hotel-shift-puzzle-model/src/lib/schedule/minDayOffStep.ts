@@ -14,6 +14,9 @@
  *     途切れる。
  *   - 一番長い区間から割るので、置くたびに「最長の連勤」が縮む。minDayOff が十分あれば（例: 30日の
  *     月に8日）休み間隔は自然に短くなり、連勤上限を超える区間は残らない。
+ *   - 前月とつないでいれば、前月末から続く出勤を月初の区間の前に足して長さを測る
+ *     （前月末に5日働いた人は、月初の区間がその5日ぶん長いのと同じ）。割る位置もその
+ *     つながった区間の真ん中にする。前月側には休みを置けないので、置けるのは今月側だけ。
  *   - 休める日数（minDayOff）を優先し、それでも割り切れない区間が残る場合は連勤が残りうる
  *     （＝日数ちょうどを最優先）。可能勤務帯の都合等で休めない日ばかりの区間は割れない。
  *
@@ -67,6 +70,10 @@ export function placeMinDayOffs(
 
     // 「休みでない日」（出勤 or 未定＝将来 出勤になる）が連続する区間を、暦順に列挙する。
     // 既にある休みで区間は途切れる。区間 = [s, e]（days の添字）。
+    // 前月末から持ち越した出勤日数。月初（s=0）の区間は、その日数ぶん前へ伸びているとみなす
+    const carried = result.precedingTail?.trailingWorkdays(staffId) ?? 0;
+    const startOf = (s: number): number => (s === 0 ? -carried : s);
+
     const nonOffRuns = (): Array<{ s: number; e: number }> => {
       const out: Array<{ s: number; e: number }> = [];
       let s = -1;
@@ -91,7 +98,7 @@ export function placeMinDayOffs(
     // 勤務表の制約に新しい違反が出ない（休み×の希望など）。無ければ null。
     const splitDay = (s: number, e: number): number | null => {
       const len = e - s + 1;
-      const mid = Math.floor((s + e) / 2);
+      const mid = Math.floor((startOf(s) + e) / 2);
       const bias = (((phase + i) % 3) + 3) % 3 - 1; // -1, 0, +1
       let center = mid + bias;
       if (center < s) center = s;
@@ -118,7 +125,9 @@ export function placeMinDayOffs(
     let placed = 0;
     while (placed < need) {
       // 一番長い区間から割る（＝最長の連勤を優先して縮める）。同長は暦の早い方から。
-      const runs = nonOffRuns().sort((a, b) => b.e - b.s - (a.e - a.s) || a.s - b.s);
+      const runs = nonOffRuns().sort(
+        (a, b) => b.e - startOf(b.s) - (a.e - startOf(a.s)) || a.s - b.s
+      );
       let didPlace = false;
       for (const r of runs) {
         const idx = splitDay(r.s, r.e);
