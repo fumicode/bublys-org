@@ -21,6 +21,7 @@ import {
   layerUp as layerUpAction,
   popChildInProcess as popChildAction,
   popChildMaxInProcess,
+  bringToFrontInProcess,
   joinSiblingInProcess as joinSiblingAction,
   relateBubbles,
   removeBubble,
@@ -32,6 +33,7 @@ import {
   OpeningPosition,
   DragDataType,
   selectHasBubbleOfUrl,
+  selectBubbleIdOfUrl,
 } from "@bublys-org/bubbles-ui";
 import { PositionDebuggerProvider, usePositionDebugger } from "@bublys-org/bubbles-ui/debug";
 import { BubbleContent } from "../ui/BubbleContent";
@@ -225,7 +227,11 @@ export const BubblesUI: FC<BubblesUI> = ({ additionalButton }) => {
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
     isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url),
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store]);
+    bringToFront: (url: string) => {
+      const id = selectBubbleIdOfUrl(store.getState() as never, url);
+      if (id) dispatch(bringToFrontInProcess(id));
+    },
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store, dispatch]);
 
   const handleBubbleClick = useCallback((name: string) => {
     console.log("Bubble clicked: " + name);

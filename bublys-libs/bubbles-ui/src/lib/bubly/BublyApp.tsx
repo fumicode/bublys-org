@@ -26,6 +26,7 @@ import {
   layerUp as layerUpAction,
   popChildInProcess as popChildAction,
   popChildMaxInProcess,
+  bringToFrontInProcess,
   joinSiblingInProcess as joinSiblingAction,
   relateBubbles,
   removeBubble,
@@ -34,6 +35,7 @@ import {
   selectSurfaceLeftTop,
   OpeningPosition,
   selectHasBubbleOfUrl,
+  selectBubbleIdOfUrl,
 } from '../state/index.js';
 import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
@@ -214,7 +216,11 @@ export const BublyApp: FC<BublyAppProps> = ({
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
     isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url),
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store]);
+    bringToFront: (url: string) => {
+      const id = selectBubbleIdOfUrl(store.getState() as never, url);
+      if (id) dispatch(bringToFrontInProcess(id));
+    },
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store, dispatch]);
 
   // Pocket
   const [isPocketOpen, setIsPocketOpen] = useState(false);

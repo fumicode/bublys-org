@@ -91,6 +91,14 @@ const LegacyScreen: FC<{ bubble: RoutedBubble; Legacy: FC<{ bubble: never }>; ch
         space.openBubble(url, openerBubbleId ?? bubble.id);
       },
       isOpen: (url: string) => space.hasUrl(url),
+      /**
+       * TODO: `bringToFront`（開いているバブルを最前面へ出す）にはまだ答えていない。
+       *   旧の海は層（手前・奥）を持つので「一番手前の層へ移す」で済むが、新しい海は
+       *   並べ方と面で見せるので、手前に出す口が `BubbleSpaceApi` に無い。
+       *   答えないあいだは、1つあれば足りるバブル（勤務表の世界線ビューなど）を
+       *   もう一度開こうとしても何も起きない。手応えを出すなら、その泡を選択状態にする
+       *   （BubbleSpace の setSelectedId）口を `BubbleSpaceApi` に足して、ここから呼ぶのが近い。
+       */
       surfaceLeftTop: { x: 0, y: 0 },
     }),
     [space, bubble.id],

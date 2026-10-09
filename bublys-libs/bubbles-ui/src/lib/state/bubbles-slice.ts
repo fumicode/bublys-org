@@ -298,6 +298,16 @@ export const bubblesSlice = createSlice({
     },
 
 
+    // すでに開いているバブルを最前面へ出す（開き直さない。位置も大きさも変えない）
+    bringToFront: {
+      reducer: (state, action: PayloadAction<string, string, UniverseMeta>) => {
+        const u = draftUniverse(state, action.meta.universeId);
+        u.process = BubblesProcess.fromJSON(u.process).bringToFront(action.payload).toJSON();
+        state.renderCount += 1;
+      },
+      prepare: prepStr,
+    },
+
     joinSibling: {
       reducer: (state, action: PayloadAction<JoinSiblingPayload, string, UniverseMeta>) => {
         const u = draftUniverse(state, action.meta.universeId);
@@ -519,6 +529,7 @@ export const {
   layerUp,
   popChild: popChildInProcess,
   popChildMax: popChildMaxInProcess,
+  bringToFront: bringToFrontInProcess,
   joinSibling: joinSiblingInProcess,
   addBubble,
   updateBubble,
@@ -574,6 +585,14 @@ export const selectBubble = (
   state: { bubbleState: BubbleStateSlice },
   { id, universeId = ROOT_UNIVERSE_ID }: { id: string; universeId?: string },
 ) => Bubble.fromJSON(universeOf(state, universeId).bubbles[id]);
+
+/** その url で開いているバブルの id（無ければ undefined） */
+export const selectBubbleIdOfUrl = (
+  state: { bubbleState: BubbleStateSlice },
+  url: string,
+  universeId: string = ROOT_UNIVERSE_ID,
+): string | undefined =>
+  Object.values(universeOf(state, universeId).bubbles).find((b) => b.url === url)?.id;
 
 /** その url のバブルが universe に開いているか */
 export const selectHasBubbleOfUrl = (

@@ -17,6 +17,7 @@ import {
   relateBubbles,
   popChildInProcess,
   popChildMaxInProcess,
+  bringToFrontInProcess,
   joinSiblingInProcess,
   deleteProcessBubble,
   removeBubble,
@@ -27,6 +28,7 @@ import {
   type OpeningPosition,
   buildSeedArrangement,
   selectHasBubbleOfUrl,
+  selectBubbleIdOfUrl,
 } from "../state/index.js";
 
 export type UniverseViewProps = {
@@ -204,8 +206,12 @@ export const UniverseView: FC<UniverseViewProps> = ({
       coordinateSystem: globalCoordinateSystem,
       openBubble,
       isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url, universeId),
+      bringToFront: (url: string) => {
+        const id = selectBubbleIdOfUrl(store.getState() as never, url, universeId);
+        if (id) dispatch(bringToFrontInProcess(id, universeId));
+      },
     }),
-    [pageSize, surfaceLeftTop, globalCoordinateSystem, openBubble, store, universeId],
+    [pageSize, surfaceLeftTop, globalCoordinateSystem, openBubble, store, universeId, dispatch],
   );
 
   return (
