@@ -14,6 +14,7 @@ import {
   WorldLineGraph,
   computeStateHash,
   createStateRef,
+  loadStatesFromIDB,
   setGraph,
   setCasEntries,
   type StateRef,
@@ -387,6 +388,49 @@ export function readFromScope<T>(
     return undefined;
   }
   return codecOf(d).fromJSON(data) as T;
+}
+
+/**
+ * スコープの**あるノード時点**から型・IDのオブジェクトを読む（非同期）。
+ *
+ * 確定した過去の版（確定レポートが指すノード）を、別の世界の中から読むためのもの。
+ * 古いノードの値はメモリ上の CAS から追い出されていることが多いので、足りなければ
+ * 永続ストア（IndexedDB）から取ってくる。取ってきた値は CAS へ載せ直す。
+ * どこにも無ければ undefined（＝その版はもう復元できない）。
+ *
+ * @param loadStates メモリに無いぶんの取得先（既定は IndexedDB。テストから差し替え可能）
+ */
+export async function readFromScopeAt<T>(
+  store: StoreLike,
+  scopeId: string,
+  nodeId: string,
+  type: string,
+  id: string,
+  loadStates: (hashes: string[]) => Promise<Map<string, unknown>> = loadStatesFromIDB
+): Promise<T | undefined> {
+  const d = getDescriptor(type);
+  if (!d) return undefined;
+  const graph = graphOf(store, scopeId);
+  if (!graph.state.nodes[nodeId]) return undefined;
+  const ref = graph.getStateRefsAt(nodeId).find((r) => r.type === type && r.id === id);
+  if (!ref) return undefined;
+  let data = store.getState().worldLineGraph?.cas?.[ref.hash];
+  if (data === undefined) {
+    data = (await loadStates([ref.hash])).get(ref.hash);
+    if (data === undefined) return undefined;
+    store.dispatch(setCasEntries({ entries: [{ hash: ref.hash, data }] }));
+  }
+  if (data === null) return undefined; // 削除済み（tombstone）
+  return codecOf(d).fromJSON(data) as T;
+}
+
+/** そのスコープのノードができた時刻（epoch ms）。ノードが無ければ undefined */
+export function nodeTimestampOf(
+  store: StoreLike,
+  scopeId: string,
+  nodeId: string
+): number | undefined {
+  return graphOf(store, scopeId).state.nodes[nodeId]?.timestamp;
 }
 
 /**

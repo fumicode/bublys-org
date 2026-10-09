@@ -8,6 +8,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
+import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
 // スコアバーのセグメント色。譲歩・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
 const COMPROMISE_COLOR = "#6d4c41";
@@ -27,6 +28,8 @@ type ScheduleReportViewProps = {
   onDelete?: () => void;
   /** このレポートを参照レポートにしている勤務表の数（削除の確認で、紐づけも外れることを伝える） */
   linkedScheduleCount?: number;
+  /** 確定した時刻（epoch ms）。同じ月の確定が複数あるとき見分けられるよう小さく出す */
+  confirmedAt?: number;
 };
 
 /**
@@ -43,6 +46,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   onChangeWeights,
   onDelete,
   linkedScheduleCount = 0,
+  confirmedAt,
 }) => {
   // 削除は取り消せないので、ボタンを押したら一度確認を挟む（ブラウザのダイアログは使わない）
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -136,6 +140,9 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </div>
         <span className="e-sub">
           {report.year}年{report.month}月 / {report.storeId}
+          {confirmedAt !== undefined && (
+            <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
+          )}
         </span>
         {onDelete && confirmingDelete && (
           <div className="e-delete-confirm" role="alertdialog" aria-label="レポートの削除の確認">
@@ -435,6 +442,10 @@ const StyledWrap = styled.div`
       font-weight: normal;
       font-size: 0.8em;
       color: #777;
+    }
+    .e-confirmed-at {
+      font-size: 0.9em;
+      color: #999;
     }
   }
 

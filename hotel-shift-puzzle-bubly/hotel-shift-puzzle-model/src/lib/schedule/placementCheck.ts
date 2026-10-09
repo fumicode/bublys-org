@@ -114,7 +114,12 @@ const memoOf = (constraints: ScheduleConstraint[], schedule: MonthlyStaffSchedul
 };
 
 const signatureOf = (projected: MonthlyStaffSchedule, projectionKey: string): string => {
-  const parts = [projectionKey, `${projected.state.year}-${projected.state.month}`];
+  // 前月の末尾も違反の出方を変える（月初の連勤・遅番明け）ので、中身ごとキーに入れる
+  const parts = [
+    projectionKey,
+    `${projected.state.year}-${projected.state.month}`,
+    projected.precedingTail?.signature ?? "",
+  ];
   for (const a of projected.assignments) {
     parts.push(`${a.staffId}@${a.day.key}=${a.shift}`);
   }

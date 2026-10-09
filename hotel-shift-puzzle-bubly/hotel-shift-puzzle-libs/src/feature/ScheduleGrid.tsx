@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import {
   ObjectView,
@@ -55,6 +55,13 @@ import {
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByReport } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
+import {
+  capturePrecedingTail,
+  confirmedAtOf,
+  newerReferenceCandidate,
+  referenceCandidates,
+  withReference,
+} from "./precedingMonth.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
@@ -64,6 +71,7 @@ import {
   recordSetCells,
   recordScheduleMutation,
   recordConstraintEdit,
+  recordReferenceEdit,
 } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -255,16 +263,26 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     () => allReports.find((r) => r.id === constraints?.linkedReportId),
     [allReports, constraints]
   );
-  // 紐づけられるのは同じ店舗の前月のレポートだけ（ScheduleReport.isReferenceableFrom）。新しい順。
-  const referenceableReports = useMemo(
+  // 参照レポートの候補：同じ店舗の前月の確定（ScheduleReport.isReferenceableFrom）を、確定の新しい順に。
+  // 参照レポートの確定版の末尾が、この勤務表の月初につながる（月跨ぎ。詳しくは precedingMonth.ts）。
+  const referenceOptions = useMemo(
     () =>
       schedule
-        ? allReports
-            .filter((r) => r.isReferenceableFrom(schedule))
-            .sort((a, b) => b.year - a.year || b.month - a.month)
+        ? referenceCandidates(allReports, schedule, (r) => confirmedAtOf(store, r))
         : [],
-    [allReports, schedule]
+    [allReports, schedule, store]
   );
+  const linkedOption = linkedReport
+    ? { report: linkedReport, confirmedAt: confirmedAtOf(store, linkedReport) }
+    : undefined;
+  // 作った後に前月の確定が増えても勝手には差し替えない。より新しい確定があれば知らせるだけ
+  const newerReference = newerReferenceCandidate(referenceOptions, linkedOption);
+  // 貢献度スコアは、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
+  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
+  const [linkingReference, setLinkingReference] = useState(false);
+  // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
+  const latestRef = useRef({ schedule, constraints });
+  latestRef.current = { schedule, constraints };
 
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。集約から（世界線に載る）。
   // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
@@ -364,9 +382,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return ConstraintSet.empty(scheduleId);
   };
 
-  // 参照レポートを紐づける（プルダウンでもドロップでも同じ入口）。紐づけは1つなので置き換わる。
+  // 参照レポートを紐づける（プルダウン・ドロップ・「取り込む」で同じ入口）。紐づけは1つなので置き換わる。
   // 参照できないレポート（別の店舗・前月以外の月）は紐づけず、理由を伝える。
-  const handleLinkReport = (reportId: string) => {
+  // 紐づけると、そのレポートの確定版の末尾を写し取り、参照と一緒に1ノードで記録する。
+  const handleLinkReport = async (reportId: string) => {
     if (!scheduleId || !schedule) return;
     const report = allReports.find((r) => r.id === reportId);
     if (!report) return;
@@ -376,24 +395,46 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       );
       return;
     }
-    const base = constraintsBase();
-    if (!base) return;
-    const next = base.linkReport(reportId);
-    if (next === base) return; // 既に紐づいている
-    recordConstraintEdit(store, { schedule, nextConstraints: next });
+    if (!constraintsBase()) return;
+    setLinkingReference(true);
+    try {
+      const tail = await capturePrecedingTail(
+        store,
+        { report, confirmedAt: confirmedAtOf(store, report) },
+        barConstraintSet.maxConsecutiveWorkdays
+      );
+      const { schedule: current, constraints: currentConstraints } = latestRef.current;
+      const base = currentConstraints ?? constraintsBase();
+      if (!current || !base) return;
+      const next = withReference(current, base, { reportId, tail });
+      recordReferenceEdit(store, {
+        schedule: current,
+        nextSchedule: next.schedule,
+        nextConstraints: next.constraints,
+      });
+      if (!tail) {
+        setAutoMessage(
+          `「${report.title}」の確定版を読み出せなかったので、前月とはつながずに紐づけました（今月1日から数えます）。`
+        );
+      }
+    } finally {
+      setLinkingReference(false);
+    }
   };
   const handleDropReportUrl = (url: string) => {
     const reportId = extractIdFromUrl(url);
-    if (reportId) handleLinkReport(reportId);
+    if (reportId) void handleLinkReport(reportId);
   };
-  const handleUnlinkReport = (reportId: string) => {
-    if (!constraints) return;
-    recordConstraintEdit(store, {
+  // 参照を外すと、前月とのつなぎも一緒に外れる（今月1日から数え直す）
+  const handleUnlinkReport = () => {
+    if (!schedule || !constraints) return;
+    const next = withReference(schedule, constraints, undefined);
+    recordReferenceEdit(store, {
       schedule,
-      nextConstraints: constraints.unlinkReport(reportId),
+      nextSchedule: next.schedule,
+      nextConstraints: next.constraints,
     });
   };
-
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
   const handleAddRule = () => {
@@ -552,7 +593,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const handleRunStep = (step: AutoShiftStep) => {
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subsetStaff,
-      linkedReport
+      priorityReport
     );
     const result = runAutoShiftStep(step, {
       schedule,
@@ -576,7 +617,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subsetStaff,
-      linkedReport
+      priorityReport
     );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -713,6 +754,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       month: apexSchedule.month,
       storeId: apexSchedule.storeId,
       ...draft,
+      // 同じ月に確定が複数あるとき、どれが新しいかはこの時刻で決める（前月とのつなぎ）
+      confirmedAt: Date.now(),
     });
     reportRepo.save(report);
 
@@ -829,15 +872,18 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             </ObjectView>
           )}
 
-          {/* 参照レポート（プルダウンで選ぶか、レポート一覧からドラッグで紐づける。
-              自動シフトで休みを優先する順に使う。詳しくは reportPriority.ts）。 */}
+          {/* 参照レポート＝前月の確定（プルダウンで選ぶか、レポート一覧からドラッグで紐づける）。
+              その確定版の末尾が月初につながる。貢献度スコアを休みの優先度に使うかは
+              制約欄の「★優先」（limitSpecs）で切り替える（precedingMonth.ts / reportPriority.ts）。 */}
           <LinkedReportsView
-            report={linkedReport}
-            candidates={referenceableReports}
-            onLink={handleLinkReport}
+            linked={linkedOption}
+            candidates={referenceOptions}
+            newer={newerReference}
+            onLink={(id) => void handleLinkReport(id)}
             onDropUrl={handleDropReportUrl}
             dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
             onUnlink={handleUnlinkReport}
+            busy={linkingReference}
           />
         </div>
       </div>
@@ -885,7 +931,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
-          referenceReport={linkedReport}
+          referenceReport={priorityReport}
           staffUrlOf={staffBubbleUrl}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}

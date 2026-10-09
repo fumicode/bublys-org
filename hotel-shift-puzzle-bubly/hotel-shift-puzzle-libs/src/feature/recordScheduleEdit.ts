@@ -129,6 +129,33 @@ export function recordConstraintEdit(
 }
 
 /**
+ * 参照レポートの付け替えを記録する（紐づけ・差し替え・外す）。
+ *
+ * 参照レポートは前月の確定で、勤務表はその確定版の末尾から続く（precedingMonth.ts）。
+ * だから参照（制約セット）と前月の末尾（勤務表）は**一緒に**変わる。同じ1ノードに載せないと、
+ * その間のノードへ時間移動したとき「参照は新しいのに前月の末尾は古い」世界が現れる。
+ */
+export function recordReferenceEdit(
+  store: StoreLike,
+  args: {
+    schedule: MonthlyStaffSchedule;
+    nextSchedule: MonthlyStaffSchedule;
+    nextConstraints: ConstraintSet;
+  }
+): void {
+  const changed: BundleItem[] = [{ type: CONSTRAINT_SET_TYPE, obj: args.nextConstraints }];
+  if (args.nextSchedule !== args.schedule) {
+    changed.unshift({ type: SCHEDULE_TYPE, obj: args.nextSchedule });
+  }
+  saveLocalBundle(
+    store,
+    localScopeId(SCHEDULE_TYPE, args.schedule.state.id),
+    changed,
+    baselineOf(args.schedule)
+  );
+}
+
+/**
  * 勤務スタッフ群の変更を記録する（誰がこの勤務表で働くか）。
  *
  * 1回の変更で複数の集約が動く。人を外せばその人の割当と責任者ルールの担当からも消す。
