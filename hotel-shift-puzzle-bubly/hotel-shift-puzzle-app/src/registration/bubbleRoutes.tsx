@@ -136,7 +136,7 @@ const createCandidatesWorker = () =>
 // 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
 // チェイン opener はやめてどちらも単独開きにしている）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
-  const { openBubble, isOpen } = useContext(BubblesContext);
+  const { openBubble, isOpen, bringToFront } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;
   // バブル URL のスキームは app 層（ここ）の関心事。
   // 勤務スタッフ・世界線・自動シフトは、勤務表バブルを opener にして bubble-side で開く。
@@ -149,10 +149,14 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   // 抽出はクリックした要素（バッジ／抽出ボタン）の近くに出したいので origin-side で開く
   const openOrigin = (url: string) => openBubble(url, bubble.id, "origin-side");
   const treeUrl = scheduleWorldLineTreeUrl(scheduleId);
-  // 世界線ビューは勤務表に1つあれば足りる。すでに開いていれば新しく開かない
-  // （解決案生成のあとの自動展開も、ボタンのダブルクリックも、この1箇所を通る）。
+  // 世界線ビューは勤務表に1つあれば足りる。すでに開いていれば新しく開かず、最前面へ出す
+  // （何も起きないと押した手応えが無い）。解決案生成のあとの自動展開も、
+  // ボタンのダブルクリックも、この1箇所を通る。
   const openWorldLine = () => {
-    if (isOpen?.(worldLineUrl)) return;
+    if (isOpen?.(worldLineUrl)) {
+      bringToFront?.(worldLineUrl);
+      return;
+    }
     openSide(worldLineUrl, "bubble-side-bottom");
   };
   return withObjects(
