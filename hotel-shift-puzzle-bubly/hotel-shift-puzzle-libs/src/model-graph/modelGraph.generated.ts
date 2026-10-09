@@ -84,8 +84,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
-          "name": "linkedReportIds",
-          "type": "string[]",
+          "name": "linkedReportId",
+          "type": "string",
           "optional": true
         }
       ],
@@ -96,7 +96,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
-        "linkedReportIds",
+        "linkedReportId",
         "leaderRules"
       ],
       "methods": [
@@ -1260,6 +1260,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "ScheduleReport",
           "isStatic": false,
           "returnsSelf": true
+        },
+        {
+          "name": "scoreOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "isReferenceableFrom",
+          "params": [
+            "target"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
         },
         {
           "name": "reweight",
@@ -2511,7 +2529,7 @@ export const MODEL_GRAPH: ModelGraph = {
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
-      "ConstraintSet.linkedReportIds",
+      "ConstraintSet.linkedReportId",
       "MonthlyStaffSchedule.storeId",
       "ScheduleReport.storeId",
       "ScheduleReport.worldLineNodeId",

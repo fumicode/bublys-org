@@ -1,15 +1,32 @@
 'use client';
 
-import { FC } from "react";
-import { ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
+import { FC, useMemo } from "react";
+import { useAppStore } from "@bublys-org/state-management";
+import {
+  ScheduleReport,
+  ConstraintSet,
+  MonthlyStaffSchedule,
+} from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReportView } from "../ui/ScheduleReportView.js";
-import { useObjectShell, useObjectRepo } from "../objects/repository.js";
-import { SCHEDULE_REPORT_TYPE } from "../objects/hotelObjects.js";
+import { useObjectShell, useObjectRepo, useObjects } from "../objects/repository.js";
+import {
+  SCHEDULE_REPORT_TYPE,
+  CONSTRAINT_SET_TYPE,
+  SCHEDULE_TYPE,
+} from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
+import { recordConstraintEdit } from "./recordScheduleEdit.js";
 
 type ScheduleReportPanelProps = {
   reportId: string;
+};
+
+type ScheduleReportPanelBodyProps = ScheduleReportPanelProps & {
+  /** このレポートを参照レポートにしている勤務表の数 */
+  linkedScheduleCount: number;
+  /** 削除したあとに呼ぶ。参照している勤務表から紐づけを外す */
+  onDeleted: () => void;
 };
 
 /**
@@ -19,7 +36,11 @@ type ScheduleReportPanelProps = {
  * 削除後はこのバブル自体は自動で閉じない（bubbles-ui にその仕組みが無いため）ので、
  * 見つからない旨を表示するに留める。
  */
-const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => {
+const ScheduleReportPanelBody: FC<ScheduleReportPanelBodyProps> = ({
+  reportId,
+  linkedScheduleCount,
+  onDeleted,
+}) => {
   // レポートは勤務表のスナップショット。名前はその勤務表で働いた人たちから引く
   const { staffList } = useWorkingStaff(ScheduleReport.scheduleIdOf(reportId));
   const { object: report, update } = useObjectShell<ScheduleReport>(
@@ -45,6 +66,7 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => 
 
   const handleDelete = () => {
     reportRepo.remove(reportId);
+    onDeleted();
   };
 
   if (!report) {
@@ -63,6 +85,7 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => 
       onRename={handleRename}
       onChangeWeights={handleChangeWeights}
       onDelete={handleDelete}
+      linkedScheduleCount={linkedScheduleCount}
     />
   );
 };
@@ -71,9 +94,36 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelProps> = ({ reportId }) => 
  * 確定レポートは非メンバー（いつ見ても同じ）だが、譲歩・貢献度に出てくるスタッフ名は
  * **確定した当時の名簿**で引きたい。レポートIDは `scheduleId:nodeId` なので、
  * レポート本体を読まなくても、どの勤務表の世界に入ればよいかが分かる。
+ *
+ * 一方「どの勤務表がこのレポートを参照しているか」は世界をまたぐ問い合わせなので、
+ * 勤務表の世界に入る**前**（グローバル台帳）で引く。レポートを消したら、それを参照している
+ * 勤務表すべてから紐づけを外す（各勤務表の世界線に1ノードずつ記録される）。
  */
-export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = (props) => (
-  <ScheduleWorld scheduleId={ScheduleReport.scheduleIdOf(props.reportId)}>
-    <ScheduleReportPanelBody {...props} />
-  </ScheduleWorld>
-);
+export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = (props) => {
+  const store = useAppStore();
+  const allConstraints = useObjects<ConstraintSet>(CONSTRAINT_SET_TYPE);
+  const allSchedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
+  const linkingSets = useMemo(
+    () => allConstraints.filter((c) => c.linkedReportId === props.reportId),
+    [allConstraints, props.reportId]
+  );
+
+  const unlinkEverywhere = () => {
+    for (const c of linkingSets) {
+      recordConstraintEdit(store, {
+        schedule: allSchedules.find((s) => s.id === c.id),
+        nextConstraints: c.unlinkReport(props.reportId),
+      });
+    }
+  };
+
+  return (
+    <ScheduleWorld scheduleId={ScheduleReport.scheduleIdOf(props.reportId)}>
+      <ScheduleReportPanelBody
+        {...props}
+        linkedScheduleCount={linkingSets.length}
+        onDeleted={unlinkEverywhere}
+      />
+    </ScheduleWorld>
+  );
+};
