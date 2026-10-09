@@ -56,6 +56,14 @@ export interface CasScopeValue {
    * 「そのオブジェクトが存在する」ではない。存在の判定は参照の有無で行う。
    */
   pending: boolean;
+  /**
+   * pending のうち、欠けを永続ストアへ取りに行っている最中（＝もうすぐ届く見込みがある）。
+   *
+   * pending だけでは「時間移動した直後で、取りに行っている」と「取りに行ったが戻って
+   * こなかった（もう読めない）」を区別できない。前者のあいだだけ直前の画面を見せ続ける、
+   * のような表示の判断に使う。
+   */
+  loading: boolean;
   /** オブジェクトを追加して grow（型文字列省略時は instanceof で自動解決） */
   addObject(type: string, obj: unknown): void;
   addObject(obj: unknown): void;
@@ -325,10 +333,14 @@ export function useCasScope(
     return missing;
   }, [currentRefs, requestedHashes, cas]);
 
+  /** 永続ストアへ取りに行って、まだ戻ってきていない要求の数 */
+  const [inFlight, setInFlight] = useState(0);
+
   useEffect(() => {
     if (missingHashes.length === 0) return;
     for (const hash of missingHashes) attemptedRef.current.add(hash);
     let cancelled = false;
+    setInFlight((n) => n + 1);
     loadStatesRef.current(missingHashes)
       .then((loaded) => {
         if (cancelled || loaded.size === 0) return;
@@ -346,11 +358,15 @@ export function useCasScope(
             "この参照の値はこのセッションでは読めません。",
           e
         );
-      });
+      })
+      .finally(() => setInFlight((n) => n - 1));
     return () => {
       cancelled = true;
     };
   }, [missingHashes, dispatch]);
+
+  // 取りに行く前（missingHashes はまだ試していないものだけ）と、取りに行っている最中の両方
+  const loading = pending && (missingHashes.length > 0 || inFlight > 0);
 
   // ============================================================
   // 初回: root ノードを initialObjects で作成
@@ -535,6 +551,7 @@ export function useCasScope(
     shells,
     getShell,
     pending,
+    loading,
     addObject,
     addObjects,
     removeObject,
