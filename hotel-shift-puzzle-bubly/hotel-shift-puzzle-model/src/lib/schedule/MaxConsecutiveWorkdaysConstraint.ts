@@ -9,6 +9,10 @@
  *   - 勤務表の稼働日（1日〜末日）を暦順にたどり、「出勤（いずれかの勤務帯）」が
  *     続いている区間を1つの連勤とみなす。
  *   - 休み・未定はいずれも連勤を区切る（出勤していない日でリセット）。
+ *   - 前月とつないでいれば（{@link MonthlyStaffSchedule.precedingTail}）、前月末から続く出勤を
+ *     今月1日からの連勤に足す。月末で働く人の暮らしは途切れないので、数え直さない。
+ *     違反の範囲は今月側の日だけ（前月は確定済みで、ここからは直せない）。
+ *     前月の中だけで終わった連勤は前月の話なので、今月には出さない。
  */
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
@@ -35,13 +39,18 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
     const days = schedule.workingDays();
     const staffIds = [...new Set(schedule.assignments.map((a) => a.staffId))];
 
+    const tail = schedule.precedingTail;
+
     for (const staffId of staffIds) {
+      // 前月末から持ち越した連勤日数（今月1日が出勤のときだけ効く）
+      let carried = tail?.trailingWorkdays(staffId) ?? 0;
       let run: WorkingDay[] = [];
       const flush = () => {
-        if (run.length > this.maxConsecutive) {
-          violations.push(this.toViolation(staffId, run));
+        if (run.length > 0 && carried + run.length > this.maxConsecutive) {
+          violations.push(this.toViolation(staffId, run, carried));
         }
         run = [];
+        carried = 0;
       };
       for (const day of days) {
         if (schedule.isWorking(staffId, day)) {
@@ -56,12 +65,20 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
     return violations;
   }
 
-  private toViolation(staffId: string, run: WorkingDay[]): ConstraintViolation {
+  private toViolation(
+    staffId: string,
+    run: WorkingDay[],
+    carried: number
+  ): ConstraintViolation {
+    const total = carried + run.length;
     return new ConstraintViolation({
       constraintType: this.type,
       staffId,
       days: run,
-      message: `${run.length}連勤（上限${this.maxConsecutive}連勤）`,
+      message:
+        carried > 0
+          ? `前月から続いて${total}連勤（上限${this.maxConsecutive}連勤）`
+          : `${total}連勤（上限${this.maxConsecutive}連勤）`,
     });
   }
 }

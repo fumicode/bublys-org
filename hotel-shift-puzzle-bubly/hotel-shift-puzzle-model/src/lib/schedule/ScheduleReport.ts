@@ -77,6 +77,12 @@ export type ScheduleReportState = {
   compromiseWeight: number;
   /** 繁忙日出勤1回あたりの重み（確定後も reweight で編集可） */
   busyDayWeight: number;
+  /**
+   * 確定した（＝このレポートを作った）時刻（epoch ms）。同じ月の確定が複数あるとき、
+   * どれが新しいかはこれで決める。この項目より前に作られたレポートには無い
+   * （上位層が確定ノードの時刻で補う）。
+   */
+  confirmedAt?: number;
 };
 
 /** シリアライズ用（state がそのまま plain） */
@@ -115,6 +121,8 @@ export class ScheduleReport {
     compromises: CompromiseEntry[];
     busyDayContributions: BusyDayEntry[];
     contributionScores: ContributionScoreEntry[];
+    /** 確定時刻（epoch ms）。時刻の取得は上位層の仕事 */
+    confirmedAt?: number;
   }): ScheduleReport {
     return new ScheduleReport({
       id: ScheduleReport.idOf(params.scheduleId, params.worldLineNodeId),
@@ -130,6 +138,7 @@ export class ScheduleReport {
       considerationNotes: {},
       compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
+      ...(params.confirmedAt !== undefined ? { confirmedAt: params.confirmedAt } : {}),
     });
   }
 
@@ -160,6 +169,11 @@ export class ScheduleReport {
 
   get title(): string {
     return this.state.title;
+  }
+
+  /** 確定時刻（epoch ms）。古いレポートは undefined */
+  get confirmedAt(): number | undefined {
+    return this.state.confirmedAt;
   }
 
   /**
@@ -268,6 +282,7 @@ export class ScheduleReport {
       considerationNotes: { ...this.state.considerationNotes },
       compromiseWeight: this.state.compromiseWeight,
       busyDayWeight: this.state.busyDayWeight,
+      ...(this.state.confirmedAt !== undefined ? { confirmedAt: this.state.confirmedAt } : {}),
     };
   }
 
@@ -289,6 +304,7 @@ export class ScheduleReport {
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
       compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,
+      ...(plain.confirmedAt !== undefined ? { confirmedAt: plain.confirmedAt } : {}),
     });
   }
 }

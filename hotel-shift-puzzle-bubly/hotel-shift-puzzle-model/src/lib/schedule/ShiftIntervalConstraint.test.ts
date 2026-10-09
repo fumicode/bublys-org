@@ -6,6 +6,7 @@ import {
   SHIFT_INTERVAL_CONSTRAINT,
   isShiftIntervalConstraintType,
 } from './ShiftIntervalConstraint.js';
+import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 
 describe('ShiftIntervalConstraint（勤務間インターバル制約）の使い方', () => {
   const YEAR = 2026;
@@ -172,5 +173,88 @@ describe('ShiftIntervalRule（宣言的ルール）', () => {
   test('インターバル時間を変えると根拠の文も変わる', () => {
     const longer = new ShiftIntervalRule({ ...rule.state, minRestHours: 11 });
     expect(longer.describe()).toContain('11時間');
+  });
+});
+
+describe('ShiftIntervalConstraint：前月とつないだとき（月跨ぎ）', () => {
+  const YEAR = 2026;
+  const MONTH = 6;
+  const SHIFT_IDS: Record<string, string[]> = {
+    早番: ['early'],
+    中番: ['middle'],
+    遅番: ['late'],
+  };
+  const rule = new ShiftIntervalRule({
+    key: 'late',
+    fromShiftName: '遅番',
+    forbiddenNextShiftNames: ['早番', '中番'],
+    minRestHours: 8,
+  });
+  const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
+  const withRow = (staffId: string, shifts: (string | '-')[]) => {
+    let s = MonthlyStaffSchedule.create({
+      id: 'sched-1',
+      storeId: 'store-1',
+      year: YEAR,
+      month: MONTH,
+    });
+    shifts.forEach((shift, i) => {
+      s =
+        shift === '-'
+          ? s.assignDayOff(staffId, day(i + 1))
+          : s.assignShift(staffId, day(i + 1), shift);
+    });
+    return s;
+  };
+  const check = (schedule: MonthlyStaffSchedule) =>
+    new ShiftIntervalConstraint(rule, (name) => SHIFT_IDS[name] ?? []).check(
+      schedule
+    );
+
+  /** 前月（5月）末日の勤務帯（前月の勤務帯IDは今月と別物でもよい。名前で写す） */
+  const tailEndingWith = (staffId: string, shiftName: string) => {
+    const may = MonthlyStaffSchedule.create({
+      id: 'may',
+      storeId: 'store-1',
+      year: YEAR,
+      month: 5,
+    }).assignShift(staffId, WorkingDay.of(YEAR, 5, 31), 'may-shift');
+    return PrecedingMonthTail.capture({
+      sourceReportId: 'may:n',
+      schedule: may,
+      shiftNameOf: () => shiftName,
+      length: 7,
+    });
+  };
+
+  test('前月末日が遅番で今月1日が早番なら違反。範囲は[前月末日, 今月1日]', () => {
+    const s = withRow('staff-A', ['early']).withPrecedingTail(
+      tailEndingWith('staff-A', '遅番')
+    );
+    const violations = check(s);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].days.map((d) => d.key)).toEqual([
+      '2026-05-31',
+      '2026-06-01',
+    ]);
+    expect(violations[0].message).toContain('遅番の翌日に早番');
+  });
+
+  test('前月末日が早番なら、今月1日に何を入れても遅番明けにはならない', () => {
+    const s = withRow('staff-A', ['early']).withPrecedingTail(
+      tailEndingWith('staff-A', '早番')
+    );
+    expect(check(s)).toEqual([]);
+  });
+
+  test('今月1日が遅番・休みなら違反にならない', () => {
+    const tail = tailEndingWith('staff-A', '遅番');
+    expect(check(withRow('staff-A', ['late']).withPrecedingTail(tail))).toEqual(
+      []
+    );
+    expect(check(withRow('staff-A', ['-']).withPrecedingTail(tail))).toEqual(
+      []
+    );
   });
 });
