@@ -51,6 +51,8 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     isAllowed,
     toggleShift,
     allowShiftForAll,
+    dayOffStyleOf,
+    overrideDayOffStyle,
   } = useWorkingStaff(scheduleId);
 
   // チェック欄の列＝この勤務表の勤務帯セット（id=scheduleId）
@@ -115,6 +117,8 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
         onToggleShift={toggleShift}
         onCommitShift={workShiftSet ? handleCommitShift : undefined}
         onRemoveShift={(id) => updateSet((s) => s.remove(id))}
+        dayOffStyleOf={dayOffStyleOf}
+        onChangeDayOffStyle={overrideDayOffStyle}
       />
     </StyledContainer>
   );

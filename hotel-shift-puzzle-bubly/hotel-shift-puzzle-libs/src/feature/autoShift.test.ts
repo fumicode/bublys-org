@@ -95,10 +95,12 @@ describe('autoShiftLimitsOf（自動シフトが置く休みの目標は制約�
   test('★ 勤務表の制約セットの値をそのまま渡す（既定の 8 / 8 に落とさない）', () => {
     const set = ConstraintSet.empty('sched-1')
       .withMinMonthlyDayOff(9)
-      .withMaxDayOffPerDay(2);
+      .withMaxDayOffPerDay(2)
+      .withMaxConsecutiveWorkdays(4);
     expect(autoShiftLimitsOf(set)).toEqual({
       minDayOff: 9,
       maxDayOffPerDay: 2,
+      maxConsecutiveWorkdays: 4,
     });
   });
 

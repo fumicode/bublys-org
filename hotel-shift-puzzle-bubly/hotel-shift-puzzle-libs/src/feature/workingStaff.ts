@@ -26,6 +26,7 @@ import {
   WorkShift,
   WorkShiftSet,
   ConstraintSet,
+  DayOffStyle,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   useObject,
@@ -84,6 +85,10 @@ export type WorkingStaffValue = {
   toggleShift: (staffId: string, shiftId: string) => void;
   /** 全員がその勤務帯に入れるようにする（勤務帯を1つ増やしたとき） */
   allowShiftForAll: (shiftId: string) => void;
+  /** その人の休みの形（既定値と、この勤務表での上書き） */
+  dayOffStyleOf: (staffId: string) => { base: DayOffStyle; override?: DayOffStyle };
+  /** この勤務表での休みの形を上書きする。undefined で既定値に戻す */
+  overrideDayOffStyle: (staffId: string, style: DayOffStyle | undefined) => void;
 };
 
 export function useWorkingStaff(
@@ -220,6 +225,20 @@ export function useWorkingStaff(
     ),
     allowShiftForAll: useCallback(
       (shiftId: string) => updateGroup((g) => g.allowShiftForAll(shiftId)),
+      [updateGroup]
+    ),
+    dayOffStyleOf: useCallback(
+      (staffId: string) => {
+        const base =
+          staffList.find((s) => s.id === staffId)?.dayOffStyle ?? DayOffStyle.DEFAULT;
+        const member = group?.members.find((m) => m.staffId === staffId);
+        return { base, override: member?.dayOffStyleOverride };
+      },
+      [staffList, group]
+    ),
+    overrideDayOffStyle: useCallback(
+      (staffId: string, style: DayOffStyle | undefined) =>
+        updateGroup((g) => g.overrideDayOffStyle(staffId, style)),
       [updateGroup]
     ),
   };

@@ -11,6 +11,7 @@ import type {
   ShiftCell,
   ScheduleReport,
   PrecedingMonthTail,
+  DayOffStyle,
 } from "../../domain/index.js";
 import {
   MIN_MONTHLY_DAY_OFF_CONSTRAINT,
@@ -72,6 +73,10 @@ type StaffScheduleRowProps = {
   earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** 休みのセルの役目の説明（休みでないセルには undefined） */
+  dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** この人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
+  dayOffStyle?: DayOffStyle;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * 渡された値は薄く描かれ、Enter / Tab で承認できる。
@@ -113,6 +118,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   minDayOff,
   earlyShiftIds,
   candidateHintOf,
+  dayOffReasonOf,
+  dayOffStyle,
   forcedCellOf,
   isDeadCell,
 }) => {
@@ -153,6 +160,14 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
                 staffId={staff.id}
                 onSelectRule={onSelectRule}
               />
+              {dayOffStyle && (
+                <span
+                  className={`e-day-off-style-badge${dayOffStyle.isClustered ? " is-clustered" : ""}`}
+                  title={`休みの形：${dayOffStyle.label}。自動シフトはこの形に沿って休みを置きます`}
+                >
+                  {dayOffStyle.shortLabel}
+                </span>
+              )}
               {referenceReport && priority && priority.score > 0 && (
                 <span
                   className="e-priority-badge"
@@ -222,6 +237,9 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onDragEnter={onDragToCell ? () => onDragToCell(here) : undefined}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             candidateHint={candidateHintOf?.(staff.id, day)}
+            dayOffReason={
+              cell.kind === "day-off" ? dayOffReasonOf?.(staff.id, day) : undefined
+            }
             forcedCandidate={forced}
             dead={dead}
             forcedShift={

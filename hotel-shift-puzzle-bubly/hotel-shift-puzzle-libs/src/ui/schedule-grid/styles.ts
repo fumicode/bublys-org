@@ -605,6 +605,27 @@ export const StyledWrap = styled.div`
       gap: 1px;
     }
     /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    /* 休みの形（分散／連休）。連休型だけ色を付けて、ひと目で分かるようにする */
+    .e-day-off-style-badge {
+      flex-shrink: 0;
+      font-size: 0.55em;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
+      white-space: nowrap;
+      color: #78909c;
+      background: #f5f7f8;
+      border: 1px solid #dde3e6;
+      cursor: help;
+
+      &.is-clustered {
+        color: #00695c;
+        background: #e0f2f1;
+        border-color: #b2dfdb;
+        font-weight: bold;
+      }
+    }
+
     .e-priority-badge {
       flex-shrink: 0;
       font-size: 0.55em;

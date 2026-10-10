@@ -518,6 +518,76 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "DayOffStyle",
+      "file": "staff/DayOffStyle.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "\"spread\" | \"clustered\"",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "isClustered",
+        "maxRun",
+        "label",
+        "shortLabel"
+      ],
+      "methods": [
+        {
+          "name": "spread",
+          "params": [],
+          "returns": "DayOffStyle",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "clustered",
+          "params": [
+            "maxRun"
+          ],
+          "returns": "DayOffStyle",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "runLimitWithin",
+          "params": [
+            "maxConsecutiveWorkdays"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "DayOffStyleState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "DayOffStyle",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -1815,12 +1885,19 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "department",
           "type": "string",
           "optional": true
+        },
+        {
+          "name": "dayOffStyle",
+          "type": "DayOffStyle",
+          "optional": true
         }
       ],
       "getters": [
         "id",
         "name",
-        "department"
+        "department",
+        "hasDayOffStyle",
+        "dayOffStyle"
       ],
       "methods": [
         {
@@ -1839,6 +1916,31 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "Staff",
           "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "changeDayOffStyle",
+          "params": [
+            "style"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StaffPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "Staff",
+          "isStatic": true,
           "returnsSelf": true
         }
       ]
@@ -2158,6 +2260,35 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "dayOffStyleOf",
+          "params": [
+            "staffId",
+            "staff"
+          ],
+          "returns": "DayOffStyle",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "hasDayOffStyleOverride",
+          "params": [
+            "staffId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "overrideDayOffStyle",
+          "params": [
+            "staffId",
+            "style"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
           "name": "temporaryStaff",
           "params": [],
           "returns": "Staff[]",
@@ -2267,11 +2398,18 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "allowedShiftIds",
           "type": "string[]",
           "optional": true
+        },
+        {
+          "name": "dayOffStyle",
+          "type": "DayOffStyle",
+          "optional": true
         }
       ],
       "getters": [
         "hasShiftLimit",
         "allowedShiftIds",
+        "hasDayOffStyleOverride",
+        "dayOffStyleOverride",
         "staffId",
         "isTemporary",
         "staff"
@@ -2326,6 +2464,24 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "allowAllShifts",
           "params": [],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "dayOffStyleOf",
+          "params": [
+            "staff"
+          ],
+          "returns": "DayOffStyle",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "overrideDayOffStyle",
+          "params": [
+            "style"
+          ],
           "returns": "WorkingStaffMember",
           "isStatic": false,
           "returnsSelf": true
@@ -2725,6 +2881,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "Staff",
+      "to": "DayOffStyle",
+      "kind": "contains",
+      "via": "dayOffStyle",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "StaffMonthlyShiftWish",
       "to": "Staff",
       "kind": "references",
@@ -2738,6 +2902,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "kind": "contains",
       "via": "members",
       "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "WorkingStaffMember",
+      "to": "DayOffStyle",
+      "kind": "contains",
+      "via": "dayOffStyle",
+      "many": false,
       "foundBy": "type"
     },
     {
@@ -2767,7 +2939,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 42,
+    "fileCount": 45,
     "classesWithoutState": [
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",

@@ -7,6 +7,7 @@ import {
   ScheduleReport,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
+  type DayOffStyle,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
 import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
@@ -70,10 +71,16 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
     actions.save(staff.changeDepartment(department));
   };
 
+  const handleChangeDayOffStyle = (style: DayOffStyle) => {
+    const next = staff.changeDayOffStyle(style);
+    if (next !== staff) actions.save(next);
+  };
+
   return (
     <StaffDetailView
       staff={staff}
       onChangeDepartment={handleChangeDepartment}
+      onChangeDayOffStyle={handleChangeDayOffStyle}
       shiftWishMonths={shiftWishMonths}
       shiftWishUrl={shiftWishUrl}
       linkedReportSummaries={linkedReportSummaries}
