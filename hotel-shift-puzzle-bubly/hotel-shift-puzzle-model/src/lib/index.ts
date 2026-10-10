@@ -4,6 +4,7 @@
 
 // Staff（スタッフ）
 export * from './staff/Staff.js';
+export * from './staff/DayOffStyle.js';
 // 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
 export * from './staff/WorkingStaffMember.js';
 export * from './staff/WorkingStaffGroup.js';
@@ -46,6 +47,8 @@ export * from './schedule/fillDemandBalancedStep.js';
 export * from './schedule/satisfyLeaderRulesStep.js';
 export * from './schedule/resolveAmbiguousLeaderSlotsStep.js';
 export * from './schedule/minDayOffStep.js';
+export * from './schedule/dayOffReason.js';
+export * from './schedule/restPressure.js';
 export * from './schedule/autoShiftSteps.js';
 
 // 制約（シフト表が満たすべきルール）

@@ -23,6 +23,8 @@ import {
   makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   WorkingDay,
+  dayOffReasonOf as readDayOffReason,
+  dayOffReasonText,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type ScheduleRepair,
@@ -45,7 +47,12 @@ import {
   useIsAbsent,
 } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
-import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
+import {
+  autoShiftLimitsOf,
+  dayOffStyleResolver,
+  decodeWishForStaff,
+  runAutoShiftStep,
+} from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import {
   useScheduleCandidates,
@@ -494,6 +501,39 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         : `候補${options.length}件: ${values}`;
     },
     [candidates, cellLabelOf]
+  );
+
+  // その人がこの勤務表で使う休みの形（勤務メンバーの上書き → スタッフの既定値）。
+  // 自動シフトと同じ引き方で引く（名前の横の印・休みの役目の説明が、置き方と食い違わない）。
+  const dayOffStyleOf = useMemo(
+    () => dayOffStyleResolver(staffList, staffGroup),
+    [staffList, staffGroup]
+  );
+
+  // 休みのセルに触れたときの説明：その休みがいまの表で何の役目を果たしているか。
+  // 置いたときの経緯は保存せず、いまの表（前月の末尾ともひと続き）から読み解く。
+  const shiftIdByName = useMemo(
+    () => new Map(workShifts.map((w) => [w.name, w.id])),
+    [workShifts]
+  );
+  const dayOffReasonOf = useCallback(
+    (staffId: string, day: WorkingDay): string | undefined => {
+      if (!schedule) return undefined;
+      const style = dayOffStyleOf(staffId);
+      const wish = wishByStaff.get(staffId);
+      const reason = readDayOffReason({
+        schedule,
+        staffId,
+        day,
+        wishOf: (d) => decodeWishForStaff(wish, d, shiftIdByName),
+        style,
+        maxConsecutiveWorkdays: limits.maxConsecutiveWorkdays,
+        minDayOff: limits.minDayOff,
+        maxDayOffPerDay: limits.maxDayOffPerDay,
+      });
+      return reason && dayOffReasonText(reason, style, { maxDayOffPerDay: limits.maxDayOffPerDay });
+    },
+    [schedule, shiftIdByName, dayOffStyleOf, wishByStaff, limits]
   );
 
   // 候補が1つに絞られたセル＝制約から一意に決まる手。承認するまで勤務表には入れない。
@@ -950,6 +990,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onSelectionChange={setCellSelection}
           clipboard={clipboard}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyleOf={dayOffStyleOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}

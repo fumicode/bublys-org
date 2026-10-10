@@ -6,6 +6,7 @@ import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
+import { DayOffStyle } from '../staff/DayOffStyle.js';
 describe('makeMinDayOffStep（月◯日休む）', () => {
   const workShifts = createDefaultWorkShifts();
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -173,6 +174,187 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       // 前月末の5連勤に続けて働くと6連勤になる。休みは月初の早いうちに入る
       const firstOff = result.schedule.workingDays().findIndex((d) => result.schedule.isDayOff('A', d));
       expect(firstOff).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('休みの形（連休型）', () => {
+    /** 休みが2日続いている組の数 */
+    const pairCount = (s: ReturnType<typeof emptySchedule>, staffId: string): number => {
+      const days = s.workingDays();
+      let n = 0;
+      for (let k = 0; k + 1 < days.length; k++) {
+        if (s.isDayOff(staffId, days[k]) && s.isDayOff(staffId, days[k + 1])) n++;
+      }
+      return n;
+    };
+    /** 休みが3日以上続いているところがあるか */
+    const hasTripleOff = (s: ReturnType<typeof emptySchedule>, staffId: string): boolean => {
+      const days = s.workingDays();
+      return days.some(
+        (_, k) =>
+          k + 2 < days.length &&
+          [0, 1, 2].every((o) => s.isDayOff(staffId, days[k + o]))
+      );
+    };
+    const clusteredCtx = (maxRun?: number) => ({
+      ...ctxOf(['A']),
+      maxConsecutiveWorkdays: 5,
+      dayOffStyleOf: () => DayOffStyle.clustered(maxRun),
+    });
+
+    test('4連まで：出勤を4日以内で区切りながら、休みの隣に置いて連休にする', () => {
+      const result = step.run(emptySchedule(), clusteredCtx(4));
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
+      // 区切りの休みの隣に置いて縮めるので、区切りと連休を同じ休みで兼ねられる
+      expect(pairCount(result.schedule, 'A')).toBe(3);
+      expect(hasTripleOff(result.schedule, 'A')).toBe(false);
+    });
+
+    test('5連まで：4連までより連休が増える（4連1休と5連1休の区別）', () => {
+      const result = step.run(emptySchedule(), clusteredCtx(5));
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+      expect(pairCount(result.schedule, 'A')).toBe(4);
+      expect(hasTripleOff(result.schedule, 'A')).toBe(false);
+    });
+
+    test('目標は全体の連勤上限を超えない', () => {
+      const ctx = { ...clusteredCtx(6), maxConsecutiveWorkdays: 4 };
+      const result = step.run(emptySchedule(), ctx);
+
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
+    });
+
+    test('分散型は、希望の休みがあっても休みの隣に置かない（連休を作らない）', () => {
+      let schedule = emptySchedule();
+      for (const d of [4, 12, 20, 27]) schedule = schedule.assignDayOff('A', day(d));
+      const result = step.run(schedule, {
+        ...ctxOf(['A']),
+        maxConsecutiveWorkdays: 5,
+        dayOffStyleOf: () => DayOffStyle.spread(),
+      });
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      expect(pairCount(result.schedule, 'A')).toBe(0);
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+    });
+
+    test('分散型でも、連勤上限を超える区間は休みの隣でも割る（上限が先）', () => {
+      // 1〜5日は出勤、6日だけ未定、7日は休み → 1〜6日の6連勤を割れるのは休みの隣の6日だけ
+      let schedule = emptySchedule().assignDayOff('A', day(7));
+      for (let d = 1; d <= 5; d++) schedule = schedule.assignShift('A', day(d), 'early');
+      for (let d = 8; d <= 30; d++) schedule = schedule.assignDayOff('A', day(d));
+      const result = makeMinDayOffStep(schedule.countDayOffForStaff('A') + 1).run(schedule, {
+        ...ctxOf(['A']),
+        maxConsecutiveWorkdays: 5,
+        dayOffStyleOf: () => DayOffStyle.spread(),
+      });
+
+      expect(result.schedule.isDayOff('A', day(6))).toBe(true);
+    });
+
+    test('分散型は、連勤上限を超える区間を、両側が上限以内に収まる日で割る', () => {
+      // 1〜6日が休み、7〜14日が8連勤（9〜11日は出勤確定、ほかは未定）、15日以降は休み。
+      // 置ける休みは1日。真ん中に近い8日で割ると9〜14日の6連勤が残るので、12日で割る
+      let schedule = emptySchedule();
+      for (let d = 1; d <= 6; d++) schedule = schedule.assignDayOff('A', day(d));
+      for (const d of [9, 10, 11]) schedule = schedule.assignShift('A', day(d), 'early');
+      for (let d = 15; d <= 30; d++) schedule = schedule.assignDayOff('A', day(d));
+      for (const phase of [0, 1, 2]) {
+        const result = makeMinDayOffStep(schedule.countDayOffForStaff('A') + 1, { phase }).run(
+          schedule,
+          { ...ctxOf(['A']), maxConsecutiveWorkdays: 5, dayOffStyleOf: () => DayOffStyle.spread() }
+        );
+        expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+      }
+    });
+
+    test('分散型は連休を狙わない（これまでと同じ置き方）', () => {
+      const spread = step.run(emptySchedule(), {
+        ...ctxOf(['A']),
+        maxConsecutiveWorkdays: 5,
+        dayOffStyleOf: () => DayOffStyle.spread(),
+      });
+      // 休みの形を渡さなければ分散型と同じ
+      const plain = step.run(emptySchedule(), { ...ctxOf(['A']), maxConsecutiveWorkdays: 5 });
+
+      expect(pairCount(spread.schedule, 'A')).toBe(0);
+      expect(spread.schedule.toPlain()).toEqual(plain.schedule.toPlain());
+    });
+
+    test('長すぎる区間は、希望の休みの隣に置いて縮める（区切りと連休を兼ねる）', () => {
+      // 希望の休み 4・12・20・27日。5〜11日の7連勤は、11日に置けば12日と連休になり5連以内に収まる
+      let schedule = emptySchedule();
+      for (const d of [4, 12, 20, 27]) schedule = schedule.assignDayOff('A', day(d));
+      const result = step.run(schedule, clusteredCtx(5));
+
+      expect(result.schedule.isDayOff('A', day(11))).toBe(true);
+      expect(result.schedule.isDayOff('A', day(10))).toBe(false);
+      expect(pairCount(result.schedule, 'A')).toBe(3);
+      expect(hasTripleOff(result.schedule, 'A')).toBe(false);
+    });
+
+    test('連休にしても、残りの休みで長すぎる区間を区切りきれないなら、連休より区切りを取る', () => {
+      // 1〜11日が未定（11連勤）、12日が単発の休み、13日は出勤、14日以降は休み。置ける休みは1日だけ。
+      // 11日に置けば12日と連休になるが、1〜10日の10連勤が残る → 真ん中で区切る
+      let schedule = emptySchedule().assignDayOff('A', day(12)).assignShift('A', day(13), 'early');
+      for (let d = 14; d <= 30; d++) schedule = schedule.assignDayOff('A', day(d));
+      const result = makeMinDayOffStep(schedule.countDayOffForStaff('A') + 1).run(
+        schedule,
+        clusteredCtx(5)
+      );
+
+      expect(result.schedule.isDayOff('A', day(11))).toBe(false);
+      expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+    });
+
+    test('希望の休みの隣に寄せて連休にする', () => {
+      const schedule = emptySchedule().assignDayOff('A', day(10));
+      const result = step.run(schedule, clusteredCtx(5));
+
+      expect(
+        result.schedule.isDayOff('A', day(9)) || result.schedule.isDayOff('A', day(11))
+      ).toBe(true);
+    });
+
+    describe('月を跨いでもリセットしない', () => {
+      /** 前月（5月）の末尾。lastOff なら末日が単発の休み、そうでなければ末日まで workdays 連勤 */
+      const mayTail = (opts: { lastOff: boolean; workdays: number }) => {
+        let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+        const lastWork = opts.lastOff ? 30 : 31;
+        for (let d = lastWork; d > lastWork - opts.workdays; d--) {
+          may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
+        }
+        may = may.assignDayOff('A', WorkingDay.of(2026, 5, lastWork - opts.workdays));
+        if (opts.lastOff) may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
+        return PrecedingMonthTail.capture({
+          sourceReportId: 'may:n',
+          schedule: may,
+          shiftNameOf: () => '早番',
+          length: 7,
+        });
+      };
+
+      test('前月末日が単発の休みなら、1日目を相方にして連休にする', () => {
+        const schedule = emptySchedule().withPrecedingTail(mayTail({ lastOff: true, workdays: 4 }));
+        const result = step.run(schedule, clusteredCtx(5));
+
+        expect(result.schedule.isDayOff('A', day(1))).toBe(true);
+        expect(result.schedule.isDayOff('A', day(2))).toBe(false); // 3連休にはしない
+      });
+
+      test('前月末から続く出勤を足して、目標の日数で区切る', () => {
+        // 前月末に3連勤 → 4連までの人は、遅くとも2日目には休む（前月から4連勤まで）
+        const schedule = emptySchedule().withPrecedingTail(mayTail({ lastOff: false, workdays: 3 }));
+        const result = step.run(schedule, clusteredCtx(4));
+
+        expect(result.schedule.isDayOff('A', day(2))).toBe(true);
+        expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(4);
+        expect(hasTripleOff(result.schedule, 'A')).toBe(false);
+      });
     });
   });
 });
