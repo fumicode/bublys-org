@@ -8,7 +8,6 @@ import {
 } from "react";
 import {
   suggestShiftInputs,
-  type WorkingStaffGroup,
   type ShiftCell,
   type ShiftSuggestion,
   type Staff,
@@ -42,11 +41,9 @@ type UseCellKeyboardEditingParams = {
   days: WorkingDay[];
   /** この勤務表で選べる勤務帯。 */
   shiftOptions: WorkShift[];
-  /** あれば「選択スタッフが入れる勤務帯」に候補を絞る。 */
-  staffGroup?: WorkingStaffGroup;
   /**
    * スタッフ行のセルの勤務割当を変更する（確定時に呼ぶ）。選択の全セルぶんを1回で渡す
-   * （1回の操作＝世界線の1ノード）。入れられないセル（可能勤務帯に無い）は除いてある。
+   * （1回の操作＝世界線の1ノード）。可能勤務帯の外の勤務帯も入れる（違反として出る。#216）。
    */
   onChangeCells: (changes: CellChange[]) => void;
   /** feature 層と共有する制御選択。undefined のときだけ内部 state を使う。 */
@@ -214,7 +211,6 @@ export function useCellKeyboardEditing({
   staffList,
   days,
   shiftOptions,
-  staffGroup,
   onChangeCells,
   selection: controlledSelection,
   onSelectionChange,
@@ -276,17 +272,10 @@ export function useCellKeyboardEditing({
   // スタッフ行のセルにいるときだけの値（候補・アンカー）
   const staffSelection = selection?.kind === "staff" ? selection : null;
 
-  // 選択中スタッフが入れる勤務帯だけに絞る（可能勤務帯があれば）
-  // 範囲のときは勤務帯ぜんぶから出し、入れる段で人ごとに飛ばす（setStaffCells）
-  const selectableShiftOptions =
-    staffGroup && staffSelection && !hasRange
-      ? shiftOptions.filter((w) => staffGroup.isAllowed(staffSelection.staffId, w.id))
-      : shiftOptions;
-
   // 入力候補（前方一致）。スタッフ行のセルを編集しているときだけ出す
   const suggestions: ShiftSuggestion[] =
     staffSelection && inputBuffer !== null
-      ? suggestShiftInputs(inputBuffer, selectableShiftOptions)
+      ? suggestShiftInputs(inputBuffer, shiftOptions)
       : [];
   // 候補が減ったときに範囲外を指さないようクランプ
   const activeClamped = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
@@ -349,14 +338,11 @@ export function useCellKeyboardEditing({
     );
   };
 
-  /** 選択中のスタッフ行のセルぜんぶに入れる。その人が入れない勤務帯のセルは飛ばす */
+  /** 選択中のスタッフ行のセルぜんぶに入れる */
   const setStaffCells = (to: ShiftCell) => {
     const changes: CellChange[] = [];
     for (const cell of targets) {
       if (cell.kind !== "staff") continue;
-      if (to.kind === "work" && staffGroup && !staffGroup.isAllowed(cell.staffId, to.shiftId)) {
-        continue;
-      }
       changes.push({ staffId: cell.staffId, day: cell.day, to });
     }
     if (changes.length > 0) onChangeCells(changes);

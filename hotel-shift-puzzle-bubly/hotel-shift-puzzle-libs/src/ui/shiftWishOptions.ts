@@ -16,6 +16,9 @@ import type {
 
 export const DAY_OFF_WISH = "day-off";
 
+/** 希望との食い違いの違反種別（ShiftWishConstraint の type）。グリッドが希望の円で描き分けるのに使う */
+export const SHIFT_WISH_MISMATCH = "shift-wish-mismatch";
+
 export const workWishKey = (shiftName: string): string => `work:${shiftName}`;
 export const isWorkWish = (key: string): boolean => key.startsWith("work:");
 export const workWishName = (key: string): string => key.slice("work:".length);

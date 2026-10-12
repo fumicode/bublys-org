@@ -572,6 +572,10 @@ export const StyledWrap = styled.div`
   /* データセル */
   .e-cell {
     position: relative;
+    /* セルの中の印（違反の帯・角・入力表示など）の z-index はセルの中だけで効かせる。
+       これが無いと中の z-index がグリッド全体で比べられ、横・縦スクロールで潜り込んだとき
+       固定のスタッフ列や日付ヘッダより手前に出てしまう */
+    isolation: isolate;
     /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
     overflow: hidden;
     display: flex;
@@ -789,6 +793,27 @@ export const StyledWrap = styled.div`
 
     &:hover {
       height: 7px;
+    }
+  }
+
+  /* 1セルで完結する違反（可能勤務帯の外に入れた、など）: 右上の角の赤い三角。
+     日をまたぐ違反（下端の赤帯）とは場所を分けて、同じセルに両方かかっても見分けられるようにする。
+     中の ObjectView を当たり判定に広げるので、border の三角ではなく clip-path で切る。 */
+  .e-violation-corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 10px;
+    background: #e53935;
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+    cursor: pointer;
+    z-index: 2;
+    transition: width 0.1s, height 0.1s;
+
+    &:hover {
+      width: 14px;
+      height: 14px;
     }
   }
 

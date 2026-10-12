@@ -10,10 +10,8 @@ import type {
   ShiftLeaderRule,
   ShiftCell,
 } from "../../domain/index.js";
-import {
-  MIN_MONTHLY_DAY_OFF_CONSTRAINT,
-  isShiftIntervalConstraintType,
-} from "../../domain/index.js";
+import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
+import { cellViolationMarks } from "./cellViolationMarks.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
@@ -152,14 +150,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
-        const covering = violations.filter((v) => v.coversCell(staff.id, day));
-        // 勤務間インターバル違反は「2日のつなぎ目」の違反なので、範囲（下端の赤帯）ではなく
-        // 境目の印として描く。どちら側の境目かは、違反範囲の初日／末日のどちらに当たるかで決まる。
-        const intervalCovering = covering.filter((v) =>
-          isShiftIntervalConstraintType(v.constraintType)
-        );
-        const otherCovering = covering.filter(
-          (v) => !isShiftIntervalConstraintType(v.constraintType)
+        // 希望の食い違いは希望の円、勤務間インターバルは境目の印、日をまたぐ違反は下端の赤帯、
+        // 1セルで完結する違反は右上の角で描く（cellViolationMarks）。
+        // 境目の印がどちら側かは、違反範囲の初日／末日のどちらに当たるかで決まる。
+        const marks = cellViolationMarks(
+          violations.filter((v) => v.coversCell(staff.id, day))
         );
         const isSelected =
           selection?.kind === "staff" &&
@@ -172,10 +167,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             cell={cell}
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
-            rangeViolation={otherCovering.find((v) => v.days.length > 1)}
-            pointViolation={otherCovering.find((v) => v.days.length === 1)}
-            intervalAfter={intervalCovering.find((v) => v.days[0]?.equals(day))}
-            intervalBefore={intervalCovering.find((v) =>
+            barViolation={marks.bar}
+            cornerViolation={marks.corner}
+            wishViolation={marks.wish}
+            intervalAfter={marks.interval.find((v) => v.days[0]?.equals(day))}
+            intervalBefore={marks.interval.find((v) =>
               v.days[v.days.length - 1]?.equals(day)
             )}
             cellKey={`${staff.id}:${day.key}`}

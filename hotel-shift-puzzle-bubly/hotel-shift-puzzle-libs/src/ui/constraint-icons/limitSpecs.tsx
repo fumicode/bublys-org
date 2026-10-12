@@ -3,7 +3,7 @@
 /**
  * limitSpecs — 「数と真偽で言い切れる制約」1つぶんの記述を1枚にまとめたテーブル。
  *
- * 連勤上限・月の最低休日・1日の休み上限・希望チェックは、どれも
+ * 連勤上限・月の最低休日・1日の休み上限・可能勤務帯チェック・希望チェックは、どれも
  * 「制約セットから1つ読んで、1つ書き戻す」だけの制約。個別のコンポーネントも
  * 個別のハンドラも要らないので、**違うのはこの表の1行だけ**にしてある。
  *
@@ -18,6 +18,7 @@ import { ConstraintSet } from "../../domain/index.js";
 import { MaxDayOffPerDayIcon } from "./MaxDayOffPerDayIcon.js";
 import { MinMonthlyDayOffIcon } from "./MinMonthlyDayOffIcon.js";
 import { MaxConsecutiveIcon } from "./MaxConsecutiveIcon.js";
+import { AllowedShiftIcon } from "./AllowedShiftIcon.js";
 import { WishIcon } from "./WishIcon.js";
 
 /** バーの3群。稼働日ごと（縦↕）／人ごと（横↔）／全体 */
@@ -51,7 +52,7 @@ const asBoolean = (v: number | boolean): boolean => v === true;
 
 /**
  * 並び順がそのままバーの並び順になる。
- * 群の中の順序も、いまの見た目（休み上限 → 休日 → 連勤 → 希望）をこの順で再現する。
+ * 群の中の順序も、いまの見た目（休み上限 → 休日 → 連勤 → 可能勤務帯 → 希望）をこの順で再現する。
  */
 export const LIMIT_SPECS: LimitSpec[] = [
   {
@@ -89,6 +90,20 @@ export const LIMIT_SPECS: LimitSpec[] = [
     apply: (set, v) => set.withMaxConsecutiveWorkdays(asNumber(v)),
     describe: (v) => `連勤は最大${asNumber(v)}日まで`,
     render: (v, size) => <MaxConsecutiveIcon max={asNumber(v)} size={size} />,
+  },
+  {
+    key: "check-allowed-shift",
+    caption: "可能勤務帯",
+    group: "per-person",
+    kind: "boolean",
+    label: "入れない勤務帯には入れない",
+    read: (set) => set.checkAllowedShift,
+    apply: (set, v) => set.withCheckAllowedShift(asBoolean(v)),
+    describe: (v) =>
+      asBoolean(v)
+        ? "入れない勤務帯には入れない（入れたら違反として出す）"
+        : "可能勤務帯は見ない",
+    render: (v, size) => <AllowedShiftIcon on={asBoolean(v)} size={size} />,
   },
   {
     key: "check-shift-wish",

@@ -17,10 +17,12 @@ type ScheduleDataCellProps = {
   shift?: WorkShift;
   /** 未割当セルに薄く出す希望ヒント */
   wishEntries: WishEntry[];
-  /** 範囲違反（連勤など複数日）。下端の赤帯で表す */
-  rangeViolation?: ConstraintViolation;
-  /** 単日違反（希望の食い違い）。希望の円をオレンジにして表す（旧: 右上の ⊿） */
-  pointViolation?: ConstraintViolation;
+  /** 日をまたぐ違反（連勤など）。下端の赤帯で表す */
+  barViolation?: ConstraintViolation;
+  /** 1セルで完結する違反（可能勤務帯の外に入れた、など）。右上の角の赤い三角で表す */
+  cornerViolation?: ConstraintViolation;
+  /** 希望の食い違い。希望の円をオレンジにして表す（旧: 右上の ⊿） */
+  wishViolation?: ConstraintViolation;
   /**
    * 前日との「つなぎ目」の違反（勤務間インターバル）。セルの左端＝前日との境目に印を出す。
    * 違反しているのはセルの中身ではなく2日の間隔なので、赤帯（範囲）でも円（単日）でもなく、
@@ -94,8 +96,9 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   cell,
   shift,
   wishEntries,
-  rangeViolation,
-  pointViolation,
+  barViolation,
+  cornerViolation,
+  wishViolation,
   intervalBefore,
   intervalAfter,
   candidateHint,
@@ -176,7 +179,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   }
   if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
 
-  if (pointViolation || rangeViolation || intervalBefore || intervalAfter) {
+  if (wishViolation || barViolation || cornerViolation || intervalBefore || intervalAfter) {
     className += " is-violation";
   }
   if (selected) className += " is-selected";
@@ -184,7 +187,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
   const hasValue = cell.kind === "work" || cell.kind === "day-off";
   // 希望と違う勤務帯になったか。判定は宣言的な制約（希望違反）から導く（表示側で再実装しない）。
-  const wishMismatch = !!pointViolation;
+  const wishMismatch = !!wishViolation;
 
   // 値が入ったセルの左上に残す円は1つだけ。「その割当に対応する希望」＝叶ったシフトの円を残す。
   // 割当が決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
@@ -234,8 +237,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
-    wishMismatch && pointViolation && violationUrl
-      ? violationUrl(pointViolation)
+    wishMismatch && wishViolation && violationUrl
+      ? violationUrl(wishViolation)
       : undefined;
 
   // 希望の円（1文字＋文字色と同じ線色）。
@@ -263,8 +266,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
             }`}
             style={style}
             title={
-              wishMismatch && pointViolation
-                ? `${pointViolation.message}（ダブルクリックで詳細）`
+              wishMismatch && wishViolation
+                ? `${wishViolation.message}（ダブルクリックで詳細）`
                 : `希望: ${wishText(e)}`
             }
             {...(wishViolationUrl ? urlProps(wishViolationUrl) : {})}
@@ -306,7 +309,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       {content}
       {wishMarks}
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
-      {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
+      {barViolation && violationMarker(barViolation, "e-violation-bar")}
+      {cornerViolation && violationMarker(cornerViolation, "e-violation-corner")}
       {/* 勤務間インターバル: 2日の境目に印。前日側と翌日側の半円が合わさって
           境界線上の1つの丸に見える（＝違反しているのは「この2日の間」）。 */}
       {intervalAfter && violationMarker(intervalAfter, "e-interval-bar is-after")}

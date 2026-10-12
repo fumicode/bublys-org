@@ -6,7 +6,7 @@ import {
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 
 /**
- * 違反の印（連勤の赤帯・勤務間インターバルの境目の印）の**構造**を固定する（#158）。
+ * 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）の**構造**を固定する（#158）。
  *
  * 印は position:absolute でセルの端に張り付く。ObjectView は泡の膜のために
  * position:relative を持つので、印を ObjectView で**包む**と印の基準が幅0の ObjectView になり、
@@ -33,7 +33,8 @@ describe("ScheduleDataCell の違反の印", () => {
       <ScheduleDataCell
         cell={{ kind: "work", shiftId: "early" }}
         wishEntries={[]}
-        rangeViolation={violation("max-consecutive-workdays")}
+        barViolation={violation("max-consecutive-workdays")}
+        cornerViolation={violation("allowed-shift")}
         intervalBefore={violation("shift-interval")}
         intervalAfter={violation("shift-interval")}
         cellKey="s1:2026-06-01"
@@ -45,6 +46,7 @@ describe("ScheduleDataCell の違反の印", () => {
 
   it.each([
     [".e-violation-bar", 1],
+    [".e-violation-corner", 1],
     [".e-interval-bar", 2],
   ])("★ %s は ObjectView に包まれず、内側に ObjectView を持つ", (selector, count) => {
     const { container } = renderCell(true);

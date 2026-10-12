@@ -115,15 +115,17 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // 自動シフトが守る制約は、抽出ビューでも勤務表全体と同じリスト（同じ勤務表を編集しているので）。
   // 表示用の violations（抽出ビュー向けに絞った一覧）とは別物。
   const allConstraints = useMemo(
-    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
-    [constraints, workShifts, wishByStaff]
+    () =>
+      scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup }),
+    [constraints, workShifts, wishByStaff, staffGroup]
   );
 
   // 自動シフトコマンド（抽出ビュー）。相方裏コマンドは廃止したので「希望を叶える」のみ。
   const steps = useMemo<AutoShiftStep[]>(() => [fulfillWishesStep], []);
 
   // 抽出ビューは subset に絞った勤務表なので、責任者違反（全体視点）は出さない
-  // （footer は relevantRules のみ）。連勤・希望は集約の設定に従う。
+  // （footer は relevantRules のみ）。連勤・希望・可能勤務帯は集約の設定に従う
+  // （可能勤務帯はセル単位なので、subset に絞っても判定は変わらない）。
   const violations = useMemo(() => {
     if (!schedule) return [];
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -133,16 +135,19 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
           new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
         ],
         wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+        allowedShift:
+          staffGroup && (constraints?.checkAllowedShift ?? true)
+            ? { staffGroup, shiftNameById }
+            : undefined,
       })
     );
-  }, [schedule, wishByStaff, workShifts, constraints]);
+  }, [schedule, wishByStaff, workShifts, constraints, staffGroup]);
 
   // セルのコピー・カット・貼り付け（#166）。貼れなかった分はメッセージ欄で知らせる
   const clipboard = useCellClipboard({
     store,
     schedule,
     workShifts,
-    staffGroup,
     onMessage: setAutoMessage,
   });
 
@@ -162,7 +167,6 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
       workShifts,
       wishByStaff,
-      staffGroup,
       constraints: allConstraints,
       ...limits,
     });
@@ -183,7 +187,6 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        staffGroup,
         constraints: allConstraints,
         ...limits,
       }).schedule;
@@ -201,7 +204,6 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
           staffList: prioritizedStaff,
           workShifts,
           wishByStaff,
-          staffGroup,
           constraints: allConstraints,
           ...limits,
         }
@@ -235,7 +237,6 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         schedule={schedule}
         staffList={subset}
         workShifts={workShifts}
-        staffGroup={staffGroup}
         wishByStaff={wishByStaff}
         violations={violations}
         leaderRules={relevantRules}

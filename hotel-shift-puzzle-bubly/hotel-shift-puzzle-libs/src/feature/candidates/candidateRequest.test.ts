@@ -118,4 +118,22 @@ describe("computeCandidatesFor", () => {
     // 以前は「早番だけ（一意に決まる）」と、入れない勤務帯を提案していた
     expect(result.candidatesOf("L2", day1)).toEqual(lateOrOff);
   });
+
+  it("#216 可能勤務帯チェックを切にすると、入れない勤務帯も候補に戻る", () => {
+    const staffGroup = new WorkingStaffGroup({
+      id: "sched-1",
+      members: [new WorkingStaffMember({ staffId: "X", allowedShiftIds: ["late"] })],
+    });
+    const request = (check: boolean) =>
+      requestFor(baseSchedule, {
+        constraints: constraints.withCheckAllowedShift(check).toPlain(),
+        staffGroup: staffGroup.toPlain(),
+      });
+
+    const on = ScheduleCandidates.fromPlain(computeCandidatesFor(request(true)));
+    const off = ScheduleCandidates.fromPlain(computeCandidatesFor(request(false)));
+
+    expect(on.candidatesOf("X", day1)).toHaveLength(2);
+    expect(off.candidatesOf("X", day1)).toHaveLength(3);
+  });
 });

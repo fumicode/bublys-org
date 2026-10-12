@@ -48,8 +48,8 @@ export type CandidateRequest = {
   checkShiftWish: boolean;
   wishes: StaffMonthlyShiftWishPlain[];
   /**
-   * 勤務スタッフ群。可能勤務帯（その人が入れる勤務帯）で候補の元を絞るのに使う。
-   * 群がまだ無い勤務表なら null（全員がどの勤務帯にも入れる）。
+   * 勤務スタッフ群。可能勤務帯の制約（入れない勤務帯は、入れたら違反になる値）を組むのに使う。
+   * 群がまだ無い勤務表なら null（可能勤務帯の制約は足さない）。
    */
   staffGroup: WorkingStaffGroupPlain | null;
   /**
@@ -77,17 +77,21 @@ function rebuildInput(request: CandidateRequest): CandidateComputationInput {
   const aggregate = request.constraints
     ? ConstraintSet.fromPlain(request.constraints)
     : undefined;
+  const staffGroup = request.staffGroup
+    ? WorkingStaffGroup.fromPlain(request.staffGroup)
+    : undefined;
 
   return {
     schedule,
     workShifts,
     staffIds: request.staffIds,
-    staffGroup: request.staffGroup
-      ? WorkingStaffGroup.fromPlain(request.staffGroup)
-      : undefined,
     constraints: buildScheduleConstraints({
       modelConstraints: aggregate?.modelConstraints(shiftIdsOf),
       wish: request.checkShiftWish ? { wishByStaff, shiftNameById } : undefined,
+      allowedShift:
+        staffGroup && (aggregate?.checkAllowedShift ?? true)
+          ? { staffGroup, shiftNameById }
+          : undefined,
     }),
   };
 }

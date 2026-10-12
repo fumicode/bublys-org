@@ -7,11 +7,13 @@
  * いずれ「店舗ごと／勤務表ごとに制約を設定」できるようにする場合も、その設定を解決して
  * ScheduleConstraint[] を返す入口をここに集約する想定。
  */
-import type {
-  ConstraintSet,
-  ScheduleConstraint,
-  StaffMonthlyShiftWish,
-  WorkShift,
+import {
+  AllowedShiftConstraint,
+  type ConstraintSet,
+  type ScheduleConstraint,
+  type StaffMonthlyShiftWish,
+  type WorkShift,
+  type WorkingStaffGroup,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishConstraint } from "./ShiftWishConstraint.js";
 
@@ -29,14 +31,20 @@ export type ScheduleConstraintContext = {
  *
  * 各制約は宣言的オブジェクト（ScheduleConstraint）で、その設定値は勤務表ごとの
  * ConstraintSet 集約（世界線に載る）が持つ。model 層で完結する制約（責任者・連勤・
- * 月最低休日・1日の休み上限）は集約の modelConstraints() から渡し、ここでは希望違反
- * （ShiftWishConstraint。feature 層＋実行時データ依存）だけを足して組み立てる。
+ * 月最低休日・1日の休み上限）は集約の modelConstraints() から渡し、ここでは勤務表の外の
+ * データが要る2つ——希望違反（ShiftWishConstraint）と可能勤務帯（AllowedShiftConstraint）——を
+ * 足して組み立てる。
  */
 export type BuildScheduleConstraintsArgs = {
   /** model 層の制約（集約の modelConstraints() から渡す）。 */
   modelConstraints?: ScheduleConstraint[];
   /** 希望違反も見るなら希望の文脈を渡す（省略時は希望チェックなし）。 */
   wish?: ScheduleConstraintContext;
+  /** 可能勤務帯も見るなら勤務スタッフ群を渡す（省略時は可能勤務帯チェックなし）。 */
+  allowedShift?: {
+    staffGroup: WorkingStaffGroup;
+    shiftNameById: Map<string, string>;
+  };
 };
 
 export const buildScheduleConstraints = (
@@ -44,6 +52,11 @@ export const buildScheduleConstraints = (
 ): ScheduleConstraint[] => {
   const constraints: ScheduleConstraint[] = [...(args.modelConstraints ?? [])];
   if (args.wish) constraints.push(new ShiftWishConstraint(args.wish));
+  if (args.allowedShift) {
+    constraints.push(
+      new AllowedShiftConstraint(args.allowedShift.staffGroup, args.allowedShift.shiftNameById)
+    );
+  }
   return constraints;
 };
 
@@ -53,20 +66,27 @@ export const buildScheduleConstraints = (
  *
  * - 制約セットの制約（連勤・責任者・勤務間インターバル・休日・休み上限・必要人数）
  * - 希望チェックが入なら、シフト希望との食い違い（制約セットがまだ読めないときは既定の入）
+ * - 可能勤務帯チェックが入なら、入れない勤務帯に入れたセル（勤務スタッフ群が無ければ足さない）
  *
  * @param wishByStaff その勤務表と同じ年月のシフト希望（staffId → 希望）
+ * @param staffGroup その勤務表の勤務スタッフ群（可能勤務帯を持つ）
  */
 export const scheduleConstraintsOf = (args: {
   constraintSet: ConstraintSet | undefined;
   workShifts: WorkShift[];
   wishByStaff: Map<string, StaffMonthlyShiftWish>;
+  staffGroup: WorkingStaffGroup | undefined;
 }): ScheduleConstraint[] => {
-  const { constraintSet, workShifts, wishByStaff } = args;
+  const { constraintSet, workShifts, wishByStaff, staffGroup } = args;
   const shiftIdsOf = (shiftName: string) =>
     workShifts.filter((w) => w.name === shiftName).map((w) => w.id);
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
   return buildScheduleConstraints({
     modelConstraints: constraintSet?.modelConstraints(shiftIdsOf),
     wish: (constraintSet?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+    allowedShift:
+      staffGroup && (constraintSet?.checkAllowedShift ?? true)
+        ? { staffGroup, shiftNameById }
+        : undefined,
   });
 };

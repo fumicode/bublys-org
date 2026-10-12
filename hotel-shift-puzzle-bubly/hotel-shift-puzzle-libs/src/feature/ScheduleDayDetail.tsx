@@ -109,7 +109,6 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
         schedule={schedule}
         staffList={staffList}
         workShifts={shiftOptions}
-        staffGroup={staffGroup}
         leaderRules={leaderRules}
         wishByStaff={wishByStaff}
         // 再計算中は前回の（古いかもしれない）候補を出さない（グリッドと同じ扱い）

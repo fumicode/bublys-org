@@ -8,7 +8,6 @@ import {
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
-  WorkingStaffGroup,
   DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
@@ -54,9 +53,6 @@ type ScheduleGridViewProps = {
   staffList: Staff[];
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
-  /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
-  /** 可能勤務帯（誰がどの勤務帯に入れるか）は勤務スタッフ群が持つ。セル編集メニューの絞りに使う */
-  staffGroup?: WorkingStaffGroup;
   /**
    * 稼働日ごとの予約状況（宿泊人数・部屋数）。あれば日付ヘッダの上に読み取り専用の行を出す。
    * 店ごとに付け替える想定の姉妹モジュール。未指定なら予約行を出さない。
@@ -182,7 +178,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  staffGroup,
   reservationInfo,
   reservationInfoUrl,
   staffColumnActions,
@@ -381,7 +376,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     staffList,
     days,
     shiftOptions,
-    staffGroup,
     onChangeCells,
     selection,
     onSelectionChange,

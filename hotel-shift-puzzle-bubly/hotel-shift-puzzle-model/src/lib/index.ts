@@ -54,6 +54,7 @@ export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
 export * from './schedule/RequiredStaffingConstraint.js';
+export * from './schedule/AllowedShiftConstraint.js';
 
 // 候補集合（まだ決まっていないセルに入れられる値を、制約から絞り込んで持つ）
 export * from './schedule/cellCandidates.js';

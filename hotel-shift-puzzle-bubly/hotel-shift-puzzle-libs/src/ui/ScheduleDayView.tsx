@@ -8,7 +8,6 @@ import {
   ScheduleCandidates,
   WorkShift,
   WorkingDay,
-  WorkingStaffGroup,
   ShiftLeaderRule,
   StaffMonthlyShiftWish,
   type ShiftCell,
@@ -26,8 +25,6 @@ type ScheduleDayViewProps = {
   staffList: Staff[];
   /** この勤務表で使える勤務帯（早番・中番・遅番）。横方向に並べる */
   workShifts: WorkShift[];
-  /** 可能勤務帯。あれば入れない勤務帯セルを無効化する */
-  staffGroup?: WorkingStaffGroup;
   /** 責任者ルール（解決済み）。名前横に早責/夜責バッジを出す */
   leaderRules?: ShiftLeaderRule[];
   /** この年月のシフト希望（staffId 別）。希望した勤務帯のセルに円で出す */
@@ -44,7 +41,8 @@ type ScheduleDayViewProps = {
 /**
  * 稼働日 1 日ぶんの詳細ビュー。
  * 縦にスタッフ、横に勤務帯（早番・中番・遅番）＋休みを並べた表。各スタッフのその日の割当を
- * 立て、クリックでその勤務帯へ割当（再クリックで未定へ）。可能勤務帯外のセルは無効。
+ * 立て、クリックでその勤務帯へ割当（再クリックで未定へ）。可能勤務帯の外の勤務帯も選べる
+ * （選ぶと勤務表に違反として出る。#216）。
  * 表の下部に、勤務帯ごとの「現在/必要」を出して必要人数が満たされているかを示す。
  *
  * セルの中身は「中央＝値 / 左上＝希望」の 2 レイヤーで読む:
@@ -61,7 +59,6 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  staffGroup,
   leaderRules = [],
   wishByStaff,
   candidates,
@@ -135,16 +132,11 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
 
               {workShifts.map((w) => {
                 const selected = status.kind === "work" && status.shiftId === w.id;
-                const allowed = !staffGroup || staffGroup.isAllowed(staff.id, w.id);
-                // 入れない勤務帯は無効（ただし既に入っている場合は外せるよう操作可）
-                const disabled = !allowed && !selected;
                 const forced =
                   forcedCell?.kind === "work" && forcedCell.shiftId === w.id;
                 const wish = wishes.find((e) => e.shiftId === w.id);
                 const title = [
-                  disabled
-                    ? `${staff.name} は ${w.name} に入れません`
-                    : `${staff.name} を ${w.name} に${selected ? "から外す" : "割り当てる"}`,
+                  `${staff.name} を ${w.name} に${selected ? "から外す" : "割り当てる"}`,
                   wish && `希望: ${wishText(wish)}`,
                   forced && `候補は${w.name}だけ（ここは一意に決まります）`,
                 ]
@@ -153,17 +145,11 @@ export const ScheduleDayView: FC<ScheduleDayViewProps> = ({
                 return (
                   <td
                     key={w.id}
-                    className={`e-cell${selected ? " is-on" : ""}${
-                      disabled ? " is-disabled" : ""
-                    }`}
+                    className={`e-cell${selected ? " is-on" : ""}`}
                     style={selected ? { background: SHIFT_BG[w.id], color: SHIFT_FG[w.id] } : undefined}
-                    role={disabled ? undefined : "button"}
+                    role="button"
                     title={title}
-                    onClick={
-                      disabled
-                        ? undefined
-                        : () => toggle(staff.id, selected, { kind: "work", shiftId: w.id })
-                    }
+                    onClick={() => toggle(staff.id, selected, { kind: "work", shiftId: w.id })}
                   >
                     {selected ? (
                       <span className="e-shift-hour">{w.startHour}</span>
@@ -343,19 +329,6 @@ const StyledTable = styled.table`
     &.is-off {
       background: #f5f5f5;
       color: #9e9e9e;
-    }
-    &.is-disabled {
-      cursor: default;
-      background: repeating-linear-gradient(
-        45deg,
-        #fafafa,
-        #fafafa 4px,
-        #f0f0f0 4px,
-        #f0f0f0 8px
-      );
-    }
-    &.is-disabled:hover {
-      box-shadow: none;
     }
   }
 

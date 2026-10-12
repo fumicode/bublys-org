@@ -10,8 +10,6 @@ import {
 import type { ShiftCell } from "./MonthlyStaffSchedule.js";
 import { WorkShift, createDefaultWorkShifts } from "./WorkShift.js";
 import { WorkingDay } from "./WorkingDay.js";
-import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
-import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
 
 /**
  * セルのコピー・貼り付け（#166）。
@@ -89,28 +87,6 @@ describe("cellClipboard（勤務表のセルのコピー・貼り付け）", () 
       expect(plan.skipped.unreadable).toBe(1);
     });
 
-    it("可能勤務帯に無い値はその人のセルだけ貼らない（休み・未定は誰にでも入る）", () => {
-      const staffGroup = new WorkingStaffGroup({
-        id: "g",
-        members: [
-          WorkingStaffMember.ofRoster("s1"),
-          new WorkingStaffMember({ staffId: "s2", allowedShiftIds: ["late"] }),
-          WorkingStaffMember.ofRoster("s3"),
-        ],
-      });
-
-      const plan = planValuePaste({
-        grid: parseClipboardText("7\n7\n休"),
-        targets: [at("s1", 1)],
-        staffIds,
-        days,
-        shifts,
-        staffGroup,
-      });
-
-      expect(labels(plan.changes)).toEqual(["s1:1=early", "s3:1=day-off"]);
-      expect(plan.skipped["not-allowed"]).toBe(1);
-    });
   });
 
   describe("オブジェクトとして（人と日で貼る）", () => {
@@ -149,23 +125,6 @@ describe("cellClipboard（勤務表のセルのコピー・貼り付け）", () 
       expect(plan.skipped["no-shift"]).toBe(1);
     });
 
-    it("貼り付け先の可能勤務帯に無い値は貼らない", () => {
-      const staffGroup = new WorkingStaffGroup({
-        id: "g",
-        members: [new WorkingStaffMember({ staffId: "s1", allowedShiftIds: ["late"] })],
-      });
-
-      const plan = planObjectPaste({
-        copied: [copyCell("s1", days[0], early, shifts), copyCell("s1", days[1], off, shifts)],
-        staffIds,
-        days,
-        shifts,
-        staffGroup,
-      });
-
-      expect(labels(plan.changes)).toEqual(["s1:2=day-off"]);
-      expect(plan.skipped["not-allowed"]).toBe(1);
-    });
   });
 
   it("貼れなかった件数を、理由ごとに知らせる", () => {
@@ -174,10 +133,9 @@ describe("cellClipboard（勤務表のセルのコピー・貼り付け）", () 
         "no-staff": 2,
         "no-day": 0,
         "no-shift": 0,
-        "not-allowed": 1,
-        unreadable: 0,
+        unreadable: 1,
         "out-of-grid": 0,
       })
-    ).toBe("3件貼れませんでした（表に居ない人 2・可能勤務帯に無い 1）");
+    ).toBe("3件貼れませんでした（表に居ない人 2・読めない文字 1）");
   });
 });

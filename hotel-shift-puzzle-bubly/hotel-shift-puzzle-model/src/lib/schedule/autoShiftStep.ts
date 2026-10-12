@@ -32,7 +32,7 @@ export type DecodedWish =
   /** 希望はあるが自動では決められない（触らず人間へ） */
   | { kind: "ambiguous" };
 
-/** 各ステップが共通で受け取る文脈（希望・可能勤務帯・勤務帯名↔ID など） */
+/** 各ステップが共通で受け取る文脈（希望・制約・勤務帯名↔ID など） */
 export type AutoShiftContext = {
   /** 割当対象のスタッフID一覧 */
   staffIds: string[];
@@ -43,9 +43,8 @@ export type AutoShiftContext = {
   /** (staffId, day) のデコード済み希望を返す。省略時の人は neutral 扱い */
   preferenceOf: (staffId: string, day: WorkingDay) => DecodedWish;
   /**
-   * staffId がその日 shiftId に入れるか。省略時は全可。
-   * 「その人が入れる帯か（可能勤務帯）」に加えて「その日は入れないと言っていないか（希望の×）」
-   * まで含めた判定を上位層が組み立てて渡す。
+   * staffId がその日 shiftId に入れるか（希望の×／○）。省略時は全可。
+   * 可能勤務帯はここに入れない。制約（constraints）として渡すので、置くたびの判定が守る。
    */
   isAvailable?: (staffId: string, shiftId: string, day: WorkingDay) => boolean;
   /**
@@ -120,8 +119,8 @@ export interface AutoShiftStep {
  * そのセルにその値を置いてよいか。**自動シフトが値を置くときは、必ずこれを通す。**
  *
  * 置いてよい ＝ 候補集合に載る値:
- *   - 出勤なら、その人がその日その帯に入れる（可能勤務帯・希望の×／○）
- *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts）
+ *   - 出勤なら、その人がその日その帯に入れる（希望の×／○）
+ *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts。可能勤務帯もここで守る）
  *
  * 「どの制約を守るか」をステップごとに書かない。書くと、書き忘れた制約（遅番明けなど）だけが
  * 自動シフトから漏れる。
