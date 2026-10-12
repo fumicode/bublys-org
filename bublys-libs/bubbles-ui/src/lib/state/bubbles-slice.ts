@@ -149,11 +149,16 @@ const createEmptyUniverse = (): UniverseState => ({
 export const getInitialBubbleUrls = (): string[] => configuredInitialBubbleUrls;
 
 /** url 群から「横に並べただけ」の配置を作る。universe の seed 用 */
-export const buildSeedArrangement = (urls: string[]): BubbleArrangementState => {
+export const buildSeedArrangement = (
+  urls: string[],
+  /** 見えている範囲（layer-local）。渡せば、撒いたバブルをそこへ収める（Bubble.fitInto） */
+  region?: { origin: Point2; size: Size2 } | null,
+): BubbleArrangementState => {
   const bubbles: Record<string, BubbleJson> = {};
   const layers: string[][] = [];
   urls.forEach((url, index) => {
-    const b = createBubble(url, { x: index * 400, y: 0 });
+    const placed = createBubble(url, { x: index * 400, y: 0 });
+    const b = region ? placed.fitInto(region) : placed;
     bubbles[b.id] = b.toJSON();
     layers.push([b.id]);
   });

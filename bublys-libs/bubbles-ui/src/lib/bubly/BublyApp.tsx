@@ -33,7 +33,7 @@ import {
   selectSurfaceLeftTop,
   OpeningPosition,
 } from '../state/index.js';
-import { BubblesLayeredView } from '../ui/BubblesLayeredView.js';
+import { BubblesLayeredView, type BubblesLayeredViewProps } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
 import { DragDataType } from '../utils/drag-types.js';
 import { BublyMenuItem } from './BublyTypes.js';
@@ -70,6 +70,8 @@ export type BublyAppProps = {
    * ── でないと、押した泡が**見えない旧い海のほう**に開く。
    */
   onOpenUrl?: (url: string) => void;
+  /** 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う（{@link BubblesLayeredViewProps.isShowreEnabled}） */
+  isShowreEnabled?: boolean;
 };
 
 /**
@@ -84,6 +86,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   backdropColor,
   sea,
   onOpenUrl,
+  isShowreEnabled,
 }) => {
   const dispatch = useAppDispatch();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
@@ -264,10 +267,15 @@ export const BublyApp: FC<BublyAppProps> = ({
         </Tooltip>
 
         <List sx={{ flex: 1, py: 0.5 }}>
+          {/*
+            ★ **メニューはダブルクリックで開く。** 1 回のクリックで開くと、触ってみただけで
+              バブルが増えていき、初めての人には「何かが勝手に出てきた」に見える。
+              何が開くかはホバーの名前で分かるので、開くと決めたときだけ開く。
+          */}
           {menuItems.map((item) => (
-            <Tooltip key={item.label} title={item.label} placement="right" arrow>
+            <Tooltip key={item.label} title={`${item.label}（ダブルクリックで開く）`} placement="right" arrow>
               <ListItemButton
-                onClick={() => handleMenuItemClick(item)}
+                onDoubleClick={() => handleMenuItemClick(item)}
                 sx={{
                   color: 'rgba(255,255,255,0.8)',
                   justifyContent: 'center',
@@ -331,6 +339,7 @@ export const BublyApp: FC<BublyAppProps> = ({
                   onBubbleLayerDown={layerDown}
                   onBubbleLayerUp={layerUp}
                   onCoordinateSystemReady={handleCoordinateSystemReady}
+                  isShowreEnabled={isShowreEnabled}
                 />
               </Box>
             </BubbleRefsProvider>

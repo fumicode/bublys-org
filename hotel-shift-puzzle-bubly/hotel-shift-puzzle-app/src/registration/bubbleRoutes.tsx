@@ -342,7 +342,9 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/violations/:violationKey", type: "schedule-violation", Component: ScheduleViolationBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/days/:dayKey", type: "schedule-day", Component: ScheduleDayBubble },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/reservation-info", type: "schedule-reservation-info", Component: ScheduleReservationInfoBubble },
-  { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble },
+  // 勤務表は 1 か月ぶんの表（名前 + 31 日 + 集計 ≒ 1490px）がそのまま入る大きさで開く。
+  // 画面に入らない分は、開くときに見えている範囲まで縮む（Bubble.fitInto）
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble, bubbleOptions: { defaultSize: { width: 1560, height: 1100 } } },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
   // シフト完成レポート（#86〜#89）。list は `/schedule-reports`、単体は `/schedule-reports/:reportId`
   // （schedules/schedule-list と同じ命名パターン）。

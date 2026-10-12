@@ -819,8 +819,7 @@ csv-importer-model/
     CsvSheet.test.ts      ← テスト（16ケース）
     index.ts              ← エクスポート定義
   src/index.ts            ← パッケージエントリポイント
-  jest.config.ts          ← テスト設定
-  .spec.swcrc             ← テスト用コンパイル設定
+  vite.config.mts         ← テスト設定（Vitest）
 
 csv-importer-libs/
   src/slice/

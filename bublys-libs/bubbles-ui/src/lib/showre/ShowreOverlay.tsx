@@ -30,6 +30,11 @@ export type ShowreOverlayProps = {
   renderBubbleContent?: (bubble: Bubble) => ReactNode;
   /** ドラッグ中の予告（離したあとの矩形）。岸でも海でも同じに描く。無ければ出さない */
   preview?: { rect: { x: number; y: number; width: number; height: number } } | null;
+  /**
+   * 岸が有効か。切っているときは岸の印（ネオン管）を描かない。
+   * もう貼り付いているバブルは、消えてしまわないように描き続ける（掴めば剥がせる）。
+   */
+  isShowreEnabled?: boolean;
 };
 
 /**
@@ -43,7 +48,7 @@ export type ShowreOverlayProps = {
  * 違うのは置き場所だけ ── 海では universe 座標、ここでは画面の座標（貼った辺に合わせた矩形）。
  */
 export const ShowreOverlay: FC<ShowreOverlayProps> = memo(
-  ({ universeId, viewport, renderBubbleContent, preview }) => {
+  ({ universeId, viewport, renderBubbleContent, preview, isShowreEnabled = true }) => {
     const dispatch = useAppDispatch();
     const docked = useAppSelector(makeSelectDockedBubbles(universeId));
     const focusedBubbleId = useAppSelector(makeSelectFocusedBubbleId(universeId));
@@ -121,7 +126,7 @@ export const ShowreOverlay: FC<ShowreOverlayProps> = memo(
           );
         })}
         {/* 管は 1 枚にまとめて描く ── 海の縁も、岸に着いたバブルも、1 本の網 */}
-        <ShowreTubes viewport={viewport} seas={[sea]} />
+        {isShowreEnabled && <ShowreTubes viewport={viewport} seas={[sea]} />}
 
         {preview && (
           <Preview
