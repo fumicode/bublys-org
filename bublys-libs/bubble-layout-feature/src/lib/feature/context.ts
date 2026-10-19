@@ -168,6 +168,18 @@ export interface BubbleSpaceApi {
    */
   sizeOf: (id: BubbleId) => { readonly w: number; readonly h: number } | null;
   /**
+   * **既にある泡を、画面のその矩形に見えるように動かす。**
+   *
+   * ★ 動かし方は**掴んで動かすのと同じ**（`dragBubble`）── だからレンズの逆写しを通る。
+   *   魚眼が掛かっていても、寄っていても、見回していても、狙った所に見えるように置ける。
+   *   座標を直に書くとそこが崩れる（歪むほどずれる。`project.ts` の `unprojectBubble` の註）。
+   * ★ **世界線の節は作らない。** 曼荼羅のように「並べ直して、やめたら戻す」使い方では、
+   *   途中の一手ずつが節になっても戻りたい所が見つけられない。
+   *   記録したい側が、区切りで `onSettled` を受けて自分で決める。
+   */
+  moveTo: (id: BubbleId, rect: { x: number; y: number; w: number; h: number }) => void;
+
+  /**
    * 岸から海へ返す ── **画面のその矩形に見えるように**置く。
    *
    * 「どこに置くか」は親の View が決める、が原則。ここで場所を渡してよいのは、
@@ -202,6 +214,7 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   roomOf: () => ({ w: 0, h: 0 }),
   sizeOf: () => null,
   takeIn: () => '',
+  moveTo: () => undefined,
 });
 export const useBubbleSpace = (): BubbleSpaceApi => useContext(BubbleSpaceContext);
 

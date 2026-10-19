@@ -146,7 +146,7 @@ export const HOMES: readonly Home[] = [
  * ★ **渡すのはここだけ。** 一覧・折り返す魚眼・窓の中の海は別の空間なので、1px も変わらない
  *   （刻みで並ぶ軸は、この口に何を渡しても積のまま ── 隣どうしがぴたり接するのを守るため）。
  */
-const SEA_RULES = { sizeCombine: 'hypot' } as const;
+export const SEA_RULES = { sizeCombine: 'hypot' } as const;
 
 /**
  * **世界線に入らないもの。**

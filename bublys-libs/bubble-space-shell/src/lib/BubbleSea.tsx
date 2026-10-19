@@ -20,9 +20,9 @@
  *   - 前後は「大きく写るものが手前」。触ると焦点が寄って入れ替わる（値は書かない）
  */
 import { CSSProperties, FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LayoutRules, PresetId } from "@bublys-org/bubble-layout";
+import type { BubbleId, LayoutRules, PresetId } from "@bublys-org/bubble-layout";
 import { type TubeJoin, type BubbleRoute as LegacyRoute } from "@bublys-org/bubbles-ui";
-import { LayoutRoutesProvider, type BubbleSpaceApi } from "@bublys-org/bubble-layout-feature";
+import { LayoutRoutesProvider, type BubbleSpaceApi, type SettleWhy } from "@bublys-org/bubble-layout-feature";
 import { SEA_GROUND } from "./ShowreLayer.js";
 import { ShoreSpace, type Home } from "./ShoreSpace.js";
 import { bridgeRoutes } from "./legacyRouteBridge.js";
@@ -78,6 +78,10 @@ export type BubbleSeaProps = {
   readonly rules?: Partial<LayoutRules>;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
+  /** **いま触られている泡**（②「触ったら選ぶ」）。岸に貼った泡からは読めないので、器が中継する */
+  readonly onSelect?: (id: BubbleId | null) => void;
+  /** **顔ぶれ・並べ方・置き場所が動いた**という合図（`SettleWhy`）。器の記録とは別に受け取れる */
+  readonly onSettled?: (why: SettleWhy) => void;
   readonly style?: CSSProperties;
   /**
    * 海と一緒に置いておきたいもの。**描かない部品**（集約を用意しておく hook など）を
@@ -96,6 +100,8 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
   worldLineSeed,
   rules,
   onSpaceReady,
+  onSelect,
+  onSettled,
   style,
   children,
 }) => {
@@ -188,6 +194,8 @@ export const BubbleSea: FC<BubbleSeaProps> = ({
         homes={homes}
         homesReady={homesReady}
         onSpaceReady={handleSpaceReady}
+        onSelect={onSelect}
+        onSettled={onSettled}
         /** 記録するのは岸つきの海の側 ── 姿には岸も入るので（`SeaWorldLine` の註） */
         worldLineScope={worldLineScope}
         worldLineOutside={worldLineOutside}

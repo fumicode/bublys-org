@@ -28,9 +28,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
+import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace, useSelectedBubble } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, BubbleSpaceProps, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import type { LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from "@bublys-org/bubble-layout";
+import type { BubbleId, LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from "@bublys-org/bubble-layout";
 import { PRESETS } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
@@ -79,6 +79,13 @@ export type ShoreSpaceProps = {
   readonly homesReady?: boolean;
   /** 海の口を外から掴む（ツールバーなどが要るとき） */
   readonly onSpaceReady?: (api: BubbleSpaceApi) => void;
+  /** **いま触られている泡**（②「触ったら選ぶ」）。世界には書かれないので、知りたい側はここで受ける */
+  readonly onSelect?: (id: BubbleId | null) => void;
+  /**
+   * **記録するに値することが起きた**という合図（`SettleWhy`）。
+   * ★ 器は自分でも世界線に記録しているので、**両方呼ぶ**（横取りしない）。
+   */
+  readonly onSettled?: (why: SettleWhy) => void;
   /**
    * **この海の世界線を、どの scope に記録するか。** 渡さなければ記録しない。
    * 記録するのは海の姿と**岸に貼ってあるもの**（`SeaWorldLine` の註）。
@@ -193,9 +200,20 @@ const SHORE_MEMORY = new Map<string, readonly Docked[]>();
 const SHORE_SEEDED = new Set<string>();
 
 /** 海の口を外から掴むための小物（`BubbleSpace` の中でしか使えないので、子として置く） */
-const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }) => {
+const SpaceHandle: FC<{
+  onReady: (api: BubbleSpaceApi) => void;
+  /** いま触られている泡を外へ知らせる（②「触ったら選ぶ」の結果。世界には書かれない値） */
+  onSelect?: (id: BubbleId | null) => void;
+}> = ({ onReady, onSelect }) => {
   const space = useBubbleSpace();
+  const selected = useSelectedBubble();
   useEffect(() => onReady(space), [space, onReady]);
+  /**
+   * ★ **岸に貼った泡からは読めない。** 岸は海（`BubbleSpace`）の外で描かれるので、
+   *   そこに居る部品は `SelectedBubbleContext` に届かない ── 海の中に立っている
+   *   この部品が受け取って、外へ渡す。
+   */
+  useEffect(() => onSelect?.(selected), [selected, onSelect]);
   return null;
 };
 
@@ -282,6 +300,8 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   homes,
   homesReady = true,
   onSpaceReady,
+  onSelect,
+  onSettled,
   worldLineScope,
   autoLens,
   rules,
@@ -344,6 +364,17 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    *   ── 戻した先で 4 回走って、余計な節が生まれていた（実測）。
    *   呼ぶ相手は覚え書きから取る。
    */
+  /**
+   * **器の記録と、外から渡された合図の両方を呼ぶ。**
+   * 器は自分でも世界線に記録しているので、外に渡す口ができても横取りはしない。
+   */
+  const settled = useCallback(
+    (why: SettleWhy) => {
+      record(why);
+      onSettled?.(why);
+    },
+    [record, onSettled],
+  );
   const recordRef = useRef(record);
   recordRef.current = record;
   useEffect(() => {
@@ -522,6 +553,11 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
    */
   const shoreSpace = useMemo<BubbleSpaceApi>(
     () => ({
+      /**
+       * ★ **岸に着いた泡は動かさない。** 置き場所は岸が持っていて（`dock`）、
+       *   海の座標で動かすものではない ── 剥がして海へ戻せば、海の口が受け持つ。
+       */
+      moveTo: () => undefined,
       /**
        * ★ 岸は**世界線に記録しない**。岸は「どこに貼ってあるか」であって並びではないし、
        *   貼ってあるものは `SHORE_MEMORY` が覚えている ── 記録するのは海の側だけ。
@@ -714,7 +750,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          *   註で「宿題」と書いてあったもの）。同じ名前で海も覚える。
          */
         memoryKey={persistKey}
-        onSettled={record}
+        onSettled={settled}
         autoLens={autoLens}
         rules={rules}
         bandDisplay={bandDisplay}
@@ -737,7 +773,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
          */
         style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}
       >
-        <SpaceHandle onReady={onReady} />
+        <SpaceHandle onReady={onReady} onSelect={onSelect} />
         {children}
       </BubbleSpace>
 

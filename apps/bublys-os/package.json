@@ -13,6 +13,7 @@
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
     "@bublys-org/lodging-libs": "*",
+    "@bublys-org/mandara-ui": "*",
     "@bublys-org/map-libs": "*",
     "@bublys-org/memo-libs": "*",
     "@bublys-org/object-shell": "*",

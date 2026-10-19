@@ -246,6 +246,40 @@ export interface TakeOutInfo {
   readonly over: { readonly id: BubbleId; readonly url: string } | null;
 }
 
+/**
+ * **その泡が、画面のその矩形に見えるように動かした世界を返す。**
+ *
+ * > 動かし方は**掴んで動かすのと同じ**（`dragBubble`）── 新しい規則は要らない。
+ *
+ * ★ 箱の真ん中を掴んで、矩形の真ん中へ持っていく。`dragBubble` が通るので、
+ *   魚眼・寄り・見回しのぶんはレンズの逆写しが面倒を見る。
+ * ★ `takeIn`（岸から海へ返す）と、`moveTo`（既にある泡を動かす）が、ここを分け合う。
+ */
+function movedTo(
+  world: BubbleWorld,
+  viewport: Viewport,
+  rules: Partial<LayoutRules> | undefined,
+  id: BubbleId,
+  rect: { x: number; y: number; w: number; h: number },
+): BubbleWorld {
+  const L = resolveWorld(world, viewport, rules);
+  const p = L.byId.get(id);
+  if (!p) return world;
+  return dragBubble(
+    world,
+    {
+      layout: L,
+      id,
+      space: p.space,
+      m: p.m,
+      pointer: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+      // 箱の真ん中を掴んで置く（＝ 中心をそこへ持っていく）
+      grab: { x: p.box.w / 2, y: p.box.h / 2 },
+    },
+    resolveRules(rules),
+  );
+}
+
 export interface BubbleSpaceProps {
   readonly routes: readonly BubbleRoute[];
   /**
@@ -806,27 +840,23 @@ export function BubbleSpace(props: BubbleSpaceProps) {
         size: { w: rect.w, h: rect.h }, hue: route.hue, rules,
         center: openCenter,
       });
-      const L = resolveWorld(opened.world, viewport, rules);
-      const p = L.byId.get(id);
-      setWorld(
-        p
-          ? dragBubble(
-              opened.world,
-              {
-                layout: L, id, space: 'root', m: p.m,
-                pointer: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
-                // 箱の真ん中を掴んで置く（＝ 中心をそこへ持っていく）
-                grab: { x: p.box.w / 2, y: p.box.h / 2 },
-              },
-              resolveRules(rules),
-            )
-          : opened.world,
-      );
+      setWorld(movedTo(opened.world, viewport, rules, id, rect));
       setUrls((m) => new Map(m).set(id, { url, type: route.type, openerId: null, originId: null, originSpot: null, at }));
       markSettled('members');
       return id;
     },
     [routes, world, viewport, rules, setWorld, openCenter, markSettled],
+  );
+
+  /**
+   * **既にある泡を、画面のその矩形に見えるように動かす**（`context.ts` の註）。
+   * 世界線の節は作らない ── 記録するかどうかは呼ぶ側が決める。
+   */
+  const moveTo = useCallback(
+    (id: BubbleId, rect: { x: number; y: number; w: number; h: number }) => {
+      setWorld((cur) => movedTo(cur, viewport, rules, id, rect));
+    },
+    [viewport, rules, setWorld],
   );
 
   /**
@@ -1200,9 +1230,9 @@ export function BubbleSpace(props: BubbleSpaceProps) {
   }, [autoLens, base, world, applyLens]);
 
   const api: BubbleSpaceApi = useMemo(
-    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn,
+    () => ({ snapshot, restore, openBubble, closeBubble, urlOf: (id) => urls.get(id)?.url ?? null, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, moveTo,
       hasSpace: (id: BubbleId) => spaceHosts.has(id), isList: (id: BubbleId) => listHosts.has(id), viewOf }),
-    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, spaceHosts, listHosts, viewOf],
+    [snapshot, restore, openBubble, closeBubble, urls, canOpen, hasUrl, setLens, setPreset, setChildren, hostOf, sizeOf, setSize, roomOf, takeIn, moveTo, spaceHosts, listHosts, viewOf],
   );
 
   /**

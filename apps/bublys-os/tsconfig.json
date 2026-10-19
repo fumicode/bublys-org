@@ -19,7 +19,13 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
+    "types": [
+      "vitest/globals",
+      "vitest/importMeta",
+      "vite/client",
+      "node",
+      "vitest"
+    ],
     "outDir": "dist",
     "rootDir": "."
   },
@@ -52,6 +58,9 @@
   ],
   "references": [
     {
+      "path": "../../bublys-libs/mandara-ui"
+    },
+    {
       "path": "../../launcher-bubly/launcher-model"
     },
     {
@@ -67,13 +76,13 @@
       "path": "../../launcher-bubly/launcher-libs"
     },
     {
-      "path": "../../map-bubly/map-libs"
+      "path": "../../lodging-bubly/lodging-libs"
     },
     {
       "path": "../../itinerary-bubly/itinerary-libs"
     },
     {
-      "path": "../../lodging-bubly/lodging-libs"
+      "path": "../../map-bubly/map-libs"
     },
     {
       "path": "../../object-transformer-bubly/object-transformer-libs"

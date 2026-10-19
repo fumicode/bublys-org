@@ -182,6 +182,9 @@
     },
     {
       "path": "./lodging-bubly/lodging-app"
+    },
+    {
+      "path": "./bublys-libs/mandara-ui"
     }
   ]
 }

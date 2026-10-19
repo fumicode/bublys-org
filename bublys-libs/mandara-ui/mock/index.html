@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>曼荼羅UI モック</title>
+<style>
+  :root {
+    --ground: #0b0e14;
+    --line: rgba(255, 255, 255, 0.18);
+    --line-w: 1px;
+    --edge: 16.6667;          /* 端から線までの帯の幅（％）。中央はその残り */
+
+    --header: 24px;
+    --panel: rgba(255, 255, 255, 0.92);
+    --panel-edge: rgba(255, 255, 255, 0.5);
+    --ink: #16202e;
+    --inset: 8px;             /* 領域の内側に取る余白 */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ground);
+    overflow: hidden;
+    font: 13px/1.4 system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  }
+
+  .grid { position: fixed; inset: 0; }
+
+  /* 領域の境目。その向きに泡がいるときだけ出る */
+  .line { position: absolute; background: var(--line); }
+  .line.v { top: 0; bottom: 0; width: var(--line-w); }
+  .line.h { left: 0; right: 0; height: var(--line-w); }
+
+  .bubble {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    color: var(--ink);
+  }
+  .bubble > .bar {
+    flex: 0 0 var(--header);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 7px;
+    background: rgba(0, 0, 0, 0.06);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .bubble > .bar .x { opacity: 0.45; }
+  .bubble > .body { flex: 1 1 auto; padding: 7px; position: relative; }
+  .bubble.focused { border-color: rgba(255, 255, 255, 0.85); }
+
+  /* どの数字でそこへ行けるか。モックの道案内で、規則ではない */
+  .key {
+    position: absolute;
+    right: 4px;
+    bottom: 2px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.35;
+  }
+  /* 中へ入れる泡だけ、中央に 5 を薄く出す */
+  .inner-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    opacity: 0.12;
+  }
+
+  /* 来た道（0 で戻れるか）を左下に小さく */
+  .trail {
+    position: fixed;
+    left: 10px;
+    bottom: 8px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div class="grid" id="grid"></div>
+  <div class="trail" id="trail"></div>
+
+<script>
+/**
+ * 曼荼羅UI モック ── テンキーで動かす
+ *
+ * 決まり:
+ *   - 中央にいるのが、フォーカス中の泡
+ *   - **8 方向に何が座るかは、泡ごとに自分で持つ**（計算で裏返さない）
+ *     ＝ 一覧の右が詳細でも、詳細の左が一覧とは限らない。向きは一方通行
+ *   - 線は、その向きに泡がいるときだけ出る（居なければ中央が帯を吸収する）
+ *   - 5 は中へ、0 は来た所へ戻る
+ *
+ * テンキーの並びが、そのまま 8 方向:
+ *     7 8 9        NW N NE
+ *     4 5 6   ＝    W  ・ E
+ *     1 2 3        SW S SE
+ */
+
+var DIRS = {
+  N:  { w: 0, e: 0, n: 1, s: 0 },
+  NE: { w: 0, e: 1, n: 1, s: 0 },
+  E:  { w: 0, e: 1, n: 0, s: 0 },
+  SE: { w: 0, e: 1, n: 0, s: 1 },
+  S:  { w: 0, e: 0, n: 0, s: 1 },
+  SW: { w: 1, e: 0, n: 0, s: 1 },
+  W:  { w: 1, e: 0, n: 0, s: 0 },
+  NW: { w: 1, e: 0, n: 1, s: 0 }
+};
+/** テンキーの数字 → 向き */
+var PAD = { '7': 'NW', '8': 'N', '9': 'NE', '4': 'W', '6': 'E', '1': 'SW', '2': 'S', '3': 'SE' };
+/** 向き → テンキーの数字（道案内を描くのに使う） */
+var KEY = {};
+for (var k in PAD) KEY[PAD[k]] = k;
+
+/**
+ * 仮の泡たち。**中身は仮置き**で、関係の持ち方を見るためのもの。
+ *
+ * ★ 詳細には西（4）を置いていない ── 一覧から詳細へは行けるが、詳細から一覧へは
+ *   向きで戻れない。**一方通行**なので、0 で戻ることになる。
+ */
+var WORLD = {
+  list:   { title: '一覧バブル', dirs: { E: 'detail', N: 'map' } },
+  detail: { title: '詳細バブル', dirs: { S: 'memo', NE: 'map' }, inside: 'detailInner' },
+  map:    { title: '地図バブル', dirs: { N: 'list' } },
+  memo:   { title: 'メモバブル', dirs: {} },
+  detailInner: { title: '詳細の中身', dirs: {} }
+};
+
+var focus = 'list';
+/** 来た道。0 はここから 1 つ取り出す */
+var trail = [];
+
+function move(to) {
+  if (!to || !WORLD[to]) return;
+  trail.push(focus);
+  focus = to;
+  render();
+}
+function back() {
+  if (!trail.length) return;
+  focus = trail.pop();
+  render();
+}
+
+document.addEventListener('keydown', function (e) {
+  /* テンキーでも、数字の行でも効くように両方見る */
+  var d = e.code && e.code.indexOf('Numpad') === 0 ? e.code.slice(6) : e.key;
+  if (d === '0') { back(); e.preventDefault(); return; }
+  if (d === '5') { move(WORLD[focus].inside); e.preventDefault(); return; }
+  if (PAD[d]) { move(WORLD[focus].dirs[PAD[d]]); e.preventDefault(); }
+});
+
+function render() {
+  var grid = document.getElementById('grid');
+  grid.textContent = '';
+
+  var E = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--edge'));
+  var here = WORLD[focus];
+
+  /** いま埋まっている向き */
+  var placed = [];
+  for (var d in here.dirs) {
+    if (WORLD[here.dirs[d]]) placed.push({ id: here.dirs[d], dir: d, v: DIRS[d] });
+  }
+  var has = { w: false, e: false, n: false, s: false };
+  placed.forEach(function (p) {
+    if (p.v.w) has.w = true;
+    if (p.v.e) has.e = true;
+    if (p.v.n) has.n = true;
+    if (p.v.s) has.s = true;
+  });
+
+  /** 中央の領域の縁（％）。居ない向きの帯は中央が吸収する */
+  var L = has.w ? E : 0;
+  var R = has.e ? 100 - E : 100;
+  var T = has.n ? E : 0;
+  var B = has.s ? 100 - E : 100;
+
+  if (has.w) addLine('v', 'left', L);
+  if (has.e) addLine('v', 'right', E);
+  if (has.n) addLine('h', 'top', T);
+  if (has.s) addLine('h', 'bottom', E);
+
+  function addLine(kind, side, at) {
+    var el = document.createElement('div');
+    el.className = 'line ' + kind;
+    el.style[side] = at + '%';
+    grid.appendChild(el);
+  }
+
+  /* 中央＝フォーカス中の泡 */
+  place(focus, L, R, T, B, true, here.inside ? '5' : null);
+
+  /* まわりの泡 */
+  placed.forEach(function (p) {
+    var x0 = p.v.w ? 0 : p.v.e ? R : L;
+    var x1 = p.v.w ? L : p.v.e ? 100 : R;
+    var y0 = p.v.n ? 0 : p.v.s ? B : T;
+    var y1 = p.v.n ? T : p.v.s ? 100 : B;
+    place(p.id, x0, x1, y0, y1, false, KEY[p.dir]);
+  });
+
+  function place(id, x0, x1, y0, y1, focused, key) {
+    var b = WORLD[id];
+    var el = document.createElement('div');
+    el.className = 'bubble' + (focused ? ' focused' : '');
+    el.style.left = 'calc(' + x0 + '% + var(--inset))';
+    el.style.top = 'calc(' + y0 + '% + var(--inset))';
+    el.style.width = 'calc(' + (x1 - x0) + '% - var(--inset) * 2)';
+    el.style.height = 'calc(' + (y1 - y0) + '% - var(--inset) * 2)';
+
+    var bar = document.createElement('div');
+    bar.className = 'bar';
+    var t = document.createElement('span');
+    t.textContent = b.title;
+    var x = document.createElement('span');
+    x.className = 'x';
+    x.textContent = '×';
+    bar.appendChild(t);
+    bar.appendChild(x);
+
+    var body = document.createElement('div');
+    body.className = 'body';
+    if (focused && key === '5') {
+      var hint = document.createElement('div');
+      hint.className = 'inner-hint';
+      hint.textContent = '5';
+      body.appendChild(hint);
+    } else if (!focused && key) {
+      var kk = document.createElement('div');
+      kk.className = 'key';
+      kk.textContent = key;
+      body.appendChild(kk);
+    }
+
+    el.appendChild(bar);
+    el.appendChild(body);
+    grid.appendChild(el);
+  }
+
+  var names = trail.map(function (id) { return WORLD[id].title; });
+  document.getElementById('trail').textContent =
+    names.length ? '0 で戻る: ' + names.join(' → ') + ' →[' + here.title + ']' : '0 で戻る先なし';
+}
+
+render();
+</script>
+</body>
+</html>
