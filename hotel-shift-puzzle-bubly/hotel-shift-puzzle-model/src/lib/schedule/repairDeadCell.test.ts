@@ -5,6 +5,8 @@ import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstr
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
 import { findRepairsForDeadCell } from "./repairDeadCell.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
+import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
 
 const early = WorkShift.of("early", "早番", { hour: 7 });
 const workShifts = [early];
@@ -94,5 +96,33 @@ describe("findRepairsForDeadCell", () => {
     });
     const diagnosis = findRepairsForDeadCell(input(schedule), dead);
     expect(diagnosis.repairs).toEqual([]);
+  });
+});
+
+describe("findRepairsForDeadCell と可能勤務帯", () => {
+  const late = WorkShift.of("late", "遅番", { hour: 15 });
+
+  it("入れない勤務帯は、詰みセルの値にも書き換え先にも出さない", () => {
+    // s1 も s2 も早番しか入れない（遅番は勤務帯セットにあるが、2人とも入れない）
+    const staffGroup = new WorkingStaffGroup({
+      id: "sched-1",
+      members: [
+        new WorkingStaffMember({ staffId: "s1", allowedShiftIds: ["early"] }),
+        new WorkingStaffMember({ staffId: "s2", allowedShiftIds: ["early"] }),
+      ],
+    });
+    const diagnosis = findRepairsForDeadCell(
+      { ...input(deadBoard()), workShifts: [early, late], staffGroup },
+      dead
+    );
+
+    const isLate = (c: ShiftCell) => c.kind === "work" && c.shiftId === "late";
+    expect(diagnosis.blocked.map((b) => b.cell).some(isLate)).toBe(false);
+    expect(diagnosis.repairs.some((r) => isLate(r.to))).toBe(false);
+    expect(diagnosis.repairs.some((r) => r.unlocks.some(isLate))).toBe(false);
+    // 早番への書き換え（s2 の休みを出勤に）は今まで通り見つかる
+    expect(
+      diagnosis.repairs.some((r) => r.staffId === "s2" && r.day.day === 6 && r.to.kind === "work")
+    ).toBe(true);
   });
 });

@@ -82,6 +82,7 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
     wishByStaff,
     workShifts,
     staffIds,
+    staffGroup,
     createWorker: createCandidatesWorker,
   });
 

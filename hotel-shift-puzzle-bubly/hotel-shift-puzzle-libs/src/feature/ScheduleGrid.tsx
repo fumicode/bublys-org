@@ -396,6 +396,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     wishByStaff,
     workShifts,
     staffIds,
+    staffGroup,
     createWorker: createCandidatesWorker,
   });
 
