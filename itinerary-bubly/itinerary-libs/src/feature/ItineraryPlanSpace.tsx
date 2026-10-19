@@ -5,39 +5,31 @@
  * > 真ん中に旅程。まわりに、まだ入っていないもの。
  * > **向きは「どの仲間か」。近さは「どれくらい埋まっているか」。**
  *
+ * ★ **ここは OS のユニバースを借りているだけ。** 入れ子の海・自分の見え方の口・
+ *   箱での切り取り・岸は、ぜんぶ道具の側が持っている（`UniverseSpace`）。
+ *   借りた側が言うのは「**誰が居て、どこに置くか**」だけ。
+ *   ── 前はこれを一覧の仕組み（`setChildren` を自分の泡に）でやっていたので、
+ *   切り取りも見え方の口も並べ方の書き戻しも、道具が持っているものを
+ *   1 つずつ手で作り直すことになっていた。
  * ★ **置き場所そのものが関係を表す。** 並べ方（縦に並べる・奥に重ねる）では
- *   「仲間」と「決まり具合」を同時に見せられないので、自由に置く座標を
- *   こちらで書く（`setChildren` の `at`）。
+ *   「仲間」と「決まり具合」を同時に見せられないので、自由に置く座標をこちらで書く。
  * ★ **入っているものは浮かばない。** 旅程に入れれば沈み、外せば浮かぶ
  *   ── 顔ぶれは毎回「渡されたもの − 入っているもの」から出す。
- * ★ ここは 1 つの空間（泡の中の海）。外の海には何も散らからない。
  *
  * ★ **この盤は、メモの別の見え方**でもある。だから
  *   「旅程の一覧から外して、盤に浮かせる」は**何も失っていない** ── 盤に居る限り、
- *   もとの 1 件は残っている。予定の札をここへ落とすのが、その操作
- *   （ボタンの ↩ と同じことを、掴んで出すやり方でできる）。
- * ★ **外の海へ持ち出すのは別の話。** そちらは今までどおり「外に 1 つ増えるだけで、
- *   ここからは減らない」── ほかの一覧と同じ振る舞い。
+ *   もとの 1 件は残っている。
+ *   ただし**そのことを道具は知らない** ── 道具にとっては、借りた側が顔ぶれを
+ *   言い切る窓、というだけ。
  */
+import { FC, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  DragEvent as ReactDragEvent,
-  FC,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { useBubbleSpace, useCurrentBubble } from "@bublys-org/bubble-layout-feature";
-import {
-  anyObjectDragType,
-  extractIdFromUrl,
-  getDragType,
-  parseDragPayload,
-} from "@bublys-org/bubbles-ui";
-import { useAppDispatch, useAppSelector } from "@bublys-org/state-management";
+  LayoutRoutesContext,
+  useCurrentBubble,
+  type BubbleSpaceApi,
+} from "@bublys-org/bubble-layout-feature";
+import { UniverseSpace } from "@bublys-org/bubble-space-shell";
 import { planPositions } from "../domain/planLayout.js";
-import { selectItineraryById, updateItinerary } from "../slice/itinerary-slice.js";
 import { useHandedPieces } from "./useHandedPieces.js";
 
 /** 真ん中に置く旅程の url */
@@ -70,23 +62,48 @@ const useBoxSize = (ref: React.RefObject<HTMLElement | null>) => {
 };
 
 export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId }) => {
-  const space = useBubbleSpace();
   const me = useCurrentBubble();
-  const dispatch = useAppDispatch();
-  const itinerary = useAppSelector(selectItineraryById(itineraryId));
+  const routes = useContext(LayoutRoutesContext);
   const pieces = useHandedPieces(itineraryId);
-  const [dragOver, setDragOver] = useState(false);
-  /** 剥がせなかったときに、なぜかを一瞬だけ言う */
-  const [refused, setRefused] = useState<string | null>(null);
+
+  /**
+   * **窓の中の海の口。**
+   *
+   * ★ **状態に入れない。** 口は窓が描き直されるたびに新しい物になるので、
+   *   状態に入れると「受け取る → 状態が変わる → 描き直す → また新しい口」で
+   *   回り続ける（実測：`Maximum update depth` が 2.5 秒に 5〜11 回）。
+   *   置くのは ref。立ち上がったことだけを 1 度、状態で知らせる。
+   */
+  const innerRef = useRef<BubbleSpaceApi | null>(null);
+  const [ready, setReady] = useState(false);
+  const onReady = useCallback((api: BubbleSpaceApi) => {
+    innerRef.current = api;
+    setReady(true);
+  }, []);
+  /** 場の広さ。ここを測った大きさが、そのまま散らばりの入れものになる */
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const box = useBoxSize(boxRef);
 
   const center = centerUrl(itineraryId);
-
-  /** 場の地。ここを測った大きさが、そのまま散らばりの入れものになる */
-  const surfaceRef = useRef<HTMLDivElement | null>(null);
-  const box = useBoxSize(surfaceRef);
-
   const spots = useMemo(() => planPositions(pieces, box), [pieces, box]);
-  const urls = useMemo(() => [center, ...pieces.map((p) => p.url)], [center, pieces]);
+  /**
+   * **岸に貼られたものは、もう海に居なくてよい。**
+   *
+   * ★ 顔ぶれを言い切っている場なので、黙っていると**貼った瞬間に海へ生え直して
+   *   二重になる**。器は「出て行った」と教えてくれるので、こちらが顔ぶれから外す
+   *   ── 外すかどうかを決めるのは持ち主、という決まりのとおり。
+   * ★ 人が岸から海へ返したら、また顔ぶれに戻す（器が控えを消すので、次の走りで生える）。
+   */
+  const [ashore, setAshore] = useState<ReadonlySet<string>>(() => new Set());
+  const onLeave = useCallback((url: string, at2: { readonly space: string | null }) => {
+    if (at2.space !== null) return; // 海の中で動いただけ（隣へ剥がした等）はここの話ではない
+    setAshore((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+  }, []);
+
+  const urls = useMemo(
+    () => [center, ...pieces.map((p) => p.url)].filter((u) => !ashore.has(u)),
+    [center, pieces, ashore],
+  );
 
   /** 真ん中は旅程。ほかは決まりどおりの所へ */
   const at = useCallback(
@@ -95,113 +112,52 @@ export const ItineraryPlanSpace: FC<{ itineraryId: string }> = ({ itineraryId })
   );
 
   /**
-   * ★ 世界に書くのは**この 1 回だけ**（`ListSpace` と同じ決まり）。
-   *   顔ぶれと置き場所を一緒に渡す ── 別々に書くと、同じ描画のうちに
-   *   後のほうが前のほうを握り潰す。
-   * ★ **箱は伸ばさない**。盤の広さは人のもの。
+   * **中の海に、顔ぶれと置き場所を言い切る。**
+   *
+   * ★ 書くのは**この 1 回だけ**。顔ぶれと置き場所を一緒に渡す ── 別々に書くと、
+   *   同じ描画のうちに後のほうが前のほうを握り潰す。
+   * ★ **測り終えるまで出さない。** 置き場所は場の実寸から出すので、測る前に出すと
+   *   全部が真ん中に生まれる（`at` が効くのは生まれるとき 1 回だけ）。
+   * ★ **並べ方は言わない。** 自由に置くのは中の海の既定で、そこから先は人のもの
+   *   ── 毎回書き戻すと、見え方の口で選んでも次の走りで消える。
    */
   useEffect(() => {
+    const inner = innerRef.current;
+    if (!ready || !inner || box.w <= 0) return;
     /**
-     * ★ **一覧ではない**（`list: false`）。ここは置き場所そのものに意味がある盤なので、
-     *   並べ方の口は出さない ── 出すと「縦に並べる」を選べてしまい、
-     *   自分で書いた座標と喧嘩する。
-     *   ついでに、子が帯（掴む所）を持ったままになるので**動かせる**。
+     * ★ **箱の伸び縮み（`grow`）は言わない。** ここは海そのもの（窓の root）で、
+     *   箱を持っていない ── 言っても書き込まれないので、器は毎回「まだ違う」と読み、
+     *   **書く → 海が変わる → また書く**で回り続ける（実測：2.5 秒で 11 回の
+     *   `Maximum update depth`）。
      */
-    /**
-     * ★ **測り終えるまで出さない。** 置き場所は場の実寸から出すので、
-     *   測る前に出すと全部が真ん中に生まれる ── `at` が効くのは**生まれるとき**だけなので、
-     *   あとから寸法が分かっても散らばらない。
-     */
-    if (!me || box.w <= 0) return;
-    /**
-     * ★ **並べ方を書くのは、まだ決まっていないときだけ。**
-     *
-     * > 見え方は人のもの。器は最初の姿を置くだけ。
-     *
-     * 毎回「自由に置く」を渡していたころは、口で魚眼や縦並びを選んでも
-     * **次の走りで書き戻されて**いた ── 口が出ているのに押しても何も起きない
-     * （実測で踏んだ）。世界に訊けば「まだ誰も決めていない」が分かるので、
-     * そのときだけ書く。部品が作り直されても、人が決めたことは残る。
-     */
-    const first = space.viewOf(me) === null;
-    space.setChildren(me, urls, { preset: first ? "free" : undefined, at, grow: false, list: false });
-  }, [me, space, urls, at, box.w]);
+    inner.setChildren("root", urls, { at, list: false, onLeave });
+  }, [ready, urls, at, box.w, onLeave]);
 
   /**
-   * **予定の札をここへ落としたら、旅程から剥がす。**
-   *
-   * ★ 剥がせるのは**もとがあるもの**だけ（メモから来た予定）。もとが無いものは、
-   *   旅程から外すと行き先が無い ── **消えるのと同じ**なので、ここでは受けない。
-   *   受けないことを黙っていると壊れて見えるので、その場で理由を言う。
+   * ★ **剥がす受け口はここには要らない。** 予定の札を掴んで盤へ出したときに
+   *   旅程から外すのは、**旅程の一覧自身**が受け持っている（`ItineraryDetail` の
+   *   `onItemLeave`）── 一覧の札が出て行ったことを知っているのは一覧なので。
+   *   盤はその結果（浮き直った付箋）を置き直すだけ。
    */
-  const canAccept = useCallback(
-    (e: ReactDragEvent) => anyObjectDragType(e) === getDragType("ItineraryItem"),
-    [],
-  );
-
-  const onDrop = useCallback(
-    (e: ReactDragEvent) => {
-      setDragOver(false);
-      if (!itinerary || !canAccept(e)) return;
-      const payload = parseDragPayload(e, { acceptTypes: [getDragType("ItineraryItem")] });
-      const itemId = payload?.url ? extractIdFromUrl(payload.url) : undefined;
-      if (!itemId) return;
-      const item = itinerary.findItem(itemId);
-      if (!item) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (!item.from) {
-        setRefused("この予定にはもとが無いので、剥がすと消えてしまいます");
-        window.setTimeout(() => setRefused(null), 2600);
-        return;
-      }
-      dispatch(updateItinerary(itinerary.withoutItem(itemId).toPlain()));
-    },
-    [itinerary, canAccept, dispatch],
-  );
-
-  /** 盤の地。落とす先であり、案内を出す所でもある */
-  const surface = (
-    <div
-      ref={surfaceRef}
-      data-plan-surface=""
-      style={{
-        position: "absolute",
-        inset: 0,
-        borderRadius: 10,
-        boxShadow: dragOver ? "inset 0 0 0 3px #1f6fd0" : undefined,
-        background: dragOver ? "rgba(31,111,208,0.06)" : undefined,
-      }}
-      onDragOver={(e) => {
-        if (!canAccept(e)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setDragOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
-      }}
-      onDrop={onDrop}
-    />
-  );
-
   /**
-   * 何も渡されていないときの案内。**空の盤を黙って見せない**
-   * ── どうすればここに何か来るのかを、その場で言う。
+   * ★ **同じ配列を返す。** 窓はこれをそのまま中の海に渡すので、毎回新しい配列を作ると
+   *   中の海が作り直しになり、**描く → 作り直す → 描く**で回り続ける
+   *   （実測：`Maximum update depth` が 3 秒に 53 回。顔ぶれを 1 度も書かなくても出た）。
    */
+  const getRoutes = useCallback(() => routes, [routes]);
+
+  /** 窓の id は泡の id（url ではない）。立ち上がるまでは何も出さない */
+  if (!me) return <div ref={boxRef} style={{ position: "absolute", inset: 0 }} />;
+
   return (
-    <>
-      {surface}
-      {refused && (
-        <div style={{ ...noticeStyle, background: "rgba(192,57,43,0.92)", color: "#fff" }}>{refused}</div>
-      )}
+    <div ref={boxRef} style={{ position: "absolute", inset: 0 }}>
+      {/* ★ 種は撒かない ── 顔ぶれは下の `setChildren` が言い切るので、
+          両方から出すと同じ url が 2 つ生える */}
+      <UniverseSpace id={me} routes={getRoutes} onReady={onReady} />
       {pieces.length === 0 && (
-        <div style={noticeStyle}>
-          メモをここへ落とすと、入らなかったものがまわりに浮かびます
-        </div>
+        <div style={noticeStyle}>メモを旅程へ落とすと、入らなかったものがここに浮かびます</div>
       )}
-    </>
+    </div>
   );
 };
 
@@ -218,4 +174,5 @@ const noticeStyle = {
   font: "11px/1.5 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif",
   whiteSpace: "nowrap",
   pointerEvents: "none",
+  zIndex: 10,
 } as const;

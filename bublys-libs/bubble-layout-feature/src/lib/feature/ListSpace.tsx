@@ -76,7 +76,7 @@ export type ListSpaceProps = {
    *   `members` が決めているので「足りない」と数えられる）。
    *   出したいなら、持ち主がここで `members` から外す。
    */
-  readonly onLeave?: (url: string, at: { readonly space: string; readonly beside: boolean }) => void;
+  readonly onLeave?: (url: string, at: { readonly space: string | null; readonly beside: boolean }) => void;
 };
 
 /** 口を置く帯の高さの既定（実際は測る） */
@@ -364,7 +364,11 @@ export const ListSpace: FC<ListSpaceProps> = ({
         height: "100%",
         overflow: "hidden",
         borderRadius: "inherit",
-        background: LIST_PANEL,
+        /** 皮（`skin-css.ts`）が板の色を差し替えられるよう、変数を通す。無ければ今までの板 */
+        background: `var(--bl-list-panel, ${LIST_PANEL})`,
+        /** 後ろのぼかしも皮が渡す（後ろに絵や泡が透けても、字が混ざらないように）。無ければぼかさない */
+        backdropFilter: "var(--bl-list-blur, none)",
+        WebkitBackdropFilter: "var(--bl-list-blur, none)",
         color: "#1b2029",
       }}
     >

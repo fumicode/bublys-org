@@ -186,14 +186,33 @@ const shoreHomeFor = (url: string): Home => (viewport) => ({
   ground: "light",
 });
 
-const WindowSpace: FC<{
-  routes: () => LayoutRoute[];
-  seeds: readonly string[];
+/**
+ * **ユニバース（窓）** ── 泡の中に、もう 1 つ海を立てる。
+ *
+ * > 汎用の道具として貸す。**何を入れるか・どこに置くかは、借りた側が決める。**
+ *
+ * ★ 人が開けて手で並べる使い方は、これだけで済む（`seeds` を撒いたら、あとは人のもの）。
+ * ★ **中身をこちらで決めたい**バブリは `onReady` で中の海の口を受け取り、
+ *   `setChildren("root", …)` で顔ぶれと置き場所を言い切る ── 器は理由を訊かない。
+ *   「これは何かの別の見え方だ」といったことを、この道具は知らないままでいる。
+ */
+export const UniverseSpace: FC<{
+  /**
+   * 中の海に配る route の一覧。
+   *
+   * ★ **同じ配列を返すこと。** 毎回新しい配列を返すと中の海が作り直しになり、
+   *   描き直しが止まらなくなる（実測：3 秒に 53 回の `Maximum update depth`）。
+   *   関数で受けるのは、窓が自分自身の url も開けるよう、作り終えてから読むため。
+   */
+  routes: () => readonly LayoutRoute[];
+  seeds?: readonly string[];
   /** 岸にはじめから貼っておくものの url（`BubbleRoute.shoreUrls`） */
-  shoreUrls: readonly string[];
+  shoreUrls?: readonly string[];
   /** **その窓の泡の id。** 中の海・岸・見え方の鍵はこれ（url ではない ── 上の註） */
   id: string;
-}> = ({ routes, seeds, shoreUrls, id }) => {
+  /** 中の海が立ち上がったら、その口を渡す（借りた側が中身を決めるとき） */
+  onReady?: (api: BubbleSpaceApi) => void;
+}> = ({ routes, seeds = [], shoreUrls = [], id, onReady }) => {
   const homes = useMemo(() => shoreUrls.map(shoreHomeFor), [shoreUrls]);
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -203,6 +222,13 @@ const WindowSpace: FC<{
    *   外の海と中の窓で管の通り方が食い違っていた。見ているのは同じ場所（`SpaceViewContext`）。
    */
   const { join, setJoin } = useSpaceView();
+  /**
+   * **外の海。** 窓の中から外へ持ち出されたものを受ける相手。
+   *
+   * ★ `WindowSpace` は外の海の中に描かれているので、ここで引ける口は**外のほう**。
+   *   中の海の口は `inner`（下）で、別物。
+   */
+  const outer = useBubbleSpace();
   /**
    * ★ **窓の中の海も、自分の見え方を持つ。** 持ち方は大元の海と同じ見本（`useSpaceViewState`）
    *   ── 外の口で中の海を変えることはできない（別の世界なので）。
@@ -219,10 +245,11 @@ const WindowSpace: FC<{
     if (!inner) return;
     innerRef.current = inner;
     WINDOW_INBOX.set(id, (u) => inner.openBubble(u, null));
+    onReady?.(inner);
     return () => {
       if (WINDOW_INBOX.get(id)) WINDOW_INBOX.delete(id);
     };
-  }, [id, inner]);
+  }, [id, inner, onReady]);
   /** 見え方が変わるたび、棚を置き換えて外へ知らせる（外の口がこれを映す） */
   useEffect(() => {
     WINDOW_VIEW.set(id, view);
@@ -311,6 +338,14 @@ const WindowSpace: FC<{
           onLens={onLens}
           // 岸に貼ると中身が描き直されるので、岸の中身は**その窓の id**で覚えておく
           persistKey={id}
+          /**
+           * ★ **中から外へ持ち出せる。** 窓は外の海の中に居るので、外の海を知っている
+           *   のはここだけ ── 中の海は「外まで運ばれた」としか言えない。
+           * ★ **引っ越しではない。** 外に 1 つ開くだけで、**中の泡はそのまま残る**
+           *   （ほかの一覧と同じ読み：外に増えるが、元からは減らない）。
+           *   開く元をこの窓にしておくので、窓の隣に出る。
+           */
+          onEscape={(info) => { outer.openBubble(info.url, id); }}
           style={{ position: "absolute", left: 0, top: 0 }}
         />
       )}
@@ -339,7 +374,7 @@ const bridgeRoute = (route: LegacyRoute, all: () => LayoutRoute[]): LayoutRoute 
     type: route.type,
     Component: ({ bubble }) =>
       isWindow ? (
-        <WindowSpace routes={all} seeds={seeds} shoreUrls={shoreUrls} id={bubble.id} />
+        <UniverseSpace routes={all} seeds={seeds} shoreUrls={shoreUrls} id={bubble.id} />
       ) : (
         <LegacyScreen bubble={bubble} Legacy={Legacy} />
       ),

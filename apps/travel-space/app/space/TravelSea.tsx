@@ -21,6 +21,7 @@ import {
   useEnsureLauncherEntity,
 } from "@bublys-org/space-furniture";
 import { useBubbleRoutes } from "@bublys-org/bubbles-ui";
+import { BUBBLE_SKIN } from "@bublys-org/bubble-layout-feature";
 // 開けるものをレジストリに登録するための副作用 import（一覧は下で hook から引く）
 import "./routes";
 import {
@@ -85,6 +86,11 @@ export const TravelSea = () => {
   const routes = useBubbleRoutes();
 
   return (
+    /**
+     * ★ **泡はシャボン玉の皮を着る**（`BUBBLE_SKIN`）。器に口が無いので、
+     *   配置に影響しない入れもの（`display: contents`）に印を付ける ── 皮は祖先の印で効く。
+     */
+    <div className={BUBBLE_SKIN} style={{ display: "contents" }}>
     <BubbleSea
       routes={routes}
       homes={HOMES}
@@ -98,6 +104,7 @@ export const TravelSea = () => {
        */
       style={{ height: "100dvh" }}
     />
+    </div>
   );
 };
 
