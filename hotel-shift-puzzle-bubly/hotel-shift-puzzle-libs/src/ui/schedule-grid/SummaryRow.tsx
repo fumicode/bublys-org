@@ -4,10 +4,13 @@ import type { WorkingDay } from "../../domain/index.js";
 import type { SummaryRow as SummaryRowModel } from "./summaryModel.js";
 import type { CellSelection, EditingRequired } from "./types.js";
 import { demandCellKey, requiredCellKey } from "./constants.js";
+import { PrecedingFiller } from "./PrecedingCells.js";
 
 type SummaryRowProps = {
   row: SummaryRowModel;
   days: WorkingDay[];
+  /** 前月の末尾の列数（集計は今月の話なので、その列は跨ぐだけ） */
+  precedingCount?: number;
   /** 集計ブロック内での行番号（先頭行だけ区切り罫線） */
   rowIndex: number;
   /** 必要人数を編集できる行か（勤務帯行のみ） */
@@ -46,6 +49,7 @@ type SummaryRowProps = {
 export const SummaryRow: FC<SummaryRowProps> = ({
   row,
   days,
+  precedingCount = 0,
   rowIndex,
   editable,
   dimmed,
@@ -109,6 +113,11 @@ export const SummaryRow: FC<SummaryRowProps> = ({
         {row.label}
         {typed(null)}
       </div>
+
+      <PrecedingFiller
+        count={precedingCount}
+        className={`e-sum-prev${firstCls}${dimCls}`}
+      />
 
       {days.map((day, i) => {
         // 責任者行: 担当勤務帯に責任者が入っていれば ◯（緑）、いなければ ✕（赤）。

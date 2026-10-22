@@ -28,6 +28,10 @@ import {
   RequiredStaffing,
   type RequiredStaffingPlain,
 } from "./RequiredStaffing.js";
+import {
+  PrecedingMonthTail,
+  type PrecedingMonthTailPlain,
+} from "./PrecedingMonthTail.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { ConstraintViolation } from "./ConstraintViolation.js";
 
@@ -48,6 +52,11 @@ export type MonthlyStaffScheduleState = {
   assignments: ShiftAssignment[];
   /** 稼働日×勤務帯名 の必要スタッフ数 */
   requiredStaffing: RequiredStaffing;
+  /**
+   * 前月の確定版から写し取った末尾（月跨ぎのつなぎ）。前月とつないでいなければ undefined。
+   * 制約はこれと今月をひと続きの日として読む（{@link PrecedingMonthTail}）。
+   */
+  precedingTail?: PrecedingMonthTail;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -62,6 +71,8 @@ export type MonthlyStaffSchedulePlain = {
   constraintSetId?: string;
   assignments: ShiftAssignmentPlain[];
   requiredStaffing: RequiredStaffingPlain;
+  /** 前月の末尾。つないでいない勤務表（と、この機能より前の記録）には無い */
+  precedingTail?: PrecedingMonthTailPlain;
 };
 
 /** セルの状態（出勤／休み／未定）。出勤は勤務帯ID で表す */
@@ -145,6 +156,36 @@ export class MonthlyStaffSchedule {
    */
   get constraintSetId(): string {
     return this.state.constraintSetId;
+  }
+
+  /** 前の月（1月なら前年の12月） */
+  previousYearMonth(): { year: number; month: number } {
+    return this.state.month === 1
+      ? { year: this.state.year - 1, month: 12 }
+      : { year: this.state.year, month: this.state.month - 1 };
+  }
+
+  // ========== 前月とのつなぎ ==========
+
+  /** 前月の確定版から写し取った末尾（つないでいなければ undefined） */
+  get precedingTail(): PrecedingMonthTail | undefined {
+    return this.state.precedingTail;
+  }
+
+  /**
+   * 前月の末尾をつなぎ替えた新しい勤務表を返す。不変。undefined ならつなぎを外す。
+   * 末尾は今月の直前の月末で終わっていなければならない（間が空いたらひと続きと言えない）。
+   */
+  withPrecedingTail(tail: PrecedingMonthTail | undefined): MonthlyStaffSchedule {
+    if (tail && !tail.directlyPrecedes(this.state.year, this.state.month)) {
+      throw new Error(
+        `前月の末尾が ${this.state.year}年${this.state.month}月の直前で終わっていません`
+      );
+    }
+    const next = { ...this.state };
+    if (tail) next.precedingTail = tail;
+    else delete next.precedingTail;
+    return new MonthlyStaffSchedule(next);
   }
 
   // ========== 稼働日 ==========
@@ -424,6 +465,11 @@ export class MonthlyStaffSchedule {
       constraintSetId: this.state.constraintSetId,
       assignments: this.state.assignments.map((a) => a.toPlain()),
       requiredStaffing: this.state.requiredStaffing.toPlain(),
+      // つないでいない勤務表にキーを足さない（足すと既存の世界の内容ハッシュが変わり、
+      // 同じ状態へ戻ったときに元のノードへ戻れなくなる）
+      ...(this.state.precedingTail
+        ? { precedingTail: this.state.precedingTail.toPlain() }
+        : {}),
     };
   }
 
@@ -439,6 +485,9 @@ export class MonthlyStaffSchedule {
       constraintSetId: plain.constraintSetId ?? plain.id,
       assignments: plain.assignments.map((a) => ShiftAssignment.fromPlain(a)),
       requiredStaffing: RequiredStaffing.fromPlain(plain.requiredStaffing),
+      ...(plain.precedingTail
+        ? { precedingTail: PrecedingMonthTail.fromPlain(plain.precedingTail) }
+        : {}),
     });
   }
 }

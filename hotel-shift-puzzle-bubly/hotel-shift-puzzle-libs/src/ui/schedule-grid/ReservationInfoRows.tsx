@@ -1,6 +1,7 @@
 import { FC, Fragment, useContext } from "react";
 import { urlProps, BubblesContext, CurrentBubbleContext } from "@bublys-org/bubbles-ui";
 import { DailyReservationInfo, type WorkingDay } from "../../domain/index.js";
+import { PrecedingFiller } from "./PrecedingCells.js";
 
 /**
  * 稼働日ごとの予約・稼働情報を、勤務表の「日付ヘッダの上」に出す読み取り専用の行群。
@@ -35,6 +36,8 @@ const RESERVATION_INFO_FIELDS: RoRow[] = [
 
 type ReservationInfoRowsProps = {
   days: WorkingDay[];
+  /** 前月の末尾の列数（予約情報は今月の話なので、その列は跨ぐだけ） */
+  precedingCount?: number;
   /** その勤務表の予約・稼働情報。未作成なら undefined（全セル空表示） */
   reservationInfo?: DailyReservationInfo;
   /** 予約・稼働情報の編集バブル URL。ダブルクリックで開く（無ければ開けない） */
@@ -47,6 +50,7 @@ type ReservationInfoRowsProps = {
  */
 export const ReservationInfoRows: FC<ReservationInfoRowsProps> = ({
   days,
+  precedingCount = 0,
   reservationInfo,
   reservationInfoUrl,
 }) => {
@@ -73,6 +77,8 @@ export const ReservationInfoRows: FC<ReservationInfoRowsProps> = ({
           >
             {field.label}
           </div>
+
+          <PrecedingFiller count={precedingCount} className="e-res-prev" />
 
           {days.map((day) => {
             const wd = day.weekday; // 0=日 6=土

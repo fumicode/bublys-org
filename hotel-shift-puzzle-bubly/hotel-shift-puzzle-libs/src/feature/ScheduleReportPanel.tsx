@@ -15,8 +15,9 @@ import {
   SCHEDULE_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { confirmedAtOf, withReference } from "./precedingMonth.js";
 import { useWorkingStaff } from "./workingStaff.js";
-import { recordConstraintEdit } from "./recordScheduleEdit.js";
+import { recordConstraintEdit, recordReferenceEdit } from "./recordScheduleEdit.js";
 
 type ScheduleReportPanelProps = {
   reportId: string;
@@ -48,6 +49,7 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelBodyProps> = ({
     reportId
   );
   const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const store = useAppStore();
 
   const nameOf = (staffId: string): string =>
     staffList.find((s) => s.id === staffId)?.name ?? staffId;
@@ -86,6 +88,7 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelBodyProps> = ({
       onChangeWeights={handleChangeWeights}
       onDelete={handleDelete}
       linkedScheduleCount={linkedScheduleCount}
+      confirmedAt={confirmedAtOf(store, report)}
     />
   );
 };
@@ -98,6 +101,8 @@ const ScheduleReportPanelBody: FC<ScheduleReportPanelBodyProps> = ({
  * 一方「どの勤務表がこのレポートを参照しているか」は世界をまたぐ問い合わせなので、
  * 勤務表の世界に入る**前**（グローバル台帳）で引く。レポートを消したら、それを参照している
  * 勤務表すべてから紐づけを外す（各勤務表の世界線に1ノードずつ記録される）。
+ * 参照レポートは前月の確定なので、その確定版から写した前月の末尾も一緒に外れる
+ * （末尾があれば必ず今の参照レポートの確定版、を崩さない。precedingMonth.ts）。
  */
 export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = (props) => {
   const store = useAppStore();
@@ -110,9 +115,16 @@ export const ScheduleReportPanel: FC<ScheduleReportPanelProps> = (props) => {
 
   const unlinkEverywhere = () => {
     for (const c of linkingSets) {
-      recordConstraintEdit(store, {
-        schedule: allSchedules.find((s) => s.id === c.id),
-        nextConstraints: c.unlinkReport(props.reportId),
+      const schedule = allSchedules.find((s) => s.id === c.id);
+      if (!schedule) {
+        recordConstraintEdit(store, { schedule, nextConstraints: c.unlinkReport(props.reportId) });
+        continue;
+      }
+      const next = withReference(schedule, c, undefined);
+      recordReferenceEdit(store, {
+        schedule,
+        nextSchedule: next.schedule,
+        nextConstraints: next.constraints,
       });
     }
   };

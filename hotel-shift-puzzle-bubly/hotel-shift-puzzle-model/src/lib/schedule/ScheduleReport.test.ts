@@ -170,4 +170,16 @@ describe('ScheduleReport（シフト表完成レポート）の使い方', () =>
     expect(restored.compromiseWeight).toBe(2);
     expect(restored.busyDayWeight).toBe(1);
   });
+
+  test('確定時刻を持てる。toPlain / fromPlain で残り、古い記録には無い', () => {
+    const report = ScheduleReport.create({
+      scheduleId: 's', worldLineNodeId: 'n', year: 2026, month: 6, storeId: 'store-1',
+      compromises: [], busyDayContributions: [], contributionScores: [],
+      confirmedAt: 1700000000000,
+    });
+    expect(ScheduleReport.fromPlain(report.toPlain()).confirmedAt).toBe(1700000000000);
+    expect(create().confirmedAt).toBeUndefined();
+    expect('confirmedAt' in create().toPlain()).toBe(false);
+  });
+
 });

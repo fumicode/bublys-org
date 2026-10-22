@@ -4,6 +4,7 @@ import {
   MaxConsecutiveWorkdaysConstraint,
   MAX_CONSECUTIVE_WORKDAYS,
 } from './MaxConsecutiveWorkdaysConstraint.js';
+import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 
 describe('MaxConsecutiveWorkdaysConstraint（連勤上限制約）の使い方', () => {
   const YEAR = 2026;
@@ -142,5 +143,100 @@ describe('MonthlyStaffSchedule.checkConstraints（制約の注入）', () => {
     const before = s.toPlain();
     s.checkConstraints([new MaxConsecutiveWorkdaysConstraint(5)]);
     expect(s.toPlain()).toEqual(before);
+  });
+});
+
+describe('MaxConsecutiveWorkdaysConstraint：前月とつないだとき（月跨ぎ）', () => {
+  const YEAR = 2026;
+  const MONTH = 6;
+  const SHIFT = 'early';
+  const emptySchedule = () =>
+    MonthlyStaffSchedule.create({
+      id: 'sched-1',
+      storeId: 'store-1',
+      year: YEAR,
+      month: MONTH,
+    });
+  const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
+  const workRange = (
+    schedule: MonthlyStaffSchedule,
+    staffId: string,
+    from: number,
+    to: number
+  ) => {
+    let s = schedule;
+    for (let d = from; d <= to; d++) s = s.assignShift(staffId, day(d), SHIFT);
+    return s;
+  };
+  const check = (schedule: MonthlyStaffSchedule, max = 5) =>
+    new MaxConsecutiveWorkdaysConstraint(max).check(schedule);
+
+  /** 前月（5月）の末尾 workDays 日を出勤にした確定版から写し取る */
+  const tailWorking = (staffId: string, workDays: number) => {
+    let may = MonthlyStaffSchedule.create({
+      id: 'may',
+      storeId: 'store-1',
+      year: YEAR,
+      month: 5,
+    });
+    for (let d = 31; d > 31 - workDays; d--) {
+      may = may.assignShift(staffId, WorkingDay.of(YEAR, 5, d), SHIFT);
+    }
+    may = may.assignDayOff(staffId, WorkingDay.of(YEAR, 5, 31 - workDays));
+    return PrecedingMonthTail.capture({
+      sourceReportId: 'may:n',
+      schedule: may,
+      shiftNameOf: () => '早番',
+      length: 7,
+    });
+  };
+
+  test('前月末の4連勤＋今月1〜2日の出勤は6連勤として違反。範囲は今月側の日だけ', () => {
+    const s = workRange(
+      emptySchedule().withPrecedingTail(tailWorking('staff-A', 4)),
+      'staff-A',
+      1,
+      2
+    );
+    const violations = check(s);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].days.map((d) => d.day)).toEqual([1, 2]);
+    expect(violations[0].message).toBe('前月から続いて6連勤（上限5連勤）');
+  });
+
+  test('合わせて上限ちょうどなら違反にならない', () => {
+    const s = workRange(
+      emptySchedule().withPrecedingTail(tailWorking('staff-A', 4)),
+      'staff-A',
+      1,
+      1
+    );
+    expect(check(s)).toEqual([]);
+  });
+
+  test('今月1日が休みなら、前月の連勤は持ち越さない', () => {
+    let s = emptySchedule()
+      .withPrecedingTail(tailWorking('staff-A', 5))
+      .assignDayOff('staff-A', day(1));
+    s = workRange(s, 'staff-A', 2, 6);
+    expect(check(s)).toEqual([]);
+  });
+
+  test('前月の中だけで上限を超えていた連勤は、今月には出さない', () => {
+    const s = emptySchedule()
+      .withPrecedingTail(tailWorking('staff-A', 7))
+      .assignDayOff('staff-A', day(1));
+    expect(check(s)).toEqual([]);
+  });
+
+  test('持ち越すのは同じ人の末尾だけ（前月に居ない人は今月1日から数える）', () => {
+    const s = workRange(
+      emptySchedule().withPrecedingTail(tailWorking('staff-A', 5)),
+      'staff-B',
+      1,
+      5
+    );
+    expect(check(s)).toEqual([]);
   });
 });

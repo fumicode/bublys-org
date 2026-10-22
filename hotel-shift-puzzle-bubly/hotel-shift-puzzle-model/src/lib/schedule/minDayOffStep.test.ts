@@ -4,6 +4,8 @@ import { createDefaultWorkShifts } from './WorkShift.js';
 import { makeMinDayOffStep } from './minDayOffStep.js';
 import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
+import { PrecedingMonthTail } from './PrecedingMonthTail.js';
+import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 describe('makeMinDayOffStep（月◯日休む）', () => {
   const workShifts = createDefaultWorkShifts();
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -147,5 +149,30 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
 
     expect(result.schedule.countDayOffForStaff('A')).toBe(8);
     expect(longestNonOffRun(result.schedule, 'A')).toBeLessThanOrEqual(5);
+  });
+
+  describe('前月とつないだとき（月跨ぎ）', () => {
+    /** 前月（5月）末に5連勤して終わった確定版 */
+    const tail = () => {
+      let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+      for (let d = 27; d <= 31; d++) may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
+      may = may.assignDayOff('A', WorkingDay.of(2026, 5, 26));
+      return PrecedingMonthTail.capture({
+        sourceReportId: 'may:n',
+        schedule: may,
+        shiftNameOf: () => '早番',
+        length: 7,
+      });
+    };
+
+    test('前月末からの連勤を足して区間を割るので、月初に休みが入る', () => {
+      const ctx = { ...ctxOf(['A']), constraints: [new MaxConsecutiveWorkdaysConstraint(5)] };
+      const result = step.run(emptySchedule().withPrecedingTail(tail()), ctx);
+
+      expect(result.schedule.countDayOffForStaff('A')).toBe(8);
+      // 前月末の5連勤に続けて働くと6連勤になる。休みは月初の早いうちに入る
+      const firstOff = result.schedule.workingDays().findIndex((d) => result.schedule.isDayOff('A', d));
+      expect(firstOff).toBeLessThanOrEqual(1);
+    });
   });
 });
