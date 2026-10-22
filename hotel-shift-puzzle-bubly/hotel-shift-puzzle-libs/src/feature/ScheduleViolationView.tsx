@@ -34,7 +34,7 @@ type Props = {
 
 const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
-  const { staffList } = useWorkingStaff(scheduleId);
+  const { staffList, group: staffGroup } = useWorkingStaff(scheduleId);
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, scheduleId);
   const workShifts = useMemo(() => workShiftSet?.shifts ?? [], [workShiftSet]);
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
@@ -43,7 +43,7 @@ const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
     scheduleId
   );
 
-  // グリッドと同じ制約セット（連勤＋責任者＋シフト希望）で再計算して、key で該当違反を引く。
+  // グリッドと同じ制約セット（連勤＋責任者＋シフト希望＋可能勤務帯）で再計算して、key で該当違反を引く。
   // 集約から解決するので、責任者の日単位違反も同じ key で復元できる。
   const violation = useMemo(() => {
     if (!schedule) return undefined;
@@ -55,10 +55,10 @@ const ScheduleViolationViewBody: FC<Props> = ({ scheduleId, violationKey }) => {
     }
     return schedule
       .checkConstraints(
-        scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff })
+        scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup })
       )
       .find((v) => v.key === violationKey);
-  }, [schedule, allWishes, workShifts, constraints, violationKey]);
+  }, [schedule, allWishes, workShifts, constraints, staffGroup, violationKey]);
 
   if (!schedule) {
     return <div style={{ padding: 16, color: "#666" }}>勤務表を読み込み中…</div>;

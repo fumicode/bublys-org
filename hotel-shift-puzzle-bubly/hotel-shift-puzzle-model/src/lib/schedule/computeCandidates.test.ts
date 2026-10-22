@@ -9,6 +9,7 @@ import { ScheduleCandidates } from "./ScheduleCandidates.js";
 import { computeAllCandidates, recomputeCandidates } from "./computeCandidates.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { ConstraintSet } from "./ConstraintSet.js";
+import { AllowedShiftConstraint } from "./AllowedShiftConstraint.js";
 import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
 
@@ -310,7 +311,7 @@ describe("候補集合は盤面だけの関数である（編集履歴に依存�
   });
 });
 
-describe("可能勤務帯（その人が入れる勤務帯）で候補の元を絞る", () => {
+describe("可能勤務帯（入れない勤務帯は、入れたら違反になる値）", () => {
   const day = (d: number) => WorkingDay.of(2026, 6, d);
   const leaderRule = new ShiftLeaderRule({
     key: "early",
@@ -328,15 +329,18 @@ describe("可能勤務帯（その人が入れる勤務帯）で候補の元を�
       new WorkingStaffMember({ staffId: "X", allowedShiftIds: ["late"] }),
     ],
   });
+  const allowedShift = new AllowedShiftConstraint(group);
   const input = (schedule: MonthlyStaffSchedule) => ({
     schedule,
-    constraints: [new ShiftLeaderConstraint(leaderRule, ["early"])] as ScheduleConstraint[],
+    constraints: [
+      new ShiftLeaderConstraint(leaderRule, ["early"]),
+      allowedShift,
+    ] as ScheduleConstraint[],
     workShifts: [early, late],
     staffIds: ["L1", "L2", "X"],
-    staffGroup: group,
   });
 
-  it("絞った人の候補には、入れない勤務帯が出ない", () => {
+  it("絞った人の候補には、入れない勤務帯が出ない（入れると新しい違反が出るので落ちる）", () => {
     const candidates = computeAllCandidates(input(emptySchedule()));
 
     expect(candidates.candidatesOf("X", day(1))).toEqual([
@@ -346,7 +350,10 @@ describe("可能勤務帯（その人が入れる勤務帯）で候補の元を�
   });
 
   it("絞っていない人は、今まで通り全勤務帯が候補になる", () => {
-    const candidates = computeAllCandidates({ ...input(emptySchedule()), constraints: [] });
+    const candidates = computeAllCandidates({
+      ...input(emptySchedule()),
+      constraints: [allowedShift],
+    });
 
     expect(candidates.candidatesOf("L1", day(1))).toHaveLength(3);
   });
@@ -374,6 +381,21 @@ describe("可能勤務帯（その人が入れる勤務帯）で候補の元を�
     ).toEqual([]);
   });
 
+  it("すでに入れない勤務帯が入っていても、他のセルの候補は変わらない", () => {
+    const clean = emptySchedule().setCell("L1", day(2), { kind: "work", shiftId: "late" });
+    // X は早番に入れないが、入っている（違反として出るだけ）
+    const violating = clean.setCell("X", day(1), { kind: "work", shiftId: "early" });
+
+    const before = computeAllCandidates(input(clean));
+    const after = computeAllCandidates(input(violating));
+    for (const staffId of ["L1", "L2"]) {
+      for (const d of [1, 2, 3]) {
+        expect(after.candidatesOf(staffId, day(d))).toEqual(before.candidatesOf(staffId, day(d)));
+      }
+    }
+    expect(after.candidatesOf("X", day(2))).toEqual(before.candidatesOf("X", day(2)));
+  });
+
   it("制約を満たす値が入れない勤務帯しか無いセルは、詰みとして出る", () => {
     // s1 は早番しか入れない。1日に遅番 → 2日は遅番明けで早番に入れず、
     // s2 が休んで休み上限（1人）を使い切っているので休めない。残る遅番には入れない。
@@ -387,16 +409,18 @@ describe("可能勤務帯（その人が入れる勤務帯）で候補の元を�
       constraints: [
         ...ConstraintSet.empty("sched-1").intervalConstraints(shiftIdsOf),
         new MaxDayOffPerDayConstraint(1),
+        new AllowedShiftConstraint(
+          new WorkingStaffGroup({
+            id: "sched-1",
+            members: [
+              new WorkingStaffMember({ staffId: "s1", allowedShiftIds: ["early"] }),
+              new WorkingStaffMember({ staffId: "s2" }),
+            ],
+          })
+        ),
       ],
       workShifts: [early, late],
       staffIds: ["s1", "s2"],
-      staffGroup: new WorkingStaffGroup({
-        id: "sched-1",
-        members: [
-          new WorkingStaffMember({ staffId: "s1", allowedShiftIds: ["early"] }),
-          new WorkingStaffMember({ staffId: "s2" }),
-        ],
-      }),
     });
 
     expect(candidates.candidatesOf("s1", day(2))).toEqual([]);

@@ -3,8 +3,6 @@ import { act, renderHook } from "@testing-library/react";
 import {
   Staff,
   WorkingDay,
-  WorkingStaffGroup,
-  WorkingStaffMember,
   createDefaultWorkShifts,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
@@ -37,7 +35,6 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     maxRequired?: number;
     onChangeRequiredCell?: (shiftName: string, day: WorkingDay | null, count: number) => void;
     onOpenRequiredList?: (shiftName: string, day: WorkingDay | null) => void;
-    staffGroup?: WorkingStaffGroup;
     clipboard?: CellClipboardHandlers;
   } = {}) => {
     const { onChangeRequiredCell, ...rest } = opts;
@@ -588,43 +585,6 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       expect(at()).toBe("s2:2");
       expect(inRange()).toEqual(["s2:2", "s2:3", "s3:2", "s3:3"]);
       expect(hook.result.current.editing).toBe(false);
-    });
-
-    it("★ 早番に入れない人のセルだけ飛ばす（休みは誰にでも入る）", () => {
-      const staffGroup = new WorkingStaffGroup({
-        id: "g",
-        members: [
-          WorkingStaffMember.ofRoster("s1"),
-          new WorkingStaffMember({ staffId: "s2", allowedShiftIds: ["late"] }),
-          WorkingStaffMember.ofRoster("s3"),
-        ],
-      });
-      const { press, onChangeCells } = setUp({ staffGroup });
-      press("ArrowDown", { shiftKey: true }); // s2:2〜s3:2
-
-      press("7");
-      press("Enter");
-      expect(labels(onChangeCells.mock.calls[0][0])).toEqual(["s3:2"]);
-
-      press("Delete");
-      expect(labels(onChangeCells.mock.calls[1][0])).toEqual(["s2:2", "s3:2"]);
-    });
-
-    it("範囲で候補リストを開くと、1人の可能勤務帯に絞らず勤務帯ぜんぶを出す", () => {
-      const staffGroup = new WorkingStaffGroup({
-        id: "g",
-        members: ["s1", "s2", "s3"].map(
-          (staffId) => new WorkingStaffMember({ staffId, allowedShiftIds: ["late"] })
-        ),
-      });
-      const { hook, press } = setUp({ staffGroup });
-      press("F2");
-      const single = hook.result.current.suggestions.length;
-      press("Escape");
-
-      press("ArrowDown", { shiftKey: true });
-      press("F2");
-      expect(hook.result.current.suggestions.length).toBeGreaterThan(single);
     });
 
     it("Delete で範囲の全セルを未定に戻す", () => {

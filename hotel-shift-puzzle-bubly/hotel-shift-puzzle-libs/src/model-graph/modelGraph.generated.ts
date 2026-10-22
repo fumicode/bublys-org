@@ -11,6 +11,31 @@ import type { ModelGraph } from '@bublys-org/model-graph';
 export const MODEL_GRAPH: ModelGraph = {
   "classes": [
     {
+      "name": "AllowedShiftConstraint",
+      "file": "schedule/AllowedShiftConstraint.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [],
+      "methods": [
+        {
+          "name": "describe",
+          "params": [],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "check",
+          "params": [
+            "schedule"
+          ],
+          "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
       "name": "ConstraintDelta",
       "file": "schedule/ConstraintDelta.ts",
       "kind": "value",
@@ -69,6 +94,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
+          "name": "checkAllowedShift",
+          "type": "boolean",
+          "optional": true
+        },
+        {
           "name": "minMonthlyDayOff",
           "type": "number",
           "optional": true
@@ -93,6 +123,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "id",
         "maxConsecutiveWorkdays",
         "checkShiftWish",
+        "checkAllowedShift",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
@@ -165,6 +196,15 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "withCheckShiftWish",
+          "params": [
+            "check"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withCheckAllowedShift",
           "params": [
             "check"
           ],
@@ -2500,8 +2540,9 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 41,
+    "fileCount": 42,
     "classesWithoutState": [
+      "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",

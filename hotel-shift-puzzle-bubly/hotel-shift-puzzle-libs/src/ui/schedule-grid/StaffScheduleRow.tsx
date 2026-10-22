@@ -10,10 +10,8 @@ import type {
   ShiftLeaderRule,
   ShiftCell,
 } from "../../domain/index.js";
-import {
-  MIN_MONTHLY_DAY_OFF_CONSTRAINT,
-  isShiftIntervalConstraintType,
-} from "../../domain/index.js";
+import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
+import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
@@ -109,7 +107,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   // 行は grid の直接の子（名前セル＋各日セル＋休合計＋早番日数）なので、各セルに同じクラスを付ける。
   const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
-  // 違反の印（連勤の赤帯・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
+  // 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
   const marks = violationMarksOf(violations, staff.id, days);
   return (
     <>
@@ -155,13 +153,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
-        // 単日の違反（希望の食い違い）だけはセルの中＝希望の円で表す。
-        // 複数日の違反・勤務間インターバル違反は marks（末尾のセルに置く印）が受け持つ。
-        const pointViolation = violations.find(
-          (v) =>
-            v.coversCell(staff.id, day) &&
-            v.days.length === 1 &&
-            !isShiftIntervalConstraintType(v.constraintType)
+        // 希望の食い違いだけはセルの中＝希望の円で表す。
+        // それ以外の違反（連勤・1セルの違反・勤務間インターバル）は marks（末尾のセルに置く印）が受け持つ。
+        const wishViolation = violations.find(
+          (v) => v.coversCell(staff.id, day) && v.constraintType === SHIFT_WISH_MISMATCH
         );
         const isSelected =
           selection?.kind === "staff" &&
@@ -175,7 +170,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
             violationMarks={marks.filter((m) => m.anchorDay.equals(day))}
-            pointViolation={pointViolation}
+            wishViolation={wishViolation}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}

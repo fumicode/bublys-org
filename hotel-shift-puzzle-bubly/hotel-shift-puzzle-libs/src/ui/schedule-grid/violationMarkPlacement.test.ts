@@ -1,7 +1,9 @@
 import {
+  ALLOWED_SHIFT_CONSTRAINT,
   ConstraintViolation,
   WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
+import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 
 describe("violationMarksOf — 違反の印の置き場所", () => {
@@ -37,8 +39,31 @@ describe("violationMarksOf — 違反の印の置き場所", () => {
     expect(marks[0]).toMatchObject({ kind: "interval", anchorDay: anchor("04") });
   });
 
-  it("単日の違反（希望の食い違い）は希望の円が受け持つので、印にしない", () => {
-    expect(violationMarksOf([violation("shift-wish", on("03"))], "s1", days)).toEqual([]);
+  it("希望の食い違いは希望の円が受け持つので、印にしない", () => {
+    expect(violationMarksOf([violation(SHIFT_WISH_MISMATCH, on("03"))], "s1", days)).toEqual([]);
+  });
+
+  it("★ 希望以外の1日の違反（可能勤務帯）は、そのセルの角に印1つ", () => {
+    const allowed = violation(ALLOWED_SHIFT_CONSTRAINT, on("03"));
+    const marks = violationMarksOf([allowed], "s1", days);
+
+    expect(marks).toHaveLength(1);
+    expect(marks[0].kind).toBe("corner");
+    expect(marks[0].violation).toBe(allowed);
+    expect(marks[0].anchorDay.key).toBe("2026-06-03");
+  });
+
+  it("★ 連勤の範囲の中に可能勤務帯の違反があっても、帯と角に分かれて両方出る", () => {
+    const marks = violationMarksOf(
+      [
+        violation("max-consecutive-workdays", on("02", "03", "04")),
+        violation(ALLOWED_SHIFT_CONSTRAINT, on("03")),
+      ],
+      "s1",
+      days
+    );
+
+    expect(marks.map((m) => m.kind).sort()).toEqual(["corner", "range"]);
   });
 
   it("他のスタッフの違反は印にしない", () => {

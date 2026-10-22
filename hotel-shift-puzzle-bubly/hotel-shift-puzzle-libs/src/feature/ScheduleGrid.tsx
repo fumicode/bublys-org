@@ -319,8 +319,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // ※ handleDropReportUrl / handleAddRule より前に定義する（use-before-define 回避）。
   // 自動シフトも同じリストを使う（置くたびに、これに新しい違反が出ないかを見る）。
   const allConstraints = useMemo(
-    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
-    [workShifts, constraints, wishByStaff]
+    () =>
+      scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup }),
+    [workShifts, constraints, wishByStaff, staffGroup]
   );
 
   /**
@@ -474,7 +475,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     store,
     schedule,
     workShifts,
-    staffGroup,
     onMessage: setAutoMessage,
   });
 
@@ -525,7 +525,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
       workShifts,
       wishByStaff,
-      staffGroup,
       // 置くたびに勤務表の制約（連勤・遅番明け・希望…）に新しい違反が出ないかを見る
       constraints: allConstraints,
       // 「必要人数を埋める」は先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
@@ -546,7 +545,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
-        staffGroup,
         // handleRunStep と同じく制約リストと休みの目標を丸ごと渡す。渡さないと、
         // 完成案が勤務表の制約（連勤・遅番明け…）に違反する
         constraints: allConstraints,
@@ -564,7 +562,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           staffList: prioritizedStaff,
           workShifts,
           wishByStaff,
-          staffGroup,
           constraints: allConstraints,
           ...limits,
         }
@@ -654,6 +651,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       constraintSet: constraints,
       workShifts,
       wishByStaff: wishByStaffForApex,
+      staffGroup,
     });
 
     const draft = buildScheduleReport({
@@ -830,7 +828,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           schedule={schedule}
           staffList={filteredStaffList}
           workShifts={workShifts}
-          staffGroup={staffGroup}
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           staffColumnActions={staffColumnActions}

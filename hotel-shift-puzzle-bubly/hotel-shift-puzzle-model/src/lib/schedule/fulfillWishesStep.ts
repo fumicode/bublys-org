@@ -3,7 +3,7 @@
  *
  * スタッフの希望を、空いているセル（未定）に反映する。本人の希望に原則沿う最初の段階。
  *   - 休みたい                  → 休みに確定
- *   - 入れる帯が1つに決まる      → その勤務帯に確定（可能勤務帯のときのみ）
+ *   - 入れる帯が1つに決まる      → その勤務帯に確定（置いても新しい違反が出ないときのみ）
  *   - それ以外（帯が絞り切れない・入れる帯が無い）→ 触らない（人間 or 後続ステップへ）
  *
  * 希望キーの解釈（どの帯に入れるか）は上位層が DecodedWish に畳んで渡す。
@@ -48,7 +48,7 @@ export const fulfillWishesStep: AutoShiftStep = {
           // この勤務表が使う帯でなければ人間へ（希望の読み違いであって、制約の話ではない）
           if (!ctx.shiftNameById.has(pref.shiftId)) continue;
           const cell = { kind: "work", shiftId: pref.shiftId } as const;
-          // 可能勤務帯でない帯は、これまでどおり黙って人間へ回す（制約違反の件数には数えない）
+          // その日は入れないと言っている帯（希望の×）は、黙って人間へ回す（制約違反の件数には数えない）
           if (ctx.isAvailable && !ctx.isAvailable(staffId, pref.shiftId, day)) continue;
           if (!canPlace(ctx, result, staffId, day, cell)) {
             blocked++;

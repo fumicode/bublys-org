@@ -1,5 +1,6 @@
 import type { ConstraintViolation, WorkingDay } from "../../domain/index.js";
 import { isShiftIntervalConstraintType } from "../../domain/index.js";
+import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 
 /**
  * violationMarkPlacement — スタッフ行の違反の印を「どのセルに、何列ぶん」置くかを決める
@@ -12,20 +13,24 @@ import { isShiftIntervalConstraintType } from "../../domain/index.js";
  * 伸ばせば、帯がかかるセルはすべて DOM で前にあり、帯の下に入る。
  *
  *   range    = 連勤など複数日の違反。末尾のセルから span 列ぶん左へ1本の帯を伸ばす
+ *   corner   = 1セルで完結する違反（可能勤務帯の外に入れた、など）。そのセルの右上の角に置く。
+ *              帯（下端）とは場所が違うので、連勤の範囲の中にあっても両方見える
  *   interval = 勤務間インターバル違反。違反しているのは2日の「間隔」なので、後の日のセルの
  *              左端＝境目に印を置く
  *
- * 単日の違反（希望の食い違い）は希望の円そのものが印なので、ここでは扱わない（円が受け持つ）。
+ * 希望の食い違いは希望の円そのものが印なので、ここでは扱わない（円が受け持つ）。
+ * 以前は「1日の違反＝希望の食い違い」と決め打ちしていたので、希望以外の1日の違反は
+ * 希望の円が無いセルでは何も描かれなかった（#216）。
  * 描画から切り離した純粋関数にしてあるので、DOM を用意せずに置き場所を固定できる。
  */
-export type ViolationMarkKind = "range" | "interval";
+export type ViolationMarkKind = "range" | "corner" | "interval";
 
 export type ViolationMark = {
   kind: ViolationMarkKind;
   violation: ConstraintViolation;
   /** 印を置くセルの日（表示中で、違反が覆う最後の日）。 */
   anchorDay: WorkingDay;
-  /** 印が覆う列の数（置くセル自身を含む）。interval では使わない。 */
+  /** 印が覆う列の数（置くセル自身を含む）。corner・interval では使わない。 */
   span: number;
 };
 
@@ -57,9 +62,9 @@ export function violationMarksOf(
   const marks: ViolationMark[] = [];
   for (const violation of violations) {
     if (violation.staffId !== staffId) continue;
+    // 希望の食い違いは希望の円が受け持つ（セルの中）
+    if (violation.constraintType === SHIFT_WISH_MISMATCH) continue;
     const interval = isShiftIntervalConstraintType(violation.constraintType);
-    // 単日の違反は希望の円が受け持つ（セルの中）
-    if (!interval && violation.days.length <= 1) continue;
     const span = visibleSpan(violation, days);
     if (!span) continue;
     const anchorDay = days[span.last];
@@ -68,7 +73,7 @@ export function violationMarksOf(
       if (!lastDay || !anchorDay.equals(lastDay) || span.first === span.last) continue;
     }
     marks.push({
-      kind: interval ? "interval" : "range",
+      kind: interval ? "interval" : violation.days.length > 1 ? "range" : "corner",
       violation,
       anchorDay,
       span: span.last - span.first + 1,

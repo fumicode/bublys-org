@@ -7,7 +7,7 @@ import { ViolationMarks } from "./ViolationMarks.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 
 /**
- * 違反の印（連勤の赤帯・勤務間インターバルの境目の印）の**構造**を固定する（#158）。
+ * 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）の**構造**を固定する（#158）。
  *
  * 印は position:absolute で違反が覆う範囲の末尾のセルに張り付く。ObjectView は泡の膜のために
  * position:relative を持つので、印を ObjectView で**包む**と印の基準が幅0の ObjectView になり、
@@ -21,11 +21,11 @@ describe("ViolationMarks", () => {
     WorkingDay.fromKey("2026-06-01"),
     WorkingDay.fromKey("2026-06-02"),
   ];
-  const violation = (constraintType: string) =>
+  const violation = (constraintType: string, vdays: WorkingDay[] = days) =>
     new ConstraintViolation({
       constraintType,
       staffId: "s1",
-      days,
+      days: vdays,
       message: "違反",
     });
 
@@ -33,7 +33,11 @@ describe("ViolationMarks", () => {
     render(
       <ViolationMarks
         marks={violationMarksOf(
-          [violation("max-consecutive-workdays"), violation("shift-interval")],
+          [
+            violation("max-consecutive-workdays"),
+            violation("allowed-shift", days.slice(1)),
+            violation("shift-interval"),
+          ],
           "s1",
           days
         )}
@@ -41,7 +45,7 @@ describe("ViolationMarks", () => {
       />
     );
 
-  it.each([".e-violation-bar", ".e-interval-bar"])(
+  it.each([".e-violation-bar", ".e-violation-corner", ".e-interval-bar"])(
     "★ %s は違反1件に1つで、ObjectView に包まれず、内側に ObjectView を持つ",
     (selector) => {
       const { container } = renderMarks(true);

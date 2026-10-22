@@ -6,7 +6,7 @@ import { EARLY_COL_WIDTH } from "./constants.js";
  * 制約ホバーのオーバーレイなど）より、固定された列・行が必ず手前」。
  *
  * スクロールする面の中では z-index 1〜5 を使っている（選択中のセル=1、違反の印=1、
- * 制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
+ * 1セルの違反の角=2、制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
  * それらより上に置き、スクロールで下に入ったものが透けて前に出ないようにする。
  */
 const Z_FIXED = 6; // 固定の列（スタッフ名・休・早・見出し列）と固定の行（日付ヘッダ）
@@ -820,16 +820,52 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 1セルで完結する違反（可能勤務帯の外に入れた、など）: 右上の角の赤い三角。
+     日をまたぐ違反（下端の赤帯）とは場所を分けて、同じセルに両方かかっても見分けられるようにする。
+
+     枠（当たり判定）は三角より一回り大きい透明な正方形にし、三角は ::before で描く。
+     三角そのものを当たり判定にすると、斜辺の下側が押せず小さすぎるため。
+     右の境目には翌日の勤務間インターバルの印（z-index:1）が乗るので、角はその上（z-index:2）に置く。
+     どちらもはみ出し幅は小さく、インターバルの印は残りの縦の帯と丸で押せる。 */
+  .e-violation-corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    z-index: 2;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      background: #e53935;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+      pointer-events: none;
+      transition: width 0.1s, height 0.1s;
+    }
+    &:hover::before {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
   /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を1つ出す。
      違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
      希望の円（単日違反）とは別の形にしている。
-     後の日のセルに置き、中心を前の日の右の罫線（セルの左端から -0.5px）に合わせる。 */
+     後の日のセルに置き、中心を前の日の右の罫線（セルの左端から -0.5px）に合わせる。
+     帯は細くする。前の日のセルへのはみ出しが太いと、前の日の右上の角（1セルの違反の印）を隠すため。
+     見つけやすさは真ん中の丸が受け持つ。 */
   .e-interval-bar {
     position: absolute;
     top: 0;
     bottom: 0;
     left: -0.5px;
-    width: 9px;
+    width: 3px;
     transform: translateX(-50%);
     background: #e53935;
     cursor: pointer;
@@ -837,7 +873,7 @@ export const StyledWrap = styled.div`
     transition: width 0.1s;
 
     &:hover {
-      width: 15px;
+      width: 7px;
     }
 
     /* 境界線の上に乗る丸。帯の当たり判定（ObjectView）の子なので、丸の上でもバブルを開ける */

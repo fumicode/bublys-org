@@ -18,7 +18,6 @@ import {
   type PastePlan,
   type ShiftCell,
   type WorkShift,
-  type WorkingStaffGroup,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import type { CellClipboardHandlers } from "../../ui/schedule-grid/types.js";
 import { localScopeId, readFromScope } from "../../objects/commit.js";
@@ -40,10 +39,9 @@ export function useCellClipboard(args: {
   /** 読み込み中（undefined）のあいだは何もしない */
   schedule: MonthlyStaffSchedule | undefined;
   workShifts: WorkShift[];
-  staffGroup?: WorkingStaffGroup;
   onMessage: (message: string) => void;
 }): CellClipboardHandlers {
-  const { store, schedule, workShifts, staffGroup, onMessage } = args;
+  const { store, schedule, workShifts, onMessage } = args;
   const scheduleId = schedule?.id;
   const content = useCellClipboardContent();
 
@@ -117,7 +115,6 @@ export function useCellClipboard(args: {
         staffIds,
         days,
         shifts: workShifts,
-        staffGroup,
       });
       // クリップボードの文字が、このカットで書いたものならカットとして貼る
       const current = cellClipboardStore.get();
@@ -135,7 +132,6 @@ export function useCellClipboard(args: {
         staffIds,
         days,
         shifts: workShifts,
-        staffGroup,
       });
       apply(plan, current.cut);
     },

@@ -20,9 +20,14 @@ import {
   WorkingDay,
   type ScheduleConstraint,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { DAY_OFF_WISH, workWishKey, wishOptionLabel } from "../ui/shiftWishOptions.js";
+import {
+  DAY_OFF_WISH,
+  SHIFT_WISH_MISMATCH,
+  workWishKey,
+  wishOptionLabel,
+} from "../ui/shiftWishOptions.js";
 
-export const SHIFT_WISH_MISMATCH = "shift-wish-mismatch";
+export { SHIFT_WISH_MISMATCH };
 
 type Context = {
   /** staffId → その月のシフト希望 */

@@ -19,12 +19,12 @@ type ScheduleDataCellProps = {
   /** 未割当セルに薄く出す希望ヒント */
   wishEntries: WishEntry[];
   /**
-   * このセルを末尾とする違反の印（連勤の赤帯・勤務間インターバルの境目の印）。
+   * このセルを末尾とする違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）。
    * 末尾のセルに置いて左へ伸ばす（置き場所の決め方は violationMarkPlacement.ts）。
    */
   violationMarks?: readonly ViolationMark[];
-  /** 単日違反（希望の食い違い）。希望の円をオレンジにして表す（旧: 右上の ⊿） */
-  pointViolation?: ConstraintViolation;
+  /** 希望の食い違い。希望の円をオレンジにして表す（旧: 右上の ⊿） */
+  wishViolation?: ConstraintViolation;
   /**
    * まだ決まっていないセルに入れられる値（候補集合）の説明文。ホバーで内容が見えるよう
    * title に添える。確定済みセル・候補集合が無いときは undefined。
@@ -80,8 +80,8 @@ type ScheduleDataCellProps = {
  *                                 ＝叶ったシフトの色の円
  *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
- * 範囲違反（連勤など）と勤務間インターバル違反は、違反1件に印1つ。違反が覆う範囲の末尾の
- * セルに置き、そこから左へ伸ばす（ViolationMarks）。
+ * 範囲違反（連勤など）・1セルで完結する違反（可能勤務帯の外など）・勤務間インターバル違反は、
+ * 違反1件に印1つ。違反が覆う範囲の末尾のセルに置き、そこから左へ伸ばす（ViolationMarks）。
  * 押して選択（Shift で範囲・Ctrl/Cmd で飛び地・ドラッグで範囲）、ダブルクリックで候補ドロップダウン
  * （キーボード操作と共通）。
  */
@@ -90,7 +90,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   shift,
   wishEntries,
   violationMarks = [],
-  pointViolation,
+  wishViolation,
   candidateHint,
   forcedCandidate,
   forcedShift,
@@ -174,7 +174,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
   const hasValue = cell.kind === "work" || cell.kind === "day-off";
   // 希望と違う勤務帯になったか。判定は宣言的な制約（希望違反）から導く（表示側で再実装しない）。
-  const wishMismatch = !!pointViolation;
+  const wishMismatch = !!wishViolation;
 
   // 値が入ったセルの左上に残す円は1つだけ。「その割当に対応する希望」＝叶ったシフトの円を残す。
   // 割当が決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
@@ -195,8 +195,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
-    wishMismatch && pointViolation && violationUrl
-      ? violationUrl(pointViolation)
+    wishMismatch && wishViolation && violationUrl
+      ? violationUrl(wishViolation)
       : undefined;
 
   // 希望の円（1文字＋文字色と同じ線色）。
@@ -224,8 +224,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
             }`}
             style={style}
             title={
-              wishMismatch && pointViolation
-                ? `${pointViolation.message}（ダブルクリックで詳細）`
+              wishMismatch && wishViolation
+                ? `${wishViolation.message}（ダブルクリックで詳細）`
                 : `希望: ${wishText(e)}`
             }
             {...(wishViolationUrl ? urlProps(wishViolationUrl) : {})}
