@@ -37,7 +37,9 @@ describe('② マスの先客は、いちばん近い空きマスへ逃げる', 
     const taken = res.world.kidsOf('cal').map((b) => `${b.state.cell.col},${b.state.cell.row}`);
     expect(new Set(taken).size).toBe(taken.length);
     // freeCellNear 単体でも同じ答え（逃がし方は集約の外に出していない）
-    const placed = w.withBubble(w.bubble('p0').withParent('cal').withCell(cell));
+    const p0 = w.bubble('p0');
+    if (!p0) throw new Error('no p0');
+    const placed = w.withBubble(p0.withParent('cal').withCell(cell));
     expect(freeCellNear(placed, 'cal', cell, occupant)).toEqual(escaped);
   });
 

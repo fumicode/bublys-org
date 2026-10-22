@@ -28,6 +28,9 @@ export const environmentSlice = createSlice({
     toggleLightweightMode: (state) => {
       state.lightweightMode = !state.lightweightMode;
     },
+    setLightweightMode: (state, action: PayloadAction<boolean>) => {
+      state.lightweightMode = action.payload;
+    },
     setLinkDisplay: (state, action: PayloadAction<LinkDisplay>) => {
       state.linkDisplay = action.payload;
     },
@@ -37,7 +40,7 @@ export const environmentSlice = createSlice({
   },
 });
 
-export const { setWindowSize, toggleLightweightMode, setLinkDisplay, toggleLinkDisplay } =
+export const { setWindowSize, toggleLightweightMode, setLightweightMode, setLinkDisplay, toggleLinkDisplay } =
   environmentSlice.actions;
 
 export const selectWindowSize = (state: RootState) =>

@@ -98,12 +98,12 @@ import { ScheduleWorld } from "./ScheduleWorld.js";
 
 type ScheduleGridProps = {
   scheduleId?: string;
-  /** 世界線ビュー（左下）を開くハンドラ */
   /**
-   * 候補集合を作ったあと、結果を見せるために世界線ビューを自動で開く。
-   * ユーザーが押して開くのではないので ObjectView ではなくハンドラのまま。
+   * 世界線ビューを開く。候補集合を作ったあとの自動展開と、左下ボタンのダブルクリックの両方で使う。
+   * 世界線ビューは勤務表に1つあれば足りるので、すでに開いていれば開かずに最前面へ出すのは
+   * 開く側（app 層）の責務。
    */
-  onOpenWorldLineAfterCandidates?: () => void;
+  onOpenWorldLine?: () => void;
   /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
   onConfirm?: (reportId: string) => void;
   /**
@@ -173,7 +173,7 @@ const newLeaderRuleKey = (): string =>
  */
 const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
-  onOpenWorldLineAfterCandidates,
+  onOpenWorldLine,
   onConfirm,
   worldLineUrl,
   treeUrl,
@@ -474,6 +474,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     wishByStaff,
     workShifts,
     staffIds,
+    staffGroup,
     createWorker: createCandidatesWorker,
   });
 
@@ -717,7 +718,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         .filter(Boolean)
         .join("\n")
     );
-    onOpenWorldLineAfterCandidates?.();
+    onOpenWorldLine?.();
   };
 
   // 必要スタッフ数の編集（その日・全日）。範囲選択でまとめて入れた分も1ノードに（#157）
@@ -1054,6 +1055,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
                 url={worldLineUrl}
                 label="世界線ビュー"
                 openingPosition="bubble-side-bottom"
+                onDoubleClick={onOpenWorldLine}
               >
                 <span
                   className="e-link e-worldline"

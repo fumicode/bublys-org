@@ -1,7 +1,8 @@
 /**
  * computeCandidates — 勤務表全体の候補集合を組み立てる
  *
- * 2つの絞り込みを重ねる:
+ * 候補の元は「その人が入れる勤務帯（可能勤務帯。workShiftsFor）＋休み」。
+ * そこに2つの絞り込みを重ねる:
  *
  *   1. 入れられない値を落とす（cellCandidates.legalCandidatesFor）
  *      「その値を入れた瞬間に新しい違反が出る」候補を除く。連勤上限に達している人の
@@ -36,6 +37,7 @@ import type { ConstraintViolation } from "./ConstraintViolation.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkShift } from "./WorkShift.js";
+import type { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import type { WorkingDay } from "./WorkingDay.js";
 import { affectedCells, cellRefKey, type ScheduleCellRef } from "./affectedCells.js";
 import { legalCandidatesFor } from "./cellCandidates.js";
@@ -47,7 +49,28 @@ export type CandidateComputationInput = {
   constraints: ScheduleConstraint[];
   workShifts: WorkShift[];
   staffIds: string[];
+  /**
+   * 勤務スタッフ群。可能勤務帯（その人が入れる勤務帯）を引くために使う。
+   * 省略時は全員がどの勤務帯にも入れるものとして扱う。
+   */
+  staffGroup?: WorkingStaffGroup;
 };
+
+/**
+ * その人のセルに入れうる勤務帯（＝候補の元）。可能勤務帯で絞る。
+ *
+ * 可能勤務帯は制約（違反）ではなく**値の範囲**として扱う。入れない勤務帯は
+ * 「入れたら違反になる値」ではなく、そもそもその人の候補に無い値。
+ * 絞っていない人（と群に居ない人）は全勤務帯が候補の元になる。
+ */
+export function workShiftsFor(
+  input: Pick<CandidateComputationInput, "workShifts" | "staffGroup">,
+  staffId: string
+): WorkShift[] {
+  const allowed = input.staffGroup?.allowedShiftIdsOf(staffId);
+  if (!allowed) return input.workShifts;
+  return input.workShifts.filter((w) => allowed.includes(w.id));
+}
 
 /** 盤面の全未定セルについて候補集合を計算する（初期化・制約変更時） */
 export function computeAllCandidates(
@@ -62,7 +85,7 @@ export function computeAllCandidates(
         input.constraints,
         staffId,
         day,
-        input.workShifts
+        workShiftsFor(input, staffId)
       );
     }
   }
@@ -115,7 +138,7 @@ export function recomputeCandidates(
       input.constraints,
       cell.staffId,
       cell.day,
-      input.workShifts
+      workShiftsFor(input, cell.staffId)
     );
   }
 

@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ObjectView } from './ObjectView.js';
@@ -18,7 +18,7 @@ import { CoordinateSystem } from '@bublys-org/bubbles-ui-util';
 const OPENER = 'opener-bubble-id';
 
 const renderWithContext = (ui: React.ReactElement) => {
-  const openBubble = jest.fn(() => 'new-bubble-id');
+  const openBubble = vi.fn(() => 'new-bubble-id');
   render(
     <BubblesContext.Provider
       value={{
@@ -92,7 +92,7 @@ describe('ObjectView が「開く」のはいつか', () => {
   });
 
   it('onClick は単クリックでだけ走り、開く動作とは独立している', () => {
-    const onClick = jest.fn();
+    const onClick = vi.fn();
     const { openBubble } = renderWithContext(
       <ObjectView url="users/1" openingPosition="bubble-side-right" draggable={false} onClick={onClick}>
         <span>佐藤</span>

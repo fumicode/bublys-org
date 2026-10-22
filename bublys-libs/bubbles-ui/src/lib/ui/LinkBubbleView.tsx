@@ -10,7 +10,6 @@ type LinkBubbleViewProps = {
   openee: Bubble;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
-  lightweightMode?: boolean;
   /** 見せるか。既定はホバー時だけなので、普段は透明にしておく（DOM は残す） */
   visible?: boolean;
 };
@@ -20,7 +19,6 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
   openee,
   coordinateSystem,
   linkZIndex,
-  lightweightMode = false,
   visible = true,
 }) => {
   const bubbleRefs = useBubbleRefsOptional();
@@ -67,23 +65,15 @@ export const LinkBubbleView: FC<LinkBubbleViewProps> = ({
       }}
     >
       <svg width="100%" height="100%">
+        {/* 帯は軽量モードでも半透明で塗る。線だけだと、どこからどこへ開いたのかが追いにくい
+            （バブル本体は不透けにしても、帯は向こうが透けて見えるほうが分かりやすい） */}
         <path
           d={pathData}
           fill={
-            lightweightMode
-              ? "none"
-              : opener.colorHue === undefined
-                ? "rgba(255,0,0,0.5)"
-                : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`
+            opener.colorHue === undefined
+              ? "rgba(255,0,0,0.5)"
+              : `hsla(${opener.colorHue}, 50%, 50%, 0.3)`
           }
-          stroke={
-            lightweightMode
-              ? opener.colorHue === undefined
-                ? "rgba(255,0,0,0.7)"
-                : `hsla(${opener.colorHue}, 50%, 50%, 0.7)`
-              : "none"
-          }
-          strokeWidth={lightweightMode ? "1.5" : "0"}
         />
       </svg>
     </div>

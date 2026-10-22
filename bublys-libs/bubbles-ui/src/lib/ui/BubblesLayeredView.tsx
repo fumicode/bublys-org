@@ -36,7 +36,8 @@ import {
  * 個別バブルを自分でReduxから取得するラッパーコンポーネント。
  * per-bubble selector のみを購読し、world-line 操作では再 render しない。
  *
- * layerIndex >= 3 のバブルは scale 0.8 以下となり内容が読めないため BubbleSkeleton で表示する。
+ * 縮んで内容が読めないバブル（既定の奥行きでは layerIndex >= 3、scale 0.8 以下）は
+ * BubbleSkeleton で表示する（isTooSmallToRead）。縮めない奥行きでは骨にならない。
  * ただしフォーカス時（ヘッダークリック・キーボードフォーカス）はスケルトンを解除してフルコンテンツを表示する。
  * このスケルトン切り替えは BubbleView の内部状態（isFocused）で管理される。
  */
@@ -167,7 +168,6 @@ type ConnectedLinkBubbleViewProps = {
   openeeId: string;
   coordinateSystem: CoordinateSystem;
   linkZIndex: number;
-  lightweightMode?: boolean;
   visible: boolean;
 };
 
@@ -177,7 +177,6 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
   openeeId,
   coordinateSystem,
   linkZIndex,
-  lightweightMode,
   visible,
 }) {
   const selectOpener = useMemo(() => makeSelectBubbleByIdInUniverse(universeId, openerId), [universeId, openerId]);
@@ -193,7 +192,6 @@ const ConnectedLinkBubbleView: FC<ConnectedLinkBubbleViewProps> = memo(function 
       openee={openee}
       coordinateSystem={coordinateSystem}
       linkZIndex={linkZIndex}
-      lightweightMode={lightweightMode}
       visible={visible}
     />
   );
@@ -213,6 +211,11 @@ export type BubblesLayeredViewProps = {
   onBubbleLayerUp?: (bubble: Bubble) => void;
   onCoordinateSystemReady?: (coordinateSystem: CoordinateSystem) => void;
   onDebugRects?: (rects: SmartRect[]) => void;
+  /**
+   * 岸（縁に寄せて離すと貼り付く）を使うか。既定は使う。
+   * 切ると、どこで離しても海に浮く。もう貼り付いているバブルは、掴めば剥がせる。
+   */
+  isShowreEnabled?: boolean;
 };
 
 const defaultRenderBubbleContent = (bubble: Bubble): ReactNode => (
@@ -232,6 +235,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   onBubbleLayerUp,
   onCoordinateSystemReady,
   onDebugRects,
+  isShowreEnabled = true,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const universeRef = useRef<HTMLDivElement>(null);
@@ -597,8 +601,9 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const viewport = { width: box.width, height: box.height };
       const local = { x: rect.x - box.left, y: rect.y - box.top };
       const edges = edgesNear({ x: cursor.x - box.left, y: cursor.y - box.top }, viewport);
-      // 縁から遠ければ海に浮く。そのままの場所・大きさで予告する（岸 → 海 のときも出る）
-      if (edges.length === 0) {
+      // 縁から遠ければ（岸を切っていればどこでも）海に浮く。
+      // そのままの場所・大きさで予告する（岸 → 海 のときも出る）
+      if (!isShowreEnabled || edges.length === 0) {
         return { rect: { x: local.x, y: local.y, width: rect.width, height: rect.height } };
       }
       const dock: DockState = { edges, at: local };
@@ -616,7 +621,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
       const snapped = snapToViewport(fitted, viewport);
       return { rect: snapped, dock: { edges, at: { x: snapped.x, y: snapped.y } } };
     },
-    [],
+    [isShowreEnabled],
   );
 
   /**
@@ -696,7 +701,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
   return (
     <UniverseContext.Provider value={universeContextValue}>
      <ShowreDockContext.Provider value={showreDock}>
-      <StyledFrame $nested={isNested}>
+      <StyledFrame $nested={isNested} $showreEnabled={isShowreEnabled}>
         {/* 誰も受け止めなかったドロップは、宇宙が落ちた場所で受け止める。
             ハンドラを StyledUniverse ではなく StyledViewport に付けるのは、
             StyledUniverse には最小サイズ（UNIVERSE_MIN_SIZE）があり、可視領域の
@@ -731,7 +736,6 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
                     openeeId={openeeId}
                     coordinateSystem={coordinateSystem}
                     linkZIndex={linkZIndex}
-                    lightweightMode={lightweightMode}
                     // 既定はホバー時だけ: どちらかの端のバブルにホバーしているとき見せる
                     visible={
                       linkDisplay === "always" ||
@@ -751,6 +755,7 @@ const BubblesLayeredViewInner: FC<BubblesLayeredViewProps> = ({
           viewport={showreViewport}
           renderBubbleContent={renderBubbleContent}
           preview={dockPreview}
+          isShowreEnabled={isShowreEnabled}
         />
 
         <StyledHeadsUpDisplay
@@ -794,7 +799,7 @@ export const BubblesLayeredView = memo(BubblesLayeredViewInner);
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 type DivPropsWithRef = DivProps & { ref: React.RefObject<HTMLDivElement | null> };
 
-const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
+const StyledFrame = styled.div<DivProps & { $nested?: boolean; $showreEnabled?: boolean }>`
   width: 100%;
   height: 100%;
   position: relative;
@@ -802,8 +807,9 @@ const StyledFrame = styled.div<DivProps & { $nested?: boolean }>`
   z-index: 0;
 
   /* 海の角は丸い。岸のネオン管（ShowreRim）と同じ丸みで切り抜く
-     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える */
-  border-radius: ${TUBE_RADIUS}px;
+     ── 管だけ丸くて中身が四角いと、角で海がはみ出して見える。
+     岸を切っていれば管が無いので、角も丸めない */
+  border-radius: ${({ $showreEnabled = true }) => ($showreEnabled ? `${TUBE_RADIUS}px` : "0")};
 
   /* root も nested も背景なし。「夜空」backdrop は外側（BublysUI 側）が 1 段だけ塗り、
      全 universe バブルはその backdrop に対する「窓」として透明に振る舞う。 */

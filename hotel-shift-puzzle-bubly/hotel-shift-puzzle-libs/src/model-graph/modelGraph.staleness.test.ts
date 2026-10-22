@@ -1,5 +1,5 @@
 /**
- * @jest-environment node
+ * @vitest-environment node
  *
  * 生成した図が**ソースと食い違っていないか**を見張る。
  *
@@ -50,7 +50,9 @@ describe("モデル図の生成物", () => {
     // Windows の checkout（core.autocrlf=true）では生成物が CRLF になるので、改行を揃えて比べる
     const committed = readFileSync(GENERATED, "utf-8").replace(/\r\n/g, "\n");
     expect(regenerate()).toBe(committed);
-  });
+    // TypeScript のコンパイラでソースを読み直すので重い（単独で約 5 秒）。
+    // 既定の 5 秒では、他のプロジェクトと並列で流したときに時間切れになる
+  }, 30_000);
 
   it("記述子の登録が、そのまま集約の根になっている", () => {
     const info = extractRegistry(REGISTRY, "HOTEL_OBJECTS");
