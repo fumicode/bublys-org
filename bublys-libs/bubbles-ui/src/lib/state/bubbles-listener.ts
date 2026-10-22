@@ -19,6 +19,7 @@ import {
 import { Layer, type Point2, type SmartRect } from '@bublys-org/bubbles-ui-util';
 import { Bubble } from '../Bubble.domain.js';
 import { getOriginRect, getDockedBubbleRect } from '../utils/get-origin-rect.js';
+import { measureOpenRegion } from '../utils/open-region.js';
 import type { ShowreSide } from '../showre/Showre.domain.js';
 import type { OpeningPosition } from './bubbles-slice.js';
 
@@ -271,6 +272,21 @@ const positionBesideDocked = (
   return g.getNeighbor(direction).position;
 };
 
+/**
+ * ★ **開いたバブルは、見えている範囲からはみ出さない。**
+ *   開く位置は opener の隣で決まるが、大きいバブル（勤務表など）はそこから画面の外へ伸び、
+ *   スクロールバーを出したうえで、毎回右下を掴んで広げ直させることになっていた。
+ *   置いたあとに 1 度だけ、見えている範囲へ寄せて、入らない分は縮める（{@link Bubble.fitInto}）。
+ *   最初に撒くバブル（seed）も同じ規則に従う（useBrowserRootArrangementWorldLine）。
+ *
+ *   いまは root の海だけ。入れ子の海は universeId から DOM を引く口がまだ無いので触らない。
+ */
+const fitToVisible = (bubble: Bubble, universeId: string, surfaceLayer: Layer): Bubble => {
+  if (universeId !== ROOT_UNIVERSE_ID) return bubble;
+  const region = measureOpenRegion(surfaceLayer.surfaceOrigin);
+  return region ? bubble.fitInto(region) : bubble;
+};
+
 // popChildInProcess 発火後、moveTo → updateBubble を実行
 // openerのrenderedRectがすでにあれば、renderBubbleを待たずに即座に位置を計算
 bubblesListener.startListening({
@@ -307,7 +323,7 @@ bubblesListener.startListening({
       const surfaceLeftTop = makeSelectSurfaceLeftTop(universeId)(state);
       const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
       const point = positionBesideDocked(docked.rect, docked.direction, poppingBubble.renderedRect?.size);
-      const moved = poppingBubble.moveTo(surfaceLayer.locate(point));
+      const moved = fitToVisible(poppingBubble.moveTo(surfaceLayer.locate(point)), universeId, surfaceLayer);
       listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
       return;
     }
@@ -352,7 +368,7 @@ bubblesListener.startListening({
 
       console.log("Pop: Converted to layer-local point", relativePoint);
 
-      const moved = poppingBubble.moveTo(relativePoint);
+      const moved = fitToVisible(poppingBubble.moveTo(relativePoint), universeId, surfaceLayer);
 
       listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
       return;
@@ -417,7 +433,7 @@ bubblesListener.startListening({
     const surfaceLayer = new Layer(0, surfaceLeftTop, coordinateConfig.vanishingPoint);
     const relativePoint = surfaceLayer.locate(point);
 
-    const moved = newPoppingBubble.moveTo(relativePoint);
+    const moved = fitToVisible(newPoppingBubble.moveTo(relativePoint), universeId, surfaceLayer);
     listenerApi.dispatch(updateBubble(moved.toJSON(), universeId));
   },
 });

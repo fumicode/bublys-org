@@ -93,3 +93,34 @@ describe('BubblesProcess - popChild', () => {
     expect(popped.focusedId).toBe('C');
   });
 });
+
+describe('BubblesProcess - bringToFront', () => {
+  it('bringToFront() moves an open bubble to its own surface layer', () => {
+    const process = makeProcess([['A'], ['B', 'C'], ['D']]);
+    const fronted = process.bringToFront('C');
+
+    expect(fronted.layers).toEqual([['C'], ['A'], ['B'], ['D']]);
+  });
+
+  it('bringToFront() leaves no duplicate and drops the emptied layer', () => {
+    const process = makeProcess([['A'], ['D']]);
+    const fronted = process.bringToFront('D');
+
+    expect(fronted.layers).toEqual([['D'], ['A']]);
+  });
+
+  it('bringToFront() focuses the bubble', () => {
+    const process = makeProcess([['A'], ['B']]).focus('A');
+    const fronted = process.bringToFront('B');
+
+    expect(fronted.focusedId).toBe('B');
+  });
+
+  it('bringToFront() is a no-op for a bubble that is not open', () => {
+    const process = makeProcess([['A'], ['B']]);
+    const fronted = process.bringToFront('X');
+
+    expect(fronted.layers).toEqual([['A'], ['B']]);
+    expect(fronted.focusedId).toBeUndefined();
+  });
+});

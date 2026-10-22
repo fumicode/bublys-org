@@ -232,6 +232,25 @@ export class Bubble {
   }
 
   /**
+   * **見えている範囲（`region`、layer-local）からはみ出さないように収める。**
+   * まず位置を範囲の内側へ寄せ、それでも入らない向きだけ範囲の大きさまで縮める。
+   * はみ出していなければ何も変えない（大きさを決めていないバブルは決めないまま）。
+   */
+  fitInto(region: { origin: Point2; size: Size2 }): Bubble {
+    const box = this.size ?? this.defaultSize;
+    const width = Math.min(box.width, region.size.width);
+    const height = Math.min(box.height, region.size.height);
+    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+    const x = clamp(this.position.x, region.origin.x, region.origin.x + region.size.width - width);
+    const y = clamp(this.position.y, region.origin.y, region.origin.y + region.size.height - height);
+    const shrunk = width !== box.width || height !== box.height;
+    const moved = x !== this.position.x || y !== this.position.y;
+    if (!shrunk && !moved) return this;
+    const resized = shrunk ? this.resizeTo({ width, height }) : this;
+    return resized.moveTo({ x, y });
+  }
+
+  /**
    * 辺／隅を掴んだリサイズ。**掴んだ辺の反対側は固定される**。
    *
    * 左辺側（`w`）は幅と位置を同時に更新する。最小サイズや universe の縁で止まったときも

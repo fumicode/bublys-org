@@ -8,7 +8,7 @@
 ```bash
 npx nx dev bublys-os              # メインアプリのNext.js devサーバーを起動
 npx nx build bublys-os            # 本番ビルド
-npx nx test bublys-os             # アプリのJestテストを実行
+npx nx test bublys-os             # アプリのテスト（Vitest）を実行
 npx nx lint bublys-os             # ESLintを実行
 ```
 
@@ -239,8 +239,7 @@ feature (domain + ui + Reduxに依存)
 - Node 24.x, npm 10.x (package.jsonのenginesを参照)
 
 **テスト:**
-- Jest 30.0.2 with ts-jest
-- Vitest 3.0.0
+- Vitest 4（全プロジェクト。テストの設定は各プロジェクトの `vite.config.*` の `test`）
 - @testing-library/react 16.1.0
 
 ### 基本的なデータフロー

@@ -164,8 +164,9 @@ describe('② 泡をドラッグする', () => {
       });
       w = withAxis(withAxis(w, 'root', 'x', { lens: 'fisheye' }), 'root', 'y', { lens: 'fisheye' });
       let L = resolveWorld(w, VP, rules);
-      let p = L.byId.get('a');
-      if (!p) throw new Error('no a');
+      const first = L.byId.get('a');
+      if (!first) throw new Error('no a');
+      let p = first;
       /** 掴んだ点 ── 箱の上の帯（0.04）から真ん中まで。**自前の座標**なので変わらない */
       const grab = { x: 0.5 * p.box.w, y: fy * p.box.h };
       let mx = p.x + 0.5 * p.w;

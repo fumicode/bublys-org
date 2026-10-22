@@ -1,18 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/jest",
-    // testEnvironment は jsdom（jest.config.cts）。DOM を触るテストのために lib.dom を入れる
+    "outDir": "./out-tsc/vitest",
+    // テストの environment は jsdom（vite.config.mts）。DOM を触るテストのために lib.dom を入れる
     "lib": ["es2022", "dom"],
-    "types": ["jest", "node"],
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "jsx": "react-jsx",
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "jest.config.ts",
-    "jest.config.cts",
+    "vite.config.mts",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
     "src/**/*.test.tsx",

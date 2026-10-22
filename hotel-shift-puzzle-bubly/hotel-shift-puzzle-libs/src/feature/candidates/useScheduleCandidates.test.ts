@@ -1,5 +1,5 @@
 import { StrictMode, createElement, type FC } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import {
   ConstraintSet,
   MonthlyStaffSchedule,
@@ -7,6 +7,8 @@ import {
   StaffMonthlyShiftWish,
   WorkShift,
   WorkingDay,
+  WorkingStaffGroup,
+  WorkingStaffMember,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { computeCandidatesFor } from "./candidateRequest.js";
 import type {
@@ -78,7 +80,7 @@ describe("useScheduleCandidates", () => {
 
   const createWorker = () => new FakeWorker() as unknown as Worker;
 
-  const Probe: FC = () => {
+  const Probe: FC<{ staffGroup?: WorkingStaffGroup }> = ({ staffGroup }) => {
     const { candidates, computing } = useScheduleCandidates({
       schedule,
       constraints,
@@ -86,6 +88,7 @@ describe("useScheduleCandidates", () => {
       wishByStaff,
       workShifts,
       staffIds,
+      staffGroup,
       createWorker,
     });
     const forced = computing ? undefined : candidates.candidatesOf("L2", day1);
@@ -101,6 +104,30 @@ describe("useScheduleCandidates", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("out").textContent).toBe("early")
+    );
+  });
+
+  it("#67 可能勤務帯だけが変わっても（勤務表のセルは同じでも）候補を計算し直す", async () => {
+    const { rerender } = render(createElement(Probe));
+    await waitFor(() =>
+      expect(screen.getByTestId("out").textContent).toBe("early")
+    );
+
+    // L2 の早番のチェックを外す。勤務表は1セルも変わらない
+    const restricted = new WorkingStaffGroup({
+      id: "sched-1",
+      members: [
+        new WorkingStaffMember({ staffId: "L1" }),
+        new WorkingStaffMember({ staffId: "L2", allowedShiftIds: ["late"] }),
+        new WorkingStaffMember({ staffId: "X" }),
+      ],
+    });
+    await act(async () => {
+      rerender(createElement(Probe, { staffGroup: restricted }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("out").textContent).toBe("late,day-off")
     );
   });
 });

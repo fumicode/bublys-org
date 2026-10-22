@@ -23,6 +23,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   type FC,
   type ReactNode,
 } from "react";
@@ -161,6 +162,30 @@ export const AppWorld: FC<{ children: ReactNode }> = ({ children }) => {
 };
 
 /**
+ * 世界線を移動して、移動先の中身が届くまでは、**直前に見ていた世界を描き続ける**。
+ *
+ * メモリ上の CAS から追い出された状態は永続ストアから取り直すので、移動した直後は
+ * 一瞬だけ中身が読めない。そこで「無い」を描くと、勤務表が「読み込み中」に差し替わって
+ * 画面ごと作り直され、開閉・選択・スクロール位置が毎回失われる。
+ *
+ * 差し替えるのは読み（shells / getShell）だけ。`pending` は本物のまま返すので、
+ * 「無ければ作る」の番人（useIsAbsent / useObjectsPending）はこれまでどおり待つ。
+ * グラフ（apex）も本物なので、世界線ビューの選択は押した瞬間に動く。
+ * 取りに行って戻ってこなかった（もう読めない）ときは前の世界を見せ続けない。
+ * 違う世界を本物のように見せてしまうので、その場合は本物（＝読めない）を返す。
+ */
+function useHeldWhileLoading(live: CasScopeValue, scopeId: string): CasScopeValue {
+  const settledRef = useRef<{ scopeId: string; scope: CasScopeValue } | null>(null);
+  if (!live.pending) {
+    settledRef.current = { scopeId, scope: live };
+    return live;
+  }
+  const settled = settledRef.current;
+  if (!live.loading || settled?.scopeId !== scopeId) return live;
+  return { ...live, shells: settled.scope.shells, getShell: settled.scope.getShell };
+}
+
+/**
  * ある世界線スコープの中に入る。
  *
  * グローバル台帳（app）は親から借りて、自分は here のぶんだけ購読する
@@ -171,7 +196,10 @@ export const World: FC<{ scopeId: string | undefined; children: ReactNode }> = (
   children,
 }) => {
   const parent = useWorld();
-  const here = useCasScope(scopeId ?? parent.scopeId);
+  const here = useHeldWhileLoading(
+    useCasScope(scopeId ?? parent.scopeId),
+    scopeId ?? parent.scopeId
+  );
   const value = useMemo<WorldValue>(
     () => ({
       scopeId: scopeId ?? parent.scopeId,
