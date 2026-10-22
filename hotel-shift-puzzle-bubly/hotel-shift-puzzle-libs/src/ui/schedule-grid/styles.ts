@@ -616,28 +616,14 @@ export const StyledWrap = styled.div`
       align-items: flex-end;
       gap: 1px;
     }
-    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
-    /* 休みの形（分散／連休）。連休型だけ色を付けて、ひと目で分かるようにする */
-    .e-day-off-style-badge {
+    /* 休みの形（分散／連休）のアイコン（DayOffStyleIcon）。休みが隣り合うか離れているかで見分ける */
+    .e-day-off-style-icon {
       flex-shrink: 0;
-      font-size: 0.55em;
-      line-height: 1.1;
-      padding: 1px 3px;
-      border-radius: 3px;
-      white-space: nowrap;
-      color: #78909c;
-      background: #f5f7f8;
-      border: 1px solid #dde3e6;
+      display: flex;
       cursor: help;
-
-      &.is-clustered {
-        color: #00695c;
-        background: #e0f2f1;
-        border-color: #b2dfdb;
-        font-weight: bold;
-      }
     }
 
+    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
     .e-priority-badge {
       flex-shrink: 0;
       font-size: 0.55em;

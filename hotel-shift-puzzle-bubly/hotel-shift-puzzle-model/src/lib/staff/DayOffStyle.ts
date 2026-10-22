@@ -71,12 +71,6 @@ export class DayOffStyle {
     return this.maxRun === undefined ? "連休型" : `連休型（${this.maxRun}連まで）`;
   }
 
-  /** 行の名前の横に出す短い印（例: 「分散」「連休4」） */
-  get shortLabel(): string {
-    if (!this.isClustered) return "分散";
-    return this.maxRun === undefined ? "連休" : `連休${this.maxRun}`;
-  }
-
   equals(other: DayOffStyle): boolean {
     return this.state.kind === other.state.kind && this.maxRun === other.maxRun;
   }

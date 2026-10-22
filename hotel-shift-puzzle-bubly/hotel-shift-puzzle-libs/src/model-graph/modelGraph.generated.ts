@@ -531,8 +531,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "isClustered",
         "maxRun",
-        "label",
-        "shortLabel"
+        "label"
       ],
       "methods": [
         {
