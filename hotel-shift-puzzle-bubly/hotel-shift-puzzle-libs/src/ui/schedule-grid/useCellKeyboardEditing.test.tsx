@@ -42,9 +42,9 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
   } = {}) => {
     const { onChangeRequiredCell, ...rest } = opts;
     // 1回の操作で渡る変更（範囲なら全セルぶん）。1セルずつ見る既存のテストは onChangeCell で読む
-    const onChangeCells = jest.fn();
-    const onChangeCell = jest.fn();
-    const onChangeRequiredCells = jest.fn();
+    const onChangeCells = vi.fn();
+    const onChangeCell = vi.fn();
+    const onChangeRequiredCells = vi.fn();
     // feature 層と同じく、カーソルは外側の state が持つ（制御値）。setOutside で外から動かせる
     const hook = renderHook(() => {
       const [selection, setOutside] = useState<CellSelection | null>(null);
@@ -73,7 +73,7 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       key: string,
       mods: { shiftKey?: boolean; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean } = {}
     ) => {
-      const preventDefault = jest.fn();
+      const preventDefault = vi.fn();
       const event = {
         key,
         shiftKey: false,
@@ -220,7 +220,7 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
       ["Enter", "down"],
       ["Tab", "right"],
     ])("確定提案があれば %s で承認し、%s 方向の次の提案を探してもらう", (key, direction) => {
-      const onApproveForced = jest.fn(() => true);
+      const onApproveForced = vi.fn(() => true);
       const { press, at } = setUp({ forcedCellOf: () => early, onApproveForced });
 
       press(key);
@@ -239,7 +239,7 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     });
 
     it("Shift+Enter / Shift+Tab は承認しない（戻るだけ）", () => {
-      const onApproveForced = jest.fn(() => true);
+      const onApproveForced = vi.fn(() => true);
       const { press, at } = setUp({ forcedCellOf: () => early, onApproveForced });
 
       press("Tab", { shiftKey: true });
@@ -273,8 +273,8 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
    */
   describe("必要人数のセル", () => {
     const requiredSetUp = () => {
-      const onChangeRequiredCell = jest.fn();
-      const onOpenRequiredList = jest.fn();
+      const onChangeRequiredCell = vi.fn();
+      const onOpenRequiredList = vi.fn();
       const ctx = setUp({
         requiredShiftNames: ["早番", "遅番"],
         maxRequired: 3,
@@ -407,18 +407,18 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
   describe("コピー・カット・貼り付け", () => {
     const clipboardSetUp = (text = "7\t休") => {
       const clipboard = {
-        onCopyCells: jest.fn(() => text),
-        onPasteValues: jest.fn(),
-        onPasteObjects: jest.fn(),
-        onCancelCut: jest.fn(() => false),
-        isCutSource: jest.fn(() => false),
+        onCopyCells: vi.fn(() => text),
+        onPasteValues: vi.fn(),
+        onPasteObjects: vi.fn(),
+        onCancelCut: vi.fn(() => false),
+        isCutSource: vi.fn(() => false),
       };
       return { ...setUp({ clipboard }), clipboard };
     };
     /** グリッドの copy / cut / paste イベント */
     const clipboardEvent = (pasted = "") => {
-      const setData = jest.fn();
-      const preventDefault = jest.fn();
+      const setData = vi.fn();
+      const preventDefault = vi.fn();
       const event = {
         preventDefault,
         clipboardData: { setData, getData: () => pasted },
@@ -650,7 +650,7 @@ describe("useCellKeyboardEditing（Excel 準拠のカーソル移動）", () => 
     });
 
     it("範囲では確定提案を承認しない（Enter は範囲を解いて動く）", () => {
-      const onApproveForced = jest.fn(() => true);
+      const onApproveForced = vi.fn(() => true);
       const { press, at, inRange } = setUp({ forcedCellOf: () => early, onApproveForced });
       press("ArrowRight", { shiftKey: true });
 

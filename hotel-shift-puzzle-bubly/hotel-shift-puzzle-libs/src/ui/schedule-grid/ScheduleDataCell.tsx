@@ -1,6 +1,5 @@
 import { FC, useContext } from "react";
 import {
-  ObjectView,
   urlProps,
   BubblesContext,
   CurrentBubbleContext,
@@ -9,6 +8,8 @@ import type { WorkShift, ConstraintViolation, ShiftCell } from "../../domain/ind
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
 import { wishText, type WishEntry } from "./wishSummary.js";
 import { DAY_OFF_WISH, workWishKey } from "../shiftWishOptions.js";
+import { ViolationMarks } from "./ViolationMarks.js";
+import type { ViolationMark } from "./violationMarkPlacement.js";
 
 type ScheduleDataCellProps = {
   /** セルの状態（出勤・休み・未定） */
@@ -17,18 +18,13 @@ type ScheduleDataCellProps = {
   shift?: WorkShift;
   /** 未割当セルに薄く出す希望ヒント */
   wishEntries: WishEntry[];
-  /** 範囲違反（連勤など複数日）。下端の赤帯で表す */
-  rangeViolation?: ConstraintViolation;
+  /**
+   * このセルを末尾とする違反の印（連勤の赤帯・勤務間インターバルの境目の印）。
+   * 末尾のセルに置いて左へ伸ばす（置き場所の決め方は violationMarkPlacement.ts）。
+   */
+  violationMarks?: readonly ViolationMark[];
   /** 単日違反（希望の食い違い）。希望の円をオレンジにして表す（旧: 右上の ⊿） */
   pointViolation?: ConstraintViolation;
-  /**
-   * 前日との「つなぎ目」の違反（勤務間インターバル）。セルの左端＝前日との境目に印を出す。
-   * 違反しているのはセルの中身ではなく2日の間隔なので、赤帯（範囲）でも円（単日）でもなく、
-   * 境目そのものに印を置いて言い分ける。
-   */
-  intervalBefore?: ConstraintViolation;
-  /** 翌日との「つなぎ目」の違反。セルの右端＝翌日との境目に印を出す（intervalBefore の対）。 */
-  intervalAfter?: ConstraintViolation;
   /**
    * まだ決まっていないセルに入れられる値（候補集合）の説明文。ホバーで内容が見えるよう
    * title に添える。確定済みセル・候補集合が無いときは undefined。
@@ -64,9 +60,8 @@ type ScheduleDataCellProps = {
   /** ダブルクリックで候補ドロップダウンを開く（マウス操作用） */
   onOpenEditor: () => void;
   /**
-   * 違反バブルの URL を作る。違反マーカー（赤帯・境目の印）の内側に ObjectView を置き、
-   * ダブルクリックで違反バブルを開く。ObjectView が data-url も埋めるので、
-   * origin-side で開いたバブルがそのマーカーの近くに出る。
+   * 違反バブルの URL を作る。違反の印（ViolationMarks）と、希望が叶わなかった円の
+   * ダブルクリックで違反バブルを開く。
    */
   violationUrl?: (violation: ConstraintViolation) => string;
   /** 行の強調/減光用に付ける追加クラス（選択モード時の is-focused / is-dimmed）。 */
@@ -85,8 +80,8 @@ type ScheduleDataCellProps = {
  *                                 ＝叶ったシフトの色の円
  *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
- * 範囲違反（連勤など）は従来どおり下端の赤帯。勤務間インターバル違反（遅番の翌日に早番など）は
- * セルの中身ではなく2日のつなぎ目の話なので、隣のセルとの境目に赤い縦線＋半円を出す。
+ * 範囲違反（連勤など）と勤務間インターバル違反は、違反1件に印1つ。違反が覆う範囲の末尾の
+ * セルに置き、そこから左へ伸ばす（ViolationMarks）。
  * 押して選択（Shift で範囲・Ctrl/Cmd で飛び地・ドラッグで範囲）、ダブルクリックで候補ドロップダウン
  * （キーボード操作と共通）。
  */
@@ -94,10 +89,8 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   cell,
   shift,
   wishEntries,
-  rangeViolation,
+  violationMarks = [],
   pointViolation,
-  intervalBefore,
-  intervalAfter,
   candidateHint,
   forcedCandidate,
   forcedShift,
@@ -176,9 +169,6 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   }
   if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
 
-  if (pointViolation || rangeViolation || intervalBefore || intervalAfter) {
-    className += " is-violation";
-  }
   if (selected) className += " is-selected";
 
   // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
@@ -202,35 +192,6 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
     wishEntries[0];
   const shownWishEntries: WishEntry[] =
     hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
-
-  // 違反マーカー（赤帯・境目の印）。ObjectView がダブルクリックでの違反バブル展開と data-url
-  // （origin-side でマーカーの近くに出す）を担う。セルは単クリック=選択 / ダブルクリック=候補なので、
-  // マーカー上の操作はセルへ伝播させない。
-  //
-  // ★ 位置を持つ枠（markerClass。position:absolute でセルの端に張り付く）と、ObjectView を分ける。
-  //   ObjectView は膜のために position:relative を持つので、枠を ObjectView で包むと枠の基準が
-  //   幅0の ObjectView になり、帯が潰れて見えなくなる（#158）。ObjectView は枠の内側に置き、
-  //   枠いっぱいに広げて当たり判定にする。
-  const violationMarker = (violation: ConstraintViolation, markerClass: string) => (
-    <span
-      className={markerClass}
-      title={`${violation.message}（ダブルクリックで詳細）`}
-      onClick={violationUrl ? (e) => e.stopPropagation() : undefined}
-      onDoubleClick={violationUrl ? (e) => e.stopPropagation() : undefined}
-    >
-      {violationUrl && (
-        <ObjectView
-          url={violationUrl(violation)}
-          openingPosition="origin-side"
-          draggable={false}
-          fullWidth
-          className="e-violation-hit"
-        >
-          {null}
-        </ObjectView>
-      )}
-    </span>
-  );
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
@@ -306,11 +267,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       {content}
       {wishMarks}
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
-      {rangeViolation && violationMarker(rangeViolation, "e-violation-bar")}
-      {/* 勤務間インターバル: 2日の境目に印。前日側と翌日側の半円が合わさって
-          境界線上の1つの丸に見える（＝違反しているのは「この2日の間」）。 */}
-      {intervalAfter && violationMarker(intervalAfter, "e-interval-bar is-after")}
-      {intervalBefore && violationMarker(intervalBefore, "e-interval-bar is-before")}
+      <ViolationMarks marks={violationMarks} violationUrl={violationUrl} />
     </div>
   );
 };

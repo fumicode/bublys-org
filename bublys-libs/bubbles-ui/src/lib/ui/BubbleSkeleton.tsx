@@ -2,6 +2,17 @@
 import { FC, memo } from "react";
 import styled from "styled-components";
 import { Bubble } from "../Bubble.domain.js";
+import { CoordinateSystem } from "@bublys-org/bubbles-ui-util";
+
+/**
+ * これより縮んだら中身が読めない。読めない中身を描いても重いだけなので、骨（種類と URL）だけにする。
+ * 縮めない奥行き（DepthStyle.scaleDecayRate = 0）なら、どの深さでも中身を描く。
+ */
+const READABLE_SCALE = 0.85;
+
+export function isTooSmallToRead(layerIndex: number): boolean {
+  return CoordinateSystem.fromLayerIndex(layerIndex).scale < READABLE_SCALE;
+}
 
 type BubbleSkeletonProps = {
   bubble: Bubble;

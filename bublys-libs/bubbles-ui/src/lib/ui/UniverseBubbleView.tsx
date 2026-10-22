@@ -113,7 +113,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
   const handleWindowMouseMove = (e: React.MouseEvent) => {
     const rect = ref.current?.getBoundingClientRect();
     if (!rect) return;
-    const near = e.clientY - rect.top < HEADER_PROXIMITY_THRESHOLD;
+    const near = isNearTop(e.clientY, HEADER_PROXIMITY_THRESHOLD);
     if (near === isMouseNearTopRef.current) return;
     setIsMouseNearTop(near);
     if (near) updateHeaderSafeZone();
@@ -128,7 +128,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
    * ヘッダーは必ず箱の外（上）に出す。出しきれないときは、内側に押し込むのではなく、
    * **出している間だけバブルが下へずれる**。消えれば 0 に戻り、そのぶん上に戻る。
    */
-  const { shift, measure: updateHeaderSafeZone } = useHeaderShift({
+  const { shift, headerDrop, measure: updateHeaderSafeZone, isNearTop } = useHeaderShift({
     ref,
     headerSelector: ".e-window-header",
     fallbackHeight: 40,
@@ -192,6 +192,7 @@ const UniverseBubbleViewInner: FC<UniverseBubbleViewProps> = ({
       $transformOrigin={vanishingPointRelative}
       $headerVisible={isHeaderVisible}
       $shift={shift}
+      $headerDrop={headerDrop}
       onClick={onClick}
       onMouseMove={handleWindowMouseMove}
       onMouseEnter={() => onHoverChange?.(true)}
@@ -335,6 +336,7 @@ type StyledWindowProps = React.HTMLAttributes<HTMLDivElement> & {
   $lightweightMode?: boolean;
   $headerVisible?: boolean;
   $shift?: number; // ヘッダーを箱の外に出しきるために、バブルを下へずらす量(px)
+  $headerDrop?: number; // 見えている範囲の上に出るぶん、ヘッダーだけをバブルに重ねて下ろす量(px)
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
@@ -428,7 +430,7 @@ const StyledWindow = styled.div<StyledWindowProps>`
 
     opacity: ${({ $headerVisible }) => $headerVisible ? 1 : 0};
     pointer-events: ${({ $headerVisible }) => $headerVisible ? 'auto' : 'none'};
-    transform: ${({ $headerVisible }) => ($headerVisible ? "translateY(0)" : "translateY(6px)")};
+    transform: ${({ $headerVisible, $headerDrop = 0 }) => `translateY(${$headerDrop + ($headerVisible ? 0 : 6)}px)`};
     transition: opacity 0.15s ease, transform 0.15s ease;
 
     .e-window-buttons-left,
