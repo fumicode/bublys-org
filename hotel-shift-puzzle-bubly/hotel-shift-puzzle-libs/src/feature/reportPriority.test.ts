@@ -1,31 +1,33 @@
 import { Staff, ScheduleReport } from '@bublys-org/hotel-shift-puzzle-model';
-import { prioritizeStaffByLinkedReports } from './reportPriority.js';
+import { prioritizeStaffByReport } from './reportPriority.js';
 
-describe('prioritizeStaffByLinkedReports（紐づけレポートによる自動シフト優先度）', () => {
-  const staffA = new Staff({ id: 'staff-A', name: 'A' });
-  const staffB = new Staff({ id: 'staff-B', name: 'B' });
-  const staffC = new Staff({ id: 'staff-C', name: 'C' });
-  const staffList = [staffA, staffB, staffC];
+const staffA = new Staff({ id: 'staff-A', name: 'A' });
+const staffB = new Staff({ id: 'staff-B', name: 'B' });
+const staffC = new Staff({ id: 'staff-C', name: 'C' });
+const staffList = [staffA, staffB, staffC];
 
-  const reportWithScores = (scores: { staffId: string; score: number }[]) =>
-    ScheduleReport.create({
-      scheduleId: 'sched-1',
-      worldLineNodeId: 'node-1',
-      year: 2026,
-      month: 6,
-      storeId: 'store-1',
-      compromises: [],
-      busyDayContributions: [],
-      contributionScores: scores.map((s) => ({
-        staffId: s.staffId,
-        compromiseCount: 0,
-        busyDayCount: 0,
-        score: s.score,
-      })),
-    });
+const reportWithScores = (scores: { staffId: string; score: number }[]) =>
+  ScheduleReport.create({
+    scheduleId: 'sched-1',
+    worldLineNodeId: 'node-1',
+    year: 2026,
+    month: 6,
+    storeId: 'store-1',
+    compromises: [],
+    busyDayContributions: [],
+    contributionScores: scores.map((s) => ({
+      staffId: s.staffId,
+      compromiseCount: 0,
+      busyDayCount: 0,
+      score: s.score,
+    })),
+  });
 
-  test('紐づけレポートが無ければ元の順序のまま', () => {
-    expect(prioritizeStaffByLinkedReports(staffList, [])).toEqual(staffList);
+const idsOf = (staff: Staff[]) => staff.map((s) => s.id);
+
+describe('prioritizeStaffByReport（参照レポートによる自動シフト優先度）', () => {
+  test('参照レポートが無ければ元の順序のまま・一文は出さない', () => {
+    expect(prioritizeStaffByReport(staffList, undefined)).toEqual({ staffList, note: null });
   });
 
   test('貢献度スコア（譲歩＋繁忙日対応の加重合計）が高いスタッフを先頭に安定ソートする', () => {
@@ -34,48 +36,51 @@ describe('prioritizeStaffByLinkedReports（紐づけレポートによる自動�
       { staffId: 'staff-C', score: 5 },
       { staffId: 'staff-B', score: 0 },
     ]);
-    const ordered = prioritizeStaffByLinkedReports(staffList, [report]);
-    expect(ordered.map((s) => s.id)).toEqual(['staff-C', 'staff-A', 'staff-B']);
-  });
-
-  test('譲歩が無くても繁忙日対応だけでスコアがあれば優先される（旧: 譲歩件数のみでは反映されなかった）', () => {
-    // staff-B は譲歩0件・繁忙日対応のみで score=3、staff-A は譲歩由来の score=2
-    const report = reportWithScores([
-      { staffId: 'staff-A', score: 2 },
-      { staffId: 'staff-B', score: 3 },
+    expect(idsOf(prioritizeStaffByReport(staffList, report).staffList)).toEqual([
+      'staff-C',
+      'staff-A',
+      'staff-B',
     ]);
-    const ordered = prioritizeStaffByLinkedReports(staffList, [report]);
-    expect(ordered.map((s) => s.id)).toEqual(['staff-B', 'staff-A', 'staff-C']);
-  });
-
-  test('複数レポートのスコアを合算する', () => {
-    const report1 = reportWithScores([{ staffId: 'staff-B', score: 2 }]);
-    const report2 = reportWithScores([
-      { staffId: 'staff-B', score: 1 },
-      { staffId: 'staff-A', score: 2 },
-    ]);
-    const ordered = prioritizeStaffByLinkedReports(staffList, [report1, report2]);
-    // staff-B: 3点, staff-A: 2点, staff-C: 0点
-    expect(ordered.map((s) => s.id)).toEqual(['staff-B', 'staff-A', 'staff-C']);
   });
 
   test('同スコア（0点含む）のスタッフは元の順序を保つ（安定ソート）', () => {
     const report = reportWithScores([{ staffId: 'staff-C', score: 4 }]);
-    const ordered = prioritizeStaffByLinkedReports(staffList, [report]);
-    expect(ordered.map((s) => s.id)).toEqual(['staff-C', 'staff-A', 'staff-B']);
-  });
-
-  test('スコアデータが1件も無ければ元の順序のまま', () => {
-    const report = reportWithScores([]);
-    expect(prioritizeStaffByLinkedReports(staffList, [report])).toEqual(staffList);
+    expect(idsOf(prioritizeStaffByReport(staffList, report).staffList)).toEqual([
+      'staff-C',
+      'staff-A',
+      'staff-B',
+    ]);
   });
 
   test('元の配列は変更しない', () => {
     const original = [...staffList];
-    prioritizeStaffByLinkedReports(
-      staffList,
-      [reportWithScores([{ staffId: 'staff-C', score: 4 }])]
-    );
+    prioritizeStaffByReport(staffList, reportWithScores([{ staffId: 'staff-C', score: 4 }]));
     expect(staffList).toEqual(original);
+  });
+
+  test('一文は「何をしたか」と優先した人数だけを言う（誰が何点かは ★ で読む）', () => {
+    const report = reportWithScores([
+      { staffId: 'staff-A', score: 1 },
+      { staffId: 'staff-C', score: 5 },
+    ]);
+    expect(prioritizeStaffByReport(staffList, report).note).toBe(
+      '★の高い順に休みを優先しました（2名）'
+    );
+  });
+
+  test('スコアのある人がいなければ一文は出さない（重みを0にした・データが無いなど）', () => {
+    expect(prioritizeStaffByReport(staffList, reportWithScores([])).note).toBeNull();
+    const allZero = reportWithScores([{ staffId: 'staff-A', score: 0 }]);
+    expect(prioritizeStaffByReport(staffList, allZero).note).toBeNull();
+  });
+
+  test('対象者の外にいる人のスコアは数えない', () => {
+    const report = reportWithScores([
+      { staffId: 'staff-A', score: 3 },
+      { staffId: 'staff-Z', score: 9 },
+    ]);
+    expect(prioritizeStaffByReport(staffList, report).note).toBe(
+      '★の高い順に休みを優先しました（1名）'
+    );
   });
 });

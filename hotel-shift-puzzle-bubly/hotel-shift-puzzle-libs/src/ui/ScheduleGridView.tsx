@@ -15,6 +15,7 @@ import {
   type ShiftCell,
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
+  type ScheduleReport,
 } from "../domain/index.js";
 import {
   STAFF_COL_WIDTH,
@@ -88,6 +89,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
+  /** 参照レポート。渡すと、スコアのある人の名前の横に貢献度スコア（＝休みの優先度）を出す */
+  referenceReport?: ScheduleReport;
+  /**
+   * スタッフ名から開くバブルの URL。省略時はスタッフの正規 URL（どの勤務表でもないスタッフ詳細）。
+   * 勤務表から開くときは、その勤務表の文脈を持った URL を渡す。
+   */
+  staffUrlOf?: (staffId: string) => string;
   /**
    * セルの勤務割当を変更する。範囲選択でまとめて入れたときも1回で渡る（1回の操作＝世界線の1ノード）。
    * 可能勤務帯に無い勤務帯のセルは除いてある。
@@ -192,6 +200,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
+  referenceReport,
+  staffUrlOf,
   onChangeCells,
   onChangeRequired,
   onChangeRequiredAllDays,
@@ -449,6 +459,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
+          referenceReport={referenceReport}
+          staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
@@ -494,6 +506,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
+          referenceReport={referenceReport}
+          staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}

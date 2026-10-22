@@ -186,6 +186,22 @@ export class ScheduleReport {
     return this.state.contributionScores;
   }
 
+  /** そのスタッフの貢献度スコア（スコアの行が無ければ 0） */
+  scoreOf(staffId: string): number {
+    return this.state.contributionScores.find((s) => s.staffId === staffId)?.score ?? 0;
+  }
+
+  /**
+   * この勤務表の参照レポートにできるか。**同じ店舗の、前月（ちょうど1か月前）**のレポートだけ。
+   * 別の店舗は働く人も事情も違い、同じ月や先の月は「振り返り」にならないため。
+   * 2か月以上前を含めないのは、振り返るべきは直前の月の譲歩・繁忙日対応で、
+   * 古い月の貢献度が今月の休みの優先順を決めると実態とずれるため。1月の前月は前年12月。
+   */
+  isReferenceableFrom(target: { storeId: string; year: number; month: number }): boolean {
+    if (target.storeId !== this.state.storeId) return false;
+    return this.state.year * 12 + this.state.month === target.year * 12 + target.month - 1;
+  }
+
   get compromiseWeight(): number {
     return this.state.compromiseWeight;
   }

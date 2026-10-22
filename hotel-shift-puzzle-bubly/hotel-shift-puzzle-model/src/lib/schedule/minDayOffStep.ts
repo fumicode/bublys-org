@@ -145,6 +145,7 @@ export function makeMinDayOffStep(
   return {
     key: phase === 0 ? `min-day-off:${minDayOff}` : `min-day-off:${minDayOff}:p${phase}`,
     label: `月${minDayOff}日休む`,
+    grantsDayOffInStaffOrder: true,
     description: `各スタッフが月に最低${minDayOff}日休めるよう、足りない分だけ空きセルに休みを入れます${
       maxPerDay !== undefined ? `（1日${maxPerDay}人を超えない範囲で）` : ""
     }。連勤を作らないよう、休みでない日が一番長く続く区間から順に休みを割り込みます（人間入力・出勤希望は尊重）。`,

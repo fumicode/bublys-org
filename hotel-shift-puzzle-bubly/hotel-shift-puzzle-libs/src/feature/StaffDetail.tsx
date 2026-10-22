@@ -22,12 +22,17 @@ import { monthSummariesOf } from "./shiftWishMonths.js";
 
 type StaffDetailProps = {
   staffId?: string;
+  /**
+   * どの勤務表から開いたか。渡されたときだけ、その勤務表の参照レポートでの評価を出す
+   * （勤務表と関係なく開いたスタッフ詳細には出さない）。
+   */
+  scheduleId?: string;
   /** この人の希望入力表バブルの URL（ObjectView に渡す。app 層から注入） */
   shiftWishUrl?: (year: number, month: number) => string;
 };
 
 
-export const StaffDetail: FC<StaffDetailProps> = ({ staffId, shiftWishUrl }) => {
+export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWishUrl }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
 
@@ -39,14 +44,15 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, shiftWishUrl }) => 
     [schedules, wishes, staffId]
   );
 
-  // 参照レポート（どの勤務表かは問わず、紐づけ済みの ScheduleReport 全部）から
-  // このスタッフに関係する分だけを取り出す（貢献度スコア・譲歩/繁忙日・配慮メモ）。
+  // 開いた勤務表の参照レポートから、このスタッフに関係する分だけを取り出す
+  // （貢献度スコア・譲歩/繁忙日・配慮メモ）。勤務表の制約セットは id = scheduleId。
   const allConstraints = useObjects<ConstraintSet>(CONSTRAINT_SET_TYPE);
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const linkedReports = useMemo(() => {
-    const linkedIds = new Set(allConstraints.flatMap((c) => c.linkedReportIds));
-    return allReports.filter((r) => linkedIds.has(r.id));
-  }, [allConstraints, allReports]);
+    if (!scheduleId) return [];
+    const reportId = allConstraints.find((c) => c.id === scheduleId)?.linkedReportId;
+    return allReports.filter((r) => r.id === reportId);
+  }, [scheduleId, allConstraints, allReports]);
   const linkedReportSummaries = useMemo(
     () => staffLinkedReportSummaries(staffId ?? "", linkedReports),
     [staffId, linkedReports]

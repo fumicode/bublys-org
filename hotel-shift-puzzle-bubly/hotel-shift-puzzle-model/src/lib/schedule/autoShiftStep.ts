@@ -110,6 +110,13 @@ export interface AutoShiftStep {
   readonly groupLabel?: string;
   /** トグル内でこの戦略を表す短いラベル（例: "まんべんなく"） */
   readonly variantLabel?: string;
+  /**
+   * 休みを置くとき、`ctx.staffIds` の**前の人から先に**取らせるか。
+   * 1日に休める人数には上限があるので、前に並んだ人ほど希望どおりの日に休みを取りやすい。
+   * 上位層はこれを見て「並び順で誰を優先したか」を利用者に伝える（並び順が効かないステップで
+   * 「優先しました」と言わないため）。省略時 false。
+   */
+  readonly grantsDayOffInStaffOrder?: boolean;
   /** 実行。純粋・不変で、新しい勤務表と結果を返す */
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult;
 }

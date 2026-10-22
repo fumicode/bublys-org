@@ -9,6 +9,7 @@ import type {
   ConstraintViolation,
   ShiftLeaderRule,
   ShiftCell,
+  ScheduleReport,
 } from "../../domain/index.js";
 import {
   MIN_MONTHLY_DAY_OFF_CONSTRAINT,
@@ -54,6 +55,10 @@ type StaffScheduleRowProps = {
   leaderRules?: ShiftLeaderRule[];
   /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
+  /** 参照レポート。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
+  referenceReport?: ScheduleReport;
+  /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
+  staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
   focused?: boolean;
   /** 選択モード中で、この行が対象外（減光＝blur でぼかす） */
@@ -97,6 +102,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onToggleSelected,
   leaderRules = [],
   onSelectRule,
+  referenceReport,
+  staffUrl,
   focused,
   dimmed,
   minDayOff,
@@ -111,6 +118,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
   // 違反の印（連勤の赤帯・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
   const marks = violationMarksOf(violations, staff.id, days);
+  const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -128,6 +136,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         )}
         <ObjectView
           object={staff}
+          url={staffUrl}
           label={staff.name}
           draggable={true}
           openingPosition="bubble-side-left"
@@ -142,6 +151,14 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
                 staffId={staff.id}
                 onSelectRule={onSelectRule}
               />
+              {referenceReport && priority && priority.score > 0 && (
+                <span
+                  className="e-priority-badge"
+                  title={`参照レポート「${referenceReport.title}」の貢献度スコア ${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                >
+                  ★{priority.score}
+                </span>
+              )}
             </span>
           </div>
         </ObjectView>

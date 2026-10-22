@@ -37,6 +37,7 @@ export const fillDemandStep: AutoShiftStep = {
   group: "fill-demand",
   groupLabel: "必要人数を埋める",
   variantLabel: "早番から順に",
+  grantsDayOffInStaffOrder: true,
   description:
     "先に各スタッフの休み（月◯日）を確保し、必要人数に足りない勤務帯へ勤務帯の並び順（早番→中番→遅番）に前から詰めます。需要を満たしたあとに残る空きセルも、入れる勤務帯へ入れて埋め切ります（未定を残さない）。人数が足りないと後ろの帯（遅番）が枯れやすい。休み希望の人は入れず、人間入力済みのセルも触りません。",
 
