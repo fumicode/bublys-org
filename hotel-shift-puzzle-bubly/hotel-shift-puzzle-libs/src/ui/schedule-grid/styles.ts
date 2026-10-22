@@ -2,6 +2,18 @@ import styled from "styled-components";
 import { EARLY_COL_WIDTH } from "./constants.js";
 
 /**
+ * グリッドの重なり順。ルールは「横・縦にスクロールする面（データセル・違反の印・
+ * 制約ホバーのオーバーレイなど）より、固定された列・行が必ず手前」。
+ *
+ * スクロールする面の中では z-index 1〜5 を使っている（選択中のセル=1、違反の印=1、
+ * 1セルの違反の角=2、制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
+ * それらより上に置き、スクロールで下に入ったものが透けて前に出ないようにする。
+ */
+const Z_FIXED = 6; // 固定の列（スタッフ名・休・早・見出し列）と固定の行（日付ヘッダ）
+const Z_FIXED_CROSS = 7; // 固定の列と行が交わる角（左上・休/早の見出し・予約の開閉）
+const Z_POPUP = 8; // 固定の列より手前に出すふきだし（制約の解消案）
+
+/**
  * 勤務表グリッドのスタイル。
  * CSS は class 名ベースのため、StyledWrap の子孫であればどの子コンポーネントが
  * 描いた要素にも適用される（ScheduleDataCell / StaffScheduleRow / SummaryRow など）。
@@ -83,7 +95,7 @@ export const StyledWrap = styled.div`
   .e-res-toggle {
     position: sticky;
     left: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -118,7 +130,7 @@ export const StyledWrap = styled.div`
   .e-res-head {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -185,14 +197,14 @@ export const StyledWrap = styled.div`
   .e-res-filler {
     position: sticky;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fff8f0;
     border-left: 1px solid #e0e0e0;
   }
   .e-res-early-filler {
     position: sticky;
     right: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fff8f0;
     border-left: 1px solid #e0e0e0;
   }
@@ -203,7 +215,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #fafafa;
     display: flex;
     align-items: center;
@@ -215,7 +227,7 @@ export const StyledWrap = styled.div`
   .e-off-total {
     position: sticky;
     right: ${EARLY_COL_WIDTH}px;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fbfbfb;
     display: flex;
     align-items: center;
@@ -251,7 +263,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     right: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #e3f2fd;
     display: flex;
     align-items: center;
@@ -263,7 +275,7 @@ export const StyledWrap = styled.div`
   .e-early-total {
     position: sticky;
     right: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #f5faff;
     display: flex;
     align-items: center;
@@ -295,7 +307,7 @@ export const StyledWrap = styled.div`
   .e-sum-head {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     display: flex;
     align-items: center;
     gap: 4px;
@@ -422,7 +434,7 @@ export const StyledWrap = styled.div`
     position: sticky;
     top: 0;
     left: 0;
-    z-index: 3;
+    z-index: ${Z_FIXED_CROSS};
     background: #fafafa;
     display: flex;
     flex-direction: column;
@@ -449,7 +461,7 @@ export const StyledWrap = styled.div`
   .e-day-head {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: ${Z_FIXED};
     background: #fafafa;
     display: flex;
     flex-direction: column;
@@ -498,7 +510,7 @@ export const StyledWrap = styled.div`
   .e-staff-cell {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fff;
     display: flex;
     align-items: center;
@@ -572,12 +584,8 @@ export const StyledWrap = styled.div`
   /* データセル */
   .e-cell {
     position: relative;
-    /* セルの中の印（違反の帯・角・入力表示など）の z-index はセルの中だけで効かせる。
-       これが無いと中の z-index がグリッド全体で比べられ、横・縦スクロールで潜り込んだとき
-       固定のスタッフ列や日付ヘッダより手前に出てしまう */
-    isolation: isolate;
-    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
-    overflow: hidden;
+    /* セル自体はクリップしない。違反の印（ViolationMarks）が末尾のセルから左の列へ伸びるため。
+       角へ退避した希望の円のクリップは .e-wish-marks が受け持つ。 */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -663,6 +671,8 @@ export const StyledWrap = styled.div`
   .e-wish-marks {
     position: absolute;
     inset: 0;
+    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
+    overflow: hidden;
     pointer-events: none; /* セルの選択を邪魔しない（叶わなかった円だけ下で戻す） */
   }
 
@@ -731,15 +741,19 @@ export const StyledWrap = styled.div`
 
      - 未割当で希望が複数あるセル … 円が横に並ぶとセル幅に収まらず端が切れて読めないので、
        クリップを外して（overflow: visible）隣の列の上へはみ出させる。円の背景は白なので
-       下のセルに重なっても読める。手前に出すため z-index はグリッド内で最も高くする
+       下のセルに重なっても読める。手前に出すため z-index はスクロールする面の中で最も高くする
        （制約ホバーの すりガラス=3 / リボン=4 より上。同じセルをホバーすると両方出るので、
-       これらの下だと右へはみ出した円が隠れてしまう）。
+       これらの下だと右へはみ出した円が隠れてしまう）。固定の列・行（Z_FIXED）よりは下に置く。
+       上にすると、選択したまま横スクロールしたときにこのセルの違反の印が名前の列に透けて出る。
      - 値が入ったセル … 角に残した円の文字（＝叶った希望）を戻す。円のクリップは
        そのまま（角の弧という見た目を崩さない）。 */
   .e-cell.has-wish-hint:hover,
   .e-cell.has-wish-hint.is-selected {
-    overflow: visible;
     z-index: 5;
+  }
+  .e-cell.has-wish-hint:hover .e-wish-marks,
+  .e-cell.has-wish-hint.is-selected .e-wish-marks {
+    overflow: visible;
   }
   .e-cell:hover .e-wish-marks.is-corner .e-wish-badge .e-wish-char,
   .e-cell.is-selected .e-wish-marks.is-corner .e-wish-badge .e-wish-char {
@@ -779,12 +793,22 @@ export const StyledWrap = styled.div`
     font-weight: normal;
   }
 
-  /* 制約違反セル: 下端に連続した赤線を引く（連勤の塊が1本の線に見える） */
+  /* 違反の印（ViolationMarks）。違反1件に印1つで、違反が覆う範囲の末尾のセルに置き、
+     そこから左へ伸ばす。セルの中の絶対配置なので、行・列の番号を数えずにセルへ追従する。
+
+     基準はセルの padding box（右と下の罫線 1px を除いた矩形）。重なり順は z-index:1 で
+     「帯がかかる左のセル（選択中の z-index:1 も DOM で前なので下）より上、制約ホバーの
+     オーバーレイ（3〜4）より下」。固定の列・行（Z_FIXED）はいつも印より手前なので、
+     横スクロールで印が名前の列の下へ入っても透けて出ない。 */
+
+  /* 連勤など複数日の違反: 覆う日の下端に1本の赤帯。
+     --span 列ぶん左へ伸ばす。1列は「padding box の幅＋右の罫線 1px」なので、
+     末尾のセルの右端から span 列ぶん戻ると先頭のセルの左端（＝以前の1セルずつの帯と同じ位置）。 */
   .e-violation-bar {
     position: absolute;
-    left: 0;
     right: 0;
     bottom: 0;
+    width: calc(var(--span, 1) * (100% + 1px) - 1px);
     height: 4px;
     background: #e53935;
     cursor: pointer;
@@ -798,71 +822,72 @@ export const StyledWrap = styled.div`
 
   /* 1セルで完結する違反（可能勤務帯の外に入れた、など）: 右上の角の赤い三角。
      日をまたぐ違反（下端の赤帯）とは場所を分けて、同じセルに両方かかっても見分けられるようにする。
-     中の ObjectView を当たり判定に広げるので、border の三角ではなく clip-path で切る。 */
+
+     枠（当たり判定）は三角より一回り大きい透明な正方形にし、三角は ::before で描く。
+     三角そのものを当たり判定にすると、斜辺の下側が押せず小さすぎるため。
+     右の境目には翌日の勤務間インターバルの印（z-index:1）が乗るので、角はその上（z-index:2）に置く。
+     どちらもはみ出し幅は小さく、インターバルの印は残りの縦の帯と丸で押せる。 */
   .e-violation-corner {
     position: absolute;
     top: 0;
     right: 0;
-    width: 10px;
-    height: 10px;
-    background: #e53935;
-    clip-path: polygon(0 0, 100% 0, 100% 100%);
+    width: 16px;
+    height: 16px;
     cursor: pointer;
     z-index: 2;
-    transition: width 0.1s, height 0.1s;
 
-    &:hover {
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 10px;
+      height: 10px;
+      background: #e53935;
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
+      pointer-events: none;
+      transition: width 0.1s, height 0.1s;
+    }
+    &:hover::before {
       width: 14px;
       height: 14px;
     }
   }
 
-  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を出す。
+  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を1つ出す。
      違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
      希望の円（単日違反）とは別の形にしている。
-
-     前日側は右端に、翌日側は左端に同じ印を出す。丸は境界線の上に中心が来るよう半分だけ
-     はみ出させ（セルは overflow:hidden なのでそこで切られる）、2つの半円が合わさって
-     境界線上の1つの丸に見えるようにしている。 */
+     後の日のセルに置き、中心を前の日の右の罫線（セルの左端から -0.5px）に合わせる。
+     帯は細くする。前の日のセルへのはみ出しが太いと、前の日の右上の角（1セルの違反の印）を隠すため。
+     見つけやすさは真ん中の丸が受け持つ。 */
   .e-interval-bar {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 4px;
+    left: -0.5px;
+    width: 3px;
+    transform: translateX(-50%);
     background: #e53935;
     cursor: pointer;
     z-index: 1;
     transition: width 0.1s;
 
-    &.is-before {
-      left: 0;
-    }
-    &.is-after {
-      right: 0;
-    }
-
     &:hover {
       width: 7px;
     }
 
-    /* 境界線の上に乗る丸（半分はセルの外＝クリップされる） */
-    &::after {
-      content: "";
+    /* 境界線の上に乗る丸。帯の当たり判定（ObjectView）の子なので、丸の上でもバブルを開ける */
+    .e-interval-dot {
       position: absolute;
       top: 50%;
+      left: 50%;
       width: 11px;
       height: 11px;
-      margin-top: -5.5px;
+      transform: translate(-50%, -50%);
       border-radius: 50%;
       background: #e53935;
       border: 1.5px solid #fff;
       box-sizing: border-box;
-    }
-    &.is-before::after {
-      left: -5.5px;
-    }
-    &.is-after::after {
-      right: -5.5px;
     }
   }
 
@@ -879,7 +904,7 @@ export const StyledWrap = styled.div`
   .e-constraint-fix-hint {
     position: absolute;
     transform: translate(-50%, 6px);
-    z-index: 5;
+    z-index: ${Z_POPUP};
     max-width: 220px;
     padding: 8px 10px;
     border-radius: 8px;
@@ -915,7 +940,7 @@ export const StyledWrap = styled.div`
   .e-staff-foot {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #fafafa;
     padding: 2px 6px;
     border-right: 1px solid #ddd;
@@ -952,7 +977,7 @@ export const StyledWrap = styled.div`
   .e-dept-label {
     position: sticky;
     left: 0;
-    z-index: 1;
+    z-index: ${Z_FIXED};
     background: #e8eaf6;
     color: #3949ab;
     font-weight: bold;

@@ -5,6 +5,7 @@ import Inventory2Icon from '@mui/icons-material/Inventory2';
 import {
   useAppSelector,
   useAppDispatch,
+  useAppStore,
   selectWindowSize,
   setWindowSize,
   selectPocketItems,
@@ -25,6 +26,7 @@ import {
   layerUp as layerUpAction,
   popChildInProcess as popChildAction,
   popChildMaxInProcess,
+  bringToFrontInProcess,
   joinSiblingInProcess as joinSiblingAction,
   relateBubbles,
   removeBubble,
@@ -32,6 +34,8 @@ import {
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
   OpeningPosition,
+  selectHasBubbleOfUrl,
+  selectBubbleIdOfUrl,
 } from '../state/index.js';
 import { BubblesLayeredView, type BubblesLayeredViewProps } from '../ui/BubblesLayeredView.js';
 import { PocketView } from '../pocket/PocketView.js';
@@ -89,6 +93,7 @@ export const BublyApp: FC<BublyAppProps> = ({
   isShowreEnabled,
 }) => {
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const bubbleLayers = useAppSelector(selectBubbleLayers);
   const surfaceBubbles = useAppSelector(selectSurfaceBubbles);
 
@@ -213,7 +218,12 @@ export const BublyApp: FC<BublyAppProps> = ({
     surfaceLeftTop,
     coordinateSystem: globalCoordinateSystem,
     openBubble: popChildOrJoinSibling,
-  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling]);
+    isOpen: (url: string) => selectHasBubbleOfUrl(store.getState() as never, url),
+    bringToFront: (url: string) => {
+      const id = selectBubbleIdOfUrl(store.getState() as never, url);
+      if (id) dispatch(bringToFrontInProcess(id));
+    },
+  }), [pageSize, surfaceLeftTop, globalCoordinateSystem, popChildOrJoinSibling, store, dispatch]);
 
   // Pocket
   const [isPocketOpen, setIsPocketOpen] = useState(false);

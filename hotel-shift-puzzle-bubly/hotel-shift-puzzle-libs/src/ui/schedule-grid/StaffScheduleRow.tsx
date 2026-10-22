@@ -11,8 +11,9 @@ import type {
   ShiftCell,
 } from "../../domain/index.js";
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
-import { cellViolationMarks } from "./cellViolationMarks.js";
+import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
+import { violationMarksOf } from "./violationMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
@@ -106,6 +107,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   // 行は grid の直接の子（名前セル＋各日セル＋休合計＋早番日数）なので、各セルに同じクラスを付ける。
   const rowMod = focused ? " is-focused" : dimmed ? " is-dimmed" : "";
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
+  // 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
+  const marks = violationMarksOf(violations, staff.id, days);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -150,11 +153,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
-        // 希望の食い違いは希望の円、勤務間インターバルは境目の印、日をまたぐ違反は下端の赤帯、
-        // 1セルで完結する違反は右上の角で描く（cellViolationMarks）。
-        // 境目の印がどちら側かは、違反範囲の初日／末日のどちらに当たるかで決まる。
-        const marks = cellViolationMarks(
-          violations.filter((v) => v.coversCell(staff.id, day))
+        // 希望の食い違いだけはセルの中＝希望の円で表す。
+        // それ以外の違反（連勤・1セルの違反・勤務間インターバル）は marks（末尾のセルに置く印）が受け持つ。
+        const wishViolation = violations.find(
+          (v) => v.coversCell(staff.id, day) && v.constraintType === SHIFT_WISH_MISMATCH
         );
         const isSelected =
           selection?.kind === "staff" &&
@@ -167,13 +169,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             cell={cell}
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
-            barViolation={marks.bar}
-            cornerViolation={marks.corner}
-            wishViolation={marks.wish}
-            intervalAfter={marks.interval.find((v) => v.days[0]?.equals(day))}
-            intervalBefore={marks.interval.find((v) =>
-              v.days[v.days.length - 1]?.equals(day)
-            )}
+            violationMarks={marks.filter((m) => m.anchorDay.equals(day))}
+            wishViolation={wishViolation}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
             inputBuffer={isSelected ? inputBuffer : null}
