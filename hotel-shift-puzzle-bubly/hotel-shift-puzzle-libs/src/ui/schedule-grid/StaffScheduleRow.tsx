@@ -21,6 +21,7 @@ import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
+import { DayOffStyleIcon } from "../constraint-icons/DayOffStyleIcon.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
 
@@ -165,10 +166,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
               />
               {dayOffStyle && (
                 <span
-                  className={`e-day-off-style-badge${dayOffStyle.isClustered ? " is-clustered" : ""}`}
+                  className="e-day-off-style-icon"
                   title={`休みの形：${dayOffStyle.label}。自動シフトはこの形に沿って休みを置きます`}
                 >
-                  {dayOffStyle.shortLabel}
+                  <DayOffStyleIcon dayOffStyle={dayOffStyle} />
                 </span>
               )}
               {referenceReport && priority && priority.score > 0 && (
