@@ -14,11 +14,16 @@
  * **可能勤務帯（その人がこの勤務表で入れる勤務帯）もここが持つ。** 「誰が働くか」と
  * 「その人がどの勤務帯に入れるか」は同じ1つの参加の話なので、別の集約に分けない。
  *
+ * **休みの形の上書きもここが持つ。** 休みの形の既定値は Staff にあり、この勤務表だけ
+ * 変えたいときにメンバーへ書く（例: 繁忙月だけ連休型にする）。読むときは
+ * 「上書きがあればそれ、無ければその人の既定値」（{@link WorkingStaffMember.dayOffStyleOf}）。
+ *
  * state は抱えるものを**インスタンスで**持つ（保存形は別に持つ）。
  * シリアライズ用に入れ子まで plain な {@link WorkingStaffMemberPlain} を定義し、
  * toPlain() / fromPlain() で橋渡しする。不変。
  */
-import { Staff, type StaffState } from "./Staff.js";
+import { Staff, type StaffPlain } from "./Staff.js";
+import { DayOffStyle, type DayOffStylePlain } from "./DayOffStyle.js";
 
 /** state：抱えている実体はインスタンス */
 export type WorkingStaffMemberState = {
@@ -34,13 +39,16 @@ export type WorkingStaffMemberState = {
    * 既定で入れる（絞っていない人に後から席を用意して回る必要がない）。
    */
   allowedShiftIds?: string[];
+  /** この勤務表での休みの形の上書き。省略＝その人の既定値のまま */
+  dayOffStyle?: DayOffStyle;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
 export type WorkingStaffMemberPlain = {
   staffId: string;
-  staff?: StaffState;
+  staff?: StaffPlain;
   allowedShiftIds?: string[];
+  dayOffStyle?: DayOffStylePlain;
 };
 
 export class WorkingStaffMember {
@@ -103,10 +111,40 @@ export class WorkingStaffMember {
   /** 絞りを外して「どの勤務帯にも入れる」に戻した新しいメンバーを返す。不変。 */
   allowAllShifts(): WorkingStaffMember {
     if (!this.hasShiftLimit) return this;
-    return new WorkingStaffMember({
-      staffId: this.state.staffId,
-      staff: this.state.staff,
-    });
+    return new WorkingStaffMember({ ...this.state, allowedShiftIds: undefined });
+  }
+
+  // ========== 休みの形 ==========
+
+  /** この勤務表で休みの形を上書きしているか */
+  get hasDayOffStyleOverride(): boolean {
+    return this.state.dayOffStyle !== undefined;
+  }
+
+  /** 上書きしている休みの形（していなければ undefined） */
+  get dayOffStyleOverride(): DayOffStyle | undefined {
+    return this.state.dayOffStyle;
+  }
+
+  /**
+   * この勤務表で使う休みの形。上書きがあればそれ、無ければその人の既定値。
+   * 実体が引けない人（staff が undefined）は分散型。
+   */
+  dayOffStyleOf(staff: Staff | undefined): DayOffStyle {
+    return this.state.dayOffStyle ?? staff?.dayOffStyle ?? DayOffStyle.DEFAULT;
+  }
+
+  /**
+   * 休みの形を上書きした新しいメンバーを返す。undefined で上書きを外す（既定値に戻す）。不変。
+   */
+  overrideDayOffStyle(style: DayOffStyle | undefined): WorkingStaffMember {
+    const current = this.state.dayOffStyle;
+    if (style === undefined) {
+      if (current === undefined) return this;
+      return new WorkingStaffMember({ ...this.state, dayOffStyle: undefined });
+    }
+    if (current && current.equals(style)) return this;
+    return new WorkingStaffMember({ ...this.state, dayOffStyle: style });
   }
 
   get staffId(): string {
@@ -151,20 +189,22 @@ export class WorkingStaffMember {
 
   toPlain(): WorkingStaffMemberPlain {
     const plain: WorkingStaffMemberPlain = { staffId: this.state.staffId };
-    if (this.state.staff) plain.staff = this.state.staff.state;
+    if (this.state.staff) plain.staff = this.state.staff.toPlain();
     if (this.state.allowedShiftIds) {
       plain.allowedShiftIds = [...this.state.allowedShiftIds];
     }
+    if (this.state.dayOffStyle) plain.dayOffStyle = this.state.dayOffStyle.toPlain();
     return plain;
   }
 
   static fromPlain(plain: WorkingStaffMemberPlain): WorkingStaffMember {
     return new WorkingStaffMember({
       staffId: plain.staffId,
-      staff: plain.staff ? new Staff(plain.staff) : undefined,
+      staff: plain.staff ? Staff.fromPlain(plain.staff) : undefined,
       allowedShiftIds: plain.allowedShiftIds
         ? [...plain.allowedShiftIds]
         : undefined,
+      dayOffStyle: plain.dayOffStyle ? DayOffStyle.fromPlain(plain.dayOffStyle) : undefined,
     });
   }
 }

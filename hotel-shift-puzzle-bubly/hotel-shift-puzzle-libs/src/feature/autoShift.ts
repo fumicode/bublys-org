@@ -15,8 +15,10 @@ import {
   WorkingStaffGroup,
   WorkShift,
   Staff,
+  DayOffStyle,
   DEFAULT_MIN_MONTHLY_DAY_OFF,
   DEFAULT_MAX_DAY_OFF_PER_DAY,
+  DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type AutoShiftContext,
@@ -132,10 +134,14 @@ export type AutoShiftParams = {
   minDayOff?: number;
   /** 1日に休んでよい人数の上限（休みを入れるときに超えない） */
   maxDayOffPerDay?: number;
+  /** 全体の連勤上限。連休型の人の出勤の塊をこの長さ（目標があれば小さい方）で区切る */
+  maxConsecutiveWorkdays?: number;
 };
 
 /** 自動シフトが目指す休みの置き方（制約セットから取り出したもの） */
-export type AutoShiftLimits = Required<Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay">>;
+export type AutoShiftLimits = Required<
+  Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay" | "maxConsecutiveWorkdays">
+>;
 
 /**
  * 制約セットから、自動シフトが「何日休みを置くか・1日何人まで休ませるか」を取り出す。
@@ -153,6 +159,8 @@ export const autoShiftLimitsOf = (
 ): AutoShiftLimits => ({
   minDayOff: constraints?.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF,
   maxDayOffPerDay: constraints?.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY,
+  maxConsecutiveWorkdays:
+    constraints?.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
 });
 
 /** params から各ステップ共通の文脈を組む（希望のデコード・可能勤務帯の述語化） */
@@ -165,6 +173,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     constraints,
     minDayOff,
     maxDayOffPerDay,
+    maxConsecutiveWorkdays,
   } = params;
 
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -193,6 +202,26 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     constraints,
     minDayOff,
     maxDayOffPerDay,
+    maxConsecutiveWorkdays,
+    dayOffStyleOf: dayOffStyleResolver(staffList, staffGroup),
+  };
+};
+
+/**
+ * その人がこの勤務表で使う休みの形を引く関数を作る。
+ * 勤務メンバーの上書きがあればそれ、無ければその人（名簿の焼き付け／臨時の人の実体）の既定値。
+ * 自動シフトと、休みの役目の読み解き（表のホバー）の両方がこれで引く。
+ */
+export const dayOffStyleResolver = (
+  staffList: readonly Staff[],
+  staffGroup: WorkingStaffGroup | undefined
+): ((staffId: string) => DayOffStyle) => {
+  const byId = new Map(staffList.map((s) => [s.id, s]));
+  return (staffId) => {
+    const staff = byId.get(staffId);
+    return staffGroup
+      ? staffGroup.dayOffStyleOf(staffId, staff)
+      : staff?.dayOffStyle ?? DayOffStyle.DEFAULT;
   };
 };
 

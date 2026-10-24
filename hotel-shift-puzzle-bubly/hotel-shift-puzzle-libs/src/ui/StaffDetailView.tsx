@@ -2,7 +2,8 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry } from "../domain/index.js";
+import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
+import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
@@ -33,6 +34,8 @@ type StaffDetailViewProps = {
   staff: Staff;
   /** 部署を変更する */
   onChangeDepartment?: (department: string) => void;
+  /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
+  onChangeDayOffStyle?: (style: DayOffStyle) => void;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
   shiftWishMonths?: ShiftWishMonthSummary[];
   /**
@@ -47,6 +50,7 @@ type StaffDetailViewProps = {
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
   onChangeDepartment,
+  onChangeDayOffStyle,
   shiftWishMonths = [],
   shiftWishUrl,
   linkedReportSummaries = [],
@@ -140,6 +144,19 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
                   </IconButton>
                 )}
               </>
+            )}
+          </dd>
+          <dt>休みの形</dt>
+          <dd>
+            {onChangeDayOffStyle ? (
+              <DayOffStyleSelect
+                className="e-day-off-style"
+                value={staff.dayOffStyle}
+                onChange={(style) => style && onChangeDayOffStyle(style)}
+                title="自動シフトが休みを置くときの形の既定値。勤務表ごとに勤務スタッフ群で変えられます"
+              />
+            ) : (
+              staff.dayOffStyle.label
             )}
           </dd>
         </dl>

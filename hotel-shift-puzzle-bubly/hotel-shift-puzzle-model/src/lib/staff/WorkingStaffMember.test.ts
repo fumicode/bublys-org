@@ -1,3 +1,4 @@
+import { DayOffStyle } from './DayOffStyle.js';
 import { Staff } from './Staff.js';
 import { WorkingStaffMember } from './WorkingStaffMember.js';
 
@@ -132,5 +133,40 @@ describe('WorkingStaffMember（勤務スタッフ群のメンバー1人）', () 
     }
     // 名簿の人は staff キーを持たない（「実体を抱えていない」が保存形にも出る）
     expect('staff' in rosterMember.toPlain()).toBe(false);
+  });
+
+  describe('休みの形', () => {
+    const staff = new Staff({ id: 's1', name: 'A' });
+
+    test('何も決めていなければ分散型', () => {
+      expect(WorkingStaffMember.ofRoster('s1').dayOffStyleOf(staff).equals(DayOffStyle.spread())).toBe(true);
+    });
+
+    test('既定値はスタッフが持ち、勤務表のメンバーで上書きできる', () => {
+      const clustered = staff.changeDayOffStyle(DayOffStyle.clustered(4));
+      const member = WorkingStaffMember.ofRoster('s1');
+      expect(member.dayOffStyleOf(clustered).label).toBe('連休型（4連まで）');
+
+      const overridden = member.overrideDayOffStyle(DayOffStyle.spread());
+      expect(overridden.dayOffStyleOf(clustered).label).toBe('分散型');
+      // 上書きを外すと既定値に戻る
+      expect(overridden.overrideDayOffStyle(undefined).dayOffStyleOf(clustered).label).toBe(
+        '連休型（4連まで）'
+      );
+    });
+
+    test('保存形を往復しても休みの形が残る（臨時の人の実体の分も）', () => {
+      const temp = WorkingStaffMember.temporary(
+        staff.changeDayOffStyle(DayOffStyle.clustered(5))
+      ).overrideDayOffStyle(DayOffStyle.clustered(4));
+      const back = WorkingStaffMember.fromPlain(JSON.parse(JSON.stringify(temp.toPlain())));
+
+      expect(back.staff?.dayOffStyle.label).toBe('連休型（5連まで）');
+      expect(back.dayOffStyleOverride?.label).toBe('連休型（4連まで）');
+    });
+
+    test('上書きしていないメンバーの保存形には何も足さない', () => {
+      expect(WorkingStaffMember.ofRoster('s1').toPlain()).toEqual({ staffId: 's1' });
+    });
   });
 });

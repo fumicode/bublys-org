@@ -20,6 +20,7 @@ import type { WorkingDay } from "./WorkingDay.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { introducesViolation } from "./placementCheck.js";
+import type { DayOffStyle } from "../staff/DayOffStyle.js";
 
 /** デコード済みの「その日のその人の希望」。希望キーの意味解釈は上位層が行う */
 export type DecodedWish =
@@ -61,6 +62,16 @@ export type AutoShiftContext = {
   minDayOff?: number;
   /** 1日に休んでよい人数の上限。休みを入れるときにこれを超えない。 */
   maxDayOffPerDay?: number;
+  /**
+   * 全体の連勤上限（制約セットの値）。連休型の人に休みを置くとき、出勤の塊をこの長さ
+   * （その人の目標があればその小さい方）で区切るのに使う。省略時は上限なしとして扱う。
+   */
+  maxConsecutiveWorkdays?: number;
+  /**
+   * その人がこの勤務表で使う休みの形（WorkingStaffMember の上書き → Staff の既定値）。
+   * 省略時は全員分散型。
+   */
+  dayOffStyleOf?: (staffId: string) => DayOffStyle;
 };
 
 /**

@@ -616,6 +616,13 @@ export const StyledWrap = styled.div`
       align-items: flex-end;
       gap: 1px;
     }
+    /* 休みの形（分散／連休）のアイコン（DayOffStyleIcon）。休みが隣り合うか離れているかで見分ける */
+    .e-day-off-style-icon {
+      flex-shrink: 0;
+      display: flex;
+      cursor: help;
+    }
+
     /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
     .e-priority-badge {
       flex-shrink: 0;

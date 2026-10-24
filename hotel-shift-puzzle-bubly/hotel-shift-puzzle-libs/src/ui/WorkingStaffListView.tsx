@@ -13,7 +13,8 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import { Button, IconButton, TextField } from "@mui/material";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import { Staff, WorkShift } from "../domain/index.js";
+import { Staff, WorkShift, type DayOffStyle } from "../domain/index.js";
+import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 
 /** 勤務帯の編集フォームのドラフト。id が null なら新規追加、そうでなければ既存の編集。 */
 type ShiftDraft = { id: string | null; name: string; hour: number };
@@ -55,6 +56,13 @@ type WorkingStaffListViewProps = {
   onCommitShift?: (id: string | null, draft: { name: string; hour: number }) => void;
   /** 勤務帯（列）を取り除く */
   onRemoveShift?: (shiftId: string) => void;
+  /**
+   * その人の休みの形。base はその人の既定値（スタッフが持つ）、override はこの勤務表だけの
+   * 上書き（無ければ undefined）。渡されたときだけ「休みの形」の列を出す。
+   */
+  dayOffStyleOf?: (staffId: string) => { base: DayOffStyle; override?: DayOffStyle };
+  /** この勤務表での休みの形を上書きする。undefined で既定値に戻す */
+  onChangeDayOffStyle?: (staffId: string, style: DayOffStyle | undefined) => void;
 };
 
 /**
@@ -83,6 +91,8 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
   onToggleShift,
   onCommitShift,
   onRemoveShift,
+  dayOffStyleOf,
+  onChangeDayOffStyle,
 }) => {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
@@ -266,6 +276,14 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                 <tr>
                   <th className="e-th-handle" />
                   <th className="e-th-name">名前</th>
+                  {dayOffStyleOf && (
+                    <th
+                      className="e-th-day-off-style"
+                      title="休みの形。既定値はスタッフが持ち、この勤務表だけ変えられます"
+                    >
+                      休みの形
+                    </th>
+                  )}
                   {workShifts.map((shift) => (
                     <th key={shift.id} className="e-th-shift" title={shift.name}>
                       {shiftColumnsEditable && shiftDraft?.id === shift.id ? (
@@ -435,6 +453,26 @@ export const WorkingStaffListView: FC<WorkingStaffListViewProps> = ({
                         </ObjectView>
                       )}
                     </td>
+
+                    {dayOffStyleOf && (() => {
+                      const { base, override } = dayOffStyleOf(staff.id);
+                      return (
+                        <td className="e-day-off-style-cell">
+                          <DayOffStyleSelect
+                            className={`e-day-off-style${override ? " is-overridden" : ""}`}
+                            value={override}
+                            inherited={base}
+                            disabled={!editable || !onChangeDayOffStyle}
+                            title={
+                              override
+                                ? `${staff.name} はこの勤務表だけ「${override.label}」（既定は${base.label}）`
+                                : `${staff.name} の休みの形（既定値のまま）`
+                            }
+                            onChange={(style) => onChangeDayOffStyle?.(staff.id, style)}
+                          />
+                        </td>
+                      );
+                    })()}
 
                     {workShifts.map((shift) => (
                       <td key={shift.id} className="e-shift-cell">
@@ -638,6 +676,24 @@ const StyledContainer = styled.div`
     .e-shift-time {
       display: block;
       color: #aaa;
+    }
+
+    .e-th-day-off-style {
+      font-weight: normal;
+      font-size: 0.75em;
+      color: #888;
+      white-space: nowrap;
+    }
+
+    .e-day-off-style {
+      font-size: 0.8em;
+      max-width: 9em;
+      color: #888;
+
+      &.is-overridden {
+        color: #00695c;
+        font-weight: bold;
+      }
     }
 
     .e-th-name {

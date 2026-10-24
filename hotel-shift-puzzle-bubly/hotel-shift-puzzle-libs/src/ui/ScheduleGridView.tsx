@@ -16,6 +16,7 @@ import {
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
   type ScheduleReport,
+  type DayOffStyle,
 } from "../domain/index.js";
 import {
   STAFF_COL_WIDTH,
@@ -134,6 +135,10 @@ type ScheduleGridViewProps = {
    * 確定済みセルには何も返さない。
    */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** 休みのセルの役目の説明。セルに触れたときに title で出す */
+  dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** その人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
+  dayOffStyleOf?: (staffId: string) => DayOffStyle;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
@@ -218,6 +223,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onSelectionChange,
   clipboard,
   candidateHintOf,
+  dayOffReasonOf,
+  dayOffStyleOf,
   forcedCellOf,
   isDeadCell,
   onApproveForced,
@@ -474,6 +481,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           minDayOff={minDayOff}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -522,6 +531,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           minDayOff={minDayOff}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
