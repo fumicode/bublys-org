@@ -16,6 +16,7 @@ import {
 } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
+import { runMarksOf } from "./runMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
@@ -60,6 +61,8 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 連勤の上限。選択中の行に連勤・連休の線を引くときの色の基準（無ければ線を引かない） */
+  maxConsecutive?: number;
   /** 早番として数える勤務帯 ID 集合（名前「早番」に属する ID） */
   earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
@@ -100,6 +103,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  maxConsecutive,
   earlyShiftIds,
   candidateHintOf,
   forcedCellOf,
@@ -111,6 +115,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
   // 違反の印（連勤の赤帯・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
   const marks = violationMarksOf(violations, staff.id, days);
+  // 連勤・連休の細い線は、選択中のスタッフの行にだけ引く（案を見比べる人を絞って読む）
+  const runMarks =
+    selected && maxConsecutive !== undefined
+      ? runMarksOf(schedule, staff.id, days, maxConsecutive)
+      : [];
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -175,6 +184,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
             violationMarks={marks.filter((m) => m.anchorDay.equals(day))}
+            runMarks={runMarks.filter((m) => m.anchorDay.equals(day))}
             pointViolation={pointViolation}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}

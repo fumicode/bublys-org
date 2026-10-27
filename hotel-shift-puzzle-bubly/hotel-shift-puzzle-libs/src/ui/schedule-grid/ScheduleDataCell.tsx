@@ -10,6 +10,8 @@ import { wishText, type WishEntry } from "./wishSummary.js";
 import { DAY_OFF_WISH, workWishKey } from "../shiftWishOptions.js";
 import { ViolationMarks } from "./ViolationMarks.js";
 import type { ViolationMark } from "./violationMarkPlacement.js";
+import { RunMarks } from "./RunMarks.js";
+import type { RunMark } from "./runMarkPlacement.js";
 
 type ScheduleDataCellProps = {
   /** セルの状態（出勤・休み・未定） */
@@ -23,6 +25,8 @@ type ScheduleDataCellProps = {
    * 末尾のセルに置いて左へ伸ばす（置き場所の決め方は violationMarkPlacement.ts）。
    */
   violationMarks?: readonly ViolationMark[];
+  /** このセルを末尾とする連勤・連休の細い線（選択中のスタッフの行だけ。runMarkPlacement.ts）。 */
+  runMarks?: readonly RunMark[];
   /** 単日違反（希望の食い違い）。希望の円をオレンジにして表す（旧: 右上の ⊿） */
   pointViolation?: ConstraintViolation;
   /**
@@ -90,6 +94,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
   shift,
   wishEntries,
   violationMarks = [],
+  runMarks = [],
   pointViolation,
   candidateHint,
   forcedCandidate,
@@ -267,6 +272,7 @@ export const ScheduleDataCell: FC<ScheduleDataCellProps> = ({
       {content}
       {wishMarks}
       {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
+      <RunMarks marks={runMarks} />
       <ViolationMarks marks={violationMarks} violationUrl={violationUrl} />
     </div>
   );

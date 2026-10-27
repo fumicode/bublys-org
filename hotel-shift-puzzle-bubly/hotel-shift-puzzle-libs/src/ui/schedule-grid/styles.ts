@@ -820,6 +820,35 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 連勤・連休の線（選択中のスタッフの行だけ。runMarkPlacement.ts）。赤帯と同じく末尾のセルから
+     --span 列ぶん左へ伸ばす。隣の塊と見分けられるよう右端を 1px 空ける。
+     連勤（2px 実線）: 何日目かで 緑＝上限-2日目まで → 黄緑＝上限-1日目 → 黄＝上限日目 と
+     じわっと変わる。変わり目は前の日へ寄せてあり、上限日目は大半が黄になる
+     （グラデーションは RunMarks.tsx が --run-* で組む）。超えたら赤帯。
+     連休（2px 点線）: 水色＝2連休 / 青＝3連休以上 */
+  .e-run-bar {
+    --run-ok: #43a047;
+    --run-near: #9ccc65;
+    --run-limit: #fdd835;
+
+    position: absolute;
+    right: 1px;
+    bottom: 0;
+    width: calc(var(--span, 1) * (100% + 1px) - 2px);
+    height: 2px;
+    pointer-events: none;
+    z-index: 1;
+
+    /* 連休は点線にして、連勤の実線と形でも見分けられるようにする */
+    &.is-off-2,
+    &.is-off-long {
+      height: 0;
+      border-bottom: 2px dotted;
+    }
+    &.is-off-2 { border-color: #4fc3f7; }
+    &.is-off-long { border-color: #1565c0; }
+  }
+
   /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を1つ出す。
      違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
      希望の円（単日違反）とは別の形にしている。

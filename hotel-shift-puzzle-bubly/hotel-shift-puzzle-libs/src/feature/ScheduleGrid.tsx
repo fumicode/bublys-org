@@ -843,6 +843,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onToggleStaffSelected={toggleStaffSelected}
           onSelectRule={selectRuleStaff}
           minDayOff={constraints?.minMonthlyDayOff}
+          maxConsecutiveWorkdays={barConstraintSet.maxConsecutiveWorkdays}
           maxDayOffPerDay={constraints?.maxDayOffPerDay}
           onChangeCells={handleChangeCells}
           onChangeRequired={handleChangeRequired}

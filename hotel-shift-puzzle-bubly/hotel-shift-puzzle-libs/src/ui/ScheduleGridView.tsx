@@ -112,6 +112,8 @@ type ScheduleGridViewProps = {
   onSelectRule?: (staffIds: string[]) => void;
   /** 月の最低休日数。これ未満のスタッフは右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 連勤の上限。選択中のスタッフの行に連勤・連休の線を引く色の基準（無ければ線を引かない） */
+  maxConsecutiveWorkdays?: number;
   /** 1日の休み人数の上限。footer の休み行でこれを超えた日を赤くする */
   maxDayOffPerDay?: number;
   /** feature 層と共有する現在セル。キーボード選択と同じ状態にする。 */
@@ -201,6 +203,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   onToggleStaffSelected,
   onSelectRule,
   minDayOff,
+  maxConsecutiveWorkdays,
   maxDayOffPerDay,
   selection,
   onSelectionChange,
@@ -452,6 +455,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          maxConsecutive={maxConsecutiveWorkdays}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
@@ -497,6 +501,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
+          maxConsecutive={maxConsecutiveWorkdays}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
           forcedCellOf={forcedCellOf}
