@@ -144,8 +144,18 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           draggable={true}
           openingPosition="bubble-side-left"
           fullWidth={true}
+          // 名前を押しても選択できる（チェックボックスと同じ切り替え）。
+          // バッジは自分で stopPropagation しているので、押しても選択は変わらない
+          onClick={onToggleSelected && (() => onToggleSelected(staff.id))}
         >
-          <div className="e-staff" title="ダブルクリックでスタッフ詳細を開く">
+          <div
+            className="e-staff"
+            title={
+              onToggleSelected
+                ? "クリックで選択・ダブルクリックでスタッフ詳細を開く"
+                : "ダブルクリックでスタッフ詳細を開く"
+            }
+          >
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
