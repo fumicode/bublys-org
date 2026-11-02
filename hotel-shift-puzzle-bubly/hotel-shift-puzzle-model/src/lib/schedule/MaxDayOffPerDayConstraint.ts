@@ -34,6 +34,7 @@ export class MaxDayOffPerDayConstraint implements ScheduleConstraint {
             staffId: undefined, // 日単位（その日に休みが多すぎる）
             days: [day],
             message: `休みが${n}人（上限${this.maxPerDay}人）`,
+            summary: `休みが${n}人（上限${this.maxPerDay}）`,
           })
         );
       }

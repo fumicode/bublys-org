@@ -1,0 +1,254 @@
+import { FC, HTMLAttributes, useContext } from "react";
+import {
+  urlProps,
+  BubblesContext,
+  CurrentBubbleContext,
+} from "@bublys-org/bubbles-ui";
+import type { WorkShift, ConstraintViolation, ShiftCell } from "../../domain/index.js";
+import { SHIFT_BG, SHIFT_FG } from "./constants.js";
+import { wishText, type WishEntry } from "./wishSummary.js";
+import { DAY_OFF_WISH, workWishKey } from "../shiftWishOptions.js";
+import { ViolationMarks } from "./ViolationMarks.js";
+import type { ViolationMark } from "./violationMarkPlacement.js";
+
+export type CellFaceProps = {
+  /** セルの状態（出勤・休み・未定） */
+  cell: ShiftCell;
+  /** 出勤のとき解決済みの勤務帯（未解決/休み/未定なら undefined） */
+  shift?: WorkShift;
+  /** 未割当セルに薄く出す希望ヒント */
+  wishEntries: WishEntry[];
+  /**
+   * このセルを末尾とする違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）。
+   * 末尾のセルに置いて左へ伸ばす（置き場所の決め方は violationMarkPlacement.ts）。
+   */
+  violationMarks?: readonly ViolationMark[];
+  /** 希望の食い違い。希望の円をオレンジにして表す（旧: 右上の ⊿） */
+  wishViolation?: ConstraintViolation;
+  /**
+   * まだ決まっていないセルに入れられる値（候補集合）の説明文。ホバーで内容が見えるよう
+   * title に添える。確定済みセル・候補集合が無いときは undefined。
+   */
+  candidateHint?: string;
+  /**
+   * 候補が1つに絞られた＝制約から一意に決まる値（確定提案）。渡すと、確定済みセルと
+   * 同じ形を薄く描いて「承認すればこうなる」を示す。承認前なので勤務表には入っていない。
+   */
+  forcedCandidate?: ShiftCell;
+  /** forcedCandidate が出勤のとき解決済みの勤務帯（色と開始時刻を確定済みセルと揃える） */
+  forcedShift?: WorkShift;
+  /**
+   * 詰み（候補が1つも無い＝何を入れても制約に反する）セルか。
+   * 違反マーカー（赤帯・⊿）は「今ある割当が違反している」印だが、これは「この先どうやっても
+   * 埋められない」印なので、セルの地の描き方そのものを変えて言い分ける。
+   */
+  dead?: boolean;
+  /** キーボード操作でフォーカス中のセルか */
+  selected?: boolean;
+  /** 入力中バッファ（このセルで打ち込み中の文字列）。null なら非表示 */
+  inputBuffer?: string | null;
+  /** 範囲選択に入っているか（2セル以上選んでいるとき。薄い青を重ねる） */
+  inRange?: boolean;
+  /** カット中の元のセルか（点線で囲む。#166） */
+  cutSource?: boolean;
+  /**
+   * 違反バブルの URL を作る。違反の印（ViolationMarks）と、希望が叶わなかった円の
+   * ダブルクリックで違反バブルを開く。
+   */
+  violationUrl?: (violation: ConstraintViolation) => string;
+  /** 追加クラス（選択モード時の is-focused / is-dimmed、ドロップダウンの縮小表示など）。 */
+  cellClassName?: string;
+} & Omit<HTMLAttributes<HTMLDivElement>, "className" | "style" | "title">;
+
+
+/**
+ * セルの見た目（値・提案・希望・違反の印・詰み）。勤務表のセルと、勤務割当のドロップダウンの
+ * 選択肢が共有する（ルール：セルの見た目は1つの部品で描く。スタイルは cellFaceStyles）。
+ * 押す・ドラッグ・ダブルクリックなどの操作は持たない。使う側が div の属性として渡す。
+ *
+ * 出勤＝開始時刻の「時」だけ（勤務帯は背景色で区別）、休み＝「休」、未定＝希望 or「·」。
+ *
+ * シフト希望は、実際の割当と同じ1文字（休 / 7 …）を「文字色と同じ色の円」で囲んで出す。
+ *   - まだ何も入っていないセル … 希望の候補すべてを円で横に並べる（中央・通常サイズ）
+ *   - 実際の値が入ったセル       … 円は1つだけに絞り、小さくなって左上の角へ退避
+ *                                 （角から少しはみ出す）。残すのは「その割当に対応する希望」
+ *                                 ＝叶ったシフトの色の円
+ *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
+ *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
+ * 範囲違反（連勤など）・1セルで完結する違反（可能勤務帯の外など）・勤務間インターバル違反は、
+ * 違反1件に印1つ。違反が覆う範囲の末尾のセルに置き、そこから左へ伸ばす（ViolationMarks）。
+ */
+export const CellFace: FC<CellFaceProps> = ({
+  cell,
+  shift,
+  wishEntries,
+  violationMarks = [],
+  wishViolation,
+  candidateHint,
+  forcedCandidate,
+  forcedShift,
+  dead = false,
+  selected = false,
+  inputBuffer = null,
+  inRange = false,
+  cutSource = false,
+  violationUrl,
+  cellClassName,
+  ...divProps
+}) => {
+  // 希望の円から違反バブルを開くため（ObjectView で包むと円が remount してアニメが消えるので、
+  // 円自身にダブルクリックを持たせる。data-url は urlProps で付けて link bubble の起点にする）
+  const { openBubble } = useContext(BubblesContext);
+  const currentBubbleId = useContext(CurrentBubbleContext);
+
+  let className = "e-cell";
+  if (cellClassName) className += ` ${cellClassName}`;
+  if (inRange) className += " is-in-range";
+  if (cutSource) className += " is-cut-source";
+  let style: React.CSSProperties | undefined;
+  let content: React.ReactNode;
+  let title: string | undefined;
+
+  if (cell.kind === "work") {
+    const id = cell.shiftId;
+    className += " e-work";
+    style = { background: SHIFT_BG[id] ?? "#eee", color: SHIFT_FG[id] ?? "#333" };
+    // 勤務帯は背景色で区別できるので、セルは開始時刻の「時」だけを大きく出す。
+    // 勤務帯名・開始時刻はホバーで分かるよう title に入れる。
+    content = <span className="e-shift-hour">{shift ? shift.startHour : id}</span>;
+    if (shift) title = `${shift.name}（${shift.startTimeLabel}）`;
+  } else if (cell.kind === "day-off") {
+    className += " e-off";
+    content = "休";
+  } else if (dead) {
+    // 詰み: 何を入れてもどれかの制約に反する。承認できる手が無いので値は描かず、
+    // 「ここは埋まらない」ことだけを示す（理由は candidateHint が title に添える）。
+    className += " e-undecided e-dead";
+    content = <span className="e-dead-mark">×</span>;
+  } else if (forcedCandidate) {
+    // 未割当だが制約から一意に決まる: 確定済みと同じ形（勤務帯色＋開始時刻の「時」/「休」）を
+    // 薄く破線で描く。承認すればこうなる、が一目で分かり、確定済みとは見間違えない。
+    // 希望ヒントより強い情報なのでこちらを優先し、希望は title に残す。
+    className += " e-undecided e-forced";
+    const forcedLabel =
+      forcedCandidate.kind === "work"
+        ? (forcedShift?.startHour ?? forcedCandidate.shiftId)
+        : "休";
+    const forcedStyle =
+      forcedCandidate.kind === "work"
+        ? {
+            background: SHIFT_BG[forcedCandidate.shiftId] ?? "#eee",
+            color: SHIFT_FG[forcedCandidate.shiftId] ?? "#333",
+          }
+        : undefined;
+    content = (
+      <span className="e-forced-value" style={forcedStyle}>
+        {forcedLabel}
+      </span>
+    );
+  } else {
+    // 未割当: 希望があれば円で表示（下で描く）。無ければ "·"
+    className += " e-undecided";
+    content = wishEntries.length > 0 ? null : "·";
+    if (wishEntries.length > 0) className += " has-wish-hint";
+  }
+
+  // 確定提案を出したセルでは希望ヒントが隠れるので、希望も title 側に残す。
+  if (forcedCandidate && wishEntries.length > 0) {
+    title = `希望: ${wishEntries.map(wishText).join(" ")}`;
+  }
+  if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
+
+  if (selected) className += " is-selected";
+
+  // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
+  const hasValue = cell.kind === "work" || cell.kind === "day-off";
+  // 希望と違う勤務帯になったか。判定は宣言的な制約（希望違反）から導く（表示側で再実装しない）。
+  const wishMismatch = !!wishViolation;
+
+  // 値が入ったセルの左上に残す円は1つだけ。「その割当に対応する希望」＝叶ったシフトの円を残す。
+  // 割当が決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
+  // 叶っていないとき（希望違反）は、破った × 希望 → 叶わなかった ○ 希望 の順に代表を1つ選び、
+  // 警告色（is-mismatch）の円として残す＝違反バブルへの導線も1つに集まる。
+  const assignedWishKey =
+    cell.kind === "day-off"
+      ? DAY_OFF_WISH
+      : cell.kind === "work"
+        ? workWishKey(shift?.name ?? cell.shiftId)
+        : undefined;
+  const cornerWishEntry =
+    wishEntries.find((e) => e.key === assignedWishKey) ??
+    wishEntries.find((e) => e.pref === "want") ??
+    wishEntries[0];
+  const shownWishEntries: WishEntry[] =
+    hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
+
+  // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
+  const wishViolationUrl =
+    wishMismatch && wishViolation && violationUrl
+      ? violationUrl(wishViolation)
+      : undefined;
+
+  // 希望の円（1文字＋文字色と同じ線色）。
+  //
+  // 重要: 円は「常に同じ素の <span>」として描く。叶わないときだけ ObjectView で包むと、
+  // .is-corner が付くのと同時に DOM ノードが作り直され（remount）、最初から角の位置で
+  // マウントされてしまい左上へ移動する transition が走らない。そのため違反バブルへの導線は
+  // ラッパではなく、この span 自身の data-url + ダブルクリック（openBubble）で持たせる。
+  const wishMarks = wishEntries.length > 0 && (
+    <span className={`e-wish-marks${hasValue ? " is-corner" : ""}`}>
+      {shownWishEntries.map((e, i) => {
+        // 見た目（背景・線幅・不透明度）は状態ごとに CSS 側で決める。ここは色と位置だけ渡す。
+        const style = {
+          // 希望の色（勤務帯色 / 休みはグレー）。文字色・線色に使う
+          ["--wish-color" as string]: e.color,
+          // 複数希望を横に並べるための位置（CSS 側で calc に使う）
+          ["--i" as string]: i,
+          ["--n" as string]: shownWishEntries.length,
+        } as React.CSSProperties;
+        return (
+          <span
+            key={e.key}
+            className={`e-wish-badge${e.pref === "avoid" ? " is-avoid" : ""}${
+              wishMismatch ? " is-mismatch" : ""
+            }`}
+            style={style}
+            title={
+              wishMismatch && wishViolation
+                ? `${wishViolation.message}（ダブルクリックで詳細）`
+                : `希望: ${wishText(e)}`
+            }
+            {...(wishViolationUrl ? urlProps(wishViolationUrl) : {})}
+            // セルの単クリック=選択 / ダブルクリック=候補 とぶつからないよう伝播を止める
+            onClick={wishViolationUrl ? (ev) => ev.stopPropagation() : undefined}
+            onDoubleClick={
+              wishViolationUrl
+                ? (ev) => {
+                    ev.stopPropagation();
+                    openBubble(wishViolationUrl, currentBubbleId, "origin-side");
+                  }
+                : undefined
+            }
+          >
+            {/* 円と文字は別要素。値が入ると円は角へ、文字は見える側へと独立に動く */}
+            <span className="e-wish-char">{e.char}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+
+  return (
+    <div
+      className={className}
+      style={style}
+      title={title}
+      {...divProps}
+    >
+      {content}
+      {wishMarks}
+      {inputBuffer !== null && <span className="e-input">{inputBuffer}</span>}
+      <ViolationMarks marks={violationMarks} violationUrl={violationUrl} />
+    </div>
+  );
+};

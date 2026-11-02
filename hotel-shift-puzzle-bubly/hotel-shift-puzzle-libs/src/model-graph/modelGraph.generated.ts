@@ -376,6 +376,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "message",
           "type": "string",
           "optional": false
+        },
+        {
+          "name": "summary",
+          "type": "string",
+          "optional": true
         }
       ],
       "getters": [
@@ -384,6 +389,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "isDayScoped",
         "days",
         "message",
+        "summary",
         "key"
       ],
       "methods": [

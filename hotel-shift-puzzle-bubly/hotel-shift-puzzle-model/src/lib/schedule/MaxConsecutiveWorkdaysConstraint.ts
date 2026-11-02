@@ -62,6 +62,7 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
       staffId,
       days: run,
       message: `${run.length}連勤（上限${this.maxConsecutive}連勤）`,
+      summary: `${run.length}連勤（上限${this.maxConsecutive}）`,
     });
   }
 }

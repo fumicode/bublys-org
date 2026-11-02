@@ -35,7 +35,7 @@ export const ViolationMarks: FC<ViolationMarksProps> = ({
   violationUrl,
 }) => (
   <>
-    {marks.map(({ kind, violation, span }) => {
+    {marks.map(({ kind, violation, span, edge }) => {
       // 境目の丸は帯からはみ出すので、当たり判定（ObjectView）の子として描く。
       // 枠の ::after で描くと丸の上の操作が ObjectView に届かず、丸からバブルを開けない。
       const dot =
@@ -43,7 +43,7 @@ export const ViolationMarks: FC<ViolationMarksProps> = ({
       return (
         <span
           key={violation.key}
-          className={MARK_CLASS[kind]}
+          className={`${MARK_CLASS[kind]}${edge === "right" ? " is-right" : ""}`}
           style={{ ["--span" as string]: span } as CSSProperties}
           title={`${violation.message}（ダブルクリックで詳細）`}
           onMouseDown={(e) => e.stopPropagation()}

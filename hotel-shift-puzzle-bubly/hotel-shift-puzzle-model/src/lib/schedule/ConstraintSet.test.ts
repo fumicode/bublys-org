@@ -4,10 +4,10 @@ import { ShiftIntervalRule } from './ShiftIntervalRule.js';
 import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
 
 describe('ConstraintSet.modelConstraints', () => {
-  test('RequiredStaffingConstraint を含む', () => {
+  test('必要人数は制約に含まない（制約バーに出ない＝明記していないものは違反にしない）', () => {
     const constraints = new ConstraintSet({ id: 'schedule-A', leaderRules: [] });
     const model = constraints.modelConstraints(() => []);
-    expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(true);
+    expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(false);
   });
 });
 

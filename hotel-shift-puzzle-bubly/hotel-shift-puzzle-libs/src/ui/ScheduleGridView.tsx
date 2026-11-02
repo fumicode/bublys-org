@@ -16,7 +16,8 @@ import {
   type ScheduleConstraint,
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
-  violationsIntroducedBy,
+  previewCellValues,
+  type CellValuePreview,
 } from "../domain/index.js";
 import {
   STAFF_COL_WIDTH,
@@ -38,7 +39,11 @@ import {
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
-import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
+import {
+  ShiftSuggestionDropdown,
+  type ShiftOptionFace,
+} from "./schedule-grid/ShiftSuggestionDropdown.js";
+import { optionFaceOf, optionKeyOf } from "./schedule-grid/optionFace.js";
 import {
   useCellKeyboardEditing,
   suggestionToCell,
@@ -183,10 +188,6 @@ function groupStaffByDepartment(
  * 派生データの算出と描画に徹し、キーボード操作（選択・入力・候補）は
  * useCellKeyboardEditing に、見た目は schedule-grid/ 配下の子コンポーネントに委ねる。
  */
-/** 選択肢（セルの値）を引くキー */
-const optionKeyOf = (cell: ShiftCell): string =>
-  cell.kind === "work" ? `work:${cell.shiftId}` : cell.kind;
-
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
@@ -416,31 +417,45 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     },
   });
 
-  // ドロップダウンの各選択肢に添える「それに替えたら新しく出る違反」。
-  // 選択肢はセルに入れたときの姿で描く＝セルに付くはずの違反の印を、選ぶ前に見せる。
+  // ドロップダウンの選択肢は「それを入れたときのセルの姿」で描く（CellFace＝勤務表のセルと同じ部品）。
   // 判定はセルに反映している制約リストそのもの（可能勤務帯を名指ししない）。
   // 開いているセル1つぶん（勤務帯＋休み＋未定）だけ、開いたときに計算する。打ち込みで絞っても計算し直さない。
   const editingCell = kb.editing && kb.selection?.kind === "staff" ? kb.selection : null;
-  const violationsByOption = useMemo(() => {
-    if (!editingCell || !constraints) return null;
+  const previewByOption = useMemo(() => {
+    if (!editingCell || !constraints) return new Map<string, CellValuePreview>();
     const cells: ShiftCell[] = [
       ...shiftOptions.map((w): ShiftCell => ({ kind: "work", shiftId: w.id })),
       { kind: "day-off" },
       { kind: "undecided" },
     ];
-    const introduced = violationsIntroducedBy(
+    const previews = previewCellValues(
       schedule,
       constraints,
       editingCell.staffId,
       editingCell.day,
       cells
     );
-    return new Map(cells.map((cell, i) => [optionKeyOf(cell), introduced[i]]));
+    return new Map(previews.map((p) => [optionKeyOf(p.cell), p]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- セルは staffId と日で同定する
   }, [editingCell?.staffId, editingCell?.day.key, constraints, schedule, shiftOptions]);
-  const suggestionViolationsOf = violationsByOption
-    ? (s: ShiftSuggestion) => violationsByOption.get(optionKeyOf(suggestionToCell(s))) ?? []
-    : undefined;
+  const optionFaceFor = (s: ShiftSuggestion): ShiftOptionFace => {
+    const cell = suggestionToCell(s);
+    if (!editingCell) {
+      return optionFaceOf(cell, undefined, {
+        staffId: "",
+        day: days[0],
+        shiftMap,
+        wishEntries: [],
+      });
+    }
+    return optionFaceOf(cell, previewByOption.get(optionKeyOf(cell)), {
+      staffId: editingCell.staffId,
+      day: editingCell.day,
+      shiftMap,
+      wishEntries: getWishEntries(editingCell.staffId, editingCell.day),
+      forced: forcedCellOf?.(editingCell.staffId, editingCell.day),
+    });
+  };
 
   // メニューで選んだ値で確定する（ルール2：留まる）。範囲を選んでいれば範囲の全セルへ。
   // 閉じたらキー操作へ戻れるようグリッドへフォーカス
@@ -714,7 +729,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         suggestions={kb.suggestions}
         activeIndex={kb.activeIndex}
         onPick={kb.applySuggestion}
-        violationsOf={suggestionViolationsOf}
+        faceOf={optionFaceFor}
       />
     </StyledWrap>
   );

@@ -4,7 +4,7 @@ import {
   WorkingDay,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
-import { violationMarksOf } from "./violationMarkPlacement.js";
+import { cellFaceMarksOf, violationMarksOf } from "./violationMarkPlacement.js";
 
 describe("violationMarksOf — 違反の印の置き場所", () => {
   // 表示中の日（列）
@@ -96,5 +96,52 @@ describe("violationMarksOf — 違反の印の置き場所", () => {
     expect(
       violationMarksOf([violation("shift-interval", on("03", "04"))], "s1", shown)
     ).toEqual([]);
+  });
+});
+
+describe("cellFaceMarksOf — 1セルだけを描くときの印（ドロップダウンの選択肢）", () => {
+  const on = (...dd: string[]) => dd.map((d) => WorkingDay.fromKey(`2026-06-${d}`));
+  const day = (d: string) => WorkingDay.fromKey(`2026-06-${d}`);
+  const violation = (constraintType: string, vdays: WorkingDay[], staffId = "s1") =>
+    new ConstraintViolation({ constraintType, staffId, days: vdays, message: "違反" });
+  const summary = (marks: ReturnType<typeof cellFaceMarksOf>) =>
+    marks.map((m) => ({ kind: m.kind, span: m.span, edge: m.edge }));
+
+  it("勤務表と同じ形に振り分ける（連勤は1列ぶんの帯・1セルは角）", () => {
+    const marks = cellFaceMarksOf(
+      [
+        violation("max-consecutive-workdays", on("02", "03", "04")),
+        violation(ALLOWED_SHIFT_CONSTRAINT, on("03")),
+      ],
+      "s1",
+      day("03")
+    );
+    expect(summary(marks)).toEqual([
+      { kind: "range", span: 1, edge: undefined },
+      { kind: "corner", span: 1, edge: undefined },
+    ]);
+  });
+
+  it("勤務間インターバルは、後の日なら左の境目・前の日なら右の境目", () => {
+    const v = [violation("shift-interval:late", on("03", "04"))];
+    expect(summary(cellFaceMarksOf(v, "s1", day("04")))).toEqual([
+      { kind: "interval", span: 1, edge: "left" },
+    ]);
+    expect(summary(cellFaceMarksOf(v, "s1", day("03")))).toEqual([
+      { kind: "interval", span: 1, edge: "right" },
+    ]);
+  });
+
+  it("そのセルにかからない違反と、希望の食い違いは印にしない", () => {
+    const marks = cellFaceMarksOf(
+      [
+        violation(ALLOWED_SHIFT_CONSTRAINT, on("05")),
+        violation(ALLOWED_SHIFT_CONSTRAINT, on("03"), "s2"),
+        violation(SHIFT_WISH_MISMATCH, on("03")),
+      ],
+      "s1",
+      day("03")
+    );
+    expect(marks).toEqual([]);
   });
 });

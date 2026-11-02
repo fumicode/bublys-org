@@ -32,7 +32,20 @@ export type ViolationMark = {
   anchorDay: WorkingDay;
   /** 印が覆う列の数（置くセル自身を含む）。corner・interval では使わない。 */
   span: number;
+  /**
+   * 勤務間インターバルの印を置く境目。勤務表では常に後の日のセルの左端（"left"）。
+   * 1セルだけを描くとき（cellFaceMarksOf）に、そのセルが前の日なら右端（"right"）になる。
+   */
+  edge?: "left" | "right";
 };
+
+/** 違反の種類から印の形を決める（勤務表・1セルの描画で共通） */
+const markKindOf = (violation: ConstraintViolation): ViolationMarkKind =>
+  isShiftIntervalConstraintType(violation.constraintType)
+    ? "interval"
+    : violation.days.length > 1
+      ? "range"
+      : "corner";
 
 /** 表示中の日（列）の並びの中で、違反が覆う日の最初と最後の位置。1日も表示されていなければ undefined。 */
 const visibleSpan = (
@@ -64,19 +77,46 @@ export function violationMarksOf(
     if (violation.staffId !== staffId) continue;
     // 希望の食い違いは希望の円が受け持つ（セルの中）
     if (violation.constraintType === SHIFT_WISH_MISMATCH) continue;
-    const interval = isShiftIntervalConstraintType(violation.constraintType);
+    const kind = markKindOf(violation);
     const span = visibleSpan(violation, days);
     if (!span) continue;
     const anchorDay = days[span.last];
-    if (interval) {
+    if (kind === "interval") {
       const lastDay = violation.days[violation.days.length - 1];
       if (!lastDay || !anchorDay.equals(lastDay) || span.first === span.last) continue;
     }
     marks.push({
-      kind: interval ? "interval" : violation.days.length > 1 ? "range" : "corner",
+      kind,
       violation,
       anchorDay,
       span: span.last - span.first + 1,
+    });
+  }
+  return marks;
+}
+
+/**
+ * 1セルだけを描くとき（勤務割当のドロップダウンの選択肢）の印。そのセルにかかる違反を、勤務表と
+ * 同じ形の印にする（希望の食い違いは希望の円が受け持つので除く）。
+ * 帯は1列ぶん。勤務間インターバルは、そのセルが後の日なら左の境目（勤務表と同じ）、前の日なら右の境目。
+ */
+export function cellFaceMarksOf(
+  violations: readonly ConstraintViolation[],
+  staffId: string,
+  day: WorkingDay
+): ViolationMark[] {
+  const marks: ViolationMark[] = [];
+  for (const violation of violations) {
+    if (!violation.coversCell(staffId, day)) continue;
+    if (violation.constraintType === SHIFT_WISH_MISMATCH) continue;
+    const kind = markKindOf(violation);
+    const lastDay = violation.days[violation.days.length - 1];
+    marks.push({
+      kind,
+      violation,
+      anchorDay: day,
+      span: 1,
+      ...(kind === "interval" ? { edge: lastDay?.equals(day) ? "left" : "right" } : {}),
     });
   }
   return marks;

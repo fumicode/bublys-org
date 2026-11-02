@@ -110,6 +110,7 @@ export class ShiftWishConstraint implements ScheduleConstraint {
             staffId,
             days: [day],
             message: `希望と異なる割当です（希望: ${mismatch.wishText} ／ 割当: ${mismatch.assignedText}）`,
+            summary: `希望（${mismatch.wishText}）と違う`,
           })
         );
       }

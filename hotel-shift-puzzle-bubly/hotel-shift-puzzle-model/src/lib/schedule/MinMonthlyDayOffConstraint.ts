@@ -47,6 +47,7 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
             staffId,
             days: [], // 月単位（特定日ではない）
             message: `休みが月${off}日（最低${this.minDays}日必要、残り${undecided}日では届きません）`,
+            summary: `月の休みが最低${this.minDays}日に届かない`,
           })
         );
       }

@@ -199,12 +199,13 @@ describe("終盤・詰みありの勤務表（2026年9月）", () => {
     expect(undecided).toEqual([`${ENDGAME_DEAD_STAFF_ID}:${deadDay.key}`]);
   });
 
-  it("詰み以外は成立している（違反は28日の必要人数不足だけ）", () => {
-    // 責任者の居ない日や連勤オーバーが散っていると、詰みがその中に埋もれてしまう
+  it("詰み以外は成立している（違反は無い）", () => {
+    // 責任者の居ない日や連勤オーバーが散っていると、詰みがその中に埋もれてしまう。
+    // 28日は人数が足りていないが、必要人数は制約ではないので違反には数えない
     const violations = endgame.checkConstraints(endgameConstraints);
     expect(
       violations.map((v) => `${v.constraintType}@${v.days.map((d) => d.day).join(",")}`)
-    ).toEqual([`required-staffing@${ENDGAME_DEAD_DAY}`]);
+    ).toEqual([]);
   });
 
   it("佐藤は出勤できない（23〜27日の5連勤）", () => {
@@ -275,23 +276,35 @@ describe("終盤・詰みありの勤務表（2026年9月）", () => {
 
     expect(diagnosis.repairs.length).toBeGreaterThan(0);
 
-    // 28日に休んでいる人を中番に入れれば、人数不足が埋まり休み枠も空く＝代償なしで解ける
+    // 佐藤の連勤の途中を休みにすれば、28日に出勤できる＝代償なしで解ける。
+    // （必要人数は制約ではないので、「28日の人数不足を埋める手」が特に優先されはしない）
     const best = diagnosis.repairs[0];
     expect(best.costs).toEqual([]);
-    expect(best.day.key).toBe(deadDay.key);
-    expect(best.to).toEqual({ kind: "work", shiftId: "middle" });
-    expect(best.unlocks).toEqual([{ kind: "day-off" }]);
+    expect(best.staffId).toBe(ENDGAME_DEAD_STAFF_ID);
+    expect(best.to).toEqual({ kind: "day-off" });
+    expect(best.unlocks).toEqual([
+      { kind: "work", shiftId: "early" },
+      { kind: "work", shiftId: "middle" },
+    ]);
+    // 28日に休んでいる人を出勤させて休み枠を空ける手も、代償なしの解き方として挙がる
+    expect(
+      diagnosis.repairs.some(
+        (r) =>
+          r.day.key === deadDay.key &&
+          r.to.kind === "work" &&
+          r.costs.length === 0 &&
+          r.unlocks.some((c) => c.kind === "day-off")
+      )
+    ).toBe(true);
 
     // 実際にその手を打つと詰みが消える
     const applied = endgame.setCell(best.staffId, best.day, best.to);
     const after = computeAllCandidates({ ...endgameInput, schedule: applied });
     expect(deadCellKeys(after)).toEqual([]);
-    expect(after.candidatesOf(ENDGAME_DEAD_STAFF_ID, deadDay)).toEqual([
-      { kind: "day-off" },
-    ]);
+    expect(after.candidatesOf(ENDGAME_DEAD_STAFF_ID, deadDay)).toEqual(best.unlocks);
   });
 
-  it("連勤の途中を休みに書き換えると詰みが解け、中番の確定提案に変わる", () => {
+  it("連勤の途中を休みに書き換えると詰みが解け、出勤の候補が戻る", () => {
     const before = computeAllCandidates(endgameInput);
 
     const fixDay = sep(ENDGAME_FIX_DAY);
@@ -304,9 +317,11 @@ describe("終盤・詰みありの勤務表（2026年9月）", () => {
       [{ staffId: ENDGAME_DEAD_STAFF_ID, day: fixDay }]
     );
 
-    // 出勤できるようになり、28日に足りないのは中番だけなので中番に絞られる
+    // 出勤できるようになる。遅番は翌29日の中番との勤務間インターバルで塞がる。
+    // 必要人数は制約ではないので、28日に足りない勤務帯へ絞られはしない
     expect(deadCellKeys(after)).toEqual([]);
     expect(after.candidatesOf(ENDGAME_DEAD_STAFF_ID, deadDay)).toEqual([
+      { kind: "work", shiftId: "early" },
       { kind: "work", shiftId: "middle" },
     ]);
     // 差分計算がその盤面の全計算と一致していること

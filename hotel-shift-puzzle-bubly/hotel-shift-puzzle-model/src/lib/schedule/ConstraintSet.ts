@@ -5,7 +5,6 @@ import { ShiftIntervalConstraint } from "./ShiftIntervalConstraint.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
-import { RequiredStaffingConstraint } from "./RequiredStaffingConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 
 /**
@@ -211,8 +210,10 @@ export class ConstraintSet {
 
   /**
    * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
-   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限・必要人数。希望違反と
+   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限。希望違反と
    *  可能勤務帯は、勤務表の外のデータ（希望・勤務スタッフ群）が要るので含まない——feature 側で足す。）
+   * 必要人数は制約ではない（制約バーに出ない＝制約として明記していないので、違反にも数えない）。
+   * 集計行の目標として見せ、自動シフトの「必要人数を埋める」が勤務表の必要人数を直接読む。
    * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
    */
   modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
@@ -222,7 +223,6 @@ export class ConstraintSet {
       ...this.intervalConstraints(shiftIdsOf),
       new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
       new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
-      new RequiredStaffingConstraint(shiftIdsOf),
     ];
   }
 

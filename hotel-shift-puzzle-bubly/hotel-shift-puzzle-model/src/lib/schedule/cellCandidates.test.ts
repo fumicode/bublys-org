@@ -3,7 +3,11 @@ import { WorkShift } from "./WorkShift.js";
 import { WorkingDay } from "./WorkingDay.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
-import { legalCandidatesFor, violationsIntroducedBy } from "./cellCandidates.js";
+import {
+  legalCandidatesFor,
+  previewCellValues,
+  violationsIntroducedBy,
+} from "./cellCandidates.js";
 import { AllowedShiftConstraint, ALLOWED_SHIFT_CONSTRAINT } from "./AllowedShiftConstraint.js";
 import { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import { WorkingStaffMember } from "../staff/WorkingStaffMember.js";
@@ -132,5 +136,32 @@ describe("violationsIntroducedBy（各値に替えたら新しく出る違反）
     );
     expect(result[1]).toHaveLength(1);
     expect(result[2]).toEqual([]);
+  });
+});
+
+describe("previewCellValues（各値を入れたときのセルの姿）", () => {
+  const day = (d: number) => WorkingDay.fromKey(`2026-06-0${d}`);
+  const allowed = new AllowedShiftConstraint(
+    new WorkingStaffGroup({
+      id: "sched-1",
+      members: [new WorkingStaffMember({ staffId: "s1", allowedShiftIds: ["late"] })],
+    })
+  );
+
+  it("すでに違反しているセルで別の入れない帯を選んでも、入れたあとの違反として見える", () => {
+    const s = MonthlyStaffSchedule.create({
+      id: "sched-1",
+      storeId: "store-1",
+      year: 2026,
+      month: 6,
+    }).setCell("s1", day(1), { kind: "work", shiftId: "early" });
+    const [middle, late] = previewCellValues(s, [allowed], "s1", day(1), [
+      { kind: "work", shiftId: "middle" },
+      { kind: "work", shiftId: "late" },
+    ]);
+    // 種類・人・日が同じなので「新しい違反」にはならないが、入れたあとの姿には出る
+    expect(middle.introduced).toEqual([]);
+    expect(middle.after.filter((v) => v.coversCell("s1", day(1)))).toHaveLength(1);
+    expect(late.after).toEqual([]);
   });
 });

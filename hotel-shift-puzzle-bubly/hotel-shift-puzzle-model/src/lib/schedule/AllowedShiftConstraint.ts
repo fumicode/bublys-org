@@ -51,6 +51,7 @@ export class AllowedShiftConstraint implements ScheduleConstraint {
           staffId: assignment.staffId,
           days: [assignment.day],
           message: `${shiftName}は入れない勤務帯です`,
+          summary: "入れない勤務帯",
         })
       );
     }

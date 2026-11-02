@@ -1,12 +1,39 @@
 import { FC } from "react";
 import styled from "styled-components";
 import { Popper } from "@mui/material";
-import {
-  ALLOWED_SHIFT_CONSTRAINT,
-  type ConstraintViolation,
-  type ShiftSuggestion,
+import type {
+  ConstraintViolation,
+  ShiftCell,
+  ShiftSuggestion,
+  WorkShift,
 } from "../../domain/index.js";
-import { SHIFT_BG, SHIFT_FG } from "./constants.js";
+import { CellFace } from "./CellFace.js";
+import { cellFaceStyles } from "./cellFaceStyles.js";
+import { PROPOSAL_BORDER, VIOLATION_STRONG } from "./cellSymbols.js";
+import type { ViolationMark } from "./violationMarkPlacement.js";
+import type { WishEntry } from "./wishSummary.js";
+
+/**
+ * 選択肢1つの「入れたときのセルの姿」。描くのは CellFace（勤務表のセルと同じ部品）。
+ */
+export type ShiftOptionFace = {
+  /** その選択肢を入れたときのセルの値 */
+  cell: ShiftCell;
+  /** 出勤なら解決済みの勤務帯 */
+  shift?: WorkShift;
+  /** そのセルの希望（勤務表のセルと同じ円で描く） */
+  wishEntries: WishEntry[];
+  /** 入れたあとのセルにかかる違反の印（勤務表と同じ形） */
+  marks: ViolationMark[];
+  /** 入れたあとに希望と食い違うなら、その違反（円を赤くする） */
+  wishViolation?: ConstraintViolation;
+  /** 添える違反の短い要約（違反の summary。重複なし）。選択肢に並べる */
+  labels: string[];
+  /** 違反の文（ホバーで読む詳しい内容） */
+  messages: string[];
+  /** 候補集合がこの値1つに絞られた（唯一の提案）。勤務表のセルの破線と同じ意味 */
+  proposed: boolean;
+};
 
 type ShiftSuggestionDropdownProps = {
   open: boolean;
@@ -18,11 +45,8 @@ type ShiftSuggestionDropdownProps = {
   activeIndex: number;
   /** 候補を選んだとき（クリック）。 */
   onPick: (s: ShiftSuggestion) => void;
-  /**
-   * その候補に替えたら新しく出る違反（勤務表に反映している制約から）。
-   * 渡さなければ違反は描かない。
-   */
-  violationsOf?: (s: ShiftSuggestion) => ConstraintViolation[];
+  /** 選択肢の「入れたときのセルの姿」。 */
+  faceOf: (s: ShiftSuggestion) => ShiftOptionFace;
 };
 
 /**
@@ -30,12 +54,14 @@ type ShiftSuggestionDropdownProps = {
  * キーボード入力・ダブルクリック用。AIの未来分岐提案とは別系統。
  * グリッドのキーボードフォーカスを奪わないよう、Menu ではなく Popper を使う。
  *
- * 選択肢は「それを入れたときのセルの姿」で描く:
- *   - 左のチップはセルと同じ形（勤務帯色＋開始時刻の「時」/「休」）
- *   - 入れたら新しく違反が出る選択肢は、チップの右上にセルと同じ赤い三角を付け、違反の文を添える
- *   - 可能勤務帯の外は、チップを斜線にする（制約バーの「可能勤務帯」アイコンと同じ描き方）
+ * ルール: **選択肢は「それを入れたときのセルの姿」で描く。** 勤務表のセルと同じ部品（CellFace）・
+ * 同じスタイル（cellFaceStyles）なので、色・形の意味は勤務表と1対1で対応する。
+ *   - 値＝勤務帯色＋開始時刻の「時」／休、希望＝円（叶わなければ赤い円）、
+ *     違反＝勤務表と同じ印（連勤は下端の帯・1セルは右上の三角・勤務間インターバルは境目）
+ *   - 破線の枠＝唯一の提案（候補集合がその値1つに絞られた）。勤務表のセルの破線と同じ意味で、
+ *     候補が2つ以上残っているときや確定済みのセルでは使わない
  * 違反が出る選択肢も消さず・押せなくもしない（入れたら違反として出る、がルール。#216）。
- * 並び順も変えない（打ち込みで絞ったときの順と、↑↓のハイライト位置をぶらさない）。
+ * 並び順もハイライトの初期位置（先頭）も変えない。
  */
 export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({
   open,
@@ -43,7 +69,7 @@ export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({
   suggestions,
   activeIndex,
   onPick,
-  violationsOf,
+  faceOf,
 }) => (
   <Popper
     open={open && !!anchorEl && suggestions.length > 0}
@@ -52,104 +78,89 @@ export const ShiftSuggestionDropdown: FC<ShiftSuggestionDropdownProps> = ({
     style={{ zIndex: 1300 }}
   >
     <StyledList>
-      {suggestions.map((s, i) => {
-        const violations = violationsOf?.(s) ?? [];
-        return (
-          <ShiftOptionRow
-            key={s.kind === "work" ? s.shift.id : s.kind}
-            suggestion={s}
-            active={i === activeIndex}
-            violations={violations}
-            onPick={() => onPick(s)}
-          />
-        );
-      })}
+      {suggestions.map((s, i) => (
+        <ShiftOptionRow
+          key={s.kind === "work" ? s.shift.id : s.kind}
+          suggestion={s}
+          face={faceOf(s)}
+          active={i === activeIndex}
+          onPick={() => onPick(s)}
+        />
+      ))}
     </StyledList>
   </Popper>
 );
 
 type ShiftOptionRowProps = {
   suggestion: ShiftSuggestion;
+  face: ShiftOptionFace;
   active: boolean;
-  violations: ConstraintViolation[];
   onPick: () => void;
 };
 
-/** 選択肢1行（チップ・名前・違反の文） */
-const ShiftOptionRow: FC<ShiftOptionRowProps> = ({ suggestion: s, active, violations, onPick }) => {
-  const outsideAllowed = violations.some((v) => v.constraintType === ALLOWED_SHIFT_CONSTRAINT);
-
-  let chip: string;
-  let chipStyle: React.CSSProperties | undefined;
-  let name: string;
-  let sub: string | undefined;
-  if (s.kind === "work") {
-    chip = String(s.shift.startHour);
-    chipStyle = {
-      background: SHIFT_BG[s.shift.id] ?? "#eee",
-      color: SHIFT_FG[s.shift.id] ?? "#333",
-    };
-    name = s.shift.name;
-    sub = s.shift.startTimeLabel;
-  } else if (s.kind === "day-off") {
-    chip = "休";
-    name = "休み";
-  } else {
-    chip = "·";
-    name = "未定（クリア）";
-  }
+/** 選択肢1行（セルの姿・名前・違反の文） */
+const ShiftOptionRow: FC<ShiftOptionRowProps> = ({ suggestion: s, face, active, onPick }) => {
+  const name =
+    s.kind === "work" ? s.shift.name : s.kind === "day-off" ? "休み" : "未定（クリア）";
 
   let className = "e-option";
   if (active) className += " is-active";
-  if (violations.length > 0) className += " has-violation";
+  if (face.proposed) className += " is-proposed";
   if (s.kind === "undecided") className += " is-clear";
 
   return (
     <div
       className={className}
-      role="option"
-      aria-selected={active}
-      title={violations.length > 0 ? violations.map((v) => v.message).join("\n") : undefined}
+      title={face.messages.length > 0 ? face.messages.join("\n") : undefined}
       // クリックでグリッドの blur → 確定前に消えるのを防ぎ、確実に適用する
       onMouseDown={(e) => e.preventDefault()}
       onClick={onPick}
     >
-      <span className={`e-chip${outsideAllowed ? " is-outside-allowed" : ""}`} style={chipStyle}>
-        {chip}
+      <span className="e-face-frame">
+        <CellFace
+          cell={face.cell}
+          shift={face.shift}
+          wishEntries={face.wishEntries}
+          violationMarks={face.marks}
+          wishViolation={face.wishViolation}
+          cellClassName="is-option-face"
+        />
       </span>
       <span className="e-text">
-        <span className="e-name">
-          {name}
-          {sub && <span className="e-sub">{sub}</span>}
-        </span>
-        {violations.map((v, i) => (
-          <span key={i} className="e-violation">
-            {v.message}
-          </span>
-        ))}
+        <span className="e-name">{name}</span>
+        {s.kind === "work" && <span className="e-sub">{s.shift.startTimeLabel}</span>}
+        {face.proposed && <span className="e-proposed-label">提案</span>}
+        {/* 違反は短い要約だけを添える（詳しい文は行の title でホバー表示） */}
+        {face.labels.length > 0 && (
+          <span className="e-violation">{face.labels.join("・")}</span>
+        )}
       </span>
     </div>
   );
 };
 
 const StyledList = styled.div`
-  margin-top: 4px;
-  min-width: 140px;
-  max-width: 260px;
-  max-height: 280px;
-  overflow-y: auto;
-  padding: 4px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.12);
-  font-size: 13px;
+  ${cellFaceStyles}
 
+  margin-top: 2px;
+  min-width: 150px;
+  max-width: 300px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 3px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16), 0 1px 2px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+
+  /* 1行＝1選択肢（セルの姿・名前・時刻・違反の文を横に並べる） */
   .e-option {
     display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 4px 6px;
-    border-radius: 6px;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 4px;
+    border-radius: 4px;
     cursor: pointer;
     &:hover {
       background: #f5f5f5;
@@ -161,63 +172,90 @@ const StyledList = styled.div`
   .e-option.is-clear {
     margin-top: 2px;
     border-top: 1px solid #eee;
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 4px 4px;
     color: #757575;
   }
 
-  /* セルと同じ形のチップ。勤務帯色は style で渡す（休み・未定はグレー） */
-  .e-chip {
-    position: relative;
+  /* セルの姿（CellFace）を縮めて置く。操作は行が受けるので、中の印・円は押せなくする */
+  .e-face-frame {
     flex: none;
-    width: 28px;
-    height: 24px;
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    background: #f0f0f0;
-    color: #555;
-    font-weight: 600;
+    padding: 1px;
+    border: 1px solid transparent;
+    border-radius: 5px;
   }
-  /* 入れたら新しく違反が出る: セルの1セル違反と同じ、右上の赤い三角 */
-  .e-option.has-violation .e-chip::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 8px;
-    height: 8px;
-    background: #e53935;
-    clip-path: polygon(0 0, 100% 0, 100% 100%);
-    border-top-right-radius: 4px;
+  .e-cell.is-option-face {
+    width: 26px;
+    min-height: 22px;
+    height: 22px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    background: #fff;
+    font-size: 11px;
+    cursor: inherit;
+    &,
+    * {
+      pointer-events: none;
+    }
+    &:hover {
+      box-shadow: none;
+    }
+    .e-shift-hour {
+      font-size: 1.1em;
+    }
+    /* 縮めたセルに合わせて希望の円・違反の印も詰める */
+    .e-wish-badge {
+      width: 16px;
+      height: 16px;
+    }
+    .e-violation-corner::before {
+      width: 7px;
+      height: 7px;
+    }
+    .e-violation-bar {
+      height: 3px;
+    }
   }
-  /* 可能勤務帯の外: 斜線（制約バーの「可能勤務帯」アイコンの、入れない帯と同じ描き方） */
-  .e-chip.is-outside-allowed {
-    background-image: repeating-linear-gradient(
-      -45deg,
-      rgba(0, 0, 0, 0.14) 0 1.5px,
-      transparent 1.5px 4px
-    ) !important;
-    opacity: 0.75;
+  .e-cell.is-option-face.e-off {
+    background: #f5f5f5;
+  }
+
+  /* 唯一の提案: 勤務表のセルの提案（.e-forced-value）と同じ破線で囲む */
+  .e-option.is-proposed .e-face-frame {
+    border: ${PROPOSAL_BORDER};
+  }
+  .e-proposed-label {
+    flex: none;
+    padding: 0 3px;
+    border: ${PROPOSAL_BORDER};
+    border-radius: 3px;
+    color: #616161;
+    font-size: 10px;
+    line-height: 14px;
   }
 
   .e-text {
     display: flex;
-    flex-direction: column;
+    align-items: baseline;
+    gap: 5px;
     min-width: 0;
-    line-height: 24px;
-  }
-  .e-name {
     white-space: nowrap;
   }
+  .e-name {
+    flex: none;
+  }
   .e-sub {
-    margin-left: 6px;
+    flex: none;
     color: #9e9e9e;
-    font-size: 12px;
+    font-size: 11px;
   }
   .e-violation {
-    color: #c62828;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: ${VIOLATION_STRONG};
     font-size: 11px;
-    line-height: 1.4;
   }
 `;
