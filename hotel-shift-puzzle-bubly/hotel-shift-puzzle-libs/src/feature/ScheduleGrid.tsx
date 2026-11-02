@@ -833,6 +833,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           staffColumnActions={staffColumnActions}
           wishByStaff={wishByStaff}
           violations={violations}
+          constraints={allConstraints}
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}

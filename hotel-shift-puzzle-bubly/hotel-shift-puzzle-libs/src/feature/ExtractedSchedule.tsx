@@ -126,22 +126,24 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // 抽出ビューは subset に絞った勤務表なので、責任者違反（全体視点）は出さない
   // （footer は relevantRules のみ）。連勤・希望・可能勤務帯は集約の設定に従う
   // （可能勤務帯はセル単位なので、subset に絞っても判定は変わらない）。
-  const violations = useMemo(() => {
-    if (!schedule) return [];
+  // 表示する違反の制約リスト。セルの違反の印と、ドロップダウンの選択肢に添える違反が同じものを見る。
+  const displayConstraints = useMemo(() => {
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    return schedule.checkConstraints(
-      buildScheduleConstraints({
-        modelConstraints: [
-          new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
-        ],
-        wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-        allowedShift:
-          staffGroup && (constraints?.checkAllowedShift ?? true)
-            ? { staffGroup, shiftNameById }
-            : undefined,
-      })
-    );
-  }, [schedule, wishByStaff, workShifts, constraints, staffGroup]);
+    return buildScheduleConstraints({
+      modelConstraints: [
+        new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
+      ],
+      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+      allowedShift:
+        staffGroup && (constraints?.checkAllowedShift ?? true)
+          ? { staffGroup, shiftNameById }
+          : undefined,
+    });
+  }, [wishByStaff, workShifts, constraints, staffGroup]);
+  const violations = useMemo(
+    () => (schedule ? schedule.checkConstraints(displayConstraints) : []),
+    [schedule, displayConstraints]
+  );
 
   // セルのコピー・カット・貼り付け（#166）。貼れなかった分はメッセージ欄で知らせる
   const clipboard = useCellClipboard({
@@ -239,6 +241,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         workShifts={workShifts}
         wishByStaff={wishByStaff}
         violations={violations}
+        constraints={displayConstraints}
         leaderRules={relevantRules}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}
