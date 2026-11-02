@@ -16,7 +16,7 @@ import {
 } from "../../domain/index.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
-import { runMarksOf } from "./runMarkPlacement.js";
+import { isDayOffSecured, runMarksOf } from "./runMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
@@ -63,6 +63,8 @@ type StaffScheduleRowProps = {
   minDayOff?: number;
   /** 連勤の上限。選択中の行に連勤・連休の線を引くときの色の基準（無ければ線を引かない） */
   maxConsecutive?: number;
+  /** 月の休みの目標日数。これだけ休みが入った人は、連勤・連休の線で未定を出勤とみなす（試行中） */
+  dayOffTarget?: number;
   /** 早番として数える勤務帯 ID 集合（名前「早番」に属する ID） */
   earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
@@ -104,6 +106,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   dimmed,
   minDayOff,
   maxConsecutive,
+  dayOffTarget,
   earlyShiftIds,
   candidateHintOf,
   forcedCellOf,
@@ -118,7 +121,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   // 連勤・連休の細い線は、選択中のスタッフの行にだけ引く（案を見比べる人を絞って読む）
   const runMarks =
     selected && maxConsecutive !== undefined
-      ? runMarksOf(schedule, staff.id, days, maxConsecutive)
+      ? runMarksOf(schedule, staff.id, days, maxConsecutive, dayOffTarget)
       : [];
   return (
     <>
@@ -208,10 +211,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })}
 
-      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くし、違反バブルを開ける */}
+      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くし、違反バブルを開ける。
+          休みの目標日数に届いていれば緑にする（残りの未定は出勤とみなす＝連勤の線と同じ判定） */}
       {(() => {
         const offCount = schedule.countDayOffForStaff(staff.id);
         const underMin = minDayOff !== undefined && offCount < minDayOff;
+        const secured = !underMin && isDayOffSecured(schedule, staff.id, dayOffTarget);
         const violation = underMin
           ? violations.find(
               (v) =>
@@ -223,14 +228,16 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         return (
           <div
             className={`e-off-total${underMin ? " is-under-min" : ""}${
-              url ? " is-clickable" : ""
-            }${rowMod}`}
+              secured ? " is-secured" : ""
+            }${url ? " is-clickable" : ""}${rowMod}`}
             title={
               underMin
                 ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）${
                     url ? "。ダブルクリックで違反を開く" : ""
                   }`
-                : `${staff.name} の休み合計`
+                : secured
+                  ? `休み数${dayOffTarget}を確保したので、残りは勤務日とみなします（${staff.name} の休み ${offCount}日）`
+                  : `${staff.name} の休み合計`
             }
           >
             {url ? (

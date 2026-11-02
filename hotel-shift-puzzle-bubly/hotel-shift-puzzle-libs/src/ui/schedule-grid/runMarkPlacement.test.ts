@@ -30,13 +30,25 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
   const lines = (row: string, max = 5) =>
     runMarksOf(scheduleOf(row), "s1", days, max).map(lineOf);
 
-  it("連勤は何日目かで色が決まり、上限を超えた塊は赤帯に任せて返さない", () => {
-    expect(lines("WWWO-WWWWO-WWWWWO-WWWWWWO")).toEqual([
+  it("連勤は何日目かで色が決まり、上限を超えた日から over（赤）が足される", () => {
+    expect(lines("WWWO-WWWWO-WWWWWO-WWWWWWWO")).toEqual([
       "ok/ok/ok",
       "ok/ok/ok/near",
       "ok/ok/ok/near/limit",
-      // 6連勤は返さない
+      "ok/ok/ok/near/limit/over/over",
     ]);
+  });
+
+  it("休みの目標日数が入った人は、未定を出勤とみなして連勤に数える", () => {
+    const row = "OOWW--WW";
+    const shown = days.slice(0, row.length); // 9日以降も未定なので、表示を 6/1〜6/8 に絞る
+    const at = (target?: number) =>
+      runMarksOf(scheduleOf(row), "s1", shown, 5, target).map(lineOf);
+
+    expect(at(2)).toEqual(["off-2", "ok/ok/ok/near/limit/over"]);
+    // 目標に届いていなければ、未定はこれまでどおり塊を区切る
+    expect(at(3)).toEqual(["off-2", "ok/ok", "ok/ok"]);
+    expect(at(undefined)).toEqual(["off-2", "ok/ok", "ok/ok"]);
   });
 
   it("連休は 2連休・3連休以上で色を分け、1日だけの休みは線にしない", () => {

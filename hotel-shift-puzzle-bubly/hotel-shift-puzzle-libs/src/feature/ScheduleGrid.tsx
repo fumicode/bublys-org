@@ -844,6 +844,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onSelectRule={selectRuleStaff}
           minDayOff={constraints?.minMonthlyDayOff}
           maxConsecutiveWorkdays={barConstraintSet.maxConsecutiveWorkdays}
+          dayOffTarget={minDayOff}
           maxDayOffPerDay={constraints?.maxDayOffPerDay}
           onChangeCells={handleChangeCells}
           onChangeRequired={handleChangeRequired}

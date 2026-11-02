@@ -243,6 +243,11 @@ export const StyledWrap = styled.div`
     background: #ffebee;
     font-weight: bold;
   }
+  /* 休みの目標日数に届いた。残りの未定は出勤とみなす（連勤の線もそう数える） */
+  .e-off-total.is-secured {
+    color: #2e7d32;
+    background: #e8f5e9;
+  }
   /* 最低休日数未満は違反。ダブルクリックで違反バブルを開ける */
   .e-off-total.is-clickable {
     cursor: pointer;
@@ -824,12 +829,13 @@ export const StyledWrap = styled.div`
      --span 列ぶん左へ伸ばす。隣の塊と見分けられるよう右端を 1px 空ける。
      連勤（2px 実線）: 何日目かで 緑＝上限-2日目まで → 黄緑＝上限-1日目 → 黄＝上限日目 と
      じわっと変わる。変わり目は前の日へ寄せてあり、上限日目は大半が黄になる
-     （グラデーションは RunMarks.tsx が --run-* で組む）。超えたら赤帯。
+     （グラデーションは RunMarks.tsx が --run-* で組む）。上限+1日目からは赤（違反なら赤帯が重なる）。
      連休（2px 点線）: 水色＝2連休 / 青＝3連休以上 */
   .e-run-bar {
     --run-ok: #43a047;
     --run-near: #9ccc65;
     --run-limit: #fdd835;
+    --run-over: #e53935;
 
     position: absolute;
     right: 1px;
