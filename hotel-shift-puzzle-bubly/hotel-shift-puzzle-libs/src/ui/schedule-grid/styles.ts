@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { EARLY_COL_WIDTH } from "./constants.js";
+import { EARLY_COL_WIDTH, RUN_TONE_COLOR } from "./constants.js";
 
 /**
  * グリッドの重なり順。ルールは「横・縦にスクロールする面（データセル・違反の印・
@@ -832,10 +832,10 @@ export const StyledWrap = styled.div`
      （グラデーションは RunMarks.tsx が --run-* で組む）。上限+1日目からは赤（違反なら赤帯が重なる）。
      連休（2px 点線）: 水色＝2連休 / 青＝3連休以上 */
   .e-run-bar {
-    --run-ok: #43a047;
-    --run-near: #9ccc65;
-    --run-limit: #fdd835;
-    --run-over: #e53935;
+    --run-ok: ${RUN_TONE_COLOR.ok};
+    --run-near: ${RUN_TONE_COLOR.near};
+    --run-limit: ${RUN_TONE_COLOR.limit};
+    --run-over: ${RUN_TONE_COLOR.over};
 
     position: absolute;
     right: 1px;

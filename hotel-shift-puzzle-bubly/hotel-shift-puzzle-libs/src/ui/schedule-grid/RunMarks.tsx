@@ -13,13 +13,19 @@ type RunMarksProps = {
 const STOP_IN_COLUMN = 0.25;
 
 /**
- * 連勤の線のグラデーション。各日の色（--run-ok / near / limit）を列の中の STOP_IN_COLUMN に置き、
- * 間をなめらかにつなぐ。色そのものは styles.ts の --run-* で決める（ここは並べ方だけ）。
+ * 連勤の線のグラデーションの色の置き場所（offset は線の左端 0 〜 右端 1）。
+ * 各日の色を列の中の STOP_IN_COLUMN に置き、間をなめらかにつなぐ。
+ * 制約バーの連勤アイコン（MaxConsecutiveIcon）も同じ置き方で描く。
  */
+export const workGradientStops = (
+  dayTones: readonly WorkDayTone[]
+): { tone: WorkDayTone; offset: number }[] =>
+  dayTones.map((tone, i) => ({ tone, offset: (i + STOP_IN_COLUMN) / dayTones.length }));
+
+/** 色そのものは styles.ts の --run-* で決める（ここは並べ方だけ）。 */
 const workGradient = (dayTones: readonly WorkDayTone[]): string => {
-  const stops = dayTones.map(
-    (tone, i) =>
-      `var(--run-${tone}) ${(((i + STOP_IN_COLUMN) / dayTones.length) * 100).toFixed(2)}%`
+  const stops = workGradientStops(dayTones).map(
+    ({ tone, offset }) => `var(--run-${tone}) ${(offset * 100).toFixed(2)}%`
   );
   return `linear-gradient(to right, ${stops.join(", ")})`;
 };

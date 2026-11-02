@@ -6,6 +6,9 @@
  * バーの小さいアイコンと**同じ図**（同じ spec の render）を大きく描く。別に「大きい版」を
  * 作らないので、図の意味が2つに割れない。
  *
+ * 見せるのは図と1文だけ（例: 図の下に「連勤は最大 5 日まで」）。数は図の中の「≤5」と
+ * 文の中の「5」の2か所にあり、どちらも押せばその場で変えられる。
+ *
  * 約束は責任者ルールの図（LeaderRuleDiagram）と同じ：**onCommit を渡された項目だけが
  * 編集できる**。渡さなければ読むだけの図になるので、グローバルでも勤務表でも、
  * 読み取り専用でもこの1つで賄える。
@@ -14,7 +17,7 @@ import { FC } from "react";
 import styled from "styled-components";
 import { Switch } from "@mui/material";
 import type { LimitSpec } from "./constraint-icons/limitSpecs.js";
-import { NumberField } from "./constraints/NumberField.js";
+import { InlineNumber } from "./constraints/InlineNumber.js";
 
 const BIG_ICON_SIZE = 180;
 
@@ -31,31 +34,32 @@ export const ConstraintLimitView: FC<ConstraintLimitViewProps> = ({
   onCommit,
 }) => (
   <StyledContainer>
-    <figure className="e-figure">
-      {spec.render(value, BIG_ICON_SIZE)}
-      <figcaption className="e-caption">{spec.caption}</figcaption>
-    </figure>
-
-    <p className="e-describe">{spec.describe(value)}</p>
-
-    {onCommit &&
-      (spec.kind === "number" ? (
-        <NumberField
-          label={spec.label}
-          unit={spec.unit}
-          value={typeof value === "number" ? value : 0}
-          onCommit={(n) => onCommit(n)}
-        />
-      ) : (
-        <label className="e-switch">
-          <Switch
-            size="small"
-            checked={value === true}
-            onChange={(e) => onCommit(e.target.checked)}
-          />
-          <span>{spec.label}</span>
-        </label>
-      ))}
+    {spec.kind === "number" ? (
+      <>
+        {spec.render(value, BIG_ICON_SIZE, onCommit)}
+        <p className="e-sentence">
+          {spec.label}
+          <InlineNumber value={typeof value === "number" ? value : 0} onCommit={onCommit} />
+          {spec.unit}
+        </p>
+      </>
+    ) : (
+      <>
+        {spec.render(value, BIG_ICON_SIZE)}
+        {onCommit ? (
+          <label className="e-switch">
+            <Switch
+              size="small"
+              checked={value === true}
+              onChange={(e) => onCommit(e.target.checked)}
+            />
+            <span>{spec.label}</span>
+          </label>
+        ) : (
+          <p className="e-sentence">{spec.describe(value)}</p>
+        )}
+      </>
+    )}
   </StyledContainer>
 );
 
@@ -66,24 +70,10 @@ const StyledContainer = styled.div`
   align-items: center;
   gap: 8px;
 
-  .e-figure {
+  .e-sentence {
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .e-caption {
-    font-size: 0.85em;
-    font-weight: 600;
-    color: #546e7a;
-  }
-
-  .e-describe {
-    margin: 0;
-    font-size: 0.85em;
-    color: #666;
+    font-size: 0.9em;
+    color: #455a64;
     text-align: center;
   }
 

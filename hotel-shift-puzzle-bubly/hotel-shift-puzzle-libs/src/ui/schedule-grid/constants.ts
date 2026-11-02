@@ -10,6 +10,17 @@ export const SHIFT_FG: Record<string, string> = {
   late: "#6a1b9a",
 };
 
+/**
+ * 連勤の何日目かの色（runMarkPlacement.ts の WorkDayTone）。連勤の線と、
+ * 制約バーの連勤アイコン（MaxConsecutiveIcon）が同じ色で描くよう、ここで共有する。
+ */
+export const RUN_TONE_COLOR = {
+  ok: "#43a047",
+  near: "#9ccc65",
+  limit: "#fdd835",
+  over: "#e53935",
+} as const;
+
 // グリッドの列幅
 export const STAFF_COL_WIDTH = 168;
 export const DAY_COL_WIDTH = 40;

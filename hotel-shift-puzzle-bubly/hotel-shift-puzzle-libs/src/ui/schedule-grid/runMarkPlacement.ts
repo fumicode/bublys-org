@@ -36,7 +36,8 @@ export type RunMark =
     })
   | (Placement & { kind: "off"; tone: OffTone });
 
-const workDayTone = (nth: number, maxConsecutive: number): WorkDayTone =>
+/** 連勤の nth 日目（1始まり）の色。制約バーの連勤アイコンも同じ決め方で塗る。 */
+export const workDayTone = (nth: number, maxConsecutive: number): WorkDayTone =>
   nth > maxConsecutive
     ? "over"
     : nth === maxConsecutive
