@@ -338,6 +338,8 @@ const StyledBar = styled.div`
     color: #4527a0;
     font-size: 0.78em;
     line-height: 1.4;
+    /* 結果と「誰を優先したか」を行を分けて出す */
+    white-space: pre-line;
   }
   .e-cmd-message-close {
     margin-left: auto;

@@ -43,8 +43,11 @@ export type ConstraintSetState = {
    * 省略時は DEFAULT_SHIFT_INTERVAL_RULES（遅番明けの早番・中番を禁止）。
    */
   shiftIntervalRules?: ShiftIntervalRule[];
-  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。省略時 []。 */
-  linkedReportIds?: string[];
+  /**
+   * 参照レポート：次の勤務表づくりの参考として紐づけた、過去のシフト完成レポート
+   * （ScheduleReport）のID。紐づけられるのは1つだけ。省略時は紐づけ無し。
+   */
+  linkedReportId?: string;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -54,6 +57,11 @@ export type ConstraintSetPlain = Omit<
 > & {
   leaderRules: ShiftLeaderRuleState[];
   shiftIntervalRules?: ShiftIntervalRuleState[];
+  /**
+   * 旧形式：参照レポートを複数紐づけられた頃の配列。読むときだけ受け付け、
+   * 最後に紐づけたもの（末尾）を linkedReportId として引き継ぐ。書くことはない。
+   */
+  linkedReportIds?: string[];
 };
 
 /** 各制約設定の既定値。 */
@@ -141,9 +149,9 @@ export class ConstraintSet {
     );
   }
 
-  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。既定 []。 */
-  get linkedReportIds(): string[] {
-    return this.state.linkedReportIds ?? [];
+  /** 参照レポート（紐づけた過去のシフト完成レポート）のID。紐づけ無しなら undefined。 */
+  get linkedReportId(): string | undefined {
+    return this.state.linkedReportId;
   }
 
   // ========== 上限・スイッチの変更 ==========
@@ -179,21 +187,23 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, [field]: next });
   }
 
-  /** レポートを紐づける（既に紐づいていれば何もしない）。新インスタンスを返す。 */
+  /**
+   * 参照レポートを紐づける。紐づけられるのは1つなので、別のレポートが紐づいていれば
+   * 置き換わる。同じレポートなら自分自身を返す。不変。
+   */
   linkReport(reportId: string): ConstraintSet {
-    if (this.linkedReportIds.includes(reportId)) return this;
-    return new ConstraintSet({
-      ...this.state,
-      linkedReportIds: [...this.linkedReportIds, reportId],
-    });
+    if (this.linkedReportId === reportId) return this;
+    return new ConstraintSet({ ...this.state, linkedReportId: reportId });
   }
 
-  /** レポートの紐づけを解除する。新インスタンスを返す。 */
+  /**
+   * 参照レポートの紐づけを外す。外すのは **そのレポートが紐づいているときだけ**
+   * （レポートを消したときに、それを指している勤務表だけから外せるように）。
+   * 紐づいていなければ自分自身を返す。不変。
+   */
   unlinkReport(reportId: string): ConstraintSet {
-    return new ConstraintSet({
-      ...this.state,
-      linkedReportIds: this.linkedReportIds.filter((id) => id !== reportId),
-    });
+    if (this.linkedReportId !== reportId) return this;
+    return new ConstraintSet({ ...this.state, linkedReportId: undefined });
   }
 
   /**
@@ -315,8 +325,11 @@ export class ConstraintSet {
   }
 
   static fromPlain(plain: ConstraintSetPlain): ConstraintSet {
+    const { linkedReportIds: legacyIds, ...rest } = plain;
+    const linkedReportId = rest.linkedReportId ?? legacyIds?.[legacyIds.length - 1];
     return new ConstraintSet({
-      ...plain,
+      ...rest,
+      ...(linkedReportId !== undefined ? { linkedReportId } : {}),
       leaderRules: plain.leaderRules.map((r) => new ShiftLeaderRule(r)),
       shiftIntervalRules: plain.shiftIntervalRules?.map(
         (r) => new ShiftIntervalRule(r)
