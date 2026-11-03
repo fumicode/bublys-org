@@ -11,6 +11,31 @@ import type { ModelGraph } from '@bublys-org/model-graph';
 export const MODEL_GRAPH: ModelGraph = {
   "classes": [
     {
+      "name": "AllowedShiftConstraint",
+      "file": "schedule/AllowedShiftConstraint.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [],
+      "methods": [
+        {
+          "name": "describe",
+          "params": [],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "check",
+          "params": [
+            "schedule"
+          ],
+          "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
       "name": "ConstraintDelta",
       "file": "schedule/ConstraintDelta.ts",
       "kind": "value",
@@ -69,6 +94,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
+          "name": "checkAllowedShift",
+          "type": "boolean",
+          "optional": true
+        },
+        {
           "name": "minMonthlyDayOff",
           "type": "number",
           "optional": true
@@ -99,6 +129,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "maxConsecutiveWorkdays",
         "useReportPriority",
         "checkShiftWish",
+        "checkAllowedShift",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
@@ -171,6 +202,15 @@ export const MODEL_GRAPH: ModelGraph = {
         },
         {
           "name": "withCheckShiftWish",
+          "params": [
+            "check"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withCheckAllowedShift",
           "params": [
             "check"
           ],
@@ -351,6 +391,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "message",
           "type": "string",
           "optional": false
+        },
+        {
+          "name": "summary",
+          "type": "string",
+          "optional": true
         }
       ],
       "getters": [
@@ -359,6 +404,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "isDayScoped",
         "days",
         "message",
+        "summary",
         "key"
       ],
       "methods": [
@@ -2938,8 +2984,9 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 45,
+    "fileCount": 46,
     "classesWithoutState": [
+      "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",

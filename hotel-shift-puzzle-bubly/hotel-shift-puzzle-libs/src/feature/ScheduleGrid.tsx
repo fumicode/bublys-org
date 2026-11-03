@@ -360,8 +360,9 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // ※ handleDropReportUrl / handleAddRule より前に定義する（use-before-define 回避）。
   // 自動シフトも同じリストを使う（置くたびに、これに新しい違反が出ないかを見る）。
   const allConstraints = useMemo(
-    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
-    [workShifts, constraints, wishByStaff]
+    () =>
+      scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup }),
+    [workShifts, constraints, wishByStaff, staffGroup]
   );
 
   /**
@@ -585,7 +586,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     store,
     schedule,
     workShifts,
-    staffGroup,
     onMessage: setAutoMessage,
   });
 
@@ -780,6 +780,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       constraintSet: constraints,
       workShifts,
       wishByStaff: wishByStaffForApex,
+      staffGroup,
     });
 
     const draft = buildScheduleReport({
@@ -963,12 +964,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           schedule={schedule}
           staffList={filteredStaffList}
           workShifts={workShifts}
-          staffGroup={staffGroup}
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           staffColumnActions={staffColumnActions}
           wishByStaff={wishByStaff}
           violations={violations}
+          constraints={allConstraints}
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}

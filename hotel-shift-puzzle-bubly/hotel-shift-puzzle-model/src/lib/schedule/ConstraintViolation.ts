@@ -23,6 +23,12 @@ export type ConstraintViolationState = {
   days: WorkingDay[];
   /** 人が読める説明（例: "6連勤（上限5連勤）"） */
   message: string;
+  /**
+   * 一目で分かる短い要約（例: "6連勤（上限5）"・"早責が不在"）。
+   * 狭い場所（勤務割当のドロップダウンの選択肢など）に並べる用。ルール名だけにせず、
+   * どうなっているのか（不在・上限超え…）が読める言葉にする。省略時は message を使う。
+   */
+  summary?: string;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -32,6 +38,7 @@ export type ConstraintViolationPlain = {
   /** WorkingDay.key の配列（"2026-06-01" 形式、昇順） */
   dayKeys: string[];
   message: string;
+  summary?: string;
 };
 
 export class ConstraintViolation {
@@ -60,6 +67,11 @@ export class ConstraintViolation {
     return this.state.message;
   }
 
+  /** 一目で分かる短い要約（省略時は message） */
+  get summary(): string {
+    return this.state.summary ?? this.state.message;
+  }
+
   /** 一意キー（バブルのパラメータ等に使える）。範囲の先頭・末尾で表す */
   get key(): string {
     const first = this.state.days[0]?.key ?? "";
@@ -83,6 +95,7 @@ export class ConstraintViolation {
       staffId: this.state.staffId,
       dayKeys: this.state.days.map((d) => d.key),
       message: this.state.message,
+      ...(this.state.summary !== undefined ? { summary: this.state.summary } : {}),
     };
   }
 
@@ -92,6 +105,7 @@ export class ConstraintViolation {
       staffId: plain.staffId,
       days: plain.dayKeys.map((k) => WorkingDay.fromKey(k)),
       message: plain.message,
+      summary: plain.summary,
     });
   }
 }

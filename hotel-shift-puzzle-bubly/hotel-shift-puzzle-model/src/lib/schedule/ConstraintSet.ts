@@ -5,14 +5,13 @@ import { ShiftIntervalConstraint } from "./ShiftIntervalConstraint.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
-import { RequiredStaffingConstraint } from "./RequiredStaffingConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 
 /**
  * ConstraintSet — 勤務表が満たすべき制約をひとまとめにした集約（制約セット）
  *
  * 責任者ルール（早責/予責/夜責…定義＋候補者）と、連勤上限・月の最低休日数・1日の休み上限・
- * 希望チェックの有無を1つで持つ。制約はスタッフの属性ではなく勤務表側の要件なので、
+ * 希望チェック・可能勤務帯チェックの有無を1つで持つ。制約はスタッフの属性ではなく勤務表側の要件なので、
  * 専用の集約として切り出してある。
  *
  * 勤務帯セット（WorkShiftSet）と同じく**2通りの使われ方**をする:
@@ -34,6 +33,8 @@ export type ConstraintSetState = {
   maxConsecutiveWorkdays?: number;
   /** シフト希望との食い違いを違反として見るか。省略時 true。 */
   checkShiftWish?: boolean;
+  /** 可能勤務帯（その人が入れる勤務帯）の外に入れたら違反として見るか。省略時 true。 */
+  checkAllowedShift?: boolean;
   /** 月の最低休日数。省略時 8。 */
   minMonthlyDayOff?: number;
   /** 1日に休んでよい人数の上限。省略時 8。 */
@@ -125,6 +126,11 @@ export class ConstraintSet {
     return this.state.checkShiftWish ?? true;
   }
 
+  /** 可能勤務帯の外に入れたら違反として見るか。既定 true。 */
+  get checkAllowedShift(): boolean {
+    return this.state.checkAllowedShift ?? true;
+  }
+
   /** 月の最低休日数。既定 8。 */
   get minMonthlyDayOff(): number {
     return this.state.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF;
@@ -188,6 +194,12 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, checkShiftWish: check });
   }
 
+  /** 可能勤務帯の外に入れたら違反として見るかを変えた新しいセットを返す。不変。 */
+  withCheckAllowedShift(check: boolean): ConstraintSet {
+    if (check === this.checkAllowedShift) return this;
+    return new ConstraintSet({ ...this.state, checkAllowedShift: check });
+  }
+
   /** 参照レポートの貢献度スコアを自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
   withUseReportPriority(use: boolean): ConstraintSet {
     if (use === this.useReportPriority) return this;
@@ -225,8 +237,10 @@ export class ConstraintSet {
 
   /**
    * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
-   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限・必要人数。希望違反は
-   *  feature 層＋実行時データ依存なので含まない——feature 側で足す。）
+   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限。希望違反と
+   *  可能勤務帯は、勤務表の外のデータ（希望・勤務スタッフ群）が要るので含まない——feature 側で足す。）
+   * 必要人数は制約ではない（制約バーに出ない＝制約として明記していないので、違反にも数えない）。
+   * 集計行の目標として見せ、自動シフトの「必要人数を埋める」が勤務表の必要人数を直接読む。
    * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
    */
   modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
@@ -236,7 +250,6 @@ export class ConstraintSet {
       ...this.intervalConstraints(shiftIdsOf),
       new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
       new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
-      new RequiredStaffingConstraint(shiftIdsOf),
     ];
   }
 

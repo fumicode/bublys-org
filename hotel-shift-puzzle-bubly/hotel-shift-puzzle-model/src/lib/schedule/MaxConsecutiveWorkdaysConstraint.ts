@@ -79,6 +79,10 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
         carried > 0
           ? `前月から続いて${total}連勤（上限${this.maxConsecutive}連勤）`
           : `${total}連勤（上限${this.maxConsecutive}連勤）`,
+      summary:
+        carried > 0
+          ? `前月から${total}連勤（上限${this.maxConsecutive}）`
+          : `${total}連勤（上限${this.maxConsecutive}）`,
     });
   }
 }

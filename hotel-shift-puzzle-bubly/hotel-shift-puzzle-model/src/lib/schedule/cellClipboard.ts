@@ -7,10 +7,9 @@
  *   - オブジェクトとして  : メンバー・日付・勤務帯を持ったまま運ぶ（アプリ内だけ）。
  *                           **貼る場所はメンバーと日付**で決まる（別の勤務表・別の案でも同じ人・同じ日）
  *
- * どちらも、貼れないセルは飛ばして理由ごとに数える。可能勤務帯は人に紐づくのでコピーの対象外だが、
- * 貼り付け先の可能勤務帯に無い値は貼らない。制約違反になる値は貼る（人の操作なのでセル入力と同じ）。
+ * どちらも、貼れないセルは飛ばして理由ごとに数える。制約違反になる値は貼る（人の操作なので
+ * セル入力と同じ）。可能勤務帯の外の値も同じで、貼ったうえで違反として出る（#216）。
  */
-import type { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 import type { ShiftCell } from "./MonthlyStaffSchedule.js";
 import type { WorkShift } from "./WorkShift.js";
 import type { WorkingDay } from "./WorkingDay.js";
@@ -30,7 +29,6 @@ export type PasteSkipReason =
   | "no-staff"
   | "no-day"
   | "no-shift"
-  | "not-allowed"
   | "unreadable"
   | "out-of-grid";
 
@@ -47,7 +45,6 @@ const emptySkipped = (): Record<PasteSkipReason, number> => ({
   "no-staff": 0,
   "no-day": 0,
   "no-shift": 0,
-  "not-allowed": 0,
   "unreadable": 0,
   "out-of-grid": 0,
 });
@@ -87,10 +84,6 @@ export function parseClipboardText(text: string): string[][] {
   return lines.map((line) => line.split("\t"));
 }
 
-/** その人のセルに入れられるか（出勤のときだけ可能勤務帯を見る。休み・未定は誰にでも入る） */
-const isAllowed = (staffGroup: WorkingStaffGroup | undefined, staffId: string, to: ShiftCell) =>
-  to.kind !== "work" || !staffGroup || staffGroup.isAllowed(staffId, to.shiftId);
-
 type PasteLayout = {
   /** 行の並び（表示順のスタッフ） */
   staffIds: readonly string[];
@@ -98,8 +91,6 @@ type PasteLayout = {
   days: readonly WorkingDay[];
   /** 貼り付け先の勤務表で使える勤務帯 */
   shifts: readonly WorkShift[];
-  /** 貼り付け先の勤務スタッフ群（可能勤務帯の判定。無ければ絞らない） */
-  staffGroup?: WorkingStaffGroup;
 };
 
 /**
@@ -115,7 +106,7 @@ export function planValuePaste(
     targets: readonly { staffId: string; day: WorkingDay }[];
   }
 ): PastePlan {
-  const { grid, targets, staffIds, days, shifts, staffGroup } = args;
+  const { grid, targets, staffIds, days, shifts } = args;
   const skipped = emptySkipped();
   const changes: CellPaste[] = [];
 
@@ -124,10 +115,6 @@ export function planValuePaste(
       text.trim() === "" ? { kind: "undecided" } : resolveShiftInput(text, [...shifts]);
     if (!to) {
       skipped.unreadable++;
-      return;
-    }
-    if (!isAllowed(staffGroup, staffId, to)) {
-      skipped["not-allowed"]++;
       return;
     }
     changes.push({ staffId, day, to });
@@ -166,7 +153,7 @@ export function planValuePaste(
 export function planObjectPaste(
   args: PasteLayout & { copied: readonly CopiedCell[] }
 ): PastePlan {
-  const { copied, staffIds, days, shifts, staffGroup } = args;
+  const { copied, staffIds, days, shifts } = args;
   const skipped = emptySkipped();
   const changes: CellPaste[] = [];
   const dayByKey = new Map(days.map((d) => [d.key, d]));
@@ -193,10 +180,6 @@ export function planObjectPaste(
       }
       to = { kind: "work", shiftId: shift.id };
     }
-    if (!isAllowed(staffGroup, c.staffId, to)) {
-      skipped["not-allowed"]++;
-      continue;
-    }
     changes.push({ staffId: c.staffId, day, to });
   }
   return { changes, skipped };
@@ -206,12 +189,11 @@ const SKIP_LABELS: Record<PasteSkipReason, string> = {
   "no-staff": "表に居ない人",
   "no-day": "表に無い日",
   "no-shift": "この勤務表に無い勤務帯",
-  "not-allowed": "可能勤務帯に無い",
   "unreadable": "読めない文字",
   "out-of-grid": "表の外",
 };
 
-/** 貼れなかった件数の知らせ（「3件貼れませんでした（居ない人 2・可能勤務帯に無い 1）」）。0件なら undefined */
+/** 貼れなかった件数の知らせ（「3件貼れませんでした（居ない人 2・読めない文字 1）」）。0件なら undefined */
 export function describeSkipped(skipped: Record<PasteSkipReason, number>): string | undefined {
   const parts = (Object.keys(SKIP_LABELS) as PasteSkipReason[])
     .filter((reason) => skipped[reason] > 0)

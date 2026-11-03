@@ -8,13 +8,16 @@ import {
   MonthlyStaffSchedule,
   WorkShift,
   WorkingDay,
-  WorkingStaffGroup,
   DailyReservationInfo,
   ConstraintViolation,
   StaffMonthlyShiftWish,
   type ShiftCell,
+  type ShiftSuggestion,
+  type ScheduleConstraint,
   ShiftLeaderRule,
   SHIFT_LEADER_CONSTRAINT,
+  previewCellValues,
+  type CellValuePreview,
   type ScheduleReport,
   type DayOffStyle,
 } from "../domain/index.js";
@@ -40,9 +43,14 @@ import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
 import { PrecedingHeadCells } from "./schedule-grid/PrecedingCells.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
-import { ShiftSuggestionDropdown } from "./schedule-grid/ShiftSuggestionDropdown.js";
+import {
+  ShiftSuggestionDropdown,
+  type ShiftOptionFace,
+} from "./schedule-grid/ShiftSuggestionDropdown.js";
+import { optionFaceOf, optionKeyOf } from "./schedule-grid/optionFace.js";
 import {
   useCellKeyboardEditing,
+  suggestionToCell,
   type ApproveDirection,
 } from "./schedule-grid/useCellKeyboardEditing.js";
 import type {
@@ -58,9 +66,6 @@ type ScheduleGridViewProps = {
   staffList: Staff[];
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
   workShifts: WorkShift[];
-  /** 可能勤務帯。あればセル編集メニューを「そのスタッフが入れる勤務帯」に絞る */
-  /** 可能勤務帯（誰がどの勤務帯に入れるか）は勤務スタッフ群が持つ。セル編集メニューの絞りに使う */
-  staffGroup?: WorkingStaffGroup;
   /**
    * 稼働日ごとの予約状況（宿泊人数・部屋数）。あれば日付ヘッダの上に読み取り専用の行を出す。
    * 店ごとに付け替える想定の姉妹モジュール。未指定なら予約行を出さない。
@@ -131,6 +136,11 @@ type ScheduleGridViewProps = {
   /** セルのコピー・カット・貼り付け（#166）。渡さなければ扱わない */
   clipboard?: CellClipboardHandlers;
   /**
+   * セルに反映している制約（violations を出したのと同じリスト）。渡すと、勤務割当の
+   * ドロップダウンの各選択肢に「それに替えたら新しく出る違反」を添える。
+   */
+  constraints?: ScheduleConstraint[];
+  /**
    * 未定セルに入れられる値（候補集合）の説明文。セルの title に添えて中身を確認できるようにする。
    * 確定済みセルには何も返さない。
    */
@@ -197,7 +207,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   schedule,
   staffList,
   workShifts,
-  staffGroup,
   reservationInfo,
   reservationInfoUrl,
   staffColumnActions,
@@ -222,6 +231,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   selection,
   onSelectionChange,
   clipboard,
+  constraints,
   candidateHintOf,
   dayOffReasonOf,
   dayOffStyleOf,
@@ -400,7 +410,6 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     staffList,
     days,
     shiftOptions,
-    staffGroup,
     onChangeCells,
     selection,
     onSelectionChange,
@@ -426,6 +435,46 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
       });
     },
   });
+
+  // ドロップダウンの選択肢は「それを入れたときのセルの姿」で描く（CellFace＝勤務表のセルと同じ部品）。
+  // 判定はセルに反映している制約リストそのもの（可能勤務帯を名指ししない）。
+  // 開いているセル1つぶん（勤務帯＋休み＋未定）だけ、開いたときに計算する。打ち込みで絞っても計算し直さない。
+  const editingCell = kb.editing && kb.selection?.kind === "staff" ? kb.selection : null;
+  const previewByOption = useMemo(() => {
+    if (!editingCell || !constraints) return new Map<string, CellValuePreview>();
+    const cells: ShiftCell[] = [
+      ...shiftOptions.map((w): ShiftCell => ({ kind: "work", shiftId: w.id })),
+      { kind: "day-off" },
+      { kind: "undecided" },
+    ];
+    const previews = previewCellValues(
+      schedule,
+      constraints,
+      editingCell.staffId,
+      editingCell.day,
+      cells
+    );
+    return new Map(previews.map((p) => [optionKeyOf(p.cell), p]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- セルは staffId と日で同定する
+  }, [editingCell?.staffId, editingCell?.day.key, constraints, schedule, shiftOptions]);
+  const optionFaceFor = (s: ShiftSuggestion): ShiftOptionFace => {
+    const cell = suggestionToCell(s);
+    if (!editingCell) {
+      return optionFaceOf(cell, undefined, {
+        staffId: "",
+        day: days[0],
+        shiftMap,
+        wishEntries: [],
+      });
+    }
+    return optionFaceOf(cell, previewByOption.get(optionKeyOf(cell)), {
+      staffId: editingCell.staffId,
+      day: editingCell.day,
+      shiftMap,
+      wishEntries: getWishEntries(editingCell.staffId, editingCell.day),
+      forced: forcedCellOf?.(editingCell.staffId, editingCell.day),
+    });
+  };
 
   // メニューで選んだ値で確定する（ルール2：留まる）。範囲を選んでいれば範囲の全セルへ。
   // 閉じたらキー操作へ戻れるようグリッドへフォーカス
@@ -717,6 +766,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         suggestions={kb.suggestions}
         activeIndex={kb.activeIndex}
         onPick={kb.applySuggestion}
+        faceOf={optionFaceFor}
       />
     </StyledWrap>
   );

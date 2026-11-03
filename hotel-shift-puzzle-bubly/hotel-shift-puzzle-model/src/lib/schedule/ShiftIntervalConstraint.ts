@@ -122,6 +122,7 @@ export class ShiftIntervalConstraint implements ScheduleConstraint {
       // 違反しているのは「この2日のつなぎ目」なので、範囲は前日と翌日の2日。
       days: [prevDay, nextDay],
       message: `${prevShiftName}の翌日に${nextShiftName}（${this.rule.restReason}）`,
+      summary: `${prevShiftName}の翌日に${nextShiftName}`,
     });
   }
 
