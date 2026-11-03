@@ -77,6 +77,12 @@ export type ScheduleReportState = {
   compromiseWeight: number;
   /** 繁忙日出勤1回あたりの重み（確定後も reweight で編集可） */
   busyDayWeight: number;
+  /**
+   * 確定した（＝このレポートを作った）時刻（epoch ms）。同じ月の確定が複数あるとき、
+   * どれが新しいかはこれで決める。この項目より前に作られたレポートには無い
+   * （上位層が確定ノードの時刻で補う）。
+   */
+  confirmedAt?: number;
 };
 
 /** シリアライズ用（state がそのまま plain） */
@@ -115,6 +121,8 @@ export class ScheduleReport {
     compromises: CompromiseEntry[];
     busyDayContributions: BusyDayEntry[];
     contributionScores: ContributionScoreEntry[];
+    /** 確定時刻（epoch ms）。時刻の取得は上位層の仕事 */
+    confirmedAt?: number;
   }): ScheduleReport {
     return new ScheduleReport({
       id: ScheduleReport.idOf(params.scheduleId, params.worldLineNodeId),
@@ -130,6 +138,7 @@ export class ScheduleReport {
       considerationNotes: {},
       compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
+      ...(params.confirmedAt !== undefined ? { confirmedAt: params.confirmedAt } : {}),
     });
   }
 
@@ -162,6 +171,11 @@ export class ScheduleReport {
     return this.state.title;
   }
 
+  /** 確定時刻（epoch ms）。古いレポートは undefined */
+  get confirmedAt(): number | undefined {
+    return this.state.confirmedAt;
+  }
+
   /**
    * タイトルを変更した新インスタンスを返す。不変。
    * 空文字（trim後）なら既定のタイトル（"{year}年{month}月"）に戻す。
@@ -184,6 +198,22 @@ export class ScheduleReport {
 
   get contributionScores(): ContributionScoreEntry[] {
     return this.state.contributionScores;
+  }
+
+  /** そのスタッフの貢献度スコア（スコアの行が無ければ 0） */
+  scoreOf(staffId: string): number {
+    return this.state.contributionScores.find((s) => s.staffId === staffId)?.score ?? 0;
+  }
+
+  /**
+   * この勤務表の参照レポートにできるか。**同じ店舗の、前月（ちょうど1か月前）**のレポートだけ。
+   * 別の店舗は働く人も事情も違い、同じ月や先の月は「振り返り」にならないため。
+   * 2か月以上前を含めないのは、振り返るべきは直前の月の譲歩・繁忙日対応で、
+   * 古い月の貢献度が今月の休みの優先順を決めると実態とずれるため。1月の前月は前年12月。
+   */
+  isReferenceableFrom(target: { storeId: string; year: number; month: number }): boolean {
+    if (target.storeId !== this.state.storeId) return false;
+    return this.state.year * 12 + this.state.month === target.year * 12 + target.month - 1;
   }
 
   get compromiseWeight(): number {
@@ -252,6 +282,7 @@ export class ScheduleReport {
       considerationNotes: { ...this.state.considerationNotes },
       compromiseWeight: this.state.compromiseWeight,
       busyDayWeight: this.state.busyDayWeight,
+      ...(this.state.confirmedAt !== undefined ? { confirmedAt: this.state.confirmedAt } : {}),
     };
   }
 
@@ -273,6 +304,7 @@ export class ScheduleReport {
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
       compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,
+      ...(plain.confirmedAt !== undefined ? { confirmedAt: plain.confirmedAt } : {}),
     });
   }
 }

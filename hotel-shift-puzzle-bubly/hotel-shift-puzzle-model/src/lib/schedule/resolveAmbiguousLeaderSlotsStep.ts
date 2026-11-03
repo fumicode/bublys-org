@@ -10,6 +10,11 @@
  * candidates/fallbackCandidates をそのまま使わない）。同じ人を必要とする複数の slot が
  * 並んでいるとき、先に確定した slot でその人が使われれば、後続の slot の候補プールから
  * 自然に消えるようにするため。
+ *
+ * **候補は、その日を出勤にしても休みの形が崩れにくい人から選ぶ**（{@link restPressureOf}）。
+ * 休みを置く段は確定した出勤の隙間にしか休みを入れられないので、ここで休みの形を知らずに
+ * 出勤を固めると、連休型の人の連休の相方の日を潰したり、分散型の人に連休を作らせたりする。
+ * 崩れ方が同じ候補の中では、これまで通り phase で順番をずらす（複数案の違いはここで出る）。
  */
 import type {
   AutoShiftStep,
@@ -19,6 +24,7 @@ import type {
 } from "./autoShiftStep.js";
 import { canPlace } from "./autoShiftStep.js";
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
+import { compareRestPressure, restPressureOf } from "./restPressure.js";
 
 export type ResolveAmbiguousLeaderSlotsOptions = {
   /** 候補の並び順をずらすオフセット（複数案の生成に使う。既定 0） */
@@ -54,13 +60,20 @@ export function makeResolveAmbiguousLeaderSlotsStep(
         if (pool.length === 0) return; // 候補が尽きている。従来通り妥協として残る
 
         const start = ((slotIndex + phase) % pool.length + pool.length) % pool.length;
-        const ordered = [...pool.slice(start), ...pool.slice(0, start)];
+        const rotated = [...pool.slice(start), ...pool.slice(0, start)];
 
         let need = slot.remainingNeed;
-        for (const id of ordered) {
-          if (need <= 0) break;
+        while (need > 0) {
           // 他の slot 解決で既に埋まった／直前に置いた人のせいで置けなくなった（日単位の制約など）
-          if (refilter([id], slot).length === 0) continue;
+          const open = refilter(rotated, slot);
+          if (open.length === 0) break;
+          // 休みの形が崩れにくい人から。同じなら phase でずらした順（sort は安定）
+          const pressure = new Map(
+            open.map((id) => [id, restPressureOf(result, ctx, id, slot.day)])
+          );
+          const [id] = [...open].sort((a, b) =>
+            compareRestPressure(pressure.get(a)!, pressure.get(b)!)
+          );
           result = result.assignShift(id, slot.day, slot.shiftId);
           assigned++;
           need--;

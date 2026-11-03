@@ -18,10 +18,13 @@ import {
   SHIFT_LEADER_CONSTRAINT,
   previewCellValues,
   type CellValuePreview,
+  type ScheduleReport,
+  type DayOffStyle,
 } from "../domain/index.js";
 import {
   STAFF_COL_WIDTH,
   DAY_COL_WIDTH,
+  PREV_COL_WIDTH,
   OFF_COL_WIDTH,
   EARLY_COL_WIDTH,
   EARLY_SHIFT_NAME,
@@ -38,6 +41,7 @@ import {
 } from "./schedule-grid/ConstraintHoverOverlay.js";
 import { SummaryRow } from "./schedule-grid/SummaryRow.js";
 import { ReservationInfoRows } from "./schedule-grid/ReservationInfoRows.js";
+import { PrecedingHeadCells } from "./schedule-grid/PrecedingCells.js";
 import { RequiredEditMenu } from "./schedule-grid/EditMenus.js";
 import {
   ShiftSuggestionDropdown,
@@ -93,6 +97,13 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
+  /** 参照レポート。渡すと、スコアのある人の名前の横に貢献度スコア（＝休みの優先度）を出す */
+  referenceReport?: ScheduleReport;
+  /**
+   * スタッフ名から開くバブルの URL。省略時はスタッフの正規 URL（どの勤務表でもないスタッフ詳細）。
+   * 勤務表から開くときは、その勤務表の文脈を持った URL を渡す。
+   */
+  staffUrlOf?: (staffId: string) => string;
   /**
    * セルの勤務割当を変更する。範囲選択でまとめて入れたときも1回で渡る（1回の操作＝世界線の1ノード）。
    * 可能勤務帯に無い勤務帯のセルは除いてある。
@@ -134,6 +145,10 @@ type ScheduleGridViewProps = {
    * 確定済みセルには何も返さない。
    */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** 休みのセルの役目の説明。セルに触れたときに title で出す */
+  dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** その人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
+  dayOffStyleOf?: (staffId: string) => DayOffStyle;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * セルに薄く描かれ、何も打っていないときの Enter（下の次の提案へ）/ Tab（右の次の提案へ）で承認できる。
@@ -201,6 +216,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
+  referenceReport,
+  staffUrlOf,
   onChangeCells,
   onChangeRequired,
   onChangeRequiredAllDays,
@@ -216,6 +233,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   clipboard,
   constraints,
   candidateHintOf,
+  dayOffReasonOf,
+  dayOffStyleOf,
   forcedCellOf,
   isDeadCell,
   onApproveForced,
@@ -470,9 +489,14 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
     kb.gridRef.current?.focus();
   };
 
-  const gridTemplateColumns = `${STAFF_COL_WIDTH}px repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
-  // スタッフ列の右から、日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
-  const daysThroughSummarySpan = `2 / ${days.length + 4}`;
+  // 前月の確定版から写し取った末尾（月跨ぎのつなぎ）。スタッフ列と今月1日の間に並べる
+  const precedingTail = schedule.precedingTail;
+  const precedingDays = precedingTail?.days ?? [];
+  const precedingCols =
+    precedingDays.length > 0 ? `repeat(${precedingDays.length}, ${PREV_COL_WIDTH}px) ` : "";
+  const gridTemplateColumns = `${STAFF_COL_WIDTH}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  // スタッフ列の右から、前月の列＋日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
+  const daysThroughSummarySpan = `2 / ${precedingDays.length + days.length + 4}`;
 
   // 部署グルーピング時は department ヘッダー行を挿入してスタッフ行を並べる
   const renderStaffRows = () => {
@@ -482,6 +506,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           key={staff.id}
           staff={staff}
           days={days}
+          precedingTail={precedingTail}
           schedule={schedule}
           shiftMap={shiftMap}
           violations={violations}
@@ -498,11 +523,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
+          referenceReport={referenceReport}
+          staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -527,6 +556,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           key={staff.id}
           staff={staff}
           days={days}
+          precedingTail={precedingTail}
           schedule={schedule}
           shiftMap={shiftMap}
           violations={violations}
@@ -543,11 +573,15 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
+          referenceReport={referenceReport}
+          staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
           minDayOff={minDayOff}
           earlyShiftIds={earlyShiftIds}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
         />
@@ -599,6 +633,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             {!reservationCollapsed && (
               <ReservationInfoRows
                 days={days}
+                precedingCount={precedingDays.length}
                 reservationInfo={reservationInfo}
                 reservationInfoUrl={reservationInfoUrl}
               />
@@ -617,6 +652,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <span className="e-corner-actions">{staffColumnActions}</span>
           )}
         </div>
+        <PrecedingHeadCells days={precedingDays} />
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
@@ -685,6 +721,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             key={`sum:${row.key}`}
             row={row}
             days={days}
+            precedingCount={precedingDays.length}
             rowIndex={rowIndex}
             editable={!!row.required && requiredEditable}
             // 減光するのは責任者ロール行だけ。フォーカス中のルールの行を残して他ロール行を退かせる。

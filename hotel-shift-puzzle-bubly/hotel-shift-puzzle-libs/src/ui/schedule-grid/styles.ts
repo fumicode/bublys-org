@@ -91,6 +91,63 @@ export const StyledWrap = styled.div`
     box-sizing: border-box;
   }
 
+  /* 前月の末尾の列（月跨ぎのつなぎ）。確定済みの前月を写した読み取り専用の参考なので、
+     灰色で細く出し、今月1日との境に太めの区切りを引く。 */
+  .e-prev-head,
+  .e-prev-cell,
+  .e-prev-filler {
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    box-sizing: border-box;
+    background: #f5f5f5;
+  }
+  .e-prev-head.is-last,
+  .e-prev-cell.is-last,
+  .e-prev-filler {
+    border-right: 2px solid #bdbdbd;
+  }
+  .e-prev-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    font-size: 0.8em;
+    color: #9e9e9e;
+
+    .e-prev-month {
+      font-size: 0.75em;
+      line-height: 1;
+    }
+    .e-day-wd {
+      font-size: 0.85em;
+    }
+    &.is-sun {
+      color: #e57373;
+    }
+    &.is-sat {
+      color: #64b5f6;
+    }
+  }
+  .e-prev-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    font-size: 0.8em;
+    color: #9e9e9e;
+    /* 今月の色を借りるが、確定済みの参考なので薄く */
+    opacity: 0.6;
+    cursor: default;
+
+    &.e-off {
+      color: #9e9e9e;
+    }
+  }
+
   /* 予約情報ブロックの折りたたみトグル行（予約行の上）。左見出しは横スクロールで固定、
      右側は帯として全日列を覆う。クリックで開閉。 */
   .e-res-toggle {
@@ -559,6 +616,27 @@ export const StyledWrap = styled.div`
       flex-direction: column;
       align-items: flex-end;
       gap: 1px;
+    }
+    /* 休みの形（分散／連休）のアイコン（DayOffStyleIcon）。休みが隣り合うか離れているかで見分ける */
+    .e-day-off-style-icon {
+      flex-shrink: 0;
+      display: flex;
+      cursor: help;
+    }
+
+    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    .e-priority-badge {
+      flex-shrink: 0;
+      font-size: 0.55em;
+      font-weight: bold;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
+      white-space: nowrap;
+      color: #8d6e00;
+      background: #fffde7;
+      border: 1px solid #ffe082;
+      cursor: help;
     }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {

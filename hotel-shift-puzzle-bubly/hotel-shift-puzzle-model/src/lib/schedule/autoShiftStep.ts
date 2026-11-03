@@ -20,6 +20,7 @@ import type { WorkingDay } from "./WorkingDay.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { introducesViolation } from "./placementCheck.js";
+import type { DayOffStyle } from "../staff/DayOffStyle.js";
 
 /** デコード済みの「その日のその人の希望」。希望キーの意味解釈は上位層が行う */
 export type DecodedWish =
@@ -60,6 +61,16 @@ export type AutoShiftContext = {
   minDayOff?: number;
   /** 1日に休んでよい人数の上限。休みを入れるときにこれを超えない。 */
   maxDayOffPerDay?: number;
+  /**
+   * 全体の連勤上限（制約セットの値）。連休型の人に休みを置くとき、出勤の塊をこの長さ
+   * （その人の目標があればその小さい方）で区切るのに使う。省略時は上限なしとして扱う。
+   */
+  maxConsecutiveWorkdays?: number;
+  /**
+   * その人がこの勤務表で使う休みの形（WorkingStaffMember の上書き → Staff の既定値）。
+   * 省略時は全員分散型。
+   */
+  dayOffStyleOf?: (staffId: string) => DayOffStyle;
 };
 
 /**
@@ -109,6 +120,13 @@ export interface AutoShiftStep {
   readonly groupLabel?: string;
   /** トグル内でこの戦略を表す短いラベル（例: "まんべんなく"） */
   readonly variantLabel?: string;
+  /**
+   * 休みを置くとき、`ctx.staffIds` の**前の人から先に**取らせるか。
+   * 1日に休める人数には上限があるので、前に並んだ人ほど希望どおりの日に休みを取りやすい。
+   * 上位層はこれを見て「並び順で誰を優先したか」を利用者に伝える（並び順が効かないステップで
+   * 「優先しました」と言わないため）。省略時 false。
+   */
+  readonly grantsDayOffInStaffOrder?: boolean;
   /** 実行。純粋・不変で、新しい勤務表と結果を返す */
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult;
 }

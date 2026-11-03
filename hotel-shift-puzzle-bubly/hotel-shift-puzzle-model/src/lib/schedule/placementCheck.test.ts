@@ -7,6 +7,7 @@ import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import { computeConstraintDelta } from './ConstraintDelta.js';
 import { introducesViolation } from './placementCheck.js';
 import type { ScheduleConstraint } from './ScheduleConstraint.js';
+import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 
 describe('introducesViolation（そのセルにその値を置くと、新しい違反が出るか）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -131,5 +132,34 @@ describe('introducesViolation（そのセルにその値を置くと、新しい
     // どちらの答えも十分に出る盤面で比べている（恒真にならないように）
     expect(blocked).toBeGreaterThan(10);
     expect(allowed).toBeGreaterThan(10);
+  });
+});
+
+describe('introducesViolation：前月とつないだとき（月跨ぎ）', () => {
+  const workShifts = createDefaultWorkShifts();
+  const shiftIdsOf = (name: string) =>
+    workShifts.filter((w) => w.name === name).map((w) => w.id);
+  const lateAfter = ConstraintSet.empty('sched-1').intervalConstraints(shiftIdsOf);
+  const june1 = WorkingDay.of(2026, 6, 1);
+  const early: ShiftCell = { kind: 'work', shiftId: 'early' };
+
+  const june = () =>
+    MonthlyStaffSchedule.create({ id: 'sched-1', storeId: 'store-1', year: 2026, month: 6 });
+  const tailEndingWithLate = PrecedingMonthTail.capture({
+    sourceReportId: 'may:n',
+    schedule: MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 })
+      .assignShift('s1', WorkingDay.of(2026, 5, 31), 'late'),
+    shiftNameOf: () => '遅番',
+    length: 7,
+  });
+
+  test('前月末日が遅番なら、今月1日に早番は置けない', () => {
+    expect(introducesViolation(june().withPrecedingTail(tailEndingWithLate), lateAfter, 's1', june1, early)).toBe(true);
+  });
+
+  test('同じ割当でも、末尾の有無で答えが変わる（判定のキャッシュを末尾ごとに分ける）', () => {
+    // 先に「つないでいない」答えを覚えさせてから、つないだ勤務表で訊く
+    expect(introducesViolation(june(), lateAfter, 's1', june1, early)).toBe(false);
+    expect(introducesViolation(june().withPrecedingTail(tailEndingWithLate), lateAfter, 's1', june1, early)).toBe(true);
   });
 });

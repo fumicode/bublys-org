@@ -30,6 +30,8 @@ export type CellFaceProps = {
    * title に添える。確定済みセル・候補集合が無いときは undefined。
    */
   candidateHint?: string;
+  /** 休みのセルの役目の説明（「休み：外すと6連勤になります（分散型）」）。title に出す */
+  dayOffReason?: string;
   /**
    * 候補が1つに絞られた＝制約から一意に決まる値（確定提案）。渡すと、確定済みセルと
    * 同じ形を薄く描いて「承認すればこうなる」を示す。承認前なので勤務表には入っていない。
@@ -85,6 +87,7 @@ export const CellFace: FC<CellFaceProps> = ({
   violationMarks = [],
   wishViolation,
   candidateHint,
+  dayOffReason,
   forcedCandidate,
   forcedShift,
   dead = false,
@@ -120,6 +123,8 @@ export const CellFace: FC<CellFaceProps> = ({
   } else if (cell.kind === "day-off") {
     className += " e-off";
     content = "休";
+    // この休みがいまの表で何の役目を果たしているか（触れたときだけ出す）
+    if (dayOffReason) title = dayOffReason;
   } else if (dead) {
     // 詰み: 何を入れてもどれかの制約に反する。承認できる手が無いので値は描かず、
     // 「ここは埋まらない」ことだけを示す（理由は candidateHint が title に添える）。

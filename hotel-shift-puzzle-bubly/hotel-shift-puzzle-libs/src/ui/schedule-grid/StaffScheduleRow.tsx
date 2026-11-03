@@ -9,18 +9,25 @@ import type {
   ConstraintViolation,
   ShiftLeaderRule,
   ShiftCell,
+  ScheduleReport,
+  PrecedingMonthTail,
+  DayOffStyle,
 } from "../../domain/index.js";
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
+import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
+import { DayOffStyleIcon } from "../constraint-icons/DayOffStyleIcon.js";
 import type { WishEntry } from "./wishSummary.js";
 import type { CellSelection } from "./types.js";
 
 type StaffScheduleRowProps = {
   staff: Staff;
   days: WorkingDay[];
+  /** 前月の確定版から写し取った末尾。あれば今月1日の左に読み取り専用で並べる */
+  precedingTail?: PrecedingMonthTail;
   schedule: MonthlyStaffSchedule;
   /** 勤務帯ID → WorkShift の解決マップ */
   shiftMap: Map<string, WorkShift>;
@@ -52,6 +59,10 @@ type StaffScheduleRowProps = {
   leaderRules?: ShiftLeaderRule[];
   /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
+  /** 参照レポート。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
+  referenceReport?: ScheduleReport;
+  /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
+  staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
   focused?: boolean;
   /** 選択モード中で、この行が対象外（減光＝blur でぼかす） */
@@ -62,6 +73,10 @@ type StaffScheduleRowProps = {
   earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
   candidateHintOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** 休みのセルの役目の説明（休みでないセルには undefined） */
+  dayOffReasonOf?: (staffId: string, day: WorkingDay) => string | undefined;
+  /** この人がこの勤務表で使う休みの形。渡されたら名前の横に印を出す */
+  dayOffStyle?: DayOffStyle;
   /**
    * 候補が1つに絞られた未定セルの、その値（確定提案）。無ければ undefined。
    * 渡された値は薄く描かれ、Enter / Tab で承認できる。
@@ -79,6 +94,7 @@ type StaffScheduleRowProps = {
 export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   staff,
   days,
+  precedingTail,
   schedule,
   shiftMap,
   violations,
@@ -95,11 +111,15 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onToggleSelected,
   leaderRules = [],
   onSelectRule,
+  referenceReport,
+  staffUrl,
   focused,
   dimmed,
   minDayOff,
   earlyShiftIds,
   candidateHintOf,
+  dayOffReasonOf,
+  dayOffStyle,
   forcedCellOf,
   isDeadCell,
 }) => {
@@ -109,6 +129,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
   // 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
   const marks = violationMarksOf(violations, staff.id, days);
+  const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -126,6 +147,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         )}
         <ObjectView
           object={staff}
+          url={staffUrl}
           label={staff.name}
           draggable={true}
           openingPosition="bubble-side-left"
@@ -140,10 +162,37 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
                 staffId={staff.id}
                 onSelectRule={onSelectRule}
               />
+              {dayOffStyle && (
+                <span
+                  className="e-day-off-style-icon"
+                  title={`休みの形：${dayOffStyle.label}。自動シフトはこの形に沿って休みを置きます`}
+                >
+                  <DayOffStyleIcon dayOffStyle={dayOffStyle} />
+                </span>
+              )}
+              {referenceReport && priority && priority.score > 0 && (
+                <span
+                  className="e-priority-badge"
+                  title={`参照レポート「${referenceReport.title}」の貢献度スコア ${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                >
+                  ★{priority.score}
+                </span>
+              )}
             </span>
           </div>
         </ObjectView>
       </div>
+
+      {/* 前月の末尾（読み取り専用）。同じ人の前月末が今月1日の左にそのまま続く */}
+      {precedingTail && (
+        <PrecedingStaffCells
+          tail={precedingTail}
+          staffId={staff.id}
+          staffName={staff.name}
+          shiftMap={shiftMap}
+          className={rowMod.trim() || undefined}
+        />
+      )}
 
       {/* 各稼働日のセル */}
       {days.map((day) => {
@@ -182,6 +231,9 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             onDragEnter={onDragToCell ? () => onDragToCell(here) : undefined}
             onOpenEditor={() => onOpenEditor(staff.id, day)}
             candidateHint={candidateHintOf?.(staff.id, day)}
+            dayOffReason={
+              cell.kind === "day-off" ? dayOffReasonOf?.(staff.id, day) : undefined
+            }
             forcedCandidate={forced}
             dead={dead}
             forcedShift={

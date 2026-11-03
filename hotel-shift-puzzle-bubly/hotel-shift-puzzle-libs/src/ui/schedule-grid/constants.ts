@@ -13,6 +13,8 @@ export const SHIFT_FG: Record<string, string> = {
 // グリッドの列幅
 export const STAFF_COL_WIDTH = 168;
 export const DAY_COL_WIDTH = 40;
+/** 前月の末尾の列（読み取り専用・参考なので今月の列より細く） */
+export const PREV_COL_WIDTH = 28;
 export const OFF_COL_WIDTH = 40; // 右端付近「休（合計）」列
 export const EARLY_COL_WIDTH = 40; // 一番右「早番日数」列
 

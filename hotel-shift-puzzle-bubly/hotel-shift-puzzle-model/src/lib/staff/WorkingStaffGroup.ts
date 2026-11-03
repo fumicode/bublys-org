@@ -17,6 +17,7 @@
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { Staff } from "./Staff.js";
+import { DayOffStyle } from "./DayOffStyle.js";
 import {
   WorkingStaffMember,
   type WorkingStaffMemberPlain,
@@ -107,6 +108,25 @@ export class WorkingStaffGroup {
     const members = this.state.members.map((m) => m.allowShift(shiftId));
     if (members.every((m, i) => m === this.state.members[i])) return this;
     return new WorkingStaffGroup({ ...this.state, members });
+  }
+
+  /**
+   * その人がこの勤務表で使う休みの形（上書きがあればそれ、無ければその人の既定値）。
+   * メンバーでなければその人の既定値。
+   */
+  dayOffStyleOf(staffId: string, staff: Staff | undefined): DayOffStyle {
+    const member = this.memberOf(staffId);
+    return member ? member.dayOffStyleOf(staff) : staff?.dayOffStyle ?? DayOffStyle.DEFAULT;
+  }
+
+  /** その人がこの勤務表で休みの形を上書きしているか */
+  hasDayOffStyleOverride(staffId: string): boolean {
+    return this.memberOf(staffId)?.hasDayOffStyleOverride ?? false;
+  }
+
+  /** その人の休みの形をこの勤務表だけ上書きした新しい群を返す。undefined で既定値に戻す。不変。 */
+  overrideDayOffStyle(staffId: string, style: DayOffStyle | undefined): WorkingStaffGroup {
+    return this.mapMember(staffId, (m) => m.overrideDayOffStyle(style));
   }
 
   /** 臨時の人たち（実体はメンバーが抱えている） */

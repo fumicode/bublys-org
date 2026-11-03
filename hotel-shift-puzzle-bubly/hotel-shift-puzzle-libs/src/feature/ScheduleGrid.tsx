@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import {
   ObjectView,
@@ -23,6 +23,8 @@ import {
   makeResolveAmbiguousLeaderSlotsStep,
   makeMinDayOffStep,
   WorkingDay,
+  dayOffReasonOf as readDayOffReason,
+  dayOffReasonText,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type ScheduleRepair,
@@ -45,7 +47,12 @@ import {
   useIsAbsent,
 } from "../objects/repository.js";
 import { commitCandidates, localScopeId } from "../objects/commit.js";
-import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
+import {
+  autoShiftLimitsOf,
+  dayOffStyleResolver,
+  decodeWishForStaff,
+  runAutoShiftStep,
+} from "./autoShift.js";
 import { suggestNextUndecided } from "./shiftSuggestion/index.js";
 import {
   useScheduleCandidates,
@@ -53,8 +60,15 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { prioritizeStaffByReport } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
+import {
+  capturePrecedingTail,
+  confirmedAtOf,
+  newerReferenceCandidate,
+  referenceCandidates,
+  withReference,
+} from "./precedingMonth.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
@@ -64,6 +78,7 @@ import {
   recordSetCells,
   recordScheduleMutation,
   recordConstraintEdit,
+  recordReferenceEdit,
 } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -132,6 +147,11 @@ type ScheduleGridProps = {
    */
   reportBubbleUrl?: (reportId: string) => string;
   /**
+   * スタッフ名から開くスタッフ詳細バブルの URL を作る（staffId を渡す）。この勤務表の文脈を
+   * 持った URL を渡すと、詳細にこの勤務表の参照レポートでの評価が出る。同上・app 層から注入。
+   */
+  staffBubbleUrl?: (staffId: string) => string;
+  /**
    * 責任者ルールを追加したあと、その編集バブルを開くハンドラ（ロールキーを渡す）。
    * 渡すと「＋ 責任者ルールを追加」が有効になる。URL/開き方は app 層の関心事なので注入で受ける。
    */
@@ -163,6 +183,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   violationBubbleUrl,
   bubbleUrlOf,
   reportBubbleUrl,
+  staffBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
   createCandidatesWorker,
@@ -241,14 +262,34 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     [constraints, scheduleId]
   );
 
-  // 参考として紐づけたシフト完成レポート（次回シフト作成のルール・配慮として使う）。
-  // ドロップで紐づけ、自動シフトの実行前に staffList をこれで優先度づけする。
+  // 参照レポート（過去のシフト完成レポートを1つ紐づける）。自動シフトの実行前に
+  // staffList をこれの貢献度スコアで並べ替え、休みを優先して取れる順にする（reportPriority.ts）。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
   const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReports = useMemo(() => {
-    const ids = constraints?.linkedReportIds ?? [];
-    return allReports.filter((r) => ids.includes(r.id));
-  }, [allReports, constraints]);
+  const linkedReport = useMemo(
+    () => allReports.find((r) => r.id === constraints?.linkedReportId),
+    [allReports, constraints]
+  );
+  // 参照レポートの候補：同じ店舗の前月の確定（ScheduleReport.isReferenceableFrom）を、確定の新しい順に。
+  // 参照レポートの確定版の末尾が、この勤務表の月初につながる（月跨ぎ。詳しくは precedingMonth.ts）。
+  const referenceOptions = useMemo(
+    () =>
+      schedule
+        ? referenceCandidates(allReports, schedule, (r) => confirmedAtOf(store, r))
+        : [],
+    [allReports, schedule, store]
+  );
+  const linkedOption = linkedReport
+    ? { report: linkedReport, confirmedAt: confirmedAtOf(store, linkedReport) }
+    : undefined;
+  // 作った後に前月の確定が増えても勝手には差し替えない。より新しい確定があれば知らせるだけ
+  const newerReference = newerReferenceCandidate(referenceOptions, linkedOption);
+  // 貢献度スコアは、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
+  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
+  const [linkingReference, setLinkingReference] = useState(false);
+  // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
+  const latestRef = useRef({ schedule, constraints });
+  latestRef.current = { schedule, constraints };
 
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。集約から（世界線に載る）。
   // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
@@ -349,22 +390,59 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return ConstraintSet.empty(scheduleId);
   };
 
+  // 参照レポートを紐づける（プルダウン・ドロップ・「取り込む」で同じ入口）。紐づけは1つなので置き換わる。
+  // 参照できないレポート（別の店舗・前月以外の月）は紐づけず、理由を伝える。
+  // 紐づけると、そのレポートの確定版の末尾を写し取り、参照と一緒に1ノードで記録する。
+  const handleLinkReport = async (reportId: string) => {
+    if (!scheduleId || !schedule) return;
+    const report = allReports.find((r) => r.id === reportId);
+    if (!report) return;
+    if (!report.isReferenceableFrom(schedule)) {
+      setAutoMessage(
+        `「${report.title}」は参照レポートにできません（同じ店舗の、前月のレポートだけ紐づけられます）。`
+      );
+      return;
+    }
+    if (!constraintsBase()) return;
+    setLinkingReference(true);
+    try {
+      const tail = await capturePrecedingTail(
+        store,
+        { report, confirmedAt: confirmedAtOf(store, report) },
+        barConstraintSet.maxConsecutiveWorkdays
+      );
+      const { schedule: current, constraints: currentConstraints } = latestRef.current;
+      const base = currentConstraints ?? constraintsBase();
+      if (!current || !base) return;
+      const next = withReference(current, base, { reportId, tail });
+      recordReferenceEdit(store, {
+        schedule: current,
+        nextSchedule: next.schedule,
+        nextConstraints: next.constraints,
+      });
+      if (!tail) {
+        setAutoMessage(
+          `「${report.title}」の確定版を読み出せなかったので、前月とはつながずに紐づけました（今月1日から数えます）。`
+        );
+      }
+    } finally {
+      setLinkingReference(false);
+    }
+  };
   const handleDropReportUrl = (url: string) => {
     const reportId = extractIdFromUrl(url);
-    if (!reportId || !scheduleId) return;
-    const base = constraintsBase();
-    if (!base) return;
-    if (base.linkedReportIds.includes(reportId)) return; // 既に紐づいていれば何もしない
-    recordConstraintEdit(store, { schedule, nextConstraints: base.linkReport(reportId) });
+    if (reportId) void handleLinkReport(reportId);
   };
-  const handleUnlinkReport = (reportId: string) => {
-    if (!constraints) return;
-    recordConstraintEdit(store, {
+  // 参照を外すと、前月とのつなぎも一緒に外れる（今月1日から数え直す）
+  const handleUnlinkReport = () => {
+    if (!schedule || !constraints) return;
+    const next = withReference(schedule, constraints, undefined);
+    recordReferenceEdit(store, {
       schedule,
-      nextConstraints: constraints.unlinkReport(reportId),
+      nextSchedule: next.schedule,
+      nextConstraints: next.constraints,
     });
   };
-
   // 責任者ルールを後から追加する。新しいルール（担当勤務帯は先頭の勤務帯・候補者は空）を
   // 制約集約に足して保存し、その場で編集バブルを開く。人の集合と時間帯はそこで編集する。
   const handleAddRule = () => {
@@ -424,6 +502,39 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         : `候補${options.length}件: ${values}`;
     },
     [candidates, cellLabelOf]
+  );
+
+  // その人がこの勤務表で使う休みの形（勤務メンバーの上書き → スタッフの既定値）。
+  // 自動シフトと同じ引き方で引く（名前の横の印・休みの役目の説明が、置き方と食い違わない）。
+  const dayOffStyleOf = useMemo(
+    () => dayOffStyleResolver(staffList, staffGroup),
+    [staffList, staffGroup]
+  );
+
+  // 休みのセルに触れたときの説明：その休みがいまの表で何の役目を果たしているか。
+  // 置いたときの経緯は保存せず、いまの表（前月の末尾ともひと続き）から読み解く。
+  const shiftIdByName = useMemo(
+    () => new Map(workShifts.map((w) => [w.name, w.id])),
+    [workShifts]
+  );
+  const dayOffReasonOf = useCallback(
+    (staffId: string, day: WorkingDay): string | undefined => {
+      if (!schedule) return undefined;
+      const style = dayOffStyleOf(staffId);
+      const wish = wishByStaff.get(staffId);
+      const reason = readDayOffReason({
+        schedule,
+        staffId,
+        day,
+        wishOf: (d) => decodeWishForStaff(wish, d, shiftIdByName),
+        style,
+        maxConsecutiveWorkdays: limits.maxConsecutiveWorkdays,
+        minDayOff: limits.minDayOff,
+        maxDayOffPerDay: limits.maxDayOffPerDay,
+      });
+      return reason && dayOffReasonText(reason, style, { maxDayOffPerDay: limits.maxDayOffPerDay });
+    },
+    [schedule, shiftIdByName, dayOffStyleOf, wishByStaff, limits]
   );
 
   // 候補が1つに絞られたセル＝制約から一意に決まる手。承認するまで勤務表には入れない。
@@ -518,33 +629,44 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 紐づけたレポートで譲歩が多かった人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 参照レポートの貢献度スコアが高い人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subsetStaff,
+      priorityReport
+    );
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: prioritizeStaffByLinkedReports(subsetStaff, linkedReports),
+      staffList: prioritizedStaff,
       workShifts,
       wishByStaff,
+      staffGroup,
       // 置くたびに勤務表の制約（連勤・遅番明け・希望…）に新しい違反が出ないかを見る
       constraints: allConstraints,
       // 「必要人数を埋める」は先に各自の休み（月◯日／1日◯人まで）を確保してから埋める
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
-    setAutoMessage(`${step.label}: ${result.message}`);
+    const note = step.grantsDayOffInStaffOrder ? priorityNote : null;
+    setAutoMessage([`${step.label}: ${result.message}`, note].filter(Boolean).join("\n"));
   };
 
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 紐づけたレポートで譲歩が多かった人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const prioritizedStaff = prioritizeStaffByLinkedReports(subsetStaff, linkedReports);
+    // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subsetStaff,
+      priorityReport
+    );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
         staffList: prioritizedStaff,
         workShifts,
         wishByStaff,
+        staffGroup,
         // handleRunStep と同じく制約リストと休みの目標を丸ごと渡す。渡さないと、
         // 完成案が勤務表の制約（連勤・遅番明け…）に違反する
         constraints: allConstraints,
@@ -562,6 +684,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           staffList: prioritizedStaff,
           workShifts,
           wishByStaff,
+          staffGroup,
           constraints: allConstraints,
           ...limits,
         }
@@ -586,8 +709,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       schedule,
       candidates
     );
+    // 完成案は「月◯日休む」まで入れるので、並び順が休みの優先に効いている
     setAutoMessage(
-      `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`
+      [
+        `世界線に比較用の完成案を${DAY_OFF_CANDIDATE_COUNT}つ置きました。世界線ビューで枝を切り替えて見比べてください。`,
+        priorityNote,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
     onOpenWorldLine?.();
   };
@@ -667,6 +796,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       month: apexSchedule.month,
       storeId: apexSchedule.storeId,
       ...draft,
+      // 同じ月に確定が複数あるとき、どれが新しいかはこの時刻で決める（前月とのつなぎ）
+      confirmedAt: Date.now(),
     });
     reportRepo.save(report);
 
@@ -783,13 +914,18 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             </ObjectView>
           )}
 
-          {/* 参考として紐づけたシフト完成レポート（レポート一覧バブルからドラッグで紐づけ、
-              自動シフトの優先度に使う。詳しくは reportPriority.ts）。 */}
+          {/* 参照レポート＝前月の確定（プルダウンで選ぶか、レポート一覧からドラッグで紐づける）。
+              その確定版の末尾が月初につながる。貢献度スコアを休みの優先度に使うかは
+              制約欄の「★優先」（limitSpecs）で切り替える（precedingMonth.ts / reportPriority.ts）。 */}
           <LinkedReportsView
-            reports={linkedReports}
+            linked={linkedOption}
+            candidates={referenceOptions}
+            newer={newerReference}
+            onLink={(id) => void handleLinkReport(id)}
             onDropUrl={handleDropReportUrl}
             dropAcceptTypes={[getDragType(SCHEDULE_REPORT_TYPE)]}
             onUnlink={handleUnlinkReport}
+            busy={linkingReference}
           />
         </div>
       </div>
@@ -837,6 +973,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
+          referenceReport={priorityReport}
+          staffUrlOf={staffBubbleUrl}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}
           onSelectRule={selectRuleStaff}
@@ -853,6 +991,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onSelectionChange={setCellSelection}
           clipboard={clipboard}
           candidateHintOf={candidateHintOf}
+          dayOffReasonOf={dayOffReasonOf}
+          dayOffStyleOf={dayOffStyleOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}
