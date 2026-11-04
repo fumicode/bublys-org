@@ -10,6 +10,7 @@
  */
 import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import type { ConstraintViolation } from "./ConstraintViolation.js";
+import type { TightnessAmount, TightnessUnit } from "./Tightness.js";
 
 /**
  * この制約の check() が、1セルの変更によってどの範囲まで結果が変わりうるかを表す。
@@ -34,4 +35,16 @@ export interface ScheduleConstraint {
   describe(): string;
   /** 勤務表をチェックし、違反箇所の一覧を返す（違反が無ければ空配列） */
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[];
+  /**
+   * この制約が宣言する段階（きつさの単位）。制約レシピは段階ごとに優先度を付ける（#229）。
+   * 段階に分けた制約は、check() もこの段階の関数から導く（違反の段階だけが違反になる）ので、
+   * 「画面では違反なのに、レシピでは違反の段階に入っていない」が起きない。
+   * まだ段階に分けていない制約は省略する。
+   */
+  readonly tightnessUnits?: readonly TightnessUnit[];
+  /**
+   * いまの勤務表のきつさ（宣言した段階ごとの件数。0件の段階も含む）。
+   * 未定は「今のまま」（何もしていない）と読む。tightnessUnits と一緒に宣言する。
+   */
+  tightness?(schedule: MonthlyStaffSchedule): TightnessAmount[];
 }

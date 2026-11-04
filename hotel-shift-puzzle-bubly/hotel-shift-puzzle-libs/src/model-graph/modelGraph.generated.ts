@@ -654,6 +654,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "ConstraintViolation[]",
           "isStatic": false,
           "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
+          "isStatic": false,
+          "returnsSelf": false
         }
       ]
     },
@@ -2133,6 +2142,79 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "TightnessAmount",
+      "file": "schedule/Tightness.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "amount",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "unit",
+          "type": "TightnessUnit",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "amount",
+        "unit",
+        "isViolating"
+      ],
+      "methods": [
+        {
+          "name": "compare",
+          "params": [
+            "other"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "きつさの量（単位つき）"
+    },
+    {
+      "name": "TightnessUnit",
+      "file": "schedule/Tightness.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "key",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "violating",
+          "type": "boolean",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "key",
+        "label",
+        "isViolating"
+      ],
+      "methods": [
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "きつさの単位。制約の段階ごとに定数で宣言する（その場で書かない＝表記揺れで別の単位にならない）"
+    },
+    {
       "name": "WorkingDay",
       "file": "schedule/WorkingDay.ts",
       "kind": "value",
@@ -2942,6 +3024,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "TightnessAmount",
+      "to": "TightnessUnit",
+      "kind": "contains",
+      "via": "unit",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "WorkingStaffGroup",
       "to": "WorkingStaffMember",
       "kind": "contains",
@@ -2984,7 +3074,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 46,
+    "fileCount": 47,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",

@@ -240,3 +240,56 @@ describe('MaxConsecutiveWorkdaysConstraint：前月とつないだとき（月�
     expect(check(s)).toEqual([]);
   });
 });
+
+describe('MaxConsecutiveWorkdaysConstraint：段階（きつさ）', () => {
+  const day = (d: number) => WorkingDay.of(2026, 6, d);
+  /** "WWWO-W" のような文字列で 1日目から並べる（W=出勤 O=休み -=未定） */
+  const scheduleOf = (row: string) => {
+    let s = MonthlyStaffSchedule.create({ id: 'sched-1', storeId: 'store-1', year: 2026, month: 6 });
+    [...row].forEach((c, i) => {
+      if (c === 'W') s = s.assignShift('s1', day(i + 1), 'early');
+      if (c === 'O') s = s.assignDayOff('s1', day(i + 1));
+    });
+    return s;
+  };
+  /** 段階ごとの件数を { key: 件数 } にする */
+  const tightness = (row: string, max = 5) =>
+    Object.fromEntries(
+      new MaxConsecutiveWorkdaysConstraint(max)
+        .tightness(scheduleOf(row))
+        .map((a) => [a.unit.key, a.amount])
+    );
+
+  test('上限ちょうど・1日超え・2日以上超えに振り分け、上限より短い連勤は数えない', () => {
+    // 4連勤 / 5連勤 / 6連勤 / 7連勤 / 3連勤（6月は30日まで）
+    expect(tightness('WWWWO' + 'WWWWWO' + 'WWWWWWO' + 'WWWWWWWO' + 'WWW')).toEqual({
+      'run-at-limit': 1,
+      'run-over-1': 1,
+      'run-over-2-plus': 1,
+    });
+  });
+
+  test('★ 6連勤×2 と 7連勤×1 は別の段階の件数になり、足し合わされない', () => {
+    expect(tightness('WWWWWWO' + 'WWWWWWO')).toMatchObject({ 'run-over-1': 2, 'run-over-2-plus': 0 });
+    expect(tightness('WWWWWWW')).toMatchObject({ 'run-over-1': 0, 'run-over-2-plus': 1 });
+  });
+
+  test('段階は上限からの相対（上限 4 なら 5連勤が1日超え）', () => {
+    expect(tightness('WWWWW', 4)).toMatchObject({ 'run-over-1': 1 });
+  });
+
+  test('違反になるのは違反の段階に入った連勤だけ（check と段階が食い違わない）', () => {
+    const constraint = new MaxConsecutiveWorkdaysConstraint(5);
+    const s = scheduleOf('WWWWWO' + 'WWWWWWO' + 'WWWWWWW');
+    const violating = constraint
+      .tightness(s)
+      .filter((a) => a.isViolating)
+      .reduce((n, a) => n + a.amount, 0);
+    expect(constraint.check(s)).toHaveLength(violating);
+    expect(violating).toBe(2);
+  });
+
+  test('連勤が無ければ、宣言した段階すべてが0件', () => {
+    expect(tightness('')).toEqual({ 'run-at-limit': 0, 'run-over-1': 0, 'run-over-2-plus': 0 });
+  });
+});
