@@ -78,6 +78,93 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "ConstraintRecipe",
+      "file": "schedule/ConstraintRecipe.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "RecipeEntry[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries"
+      ],
+      "methods": [
+        {
+          "name": "empty",
+          "params": [],
+          "returns": "ConstraintRecipe",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "weightOf",
+          "params": [
+            "unit"
+          ],
+          "returns": "RecipeWeight",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "with",
+          "params": [
+            "unitKey",
+            "weight"
+          ],
+          "returns": "ConstraintRecipe",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "without",
+          "params": [
+            "unitKey"
+          ],
+          "returns": "ConstraintRecipe",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "tiers",
+          "params": [
+            "units"
+          ],
+          "returns": "RecipeTier[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "orderings",
+          "params": [
+            "units",
+            "limit"
+          ],
+          "returns": "TightnessUnit[][]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ConstraintRecipePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ConstraintRecipe",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "ConstraintSet",
       "file": "schedule/ConstraintSet.ts",
       "kind": "aggregate",
@@ -131,6 +218,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "useReportPriority",
           "type": "boolean",
           "optional": true
+        },
+        {
+          "name": "recipe",
+          "type": "ConstraintRecipe",
+          "optional": true
         }
       ],
       "getters": [
@@ -143,7 +235,8 @@ export const MODEL_GRAPH: ModelGraph = {
         "maxDayOffPerDay",
         "shiftIntervalRules",
         "linkedReportId",
-        "leaderRules"
+        "leaderRules",
+        "recipe"
       ],
       "methods": [
         {
@@ -353,6 +446,25 @@ export const MODEL_GRAPH: ModelGraph = {
           "params": [
             "ruleKey",
             "minCount"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withRecipeWeight",
+          "params": [
+            "unitKey",
+            "weight"
+          ],
+          "returns": "ConstraintSet",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withoutRecipeWeight",
+          "params": [
+            "unitKey"
           ],
           "returns": "ConstraintSet",
           "isStatic": false,
@@ -1244,6 +1356,34 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         }
       ]
+    },
+    {
+      "name": "RecipeEntry",
+      "file": "schedule/ConstraintRecipe.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "hard",
+          "type": "boolean",
+          "optional": false
+        },
+        {
+          "name": "priority",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "unitKey",
+          "type": "string",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "unitKey",
+        "weight"
+      ],
+      "methods": [],
+      "doc": "レシピの1行"
     },
     {
       "name": "RequiredStaffing",
@@ -2907,11 +3047,27 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "ConstraintRecipe",
+      "to": "RecipeEntry",
+      "kind": "contains",
+      "via": "entries",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ConstraintSet",
       "to": "ShiftLeaderRule",
       "kind": "contains",
       "via": "leaderRules",
       "many": true,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConstraintSet",
+      "to": "ConstraintRecipe",
+      "kind": "contains",
+      "via": "recipe",
+      "many": false,
       "foundBy": "type"
     },
     {
@@ -3125,7 +3281,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 47,
+    "fileCount": 48,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",

@@ -6,6 +6,7 @@ import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstr
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { ConstraintRecipe, type ConstraintRecipePlain, type RecipeWeight } from "./ConstraintRecipe.js";
 
 /**
  * ConstraintSet — 勤務表が満たすべき制約をひとまとめにした集約（制約セット）
@@ -55,15 +56,21 @@ export type ConstraintSetState = {
    * これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は参照している限り常に効く。
    */
   useReportPriority?: boolean;
+  /**
+   * 制約レシピ：きつさの単位ごとの（絶対か任意か, 優先度）（#229）。省略時は空のレシピ
+   * （どの単位も既定の重み＝今の動きと同じ）。
+   */
+  recipe?: ConstraintRecipe;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
 export type ConstraintSetPlain = Omit<
   ConstraintSetState,
-  "leaderRules" | "shiftIntervalRules"
+  "leaderRules" | "shiftIntervalRules" | "recipe"
 > & {
   leaderRules: ShiftLeaderRuleState[];
   shiftIntervalRules?: ShiftIntervalRuleState[];
+  recipe?: ConstraintRecipePlain;
   /**
    * 旧形式：参照レポートを複数紐づけられた頃の配列。読むときだけ受け付け、
    * 最後に紐づけたもの（末尾）を linkedReportId として引き継ぐ。書くことはない。
@@ -346,16 +353,33 @@ export class ConstraintSet {
 
   // ========== シリアライズ ==========
 
+  /** 制約レシピ（省略時は空＝どの単位も既定の重み） */
+  get recipe(): ConstraintRecipe {
+    return this.state.recipe ?? ConstraintRecipe.empty();
+  }
+
+  /** きつさの単位1つの重みを決めた新しいセット（レシピの1行を書き換える） */
+  withRecipeWeight(unitKey: string, weight: RecipeWeight): ConstraintSet {
+    return new ConstraintSet({ ...this.state, recipe: this.recipe.with(unitKey, weight) });
+  }
+
+  /** きつさの単位1つをレシピから外し、既定の重みに戻した新しいセット */
+  withoutRecipeWeight(unitKey: string): ConstraintSet {
+    return new ConstraintSet({ ...this.state, recipe: this.recipe.without(unitKey) });
+  }
+
   toPlain(): ConstraintSetPlain {
+    const { recipe, ...rest } = this.state;
     return {
-      ...this.state,
+      ...rest,
       leaderRules: this.state.leaderRules.map((r) => r.state),
       shiftIntervalRules: this.state.shiftIntervalRules?.map((r) => r.state),
+      ...(recipe ? { recipe: recipe.toPlain() } : {}),
     };
   }
 
   static fromPlain(plain: ConstraintSetPlain): ConstraintSet {
-    const { linkedReportIds: legacyIds, ...rest } = plain;
+    const { linkedReportIds: legacyIds, recipe, ...rest } = plain;
     const linkedReportId = rest.linkedReportId ?? legacyIds?.[legacyIds.length - 1];
     return new ConstraintSet({
       ...rest,
@@ -364,6 +388,7 @@ export class ConstraintSet {
       shiftIntervalRules: plain.shiftIntervalRules?.map(
         (r) => new ShiftIntervalRule(r)
       ),
+      ...(recipe ? { recipe: ConstraintRecipe.fromPlain(recipe) } : {}),
     });
   }
 }

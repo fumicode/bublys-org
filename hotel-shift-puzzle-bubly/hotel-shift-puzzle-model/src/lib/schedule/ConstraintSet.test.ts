@@ -1,3 +1,4 @@
+import { ConstraintRecipe } from './ConstraintRecipe.js';
 import { ConstraintSet } from './ConstraintSet.js';
 import { ShiftLeaderRule } from './ShiftLeaderRule.js';
 import { ShiftIntervalRule } from './ShiftIntervalRule.js';
@@ -153,5 +154,29 @@ describe('ConstraintSet の勤務間インターバル（main から合流した
     expect(set.useReportPriority).toBe(false); // 不変
     expect(on.withUseReportPriority(true)).toBe(on);
     expect(ConstraintSet.fromPlain(on.toPlain()).useReportPriority).toBe(true);
+  });
+});
+
+describe('ConstraintSet：制約レシピ', () => {
+  test('★ レシピは toPlain / fromPlain の往復でインスタンスに戻る（plain が state に混ざらない）', () => {
+    const set = ConstraintSet.empty('sched-1').withRecipeWeight('run-over', { hard: false, priority: 0.7 });
+    const back = ConstraintSet.fromPlain(JSON.parse(JSON.stringify(set.toPlain())));
+    expect(back.state.recipe).toBeInstanceOf(ConstraintRecipe);
+    expect(back.recipe.entries.map((e) => e.state)).toEqual([
+      { unitKey: 'run-over', hard: false, priority: 0.7 },
+    ]);
+  });
+
+  test('レシピを持たない古いセットは空のレシピとして読む（今の動きと同じ）', () => {
+    const back = ConstraintSet.fromPlain({ id: 'sched-1', leaderRules: [] });
+    expect(back.recipe.entries).toEqual([]);
+    expect(back.toPlain()).not.toHaveProperty('recipe');
+  });
+
+  test('withoutRecipeWeight で既定の重みに戻す', () => {
+    const set = ConstraintSet.empty('sched-1')
+      .withRecipeWeight('run-over', { hard: false, priority: 0.7 })
+      .withoutRecipeWeight('run-over');
+    expect(set.recipe.entries).toEqual([]);
   });
 });
