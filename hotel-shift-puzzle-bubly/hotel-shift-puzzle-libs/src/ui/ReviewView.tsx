@@ -2,16 +2,12 @@
 
 import { FC, useEffect, useState } from "react";
 import styled from "styled-components";
-import HandshakeIcon from "@mui/icons-material/Handshake";
-import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ConfirmedSchedule } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
-
-// スコアバーのセグメント色。譲歩・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
-const COMPROMISE_COLOR = "#6d4c41";
-const BUSY_DAY_COLOR = "#e64a19";
+import { dayStripOf } from "./review/reviewDayStrip.js";
+import { ReviewDayScale, ReviewDayStrip, ReviewMark } from "./review/ReviewDayStrip.js";
+import { VIOLATION_STRONG } from "./schedule-grid/cellSymbols.js";
 
 type ScheduleReportViewProps = {
   report: ConfirmedSchedule;
@@ -29,7 +25,9 @@ type ScheduleReportViewProps = {
 
 /**
  * 確定版の振り返りの表示（プレゼンテーショナル）。
- * スタッフごとに1行（★＋譲歩/繁忙日の内訳を色分けしたバー）にまとめる。
+ * スタッフごとに1行（1〜末日の帯＋★）にまとめる。帯には「いつ無理を引き受けてくれたか」を
+ * 勤務表と同じ色で置く（譲歩＝違反の赤い帯、繁忙日に出勤＝淡い藍の地。review/reviewDayStrip.ts）。
+ * 重みは「譲歩1件で★2・繁忙日1回で★1」という★の定義の文の中の数字を ＋− で変える。
  * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモが出る
  * （複数行を同時に展開できる）。
  *
@@ -66,29 +64,13 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
   };
 
   // タイトル編集（世界線ビューの nameable 入力と同じ素直な制御 input。IME は触らない）。
-  // report が別のレポートに切り替わったとき（同じコンポーネントインスタンスの再利用時）は
+  // report が別の確定版に切り替わったとき（同じコンポーネントインスタンスの再利用時）は
   // 下書きを同期し直す。
   const [titleDraft, setTitleDraft] = useState(report.title);
   useEffect(() => {
     setTitleDraft(report.title);
   }, [report.id, report.title]);
   const commitTitle = () => onRename?.(titleDraft);
-
-  // 重み編集（同じく下書き→blur/Enterで確定。数値のみ・0未満は入力させない）。
-  const [compromiseWeightDraft, setCompromiseWeightDraft] = useState(String(report.compromiseWeight));
-  const [busyDayWeightDraft, setBusyDayWeightDraft] = useState(String(report.busyDayWeight));
-  useEffect(() => {
-    setCompromiseWeightDraft(String(report.compromiseWeight));
-    setBusyDayWeightDraft(String(report.busyDayWeight));
-  }, [report.id, report.compromiseWeight, report.busyDayWeight]);
-  const commitWeights = () => {
-    const w1 = Number(compromiseWeightDraft);
-    const w2 = Number(busyDayWeightDraft);
-    onChangeWeights?.(
-      Number.isFinite(w1) ? w1 : report.compromiseWeight,
-      Number.isFinite(w2) ? w2 : report.busyDayWeight
-    );
-  };
 
   const compromisesByStaff = new Map<string, typeof report.compromises>();
   for (const c of report.compromises) {
@@ -106,7 +88,36 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
     }
   }
 
-  const maxScore = Math.max(1, ...report.stars.map((s) => s.score));
+  // 重みは ★ の定義の文の中の数字。＋− で1ずつ変え、0 より下げない
+  const stepWeight = (which: "compromise" | "busy", delta: number) => {
+    const c = report.compromiseWeight;
+    const b = report.busyDayWeight;
+    onChangeWeights?.(
+      which === "compromise" ? Math.max(0, c + delta) : c,
+      which === "busy" ? Math.max(0, b + delta) : b
+    );
+  };
+  const weightControl = (which: "compromise" | "busy", label: string) => {
+    const value = which === "compromise" ? report.compromiseWeight : report.busyDayWeight;
+    if (!onChangeWeights) return <span className="e-weight-value">{value}</span>;
+    return (
+      <span className="e-stepper">
+        <button
+          type="button"
+          onClick={() => stepWeight(which, -1)}
+          disabled={value <= 0}
+          aria-label={`${label}の重みを1下げる`}
+        >
+          −
+        </button>
+        <span className="e-weight-value">{value}</span>
+        <button type="button" onClick={() => stepWeight(which, 1)} aria-label={`${label}の重みを1上げる`}>
+          ＋
+        </button>
+      </span>
+    );
+  };
+  const dayCount = new Date(report.year, report.month, 0).getDate();
 
   return (
     <StyledWrap>
@@ -136,69 +147,38 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
         </span>
       </div>
 
-      {/* ★: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
+      {/* ★: 人ごとに1行（日別の帯＋★）。展開すると譲歩・繁忙日の詳細＋配慮メモ */}
       <section className="e-section">
-        <h4>
-          <EmojiEventsIcon fontSize="small" className="e-icon e-icon-score" />
-          ★
-        </h4>
-        <div className="e-legend">
-          <label className="e-legend-item">
-            <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩 ×
-            {onChangeWeights ? (
-              <input
-                type="number"
-                className="e-weight-input"
-                min={0}
-                step={0.5}
-                value={compromiseWeightDraft}
-                onChange={(e) => setCompromiseWeightDraft(e.target.value)}
-                onBlur={commitWeights}
-                onKeyDown={(e) => {
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                aria-label="譲歩の重み"
-              />
-            ) : (
-              <span className="e-weight-value">{report.compromiseWeight}</span>
-            )}
-          </label>
-          <label className="e-legend-item">
-            <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日 ×
-            {onChangeWeights ? (
-              <input
-                type="number"
-                className="e-weight-input"
-                min={0}
-                step={0.5}
-                value={busyDayWeightDraft}
-                onChange={(e) => setBusyDayWeightDraft(e.target.value)}
-                onBlur={commitWeights}
-                onKeyDown={(e) => {
-                  if (e.nativeEvent.isComposing) return;
-                  if (e.key === "Enter") e.currentTarget.blur();
-                }}
-                aria-label="繁忙日の重み"
-              />
-            ) : (
-              <span className="e-weight-value">{report.busyDayWeight}</span>
-            )}
-          </label>
-        </div>
-        <p className="e-hint">
-          重みはこの確定版だけの設定です。
+        <p
+          className="e-rule"
+          title="★はその月に無理を引き受けてくれたことを称える数です。★が高い人ほど、翌月の自動シフトで休みを先に置けます（制約欄の「★優先」）"
+        >
+          譲歩1件で★{weightControl("compromise", "譲歩")}・繁忙日1回で★{weightControl("busy", "繁忙日")}
+        </p>
+        <p className="e-legend">
+          <ReviewMark kind="compromise" /> 譲歩（その人が飲んでくれた違反）
+          <ReviewMark kind="busy" /> 繁忙日に出勤
         </p>
 
         {report.stars.length === 0 ? (
           <p className="e-empty">対象スタッフがいません。</p>
         ) : (
           <ul className="e-person-list">
+            <li className="e-scale-row" aria-hidden>
+              <span />
+              <span />
+              <ReviewDayScale dayCount={dayCount} />
+            </li>
             {report.stars.map((s) => {
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
-              const compromisePortion = s.compromiseCount * report.compromiseWeight;
-              const busyDayPortion = s.busyDayCount * report.busyDayWeight;
+              const strip = dayStripOf({
+                year: report.year,
+                month: report.month,
+                staffId: s.staffId,
+                compromises: report.compromises,
+                busyDayContributions: report.busyDayContributions,
+              });
               const compromises = compromisesByStaff.get(s.staffId) ?? [];
               const busyDays = busyDaysByStaff.get(s.staffId) ?? [];
 
@@ -218,35 +198,28 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                       {nameOf(s.staffId)}
                       {hasNote && <span className="e-note-dot" />}
                     </span>
-                    <div className="e-score-bar-track">
-                      {compromisePortion > 0 && (
-                        <div
-                          className="e-score-bar-segment"
-                          style={{
-                            width: `${(compromisePortion / maxScore) * 100}%`,
-                            background: COMPROMISE_COLOR,
-                          }}
-                        />
+                    <ReviewDayStrip strip={strip} />
+                    <span className="e-monthly" title="日に紐づかない譲歩（月の休日不足など）。中身は行を開くと読めます">
+                      {strip.monthlyCount > 0 && (
+                        <>
+                          <ReviewMark kind="compromise" />
+                          {strip.monthlyCount > 1 && strip.monthlyCount}
+                        </>
                       )}
-                      {busyDayPortion > 0 && (
-                        <div
-                          className="e-score-bar-segment"
-                          style={{
-                            width: `${(busyDayPortion / maxScore) * 100}%`,
-                            background: BUSY_DAY_COLOR,
-                          }}
-                        />
-                      )}
-                    </div>
-                    <span className="e-score-value">{s.score}</span>
+                    </span>
+                    <span
+                      className="e-score-value"
+                      aria-label={`星${s.score}`}
+                      title={`★${s.score}（譲歩${s.compromiseCount}件・繁忙日${s.busyDayCount}回）`}
+                    >
+                      {s.score > 0 ? `★${s.score}` : "—"}
+                    </span>
                   </button>
 
                   {expanded && (
                     <div className="e-person-detail">
                       <div className="e-detail-block">
-                        <span className="e-detail-label">
-                          <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩
-                        </span>
+                        <span className="e-detail-label">譲歩</span>
                         {compromises.length === 0 ? (
                           <p className="e-empty">特になし</p>
                         ) : (
@@ -268,10 +241,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                       </div>
 
                       <div className="e-detail-block">
-                        <span className="e-detail-label">
-                          <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" />{" "}
-                          繁忙日対応
-                        </span>
+                        <span className="e-detail-label">繁忙日に出勤</span>
                         {busyDays.length === 0 ? (
                           <p className="e-empty">特になし</p>
                         ) : (
@@ -371,22 +341,6 @@ const StyledWrap = styled.div`
   .e-section {
     margin-bottom: 16px;
 
-    h4 {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin: 0 0 6px;
-      font-size: 0.9em;
-    }
-    .e-icon-score {
-      color: #f9a825;
-    }
-    .e-icon-compromise {
-      color: ${COMPROMISE_COLOR};
-    }
-    .e-icon-busy {
-      color: ${BUSY_DAY_COLOR};
-    }
     .e-empty {
       margin: 0;
       font-size: 0.85em;
@@ -394,44 +348,58 @@ const StyledWrap = styled.div`
     }
   }
 
-  .e-legend {
+  /* ★の定義の文。数字の ＋− で重みを変える */
+  .e-rule {
     display: flex;
-    gap: 14px;
-    margin: 0 0 4px;
-    font-size: 0.78em;
-    color: #666;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    margin: 0 0 6px;
+    font-size: 0.85em;
+    color: #444;
+  }
+  .e-weight-value {
+    font-weight: bold;
+    min-width: 1.2em;
+    text-align: center;
+  }
+  .e-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: 4px;
 
-    .e-legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-    }
-
-    .e-weight-value {
-      font-weight: bold;
-    }
-
-    .e-weight-input {
-      width: 3.2em;
-      border: 1px solid #dcdcdc;
+    button {
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: 1px solid #ddd;
       border-radius: 4px;
-      padding: 1px 4px;
-      font-size: 1em;
-      font-family: inherit;
-      color: inherit;
       background: #fff;
+      color: #555;
+      font-size: 0.9em;
+      line-height: 1;
+      cursor: pointer;
 
-      &:focus {
-        outline: none;
-        border-color: #90a4ae;
+      &:hover:not(:disabled) {
+        background: #f5f5f5;
+      }
+      &:disabled {
+        opacity: 0.4;
+        cursor: default;
       }
     }
   }
 
-  .e-hint {
+  /* 帯の印の凡例（帯と同じ形の印を並べる） */
+  .e-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
     margin: 0 0 8px;
     font-size: 0.74em;
-    color: #999;
+    color: #888;
   }
 
   .e-person-list {
@@ -450,7 +418,7 @@ const StyledWrap = styled.div`
 
   .e-person-row {
     display: grid;
-    grid-template-columns: 20px 96px 1fr 24px;
+    grid-template-columns: 20px 72px max-content 24px 1fr;
     align-items: center;
     gap: 8px;
     width: 100%;
@@ -495,15 +463,12 @@ const StyledWrap = styled.div`
       vertical-align: middle;
     }
 
-    .e-score-bar-track {
-      display: flex;
-      height: 8px;
-      background: #f5f5f5;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .e-score-bar-segment {
-      height: 100%;
+    .e-monthly {
+      display: inline-flex;
+      align-items: center;
+      gap: 1px;
+      font-size: 0.8em;
+      color: ${VIOLATION_STRONG};
     }
 
     .e-score-value {
@@ -511,6 +476,14 @@ const StyledWrap = styled.div`
       font-weight: bold;
       color: #555;
     }
+  }
+
+  /* 目盛りの行。帯と同じ列に揃える */
+  .e-scale-row {
+    display: grid;
+    grid-template-columns: 20px 72px max-content;
+    gap: 8px;
+    padding: 0 2px;
   }
 
   .e-person-detail {
@@ -551,8 +524,8 @@ const StyledWrap = styled.div`
   .e-compromise-tag {
     display: inline-block;
     border-radius: 4px;
-    background: #efebe9;
-    color: ${COMPROMISE_COLOR};
+    background: #ffebee;
+    color: ${VIOLATION_STRONG};
     font-size: 0.85em;
     padding: 0 5px;
     margin-right: 4px;
