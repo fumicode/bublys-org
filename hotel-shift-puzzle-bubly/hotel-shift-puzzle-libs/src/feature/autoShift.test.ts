@@ -1,9 +1,15 @@
 import {
   ConstraintSet,
+  MonthlyStaffSchedule,
+  RequiredStaffing,
+  Staff,
   StaffMonthlyShiftWish,
   WorkingDay,
+  createDefaultWorkShifts,
+  fillDemandStep,
 } from '@bublys-org/hotel-shift-puzzle-model';
-import { autoShiftLimitsOf, decodeWishForStaff } from './autoShift.js';
+import { autoShiftLimitsOf, decodeWishForStaff, runAutoShiftStep } from './autoShift.js';
+import { scheduleConstraintsOf } from './scheduleConstraints.js';
 import { DAY_OFF_WISH, toggleWishInput, workWishKey } from '../ui/shiftWishOptions.js';
 
 describe('decodeWishForStaff（×で候補を絞る）', () => {
@@ -108,5 +114,50 @@ describe('autoShiftLimitsOf（自動シフトが置く休みの目標は制約�
     expect(autoShiftLimitsOf(undefined)).toEqual(
       autoShiftLimitsOf(ConstraintSet.empty('sched-1'))
     );
+  });
+});
+
+describe('自動シフトが希望を見るのは、制約リストの希望の制約だけ', () => {
+  const d1 = WorkingDay.of(2026, 6, 1);
+  const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
+  const staffA = new Staff({ id: 'staff-A', name: 'A' });
+  // A は 6/1 の早番に×。6/1 は早番が1人要る
+  const wishByStaff = new Map([
+    [
+      'staff-A',
+      StaffMonthlyShiftWish.create({ staffId: 'staff-A', year: 2026, month: 6 }).setPreference(
+        d1,
+        workWishKey('早番'),
+        'avoid'
+      ),
+    ],
+  ]);
+  const schedule = MonthlyStaffSchedule.create({
+    id: 'sched-1',
+    storeId: 'store-1',
+    year: 2026,
+    month: 6,
+    requiredStaffing: RequiredStaffing.uniform([d1], { 早番: 1 }),
+  });
+  const fill = (checkShiftWish: boolean) =>
+    runAutoShiftStep(fillDemandStep, {
+      schedule,
+      staffList: [staffA],
+      workShifts,
+      wishByStaff,
+      constraints: scheduleConstraintsOf({
+        constraintSet: ConstraintSet.empty('sched-1').withCheckShiftWish(checkShiftWish),
+        workShifts,
+        wishByStaff,
+        staffGroup: undefined,
+      }),
+    }).schedule;
+
+  test('希望チェックが入なら、×の帯には入れない', () => {
+    expect(fill(true).getShiftIdFor('staff-A', d1)).not.toBe('early');
+  });
+
+  test('★ 希望チェックが切なら、自動シフトも希望を見ない（×の帯にも入れる）', () => {
+    expect(fill(false).getShiftIdFor('staff-A', d1)).toBe('early');
   });
 });

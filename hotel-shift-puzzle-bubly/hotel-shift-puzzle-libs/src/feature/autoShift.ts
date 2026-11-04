@@ -31,7 +31,6 @@ import {
 import {
   DAY_OFF_WISH,
   isWorkWish,
-  workWishKey,
   workWishName,
 } from "../ui/shiftWishOptions.js";
 
@@ -89,30 +88,8 @@ export const decodeWishForStaff = (
     return shiftId ? { kind: "work", shiftId } : { kind: "ambiguous" };
   }
   // 候補は絞れたが1つには決まらない。どの帯にするかは需要充足ステップに委ねる
-  // （×の帯を選ばせないのは AutoShiftContext.isAvailable が担う）。
+  // （×の帯を選ばせないのは、制約リストの希望の制約＝ShiftWishConstraint が担う）。
   return { kind: "neutral" };
-};
-
-/**
- * その日その人が、その勤務帯に入れるか（希望の×／○を見る）。
- * 候補の絞り方は decodeWishForStaff と同じ：○があれば○の帯だけ、無ければ×を除いた残り。
- * ただし○の帯がこの勤務表に無いときは絞り込まない（絞ると埋められるセルが無くなるため）。
- * これがそのまま AutoShiftContext.isAvailable になる（可能勤務帯は制約リストの側で守る）。
- */
-const isWishedShift = (
-  wish: StaffMonthlyShiftWish | undefined,
-  day: WorkingDay,
-  shiftName: string | undefined,
-  shiftIdByName: Map<string, string>
-): boolean => {
-  if (!wish || !shiftName) return true;
-  const wishes = wish.wishesOn(day);
-  const wantedNames = Object.keys(wishes)
-    .filter((k) => isWorkWish(k) && wishes[k] === "want")
-    .map(workWishName)
-    .filter((name) => shiftIdByName.has(name));
-  if (wantedNames.length > 0) return wantedNames.includes(shiftName);
-  return wishes[workWishKey(shiftName)] !== "avoid";
 };
 
 export type AutoShiftParams = {
@@ -193,15 +170,6 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     shiftNameById,
     preferenceOf: (staffId, day) =>
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    // 「入れるか」はその日の希望×／○（日ごと）で決まる。可能勤務帯（人ごと・月通し）は
-    // 制約リストに入っているので、ここで名指ししない（名指しすると判断が2箇所になる）。
-    isAvailable: (staffId, shiftId, day) =>
-      isWishedShift(
-        wishByStaff.get(staffId),
-        day,
-        shiftNameById.get(shiftId),
-        shiftIdByName
-      ),
     constraints,
     minDayOff,
     maxDayOffPerDay,

@@ -7,6 +7,8 @@ import { fillDemandStep } from './fillDemandStep.js';
 import { fillDemandBalancedStep } from './fillDemandBalancedStep.js';
 import { AUTO_SHIFT_STEPS } from './autoShiftSteps.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
+import { ConstraintViolation } from './ConstraintViolation.js';
+import type { ScheduleConstraint } from './ScheduleConstraint.js';
 import type { AutoShiftContext, AutoShiftStep, DecodedWish } from './autoShiftStep.js';
 
 describe('段階的な自動シフト（AutoShiftStep）', () => {
@@ -35,6 +37,29 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     shiftNameById,
     preferenceOf: (staffId, d) => prefs[`${staffId}|${d.key}`] ?? { kind: 'neutral' },
     ...extra,
+  });
+
+  /**
+   * 「その人をその帯に入れない」だけの制約。自動シフトは入れない帯を名指しせず、
+   * 制約リストに入っている制約だけで守る（希望の×・可能勤務帯と同じ形）。
+   */
+  const forbidShift = (forbidden: (staffId: string, shiftId: string) => boolean): ScheduleConstraint => ({
+    type: 'test-forbid-shift',
+    label: '入れない帯',
+    scope: 'cell',
+    describe: () => '入れない帯には入れない',
+    check: (schedule) =>
+      schedule.assignments
+        .filter((a) => a.shiftId !== undefined && forbidden(a.staffId, a.shiftId))
+        .map(
+          (a) =>
+            new ConstraintViolation({
+              constraintType: 'test-forbid-shift',
+              staffId: a.staffId,
+              days: [a.day],
+              message: '入れない帯',
+            })
+        ),
   });
 
   describe('ステップ共通', () => {
@@ -98,7 +123,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       const ctx = ctxOf(
         ['s1'],
         { [`s1|${day(5).key}`]: { kind: 'work', shiftId: 'early' } },
-        { isAvailable: (_s, shiftId) => shiftId !== 'early' }
+        { constraints: [forbidShift((_s, shiftId) => shiftId === 'early')] }
       );
       const { schedule } = fulfillWishesStep.run(emptySchedule(), ctx);
       expect(schedule.isUndecided('s1', day(5))).toBe(true);
@@ -169,7 +194,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     test('可能勤務帯でない帯には入れない（空き埋めでも入れない）', () => {
       const required = RequiredStaffing.uniform([day(1)], { 遅番: 1 });
       // s1 は遅番に入れない → 遅番の需要は埋まらない。空き埋めでも遅番には入れず、入れる帯へ入る。
-      const ctx = ctxOf(['s1'], {}, { isAvailable: (_s, shiftId) => shiftId !== 'late' });
+      const ctx = ctxOf(['s1'], {}, { constraints: [forbidShift((_s, shiftId) => shiftId === 'late')] });
       const { schedule } = fillDemandStep.run(emptySchedule(required), ctx);
       expect(schedule.countWorkingByShift(day(1)).get('late') ?? 0).toBe(0);
       expect(schedule.getShiftIdFor('s1', day(1))).not.toBe('late');
@@ -211,7 +236,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
       // 早番に s1 を入れてしまうと遅番が埋まらない。まんべんなく版は s2→早番, s1→遅番 にする。
       const required = RequiredStaffing.uniform([day(1)], { 早番: 1, 遅番: 1 });
       const ctx = ctxOf(['s1', 's2'], {}, {
-        isAvailable: (s, shiftId) => !(s === 's2' && shiftId === 'late'),
+        constraints: [forbidShift((s, shiftId) => s === 's2' && shiftId === 'late')],
       });
       const { schedule } = fillDemandBalancedStep.run(emptySchedule(required), ctx);
 

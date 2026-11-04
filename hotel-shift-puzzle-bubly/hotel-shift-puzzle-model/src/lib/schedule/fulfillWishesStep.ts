@@ -48,8 +48,6 @@ export const fulfillWishesStep: AutoShiftStep = {
           // この勤務表が使う帯でなければ人間へ（希望の読み違いであって、制約の話ではない）
           if (!ctx.shiftNameById.has(pref.shiftId)) continue;
           const cell = { kind: "work", shiftId: pref.shiftId } as const;
-          // その日は入れないと言っている帯（希望の×）は、黙って人間へ回す（制約違反の件数には数えない）
-          if (ctx.isAvailable && !ctx.isAvailable(staffId, pref.shiftId, day)) continue;
           if (!canPlace(ctx, result, staffId, day, cell)) {
             blocked++;
             continue;

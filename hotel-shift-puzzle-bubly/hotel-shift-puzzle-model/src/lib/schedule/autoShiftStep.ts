@@ -44,11 +44,6 @@ export type AutoShiftContext = {
   /** (staffId, day) のデコード済み希望を返す。省略時の人は neutral 扱い */
   preferenceOf: (staffId: string, day: WorkingDay) => DecodedWish;
   /**
-   * staffId がその日 shiftId に入れるか（希望の×／○）。省略時は全可。
-   * 可能勤務帯はここに入れない。制約（constraints）として渡すので、置くたびの判定が守る。
-   */
-  isAvailable?: (staffId: string, shiftId: string, day: WorkingDay) => boolean;
-  /**
    * 勤務表の制約リスト（違反表示・候補集合と同じもの）。**置くたびに、新しい違反が出ないかを見る**
    * （連勤・遅番明け・休日・希望…）。制約の中身は見ないので、制約を足せばそれも守られる。
    * 省略時は制約を見ない。
@@ -136,9 +131,9 @@ export interface AutoShiftStep {
 /**
  * そのセルにその値を置いてよいか。**自動シフトが値を置くときは、必ずこれを通す。**
  *
- * 置いてよい ＝ 候補集合に載る値:
- *   - 出勤なら、その人がその日その帯に入れる（希望の×／○）
- *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts。可能勤務帯もここで守る）
+ * 置いてよい ＝ 候補集合に載る値 ＝ 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts）。
+ * 希望の×／○も可能勤務帯も、制約（ShiftWishConstraint / AllowedShiftConstraint）として守る。
+ * 希望チェックを切った勤務表では希望の制約がリストに入らないので、自動シフトも希望を見ない。
  *
  * 「どの制約を守るか」をステップごとに書かない。書くと、書き忘れた制約（遅番明けなど）だけが
  * 自動シフトから漏れる。
@@ -150,9 +145,6 @@ export const canPlace = (
   day: WorkingDay,
   cell: ShiftCell
 ): boolean => {
-  if (cell.kind === "work" && ctx.isAvailable && !ctx.isAvailable(staffId, cell.shiftId, day)) {
-    return false;
-  }
   return !ctx.constraints || !introducesViolation(schedule, ctx.constraints, staffId, day, cell);
 };
 
