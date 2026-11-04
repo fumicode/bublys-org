@@ -27,6 +27,7 @@ import {
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
+import { inheritedScoresOf, precedingConfirmedOf } from "./precedingMonth.js";
 import { prioritizeStaffByReport } from "./reportPriority.js";
 import { recordSetCells, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
@@ -84,15 +85,17 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     CONSTRAINT_SET_TYPE,
     scheduleId
   );
-  // 参照レポート（ScheduleGrid で紐づけたもの）。
+  // 前月の確定版から引き継いだ★（勤務表に焼き付いている）。
   // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは reportPriority.ts）。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReport = useMemo(
-    () => allReports.find((r) => r.id === constraints?.linkedReportId),
-    [allReports, constraints]
+  const precedingConfirmed = useMemo(
+    () => (schedule ? precedingConfirmedOf(allReports, schedule) : undefined),
+    [allReports, schedule]
   );
-  // 貢献度スコアは、スイッチ（ConstraintSet.useReportPriority）がオンのときだけ優先度に使う
-  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
+  // ★は、スイッチ（ConstraintSet.useReportPriority）がオンのときだけ優先度に使う
+  const priorityScores = constraints?.useReportPriority
+    ? inheritedScoresOf(schedule?.precedingTail, precedingConfirmed)
+    : undefined;
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
@@ -171,7 +174,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   const handleRunStep = (step: AutoShiftStep) => {
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subset,
-      priorityReport
+      priorityScores
     );
     const result = runAutoShiftStep(step, {
       schedule,
@@ -195,7 +198,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     if (!scheduleId) return;
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subset,
-      priorityReport
+      priorityScores
     );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -264,7 +267,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         violations={violations}
         constraints={displayConstraints}
         leaderRules={relevantRules}
-        referenceReport={priorityReport}
+        inheritedScores={priorityScores}
         staffUrlOf={staffBubbleUrl}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}

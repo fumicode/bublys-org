@@ -85,7 +85,8 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
     may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
     const tail = PrecedingMonthTail.capture({
-      sourceReportId: 'may:n',
+      source: { scheduleId: 'may', worldLineNodeId: 'n' },
+      contributionScores: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,
@@ -101,7 +102,8 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
     for (let d = 28; d <= 31; d++) may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
     const tail = PrecedingMonthTail.capture({
-      sourceReportId: 'may:n',
+      source: { scheduleId: 'may', worldLineNodeId: 'n' },
+      contributionScores: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,

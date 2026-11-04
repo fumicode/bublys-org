@@ -23,7 +23,8 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
   const capture = (length = 7) =>
     PrecedingMonthTail.capture({
-      sourceReportId: 'may:node-1',
+      source: { scheduleId: 'may', worldLineNodeId: 'node-1' },
+      contributionScores: [],
       confirmedAt: 1000,
       schedule: maySchedule(),
       shiftNameOf: (id) => SHIFT_NAMES[id],
@@ -52,7 +53,8 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
   test('定義から消えた勤務帯でも、出勤だった事実は落とさない（IDを名前として残す）', () => {
     const tail = PrecedingMonthTail.capture({
-      sourceReportId: 'r',
+      source: { scheduleId: 'r', worldLineNodeId: '' },
+      contributionScores: [],
       schedule: maySchedule(),
       shiftNameOf: () => undefined,
       length: 1,
@@ -68,12 +70,47 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
 
     const dec = MonthlyStaffSchedule.create({ id: 'dec', storeId: 's', year: 2025, month: 12 });
     const decTail = PrecedingMonthTail.capture({
-      sourceReportId: 'r',
+      source: { scheduleId: 'r', worldLineNodeId: '' },
+      contributionScores: [],
       schedule: dec,
       shiftNameOf: () => undefined,
       length: 7,
     });
     expect(decTail.directlyPrecedes(2026, 1)).toBe(true);
+  });
+
+  test('★（貢献度スコア）も一緒に写し取る。写した後に元を変えても、写しは変わらない', () => {
+    const scores = [{ staffId: 'A', compromiseCount: 2, busyDayCount: 1, score: 5 }];
+    const tail = PrecedingMonthTail.capture({
+      source: { scheduleId: 'may', worldLineNodeId: 'node-1' },
+      schedule: maySchedule(),
+      shiftNameOf: (id) => SHIFT_NAMES[id],
+      length: 7,
+      contributionScores: scores,
+    });
+    scores[0].score = 99;
+
+    expect(tail.scoreOf('A')).toBe(5);
+    expect(tail.scoreOf('新人')).toBe(0);
+    const back = PrecedingMonthTail.fromPlain(JSON.parse(JSON.stringify(tail.toPlain())));
+    expect(back.contributionScores).toEqual([
+      { staffId: 'A', compromiseCount: 2, busyDayCount: 1, score: 5 },
+    ]);
+  });
+
+  test('#231 より前の形（sourceReportId・★なし）も読める', () => {
+    const legacy = {
+      sourceReportId: 'may:node-1',
+      days: [{ year: 2026, month: 5, day: 31 }],
+      cells: [{ staffId: 'A', day: { year: 2026, month: 5, day: 31 }, value: { kind: 'day-off' } }],
+    };
+    const tail = PrecedingMonthTail.fromPlain(legacy as never);
+
+    expect(tail.source).toEqual({ scheduleId: 'may', worldLineNodeId: 'node-1' });
+    // ★を写す前の形は「0点ばかり」と区別する
+    expect(tail.contributionScores).toBeUndefined();
+    expect(tail.scoreOf('A')).toBe(0);
+    expect(tail.toPlain()).not.toHaveProperty('sourceReportId');
   });
 
   test('写し取る日数は1週間か連勤上限の長い方', () => {
@@ -98,7 +135,7 @@ describe('PrecedingMonthTail（前月の末尾）の使い方', () => {
       const linked = june().withPrecedingTail(capture());
       const back = MonthlyStaffSchedule.fromPlain(JSON.parse(JSON.stringify(linked.toPlain())));
 
-      expect(back.precedingTail?.sourceReportId).toBe('may:node-1');
+      expect(back.precedingTail?.source).toEqual({ scheduleId: 'may', worldLineNodeId: 'node-1' });
       expect(back.withPrecedingTail(undefined).precedingTail).toBeUndefined();
     });
 

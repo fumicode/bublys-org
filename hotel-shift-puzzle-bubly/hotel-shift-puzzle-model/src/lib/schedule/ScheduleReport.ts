@@ -1,9 +1,14 @@
 /**
- * ScheduleReport — シフト表完成レポート
+ * ScheduleReport — 確定版（店舗×月で1つ）とその振り返り
  *
- * 確定した勤務表（世界線の apex）について、譲歩（#87）・繁忙日対応（#88）・
- * 貢献度スコア（#89）を確定時点のスナップショットとして保持する。
- * 以降スタッフの希望や勤務表が変わっても、このレポートの内容は変化しない（確定記録）。
+ * 「確定する」と、いま見ている勤務表の版（世界線のノード）が、その店舗×月の確定版になる。
+ * 確定版は**店舗×月で1つ**（#231）。ID は店舗と年月から決まり（{@link ScheduleReport.idFor}）、
+ * もう一度確定すると同じ ID のまま置き換わる（{@link ScheduleReport.confirm}）。別の勤務表で
+ * 確定しても置き換わる。どの勤務表のどの版かは scheduleId / worldLineNodeId が持つ。
+ *
+ * 振り返り（譲歩 #87・繁忙日対応 #88・貢献度スコア #89）は、確定版を「その月どうだったか」の
+ * 角度から見たもの。確定時点のスナップショットとして持ち、以降スタッフの希望や勤務表が
+ * 変わっても変化しない。置き換えると新しい版の振り返りになり、古い版の振り返りは残さない。
  * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・譲歩/繁忙日の重み
  * （compromiseWeight/busyDayWeight）だけは確定後も編集できる。
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
@@ -57,10 +62,18 @@ export const DEFAULT_COMPROMISE_WEIGHT = 2;
 /** 繁忙日出勤1回あたりの重みの既定値（#89 スコア算出） */
 export const DEFAULT_BUSY_DAY_WEIGHT = 1;
 
-export type ScheduleReportState = {
-  id: string;
+/** 確定版の版：どの勤務表の、どの世界線ノードか */
+export type ConfirmedVersion = {
   scheduleId: string;
-  /** 確定時点の世界線ノードID（トレーサビリティ用の参照。このスコープの時間移動には使わない） */
+  worldLineNodeId: string;
+};
+
+export type ScheduleReportState = {
+  /** 店舗×月で一意（{@link ScheduleReport.idFor}） */
+  id: string;
+  /** 確定版を持つ勤務表 */
+  scheduleId: string;
+  /** 確定版の世界線ノードID（その勤務表の世界線の中の、確定した版） */
   worldLineNodeId: string;
   year: number;
   /** 1-12 */
@@ -78,9 +91,8 @@ export type ScheduleReportState = {
   /** 繁忙日出勤1回あたりの重み（確定後も reweight で編集可） */
   busyDayWeight: number;
   /**
-   * 確定した（＝このレポートを作った）時刻（epoch ms）。同じ月の確定が複数あるとき、
-   * どれが新しいかはこれで決める。この項目より前に作られたレポートには無い
-   * （上位層が確定ノードの時刻で補う）。
+   * 確定した時刻（epoch ms）。置き換えるたびに新しくなる。この項目より前に作られた
+   * 古いレポートには無い（上位層が確定ノードの時刻で補う）。
    */
   confirmedAt?: number;
 };
@@ -91,19 +103,21 @@ export type ScheduleReportPlain = ScheduleReportState;
 export class ScheduleReport {
   constructor(readonly state: ScheduleReportState) {}
 
-  /** 勤務表×確定ノードで一意な ID */
-  static idOf(scheduleId: string, worldLineNodeId: string): string {
-    return `${scheduleId}:${worldLineNodeId}`;
+  /** 店舗×月で一意な ID（"store-1:2026-06"）。確定し直しても変わらない */
+  static idFor(storeId: string, year: number, month: number): string {
+    return `${storeId}:${year}-${String(month).padStart(2, "0")}`;
   }
 
   /**
-   * レポートIDから勤務表IDを取り出す（{@link idOf} の逆）。
-   * レポート本体を読まなくても「どの勤務表の記録か」が分かるようにしておく
-   * （レポートのバブルはIDしか受け取らないため）。最初のコロンで切る。
+   * その勤務表が引き継ぐ前月の確定版の ID（同じ店舗の、ちょうど1か月前）。1月の前月は前年12月。
+   * 2か月以上前を含めないのは、つながるのは直前の月末だけで、振り返るべきも直前の月だから。
    */
-  static scheduleIdOf(reportId: string): string {
-    const i = reportId.indexOf(":");
-    return i < 0 ? reportId : reportId.slice(0, i);
+  static precedingIdFor(target: { storeId: string; year: number; month: number }): string {
+    const prev =
+      target.month === 1
+        ? { year: target.year - 1, month: 12 }
+        : { year: target.year, month: target.month - 1 };
+    return ScheduleReport.idFor(target.storeId, prev.year, prev.month);
   }
 
   /** 既定のタイトル（未命名時・rename で空にしたときのフォールバック） */
@@ -111,7 +125,7 @@ export class ScheduleReport {
     return `${year}年${month}月`;
   }
 
-  /** 確定時に計算済みのデータからレポートを作る（配慮メモは空、タイトルは既定値で始まる） */
+  /** 確定時に計算済みのデータから確定版を作る（配慮メモは空、タイトルは既定値で始まる） */
   static create(params: {
     scheduleId: string;
     worldLineNodeId: string;
@@ -125,7 +139,7 @@ export class ScheduleReport {
     confirmedAt?: number;
   }): ScheduleReport {
     return new ScheduleReport({
-      id: ScheduleReport.idOf(params.scheduleId, params.worldLineNodeId),
+      id: ScheduleReport.idFor(params.storeId, params.year, params.month),
       scheduleId: params.scheduleId,
       worldLineNodeId: params.worldLineNodeId,
       year: params.year,
@@ -142,8 +156,42 @@ export class ScheduleReport {
     });
   }
 
+  /**
+   * 確定する。その店舗×月にすでに確定版（current）があれば、新しい版で置き換える。
+   * 置き換えても、手で書いた部分（タイトル・配慮メモ・譲歩/繁忙日の重み）は引き継ぎ、
+   * 貢献度スコアは引き継いだ重みで出し直す。取り消しは無い（差し替えたければ別の版を確定する）。
+   */
+  static confirm(
+    params: Parameters<typeof ScheduleReport.create>[0],
+    current?: ScheduleReport
+  ): ScheduleReport {
+    const fresh = ScheduleReport.create(params);
+    if (!current) return fresh;
+    if (current.id !== fresh.id) {
+      throw new Error(`別の店舗・月の確定版は置き換えられません（${current.id} → ${fresh.id}）`);
+    }
+    return new ScheduleReport({
+      ...fresh.state,
+      title: current.title,
+      considerationNotes: { ...current.considerationNotes },
+    }).reweight(current.compromiseWeight, current.busyDayWeight);
+  }
+
   get id(): string {
     return this.state.id;
+  }
+
+  /** 確定版の版（どの勤務表のどのノードか） */
+  get version(): ConfirmedVersion {
+    return { scheduleId: this.state.scheduleId, worldLineNodeId: this.state.worldLineNodeId };
+  }
+
+  /** その版がいまの確定版か */
+  isVersion(version: ConfirmedVersion): boolean {
+    return (
+      version.scheduleId === this.state.scheduleId &&
+      version.worldLineNodeId === this.state.worldLineNodeId
+    );
   }
 
   get scheduleId(): string {
@@ -203,17 +251,6 @@ export class ScheduleReport {
   /** そのスタッフの貢献度スコア（スコアの行が無ければ 0） */
   scoreOf(staffId: string): number {
     return this.state.contributionScores.find((s) => s.staffId === staffId)?.score ?? 0;
-  }
-
-  /**
-   * この勤務表の参照レポートにできるか。**同じ店舗の、前月（ちょうど1か月前）**のレポートだけ。
-   * 別の店舗は働く人も事情も違い、同じ月や先の月は「振り返り」にならないため。
-   * 2か月以上前を含めないのは、振り返るべきは直前の月の譲歩・繁忙日対応で、
-   * 古い月の貢献度が今月の休みの優先順を決めると実態とずれるため。1月の前月は前年12月。
-   */
-  isReferenceableFrom(target: { storeId: string; year: number; month: number }): boolean {
-    if (target.storeId !== this.state.storeId) return false;
-    return this.state.year * 12 + this.state.month === target.year * 12 + target.month - 1;
   }
 
   get compromiseWeight(): number {

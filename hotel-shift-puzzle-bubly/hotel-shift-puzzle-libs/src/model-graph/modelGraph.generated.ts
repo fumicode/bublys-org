@@ -114,11 +114,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
-          "name": "linkedReportId",
-          "type": "string",
-          "optional": true
-        },
-        {
           "name": "useReportPriority",
           "type": "boolean",
           "optional": true
@@ -133,7 +128,6 @@ export const MODEL_GRAPH: ModelGraph = {
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
-        "linkedReportId",
         "leaderRules"
       ],
       "methods": [
@@ -222,24 +216,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "withUseReportPriority",
           "params": [
             "use"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "linkReport",
-          "params": [
-            "reportId"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "unlinkReport",
-          "params": [
-            "reportId"
           ],
           "returns": "ConstraintSet",
           "isStatic": false,
@@ -1091,8 +1067,8 @@ export const MODEL_GRAPH: ModelGraph = {
       "kind": "value",
       "fields": [
         {
-          "name": "sourceReportId",
-          "type": "string",
+          "name": "source",
+          "type": "ConfirmedVersion",
           "optional": false
         },
         {
@@ -1109,10 +1085,16 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "cells",
           "type": "PrecedingCell[]",
           "optional": false
+        },
+        {
+          "name": "contributionScores",
+          "type": "ContributionScoreEntry[]",
+          "optional": true
         }
       ],
       "getters": [
-        "sourceReportId",
+        "source",
+        "contributionScores",
         "confirmedAt",
         "days",
         "lastDay",
@@ -1128,6 +1110,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "PrecedingMonthTail",
           "isStatic": true,
           "returnsSelf": true
+        },
+        {
+          "name": "scoreOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
         },
         {
           "name": "directlyPrecedes",
@@ -1523,6 +1514,7 @@ export const MODEL_GRAPH: ModelGraph = {
       ],
       "getters": [
         "id",
+        "version",
         "scheduleId",
         "worldLineNodeId",
         "year",
@@ -1539,19 +1531,20 @@ export const MODEL_GRAPH: ModelGraph = {
       ],
       "methods": [
         {
-          "name": "idOf",
+          "name": "idFor",
           "params": [
-            "scheduleId",
-            "worldLineNodeId"
+            "storeId",
+            "year",
+            "month"
           ],
           "returns": "string",
           "isStatic": true,
           "returnsSelf": false
         },
         {
-          "name": "scheduleIdOf",
+          "name": "precedingIdFor",
           "params": [
-            "reportId"
+            "target"
           ],
           "returns": "string",
           "isStatic": true,
@@ -1577,6 +1570,25 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "confirm",
+          "params": [
+            "params",
+            "current"
+          ],
+          "returns": "ScheduleReport",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "isVersion",
+          "params": [
+            "version"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "rename",
           "params": [
             "title"
@@ -1591,15 +1603,6 @@ export const MODEL_GRAPH: ModelGraph = {
             "staffId"
           ],
           "returns": "number",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "isReferenceableFrom",
-          "params": [
-            "target"
-          ],
-          "returns": "boolean",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2996,9 +2999,7 @@ export const MODEL_GRAPH: ModelGraph = {
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
-      "ConstraintSet.linkedReportId",
       "MonthlyStaffSchedule.storeId",
-      "PrecedingMonthTail.sourceReportId",
       "ScheduleReport.storeId",
       "ScheduleReport.worldLineNodeId",
       "WorkingStaffMember.allowedShiftIds"

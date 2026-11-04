@@ -6,6 +6,7 @@ const staffB = new Staff({ id: 'staff-B', name: 'B' });
 const staffC = new Staff({ id: 'staff-C', name: 'C' });
 const staffList = [staffA, staffB, staffC];
 
+/** 前月の確定版から引き継いだ★（貢献度スコアの行） */
 const reportWithScores = (scores: { staffId: string; score: number }[]) =>
   ScheduleReport.create({
     scheduleId: 'sched-1',
@@ -21,12 +22,12 @@ const reportWithScores = (scores: { staffId: string; score: number }[]) =>
       busyDayCount: 0,
       score: s.score,
     })),
-  });
+  }).contributionScores;
 
 const idsOf = (staff: Staff[]) => staff.map((s) => s.id);
 
-describe('prioritizeStaffByReport（参照レポートによる自動シフト優先度）', () => {
-  test('参照レポートが無ければ元の順序のまま・一文は出さない', () => {
+describe('prioritizeStaffByReport（引き継いだ★による自動シフト優先度）', () => {
+  test('★を引き継いでいなければ元の順序のまま・一文は出さない', () => {
     expect(prioritizeStaffByReport(staffList, undefined)).toEqual({ staffList, note: null });
   });
 
