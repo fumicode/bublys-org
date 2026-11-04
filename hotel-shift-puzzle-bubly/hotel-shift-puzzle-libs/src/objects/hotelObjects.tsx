@@ -17,6 +17,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import {
   Staff,
+  type StaffPlain,
   WorkingStaffGroup,
   type WorkingStaffGroupPlain,
   WorkShiftSet,
@@ -64,7 +65,11 @@ export const HOTEL_OBJECTS = defineObjects({
     getId: (s: Staff) => s.id,
     icon: React.createElement(PersonIcon, { fontSize: "small" }),
     // url は app 層（registration/bubbleUrls.ts）で登録する
-    // serialize 無し → state-object 規約で plain 化
+    // 休みの形をインスタンスで持つので codec を明示する（plain にするのは記録するこの1箇所）
+    serialize: {
+      toJSON: (s: Staff) => s.toPlain(),
+      fromJSON: (j) => Staff.fromPlain(j as StaffPlain),
+    },
     //
     // 固定メンバー。名簿はグローバルの資産だが、勤務表は「その時点のメンバーで組んだ記録」
     // なので、あとの入退社・改名に揺さぶられてはいけない。勤務表の世界が生まれるときに

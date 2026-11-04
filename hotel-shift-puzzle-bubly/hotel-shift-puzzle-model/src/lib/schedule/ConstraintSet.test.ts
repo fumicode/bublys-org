@@ -4,56 +4,66 @@ import { ShiftIntervalRule } from './ShiftIntervalRule.js';
 import { REQUIRED_STAFFING_CONSTRAINT } from './RequiredStaffingConstraint.js';
 
 describe('ConstraintSet.modelConstraints', () => {
-  test('RequiredStaffingConstraint を含む', () => {
+  test('必要人数は制約に含まない（制約バーに出ない＝明記していないものは違反にしない）', () => {
     const constraints = new ConstraintSet({ id: 'schedule-A', leaderRules: [] });
     const model = constraints.modelConstraints(() => []);
-    expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(true);
+    expect(model.some((c) => c.type === REQUIRED_STAFFING_CONSTRAINT)).toBe(false);
   });
 });
 
-describe('ConstraintSet の参考レポート紐づけ（linkReport/unlinkReport）', () => {
+describe('ConstraintSet の参照レポート紐づけ（linkReport/unlinkReport）', () => {
   const create = () =>
     new ConstraintSet({ id: 'schedule-A', leaderRules: [] });
 
   test('既定は紐づけ無し', () => {
-    expect(create().linkedReportIds).toEqual([]);
+    expect(create().linkedReportId).toBeUndefined();
   });
 
-  test('linkReport で紐づけを追加できる（不変）', () => {
+  test('linkReport で紐づけられる（不変）', () => {
     const base = create();
     const linked = base.linkReport('report-1');
-    expect(linked.linkedReportIds).toEqual(['report-1']);
+    expect(linked.linkedReportId).toBe('report-1');
     // 元は不変
-    expect(base.linkedReportIds).toEqual([]);
+    expect(base.linkedReportId).toBeUndefined();
   });
 
-  test('同じレポートを重複して紐づけない', () => {
-    const linked = create().linkReport('report-1').linkReport('report-1');
-    expect(linked.linkedReportIds).toEqual(['report-1']);
-  });
-
-  test('複数のレポートを紐づけられる', () => {
-    const linked = create().linkReport('report-1').linkReport('report-2');
-    expect(linked.linkedReportIds).toEqual(['report-1', 'report-2']);
-  });
-
-  test('unlinkReport で紐づけを解除できる（不変）', () => {
-    const linked = create().linkReport('report-1').linkReport('report-2');
-    const unlinked = linked.unlinkReport('report-1');
-    expect(unlinked.linkedReportIds).toEqual(['report-2']);
-    // 元は不変
-    expect(linked.linkedReportIds).toEqual(['report-1', 'report-2']);
-  });
-
-  test('紐づいていないレポートを解除しても何も起きない', () => {
+  test('同じレポートを紐づけ直しても自分自身が返る', () => {
     const linked = create().linkReport('report-1');
-    expect(linked.unlinkReport('report-9').linkedReportIds).toEqual(['report-1']);
+    expect(linked.linkReport('report-1')).toBe(linked);
+  });
+
+  test('紐づけられるのは1つ。別のレポートを紐づけると置き換わる', () => {
+    const linked = create().linkReport('report-1').linkReport('report-2');
+    expect(linked.linkedReportId).toBe('report-2');
+  });
+
+  test('unlinkReport で紐づけを外せる（不変）', () => {
+    const linked = create().linkReport('report-1');
+    const unlinked = linked.unlinkReport('report-1');
+    expect(unlinked.linkedReportId).toBeUndefined();
+    expect(linked.linkedReportId).toBe('report-1');
+  });
+
+  test('紐づいていないレポートを外そうとしても何も起きない（自分自身が返る）', () => {
+    const linked = create().linkReport('report-1');
+    expect(linked.unlinkReport('report-9')).toBe(linked);
   });
 
   test('toPlain / fromPlain でラウンドトリップできる', () => {
-    const linked = create().linkReport('report-1').linkReport('report-2');
-    const restored = ConstraintSet.fromPlain(linked.toPlain());
-    expect(restored.linkedReportIds).toEqual(['report-1', 'report-2']);
+    const linked = create().linkReport('report-1');
+    expect(ConstraintSet.fromPlain(linked.toPlain()).linkedReportId).toBe('report-1');
+    const none = create();
+    expect(ConstraintSet.fromPlain(none.toPlain()).linkedReportId).toBeUndefined();
+  });
+
+  test('fromPlain は複数紐づけ時代の配列を読み、最後に紐づけたものを引き継ぐ', () => {
+    const restored = ConstraintSet.fromPlain({
+      id: 'schedule-A',
+      leaderRules: [],
+      linkedReportIds: ['report-1', 'report-2'],
+    });
+    expect(restored.linkedReportId).toBe('report-2');
+    expect(restored.toPlain()).not.toHaveProperty('linkedReportIds');
   });
 });
 
@@ -132,5 +142,16 @@ describe('ConstraintSet の勤務間インターバル（main から合流した
     const copy = ConstraintSet.empty('global').withId('schedule-A');
     expect(copy.id).toBe('schedule-A');
     expect(copy.shiftIntervalRules).toHaveLength(1);
+  });
+
+  test('参照レポートの貢献度スコアを優先度に使うかは既定でオフ。切り替えられ、保存形で残る', () => {
+    const set = ConstraintSet.empty('s');
+    expect(set.useReportPriority).toBe(false);
+
+    const on = set.withUseReportPriority(true);
+    expect(on.useReportPriority).toBe(true);
+    expect(set.useReportPriority).toBe(false); // 不変
+    expect(on.withUseReportPriority(true)).toBe(on);
+    expect(ConstraintSet.fromPlain(on.toPlain()).useReportPriority).toBe(true);
   });
 });

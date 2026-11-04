@@ -1,12 +1,13 @@
 import styled from "styled-components";
-import { EARLY_COL_WIDTH, RUN_TONE_COLOR } from "./constants.js";
+import { EARLY_COL_WIDTH } from "./constants.js";
+import { cellFaceStyles } from "./cellFaceStyles.js";
 
 /**
  * グリッドの重なり順。ルールは「横・縦にスクロールする面（データセル・違反の印・
  * 制約ホバーのオーバーレイなど）より、固定された列・行が必ず手前」。
  *
  * スクロールする面の中では z-index 1〜5 を使っている（選択中のセル=1、違反の印=1、
- * 制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
+ * 1セルの違反の角=2、制約ホバーのすりガラス=3 / リボン=4、希望を読むモードのセル=5）。固定の列・行は
  * それらより上に置き、スクロールで下に入ったものが透けて前に出ないようにする。
  */
 const Z_FIXED = 6; // 固定の列（スタッフ名・休・早・見出し列）と固定の行（日付ヘッダ）
@@ -88,6 +89,63 @@ export const StyledWrap = styled.div`
     border-right: 1px solid #eee;
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
+  }
+
+  /* 前月の末尾の列（月跨ぎのつなぎ）。確定済みの前月を写した読み取り専用の参考なので、
+     灰色で細く出し、今月1日との境に太めの区切りを引く。 */
+  .e-prev-head,
+  .e-prev-cell,
+  .e-prev-filler {
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    box-sizing: border-box;
+    background: #f5f5f5;
+  }
+  .e-prev-head.is-last,
+  .e-prev-cell.is-last,
+  .e-prev-filler {
+    border-right: 2px solid #bdbdbd;
+  }
+  .e-prev-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    font-size: 0.8em;
+    color: #9e9e9e;
+
+    .e-prev-month {
+      font-size: 0.75em;
+      line-height: 1;
+    }
+    .e-day-wd {
+      font-size: 0.85em;
+    }
+    &.is-sun {
+      color: #e57373;
+    }
+    &.is-sat {
+      color: #64b5f6;
+    }
+  }
+  .e-prev-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    font-size: 0.8em;
+    color: #9e9e9e;
+    /* 今月の色を借りるが、確定済みの参考なので薄く */
+    opacity: 0.6;
+    cursor: default;
+
+    &.e-off {
+      color: #9e9e9e;
+    }
   }
 
   /* 予約情報ブロックの折りたたみトグル行（予約行の上）。左見出しは横スクロールで固定、
@@ -564,6 +622,27 @@ export const StyledWrap = styled.div`
       align-items: flex-end;
       gap: 1px;
     }
+    /* 休みの形（分散／連休）のアイコン（DayOffStyleIcon）。休みが隣り合うか離れているかで見分ける */
+    .e-day-off-style-icon {
+      flex-shrink: 0;
+      display: flex;
+      cursor: help;
+    }
+
+    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    .e-priority-badge {
+      flex-shrink: 0;
+      font-size: 0.55em;
+      font-weight: bold;
+      line-height: 1.1;
+      padding: 1px 3px;
+      border-radius: 3px;
+      white-space: nowrap;
+      color: #8d6e00;
+      background: #fffde7;
+      border: 1px solid #ffe082;
+      cursor: help;
+    }
     /* 責任者バッジ。配色は leaderRoleStyle（ロールキー→色）を inline で当てる */
     .e-leader-badge {
       flex-shrink: 0;
@@ -586,316 +665,8 @@ export const StyledWrap = styled.div`
   }
 
 
-  /* データセル */
-  .e-cell {
-    position: relative;
-    /* セル自体はクリップしない。違反の印（ViolationMarks）が末尾のセルから左の列へ伸びるため。
-       角へ退避した希望の円のクリップは .e-wish-marks が受け持つ。 */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    min-height: 36px;
-    cursor: pointer;
-    transition: box-shadow 0.1s;
+  ${cellFaceStyles}
 
-    &:hover {
-      box-shadow: inset 0 0 0 2px #90caf9;
-    }
-
-    /* キーボードでフォーカス中のセル。hover より強い枠で示す */
-    &.is-selected {
-      box-shadow: inset 0 0 0 2px #1976d2;
-      z-index: 1;
-    }
-  }
-
-  /* 範囲選択に入っているセル（#157）。勤務帯の背景色は inline なので、上に薄い青を重ねる */
-  /* カット中の元のセル（#166）。Excel の点線と同じく、貼るまでは囲むだけ */
-  .e-cell.is-cut-source::after {
-    content: "";
-    position: absolute;
-    inset: 1px;
-    border: 2px dashed #1976d2;
-    pointer-events: none;
-    z-index: 3;
-  }
-  .e-cell.is-in-range::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(25, 118, 210, 0.18);
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  /* 入力中バッファ（Enter 確定前に打った文字を選択セルに重ねて見せる） */
-  .e-cell .e-input {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(25, 118, 210, 0.08);
-    color: #0d47a1;
-    font-weight: bold;
-    font-variant-numeric: tabular-nums;
-    z-index: 2;
-
-    &::after {
-      content: "";
-      width: 1px;
-      height: 1em;
-      margin-left: 1px;
-      background: #0d47a1;
-      animation: e-caret-blink 1s step-end infinite;
-    }
-  }
-
-  @keyframes e-caret-blink {
-    50% {
-      opacity: 0;
-    }
-  }
-
-
-  /* 未割当セルに薄く表示する希望ヒント */
-  /* シフト希望の円。実際の割当と同じ1文字（休 / 7 …）を、文字色と同じ色の線で囲む。
-     色は --wish-color（勤務帯色 / 休みはグレー）で inline から入る。見た目（背景・線幅・
-     不透明度）は状態ごとにここで決める。
-
-     円と中の文字は別要素にして「独立して」動かす:
-       - 何も入っていないセル … 円は中央・通常サイズ、文字も中央（しっかり見せる）
-       - 実際の値が入ったセル … 円は大きくなり、中心がセルの左上角へ移動する
-         （overflow:hidden でクリップされ、円の 1/4 だけが角から覗く）。文字は円と別に
-         「見えている右下の1/4」の中へ移動して読めるまま残る。すでに決まった情報なので
-         背景は透明・線は細く・薄く（叶っていれば opacity 0.7）して控えめにする。
-       - 希望が叶わなかった円だけは背景赤・文字白のまま強く出す（アラート）。
-     left/top を % で持つので、状態が変わると transition でなめらかに動く。 */
-  .e-wish-marks {
-    position: absolute;
-    inset: 0;
-    /* 左上へ退避した希望の円をセルの内側でクリップする（角から1/4だけ覗かせる） */
-    overflow: hidden;
-    pointer-events: none; /* セルの選択を邪魔しない（叶わなかった円だけ下で戻す） */
-  }
-
-  .e-wish-badge {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    /* 複数希望は横に並べる（--i=何番目 / --n=総数） */
-    margin-left: calc((var(--i, 0) - (var(--n, 1) - 1) / 2) * 22px);
-    width: 20px;
-    height: 20px;
-    box-sizing: border-box;
-    border: 1.5px solid var(--wish-color, #607d8b);
-    border-radius: 50%;
-    background: #fff;
-    color: var(--wish-color, #607d8b);
-    transform: translate(-50%, -50%);
-    transition: left 0.24s ease, top 0.24s ease, width 0.24s ease, height 0.24s ease,
-      margin-left 0.24s ease, background 0.18s ease, border-color 0.18s ease,
-      border-width 0.18s ease, color 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
-  }
-
-  /* 中の文字。円とは独立に動く（円が角へ逃げても、文字は見える側へ寄る）。細字で。 */
-  .e-wish-char {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.78em;
-    font-weight: 400;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    transition: left 0.24s ease, top 0.24s ease, font-size 0.24s ease, opacity 0.18s ease;
-  }
-
-  /* 実際の値が入ったセル: 円は中心が左上角へ（＝1/4だけ覗く）。控えめに。 */
-  .e-wish-marks.is-corner .e-wish-badge {
-    left: 0%;
-    top: 0%;
-    width: 30px;
-    height: 30px;
-    margin-left: calc(var(--i, 0) * 15px);
-    background: transparent; /* すでに決まった情報なので背景は敷かない */
-    border-width: 1px; /* 線も細く */
-    opacity: 0.7;
-  }
-  /* 文字は円の「見えている右下1/4」の中へ寄せる */
-  .e-wish-marks.is-corner .e-wish-char {
-    left: 68%;
-    top: 68%;
-    font-size: 0.6em;
-  }
-
-  /* 希望どおりに入ったセル: もう決まった情報なので、中の文字は消して小さな弧だけ角に残す。
-     （叶わなかった円だけは下のルールで文字ごと強く出す） */
-  .e-wish-marks.is-corner .e-wish-badge:not(.is-mismatch) {
-    width: 22px;
-    height: 22px;
-  }
-  .e-wish-marks.is-corner .e-wish-badge:not(.is-mismatch) .e-wish-char {
-    opacity: 0;
-  }
-
-  /* いま見ているセル（hover / キーボード選択中）は「希望を読むモード」にする。
-     平常時は情報量を抑えて省略しているものを、見ているセルだけ読めるまで開く。
-
-     - 未割当で希望が複数あるセル … 円が横に並ぶとセル幅に収まらず端が切れて読めないので、
-       クリップを外して（overflow: visible）隣の列の上へはみ出させる。円の背景は白なので
-       下のセルに重なっても読める。手前に出すため z-index はスクロールする面の中で最も高くする
-       （制約ホバーの すりガラス=3 / リボン=4 より上。同じセルをホバーすると両方出るので、
-       これらの下だと右へはみ出した円が隠れてしまう）。固定の列・行（Z_FIXED）よりは下に置く。
-       上にすると、選択したまま横スクロールしたときにこのセルの違反の印が名前の列に透けて出る。
-     - 値が入ったセル … 角に残した円の文字（＝叶った希望）を戻す。円のクリップは
-       そのまま（角の弧という見た目を崩さない）。 */
-  .e-cell.has-wish-hint:hover,
-  .e-cell.has-wish-hint.is-selected {
-    z-index: 5;
-  }
-  .e-cell.has-wish-hint:hover .e-wish-marks,
-  .e-cell.has-wish-hint.is-selected .e-wish-marks {
-    overflow: visible;
-  }
-  .e-cell:hover .e-wish-marks.is-corner .e-wish-badge .e-wish-char,
-  .e-cell.is-selected .e-wish-marks.is-corner .e-wish-badge .e-wish-char {
-    opacity: 1;
-  }
-
-  /* ×（避けたい）希望は破線の円＋取り消し線で区別する */
-  .e-wish-badge.is-avoid {
-    border-style: dashed;
-  }
-  .e-wish-badge.is-avoid .e-wish-char {
-    text-decoration: line-through;
-  }
-
-  /* 希望が叶わなかった円（旧・右上の ⊿ の代わり）。角へ寄っても背景赤・文字白のまま強く出す。
-     ダブルクリックで違反バブルを開ける導線もここが担う。 */
-  .e-wish-badge.is-mismatch,
-  .e-wish-marks.is-corner .e-wish-badge.is-mismatch {
-    background: #e53935;
-    border: 1.5px solid #c62828;
-    color: #fff;
-    opacity: 1;
-    pointer-events: auto;
-    cursor: pointer;
-    box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.22);
-  }
-  .e-wish-badge.is-mismatch .e-wish-char {
-    font-weight: 700; /* 警告なので文字はしっかり */
-  }
-  .e-wish-badge.is-mismatch:hover {
-    box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.35);
-  }
-
-  .e-undecided.has-wish-hint {
-    color: #b4b4b4;
-    font-size: 0.82em;
-    font-weight: normal;
-  }
-
-  /* 違反の印（ViolationMarks）。違反1件に印1つで、違反が覆う範囲の末尾のセルに置き、
-     そこから左へ伸ばす。セルの中の絶対配置なので、行・列の番号を数えずにセルへ追従する。
-
-     基準はセルの padding box（右と下の罫線 1px を除いた矩形）。重なり順は z-index:1 で
-     「帯がかかる左のセル（選択中の z-index:1 も DOM で前なので下）より上、制約ホバーの
-     オーバーレイ（3〜4）より下」。固定の列・行（Z_FIXED）はいつも印より手前なので、
-     横スクロールで印が名前の列の下へ入っても透けて出ない。 */
-
-  /* 連勤など複数日の違反: 覆う日の下端に1本の赤帯。
-     --span 列ぶん左へ伸ばす。1列は「padding box の幅＋右の罫線 1px」なので、
-     末尾のセルの右端から span 列ぶん戻ると先頭のセルの左端（＝以前の1セルずつの帯と同じ位置）。 */
-  .e-violation-bar {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: calc(var(--span, 1) * (100% + 1px) - 1px);
-    height: 4px;
-    background: #e53935;
-    cursor: pointer;
-    z-index: 1;
-    transition: height 0.1s;
-
-    &:hover {
-      height: 7px;
-    }
-  }
-
-  /* 連勤・連休の線（選択中のスタッフの行だけ。runMarkPlacement.ts）。赤帯と同じく末尾のセルから
-     --span 列ぶん左へ伸ばす。隣の塊と見分けられるよう右端を 1px 空ける。
-     連勤（2px 実線）: 何日目かで 緑＝上限-2日目まで → 黄緑＝上限-1日目 → 黄＝上限日目 と
-     じわっと変わる。変わり目は前の日へ寄せてあり、上限日目は大半が黄になる
-     （グラデーションは RunMarks.tsx が --run-* で組む）。上限+1日目からは赤（違反なら赤帯が重なる）。
-     連休（2px 点線）: 水色＝2連休 / 青＝3連休以上 */
-  .e-run-bar {
-    --run-ok: ${RUN_TONE_COLOR.ok};
-    --run-near: ${RUN_TONE_COLOR.near};
-    --run-limit: ${RUN_TONE_COLOR.limit};
-    --run-over: ${RUN_TONE_COLOR.over};
-
-    position: absolute;
-    right: 1px;
-    bottom: 0;
-    width: calc(var(--span, 1) * (100% + 1px) - 2px);
-    height: 2px;
-    pointer-events: none;
-    z-index: 1;
-
-    /* 連休は点線にして、連勤の実線と形でも見分けられるようにする */
-    &.is-off-2,
-    &.is-off-long {
-      height: 0;
-      border-bottom: 2px dotted;
-    }
-    &.is-off-2 { border-color: #4fc3f7; }
-    &.is-off-long { border-color: #1565c0; }
-  }
-
-  /* 勤務間インターバル違反（遅番の翌日に早番など）: 隣り合う2日の「境目」に印を1つ出す。
-     違反しているのはどちらか一方のセルの中身ではなく2日の間隔なので、下端の赤帯（範囲違反）や
-     希望の円（単日違反）とは別の形にしている。
-     後の日のセルに置き、中心を前の日の右の罫線（セルの左端から -0.5px）に合わせる。 */
-  .e-interval-bar {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -0.5px;
-    width: 9px;
-    transform: translateX(-50%);
-    background: #e53935;
-    cursor: pointer;
-    z-index: 1;
-    transition: width 0.1s;
-
-    &:hover {
-      width: 15px;
-    }
-
-    /* 境界線の上に乗る丸。帯の当たり判定（ObjectView）の子なので、丸の上でもバブルを開ける */
-    .e-interval-dot {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 11px;
-      height: 11px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: #e53935;
-      border: 1.5px solid #fff;
-      box-sizing: border-box;
-    }
-  }
-
-  /* 違反の印の当たり判定（ObjectView のラッパ span）。fullWidth で幅は枠いっぱいになるので、
-     高さも枠いっぱいに広げる。膜は細い帯に沿うよう角丸を小さくする */
-  .e-violation-hit {
-    height: 100%;
-    --object-view-film-radius: 2px;
-  }
 
   /* 制約エラーが出ているセルをホバーしたときだけ出す、解消案のふわっとしたヒント。
      クリックしやすいよう data-cell-key を自身にも持たせ、hover 判定が途切れないようにしている
@@ -992,64 +763,4 @@ export const StyledWrap = styled.div`
     box-sizing: border-box;
   }
 
-  .e-work {
-    .e-shift-hour {
-      font-weight: bold;
-      font-size: 1.15em;
-      font-variant-numeric: tabular-nums;
-    }
-  }
-  .e-off {
-    background: #f5f5f5;
-    color: #9e9e9e;
-    font-weight: bold;
-  }
-  .e-undecided {
-    color: #d0d0d0;
-  }
-
-  /* 確定提案セル: 制約から一意に決まった値を「まだ入っていない」形で見せる。
-     確定済みセルと同じ勤務帯色・同じ数字を使いつつ、薄く・破線で囲うことで
-     「承認すればこうなる」と読ませる（Enter / Tab で承認）。 */
-  .e-forced {
-    .e-forced-value {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 1.6em;
-      padding: 0 3px;
-      border: 1px dashed rgba(0, 0, 0, 0.35);
-      border-radius: 4px;
-      opacity: 0.5;
-      font-weight: bold;
-      font-size: 1.05em;
-      font-variant-numeric: tabular-nums;
-    }
-  }
-  /* 選択中は提案を少しはっきりさせる（今まさに Enter / Tab で承認できる場所） */
-  .e-forced.is-selected .e-forced-value {
-    opacity: 0.75;
-  }
-
-  /* 詰みセル: 候補が1つも無い＝この先どうやっても埋められない。
-     違反マーカー（右上の ⊿・下端の赤帯）は「今の割当が違反している」印なので、
-     こちらは地を斜線ハッチにして「入れる値が無い」ことを別の見た目で言い分ける。 */
-  .e-dead {
-    background: repeating-linear-gradient(
-      45deg,
-      rgba(211, 47, 47, 0.06),
-      rgba(211, 47, 47, 0.06) 3px,
-      rgba(211, 47, 47, 0.16) 3px,
-      rgba(211, 47, 47, 0.16) 6px
-    );
-    .e-dead-mark {
-      color: #d32f2f;
-      opacity: 0.65;
-      font-weight: bold;
-      font-size: 1.05em;
-    }
-  }
-  .e-dead.is-selected .e-dead-mark {
-    opacity: 0.9;
-  }
 `;

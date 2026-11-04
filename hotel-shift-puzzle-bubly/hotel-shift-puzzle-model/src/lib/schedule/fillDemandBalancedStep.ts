@@ -36,6 +36,7 @@ export const fillDemandBalancedStep: AutoShiftStep = {
   group: "fill-demand",
   groupLabel: "必要人数を埋める",
   variantLabel: "まんべんなく",
+  grantsDayOffInStaffOrder: true,
   description:
     "先に各スタッフの休み（月◯日）を確保し、必要人数に足りない勤務帯へ、全帯の充足率が均等になるよう最も足りない帯から1人ずつ配ります。需要を満たしたあとに残る空きセルも、いま人数が一番少ない帯へ入れて埋め切ります（未定を残さない）。早番だけ満杯で遅番ゼロ、になりにくい。休み希望の人は入れず、人間入力済みのセルも触りません。",
 

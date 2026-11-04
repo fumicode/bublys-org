@@ -27,7 +27,7 @@ import {
   DAY_OFF_CANDIDATE_COUNT,
 } from "./scheduleConstraints.js";
 import { autoShiftLimitsOf, runAutoShiftStep } from "./autoShift.js";
-import { prioritizeStaffByLinkedReports } from "./reportPriority.js";
+import { prioritizeStaffByReport } from "./reportPriority.js";
 import { recordSetCells, recordScheduleMutation } from "./recordScheduleEdit.js";
 import {
   WORKSHIFT_SET_TYPE,
@@ -43,6 +43,8 @@ type ExtractedScheduleProps = {
   scheduleId?: string;
   /** 抽出対象のスタッフID（元の勤務表で選択した人たち） */
   staffIds: string[];
+  /** スタッフ名から開くスタッフ詳細バブルの URL（ScheduleGrid と同じ。app 層から注入） */
+  staffBubbleUrl?: (staffId: string) => string;
 };
 
 /**
@@ -59,6 +61,7 @@ type ExtractedScheduleProps = {
 const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   scheduleId,
   staffIds,
+  staffBubbleUrl,
 }) => {
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
   const store = useAppStore();
@@ -81,13 +84,15 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     CONSTRAINT_SET_TYPE,
     scheduleId
   );
-  // 参考として紐づけたシフト完成レポート（ScheduleGrid でドラッグ紐づけ済みのもの）。
+  // 参照レポート（ScheduleGrid で紐づけたもの）。
   // 自動シフトの実行前に staffList をこれで優先度づけする（詳しくは reportPriority.ts）。
   const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReports = useMemo(() => {
-    const ids = constraints?.linkedReportIds ?? [];
-    return allReports.filter((r) => ids.includes(r.id));
-  }, [allReports, constraints]);
+  const linkedReport = useMemo(
+    () => allReports.find((r) => r.id === constraints?.linkedReportId),
+    [allReports, constraints]
+  );
+  // 貢献度スコアは、スイッチ（ConstraintSet.useReportPriority）がオンのときだけ優先度に使う
+  const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
   const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
@@ -115,34 +120,41 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // 自動シフトが守る制約は、抽出ビューでも勤務表全体と同じリスト（同じ勤務表を編集しているので）。
   // 表示用の violations（抽出ビュー向けに絞った一覧）とは別物。
   const allConstraints = useMemo(
-    () => scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff }),
-    [constraints, workShifts, wishByStaff]
+    () =>
+      scheduleConstraintsOf({ constraintSet: constraints, workShifts, wishByStaff, staffGroup }),
+    [constraints, workShifts, wishByStaff, staffGroup]
   );
 
   // 自動シフトコマンド（抽出ビュー）。相方裏コマンドは廃止したので「希望を叶える」のみ。
   const steps = useMemo<AutoShiftStep[]>(() => [fulfillWishesStep], []);
 
   // 抽出ビューは subset に絞った勤務表なので、責任者違反（全体視点）は出さない
-  // （footer は relevantRules のみ）。連勤・希望は集約の設定に従う。
-  const violations = useMemo(() => {
-    if (!schedule) return [];
+  // （footer は relevantRules のみ）。連勤・希望・可能勤務帯は集約の設定に従う
+  // （可能勤務帯はセル単位なので、subset に絞っても判定は変わらない）。
+  // 表示する違反の制約リスト。セルの違反の印と、ドロップダウンの選択肢に添える違反が同じものを見る。
+  const displayConstraints = useMemo(() => {
     const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
-    return schedule.checkConstraints(
-      buildScheduleConstraints({
-        modelConstraints: [
-          new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
-        ],
-        wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
-      })
-    );
-  }, [schedule, wishByStaff, workShifts, constraints]);
+    return buildScheduleConstraints({
+      modelConstraints: [
+        new MaxConsecutiveWorkdaysConstraint(constraints?.maxConsecutiveWorkdays),
+      ],
+      wish: (constraints?.checkShiftWish ?? true) ? { wishByStaff, shiftNameById } : undefined,
+      allowedShift:
+        staffGroup && (constraints?.checkAllowedShift ?? true)
+          ? { staffGroup, shiftNameById }
+          : undefined,
+    });
+  }, [wishByStaff, workShifts, constraints, staffGroup]);
+  const violations = useMemo(
+    () => (schedule ? schedule.checkConstraints(displayConstraints) : []),
+    [schedule, displayConstraints]
+  );
 
   // セルのコピー・カット・貼り付け（#166）。貼れなかった分はメッセージ欄で知らせる
   const clipboard = useCellClipboard({
     store,
     schedule,
     workShifts,
-    staffGroup,
     onMessage: setAutoMessage,
   });
 
@@ -157,9 +169,13 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
 
   // 自動シフト：対象スタッフ（subset）だけを staffList として渡す → ステップが subset 限定になる
   const handleRunStep = (step: AutoShiftStep) => {
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subset,
+      priorityReport
+    );
     const result = runAutoShiftStep(step, {
       schedule,
-      staffList: prioritizeStaffByLinkedReports(subset, linkedReports),
+      staffList: prioritizedStaff,
       workShifts,
       wishByStaff,
       staffGroup,
@@ -167,7 +183,8 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       ...limits,
     });
     recordScheduleMutation(store, { schedule, transform: () => result.schedule });
-    setAutoMessage(`${step.label}: ${result.message}`);
+    const note = step.grantsDayOffInStaffOrder ? priorityNote : null;
+    setAutoMessage([`${step.label}: ${result.message}`, note].filter(Boolean).join("\n"));
   };
 
   // 完成案の複数生成：抽出中の人について「毎日 担当勤務帯に責任者が最低1人いる（責任者ルール）」
@@ -176,7 +193,10 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   // （たいてい既に開いているため）。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    const prioritizedStaff = prioritizeStaffByLinkedReports(subset, linkedReports);
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+      subset,
+      priorityReport
+    );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
         schedule: sched,
@@ -224,7 +244,12 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     }));
     commitCandidates(store, localScopeId(SCHEDULE_TYPE, scheduleId), SCHEDULE_TYPE, schedule, candidates);
     setAutoMessage(
-      `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`
+      [
+        `${DAY_OFF_CANDIDATE_COUNT}案を世界線に作成し、案1を表示中です。世界線ビューで切り替えて見比べてください。`,
+        priorityNote,
+      ]
+        .filter(Boolean)
+        .join("\n")
     );
   };
 
@@ -235,10 +260,12 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         schedule={schedule}
         staffList={subset}
         workShifts={workShifts}
-        staffGroup={staffGroup}
         wishByStaff={wishByStaff}
         violations={violations}
+        constraints={displayConstraints}
         leaderRules={relevantRules}
+        referenceReport={priorityReport}
+        staffUrlOf={staffBubbleUrl}
         leaderRulesOnlyFooter
         minDayOff={minDayOff}
         onChangeCells={handleChangeCells}

@@ -12,7 +12,7 @@
  */
 import { FC, useId, useRef, useState, type PointerEvent } from "react";
 import { ICON_SIZE, IconValueText } from "./common.js";
-import { RUN_TONE_COLOR } from "../schedule-grid/constants.js";
+import { RUN_TONE_COLOR } from "../schedule-grid/cellSymbols.js";
 import { workDayTone } from "../schedule-grid/runMarkPlacement.js";
 import { workGradientStops } from "../schedule-grid/RunMarks.js";
 

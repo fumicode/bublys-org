@@ -4,7 +4,10 @@
  * 候補集合機能の最小単位。ここは「そのセル単体で見て入れられるか」だけを判定し、
  * 「盤面全体として、どのセルが一意に決まるか」は computeCandidates が組み立てる。
  */
-import type { ConstraintViolationPlain } from "./ConstraintViolation.js";
+import type {
+  ConstraintViolation,
+  ConstraintViolationPlain,
+} from "./ConstraintViolation.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
 import { computeConstraintDelta } from "./ConstraintDelta.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
@@ -49,22 +52,58 @@ export function evaluateCellCandidates(
   day: WorkingDay,
   workShifts: WorkShift[]
 ): CellCandidateEvaluation[] {
-  const before = schedule.checkConstraints(constraints);
+  const cells = enumerateCellCandidates(workShifts).filter(
+    (cell) => cell.kind !== "undecided"
+  );
+  const introduced = violationsIntroducedBy(schedule, constraints, staffId, day, cells);
+  // 候補評価は worker 境界を越える（structured clone）ので plain にして返す
+  return cells.map((cell, i) => ({
+    cell,
+    blockedBy: introduced[i].map((v) => v.toPlain()),
+  }));
+}
 
-  return enumerateCellCandidates(workShifts)
-    .filter((cell) => cell.kind !== "undecided")
-    .map((cell) => {
-      const after = schedule
-        .setCell(staffId, day, cell)
-        .checkConstraints(constraints);
-      // 候補評価は worker 境界を越える（structured clone）ので plain にして返す
-      return {
-        cell,
-        blockedBy: computeConstraintDelta(before, after).newlyViolated.map((v) =>
-          v.toPlain()
-        ),
-      };
-    });
+/** そのセルにその値を入れたときの見込み（選択肢をセルの姿で描くのに使う） */
+export type CellValuePreview = {
+  cell: ShiftCell;
+  /** 入れたあとの盤面の全違反（このセルにかかるものを選べば、入れたときのセルの姿になる） */
+  after: ConstraintViolation[];
+  /** 今の盤面と比べて新しく出る違反 */
+  introduced: ConstraintViolation[];
+};
+
+/**
+ * そのセルに各値を入れたときの見込み（cells と同じ順に返す）。
+ *
+ * 比べる相手は「今の盤面」なので、確定済みのセルなら「今の値からその値に替えたら」になる。
+ * 今の値と同じ値なら盤面が変わらないので introduced は空になる。未定に戻す（クリア）も同じ式で
+ * 見られる（必要人数が足りなくなる、など）。
+ */
+export function previewCellValues(
+  schedule: MonthlyStaffSchedule,
+  constraints: ScheduleConstraint[],
+  staffId: string,
+  day: WorkingDay,
+  cells: ShiftCell[]
+): CellValuePreview[] {
+  const before = schedule.checkConstraints(constraints);
+  return cells.map((cell) => {
+    const after = schedule.setCell(staffId, day, cell).checkConstraints(constraints);
+    return { cell, after, introduced: computeConstraintDelta(before, after).newlyViolated };
+  });
+}
+
+/** そのセルを各値に替えたら、新しく出る違反（cells と同じ順に返す。{@link previewCellValues} の introduced） */
+export function violationsIntroducedBy(
+  schedule: MonthlyStaffSchedule,
+  constraints: ScheduleConstraint[],
+  staffId: string,
+  day: WorkingDay,
+  cells: ShiftCell[]
+): ConstraintViolation[][] {
+  return previewCellValues(schedule, constraints, staffId, day, cells).map(
+    (p) => p.introduced
+  );
 }
 
 /**

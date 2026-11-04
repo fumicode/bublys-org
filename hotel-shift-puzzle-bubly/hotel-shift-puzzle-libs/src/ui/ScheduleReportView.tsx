@@ -8,6 +8,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
+import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
 // スコアバーのセグメント色。譲歩・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
 const COMPROMISE_COLOR = "#6d4c41";
@@ -23,8 +24,12 @@ type ScheduleReportViewProps = {
   onRename: (title: string) => void;
   /** 譲歩・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される */
   onChangeWeights: (compromiseWeight: number, busyDayWeight: number) => void;
-  /** レポートの削除。渡すと見出しに削除ボタンが出る */
+  /** レポートの削除。渡すと見出しに削除ボタンが出る（押すと確認を挟む） */
   onDelete?: () => void;
+  /** このレポートを参照レポートにしている勤務表の数（削除の確認で、紐づけも外れることを伝える） */
+  linkedScheduleCount?: number;
+  /** 確定した時刻（epoch ms）。同じ月の確定が複数あるとき見分けられるよう小さく出す */
+  confirmedAt?: number;
 };
 
 /**
@@ -40,7 +45,11 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   onRename,
   onChangeWeights,
   onDelete,
+  linkedScheduleCount = 0,
+  confirmedAt,
 }) => {
+  // 削除は取り消せないので、ボタンを押したら一度確認を挟む（ブラウザのダイアログは使わない）
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const dayLabel = (dayKey: string) => WorkingDay.fromKey(dayKey).label;
   // 月単位の違反（休日不足など）は dayKeys が空。1日なら単日、複数日なら範囲で示す。
   const dayRangeLabel = (dayKeys: string[]) => {
@@ -123,7 +132,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
               className="e-delete"
               aria-label="レポートを削除"
               title="このレポートを削除"
-              onClick={onDelete}
+              onClick={() => setConfirmingDelete(true)}
             >
               <DeleteOutlineIcon fontSize="small" />
             </button>
@@ -131,7 +140,39 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </div>
         <span className="e-sub">
           {report.year}年{report.month}月 / {report.storeId}
+          {confirmedAt !== undefined && (
+            <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
+          )}
         </span>
+        {onDelete && confirmingDelete && (
+          <div className="e-delete-confirm" role="alertdialog" aria-label="レポートの削除の確認">
+            <span>
+              このレポートを削除しますか？
+              {linkedScheduleCount > 0 &&
+                `参照レポートにしている勤務表（${linkedScheduleCount}件）の紐づけも外れます。`}
+            </span>
+            <div className="e-delete-actions">
+              <button
+                type="button"
+                className="e-delete-yes"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  onDelete();
+                }}
+              >
+                削除する
+              </button>
+              <button
+                type="button"
+                className="e-delete-no"
+                onClick={() => setConfirmingDelete(false)}
+                autoFocus
+              >
+                やめる
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 貢献度: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
@@ -341,6 +382,45 @@ const StyledWrap = styled.div`
       }
     }
 
+    .e-delete-confirm {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border: 1px solid #ffcdd2;
+      background: #fff5f5;
+      border-radius: 8px;
+      font-size: 0.82em;
+      color: #b71c1c;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .e-delete-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .e-delete-yes,
+    .e-delete-no {
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.95em;
+      cursor: pointer;
+    }
+
+    .e-delete-yes {
+      border: 1px solid #d32f2f;
+      background: #d32f2f;
+      color: #fff;
+    }
+
+    .e-delete-no {
+      border: 1px solid #ccc;
+      background: #fff;
+      color: #555;
+    }
+
     .e-delete {
       flex-shrink: 0;
       border: none;
@@ -362,6 +442,10 @@ const StyledWrap = styled.div`
       font-weight: normal;
       font-size: 0.8em;
       color: #777;
+    }
+    .e-confirmed-at {
+      font-size: 0.9em;
+      color: #999;
     }
   }
 

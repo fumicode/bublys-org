@@ -3,6 +3,7 @@ import { WorkingDay } from './WorkingDay.js';
 import { createDefaultWorkShifts } from './WorkShift.js';
 import { makeResolveAmbiguousLeaderSlotsStep } from './resolveAmbiguousLeaderSlotsStep.js';
 import type { AmbiguousLeaderSlot, AutoShiftContext, DecodedWish } from './autoShiftStep.js';
+import { DayOffStyle } from '../staff/DayOffStyle.js';
 
 describe('makeResolveAmbiguousLeaderSlotsStep（残った責任者枠を決める）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -95,5 +96,54 @@ describe('makeResolveAmbiguousLeaderSlotsStep（残った責任者枠を決め�
     );
     expect(result.assigned).toBe(0);
     expect(result.schedule.isUndecided('anyone', june1)).toBe(true);
+  });
+
+  describe('休みの形が崩れにくい人から選ぶ', () => {
+    const day = (d: number) => WorkingDay.of(2026, 6, d);
+    const slotOn = (d: number, ids: string[]) =>
+      slot({ day: day(d), candidates: ids, fallbackCandidates: ids });
+    const run = (schedule: MonthlyStaffSchedule, s: AmbiguousLeaderSlot, phase: number, extra: Partial<AutoShiftContext> = {}) =>
+      makeResolveAmbiguousLeaderSlotsStep([s], { phase }).run(schedule, {
+        ...ctxOf(['A', 'B']),
+        maxConsecutiveWorkdays: 5,
+        ...extra,
+      }).schedule;
+
+    test('出勤が続いている人より、続いていない人を選ぶ（どの案でも）', () => {
+      // A は 1〜4日に出勤済み。5日を A にすると5連勤、B なら1日目
+      let schedule = emptySchedule();
+      for (let d = 1; d <= 4; d++) schedule = schedule.assignShift('A', day(d), 'early');
+      for (const phase of [0, 1, 2]) {
+        expect(run(schedule, slotOn(5, ['A', 'B']), phase).getShiftIdFor('B', day(5))).toBe('early');
+      }
+    });
+
+    test('出勤の希望で埋まった未定の日も、休めない日として数える', () => {
+      // A は 6〜9日が未定だが全部出勤の希望。5日を A にすると休めない日が5日続く
+      const prefs: Record<string, DecodedWish> = {};
+      for (let d = 6; d <= 9; d++) prefs[`A|${day(d).key}`] = { kind: 'work', shiftId: 'early' };
+      const schedule = emptySchedule().assignShift('B', day(4), 'early');
+      for (const phase of [0, 1, 2]) {
+        const r = run(schedule, slotOn(5, ['A', 'B']), phase, {
+          preferenceOf: (id, d) => prefs[`${id}|${d.key}`] ?? { kind: 'neutral' },
+        });
+        expect(r.getShiftIdFor('B', day(5))).toBe('early');
+      }
+    });
+
+    test('連休型の人の、単発の休みの隣（連休の相方の日）は取らない', () => {
+      const schedule = emptySchedule().assignDayOff('A', day(4)).assignDayOff('B', day(4));
+      const r = run(schedule, slotOn(5, ['A', 'B']), 0, {
+        dayOffStyleOf: (id) => (id === 'A' ? DayOffStyle.clustered(5) : DayOffStyle.spread()),
+      });
+      expect(r.getShiftIdFor('B', day(5))).toBe('early');
+    });
+
+    test('崩れ方が同じなら、これまで通り案ごとに選ぶ人が変わる', () => {
+      const picked = [0, 1].map((phase) =>
+        run(emptySchedule(), slotOn(5, ['A', 'B']), phase).getShiftIdFor('A', day(5))
+      );
+      expect(picked[0]).not.toEqual(picked[1]);
+    });
   });
 });

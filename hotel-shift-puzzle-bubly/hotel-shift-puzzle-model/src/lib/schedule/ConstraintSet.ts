@@ -5,14 +5,13 @@ import { ShiftIntervalConstraint } from "./ShiftIntervalConstraint.js";
 import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstraint.js";
 import { MinMonthlyDayOffConstraint } from "./MinMonthlyDayOffConstraint.js";
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
-import { RequiredStaffingConstraint } from "./RequiredStaffingConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 
 /**
  * ConstraintSet — 勤務表が満たすべき制約をひとまとめにした集約（制約セット）
  *
  * 責任者ルール（早責/予責/夜責…定義＋候補者）と、連勤上限・月の最低休日数・1日の休み上限・
- * 希望チェックの有無を1つで持つ。制約はスタッフの属性ではなく勤務表側の要件なので、
+ * 希望チェック・可能勤務帯チェックの有無を1つで持つ。制約はスタッフの属性ではなく勤務表側の要件なので、
  * 専用の集約として切り出してある。
  *
  * 勤務帯セット（WorkShiftSet）と同じく**2通りの使われ方**をする:
@@ -34,6 +33,8 @@ export type ConstraintSetState = {
   maxConsecutiveWorkdays?: number;
   /** シフト希望との食い違いを違反として見るか。省略時 true。 */
   checkShiftWish?: boolean;
+  /** 可能勤務帯（その人が入れる勤務帯）の外に入れたら違反として見るか。省略時 true。 */
+  checkAllowedShift?: boolean;
   /** 月の最低休日数。省略時 8。 */
   minMonthlyDayOff?: number;
   /** 1日に休んでよい人数の上限。省略時 8。 */
@@ -43,8 +44,17 @@ export type ConstraintSetState = {
    * 省略時は DEFAULT_SHIFT_INTERVAL_RULES（遅番明けの早番・中番を禁止）。
    */
   shiftIntervalRules?: ShiftIntervalRule[];
-  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。省略時 []。 */
-  linkedReportIds?: string[];
+  /**
+   * 参照レポート：次の勤務表づくりの参考として紐づけた、過去のシフト完成レポート
+   * （ScheduleReport）のID。紐づけられるのは1つだけ。省略時は紐づけ無し。
+   */
+  linkedReportId?: string;
+  /**
+   * 参照レポートの貢献度スコアを、自動シフトで休みを割り当てる順（優先度）に使うか。省略時 false。
+   * 参照レポートは勤務表を作るときに自動で紐づくので、スコアまで黙って効かないよう既定はオフ。
+   * これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は参照している限り常に効く。
+   */
+  useReportPriority?: boolean;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -54,6 +64,11 @@ export type ConstraintSetPlain = Omit<
 > & {
   leaderRules: ShiftLeaderRuleState[];
   shiftIntervalRules?: ShiftIntervalRuleState[];
+  /**
+   * 旧形式：参照レポートを複数紐づけられた頃の配列。読むときだけ受け付け、
+   * 最後に紐づけたもの（末尾）を linkedReportId として引き継ぐ。書くことはない。
+   */
+  linkedReportIds?: string[];
 };
 
 /** 各制約設定の既定値。 */
@@ -101,9 +116,19 @@ export class ConstraintSet {
     return this.state.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS;
   }
 
+  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うか。既定 false。 */
+  get useReportPriority(): boolean {
+    return this.state.useReportPriority ?? false;
+  }
+
   /** シフト希望との食い違いを違反として見るか。既定 true。 */
   get checkShiftWish(): boolean {
     return this.state.checkShiftWish ?? true;
+  }
+
+  /** 可能勤務帯の外に入れたら違反として見るか。既定 true。 */
+  get checkAllowedShift(): boolean {
+    return this.state.checkAllowedShift ?? true;
   }
 
   /** 月の最低休日数。既定 8。 */
@@ -141,9 +166,9 @@ export class ConstraintSet {
     );
   }
 
-  /** 参考として紐づけた過去のシフト完成レポート（ScheduleReport）のID。既定 []。 */
-  get linkedReportIds(): string[] {
-    return this.state.linkedReportIds ?? [];
+  /** 参照レポート（紐づけた過去のシフト完成レポート）のID。紐づけ無しなら undefined。 */
+  get linkedReportId(): string | undefined {
+    return this.state.linkedReportId;
   }
 
   // ========== 上限・スイッチの変更 ==========
@@ -169,6 +194,18 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, checkShiftWish: check });
   }
 
+  /** 可能勤務帯の外に入れたら違反として見るかを変えた新しいセットを返す。不変。 */
+  withCheckAllowedShift(check: boolean): ConstraintSet {
+    if (check === this.checkAllowedShift) return this;
+    return new ConstraintSet({ ...this.state, checkAllowedShift: check });
+  }
+
+  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
+  withUseReportPriority(use: boolean): ConstraintSet {
+    if (use === this.useReportPriority) return this;
+    return new ConstraintSet({ ...this.state, useReportPriority: use });
+  }
+
   private withNumber(
     field: "maxConsecutiveWorkdays" | "minMonthlyDayOff" | "maxDayOffPerDay",
     value: number,
@@ -179,27 +216,31 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, [field]: next });
   }
 
-  /** レポートを紐づける（既に紐づいていれば何もしない）。新インスタンスを返す。 */
+  /**
+   * 参照レポートを紐づける。紐づけられるのは1つなので、別のレポートが紐づいていれば
+   * 置き換わる。同じレポートなら自分自身を返す。不変。
+   */
   linkReport(reportId: string): ConstraintSet {
-    if (this.linkedReportIds.includes(reportId)) return this;
-    return new ConstraintSet({
-      ...this.state,
-      linkedReportIds: [...this.linkedReportIds, reportId],
-    });
+    if (this.linkedReportId === reportId) return this;
+    return new ConstraintSet({ ...this.state, linkedReportId: reportId });
   }
 
-  /** レポートの紐づけを解除する。新インスタンスを返す。 */
+  /**
+   * 参照レポートの紐づけを外す。外すのは **そのレポートが紐づいているときだけ**
+   * （レポートを消したときに、それを指している勤務表だけから外せるように）。
+   * 紐づいていなければ自分自身を返す。不変。
+   */
   unlinkReport(reportId: string): ConstraintSet {
-    return new ConstraintSet({
-      ...this.state,
-      linkedReportIds: this.linkedReportIds.filter((id) => id !== reportId),
-    });
+    if (this.linkedReportId !== reportId) return this;
+    return new ConstraintSet({ ...this.state, linkedReportId: undefined });
   }
 
   /**
    * この集約が持つ「モデル層で完結する制約」をすべて ScheduleConstraint として返す。
-   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限・必要人数。希望違反は
-   *  feature 層＋実行時データ依存なので含まない——feature 側で足す。）
+   * （責任者・連勤上限・勤務間インターバル・月最低休日・1日の休み上限。希望違反と
+   *  可能勤務帯は、勤務表の外のデータ（希望・勤務スタッフ群）が要るので含まない——feature 側で足す。）
+   * 必要人数は制約ではない（制約バーに出ない＝制約として明記していないので、違反にも数えない）。
+   * 集計行の目標として見せ、自動シフトの「必要人数を埋める」が勤務表の必要人数を直接読む。
    * 担当勤務帯名 → 勤務帯ID群の解決は勤務表側の事情なので shiftIdsOf で受ける。
    */
   modelConstraints(shiftIdsOf: (shiftName: string) => string[]): ScheduleConstraint[] {
@@ -209,7 +250,6 @@ export class ConstraintSet {
       ...this.intervalConstraints(shiftIdsOf),
       new MinMonthlyDayOffConstraint(this.minMonthlyDayOff),
       new MaxDayOffPerDayConstraint(this.maxDayOffPerDay),
-      new RequiredStaffingConstraint(shiftIdsOf),
     ];
   }
 
@@ -315,8 +355,11 @@ export class ConstraintSet {
   }
 
   static fromPlain(plain: ConstraintSetPlain): ConstraintSet {
+    const { linkedReportIds: legacyIds, ...rest } = plain;
+    const linkedReportId = rest.linkedReportId ?? legacyIds?.[legacyIds.length - 1];
     return new ConstraintSet({
-      ...plain,
+      ...rest,
+      ...(linkedReportId !== undefined ? { linkedReportId } : {}),
       leaderRules: plain.leaderRules.map((r) => new ShiftLeaderRule(r)),
       shiftIntervalRules: plain.shiftIntervalRules?.map(
         (r) => new ShiftIntervalRule(r)

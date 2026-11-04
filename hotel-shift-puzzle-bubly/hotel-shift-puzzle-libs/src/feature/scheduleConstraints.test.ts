@@ -1,6 +1,8 @@
 import {
+  ALLOWED_SHIFT_CONSTRAINT,
   ConstraintSet,
   WorkShift,
+  WorkingStaffGroup,
   isShiftIntervalConstraintType,
 } from '@bublys-org/hotel-shift-puzzle-model';
 import { scheduleConstraintsOf } from './scheduleConstraints.js';
@@ -13,10 +15,14 @@ describe('scheduleConstraintsOf（その勤務表に効く制約リスト）', (
     WorkShift.of('early', '早番', { hour: 7 }),
     WorkShift.of('late', '遅番', { hour: 15 }),
   ];
-  const typesOf = (constraintSet: ConstraintSet | undefined) =>
-    scheduleConstraintsOf({ constraintSet, workShifts, wishByStaff: new Map() }).map(
+  const typesOf = (
+    constraintSet: ConstraintSet | undefined,
+    staffGroup: WorkingStaffGroup | undefined = undefined
+  ) =>
+    scheduleConstraintsOf({ constraintSet, workShifts, wishByStaff: new Map(), staffGroup }).map(
       (c) => c.type
     );
+  const group = WorkingStaffGroup.ofRoster('sched-1', ['a']);
 
   test('制約セットの制約（遅番明けを含む）が入る', () => {
     const types = typesOf(ConstraintSet.empty('sched-1'));
@@ -32,5 +38,18 @@ describe('scheduleConstraintsOf（その勤務表に効く制約リスト）', (
 
   test('制約セットがまだ読めていないときは、希望チェックだけ（既定の入）', () => {
     expect(typesOf(undefined)).toHaveLength(1);
+  });
+
+  test('可能勤務帯チェックが入なら可能勤務帯を足し、切なら足さない（#216）', () => {
+    const on = ConstraintSet.empty('sched-1').withCheckAllowedShift(true);
+    const off = ConstraintSet.empty('sched-1').withCheckAllowedShift(false);
+    expect(typesOf(on, group)).toContain(ALLOWED_SHIFT_CONSTRAINT);
+    expect(typesOf(off, group)).not.toContain(ALLOWED_SHIFT_CONSTRAINT);
+    // 制約セットがまだ読めていないときは既定の入
+    expect(typesOf(undefined, group)).toContain(ALLOWED_SHIFT_CONSTRAINT);
+  });
+
+  test('勤務スタッフ群がまだ無い勤務表には、可能勤務帯を足さない', () => {
+    expect(typesOf(ConstraintSet.empty('sched-1'))).not.toContain(ALLOWED_SHIFT_CONSTRAINT);
   });
 });

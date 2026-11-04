@@ -56,6 +56,11 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
               this.rule.minCount <= 1
                 ? `${this.rule.label}が${this.rule.shiftName}に不在`
                 : `${this.rule.label}が${this.rule.shiftName}に不足（${count}/${this.rule.minCount}人）`,
+            // 狭い場所向けの要約。ルール名と「どうなっているか」だけを言う（勤務帯はホバーの文で読む）
+            summary:
+              this.rule.minCount <= 1
+                ? `${this.rule.label}が不在`
+                : `${this.rule.label}が${count}/${this.rule.minCount}人`,
           })
         );
       }

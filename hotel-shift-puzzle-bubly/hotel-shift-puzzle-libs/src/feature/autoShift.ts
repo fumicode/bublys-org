@@ -2,8 +2,9 @@
  * 自動シフト（段階的ステップ）の feature 層アダプタ。
  *
  * ドメインの各ステップ（model 層の AutoShiftStep）は希望の「オプションキー」の意味を知らない。
- * ここで shiftWishOptions の規約に従って希望をデコードし、可能勤務帯（勤務スタッフ群が持つ）を
- * 述語に変換して AutoShiftContext を組み、ステップへ渡す。希望キーの解釈はこの層が持つ。
+ * ここで shiftWishOptions の規約に従って希望をデコードし、AutoShiftContext を組んでステップへ渡す。
+ * 希望キーの解釈はこの層が持つ。可能勤務帯はここでは見ない——制約リスト（constraints）に
+ * 入っているので、置くたびの判定（canPlace）が他の制約と一緒に守る（#216）。
  *
  * UI へはステップ一覧（AUTO_SHIFT_STEPS）をそのまま見せ、選ばれたステップを runAutoShiftStep で
  * 実行する。新しいコマンドが増えても UI は変更不要（リスト駆動）。
@@ -15,8 +16,10 @@ import {
   WorkingStaffGroup,
   WorkShift,
   Staff,
+  DayOffStyle,
   DEFAULT_MIN_MONTHLY_DAY_OFF,
   DEFAULT_MAX_DAY_OFF_PER_DAY,
+  DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
   type AutoShiftContext,
@@ -94,7 +97,7 @@ export const decodeWishForStaff = (
  * その日その人が、その勤務帯に入れるか（希望の×／○を見る）。
  * 候補の絞り方は decodeWishForStaff と同じ：○があれば○の帯だけ、無ければ×を除いた残り。
  * ただし○の帯がこの勤務表に無いときは絞り込まない（絞ると埋められるセルが無くなるため）。
- * 可能勤務帯（ScheduleAvailability）と AND して AutoShiftContext.isAvailable にする。
+ * これがそのまま AutoShiftContext.isAvailable になる（可能勤務帯は制約リストの側で守る）。
  */
 const isWishedShift = (
   wish: StaffMonthlyShiftWish | undefined,
@@ -118,11 +121,14 @@ export type AutoShiftParams = {
   workShifts: WorkShift[];
   /** staffId → その月のシフト希望 */
   wishByStaff: Map<string, StaffMonthlyShiftWish>;
-  /** 可能勤務帯（無ければ全可） */
+  /**
+   * 勤務メンバー。人ごとの休みの形の上書きを引くのに使う。
+   * 可能勤務帯は制約リスト（constraints）が見るので、ここでは見ない。
+   */
   staffGroup?: WorkingStaffGroup;
   /**
    * 勤務表の制約リスト（違反表示・候補集合と同じもの。scheduleConstraintsOf で組む）。
-   * 自動シフトは置くたびに、これに新しい違反が出ないかを見る（連勤・遅番明け・希望…）。
+   * 自動シフトは置くたびに、これに新しい違反が出ないかを見る（連勤・遅番明け・希望・可能勤務帯…）。
    */
   constraints?: ScheduleConstraint[];
   /**
@@ -132,10 +138,14 @@ export type AutoShiftParams = {
   minDayOff?: number;
   /** 1日に休んでよい人数の上限（休みを入れるときに超えない） */
   maxDayOffPerDay?: number;
+  /** 全体の連勤上限。連休型の人の出勤の塊をこの長さ（目標があれば小さい方）で区切る */
+  maxConsecutiveWorkdays?: number;
 };
 
 /** 自動シフトが目指す休みの置き方（制約セットから取り出したもの） */
-export type AutoShiftLimits = Required<Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay">>;
+export type AutoShiftLimits = Required<
+  Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay" | "maxConsecutiveWorkdays">
+>;
 
 /**
  * 制約セットから、自動シフトが「何日休みを置くか・1日何人まで休ませるか」を取り出す。
@@ -153,9 +163,11 @@ export const autoShiftLimitsOf = (
 ): AutoShiftLimits => ({
   minDayOff: constraints?.minMonthlyDayOff ?? DEFAULT_MIN_MONTHLY_DAY_OFF,
   maxDayOffPerDay: constraints?.maxDayOffPerDay ?? DEFAULT_MAX_DAY_OFF_PER_DAY,
+  maxConsecutiveWorkdays:
+    constraints?.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS,
 });
 
-/** params から各ステップ共通の文脈を組む（希望のデコード・可能勤務帯の述語化） */
+/** params から各ステップ共通の文脈を組む（希望のデコード・希望の×／○の述語化） */
 const buildContext = (params: AutoShiftParams): AutoShiftContext => {
   const {
     staffList,
@@ -165,6 +177,7 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     constraints,
     minDayOff,
     maxDayOffPerDay,
+    maxConsecutiveWorkdays,
   } = params;
 
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -180,10 +193,9 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     shiftNameById,
     preferenceOf: (staffId, day) =>
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
-    // 「入れるか」は 可能勤務帯（人ごと・月通し） AND その日の希望×／○（日ごと） で決まる。
-    // 可能勤務帯は勤務スタッフ群のメンバーが持つ（絞っていない人はどの勤務帯にも入れる）。
+    // 「入れるか」はその日の希望×／○（日ごと）で決まる。可能勤務帯（人ごと・月通し）は
+    // 制約リストに入っているので、ここで名指ししない（名指しすると判断が2箇所になる）。
     isAvailable: (staffId, shiftId, day) =>
-      (!staffGroup || staffGroup.isAllowed(staffId, shiftId)) &&
       isWishedShift(
         wishByStaff.get(staffId),
         day,
@@ -193,6 +205,26 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     constraints,
     minDayOff,
     maxDayOffPerDay,
+    maxConsecutiveWorkdays,
+    dayOffStyleOf: dayOffStyleResolver(staffList, staffGroup),
+  };
+};
+
+/**
+ * その人がこの勤務表で使う休みの形を引く関数を作る。
+ * 勤務メンバーの上書きがあればそれ、無ければその人（名簿の焼き付け／臨時の人の実体）の既定値。
+ * 自動シフトと、休みの役目の読み解き（表のホバー）の両方がこれで引く。
+ */
+export const dayOffStyleResolver = (
+  staffList: readonly Staff[],
+  staffGroup: WorkingStaffGroup | undefined
+): ((staffId: string) => DayOffStyle) => {
+  const byId = new Map(staffList.map((s) => [s.id, s]));
+  return (staffId) => {
+    const staff = byId.get(staffId);
+    return staffGroup
+      ? staffGroup.dayOffStyleOf(staffId, staff)
+      : staff?.dayOffStyle ?? DayOffStyle.DEFAULT;
   };
 };
 

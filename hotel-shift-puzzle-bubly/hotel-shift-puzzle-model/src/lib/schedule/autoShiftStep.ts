@@ -20,6 +20,7 @@ import type { WorkingDay } from "./WorkingDay.js";
 import type { MonthlyStaffSchedule, ShiftCell } from "./MonthlyStaffSchedule.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { introducesViolation } from "./placementCheck.js";
+import type { DayOffStyle } from "../staff/DayOffStyle.js";
 
 /** デコード済みの「その日のその人の希望」。希望キーの意味解釈は上位層が行う */
 export type DecodedWish =
@@ -32,7 +33,7 @@ export type DecodedWish =
   /** 希望はあるが自動では決められない（触らず人間へ） */
   | { kind: "ambiguous" };
 
-/** 各ステップが共通で受け取る文脈（希望・可能勤務帯・勤務帯名↔ID など） */
+/** 各ステップが共通で受け取る文脈（希望・制約・勤務帯名↔ID など） */
 export type AutoShiftContext = {
   /** 割当対象のスタッフID一覧 */
   staffIds: string[];
@@ -43,9 +44,8 @@ export type AutoShiftContext = {
   /** (staffId, day) のデコード済み希望を返す。省略時の人は neutral 扱い */
   preferenceOf: (staffId: string, day: WorkingDay) => DecodedWish;
   /**
-   * staffId がその日 shiftId に入れるか。省略時は全可。
-   * 「その人が入れる帯か（可能勤務帯）」に加えて「その日は入れないと言っていないか（希望の×）」
-   * まで含めた判定を上位層が組み立てて渡す。
+   * staffId がその日 shiftId に入れるか（希望の×／○）。省略時は全可。
+   * 可能勤務帯はここに入れない。制約（constraints）として渡すので、置くたびの判定が守る。
    */
   isAvailable?: (staffId: string, shiftId: string, day: WorkingDay) => boolean;
   /**
@@ -61,6 +61,16 @@ export type AutoShiftContext = {
   minDayOff?: number;
   /** 1日に休んでよい人数の上限。休みを入れるときにこれを超えない。 */
   maxDayOffPerDay?: number;
+  /**
+   * 全体の連勤上限（制約セットの値）。連休型の人に休みを置くとき、出勤の塊をこの長さ
+   * （その人の目標があればその小さい方）で区切るのに使う。省略時は上限なしとして扱う。
+   */
+  maxConsecutiveWorkdays?: number;
+  /**
+   * その人がこの勤務表で使う休みの形（WorkingStaffMember の上書き → Staff の既定値）。
+   * 省略時は全員分散型。
+   */
+  dayOffStyleOf?: (staffId: string) => DayOffStyle;
 };
 
 /**
@@ -110,6 +120,13 @@ export interface AutoShiftStep {
   readonly groupLabel?: string;
   /** トグル内でこの戦略を表す短いラベル（例: "まんべんなく"） */
   readonly variantLabel?: string;
+  /**
+   * 休みを置くとき、`ctx.staffIds` の**前の人から先に**取らせるか。
+   * 1日に休める人数には上限があるので、前に並んだ人ほど希望どおりの日に休みを取りやすい。
+   * 上位層はこれを見て「並び順で誰を優先したか」を利用者に伝える（並び順が効かないステップで
+   * 「優先しました」と言わないため）。省略時 false。
+   */
+  readonly grantsDayOffInStaffOrder?: boolean;
   /** 実行。純粋・不変で、新しい勤務表と結果を返す */
   run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult;
 }
@@ -120,8 +137,8 @@ export interface AutoShiftStep {
  * そのセルにその値を置いてよいか。**自動シフトが値を置くときは、必ずこれを通す。**
  *
  * 置いてよい ＝ 候補集合に載る値:
- *   - 出勤なら、その人がその日その帯に入れる（可能勤務帯・希望の×／○）
- *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts）
+ *   - 出勤なら、その人がその日その帯に入れる（希望の×／○）
+ *   - 置いても勤務表の制約に新しい違反が出ない（placementCheck.ts。可能勤務帯もここで守る）
  *
  * 「どの制約を守るか」をステップごとに書かない。書くと、書き忘れた制約（遅番明けなど）だけが
  * 自動シフトから漏れる。

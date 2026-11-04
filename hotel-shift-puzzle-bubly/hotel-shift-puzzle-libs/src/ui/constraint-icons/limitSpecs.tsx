@@ -3,7 +3,7 @@
 /**
  * limitSpecs — 「数と真偽で言い切れる制約」1つぶんの記述を1枚にまとめたテーブル。
  *
- * 連勤上限・月の最低休日・1日の休み上限・希望チェックは、どれも
+ * 連勤上限・月の最低休日・1日の休み上限・可能勤務帯チェック・希望チェック・参照レポートの優先度は、どれも
  * 「制約セットから1つ読んで、1つ書き戻す」だけの制約。個別のコンポーネントも
  * 個別のハンドラも要らないので、**違うのはこの表の1行だけ**にしてある。
  *
@@ -18,7 +18,9 @@ import { ConstraintSet } from "../../domain/index.js";
 import { MaxDayOffPerDayIcon } from "./MaxDayOffPerDayIcon.js";
 import { MinMonthlyDayOffIcon } from "./MinMonthlyDayOffIcon.js";
 import { MaxConsecutiveIcon } from "./MaxConsecutiveIcon.js";
+import { AllowedShiftIcon } from "./AllowedShiftIcon.js";
 import { WishIcon } from "./WishIcon.js";
+import { ReportPriorityIcon } from "./ReportPriorityIcon.js";
 
 /** バーの3群。稼働日ごと（縦↕）／人ごと（横↔）／全体 */
 export type LimitGroup = "per-day" | "per-person" | "whole";
@@ -61,7 +63,7 @@ const asBoolean = (v: number | boolean): boolean => v === true;
 
 /**
  * 並び順がそのままバーの並び順になる。
- * 群の中の順序も、いまの見た目（休み上限 → 休日 → 連勤 → 希望）をこの順で再現する。
+ * 群の中の順序も、いまの見た目（休み上限 → 休日 → 連勤 → 可能勤務帯 → 希望）をこの順で再現する。
  */
 export const LIMIT_SPECS: LimitSpec[] = [
   {
@@ -107,6 +109,20 @@ export const LIMIT_SPECS: LimitSpec[] = [
     ),
   },
   {
+    key: "check-allowed-shift",
+    caption: "可能勤務帯",
+    group: "per-person",
+    kind: "boolean",
+    label: "入れない勤務帯には入れない",
+    read: (set) => set.checkAllowedShift,
+    apply: (set, v) => set.withCheckAllowedShift(asBoolean(v)),
+    describe: (v) =>
+      asBoolean(v)
+        ? "入れない勤務帯には入れない（入れたら違反として出す）"
+        : "可能勤務帯は見ない",
+    render: (v, size) => <AllowedShiftIcon on={asBoolean(v)} size={size} />,
+  },
+  {
     key: "check-shift-wish",
     caption: "希望",
     group: "whole",
@@ -119,6 +135,20 @@ export const LIMIT_SPECS: LimitSpec[] = [
         ? "できるだけシフト希望に沿う（沿わない日は違反として出す）"
         : "シフト希望は見ない",
     render: (v, size) => <WishIcon on={asBoolean(v)} size={size} />,
+  },
+  {
+    key: "use-report-priority",
+    caption: "★優先",
+    group: "whole",
+    kind: "boolean",
+    label: "参照レポートの貢献度で休みを優先する",
+    read: (set) => set.useReportPriority,
+    apply: (set, v) => set.withUseReportPriority(asBoolean(v)),
+    describe: (v) =>
+      asBoolean(v)
+        ? "参照レポートの貢献度（★）が高い人ほど、自動シフトで休みを優先して取れる"
+        : "参照レポートの貢献度は休みの優先度に使わない",
+    render: (v, size) => <ReportPriorityIcon on={asBoolean(v)} size={size} />,
   },
 ];
 

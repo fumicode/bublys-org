@@ -1,7 +1,13 @@
 import type { CSSProperties, FC } from "react";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import type { ConstraintViolation } from "../../domain/index.js";
-import type { ViolationMark } from "./violationMarkPlacement.js";
+import type { ViolationMark, ViolationMarkKind } from "./violationMarkPlacement.js";
+
+const MARK_CLASS: Record<ViolationMarkKind, string> = {
+  range: "e-violation-bar",
+  corner: "e-violation-corner",
+  interval: "e-interval-bar",
+};
 
 type ViolationMarksProps = {
   /** このセルに置く印（violationMarksOf の結果のうち、anchorDay がこのセルの日のもの）。 */
@@ -11,7 +17,7 @@ type ViolationMarksProps = {
 };
 
 /**
- * セルに重ねる違反の印（連勤の赤帯・勤務間インターバルの境目の印）。
+ * セルに重ねる違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）。
  *
  * 違反1件につき印は1つ。違反が覆う範囲の末尾のセルに置き、そこから左へ伸ばす
  * （置き場所の決め方は violationMarkPlacement.ts）。帯の長さは --span（覆う列の数）から CSS で出す。
@@ -29,7 +35,7 @@ export const ViolationMarks: FC<ViolationMarksProps> = ({
   violationUrl,
 }) => (
   <>
-    {marks.map(({ kind, violation, span }) => {
+    {marks.map(({ kind, violation, span, edge }) => {
       // 境目の丸は帯からはみ出すので、当たり判定（ObjectView）の子として描く。
       // 枠の ::after で描くと丸の上の操作が ObjectView に届かず、丸からバブルを開けない。
       const dot =
@@ -37,7 +43,7 @@ export const ViolationMarks: FC<ViolationMarksProps> = ({
       return (
         <span
           key={violation.key}
-          className={kind === "interval" ? "e-interval-bar" : "e-violation-bar"}
+          className={`${MARK_CLASS[kind]}${edge === "right" ? " is-right" : ""}`}
           style={{ ["--span" as string]: span } as CSSProperties}
           title={`${violation.message}（ダブルクリックで詳細）`}
           onMouseDown={(e) => e.stopPropagation()}

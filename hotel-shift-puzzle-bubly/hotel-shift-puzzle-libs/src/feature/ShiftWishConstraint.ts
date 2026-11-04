@@ -20,9 +20,14 @@ import {
   WorkingDay,
   type ScheduleConstraint,
 } from "@bublys-org/hotel-shift-puzzle-model";
-import { DAY_OFF_WISH, workWishKey, wishOptionLabel } from "../ui/shiftWishOptions.js";
+import {
+  DAY_OFF_WISH,
+  SHIFT_WISH_MISMATCH,
+  workWishKey,
+  wishOptionLabel,
+} from "../ui/shiftWishOptions.js";
 
-export const SHIFT_WISH_MISMATCH = "shift-wish-mismatch";
+export { SHIFT_WISH_MISMATCH };
 
 type Context = {
   /** staffId → その月のシフト希望 */
@@ -105,6 +110,7 @@ export class ShiftWishConstraint implements ScheduleConstraint {
             staffId,
             days: [day],
             message: `希望と異なる割当です（希望: ${mismatch.wishText} ／ 割当: ${mismatch.assignedText}）`,
+            summary: `希望（${mismatch.wishText}）と違う`,
           })
         );
       }

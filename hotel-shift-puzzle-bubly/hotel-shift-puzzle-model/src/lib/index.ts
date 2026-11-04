@@ -4,6 +4,7 @@
 
 // Staff（スタッフ）
 export * from './staff/Staff.js';
+export * from './staff/DayOffStyle.js';
 // 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
 export * from './staff/WorkingStaffMember.js';
 export * from './staff/WorkingStaffGroup.js';
@@ -19,6 +20,7 @@ export * from './schedule/cellClipboard.js';
 export * from './schedule/RequiredStaffing.js';
 export * from './schedule/StaffMonthlyShiftWish.js';
 export * from './schedule/MonthlyStaffSchedule.js';
+export * from './schedule/PrecedingMonthTail.js';
 // 稼働日ごとの予約状況（宿泊人数・部屋数）。勤務表に紐づく姉妹集約。店ごとに付け替える想定。
 export * from './schedule/DailyReservationInfo.js';
 export * from './schedule/ScheduleReport.js';
@@ -45,6 +47,8 @@ export * from './schedule/fillDemandBalancedStep.js';
 export * from './schedule/satisfyLeaderRulesStep.js';
 export * from './schedule/resolveAmbiguousLeaderSlotsStep.js';
 export * from './schedule/minDayOffStep.js';
+export * from './schedule/dayOffReason.js';
+export * from './schedule/restPressure.js';
 export * from './schedule/autoShiftSteps.js';
 
 // 制約（シフト表が満たすべきルール）
@@ -54,6 +58,7 @@ export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';
 export * from './schedule/RequiredStaffingConstraint.js';
+export * from './schedule/AllowedShiftConstraint.js';
 
 // 候補集合（まだ決まっていないセルに入れられる値を、制約から絞り込んで持つ）
 export * from './schedule/cellCandidates.js';
