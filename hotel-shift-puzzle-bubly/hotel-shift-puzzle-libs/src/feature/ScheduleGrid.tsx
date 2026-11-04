@@ -295,7 +295,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 自動シフトを呼ぶところは必ずこれを丸ごと渡す（個別に書くと渡し忘れる）。
   // 守る制約（連勤・遅番明け…）は allConstraints で渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
-  const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
+  const { minDayOff } = limits;
 
   // 責任者バッジのクリック: そのルールの担当者を選択に足す（全員入っていれば外す＝トグル）。
   const selectRuleStaff = (ids: string[]) =>
@@ -695,7 +695,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         s,
         makeResolveAmbiguousLeaderSlotsStep(leaderFill.ambiguousLeaderSlots ?? [], { phase })
       );
-      s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
+      s = runOn(s, makeMinDayOffStep(minDayOff, { phase }));
       return s;
     };
     const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
@@ -952,7 +952,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onRunStep={handleRunStep}
           onGenerateCandidates={handleGenerateCandidates}
           candidateLabel={candidateLabel}
-          candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${limits.maxDayOffPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
           message={autoMessage}
           onCloseMessage={() => setAutoMessage(null)}
         />

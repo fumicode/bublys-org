@@ -6,11 +6,11 @@ import { WorkingDay } from './WorkingDay.js';
 import { MinMonthlyDayOffConstraint } from './MinMonthlyDayOffConstraint.js';
 
 /**
- * 段階に分けた制約は、check() も段階の振り分けから導く（#229）。
- * だから「違反の件数」と「違反の段階の件数の合計」が食い違わない。全部の制約でそれを見張る。
+ * 制約は、check() もきつさの量と同じ振り分けから導く（#229）。
+ * だから「違反の量の合計」と「違反の単位の量の合計」が食い違わない。全部の制約でそれを見張る。
  * 例外は月の休日だけ：check() は未定を楽観的に読み（もう届かないか）、tightness() は今のまま読む。
  */
-describe('きつさの段階と check() が食い違わない', () => {
+describe('きつさの量と check() が食い違わない', () => {
   const day = (d: number) => WorkingDay.of(2026, 6, d);
   const shiftIdsOf = (name: string) => ({ 早番: ['early'], 遅番: ['late'] })[name] ?? [];
 
@@ -45,10 +45,10 @@ describe('きつさの段階と check() が食い違わない', () => {
   test.each(constraints.map((c) => [c.type, c] as const))('%s', (_type, constraint) => {
     expect(constraint.tightnessUnits?.length).toBeGreaterThan(0);
     const amounts = constraint.tightness?.(schedule) ?? [];
-    // 宣言した段階をすべて返す（0件の段階も）
+    // 宣言した単位をすべて返す（0 の単位も）
     expect(amounts.map((a) => a.unit.key)).toEqual(constraint.tightnessUnits?.map((u) => u.key));
     const violating = amounts.filter((a) => a.isViolating).reduce((n, a) => n + a.amount, 0);
-    expect(constraint.check(schedule)).toHaveLength(violating);
+    expect(constraint.check(schedule).reduce((n, v) => n + v.amount, 0)).toBe(violating);
   });
 
   test('この勤務表で、どの制約も1件以上の違反を出している（見張りが空振りしていない）', () => {
@@ -59,7 +59,8 @@ describe('きつさの段階と check() が食い違わない', () => {
     const c = new MinMonthlyDayOffConstraint(8);
     // c は休み1日、残りは未定。まだ届きうるので違反ではないが、今は7日足りない
     expect(c.check(schedule).filter((v) => v.staffId === 'c')).toHaveLength(0);
+    // 今のまま読むと、c は 7日・a と b は 8日足りない
     const short = Object.fromEntries(c.tightness(schedule).map((a) => [a.unit.key, a.amount]));
-    expect(short['monthly-day-off-short-2-plus']).toBeGreaterThanOrEqual(1);
+    expect(short['monthly-day-off-short']).toBe(7 + 8 + 7);
   });
 });

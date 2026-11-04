@@ -6,6 +6,7 @@ import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
+import { MaxDayOffPerDayConstraint } from './MaxDayOffPerDayConstraint.js';
 import { DayOffStyle } from '../staff/DayOffStyle.js';
 describe('makeMinDayOffStep（月◯日休む）', () => {
   const workShifts = createDefaultWorkShifts();
@@ -78,10 +79,12 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
     expect(result.assigned).toBe(0);
   });
 
-  test('maxPerDay: 1日の休み人数が上限を超えない', () => {
+  test('1日の休み人数が上限を超えない（休み上限の制約で守る。ステップは上限を名指ししない）', () => {
     // 3人×各8日休み。1日上限1人 → どの日も休みは1人以下
-    const capped = makeMinDayOffStep(8, { maxPerDay: 1 });
-    const result = capped.run(emptySchedule(), ctxOf(['A', 'B', 'C']));
+    const result = step.run(emptySchedule(), {
+      ...ctxOf(['A', 'B', 'C']),
+      constraints: [new MaxDayOffPerDayConstraint(1)],
+    });
 
     for (const day of result.schedule.workingDays()) {
       expect(result.schedule.countDayOffOn(day)).toBeLessThanOrEqual(1);

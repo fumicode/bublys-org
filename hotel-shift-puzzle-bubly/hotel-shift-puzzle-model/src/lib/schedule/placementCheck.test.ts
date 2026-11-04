@@ -8,6 +8,8 @@ import { computeConstraintDelta } from './ConstraintDelta.js';
 import { introducesViolation } from './placementCheck.js';
 import type { ScheduleConstraint } from './ScheduleConstraint.js';
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
+import { MaxDayOffPerDayConstraint } from './MaxDayOffPerDayConstraint.js';
+import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 
 describe('introducesViolation（そのセルにその値を置くと、新しい違反が出るか）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -52,6 +54,23 @@ describe('introducesViolation（そのセルにその値を置くと、新しい
     test('他のスタッフには関係ない', () => {
       expect(introducesViolation(base, lateAfter, 's2', day(2), early)).toBe(false);
     });
+  });
+
+  test('★ すでに休み上限を超えた日に、さらに休みは置けない（同じ違反のまま悪化する手も見つける）', () => {
+    const cap = [new MaxDayOffPerDayConstraint(1)];
+    // 6/1 は休みが2人（上限1）＝すでに違反
+    const over = emptySchedule().assignDayOff('a', day(1)).assignDayOff('b', day(1));
+    expect(introducesViolation(over, cap, 'c', day(1), off)).toBe(true);
+    // 出勤なら超えた人数は増えないので置ける
+    expect(introducesViolation(over, cap, 'c', day(1), early)).toBe(false);
+  });
+
+  test('★ すでに連勤上限を超えた連勤を、さらに伸ばす手も置けない', () => {
+    const run = [new MaxConsecutiveWorkdaysConstraint(3)];
+    let s = emptySchedule();
+    for (let d = 1; d <= 4; d++) s = s.assignShift('s1', day(d), 'early'); // 4連勤（1日超え）
+    expect(introducesViolation(s, run, 's1', day(5), early)).toBe(true);
+    expect(introducesViolation(s, run, 's1', day(5), off)).toBe(false);
   });
 
   test('「まだ足りない」を表す制約（必要人数・責任者）は、空きを埋めるのを妨げない', () => {

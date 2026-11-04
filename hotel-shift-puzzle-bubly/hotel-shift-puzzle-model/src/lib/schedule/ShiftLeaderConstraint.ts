@@ -8,16 +8,15 @@
  *
  * 勤務帯の解決（shiftName → 勤務帯ID集合）は勤務表側の事情なので、呼び出し側が解決して渡す。
  *
- * 段階（#229）: 不在（0人）／足りない（1人以上いるが最低人数に届かない）。どちらも違反。
- * 最低人数が1人のルールでは「足りない」は起きない。単位はルールごと（早責と予責は別の制約）。
- * 日ごとに人数を測って段階に振り分け、check() も同じ振り分けから導く。
+ * きつさ（#229）: 足りない（足りない人数・違反）。単位はルールごと（早責と予責は別の制約）。
+ * 日ごとに人数を測り、check() も同じ量から導く（不在は「最低人数ぶん足りない」）。
  */
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
 import { ShiftLeaderRule } from "./ShiftLeaderRule.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkingDay } from "./WorkingDay.js";
-import { TightnessUnit, countByUnit, type TightnessAmount } from "./Tightness.js";
+import { TightnessUnit, sumByUnit, type Tally, type TightnessAmount } from "./Tightness.js";
 
 /** 測った1件＝1日の、担当勤務帯に入っている責任者の人数 */
 type LeaderCount = { day: WorkingDay; count: number };
@@ -28,9 +27,7 @@ export const SHIFT_LEADER_CONSTRAINT = "shift-leader";
 export class ShiftLeaderConstraint implements ScheduleConstraint {
   readonly type: string;
   readonly label: string;
-  /** 不在（0人） */
-  readonly absentUnit: TightnessUnit;
-  /** 足りない（1人以上いるが最低人数に届かない） */
+  /** 足りない（足りない人数で数える） */
   readonly shortUnit: TightnessUnit;
   readonly tightnessUnits: readonly TightnessUnit[];
 
@@ -44,17 +41,12 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
   ) {
     this.type = `${SHIFT_LEADER_CONSTRAINT}:${rule.key}`;
     this.label = rule.label;
-    this.absentUnit = new TightnessUnit({
-      key: `${this.type}:absent`,
-      label: `${rule.label}が不在`,
-      violating: true,
-    });
     this.shortUnit = new TightnessUnit({
       key: `${this.type}:short`,
-      label: `${rule.label}が足りない`,
+      label: `${rule.label}の不足（人）`,
       violating: true,
     });
-    this.tightnessUnits = [this.absentUnit, this.shortUnit];
+    this.tightnessUnits = [this.shortUnit];
   }
 
   /** 対象日の責任者ロースターだけを見る（他日には影響しない） */
@@ -67,11 +59,12 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
-    return this.measure(schedule)
-      .filter((m) => this.unitOf(m)?.isViolating)
-      .map(
-        ({ day, count }) =>
+    return this.measure(schedule).flatMap(({ day, count }) => {
+      const tally = this.tallyOf({ day, count });
+      if (!tally?.unit.isViolating) return [];
+      return [
           new ConstraintViolation({
+            amount: tally.amount,
             constraintType: this.type,
             // スタッフに紐づかない「その日に責任者が不在」＝日単位の違反
             staffId: undefined,
@@ -85,18 +78,19 @@ export class ShiftLeaderConstraint implements ScheduleConstraint {
               this.rule.minCount <= 1
                 ? `${this.rule.label}が不在`
                 : `${this.rule.label}が${count}/${this.rule.minCount}人`,
-          })
-      );
+          }),
+      ];
+    });
   }
 
   tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
-    return countByUnit(this.tightnessUnits, this.measure(schedule), (m) => this.unitOf(m));
+    return sumByUnit(this.tightnessUnits, this.measure(schedule), (m) => this.tallyOf(m));
   }
 
-  /** 人数 → 段階。最低人数に届いていれば数えない */
-  private unitOf({ count }: LeaderCount): TightnessUnit | undefined {
-    if (count >= this.rule.minCount) return undefined;
-    return count === 0 ? this.absentUnit : this.shortUnit;
+  /** 人数 → 量（足りない人数）。最低人数に届いていれば数えない */
+  private tallyOf({ count }: LeaderCount): Tally | undefined {
+    const shortage = this.rule.minCount - count;
+    return shortage > 0 ? { unit: this.shortUnit, amount: shortage } : undefined;
   }
 
   private measure(schedule: MonthlyStaffSchedule): LeaderCount[] {

@@ -27,6 +27,19 @@ describe("computeConstraintDelta", () => {
     expect(delta.newlyResolved).toHaveLength(0);
   });
 
+  it("★ 同じ違反でも量が増えたら newlyViolated に入れ、減ったり同じなら入れない", () => {
+    const over = (amount: number) =>
+      new ConstraintViolation({
+        constraintType: "max-day-off-per-day",
+        days: [day],
+        message: `休みの上限超え${amount}人`,
+        amount,
+      });
+    expect(computeConstraintDelta([over(1)], [over(2)]).newlyViolated).toHaveLength(1);
+    expect(computeConstraintDelta([over(2)], [over(1)]).newlyViolated).toHaveLength(0);
+    expect(computeConstraintDelta([over(2)], [over(2)]).newlyViolated).toHaveLength(0);
+  });
+
   it("解消された違反を newlyResolved に入れる", () => {
     const before = [
       new ConstraintViolation({

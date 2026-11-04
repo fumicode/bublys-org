@@ -405,6 +405,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "summary",
           "type": "string",
           "optional": true
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "optional": true
         }
       ],
       "getters": [
@@ -414,6 +419,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "days",
         "message",
         "summary",
+        "amount",
         "key"
       ],
       "methods": [

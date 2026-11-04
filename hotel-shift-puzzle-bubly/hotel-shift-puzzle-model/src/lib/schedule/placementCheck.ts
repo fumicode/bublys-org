@@ -3,7 +3,8 @@
  *
  * 自動シフトの各ステップが「置いてよいか」を判定する唯一の入口。
  * 考え方は候補集合（cellCandidates.ts の evaluateCellCandidates）と同じで、置く前と後の違反を
- * 同一性キー（violationIdentityKey）で比べ、後にだけあるものが1つでもあれば「新しい違反」。
+ * 同一性キー（violationIdentityKey）で比べ、後にだけあるもの、または同じ違反の量（amount）が
+ * 増えたものが1つでもあれば「新しい違反」（ConstraintDelta の isWorse と同じ判定）。
  * だから**自動シフトが置けるのは、候補集合に載る値だけ**になる。
  *
  * 制約の中身は見ない（check() と scope しか使わない）。遅番明けのような制約も、
@@ -20,11 +21,11 @@
  * 前後どちらにも同じだけ現れるので、差分（新しい違反）には影響しない。
  * 判定は、絞った範囲の割当の中身ごとにキャッシュする（1人置いても、別の人の判定は使い回せる）。
  *
- * 既知の限界（候補集合と同じ）: すでにある違反と同じキーのまま**悪化**する手は、
- * 新しい違反とは見なさない（例：すでに休み上限を超えている日にさらに休みを置く）。
+ * 同じ違反のまま悪化する手も見つける（例：すでに休み上限を超えている日にさらに休みを置く
+ * ＝同じ違反のまま、超えた人数が増える）。
  */
 import { MonthlyStaffSchedule, shiftCellKey, type ShiftCell } from "./MonthlyStaffSchedule.js";
-import { violationIdentityKey } from "./ConstraintDelta.js";
+import { isWorse, violationIdentityKey } from "./ConstraintDelta.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import type { WorkingDay } from "./WorkingDay.js";
 
@@ -71,12 +72,12 @@ const project = (
   return new MonthlyStaffSchedule({ ...schedule.state, assignments });
 };
 
-/** 勤務表の違反を同一性キーの集合にする（候補集合の差分と同じキー） */
-export const violationKeys = (
+/** 勤務表の違反を「同一性キー → 量」にする（候補集合の差分と同じキー） */
+const violationAmounts = (
   schedule: MonthlyStaffSchedule,
   constraints: ScheduleConstraint[]
-): Set<string> =>
-  new Set(schedule.checkConstraints(constraints).map(violationIdentityKey));
+): Map<string, number> =>
+  new Map(schedule.checkConstraints(constraints).map((v) => [violationIdentityKey(v), v.amount]));
 
 /**
  * 判定のキャッシュ。
@@ -89,8 +90,8 @@ export const violationKeys = (
  * どちらも不変のインスタンスごとに分ける。
  */
 type Memo = {
-  /** 絞った割当の中身 → 置く前の違反キー */
-  before: Map<string, Set<string>>;
+  /** 絞った割当の中身 → 置く前の違反（同一性キー → 量） */
+  before: Map<string, Map<string, number>>;
   /** 絞った割当の中身＋置くセルと値 → 新しい違反が出るか */
   answer: Map<string, boolean>;
 };
@@ -150,11 +151,14 @@ export function introducesViolation(
     if (introduces === undefined) {
       let before = memo.before.get(signature);
       if (!before) {
-        before = violationKeys(projected, group);
+        before = violationAmounts(projected, group);
         memo.before.set(signature, before);
       }
-      const after = violationKeys(projected.setCell(staffId, day, cell), group);
-      introduces = [...after].some((key) => !before?.has(key));
+      const beforeAmounts = before;
+      introduces = projected
+        .setCell(staffId, day, cell)
+        .checkConstraints(group)
+        .some((v) => isWorse(v, beforeAmounts));
       memo.answer.set(answerKey, introduces);
     }
     if (introduces) return true;

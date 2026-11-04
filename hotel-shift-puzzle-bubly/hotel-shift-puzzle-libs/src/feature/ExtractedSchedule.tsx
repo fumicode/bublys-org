@@ -95,7 +95,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
   const priorityReport = constraints?.useReportPriority ? linkedReport : undefined;
   // 自動シフトが置く休みの目標（月◯日・1日◯人まで）。自動シフトを呼ぶところは必ず丸ごと渡す。
   const limits = useMemo(() => autoShiftLimitsOf(constraints), [constraints]);
-  const { minDayOff, maxDayOffPerDay: maxPerDay } = limits;
+  const { minDayOff } = limits;
   const allLeaderRules = useMemo(() => constraints?.leaderRules ?? [], [constraints]);
   const relevantRules = useMemo(
     () =>
@@ -234,7 +234,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
       );
       s = runOn(
         s,
-        makeMinDayOffStep(minDayOff, { maxPerDay, phase })
+        makeMinDayOffStep(minDayOff, { phase })
       );
       return s;
     };
@@ -287,7 +287,7 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
         <button
           type="button"
           className="e-candidate-run"
-          title={`この ${subset.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${maxPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
+          title={`この ${subset.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${limits.maxDayOffPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
           onClick={handleGenerateCandidates}
         >
           🌱 完成案を{DAY_OFF_CANDIDATE_COUNT}つ世界線に作る

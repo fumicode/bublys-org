@@ -29,6 +29,11 @@ export type ConstraintViolationState = {
    * どうなっているのか（不在・上限超え…）が読める言葉にする。省略時は message を使う。
    */
   summary?: string;
+  /**
+   * この違反の量（連勤なら上限を超えた日数、休み上限なら超えた人数…）。省略時は 1。
+   * 同じ違反（同じ同一性キー）の量が増えたら「悪化」とみなす（ConstraintDelta）。
+   */
+  amount?: number;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -39,6 +44,7 @@ export type ConstraintViolationPlain = {
   dayKeys: string[];
   message: string;
   summary?: string;
+  amount?: number;
 };
 
 export class ConstraintViolation {
@@ -72,6 +78,11 @@ export class ConstraintViolation {
     return this.state.summary ?? this.state.message;
   }
 
+  /** この違反の量（省略時は 1） */
+  get amount(): number {
+    return this.state.amount ?? 1;
+  }
+
   /** 一意キー（バブルのパラメータ等に使える）。範囲の先頭・末尾で表す */
   get key(): string {
     const first = this.state.days[0]?.key ?? "";
@@ -96,6 +107,7 @@ export class ConstraintViolation {
       dayKeys: this.state.days.map((d) => d.key),
       message: this.state.message,
       ...(this.state.summary !== undefined ? { summary: this.state.summary } : {}),
+      ...(this.state.amount !== undefined ? { amount: this.state.amount } : {}),
     };
   }
 
@@ -106,6 +118,7 @@ export class ConstraintViolation {
       days: plain.dayKeys.map((k) => WorkingDay.fromKey(k)),
       message: plain.message,
       summary: plain.summary,
+      amount: plain.amount,
     });
   }
 }

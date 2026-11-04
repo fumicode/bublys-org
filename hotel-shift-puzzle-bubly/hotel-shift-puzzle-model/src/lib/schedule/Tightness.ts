@@ -6,8 +6,10 @@
  * どの段階をどれだけ重く見るかは、制約レシピの優先度で現場ごとに決める（#229）。
  *
  * 単位は制約の「段階」ごとに1つ。例：連勤（上限 N）なら
- *   上限ちょうど（N日・守っている）／1日超え（N+1日・違反）／2日以上超え（N+2日以上・違反）
- * 同じ段階の1件は同じ意味なので、件数で数えてよい。
+ *   上限ちょうど（件・守っている）／上限超え（超えた日数・違反）
+ * 量は件数でも、超えた分・足りない分でもよい（単位が何を数えるかを決める）。
+ * いまは段階を細かく分けず、量で数える（6連勤と7連勤の重さの違いは、超えた日数の差として出る）。
+ * 1日超えと2日以上超えのように意味の違う段階に分けたくなったら、単位を分けて足す。
  *
  * **違反かどうかは単位が決める。** 量そのものには印を持たない（持つと単位と量の2か所に真実ができる）。
  * 向きは「大きいほど悪い」にそろえる（余裕のように逆向きの量は持たない）。
@@ -69,25 +71,28 @@ export class TightnessAmount {
   }
 }
 
+/** 測った1件ぶんの量：どの単位に、いくつ */
+export type Tally = { unit: TightnessUnit; amount: number };
+
 /**
- * 1件ごとの測った値を段階に振り分け、単位ごとの件数にする。
- * 宣言した単位はすべて返す（0件の段階も「0件」として比べられるように）。
+ * 1件ごとの測った値を単位に振り分け、単位ごとに量を合計する。
+ * 宣言した単位はすべて返す（0 の単位も「0」として比べられるように）。
  */
-export const countByUnit = <M>(
+export const sumByUnit = <M>(
   units: readonly TightnessUnit[],
   measurements: readonly M[],
-  unitOf: (measurement: M) => TightnessUnit | undefined
+  tallyOf: (measurement: M) => Tally | undefined
 ): TightnessAmount[] => {
-  const counts = new Map(units.map((u) => [u.key, 0]));
+  const sums = new Map(units.map((u) => [u.key, 0]));
   for (const m of measurements) {
-    const unit = unitOf(m);
-    if (!unit) continue;
-    if (!counts.has(unit.key)) {
-      throw new Error(`宣言していない単位: ${unit.key}`);
+    const tally = tallyOf(m);
+    if (!tally) continue;
+    if (!sums.has(tally.unit.key)) {
+      throw new Error(`宣言していない単位: ${tally.unit.key}`);
     }
-    counts.set(unit.key, (counts.get(unit.key) ?? 0) + 1);
+    sums.set(tally.unit.key, (sums.get(tally.unit.key) ?? 0) + tally.amount);
   }
-  return units.map((unit) => new TightnessAmount({ amount: counts.get(unit.key) ?? 0, unit }));
+  return units.map((unit) => new TightnessAmount({ amount: sums.get(unit.key) ?? 0, unit }));
 };
 
 /**

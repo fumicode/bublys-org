@@ -14,47 +14,38 @@
  *     違反の範囲は今月側の日だけ（前月は確定済みで、ここからは直せない）。
  *     前月の中だけで終わった連勤は前月の話なので、今月には出さない。
  *
- * 段階（#229。上限 N からの相対なので、N を変えても現場の価値観の並びは崩れない）:
- *   上限ちょうど（N日・守っている）／1日超え（N+1日・違反）／2日以上超え（N+2日以上・違反）
- * 連勤を1つずつ測り（上限からの距離）、段階に振り分ける。check() も同じ振り分けから導く
- * （違反の段階に入った連勤だけが違反）。
+ * きつさ（#229。上限 N からの相対）: 上限ちょうど（件・守っている）／上限超え（超えた日数・違反）。
+ * 連勤を1つずつ測り（上限からの距離）、単位に振り分ける。check() も同じ振り分けから導く
+ * （違反の単位に入った連勤だけが違反で、違反の量は超えた日数）。
  */
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
 import { WorkingDay } from "./WorkingDay.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
-import { TightnessUnit, countByUnit, type TightnessAmount } from "./Tightness.js";
+import { TightnessUnit, sumByUnit, type Tally, type TightnessAmount } from "./Tightness.js";
 
 export const MAX_CONSECUTIVE_WORKDAYS = "max-consecutive-workdays";
 
-/** 連勤が上限ちょうど（守っているが、きつい） */
+/** 連勤が上限ちょうど（守っているが、きつい）。件数で数える */
 export const RUN_AT_LIMIT = new TightnessUnit({
   key: "run-at-limit",
-  label: "連勤上限ちょうど",
+  label: "連勤上限ちょうど（件）",
   violating: false,
 });
-/** 連勤が上限を1日超えた */
-export const RUN_OVER_1 = new TightnessUnit({
-  key: "run-over-1",
-  label: "連勤1日超え",
-  violating: true,
-});
-/** 連勤が上限を2日以上超えた */
-export const RUN_OVER_2_PLUS = new TightnessUnit({
-  key: "run-over-2-plus",
-  label: "連勤2日以上超え",
+/** 連勤が上限を超えた。超えた日数で数える */
+export const RUN_OVER = new TightnessUnit({
+  key: "run-over",
+  label: "連勤の上限超え（日）",
   violating: true,
 });
 
-/** 連勤の上限からの距離（連勤の日数 - 上限）→ 段階。上限より短い連勤は数えない */
-export const runTightnessOf = (distance: number): TightnessUnit | undefined =>
+/** 連勤の上限からの距離（連勤の日数 - 上限）→ 量。上限より短い連勤は数えない */
+export const runTallyOf = (distance: number): Tally | undefined =>
   distance < 0
     ? undefined
     : distance === 0
-      ? RUN_AT_LIMIT
-      : distance === 1
-        ? RUN_OVER_1
-        : RUN_OVER_2_PLUS;
+      ? { unit: RUN_AT_LIMIT, amount: 1 }
+      : { unit: RUN_OVER, amount: distance };
 
 /** 測った1件＝1つの連勤（今月側の日と、前月から持ち越した日数） */
 type Run = { staffId: string; days: WorkingDay[]; carried: number };
@@ -65,7 +56,7 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   /** 対象スタッフの日列だけを見る（他スタッフには影響しない） */
   readonly scope = "staff" as const;
 
-  readonly tightnessUnits = [RUN_AT_LIMIT, RUN_OVER_1, RUN_OVER_2_PLUS] as const;
+  readonly tightnessUnits = [RUN_AT_LIMIT, RUN_OVER] as const;
 
   /** @param maxConsecutive 許容する連勤日数の上限（既定 5） */
   constructor(readonly maxConsecutive = 5) {}
@@ -75,17 +66,20 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
-    return this.runs(schedule)
-      .filter((run) => this.unitOf(run)?.isViolating)
-      .map((run) => this.toViolation(run.staffId, run.days, run.carried));
+    return this.runs(schedule).flatMap((run) => {
+      const tally = this.tallyOf(run);
+      return tally?.unit.isViolating
+        ? [this.toViolation(run.staffId, run.days, run.carried, tally.amount)]
+        : [];
+    });
   }
 
   tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
-    return countByUnit(this.tightnessUnits, this.runs(schedule), (run) => this.unitOf(run));
+    return sumByUnit(this.tightnessUnits, this.runs(schedule), (run) => this.tallyOf(run));
   }
 
-  private unitOf(run: Run): TightnessUnit | undefined {
-    return runTightnessOf(run.carried + run.days.length - this.maxConsecutive);
+  private tallyOf(run: Run): Tally | undefined {
+    return runTallyOf(run.carried + run.days.length - this.maxConsecutive);
   }
 
   /** スタッフごとに、今月の日にかかる連勤をすべて測る（前月から続く分は carried に数える） */
@@ -119,13 +113,15 @@ export class MaxConsecutiveWorkdaysConstraint implements ScheduleConstraint {
   private toViolation(
     staffId: string,
     run: WorkingDay[],
-    carried: number
+    carried: number,
+    amount: number
   ): ConstraintViolation {
     const total = carried + run.length;
     return new ConstraintViolation({
       constraintType: this.type,
       staffId,
       days: run,
+      amount,
       message:
         carried > 0
           ? `前月から続いて${total}連勤（上限${this.maxConsecutive}連勤）`

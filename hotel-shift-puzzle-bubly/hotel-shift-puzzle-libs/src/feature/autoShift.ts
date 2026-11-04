@@ -113,16 +113,20 @@ export type AutoShiftParams = {
    * （先に需要で埋め切ると空きセルが無くなって月◯日休めなくなるため）。
    */
   minDayOff?: number;
-  /** 1日に休んでよい人数の上限（休みを入れるときに超えない） */
-  maxDayOffPerDay?: number;
   /** 全体の連勤上限。連休型の人の出勤の塊をこの長さ（目標があれば小さい方）で区切る */
   maxConsecutiveWorkdays?: number;
 };
 
 /** 自動シフトが目指す休みの置き方（制約セットから取り出したもの） */
 export type AutoShiftLimits = Required<
-  Pick<AutoShiftParams, "minDayOff" | "maxDayOffPerDay" | "maxConsecutiveWorkdays">
->;
+  Pick<AutoShiftParams, "minDayOff" | "maxConsecutiveWorkdays">
+> & {
+  /**
+   * 1日に休んでよい人数の上限。**自動シフトはこれを読まない**（守るのは休み上限の制約。#229）。
+   * 休みの理由の説明や、ボタンの説明文に出すためだけに持つ。
+   */
+  maxDayOffPerDay: number;
+};
 
 /**
  * 制約セットから、自動シフトが「何日休みを置くか・1日何人まで休ませるか」を取り出す。
@@ -153,7 +157,6 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
     staffGroup,
     constraints,
     minDayOff,
-    maxDayOffPerDay,
     maxConsecutiveWorkdays,
   } = params;
 
@@ -172,7 +175,6 @@ const buildContext = (params: AutoShiftParams): AutoShiftContext => {
       decodeWishForStaff(wishByStaff.get(staffId), day, shiftIdByName),
     constraints,
     minDayOff,
-    maxDayOffPerDay,
     maxConsecutiveWorkdays,
     dayOffStyleOf: dayOffStyleResolver(staffList, staffGroup),
   };

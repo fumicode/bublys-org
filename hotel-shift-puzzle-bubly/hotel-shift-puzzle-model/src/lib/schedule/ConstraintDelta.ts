@@ -14,6 +14,18 @@ export type ConstraintDeltaState = {
   newlyResolved: ConstraintViolation[];
 };
 
+/**
+ * 手を打ったあとの違反が、前より悪いか。**新しく出た違反か、同じ違反の量が増えたもの**を悪いとする
+ * （休み上限を超えた日にさらに休みを置く＝同じ違反のまま超えた人数が増える、を見落とさない）。
+ */
+export function isWorse(
+  after: ConstraintViolation,
+  beforeAmounts: ReadonlyMap<string, number>
+): boolean {
+  const before = beforeAmounts.get(violationIdentityKey(after));
+  return before === undefined || after.amount > before;
+}
+
 /** 違反の同一性キー（差分比較用） */
 export function violationIdentityKey(violation: ConstraintViolation): string {
   const dayKeys = violation.days.map((d) => d.key);
@@ -30,10 +42,10 @@ export class ConstraintDelta {
     before: ConstraintViolation[],
     after: ConstraintViolation[]
   ): ConstraintDelta {
-    const beforeKeys = new Set(before.map(violationIdentityKey));
+    const beforeAmounts = new Map(before.map((v) => [violationIdentityKey(v), v.amount]));
     const afterKeys = new Set(after.map(violationIdentityKey));
     return new ConstraintDelta({
-      newlyViolated: after.filter((v) => !beforeKeys.has(violationIdentityKey(v))),
+      newlyViolated: after.filter((v) => isWorse(v, beforeAmounts)),
       newlyResolved: before.filter((v) => !afterKeys.has(violationIdentityKey(v))),
     });
   }

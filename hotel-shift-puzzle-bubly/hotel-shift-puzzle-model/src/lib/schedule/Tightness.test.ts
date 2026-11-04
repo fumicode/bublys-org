@@ -1,4 +1,4 @@
-import { TightnessAmount, TightnessUnit, countByUnit } from './Tightness.js';
+import { TightnessAmount, TightnessUnit, sumByUnit } from './Tightness.js';
 
 describe('TightnessAmount（単位つきのきつさ）', () => {
   const A = new TightnessUnit({ key: 'a', label: 'A', violating: true });
@@ -24,10 +24,10 @@ describe('TightnessAmount（単位つきのきつさ）', () => {
     expect(amount(1, A).compare(amount(1, A2))).toBe(0);
   });
 
-  test('countByUnit は宣言した単位をすべて返し、宣言していない単位は例外', () => {
-    expect(countByUnit([A, B], [1, 2, 3], (n) => (n === 2 ? B : A)).map((a) => a.amount)).toEqual([
-      2, 1,
-    ]);
-    expect(() => countByUnit([A], [1], () => B)).toThrow();
+  test('sumByUnit は単位ごとに量を合計し、宣言した単位をすべて返す（0 も）。宣言していない単位は例外', () => {
+    const tally = (n: number) => (n === 2 ? { unit: B, amount: 5 } : { unit: A, amount: n });
+    expect(sumByUnit([A, B], [1, 2, 3], tally).map((a) => a.amount)).toEqual([4, 5]);
+    expect(sumByUnit([A, B], [], tally).map((a) => a.amount)).toEqual([0, 0]);
+    expect(() => sumByUnit([A], [1], () => ({ unit: B, amount: 1 }))).toThrow();
   });
 });

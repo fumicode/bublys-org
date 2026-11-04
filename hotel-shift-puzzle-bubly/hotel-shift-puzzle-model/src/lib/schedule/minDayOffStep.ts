@@ -38,14 +38,15 @@
  *   - 前月末日が単発の休みなら、連休型の人は1日目を相方にできる（前月末からの連休）
  *
  * オプション:
- *   - maxPerDay : 1日に休んでよい人数の上限。これに達している日には休みを入れない（崩さない）。
  *   - phase     : 区間を割る位置のズラし。スタッフごとにも (phase + 並び順) でずらすため、
  *                 phase を変えると別の有効解になる（複数案＝世界線の生成に使う）。
  *
  * 大原則は他ステップと同じ:
  *   - 人間が入力済みのセル（出勤・休み）は上書きしない（未定セルのみ触る）
  *   - 出勤したい希望（work 指定）の日は休みにしない
- *   - 置いても勤務表の制約に新しい違反が出ない日にだけ休みを置く（canPlace）
+ *   - 置いても勤務表の制約に新しい違反が出ない日にだけ休みを置く（canPlace）。
+ *     1日の休み上限もここで守る（休み上限の制約。上限を超えた日にさらに置くのも、超えた人数が
+ *     増える＝悪化として止まる）。以前あった maxPerDay の直接判定は持たない（判断が2箇所になる。#229）
  *
  * 純粋・不変。乱数は使わず、phase で決定的に解を変える。
  */
@@ -59,8 +60,6 @@ import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { DayOffStyle } from "../staff/DayOffStyle.js";
 
 export type MinDayOffOptions = {
-  /** 1日に休んでよい人数の上限（未指定なら無制限） */
-  maxPerDay?: number;
   /** 区間を割る位置のズラし（複数案の生成に使う。既定 0） */
   phase?: number;
 };
@@ -77,7 +76,7 @@ export function placeMinDayOffs(
   minDayOff: number,
   opts: MinDayOffOptions = {}
 ): { schedule: MonthlyStaffSchedule; assigned: number } {
-  const { maxPerDay, phase = 0 } = opts;
+  const { phase = 0 } = opts;
   const days = schedule.workingDays();
   let result = schedule;
   let assigned = 0;
@@ -119,15 +118,14 @@ export function placeMinDayOffs(
       return out;
     };
 
-    // 休みを入れられる = 未定 かつ 出勤希望でない かつ maxPerDay 未満 かつ
-    // 勤務表の制約に新しい違反が出ない（休み×の希望など）
+    // 休みを入れられる = 未定 かつ 出勤希望でない かつ
+    // 勤務表の制約に新しい違反が出ない（休み×の希望・1日の休み上限など）
     const eligible = (idx: number): boolean => {
       const d = days[idx];
       if (!d) return false;
       return (
         result.isUndecided(staffId, d) &&
         ctx.preferenceOf(staffId, d).kind !== "work" &&
-        (maxPerDay === undefined || result.countDayOffOn(d) < maxPerDay) &&
         canPlace(ctx, result, staffId, d, { kind: "day-off" })
       );
     };
@@ -167,7 +165,7 @@ export function placeMinDayOffs(
     // 区間 [s, e] の中央を割る（最長の連勤を半分にして最大連勤を最小化する）。案ごとの差は
     // 中央から ±1 の小さなズラしに留める（端まで飛ばすと区間が偏って長い連勤が残るため）。
     // ズラし量は (phase + 並び順) から {-1,0,+1} を作り、案の違い＋スタッフ間の分散に使う。
-    // 中央が休めない日（出勤希望・確定・maxPerDay 上限）なら、中央の近い順に外へ探す。
+    // 中央が休めない日（出勤希望・確定・1日の休み上限）なら、中央の近い順に外へ探す。
     //
     // ただし割った両側のどちらかが連勤上限を超える日は、両側が上限以内に収まる日より後に回す。
     // 確定した出勤が偏っていると、真ん中に近い日で割っても片側に上限超えが残り、休みを
@@ -312,23 +310,19 @@ export function makeMinDayOffStep(
   minDayOff: number,
   opts: MinDayOffOptions = {}
 ): AutoShiftStep {
-  const { maxPerDay, phase = 0 } = opts;
+  const { phase = 0 } = opts;
   return {
     key: phase === 0 ? `min-day-off:${minDayOff}` : `min-day-off:${minDayOff}:p${phase}`,
     label: `月${minDayOff}日休む`,
     grantsDayOffInStaffOrder: true,
-    description: `各スタッフが月に最低${minDayOff}日休めるよう、足りない分だけ空きセルに休みを入れます${
-      maxPerDay !== undefined ? `（1日${maxPerDay}人を超えない範囲で）` : ""
-    }。連勤を作らないよう、休みでない日が一番長く続く区間から順に休みを割り込みます（人間入力・出勤希望は尊重）。`,
+    description: `各スタッフが月に最低${minDayOff}日休めるよう、足りない分だけ空きセルに休みを入れます（勤務表の制約に反しない日だけ）。連勤を作らないよう、休みでない日が一番長く続く区間から順に休みを割り込みます（人間入力・出勤希望は尊重）。`,
 
     run(schedule: MonthlyStaffSchedule, ctx: AutoShiftContext): AutoShiftStepResult {
       const { schedule: result, assigned } = placeMinDayOffs(schedule, ctx, minDayOff, opts);
       return {
         schedule: result,
         assigned,
-        message: `休みを ${assigned}件入れました（目標: 各自月${minDayOff}日${
-          maxPerDay !== undefined ? ` / 1日${maxPerDay}人まで` : ""
-        }）。`,
+        message: `休みを ${assigned}件入れました（目標: 各自月${minDayOff}日）。`,
       };
     },
   };

@@ -47,9 +47,7 @@ export const fillDemandBalancedStep: AutoShiftStep = {
     // 需要で埋め切ると空きセルが無くなって月◯日休めなくなるので、先に休みを確保しておく。
     let dayOffAssigned = 0;
     if (ctx.minDayOff !== undefined && ctx.minDayOff > 0) {
-      const placed = placeMinDayOffs(result, ctx, ctx.minDayOff, {
-        maxPerDay: ctx.maxDayOffPerDay,
-      });
+      const placed = placeMinDayOffs(result, ctx, ctx.minDayOff);
       result = placed.schedule;
       dayOffAssigned = placed.assigned;
     }
