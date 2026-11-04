@@ -25,6 +25,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": false
         },
         {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "check",
           "params": [
             "schedule"
@@ -688,6 +697,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "ConstraintViolation[]",
           "isStatic": false,
           "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
+          "isStatic": false,
+          "returnsSelf": false
         }
       ]
     },
@@ -711,6 +729,15 @@ export const MODEL_GRAPH: ModelGraph = {
             "schedule"
           ],
           "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
           "isStatic": false,
           "returnsSelf": false
         }
@@ -1723,6 +1750,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": false
         },
         {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "check",
           "params": [
             "schedule"
@@ -1807,6 +1843,15 @@ export const MODEL_GRAPH: ModelGraph = {
             "schedule"
           ],
           "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
           "isStatic": false,
           "returnsSelf": false
         }

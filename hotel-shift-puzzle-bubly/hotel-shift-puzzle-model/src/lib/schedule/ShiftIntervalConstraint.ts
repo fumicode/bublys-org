@@ -25,6 +25,7 @@ import { ConstraintViolation } from "./ConstraintViolation.js";
 import { ShiftIntervalRule } from "./ShiftIntervalRule.js";
 import type { WorkingDay } from "./WorkingDay.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { singleStageUnit, violationCount, type TightnessAmount, type TightnessUnit } from "./Tightness.js";
 
 /** 制約種別の接頭辞。ルールキーを付けて "shift-interval:late" のように一意にする。 */
 export const SHIFT_INTERVAL_CONSTRAINT = "shift-interval";
@@ -37,6 +38,8 @@ export const isShiftIntervalConstraintType = (type: string): boolean =>
 export class ShiftIntervalConstraint implements ScheduleConstraint {
   readonly type: string;
   readonly label: string;
+  /** 段階は1つ（破ったかどうか。#229） */
+  readonly tightnessUnits: readonly TightnessUnit[];
   /** 対象スタッフの前後の日だけを見る（他スタッフには影響しない） */
   readonly scope = "staff" as const;
 
@@ -57,6 +60,7 @@ export class ShiftIntervalConstraint implements ScheduleConstraint {
   ) {
     this.type = `${SHIFT_INTERVAL_CONSTRAINT}:${rule.key}`;
     this.label = rule.label;
+    this.tightnessUnits = [singleStageUnit(this.type, rule.label)];
     this.shiftNameById = new Map();
     for (const name of [rule.fromShiftName, ...rule.forbiddenNextShiftNames]) {
       for (const id of shiftIdsOf(name)) this.shiftNameById.set(id, name);
@@ -65,6 +69,10 @@ export class ShiftIntervalConstraint implements ScheduleConstraint {
 
   describe(): string {
     return this.rule.describe();
+  }
+
+  tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
+    return violationCount(this.tightnessUnits[0], this.check(schedule));
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {

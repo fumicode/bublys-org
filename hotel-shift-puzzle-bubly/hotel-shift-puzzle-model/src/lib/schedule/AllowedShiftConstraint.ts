@@ -14,6 +14,7 @@
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { singleStageUnit, violationCount, type TightnessAmount } from "./Tightness.js";
 import type { WorkingStaffGroup } from "../staff/WorkingStaffGroup.js";
 
 export const ALLOWED_SHIFT_CONSTRAINT = "allowed-shift";
@@ -21,6 +22,8 @@ export const ALLOWED_SHIFT_CONSTRAINT = "allowed-shift";
 export class AllowedShiftConstraint implements ScheduleConstraint {
   readonly type = ALLOWED_SHIFT_CONSTRAINT;
   readonly label = "可能勤務帯";
+  /** 段階は1つ（破ったかどうか。#229） */
+  readonly tightnessUnits = [singleStageUnit(ALLOWED_SHIFT_CONSTRAINT, "入れない勤務帯")] as const;
   /** 対象セル（そのスタッフ・その日）だけを見る（他のどのセルにも影響しない） */
   readonly scope = "cell" as const;
 
@@ -35,6 +38,10 @@ export class AllowedShiftConstraint implements ScheduleConstraint {
 
   describe(): string {
     return "入れない勤務帯には入れない";
+  }
+
+  tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
+    return violationCount(this.tightnessUnits[0], this.check(schedule));
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {

@@ -89,3 +89,16 @@ export const countByUnit = <M>(
   }
   return units.map((unit) => new TightnessAmount({ amount: counts.get(unit.key) ?? 0, unit }));
 };
+
+/**
+ * 段階が1つ（破ったかどうかだけ）の制約の単位。key は制約の type（制約ごとに1つ）。
+ * 遅番明け・可能勤務帯・希望のように、破り方に重さの違いが無い制約が使う。
+ */
+export const singleStageUnit = (type: string, label: string): TightnessUnit =>
+  new TightnessUnit({ key: type, label, violating: true });
+
+/** 段階が1つの制約のきつさ＝違反の件数 */
+export const violationCount = (
+  unit: TightnessUnit,
+  violations: readonly unknown[]
+): TightnessAmount[] => [new TightnessAmount({ amount: violations.length, unit })];

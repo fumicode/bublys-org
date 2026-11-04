@@ -18,7 +18,10 @@ import {
   StaffMonthlyShiftWish,
   ConstraintViolation,
   WorkingDay,
+  singleStageUnit,
+  violationCount,
   type ScheduleConstraint,
+  type TightnessAmount,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   DAY_OFF_WISH,
@@ -79,6 +82,8 @@ export function wishMismatchFor(
 export class ShiftWishConstraint implements ScheduleConstraint {
   readonly type = SHIFT_WISH_MISMATCH;
   readonly label = "希望";
+  /** 段階は1つ（希望と食い違ったかどうか。#229） */
+  readonly tightnessUnits = [singleStageUnit(SHIFT_WISH_MISMATCH, "希望と食い違う")] as const;
   /** 対象セル（そのスタッフ・その日）だけを見る（他のどのセルにも影響しない） */
   readonly scope = "cell" as const;
 
@@ -86,6 +91,10 @@ export class ShiftWishConstraint implements ScheduleConstraint {
 
   describe(): string {
     return "できるだけシフト希望に沿う";
+  }
+
+  tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
+    return violationCount(this.tightnessUnits[0], this.check(schedule));
   }
 
   check(schedule: MonthlyStaffSchedule): ConstraintViolation[] {
