@@ -9,22 +9,22 @@
  * 時間移動しても「いまの確定版」は変わらない。
  */
 import { useMemo } from "react";
-import type { ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
+import type { ConfirmedSchedule } from "@bublys-org/hotel-shift-puzzle-model";
 import { useObjects } from "../objects/repository.js";
-import { SCHEDULE_REPORT_TYPE } from "../objects/hotelObjects.js";
+import { CONFIRMED_SCHEDULE_TYPE } from "../objects/hotelObjects.js";
 
 /** その勤務表が持っている確定版（無ければ undefined。純粋） */
 export function confirmedVersionOf(
-  reports: readonly ScheduleReport[],
+  reports: readonly ConfirmedSchedule[],
   scheduleId: string | undefined
-): ScheduleReport | undefined {
+): ConfirmedSchedule | undefined {
   if (!scheduleId) return undefined;
   return reports.find((r) => r.scheduleId === scheduleId);
 }
 
 /** その勤務表が持っている確定版 */
-export function useConfirmedVersion(scheduleId: string | undefined): ScheduleReport | undefined {
-  const reports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+export function useConfirmedVersion(scheduleId: string | undefined): ConfirmedSchedule | undefined {
+  const reports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
   return useMemo(() => confirmedVersionOf(reports, scheduleId), [reports, scheduleId]);
 }
 

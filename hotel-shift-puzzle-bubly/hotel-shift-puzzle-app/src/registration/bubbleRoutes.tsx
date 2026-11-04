@@ -69,7 +69,7 @@ const StaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   );
 };
 
-// --- 勤務表から開いたスタッフ詳細バブル（その勤務表の参照レポートでの評価も出す） ---
+// --- 勤務表から開いたスタッフ詳細バブル（その勤務表の前月の振り返りも出す） ---
 const ScheduleStaffDetailBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { staffId, scheduleId } = bubble.params;
   return withObjects(
@@ -126,7 +126,6 @@ const ConstraintSetBubble: BubbleRoute["Component"] = () =>
   );
 
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
-// 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
 const ScheduleListBubble: BubbleRoute["Component"] = () =>
   withObjects(<ScheduleCollection />);
 
@@ -141,9 +140,8 @@ const createCandidatesWorker = () =>
   });
 
 // --- 月間スタッフ勤務表バブル（グリッド + 可能勤務帯 / 世界線 / 自動シフトへのリンク） ---
-// キセキの木と完成レポートは、それぞれ独立したボタンから勤務表バブルを opener にして
-// 別々に開く（bubble-ui は2つのバブルを連動して横並び配置するのが難しいため、
-// チェイン opener はやめてどちらも単独開きにしている）。
+// 世界線ビュー・キセキの木は、それぞれ独立したボタンから勤務表バブルを opener にして
+// 単独で開く。確定版の振り返りはバブルを持たず、勤務表の中に出る（#231）。
 const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
   const { openBubble, isOpen, bringToFront } = useContext(BubblesContext);
   const scheduleId = bubble.params.scheduleId;

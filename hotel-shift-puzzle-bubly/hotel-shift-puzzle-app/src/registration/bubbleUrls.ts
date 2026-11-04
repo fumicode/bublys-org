@@ -23,7 +23,7 @@ export const staffUrl = (staffId: string): string =>
 
 /**
  * 勤務表から開いたスタッフ詳細バブル。どの勤務表から開いたかを URL で持つので、
- * 詳細にその勤務表の参照レポートでの評価が出る（スタッフ一覧から開く staffUrl には出ない）。
+ * 詳細にその勤務表の前月の振り返りが出る（スタッフ一覧から開く staffUrl には出ない）。
  * 最後の区切りが staffId なので、ここからドラッグしてもスタッフとして落とせる。
  */
 export const scheduleStaffDetailUrl = (scheduleId: string, staffId: string): string =>

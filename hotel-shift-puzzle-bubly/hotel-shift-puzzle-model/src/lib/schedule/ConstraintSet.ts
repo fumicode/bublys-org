@@ -45,10 +45,13 @@ export type ConstraintSetState = {
    */
   shiftIntervalRules?: ShiftIntervalRule[];
   /**
-   * 前月の確定版から引き継いだ貢献度スコア（★）を、自動シフトで休みを割り当てる順（優先度）に
-   * 使うか。省略時 false。引き継ぎは勤務表を作るときに自動で起きるので、スコアまで黙って
-   * 効かないよう既定はオフ。これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は
+   * 前月の確定版から引き継いだ★を、自動シフトで休みを割り当てる順（優先度）に使うか。
+   * 省略時 false。引き継ぎは勤務表を作るときに自動で起きるので、★まで黙って効かないよう
+   * 既定はオフ。これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は
    * 引き継いでいる限り常に効く。
+   *
+   * ドメインでは useStarPriority と呼ぶが、キーは旧名のまま変えない（勤務表の世界線に載る
+   * 保存形なので、名前を変えると同じ中身でもハッシュが変わり、元の世界へ戻れなくなる）。
    */
   useReportPriority?: boolean;
 };
@@ -61,7 +64,7 @@ export type ConstraintSetPlain = Omit<
   leaderRules: ShiftLeaderRuleState[];
   shiftIntervalRules?: ShiftIntervalRuleState[];
   /**
-   * 旧形式：参照レポート（紐づけた完成レポートの ID）。読むときだけ受け付けて捨てる。
+   * 旧形式：参照レポート（紐づけた振り返りの ID）。読むときだけ受け付けて捨てる。
    * 前月の確定版は勤務表の店舗と年月から決まるので、紐づけを持たなくなった（#231）。
    */
   linkedReportId?: string;
@@ -114,8 +117,8 @@ export class ConstraintSet {
     return this.state.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS;
   }
 
-  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うか。既定 false。 */
-  get useReportPriority(): boolean {
+  /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うか。既定 false。 */
+  get useStarPriority(): boolean {
     return this.state.useReportPriority ?? false;
   }
 
@@ -193,9 +196,9 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, checkAllowedShift: check });
   }
 
-  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
-  withUseReportPriority(use: boolean): ConstraintSet {
-    if (use === this.useReportPriority) return this;
+  /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
+  withUseStarPriority(use: boolean): ConstraintSet {
+    if (use === this.useStarPriority) return this;
     return new ConstraintSet({ ...this.state, useReportPriority: use });
   }
 

@@ -101,14 +101,14 @@ describe('ConstraintSet の勤務間インターバル（main から合流した
     expect(copy.shiftIntervalRules).toHaveLength(1);
   });
 
-  test('参照レポートの貢献度スコアを優先度に使うかは既定でオフ。切り替えられ、保存形で残る', () => {
+  test('前月の確定版から引き継いだ★を優先度に使うかは既定でオフ。切り替えられ、保存形で残る', () => {
     const set = ConstraintSet.empty('s');
-    expect(set.useReportPriority).toBe(false);
+    expect(set.useStarPriority).toBe(false);
 
-    const on = set.withUseReportPriority(true);
-    expect(on.useReportPriority).toBe(true);
-    expect(set.useReportPriority).toBe(false); // 不変
-    expect(on.withUseReportPriority(true)).toBe(on);
-    expect(ConstraintSet.fromPlain(on.toPlain()).useReportPriority).toBe(true);
+    const on = set.withUseStarPriority(true);
+    expect(on.useStarPriority).toBe(true);
+    expect(set.useStarPriority).toBe(false); // 不変
+    expect(on.withUseStarPriority(true)).toBe(on);
+    expect(ConstraintSet.fromPlain(on.toPlain()).useStarPriority).toBe(true);
   });
 });

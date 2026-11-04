@@ -22,7 +22,7 @@
  *
  * 前月の確定版で未定のままのセルは記録しない（＝出勤していない扱い。月内の未定と同じ）。
  *
- * **引き継ぐのは末尾の勤務だけではない**（#231）。振り返りの貢献度スコア（★）も一緒に写し取る。
+ * **引き継ぐのは末尾の勤務だけではない**（#231）。振り返りの★も一緒に写し取る。
  * 「引き継いだものは今月の世界に焼き付き、前月の確定版を後から見に行かない」ので、
  * 前月の確定版が置き換わったり重みが変わったりしても、今月の休みの優先順は黙って変わらない。
  * 新しい確定版を取り込むかは人が決める（どの版から写したかは source が持つ）。
@@ -30,7 +30,7 @@
  * 不変。
  */
 import { WorkingDay, type WorkingDayState } from "./WorkingDay.js";
-import type { ConfirmedVersion, ContributionScoreEntry } from "./ScheduleReport.js";
+import type { ConfirmedVersion, StarEntry } from "./ConfirmedSchedule.js";
 // 型だけ（MonthlyStaffSchedule 側がこのクラスを値として使うので、実行時の循環を作らない）
 import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
@@ -108,33 +108,35 @@ export const precedingTailLengthFor = (maxConsecutiveWorkdays: number): number =
 export type PrecedingMonthTailState = {
   /** 写し元：前月の確定版の版（どの勤務表のどのノードか） */
   source: ConfirmedVersion;
-  /** 写し元が確定した時刻（epoch ms）。分からない古いレポートは undefined */
+  /** 写し元が確定した時刻（epoch ms）。分からない古い確定版は undefined */
   confirmedAt?: number;
   /** 写し取った前月の日（暦順。最後が前月の末日） */
   days: WorkingDay[];
   /** 写し取ったセル（出勤・休みのみ。未定は持たない） */
   cells: PrecedingCell[];
   /**
-   * 写し取った貢献度スコア（★）。undefined は★を写す前に引き継いだ古い形
+   * 写し取った★。undefined は★を写す前に引き継いだ古い形
    * （#231 より前。0点の人ばかりの [] とは違う）。
    */
-  contributionScores?: ContributionScoreEntry[];
+  stars?: StarEntry[];
 };
 
 export type PrecedingMonthTailPlain = {
   source?: ConfirmedVersion;
   /**
-   * 旧形式：写し元の完成レポートの ID（"勤務表ID:ノードID"）。読むときだけ受け付けて
+   * 旧形式：写し元の振り返りの ID（"勤務表ID:ノードID"）。読むときだけ受け付けて
    * source へ読み替える。書くことはない。
    */
   sourceReportId?: string;
   confirmedAt?: number;
   days: WorkingDayState[];
   cells: PrecedingCellPlain[];
-  contributionScores?: ContributionScoreEntry[];
+  stars?: StarEntry[];
+  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
+  contributionScores?: StarEntry[];
 };
 
-/** 旧形式の完成レポート ID（"勤務表ID:ノードID"）を版へ読み替える。最初のコロンで切る */
+/** 旧形式の振り返り ID（"勤務表ID:ノードID"）を版へ読み替える。最初のコロンで切る */
 const versionFromLegacyReportId = (reportId: string): ConfirmedVersion => {
   const i = reportId.indexOf(":");
   return i < 0
@@ -158,8 +160,8 @@ export class PrecedingMonthTail {
     schedule: MonthlyStaffSchedule;
     shiftNameOf: (shiftId: string) => string | undefined;
     length: number;
-    /** 前月の確定版の振り返りの貢献度スコア（★）。一緒に写し取る */
-    contributionScores: readonly ContributionScoreEntry[];
+    /** 前月の確定版の振り返りの★。一緒に写し取る */
+    stars: readonly StarEntry[];
   }): PrecedingMonthTail {
     const all = params.schedule.workingDays();
     const days = all.slice(Math.max(0, all.length - params.length));
@@ -180,7 +182,7 @@ export class PrecedingMonthTail {
       confirmedAt: params.confirmedAt,
       days,
       cells,
-      contributionScores: params.contributionScores.map((s) => ({ ...s })),
+      stars: params.stars.map((s) => ({ ...s })),
     });
   }
 
@@ -189,14 +191,14 @@ export class PrecedingMonthTail {
     return this.state.source;
   }
 
-  /** 写し取った貢献度スコア（★）。★を写す前の古い形なら undefined */
-  get contributionScores(): ContributionScoreEntry[] | undefined {
-    return this.state.contributionScores;
+  /** 写し取った★。★を写す前の古い形なら undefined */
+  get stars(): StarEntry[] | undefined {
+    return this.state.stars;
   }
 
-  /** そのスタッフの写し取った貢献度スコア（★）。行が無ければ 0 */
-  scoreOf(staffId: string): number {
-    return this.state.contributionScores?.find((s) => s.staffId === staffId)?.score ?? 0;
+  /** そのスタッフの写し取った★。行が無ければ 0 */
+  starsOf(staffId: string): number {
+    return this.state.stars?.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get confirmedAt(): number | undefined {
@@ -289,8 +291,8 @@ export class PrecedingMonthTail {
       cells: this.state.cells.map((c) => c.toPlain()),
     };
     if (this.state.confirmedAt !== undefined) plain.confirmedAt = this.state.confirmedAt;
-    if (this.state.contributionScores !== undefined) {
-      plain.contributionScores = this.state.contributionScores.map((s) => ({ ...s }));
+    if (this.state.stars !== undefined) {
+      plain.stars = this.state.stars.map((s) => ({ ...s }));
     }
     return plain;
   }
@@ -308,8 +310,8 @@ export class PrecedingMonthTail {
       confirmedAt: plain.confirmedAt,
       days: plain.days.map((d) => new WorkingDay({ ...d })),
       cells: plain.cells.map((c) => PrecedingCell.fromPlain(c)),
-      ...(plain.contributionScores
-        ? { contributionScores: plain.contributionScores.map((s) => ({ ...s })) }
+      ...((plain.stars ?? plain.contributionScores)
+        ? { stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })) }
         : {}),
     });
   }

@@ -14,7 +14,7 @@ import {
   DailyReservationInfo,
   StaffMonthlyShiftWish,
   ConstraintSet,
-  ScheduleReport,
+  ConfirmedSchedule,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
   makeResolveAmbiguousLeaderSlotsStep,
@@ -57,8 +57,8 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
-import { prioritizeStaffByReport } from "./reportPriority.js";
-import { buildScheduleReport } from "./buildScheduleReport.js";
+import { prioritizeStaffByStars } from "./starPriority.js";
+import { buildReview } from "./buildReview.js";
 import {
   captureInheritance,
   confirmedAtOf,
@@ -85,7 +85,7 @@ import {
   WORKING_STAFF_GROUP_TYPE,
   SCHEDULE_RESERVATION_INFO_TYPE,
   CONSTRAINT_SET_TYPE,
-  SCHEDULE_REPORT_TYPE,
+  CONFIRMED_SCHEDULE_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import {
@@ -138,7 +138,7 @@ type ScheduleGridProps = {
   ) => string;
   /**
    * スタッフ名から開くスタッフ詳細バブルの URL を作る（staffId を渡す）。この勤務表の文脈を
-   * 持った URL を渡すと、詳細にこの勤務表の参照レポートでの評価が出る。同上・app 層から注入。
+   * 持った URL を渡すと、詳細にこの勤務表の前月の振り返りが出る。同上・app 層から注入。
    */
   staffBubbleUrl?: (staffId: string) => string;
   /**
@@ -252,8 +252,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
   // 前月の確定版（同じ店舗の1か月前。店舗×月で1つなので選ぶ余地は無い）と、そこから引き継いだもの。
   // 引き継ぎ（月末の勤務と★）は勤務表に焼き付いている（precedingMonth.ts）。
-  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const reportRepo = useObjectRepo<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const allReports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const reportRepo = useObjectRepo<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
   const precedingConfirmed = useMemo(
     () => (schedule ? precedingConfirmedOf(allReports, schedule) : undefined),
     [allReports, schedule]
@@ -262,7 +262,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 作った後に前月の確定版が置き換わっても、あとから確定しても、勝手には取り込まない。知らせるだけ
   const pendingInheritance = pendingInheritanceOf(precedingConfirmed, inherited);
   // 引き継いだ★は、スイッチがオンのときだけ自動シフトの優先度（と★の表示）に使う
-  const priorityScores = constraints?.useReportPriority
+  const priorityStars = constraints?.useStarPriority
     ? inheritedScoresOf(inherited, precedingConfirmed)
     : undefined;
   const [importingInheritance, setImportingInheritance] = useState(false);
@@ -362,7 +362,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
    *
    * `constraints ?? new ConstraintSet(...)` と書いてはいけない。値が読めないのには
    * 「本当に無い」と「メモリ上の CAS から追い出された」の2つの理由があり、後者で空から
-   * 始めると責任者ルールと紐づけレポートを丸ごと消して保存してしまう。
+   * 始めると責任者ルールや上限を丸ごと消して保存してしまう。
    * 存在の判定は参照で行い、読み込み待ちのあいだは編集させない。
    */
   const constraintsBase = (): ConstraintSet | undefined => {
@@ -375,8 +375,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     return ConstraintSet.empty(scheduleId);
   };
 
-  // 参照レポートを紐づける（プルダウン・ドロップ・「取り込む」で同じ入口）。紐づけは1つなので置き換わる。
-  // 参照できないレポート（別の店舗・前月以外の月）は紐づけず、理由を伝える。
   // 前月の確定版を取り込む：確定版から引き継ぐもの（月末の勤務と★）を写し取り、勤務表に焼き付ける。
   // 確定版が読めなければ取り込まない（いまの引き継ぎのまま）。
   const handleImportInheritance = async () => {
@@ -590,12 +588,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   };
 
   // 自動シフト：操作対象（subset＝選択 or 全員）だけを staffList として渡す → ステップが subset 限定になる。
-  // 参照レポートの貢献度スコアが高い人を先に処理する（休みの取得優先権に効く。詳しくは reportPriority.ts）。
+  // 前月の確定版から引き継いだ★が高い人を先に処理する（休みの取得優先権に効く。詳しくは starPriority.ts）。
   // 並び順が効くステップ（grantsDayOffInStaffOrder）を実行したときだけ、優先したことを伝える。
   const handleRunStep = (step: AutoShiftStep) => {
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
       subsetStaff,
-      priorityScores
+      priorityStars
     );
     const result = runAutoShiftStep(step, {
       schedule,
@@ -616,10 +614,10 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
-    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
+    // 前月の確定版から引き継いだ★が高い人を先に処理する（handleRunStep と同じ優先度づけ）。
+    const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByStars(
       subsetStaff,
-      priorityScores
+      priorityStars
     );
     const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
       runAutoShiftStep(step, {
@@ -701,7 +699,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
   // 「確定する」: いま見ている版（apex）を、この店舗×月の確定版にする（#231）。
   // 確定版は店舗×月で1つなので、すでにあれば置き換わる（別の勤務表の版でも）。置き換えても
-  // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ScheduleReport.confirm）。
+  // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ConfirmedSchedule.confirm）。
   // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。
   // 確定したら、その場で振り返りの欄を開く（振り返りは独立したバブルを持たない）。
   //
@@ -713,7 +711,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     if (!scheduleId || !apex || !schedule) return;
 
     const currentConfirmed = allReports.find(
-      (r) => r.id === ScheduleReport.idFor(schedule.storeId, schedule.year, schedule.month)
+      (r) => r.id === ConfirmedSchedule.idFor(schedule.storeId, schedule.year, schedule.month)
     );
     if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
       setReviewOpen(true);
@@ -721,7 +719,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     }
 
     // ここは useObject の同期読みで済ませない。確定はスナップショットを永続化する操作で、
-    // 値がメモリから追い出されていると「無い」と区別がつかず、間違ったレポートを焼いてしまう。
+    // 値がメモリから追い出されていると「無い」と区別がつかず、間違った振り返りを焼いてしまう。
     // 永続ストアからの取得を待てる resolveObjectsAt を使う（読み対称化とは別の理由で必要）。
     // なお staffIds はこの世界の固定メンバー（＝確定時点の名簿）から取る。
     const resolved = await scope.resolveObjectsAt(apex.id);
@@ -743,14 +741,14 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       staffGroup,
     });
 
-    const draft = buildScheduleReport({
+    const draft = buildReview({
       schedule: apexSchedule,
       staffIds: staffList.map((s) => s.id),
       constraints: reportConstraints,
     });
 
     const confirmedAt = Date.now();
-    const report = ScheduleReport.confirm(
+    const report = ConfirmedSchedule.confirm(
       {
         scheduleId,
         worldLineNodeId: apex.id,
@@ -946,7 +944,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           groupByDepartment={groupByDept}
           workingStaffSlot={workingStaffSlot}
           leaderRules={leaderRules}
-          inheritedScores={priorityScores}
+          inheritedScores={priorityStars}
           staffUrlOf={staffBubbleUrl}
           selectedStaffIds={selectedStaffIds}
           onToggleStaffSelected={toggleStaffSelected}
@@ -1077,7 +1075,7 @@ const StyledContainer = styled.div`
   .e-header {
     display: flex;
     align-items: center;
-    flex-wrap: wrap; /* 参照レポートが増えても溢れず折り返す */
+    flex-wrap: wrap; /* 引き継ぎ欄が長くなっても溢れず折り返す */
     gap: 12px;
     margin-bottom: 8px;
 
@@ -1089,7 +1087,7 @@ const StyledContainer = styled.div`
       font-size: 0.8em;
       color: #777;
     }
-    /* 参照レポートのドロップ欄。見出しと1行に収めて縦を抑える */
+    /* 見出しの右の操作（引き継ぎ欄など）。見出しと1行に収めて縦を抑える */
     .e-actions {
       display: flex;
       align-items: center;

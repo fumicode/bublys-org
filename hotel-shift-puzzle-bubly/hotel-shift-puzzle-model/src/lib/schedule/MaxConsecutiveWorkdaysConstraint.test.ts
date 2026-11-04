@@ -185,7 +185,7 @@ describe('MaxConsecutiveWorkdaysConstraint：前月とつないだとき（月�
     may = may.assignDayOff(staffId, WorkingDay.of(YEAR, 5, 31 - workDays));
     return PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'n' },
-      contributionScores: [],
+      stars: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,

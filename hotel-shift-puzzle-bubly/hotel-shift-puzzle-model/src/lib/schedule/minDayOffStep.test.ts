@@ -160,7 +160,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
       may = may.assignDayOff('A', WorkingDay.of(2026, 5, 26));
       return PrecedingMonthTail.capture({
         source: { scheduleId: 'may', worldLineNodeId: 'n' },
-        contributionScores: [],
+        stars: [],
         schedule: may,
         shiftNameOf: () => '早番',
         length: 7,
@@ -333,7 +333,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
         if (opts.lastOff) may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
         return PrecedingMonthTail.capture({
           source: { scheduleId: 'may', worldLineNodeId: 'n' },
-          contributionScores: [],
+          stars: [],
           schedule: may,
           shiftNameOf: () => '早番',
           length: 7,

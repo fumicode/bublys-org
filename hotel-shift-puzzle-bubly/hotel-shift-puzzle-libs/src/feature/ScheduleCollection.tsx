@@ -5,7 +5,7 @@ import styled from "styled-components";
 import {
   MonthlyStaffSchedule,
   ConstraintSet,
-  ScheduleReport,
+  ConfirmedSchedule,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
@@ -18,7 +18,7 @@ import {
 } from "./precedingMonth.js";
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_REPORT_TYPE,
+  CONFIRMED_SCHEDULE_TYPE,
   CONSTRAINT_SET_TYPE,
   GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
@@ -27,7 +27,7 @@ export const ScheduleCollection: FC = () => {
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
-  const reports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const reports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
   // 新しい勤務表はグローバルの制約セットを写して始まるので、何日写すかもそれで決める
   const globalConstraints = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, GLOBAL_CONSTRAINT_SET_ID);
 

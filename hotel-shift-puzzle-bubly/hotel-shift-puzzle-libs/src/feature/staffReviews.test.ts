@@ -1,14 +1,14 @@
-import { ScheduleReport } from '@bublys-org/hotel-shift-puzzle-model';
-import { staffLinkedReportSummaries } from './staffLinkedReports.js';
+import { ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
+import { staffReviewSummaries } from './staffReviews.js';
 
-describe('staffLinkedReportSummaries（紐づけレポートからスタッフ分だけ取り出す）', () => {
+describe('staffReviewSummaries（前月の振り返りからスタッフ分だけ取り出す）', () => {
   const reportOf = (params: {
     scheduleId: string;
     year: number;
     month: number;
     scores?: { staffId: string; score: number }[];
   }) =>
-    ScheduleReport.create({
+    ConfirmedSchedule.create({
       scheduleId: params.scheduleId,
       worldLineNodeId: 'node-1',
       year: params.year,
@@ -16,7 +16,7 @@ describe('staffLinkedReportSummaries（紐づけレポートからスタッフ�
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
-      contributionScores: (params.scores ?? []).map((s) => ({
+      stars: (params.scores ?? []).map((s) => ({
         staffId: s.staffId,
         compromiseCount: 0,
         busyDayCount: 0,
@@ -24,24 +24,24 @@ describe('staffLinkedReportSummaries（紐づけレポートからスタッフ�
       })),
     });
 
-  test('スコアも配慮メモも無いスタッフのレポートは除外する', () => {
+  test('スコアも配慮メモも無いスタッフの振り返りは除外する', () => {
     const report = reportOf({
       scheduleId: 'sched-1',
       year: 2026,
       month: 6,
       scores: [{ staffId: 'staff-A', score: 0 }],
     });
-    expect(staffLinkedReportSummaries('staff-A', [report])).toEqual([]);
+    expect(staffReviewSummaries('staff-A', [report])).toEqual([]);
   });
 
-  test('スコアが正のレポートは含める', () => {
+  test('★が正の振り返りは含める', () => {
     const report = reportOf({
       scheduleId: 'sched-1',
       year: 2026,
       month: 6,
       scores: [{ staffId: 'staff-A', score: 3 }],
     });
-    const result = staffLinkedReportSummaries('staff-A', [report]);
+    const result = staffReviewSummaries('staff-A', [report]);
     expect(result).toHaveLength(1);
     expect(result[0].score).toBe(3);
   });
@@ -53,7 +53,7 @@ describe('staffLinkedReportSummaries（紐づけレポートからスタッフ�
       month: 6,
       scores: [{ staffId: 'staff-A', score: 0 }],
     }).setNote('staff-A', '来月は休み希望を優先してあげたい');
-    const result = staffLinkedReportSummaries('staff-A', [report]);
+    const result = staffReviewSummaries('staff-A', [report]);
     expect(result).toHaveLength(1);
     expect(result[0].note).toBe('来月は休み希望を優先してあげたい');
   });
@@ -65,7 +65,7 @@ describe('staffLinkedReportSummaries（紐づけレポートからスタッフ�
       month: 6,
       scores: [{ staffId: 'staff-B', score: 5 }],
     });
-    expect(staffLinkedReportSummaries('staff-A', [report])).toEqual([]);
+    expect(staffReviewSummaries('staff-A', [report])).toEqual([]);
   });
 
   test('新しい年月順（降順）に並べる', () => {
@@ -81,7 +81,7 @@ describe('staffLinkedReportSummaries（紐づけレポートからスタッフ�
       month: 6,
       scores: [{ staffId: 'staff-A', score: 1 }],
     });
-    const result = staffLinkedReportSummaries('staff-A', [older, newer]);
+    const result = staffReviewSummaries('staff-A', [older, newer]);
     expect(result.map((s) => s.report.month)).toEqual([6, 3]);
   });
 });

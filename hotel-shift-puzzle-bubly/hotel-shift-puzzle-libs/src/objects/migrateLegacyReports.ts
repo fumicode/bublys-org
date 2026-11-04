@@ -12,7 +12,7 @@
  * - 勤務表の引き継ぎ（どの版から写したか）は書き換えない。引き継いだ版と残った確定版が
  *   違えば、勤務表が「確定版が新しくなりました」と知らせ、人が取り込む。
  */
-import { ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
+import { ConfirmedSchedule } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   APP_SCOPE_ID,
   localScopeId,
@@ -22,12 +22,12 @@ import {
   removeObject,
   saveObject,
 } from "./commit.js";
-import { SCHEDULE_REPORT_TYPE, SCHEDULE_TYPE } from "./hotelObjects.js";
+import { CONFIRMED_SCHEDULE_TYPE, SCHEDULE_TYPE } from "./hotelObjects.js";
 
 type StoreLike = Parameters<typeof saveObject>[0];
 
-/** 確定した時刻。古いレポートは確定ノードができた時刻で補う。分からなければ -Infinity */
-const confirmedAtOf = (store: StoreLike, report: ScheduleReport): number =>
+/** 確定した時刻。古い確定版は確定ノードができた時刻で補う。分からなければ -Infinity */
+const confirmedAtOf = (store: StoreLike, report: ConfirmedSchedule): number =>
   report.confirmedAt ??
   nodeTimestampOf(store, localScopeId(SCHEDULE_TYPE, report.scheduleId), report.worldLineNodeId) ??
   -Infinity;
@@ -37,15 +37,15 @@ const confirmedAtOf = (store: StoreLike, report: ScheduleReport): number =>
  * @returns 畳んだ店舗×月の確定版 ID の一覧
  */
 export function migrateLegacyReports(store: StoreLike): string[] {
-  const refs = refsOfTypeInScope(store, APP_SCOPE_ID, SCHEDULE_REPORT_TYPE);
+  const refs = refsOfTypeInScope(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE);
 
   // 店舗×月ごとに集める。読めないレポートはどの店舗×月かも分からないので、
   // 1つでも読めなければ全部見送る（次の起動でまた試す）
-  const groups = new Map<string, ScheduleReport[]>();
+  const groups = new Map<string, ConfirmedSchedule[]>();
   for (const ref of refs) {
-    const report = readFromScope<ScheduleReport>(store, APP_SCOPE_ID, SCHEDULE_REPORT_TYPE, ref.id);
+    const report = readFromScope<ConfirmedSchedule>(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE, ref.id);
     if (!report) return [];
-    const id = ScheduleReport.idFor(report.storeId, report.year, report.month);
+    const id = ConfirmedSchedule.idFor(report.storeId, report.year, report.month);
     groups.set(id, [...(groups.get(id) ?? []), report]);
   }
 
@@ -55,10 +55,10 @@ export function migrateLegacyReports(store: StoreLike): string[] {
     const [latest] = [...reports].sort((a, b) => confirmedAtOf(store, b) - confirmedAtOf(store, a));
     // いちばん新しいのが旧形式なら、新しい ID で残す（新しい形式のものがあれば置き換わる）
     if (latest.id !== id) {
-      saveObject(store, SCHEDULE_REPORT_TYPE, ScheduleReport.fromPlain({ ...latest.toPlain(), id }));
+      saveObject(store, CONFIRMED_SCHEDULE_TYPE, ConfirmedSchedule.fromPlain({ ...latest.toPlain(), id }));
     }
     for (const r of reports) {
-      if (r.id !== id) removeObject(store, SCHEDULE_REPORT_TYPE, r.id);
+      if (r.id !== id) removeObject(store, CONFIRMED_SCHEDULE_TYPE, r.id);
     }
     migrated.push(id);
   }

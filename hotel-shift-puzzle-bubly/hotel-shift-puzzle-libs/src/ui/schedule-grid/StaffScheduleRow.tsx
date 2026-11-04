@@ -9,7 +9,7 @@ import type {
   ConstraintViolation,
   ShiftLeaderRule,
   ShiftCell,
-  ContributionScoreEntry,
+  StarEntry,
   PrecedingMonthTail,
   DayOffStyle,
 } from "../../domain/index.js";
@@ -60,7 +60,7 @@ type StaffScheduleRowProps = {
   /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
   /** 前月の確定版から引き継いだ★。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
-  inheritedScores?: readonly ContributionScoreEntry[];
+  inheritedScores?: readonly StarEntry[];
   /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
   staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
@@ -173,6 +173,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
               {priority && priority.score > 0 && (
                 <span
                   className="e-priority-badge"
+                  aria-label={`星${priority.score}`}
                   title={`前月の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
                 >
                   ★{priority.score}

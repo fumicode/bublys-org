@@ -6,7 +6,7 @@ import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import { WorkingDay, ScheduleReport } from "../domain/index.js";
+import { WorkingDay, ConfirmedSchedule } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
 // スコアバーのセグメント色。譲歩・繁忙日アイコンと同じ色を流用し、凡例としても機能させる。
@@ -14,14 +14,14 @@ const COMPROMISE_COLOR = "#6d4c41";
 const BUSY_DAY_COLOR = "#e64a19";
 
 type ScheduleReportViewProps = {
-  report: ScheduleReport;
+  report: ConfirmedSchedule;
   /** staffId → 表示名（解決済み。無ければ staffId を出す） */
   nameOf: (staffId: string) => string;
   /** 配慮メモ欄の編集（保存はシェル経由で feature 層が担う）。省略すると読むだけ */
   onChangeNote?: (staffId: string, text: string) => void;
   /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る）。省略すると読むだけ */
   onRename?: (title: string) => void;
-  /** 譲歩・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される。省略すると読むだけ */
+  /** 譲歩・繁忙日の重み（倍率）の変更。★が再計算される。省略すると読むだけ */
   onChangeWeights?: (compromiseWeight: number, busyDayWeight: number) => void;
   /** 確定した時刻（epoch ms） */
   confirmedAt?: number;
@@ -29,7 +29,7 @@ type ScheduleReportViewProps = {
 
 /**
  * 確定版の振り返りの表示（プレゼンテーショナル）。
- * スタッフごとに1行（貢献度スコア＋譲歩/繁忙日の内訳を色分けしたバー）にまとめる。
+ * スタッフごとに1行（★＋譲歩/繁忙日の内訳を色分けしたバー）にまとめる。
  * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモが出る
  * （複数行を同時に展開できる）。
  *
@@ -37,7 +37,7 @@ type ScheduleReportViewProps = {
  * （読むだけ）に同じ部品で出る（#231）。編集の口を渡さなければ読むだけになる。
  * 確定版に取り消しは無いので、削除の口は持たない。
  */
-export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
+export const ReviewView: FC<ScheduleReportViewProps> = ({
   report,
   nameOf,
   onChangeNote,
@@ -106,7 +106,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
     }
   }
 
-  const maxScore = Math.max(1, ...report.contributionScores.map((s) => s.score));
+  const maxScore = Math.max(1, ...report.stars.map((s) => s.score));
 
   return (
     <StyledWrap>
@@ -136,11 +136,11 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         </span>
       </div>
 
-      {/* 貢献度: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
+      {/* ★: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
       <section className="e-section">
         <h4>
           <EmojiEventsIcon fontSize="small" className="e-icon e-icon-score" />
-          貢献度
+          ★
         </h4>
         <div className="e-legend">
           <label className="e-legend-item">
@@ -190,11 +190,11 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
           重みはこの確定版だけの設定です。
         </p>
 
-        {report.contributionScores.length === 0 ? (
+        {report.stars.length === 0 ? (
           <p className="e-empty">対象スタッフがいません。</p>
         ) : (
           <ul className="e-person-list">
-            {report.contributionScores.map((s) => {
+            {report.stars.map((s) => {
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
               const compromisePortion = s.compromiseCount * report.compromiseWeight;

@@ -1,12 +1,12 @@
 /**
- * ScheduleReport — 確定版（店舗×月で1つ）とその振り返り
+ * ConfirmedSchedule — 確定版（店舗×月で1つ）とその振り返り
  *
  * 「確定する」と、いま見ている勤務表の版（世界線のノード）が、その店舗×月の確定版になる。
- * 確定版は**店舗×月で1つ**（#231）。ID は店舗と年月から決まり（{@link ScheduleReport.idFor}）、
- * もう一度確定すると同じ ID のまま置き換わる（{@link ScheduleReport.confirm}）。別の勤務表で
+ * 確定版は**店舗×月で1つ**（#231）。ID は店舗と年月から決まり（{@link ConfirmedSchedule.idFor}）、
+ * もう一度確定すると同じ ID のまま置き換わる（{@link ConfirmedSchedule.confirm}）。別の勤務表で
  * 確定しても置き換わる。どの勤務表のどの版かは scheduleId / worldLineNodeId が持つ。
  *
- * 振り返り（譲歩 #87・繁忙日対応 #88・貢献度スコア #89）は、確定版を「その月どうだったか」の
+ * 振り返り（譲歩 #87・繁忙日対応 #88・★ #89）は、確定版を「その月どうだったか」の
  * 角度から見たもの。確定時点のスナップショットとして持ち、以降スタッフの希望や勤務表が
  * 変わっても変化しない。置き換えると新しい版の振り返りになり、古い版の振り返りは残さない。
  * 自由記述の配慮メモ（considerationNotes）・タイトル（title）・譲歩/繁忙日の重み
@@ -14,13 +14,14 @@
  * 削除は集約自体をリポジトリから取り除く操作（feature 層が useObjectRepo.remove で行う）
  * なので、ここにはメソッドを持たない。
  *
- * 重みはシフト管理者によって貢献度の感じ方が異なるため直接編集できるようにしている。
+ * 重みはシフト管理者によって★の感じ方が異なるため直接編集できるようにしている。
  * reweight() は譲歩・繁忙日の生データ（compromises/busyDayContributions/各エントリの
- * compromiseCount/busyDayCount）は変えず、重みと contributionScores の score だけを
+ * compromiseCount/busyDayCount）は変えず、重みと stars の score だけを
  * 再計算する（「何が起きたか」という事実は確定時点のまま、「どう評価するか」という
  * 重みだけを後から調整できる）。
  *
- * state は完全に plain なので、state がそのまま plain 形式を兼ねる。
+ * state は plain だけでできているが、保存形（{@link ConfirmedSchedulePlain}）は旧形式の名前も
+ * 読めるよう別に定義する。
  * 不変。setNote / rename / reweight 以外の更新手段は無い（compromises 等は create 時に一括で決まる）。
  */
 
@@ -49,8 +50,8 @@ export type BusyDayEntry = {
   workedStaffIds: string[];
 };
 
-/** スタッフごとの貢献度スコア（譲歩回数・繁忙日出勤回数の加重合計）。#89 */
-export type ContributionScoreEntry = {
+/** スタッフごとの★（譲歩回数・繁忙日出勤回数の加重合計）。#89 */
+export type StarEntry = {
   staffId: string;
   compromiseCount: number;
   busyDayCount: number;
@@ -68,8 +69,8 @@ export type ConfirmedVersion = {
   worldLineNodeId: string;
 };
 
-export type ScheduleReportState = {
-  /** 店舗×月で一意（{@link ScheduleReport.idFor}） */
+export type ConfirmedScheduleState = {
+  /** 店舗×月で一意（{@link ConfirmedSchedule.idFor}） */
   id: string;
   /** 確定版を持つ勤務表 */
   scheduleId: string;
@@ -83,7 +84,7 @@ export type ScheduleReportState = {
   title: string;
   compromises: CompromiseEntry[];
   busyDayContributions: BusyDayEntry[];
-  contributionScores: ContributionScoreEntry[];
+  stars: StarEntry[];
   /** staffId → 自由記述の配慮メモ（確定後も編集可） */
   considerationNotes: Record<string, string>;
   /** 譲歩1件あたりの重み（確定後も reweight で編集可） */
@@ -92,16 +93,20 @@ export type ScheduleReportState = {
   busyDayWeight: number;
   /**
    * 確定した時刻（epoch ms）。置き換えるたびに新しくなる。この項目より前に作られた
-   * 古いレポートには無い（上位層が確定ノードの時刻で補う）。
+   * 古い確定版には無い（上位層が確定ノードの時刻で補う）。
    */
   confirmedAt?: number;
 };
 
-/** シリアライズ用（state がそのまま plain） */
-export type ScheduleReportPlain = ScheduleReportState;
+/** シリアライズ用 */
+export type ConfirmedSchedulePlain = Omit<ConfirmedScheduleState, "stars"> & {
+  stars?: StarEntry[];
+  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
+  contributionScores?: StarEntry[];
+};
 
-export class ScheduleReport {
-  constructor(readonly state: ScheduleReportState) {}
+export class ConfirmedSchedule {
+  constructor(readonly state: ConfirmedScheduleState) {}
 
   /** 店舗×月で一意な ID（"store-1:2026-06"）。確定し直しても変わらない */
   static idFor(storeId: string, year: number, month: number): string {
@@ -117,7 +122,7 @@ export class ScheduleReport {
       target.month === 1
         ? { year: target.year - 1, month: 12 }
         : { year: target.year, month: target.month - 1 };
-    return ScheduleReport.idFor(target.storeId, prev.year, prev.month);
+    return ConfirmedSchedule.idFor(target.storeId, prev.year, prev.month);
   }
 
   /** 既定のタイトル（未命名時・rename で空にしたときのフォールバック） */
@@ -134,21 +139,21 @@ export class ScheduleReport {
     storeId: string;
     compromises: CompromiseEntry[];
     busyDayContributions: BusyDayEntry[];
-    contributionScores: ContributionScoreEntry[];
+    stars: StarEntry[];
     /** 確定時刻（epoch ms）。時刻の取得は上位層の仕事 */
     confirmedAt?: number;
-  }): ScheduleReport {
-    return new ScheduleReport({
-      id: ScheduleReport.idFor(params.storeId, params.year, params.month),
+  }): ConfirmedSchedule {
+    return new ConfirmedSchedule({
+      id: ConfirmedSchedule.idFor(params.storeId, params.year, params.month),
       scheduleId: params.scheduleId,
       worldLineNodeId: params.worldLineNodeId,
       year: params.year,
       month: params.month,
       storeId: params.storeId,
-      title: ScheduleReport.defaultTitle(params.year, params.month),
+      title: ConfirmedSchedule.defaultTitle(params.year, params.month),
       compromises: params.compromises,
       busyDayContributions: params.busyDayContributions,
-      contributionScores: params.contributionScores,
+      stars: params.stars,
       considerationNotes: {},
       compromiseWeight: DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: DEFAULT_BUSY_DAY_WEIGHT,
@@ -159,18 +164,18 @@ export class ScheduleReport {
   /**
    * 確定する。その店舗×月にすでに確定版（current）があれば、新しい版で置き換える。
    * 置き換えても、手で書いた部分（タイトル・配慮メモ・譲歩/繁忙日の重み）は引き継ぎ、
-   * 貢献度スコアは引き継いだ重みで出し直す。取り消しは無い（差し替えたければ別の版を確定する）。
+   * ★は引き継いだ重みで出し直す。取り消しは無い（差し替えたければ別の版を確定する）。
    */
   static confirm(
-    params: Parameters<typeof ScheduleReport.create>[0],
-    current?: ScheduleReport
-  ): ScheduleReport {
-    const fresh = ScheduleReport.create(params);
+    params: Parameters<typeof ConfirmedSchedule.create>[0],
+    current?: ConfirmedSchedule
+  ): ConfirmedSchedule {
+    const fresh = ConfirmedSchedule.create(params);
     if (!current) return fresh;
     if (current.id !== fresh.id) {
       throw new Error(`別の店舗・月の確定版は置き換えられません（${current.id} → ${fresh.id}）`);
     }
-    return new ScheduleReport({
+    return new ConfirmedSchedule({
       ...fresh.state,
       title: current.title,
       considerationNotes: { ...current.considerationNotes },
@@ -219,7 +224,7 @@ export class ScheduleReport {
     return this.state.title;
   }
 
-  /** 確定時刻（epoch ms）。古いレポートは undefined */
+  /** 確定時刻（epoch ms）。古い確定版は undefined */
   get confirmedAt(): number | undefined {
     return this.state.confirmedAt;
   }
@@ -228,11 +233,11 @@ export class ScheduleReport {
    * タイトルを変更した新インスタンスを返す。不変。
    * 空文字（trim後）なら既定のタイトル（"{year}年{month}月"）に戻す。
    */
-  rename(title: string): ScheduleReport {
+  rename(title: string): ConfirmedSchedule {
     const trimmed = title.trim();
-    return new ScheduleReport({
+    return new ConfirmedSchedule({
       ...this.state,
-      title: trimmed || ScheduleReport.defaultTitle(this.state.year, this.state.month),
+      title: trimmed || ConfirmedSchedule.defaultTitle(this.state.year, this.state.month),
     });
   }
 
@@ -244,13 +249,13 @@ export class ScheduleReport {
     return this.state.busyDayContributions;
   }
 
-  get contributionScores(): ContributionScoreEntry[] {
-    return this.state.contributionScores;
+  get stars(): StarEntry[] {
+    return this.state.stars;
   }
 
-  /** そのスタッフの貢献度スコア（スコアの行が無ければ 0） */
-  scoreOf(staffId: string): number {
-    return this.state.contributionScores.find((s) => s.staffId === staffId)?.score ?? 0;
+  /** そのスタッフの★（スコアの行が無ければ 0） */
+  starsOf(staffId: string): number {
+    return this.state.stars.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get compromiseWeight(): number {
@@ -262,22 +267,22 @@ export class ScheduleReport {
   }
 
   /**
-   * 譲歩・繁忙日の重みを変更し、貢献度スコア（contributionScores の score、降順の並び）を
+   * 譲歩・繁忙日の重みを変更し、★（stars の score、降順の並び）を
    * 再計算した新インスタンスを返す。不変。負の重みは 0 に丸める。
    * 生データ（compromises/busyDayContributions/各エントリの compromiseCount/busyDayCount）は
    * 変えない（「何が起きたか」は確定時点のまま、「どう評価するか」だけを調整する）。
    */
-  reweight(compromiseWeight: number, busyDayWeight: number): ScheduleReport {
+  reweight(compromiseWeight: number, busyDayWeight: number): ConfirmedSchedule {
     const w1 = Math.max(0, compromiseWeight);
     const w2 = Math.max(0, busyDayWeight);
-    const contributionScores = this.state.contributionScores
+    const stars = this.state.stars
       .map((s) => ({ ...s, score: s.compromiseCount * w1 + s.busyDayCount * w2 }))
       .sort((a, b) => b.score - a.score);
-    return new ScheduleReport({
+    return new ConfirmedSchedule({
       ...this.state,
       compromiseWeight: w1,
       busyDayWeight: w2,
-      contributionScores,
+      stars,
     });
   }
 
@@ -294,14 +299,14 @@ export class ScheduleReport {
    * スタッフごとの配慮メモを設定した新インスタンスを返す。不変。
    * 空文字（trim後）ならそのキーを取り除く。
    */
-  setNote(staffId: string, text: string): ScheduleReport {
+  setNote(staffId: string, text: string): ConfirmedSchedule {
     const considerationNotes = { ...this.state.considerationNotes };
     if (text.trim()) considerationNotes[staffId] = text;
     else delete considerationNotes[staffId];
-    return new ScheduleReport({ ...this.state, considerationNotes });
+    return new ConfirmedSchedule({ ...this.state, considerationNotes });
   }
 
-  toPlain(): ScheduleReportPlain {
+  toPlain(): ConfirmedSchedulePlain {
     return {
       id: this.state.id,
       scheduleId: this.state.scheduleId,
@@ -315,7 +320,7 @@ export class ScheduleReport {
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      contributionScores: this.state.contributionScores.map((s) => ({ ...s })),
+      stars: this.state.stars.map((s) => ({ ...s })),
       considerationNotes: { ...this.state.considerationNotes },
       compromiseWeight: this.state.compromiseWeight,
       busyDayWeight: this.state.busyDayWeight,
@@ -323,21 +328,21 @@ export class ScheduleReport {
     };
   }
 
-  static fromPlain(plain: ScheduleReportPlain): ScheduleReport {
-    return new ScheduleReport({
+  static fromPlain(plain: ConfirmedSchedulePlain): ConfirmedSchedule {
+    return new ConfirmedSchedule({
       id: plain.id,
       scheduleId: plain.scheduleId,
       worldLineNodeId: plain.worldLineNodeId,
       year: plain.year,
       month: plain.month,
       storeId: plain.storeId,
-      title: plain.title ?? ScheduleReport.defaultTitle(plain.year, plain.month),
+      title: plain.title ?? ConfirmedSchedule.defaultTitle(plain.year, plain.month),
       compromises: plain.compromises.map((c) => ({ ...c, dayKeys: [...c.dayKeys] })),
       busyDayContributions: plain.busyDayContributions.map((b) => ({
         ...b,
         workedStaffIds: [...b.workedStaffIds],
       })),
-      contributionScores: plain.contributionScores.map((s) => ({ ...s })),
+      stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })),
       considerationNotes: { ...(plain.considerationNotes ?? {}) },
       compromiseWeight: plain.compromiseWeight ?? DEFAULT_COMPROMISE_WEIGHT,
       busyDayWeight: plain.busyDayWeight ?? DEFAULT_BUSY_DAY_WEIGHT,

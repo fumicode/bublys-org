@@ -17,7 +17,7 @@
  *   - Ctrl/Cmd+Z で1つ戻る、Ctrl/Cmd+Shift+Z で1つ進む。勤務表バブルと同じ割り当て
  *     （scheduleUndoBindings。このアプリでは編集を元に戻す＝世界線を戻す）。
  *
- * 「完成レポートを作成」ボタンは勤務表（ScheduleGrid）側に移した。ここは純粋に
+ * 「🏁 確定する」ボタンは勤務表（ScheduleGrid）側にある。ここは純粋に
  * 世界線の可視化・時間移動だけを担う。
  */
 import { FC, useMemo } from "react";

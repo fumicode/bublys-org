@@ -221,7 +221,7 @@ describe('ShiftIntervalConstraint：前月とつないだとき（月跨ぎ）',
     }).assignShift(staffId, WorkingDay.of(YEAR, 5, 31), 'may-shift');
     return PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'n' },
-      contributionScores: [],
+      stars: [],
       schedule: may,
       shiftNameOf: () => shiftName,
       length: 7,

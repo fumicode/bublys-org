@@ -86,7 +86,7 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
     const tail = PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'n' },
-      contributionScores: [],
+      stars: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,
@@ -103,7 +103,7 @@ describe('dayOffReasonOf（その休みの役目を、いまの表から読み�
     for (let d = 28; d <= 31; d++) may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
     const tail = PrecedingMonthTail.capture({
       source: { scheduleId: 'may', worldLineNodeId: 'n' },
-      contributionScores: [],
+      stars: [],
       schedule: may,
       shiftNameOf: () => '早番',
       length: 7,

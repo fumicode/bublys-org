@@ -147,7 +147,7 @@ describe('introducesViolation：前月とつないだとき（月跨ぎ）', () 
     MonthlyStaffSchedule.create({ id: 'sched-1', storeId: 'store-1', year: 2026, month: 6 });
   const tailEndingWithLate = PrecedingMonthTail.capture({
     source: { scheduleId: 'may', worldLineNodeId: 'n' },
-    contributionScores: [],
+    stars: [],
     schedule: MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 })
       .assignShift('s1', WorkingDay.of(2026, 5, 31), 'late'),
     shiftNameOf: () => '遅番',

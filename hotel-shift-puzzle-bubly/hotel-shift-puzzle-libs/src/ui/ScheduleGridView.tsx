@@ -18,7 +18,7 @@ import {
   SHIFT_LEADER_CONSTRAINT,
   previewCellValues,
   type CellValuePreview,
-  type ContributionScoreEntry,
+  type StarEntry,
   type DayOffStyle,
 } from "../domain/index.js";
 import {
@@ -98,7 +98,7 @@ type ScheduleGridViewProps = {
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
   /** 前月の確定版から引き継いだ★。渡すと、スコアのある人の名前の横に出す（＝休みの優先度） */
-  inheritedScores?: readonly ContributionScoreEntry[];
+  inheritedScores?: readonly StarEntry[];
   /**
    * スタッフ名から開くバブルの URL。省略時はスタッフの正規 URL（どの勤務表でもないスタッフ詳細）。
    * 勤務表から開くときは、その勤務表の文脈を持った URL を渡す。

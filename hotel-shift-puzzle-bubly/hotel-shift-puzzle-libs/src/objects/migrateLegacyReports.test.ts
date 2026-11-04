@@ -2,9 +2,9 @@
  * 旧形式の完成レポート（ID が `勤務表ID:ノードID`）を、店舗×月で1つの確定版に畳む（#231）。
  */
 import { worldLineGraphSlice } from "@bublys-org/world-line-graph";
-import { ScheduleReport } from "@bublys-org/hotel-shift-puzzle-model";
+import { ConfirmedSchedule } from "@bublys-org/hotel-shift-puzzle-model";
 import { registerObjects } from "./framework.js";
-import { HOTEL_OBJECTS, SCHEDULE_REPORT_TYPE } from "./hotelObjects.js";
+import { HOTEL_OBJECTS, CONFIRMED_SCHEDULE_TYPE } from "./hotelObjects.js";
 import { APP_SCOPE_ID, readFromScope, refsOfTypeInScope, saveObject } from "./commit.js";
 import { migrateLegacyReports } from "./migrateLegacyReports.js";
 
@@ -40,7 +40,7 @@ const legacy = (
   nodeId: string,
   params: { month?: number; storeId?: string; confirmedAt: number; title?: string }
 ) => {
-  const fresh = ScheduleReport.create({
+  const fresh = ConfirmedSchedule.create({
     scheduleId,
     worldLineNodeId: nodeId,
     year: 2026,
@@ -48,28 +48,28 @@ const legacy = (
     storeId: params.storeId ?? "st",
     compromises: [],
     busyDayContributions: [],
-    contributionScores: [],
+    stars: [],
     confirmedAt: params.confirmedAt,
   });
   const plain = { ...fresh.toPlain(), id: `${scheduleId}:${nodeId}` };
-  return ScheduleReport.fromPlain(params.title ? { ...plain, title: params.title } : plain);
+  return ConfirmedSchedule.fromPlain(params.title ? { ...plain, title: params.title } : plain);
 };
 
 const reportIds = (store: ReturnType<typeof fakeStore>) =>
-  refsOfTypeInScope(store, APP_SCOPE_ID, SCHEDULE_REPORT_TYPE)
+  refsOfTypeInScope(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE)
     .map((r) => r.id)
     .sort();
 
 const read = (store: ReturnType<typeof fakeStore>, id: string) =>
-  readFromScope<ScheduleReport>(store, APP_SCOPE_ID, SCHEDULE_REPORT_TYPE, id);
+  readFromScope<ConfirmedSchedule>(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE, id);
 
 describe("migrateLegacyReports（旧形式の完成レポートを確定版に畳む）", () => {
   it("同じ店舗×月は、いちばん新しい確定を新しい ID で残し、残りは消す", () => {
     const store = fakeStore();
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("b", "n2", { confirmedAt: 300, title: "本番" }));
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("a", "n3", { confirmedAt: 200 }));
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("c", "n4", { confirmedAt: 50, month: 6 }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("b", "n2", { confirmedAt: 300, title: "本番" }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("a", "n3", { confirmedAt: 200 }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("c", "n4", { confirmedAt: 50, month: 6 }));
 
     expect(migrateLegacyReports(store).sort()).toEqual(["st:2026-05", "st:2026-06"]);
 
@@ -82,8 +82,8 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
 
   it("新しい形式の確定版のほうが新しければ、それを残す", () => {
     const store = fakeStore();
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
-    const current = ScheduleReport.confirm({
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
+    const current = ConfirmedSchedule.confirm({
       scheduleId: "b",
       worldLineNodeId: "n9",
       year: 2026,
@@ -91,10 +91,10 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
       storeId: "st",
       compromises: [],
       busyDayContributions: [],
-      contributionScores: [],
+      stars: [],
       confirmedAt: 500,
     });
-    saveObject(store, SCHEDULE_REPORT_TYPE, current);
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, current);
 
     migrateLegacyReports(store);
 
@@ -104,7 +104,7 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
 
   it("冪等。畳んだあとは何もしない", () => {
     const store = fakeStore();
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
     migrateLegacyReports(store);
 
     expect(migrateLegacyReports(store)).toEqual([]);
@@ -113,9 +113,9 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
 
   it("★ 1つでも読めないレポートがあれば、何もしない（迷ったら触らない）", () => {
     const store = fakeStore();
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
-    saveObject(store, SCHEDULE_REPORT_TYPE, legacy("b", "n2", { confirmedAt: 300 }));
-    const ref = refsOfTypeInScope(store, APP_SCOPE_ID, SCHEDULE_REPORT_TYPE).find(
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("a", "n1", { confirmedAt: 100 }));
+    saveObject(store, CONFIRMED_SCHEDULE_TYPE, legacy("b", "n2", { confirmedAt: 300 }));
+    const ref = refsOfTypeInScope(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE).find(
       (r) => r.id === "b:n2"
     );
     store.evict(ref?.hash ?? "");

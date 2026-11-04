@@ -47,7 +47,7 @@ export type ObjectSerialize<T> = {
  *                どのスコープへ焼くかはメンバー側では言えないので、
  *                オーナー型の {@link ObjectDescriptor.scope} の pinTypes が決める。
  *   - external … スコープに属さず、**世界の中から読んでも常にグローバル**。
- *                実データ（予約状況）や確定記録（レポート）のように、時間移動しても
+ *                実データ（予約状況）や確定記録（確定版）のように、時間移動しても
  *                変わってはいけないもの。
  *
  * 引数が obj ではなく id なのが要点。削除は `removeObject(type, id)` のように
