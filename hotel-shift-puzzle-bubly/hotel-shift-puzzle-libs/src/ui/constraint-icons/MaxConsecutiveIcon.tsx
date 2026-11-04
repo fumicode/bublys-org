@@ -5,14 +5,14 @@
  * 横に連続した出勤セル（勤務表のセルと同じ灰色の枠）を N 個ぶん並べ、末尾に停止バー
  * （休みで区切る）を置き ≤N を示す。停止バーの先に「超えた1日」のセル（点線の枠）を1つ置く。
  * セルの下には勤務表の連勤の線と同じグラデーション
- * （何日目かで 緑 → 黄緑（N-1日目）→ 黄（N日目））の線を通し、停止バーで切って超えた日は赤。
+ * （何日目かで 緑 → 黄緑（N-1日目）→ 黄（N日目））の線を通し、停止バーで切って、超えた日は違反の赤（勤務表で違反の赤帯が重なるのと同じ）。
  *
  * onCommit を渡すと（バブルの大きい図）、停止バーを横にドラッグして N を変えられる。
  * 停止バーは指にいちばん近いマスの境目に吸い付き、左にあるマスの数がそのまま N になる。
  */
 import { FC, useId, useRef, useState, type PointerEvent } from "react";
 import { ICON_SIZE, IconValueText } from "./common.js";
-import { RUN_TONE_COLOR } from "../schedule-grid/cellSymbols.js";
+import { RUN_TONE_COLOR, VIOLATION } from "../schedule-grid/cellSymbols.js";
 import { workDayTone } from "../schedule-grid/runMarkPlacement.js";
 import { workGradientStops } from "../schedule-grid/RunMarks.js";
 
@@ -122,7 +122,7 @@ export const MaxConsecutiveIcon: FC<Props> = ({ max, size = ICON_SIZE, onCommit 
         />
       ))}
       {/* セルの下を通る連勤の線。上限までは勤務表の線と同じグラデーション、
-          停止バーで切って、超えた日は赤 */}
+          停止バーで切って、超えた日は違反の赤 */}
       {run > 0 && (
         <rect
           x={X0}
@@ -133,7 +133,7 @@ export const MaxConsecutiveIcon: FC<Props> = ({ max, size = ICON_SIZE, onCommit 
           fill={`url(#${gradientId})`}
         />
       )}
-      <rect x={cellX(run)} y={42} width={w} height={3} rx={1.5} fill={RUN_TONE_COLOR.over} />
+      <rect x={cellX(run)} y={42} width={w} height={3} rx={1.5} fill={VIOLATION} />
       {/* 停止バー（ここで連勤が切れる＝休み） */}
       <line
         x1={barX}

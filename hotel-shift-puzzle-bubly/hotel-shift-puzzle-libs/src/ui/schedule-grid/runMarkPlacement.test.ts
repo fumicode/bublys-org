@@ -31,7 +31,7 @@ describe("runMarksOf — 連勤・連休の線の置き場所", () => {
   const lines = (row: string, max = 5) =>
     runMarksOf(scheduleOf(row), "s1", days, max).map(lineOf);
 
-  it("連勤は何日目かで色が決まり、上限を超えた日から over（赤）が足される", () => {
+  it("連勤は何日目かで色が決まり、上限を超えた日から over（濃い橙）が足される", () => {
     expect(lines("WWWO-WWWWO-WWWWWO-WWWWWWWO")).toEqual([
       "ok/ok/ok",
       "ok/ok/ok/near",
