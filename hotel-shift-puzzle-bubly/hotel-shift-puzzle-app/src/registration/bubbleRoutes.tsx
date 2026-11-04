@@ -32,8 +32,6 @@ import {
   ShiftWishStaffList,
   LeaderRuleView,
   ShiftIntervalRuleView,
-  ScheduleReportPanel,
-  ScheduleReportList,
   WorldFilePanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
@@ -45,8 +43,6 @@ import {
   scheduleReservationInfoUrl,
   scheduleWorldLineUrl,
   constraintBubbleUrlOf,
-  scheduleReportUrl,
-  scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
   staffShiftWishUrl,
   shiftWishMonthUrl,
@@ -132,7 +128,7 @@ const ConstraintSetBubble: BubbleRoute["Component"] = () =>
 // --- 勤務表一覧バブル（複数の勤務表を作成・管理） ---
 // 「シフト完成レポート一覧」から過去レポートを参照できる（次回シフト作成前の参考用）。
 const ScheduleListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ScheduleCollection reportListUrl={scheduleReportListUrl()} />);
+  withObjects(<ScheduleCollection />);
 
 /**
  * 候補集合の計算 worker を作る。worker の作り方（new Worker + import.meta.url）は
@@ -176,13 +172,11 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
     <ScheduleGrid
       scheduleId={scheduleId}
       onOpenWorldLine={openWorldLine}
-      onConfirm={(reportId) => openSide(scheduleReportUrl(reportId), "bubble-side-bottom")}
       workingStaffUrl={workingStaffUrl}
       shiftWishesUrl={shiftWishMonthUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
-      reportBubbleUrl={scheduleReportUrl}
       staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(scheduleId, staffId)}
       onOpenRule={(ruleKey) =>
         openOrigin(constraintBubbleUrlOf(scheduleId, "leaderRule", ruleKey))
@@ -239,14 +233,6 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
 // --- 勤務表の世界線ビューバブル（canvas版） ---
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
   withObjects(<ScheduleWorldLineView scheduleId={bubble.params.scheduleId} />);
-
-// --- シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） ---
-const ScheduleReportBubble: BubbleRoute["Component"] = ({ bubble }) =>
-  withObjects(<ScheduleReportPanel reportId={bubble.params.reportId} />);
-
-// --- シフト完成レポート一覧バブル（勤務表一覧の「シフト完成レポート一覧」から開く） ---
-const ScheduleReportListBubble: BubbleRoute["Component"] = () =>
-  withObjects(<ScheduleReportList />);
 
 // --- 勤務表のキセキの木ビューバブル（SVG版・読み取り専用） ---
 const ScheduleWorldLineTreeBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -372,8 +358,4 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   // 画面に入らない分は、開くときに見えている範囲まで縮む（Bubble.fitInto）
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId", type: "schedule", Component: ScheduleBubble, bubbleOptions: { defaultSize: { width: 1560, height: 1100 } } },
   { pattern: "hotel-shift-puzzle/schedules", type: "schedule-list", Component: ScheduleListBubble },
-  // シフト完成レポート（#86〜#89）。list は `/schedule-reports`、単体は `/schedule-reports/:reportId`
-  // （schedules/schedule-list と同じ命名パターン）。
-  { pattern: "hotel-shift-puzzle/schedule-reports/:reportId", type: "schedule-report", Component: ScheduleReportBubble },
-  { pattern: "hotel-shift-puzzle/schedule-reports", type: "schedule-report-list", Component: ScheduleReportListBubble },
 ];

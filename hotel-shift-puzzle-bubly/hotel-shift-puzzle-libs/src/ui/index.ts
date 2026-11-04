@@ -29,6 +29,5 @@ export * from "./ShiftWishStaffListView.js";
 export * from "./shiftWishOptions.js";
 export * from "./ClimberWorldLineCanvasView.js";
 export * from "./ScheduleReportView.js";
-export * from "./ScheduleReportListView.js";
 export * from "./InheritanceView.js";
 export * from "./WorldFileView.js";

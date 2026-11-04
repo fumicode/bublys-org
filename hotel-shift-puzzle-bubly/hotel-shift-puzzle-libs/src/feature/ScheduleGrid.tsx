@@ -1,10 +1,9 @@
 'use client';
 
-import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import {
   ObjectView,
-  UrledPlace,
   useKeyBindings,
 } from "@bublys-org/bubbles-ui";
 import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
@@ -68,6 +67,8 @@ import {
   precedingConfirmedOf,
 } from "./precedingMonth.js";
 import { versionLabelFor } from "./versionLabel.js";
+import { ConfirmedReview } from "./ConfirmedReview.js";
+import { useConfirmedVersion } from "./confirmedVersion.js";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { useCellClipboard } from "./cellClipboard/useCellClipboard.js";
@@ -102,8 +103,6 @@ type ScheduleGridProps = {
    * 開く側（app 層）の責務。
    */
   onOpenWorldLine?: () => void;
-  /** 完成レポート確定後に呼ばれる（レポートバブルを開くのは app 層の関心事） */
-  onConfirm?: (reportId: string) => void;
   /**
    * 各アクションバブルの URL（data-url アンカー用）。ボタンを UrledPlace で包むと、
    * そのボタンから link bubble が伸びる。openBubble する URL と一致させる。
@@ -138,13 +137,6 @@ type ScheduleGridProps = {
     key: string
   ) => string;
   /**
-   * シフト完成レポートバブルの URL を作る（レポート ID）。同上・app 層から注入。
-   * レポート ID は scheduleId と現在の apex ノード ID から決まる（ScheduleReport.idOf）ため、
-   * 確定前でも「今クリックしたら作られるレポート」の URL を先読みして「完成レポートを
-   * 作成」ボタンに付けられる（そのボタン自身が schedule-report の bubble link 起点になる）。
-   */
-  reportBubbleUrl?: (reportId: string) => string;
-  /**
    * スタッフ名から開くスタッフ詳細バブルの URL を作る（staffId を渡す）。この勤務表の文脈を
    * 持った URL を渡すと、詳細にこの勤務表の参照レポートでの評価が出る。同上・app 層から注入。
    */
@@ -172,7 +164,6 @@ const newLeaderRuleKey = (): string =>
 const ScheduleGridBody: FC<ScheduleGridProps> = ({
   scheduleId,
   onOpenWorldLine,
-  onConfirm,
   worldLineUrl,
   treeUrl,
   workingStaffUrl,
@@ -180,7 +171,6 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   dayBubbleUrl,
   violationBubbleUrl,
   bubbleUrlOf,
-  reportBubbleUrl,
   staffBubbleUrl,
   reservationInfoUrl,
   onOpenRule,
@@ -276,6 +266,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     ? inheritedScoresOf(inherited, precedingConfirmed)
     : undefined;
   const [importingInheritance, setImportingInheritance] = useState(false);
+  // この勤務表が持っている確定版（あれば振り返りを出す）と、その版のノードの名前
+  const confirmedVersion = useConfirmedVersion(scheduleId);
+  const confirmedNodeLabel = confirmedVersion
+    ? scope.graph.state.nodes[confirmedVersion.worldLineNodeId]?.label
+    : undefined;
+  const [reviewOpen, setReviewOpen] = useState(false);
   // 確定版の読み出しは非同期なので、記録するときは待っている間の編集を含む最新の値へ載せる
   const latestRef = useRef({ schedule, constraints });
   latestRef.current = { schedule, constraints };
@@ -706,11 +702,11 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 「確定する」: いま見ている版（apex）を、この店舗×月の確定版にする（#231）。
   // 確定版は店舗×月で1つなので、すでにあれば置き換わる（別の勤務表の版でも）。置き換えても
   // 手で書いた部分（タイトル・配慮メモ・重み）は引き継ぐ（ScheduleReport.confirm）。
-  // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。振り返りを開くのは
-  // app 層（onConfirm）の関心事。
+  // apex には「◯月◯日版」の名前を付ける（既に名前があれば尊重して残す）。
+  // 確定したら、その場で振り返りの欄を開く（振り返りは独立したバブルを持たない）。
   //
-  // いまの版がすでに確定版なら作り直さず、そのまま開く（振り返りは確定時点のスナップショット
-  // なので、押し直しで出し直す理由が無い）。
+  // いまの版がすでに確定版なら作り直さず、振り返りを開くだけ（振り返りは確定時点の
+  // スナップショットなので、押し直しで出し直す理由が無い）。
   // 世界線のノードから状態を取り出すので resolveObjectsAt を使う（同期の getObjectAt だと
   // メモリから追い出されたぶんが黙って読めず、何も起きないボタンになる）。
   const handleConfirm = async () => {
@@ -720,7 +716,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       (r) => r.id === ScheduleReport.idFor(schedule.storeId, schedule.year, schedule.month)
     );
     if (currentConfirmed?.isVersion({ scheduleId, worldLineNodeId: apex.id })) {
-      onConfirm?.(currentConfirmed.id);
+      setReviewOpen(true);
       return;
     }
 
@@ -773,21 +769,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       scope.setNodeLabel(apex.id, versionLabelFor(new Date(confirmedAt), labels));
     }
 
-    onConfirm?.(report.id);
+    setReviewOpen(true);
   };
-
-  // アクションボタンを URL（data-url）で包む。url があると、その URL のバブルを開いたとき
-  // link bubble がこのボタンから伸びる（openBubble する URL と一致している必要がある）。
-  const withUrl = (url: string | undefined, node: ReactNode): ReactNode =>
-    url ? <UrledPlace url={url}>{node}</UrledPlace> : node;
-
-  // 「確定する」ボタン。確定版の ID は店舗×月で決まる（ScheduleReport.idFor）ので、
-  // クリック前でも開く先の URL を先読みしてボタンに付けられる。これにより振り返りの
-  // bubble link はこのボタン自身から伸びる。
-  const pendingReportUrl =
-    schedule && reportBubbleUrl
-      ? reportBubbleUrl(ScheduleReport.idFor(schedule.storeId, schedule.year, schedule.month))
-      : undefined;
 
   // 行＝勤務スタッフ群のメンバーなので、その並びの続きに導線を置く（ヘッダには出さない）
   const workingStaffSlot = workingStaffUrl ? (
@@ -845,15 +828,17 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     </>
   );
 
-  const confirmButton = withUrl(
-    pendingReportUrl,
+  const confirmButton = (
     <button
       type="button"
       className="e-confirm"
       onClick={() => void handleConfirm()}
-      title="今表示している勤務表を確定し、譲歩・繁忙日対応・貢献度のレポートを作成します"
+      title={
+        "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
+        "翌月の勤務表は、確定版から引き継いで始まります"
+      }
     >
-      🏁 完成レポートを作成
+      🏁 確定する
     </button>
   );
 
@@ -899,6 +884,21 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             }
             onImport={() => void handleImportInheritance()}
             busy={importingInheritance}
+            wrapSource={(node) =>
+              inherited ? (
+                <ObjectView
+                  type={SCHEDULE_TYPE}
+                  id={inherited.source.scheduleId}
+                  label={inherited.yearMonth ? `${inherited.yearMonth.year}年${inherited.yearMonth.month}月の勤務表` : "前月の勤務表"}
+                  openingPosition="origin-side"
+                  draggable={false}
+                >
+                  {node}
+                </ObjectView>
+              ) : (
+                node
+              )
+            }
           />
         </div>
       </div>
@@ -1021,8 +1021,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(worldLineUrl || treeUrl || pendingReportUrl) && (
-        <div className="e-footer">
+      <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
                 type={SCHEDULE_WORLD_LINE_VIEW_TYPE}
@@ -1052,7 +1051,23 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               </ObjectView>
           )}
           {confirmButton}
-        </div>
+      </div>
+
+      {/* この勤務表が確定版を持っていれば、その振り返り（独立したバブルは持たない。#231）。
+          確定した直後は開いて出す。前月の勤務表を開いたときも、ここで振り返りが見られる */}
+      {confirmedVersion && (
+        <details
+          className="e-review"
+          open={reviewOpen}
+          onToggle={(e) => setReviewOpen(e.currentTarget.open)}
+        >
+          <summary>
+            🏁 {confirmedVersion.year}年{confirmedVersion.month}月の確定版
+            {confirmedNodeLabel && <span className="e-review-version">（{confirmedNodeLabel}）</span>}
+            の振り返り
+          </summary>
+          <ConfirmedReview report={confirmedVersion} editable />
+        </details>
       )}
     </StyledContainer>
   );
@@ -1273,7 +1288,7 @@ const StyledContainer = styled.div`
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・完成レポート */
+  /* 左下：世界線ビュー・キセキの木・確定する */
   .e-footer {
     margin-top: 8px;
     display: flex;
@@ -1281,7 +1296,7 @@ const StyledContainer = styled.div`
     gap: 8px;
   }
 
-  /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */
+  /* 確定する（いま見ている版をこの月の確定版にする） */
   .e-confirm {
     border: 1px solid #2e7d32;
     border-radius: 6px;
@@ -1296,6 +1311,26 @@ const StyledContainer = styled.div`
     &:hover {
       background: #e8f5e9;
       border-color: #388e3c;
+    }
+  }
+
+  /* この勤務表が持っている確定版の振り返り（確定した直後は開いて出す） */
+  .e-review {
+    margin-top: 10px;
+    border: 1px solid #ffe082;
+    border-radius: 8px;
+    background: #fffdf5;
+
+    > summary {
+      padding: 6px 10px;
+      font-size: 0.82em;
+      font-weight: 600;
+      color: #8d6e00;
+      cursor: pointer;
+    }
+    .e-review-version {
+      font-weight: normal;
+      color: #b0a060;
     }
   }
 

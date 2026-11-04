@@ -5,7 +5,6 @@ import styled from "styled-components";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ScheduleReport } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
@@ -18,25 +17,25 @@ type ScheduleReportViewProps = {
   report: ScheduleReport;
   /** staffId → 表示名（解決済み。無ければ staffId を出す） */
   nameOf: (staffId: string) => string;
-  /** 配慮メモ欄の編集（保存はシェル経由で feature 層が担う） */
-  onChangeNote: (staffId: string, text: string) => void;
-  /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る） */
-  onRename: (title: string) => void;
-  /** 譲歩・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される */
-  onChangeWeights: (compromiseWeight: number, busyDayWeight: number) => void;
-  /** レポートの削除。渡すと見出しに削除ボタンが出る（押すと確認を挟む） */
-  onDelete?: () => void;
-  /** このレポートを参照レポートにしている勤務表の数（削除の確認で、紐づけも外れることを伝える） */
-  linkedScheduleCount?: number;
-  /** 確定した時刻（epoch ms）。同じ月の確定が複数あるとき見分けられるよう小さく出す */
+  /** 配慮メモ欄の編集（保存はシェル経由で feature 層が担う）。省略すると読むだけ */
+  onChangeNote?: (staffId: string, text: string) => void;
+  /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る）。省略すると読むだけ */
+  onRename?: (title: string) => void;
+  /** 譲歩・繁忙日の重み（倍率）の変更。貢献度スコアが再計算される。省略すると読むだけ */
+  onChangeWeights?: (compromiseWeight: number, busyDayWeight: number) => void;
+  /** 確定した時刻（epoch ms） */
   confirmedAt?: number;
 };
 
 /**
- * シフト完成レポートの表示（プレゼンテーショナル）。
+ * 確定版の振り返りの表示（プレゼンテーショナル）。
  * スタッフごとに1行（貢献度スコア＋譲歩/繁忙日の内訳を色分けしたバー）にまとめる。
- * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモの編集欄が出る
+ * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモが出る
  * （複数行を同時に展開できる）。
+ *
+ * 振り返りは独立したバブルを持たず、確定版を持つ勤務表の中（書ける）と、成果木の詳細欄
+ * （読むだけ）に同じ部品で出る（#231）。編集の口を渡さなければ読むだけになる。
+ * 確定版に取り消しは無いので、削除の口は持たない。
  */
 export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   report,
@@ -44,12 +43,8 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   onChangeNote,
   onRename,
   onChangeWeights,
-  onDelete,
-  linkedScheduleCount = 0,
   confirmedAt,
 }) => {
-  // 削除は取り消せないので、ボタンを押したら一度確認を挟む（ブラウザのダイアログは使わない）
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const dayLabel = (dayKey: string) => WorkingDay.fromKey(dayKey).label;
   // 月単位の違反（休日不足など）は dayKeys が空。1日なら単日、複数日なら範囲で示す。
   const dayRangeLabel = (dayKeys: string[]) => {
@@ -77,7 +72,7 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   useEffect(() => {
     setTitleDraft(report.title);
   }, [report.id, report.title]);
-  const commitTitle = () => onRename(titleDraft);
+  const commitTitle = () => onRename?.(titleDraft);
 
   // 重み編集（同じく下書き→blur/Enterで確定。数値のみ・0未満は入力させない）。
   const [compromiseWeightDraft, setCompromiseWeightDraft] = useState(String(report.compromiseWeight));
@@ -89,7 +84,10 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   const commitWeights = () => {
     const w1 = Number(compromiseWeightDraft);
     const w2 = Number(busyDayWeightDraft);
-    onChangeWeights(Number.isFinite(w1) ? w1 : report.compromiseWeight, Number.isFinite(w2) ? w2 : report.busyDayWeight);
+    onChangeWeights?.(
+      Number.isFinite(w1) ? w1 : report.compromiseWeight,
+      Number.isFinite(w2) ? w2 : report.busyDayWeight
+    );
   };
 
   const compromisesByStaff = new Map<string, typeof report.compromises>();
@@ -113,29 +111,21 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
   return (
     <StyledWrap>
       <div className="e-head">
-        <span className="e-kicker">シフト完成レポート</span>
         <div className="e-title-row">
-          <input
-            className="e-title-input"
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={(e) => {
-              if (e.nativeEvent.isComposing) return; // IME確定のEnterでは確定しない
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            placeholder={`${report.year}年${report.month}月`}
-          />
-          {onDelete && (
-            <button
-              type="button"
-              className="e-delete"
-              aria-label="レポートを削除"
-              title="このレポートを削除"
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <DeleteOutlineIcon fontSize="small" />
-            </button>
+          {onRename ? (
+            <input
+              className="e-title-input"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return; // IME確定のEnterでは確定しない
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              placeholder={`${report.year}年${report.month}月`}
+            />
+          ) : (
+            <span className="e-title-text">{report.title}</span>
           )}
         </div>
         <span className="e-sub">
@@ -144,35 +134,6 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
             <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
           )}
         </span>
-        {onDelete && confirmingDelete && (
-          <div className="e-delete-confirm" role="alertdialog" aria-label="レポートの削除の確認">
-            <span>
-              このレポートを削除しますか？
-              {linkedScheduleCount > 0 &&
-                `参照レポートにしている勤務表（${linkedScheduleCount}件）の紐づけも外れます。`}
-            </span>
-            <div className="e-delete-actions">
-              <button
-                type="button"
-                className="e-delete-yes"
-                onClick={() => {
-                  setConfirmingDelete(false);
-                  onDelete();
-                }}
-              >
-                削除する
-              </button>
-              <button
-                type="button"
-                className="e-delete-no"
-                onClick={() => setConfirmingDelete(false)}
-                autoFocus
-              >
-                やめる
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 貢献度: #87譲歩・#88繁忙日対応・#89スコアを人ごとに1行へ統合。展開すると詳細＋配慮メモ */}
@@ -184,41 +145,49 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
         <div className="e-legend">
           <label className="e-legend-item">
             <HandshakeIcon fontSize="inherit" className="e-icon-compromise" /> 譲歩 ×
-            <input
-              type="number"
-              className="e-weight-input"
-              min={0}
-              step={0.5}
-              value={compromiseWeightDraft}
-              onChange={(e) => setCompromiseWeightDraft(e.target.value)}
-              onBlur={commitWeights}
-              onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              aria-label="譲歩の重み"
-            />
+            {onChangeWeights ? (
+              <input
+                type="number"
+                className="e-weight-input"
+                min={0}
+                step={0.5}
+                value={compromiseWeightDraft}
+                onChange={(e) => setCompromiseWeightDraft(e.target.value)}
+                onBlur={commitWeights}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                aria-label="譲歩の重み"
+              />
+            ) : (
+              <span className="e-weight-value">{report.compromiseWeight}</span>
+            )}
           </label>
           <label className="e-legend-item">
             <LocalFireDepartmentIcon fontSize="inherit" className="e-icon-busy" /> 繁忙日 ×
-            <input
-              type="number"
-              className="e-weight-input"
-              min={0}
-              step={0.5}
-              value={busyDayWeightDraft}
-              onChange={(e) => setBusyDayWeightDraft(e.target.value)}
-              onBlur={commitWeights}
-              onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              aria-label="繁忙日の重み"
-            />
+            {onChangeWeights ? (
+              <input
+                type="number"
+                className="e-weight-input"
+                min={0}
+                step={0.5}
+                value={busyDayWeightDraft}
+                onChange={(e) => setBusyDayWeightDraft(e.target.value)}
+                onBlur={commitWeights}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                aria-label="繁忙日の重み"
+              />
+            ) : (
+              <span className="e-weight-value">{report.busyDayWeight}</span>
+            )}
           </label>
         </div>
         <p className="e-hint">
-          重みはこのレポート限定の設定です。
+          重みはこの確定版だけの設定です。
         </p>
 
         {report.contributionScores.length === 0 ? (
@@ -318,13 +287,19 @@ export const ScheduleReportView: FC<ScheduleReportViewProps> = ({
 
                       <div className="e-detail-block">
                         <span className="e-detail-label">配慮メモ</span>
-                        <textarea
-                          className="e-note-input"
-                          rows={3}
-                          placeholder="例: 来月は休み希望を優先してあげたい"
-                          value={report.noteFor(s.staffId)}
-                          onChange={(e) => onChangeNote(s.staffId, e.target.value)}
-                        />
+                        {onChangeNote ? (
+                          <textarea
+                            className="e-note-input"
+                            rows={3}
+                            placeholder="例: 来月は休み希望を優先してあげたい"
+                            value={report.noteFor(s.staffId)}
+                            onChange={(e) => onChangeNote(s.staffId, e.target.value)}
+                          />
+                        ) : hasNote ? (
+                          <p className="e-note-text">{report.noteFor(s.staffId)}</p>
+                        ) : (
+                          <p className="e-empty">特になし</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -344,14 +319,6 @@ const StyledWrap = styled.div`
 
   .e-head {
     margin-bottom: 12px;
-
-    .e-kicker {
-      display: block;
-      font-size: 0.72em;
-      color: #999;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
 
     .e-title-row {
       display: flex;
@@ -382,59 +349,11 @@ const StyledWrap = styled.div`
       }
     }
 
-    .e-delete-confirm {
-      margin-top: 8px;
-      padding: 8px 10px;
-      border: 1px solid #ffcdd2;
-      background: #fff5f5;
-      border-radius: 8px;
-      font-size: 0.82em;
-      color: #b71c1c;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .e-delete-actions {
-      display: flex;
-      gap: 6px;
-      justify-content: flex-end;
-    }
-
-    .e-delete-yes,
-    .e-delete-no {
-      border-radius: 6px;
-      padding: 3px 10px;
-      font-size: 0.95em;
-      cursor: pointer;
-    }
-
-    .e-delete-yes {
-      border: 1px solid #d32f2f;
-      background: #d32f2f;
-      color: #fff;
-    }
-
-    .e-delete-no {
-      border: 1px solid #ccc;
-      background: #fff;
-      color: #555;
-    }
-
-    .e-delete {
-      flex-shrink: 0;
-      border: none;
-      background: transparent;
-      color: #b0b0b0;
-      border-radius: 6px;
-      padding: 4px;
-      cursor: pointer;
-      display: flex;
-
-      &:hover {
-        color: #d32f2f;
-        background: #ffebee;
-      }
+    .e-title-text {
+      flex: 1;
+      min-width: 0;
+      font-size: 1.15em;
+      font-weight: bold;
     }
 
     .e-sub {
@@ -486,6 +405,10 @@ const StyledWrap = styled.div`
       display: inline-flex;
       align-items: center;
       gap: 3px;
+    }
+
+    .e-weight-value {
+      font-weight: bold;
     }
 
     .e-weight-input {
@@ -636,6 +559,12 @@ const StyledWrap = styled.div`
   }
   .e-compromise-range {
     color: #888;
+  }
+
+  .e-note-text {
+    margin: 0;
+    font-size: 0.82em;
+    white-space: pre-wrap;
   }
 
   .e-note-input {

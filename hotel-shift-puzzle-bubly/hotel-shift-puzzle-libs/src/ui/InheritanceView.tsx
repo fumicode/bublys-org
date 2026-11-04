@@ -1,7 +1,7 @@
 'use client';
 
 import { FC } from "react";
-import type { HTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import styled from "styled-components";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
@@ -26,6 +26,11 @@ type InheritanceViewProps = {
   onImport?: () => void;
   /** 取り込み中（確定版の読み出しは非同期） */
   busy?: boolean;
+  /**
+   * 引き継ぎ元の表示を、前月の勤務表を開く導線で包む（feature 層が ObjectView で包む）。
+   * 前月の勤務表を開けば、その確定版の振り返りが見られる。
+   */
+  wrapSource?: (node: ReactNode) => ReactNode;
 };
 
 /** 引き継ぎが勤務表のどこに効くか（ラベルの説明に出す） */
@@ -47,6 +52,7 @@ export const InheritanceView: FC<InheritanceViewProps> = ({
   pending,
   onImport,
   busy = false,
+  wrapSource = (node) => node,
 }) => {
   if (!inherited && !pending) return null;
 
@@ -55,14 +61,15 @@ export const InheritanceView: FC<InheritanceViewProps> = ({
       <span className="e-label" title={EFFECT_HINT}>
         🏁 引き継ぎ
       </span>
-      {inherited && (
-        <span className="e-chip" title={EFFECT_HINT}>
-          ← {sourceLabel(inherited)}
-          {inherited.confirmedAt !== undefined && (
-            <span className="e-at">確定 {formatConfirmedAt(inherited.confirmedAt)}</span>
-          )}
-        </span>
-      )}
+      {inherited &&
+        wrapSource(
+          <span className="e-chip" title={`${EFFECT_HINT}\nダブルクリックで前月の勤務表を開きます（振り返りが見られます）。`}>
+            ← {sourceLabel(inherited)}
+            {inherited.confirmedAt !== undefined && (
+              <span className="e-at">確定 {formatConfirmedAt(inherited.confirmedAt)}</span>
+            )}
+          </span>
+        )}
       {pending && (
         <span className="e-pending">
           {inherited ? "確定版が新しくなりました" : `${sourceLabel(pending)}があります`}
