@@ -47,7 +47,17 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
   readonly tightnessUnits = [MONTHLY_DAY_OFF_SHORT] as const;
 
   /** @param minDays 月の最低休日数（既定 8） */
-  constructor(readonly minDays = 8) {}
+  /**
+   * @param minDays  月の最低休日数（既定 8）
+   * @param staffIds 測る人。省略すると勤務表に1セルでも入っている人だけを測る
+   *   （まだ1セルも無い人は見えない）。探索のように空の勤務表から埋めていくときは、
+   *   勤務スタッフを渡す（渡さないと、最初の1セルを置いた瞬間にその人の不足が「現れて」
+   *   悪化に見え、何も置けなくなる）
+   */
+  constructor(
+    readonly minDays = 8,
+    readonly staffIds?: readonly string[]
+  ) {}
 
   describe(): string {
     return `月に${this.minDays}日以上休む`;
@@ -80,7 +90,7 @@ export class MinMonthlyDayOffConstraint implements ScheduleConstraint {
 
   private measure(schedule: MonthlyStaffSchedule, reading: UndecidedReading): MonthlyDayOff[] {
     const days = schedule.workingDays();
-    const staffIds = [...new Set(schedule.assignments.map((a) => a.staffId))];
+    const staffIds = this.staffIds ?? [...new Set(schedule.assignments.map((a) => a.staffId))];
     return staffIds.map((staffId) => {
       const off = days.filter((d) => schedule.statusOf(staffId, d).kind === "day-off").length;
       const undecided = days.filter((d) => schedule.statusOf(staffId, d).kind === "undecided").length;

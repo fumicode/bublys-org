@@ -22,6 +22,11 @@ export type TightnessUnitState = {
   label: string;
   /** この段階が違反か（違反の段階だけが check() の違反になる） */
   violating: boolean;
+  /**
+   * 制約レシピに載っていないときの重み（ConstraintRecipe.weightOf）。省略時は違反かどうかで決まる。
+   * 違反ではないが目標として重く見たい単位（必要人数の不足など）が指定する。
+   */
+  defaultWeight?: { hard: boolean; priority: number };
 };
 
 /** きつさの単位。制約の段階ごとに定数で宣言する（その場で書かない＝表記揺れで別の単位にならない） */

@@ -73,6 +73,7 @@ export class ConstraintRecipe {
   weightOf(unit: TightnessUnit): RecipeWeight {
     const entry = this.state.entries.find((e) => e.unitKey === unit.key);
     if (entry) return entry.weight;
+    if (unit.state.defaultWeight) return unit.state.defaultWeight;
     return unit.isViolating ? DEFAULT_VIOLATING_WEIGHT : DEFAULT_TIGHT_WEIGHT;
   }
 

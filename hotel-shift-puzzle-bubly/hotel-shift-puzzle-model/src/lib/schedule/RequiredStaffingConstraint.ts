@@ -8,18 +8,32 @@
  * 同じ日に複数の勤務帯が同時に不足していても、violation は日1件に集約する。
  * ConstraintViolation.key は type:staffId:day までしか含まないため、勤務帯ごとに
  * 別violationを積むと同じキーで衝突し computeConstraintDelta が片方を握りつぶしてしまう。
+ *
+ * **必要人数は違反として表示する制約ではない**（制約リストに入れない。CLAUDE.md）。
+ * 制約レシピでは「任意の目標」として数える（#229）：単位は不足（足りない人数）で、違反ではない
+ * （赤は出さない）。既定は任意・中くらいの優先度（上限ちょうど などより先に見る）。
  */
 import { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 import { ConstraintViolation } from "./ConstraintViolation.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
+import { TightnessAmount, TightnessUnit } from "./Tightness.js";
 
 export const REQUIRED_STAFFING_CONSTRAINT = "required-staffing";
+
+/** 必要人数の不足（足りない人数）。違反ではなく目標 */
+export const REQUIRED_STAFFING_SHORT = new TightnessUnit({
+  key: "required-staffing-short",
+  label: "必要人数の不足（人）",
+  violating: false,
+  defaultWeight: { hard: false, priority: 0.5 },
+});
 
 export class RequiredStaffingConstraint implements ScheduleConstraint {
   readonly type = REQUIRED_STAFFING_CONSTRAINT;
   readonly label = "必要人数";
   /** 対象日の必要人数と実際の出勤人数だけを見る（他日には影響しない） */
   readonly scope = "day" as const;
+  readonly tightnessUnits = [REQUIRED_STAFFING_SHORT] as const;
 
   /** @param shiftIdsOf 勤務帯名 → この勤務表で使う勤務帯ID群（同名複数IDを合算するため） */
   constructor(readonly shiftIdsOf: (shiftName: string) => string[]) {}
@@ -56,5 +70,18 @@ export class RequiredStaffingConstraint implements ScheduleConstraint {
       }
     }
     return violations;
+  }
+
+  /** 必要人数の不足の合計（日×勤務帯ごとの足りない人数を足す） */
+  tightness(schedule: MonthlyStaffSchedule): TightnessAmount[] {
+    let shortage = 0;
+    for (const day of schedule.workingDays()) {
+      const counts = schedule.countWorkingByShift(day);
+      for (const [shiftName, required] of Object.entries(schedule.requiredStaffing.requiredOn(day))) {
+        const actual = this.shiftIdsOf(shiftName).reduce((n, id) => n + (counts.get(id) ?? 0), 0);
+        shortage += Math.max(0, required - actual);
+      }
+    }
+    return [new TightnessAmount({ amount: shortage, unit: REQUIRED_STAFFING_SHORT })];
   }
 }

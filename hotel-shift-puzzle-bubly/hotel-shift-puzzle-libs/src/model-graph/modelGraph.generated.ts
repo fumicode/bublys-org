@@ -1386,6 +1386,73 @@ export const MODEL_GRAPH: ModelGraph = {
       "doc": "レシピの1行"
     },
     {
+      "name": "RecipeObjective",
+      "file": "schedule/search/RecipeObjective.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "ordering",
+          "type": "TightnessUnit[]",
+          "optional": false
+        },
+        {
+          "name": "constraints",
+          "type": "ScheduleConstraint[]",
+          "optional": false
+        },
+        {
+          "name": "hardCount",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "ordering"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "recipe",
+            "constraints",
+            "ordering"
+          ],
+          "returns": "RecipeObjective",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "evaluate",
+          "params": [
+            "schedule"
+          ],
+          "returns": "number[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "compare",
+          "params": [
+            "a",
+            "b"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "worsensHard",
+          "params": [
+            "candidate",
+            "current"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
       "name": "RequiredStaffing",
       "file": "schedule/RequiredStaffing.ts",
       "kind": "value",
@@ -1494,6 +1561,15 @@ export const MODEL_GRAPH: ModelGraph = {
             "schedule"
           ],
           "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
           "isStatic": false,
           "returnsSelf": false
         }
@@ -2385,6 +2461,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "violating",
           "type": "boolean",
           "optional": false
+        },
+        {
+          "name": "defaultWeight",
+          "type": "{ hard: boolean; priority: number; }",
+          "optional": true
         }
       ],
       "getters": [
@@ -3175,6 +3256,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "RecipeObjective",
+      "to": "TightnessUnit",
+      "kind": "contains",
+      "via": "ordering",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ScheduleCandidates",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -3281,7 +3370,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 48,
+    "fileCount": 52,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
