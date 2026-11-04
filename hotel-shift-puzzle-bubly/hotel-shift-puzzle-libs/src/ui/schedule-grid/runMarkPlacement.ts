@@ -17,6 +17,12 @@ import type { MonthlyStaffSchedule, WorkingDay } from "../../domain/index.js";
  * 連休: off-2 = 2連休 / off-long = 3連休以上。1日だけの休みは線にしない。
  *
  * 塊の長さは表示中の日（列）で数える。月全体を表示していれば制約の判定と同じになる。
+ *
+ * **月でリセットしない。** 前月の末尾（precedingTail）を持つ勤務表では、前月末から続く塊を
+ * ひと続きに数える（連勤制約と同じ。前月末の3連勤に今月1日の出勤が続けば、1日は4日目）。
+ * 前月の列にも線を引き、月をまたぐ塊は前月側と今月側の2本に分けて、それぞれの列の末尾に置く
+ * （前月の列は幅が違うので、1本で伸ばすと長さが合わない）。2本は同じ色の並びを分け合うので、
+ * グラデーションは境目でつながる。前月の列は確定済みの参考なので、セルごと薄く描かれる。
  */
 export type WorkDayTone = "ok" | "near" | "limit" | "over";
 export type OffTone = "off-2" | "off-long";
@@ -24,14 +30,16 @@ export type OffTone = "off-2" | "off-long";
 type Placement = {
   /** 線を置くセルの日（塊の最後の日）。 */
   anchorDay: WorkingDay;
-  /** 線が覆う列の数（置くセル自身を含む）＝塊の日数。 */
+  /** 線が覆う列の数（置くセル自身を含む）。月をまたぐ塊では、その月の側の日数。 */
   span: number;
+  /** 塊全体の日数（月をまたぐ塊なら前月の側も含む）。ツールチップの「N連勤」に使う。 */
+  length: number;
 };
 
 export type RunMark =
   | (Placement & {
       kind: "work";
-      /** 塊の各日（左から）が何日目かで決まる色。 */
+      /** このセルが覆う各日（左から）が、塊の何日目かで決まる色。 */
       dayTones: WorkDayTone[];
     })
   | (Placement & { kind: "off"; tone: OffTone });
@@ -63,9 +71,12 @@ export const isDayOffSecured = (
 const offTone = (length: number): OffTone | undefined =>
   length >= 3 ? "off-long" : length === 2 ? "off-2" : undefined;
 
+/** 1列ぶん：その日と、出勤／休み／どちらでもない（塊を区切る） */
+type Slot = { day: WorkingDay; kind: RunMark["kind"] | undefined; inTail: boolean };
+
 /**
- * そのスタッフの連勤・連休の線の置き場所を返す。
- * dayOffTarget を渡すと、その日数の休みが入っている人の未定を出勤とみなす。
+ * そのスタッフの連勤・連休の線の置き場所を返す（前月の列に置く線も含む。anchorDay で見分ける）。
+ * dayOffTarget を渡すと、その日数の休みが入っている人の未定を出勤とみなす（今月の側だけ）。
  */
 export function runMarksOf(
   schedule: MonthlyStaffSchedule,
@@ -75,31 +86,58 @@ export function runMarksOf(
   dayOffTarget?: number
 ): RunMark[] {
   const undecidedIsWork = isDayOffSecured(schedule, staffId, dayOffTarget);
-  const marks: RunMark[] = [];
-  let kind: RunMark["kind"] | undefined;
-  let length = 0;
-  const flush = (lastIndex: number) => {
-    const anchorDay = days[lastIndex];
-    if (kind === "work") {
-      marks.push({ kind, dayTones: workDayTones(length, maxConsecutive), anchorDay, span: length });
-    }
-    const tone = kind === "off" ? offTone(length) : undefined;
-    if (tone) marks.push({ kind: "off", tone, anchorDay, span: length });
-    kind = undefined;
-    length = 0;
-  };
-  days.forEach((day, i) => {
-    const here = schedule.isWorking(staffId, day)
+  // 前月の末尾は、表示が今月1日から始まっているときだけつなぐ（間が空くとひと続きではない）
+  const tail = schedule.precedingTail;
+  const startsMonth = days.length > 0 && days[0].equals(schedule.workingDays()[0]);
+  const tailSlots: Slot[] =
+    tail && startsMonth
+      ? tail.days.map((day) => ({
+          day,
+          // 前月の末尾が持つのは出勤と休みだけ（未定は持たない）
+          kind: tail.isWorking(staffId, day) ? "work" : tail.cellOf(staffId, day) ? "off" : undefined,
+          inTail: true,
+        }))
+      : [];
+  const monthSlots: Slot[] = days.map((day) => ({
+    day,
+    kind: schedule.isWorking(staffId, day)
       ? "work"
       : schedule.isDayOff(staffId, day)
         ? "off"
         : undecidedIsWork
           ? "work"
-          : undefined;
-    if (here !== kind) flush(i - 1);
-    kind = here;
-    if (here) length++;
-  });
-  flush(days.length - 1);
+          : undefined,
+    inTail: false,
+  }));
+
+  const marks: RunMark[] = [];
+  /** 1つの塊を、前月の側と今月の側に分けて置く */
+  const place = (run: Slot[]) => {
+    const kind = run[0].kind;
+    const length = run.length;
+    const dayTones = kind === "work" ? workDayTones(length, maxConsecutive) : [];
+    const tone = kind === "off" ? offTone(length) : undefined;
+    if (kind === undefined || (kind === "off" && !tone)) return;
+    const splitAt = run.findIndex((slot) => !slot.inTail);
+    const parts = splitAt <= 0 ? [[0, length]] : [[0, splitAt], [splitAt, length]];
+    for (const [from, to] of parts) {
+      const anchorDay = run[to - 1].day;
+      const span = to - from;
+      if (kind === "work") {
+        marks.push({ kind, dayTones: dayTones.slice(from, to), anchorDay, span, length });
+      } else if (tone) {
+        marks.push({ kind, tone, anchorDay, span, length });
+      }
+    }
+  };
+  let run: Slot[] = [];
+  for (const slot of [...tailSlots, ...monthSlots]) {
+    if (run.length > 0 && slot.kind !== run[0].kind) {
+      place(run);
+      run = [];
+    }
+    run.push(slot);
+  }
+  if (run.length > 0) place(run);
   return marks;
 }

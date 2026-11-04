@@ -48,7 +48,7 @@ export const RunMarks: FC<RunMarksProps> = ({ marks }) => (
             ...(mark.kind === "work" && { background: workGradient(mark.dayTones) }),
           } as CSSProperties
         }
-        title={mark.kind === "work" ? `${mark.span}連勤` : `${mark.span}連休`}
+        title={mark.kind === "work" ? `${mark.length}連勤` : `${mark.length}連休`}
       />
     ))}
   </>

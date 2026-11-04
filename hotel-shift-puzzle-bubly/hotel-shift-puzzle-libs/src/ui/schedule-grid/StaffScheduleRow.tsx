@@ -213,6 +213,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           staffName={staff.name}
           shiftMap={shiftMap}
           className={rowMod.trim() || undefined}
+          runMarks={runMarks}
         />
       )}
 

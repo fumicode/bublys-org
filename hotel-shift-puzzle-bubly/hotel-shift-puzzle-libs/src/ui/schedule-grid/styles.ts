@@ -133,6 +133,8 @@ export const StyledWrap = styled.div`
     }
   }
   .e-prev-cell {
+    /* 連勤・連休の線（.e-run-bar）をセルの下端に置くため */
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
