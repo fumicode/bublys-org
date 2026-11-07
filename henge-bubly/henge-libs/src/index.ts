@@ -35,3 +35,7 @@ export {
 
 // Registration（バブルルート）
 export { hengeBubbleRoutes } from "./registration/bubbleRoutes.js";
+
+// AI を呼ぶ口（ここから先が AI）
+export { askAI, askAIForJson, setAIEndpoint, getAIEndpoint, AIError } from "./ai/askAI.js";
+export type { AskAIRequest } from "./ai/askAI.js";
