@@ -1,0 +1,6 @@
+{
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "cd ../.. && npx nx build @bublys-org/henge-app",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/((?!assets/|bubly\\.js|favicon\\.ico).*)", "destination": "/index.html" }]
+}

@@ -49,6 +49,7 @@ export const OS_LAUNCH_TARGETS: LaunchTarget[] = [
   { url: "itineraries", label: "旅程", icon: <EventNoteIcon color="primary" /> },
   { url: "spots", label: "アクティビティ", icon: <HikingIcon sx={{ color: "#e06c2b" }} /> },
   { url: "lodgings", label: "宿泊施設", icon: <HotelIcon sx={{ color: "#9a5bd6" }} /> },
+  { url: "henge", label: "化", icon: <TransformIcon sx={{ color: "#d4503e" }} /> },
   { url: "pocket", label: "ポケット", icon: <WorkspacesIcon sx={{ color: "#6ea8ff" }} /> },
   { url: "universe", label: "ユニバース", icon: <PublicIcon sx={{ color: "#7e9bd4" }} /> },
   { url: "bubly-loader", label: "バブリを追加", icon: <ExtensionIcon color="action" /> },

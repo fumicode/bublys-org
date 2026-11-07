@@ -9,6 +9,7 @@
     "@bublys-org/csv-importer-libs": "*",
     "@bublys-org/domain-registry": "*",
     "@bublys-org/hash-world-line": "*",
+    "@bublys-org/henge-libs": "*",
     "@bublys-org/itinerary-libs": "*",
     "@bublys-org/launcher-libs": "*",
     "@bublys-org/launcher-model": "*",
