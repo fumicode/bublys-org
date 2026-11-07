@@ -26,6 +26,7 @@ import { objectTransformerBubbleRoutes } from "@bublys-org/object-transformer-li
 import { mapBubbleRoutes } from "@bublys-org/map-libs";
 import { itineraryBubbleRoutes } from "@bublys-org/itinerary-libs";
 import { lodgingBubbleRoutes } from "@bublys-org/lodging-libs";
+import { hengeBubbleRoutes } from "@bublys-org/henge-libs";
 import { igoGameBubbleRoutes } from "@/app/igo-game/bubbleRoutes";
 // ekikyoは動的ロードに移行（バブリテスト）
 // import { ekikyoBubbleRoutes } from "@bublys-org/ekikyo-libs";
@@ -198,6 +199,7 @@ const routes: BubbleRoute[] = [
   ...mapBubbleRoutes,
   ...itineraryBubbleRoutes,
   ...lodgingBubbleRoutes,
+  ...hengeBubbleRoutes,
 
   // 易経（プラグインとして動的ロード）
   // ...ekikyoBubbleRoutes,

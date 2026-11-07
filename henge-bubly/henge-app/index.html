@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>化</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="化（henge）バブリ。" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <!-- JS が届くまでのあいだ出ている最初の画面。React が最初の描画で置き換える -->
+    <div id="root">
+      <div
+        style="
+          position: fixed; inset: 0; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 14px;
+          background: hsl(24, 18%, 14%); color: #f2ece2;
+          font: 400 16px/1.7 -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+          letter-spacing: 0.02em; text-align: center; padding: 24px;
+        "
+      >
+        <div style="font-size: 28px; font-weight: 600; letter-spacing: 0.2em">化</div>
+        <div style="opacity: 0.45; font-size: 13px">読み込んでいます…</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
