@@ -83,6 +83,21 @@ export function normalizeSeed(seed: PieceSeed_ものの種): PieceSeed_ものの
   return seed;
 }
 
+/** 最初の盤面。化 から 金 へ */
+export const DEFAULT_PUZZLE: { start: string; goal: string; wallet: number; items: PieceSeed_ものの種[] } = {
+  start: "化",
+  goal: "金",
+  wallet: 10,
+  items: [
+    { kind: "kanji", text: "革" },
+    { kind: "kanji", text: "口" },
+    { kind: "meaning", text: "🐚", gloss: "貝" },
+    { kind: "meaning", text: "🧑", gloss: "人" },
+    { kind: "meaning", text: "💬", gloss: "言葉" },
+    { kind: "meaning", text: "🌿", gloss: "草" },
+  ],
+};
+
 /** 非のもの 1 つにつき減らす点 */
 export const NON_PENALTY = 2;
 
