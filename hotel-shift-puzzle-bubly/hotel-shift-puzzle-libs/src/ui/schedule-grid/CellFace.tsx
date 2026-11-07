@@ -72,9 +72,9 @@ export type CellFaceProps = {
  *
  * シフト希望は、実際の割当と同じ1文字（休 / 7 …）を「文字色と同じ色の円」で囲んで出す。
  *   - まだ何も入っていないセル … 希望の候補すべてを円で横に並べる（中央・通常サイズ）
- *   - 実際の値が入ったセル       … 円は1つだけに絞り、小さくなって左上の角へ退避
- *                                 （角から少しはみ出す）。残すのは「その割当に対応する希望」
- *                                 ＝叶ったシフトの色の円
+ *   - 中央に主役が居るセル       … 円は1つだけに絞り、小さくなって左上の角へ退避
+ *     （実際の値・唯一の提案の破線・詰みの ×）。角から少しはみ出す。残すのは「その値に
+ *     対応する希望」＝叶った（提案なら承認すれば叶う）シフトの円
  *   - 希望と違う勤務帯になった   … 円をオレンジにする（＝旧・右上の ⊿ の代わり。
  *                                   ダブルクリックで違反バブルを開けるのも円が引き継ぐ）
  * 範囲違反（連勤など）・1セルで完結する違反（可能勤務帯の外など）・勤務間インターバル違反は、
@@ -158,7 +158,7 @@ export const CellFace: FC<CellFaceProps> = ({
     if (wishEntries.length > 0) className += " has-wish-hint";
   }
 
-  // 確定提案を出したセルでは希望ヒントが隠れるので、希望も title 側に残す。
+  // 確定提案を出したセルでは希望の円が角に1つへ絞られるので、希望の全体は title 側に残す。
   if (forcedCandidate && wishEntries.length > 0) {
     title = `希望: ${wishEntries.map(wishText).join(" ")}`;
   }
@@ -166,27 +166,32 @@ export const CellFace: FC<CellFaceProps> = ({
 
   if (selected) className += " is-selected";
 
-  // 実際の値（出勤/休み）が入っているか。入っていれば希望の円は小さくして左上へ退避する。
+  // ルール: セルの中央は主役（実際の値・唯一の提案の破線・詰みの ×）が使う。主役が居れば
+  // 希望の円は小さくして左上へ退避する（#153。以前は値だけを見ていたので、提案の破線と
+  // 希望の円が中央で重なっていた）。
   const hasValue = cell.kind === "work" || cell.kind === "day-off";
+  const centerTaken = hasValue || !!forcedCandidate || dead;
   // 希望と違う勤務帯になったか。判定は宣言的な制約（希望違反）から導く（表示側で再実装しない）。
   const wishMismatch = !!wishViolation;
 
-  // 値が入ったセルの左上に残す円は1つだけ。「その割当に対応する希望」＝叶ったシフトの円を残す。
-  // 割当が決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
+  // 左上に残す円は1つだけ。「中央の値に対応する希望」＝叶った（提案なら、承認すれば叶う）
+  // シフトの円を残す。決まった後に希望の候補を全部並べても読めないし、どれが叶ったのか分からないため。
   // 叶っていないとき（希望違反）は、破った × 希望 → 叶わなかった ○ 希望 の順に代表を1つ選び、
   // 警告色（is-mismatch）の円として残す＝違反バブルへの導線も1つに集まる。
+  const centerValue = hasValue ? cell : dead ? undefined : forcedCandidate;
+  const centerShift = hasValue ? shift : forcedShift;
   const assignedWishKey =
-    cell.kind === "day-off"
+    centerValue?.kind === "day-off"
       ? DAY_OFF_WISH
-      : cell.kind === "work"
-        ? workWishKey(shift?.name ?? cell.shiftId)
+      : centerValue?.kind === "work"
+        ? workWishKey(centerShift?.name ?? centerValue.shiftId)
         : undefined;
   const cornerWishEntry =
     wishEntries.find((e) => e.key === assignedWishKey) ??
     wishEntries.find((e) => e.pref === "want") ??
     wishEntries[0];
   const shownWishEntries: WishEntry[] =
-    hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
+    centerTaken && cornerWishEntry ? [cornerWishEntry] : wishEntries;
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
@@ -201,7 +206,7 @@ export const CellFace: FC<CellFaceProps> = ({
   // マウントされてしまい左上へ移動する transition が走らない。そのため違反バブルへの導線は
   // ラッパではなく、この span 自身の data-url + ダブルクリック（openBubble）で持たせる。
   const wishMarks = wishEntries.length > 0 && (
-    <span className={`e-wish-marks${hasValue ? " is-corner" : ""}`}>
+    <span className={`e-wish-marks${centerTaken ? " is-corner" : ""}`}>
       {shownWishEntries.map((e, i) => {
         // 見た目（背景・線幅・不透明度）は状態ごとに CSS 側で決める。ここは色と位置だけ渡す。
         const style = {
