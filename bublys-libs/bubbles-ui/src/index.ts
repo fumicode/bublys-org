@@ -54,6 +54,7 @@ export * from './lib/context/KeyboardFocusContext.js';
 // Universe / Viewport glue
 export * from './lib/universe-config.js';
 export * from './lib/utils/measure-viewport.js';
+export * from './lib/utils/narrow-screen.js';
 export * from './lib/utils/drop-point.js';
 export * from './lib/utils/drag-session.js';
 

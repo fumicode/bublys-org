@@ -40,3 +40,16 @@ describe("Bubble.fitInto — 見えている範囲からはみ出さない", () 
     expect(fitted.position).toEqual({ x: 500, y: 200 });
   });
 });
+
+describe("Bubble.fillInto — 狭い画面では見えている範囲いっぱいに広げる", () => {
+  it("小さいバブルも、範囲の左上へ寄せて範囲いっぱいにする", () => {
+    const filled = makeBubble({ x: 30, y: 40 }, { width: 200, height: 100 }).fillInto(region);
+    expect(filled.position).toEqual({ x: 0, y: 0 });
+    expect(filled.size).toEqual({ width: 1000, height: 600 });
+  });
+
+  it("すでにいっぱいなら何も変えない（同じインスタンスを返す）", () => {
+    const b = makeBubble({ x: 0, y: 0 }, { width: 1000, height: 600 });
+    expect(b.fillInto(region)).toBe(b);
+  });
+});

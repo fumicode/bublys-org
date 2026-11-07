@@ -17,6 +17,8 @@ import { Bubble, createBubble } from '../Bubble.domain.js';
 import { BubblesContext, type OpenBubbleOptions } from '../bubble-routing/BubbleRouting.js';
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
 import { measureViewport } from '../utils/measure-viewport.js';
+import { measureOpenRegion } from '../utils/open-region.js';
+import { isNarrowScreen, isSmallScreen, surfaceLeftTopFor } from '../utils/narrow-screen.js';
 import {
   selectBubbleLayers,
   selectSurfaceBubbles,
@@ -33,6 +35,8 @@ import {
   selectGlobalCoordinateSystem,
   setGlobalCoordinateSystem,
   selectSurfaceLeftTop,
+  setSurfaceLeftTop,
+  updateBubble,
   OpeningPosition,
   selectHasBubbleOfUrl,
   selectBubbleIdOfUrl,
@@ -112,6 +116,37 @@ export const BublyApp: FC<BublyAppProps> = ({
   // CoordinateSystem
   const globalCoordinateSystem = useAppSelector(selectGlobalCoordinateSystem);
   const surfaceLeftTop = useAppSelector(selectSurfaceLeftTop);
+
+  /**
+   * ★ **小さい画面では、手前のバブルが画面を使い切る**（utils/narrow-screen.ts）。
+   *   奥のレイヤーを覗かせる空きをやめる。メニューの帯は、幅が狭いときだけ下へ寝かせる
+   *   （下の描画。横持ちは高さのほうが貴重なので脇のまま）。
+   *   そのうえで、**いま表に出ているバブル**を見えている範囲いっぱいに広げる（Bubble.fillInto）。
+   *   開いたとき・PC で置いた配置をスマホで開き直したとき・奥のバブルが表に出てきたときの
+   *   どれも、この1つの規則で画面いっぱいになる。
+   *   広い画面では触らない（海はスクロールでき、画面の外に置くのも使い方のうち）。
+   */
+  const small = isSmallScreen(pageSize);
+  const narrow = isNarrowScreen(pageSize.width);
+  useEffect(() => {
+    if (pageSize.width === 0) return; // まだ測っていない
+    dispatch(setSurfaceLeftTop(surfaceLeftTopFor(pageSize)));
+    // 小さい／広いが切り替わったときだけ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, small]);
+  useEffect(() => {
+    if (!small) return;
+    // 帯が下へ移った後の大きさで測りたいので、描画を 1 回待つ
+    const frame = requestAnimationFrame(() => {
+      const region = measureOpenRegion(surfaceLeftTop);
+      if (!region) return;
+      for (const b of surfaceBubbles) {
+        const filled = b.fillInto(region);
+        if (filled !== b) dispatch(updateBubble(filled.toJSON()));
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [small, narrow, pageSize, surfaceLeftTop, surfaceBubbles, dispatch]);
 
   // アクションハンドラ
   const deleteBubble = useCallback((b: Bubble) => {
@@ -249,6 +284,15 @@ export const BublyApp: FC<BublyAppProps> = ({
     dispatch(removePocketItem(id));
   }, [dispatch]);
 
+  // ポケットの口の置き場。小さい画面ではメニューの帯の中に収める
+  // （バブルの上に浮かせると、画面いっぱいに広げたバブルの中身を隠す）。
+  // 縦持ちは下の帯の右端、横持ちは脇の帯の下端。
+  const pocketPlace = narrow
+    ? { bottom: 6, right: 8 }
+    : small
+      ? { bottom: 6, left: 4 }
+      : { bottom: 20, right: 80 };
+
   const handleMenuItemClick = (item: BublyMenuItem) => {
     const url = typeof item.url === 'function' ? item.url() : item.url;
     if (onOpenUrl) onOpenUrl(url);
@@ -256,34 +300,65 @@ export const BublyApp: FC<BublyAppProps> = ({
   };
 
   return (
-    <Box sx={{ display: 'flex', width: '100%', height: '100vh' }}>
-      {/* サイドバー（アイコンのみ、ホバーでラベル表示） */}
+    <Box
+      sx={{
+        display: 'flex',
+        // 狭い画面では、メニューの帯を下に寝かせる（帯を後ろに描くので column-reverse）
+        flexDirection: narrow ? 'column-reverse' : 'row',
+        width: '100%',
+        // スマホのブラウザはアドレスバーの出入りで 100vh が画面より高くなるので、dvh を使う
+        height: '100dvh',
+      }}
+    >
+      {/* サイドバー（アイコンのみ、ホバーでラベル表示）。狭い画面では下の帯になる */}
       <Box
         sx={{
-          width: 56,
+          ...(narrow
+            // 右端はポケットの口を置く場所として空けておく（下の Pocket）
+            ? { height: 52, borderTop: '1px solid rgba(255,255,255,0.1)', flexDirection: 'row', pr: 7 }
+            : {
+                width: 56,
+                borderRight: '1px solid rgba(255,255,255,0.1)',
+                flexDirection: 'column',
+                // 小さい画面（横持ち）では、下端をポケットの口を置く場所として空けておく
+                ...(small ? { pb: 7 } : {}),
+              }),
           backgroundColor: 'rgba(30, 30, 40, 0.95)',
-          borderRight: '1px solid rgba(255,255,255,0.1)',
           display: 'flex',
-          flexDirection: 'column',
           flexShrink: 0,
         }}
       >
-        <Tooltip title={title} placement="right" arrow>
-          <Box sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+        <Tooltip title={title} placement={narrow ? 'top' : 'right'} arrow>
+          <Box
+            sx={{
+              p: 1.5,
+              textAlign: 'center',
+              ...(narrow
+                ? { borderRight: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center' }
+                : { borderBottom: '1px solid rgba(255,255,255,0.1)' }),
+            }}
+          >
             <Typography variant="subtitle2" sx={{ color: '#fff', fontWeight: 'bold', fontSize: '0.7rem' }}>
               {title.slice(0, 2)}
             </Typography>
           </Box>
         </Tooltip>
 
-        <List sx={{ flex: 1, py: 0.5 }}>
+        <List
+          sx={{
+            flex: 1,
+            ...(narrow
+              ? { display: 'flex', flexDirection: 'row', py: 0, px: 0.5, overflowX: 'auto' }
+              : { py: 0.5, overflowY: 'auto' }),
+          }}
+        >
           {/*
             ★ **メニューはダブルクリックで開く。** 1 回のクリックで開くと、触ってみただけで
               バブルが増えていき、初めての人には「何かが勝手に出てきた」に見える。
               何が開くかはホバーの名前で分かるので、開くと決めたときだけ開く。
           */}
           {menuItems.map((item) => (
-            <Tooltip key={item.label} title={`${item.label}（ダブルクリックで開く）`} placement="right" arrow>
+            <Tooltip key={item.label} title={`${item.label}（ダブルクリックで開く）`} placement={narrow ? 'top' : 'right'} arrow>
               <ListItemButton
                 onDoubleClick={() => handleMenuItemClick(item)}
                 sx={{
@@ -291,6 +366,7 @@ export const BublyApp: FC<BublyAppProps> = ({
                   justifyContent: 'center',
                   px: 0,
                   minHeight: 48,
+                  ...(narrow ? { minWidth: 48, flex: '0 0 auto' } : {}),
                   '&:hover': {
                     backgroundColor: 'rgba(255,255,255,0.1)',
                   },
@@ -316,9 +392,10 @@ export const BublyApp: FC<BublyAppProps> = ({
         {sidebarFooter && (
           <Box
             sx={{
-              mt: 'auto',
+              ...(narrow
+                ? { ml: 'auto', borderLeft: '1px solid rgba(255,255,255,0.1)', alignItems: 'center' }
+                : { mt: 'auto', borderTop: '1px solid rgba(255,255,255,0.1)' }),
               p: 0.5,
-              borderTop: '1px solid rgba(255,255,255,0.1)',
               display: 'flex',
               justifyContent: 'center',
             }}
@@ -359,7 +436,7 @@ export const BublyApp: FC<BublyAppProps> = ({
 
       {/* Pocket */}
       {isPocketOpen ? (
-        <Box sx={{ position: 'fixed', bottom: 20, right: 80, zIndex: 1000 }}>
+        <Box sx={{ position: 'fixed', ...pocketPlace, zIndex: 1000 }}>
           <PocketView
             items={pocketItems}
             onRemove={handlePocketRemove}
@@ -372,8 +449,7 @@ export const BublyApp: FC<BublyAppProps> = ({
         <IconButton
           sx={{
             position: 'fixed',
-            bottom: 20,
-            right: 80,
+            ...pocketPlace,
             zIndex: 1000,
             backgroundColor: 'rgba(255, 255, 255, 0.8)',
             '&:hover': {

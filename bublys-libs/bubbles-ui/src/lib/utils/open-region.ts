@@ -1,8 +1,6 @@
 import type { Point2, Size2 } from "@bublys-org/bubbles-ui-util";
 import { measureViewport } from "./measure-viewport.js";
-
-/** 開いたバブルと画面の縁とのあいだに残す余白（px） */
-const OPEN_MARGIN = 16;
+import { openMarginFor } from "./narrow-screen.js";
 
 /**
  * root の海で**いま見えている範囲**を、surface レイヤーの layer-local 座標で返す。
@@ -17,11 +15,13 @@ export const measureOpenRegion = (surfaceOrigin: Point2): { origin: Point2; size
   const viewport = measureViewport();
   if (!viewport) return null;
   const visible = viewport.visibleRegion();
+  // 縁の余白。狭い画面では詰める（narrow-screen.ts）
+  const margin = openMarginFor(visible.size);
   return {
-    origin: { x: visible.origin.x + OPEN_MARGIN, y: visible.origin.y + OPEN_MARGIN },
+    origin: { x: visible.origin.x + margin, y: visible.origin.y + margin },
     size: {
-      width: visible.size.width - surfaceOrigin.x - OPEN_MARGIN * 2,
-      height: visible.size.height - surfaceOrigin.y - OPEN_MARGIN * 2,
+      width: visible.size.width - surfaceOrigin.x - margin * 2,
+      height: visible.size.height - surfaceOrigin.y - margin * 2,
     },
   };
 };
