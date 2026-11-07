@@ -13,10 +13,11 @@
  *     （以前はアプリ全体スコープへ書き戻す restore 版を自前で持っていた）。
  *   - nameable で apex（選択中の世界）に名前をつけられる（setNodeLabel）。
  *   - ノード要約は出さない。
+ *   - 確定版のノードには節目の旗を立てる（confirmedVersion.ts）。
  *   - Ctrl/Cmd+Z で1つ戻る、Ctrl/Cmd+Shift+Z で1つ進む。勤務表バブルと同じ割り当て
  *     （scheduleUndoBindings。このアプリでは編集を元に戻す＝世界線を戻す）。
  *
- * 「完成レポートを作成」ボタンは勤務表（ScheduleGrid）側に移した。ここは純粋に
+ * 「🏁 確定する」ボタンは勤務表（ScheduleGrid）側にある。ここは純粋に
  * 世界線の可視化・時間移動だけを担う。
  */
 import { FC, useMemo } from "react";
@@ -29,13 +30,15 @@ import {
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { scheduleUndoBindings } from "./scheduleWorldLineKeys.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useConfirmedMilestones } from "./confirmedVersion.js";
 
 type Props = {
   scheduleId: string;
 };
 
-const ScheduleWorldLineViewBody: FC<Props> = () => {
+const ScheduleWorldLineViewBody: FC<Props> = ({ scheduleId }) => {
   const { scope } = useScheduleHistory();
+  const milestones = useConfirmedMilestones(scheduleId);
 
   // 矢印キーで時間移動（← 親 / → 子 / ↑↓ 分岐の兄弟切替）。Ctrl/Cmd+Z・Shift+Z は勤務表バブルと共通
   const keyBindings = useMemo<KeyBinding[]>(
@@ -75,7 +78,12 @@ const ScheduleWorldLineViewBody: FC<Props> = () => {
   // nameable で選択中の世界に名前をつけられる。
   return (
     <StyledWrap>
-      <WorldLineScopeView scope={scope} keyBindings={keyBindings} nameable />
+      <WorldLineScopeView
+        scope={scope}
+        keyBindings={keyBindings}
+        nameable
+        milestoneNodeIds={milestones}
+      />
     </StyledWrap>
   );
 };

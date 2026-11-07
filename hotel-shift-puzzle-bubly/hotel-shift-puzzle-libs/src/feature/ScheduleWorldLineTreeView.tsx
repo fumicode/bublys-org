@@ -7,19 +7,28 @@
  * 「作成後の評価」として世界線グラフを木のビジュアルに変換して見せるビュー。
  * ノードクリックで詳細パネルを開閉（同じノードをもう一度クリック、または
  * 閉じるボタンで閉じる）するだけで、勤務表の状態は変更しない（restore を呼ばない）。
+ * 確定版のノードには節目の旗が立ち、選ぶと詳細パネルに振り返りが出る（読むだけ。#231）。
  */
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
 import { WorldLineTreeView } from "@bublys-org/world-line-graph";
 import { useScheduleHistory } from "./useScheduleHistory.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useConfirmedVersion } from "./confirmedVersion.js";
+import { ConfirmedReview } from "./ConfirmedReview.js";
 
 type Props = {
   scheduleId: string;
 };
 
-const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
+const ScheduleWorldLineTreeViewBody: FC<Props> = ({ scheduleId }) => {
   const { scope } = useScheduleHistory();
+  // 確定版のノードには節目の旗を立て、選ぶと詳細欄に振り返りを出す（#231）
+  const confirmed = useConfirmedVersion(scheduleId);
+  const milestones = useMemo(
+    () => new Set(confirmed ? [confirmed.worldLineNodeId] : []),
+    [confirmed]
+  );
   const getNodeLabel = (id: string) => scope.graph.state.nodes[id]?.label ?? "";
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -43,6 +52,7 @@ const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
           graph={scope.graph}
           getNodeLabel={getNodeLabel}
           onSelectNode={handleSelectNode}
+          milestoneNodeIds={milestones}
         />
       </div>
       {selectedNode && (
@@ -77,6 +87,11 @@ const ScheduleWorldLineTreeViewBody: FC<Props> = () => {
             <span className="d-key">変更件数</span>
             <span className="d-val">{selectedNode.changedRefs.length}件</span>
           </div>
+          {confirmed && selectedNodeId === confirmed.worldLineNodeId && (
+            <div className="d-review">
+              <ConfirmedReview report={confirmed} />
+            </div>
+          )}
         </StyledDetailPanel>
       )}
     </StyledRoot>
@@ -106,6 +121,12 @@ const StyledDetailPanel = styled.div`
   right: 12px;
   bottom: 12px;
   min-width: 180px;
+  /* 振り返りが入ると大きくなるので、木の領域の中に収めて中だけスクロールする
+     （はみ出すと閉じるボタンが外へ出て閉じられなくなる） */
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 8px;
   background: rgba(20, 22, 30, 0.85);
@@ -113,12 +134,17 @@ const StyledDetailPanel = styled.div`
   font-size: 0.78em;
   color: rgba(230, 235, 255, 0.92);
 
+  /* スクロールしても閉じるボタンは欄の上端に残す */
   .d-close {
-    position: absolute;
-    top: 4px;
-    right: 6px;
+    position: sticky;
+    top: 0;
+    float: right;
+    margin: -6px -8px 0 4px;
+    z-index: 1;
     border: none;
-    background: transparent;
+    border-radius: 4px;
+    /* 振り返りの上に重なっても読めるよう、欄と同じ地を敷く */
+    background: rgba(20, 22, 30, 0.85);
     color: rgba(230, 235, 255, 0.6);
     font-size: 1.1em;
     line-height: 1;
@@ -141,6 +167,18 @@ const StyledDetailPanel = styled.div`
   }
   .d-val {
     font-weight: 600;
+  }
+
+  /* 確定版の振り返り（読むだけ）。勤務表の中と同じ部品なので、明るい地の上に描く */
+  .d-review {
+    clear: both;
+    margin-top: 8px;
+    width: 420px;
+    max-width: 100%;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-size: 1.25em;
   }
 `;
 

@@ -624,7 +624,7 @@ export const StyledWrap = styled.div`
       cursor: help;
     }
 
-    /* 参照レポートの貢献度スコア（＝自動シフトで休みを優先する順）。参照レポートと同じ琥珀色 */
+    /* 前月の確定版から引き継いだ★（＝自動シフトで休みを優先する順）。確定版（🏁）と同じ琥珀色 */
     .e-priority-badge {
       flex-shrink: 0;
       font-size: 0.55em;

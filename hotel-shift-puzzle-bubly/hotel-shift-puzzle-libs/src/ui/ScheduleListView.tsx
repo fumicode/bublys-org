@@ -11,12 +11,18 @@ import { MonthlyStaffSchedule } from "../domain/index.js";
 
 type ScheduleListViewProps = {
   schedules: MonthlyStaffSchedule[];
+  /** その月の確定版を持っている勤務表（🏁 を出す） */
+  confirmedScheduleIds?: ReadonlySet<string>;
+  /** 取り込んでいない前月の確定版がある勤務表（「新しい確定版あり」を添える） */
+  pendingScheduleIds?: ReadonlySet<string>;
   onCreate: (params: { storeId: string; year: number; month: number }) => void;
   onRemove: (id: string) => void;
 };
 
 export const ScheduleListView: FC<ScheduleListViewProps> = ({
   schedules,
+  confirmedScheduleIds,
+  pendingScheduleIds,
   onCreate,
   onRemove,
 }) => {
@@ -49,10 +55,30 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                   <div className="e-text">
                     <div className="e-title">
                       {schedule.year}年{schedule.month}月
+                      {confirmedScheduleIds?.has(schedule.id) && (
+                        <span className="e-confirmed" title="この月の確定版を持っています">
+                          🏁 確定版
+                        </span>
+                      )}
                     </div>
                     <div className="e-meta">
                       {schedule.storeId} ・ {schedule.assignments.length}件の割当
                     </div>
+                    {(schedule.precedingTail?.yearMonth || pendingScheduleIds?.has(schedule.id)) && (
+                      <div className="e-inheritance">
+                        {schedule.precedingTail?.yearMonth && (
+                          <span title="勤務表は、前月の確定版から引き継いで始まります">
+                            ← {schedule.precedingTail.yearMonth.year}年
+                            {schedule.precedingTail.yearMonth.month}月の確定版から引き継ぎ
+                          </span>
+                        )}
+                        {pendingScheduleIds?.has(schedule.id) && (
+                          <span className="e-pending" title="勤務表を開くと取り込めます">
+                            新しい確定版あり
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </ObjectView>
@@ -161,6 +187,26 @@ const StyledContainer = styled.div`
     .e-meta {
       font-size: 0.82em;
       color: #777;
+    }
+    .e-confirmed {
+      margin-left: 6px;
+      font-size: 0.75em;
+      font-weight: normal;
+      color: #8d6e00;
+      border: 1px solid #ffe082;
+      background: #fffde7;
+      border-radius: 999px;
+      padding: 0 6px;
+    }
+    .e-inheritance {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 0.78em;
+      color: #8d6e00;
+    }
+    .e-pending {
+      color: #e65100;
     }
     .e-remove {
       color: #b0b0b0;

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * ReportPriorityIcon — 「参照レポートの貢献度で休みを優先する」（全体・on/off）の動的アイコン。
+ * StarPriorityIcon — 「前月の確定版から引き継いだ★で休みを優先する」（全体・on/off）の動的アイコン。
  * ★の高い人から順に休み（休）を取る並びを描き、有効なら色付き、無効（off）なら淡色にする。
  */
 import { FC } from "react";
@@ -13,7 +13,7 @@ type Props = {
   size?: number;
 };
 
-export const ReportPriorityIcon: FC<Props> = ({ on, size = ICON_SIZE }) => {
+export const StarPriorityIcon: FC<Props> = ({ on, size = ICON_SIZE }) => {
   const star = on ? "#f9a825" : "#bdbdbd";
   const offBg = on ? "#eceff1" : "#f5f5f5";
   const offFg = on ? "#546e7a" : "#bdbdbd";

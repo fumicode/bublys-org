@@ -27,7 +27,8 @@ import {
   StaffMonthlyShiftWish,
   ConstraintSet,
   type ConstraintSetPlain,
-  ScheduleReport,
+  ConfirmedSchedule,
+  type ConfirmedSchedulePlain,
   type MonthlyStaffSchedulePlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
@@ -55,7 +56,11 @@ export const CONSTRAINT_SET_TYPE = "ConstraintSet";
 /** グローバルの制約セット（テンプレート）の固定ID。勤務表作成時にこれをコピーする。 */
 export const GLOBAL_CONSTRAINT_SET_ID = "global";
 
-export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
+/**
+ * 確定版（店舗×月で1つ。#231）。型名は保存されている世界線の参照に載っているので、
+ * クラスを ConfirmedSchedule に改めたあとも旧名 "ScheduleReport" のまま変えない。
+ */
+export const CONFIRMED_SCHEDULE_TYPE = "ScheduleReport";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
@@ -146,7 +151,7 @@ export const HOTEL_OBJECTS = defineObjects({
     // 稼働日ごとの予約状況（宿泊人数・部屋数）は「実際の予約」という外部の実データ。
     // シフト作成の試行錯誤（勤務表の世界線）とは別物なので、世界に属さない（external、既定）。
     // 勤務表の世界の中から読んでも常にグローバルを見るので、時間移動しても予約状況は
-    // 変わらない（ScheduleReport と同じ考え方）。
+    // 変わらない（ConfirmedSchedule と同じ考え方）。
     // state が完全 plain（scheduleId ＋ byDay マップ）なので serialize 不要。
   },
   StaffMonthlyShiftWish: {
@@ -174,13 +179,18 @@ export const HOTEL_OBJECTS = defineObjects({
         id === GLOBAL_CONSTRAINT_SET_ID ? undefined : localScopeId(SCHEDULE_TYPE, id),
     },
   },
+  // 保存上の型名は旧名のまま（CONFIRMED_SCHEDULE_TYPE を参照）
   ScheduleReport: {
-    class: ScheduleReport,
-    getId: (r: ScheduleReport) => r.state.id,
+    class: ConfirmedSchedule,
+    getId: (r: ConfirmedSchedule) => r.state.id,
     icon: React.createElement(AssessmentIcon, { fontSize: "small" }),
     // 確定時点のスナップショット。世界に属さない（external、既定）。
     // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
-    // 意味が壊れる。state が完全 plain → serialize 不要。
+    // 意味が壊れる。保存形は旧形式の名前（contributionScores）も読めるよう codec を明示する。
+    serialize: {
+      toJSON: (r: ConfirmedSchedule) => r.toPlain(),
+      fromJSON: (j) => ConfirmedSchedule.fromPlain(j as ConfirmedSchedulePlain),
+    },
   },
 });
 

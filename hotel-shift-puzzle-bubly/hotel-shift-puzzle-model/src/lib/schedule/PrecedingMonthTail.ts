@@ -22,9 +22,15 @@
  *
  * 前月の確定版で未定のままのセルは記録しない（＝出勤していない扱い。月内の未定と同じ）。
  *
+ * **引き継ぐのは末尾の勤務だけではない**（#231）。振り返りの★も一緒に写し取る。
+ * 「引き継いだものは今月の世界に焼き付き、前月の確定版を後から見に行かない」ので、
+ * 前月の確定版が置き換わったり重みが変わったりしても、今月の休みの優先順は黙って変わらない。
+ * 新しい確定版を取り込むかは人が決める（どの版から写したかは source が持つ）。
+ *
  * 不変。
  */
 import { WorkingDay, type WorkingDayState } from "./WorkingDay.js";
+import type { ConfirmedVersion, StarEntry } from "./ConfirmedSchedule.js";
 // 型だけ（MonthlyStaffSchedule 側がこのクラスを値として使うので、実行時の循環を作らない）
 import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
@@ -100,21 +106,42 @@ export const precedingTailLengthFor = (maxConsecutiveWorkdays: number): number =
   Math.max(PRECEDING_TAIL_MIN_DAYS, maxConsecutiveWorkdays);
 
 export type PrecedingMonthTailState = {
-  /** 写し元：前月の確定レポートのID */
-  sourceReportId: string;
-  /** 写し元が確定した時刻（epoch ms）。分からない古いレポートは undefined */
+  /** 写し元：前月の確定版の版（どの勤務表のどのノードか） */
+  source: ConfirmedVersion;
+  /** 写し元が確定した時刻（epoch ms）。分からない古い確定版は undefined */
   confirmedAt?: number;
   /** 写し取った前月の日（暦順。最後が前月の末日） */
   days: WorkingDay[];
   /** 写し取ったセル（出勤・休みのみ。未定は持たない） */
   cells: PrecedingCell[];
+  /**
+   * 写し取った★。undefined は★を写す前に引き継いだ古い形
+   * （#231 より前。0点の人ばかりの [] とは違う）。
+   */
+  stars?: StarEntry[];
 };
 
 export type PrecedingMonthTailPlain = {
-  sourceReportId: string;
+  source?: ConfirmedVersion;
+  /**
+   * 旧形式：写し元の振り返りの ID（"勤務表ID:ノードID"）。読むときだけ受け付けて
+   * source へ読み替える。書くことはない。
+   */
+  sourceReportId?: string;
   confirmedAt?: number;
   days: WorkingDayState[];
   cells: PrecedingCellPlain[];
+  stars?: StarEntry[];
+  /** 旧形式：★を「貢献度スコア」と呼んでいた頃の名前。読むときだけ受け付ける */
+  contributionScores?: StarEntry[];
+};
+
+/** 旧形式の振り返り ID（"勤務表ID:ノードID"）を版へ読み替える。最初のコロンで切る */
+const versionFromLegacyReportId = (reportId: string): ConfirmedVersion => {
+  const i = reportId.indexOf(":");
+  return i < 0
+    ? { scheduleId: reportId, worldLineNodeId: "" }
+    : { scheduleId: reportId.slice(0, i), worldLineNodeId: reportId.slice(i + 1) };
 };
 
 export class PrecedingMonthTail {
@@ -128,11 +155,13 @@ export class PrecedingMonthTail {
    *   （出勤だったという事実は連勤に効くので落とさない）。
    */
   static capture(params: {
-    sourceReportId: string;
+    source: ConfirmedVersion;
     confirmedAt?: number;
     schedule: MonthlyStaffSchedule;
     shiftNameOf: (shiftId: string) => string | undefined;
     length: number;
+    /** 前月の確定版の振り返りの★。一緒に写し取る */
+    stars: readonly StarEntry[];
   }): PrecedingMonthTail {
     const all = params.schedule.workingDays();
     const days = all.slice(Math.max(0, all.length - params.length));
@@ -149,15 +178,27 @@ export class PrecedingMonthTail {
       }
     }
     return new PrecedingMonthTail({
-      sourceReportId: params.sourceReportId,
+      source: { ...params.source },
       confirmedAt: params.confirmedAt,
       days,
       cells,
+      stars: params.stars.map((s) => ({ ...s })),
     });
   }
 
-  get sourceReportId(): string {
-    return this.state.sourceReportId;
+  /** 写し元：前月の確定版の版 */
+  get source(): ConfirmedVersion {
+    return this.state.source;
+  }
+
+  /** 写し取った★。★を写す前の古い形なら undefined */
+  get stars(): StarEntry[] | undefined {
+    return this.state.stars;
+  }
+
+  /** そのスタッフの写し取った★。行が無ければ 0 */
+  starsOf(staffId: string): number {
+    return this.state.stars?.find((s) => s.staffId === staffId)?.score ?? 0;
   }
 
   get confirmedAt(): number | undefined {
@@ -232,7 +273,9 @@ export class PrecedingMonthTail {
   /** 中身の同一性キー（判定のキャッシュを末尾ごとに分けるため） */
   get signature(): string {
     if (this.cachedSignature === undefined) {
-      const parts = [this.state.sourceReportId, ...this.state.days.map((d) => d.key)];
+      // ★は制約の判定に効かないので入れない（判定のキャッシュを無駄に分けない）
+      const { scheduleId, worldLineNodeId } = this.state.source;
+      const parts = [`${scheduleId}:${worldLineNodeId}`, ...this.state.days.map((d) => d.key)];
       for (const c of this.state.cells) {
         parts.push(`${c.staffId}@${c.day.key}=${c.shiftName ?? "off"}`);
       }
@@ -243,20 +286,33 @@ export class PrecedingMonthTail {
 
   toPlain(): PrecedingMonthTailPlain {
     const plain: PrecedingMonthTailPlain = {
-      sourceReportId: this.state.sourceReportId,
+      source: { ...this.state.source },
       days: this.state.days.map((d) => ({ ...d.state })),
       cells: this.state.cells.map((c) => c.toPlain()),
     };
     if (this.state.confirmedAt !== undefined) plain.confirmedAt = this.state.confirmedAt;
+    if (this.state.stars !== undefined) {
+      plain.stars = this.state.stars.map((s) => ({ ...s }));
+    }
     return plain;
   }
 
+  /**
+   * 世界線の過去のノードには #231 より前の形（sourceReportId・★なし）が残っているので、
+   * 読み替えて受け付ける。
+   */
   static fromPlain(plain: PrecedingMonthTailPlain): PrecedingMonthTail {
+    const source = plain.source
+      ? { ...plain.source }
+      : versionFromLegacyReportId(plain.sourceReportId ?? "");
     return new PrecedingMonthTail({
-      sourceReportId: plain.sourceReportId,
+      source,
       confirmedAt: plain.confirmedAt,
       days: plain.days.map((d) => new WorkingDay({ ...d })),
       cells: plain.cells.map((c) => PrecedingCell.fromPlain(c)),
+      ...((plain.stars ?? plain.contributionScores)
+        ? { stars: (plain.stars ?? plain.contributionScores ?? []).map((s) => ({ ...s })) }
+        : {}),
     });
   }
 }
