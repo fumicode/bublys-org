@@ -23,6 +23,7 @@ import {
 } from "../domain/index.js";
 import {
   STAFF_COL_WIDTH,
+  STAFF_COL_WIDTH_COMPACT,
   DAY_COL_WIDTH,
   PREV_COL_WIDTH,
   OFF_COL_WIDTH,
@@ -62,6 +63,16 @@ import type {
 } from "./schedule-grid/types.js";
 
 type ScheduleGridViewProps = {
+  /**
+   * 狭い表示（スマホなど、勤務表バブルの幅が狭いとき）。表を読むのを優先して、スタッフ列は
+   * 名前だけに細くし、右の「休」「早」の列は固定せずに日の列と一緒に流す（styles.ts）。
+   */
+  compact?: boolean;
+  /**
+   * 予約情報を畳んで始めるか（表が主役の表示。スマホの縦持ち・横持ち）。
+   * 一度開け閉めしたら、その選択に従う。
+   */
+  reservationFolded?: boolean;
   schedule: MonthlyStaffSchedule;
   staffList: Staff[];
   /** 勤務帯（独立集約）。勤務帯ID の解決に使う */
@@ -204,6 +215,8 @@ function groupStaffByDepartment(
  * useCellKeyboardEditing に、見た目は schedule-grid/ 配下の子コンポーネントに委ねる。
  */
 export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
+  compact = false,
+  reservationFolded = false,
   schedule,
   staffList,
   workShifts,
@@ -242,7 +255,12 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const days = schedule.workingDays();
 
   // 予約情報ブロック（日付の上の 中/夕/泊・備考・婚礼）の折りたたみ状態
-  const [reservationCollapsed, setReservationCollapsed] = useState(false);
+  // 予約情報の折りたたみ。触るまでは reservationFolded に従う（表が主役の表示では畳んで始める）。
+  // 一度開け閉めしたら、その選択に従う。
+  const [reservationChoice, setReservationChoice] = useState<boolean | null>(null);
+  const reservationCollapsed = reservationChoice ?? reservationFolded;
+  const setReservationCollapsed = (toggle: (collapsed: boolean) => boolean) =>
+    setReservationChoice(toggle(reservationCollapsed));
 
   // 選択モード（誰か選択中）か。選択中は対象行を強調し、対象外の行を減光する。
   const focusActive = (selectedStaffIds?.size ?? 0) > 0;
@@ -494,7 +512,8 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   const precedingDays = precedingTail?.days ?? [];
   const precedingCols =
     precedingDays.length > 0 ? `repeat(${precedingDays.length}, ${PREV_COL_WIDTH}px) ` : "";
-  const gridTemplateColumns = `${STAFF_COL_WIDTH}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
+  const staffColWidth = compact ? STAFF_COL_WIDTH_COMPACT : STAFF_COL_WIDTH;
+  const gridTemplateColumns = `${staffColWidth}px ${precedingCols}repeat(${days.length}, ${DAY_COL_WIDTH}px) ${OFF_COL_WIDTH}px ${EARLY_COL_WIDTH}px`;
   // スタッフ列の右から、前月の列＋日列＋休＋早までを覆う span（部署セパレータ・予約トグル帯）
   const daysThroughSummarySpan = `2 / ${precedingDays.length + days.length + 4}`;
 
@@ -592,7 +611,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   return (
     <StyledWrap>
       <div
-        className="e-grid"
+        className={`e-grid${compact ? " is-compact" : ""}`}
         style={{ gridTemplateColumns }}
         ref={kb.gridRef}
         tabIndex={0}
