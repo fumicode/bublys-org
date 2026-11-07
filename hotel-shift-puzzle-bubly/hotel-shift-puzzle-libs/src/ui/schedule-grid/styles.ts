@@ -564,6 +564,32 @@ export const StyledWrap = styled.div`
     }
   }
 
+  /* 狭い表示（compact。スマホなど）: 表を読むのを優先する。
+     - 左のスタッフ列は名前だけ（人のアイコン・抽出のチェックは畳む）
+     - 右の「休」「早」の列は固定しない。左右の両方を固定すると、幅 380px ほどの画面では
+       日の列が3日ぶんしか見えない。休・早は日の列と一緒に流れ、右端までスクロールすれば読める */
+  .e-grid.is-compact {
+    .e-staff-icon,
+    .e-staff-check {
+      display: none;
+    }
+    .e-staff {
+      padding: 4px;
+    }
+    /* 左上の部署フィルタも細い列に収める */
+    .e-dept-select {
+      max-width: 52px;
+    }
+    .e-off-head,
+    .e-off-total,
+    .e-early-head,
+    .e-early-total,
+    .e-res-filler,
+    .e-res-early-filler {
+      right: auto;
+    }
+  }
+
   /* スタッフ名（左に固定）。抽出チェックボックスがあるときは横並び */
   .e-staff-cell {
     position: sticky;

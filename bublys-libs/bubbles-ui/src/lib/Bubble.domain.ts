@@ -236,6 +236,21 @@ export class Bubble {
    * まず位置を範囲の内側へ寄せ、それでも入らない向きだけ範囲の大きさまで縮める。
    * はみ出していなければ何も変えない（大きさを決めていないバブルは決めないまま）。
    */
+  /**
+   * **見えている範囲（`region`、layer-local）いっぱいに広げる。** 狭い画面で、表に出ている
+   * バブルが画面を使い切るために使う（narrow-screen.ts）。すでにいっぱいなら何も変えない。
+   */
+  fillInto(region: { origin: Point2; size: Size2 }): Bubble {
+    const box = this.size ?? this.defaultSize;
+    const same =
+      this.position.x === region.origin.x &&
+      this.position.y === region.origin.y &&
+      box.width === region.size.width &&
+      box.height === region.size.height;
+    if (same) return this;
+    return this.resizeTo({ ...region.size }).moveTo({ ...region.origin });
+  }
+
   fitInto(region: { origin: Point2; size: Size2 }): Bubble {
     const box = this.size ?? this.defaultSize;
     const width = Math.min(box.width, region.size.width);
