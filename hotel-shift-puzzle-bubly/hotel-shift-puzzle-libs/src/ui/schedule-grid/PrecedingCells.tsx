@@ -16,6 +16,8 @@ import type {
   WorkShift,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { SHIFT_BG, SHIFT_FG } from "./constants.js";
+import { RunMarks } from "./RunMarks.js";
+import type { RunMark } from "./runMarkPlacement.js";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -47,7 +49,9 @@ export const PrecedingStaffCells: FC<{
   /** 今月の勤務帯（名前で引いて、色と開始時刻を借りる） */
   shiftMap: Map<string, WorkShift>;
   className?: string;
-}> = ({ tail, staffId, staffName, shiftMap, className }) => {
+  /** 連勤・連休の線（runMarksOf の結果。前月の日に置くものだけをここで描く） */
+  runMarks?: readonly RunMark[];
+}> = ({ tail, staffId, staffName, shiftMap, className, runMarks = [] }) => {
   const shiftByName = new Map<string, WorkShift>();
   for (const w of shiftMap.values()) if (!shiftByName.has(w.name)) shiftByName.set(w.name, w);
   return (
@@ -57,6 +61,7 @@ export const PrecedingStaffCells: FC<{
         const last = i === tail.days.length - 1 ? " is-last" : "";
         const extra = className ? ` ${className}` : "";
         const base = `前月 ${day.label} ${staffName}`;
+        const lines = <RunMarks marks={runMarks.filter((m) => m.anchorDay.equals(day))} />;
         if (cell?.shiftName !== undefined) {
           const shift = shiftByName.get(cell.shiftName);
           return (
@@ -71,6 +76,7 @@ export const PrecedingStaffCells: FC<{
               title={`${base}: ${cell.shiftName}`}
             >
               {shift ? shift.startHour : cell.shiftName.slice(0, 1)}
+              {lines}
             </div>
           );
         }
@@ -82,6 +88,7 @@ export const PrecedingStaffCells: FC<{
               title={`${base}: 休み`}
             >
               休
+              {lines}
             </div>
           );
         }

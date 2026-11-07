@@ -18,6 +18,8 @@
  * | 違反（日をまたぐ）     | 下端の赤い帯                                 |
  * | 違反（勤務間の間隔）   | 2日の境目の赤い縦線＋丸                      |
  * | 詰み（入れる値が無い） | 赤い斜線の地＋×                              |
+ * | 連勤（選んだ人の行）   | 下端の 2px の線。何日目かで 緑→黄緑→黄→濃い橙（RUN_TONE_COLOR） |
+ * | 連休（選んだ人の行）   | 下端の 2px の点線。2連休＝水色 / 3連休以上＝青（OFF_RUN_COLOR） |
  *
  * 赤（VIOLATION）は「制約に反している」だけに使う。破線は「唯一の提案」だけに使う
  * （希望の×の円の破線は、円という別の形の中の線種なので混同しない）。斜線は「詰み」だけに使う。
@@ -27,5 +29,25 @@
 export const VIOLATION = "#e53935";
 /** 違反の赤（濃い：違反の文・円の縁） */
 export const VIOLATION_STRONG = "#c62828";
+/**
+ * 連勤の何日目かの色（runMarkPlacement.ts の WorkDayTone）。勤務表の連勤の線と、
+ * 制約バーの連勤アイコン（MaxConsecutiveIcon）が同じ色で描く。
+ * 上限を超えた日（over）は赤に近い濃い橙で、**赤は使わない**。線が上限を超えて見えても、
+ * 制約に反しているとは限らないため（みなし出勤は連勤制約に数えない）。本当の違反なら、
+ * その上に違反の赤帯が重なって赤になる。
+ */
+export const RUN_TONE_COLOR = {
+  ok: "#43a047",
+  near: "#9ccc65",
+  limit: "#fdd835",
+  over: "#f4511e",
+} as const;
+
+/** 連休の点線の色（runMarkPlacement.ts の OffTone） */
+export const OFF_RUN_COLOR = {
+  "off-2": "#4fc3f7",
+  "off-long": "#1565c0",
+} as const;
+
 /** 唯一の提案の破線 */
 export const PROPOSAL_BORDER = "1px dashed rgba(0, 0, 0, 0.35)";

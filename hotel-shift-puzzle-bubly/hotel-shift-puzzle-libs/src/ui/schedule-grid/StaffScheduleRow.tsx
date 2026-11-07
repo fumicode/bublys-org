@@ -18,6 +18,7 @@ import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
 import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
+import { isDayOffSecured, runMarksOf } from "./runMarkPlacement.js";
 import { LeaderBadges } from "../LeaderBadges.js";
 import { DayOffStyleIcon } from "../constraint-icons/DayOffStyleIcon.js";
 import type { WishEntry } from "./wishSummary.js";
@@ -69,6 +70,10 @@ type StaffScheduleRowProps = {
   dimmed?: boolean;
   /** 月の最低休日数。これ未満なら右端の休み合計を赤くする（制約の可視化） */
   minDayOff?: number;
+  /** 連勤の上限。選択中の行に連勤・連休の線を引くときの色の基準（無ければ線を引かない） */
+  maxConsecutive?: number;
+  /** 月の休みの目標日数。これだけ休みが入った人は、連勤・連休の線で未定を出勤とみなす（試行中） */
+  dayOffTarget?: number;
   /** 早番として数える勤務帯 ID 集合（名前「早番」に属する ID） */
   earlyShiftIds: ReadonlySet<string>;
   /** 未定セルの候補集合の説明文（title に添える）。確定済みセルには何も返さない。 */
@@ -116,6 +121,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   focused,
   dimmed,
   minDayOff,
+  maxConsecutive,
+  dayOffTarget,
   earlyShiftIds,
   candidateHintOf,
   dayOffReasonOf,
@@ -129,6 +136,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   const earlyCount = schedule.countWorkingForStaff(staff.id, earlyShiftIds);
   // 違反の印（連勤の赤帯・1セルの違反の角・勤務間インターバルの境目の印）は、違反が覆う範囲の末尾のセルに置く
   const marks = violationMarksOf(violations, staff.id, days);
+  // 連勤・連休の細い線は、選択中のスタッフの行にだけ引く（案を見比べる人を絞って読む）
+  const runMarks =
+    selected && maxConsecutive !== undefined
+      ? runMarksOf(schedule, staff.id, days, maxConsecutive, dayOffTarget)
+      : [];
   const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
   return (
     <>
@@ -152,8 +164,18 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           draggable={true}
           openingPosition="bubble-side-left"
           fullWidth={true}
+          // 名前を押しても選択できる（チェックボックスと同じ切り替え）。
+          // バッジは自分で stopPropagation しているので、押しても選択は変わらない
+          onClick={onToggleSelected && (() => onToggleSelected(staff.id))}
         >
-          <div className="e-staff" title="ダブルクリックでスタッフ詳細を開く">
+          <div
+            className="e-staff"
+            title={
+              onToggleSelected
+                ? "クリックで選択・ダブルクリックでスタッフ詳細を開く"
+                : "ダブルクリックでスタッフ詳細を開く"
+            }
+          >
             <PersonIcon fontSize="small" className="e-staff-icon" />
             <span className="e-staff-name">{staff.name}</span>
             <span className="e-staff-badges">
@@ -191,6 +213,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           staffName={staff.name}
           shiftMap={shiftMap}
           className={rowMod.trim() || undefined}
+          runMarks={runMarks}
         />
       )}
 
@@ -219,6 +242,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             shift={shift}
             wishEntries={getWishEntries(staff.id, day)}
             violationMarks={marks.filter((m) => m.anchorDay.equals(day))}
+            runMarks={runMarks.filter((m) => m.anchorDay.equals(day))}
             wishViolation={wishViolation}
             cellKey={`${staff.id}:${day.key}`}
             selected={isSelected}
@@ -245,10 +269,12 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         );
       })}
 
-      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くし、違反バブルを開ける */}
+      {/* 右端: そのスタッフの月内休み合計。最低休日数未満なら赤くし、違反バブルを開ける。
+          休みの目標日数に届いていれば緑にする（残りの未定は出勤とみなす＝連勤の線と同じ判定） */}
       {(() => {
         const offCount = schedule.countDayOffForStaff(staff.id);
         const underMin = minDayOff !== undefined && offCount < minDayOff;
+        const secured = !underMin && isDayOffSecured(schedule, staff.id, dayOffTarget);
         const violation = underMin
           ? violations.find(
               (v) =>
@@ -260,14 +286,16 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
         return (
           <div
             className={`e-off-total${underMin ? " is-under-min" : ""}${
-              url ? " is-clickable" : ""
-            }${rowMod}`}
+              secured ? " is-secured" : ""
+            }${url ? " is-clickable" : ""}${rowMod}`}
             title={
               underMin
                 ? `${staff.name} の休み ${offCount}日（最低${minDayOff}日）${
                     url ? "。ダブルクリックで違反を開く" : ""
                   }`
-                : `${staff.name} の休み合計`
+                : secured
+                  ? `休み数${dayOffTarget}を確保したので、残りは勤務日とみなします（${staff.name} の休み ${offCount}日）`
+                  : `${staff.name} の休み合計`
             }
           >
             {url ? (
