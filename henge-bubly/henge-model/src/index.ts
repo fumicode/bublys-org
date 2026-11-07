@@ -4,6 +4,7 @@ export {
   HENGE_METHODS,
   PIECE_KIND_LABEL,
   NON_PENALTY,
+  DEFAULT_PUZZLE,
   methodsFor,
   normalizeSeed,
 } from "./lib/HengeGame.js";

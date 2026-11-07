@@ -1,11 +1,11 @@
 "use client";
-import { FC, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { HengeGame_化ゲーム, type HengeMethodDef } from "@bublys-org/henge-model";
+import { FC, useCallback, useContext, useEffect, useState } from "react";
+import { DEFAULT_PUZZLE, HengeGame_化ゲーム, type HengeMethodDef } from "@bublys-org/henge-model";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { gameScopeId, HENGE_GAME_TYPE } from "./HengeGameProvider.js";
 import { HengeGameView } from "../ui/HengeGameView.js";
-import { askHenge, askPuzzle } from "../ai/hengeOracle.js";
+import { askHenge } from "../ai/hengeOracle.js";
 
 export type HengeGameFeatureProps = {
   gameId: string;
@@ -33,16 +33,9 @@ export const HengeGameFeature: FC<HengeGameFeatureProps> = ({ gameId, bubbleId }
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 盤面がまだなら AI に作らせる（StrictMode の二重呼びを避ける）
-  const generating = useRef(false);
+  // 盤面がまだなら最初の盤面を置く
   useEffect(() => {
-    if (!shell || !game || game.isSetUp || generating.current) return;
-    generating.current = true;
-    setBusy("盤面を作っています…");
-    askPuzzle()
-      .then((p) => shell.update((g) => g.setUp(p, newId)))
-      .catch((e) => setError(String(e?.message ?? e)))
-      .finally(() => { setBusy(null); generating.current = false; });
+    if (shell && game && !game.isSetUp) shell.update((g) => (g.isSetUp ? g : g.setUp(DEFAULT_PUZZLE, newId)));
   }, [shell, game]);
 
   const handleToggle = useCallback((id: string) => {
