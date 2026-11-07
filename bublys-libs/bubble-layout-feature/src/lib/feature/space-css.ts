@@ -21,6 +21,26 @@ import { CHROME, chromeInset } from '@bublys-org/bubble-layout';
 export const WINDOW_SKY =
   'linear-gradient(145deg,hsl(220 35% 18%) 0%,hsl(225 40% 22%) 40%,hsl(230 35% 20%) 100%)';
 
+/**
+ * **羽** ── 風と針のカーソルが、同じ 1 枚の羽を向きだけ変えて使う。
+ *
+ * ★ 優雅に ── なめらかな曲線だけで描き、切れ込みはやわらかく 1 つ。根元の毛のような
+ *   写実は入れない。白から淡い藤色・水色へ。矢印は出さない（羽だけ）。
+ * ★ 縁の下に白を敷いてある。暗い海の上でも、明るい中身の上でも輪郭が沈まないように。
+ * ★ 48×48（SVG なので高精細の画面でも滲まない）。大きすぎて使えない環境では控えに落ちる。
+ * ★ 押す点はどちらも**羽の軸の根元**（羽ペンのペン先と同じ所）。
+ */
+const featherSvg = (transform: string) =>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='0'><stop offset='0' stop-color='#ffffff'/><stop offset='.5' stop-color='#f2edff'/><stop offset='1' stop-color='#dcefff'/></linearGradient></defs><g transform='${transform}'><path d='M7 0C13 -7 24 -12.6 36 -14.6Q34.6 -12.4 35.6 -11.6Q39.6 -15.4 46 -16C51.5 -16.4 55.5 -14.6 55 -12.6C50 -7 40 -2.6 28 -0.4C19 1.2 11.5 1.4 7 0Z' fill='none' stroke='#fff' stroke-width='2.4' stroke-linejoin='round'/><path d='M0 0C18 0.4 37 -4 54.6 -12.4' fill='none' stroke='#fff' stroke-width='2.2' stroke-linecap='round'/><path d='M7 0C13 -7 24 -12.6 36 -14.6Q34.6 -12.4 35.6 -11.6Q39.6 -15.4 46 -16C51.5 -16.4 55.5 -14.6 55 -12.6C50 -7 40 -2.6 28 -0.4C19 1.2 11.5 1.4 7 0Z' fill='url(#g)' stroke='#8a8dc0' stroke-width='.7' stroke-linejoin='round'/><path d='M17 -0.6Q22 -4.6 25 -9.4M27 -2Q33 -6.4 36.5 -11.6M38.5 -5Q44 -9.4 47.5 -14M19 0.4Q25 0.6 29 -0.6' fill='none' stroke='#d3cdf3' stroke-width='.55' stroke-linecap='round'/><path d='M0 0C18 0.4 37 -4 54.6 -12.4' fill='none' stroke='#8a8dc0' stroke-width='.8' stroke-linecap='round'/></g></svg>`;
+const svgCursor = (svg: string, x: number, y: number) =>
+  `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${x} ${y}`;
+
+/** 風 ── 根元が左下、羽先が右上（そっと吹いて運ぶ） */
+const FEATHER_CURSOR = svgCursor(featherSvg('translate(4 44) rotate(-55) scale(.9 -.9)'), 4, 44);
+
+/** 針 ── 同じ羽を上下に返して、根元が左上・羽先が右下。軸の根元で泡を突いて割る */
+const NEEDLE_CURSOR = svgCursor(featherSvg('translate(4 4) rotate(55) scale(.9 .9)'), 4, 4);
+
 export const SPACE_CSS = `
 /**
  * 器（泡の見た目）── ラボの暗い箱ではなく、バブリの画面が乗る器にする。
@@ -41,6 +61,8 @@ export const SPACE_CSS = `
     hsl(var(--h) 34% 19%) 0%, hsl(var(--h) 32% 15%) 45%, hsl(var(--h) 30% 13%) 100%);
   box-shadow:0 8px 32px hsl(var(--h) 50% 22% / .38), 0 2px 8px rgba(0,0,0,.18),
     inset 0 2px 4px hsla(0,0%,100%,.35), inset 0 -1px 2px hsl(var(--h) 50% 30% / .2)}
+/* 札は小さい角のまま（FIELD_CSS の .bub.chip）。段に入れると上の --rr:16px が勝つので言い直す */
+.bub.chip{--rr:6px}
 /* ③ 見えない親は体を持たない（FIELD_CSS の指定をここでも守る） */
 .bub.imp{background:none;box-shadow:none}
 
@@ -135,6 +157,26 @@ export const SPACE_CSS = `
  * ★ 閉じる（右 4・幅 18）の左隣に 4px 空けて並べるので right は 26。
  *   出るときは url の行き止まりもそのぶん手前へ（下の .bl-url を見よ）。
  */
+/*
+ * 鎖（url を見る・コピーする）── 閉じるの左隣（閉じる 右 4・幅 18 ＋ 隙間 4 ＝ 右 26）。
+ *   ロックが出る泡では、ロックが閉じるの隣に居るので、鎖はそのさらに左（右 48）。
+ * ★ 吹き出しは帯のすぐ下、右端に揃えて出す（泡の外へははみ出してよい）。
+ *   字は data-url を読むだけ ── 乗せるたびに描き直さない。
+ */
+.bub > .bl-link{position:absolute;right:26px;top:3px;width:18px;height:18px;padding:0;
+  border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;pointer-events:auto}
+.bub > .bl-link:hover,.bub > .bl-link:focus-visible{opacity:1;background:rgba(255,255,255,.14)}
+.bub > .bl-link::after{content:attr(data-url);position:absolute;right:0;top:calc(100% + 6px);z-index:3;
+  max-width:360px;padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font:500 11px/1.4 var(--f);letter-spacing:.01em;color:#eaf1ff;background:rgba(12,16,28,.92);
+  box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;opacity:0;transition:opacity 120ms ease}
+.bub > .bl-link:hover::after,.bub > .bl-link:focus-visible::after,
+.bub > .bl-link[data-copied]::after{opacity:1}
+.bub > .bl-link[data-copied]{opacity:1;color:#8ff0b8}
+.bub.nt > .bl-link{display:none}
+.bub:has(> .bl-tool) > .bl-link{right:48px}
 .bub > .bl-tool{position:absolute;right:26px;top:3px;width:18px;height:18px;padding:0;
   border:0;border-radius:4px;background:transparent;color:#eaf1ff;opacity:.55;
   display:flex;align-items:center;justify-content:center;
@@ -182,13 +224,27 @@ export const SPACE_CSS = `
  *   text-overflow:ellipsis が効くのは**行**であって、並べ物の入れ物ではないから
  *   ── flex のままだと、はみ出したぶんがただ切り落とされて … が出ない。
  *   区切りの / は中の字のまま（inline）なので、見た目は今までどおり。
- *   右の余地 34px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 隙間 4。
+ *   右の余地 56px ＝ 左の 8 ＋ 閉じるボタン（右 4・幅 18）＋ 鎖（幅 18 ＋ 隙間 4）＋ 隙間 4。
+ *   ロックが出る泡は、さらにロック 1 つぶん（22px）手前で切る。
  */
-.bub:has(> .bl-tool) > .bl-url{max-width:calc(100% - 56px)}
-.bub > .bl-url{display:block;max-width:calc(100% - 34px);
+.bub:has(> .bl-tool) > .bl-url{max-width:calc(100% - 78px)}
+.bub > .bl-url{display:block;max-width:calc(100% - 56px);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;
   font:600 11px/24px var(--f);letter-spacing:.01em}
 .bl-seg{white-space:nowrap}
+/* 膜の板は皮（skin-css）が使う。皮が無い海では出さない */
+.bub > .bl-film{display:none}
+/*
+ * 型の名前とアイコン。アイコンは字の高さに合わせる（MUI の既定 20px では帯 24px に窮屈）。
+ * ★ **大きさは transform で縮める。** アイコンは型が名乗った MUI の部品で、MUI の CSS は
+ *   段に入っていない ── 器（@layer bl）が width を書いても MUI が必ず勝つ（中身が器に勝つ決まり）。
+ *   MUI が触らない性質で、20px を 14px の台に収める。
+ */
+.bl-kind{display:inline-flex;align-items:center;gap:5px;height:24px;vertical-align:top;white-space:nowrap}
+/* 台は flex にして、中の svg の display（MUI が決める）に行の高さを左右させない */
+.bl-kind-icon{display:flex;flex:none;width:14px;height:14px;line-height:0;overflow:visible}
+.bl-kind-icon > svg{flex:none;transform-origin:0 0;transform:scale(.7)}
+.bl-kind-list{opacity:.7;font-weight:500}
 .bl-sep{opacity:.45;margin:0 3px}
 /*
  * 一覧の中の札 ── **選んでいないあいだは「中身だけ」**。
@@ -204,7 +260,8 @@ export const SPACE_CSS = `
 .bub:not(.sel):has(> .bl-quiet)::after{content:none}
 .bub:not(.sel):has(> .bl-quiet) > .hd,
 .bub:not(.sel):has(> .bl-quiet) > .bl-close,
-.bub:not(.sel):has(> .bl-quiet) > .bl-tool{display:none}
+.bub:not(.sel):has(> .bl-quiet) > .bl-tool,
+.bub:not(.sel):has(> .bl-quiet) > .bl-link{display:none}
 /*
  * ★ 装いを出さないあいだは、**その空けてあった所まで中身を広げる**。
  *   ヘッダのぶん（上 27px）を空けたままだと、札と札のあいだが 48px も開いて
@@ -238,7 +295,8 @@ export const SPACE_CSS = `
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .hd,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .ttl,
 .bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-close,
-.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool{z-index:2}
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-tool,
+.bub.sel:has(> .bl-body.bl-tight:not(.bl-grown)) > .bl-link{z-index:2}
 
 
 /* ObjectView の膜。「掴める・開ける」の唯一の合図（出たら必ず何かできる） */
@@ -258,4 +316,62 @@ export const SPACE_CSS = `
 /* 入れ子のときは内側が勝つ（開くときの stopPropagation と同じ決まりを見た目にも通す） */
 .bl-object[data-film=on]:has([data-object-view]:hover)::after{opacity:0}
 @media (prefers-reduced-motion:reduce){ .bl-object::after{transition:none} }
+
+/*
+ * 風（並べる）── 海のモード（BubbleSpace の SeaMode）。層に .bl-wind が付く。
+ * ★ 自分の層の泡だけに効かせる（子の結合子）。窓の中の海は、窓ごと手が届かなくなるので要らない。
+ * ★ 中身へは手を届かせない。押した所はどこでも泡の枠になる（当たり判定は wholeGrab）。
+ * ★ カーソルは海ぜんぶで羽 ── 背景の上でも、いまのモードが見えるように。
+ *   閉じる・道具の口はそのまま押せるので指のまま。角は大きさを変える矢印のまま。
+ */
+.bl-wind > .bl-hold > .bub > .bl-body{pointer-events:none}
+.bl-wind,.bl-wind .bub,.bl-wind .bub *{cursor:${FEATHER_CURSOR},grab}
+.bl-wind .bub > :is(.bl-close,.bl-tool,.bl-link){cursor:pointer}
+.bl-wind > .bl-hnd{cursor:nwse-resize}
+
+/*
+ * 針 ── × を押したまま引いている間だけ。層に .bl-needle が付く。
+ * ★ どの泡にも**急所**（.bl-spot）が出る。筆跡が急所を通った泡が割れる（BubbleSpace の armNeedle）。
+ *   急所は × の下、泡の右上の**内側**── 割るものと閉じるものが同じ所にある。
+ *   くっきりした玉ではなく、縁のぼやけた赤い光（膜の一部がぼんやり赤くなっている）。
+ *   大きめにして、おおざっぱに引いても当たるようにする（直径 64、赤が濃いのは真ん中）。
+ *   泡ごと縮んで描かれる（transform）ので、px で書けば遠い泡の急所は一緒に小さくなる。
+ * ★ 中身へは手を届かせない ── 筆跡の当たりは急所だけで取るので、中身が上にあると隠れる。
+ */
+.bub > .bl-spot{display:none}
+/* 中身は 1 つの重なりに閉じ込める ── 中身が自分で z-index を持つと（地図の板は 400）、急所を追い越して前に出る */
+.bl-needle > .bl-hold > .bub > .bl-body{pointer-events:none;isolation:isolate}
+.bl-needle > .bl-hold > .bub > .bl-spot{display:block;position:absolute;right:6px;top:28px;z-index:3;
+  width:64px;height:64px;border-radius:50%;pointer-events:auto;
+  background:radial-gradient(circle,rgba(236,34,62,.85) 0,rgba(236,34,62,.6) 28%,rgba(236,34,62,.22) 52%,rgba(236,34,62,0) 72%);
+  animation:bl-spot-beat 1.4s ease-in-out infinite}
+/*
+ * 当たりは、見える赤より画面の上でいつも少し広い（見えない縁）。
+ * ★ 遠い泡は急所も縮んで写るので、そのままだと遠いものほど当てにくい。縁の幅は --k
+ *   （写る倍率の逆数）を掛けて、泡がどれだけ縮んでも画面の上で同じにする。
+ */
+.bl-needle > .bl-hold > .bub > .bl-spot::before{content:"";position:absolute;inset:calc(-6px * var(--k,1));border-radius:50%}
+/* 呼吸 ── 大きさは変えず、赤の濃さだけが寄せては引く（膜が脈打つ） */
+@keyframes bl-spot-beat{0%,100%{opacity:.75}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){ .bl-needle > .bl-hold > .bub > .bl-spot{animation:none} }
+/*
+ * 急所を持たない泡（一覧の札）は、針を素通しにして薄める。
+ * ★ 札は DOM では一覧の兄弟で、一覧より前に描かれる ── そのままだと一覧の急所が札の下に隠れ、
+ *   筆跡も札に当たって届かない。薄めれば、下の急所が透けて見え、札が割る相手でないことも伝わる。
+ * ★ 薄めるのは filter ── 泡の opacity は遠さの薄まりとして style に直に入っているので、上書きできない。
+ */
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)),
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)) *{pointer-events:none}
+.bl-needle > .bl-hold > .bub:not(:has(> .bl-spot)){filter:opacity(.3)}
+.bl-needle,.bl-needle .bub,.bl-needle .bub *{cursor:${NEEDLE_CURSOR},crosshair}
+
+/* はじける泡（popEffect.ts）── 割った瞬間の写し。手は素通し（筆跡の当たりを邪魔しない） */
+/* ★ 写しは現れ直さない ── 泡の出現アニメ（bl-in）まで写ると、割れる泡がふわっと現れ直す */
+.bl-pop-ghost,.bl-pop-ghost *{pointer-events:none !important;transition:none !important;animation:none !important}
+.bl-pop-fx{position:absolute;left:0;top:0;transform-origin:0 0;overflow:visible}
+.bl-pop-ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.95);box-shadow:0 0 10px rgba(255,140,170,.75),inset 0 0 6px rgba(255,255,255,.8)}
+.bl-pop-drop{position:absolute;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff 0,rgba(255,182,224,.95) 45%,rgba(150,214,255,.85) 100%);
+  box-shadow:0 0 4px rgba(255,255,255,.7)}
 `;

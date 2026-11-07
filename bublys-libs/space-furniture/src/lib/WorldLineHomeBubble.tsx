@@ -11,7 +11,7 @@
  * ★ 開く先は**同じ url**（`world-lines`）── つまり出てくるのは自分の複製で、
  *   そちらは広いので世界線を映す。姿の違いは大きさだけで、別の作りは要らない。
  */
-import { FC, useContext, useMemo } from "react";
+import { CSSProperties, FC, useContext, useMemo } from "react";
 import { IconButton, Tooltip } from "@mui/material";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
@@ -82,6 +82,26 @@ export const WorldLineHomeBubble: FC = () => {
 };
 
 /**
+ * **世界線の板** ── 暗いすりガラスに淡い縁。世界線は自分で地を持つ（海は地を敷かない）。
+ *
+ * ★ 地を持たないと、皮を着た海では木だけが背景の絵の上に浮いて、どこまでが世界線か分からない。
+ *   ほかの泡（地図・囲碁）は枠が無くても中身が形を持つが、世界線は線と点だけなので、
+ *   窓として枠を着る。
+ * ★ 暗いほうに寄せるのは、木の線を明るい色で描いているから（明るい板だと読みにくい）。
+ */
+const WORLD_LINE_PANEL: CSSProperties = {
+  position: "relative",
+  width: "100%",
+  height: "100%",
+  borderRadius: "inherit",
+  overflow: "hidden",
+  background: "linear-gradient(180deg,rgba(22,27,46,.86) 0%,rgba(16,20,36,.9) 100%)",
+  backdropFilter: "blur(12px) saturate(1.2)",
+  WebkitBackdropFilter: "blur(12px) saturate(1.2)",
+  boxShadow: "inset 0 0 0 1px rgba(255,255,255,.22), 0 8px 28px rgba(10,14,30,.35)",
+};
+
+/**
  * 海の世界線そのもの。
  *
  * ★ `bubbles-ui` の `WorldLinesBubble` は**旧い海の並び**（`BubbleArrangement`）を読むので、
@@ -108,7 +128,7 @@ const SeaWorldLineView: FC = () => {
     [scope],
   );
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={WORLD_LINE_PANEL}>
       <WorldLineScopeView scope={scope} getNodeSummary={getNodeSummary} keyBindings={keyBindings} />
       <ExportSeedButton />
     </div>

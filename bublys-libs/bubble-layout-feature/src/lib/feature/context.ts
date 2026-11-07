@@ -3,7 +3,7 @@
  * ★ `openingPosition` は無い ── どこに置くかは親の View が決める（DECISIONS.md）。
  */
 import { createContext, useContext } from 'react';
-import type { BubbleId, LensId, PlaneAxis, PresetId, View, WorldState } from '@bublys-org/bubble-layout';
+import type { BubbleId, LensId, PlaneAxis, PresetId, WorldState } from '@bublys-org/bubble-layout';
 
 /**
  * 子をどう並べるか ── **顔ぶれと一緒に渡すもの**（`setChildren`）。
@@ -63,11 +63,12 @@ export interface ChildrenLayout {
    * ★ 出て行ったことをここで知らせれば、持ち主が「では顔ぶれから外す」と決められる。
    *   **決めるのは持ち主**で、器は起きたことを伝えるだけ ── 器が勝手に外すと、
    *   外へ持ち出しただけ（一覧には残したい）のときに消えてしまう。
+   * ★ `space` が `null` なら、**海そのものから出て行った**（岸に貼った・外へ渡した）。
    * ★ `beside` は「**一覧のすぐ隣**（一覧自身と同じ空間）に出されたか」。
    *   もっと外（外の海）へ持ち出されたのとは意味が違うので、そこは持ち主が分けられる
    *   ── 隣に出したのは「一覧から剥がした」、外へ出したのは「持ち出した」。
    */
-  readonly onLeave?: (url: string, at: { readonly space: BubbleId; readonly beside: boolean }) => void;
+  readonly onLeave?: (url: string, at: { readonly space: BubbleId | null; readonly beside: boolean }) => void;
 }
 
 /**
@@ -120,19 +121,7 @@ export interface BubbleSpaceApi {
    * 外の空間の、その軸のレンズを変える ── **魚眼をどちらの向きに掛けるか**。
    * レンズは軸ごとに持つものなので、X と Y は別々に決まる（両方でも、どちらも平行でもよい）。
    */
-  setLens: (axis: PlaneAxis, lens: LensId, spaceId?: BubbleId) => void;
-  /** その泡が中に空間を持っているか（`setChildren` を呼んだ泡） */
-  hasSpace: (id: BubbleId) => boolean;
-  /**
-   * その空間が**一覧か**（中身が同じ型 1 つで、順番で並ぶ所）。
-   *
-   * ★ 一覧とそうでない空間とでは、出す口が違う ── 一覧は「縦・横・格子…」を選ぶ口、
-   *   置いた所に意味がある空間は「どう見るか（寄り引き・魚眼）」の口。
-   *   同じ `View` を書き換えてはいるが、**選ばせてよいものが違う**。
-   */
-  isList: (id: BubbleId) => boolean;
-  /** その空間の、いまの見え方（無ければ null） */
-  viewOf: (spaceId: BubbleId) => View | null;
+  setLens: (axis: PlaneAxis, lens: LensId) => void;
   /**
    * 外の空間の**並べ方**を選ぶ（View のプリセット）。
    * 「開き方」は 1 つしかないので、見え方が変わるのはここだけ。
@@ -187,9 +176,6 @@ export const BubbleSpaceContext = createContext<BubbleSpaceApi>({
   snapshot: () => EMPTY_SNAPSHOT,
   restore: () => undefined,
   openBubble: () => { console.warn('BubbleSpace の外で openBubble が呼ばれた'); return ''; },
-  hasSpace: () => false,
-  isList: () => false,
-  viewOf: () => null,
   closeBubble: () => undefined,
   urlOf: () => null,
   canOpen: () => false,

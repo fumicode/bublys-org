@@ -7,7 +7,7 @@
  *   中の `StoreProvider` と `StyledComponentsRegistry` はどちらも client の部品なので、
  *   サーバの layout から呼んでそのまま動く。
  */
-import 'modern-normalize';
+// modern-normalize は global.css が段（reset）に入れて読む
 import './global.css';
 import type { Metadata, Viewport } from 'next';
 import { StyledComponentsRegistry } from './registry';

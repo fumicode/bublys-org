@@ -1,9 +1,18 @@
-/* modern-normalize は layout.tsx で import 済み */
+/*
+ * ★ **段の順を最初に言う。** 後ろほど強い。段に入っていない CSS（中身の styled-components）は、どの段にも勝つ。
+ *   reset … ブラウザの差をならすもの（modern-normalize と下の全体指定）
+ *   bl    … 泡の器（bubble-layout-feature の BubbleSpace が差し込む）
+ * ★ ならしを段に入れないと、泡の器に勝ってしまう（閉じるボタンの字の大きさなど）。
+ */
+@layer reset, bl;
+@import 'modern-normalize' layer(reset);
 
-*,
-::before,
-::after {
-  box-sizing: border-box;
+@layer reset {
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
+  }
 }
 
 html,

@@ -132,9 +132,16 @@ export const FIELD_CSS = `
 `;
 
 /** 印（いま離したらどうなるか）。lab.html の #marks の所 */
+/*
+ * ★ 印は**どの泡よりも前**。泡は z-index を 100 より上まで持つので、2 だと泡の後ろに隠れていた
+ *   （並べようとしている先が、まさにその泡の上なのに見えない）。
+ * ★ 水色の光に**濃い縁**を足す ── 明るい地（絵や白い泡）の上でも、暗い地の上でも浮くように。
+ */
 export const MARKS_CSS = `
-.bl-marks{position:absolute;inset:0;pointer-events:none;z-index:2}
+.bl-marks{position:absolute;inset:0;pointer-events:none;z-index:100000}
 .bl-marks div{position:absolute;box-sizing:border-box}
-.bl-marks .mk-cell{border:2px dashed #6ee7ff;border-radius:5px;background:rgba(110,231,255,.12);box-shadow:0 0 10px rgba(110,231,255,.75)}
-.bl-marks .mk-line{background:#6ee7ff;box-shadow:0 0 10px rgba(110,231,255,.85)}
+.bl-marks .mk-cell{border:2px dashed #3fd8ff;border-radius:5px;background:rgba(63,216,255,.18);
+  box-shadow:0 0 0 1px rgba(12,32,64,.55),inset 0 0 0 1px rgba(12,32,64,.35),0 0 12px rgba(63,216,255,.8)}
+.bl-marks .mk-line{background:#3fd8ff;border-radius:2px;
+  box-shadow:0 0 0 1.5px rgba(12,32,64,.6),0 0 12px rgba(63,216,255,.9)}
 `;

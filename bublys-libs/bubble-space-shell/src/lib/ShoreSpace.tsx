@@ -30,8 +30,7 @@ import {
 } from "react";
 import { BubbleSpace, BubbleSpaceContext, CurrentBubbleContext, matchBubbleRoute, renderRoute, useBubbleSpace } from "@bublys-org/bubble-layout-feature";
 import type { BubbleRoute as LayoutRoute, BubbleSpaceApi, BubbleSpaceProps, RoutedBubble, SettleWhy, TakeOutInfo } from "@bublys-org/bubble-layout-feature";
-import type { LayoutRules, LensId, PlaneAxis, PresetId, View, Viewport } from "@bublys-org/bubble-layout";
-import { PRESETS } from "@bublys-org/bubble-layout";
+import type { LayoutRules, LensId, PlaneAxis, Viewport } from "@bublys-org/bubble-layout";
 import {
   TUBE_RADIUS,
   anchoredRect,
@@ -46,7 +45,6 @@ import { ShowreLayer, resolveDock, seaCornerRadius, type Docked } from "./Showre
 import { ShoreLockButton, useShoreLock } from "./ShoreLock.js";
 import { putIntoWindow, useWindowView } from "./legacyRouteBridge.js";
 import { SpaceViewTools } from "./SpaceViewBubble.js";
-import type { SpaceView } from "./SpaceViewContext.js";
 import { useSeaWorldLine, type SeaSeed } from "./SeaWorldLine.js";
 
 /** 岸に「定位置」を持つもの（ランチャーなど）。居なくなったらここへ戻ってくる */
@@ -93,6 +91,17 @@ export type ShoreSpaceProps = {
   readonly worldLineSeed?: SeaSeed;
   /** 枠の上に貼る口（`BubbleSpace` の `frameTools`）。窓の見え方の口がここを通る */
   readonly frameTools?: BubbleSpaceProps['frameTools'];
+  /**
+   * **この海の外へ出そうとした。**
+   *
+   * > 岸にも着かず、**海の外まで運ばれた**ときに 1 度だけ呼ばれる。
+   *
+   * ★ 外に何があるか（もう 1 つ外の海があるのか、画面の端なのか）を、この海は知らない。
+   *   知っている外の器が受け取って決める ── 窓なら「外の海に 1 つ開く」。
+   * ★ **泡はこの海に残る。** 持ち出しは引っ越しではないので（外に 1 つ増えるだけ）、
+   *   ここが true を返して泡を消すことはしない。
+   */
+  readonly onEscape?: (info: TakeOutInfo) => void;
   readonly autoLens?: boolean;
   /**
    * **規則が決めていない所の選び方**（`LayoutRules`）。渡さなければ既定 ＝ 今までと同じ答え。
@@ -192,6 +201,14 @@ const SHORE_MEMORY = new Map<string, readonly Docked[]>();
  */
 const SHORE_SEEDED = new Set<string>();
 
+/**
+ * 縁を**どれだけ越えたら**「外へ出したい」と読むか。
+ *
+ * ★ 0 にすると、岸に着けるつもりで少し行きすぎただけで外へ出てしまう。
+ *   逆に大きくすると、窓の外まで運んでも岸に貼り付く。指 1 本ぶんくらいにしてある。
+ */
+const ESCAPE_MARGIN = 40;
+
 /** 海の口を外から掴むための小物（`BubbleSpace` の中でしか使えないので、子として置く） */
 const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }) => {
   const space = useBubbleSpace();
@@ -210,39 +227,8 @@ const SpaceHandle: FC<{ onReady: (api: BubbleSpaceApi) => void }> = ({ onReady }
  * ★ **全画面は出さない** ── あれは画面ぜんぶの話で、窓には無い。
  */
 const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
-  const win = useWindowView(id);
-  const space = useBubbleSpace();
-  /**
-   * **中に空間を持つ泡の見え方** ── 窓（別の世界）ではないが、自分の中に子を並べている泡。
-   *
-   * > 本計画づくりの場がこれ。**置いた所に意味がある**ので、
-   * > 一覧の「縦・横・格子…」ではなく、**どう見るか**の口を出す。
-   *
-   * ★ 触る相手は海の口と同じ形（`SpaceView`）にして、中身は同じ見本から出す。
-   *   ここが作るのは「その空間を読む・書く」の繋ぎだけ。
-   * ★ **まかせる・帯は出さない。** どちらも海ぜんぶの決まりで、
-   *   1 つの空間が自分で持てるものではない ── 出すと押せるのに何も起きない口になる。
-   */
-  const own = space.viewOf(id);
-  const mine = useMemo<SpaceView | null>(() => {
-    if (!own) return null;
-    const lensOf = (axis: "x" | "y") => own[axis].lens === "fisheye";
-    return {
-      preset: presetIdOf(own),
-      setPreset: (p) => space.setPreset(p, id),
-      join: "detour",
-      setJoin: () => undefined,
-      fisheye: { x: lensOf("x"), y: lensOf("y") },
-      toggleFisheye: (axis) => space.setLens(axis, lensOf(axis) ? "parallel" : "fisheye", id),
-      autoLens: false,
-      setAutoLens: () => undefined,
-      bandsAlways: false,
-      setBandsAlways: () => undefined,
-    };
-  }, [own, space, id]);
-
-  // 窓なら窓の口。そうでなければ、中に空間を持つ泡の口。どちらでもなければ何も出さない
-  const view = win ?? (space.hasSpace(id) && !space.isList(id) ? mine : null);
+  const view = useWindowView(id);
+  // 窓でない泡・まだ立ち上がっていない窓には、何も出さない
   if (!view) return null;
   return (
     <div
@@ -250,27 +236,9 @@ const WindowViewTools: FC<{ readonly id: string }> = ({ id }) => {
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
-      <SpaceViewTools view={view} fullscreen={false} autoLens={!!win} bands={!!win} />
+      <SpaceViewTools view={view} fullscreen={false} />
     </div>
   );
-};
-
-/**
- * いまの見え方が、どの並べ方にいちばん近いか。
- *
- * ★ 空間は並べ方を**名前では覚えていない**（軸ごとの値しか持たない）ので、
- *   選ぶ欄に出すために逆から当てる。当たらなければ「自由に置く」
- *   ── 座標で置いている空間はここに来る。
- */
-const presetIdOf = (view: View): PresetId => {
-  for (const id of Object.keys(PRESETS) as PresetId[]) {
-    const p = PRESETS[id];
-    const same = (["x", "y", "z"] as const).every(
-      (a) => p[a].dim === view[a].dim && p[a].arrange === view[a].arrange && p[a].lens === view[a].lens,
-    );
-    if (same) return id;
-  }
-  return "free";
 };
 
 export const ShoreSpace: FC<ShoreSpaceProps> = ({
@@ -288,6 +256,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
   worldLineOutside,
   worldLineSeed,
   frameTools,
+  onEscape,
   bandDisplay,
   persistKey,
   onLens,
@@ -474,8 +443,25 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
        *   ── 落としたのは「その url を窓で開け」という合図になる。
        */
       if (info.over && putIntoWindow(info.over.id, info.url)) return true;
-      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const at = toShore(info);
+      /**
+       * ★ **縁を越えた先まで運んだら、外へ渡す。**
+       *
+       * > 縁に「着ける」のと、縁を「越える」のは別の身ぶり。
+       *
+       * ★ 岸に着けるのは、**海の中で縁へ寄せる**動き。少しはみ出すのは行きすぎただけなので、
+       *   そこまでは岸が受ける。それより先まで運んだら「この海の外へ出したい」と読む。
+       * ★ **先に見る。** あとに回すと岸がいつも先に当たって（縁の外でも近い岸が見つかる）、
+       *   外へ出る道に入れない（実測で踏んだ：下へ大きく引いても岸に貼り付いた）。
+       */
+      const beyond =
+        at.pointer.x < -ESCAPE_MARGIN || at.pointer.y < -ESCAPE_MARGIN ||
+        at.pointer.x > vp.width + ESCAPE_MARGIN || at.pointer.y > vp.height + ESCAPE_MARGIN;
+      if (beyond && onEscape) {
+        onEscape(info);
+        return false;
+      }
+      const others = docked.map((d) => anchoredRect(d.dock, d.size, vp));
       const want = toDockSize(info.size);
       const hit = resolveDock(
         { x: at.x, y: at.y, width: want.width, height: want.height },
@@ -491,7 +477,7 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       noteShore('members');
       return true;
     },
-    [docked, vp, routes, noteShore],
+    [docked, vp, routes, noteShore, onEscape],
   );
 
   /** ドラッグ中 ── 縁の近くなら、着いたあとの矩形を予告する（大きさは貼るときと同じ規則） */
@@ -547,10 +533,6 @@ export const ShoreSpace: FC<ShoreSpaceProps> = ({
       // 岸に貼った一覧が置ける広さは、岸の窓ぶん（それ以上は岸からはみ出す）
       roomOf: () => ({ w: vp.width, h: vp.height }),
       takeIn: (url, rect) => spaceRef.current?.takeIn(url, rect) ?? "",
-      /** ★ 岸に貼った泡は空間を持たない ── 中に子を並べるのは海の側の話 */
-      hasSpace: (id) => spaceRef.current?.hasSpace(id) ?? false,
-      isList: (id) => spaceRef.current?.isList(id) ?? false,
-      viewOf: (spaceId) => spaceRef.current?.viewOf(spaceId) ?? null,
     }),
     [vp],
   );

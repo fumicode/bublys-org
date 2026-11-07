@@ -224,6 +224,21 @@ feature (domain + ui + Reduxに依存)
      // feature: dispatch(updateSchedule(schedule.setCell(...).toPlain()))
      ```
 
+### CSS の決まり（泡の器と中身）
+
+> **器の CSS は中身に勝てない。器の CSS は中身に入らない。**
+
+- **泡の器**（枠・帯・札。`bubble-layout-ui` の `FIELD_CSS`、`bubble-layout-feature` の `SPACE_CSS` と皮）は
+  素の CSS 文字列で書き、`@layer bl` の段に入れる（`BubbleSpace` の `FRAME_CSS`）。
+  ラボとクラス名を1字ずつ揃えるため、styled-components にはしない
+- **泡の中身**（各バブリの画面）は今までどおり styled-components。段に入っていないので、器に必ず勝つ
+- アプリの `global.css` は最初に `@layer reset, bl;` を宣言し、modern-normalize と全体指定を `reset` に入れる
+  （入れないと器に勝ってしまう）
+- **名前**：器のクラスは `bl-`、器の CSS 変数は `--bl-` を頭に付ける（ラボから引き継いだ `bub` `hd` などは例外）。
+  中身のクラスは `e-` を頭に付ける。中身から全体に効く CSS は書かない
+- 予定：器の CSS を `@scope (.bl-layer) to (.bl-body > *)` で囲み、中身に当たらないようにする
+  （岸の泡の描かれ方と対象ブラウザを確かめてから）
+
 ### 技術スタック
 
 **コア:**
