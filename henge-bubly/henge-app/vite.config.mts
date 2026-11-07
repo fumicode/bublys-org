@@ -99,7 +99,7 @@ export default defineConfig(({ mode }) => {
   // .env.local（未追跡）→ 無ければ環境変数
   const env = loadEnv(mode, import.meta.dirname, '');
   const apiKey = env.OPENAI_API_KEY ?? process.env.OPENAI_API_KEY ?? '';
-  const model = env.HENGE_AI_MODEL ?? process.env.HENGE_AI_MODEL ?? 'gpt-6-luna';
+  const model = env.HENGE_AI_MODEL ?? process.env.HENGE_AI_MODEL ?? 'gpt-6.1-terra';
 
   return {
     root: import.meta.dirname,
