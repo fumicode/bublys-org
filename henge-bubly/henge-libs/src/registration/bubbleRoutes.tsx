@@ -38,7 +38,7 @@ export const hengeBubbleRoutes: BubbleRoute[] = [
   {
     pattern: /^henge\/games\/[^/]+$/,
     type: "henge-game",
-    bubbleOptions: { defaultSize: { width: 420, height: 340 } },
+    bubbleOptions: { defaultSize: { width: 560, height: 520 } },
     Component: ({ bubble }) => (
       <HengeGameProvider>
         <HengeGameFeature gameId={gameIdOf(bubble.url)} bubbleId={bubble.id} />

@@ -32,7 +32,7 @@ export const WorldLineFeature: FC<WorldLineFeatureProps> = ({ gameId, bubbleId }
   const renderNodeSummary = useCallback(
     (nodeId: string): string => {
       const game = scope.getObjectAt<HengeGame_化ゲーム>(nodeId, HENGE_GAME_TYPE, gameId);
-      return game ? `${game.revision} 回目` : "";
+      return game ? `残り ${game.wallet} バケ` : "";
     },
     [scope, gameId],
   );

@@ -1,27 +1,25 @@
 "use client";
-import { FC, useCallback, useContext } from "react";
-import { HengeGame_化ゲーム } from "@bublys-org/henge-model";
+import { FC, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { HengeGame_化ゲーム, type HengeMethodDef } from "@bublys-org/henge-model";
 import { useCasScope } from "@bublys-org/world-line-graph";
 import { BubblesContext } from "@bublys-org/bubbles-ui";
 import { gameScopeId, HENGE_GAME_TYPE } from "./HengeGameProvider.js";
 import { HengeGameView } from "../ui/HengeGameView.js";
+import { askHenge, askPuzzle } from "../ai/hengeOracle.js";
 
 export type HengeGameFeatureProps = {
   gameId: string;
   bubbleId?: string;
 };
 
+const newId = () => crypto.randomUUID();
+
 /**
  * ゲーム 1 つ。**このゲーム専用の世界線**に繋ぐ。
- *
- * `shell.update()` を呼ぶたびに世界線に節が 1 つ増える。
- * 戻ってから更新すれば、そこから枝が割れる ── それが「別の可能性を試す」。
+ * 変化 1 回 = 世界線の節 1 つ。待っている間のことは世界線に載せない。
  */
 export const HengeGameFeature: FC<HengeGameFeatureProps> = ({ gameId, bubbleId }) => {
   const { openBubble } = useContext(BubblesContext);
-
-  // ★ id が取れていないのに create すると、中身が undefined のゲームが
-  //   世界線に書き込まれる。落ちるより前に止める。
   const hasId = gameId.length > 0;
 
   const scope = useCasScope(gameScopeId(gameId), {
@@ -31,9 +29,46 @@ export const HengeGameFeature: FC<HengeGameFeatureProps> = ({ gameId, bubbleId }
   const shell = scope.getShell<HengeGame_化ゲーム>(HENGE_GAME_TYPE, gameId);
   const game = shell?.object ?? null;
 
-  const handleAdvance = useCallback(() => {
-    shell?.update((g) => g.advance());
-  }, [shell]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // 盤面がまだなら AI に作らせる（StrictMode の二重呼びを避ける）
+  const generating = useRef(false);
+  useEffect(() => {
+    if (!shell || !game || game.isSetUp || generating.current) return;
+    generating.current = true;
+    setBusy("盤面を作っています…");
+    askPuzzle()
+      .then((p) => shell.update((g) => g.setUp(p, newId)))
+      .catch((e) => setError(String(e?.message ?? e)))
+      .finally(() => { setBusy(null); generating.current = false; });
+  }, [shell, game]);
+
+  const handleToggle = useCallback((id: string) => {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id].slice(-2)));
+  }, []);
+
+  const handlePerform = useCallback(
+    async (method: HengeMethodDef) => {
+      if (!shell || !game) return;
+      const pieces = selected.map((id) => game.field.find((p) => p.id === id)).filter(Boolean);
+      if (!game.canPerform(method, selected)) return;
+      setBusy(`${method.label}…`);
+      setError(null);
+      try {
+        const outputs = await askHenge(method.id, pieces as never);
+        const ids = selected;
+        shell.update((g) => g.apply(method, ids, outputs, newId));
+        setSelected([]);
+      } catch (e) {
+        setError(String((e as Error)?.message ?? e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [shell, game, selected],
+  );
 
   const handleOpenWorldLine = useCallback(() => {
     openBubble(`henge/games/${gameId}/history`, bubbleId ?? "root");
@@ -47,7 +82,6 @@ export const HengeGameFeature: FC<HengeGameFeatureProps> = ({ gameId, bubbleId }
     );
   }
 
-  // ★ 参照はあるのに実データが手元に無い瞬間がある。そこで「無い」と判断しない
   if (!game) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#888", fontSize: 13 }}>
@@ -59,11 +93,15 @@ export const HengeGameFeature: FC<HengeGameFeatureProps> = ({ gameId, bubbleId }
   return (
     <HengeGameView
       game={game}
+      selected={selected.filter((id) => game.field.some((p) => p.id === id))}
+      busy={busy}
+      error={error}
       canUndo={scope.canUndo}
       canRedo={scope.canRedo}
-      onAdvance={handleAdvance}
-      onUndo={scope.moveBack}
-      onRedo={scope.moveForward}
+      onToggle={handleToggle}
+      onPerform={handlePerform}
+      onUndo={() => { setSelected([]); scope.moveBack(); }}
+      onRedo={() => { setSelected([]); scope.moveForward(); }}
       onOpenWorldLine={handleOpenWorldLine}
     />
   );
