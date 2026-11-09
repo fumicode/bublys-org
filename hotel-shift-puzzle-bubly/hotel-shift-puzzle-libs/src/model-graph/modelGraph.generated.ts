@@ -1204,6 +1204,295 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "ProfileItem",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "category",
+          "type": "\"basic\" | \"role\" | \"ability\" | \"workStyle\" | \"status\"",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "choice",
+          "type": "ProfileChoice",
+          "optional": false
+        },
+        {
+          "name": "values",
+          "type": "ProfileValue[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "category",
+        "name",
+        "choice",
+        "values"
+      ],
+      "methods": [
+        {
+          "name": "value",
+          "params": [
+            "valueId"
+          ],
+          "returns": "ProfileValue | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "valueIds"
+          ],
+          "returns": "ProfileValue[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "rename",
+          "params": [
+            "name"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withCategory",
+          "params": [
+            "category"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withChoice",
+          "params": [
+            "choice"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "addValue",
+          "params": [
+            "value"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateValue",
+          "params": [
+            "valueId",
+            "fn"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeValue",
+          "params": [
+            "valueId"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileItemPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileItem",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ProfileSelection",
+      "file": "staff/ProfileSelection.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "entries",
+          "type": "ProfileSelectionEntry[]",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "entries",
+        "isEmpty"
+      ],
+      "methods": [
+        {
+          "name": "has",
+          "params": [
+            "itemId"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "valueIdsOf",
+          "params": [
+            "itemId"
+          ],
+          "returns": "readonly string[] | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "set",
+          "params": [
+            "itemId",
+            "valueIds"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "clear",
+          "params": [
+            "itemId"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileSelectionPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileSelection",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "ProfileValue",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "symbol",
+          "type": "string",
+          "optional": true
+        },
+        {
+          "name": "mark",
+          "type": "ProfileMarkStyle",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "label",
+        "symbol",
+        "markStyle",
+        "markText"
+      ],
+      "methods": [
+        {
+          "name": "withMarkStyle",
+          "params": [
+            "style"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withLabel",
+          "params": [
+            "label"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withSymbol",
+          "params": [
+            "symbol"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ProfileValueState",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ProfileValue",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "RequiredStaffing",
       "file": "schedule/RequiredStaffing.ts",
       "kind": "value",
@@ -1935,6 +2224,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "dayOffStyle",
           "type": "DayOffStyle",
           "optional": true
+        },
+        {
+          "name": "profile",
+          "type": "ProfileSelection",
+          "optional": true
         }
       ],
       "getters": [
@@ -1942,9 +2236,20 @@ export const MODEL_GRAPH: ModelGraph = {
         "name",
         "department",
         "hasDayOffStyle",
-        "dayOffStyle"
+        "dayOffStyle",
+        "profile"
       ],
       "methods": [
+        {
+          "name": "setProfileValues",
+          "params": [
+            "itemId",
+            "valueIds"
+          ],
+          "returns": "Staff",
+          "isStatic": false,
+          "returnsSelf": true
+        },
         {
           "name": "rename",
           "params": [
@@ -2127,6 +2432,154 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "StaffMonthlyShiftWish",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "StaffProfile",
+      "file": "staff/StaffProfile.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "marks",
+        "markGroups"
+      ],
+      "methods": [
+        {
+          "name": "entriesIn",
+          "params": [
+            "category"
+          ],
+          "returns": "ProfileEntry[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "entry",
+          "params": [
+            "itemId"
+          ],
+          "returns": "ProfileEntry | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
+      "name": "StaffProfileDictionary",
+      "file": "staff/StaffProfileDictionary.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "items",
+          "type": "ProfileItem[]",
+          "optional": false
+        },
+        {
+          "name": "builtInMarks",
+          "type": "Partial<BuiltInProfileMarks>",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "items"
+      ],
+      "methods": [
+        {
+          "name": "empty",
+          "params": [
+            "id"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "item",
+          "params": [
+            "itemId"
+          ],
+          "returns": "ProfileItem | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "showsBuiltIn",
+          "params": [
+            "key"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "withBuiltInMark",
+          "params": [
+            "key",
+            "shown"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "itemsIn",
+          "params": [
+            "category"
+          ],
+          "returns": "ProfileItem[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addItem",
+          "params": [
+            "item"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "updateItem",
+          "params": [
+            "itemId",
+            "fn"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "removeItem",
+          "params": [
+            "itemId"
+          ],
+          "returns": "StaffProfileDictionary",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StaffProfileDictionaryPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "StaffProfileDictionary",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2334,6 +2787,17 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "overrideProfileValues",
+          "params": [
+            "staffId",
+            "itemId",
+            "valueIds"
+          ],
+          "returns": "WorkingStaffGroup",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
           "name": "temporaryStaff",
           "params": [],
           "returns": "Staff[]",
@@ -2407,6 +2871,15 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "memberOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "WorkingStaffMember | undefined",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "toPlain",
           "params": [],
           "returns": "WorkingStaffGroupPlain",
@@ -2448,6 +2921,11 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "dayOffStyle",
           "type": "DayOffStyle",
           "optional": true
+        },
+        {
+          "name": "profile",
+          "type": "ProfileSelection",
+          "optional": true
         }
       ],
       "getters": [
@@ -2455,6 +2933,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "allowedShiftIds",
         "hasDayOffStyleOverride",
         "dayOffStyleOverride",
+        "profileOverride",
         "staffId",
         "isTemporary",
         "staff"
@@ -2526,6 +3005,26 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "overrideDayOffStyle",
           "params": [
             "style"
+          ],
+          "returns": "WorkingStaffMember",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "profileValueIdsOf",
+          "params": [
+            "itemId",
+            "staff"
+          ],
+          "returns": "readonly string[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "overrideProfileValues",
+          "params": [
+            "itemId",
+            "valueIds"
           ],
           "returns": "WorkingStaffMember",
           "isStatic": false,
@@ -2886,6 +3385,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "ProfileItem",
+      "to": "ProfileValue",
+      "kind": "contains",
+      "via": "values",
+      "many": true,
+      "foundBy": "type"
+    },
+    {
       "from": "ScheduleCandidates",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
@@ -2934,12 +3441,28 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "Staff",
+      "to": "ProfileSelection",
+      "kind": "contains",
+      "via": "profile",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "StaffMonthlyShiftWish",
       "to": "Staff",
       "kind": "references",
       "via": "staffId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "StaffProfileDictionary",
+      "to": "ProfileItem",
+      "kind": "contains",
+      "via": "items",
+      "many": true,
+      "foundBy": "type"
     },
     {
       "from": "WorkingStaffGroup",
@@ -2954,6 +3477,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "to": "DayOffStyle",
       "kind": "contains",
       "via": "dayOffStyle",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "WorkingStaffMember",
+      "to": "ProfileSelection",
+      "kind": "contains",
+      "via": "profile",
       "many": false,
       "foundBy": "type"
     },
@@ -2984,7 +3515,7 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 46,
+    "fileCount": 49,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
@@ -2992,7 +3523,8 @@ export const MODEL_GRAPH: ModelGraph = {
       "MinMonthlyDayOffConstraint",
       "RequiredStaffingConstraint",
       "ShiftIntervalConstraint",
-      "ShiftLeaderConstraint"
+      "ShiftLeaderConstraint",
+      "StaffProfile"
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [

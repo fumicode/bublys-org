@@ -5,6 +5,10 @@
 // Staff（スタッフ）
 export * from './staff/Staff.js';
 export * from './staff/DayOffStyle.js';
+// スタッフプロファイル（人に付くものを分類ごとに束ねる見方。辞書・人ごとの値・読む関数。#236）
+export * from './staff/StaffProfileDictionary.js';
+export * from './staff/ProfileSelection.js';
+export * from './staff/StaffProfile.js';
 // 勤務スタッフ群（勤務表とスタッフの間の入れ物。名簿から来た人と臨時の人を区別する）
 export * from './staff/WorkingStaffMember.js';
 export * from './staff/WorkingStaffGroup.js';

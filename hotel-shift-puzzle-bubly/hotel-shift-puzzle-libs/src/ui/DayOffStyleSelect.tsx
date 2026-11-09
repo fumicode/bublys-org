@@ -4,8 +4,6 @@ import { FC } from "react";
 import { DayOffStyle, DAY_OFF_STYLE_MAX_RUN_OPTIONS } from "../domain/index.js";
 
 /** 選択肢の値（select の value は文字列なので、休みの形を文字列に畳む） */
-const DEFAULT_VALUE = "__default__";
-
 const valueOf = (style: DayOffStyle): string =>
   style.isClustered ? `clustered:${style.maxRun ?? ""}` : "spread";
 
@@ -25,8 +23,9 @@ type Props = {
   /** いま選ばれている休みの形。inherited を渡したときに undefined なら「既定のまま」 */
   value: DayOffStyle | undefined;
   /**
-   * 渡すと先頭に「既定（◯◯）」を出す。勤務表ごとの上書きで、上書きを外す選択肢。
-   * 選ぶと onChange(undefined)。
+   * 渡すと勤務表ごとの上書きとして扱う（既定値）。「既定（◯◯）」という選択肢は作らず、
+   * 既定の形に「（既定）」と添える。**既定と同じ形を選んだら上書きを外す**（onChange(undefined)）。
+   * スタッフプロファイルの欄（ProfileItemSelect）と同じルール
    */
   inherited?: DayOffStyle;
   onChange: (style: DayOffStyle | undefined) => void;
@@ -49,17 +48,18 @@ export const DayOffStyleSelect: FC<Props> = ({
 }) => (
   <select
     className={className}
-    value={value ? valueOf(value) : DEFAULT_VALUE}
+    value={valueOf(value ?? inherited ?? DayOffStyle.DEFAULT)}
     disabled={disabled}
     title={title}
-    onChange={(e) =>
-      onChange(e.target.value === DEFAULT_VALUE ? undefined : styleOf(e.target.value))
-    }
+    onChange={(e) => {
+      const chosen = styleOf(e.target.value);
+      onChange(inherited && chosen.equals(inherited) ? undefined : chosen);
+    }}
   >
-    {inherited && <option value={DEFAULT_VALUE}>既定（{inherited.label}）</option>}
     {CHOICES.map((style) => (
       <option key={valueOf(style)} value={valueOf(style)}>
         {style.label === "連休型" ? "連休型（連勤上限まで）" : style.label}
+        {inherited && style.equals(inherited) ? "（既定）" : ""}
       </option>
     ))}
   </select>

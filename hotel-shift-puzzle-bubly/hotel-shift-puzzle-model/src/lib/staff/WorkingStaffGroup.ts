@@ -129,6 +129,18 @@ export class WorkingStaffGroup {
     return this.mapMember(staffId, (m) => m.overrideDayOffStyle(style));
   }
 
+  /**
+   * その人のプロファイルの項目を、この勤務表だけ上書きした新しい群を返す（#236）。
+   * undefined で上書きを外す（既定値に戻す）。空配列は「この勤務表では何も無い」。不変。
+   */
+  overrideProfileValues(
+    staffId: string,
+    itemId: string,
+    valueIds: readonly string[] | undefined
+  ): WorkingStaffGroup {
+    return this.mapMember(staffId, (m) => m.overrideProfileValues(itemId, valueIds));
+  }
+
   /** 臨時の人たち（実体はメンバーが抱えている） */
   temporaryStaff(): Staff[] {
     return this.state.members
@@ -197,7 +209,8 @@ export class WorkingStaffGroup {
     );
   }
 
-  private memberOf(staffId: string): WorkingStaffMember | undefined {
+  /** その人のメンバー（この勤務表で働かない人は undefined） */
+  memberOf(staffId: string): WorkingStaffMember | undefined {
     return this.state.members.find((m) => m.staffId === staffId);
   }
 

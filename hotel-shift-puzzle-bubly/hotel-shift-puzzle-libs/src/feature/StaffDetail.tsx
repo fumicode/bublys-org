@@ -7,7 +7,6 @@ import {
   ScheduleReport,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
-  type DayOffStyle,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
 import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
@@ -20,6 +19,8 @@ import {
 } from "../objects/hotelObjects.js";
 import { staffLinkedReportSummaries } from "./staffLinkedReports.js";
 import { monthSummariesOf } from "./shiftWishMonths.js";
+import { ScheduleWorld } from "./ScheduleWorld.js";
+import { useScheduleProfileEditing } from "./profileEditing.js";
 
 type StaffDetailProps = {
   staffId?: string;
@@ -33,9 +34,27 @@ type StaffDetailProps = {
 };
 
 
-export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWishUrl }) => {
+/**
+ * スタッフ詳細。**勤務表の中の1人（#236）。**
+ *   - 勤務表から開いた … その勤務表の世界で読み、その勤務表での値を直す。
+ *     スタッフプロファイル・休みの形はメンバーの上書き、責任者は制約セットの担当者
+ *     （勤務スタッフの表の ✎ と同じ欄・同じ中身。profileEditing.ts）
+ *   - 勤務表の外（名簿・ポケット）から開いた … 店舗の情報（名前・所属・シフト希望）だけ。
+ *     プロファイル（店舗の既定値）はスタッフプロファイルの表で直す。店舗の既定値を直す場所を
+ *     1つにするため、ここには載せない
+ */
+export const StaffDetail: FC<StaffDetailProps> = (props) => (
+  <ScheduleWorld scheduleId={props.scheduleId}>
+    <StaffDetailBody {...props} />
+  </ScheduleWorld>
+);
+
+const StaffDetailBody: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWishUrl }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
   const actions = useObjectRepo<Staff>(STAFF_TYPE);
+  // 勤務表から開いたとき：その勤務表での値を直す欄（勤務スタッフの表の ✎ と同じ中身）
+  const scheduleProfileFields = useScheduleProfileEditing(scheduleId);
+  const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
 
   // 希望を集める月は「勤務表がある月」。この人のぶんだけ状況を並べる。
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
@@ -67,20 +86,34 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
     );
   }
 
+  // 勤務表から開いた ＝ その勤務表での値を扱う。その勤務表で働いていない人は直す先が無いので読むだけ
+  if (scheduleId) {
+    return (
+      <StaffDetailView
+        staff={staff}
+        scope={{
+          kind: "schedule",
+          label: schedule ? `${schedule.year}年${schedule.month}月の勤務表` : "この勤務表",
+        }}
+        profileFields={scheduleProfileFields(staff)}
+        shiftWishMonths={shiftWishMonths}
+        shiftWishUrl={shiftWishUrl}
+        linkedReportSummaries={linkedReportSummaries}
+      />
+    );
+  }
+
+  // 勤務表の外（名簿・ポケット）から開いた ＝ 店舗の情報（名前・所属・シフト希望）だけ。
+  // プロファイルはスタッフプロファイルで直す（店舗の既定値を直す場所を1つにする）
   const handleChangeDepartment = (department: string) => {
     actions.save(staff.changeDepartment(department));
-  };
-
-  const handleChangeDayOffStyle = (style: DayOffStyle) => {
-    const next = staff.changeDayOffStyle(style);
-    if (next !== staff) actions.save(next);
   };
 
   return (
     <StaffDetailView
       staff={staff}
+      scope={{ kind: "store" }}
       onChangeDepartment={handleChangeDepartment}
-      onChangeDayOffStyle={handleChangeDayOffStyle}
       shiftWishMonths={shiftWishMonths}
       shiftWishUrl={shiftWishUrl}
       linkedReportSummaries={linkedReportSummaries}

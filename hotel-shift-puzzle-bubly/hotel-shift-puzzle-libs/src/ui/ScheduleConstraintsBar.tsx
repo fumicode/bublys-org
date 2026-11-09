@@ -8,7 +8,7 @@
  *   - 人ごと（横↔）    : 休日（月 N 日以上）＋ 連勤（N 連勤まで）＋ 勤務間インターバル（遅番明け）
  *   - 全体             : 希望（できるだけ希望に沿う）
  *
- * 責任者アイコンは、スタッフ名右の責任者バッジ（LeaderBadges）と同じく、単クリックで
+ * 責任者アイコンは、スタッフ名右の責任者の記号（ProfileMarks）と同じく、単クリックで
  * その関係者を選択してフォーカス/解決モードに入る（onSelectRule）。ダブルクリックでは
  * ObjectView 経由で schedule-leader-rule バブルを開く（既存動作を維持）。
  */
@@ -21,7 +21,7 @@ import {
   SHIFT_INTERVAL_RULE_VIEW_TYPE,
 } from "./viewObjectTypes.js";
 import { ShiftIntervalRule, ShiftLeaderRule, ConstraintSet } from "../domain/index.js";
-import { leaderRoleColor } from "./LeaderBadges.js";
+import { leaderRoleColor } from "./leaderRoleColors.js";
 import { SHIFT_BG, SHIFT_FG } from "./schedule-grid/constants.js";
 import { IconColor, IconFrame, IconCaption } from "./constraint-icons/common.js";
 import { LeaderConstraintIcon } from "./constraint-icons/LeaderConstraintIcon.js";

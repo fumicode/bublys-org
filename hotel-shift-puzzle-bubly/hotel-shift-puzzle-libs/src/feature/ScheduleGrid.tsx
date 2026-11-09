@@ -32,6 +32,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import { staffProfileResolver, useStaffProfileDictionary } from "./staffProfile.js";
 import type { CellChange, CellSelection } from "../ui/schedule-grid/types.js";
 import {
   ScheduleConstraintsBar,
@@ -509,6 +510,20 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   const dayOffStyleOf = useMemo(
     () => dayOffStyleResolver(staffList, staffGroup),
     [staffList, staffGroup]
+  );
+
+  // 名前の横の記号（🔰・責任者・休みの形…）＝スタッフプロファイル（#236）。
+  // 休みの形は上の dayOffStyleOf と同じ引き方（メンバーの上書き → その人の既定値）で読む。
+  const profileDictionary = useStaffProfileDictionary();
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup,
+        dictionary: profileDictionary,
+        leaderRules,
+      }),
+    [staffList, staffGroup, profileDictionary, leaderRules]
   );
 
   // 休みのセルに触れたときの説明：その休みがいまの表で何の役目を果たしているか。
@@ -992,7 +1007,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           clipboard={clipboard}
           candidateHintOf={candidateHintOf}
           dayOffReasonOf={dayOffReasonOf}
-          dayOffStyleOf={dayOffStyleOf}
+          profileOf={profileOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
           onApproveForced={handleApproveForced}

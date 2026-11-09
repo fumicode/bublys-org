@@ -18,12 +18,16 @@
  * 変えたいときにメンバーへ書く（例: 繁忙月だけ連休型にする）。読むときは
  * 「上書きがあればそれ、無ければその人の既定値」（{@link WorkingStaffMember.dayOffStyleOf}）。
  *
+ * **スタッフプロファイルの上書きもここが持つ（#236）。** 休みの形と同じ考えで、辞書の項目ごとに
+ * 「上書きがあればそれ、無ければその人の既定値」（{@link WorkingStaffMember.profileValueIdsOf}）。
+ *
  * state は抱えるものを**インスタンスで**持つ（保存形は別に持つ）。
  * シリアライズ用に入れ子まで plain な {@link WorkingStaffMemberPlain} を定義し、
  * toPlain() / fromPlain() で橋渡しする。不変。
  */
 import { Staff, type StaffPlain } from "./Staff.js";
 import { DayOffStyle, type DayOffStylePlain } from "./DayOffStyle.js";
+import { ProfileSelection, type ProfileSelectionPlain } from "./ProfileSelection.js";
 
 /** state：抱えている実体はインスタンス */
 export type WorkingStaffMemberState = {
@@ -41,6 +45,8 @@ export type WorkingStaffMemberState = {
   allowedShiftIds?: string[];
   /** この勤務表での休みの形の上書き。省略＝その人の既定値のまま */
   dayOffStyle?: DayOffStyle;
+  /** この勤務表でのプロファイルの上書き（項目ごと）。省略＝全項目その人の既定値のまま */
+  profile?: ProfileSelection;
 };
 
 /** シリアライズ用：入れ子まで全部 plain */
@@ -49,6 +55,8 @@ export type WorkingStaffMemberPlain = {
   staff?: StaffPlain;
   allowedShiftIds?: string[];
   dayOffStyle?: DayOffStylePlain;
+  /** 上書きが無ければ書かない（プロファイル以前の記録と同じ形・同じハッシュを保つ） */
+  profile?: ProfileSelectionPlain;
 };
 
 export class WorkingStaffMember {
@@ -147,6 +155,34 @@ export class WorkingStaffMember {
     return new WorkingStaffMember({ ...this.state, dayOffStyle: style });
   }
 
+  // ========== スタッフプロファイル ==========
+
+  /** この勤務表で上書きしているプロファイル（項目ごと）。上書きが無ければ空 */
+  get profileOverride(): ProfileSelection {
+    return this.state.profile ?? ProfileSelection.EMPTY;
+  }
+
+  /**
+   * この勤務表で使う、その項目の値 ID。上書きがあればそれ（空＝この勤務表では何も無い）、
+   * 無ければその人の既定値。
+   */
+  profileValueIdsOf(itemId: string, staff: Staff | undefined): readonly string[] {
+    return (
+      this.profileOverride.valueIdsOf(itemId) ?? staff?.profile.valueIdsOf(itemId) ?? []
+    );
+  }
+
+  /**
+   * その項目を上書きした新しいメンバーを返す。undefined で上書きを外す（既定値に戻す）。
+   * 空配列は「この勤務表では何も無い」の上書き。不変。
+   */
+  overrideProfileValues(itemId: string, valueIds: readonly string[] | undefined): WorkingStaffMember {
+    const current = this.profileOverride;
+    const next = valueIds === undefined ? current.clear(itemId) : current.set(itemId, valueIds);
+    if (next === current) return this;
+    return new WorkingStaffMember({ ...this.state, profile: next.isEmpty ? undefined : next });
+  }
+
   get staffId(): string {
     return this.state.staffId;
   }
@@ -194,6 +230,9 @@ export class WorkingStaffMember {
       plain.allowedShiftIds = [...this.state.allowedShiftIds];
     }
     if (this.state.dayOffStyle) plain.dayOffStyle = this.state.dayOffStyle.toPlain();
+    if (this.state.profile && !this.state.profile.isEmpty) {
+      plain.profile = this.state.profile.toPlain();
+    }
     return plain;
   }
 
@@ -205,6 +244,7 @@ export class WorkingStaffMember {
         ? [...plain.allowedShiftIds]
         : undefined,
       dayOffStyle: plain.dayOffStyle ? DayOffStyle.fromPlain(plain.dayOffStyle) : undefined,
+      profile: plain.profile?.length ? ProfileSelection.fromPlain(plain.profile) : undefined,
     });
   }
 }

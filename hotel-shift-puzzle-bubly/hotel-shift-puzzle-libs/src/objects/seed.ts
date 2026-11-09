@@ -22,6 +22,7 @@ import {
   ENDGAME_MAX_DAY_OFF_PER_DAY,
   ENDGAME_SCHEDULE_ID,
   ALLOWED_SHIFT_IDS_BY_STAFF,
+  createSampleStaffProfileDictionary,
 } from "../data/index.js";
 import type { BundleItem } from "./commit.js";
 import {
@@ -32,6 +33,7 @@ import {
   CONSTRAINT_SET_TYPE,
   GLOBAL_CONSTRAINT_SET_ID,
   STAFF_SHIFT_WISH_TYPE,
+  STAFF_PROFILE_DICTIONARY_TYPE,
 } from "./hotelObjects.js";
 
 /**
@@ -39,6 +41,7 @@ import {
  *
  * 中身:
  *   - スタッフ 9 人、グローバルの勤務帯セット・制約セット（テンプレート）、全員の希望（6〜9月）
+ *   - スタッフプロファイルの辞書（🔰 新人など）
  *   - 勤務表 4 つ
  *       空の勤務表（6月・7月） … 自動シフトを一から動かす用
  *       作成途中（8月）       … 候補集合・確定提案を見る用（実際に人が触る状態）
@@ -51,6 +54,9 @@ export function buildSampleItems(): BundleItem[] {
   for (const staff of createSampleStaffList()) {
     items.push({ type: STAFF_TYPE, obj: staff });
   }
+
+  // スタッフプロファイルの辞書（店舗共通）。名簿の人が選んだ値はこの辞書の項目を指す
+  items.push({ type: STAFF_PROFILE_DICTIONARY_TYPE, obj: createSampleStaffProfileDictionary() });
 
   // グローバルの勤務帯セット（テンプレート）。勤務表作成時にこれをコピーする。
   items.push({ type: WORKSHIFT_SET_TYPE, obj: createSampleWorkShiftSet() });

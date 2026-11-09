@@ -2,6 +2,7 @@
  * サンプルデータ
  */
 export * from "./sampleStaff.js";
+export * from "./sampleStaffProfile.js";
 export * from "./sampleWorkingStaff.js";
 export * from "./sampleWorkShifts.js";
 export * from "./sampleSchedule.js";
