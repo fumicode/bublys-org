@@ -89,6 +89,20 @@ export type WorkingStaffValue = {
   dayOffStyleOf: (staffId: string) => { base: DayOffStyle; override?: DayOffStyle };
   /** この勤務表での休みの形を上書きする。undefined で既定値に戻す */
   overrideDayOffStyle: (staffId: string, style: DayOffStyle | undefined) => void;
+  /**
+   * その人のスタッフプロファイルの辞書の項目（#236）。base はその人の既定値（スタッフが持つ）、
+   * override はこの勤務表だけの上書き（無ければ undefined。空配列は「この勤務表では無い」）
+   */
+  profileValuesOf: (
+    staffId: string,
+    itemId: string
+  ) => { base: readonly string[]; override?: readonly string[] };
+  /** この勤務表での辞書の項目を上書きする。undefined で既定値に戻す */
+  overrideProfileValues: (
+    staffId: string,
+    itemId: string,
+    valueIds: readonly string[] | undefined
+  ) => void;
 };
 
 export function useWorkingStaff(
@@ -239,6 +253,19 @@ export function useWorkingStaff(
     overrideDayOffStyle: useCallback(
       (staffId: string, style: DayOffStyle | undefined) =>
         updateGroup((g) => g.overrideDayOffStyle(staffId, style)),
+      [updateGroup]
+    ),
+    profileValuesOf: useCallback(
+      (staffId: string, itemId: string) => {
+        const base = staffList.find((s) => s.id === staffId)?.profile.valueIdsOf(itemId) ?? [];
+        const override = group?.memberOf(staffId)?.profileOverride.valueIdsOf(itemId);
+        return { base, override };
+      },
+      [staffList, group]
+    ),
+    overrideProfileValues: useCallback(
+      (staffId: string, itemId: string, valueIds: readonly string[] | undefined) =>
+        updateGroup((g) => g.overrideProfileValues(staffId, itemId, valueIds)),
       [updateGroup]
     ),
   };

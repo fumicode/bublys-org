@@ -6,9 +6,14 @@
  * 時間移動でその編集に戻れないことを意味するので、静かに壊れると気づけない。
  */
 import { worldLineGraphSlice } from '@bublys-org/world-line-graph';
-import { MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
+import { MonthlyStaffSchedule, Staff, WorkingStaffGroup } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from './framework.js';
-import { HOTEL_OBJECTS, SCHEDULE_TYPE, STAFF_TYPE } from './hotelObjects.js';
+import {
+  HOTEL_OBJECTS,
+  SCHEDULE_TYPE,
+  STAFF_TYPE,
+  WORKING_STAFF_GROUP_TYPE,
+} from './hotelObjects.js';
 import { APP_SCOPE_ID, localScopeId, saveObject } from './commit.js';
 import { createSchedule } from '../feature/createSchedule.js';
 import { recordSetCell } from '../feature/recordScheduleEdit.js';
@@ -161,6 +166,33 @@ describe('どの操作でどのスコープが伸びるか', () => {
       day,
       to: { kind: 'undecided' },
     });
+
+    expect(store.counts()[scopeId]).toBe(countAfterB);
+    expect(apexOf()).toBe(nodeA);
+  });
+
+  /**
+   * ★ スタッフプロファイル（#236）は、何も選んでいなければ保存形に書かない。
+   *   だからプロファイルを入れる前に生まれた世界でも、上書きを付けて外せば元のノードへ戻る
+   *   （移行の前後をまたいで打ち消しスナップが効く）。
+   */
+  it('★ プロファイルの上書きを付けて外すと、元のノードへ戻る（世界線が伸びない）', () => {
+    const { store, schedule, scopeId } = setUp();
+    const apexOf = () => store.getState().worldLineGraph.graphs[scopeId].apexNodeId;
+    const nodeA = apexOf();
+    const group = WorkingStaffGroup.ofRoster(schedule.workingStaffGroupId, ['s1', 's2', 's3']);
+
+    saveObject(store, WORKING_STAFF_GROUP_TYPE, group.overrideProfileValues('s1', 'experience', ['new']));
+    expect(apexOf()).not.toBe(nodeA);
+    const countAfterB = store.counts()[scopeId];
+
+    saveObject(
+      store,
+      WORKING_STAFF_GROUP_TYPE,
+      group
+        .overrideProfileValues('s1', 'experience', ['new'])
+        .overrideProfileValues('s1', 'experience', undefined)
+    );
 
     expect(store.counts()[scopeId]).toBe(countAfterB);
     expect(apexOf()).toBe(nodeA);

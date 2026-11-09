@@ -1,8 +1,9 @@
 'use client';
 
-import { FC, useEffect } from "react";
+import { FC, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import {
+  ConstraintSet,
   MonthlyStaffSchedule,
   WorkShift,
   WorkShiftSet,
@@ -15,12 +16,24 @@ import {
   useObjectRepo,
   useObjectsPending,
 } from "../objects/repository.js";
-import { SCHEDULE_TYPE, WORKSHIFT_SET_TYPE } from "../objects/hotelObjects.js";
+import {
+  CONSTRAINT_SET_TYPE,
+  SCHEDULE_TYPE,
+  WORKSHIFT_SET_TYPE,
+} from "../objects/hotelObjects.js";
+import { staffProfileResolver, useStaffProfileDictionary } from "./staffProfile.js";
+import { useScheduleProfileEditing } from "./profileEditing.js";
+import { ProfileCategoryFields } from "../ui/ProfileCategoryFields.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type Props = {
   scheduleId: string;
+  /**
+   * 名前のダブルクリックで開くスタッフ詳細の URL（app 層から注入）。この勤務表から開く
+   * 詳細を渡すと、そこでこの勤務表での値（プロファイル・休みの形・責任者）を直せる
+   */
+  staffBubbleUrl?: (staffId: string) => string;
 };
 
 /** 新しい勤務帯の ID を生成する（採番は feature 層の仕事） */
@@ -32,10 +45,14 @@ const newWorkShiftId = (): string =>
  * 足す・外す・並べ替える・臨時の人を作る・誰がどの勤務帯に入れるかを決める。
  * チェック欄の列（この勤務表の勤務帯セット）もここで足す・直す・消す。
  *
+ * スタッフプロファイル（#236）は分類ごとの列で見せる（この勤務表での値。責任者も含む）。
+ * セルの ✎ でその場で直せる。名前のダブルクリックでは、この勤務表から開いたスタッフ詳細が
+ * 開く。どちらも同じ欄（ProfileCategoryFields）・同じ中身（useScheduleProfileEditing）で直す。
+ *
  * 編集はすべてこの勤務表の世界線に記録される。グローバルの名簿は動かないので、
  * 「この月だけ応援を1人入れる」「この月はこの人を外す」が勤務表の中で完結する。
  */
-const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
+const WorkingStaffPanelBody: FC<Props> = ({ scheduleId, staffBubbleUrl }) => {
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
   const {
     staffList,
@@ -51,9 +68,24 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
     isAllowed,
     toggleShift,
     allowShiftForAll,
-    dayOffStyleOf,
-    overrideDayOffStyle,
+    group,
   } = useWorkingStaff(scheduleId);
+
+  // スタッフプロファイル（この勤務表での値。責任者はこの勤務表の制約セットから）
+  const profileDictionary = useStaffProfileDictionary();
+  const constraintSet = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, schedule?.constraintSetId);
+  const profileOf = useMemo(
+    () =>
+      staffProfileResolver({
+        staffList,
+        staffGroup: group,
+        dictionary: profileDictionary,
+        leaderRules: constraintSet?.leaderRules,
+      }),
+    [staffList, group, profileDictionary, constraintSet]
+  );
+  // セルの ✎ で開く編集欄（この勤務表での値。勤務表から開いたスタッフ詳細と同じ中身）
+  const profileFieldsOf = useScheduleProfileEditing(scheduleId);
 
   // チェック欄の列＝この勤務表の勤務帯セット（id=scheduleId）
   const { object: workShiftSet, update: updateSet } = useObjectShell<WorkShiftSet>(
@@ -117,8 +149,11 @@ const WorkingStaffPanelBody: FC<Props> = ({ scheduleId }) => {
         onToggleShift={toggleShift}
         onCommitShift={workShiftSet ? handleCommitShift : undefined}
         onRemoveShift={(id) => updateSet((s) => s.remove(id))}
-        dayOffStyleOf={dayOffStyleOf}
-        onChangeDayOffStyle={overrideDayOffStyle}
+        profileOf={profileOf}
+        staffUrlOf={staffBubbleUrl}
+        renderProfileEditor={(staff, category) => (
+          <ProfileCategoryFields category={category} staff={staff} {...profileFieldsOf(staff)} />
+        )}
       />
     </StyledContainer>
   );

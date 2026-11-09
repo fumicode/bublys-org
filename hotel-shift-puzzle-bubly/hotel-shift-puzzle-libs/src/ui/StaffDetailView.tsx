@@ -2,8 +2,19 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ScheduleReport, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
-import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
+import {
+  PROFILE_CATEGORIES,
+  Staff,
+  ScheduleReport,
+  WorkingDay,
+  type CompromiseEntry,
+  type BusyDayEntry,
+} from "../domain/index.js";
+import {
+  ProfileCategoryFields,
+  profileCategoryFieldsStyles,
+  type ProfileCategoryFieldsProps,
+} from "./ProfileCategoryFields.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
 import CheckIcon from "@mui/icons-material/Check";
@@ -32,10 +43,20 @@ export type StaffLinkedReportSummary = {
 
 type StaffDetailViewProps = {
   staff: Staff;
-  /** 部署を変更する */
+  /**
+   * どこの値を見ているか（#236）。**スタッフ詳細は勤務表の中の1人。**
+   *   - store    … 勤務表の外（名簿・ポケット）から開いた。店舗の情報（名前・所属・シフト希望）だけ。
+   *                プロファイルはスタッフプロファイルで直す
+   *   - schedule … 勤務表から開いた。その勤務表での値（プロファイル・休みの形・責任者）を直す
+   */
+  scope?: { kind: "store" } | { kind: "schedule"; label: string };
+  /** 部署を変更する（店舗での値だけ。勤務表から開いたときは渡さない） */
   onChangeDepartment?: (department: string) => void;
-  /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
-  onChangeDayOffStyle?: (style: DayOffStyle) => void;
+  /**
+   * 勤務表での値のプロファイルの欄（分類ごとに ProfileCategoryFields で描く）。
+   * 勤務表から開いたときだけ渡す
+   */
+  profileFields?: Omit<ProfileCategoryFieldsProps, "category" | "staff" | "department">;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
   shiftWishMonths?: ShiftWishMonthSummary[];
   /**
@@ -49,8 +70,9 @@ type StaffDetailViewProps = {
 
 export const StaffDetailView: FC<StaffDetailViewProps> = ({
   staff,
+  scope = { kind: "store" },
   onChangeDepartment,
-  onChangeDayOffStyle,
+  profileFields,
   shiftWishMonths = [],
   shiftWishUrl,
   linkedReportSummaries = [],
@@ -98,6 +120,15 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
         </div>
       </div>
 
+      {/* スタッフプロファイル（#236）。分類ごとに並べる。組み込みの項目（所属・休みの形）も
+          その分類の中に置き、辞書の項目はここで店舗での既定値を選ぶ */}
+      {/* どこの値を見ているか。開いた場所の値を編集する（名簿＝店舗の既定値／勤務表＝その勤務表での値） */}
+      <p className={`e-scope is-${scope.kind}`}>
+        {scope.kind === "schedule"
+          ? `${scope.label}での値を表示・編集しています。既定値（店舗）と違う値は、この勤務表だけに効きます。`
+          : "店舗の情報です。経験・休みの形などのプロファイルは「スタッフプロファイル」で、勤務表ごとの値は勤務表から開いて直します。"}
+      </p>
+
       <section className="e-section">
         <h4>基本情報</h4>
         <dl className="e-dl">
@@ -105,7 +136,7 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
           <dd>{staff.id}</dd>
           <dt>名前</dt>
           <dd>{staff.name}</dd>
-          <dt>部署</dt>
+          <dt>所属</dt>
           <dd className="e-dept-row">
             {editingDept ? (
               <>
@@ -146,21 +177,23 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               </>
             )}
           </dd>
-          <dt>休みの形</dt>
-          <dd>
-            {onChangeDayOffStyle ? (
-              <DayOffStyleSelect
-                className="e-day-off-style"
-                value={staff.dayOffStyle}
-                onChange={(style) => style && onChangeDayOffStyle(style)}
-                title="自動シフトが休みを置くときの形の既定値。勤務表ごとに勤務スタッフ群で変えられます"
-              />
-            ) : (
-              staff.dayOffStyle.label
-            )}
-          </dd>
         </dl>
+        {profileFields && <ProfileCategoryFields category="basic" staff={staff} {...profileFields} />}
       </section>
+
+      {/* 勤務表の中の1人として、その勤務表での値を分類ごとに直す（表の ✎ と同じ欄） */}
+      {profileFields &&
+        PROFILE_CATEGORIES.filter((c) => c.key !== "basic").map((c) => {
+          const hasDictionaryItems = (profileFields.dictionary?.itemsIn(c.key).length ?? 0) > 0;
+          const hasBuiltIn = c.key === "role" || c.key === "workStyle";
+          if (!hasDictionaryItems && !hasBuiltIn) return null;
+          return (
+            <section key={c.key} className="e-section">
+              <h4>{c.label}</h4>
+              <ProfileCategoryFields category={c.key} staff={staff} {...profileFields} />
+            </section>
+          );
+        })}
 
       {shiftWishUrl && (
         <section className="e-section">
@@ -313,6 +346,31 @@ const StyledStaffDetail = styled.div`
       border-bottom: 1px solid #eee;
       padding-bottom: 4px;
     }
+  }
+
+  /* どこの値を見ているか（名簿＝店舗の既定値／勤務表＝その勤務表での値） */
+  .e-scope {
+    margin: 0 0 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.78em;
+    background: #f5f5f5;
+    color: #607d8b;
+    &.is-schedule {
+      background: #e0f2f1;
+      color: #00695c;
+    }
+  }
+  /* 役割・責任の説明（責任者は勤務表ごとに決めるので、ここでは選ばない） */
+  .e-profile-note {
+    margin: 0 0 4px;
+    font-size: 0.8em;
+    color: #78909c;
+  }
+  /* プロファイルの欄（表の ✎ と共有） */
+  ${profileCategoryFieldsStyles}
+  .e-section .e-profile-fields {
+    margin-top: 6px;
   }
 
   .e-dl {

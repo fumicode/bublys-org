@@ -51,6 +51,9 @@ export const scheduleUrl = (scheduleId: string): string =>
 /** グローバルの制約セット（テンプレート）バブル。勤務表作成時にここからコピーされる */
 export const constraintSetUrl = (): string => `hotel-shift-puzzle/constraints`;
 
+/** スタッフプロファイルバブル（人×分類の表＋辞書。店舗共通。#236） */
+export const staffProfileDictionaryUrl = (): string => `hotel-shift-puzzle/staff-profile`;
+
 /** 勤務スタッフ群バブル（誰が働くか・並び順・可能勤務帯・勤務帯の列をここで全部） */
 export const scheduleStaffUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/staff`;

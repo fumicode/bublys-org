@@ -3,6 +3,9 @@
  */
 export * from "./StaffCollection.js";
 export * from "./StaffDetail.js";
+export * from "./StaffProfileDictionaryEditor.js";
+export * from "./StaffProfilePanel.js";
+export * from "./profileEditing.js";
 export * from "./WorkShiftCollection.js";
 export * from "./ConstraintSetCollection.js";
 export * from "./ConstraintSetWorld.js";

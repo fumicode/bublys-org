@@ -10,9 +10,14 @@ import { registerBubly, Bubly, BublyMenuItem } from "@bublys-org/bubbles-ui";
 import GridOnIcon from '@mui/icons-material/GridOn';
 
 // Bubble Routes
-import { hotelShiftPuzzleBubbleRoutes, shiftWishListUrl } from "./registration/index.js";
+import {
+  hotelShiftPuzzleBubbleRoutes,
+  shiftWishListUrl,
+  staffProfileDictionaryUrl,
+} from "./registration/index.js";
 
 import PeopleIcon from "@mui/icons-material/People";
+import BadgeIcon from "@mui/icons-material/Badge";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import RuleIcon from "@mui/icons-material/Rule";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
@@ -31,6 +36,7 @@ import SaveIcon from "@mui/icons-material/Save";
  */
 export const menuItems: BublyMenuItem[] = [
   { label: "スタッフ一覧", url: 'hotel-shift-puzzle/staffs', icon: React.createElement(PeopleIcon) },
+  { label: "スタッフプロファイル", url: staffProfileDictionaryUrl(), icon: React.createElement(BadgeIcon) },
   { label: "勤務帯", url: 'hotel-shift-puzzle/work-shifts', icon: React.createElement(ScheduleIcon) },
   { label: "制約", url: 'hotel-shift-puzzle/constraints', icon: React.createElement(RuleIcon) },
   { label: "シフト希望", url: shiftWishListUrl(), icon: React.createElement(EditCalendarIcon) },

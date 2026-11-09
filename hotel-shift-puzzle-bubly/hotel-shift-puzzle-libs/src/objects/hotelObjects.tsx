@@ -29,6 +29,8 @@ import {
   type ConstraintSetPlain,
   ScheduleReport,
   type MonthlyStaffSchedulePlain,
+  StaffProfileDictionary,
+  type StaffProfileDictionaryPlain,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { objectShape, primitiveShape } from "@bublys-org/domain-registry";
 import { defineObjects, makeObjectsProvider } from "./framework.js";
@@ -56,6 +58,9 @@ export const CONSTRAINT_SET_TYPE = "ConstraintSet";
 export const GLOBAL_CONSTRAINT_SET_ID = "global";
 
 export const SCHEDULE_REPORT_TYPE = "ScheduleReport";
+
+/** スタッフプロファイルの辞書（店舗共通。いまはアプリに1つ、id="global"。#236） */
+export const STAFF_PROFILE_DICTIONARY_TYPE = "StaffProfileDictionary";
 
 // 注: バブル URL（開く URL のスキーム）は app 層の関心事なので、ここ（libs）では持たない。
 // オブジェクトの正規 URL は app の registration/bubbleUrls.ts が registerObjectUrl で登録する。
@@ -181,6 +186,19 @@ export const HOTEL_OBJECTS = defineObjects({
     // 確定時点のスナップショット。世界に属さない（external、既定）。
     // 勤務表の世界に相乗りさせると、時間移動のたびに現れたり消えたりして確定記録の
     // 意味が壊れる。state が完全 plain → serialize 不要。
+  },
+  StaffProfileDictionary: {
+    class: StaffProfileDictionary,
+    getId: (d: StaffProfileDictionary) => d.id,
+    // 項目・値・記号の定義は店舗共通。世界に属さない（external、既定）。
+    // 勤務表の世界の中から読んでも常にグローバルを見るので、辞書の記号を変えれば
+    // 過去の勤務表も含めて一度に変わる（1つの意味に1つの記号）。人が選んだ値は
+    // Staff（焼き付け）とメンバー（勤務表の世界）が持つので、時間移動ではそちらが戻る。
+    // 入れ子にインスタンス（項目・値）を持つので codec を明示。
+    serialize: {
+      toJSON: (d: StaffProfileDictionary) => d.toPlain(),
+      fromJSON: (j) => StaffProfileDictionary.fromPlain(j as StaffProfileDictionaryPlain),
+    },
   },
 });
 
