@@ -1,12 +1,12 @@
 import { ConfirmedSchedule } from './ConfirmedSchedule.js';
+import { CalendarMonthPeriod } from './SchedulePeriod.js';
 
 describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
   const create = () =>
     ConfirmedSchedule.create({
       scheduleId: 'schedule-A',
       worldLineNodeId: 'node-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       storeId: 'store-1',
       compromises: [
         {
@@ -27,7 +27,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
   test('id は店舗×月で一意（どの勤務表・どの版かには依らない）', () => {
     expect(create().id).toBe('store-1:2026-06');
-    expect(ConfirmedSchedule.idFor('store-2', 2026, 12)).toBe('store-2:2026-12');
+    expect(ConfirmedSchedule.idFor('store-2', CalendarMonthPeriod.of(2026, 12))).toBe('store-2:2026-12');
     expect(create().version).toEqual({ scheduleId: 'schedule-A', worldLineNodeId: 'node-1' });
   });
 
@@ -54,13 +54,13 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
   describe('precedingIdFor（引き継ぐのは同じ店舗の前月の確定版）', () => {
     test('同じ店舗の、ちょうど1か月前', () => {
-      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', year: 2026, month: 7 })).toBe(
+      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 7) })).toBe(
         create().id
       );
     });
 
     test('1月の前月は前年12月', () => {
-      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', year: 2027, month: 1 })).toBe(
+      expect(ConfirmedSchedule.precedingIdFor({ storeId: 'store-1', period: CalendarMonthPeriod.of(2027, 1) })).toBe(
         'store-1:2026-12'
       );
     });
@@ -70,8 +70,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     const params = (scheduleId: string, worldLineNodeId: string) => ({
       scheduleId,
       worldLineNodeId,
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
@@ -106,7 +105,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
     });
 
     test('別の店舗・月の確定版は置き換えられない', () => {
-      const other = ConfirmedSchedule.confirm({ ...params('schedule-A', 'node-1'), month: 7 });
+      const other = ConfirmedSchedule.confirm({ ...params('schedule-A', 'node-1'), period: CalendarMonthPeriod.of(2026, 7) });
       expect(() => ConfirmedSchedule.confirm(params('schedule-A', 'node-1'), other)).toThrow();
     });
   });
@@ -213,7 +212,7 @@ describe('ConfirmedSchedule（確定版と振り返り）の使い方', () => {
 
   test('確定時刻を持てる。toPlain / fromPlain で残り、古い記録には無い', () => {
     const report = ConfirmedSchedule.create({
-      scheduleId: 's', worldLineNodeId: 'n', year: 2026, month: 6, storeId: 'store-1',
+      scheduleId: 's', worldLineNodeId: 'n', period: CalendarMonthPeriod.of(2026, 6), storeId: 'store-1',
       compromises: [], busyDayContributions: [], stars: [],
       confirmedAt: 1700000000000,
     });

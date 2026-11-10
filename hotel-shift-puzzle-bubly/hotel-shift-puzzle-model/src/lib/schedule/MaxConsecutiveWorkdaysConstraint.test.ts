@@ -5,6 +5,7 @@ import {
   MAX_CONSECUTIVE_WORKDAYS,
 } from './MaxConsecutiveWorkdaysConstraint.js';
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('MaxConsecutiveWorkdaysConstraint（連勤上限制約）の使い方', () => {
   const YEAR = 2026;
@@ -16,8 +17,7 @@ describe('MaxConsecutiveWorkdaysConstraint（連勤上限制約）の使い方',
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: YEAR,
-      month: MONTH,
+      period: CalendarMonthPeriod.of(YEAR, MONTH),
     });
 
   const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
@@ -108,8 +108,7 @@ describe('MonthlyStaffSchedule.checkConstraints（制約の注入）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   const workRange = (
@@ -154,8 +153,7 @@ describe('MaxConsecutiveWorkdaysConstraint：前月とつないだとき（月�
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: YEAR,
-      month: MONTH,
+      period: CalendarMonthPeriod.of(YEAR, MONTH),
     });
   const day = (d: number) => WorkingDay.of(YEAR, MONTH, d);
   const workRange = (
@@ -176,8 +174,7 @@ describe('MaxConsecutiveWorkdaysConstraint：前月とつないだとき（月�
     let may = MonthlyStaffSchedule.create({
       id: 'may',
       storeId: 'store-1',
-      year: YEAR,
-      month: 5,
+      period: CalendarMonthPeriod.of(YEAR, 5),
     });
     for (let d = 31; d > 31 - workDays; d--) {
       may = may.assignShift(staffId, WorkingDay.of(YEAR, 5, d), SHIFT);

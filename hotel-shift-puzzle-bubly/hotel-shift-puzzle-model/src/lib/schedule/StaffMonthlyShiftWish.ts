@@ -21,7 +21,8 @@
  * state は完全に plain（入れ子の Record まで素の値）なので、state がそのまま plain を兼ねる。
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
-import { WorkingDay } from "./WorkingDay.js";
+import type { WorkingDay } from "./WorkingDay.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 /** 希望の極性: したい / 避けたい（neutral はキーを持たないことで表す） */
 export type ShiftWishPreference = "want" | "avoid";
@@ -92,12 +93,17 @@ export class StaffMonthlyShiftWish {
     return this.state.month;
   }
 
+  /**
+   * この希望が受け持つ期。希望は今のところ暦月ごとに集めるので、暦月の期になる。
+   * 勤務表はこれと自分の期を比べて希望を引く（4週の期の勤務表は、まだ希望を引かない）。
+   */
+  get period(): CalendarMonthPeriod {
+    return CalendarMonthPeriod.of(this.state.year, this.state.month);
+  }
+
   /** その月の全稼働日（1日〜末日） */
   workingDays(): WorkingDay[] {
-    const lastDay = new Date(this.state.year, this.state.month, 0).getDate();
-    return Array.from({ length: lastDay }, (_, i) =>
-      WorkingDay.of(this.state.year, this.state.month, i + 1)
-    );
+    return this.period.days();
   }
 
   /** その稼働日・そのオプションの希望（neutral は undefined） */

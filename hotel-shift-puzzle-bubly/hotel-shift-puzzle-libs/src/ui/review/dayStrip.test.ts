@@ -1,10 +1,10 @@
+import { CalendarMonthPeriod } from '../../domain/index.js';
 import { dayStripOf } from './dayStrip.js';
 
 describe('dayStripOf（振り返りの日別の帯）', () => {
   const strip = () =>
     dayStripOf({
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       staffId: 'A',
       compromises: [
         { staffId: 'A', label: '希望', dayKeys: ['2026-06-03'], message: '' },

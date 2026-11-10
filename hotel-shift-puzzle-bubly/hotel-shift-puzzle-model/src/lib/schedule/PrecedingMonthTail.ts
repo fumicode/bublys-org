@@ -31,6 +31,7 @@
  */
 import { WorkingDay, type WorkingDayState } from "./WorkingDay.js";
 import type { ConfirmedVersion, StarEntry } from "./ConfirmedSchedule.js";
+import type { SchedulePeriod } from "./SchedulePeriod.js";
 // 型だけ（MonthlyStaffSchedule 側がこのクラスを値として使うので、実行時の循環を作らない）
 import type { MonthlyStaffSchedule } from "./MonthlyStaffSchedule.js";
 
@@ -215,22 +216,15 @@ export class PrecedingMonthTail {
     return this.state.days[this.state.days.length - 1];
   }
 
-  /** 写し元の年月（日が無ければ undefined） */
-  get yearMonth(): { year: number; month: number } | undefined {
-    const last = this.lastDay;
-    return last ? { year: last.year, month: last.month } : undefined;
-  }
-
   /**
-   * この末尾が (year, month) の**直前**の月末で終わっているか。
-   * 前月の末日まで写し取っていないと、間に空白がある＝ひと続きとは言えない。
+   * この末尾が period の**直前**で終わっているか（＝末日の翌日が期の起点日）。
+   * 前の期の最終日まで写し取っていないと、間に空白がある＝ひと続きとは言えない。
+   * 写し元がどの期だったかは持たない。直前で終わっていれば、それは引き継ぐ側の前の期
+   * （`period.previous()`）。
    */
-  directlyPrecedes(year: number, month: number): boolean {
+  directlyPrecedes(period: SchedulePeriod): boolean {
     const last = this.lastDay;
-    if (!last) return false;
-    const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
-    const lastDayOfPrev = new Date(prev.year, prev.month, 0).getDate();
-    return last.year === prev.year && last.month === prev.month && last.day === lastDayOfPrev;
+    return last !== undefined && period.startsRightAfter(last);
   }
 
   private cellIndex?: Map<string, PrecedingCell>;

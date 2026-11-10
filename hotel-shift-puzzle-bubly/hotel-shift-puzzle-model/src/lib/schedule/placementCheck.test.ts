@@ -8,6 +8,7 @@ import { computeConstraintDelta } from './ConstraintDelta.js';
 import { introducesViolation } from './placementCheck.js';
 import type { ScheduleConstraint } from './ScheduleConstraint.js';
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('introducesViolation（そのセルにその値を置くと、新しい違反が出るか）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -23,8 +24,7 @@ describe('introducesViolation（そのセルにその値を置くと、新しい
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       requiredStaffing: required,
     });
 
@@ -144,11 +144,11 @@ describe('introducesViolation：前月とつないだとき（月跨ぎ）', () 
   const early: ShiftCell = { kind: 'work', shiftId: 'early' };
 
   const june = () =>
-    MonthlyStaffSchedule.create({ id: 'sched-1', storeId: 'store-1', year: 2026, month: 6 });
+    MonthlyStaffSchedule.create({ id: 'sched-1', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 6) });
   const tailEndingWithLate = PrecedingMonthTail.capture({
     source: { scheduleId: 'may', worldLineNodeId: 'n' },
     stars: [],
-    schedule: MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 })
+    schedule: MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) })
       .assignShift('s1', WorkingDay.of(2026, 5, 31), 'late'),
     shiftNameOf: () => '遅番',
     length: 7,

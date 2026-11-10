@@ -1,3 +1,4 @@
+import { CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import { ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
 import { staffReviewSummaries } from './staffReviews.js';
 
@@ -11,8 +12,7 @@ describe('staffReviewSummaries（前月の振り返りからスタッフ分だ�
     ConfirmedSchedule.create({
       scheduleId: params.scheduleId,
       worldLineNodeId: 'node-1',
-      year: params.year,
-      month: params.month,
+      period: CalendarMonthPeriod.of(params.year, params.month),
       storeId: 'store-1',
       compromises: [],
       busyDayContributions: [],
@@ -68,7 +68,7 @@ describe('staffReviewSummaries（前月の振り返りからスタッフ分だ�
     expect(staffReviewSummaries('staff-A', [report])).toEqual([]);
   });
 
-  test('新しい年月順（降順）に並べる', () => {
+  test('新しい期の順（降順）に並べる', () => {
     const older = reportOf({
       scheduleId: 'sched-1',
       year: 2026,
@@ -82,6 +82,6 @@ describe('staffReviewSummaries（前月の振り返りからスタッフ分だ�
       scores: [{ staffId: 'staff-A', score: 1 }],
     });
     const result = staffReviewSummaries('staff-A', [older, newer]);
-    expect(result.map((s) => s.report.month)).toEqual([6, 3]);
+    expect(result.map((s) => s.report.period.label)).toEqual(['2026年6月', '2026年3月']);
   });
 });

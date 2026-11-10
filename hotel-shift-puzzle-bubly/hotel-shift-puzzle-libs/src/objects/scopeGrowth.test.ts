@@ -6,7 +6,7 @@
  * 時間移動でその編集に戻れないことを意味するので、静かに壊れると気づけない。
  */
 import { worldLineGraphSlice } from '@bublys-org/world-line-graph';
-import { MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, MonthlyStaffSchedule, Staff } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from './framework.js';
 import { HOTEL_OBJECTS, SCHEDULE_TYPE, STAFF_TYPE } from './hotelObjects.js';
 import { APP_SCOPE_ID, localScopeId, saveObject } from './commit.js';
@@ -46,7 +46,7 @@ function setUp() {
   for (let i = 1; i <= 3; i++) {
     saveObject(store, STAFF_TYPE, new Staff({ id: `s${i}`, name: `staff${i}` }));
   }
-  const schedule = createSchedule(store, { storeId: 'st', year: 2026, month: 6 });
+  const schedule = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 6) });
   const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
   return { store, schedule, scopeId };
 }
@@ -119,7 +119,7 @@ describe('どの操作でどのスコープが伸びるか', () => {
 
   it('他の勤務表の世界線は伸びない（編集は自分の世界にだけ載る）', () => {
     const { store, schedule } = setUp();
-    const other = createSchedule(store, { storeId: 'st', year: 2026, month: 7 });
+    const other = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 7) });
     const otherScope = localScopeId(SCHEDULE_TYPE, other.state.id);
     const before = store.counts()[otherScope];
 

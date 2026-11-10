@@ -6,6 +6,7 @@ import {
   MonthlyStaffSchedule,
   ConstraintSet,
   ConfirmedSchedule,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
@@ -34,7 +35,7 @@ export const ScheduleCollection: FC = () => {
   // 勤務表を作る＝その世界が生まれる。勤務表・勤務帯セット・可能勤務帯・固定メンバー
   // （そのときのスタッフ名簿）が1ノードにまとまる。詳しくは createSchedule.ts。
   // 勤務表は、前月の確定版から引き継いで始まる（月末の勤務と★。precedingMonth.ts）。
-  const handleCreate = async (params: { storeId: string; year: number; month: number }) => {
+  const handleCreate = async (params: { storeId: string; period: SchedulePeriod }) => {
     const confirmed = precedingConfirmedOf(reports, params);
     // 確定版が読めなくても勤務表は作る（引き継がず、今月1日から数える。取り込みは後からできる）
     const inheritance = confirmed

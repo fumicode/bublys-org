@@ -36,6 +36,65 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "CalendarMonthPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "year",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "month",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "year",
+        "month",
+        "start",
+        "key",
+        "length",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "year",
+            "month"
+          ],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月の期：起点は毎月1日、長さはその月の日数"
+    },
+    {
       "name": "ConfirmedSchedule",
       "file": "schedule/ConfirmedSchedule.ts",
       "kind": "aggregate",
@@ -56,13 +115,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -116,8 +170,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "version",
         "scheduleId",
         "worldLineNodeId",
-        "year",
-        "month",
+        "period",
         "storeId",
         "title",
         "confirmedAt",
@@ -133,8 +186,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "idFor",
           "params": [
             "storeId",
-            "year",
-            "month"
+            "period"
           ],
           "returns": "string",
           "isStatic": true,
@@ -152,8 +204,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "defaultTitle",
           "params": [
-            "year",
-            "month"
+            "period"
           ],
           "returns": "string",
           "isStatic": true,
@@ -826,6 +877,58 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "FourWeekPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "start",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "start",
+        "key",
+        "length",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "containing",
+          "params": [
+            "anchor",
+            "day"
+          ],
+          "returns": "FourWeekPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週の期：起点日から28日"
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -916,13 +1019,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -954,8 +1052,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "storeId",
-        "year",
-        "month",
+        "period",
         "workingStaffGroupId",
         "constraintSetId",
         "precedingTail",
@@ -972,13 +1069,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "MonthlyStaffSchedule",
           "isStatic": true,
           "returnsSelf": true
-        },
-        {
-          "name": "previousYearMonth",
-          "params": [],
-          "returns": "{ year: number; month: number; }",
-          "isStatic": false,
-          "returnsSelf": false
         },
         {
           "name": "withPrecedingTail",
@@ -1315,7 +1405,6 @@ export const MODEL_GRAPH: ModelGraph = {
         "confirmedAt",
         "days",
         "lastDay",
-        "yearMonth",
         "signature"
       ],
       "methods": [
@@ -1340,8 +1429,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "directlyPrecedes",
           "params": [
-            "year",
-            "month"
+            "period"
           ],
           "returns": "boolean",
           "isStatic": false,
@@ -1648,6 +1736,85 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "ScheduleCandidates",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "SchedulePeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "start",
+        "length",
+        "label",
+        "key",
+        "end"
+      ],
+      "methods": [
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "days",
+          "params": [],
+          "returns": "WorkingDay[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "contains",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "startsRightAfter",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "SchedulePeriod",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2029,6 +2196,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "staffId",
         "year",
         "month",
+        "period",
         "filledDayCount",
         "isEmpty",
         "isSubmitted",
@@ -2189,6 +2357,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "toDate",
           "params": [],
           "returns": "Date",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addDays",
+          "params": [
+            "n"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "daysSince",
+          "params": [
+            "other"
+          ],
+          "returns": "number",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2762,6 +2948,14 @@ export const MODEL_GRAPH: ModelGraph = {
   "relations": [
     {
       "from": "ConfirmedSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConfirmedSchedule",
       "to": "MonthlyStaffSchedule",
       "kind": "references",
       "via": "scheduleId",
@@ -2825,6 +3019,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "FourWeekPeriod",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "start",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "MonthlyStaffSchedule",
       "to": "ShiftAssignment",
       "kind": "contains",
@@ -2839,6 +3041,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "constraintSetId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
     },
     {
       "from": "MonthlyStaffSchedule",
@@ -2987,13 +3197,14 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 46,
+    "fileCount": 47,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
       "RequiredStaffingConstraint",
+      "SchedulePeriod",
       "ShiftIntervalConstraint",
       "ShiftLeaderConstraint"
     ],

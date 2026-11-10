@@ -2,7 +2,7 @@
  * 旧形式の完成レポート（ID が `勤務表ID:ノードID`）を、店舗×月で1つの確定版に畳む（#231）。
  */
 import { worldLineGraphSlice } from "@bublys-org/world-line-graph";
-import { ConfirmedSchedule } from "@bublys-org/hotel-shift-puzzle-model";
+import { ConfirmedSchedule, CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import { registerObjects } from "./framework.js";
 import { HOTEL_OBJECTS, CONFIRMED_SCHEDULE_TYPE } from "./hotelObjects.js";
 import { APP_SCOPE_ID, readFromScope, refsOfTypeInScope, saveObject } from "./commit.js";
@@ -43,8 +43,7 @@ const legacy = (
   const fresh = ConfirmedSchedule.create({
     scheduleId,
     worldLineNodeId: nodeId,
-    year: 2026,
-    month: params.month ?? 5,
+    period: CalendarMonthPeriod.of(2026, params.month ?? 5),
     storeId: params.storeId ?? "st",
     compromises: [],
     busyDayContributions: [],
@@ -86,8 +85,7 @@ describe("migrateLegacyReports（旧形式の完成レポートを確定版に�
     const current = ConfirmedSchedule.confirm({
       scheduleId: "b",
       worldLineNodeId: "n9",
-      year: 2026,
-      month: 5,
+      period: CalendarMonthPeriod.of(2026, 5),
       storeId: "st",
       compromises: [],
       busyDayContributions: [],

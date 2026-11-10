@@ -22,6 +22,7 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type ScheduleDayDetailProps = {
@@ -60,17 +61,13 @@ const ScheduleDayDetailBody: FC<ScheduleDayDetailProps> = ({
 
   // この勤務表と同じ年月のシフト希望を staffId 別に引けるようにする（本人の希望表示用）
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
-  const wishByStaff = useMemo(() => {
-    const map = new Map<string, StaffMonthlyShiftWish>();
-    if (schedule) {
-      for (const w of allWishes) {
-        if (w.year === schedule.year && w.month === schedule.month) {
-          map.set(w.staffId, w);
-        }
-      }
-    }
-    return map;
-  }, [allWishes, schedule]);
+  const wishByStaff = useMemo(
+    () =>
+      schedule
+        ? wishesOfPeriod(allWishes, schedule.period)
+        : new Map<string, StaffMonthlyShiftWish>(),
+    [allWishes, schedule]
+  );
 
   // まだ決まっていないセルに入れられる値（候補集合）。勤務表グリッドと同じフックを通すので、
   // ここで見える候補はグリッドの候補と一致する（計算対象も盤面全体で揃える）。

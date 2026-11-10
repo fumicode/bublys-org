@@ -1,3 +1,4 @@
+import { CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import { Staff, ConfirmedSchedule } from '@bublys-org/hotel-shift-puzzle-model';
 import { prioritizeStaffByStars } from './starPriority.js';
 
@@ -11,8 +12,7 @@ const reportWithScores = (scores: { staffId: string; score: number }[]) =>
   ConfirmedSchedule.create({
     scheduleId: 'sched-1',
     worldLineNodeId: 'node-1',
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
     storeId: 'store-1',
     compromises: [],
     busyDayContributions: [],

@@ -117,7 +117,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
       </span>
     );
   };
-  const dayCount = new Date(report.year, report.month, 0).getDate();
+  const dayCount = report.period.length;
 
   return (
     <StyledWrap>
@@ -133,14 +133,14 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                 if (e.nativeEvent.isComposing) return; // IME確定のEnterでは確定しない
                 if (e.key === "Enter") e.currentTarget.blur();
               }}
-              placeholder={`${report.year}年${report.month}月`}
+              placeholder={report.period.label}
             />
           ) : (
             <span className="e-title-text">{report.title}</span>
           )}
         </div>
         <span className="e-sub">
-          {report.year}年{report.month}月 / {report.storeId}
+          {report.period.label} / {report.storeId}
           {confirmedAt !== undefined && (
             <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
           )}
@@ -173,8 +173,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
               const expanded = expandedStaffIds.has(s.staffId);
               const hasNote = report.noteFor(s.staffId).trim().length > 0;
               const strip = dayStripOf({
-                year: report.year,
-                month: report.month,
+                period: report.period,
                 staffId: s.staffId,
                 compromises: report.compromises,
                 busyDayContributions: report.busyDayContributions,

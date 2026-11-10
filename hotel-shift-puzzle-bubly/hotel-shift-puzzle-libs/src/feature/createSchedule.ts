@@ -25,6 +25,7 @@ import {
   WorkingStaffGroup,
   ConstraintSet,
   type PrecedingMonthTail,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   APP_SCOPE_ID,
@@ -62,8 +63,7 @@ export function createSchedule(
   store: StoreLike,
   params: {
     storeId: string;
-    year: number;
-    month: number;
+    period: SchedulePeriod;
     /**
      * 前月の確定版から引き継ぐもの（月末の勤務と★。precedingMonth.ts の captureInheritance）。
      * 前月が確定していない・確定版が読めなければ省略（今月1日から数える）

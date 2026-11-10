@@ -644,7 +644,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 休合計 + 早番日数 */}
         <div className="e-corner">
           <span className="e-corner-title">
-            {schedule.year}年{schedule.month}月
+            {schedule.period.label}
           </span>
           {/* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。スタッフ列の真上＝
               このコーナーセルに入れて、何に効く操作なのかを位置で示す。 */}

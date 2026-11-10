@@ -7,7 +7,11 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import { MonthlyStaffSchedule } from "../domain/index.js";
+import {
+  CalendarMonthPeriod,
+  MonthlyStaffSchedule,
+  type SchedulePeriod,
+} from "../domain/index.js";
 
 type ScheduleListViewProps = {
   schedules: MonthlyStaffSchedule[];
@@ -15,7 +19,7 @@ type ScheduleListViewProps = {
   confirmedScheduleIds?: ReadonlySet<string>;
   /** 取り込んでいない前月の確定版がある勤務表（「新しい確定版あり」を添える） */
   pendingScheduleIds?: ReadonlySet<string>;
-  onCreate: (params: { storeId: string; year: number; month: number }) => void;
+  onCreate: (params: { storeId: string; period: SchedulePeriod }) => void;
   onRemove: (id: string) => void;
 };
 
@@ -31,7 +35,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
   const [month, setMonth] = useState(7);
 
   const handleCreate = () => {
-    onCreate({ storeId, year, month });
+    onCreate({ storeId, period: CalendarMonthPeriod.of(year, month) });
   };
 
   return (
@@ -45,7 +49,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
               {/* ObjectView: ダブルクリックで勤務表グリッドを開く / ドラッグでポケットへ */}
               <ObjectView
                 object={schedule}
-                label={`${schedule.year}年${schedule.month}月`}
+                label={schedule.period.label}
                 draggable={true}
                 openingPosition="bubble-side-right"
                 fullWidth={true}
@@ -54,7 +58,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                   <CalendarMonthIcon fontSize="small" className="e-icon" />
                   <div className="e-text">
                     <div className="e-title">
-                      {schedule.year}年{schedule.month}月
+                      {schedule.period.label}
                       {confirmedScheduleIds?.has(schedule.id) && (
                         <span className="e-confirmed" title="この月の確定版を持っています">
                           🏁 確定版
@@ -64,12 +68,11 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                     <div className="e-meta">
                       {schedule.storeId} ・ {schedule.assignments.length}件の割当
                     </div>
-                    {(schedule.precedingTail?.yearMonth || pendingScheduleIds?.has(schedule.id)) && (
+                    {(schedule.precedingTail?.lastDay || pendingScheduleIds?.has(schedule.id)) && (
                       <div className="e-inheritance">
-                        {schedule.precedingTail?.yearMonth && (
+                        {schedule.precedingTail?.lastDay && (
                           <span title="勤務表は、前月の確定版から引き継いで始まります">
-                            ← {schedule.precedingTail.yearMonth.year}年
-                            {schedule.precedingTail.yearMonth.month}月の確定版から引き継ぎ
+                            ← {schedule.period.previous().label}の確定版から引き継ぎ
                           </span>
                         )}
                         {pendingScheduleIds?.has(schedule.id) && (

@@ -8,8 +8,10 @@
  * 表示語彙（状態・ラベル）は ui/shiftWishStatus が持つ。ここはその語彙で行を組むだけ。
  */
 import {
+  CalendarMonthPeriod,
   StaffMonthlyShiftWish,
   type MonthlyStaffSchedule,
+  type SchedulePeriod,
   type Staff,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
@@ -22,13 +24,21 @@ import {
 /** 年月（1-12） */
 export type ShiftWishMonth = { year: number; month: number };
 
-/** 勤務表がある年月（重複除去・古い順）。同じ月の勤務表が複数あっても1つに畳む。 */
+/**
+ * 勤務表がある年月（重複除去・古い順）。同じ月の勤務表が複数あっても1つに畳む。
+ * 希望はいまのところ暦月ごとに集めるので、暦月の期の勤務表だけを数える
+ * （4週の期の勤務表の希望の集め方は、行政の入口を作るときに決める）。
+ */
 export const monthsWithSchedule = (
   schedules: MonthlyStaffSchedule[]
 ): ShiftWishMonth[] => {
   const seen = new Set<string>();
   return schedules
-    .map((s) => ({ year: s.year, month: s.month }))
+    .flatMap((s) =>
+      s.period instanceof CalendarMonthPeriod
+        ? [{ year: s.period.year, month: s.period.month }]
+        : []
+    )
     .filter(({ year, month }) => {
       const key = `${year}-${month}`;
       if (seen.has(key)) return false;
@@ -38,17 +48,24 @@ export const monthsWithSchedule = (
     .sort((a, b) => a.year - b.year || a.month - b.month);
 };
 
+/**
+ * その期の希望を staffId で引ける Map にする（他の期は混ざらない）。
+ * 勤務表が希望を引くのはここ1箇所。希望が受け持つ期（{@link StaffMonthlyShiftWish.period}）と
+ * 勤務表の期が同じものだけを引く。
+ */
+export const wishesOfPeriod = (
+  wishes: readonly StaffMonthlyShiftWish[],
+  period: SchedulePeriod
+): Map<string, StaffMonthlyShiftWish> =>
+  new Map(wishes.filter((w) => w.period.equals(period)).map((w) => [w.staffId, w]));
+
 /** その月の希望を staffId で引ける Map にする（他の月は混ざらない） */
 export const wishesOfMonth = (
   wishes: StaffMonthlyShiftWish[],
   year: number,
   month: number
 ): Map<string, StaffMonthlyShiftWish> =>
-  new Map(
-    wishes
-      .filter((w) => w.year === year && w.month === month)
-      .map((w) => [w.staffId, w])
-  );
+  wishesOfPeriod(wishes, CalendarMonthPeriod.of(year, month));
 
 /** 月一覧の行：勤務表がある月ごとに、全スタッフぶんの回収の進み具合を数える */
 export const monthProgressList = (

@@ -11,6 +11,8 @@ export * from './staff/WorkingStaffGroup.js';
 
 // 月間スタッフ勤務表（シフト表）
 export * from './schedule/WorkingDay.js';
+// 期（勤務表の区切り。暦月の期・4週の期。起点日で見分け、月には換算しない）
+export * from './schedule/SchedulePeriod.js';
 export * from './schedule/WorkShift.js';
 export * from './schedule/WorkShiftSet.js';
 export * from './schedule/ShiftAssignment.js';

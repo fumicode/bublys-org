@@ -61,7 +61,7 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
         <h3>
           予約状況{" "}
           <span className="e-sub">
-            {schedule.year}年{schedule.month}月 / {schedule.storeId}
+            {schedule.period.label} / {schedule.storeId}
           </span>
         </h3>
         <p className="e-note">

@@ -1,4 +1,5 @@
 import {
+  CalendarMonthPeriod,
   MonthlyStaffSchedule,
   Staff,
   StaffMonthlyShiftWish,
@@ -18,7 +19,7 @@ import {
 import { DAY_OFF_WISH } from '../ui/shiftWishOptions.js';
 
 const schedule = (year: number, month: number, id = `sch-${year}-${month}`) =>
-  MonthlyStaffSchedule.create({ id, storeId: 'store-1', year, month });
+  MonthlyStaffSchedule.create({ id, storeId: 'store-1', period: CalendarMonthPeriod.of(year, month) });
 
 const emptyWish = (staffId: string, year: number, month: number) =>
   StaffMonthlyShiftWish.create({ staffId, year, month });

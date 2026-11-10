@@ -7,7 +7,7 @@
  * あるいは臨時の人が時間移動で戻らない、という形で静かに壊れる。
  */
 import { worldLineGraphSlice } from '@bublys-org/world-line-graph';
-import { Staff, WorkingStaffGroup } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, Staff, WorkingStaffGroup } from '@bublys-org/hotel-shift-puzzle-model';
 import { registerObjects } from './framework.js';
 import {
   HOTEL_OBJECTS,
@@ -52,7 +52,7 @@ function setUp() {
   for (let i = 1; i <= 3; i++) {
     saveObject(store, STAFF_TYPE, new Staff({ id: `s${i}`, name: `staff${i}` }));
   }
-  const schedule = createSchedule(store, { storeId: 'st', year: 2026, month: 6 });
+  const schedule = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 6) });
   const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
   const readGroup = () =>
     readFromScope<WorkingStaffGroup>(
@@ -108,7 +108,7 @@ describe('勤務スタッフ群（勤務表 → 群 → スタッフ）', () => 
       readGroup().addTemporary(new Staff({ id: 'tmp-1', name: '応援 太郎' }))
     );
 
-    const other = createSchedule(store, { storeId: 'st', year: 2026, month: 7 });
+    const other = createSchedule(store, { storeId: 'st', period: CalendarMonthPeriod.of(2026, 7) });
     const otherGroup = readFromScope<WorkingStaffGroup>(
       store,
       localScopeId(SCHEDULE_TYPE, other.id),

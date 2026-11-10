@@ -25,5 +25,5 @@ export function staffReviewSummaries(
       note: report.noteFor(staffId),
     }))
     .filter((s) => s.score > 0 || s.note.trim().length > 0)
-    .sort((a, b) => b.report.year - a.report.year || b.report.month - a.report.month);
+    .sort((a, b) => b.report.period.start.compareTo(a.report.period.start));
 }

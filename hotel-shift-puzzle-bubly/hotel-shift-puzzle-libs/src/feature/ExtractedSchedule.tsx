@@ -38,6 +38,7 @@ import {
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
 import { ScheduleWorld } from "./ScheduleWorld.js";
+import { wishesOfPeriod } from "./shiftWishMonths.js";
 import { useWorkingStaff } from "./workingStaff.js";
 
 type ExtractedScheduleProps = {
@@ -108,17 +109,13 @@ const ExtractedScheduleBody: FC<ExtractedScheduleProps> = ({
     [allLeaderRules, idSet]
   );
 
-  const wishByStaff = useMemo(() => {
-    const map = new Map<string, StaffMonthlyShiftWish>();
-    if (schedule) {
-      for (const w of allWishes) {
-        if (w.year === schedule.year && w.month === schedule.month) {
-          map.set(w.staffId, w);
-        }
-      }
-    }
-    return map;
-  }, [allWishes, schedule]);
+  const wishByStaff = useMemo(
+    () =>
+      schedule
+        ? wishesOfPeriod(allWishes, schedule.period)
+        : new Map<string, StaffMonthlyShiftWish>(),
+    [allWishes, schedule]
+  );
 
   // 自動シフトが守る制約は、抽出ビューでも勤務表全体と同じリスト（同じ勤務表を編集しているので）。
   // 表示用の violations（抽出ビュー向けに絞った一覧）とは別物。

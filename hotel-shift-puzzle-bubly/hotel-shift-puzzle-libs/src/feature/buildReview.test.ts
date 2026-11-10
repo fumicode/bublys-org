@@ -1,3 +1,4 @@
+import { CalendarMonthPeriod } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
@@ -22,8 +23,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     })
       .setRequired(day1, '早番', 1)
       .setRequired(day2, '中番', 2)
@@ -122,8 +122,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
     const empty = MonthlyStaffSchedule.create({
       id: 'sched-2',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
     const report = buildReview({
       schedule: empty,

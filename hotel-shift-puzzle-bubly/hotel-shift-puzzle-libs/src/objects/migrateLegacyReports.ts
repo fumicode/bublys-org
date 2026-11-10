@@ -39,13 +39,13 @@ const confirmedAtOf = (store: StoreLike, report: ConfirmedSchedule): number =>
 export function migrateLegacyReports(store: StoreLike): string[] {
   const refs = refsOfTypeInScope(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE);
 
-  // 店舗×月ごとに集める。読めないレポートはどの店舗×月かも分からないので、
+  // 店舗×期ごとに集める。読めないレポートはどの店舗×期かも分からないので、
   // 1つでも読めなければ全部見送る（次の起動でまた試す）
   const groups = new Map<string, ConfirmedSchedule[]>();
   for (const ref of refs) {
     const report = readFromScope<ConfirmedSchedule>(store, APP_SCOPE_ID, CONFIRMED_SCHEDULE_TYPE, ref.id);
     if (!report) return [];
-    const id = ConfirmedSchedule.idFor(report.storeId, report.year, report.month);
+    const id = ConfirmedSchedule.idFor(report.storeId, report.period);
     groups.set(id, [...(groups.get(id) ?? []), report]);
   }
 

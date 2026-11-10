@@ -22,6 +22,7 @@ import {
   type StarEntry,
   type MonthlyStaffSchedule,
   type WorkShiftSet,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
   localScopeId,
@@ -40,10 +41,10 @@ export function confirmedAtOf(store: StoreLike, report: ConfirmedSchedule): numb
   );
 }
 
-/** target の勤務表が引き継ぐ前月の確定版（同じ店舗の1か月前）。まだ確定していなければ undefined（純粋） */
+/** target の勤務表が引き継ぐ前の期の確定版（同じ店舗の、すぐ前の期）。まだ確定していなければ undefined（純粋） */
 export function precedingConfirmedOf(
   reports: readonly ConfirmedSchedule[],
-  target: { storeId: string; year: number; month: number }
+  target: { storeId: string; period: SchedulePeriod }
 ): ConfirmedSchedule | undefined {
   const id = ConfirmedSchedule.precedingIdFor(target);
   return reports.find((r) => r.id === id);

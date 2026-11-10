@@ -9,6 +9,7 @@ import {
   WorkingDay,
   WorkingStaffGroup,
   WorkingStaffMember,
+  CalendarMonthPeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { computeCandidatesFor } from "./candidateRequest.js";
 import type {
@@ -50,8 +51,7 @@ describe("useScheduleCandidates", () => {
   const schedule = MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   }).setCell("L1", day1, { kind: "work", shiftId: "late" });
 
   /** 本物の worker と同じく「非同期に応答し、terminate されたら黙る」スタブ */

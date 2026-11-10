@@ -3,13 +3,13 @@
 import { FC } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import styled from "styled-components";
+import type { SchedulePeriod } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
-/** 引き継ぎ元・取り込み候補の1件（どの月の確定版で、いつ確定したか） */
+/** 引き継ぎ元・取り込み候補の1件（どの期の確定版で、いつ確定したか） */
 export type InheritanceSource = {
-  year: number;
-  /** 1-12 */
-  month: number;
+  /** 確定版の期（引き継ぐ側の前の期） */
+  period: SchedulePeriod;
   /** 確定した時刻（epoch ms）。分からなければ undefined */
   confirmedAt?: number;
 };
@@ -39,7 +39,7 @@ const EFFECT_HINT =
   "（連勤・遅番明けを月をまたいで数えます）、振り返りの★も一緒に引き継ぎます。" +
   "★を休みの優先度に使うかは、制約欄の「★優先」で切り替えます。";
 
-const sourceLabel = ({ year, month }: InheritanceSource): string => `${year}年${month}月の確定版`;
+const sourceLabel = ({ period }: InheritanceSource): string => `${period.label}の確定版`;
 
 /**
  * 勤務表が前月の確定版から何を引き継いでいるかを見せる（プレゼンテーショナル）。
