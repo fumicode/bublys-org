@@ -316,9 +316,14 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
   `year`/`month` で書き、それ以外の期だけが `period` を書く。だからホテルの勤務表・確定版は内容ハッシュが
   変わらず、打ち消しスナップが効き続ける（`objects/periodHash.test.ts` が見張る）
 - 振り返りの日別の帯は「期の何日目か」で並べる（`ui/review/dayStrip.ts`）。暦月の期ならそれが日付
-- 希望（`StaffMonthlyShiftWish`）はまだ暦月ごとに集める。勤務表は `wishesOfPeriod`（`feature/shiftWishMonths.ts`）
-  1箇所で、自分の期と同じ期の希望を引く。4週の期の勤務表は、いまは希望を引かず、希望へのリンクも出さない
-- 4週の期を作る入口（店舗の起算日・形態）はまだ無い。モデルとテストだけがある
+- **希望も期ごとに集める**（`StaffMonthlyShiftWish` は期を持つ）。ID は `staffId:期のキー` で、暦月の期は
+  期を入れる前と同じ ID・保存形（`year`/`month`）。希望を出す期は「勤務表がある期」（`periodsWithSchedule`）。
+  勤務表は `wishesOfPeriod`（`feature/shiftWishMonths.ts`）1箇所で、自分の期と同じ期の希望を引く
+- 希望のバブルの URL は期のキーで作る（`shift-wishes/2026-06`・`shift-wishes/four-week:2026-06-07`）。
+  期を入れる前の `shift-wishes/2026/6` も、保存済みのバブル配置に残っているので開けるようにしてある
+  （app の `periodOfWishParams`）。期のキーから期へは `SchedulePeriod.fromKey`
+- **期にかかわる言葉は期の種類が決める**（`SchedulePeriod.words`：「月／期」「前月／前の期」「翌月／次の期」）。
+  画面・制約の文・休みの理由はこれを通す。期を持たない所（グローバルの制約セット）は、どちらにも通じる言い方にする
 
 ---
 
@@ -349,8 +354,13 @@ hotelCellRole(ref, currentScopeId)     // その世界でどういう立場か: 
 - **storeId は人に見せない。見せるのは店舗の名前。** 店舗の ID は採番した UUID なので、画面に店舗を出すところは
   `feature/useStore.ts`（`Store.resolve`）で引いて `name` を出す
 - 「今日」は feature 層が作って渡す（`feature/today.ts`）。ドメインは時計を読まない
-- **選べる形態・区切り方はデプロイが決める**（app の `registration/storeFormats.ts`）。行政は作りかけなので、
-  `VITE_SHIFT_GOVERNMENT=on` のビルドでだけ行政の形態と4週の区切り方を選べる
+- **組織にかかわる言葉は形態が決める**（`StoreFormat.storeNoun`：「店舗／課」）。デプロイの形態が1つなら
+  その言葉、混ざるなら「店舗」（`StoreFormat.nounFor`）
+- **既定の形態と選べる形態はデプロイが決める**（app の `registration/storeFormats.ts`）。環境変数
+  `VITE_SHIFT_FORMATS` に形態の ID を並べ、先頭が既定（未設定はホテルだけ＝公開中のホテル版）。
+  行政版（`government`）にはホテルの形態を出さない。ホテルの区切り方は暦月だけ（4週はホテル版に出さない）。
+  行政版の作り方は `docs/shift-puzzle/government-deploy.md`
+- ホテルを選べないデプロイ（行政版）では、勤務表を作れる店舗に既定の `"store-1"` を出さない。先に課を作る
 
 ---
 
@@ -571,11 +581,13 @@ Staff は焼き付け（pinned）なので、スタッフ詳細で既定値を�
   読み込み時は先に IndexedDB へ書いてから Redux に載せる（`applyWorldFile`）。
 - **dispatch 順は CAS → グラフ、かつ await をまたがない**。逆にすると
   「全オブジェクトが消えた世界」が 1 フレーム観測される。
-- **例データは自動で入らない**。ファイルバブルの「例データ読み込み」ボタンで明示的に投入する
-  （`objects/seed.ts` の `buildSampleItems()`）。初回起動は空。
-  自動投入をやめたので「まだ無いものだけ足す」差分ロジックも不要になった
-  （読み込みは開くのと同じ全置き換え。足し込みだと今の状態しだいで結果が変わり、
+- **例データは、世界が空のときだけ起動時に入る**（`feature/useSampleWhenEmpty.ts`。初めて来た人に
+  空のページを見せないため）。1度でも触った人の世界は上書きしない。入れ直したいときはファイルバブルの
+  「例データ読み込み」で入れる（全置き換え。足し込みだと今の状態しだいで結果が変わり、
   「このパターンを再現する」用途に使えない）。
+- **例データはデプロイの形態に合わせる**（`objects/seed.ts` の `sampleItemsFor` / `hasSampleFor`）。
+  いま例データを持つのはホテルだけ。行政版は空で始まり、「例データ読み込み」も出さず、起動時は
+  作成途中の勤務表の代わりに課の一覧と勤務表一覧を開く。行政の例データは現場のヒアリング待ち
 - File System Access API（Chromium 系）を使い、「保存」は同じファイルへ上書きする。
   ハンドルは IndexedDB に覚えてリロードをまたぐ。非対応ブラウザは
   ダウンロード／`<input type=file>` に落ちる。
