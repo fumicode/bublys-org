@@ -3,7 +3,7 @@
 import { FC } from "react";
 import type { HTMLAttributes, ReactNode } from "react";
 import styled from "styled-components";
-import type { SchedulePeriod } from "../domain/index.js";
+import type { PeriodWords, SchedulePeriod } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
 
 /** 引き継ぎ元・取り込み候補の1件（どの期の確定版で、いつ確定したか） */
@@ -31,12 +31,14 @@ type InheritanceViewProps = {
    * 前月の勤務表を開けば、その確定版の振り返りが見られる。
    */
   wrapSource?: (node: ReactNode) => ReactNode;
+  /** この勤務表の期の言葉（「前月」か「前の期」か） */
+  words: PeriodWords;
 };
 
 /** 引き継ぎが勤務表のどこに効くか（ラベルの説明に出す） */
-const EFFECT_HINT =
-  "勤務表は、前月の確定版から引き継いで始まります。確定版の月末がこの勤務表の月初につながり" +
-  "（連勤・遅番明けを月をまたいで数えます）、振り返りの★も一緒に引き継ぎます。" +
+const effectHint = ({ previous, unit }: PeriodWords): string =>
+  `勤務表は、${previous}の確定版から引き継いで始まります。確定版の最後の日がこの勤務表の最初の日につながり` +
+  `（連勤・遅番明けを${unit}をまたいで数えます）、振り返りの★も一緒に引き継ぎます。` +
   "★を休みの優先度に使うかは、制約欄の「★優先」で切り替えます。";
 
 const sourceLabel = ({ period }: InheritanceSource): string => `${period.label}の確定版`;
@@ -53,17 +55,19 @@ export const InheritanceView: FC<InheritanceViewProps> = ({
   onImport,
   busy = false,
   wrapSource = (node) => node,
+  words,
 }) => {
   if (!inherited && !pending) return null;
+  const hint = effectHint(words);
 
   return (
     <StyledWrap>
-      <span className="e-label" title={EFFECT_HINT}>
+      <span className="e-label" title={hint}>
         🏁 引き継ぎ
       </span>
       {inherited &&
         wrapSource(
-          <span className="e-chip" title={`${EFFECT_HINT}\nダブルクリックで前月の勤務表を開きます（振り返りが見られます）。`}>
+          <span className="e-chip" title={`${hint}\nダブルクリックで${words.previous}の勤務表を開きます（振り返りが見られます）。`}>
             ← {sourceLabel(inherited)}
             {inherited.confirmedAt !== undefined && (
               <span className="e-at">確定 {formatConfirmedAt(inherited.confirmedAt)}</span>

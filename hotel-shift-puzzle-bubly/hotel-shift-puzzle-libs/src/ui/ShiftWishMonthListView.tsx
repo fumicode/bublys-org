@@ -3,17 +3,18 @@
 import { FC } from "react";
 import styled from "styled-components";
 import { ObjectView } from "@bublys-org/bubbles-ui";
-import type { ShiftWishMonthProgress } from "./shiftWishStatus.js";
+import type { SchedulePeriod } from "../domain/index.js";
+import type { ShiftWishPeriodProgress } from "./shiftWishStatus.js";
 import { SHIFT_WISH_MONTH_VIEW_TYPE } from "./viewObjectTypes.js";
 
 type ShiftWishMonthListViewProps = {
   /** 希望を出す月（勤務表がある月）と、その月の回収の進み具合 */
-  months: ShiftWishMonthProgress[];
+  periods: ShiftWishPeriodProgress[];
   /**
    * その月のシフト希望一覧バブルの URL。ObjectView に渡すだけで、ダブルクリック展開・
    * ドラッグ・data-url は ObjectView が担う。URL スキームは app 層の関心事なので注入で受ける。
    */
-  monthUrl: (year: number, month: number) => string;
+  periodUrl: (period: SchedulePeriod) => string;
 };
 
 /**
@@ -24,8 +25,8 @@ type ShiftWishMonthListViewProps = {
  * 一覧バブルが**新しく出る**。この画面の中で対象が入れ替わることはない。
  */
 export const ShiftWishMonthListView: FC<ShiftWishMonthListViewProps> = ({
-  months,
-  monthUrl,
+  periods,
+  periodUrl,
 }) => (
   <StyledContainer>
     <div className="e-header">
@@ -37,32 +38,32 @@ export const ShiftWishMonthListView: FC<ShiftWishMonthListViewProps> = ({
     </div>
 
     <ul className="e-months">
-      {months.length === 0 ? (
+      {periods.length === 0 ? (
         <li className="e-empty">
           希望を集める月がありません（勤務表が作られると、その月がここに並びます）
         </li>
       ) : (
-        months.map((m) => {
+        periods.map((m) => {
           const done = m.staffCount > 0 && m.collectedCount === m.staffCount;
           return (
             <li
-              key={`${m.year}-${m.month}`}
+              key={m.period.key}
               className={`e-month${done ? " is-done" : m.startedCount > 0 ? " is-started" : ""}`}
             >
               {/* ObjectView: ダブルクリックでその月の一覧バブル / ドラッグでポケットへ */}
               <ObjectView
                 type={SHIFT_WISH_MONTH_VIEW_TYPE}
-                url={monthUrl(m.year, m.month)}
-                label={`${m.year}年${m.month}月のシフト希望`}
+                url={periodUrl(m.period)}
+                label={`${m.period.label}のシフト希望`}
                 openingPosition="bubble-side-right"
                 fullWidth
               >
                 <span
                   className="e-month-card"
-                  title={`ダブルクリックで${m.year}年${m.month}月のシフト希望を開く`}
+                  title={`ダブルクリックで${m.period.label}のシフト希望を開く`}
                 >
                   <span className="e-month-label">
-                    {m.year}年{m.month}月
+                    {m.period.label}
                   </span>
                   <span className="e-month-progress">
                     回収済み {m.collectedCount}/{m.staffCount}人

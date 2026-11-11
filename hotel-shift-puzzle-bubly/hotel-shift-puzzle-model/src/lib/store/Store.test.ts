@@ -53,6 +53,21 @@ describe('形態', () => {
     expect(GOVERNMENT_FORMAT.storeNoun).toBe('課');
   });
 
+  test('デプロイの設定（ID の並び）から形態の並びを作る。先頭が既定', () => {
+    expect(StoreFormat.listOf('government')).toEqual([GOVERNMENT_FORMAT]);
+    expect(StoreFormat.listOf('hotel, government')).toEqual([HOTEL_FORMAT, GOVERNMENT_FORMAT]);
+    expect(StoreFormat.listOf('government,hotel,government')).toEqual([GOVERNMENT_FORMAT, HOTEL_FORMAT]);
+    // 未設定・知らない ID だけならホテル（公開中のホテル版と同じ）
+    expect(StoreFormat.listOf(undefined)).toEqual([HOTEL_FORMAT]);
+    expect(StoreFormat.listOf('hospital')).toEqual([HOTEL_FORMAT]);
+  });
+
+  test('組織の呼び方：形態が1つならその言葉、混ざるなら「店舗」', () => {
+    expect(StoreFormat.nounFor([GOVERNMENT_FORMAT])).toBe('課');
+    expect(StoreFormat.nounFor([HOTEL_FORMAT])).toBe('店舗');
+    expect(StoreFormat.nounFor([HOTEL_FORMAT, GOVERNMENT_FORMAT])).toBe('店舗');
+  });
+
   test('見つからない形態の ID はホテルとして読む', () => {
     expect(StoreFormat.of('government')).toBe(GOVERNMENT_FORMAT);
     expect(StoreFormat.of('unknown')).toBe(HOTEL_FORMAT);

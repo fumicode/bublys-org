@@ -61,6 +61,29 @@ export class StoreFormat {
   static of(id: string): StoreFormat {
     return STORE_FORMATS.find((f) => f.id === id) ?? HOTEL_FORMAT;
   }
+
+  /**
+   * 組織を何と呼ぶか（「店舗」「課」）。**組織にかかわる言葉は形態が決める。**
+   * 形態が1つならその言葉、ホテルと行政が混ざるなら「店舗」。
+   */
+  static nounFor(formats: readonly StoreFormat[]): string {
+    const nouns = new Set(formats.map((f) => f.storeNoun));
+    return nouns.size === 1 ? [...nouns][0] : HOTEL_FORMAT.storeNoun;
+  }
+
+  /**
+   * "hotel,government" のような ID の並びから形態の並びを作る（デプロイの設定を読む）。
+   * 知らない ID・重なりは捨て、1つも残らなければホテルだけ。並びの先頭が既定の形態。
+   */
+  static listOf(ids: string | undefined): StoreFormat[] {
+    const found = (ids ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .map((id) => STORE_FORMATS.find((f) => f.id === id))
+      .filter((f): f is StoreFormat => f !== undefined);
+    const unique = [...new Set(found)];
+    return unique.length > 0 ? unique : [HOTEL_FORMAT];
+  }
 }
 
 /** その日以前でいちばん近い日曜（その日が日曜ならその日） */

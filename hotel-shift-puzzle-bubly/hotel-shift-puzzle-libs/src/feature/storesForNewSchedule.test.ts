@@ -33,4 +33,8 @@ describe('storesForNewSchedule（勤務表を作れる店舗）', () => {
     const stores = storesForNewSchedule([], [{ storeId: 'gone' }, { storeId: 'store-1' }], new Set(['gone']));
     expect(stores.map((s) => s.id)).toEqual(['store-1']);
   });
+
+  test('ホテルを選べないデプロイ（行政版）では、何も無くても既定の store-1 を出さない', () => {
+    expect(storesForNewSchedule([], [], new Set(), false)).toEqual([]);
+  });
 });

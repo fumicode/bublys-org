@@ -23,7 +23,8 @@ type WorldFileViewProps = {
   onSave: () => void;
   onSaveAs: () => void;
   onStartBlank: () => void;
-  onLoadSample: () => void;
+  /** 例データ読み込み。無ければボタンを出さない（例データを持たない形態のデプロイ） */
+  onLoadSample?: () => void;
   onNoteChange: (note: string) => void;
   onDismissMessage: () => void;
 };
@@ -128,25 +129,27 @@ export const WorldFileView: FC<WorldFileViewProps> = ({
 
     {/* 例データはデバッグ用の出発点。読み込みは全置き換えなので、開く／白紙とは
         別の行に置いて、間違って押しにくくしておく。 */}
-    <div className="e-sample">
-      <Tooltip title="今の内容を破棄して、デバッグ用のデータパターン一式に置き換えます">
-        <span>
-          <Button
-            size="small"
-            variant="outlined"
-            color="secondary"
-            startIcon={<ScienceOutlinedIcon />}
-            disabled={busy}
-            onClick={onLoadSample}
-          >
-            例データ読み込み
-          </Button>
+    {onLoadSample && (
+      <div className="e-sample">
+        <Tooltip title="今の内容を破棄して、デバッグ用のデータパターン一式に置き換えます">
+          <span>
+            <Button
+              size="small"
+              variant="outlined"
+              color="secondary"
+              startIcon={<ScienceOutlinedIcon />}
+              disabled={busy}
+              onClick={onLoadSample}
+            >
+              例データ読み込み
+            </Button>
+          </span>
+        </Tooltip>
+        <span className="e-sampledesc">
+          スタッフ9人・希望・制約と、勤務表4つ（6月/7月=空、8月=作成途中、9月=詰みあり）
         </span>
-      </Tooltip>
-      <span className="e-sampledesc">
-        スタッフ9人・希望・制約と、勤務表4つ（6月/7月=空、8月=作成途中、9月=詰みあり）
-      </span>
-    </div>
+      </div>
+    )}
 
     <TextField
       className="e-note"

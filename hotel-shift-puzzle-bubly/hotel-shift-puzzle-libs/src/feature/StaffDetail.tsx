@@ -7,6 +7,7 @@ import {
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   type DayOffStyle,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { StaffDetailView } from "../ui/StaffDetailView.js";
 import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
@@ -18,7 +19,7 @@ import {
 } from "../objects/hotelObjects.js";
 import { staffReviewSummaries } from "./staffReviews.js";
 import { precedingConfirmedOf } from "./precedingMonth.js";
-import { monthSummariesOf } from "./shiftWishMonths.js";
+import { periodSummariesOf } from "./shiftWishMonths.js";
 
 type StaffDetailProps = {
   staffId?: string;
@@ -28,7 +29,7 @@ type StaffDetailProps = {
    */
   scheduleId?: string;
   /** この人の希望入力表バブルの URL（ObjectView に渡す。app 層から注入） */
-  shiftWishUrl?: (year: number, month: number) => string;
+  shiftWishUrl?: (period: SchedulePeriod) => string;
 };
 
 
@@ -40,7 +41,7 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const wishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const shiftWishMonths = useMemo(
-    () => monthSummariesOf(schedules, wishes, staffId ?? ""),
+    () => periodSummariesOf(schedules, wishes, staffId ?? ""),
     [schedules, wishes, staffId]
   );
 

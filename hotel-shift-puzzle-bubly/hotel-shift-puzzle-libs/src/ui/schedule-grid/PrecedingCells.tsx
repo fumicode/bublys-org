@@ -22,14 +22,17 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const weekdayCls = (day: WorkingDay): string =>
   day.weekday === 0 ? " is-sun" : day.weekday === 6 ? " is-sat" : "";
 
-/** 前月の列の日付ヘッダ */
-export const PrecedingHeadCells: FC<{ days: WorkingDay[] }> = ({ days }) => (
+/** 前の期の列の日付ヘッダ。previous は前の期の呼び方（"前月" / "前の期"） */
+export const PrecedingHeadCells: FC<{ days: WorkingDay[]; previous: string }> = ({
+  days,
+  previous,
+}) => (
   <>
     {days.map((day, i) => (
       <div
         key={`prev-head:${day.key}`}
         className={`e-prev-head${weekdayCls(day)}${i === days.length - 1 ? " is-last" : ""}`}
-        title={`前月 ${day.label}（確定版から写し取った読み取り専用の列）`}
+        title={`${previous} ${day.label}（確定版から写し取った読み取り専用の列）`}
       >
         {i === 0 && <span className="e-prev-month">{day.month}月</span>}
         <span className="e-day-num">{day.day}</span>
@@ -44,10 +47,12 @@ export const PrecedingStaffCells: FC<{
   tail: PrecedingMonthTail;
   staffId: string;
   staffName: string;
+  /** 前の期の呼び方（"前月" / "前の期"） */
+  previous: string;
   /** 今月の勤務帯（名前で引いて、色と開始時刻を借りる） */
   shiftMap: Map<string, WorkShift>;
   className?: string;
-}> = ({ tail, staffId, staffName, shiftMap, className }) => {
+}> = ({ tail, staffId, staffName, previous, shiftMap, className }) => {
   const shiftByName = new Map<string, WorkShift>();
   for (const w of shiftMap.values()) if (!shiftByName.has(w.name)) shiftByName.set(w.name, w);
   return (
@@ -56,7 +61,7 @@ export const PrecedingStaffCells: FC<{
         const cell = tail.cellOf(staffId, day);
         const last = i === tail.days.length - 1 ? " is-last" : "";
         const extra = className ? ` ${className}` : "";
-        const base = `前月 ${day.label} ${staffName}`;
+        const base = `${previous} ${day.label} ${staffName}`;
         if (cell?.shiftName !== undefined) {
           const shift = shiftByName.get(cell.shiftName);
           return (
@@ -89,7 +94,7 @@ export const PrecedingStaffCells: FC<{
           <div
             key={`prev:${staffId}:${day.key}`}
             className={`e-prev-cell is-empty${last}${extra}`}
-            title={`${base}: 記録なし（未定・前月に居なかった）`}
+            title={`${base}: 記録なし（未定・${previous}に居なかった）`}
           />
         );
       })}

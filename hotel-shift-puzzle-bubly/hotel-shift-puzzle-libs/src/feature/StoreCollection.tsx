@@ -6,8 +6,8 @@ import {
   HOTEL_FORMAT,
   MonthlyStaffSchedule,
   Store,
+  StoreFormat,
   type PeriodRuleKind,
-  type StoreFormat,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { StoreListView } from "../ui/StoreListView.js";
 import { useObjects, useObjectRepo } from "../objects/repository.js";
@@ -38,7 +38,9 @@ export const StoreCollection: FC<{
   return (
     <StyledContainer>
       <div className="e-header">
-        <h3>店舗一覧 ({stores.length})</h3>
+        <h3>
+          {StoreFormat.nounFor(formats)}一覧 ({stores.length})
+        </h3>
       </div>
       <StoreListView
         stores={stores}

@@ -154,7 +154,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
       <section className="e-section">
         <p
           className="e-rule"
-          title="★はその月に無理を引き受けてくれたことを称える数です。★が高い人ほど、翌月の自動シフトで休みを先に置けます（制約欄の「★優先」）"
+          title={`★はその${report.period.words.unit}に無理を引き受けてくれたことを称える数です。★が高い人ほど、${report.period.words.next}の自動シフトで休みを先に置けます（制約欄の「★優先」）`}
         >
           譲歩1件で★{weightControl("compromise", "譲歩")}・繁忙日1回で★{weightControl("busy", "繁忙日")}
         </p>
@@ -201,7 +201,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
                       {hasNote && <span className="e-note-dot" />}
                     </span>
                     <ReviewDayStrip strip={strip} />
-                    <span className="e-monthly" title="日に紐づかない譲歩（月の休日不足など）。中身は行を開くと読めます">
+                    <span className="e-monthly" title={`日に紐づかない譲歩（${report.period.words.unit}の休日不足など）。中身は行を開くと読めます`}>
                       {strip.monthlyCount > 0 && (
                         <>
                           <ReviewMark kind="compromise" />

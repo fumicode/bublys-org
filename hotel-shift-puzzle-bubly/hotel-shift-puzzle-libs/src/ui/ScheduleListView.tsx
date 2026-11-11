@@ -22,6 +22,8 @@ type ScheduleListViewProps = {
   pendingScheduleIds?: ReadonlySet<string>;
   /** 勤務表を作れる店舗（記録された店舗と、記録が無いが勤務表が指している店舗） */
   stores: readonly Store[];
+  /** 組織の呼び方（"店舗" / "課"） */
+  storeNoun: string;
   /** storeId → 表示名 */
   storeNameOf?: (storeId: string) => string;
   /** 今日（期の選択肢の真ん中） */
@@ -39,6 +41,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
   confirmedScheduleIds,
   pendingScheduleIds,
   stores,
+  storeNoun,
   storeNameOf,
   today,
   onCreate,
@@ -81,7 +84,10 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                     <div className="e-title">
                       {schedule.period.label}
                       {confirmedScheduleIds?.has(schedule.id) && (
-                        <span className="e-confirmed" title="この月の確定版を持っています">
+                        <span
+                          className="e-confirmed"
+                          title={`この${schedule.period.words.unit}の確定版を持っています`}
+                        >
                           🏁 確定版
                         </span>
                       )}
@@ -93,7 +99,9 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                     {(schedule.precedingTail?.lastDay || pendingScheduleIds?.has(schedule.id)) && (
                       <div className="e-inheritance">
                         {schedule.precedingTail?.lastDay && (
-                          <span title="勤務表は、前月の確定版から引き継いで始まります">
+                          <span
+                            title={`勤務表は、${schedule.period.words.previous}の確定版から引き継いで始まります`}
+                          >
                             ← {schedule.period.previous().label}の確定版から引き継ぎ
                           </span>
                         )}
@@ -122,13 +130,16 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
 
       <div className="e-create">
         <h4>新しい勤務表を作成</h4>
+        {stores.length === 0 && (
+          <p className="e-hint">先に{storeNoun}を作ってください（メニューの「{storeNoun}」）。</p>
+        )}
         <div className="e-fields">
           <TextField
             select
             className="e-store"
             variant="standard"
             size="small"
-            label="店舗"
+            label={storeNoun}
             value={store?.id ?? ""}
             onChange={(e) => {
               setStoreId(e.target.value);
@@ -273,6 +284,12 @@ const StyledContainer = styled.div`
 
     .e-add {
       text-transform: none;
+    }
+
+    .e-hint {
+      margin: 0 0 8px;
+      font-size: 0.85em;
+      color: #8d6e00;
     }
   }
 `;

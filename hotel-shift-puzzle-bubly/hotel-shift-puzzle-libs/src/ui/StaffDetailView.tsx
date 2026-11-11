@@ -2,7 +2,7 @@
 
 import { FC, useState } from "react";
 import styled from "styled-components";
-import { Staff, ConfirmedSchedule, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle } from "../domain/index.js";
+import { Staff, ConfirmedSchedule, WorkingDay, type CompromiseEntry, type BusyDayEntry, type DayOffStyle, type SchedulePeriod } from "../domain/index.js";
 import { DayOffStyleSelect } from "./DayOffStyleSelect.js";
 import PersonIcon from "@mui/icons-material/Person";
 import EditIcon from "@mui/icons-material/Edit";
@@ -17,7 +17,7 @@ import { ShiftWishStatusIcon } from "./ShiftWishStatusIcon.js";
 import {
   collectedAtLabel,
   WISH_STATUS_LABEL,
-  type ShiftWishMonthSummary,
+  type ShiftWishPeriodSummary,
 } from "./shiftWishStatus.js";
 import { STAFF_SHIFT_WISH_SHEET_VIEW_TYPE } from "./viewObjectTypes.js";
 
@@ -37,12 +37,12 @@ type StaffDetailViewProps = {
   /** 休みの形の既定値を変更する（勤務表ごとの上書きは勤務スタッフ群で） */
   onChangeDayOffStyle?: (style: DayOffStyle) => void;
   /** 希望を集める月（勤務表がある月）と、この人の回収状況 */
-  shiftWishMonths?: ShiftWishMonthSummary[];
+  shiftWishMonths?: ShiftWishPeriodSummary[];
   /**
    * この人の希望入力表バブルの URL。渡すと「シフト希望」欄が出る。ObjectView に渡すだけで
    * ダブルクリック展開・ドラッグ・data-url は ObjectView が担う（URL スキームは app 層）。
    */
-  shiftWishUrl?: (year: number, month: number) => string;
+  shiftWishUrl?: (period: SchedulePeriod) => string;
   /** このスタッフに関する前月の振り返り（★・譲歩/繁忙日・配慮メモ）。読み取り専用 */
   reviewSummaries?: StaffReviewSummary[];
 };
@@ -174,24 +174,24 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
               </li>
             ) : (
               shiftWishMonths.map((m) => (
-                <li key={`${m.year}-${m.month}`}>
+                <li key={m.period.key}>
                   {/* ObjectView: ダブルクリックでその月の入力表 / ドラッグでポケットへ */}
                   <ObjectView
                     type={STAFF_SHIFT_WISH_SHEET_VIEW_TYPE}
-                    url={shiftWishUrl(m.year, m.month)}
-                    label={`${staff.name}のシフト希望（${m.year}年${m.month}月）`}
+                    url={shiftWishUrl(m.period)}
+                    label={`${staff.name}のシフト希望（${m.period.label}）`}
                     openingPosition="bubble-side-right"
                     fullWidth
                   >
                     <span
                       className={`e-wish-month is-${m.status}`}
-                      title={`ダブルクリックで${m.year}年${m.month}月の入力表を開く`}
+                      title={`ダブルクリックで${m.period.label}の入力表を開く`}
                     >
                       <span className="e-status-icon">
                         <ShiftWishStatusIcon status={m.status} />
                       </span>
                       <span className="e-wish-month-label">
-                        {m.year}年{m.month}月
+                        {m.period.label}
                       </span>
                       <span className="e-wish-month-status">
                         {WISH_STATUS_LABEL[m.status]}
@@ -211,7 +211,8 @@ export const StaffDetailView: FC<StaffDetailViewProps> = ({
 
       {reviewSummaries.length > 0 && (
         <section className="e-section">
-          <h4>前月の振り返り</h4>
+          {/* 振り返りは引き継いだ確定版（勤務表の前の期）のもの。期の呼び方で見出しにする */}
+          <h4>{reviewSummaries[0].report.period.label}の振り返り</h4>
           <ul className="e-linked-reports">
             {reviewSummaries.map(({ report, score, compromises, busyDays, note }) => (
               <li key={report.id} className="e-linked-report">

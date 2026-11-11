@@ -652,7 +652,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <span className="e-corner-actions">{staffColumnActions}</span>
           )}
         </div>
-        <PrecedingHeadCells days={precedingDays} />
+        <PrecedingHeadCells days={precedingDays} previous={schedule.period.words.previous} />
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);

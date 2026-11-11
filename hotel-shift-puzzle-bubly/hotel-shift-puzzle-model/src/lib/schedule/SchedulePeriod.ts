@@ -17,6 +17,37 @@
  */
 import { WorkingDay, type WorkingDayState } from "./WorkingDay.js";
 
+/**
+ * 期にかかわる言葉。**期にかかわる言葉は期の種類が決める**（組織の言葉「店舗／課」は形態が決める）。
+ * だからホテルの店舗で4週を選んでも「前の期」と正しく出る。
+ */
+export type PeriodWords = {
+  /** 期の単位（"月" / "期"）。「この月」「月の休み」 */
+  unit: string;
+  /** 前の期（"前月" / "前の期"） */
+  previous: string;
+  /** 次の期（"翌月" / "次の期"） */
+  next: string;
+  /** 前の期の最後の日（"前月末" / "前の期の最終日"） */
+  previousEnd: string;
+};
+
+/** 暦月の期の言葉。期を持たない所（グローバルの制約セットなど）の既定にも使う */
+export const CALENDAR_MONTH_WORDS: PeriodWords = {
+  unit: "月",
+  previous: "前月",
+  next: "翌月",
+  previousEnd: "前月末",
+};
+
+/** 4週の期の言葉 */
+export const FOUR_WEEK_WORDS: PeriodWords = {
+  unit: "期",
+  previous: "前の期",
+  next: "次の期",
+  previousEnd: "前の期の最終日",
+};
+
 /** シリアライズ用 */
 export type SchedulePeriodPlain =
   | { kind: "calendar-month"; year: number; month: number }
@@ -42,6 +73,9 @@ export abstract class SchedulePeriod {
 
   /** 人が読む呼び方（例: "2026年6月" / "2026/6/7〜7/4"） */
   abstract get label(): string;
+
+  /** この期の種類の言葉（{@link PeriodWords}） */
+  abstract get words(): PeriodWords;
 
   abstract toPlain(): SchedulePeriodPlain;
 
@@ -83,6 +117,21 @@ export abstract class SchedulePeriod {
 
   equals(other: SchedulePeriod): boolean {
     return this.key === other.key;
+  }
+
+  /**
+   * キー（{@link key}）から期に戻す。読めなければ undefined。
+   * URL に期を載せるときに使う（"2026-06" / "four-week:2026-06-07"）。
+   */
+  static fromKey(key: string): SchedulePeriod | undefined {
+    const month = /^(\d{4})-(\d{2})$/.exec(key);
+    if (month) {
+      const m = Number(month[2]);
+      return m >= 1 && m <= 12 ? CalendarMonthPeriod.of(Number(month[1]), m) : undefined;
+    }
+    const fourWeek = /^four-week:(\d{4}-\d{2}-\d{2})$/.exec(key);
+    if (fourWeek) return new FourWeekPeriod({ start: WorkingDay.fromKey(fourWeek[1]) });
+    return undefined;
   }
 
   static fromPlain(plain: SchedulePeriodPlain): SchedulePeriod {
@@ -145,6 +194,10 @@ export class CalendarMonthPeriod extends SchedulePeriod {
     return `${this.state.year}年${this.state.month}月`;
   }
 
+  get words(): PeriodWords {
+    return CALENDAR_MONTH_WORDS;
+  }
+
   toPlain(): SchedulePeriodPlain {
     return { kind: "calendar-month", year: this.state.year, month: this.state.month };
   }
@@ -198,6 +251,10 @@ export class FourWeekPeriod extends SchedulePeriod {
     const e = this.end;
     const endLabel = e.year === s.year ? e.label : `${e.year}/${e.label}`;
     return `${s.year}/${s.label}〜${endLabel}`;
+  }
+
+  get words(): PeriodWords {
+    return FOUR_WEEK_WORDS;
   }
 
   toPlain(): SchedulePeriodPlain {

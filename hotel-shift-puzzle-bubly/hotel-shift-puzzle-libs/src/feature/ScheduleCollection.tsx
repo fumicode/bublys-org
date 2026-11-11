@@ -6,7 +6,9 @@ import {
   MonthlyStaffSchedule,
   ConstraintSet,
   ConfirmedSchedule,
+  HOTEL_FORMAT,
   Store,
+  StoreFormat,
   type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
@@ -28,7 +30,12 @@ import {
   GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
 
-export const ScheduleCollection: FC = () => {
+const DEFAULT_FORMATS: readonly StoreFormat[] = [HOTEL_FORMAT];
+
+export const ScheduleCollection: FC<{
+  /** このデプロイで選べる形態（組織の呼び方と、既定の店舗を出すかが決まる）。省略時はホテルだけ */
+  formats?: readonly StoreFormat[];
+}> = ({ formats = DEFAULT_FORMATS }) => {
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
@@ -37,8 +44,14 @@ export const ScheduleCollection: FC = () => {
   const removedStoreIds = useRemovedIds(STORE_TYPE);
   const today = useMemo(() => todayWorkingDay(), []);
   const stores = useMemo(
-    () => storesForNewSchedule(recordedStores, schedules, removedStoreIds),
-    [recordedStores, schedules, removedStoreIds]
+    () =>
+      storesForNewSchedule(
+        recordedStores,
+        schedules,
+        removedStoreIds,
+        formats.some((f) => f.id === HOTEL_FORMAT.id)
+      ),
+    [recordedStores, schedules, removedStoreIds, formats]
   );
   const storeNameOf = (storeId: string) =>
     Store.resolve(recordedStores, storeId, removedStoreIds).name;
@@ -94,6 +107,7 @@ export const ScheduleCollection: FC = () => {
         confirmedScheduleIds={confirmedScheduleIds}
         pendingScheduleIds={pendingScheduleIds}
         stores={stores}
+        storeNoun={StoreFormat.nounFor(formats)}
         storeNameOf={storeNameOf}
         today={today}
         onCreate={handleCreate}

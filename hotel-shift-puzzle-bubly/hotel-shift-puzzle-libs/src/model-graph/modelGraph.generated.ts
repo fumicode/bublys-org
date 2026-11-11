@@ -57,7 +57,8 @@ export const MODEL_GRAPH: ModelGraph = {
         "start",
         "key",
         "length",
-        "label"
+        "label",
+        "words"
       ],
       "methods": [
         {
@@ -919,7 +920,8 @@ export const MODEL_GRAPH: ModelGraph = {
         "start",
         "key",
         "length",
-        "label"
+        "label",
+        "words"
       ],
       "methods": [
         {
@@ -1885,6 +1887,7 @@ export const MODEL_GRAPH: ModelGraph = {
         "start",
         "length",
         "label",
+        "words",
         "key",
         "end"
       ],
@@ -1942,6 +1945,15 @@ export const MODEL_GRAPH: ModelGraph = {
           ],
           "returns": "boolean",
           "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromKey",
+          "params": [
+            "key"
+          ],
+          "returns": "SchedulePeriod | undefined",
+          "isStatic": true,
           "returnsSelf": false
         },
         {
@@ -2306,13 +2318,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -2329,8 +2336,6 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "staffId",
-        "year",
-        "month",
         "period",
         "filledDayCount",
         "isEmpty",
@@ -2342,8 +2347,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "idOf",
           "params": [
             "staffId",
-            "year",
-            "month"
+            "period"
           ],
           "returns": "string",
           "isStatic": true,
@@ -2423,7 +2427,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "toPlain",
           "params": [],
-          "returns": "StaffMonthlyShiftWishState",
+          "returns": "StaffMonthlyShiftWishPlain",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2621,6 +2625,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "StoreFormat",
           "isStatic": true,
           "returnsSelf": true
+        },
+        {
+          "name": "nounFor",
+          "params": [
+            "formats"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "listOf",
+          "params": [
+            "ids"
+          ],
+          "returns": "StoreFormat[]",
+          "isStatic": true,
+          "returnsSelf": false
         }
       ]
     },
@@ -3488,6 +3510,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "to": "DayOffStyle",
       "kind": "contains",
       "via": "dayOffStyle",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StaffMonthlyShiftWish",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
       "many": false,
       "foundBy": "type"
     },

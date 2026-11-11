@@ -125,13 +125,15 @@ export const LIMIT_SPECS: LimitSpec[] = [
     caption: "★優先",
     group: "whole",
     kind: "boolean",
-    label: "前月の確定版から引き継いだ★で休みを優先する",
+    // 制約セットはグローバルのテンプレートとしても使い、期を持たない。だから「前月」「前の期」の
+    // どちらにも寄せず、どちらにも通じる言い方にする（期の言葉は期の種類が決める）
+    label: "引き継いだ★で休みを優先する",
     read: (set) => set.useStarPriority,
     apply: (set, v) => set.withUseStarPriority(asBoolean(v)),
     describe: (v) =>
       asBoolean(v)
-        ? "前月の確定版から引き継いだ★が高い人ほど、自動シフトで休みを優先して取れる"
-        : "前月の確定版から引き継いだ★は休みの優先度に使わない",
+        ? "前の確定版から引き継いだ★が高い人ほど、自動シフトで休みを優先して取れる"
+        : "前の確定版から引き継いだ★は休みの優先度に使わない",
     render: (v, size) => <StarPriorityIcon on={asBoolean(v)} size={size} />,
   },
 ];

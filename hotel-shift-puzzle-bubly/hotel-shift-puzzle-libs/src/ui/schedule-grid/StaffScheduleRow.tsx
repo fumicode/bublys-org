@@ -174,7 +174,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
                 <span
                   className="e-priority-badge"
                   aria-label={`星${priority.score}`}
-                  title={`前月の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                  title={`${schedule.period.words.previous}の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
                 >
                   ★{priority.score}
                 </span>
@@ -190,6 +190,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           tail={precedingTail}
           staffId={staff.id}
           staffName={staff.name}
+          previous={schedule.period.words.previous}
           shiftMap={shiftMap}
           className={rowMod.trim() || undefined}
         />

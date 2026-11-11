@@ -23,7 +23,12 @@ import {
   ENDGAME_SCHEDULE_ID,
   ALLOWED_SHIFT_IDS_BY_STAFF,
 } from "../data/index.js";
-import { HOTEL_FORMAT, PeriodRule, Store } from "@bublys-org/hotel-shift-puzzle-model";
+import {
+  HOTEL_FORMAT,
+  PeriodRule,
+  Store,
+  type StoreFormat,
+} from "@bublys-org/hotel-shift-puzzle-model";
 import type { BundleItem } from "./commit.js";
 import {
   STORE_TYPE,
@@ -122,4 +127,21 @@ export function buildSampleItems(): BundleItem[] {
   }
 
   return items;
+}
+
+/**
+ * そのデプロイで選べる形態の例データ。例データを持つ形態が1つも無ければ undefined。
+ *
+ * **例データはデプロイの形態に合わせる。** 起動時の自動投入（`useSampleWhenEmpty`）と
+ * ファイルのバブルの「例データ読み込み」は、どちらもここを通る。いま例データを持つのは
+ * ホテルだけ（行政の例データは現場のヒアリング待ち）なので、行政版は空で始まり、
+ * 「例データ読み込み」も出ない。
+ */
+export function sampleItemsFor(formats: readonly StoreFormat[]): BundleItem[] | undefined {
+  return hasSampleFor(formats) ? buildSampleItems() : undefined;
+}
+
+/** そのデプロイの形態に例データがあるか（例データを組み立てずに分かる） */
+export function hasSampleFor(formats: readonly StoreFormat[]): boolean {
+  return formats.some((f) => f.id === HOTEL_FORMAT.id);
 }

@@ -26,6 +26,7 @@ import {
   MonthlyStaffSchedule,
   DailyReservationInfo,
   StaffMonthlyShiftWish,
+  type StaffMonthlyShiftWishPlain,
   ConstraintSet,
   type ConstraintSetPlain,
   ConfirmedSchedule,
@@ -174,8 +175,13 @@ export const HOTEL_OBJECTS = defineObjects({
   StaffMonthlyShiftWish: {
     class: StaffMonthlyShiftWish,
     getId: (w: StaffMonthlyShiftWish) => w.id,
-    // スタッフ×月で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
-    // state が完全 plain なので state-object 規約で plain 化（serialize 不要）。
+    // スタッフ×期で1つ。店舗・勤務表には依存しないので世界に属さない（external、既定）。
+    // 期をインスタンスで持つので codec を明示する（暦月の期は前と同じ year/month で書くので、
+    // 保存済みの希望と形・ハッシュが変わらない）。
+    serialize: {
+      toJSON: (w: StaffMonthlyShiftWish) => w.toPlain(),
+      fromJSON: (j) => StaffMonthlyShiftWish.fromPlain(j as StaffMonthlyShiftWishPlain),
+    },
   },
   ConstraintSet: {
     class: ConstraintSet,

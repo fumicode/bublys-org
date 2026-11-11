@@ -15,7 +15,7 @@ import {
   StaffMonthlyShiftWish,
   ConstraintSet,
   ConfirmedSchedule,
-  CalendarMonthPeriod,
+  type SchedulePeriod,
   fulfillWishesStep,
   makeSatisfyLeaderRulesStep,
   makeResolveAmbiguousLeaderSlotsStep,
@@ -118,7 +118,7 @@ type ScheduleGridProps = {
    * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
    * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
    */
-  shiftWishesUrl?: (year: number, month: number) => string;
+  shiftWishesUrl?: (period: SchedulePeriod) => string;
   /**
    * 稼働日詳細バブルの URL を作る（稼働日キーを渡す）。URL スキームは app 層の関心事なので
    * バブルルート側から注入してもらう。グリッドはこれを ObjectView に渡すだけ。
@@ -492,7 +492,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         minDayOff: limits.minDayOff,
         maxDayOffPerDay: limits.maxDayOffPerDay,
       });
-      return reason && dayOffReasonText(reason, style, { maxDayOffPerDay: limits.maxDayOffPerDay });
+      return (
+        reason &&
+        dayOffReasonText(reason, style, {
+          maxDayOffPerDay: limits.maxDayOffPerDay,
+          words: schedule.period.words,
+        })
+      );
     },
     [schedule, shiftIdByName, dayOffStyleOf, wishByStaff, limits]
   );
@@ -827,8 +833,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       className="e-confirm"
       onClick={() => void handleConfirm()}
       title={
-        "いま見ている版を、この月の確定版にします（すでに確定版があれば置き換わります）。" +
-        "翌月の勤務表は、確定版から引き継いで始まります"
+        `いま見ている版を、この${schedule.period.words.unit}の確定版にします（すでに確定版があれば置き換わります）。` +
+        `${schedule.period.words.next}の勤務表は、確定版から引き継いで始まります`
       }
     >
       🏁 確定する
@@ -845,16 +851,15 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
         <div className="e-actions e-actions-left">
-          {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。
-              希望はいまのところ暦月ごとに集めるので、暦月の期の勤務表にだけ出す */}
-          {shiftWishesUrl && schedule.period instanceof CalendarMonthPeriod && (
+          {/* この期のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
+          {shiftWishesUrl && (
             <ObjectView
               type={SHIFT_WISH_MONTH_VIEW_TYPE}
-              url={shiftWishesUrl(schedule.period.year, schedule.period.month)}
+              url={shiftWishesUrl(schedule.period)}
               label={`${schedule.period.label}のシフト希望`}
               openingPosition="bubble-side-right"
             >
-              <span className="e-link" title="ダブルクリックでこの月のシフト希望を開く">
+              <span className="e-link" title="ダブルクリックでこの期のシフト希望を開く">
                 シフト希望
               </span>
             </ObjectView>
@@ -863,6 +868,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           {/* 前月の確定版からの引き継ぎ。新しい確定版があれば取り込みを促す（precedingMonth.ts）。
               ★を休みの優先度に使うかは制約欄の「★優先」（limitSpecs）で切り替える。 */}
           <InheritanceView
+            words={schedule.period.words}
             inherited={
               // 引き継ぎ元は、この勤務表の前の期（末尾はその最終日で終わっている）
               inherited?.lastDay && {

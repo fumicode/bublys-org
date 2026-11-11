@@ -58,4 +58,16 @@ describe("期を入れる前のホテルのデータは、読んで書き戻し�
     const codec = HOTEL_OBJECTS.ScheduleReport.serialize;
     expect(computeStateHash(roundTrip(codec, legacy))).toBe(computeStateHash(legacy));
   });
+
+  test("シフト希望", () => {
+    const legacy = {
+      staffId: "A",
+      year: 2026,
+      month: 6,
+      byDay: { "2026-06-01": { "day-off": "want" } },
+      submittedAt: "2026-05-20T10:00:00.000Z",
+    };
+    const codec = HOTEL_OBJECTS.StaffMonthlyShiftWish.serialize;
+    expect(computeStateHash(roundTrip(codec, legacy))).toBe(computeStateHash(legacy));
+  });
 });

@@ -14,6 +14,8 @@ import { hotelShiftPuzzleBubbleRoutes, shiftWishListUrl, storeListUrl } from "./
 
 import PeopleIcon from "@mui/icons-material/People";
 import StorefrontIcon from "@mui/icons-material/Storefront";
+import { StoreFormat } from "@bublys-org/hotel-shift-puzzle-model";
+import { availableStoreFormats } from "./registration/storeFormats.js";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import RuleIcon from "@mui/icons-material/Rule";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
@@ -31,7 +33,8 @@ import SaveIcon from "@mui/icons-material/Save";
  * URL を直に開けば今も見られる。
  */
 export const menuItems: BublyMenuItem[] = [
-  { label: "店舗", url: storeListUrl(), icon: React.createElement(StorefrontIcon) },
+  // 組織の呼び方は形態が決める（行政版なら「課」）
+  { label: StoreFormat.nounFor(availableStoreFormats), url: storeListUrl(), icon: React.createElement(StorefrontIcon) },
   { label: "スタッフ一覧", url: 'hotel-shift-puzzle/staffs', icon: React.createElement(PeopleIcon) },
   { label: "勤務帯", url: 'hotel-shift-puzzle/work-shifts', icon: React.createElement(ScheduleIcon) },
   { label: "制約", url: 'hotel-shift-puzzle/constraints', icon: React.createElement(RuleIcon) },

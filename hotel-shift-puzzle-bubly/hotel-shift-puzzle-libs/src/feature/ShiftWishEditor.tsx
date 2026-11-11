@@ -9,6 +9,7 @@ import {
   WorkShiftSet,
   StaffMonthlyShiftWish,
   type WorkingDay,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ShiftWishGridView } from "../ui/ShiftWishGridView.js";
 import { buildWishOptions, toggleWishInput } from "../ui/shiftWishOptions.js";
@@ -22,29 +23,29 @@ import {
 
 type Props = {
   staffId: string;
-  year: number;
-  month: number;
+  /** 希望を出す期 */
+  period: SchedulePeriod;
 };
 
 /**
- * スタッフ月別シフト希望エディタ。(staffId, year, month) の希望をリポジトリで読み書きする。
+ * スタッフの期ごとのシフト希望エディタ。(staffId, period) の希望をリポジトリで読み書きする。
  * 希望は店舗・勤務表に依存しないアプリ全体の集約（無ければ空から作って保存）。
  *
  * 入力するのはシフト作成者。本人から聞き取った希望をここに写し、聞き終わったら「回収済み」に
- * する（＝その内容で確定。取り消すまで書き換えられない）。対象の人・月は URL で決まるので、
+ * する（＝その内容で確定。取り消すまで書き換えられない）。対象の人・期は URL で決まるので、
  * この画面の中で対象が入れ替わることはない。
  */
-export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
+export const ShiftWishEditor: FC<Props> = ({ staffId, period }) => {
   const staff = useObject<Staff>(STAFF_TYPE, staffId);
-  // 希望は勤務表に紐づかない（スタッフ×月）ので、グローバルの勤務帯セットから選択肢を作る
+  // 希望は勤務表に紐づかない（スタッフ×期）ので、グローバルの勤務帯セットから選択肢を作る
   const workShiftSet = useObject<WorkShiftSet>(WORKSHIFT_SET_TYPE, GLOBAL_WORKSHIFT_SET_ID);
   const workShifts = workShiftSet?.shifts ?? [];
-  const wishId = StaffMonthlyShiftWish.idOf(staffId, year, month);
+  const wishId = StaffMonthlyShiftWish.idOf(staffId, period);
   const stored = useObject<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE, wishId);
   const repo = useObjectRepo<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
 
   // 無ければ空の希望をその場で用意（保存は最初の編集時）
-  const wish = stored ?? StaffMonthlyShiftWish.create({ staffId, year, month });
+  const wish = stored ?? StaffMonthlyShiftWish.create({ staffId, period });
   const options = buildWishOptions(workShifts.map((w) => w.name));
 
   const handleToggle = (day: WorkingDay, optionKey: string) => {
@@ -61,7 +62,7 @@ export const ShiftWishEditor: FC<Props> = ({ staffId, year, month }) => {
         <h3>
           シフト希望{" "}
           <span className="e-sub">
-            {staff?.name ?? staffId} / {year}年{month}月
+            {staff?.name ?? staffId} / {period.label}
           </span>
         </h3>
         {wish.isSubmitted ? (

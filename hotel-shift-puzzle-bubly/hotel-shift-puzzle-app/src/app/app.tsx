@@ -2,10 +2,11 @@ import { BublyApp, BublyStoreProvider, BubbleRouteRegistry, BUBBLE_ARRANGEMENT_D
 
 // hotel-shift-puzzle-libs のslices等をimport（副作用で自動注入される）
 import { useSampleWhenEmpty } from '@bublys-org/hotel-shift-puzzle-libs';
+import { availableStoreFormats } from "../registration/storeFormats.js";
 
 // ルート登録（app側で管理）
-import { hotelShiftPuzzleBubbleRoutes, scheduleUrl } from '../registration/index.js';
-import { MID_MONTH_SCHEDULE_ID } from '@bublys-org/hotel-shift-puzzle-libs';
+import { hotelShiftPuzzleBubbleRoutes, scheduleUrl, storeListUrl } from '../registration/index.js';
+import { MID_MONTH_SCHEDULE_ID, hasSampleFor } from '@bublys-org/hotel-shift-puzzle-libs';
 
 /** 開けるものは**バブリが名乗る**（`bubly.ts`）── 単体でも OS の中でも同じ 1 つ */
 import { menuItems } from "../bubly";
@@ -13,6 +14,11 @@ import { useEffect } from 'react';
 import { useAppDispatch, setLightweightMode } from '@bublys-org/state-management';
 
 BubbleRouteRegistry.registerRoutes(hotelShiftPuzzleBubbleRoutes);
+
+/** 開いた瞬間に見せるバブル（例データの有無で変わる。下の initialBubbleUrls の註） */
+const INITIAL_BUBBLE_URLS = hasSampleFor(availableStoreFormats)
+  ? ['hotel-shift-puzzle/schedules', scheduleUrl(MID_MONTH_SCHEDULE_ID)]
+  : [storeListUrl(), 'hotel-shift-puzzle/schedules'];
 
 /**
  * ★ **奥へ行っても縮めない。** 勤務表は字が細かいので、縮むと読めなくなり、
@@ -28,7 +34,8 @@ configureDepth({ scaleDecayRate: 0 });
  *   （`useSampleWhenEmpty` の註）。口を持たない部品なので、何も描かない。
  */
 function SampleWhenEmpty() {
-  useSampleWhenEmpty();
+  // 入れる例データはデプロイの形態で決まる（行政版は例データが無いので空で始まる）
+  useSampleWhenEmpty(availableStoreFormats);
   return null;
 }
 
@@ -54,8 +61,10 @@ export function App() {
        *   「押す物が並んでいるページ」でしかない ── 何ができるアプリか、1 回押すまで分からない。
        *   例データのうち**作成途中の 8 月**（人が触っている状態）を一緒に開く。
        *   id は例データが持っている固定の値（`MID_MONTH_SCHEDULE_ID`）。
+       * ★ 例データの無い形態のデプロイ（いまは行政版）は空で始まるので、作成途中の勤務表は無い。
+       *   最初にやることは店舗を作ることなので、店舗の一覧と勤務表一覧を開く。
        */
-      initialBubbleUrls={['hotel-shift-puzzle/schedules', scheduleUrl(MID_MONTH_SCHEDULE_ID)]}
+      initialBubbleUrls={INITIAL_BUBBLE_URLS}
       enableWorldLine
       domainRegistry={BUBBLE_ARRANGEMENT_DOMAIN}
       urlBinding={makeSnapshotCodec('universe')}

@@ -9,10 +9,10 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import {
   FourWeekRule,
   PeriodRule,
+  StoreFormat,
   WorkingDay,
   type PeriodRuleKind,
   type Store,
-  type StoreFormat,
 } from "../domain/index.js";
 
 type StoreListViewProps = {
@@ -53,6 +53,8 @@ export const StoreListView: FC<StoreListViewProps> = ({
 }) => {
   const [name, setName] = useState("");
   const [formatId, setFormatId] = useState(formats[0]?.id ?? "hotel");
+  // 組織の呼び方は形態が決める（行政だけのデプロイなら「課」）
+  const noun = StoreFormat.nounFor(formats);
 
   const handleCreate = () => {
     const trimmed = name.trim();
@@ -69,7 +71,7 @@ export const StoreListView: FC<StoreListViewProps> = ({
       </p>
       <ul className="e-list">
         {stores.length === 0 ? (
-          <li className="e-empty">店舗がありません</li>
+          <li className="e-empty">{noun}がありません</li>
         ) : (
           stores.map((store) => (
             <StoreRow
@@ -79,6 +81,7 @@ export const StoreListView: FC<StoreListViewProps> = ({
               ruleKinds={ruleKinds}
               today={today}
               onSave={onSave}
+              noun={noun}
               scheduleCount={scheduleCountOf(store.id)}
               onRemove={onRemove}
             />
@@ -87,7 +90,7 @@ export const StoreListView: FC<StoreListViewProps> = ({
       </ul>
 
       <div className="e-create">
-        <h4>新しい店舗</h4>
+        <h4>新しい{noun}</h4>
         <div className="e-fields">
           <TextField
             variant="standard"
@@ -137,9 +140,11 @@ const StoreRow: FC<{
   ruleKinds: readonly PeriodRuleKind[];
   today: WorkingDay;
   onSave: (store: Store) => void;
+  /** 組織の呼び方（"店舗" / "課"） */
+  noun: string;
   scheduleCount: number;
   onRemove: (id: string) => void;
-}> = ({ store, formats, ruleKinds, today, onSave, scheduleCount, onRemove }) => {
+}> = ({ store, formats, ruleKinds, today, onSave, noun, scheduleCount, onRemove }) => {
   // 勤務表が使っている店舗は、削除の前に確認する（使っていなければすぐ削除）
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const requestRemove = () => {
@@ -242,7 +247,7 @@ const StoreRow: FC<{
         {confirmingRemove && (
           <div className="e-confirm" role="alert">
             <p>
-              この店舗は勤務表 {scheduleCount} 件で使われています。削除すると、それらの勤務表には
+              この{noun}は勤務表 {scheduleCount} 件で使われています。削除すると、それらの勤務表には
               「（削除された店舗）」と出ます。勤務表そのものは消えません。
             </p>
             <div className="e-confirm-actions">
@@ -264,7 +269,7 @@ const StoreRow: FC<{
           </div>
         )}
       </div>
-      <IconButton size="small" aria-label="店舗を削除" onClick={requestRemove}>
+      <IconButton size="small" aria-label={`${noun}を削除`} onClick={requestRemove}>
         <DeleteOutlineIcon fontSize="small" />
       </IconButton>
     </li>

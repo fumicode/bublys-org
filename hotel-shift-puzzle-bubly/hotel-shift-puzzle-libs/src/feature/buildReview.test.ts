@@ -41,8 +41,7 @@ describe('buildReview（確定時の振り返りの計算）', () => {
 
   const wishA = StaffMonthlyShiftWish.create({
     staffId: 'staff-A',
-    year: 2026,
-    month: 6,
+    period: CalendarMonthPeriod.of(2026, 6),
   }).setPreference(day1, 'day-off', 'want'); // 6/1 は休みたいが早番に入った＝譲歩
 
   const staffIds = ['staff-A', 'staff-B', 'staff-C', 'staff-D'];

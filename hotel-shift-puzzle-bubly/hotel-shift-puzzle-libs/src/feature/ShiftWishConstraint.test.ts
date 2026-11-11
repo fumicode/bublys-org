@@ -1,10 +1,10 @@
-import { StaffMonthlyShiftWish, WorkingDay } from '@bublys-org/hotel-shift-puzzle-model';
+import { CalendarMonthPeriod, StaffMonthlyShiftWish, WorkingDay } from '@bublys-org/hotel-shift-puzzle-model';
 import { wishMismatchFor } from './ShiftWishConstraint.js';
 
 describe('wishMismatchFor（希望と割当の食い違い判定）', () => {
   const d1 = WorkingDay.of(2026, 6, 1);
   const wish = () =>
-    StaffMonthlyShiftWish.create({ staffId: 'staff-A', year: 2026, month: 6 });
+    StaffMonthlyShiftWish.create({ staffId: 'staff-A', period: CalendarMonthPeriod.of(2026, 6) });
 
   test('希望が無い日は食い違いなし（null）', () => {
     expect(wishMismatchFor(d1, wish(), 'work:早番')).toBeNull();

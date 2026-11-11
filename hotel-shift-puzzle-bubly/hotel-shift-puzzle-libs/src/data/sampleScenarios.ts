@@ -184,7 +184,7 @@ function dayOffWishLookup(
 ): (staffId: string, day: WorkingDay) => boolean {
   const byStaff = new Map(
     wishes
-      .filter((w) => w.year === YEAR && w.month === month)
+      .filter((w) => w.period.equals(CalendarMonthPeriod.of(YEAR, month)))
       .map((w) => [w.staffId, w])
   );
   return (staffId, day) =>
