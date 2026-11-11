@@ -4,7 +4,7 @@ import { FC } from "react";
 import type { HTMLAttributes } from "react";
 import styled from "styled-components";
 import { BUSY_DAY, VIOLATION } from "../schedule-grid/cellSymbols.js";
-import type { DayStrip } from "./reviewDayStrip.js";
+import type { DayStrip } from "./dayStrip.js";
 
 /** 帯の1日ぶんの幅（px） */
 export const STRIP_DAY_WIDTH = 10;
@@ -14,7 +14,7 @@ const STRIP_HEIGHT = 16;
 const BAND_HEIGHT = 4;
 
 /**
- * 振り返りの日別の帯（1人ぶん）。どの日に印を置くかは reviewDayStrip.ts が決める。
+ * 振り返りの日別の帯（1人ぶん）。どの日に印を置くかは dayStrip.ts が決める。
  * 印の色は勤務表のシンボル辞書（cellSymbols.ts）のもの。
  */
 export const ReviewDayStrip: FC<{ strip: DayStrip }> = ({ strip }) => (

@@ -5,7 +5,7 @@ import styled from "styled-components";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { WorkingDay, ConfirmedSchedule } from "../domain/index.js";
 import { formatConfirmedAt } from "./formatConfirmedAt.js";
-import { dayStripOf } from "./review/reviewDayStrip.js";
+import { dayStripOf } from "./review/dayStrip.js";
 import { ReviewDayScale, ReviewDayStrip, ReviewMark } from "./review/ReviewDayStrip.js";
 import { VIOLATION_STRONG } from "./schedule-grid/cellSymbols.js";
 
@@ -26,7 +26,7 @@ type ScheduleReportViewProps = {
 /**
  * 確定版の振り返りの表示（プレゼンテーショナル）。
  * スタッフごとに1行（1〜末日の帯＋★）にまとめる。帯には「いつ無理を引き受けてくれたか」を
- * 勤務表と同じ色で置く（譲歩＝違反の赤い帯、繁忙日に出勤＝淡い藍の地。review/reviewDayStrip.ts）。
+ * 勤務表と同じ色で置く（譲歩＝違反の赤い帯、繁忙日に出勤＝淡い藍の地。review/dayStrip.ts）。
  * 重みは「譲歩1件で★2・繁忙日1回で★1」という★の定義の文の中の数字を ＋− で変える。
  * 行をクリックして展開すると、譲歩（#87）・繁忙日対応（#88）の詳細と配慮メモが出る
  * （複数行を同時に展開できる）。

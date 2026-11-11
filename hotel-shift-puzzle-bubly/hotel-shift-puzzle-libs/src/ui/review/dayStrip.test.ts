@@ -1,4 +1,4 @@
-import { dayStripOf } from './reviewDayStrip.js';
+import { dayStripOf } from './dayStrip.js';
 
 describe('dayStripOf（振り返りの日別の帯）', () => {
   const strip = () =>
