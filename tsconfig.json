@@ -191,6 +191,15 @@
     },
     {
       "path": "./henge-bubly/henge-app"
+    },
+    {
+      "path": "./koyomi-bubly/koyomi-model"
+    },
+    {
+      "path": "./koyomi-bubly/koyomi-libs"
+    },
+    {
+      "path": "./koyomi-bubly/koyomi-app"
     }
   ]
 }

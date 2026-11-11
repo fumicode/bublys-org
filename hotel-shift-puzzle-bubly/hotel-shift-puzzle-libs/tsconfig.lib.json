@@ -24,6 +24,9 @@
     },
     {
       "path": "../hotel-shift-puzzle-model/tsconfig.lib.json"
+    },
+    {
+      "path": "../../koyomi-bubly/koyomi-model/tsconfig.lib.json"
     }
   ],
   "exclude": [

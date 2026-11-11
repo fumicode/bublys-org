@@ -109,6 +109,7 @@
     "itinerary-bubly/*",
     "note-bubly/*",
     "lodging-bubly/*",
-    "henge-bubly/*"
+    "henge-bubly/*",
+    "koyomi-bubly/*"
   ]
 }
