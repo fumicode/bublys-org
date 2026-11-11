@@ -539,6 +539,13 @@ export const StyledWrap = styled.div`
       font-size: 0.8em;
       color: #888;
     }
+    /* 日付の注記（六曜など）。色は DAY_NOTE_COLOR（シンボル辞書）がインラインで付ける */
+    .e-day-note {
+      font-size: 0.65em;
+      line-height: 1.1;
+      color: #999;
+      white-space: nowrap;
+    }
 
     &.is-sun .e-day-num,
     &.is-sun .e-day-wd {

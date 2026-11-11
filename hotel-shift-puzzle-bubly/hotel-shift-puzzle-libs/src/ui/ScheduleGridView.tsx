@@ -32,6 +32,7 @@ import {
   requiredCellKey,
 } from "./schedule-grid/constants.js";
 import { StyledWrap } from "./schedule-grid/styles.js";
+import { DAY_NOTE_COLOR, type DayNote } from "./schedule-grid/cellSymbols.js";
 import { wishEntriesFor } from "./schedule-grid/wishSummary.js";
 import { buildSummaryRows } from "./schedule-grid/summaryModel.js";
 import { StaffScheduleRow } from "./schedule-grid/StaffScheduleRow.js";
@@ -82,6 +83,11 @@ type ScheduleGridViewProps = {
    * 位置で示す。表の外の見出し行には置かない。中身は app/feature 層が決める。
    */
   staffColumnActions?: ReactNode;
+  /**
+   * 日付に添える注記（六曜など）。渡すと日付の見出しの下に小さく出す。何を添えるかは
+   * feature 層が決める（表は中身を知らない）。省略すると何も添えない
+   */
+  dayNoteOf?: (day: WorkingDay) => DayNote | undefined;
   /** スタッフID → その月のシフト希望。各セル隅にマーカーで表示する */
   wishByStaff?: Map<string, StaffMonthlyShiftWish>;
   /** 制約違反の一覧。該当セルに赤線を引き、クリックで違反バブルを開く */
@@ -210,6 +216,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   reservationInfo,
   reservationInfoUrl,
   staffColumnActions,
+  dayNoteOf,
   wishByStaff,
   violations = [],
   groupByDepartment = false,
@@ -656,17 +663,27 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);
+          const note = dayNoteOf?.(day);
           const inner = (
             <span
               className="e-day-inner"
               // 違反マーク（⚠）は嵩張るのでヘッダ色だけで示し、理由は title で読めるようにする
               title={[
                 ...(warns ? warns.map((v) => v.message) : []),
+                ...(note?.title ? [note.title] : []),
                 `${day.label} の詳細を開く（ダブルクリック）`,
               ].join("\n")}
             >
               <span className="e-day-num">{day.day}</span>
               <span className="e-day-wd">{["日", "月", "火", "水", "木", "金", "土"][wd]}</span>
+              {note && (
+                <span
+                  className="e-day-note"
+                  style={note.tone ? { color: DAY_NOTE_COLOR[note.tone] } : undefined}
+                >
+                  {note.label}
+                </span>
+              )}
             </span>
           );
           return (

@@ -62,6 +62,7 @@ import {
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByReport } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
+import { rokuyoNoteOf } from "./rokuyoNote.js";
 import {
   capturePrecedingTail,
   confirmedAtOf,
@@ -214,6 +215,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
+  // 日付の見出しに六曜を添えるか（見え方の切り替え。ドメインのデータは変わらない。既定は切る）
+  const [showRokuyo, setShowRokuyo] = useState(false);
   const [deptFilter, setDeptFilter] = useState<string>(""); // "" = 全部署
 
   // ----- 抽出のためのスタッフ選択状態 -----
@@ -875,6 +878,19 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           </select>
         </label>
       )}
+
+      {/* 日付の見出しに六曜を添える（#235）。表の左上の角は、スタッフ列と日付の見出しが
+          交わる所なので、日付の見え方の切り替えもここに置く */}
+      <button
+        type="button"
+        className={`e-icon-btn e-text-btn${showRokuyo ? " is-active" : ""}`}
+        onClick={() => setShowRokuyo((v) => !v)}
+        title="日付の見出しに六曜（大安・仏滅など）を出す"
+        aria-label="日付の見出しに六曜を出す"
+        aria-pressed={showRokuyo}
+      >
+        六曜
+      </button>
     </>
   );
 
@@ -967,6 +983,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           reservationInfo={reservationInfo}
           reservationInfoUrl={reservationInfoUrl}
           staffColumnActions={staffColumnActions}
+          dayNoteOf={showRokuyo ? rokuyoNoteOf : undefined}
           wishByStaff={wishByStaff}
           violations={violations}
           constraints={allConstraints}
@@ -1139,6 +1156,12 @@ const StyledContainer = styled.div`
         border-color: #3949ab;
         color: #3949ab;
       }
+    }
+
+    /* 文字で示す切り替え（六曜）。アイコンと同じ枠に、小さな文字を入れる */
+    .e-text-btn {
+      font-size: 11px;
+      padding: 2px 4px;
     }
 
     /* 部署フィルタ。目印のアイコン＋部署名の select を1つの枠に見せる */

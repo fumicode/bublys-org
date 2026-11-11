@@ -18,6 +18,7 @@
  * | 違反（日をまたぐ）     | 下端の赤い帯                                 |
  * | 違反（勤務間の間隔）   | 2日の境目の赤い縦線＋丸                      |
  * | 詰み（入れる値が無い） | 赤い斜線の地＋×                              |
+ * | 日付の注記（六曜など） | 日付の見出しの下に小さな文字。吉日・友引・凶日だけ色（DAY_NOTE_COLOR）|
  *
  * 赤（VIOLATION）は「制約に反している」だけに使う。破線は「唯一の提案」だけに使う
  * （希望の×の円の破線は、円という別の形の中の線種なので混同しない）。斜線は「詰み」だけに使う。
@@ -29,3 +30,28 @@ export const VIOLATION = "#e53935";
 export const VIOLATION_STRONG = "#c62828";
 /** 唯一の提案の破線 */
 export const PROPOSAL_BORDER = "1px dashed rgba(0, 0, 0, 0.35)";
+
+/**
+ * 日付の注記（六曜など）の色。吉日（大安）・友引・凶日（仏滅）だけ色を付け、ほかは地の文字色。
+ * 赤は違反に取ってあるので、吉日にも凶日にも使わない。
+ */
+export const DAY_NOTE_COLOR = {
+  lucky: "#a1740a",
+  friend: "#2e7d32",
+  unlucky: "#546e7a",
+} as const;
+
+export type DayNoteTone = keyof typeof DAY_NOTE_COLOR;
+
+/**
+ * 日付に添える注記（六曜など）。勤務表は中身を知らず、渡されたものを日付の見出しの下に出すだけ。
+ * 何を添えるかは feature 層が決める（いまは六曜。feature/rokuyoNote.ts）。
+ */
+export type DayNote = {
+  /** 見出しに出す短い文字（"大安"） */
+  label: string;
+  /** 色の意味。無ければ地の文字色 */
+  tone?: DayNoteTone;
+  /** ホバーで出す説明 */
+  title?: string;
+};
