@@ -17,6 +17,9 @@ import {
   SCHEDULE_TYPE,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
+/** 店舗一覧バブル（名前・形態・区切り方・起算日） */
+export const storeListUrl = (): string => `hotel-shift-puzzle/stores`;
+
 /** スタッフ詳細バブル */
 export const staffUrl = (staffId: string): string =>
   `hotel-shift-puzzle/staffs/${staffId}`;

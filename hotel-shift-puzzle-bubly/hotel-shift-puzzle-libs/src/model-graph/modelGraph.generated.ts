@@ -95,6 +95,34 @@ export const MODEL_GRAPH: ModelGraph = {
       "doc": "暦月の期：起点は毎月1日、長さはその月の日数"
     },
     {
+      "name": "CalendarMonthRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月：毎月1日から月末まで"
+    },
+    {
       "name": "ConfirmedSchedule",
       "file": "schedule/ConfirmedSchedule.ts",
       "kind": "aggregate",
@@ -929,6 +957,41 @@ export const MODEL_GRAPH: ModelGraph = {
       "doc": "4週の期：起点日から28日"
     },
     {
+      "name": "FourWeekRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "anchor",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "anchor",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週：起算日から4週ずつ"
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -1315,6 +1378,78 @@ export const MODEL_GRAPH: ModelGraph = {
             "plain"
           ],
           "returns": "MonthlyStaffSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "PeriodRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "periodsAround",
+          "params": [
+            "day",
+            "before",
+            "after"
+          ],
+          "returns": "SchedulePeriod[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "calendarMonth",
+          "params": [],
+          "returns": "CalendarMonthRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fourWeek",
+          "params": [
+            "anchor"
+          ],
+          "returns": "FourWeekRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "PeriodRule",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2304,6 +2439,192 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "Store",
+      "file": "store/Store.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "format",
+          "type": "StoreFormat",
+          "optional": false
+        },
+        {
+          "name": "periodRule",
+          "type": "PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "name",
+        "format",
+        "periodRule"
+      ],
+      "methods": [
+        {
+          "name": "create",
+          "params": [
+            "params"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "fallback",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "removed",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "stores",
+            "id",
+            "removedIds"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "rename",
+          "params": [
+            "name"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withFormat",
+          "params": [
+            "format"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withPeriodRule",
+          "params": [
+            "periodRule"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StorePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "StoreFormat",
+      "file": "store/StoreFormat.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "StoreFormatId",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "storeNoun",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "defaultRule",
+          "type": "(today: WorkingDay) => PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "label",
+        "storeNoun"
+      ],
+      "methods": [
+        {
+          "name": "defaultRule",
+          "params": [
+            "today"
+          ],
+          "returns": "PeriodRule",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "defaultAnchor",
+          "params": [
+            "today"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "of",
+          "params": [
+            "id"
+          ],
+          "returns": "StoreFormat",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "WorkingDay",
       "file": "schedule/WorkingDay.ts",
       "kind": "value",
@@ -2963,6 +3284,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "ConfirmedSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
       "from": "ConstraintDelta",
       "to": "ConstraintViolation",
       "kind": "contains",
@@ -3027,6 +3356,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "type"
     },
     {
+      "from": "FourWeekRule",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "anchor",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "MonthlyStaffSchedule",
       "to": "ShiftAssignment",
       "kind": "contains",
@@ -3065,6 +3402,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "requiredStaffing",
       "many": false,
       "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
     },
     {
       "from": "MonthlyStaffSchedule",
@@ -3155,6 +3500,38 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "Store",
+      "to": "StoreFormat",
+      "kind": "contains",
+      "via": "format",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "Store",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "periodRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "WorkingStaffGroup",
       "to": "WorkingStaffMember",
       "kind": "contains",
@@ -3197,12 +3574,14 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 47,
+    "fileCount": 50,
     "classesWithoutState": [
       "AllowedShiftConstraint",
+      "CalendarMonthRule",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
+      "PeriodRule",
       "RequiredStaffingConstraint",
       "SchedulePeriod",
       "ShiftIntervalConstraint",
@@ -3210,9 +3589,7 @@ export const MODEL_GRAPH: ModelGraph = {
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
-      "ConfirmedSchedule.storeId",
       "ConfirmedSchedule.worldLineNodeId",
-      "MonthlyStaffSchedule.storeId",
       "WorkingStaffMember.allowedShiftIds"
     ]
   }

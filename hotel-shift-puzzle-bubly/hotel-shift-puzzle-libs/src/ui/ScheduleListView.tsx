@@ -1,16 +1,17 @@
 'use client';
 
-import { FC, useState } from "react";
+import { FC, useMemo, useState } from "react";
 import styled from "styled-components";
-import { Button, IconButton, TextField } from "@mui/material";
+import { Button, IconButton, MenuItem, TextField } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import { ObjectView } from "@bublys-org/bubbles-ui";
 import {
-  CalendarMonthPeriod,
   MonthlyStaffSchedule,
   type SchedulePeriod,
+  type Store,
+  type WorkingDay,
 } from "../domain/index.js";
 
 type ScheduleListViewProps = {
@@ -19,23 +20,43 @@ type ScheduleListViewProps = {
   confirmedScheduleIds?: ReadonlySet<string>;
   /** 取り込んでいない前月の確定版がある勤務表（「新しい確定版あり」を添える） */
   pendingScheduleIds?: ReadonlySet<string>;
+  /** 勤務表を作れる店舗（記録された店舗と、記録が無いが勤務表が指している店舗） */
+  stores: readonly Store[];
+  /** storeId → 表示名 */
+  storeNameOf?: (storeId: string) => string;
+  /** 今日（期の選択肢の真ん中） */
+  today: WorkingDay;
   onCreate: (params: { storeId: string; period: SchedulePeriod }) => void;
   onRemove: (id: string) => void;
 };
+
+/** 期の選択肢：今日を含む期の前3期〜後12期。初期値は次の期（ふつうは次の期の勤務表を作る） */
+const PERIODS_BEFORE = 3;
+const PERIODS_AFTER = 12;
 
 export const ScheduleListView: FC<ScheduleListViewProps> = ({
   schedules,
   confirmedScheduleIds,
   pendingScheduleIds,
+  stores,
+  storeNameOf,
+  today,
   onCreate,
   onRemove,
 }) => {
-  const [storeId, setStoreId] = useState("store-1");
-  const [year, setYear] = useState(2026);
-  const [month, setMonth] = useState(7);
+  const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
+  const store = stores.find((s) => s.id === storeId) ?? stores[0];
+  // 期の選択肢は店舗の区切り方が出す（暦月なら月、4週なら起算日から数えた期）
+  const periods = useMemo(
+    () => (store ? store.periodRule.periodsAround(today, PERIODS_BEFORE, PERIODS_AFTER) : []),
+    [store, today]
+  );
+  const [periodKey, setPeriodKey] = useState<string | undefined>(undefined);
+  const period =
+    periods.find((p) => p.key === periodKey) ?? periods[PERIODS_BEFORE + 1] ?? periods[0];
 
   const handleCreate = () => {
-    onCreate({ storeId, period: CalendarMonthPeriod.of(year, month) });
+    if (store && period) onCreate({ storeId: store.id, period });
   };
 
   return (
@@ -66,7 +87,8 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
                       )}
                     </div>
                     <div className="e-meta">
-                      {schedule.storeId} ・ {schedule.assignments.length}件の割当
+                      {storeNameOf?.(schedule.storeId) ?? schedule.storeId} ・{" "}
+                      {schedule.assignments.length}件の割当
                     </div>
                     {(schedule.precedingTail?.lastDay || pendingScheduleIds?.has(schedule.id)) && (
                       <div className="e-inheritance">
@@ -102,35 +124,38 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
         <h4>新しい勤務表を作成</h4>
         <div className="e-fields">
           <TextField
+            select
             className="e-store"
             variant="standard"
             size="small"
             label="店舗"
-            value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-          />
-          <TextField
-            className="e-year"
-            variant="standard"
-            size="small"
-            type="number"
-            label="年"
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value, 10) || year)}
-          />
-          <TextField
-            className="e-month"
-            variant="standard"
-            size="small"
-            type="number"
-            label="月"
-            inputProps={{ min: 1, max: 12 }}
-            value={month}
+            value={store?.id ?? ""}
             onChange={(e) => {
-              const m = parseInt(e.target.value, 10);
-              if (!Number.isNaN(m)) setMonth(Math.min(12, Math.max(1, m)));
+              setStoreId(e.target.value);
+              setPeriodKey(undefined);
             }}
-          />
+          >
+            {stores.map((s) => (
+              <MenuItem key={s.id} value={s.id}>
+                {s.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            className="e-period"
+            variant="standard"
+            size="small"
+            label="期"
+            value={period?.key ?? ""}
+            onChange={(e) => setPeriodKey(e.target.value)}
+          >
+            {periods.map((p) => (
+              <MenuItem key={p.key} value={p.key}>
+                {p.label}
+              </MenuItem>
+            ))}
+          </TextField>
         </div>
         <Button
           className="e-add"
@@ -138,7 +163,7 @@ export const ScheduleListView: FC<ScheduleListViewProps> = ({
           size="small"
           startIcon={<AddIcon />}
           onClick={handleCreate}
-          disabled={!storeId.trim()}
+          disabled={!store || !period}
         >
           作成
         </Button>
@@ -238,12 +263,11 @@ const StyledContainer = styled.div`
 
       .e-store {
         flex: 1;
+        min-width: 100px;
       }
-      .e-year {
-        width: 72px;
-      }
-      .e-month {
-        width: 56px;
+      .e-period {
+        flex: 1;
+        min-width: 140px;
       }
     }
 

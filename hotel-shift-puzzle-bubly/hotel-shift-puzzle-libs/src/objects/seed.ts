@@ -23,8 +23,10 @@ import {
   ENDGAME_SCHEDULE_ID,
   ALLOWED_SHIFT_IDS_BY_STAFF,
 } from "../data/index.js";
+import { HOTEL_FORMAT, PeriodRule, Store } from "@bublys-org/hotel-shift-puzzle-model";
 import type { BundleItem } from "./commit.js";
 import {
+  STORE_TYPE,
   STAFF_TYPE,
   WORKING_STAFF_GROUP_TYPE,
   WORKSHIFT_SET_TYPE,
@@ -47,6 +49,18 @@ import {
  */
 export function buildSampleItems(): BundleItem[] {
   const items: BundleItem[] = [];
+
+  // 例データの勤務表が指す店舗（ホテル・暦月）。記録が無くても store-1 はホテル・暦月で
+  // 読めるが、店舗の一覧に出して名前を付けておく
+  items.push({
+    type: STORE_TYPE,
+    obj: new Store({
+      id: "store-1",
+      name: "サンプルホテル",
+      format: HOTEL_FORMAT,
+      periodRule: PeriodRule.calendarMonth(),
+    }),
+  });
 
   for (const staff of createSampleStaffList()) {
     items.push({ type: STAFF_TYPE, obj: staff });

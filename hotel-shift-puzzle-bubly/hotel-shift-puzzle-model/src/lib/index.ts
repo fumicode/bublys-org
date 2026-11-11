@@ -2,6 +2,11 @@
  * ドメイン層エクスポート
  */
 
+// 店舗（勤務表の外のデータ：名前・形態・期の決め方。勤務表を作るときに読むだけ）
+export * from './store/PeriodRule.js';
+export * from './store/StoreFormat.js';
+export * from './store/Store.js';
+
 // Staff（スタッフ）
 export * from './staff/Staff.js';
 export * from './staff/DayOffStyle.js';

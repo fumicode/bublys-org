@@ -13,6 +13,8 @@ type ScheduleReportViewProps = {
   report: ConfirmedSchedule;
   /** staffId → 表示名（解決済み。無ければ staffId を出す） */
   nameOf: (staffId: string) => string;
+  /** 店舗の名前（storeId は人に見せない） */
+  storeName: string;
   /** 配慮メモ欄の編集（保存はシェル経由で feature 層が担う）。省略すると読むだけ */
   onChangeNote?: (staffId: string, text: string) => void;
   /** タイトルの変更（空にすると既定の "{年}年{月}" に戻る）。省略すると読むだけ */
@@ -38,6 +40,7 @@ type ScheduleReportViewProps = {
 export const ReviewView: FC<ScheduleReportViewProps> = ({
   report,
   nameOf,
+  storeName,
   onChangeNote,
   onRename,
   onChangeWeights,
@@ -140,7 +143,7 @@ export const ReviewView: FC<ScheduleReportViewProps> = ({
           )}
         </div>
         <span className="e-sub">
-          {report.period.label} / {report.storeId}
+          {report.period.label} / {storeName}
           {confirmedAt !== undefined && (
             <span className="e-confirmed-at"> ・ 確定 {formatConfirmedAt(confirmedAt)}</span>
           )}

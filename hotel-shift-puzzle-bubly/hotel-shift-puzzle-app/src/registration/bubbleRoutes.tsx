@@ -11,6 +11,7 @@ import {
   hotelCellRole,
   ModelClassDiagram,
   hotelNestedScope,
+  StoreCollection,
   StaffCollection,
   StaffDetail,
   WorkShiftCollection,
@@ -34,6 +35,7 @@ import {
   ShiftIntervalRuleView,
   WorldFilePanel,
 } from "@bublys-org/hotel-shift-puzzle-libs";
+import { availablePeriodRuleKinds, availableStoreFormats } from "./storeFormats.js";
 // バブル URL スキーム（app 層で一元管理）。import すると同時にオブジェクト URL の
 // registerObjectUrl 副作用も走る。
 import {
@@ -56,6 +58,12 @@ const withObjects = (node: ReactNode) => (
 );
 
 // --- スタッフ一覧バブル ---
+// --- 店舗一覧バブル（勤務表の外のデータ。選べる形態・区切り方はデプロイが決める） ---
+const StoreListBubble: BubbleRoute["Component"] = () =>
+  withObjects(
+    <StoreCollection formats={availableStoreFormats} ruleKinds={availablePeriodRuleKinds} />
+  );
+
 const StaffListBubble: BubbleRoute["Component"] = () => withObjects(<StaffCollection />);
 
 // --- スタッフ詳細バブル ---
@@ -321,6 +329,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/shift-wishes/:year/:month", type: "shift-wish-month", Component: ShiftWishMonthBubble },
   { pattern: "hotel-shift-puzzle/shift-wishes", type: "shift-wish-list", Component: ShiftWishListBubble },
   { pattern: "hotel-shift-puzzle/staffs/:staffId", type: "staff", Component: StaffDetailBubble },
+  { pattern: "hotel-shift-puzzle/stores", type: "store-list", Component: StoreListBubble },
   { pattern: "hotel-shift-puzzle/staffs", type: "staff-list", Component: StaffListBubble },
   { pattern: "hotel-shift-puzzle/work-shifts", type: "work-shift-list", Component: WorkShiftListBubble },
   // 制約1つぶんのバブル。具体的な pattern を先に置く（constraints 単体より上）

@@ -8,6 +8,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { ScheduleReservationInfoView } from "../ui/ScheduleReservationInfoView.js";
 import { useObject, useObjectRepo } from "../objects/repository.js";
+import { useStore } from "./useStore.js";
 import { SCHEDULE_TYPE, SCHEDULE_RESERVATION_INFO_TYPE } from "../objects/hotelObjects.js";
 
 type ScheduleReservationInfoDetailProps = {
@@ -27,6 +28,8 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
 }) => {
   // 稼働日は勤務表（年月）から導出するので勤務表本体も読む
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
+  // storeId は人に見せない。見せるのは店舗の名前（記録が無ければ ID のまま）
+  const storeName = useStore(schedule?.storeId)?.name ?? "";
   const reservationInfo = useObject<DailyReservationInfo>(
     SCHEDULE_RESERVATION_INFO_TYPE,
     scheduleId
@@ -61,7 +64,7 @@ export const ScheduleReservationInfoDetail: FC<ScheduleReservationInfoDetailProp
         <h3>
           予約状況{" "}
           <span className="e-sub">
-            {schedule.period.label} / {schedule.storeId}
+            {schedule.period.label} / {storeName}
           </span>
         </h3>
         <p className="e-note">

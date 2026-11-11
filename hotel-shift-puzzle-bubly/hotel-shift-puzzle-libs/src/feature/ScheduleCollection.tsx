@@ -6,12 +6,15 @@ import {
   MonthlyStaffSchedule,
   ConstraintSet,
   ConfirmedSchedule,
+  Store,
   type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
-import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
+import { useObject, useObjects, useObjectRepo, useRemovedIds } from "../objects/repository.js";
 import { createSchedule } from "./createSchedule.js";
+import { todayWorkingDay } from "./today.js";
+import { storesForNewSchedule } from "./storesForNewSchedule.js";
 import {
   captureInheritance,
   pendingInheritanceOf,
@@ -19,6 +22,7 @@ import {
 } from "./precedingMonth.js";
 import {
   SCHEDULE_TYPE,
+  STORE_TYPE,
   CONFIRMED_SCHEDULE_TYPE,
   CONSTRAINT_SET_TYPE,
   GLOBAL_CONSTRAINT_SET_ID,
@@ -29,6 +33,15 @@ export const ScheduleCollection: FC = () => {
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const reports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const recordedStores = useObjects<Store>(STORE_TYPE);
+  const removedStoreIds = useRemovedIds(STORE_TYPE);
+  const today = useMemo(() => todayWorkingDay(), []);
+  const stores = useMemo(
+    () => storesForNewSchedule(recordedStores, schedules, removedStoreIds),
+    [recordedStores, schedules, removedStoreIds]
+  );
+  const storeNameOf = (storeId: string) =>
+    Store.resolve(recordedStores, storeId, removedStoreIds).name;
   // 新しい勤務表はグローバルの制約セットを写して始まるので、何日写すかもそれで決める
   const globalConstraints = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, GLOBAL_CONSTRAINT_SET_ID);
 
@@ -80,6 +93,9 @@ export const ScheduleCollection: FC = () => {
         schedules={schedules}
         confirmedScheduleIds={confirmedScheduleIds}
         pendingScheduleIds={pendingScheduleIds}
+        stores={stores}
+        storeNameOf={storeNameOf}
+        today={today}
         onCreate={handleCreate}
         onRemove={handleRemove}
       />

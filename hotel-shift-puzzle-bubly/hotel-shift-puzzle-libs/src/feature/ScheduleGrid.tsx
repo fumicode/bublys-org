@@ -60,6 +60,7 @@ import {
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
 import { prioritizeStaffByStars } from "./starPriority.js";
 import { buildReview } from "./buildReview.js";
+import { useStore } from "./useStore.js";
 import { wishesOfPeriod } from "./shiftWishMonths.js";
 import {
   captureInheritance,
@@ -201,6 +202,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   );
   const allWishes = useObjects<StaffMonthlyShiftWish>(STAFF_SHIFT_WISH_TYPE);
   const schedule = useObject<MonthlyStaffSchedule>(SCHEDULE_TYPE, scheduleId);
+  // storeId は人に見せない。見せるのは店舗の名前（記録が無ければ ID のまま）
+  const storeName = useStore(schedule?.storeId)?.name ?? "";
 
   // ----- 部署フィルタ / グルーピング状態 -----
   const [groupByDept, setGroupByDept] = useState(false);
@@ -837,7 +840,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       <div className="e-header">
         <h3>
           {schedule.period.label}の勤務表{" "}
-          <span className="e-sub">{schedule.storeId}</span>
+          <span className="e-sub">{storeName}</span>
         </h3>
 
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
