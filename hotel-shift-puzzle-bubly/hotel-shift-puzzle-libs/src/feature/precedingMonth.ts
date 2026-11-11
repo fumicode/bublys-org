@@ -1,29 +1,26 @@
 /**
- * precedingMonth — 参照レポート（前月の確定）を選び、その確定版の末尾を今月へつなぐ
+ * precedingMonth — 勤務表は、前月の確定版から引き継いで始まる（#231）
  *
- * ルールは「勤務表は、参照レポートの確定版の末尾から続いている」の1つ（{@link PrecedingMonthTail}）。
- * 参照レポートにできるのは同じ店舗の前月の確定だけ（`ScheduleReport.isReferenceableFrom`）なので、
- * 参照レポートを選ぶことが、そのまま前月の確定版を選ぶことになる。紐づけを二重に持たない。
- *
- * - **候補の順**：同じ月に確定が複数（勤務表が複数・同じ勤務表で何度も確定）あれば、
- *   **確定した時刻の新しい順**。確定時刻を持たない古いレポートは、確定ノードができた時刻で補う。
- * - **いつ紐づくか**：勤務表を作るときに、いちばん新しい前月の確定を自動で紐づけ、末尾を写す。
- *   作った後に前月の確定が増えても**勝手には差し替えない**（今月の違反表示や確定レポートの
- *   前提が知らないうちに変わらないように）。新しい確定があることを知らせ、人が取り込む。
- * - 参照（制約セット）と写した末尾（勤務表）は同じ1ノードで一緒に変わる（{@link withReference}）。
- *   末尾があれば、それは必ず今の参照レポートの確定版。
- * - 貢献度スコアを自動シフトの優先度に使うかは別のスイッチ（`ConstraintSet.useReportPriority`）。
- *   前月とのつなぎはスイッチに関係なく、参照している限り効く。
+ * - **前月の確定版は1つに決まる。** 確定版は店舗×月で1つなので、同じ店舗の前月の確定版は
+ *   勤務表の店舗と年月から決まる（`ConfirmedSchedule.precedingIdFor`）。選ぶことも、紐づけを
+ *   持つことも無い。
+ * - **引き継いだものは今月の世界に焼き付く。** 写し取るのは確定版の月末の勤務と、振り返りの
+ *   ★と、どの版から写したか（{@link PrecedingMonthTail}）。前月の確定版を
+ *   後から見に行かない。
+ * - **いつ引き継ぐか**：勤務表を作るときに自動で。作った後に前月の確定版が置き換わったり、
+ *   前月があとから確定したりしても**勝手には差し替えない**（今月の違反表示や休みの優先順が
+ *   知らないうちに変わらないように）。新しい版があることを知らせ（{@link pendingInheritanceOf}）、
+ *   人が取り込む。
  *
  * 読み出しは確定ノード時点の値なので、前月の勤務表がその後どう編集されていても、
  * 確定したときの版が写る。勤務帯の名前もそのノード時点の前月の勤務帯セットで引く。
  */
 import {
   PrecedingMonthTail,
+  ConfirmedSchedule,
   precedingTailLengthFor,
-  type ConstraintSet,
+  type StarEntry,
   type MonthlyStaffSchedule,
-  type ScheduleReport,
   type WorkShiftSet,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import {
@@ -35,112 +32,90 @@ import { SCHEDULE_TYPE, WORKSHIFT_SET_TYPE } from "../objects/hotelObjects.js";
 
 type StoreLike = Parameters<typeof nodeTimestampOf>[0];
 
-/** 参照レポート（前月の確定）の候補1件（確定時刻つき） */
-export type ReferenceCandidate = {
-  report: ScheduleReport;
-  /** 確定した時刻（epoch ms）。分からなければ undefined */
-  confirmedAt?: number;
-};
-
-/** そのレポートが確定した時刻。古いレポートは確定ノードができた時刻で補う */
-export function confirmedAtOf(store: StoreLike, report: ScheduleReport): number | undefined {
+/** その確定版が確定した時刻。古い確定版は確定ノードができた時刻で補う */
+export function confirmedAtOf(store: StoreLike, report: ConfirmedSchedule): number | undefined {
   return (
     report.confirmedAt ??
     nodeTimestampOf(store, localScopeId(SCHEDULE_TYPE, report.scheduleId), report.worldLineNodeId)
   );
 }
 
-/**
- * target の勤務表の参照レポートにできる確定（同じ店舗の前月）を、確定の新しい順に並べる（純粋）。
- * 確定時刻の分からないものは最後へ。
- */
-export function referenceCandidates(
-  reports: readonly ScheduleReport[],
-  target: { storeId: string; year: number; month: number },
-  confirmedAt: (report: ScheduleReport) => number | undefined
-): ReferenceCandidate[] {
-  return reports
-    .filter((r) => r.isReferenceableFrom(target))
-    .map((report) => ({ report, confirmedAt: confirmedAt(report) }))
-    .sort((a, b) => (b.confirmedAt ?? -Infinity) - (a.confirmedAt ?? -Infinity));
+/** target の勤務表が引き継ぐ前月の確定版（同じ店舗の1か月前）。まだ確定していなければ undefined（純粋） */
+export function precedingConfirmedOf(
+  reports: readonly ConfirmedSchedule[],
+  target: { storeId: string; year: number; month: number }
+): ConfirmedSchedule | undefined {
+  const id = ConfirmedSchedule.precedingIdFor(target);
+  return reports.find((r) => r.id === id);
 }
 
 /**
- * いまつないでいる末尾より新しい前月の確定があれば、そのうち最新を返す（純粋）。
- * 人が古い方をあえて選んでいても、より新しい確定が出たときだけ知らせる。
+ * 取り込んでいない前月の確定版があれば返す（純粋）。
+ * 前月の確定版があり、いま引き継いでいる版と違う（＝置き換わった／あとから確定した／
+ * まだ引き継いでいない）ときだけ。
  */
-export function newerReferenceCandidate(
-  candidates: readonly ReferenceCandidate[],
-  linked: ReferenceCandidate | undefined
-): ReferenceCandidate | undefined {
-  const latest = candidates[0];
-  if (!latest) return undefined;
-  if (!linked) return latest;
-  if (latest.report.id === linked.report.id) return undefined;
-  if (latest.confirmedAt === undefined) return undefined;
-  return latest.confirmedAt > (linked.confirmedAt ?? -Infinity) ? latest : undefined;
+export function pendingInheritanceOf(
+  confirmed: ConfirmedSchedule | undefined,
+  inherited: PrecedingMonthTail | undefined
+): ConfirmedSchedule | undefined {
+  if (!confirmed) return undefined;
+  if (inherited && confirmed.isVersion(inherited.source)) return undefined;
+  return confirmed;
 }
 
 /**
- * 参照レポートを付け替えた勤務表と制約セットを返す（純粋）。reference が undefined なら外す。
+ * 引き継いだ★の行を返す（純粋）。
  *
- * 参照と前月の末尾は一緒に変わる。確定版が読めなかった（tail が無い）ときは参照だけを付け、
- * 前月とはつながない（＝今月1日から数える）。古い末尾を残すと、参照と食い違う。
+ * ★は引き継ぎに焼き付いているものを読む。★を写す前に引き継いだ古い勤務表（#231 より前）は
+ * 焼き付いていないので、引き継いだ版がいまの確定版と同じときだけそこから読む
+ * （版が違えば、今月の前提ではないので読まない）。
  */
-export function withReference(
-  schedule: MonthlyStaffSchedule,
-  constraints: ConstraintSet,
-  reference: { reportId: string; tail?: PrecedingMonthTail } | undefined
-): { schedule: MonthlyStaffSchedule; constraints: ConstraintSet } {
-  if (!reference) {
-    const linked = constraints.linkedReportId;
-    return {
-      schedule: schedule.withPrecedingTail(undefined),
-      constraints: linked ? constraints.unlinkReport(linked) : constraints,
-    };
-  }
-  return {
-    schedule: schedule.withPrecedingTail(reference.tail),
-    constraints: constraints.linkReport(reference.reportId),
-  };
+export function inheritedScoresOf(
+  inherited: PrecedingMonthTail | undefined,
+  confirmed: ConfirmedSchedule | undefined
+): readonly StarEntry[] | undefined {
+  if (!inherited) return undefined;
+  if (inherited.stars) return inherited.stars;
+  if (confirmed?.isVersion(inherited.source)) return confirmed.stars;
+  return undefined;
 }
 
 /**
- * 前月の確定版（確定ノード時点の勤務表）から末尾を写し取る。
- * 確定した版がもう読めなければ undefined。
+ * 前月の確定版（確定ノード時点の勤務表）から、引き継ぐもの（月末の勤務と★）を写し取る。
+ * 確定した版がもう読めなければ undefined（＝引き継がない。今月1日から数える）。
  *
  * @param maxConsecutiveWorkdays 今月の連勤上限（何日写せば足りるかを決める）
  */
-export async function capturePrecedingTail(
+export async function captureInheritance(
   store: StoreLike,
-  candidate: ReferenceCandidate,
+  confirmed: ConfirmedSchedule,
   maxConsecutiveWorkdays: number
 ): Promise<PrecedingMonthTail | undefined> {
-  const { report } = candidate;
-  const scopeId = localScopeId(SCHEDULE_TYPE, report.scheduleId);
+  const scopeId = localScopeId(SCHEDULE_TYPE, confirmed.scheduleId);
   const [schedule, workShifts] = await Promise.all([
     readFromScopeAt<MonthlyStaffSchedule>(
       store,
       scopeId,
-      report.worldLineNodeId,
+      confirmed.worldLineNodeId,
       SCHEDULE_TYPE,
-      report.scheduleId
+      confirmed.scheduleId
     ),
     // 勤務表ごとの勤務帯セットは勤務表と同じ ID（createSchedule が withId で作る）
     readFromScopeAt<WorkShiftSet>(
       store,
       scopeId,
-      report.worldLineNodeId,
+      confirmed.worldLineNodeId,
       WORKSHIFT_SET_TYPE,
-      report.scheduleId
+      confirmed.scheduleId
     ),
   ]);
   if (!schedule) return undefined;
   return PrecedingMonthTail.capture({
-    sourceReportId: report.id,
-    confirmedAt: candidate.confirmedAt,
+    source: confirmed.version,
+    confirmedAt: confirmedAtOf(store, confirmed),
     schedule,
     shiftNameOf: (shiftId) => workShifts?.findById(shiftId)?.name,
     length: precedingTailLengthFor(maxConsecutiveWorkdays),
+    stars: confirmed.stars,
   });
 }

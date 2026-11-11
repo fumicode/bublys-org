@@ -56,6 +56,11 @@ export type WorldLineScopeViewProps = {
    * ラッパ機能はそのまま共有できる。
    */
   renderCanvas?: (props: WorldLinesCanvasViewProps) => ReactNode;
+  /**
+   * 節目のノード（バブリが「この世界線の中で意味のある地点」と呼ぶもの）。旗を立てて描く。
+   * 何を節目とするかはバブリが決める（例: hotel は勤務表の確定版）。renderCanvas にもそのまま渡る。
+   */
+  milestoneNodeIds?: ReadonlySet<string>;
 };
 
 export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
@@ -66,6 +71,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
   onSelectNode,
   style,
   renderCanvas,
+  milestoneNodeIds,
 }) => {
   useKeyBindings(keyBindings ?? EMPTY_BINDINGS);
   const apexId = scope.graph.getApex()?.id ?? null;
@@ -130,6 +136,7 @@ export const WorldLineScopeView: FC<WorldLineScopeViewProps> = ({
         getNodeLabel,
         onSelectNode: onSelectNode ?? scope.moveTo,
         onApexScreenPos: nameable ? placeInput : undefined,
+        milestoneNodeIds,
       })}
     </div>
   );

@@ -3,8 +3,7 @@
 import { FC, useMemo } from "react";
 import {
   Staff,
-  ConstraintSet,
-  ScheduleReport,
+  ConfirmedSchedule,
   MonthlyStaffSchedule,
   StaffMonthlyShiftWish,
   type DayOffStyle,
@@ -13,18 +12,18 @@ import { StaffDetailView } from "../ui/StaffDetailView.js";
 import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
 import {
   STAFF_TYPE,
-  CONSTRAINT_SET_TYPE,
-  SCHEDULE_REPORT_TYPE,
+  CONFIRMED_SCHEDULE_TYPE,
   SCHEDULE_TYPE,
   STAFF_SHIFT_WISH_TYPE,
 } from "../objects/hotelObjects.js";
-import { staffLinkedReportSummaries } from "./staffLinkedReports.js";
+import { staffReviewSummaries } from "./staffReviews.js";
+import { precedingConfirmedOf } from "./precedingMonth.js";
 import { monthSummariesOf } from "./shiftWishMonths.js";
 
 type StaffDetailProps = {
   staffId?: string;
   /**
-   * どの勤務表から開いたか。渡されたときだけ、その勤務表の参照レポートでの評価を出す
+   * どの勤務表から開いたか。渡されたときだけ、その勤務表の前月の振り返りを出す
    * （勤務表と関係なく開いたスタッフ詳細には出さない）。
    */
   scheduleId?: string;
@@ -45,18 +44,20 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
     [schedules, wishes, staffId]
   );
 
-  // 開いた勤務表の参照レポートから、このスタッフに関係する分だけを取り出す
-  // （貢献度スコア・譲歩/繁忙日・配慮メモ）。勤務表の制約セットは id = scheduleId。
-  const allConstraints = useObjects<ConstraintSet>(CONSTRAINT_SET_TYPE);
-  const allReports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
-  const linkedReports = useMemo(() => {
-    if (!scheduleId) return [];
-    const reportId = allConstraints.find((c) => c.id === scheduleId)?.linkedReportId;
-    return allReports.filter((r) => r.id === reportId);
-  }, [scheduleId, allConstraints, allReports]);
-  const linkedReportSummaries = useMemo(
-    () => staffLinkedReportSummaries(staffId ?? "", linkedReports),
-    [staffId, linkedReports]
+  // 開いた勤務表が引き継いだ前月の確定版の振り返りから、このスタッフに関係する分だけを取り出す
+  // （★・譲歩/繁忙日・配慮メモ）。引き継いだ版と違う版（取り込んでいない新しい確定版）は
+  // 今月の前提ではないので出さない。
+  const allReports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const precedingReviews = useMemo(() => {
+    const schedule = schedules.find((s) => s.id === scheduleId);
+    const inherited = schedule?.precedingTail;
+    if (!schedule || !inherited) return [];
+    const confirmed = precedingConfirmedOf(allReports, schedule);
+    return confirmed?.isVersion(inherited.source) ? [confirmed] : [];
+  }, [scheduleId, schedules, allReports]);
+  const reviewSummaries = useMemo(
+    () => staffReviewSummaries(staffId ?? "", precedingReviews),
+    [staffId, precedingReviews]
   );
 
   if (!staff) {
@@ -83,7 +84,7 @@ export const StaffDetail: FC<StaffDetailProps> = ({ staffId, scheduleId, shiftWi
       onChangeDayOffStyle={handleChangeDayOffStyle}
       shiftWishMonths={shiftWishMonths}
       shiftWishUrl={shiftWishUrl}
-      linkedReportSummaries={linkedReportSummaries}
+      reviewSummaries={reviewSummaries}
     />
   );
 };

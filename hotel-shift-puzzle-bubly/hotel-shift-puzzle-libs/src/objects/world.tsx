@@ -32,6 +32,7 @@ import { useAppStore } from "@bublys-org/state-management";
 import { APP_SCOPE_ID, isAbsentInScope } from "./commit.js";
 import { membershipOf } from "./framework.js";
 import { migrateLegacyScopes } from "./migrateLegacyScopes.js";
+import { migrateLegacyReports } from "./migrateLegacyReports.js";
 
 export type WorldValue = {
   /** いま居る世界のスコープID */
@@ -60,7 +61,7 @@ export function useWorld(): WorldValue {
  * 読み先の**スコープID**を決める唯一の分岐。ここ以外に分岐を作らないこと。
  *
  *   1. 非メンバー（external）は常にグローバル。
- *      実際の予約や確定レポートは、世界の中から読んでも時間移動で変わってはいけない。
+ *      実際の予約や確定版は、世界の中から読んでも時間移動で変わってはいけない。
  *   2. まだ誕生していない世界は「存在しない」。グローバルが現在の世界。
  *      これは**スコープ単位**の判定なので、過去に戻ったときに最新値が現れる心配はない
  *      （誕生していない世界には時間移動もできない）。
@@ -137,7 +138,8 @@ export const AppWorld: FC<{ children: ReactNode }> = ({ children }) => {
   const store = useAppStore();
   const app = useCasScope(APP_SCOPE_ID);
 
-  // 固定メンバーを持たない古い形式の世界線を作り直す。
+  // 固定メンバーを持たない古い形式の世界線を作り直す。旧形式の完成レポートを
+  // 店舗×月で1つの確定版に畳む（#231）。
   //
   // ★ バブルルートは全部トップレベルなので、AppWorld は**バブルを1つ開くたび**に
   //   マウントする。走らせるのはアプリ起動につき1回だけにする。冪等ではあるが、
@@ -148,6 +150,7 @@ export const AppWorld: FC<{ children: ReactNode }> = ({ children }) => {
     if (migratedStores.has(store)) return;
     migratedStores.add(store);
     migrateLegacyScopes(store);
+    migrateLegacyReports(store);
   }, [store]);
   const value = useMemo<WorldValue>(
     () => ({

@@ -5,10 +5,10 @@ import {
   MaxConsecutiveWorkdaysConstraint,
   MaxDayOffPerDayConstraint,
 } from '@bublys-org/hotel-shift-puzzle-model';
-import { buildScheduleReport } from './buildScheduleReport.js';
+import { buildReview } from './buildReview.js';
 import { buildScheduleConstraints } from './scheduleConstraints.js';
 
-describe('buildScheduleReport（シフト確定時のレポート計算）', () => {
+describe('buildReview（確定時の振り返りの計算）', () => {
   const days = Array.from({ length: 6 }, (_, i) => WorkingDay.of(2026, 6, i + 1));
   const [day1, day2, day3, day4, day5, day6] = days;
 
@@ -54,7 +54,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
     });
 
   test('#87 スタッフに紐づくルール違反（連勤・希望など）を譲歩として検出する', () => {
-    const report = buildScheduleReport({
+    const report = buildReview({
       schedule: buildSchedule(),
       staffIds,
       constraints: buildConstraints(),
@@ -78,7 +78,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
 
   test('責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は譲歩に含めない', () => {
     // maxPerDay=0 にすると staff-D の6/2の休みが必ず「休み上限超過」を発生させる（日単位・staffIdなし）
-    const report = buildScheduleReport({
+    const report = buildReview({
       schedule: buildSchedule(),
       staffIds,
       constraints: buildConstraints([new MaxDayOffPerDayConstraint(0)]),
@@ -91,7 +91,7 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
 
   test('#88 必要人数合計が平均を上回る日だけを繁忙日にする', () => {
     // day1 required=1, day2 required=4 → average=2.5 → busy = day2 のみ
-    const report = buildScheduleReport({
+    const report = buildReview({
       schedule: buildSchedule(),
       staffIds,
       constraints: buildConstraints(),
@@ -103,14 +103,14 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
   });
 
   test('#89 譲歩回数×2 + 繁忙日出勤回数×1 のスコアをスタッフ全員分、降順で返す', () => {
-    const report = buildScheduleReport({
+    const report = buildReview({
       schedule: buildSchedule(),
       staffIds,
       constraints: buildConstraints(),
     });
 
     // staff-A: 譲歩2件(連勤+希望)・繁忙日1回(6/2出勤) → 2*2+1=5
-    expect(report.contributionScores).toEqual([
+    expect(report.stars).toEqual([
       { staffId: 'staff-A', compromiseCount: 2, busyDayCount: 1, score: 5 },
       { staffId: 'staff-B', compromiseCount: 0, busyDayCount: 1, score: 1 },
       { staffId: 'staff-C', compromiseCount: 0, busyDayCount: 1, score: 1 },
@@ -125,13 +125,13 @@ describe('buildScheduleReport（シフト確定時のレポート計算）', () 
       year: 2026,
       month: 6,
     });
-    const report = buildScheduleReport({
+    const report = buildReview({
       schedule: empty,
       staffIds: [],
       constraints: buildScheduleConstraints({}),
     });
     expect(report.busyDayContributions).toEqual([]);
     expect(report.compromises).toEqual([]);
-    expect(report.contributionScores).toEqual([]);
+    expect(report.stars).toEqual([]);
   });
 });

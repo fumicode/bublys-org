@@ -45,14 +45,13 @@ export type ConstraintSetState = {
    */
   shiftIntervalRules?: ShiftIntervalRule[];
   /**
-   * 参照レポート：次の勤務表づくりの参考として紐づけた、過去のシフト完成レポート
-   * （ScheduleReport）のID。紐づけられるのは1つだけ。省略時は紐づけ無し。
-   */
-  linkedReportId?: string;
-  /**
-   * 参照レポートの貢献度スコアを、自動シフトで休みを割り当てる順（優先度）に使うか。省略時 false。
-   * 参照レポートは勤務表を作るときに自動で紐づくので、スコアまで黙って効かないよう既定はオフ。
-   * これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は参照している限り常に効く。
+   * 前月の確定版から引き継いだ★を、自動シフトで休みを割り当てる順（優先度）に使うか。
+   * 省略時 false。引き継ぎは勤務表を作るときに自動で起きるので、★まで黙って効かないよう
+   * 既定はオフ。これが切り替えるのは優先度だけで、前月とのつなぎ（連勤・遅番明け）は
+   * 引き継いでいる限り常に効く。
+   *
+   * ドメインでは useStarPriority と呼ぶが、キーは旧名のまま変えない（勤務表の世界線に載る
+   * 保存形なので、名前を変えると同じ中身でもハッシュが変わり、元の世界へ戻れなくなる）。
    */
   useReportPriority?: boolean;
 };
@@ -65,9 +64,11 @@ export type ConstraintSetPlain = Omit<
   leaderRules: ShiftLeaderRuleState[];
   shiftIntervalRules?: ShiftIntervalRuleState[];
   /**
-   * 旧形式：参照レポートを複数紐づけられた頃の配列。読むときだけ受け付け、
-   * 最後に紐づけたもの（末尾）を linkedReportId として引き継ぐ。書くことはない。
+   * 旧形式：参照レポート（紐づけた振り返りの ID）。読むときだけ受け付けて捨てる。
+   * 前月の確定版は勤務表の店舗と年月から決まるので、紐づけを持たなくなった（#231）。
    */
+  linkedReportId?: string;
+  /** 旧形式：参照レポートを複数紐づけられた頃の配列。読むときだけ受け付けて捨てる */
   linkedReportIds?: string[];
 };
 
@@ -116,8 +117,8 @@ export class ConstraintSet {
     return this.state.maxConsecutiveWorkdays ?? DEFAULT_MAX_CONSECUTIVE_WORKDAYS;
   }
 
-  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うか。既定 false。 */
-  get useReportPriority(): boolean {
+  /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うか。既定 false。 */
+  get useStarPriority(): boolean {
     return this.state.useReportPriority ?? false;
   }
 
@@ -166,11 +167,6 @@ export class ConstraintSet {
     );
   }
 
-  /** 参照レポート（紐づけた過去のシフト完成レポート）のID。紐づけ無しなら undefined。 */
-  get linkedReportId(): string | undefined {
-    return this.state.linkedReportId;
-  }
-
   // ========== 上限・スイッチの変更 ==========
 
   /** 連勤上限を変えた新しいセットを返す（1 以上に丸める）。変わらなければ自分自身。不変。 */
@@ -200,9 +196,9 @@ export class ConstraintSet {
     return new ConstraintSet({ ...this.state, checkAllowedShift: check });
   }
 
-  /** 参照レポートの貢献度スコアを自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
-  withUseReportPriority(use: boolean): ConstraintSet {
-    if (use === this.useReportPriority) return this;
+  /** 前月の確定版から引き継いだ★を自動シフトの優先度に使うかを変えた新しいセットを返す。不変。 */
+  withUseStarPriority(use: boolean): ConstraintSet {
+    if (use === this.useStarPriority) return this;
     return new ConstraintSet({ ...this.state, useReportPriority: use });
   }
 
@@ -214,25 +210,6 @@ export class ConstraintSet {
     const next = Math.max(1, Math.floor(value));
     if (next === current) return this;
     return new ConstraintSet({ ...this.state, [field]: next });
-  }
-
-  /**
-   * 参照レポートを紐づける。紐づけられるのは1つなので、別のレポートが紐づいていれば
-   * 置き換わる。同じレポートなら自分自身を返す。不変。
-   */
-  linkReport(reportId: string): ConstraintSet {
-    if (this.linkedReportId === reportId) return this;
-    return new ConstraintSet({ ...this.state, linkedReportId: reportId });
-  }
-
-  /**
-   * 参照レポートの紐づけを外す。外すのは **そのレポートが紐づいているときだけ**
-   * （レポートを消したときに、それを指している勤務表だけから外せるように）。
-   * 紐づいていなければ自分自身を返す。不変。
-   */
-  unlinkReport(reportId: string): ConstraintSet {
-    if (this.linkedReportId !== reportId) return this;
-    return new ConstraintSet({ ...this.state, linkedReportId: undefined });
   }
 
   /**
@@ -355,11 +332,11 @@ export class ConstraintSet {
   }
 
   static fromPlain(plain: ConstraintSetPlain): ConstraintSet {
-    const { linkedReportIds: legacyIds, ...rest } = plain;
-    const linkedReportId = rest.linkedReportId ?? legacyIds?.[legacyIds.length - 1];
+    // 旧形式の紐づけは捨てる（世界線の過去のノードには残っている）
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { linkedReportId, linkedReportIds, ...rest } = plain;
     return new ConstraintSet({
       ...rest,
-      ...(linkedReportId !== undefined ? { linkedReportId } : {}),
       leaderRules: plain.leaderRules.map((r) => new ShiftLeaderRule(r)),
       shiftIntervalRules: plain.shiftIntervalRules?.map(
         (r) => new ShiftIntervalRule(r)

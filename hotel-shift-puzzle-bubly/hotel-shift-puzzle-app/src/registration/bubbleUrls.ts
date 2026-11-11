@@ -15,7 +15,6 @@ import { registerObjectUrl } from "@bublys-org/bubbles-ui";
 import {
   STAFF_TYPE,
   SCHEDULE_TYPE,
-  SCHEDULE_REPORT_TYPE,
 } from "@bublys-org/hotel-shift-puzzle-libs";
 
 /** スタッフ詳細バブル */
@@ -24,7 +23,7 @@ export const staffUrl = (staffId: string): string =>
 
 /**
  * 勤務表から開いたスタッフ詳細バブル。どの勤務表から開いたかを URL で持つので、
- * 詳細にその勤務表の参照レポートでの評価が出る（スタッフ一覧から開く staffUrl には出ない）。
+ * 詳細にその勤務表の前月の振り返りが出る（スタッフ一覧から開く staffUrl には出ない）。
  * 最後の区切りが staffId なので、ここからドラッグしてもスタッフとして落とせる。
  */
 export const scheduleStaffDetailUrl = (scheduleId: string, staffId: string): string =>
@@ -109,13 +108,6 @@ export const scheduleViolationUrl = (
   violationKey: string
 ): string => `hotel-shift-puzzle/schedules/${scheduleId}/violations/${violationKey}`;
 
-/** シフト完成レポートバブル（勤務表の「完成レポートを作成」から開く） */
-export const scheduleReportUrl = (reportId: string): string =>
-  `hotel-shift-puzzle/schedule-reports/${reportId}`;
-
-/** シフト完成レポート一覧バブル（次回シフト作成前の参照用。勤務表一覧から開く） */
-export const scheduleReportListUrl = (): string => `hotel-shift-puzzle/schedule-reports`;
-
 /**
  * 勤務表ファイルバブル（ローカルファイルへの保存・読み込み）。
  * 特定の勤務表ではなく世界全体を扱うので、勤務表の下ではなくトップレベルに置く。
@@ -141,4 +133,3 @@ export const modelClassDiagramUrl = (): string => `hotel-shift-puzzle/model-clas
 // import されるため、ルート登録と同じタイミングで一度だけ走る。
 registerObjectUrl(STAFF_TYPE, staffUrl);
 registerObjectUrl(SCHEDULE_TYPE, scheduleUrl);
-registerObjectUrl(SCHEDULE_REPORT_TYPE, scheduleReportUrl);
