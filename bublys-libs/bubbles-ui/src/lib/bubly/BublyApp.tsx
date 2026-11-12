@@ -418,7 +418,11 @@ export const BublyApp: FC<BublyAppProps> = ({
         {sea ?? (
           <BubblesContext.Provider value={bubblesContextValue}>
             <BubbleRefsProvider>
-              <Box sx={{ width: '100%', height: '100%' }}>
+              {/* 小さい画面では海を動かさない（印を付け、BubblesLayeredView の海が見る）。
+                  手前のバブルが画面を使い切るので、海を動かす理由が無い。動くと、表に出ている
+                  バブルが見えている範囲からずれ、画面いっぱいに広げ直すたびに跳ねる
+                  （スマホで表をなぞると、表の端でスクロールが海まで伝わって起きていた） */}
+              <Box sx={{ width: '100%', height: '100%' }} data-small-screen={small || undefined}>
                 <BubblesLayeredView
                   bubbleLayers={bubbleLayers}
                   vanishingPoint={globalCoordinateSystem.vanishingPoint}

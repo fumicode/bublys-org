@@ -846,6 +846,14 @@ const StyledViewport = styled.div<DivPropsWithRef & { $nested?: boolean }>`
       pointer-events: none;
       body.${DRAGGING_CLASS} & { pointer-events: auto; }
     `}
+  /* 小さい画面では、一番外側の海は動かさない（BublyApp が印を付ける）。手前のバブルが
+     画面を使い切るので、海が動くとバブルが見えている範囲からずれ、広げ直すたびに跳ねる。
+     バブルの中の宇宙（nested）は窓として今までどおりスクロールする */
+  ${({ $nested }) =>
+    !$nested &&
+    `
+      [data-small-screen] & { overflow: hidden; }
+    `}
 `;
 
 const StyledUniverse = styled.div.attrs({ 'data-bubble-universe': '' })<
