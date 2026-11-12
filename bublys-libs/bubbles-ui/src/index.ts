@@ -12,6 +12,7 @@ export * from './lib/utils/url-props.js';
 export * from './lib/utils/url-parser.js';
 export * from './lib/utils/drag-types.js';
 export * from './lib/utils/ime.js';
+export * from './lib/utils/new-id.js';
 export * from './lib/components/UrledPlace.js';
 export * from './lib/components/EditableText.js';
 export * from './lib/context/FocusedObjectContext.js';

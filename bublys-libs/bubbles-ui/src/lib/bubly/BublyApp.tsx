@@ -18,6 +18,7 @@ import { BubblesContext, type OpenBubbleOptions } from '../bubble-routing/Bubble
 import { BubbleRefsProvider } from '../context/BubbleRefsContext.js';
 import { measureViewport } from '../utils/measure-viewport.js';
 import { measureOpenRegion } from '../utils/open-region.js';
+import { newId } from '../utils/new-id.js';
 import { isNarrowScreen, isSmallScreen, surfaceLeftTopFor } from '../utils/narrow-screen.js';
 import {
   selectBubbleLayers,
@@ -266,7 +267,7 @@ export const BublyApp: FC<BublyAppProps> = ({
 
   const handlePocketDrop = useCallback((url: string, type: DragDataType, label?: string, objectId?: string) => {
     dispatch(addPocketItem({
-      id: crypto.randomUUID(),
+      id: newId(),
       url,
       type,
       objectId,
