@@ -1079,7 +1079,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         </div>
       )}
 
-      {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
+      {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く）。
+          表が長くても開いた瞬間に見えるよう、バブルの下端に貼り付ける（.e-footer の sticky） */}
       {(worldLineUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
@@ -1350,12 +1351,23 @@ const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・完成レポート */
+  /* 左下：世界線ビュー・キセキの木・完成レポート。
+     バブルの中身がスクロールしても、バブルの下端に貼り付いて見えている
+     （以前は表の下にあり、開いた直後はバブルの中を下までスクロールしないと見えなかった） */
   .e-footer {
+    position: sticky;
+    /* バブルの中身には下に 16px の余白（bubbles-ui の .e-bubble-content の padding）がある。
+       sticky は余白の内側に貼り付くので、そのぶん下げて中身の下端に付け、下の行が覗かないようにする */
+    bottom: -16px;
+    z-index: 10;
     margin-top: 8px;
+    padding: 6px 0 22px;
     display: flex;
     align-items: center;
     gap: 8px;
+    /* 下に重なった表の行が透けないよう、不透明にする */
+    background: #fff;
+    box-shadow: 0 -6px 8px -6px rgba(0, 0, 0, 0.15);
   }
 
   /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */
