@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, HTMLAttributes, ReactNode, Ref, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import {
   ObjectView,
@@ -8,6 +8,8 @@ import {
   getDragType,
   extractIdFromUrl,
   useKeyBindings,
+  BubblesContext,
+  isSmallScreen,
 } from "@bublys-org/bubbles-ui";
 import GroupWorkOutlinedIcon from "@mui/icons-material/GroupWorkOutlined";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
@@ -32,6 +34,7 @@ import {
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
+import { useIsNarrow } from "../ui/useIsNarrow.js";
 import type { CellChange, CellSelection } from "../ui/schedule-grid/types.js";
 import {
   ScheduleConstraintsBar,
@@ -195,6 +198,17 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   useKeyBindings(scheduleUndoBindings(scope));
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+
+  // ★ 狭い表示（スマホなど）では表が主役。
+  //   - 表の上の段（シフト希望・参照レポート・制約・シフトコマンド）は1行に畳み、押したときだけ
+  //     開く。畳むのは、このバブルの幅が狭いとき**か、画面が小さいとき**（横持ちは幅があっても
+  //     高さが無く、上の段だけで画面が埋まる）
+  //   - 表のスタッフ列を細くする（compact）のは、このバブルの幅が狭いときだけ（useIsNarrow）
+  const { ref: containerRef, narrow } = useIsNarrow<HTMLDivElement>();
+  const { pageSize } = useContext(BubblesContext);
+  const foldPanels = narrow || (!!pageSize && isSmallScreen(pageSize));
+  const [panelsOpen, setPanelsOpen] = useState(false);
+  const showPanels = !foldPanels || panelsOpen;
   // キーボードのカーソル（スタッフ行のセル or 必要人数のセル。カーソルは1つ）
   const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
   // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
@@ -891,14 +905,27 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   );
 
   return (
-    <StyledContainer>
+    <StyledContainer ref={containerRef} className={foldPanels ? "is-narrow" : undefined}>
       <div className="e-header">
         <h3>
           {schedule.year}年{schedule.month}月の勤務表{" "}
           <span className="e-sub">{schedule.storeId}</span>
         </h3>
 
+        {foldPanels && (
+          <button
+            type="button"
+            className="e-panels-toggle"
+            aria-expanded={panelsOpen}
+            title="シフト希望・参照レポート・制約・シフトコマンド"
+            onClick={() => setPanelsOpen((open) => !open)}
+          >
+            {panelsOpen ? "▴ 閉じる" : "▾ 制約・コマンド"}
+          </button>
+        )}
+
         {/* 見出し行には、スタッフ列の見え方ではなく勤務表（この月）そのものに紐づくものを置く */}
+        {showPanels && (
         <div className="e-actions e-actions-left">
           {/* この月のシフト希望（回収状況）。押す前から在るものなのでダブルクリックで開く。 */}
           {shiftWishesUrl && (
@@ -928,10 +955,12 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
             busy={linkingReference}
           />
         </div>
+        )}
       </div>
 
       {/* 左: 適用中の制約を動的アイコンで描く（稼働日ごと↕ / 人ごと↔ / 全体）
           右: それを満たすためのシフトコマンド（制約を見ながら打てるように隣へ置く） */}
+      {showPanels && (
       <div className="e-rules-strip">
         <ScheduleConstraintsBar
           constraintSet={barConstraintSet}
@@ -957,10 +986,13 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           onCloseMessage={() => setAutoMessage(null)}
         />
       </div>
+      )}
 
       {/* グリッド領域 */}
       <div className="e-grid-area">
         <ScheduleGridView
+          compact={narrow}
+          reservationFolded={foldPanels}
           schedule={schedule}
           staffList={filteredStaffList}
           workShifts={workShifts}
@@ -1047,7 +1079,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         </div>
       )}
 
-      {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
+      {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く）。
+          表が長くても開いた瞬間に見えるよう、バブルの下端に貼り付ける（.e-footer の sticky） */}
       {(worldLineUrl || treeUrl || pendingReportUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
@@ -1085,7 +1118,25 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   );
 };
 
-const StyledContainer = styled.div`
+const StyledContainer = styled.div<HTMLAttributes<HTMLDivElement> & { ref?: Ref<HTMLDivElement> }>`
+  /* 狭い表示で、表の上の段を開け閉めするボタン */
+  .e-panels-toggle {
+    margin-left: auto;
+    border: 1px solid #cfd8dc;
+    border-radius: 999px;
+    background: #fff;
+    color: #455a64;
+    font-size: 0.8em;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  &.is-narrow .e-header {
+    gap: 8px;
+    h3 {
+      font-size: 1em;
+    }
+  }
+
   .e-header {
     display: flex;
     align-items: center;
@@ -1300,12 +1351,23 @@ const StyledContainer = styled.div`
   }
 
 
-  /* 左下：世界線ビュー・キセキの木・完成レポート */
+  /* 左下：世界線ビュー・キセキの木・完成レポート。
+     バブルの中身がスクロールしても、バブルの下端に貼り付いて見えている
+     （以前は表の下にあり、開いた直後はバブルの中を下までスクロールしないと見えなかった） */
   .e-footer {
+    position: sticky;
+    /* バブルの中身には下に 16px の余白（bubbles-ui の .e-bubble-content の padding）がある。
+       sticky は余白の内側に貼り付くので、そのぶん下げて中身の下端に付け、下の行が覗かないようにする */
+    bottom: -16px;
+    z-index: 10;
     margin-top: 8px;
+    padding: 6px 0 22px;
     display: flex;
     align-items: center;
     gap: 8px;
+    /* 下に重なった表の行が透けないよう、不透明にする */
+    background: #fff;
+    box-shadow: 0 -6px 8px -6px rgba(0, 0, 0, 0.15);
   }
 
   /* 完成レポートを作成(勤務表を確定してレポート＋キセキの木を開く) */

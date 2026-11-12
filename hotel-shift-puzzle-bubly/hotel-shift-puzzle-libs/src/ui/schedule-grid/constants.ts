@@ -12,6 +12,8 @@ export const SHIFT_FG: Record<string, string> = {
 
 // グリッドの列幅
 export const STAFF_COL_WIDTH = 168;
+/** 狭い表示（スマホなど）のスタッフ列。名前だけを出して、日の列に幅を回す */
+export const STAFF_COL_WIDTH_COMPACT = 88;
 export const DAY_COL_WIDTH = 40;
 /** 前月の末尾の列（読み取り専用・参考なので今月の列より細く） */
 export const PREV_COL_WIDTH = 28;

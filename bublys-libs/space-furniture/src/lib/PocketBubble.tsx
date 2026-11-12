@@ -15,7 +15,7 @@
  */
 import { DragEvent as ReactDragEvent, FC, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BubblesContext, PocketView, hasDragPayload, parseDragPayload, useBubbleBox } from "@bublys-org/bubbles-ui";
+import { BubblesContext, PocketView, hasDragPayload, newId, parseDragPayload, useBubbleBox } from "@bublys-org/bubbles-ui";
 import type { Bubble, DragDataType } from "@bublys-org/bubbles-ui";
 import {
   addPocketItem,
@@ -61,7 +61,7 @@ export const PocketBubble: FC<{ bubble: Bubble }> = ({ bubble }) => {
   /** 仕舞う（受け入れるかどうかは型で決まる） */
   const take = useCallback(
     (url: string, type: DragDataType, label?: string, objectId?: string) => {
-      dispatch(addPocketItem({ id: crypto.randomUUID(), url, type, objectId, label, addedAt: Date.now() }));
+      dispatch(addPocketItem({ id: newId(), url, type, objectId, label, addedAt: Date.now() }));
     },
     [dispatch],
   );
