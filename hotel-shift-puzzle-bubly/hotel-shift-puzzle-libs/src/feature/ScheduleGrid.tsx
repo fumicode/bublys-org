@@ -703,16 +703,16 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         });
         s = leaderFill.schedule;
 
+        const dayOffStep = makeMinDayOffStep(minDayOff, { maxPerDay, phase });
+        s = runAutoShiftStep(dayOffStep, {
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 2, dayOffStep.label),
+        }).schedule;
+
         const resolveStep = makeResolveAmbiguousLeaderSlotsStep(
           leaderFill.ambiguousLeaderSlots ?? [], { phase }
         );
         s = runAutoShiftStep(resolveStep, {
-          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 2, resolveStep.label),
-        }).schedule;
-
-        const dayOffStep = makeMinDayOffStep(minDayOff, { maxPerDay, phase });
-        s = runAutoShiftStep(dayOffStep, {
-          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 3, dayOffStep.label),
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 3, resolveStep.label),
         }).schedule;
 
         return `案${phase + 1}`;

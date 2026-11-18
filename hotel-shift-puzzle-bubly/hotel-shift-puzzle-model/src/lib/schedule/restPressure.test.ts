@@ -21,20 +21,24 @@ describe('restPressureOf（その日を出勤にしたら、休みの形がど�
     expect(p.overRun).toBe(0);
   });
 
-  test('続けてよい日数を超えるなら overRun（連休型は目標の日数で）', () => {
+  test('続けてよい日数を超えるなら overRun（連休型も全体の連勤上限で判定）', () => {
     let s = empty();
     for (let d = 1; d <= 4; d++) s = s.assignShift('A', day(d), 'early');
+    // 4連勤 + 5日目 = 5連勤。上限5なので超えない
     expect(restPressureOf(s, ctx(), 'A', day(5)).overRun).toBe(0);
-    expect(restPressureOf(s, ctx({ style: DayOffStyle.clustered(4) }), 'A', day(5)).overRun).toBe(1);
+    expect(restPressureOf(s, ctx({ style: DayOffStyle.clustered() }), 'A', day(5)).overRun).toBe(0);
+    // 5連勤 + 6日目 = 6連勤。上限5を超える
+    s = s.assignShift('A', day(5), 'early');
+    expect(restPressureOf(s, ctx({ style: DayOffStyle.clustered() }), 'A', day(6)).overRun).toBe(1);
   });
 
   test('連休型の、単発の休みの隣は pairSlot（分散型には無い）', () => {
     const s = empty().assignDayOff('A', day(4));
-    expect(restPressureOf(s, ctx({ style: DayOffStyle.clustered(5) }), 'A', day(5)).pairSlot).toBe(1);
+    expect(restPressureOf(s, ctx({ style: DayOffStyle.clustered() }), 'A', day(5)).pairSlot).toBe(1);
     expect(restPressureOf(s, ctx(), 'A', day(5)).pairSlot).toBe(0);
     // 既に連休なら相方は要らない
     const paired = s.assignDayOff('A', day(3));
-    expect(restPressureOf(paired, ctx({ style: DayOffStyle.clustered(5) }), 'A', day(5)).pairSlot).toBe(0);
+    expect(restPressureOf(paired, ctx({ style: DayOffStyle.clustered() }), 'A', day(5)).pairSlot).toBe(0);
   });
 
   test('出勤にすると最低休日数を置く日が足りなくなるなら budget', () => {

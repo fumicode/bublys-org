@@ -21,11 +21,7 @@ describe("DayOffStyleIcon", () => {
     expect(b - a).toBeGreaterThan(1);
   });
 
-  it("何連までが決まっていれば数を添え、無ければ添えない", () => {
-    expect(
-      render(<DayOffStyleIcon dayOffStyle={DayOffStyle.clustered(4)} />).container.querySelector("text")
-        ?.textContent
-    ).toBe("4");
+  it("連休型でも数は添えない（maxRun 廃止）", () => {
     expect(
       render(<DayOffStyleIcon dayOffStyle={DayOffStyle.clustered()} />).container.querySelector("text")
     ).toBeNull();
