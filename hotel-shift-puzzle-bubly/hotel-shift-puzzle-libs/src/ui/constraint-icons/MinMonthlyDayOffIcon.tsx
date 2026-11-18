@@ -5,17 +5,19 @@
  * 横の“1人の1か月”ストリップに、最低必要な休み（緑）を N 個ぶん塗り、≥N を示す。
  */
 import { FC } from "react";
-import { ICON_SIZE } from "./common.js";
+import { ICON_SIZE, IconValueText } from "./common.js";
 
 type Props = {
   min: number;
   /** 1辺のサイズ（px）。バーは既定の80、バブルの図は大きく描く */
   size?: number;
+  /** 渡されたときだけ、図の中の数を押して変えられる（バブルの大きい図） */
+  onCommit?: (value: number) => void;
 };
 
 const CELLS = 10;
 
-export const MinMonthlyDayOffIcon: FC<Props> = ({ min, size = ICON_SIZE }) => {
+export const MinMonthlyDayOffIcon: FC<Props> = ({ min, size = ICON_SIZE, onCommit }) => {
   const off = Math.min(Math.max(0, min), CELLS);
   const w = 6;
   const gap = 1;
@@ -41,9 +43,7 @@ export const MinMonthlyDayOffIcon: FC<Props> = ({ min, size = ICON_SIZE }) => {
         );
       })}
       {/* 値 */}
-      <text x={40} y={62} fontSize={14} fontWeight={700} fill="#2e7d32" textAnchor="middle">
-        ≥{min}
-      </text>
+      <IconValueText x={40} y={62} fill="#2e7d32" prefix="≥" value={min} onCommit={onCommit} />
     </svg>
   );
 };
