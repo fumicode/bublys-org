@@ -300,6 +300,7 @@ export function placeMinDayOffs(
       const idx = nextDay(need - placed);
       if (idx === null) break; // どの区間にも休める日が無い → これ以上置けない
       result = result.assignDayOff(staffId, days[idx]);
+      ctx.onPlace?.(result);
       assigned++;
       placed++;
     }

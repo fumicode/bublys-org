@@ -75,6 +75,7 @@ export function makeResolveAmbiguousLeaderSlotsStep(
             compareRestPressure(pressure.get(a)!, pressure.get(b)!)
           );
           result = result.assignShift(id, slot.day, slot.shiftId);
+          ctx.onPlace?.(result);
           assigned++;
           need--;
         }

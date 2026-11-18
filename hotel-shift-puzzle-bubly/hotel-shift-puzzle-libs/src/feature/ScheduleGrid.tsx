@@ -46,7 +46,7 @@ import {
   useObjectRepo,
   useIsAbsent,
 } from "../objects/repository.js";
-import { commitCandidates, localScopeId } from "../objects/commit.js";
+import { runCandidateBranches, growScope, localScopeId } from "../objects/commit.js";
 import {
   autoShiftLimitsOf,
   dayOffStyleResolver,
@@ -655,59 +655,68 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
   const handleGenerateCandidates = () => {
     if (!scheduleId) return;
-    // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subsetStaff,
       priorityReport
     );
-    const runOn = (sched: MonthlyStaffSchedule, step: AutoShiftStep) =>
-      runAutoShiftStep(step, {
-        schedule: sched,
-        staffList: prioritizedStaff,
-        workShifts,
-        wishByStaff,
-        staffGroup,
-        // handleRunStep と同じく制約リストと休みの目標を丸ごと渡す。渡さないと、
-        // 完成案が勤務表の制約（連勤・遅番明け…）に違反する
-        constraints: allConstraints,
-        ...limits,
-      }).schedule;
-    const buildCandidate = (phase: number): MonthlyStaffSchedule => {
-      let s = schedule;
-      s = runOn(s, fulfillWishesStep);
+    const scopeId = localScopeId(SCHEDULE_TYPE, scheduleId);
+    const STEP_COUNT = 4;
 
-      // ambiguousLeaderSlots が要るので runOn（.scheduleだけ取り出す）は使わず直接呼ぶ
-      const leaderFill = runAutoShiftStep(
-        makeSatisfyLeaderRulesStep(relevantRules, leaderRules),
-        {
-          schedule: s,
-          staffList: prioritizedStaff,
-          workShifts,
-          wishByStaff,
-          staffGroup,
-          constraints: allConstraints,
-          ...limits,
-        }
-      );
-      s = leaderFill.schedule;
-
-      s = runOn(
-        s,
-        makeResolveAmbiguousLeaderSlotsStep(leaderFill.ambiguousLeaderSlots ?? [], { phase })
-      );
-      s = runOn(s, makeMinDayOffStep(minDayOff, { maxPerDay, phase }));
-      return s;
+    const makeOnPlace = (commandGroupId: string, stepIndex: number, stepLabel: string) => {
+      let first = true;
+      return (sched: MonthlyStaffSchedule) => {
+        growScope(store, scopeId, { save: [{ type: SCHEDULE_TYPE, obj: sched }] }, {
+          commandGroupId,
+          commandStepIndex: stepIndex,
+          commandStepCount: STEP_COUNT,
+          ...(first ? { intentLabel: stepLabel } : {}),
+        });
+        first = false;
+      };
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
-      obj: buildCandidate(i),
-      label: `案${i + 1}`,
-    }));
-    commitCandidates(
+
+    const commonParams = {
+      staffList: prioritizedStaff,
+      workShifts,
+      wishByStaff,
+      staffGroup,
+      constraints: allConstraints,
+      ...limits,
+    };
+
+    runCandidateBranches(
       store,
-      localScopeId(SCHEDULE_TYPE, scheduleId),
+      scopeId,
       SCHEDULE_TYPE,
       schedule,
-      candidates
+      DAY_OFF_CANDIDATE_COUNT,
+      (phase, commandGroupId) => {
+        let s = schedule;
+
+        s = runAutoShiftStep(fulfillWishesStep, {
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 0, fulfillWishesStep.label),
+        }).schedule;
+
+        const satisfyStep = makeSatisfyLeaderRulesStep(relevantRules, leaderRules);
+        const leaderFill = runAutoShiftStep(satisfyStep, {
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 1, satisfyStep.label),
+        });
+        s = leaderFill.schedule;
+
+        const resolveStep = makeResolveAmbiguousLeaderSlotsStep(
+          leaderFill.ambiguousLeaderSlots ?? [], { phase }
+        );
+        s = runAutoShiftStep(resolveStep, {
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 2, resolveStep.label),
+        }).schedule;
+
+        const dayOffStep = makeMinDayOffStep(minDayOff, { maxPerDay, phase });
+        s = runAutoShiftStep(dayOffStep, {
+          ...commonParams, schedule: s, onPlace: makeOnPlace(commandGroupId, 3, dayOffStep.label),
+        }).schedule;
+
+        return `案${phase + 1}`;
+      }
     );
     // 完成案は「月◯日休む」まで入れるので、並び順が休みの優先に効いている
     setAutoMessage(

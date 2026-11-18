@@ -43,6 +43,7 @@ export const fulfillWishesStep: AutoShiftStep = {
             continue;
           }
           result = result.assignDayOff(staffId, day);
+          ctx.onPlace?.(result);
           assigned++;
         } else if (pref.kind === "work") {
           // この勤務表が使う帯でなければ人間へ（希望の読み違いであって、制約の話ではない）
@@ -55,6 +56,7 @@ export const fulfillWishesStep: AutoShiftStep = {
             continue;
           }
           result = result.assignShift(staffId, day, pref.shiftId);
+          ctx.onPlace?.(result);
           assigned++;
         }
         // neutral / ambiguous は触らない

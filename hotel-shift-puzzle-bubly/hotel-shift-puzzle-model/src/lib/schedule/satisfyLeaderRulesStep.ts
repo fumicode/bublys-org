@@ -111,6 +111,7 @@ export function makeSatisfyLeaderRulesStep(
                 // 直前に置いた人のせいで置けなくなることがある（日単位の制約など）ので置く直前にも見る
                 if (!canPlace(ctx, result, id, day, { kind: "work", shiftId: coverShiftId })) continue;
                 result = result.assignShift(id, day, coverShiftId);
+                ctx.onPlace?.(result);
                 assigned++;
               }
               continue;

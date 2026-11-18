@@ -15,6 +15,8 @@ import {
   APP_SCOPE_ID,
   commitToScope,
   commitCandidates,
+  runCandidateBranches,
+  growScope,
   ensureWorldBorn,
   isAbsentInScope,
   refInScope,
@@ -486,5 +488,162 @@ describe("ensureWorldBorn — 世界の誕生", () => {
     ]);
 
     expect(typesAtRoot(store, LOCAL)).toContain(PERSON);
+  });
+});
+
+describe("runCandidateBranches — onPlace 経由の1手ずつの世界線記録", () => {
+  const graphOf = (store: ReturnType<typeof fakeStore>, scopeId: string) =>
+    WorldLineGraph.fromJSON(store.getState().worldLineGraph.graphs[scopeId]);
+
+  it("コールバック内の growScope が個別のノードを作る", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    runCandidateBranches(store, LOCAL, NOTE, base, 1, (phase, commandGroupId) => {
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "1手目" }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 2, intentLabel: "希望を叶える",
+      });
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "2手目" }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 2, intentLabel: "希望を叶える",
+      });
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "完成" }) }] }, {
+        commandGroupId, commandStepIndex: 1, commandStepCount: 2, intentLabel: "休みを配置",
+      });
+      return "案1";
+    });
+
+    // 起点 + 3手 = 4ノード
+    const graph = store.getState().worldLineGraph.graphs[LOCAL];
+    expect(Object.keys(graph.nodes)).toHaveLength(4);
+  });
+
+  it("commandGroupId がノードに付く", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    const capturedGroupIds: string[] = [];
+    runCandidateBranches(store, LOCAL, NOTE, base, 1, (_phase, commandGroupId) => {
+      capturedGroupIds.push(commandGroupId);
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "s1" }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 2,
+      });
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "s2" }) }] }, {
+        commandGroupId, commandStepIndex: 1, commandStepCount: 2,
+      });
+      return "案1";
+    });
+
+    const graph = store.getState().worldLineGraph.graphs[LOCAL];
+    const nodes = Object.values(graph.nodes).filter((n: { commandGroupId?: string }) => n.commandGroupId);
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0].commandGroupId).toBe(capturedGroupIds[0]);
+    expect(nodes[0].commandGroupId).toBe(nodes[1].commandGroupId);
+  });
+
+  it("複数案が兄弟ブランチになる", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    runCandidateBranches(store, LOCAL, NOTE, base, 2, (phase, commandGroupId) => {
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: `${phase}a` }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 1,
+      });
+      return `案${phase + 1}`;
+    });
+
+    const graph = graphOf(store, LOCAL);
+    const root = graph.state.rootNodeId!;
+    // ルートから2つの子が分岐
+    const children = Object.values(graph.state.nodes).filter(
+      (n) => n.parentId === root
+    );
+    expect(children).toHaveLength(2);
+    expect(children[0].worldLineId).not.toBe(children[1].worldLineId);
+  });
+
+  it("最終ノードにラベルが付く", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    runCandidateBranches(store, LOCAL, NOTE, base, 1, (_phase, commandGroupId) => {
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "完成" }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 1,
+      });
+      return "案1";
+    });
+
+    const graph = store.getState().worldLineGraph.graphs[LOCAL];
+    const labeledNodes = Object.values(graph.nodes).filter(
+      (n: { label?: string }) => n.label === "案1"
+    );
+    expect(labeledNodes).toHaveLength(1);
+  });
+
+  it("案1の最終ノードに着地する", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    const apexAfterCandidate: string[] = [];
+    runCandidateBranches(store, LOCAL, NOTE, base, 2, (phase, commandGroupId) => {
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: `${phase}a` }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 2,
+      });
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: `${phase}b` }) }] }, {
+        commandGroupId, commandStepIndex: 1, commandStepCount: 2,
+      });
+      const apex = graphOf(store, LOCAL).state.apexNodeId!;
+      apexAfterCandidate.push(apex);
+      return `案${phase + 1}`;
+    });
+
+    const graph = store.getState().worldLineGraph.graphs[LOCAL];
+    // 案1の最終ノードに着地（案2ではない）
+    expect(graph.apexNodeId).toBe(apexAfterCandidate[0]);
+  });
+
+  it("各案は異なる commandGroupId を受け取る", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    const groupIds: string[] = [];
+    runCandidateBranches(store, LOCAL, NOTE, base, 2, (phase, commandGroupId) => {
+      groupIds.push(commandGroupId);
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: `${phase}` }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 1,
+      });
+      return `案${phase + 1}`;
+    });
+
+    expect(groupIds[0]).toBeDefined();
+    expect(groupIds[1]).toBeDefined();
+    expect(groupIds[0]).not.toBe(groupIds[1]);
+  });
+
+  it("同じ状態の配置はスナップで共有される（案1と案2の共通ステップ）", () => {
+    const store = fakeStore();
+    const base = new Note({ id: "n1", text: "元" });
+    commitToScope(store, APP_SCOPE_ID, NOTE, base);
+
+    runCandidateBranches(store, LOCAL, NOTE, base, 2, (phase, commandGroupId) => {
+      // 両案とも同じ1手目
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: "共通" }) }] }, {
+        commandGroupId, commandStepIndex: 0, commandStepCount: 2, intentLabel: "希望を叶える",
+      });
+      // 2手目で分岐
+      growScope(store, LOCAL, { save: [{ type: NOTE, obj: new Note({ id: "n1", text: `分岐${phase}` }) }] }, {
+        commandGroupId, commandStepIndex: 1, commandStepCount: 2, intentLabel: "休みを配置",
+      });
+      return `案${phase + 1}`;
+    });
+
+    const graph = graphOf(store, LOCAL);
+    // 起点 + 共通1手 + 分岐2手 = 4ノード（共通の1手目はスナップで1ノードに統合される）
+    expect(Object.keys(graph.state.nodes)).toHaveLength(4);
   });
 });
