@@ -133,6 +133,8 @@ export const StyledWrap = styled.div`
     }
   }
   .e-prev-cell {
+    /* 連勤・連休の線（.e-run-bar）をセルの下端に置くため */
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -300,6 +302,11 @@ export const StyledWrap = styled.div`
     color: #c62828;
     background: #ffebee;
     font-weight: bold;
+  }
+  /* 休みの目標日数に届いた。残りの未定は出勤とみなす（連勤の線もそう数える） */
+  .e-off-total.is-secured {
+    color: #2e7d32;
+    background: #e8f5e9;
   }
   /* 最低休日数未満は違反。ダブルクリックで違反バブルを開ける */
   .e-off-total.is-clickable {

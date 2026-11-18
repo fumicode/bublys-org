@@ -108,6 +108,7 @@
     "activity-bubly/*",
     "itinerary-bubly/*",
     "note-bubly/*",
-    "lodging-bubly/*"
+    "lodging-bubly/*",
+    "henge-bubly/*"
   ]
 }
