@@ -16,6 +16,7 @@ import type {
 import { MIN_MONTHLY_DAY_OFF_CONSTRAINT } from "../../domain/index.js";
 import { SHIFT_WISH_MISMATCH } from "../shiftWishOptions.js";
 import { ScheduleDataCell } from "./ScheduleDataCell.js";
+import type { CellOutlookMark } from "./CellFace.js";
 import { PrecedingStaffCells } from "./PrecedingCells.js";
 import { violationMarksOf } from "./violationMarkPlacement.js";
 import { isDayOffSecured, runMarksOf } from "./runMarkPlacement.js";
@@ -89,6 +90,8 @@ type StaffScheduleRowProps = {
   forcedCellOf?: (staffId: string, day: WorkingDay) => ShiftCell | undefined;
   /** そのセルが詰み（候補が1つも無い＝何を入れても制約に反する）か。 */
   isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
+  /** 探索の見込み（未定のセルにだけ重ねる） */
+  outlookOf?: (staffId: string, day: WorkingDay) => CellOutlookMark | undefined;
 };
 
 /**
@@ -129,6 +132,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   dayOffStyle,
   forcedCellOf,
   isDeadCell,
+  outlookOf,
 }) => {
   // 選択モード中の行の見た目：選択対象は強調（浮かせる）、対象外は減光（blur）。
   // 行は grid の直接の子（名前セル＋各日セル＋休合計＋早番日数）なので、各セルに同じクラスを付ける。
@@ -225,6 +229,8 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           cell.kind === "undecided" ? forcedCellOf?.(staff.id, day) : undefined;
         const dead =
           cell.kind === "undecided" ? isDeadCell?.(staff.id, day) : undefined;
+        const outlook =
+          cell.kind === "undecided" ? outlookOf?.(staff.id, day) : undefined;
         // 希望の食い違いだけはセルの中＝希望の円で表す。
         // それ以外の違反（連勤・1セルの違反・勤務間インターバル）は marks（末尾のセルに置く印）が受け持つ。
         const wishViolation = violations.find(
@@ -262,6 +268,10 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
             dead={dead}
             forcedShift={
               forced?.kind === "work" ? shiftMap.get(forced.shiftId) : undefined
+            }
+            outlook={outlook}
+            outlookShift={
+              outlook?.value.kind === "work" ? shiftMap.get(outlook.value.shiftId) : undefined
             }
             violationUrl={violationUrl}
             cellClassName={rowMod.trim() || undefined}

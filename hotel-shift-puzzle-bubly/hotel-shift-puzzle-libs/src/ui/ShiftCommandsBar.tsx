@@ -65,6 +65,10 @@ type ShiftCommandsBarProps = {
   candidateLabel: string;
   /** 解決案ボタンの説明（ツールチップ） */
   candidateTitle?: string;
+  /** 解決案を探索で作る（#229 の試し口）。省略するとボタンを出さない */
+  onRefineCandidates?: () => void;
+  /** 探索ボタンの説明（ツールチップ） */
+  refineTitle?: string;
 
   /** コマンドの実行結果メッセージ（ボタンのすぐ下に出す）。null なら出さない。 */
   message?: string | null;
@@ -81,6 +85,8 @@ export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
   onGenerateCandidates,
   candidateLabel,
   candidateTitle,
+  onRefineCandidates,
+  refineTitle,
   message,
   onCloseMessage,
 }) => {
@@ -145,6 +151,16 @@ export const ShiftCommandsBar: FC<ShiftCommandsBarProps> = ({
         >
           🌱 {candidateLabel}
         </button>
+        {onRefineCandidates && (
+          <button
+            type="button"
+            className="e-cmd e-candidate"
+            title={refineTitle}
+            onClick={onRefineCandidates}
+          >
+            🔎 探索で解決案生成
+          </button>
+        )}
       </div>
 
       {/* 2行目: 戦略を切り替えて使うコマンド（必要人数を埋める＝トグル＋実行） */}

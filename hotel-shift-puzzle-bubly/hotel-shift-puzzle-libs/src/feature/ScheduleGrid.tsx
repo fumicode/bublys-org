@@ -27,12 +27,14 @@ import {
   dayOffReasonText,
   AUTO_SHIFT_STEPS,
   type AutoShiftStep,
+  type CellOutlook,
   type ScheduleRepair,
   type ShiftCell,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleGridView } from "../ui/ScheduleGridView.js";
 import type { CellChange, CellSelection } from "../ui/schedule-grid/types.js";
+import type { CellOutlookMark } from "../ui/schedule-grid/CellFace.js";
 import {
   ScheduleConstraintsBar,
   shiftColorOfNames,
@@ -60,6 +62,10 @@ import {
   nextForcedCellAfter,
 } from "./candidates/index.js";
 import { scheduleConstraintsOf, DAY_OFF_CANDIDATE_COUNT } from "./scheduleConstraints.js";
+import { refineBySearch } from "./refineBySearch.js";
+
+/** 探索で仕上げるとき、1案に使う秒数（まだ速くないので短めに打ち切る） */
+const REFINE_SECONDS_PER_PLAN = 3;
 import { prioritizeStaffByReport } from "./reportPriority.js";
 import { buildScheduleReport } from "./buildScheduleReport.js";
 import {
@@ -114,6 +120,8 @@ type ScheduleGridProps = {
   worldLineUrl?: string;
   treeUrl?: string;
   workingStaffUrl?: string;
+  /** 探索で解決案生成に使う制約レシピのバブル */
+  recipeUrl?: string;
   /**
    * この勤務表の月のシフト希望一覧（回収状況）バブルの URL を作る（年月を渡す）。
    * 年月は勤務表が持っているので、ここでビルダーとして受けて呼ぶ。
@@ -178,6 +186,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   worldLineUrl,
   treeUrl,
   workingStaffUrl,
+  recipeUrl,
   shiftWishesUrl,
   dayBubbleUrl,
   violationBubbleUrl,
@@ -195,6 +204,11 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
   useKeyBindings(scheduleUndoBindings(scope));
   const apex = scope.graph.getApex();
   const [autoMessage, setAutoMessage] = useState<string | null>(null);
+  // 探索の見込み（探索で解決案生成をしたときだけ）。どの勤務表のものかも覚え、別の勤務表には出さない
+  const [searchOutlook, setSearchOutlook] = useState<{
+    scheduleId: string;
+    cells: CellOutlook[];
+  } | null>(null);
   // キーボードのカーソル（スタッフ行のセル or 必要人数のセル。カーソルは1つ）
   const [cellSelection, setCellSelection] = useState<CellSelection | null>(null);
   // 勤務表の行＝この勤務表で働く人たち（勤務スタッフ群）。世界に居るスタッフ全員ではない。
@@ -561,6 +575,18 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     [candidates, computing]
   );
 
+  // 見込みは未定のセルにだけ重ねる（行側が未定かを見る）。探索が「置かない」をいちばんにしたセルでも、
+  // 置いた値があれば一番多い値をその割合で薄く出す（ぼやっと見えている候補）。
+  const outlookOf = useMemo(() => {
+    if (!searchOutlook || searchOutlook.scheduleId !== scheduleId) return undefined;
+    const byCell = new Map<string, CellOutlookMark>();
+    for (const c of searchOutlook.cells) {
+      const top = c.shares.find((s) => s.value.kind !== "undecided");
+      if (top) byCell.set(`${c.staffId}:${c.dayKey}`, top);
+    }
+    return (staffId: string, day: WorkingDay) => byCell.get(`${staffId}:${day.key}`);
+  }, [searchOutlook, scheduleId]);
+
   const isDeadCell = useMemo(() => {
     const keys = new Set(deadCells.map((cell) => `${cell.staffId}:${cell.day.key}`));
     return (staffId: string, day: WorkingDay) => keys.has(`${staffId}:${day.key}`);
@@ -652,9 +678,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
     setAutoMessage([`${step.label}: ${result.message}`, note].filter(Boolean).join("\n"));
   };
 
-  // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
-  const handleGenerateCandidates = () => {
-    if (!scheduleId) return;
+  // 完成案の複数生成：今の段取り（希望 → 責任者 → 休み）で案を作る。
+  const buildCandidatePlans = () => {
     // 参照レポートの貢献度スコアが高い人を先に処理する（handleRunStep と同じ優先度づけ）。
     const { staffList: prioritizedStaff, note: priorityNote } = prioritizeStaffByReport(
       subsetStaff,
@@ -698,10 +723,17 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       s = runOn(s, makeMinDayOffStep(minDayOff, { phase }));
       return s;
     };
-    const candidates = Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => ({
-      obj: buildCandidate(i),
-      label: `案${i + 1}`,
-    }));
+    return {
+      plans: Array.from({ length: DAY_OFF_CANDIDATE_COUNT }, (_, i) => buildCandidate(i)),
+      priorityNote,
+    };
+  };
+
+  // 完成案の複数生成：世界線比較ツール。生成後は世界線ビューへ誘導する。
+  const handleGenerateCandidates = () => {
+    if (!scheduleId) return;
+    const { plans, priorityNote } = buildCandidatePlans();
+    const candidates = plans.map((obj, i) => ({ obj, label: `案${i + 1}` }));
     commitCandidates(
       store,
       localScopeId(SCHEDULE_TYPE, scheduleId),
@@ -719,6 +751,40 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
         .join("\n")
     );
     onOpenWorldLine?.();
+  };
+
+  // 解決案生成を探索で（#229 の試し口）。責任者の対象者だけを動かす（レシピは refineBySearch.ts）。
+  // まだ Worker に載せていないので、押すと案の数 × 数秒のあいだ画面が止まる。
+  const handleRefineCandidates = () => {
+    if (!scheduleId) return;
+    setAutoMessage(`探索で解決案を作っています…（${DAY_OFF_CANDIDATE_COUNT}案 × 約${REFINE_SECONDS_PER_PLAN}秒。その間は画面が止まります）`);
+    // メッセージを描いてから重い計算に入る
+    setTimeout(() => {
+      const refined = refineBySearch({
+        original: schedule,
+        planCount: DAY_OFF_CANDIDATE_COUNT,
+        constraints: allConstraints,
+        targetStaffIds: subsetStaff.map((s) => s.id),
+        minDayOff,
+        timeLimitMsPerPlan: REFINE_SECONDS_PER_PLAN * 1000,
+      });
+      // 元に着地して、元の未定のセルに見込みを重ねる（案は世界線の枝に置く）
+      commitCandidates(
+        store,
+        localScopeId(SCHEDULE_TYPE, scheduleId),
+        SCHEDULE_TYPE,
+        schedule,
+        refined.plans.map((r, i) => ({ obj: r.schedule, label: `探索案${i + 1}` })),
+        "base"
+      );
+      setSearchOutlook({ scheduleId, cells: refined.outlook });
+      setAutoMessage(
+        `責任者の対象者 ${refined.leaderStaffIds.length} 名について、探索で作った案を${refined.plans.length}つ世界線に置きました（${refined.plans
+          .map((r) => `${r.iterations}手`)
+          .join("・")}）。勤務表には、案を作るあいだに見えた候補を薄く重ねています（濃く・くっきりなほど、どの良い案でもそうなっていた）。`
+      );
+      onOpenWorldLine?.();
+    }, 50);
   };
 
   // 必要スタッフ数の編集（その日・全日）。範囲選択でまとめて入れた分も1ノードに（#157）
@@ -951,6 +1017,8 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           steps={AUTO_SHIFT_STEPS}
           onRunStep={handleRunStep}
           onGenerateCandidates={handleGenerateCandidates}
+          onRefineCandidates={handleRefineCandidates}
+          refineTitle={`責任者の対象者だけについて、いつ責任者ポジに入り・いつ休むか（月${minDayOff}日）を探索で${DAY_OFF_CANDIDATE_COUNT}案つくります（1案約${REFINE_SECONDS_PER_PLAN}秒）。レシピ：責任者・月の休み・連勤の上限・遅番明け・可能勤務帯（絶対）＞ 希望 ＞ 1日の休み上限 ＞ 置いたセルの数（任意）。案は世界線に置き、勤務表には見込みを薄く重ねます。試作のため、その間は画面が止まります。`}
           candidateLabel={candidateLabel}
           candidateTitle={`この ${subsetStaff.length} 名について「毎日 責任者が入る＋全員 月${minDayOff}日休む（1日${limits.maxDayOffPerDay}人まで）」完成案を ${DAY_OFF_CANDIDATE_COUNT} つくり、それぞれ別の世界線に書いて見比べます。`}
           message={autoMessage}
@@ -997,6 +1065,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
           dayOffStyleOf={dayOffStyleOf}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
+          outlookOf={outlookOf}
           onApproveForced={handleApproveForced}
         />
       </div>
@@ -1050,7 +1119,7 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
       )}
 
       {/* 左下：世界線ビュー。ボタンから link bubble が伸びる（bubble-side で開く） */}
-      {(worldLineUrl || treeUrl || pendingReportUrl) && (
+      {(worldLineUrl || treeUrl || recipeUrl || pendingReportUrl) && (
         <div className="e-footer">
           {worldLineUrl && (
               <ObjectView
@@ -1077,6 +1146,16 @@ const ScheduleGridBody: FC<ScheduleGridProps> = ({
               >
                 <span className="e-link" title="ダブルクリックでキセキの木を開く">
                   🌳 キセキの木で見る
+                </span>
+              </ObjectView>
+          )}
+          {recipeUrl && (
+              <ObjectView url={recipeUrl} label="制約レシピ" openingPosition="bubble-side-right">
+                <span
+                  className="e-link"
+                  title="ダブルクリックで、探索で解決案生成に使う制約レシピを開く"
+                >
+                  🧪 制約レシピ
                 </span>
               </ObjectView>
           )}

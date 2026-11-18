@@ -66,6 +66,10 @@ export const scheduleReservationInfoUrl = (scheduleId: string): string =>
 export const scheduleWorldLineUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/world-line`;
 
+/** 制約レシピのバブル（探索で解決案生成が比べる単位と重みを、漏斗の上に描く） */
+export const scheduleRecipeUrl = (scheduleId: string): string =>
+  `hotel-shift-puzzle/schedules/${scheduleId}/recipe`;
+
 /** キセキの木ビューバブル（SVG版・読み取り専用） */
 export const scheduleWorldLineTreeUrl = (scheduleId: string): string =>
   `hotel-shift-puzzle/schedules/${scheduleId}/tree`;

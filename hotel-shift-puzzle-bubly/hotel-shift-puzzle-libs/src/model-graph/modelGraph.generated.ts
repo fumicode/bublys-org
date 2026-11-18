@@ -1192,6 +1192,71 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "OutlookTally",
+      "file": "schedule/search/outlook.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [],
+      "methods": [
+        {
+          "name": "reset",
+          "params": [],
+          "returns": "void",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "observe",
+          "params": [
+            "schedule"
+          ],
+          "returns": "void",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "result",
+          "params": [],
+          "returns": "CellOutlook[]",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "セルごとに値を数える（探索の中で使う）"
+    },
+    {
+      "name": "PlacementCount",
+      "file": "schedule/search/PlacementCount.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [],
+      "methods": [
+        {
+          "name": "describe",
+          "params": [],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "check",
+          "params": [],
+          "returns": "ConstraintViolation[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "tightness",
+          "params": [
+            "schedule"
+          ],
+          "returns": "TightnessAmount[]",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ]
+    },
+    {
       "name": "PrecedingCell",
       "file": "schedule/PrecedingMonthTail.ts",
       "kind": "value",
@@ -3370,12 +3435,14 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 52,
+    "fileCount": 54,
     "classesWithoutState": [
       "AllowedShiftConstraint",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
+      "OutlookTally",
+      "PlacementCount",
       "RequiredStaffingConstraint",
       "ShiftIntervalConstraint",
       "ShiftLeaderConstraint"

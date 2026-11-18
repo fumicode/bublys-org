@@ -27,6 +27,7 @@ import {
   ScheduleWorldLineTreeView,
   WorkingStaffPanel,
   ScheduleViolationView,
+  ScheduleRecipeView,
   ShiftWishEditor,
   ShiftWishMonthList,
   ShiftWishStaffList,
@@ -48,6 +49,7 @@ import {
   scheduleReportUrl,
   scheduleReportListUrl,
   scheduleWorldLineTreeUrl,
+  scheduleRecipeUrl,
   staffShiftWishUrl,
   shiftWishMonthUrl,
   scheduleStaffDetailUrl,
@@ -181,6 +183,7 @@ const ScheduleBubble: BubbleRoute["Component"] = ({ bubble }) => {
       shiftWishesUrl={shiftWishMonthUrl}
       worldLineUrl={worldLineUrl}
       treeUrl={treeUrl}
+      recipeUrl={scheduleRecipeUrl(scheduleId)}
       bubbleUrlOf={(kind, key) => constraintBubbleUrlOf(scheduleId, kind, key)}
       reportBubbleUrl={scheduleReportUrl}
       staffBubbleUrl={(staffId) => scheduleStaffDetailUrl(scheduleId, staffId)}
@@ -235,6 +238,10 @@ const ScheduleViolationBubble: BubbleRoute["Component"] = ({ bubble }) =>
       violationKey={bubble.params.violationKey}
     />
   );
+
+// --- 制約レシピバブル（勤務表の「制約レシピ」から開く） ---
+const ScheduleRecipeBubble: BubbleRoute["Component"] = ({ bubble }) =>
+  withObjects(<ScheduleRecipeView scheduleId={bubble.params.scheduleId} />);
 
 // --- 勤務表の世界線ビューバブル（canvas版） ---
 const ScheduleWorldLineBubble: BubbleRoute["Component"] = ({ bubble }) =>
@@ -357,6 +364,7 @@ export const hotelShiftPuzzleBubbleRoutes: BubbleRoute[] = [
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/world-line", type: "schedule-world-line", Component: ScheduleWorldLineBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 400, height: 300 } } },
   // キセキの木ビューも同じくSVGを透かすため背景は半透明ダークに揃える。
   // 木の全体像をゆったり眺められるよう、世界線ビューより大きめの窓（fillsContainer）で開く。
+  { pattern: "hotel-shift-puzzle/schedules/:scheduleId/recipe", type: "schedule-recipe", Component: ScheduleRecipeBubble, bubbleOptions: { defaultSize: { width: 560, height: 560 } } },
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/tree", type: "schedule-tree", Component: ScheduleWorldLineTreeBubble, bubbleOptions: { contentBackground: "rgba(15,18,28,0.3)", fillsContainer: true, defaultSize: { width: 700, height: 500 } } },
   // 旧住所（エイリアス）。新しい URL は constraints/:constraintSetId/... で作られる
   { pattern: "hotel-shift-puzzle/schedules/:scheduleId/leader-rules/:ruleKey", type: "schedule-leader-rule", Component: LegacyScheduleLeaderRuleBubble },

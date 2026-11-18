@@ -32,3 +32,4 @@ export * from "./ScheduleReportView.js";
 export * from "./ScheduleReportListView.js";
 export * from "./LinkedReportsView.js";
 export * from "./WorldFileView.js";
+export * from "./ConstraintRecipeFunnel.js";

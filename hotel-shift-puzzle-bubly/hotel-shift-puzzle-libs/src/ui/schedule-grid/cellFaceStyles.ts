@@ -408,6 +408,22 @@ export const cellFaceStyles = css`
       font-variant-numeric: tabular-nums;
     }
   }
+  /* 見込みセル: 探索がよく置く値。確定済みと同じ勤務帯色・同じ数字を、割合が低いほど
+     薄く・ぼかして描く（薄さとぼかしは CellFace の outlookLook がインラインで決める）。
+     枠は付けない（破線の枠は「唯一の提案」だけの記号）。 */
+  .e-outlook {
+    .e-outlook-value {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.6em;
+      padding: 0 3px;
+      border-radius: 4px;
+      font-weight: bold;
+      font-size: 1.05em;
+      font-variant-numeric: tabular-nums;
+    }
+  }
   /* 選択中は提案を少しはっきりさせる（今まさに Enter / Tab で承認できる場所） */
   .e-forced.is-selected .e-forced-value {
     opacity: 0.75;

@@ -589,7 +589,9 @@ export function commitCandidates(
   scopeId: string,
   type: string,
   baseObj: unknown,
-  candidates: { obj: unknown; label?: string }[]
+  candidates: { obj: unknown; label?: string }[],
+  /** どこに着地するか。既定は案1。"base" なら元（共通の親）へ戻る（元の上に見込みを重ねて見せるとき） */
+  landing: "first" | "base" = "first"
 ): { parentNodeId: string; nodeIds: string[] } {
   // 共通の親（root）を作るのも誕生の一種。作る場所は ensureWorldBorn 一本にする
   // （ここで commitToScope すると勤務表だけの起点ができ、固定メンバーが載らない）。
@@ -613,13 +615,13 @@ export function commitCandidates(
     if (c.label) labelIfNew(store, scopeId, apex, knownNodeIds, c.label);
   });
 
-  // 案1に着地：ローカル apex を案1へ移す。
+  // 案1（または元）に着地：ローカル apex を移す。
   // 読みもこの世界からなので、移すだけで画面が案1になる（以前はここで案1の状態を
   // アプリ全体スコープへ書き戻していた。restore と同じ橋渡しで、もう要らない）。
-  const landing = nodeIds[0];
-  if (landing) {
+  const landingNodeId = landing === "base" ? parentNodeId : nodeIds[0];
+  if (landingNodeId) {
     store.dispatch(
-      setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landing).toJSON() })
+      setGraph({ scopeId, graph: graphOf(store, scopeId).moveTo(landingNodeId).toJSON() })
     );
   }
 

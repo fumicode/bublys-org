@@ -48,6 +48,7 @@ import {
   type ShiftOptionFace,
 } from "./schedule-grid/ShiftSuggestionDropdown.js";
 import { optionFaceOf, optionKeyOf } from "./schedule-grid/optionFace.js";
+import type { CellOutlookMark } from "./schedule-grid/CellFace.js";
 import {
   useCellKeyboardEditing,
   suggestionToCell,
@@ -163,6 +164,8 @@ type ScheduleGridViewProps = {
    * 埋められないセルを抱えたまま作業が進むのを防ぐため、セル自身に描く。
    */
   isDeadCell?: (staffId: string, day: WorkingDay) => boolean;
+  /** 探索の見込み（未定のセルにだけ、割合に応じた薄さとぼかしで重ねる） */
+  outlookOf?: (staffId: string, day: WorkingDay) => CellOutlookMark | undefined;
   /**
    * 選択セルの確定提案を承認する（Enter＝"down" / Tab＝"right"）。
    * その向きの次の提案セルへ選択を移したら true。false なら、その向きへ1マス動く。
@@ -243,6 +246,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   dayOffStyleOf,
   forcedCellOf,
   isDeadCell,
+  outlookOf,
   onApproveForced,
 }) => {
   const days = schedule.workingDays();
@@ -542,6 +546,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
+          outlookOf={outlookOf}
         />
       ));
     }
@@ -594,6 +599,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           dayOffStyle={dayOffStyleOf?.(staff.id)}
           forcedCellOf={forcedCellOf}
           isDeadCell={isDeadCell}
+          outlookOf={outlookOf}
         />
       )),
     ]);

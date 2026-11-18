@@ -13,6 +13,18 @@ import type { ViolationMark } from "./violationMarkPlacement.js";
 import { RunMarks } from "./RunMarks.js";
 import type { RunMark } from "./runMarkPlacement.js";
 
+/**
+ * 見込み：探索がこのセルによく置く値と、その割合（0〜1）。割合が高いほど濃く・くっきり描く。
+ * 割合は「いちばん良い水準の盤面のうち、何割でこの値だったか」（search/outlook.ts）。
+ */
+export type CellOutlookMark = { value: ShiftCell; share: number };
+
+/** 見込みの割合 → 薄さとぼかし。割合が低いほど薄く、ぼやける */
+export const outlookLook = (share: number): { opacity: number; blurPx: number } => ({
+  opacity: 0.15 + 0.6 * share,
+  blurPx: Math.round((1 - share) * 3 * 10) / 10,
+});
+
 export type CellFaceProps = {
   /** セルの状態（出勤・休み・未定） */
   cell: ShiftCell;
@@ -43,6 +55,10 @@ export type CellFaceProps = {
   forcedCandidate?: ShiftCell;
   /** forcedCandidate が出勤のとき解決済みの勤務帯（色と開始時刻を確定済みセルと揃える） */
   forcedShift?: WorkShift;
+  /** 見込み（未定のセルだけ）。確定提案より弱い情報なので、確定提案があればそちらを描く */
+  outlook?: CellOutlookMark;
+  /** outlook が出勤のとき解決済みの勤務帯 */
+  outlookShift?: WorkShift;
   /**
    * 詰み（候補が1つも無い＝何を入れても制約に反する）セルか。
    * 違反マーカー（赤帯・⊿）は「今ある割当が違反している」印だが、これは「この先どうやっても
@@ -95,6 +111,8 @@ export const CellFace: FC<CellFaceProps> = ({
   dayOffReason,
   forcedCandidate,
   forcedShift,
+  outlook,
+  outlookShift,
   dead = false,
   selected = false,
   inputBuffer = null,
@@ -156,6 +174,30 @@ export const CellFace: FC<CellFaceProps> = ({
         {forcedLabel}
       </span>
     );
+  } else if (outlook) {
+    // 未割当で、探索の見込みがある: 確定済みと同じ形を、割合が低いほど薄く・ぼかして描く（枠なし）。
+    // 「たぶんこう」の度合いを薄さとぼかしで読ませる。破線の枠（唯一の提案）とは形を分ける。
+    // 希望は確定提案のときと同じく title に残す。
+    className += " e-undecided e-outlook";
+    const { opacity, blurPx } = outlookLook(outlook.share);
+    const v = outlook.value;
+    content = (
+      <span
+        className="e-outlook-value"
+        style={{
+          ...(v.kind === "work"
+            ? { background: SHIFT_BG[v.shiftId] ?? "#eee", color: SHIFT_FG[v.shiftId] ?? "#333" }
+            : {}),
+          opacity,
+          filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
+        }}
+      >
+        {v.kind === "work" ? (outlookShift?.startHour ?? v.shiftId) : "休"}
+      </span>
+    );
+    title = `見込み: ${
+      v.kind === "work" ? (outlookShift?.name ?? v.shiftId) : "休み"
+    }（良い盤面の${Math.round(outlook.share * 100)}%）`;
   } else {
     // 未割当: 希望があれば円で表示（下で描く）。無ければ "·"
     className += " e-undecided";
@@ -166,6 +208,8 @@ export const CellFace: FC<CellFaceProps> = ({
   // 確定提案を出したセルでは希望ヒントが隠れるので、希望も title 側に残す。
   if (forcedCandidate && wishEntries.length > 0) {
     title = `希望: ${wishEntries.map(wishText).join(" ")}`;
+  } else if (outlook && !dead && wishEntries.length > 0) {
+    title = `${title}\n希望: ${wishEntries.map(wishText).join(" ")}`;
   }
   if (candidateHint) title = title ? `${title}\n${candidateHint}` : candidateHint;
 
@@ -190,8 +234,10 @@ export const CellFace: FC<CellFaceProps> = ({
     wishEntries.find((e) => e.key === assignedWishKey) ??
     wishEntries.find((e) => e.pref === "want") ??
     wishEntries[0];
+  // 見込みを描いたセルも、真ん中は見込みが使うので円は角へ寄せる
+  const cornered = hasValue || (!!outlook && !forcedCandidate && !dead);
   const shownWishEntries: WishEntry[] =
-    hasValue && cornerWishEntry ? [cornerWishEntry] : wishEntries;
+    cornered && cornerWishEntry ? [cornerWishEntry] : wishEntries;
 
   // 希望が叶わなかったとき、円から違反バブルを開くための URL（旧・右上の ⊿ の役割）。
   const wishViolationUrl =
@@ -206,7 +252,7 @@ export const CellFace: FC<CellFaceProps> = ({
   // マウントされてしまい左上へ移動する transition が走らない。そのため違反バブルへの導線は
   // ラッパではなく、この span 自身の data-url + ダブルクリック（openBubble）で持たせる。
   const wishMarks = wishEntries.length > 0 && (
-    <span className={`e-wish-marks${hasValue ? " is-corner" : ""}`}>
+    <span className={`e-wish-marks${cornered ? " is-corner" : ""}`}>
       {shownWishEntries.map((e, i) => {
         // 見た目（背景・線幅・不透明度）は状態ごとに CSS 側で決める。ここは色と位置だけ渡す。
         const style = {
