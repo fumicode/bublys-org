@@ -7,6 +7,7 @@ import { MinMonthlyDayOffConstraint } from '../MinMonthlyDayOffConstraint.js';
 import { RequiredStaffingConstraint } from '../RequiredStaffingConstraint.js';
 import type { ScheduleConstraint } from '../ScheduleConstraint.js';
 import { RecipeObjective } from './RecipeObjective.js';
+import { PlacementCount } from './PlacementCount.js';
 import { hillClimbing, lateAcceptance } from './acceptance.js';
 import {
   cellValuesOf,
@@ -118,6 +119,56 @@ describe('searchSchedule（制約レシピに沿って勤務表を直し続け�
       now: () => (t += 1),
     });
     expect(result.iterations).toBeLessThan(20);
+  });
+
+  test('★ セルが置ける値を持てば、それ以外は置かない（入れ替え・休みの移動でも持ち込まない）', () => {
+    const onlyEarlyOrOff = [{ kind: 'work', shiftId: 'early' }, { kind: 'day-off' }, { kind: 'undecided' }] as const;
+    const cells = freeCellsOf(original, staffIds).map((c) =>
+      c.staffId === 'a' ? { ...c, values: onlyEarlyOrOff } : c
+    );
+    const result = searchSchedule({
+      initial: original,
+      freeCells: cells,
+      values: cellValuesOf(['early', 'late']),
+      objective,
+      rng: seededRng(6),
+      maxIterations: 2000,
+    });
+    expect(result.best.assignmentsForStaff('a').some((x) => x.shiftId === 'late')).toBe(false);
+  });
+
+  test('★ 見込み：いちばん良い水準の盤面で、セルごとに値の割合を数える（割合の合計は 1）', () => {
+    const result = searchSchedule({
+      initial: original,
+      freeCells,
+      values,
+      objective,
+      rng: seededRng(7),
+      maxIterations: 2000,
+      collectOutlook: true,
+    });
+    expect(result.outlook).toHaveLength(freeCells.length);
+    for (const c of result.outlook) {
+      expect(c.shares.reduce((n, s) => n + s.share, 0)).toBeCloseTo(1);
+    }
+  });
+
+  test('★ 置いたセルの数を一番下に置くと、何にも効かないセルは未定のまま残る', () => {
+    // 連勤の上限だけを見るなら、何も置かないのがいちばん良い
+    const result = searchSchedule({
+      initial: original,
+      freeCells,
+      values,
+      objective: RecipeObjective.of(ConstraintRecipe.empty(), [
+        new MaxConsecutiveWorkdaysConstraint(5),
+        new PlacementCount(staffIds),
+      ]),
+      acceptance: hillClimbing,
+      rng: seededRng(8),
+      maxIterations: 2000,
+    });
+    // 残るのは人間が入力した a の 6/1 の休みだけ
+    expect(staffIds.flatMap((s) => result.best.assignmentsForStaff(s))).toHaveLength(1);
   });
 
   test('★ 優先度が同じ単位どうしの並べ方ごとに、案を作る', () => {

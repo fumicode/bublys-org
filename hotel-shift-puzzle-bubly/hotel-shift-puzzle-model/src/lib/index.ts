@@ -60,6 +60,8 @@ export * from './schedule/search/RecipeObjective.js';
 export * from './schedule/search/moves.js';
 export * from './schedule/search/acceptance.js';
 export * from './schedule/search/searchSchedule.js';
+export * from './schedule/search/outlook.js';
+export * from './schedule/search/PlacementCount.js';
 export * from './schedule/MaxConsecutiveWorkdaysConstraint.js';
 export * from './schedule/MinMonthlyDayOffConstraint.js';
 export * from './schedule/MaxDayOffPerDayConstraint.js';

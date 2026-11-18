@@ -10,8 +10,12 @@
 import type { MonthlyStaffSchedule, ShiftCell } from "../MonthlyStaffSchedule.js";
 import type { WorkingDay } from "../WorkingDay.js";
 
-/** 動かしてよいセル（元の勤務表で未定だったセル） */
-export type FreeCell = { staffId: string; day: WorkingDay };
+/**
+ * 動かしてよいセル（元の勤務表で未定だったセル）。
+ * values を持てば、そのセルにはそれだけを置く（人ごとに置ける値が違うとき。例：責任者は担当勤務帯か休み）。
+ * 持たなければ探索全体の値（MoveContext.values）を置く。
+ */
+export type FreeCell = { staffId: string; day: WorkingDay; values?: readonly ShiftCell[] };
 
 /** 0 以上 1 未満の乱数を返す関数（種つきで決定的にできる） */
 export type Rng = () => number;
@@ -44,8 +48,16 @@ export type Neighborhood = {
 const pick = <T>(items: readonly T[], rng: Rng): T | undefined =>
   items.length === 0 ? undefined : items[Math.floor(rng() * items.length)];
 
-const sameCell = (a: ShiftCell, b: ShiftCell): boolean =>
+export const sameCell = (a: ShiftCell, b: ShiftCell): boolean =>
   a.kind === b.kind && (a.kind !== "work" || (b.kind === "work" && a.shiftId === b.shiftId));
+
+/** そのセルに置ける値 */
+const valuesFor = (ctx: MoveContext, cell: FreeCell): readonly ShiftCell[] =>
+  cell.values ?? ctx.values;
+
+/** そのセルにその値を置けるか（入れ替え・移動の手が、置けない値を持ち込まないように） */
+const accepts = (ctx: MoveContext, cell: FreeCell, value: ShiftCell): boolean =>
+  valuesFor(ctx, cell).some((v) => sameCell(v, value));
 
 /** 動かしてよいセルを、日ごと・人ごとに引けるようにする */
 export const moveContextOf = (
@@ -70,7 +82,7 @@ export const changeCell: Neighborhood = {
     if (!cell) return undefined;
     const current = ctx.schedule.statusOf(cell.staffId, cell.day);
     const to = pick(
-      ctx.values.filter((v) => !sameCell(v, current)),
+      valuesFor(ctx, cell).filter((v) => !sameCell(v, current)),
       rng
     );
     if (!to) return undefined;
@@ -88,7 +100,10 @@ export const swapOnDay: Neighborhood = {
     if (!a) return undefined;
     const av = ctx.schedule.statusOf(a.staffId, a.day);
     const b = pick(
-      cells.filter((c) => !sameCell(ctx.schedule.statusOf(c.staffId, c.day), av)),
+      cells.filter((c) => {
+        const cv = ctx.schedule.statusOf(c.staffId, c.day);
+        return !sameCell(cv, av) && accepts(ctx, c, av) && accepts(ctx, a, cv);
+      }),
       rng
     );
     if (!b) return undefined;
@@ -107,10 +122,14 @@ export const moveDayOff: Neighborhood = {
     const staffId = pick([...ctx.freeCellsByStaff.keys()], rng);
     const cells = staffId ? (ctx.freeCellsByStaff.get(staffId) ?? []) : [];
     const offs = cells.filter((c) => ctx.schedule.statusOf(c.staffId, c.day).kind === "day-off");
-    const others = cells.filter((c) => ctx.schedule.statusOf(c.staffId, c.day).kind !== "day-off");
     const from = pick(offs, rng);
+    if (!from) return undefined;
+    const others = cells.filter((c) => {
+      const cv = ctx.schedule.statusOf(c.staffId, c.day);
+      return cv.kind !== "day-off" && accepts(ctx, c, { kind: "day-off" }) && accepts(ctx, from, cv);
+    });
     const to = pick(others, rng);
-    if (!from || !to) return undefined;
+    if (!to) return undefined;
     const toValue = ctx.schedule.statusOf(to.staffId, to.day);
     return {
       kind: this.kind,

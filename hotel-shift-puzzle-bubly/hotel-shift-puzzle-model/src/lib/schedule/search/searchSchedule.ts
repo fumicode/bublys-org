@@ -25,6 +25,7 @@ import {
   type Rng,
 } from "./moves.js";
 import { lateAcceptance, type Acceptance } from "./acceptance.js";
+import { OutlookTally, type CellOutlook } from "./outlook.js";
 
 /** 種つきの乱数（mulberry32） */
 export const seededRng = (seed: number): Rng => {
@@ -73,6 +74,8 @@ export type SearchParams = {
   timeLimitMs?: number;
   /** 時計（テストで差し替える）。既定は Date.now */
   now?: () => number;
+  /** 見込み（いちばん良い水準の盤面でセルごとに値を数えたもの）を集めるか。既定は集めない */
+  collectOutlook?: boolean;
 };
 
 export type SearchResult = {
@@ -84,6 +87,8 @@ export type SearchResult = {
   iterations: number;
   /** 採った手の数 */
   accepted: number;
+  /** 見込み（collectOutlook のときだけ。それ以外は空） */
+  outlook: CellOutlook[];
 };
 
 export function searchSchedule(params: SearchParams): SearchResult {
@@ -98,6 +103,7 @@ export function searchSchedule(params: SearchParams): SearchResult {
     maxIterations,
     timeLimitMs,
     now = Date.now,
+    collectOutlook = false,
   } = params;
   const compare = (a: readonly number[], b: readonly number[]) => objective.compare(a, b);
   const startedAt = now();
@@ -112,6 +118,7 @@ export function searchSchedule(params: SearchParams): SearchResult {
   const baseContext = moveContextOf(initial, freeCells, values);
   let accepted = 0;
   let iterations = 0;
+  const tally = collectOutlook ? new OutlookTally(freeCells) : undefined;
 
   for (; iterations < maxIterations; iterations++) {
     if (timeLimitMs !== undefined && now() - startedAt >= timeLimitMs) break;
@@ -130,13 +137,16 @@ export function searchSchedule(params: SearchParams): SearchResult {
         if (compare(currentCost, bestCost) < 0) {
           best = current;
           bestCost = currentCost;
+          tally?.reset();
         }
       }
     }
+    // いちばん良い水準にいるあいだだけ数える（その水準の盤面どうしは同じくらい良い）
+    if (tally && compare(currentCost, bestCost) === 0) tally.observe(current);
     run.record(currentCost, iterations);
   }
 
-  return { best, bestCost, initialCost, iterations, accepted };
+  return { best, bestCost, initialCost, iterations, accepted, outlook: tally?.result() ?? [] };
 }
 
 /** 1つの案（並べ方1つぶんの探索の結果） */
