@@ -75,7 +75,7 @@ const ScheduleWorldLineViewBody: FC<Props> = () => {
   // nameable で選択中の世界に名前をつけられる。
   return (
     <StyledWrap>
-      <WorldLineScopeView scope={scope} keyBindings={keyBindings} nameable />
+      <WorldLineScopeView scope={scope} keyBindings={keyBindings} nameable foldable />
     </StyledWrap>
   );
 };
