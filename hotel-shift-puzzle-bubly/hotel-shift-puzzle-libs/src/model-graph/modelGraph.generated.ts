@@ -36,6 +36,303 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "CalendarMonthPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "year",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "month",
+          "type": "number",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "year",
+        "month",
+        "start",
+        "key",
+        "length",
+        "label",
+        "words"
+      ],
+      "methods": [
+        {
+          "name": "of",
+          "params": [
+            "year",
+            "month"
+          ],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "CalendarMonthPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月の期：起点は毎月1日、長さはその月の日数"
+    },
+    {
+      "name": "CalendarMonthRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "暦月：毎月1日から月末まで"
+    },
+    {
+      "name": "ConfirmedSchedule",
+      "file": "schedule/ConfirmedSchedule.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "scheduleId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "worldLineNodeId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "period",
+          "type": "SchedulePeriod",
+          "optional": false
+        },
+        {
+          "name": "storeId",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "compromises",
+          "type": "CompromiseEntry[]",
+          "optional": false
+        },
+        {
+          "name": "busyDayContributions",
+          "type": "BusyDayEntry[]",
+          "optional": false
+        },
+        {
+          "name": "stars",
+          "type": "StarEntry[]",
+          "optional": false
+        },
+        {
+          "name": "considerationNotes",
+          "type": "Record<string, string>",
+          "optional": false
+        },
+        {
+          "name": "compromiseWeight",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "busyDayWeight",
+          "type": "number",
+          "optional": false
+        },
+        {
+          "name": "confirmedAt",
+          "type": "number",
+          "optional": true
+        }
+      ],
+      "getters": [
+        "id",
+        "version",
+        "scheduleId",
+        "worldLineNodeId",
+        "period",
+        "storeId",
+        "title",
+        "confirmedAt",
+        "compromises",
+        "busyDayContributions",
+        "stars",
+        "compromiseWeight",
+        "busyDayWeight",
+        "considerationNotes"
+      ],
+      "methods": [
+        {
+          "name": "idFor",
+          "params": [
+            "storeId",
+            "period"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "precedingIdFor",
+          "params": [
+            "target"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "defaultTitle",
+          "params": [
+            "period"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "create",
+          "params": [
+            "params"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "confirm",
+          "params": [
+            "params",
+            "current"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "isVersion",
+          "params": [
+            "version"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "rename",
+          "params": [
+            "title"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "starsOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "reweight",
+          "params": [
+            "compromiseWeight",
+            "busyDayWeight"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "noteFor",
+          "params": [
+            "staffId"
+          ],
+          "returns": "string",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "setNote",
+          "params": [
+            "staffId",
+            "text"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "ConfirmedSchedulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "ConfirmedSchedule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "ConstraintDelta",
       "file": "schedule/ConstraintDelta.ts",
       "kind": "value",
@@ -114,11 +411,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": true
         },
         {
-          "name": "linkedReportId",
-          "type": "string",
-          "optional": true
-        },
-        {
           "name": "useReportPriority",
           "type": "boolean",
           "optional": true
@@ -127,13 +419,12 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "maxConsecutiveWorkdays",
-        "useReportPriority",
+        "useStarPriority",
         "checkShiftWish",
         "checkAllowedShift",
         "minMonthlyDayOff",
         "maxDayOffPerDay",
         "shiftIntervalRules",
-        "linkedReportId",
         "leaderRules"
       ],
       "methods": [
@@ -219,27 +510,9 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
-          "name": "withUseReportPriority",
+          "name": "withUseStarPriority",
           "params": [
             "use"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "linkReport",
-          "params": [
-            "reportId"
-          ],
-          "returns": "ConstraintSet",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "unlinkReport",
-          "params": [
-            "reportId"
           ],
           "returns": "ConstraintSet",
           "isStatic": false,
@@ -633,6 +906,94 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "FourWeekPeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "start",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "start",
+        "key",
+        "length",
+        "label",
+        "words"
+      ],
+      "methods": [
+        {
+          "name": "containing",
+          "params": [
+            "anchor",
+            "day"
+          ],
+          "returns": "FourWeekPeriod",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "previous",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "next",
+          "params": [],
+          "returns": "FourWeekPeriod",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "SchedulePeriodPlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週の期：起点日から28日"
+    },
+    {
+      "name": "FourWeekRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [
+        {
+          "name": "anchor",
+          "type": "WorkingDay",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "anchor",
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        }
+      ],
+      "doc": "4週：起算日から4週ずつ"
+    },
+    {
       "name": "MaxConsecutiveWorkdaysConstraint",
       "file": "schedule/MaxConsecutiveWorkdaysConstraint.ts",
       "kind": "value",
@@ -723,13 +1084,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -761,8 +1117,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "storeId",
-        "year",
-        "month",
+        "period",
         "workingStaffGroupId",
         "constraintSetId",
         "precedingTail",
@@ -779,13 +1134,6 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "MonthlyStaffSchedule",
           "isStatic": true,
           "returnsSelf": true
-        },
-        {
-          "name": "previousYearMonth",
-          "params": [],
-          "returns": "{ year: number; month: number; }",
-          "isStatic": false,
-          "returnsSelf": false
         },
         {
           "name": "withPrecedingTail",
@@ -1038,6 +1386,78 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
+      "name": "PeriodRule",
+      "file": "store/PeriodRule.ts",
+      "kind": "value",
+      "fields": [],
+      "getters": [
+        "label"
+      ],
+      "methods": [
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "PeriodRulePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "periodsAround",
+          "params": [
+            "day",
+            "before",
+            "after"
+          ],
+          "returns": "SchedulePeriod[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "calendarMonth",
+          "params": [],
+          "returns": "CalendarMonthRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fourWeek",
+          "params": [
+            "anchor"
+          ],
+          "returns": "FourWeekRule",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "PeriodRule",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
       "name": "PrecedingCell",
       "file": "schedule/PrecedingMonthTail.ts",
       "kind": "value",
@@ -1091,8 +1511,8 @@ export const MODEL_GRAPH: ModelGraph = {
       "kind": "value",
       "fields": [
         {
-          "name": "sourceReportId",
-          "type": "string",
+          "name": "source",
+          "type": "ConfirmedVersion",
           "optional": false
         },
         {
@@ -1109,14 +1529,19 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "cells",
           "type": "PrecedingCell[]",
           "optional": false
+        },
+        {
+          "name": "stars",
+          "type": "StarEntry[]",
+          "optional": true
         }
       ],
       "getters": [
-        "sourceReportId",
+        "source",
+        "stars",
         "confirmedAt",
         "days",
         "lastDay",
-        "yearMonth",
         "signature"
       ],
       "methods": [
@@ -1130,10 +1555,18 @@ export const MODEL_GRAPH: ModelGraph = {
           "returnsSelf": true
         },
         {
+          "name": "starsOf",
+          "params": [
+            "staffId"
+          ],
+          "returns": "number",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
           "name": "directlyPrecedes",
           "params": [
-            "year",
-            "month"
+            "period"
           ],
           "returns": "boolean",
           "isStatic": false,
@@ -1446,197 +1879,81 @@ export const MODEL_GRAPH: ModelGraph = {
       ]
     },
     {
-      "name": "ScheduleReport",
-      "file": "schedule/ScheduleReport.ts",
-      "kind": "aggregate",
-      "fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "scheduleId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "worldLineNodeId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "storeId",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "title",
-          "type": "string",
-          "optional": false
-        },
-        {
-          "name": "compromises",
-          "type": "CompromiseEntry[]",
-          "optional": false
-        },
-        {
-          "name": "busyDayContributions",
-          "type": "BusyDayEntry[]",
-          "optional": false
-        },
-        {
-          "name": "contributionScores",
-          "type": "ContributionScoreEntry[]",
-          "optional": false
-        },
-        {
-          "name": "considerationNotes",
-          "type": "Record<string, string>",
-          "optional": false
-        },
-        {
-          "name": "compromiseWeight",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "busyDayWeight",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "confirmedAt",
-          "type": "number",
-          "optional": true
-        }
-      ],
+      "name": "SchedulePeriod",
+      "file": "schedule/SchedulePeriod.ts",
+      "kind": "value",
+      "fields": [],
       "getters": [
-        "id",
-        "scheduleId",
-        "worldLineNodeId",
-        "year",
-        "month",
-        "storeId",
-        "title",
-        "confirmedAt",
-        "compromises",
-        "busyDayContributions",
-        "contributionScores",
-        "compromiseWeight",
-        "busyDayWeight",
-        "considerationNotes"
+        "start",
+        "length",
+        "label",
+        "words",
+        "key",
+        "end"
       ],
       "methods": [
         {
-          "name": "idOf",
-          "params": [
-            "scheduleId",
-            "worldLineNodeId"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "scheduleIdOf",
-          "params": [
-            "reportId"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "defaultTitle",
-          "params": [
-            "year",
-            "month"
-          ],
-          "returns": "string",
-          "isStatic": true,
-          "returnsSelf": false
-        },
-        {
-          "name": "create",
-          "params": [
-            "params"
-          ],
-          "returns": "ScheduleReport",
-          "isStatic": true,
-          "returnsSelf": true
-        },
-        {
-          "name": "rename",
-          "params": [
-            "title"
-          ],
-          "returns": "ScheduleReport",
+          "name": "previous",
+          "params": [],
+          "returns": "SchedulePeriod",
           "isStatic": false,
           "returnsSelf": true
         },
         {
-          "name": "scoreOf",
-          "params": [
-            "staffId"
-          ],
-          "returns": "number",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "isReferenceableFrom",
-          "params": [
-            "target"
-          ],
-          "returns": "boolean",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "reweight",
-          "params": [
-            "compromiseWeight",
-            "busyDayWeight"
-          ],
-          "returns": "ScheduleReport",
-          "isStatic": false,
-          "returnsSelf": true
-        },
-        {
-          "name": "noteFor",
-          "params": [
-            "staffId"
-          ],
-          "returns": "string",
-          "isStatic": false,
-          "returnsSelf": false
-        },
-        {
-          "name": "setNote",
-          "params": [
-            "staffId",
-            "text"
-          ],
-          "returns": "ScheduleReport",
+          "name": "next",
+          "params": [],
+          "returns": "SchedulePeriod",
           "isStatic": false,
           "returnsSelf": true
         },
         {
           "name": "toPlain",
           "params": [],
-          "returns": "ScheduleReportState",
+          "returns": "SchedulePeriodPlain",
           "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "days",
+          "params": [],
+          "returns": "WorkingDay[]",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "contains",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "startsRightAfter",
+          "params": [
+            "day"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "equals",
+          "params": [
+            "other"
+          ],
+          "returns": "boolean",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromKey",
+          "params": [
+            "key"
+          ],
+          "returns": "SchedulePeriod | undefined",
+          "isStatic": true,
           "returnsSelf": false
         },
         {
@@ -1644,7 +1961,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "params": [
             "plain"
           ],
-          "returns": "ScheduleReport",
+          "returns": "SchedulePeriod",
           "isStatic": true,
           "returnsSelf": true
         }
@@ -2001,13 +2318,8 @@ export const MODEL_GRAPH: ModelGraph = {
           "optional": false
         },
         {
-          "name": "year",
-          "type": "number",
-          "optional": false
-        },
-        {
-          "name": "month",
-          "type": "number",
+          "name": "period",
+          "type": "SchedulePeriod",
           "optional": false
         },
         {
@@ -2024,8 +2336,7 @@ export const MODEL_GRAPH: ModelGraph = {
       "getters": [
         "id",
         "staffId",
-        "year",
-        "month",
+        "period",
         "filledDayCount",
         "isEmpty",
         "isSubmitted",
@@ -2036,8 +2347,7 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "idOf",
           "params": [
             "staffId",
-            "year",
-            "month"
+            "period"
           ],
           "returns": "string",
           "isStatic": true,
@@ -2117,7 +2427,7 @@ export const MODEL_GRAPH: ModelGraph = {
         {
           "name": "toPlain",
           "params": [],
-          "returns": "StaffMonthlyShiftWishState",
+          "returns": "StaffMonthlyShiftWishPlain",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2129,6 +2439,210 @@ export const MODEL_GRAPH: ModelGraph = {
           "returns": "StaffMonthlyShiftWish",
           "isStatic": true,
           "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "Store",
+      "file": "store/Store.ts",
+      "kind": "aggregate",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "format",
+          "type": "StoreFormat",
+          "optional": false
+        },
+        {
+          "name": "periodRule",
+          "type": "PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "name",
+        "format",
+        "periodRule"
+      ],
+      "methods": [
+        {
+          "name": "create",
+          "params": [
+            "params"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "fallback",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "removed",
+          "params": [
+            "id"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "resolve",
+          "params": [
+            "stores",
+            "id",
+            "removedIds"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "rename",
+          "params": [
+            "name"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withFormat",
+          "params": [
+            "format"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "withPeriodRule",
+          "params": [
+            "periodRule"
+          ],
+          "returns": "Store",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "periodContaining",
+          "params": [
+            "day"
+          ],
+          "returns": "SchedulePeriod",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "toPlain",
+          "params": [],
+          "returns": "StorePlain",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "fromPlain",
+          "params": [
+            "plain"
+          ],
+          "returns": "Store",
+          "isStatic": true,
+          "returnsSelf": true
+        }
+      ]
+    },
+    {
+      "name": "StoreFormat",
+      "file": "store/StoreFormat.ts",
+      "kind": "part",
+      "fields": [
+        {
+          "name": "id",
+          "type": "StoreFormatId",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "storeNoun",
+          "type": "string",
+          "optional": false
+        },
+        {
+          "name": "defaultRule",
+          "type": "(today: WorkingDay) => PeriodRule",
+          "optional": false
+        }
+      ],
+      "getters": [
+        "id",
+        "label",
+        "storeNoun"
+      ],
+      "methods": [
+        {
+          "name": "defaultRule",
+          "params": [
+            "today"
+          ],
+          "returns": "PeriodRule",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "defaultAnchor",
+          "params": [
+            "today"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "of",
+          "params": [
+            "id"
+          ],
+          "returns": "StoreFormat",
+          "isStatic": true,
+          "returnsSelf": true
+        },
+        {
+          "name": "nounFor",
+          "params": [
+            "formats"
+          ],
+          "returns": "string",
+          "isStatic": true,
+          "returnsSelf": false
+        },
+        {
+          "name": "listOf",
+          "params": [
+            "ids"
+          ],
+          "returns": "StoreFormat[]",
+          "isStatic": true,
+          "returnsSelf": false
         }
       ]
     },
@@ -2186,6 +2700,24 @@ export const MODEL_GRAPH: ModelGraph = {
           "name": "toDate",
           "params": [],
           "returns": "Date",
+          "isStatic": false,
+          "returnsSelf": false
+        },
+        {
+          "name": "addDays",
+          "params": [
+            "n"
+          ],
+          "returns": "WorkingDay",
+          "isStatic": false,
+          "returnsSelf": true
+        },
+        {
+          "name": "daysSince",
+          "params": [
+            "other"
+          ],
+          "returns": "number",
           "isStatic": false,
           "returnsSelf": false
         },
@@ -2758,6 +3290,30 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "relations": [
     {
+      "from": "ConfirmedSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "ConfirmedSchedule",
+      "to": "MonthlyStaffSchedule",
+      "kind": "references",
+      "via": "scheduleId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
+      "from": "ConfirmedSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
+    },
+    {
       "from": "ConstraintDelta",
       "to": "ConstraintViolation",
       "kind": "contains",
@@ -2814,6 +3370,22 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
+      "from": "FourWeekPeriod",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "start",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "FourWeekRule",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "anchor",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
       "from": "MonthlyStaffSchedule",
       "to": "ShiftAssignment",
       "kind": "contains",
@@ -2831,6 +3403,14 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "MonthlyStaffSchedule",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
       "to": "PrecedingMonthTail",
       "kind": "contains",
       "via": "precedingTail",
@@ -2844,6 +3424,14 @@ export const MODEL_GRAPH: ModelGraph = {
       "via": "requiredStaffing",
       "many": false,
       "foundBy": "type"
+    },
+    {
+      "from": "MonthlyStaffSchedule",
+      "to": "Store",
+      "kind": "references",
+      "via": "storeId",
+      "many": false,
+      "foundBy": "id-naming"
     },
     {
       "from": "MonthlyStaffSchedule",
@@ -2894,14 +3482,6 @@ export const MODEL_GRAPH: ModelGraph = {
       "foundBy": "id-naming"
     },
     {
-      "from": "ScheduleReport",
-      "to": "MonthlyStaffSchedule",
-      "kind": "references",
-      "via": "scheduleId",
-      "many": false,
-      "foundBy": "id-naming"
-    },
-    {
       "from": "ShiftAssignment",
       "to": "WorkingDay",
       "kind": "contains",
@@ -2935,11 +3515,51 @@ export const MODEL_GRAPH: ModelGraph = {
     },
     {
       "from": "StaffMonthlyShiftWish",
+      "to": "SchedulePeriod",
+      "kind": "contains",
+      "via": "period",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StaffMonthlyShiftWish",
       "to": "Staff",
       "kind": "references",
       "via": "staffId",
       "many": false,
       "foundBy": "id-naming"
+    },
+    {
+      "from": "Store",
+      "to": "StoreFormat",
+      "kind": "contains",
+      "via": "format",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "Store",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "periodRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "PeriodRule",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
+    },
+    {
+      "from": "StoreFormat",
+      "to": "WorkingDay",
+      "kind": "contains",
+      "via": "defaultRule",
+      "many": false,
+      "foundBy": "type"
     },
     {
       "from": "WorkingStaffGroup",
@@ -2984,23 +3604,22 @@ export const MODEL_GRAPH: ModelGraph = {
   ],
   "diagnostics": {
     "sourceRoot": "hotel-shift-puzzle-bubly/hotel-shift-puzzle-model/src/lib",
-    "fileCount": 46,
+    "fileCount": 50,
     "classesWithoutState": [
       "AllowedShiftConstraint",
+      "CalendarMonthRule",
       "MaxConsecutiveWorkdaysConstraint",
       "MaxDayOffPerDayConstraint",
       "MinMonthlyDayOffConstraint",
+      "PeriodRule",
       "RequiredStaffingConstraint",
+      "SchedulePeriod",
       "ShiftIntervalConstraint",
       "ShiftLeaderConstraint"
     ],
     "unresolvedTypes": [],
     "unresolvedIdFields": [
-      "ConstraintSet.linkedReportId",
-      "MonthlyStaffSchedule.storeId",
-      "PrecedingMonthTail.sourceReportId",
-      "ScheduleReport.storeId",
-      "ScheduleReport.worldLineNodeId",
+      "ConfirmedSchedule.worldLineNodeId",
       "WorkingStaffMember.allowedShiftIds"
     ]
   }

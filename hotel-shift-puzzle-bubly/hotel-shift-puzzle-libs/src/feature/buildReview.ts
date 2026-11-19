@@ -1,17 +1,17 @@
 /**
- * buildScheduleReport — シフト表確定時にレポートのデータを一括計算する
+ * buildReview — 確定するときに振り返りのデータを一括計算する
  *
- * 世界線ビューの「確定してレポート作成」から一度だけ呼ばれる純粋関数。
- * ScheduleReport（model層の不変集約）へそのまま渡せる draft を返す。
+ * 勤務表の「🏁 確定する」から呼ばれる純粋関数。
+ * ConfirmedSchedule（model層の不変集約）へそのまま渡せる draft を返す。
  *
  *   - #87 譲歩: 連勤・休日・希望など、勤務表に適用する制約一式（グリッドと同じ組み立て。
  *     `constraints` として渡す）を schedule.checkConstraints() にかけ、スタッフに紐づく
  *     違反（ConstraintViolation.staffId が付くもの）をすべて譲歩として数える。
  *     責任者不足・休み上限超過など日単位（誰のせいでもない）の違反は個人の譲歩に含めない。
  *   - #88 繁忙日: 稼働日ごとの必要人数合計が平均を上回る日を自動的に繁忙日とする。
- *   - #89 貢献度スコア: 譲歩回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
+ *   - #89 ★: 譲歩回数・繁忙日出勤回数の加重合計（シンプルな加重合計）。重みは
  *     model層の DEFAULT_COMPROMISE_WEIGHT/DEFAULT_BUSY_DAY_WEIGHT を確定時点の初期値として
- *     使う（確定後は ScheduleReport.reweight() でシフト管理者が調整できる）。
+ *     使う（確定後は ConfirmedSchedule.reweight() でシフト管理者が調整できる）。
  */
 import {
   MonthlyStaffSchedule,
@@ -20,10 +20,10 @@ import {
   type ScheduleConstraint,
   type CompromiseEntry,
   type BusyDayEntry,
-  type ContributionScoreEntry,
+  type StarEntry,
 } from "@bublys-org/hotel-shift-puzzle-model";
 
-export type BuildScheduleReportArgs = {
+export type BuildReviewArgs = {
   schedule: MonthlyStaffSchedule;
   /** スコアに含める全スタッフID（譲歩・繁忙日出勤が0件でもスコア0として載せる） */
   staffIds: string[];
@@ -31,10 +31,10 @@ export type BuildScheduleReportArgs = {
   constraints: ScheduleConstraint[];
 };
 
-export type ScheduleReportDraft = {
+export type ReviewDraft = {
   compromises: CompromiseEntry[];
   busyDayContributions: BusyDayEntry[];
-  contributionScores: ContributionScoreEntry[];
+  stars: StarEntry[];
 };
 
 /**
@@ -89,7 +89,7 @@ function computeContributionScores(
   staffIds: string[],
   compromises: CompromiseEntry[],
   busyDayContributions: BusyDayEntry[]
-): ContributionScoreEntry[] {
+): StarEntry[] {
   const compromiseCounts = new Map<string, number>();
   for (const c of compromises) {
     compromiseCounts.set(c.staffId, (compromiseCounts.get(c.staffId) ?? 0) + 1);
@@ -116,14 +116,14 @@ function computeContributionScores(
     .sort((a, b) => b.score - a.score);
 }
 
-/** 確定時に呼ぶ: 譲歩・繁忙日対応・貢献度スコアをまとめて計算する */
-export function buildScheduleReport(args: BuildScheduleReportArgs): ScheduleReportDraft {
+/** 確定時に呼ぶ: 譲歩・繁忙日対応・★をまとめて計算する */
+export function buildReview(args: BuildReviewArgs): ReviewDraft {
   const compromises = computeCompromises(args.schedule, args.constraints);
   const busyDayContributions = computeBusyDayContributions(args.schedule);
-  const contributionScores = computeContributionScores(
+  const stars = computeContributionScores(
     args.staffIds,
     compromises,
     busyDayContributions
   );
-  return { compromises, busyDayContributions, contributionScores };
+  return { compromises, busyDayContributions, stars };
 }

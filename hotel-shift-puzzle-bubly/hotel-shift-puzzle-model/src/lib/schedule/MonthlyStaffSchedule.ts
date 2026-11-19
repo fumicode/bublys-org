@@ -1,7 +1,9 @@
 /**
  * MonthlyStaffSchedule — 月間スタッフ勤務表（シフト表）
  *
- * ある店舗・ある月について、各スタッフが稼働日ごとにどうなる予定なのかを表す。
+ * ある店舗・ある期（{@link SchedulePeriod}）について、各スタッフが稼働日ごとにどうなる予定なのかを表す。
+ * 期はホテルなら暦月の期（1日〜月末）、行政なら4週の期。勤務表は期の種類を知らずに、
+ * 期が持つ日の並び（{@link SchedulePeriod.days}）を稼働日として扱う。
  * 例: 6/1 に Aさん=早番、Bさん=休み、Cさん=遅番。
  *
  * 各セル（スタッフ×稼働日）は次のいずれか:
@@ -18,6 +20,12 @@
  * 不変。更新メソッドは新しいインスタンスを返す。
  */
 import { WorkingDay } from "./WorkingDay.js";
+import {
+  type SchedulePeriod,
+  periodFieldsOf,
+  periodFromFields,
+  type PeriodFields,
+} from "./SchedulePeriod.js";
 import {
   ShiftAssignment,
   type ShiftAssignmentPlain,
@@ -40,10 +48,8 @@ export type MonthlyStaffScheduleState = {
   id: string;
   /** 店舗ID */
   storeId: string;
-  /** 対象年 */
-  year: number;
-  /** 対象月 1-12 */
-  month: number;
+  /** 対象の期 */
+  period: SchedulePeriod;
   /** この勤務表で働く人たち（勤務スタッフ群）のID。勤務表1つにつき1つ */
   workingStaffGroupId: string;
   /** この勤務表が満たすべき制約セットのID。勤務表1つにつき1つ */
@@ -59,12 +65,13 @@ export type MonthlyStaffScheduleState = {
   precedingTail?: PrecedingMonthTail;
 };
 
-/** シリアライズ用：入れ子まで全部 plain */
-export type MonthlyStaffSchedulePlain = {
+/**
+ * シリアライズ用：入れ子まで全部 plain。
+ * 期は暦月の期なら `year`/`month`、それ以外なら `period` で書く（{@link periodFieldsOf}）。
+ */
+export type MonthlyStaffSchedulePlain = PeriodFields & {
   id: string;
   storeId: string;
-  year: number;
-  month: number;
   /** 勤務スタッフ群のID。この集約より後から入れたので、古い記録には無い */
   workingStaffGroupId?: string;
   /** 制約セットのID。この集約より後から入れたので、古い記録には無い */
@@ -91,9 +98,6 @@ export function shiftCellsEqual(a: ShiftCell, b: ShiftCell): boolean {
   return shiftCellKey(a) === shiftCellKey(b);
 }
 
-/** 年月（"2026-6"）→ その月の稼働日。WorkingDay は不変なので使い回す（workingDays を参照） */
-const WORKING_DAYS_BY_MONTH = new Map<string, WorkingDay[]>();
-
 export class MonthlyStaffSchedule {
   constructor(readonly state: MonthlyStaffScheduleState) {}
 
@@ -101,8 +105,7 @@ export class MonthlyStaffSchedule {
   static create(params: {
     id: string;
     storeId: string;
-    year: number;
-    month: number;
+    period: SchedulePeriod;
     /** 省略時は勤務表と同じID（勤務表1つにつき群1つなので、別IDにする理由は普通は無い） */
     workingStaffGroupId?: string;
     /** 省略時は勤務表と同じID */
@@ -112,8 +115,7 @@ export class MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
       id: params.id,
       storeId: params.storeId,
-      year: params.year,
-      month: params.month,
+      period: params.period,
       workingStaffGroupId: params.workingStaffGroupId ?? params.id,
       constraintSetId: params.constraintSetId ?? params.id,
       assignments: [],
@@ -129,13 +131,9 @@ export class MonthlyStaffSchedule {
     return this.state.storeId;
   }
 
-  get year(): number {
-    return this.state.year;
-  }
-
-  /** 対象月 1-12 */
-  get month(): number {
-    return this.state.month;
+  /** 対象の期 */
+  get period(): SchedulePeriod {
+    return this.state.period;
   }
 
   /**
@@ -158,13 +156,6 @@ export class MonthlyStaffSchedule {
     return this.state.constraintSetId;
   }
 
-  /** 前の月（1月なら前年の12月） */
-  previousYearMonth(): { year: number; month: number } {
-    return this.state.month === 1
-      ? { year: this.state.year - 1, month: 12 }
-      : { year: this.state.year, month: this.state.month - 1 };
-  }
-
   // ========== 前月とのつなぎ ==========
 
   /** 前月の確定版から写し取った末尾（つないでいなければ undefined） */
@@ -174,13 +165,11 @@ export class MonthlyStaffSchedule {
 
   /**
    * 前月の末尾をつなぎ替えた新しい勤務表を返す。不変。undefined ならつなぎを外す。
-   * 末尾は今月の直前の月末で終わっていなければならない（間が空いたらひと続きと言えない）。
+   * 末尾はこの期の起点日の前日で終わっていなければならない（間が空いたらひと続きと言えない）。
    */
   withPrecedingTail(tail: PrecedingMonthTail | undefined): MonthlyStaffSchedule {
-    if (tail && !tail.directlyPrecedes(this.state.year, this.state.month)) {
-      throw new Error(
-        `前月の末尾が ${this.state.year}年${this.state.month}月の直前で終わっていません`
-      );
+    if (tail && !tail.directlyPrecedes(this.state.period)) {
+      throw new Error(`前の末尾が ${this.state.period.label} の直前で終わっていません`);
     }
     const next = { ...this.state };
     if (tail) next.precedingTail = tail;
@@ -190,21 +179,9 @@ export class MonthlyStaffSchedule {
 
   // ========== 稼働日 ==========
 
-  /** その月の全稼働日（1日〜末日） */
+  /** この期の全稼働日（起点日から順に）。呼び出し側が触れるよう毎回複製を返す */
   workingDays(): WorkingDay[] {
-    // 制約チェックは制約ごとにこれを呼ぶので、自動シフトや候補集合のように何千回も
-    // チェックすると、毎回30個の WorkingDay とそのキー文字列を作り直すのが効いてくる。
-    // WorkingDay は不変なので年月ごとに使い回す（配列は呼び出し側が触れるよう毎回複製する）。
-    const monthKey = `${this.state.year}-${this.state.month}`;
-    let days = WORKING_DAYS_BY_MONTH.get(monthKey);
-    if (!days) {
-      const lastDay = new Date(this.state.year, this.state.month, 0).getDate();
-      days = Array.from({ length: lastDay }, (_, i) =>
-        WorkingDay.of(this.state.year, this.state.month, i + 1)
-      );
-      WORKING_DAYS_BY_MONTH.set(monthKey, days);
-    }
-    return days.slice();
+    return this.state.period.days();
   }
 
   // ========== 割当 ==========
@@ -459,8 +436,8 @@ export class MonthlyStaffSchedule {
     return {
       id: this.state.id,
       storeId: this.state.storeId,
-      year: this.state.year,
-      month: this.state.month,
+      // 暦月の期は前と同じ year/month で書く（ホテルの勤務表の内容ハッシュを変えない）
+      ...periodFieldsOf(this.state.period),
       workingStaffGroupId: this.state.workingStaffGroupId,
       constraintSetId: this.state.constraintSetId,
       assignments: this.state.assignments.map((a) => a.toPlain()),
@@ -477,8 +454,7 @@ export class MonthlyStaffSchedule {
     return new MonthlyStaffSchedule({
       id: plain.id,
       storeId: plain.storeId,
-      year: plain.year,
-      month: plain.month,
+      period: periodFromFields(plain),
       // 勤務スタッフ群／制約セットより前に保存された勤務表は、自分と同じIDのものを指す
       // （作成時の既定と同じ）
       workingStaffGroupId: plain.workingStaffGroupId ?? plain.id,

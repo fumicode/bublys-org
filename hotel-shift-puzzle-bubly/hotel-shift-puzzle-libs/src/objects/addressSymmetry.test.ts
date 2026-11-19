@@ -8,7 +8,7 @@ import {
   computeStateHash,
   worldLineGraphSlice,
 } from "@bublys-org/world-line-graph";
-import { MonthlyStaffSchedule, Staff } from "@bublys-org/hotel-shift-puzzle-model";
+import { CalendarMonthPeriod, MonthlyStaffSchedule, Staff } from "@bublys-org/hotel-shift-puzzle-model";
 import { registerObjects } from "./framework.js";
 import {
   GLOBAL_WORKSHIFT_SET_ID,
@@ -73,7 +73,7 @@ describe("削除は保存と同じ住所へ届く", () => {
   it("★ 削除した勤務表は、その勤務表自身の世界線にも墓標が立つ", () => {
     const store = fakeStore();
     saveObject(store, STAFF_TYPE, new Staff({ id: "s1", name: "a" }));
-    const schedule = createSchedule(store, { storeId: "st", year: 2026, month: 6 });
+    const schedule = createSchedule(store, { storeId: "st", period: CalendarMonthPeriod.of(2026, 6) });
     const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
 
     removeObject(store, SCHEDULE_TYPE, schedule.state.id);
@@ -87,7 +87,7 @@ describe("削除は保存と同じ住所へ届く", () => {
   it("固定メンバーの削除は台帳だけを動かす（焼き付けた世界には届かない＝固定の意味）", () => {
     const store = fakeStore();
     saveObject(store, STAFF_TYPE, new Staff({ id: "s1", name: "a" }));
-    const schedule = createSchedule(store, { storeId: "st", year: 2026, month: 6 });
+    const schedule = createSchedule(store, { storeId: "st", period: CalendarMonthPeriod.of(2026, 6) });
     const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
     const before = store.nodeCount(scopeId);
 
@@ -103,7 +103,7 @@ describe("古い形式の作り直しは、正しく生まれた世界を巻き�
   it("★ 名簿が空のときに作った勤務表の履歴を、あとから人を足しても消さない", () => {
     const store = fakeStore();
     // 名簿が空のまま勤務表を作る＝固定メンバー0件で**正しく**生まれた世界
-    const schedule = createSchedule(store, { storeId: "st", year: 2026, month: 6 });
+    const schedule = createSchedule(store, { storeId: "st", period: CalendarMonthPeriod.of(2026, 6) });
     const scopeId = localScopeId(SCHEDULE_TYPE, schedule.state.id);
 
     let cur: MonthlyStaffSchedule = schedule;
@@ -207,8 +207,8 @@ describe("「読めない」と「無い」を分ける", () => {
   it("★ 判定は読んだのと同じスコープを見る（別スコープを見ると永久に「読み込み中」になる）", () => {
     const store = fakeStore();
     saveObject(store, STAFF_TYPE, new Staff({ id: "s1", name: "a" }));
-    const a = createSchedule(store, { storeId: "st", year: 2026, month: 6 });
-    const b = createSchedule(store, { storeId: "st", year: 2026, month: 7 });
+    const a = createSchedule(store, { storeId: "st", period: CalendarMonthPeriod.of(2026, 6) });
+    const b = createSchedule(store, { storeId: "st", period: CalendarMonthPeriod.of(2026, 7) });
     const inA = world(true, localScopeId(SCHEDULE_TYPE, a.state.id));
 
     // 別の勤務表は、この勤務表の世界には居ない。**でもグローバル台帳には居る。**

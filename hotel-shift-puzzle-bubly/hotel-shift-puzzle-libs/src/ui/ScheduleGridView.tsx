@@ -18,7 +18,7 @@ import {
   SHIFT_LEADER_CONSTRAINT,
   previewCellValues,
   type CellValuePreview,
-  type ScheduleReport,
+  type StarEntry,
   type DayOffStyle,
 } from "../domain/index.js";
 import {
@@ -108,8 +108,8 @@ type ScheduleGridViewProps = {
   leaderRules?: ShiftLeaderRule[];
   /** true なら footer を責任者ルールの ◯/✕ 行だけにする（必要人数・休み行を出さない）。抽出ビュー用 */
   leaderRulesOnlyFooter?: boolean;
-  /** 参照レポート。渡すと、スコアのある人の名前の横に貢献度スコア（＝休みの優先度）を出す */
-  referenceReport?: ScheduleReport;
+  /** 前月の確定版から引き継いだ★。渡すと、スコアのある人の名前の横に出す（＝休みの優先度） */
+  inheritedScores?: readonly StarEntry[];
   /**
    * スタッフ名から開くバブルの URL。省略時はスタッフの正規 URL（どの勤務表でもないスタッフ詳細）。
    * 勤務表から開くときは、その勤務表の文脈を持った URL を渡す。
@@ -233,7 +233,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
   workingStaffSlot,
   leaderRules = [],
   leaderRulesOnlyFooter = false,
-  referenceReport,
+  inheritedScores,
   staffUrlOf,
   onChangeCells,
   onChangeRequired,
@@ -548,7 +548,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
-          referenceReport={referenceReport}
+          inheritedScores={inheritedScores}
           staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
@@ -600,7 +600,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
           onToggleSelected={onToggleStaffSelected}
           leaderRules={leaderRules}
           onSelectRule={onSelectRule}
-          referenceReport={referenceReport}
+          inheritedScores={inheritedScores}
           staffUrl={staffUrlOf?.(staff.id)}
           focused={focusActive && !!selectedStaffIds?.has(staff.id)}
           dimmed={focusActive && !selectedStaffIds?.has(staff.id)}
@@ -673,7 +673,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
         {/* ヘッダ行: 左上の角 + 日付ヘッダ + 休合計 + 早番日数 */}
         <div className="e-corner">
           <span className="e-corner-title">
-            {schedule.year}年{schedule.month}月
+            {schedule.period.label}
           </span>
           {/* スタッフ列に効く操作（部署別・部署フィルタ・可能勤務帯）。スタッフ列の真上＝
               このコーナーセルに入れて、何に効く操作なのかを位置で示す。 */}
@@ -681,7 +681,7 @@ export const ScheduleGridView: FC<ScheduleGridViewProps> = ({
             <span className="e-corner-actions">{staffColumnActions}</span>
           )}
         </div>
-        <PrecedingHeadCells days={precedingDays} />
+        <PrecedingHeadCells days={precedingDays} previous={schedule.period.words.previous} />
         {days.map((day) => {
           const wd = day.weekday; // 0=日 6=土
           const warns = dayWarnings.get(day.key);

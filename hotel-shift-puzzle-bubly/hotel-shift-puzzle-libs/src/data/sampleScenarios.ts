@@ -31,6 +31,7 @@ import {
   StaffMonthlyShiftWish,
   WorkingDay,
   type ShiftCell,
+  CalendarMonthPeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { DAY_OFF_WISH } from "../ui/shiftWishOptions.js";
 import { sampleDemandFor } from "./sampleSchedule.js";
@@ -183,7 +184,7 @@ function dayOffWishLookup(
 ): (staffId: string, day: WorkingDay) => boolean {
   const byStaff = new Map(
     wishes
-      .filter((w) => w.year === YEAR && w.month === month)
+      .filter((w) => w.period.equals(CalendarMonthPeriod.of(YEAR, month)))
       .map((w) => [w.staffId, w])
   );
   return (staffId, day) =>
@@ -287,8 +288,7 @@ export function createMidMonthSchedule(params: ScenarioParams): MonthlyStaffSche
   const base = MonthlyStaffSchedule.create({
     id: MID_MONTH_SCHEDULE_ID,
     storeId: "store-1",
-    year: YEAR,
-    month: AUGUST,
+    period: CalendarMonthPeriod.of(YEAR, AUGUST),
     requiredStaffing: requiredStaffing(AUGUST),
   });
 
@@ -553,8 +553,7 @@ export function createEndgameSchedule(params: ScenarioParams): MonthlyStaffSched
   const base = MonthlyStaffSchedule.create({
     id: ENDGAME_SCHEDULE_ID,
     storeId: "store-1",
-    year: YEAR,
-    month: SEPTEMBER,
+    period: CalendarMonthPeriod.of(YEAR, SEPTEMBER),
     requiredStaffing: requiredStaffing(SEPTEMBER),
   });
 

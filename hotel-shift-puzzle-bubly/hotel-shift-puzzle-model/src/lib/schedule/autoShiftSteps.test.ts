@@ -8,6 +8,7 @@ import { fillDemandBalancedStep } from './fillDemandBalancedStep.js';
 import { AUTO_SHIFT_STEPS } from './autoShiftSteps.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 import type { AutoShiftContext, AutoShiftStep, DecodedWish } from './autoShiftStep.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('段階的な自動シフト（AutoShiftStep）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -20,8 +21,7 @@ describe('段階的な自動シフト（AutoShiftStep）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
       requiredStaffing: required,
     });
 

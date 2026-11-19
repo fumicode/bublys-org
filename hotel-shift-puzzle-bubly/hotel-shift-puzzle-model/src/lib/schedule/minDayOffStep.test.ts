@@ -7,6 +7,7 @@ import type { AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 import { PrecedingMonthTail } from './PrecedingMonthTail.js';
 import { MaxConsecutiveWorkdaysConstraint } from './MaxConsecutiveWorkdaysConstraint.js';
 import { DayOffStyle } from '../staff/DayOffStyle.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 describe('makeMinDayOffStep（月◯日休む）', () => {
   const workShifts = createDefaultWorkShifts();
   const shiftNameById = new Map(workShifts.map((w) => [w.id, w.name]));
@@ -17,8 +18,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   const ctxOf = (
@@ -155,11 +155,12 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
   describe('前月とつないだとき（月跨ぎ）', () => {
     /** 前月（5月）末に5連勤して終わった確定版 */
     const tail = () => {
-      let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+      let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) });
       for (let d = 27; d <= 31; d++) may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
       may = may.assignDayOff('A', WorkingDay.of(2026, 5, 26));
       return PrecedingMonthTail.capture({
-        sourceReportId: 'may:n',
+        source: { scheduleId: 'may', worldLineNodeId: 'n' },
+        stars: [],
         schedule: may,
         shiftNameOf: () => '早番',
         length: 7,
@@ -323,7 +324,7 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
     describe('月を跨いでもリセットしない', () => {
       /** 前月（5月）の末尾。lastOff なら末日が単発の休み、そうでなければ末日まで workdays 連勤 */
       const mayTail = (opts: { lastOff: boolean; workdays: number }) => {
-        let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', year: 2026, month: 5 });
+        let may = MonthlyStaffSchedule.create({ id: 'may', storeId: 'store-1', period: CalendarMonthPeriod.of(2026, 5) });
         const lastWork = opts.lastOff ? 30 : 31;
         for (let d = lastWork; d > lastWork - opts.workdays; d--) {
           may = may.assignShift('A', WorkingDay.of(2026, 5, d), 'early');
@@ -331,7 +332,8 @@ describe('makeMinDayOffStep（月◯日休む）', () => {
         may = may.assignDayOff('A', WorkingDay.of(2026, 5, lastWork - opts.workdays));
         if (opts.lastOff) may = may.assignDayOff('A', WorkingDay.of(2026, 5, 31));
         return PrecedingMonthTail.capture({
-          sourceReportId: 'may:n',
+          source: { scheduleId: 'may', worldLineNodeId: 'n' },
+          stars: [],
           schedule: may,
           shiftNameOf: () => '早番',
           length: 7,

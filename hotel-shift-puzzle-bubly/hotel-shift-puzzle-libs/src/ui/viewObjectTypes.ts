@@ -26,9 +26,6 @@ export const SCHEDULE_WORLD_LINE_VIEW_TYPE = "ScheduleWorldLine";
 /** キセキの木ビュー（世界線を木で描いた読み取り専用ビュー） */
 export const SCHEDULE_WORLD_LINE_TREE_VIEW_TYPE = "ScheduleWorldLineTree";
 
-/** シフト完成レポート一覧 */
-export const SCHEDULE_REPORT_LIST_VIEW_TYPE = "ScheduleReportList";
-
 /** 数と真偽で言い切れる制約1つ（連勤・休日・休み上限・希望）。バブルで開いて直す */
 export const CONSTRAINT_LIMIT_VIEW_TYPE = "ConstraintLimit";
 

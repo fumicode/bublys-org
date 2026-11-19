@@ -240,6 +240,26 @@ export function refsOfTypeInScope(
 }
 
 /**
+ * スコープの apex で**削除済み**（墓標）になっている、その型の ID。
+ *
+ * 「記録が無い」には、一度も記録していない／削除した、の2つがある。参照は追い出されず、
+ * 削除は墓標として残るので、この2つは参照で見分けられる（値が読めるかでは見分けない）。
+ */
+export function removedIdsOfTypeInScope(
+  store: StoreLike,
+  scopeId: string,
+  type: string
+): string[] {
+  const graph = graphOf(store, scopeId);
+  const apex = graph.state.apexNodeId;
+  if (!apex) return [];
+  return graph
+    .getStateRefsAt(apex)
+    .filter((r) => r.type === type && r.hash === TOMBSTONE_HASH)
+    .map((r) => r.id);
+}
+
+/**
  * そのオーナー型のスコープが生まれるとき焼き付ける、固定メンバーの参照。
  * グローバル（アプリ全体スコープ）の**現在の**参照をそのまま使う。値は読まない。
  */
@@ -393,7 +413,7 @@ export function readFromScope<T>(
 /**
  * スコープの**あるノード時点**から型・IDのオブジェクトを読む（非同期）。
  *
- * 確定した過去の版（確定レポートが指すノード）を、別の世界の中から読むためのもの。
+ * 確定した過去の版（確定版が指すノード）を、別の世界の中から読むためのもの。
  * 古いノードの値はメモリ上の CAS から追い出されていることが多いので、足りなければ
  * 永続ストア（IndexedDB）から取ってくる。取ってきた値は CAS へ載せ直す。
  * どこにも無ければ undefined（＝その版はもう復元できない）。

@@ -4,13 +4,13 @@ import { MaxConsecutiveWorkdaysConstraint } from "./MaxConsecutiveWorkdaysConstr
 import { MaxDayOffPerDayConstraint } from "./MaxDayOffPerDayConstraint.js";
 import type { ScheduleConstraint } from "./ScheduleConstraint.js";
 import { affectedCells } from "./affectedCells.js";
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe("affectedCells", () => {
   const schedule = MonthlyStaffSchedule.create({
     id: "sched-1",
     storeId: "store-1",
-    year: 2026,
-    month: 6, // 30日
+    period: CalendarMonthPeriod.of(2026, 6), // 30日
   });
   const changed = { staffId: "s1", day: WorkingDay.of(2026, 6, 10) };
   const staffIds = ["s1", "s2", "s3"];

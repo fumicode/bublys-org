@@ -9,14 +9,20 @@
  *   - useObject(type, id)     … 単体（クエリ・購読、読み取り専用）
  *   - useObjectShell(type, id)… シェル。object（現在値）と update（メソッド実行→自動保存）
  *   - useObjectRepo(type)     … 新規作成・削除（save / remove）
+ *   - useRemovedIds(type)     … 削除した ID（グローバル台帳の墓標）
  *
  * 書きは commit.ts が記述子の homeScope を見て fan-out する（本籍のローカル世界線＋
  * グローバル台帳）。グローバル台帳は「全世界の最新値インデックス」で、勤務表一覧や
  * スタッフ詳細のような**世界をまたぐ問い合わせ**がここを読む。
  */
 import { useMemo, useCallback } from "react";
-import { useAppStore } from "@bublys-org/state-management";
-import { APP_SCOPE_ID, saveObject, removeObject } from "./commit.js";
+import { useAppSelector, useAppStore } from "@bublys-org/state-management";
+import {
+  APP_SCOPE_ID,
+  removedIdsOfTypeInScope,
+  saveObject,
+  removeObject,
+} from "./commit.js";
 import { absentInReadScope, readScopeOf, useWorld } from "./world.js";
 
 export { APP_SCOPE_ID };
@@ -108,5 +114,23 @@ export function useObjectRepo<T>(type: string): {
       remove: (id: string) => removeObject(store, type, id),
     }),
     [store, type]
+  );
+}
+
+/**
+ * その型で**削除した** ID（グローバル台帳に墓標があるもの）。
+ *
+ * 「記録が無い」を、一度も記録していない／削除した、に分けたいときに使う
+ * （例: 店舗。削除した店舗の勤務表には「（削除された店舗）」と出す）。
+ * 削除はグローバル台帳にも届くので、台帳だけを見ればよい。
+ */
+export function useRemovedIds(type: string): ReadonlySet<string> {
+  const store = useAppStore();
+  // 台帳のグラフが変わったときだけ数え直す
+  const graphJson = useAppSelector((s) => s.worldLineGraph?.graphs?.[APP_SCOPE_ID]);
+  return useMemo(
+    () => new Set(removedIdsOfTypeInScope(store, APP_SCOPE_ID, type)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, type, graphJson]
   );
 }

@@ -1,66 +1,97 @@
 'use client';
 
-import { FC } from "react";
+import { FC, useMemo } from "react";
 import styled from "styled-components";
-import { ObjectView } from "@bublys-org/bubbles-ui";
-import { SCHEDULE_REPORT_LIST_VIEW_TYPE } from "../ui/viewObjectTypes.js";
 import {
   MonthlyStaffSchedule,
   ConstraintSet,
-  ScheduleReport,
+  ConfirmedSchedule,
+  HOTEL_FORMAT,
+  Store,
+  StoreFormat,
+  type SchedulePeriod,
 } from "@bublys-org/hotel-shift-puzzle-model";
 import { useAppStore } from "@bublys-org/state-management";
 import { ScheduleListView } from "../ui/ScheduleListView.js";
-import { useObject, useObjects, useObjectRepo } from "../objects/repository.js";
+import { useObject, useObjects, useObjectRepo, useRemovedIds } from "../objects/repository.js";
 import { createSchedule } from "./createSchedule.js";
+import { todayWorkingDay } from "./today.js";
+import { storesForNewSchedule } from "./storesForNewSchedule.js";
 import {
-  capturePrecedingTail,
-  confirmedAtOf,
-  referenceCandidates,
+  captureInheritance,
+  pendingInheritanceOf,
+  precedingConfirmedOf,
 } from "./precedingMonth.js";
 import {
   SCHEDULE_TYPE,
-  SCHEDULE_REPORT_TYPE,
+  STORE_TYPE,
+  CONFIRMED_SCHEDULE_TYPE,
   CONSTRAINT_SET_TYPE,
   GLOBAL_CONSTRAINT_SET_ID,
 } from "../objects/hotelObjects.js";
 
-type ScheduleCollectionProps = {
-  /** シフト完成レポート一覧バブルを開くハンドラ（次回シフト作成前の参照用） */
-  /** シフト完成レポート一覧のURL（ダブルクリックで開く先）。URL スキームは app 層の関心事 */
-  reportListUrl?: string;
-};
+const DEFAULT_FORMATS: readonly StoreFormat[] = [HOTEL_FORMAT];
 
-export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ reportListUrl }) => {
+export const ScheduleCollection: FC<{
+  /** このデプロイで選べる形態（組織の呼び方と、既定の店舗を出すかが決まる）。省略時はホテルだけ */
+  formats?: readonly StoreFormat[];
+}> = ({ formats = DEFAULT_FORMATS }) => {
   const store = useAppStore();
   const schedules = useObjects<MonthlyStaffSchedule>(SCHEDULE_TYPE);
   const scheduleActions = useObjectRepo<MonthlyStaffSchedule>(SCHEDULE_TYPE);
-  const reports = useObjects<ScheduleReport>(SCHEDULE_REPORT_TYPE);
+  const reports = useObjects<ConfirmedSchedule>(CONFIRMED_SCHEDULE_TYPE);
+  const recordedStores = useObjects<Store>(STORE_TYPE);
+  const removedStoreIds = useRemovedIds(STORE_TYPE);
+  const today = useMemo(() => todayWorkingDay(), []);
+  const stores = useMemo(
+    () =>
+      storesForNewSchedule(
+        recordedStores,
+        schedules,
+        removedStoreIds,
+        formats.some((f) => f.id === HOTEL_FORMAT.id)
+      ),
+    [recordedStores, schedules, removedStoreIds, formats]
+  );
+  const storeNameOf = (storeId: string) =>
+    Store.resolve(recordedStores, storeId, removedStoreIds).name;
   // 新しい勤務表はグローバルの制約セットを写して始まるので、何日写すかもそれで決める
   const globalConstraints = useObject<ConstraintSet>(CONSTRAINT_SET_TYPE, GLOBAL_CONSTRAINT_SET_ID);
 
   // 勤務表を作る＝その世界が生まれる。勤務表・勤務帯セット・可能勤務帯・固定メンバー
   // （そのときのスタッフ名簿）が1ノードにまとまる。詳しくは createSchedule.ts。
-  // 同じ店舗の前月に確定があれば、いちばん新しい確定を参照レポートとして紐づけ、
-  // その確定版の末尾を持って生まれる（precedingMonth.ts）。
-  const handleCreate = async (params: { storeId: string; year: number; month: number }) => {
-    const [latest] = referenceCandidates(reports, params, (r) => confirmedAtOf(store, r));
-    // 確定版が読めなくても勤務表は作る（参照だけ紐づけ、前月とはつながない）
-    const tail = latest
-      ? await capturePrecedingTail(
+  // 勤務表は、前月の確定版から引き継いで始まる（月末の勤務と★。precedingMonth.ts）。
+  const handleCreate = async (params: { storeId: string; period: SchedulePeriod }) => {
+    const confirmed = precedingConfirmedOf(reports, params);
+    // 確定版が読めなくても勤務表は作る（引き継がず、今月1日から数える。取り込みは後からできる）
+    const inheritance = confirmed
+      ? await captureInheritance(
           store,
-          latest,
+          confirmed,
           globalConstraints?.maxConsecutiveWorkdays ?? ConstraintSet.empty("").maxConsecutiveWorkdays
         ).catch((e) => {
           console.warn("前月の確定版を読み出せませんでした", e);
           return undefined;
         })
       : undefined;
-    createSchedule(store, {
-      ...params,
-      reference: latest ? { reportId: latest.report.id, tail } : undefined,
-    });
+    createSchedule(store, { ...params, inheritance });
   };
+
+  // 一覧に引き継ぎを直接出す（#231）。確定版を持つ勤務表には 🏁、取り込んでいない
+  // 前月の確定版がある勤務表には「新しい確定版あり」を添える
+  const confirmedScheduleIds = useMemo(
+    () => new Set(reports.map((r) => r.scheduleId)),
+    [reports]
+  );
+  const pendingScheduleIds = useMemo(
+    () =>
+      new Set(
+        schedules
+          .filter((s) => pendingInheritanceOf(precedingConfirmedOf(reports, s), s.precedingTail))
+          .map((s) => s.id)
+      ),
+    [schedules, reports]
+  );
 
   const handleRemove = (id: string) => {
     scheduleActions.remove(id);
@@ -70,25 +101,15 @@ export const ScheduleCollection: FC<ScheduleCollectionProps> = ({ reportListUrl 
     <StyledContainer>
       <div className="e-header">
         <h3>勤務表一覧 ({schedules.length})</h3>
-        {reportListUrl && (
-          <ObjectView
-            type={SCHEDULE_REPORT_LIST_VIEW_TYPE}
-            url={reportListUrl}
-            label="シフト完成レポート一覧"
-            openingPosition="bubble-side-right"
-            className="e-reports-slot"
-          >
-            <span
-              className="e-reports"
-              title="ダブルクリックでシフト完成レポート一覧を開く"
-            >
-              📋 シフト完成レポート一覧
-            </span>
-          </ObjectView>
-        )}
       </div>
       <ScheduleListView
         schedules={schedules}
+        confirmedScheduleIds={confirmedScheduleIds}
+        pendingScheduleIds={pendingScheduleIds}
+        stores={stores}
+        storeNoun={StoreFormat.nounFor(formats)}
+        storeNameOf={storeNameOf}
+        today={today}
         onCreate={handleCreate}
         onRemove={handleRemove}
       />
@@ -105,30 +126,6 @@ const StyledContainer = styled.div`
 
     h3 {
       margin: 0;
-    }
-
-    /* ObjectView のラッパ span。.e-header は flex なので、右寄せの指定は
-       中のチップではなくラッパ側に載せないと効かない */
-    .e-reports-slot {
-      margin-left: auto;
-    }
-
-    .e-reports {
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid #cfd8dc;
-      border-radius: 6px;
-      background: #fff;
-      color: #37474f;
-      font-size: 0.8em;
-      padding: 4px 10px;
-      cursor: pointer;
-      transition: background 0.1s, border-color 0.1s;
-
-      &:hover {
-        background: #eceff1;
-        border-color: #90a4ae;
-      }
     }
   }
 `;

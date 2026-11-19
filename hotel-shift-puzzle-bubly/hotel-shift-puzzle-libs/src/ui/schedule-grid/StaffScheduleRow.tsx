@@ -9,7 +9,7 @@ import type {
   ConstraintViolation,
   ShiftLeaderRule,
   ShiftCell,
-  ScheduleReport,
+  StarEntry,
   PrecedingMonthTail,
   DayOffStyle,
 } from "../../domain/index.js";
@@ -60,8 +60,8 @@ type StaffScheduleRowProps = {
   leaderRules?: ShiftLeaderRule[];
   /** 責任者バッジをクリックしたときに、そのルールの関係者を選択させるコールバック */
   onSelectRule?: (staffIds: string[]) => void;
-  /** 参照レポート。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
-  referenceReport?: ScheduleReport;
+  /** 前月の確定版から引き継いだ★。この人にスコアがあれば名前の横に出す（自動シフトで休みを優先する順） */
+  inheritedScores?: readonly StarEntry[];
   /** 名前から開くバブルの URL。省略時はスタッフの正規 URL */
   staffUrl?: string;
   /** 選択モード中で、この行が選択対象（強調＝少し浮かせる） */
@@ -116,7 +116,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
   onToggleSelected,
   leaderRules = [],
   onSelectRule,
-  referenceReport,
+  inheritedScores,
   staffUrl,
   focused,
   dimmed,
@@ -141,7 +141,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
     selected && maxConsecutive !== undefined
       ? runMarksOf(schedule, staff.id, days, maxConsecutive, dayOffTarget)
       : [];
-  const priority = referenceReport?.contributionScores.find((s) => s.staffId === staff.id);
+  const priority = inheritedScores?.find((s) => s.staffId === staff.id);
   return (
     <>
       {/* スタッフ名（行ヘッダ）: ObjectView でダブルクリック展開（bubble-side-left）/ ドラッグ。
@@ -192,10 +192,11 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
                   <DayOffStyleIcon dayOffStyle={dayOffStyle} />
                 </span>
               )}
-              {referenceReport && priority && priority.score > 0 && (
+              {priority && priority.score > 0 && (
                 <span
                   className="e-priority-badge"
-                  title={`参照レポート「${referenceReport.title}」の貢献度スコア ${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
+                  aria-label={`星${priority.score}`}
+                  title={`${schedule.period.words.previous}の確定版から引き継いだ★${priority.score}（譲歩${priority.compromiseCount}件・繁忙日${priority.busyDayCount}日）。高い人ほど自動シフトで休みを優先して取れます`}
                 >
                   ★{priority.score}
                 </span>
@@ -211,6 +212,7 @@ export const StaffScheduleRow: FC<StaffScheduleRowProps> = ({
           tail={precedingTail}
           staffId={staff.id}
           staffName={staff.name}
+          previous={schedule.period.words.previous}
           shiftMap={shiftMap}
           className={rowMod.trim() || undefined}
           runMarks={runMarks}

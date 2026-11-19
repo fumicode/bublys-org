@@ -4,6 +4,7 @@ import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { WorldLineGraph } from '../domain/WorldLineGraph.js';
 import { computeTreeLayout } from './treeLayout.js';
 import { computeOrganicTree, OrganicEdge } from './organicTree.js';
+import { MILESTONE_COLOR, milestoneFlagShape } from './milestoneMark.js';
 
 // ============================================================================
 // Types
@@ -18,6 +19,11 @@ export type WorldLineTreeViewProps = {
    * 呼び出し側でローカルに「選択中ノード」を保持して詳細表示する用途を想定。
    */
   onSelectNode?: (nodeId: string) => void;
+  /**
+   * 節目のノード（バブリが「この世界線の中で意味のある地点」と呼ぶもの）。旗を立てて描く
+   * （milestoneMark.ts）。何を節目とするかはバブリが決める。
+   */
+  milestoneNodeIds?: ReadonlySet<string>;
 };
 
 // ============================================================================
@@ -53,6 +59,7 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
   graph,
   getNodeLabel,
   onSelectNode,
+  milestoneNodeIds,
 }) => {
   const layout = useMemo(() => computeTreeLayout(graph), [graph.state]);
   const apexNodeId = graph.state.apexNodeId;
@@ -177,6 +184,10 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
                 />
               )}
 
+              {milestoneNodeIds?.has(id) && (
+                <MilestoneFlag x={node.x} y={node.y} r={NODE_RADIUS} style={fadeStyle} />
+              )}
+
               {/* クリック当たり判定（装飾の見た目に関わらず一定サイズを確保） */}
               <circle cx={node.x} cy={node.y} r={NODE_RADIUS + 4} fill="transparent" style={{ pointerEvents: 'all' }} />
 
@@ -190,6 +201,25 @@ export const WorldLineTreeView: FC<WorldLineTreeViewProps> = ({
         })}
       </svg>
     </div>
+  );
+};
+
+// ============================================================================
+// 節目の旗
+// ============================================================================
+
+const MilestoneFlag: FC<{ x: number; y: number; r: number; style?: React.CSSProperties }> = ({
+  x,
+  y,
+  r,
+  style,
+}) => {
+  const { pole, pennant } = milestoneFlagShape(x, y, r);
+  return (
+    <g style={style} pointerEvents="none">
+      <line {...pole} stroke={MILESTONE_COLOR} strokeWidth={1.4} strokeLinecap="round" />
+      <polygon points={pennant.map(([px, py]) => `${px},${py}`).join(' ')} fill={MILESTONE_COLOR} />
+    </g>
   );
 };
 

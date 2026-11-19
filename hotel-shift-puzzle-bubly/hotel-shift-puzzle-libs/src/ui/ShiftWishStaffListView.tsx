@@ -1,6 +1,7 @@
 'use client';
 
 import { FC } from "react";
+import type { SchedulePeriod } from "../domain/index.js";
 import styled from "styled-components";
 import PersonIcon from "@mui/icons-material/Person";
 import { ObjectView } from "@bublys-org/bubbles-ui";
@@ -13,9 +14,8 @@ import {
 import { STAFF_SHIFT_WISH_SHEET_VIEW_TYPE } from "./viewObjectTypes.js";
 
 type ShiftWishStaffListViewProps = {
-  year: number;
-  /** 1-12 */
-  month: number;
+  /** 希望を出す期 */
+  period: SchedulePeriod;
   /** スタッフ全員ぶんの行（希望をまだ聞いていない人も「未入力」で並ぶ） */
   rows: ShiftWishStaffRow[];
   /**
@@ -33,8 +33,7 @@ type ShiftWishStaffListViewProps = {
  * ない（別の人を見たければ、その人のバブルを開く）。
  */
 export const ShiftWishStaffListView: FC<ShiftWishStaffListViewProps> = ({
-  year,
-  month,
+  period,
   rows,
   wishUrl,
 }) => {
@@ -47,7 +46,7 @@ export const ShiftWishStaffListView: FC<ShiftWishStaffListViewProps> = ({
         <h3>
           シフト希望{" "}
           <span className="e-sub">
-            {year}年{month}月
+            {period.label}
           </span>
         </h3>
         <p className="e-progress">
@@ -102,7 +101,7 @@ export const ShiftWishStaffListView: FC<ShiftWishStaffListViewProps> = ({
                   <ObjectView
                     type={STAFF_SHIFT_WISH_SHEET_VIEW_TYPE}
                     url={wishUrl(row.staff.id)}
-                    label={`${row.staff.name}のシフト希望（${year}年${month}月）`}
+                    label={`${row.staff.name}のシフト希望（${period.label}）`}
                     openingPosition="bubble-side-right"
                   >
                     <span

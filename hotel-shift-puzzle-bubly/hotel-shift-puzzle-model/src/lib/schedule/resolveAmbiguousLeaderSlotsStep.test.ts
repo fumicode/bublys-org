@@ -4,6 +4,7 @@ import { createDefaultWorkShifts } from './WorkShift.js';
 import { makeResolveAmbiguousLeaderSlotsStep } from './resolveAmbiguousLeaderSlotsStep.js';
 import type { AmbiguousLeaderSlot, AutoShiftContext, DecodedWish } from './autoShiftStep.js';
 import { DayOffStyle } from '../staff/DayOffStyle.js';
+import { CalendarMonthPeriod } from "./SchedulePeriod.js";
 
 describe('makeResolveAmbiguousLeaderSlotsStep（残った責任者枠を決める）', () => {
   const workShifts = createDefaultWorkShifts(); // 早番 early / 中番 middle / 遅番 late
@@ -15,8 +16,7 @@ describe('makeResolveAmbiguousLeaderSlotsStep（残った責任者枠を決め�
     MonthlyStaffSchedule.create({
       id: 'sched-1',
       storeId: 'store-1',
-      year: 2026,
-      month: 6,
+      period: CalendarMonthPeriod.of(2026, 6),
     });
 
   const ctxOf = (
