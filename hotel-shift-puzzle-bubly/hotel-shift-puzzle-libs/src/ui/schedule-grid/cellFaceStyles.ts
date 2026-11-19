@@ -1,5 +1,11 @@
 import { css } from "styled-components";
-import { PROPOSAL_BORDER, VIOLATION, VIOLATION_STRONG } from "./cellSymbols.js";
+import {
+  OFF_RUN_COLOR,
+  PROPOSAL_BORDER,
+  RUN_TONE_COLOR,
+  VIOLATION,
+  VIOLATION_STRONG,
+} from "./cellSymbols.js";
 
 /**
  * セルの見た目（CellFace）のスタイル。勤務表のセルと、勤務割当のドロップダウンの選択肢が共有する。
@@ -246,6 +252,40 @@ export const cellFaceStyles = css`
 
     &:hover {
       height: 7px;
+    }
+  }
+
+  /* 連勤・連休の線（選択中のスタッフの行だけ。runMarkPlacement.ts）。赤帯と同じく末尾のセルから
+     --span 列ぶん左へ伸ばす。隣の塊と見分けられるよう右端を 1px 空ける。
+     連勤（2px 実線）: 何日目かで 緑＝上限-2日目まで → 黄緑＝上限-1日目 → 黄＝上限日目 と
+     じわっと変わる。変わり目は前の日へ寄せてあり、上限日目は大半が黄になる
+     （グラデーションは RunMarks.tsx が --run-* で組む）。上限+1日目からは濃い橙（違反なら赤帯が重なって赤になる）。
+     連休（2px 点線）: 水色＝2連休 / 青＝3連休以上 */
+  .e-run-bar {
+    --run-ok: ${RUN_TONE_COLOR.ok};
+    --run-near: ${RUN_TONE_COLOR.near};
+    --run-limit: ${RUN_TONE_COLOR.limit};
+    --run-over: ${RUN_TONE_COLOR.over};
+
+    position: absolute;
+    right: 1px;
+    bottom: 0;
+    width: calc(var(--span, 1) * (100% + 1px) - 2px);
+    height: 2px;
+    pointer-events: none;
+    z-index: 1;
+
+    /* 連休は点線にして、連勤の実線と形でも見分けられるようにする */
+    &.is-off-2,
+    &.is-off-long {
+      height: 0;
+      border-bottom: 2px dotted;
+    }
+    &.is-off-2 {
+      border-color: ${OFF_RUN_COLOR["off-2"]};
+    }
+    &.is-off-long {
+      border-color: ${OFF_RUN_COLOR["off-long"]};
     }
   }
 
